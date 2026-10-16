@@ -4,6 +4,16 @@ import { expect, test, type Page, type Route, type TestInfo } from "@playwright/
 import { deriveFileKey, intakeManifestDigest } from "../lib/intake-approval";
 import { intakePricingFingerprint } from "../lib/usage-pricing";
 import { installFixtureSession, installWorkspaceRoutes } from "./fixtures/workspace-fixture";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "../lib/intake-approval-rollout";
+
+/*
+  Every case here drives the source review (components/intake-triage-review.tsx). Since review 2
+  (FE-B2) the workspace mounts it only with the approval lineage on: its cost-approval wording is
+  founder-only, and production -- switch off -- ships main's single "Upload & compile" instead
+  (asserted in e2e/failure-states-audit.spec.ts). The component keeps its unit and interaction
+  suites in the default vitest run; this file runs again in the build that flips the switch.
+*/
+test.skip(!INTAKE_APPROVAL_ROLLOUT_ENABLED, "source review ships only with INTAKE_APPROVAL_ROLLOUT_ENABLED (off in production)");
 
 const PREFLIGHT_ID = "00000000-0000-4000-8000-000000000001";
 const RECEIPT_ID = "00000000-0000-4000-8000-000000000002";

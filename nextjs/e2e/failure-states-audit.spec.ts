@@ -23,6 +23,7 @@ import {
   installWorkspaceRoutes,
   sseFrames,
 } from "./fixtures/workspace-fixture";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "../lib/intake-approval-rollout";
 
 const JOB_ID = `cjob-${"a".repeat(32)}`;
 
@@ -36,15 +37,27 @@ const pdfFixture = (name = "audit-fixture.pdf") => ({
 type Page = import("@playwright/test").Page;
 
 /**
- * Select the fixture, open source review, and return the full-scope approval control.
+ * Select the fixture and return the control that uploads it.
  *
- * Production ships server triage off, so review answers INTAKE_TRIAGE_DISABLED and the panel falls
- * back to "Approve maximum & upload". That reply also says whether the whole-set approval lineage
- * exists (lib/intake-approval-rollout.ts). Off -- the production default -- the fallback uploads
- * file by file through /api/uploads/capability, exactly as main dbe22b1e does; on, it asks
- * /api/uploads/approval for the complete set first.
+ * With the approval lineage off (lib/intake-approval-rollout.ts) -- the production default -- that
+ * is main dbe22b1e's single "Upload & compile", which uploads file by file through
+ * /api/uploads/capability, and none of the source-review flow or its cost-approval wording renders
+ * (review 2, FE-B2: those words are founder-only). With the lineage on, the source review opens; the
+ * server's triage-disabled reply says whether the whole-set approval exists, and the panel falls back
+ * to "Approve maximum & upload".
  */
 async function openFallbackApproval(page: Page, approvalLineage: boolean) {
+  if (!INTAKE_APPROVAL_ROLLOUT_ENABLED) {
+    await page.goto("/workspace", { waitUntil: "domcontentloaded" });
+    await expect(page.locator(".workspace-intake")).toHaveAttribute("data-inventory-state", "ready");
+    await page.locator('input[type="file"][multiple]').first().setInputFiles(pdfFixture());
+    const preflight = page.getByRole("region", { name: "Compile preflight" });
+    await expect(preflight).toBeVisible();
+    // The dead end this file found at integration (see below), on main's control.
+    const upload = preflight.getByRole("button", { name: /Upload & compile/ });
+    await expect(upload, "an uncounted set must still be uploadable -- the quote is information, not authorisation").toBeEnabled();
+    return upload;
+  }
   await page.route("**/api/v1/uploads/triage/stage", route => route.fulfill({
     status: 404,
     json: { code: "INTAKE_TRIAGE_DISABLED", intakeApproval: approvalLineage ? "enabled" : "disabled" },
@@ -122,6 +135,26 @@ test("a refused intake ends in a sentence and a usable control, not a spinner", 
   await expect(page.getByText("Uploading & compiling…")).toHaveCount(0);
 });
 
+test("production stages with main's single control and none of the cost-approval wording", async ({ page }) => {
+  /*
+    Review 2 (FE-B2). Merging deploys production with the approval lineage off; the source review,
+    "Approve maximum & upload" and the customer-charge / operator-cost paragraphs are founder-only
+    wording and must not reach it. main dbe22b1e's staged panel is what ships.
+  */
+  test.skip(INTAKE_APPROVAL_ROLLOUT_ENABLED, "asserts the switch-off posture");
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page);
+  await openFallbackApproval(page, false);
+  const preflight = page.getByRole("region", { name: "Compile preflight" });
+  await expect(preflight.locator(".workspace-staged-summary")).toContainText("1 file staged. Nothing has been uploaded yet. Review the estimate, then upload and compile.");
+  await expect(page.locator("p.notice")).toContainText("1 supported file ready for preflight. Nothing has been uploaded or processed yet.");
+  await expect(preflight.getByRole("button", { name: "Review sources before processing" })).toHaveCount(0);
+  await expect(preflight.getByRole("button", { name: /Approve maximum/ })).toHaveCount(0);
+  for (const words of ["Customer page charge", "Operator infrastructure cost", "Full-scope legacy approval", "separate approvals"]) {
+    await expect(page.locator("body")).not.toContainText(words);
+  }
+});
+
 test("a refused intake says why", async ({ page }) => {
   /*
     Fixed at integration (stage 2 C7): the batch summary carries the per-file reasons, deduped,
@@ -143,6 +176,7 @@ test("a processing-ceiling refusal names the code and the limit", async ({ page 
 });
 
 test("a refused whole-set approval ends in a sentence and a usable control, not a spinner", async ({ page }) => {
+  test.skip(!INTAKE_APPROVAL_ROLLOUT_ENABLED, "whole-set approval UI ships only with INTAKE_APPROVAL_ROLLOUT_ENABLED (off in production)");
   const calls = await refuseApproval(page, "INTAKE_PRICE_STALE", 409);
   const notice = page.locator("p.notice");
   await expect(notice).toContainText("Pricing changed since this estimate");
@@ -153,6 +187,7 @@ test("a refused whole-set approval ends in a sentence and a usable control, not 
 });
 
 test("a processing-ceiling refusal keeps the complete set out and leaves a retry", async ({ page }) => {
+  test.skip(!INTAKE_APPROVAL_ROLLOUT_ENABLED, "whole-set approval UI ships only with INTAKE_APPROVAL_ROLLOUT_ENABLED (off in production)");
   /*
     The approval endpoint uses SOURCE_EXCEEDS_PROCESSING_CEILING (413) when a selected file is
     above the processor's supported byte/page ceiling. Keep this distinct from stale pricing.
@@ -170,6 +205,7 @@ test("a processing-ceiling refusal keeps the complete set out and leaves a retry
 });
 
 test("native fetch sends capability and reads approval state after a lost capability reply", async ({ page }) => {
+  test.skip(!INTAKE_APPROVAL_ROLLOUT_ENABLED, "whole-set approval UI ships only with INTAKE_APPROVAL_ROLLOUT_ENABLED (off in production)");
   await installFixtureSession(page);
   await installWorkspaceRoutes(page);
 

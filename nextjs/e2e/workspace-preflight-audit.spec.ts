@@ -22,6 +22,7 @@
 
 import { test, expect } from "@playwright/test";
 import { installFixtureSession, installWorkspaceRoutes } from "./fixtures/workspace-fixture";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "../lib/intake-approval-rollout";
 
 /* Two staged files: one accepted-but-lossy, one the intake cannot read at all. Bytes are
    irrelevant to every assertion below — the report is a manifest lookup on the MIME the browser
@@ -55,7 +56,8 @@ async function stage(page: import("@playwright/test").Page) {
   same three facts, in the new words, read off the 1aca28de row (Launch QA run 38835040264):
   "Not extracted: sheet names, cell addresses, formulas, ...", "Planned conversion to PDF before
   reading", "Expected output: page, paragraph text, Locations on the source page". The notice no
-  longer says "Nothing has been uploaded", so that half of the promise is asserted on the network.
+  says "Nothing has been uploaded" only with the approval lineage off (review 2, FE-B2), so that half of
+  the promise is also asserted on the network.
 */
 test("the preflight rows say what each staged file loses, before anything is uploaded", async ({ page }) => {
   const uploads: string[] = [];
@@ -76,7 +78,10 @@ test("the preflight rows say what each staged file loses, before anything is upl
   await expect(preflight).toContainText("supported formats carry a qualification receipt");
 
   // Nothing has left the browser. If this ever fails, the panel is no longer a preflight.
-  await expect(page.locator("p.notice")).toContainText("1 supported file selected for source review. Upload checks and full processing require separate approvals.");
+  // main's notice with the approval lineage off (production); the lineage's words only with it on.
+  await expect(page.locator("p.notice")).toContainText(INTAKE_APPROVAL_ROLLOUT_ENABLED
+    ? "1 supported file selected for source review. Upload checks and full processing require separate approvals."
+    : "Nothing has been uploaded or processed yet");
   expect(uploads, "staging a selection must not call an upload route").toEqual([]);
 });
 

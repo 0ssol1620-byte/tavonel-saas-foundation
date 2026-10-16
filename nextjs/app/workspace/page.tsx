@@ -18,6 +18,7 @@ import {
   estimateBillablePages,
   formatUsd,
   pageCountLabel,
+  quoteCompilePages,
   quoteIntakeManifest,
   intakePricingFingerprint,
   weakestConfidence,
@@ -2081,12 +2082,16 @@ export default function WorkspacePage() {
       if (prepared.files.length === 0) {
         setStagedSelection(prepared);
         setStagedSelectionRevision(crypto.randomUUID());
-        setNotice("No supported files were found in this selection. File selection does not upload bytes or authorize processing.");
+        setNotice(INTAKE_APPROVAL_ROLLOUT_ENABLED
+          ? "No supported files were found in this selection. File selection does not upload bytes or authorize processing."
+          : "No supported files were found. Nothing was uploaded or processed.");
         return;
       }
       setStagedSelection(prepared);
       setStagedSelectionRevision(crypto.randomUUID());
-      setNotice(`${prepared.files.length} supported file${prepared.files.length === 1 ? "" : "s"} selected for source review. Upload checks and full processing require separate approvals.`);
+      setNotice(INTAKE_APPROVAL_ROLLOUT_ENABLED
+        ? `${prepared.files.length} supported file${prepared.files.length === 1 ? "" : "s"} selected for source review. Upload checks and full processing require separate approvals.`
+        : `${prepared.files.length} supported file${prepared.files.length === 1 ? "" : "s"} ready for preflight. Nothing has been uploaded or processed yet.`);
     } catch (error) {
       if (controller.signal.aborted) return;
       setStagedSelection(null);
@@ -2094,8 +2099,8 @@ export default function WorkspacePage() {
       const reason = error instanceof Error ? error.message : "INVALID_SELECTION";
       // Cancelling is something the visitor did, not something that went wrong.
       setNotice(reason === "ARCHIVE_CANCELLED" || reason === "SELECTION_CANCELLED"
-        ? "File selection cancelled. Selection does not upload bytes or authorize processing."
-        : `File selection was blocked (${reason}). Selection does not upload bytes or authorize processing.`);
+        ? INTAKE_APPROVAL_ROLLOUT_ENABLED ? "File selection cancelled. Selection does not upload bytes or authorize processing." : "Selection cancelled. Nothing was uploaded."
+        : INTAKE_APPROVAL_ROLLOUT_ENABLED ? `File selection was blocked (${reason}). Selection does not upload bytes or authorize processing.` : `Preflight blocked this selection (${reason}). Nothing was uploaded.`);
     } finally {
       if (stagingAbortRef.current === controller) {
         setStaging(null);
@@ -2129,7 +2134,7 @@ export default function WorkspacePage() {
   const stagedUncounted = stagedEstimates.length - stagedCounted.length;
   // Files with an available page estimate only. Unknown files remain in the quote's maximum.
   const stagedPages = stagedCounted.reduce((total, estimate) => total + estimate.pages, 0);
-  const stagedManifestQuote = stagedSelection && stagedPageCounts?.length === stagedSelection.files.length
+  const stagedManifestQuote = INTAKE_APPROVAL_ROLLOUT_ENABLED && stagedSelection && stagedPageCounts?.length === stagedSelection.files.length
     ? quoteIntakeManifest(stagedSelection.files.map((entry, index) => ({
       bytes: entry.file.size,
       mimeType: entry.file.type || "application/octet-stream",
@@ -2137,7 +2142,9 @@ export default function WorkspacePage() {
       claimedBasis: stagedPageCounts[index] && "basis" in stagedPageCounts[index] ? stagedPageCounts[index].basis : null,
     })))
     : null;
-  const stagedQuote = stagedManifestQuote?.ok ? stagedManifestQuote.quote : null;
+  const stagedQuote: { estimatedUsd: number; maximumUsd: number } | null = INTAKE_APPROVAL_ROLLOUT_ENABLED
+    ? stagedManifestQuote?.ok ? stagedManifestQuote.quote : null
+    : quoteCompilePages(stagedPages);
   /*
     Audit D10. The counts above say how many files there are; this says what each one loses.
 
@@ -2338,7 +2345,8 @@ export default function WorkspacePage() {
       const quote = quoteIntakeManifest(files.map((file) => ({
         bytes: file.size, mimeType: file.type || "application/pdf", claimedPages: null, claimedBasis: null,
       })));
-      if (!quote.ok || !window.confirm(`Approve a maximum of ${formatUsd(quote.quote.maximumUsd)} for all ${files.length} public proof files?`)) return;
+      // The cost-approval prompt belongs to the approval lineage; switch off is main's direct upload.
+      if (INTAKE_APPROVAL_ROLLOUT_ENABLED && (!quote.ok || !window.confirm(`Approve a maximum of ${formatUsd(quote.quote.maximumUsd)} for all ${files.length} public proof files?`))) return;
       await uploadDocuments(files, null);
     } catch {
       setNotice("The public collection proof could not be prepared. Nothing was activated.");
@@ -3012,7 +3020,7 @@ export default function WorkspacePage() {
                     ? <h1 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : sourcePending === "terms_acceptance_required" ? "Start with your documents" : "See how a source becomes usable knowledge"}</h1>
                     : <h2 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : "See a compiled World"}</h2>}
                   <p>{customerDataAccess === "checking"
-                    ? "We are checking whether this workspace can receive files. This access check does not upload file bytes."
+                    ? INTAKE_APPROVAL_ROLLOUT_ENABLED ? "We are checking whether this workspace can receive files. This access check does not upload file bytes." : "We are checking whether this workspace can receive files. Nothing is being uploaded."
                     : customerDataAccess === "closed"
                       ? sourcePending === "terms_acceptance_required"
                         ? "Your account is ready. To process your own files, review and accept the processing terms."
@@ -3125,7 +3133,7 @@ export default function WorkspacePage() {
                   <p className="eyebrow">Opening archive</p>
                   <p>{staging.archive}</p>
                   <progress max={staging.total} value={staging.done} aria-label={`${staging.done} of ${staging.total} entries expanded`} />
-                  <p className="fine">{staging.done} of {staging.total} entries. This local expansion step does not upload file bytes.</p>
+                  <p className="fine">{staging.done} of {staging.total} entries. {INTAKE_APPROVAL_ROLLOUT_ENABLED ? "This local expansion step does not upload file bytes." : "Nothing has been uploaded."}</p>
                   <button type="button" onClick={() => stagingAbortRef.current?.abort()}>Cancel</button>
                 </div>
               ) : null}
@@ -3133,8 +3141,14 @@ export default function WorkspacePage() {
                 <div className="workspace-preflight" role="region" aria-label="Compile preflight">
                   <p className="eyebrow">Preflight</p>
                   <p className="workspace-staged-summary">
-                    <strong>{stagedSelection.files.length} file{stagedSelection.files.length === 1 ? "" : "s"} selected.</strong>{" "}
-                    Review files and the preliminary estimate below. The preliminary maximum covers every selected file, including files whose pages are unknown. Upload checks and full processing require separate approvals; bounded upload checks do not authorize OCR, parsing, or compile.
+                    {/* Approval-lineage wording ships with its switch; off is main's sentence (review 2, FE-B2). */}
+                    {INTAKE_APPROVAL_ROLLOUT_ENABLED ? <>
+                      <strong>{stagedSelection.files.length} file{stagedSelection.files.length === 1 ? "" : "s"} selected.</strong>{" "}
+                      Review files and the preliminary estimate below. The preliminary maximum covers every selected file, including files whose pages are unknown. Upload checks and full processing require separate approvals; bounded upload checks do not authorize OCR, parsing, or compile.
+                    </> : <>
+                      <strong>{stagedSelection.files.length} file{stagedSelection.files.length === 1 ? "" : "s"} staged.</strong>{" "}
+                      Nothing has been uploaded yet. Review the estimate, then upload and compile.
+                    </>}
                   </p>
                   <dl>
                     <div><dt>Files</dt><dd>{stagedSelection.files.length}</dd></div>
@@ -3149,7 +3163,7 @@ export default function WorkspacePage() {
                   </dl>
                   <p className="fine" aria-live="polite">
                     {!stagedPageCounts
-                      ? "Counting pages in this browser. This page-count step does not upload file bytes."
+                      ? INTAKE_APPROVAL_ROLLOUT_ENABLED ? "Counting pages in this browser. This page-count step does not upload file bytes." : "Counting the pages in these files. Nothing has been uploaded."
                       : stagedCounted.length === 0
                         ? "None of these files states a page count before it is read. Pages are counted while the documents are processed, and the estimate appears once there is a number to show."
                         : stagedConfidence === "verified"
@@ -3169,7 +3183,9 @@ export default function WorkspacePage() {
                       {stagedUncounted - stagedSpreadsheets === 1
                         ? "One other file states no page count"
                         : `${stagedUncounted - stagedSpreadsheets} other files state no page count`} before being read,
-                      each is included in the approved maximum at the full 80-page processing ceiling.
+                      {INTAKE_APPROVAL_ROLLOUT_ENABLED
+                        ? " each is included in the approved maximum at the full 80-page processing ceiling."
+                        : " so they are not in the total either. Their pages are counted while the documents are processed."}
                     </p>
                   ) : null}
                   {stagedPreflight.files.length > 0 ? (
@@ -3211,6 +3227,12 @@ export default function WorkspacePage() {
                       blocks is a corpus the compile step would refuse and a count still in
                       flight, both of which are answers rather than the absence of one.
                     */}
+                    {/*
+                      Review 2 (FE-B2): the source review and its cost-approval wording are the approval
+                      lineage's, and their words are founder-only. With the switch off this is main
+                      dbe22b1e's single control, its copy and its guard.
+                    */}
+                    {INTAKE_APPROVAL_ROLLOUT_ENABLED ? <>
                     <IntakeTriageReview
                       files={stagedSelection.files.map(({ file }) => ({
                         file,
@@ -3233,6 +3255,10 @@ export default function WorkspacePage() {
                       onProcessingApproval={startTriageCompile}
                     />
                     <button type="button" disabled={busy} onClick={() => { setStagedSelection(null); setStagedSelectionRevision(""); }}>Clear</button>
+                    </> : <>
+                    <button type="button" disabled={busy || !stagedPageCounts || !stagedVerdict.ok || !intakeOpen} onClick={() => void startStagedCompile()}>{busy ? "Uploading & compiling…" : "Upload & compile"}</button>
+                    <button type="button" onClick={() => setStagedSelection(null)}>Clear</button>
+                    </>}
                   </div>
                 </div>
               ) : null}
