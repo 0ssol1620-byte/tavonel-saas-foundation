@@ -1877,6 +1877,15 @@ export const FIX_ROUND_3_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/upload-release-route.switch-off.test.ts', 'lib/visual-refinement.test.ts',
 ]);
 export const FIX_ROUND_3_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/site-chrome-v2.spec.ts']);
+// PR #141 fix round 4 (review 3, CI-TI-1): the OpenAPI route publishes main's upload contract while the approval lineage is off.
+// main bcba7173's four OpenAPI suites return as .switch-off copies, and three head suites test the switch-on document under an
+// explicit switch mock. Each of the seven selects all seven. Test code only, so never nativeReuse.
+export const FIX_ROUND_4_AFFECTED_PATHS = Object.freeze([
+  'lib/openapi-compile-jobs.switch-off.test.ts', 'lib/openapi-compile-jobs.test.ts', 'lib/openapi-completeness.switch-off.test.ts',
+  'lib/openapi-completeness.test.ts', 'lib/openapi-response-shape.switch-off.test.ts', 'lib/openapi-routes.switch-off.test.ts',
+  'lib/openapi-routes.test.ts',
+]);
+export const FIX_ROUND_4_AFFECTED_UNIT_FILES = Object.freeze([...FIX_ROUND_4_AFFECTED_PATHS]);
 // PR #141's merge of main bcba7173 (Home Release 3, PR #150): the thirty changed endpoints no owner listed -- the Home and
 // Korean entry pages, the receipted measurement band (component, styles, data, its claims pack and suite, its receipt and research
 // note), the re-cut film posters with their lock file and README, the stage and copy modules, the evidence record, the public
@@ -2252,6 +2261,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // PR #141's merge of main bcba7173: the thirty exact repository paths above select their direct suites and six browser suites.
   affectedGroup('pr141-main-merge-bcba7173', new RegExp(`^(?:${exactPathAlternation(PR141_MAIN_MERGE_BCBA_AFFECTED_PATHS)})$`),
     { unitFiles: PR141_MAIN_MERGE_BCBA_AFFECTED_UNIT_FILES, browserFiles: PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES }),
+  // PR #141 fix round 4: the seven exact OpenAPI suites above select themselves.
+  affectedGroup('pr141-fix-round-4', new RegExp(`^nextjs/(?:${exactPathAlternation(FIX_ROUND_4_AFFECTED_PATHS)})$`),
+    { unitFiles: FIX_ROUND_4_AFFECTED_UNIT_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.

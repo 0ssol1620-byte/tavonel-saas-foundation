@@ -7109,7 +7109,8 @@ test('affected PR #141 fix owners: intake approval rollout, solutions proof and 
     EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES, EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_PATHS,
     LAUNCH_QA_PRODUCT_REPINS_AFFECTED_UNIT_FILES, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_BROWSER_FILES, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS,
     PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES, FIX_ROUND_3_AFFECTED_PATHS,
-    FIX_ROUND_3_AFFECTED_UNIT_FILES, FIX_ROUND_3_AFFECTED_BROWSER_FILES } = await import('./repair-scope.mjs');
+    FIX_ROUND_3_AFFECTED_UNIT_FILES, FIX_ROUND_3_AFFECTED_BROWSER_FILES, FIX_ROUND_4_AFFECTED_PATHS,
+    FIX_ROUND_4_AFFECTED_UNIT_FILES } = await import('./repair-scope.mjs');
   // Fix round 2: the Launch QA Product QA repins and the route-owned paper-product.css.
   for (const [group, paths, units, browsers] of [
     ['launch-qa-product-repins', LAUNCH_QA_PRODUCT_REPINS_AFFECTED_PATHS, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_UNIT_FILES, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_BROWSER_FILES],
@@ -7135,6 +7136,17 @@ test('affected PR #141 fix owners: intake approval rollout, solutions proof and 
     [['app/api/openapi/route.ts','app/api/v1/connections/[id]/sync/route.ts','app/api/v1/oauth-connectors/viewer-links/revoke/route.ts','app/chrome-v2.css','lib/connector-oauth-adapters.switch-off.test.ts','lib/connector-oauth-route.test.ts','lib/connector-oauth-store.test.ts','lib/connector-oauth-store.ts','lib/google-drive-viewer-link-off.test.ts','lib/pricing-plan-overview.test.ts','lib/sync-worker.switch-off.test.ts','lib/upload-confirm-route.switch-off.test.ts','lib/upload-release-route.switch-off.test.ts','public/developer/README.md'],
     ['lib/brand-marks.test.ts','lib/connector-oauth-adapters.switch-off.test.ts','lib/connector-oauth-callback-route.test.ts','lib/connector-oauth-route.test.ts','lib/connector-oauth-store.test.ts','lib/developer-distribution.test.ts','lib/google-drive-viewer-link-off.test.ts','lib/google-drive-viewer-link-request.test.ts','lib/intake-approval-rollout-off.test.ts','lib/openapi-completeness.test.ts','lib/openapi-contract.test.ts','lib/openapi-response-shape.test.ts','lib/openapi-routes.test.ts','lib/pricing-plan-overview.test.ts','lib/secret-scan.test.ts','lib/sync-worker.switch-off.test.ts','lib/upload-confirm-route.switch-off.test.ts','lib/upload-release-route.switch-off.test.ts','lib/visual-refinement.test.ts'],
     ['e2e/site-chrome-v2.spec.ts']]);
+  // Fix round 4: exactly these seven OpenAPI suites (main's four restored as .switch-off copies, three switch-on suites), each
+  // selecting all seven and no browser suite.
+  assert.deepEqual([[...FIX_ROUND_4_AFFECTED_PATHS], [...FIX_ROUND_4_AFFECTED_UNIT_FILES]], [['lib/openapi-compile-jobs.switch-off.test.ts', 'lib/openapi-compile-jobs.test.ts', 'lib/openapi-completeness.switch-off.test.ts', 'lib/openapi-completeness.test.ts', 'lib/openapi-response-shape.switch-off.test.ts', 'lib/openapi-routes.switch-off.test.ts', 'lib/openapi-routes.test.ts'], ['lib/openapi-compile-jobs.switch-off.test.ts', 'lib/openapi-compile-jobs.test.ts', 'lib/openapi-completeness.switch-off.test.ts', 'lib/openapi-completeness.test.ts', 'lib/openapi-response-shape.switch-off.test.ts', 'lib/openapi-routes.switch-off.test.ts', 'lib/openapi-routes.test.ts']]);
+  for (const path of FIX_ROUND_4_AFFECTED_PATHS) {
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles],
+      [[], ['pr141-fix-round-4'], [], [...FIX_ROUND_4_AFFECTED_UNIT_FILES].sort(), []], path);
+  }
+  for (const adjacent of ['nextjs/lib/openapi-routes.switch-off.test.tsx', 'nextjs/lib/openapi-completeness-2.test.ts', 'nextjs/lib/openapi-contract.switch-off.test.ts']) {
+    assert.deepEqual(affectedMap([affectedRecord('A', [adjacent], '000000')]).failures, [`unmapped changed endpoint: ${adjacent}`], adjacent);
+  }
   for (const adjacent of ['nextjs/components/compile-stage.tsx.bak', 'nextjs/e2e/pipeline-board-2.spec.ts', 'nextjs/components/explore/explore-stage-2.tsx',
     'nextjs/lib/sync-worker.switch-off.test.tsx', 'nextjs/app/chrome-v2.css.bak', 'nextjs/lib/connector-oauth-store-2.ts']) {
     assert.deepEqual(affectedMap([affectedRecord('A', [adjacent], '000000')]).failures, [`unmapped changed endpoint: ${adjacent}`], adjacent);
