@@ -143,6 +143,10 @@ class ReviewRequiredError(AgentError):
     """The caller must decide; the message is safe to print and says what to do next."""
 
 
+class ApprovalDisabled(AgentError):
+    """The Foundation answered INTAKE_APPROVAL_DISABLED: whole-set approval is not enabled there."""
+
+
 def canonical(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
@@ -186,6 +190,11 @@ def intake_manifest_digest(entries: list[dict[str, Any]]) -> str:
 def approved_source_idempotency_key(attempt_key: str, file_key: str) -> str:
     """The capability's x-tavonel-source-idempotency-key, recomputed by the server from the member."""
     return sha256("\x1f".join(("tavonel-approved-source-v1", attempt_key, file_key)))
+
+
+def per_file_source_idempotency_key(connection_id: str, native_id: str, revision: object) -> str:
+    """The key the per-file path derives a document from: one per (connection, source, revision)."""
+    return sha256("\x1f".join((connection_id, native_id, str(revision))))
 
 
 def intake_manifest_entry(native_id: str, item: dict[str, object]) -> dict[str, Any]:
@@ -364,7 +373,11 @@ class FoundationClient:
         return value
 
     def read_approval(self, attempt_key: str) -> dict[str, Any] | None:
-        """The committed state of one attempt, or None when the Foundation holds no such attempt."""
+        """The committed state of one attempt, or None when the Foundation holds no such attempt.
+
+        A Foundation without whole-set approval answers 404 INTAKE_APPROVAL_DISABLED and holds no
+        attempt either, so that is None too; create_approval is where the per-file switch is made.
+        """
         status, value = self._exchange(
             "GET", "/api/v1/uploads/approval?attemptKey=" + urllib.parse.quote(attempt_key, safe=""),
         )
@@ -394,6 +407,8 @@ class FoundationClient:
                 "approval reply was lost before it committed; the retry re-reads, then re-sends the same saved approval"
             )
         code = response_code(value, status)
+        if status == 404 and code == "INTAKE_APPROVAL_DISABLED":
+            raise ApprovalDisabled(code)
         if code in STALE_APPROVAL_CODES:
             raise ReviewRequiredError(
                 f"the saved quote is no longer the Foundation's price ({code}); nothing was approved or reserved. "
@@ -515,35 +530,7 @@ class FoundationClient:
         ):
             raise AgentError("upload capability does not match the approved member")
         record("put_sent")
-        before = path.stat()
-        refused: int | None = None
-        with path.open("rb") as source:
-            request = urllib.request.Request(  # noqa: S310 - capability URL validated above.
-                upload_url,
-                data=source,
-                method="PUT",
-                # Signed URL only: the Foundation bearer token never travels to the object store.
-                headers={"content-type": member["mimeType"], "content-length": str(size)},
-            )
-            try:
-                with self.opener.open(  # noqa: S310 - validated capability URL.
-                    request, timeout=self.timeout
-                ) as response:
-                    if response.status not in {200, 201, 204}:
-                        raise AgentError(f"direct upload returned HTTP {response.status}")
-            except urllib.error.HTTPError as exc:
-                exc.close()
-                if exc.code in {408, 429} or exc.code >= 500:
-                    raise RetryableAgentError(f"direct upload returned HTTP {exc.code}") from exc
-                if exc.code < 400:
-                    raise AgentError(f"direct upload returned HTTP {exc.code}") from exc
-                refused = exc.code
-            except (OSError, http.client.HTTPException) as exc:
-                # The object may exist now, so its hold is never released on this path.
-                raise RetryableAgentError("direct upload network request failed") from exc
-        after = path.stat()
-        if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
-            raise AgentError(f"{path.name!r} changed during upload")
+        refused = self._put(path, upload_url, member["mimeType"], size)
         if refused is not None:
             self._release(attempt_key, attempt["scopeDigest"], file_key, document_id, refused)
         record("confirm_sent")
@@ -577,6 +564,85 @@ class FoundationClient:
             raise RetryableAgentError(
                 "upload confirmation reply was lost; the retry re-reads the approval before reusing the same member"
             )
+        raise refusal("upload confirmation", response_code(value, status))
+
+    def _put(self, path: Path, upload_url: str, mime_type: str, size: int) -> int | None:
+        """The direct PUT to a validated signed URL; returns the status of a definitive 4xx refusal."""
+        before = path.stat()
+        refused: int | None = None
+        with path.open("rb") as source:
+            request = urllib.request.Request(  # noqa: S310 - capability URL validated by the caller.
+                upload_url,
+                data=source,
+                method="PUT",
+                # Signed URL only: the Foundation bearer token never travels to the object store.
+                headers={"content-type": mime_type, "content-length": str(size)},
+            )
+            try:
+                with self.opener.open(  # noqa: S310 - validated capability URL.
+                    request, timeout=self.timeout
+                ) as response:
+                    if response.status not in {200, 201, 204}:
+                        raise AgentError(f"direct upload returned HTTP {response.status}")
+            except urllib.error.HTTPError as exc:
+                exc.close()
+                if exc.code in {408, 429} or exc.code >= 500:
+                    raise RetryableAgentError(f"direct upload returned HTTP {exc.code}") from exc
+                if exc.code < 400:
+                    raise AgentError(f"direct upload returned HTTP {exc.code}") from exc
+                refused = exc.code
+            except (OSError, http.client.HTTPException) as exc:
+                # The object may exist now, so its hold is never released on this path.
+                raise RetryableAgentError("direct upload network request failed") from exc
+        after = path.stat()
+        if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+            raise AgentError(f"{path.name!r} changed during upload")
+        return refused
+
+    def upload_per_file(self, path: Path, entry: dict[str, Any], source_key: str) -> str:
+        """main's per-file path, for a Foundation that answered INTAKE_APPROVAL_DISABLED.
+
+        A capability without an attempt identity, the direct PUT, then a confirmation naming only
+        the document and its digest. The Foundation derives the document from the source key, so a
+        retry lands on the same document rather than a second one.
+        """
+        size = path.stat().st_size
+        if size != entry["byteLength"]:
+            raise AgentError("sealed source does not match its quoted length")
+        status, value = self._exchange(
+            "POST",
+            "/api/v1/uploads/capability",
+            {"originalFilename": entry["originalFilename"], "declaredMimeType": entry["mimeType"], "requestedBytes": size},
+            {"x-tavonel-source-idempotency-key": source_key},
+        )
+        if reply_uncertain(status):
+            raise RetryableAgentError("upload capability reply was lost; the retry derives the same document")
+        if status != 200 or value is None:
+            raise refusal("upload capability", response_code(value, status))
+        upload_url = value.get("uploadUrl")
+        document_id = value.get("documentId")
+        if not isinstance(upload_url, str) or not safe_url(upload_url):
+            raise AgentError("upload capability URL is invalid")
+        if (
+            not isinstance(document_id, str) or UUID_PATTERN.match(document_id) is None
+            or value.get("contentLength") != size or value.get("declaredMimeType") != entry["mimeType"]
+        ):
+            raise AgentError("upload capability does not match the file")
+        refused = self._put(path, upload_url, entry["mimeType"], size)
+        if refused is not None:
+            # As main's agent: no release call; the hold lapses and a rerun reuses this document.
+            raise AgentError(f"direct upload returned HTTP {refused}")
+        status, value = self._exchange(
+            "POST", "/api/v1/uploads/confirm", {"documentId": document_id, "sourceSha256": entry["contentSha256"]},
+        )
+        result = value.get("result") if value is not None else None
+        if (
+            status == 200 and isinstance(result, dict) and value is not None and value.get("code") == "UPLOAD_CONFIRMED"
+            and result.get("status") == "confirmed" and result.get("documentId") == document_id
+        ):
+            return document_id
+        if status == 200 or reply_uncertain(status):
+            raise RetryableAgentError("upload confirmation reply was lost; the retry confirms the same document")
         raise refusal("upload confirmation", response_code(value, status))
 
 
@@ -2454,6 +2520,8 @@ def check_intake(intake: dict[str, Any], files: dict[str, Any]) -> None:
             and (quote is None or (isinstance(quote["pricingFingerprint"], str) and _count(quote["quote"]["maximumCredits"])))
             and (approval is None or all(isinstance(approval[name], str) for name in ("approvalId", "scopeDigest", "pricingFingerprint")))
             and "previousCursorSha256" in intake and "nextCursorSha256" in intake and "approvalBody" in intake
+            # A set switched to the per-file path never holds an approval.
+            and type(intake.get("perFile", False)) is bool and not (intake.get("perFile") and approval is not None)
         )
         digest_matches = valid and intake_manifest_digest(manifest) == intake["clientManifestDigest"]
     except (KeyError, TypeError, AttributeError):
@@ -2591,7 +2659,8 @@ def approve_and_upload(
         intake["allowUnknownPageCount"] = allow_unknown
         write_journal(pending_path, pending)
     approval = None
-    if resumed and (intake["approvalPosted"] or intake["approval"] is not None):
+    per_file = intake.get("perFile") is True
+    if resumed and not per_file and (intake["approvalPosted"] or intake["approval"] is not None):
         # A reload never guesses: it reads this same attempt's committed state first.
         approval = client.read_approval(intake["attemptKey"])
         if approval is None and intake["approval"] is not None:
@@ -2613,6 +2682,8 @@ def approve_and_upload(
                 f"quote, then rerun with --approve-up-to-credits {quoted['maximumCredits']} or more to approve "
                 f"this same saved set, or {DISCARD_HINT}"
             )
+        if per_file:
+            return upload_set_per_file(args, client, pending_path, pending, root=root, cloud=cloud)
         if not intake["approvalPosted"]:
             intake["approvalBody"] = {
                 "attemptKey": intake["attemptKey"],
@@ -2623,7 +2694,12 @@ def approve_and_upload(
             }
             intake["approvalPosted"] = True
             write_journal(pending_path, pending)
-        approval = client.create_approval(intake["approvalBody"])
+        try:
+            approval = client.create_approval(intake["approvalBody"])
+        except ApprovalDisabled:
+            # Nothing was approved or reserved; the quoted set goes through main's per-file path.
+            intake["perFile"] = True
+            return upload_set_per_file(args, client, pending_path, pending, root=root, cloud=cloud)
     held = verify_approval(intake, approval, cap)
     if intake["approval"] is None:
         intake["approval"] = {
@@ -2676,7 +2752,60 @@ def approve_and_upload(
         if document_id != member["documentId"]:
             raise AgentError("Foundation confirmed a different document than the approved member")
         record("confirmed")
-    documents = {member["nativeId"]: member["documentId"] for member in members.values()}
+    return commit_intake(args, client, pending_path, pending)
+
+
+def upload_set_per_file(
+    args: argparse.Namespace,
+    client: FoundationClient,
+    pending_path: Path,
+    pending: dict[str, Any],
+    *,
+    root: _HeldRoot | None,
+    cloud: Any = None,
+) -> dict[str, object]:
+    """The saved, quoted set through main's per-file path, once approval answered INTAKE_APPROVAL_DISABLED.
+
+    Each source key is main's (connection, source, revision) derivation, so every retry reaches the
+    same document, and a member already confirmed is never uploaded again.
+    """
+    intake = pending["intake"]
+    members = intake["members"]
+    print(canonical({
+        "status": "uploading_per_file", "code": "INTAKE_APPROVAL_DISABLED", "fileCount": len(intake["manifest"]),
+        "detail": "whole-set intake approval is not enabled on this Foundation; uploading each file with its own upload capability",
+    }), flush=True)
+    keys = {
+        member["nativeId"]: per_file_source_idempotency_key(
+            args.connection_id, member["nativeId"], pending["files"][member["nativeId"]]["revision"],
+        )
+        for member in members.values()
+    }
+    for event in intake["events"]:
+        if event["nativeId"] in keys:
+            event["sourceIdempotencyKey"] = keys[event["nativeId"]]
+    # The switch and every source key are durable before the first capability is requested.
+    write_journal(pending_path, pending)
+    for entry in intake["manifest"]:
+        member = members[entry["fileKey"]]
+        if member["phase"] == "confirmed":
+            continue
+        if root is None and cloud is None:
+            cloud = s3_client(args)
+        source, cleanup = sealed_source(args, root, cloud, member["nativeId"], pending["files"][member["nativeId"]], entry)
+        try:
+            member["documentId"] = client.upload_per_file(source, entry, keys[member["nativeId"]])
+        finally:
+            cleanup()
+        member["phase"] = "confirmed"
+        write_journal(pending_path, pending)
+    return commit_intake(args, client, pending_path, pending)
+
+
+def commit_intake(args: argparse.Namespace, client: FoundationClient, pending_path: Path, pending: dict[str, Any]) -> dict[str, object]:
+    """Every member is confirmed: bind the documents into the saved batch and commit it."""
+    intake = pending["intake"]
+    documents = {member["nativeId"]: member["documentId"] for member in intake["members"].values()}
     events = [
         dict(event, documentId=documents[event["nativeId"]]) if event["nativeId"] in documents else event
         for event in intake["events"]

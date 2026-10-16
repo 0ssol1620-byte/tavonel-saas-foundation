@@ -230,7 +230,7 @@ export async function GET(request: Request) {
         get: {
           operationId: "getUploadApproval",
           summary: "Read an upload attempt's approval state",
-          description: "Read the caller's saved attempt by its stable attemptKey. Use this after reload or an uncertain approval or confirmation reply before retrying; the response preserves the committed scope, pricing fingerprint and per-file document identities.",
+          description: "Read the caller's saved attempt by its stable attemptKey. Use this after reload or an uncertain approval or confirmation reply before retrying; the response preserves the committed scope, pricing fingerprint and per-file document identities. While whole-set intake approval is not enabled this answers 404 INTAKE_APPROVAL_DISABLED; request an upload capability per file without an attempt identity instead.",
           tags: ["Documents"],
           "x-tavonel-scope": "documents:intake",
           parameters: [{ name: "attemptKey", in: "query", required: true, schema: { type: "string", minLength: 16, maxLength: 128 } }],
@@ -238,6 +238,7 @@ export async function GET(request: Request) {
             "200": ok("The current state of this caller's attempt, including its stable approval, scope and per-file document identities. Read after a reload or an uncertain approval/confirmation reply.", { type: "object", required: ["code", "approval"], properties: { code: { const: "INTAKE_APPROVAL" }, approval: { $ref: "#/components/schemas/UploadApproval" } } }, { code: "INTAKE_APPROVAL", approval: { approvalId: "22222222-2222-4222-8222-222222222222", attemptKey: "att_0123456789abcdef0123456789abcdef", clientManifestDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", scopeDigest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", pricingFingerprint, state: "approved", aggregateMaximumCredits: sampleQuote.maximumCredits, files: [{ fileKey: "fk_0123456789abcdef0123456789abcdef01234567", documentId: "33333333-3333-4333-8333-333333333333", fileState: "approved", approvedMaximumCredits: sampleFileQuote.maximumCredits }] } }),
             "400": err("INTAKE_APPROVAL_INVALID"),
             "401": err("AUTH_REQUIRED", "API_KEY_INVALID", "API_KEY_EXPIRED", "API_KEY_REVOKED"),
+            "404": err("INTAKE_APPROVAL_DISABLED"),
           },
         },
         post: {
@@ -245,7 +246,7 @@ export async function GET(request: Request) {
           summary: "Approve one complete quoted upload set",
           tags: ["Documents"],
           "x-tavonel-scope": "documents:intake",
-          description: "The caller supplies the exact whole-set manifest, the quoted pricing fingerprint and its exact aggregate maximum. The server recomputes pricing and atomically records one approval and all file identities. A changed quote is returned as a conflict and is never approved implicitly.",
+          description: "The caller supplies the exact whole-set manifest, the quoted pricing fingerprint and its exact aggregate maximum. The server recomputes pricing and atomically records one approval and all file identities. A changed quote is returned as a conflict and is never approved implicitly. While whole-set intake approval is not enabled this answers 404 INTAKE_APPROVAL_DISABLED and approves nothing; request an upload capability per file without an attempt identity instead.",
           requestBody: { required: true, content: { "application/json": { schema: {
             type: "object", required: ["attemptKey", "clientManifestDigest", "pricingFingerprint", "aggregateMaximumCredits", "files"], additionalProperties: false,
             properties: { attemptKey: { type: "string", minLength: 16, maxLength: 128 }, clientManifestDigest: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, pricingFingerprint: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, aggregateMaximumCredits: { type: "integer", minimum: 0 }, files: { type: "array", minItems: 1, maxItems: MAX_APPROVAL_FILES, items: { $ref: "#/components/schemas/IntakeManifestEntry" } } },
@@ -254,6 +255,7 @@ export async function GET(request: Request) {
             "200": ok("The committed approval, stable document ids, and exact quote the caller approved.", { type: "object", required: ["code", "approval", "quote"], properties: { code: { const: "INTAKE_APPROVED" }, approval: { $ref: "#/components/schemas/UploadApproval" }, quote: { $ref: "#/components/schemas/UploadQuoteTotals" } } }, { code: "INTAKE_APPROVED", approval: { approvalId: "22222222-2222-4222-8222-222222222222", attemptKey: "att_0123456789abcdef0123456789abcdef", clientManifestDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", scopeDigest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", pricingFingerprint, state: "approved", aggregateMaximumCredits: sampleQuote.maximumCredits, files: [{ fileKey: "fk_0123456789abcdef0123456789abcdef01234567", documentId: "33333333-3333-4333-8333-333333333333", fileState: "approved", approvedMaximumCredits: sampleFileQuote.maximumCredits }] }, quote: { maximumPages: sampleQuote.maximumPages, reservedCredits: sampleQuote.reservedCredits, maximumCredits: sampleQuote.maximumCredits, estimatedUsd: sampleQuote.estimatedUsd, maximumUsd: sampleQuote.maximumUsd } }),
             "400": err("INTAKE_APPROVAL_INVALID", "INTAKE_APPROVAL_DUPLICATE_FILE", "INTAKE_APPROVAL_MIME_NOT_NORMALIZED", "INTAKE_APPROVAL_MANIFEST_MISMATCH", "INTAKE_APPROVAL_AGGREGATE_MISMATCH", "UNQUALIFIED_MIME", "FILENAME_MIME_MISMATCH", "INVALID_FILENAME"),
             "401": err("AUTH_REQUIRED", "API_KEY_INVALID", "API_KEY_EXPIRED", "API_KEY_REVOKED"),
+            "404": err("INTAKE_APPROVAL_DISABLED"),
             "409": err("INTAKE_PRICE_STALE", "INTAKE_APPROVAL_AGGREGATE_MISMATCH", "INTAKE_APPROVAL_AGGREGATE_EXCEEDED", "INTAKE_APPROVAL_CONFLICT"),
             "503": err("INTAKE_DISABLED", "INTAKE_APPROVAL_UNKNOWN_CEILING_REQUIRED", "COMPUTE_LEDGER_NOT_CONFIGURED", "INTAKE_APPROVAL_LEDGER_FAILED", "INTAKE_APPROVAL_RECEIPT_INVALID"),
           },
@@ -275,6 +277,7 @@ export async function GET(request: Request) {
             "400": err("INTAKE_APPROVAL_CANCEL_INVALID"),
             "401": err("AUTH_REQUIRED", "API_KEY_INVALID", "API_KEY_EXPIRED", "API_KEY_REVOKED"),
             "403": err("API_SCOPE_REQUIRED"),
+            "404": err("INTAKE_APPROVAL_DISABLED"),
             "409": err("INTAKE_APPROVAL_CONFLICT", "INTAKE_APPROVAL_FILE_OUT_OF_SCOPE"),
             "503": err("COMPUTE_LEDGER_NOT_CONFIGURED", "INTAKE_APPROVAL_LEDGER_FAILED", "INTAKE_APPROVAL_RECEIPT_INVALID"),
           },
@@ -286,7 +289,7 @@ export async function GET(request: Request) {
           summary: "Request an approved direct upload URL",
           tags: ["Documents"],
           "x-tavonel-scope": "documents:intake",
-          description: "Returns a short-lived direct PUT URL only for an exact member of an approved complete set. Send the approval's attemptKey, scopeDigest, pricingFingerprint, fileKey and exact contentSha256, and the stable x-tavonel-source-idempotency-key derived from attemptKey and fileKey. The API key authenticates this call only; never send it to storage. Document bytes never pass through the application server.",
+          description: "Returns a short-lived direct PUT URL only for an exact member of an approved complete set. Send the approval's attemptKey, scopeDigest, pricingFingerprint, fileKey and exact contentSha256, and the stable x-tavonel-source-idempotency-key derived from attemptKey and fileKey. The API key authenticates this call only; never send it to storage. Document bytes never pass through the application server. While whole-set intake approval is not enabled (the approval endpoints answer 404 INTAKE_APPROVAL_DISABLED), request a capability per file without an attempt identity: send originalFilename, declaredMimeType and requestedBytes, with an optional stable x-tavonel-source-idempotency-key from which the document id is derived, then confirm with documentId and sourceSha256. The source agent falls back to this automatically.",
           requestBody: { required: true, content: { "application/json": { schema: {
             type: "object", required: ["originalFilename", "declaredMimeType", "requestedBytes", "attemptKey", "scopeDigest", "pricingFingerprint", "fileKey", "contentSha256"], additionalProperties: false,
             properties: { originalFilename: { type: "string", minLength: 1, maxLength: 255 }, declaredMimeType: { type: "string", enum: Object.keys(qualifiedDocumentInputs) }, requestedBytes: { type: "integer", minimum: 1, maximum: 524288000 }, attemptKey: { type: "string", minLength: 16, maxLength: 128 }, scopeDigest: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, pricingFingerprint: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, fileKey: { type: "string", minLength: 8, maxLength: 128 }, contentSha256: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" } },

@@ -238,6 +238,18 @@ and an expected previous cursor digest. Cursor conflicts fail closed with HTTP
 409. Source bytes use separate short-lived browser/agent-direct R2 capabilities;
 they do not travel through the application server.
 
+While whole-set intake approval is not enabled, the approval endpoints
+(`/api/v1/uploads/approval` and `/api/v1/uploads/approval/cancel`) answer 404
+`INTAKE_APPROVAL_DISABLED` and approve nothing; uploads reserve and confirm one
+file at a time. A client then requests an upload capability per file without an
+attempt identity: `originalFilename`, `declaredMimeType` and `requestedBytes`,
+with an optional stable `x-tavonel-source-idempotency-key`, then the PUT, then
+`/api/v1/uploads/confirm` with `documentId` and `sourceSha256`. The agent falls
+back to this automatically after the quote, prints a line naming
+`INTAKE_APPROVAL_DISABLED`, and derives each file's key from the connection,
+the source path and its revision, so a rerun reaches the same document and a
+file already confirmed is not uploaded again.
+
 ## Managed OAuth connectors
 
 Google Drive, Dropbox, and Microsoft OneDrive/SharePoint use browser-session

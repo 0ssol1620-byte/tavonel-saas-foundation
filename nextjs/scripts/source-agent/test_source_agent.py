@@ -37,6 +37,10 @@ root itself, not a child: a linked --root is retargeted, or the root path is ren
 by a link to a test-owned outside tree, after the fingerprint, after approval, or before a pending set
 resumes. They compare the file identity behind every descriptor the agent opens with the held original
 and the outside sentinel, and compare file identities rather than reading the swapped path.
+
+A later Claude Opus 5.5 correction added PerFileFallbackWireTests: the same 127.0.0.1 server stands in
+for a Foundation with whole-set approval off, so approval answers 404 INTAKE_APPROVAL_DISABLED and
+capability, confirm and the sync batch take main's per-file shapes.
 """
 import hashlib
 import importlib.util
@@ -1855,5 +1859,185 @@ class FullSyncWireTests(unittest.TestCase):
         self.assertEqual(cancel[3],{'attemptKey':self.store['approval']['attemptKey'],
             'scopeDigest':self.store['approval']['scopeDigest'],'fileKey':self.store['approval']['files'][0]['fileKey']})
         self.assertFalse(any(c[1]=='/api/v1/uploads/confirm' for c in self.calls if len(c)==4))
+
+
+def expected_per_file_key(native_id, revision):
+    """main dbe22b1e's per-file source key, written out independently of the agent."""
+    return sha(f'{CONNECTION}\x1f{native_id}\x1f{revision}'.encode())
+
+def per_file_document(source_key):
+    """Stands in for deterministicSourceDocumentId(workspace, key): the document follows the key."""
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, 'pilot-fixture/' + source_key))
+
+class PerFileFallbackWireTests(unittest.TestCase):
+    """FE-M1. With the approval lineage off (lib/intake-approval-rollout.ts, the production default) the
+    approval routes answer 404 INTAKE_APPROVAL_DISABLED and capability, confirm and the connection batch
+    run main's per-file path. The agent must take that path, say so, and never upload a confirmed file twice."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name) / 'source-root'; self.root.mkdir()
+        self.state_path = Path(self.tmp.name) / 'state.json'
+        self.journal = self.state_path.with_name(self.state_path.name + '.pending')
+        self.calls = []
+        self.store = {'approval_reply': (404, {'code': 'INTAKE_APPROVAL_DISABLED'}), 'drop_approval_post': False,
+                      'fail_capability_call': None, 'capability_calls': 0, 'objects': {}, 'confirmed': set(), 'batches': {}}
+        test = self
+
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version = 'HTTP/1.1'
+            def log_message(self, *args): pass
+            def send_json(self, status, payload):
+                raw = json.dumps(payload, separators=(',', ':')).encode()
+                self.send_response(status); self.send_header('content-type', 'application/json')
+                self.send_header('content-length', str(len(raw))); self.end_headers(); self.wfile.write(raw)
+            def lose_reply(self):
+                self.close_connection = True
+                try: self.connection.shutdown(socket.SHUT_RDWR)
+                except OSError: pass
+                self.connection.close()
+            def record(self, body):
+                test.calls.append((self.command, self.path, {k.lower(): v for k, v in self.headers.items()}, body))
+            def do_POST(self):
+                body = json.loads(self.rfile.read(int(self.headers.get('content-length', '0'))) or b'{}')
+                self.record(body)
+                store = test.store
+                if self.headers.get('authorization') != 'Bearer ' + API_KEY: return self.send_json(401, {'code': 'UNAUTHORIZED'})
+                if self.path == '/api/v1/uploads/quote': return self.send_json(200, quote_for(body))
+                if self.path == '/api/v1/uploads/approval':
+                    if store['drop_approval_post']:
+                        store['drop_approval_post'] = False; return self.lose_reply()
+                    return self.send_json(*store['approval_reply'])
+                if self.path == '/api/v1/uploads/capability':
+                    store['capability_calls'] += 1
+                    if store['capability_calls'] == store['fail_capability_call']: return self.send_json(503, {'code': 'SIGNER_NOT_CONFIGURED'})
+                    key = self.headers.get('x-tavonel-source-idempotency-key')
+                    document_id = per_file_document(key or '')
+                    return self.send_json(200, {'code': 'QUALIFIED', 'documentId': document_id,
+                        'uploadUrl': f'{test.base}/storage/{document_id}', 'contentLength': body.get('requestedBytes'),
+                        'declaredMimeType': body.get('declaredMimeType'), 'sourceIdempotency': 'stable' if key else 'none',
+                        'computeReservation': {'reservedCredits': 80}})
+                if self.path == '/api/v1/uploads/confirm':
+                    document_id = body.get('documentId')
+                    if document_id not in store['objects']: return self.send_json(409, {'code': 'QUARANTINE_OBJECT_NOT_FOUND'})
+                    store['confirmed'].add(document_id)
+                    return self.send_json(200, {'code': 'UPLOAD_CONFIRMED', 'result': {
+                        'status': 'confirmed', 'documentId': document_id, 'confirmedAt': '2026-10-16T00:00:00Z'}})
+                if self.path == f'/api/v1/connections/{CONNECTION}/sync':
+                    # main's binding with the switch off: each documentId is the one its source key derives.
+                    for event in body.get('events', []):
+                        if (event.get('documentId') != per_file_document(event.get('sourceIdempotencyKey') or '')
+                                or event['documentId'] not in store['confirmed']):
+                            return self.send_json(400, {'code': 'CONNECTION_BATCH_INVALID'})
+                    replayed = body.get('batchId') in store['batches']
+                    store['batches'][body.get('batchId')] = body
+                    return self.send_json(200, {'status': 'replayed' if replayed else 'applied'})
+                self.send_json(404, {'code': 'NOT_FOUND'})
+            def do_GET(self):
+                self.record(None)
+                if self.path.startswith('/api/v1/uploads/approval?'): return self.send_json(404, {'code': 'INTAKE_APPROVAL_DISABLED'})
+                self.send_json(404, {'code': 'NOT_FOUND'})
+            def do_PUT(self):
+                payload = self.rfile.read(int(self.headers.get('content-length', '0')))
+                self.record(payload)
+                if not self.path.startswith('/storage/') or self.headers.get('authorization') is not None:
+                    return self.send_json(403, {'code': 'OBJECT_STORE_REFUSED'})
+                test.store['objects'][self.path.rsplit('/', 1)[-1]] = payload
+                self.send_response(200); self.send_header('content-length', '0'); self.end_headers()
+
+        server = ThreadingHTTPServer(('127.0.0.1', 0), Handler); server.daemon_threads = True
+        thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+        self.addCleanup(lambda: (server.shutdown(), server.server_close(), thread.join(timeout=2)))
+        self.base = f'http://127.0.0.1:{server.server_address[1]}'
+        self.args = agent.parser().parse_args(['--root', str(self.root), '--connection-id', CONNECTION, '--state', str(self.state_path),
+            '--base-url', self.base, '--approve-up-to-credits', '100000', '--allow-unknown-page-count', '--timeout-seconds', '2'])
+        env = patch.dict(os.environ, {'TAVONEL_API_KEY': API_KEY}); env.start(); self.addCleanup(env.stop)
+
+    def sync(self):
+        """One agent.sync: its result (or the AgentError it raised) and the lines it printed."""
+        with patch('sys.stdout', new_callable=io.StringIO) as out:
+            try: result = agent.sync(self.args)
+            except agent.AgentError as exc: result = exc
+        return result, out.getvalue().splitlines()
+
+    def count(self, method, path):
+        return sum(1 for call in self.calls if (call[0], call[1].split('?', 1)[0]) == (method, path))
+
+    def assert_fallback_announced(self, lines, files):
+        announced = [json.loads(line) for line in lines if 'INTAKE_APPROVAL_DISABLED' in line]
+        self.assertEqual(len(announced), 1, lines)
+        self.assertEqual((announced[0]['status'], announced[0]['code'], announced[0]['fileCount']),
+                         ('uploading_per_file', 'INTAKE_APPROVAL_DISABLED', files))
+        self.assertIn('uploading each file with its own upload capability', announced[0]['detail'])
+
+    def test_approval_disabled_uploads_each_file_through_mains_per_file_path(self):
+        data = b'per-file fallback bytes'; (self.root / 'a.pdf').write_bytes(data)
+        result, lines = self.sync()
+        self.assertIsInstance(result, dict, repr(result)); self.assertEqual(result['status'], 'applied')
+        self.assert_fallback_announced(lines, 1)
+        revision = json.loads(self.state_path.read_text(encoding='utf-8'))['files']['a.pdf']['revision']
+        key = expected_per_file_key('a.pdf', revision); document_id = per_file_document(key)
+        sync_path = f'/api/v1/connections/{CONNECTION}/sync'
+        self.assertEqual([(c[0], c[1]) for c in self.calls], [
+            ('POST', '/api/v1/uploads/quote'), ('POST', '/api/v1/uploads/approval'), ('POST', '/api/v1/uploads/capability'),
+            ('PUT', f'/storage/{document_id}'), ('POST', '/api/v1/uploads/confirm'), ('POST', sync_path)])
+        capability = next(c for c in self.calls if c[1] == '/api/v1/uploads/capability')
+        # main's request: metadata only, no attempt, scope, price or file identity, keyed by the source.
+        self.assertEqual(capability[3], {'originalFilename': 'a.pdf', 'declaredMimeType': 'application/pdf', 'requestedBytes': len(data)})
+        self.assertEqual(capability[2]['x-tavonel-source-idempotency-key'], key)
+        put = next(c for c in self.calls if c[0] == 'PUT')
+        self.assertEqual(put[3], data); self.assertNotIn('authorization', put[2])
+        confirm = next(c for c in self.calls if c[1] == '/api/v1/uploads/confirm')
+        self.assertEqual(confirm[3], {'documentId': document_id, 'sourceSha256': 'sha256:' + sha(data)})
+        event = next(c[3] for c in self.calls if c[1] == sync_path)['events'][0]
+        self.assertEqual((event['documentId'], event['sourceIdempotencyKey']), (document_id, key))
+        self.assertFalse(self.journal.exists())
+
+    def test_rerun_after_per_file_fallback_skips_confirmed_files_and_never_reapproves(self):
+        (self.root / 'a.pdf').write_bytes(b'first per-file source'); (self.root / 'b.pdf').write_bytes(b'second per-file source')
+        self.store['fail_capability_call'] = 2
+        result, lines = self.sync()
+        self.assertIsInstance(result, agent.RetryableAgentError, repr(result))
+        self.assert_fallback_announced(lines, 2)
+        intake = json.loads(self.journal.read_text(encoding='utf-8'))['intake']
+        self.assertIs(intake['perFile'], True); self.assertIsNone(intake['approval'])
+        self.assertEqual(sorted(member['phase'] for member in intake['members'].values()), ['confirmed', 'planned'])
+        result, lines = self.sync()
+        self.assertIsInstance(result, dict, repr(result)); self.assertEqual(result['status'], 'applied')
+        self.assert_fallback_announced(lines, 2)
+        puts = [c[1] for c in self.calls if c[0] == 'PUT']
+        self.assertEqual(len(puts), 2); self.assertEqual(len(set(puts)), 2)
+        self.assertEqual((self.count('POST', '/api/v1/uploads/quote'), self.count('POST', '/api/v1/uploads/approval'),
+                          self.count('GET', '/api/v1/uploads/approval'), self.count('POST', '/api/v1/uploads/capability'),
+                          self.count('POST', '/api/v1/uploads/confirm')), (1, 1, 0, 3, 2))
+        self.assertFalse(self.journal.exists())
+
+    def test_saved_quote_without_approval_resumes_into_the_per_file_path(self):
+        (self.root / 'a.pdf').write_bytes(b'quoted then lost')
+        self.store['drop_approval_post'] = True
+        result, lines = self.sync()
+        self.assertIsInstance(result, agent.RetryableAgentError, repr(result)); self.assertEqual(lines, [])
+        intake = json.loads(self.journal.read_text(encoding='utf-8'))['intake']
+        self.assertIsNotNone(intake['quote']); self.assertTrue(intake['approvalPosted']); self.assertIsNone(intake['approval'])
+        result, lines = self.sync()
+        self.assertIsInstance(result, dict, repr(result)); self.assertEqual(result['status'], 'applied')
+        self.assert_fallback_announced(lines, 1)
+        self.assertEqual((self.count('POST', '/api/v1/uploads/quote'), self.count('POST', '/api/v1/uploads/capability'),
+                          self.count('PUT', '/storage/' + next(iter(self.store['objects'])))), (1, 1, 1))
+
+    def assert_refusal_still_requires_review(self, status, code, message):
+        (self.root / 'a.pdf').write_bytes(b'refused set')
+        self.store['approval_reply'] = (status, {'code': code})
+        result, lines = self.sync()
+        self.assertIsInstance(result, agent.ReviewRequiredError, repr(result))
+        self.assertIn(f'({code})', str(result)); self.assertIn(message, str(result))
+        self.assertFalse(any('INTAKE_APPROVAL_DISABLED' in line for line in lines))
+        self.assertEqual(self.count('POST', '/api/v1/uploads/capability'), 0)
+        self.assertNotIn('perFile', json.loads(self.journal.read_text(encoding='utf-8'))['intake'])
+
+    def test_stale_price_refusal_still_requires_review(self):
+        self.assert_refusal_still_requires_review(409, 'INTAKE_PRICE_STALE', "no longer the Foundation's price")
+
+    def test_a_different_404_is_not_read_as_approval_disabled(self):
+        self.assert_refusal_still_requires_review(404, 'NOT_FOUND', 'refused to approve the saved set')
 
 if __name__=='__main__':unittest.main()
