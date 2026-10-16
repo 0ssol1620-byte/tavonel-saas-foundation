@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import CompileStage from "./compile-stage";
 import type { PipelineRow } from "@/lib/pipeline";
+import type { WorldReadModel } from "@/lib/world-read-model";
 import { clearSourceVersionUnavailable, filterPollableSourceVersions, markSourceVersionUnavailable, pruneUnavailableSourceVersions, type OcrProgress } from "@/lib/ocr-progress";
 
 const row = (id: string): PipelineRow => ({
@@ -177,9 +178,28 @@ describe("compile stage separates durable run state from source-version observat
         runProgress={{ jobId: "run-A", documentsTotal: 1, documentsReady: 0 }} />,
     );
 
-    expect(attention).toContain('data-state="attention"');
-    expect(stopped).toContain('data-state="stopped"');
+    // Re-pinned with the result-less rule in compile-stage.tsx (`resultless`): a settled run with
+    // no visual keeps its tone on the section and its words in the status line, and draws neither
+    // the stage strip nor the counts. Measured by e2e/detail-integrity.spec.ts: with both, the
+    // frame was 265px at 1440 and 309-354px at 390/360 against the < 260 ceiling (Launch QA run
+    // 38835040264, head 1aca28de); behaviour introduced by 8d667edf.
+    expect(attention).toContain('data-tone="attention"');
+    expect(stopped).toContain('data-tone="stopped"');
     expect(stopped).toContain('role="status"');
-    expect(stopped).toContain('aria-label="Compilation stages"');
+    expect(stopped).toContain("Compilation stopped");
+    for (const markup of [attention, stopped]) {
+      expect(markup).not.toContain('aria-label="Compilation stages"');
+      expect(markup).not.toContain('aria-label="Compilation counts"');
+    }
+
+    // A review_required run that has its result still shows where it is paused, in the strip.
+    const world = { world: { id: "world-A", status: "candidate" }, objects: [{ id: "object-1", type: "Claim", status: "candidate" }], relations: [] } as unknown as WorldReadModel;
+    const attentionWithResult = renderToStaticMarkup(
+      <CompileStage rows={[row("reused")]} state="review_required" world={world} resultId="world-A"
+        runProgress={{ jobId: "run-A", documentsTotal: 1, documentsReady: 1 }} />,
+    );
+    expect(attentionWithResult).toContain('data-visual="world"');
+    expect(attentionWithResult).toContain('aria-label="Compilation stages"');
+    expect(attentionWithResult).toContain('data-state="attention"');
   });
 });

@@ -316,7 +316,17 @@ export default function CompileStage({ rows, reading = {}, sourceObservation = n
     return () => { disposed = true; cancelAnimationFrame(frame); observer.disconnect(); window.removeEventListener("resize", onResize); };
   }, [names, rows, state, world, reached, settled, stopped, hasVisual, view.finalLabel, view.progressId, view.tone, hasCanvasVisual]);
 
-  const showCounts = rows.length > 0 || state !== null;
+  /*
+    A settled run with no result to show is its status line and nothing else, as on main.
+
+    8d667edf put the stage strip and the counts on every stage. On a ready, review_required,
+    failed or cancelled run with no visual they repeat what the status line already says (a
+    stopped run sits at position 0, so its strip only ever marked the first beat) and grew the
+    frame to 265-354px, which is the "empty frame" e2e/detail-integrity.spec.ts holds below 260.
+  */
+  const resultless = view.visual === "none"
+    && (state === "ready" || state === "review_required" || state === "failed" || state === "cancelled");
+  const showCounts = !resultless && (rows.length > 0 || state !== null);
   const showEvidenceUnavailable = runProgress !== null && (state === "reading" || state === "structuring");
   const observationState = selectedSourceState === "operator_review" ? "operator_review"
     : selectedSourceState === "ocr_ready" ? "ocr_ready"
@@ -334,7 +344,7 @@ export default function CompileStage({ rows, reading = {}, sourceObservation = n
         <strong>{view.title}</strong>
         <p>{view.detail}</p>
       </div>
-      <ol className={styles.sequence} aria-label="Compilation stages">
+      {resultless ? null : <ol className={styles.sequence} aria-label="Compilation stages">
         {PIPELINE_STAGES.map((stage, index) => {
           const active = view.tone === "active" && index === reached;
           const attention = view.tone === "attention" && index === reached;
@@ -347,7 +357,7 @@ export default function CompileStage({ rows, reading = {}, sourceObservation = n
             </li>
           );
         })}
-      </ol>
+      </ol>}
       {showCounts ? <dl className={styles.metrics} aria-label="Compilation counts">
         <div><dt>{runProgress ? "Run sources" : "Sources in view"}</dt><dd>{runProgress?.documentsTotal ?? rows.length}</dd></div>
         {runProgress ? <div><dt>Sources read</dt><dd>{runProgress.documentsReady}</dd></div> : null}
