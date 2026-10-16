@@ -1,7 +1,7 @@
 import { gunzipSync } from 'node:zlib';
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -1566,5 +1566,43 @@ test('affected real Git regular owner plan binds current CI selection but missin
     const againReceipt=JSON.parse(readFileSync(receiptPath,'utf8'));assert.equal(againReceipt.gate,'failed');
     assert.ok(againReceipt.gateFailures.some(reason=>reason.startsWith('affected selected reports: ')));
     assert.ok(!Object.hasOwn(againReceipt.executedChecks,'affectedNodeUnits'));
+  }finally{process.chdir(previous);fixture?.cleanup();if(support)rmSync(support,{recursive:true,force:true});}
+});
+test('affected routing is pull_request-only: push and workflow_dispatch eligibility keep the normal full DB rehearsal outputs',()=>{
+  const previous=process.cwd();let fixture,support;
+  try{
+    fixture=affectedRealGitFixture();const {root,put,commit,checkout}=fixture;support=mkdtempSync(resolve(tmpdir(),'affected-event-support-'));
+    const script=fileURLToPath(new URL('./repair-collector-only.mjs',import.meta.url));
+    // The workflow runs the classifier from the repository root; outputs go outside the checkout so it stays clean.
+    const run=(head,event,label,extra={})=>{
+      const env={...process.env,REPAIR_HEAD_SHA:head,GITHUB_OUTPUT:resolve(support,label+'.txt')};delete env.COLLECTOR_EVENT;delete env.REQUIRE_NATIVE_DB_SCOPE;
+      Object.assign(env,event===undefined?{}:{COLLECTOR_EVENT:event},extra);
+      const r=spawnSync(process.execPath,[script,'eligibility'],{cwd:root,env,encoding:'utf8',timeout:120000});
+      return {...r,output:existsSync(env.GITHUB_OUTPUT)?readFileSync(env.GITHUB_OUTPUT,'utf8'):''};
+    };
+    const normalOutputs='intended=false\neligible=false\nnative_database=false\n';
+    const docs=commit(put('nextjs/lib/docs-content.ts','export const docs = 1;\n'));
+    // A direct race-script edit is read as an intended native World race candidate on any parent; a merge head carries such paths too.
+    const race=commit(put('nextjs/scripts/db/native-world-race.mjs','export const race = 1;\n'));
+    process.chdir(root);
+    for(const head of [race,docs]){checkout(head);for(const event of ['push','workflow_dispatch']){
+      const r=run(head,event,`${event}-${head.slice(0,7)}`),label=`${event} at ${head===docs?'docs':'race'} head`;
+      assert.equal(r.status,0,label+': '+r.stderr);
+      assert.equal(r.output,normalOutputs,label+' writes only the normal outputs, never affected=true');
+      assert.deepEqual(JSON.parse(r.stdout.trim()),{eligible:false,reason:'Non-PR events retain normal DB execution.'},label);
+      assert.equal(existsSync(resolve(root,'collector-only-failure-receipt.json')),false,label+' writes no failure receipt');
+      // The decision step then admits the full rehearsal: fresh DB and transport, no race disposition.
+      const decision=world.nativeDbJobDecision({classifierResult:'success',intended:'false',eligible:'false',nativeDatabase:'false',nativeRace:''});
+      assert.deepEqual(decision,{explicit:true,runDatabase:true,runTransport:true},label);
+      assert.equal(world.nativeRaceDecisionHolds({headSha:head,nativeRace:'',decision}),true,label);
+    }}
+    // Pull requests are unchanged: the same (still checked-out) descendant is classified and routed to the affected map.
+    assert.equal(world.classifyAffectedIntent({headSha:docs}).classification,'intended');
+    const pr=run(docs,'pull_request','pull_request');
+    assert.equal(pr.status,0,pr.stderr);
+    assert.equal(pr.output,normalOutputs+'affected=true\naffected_database=false\naffected_database_tests=\n');
+    // The native revalidation step carries no COLLECTOR_EVENT; it still reaches the routings instead of the unqualified-native throw.
+    const revalidate=run(docs,undefined,'revalidate',{REQUIRE_NATIVE_DB_SCOPE:'1'});
+    assert.equal(revalidate.status,0,revalidate.stderr);assert.match(revalidate.output,/^affected=true$/m);
   }finally{process.chdir(previous);fixture?.cleanup();if(support)rmSync(support,{recursive:true,force:true});}
 });

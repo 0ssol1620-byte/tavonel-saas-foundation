@@ -1729,6 +1729,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   const mode = process.argv[2];
   if (!['plan', 'eligibility'].includes(mode)) throw new Error('Usage: repair-collector-only.mjs <plan|eligibility>');
   const headSha = process.env.REPAIR_HEAD_SHA;
+  // The affected map and every exact profile below are pull_request admissions. A push or workflow_dispatch eligibility run skips
+  // them and keeps the normal fresh DB rehearsal: affected=true would skip it, and a merge head's first-parent diff carries the whole
+  // PR, which the race, Solutions and native classifiers read as an intended candidate and fail closed. The native revalidation step
+  // (REQUIRE_NATIVE_DB_SCOPE, run only after a PR native classification and without COLLECTOR_EVENT) still re-derives its profile.
+  const nonPr = mode === 'eligibility' && process.env.COLLECTOR_EVENT !== 'pull_request';
+  if (!nonPr || process.env.REQUIRE_NATIVE_DB_SCOPE === '1') {
   // Descendants of the verified affected-integration baseline are planned from its fail-closed incremental map, before any exact profile.
   const affectedIntent=classifyAffectedIntent({headSha});if(affectedIntent.classification!=='normal'){runAffectedMode(mode,headSha,affectedIntent);process.exit(0);}
   // The exact2bb native World race profile is routed next and never reaches the Explore, Solutions, native DB or broad classifiers.
@@ -1741,8 +1747,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   if(pageIntent.classification!=='normal'){runPublicPagesMode(mode,headSha,pageIntent);process.exit(0);}
   const nativeIntent = classifyNativeDbIntent({ headSha });
   if (nativeIntent.classification !== 'normal') { runNativeDbMode(mode, headSha, nativeIntent); process.exit(0); }
+  }
   if (process.env.REQUIRE_NATIVE_DB_SCOPE === '1') throw Error('Expected an exact intended native DB source.');
-  const nonPr = mode === 'eligibility' && process.env.COLLECTOR_EVENT !== 'pull_request';
   const intakeIntent = nonPr ? { classification: 'normal' } : repair.classifyIntakePresentationIntent({ headSha });
   const intakePresentation = intakeIntent.classification !== 'normal';
   const repairIntent = intakePresentation ? { classification: 'normal' } : nonPr ? { classification: 'normal' } : repair.classifyKnownRepairIntent({ headSha });

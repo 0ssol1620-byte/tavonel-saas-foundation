@@ -1995,12 +1995,15 @@ export const MARKETING_TOOLING_POSTIMAGES = Object.freeze({
   "nextjs/pnpm-lock.yaml": "a814e2ff45e2c563949ebd917df8036bcd7bde2c2a8a98480386fab0ea79be04"
 });
 // Shared test discovery: the exact global Vitest config, edited by the product author. A change is admitted only when every
-// existing include survives, the one addition is the registered mobile-view suite and nothing outside the include list moved.
+// existing include survives, the additions are the registered mobile-view suite and the five PR suites that the repair-only
+// configs used to discover alone (so `pnpm test` and the prebuild hermetic run them), and nothing outside the include list moved.
 export const VITEST_DISCOVERY_CONFIG_PATH = 'nextjs/vitest.config.ts';
 export const VITEST_DISCOVERY_INCLUDES = Object.freeze([
   'lib/**/*.test.ts', 'lib/**/*.spec.ts', 'eval/**/metrics.test.ts',
   'components/explore/evidence-workbench.test.tsx', 'components/landing-v2/hero-source-card.test.tsx', 'components/evaluation-page.test.tsx',
   'components/compile-stage-player.mobile-view.test.tsx',
+  'components/compile-stage.test.tsx', 'components/intake-triage-review.test.tsx', 'components/intake-triage-review.interaction.test.ts',
+  'app/api/documents/**/route.test.ts', 'app/api/compile-jobs/route.test.ts',
   'scripts/router/*.test.mjs', 'scripts/billing/*.test.mjs',
 ]);
 const VITEST_DISCOVERY_INCLUDE_SLOT = '\n    include: [@@],\n';

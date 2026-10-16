@@ -779,14 +779,22 @@ test('dev compile-stage fixture path is narrowly qualified only with the exact r
   assert.equal(partial.runFullHermeticVitest, true);
 });
 
-test('repair-only Vitest config adds the two exact out-of-default-include files without touching global config', () => {
+// The five PR suites the repair-only configs used to discover alone; the base config now discovers them too, so `pnpm test`
+// and the prebuild hermetic run cover them. Dropping any of them from vitest.config.ts or the discovery contract fails here.
+const BASE_DISCOVERED_PR_SUITES = Object.freeze(['components/compile-stage.test.tsx', 'components/intake-triage-review.test.tsx',
+  'components/intake-triage-review.interaction.test.ts', 'app/api/documents/**/route.test.ts', 'app/api/compile-jobs/route.test.ts']);
+test('repair-only Vitest config keeps its scoped includes and the global config also discovers the five PR suites', () => {
   const scoped = readFileSync(new URL('../vitest.repair-scope.config.ts', import.meta.url), 'utf8');
   const global = readFileSync(new URL('../vitest.config.ts', import.meta.url), 'utf8');
   assert.match(scoped, /import baseConfig from ["']\.\/vitest\.config["']/);
   assert.match(scoped, /\.\.\.inheritedIncludes/);
   assert.match(scoped, /components\/compile-stage\.test\.tsx/);
   assert.match(scoped, /app\/api\/documents\/\*\*\/route\.test\.ts/);
-  assert.doesNotMatch(global, /compile-stage\.test|workspace-source-observation/);
+  for (const include of BASE_DISCOVERED_PR_SUITES) {
+    assert.ok(global.includes(`"${include}"`), 'global Vitest config discovers ' + include);
+    assert.ok(VITEST_DISCOVERY_INCLUDES.includes(include), 'shared discovery contract requires ' + include);
+  }
+  assert.doesNotMatch(global, /workspace-source-observation/);
   const args = buildUnitArgs(WORKSPACE_SOURCE_UNIT_FILES, 'node_modules/.cache/repair-scope-reports/vitest.json');
   assert.deepEqual(args.slice(0, 6), ['exec', 'vitest', 'run', '--config', 'vitest.repair-scope.config.ts', '--reporter=default']);
   assert.deepEqual(args.slice(-WORKSPACE_SOURCE_UNIT_FILES.length), WORKSPACE_SOURCE_UNIT_FILES);
@@ -4005,7 +4013,7 @@ test('affected Home reader guide owner: the six-path successor keeps prior owner
   assert.equal(mixed.nativeEvidence.disposition,'fresh-seven-case-native-run-required');
   assert.equal(mixed.nativeEvidence.freshRunClaimed,false);
 });
-// The e9c global Vitest config, and the same config with only the registered mobile-view suite added to its include list.
+// The e9c global Vitest config; the admitted config adds the registered mobile-view suite and the five base-discovered PR suites.
 const affectedHomeConfigHead=['import { defineConfig } from "vitest/config";','import path from "node:path";','','const packageRoot = path.resolve(import.meta.dirname);','','export default defineConfig({',
   '  root: packageRoot,','  // Component render tests use the same automatic JSX runtime as Next.js.','  esbuild: { jsx: "automatic" },','  resolve: {','    alias: { "@": packageRoot },','  },','  test: {',
   '    environment: "node",','    // Deployment flags must not turn isolated route tests into live database calls.','    // Durable boundary suites explicitly stub production/opt-in mode and the RPC.',
@@ -4015,7 +4023,13 @@ const affectedHomeConfigHead=['import { defineConfig } from "vitest/config";','i
   '      "components/explore/evidence-workbench.test.tsx", "components/landing-v2/hero-source-card.test.tsx", "components/evaluation-page.test.tsx",'];
 const affectedHomeConfigTail=['      "scripts/router/*.test.mjs", "scripts/billing/*.test.mjs",','    ],','  },','});',''];
 const AFFECTED_HOME_E9C_CONFIG=[...affectedHomeConfigHead,...affectedHomeConfigTail].join('\n');
-const AFFECTED_HOME_FINAL_CONFIG=[...affectedHomeConfigHead,'      "components/compile-stage-player.mobile-view.test.tsx",',...affectedHomeConfigTail].join('\n');
+const affectedHomeMobileLine='      "components/compile-stage-player.mobile-view.test.tsx",';
+const affectedHomePrSuiteLines=['      "components/compile-stage.test.tsx", "components/intake-triage-review.test.tsx", "components/intake-triage-review.interaction.test.ts",',
+  '      "app/api/documents/**/route.test.ts", "app/api/compile-jobs/route.test.ts",'];
+// The pre-fix config: the mobile-view suite only, so `pnpm test` and the prebuild never discovered the five PR suites.
+const AFFECTED_HOME_MOBILE_ONLY_CONFIG=[...affectedHomeConfigHead,affectedHomeMobileLine,...affectedHomeConfigTail].join('\n');
+const AFFECTED_HOME_FINAL_CONFIG=[...affectedHomeConfigHead,affectedHomeMobileLine,...affectedHomePrSuiteLines,...affectedHomeConfigTail].join('\n');
+const affectedHomePrSuitesMissing=BASE_DISCOVERED_PR_SUITES.map(include=>`include is missing: ${include}`);
 const AFFECTED_HOME_FRAME_FAILURE='changed outside its include list (root, runtime, JSX, alias, environment and env stay fixed)';
 const affectedHomeSwap=(text,from,to)=>{assert.ok(text.includes(from),'fixture anchor: '+from);return text.replace(from,to);};
 const affectedHomeConfigMap=(records,source=AFFECTED_HOME_FINAL_CONFIG,headHasFile)=>buildAffectedMap({headSha:affectedHeadSha,records,headHasFile,
@@ -4267,16 +4281,19 @@ test('affected Home admission: readAffectedExecution rereads nine units and four
     restore();assert.equal(readAffectedExecution(root,plan).units.passed,9,'the restored actual reports qualify again');
   } finally { rmSync(root,{recursive:true,force:true}); }
 });
-test('affected Home admission: the shared test-discovery contract keeps every include, admits only the mobile-view addition and refuses everything else', () => {
+test('affected Home admission: the shared test-discovery contract keeps every include, admits only the mobile-view and five PR-suite additions and refuses everything else', () => {
   assert.equal(VITEST_DISCOVERY_CONFIG_PATH,'nextjs/vitest.config.ts');
   assert.deepEqual(VITEST_DISCOVERY_INCLUDES,['lib/**/*.test.ts','lib/**/*.spec.ts','eval/**/metrics.test.ts','components/explore/evidence-workbench.test.tsx','components/landing-v2/hero-source-card.test.tsx',
-    'components/evaluation-page.test.tsx',AFFECTED_HOME_TSX,'scripts/router/*.test.mjs','scripts/billing/*.test.mjs']);
+    'components/evaluation-page.test.tsx',AFFECTED_HOME_TSX,...BASE_DISCOVERED_PR_SUITES,'scripts/router/*.test.mjs','scripts/billing/*.test.mjs']);
   const missing=`include is missing: ${AFFECTED_HOME_TSX}`;
-  // The checked-in config is either the e9c config (only the addition missing) or the admitted final config; nothing else passes.
+  // The checked-in config is the admitted final config; the e9c and mobile-only configs, or any single dropped PR suite, fail.
   const actual=vitestDiscoveryConfigFailures(readFileSync(new URL('../vitest.config.ts',import.meta.url),'utf8'));
-  assert.ok(actual.length<=1&&actual.every(failure=>failure===missing),JSON.stringify(actual));
-  assert.deepEqual(vitestDiscoveryConfigFailures(AFFECTED_HOME_E9C_CONFIG),[missing]);
+  assert.deepEqual(actual,[],JSON.stringify(actual));
+  assert.deepEqual(vitestDiscoveryConfigFailures(AFFECTED_HOME_E9C_CONFIG),[missing,...affectedHomePrSuitesMissing]);
+  assert.deepEqual(vitestDiscoveryConfigFailures(AFFECTED_HOME_MOBILE_ONLY_CONFIG),affectedHomePrSuitesMissing);
   const final=AFFECTED_HOME_FINAL_CONFIG;
+  for (const include of BASE_DISCOVERED_PR_SUITES)
+    assert.deepEqual(vitestDiscoveryConfigFailures(affectedHomeSwap(final,`"${include}",`,'')),[`include is missing: ${include}`],'a dropped '+include);
   const reordered=affectedHomeSwap(affectedHomeSwap(final,`      "${AFFECTED_HOME_TSX}",\n`,''),'"lib/**/*.test.ts",',`"${AFFECTED_HOME_TSX}", "lib/**/*.test.ts",`);
   for (const [label,source] of [['final',final],['CRLF',final.replace(/\n/g,'\r\n')],['extra trailing newlines',final+'\n\n'],['reordered',reordered]])
     assert.deepEqual(vitestDiscoveryConfigFailures(source),[],label);
@@ -4287,7 +4304,7 @@ test('affected Home admission: the shared test-discovery contract keeps every in
     ['an unrelated suite',add('"components/landing-v2/hero-actions.test.tsx",'),['include is not admitted: components/landing-v2/hero-actions.test.tsx']],
     ['a duplicated addition',add(addition),[`include is duplicated: ${AFFECTED_HOME_TSX}`]],
     ['a duplicated existing include',add('"lib/**/*.test.ts",'),['include is duplicated: lib/**/*.test.ts']],
-    ['a replaced instead of added include',affectedHomeSwap(AFFECTED_HOME_E9C_CONFIG,'"components/evaluation-page.test.tsx",',addition),['include is missing: components/evaluation-page.test.tsx']],
+    ['a replaced instead of added include',affectedHomeSwap(AFFECTED_HOME_E9C_CONFIG,'"components/evaluation-page.test.tsx",',addition),['include is missing: components/evaluation-page.test.tsx',...affectedHomePrSuitesMissing]],
     ['a removed Explore include',affectedHomeSwap(final,'"components/explore/evidence-workbench.test.tsx", ',''),['include is missing: components/explore/evidence-workbench.test.tsx']],
     ['a removed hero-source-card include',affectedHomeSwap(final,'"components/landing-v2/hero-source-card.test.tsx", ',''),['include is missing: components/landing-v2/hero-source-card.test.tsx']],
     ['a removed lib glob',affectedHomeSwap(final,'"lib/**/*.spec.ts", ',''),['include is missing: lib/**/*.spec.ts']],
@@ -4324,7 +4341,8 @@ test('affected Home admission: the global Vitest config maps only to shared-test
   const absent='shared test-discovery config is absent or unreadable at head: nextjs/vitest.config.ts',refused=failure=>`unsupported shared test-discovery config change: ${failure}`;
   assert.deepEqual(affectedMap([affectedRecord('M',[VITEST_DISCOVERY_CONFIG_PATH])]).failures,[absent],'no head reader is no admission');
   assert.deepEqual(affectedHomeConfigMap([affectedRecord('M',[VITEST_DISCOVERY_CONFIG_PATH])],null).failures,[absent],'an unreadable head config');
-  assert.deepEqual(affectedHomeConfigMap([affectedRecord('M',[VITEST_DISCOVERY_CONFIG_PATH])],AFFECTED_HOME_E9C_CONFIG).failures,[refused(`include is missing: ${AFFECTED_HOME_TSX}`)]);
+  assert.deepEqual(affectedHomeConfigMap([affectedRecord('M',[VITEST_DISCOVERY_CONFIG_PATH])],AFFECTED_HOME_E9C_CONFIG).failures,[`include is missing: ${AFFECTED_HOME_TSX}`,...affectedHomePrSuitesMissing].map(refused));
+  assert.deepEqual(affectedHomeConfigMap([affectedRecord('M',[VITEST_DISCOVERY_CONFIG_PATH])],AFFECTED_HOME_MOBILE_ONLY_CONFIG).failures,affectedHomePrSuitesMissing.map(refused));
   const wildcard=affectedHomeSwap(AFFECTED_HOME_FINAL_CONFIG,`"${AFFECTED_HOME_TSX}",`,`"${AFFECTED_HOME_TSX}", "components/**/*.test.tsx",`);
   const invalid=affectedHomeConfigMap([affectedRecord('M',[VITEST_DISCOVERY_CONFIG_PATH])],wildcard);
   assert.deepEqual([invalid.groups,invalid.failures],[['shared-test-discovery'],[refused('include is not admitted: components/**/*.test.tsx')]]);
@@ -4360,7 +4378,7 @@ test('affected Home admission: collection reads the head config only for a confi
   };
   const admitted=run(VITEST_DISCOVERY_CONFIG_PATH,()=>AFFECTED_HOME_FINAL_CONFIG);
   assert.deepEqual([admitted.map.failures,admitted.map.groups,admitted.shows],[[],['shared-test-discovery'],[`show ${affectedHeadSha}:${VITEST_DISCOVERY_CONFIG_PATH}`]]);
-  assert.deepEqual(run(VITEST_DISCOVERY_CONFIG_PATH,()=>AFFECTED_HOME_E9C_CONFIG).map.failures,[`unsupported shared test-discovery config change: include is missing: ${AFFECTED_HOME_TSX}`]);
+  assert.deepEqual(run(VITEST_DISCOVERY_CONFIG_PATH,()=>AFFECTED_HOME_E9C_CONFIG).map.failures,[`include is missing: ${AFFECTED_HOME_TSX}`,...affectedHomePrSuitesMissing].map(failure=>`unsupported shared test-discovery config change: ${failure}`));
   assert.deepEqual(run(VITEST_DISCOVERY_CONFIG_PATH,()=>{throw Error('no blob');}).map.failures,['shared test-discovery config is absent or unreadable at head: nextjs/vitest.config.ts']);
   const home=run('nextjs/components/landing-v2/hero-film.tsx',()=>{throw Error('unexpected show');});
   assert.deepEqual([home.map.failures,home.map.groups,home.shows],[[],['home-landing'],[]]);
