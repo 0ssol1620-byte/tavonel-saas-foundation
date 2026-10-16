@@ -110,10 +110,13 @@ jobs:
     name: db-rehearsal
     needs: [collector-only-eligibility]
     # Qualified native scope runs a fresh DB; invalid/missing classification blocks expensive jobs.
+    # Review 3 (CI-TI-2): an affected pull request runs this full job too (all pgTAP files, including
+    # tenant_rls_matrix and service_role_grant_matrix), with the selected fixtures alongside. main runs it
+    # on every PR, and after a merge commit every descendant of the affected baseline classifies as affected.
     if: >-
       always() && needs.collector-only-eligibility.result == 'success' &&
       ((needs.collector-only-eligibility.outputs.native_database == 'true' && needs.collector-only-eligibility.outputs.intended == 'true' && needs.collector-only-eligibility.outputs.eligible == 'false') ||
-       (needs.collector-only-eligibility.outputs.affected != 'true' && needs.collector-only-eligibility.outputs.native_database == 'false' && needs.collector-only-eligibility.outputs.intended == 'false' && needs.collector-only-eligibility.outputs.eligible == 'false'))
+       (needs.collector-only-eligibility.outputs.native_database == 'false' && needs.collector-only-eligibility.outputs.intended == 'false' && needs.collector-only-eligibility.outputs.eligible == 'false'))
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:

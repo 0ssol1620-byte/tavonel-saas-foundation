@@ -1730,7 +1730,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   if (!['plan', 'eligibility'].includes(mode)) throw new Error('Usage: repair-collector-only.mjs <plan|eligibility>');
   const headSha = process.env.REPAIR_HEAD_SHA;
   // The affected map and every exact profile below are pull_request admissions. A push or workflow_dispatch eligibility run skips
-  // them and keeps the normal fresh DB rehearsal: affected=true would skip it, and a merge head's first-parent diff carries the whole
+  // them and keeps the normal fresh DB rehearsal (an affected pull request runs that full job too, beside its selected fixtures:
+  // review 3, CI-TI-2), and a merge head's first-parent diff carries the whole
   // PR, which the race, Solutions and native classifiers read as an intended candidate and fail closed. The native revalidation step
   // (REQUIRE_NATIVE_DB_SCOPE, run only after a PR native classification and without COLLECTOR_EVENT) still re-derives its profile.
   const nonPr = mode === 'eligibility' && process.env.COLLECTOR_EVENT !== 'pull_request';

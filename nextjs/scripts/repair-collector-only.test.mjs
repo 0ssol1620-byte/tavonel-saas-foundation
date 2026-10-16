@@ -1601,6 +1601,18 @@ test('affected routing is pull_request-only: push and workflow_dispatch eligibil
     const pr=run(docs,'pull_request','pull_request');
     assert.equal(pr.status,0,pr.stderr);
     assert.equal(pr.output,normalOutputs+'affected=true\naffected_database=false\naffected_database_tests=\n');
+    // Review 3 (CI-TI-2): those affected outputs select the full db-rehearsal job too, as main runs it on every PR; the selected
+    // fixtures run beside it, not instead. The job's own `if:` is evaluated here against the real outputs.
+    const workflow=readFileSync(fileURLToPath(new URL('../../.github/workflows/db-rehearsal.yml',import.meta.url)),'utf8').replace(/\r\n/g,'\n');
+    const dbJob=workflow.slice(workflow.indexOf('\n  db-rehearsal:\n'),workflow.indexOf('\n  real-auth-journey:\n'));
+    const condition=dbJob.match(/    if: >-\n([\s\S]*?)    runs-on:/)?.[1]?.replace(/\s+/g,' ').trim();
+    assert.ok(condition,'the db-rehearsal job keeps an explicit if:');
+    const selects=outputs=>Function(`return ${condition.replace(/always\(\)/g,'true').replace(/needs\.collector-only-eligibility\.result/g,"'success'")
+      .replace(/needs\.collector-only-eligibility\.outputs\.([a-z_]+)/g,(_,name)=>JSON.stringify(outputs[name]??'')).replace(/!=|==/g,op=>op==='!='?'!==':'===')}`)();
+    const outputsOf=text=>Object.fromEntries(text.trim().split('\n').map(line=>[line.slice(0,line.indexOf('=')),line.slice(line.indexOf('=')+1)]));
+    assert.equal(selects(outputsOf(pr.output)),true,'an affected pull request runs the full db-rehearsal job');
+    assert.equal(selects(outputsOf(normalOutputs)),true,'a normal head still runs the full db-rehearsal job');
+    assert.equal(selects({...outputsOf(normalOutputs),eligible:'true'}),false,'exact collector-only reuse still skips it');
     // The native revalidation step carries no COLLECTOR_EVENT; it still reaches the routings instead of the unqualified-native throw.
     const revalidate=run(docs,undefined,'revalidate',{REQUIRE_NATIVE_DB_SCOPE:'1'});
     assert.equal(revalidate.status,0,revalidate.stderr);assert.match(revalidate.output,/^affected=true$/m);
