@@ -29,6 +29,15 @@ describe("Dropbox source reconciliation store", () => {
     expect(await reconcileDropboxSourcePage(job, "worker", null)).toEqual({ ok: false, code });
   });
 
+  it.each([
+    [404, { code: "PGRST202", message: "Could not find the function public.reconcile_dropbox_source_page" }],
+    [400, { code: "42883", message: "function public.reconcile_dropbox_source_page(text, text, text, text) does not exist" }],
+  ])("names a database without migration 20261007100000 apart from an outage (%s)", async (status, body) => {
+    request.mockResolvedValue(Response.json(body, { status }));
+    expect(await reconcileDropboxSourcePage(job, "worker", null))
+      .toEqual({ ok: false, code: "DROPBOX_SOURCE_RECONCILIATION_MIGRATION_MISSING" });
+  });
+
   it("reports an unreachable store or a malformed answer as unavailable, never as an empty removal set", async () => {
     for (const response of [new Response(null, { status: 503 }), Response.json({ suspend: ["/a.pdf"] }),
       Response.json({ suspend: null }), Response.json({ message: "CONNECTOR_PAGE_LEASE_INVALID" }, { status: 400 })]) {

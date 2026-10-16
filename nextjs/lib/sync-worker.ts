@@ -10,6 +10,7 @@ import { requestConnectorSourceDeletion, suspendConnectorSource } from "./connec
 import { loadConnectorSyncPage } from "./connector-sync-page";
 import { listGoogleDriveLifecyclePage } from "./google-drive-lifecycle";
 import { reconcileDropboxSourcePage } from "./dropbox-source-reconciliation";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "./intake-approval-rollout";
 
 // The worker that actually moves a connector sync forward.
 //
@@ -252,14 +253,21 @@ export async function runSourceImportBatch(
   // every turn (a replay returns the page's receipt): removals resolve to the id observed at that
   // path and wait for the listing boundary, so a move split across pages keeps its source. Every
   // other provider removes by stable id, immediately.
+  //
+  // Reconciliation needs migration 20261007100000, so it ships behind the intake-approval rollout
+  // switch. Off, Dropbox takes main dbe22b1e's path in the else branch: the adapter keeps main's
+  // DeletedMetadata mapping (nativeId = path_lower), the removal is suspended by that id at once,
+  // and reconcile_dropbox_source_page is never called.
   let removals: Array<{ nativeId: string; reason: "provider_deleted" | "provider_inaccessible" }> = [];
-  if (binding.provider === "dropbox") {
+  if (binding.provider === "dropbox" && INTAKE_APPROVAL_ROLLOUT_ENABLED) {
     const reconciled = await reconcileDropboxSourcePage(job, workerId, resume.providerCursor);
     if (!reconciled.ok) {
       // An unresolved or legacy path is not retryable into meaning; neither outcome moves the cursor.
       const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
-        // A non-canonical stream (DROPBOX_SOURCE_STREAM_INVALID) is refused the same way.
-        outcome: reconciled.code === "DROPBOX_SOURCE_RECONCILIATION_UNAVAILABLE" ? "retry" : "failed",
+        // A non-canonical stream (DROPBOX_SOURCE_STREAM_INVALID) is refused the same way. A store
+        // outage and a database without the migration are operational: retried, checkpoint held.
+        outcome: ["DROPBOX_SOURCE_RECONCILIATION_UNAVAILABLE", "DROPBOX_SOURCE_RECONCILIATION_MIGRATION_MISSING"]
+          .includes(reconciled.code) ? "retry" : "failed",
         errorCode: reconciled.code,
       });
       return { ok: false, code: reported.ok ? reconciled.code : reported.code };
@@ -315,7 +323,7 @@ export async function runSourceImportBatch(
     // list_folder is ordered: a removal of this path (or an ancestor) later on the same page
     // ends this entry, and reconciliation already staged it. Importing it would bind a source
     // the boundary has already judged.
-    if (binding.provider === "dropbox" && removedLaterOnPage(page, resume.pageOffset + index)) {
+    if (binding.provider === "dropbox" && INTAKE_APPROVAL_ROLLOUT_ENABLED && removedLaterOnPage(page, resume.pageOffset + index)) {
       processed += 1;
       continue;
     }

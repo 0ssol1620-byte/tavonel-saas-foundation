@@ -16,6 +16,10 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
 // Permanent: retrying cannot give a path meaning, a legacy snapshot an id, or a second stream canon.
 const REFUSALS = new Set(["DROPBOX_SOURCE_PATH_UNRESOLVED", "DROPBOX_SOURCE_IDENTITY_LEGACY", "DROPBOX_SOURCE_STREAM_INVALID"]);
 const UNAVAILABLE = "DROPBOX_SOURCE_RECONCILIATION_UNAVAILABLE";
+// The database does not have reconcile_dropbox_source_page: migration 20261007100000 is not
+// applied. Named apart from UNAVAILABLE (an outage that waiting fixes) because only applying the
+// migration fixes it. Reached only with the intake-approval rollout switch on.
+const MIGRATION_MISSING = "DROPBOX_SOURCE_RECONCILIATION_MIGRATION_MISSING";
 
 export async function reconcileDropboxSourcePage(
   job: ClaimedJob, workerId: string, providerCursor: string | null,
@@ -31,7 +35,9 @@ export async function reconcileDropboxSourcePage(
     });
     if (!response.ok) {
       const body: unknown = await response.json().catch(() => null);
-      const message = body && typeof body === "object" ? (body as { message?: unknown }).message : null;
+      const { message, code } = (body && typeof body === "object" ? body : {}) as { message?: unknown; code?: unknown };
+      // PostgREST PGRST202 (no such function) or Postgres 42883 (undefined_function).
+      if (code === "PGRST202" || code === "42883") return { ok: false, code: MIGRATION_MISSING };
       return { ok: false, code: typeof message === "string" && REFUSALS.has(message) ? message : UNAVAILABLE };
     }
     const value: unknown = await response.json();

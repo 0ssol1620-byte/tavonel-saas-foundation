@@ -22,6 +22,10 @@ vi.mock("./connector-sync-page", () => ({ loadConnectorSyncPage }));
 vi.mock("./connector-source-access", () => ({ requestConnectorSourceDeletion, suspendConnectorSource }));
 const reconcileDropboxSourcePage = vi.fn<(...args: any[]) => any>();
 vi.mock("./dropbox-source-reconciliation", () => ({ reconcileDropboxSourcePage }));
+// These tests pin the PR's Dropbox reconciliation, which runs only with the intake-approval rollout
+// switch on (it needs migration 20261007100000). The shipped switch-off path -- main dbe22b1e's --
+// is pinned against a production-schema database in dropbox-sync-rollout.test.ts.
+vi.mock("./intake-approval-rollout", () => ({ INTAKE_APPROVAL_ROLLOUT_ENABLED: true }));
 const refreshOAuthAccessToken = vi.fn<(...args: any[]) => Promise<any>>(async () => ({ accessToken: "at-1" }));
 const readOAuthProviderRuntime = vi.fn<(...args: any[]) => any>(() => ({ clientSecretReference: "vault://client" }));
 const readOAuthSecretBrokerConfig = vi.fn<(...args: any[]) => any>(() => ({ kind: "vault" }));
@@ -532,6 +536,7 @@ describe("Dropbox path-only removals", () => {
     ["DROPBOX_SOURCE_IDENTITY_LEGACY", "failed"],
     ["DROPBOX_SOURCE_STREAM_INVALID", "failed"],
     ["DROPBOX_SOURCE_RECONCILIATION_UNAVAILABLE", "retry"],
+    ["DROPBOX_SOURCE_RECONCILIATION_MIGRATION_MISSING", "retry"],
   ])("fails closed on %s without importing, suspending or advancing", async (code, outcome) => {
     reconcileDropboxSourcePage.mockResolvedValue({ ok: false, code });
     listOAuthSourcePage.mockResolvedValue({ items: [tombstone("/never-seen"), sourceItem("id:B")], cursor: "next", complete: true });

@@ -8,33 +8,42 @@ the PR #141 reviewer, 2026-10-15):
 | 1 | `20261003120000_intake_approval_budget_invariants` | `foundation_intake_approvals`, `foundation_intake_approval_files`, and the approval RPCs (`create_`, `read_`, `reserve_…_approved_file`, `confirm_…_approved_upload`, `confirm_…_approved_file`, `cancel_…_approved_file`, `settle_…_approved_compute`, `assert_foundation_intake_compile_set`) | nothing while the approval switch is off |
 | 2 | `20261003130000_intake_approval_file_cap` | two `check` constraints on table 1 (128 files) | nothing |
 | 3 | `20261004100000_approved_intake_connection_batch_binding` | replaces `apply_foundation_connection_batch` (same ten parameters) so an approved upload's UUIDv4 binds to its confirmed member | the local-agent connection batch, on every batch |
-| 4 | `20261007100000_dropbox_source_path_reconciliation` | three `dropbox_source_*` tables, `reconcile_dropbox_source_page`, `dropbox_uncommitted_source_stream`; replaces `enqueue_connector_sync` | **every Dropbox sync page, unconditionally** |
+| 4 | `20261007100000_dropbox_source_path_reconciliation` | three `dropbox_source_*` tables, `reconcile_dropbox_source_page`, `dropbox_uncommitted_source_stream`, a `foundation_jobs` insert guard; replaces `enqueue_connector_sync` | every Dropbox sync page, **only while the approval switch is on** |
 
 `read_foundation_intake_approval_v2` is **not** in this list. It exists only in
 `supabase/drafts/migrations/20261004120000_foundation_intake_triage_v3.sql`, which says DRAFT ONLY,
 never apply. The application calls it only with triage on (`lib/intake-triage-rollout.ts`, off).
 
-This runbook follows `RELEASE_ORDER.md`: migrations first, then the deploy that needs them.
+This runbook follows `RELEASE_ORDER.md`: migrations first, then the deploy that needs them. The
+deploy that needs them is the later one that turns the switch on (section 4), **not PR #141**.
 
 ## What the deploy needs, and what it does not
 
+**None of the four is required to merge or deploy PR #141.** They are one feature-enablement step,
+tied to turning `INTAKE_APPROVAL_ROLLOUT_ENABLED` on.
+
 PR #141 ships with `INTAKE_APPROVAL_ROLLOUT_ENABLED = false` (`nextjs/lib/intake-approval-rollout.ts`).
-With it off, upload capability, confirm, release, `compile-jobs` and `collections/compile` run main
-dbe22b1e's path (`reserve_foundation_intake_admission`, `reserve_foundation_compute_v3`,
-`confirm_foundation_intake_admission`, `settle_foundation_compute_v3`) and call none of migration
-1's functions. `nextjs/lib/intake-approval-rollout-off.test.ts` pins that against a mocked database
-that has only main's functions.
+With it off:
 
-So migrations 1 and 2 are needed **before the switch is turned on**, not before the deploy.
+- upload capability, confirm, release, `compile-jobs` and `collections/compile` run main
+  dbe22b1e's path (`reserve_foundation_intake_admission`, `reserve_foundation_compute_v3`,
+  `confirm_foundation_intake_admission`, `settle_foundation_compute_v3`) and call none of
+  migration 1's functions. `nextjs/lib/intake-approval-rollout-off.test.ts` pins that against a
+  mocked database that has only main's functions.
+- Dropbox sync runs main dbe22b1e's path too: a DeletedMetadata keeps main's `path_lower` id and is
+  suspended at once, the checkpoint moves as on main, and `reconcile_dropbox_source_page` is never
+  called. `nextjs/lib/dropbox-sync-rollout.test.ts` pins that against the same kind of database.
+- migration 3's `apply_foundation_connection_batch` keeps its ten parameters, so the application
+  calls it the same way before and after; main's definition serves the switch-off path.
 
-Migration 4 is different: the PR's Dropbox sync calls `reconcile_dropbox_source_page` on every
-page and is not behind the switch. Without migration 4 a Dropbox sync fails closed with
-`DROPBOX_SOURCE_RECONCILIATION_UNAVAILABLE` and retries — no wrong data, but no Dropbox sync.
-**Apply migration 4 before the deploy**, unless the founder confirms production has no Dropbox
-connection (`select count(*) from public.foundation_oauth_connections where provider = 'dropbox';`).
+With the switch **on**, every Dropbox page goes through `reconcile_dropbox_source_page`. A database
+without migration 4 then answers PGRST202 / 42883, and the sync fails closed with
+`DROPBOX_SOURCE_RECONCILIATION_MIGRATION_MISSING`: retried, nothing imported or suspended, the
+checkpoint where it was.
 
-Migration 3 depends on migration 1's tables, so it goes after 1. It keeps the function's
-parameters, so the deployed application calls it the same way before and after.
+Order among the four: migration 3 depends on migration 1's tables, so it goes after 1. Migration 4's
+`enqueue_connector_sync` replacement and `foundation_jobs` insert guard act from the moment it is
+applied, switch or no switch, so apply it in the switch-on window (section 4), not ahead of it.
 
 ## Why not `supabase db push`
 
@@ -46,8 +55,9 @@ that are already there. Apply these four by hand and match the history **by name
 ## 0. Founder approval
 
 The production apply is the founder's step. An agent does not run it. Approve, in writing, the
-four files at the PR head's sha (check `git log -1 -- supabase/migrations/<file>`), and decide on
-migration 4 above.
+four files at the sha being enabled (check `git log -1 -- supabase/migrations/<file>`), together
+with the switch-on change in section 4. Merging or deploying PR #141 with the switch off needs
+neither.
 
 ## 1. Read-only pre-check
 
@@ -133,16 +143,20 @@ against a rehearsal database, not production.
 ## 4. Turning the approval lineage on (later, separately)
 
 Only after step 3 passes: a reviewed PR that sets `APPROVAL_LINEAGE_SWITCH = true` in
-`nextjs/lib/intake-approval-rollout.ts`. Triage stays off; it needs the draft above to become a
-reviewed migration first. With the switch on, a missing approval function answers
-`INTAKE_APPROVAL_LINEAGE_UNAVAILABLE` (503), not a ledger outage.
+`nextjs/lib/intake-approval-rollout.ts`. Apply the four migrations (steps 1–3) in the same window,
+immediately before that deploy. Triage stays off; it needs the draft above to become a reviewed
+migration first. With the switch on, a missing approval function answers
+`INTAKE_APPROVAL_LINEAGE_UNAVAILABLE` (503), not a ledger outage, and the switch also turns on the
+Dropbox path reconciliation: a missing `reconcile_dropbox_source_page` fails the sync closed as
+`DROPBOX_SOURCE_RECONCILIATION_MIGRATION_MISSING` with the checkpoint held.
 
 ## Rollback
 
 - Before the switch is on, migrations 1 and 2 are inert; leaving them in place is the rollback.
 - Migration 3: re-create `apply_foundation_connection_batch` from
   `supabase/migrations/0012_foundation_connections_and_api_keys.sql` (its last definition before 3).
-- Migration 4: re-create `enqueue_connector_sync` from
-  `supabase/migrations/20260909210203_connector_sync_checkpoints.sql`. The `dropbox_source_*`
-  tables can stay; nothing else reads them.
+- Migration 4: turn the switch off first (reconciliation then stops being called), re-create
+  `enqueue_connector_sync` from `supabase/migrations/20260909210203_connector_sync_checkpoints.sql`,
+  and drop trigger `foundation_jobs_dropbox_stream_guard` on `public.foundation_jobs`. The
+  `dropbox_source_*` tables can stay; nothing else reads them.
 - Application: production `dpl_4eqGTMU6SxLbfmUCP6e5tTqEZZh5` is main dbe22b1e.

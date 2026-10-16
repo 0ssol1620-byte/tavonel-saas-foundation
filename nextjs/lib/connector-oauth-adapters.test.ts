@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { listOAuthSourcePage, OAUTH_SOURCE_PAGE_SIZE, oauthSourceDownloadRequest } from "./connector-oauth-adapters";
 
+// The Dropbox path-tombstone mapping below runs only with the intake-approval rollout switch on
+// (its tombstones need migration 20261007100000). Main's switch-off mapping is pinned in
+// dropbox-sync-rollout.test.ts.
+vi.mock("./intake-approval-rollout", () => ({ INTAKE_APPROVAL_ROLLOUT_ENABLED: true }));
+
 describe("OAuth source adapters", () => {
   it("refuses the retired Google files listing, whose trashed filter hides deletions, without network I/O", async () => {
     // Gate #9: `q=trashed = false` turned a deletion into absence. Google now reads only the
