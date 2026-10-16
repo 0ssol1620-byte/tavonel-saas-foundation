@@ -6,6 +6,7 @@ import { resolveOpenApiOrigin } from "../../../lib/openapi-origin";
 import { qualifiedDocumentInputs } from "../../../lib/qualified-input";
 import { MAX_APPROVAL_FILES, MAX_APPROVAL_METADATA_BYTES } from "@/lib/intake-approval";
 import { intakePricingFingerprint, quoteIntakeManifest } from "@/lib/usage-pricing";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "@/lib/intake-approval-rollout";
 
 // The published server URL must be the origin the caller actually reached, and this route
 // used to be force-static: Next.js evaluated the handler once at build time, so
@@ -99,7 +100,7 @@ export async function GET(request: Request) {
   */
   const unversioned = [{ url: `${origin}/api` }];
 
-  return NextResponse.json({
+  const contract = {
     openapi: "3.1.0",
     info: {
       title: "TAVONEL Knowledge Compiler API",
@@ -1733,5 +1734,82 @@ export async function GET(request: Request) {
     "x-tavonel-error-catalogue": API_ERROR_CODES,
     "x-tavonel-browser-session-paths": ["/oauth-connectors", "/oauth-connectors/authorize", "/oauth-connectors/connections/{id}", "/developer/keys/{id}/rotate", "/developer/audit", "/reviews"],
     "x-tavonel-decision-gates": { promotion: "browser-session-only", rollback: "browser-session-only", mcp: "read-only" },
-  }, { headers: { "Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex" } });
+  };
+  return NextResponse.json(INTAKE_APPROVAL_ROLLOUT_ENABLED ? contract : withoutApprovalLineage(contract), {
+    headers: { "Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex" },
+  });
+}
+
+/*
+  Review 3 (CI-TI-1). The whole-set approval lineage ships behind lib/intake-approval-rollout.ts. While it
+  is off -- production -- its six operations answer 404 INTAKE_APPROVAL_DISABLED and the capability route
+  reads only main's three fields, so the published contract is main bcba7173's: the per-file
+  /uploads/capability operation below (verbatim, plus 9acf679d's per-file fallback sentence), no approval
+  operation and none of their schemas. lib/openapi-response-shape.switch-off.test.ts is main's suite run
+  against it; the switch-on document keeps its own suites.
+*/
+const APPROVAL_LINEAGE_PATHS: readonly string[] = ["/uploads/quote", "/uploads/approval", "/uploads/approval/cancel", "/uploads/confirm", "/uploads/release"];
+const APPROVAL_LINEAGE_SCHEMAS: readonly string[] = ["IntakeManifestEntry", "UploadQuoteTotals", "IntakeQuote", "UploadApprovalFile", "UploadApproval"];
+const PER_FILE_CAPABILITY = {
+  post: {
+    operationId: "createDirectUploadCapability",
+    summary: "Request a direct upload URL",
+    tags: ["Documents"],
+    "x-tavonel-scope": "documents:intake",
+    description: "Returns a short-lived browser/agent-direct R2 PUT URL only when this workspace is approved for source processing. A closed workspace receives 403 CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE before any URL or compute reservation is issued. Document bytes never pass through the application server. `requestedBytes` is checked against the deployment's per-source ceiling here, before any byte is stored: above it the answer is 413 SOURCE_EXCEEDS_PROCESSING_CEILING carrying `maxBytes`, `maxPages` and a sentence you can show a customer. Send `x-tavonel-source-idempotency-key` (a sha256 hex digest of the source event) to make the document id deterministic, so a retried intake converges on one document rather than two. While whole-set intake approval is not enabled (the approval endpoints answer 404 INTAKE_APPROVAL_DISABLED), request a capability per file without an attempt identity: send originalFilename, declaredMimeType and requestedBytes, with an optional stable x-tavonel-source-idempotency-key from which the document id is derived, then confirm with documentId and sourceSha256. The source agent falls back to this automatically.",
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: { type: "object", required: ["originalFilename", "declaredMimeType", "requestedBytes"], properties: { originalFilename: { type: "string", maxLength: 512 }, declaredMimeType: { type: "string", enum: Object.keys(qualifiedDocumentInputs) }, requestedBytes: { type: "integer", minimum: 1, maximum: 524288000 }, estimatedPages: { type: "integer", minimum: 1 } }, additionalProperties: false },
+          examples: { default: { value: { originalFilename: "manual.pdf", declaredMimeType: "application/pdf", requestedBytes: 184320 } } },
+        },
+      },
+    },
+    parameters: [{ $ref: "#/components/parameters/SourceIdempotencyKey" }],
+    responses: {
+      "200": ok(
+        "A qualified direct upload capability and the immutable document id the bytes will be registered under. PUT the bytes to `url` with the headers in `headers` and nothing else; the URL is the credential and it is short-lived.",
+        {
+          type: "object",
+          required: ["documentId", "url", "method", "expiresAt"],
+          properties: {
+            documentId: { type: "string", format: "uuid" },
+            url: { type: "string", format: "uri", description: "Presigned object-storage URL. Unauthenticated: do not send the API key to it." },
+            method: { const: "PUT" },
+            headers: { type: "object", additionalProperties: str, description: "Every header the PUT must carry, and no others." },
+            expiresAt: { type: "string", format: "date-time" },
+            objectKey: str,
+            ...bestEffort,
+          },
+          ...bestEffort,
+        },
+        {
+          documentId: "00000000-0000-4000-8000-000000000000",
+          url: "https://<storage-host>/quarantine/...?X-Amz-Signature=...",
+          method: "PUT",
+          headers: { "content-type": "application/pdf", "content-length": "184320" },
+          expiresAt: "2026-09-16T00:15:00.000Z",
+        },
+      ),
+      "400": err("UNQUALIFIED_INPUT", "UNQUALIFIED_MIME", "FILENAME_MIME_MISMATCH", "FILE_NAME_INVALID", "SOURCE_IDEMPOTENCY_KEY_INVALID"),
+      "401": err("AUTH_REQUIRED", "API_KEY_INVALID", "API_KEY_EXPIRED", "API_KEY_REVOKED"),
+      "402": err("STUDIO_SUBSCRIPTION_REQUIRED", "TRIAL_ARCHIVE_NOT_INCLUDED", "TRIAL_FILE_LIMIT_EXCEEDED", "GPU_CREDITS_REQUIRED"),
+      "403": err("CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE"),
+      "409": err("INTAKE_IDEMPOTENCY_CONFLICT", "COMPUTE_IDEMPOTENCY_CONFLICT"),
+      "413": err("SOURCE_EXCEEDS_PROCESSING_CEILING", "TRIAL_FILE_TOO_LARGE"),
+      "429": err("API_RATE_LIMITED", "INTAKE_RATE_LIMITED", "INTAKE_DAILY_QUOTA_EXCEEDED"),
+      "503": err("SIGNER_NOT_CONFIGURED", "INTAKE_DISABLED", "API_RATE_LIMIT_UNAVAILABLE"),
+    },
+  },
+};
+
+function withoutApprovalLineage<T extends { paths: Record<string, unknown>; components: { schemas: Record<string, unknown> } }>(contract: T): T {
+  const paths: Record<string, unknown> = {};
+  for (const [path, item] of Object.entries(contract.paths)) {
+    if (APPROVAL_LINEAGE_PATHS.includes(path)) continue;
+    paths[path] = path === "/uploads/capability" ? PER_FILE_CAPABILITY : item;
+  }
+  const schemas = Object.fromEntries(Object.entries(contract.components.schemas).filter(([name]) => !APPROVAL_LINEAGE_SCHEMAS.includes(name)));
+  return { ...contract, paths, components: { ...contract.components, schemas } };
 }

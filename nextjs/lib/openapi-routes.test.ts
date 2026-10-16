@@ -1,8 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { GET as openApiRoute } from "@/app/api/openapi/route";
 import { intakePricingFingerprint, quoteIntakeManifest } from "./usage-pricing";
+// The 39-operation surface below is the whole-set approval lineage's. With the switch off (production) the
+// route publishes main's 33 operations, pinned by lib/openapi-routes.switch-off.test.ts (review 3, CI-TI-1).
+vi.mock("@/lib/intake-approval-rollout", () => ({ INTAKE_APPROVAL_ROLLOUT_ENABLED: true }));
 
 /*
   G3-001, as a check the build runs instead of a person.

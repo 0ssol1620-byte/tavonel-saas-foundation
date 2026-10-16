@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { GET as openApi } from "../app/api/openapi/route";
 import { COMPILE_MAX_DOCUMENTS, COMPILE_MIN_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
+// The approved direct-upload path set exists only with the approval lineage on. Main's switch-off contract
+// is pinned by lib/openapi-compile-jobs.switch-off.test.ts (review 3, CI-TI-1).
+vi.mock("@/lib/intake-approval-rollout", () => ({ INTAKE_APPROVAL_ROLLOUT_ENABLED: true }));
 
 /*
   The published spec is what someone else's generated client is built from.

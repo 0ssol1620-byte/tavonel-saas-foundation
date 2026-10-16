@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { GET as openApiRoute } from "@/app/api/openapi/route";
 import { API_ERROR_CODE_NAMES } from "./api-error-codes";
 import { DOCS_SECTIONS } from "./docs-content";
+// 39 operations is the approval lineage's surface. With the switch off (production) the route publishes
+// main's 33, pinned by lib/openapi-completeness.switch-off.test.ts (review 3, CI-TI-1).
+vi.mock("@/lib/intake-approval-rollout", () => ({ INTAKE_APPROVAL_ROLLOUT_ENABLED: true }));
 
 /*
   G3-030 and G3-031, as assertions.
