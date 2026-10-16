@@ -218,7 +218,11 @@ test("Changes reads the World's own history and derives every count from two art
   await expect(impact.getByText("Maintenance interval is 2,000 hours")).toBeVisible();
   // Compiled ids are resolved to labels; an internal key never becomes the primary line.
   await expect(impact.getByText("Feedwater Pump FP-200 has_maintenance_interval Maintenance interval is 2,000 hours")).toHaveCount(0);
-  await expect(impact.locator("li")).toHaveCount(1);
+  // Two rows, for the same reason as the count above (456b13fb): the entity changed its sourceVersions and the claim its
+  // label and sourceVersions. Measured locally on this head: "Entity · changed / Feedwater Pump FP-200 / sourceVersions" and
+  // "Claim · changed / Maintenance interval is 2,000 hours / Label, sourceVersions".
+  await expect(impact.locator("li")).toHaveCount(2);
+  await expect(impact.locator("li").filter({ hasText: "Feedwater Pump FP-200" })).toContainText("sourceVersions");
 
   // The existing version-diff panel, opened on this pair rather than on its own default.
   await expect(surface.getByRole("heading", { name: "FIELD-LEVEL COMPARISON" })).toBeVisible();

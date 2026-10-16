@@ -71,19 +71,26 @@ for (const locale of LOCALES) {
 
       // The phone player starts fitted and exposes the localized action and explanation.
       await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
-      await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "0");
       await expect(focusControl).toHaveAttribute("aria-pressed", "false");
       await expect(focusControl).toHaveText(locale.focus);
       await expect(hint).toHaveText(locale.fittedHint);
 
-      // Focus is an explicit opt-in and pans to the selected stage's authored pane.
+      /*
+        Focus is an explicit opt-in and pans to the selected stage's authored pane. The pane is the stage's reading target in
+        components/compile-stage-player.tsx STAGE_FRAMES (Files 1, Organize 1, Updates 0, Use with AI 3 on Release 2), not
+        the stage's position, and a playing film advances by itself, so each check follows a stage the visitor chose.
+      */
       await focusControl.click();
       await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
       await expect(focusControl).toHaveAttribute("aria-pressed", "true");
       await expect(focusControl).toHaveText(locale.fit);
       await expect(hint).toHaveText(locale.focusedHint);
-      await stages.nth(1).click();
-      await expect(stages.nth(1)).toHaveAttribute("aria-selected", "true");
+      await stages.nth(2).click();
+      await expect(stages.nth(2)).toHaveAttribute("aria-selected", "true");
+      await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "0");
+      await expect.poll(() => viewport.evaluate((element) => element.scrollLeft)).toBe(0);
+      await stages.nth(0).click();
+      await expect(stages.nth(0)).toHaveAttribute("aria-selected", "true");
       await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
       await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "1");
       await expect.poll(() => viewport.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
@@ -94,8 +101,8 @@ for (const locale of LOCALES) {
       await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "1");
       await expect(focusControl).toHaveAttribute("aria-pressed", "false");
       await expect(focusControl).toHaveText(locale.focus);
-      await stages.nth(0).click();
-      await expect(stages.nth(0)).toHaveAttribute("aria-selected", "true");
+      await stages.nth(2).click();
+      await expect(stages.nth(2)).toHaveAttribute("aria-selected", "true");
       await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
       await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "0");
     });
