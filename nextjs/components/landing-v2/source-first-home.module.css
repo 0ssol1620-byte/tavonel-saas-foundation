@@ -233,7 +233,14 @@
       frame it started at 848px on a 390x844 screen (854px at 360x800). Grid placement only: the
       DOM order (frame, then line) and the desktop and Focus layouts are unchanged.
     */
-    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"]) { gap: 8px; }
+    /*
+      Fix round 5 (R4-MJ1): the caption row is the other half of a stage-independent frame top. Stage
+      4's caption needs 201px for two lines; beside the toggle it had 204.5px in Chrome at 360 and
+      194.5px in Windows WebKit (310px column), where it wrapped to a third line and dropped the
+      frame 21.5px on stage 4 (fix4/cap-*.txt). A 4px column gap here and 6px toggle padding below
+      give the caption 216.5 / 206.5px.
+    */
+    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"]) { gap: 8px 4px; }
     .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] [data-film-reading]) { grid-row: 3; }
     .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] .compile-film-viewport) { grid-row: 4; }
     /*
@@ -297,7 +304,7 @@
     .home[lang="ko"].home :global(.lv2-hero-support) { line-height: 1.6; }
     .home.home :global(#s1 .compile-film-stages button) { font-size: 14px; padding-block: 10px; padding-inline: 2px; min-height: 44px; }
     .home.home :global(#s1 .compile-film-caption p) { font-size: 15px; line-height: 1.45; }
-    .home.home :global(#s1 .compile-film-focus-control) { padding: 8px 10px; border: 1px solid var(--home-rule-strong); border-radius: 4px; color: var(--home-ink); font: 560 14px/1.4 var(--f-sans); }
+    .home.home :global(#s1 .compile-film-focus-control) { padding: 8px 6px; border: 1px solid var(--home-rule-strong); border-radius: 4px; color: var(--home-ink); font: 560 14px/1.4 var(--f-sans); }
     .heroAside { margin: 16px auto 16px; gap: 4px; }
     .heroAside :global(.lv2-actions) { display: grid; grid-template-columns: minmax(0, 1fr); width: min(100%, 320px); gap: 0; }
     .heroAside :global(.lv2-text-link) { min-height: 44px; }

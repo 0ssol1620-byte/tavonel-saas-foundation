@@ -571,6 +571,7 @@ for (const path of ["/", "/ko"]) {
     const heights: Record<number, number> = { 360: 800, 390: 844, 412: 915, 430: 932 };
     const measured: Record<string, unknown>[] = [];
     for (const width of [360, 390, 412, 430]) {
+      const frameTops: number[] = [];
       await page.setViewportSize({ width, height: heights[width]! });
       await page.goto(path);
       const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
@@ -615,7 +616,17 @@ for (const path of ["/", "/ko"]) {
         expect(text.x).toBeGreaterThanOrEqual(0);
         expect(text.x + text.width).toBeLessThanOrEqual(width);
         measured.push({ width, stage: stage + 1, lineTop: text.y, lineBottom: text.y + text.height, frameTop: frame.y, frameBottom: frame.y + frame.height, fold: heights[width], contrast, lcpSize: lcp.size });
+        frameTops.push(frame.y);
       }
+      /*
+        Fix round 5 (R4-MJ1): the frame does not move with the stage. The line above it wrapped to
+        1-3 lines by stage and pushed the frame 22.5px on every auto-advance (EN 360 629.5 / 607 /
+        629.5 / 629.5, EN 430 548.2 / 525.7 / 548.2 / 570.7, KO 360 583.5 / 561 / 561 / 561;
+        critic4/phone4-chrome.json). The reading block now reserves three lines, and the frame
+        sits at EN 629.5 / 596.2 / 570.7 / 570.7 and KO 583.5 / 583.5 / 583.5 / 583.5 at
+        360 / 390 / 412 / 430 on all four stages (fix4/frames-after-chrome.json).
+      */
+      for (const [stage, top] of frameTops.entries()) expect(Math.abs(top - frameTops[0]!), `${width} stage ${stage + 1}: frame top as on stage 1`).toBeLessThanOrEqual(0.5);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await page.screenshot({ path: testInfo.outputPath(`phone-${path === "/" ? "en" : "ko"}-${width}-fit-line.png`) });
     }

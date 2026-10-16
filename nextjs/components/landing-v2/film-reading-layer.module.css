@@ -84,6 +84,20 @@
   .quote {
     font-size: 15px;
   }
+
+  /*
+    Fix round 5 (R4-MJ1): in phone Fit the line sits above the frame, so a stage whose line wraps
+    to one line more or less moved the film by 22.5px -- on every ~18 s auto-advance, with no
+    input (critic4/cls4-after.json: single layout shifts up to 0.0624). The block reserves the
+    longest line's height and sets the text on its foot, 8px over the frame, so the frame's top
+    no longer depends on the stage. Three lines at 15px x 1.5 is the maximum: measured at 360-430
+    x EN/KO in Chrome and in Windows WebKit (310-410px columns), the longest line (stage 4 EN)
+    needs 266px for three lines and every column is 310px or wider (fix4/frames-*.json, min3).
+  */
+  .story[data-mobile-view="fit"] .reading {
+    min-height: 67.5px;
+    align-content: end;
+  }
 }
 
 /*

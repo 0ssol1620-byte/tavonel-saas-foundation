@@ -180,6 +180,81 @@ test("on a Home phone the prompt never opens over the hero film", async ({ page 
 });
 
 /*
+  Fix round 5 (R4-MJ2). Projects 390 and 360 (390x844, 360x844) always take the waiting branch
+  above: their frame reaches the 104px zone, so neither the 8 s line check nor a sheet that
+  could cover the line ever ran in CI. These two scenarios run where they can.
+
+  (a) 430x932 and 412x915, the widths where the 8 s sheet does open. Fix round 5 measured the
+  frame at 570.7-820.1 (430) and 570.7-809.7 (412) on every stage (fix4/frames-after-chrome.json)
+  against zones from 828 and 811, so the sheet shows at 8 s at 430 and must be clear of the frame
+  and of the line. At 412 the margin is 1.3px, so the spec asserts the rule both ways from the
+  measured boxes instead of a fixed answer: open and clear when both boxes are out of the zone,
+  waiting when either reaches into it.
+*/
+for (const [width, height] of [[430, 932], [412, 915]] as const) {
+  test(`on a wide Home phone the 8 s sheet opens clear of the film and its reading line (${width}x${height})`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "390", "sets its own viewport");
+    await page.setViewportSize({ width, height });
+    await page.clock.install();
+    await page.goto("/");
+    const panel = page.getByRole("region", PANEL);
+    await expect(page.locator("#s1 .compile-film-sequence")).toHaveAttribute("data-narrow", "1");
+    await expect(panel).toHaveCount(0);
+    await page.clock.fastForward(8_000);
+    await page.clock.runFor(500);
+    expect(await page.evaluate(() => window.scrollY), `${width}: unscrolled`).toBe(0);
+    const film = (await page.locator("#s1 .compile-film-viewport").boundingBox())!;
+    const line = (await page.locator("#s1 [data-film-reading] p").boundingBox())!;
+    const reach = Math.max(film.y + film.height, line.y + line.height);
+    if (width === 430 || reach <= height - 104) {
+      expect(reach, `${width}: film and line clear of the sheet's zone`).toBeLessThanOrEqual(height - 104);
+      await expect(panel, `${width}: the 8 s sheet opens`).toBeVisible();
+      await settle(panel);
+      const box = (await panel.boundingBox())!;
+      expect(overlaps(box, film), `${width}: the 8 s sheet covers the film`).toBe(false);
+      expect(overlaps(box, line), `${width}: the 8 s sheet covers the reading line`).toBe(false);
+    } else {
+      await expect(panel, `${width}: the sheet waits while the film reaches its zone`).toHaveCount(0);
+    }
+    await testInfo.attach(`home-phone-sheet-8s-${width}`, { body: await page.screenshot(), contentType: "image/png" });
+  });
+}
+
+/*
+  (b) 430x932 in Focus details, scrolled 300px: the frame (about 237-717) is above the zone from
+  828 and only the reading block under it (about 729-834) reaches in. This is the one path where
+  the sheet's check of [data-film-reading] decides alone; without it the sheet opens on the line
+  (verified in fix round 5 by removing `line` from the boxes in marketing-consent.tsx: this test
+  failed, fix4/mutation-*.log).
+*/
+test("on a wide Home phone in Focus the scrolled sheet never covers the reading line", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "390", "sets its own viewport");
+  const [width, height] = [430, 932];
+  await page.setViewportSize({ width, height });
+  await page.goto("/");
+  const film = page.locator('#s1 figure[data-testid="landing-hero-film"]');
+  await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-narrow", "1");
+  await film.getByRole("button", { name: "Focus details", exact: true }).click();
+  await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
+  await page.evaluate(() => window.scrollTo(0, 300));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(300);
+  const frame = (await film.locator(".compile-film-viewport").boundingBox())!;
+  const reading = (await film.locator("[data-film-reading]").boundingBox())!;
+  // The scenario: the frame is out of the zone and only the reading block reaches into it.
+  expect(frame.y + frame.height, "frame above the sheet's zone").toBeLessThanOrEqual(height - 104);
+  expect(reading.y + reading.height, "reading block inside the sheet's zone").toBeGreaterThan(height - 104);
+  // Past the 200px trigger the sheet decides within a frame; give it the 180ms entry as well.
+  await page.waitForTimeout(800);
+  const panel = page.getByRole("region", PANEL);
+  if (await panel.count()) {
+    await settle(panel);
+    const box = (await panel.boundingBox())!;
+    expect(overlaps(box, reading), "the scrolled sheet covers the reading line").toBe(false);
+  }
+  await testInfo.attach("home-phone-sheet-focus-300", { body: await page.screenshot(), contentType: "image/png" });
+});
+
+/*
   Fix round 3 (judge gap 3), 1440. The row under the header was #faf9f6 on the #faf9f6 page with a
   1.31:1 rule. Text >= 4.5:1, and the rule and the two answers' borders >= 3:1 (WCAG 1.4.11) against
   the row and the page.

@@ -652,7 +652,13 @@ export default function CompileStagePlayer({
       </ol>
       {(() => {
         const [before, after] = (korean ? target.lineKo : target.line).split("{q}");
-        return <p className={readingStyles.line}>{before}<q className={target.mono ? readingStyles.mono : readingStyles.quote} lang={korean ? "en" : undefined}>{target.text}</q>{after}</p>;
+        /*
+          Keyed by stage (fix round 5, R4-MJ1): a stage's line is new text, not the last stage's
+          text moved. Reused, its text nodes reflowed by one line on each auto-advance and scored
+          as layout shifts without input (up to 0.0192 at KO 360 with the frame already fixed,
+          fix4/cls4-after-local.json).
+        */
+        return <p key={active.id} className={readingStyles.line}>{before}<q className={target.mono ? readingStyles.mono : readingStyles.quote} lang={korean ? "en" : undefined}>{target.text}</q>{after}</p>;
       })()}
     </div>
   ) : null;
