@@ -198,8 +198,13 @@ test("Changes reads the World's own history and derives every count from two art
   const record = surface.getByRole("button", { name: /world-revision-b.*world-revision-c/s });
   await expect(record).toHaveAttribute("aria-pressed", "true");
 
-  // Derived, not typed: one object changed, one evidence region changed, one package file changed.
-  await expect(surface.getByText(/1 object \(1 changed\)/)).toBeVisible();
+  // Derived, not typed: two objects changed, one evidence region changed, one package file changed.
+  // Re-pinned from "1 object (1 changed)" to the per-object source-version diff of 456b13fb
+  // ("fix: integrate reviewed blueprint lifecycle and bounded browser corrections"; pinned by
+  // lib/world-version-diff.test.ts "source versions exchanged between two objects are reported per
+  // object"): both fixture objects move from sourceVersions ["version-b"] to ["version-c"], so
+  // entity-1 changes as well as claim-1. Measured at 1aca28de: "2 objects (2 changed)".
+  await expect(surface.getByText(/2 objects \(2 changed\)/)).toBeVisible();
   await expect(surface.getByText(/1 evidence region \(1 changed\)/)).toBeVisible();
   await expect(surface.getByText(/2 source revisions/)).toBeVisible();
 

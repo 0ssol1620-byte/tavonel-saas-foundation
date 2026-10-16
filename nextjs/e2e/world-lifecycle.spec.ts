@@ -1590,7 +1590,8 @@ test("version comparison pages 51 changes and resets intersected filters", async
   await expect(rows).toContainText("Paging object 01");
   await page.getByRole("button", { name: "Clear filters", exact: true }).click();
   await expect(paging).toContainText("Page 1 of 2"); await expect(rows).toHaveCount(50);
-  await expect(page.getByText("Answer-cache effects: unknown (not_yet).", { exact: false })).toBeVisible();
+  // Copy no longer prints the "not_yet" token (components/world-version-diff.tsx VersionComparisonEffects).
+  await expect(page.getByText("Answer-cache effects: unknown.", { exact: false })).toBeVisible();
   expect(errors).toEqual([]);
   await testInfo.attach("version-paging-local-fixture", { body: await page.screenshot({ path: testInfo.outputPath("version-paging-local-fixture.png"), fullPage: true }), contentType: "image/png" });
 });

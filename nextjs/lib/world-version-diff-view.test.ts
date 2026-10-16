@@ -197,8 +197,11 @@ describe("filtering actual comparison output preserves read model contracts", ()
     const impact = freeze(structuredClone(unknownImpact));
     const snapshot = JSON.stringify(impact);
     const markup = renderToStaticMarkup(createElement(VersionComparisonEffects, { impact }));
-    expect(markup).toContain("Merge, split, bridge and ACL effects: unknown (not_yet");
-    expect(markup).toContain("Answer-cache effects: unknown (not_yet).");
+    // The internal state token stays out of the copy (main's e2e/change-inbox.spec.ts forbids
+    // "not_yet" anywhere on the page); the unknown is still said, with its reason.
+    expect(markup).toContain("Merge, split, bridge and ACL effects: unknown (not materialized in this comparison).");
+    expect(markup).toContain("Answer-cache effects: unknown.");
+    expect(markup).not.toContain("not_yet");
     expect(markup).toContain(impact.answerCaches.state === "not_yet" ? impact.answerCaches.reason : "unreachable");
     expect(markup).not.toContain("0");
     expect(JSON.stringify(impact)).toBe(snapshot);
@@ -275,8 +278,9 @@ describe("UX24 bounded diff paging", () => {
     expect(markup).toContain("No objects on this page.");
     expect(markup).not.toContain("No objects match these filters.");
     const effects = renderToStaticMarkup(createElement(VersionComparisonEffects, { impact: unknownImpact }));
-    expect(effects).toContain("ACL effects: unknown (not_yet");
-    expect(effects).toContain("Answer-cache effects: unknown (not_yet)");
+    expect(effects).toContain("ACL effects: unknown (not materialized");
+    expect(effects).toContain("Answer-cache effects: unknown.");
+    expect(effects).not.toContain("not_yet");
   });
 });
 
@@ -369,7 +373,7 @@ describe("UX24 bounded diff paging actual handlers", () => {
       expect(ids()[0]).toBe("entity-50"); expect(ids()).toHaveLength(50);
       expect(pageText(hooks.tree)).toContain("all 123 artifact changes");
       expect(pageText(hooks.tree)).toContain("Keep complete ledger");
-      expect(pageText(hooks.tree)).toContain("ACL effects: unknown (not_yet");
+      expect(pageText(hooks.tree)).toContain("ACL effects: unknown (not materialized");
       pageButton(hooks, "Roll back to this version").props.onClick();
       expect(calls).toEqual([`sha256:${"a".repeat(64)}`]);
     });

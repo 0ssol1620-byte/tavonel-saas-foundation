@@ -279,8 +279,9 @@ export default function WorldVersionDiffPanel({ model, onRollback, rollbackBusy 
 export function VersionComparisonEffects({ impact }: { impact: ReviewImpactContract }) {
   return (
     <p className={styles.note}>
-      Merge, split, bridge and ACL effects: unknown (not_yet; not materialized in this comparison).
-      {" "}Answer-cache effects: unknown (not_yet). {impact.answerCaches.state === "not_yet"
+      {/* "not_yet" is the contract's state token, not copy: the reader is told what is unknown and why. */}
+      Merge, split, bridge and ACL effects: unknown (not materialized in this comparison).
+      {" "}Answer-cache effects: unknown. {impact.answerCaches.state === "not_yet"
         ? impact.answerCaches.reason
         : "The review impact contract does not establish cache effects for this version comparison."}
     </p>
