@@ -1744,8 +1744,9 @@ export async function GET(request: Request) {
   Review 3 (CI-TI-1). The whole-set approval lineage ships behind lib/intake-approval-rollout.ts. While it
   is off -- production -- its six operations answer 404 INTAKE_APPROVAL_DISABLED and the capability route
   reads only main's three fields, so the published contract is main bcba7173's: the per-file
-  /uploads/capability operation below (verbatim, plus 9acf679d's per-file fallback sentence), no approval
-  operation and none of their schemas. lib/openapi-response-shape.switch-off.test.ts is main's suite run
+  /uploads/capability operation below (main's, verbatim), no approval operation and none of their schemas.
+  9acf679d's per-file fallback sentence names the approval endpoints' 404, so only the switch-on document,
+  which publishes those endpoints, carries it. lib/openapi-response-shape.switch-off.test.ts is main's suite run
   against it; the switch-on document keeps its own suites.
 */
 const APPROVAL_LINEAGE_PATHS: readonly string[] = ["/uploads/quote", "/uploads/approval", "/uploads/approval/cancel", "/uploads/confirm", "/uploads/release"];
@@ -1756,7 +1757,7 @@ const PER_FILE_CAPABILITY = {
     summary: "Request a direct upload URL",
     tags: ["Documents"],
     "x-tavonel-scope": "documents:intake",
-    description: "Returns a short-lived browser/agent-direct R2 PUT URL only when this workspace is approved for source processing. A closed workspace receives 403 CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE before any URL or compute reservation is issued. Document bytes never pass through the application server. `requestedBytes` is checked against the deployment's per-source ceiling here, before any byte is stored: above it the answer is 413 SOURCE_EXCEEDS_PROCESSING_CEILING carrying `maxBytes`, `maxPages` and a sentence you can show a customer. Send `x-tavonel-source-idempotency-key` (a sha256 hex digest of the source event) to make the document id deterministic, so a retried intake converges on one document rather than two. While whole-set intake approval is not enabled (the approval endpoints answer 404 INTAKE_APPROVAL_DISABLED), request a capability per file without an attempt identity: send originalFilename, declaredMimeType and requestedBytes, with an optional stable x-tavonel-source-idempotency-key from which the document id is derived, then confirm with documentId and sourceSha256. The source agent falls back to this automatically.",
+    description: "Returns a short-lived browser/agent-direct R2 PUT URL only when this workspace is approved for source processing. A closed workspace receives 403 CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE before any URL or compute reservation is issued. Document bytes never pass through the application server. `requestedBytes` is checked against the deployment's per-source ceiling here, before any byte is stored: above it the answer is 413 SOURCE_EXCEEDS_PROCESSING_CEILING carrying `maxBytes`, `maxPages` and a sentence you can show a customer. Send `x-tavonel-source-idempotency-key` (a sha256 hex digest of the source event) to make the document id deterministic, so a retried intake converges on one document rather than two.",
     requestBody: {
       required: true,
       content: {
