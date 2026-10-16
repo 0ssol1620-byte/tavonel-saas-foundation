@@ -274,10 +274,42 @@ test("the film opens each stage on its scanned default view and reads at 9px or 
     await toggle.press("Enter");
     await expect(sequence).toHaveAttribute("data-wide-view", "crop");
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
-    // The visitor's own choice then holds across stages, Fit-default stage 4 included.
+    /*
+      Fix round 4 (M1): that round trip ended on stage 1's own default, so it records no choice, and
+      stage 4 opens on its default, Fit. Until this round the trip stored "crop", which opened stage 4
+      on the window whose TERMINAL pane is blank for most of the cut: blankScan share 169/424 = 0.399
+      against the 0.85 threshold (redesign-r3-20261015/fix2/BLANK-SCAN-2.json).
+    */
+    await film.getByRole("tab").nth(3).click();
+    expect(scan.stages.world!.share, "stage 4's crop fails the blank scan").toBeLessThan(scan.threshold);
+    await expect(sequence).toHaveAttribute("data-wide-view", "fit");
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    // A Focus pressed on stage 4 itself is the visitor's: it stays while stage 4 stays, a press on
+    // the stage's own tab included ...
+    await toggle.click();
+    await expect(sequence).toHaveAttribute("data-wide-view", "crop");
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(await zoom(film)).toBeCloseTo(2, 2);
     await film.getByRole("tab").nth(3).click();
     await expect(sequence).toHaveAttribute("data-wide-view", "crop");
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    // ... and belongs to stage 4: another stage opens on its own default, and stage 4 on Fit again.
+    await film.getByRole("tab").nth(1).click();
+    await expect(sequence).toHaveAttribute("data-wide-view", "crop");
+    await film.getByRole("tab").nth(3).click();
+    await expect(sequence).toHaveAttribute("data-wide-view", "fit");
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    // A Fit the visitor asks for holds across stages (Fit is never blank).
+    await film.getByRole("tab").first().click();
+    await toggle.click();
+    await expect(sequence).toHaveAttribute("data-wide-view", "fit");
+    await film.getByRole("tab").nth(2).click();
+    await expect(sequence).toHaveAttribute("data-wide-view", "fit");
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await toggle.click();
+    await expect(sequence).toHaveAttribute("data-wide-view", "crop");
+    await film.getByRole("tab").nth(3).click();
+    await expect(sequence).toHaveAttribute("data-wide-view", "fit");
     await page.screenshot({ path: testInfo.outputPath(`film-1440${reduced ? "-reduced" : ""}.png`) });
 
     await page.setViewportSize({ width: 390, height: 844 });
@@ -496,14 +528,36 @@ test("every stage that opens cropped keeps ink in both panes of its whole window
 
 /*
   Release 3 fix round 3 (judge gap 2). A phone opens on Fit -- the poster stays the LCP element --
-  and the stage's reading line is HTML at 15px or more directly under the frame, so the stage's text
-  is read without pressing Focus details. Asserted at 360, 390 and 430, in English and Korean, under
-  reduced motion (where the frame is the poster) for every stage.
+  and the stage's reading line is HTML at 15px or more, so the stage's text is read without pressing
+  Focus details. Asserted in English and Korean, under reduced motion (where the frame is the
+  poster) for every stage.
+
+  Fix round 4 (M2, 4/4 judges): under the frame the line started below the fold (top 848 of 844 at
+  390, 854 of 800 at 360; critic3/phone.json), so the first screen held the four-pane miniature and
+  no readable line. It now sits directly above the frame, and its bottom edge and the frame's top
+  edge are both on the first screen at 360, 390, 412 and 430. The poster's LCP area may not shrink
+  below the 2c7fba3 measurement (fix2/LCP-after.json, same viewports, reduced motion) by more than
+  1%: the same fully visible 348px-wide frame reads 75,516 or 75,864 px² depending on where its top
+  lands between pixels (one row), and the frame sliding under the fold costs far more (an 80px slide
+  at 360x800 is -43%). Fix round 4 measured EN 52,470 / 75,516 / 85,470 / 93,896 and KO 63,282 /
+  75,516 / 85,470 / 94,284 (fix3/LCP-after.json). The floors are per engine: Windows WebKit lays the
+  page out beside a 10px classic scrollbar (310-410px of content), so its areas are their own
+  baseline, measured on the 2c7fba3 preview (fix3/LCP-webkit-before-2c7fba3.json).
 */
+const LCP_FLOOR: Record<string, Record<string, Record<number, number>>> = {
+  chromium: {
+    "/": { 360: 51_516, 390: 75_516, 412: 85_470, 430: 93_896 },
+    "/ko": { 360: 62_646, 390: 75_864, 412: 85_470, 430: 94_284 },
+  },
+  webkit: {
+    "/": { 360: 43_495, 390: 68_640, 412: 81_000, 430: 89_302 },
+    "/ko": { 360: 59_290, 390: 71_402, 412: 81_000, 430: 89_302 },
+  },
+};
 for (const path of ["/", "/ko"]) {
-  test(`a phone in Fit reads each stage's line directly under the frame (${path})`, async ({ page }, testInfo) => {
+  test(`a phone in Fit reads each stage's line directly above the frame, on the first screen (${path})`, async ({ page, browserName }, testInfo) => {
     test.skip(testInfo.project.name !== "390", "sets its own viewports");
-    test.setTimeout(90_000);
+    test.setTimeout(120_000);
     const quotes = ["WORKING COPY.md", "# Payment terms", "CHANGED", "nodes lit"];
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.addInitScript(() => {
@@ -511,8 +565,10 @@ for (const path of ["/", "/ko"]) {
       new PerformanceObserver(list => { (window as unknown as { __lcp: PerformanceEntry[] }).__lcp.push(...list.getEntries()); })
         .observe({ type: "largest-contentful-paint", buffered: true });
     });
-    for (const width of [360, 390, 430]) {
-      await page.setViewportSize({ width, height: width === 360 ? 800 : width === 390 ? 844 : 932 });
+    const heights: Record<number, number> = { 360: 800, 390: 844, 412: 915, 430: 932 };
+    const measured: Record<string, unknown>[] = [];
+    for (const width of [360, 390, 412, 430]) {
+      await page.setViewportSize({ width, height: heights[width]! });
       await page.goto(path);
       const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
       const sequence = film.locator(".compile-film-sequence");
@@ -527,23 +583,39 @@ for (const path of ["/", "/ko"]) {
       });
       expect(new URL(lcp.url).pathname, `LCP at ${width}`).toBe("/film/poster-1-t3.00.webp");
       expect(lcp.still, `LCP element at ${width}`).toBe(true);
+      expect(lcp.size, `LCP area at ${width}`).toBeGreaterThanOrEqual(LCP_FLOOR[browserName]![path]![width]! * 0.99);
       for (let stage = 0; stage < 4; stage++) {
         await film.getByRole("tab").nth(stage).click();
         const line = film.locator("[data-film-reading] p");
         await expect(line).toBeVisible();
         await expect(line.locator("q")).toHaveText(quotes[stage]!);
         expect(parseFloat(await line.evaluate(node => getComputedStyle(node).fontSize)), `${width} stage ${stage + 1}`).toBeGreaterThanOrEqual(15);
-        // Directly under the frame: only the grid gap between them, no pane strip in Fit.
+        // WCAG 1.4.3 on the paper ground, for the line and for its quote.
+        const contrast = await line.evaluate(node => {
+          const rgb = (value: string) => (value.match(/[\d.]+/g) ?? []).map(Number);
+          const lum = (c: number[]) => { const f = (v: number) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]!) + 0.7152 * f(c[1]!) + 0.0722 * f(c[2]!); };
+          const ratio = (a: number[], b: number[]) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x! + 0.05) / (y! + 0.05); };
+          const ground = rgb(getComputedStyle(document.querySelector("#s1")!).backgroundColor);
+          return [node, node.querySelector("q")!].map(el => ratio(rgb(getComputedStyle(el).color), ground));
+        });
+        for (const value of contrast) expect(value, `${width} stage ${stage + 1}: contrast`).toBeGreaterThanOrEqual(4.5);
+        // Directly above the frame: only the grid gap between them, no pane strip in Fit.
         await expect(film.locator("[data-film-reading] ol")).toBeHidden();
         const frame = (await film.locator(".compile-film-viewport").boundingBox())!;
         const text = (await line.boundingBox())!;
-        expect(text.y - (frame.y + frame.height), `${width} stage ${stage + 1}: gap under the frame`).toBeGreaterThanOrEqual(0);
-        expect(text.y - (frame.y + frame.height), `${width} stage ${stage + 1}: gap under the frame`).toBeLessThanOrEqual(16);
+        expect(frame.y - (text.y + text.height), `${width} stage ${stage + 1}: gap above the frame`).toBeGreaterThanOrEqual(0);
+        expect(frame.y - (text.y + text.height), `${width} stage ${stage + 1}: gap above the frame`).toBeLessThanOrEqual(16);
+        // The first screen holds the readable line and the top of the film together.
+        expect(await page.evaluate(() => scrollY), `${width} stage ${stage + 1}: no scroll`).toBe(0);
+        expect(text.y + text.height, `${width} stage ${stage + 1}: line on the first screen`).toBeLessThanOrEqual(heights[width]!);
+        expect(frame.y, `${width} stage ${stage + 1}: film top on the first screen`).toBeLessThan(heights[width]!);
         expect(text.x).toBeGreaterThanOrEqual(0);
         expect(text.x + text.width).toBeLessThanOrEqual(width);
+        measured.push({ width, stage: stage + 1, lineTop: text.y, lineBottom: text.y + text.height, frameTop: frame.y, frameBottom: frame.y + frame.height, fold: heights[width], contrast, lcpSize: lcp.size });
       }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await page.screenshot({ path: testInfo.outputPath(`phone-${path === "/" ? "en" : "ko"}-${width}-fit-line.png`) });
     }
+    await testInfo.attach(`phone-fit-line-${path === "/" ? "en" : "ko"}`, { body: JSON.stringify(measured, null, 2), contentType: "application/json" });
   });
 }

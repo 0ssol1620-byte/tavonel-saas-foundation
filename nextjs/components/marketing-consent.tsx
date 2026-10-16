@@ -87,6 +87,19 @@ export const CONSENT_REVEAL = { scrollPx: 200, delayMs: 8000 } as const;
 const PHONE_SHEET_ZONE_PX = 104;
 const PHONE = "(max-width: 899.98px)";
 
+/*
+  Fix round 4 (M3). What the sheet keeps clear of is the frame AND the stage's reading line: at 430
+  the sheet cleared the frame but covered the line under it, and on a phone in Fit the line now sits
+  above the frame. The clear-of region runs from the higher top to the lower bottom of the two
+  boxes; the sheet may show when that region ends above its zone or starts below the screen.
+*/
+export function homeSheetClear(boxes: readonly { top: number; bottom: number }[], viewportHeight: number): boolean {
+  if (boxes.length === 0) return true;
+  const top = Math.min(...boxes.map(box => box.top));
+  const bottom = Math.max(...boxes.map(box => box.bottom));
+  return bottom <= viewportHeight - PHONE_SHEET_ZONE_PX || top >= viewportHeight;
+}
+
 const denied = { analytics_storage: "denied", ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied" };
 
 function disableAnalytics() {
@@ -149,15 +162,19 @@ export default function MarketingConsent() {
   useEffect(() => {
     const film = document.querySelector("[data-home-ia] #s1 .compile-film-viewport");
     if (!film) { setFilmClear(true); return; }
+    const line = document.querySelector("[data-home-ia] #s1 [data-film-reading]");
     const phone = window.matchMedia(PHONE);
     const check = () => {
-      const box = film.getBoundingClientRect();
-      setFilmClear(!phone.matches || box.bottom <= window.innerHeight - PHONE_SHEET_ZONE_PX || box.top >= window.innerHeight);
+      const boxes = [film, line].flatMap(node => (node ? [node.getBoundingClientRect()] : []));
+      setFilmClear(!phone.matches || homeSheetClear(boxes, window.innerHeight));
     };
     check();
     window.addEventListener("scroll", check, { passive: true });
     window.addEventListener("resize", check);
-    return () => { window.removeEventListener("scroll", check); window.removeEventListener("resize", check); };
+    // A stage change or a Focus press moves the frame and the line without a scroll.
+    const resize = new ResizeObserver(check);
+    resize.observe(film.closest(".compile-film-sequence") ?? film);
+    return () => { window.removeEventListener("scroll", check); window.removeEventListener("resize", check); resize.disconnect(); };
   }, [pathname]);
 
   // Per navigation: a route with the site footer and a route without it are different answers,

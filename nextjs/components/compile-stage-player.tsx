@@ -261,6 +261,24 @@ export function toggleMobileFilmFit(fit: boolean): boolean {
   return !fit;
 }
 
+/*
+  The Home desktop toggle records the visitor's choice against the stage's own default, not as an
+  absolute view (Release 3 fix round 4, M1). It stored "crop" after a Fit -> Focus round trip on
+  stages 1-3, and that "crop" then opened stage 4 -- whose default is Fit because its crop leaves
+  TERMINAL blank for 60% of the cut (blankScan) -- on the blank window. Now a press that lands back
+  on the stage default clears the choice, so every stage opens on its own default again. A Fit asked
+  for anywhere holds across stages (Fit is never blank); a Focus asked for on a Fit-default stage
+  belongs to that stage and clears when the stage changes. Pure, so the walk is tested without a DOM.
+*/
+export function nextWideChoice(shown: WideView, stageDefault: WideView): WideView | null {
+  const next: WideView = shown === "fit" ? "crop" : "fit";
+  return next === stageDefault ? null : next;
+}
+
+export function wideChoiceOnStageChange(choice: WideView | null): WideView | null {
+  return choice === "crop" ? null : choice;
+}
+
 export const FILM_TEXT = {
   en: { stages: "Compilation stages", error: FILM_ERROR, errorLong: `${FILM_ERROR.slice(0, -1)}; try another stage or inspect the public sample.` },
   ko: { stages: "컴파일 단계", error: FILM_ERROR_KO, errorLong: `${FILM_ERROR_KO} 다른 단계를 선택하거나 공개 샘플을 확인해 보세요.` },
@@ -311,7 +329,8 @@ export default function CompileStagePlayer({
   const [saveData, setSaveData] = useState(false);
   const [documentVisible, setDocumentVisible] = useState(true);
   const [mobileFilmFit, setMobileFilmFit] = useState(initialMobileFilmView === "fit");
-  /* Home desktop (not narrow): the visitor's own Focus/Fit choice, which then holds across stages. */
+  /* Home desktop (not narrow): the visitor's own choice where it differs from the stage default
+     (nextWideChoice / wideChoiceOnStageChange). */
   const [wideChoice, setWideChoice] = useState<WideView | null>(null);
   const [videoError, setVideoError] = useState(false);
   const [failedPreferredSrc, setFailedPreferredSrc] = useState<string | null>(null);
@@ -405,8 +424,9 @@ export default function CompileStagePlayer({
   const go = useCallback((next: number) => {
     const wrapped = ((next % stages.length) + stages.length) % stages.length;
     setVideoError(false);
+    if (wrapped !== index) setWideChoice(wideChoiceOnStageChange);
     setIndex(wrapped);
-  }, [stages.length]);
+  }, [index, stages.length]);
 
   useEffect(() => {
     const frame = frameRef.current;
@@ -595,7 +615,7 @@ export default function CompileStagePlayer({
       </div>);
   /* Home desktop: the same toggle as the phone, on its own crop state (CSS shows one of the two). */
   const viewControl = storyLayout ? (
-    <button type="button" className={`compile-film-view-control ${readingStyles.viewControl}`} aria-controls={panelId} aria-pressed={!wideFit} onClick={() => setWideChoice(wideFit ? "crop" : "fit")}>
+    <button type="button" className={`compile-film-view-control ${readingStyles.viewControl}`} aria-controls={panelId} aria-pressed={!wideFit} onClick={() => setWideChoice(nextWideChoice(wideFit ? "fit" : "crop", stageFrame?.wideView ?? "crop"))}>
       {MOBILE_FILM_VIEW[korean ? "ko" : "en"].focus}
     </button>
   ) : null;

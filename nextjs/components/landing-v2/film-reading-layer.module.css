@@ -1,7 +1,7 @@
 /*
-  Home film reading layer (brief 2026-10-15 move 2b/2c). Sits below the frame, outside the locked
-  pixels, spanning the same width so the four cells line up under the four panes. The reading
-  line is 15-16px HTML text; nothing here animates.
+  Home film reading layer (brief 2026-10-15 move 2b/2c). Sits below the frame (above it on a phone
+  in Fit, fix round 4), outside the locked pixels, spanning the same width so the four cells line
+  up under the four panes. The reading line is 15-16px HTML text; nothing here animates.
 */
 .reading {
   grid-column: 1 / -1;
@@ -68,9 +68,15 @@
   font: 600 16px/1.5 var(--f-sans);
 }
 
+/*
+  Fix round 4 (M2): the stack names the face and then the system monospaces, skipping next/font's
+  "IBM Plex Mono Fallback" -- Arial at size-adjust 134.59%. With `display: optional` a face that
+  misses the block period leaves that fallback in place for the whole page view, and on a cold
+  phone load it drew "WORKING COPY.md" as ~20px Arial inside a 15px line. A filename never breaks.
+*/
 .mono {
-  font: 500 15px/1.5 var(--f-mono);
-  white-space: pre-wrap;
+  font: 500 15px/1.5 "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  white-space: nowrap;
 }
 
 @media (max-width: 767px) {
@@ -201,13 +207,25 @@
   }
 
   /*
-    Phone Fit (fix round 3, judge gap 2): the reading line sits directly under the frame, so the
-    stage's text is read without pressing Focus. The pane strip is aria-hidden in Fit and only
-    repeats the pane the line already names; at 77-85px a quarter it also broke MARKDOWN and
+    Phone Fit (fix round 3, judge gap 2): the stage's text is read without pressing Focus. Fix round
+    4 (M2) moves the line directly above the frame (grid rows in source-first-home.module.css) and
+    sets it one step under the caption above it -- regular weight, muted ink (#58606a on #faf9f6,
+    6.05:1, measured) -- with the quoted on-screen string kept in ink, so caption, pointer and
+    quote read in that order instead of as one paragraph. The pane strip is aria-hidden in Fit and
+    only repeats the pane the line already names; at 77-85px a quarter it also broke MARKDOWN and
     ASSISTANT · MCP mid-word. Focus keeps it: there it is the pane indicator.
   */
   .story[data-mobile-view="fit"] .panes {
     display: none;
+  }
+
+  .story[data-mobile-view="fit"] .line {
+    color: var(--home-muted, #58606a);
+    font-weight: 400;
+  }
+
+  .story[data-mobile-view="fit"] .line q {
+    color: var(--home-ink, #15191d);
   }
 
   .story :global(.compile-film-focus-control)[aria-pressed="true"] {

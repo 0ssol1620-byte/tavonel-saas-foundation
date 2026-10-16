@@ -140,6 +140,10 @@ test("on Home from 900px the 8 s prompt covers no title, support, action or film
   360-430px first screen, where the bottom sheet sits, so the sheet waits until the film is out of
   its zone and never opens over the film; the 200px scroll path is always clear. Neither path
   shows anything on the first paint.
+
+  Fix round 4 (M3): the zone is kept clear of the frame and the stage's reading line together (at
+  430 the 8 s sheet cleared the frame and covered the line under it). Both boxes are checked on
+  both paths.
 */
 test("on a Home phone the prompt never opens over the hero film", async ({ page }, testInfo) => {
   test.skip(!["390", "360"].includes(testInfo.project.name), "the phone bottom sheet");
@@ -152,21 +156,25 @@ test("on a Home phone the prompt never opens over the hero film", async ({ page 
   await page.clock.fastForward(8_000);
   await page.clock.runFor(500);
   const film = (await page.locator("#s1 .compile-film-viewport").boundingBox())!;
+  const line = (await page.locator("#s1 [data-film-reading] p").boundingBox())!;
   const height = page.viewportSize()!.height;
   if (await panel.count()) {
     const box = (await panel.boundingBox())!;
     expect(overlaps(box, film), "the 8 s sheet covers the film").toBe(false);
+    expect(overlaps(box, line), "the 8 s sheet covers the reading line").toBe(false);
   } else {
-    // Waiting, because the film is in the sheet's 104px zone at the foot of the screen.
-    expect(film.y + film.height).toBeGreaterThan(height - 104);
-    expect(film.y).toBeLessThan(height);
+    // Waiting, because the film and its line reach into the sheet's 104px zone at the foot of the screen.
+    expect(Math.max(film.y + film.height, line.y + line.height)).toBeGreaterThan(height - 104);
+    expect(Math.min(film.y, line.y)).toBeLessThan(height);
   }
   await page.evaluate(() => window.scrollTo(0, 300));
   await expect(panel).toBeVisible();
   await settle(panel);
   const box = (await panel.boundingBox())!;
   const moved = (await page.locator("#s1 .compile-film-viewport").boundingBox())!;
+  const movedLine = (await page.locator("#s1 [data-film-reading] p").boundingBox())!;
   expect(overlaps(box, moved), "the scrolled sheet covers the film").toBe(false);
+  expect(overlaps(box, movedLine), "the scrolled sheet covers the reading line").toBe(false);
   expect(box.y + box.height).toBeGreaterThan(height - 40);
   await testInfo.attach("home-phone-sheet", { body: await page.screenshot(), contentType: "image/png" });
 });

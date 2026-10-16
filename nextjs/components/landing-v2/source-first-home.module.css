@@ -227,6 +227,15 @@
       background: var(--home-ink) !important; color: #ffffff !important; border-color: var(--home-ink) !important;
     }
     .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-mobile-tools .compile-film-motion-control:focus-visible) { outline: 2px solid var(--home-cobalt) !important; outline-offset: 3px; }
+    /*
+      Fix round 4 (M2, 4/4 judges): in Fit the stage's reading line sits between the caption row and
+      the frame, so a 360-430px first screen shows readable text and the film together. Under the
+      frame it started at 848px on a 390x844 screen (854px at 360x800). Grid placement only: the
+      DOM order (frame, then line) and the desktop and Focus layouts are unchanged.
+    */
+    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"]) { gap: 8px; }
+    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] [data-film-reading]) { grid-row: 3; }
+    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] .compile-film-viewport) { grid-row: 4; }
   }
   @media (max-width: 899px) {
     .home.home :global(#s5 .lv2-proof-list) { grid-template-columns: minmax(0, 1fr); margin-top: 32px; }
@@ -262,17 +271,26 @@
       so the film's top on the first screen does not move down at 360-430 (EN 633/609/574/545px,
       KO 598/559px against 636/612/613/583 and 601/601 before) and the poster's LCP area does not
       shrink (fix2/LCP-before-8d68c53.json vs fix2/LCP-after.json).
+
+      Fix round 4 (M2): the reading line now sits above the frame, and the stack pays for its three
+      lines again, so the poster's LCP area does not shrink. Where the fold cut the frame (EN and KO
+      360) its top moves up (633 -> 629, 598 -> 583); elsewhere the whole frame stays on the first
+      screen (EN 390 609 -> 596; KO 390 559 -> 583, bottom 810 of 844). Hero top 64, H1 32px (two
+      lines at 390 EN), support 17/1.5, tabs 44 (2px inline padding, so "Use with AI" holds one line in a 310px
+      WebKit column), caption 15/1.45 beside the toggle at an 8px gap (two lines at 360 with 16px to
+      spare), 16px rhythm.
+      Before/after: redesign-r3-20261015/fix3/GEOMETRY.json and fix3/LCP-*.json.
     */
-    .home.home :global(#s1) { padding-top: 70px; padding-bottom: 48px; }
+    .home.home :global(#s1) { padding-top: 64px; padding-bottom: 48px; }
     .home.home :global(.lv2-hero-eyebrow) { margin-bottom: 8px; line-height: 1.3; }
-    .home.home :global(.lv2-hero-h1) { font-size: 34px; line-height: 1.04; margin-bottom: 12px; }
-    .home[lang="ko"].home :global(.lv2-hero-h1) { font-size: 34px; line-height: 1.16; letter-spacing: -0.02em; }
-    .home.home :global(.lv2-hero-support) { font-size: 18px; line-height: 1.6; margin-bottom: 20px; }
-    .home[lang="ko"].home :global(.lv2-hero-support) { line-height: 1.7; }
-    .home.home :global(#s1 .compile-film-stages button) { font-size: 14px; padding-inline: 4px; min-height: 48px; }
-    .home.home :global(#s1 .compile-film-caption p) { font-size: 16px; }
-    .home.home :global(#s1 .compile-film-focus-control) { padding: 8px 12px; border: 1px solid var(--home-rule-strong); border-radius: 4px; color: var(--home-ink); font: 560 14px/1.4 var(--f-sans); }
-    .heroAside { margin: 16px auto 24px; gap: 4px; }
+    .home.home :global(.lv2-hero-h1) { font-size: 32px; line-height: 1.04; margin-bottom: 10px; }
+    .home[lang="ko"].home :global(.lv2-hero-h1) { font-size: 32px; line-height: 1.16; letter-spacing: -0.02em; }
+    .home.home :global(.lv2-hero-support) { font-size: 17px; line-height: 1.5; margin-bottom: 16px; }
+    .home[lang="ko"].home :global(.lv2-hero-support) { line-height: 1.6; }
+    .home.home :global(#s1 .compile-film-stages button) { font-size: 14px; padding-block: 10px; padding-inline: 2px; min-height: 44px; }
+    .home.home :global(#s1 .compile-film-caption p) { font-size: 15px; line-height: 1.45; }
+    .home.home :global(#s1 .compile-film-focus-control) { padding: 8px 10px; border: 1px solid var(--home-rule-strong); border-radius: 4px; color: var(--home-ink); font: 560 14px/1.4 var(--f-sans); }
+    .heroAside { margin: 16px auto 16px; gap: 4px; }
     .heroAside :global(.lv2-actions) { display: grid; grid-template-columns: minmax(0, 1fr); width: min(100%, 320px); gap: 0; }
     .heroAside :global(.lv2-text-link) { min-height: 44px; }
     .heroAside :global(.lv2-actions a) { width: 100%; justify-content: center; }

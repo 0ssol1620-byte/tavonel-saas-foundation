@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import CompileStagePlayer, { FILM_POSTER_SIZES, STAGE_FRAMES, toggleMobileFilmFit, type MobileFilmView } from "@/components/compile-stage-player";
+import CompileStagePlayer, { FILM_POSTER_SIZES, STAGE_FRAMES, nextWideChoice, toggleMobileFilmFit, wideChoiceOnStageChange, type MobileFilmView, type WideView } from "@/components/compile-stage-player";
 import HeroFilm from "@/components/landing-v2/hero-film";
 import { LANDING_MOBILE_FILM_VIEW } from "@/components/landing-v2/hero-film-disclosure";
 import { COMPILE_STAGES } from "@/lib/compile-stages";
@@ -207,6 +207,67 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
     // The failure path this guards: stage 4's window on "nodes lit" leaves TERMINAL blank for ~11 s.
     expect(scan.stages.world!.share).toBeLessThan(scan.threshold);
     expect(STAGE_FRAMES.world!.wideView).toBe("fit");
+  });
+
+  /*
+    Fix round 4 (M1). The desktop toggle's choice is kept relative to the stage default. The player's
+    own two transitions are walked here: a press (nextWideChoice) and a stage change
+    (wideChoiceOnStageChange); what the stage shows is the choice, else the stage default.
+  */
+  it("keeps the view choice relative to the stage default, so stage 4 never inherits a crop", () => {
+    const ids = COMPILE_STAGES.map(stage => stage.id);
+    const defaults = ids.map(id => STAGE_FRAMES[id]!.wideView);
+    expect(defaults).toEqual(["crop", "crop", "crop", "fit"]);
+    let stage = 0;
+    let choice: WideView | null = null;
+    const shown = () => choice ?? defaults[stage]!;
+    const press = () => { choice = nextWideChoice(shown(), defaults[stage]!); };
+    const go = (next: number) => { if (next !== stage) choice = wideChoiceOnStageChange(choice); stage = next; };
+
+    // The critic's walk: Fit -> Focus on stage 1, then stage 4. The round trip records nothing.
+    press();
+    expect([shown(), choice]).toEqual(["fit", "fit"]);
+    press();
+    expect([shown(), choice]).toEqual(["crop", null]);
+    go(3);
+    expect(shown()).toBe("fit");
+
+    // Focus asked for on stage 4 stays on stage 4 (its own tab again included) ...
+    press();
+    expect([shown(), choice]).toEqual(["crop", "crop"]);
+    go(3);
+    expect(shown()).toBe("crop");
+    // ... and clears with the stage: stage 1 is on its default, and stage 4 is Fit again.
+    go(0);
+    expect([shown(), choice]).toEqual(["crop", null]);
+    go(3);
+    expect(shown()).toBe("fit");
+
+    // A Fit asked for holds across stages; pressing back to a stage's default clears it.
+    go(1);
+    press();
+    expect(shown()).toBe("fit");
+    go(2);
+    expect(shown()).toBe("fit");
+    go(3);
+    expect(shown()).toBe("fit");
+    go(0);
+    press();
+    expect([shown(), choice]).toEqual(["crop", null]);
+
+    // The two pure transitions on their own.
+    expect(nextWideChoice("crop", "crop")).toBe("fit");
+    expect(nextWideChoice("fit", "crop")).toBeNull();
+    expect(nextWideChoice("fit", "fit")).toBe("crop");
+    expect(nextWideChoice("crop", "fit")).toBeNull();
+    expect([wideChoiceOnStageChange("crop"), wideChoiceOnStageChange("fit"), wideChoiceOnStageChange(null)]).toEqual([null, "fit", null]);
+  });
+
+  it("wires the desktop toggle and the stage change through those two transitions", () => {
+    const source = readFileSync(new URL("./compile-stage-player.tsx", import.meta.url), "utf8");
+    expect(source).toContain('onClick={() => setWideChoice(nextWideChoice(wideFit ? "fit" : "crop", stageFrame?.wideView ?? "crop"))}');
+    expect(source).toContain("if (wrapped !== index) setWideChoice(wideChoiceOnStageChange);");
+    expect(source).toContain('const wideFit = (wideChoice ?? stageFrame?.wideView ?? "crop") === "fit";');
   });
 
   it("serves the stage-1 re-cut poster at 2x for the crop and 1x for a phone in Fit, masked only on its own frame", () => {
