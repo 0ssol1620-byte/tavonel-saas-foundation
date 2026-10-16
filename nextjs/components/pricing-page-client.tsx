@@ -1,5 +1,7 @@
 "use client";
 
+// Route-owned, not layout-owned: see the note in app/layout.tsx. First, so the modules below still follow it.
+import "@/app/paper-product.css";
 import Link from "next/link";
 import type { Route } from "next";
 import { useEffect, useRef, useState } from "react";

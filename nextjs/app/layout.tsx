@@ -10,7 +10,13 @@ import "./globals.css";
 import "./one-path.css";
 import "./chrome-v2.css";
 import "./landing-v2.css";
-import "./paper-product.css";
+/*
+  paper-product.css is not imported here. It styles three surfaces (Pricing, Explore, the
+  evaluation page), and each imports it itself. From this layout it was a seventh render-blocking
+  stylesheet on every route, Home included, which renders none of its classes: Lighthouse `/`
+  render delay 23-37 ms -> 256-282 ms and LCP +80 ms locally, 3002-3172 ms in CI against the
+  3000 ms budget (main 2815-2889 ms).
+*/
 
 /**
  * The three faces, landing V2 blueprint §6 / lane D3.
