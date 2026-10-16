@@ -136,11 +136,15 @@ const raceExact=(head=HEAD)=>({profile:NATIVE_RACE_PROFILE,headSha:head,parent:N
   grandparent:EXPLORE_SUCCESSOR_PARENT,grandparentTree:EXPLORE_SUCCESSOR_PARENT_TREE,fullAnchor:FULL_ANCHOR,exactChangedPaths:[...NATIVE_RACE_CHANGED_PATHS],
   additions:{...NATIVE_RACE_ADDITIONS},ownerPreimages:{...NATIVE_RACE_PARENT_OWNER_BLOBS},changedOwners:[...NATIVE_RACE_CONFIG_PATHS],
   unchangedOwners:[...NATIVE_RACE_UNCHANGED_OWNERS],mainOverlays:nativeRaceMainOverlayEvidence()});
+// Since 933fb05e every PR admission first asks whether the head descends from the verified affected baseline, and an
+// unanswerable question fails closed into the affected route. These exact race and successor heads predate that baseline,
+// so their fixtures answer as the real classifier does for them: not a descendant.
+const notAffectedDescendant=()=>({classification:'normal',intended:false,reason:'Head is not descended from the verified affected-integration baseline.'});
 function raceStub({source=head=>({eligible:true,...raceExact(head),workflow:'.github/workflows/native-world-race.yml'})}={}) {
   const log=[],intent=head=>({classification:'intended',intended:true,headSha:head,parent:NATIVE_RACE_PARENT,repoRoot:'/repo',
     paths:[...NATIVE_RACE_CHANGED_PATHS],profile:NATIVE_RACE_PROFILE});
   const exec=()=>{throw Error('stubbed race verifiers run no git');};
-  return {log,race:{exec,classify:args=>{log.push(['classify',args]);return intent(args.headSha);},verify:args=>{log.push(['verify',args]);return source(args.headSha);}}};
+  return {log,race:{exec,classifyAffected:notAffectedDescendant,classify:args=>{log.push(['classify',args]);return intent(args.headSha);},verify:args=>{log.push(['verify',args]);return source(args.headSha);}}};
 }
 const admitPr=(changes={})=>admitDispatch({...env,...prEnv,...changes.env},{git:changes.git ?? fakeGit(),read:changes.read ?? read(),plan,
   race:'race' in changes?changes.race:raceStub().race,event:'event' in changes?changes.event:prEvent(),caseName:'grant_revoke',platform:'linux',nodeVersion:'20.19.0'});
@@ -330,7 +334,7 @@ for (const [label,edit,pattern] of [
   ['mutated overlay resolution bytes',w=>{w.overlayBytes[OVERLAY]=Buffer.concat([overlayBytes(OVERLAY),Buffer.from('\n')]);},/Released-main overlay resolution identity changed/]]) {
   test('PR admission refuses '+label+' through the local race verifiers before 623 checks, pins, staging or hosted setup',()=>{
     const calls=[],reads=[],{exec,world}=raceWorld(edit);
-    assert.throws(()=>admitPr({git:recordGit(calls),read:recordRead(reads),race:{exec}}),pattern);
+    assert.throws(()=>admitPr({git:recordGit(calls),read:recordRead(reads),race:{exec,classifyAffected:notAffectedDescendant}}),pattern);
     assert.deepEqual(calls,['rev-parse --verify HEAD^{commit}'],'only the checkout identity precedes the race source');
     assert.deepEqual(reads,[],'no pinned byte is read');
     assert.equal(world.calls[0],'rev-parse --show-toplevel');
@@ -371,7 +375,7 @@ test('a refused PR 141 race admission writes no admission, so staging, capture a
     const eventPath=path.join(temp,'event.json');writeFileSync(eventPath,JSON.stringify(prEvent()));
     const runEnv={...env,...prEnv,RUNNER_TEMP:temp,GITHUB_EVENT_PATH:eventPath,NWR_CASE:'grant_revoke'},calls=[],reads=[];
     const {exec}=raceWorld(w=>{w.parents[HEAD]=[NATIVE_RACE_PARENT,OUTSIDE];});
-    await assert.rejects(main(['admit'],runEnv,{git:recordGit(calls),read:recordRead(reads),plan,platform:'linux',nodeVersion:'20.19.0',race:{exec}}),
+    await assert.rejects(main(['admit'],runEnv,{git:recordGit(calls),read:recordRead(reads),plan,platform:'linux',nodeVersion:'20.19.0',race:{exec,classifyAffected:notAffectedDescendant}}),
       /requires one exact parent/);
     assert.deepEqual(calls,['rev-parse --verify HEAD^{commit}']);assert.deepEqual(reads,[]);
     const state=path.join(temp,'native-world-race');assert.deepEqual(readdirSync(state),[]);
@@ -475,7 +479,7 @@ const blobs=c=>Object.fromEntries(RACE_SUCCESSOR_PATHS.map((p,i)=>[p,(c+i.toStri
 // Stubbed classifier and collector proof: the positive path and every result-shape refusal, with no git at all.
 function successorStub({source=args=>({eligible:true,...successorExact(args.headSha),preimages:blobs('a'),finalBlobs:blobs('b'),parentFailure:{runId:37646273750}}),parent=C61}={}) {
   const log=[];
-  return {log,race:{exec:()=>{throw Error('stubbed successor runs no git');},
+  return {log,race:{exec:()=>{throw Error('stubbed successor runs no git');},classifyAffected:notAffectedDescendant,
     classify:args=>{log.push('classify');return {classification:'intended',intended:true,headSha:args.headSha,parent,repoRoot:ROOT,paths:[...RACE_SUCCESSOR_PATHS],profile:NATIVE_RACE_PROFILE};},
     verify:()=>{log.push('verify');throw Error('exact2bb verifier reached');},
     successor:args=>{log.push('successor');assert.equal(args.intent.headSha,args.headSha);assert.equal(args.intent.parent,C61);return source(args);}}};
@@ -578,7 +582,7 @@ function successorGit(o={}) {
   return {exec,calls};
 }
 const SUCCESSOR_READ_ONLY=/^(?:rev-parse|rev-list|merge-base|diff|ls-tree|show|hash-object --no-filters|ls-files) /;
-const admitSuccessor=o=>{const g=successorGit(o);try {return {value:admitRaceSource(SUCCESSOR_HEAD,{exec:g.exec}),calls:g.calls};} catch (error) {return {error,calls:g.calls};}};
+const admitSuccessor=o=>{const g=successorGit(o);try {return {value:admitRaceSource(SUCCESSOR_HEAD,{exec:g.exec,classifyAffected:notAffectedDescendant}),calls:g.calls};} catch (error) {return {error,calls:g.calls};}};
 test('PR 141 race successor admits the exact c61 child through the actual collector proof over actual c61 and workspace bytes',()=>{
   const {value,error,calls}=admitSuccessor({});
   assert.equal(error,undefined,error?.message);
@@ -1300,5 +1304,5 @@ test('native World routing skips only verified docs/UI historical reuse and requ
   assert.deepEqual(nativeRaceRunDecision({event:'pull_request',head,exec,classifyAffected,affected:()=>affected('fresh-seven-case-native-run-required')}),
     {runCases:true,reason:'fresh-seven-case-native-run-required',headSha:head});
   assert.throws(()=>nativeRaceRunDecision({event:'pull_request',head,exec,classifyAffected,affected:()=>affected('unknown')}),/Unknown Native World evidence disposition/);
-  assert.throws(()=>nativeRaceRunDecision({event:'pull_request',head,exec,classifyAffected:()=>({classification:'unsupported'})}),/Unsupported or unverified PR head/);
+  assert.throws(()=>nativeRaceRunDecision({event:'pull_request',head,exec,classifyAffected:()=>({classification:'unsupported'})}),/outside or unverified against the authenticated affected baseline: unsupported/);
 });

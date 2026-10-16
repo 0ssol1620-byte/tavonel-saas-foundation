@@ -47,7 +47,11 @@ jobs:
       run:
         working-directory: nextjs
     steps:
+      # Full history: `pnpm test` runs scripts/db/native-world-race-ci.test.mjs, whose race and successor proofs read
+      # the bytes of their historical parent commits (c61fe1a5, 2bb). A depth-1 checkout cannot answer them.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with: { version: 10.34.4 }
       - uses: actions/setup-node@v4
