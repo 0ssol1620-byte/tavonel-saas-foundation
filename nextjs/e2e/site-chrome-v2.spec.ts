@@ -268,6 +268,13 @@ test.describe("at 390", () => {
   moved the header action to #005bb3 (rgb(0, 91, 179)) and Home's --source to var(--action). They
   were read off tavonel.com (deployment dpl_3JjTwcBhpjARzmQ6xGYR8JU2cdm2) on 2026-10-16 at these
   three widths, and the merged build matched all 160 measured Home header and footer properties.
+
+  Review 3 (FE-H1, FE-H2) found what that list left out: pseudo-elements and motion. The phone menu
+  icon's ::before/::after keep main's `transform .18s ease, box-shadow .18s ease` morph on Home (an
+  unscoped `transition: none` had stopped it at 400px and below), and Home's header keeps main's
+  min-height at 1440. Both read off the same deployment on 2026-10-16: "transform 0.18s, box-shadow
+  0.18s" on / and /ko at 390 and 360, header min-height "0px" at 1440. The paper pages keep the
+  instant swap, and their own 64px minimum.
 */
 test.describe("Home keeps main's header and footer colours", () => {
   test.beforeEach(async ({}, testInfo) => {
@@ -287,14 +294,29 @@ test.describe("Home keeps main's header and footer colours", () => {
       if (testInfo.project.name === "1440") {
         await expect(header.locator(".site-nav-direct").first()).toHaveCSS("color", "rgb(66, 73, 81)");
         await expect(header.locator(".nav-signin")).toHaveCSS("color", "rgb(21, 25, 29)");
+        await expect(header).toHaveCSS("min-height", "0px");
+      } else {
+        const summary = header.locator("details.mobile-primary-nav > summary");
+        for (const pseudo of ["::before", "::after"]) {
+          expect(await summary.evaluate((element, which) => getComputedStyle(element, which).transition, pseudo), `menu icon ${pseudo}`)
+            .toBe("transform 0.18s, box-shadow 0.18s");
+        }
       }
     });
   }
 
-  test("while the reading pages keep the paper chrome", async ({ page }) => {
+  test("while the reading pages keep the paper chrome", async ({ page }, testInfo) => {
     await page.goto("/pricing");
     await expect(page.locator("footer.site")).toHaveCSS("background-color", "rgb(247, 245, 239)");
     await expect(page.locator("footer.site .site-footer-groups a").first()).toHaveCSS("color", "rgb(83, 96, 106)");
     expect(await page.locator(HEADER).evaluate((element) => getComputedStyle(element).getPropertyValue("--source").trim())).toBe("#2447b3");
+    if (testInfo.project.name === "1440") {
+      await expect(page.locator(HEADER)).toHaveCSS("min-height", "64px");
+    } else {
+      const summary = page.locator(`${HEADER} details.mobile-primary-nav > summary`);
+      for (const pseudo of ["::before", "::after"]) {
+        expect(await summary.evaluate((element, which) => getComputedStyle(element, which).transition, pseudo), `menu icon ${pseudo}`).toBe("none");
+      }
+    }
   });
 });
