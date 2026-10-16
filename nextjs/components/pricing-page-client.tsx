@@ -854,7 +854,11 @@ export default function PricingPageClient({
               <aside className="paper-purchase-boundary" aria-label="Before choosing a plan">
                 <h2>{selfService ? "Check the scope before choosing a plan" : "Start with the sample. Agree on your evaluation."}</h2>
                 {!ownFilesOpen ? <p>{gates.find(gate => gate.id === "customerData")?.reason}</p> : null}
-                <p>Developer and Team are currently single-member workspaces. The Team name does not include team invitations, shared roles, or organization administration.</p>
+                {/*
+                  No plan-scope sentence here: what a plan includes is pricing wording, which is the
+                  founder's (CLAUDE.md). The proposed sentence waits in PR #141's "Founder wording
+                  approval needed" list; main's Team card keeps "Single-member workspace".
+                */}
                 <nav className="pricing-utility-links" aria-label="Pricing resources">
                   <Link href="/evaluation">Discuss an evaluation</Link>
                   <Link href="/sources">Read processing limits</Link>

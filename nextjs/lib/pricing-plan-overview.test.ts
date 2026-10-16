@@ -50,9 +50,12 @@ describe("pricing plan overview", () => {
     expect(html).not.toContain("View plan details");
   });
 
-  it("keeps the gated evaluation wording and single-member notice before the overview", () => {
+  it("keeps the gated evaluation wording before the overview and ships no unapproved plan-scope wording", () => {
     expect(english).toContain('unit: plan.name === EVALUATION.name && !selfService ? "to explore the public World" : plan.unit');
-    expectDisclosureBefore(english, "Developer and Team are currently single-member workspaces.", "<PricingPlanOverview");
+    // SEC-2 / FE-B2 (review 2): plan-scope wording is pricing wording and is founder-only. main's
+    // card line stays; the proposed sentence is listed for founder approval, not shipped.
+    expect(english).not.toContain("single-member workspaces. The Team name does not include");
+    expect(english).toContain("<b>Single-member workspace</b>");
     expectDisclosureBefore(english, 'gates.find(gate => gate.id === "customerData")?.reason', "<PricingPlanOverview");
     expect(english).toContain("plans={PLANS.map(plan => ({");
     expect(english).toContain('id={pricingPlanId(index)} tabIndex={-1}');
