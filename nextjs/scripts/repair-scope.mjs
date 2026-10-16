@@ -1871,11 +1871,11 @@ export const FIX_ROUND_3_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/upload-release-route.switch-off.test.ts', 'lib/visual-refinement.test.ts',
 ]);
 export const FIX_ROUND_3_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/site-chrome-v2.spec.ts']);
-// PR #141's merge of main bcba7173 (Home Release 3, PR #150): the twenty-nine changed endpoints no owner listed -- the Home and
+// PR #141's merge of main bcba7173 (Home Release 3, PR #150): the thirty changed endpoints no owner listed -- the Home and
 // Korean entry pages, the receipted measurement band (component, styles, data, its claims pack and suite, its receipt and research
 // note), the re-cut film posters with their lock file and README, the stage and copy modules, the evidence record, the public
 // package proof styles, two suites main changed, two specs, .gitattributes (which keeps the claims pack's bytes), and the DB
-// rehearsal workflow contract this round extended. Repository-relative, because .gitattributes is outside nextjs/. Selects each
+// rehearsal workflow contract and real-Auth journey this round fixed. Repository-relative, because .gitattributes is outside nextjs/. Selects each
 // path's direct suites and six browser suites. Product code, so never nativeReuse.
 export const PR141_MAIN_MERGE_BCBA_AFFECTED_PATHS = Object.freeze([
   '.gitattributes',
@@ -1907,6 +1907,7 @@ export const PR141_MAIN_MERGE_BCBA_AFFECTED_PATHS = Object.freeze([
   'nextjs/public/film/poster-4-t17.96-2x.webp',
   'nextjs/public/film/poster-4-t17.96.webp',
   'nextjs/public/research/receipts/R-03-olmocr-bench-evaluation-2026-08-04.json',
+  'nextjs/scripts/journey/real-auth-ci-journey.mjs',
 ]);
 export const PR141_MAIN_MERGE_BCBA_AFFECTED_UNIT_FILES = Object.freeze([
   'components/compile-stage-player.mobile-view.test.tsx',
@@ -2242,7 +2243,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // PR #141 fix round 3: the fourteen exact paths above select their direct suites and the site chrome browser suite.
   affectedGroup('pr141-fix-round-3', new RegExp(`^nextjs/(?:${exactPathAlternation(FIX_ROUND_3_AFFECTED_PATHS)})$`),
     { unitFiles: FIX_ROUND_3_AFFECTED_UNIT_FILES, browserFiles: FIX_ROUND_3_AFFECTED_BROWSER_FILES }),
-  // PR #141's merge of main bcba7173: the twenty-nine exact repository paths above select their direct suites and six browser suites.
+  // PR #141's merge of main bcba7173: the thirty exact repository paths above select their direct suites and six browser suites.
   affectedGroup('pr141-main-merge-bcba7173', new RegExp(`^(?:${exactPathAlternation(PR141_MAIN_MERGE_BCBA_AFFECTED_PATHS)})$`),
     { unitFiles: PR141_MAIN_MERGE_BCBA_AFFECTED_UNIT_FILES, browserFiles: PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),

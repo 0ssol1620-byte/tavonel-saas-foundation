@@ -59,6 +59,26 @@ describe("db-rehearsal local stack port reservation", () => {
     The real-Auth job checked out at the default depth of 1, and six of those tests failed in
     workflow_dispatch run 38858228268 with "exists on disk, but not in <sha>".
   */
+  /*
+    Accept on the review page decides one selected evidence record and is disabled until one is chosen
+    (app/workspace/page.tsx, since 933fb05e). The real-Auth journey clicked it unselected, and workflow_dispatch
+    run 38867098672 failed waiting 30 s for the POST /api/v1/reviews a disabled control never sends.
+  */
+  it("the real-Auth journey selects the candidate's evidence through the review comparison before Accept", () => {
+    const page = readFileSync("app/workspace/page.tsx", "utf8");
+    expect(page).toMatch(/<button type="button" disabled=\{evidenceReviewBusy \|\| !reviewEvidence\} onClick=\{\(\) => void recordEvidenceReview\("accept", ACCEPTED_WITHOUT_NOTE\)\}>Accept<\/button>/);
+    const journey = readFileSync("scripts/journey/real-auth-ci-journey.mjs", "utf8").replace(/\r\n/g, "\n");
+    const accept = journey.indexOf("await acceptEvidenceThroughUi(page,");
+    const review = journey.lastIndexOf("/workspace/review?collection=", accept);
+    expect(review).toBeGreaterThan(-1);
+    expect(accept).toBeGreaterThan(review);
+    const between = journey.slice(review, accept);
+    const select = between.indexOf(`page.locator('section[aria-labelledby="review-comparison-title"]').getByRole("button",{name:/45 days/}).first().click();`);
+    expect(select, "the candidate's evidence record is chosen in the review comparison").toBeGreaterThan(-1);
+    expect(between.indexOf('await expect(page.getByRole("button",{name:"Accept",exact:true})).toBeEnabled();'), "Accept is enabled before the click")
+      .toBeGreaterThan(select);
+  });
+
   it("checks out full history in every job that runs the repository test suite", () => {
     const names = [...workflow.matchAll(/\n {2}([a-z][a-z-]*):\n/g)].map(match => match[1]!);
     const testing = names.filter(name => /\n\s+pnpm test\n/.test(job(name)));

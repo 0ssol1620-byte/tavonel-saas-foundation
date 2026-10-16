@@ -194,6 +194,11 @@ try {
       check("candidate is not active before the hydrated publication",sql(`select manifest_digest||'@'||revision from public.foundation_active_worlds where ${scope}`),`${published.manifestDigest}@1`);
       await page.goto(`${origin}/workspace/review?collection=${candidate.collectionId}&manifest=${encodeURIComponent(candidate.manifestDigest)}`);
       await expect(page.getByRole("button",{name:"Accept",exact:true})).toBeVisible({timeout:30_000});
+      // Accept decides one selected evidence record and stays disabled until one is chosen (933fb05e). Run 38867098672
+      // clicked it unselected and waited 30 s for a POST that a disabled control never sends. Choose the candidate's
+      // 45-day record in the review comparison through the production control, as e2e/world-lifecycle.spec.ts does.
+      await page.locator('section[aria-labelledby="review-comparison-title"]').getByRole("button",{name:/45 days/}).first().click();
+      await expect(page.getByRole("button",{name:"Accept",exact:true})).toBeEnabled();
       const accepted=await acceptEvidenceThroughUi(page,candidate.collectionId,candidate.manifestDigest);
       check("actual Next records the hydrated evidence acceptance",accepted.status(),201);
       check("actual SQL retains the accept decision for the exact reviewed revision",
