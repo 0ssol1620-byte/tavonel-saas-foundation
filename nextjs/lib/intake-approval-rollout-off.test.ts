@@ -16,6 +16,8 @@ const PRODUCTION_FUNCTIONS = new Set([
   "reserve_foundation_compute_v3",
   "confirm_foundation_intake_admission",
   "settle_foundation_compute_v3",
+  // main's 0012 body: checks actor, cursor and idempotency, then stores p_event_manifest verbatim.
+  "apply_foundation_connection_batch",
 ]);
 
 const mocks = vi.hoisted(() => ({
@@ -48,6 +50,9 @@ vi.mock("@/lib/supabase-admin", () => ({
         reservationId: p.p_document_id, documentId: p.p_document_id, state: "reserved", expiresAt: soon,
         reservedCredits: p.p_reserved_credits, maximumCredits: p.p_maximum_credits, billingSource: "paid",
       });
+    }
+    if (name === "apply_foundation_connection_batch") {
+      return Response.json({ batchId: p.p_batch_id, applied: true, eventCount: p.p_event_count });
     }
     if (name === "confirm_foundation_intake_admission") {
       return Response.json({ documentId: p.p_document_id, status: "confirmed", confirmedAt: new Date().toISOString() });
@@ -104,6 +109,9 @@ import { POST as v1CapabilityPost } from "../app/api/v1/uploads/capability/route
 import { POST as stagePost } from "../app/api/v1/uploads/triage/stage/route";
 import { POST as compileJobsPost } from "../app/api/compile-jobs/route";
 import { POST as collectionsCompilePost } from "../app/api/collections/compile/route";
+import { POST as connectionSyncPost } from "../app/api/v1/connections/[id]/sync/route";
+import { canonicalJson, sha256Prefixed } from "./developer-contracts";
+import { deterministicSourceDocumentId } from "./source-intake";
 
 const documentId = "f07fe147-f52e-4fd0-8afc-79cd848b928d";
 const otherId = "11111111-1111-4111-8111-111111111111";
@@ -205,5 +213,42 @@ describe("intake approval lineage off (the production default)", () => {
     expect(mocks.runCompile).toHaveBeenCalledTimes(1);
     expect(mocks.calls).not.toContain("assert_foundation_intake_compile_set");
     expect(mocks.calls).toEqual([]);
+  });
+
+  /*
+    SEC-1 (review 2). Production's apply_foundation_connection_batch is still 0012's body: it never
+    checks that an event's documentId belongs to this workspace. With the switch off the route is
+    main's guard: an id not derived from (workspace, sourceIdempotencyKey) is refused before the RPC.
+  */
+  async function syncBatch(documentId: string, sourceIdempotencyKey: string) {
+    const events = [{
+      kind: "added", nativeId: "folder/report.pdf", revision: "rev-1", contentSha256: "a".repeat(64),
+      sizeBytes: 128, mimeType: "application/pdf", documentId, sourceIdempotencyKey,
+    }];
+    return connectionSyncPost(json("https://tavonel.com/api/v1/connections/49d42924-a3cc-4a09-b92d-9c86b58901a1/sync", {
+      batchId: "59d42924-a3cc-4a09-b92d-9c86b58901a1",
+      previousCursorSha256: null,
+      nextCursorSha256: `sha256:${"b".repeat(64)}`,
+      manifestSha256: await sha256Prefixed(canonicalJson(events)),
+      events,
+    }), { params: Promise.resolve({ id: "49d42924-a3cc-4a09-b92d-9c86b58901a1" }) });
+  }
+
+  it("refuses a connection batch whose documentId is not derived from this workspace, before the RPC", async () => {
+    const sourceIdempotencyKey = "c".repeat(64);
+    // A well-formed UUIDv4 the approval lineage could mint, but nothing in production binds it.
+    const response = await syncBatch(otherId, sourceIdempotencyKey);
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ code: "CONNECTION_BATCH_INVALID" });
+    expect(mocks.calls).toEqual([]);
+  });
+
+  it("applies a connection batch whose documentId is main's workspace derivation", async () => {
+    const sourceIdempotencyKey = "c".repeat(64);
+    const derived = await deterministicSourceDocumentId("pilot-969dc192daa24119", sourceIdempotencyKey);
+    const response = await syncBatch(derived, sourceIdempotencyKey);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ code: "OK", applied: true });
+    expect(mocks.calls).toEqual(["apply_foundation_connection_batch"]);
   });
 });
