@@ -20,6 +20,16 @@
   padding-inline: max(var(--chrome-gutter), calc((100% - var(--chrome-measure)) / 2));
   background: #f7f5ef;
   border-bottom: 1px solid #d8ddd9;
+}
+/*
+  Paper chrome colours are unlayered, so on Home they would beat its own header and footer rules
+  (components/landing-v2/source-first-home.module.css, @layer overrides): review 2 (FE-B1) measured
+  Release 2's dark footer turning paper and the header's links and Sign in changing colour. Home's
+  root is `.page.lv2` with the header and footer as direct children, so `:where(:not(.lv2 > header))`
+  keeps these rules off Home at unchanged specificity. Home's background and border are its own
+  `!important` declarations and need no exclusion.
+*/
+.nav.chrome-v2-header:where(:not(.lv2 > header)) {
   color: #171c20;
   --text-hi: #171c20;
   --text-mid: #53606a;
@@ -30,9 +40,14 @@
   background: #f7f5ef;
   border-bottom-color: #d8ddd9;
 }
+/* main dbe22b1e's scrolled header blur, which Home still has. */
+.nav.chrome-v2-header[data-scrolled="1"]:where(.lv2 > header) {
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
 
 /* The disclosure panel is a public reading surface, including on dark product routes. */
-.nav.chrome-v2-header .one-path-mobile-nav {
+.nav.chrome-v2-header:where(:not(.lv2 > header)) .one-path-mobile-nav {
   --ground: #fff;
   --seam: #d8ddd9;
   --g1: #f7f5ef;
@@ -57,10 +72,11 @@
   .mobile-primary-nav.one-path-mobile-nav { display: block; }
   .nav-signin.chrome-v2-signin { display: none; }
 }
-.nav-signin.chrome-v2-signin { min-width: 44px; justify-content: center; color: #53606a; }
+.nav-signin.chrome-v2-signin { min-width: 44px; justify-content: center; }
+.nav-signin.chrome-v2-signin:where(:not(.lv2 > header *)) { color: #53606a; }
 
 /* The phone disclosure stays legible on paper, scrolled, and unscrolled public headers. */
-.nav.chrome-v2-header .one-path-mobile-nav > summary {
+.nav.chrome-v2-header:where(:not(.lv2 > header)) .one-path-mobile-nav > summary {
   min-height: 44px;
   border-radius: 6px;
   border-color: #88928d;
@@ -69,13 +85,13 @@
   transition: color .15s ease, border-color .15s ease;
 }
 @media (max-width: 400px) {
-  .nav.chrome-v2-header .one-path-mobile-nav > summary::before,
-  .nav.chrome-v2-header .one-path-mobile-nav > summary::after {
+  .nav.chrome-v2-header:where(:not(.lv2 > header)) .one-path-mobile-nav > summary::before,
+  .nav.chrome-v2-header:where(:not(.lv2 > header)) .one-path-mobile-nav > summary::after {
     color: #111519;
     background: currentColor;
   }
 }
-.nav.chrome-v2-header .nav-actions .btn { color: #fff; background: #2447b3; border-color: #2447b3; }
+.nav.chrome-v2-header:where(:not(.lv2 > header)) .nav-actions .btn { color: #fff; background: #2447b3; border-color: #2447b3; }
 @media (min-width: 1250px) {
   .mobile-primary-nav.one-path-mobile-nav { display: none; }
 }
@@ -178,7 +194,10 @@
   }
 }
 footer.site.chrome-v2-footer {
-  border-top: 1px solid #d8ddd9;
+  border-top: 1px solid var(--border-dark, var(--hairline));
+}
+/* Paper footer everywhere but Home, whose footer is Release 2's dark surface (see the header note). */
+footer.site.chrome-v2-footer:where(:not(.lv2 > footer)) {
   background: #f7f5ef;
   color: #171c20;
   --text-hi: #171c20;

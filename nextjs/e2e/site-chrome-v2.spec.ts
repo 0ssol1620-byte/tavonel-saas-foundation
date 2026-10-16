@@ -259,3 +259,39 @@ test.describe("at 390", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 });
+
+/*
+  Review 2 (FE-B1). The paper chrome (app/chrome-v2.css) is for the public reading pages, not Home:
+  its rules are unlayered, so without the Home exclusion they beat Home's own header and footer
+  (source-first-home.module.css, @layer overrides) and Release 2's dark footer turned paper. The
+  expected values are main dbe22b1e's, read off tavonel.com on 2026-10-16 at these three widths.
+*/
+test.describe("Home keeps Release 2's header and footer colours", () => {
+  test.beforeEach(async ({}, testInfo) => {
+    test.skip(!["1440", "390", "360"].includes(testInfo.project.name), "measured at 1440, 390 and 360");
+  });
+
+  for (const path of ["/", "/ko"]) {
+    test(`on ${path}`, async ({ page }, testInfo) => {
+      await page.goto(path);
+      const footer = page.locator("footer.site");
+      await expect(footer).toHaveCSS("background-color", "rgb(9, 13, 20)");
+      await expect(footer.locator(".site-footer-groups a").first()).toHaveCSS("color", "rgb(183, 195, 210)");
+      const header = page.locator(HEADER);
+      await expect(header).toHaveCSS("color", "rgb(21, 25, 29)");
+      expect(await header.evaluate((element) => getComputedStyle(element).getPropertyValue("--source").trim())).toBe("#7da7ff");
+      await expect(header.locator(".nav-actions .btn")).toHaveCSS("background-color", "rgb(36, 74, 200)");
+      if (testInfo.project.name === "1440") {
+        await expect(header.locator(".site-nav-direct").first()).toHaveCSS("color", "rgb(66, 73, 81)");
+        await expect(header.locator(".nav-signin")).toHaveCSS("color", "rgb(21, 25, 29)");
+      }
+    });
+  }
+
+  test("while the reading pages keep the paper chrome", async ({ page }) => {
+    await page.goto("/pricing");
+    await expect(page.locator("footer.site")).toHaveCSS("background-color", "rgb(247, 245, 239)");
+    await expect(page.locator("footer.site .site-footer-groups a").first()).toHaveCSS("color", "rgb(83, 96, 106)");
+    expect(await page.locator(HEADER).evaluate((element) => getComputedStyle(element).getPropertyValue("--source").trim())).toBe("#2447b3");
+  });
+});
