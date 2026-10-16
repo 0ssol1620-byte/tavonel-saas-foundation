@@ -1829,6 +1829,11 @@ export const INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES = Object.freeze([
 export const SOLUTIONS_PROOF_AFFECTED_PATHS = Object.freeze(['app/solutions/[slug]/page.tsx', 'app/solutions/solution-workflow-proof.tsx']);
 export const SOLUTIONS_PROOF_AFFECTED_UNIT_FILES = Object.freeze(['lib/copy-trust-guard.test.ts', 'lib/output-escaping.test.ts']);
 export const SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/solutions-workflows.spec.ts']);
+// Evidence viewer overlay (PR #141 fix): the stylesheet that places the bbox overlay over the drawn page. Its direct suite
+// and the world-lifecycle browser suite, whose Ask source-region test measures the overlay against the canvas.
+export const EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS = Object.freeze(['components/pdf-evidence-viewer.module.css']);
+export const EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES = Object.freeze(['lib/pdf-evidence-viewer.test.ts']);
+export const EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/world-lifecycle.spec.ts']);
 // Exact literal alternation: every regular-expression metacharacter is escaped, not only '.', because the cookbook route
 // carries a literal [slug] segment that would otherwise be read as a character class.
 const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
@@ -2110,6 +2115,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // Solutions proof: the two exact paths above select two direct suites and the 1440 solutions browser suite.
   affectedGroup('solutions-proof', new RegExp(`^nextjs/(?:${exactPathAlternation(SOLUTIONS_PROOF_AFFECTED_PATHS)})$`),
     { unitFiles: SOLUTIONS_PROOF_AFFECTED_UNIT_FILES, browserFiles: SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES }),
+  // Evidence viewer overlay: the one exact stylesheet above selects its direct suite and the world-lifecycle browser suite.
+  affectedGroup('evidence-viewer-overlay', new RegExp(`^nextjs/(?:${exactPathAlternation(EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS)})$`),
+    { unitFiles: EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES, browserFiles: EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.

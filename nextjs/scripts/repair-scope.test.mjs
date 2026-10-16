@@ -7036,7 +7036,17 @@ test('affected pilot worksheet runner admits the exact registered component suit
 
 test('affected PR #141 fix owners: intake approval rollout, solutions proof and the compile-run suite are exact and finite', async () => {
   const { INTAKE_APPROVAL_ROLLOUT_AFFECTED_PATHS, INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_PATHS,
-    SOLUTIONS_PROOF_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES } = await import('./repair-scope.mjs');
+    SOLUTIONS_PROOF_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES, EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS,
+    EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES, EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES } = await import('./repair-scope.mjs');
+  assert.deepEqual([[...EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS], [...EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES], [...EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES]],
+    [['components/pdf-evidence-viewer.module.css'], ['lib/pdf-evidence-viewer.test.ts'], ['e2e/world-lifecycle.spec.ts']]);
+  {
+    const map = affectedMap([affectedRecord('M', ['nextjs/components/pdf-evidence-viewer.module.css'])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles],
+      [[], ['evidence-viewer-overlay'], [], ['lib/pdf-evidence-viewer.test.ts'], ['e2e/world-lifecycle.spec.ts']]);
+    const neighbour = affectedMap([affectedRecord('A', ['nextjs/components/pdf-evidence-viewer.module.css.bak'], '000000')]);
+    assert.deepEqual(neighbour.failures, ['unmapped changed endpoint: nextjs/components/pdf-evidence-viewer.module.css.bak']);
+  }
   assert.equal(INTAKE_APPROVAL_ROLLOUT_AFFECTED_PATHS.length, 10);
   assert.equal(INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES.length, 10);
   assert.ok(!INTAKE_TRIAGE_UNIT_TESTS.includes('lib/intake-approval-rollout-off.test.ts'));
