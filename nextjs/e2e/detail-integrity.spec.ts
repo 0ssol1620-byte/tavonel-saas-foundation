@@ -2,6 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { fixtureDocument, installFixtureSession, installWorkspaceRoutes, sseFrames } from "./fixtures/workspace-fixture";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "../lib/intake-approval-rollout";
 const evidenceDir = process.env.DETAIL_AUDIT_DIR;
 async function capture(page: Page, name: string) {
   if (!evidenceDir) return;
@@ -157,7 +158,9 @@ test('source endpoints stay attached after a width change, without a page reload
 test('API reference is scannable while endpoint contracts stay reachable by keyboard', async ({ page }) => {
   await page.goto('/api');
   const operations = page.locator('article[id]');
-  await expect(operations).toHaveCount(39);
+  // While the approval lineage is off the route publishes main's 33 operations (review 3, CI-TI-1); its six
+  // approved-upload operations join them only with the switch on.
+  await expect(operations).toHaveCount(INTAKE_APPROVAL_ROLLOUT_ENABLED ? 39 : 33);
   const operation = operations.first();
   const details = operation.locator('details').first();
   await expect(details).not.toHaveAttribute('open');
