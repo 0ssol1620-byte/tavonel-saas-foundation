@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { sharedBrowserProjectsMapExcludesExplore, NATIVE_RACE_ADDITIONS, NATIVE_RACE_CONFIG_PATHS, NATIVE_RACE_CHANGED_PATHS, NATIVE_RACE_MAIN_OVERLAYS, NATIVE_RACE_MAIN_OVERLAY_PROVENANCE } from './repair-collector-only.mjs';
-import { AFFECTED_GROUPS, HOME_AFFECTED_BROWSER_FILE, HOME_AFFECTED_PATHS, HOME_AFFECTED_UNIT_FILES, HOME_READER_HEADING_CSS_AFFECTED_PATHS, HOME_READER_HEADING_CSS_AFFECTED_UNIT_FILES, REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE, RECIPE_CONTINUATION_AFFECTED_BROWSER_FILES, RECIPE_CONTINUATION_AFFECTED_PATHS, RECIPE_CONTINUATION_AFFECTED_UNIT_FILES, VITEST_DISCOVERY_CONFIG_PATH, vitestDiscoveryConfigFailures, COMPILE_SOURCE_OBSERVATIONS_AFFECTED_PATHS, COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES, WORLD_EXPLORER_NAVIGATION_AFFECTED_PATHS, WORLD_EXPLORER_NAVIGATION_AFFECTED_UNIT_FILES, WORLD_VERSION_DIFF_AFFECTED_PATHS, WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES, INTAKE_APPROVAL_ROLLOUT_AFFECTED_PATHS, INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_PATHS, SOLUTIONS_PROOF_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES, EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS, EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES, EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+import { AFFECTED_GROUPS, HOME_AFFECTED_BROWSER_FILE, HOME_AFFECTED_PATHS, HOME_AFFECTED_UNIT_FILES, HOME_READER_HEADING_CSS_AFFECTED_PATHS, HOME_READER_HEADING_CSS_AFFECTED_UNIT_FILES, REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE, RECIPE_CONTINUATION_AFFECTED_BROWSER_FILES, RECIPE_CONTINUATION_AFFECTED_PATHS, RECIPE_CONTINUATION_AFFECTED_UNIT_FILES, VITEST_DISCOVERY_CONFIG_PATH, vitestDiscoveryConfigFailures, COMPILE_SOURCE_OBSERVATIONS_AFFECTED_PATHS, COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES, WORLD_EXPLORER_NAVIGATION_AFFECTED_PATHS, WORLD_EXPLORER_NAVIGATION_AFFECTED_UNIT_FILES, WORLD_VERSION_DIFF_AFFECTED_PATHS, WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES, INTAKE_APPROVAL_ROLLOUT_AFFECTED_PATHS, INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_PATHS, SOLUTIONS_PROOF_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES, EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS, EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES, EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_PATHS, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_UNIT_FILES, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_BROWSER_FILES, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
 const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -503,6 +503,35 @@ const currentOwnerBindings = [
     && ['components/pdf-evidence-viewer.tsx', 'components/pdf-evidence-viewer.module.css.bak'].every(p => !owner.match.test('nextjs/' + p))
     && runner.includes("['e2e/world-lifecycle.spec.ts', ['1440', '390', 'reduced-motion']]"),
     'Evidence viewer overlay owner must keep its one exact stylesheet, its direct suite and the world-lifecycle browser suite');
+}
+// Launch QA Product QA repins: six exact paths, the compile-stage suite and two mapped browser suites.
+{
+  const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'launch-qa-product-repins'), [owner] = owners;
+  const paths = ['components/compile-stage.test.tsx', 'components/compile-stage.tsx', 'e2e/change-inbox.spec.ts',
+    'e2e/landing-hero-film-loading.spec.ts', 'e2e/pipeline-board.spec.ts', 'e2e/workspace-preflight-audit.spec.ts'];
+  const suites = ['components/compile-stage.test.tsx'], browsers = ['e2e/landing-hero-film-loading.spec.ts', 'e2e/workspace-source-observation.spec.ts'];
+  assert(owners.length === 1 && JSON.stringify(LAUNCH_QA_PRODUCT_REPINS_AFFECTED_PATHS) === JSON.stringify(paths)
+    && JSON.stringify(LAUNCH_QA_PRODUCT_REPINS_AFFECTED_UNIT_FILES) === JSON.stringify(suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(suites)
+    && JSON.stringify(LAUNCH_QA_PRODUCT_REPINS_AFFECTED_BROWSER_FILES) === JSON.stringify(browsers) && JSON.stringify(owner.browserFiles) === JSON.stringify(browsers)
+    && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
+    && paths.every(p => owner.match.test('nextjs/' + p))
+    && ['components/compile-stage-player.tsx', 'e2e/change-inbox.spec.ts.bak', 'e2e/detail-integrity.spec.ts'].every(p => !owner.match.test('nextjs/' + p))
+    && runner.includes("['e2e/landing-hero-film-loading.spec.ts', ['390']]") && runner.includes("['e2e/workspace-source-observation.spec.ts', ['1440']]"),
+    'Launch QA Product QA repins owner must keep its six exact paths, the compile-stage suite and its two mapped browser suites');
+}
+// paper-product.css route ownership: two exact components, three direct suites and the Explore and Pricing browser suites.
+{
+  const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'paper-product-route-css'), [owner] = owners;
+  const paths = ['components/explore/explore-stage.tsx', 'components/pricing-page-client.tsx'];
+  const suites = ['lib/brand-copy.test.ts', 'lib/explore-story.test.ts', 'lib/pricing-plan-overview.test.ts'], browsers = ['e2e/explore.spec.ts', 'e2e/pricing-plan-overview.spec.ts'];
+  assert(owners.length === 1 && JSON.stringify(PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS) === JSON.stringify(paths)
+    && JSON.stringify(PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES) === JSON.stringify(suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(suites)
+    && JSON.stringify(PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES) === JSON.stringify(browsers) && JSON.stringify(owner.browserFiles) === JSON.stringify(browsers)
+    && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
+    && paths.every(p => owner.match.test('nextjs/' + p))
+    && ['components/explore/explore-stage-2.tsx', 'components/pricing-page-client.test.tsx'].every(p => !owner.match.test('nextjs/' + p))
+    && runner.includes("['e2e/explore.spec.ts', ['1440']]") && runner.includes("['e2e/pricing-plan-overview.spec.ts', ['1440', '390']]"),
+    'paper-product.css route owner must keep its two exact components, three direct suites and the Explore and Pricing browser suites');
 }
 for (const binding of currentOwnerBindings) {
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === binding.group), [owner] = owners;

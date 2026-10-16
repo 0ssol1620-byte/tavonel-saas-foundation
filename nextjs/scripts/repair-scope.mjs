@@ -1834,6 +1834,21 @@ export const SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/soluti
 export const EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS = Object.freeze(['components/pdf-evidence-viewer.module.css']);
 export const EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES = Object.freeze(['lib/pdf-evidence-viewer.test.ts']);
 export const EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/world-lifecycle.spec.ts']);
+// Launch QA Product QA repins (PR #141 fix round 2): the compile stage's result-less rule and its direct suite, and the four
+// Product QA specs re-pointed to behaviour the PR changed on purpose. Selects the compile-stage suite and the two mapped browser
+// suites (the source-observation stage at 1440, the Home film loading contract at 390). change-inbox, pipeline-board and
+// workspace-preflight-audit have no reviewed Repair project row; Launch QA's Product QA job runs all four on every push.
+export const LAUNCH_QA_PRODUCT_REPINS_AFFECTED_PATHS = Object.freeze([
+  'components/compile-stage.test.tsx', 'components/compile-stage.tsx', 'e2e/change-inbox.spec.ts',
+  'e2e/landing-hero-film-loading.spec.ts', 'e2e/pipeline-board.spec.ts', 'e2e/workspace-preflight-audit.spec.ts',
+]);
+export const LAUNCH_QA_PRODUCT_REPINS_AFFECTED_UNIT_FILES = Object.freeze(['components/compile-stage.test.tsx']);
+export const LAUNCH_QA_PRODUCT_REPINS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/landing-hero-film-loading.spec.ts', 'e2e/workspace-source-observation.spec.ts']);
+// paper-product.css route ownership (PR #141 fix round 2): Pricing and Explore now import the stylesheet the root layout no longer
+// loads. The suites that read both sources or render their pages, and the two browser suites for those routes.
+export const PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS = Object.freeze(['components/explore/explore-stage.tsx', 'components/pricing-page-client.tsx']);
+export const PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/explore-story.test.ts', 'lib/pricing-plan-overview.test.ts']);
+export const PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/explore.spec.ts', 'e2e/pricing-plan-overview.spec.ts']);
 // Exact literal alternation: every regular-expression metacharacter is escaped, not only '.', because the cookbook route
 // carries a literal [slug] segment that would otherwise be read as a character class.
 const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
@@ -2118,6 +2133,12 @@ export const AFFECTED_GROUPS = Object.freeze([
   // Evidence viewer overlay: the one exact stylesheet above selects its direct suite and the world-lifecycle browser suite.
   affectedGroup('evidence-viewer-overlay', new RegExp(`^nextjs/(?:${exactPathAlternation(EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS)})$`),
     { unitFiles: EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES, browserFiles: EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES }),
+  // Launch QA Product QA repins: the six exact paths above select the compile-stage suite and two mapped browser suites.
+  affectedGroup('launch-qa-product-repins', new RegExp(`^nextjs/(?:${exactPathAlternation(LAUNCH_QA_PRODUCT_REPINS_AFFECTED_PATHS)})$`),
+    { unitFiles: LAUNCH_QA_PRODUCT_REPINS_AFFECTED_UNIT_FILES, browserFiles: LAUNCH_QA_PRODUCT_REPINS_AFFECTED_BROWSER_FILES }),
+  // paper-product.css route ownership: the two exact components above select three direct suites and the Explore and Pricing suites.
+  affectedGroup('paper-product-route-css', new RegExp(`^nextjs/(?:${exactPathAlternation(PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS)})$`),
+    { unitFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, browserFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.

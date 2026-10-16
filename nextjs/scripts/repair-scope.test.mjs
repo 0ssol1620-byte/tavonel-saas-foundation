@@ -7037,7 +7037,31 @@ test('affected pilot worksheet runner admits the exact registered component suit
 test('affected PR #141 fix owners: intake approval rollout, solutions proof and the compile-run suite are exact and finite', async () => {
   const { INTAKE_APPROVAL_ROLLOUT_AFFECTED_PATHS, INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_PATHS,
     SOLUTIONS_PROOF_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES, EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS,
-    EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES, EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES } = await import('./repair-scope.mjs');
+    EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES, EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_PATHS,
+    LAUNCH_QA_PRODUCT_REPINS_AFFECTED_UNIT_FILES, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_BROWSER_FILES, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS,
+    PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES } = await import('./repair-scope.mjs');
+  // Fix round 2: the Launch QA Product QA repins and the route-owned paper-product.css.
+  for (const [group, paths, units, browsers] of [
+    ['launch-qa-product-repins', LAUNCH_QA_PRODUCT_REPINS_AFFECTED_PATHS, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_UNIT_FILES, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_BROWSER_FILES],
+    ['paper-product-route-css', PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES],
+  ]) {
+    for (const path of paths) {
+      const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+      assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles],
+        [[], [group], [], [...units].sort(), [...browsers].sort()], path);
+    }
+    assert.doesNotThrow(() => planBrowserRuns([...browsers], false), group);
+  }
+  assert.deepEqual([[...LAUNCH_QA_PRODUCT_REPINS_AFFECTED_PATHS], [...LAUNCH_QA_PRODUCT_REPINS_AFFECTED_UNIT_FILES], [...LAUNCH_QA_PRODUCT_REPINS_AFFECTED_BROWSER_FILES]],
+    [['components/compile-stage.test.tsx', 'components/compile-stage.tsx', 'e2e/change-inbox.spec.ts', 'e2e/landing-hero-film-loading.spec.ts',
+      'e2e/pipeline-board.spec.ts', 'e2e/workspace-preflight-audit.spec.ts'],
+    ['components/compile-stage.test.tsx'], ['e2e/landing-hero-film-loading.spec.ts', 'e2e/workspace-source-observation.spec.ts']]);
+  assert.deepEqual([[...PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS], [...PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES], [...PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES]],
+    [['components/explore/explore-stage.tsx', 'components/pricing-page-client.tsx'],
+    ['lib/brand-copy.test.ts', 'lib/explore-story.test.ts', 'lib/pricing-plan-overview.test.ts'], ['e2e/explore.spec.ts', 'e2e/pricing-plan-overview.spec.ts']]);
+  for (const adjacent of ['nextjs/components/compile-stage.tsx.bak', 'nextjs/e2e/pipeline-board-2.spec.ts', 'nextjs/components/explore/explore-stage-2.tsx']) {
+    assert.deepEqual(affectedMap([affectedRecord('A', [adjacent], '000000')]).failures, [`unmapped changed endpoint: ${adjacent}`], adjacent);
+  }
   assert.deepEqual([[...EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS], [...EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES], [...EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES]],
     [['components/pdf-evidence-viewer.module.css'], ['lib/pdf-evidence-viewer.test.ts'], ['e2e/world-lifecycle.spec.ts']]);
   {
