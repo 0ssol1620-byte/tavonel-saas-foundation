@@ -7,7 +7,7 @@ the PR #141 reviewer, 2026-10-15):
 |---|---|---|---|
 | 1 | `20261003120000_intake_approval_budget_invariants` | `foundation_intake_approvals`, `foundation_intake_approval_files`, and the approval RPCs (`create_`, `read_`, `reserve_…_approved_file`, `confirm_…_approved_upload`, `confirm_…_approved_file`, `cancel_…_approved_file`, `settle_…_approved_compute`, `assert_foundation_intake_compile_set`) | nothing while the approval switch is off |
 | 2 | `20261003130000_intake_approval_file_cap` | two `check` constraints on table 1 (128 files) | nothing |
-| 3 | `20261004100000_approved_intake_connection_batch_binding` | replaces `apply_foundation_connection_batch` (same ten parameters) so an approved upload's UUIDv4 binds to its confirmed member | the local-agent connection batch, on every batch |
+| 3 | `20261004100000_approved_intake_connection_batch_binding` | replaces `apply_foundation_connection_batch` (same ten parameters): it validates each event's `documentId` itself -- main's workspace derivation, or a confirmed approval member bound to the caller -- so an approved upload's UUIDv4 can bind | the local-agent connection batch, on every batch. **Switch off: the route keeps main's check** (`parseConnectionBatchInput(body, workspaceKey)` refuses an id not derived from the workspace with `CONNECTION_BATCH_INVALID`) because production's 0012 body checks only actor, cursor and idempotency. Switch on: the route defers to this function, so it must be applied first |
 | 4 | `20261007100000_dropbox_source_path_reconciliation` | three `dropbox_source_*` tables, `reconcile_dropbox_source_page`, `dropbox_uncommitted_source_stream`, a `foundation_jobs` insert guard; replaces `enqueue_connector_sync` | every Dropbox sync page, **only while the approval switch is on** |
 
 `read_foundation_intake_approval_v2` is **not** in this list. It exists only in
@@ -33,8 +33,12 @@ With it off:
 - Dropbox sync runs main dbe22b1e's path too: a DeletedMetadata keeps main's `path_lower` id and is
   suspended at once, the checkpoint moves as on main, and `reconcile_dropbox_source_page` is never
   called. `nextjs/lib/dropbox-sync-rollout.test.ts` pins that against the same kind of database.
-- migration 3's `apply_foundation_connection_batch` keeps its ten parameters, so the application
-  calls it the same way before and after; main's definition serves the switch-off path.
+- the connection-batch route binds every event's `documentId` to the caller's workspace before the
+  RPC, exactly as main does (`app/api/v1/connections/[id]/sync/route.ts`); production's 0012
+  `apply_foundation_connection_batch` does not, so the route check is the guard while the switch is
+  off. `nextjs/lib/intake-approval-rollout-off.test.ts` pins the refusal (`CONNECTION_BATCH_INVALID`,
+  no RPC call) and the derived-id pass against the same mocked production database. Migration 3
+  keeps the ten parameters, so the call is the same before and after it is applied.
 
 With the switch **on**, every Dropbox page goes through `reconcile_dropbox_source_page`. A database
 without migration 4 then answers PGRST202 / 42883, and the sync fails closed with
@@ -44,6 +48,45 @@ checkpoint where it was.
 Order among the four: migration 3 depends on migration 1's tables, so it goes after 1. Migration 4's
 `enqueue_connector_sync` replacement and `foundation_jobs` insert guard act from the moment it is
 applied, switch or no switch, so apply it in the switch-on window (section 4), not ahead of it.
+
+## Draft-schema paths and their gates
+
+The four migrations above are registered but unapplied. Other paths in this PR call schema that is
+**not a migration at all**: it exists only in `supabase/drafts/`, which says "draft only, do not
+apply". Each such path sits behind a gate that is off in production. Read-only check against
+production (`tfcorhjkqcuisqhsjemz`, 2026-10-16): none of the functions or columns below exists, and
+none of the environment variables below is set in the Vercel production project (names checked,
+values not read).
+
+**Each gate stays off until its draft is promoted to a registered migration, reviewed, and applied
+to production.** Turning a gate on before that is not a configuration change: every request on that
+path fails closed (missing function or column), and some fail with a code that names the store, not
+the missing migration.
+
+| gate (off in production) | kind | path | draft-only schema it needs |
+|---|---|---|---|
+| `INTAKE_TRIAGE_ROLLOUT_ENABLED` | code constant, `false` (`nextjs/lib/intake-triage-rollout.ts`) | server triage routes (`app/api/v1/uploads/triage/*`), triage branches of `lib/compute-reservation.ts` and `app/api/uploads/confirm/route.ts`; turning it on also turns the approval lineage on | `supabase/drafts/migrations/20261004120000_foundation_intake_triage_v3.sql`: `create_foundation_intake_preflight_approval`, `create_foundation_intake_triage_stage`, `claim_/finish_foundation_intake_triage_stage_seal`, `read_foundation_intake_triage_stages`, `create_/read_foundation_intake_triage_receipt`, `create_foundation_intake_approval_v2`, `read_foundation_intake_approval_v2`, `reserve_foundation_intake_approved_file_v2`, `assert_foundation_intake_triage_compile_set`; tables `foundation_intake_preflight_approvals`, `foundation_intake_triage_*`; approval columns `preflight_approval_id`, `triage_receipt_id`, `triage_version`, `configuration_revision` |
+| `TAVONEL_GOOGLE_VIEWER_LINK_ENABLED` | env, `=== "true"` (`nextjs/lib/connector-oauth.ts`) | viewer-link authorize, callback and revoke (`app/api/v1/oauth-connectors/…`), `/workspace/google-drive-access` (`notFound()` while off), viewer ACL check (`lib/connector-source-access.ts`), ACL capture on Google import (`lib/source-import.ts`), ACL refresh turn (`lib/google-drive-acl-refresh.ts`, `/api/internal/jobs/acl-refresh`) | `supabase/drafts/google-viewer-principal-boundary.sql`: column `foundation_oauth_authorizations.authorization_purpose` and the replaced `consume_foundation_oauth_authorization` that returns it, `source_acl_snapshots.capture_complete`, table `foundation_provider_principal_links`, `record_google_drive_viewer_principal`, `revoke_google_drive_viewer_principals`, `connector_documents_blocked_for_viewer`, `record_google_drive_source_acl_snapshot`, `record_google_drive_source_acl_capture_failure`; `supabase/drafts/google-drive-acl-refresh/queue.sql`: `enqueue_stale_google_drive_acl_refreshes`, `claim_google_drive_acl_refresh_batch`, `read_google_drive_acl_refresh_source`, `finish_google_drive_acl_refresh`, `cooldown_google_drive_acl_refresh_connection`, `google_drive_acl_refresh_connection_active`, `google_drive_acl_refresh_lease_owned` and the `foundation_google_drive_acl_refresh_*` tables. A connector (not viewer-link) authorization never names `authorization_purpose`, and a consume row without it reads as a connector connection, so main's Google Drive connection works against production's schema (`nextjs/lib/connector-oauth-store.test.ts`) |
+| `TAVONEL_COMPILE_JOB_AUTHORITY_VERSION` | env, `=== "v1"` (`nextjs/lib/compile-job-authority.ts`) | compile-job viewer authority and the authority-bound enqueue (`lib/compile-job-store.ts`); off, main's `enqueue_foundation_compile_job` | `supabase/drafts/compile-job-viewer-authority.sql`: `authorize_foundation_compile_job`, `enqueue_foundation_compile_job_with_authority`, table `foundation_compile_job_source_authority` |
+| `FOUNDATION_COMPLETED_READ_ENABLED` | env, `=== "true"` (`nextjs/lib/completed-read-proof.ts`) | completed-read proof settle and read | `supabase/drafts/migrations/20261005130000_foundation_completed_read_proof.sql`: `settle_foundation_completed_read_v1`, `read_foundation_completed_read_v1`, tables `foundation_completed_read_*` |
+| `INTAKE_APPROVAL_ROLLOUT_ENABLED` | code constant, `false` (`nextjs/lib/intake-approval-rollout.ts`) | the whole-set approval lineage, Dropbox path reconciliation, and the connection-batch route's deferral to migration 3 | not draft: migrations 1–4 above (registered, unapplied). Listed so the table names every gate |
+
+The read-only check that produced this table, for the next change that touches a gate:
+
+```sql
+-- Expect zero rows once a gate's draft has been promoted and applied; today every name returns.
+select n from unnest(array['authorization_purpose']) n
+where not exists (select 1 from information_schema.columns where table_schema = 'public' and column_name = n)
+union all
+select n from unnest(array[
+  'create_foundation_intake_triage_stage', 'read_foundation_intake_approval_v2',
+  'record_google_drive_viewer_principal', 'revoke_google_drive_viewer_principals',
+  'connector_documents_blocked_for_viewer', 'claim_google_drive_acl_refresh_batch',
+  'authorize_foundation_compile_job', 'enqueue_foundation_compile_job_with_authority',
+  'settle_foundation_completed_read_v1', 'read_foundation_completed_read_v1']) n
+where not exists (select 1 from pg_proc p join pg_namespace s on s.oid = p.pronamespace
+                  where s.nspname = 'public' and p.proname = n);
+```
 
 ## Why not `supabase db push`
 
