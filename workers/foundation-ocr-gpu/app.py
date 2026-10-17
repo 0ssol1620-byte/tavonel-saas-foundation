@@ -8,6 +8,7 @@ import os
 import re
 from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from queue import Queue
 from threading import Lock, Thread
 from time import monotonic
 from collections.abc import Iterator
@@ -821,14 +822,20 @@ def ocr(
         )
 
     def lines() -> Iterator[bytes]:
-        events: list[dict] = []
+        # The document is read on its own thread, which hands each page over the moment it is
+        # done, so that page's line is on the wire while the next page is still being read.
+        # Collecting the events and writing them after the last page made the first byte of an
+        # 80-page stream arrive at 216.6 s (T7, PRODUCT-PATH-OCR-TIMING.md finding 5).
+        # ponytail: a client that hangs up does not stop the read, exactly as before; it runs to
+        # the end on that thread. Add a cancel flag checked between pages if that costs GPU time.
+        handoff: Queue[dict | tuple[str, int, list[OcrRegion]] | BaseException] = Queue()
 
         def on_page(page_number1: int, page_count: int, path: str, regions: list[OcrRegion]) -> None:
             # What a reader can be shown about a page: where it is, how much was found, how
             # confident the reader is, and where on the page each line sits. No page is reported
             # before it has been read, and nothing is estimated.
             confidences = [r["confidence"] for r in regions]
-            events.append({
+            handoff.put({
                 "schemaVersion": "tavonel.ocr_progress.v1",
                 "type": "page",
                 "pageNumber1": page_number1,
@@ -850,21 +857,35 @@ def ocr(
                 ],
             })
 
-        try:
-            text, page_count, regions = extract_text(payload, on_page)
-        except HTTPException as exc:
-            # A refusal is part of the stream, not a broken connection. The status line is the
-            # last thing a reader sees, and it says why.
-            yield (json.dumps({
-                "schemaVersion": "tavonel.ocr_progress.v1",
-                "type": "refused",
-                "status": exc.status_code,
-                "detail": exc.detail,
-            }, ensure_ascii=False) + NEWLINE).encode("utf-8")
-            return
+        def read() -> None:
+            # Every way out of the read puts exactly one last item, so the stream never waits on
+            # a reader that has already stopped.
+            try:
+                handoff.put(extract_text(payload, on_page))
+            except BaseException as exc:  # noqa: BLE001 -- handed to the stream below, which raises it
+                handoff.put(exc)
 
-        for event in events:
-            yield (json.dumps(event, ensure_ascii=False) + NEWLINE).encode("utf-8")
-        yield (json.dumps(ocr_result_body(text, page_count, regions, expected_digest), ensure_ascii=False) + NEWLINE).encode("utf-8")
+        Thread(target=read, name="ocr-stream-read", daemon=True).start()
+        while True:
+            item = handoff.get()
+            if isinstance(item, dict):
+                yield (json.dumps(item, ensure_ascii=False) + NEWLINE).encode("utf-8")
+                continue
+            if isinstance(item, HTTPException):
+                # A refusal is part of the stream, not a broken connection. The status line is the
+                # last thing a reader sees, and it says why.
+                yield (json.dumps({
+                    "schemaVersion": "tavonel.ocr_progress.v1",
+                    "type": "refused",
+                    "status": item.status_code,
+                    "detail": item.detail,
+                }, ensure_ascii=False) + NEWLINE).encode("utf-8")
+                return
+            if isinstance(item, BaseException):
+                # Anything else is a fault, not an answer: it breaks the stream, as it always did.
+                raise item
+            text, page_count, regions = item
+            yield (json.dumps(ocr_result_body(text, page_count, regions, expected_digest), ensure_ascii=False) + NEWLINE).encode("utf-8")
+            return
 
     return StreamingResponse(lines(), media_type=NDJSON_MEDIA_TYPE, headers={"cache-control": "no-store"})

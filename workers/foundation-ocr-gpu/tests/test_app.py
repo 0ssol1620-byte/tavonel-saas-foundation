@@ -719,6 +719,97 @@ def test_stream_matches_buffered_for_a_mixed_document(monkeypatch: pytest.Monkey
     assert sorted(streamed_ids) == sorted(region["regionId"] for region in lines[-1]["regions"])
 
 
+def test_a_page_line_reaches_the_client_before_the_last_page_is_read(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    # T7 (table-limits-receipts/PRODUCT-PATH-OCR-TIMING.md, finding 5): every line used to be
+    # written after the last page, so the first byte of an 80-page stream arrived at 216.6 s.
+    # Starlette's TestClient collects the whole body before it returns and cannot see this, so the
+    # worker is served by uvicorn on loopback and read with httpx, the way the CDR worker reads it.
+    # The last page is not read until the client holds a line; a buffered stream times out here.
+    import json
+    import socket
+    import threading
+    import time
+
+    import httpx
+    import uvicorn
+
+    worker, _ = ready_fake_ocr(monkeypatch, SCAN)
+    payload = pages_pdf(None, None, None)
+    digest = "sha256:" + hashlib.sha256(payload).hexdigest()
+    buffered = client.post("/v1/ocr", headers=headers(digest), files={"source": ("scan.pdf", payload, "application/pdf")})
+    assert buffered.status_code == 200
+
+    first_line = threading.Event()
+    held_a_line: list[bool] = []
+    rapidocr_lines = worker.rapidocr_lines
+
+    def gated(engine, image, **options):
+        if engine is worker._general_rapidocr:  # once per raster page
+            if len(held_a_line) == 2:  # the third and last page
+                first_line.wait(timeout=10)
+            held_a_line.append(first_line.is_set())
+        return rapidocr_lines(engine, image, **options)
+
+    monkeypatch.setattr(worker, "rapidocr_lines", gated)
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    server = uvicorn.Server(uvicorn.Config(worker.app, host="127.0.0.1", port=port, lifespan="off", ws="none", log_level="warning"))
+    serving = threading.Thread(target=server.run, daemon=True)
+    serving.start()
+    lines: list[dict] = []
+    try:
+        deadline = time.monotonic() + 10
+        while not server.started:
+            assert time.monotonic() < deadline, "uvicorn did not start"
+            time.sleep(0.01)
+        with httpx.stream(
+            "POST",
+            f"http://127.0.0.1:{port}/v1/ocr",
+            headers={**headers(digest), "accept": NDJSON},
+            files={"source": ("scan.pdf", payload, "application/pdf")},
+            timeout=30,
+        ) as response:
+            assert response.status_code == 200
+            assert response.headers["content-type"].startswith(NDJSON)
+            for line in response.iter_lines():
+                if line.strip():
+                    lines.append(json.loads(line))
+                    first_line.set()
+    finally:
+        server.should_exit = True
+        serving.join(timeout=10)
+
+    assert len(held_a_line) == 3 and held_a_line[-1], "the first line was not sent until the document was read"
+    # The lines themselves are unchanged: the same page events, then the buffered result.
+    pages = [(line["pageNumber1"], line["path"], line["regionCount"]) for line in lines[:-1]]
+    assert pages == [(1, "native", 0), (1, "raster", 1), (2, "native", 0), (2, "raster", 1), (3, "native", 0), (3, "raster", 1)]
+    assert lines[-1] == buffered.json()
+
+
+def test_an_engine_fault_while_streaming_breaks_the_stream_instead_of_ending_it(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    worker, _ = ready_fake_ocr(monkeypatch, SCAN)
+
+    def engine_fault(*_args, **_kwargs):
+        raise RuntimeError("synthetic engine fault")
+
+    monkeypatch.setattr(worker, "rapidocr_lines", engine_fault)
+    payload = pages_pdf("NATIVE 1", None)
+    digest = "sha256:" + hashlib.sha256(payload).hexdigest()
+    # Not a refusal line and never a result: an unexpected fault reaches the server, as before.
+    with pytest.raises(RuntimeError, match="synthetic engine fault"):
+        client.post(
+            "/v1/ocr",
+            headers={**headers(digest), "accept": NDJSON},
+            files={"source": ("mixed.pdf", payload, "application/pdf")},
+        )
+    assert not worker._engine_lock.locked()
+
+
 def test_ocr_exception_on_a_mixed_document_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     worker, _ = ready_fake_ocr(monkeypatch, SCAN)
 
