@@ -301,8 +301,10 @@ export function incompleteInventorySentence(partial: DocumentListPartial): strin
   const unread = count > 0
     ? `${count} source${count === 1 ? "" : "s"} in this workspace could not be fully read, so the list below is incomplete.`
     : "";
+  // The listing stops early without knowing what lies past it -- refused, still being
+  // prepared or already prepared -- so this says only that something may be missing.
   const truncated = partial.truncated
-    ? "This workspace has more refused or unprepared sources than one listing returns, so some are not shown."
+    ? "The source listing stopped before its end, so some sources may not be shown."
     : "";
   return [unread, truncated, "Retry; nothing was changed."].filter(Boolean).join(" ");
 }

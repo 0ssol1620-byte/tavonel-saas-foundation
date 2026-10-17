@@ -567,17 +567,20 @@ export function foundationQuarantineRejectKey(workspaceKey: string, documentId: 
 const MAX_LISTED_REJECTS = 20;
 const MAX_REJECT_RECEIPT_BYTES = 4_096;
 const DOCUMENT_SEGMENT = /^[A-Za-z0-9_-]{1,80}$/;
+/** The same 8 x 1,000-key bound `listImmutableWorkspaceObjects` pages to. */
+const MAX_QUARANTINE_LIST_PAGES = 8;
 
 /**
  * The document ids in this workspace whose source was refused, and those whose source is stored
  * with no refusal beside it.
  *
- * One `ListObjectsV2` page is enough and deliberately not paged: this is a display path, the cap
- * is disclosed by `truncated`, and a workspace with more than twenty refusals has a problem that
- * a longer list does not solve. `truncated` is also set when R2 says the page itself was cut
- * short, because then refusals and stored sources past it are missing too.
+ * The listing is paged, because a source is never deleted after preparation: a single page would
+ * be cut short for every workspace past 1,000 quarantine objects and mark it incomplete forever.
+ * Paging stops at `MAX_QUARANTINE_LIST_PAGES`. Only a listing still cut short there, or one R2
+ * cut short without a cursor to continue from, is `truncated`; so is one with more than twenty
+ * refusals, a cap that is disclosed rather than lifted because a longer list does not solve it.
  *
- * `storedDocumentIds` is every source key in the page without a `cdr-reject.json`, including
+ * `storedDocumentIds` is every source key listed without a `cdr-reject.json`, including
  * refusals past the twenty-item cap, which are left out of it rather than shown as stored. The
  * source is never deleted after preparation, so most of these also have immutable objects; the
  * caller subtracts those.
@@ -593,30 +596,44 @@ export async function listFoundationQuarantineRejects(
   if (env.bucket !== FOUNDATION_R2_BUCKET) return { ok: false, code: "BUCKET_NOT_FOUNDATION" };
   if (!/^[A-Za-z0-9_-]{1,80}$/.test(workspaceKey)) return { ok: false, code: "QUARANTINE_PREFIX_REQUIRED" };
   const prefix = `quarantine/${workspaceKey}/`;
-  const query: Record<string, string> = { "list-type": "2", "max-keys": "1000", prefix };
-  const canonicalQuery = Object.keys(query)
-    .sort()
-    .map((name) => `${encodeURIComponent(name)}=${encodeURIComponent(query[name])}`)
-    .join("&");
-  const response = await signedS3Request(env, "GET", `/${env.bucket}`, canonicalQuery, undefined, now);
-  if (!response?.ok) return { ok: false, code: "LIST_FAILED" };
-  const xml = await response.text();
   const documentIds: string[] = [];
   const sourceIds: string[] = [];
-  for (const block of xml.split(/<Contents>/i).slice(1)) {
-    const key = /<Key>([^<]+)<\/Key>/i.exec(block)?.[1];
-    if (!key || !key.startsWith(prefix)) continue;
-    const parts = key.slice(prefix.length).split("/");
-    if (parts.length !== 2 || !DOCUMENT_SEGMENT.test(parts[0])) continue;
-    if (parts[1] === CDR_REJECT_FILENAME) documentIds.push(parts[0]);
-    else if (parts[1] === "source") sourceIds.push(parts[0]);
+  let continuation: string | undefined;
+  let cutShort = true;
+  for (let page = 0; cutShort && page < MAX_QUARANTINE_LIST_PAGES; page += 1) {
+    const query: Record<string, string> = { "list-type": "2", "max-keys": "1000", prefix };
+    if (continuation) query["continuation-token"] = continuation;
+    const canonicalQuery = Object.keys(query)
+      .sort()
+      .map((name) => `${encodeURIComponent(name)}=${encodeURIComponent(query[name])}`)
+      .join("&");
+    const response = await signedS3Request(env, "GET", `/${env.bucket}`, canonicalQuery, undefined, now);
+    if (!response?.ok) return { ok: false, code: "LIST_FAILED" };
+    const xml = await response.text();
+    for (const block of xml.split(/<Contents>/i).slice(1)) {
+      const key = /<Key>([^<]+)<\/Key>/i.exec(block)?.[1];
+      if (!key || !key.startsWith(prefix)) continue;
+      const parts = key.slice(prefix.length).split("/");
+      if (parts.length !== 2 || !DOCUMENT_SEGMENT.test(parts[0])) continue;
+      if (parts[1] === CDR_REJECT_FILENAME) documentIds.push(parts[0]);
+      else if (parts[1] === "source") sourceIds.push(parts[0]);
+    }
+    // A page that does not say whether it is complete is not read as complete.
+    const truncation = /<IsTruncated>\s*(true|false)\s*<\/IsTruncated>/i.exec(xml)?.[1]?.toLowerCase();
+    if (!truncation) return { ok: false, code: "LIST_INVALID" };
+    cutShort = truncation === "true";
+    continuation = cutShort
+      ? decodeXml(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/i.exec(xml)?.[1] ?? "") || undefined
+      : undefined;
+    // Cut short with no cursor: the rest cannot be read, so the listing stays `truncated`.
+    if (!continuation) break;
   }
   const refused = new Set(documentIds);
   return {
     ok: true,
     documentIds: documentIds.slice(0, MAX_LISTED_REJECTS),
     storedDocumentIds: sourceIds.filter((documentId) => !refused.has(documentId)),
-    truncated: documentIds.length > MAX_LISTED_REJECTS || /<IsTruncated>\s*true\s*<\/IsTruncated>/i.test(xml),
+    truncated: documentIds.length > MAX_LISTED_REJECTS || cutShort,
   };
 }
 

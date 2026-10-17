@@ -57,6 +57,53 @@ describe("quarantine listing", () => {
   it("fails rather than returning an empty listing when the store refuses", async () => {
     await expect(listing("<Error/>", 500)).resolves.toEqual({ ok: false, code: "LIST_FAILED" });
   });
+
+  /*
+    REVIEW-2026-10-17 N1. A source is never deleted after preparation, so one 1,000-key page is
+    cut short for every workspace past 1,000 quarantine objects. Reporting that page as
+    `truncated` marked such a workspace incomplete forever. The listing pages; only a listing
+    still cut short at its bound is `truncated`.
+  */
+  const cursorPage = (keys: string[], cursor: string) => page(keys, true)
+    .replace("</ListBucketResult>", `<NextContinuationToken>${cursor}</NextContinuationToken></ListBucketResult>`);
+  const pagedListing = (xmls: string[]) => {
+    let served = 0;
+    const fetchMock = vi.fn(async (..._args: unknown[]) => new Response(xmls[served++] ?? ""));
+    vi.stubGlobal("fetch", fetchMock);
+    return { fetchMock, result: listFoundationQuarantineRejects(env, workspace) };
+  };
+
+  it("follows the cursor to a complete listing, which is not truncated", async () => {
+    const { fetchMock, result } = pagedListing([
+      cursorPage([`quarantine/${workspace}/doc-a/cdr-reject.json`, `quarantine/${workspace}/doc-a/source`], "next+1/="),
+      page([`quarantine/${workspace}/doc-b/source`]),
+    ]);
+    await expect(result).resolves.toEqual({ ok: true, documentIds: ["doc-a"], storedDocumentIds: ["doc-b"], truncated: false });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0][0])).not.toContain("continuation-token");
+    expect(String(fetchMock.mock.calls[1][0])).toContain(`continuation-token=${encodeURIComponent("next+1/=")}`);
+  });
+
+  it("is truncated only when it is still cut short at its eight-page bound", async () => {
+    const { fetchMock, result } = pagedListing(Array.from({ length: 9 }, (_, index) =>
+      cursorPage([`quarantine/${workspace}/doc-${index}/source`], `cursor-${index}`)));
+    const listed = await result;
+    expect(listed).toMatchObject({ ok: true, documentIds: [], truncated: true });
+    expect(listed.ok && listed.storedDocumentIds).toHaveLength(8);
+    expect(fetchMock).toHaveBeenCalledTimes(8);
+  });
+
+  it("fails rather than reading a page that does not say whether it is complete as complete", async () => {
+    await expect(listing(`<ListBucketResult><Contents><Key>quarantine/${workspace}/doc-b/source</Key></Contents></ListBucketResult>`))
+      .resolves.toEqual({ ok: false, code: "LIST_INVALID" });
+  });
+
+  it("fails when a later page cannot be read, instead of returning the pages before it", async () => {
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response(cursorPage([`quarantine/${workspace}/doc-a/source`], "next")))
+      .mockResolvedValueOnce(new Response("<Error/>", { status: 500 })));
+    await expect(listFoundationQuarantineRejects(env, workspace)).resolves.toEqual({ ok: false, code: "LIST_FAILED" });
+  });
 });
 
 describe("r2 synthetic canary guards", () => {

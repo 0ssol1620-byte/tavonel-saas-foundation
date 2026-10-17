@@ -65,7 +65,7 @@ export type PipelineDocument = Omit<DocumentListItem, "processingState"> & {
  * `documentIds` are documents the listing knows exist but could not fully read: a refusal or
  * review receipt that failed to load or validate. One that is also in `documents` is listed
  * without the detail that failed; one that is not could not be described at all. `truncated`
- * means the quarantine listing hit its bound, so refused and stored sources past it are missing.
+ * means the quarantine listing hit its bound, so sources past it -- of any state -- may be missing.
  */
 export type DocumentListPartial = {
   documentIds: string[];

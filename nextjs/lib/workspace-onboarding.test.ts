@@ -276,7 +276,9 @@ describe("an incomplete inventory", () => {
     const items = deriveAttentionItems(input({ inventoryPartial: { documentIds: [], truncated: true }, operatorReviewCount: 1 }));
     expect(items.map((item) => item.id)).toEqual(["inventory-incomplete", "operator-review"]);
     expect(items[0]).toMatchObject({ label: "Incomplete", action: { intent: "refresh" } });
-    expect(items[0].detail).toContain("more refused or unprepared sources than one listing returns");
+    // REVIEW-2026-10-17 N1: what lies past the bound is unknown, so the sentence names no state.
+    expect(items[0].detail).toBe("The source listing stopped before its end, so some sources may not be shown. Retry; nothing was changed.");
+    expect(items[0].detail).not.toMatch(/refused|unprepared|prepar/i);
     expect(items[0].detail).not.toMatch(/[A-Z]{3,}_[A-Z]/);
   });
 

@@ -203,14 +203,21 @@ describe("the documents listing", () => {
     expect(sourceAccess).toHaveBeenLastCalledWith(workspaceKey, [readId, refusedId], "viewer-user");
   });
 
+  /*
+    REVIEW-2026-10-17: this used to deny the second check whatever ids it was given, so it passed
+    even if `partial` ids were never checked. Access is now denied only for the id that `partial`
+    alone carries: the response is refused only if that id reaches the access check.
+  */
   it("returns no partial ids once access to them is revoked", async () => {
     getReject.mockResolvedValue({ ok: false, code: "READ_FAILED" });
-    sourceAccess.mockResolvedValueOnce({ ok: true }).mockResolvedValueOnce({
-      ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED",
-    });
+    sourceAccess.mockImplementation(async (_workspace: string, ids: string[]) => ids.includes(refusedId)
+      ? { ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" }
+      : { ok: true });
     const body = await documents();
+    expect(sourceAccess).toHaveBeenLastCalledWith(workspaceKey, [readId, refusedId], "viewer-user");
     expect(body.status).toBe(403);
-    expect(body.partial).toBeUndefined();
+    expect(body).toEqual({ status: 403, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    expect(JSON.stringify(body)).not.toContain(refusedId);
   });
 
   it.each([
