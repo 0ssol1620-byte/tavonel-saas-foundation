@@ -6,6 +6,13 @@ import { useCallback, useState } from "react";
 import type { BillingOfferCode } from "./billing-catalog";
 import { trackFunnel } from "./funnel-events";
 import { failureSentence } from "./workspace-failure-copy";
+import {
+  ENTITLEMENT_PENDING_SENTENCE,
+  entitlementActiveSentence,
+  waitForEntitlement,
+  type BillingStatusAccount,
+  type EntitlementWaitResult,
+} from "./entitlement-wait";
 
 type CheckoutResponse = {
   code?: string;
@@ -34,7 +41,11 @@ function overlayLook(): { theme: "light" | "dark"; locale: "ko" | "en" } {
   };
 }
 
-export function useCheckout(notify: (message: string) => void) {
+/**
+ * `onEntitlement` hears how the bounded wait after `checkout.completed` ended (journey A4), so a
+ * page that shows billing can show the account the wait read without a reload.
+ */
+export function useCheckout(notify: (message: string) => void, onEntitlement?: (wait: EntitlementWaitResult) => void) {
   const [busy, setBusy] = useState<BillingOfferCode | null>(null);
 
   const start = useCallback(
@@ -98,6 +109,19 @@ export function useCheckout(notify: (message: string) => void) {
               */
               trackFunnel("checkout_completed", { offer: offerCode, mode: paymentMode });
               notify(`Paddle accepted the ${paymentMode} payment. Access and credits remain pending until the signed webhook is persisted.`);
+              /*
+                Journey A4 (D-04): then read billing status again, a bounded number of times, and
+                end in a stated outcome -- active, or still pending with what to do next.
+              */
+              const label = checkout.offer?.label;
+              void waitForEntitlement(offerCode, async () => {
+                const status = await fetch("/api/billing/status", { headers: { authorization: `Bearer ${token}` } });
+                if (!status.ok) return null;
+                return ((await status.json()) as { account?: BillingStatusAccount }).account ?? null;
+              }).then((wait) => {
+                notify(wait.outcome === "active" ? entitlementActiveSentence(label) : ENTITLEMENT_PENDING_SENTENCE);
+                onEntitlement?.(wait);
+              });
             }
           },
         });
@@ -119,7 +143,7 @@ export function useCheckout(notify: (message: string) => void) {
         setBusy(null);
       }
     },
-    [notify],
+    [notify, onEntitlement],
   );
 
   return { start, busy };

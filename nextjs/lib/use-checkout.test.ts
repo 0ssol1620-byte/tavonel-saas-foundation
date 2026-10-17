@@ -17,11 +17,13 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { failureSentence } from "./workspace-failure-copy";
+import { ENTITLEMENT_PENDING_SENTENCE, type BillingStatusAccount, type EntitlementWaitResult } from "./entitlement-wait";
 
 /* ---------------------------------------------------------------- module doubles */
 
 const session = { token: null as string | null };
-const paddle = { opened: [] as unknown[], init: null as unknown };
+type PaddleEvent = { name: string };
+const paddle = { opened: [] as unknown[], init: null as unknown, eventCallback: null as null | ((event: PaddleEvent) => void) };
 
 vi.mock("./supabase-browser", () => ({
   getSupabaseBrowserClient: () => ({
@@ -32,7 +34,10 @@ vi.mock("./supabase-browser", () => ({
 }));
 
 vi.mock("./paddle-browser", () => ({
-  initializePaddleBrowser: async () => paddle.init,
+  initializePaddleBrowser: async (options: { eventCallback?: (event: PaddleEvent) => void }) => {
+    paddle.eventCallback = options.eventCallback ?? null;
+    return paddle.init;
+  },
 }));
 
 /* ------------------------------------------------------------------- harness */
@@ -41,7 +46,7 @@ vi.mock("./paddle-browser", () => ({
  * Drives the hook without a DOM. `useCallback`/`useState` are the only React features it uses,
  * so a two-hook dispatcher is enough and keeps the test free of a renderer dependency.
  */
-async function runCheckout(offer: string) {
+async function runCheckout(offer: string, onEntitlement?: (wait: EntitlementWaitResult) => void) {
   const notices: string[] = [];
   const React = await import("react");
   const states: unknown[] = [];
@@ -70,7 +75,7 @@ async function runCheckout(offer: string) {
 
   let start: (code: string) => Promise<void>;
   try {
-    const hook = useCheckout((m) => notices.push(m)) as { start: (code: string) => Promise<void> };
+    const hook = useCheckout((m) => notices.push(m), onEntitlement) as { start: (code: string) => Promise<void> };
     start = hook.start;
   } finally {
     if (internals && "H" in internals) internals.H = previous;
@@ -101,6 +106,7 @@ const page = { lang: "en", scheme: "dark" };
 beforeEach(() => {
   fetchCalls.length = 0;
   paddle.opened.length = 0;
+  paddle.eventCallback = null;
   paddle.init = { Checkout: { open: (args: unknown) => paddle.opened.push(args) } };
   session.token = "session-token";
   page.lang = "en";
@@ -112,6 +118,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -297,5 +304,83 @@ describe("checkout overlay look", () => {
 
     expect(paddle.opened).toHaveLength(0);
     expect(notices.join(" ")).toMatch(/could not be opened\. No entitlement was changed/);
+  });
+});
+
+
+/*
+  Journey A4, U7 wiring (JOURNEY-MAP-2026-10-17 D-04). After `checkout.completed` the hook reads
+  /api/billing/status again within the caps of `entitlement-wait.ts` and ends in a stated outcome.
+  Nothing is read before Paddle reports the payment.
+*/
+describe("waiting for the entitlement after checkout", () => {
+  const ready = { clientToken: "ct", environment: "sandbox", offer: { priceId: "pri_1", label: "Developer" }, customData: { u: "1" } };
+  const inactive = {
+    accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0,
+    billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null,
+  } satisfies BillingStatusAccount;
+  const active = { ...inactive, accessPlan: "observer_access", subscriptionStatus: "active", creditBalance: 2_000, paddleCustomerId: "ctm_1" };
+
+  /** The checkout POST answers `ready`; each billing-status read takes the next answer, the last one repeating. */
+  function serve(statusAnswers: Array<{ ok: boolean; status: number; body: unknown }>) {
+    let reads = 0;
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      fetchCalls.push({ url: String(url), init });
+      if (String(url) !== "/api/billing/status") return { ok: true, status: 200, json: async () => ready } as unknown as Response;
+      const answer = statusAnswers[Math.min(reads++, statusAnswers.length - 1)];
+      return { ok: answer.ok, status: answer.status, json: async () => answer.body } as unknown as Response;
+    }) as unknown as typeof fetch;
+  }
+  const statusReads = () => fetchCalls.filter((call) => call.url === "/api/billing/status");
+
+  async function completeCheckout(statusAnswers: Parameters<typeof serve>[0]) {
+    serve(statusAnswers);
+    const settled: EntitlementWaitResult[] = [];
+    const notices = await runCheckout("observer_access", (wait) => settled.push(wait));
+    expect(paddle.opened).toHaveLength(1);
+    vi.useFakeTimers();
+    paddle.eventCallback?.({ name: "checkout.completed" });
+    await vi.advanceTimersByTimeAsync(120_000);
+    return { notices, settled };
+  }
+
+  it("reads nothing before Paddle reports the payment, and nothing on other Paddle events", async () => {
+    serve([{ ok: true, status: 200, body: { account: active } }]);
+    await runCheckout("observer_access");
+    vi.useFakeTimers();
+    paddle.eventCallback?.({ name: "checkout.closed" });
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(statusReads()).toHaveLength(0);
+  });
+
+  it("stops reading once the plan is active, says so and hands the account to the page", async () => {
+    const { notices, settled } = await completeCheckout([
+      { ok: true, status: 200, body: { account: inactive } },
+      { ok: true, status: 200, body: { account: active } },
+    ]);
+
+    expect(statusReads()).toHaveLength(2);
+    expect((statusReads()[0].init.headers as Record<string, string>).authorization).toBe("Bearer session-token");
+    expect(notices.at(-2)).toMatch(/remain pending until the signed webhook is persisted/);
+    expect(notices.at(-1)).toBe("Developer access is active. The signed webhook was persisted.");
+    expect(settled).toEqual([{ outcome: "active", account: active }]);
+  });
+
+  it("ends in the pending sentence when the webhook never arrives, after five reads", async () => {
+    const { notices, settled } = await completeCheckout([{ ok: true, status: 200, body: { account: inactive } }]);
+
+    expect(statusReads()).toHaveLength(5);
+    expect(notices.at(-1)).toBe(ENTITLEMENT_PENDING_SENTENCE);
+    expect(notices.join(" ")).not.toMatch(/access is active/i);
+    expect(settled).toEqual([{ outcome: "pending", account: inactive }]);
+  });
+
+  it("does not take a refused status read for an arrival", async () => {
+    const { notices, settled } = await completeCheckout([{ ok: false, status: 503, body: { code: "BILLING_STORE_UNAVAILABLE", account: active } }]);
+
+    expect(statusReads()).toHaveLength(5);
+    expect(notices.at(-1)).toBe(ENTITLEMENT_PENDING_SENTENCE);
+    expect(settled).toEqual([{ outcome: "pending", account: null }]);
   });
 });

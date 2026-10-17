@@ -11,6 +11,7 @@ import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualif
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { useCheckout } from "@/lib/use-checkout";
+import type { BillingStatusAccount, EntitlementWaitResult } from "@/lib/entitlement-wait";
 import { formatCount, formatTimestamp } from "@/lib/format";
 import { readOfferParam, takeCheckoutIntent } from "@/lib/checkout-intent";
 import { putWithProgress } from "@/lib/upload-transfer";
@@ -197,17 +198,8 @@ const WORKSPACE_SOURCE_CHOICES = [
   { name: "MinIO", availability: "Assisted setup" },
 ] as const;
 
-type BillingAccount = {
-  accessPlan: string | null;
-  subscriptionStatus: string;
-  creditBalance: number;
-  lifetimeCreditsPurchased: number;
-  lifetimeCreditsReversed: number;
-  billingHold: boolean;
-  paddleCustomerId: string | null;
-  subscriptionCancelAt: string | null;
-  updatedAt: string | null;
-};
+/** One shape for the billing card and the post-checkout wait (journey A4) that refreshes it. */
+type BillingAccount = BillingStatusAccount;
 /*
   Mirrors BillingNotice in lib/billing-gate-enforcement.ts, which is server-only. The server sends
   codes; the sentences are this page's. `null` from the server means the notice store could not be
@@ -317,7 +309,16 @@ export default function WorkspacePage() {
     : customerDataAccess === "checking"
       ? "Checking source access before choosing files."
       : "Source access could not be verified. Refresh before choosing files.";
-  const { start: buy } = useCheckout(setNotice);
+  /*
+    Journey A4 (D-04): the bounded wait after checkout.completed puts the account it last read on
+    the billing card, and an arrival makes the shell read bootstrap again -- no reload, no hunting
+    for "Refresh billing". Only state setters are used, so the mount-time `buy` stays correct.
+  */
+  const settleEntitlement = useCallback((wait: EntitlementWaitResult) => {
+    if (wait.account) setBillingAccount(wait.account);
+    if (wait.outcome === "active") setAccessEpoch((epoch) => epoch + 1);
+  }, []);
+  const { start: buy } = useCheckout(setNotice, settleEntitlement);
   // Read from the URL on mount so a linked or reloaded workspace opens on the same view.
   const [tab, setTab] = useState<WorkspaceTab>("overview");
   const [surface, setSurface] = useState<WorkspaceSurface>("home");
