@@ -21,24 +21,21 @@
         the sake of moving. Transitions exist where something genuinely changed, and
         the reduced-motion block below removes them wholesale without removing content.
 
-     Type: Geist is the text and display face (landing V2 blueprint §6), loaded by
-     app/layout.tsx through next/font/google and self-hosted by the build, so no webfont
-     host is contacted for it either. Wanted Sans Variable stays behind it in --f-sans as
-     the fallback, self-hosted from public/fonts (see the @font-face blocks below): it is
-     vendored under the OFL, carries a real 400-1000 weight axis and carries Hangul, which
-     is what /ko renders if the Geist file has not arrived. Instrument Serif is the
-     editorial accent (--f-serif) and appears on the landing only -- one phrase of the H1
-     and the manifesto line, never a paragraph. IBM Plex Mono carries the instrument voice:
-     counts, clocks, state labels, keys, source locations.
+     Type: Wanted Sans Variable is the one text and display face (decision.md G-B;
+     UX-PLAN-2026-10-17 §4.4, lane UX-L3), self-hosted from public/fonts (see the
+     @font-face blocks below and app/wanted-sans-korean.css): it is vendored under the OFL,
+     carries a real 400-1000 weight axis and draws Latin and Hangul as one design. Geist and
+     Instrument Serif were removed with UX-L3 -- hierarchy comes from size and weight, not
+     from a second face. IBM Plex Mono carries coordinates, digests, IDs, file names and code.
      ============================================================================ */
 
   /* --------------------------------------------------------------------------
      Wanted Sans Variable -- SIL Open Font License 1.1, licence vendored beside the
      files at public/fonts/OFL.txt. Two Latin subsets from the upstream split build:
      [90] basic Latin + punctuation + currency, [89] Latin Extended. The English page
-     downloads [90] only. Nothing preloads either of them: since 2026-09-19 Wanted Sans is
-     the fallback behind Geist in --f-sans, and font-display: optional means a client that
-     has not got the file simply keeps the face above it rather than waiting.
+     downloads [90] only, and app/layout.tsx preloads it on every route: font-display is
+     optional (no swap repaint, so no CLS), and an optional face that is not preloaded seldom
+     arrives inside the block period. [89] loads on demand.
      -------------------------------------------------------------------------- */
   @font-face {
     font-family: "Wanted Sans Variable";
@@ -213,17 +210,11 @@
     --ease-scene: cubic-bezier(0.16, 1, 0.3, 1);
 
     /*
-      Geist is the text and display face, loaded by app/layout.tsx through next/font/google and
-      self-hosted by the build, so no webfont host is contacted. Wanted Sans Variable stays behind
-      it as the fallback: its @font-face blocks above are unchanged and it is what renders if the
-      Geist file has not arrived, which matters because Wanted Sans carries Hangul and /ko is a
-      real page. Instrument Serif is an editorial accent -- one phrase of the landing H1 and the
-      manifesto line -- and nothing else; --f-serif exists so no component reaches for a font
-      name directly.
+      UX-L3 (UX-PLAN-2026-10-17 §4.4): one sans stack, read from the --tv-* block below. It used
+      to lead with Geist, so every route that did not override --f-sans on its own wrapper
+      rendered Geist; --f-serif went with Instrument Serif, which no stylesheet used.
     */
-    --f-sans: var(--font-geist), "Wanted Sans Variable", -apple-system, BlinkMacSystemFont,
-      "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --f-serif: var(--font-serif), "Instrument Serif", Georgia, serif;
+    --f-sans: var(--tv-font-sans);
     --f-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 
     /*
@@ -239,7 +230,7 @@
     --t-6: 20px;
     --t-7: 24px;
     --t-8: 32px;
-    --t-9: clamp(38px, 4vw, 56px);
+    /* --t-9 (the 38-56px H1) is gone: the H1 role reads --tv-fs-h1 since UX-L3. */
     /*
       BQ-006. Two display sizes that sit between the h1 and `--t-8`, because a landing section
       heading is a band that owns a screen and a card heading is not. They are named rather than
@@ -635,15 +626,22 @@
     The scale had two display sizes and then a cliff: h1 52, h2 43, h3 19, body 15. The
     h2-to-h3 drop was 24px with nothing in between, and on /docs it read as a 43px heading
     followed immediately by 17px prose -- a flat hierarchy with a shout at the top of it, which is
-    the template tell. The steps are 56 / 32 / 20 / 15 now, each about 1.6x the one below, taken
-    from the --t-* scale. Display 1 is the landing page's alone; every other h1, /explore
-    included, is Display 2. Heading leading is 1.08 at display sizes.
+    the template tell. Display 1 is the landing page's alone; every other h1, /explore included,
+    is Display 2.
+
+    UX-L3 (UX-PLAN-2026-10-17 §4.4, §5.3 R2/R3) puts the roles on the --tv-* scale: Display 2
+    (52 at 1440, 32 at 390, weight 510) for the H1 and `.document-title` of every T1-T5 route,
+    Title 1 (34 / 24, weight 510) for a section H2. Before it the same role measured 51.84, 56,
+    59.04, 77.76 and 112px on five T1 routes, because each page sized its own H1; those per-page
+    sizes are deleted, so the role is declared here once. The weights are decision.md G-B's
+    non-integer cuts (600 -> 510). The tracking tokens become -0.012em under :lang(ko).
   */
-  h1 {
-    font-size: var(--t-9);
-    line-height: 1.08;
-    letter-spacing: -0.032em;
-    font-variation-settings: "wght" 600;
+  h1, .document-title {
+    font-size: var(--tv-fs-h1);
+    line-height: 1.12;
+    letter-spacing: var(--tv-track-display);
+    font-weight: var(--tv-w-title);
+    font-variation-settings: "wght" var(--tv-w-title);
   }
   .landing-page h1 {
     font-size: clamp(40px, 5.2vw, 68px);
@@ -656,18 +654,13 @@
   h1 .line.dim { color: var(--text-lo); }
 
   h2 {
-    font-size: clamp(24px, 2.6vw, 32px);
-    line-height: 1.12;
-    letter-spacing: -0.025em;
-    font-variation-settings: "wght" 600;
+    font-size: var(--tv-fs-title);
+    line-height: var(--tv-lh-title);
+    letter-spacing: var(--tv-track-title);
+    font-weight: var(--tv-w-title);
+    font-variation-settings: "wght" var(--tv-w-title);
   }
-  .document-title {
-    font-size: var(--t-9);
-    line-height: 1.08;
-    letter-spacing: -0.038em;
-    font-variation-settings: "wght" 590;
-    text-wrap: pretty;
-  }
+  .document-title { text-wrap: pretty; }
   /* Narrative type is distinct from compact evidence instrumentation. */
   .scene.doc > .shell > .lede {
     font-size: clamp(16px, 1.3vw, 18px);

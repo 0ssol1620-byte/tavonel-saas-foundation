@@ -1120,12 +1120,15 @@
 
 .next .nextNote a { color: var(--text-hi); text-decoration: underline; text-underline-offset: 3px; }
 
+/* UX-L3 (UX-PLAN-2026-10-17 §4.4): the closing H2 is Display 2, the same role as Home's close, so
+   it no longer outranks the page's own H1 (it measured 72px under a 40px H1). */
 .next h2 {
   margin: 0;
-  font-size: clamp(32px, 5vw, 74px);
-  line-height: 0.96;
-  font-weight: 500;
-  letter-spacing: -0.05em;
+  font-size: var(--tv-fs-h1);
+  line-height: 1.12;
+  font-weight: var(--tv-w-title);
+  font-variation-settings: "wght" var(--tv-w-title);
+  letter-spacing: var(--tv-track-display);
 }
 
 .next > div {

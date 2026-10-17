@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
-import { Geist, IBM_Plex_Mono, Instrument_Serif } from "next/font/google";
+import { IBM_Plex_Mono } from "next/font/google";
+import { preload } from "react-dom";
 import FontOutlineProbe from "@/components/font-outline-probe";
 import MarketingConsent from "@/components/marketing-consent";
 import SkipLink from "@/components/skip-link";
@@ -19,56 +20,28 @@ import "./landing-v2.css";
 */
 
 /**
- * The three faces, landing V2 blueprint §6 / lane D3.
+ * One text face: Wanted Sans Variable (decision.md G-B; UX-PLAN-2026-10-17 §4.4, lane UX-L3).
  *
- * All three come through `next/font/google`, which downloads the files at build time and serves
- * them from this origin. Nothing here contacts fonts.googleapis.com at runtime — the CSP is
- * `font-src 'self' data:` and a `<link>` to a font host would simply fail.
+ * Until UX-L3 this layout loaded Geist as the text and display face and Instrument Serif as a
+ * landing accent, while most paper pages set `--f-sans` back to Wanted Sans on their own wrapper.
+ * The routes that did not -- /knowledge-compiler, /reproducibility, /explore, /login -- rendered
+ * Geist, so the site spoke in two faces, and no stylesheet used `--f-serif` at all. Both loads are
+ * deleted, not replaced: `--f-sans` in tavonel.css is `--tv-font-sans`, and the faces are the
+ * self-hosted OFL files under public/fonts (the @font-face blocks in tavonel.css and
+ * wanted-sans-korean.css). No webfont host is contacted -- the CSP is `font-src 'self' data:`.
  *
- * Geist is the text and display face. No `weight` is passed on purpose: Geist publishes a
- * variable file with a real 100–900 axis, and asking for three static cuts would download three
- * files where the axis is one. Wanted Sans Variable stays behind it in `--f-sans` (its
- * `@font-face` blocks are still in `tavonel.css`) as the fallback that carries Hangul for `/ko`.
+ * WHY THE LATIN FILE IS PRELOADED ON EVERY ROUTE. Wanted Sans is declared `font-display:
+ * optional`, because `swap` repainted /ko in the real face and QA round 4 (2026-09-19) measured
+ * CLS 0.2351 at 1024 and 0.3059 at 768. An optional face that nobody preloads seldom arrives
+ * inside the block period, and then the whole page view paints in the system fallback. Geist did
+ * not have that problem because next/font preloaded it; Wanted Sans [90] (basic Latin, 44,356
+ * bytes) takes over that preload. Home already hinted the same file, and React dedupes a preload
+ * by href. [89] (Latin Extended) and the Hangul ranges stay on demand; /ko preloads its own four.
  *
- * Instrument Serif is an editorial accent and appears on the landing only — one phrase of the H1
- * and the manifesto line. `preload: false` because of that: preloading a face that most routes
- * never render spends the first-paint budget on nothing. Italic ships with it because the
- * accent is set in italic.
- *
- * IBM Plex Mono is unchanged and carries the instrument voice — clocks, counts, state labels,
- * source locations.
- *
- * WHY `display: "optional"` ON THE TWO PRELOADED FACES (QA round 4, 2026-09-19).
- * D3 asked for `swap`. `swap` paints the page in the fallback face and then repaints it in the
- * real one, and a repaint that changes glyph widths changes line counts: QA measured /ko at CLS
- * 0.2351 (1024) and 0.3059 (768) — one shift at ~322ms in which the hero support sentence lost a
- * line and everything under it (the action row, the intake line, the whole demo) was pulled up
- * 30px. That is six times the contract's 0.05 budget and above the CI Lighthouse gate, and
- * reserving height does not fix it, because the box SHRINKS when the real face arrives.
- * `optional` removes the second paint: the face is preloaded and used when it is ready inside
- * the block period, and otherwise that one page view renders in the metric-adjusted fallback
- * `next/font` already generates. `tavonel.css` made the same choice for Wanted Sans for the same
- * reason. Contract rule 10 (CLS) outranks D3's spelling of this option.
- *
- * Instrument Serif keeps `swap`: it is `preload: false` by design, and an unpreloaded `optional`
- * face would effectively never paint — which is not a font setting but a deletion of the accent.
- * It sets two words of the English H1 only (/ko passes no accent phrase) and English measured
- * 0.043 / 0.035, inside the budget.
+ * IBM Plex Mono is unchanged: coordinates, digests, IDs, file names and code (UX-PLAN §5.3 R10).
+ * `display: "optional"` for the same CLS reason.
  */
-const sans = Geist({
-  subsets: ["latin"],
-  variable: "--font-geist",
-  display: "optional",
-});
-
-const serif = Instrument_Serif({
-  subsets: ["latin"],
-  weight: "400",
-  style: ["normal", "italic"],
-  variable: "--font-serif",
-  display: "swap",
-  preload: false,
-});
+const WANTED_SANS_LATIN = "/fonts/WantedSansVariable.split.90.woff2";
 
 const mono = IBM_Plex_Mono({
   subsets: ["latin"],
@@ -154,11 +127,12 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  preload(WANTED_SANS_LATIN, { as: "font", type: "font/woff2", crossOrigin: "anonymous" });
   return (
-    <html lang="en" className={`${sans.variable} ${serif.variable} ${mono.variable}`}>
+    <html lang="en" className={mono.variable}>
       <body>
-        {/* The three font variables are on <html> so `--f-sans`, `--f-serif` and `--f-mono` in
-            tavonel.css resolve everywhere, including in a portal rendered outside <body>. */}
+        {/* The mono variable is on <html> so `--f-mono` in tavonel.css resolves everywhere,
+            including in a portal rendered outside <body>. */}
         {/*
           A6 -- the first thing in the tab order, on every page.
           The header runs a wordmark, five section links and two actions before any page reaches

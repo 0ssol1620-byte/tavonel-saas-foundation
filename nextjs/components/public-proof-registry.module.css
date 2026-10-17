@@ -13,8 +13,12 @@
   stacked lines roughly 700px tall, and the hero's own summary sat beside it in a column
   more than twice as wide. 18ch is still a display measure -- two or three lines for a
   headline of this length -- and it is the column the rest of the page is built on.
+
+  UX-L3 (UX-PLAN-2026-10-17 §5.3 R2): the size, leading and tracking are the H1 role in
+  tavonel.css. /knowledge-compiler (T1) and /reproducibility (T5) set it at 77.76px in Geist while
+  every other route in those templates measured 51.84-59.04px.
 */
-.hero h1 { max-width: 18ch; margin: 0; color: var(--text-hi); font-size: clamp(48px, 5.4vw, 84px); line-height: .94; letter-spacing: -.055em; text-wrap: balance; }
+.hero h1 { max-width: 18ch; margin: 0; color: var(--text-hi); text-wrap: balance; }
 .hero aside { width: min(100%, 620px); display: grid; gap: 20px; padding-bottom: 4px; }
 .hero aside p { max-width: 62ch; margin: 0; color: var(--text-lo); font-size: 15px; line-height: 1.72; text-wrap: pretty; }
 .status { width: fit-content; max-width: 100%; padding: 5px 8px; border: 1px solid var(--changed); color: var(--changed); font: 12px/1.5 var(--f-mono); letter-spacing: .12em; overflow-wrap: anywhere; }
@@ -94,7 +98,6 @@
 }
 @media (max-width: 760px) {
   .hero { gap: 30px; padding: 86px var(--chrome-edge) 52px; }
-  .hero h1 { font-size: clamp(46px, 15vw, 68px); }
   .body { padding: 0 var(--chrome-edge) 80px; }
   .row { grid-template-columns: minmax(0, 1fr); gap: 22px; }
   .protocol li { grid-template-columns: minmax(0, 1fr); gap: 6px; }

@@ -68,7 +68,8 @@
 /* A result excerpt is prose, not a title: let it use the two lines it needs. */
 .rail :global(.docs-search-results span) { display: block; }
 .layout > :global(.body) > :global(.stack) { min-width: 0; width: 100%; }
-.layout :global(.document-title) { width: 100%; max-width: 100%; font-size: clamp(34px, 3.5vw, 50px); line-height: 1.08; }
+/* UX-L3 (UX-PLAN-2026-10-17 §5.3 R2): size and leading are the T3 H1 role in tavonel.css; /docs measured 56px, a chapter 50px. */
+.layout :global(.document-title) { width: 100%; max-width: 100%; }
 .layout :global(.docs-body) { max-width: 100%; width: 100%; }
 .layout :global(.docs-body p), .layout :global(.docs-steps) { font-size: 17px; line-height: 1.7; }
 .layout :global(.docs-body .lede) { font-size: 18px; line-height: 1.6; }

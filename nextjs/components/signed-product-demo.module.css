@@ -53,7 +53,8 @@
   letter-spacing: .13em;
   text-transform: uppercase;
 }
-.hero h1 { max-width: 10ch; margin: 0; font-size: clamp(54px, 8vw, 112px); font-weight: 520; line-height: .92; letter-spacing: -.055em; text-wrap: balance; }
+/* UX-L3 (UX-PLAN-2026-10-17 §5.3 R2): the T1 H1 role in tavonel.css sets the type; this hero measured 112px. */
+.hero h1 { max-width: 10ch; margin: 0; text-wrap: balance; }
 .lede { max-width: 32ch; margin: 0; font-size: clamp(18px, 2vw, 24px); line-height: 1.45; }
 .boundary { max-width: 76ch; margin: 36px 0 0; color: var(--demo-muted); font-size: 13px; line-height: 1.65; }
 
@@ -131,7 +132,6 @@
 
 @media (max-width: 767px) {
   .hero { padding-top: 96px; }
-  .hero h1 { font-size: clamp(48px, 15vw, 70px); }
   .facing { grid-template-columns: 1fr; }
   .facing > section + section { border-top: 1px solid var(--demo-line); border-left: 0; }
   .sources li { grid-template-columns: 1fr; gap: 6px; }

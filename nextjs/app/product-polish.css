@@ -586,11 +586,16 @@
   `.docs-body h2` is 22px above, which is the same decision one surface further in.
 
   The root fix is the type scale in `tavonel.css`; it is in the report for L1.
+
+  UX-L3 (UX-PLAN-2026-10-17 §4.4, §5.3 R3) landed it: a section H2 is Title 1 everywhere, so this
+  rule names the token instead of its own clamp. It stays because `.policy-copy h2` (18px and
+  --t-h2-sm in tavonel.css's components layer) would otherwise outrank the base h2 inside the
+  same column, and /developers measured 30 and 32px for two sibling sections.
 */
 .scene.doc .body > .stack > h2 {
-  font-size: clamp(22px, 2.2vw, 30px);
-  line-height: 1.22;
-  letter-spacing: -.02em;
+  font-size: var(--tv-fs-title);
+  line-height: var(--tv-lh-title);
+  letter-spacing: var(--tv-track-title);
 }
 
 

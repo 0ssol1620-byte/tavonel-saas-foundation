@@ -78,13 +78,12 @@
   font-weight: 500;
 }
 
-/* A section heading, the step between the 48px h1 and the mono labels. */
+/* A section heading, the step between the h1 and the mono labels. UX-L3 (UX-PLAN-2026-10-17 §4.4,
+   §5.3 R3): size, tracking and weight come from the role in tavonel.css -- Title 1 for an H2, as on
+   /benchmarks -- rather than a 16px title of this page's own. */
 .sectionTitle {
   font-family: var(--f-sans);
-  font-size: 16px;
-  letter-spacing: -0.008em;
   text-transform: none;
-  font-variation-settings: "wght" 560;
   text-wrap: initial;
   color: var(--text-hi);
 }

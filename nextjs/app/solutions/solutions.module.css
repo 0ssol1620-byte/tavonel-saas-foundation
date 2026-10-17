@@ -190,13 +190,11 @@
 
 .hero { padding-bottom: 0; border-bottom: 0; }
 
+/* UX-L3 (UX-PLAN-2026-10-17 §5.3 R2): size, leading and tracking are the T1 H1 role in tavonel.css. */
 .hubIntro :global(.document-title), .hero :global(.document-title) {
   margin: 0;
   max-width: 19ch;
   color: var(--text-hi);
-  font-size: clamp(34px, 4.1vw, 62px);
-  line-height: 1.06;
-  letter-spacing: -0.035em;
 }
 
 .hubIntro :global(.lede), .hero :global(.lede) {

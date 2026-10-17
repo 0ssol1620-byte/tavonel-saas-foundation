@@ -1,7 +1,8 @@
 .workbench { min-width:0; color:#171c20; }
 .intro { display:flex; justify-content:space-between; align-items:flex-end; gap:24px; padding:24px 0; }
 .eyebrow { font-size:13px; color:#53606a; margin:0 0 12px; }
-.intro h1 { font-size:clamp(28px,3.2vw,40px); line-height:1.15; letter-spacing:-.035em; font-weight:600; margin:0; }
+/* UX-L3 (UX-PLAN-2026-10-17 §5.1 T4, §5.3 R2): the H1 role in tavonel.css sets the type; it measured 40px in Geist. */
+.intro h1 { margin:0; }
 .intro h1 span { color:#53606a; }
 .scope { font-size:13px; line-height:1.8; color:#53606a; margin:0; }
 .workbench a { color:var(--tv-action); text-decoration:underline; text-underline-offset:3px; }
