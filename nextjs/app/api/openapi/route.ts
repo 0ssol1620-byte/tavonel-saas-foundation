@@ -75,6 +75,115 @@ const bestEffort = { "x-tavonel-status": "best-effort", additionalProperties: tr
 const str = { type: "string" } as const;
 const nullableStr = { type: ["string", "null"] } as const;
 const int = { type: "integer" } as const;
+const uuid = { type: "string", format: "uuid" } as const;
+const dateTime = { type: "string", format: "date-time" } as const;
+const nullableDateTime = { type: ["string", "null"], format: "date-time" } as const;
+const sha256Digest = { type: "string", pattern: "^sha256:[a-f0-9]{64}$" } as const;
+
+/*
+  G1 (SERVICE-DEFINITION 2026-10-17 section 1 "API", section 2.2 A14). The capability 200 promised
+  `url, method, headers, expiresAt`; no branch of app/api/uploads/capability/route.ts has ever
+  answered with them, and the published source agent reads `uploadUrl`. These are the bodies the
+  handler builds, one schema per branch, each `required` listing every key that branch writes.
+  lib/openapi-handler-contract.test.ts calls the handlers and fails when a body's keys and the
+  `required` list published here differ, so the next rename breaks the build instead of a client.
+*/
+const CAPABILITY_REQUIRED = [
+  "code", "documentId", "objectKey", "uploadUrl", "expiresInSeconds", "contentLength", "originalFilename",
+  "declaredMimeType", "sanitization", "sourceIdempotency", "admissionExpiresAt", "computeReservation",
+] as const;
+const CAPABILITY_PROPERTIES = {
+  documentId: { ...uuid, description: "The document the bytes are registered under. Confirm with this id." },
+  objectKey: { type: "string", description: "The quarantine object key the bytes land at." },
+  contentLength: { type: "integer", description: "The exact byte count the PUT is signed for." },
+  originalFilename: str,
+  declaredMimeType: { type: "string", description: "The normalized content type the PUT is signed for." },
+  sanitization: { const: "pending_cdr" },
+  admissionExpiresAt: dateTime,
+} as const;
+const UPLOAD_URL = { type: "string", format: "uri", description: "Presigned object-storage PUT URL. It is the credential: do not send the API key to it." } as const;
+const UPLOAD_URL_SECONDS = { type: "integer", minimum: 1, description: "How long `uploadUrl` is valid from this response, in seconds." } as const;
+/** The approval lineage's hold: the route writes every field, quote included. */
+const APPROVED_COMPUTE_RESERVATION = {
+  type: "object",
+  required: ["reservationId", "reservedCredits", "maximumCredits", "billingSource", "expiresAt", "quote"],
+  properties: {
+    reservationId: str, reservedCredits: int, maximumCredits: int, billingSource: str, expiresAt: dateTime,
+    quote: {
+      type: "object",
+      required: ["approvedMaxPages", "estimatedUsd", "maximumUsd", "pageBasis"],
+      properties: { approvedMaxPages: int, estimatedUsd: { type: "number" }, maximumUsd: { type: "number" }, pageBasis: str },
+    },
+  },
+} as const;
+const APPROVED_CAPABILITY_BODY = {
+  type: "object",
+  description: "QUALIFIED: PUT the bytes to `uploadUrl`, then confirm.",
+  required: [...CAPABILITY_REQUIRED],
+  properties: {
+    code: { const: "QUALIFIED" }, ...CAPABILITY_PROPERTIES, uploadUrl: UPLOAD_URL, expiresInSeconds: UPLOAD_URL_SECONDS,
+    sourceIdempotency: { const: "stable" }, computeReservation: APPROVED_COMPUTE_RESERVATION,
+  },
+} as const;
+const TRIAGE_CAPABILITY_BODY = {
+  type: "object",
+  description: "TRIAGE_OBJECT_READY: triage already sealed the bytes in quarantine. There is nothing to PUT; confirm with `documentId` and `contentSha256`.",
+  required: [...CAPABILITY_REQUIRED, "triageReceiptId", "triageInventoryDigest", "contentSha256", "objectVersion"],
+  properties: {
+    code: { const: "TRIAGE_OBJECT_READY" }, ...CAPABILITY_PROPERTIES, uploadUrl: { type: "null" }, expiresInSeconds: { const: 0 },
+    triageReceiptId: str, triageInventoryDigest: str, contentSha256: sha256Digest, objectVersion: str,
+    sourceIdempotency: { const: "stable" }, computeReservation: APPROVED_COMPUTE_RESERVATION,
+  },
+} as const;
+/** main's per-file path (approval lineage off). Its `quote` is lib/usage-pricing's, described rather than closed. */
+const PER_FILE_CAPABILITY_BODY = {
+  type: "object",
+  required: [...CAPABILITY_REQUIRED],
+  properties: {
+    code: { const: "QUALIFIED" }, ...CAPABILITY_PROPERTIES, uploadUrl: UPLOAD_URL, expiresInSeconds: UPLOAD_URL_SECONDS,
+    sourceIdempotency: { enum: ["stable", "none"], description: "stable when the request carried x-tavonel-source-idempotency-key." },
+    computeReservation: {
+      type: "object",
+      required: ["reservationId", "reservedCredits", "billingSource", "expiresAt", "quote"],
+      properties: { reservationId: uuid, reservedCredits: int, billingSource: { enum: ["paid", "trial", "owner"] }, expiresAt: dateTime, quote: { type: "object", ...bestEffort } },
+    },
+  },
+} as const;
+/** The admission row confirm_foundation_intake_admission returns. The route checks these three fields; the rest is the database's. */
+const CONFIRMATION_RECEIPT = {
+  type: "object",
+  required: ["documentId", "status", "confirmedAt"],
+  properties: { documentId: uuid, status: { const: "confirmed" }, confirmedAt: dateTime },
+  ...bestEffort,
+} as const;
+
+/** The refusals both confirmations share, read off app/api/uploads/confirm/route.ts; the approved one adds its approval checks. */
+function confirmErrors(conflicts: string[] = [], outages: string[] = []) {
+  return {
+    "400": err("UPLOAD_CONFIRM_BODY_INVALID", "INVALID_SOURCE_DIGEST", "SOURCE_DIGEST_REQUIRED"),
+    "401": err("AUTH_REQUIRED", "API_KEY_INVALID", "API_KEY_EXPIRED", "API_KEY_REVOKED"),
+    "403": err("API_SCOPE_REQUIRED", "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE"),
+    "409": err(...conflicts, "QUARANTINE_ADMISSION_NOT_FOUND", "QUARANTINE_OBJECT_NOT_FOUND", "CONTENT_LENGTH_MISMATCH", "OBSERVED_MIME_MISMATCH", "SOURCE_DIGEST_CONFLICT"),
+    "413": err("UPLOAD_CONFIRM_REQUEST_TOO_LARGE"),
+    "429": err("API_RATE_LIMITED", "TRIAL_SOURCE_REVIEW_REQUIRED"),
+    "503": err("SIGNER_NOT_CONFIGURED", "INTAKE_CONFIRMATION_NOT_CONFIGURED", "INTAKE_CONFIRMATION_FAILED", "INTAKE_CONFIRMATION_RECEIPT_INVALID", "API_RATE_LIMIT_UNAVAILABLE", ...outages),
+  };
+}
+
+/** The body POST /developer/keys and its rotation read (app/api/developer/keys/route.ts). Inline, so the docs can print a request from it. */
+const DEVELOPER_KEY_INPUT = {
+  type: "object",
+  required: ["name", "scopes"],
+  properties: {
+    name: { type: "string", minLength: 1, maxLength: 80 },
+    scopes: { type: "array", minItems: 1, items: { type: "string", enum: [...DEVELOPER_SCOPES] } },
+    expiresInDays: { type: ["integer", "null"], minimum: 1, maximum: 365, description: "Omit or null for a key that does not expire." },
+  },
+} as const;
+const SAMPLE_DEVELOPER_KEY = {
+  keyId: "00000000-0000-4000-8000-000000000002", name: "ci-ingest", prefix: "<prefix>", scopes: ["documents:read", "worlds:read"],
+  createdAt: "2026-09-16T00:07:00.000Z", expiresAt: "2026-12-15T00:07:00.000Z", lastUsedAt: null, revokedAt: null,
+};
 
 export async function GET(request: Request) {
   if (request.headers.get("accept")?.includes("text/html")) {
@@ -297,14 +406,21 @@ export async function GET(request: Request) {
             }, examples: { default: { value: { originalFilename: "manual.pdf", declaredMimeType: "application/pdf", requestedBytes: 184320, attemptKey: "att_0123456789abcdef0123456789abcdef", scopeDigest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", pricingFingerprint, fileKey: "fk_0123456789abcdef0123456789abcdef01234567", contentSha256: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } } } } } },
           parameters: [{ $ref: "#/components/parameters/SourceIdempotencyKey" }],
           responses: {
-            "200": ok("An approved member's direct PUT capability and its already-persisted document identity.", { type: "object", required: ["code", "documentId", "uploadUrl", "contentLength", "declaredMimeType", "computeReservation"], properties: { code: { const: "QUALIFIED" }, documentId: { type: "string", format: "uuid" }, uploadUrl: { type: "string", format: "uri", description: "Presigned object-storage URL. The API key is never sent to it." }, contentLength: { type: "integer" }, declaredMimeType: str, computeReservation: { type: "object", required: ["reservationId", "maximumCredits"], properties: { reservationId: str, maximumCredits: int, reservedCredits: int, billingSource: str, expiresAt: { type: "string", format: "date-time" }, quote: bestEffort }, ...bestEffort } } }, { code: "QUALIFIED", documentId: "33333333-3333-4333-8333-333333333333", uploadUrl: "https://<storage-host>/quarantine/...?X-Amz-Signature=...", contentLength: 184320, declaredMimeType: "application/pdf", computeReservation: { reservationId: "reservation_example", maximumCredits: sampleFileQuote.maximumCredits, reservedCredits: sampleFileQuote.reservedCredits, billingSource: "subscription" } }),
+            "200": ok(
+              "An approved member's capability and its already-persisted document identity. With the triage lineage off the answer is QUALIFIED: PUT the bytes to `uploadUrl` within `expiresInSeconds`, then confirm. With it on the answer is TRIAGE_OBJECT_READY: triage already sealed the bytes, `uploadUrl` is null and there is nothing to PUT.",
+              { oneOf: [APPROVED_CAPABILITY_BODY, TRIAGE_CAPABILITY_BODY] },
+              { code: "QUALIFIED", documentId: "33333333-3333-4333-8333-333333333333", objectKey: "quarantine/<workspace>/33333333-3333-4333-8333-333333333333/source", uploadUrl: "https://<storage-host>/quarantine/...?X-Amz-Signature=...", expiresInSeconds: 300, contentLength: 184320, originalFilename: "manual.pdf", declaredMimeType: "application/pdf", sanitization: "pending_cdr", sourceIdempotency: "stable", admissionExpiresAt: "2026-09-16T00:15:00.000Z", computeReservation: { reservationId: "reservation_example", reservedCredits: sampleFileQuote.reservedCredits, maximumCredits: sampleFileQuote.maximumCredits, billingSource: "paid", expiresAt: "2026-09-16T00:15:00.000Z", quote: { approvedMaxPages: sampleFileQuote.approvedMaxPages, estimatedUsd: sampleFileQuote.reservedCredits / 100, maximumUsd: sampleFileQuote.maximumCredits / 100, pageBasis: sampleFileQuote.pageBasis } } },
+            ),
             "400": err("UNQUALIFIED_INPUT", "UNQUALIFIED_MIME", "FILENAME_MIME_MISMATCH", "INVALID_FILENAME", "INTAKE_APPROVAL_INVALID"),
             "401": err("AUTH_REQUIRED", "API_KEY_INVALID", "API_KEY_EXPIRED", "API_KEY_REVOKED"),
+            "402": err("TRIAL_ARCHIVE_NOT_INCLUDED", "TRIAL_FILE_TOO_LARGE", "TRIAL_NOT_ACTIVE", "STUDIO_SUBSCRIPTION_REQUIRED", "SUBSCRIPTION_REQUIRED", "GPU_CREDITS_REQUIRED", "TRIAL_PAGE_LIMIT_EXCEEDED", "TRIAL_DISABLED"),
             "403": err("API_SCOPE_REQUIRED", "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE"),
-            "409": err("INTAKE_PRICE_STALE", "INTAKE_APPROVAL_SCOPE_MISMATCH", "INTAKE_APPROVAL_RESERVATION_EXPIRED", "SOURCE_IDEMPOTENCY_KEY_INVALID", "INTAKE_APPROVAL_CONFLICT"),
+            "409": err("INTAKE_PRICE_STALE", "INTAKE_APPROVAL_SCOPE_MISMATCH", "INTAKE_APPROVAL_RESERVATION_EXPIRED", "INTAKE_APPROVAL_CONFLICT", "INTAKE_RETRIAGE_REQUIRED", "INTAKE_TRIAGE_OBJECT_NOT_SEALED", "INTAKE_TRIAGE_OBJECT_CHANGED"),
             "413": err("SOURCE_EXCEEDS_PROCESSING_CEILING", "TRIAL_FILE_TOO_LARGE"),
+            "415": err("METADATA_ONLY_ENDPOINT"),
             "428": err("INTAKE_APPROVAL_REQUIRED"),
-            "503": err("SIGNER_NOT_CONFIGURED", "INTAKE_DISABLED"),
+            "429": err("API_RATE_LIMITED", "INTAKE_RATE_LIMITED", "INTAKE_DAILY_QUOTA_EXCEEDED", "TRIAL_FILE_LIMIT_EXCEEDED", "TRIAL_CAPACITY_REACHED"),
+            "503": err("SIGNER_NOT_CONFIGURED", "INTAKE_DISABLED", "API_RATE_LIMIT_UNAVAILABLE", "INTAKE_TRIAGE_ROLLOUT_DISABLED", "INTAKE_APPROVAL_LINEAGE_UNAVAILABLE"),
           },
         },
       },
@@ -316,7 +432,11 @@ export async function GET(request: Request) {
           "x-tavonel-scope": "documents:intake",
           description: "After the direct PUT succeeds, submit its digest with the same attempt, scope and member identity. The server verifies the stored object and commits confirmation and ledger state atomically. Do not treat the PUT response as confirmation.",
           requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["documentId", "sourceSha256", "attemptKey", "scopeDigest", "fileKey"], additionalProperties: false, properties: { documentId: { type: "string", format: "uuid" }, sourceSha256: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, attemptKey: { type: "string", minLength: 16, maxLength: 128 }, scopeDigest: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, fileKey: { type: "string", minLength: 8, maxLength: 128 } } }, examples: { default: { value: { documentId: "33333333-3333-4333-8333-333333333333", sourceSha256: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", attemptKey: "att_0123456789abcdef0123456789abcdef", scopeDigest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", fileKey: "fk_0123456789abcdef0123456789abcdef01234567" } } } } } },
-          responses: { "200": ok("The confirmed approval member and atomic admission receipt.", { type: "object", required: ["code", "approvedFile"], properties: { code: { const: "UPLOAD_CONFIRMED" }, approvedFile: { $ref: "#/components/schemas/UploadApprovalFile" }, result: bestEffort } }, { code: "UPLOAD_CONFIRMED", approvedFile: { fileKey: "fk_0123456789abcdef0123456789abcdef01234567", documentId: "33333333-3333-4333-8333-333333333333", fileState: "confirmed" }, result: { documentId: "33333333-3333-4333-8333-333333333333", status: "confirmed" } }), "401": err("AUTH_REQUIRED", "API_KEY_INVALID", "API_KEY_EXPIRED", "API_KEY_REVOKED"), "403": err("API_SCOPE_REQUIRED", "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE"), "409": err("INTAKE_PRICE_STALE", "INTAKE_APPROVAL_SCOPE_MISMATCH", "QUARANTINE_ADMISSION_NOT_FOUND", "QUARANTINE_OBJECT_NOT_FOUND", "CONTENT_LENGTH_MISMATCH", "OBSERVED_MIME_MISMATCH", "SOURCE_DIGEST_CONFLICT"), "428": err("INTAKE_APPROVAL_REQUIRED") },
+          responses: {
+            "200": ok("The confirmed approval member and atomic admission receipt.", { type: "object", required: ["code", "result", "approvedFile"], properties: { code: { const: "UPLOAD_CONFIRMED" }, result: CONFIRMATION_RECEIPT, approvedFile: { $ref: "#/components/schemas/UploadApprovalFile" } } }, { code: "UPLOAD_CONFIRMED", result: { documentId: "33333333-3333-4333-8333-333333333333", status: "confirmed", confirmedAt: "2026-09-16T00:16:00.000Z" }, approvedFile: { fileKey: "fk_0123456789abcdef0123456789abcdef01234567", documentId: "33333333-3333-4333-8333-333333333333", fileState: "confirmed" } }),
+            ...confirmErrors(["INTAKE_PRICE_STALE", "INTAKE_APPROVAL_SCOPE_MISMATCH", "INTAKE_RETRIAGE_REQUIRED", "INTAKE_TRIAGE_OBJECT_CHANGED"], ["INTAKE_APPROVAL_LINEAGE_UNAVAILABLE", "INTAKE_TRIAGE_ROLLOUT_DISABLED"]),
+            "428": err("INTAKE_APPROVAL_REQUIRED"),
+          },
         },
       },
       "/uploads/release": {
@@ -1326,6 +1446,36 @@ export async function GET(request: Request) {
           },
         },
       },
+      "/developer/keys": {
+        /*
+          G1 (SERVICE-DEFINITION 2026-10-17 section 2.4 C5 and C7): the operation every key holder
+          depends on first was the one developer operation the contract did not carry. It lives at
+          /api/developer/keys, not under /api/v1, so it names its own server.
+        */
+        servers: unversioned,
+        post: {
+          operationId: "createDeveloperApiKey",
+          summary: "Create an API key",
+          tags: ["Workspace administration"],
+          "x-tavonel-auth": "browser-session",
+          security: [{ TavonelUserSession: [] }],
+          description: "Creates a workspace-scoped key with an explicit scope set. The plaintext `token` is in this response and nowhere else: only its SHA-256 digest is stored. A free evaluation cannot create keys and is answered 402 TRIAL_FEATURE_NOT_INCLUDED.",
+          requestBody: { required: true, content: { "application/json": { schema: DEVELOPER_KEY_INPUT, examples: { default: { value: { name: "ci-ingest", scopes: ["documents:read", "worlds:read"], expiresInDays: 90 } } } } } },
+          responses: {
+            "201": ok(
+              "The key's record and its one-time plaintext `token`. Store the token now; it is not shown again.",
+              { type: "object", required: ["code", "key", "token"], properties: { code: { const: "CREATED" }, key: { $ref: "#/components/schemas/DeveloperApiKey" }, token: { type: "string", description: "Shown once." } } },
+              { code: "CREATED", key: SAMPLE_DEVELOPER_KEY, token: "tvnl_live_<prefix>_<secret>" },
+            ),
+            "400": err("INVALID_JSON", "API_KEY_INPUT_INVALID"),
+            "401": err("AUTH_REQUIRED"),
+            "402": err("TRIAL_FEATURE_NOT_INCLUDED"),
+            "403": err("PILOT_ACCESS_REQUIRED", "AUTHORIZATION_CHANGED_RETRY"),
+            "413": err("REQUEST_TOO_LARGE"),
+            "503": err("DEVELOPER_STORE_NOT_CONFIGURED", "API_KEY_CREATE_FAILED", "DEVELOPER_STORE_BINDING_INVALID"),
+          },
+        },
+      },
       "/developer/keys/{id}/rotate": {
         post: {
           operationId: "rotateDeveloperApiKey",
@@ -1335,23 +1485,22 @@ export async function GET(request: Request) {
           security: [{ TavonelUserSession: [] }],
           description: "Atomically creates a replacement key, revokes the source key and writes an audit event. Plaintext is returned once and is not recoverable afterwards. Either all three happened or none did — there is no state where the old key is revoked and no replacement exists.",
           parameters: [{ $ref: "#/components/parameters/DeveloperKeyId" }],
+          // G1: the route reads the replacement's name, scopes and expiry from this body and answers
+          // { code, apiVersion, key, token, replacedKeyId }; the contract had no body and other names.
+          requestBody: { required: true, content: { "application/json": { schema: DEVELOPER_KEY_INPUT, examples: { default: { value: { name: "ci-ingest", scopes: ["documents:read", "worlds:read"], expiresInDays: 90 } } } } } },
           responses: {
             "201": ok(
-              "The one-time replacement credential. Store it now; it is not shown again.",
-              {
-                type: "object",
-                required: ["code", "keyId", "plaintext"],
-                properties: { code: { const: "ROTATED" }, keyId: { type: "string", format: "uuid" }, plaintext: { type: "string", description: "Shown once." }, scopes: { type: "array", items: str }, revokedKeyId: str, createdAt: str },
-                ...bestEffort,
-              },
-              { code: "ROTATED", keyId: "00000000-0000-4000-8000-000000000002", plaintext: "tvnl_live_<prefix>_<secret>", scopes: ["documents:read", "worlds:read"], revokedKeyId: "00000000-0000-4000-8000-000000000001", createdAt: "2026-09-16T00:07:00.000Z" },
+              "The replacement key's record, its one-time plaintext `token`, and `replacedKeyId`, the key now revoked. Store the token now; it is not shown again.",
+              { type: "object", required: ["code", "apiVersion", "key", "token", "replacedKeyId"], properties: { code: { const: "ROTATED" }, apiVersion: { const: 1 }, key: { $ref: "#/components/schemas/DeveloperApiKey" }, token: { type: "string", description: "Shown once." }, replacedKeyId: uuid } },
+              { code: "ROTATED", apiVersion: 1, key: SAMPLE_DEVELOPER_KEY, token: "tvnl_live_<prefix>_<secret>", replacedKeyId: "00000000-0000-4000-8000-000000000001" },
             ),
             "400": err("API_KEY_ID_INVALID", "API_KEY_INPUT_INVALID", "INVALID_JSON"),
             "401": err("AUTH_REQUIRED"),
             "402": err("TRIAL_FEATURE_NOT_INCLUDED"),
+            "403": err("PILOT_ACCESS_REQUIRED", "AUTHORIZATION_CHANGED_RETRY"),
             "404": err("API_KEY_NOT_FOUND"),
             "413": err("REQUEST_TOO_LARGE"),
-            "503": err("API_KEY_ROTATE_FAILED", "API_KEY_CREATE_FAILED", "DEVELOPER_AUDIT_WRITE_FAILED"),
+            "503": err("API_KEY_ROTATE_FAILED", "DEVELOPER_STORE_NOT_CONFIGURED", "DEVELOPER_STORE_BINDING_INVALID"),
           },
         },
       },
@@ -1363,23 +1512,26 @@ export async function GET(request: Request) {
           "x-tavonel-auth": "browser-session",
           security: [{ TavonelUserSession: [] }],
           description: "The tenant-scoped developer and connector audit trail, newest first, bounded by `limit`. Every key create, rotate and revoke writes a row here or does not happen.",
-          parameters: [{ name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 200, default: 50 } }],
+          // G1: the route's default limit is 100 and its rows are lib/developer-store.ts's, not the names this used to publish.
+          parameters: [{ name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 200, default: 100 } }],
           responses: {
             "200": ok(
-              "{ code: OK, events }, newest first.",
+              "{ code: OK, apiVersion, events }, newest first.",
               {
                 type: "object",
-                required: ["code", "events"],
+                required: ["code", "apiVersion", "events"],
                 properties: {
                   code: { const: "OK" },
-                  events: { type: "array", items: { type: "object", required: ["eventType", "occurredAt"], properties: { eventType: str, occurredAt: str, actor: nullableStr, subject: nullableStr, detail: { type: "object", ...bestEffort } }, ...bestEffort } },
+                  apiVersion: { const: 1 },
+                  events: { type: "array", items: { type: "object", required: ["eventId", "action", "targetId", "actorUserId", "actorKeyId", "details", "createdAt"], properties: { eventId: str, action: str, targetId: str, actorUserId: nullableStr, actorKeyId: nullableStr, details: { type: "object", ...bestEffort }, createdAt: dateTime } } },
                 },
               },
-              { code: "OK", events: [{ eventType: "developer_key_rotated", occurredAt: "2026-09-16T00:07:00.000Z", actor: "<user id>", subject: "00000000-0000-4000-8000-000000000001", detail: {} }] },
+              { code: "OK", apiVersion: 1, events: [{ eventId: "00000000-0000-4000-8000-000000000003", action: "api_key_rotated", targetId: "00000000-0000-4000-8000-000000000001", actorUserId: "<user id>", actorKeyId: null, details: {}, createdAt: "2026-09-16T00:07:00.000Z" }] },
             ),
             "400": err("AUDIT_LIMIT_INVALID"),
             "401": err("AUTH_REQUIRED"),
-            "503": err("DEVELOPER_AUDIT_READ_FAILED", "DEVELOPER_STORE_NOT_CONFIGURED"),
+            "403": err("PILOT_ACCESS_REQUIRED", "AUTHORIZATION_CHANGED_RETRY"),
+            "503": err("DEVELOPER_AUDIT_READ_FAILED", "DEVELOPER_STORE_NOT_CONFIGURED", "DEVELOPER_STORE_BINDING_INVALID"),
           },
         },
       },
@@ -1438,6 +1590,11 @@ export async function GET(request: Request) {
         },
         IntakeQuote: {
           type: "object", required: ["code", "clientManifestDigest", "pricingFingerprint", "metadataLimitBytes", "quote", "files"], properties: { code: { const: "INTAKE_QUOTE" }, clientManifestDigest: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, pricingFingerprint: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, metadataLimitBytes: int, quote: { $ref: "#/components/schemas/UploadQuoteTotals" }, files: { type: "array", items: { type: "object", required: ["fileKey", "pageBasis", "approvedMaxPages", "reservedCredits", "maximumCredits"], properties: { fileKey: str, pageBasis: { type: "string", enum: ["unknown", "declared", "pdf_page_tree", "image", "pptx_slides", "docx_declared"] }, approvedMaxPages: int, reservedCredits: int, maximumCredits: int } } }, ...bestEffort },
+        },
+        DeveloperApiKey: {
+          type: "object",
+          required: ["keyId", "name", "prefix", "scopes", "createdAt", "expiresAt", "lastUsedAt", "revokedAt"],
+          properties: { keyId: uuid, name: str, prefix: str, scopes: { type: "array", items: { type: "string", enum: [...DEVELOPER_SCOPES] } }, createdAt: dateTime, expiresAt: nullableDateTime, lastUsedAt: nullableDateTime, revokedAt: nullableDateTime },
         },
         UploadApprovalFile: {
           type: "object", required: ["fileKey", "documentId", "fileState"], properties: { fileKey: str, documentId: { type: "string", format: "uuid" }, fileState: { type: "string", enum: ["approved", "reserved", "confirmed", "cancelled"] }, contentSha256: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, byteLength: int, mimeType: str, approvedMaximumCredits: int },
@@ -1738,7 +1895,7 @@ export async function GET(request: Request) {
       authoritative status per operation is the key it sits under in `responses`.
     */
     "x-tavonel-error-catalogue": API_ERROR_CODES,
-    "x-tavonel-browser-session-paths": ["/oauth-connectors", "/oauth-connectors/authorize", "/oauth-connectors/connections/{id}", "/developer/keys/{id}/rotate", "/developer/audit", "/reviews"],
+    "x-tavonel-browser-session-paths": ["/developer/keys", "/oauth-connectors", "/oauth-connectors/authorize", "/oauth-connectors/connections/{id}", "/developer/keys/{id}/rotate", "/developer/audit", "/reviews"],
     "x-tavonel-decision-gates": { promotion: "browser-session-only", rollback: "browser-session-only", mcp: "read-only" },
   };
   return NextResponse.json(INTAKE_APPROVAL_ROLLOUT_ENABLED ? contract : withoutApprovalLineage(contract), {
@@ -1751,11 +1908,18 @@ export async function GET(request: Request) {
   is off -- production -- its six operations answer 404 INTAKE_APPROVAL_DISABLED and the capability route
   reads only main's three fields, so the published contract is main bcba7173's: the per-file
   /uploads/capability operation below (main's, verbatim), no approval operation and none of their schemas.
+
+  Two corrections to main's, both G1 (SERVICE-DEFINITION 2026-10-17 section 1 "API", section 2.2 A14).
+  The capability 200 now describes the body the per-file branch writes (uploadUrl, expiresInSeconds,
+  objectKey, ...) rather than url/method/headers/expiresAt, and its refusals are the codes that branch
+  returns. And /uploads/confirm is published as PER_FILE_CONFIRM instead of being dropped: with the
+  switch off the route is live and an upload is not admitted until it answers, so a contract without
+  it described an upload nobody could finish.
   9acf679d's per-file fallback sentence names the approval endpoints' 404, so only the switch-on document,
   which publishes those endpoints, carries it. lib/openapi-response-shape.switch-off.test.ts is main's suite run
   against it; the switch-on document keeps its own suites.
 */
-const APPROVAL_LINEAGE_PATHS: readonly string[] = ["/uploads/quote", "/uploads/approval", "/uploads/approval/cancel", "/uploads/confirm", "/uploads/release"];
+const APPROVAL_LINEAGE_PATHS: readonly string[] = ["/uploads/quote", "/uploads/approval", "/uploads/approval/cancel", "/uploads/release"];
 const APPROVAL_LINEAGE_SCHEMAS: readonly string[] = ["IntakeManifestEntry", "UploadQuoteTotals", "IntakeQuote", "UploadApprovalFile", "UploadApproval"];
 const PER_FILE_CAPABILITY = {
   post: {
@@ -1776,37 +1940,59 @@ const PER_FILE_CAPABILITY = {
     parameters: [{ $ref: "#/components/parameters/SourceIdempotencyKey" }],
     responses: {
       "200": ok(
-        "A qualified direct upload capability and the immutable document id the bytes will be registered under. PUT the bytes to `url` with the headers in `headers` and nothing else; the URL is the credential and it is short-lived.",
+        "A qualified direct upload capability and the immutable document id the bytes will be registered under. PUT the bytes to `uploadUrl` with content-type `declaredMimeType` and content-length `contentLength`, within `expiresInSeconds`; the URL is the credential and it is short-lived. Then confirm with `documentId`.",
+        PER_FILE_CAPABILITY_BODY,
         {
-          type: "object",
-          required: ["documentId", "url", "method", "expiresAt"],
-          properties: {
-            documentId: { type: "string", format: "uuid" },
-            url: { type: "string", format: "uri", description: "Presigned object-storage URL. Unauthenticated: do not send the API key to it." },
-            method: { const: "PUT" },
-            headers: { type: "object", additionalProperties: str, description: "Every header the PUT must carry, and no others." },
-            expiresAt: { type: "string", format: "date-time" },
-            objectKey: str,
-            ...bestEffort,
-          },
-          ...bestEffort,
-        },
-        {
+          code: "QUALIFIED",
           documentId: "00000000-0000-4000-8000-000000000000",
-          url: "https://<storage-host>/quarantine/...?X-Amz-Signature=...",
-          method: "PUT",
-          headers: { "content-type": "application/pdf", "content-length": "184320" },
-          expiresAt: "2026-09-16T00:15:00.000Z",
+          objectKey: "quarantine/<workspace>/00000000-0000-4000-8000-000000000000/source",
+          uploadUrl: "https://<storage-host>/quarantine/...?X-Amz-Signature=...",
+          expiresInSeconds: 300,
+          contentLength: 184320,
+          originalFilename: "manual.pdf",
+          declaredMimeType: "application/pdf",
+          sanitization: "pending_cdr",
+          sourceIdempotency: "none",
+          admissionExpiresAt: "2026-09-16T00:15:00.000Z",
+          computeReservation: { reservationId: "00000000-0000-4000-8000-000000000009", reservedCredits: 12, billingSource: "paid", expiresAt: "2026-09-16T00:15:00.000Z", quote: {} },
         },
       ),
-      "400": err("UNQUALIFIED_INPUT", "UNQUALIFIED_MIME", "FILENAME_MIME_MISMATCH", "FILE_NAME_INVALID", "SOURCE_IDEMPOTENCY_KEY_INVALID"),
+      "400": err("UNQUALIFIED_INPUT", "UNQUALIFIED_MIME", "FILENAME_MIME_MISMATCH", "INVALID_FILENAME", "SOURCE_IDEMPOTENCY_KEY_INVALID"),
       "401": err("AUTH_REQUIRED", "API_KEY_INVALID", "API_KEY_EXPIRED", "API_KEY_REVOKED"),
-      "402": err("STUDIO_SUBSCRIPTION_REQUIRED", "TRIAL_ARCHIVE_NOT_INCLUDED", "TRIAL_FILE_LIMIT_EXCEEDED", "GPU_CREDITS_REQUIRED"),
-      "403": err("CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE"),
-      "409": err("INTAKE_IDEMPOTENCY_CONFLICT", "COMPUTE_IDEMPOTENCY_CONFLICT"),
+      "402": err("STUDIO_SUBSCRIPTION_REQUIRED", "TRIAL_ARCHIVE_NOT_INCLUDED", "TRIAL_FILE_LIMIT_EXCEEDED", "GPU_CREDITS_REQUIRED", "TRIAL_PAGE_LIMIT_EXCEEDED", "TRIAL_NOT_ACTIVE", "TRIAL_DISABLED"),
+      "403": err("API_SCOPE_REQUIRED", "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE"),
+      "409": err("INTAKE_IDEMPOTENCY_CONFLICT", "COMPUTE_IDEMPOTENCY_CONFLICT", "SOURCE_DELETED"),
       "413": err("SOURCE_EXCEEDS_PROCESSING_CEILING", "TRIAL_FILE_TOO_LARGE"),
-      "429": err("API_RATE_LIMITED", "INTAKE_RATE_LIMITED", "INTAKE_DAILY_QUOTA_EXCEEDED"),
+      "415": err("METADATA_ONLY_ENDPOINT"),
+      "429": err("API_RATE_LIMITED", "INTAKE_RATE_LIMITED", "INTAKE_DAILY_QUOTA_EXCEEDED", "TRIAL_CAPACITY_REACHED"),
       "503": err("SIGNER_NOT_CONFIGURED", "INTAKE_DISABLED", "API_RATE_LIMIT_UNAVAILABLE"),
+    },
+  },
+};
+/** main's per-file confirmation (app/api/uploads/confirm/route.ts, confirmLegacy), the step that admits the bytes. */
+const PER_FILE_CONFIRM = {
+  post: {
+    operationId: "confirmDirectUpload",
+    summary: "Confirm the stored bytes of a direct upload",
+    tags: ["Documents"],
+    "x-tavonel-scope": "documents:intake",
+    description: "After the PUT to `uploadUrl` succeeds, confirm the document with its `documentId` and the sha256 of the bytes you sent as `sourceSha256` (required on a free evaluation). The server checks the stored object's size, type and leading bytes against what the capability admitted and records the confirmation in one statement; the PUT response is not a confirmation. A digest that differs from one already recorded for the document is refused as SOURCE_DIGEST_CONFLICT.",
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: { type: "object", required: ["documentId"], properties: { documentId: uuid, sourceSha256: sha256Digest } },
+          examples: { default: { value: { documentId: "00000000-0000-4000-8000-000000000000", sourceSha256: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } } },
+        },
+      },
+    },
+    responses: {
+      "200": ok(
+        "The admission receipt: `result.status` is confirmed for the `documentId` you named.",
+        { type: "object", required: ["code", "result"], properties: { code: { const: "UPLOAD_CONFIRMED" }, result: CONFIRMATION_RECEIPT } },
+        { code: "UPLOAD_CONFIRMED", result: { documentId: "00000000-0000-4000-8000-000000000000", status: "confirmed", confirmedAt: "2026-09-16T00:16:00.000Z" } },
+      ),
+      ...confirmErrors(),
     },
   },
 };
@@ -1815,7 +2001,7 @@ function withoutApprovalLineage<T extends { paths: Record<string, unknown>; comp
   const paths: Record<string, unknown> = {};
   for (const [path, item] of Object.entries(contract.paths)) {
     if (APPROVAL_LINEAGE_PATHS.includes(path)) continue;
-    paths[path] = path === "/uploads/capability" ? PER_FILE_CAPABILITY : item;
+    paths[path] = path === "/uploads/capability" ? PER_FILE_CAPABILITY : path === "/uploads/confirm" ? PER_FILE_CONFIRM : item;
   }
   const schemas = Object.fromEntries(Object.entries(contract.components.schemas).filter(([name]) => !APPROVAL_LINEAGE_SCHEMAS.includes(name)));
   return { ...contract, paths, components: { ...contract.components, schemas } };
