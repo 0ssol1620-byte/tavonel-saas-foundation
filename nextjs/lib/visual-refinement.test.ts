@@ -13,7 +13,10 @@ describe("2026-09-20 visual refinement", () => {
     expect(landing).not.toMatch(/--lv2-film-w:[^;]*(?:svh|vh)/);
   });
   it("shares the outer measure across navigation, landing and public articles", () => {
-    expect(chrome).toContain("--chrome-measure: 1280px");
+    // UX-PLAN-2026-10-17 §4.5 (UX-L2): the shared measure is the one container token, 1320px
+    // (DESIGN_MASTER_V3 §6.4), read from app/tavonel.css rather than a 1280px copy of its own.
+    expect(chrome).toContain("--chrome-measure: var(--tv-page-max)");
+    expect(chrome).toContain("--chrome-gutter: var(--tv-page-margin)");
     expect(landing).toContain("--lv2-gutter: var(--chrome-gutter)");
     expect(chrome).toContain(".public-page main .shell");
     expect(landing).toContain("width: min(var(--chrome-measure)");

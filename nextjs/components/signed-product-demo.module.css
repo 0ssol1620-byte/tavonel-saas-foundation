@@ -33,8 +33,9 @@
   border-bottom-color: var(--border-paper, rgba(10, 12, 14, 0.12));
 }
 
+/* UX-L2 (UX-PLAN-2026-10-17 §4.5, R1): the site's one container, at every width, so the H1 sits under the wordmark. */
 .hero,
-.story { width: min(1180px, calc(100% - 48px)); margin-inline: auto; }
+.story { width: var(--tv-page-w); margin-inline: auto; }
 
 .hero { padding: clamp(112px, 15vw, 190px) 0 72px; }
 .disclosure {
@@ -129,7 +130,6 @@
 }
 
 @media (max-width: 767px) {
-  .hero, .story { width: min(100% - 28px, 620px); }
   .hero { padding-top: 96px; }
   .hero h1 { font-size: clamp(48px, 15vw, 70px); }
   .facing { grid-template-columns: 1fr; }

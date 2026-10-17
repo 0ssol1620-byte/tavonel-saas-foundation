@@ -1,7 +1,9 @@
 .page { min-height: 100vh; background: var(--ground); color: var(--text); }
 /* D33 -- one container. The 7vw side padding put this page's H1 at x=101 while its own header
-   wordmark sat at x=30; the shared shell formula puts them on the same gutter. */
-.hero { width: min(100%, var(--shell-wide)); min-height: clamp(520px, 58vh, 700px); margin: 0 auto; display: grid; grid-template-columns: minmax(0, .94fr) minmax(0, 1.06fr); align-items: center; gap: clamp(48px, 7vw, 112px); padding: clamp(112px, 10vw, 156px) var(--gutter) clamp(64px, 7vw, 104px); border-bottom: 1px solid var(--hairline-hi); }
+   wordmark sat at x=30; the shared shell formula puts them on the same gutter. UX-L2 (UX-PLAN-2026-10-17
+   §4.5, R1): that gutter is the site's one container edge now (app/chrome-v2.css --chrome-edge), and
+   the hero is full-bleed so its rule still crosses the page. */
+.hero { width: 100%; min-height: clamp(520px, 58vh, 700px); margin: 0 auto; display: grid; grid-template-columns: minmax(0, .94fr) minmax(0, 1.06fr); align-items: center; gap: clamp(48px, 7vw, 112px); padding: clamp(112px, 10vw, 156px) var(--chrome-edge) clamp(64px, 7vw, 104px); border-bottom: 1px solid var(--hairline-hi); }
 /* The kicker is the global `.eyebrow`; what belongs to this layout is the gap under it. */
 .heroLead { display: grid; gap: 18px; }
 /*
@@ -16,7 +18,7 @@
 .hero aside { width: min(100%, 620px); display: grid; gap: 20px; padding-bottom: 4px; }
 .hero aside p { max-width: 62ch; margin: 0; color: var(--text-lo); font-size: 15px; line-height: 1.72; text-wrap: pretty; }
 .status { width: fit-content; max-width: 100%; padding: 5px 8px; border: 1px solid var(--changed); color: var(--changed); font: 12px/1.5 var(--f-mono); letter-spacing: .12em; overflow-wrap: anywhere; }
-.body { max-width: var(--shell-wide); margin: 0 auto; padding: 0 var(--gutter) 110px; }
+.body { margin: 0 auto; padding: 0 var(--chrome-edge) 110px; }
 .row { display: grid; grid-template-columns: minmax(180px, .38fr) minmax(0, 1fr); gap: 8vw; padding: 42px 0; border-bottom: 1px solid var(--hairline); }
 /*
   pages-01 / regressions-04. A row carrying a figure is one column.
@@ -91,9 +93,9 @@
   .hero aside { max-width: 680px; }
 }
 @media (max-width: 760px) {
-  .hero { gap: 30px; padding: 86px 18px 52px; }
+  .hero { gap: 30px; padding: 86px var(--chrome-edge) 52px; }
   .hero h1 { font-size: clamp(46px, 15vw, 68px); }
-  .body { padding: 0 18px 80px; }
+  .body { padding: 0 var(--chrome-edge) 80px; }
   .row { grid-template-columns: minmax(0, 1fr); gap: 22px; }
   .protocol li { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 }

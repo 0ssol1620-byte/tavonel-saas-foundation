@@ -21,7 +21,6 @@
   --unresolved: var(--tv-unresolved);
   --paper-50: #fff;
   --lv2-paper-shadow: none;
-  --chrome-measure: 1280px;
   color: var(--text-hi);
   background: var(--ground);
 }
@@ -31,7 +30,8 @@
   outline-offset: 3px;
 }
 .page :global(.paper-label) { font: 600 13px/1.5 var(--f-sans); color: #53606a; margin: 0; }
-.page :global(.evaluation-shell) { max-width: 1280px; margin: 0 auto; padding: calc(64px + 56px) 32px 80px; }
+/* UX-L2 (UX-PLAN-2026-10-17 §4.5, R1): the site's one container, so the H1 sits under the wordmark. */
+.page :global(.evaluation-shell) { width: var(--tv-page-w); max-width: none; margin: 0 auto; padding: calc(64px + 56px) 0 80px; }
 .page :global(.evaluation-intro) { max-width: 760px; }
 .page :global(.evaluation-intro) h1 {
   color: var(--text-hi);
@@ -94,7 +94,7 @@
 .page > header :global(.btn) { color: #fff; background: var(--tv-action); border-color: var(--tv-action); }
 
 @media (max-width: 760px) {
-  .page :global(.evaluation-shell) { padding: calc(64px + 32px) 20px 48px; }
+  .page :global(.evaluation-shell) { padding: calc(64px + 32px) 0 48px; }
   .page :global(.evaluation-grid) { grid-template-columns: 1fr; gap: 24px; }
   .page :global(.evaluation-form) { padding: 20px 16px; }
 }

@@ -74,7 +74,8 @@
 .paper-purchase-boundary a { color:var(--tv-action); text-decoration:underline; }
 @media(max-width:760px) { .evaluation-shell { padding:32px 20px 48px; } .evaluation-grid { grid-template-columns:1fr; gap:24px; } .evaluation-form { padding:20px 16px; } }
 .paper-product .nav.chrome-v2-header[data-scrolled="1"] { background:#f7f5ef; border-bottom-color:#d8ddd9; }
-.paper-product { --chrome-measure:1280px; --ink-900:#fff; --ink-850:#f0f1ec; --border-dark:#d8ddd9; --border-dark-hi:#88928d; }
+/* UX-L2 (UX-PLAN-2026-10-17 §4.5, R1): no measure of its own; the site's one container (app/chrome-v2.css) applies here too. */
+.paper-product { --ink-900:#fff; --ink-850:#f0f1ec; --border-dark:#d8ddd9; --border-dark-hi:#88928d; }
 .paper-product .nav .btn { color:#fff; background:var(--tv-action); border-color:var(--tv-action); }
 .paper-product .lv2-hero-stats a { color:#171c20; }
 

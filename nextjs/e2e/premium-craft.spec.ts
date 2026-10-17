@@ -155,7 +155,9 @@ test("copy controls and navigation remain readable and operable", async ({ page 
   const pricing = page.viewportSize()!.width < 1250
     ? (await page.locator("header.nav details.mobile-primary-nav > summary").click(), page.locator('header.nav details.mobile-primary-nav > nav a.mobile-nav-direct[href="/pricing"]'))
     : nav.getByRole("link", { name: "Pricing", exact: true });
-  if (page.viewportSize()!.width < 1250) await expect(nav).toBeHidden();
+  // UX-PLAN-2026-10-17 §5.2 (UX-L2): from 900px the group stays in the row with the filled action;
+  // Pricing and Sign in are sheet rows below 1250. Only below 900 is the group gone.
+  if (page.viewportSize()!.width < 900) await expect(nav).toBeHidden();
   else {
     const box = await nav.boundingBox();
     expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);

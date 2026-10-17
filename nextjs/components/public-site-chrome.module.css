@@ -90,8 +90,16 @@
   @media (hover: hover) and (pointer: fine) {
     .header .cta:hover { background: var(--action-hover, var(--tv-action-hover)) !important; border-color: var(--action-hover, var(--tv-action-hover)) !important; }
   }
-  /* Brief move 6: below the desktop switch the row is wordmark + Menu; Pricing and Sign in are in the sheet. */
+  /*
+    Brief move 6, narrowed by UX-L2 (UX-PLAN-2026-10-17 §5.2). Below the desktop switch Pricing and
+    Sign in are rows of the Menu sheet, but from 900px the filled action stays in the row: hiding the
+    whole group at 1249 left a 1024 laptop with no action in the header at all. Below 900 the row is
+    the wordmark and Menu, and the hero carries the action.
+  */
   @media (max-width: 1249px) {
+    .header .pricingLink { display: none !important; }
+  }
+  @media (max-width: 899.98px) {
     .header :global(.nav-actions) { display: none !important; }
   }
   :global(.page:not(.lv2)):has(> .header) {

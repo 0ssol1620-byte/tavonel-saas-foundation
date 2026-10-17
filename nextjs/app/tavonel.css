@@ -3603,7 +3603,9 @@
     horizontal scroll nobody finds, so each row becomes a stacked card and each cell prints its
     column name from the `data-label` the component already writes for accessibility.
   */
-  .src-scroll { overflow-x: auto; margin: 0 -2px; }
+  /* The -2px keeps a focus ring clear of the scroll clip; the matching padding keeps the table on the
+     container edge (UX-L2, R1: it sat 2px left of the H1). */
+  .src-scroll { overflow-x: auto; margin: 0 -2px; padding: 0 2px; }
 
   .src-matrix {
     width: 100%;

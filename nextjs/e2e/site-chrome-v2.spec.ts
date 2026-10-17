@@ -163,7 +163,9 @@ test.describe("at 1440", () => {
   test("aligns the wordmark and footer on the shared fluid content edge", async ({ page }) => {
     await page.goto("/product");
     const width = page.viewportSize()!.width;
-    const edge = Math.max(Math.min(Math.max(width * .025, 20), 32), (width - 1280) / 2);
+    // UX-PLAN-2026-10-17 §4.5 (UX-L2): the one container is DESIGN_MASTER_V3 §6.4's 1320px with a
+    // clamp(24px, 5vw, 72px) margin; it was 1280px with clamp(20px, 2.5vw, 32px).
+    const edge = Math.max(Math.min(Math.max(width * .05, 24), 72), (width - 1320) / 2);
     const wordmark = await page.locator(`${HEADER} .wordmark`).first().boundingBox();
     expect(wordmark).not.toBeNull();
     expect(Math.abs((wordmark?.x ?? 0) - edge), `wordmark x ${wordmark?.x}`).toBeLessThanOrEqual(1);

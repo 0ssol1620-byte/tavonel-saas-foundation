@@ -24,10 +24,12 @@
   :global(body):has(.home) > :global(.skip) { border-color: var(--action); outline-color: var(--action); }
 
   /* Brief 2026-10-15 §4: one container, one paper, one ink. Header, hero, film and every
-     section share --page-w, so at 1440 they all run x=120-1320 and at 390 x=20-370. */
+     section share --page-w. UX-L2 (UX-PLAN-2026-10-17 §4.5, R1): that container is the site's,
+     not Home's own 1200px -- --tv-page-max / --tv-page-margin -- so at 1440 they all run
+     x=72-1368 and at 390 x=24-366, on the same edge as every other page. */
   .home {
-    --page-max: 1200px;
-    --page-pad: clamp(20px, 2.5vw, 32px);
+    --page-max: var(--tv-page-max);
+    --page-pad: var(--tv-page-margin);
     --page-w: min(var(--page-max), calc(100% - 2 * var(--page-pad)));
     --measure: 64ch;
     --hero-measure: 1040px;
@@ -303,7 +305,12 @@
       WebKit column), caption 15/1.45 beside the toggle at an 8px gap (two lines at 360 with 16px to
       spare), 16px rhythm.
       Before/after: redesign-r3-20261015/fix3/GEOMETRY.json and fix3/LCP-*.json.
+
+      UX-L2 (UX-PLAN-2026-10-17 §4.5): the container's 24px phone margin leaves the tab row 312px at
+      360, and four equal 78px columns wrapped "Use with AI" to two lines in WebKit. The tracks size
+      to their labels and share the rest, so every label holds one line.
     */
+    .home.home :global(#s1 .compile-film-stages) { grid-template-columns: repeat(4, auto); }
     .home.home :global(#s1) { padding-top: 64px; padding-bottom: 48px; }
     .home.home :global(.lv2-hero-eyebrow) { margin-bottom: 8px; line-height: 1.3; }
     .home.home :global(.lv2-hero-h1) { font-size: 32px; line-height: 1.04; margin-bottom: 10px; }

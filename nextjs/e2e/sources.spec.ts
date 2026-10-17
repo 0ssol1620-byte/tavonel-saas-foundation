@@ -178,12 +178,14 @@ test("carries no empty structural cell and never overflows its viewport", async 
   test is what fails if the row stops fitting.
 */
 test("keeps the header's primary action reachable at the width the section row appears", async ({ page }) => {
-  // Brief 2026-10-15 move 6: the action group shares the section row's switch (app/chrome-v2.css,
-  // 1250px). Below it the row is the wordmark and Menu; at it, the whole group must fit.
+  // Brief 2026-10-15 move 6, narrowed by UX-PLAN-2026-10-17 §5.2 (UX-L2): below the section row's
+  // switch (1250px) Pricing and Sign in move to the sheet but the filled action stays in the row
+  // down to 900px; at 1250 the whole group must fit.
   await page.setViewportSize({ width: 1249, height: 900 });
   await page.goto("/sources");
   const actions = page.locator("header.nav .nav-actions");
-  await expect(actions).toBeHidden();
+  await expect(actions.locator("a.btn")).toBeVisible();
+  await expect(actions.locator('a[href="/pricing"]')).toBeHidden();
   await page.setViewportSize({ width: 1250, height: 900 });
   await expect(actions).toBeVisible();
   const box = await actions.boundingBox();
