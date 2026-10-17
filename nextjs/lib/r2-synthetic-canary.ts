@@ -569,17 +569,27 @@ const MAX_REJECT_RECEIPT_BYTES = 4_096;
 const DOCUMENT_SEGMENT = /^[A-Za-z0-9_-]{1,80}$/;
 
 /**
- * The document ids in this workspace whose source was refused.
+ * The document ids in this workspace whose source was refused, and those whose source is stored
+ * with no refusal beside it.
  *
  * One `ListObjectsV2` page is enough and deliberately not paged: this is a display path, the cap
  * is disclosed by `truncated`, and a workspace with more than twenty refusals has a problem that
- * a longer list does not solve.
+ * a longer list does not solve. `truncated` is also set when R2 says the page itself was cut
+ * short, because then refusals and stored sources past it are missing too.
+ *
+ * `storedDocumentIds` is every source key in the page without a `cdr-reject.json`, including
+ * refusals past the twenty-item cap, which are left out of it rather than shown as stored. The
+ * source is never deleted after preparation, so most of these also have immutable objects; the
+ * caller subtracts those.
  */
 export async function listFoundationQuarantineRejects(
   env: R2SignerEnv,
   workspaceKey: string,
   now = new Date(),
-): Promise<{ ok: true; documentIds: string[]; truncated: boolean } | { ok: false; code: string }> {
+): Promise<
+  | { ok: true; documentIds: string[]; storedDocumentIds: string[]; truncated: boolean }
+  | { ok: false; code: string }
+> {
   if (env.bucket !== FOUNDATION_R2_BUCKET) return { ok: false, code: "BUCKET_NOT_FOUNDATION" };
   if (!/^[A-Za-z0-9_-]{1,80}$/.test(workspaceKey)) return { ok: false, code: "QUARANTINE_PREFIX_REQUIRED" };
   const prefix = `quarantine/${workspaceKey}/`;
@@ -592,17 +602,21 @@ export async function listFoundationQuarantineRejects(
   if (!response?.ok) return { ok: false, code: "LIST_FAILED" };
   const xml = await response.text();
   const documentIds: string[] = [];
+  const sourceIds: string[] = [];
   for (const block of xml.split(/<Contents>/i).slice(1)) {
     const key = /<Key>([^<]+)<\/Key>/i.exec(block)?.[1];
-    if (!key || !key.startsWith(prefix) || !key.endsWith(`/${CDR_REJECT_FILENAME}`)) continue;
+    if (!key || !key.startsWith(prefix)) continue;
     const parts = key.slice(prefix.length).split("/");
     if (parts.length !== 2 || !DOCUMENT_SEGMENT.test(parts[0])) continue;
-    documentIds.push(parts[0]);
+    if (parts[1] === CDR_REJECT_FILENAME) documentIds.push(parts[0]);
+    else if (parts[1] === "source") sourceIds.push(parts[0]);
   }
+  const refused = new Set(documentIds);
   return {
     ok: true,
     documentIds: documentIds.slice(0, MAX_LISTED_REJECTS),
-    truncated: documentIds.length > MAX_LISTED_REJECTS,
+    storedDocumentIds: sourceIds.filter((documentId) => !refused.has(documentId)),
+    truncated: documentIds.length > MAX_LISTED_REJECTS || /<IsTruncated>\s*true\s*<\/IsTruncated>/i.test(xml),
   };
 }
 

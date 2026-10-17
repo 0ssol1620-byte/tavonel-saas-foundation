@@ -250,3 +250,37 @@ describe("selected run and header consistency", () => {
     expect(deriveWorkspaceState(input({ compileJobState: "ready", hasCandidate: true, activeRevision: 2 })).stateTitle).toBe("Your published knowledge · v2");
   });
 });
+
+/*
+  G2. `/api/documents` now says when its listing is incomplete instead of returning fewer rows.
+  The workspace has to carry that through: a listing whose only source failed to load must not
+  read as the first-run "add your knowledge" hero, and the reader is told in a sentence, never a
+  raw code, with a way to retry.
+*/
+describe("an incomplete inventory", () => {
+  const partial = { documentIds: ["doc-1", "doc-2"], truncated: false };
+
+  it("is never an empty workspace, even when nothing else is listed", () => {
+    expect(deriveWorkspaceMode(input({ inventoryPartial: partial }))).toBe("returning");
+    expect(deriveWorkspaceMode(input({ inventoryPartial: null }))).toBe("new");
+  });
+
+  it("says so in the hero and offers a retry, before any next-step suggestion", () => {
+    const state = deriveWorkspaceState(input({ inventoryPartial: partial, readyDocumentCount: 3, documentCount: 3 }));
+    expect(state.stateTitle).toBe("Some sources could not be loaded.");
+    expect(state.stateDescription).toContain("2 sources in this workspace could not be fully read");
+    expect(state.nextAction).toEqual({ label: "Retry loading sources", intent: "refresh" });
+  });
+
+  it("puts an Incomplete item first in the attention queue, in words and without a code", () => {
+    const items = deriveAttentionItems(input({ inventoryPartial: { documentIds: [], truncated: true }, operatorReviewCount: 1 }));
+    expect(items.map((item) => item.id)).toEqual(["inventory-incomplete", "operator-review"]);
+    expect(items[0]).toMatchObject({ label: "Incomplete", action: { intent: "refresh" } });
+    expect(items[0].detail).toContain("more refused or unprepared sources than one listing returns");
+    expect(items[0].detail).not.toMatch(/[A-Z]{3,}_[A-Z]/);
+  });
+
+  it("adds nothing when the listing was complete", () => {
+    expect(deriveAttentionItems(input()).map((item) => item.id)).toEqual([]);
+  });
+});

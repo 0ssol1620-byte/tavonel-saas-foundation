@@ -7,11 +7,57 @@ import {
   assertFoundationSyntheticKey,
   authorizeSyntheticCanary,
   foundationQuarantineRejectKey,
+  listFoundationQuarantineRejects,
   readR2SignerEnv,
   validateCdrRejectReceipt,
 } from "./r2-synthetic-canary";
 
 afterEach(() => vi.unstubAllGlobals());
+
+/*
+ * G2: the quarantine listing is where the documents with no immutable object are found -- the
+ * refused ones and the ones still stored with nothing after them. A refusal must never be shown
+ * as a stored source, even past the twenty-refusal cap, and a page R2 cut short must say so.
+ */
+describe("quarantine listing", () => {
+  const workspace = "pilot-969dc192daa24119";
+  const env = { accountId: "account", bucket: FOUNDATION_R2_BUCKET, accessKeyId: "access", secretAccessKey: "secret" };
+  const page = (keys: string[], truncated = false) => `<ListBucketResult><IsTruncated>${truncated}</IsTruncated>${
+    keys.map((key) => `<Contents><Key>${key}</Key><Size>1</Size></Contents>`).join("")}</ListBucketResult>`;
+  const listing = (xml: string, status = 200) => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(xml, { status })));
+    return listFoundationQuarantineRejects(env, workspace);
+  };
+
+  it("separates refused sources from stored ones and ignores triage staging", async () => {
+    const result = await listing(page([
+      `quarantine/${workspace}/doc-a/source`,
+      `quarantine/${workspace}/doc-a/cdr-reject.json`,
+      `quarantine/${workspace}/doc-b/source`,
+      `quarantine/${workspace}/triage-staging/stage-1/upload`,
+    ]));
+    expect(result).toEqual({ ok: true, documentIds: ["doc-a"], storedDocumentIds: ["doc-b"], truncated: false });
+  });
+
+  it("never lists a refusal past the cap as a stored source, and says the list is truncated", async () => {
+    const ids = Array.from({ length: 21 }, (_, index) => `doc-${index}`);
+    const result = await listing(page(ids.flatMap((id) => [
+      `quarantine/${workspace}/${id}/source`,
+      `quarantine/${workspace}/${id}/cdr-reject.json`,
+    ])));
+    expect(result).toMatchObject({ ok: true, storedDocumentIds: [], truncated: true });
+    expect(result.ok && result.documentIds).toHaveLength(20);
+  });
+
+  it("reports a page R2 cut short as truncated", async () => {
+    const result = await listing(page([`quarantine/${workspace}/doc-b/source`], true));
+    expect(result).toMatchObject({ ok: true, storedDocumentIds: ["doc-b"], truncated: true });
+  });
+
+  it("fails rather than returning an empty listing when the store refuses", async () => {
+    await expect(listing("<Error/>", 500)).resolves.toEqual({ ok: false, code: "LIST_FAILED" });
+  });
+});
 
 describe("r2 synthetic canary guards", () => {
   it("refuses a missing signer env", () => {

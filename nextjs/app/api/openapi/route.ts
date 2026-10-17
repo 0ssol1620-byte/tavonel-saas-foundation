@@ -347,6 +347,12 @@ export async function GET(request: Request) {
                   code: { const: "OK" },
                   workspaceId: str,
                   documents: { type: "array", items: { $ref: "#/components/schemas/Document" } },
+                  partial: {
+                    type: "object",
+                    description: "Present only when the listing could not be completed. `documentIds` are documents whose refusal or review receipt could not be read; one absent from `documents` could not be described at all. `truncated` means the quarantine listing hit its bound.",
+                    required: ["documentIds", "truncated"],
+                    properties: { documentIds: { type: "array", items: str }, truncated: { type: "boolean" } },
+                  },
                 },
               },
               {
@@ -365,7 +371,7 @@ export async function GET(request: Request) {
             "401": err("AUTH_REQUIRED", "API_KEY_INVALID"),
             "403": err("API_SCOPE_REQUIRED", "PILOT_ACCESS_REQUIRED", "CONNECTOR_SOURCE_ACCESS_DENIED", "AUTHORIZATION_CHANGED_RETRY"),
             "429": err("API_RATE_LIMITED"),
-            "503": err("CONNECTOR_SOURCE_ACCESS_UNAVAILABLE", "READ_FAILED", "API_RATE_LIMIT_UNAVAILABLE"),
+            "503": err("CONNECTOR_SOURCE_ACCESS_UNAVAILABLE", "READ_FAILED", "QUARANTINE_LIST_UNAVAILABLE", "API_RATE_LIMIT_UNAVAILABLE"),
           },
         },
       },
