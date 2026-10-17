@@ -6,7 +6,8 @@
     (`--brand oklch(48% 0.20 255)`, hover 53%, dark ground 72% / 0.14); it wins over the brief's
     #244ac8, which is 265.7°. Chroma 0.20 is outside sRGB at 48% / 255°, so each token is
     decision.md's lightness and hue at the sRGB chroma boundary -- what CSS gamut mapping draws for
-    it -- written as hex so the contrast is the same on every screen:
+    it -- written as hex so the contrast is the same on every screen. Since UX-L1 the hexes live once,
+    as --tv-action* in app/tavonel.css, and these names read them:
       --action          oklch(48% 0.158 255)  white on it 6.67:1, on paper 6.34:1
       --action-hover    oklch(53% 0.174 255)  white on it 5.38:1
       --action-on-dark  oklch(72% 0.139 255)  7.68:1 on obsidian (the focus ring on the footer)
@@ -16,9 +17,9 @@
     `.home` -- the layout's skip link and the consent card -- read the same values.
   */
   :global(body):has(.home) {
-    --action: #005bb3;
-    --action-hover: #0169cd;
-    --action-on-dark: #65a7fa;
+    --action: var(--tv-action);
+    --action-hover: var(--tv-action-hover);
+    --action-on-dark: var(--tv-action-on-dark);
   }
   :global(body):has(.home) > :global(.skip) { border-color: var(--action); outline-color: var(--action); }
 
@@ -32,29 +33,36 @@
     --hero-measure: 1040px;
     --chrome-measure: var(--page-max);
     --chrome-gutter: var(--page-pad);
-    --paper: #faf9f6;
-    --ink: #15191d;
-    --ink-muted: #58606a;
+    --paper: var(--tv-paper);
+    --ink: var(--tv-ink);
+    --ink-muted: var(--tv-ink-muted);
     --rule: #d8ddd9;
-    --obsidian: #0e1013;
-    --on-obsidian: #edf2f5;
-    --on-obsidian-muted: #9ba0a8;
+    --obsidian: var(--tv-inst-1);
+    --on-obsidian: var(--tv-on-inst);
+    --on-obsidian-muted: var(--tv-on-inst-muted);
     --home-paper: var(--paper);
     --home-stone: var(--paper);
-    --home-sheet: #ffffff;
+    --home-sheet: var(--tv-paper-raised);
     --home-ink: var(--ink);
     --home-muted: var(--ink-muted);
     --home-cobalt: var(--action);
     --home-cobalt-deep: var(--action-hover);
-    --home-amber: #f2b73a;
-    --home-amber-wash: #fff1c7;
-    --home-amber-ink: #795400; /* §4.3 --source: source regions only. The shared `--source` token (Evidence Line, focus) is --action, below. */
+    /*
+      Source regions. UX-L1 (UX-PLAN-2026-10-17 §4.2-2) draws them in ink rather than amber: amber
+      keeps one meaning on the site, "changed", and the accent above stays the only hue on Home.
+      The names are kept so the consumers in landing-hero.module.css are unchanged; the values are
+      the plan's outline, wash and a muted ink for the region marks. This reverses Release 3's
+      delegated choice (brief §4.3) toward decision.md, and the founder's veto stays open.
+    */
+    --home-amber: var(--tv-rule-strong);
+    --home-amber-wash: var(--tv-paper-sunk);
+    --home-amber-ink: var(--tv-ink-muted);
     --home-rule: var(--rule);
     --home-rule-strong: rgb(21 25 29 / 32%);
     /*
       The shared landing and chrome tokens that painted a second and third blue (#2259ce, #7da7ff),
       a violet fan, a mint focus ring, a brown "changed" count and a navy-tinted ink on Home,
-      re-pointed so the accent above is the only hue CSS paints here besides the source amber.
+      re-pointed so the accent above is the only hue CSS paints here.
     */
     --source: var(--action);
     --source-ink: var(--action);

@@ -21,10 +21,10 @@ const layout = read("app/layout.tsx");
 
 const stripComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, "");
 
-/** The declarations of the first `:root` block, by token name. */
-function rootTokens(css: string): Map<string, string> {
+/** The declarations of the first `:root` block -- or of the `:root` block declaring `declaring` -- by token name. */
+function rootTokens(css: string, declaring?: string): Map<string, string> {
   const code = stripComments(css);
-  const start = code.indexOf(":root {");
+  const start = declaring ? code.lastIndexOf(":root {", code.indexOf(`${declaring}:`)) : code.indexOf(":root {");
   expect(start, "tavonel.css has a :root block").toBeGreaterThan(-1);
   let depth = 0;
   let end = start;
@@ -47,6 +47,12 @@ function rootTokens(css: string): Map<string, string> {
 }
 
 const tokens = rootTokens(tavonel);
+/*
+  UX-L1 (UX-PLAN-2026-10-17 §4.3, §8.2). The --tv-* block is the one place an accent's hex lives now,
+  and a family token that reads it -- `--source-ink: var(--tv-action)` -- is measured at the value
+  it resolves to. One hop, into that block only, and the end must be a literal hex.
+*/
+const tvTokens = rootTokens(tavonel, "--tv-paper");
 
 /* ---------------------------------------------------------------- WCAG 2.x, recomputed */
 
@@ -75,7 +81,11 @@ function contrast(a: string, b: string): number {
 function token(name: string): string {
   const value = tokens.get(name);
   expect(value, `${name} is declared in tavonel.css :root`).toBeTruthy();
-  return value as string;
+  const alias = /^var\((--tv-[\w-]+)\)$/.exec(value as string);
+  if (!alias) return value as string;
+  const resolved = tvTokens.get(alias[1]);
+  expect(resolved, `${name} reads ${alias[1]}, which must be a literal hex in the --tv-* block`).toMatch(/^#[0-9a-f]{6}$/i);
+  return resolved as string;
 }
 
 /** Hue in degrees, which is how "in the coral family" is checked rather than by eye. */

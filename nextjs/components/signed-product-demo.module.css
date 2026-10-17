@@ -3,7 +3,7 @@
   --demo-muted: var(--text-muted-paper, #4f5d70);
   --demo-paper: var(--paper, #f4f0e7);
   --demo-line: color-mix(in srgb, var(--demo-ink) 16%, transparent);
-  --demo-blue: var(--source-ink, #2259ce);
+  --demo-blue: var(--source-ink, var(--tv-action));
   --demo-cyan: var(--verified-ink, #1a6d51);
   --text-hi: var(--demo-ink);
   --text-mid: var(--demo-muted);

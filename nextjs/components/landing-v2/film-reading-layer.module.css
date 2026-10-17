@@ -32,7 +32,7 @@
 }
 
 .panes li[data-marked] {
-  border-top-color: var(--home-cobalt, #244ac8);
+  border-top-color: var(--home-cobalt, var(--tv-action));
   color: var(--home-ink, #15191d);
 }
 
@@ -52,7 +52,7 @@
 }
 
 .panes button:focus-visible {
-  outline: 2px solid var(--home-cobalt, #244ac8);
+  outline: 2px solid var(--home-cobalt, var(--tv-action));
   outline-offset: 2px;
 }
 
@@ -169,7 +169,7 @@
   }
 
   .story[data-narrow="0"] .viewControl:focus-visible {
-    outline: 2px solid var(--home-cobalt, #244ac8);
+    outline: 2px solid var(--home-cobalt, var(--tv-action));
     outline-offset: 2px;
   }
 

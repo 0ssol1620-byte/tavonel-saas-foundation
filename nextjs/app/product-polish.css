@@ -606,11 +606,12 @@
   --text-hi: #171c20;
   --text-mid: #53606a;
   --text-lo: #53606a;
-  --source: #2447b3;
-  --relation: #5f42e0;
-  --verified: #226849;
-  --changed: #8a5a00;
-  --unresolved: #b42318;
+  /* UX-L1 (UX-PLAN-2026-10-17 §4.2): the one accent, one value per state, and no violet. */
+  --source: var(--tv-action);
+  --relation: var(--tv-ink-muted);
+  --verified: var(--tv-verified);
+  --changed: var(--tv-changed);
+  --unresolved: var(--tv-unresolved);
   background: #fff;
   color: #171c20;
   padding-top: clamp(40px, 4vw, 50px);
@@ -627,11 +628,13 @@
   --text-hi: #f4f6fa;
   --text-mid: #bac3d0;
   --text-lo: #a3afbf;
-  --source: #7da7ff;
-  --relation: #a996ff;
-  --verified: #7be0be;
-  --changed: #f2a65a;
-  --unresolved: #f07d73;
+  /* The code block is an instrument face on a paper page: its tab marker and copy feedback read
+     the dark-ground accent, its relation a neutral (UX-L1, §4.2-1). */
+  --source: var(--tv-action-on-dark);
+  --relation: var(--tv-on-inst-muted);
+  --verified: var(--tv-action-on-dark);
+  --changed: var(--tv-changed-on-dark);
+  --unresolved: var(--tv-unresolved-on-dark);
   border-color: #2e353b;
   background: #101721;
   color: #f4f6fa;

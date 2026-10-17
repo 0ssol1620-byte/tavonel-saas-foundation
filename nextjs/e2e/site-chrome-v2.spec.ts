@@ -309,7 +309,9 @@ test.describe("Home keeps main's header and footer colours", () => {
     await page.goto("/pricing");
     await expect(page.locator("footer.site")).toHaveCSS("background-color", "rgb(247, 245, 239)");
     await expect(page.locator("footer.site .site-footer-groups a").first()).toHaveCSS("color", "rgb(83, 96, 106)");
-    expect(await page.locator(HEADER).evaluate((element) => getComputedStyle(element).getPropertyValue("--source").trim())).toBe("#2447b3");
+    // UX-L1 (UX-PLAN-2026-10-17 §4.2-5, §8.2): the paper header's --source was the retired 265° #2447b3; it reads
+    // var(--tv-action) now, the same 255° accent Home's header carries above.
+    expect(await page.locator(HEADER).evaluate((element) => getComputedStyle(element).getPropertyValue("--source").trim())).toBe("#005bb3");
     if (testInfo.project.name === "1440") {
       await expect(page.locator(HEADER)).toHaveCSS("min-height", "64px");
     } else {

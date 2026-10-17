@@ -10,7 +10,7 @@
 .tree { min-width: 0; border-top: 1px solid #88928d; }
 .group, .integrity { min-width: 0; border-bottom: 1px solid #d8ddd9; }
 .group summary, .integrity summary { display: list-item; min-height: 44px; box-sizing: border-box; padding: 12px 8px; cursor: pointer; font: 500 15px/1.5 var(--f-sans); overflow-wrap: anywhere; }
-.group summary::marker, .integrity summary::marker { color: #005bb3; }
+.group summary::marker, .integrity summary::marker { color: var(--tv-action); }
 .groupHeading { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; max-width: 100%; }
 .groupHeading code { font-size: 15px; }
 .groupHeading > span { color: #46545e; font-size: 13px; }
@@ -34,11 +34,11 @@
 .sources { list-style: none; margin: 0; padding: 0 8px 12px; }
 .sources li { padding-block: 12px; border-top: 1px solid #d8ddd9; }
 .sources li > span { display: block; color: #46545e; font: 500 13px/1.5 var(--f-sans); }
-.sources a, .actions a { display: flex; align-items: center; gap: 8px; min-height: 44px; min-width: 44px; box-sizing: border-box; color: #005bb3; font: 500 14px/1.5 var(--f-sans); text-decoration: underline; text-underline-offset: 4px; overflow-wrap: anywhere; }
+.sources a, .actions a { display: flex; align-items: center; gap: 8px; min-height: 44px; min-width: 44px; box-sizing: border-box; color: var(--tv-action); font: 500 14px/1.5 var(--f-sans); text-decoration: underline; text-underline-offset: 4px; overflow-wrap: anywhere; }
 .actions { display: flex; flex-direction: column; padding-block: 12px; }
 /* Keep focused controls and their outlines clear of rounded viewport scroll edges. */
 .proof :is(summary, a, pre) { scroll-margin-block: 8px; }
-.proof :is(summary, a, pre):focus-visible { outline: 3px solid #005bb3; outline-offset: 3px; }
+.proof :is(summary, a, pre):focus-visible { outline: 3px solid var(--tv-action); outline-offset: 3px; }
 @media (max-width: 600px) {
   .proof { margin-top: 20px; }
   .facts { gap: 12px 20px; }

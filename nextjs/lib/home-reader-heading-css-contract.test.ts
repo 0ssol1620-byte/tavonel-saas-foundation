@@ -72,6 +72,10 @@ function opaqueToken(name: string) {
   // --home-* tokens to it in the same .home rule. Follow exactly that one hop; the end must be a hex.
   const alias = root === activeRootCss ? /^var\((--[a-z-]+)\)$/.exec(value) : null;
   if (alias) value = declaration(root, selector, alias[1]).value;
+  // UX-L1 (UX-PLAN-2026-10-17 §4.3, §8.2) points that palette at the --tv-* tokens in app/tavonel.css.
+  // Follow exactly one more hop, into that sheet's :root only; the end must still be a hex.
+  const tv = root === activeRootCss ? /^var\((--tv-[a-z0-9-]+)\)$/.exec(value) : null;
+  if (tv) value = declaration(globalCss, ":root", tv[1]).value;
   expect(value).toMatch(/^#[0-9a-f]{6}$/i);
   return value.toLowerCase();
 }
@@ -178,9 +182,12 @@ describe("reviewed Home reader heading CSS source contract", () => {
     expect(declaration(moduleCss, ".home", "--home-paper")).toEqual({ value: "#f6f3ec", important: false, layered: false });
     // Release 2: the mounted root aliases its tokens to one named palette; the values behind them are unchanged.
     expect(declaration(activeRootCss, ".home", "--home-ink")).toEqual({ value: "var(--ink)", important: false, layered: true });
-    expect(declaration(activeRootCss, ".home", "--ink")).toEqual({ value: "#15191d", important: false, layered: true });
+    // UX-L1 (UX-PLAN-2026-10-17 §8.2): the named palette reads the --tv-* tokens; the values behind them are unchanged.
+    expect(declaration(activeRootCss, ".home", "--ink")).toEqual({ value: "var(--tv-ink)", important: false, layered: true });
+    expect(declaration(globalCss, ":root", "--tv-ink")).toEqual({ value: "#15191d", important: false, layered: true });
     expect(declaration(activeRootCss, ".home", "--home-paper")).toEqual({ value: "var(--paper)", important: false, layered: true });
-    expect(declaration(activeRootCss, ".home", "--paper")).toEqual({ value: "#faf9f6", important: false, layered: true });
+    expect(declaration(activeRootCss, ".home", "--paper")).toEqual({ value: "var(--tv-paper)", important: false, layered: true });
+    expect(declaration(globalCss, ":root", "--tv-paper")).toEqual({ value: "#faf9f6", important: false, layered: true });
     const page = readFileSync(new URL("components/landing-v2/landing-page.tsx", packageRoot), "utf8");
     expect(page).toContain('className={`page lv2 ${sourceStyles.home}`}');
     expect(page).not.toContain('${heroStyles.home}');

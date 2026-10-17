@@ -93,7 +93,7 @@ export function workbenchLineGeometry(root: Rect, origin: Rect, box: Rect): Work
   };
 }
 
-const COBALT = "var(--action, #244ac8)";
+const COBALT = "var(--action, var(--tv-action))";
 type LineState = { line: (WorkbenchLine & { id: string }) | null; retired: readonly string[] };
 
 /*

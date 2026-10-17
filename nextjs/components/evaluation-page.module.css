@@ -14,11 +14,11 @@
   --hairline-hi: #88928d;
   --border-dark: #d8ddd9;
   --border-dark-hi: #88928d;
-  --source: #005bb3;
-  --verified: #226849;
+  --source: var(--tv-action);
+  --verified: var(--tv-verified);
   --verified-dim: #5e8872;
-  --changed: #8a5a00;
-  --unresolved: #8a5a00;
+  --changed: var(--tv-changed);
+  --unresolved: var(--tv-unresolved);
   --paper-50: #fff;
   --lv2-paper-shadow: none;
   --chrome-measure: 1280px;
@@ -27,7 +27,7 @@
 }
 
 .page :is(a, button, input, select, summary, textarea):focus-visible {
-  outline: 3px solid #005bb3;
+  outline: 3px solid var(--tv-action);
   outline-offset: 3px;
 }
 .page :global(.paper-label) { font: 600 13px/1.5 var(--f-sans); color: #53606a; margin: 0; }
@@ -62,7 +62,7 @@
 .page :global(.evaluation-steps) { display: grid; gap: 24px; padding-left: 24px; }
 .page :global(.evaluation-steps) li { padding-left: 8px; }
 .page :global(.evaluation-steps) p { margin: 8px 0; }
-.page :global(.evaluation-shell) a { color: #005bb3; }
+.page :global(.evaluation-shell) a { color: var(--tv-action); }
 .page :global(.evaluation-form) { padding: 24px; border: 1px solid #d8ddd9; border-radius: 8px; background: #fff; }
 .page :global(.evaluation-form) :is(input, select, textarea) {
   background-color: #fff;
@@ -70,7 +70,7 @@
   color: #171c20;
   border-radius: 6px;
 }
-.page :global(.evaluation-form .btn) { background: #005bb3; color: #fff; }
+.page :global(.evaluation-form .btn) { background: var(--tv-action); color: #fff; }
 
 /* Main's shared header is transparent on first paint. Re-ink it only on this paper page. */
 .page > header:not([data-scrolled="1"]) > :global(.wordmark),
@@ -91,7 +91,7 @@
   background: #f7f5ef;
   border-bottom-color: #d8ddd9;
 }
-.page > header :global(.btn) { color: #fff; background: #005bb3; border-color: #005bb3; }
+.page > header :global(.btn) { color: #fff; background: var(--tv-action); border-color: var(--tv-action); }
 
 @media (max-width: 760px) {
   .page :global(.evaluation-shell) { padding: calc(64px + 32px) 20px 48px; }

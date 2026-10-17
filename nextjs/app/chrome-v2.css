@@ -35,7 +35,7 @@
   --text-hi: #171c20;
   --text-mid: #53606a;
   --text-lo: #53606a;
-  --source: #2447b3;
+  --source: var(--tv-action);
 }
 .nav.chrome-v2-header[data-scrolled="1"] {
   background: #f7f5ef;
@@ -92,7 +92,7 @@
     background: currentColor;
   }
 }
-.nav.chrome-v2-header:where(:not(.lv2 > header)) .nav-actions .btn { color: #fff; background: #2447b3; border-color: #2447b3; }
+.nav.chrome-v2-header:where(:not(.lv2 > header)) .nav-actions .btn { color: #fff; background: var(--tv-action); border-color: var(--tv-action); }
 @media (min-width: 1250px) {
   .mobile-primary-nav.one-path-mobile-nav { display: none; }
 }
@@ -123,7 +123,7 @@
 .one-path-primary-nav .site-nav-direct[aria-current="location"] {
   color: var(--text-hi);
   text-decoration: underline;
-  text-decoration-color: #2447b3;
+  text-decoration-color: var(--tv-action);
   text-decoration-thickness: 2px;
   text-underline-offset: 7px;
 }
@@ -140,7 +140,7 @@
 .one-path-mobile-nav .mobile-nav-direct[aria-current="page"],
 .one-path-mobile-nav .mobile-nav-direct[aria-current="location"] {
   color: var(--text-hi);
-  box-shadow: inset 2px 0 0 #2447b3;
+  box-shadow: inset 2px 0 0 var(--tv-action);
 }
 .one-path-mobile-nav .mobile-nav-signin {
   border-top: 1px solid var(--border-dark, var(--hairline));

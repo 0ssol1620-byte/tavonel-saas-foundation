@@ -169,8 +169,8 @@
   --text-max: #0b1115;
   --text-mid: #46545e;
   --text-lo: #53606a;
-  --verified: #2447b3;
-  --source: #2447b3;
+  --verified: var(--tv-action);
+  --source: var(--tv-action);
   --seam: #d8ddd9;
   --hairline: #d8ddd9;
   --hairline-hi: #b7c0bc;
@@ -299,20 +299,20 @@
 
 /* Public CTA states remain readable on Solutions' paper surface. */
 .surface :global(.btn):not(:global(.ghost)) {
-  background: #2447b3;
-  border-color: #2447b3;
+  background: var(--tv-action);
+  border-color: var(--tv-action);
   color: #fff;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .surface :global(.btn):not(:global(.ghost)):hover {
-    background: #1b3586;
-    border-color: #1b3586;
+    background: var(--tv-action-hover);
+    border-color: var(--tv-action-hover);
     color: #fff;
   }
 }
 
 .surface :global(.btn):focus-visible {
-  outline: 2px solid #2447b3;
+  outline: 2px solid var(--tv-action);
   outline-offset: 4px;
 }

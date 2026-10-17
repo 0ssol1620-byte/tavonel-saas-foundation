@@ -67,17 +67,18 @@
     The header's one filled control: the same action, words and cobalt as the Home hero and close.
     `!important` because Home re-inks every `.nav-actions > a` with an unlayered ink colour.
     The colour is Home's `--action` token where Home defines it, and the same 255° accent
-    (decision.md G-H, #005bb3 / hover #0169cd) as the fallback everywhere else: the header action
-    is one colour on every page (Release 3 fix round, M2; it was the 265° #244ac8 off Home).
+    (decision.md G-H, --tv-action / --tv-action-hover since UX-L1) as the fallback everywhere else:
+    the header action is one colour on every page (Release 3 fix round, M2; it was the 265° #244ac8
+    off Home).
   */
   .header .cta {
     display: inline-flex !important;
     align-items: center !important;
     min-height: 44px !important;
     padding: 0 18px !important;
-    border: 1px solid var(--action, #005bb3) !important;
+    border: 1px solid var(--action, var(--tv-action)) !important;
     border-radius: 4px !important;
-    background: var(--action, #005bb3) !important;
+    background: var(--action, var(--tv-action)) !important;
     color: #ffffff !important;
     font: 560 15px/1.2 var(--f-sans) !important;
     letter-spacing: 0 !important;
@@ -85,9 +86,9 @@
     text-decoration: none !important;
     white-space: nowrap !important;
   }
-  .header .cta:focus-visible { outline: 2px solid var(--action, #005bb3) !important; outline-offset: 2px !important; }
+  .header .cta:focus-visible { outline: 2px solid var(--action, var(--tv-action)) !important; outline-offset: 2px !important; }
   @media (hover: hover) and (pointer: fine) {
-    .header .cta:hover { background: var(--action-hover, #0169cd) !important; border-color: var(--action-hover, #0169cd) !important; }
+    .header .cta:hover { background: var(--action-hover, var(--tv-action-hover)) !important; border-color: var(--action-hover, var(--tv-action-hover)) !important; }
   }
   /* Brief move 6: below the desktop switch the row is wordmark + Menu; Pricing and Sign in are in the sheet. */
   @media (max-width: 1249px) {
@@ -95,24 +96,25 @@
   }
   :global(.page:not(.lv2)):has(> .header) {
     --ground: #fbfaf7;
-    --g1: #f2f0eb;
-    --g2: #ffffff;
+    --g1: var(--tv-paper-sunk);
+    --g2: var(--tv-paper-raised);
     --g3: #ece9e2;
     --seam: #d8d5ce;
-    --hairline: rgb(21 25 29 / 0.12);
+    --hairline: var(--tv-rule);
     --hairline-hi: #c6c3bc;
-    --text-hi: #15191d;
+    --text-hi: var(--tv-ink);
     --text-max: #292f35;
     --text-mid: #424951;
     --text-lo: #555b62;
-    --verified: #1a6d51;
+    /* UX-L1 (UX-PLAN-2026-10-17 §4.2): one value per state, the one accent, and no violet. */
+    --verified: var(--tv-verified);
     --verified-dim: #278366;
     --verified-deep: #dcece4;
-    --source: #005bb3;
-    --relation: #5f42a1;
-    --changed: #8c5217;
+    --source: var(--tv-action);
+    --relation: var(--tv-ink-muted);
+    --changed: var(--tv-changed);
     --changed-deep: #f5e9d4;
-    --unresolved: #a72d23;
+    --unresolved: var(--tv-unresolved);
     --f-sans: "Wanted Sans Variable", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
     color-scheme: light !important;
     color: var(--text-hi) !important;
@@ -121,16 +123,16 @@
     font-family: var(--f-sans) !important;
   }
   .header.header {
-    --text-hi: #15191d;
+    --text-hi: var(--tv-ink);
     --text-mid: #424951;
     --text-lo: #555b62;
-    --g1: #ffffff;
-    --g2: #f2f0eb;
+    --g1: var(--tv-paper-raised);
+    --g2: var(--tv-paper-sunk);
     --ground: #fbfaf7;
-    --verified: #005bb3;
+    --verified: var(--tv-action);
     background: #fbfaf7 !important;
-    color: #15191d !important;
-    border-bottom-color: rgb(21 25 29 / 0.12) !important;
+    color: var(--tv-ink) !important;
+    border-bottom-color: var(--tv-rule) !important;
     font-family: "Wanted Sans Variable", "Malgun Gothic", sans-serif !important;
   }
   .header.header :global(.wordmark), .header.header :global(.wordmark) :is(b, svg) { color: #15191d !important; }
@@ -178,10 +180,29 @@
   .header.header :global(.one-path-mobile-nav > summary)::after { transform: translateY(4.5px) !important; }
   .header.header :global(.one-path-mobile-nav[open] > summary)::before { transform: rotate(45deg) !important; box-shadow: none !important; }
   .header.header :global(.one-path-mobile-nav[open] > summary)::after { transform: rotate(-45deg) !important; }
-  .header.header :global(.one-path-mobile-nav > summary):focus-visible { outline: 2px solid var(--action, #005bb3) !important; outline-offset: 2px !important; }
+  .header.header :global(.one-path-mobile-nav > summary):focus-visible { outline: 2px solid var(--action, var(--tv-action)) !important; outline-offset: 2px !important; }
   @media (prefers-reduced-motion: reduce) {
     .header.header :global(.one-path-mobile-nav > summary)::before,
     .header.header :global(.one-path-mobile-nav > summary)::after { transition: none; }
+  }
+  /*
+    UX-L1 (UX-PLAN-2026-10-17 §4.2-1, rule R5): the filled primary action is the one accent on every
+    page that renders this header. The components-layer `.btn` fills with the page's --text-hi, so
+    the same control was ink on /docs, near-black on /pricing, a 265° cobalt on /solutions and
+    #005bb3 in the header above all of them. Outline, secondary, danger and disabled controls keep
+    their own faces; the consent card is outside the page root and is not reached; the press
+    feedback stays on the base rule.
+  */
+  :global(*):has(> .header) :global(:is(.btn, .btn-primary):not(.ghost, .btn-ghost, .btn-secondary, .btn-danger, :disabled, [aria-disabled="true"])) {
+    border-color: var(--tv-action);
+    background: var(--tv-action);
+    color: #ffffff;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    :global(*):has(> .header) :global(:is(.btn, .btn-primary):not(.ghost, .btn-ghost, .btn-secondary, .btn-danger, :disabled, [aria-disabled="true"]):hover) {
+      border-color: var(--tv-action-hover);
+      background: var(--tv-action-hover);
+    }
   }
 }
 .wordmark.wordmark {
