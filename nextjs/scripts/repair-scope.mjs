@@ -1886,6 +1886,19 @@ export const FIX_ROUND_4_AFFECTED_PATHS = Object.freeze([
   'lib/openapi-routes.test.ts',
 ]);
 export const FIX_ROUND_4_AFFECTED_UNIT_FILES = Object.freeze([...FIX_ROUND_4_AFFECTED_PATHS]);
+// PR #151 service truth: the documents listing pages the quarantine listing, fails closed on a broken one and reports a partial
+// load (route, R2 listing, pipeline `stored` row, workspace inventory state), and the OpenAPI handler contract suite. The nine
+// endpoints no owner listed select their direct suites, plus api-error-codes, which scans app/api/documents for every code it
+// returns. No browser suite of its own: the workspace page and its specs keep their existing owners. Product code, so never nativeReuse.
+export const PR151_SERVICE_TRUTH_AFFECTED_PATHS = Object.freeze([
+  'app/api/documents/route.ts', 'lib/documents-route.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/pipeline.test.ts',
+  'lib/pipeline.ts', 'lib/r2-synthetic-canary.test.ts', 'lib/r2-synthetic-canary.ts', 'lib/workspace-onboarding.test.ts',
+  'lib/workspace-onboarding.ts',
+]);
+export const PR151_SERVICE_TRUTH_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/api-error-codes.test.ts', 'lib/documents-route.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/pipeline.test.ts',
+  'lib/r2-synthetic-canary.test.ts', 'lib/workspace-onboarding.test.ts',
+]);
 // PR #141's merge of main bcba7173 (Home Release 3, PR #150): the thirty changed endpoints no owner listed -- the Home and
 // Korean entry pages, the receipted measurement band (component, styles, data, its claims pack and suite, its receipt and research
 // note), the re-cut film posters with their lock file and README, the stage and copy modules, the evidence record, the public
@@ -2264,6 +2277,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // PR #141 fix round 4: the seven exact OpenAPI suites above select themselves.
   affectedGroup('pr141-fix-round-4', new RegExp(`^nextjs/(?:${exactPathAlternation(FIX_ROUND_4_AFFECTED_PATHS)})$`),
     { unitFiles: FIX_ROUND_4_AFFECTED_UNIT_FILES }),
+  // PR #151 service truth: the nine exact paths above select six direct suites and no browser suite.
+  affectedGroup('pr151-service-truth', new RegExp(`^nextjs/(?:${exactPathAlternation(PR151_SERVICE_TRUTH_AFFECTED_PATHS)})$`),
+    { unitFiles: PR151_SERVICE_TRUTH_AFFECTED_UNIT_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.
