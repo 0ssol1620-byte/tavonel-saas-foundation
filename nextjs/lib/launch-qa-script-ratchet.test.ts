@@ -1,19 +1,37 @@
 import { spawn } from "node:child_process";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:http";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 /*
-  The real launch gate, run end to end against a stand-in for Lighthouse (UX-L0, UX-PLAN-2026-10-17
-  §8.2): a `pnpm` shim first on PATH answers `pnpm dlx lighthouse ...` by writing a report whose
+  The Lighthouse launch gate's script ratchet (UX-L0, UX-PLAN-2026-10-17 §8.2 and §8.4), run end to
+  end. A `pnpm` shim first on PATH answers `pnpm dlx lighthouse ...` by writing a report whose
   resource-summary script row the test chooses per route. Everything else -- the health check,
-  sampling, medians, the ratchet and the exit code -- is the shipped script.
+  sampling, medians, the ratchet and the exit code -- is the shipped
+  scripts/launch-qa/lighthouse-budgets.mjs.
+
+  It lives under lib/ because vitest.config.ts is a locked discovery frame
+  (scripts/repair-scope.mjs vitestDiscoveryConfigFailures) whose admitted lib test glob already
+  matches this file, so `pnpm test` and the prebuild hermetic run pick it up with the config unchanged.
 */
-const script = fileURLToPath(new URL("./lighthouse-budgets.mjs", import.meta.url));
-const nextjsDir = fileURLToPath(new URL("../..", import.meta.url));
+const script = fileURLToPath(new URL("../scripts/launch-qa/lighthouse-budgets.mjs", import.meta.url));
+const nextjsDir = fileURLToPath(new URL("..", import.meta.url));
+
+// A number is that route's script bytes; "missing" drops the script row; "slow-lcp" misses LCP.
+type Plan = Record<string, number | "missing" | "slow-lcp">;
+type Summary = {
+  route: string;
+  enforced: boolean;
+  scriptTransferBytes: number;
+  scriptTransferSamples: number[];
+  scriptRatchetBytes: number | null;
+  over: string[];
+};
+type Run = { code: number | null; stdout: string; stderr: string; summaries: Summary[] };
 
 const fakeLighthouse = `
 import { writeFileSync } from "node:fs";
@@ -21,7 +39,6 @@ const args = process.argv.slice(2);
 const route = new URL(args.find((arg) => arg.startsWith("http"))).pathname;
 const output = args.find((arg) => arg.startsWith("--output-path=")).slice("--output-path=".length);
 const plan = JSON.parse(process.env.FAKE_SCRIPT_BYTES);
-// A number is that route's script bytes; "missing" drops the script row; "slow-lcp" misses LCP.
 const entry = route in plan ? plan[route] : 1000;
 const items = entry === "missing"
   ? [{ resourceType: "image", transferSize: 10 }]
@@ -37,9 +54,9 @@ writeFileSync(output, JSON.stringify({
 }));
 `;
 
-let shimDir;
-let server;
-let baseUrl;
+let shimDir = "";
+let server: Server;
+let baseUrl = "";
 
 beforeAll(async () => {
   shimDir = await mkdtemp(join(tmpdir(), "tavonel-lighthouse-shim-"));
@@ -50,8 +67,8 @@ beforeAll(async () => {
   server = createServer((request, response) => {
     response.writeHead(request.url === "/api/healthz" ? 200 : 404).end();
   });
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  baseUrl = `http://127.0.0.1:${server.address().port}`;
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
 
 afterAll(async () => {
@@ -59,39 +76,44 @@ afterAll(async () => {
   await rm(shimDir, { recursive: true, force: true });
 });
 
-function runGate(plan) {
-  const env = { ...process.env, QA_BASE_URL: baseUrl, QA_SERVER_MODE: "production", FAKE_SCRIPT_BYTES: JSON.stringify(plan) };
+function runGate(plan: Plan): Promise<Run> {
+  const env: NodeJS.ProcessEnv = { ...process.env, QA_BASE_URL: baseUrl, QA_SERVER_MODE: "production", FAKE_SCRIPT_BYTES: JSON.stringify(plan) };
   const pathKey = Object.keys(env).find((key) => key.toUpperCase() === "PATH") ?? "PATH";
   env[pathKey] = `${shimDir}${delimiter}${env[pathKey] ?? ""}`;
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [script], { cwd: nextjsDir, env, windowsHide: true });
     let stdout = "";
     let stderr = "";
-    child.stdout.on("data", (chunk) => { stdout += chunk; });
-    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
+    child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
     child.on("error", reject);
     child.on("close", (code) => {
-      const summaries = stdout.split("\n").filter((line) => line.startsWith("{")).map((line) => JSON.parse(line));
+      const summaries = stdout.split("\n").filter((line) => line.startsWith("{")).map((line) => JSON.parse(line) as Summary);
       resolve({ code, stdout, stderr, summaries });
     });
   });
 }
 
+function summaryFor(run: Run, route: string): Summary {
+  const summary = run.summaries.find((candidate) => candidate.route === route);
+  if (!summary) throw new Error(`no summary line for ${route}`);
+  return summary;
+}
+
 describe("lighthouse-budgets script ratchet", { timeout: 180_000 }, () => {
-  let ratchet;
+  let ratchet: Record<string, number> = {};
 
   it("prints script transfer bytes for every route and passes under the ratchet", async () => {
     const run = await runGate({});
     expect(run.stderr).toBe("");
     expect(run.code).toBe(0);
     expect(run.stdout).toContain("Lighthouse launch budgets passed.");
-    const routes = run.summaries.map((summary) => summary.route);
-    for (const route of ["/", "/ko", "/pricing", "/explore"]) expect(routes).toContain(route);
+    for (const route of ["/", "/ko", "/pricing", "/explore"]) summaryFor(run, route);
     for (const summary of run.summaries) {
       expect(summary.scriptTransferBytes).toBe(1000);
       expect(summary.scriptTransferSamples).toEqual([1000, 1000, 1000]);
     }
-    ratchet = Object.fromEntries(run.summaries.filter((s) => s.scriptRatchetBytes !== null).map((s) => [s.route, s.scriptRatchetBytes]));
+    ratchet = Object.fromEntries(run.summaries.flatMap((s) => (s.scriptRatchetBytes === null ? [] : [[s.route, s.scriptRatchetBytes]])));
     expect(Object.keys(ratchet).sort()).toEqual(["/", "/ko"]);
     for (const value of Object.values(ratchet)) expect(Number.isInteger(value) && value > 0).toBe(true);
   });
@@ -99,7 +121,8 @@ describe("lighthouse-budgets script ratchet", { timeout: 180_000 }, () => {
   it("passes at exactly the ratchet", async () => {
     const run = await runGate({ "/": ratchet["/"], "/ko": ratchet["/ko"] });
     expect(run.code).toBe(0);
-    expect(run.summaries.find((s) => s.route === "/").over).toEqual([]);
+    expect(summaryFor(run, "/").over).toEqual([]);
+    expect(summaryFor(run, "/ko").over).toEqual([]);
   });
 
   it("exits 1 when / or /ko is one byte over its ratchet", async () => {
@@ -109,7 +132,7 @@ describe("lighthouse-budgets script ratchet", { timeout: 180_000 }, () => {
     expect(run.stderr).toContain(`- / script-transfer-bytes ${ratchet["/"] + 1} > ${ratchet["/"]}`);
     expect(run.stderr).toContain(`- /ko script-transfer-bytes ${ratchet["/ko"] + 1} > ${ratchet["/ko"]}`);
     // /ko is measure-only for its other budgets; its ratchet miss must not be reported as ignored.
-    expect(run.summaries.find((s) => s.route === "/ko").enforced).toBe(false);
+    expect(summaryFor(run, "/ko").enforced).toBe(false);
     expect(run.stderr).not.toContain("LIGHTHOUSE_MEASURED_NOT_ENFORCED");
   });
 
@@ -122,7 +145,7 @@ describe("lighthouse-budgets script ratchet", { timeout: 180_000 }, () => {
   it("does not gate script bytes on routes without a ratchet", async () => {
     const run = await runGate({ "/explore": 10_000_000 });
     expect(run.code).toBe(0);
-    expect(run.summaries.find((s) => s.route === "/explore")).toMatchObject({ scriptTransferBytes: 10_000_000, scriptRatchetBytes: null });
+    expect(summaryFor(run, "/explore")).toMatchObject({ scriptTransferBytes: 10_000_000, scriptRatchetBytes: null });
   });
 
   it("fails closed as a tool blocker when a report has no script row", async () => {

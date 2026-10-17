@@ -19,14 +19,13 @@ export default defineConfig({
     // every run. eval/ask-eval/run.harness.test.ts and eval/k08-live-engine/emit-inputs.test.ts
     // stay out -- they write report files and take minutes, and live in eval/vitest.config.ts.
     // scripts/router/*, scripts/billing/*: operator CLIs whose pure planning/aggregation half is unit tested here.
-    // scripts/launch-qa/*: the Lighthouse gate, run end to end against a stand-in Lighthouse.
     include: [
       "lib/**/*.test.ts", "lib/**/*.spec.ts", "eval/**/metrics.test.ts",
       "components/explore/evidence-workbench.test.tsx", "components/landing-v2/hero-source-card.test.tsx", "components/evaluation-page.test.tsx",
       "components/compile-stage-player.mobile-view.test.tsx",
       "components/compile-stage.test.tsx", "components/intake-triage-review.test.tsx", "components/intake-triage-review.interaction.test.ts",
       "app/api/documents/**/route.test.ts", "app/api/compile-jobs/route.test.ts",
-      "scripts/router/*.test.mjs", "scripts/billing/*.test.mjs", "scripts/launch-qa/*.test.mjs",
+      "scripts/router/*.test.mjs", "scripts/billing/*.test.mjs",
     ],
   },
 });
