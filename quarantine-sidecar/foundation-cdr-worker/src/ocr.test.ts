@@ -782,6 +782,37 @@ describe("page-range reading", () => {
   const rangeKeys = (r2: FakeR2) => [...r2.objects.keys()].filter((key) => key.startsWith(RANGES_PREFIX)).sort();
   const decode = (bytes: Uint8Array | undefined) => JSON.parse(new TextDecoder().decode(bytes));
 
+  /** The same range read differently: every region's text changes, so the answer's bytes do too. */
+  const reread = (answer: Record<string, unknown>) => ({ ...answer,
+    regions: (answer.regions as Array<Record<string, unknown>>).map((row) => ({ ...row, text: `${row.text} REREAD` })) });
+
+  /** `count` SYNTHETIC regions on one page, each `textLength` long, and optionally each in conflict. */
+  function denseRegions(pageIndex0: number, count: number, digest: string, { conflict = false, textLength = 0 } = {}) {
+    const page = String(pageIndex0 + 1).padStart(4, "0");
+    return Array.from({ length: count }, (_unused, line): Record<string, unknown> => {
+      const regionId = `ocr-p${page}-l${String(line + 1).padStart(5, "0")}`;
+      const text = `SYNTHETIC ${regionId}`.padEnd(textLength, ".");
+      const bbox1000 = [100, 100, 900, 150];
+      return {
+        regionId, pageIndex0, pageNumber1: pageIndex0 + 1, order: line, blockType: "paragraph", text, bbox1000,
+        confidence: 0.8123, authority: "informal",
+        ...(conflict ? { recognitionConflict: { regionId, pageIndex0, bbox1000, sourceSha256: digest, candidates: [
+          { engineId: "general-ppocrv6", modelSha256: "sha256:6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884", text, confidence: 0.8123, polygon: POLYGON_A },
+          { engineId: "korean-ppocrv5", modelSha256: "sha256:cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b", text: `${text} ALT`, confidence: 0.69, polygon: POLYGON_B },
+        ] } } : {}),
+      };
+    });
+  }
+
+  /** A range answer rebuilt around `regions`: page statuses, order and conflict count follow them. */
+  const withRegions = (answer: Record<string, unknown>, regions: Array<Record<string, unknown>>) => ({ ...answer,
+    pages: (answer.pages as Array<{ pageNumber1: number }>).map((page) => ({ ...page,
+      pageStatus: regions.some((row) => row.pageIndex0 === page.pageNumber1 - 1) ? "ok" : "no_text" })),
+    regions: regions.map((row, order) => ({ ...row, order })),
+    ...("recognitionConflictCount" in answer
+      ? { recognitionConflictCount: regions.filter((row) => row.recognitionConflict).length } : {}),
+  });
+
   it("names a range by the pages asked for, beside ocr.json", () => {
     assert.equal(ocrPageRangeSiblingKey(IMMUTABLE, 8, 16),
       "immutable/ws_pilot/ws_pilot/doc_1/abcdabcdabcdabcdabcdabcdabcdabcd/ocr-pages/8-16.json");
@@ -919,6 +950,25 @@ describe("page-range reading", () => {
     assert.deepEqual(r2.objects.get(OCR_JSON), reference.objects.get(OCR_JSON));
   });
 
+  it("keeps a concurrent winner whose answer differs from ours, and assembles from the winner", async () => {
+    // The other delivery read pages 9-16 differently, so an overwrite would change the stored bytes.
+    const reference = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+    await dispatchOcrAfterSanitize(rangeEnv(reference, "8"), IMMUTABLE,
+      syntheticReader(16, { range: (start0, answer) => (start0 === 8 ? reread(answer) : undefined) }).fetcher);
+    const winner = reference.objects.get(`${RANGES_PREFIX}8-16.json`)!;
+    const r2 = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+    const put = r2.put.bind(r2);
+    r2.put = async (key, value, options) => {
+      if (key.endsWith("/8-16.json") && !r2.objects.has(key)) r2.objects.set(key, winner);
+      return put(key, value, options);
+    };
+    const result = await dispatchOcrAfterSanitize(rangeEnv(r2, "8"), IMMUTABLE, syntheticReader(16).fetcher);
+    assert.equal(result.status, "written");
+    assert.deepEqual(r2.objects.get(`${RANGES_PREFIX}8-16.json`), winner);
+    assert.deepEqual(r2.objects.get(OCR_JSON), reference.objects.get(OCR_JSON));
+    assert.match(decode(r2.objects.get(OCR_JSON)).text, /page 10 line 1 REREAD/);
+  });
+
   it("never assembles from a missing range, however it went missing", async () => {
     const cases: Array<[string, ReaderOptions, ((r2: CreateOnceR2) => void)?]> = [
       ["unavailable", { range: (start0) => (start0 === 8 ? new Response("busy", { status: 503 }) : undefined) }],
@@ -1000,5 +1050,69 @@ describe("page-range reading", () => {
     assert.deepEqual(reader.calls, ["0-8"]);
     assert.deepEqual(r2.objects.get(`${RANGES_PREFIX}8-16.json`), corrupted);
     assert.equal(r2.objects.has(OCR_JSON), false);
+  });
+
+  // Each range is held to the whole-document rules on its own, so these bounds can only be crossed
+  // by the ranges together. At the bound the document is written; one past it, nothing is.
+  const WHOLE_DOCUMENT_BOUNDS: Array<[string, boolean, (start0: number, digest: string, extra: number) => Array<Record<string, unknown>>]> = [
+    ["128 recognition conflicts", true, (start0, digest, extra) =>
+      denseRegions(start0, 64 + (start0 === 8 ? extra : 0), digest, { conflict: true })],
+    ["a regionId used once", false, (start0, digest, extra) => denseRegions(start0, 2, digest)
+      .map((row, index) => (extra && start0 === 8 && index === 0 ? { ...row, regionId: "ocr-p0001-l00001" } : row))],
+    ["50,000 regions", false, (start0, digest, extra) => denseRegions(start0, 25_000 + (start0 === 8 ? extra : 0), digest)],
+    // 19 regions of 200,000 characters, one of 199,981, and 19 newlines: 4,000,000 exactly.
+    ["4,000,000 characters of text", false, (start0, digest, extra) => denseRegions(start0, 10, digest, { textLength: 200_000 })
+      .map((row, index) => (start0 === 8 && index === 9 ? { ...row, text: String(row.text).slice(0, 199_981 + extra) } : row))],
+  ];
+  for (const [bound, v3, regionsFor] of WHOLE_DOCUMENT_BOUNDS) {
+    it(`refuses an assembled document past the whole-document bound of ${bound}, though every range holds`, async () => {
+      for (const extra of [0, 1]) {
+        const r2 = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+        const reader = syntheticReader(16, { v3,
+          range: (start0, answer) => withRegions(answer, regionsFor(start0, String(answer.inputSha256), extra)) });
+        const result = await dispatchOcrAfterSanitize(rangeEnv(r2, "8", v3), IMMUTABLE, reader.fetcher);
+        const label = `${bound} +${extra}`;
+        assert.equal(rangeKeys(r2).length, 2, label);
+        if (extra === 0) {
+          assert.equal(result.status, "written", label);
+          continue;
+        }
+        assert.equal(result.status, "failed", label);
+        assert.equal(result.reasonCode, "OCR_RESPONSE_INVALID", label);
+        assert.equal(result.reason, "assembled OCR exceeds the whole-document bounds", label);
+        assert.equal(result.computeCredits, 2, label);
+        assert.equal(r2.objects.has(OCR_JSON), false, label);
+      }
+    });
+  }
+
+  it("refuses an ocr.json that is not byte for byte the assembly of its ranges, and leaves it alone", async () => {
+    const whole = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+    await dispatchOcrAfterSanitize(rangeEnv(whole, undefined), IMMUTABLE, syntheticReader(16).fetcher);
+    const single = whole.objects.get(OCR_JSON)!;
+    for (const differs of [false, true]) {
+      const r2 = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+      const put = r2.put.bind(r2);
+      r2.put = async (key, value, options) => {
+        // A whole-document request for the same source finished between our lookup and our write.
+        if (key === OCR_JSON && !r2.objects.has(key)) r2.objects.set(key, single);
+        return put(key, value, options);
+      };
+      // Read range by range, pages 9-16 come back differently from the whole-document answer.
+      const reader = syntheticReader(16, { range: (start0, answer) => (differs && start0 === 8 ? reread(answer) : undefined) });
+      const result = await dispatchOcrAfterSanitize(rangeEnv(r2, "8"), IMMUTABLE, reader.fetcher);
+      assert.deepEqual(r2.objects.get(OCR_JSON), single, String(differs));
+      assert.equal(rangeKeys(r2).length, 2, String(differs));
+      if (!differs) {
+        assert.equal(result.status, "exists");
+        assert.equal(result.outputSha256, await sha256DigestHeader(new Uint8Array(single)));
+        continue;
+      }
+      assert.equal(result.status, "failed");
+      assert.equal(result.reasonCode, "OCR_PERSISTED_RESULT_INVALID");
+      assert.equal(result.reason, "persisted OCR is not the assembly of its page ranges");
+      assert.equal(result.computeCredits, 2);
+      assert.equal(result.outputSha256, undefined);
+    }
   });
 });

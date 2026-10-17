@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import math
 import os
 import secrets
 import subprocess
@@ -246,6 +247,36 @@ class PdfRasterCdrTest(unittest.TestCase):
             finally:
                 page.close()
                 document.close()
+
+    def test_the_qualified_scale_is_the_largest_that_fits(self) -> None:
+        # Fitting is not enough: a scale smaller than the budget allows costs resolution for nothing.
+        # Below RENDER_SCALE, one floating-point step larger must render bitmaps over the budget.
+        below: dict[str, list[int]] = {}
+        for name, (width, height) in {"A4": A4, "Letter": LETTER}.items():
+            document = pdfium.PdfDocument.new()
+            page = document.new_page(width, height)
+            try:
+                page_width, page_height = page.get_size()
+                size = (float(page_width), float(page_height))
+                for pages in range(1, MAX_PAGES + 1):
+                    scale = qualified_render_scale([size] * pages)
+                    if scale == RENDER_SCALE:
+                        continue
+                    below.setdefault(name, []).append(pages)
+                    with self.subTest(format=name, pages=pages):
+                        bitmap = page.render(scale=math.nextafter(scale, math.inf))
+                        try:
+                            pixels = bitmap.width * bitmap.height
+                        finally:
+                            bitmap.close()
+                        self.assertTrue(
+                            pixels > MAX_RENDER_PIXELS_PER_PAGE or pixels * pages > MAX_RENDER_PIXELS_TOTAL
+                        )
+            finally:
+                page.close()
+                document.close()
+        # The page counts the bisection serves (T7 finding 4); the check above is not vacuous.
+        self.assertEqual(below, {"A4": list(range(71, 81)), "Letter": list(range(74, 81))})
 
     def test_an_80_page_a4_document_is_rasterized_not_refused(self) -> None:
         with tempfile.TemporaryDirectory() as work:
