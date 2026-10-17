@@ -5,6 +5,7 @@
 import { useCallback, useState } from "react";
 import type { BillingOfferCode } from "./billing-catalog";
 import { trackFunnel } from "./funnel-events";
+import { failureSentence } from "./workspace-failure-copy";
 
 type CheckoutResponse = {
   code?: string;
@@ -14,6 +15,24 @@ type CheckoutResponse = {
   customer?: { email?: string };
   customData?: Record<string, string>;
 };
+
+/*
+  Journey A11 (D-09). The overlay used to be hard-coded `theme: "dark", locale: "en"`, so a Korean
+  reader got an English checkout and a paper page got a black one. It now reads the page it opens
+  over: the language of the nearest `lang` above `#main` (the `/ko` wrapper and `DocumentLangKo`
+  both set `ko`), and the computed `color-scheme` of `#main` itself -- the paper public pages
+  declare `light` there while the workspace inherits the root's `dark`. Only `ko` and `en` are
+  sent because those are the two languages this site is written in.
+*/
+function overlayLook(): { theme: "light" | "dark"; locale: "ko" | "en" } {
+  const surface = document.getElementById("main") ?? document.documentElement;
+  const lang = surface.closest("[lang]")?.getAttribute("lang") ?? "";
+  const scheme = getComputedStyle(surface).colorScheme;
+  return {
+    theme: scheme.includes("dark") && !scheme.includes("light") ? "dark" : "light",
+    locale: lang.toLowerCase().startsWith("ko") ? "ko" : "en",
+  };
+}
 
 export function useCheckout(notify: (message: string) => void) {
   const [busy, setBusy] = useState<BillingOfferCode | null>(null);
@@ -45,14 +64,14 @@ export function useCheckout(notify: (message: string) => void) {
           notify("Owner access is already active. No checkout or payment is required for this account.");
           return;
         }
-        if (
-          !response.ok ||
-          !checkout.clientToken ||
-          !checkout.environment ||
-          !checkout.offer?.priceId ||
-          !checkout.customData
-        ) {
-          notify(`Checkout is unavailable (${checkout.code ?? response.status}).`);
+        // Journey A1 (D-03): a refusal is a sentence from the one failure-copy table, never a raw
+        // code in parentheses. A code with no sentence still reaches the screen as a reference.
+        if (!response.ok) {
+          notify(`Checkout is unavailable. ${failureSentence(checkout.code, response.status)}`);
+          return;
+        }
+        if (!checkout.clientToken || !checkout.environment || !checkout.offer?.priceId || !checkout.customData) {
+          notify("Checkout is unavailable. The checkout response was incomplete, so nothing was opened or charged.");
           return;
         }
 
@@ -91,7 +110,7 @@ export function useCheckout(notify: (message: string) => void) {
           items: [{ priceId: checkout.offer.priceId, quantity: 1 }],
           customer: checkout.customer?.email ? { email: checkout.customer.email } : undefined,
           customData: checkout.customData,
-          settings: { displayMode: "overlay", theme: "dark", locale: "en" },
+          settings: { displayMode: "overlay", ...overlayLook() },
         });
         notify(`${checkout.offer.label ?? "Selected offer"} ${paymentMode} checkout opened. Only a verified webhook can change entitlements.`);
       } catch {

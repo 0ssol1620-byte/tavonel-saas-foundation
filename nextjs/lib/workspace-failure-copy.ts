@@ -28,6 +28,20 @@ const FAILURE_COPY: Record<string, string> = {
   JOB_SYNC_CONFLICT: "An import is already running for this connection. Check its progress before starting another.",
   PATCH_BEFORE_MISMATCH: "The value changed after you opened it, so the correction was not applied. Reload and look again.",
   RATE_LIMITED: "Too many requests at once. Wait a minute and try again.",
+  /*
+    Journey A1 (JOURNEY-MAP-2026-10-17 D-03, D-13). The checkout, portal and access refusals a
+    customer can meet today. Each checkout refusal says that nothing was charged, because a
+    refused purchase reads first as "did I just pay?", and each line points at the one next step
+    that can change the answer -- never at a retry that cannot. `PILOT_ACCESS_REQUIRED` and
+    `PADDLE_CUSTOMER_NOT_FOUND` used to fall through to the 403 and 409 status lines, which told
+    the reader to sign in again and to reload: two retries that never succeed.
+  */
+  BILLING_LAUNCH_PENDING: "Plan purchase is not open, so nothing was charged. Access is arranged with us through the contact page.",
+  BILLING_NOT_CONFIGURED: "Online payment is not configured, so nothing was charged. Access is arranged with us through the contact page.",
+  BILLING_OFFER_CONTACT_REQUIRED: "This plan is arranged with us rather than bought online, so nothing was charged. Use the contact page to set it up.",
+  PROCESSING_QUALIFICATION_NOT_BILLABLE: "This workspace's source access covers a processing check, not paid use, so nothing was charged. Request source access for paid use before retrying.",
+  PILOT_ACCESS_REQUIRED: "This account is not admitted to a TAVONEL workspace. Access is arranged with us through the contact page.",
+  PADDLE_CUSTOMER_NOT_FOUND: "No payment is linked to this account, so there is no billing to manage. A payment made a moment ago appears here once it is confirmed.",
 };
 
 /** What to say when the code is not one we have written a sentence for. */

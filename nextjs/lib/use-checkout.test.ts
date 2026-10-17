@@ -16,6 +16,7 @@
    test harness rather than a component, in order to assert on the real implementation. */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { failureSentence } from "./workspace-failure-copy";
 
 /* ---------------------------------------------------------------- module doubles */
 
@@ -84,23 +85,35 @@ async function runCheckout(offer: string) {
 
 const fetchCalls: Array<{ url: string; init: RequestInit }> = [];
 
-function respondWith(body: unknown, ok = true) {
+function respondWith(body: unknown, ok = true, status = ok ? 200 : 402) {
   globalThis.fetch = (async (url: string, init: RequestInit) => {
     fetchCalls.push({ url: String(url), init });
-    return { ok, status: ok ? 200 : 402, json: async () => body } as unknown as Response;
+    return { ok, status, json: async () => body } as unknown as Response;
   }) as unknown as typeof fetch;
 }
+
+/**
+ * The page the overlay opens over: the `lang` the nearest ancestor of `#main` carries and the
+ * `color-scheme` `#main` computes to. Only the three DOM reads `use-checkout` makes exist.
+ */
+const page = { lang: "en", scheme: "dark" };
 
 beforeEach(() => {
   fetchCalls.length = 0;
   paddle.opened.length = 0;
   paddle.init = { Checkout: { open: (args: unknown) => paddle.opened.push(args) } };
   session.token = "session-token";
+  page.lang = "en";
+  page.scheme = "dark";
+  const main = { closest: (selector: string) => (selector === "[lang]" ? { getAttribute: () => page.lang } : null) };
+  vi.stubGlobal("document", { getElementById: (id: string) => (id === "main" ? main : null), documentElement: main });
+  vi.stubGlobal("getComputedStyle", () => ({ colorScheme: page.scheme }));
   respondWith({});
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("checkout", () => {
@@ -194,5 +207,95 @@ describe("checkout", () => {
     expect(said).toMatch(/live checkout opened/);
     expect(said).toMatch(/webhook/);
     expect(said).not.toMatch(/sandbox checkout opened/);
+  });
+});
+
+/*
+  Journey A1, U1 (JOURNEY-MAP-2026-10-17 D-03). `/api/billing/checkout` refuses with six codes a
+  customer can meet, and the hook used to print each one raw: "Checkout is unavailable
+  (BILLING_LAUNCH_PENDING)." Each now reads as the sentence the failure-copy table holds for it.
+*/
+describe("checkout refusals", () => {
+  const REFUSALS = [
+    ["BILLING_LAUNCH_PENDING", 503],
+    ["CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE", 403],
+    ["PROCESSING_QUALIFICATION_NOT_BILLABLE", 403],
+    ["BILLING_OFFER_CONTACT_REQUIRED", 403],
+    ["PILOT_ACCESS_REQUIRED", 403],
+    ["BILLING_NOT_CONFIGURED", 503],
+  ] as const;
+
+  for (const [code, status] of REFUSALS) {
+    it(`turns ${code} into a sentence with no raw code`, async () => {
+      respondWith({ code }, false, status);
+      const notices = await runCheckout("observer_access");
+
+      expect(paddle.opened).toHaveLength(0);
+      expect(notices).toEqual([`Checkout is unavailable. ${failureSentence(code, status)}`]);
+      expect(notices[0]).not.toContain(code);
+      expect(notices[0]).not.toContain("Reference");
+      expect(notices[0], "no parenthetical code or status").not.toMatch(/\([A-Z0-9_]+\)|\(\d{3}\)/);
+    });
+  }
+
+  it("still names a code it has no sentence for, as a reference rather than dropping it", async () => {
+    respondWith({ code: "BILLING_OFFER_INVALID" }, false, 400);
+    const notices = await runCheckout("observer_access");
+
+    expect(paddle.opened).toHaveLength(0);
+    expect(notices[0]).toBe("Checkout is unavailable. This request was refused. (Reference BILLING_OFFER_INVALID.)");
+  });
+
+  it("says nothing was opened or charged when an ok response is incomplete", async () => {
+    respondWith({ code: "CHECKOUT_READY", environment: "sandbox", offer: { priceId: "p" }, customData: {} });
+    const notices = await runCheckout("observer_access");
+
+    expect(paddle.opened).toHaveLength(0);
+    expect(notices[0]).toMatch(/nothing was opened or charged/);
+    expect(notices[0]).not.toContain("CHECKOUT_READY");
+  });
+});
+
+/*
+  Journey A11 (D-09). The overlay was always `theme: "dark", locale: "en"`. It follows the page now:
+  the `lang` above `#main` and the `color-scheme` `#main` computes to.
+*/
+describe("checkout overlay look", () => {
+  const ready = { clientToken: "ct", environment: "sandbox", offer: { priceId: "pri_1" }, customData: { u: "1" } };
+  const settingsOf = (opened: unknown) => (opened as { settings: Record<string, string> }).settings;
+
+  for (const [where, lang, scheme, expected] of [
+    ["/ko on a paper page", "ko", "light", { displayMode: "overlay", theme: "light", locale: "ko" }],
+    ["/pricing on a paper page", "en", "light", { displayMode: "overlay", theme: "light", locale: "en" }],
+    ["the dark workspace", "en", "dark", { displayMode: "overlay", theme: "dark", locale: "en" }],
+    ["a ko-KR page", "ko-KR", "dark", { displayMode: "overlay", theme: "dark", locale: "ko" }],
+    ["a page that declares no scheme", "en", "normal", { displayMode: "overlay", theme: "light", locale: "en" }],
+  ] as const) {
+    it(`matches ${where}`, async () => {
+      page.lang = lang;
+      page.scheme = scheme;
+      respondWith(ready);
+      await runCheckout("observer_access");
+
+      expect(paddle.opened).toHaveLength(1);
+      expect(settingsOf(paddle.opened[0])).toEqual(expected);
+    });
+  }
+
+  it("sends only the two languages the site is written in", async () => {
+    page.lang = "ja";
+    respondWith(ready);
+    await runCheckout("observer_access");
+
+    expect(settingsOf(paddle.opened[0]).locale).toBe("en");
+  });
+
+  it("opens nothing when the page cannot be read, and says no entitlement changed", async () => {
+    vi.stubGlobal("getComputedStyle", () => { throw new Error("no layout"); });
+    respondWith(ready);
+    const notices = await runCheckout("observer_access");
+
+    expect(paddle.opened).toHaveLength(0);
+    expect(notices.join(" ")).toMatch(/could not be opened\. No entitlement was changed/);
   });
 });
