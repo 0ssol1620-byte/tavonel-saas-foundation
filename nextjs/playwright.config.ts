@@ -49,6 +49,23 @@ export default defineConfig({
       testIgnore: [/launch-qa.*\.spec\.ts/, auditSpecs],
       use: { viewport: { width, height: width <= 390 ? 844 : 900 } },
     })),
+    /*
+      UX-L6 (UX-PLAN-2026-10-17 sections 3.6 and 8.2, R4-MJ2): the two wide phones, for the consent
+      spec only.
+
+      At 390x844 and 360x844 the hero film reaches the bottom sheet's 104px zone, so the 8 s sheet
+      always waits and the checks of what it may cover never ran there. At 430x932 the frame ends
+      above the zone and the sheet opens; 412x915 sits at the zone's edge (frame bottom 811-824px
+      against a zone from 811, EN/KO). Both are the devices' own CSS viewports.
+      Scoped to marketing-consent.spec.ts instead of joining `widths`: the other phone checks set
+      their own 412/430 viewports from project 390, and two more width projects would run every
+      other spec twice more. launch-qa's consent step runs all projects, so it runs these.
+    */
+    ...([[412, 915], [430, 932]] as const).map(([width, height]) => ({
+      name: `${width}`,
+      testMatch: /marketing-consent\.spec\.ts/,
+      use: { viewport: { width, height } },
+    })),
     {
       name: "reduced-motion",
       testIgnore: [/launch-qa.*\.spec\.ts/, auditSpecs],

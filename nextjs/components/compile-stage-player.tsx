@@ -620,7 +620,13 @@ export default function CompileStagePlayer({
     </button>
   ) : null;
   const stageCaption = !compact ? <div className="compile-film-caption">
-        <p>{videoError ? text.errorLong : active.line}</p>
+        {/*
+          Keyed by stage for the reason the reading line is (UX-L6, R4-MJ1): where a stage's caption
+          takes one line and the next two (KO 430), the reused text node moved inside the caption
+          row on each auto-advance and Chrome scored it as a layout shift without input (0.00073
+          over three advances, p2-06-film-line). A new stage's caption is new text.
+        */}
+        <p key={active.id}>{videoError ? text.errorLong : active.line}</p>
         {/*
           `data-derived` because both halves of this counter are read rather than typed: the
           position is the player's own index and the total is `stages.length`. The landing's

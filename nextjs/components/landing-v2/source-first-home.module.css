@@ -249,8 +249,22 @@
       194.5px in Windows WebKit (310px column), where it wrapped to a third line and dropped the
       frame 21.5px on stage 4 (fix4/cap-*.txt). A 4px column gap here and 6px toggle padding below
       give the caption 216.5 / 206.5px.
+
+      UX-L6 (UX-PLAN-2026-10-17 §3.6): the one-face change (UX-L3) set the toggle's "Focus details"
+      in Wanted Sans, 8px wider (99.5px), and the 24px phone margin (UX-L2) leaves Windows WebKit a
+      302px column at 360 (its classic scrollbar takes 10px). The caption had 208.5px in Chrome and
+      198.5px in WebKit against the 200.5px stage 4 needs for two lines, so WebKit wrapped it to a
+      third line and dropped the frame 21.2px on stage 4 (p2-06-film-line/caption-need-base.txt). A
+      2px gap here and 4px toggle padding below give back 6px: 214.5 / 204.5px.
     */
-    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"]) { gap: 8px 4px; }
+    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"]) { gap: 8px 2px; }
+    /*
+      UX-L6: the caption box fills its row and centres its text inside, instead of being centred in
+      the row itself, so a caption that goes from one line to two (KO 430) changes the box's height
+      and not its top. With the caption <p> keyed by stage (compile-stage-player.tsx) an
+      auto-advance moves nothing that was already on screen. Same place on screen as before.
+    */
+    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] .compile-film-caption) { align-self: stretch; align-items: center; }
     .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] [data-film-reading]) { grid-row: 3; }
     .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] .compile-film-viewport) { grid-row: 4; }
     /*
@@ -319,7 +333,7 @@
     .home[lang="ko"].home :global(.lv2-hero-support) { line-height: 1.6; }
     .home.home :global(#s1 .compile-film-stages button) { font-size: 14px; padding-block: 10px; padding-inline: 2px; min-height: 44px; }
     .home.home :global(#s1 .compile-film-caption p) { font-size: 15px; line-height: 1.45; }
-    .home.home :global(#s1 .compile-film-focus-control) { padding: 8px 6px; border: 1px solid var(--home-rule-strong); border-radius: 4px; color: var(--home-ink); font: 560 14px/1.4 var(--f-sans); }
+    .home.home :global(#s1 .compile-film-focus-control) { padding: 8px 4px; border: 1px solid var(--home-rule-strong); border-radius: 4px; color: var(--home-ink); font: 560 14px/1.4 var(--f-sans); }
     .heroAside { margin: 16px auto 16px; gap: 4px; }
     .heroAside :global(.lv2-actions) { display: grid; grid-template-columns: minmax(0, 1fr); width: min(100%, 320px); gap: 0; }
     .heroAside :global(.lv2-text-link) { min-height: 44px; }
