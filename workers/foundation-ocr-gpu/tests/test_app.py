@@ -775,3 +775,153 @@ def test_page_limit_accepts_80_pages_and_rejects_81_before_any_ocr(monkeypatch: 
     assert refused.value.status_code == 422
     assert "page count" in refused.value.detail
     assert calls == []
+
+
+# ---------------------------------------------------------------- page ranges
+#
+# A range request reads pages [start0, end0) and lists every one of them, `no_text` included.
+# Joined in page order with `order` renumbered, the ranges are the whole-document result; that
+# equivalence is what lets the CDR worker assemble ocr.json from ranges byte for byte. Synthetic
+# PDFs and a faked reader: this proves control flow and contract, not OCR quality.
+
+RANGED_DOCUMENT = ("NATIVE 1", "SCAN 2", None, "NATIVE 4", None, None, "SCAN 7")
+RANGE_HEADER = "x-tavonel-ocr-page-range"
+
+
+def ranges_enabled(monkeypatch: pytest.MonkeyPatch, enabled: bool = True) -> tuple[types.ModuleType, list[str]]:
+    worker, _ = ready_fake_ocr(monkeypatch)
+    monkeypatch.setattr(worker, "OCR_PAGE_RANGES_ENABLED", enabled)
+    native_page_region = worker.native_page_region
+    # A "SCAN" page has a text layer with unusable geometry, so its pixels are read instead.
+    monkeypatch.setattr(
+        worker,
+        "native_page_region",
+        lambda page, textpage, text, index, order: None
+        if text.startswith("SCAN")
+        else native_page_region(page, textpage, text, index, order),
+    )
+    rendered: list[str] = []
+
+    def lines(engine, image, **_options) -> list[dict]:
+        # A page without a text layer renders blank and reads as nothing, like a blank scan.
+        blank = image.convert("L").getextrema() == (255, 255)
+        rendered.append("blank" if blank else "ink")
+        if blank or engine is not worker._general_rapidocr:
+            return []
+        return [{"polygon": box_at(0), "text": "SCANNED PAGE", "rawText": "SCANNED PAGE", "confidence": 0.97}]
+
+    monkeypatch.setattr(worker, "rapidocr_lines", lines)
+    return worker, rendered
+
+
+def post_pdf(client: TestClient, payload: bytes, extra: dict[str, str] | None = None):
+    digest = "sha256:" + hashlib.sha256(payload).hexdigest()
+    return client.post(
+        "/v1/ocr",
+        headers={**headers(digest), **(extra or {})},
+        files={"source": ("ranged.pdf", payload, "application/pdf")},
+    )
+
+
+def test_page_ranges_join_to_the_whole_document_result(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    import json
+
+    ranges_enabled(monkeypatch)
+    payload = pages_pdf(*RANGED_DOCUMENT)
+    whole = post_pdf(client, payload)
+    assert whole.status_code == 200
+    responses = [post_pdf(client, payload, {RANGE_HEADER: f"{start}-{start + 3}"}) for start in (0, 3, 6)]
+    assert [response.status_code for response in responses] == [200, 200, 200]
+    parts = [response.json() for response in responses]
+
+    assert [part["pageRange"] for part in parts] == [
+        {"start0": 0, "end0": 3}, {"start0": 3, "end0": 6}, {"start0": 6, "end0": 7},
+    ]
+    assert {part["pageCount"] for part in parts} == {7}
+    assert {part["schemaVersion"] for part in parts} == {"tavonel.ocr_page_range.v1"}
+    assert {part["resultSchemaVersion"] for part in parts} == {whole.json()["schemaVersion"]}
+    assert [region["order"] for region in parts[0]["regions"]] == [0, 1]
+    assert [(page["pageNumber1"], page["pageStatus"]) for part in parts for page in part["pages"]] == [
+        (1, "ok"), (2, "ok"), (3, "no_text"), (4, "ok"), (5, "no_text"), (6, "no_text"), (7, "ok"),
+    ]
+    joined = [{**region, "order": order} for order, region in enumerate(r for part in parts for r in part["regions"])]
+    # Key order included: the worker serializes what it parsed, so this is the byte-level claim.
+    assert json.dumps(joined) == json.dumps(whole.json()["regions"])
+    assert "\n".join(region["text"] for region in joined).strip() == whole.json()["text"]
+    assert [region["regionId"] for region in joined] == [
+        "native-p0001", "ocr-p0002-l00001", "native-p0004", "ocr-p0007-l00001",
+    ]
+
+
+def test_a_range_of_blank_pages_is_an_answer_not_a_refusal(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    _, rendered = ranges_enabled(monkeypatch)
+    payload = pages_pdf(*RANGED_DOCUMENT)
+    response = post_pdf(client, payload, {RANGE_HEADER: "4-6", "accept": NDJSON})
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")  # never streamed
+    body = response.json()
+    assert body["regions"] == []
+    assert body["pages"] == [{"pageNumber1": 5, "pageStatus": "no_text"}, {"pageNumber1": 6, "pageStatus": "no_text"}]
+    assert rendered == ["blank", "blank", "blank", "blank"]  # both passes ran on both pages
+
+    # The whole-document request for a document with no text anywhere is still refused.
+    blank_only = pages_pdf(None, None)
+    assert post_pdf(client, blank_only).status_code == 422
+    ranged = post_pdf(client, blank_only, {RANGE_HEADER: "0-2"})
+    assert ranged.status_code == 200
+    assert [page["pageStatus"] for page in ranged.json()["pages"]] == ["no_text", "no_text"]
+
+
+def test_page_ranges_are_refused_unless_enabled(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    _, rendered = ranges_enabled(monkeypatch, enabled=False)
+    payload = pages_pdf(*RANGED_DOCUMENT)
+    for value in ("0-3", "not-a-range"):
+        response = post_pdf(client, payload, {RANGE_HEADER: value})
+        assert response.status_code == 501
+        assert "not enabled" in response.json()["detail"]
+    assert rendered == []
+    # Without the header nothing changes.
+    assert post_pdf(client, payload).status_code == 200
+
+
+@pytest.mark.parametrize("value", ["3-3", "4-2", "a-b", "1-", "-1-2", "0-1234567", "0-3,3-6", "7-9"])
+def test_invalid_or_out_of_document_ranges_are_refused_before_reading(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient, value: str
+) -> None:
+    _, rendered = ranges_enabled(monkeypatch)
+    response = post_pdf(client, pages_pdf(*RANGED_DOCUMENT), {RANGE_HEADER: value})
+    assert response.status_code == 422
+    assert rendered == []
+
+
+def test_ranges_keep_the_whole_document_page_bound(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    worker, rendered = ranges_enabled(monkeypatch)
+    response = post_pdf(client, pages_pdf(*[None] * (worker.MAX_PAGES + 1), size=(306, 396)), {RANGE_HEADER: "0-8"})
+    assert response.status_code == 422
+    assert "page count" in response.json()["detail"]
+    assert rendered == []
+
+
+def test_range_body_stamps_conflicts_like_the_whole_document_body(monkeypatch: pytest.MonkeyPatch) -> None:
+    import json
+
+    worker = importlib.import_module("app")
+    sha = "sha256:" + "a" * 64
+    region = {
+        "regionId": "ocr-p0002-l00001", "pageIndex0": 1, "pageNumber1": 2, "order": 0, "blockType": "paragraph",
+        "text": "FICTIONAL-A", "bbox1000": [50, 200, 550, 400], "confidence": 0.71, "authority": "informal",
+        "recognitionConflict": {"regionId": "ocr-p0002-l00001", "pageIndex0": 1, "bbox1000": [50, 200, 550, 400],
+                                "candidates": []},
+    }
+    monkeypatch.setattr(worker, "OCR_CONFLICT_V3_ENABLED", True)
+    part = worker.page_range_body(3, 1, 2, [region], sha)
+    assert json.dumps(part["regions"]) == json.dumps(worker.ocr_result_body("FICTIONAL-A", 3, [region], sha)["regions"])
+    assert part["regions"][0]["recognitionConflict"]["sourceSha256"] == sha
+    assert (part["resultSchemaVersion"], part["recognitionConflictCount"]) == ("tavonel.ocr_result.v3", 1)
+    assert worker.page_range_body(3, 0, 1, [], sha)["recognitionConflictCount"] == 0
+
+    monkeypatch.setattr(worker, "OCR_CONFLICT_V3_ENABLED", False)
+    with pytest.raises(HTTPException) as refused:
+        worker.page_range_body(3, 1, 2, [region], sha)
+    assert refused.value.status_code == 422
+    assert "recognitionConflictCount" not in worker.page_range_body(3, 0, 1, [], sha)
