@@ -15,8 +15,11 @@ const widths = [1920, 1440, 1280, 1024, 768, 390, 360] as const;
   media it needs from inside the test, so running them once per width project would repeat the
   same measurement seven times. `auditWidthSpecs` is the subset for which the viewport is the
   variable rather than something the spec sets itself.
+
+  `self-serve-journey` (journey A7, JOURNEY-MAP-2026-10-17 §8.1) joins the set for the same reason:
+  it runs once at 1440 and opens its own 360/390/430 contexts for the phone checks.
 */
-const auditSpecs = /(overflow-audit|contrast-zoom-audit|dialog-focus-audit|film-fallback-audit|film-motion-control-audit|failure-states-audit|billing-lifecycle|cross-tenant-negative|compile-resume|workspace-intake-triage)\.spec\.ts/;
+const auditSpecs = /(overflow-audit|contrast-zoom-audit|dialog-focus-audit|film-fallback-audit|film-motion-control-audit|failure-states-audit|billing-lifecycle|cross-tenant-negative|compile-resume|workspace-intake-triage|self-serve-journey)\.spec\.ts/;
 const auditWidthSpecs = /(contrast-zoom-audit|failure-states-audit|billing-lifecycle)\.spec\.ts/;
 const testPort = Number(process.env.PLAYWRIGHT_PORT ?? "3117");
 /*
