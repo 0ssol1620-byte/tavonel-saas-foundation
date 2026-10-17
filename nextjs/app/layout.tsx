@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { Analytics } from "@vercel/analytics/next";
 import { IBM_Plex_Mono } from "next/font/google";
 import { preload } from "react-dom";
 import FontOutlineProbe from "@/components/font-outline-probe";
@@ -217,26 +216,14 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           it before page chrome gives the notice real space instead of placing it over the hero,
           pricing actions or mobile safe area. After a choice, the standing footer control remains
           the withdrawal path.
+
+          P2-07: the Vercel collector is no longer mounted here. `MarketingConsent` loads it on
+          demand, behind the flag and the same consent and public-path gate as the Google tag,
+          because a collector mounted at the root loads before any choice and on the workspace
+          (ANALYTICS-ACTIVATION-2026-10-17 §3).
         */}
         <MarketingConsent />
         {children}
-        {/*
-          Measurement, on the same terms as everything else here.
-
-          Nothing in this product could be judged before this: the page argues for a sequence of
-          scenes and nobody knew how far down anyone got. It is Vercel's own analytics for
-          one specific reason -- it loads from `/_vercel/insights` on this origin, so the strict
-          CSP above admits it without a single directive being widened, and no third party is
-          contacted by that collector. It sets no cookie. The separate Google Analytics
-          integration below requires an explicit visitor choice before loading.
-
-          Analytics is fail-closed. Vercel exposes observability build variables even when Web
-          Analytics is not enabled for the project; rendering the component in that state points
-          the browser at a deployment-specific 404. The explicit public flag is set only after the
-          collector is enabled and verified, so local, preview and unconfigured production builds
-          stay quiet and do not imply that measurement is active.
-        */}
-        {process.env.NEXT_PUBLIC_TAVONEL_ANALYTICS_ENABLED === "1" ? <Analytics /> : null}
       </body>
     </html>
   );

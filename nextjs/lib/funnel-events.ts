@@ -1,6 +1,5 @@
 /** Privacy-minimal product interaction telemetry. Details are enumerated UI states only: no ids,
  * filenames, prompts, source text, IPs or user-provided strings ever leave through this module. */
-import { track } from "@vercel/analytics";
 
 /*
   §40's funnel is landing → Explore → evidence → pricing → start → sign in → first file → compile
@@ -241,7 +240,14 @@ export function trackFunnel(event: FunnelEvent, detail?: FunnelDetail) {
     existing.push(record);
     window.sessionStorage.setItem(LOG_KEY, JSON.stringify(existing.slice(-LOG_LIMIT)));
   } catch { /* analytics must never break the user's action */ }
-  try { track(event, safe); } catch { /* collector absence is not a product failure */ }
+  /*
+    P2-07 (ANALYTICS-ACTIVATION-2026-10-17 §4.4 G2, §5 step 2): no vendor call here. This used to
+    call the Vercel `track()` for every name on every path, workspace included. Both collectors
+    now hear this event behind the consent -- the Google relay in `components/marketing-consent.tsx`,
+    the Vercel one in `components/vercel-collector.tsx` -- and send only what `marketingEventPayload`
+    admits. Asking from here instead would put the consent module into every page bundle beside
+    the copy the root layout already loads.
+  */
   window.dispatchEvent(new CustomEvent("tavonel:funnel", { detail: record }));
 }
 

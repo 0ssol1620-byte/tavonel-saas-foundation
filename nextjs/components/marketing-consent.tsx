@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   CONSENT_ANCHOR_ATTRIBUTE,
@@ -67,6 +67,7 @@ type AnalyticsWindow = Window & {
   dataLayer?: unknown[];
   gtag?: (...args: unknown[]) => void;
   "ga-disable-G-XQ6Z2RJME7"?: boolean;
+  va?: unknown;
 };
 /**
  * Release 2 (orchestrator decision, 2026-10-15): the first-time prompt is not on the first paint.
@@ -106,6 +107,21 @@ function disableAnalytics() {
   const win = window as AnalyticsWindow;
   win[`ga-disable-${GA_ID}`] = true;
 }
+
+/*
+  P2-07 (ANALYTICS-ACTIVATION-2026-10-17 §4.4 G1, §5 step 1): the Vercel collector, fetched only
+  once it may run -- the flag on, storage read, a stored yes, a listed page.
+
+  A lazy import rather than a static one, because a static import of the SDK from here or from the
+  root layout puts it in the script of every page, whether it renders or not, and that broke the
+  §22 ratchet on / (P2-07's receipt). A chunk that fails to load leaves the page without the
+  collector, which is the closed state, and says so in the console rather than reaching the page's
+  error boundary.
+*/
+const VercelCollector = lazy(() => import("@/components/vercel-collector").catch((error: unknown) => {
+  console.warn("[TAVONEL] the Vercel collector did not load; nothing is collected by it", error);
+  return { default: () => null };
+}));
 
 export default function MarketingConsent() {
   const pathname = usePathname();
@@ -234,35 +250,46 @@ export default function MarketingConsent() {
     try { window.localStorage.setItem(CONSENT_KEY, JSON.stringify({ allowed, expires: Date.now() + 180 * 24 * 60 * 60 * 1000 })); } catch { /* this page choice still works */ }
     setConsent(allowed);
     setEditing(false);
-    // On withdrawal unload the vendor runtime too: no subsequent cookieless pings.
-    if (!allowed && document.getElementById("tavonel-google-tag")) window.location.reload();
+    // On withdrawal unload the vendor runtimes too: no subsequent cookieless pings. `window.va` is
+    // the Vercel collector's queue, which outlives the unmounted component (P2-07).
+    if (!allowed && (document.getElementById("tavonel-google-tag") || (window as AnalyticsWindow).va)) window.location.reload();
   }
 
-  const surface = consentSurface({ measured: Boolean(location), ready, consent, editing, navOpen });
-  if (surface === "nothing") return null;
-  if (surface === "prompt" && (!revealed || !filmClear)) return null;
-  /*
-    G1-033. After a choice the reopen control is the footer's, so this draws nothing -- unless the
-    page has no footer to carry it, in which case the old floating pill is the only withdrawal
-    path there is and it stays. Never both.
-  */
-  if (surface === "settings") {
-    if (anchored) return null;
-    return <button className={`${styles.settings} ${styles.floating}`} onClick={() => setEditing(true)}>{copy.settings}</button>;
-  }
-  // Escape closes the card as the refuse button does; reopened from the footer, it only closes.
-  const onKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key !== "Escape") return;
-    if (consent === null) choose(false);
-    else setEditing(false);
-  };
-  return <section className={styles.panel} aria-label={copy.region} data-marketing-consent-panel="" onKeyDown={onKeyDown}>
-    <div className={styles.inner}>
-      <p>{copy.prompt} <a href="/privacy">{copy.privacy}</a></p>
-      <div className={styles.actions}>
-        <button onClick={() => choose(false)}>{copy.refuse}</button>
-        <button onClick={() => choose(true)}>{copy.allow}</button>
+  function consentPanel() {
+    const surface = consentSurface({ measured: Boolean(location), ready, consent, editing, navOpen });
+    if (surface === "nothing") return null;
+    if (surface === "prompt" && (!revealed || !filmClear)) return null;
+    /*
+      G1-033. After a choice the reopen control is the footer's, so this draws nothing -- unless the
+      page has no footer to carry it, in which case the old floating pill is the only withdrawal
+      path there is and it stays. Never both.
+    */
+    if (surface === "settings") {
+      if (anchored) return null;
+      return <button className={`${styles.settings} ${styles.floating}`} onClick={() => setEditing(true)}>{copy.settings}</button>;
+    }
+    // Escape closes the card as the refuse button does; reopened from the footer, it only closes.
+    const onKeyDown = (event: React.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (consent === null) choose(false);
+      else setEditing(false);
+    };
+    return <section className={styles.panel} aria-label={copy.region} data-marketing-consent-panel="" onKeyDown={onKeyDown}>
+      <div className={styles.inner}>
+        <p>{copy.prompt} <a href="/privacy">{copy.privacy}</a></p>
+        <div className={styles.actions}>
+          <button onClick={() => choose(false)}>{copy.refuse}</button>
+          <button onClick={() => choose(true)}>{copy.allow}</button>
+        </div>
       </div>
-    </div>
-  </section>;
+    </section>;
+  }
+
+  // One stable tree: the collector is always the first child, so a change of surface (the prompt
+  // revealing, the phone menu opening) never remounts it -- every mount sends a page view.
+  return <>
+    {process.env.NEXT_PUBLIC_TAVONEL_ANALYTICS_ENABLED === "1" && ready && consent === true && location
+      ? <Suspense fallback={null}><VercelCollector ready={ready} consent={consent} location={location} /></Suspense> : null}
+    {consentPanel()}
+  </>;
 }
