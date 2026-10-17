@@ -1,7 +1,7 @@
 import { sha256DigestHeader } from "./hmac";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { ocrSiblingKey } from "./keys";
+import { ocrPageRangeSiblingKey, ocrSiblingKey } from "./keys";
 import {
   dispatchOcrAfterSanitize,
   OcrEvidenceRetryableError,
@@ -10,6 +10,7 @@ import {
   OCR_FAILURE_CATEGORY,
   OCR_REQUEST_TIMEOUT_MS,
   ocrFailureKind,
+  ocrPageRangeSize,
   qualifyOcrResult,
   shouldDispatchOcr,
   type OcrDispatchEnv,
@@ -517,6 +518,7 @@ describe("OCR failure taxonomy", () => {
       "OCR_RESPONSE_INVALID",
       "OCR_PERSISTED_RESULT_INVALID",
       "OCR_RESULT_WRITE_FAILED",
+      "OCR_PAGES_INCOMPLETE",
     ];
     assert.deepEqual(Object.keys(OCR_FAILURE_CATEGORY).sort(), [...codes].sort());
 
@@ -664,5 +666,339 @@ describe("persisted OCR source validation", () => {
       ? {size:24*1024*1024+1,arrayBuffer:async()=>{loaded++;return new ArrayBuffer(0);}} : get(key);
     assert.equal((await f.run()).reasonCode,"OCR_PERSISTED_RESULT_INVALID");
     assert.equal(loaded,0);assert.equal(f.calls(),0);
+  });
+});
+
+/*
+ * Page-range reading (table/limits design 2026-10-17, A4.1, lane T5).
+ *
+ * SYNTHETIC documents and a fake reader only. The fake answers a whole-document request and a
+ * range request from one page list, the way `workers/foundation-ocr-gpu` does; that side of the
+ * equivalence is proven against the real reader code in its test_app.py. Nothing here says
+ * anything about OCR quality or timing.
+ */
+describe("page-range reading", () => {
+  const OCR_JSON = ocrSiblingKey(IMMUTABLE);
+  const RANGES_PREFIX = OCR_JSON.replace("ocr.json", "ocr-pages/");
+  const NO_TEXT = new Set([2, 7, 8, 13, 15]);
+  const POLYGON_A = [[10, 20], [110, 20], [110, 40], [10, 40]];
+  const POLYGON_B = [[11, 20], [111, 20], [111, 40], [11, 40]];
+
+  /** Page index -> regions, page-major with a running order, like the reader. */
+  function syntheticRegions(pageCount: number, digest: string, v3: boolean) {
+    const regions: Array<Record<string, unknown>> = [];
+    for (let index = 0; index < pageCount; index += 1) {
+      if (NO_TEXT.has(index % 20)) continue;
+      const page = String(index + 1).padStart(4, "0");
+      const native = index % 3 === 0;
+      for (let line = 0; line < (native ? 1 : 2); line += 1) {
+        const regionId = native ? `native-p${page}` : `ocr-p${page}-l${String(line + 1).padStart(5, "0")}`;
+        const text = `SYNTHETIC page ${index + 1} line ${line + 1}`;
+        const bbox1000 = [100, 100 + line * 60, 900, 150 + line * 60];
+        const confidence = native ? 1 : 0.8123;
+        regions.push({
+          regionId, pageIndex0: index, pageNumber1: index + 1, order: regions.length, blockType: "paragraph",
+          text, bbox1000, confidence, authority: "informal",
+          ...(v3 && index % 10 === 1 && line === 0 ? { recognitionConflict: {
+            regionId, pageIndex0: index, bbox1000, candidates: [
+              { engineId: "general-ppocrv6", modelSha256: "sha256:6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884", text, confidence, polygon: POLYGON_A },
+              { engineId: "korean-ppocrv5", modelSha256: "sha256:cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b", text: `${text} ALT`, confidence: 0.69, polygon: POLYGON_B },
+            ], sourceSha256: digest,
+          } } : {}),
+        });
+      }
+    }
+    return regions;
+  }
+
+  type ReaderOptions = {
+    v3?: boolean;
+    /** Replaces the answer for one range, or throws for it. */
+    range?: (start0: number, answer: Record<string, unknown>) => Response | Record<string, unknown> | undefined;
+  };
+
+  /** A SYNTHETIC reader for a `pageCount`-page document. `calls` records what was asked. */
+  function syntheticReader(pageCount: number, options: ReaderOptions = {}) {
+    const calls: string[] = [];
+    const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      const digest = headers.get("x-tavonel-input-sha256") ?? "";
+      const asked = headers.get("x-tavonel-ocr-page-range");
+      calls.push(asked ?? "whole");
+      const v3 = options.v3 === true;
+      const schemaVersion = v3 ? "tavonel.ocr_result.v3" : "tavonel.ocr_result.v2";
+      const regions = syntheticRegions(pageCount, digest, v3);
+      const conflicts = (rows: Array<Record<string, unknown>>) =>
+        v3 ? { recognitionConflictCount: rows.filter((row) => row.recognitionConflict).length } : {};
+      let answer: Record<string, unknown>;
+      if (asked === null) {
+        answer = { schemaVersion, status: "ok", text: regions.map((row) => row.text).join("\n").trim(),
+          pageCount, inputSha256: digest, regions, ...conflicts(regions) };
+      } else {
+        const [start0, askedEnd] = asked.split("-").map(Number);
+        const end0 = Math.min(askedEnd, pageCount);
+        const part: Array<Record<string, unknown>> = regions.filter((row) => Number(row.pageIndex0) >= start0 && Number(row.pageIndex0) < end0)
+          .map((row, order) => ({ ...row, order }));
+        answer = {
+          schemaVersion: "tavonel.ocr_page_range.v1", status: "ok", resultSchemaVersion: schemaVersion,
+          inputSha256: digest, pageCount, pageRange: { start0, end0 },
+          pages: Array.from({ length: end0 - start0 }, (_unused, offset) => ({
+            pageNumber1: start0 + offset + 1,
+            pageStatus: part.some((row) => row.pageIndex0 === start0 + offset) ? "ok" : "no_text",
+          })),
+          regions: part, ...conflicts(part),
+        };
+        const replaced = options.range?.(start0, answer);
+        if (replaced instanceof Response) return replaced;
+        if (replaced) answer = replaced;
+      }
+      const response = Response.json(answer);
+      Object.defineProperty(response, "url", { value: String(url) });
+      return response;
+    }) as typeof fetch;
+    return { fetcher, calls };
+  }
+
+  /** R2 that honours `onlyIf: etagDoesNotMatch "*"` the way create-once needs. */
+  class CreateOnceR2 extends FakeR2 {
+    override async put(key: string, value: ArrayBuffer | Uint8Array, options?: { onlyIf?: { etagDoesNotMatch: string } }) {
+      if (options?.onlyIf && this.objects.has(key)) throw new Error("precondition failed");
+      return super.put(key, value);
+    }
+  }
+
+  const BINDING = JSON.stringify({ schemaVersion: "tavonel.qualified_reader_binding.v1", endpoint: FOUNDATION_OCR,
+    readerRevision: `sha256:${"a".repeat(64)}`, qualificationSha256: `sha256:${"b".repeat(64)}` });
+
+  function rangeEnv(r2: FakeR2, size: string | undefined, v3 = false): OcrDispatchEnv {
+    return envFor(r2, {
+      FOUNDATION_OCR_URL: FOUNDATION_OCR,
+      ...(size === undefined ? {} : { FOUNDATION_OCR_PAGE_RANGE_SIZE: size }),
+      ...(v3 ? { FOUNDATION_COMPLETED_READ_ENABLED: "true", FOUNDATION_COMPLETED_READ_BINDING: BINDING,
+        FOUNDATION_OCR_CONFLICT_V3_REQUIRED: "true" } : {}),
+    });
+  }
+
+  const rangeKeys = (r2: FakeR2) => [...r2.objects.keys()].filter((key) => key.startsWith(RANGES_PREFIX)).sort();
+  const decode = (bytes: Uint8Array | undefined) => JSON.parse(new TextDecoder().decode(bytes));
+
+  it("names a range by the pages asked for, beside ocr.json", () => {
+    assert.equal(ocrPageRangeSiblingKey(IMMUTABLE, 8, 16),
+      "immutable/ws_pilot/ws_pilot/doc_1/abcdabcdabcdabcdabcdabcdabcdabcd/ocr-pages/8-16.json");
+    for (const [start0, end0] of [[-1, 8], [8, 8], [9, 8], [0.5, 8], [0, Number.NaN]]) {
+      assert.throws(() => ocrPageRangeSiblingKey(IMMUTABLE, start0, end0), /page range is invalid/);
+    }
+    assert.throws(() => ocrPageRangeSiblingKey("immutable/x/ocr.json", 0, 8), /sanitized\.pdf/);
+  });
+
+  it("stays one whole-document request unless the range size is set", async () => {
+    assert.equal(ocrPageRangeSize({}), null);
+    assert.equal(ocrPageRangeSize({ FOUNDATION_OCR_PAGE_RANGE_SIZE: " " }), null);
+    const r2 = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+    const reader = syntheticReader(12);
+    const result = await dispatchOcrAfterSanitize(rangeEnv(r2, undefined), IMMUTABLE, reader.fetcher);
+    assert.equal(result.status, "written");
+    assert.deepEqual(reader.calls, ["whole"]);
+    assert.deepEqual(rangeKeys(r2), []);
+  });
+
+  it("refuses a malformed range size before reading anything, rather than ignoring it", async () => {
+    for (const size of ["0", "eight", "8 pages", "1000", "-8", "8.5"]) {
+      const r2 = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+      const reader = syntheticReader(12);
+      await assert.rejects(dispatchOcrAfterSanitize(rangeEnv(r2, size), IMMUTABLE, reader.fetcher), OcrEvidenceRetryableError, size);
+      assert.deepEqual(reader.calls, [], size);
+      assert.equal(r2.puts.length, 0, size);
+    }
+  });
+
+  for (const v3 of [false, true]) {
+    it(`assembles ocr.json byte for byte as the whole-document request writes it (${v3 ? "v3, qualified binding" : "v2"})`, async () => {
+      const whole = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+      const single = await dispatchOcrAfterSanitize(rangeEnv(whole, undefined, v3), IMMUTABLE, syntheticReader(20, { v3 }).fetcher);
+      const ranged = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+      const reader = syntheticReader(20, { v3 });
+      const assembled = await dispatchOcrAfterSanitize(rangeEnv(ranged, "6", v3), IMMUTABLE, reader.fetcher);
+
+      assert.equal(single.status, "written");
+      assert.equal(assembled.status, "written");
+      assert.deepEqual(reader.calls, ["0-6", "6-12", "12-18", "18-24"]);
+      // The same bytes, so the same digest, page count and provenance in the receipt facts.
+      assert.deepEqual(ranged.objects.get(OCR_JSON), whole.objects.get(OCR_JSON));
+      assert.deepEqual(assembled, single);
+      const written = decode(ranged.objects.get(OCR_JSON));
+      assert.equal(written.schemaVersion, v3 ? "tavonel.ocr_result.v3" : "tavonel.ocr_result.v2");
+      if (v3) assert.equal(written.recognitionConflictCount, 2);
+      assert.deepEqual(rangeKeys(ranged), ["0-6", "12-18", "18-24", "6-12"].map((range) => `${RANGES_PREFIX}${range}.json`));
+      const last = decode(ranged.objects.get(`${RANGES_PREFIX}18-24.json`));
+      assert.deepEqual(last.pageRange, { start0: 18, end0: 20 });
+      assert.equal(last.sourceImmutableKey, IMMUTABLE);
+    });
+  }
+
+  it("reads a 120-page SYNTHETIC document range by range and completes", async () => {
+    const r2 = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+    const reader = syntheticReader(120);
+    const result = await dispatchOcrAfterSanitize(rangeEnv(r2, "8"), IMMUTABLE, reader.fetcher);
+
+    assert.equal(result.status, "written");
+    assert.equal(result.observedPageCount, 120);
+    assert.equal(result.computeCredits, 2);
+    assert.equal(result.outputSha256, await sha256DigestHeader(new Uint8Array(r2.objects.get(OCR_JSON)!)));
+    assert.deepEqual(reader.calls, Array.from({ length: 15 }, (_unused, index) => `${index * 8}-${index * 8 + 8}`));
+    assert.equal(rangeKeys(r2).length, 15);
+    const written = decode(r2.objects.get(OCR_JSON));
+    const expected = syntheticRegions(120, written.inputSha256, false);
+    assert.equal(written.pageCount, 120);
+    assert.deepEqual(written.regions, expected);
+    assert.equal(written.text, expected.map((row) => row.text).join("\n"));
+    // The blank pages are recorded as read and empty, never as missing.
+    const third = decode(r2.objects.get(`${RANGES_PREFIX}0-8.json`));
+    assert.deepEqual(third.pages.map((page: { pageStatus: string }) => page.pageStatus),
+      ["ok", "ok", "no_text", "ok", "ok", "ok", "ok", "no_text"]);
+  });
+
+  it("resends idempotently: same keys, same bytes, and no second read of a stored range", async () => {
+    const clean = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+    await dispatchOcrAfterSanitize(rangeEnv(clean, "8"), IMMUTABLE, syntheticReader(40).fetcher);
+
+    const crashed = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+    const dropped = syntheticReader(40, { range: (start0) => { if (start0 === 16) throw new TypeError("connection reset"); return undefined; } });
+    const first = await dispatchOcrAfterSanitize(rangeEnv(crashed, "8"), IMMUTABLE, dropped.fetcher);
+    assert.equal(first.status, "failed");
+    assert.equal(first.reasonCode, "OCR_PAGES_INCOMPLETE");
+    assert.match(first.reason ?? "", /pages from 17 were not read \(OCR_TIMEOUT_OR_NETWORK\)/);
+    assert.equal(first.computeCredits, 0);
+    assert.equal(ocrFailureKind(first.reasonCode), "transport");
+    assert.equal(crashed.objects.has(OCR_JSON), false);
+    assert.deepEqual(rangeKeys(crashed), [`${RANGES_PREFIX}0-8.json`, `${RANGES_PREFIX}8-16.json`]);
+
+    const redelivered = syntheticReader(40);
+    const second = await dispatchOcrAfterSanitize(rangeEnv(crashed, "8"), IMMUTABLE, redelivered.fetcher);
+    assert.equal(second.status, "written");
+    assert.deepEqual(redelivered.calls, ["16-24", "24-32", "32-40"]);
+    assert.deepEqual([...crashed.objects.keys()].sort(), [...clean.objects.keys()].sort());
+    for (const [key, bytes] of clean.objects) assert.deepEqual(crashed.objects.get(key), bytes, key);
+
+    const putsBefore = crashed.puts.length;
+    const again = syntheticReader(40);
+    const third = await dispatchOcrAfterSanitize(rangeEnv(crashed, "8"), IMMUTABLE, again.fetcher);
+    assert.equal(third.status, "exists");
+    assert.equal(third.outputSha256, second.outputSha256);
+    assert.deepEqual(again.calls, []);
+    assert.equal(crashed.puts.length, putsBefore);
+  });
+
+  it("proves an existing ocr.json longer than one answer from its stored ranges, without the reader", async () => {
+    const r2 = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+    const written = await dispatchOcrAfterSanitize(rangeEnv(r2, "8"), IMMUTABLE, syntheticReader(120).fetcher);
+    const replay = syntheticReader(120);
+    const exists = await dispatchOcrAfterSanitize(rangeEnv(r2, "8"), IMMUTABLE, replay.fetcher);
+    assert.deepEqual(exists, { ...written, status: "exists" });
+    assert.deepEqual(replay.calls, []);
+
+    r2.objects.delete(`${RANGES_PREFIX}64-72.json`);
+    const unproven = await dispatchOcrAfterSanitize(rangeEnv(r2, "8"), IMMUTABLE, replay.fetcher);
+    assert.equal(unproven.reasonCode, "OCR_PERSISTED_RESULT_INVALID");
+    assert.deepEqual(replay.calls, []);
+    assert.equal(r2.objects.has(`${RANGES_PREFIX}64-72.json`), false);
+  });
+
+  it("reads back a concurrent winner for a range instead of overwriting it", async () => {
+    const r2 = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+    const reference = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+    await dispatchOcrAfterSanitize(rangeEnv(reference, "8"), IMMUTABLE, syntheticReader(16).fetcher);
+    const put = r2.put.bind(r2);
+    r2.put = async (key, value, options) => {
+      // Another delivery stored this range between our read and our write.
+      if (key.endsWith("/8-16.json") && !r2.objects.has(key)) r2.objects.set(key, reference.objects.get(key)!);
+      return put(key, value, options);
+    };
+    const result = await dispatchOcrAfterSanitize(rangeEnv(r2, "8"), IMMUTABLE, syntheticReader(16).fetcher);
+    assert.equal(result.status, "written");
+    assert.deepEqual(r2.objects.get(OCR_JSON), reference.objects.get(OCR_JSON));
+  });
+
+  it("never assembles from a missing range, however it went missing", async () => {
+    const cases: Array<[string, ReaderOptions, ((r2: CreateOnceR2) => void)?]> = [
+      ["unavailable", { range: (start0) => (start0 === 8 ? new Response("busy", { status: 503 }) : undefined) }],
+      ["reader without ranges", { range: (start0) => (start0 === 8 ? new Response("off", { status: 501 }) : undefined) }],
+      ["lost write", {}, (r2) => {
+        const put = r2.put.bind(r2);
+        r2.put = async (key, value, options) => (key.endsWith("/8-16.json") ? { etag: "lost" } : put(key, value, options));
+      }],
+      ["failed write", {}, (r2) => {
+        const put = r2.put.bind(r2);
+        r2.put = async (key, value, options) => {
+          if (key.endsWith("/8-16.json")) throw new Error("synthetic R2 outage");
+          return put(key, value, options);
+        };
+      }],
+    ];
+    for (const [name, options, sabotage] of cases) {
+      const r2 = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+      sabotage?.(r2);
+      const result = await dispatchOcrAfterSanitize(rangeEnv(r2, "8"), IMMUTABLE, syntheticReader(24, options).fetcher);
+      assert.equal(result.status, "failed", name);
+      assert.equal(result.reasonCode, "OCR_PAGES_INCOMPLETE", name);
+      assert.equal(result.computeCredits, 0, name);
+      assert.equal(r2.objects.has(OCR_JSON), false, name);
+    }
+  });
+
+  it("treats a range answer that does not hold as that answer, and stores nothing for it", async () => {
+    type Rows = Array<Record<string, unknown>>;
+    const wrong: Array<[string, number, (answer: Record<string, unknown>) => Response | Record<string, unknown>, OcrFailureCode]> = [
+      ["another range", 8, (answer) => ({ ...answer, pageRange: { start0: 0, end0: 8 } }), "OCR_RESPONSE_INVALID"],
+      ["an old reader's whole-document answer", 8, (answer) => ({ schemaVersion: "tavonel.ocr_result.v2", status: "ok",
+        text: (answer.regions as Rows).map((row) => row.text).join("\n"), pageCount: 24,
+        inputSha256: answer.inputSha256, regions: answer.regions }), "OCR_RESPONSE_INVALID"],
+      ["text on a no_text page", 0, (answer) => ({ ...answer,
+        pages: (answer.pages as Rows).map((page) => ({ ...page, pageStatus: "no_text" })) }), "OCR_RESPONSE_INVALID"],
+      ["a page left out", 8, (answer) => ({ ...answer, pages: (answer.pages as Rows).slice(1) }), "OCR_RESPONSE_INVALID"],
+      ["a region outside the range", 8, (answer) => ({ ...answer, regions: [...(answer.regions as Rows),
+        { ...(answer.regions as Rows)[0], regionId: "ocr-p0017-l00009", pageIndex0: 16, pageNumber1: 17, order: 99 }] }), "OCR_RESPONSE_INVALID"],
+      ["a region that breaks the whole-document rules", 8, (answer) => ({ ...answer, regions: (answer.regions as Rows)
+        .map((row, index) => (index === 0 ? { ...row, bbox1000: [500, 100, 400, 150] } : row)) }), "OCR_RESPONSE_INVALID"],
+      ["a different document length", 8, (answer) => ({ ...answer, pageCount: 23 }), "OCR_RESPONSE_INVALID"],
+      ["an unbounded document", 0, (answer) => ({ ...answer, pageCount: 501 }), "OCR_RESPONSE_INVALID"],
+      ["a refused range", 8, () => new Response("refused", { status: 422 }), "OCR_HTTP_REJECTED"],
+      ["a body that is not JSON", 8, () => new Response("{ not json"), "OCR_RESPONSE_NOT_JSON"],
+    ];
+    for (const [name, failAt, mutate, code] of wrong) {
+      const r2 = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+      const reader = syntheticReader(24, { range: (start0, answer) => (start0 === failAt ? mutate(answer) : undefined) });
+      const result = await dispatchOcrAfterSanitize(rangeEnv(r2, "8"), IMMUTABLE, reader.fetcher);
+      assert.equal(result.reasonCode, code, name);
+      assert.equal(result.computeCredits, 2, name);
+      assert.equal(ocrFailureKind(result.reasonCode), "semantic", name);
+      assert.equal(r2.objects.has(OCR_JSON), false, name);
+      // Only the ranges before the bad one are stored; reading stops at the first answer that fails.
+      assert.deepEqual(rangeKeys(r2), failAt === 0 ? [] : [`${RANGES_PREFIX}0-8.json`], name);
+      assert.equal(reader.calls.at(-1), `${failAt}-${failAt + 8}`, name);
+    }
+  });
+
+  it("refuses a document with no text on any page the way the whole-document request does", async () => {
+    const r2 = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+    const blank = syntheticReader(16, { range: (_start0, answer) => ({ ...answer, regions: [],
+      pages: (answer.pages as Array<Record<string, unknown>>).map((page) => ({ ...page, pageStatus: "no_text" })) }) });
+    const result = await dispatchOcrAfterSanitize(rangeEnv(r2, "8"), IMMUTABLE, blank.fetcher);
+    assert.equal(result.reasonCode, "OCR_HTTP_REJECTED");
+    assert.equal(result.computeCredits, 2);
+    assert.equal(r2.objects.has(OCR_JSON), false);
+    assert.equal(rangeKeys(r2).length, 2);
+  });
+
+  it("refuses a corrupted stored range without asking the reader again or overwriting it", async () => {
+    const r2 = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+    const corrupted = new TextEncoder().encode("{\"schemaVersion\":\"tavonel.ocr_page_range.v1\"}");
+    r2.objects.set(`${RANGES_PREFIX}8-16.json`, corrupted);
+    const reader = syntheticReader(24);
+    const result = await dispatchOcrAfterSanitize(rangeEnv(r2, "8"), IMMUTABLE, reader.fetcher);
+    assert.equal(result.reasonCode, "OCR_PERSISTED_RESULT_INVALID");
+    assert.deepEqual(reader.calls, ["0-8"]);
+    assert.deepEqual(r2.objects.get(`${RANGES_PREFIX}8-16.json`), corrupted);
+    assert.equal(r2.objects.has(OCR_JSON), false);
   });
 });
