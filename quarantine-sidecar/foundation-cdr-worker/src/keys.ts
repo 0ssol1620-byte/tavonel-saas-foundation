@@ -81,6 +81,24 @@ export function ocrSiblingKey(immutablePdfKey: string): string {
 }
 
 /**
+ * Where one page range of an OCR reading is kept, create-once (table/limits design A4.1).
+ *
+ * `start0` and `end0` are the range that was asked for, 0-based and end-exclusive, so a
+ * redelivery finds the same key before it knows the page count. The last range of a document
+ * stops at its last page; the object records the pages actually read. `ocr.json` is assembled
+ * from these and stays the record everything downstream reads.
+ */
+export function ocrPageRangeSiblingKey(immutablePdfKey: string, start0: number, end0: number): string {
+  if (!immutablePdfKey.endsWith("/sanitized.pdf")) {
+    throw new PermanentReject("immutable PDF key is not a sanitized.pdf object");
+  }
+  if (!Number.isSafeInteger(start0) || !Number.isSafeInteger(end0) || start0 < 0 || end0 <= start0) {
+    throw new PermanentReject("OCR page range is invalid");
+  }
+  return `${immutablePdfKey.slice(0, -"/sanitized.pdf".length)}/ocr-pages/${start0}-${end0}.json`;
+}
+
+/**
  * Where the live reading is reported.
  *
  * This object is deliberately *not* a sibling receipt in the sense the others are. It is mutable,
