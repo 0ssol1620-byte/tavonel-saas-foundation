@@ -257,3 +257,68 @@ describe("Paddle billing event projection", () => {
     }, "r"), env)).toMatchObject({ action: "ignored" });
   });
 });
+
+// U6 (journey map §8.3, A6): a renewal of a subscription bound before FOUNDATION_BILLING_HMAC was
+// rotated. Without FOUNDATION_BILLING_HMAC_PREVIOUS it is quarantined as binding_invalid, exactly
+// as before A6; with the replaced key configured as previous it projects.
+describe("Paddle billing events across a binding key rotation", () => {
+  const OLD = "billing-old-secret-that-is-at-least-32-characters";
+  const boundBeforeRotation = createCheckoutBinding({ ...bindingInput, offerCode: "observer_access" }, OLD,
+    new Date("2026-07-29T07:00:00.000Z"));
+  const renewal = body("transaction.completed", {
+    id: `txn_${"r".repeat(26)}`,
+    customer_id: `ctm_${"c".repeat(26)}`,
+    subscription_id: `sub_${"s".repeat(26)}`,
+    custom_data: boundBeforeRotation,
+    items: [{ quantity: 1, price: { id: OBSERVER_PRICE } }],
+  });
+  const lifecycle = body("subscription.updated", {
+    id: `sub_${"s".repeat(26)}`,
+    customer_id: `ctm_${"c".repeat(26)}`,
+    status: "active",
+    custom_data: boundBeforeRotation,
+    items: [{ quantity: 1, price: { id: OBSERVER_PRICE } }],
+  }, "u");
+
+  it("quarantines a renewal signed under the replaced key while no previous key is configured", () => {
+    expect(parsePaddleBillingAction(renewal, env)).toMatchObject({ action: "ignored", reason: "binding_invalid" });
+    expect(parsePaddleBillingAction(lifecycle, env)).toMatchObject({ action: "ignored", reason: "binding_invalid" });
+    for (const blank of ["", "   ", "p".repeat(31)]) {
+      expect(parsePaddleBillingAction(renewal, { ...env, FOUNDATION_BILLING_HMAC_PREVIOUS: blank }))
+        .toMatchObject({ action: "ignored", reason: "binding_invalid" });
+    }
+  });
+
+  it("projects the same renewal once the replaced key is configured as previous", () => {
+    const rotated = { ...env, FOUNDATION_BILLING_HMAC_PREVIOUS: OLD };
+    expect(parsePaddleBillingAction(renewal, rotated)).toMatchObject({
+      action: "allowance",
+      offerCode: "observer_access",
+      checkoutBindingNonce: boundBeforeRotation.tavonel_nonce,
+      priceId: OBSERVER_PRICE,
+    });
+    expect(parsePaddleBillingAction(lifecycle, rotated)).toMatchObject({
+      action: "subscription",
+      subscriptionStatus: "active",
+      checkoutBindingNonce: boundBeforeRotation.tavonel_nonce,
+    });
+    // A current-key binding projects identically with or without the previous key.
+    const current = body("transaction.completed", {
+      id: `txn_${"t".repeat(26)}`,
+      customer_id: `ctm_${"c".repeat(26)}`,
+      subscription_id: `sub_${"s".repeat(26)}`,
+      custom_data: checkoutBinding(),
+      items: [{ quantity: 1, price: { id: OBSERVER_PRICE } }],
+    });
+    expect(parsePaddleBillingAction(current, rotated)).toEqual(parsePaddleBillingAction(current, env));
+  });
+
+  it("does not accept a key that never signed, nor the previous key in place of a missing current key", () => {
+    expect(parsePaddleBillingAction(renewal, {
+      ...env, FOUNDATION_BILLING_HMAC_PREVIOUS: "unrelated-secret-that-is-at-least-32-characters",
+    })).toMatchObject({ action: "ignored", reason: "binding_invalid" });
+    expect(parsePaddleBillingAction(renewal, {
+      PADDLE_PRICE_OBSERVER_ACCESS: OBSERVER_PRICE, FOUNDATION_BILLING_HMAC_PREVIOUS: OLD,
+    })).toMatchObject({ action: "ignored", reason: "binding_invalid" });
+  });
+});

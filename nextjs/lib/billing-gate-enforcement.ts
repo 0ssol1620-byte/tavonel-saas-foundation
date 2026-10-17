@@ -89,6 +89,8 @@ export type GateEnforcementDeps = {
   pauseSubscription(subscriptionId: string): Promise<PaddleSubscriptionResult>;
   expectedEnvironment: "sandbox" | "production";
   bindingSecret: string;
+  /** Verification-only key during a FOUNDATION_BILLING_HMAC rotation; see previousBillingHmac. */
+  previousBindingSecret?: string;
   now(): Date;
   /** Stop starting new candidates after this epoch-ms; the rest are first in line next run. */
   deadline?: number;
@@ -164,7 +166,7 @@ async function evaluate(
   if (read.environment !== deps.expectedEnvironment) return empty("environment_mismatch", gateCode);
   const subscription = read.subscription;
   const observed = { ...empty("identity_mismatch", gateCode), ...providerFacts(subscription) };
-  const binding = authenticateCheckoutBinding(subscription.customData, deps.bindingSecret);
+  const binding = authenticateCheckoutBinding(subscription.customData, deps.bindingSecret, deps.previousBindingSecret);
   if (subscription.id !== candidate.subscriptionId || subscription.customerId !== candidate.customerId || !binding ||
     binding.tavonel_workspace_id !== candidate.workspaceKey ||
     binding.tavonel_user_id.toLowerCase() !== candidate.userId.toLowerCase()) {
