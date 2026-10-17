@@ -1,10 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import {
-  PublicSiteFooter,
-  PublicSiteHeader,
-  SAMPLE_CTA,
-} from "@/components/public-site-chrome";
+import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
 import HeroFilm from "./hero-film";
 import HeroActions from "./hero-actions";
 import HeroSourceCard from "./hero-source-card";
@@ -38,7 +34,7 @@ import {
   type EvidenceCase,
   type EvidenceRegion,
 } from "@/lib/home-evidence-view";
-import { KO_CHROME } from "@/lib/site-navigation";
+import { KO_CHROME, SAMPLE_CTA } from "@/lib/site-navigation";
 import { primaryCallToAction } from "@/lib/commercial-state";
 import {
   landingVariantState,

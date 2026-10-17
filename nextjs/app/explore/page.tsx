@@ -4,6 +4,7 @@ import { solutionWorkflowEvidence } from "@/app/solutions/solution-workflow-proo
 import ExploreStage from "@/components/explore/explore-stage";
 import stageStyles from "@/components/explore/explore-stage.module.css";
 import { PublicSiteFooter } from "@/components/public-site-chrome";
+import { primaryCallToAction } from "@/lib/commercial-state";
 import { chooseExploreEntryProof } from "@/lib/explore-entry-proof";
 import {
   exploreChangeBaselineDocument,
@@ -146,6 +147,7 @@ export default function ExplorePage() {
   return (
     <>
       <ExploreStage
+        access={primaryCallToAction()}
         model={model}
         layout={layout}
         change={change}

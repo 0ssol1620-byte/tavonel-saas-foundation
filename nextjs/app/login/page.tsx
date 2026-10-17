@@ -16,6 +16,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { useEffect, useState } from "react";
+import CheckoutIntentNotice from "@/components/checkout-intent-notice";
 import Logomark from "@/components/logomark";
 import { RecipeContinuation, RecipePreflight } from "@/components/recipe-preflight";
 import { readOfferParam, rememberCheckoutIntent, takeCheckoutIntent } from "@/lib/checkout-intent";
@@ -28,7 +29,7 @@ import {
   takeRecipeIntent,
   type RecipeIntent,
 } from "@/lib/recipe-intent";
-import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
+import type { BillingOfferCode } from "@/lib/billing-catalog";
 import { EXPLORE_CTA } from "@/lib/site-navigation";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
 
@@ -50,6 +51,8 @@ export default function LoginPage() {
   const [commercialMode, setCommercialMode] = useState<"pilot" | "live" | null>(null);
   const [selfService, setSelfService] = useState(false);
   const [customerProcessingEnabled, setCustomerProcessingEnabled] = useState(false);
+  /* P2-10 (JOURNEY-MAP D-02): whether a plan can be bought, so the intent notice promises no more. */
+  const [purchaseOpen, setPurchaseOpen] = useState<boolean | null>(null);
   /**
    * R1, second half. Someone who arrived by picking a plan is not here to "open a workspace" --
    * they are part-way through a purchase, and the page has to say so or the detour looks like the
@@ -137,10 +140,12 @@ export default function LoginPage() {
         setCommercialMode(body.service.commercialMode);
         setSelfService(body.availableActions.createAccount.enabled);
         setCustomerProcessingEnabled(body.availableActions.compileCustomerDocuments.enabled);
+        setPurchaseOpen(body.availableActions.purchasePlan.enabled);
         setAuthState(body.availableActions.signIn.enabled ? "ready" : "unconfigured");
       } catch {
         // Fail closed: if the deployment cannot be asked, do not offer a control that will fail.
         if (!cancelled) {
+          setPurchaseOpen(false);
           setSelfService(false);
           setAuthState("unconfigured");
         }
@@ -186,9 +191,14 @@ export default function LoginPage() {
             not open yet." The heading and the first paragraph contradicted each other on the
             surface that converts. The heading now says what the page does, which is true in
             every deployment state; what is and is not open is the notice’s job.
+
+            P2-10 (JOURNEY-MAP D-02): the same rule for a reader who arrived with a plan. "One step
+            before checkout" is a promise, so it waits for `purchasePlan` exactly as the notice
+            under it does; until then, and wherever no plan can be bought, the heading is the one
+            that is true in every state.
           */}
           <h1>
-            {intent ? "One step before checkout."
+            {intent && purchaseOpen ? "One step before checkout."
               : signedIn && recipe ? "Continue your recipe."
               : recipe ? "One step before you run this."
                 : "Sign in to TAVONEL."}
@@ -211,11 +221,7 @@ export default function LoginPage() {
             />
           ) : <>
           {intent ? (
-            <p className="notice static" role="status">
-              <strong>{BILLING_OFFERS[intent].label} is held for you.</strong> Checkout opens by
-              itself once you are in. Nothing is charged by signing in, and access changes only
-              after a signed webhook is persisted.
-            </p>
+            <CheckoutIntentNotice offer={intent} purchaseOpen={purchaseOpen} />
           ) : recipe ? (
             <>
               {/*

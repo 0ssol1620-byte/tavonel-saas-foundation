@@ -1,11 +1,15 @@
-import type { Metadata } from "next";
+import type { Metadata, Route } from "next";
 import Link from "next/link";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import PricingPlanOverview, { pricingPlanDestinationClass, pricingPlanId } from "@/components/pricing-plan-overview";
 import { activationPolicy } from "@/lib/activation-policy";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
+import { loginUrlForOffer } from "@/lib/checkout-intent";
+import { primaryCallToAction } from "@/lib/commercial-state";
 import { pageMetadata } from "@/lib/page-seo";
+import { readPublicStatusV2 } from "@/lib/public-status";
+import { ACCESS_CTA, KO_CHROME, SELF_SERVE_CTA } from "@/lib/site-navigation";
 import { MAX_UNITS_PER_PAGE, PROCESSING_UNIT_USD, STANDARD_UNITS_PER_PAGE } from "@/lib/usage-pricing";
 import DocumentLangKo from "../document-lang";
 import styles from "./pricing.module.css";
@@ -33,6 +37,22 @@ const standardPageUsd = STANDARD_UNITS_PER_PAGE * PROCESSING_UNIT_USD;
 const maximumPageUsd = MAX_UNITS_PER_PAGE * PROCESSING_UNIT_USD;
 
 export default function KoreanPricingPage() {
+  /*
+    P2-10 (JOURNEY-MAP D-07, A5). This page wrote `/ko/contact` into both of the actions that
+    change with the commercial state, so on the day a plan could be bought the English page would
+    offer checkout while this one kept sending the same buyer to a consultation. The intro reads
+    the site's access action and the Developer card reads `purchasePlan`, the same answer
+    `/pricing` reads. While both are closed -- today -- the two branches below print exactly what
+    this page printed before (`lib/cta-truth.test.ts` pins it).
+
+    The open branch reuses existing Korean strings rather than writing pricing copy: the S2 Korean
+    wording is founder decision D-07, set in P2-37 before the switch moves.
+  */
+  const access = primaryCallToAction();
+  const intro = access.href === ACCESS_CTA.href
+    ? { href: "/ko/contact", label: "도입 상담하기" }
+    : { href: access.href, label: KO_CHROME.cta[access.href] ?? access.label };
+  const purchaseOpen = readPublicStatusV2().availableActions.purchasePlan.enabled;
   return (
     <PublicSitePage korean languageHref="/pricing">
       <DocumentLangKo />
@@ -45,7 +65,7 @@ export default function KoreanPricingPage() {
               <h1 className="document-title" id="ko-pricing-title">먼저 확인하고, 맞는 범위로 시작하세요.</h1>
               <p className="lede">완성된 공개 World는 로그인 없이 살펴볼 수 있습니다. 내 자료를 컴파일하는 절차와 요금은 아래에서 확인하고 상담으로 연결할 수 있습니다.</p>
               <div className={styles.actions}>
-                <Link className="btn" href="/ko/contact">도입 상담하기</Link>
+                <Link className="btn" href={intro.href as Route}>{intro.label}</Link>
                 <Link className="btn ghost" href="/explore" hrefLang="en">공개 World 확인 (영문)</Link>
               </div>
               {!activationPolicy.customerData.enabled ? (
@@ -67,7 +87,11 @@ export default function KoreanPricingPage() {
                   <p className={styles.price}>${developer.priceUsd}<span className={styles.unit}> {monthlyUnit}</span></p>
                   <p>월 {developer.includedPages.toLocaleString("en-US")} 표준 페이지, 증거 연결·Ask·서명된 내보내기, API·MCP 접근.</p>
                   <p className="fine">자체 자료 컴파일은 승인된 시범 운영 범위에서만 진행합니다.</p>
-                  <Link href="/ko/contact?plan=Developer">Developer 도입 상담</Link>
+                  {purchaseOpen ? (
+                    <Link href={loginUrlForOffer("observer_access") as Route}>{developer.label} · {KO_CHROME.cta[SELF_SERVE_CTA.href]}</Link>
+                  ) : (
+                    <Link href="/ko/contact?plan=Developer">Developer 도입 상담</Link>
+                  )}
                 </article>
                 <article className={`${styles.card} ${pricingPlanDestinationClass}`} id={pricingPlanId(2)} tabIndex={-1}>
                   <h3>{team.label}</h3>

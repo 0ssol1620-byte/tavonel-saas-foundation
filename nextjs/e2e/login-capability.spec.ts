@@ -5,6 +5,7 @@ const statusV2 = ({
   signIn = true,
   createAccount = false,
   compileCustomerDocuments = false,
+  purchasePlan = false,
   commercialMode = "live" as "pilot" | "live",
 } = {}) => ({
   schemaVersion: "tavonel.public_status.v2",
@@ -14,7 +15,7 @@ const statusV2 = ({
     requestPilot: { enabled: true, href: "/contact", reason: "A pilot can be requested." },
     signIn: { enabled: signIn, href: signIn ? "/login" : "/contact", reason: "Sign-in state." },
     createAccount: { enabled: createAccount, href: createAccount ? "/login" : "/contact", reason: "Account state." },
-    purchasePlan: { enabled: false, href: "/contact", reason: "Purchase state." },
+    purchasePlan: { enabled: purchasePlan, href: purchasePlan ? "/pricing" : "/contact", reason: "Purchase state." },
     compileCustomerDocuments: {
       enabled: compileCustomerDocuments,
       href: compileCustomerDocuments ? "/workspace" : "/contact",
@@ -76,6 +77,40 @@ test("never shows PRIVATE PILOT on a live deployment, not even for a frame", asy
   const html = await (await page.goto("/login"))!.text();
   expect(html, "the server payload must not carry the pilot badge").not.toContain("PRIVATE PILOT");
   await expect(page.locator("header .mode")).toHaveCount(0);
+});
+
+/*
+  P2-10 (JOURNEY-MAP D-02, A2): a reader who reached sign-in with a plan is promised a checkout
+  only where `purchasePlan` is open. The unit table (`lib/cta-truth.test.ts`) renders the notice
+  itself; these three drive the page, which is where the status answer and its failure are read.
+*/
+const INTENT_URL = "/login?next=checkout&offer=observer_access";
+
+test("a plan intent is not promised a checkout while no plan can be bought", async ({ page }) => {
+  await page.route("**/api/status/v2", route => route.fulfill({ json: statusV2({ createAccount: true }) }));
+  await page.goto(INTENT_URL);
+  await expect(page.getByText("Developer is not sold online today.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Request Developer access" })).toHaveAttribute("href", "/contact?plan=Developer");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in to TAVONEL.");
+  await expect(page.getByText("Checkout opens by itself", { exact: false })).toHaveCount(0);
+});
+
+test("a plan intent keeps main's checkout promise where a plan can be bought", async ({ page }) => {
+  await page.route("**/api/status/v2", route => route.fulfill({
+    json: statusV2({ createAccount: true, compileCustomerDocuments: true, purchasePlan: true }),
+  }));
+  await page.goto(INTENT_URL);
+  await expect(page.getByText("Developer is held for you.")).toBeVisible();
+  await expect(page.getByText("Checkout opens by itself once you are in.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("One step before checkout.");
+});
+
+test("a plan intent fails closed when the deployment cannot be asked", async ({ page }) => {
+  await page.route("**/api/status/v2", route => route.fulfill({ status: 503, body: "unavailable" }));
+  await page.goto(INTENT_URL);
+  await expect(page.getByText("Developer is not sold online today.")).toBeVisible();
+  await expect(page.getByText("Checkout opens by itself", { exact: false })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in to TAVONEL.");
 });
 
 test("/pricing names the customer-data gate, server-side, with its own reason", async ({ page }) => {

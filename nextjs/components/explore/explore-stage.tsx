@@ -40,7 +40,7 @@ import AskOverlay from "./ask-overlay";
 import type { TechnicalSelection } from "./technical-details";
 import styles from "./explore-stage.module.css";
 import { useNarrowStage, useReducedMotion } from "@/components/world-visual/use-stage-media";
-import { ACCESS_CTA, PRIMARY_NAV } from "@/lib/site-navigation";
+import { PRIMARY_NAV, type SiteLink } from "@/lib/site-navigation";
 import {
   EXPLORE_ACTS,
   EXPLORE_COPY,
@@ -58,16 +58,22 @@ const TechnicalDetails = dynamic(() => import("./technical-details"), { ssr: fal
 /*
   G1-021. The three destinations a visitor who landed here from a search actually needs.
 
-  Read from `PRIMARY_NAV` and `ACCESS_CTA` rather than typed, so the labels are the site's own and
-  a rename reaches this header too. Three, not the whole bar: the stage replaces the site chrome
-  on purpose, and reproducing eight links over it would undo what the stage is for.
+  Read from `PRIMARY_NAV` and the `access` prop rather than typed, so the labels are the site's own
+  and a rename reaches this header too. Three, not the whole bar: the stage replaces the site
+  chrome on purpose, and reproducing eight links over it would undo what the stage is for.
 */
-const EXIT_LINKS = [
-  ...PRIMARY_NAV.filter((link) => link.href === "/product" || link.href === "/pricing"),
-  ACCESS_CTA,
-];
+const NAV_EXITS = PRIMARY_NAV.filter((link) => link.href === "/product" || link.href === "/pricing");
 
 type Props = {
+  /*
+    P2-10 (JOURNEY-MAP D-07, A5): the access action, resolved on the server by
+    `primaryCallToAction()` in `app/explore/page.tsx`. It was `ACCESS_CTA` written into this
+    client module, so the day live commerce opened, the header, the Home hero and the rest of the
+    site would offer "Start with your files" while this page alone still sent a buyer to /contact.
+    A client module cannot resolve the posture itself: the commercial flags inline as `undefined`
+    here (BA-232). While the gate is closed the server passes `ACCESS_CTA`, so nothing changes.
+  */
+  access: SiteLink;
   model: VisualWorldModel;
   layout: VisualLayout;
   change: ExploreChangeView;
@@ -80,7 +86,12 @@ type Props = {
   capturedOn: string;
 };
 
-export default function ExploreStage({ model, layout, change, answers, technical, capturedOn }: Props) {
+export default function ExploreStage({ access, model, layout, change, answers, technical, capturedOn }: Props) {
+  const exitLinks = [...NAV_EXITS, access];
+  // The closing scene's primary action is the same access action, not a second copy of it.
+  const endActions = EXPLORE_COPY.endActions.map((action) =>
+    action.primary ? { ...action, label: access.label, href: access.href } : action,
+  );
   const reduced = useReducedMotion();
   const narrow = useNarrowStage();
 
@@ -367,7 +378,7 @@ export default function ExploreStage({ model, layout, change, answers, technical
         */}
         <div className={styles.headerActions}>
           <nav className={styles.siteLinks} aria-label="TAVONEL">
-            {EXIT_LINKS.map((link) => (
+            {exitLinks.map((link) => (
               <Link key={link.href} href={link.href as Route}>{link.label}</Link>
             ))}
           </nav>
@@ -550,7 +561,7 @@ export default function ExploreStage({ model, layout, change, answers, technical
           funnel row.
         */}
         <div>
-          {EXPLORE_COPY.endActions.map((action) => (
+          {endActions.map((action) => (
             <Link
               key={action.href}
               href={action.href as Route}
