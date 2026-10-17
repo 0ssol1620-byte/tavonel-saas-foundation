@@ -28,6 +28,11 @@ REQUEST_ID: Final = re.compile(r"^[A-Za-z0-9_-]{16,160}$")
 PDF_MAGIC: Final = b"%PDF"
 RENDER_SCALE: Final = 2.0
 OCR_ENGINE_RELEASE: Final = "rapidocr-3.9.2-ko-pass-nocls-v3-selftest"
+# Page-range reading (`x-tavonel-ocr-page-range: start0-end0`) is off unless this is set, so an
+# image built from this source answers every request exactly as before until it is switched on.
+OCR_PAGE_RANGES_ENABLED: Final = os.getenv("TAVONEL_OCR_PAGE_RANGES_ENABLED") == "true"
+PAGE_RANGE: Final = re.compile(r"^(\d{1,6})-(\d{1,6})$")
+PAGE_RANGE_SCHEMA: Final = "tavonel.ocr_page_range.v1"
 OCR_MODEL_SHA256: Final = {
     "general-det": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f",
     "general-rec": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884",
@@ -489,6 +494,32 @@ def reject_non_pdf(filename: str | None, mime: str | None, payload: bytes) -> No
 PageObserver = "object"
 
 
+def read_pages(document, indexes, on_page=None) -> list[OcrRegion]:
+    """Reads the given pages in order. `order` counts from 0 over these pages only."""
+    page_count = len(document)
+    regions: list[OcrRegion] = []
+    for index in indexes:
+        page = document[index]
+        textpage = page.get_textpage()
+        try:
+            text = textpage.get_text_bounded().strip()
+            region = native_page_region(page, textpage, text, index, len(regions)) if text else None
+        finally:
+            textpage.close()
+            page.close()
+        if on_page is not None:
+            on_page(index + 1, page_count, "native", [region] if region else [])
+        if region:
+            regions.append(region)
+            continue
+        # No usable embedded text on this page, whatever the other pages carry. The raster
+        # pass re-reads it, so it reports the page again rather than leaving the observer
+        # stuck on its empty native view. A page with usable native text is never rasterized.
+        for raster_region in raster_regions(document, on_page, (index,)):
+            regions.append({**raster_region, "order": len(regions)})
+    return regions
+
+
 def extract_text(payload: bytes, on_page=None) -> tuple[str, int, list[OcrRegion]]:
     """Extracts text, optionally reporting each page as it is finished.
 
@@ -504,30 +535,35 @@ def extract_text(payload: bytes, on_page=None) -> tuple[str, int, list[OcrRegion
         page_count = len(document)
         if page_count < 1 or page_count > MAX_PAGES:
             raise HTTPException(422, "OCR source page count is not qualified")
-        regions: list[OcrRegion] = []
-        for index in range(page_count):
-            page = document[index]
-            textpage = page.get_textpage()
-            try:
-                text = textpage.get_text_bounded().strip()
-                region = native_page_region(page, textpage, text, index, len(regions)) if text else None
-            finally:
-                textpage.close()
-                page.close()
-            if on_page is not None:
-                on_page(index + 1, page_count, "native", [region] if region else [])
-            if region:
-                regions.append(region)
-                continue
-            # No usable embedded text on this page, whatever the other pages carry. The raster
-            # pass re-reads it, so it reports the page again rather than leaving the observer
-            # stuck on its empty native view. A page with usable native text is never rasterized.
-            for raster_region in raster_regions(document, on_page, (index,)):
-                regions.append({**raster_region, "order": len(regions)})
+        regions = read_pages(document, range(page_count), on_page)
         text = "\n".join(region["text"] for region in regions).strip()
         if not text:
             raise HTTPException(422, "OCR source has no extractable text regions")
         return text, page_count, regions
+    finally:
+        document.close()
+
+
+def extract_page_range(payload: bytes, start0: int, end0: int) -> tuple[int, int, list[OcrRegion]]:
+    """Reads pages [start0, end0) of the document; the end stops at the last page.
+
+    The document page bound is the same as for a whole-document request, so switching ranges on
+    reads nothing a whole-document request would refuse. What changes is the empty page: a range
+    whose pages carry no text is an answer (every page `no_text`), not a 422, because one blank
+    page must not refuse the document it belongs to.
+    """
+    try:
+        document = pdfium.PdfDocument(payload)
+    except Exception as exc:
+        raise HTTPException(422, "OCR renderer rejected this PDF") from exc
+    try:
+        page_count = len(document)
+        if page_count < 1 or page_count > MAX_PAGES:
+            raise HTTPException(422, "OCR source page count is not qualified")
+        if start0 >= page_count:
+            raise HTTPException(422, "OCR page range starts after the last page")
+        end0 = min(end0, page_count)
+        return page_count, end0, read_pages(document, range(start0, end0))
     finally:
         document.close()
 
@@ -635,6 +671,30 @@ def ocr_result_body(text: str, page_count: int, regions: list[OcrRegion], input_
     }
 
 
+def page_range_body(page_count: int, start0: int, end0: int, regions: list[OcrRegion], input_sha256: str) -> dict:
+    """One range of the document, in a schema that can never pass for a whole-document result.
+
+    Regions are built and stamped by `ocr_result_body`, so the caller that joins the ranges in
+    page order and renumbers `order` gets the regions a whole-document request returns. Every
+    page in the range is listed: `ok` when it yielded a region, `no_text` when it yielded none.
+    """
+    result = ocr_result_body("", page_count, regions, input_sha256)
+    read = {region["pageIndex0"] for region in result["regions"]}
+    return {
+        "schemaVersion": PAGE_RANGE_SCHEMA,
+        "status": "ok",
+        "resultSchemaVersion": result["schemaVersion"],
+        "inputSha256": input_sha256,
+        "pageCount": page_count,
+        "pageRange": {"start0": start0, "end0": end0},
+        "pages": [
+            {"pageNumber1": index + 1, "pageStatus": "ok" if index in read else "no_text"}
+            for index in range(start0, end0)
+        ],
+        "regions": result["regions"],
+    }
+
+
 # The two response classes are a union, which FastAPI cannot turn into a response model;
 # the endpoint returns Response objects directly, so there is no model to generate.
 @app.post("/v1/ocr", response_model=None)
@@ -645,6 +705,7 @@ def ocr(
     x_tavonel_ocr_timestamp: str | None = Header(default=None),
     x_tavonel_ocr_request_id: str | None = Header(default=None),
     x_tavonel_ocr_signature: str | None = Header(default=None),
+    x_tavonel_ocr_page_range: str | None = Header(default=None),
 ) -> JSONResponse | StreamingResponse:
     """Reads a PDF. Same contract as before, plus an optional per-page view of the reading.
 
@@ -655,6 +716,10 @@ def ocr(
 
     Authentication, the digest check and the PDF check all happen before either path begins, so
     streaming never becomes a way to get a partial answer out of an unqualified request.
+
+    A request carrying `x-tavonel-ocr-page-range: start0-end0` (0-based, end exclusive) reads only
+    those pages and answers with `page_range_body`, always as plain JSON. It is refused with 501
+    unless `TAVONEL_OCR_PAGE_RANGES_ENABLED` is set.
     """
     expected_digest = require_authentication(
         x_tavonel_input_sha256,
@@ -669,6 +734,19 @@ def ocr(
         reject_non_pdf(source.filename, source.content_type, payload)
     finally:
         source.file.close()
+
+    if x_tavonel_ocr_page_range is not None:
+        # The reader did not run, so this is unavailability rather than an answer about the PDF.
+        if not OCR_PAGE_RANGES_ENABLED:
+            raise HTTPException(501, "OCR page ranges are not enabled on this reader")
+        match = PAGE_RANGE.fullmatch(x_tavonel_ocr_page_range)
+        if not match or int(match[1]) >= int(match[2]):
+            raise HTTPException(422, "OCR page range is invalid")
+        page_count, end0, regions = extract_page_range(payload, int(match[1]), int(match[2]))
+        return JSONResponse(
+            content=page_range_body(page_count, int(match[1]), end0, regions, expected_digest),
+            headers={"cache-control": "no-store"},
+        )
 
     wants_stream = NDJSON_MEDIA_TYPE in (request.headers.get("accept") or "").lower()
     if not wants_stream:
