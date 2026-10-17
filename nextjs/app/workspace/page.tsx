@@ -10,7 +10,7 @@ import { failureSentence } from "@/lib/workspace-failure-copy";
 import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion } from "@/lib/workspace-ask-copy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
-import { useCheckout } from "@/lib/use-checkout";
+import { useCheckout, type NoticeTone } from "@/lib/use-checkout";
 import type { BillingStatusAccount, EntitlementWaitResult } from "@/lib/entitlement-wait";
 import { formatCount, formatTimestamp } from "@/lib/format";
 import { readOfferParam, takeCheckoutIntent } from "@/lib/checkout-intent";
@@ -295,7 +295,13 @@ export default function WorkspacePage() {
   const folderRef = useRef<HTMLInputElement>(null);
   /** Distinguishes two uploads of the same file in one session (the per-file path below). */
   const uploadSeq = useRef(0);
-  const [notice, setNotice] = useState<string | null>(null);
+  /*
+    Journey A9 (D-08). One notice slot, two live regions: a plain string is progress and is read
+    in `role="status"`; `{ alert }` is a refusal and is read in `role="alert"`. The setter stays
+    React's own, so every existing call keeps meaning progress and no hook gains a dependency.
+  */
+  const [notice, setNotice] = useState<string | { alert: string } | null>(null);
+  const notifyCheckout = useCallback((text: string, tone: NoticeTone) => setNotice(tone === "alert" ? { alert: text } : text), []);
   /** Reported by the shell from /api/access/bootstrap; gates the Connections and Developer bodies, not only their nav entries. */
   const [accessSource, setAccessSource] = useState<"owner" | "paid" | "trial" | "unentitled" | null>(null);
   const [customerDataAccess, setCustomerDataAccess] = useState<"checking" | "open" | "closed" | "unavailable">("checking");
@@ -318,7 +324,7 @@ export default function WorkspacePage() {
     if (wait.account) setBillingAccount(wait.account);
     if (wait.outcome === "active") setAccessEpoch((epoch) => epoch + 1);
   }, []);
-  const { start: buy } = useCheckout(setNotice, settleEntitlement);
+  const { start: buy } = useCheckout(notifyCheckout, settleEntitlement);
   // Read from the URL on mount so a linked or reloaded workspace opens on the same view.
   const [tab, setTab] = useState<WorkspaceTab>("overview");
   const [surface, setSurface] = useState<WorkspaceSurface>("home");
@@ -1031,7 +1037,7 @@ export default function WorkspacePage() {
       const { data } = client ? await client.auth.getSession() : { data: { session: null } };
       const token = data.session?.access_token;
       if (!token) {
-        setNotice("Sign in with Google before managing billing.");
+        setNotice({ alert: "Sign in with Google before managing billing." });
         return;
       }
       const response = await fetch("/api/billing/portal", {
@@ -1040,7 +1046,7 @@ export default function WorkspacePage() {
       });
       const json = await response.json() as { code?: string; url?: string };
       if (!response.ok || !json.url) {
-        setNotice(`Billing portal is unavailable. ${failureSentence(json.code, response.status)}`);
+        setNotice({ alert: `Billing portal is unavailable. ${failureSentence(json.code, response.status)}` });
         return;
       }
       window.location.assign(json.url);
@@ -2858,20 +2864,30 @@ export default function WorkspacePage() {
     >
           <input ref={fileRef} type="file" multiple hidden accept={uploadAcceptAttribute} onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
           <input ref={(node) => { folderRef.current = node; node?.setAttribute("webkitdirectory", ""); }} type="file" multiple hidden onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
-          {notice ? (
-            <p className="notice static" role="status">
-              <strong>Activity.</strong> {notice}
-              {/*
-                The compensating action for a partly enqueued corpus, beside the sentence that
-                reports it. It re-submits the identical document set: enqueue is idempotent and
-                the corpus id is derived from the set, so the parts that exist come back
-                unchanged and only the empty slots are written.
-              */}
-              {resumeCorpus ? (
-                <> <button type="button" onClick={() => void startDurableCompile(resumeCorpus)}>Resume the missing parts</button></>
+          {/*
+            Journey A9 (D-08). Both regions are in the page from the first paint, so a screen
+            reader is already listening when a sentence arrives -- a region that mounts together
+            with its text is often not read at all. Progress goes to `status`, a refusal to
+            `alert`; an empty region takes no room (workspace-states.module.css).
+          */}
+          {(["status", "alert"] as const).map((region) => (
+            <div key={region} className={workspaceStateStyles.noticeRegion} role={region}>
+              {notice !== null && (typeof notice === "string") === (region === "status") ? (
+                <p className="notice static">
+                  <strong>Activity.</strong> {typeof notice === "string" ? notice : notice.alert}
+                  {/*
+                    The compensating action for a partly enqueued corpus, beside the sentence that
+                    reports it. It re-submits the identical document set: enqueue is idempotent and
+                    the corpus id is derived from the set, so the parts that exist come back
+                    unchanged and only the empty slots are written.
+                  */}
+                  {resumeCorpus ? (
+                    <> <button type="button" onClick={() => void startDurableCompile(resumeCorpus)}>Resume the missing parts</button></>
+                  ) : null}
+                </p>
               ) : null}
-            </p>
-          ) : null}
+            </div>
+          ))}
 
           {/*
             §13.6. Review required, operator action, refused and failed each get their own row
@@ -3015,12 +3031,18 @@ export default function WorkspacePage() {
                   </div>
                 </div>
               ) : !intakeOpen ? (
-                <div className="workspace-intake-copy workspace-intake-closed" role="status" aria-live="polite">
+                /*
+                  Journey A9 (D-08). This block used to be one polite live region around its h1,
+                  the terms form and every action, so any change inside it re-read the whole form.
+                  Only the access sentence is announced now; the form and the actions sit outside
+                  any live region.
+                */
+                <div className="workspace-intake-copy workspace-intake-closed">
                   <p className="eyebrow">{sourcePending === "terms_acceptance_required" ? "Your workspace" : "A complete example is ready"}</p>
                   {workspaceState.mode === "new" && surface === "home"
                     ? <h1 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : sourcePending === "terms_acceptance_required" ? "Start with your documents" : "See how a source becomes usable knowledge"}</h1>
                     : <h2 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : "See a compiled World"}</h2>}
-                  <p>{customerDataAccess === "checking"
+                  <p role="status">{customerDataAccess === "checking"
                     ? INTAKE_APPROVAL_ROLLOUT_ENABLED ? "We are checking whether this workspace can receive files. This access check does not upload file bytes." : "We are checking whether this workspace can receive files. Nothing is being uploaded."
                     : customerDataAccess === "closed"
                       ? sourcePending === "terms_acceptance_required"
@@ -3057,9 +3079,12 @@ export default function WorkspacePage() {
                       </div>
                     )
                   ) : null}
-                  {customerDataAccess === "closed" && sourcePending === "release_pending" && accessRecheck === "done"
-                    ? <p className={workspaceStateStyles.recheck} role="status">Checked just now. File access is still awaiting release.</p>
-                    : null}
+                  {/* The answer's region is there with the button, before the first press (A9). */}
+                  {customerDataAccess === "closed" && sourcePending === "release_pending" ? (
+                    <div className={workspaceStateStyles.noticeRegion} role="status">
+                      {accessRecheck === "done" ? <p className={workspaceStateStyles.recheck}>Checked just now. File access is still awaiting release.</p> : null}
+                    </div>
+                  ) : null}
                   {customerDataAccess === "closed"
                     ? <small>{sourcePending === "workspace_refused" ? "Public example. Your files stay on your device." : "Public example. Your files stay on your device until source access is enabled."}</small>
                     : null}
