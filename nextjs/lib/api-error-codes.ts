@@ -134,6 +134,7 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
       { code: "UPLOAD_RELEASE_BODY_INVALID", status: 400, meaning: "The release request did not identify a valid approved document.", whatToDo: "Recover the saved attempt and submit the exact approved member identity." },
       { code: "UPLOAD_RELEASE_REQUEST_TOO_LARGE", status: 413, meaning: "The release metadata exceeded the endpoint's bounded request size.", whatToDo: "Retry with the supported attempt and member fields only." },
       { code: "UPLOAD_ALREADY_STORED", status: 409, meaning: "The release endpoint found the object in storage, so the approved member was not released.", whatToDo: "Confirm the same approved member; do not start a replacement attempt." },
+      { code: "QUARANTINE_LIST_UNAVAILABLE", status: 503, meaning: "The listing of sources that were refused or are not yet prepared could not be read. No inventory is returned rather than one that silently leaves those sources out.", whatToDo: "Retry. Nothing was changed; if it keeps failing, contact TAVONEL with the time of the request." },
       {
         code: "AUTH_REQUIRED",
         status: 401,
