@@ -7087,6 +7087,46 @@ test('affected CPU OCR synthetic binding owns exactly four paths and defers its 
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+test('affected CDR Cloud Run service owns exactly its app and wiring suite and defers its exact-head malware-scan qualification', () => {
+  const paths = ['quarantine-sidecar/cdr-cloudrun/app.py', 'quarantine-sidecar/cdr-cloudrun/tests/test_app.py'];
+  const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'cdr-cloudrun-service');
+  assert.equal(owners.length, 1);
+  assert.deepEqual([owners[0].unitFiles, owners[0].browserFiles, owners[0].databaseTests, Boolean(owners[0].worker), Boolean(owners[0].selector), Boolean(owners[0].database), owners[0].nativeReuse],
+    [[], [], [], false, false, false, false]);
+  for (const path of paths) assert.deepEqual(AFFECTED_GROUPS.filter(owner => owner.match.test(path)).map(owner => owner.group), ['cdr-cloudrun-service'], path);
+  const records = paths.map(path => affectedRecord('M', [path]));
+  const map = affectedMap(records);
+  assert.deepEqual([map.failures, map.unmappedPaths, map.groups, map.changedPaths], [[], [], ['cdr-cloudrun-service'], paths]);
+  assert.deepEqual([map.unitFiles, map.browserFiles, map.databaseTests], [[], [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  assert.deepEqual([map.nativeEvidence.disposition, map.nativeEvidence.invalidatingPaths], ['fresh-seven-case-native-run-required', paths]);
+  const plan = affectedAskPlan(map);
+  assert.deepEqual(plan.deferredGroups, ['native-world-race-fresh-run', 'cdr-cloudrun-service']);
+  assert.ok(plan.pendingDebt.includes('cdr-cloudrun-service'));
+  assert.equal(plan.runCdrWorkerChecks, false);
+  const obligation = plan.qualificationReasons.filter(reason => reason.includes('malware-scan-qualification.yml'));
+  assert.equal(obligation.length, 1);
+  assert.ok(obligation[0].startsWith('cdr-cloudrun-service is pending independent verification') && obligation[0].includes(`exact head ${plan.headSha}`));
+  // A claimed local pass never clears the deferred service debt or earns a pass anchor.
+  const receipt = buildRepairReceipt(plan, { headSha: plan.headSha, executedChecks: { cdrWorker: 'success', 'cdr-cloudrun-service': 'passed in this run' } });
+  assert.deepEqual([receipt.gate, receipt.runResults['cdr-cloudrun-service'], 'cdr-cloudrun-service' in receipt.passedGroupAnchors], ['passed-scoped-only', 'pending-deferred', false]);
+  assert.ok(receipt.pendingDebt.includes('cdr-cloudrun-service'));
+  // The TypeScript CDR worker keeps its own owner and check; neither owner joins the other.
+  const withWorker = affectedAskPlan(affectedMap([...records, affectedRecord('M', ['quarantine-sidecar/foundation-cdr-worker/src/ocr.ts'])]));
+  assert.equal(withWorker.runCdrWorkerChecks, true);
+  assert.deepEqual(withWorker.affectedIntegration.entries.map(entry => entry.groups), [['cdr-cloudrun-service'], ['cdr-cloudrun-service'], ['ocr-worker']]);
+  assert.ok(withWorker.deferredGroups.includes('cdr-cloudrun-service') && !withWorker.deferredGroups.includes('ocr-worker'));
+  for (const adjacent of [
+    'quarantine-sidecar/cdr-cloudrun/malware.py', 'quarantine-sidecar/cdr-cloudrun/Dockerfile', 'quarantine-sidecar/cdr-cloudrun/requirements.txt',
+    'quarantine-sidecar/cdr-cloudrun/service.yaml', 'quarantine-sidecar/cdr-cloudrun/app_v2.py', 'quarantine-sidecar/cdr-cloudrun/test_app.py',
+    'quarantine-sidecar/cdr-cloudrun/tests/test_app_v2.py', 'quarantine-sidecar/cdr-cloudrun/tests/test_malware_clamd.py', 'quarantine-sidecar/cdr-cloudrun/tests/conftest.py',
+    'nextjs/quarantine-sidecar/cdr-cloudrun/app.py',
+  ]) {
+    const unknown = affectedMap([...records, affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
 test('affected pilot worksheet runner admits the exact registered component suite and refuses unregistered siblings', async () => {
   const { buildUnitArgs, validateSelectedPath } = await import('./run-repair-check.mjs');
   const file = 'components/evaluation-page.test.tsx';

@@ -2287,6 +2287,10 @@ export const AFFECTED_GROUPS = Object.freeze([
   // GPU OCR worker: only its two actual application/test paths. No worker flag (never the CDR/CPU checks) and not nativeReuse; its
   // qualification is the external foundation-ocr-gpu-image candidate job, which affectedPlan defers as pending debt.
   affectedGroup('ocr-gpu-worker', /^workers\/foundation-ocr-gpu\/(?:app\.py|tests\/(?:test_app|test_gpu_ocr_v3_contract)\.py)$/),
+  // CDR Cloud Run service (PR #152): only its app and wiring suite. No worker flag (the CDR worker check is the TypeScript worker,
+  // not this service) and not nativeReuse; its qualification is the external malware-scan-qualification workflow, which runs this
+  // suite against the digest-pinned clamd and inside the service image built from the checkout, and which affectedPlan defers as pending debt.
+  affectedGroup('cdr-cloudrun-service', /^quarantine-sidecar\/cdr-cloudrun\/(?:app\.py|tests\/test_app\.py)$/),
   affectedGroup('dropbox-connector', /^nextjs\/lib\/(?:dropbox-[a-z-]+|connector-(?:oauth-adapters|page-integrity|provider-isolation|source-identity|sync-page|replay-world-currency-migration)|sync-worker|source-import|source-version-guard)(?:\.test)?\.ts$/,
     { unitFiles: ['lib/dropbox-source-reconciliation.test.ts', 'lib/connector-oauth-adapters.test.ts', 'lib/sync-worker.test.ts', 'lib/source-import.test.ts',
       'lib/connector-page-integrity.test.ts', 'lib/connector-sync-page.test.ts', 'lib/connector-provider-isolation.test.ts', 'lib/connector-source-identity.test.ts',
