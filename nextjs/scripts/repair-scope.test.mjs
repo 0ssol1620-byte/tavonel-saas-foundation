@@ -89,6 +89,8 @@ import {
   collectAffectedChanges,
   PR151_SERVICE_TRUTH_AFFECTED_PATHS,
   PR151_SERVICE_TRUTH_AFFECTED_UNIT_FILES,
+  OCR_PAGES_INCOMPLETE_AFFECTED_PATHS,
+  OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES,
 } from './repair-scope.mjs';
 import { buildRepairReceipt, requireCompletedReadRehearsal } from './repair-scope-gate.mjs';
 import { auditBrowserFiles, browserRunOutputDir, buildNodeTestArgs, buildUnitArgs, collectWorkspaceIntakeCaptures, WORKSPACE_INTAKE_CAPTURE_NAMES, MAX_MOUNTED_PNG_BYTES, validateMountedPngMetadata, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, runBrowserGroups, validateNodeTapReport, validateSelectedPath } from './run-repair-check.mjs';
@@ -7256,6 +7258,25 @@ test('affected PR #151 service truth owner: nine exact paths select six direct s
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
   for (const adjacent of ['nextjs/app/api/documents/route.tsx', 'nextjs/app/api/documents/[id]/route.ts', 'nextjs/lib/pipeline.tsx', 'nextjs/lib/pipeline-v2.test.ts',
     'nextjs/lib/r2-synthetic-canary-2.ts', 'nextjs/lib/workspace-onboarding.test.tsx', 'nextjs/lib/openapi-handler-contract.switch-off.test.ts', 'lib/pipeline.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
+test('affected OCR_PAGES_INCOMPLETE owner: four exact paths select three direct suites and no browser suite; neighbours stay unmapped', () => {
+  const suites = ['lib/documents-route.test.ts', 'lib/operations-p0.test.ts', 'lib/processing-receipts.test.ts'];
+  assert.deepEqual([[...OCR_PAGES_INCOMPLETE_AFFECTED_PATHS], [...OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES]], [['lib/operations-p0.test.ts',
+    'lib/operations-p0.ts', 'lib/processing-receipts.test.ts', 'lib/processing-receipts.ts'], suites]);
+  for (const path of OCR_PAGES_INCOMPLETE_AFFECTED_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['ocr-pages-incomplete-code'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['ocr-pages-incomplete-code'], [], suites, [], []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const plan = affectedAskPlan(affectedMap(OCR_PAGES_INCOMPLETE_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
+  for (const adjacent of ['nextjs/lib/operations-p0.tsx', 'nextjs/lib/operations-p0-v2.ts', 'nextjs/lib/processing-receipts.test.tsx',
+    'nextjs/lib/processing-receipts-v2.ts', 'nextjs/app/api/operations/p0/credits/release/route.ts', 'nextjs/e2e/operations-p0.spec.ts', 'lib/operations-p0.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);

@@ -222,7 +222,6 @@ describe("the documents listing", () => {
 
   it.each([
     ["could not be read", { ok: false, code: "GET_FAILED" }],
-    ["did not validate", { ok: true, json: { schemaVersion: "tavonel.ocr_review_receipt.v1" } }],
   ])("keeps a held document whose review receipt %s, without a reason, and says so", async (_, loaded) => {
     const heldId = "7a7a7a7a-2222-4222-8222-222222222222";
     listImmutable.mockResolvedValue({ ok: true, objects: [...immutableObjectsFor(readId), ...reviewObjectsFor(heldId)] });
@@ -233,6 +232,52 @@ describe("the documents listing", () => {
     expect(held).toMatchObject({ processingState: "operator_review" });
     expect(held).not.toHaveProperty("ocrReviewReasonCode");
     expect(body.partial).toEqual({ documentIds: [heldId], truncated: false });
+  });
+
+  /*
+    RECEIPT-V2: a receipt that loaded and was refused used to be the case above -- a held row with no
+    reason, which the board could only call incomplete. The refusal now names itself with a stable
+    code; the worker's own reason is still unread, so the id stays in `partial`.
+  */
+  it.each([
+    ["is missing fields", { schemaVersion: "tavonel.ocr_review_receipt.v1" }, "OCR_RECEIPT_INVALID"],
+    ["has a schema this site does not know", { schemaVersion: "tavonel.ocr_review_receipt.v9" }, "OCR_RECEIPT_SCHEMA_UNSUPPORTED"],
+  ])("names why a held document's review receipt was refused when it %s, and says the listing is partial", async (_, json, code) => {
+    const heldId = "7a7a7a7a-2222-4222-8222-222222222222";
+    listImmutable.mockResolvedValue({ ok: true, objects: [...immutableObjectsFor(readId), ...reviewObjectsFor(heldId)] });
+    reviewJson.mockResolvedValue({ ok: true, json });
+    const body = await documents();
+    expect(body.status).toBe(200);
+    const held = body.documents.find((item) => item.documentId === heldId);
+    expect(held).toMatchObject({ processingState: "operator_review", ocrReviewReasonCode: code });
+    expect(body.partial).toEqual({ documentIds: [heldId], truncated: false });
+  });
+
+  it("reads the reason from the v2 receipt the CDR worker writes", async () => {
+    const heldId = "7a7a7a7a-2222-4222-8222-222222222222";
+    const objects = reviewObjectsFor(heldId);
+    listImmutable.mockResolvedValue({ ok: true, objects: [...immutableObjectsFor(readId), ...objects] });
+    // Field for field what foundation-cdr-worker/src/sanitize.ts writes since 933fb05e.
+    reviewJson.mockResolvedValue({ ok: true, json: {
+      schemaVersion: "tavonel.ocr_review_receipt.v2",
+      status: "operator_review",
+      sourceKey: `quarantine/${workspaceKey}/${heldId}/source`,
+      immutableKey: objects[0].key,
+      inputSha256: `sha256:${"c".repeat(64)}`,
+      reasonCode: "OCR_PERSISTED_RESULT_INVALID",
+      reason: "stored OCR page range does not match the sanitized source",
+      requestId: null,
+      occurredAt: "2026-10-19T00:00:00.000Z",
+      retryPolicy: "explicit_operator_only",
+      candidatePromotion: false,
+      billingDisposition: "operator_review",
+      computeCredits: 2,
+    } });
+    const body = await documents();
+    expect(body.status).toBe(200);
+    const held = body.documents.find((item) => item.documentId === heldId);
+    expect(held).toMatchObject({ processingState: "operator_review", ocrReviewReasonCode: "OCR_PERSISTED_RESULT_INVALID" });
+    expect(body).not.toHaveProperty("partial");
   });
 
   it("carries no partial marker when every receipt loaded", async () => {
