@@ -32,8 +32,22 @@ const B = "pilot-beta";
 const HOOK = { [A]: "https://hooks.alpha.example/tavonel", [B]: "https://hooks.beta.example/tavonel" };
 const COLLECTION_A = `collection-${"a".repeat(32)}`;
 const COLLECTION_B = `collection-${"b".repeat(32)}`;
-const DIGEST = (c: string) => c.repeat(64);
+// The form the database holds (`sha256:` + 64 hex), not bare hex: a bare-hex fixture is how the
+// sender once passed every test here and detected nothing on a real row.
+const DIGEST = (c: string) => `sha256:${c.repeat(64)}`;
 const STORE = "https://db.example.supabase.co";
+
+// The CHECKs the real tables enforce, read from the migrations themselves. The fake store below
+// refuses a fixture the database would refuse, so the fixtures cannot drift from the schema again.
+const migration = (file: string) => readFileSync(resolve(import.meta.dirname, "../../supabase/migrations", file), "utf8");
+const checkIn = (sql: string, pattern: RegExp) => new RegExp(sql.match(pattern)![1]!);
+const DB_SHAPE = {
+  // foundation_compile_jobs_candidate_digest_shape
+  candidate: checkIn(migration("20260911120200_compile_job_candidate_manifest_digest.sql"), /candidate_manifest_digest ~ '([^']+)'/),
+  // foundation_active_worlds.manifest_digest references foundation_world_versions, which checks this.
+  active: checkIn(migration("0007_foundation_world_lifecycle.sql"), /manifest_digest text not null check \(manifest_digest ~ '([^']+)'\)/),
+  collection: checkIn(migration("0038_foundation_compile_jobs.sql"), /collection_id ~ '([^']+)'/),
+};
 
 const env = (endpoints: Record<string, string> = HOOK, extra: Record<string, string> = {}) => ({
   TAVONEL_CHANGE_NOTIFY_ENABLED: "1",
@@ -65,6 +79,8 @@ let jobs: Row[];
 let pointers: Row[];
 let outbox: Row[];
 let storeDown: boolean;
+let enforceDbShape: boolean;
+let refusedByDb: string[];
 let storeReads: string[];
 type Sent = { host: string; headers: Headers; body: string; signal: unknown };
 let sent: Sent[];
@@ -86,6 +102,23 @@ function filterRows(rows: Row[], query: URLSearchParams) {
   }));
 }
 
+/** A GET as PostgREST answers it: filtered, ordered, limited. */
+function select(rows: Row[], query: URLSearchParams) {
+  const [column, direction] = (query.get("order") ?? "").split(".");
+  const matched = filterRows(rows, query);
+  if (column) matched.sort((left, right) => (Date.parse(String(left[column])) - Date.parse(String(right[column]))) * (direction === "desc" ? -1 : 1));
+  return matched.slice(0, Number(query.get("limit") ?? "1000")).map((row) => structuredClone(row));
+}
+
+/** Only rows the real table could hold; any other fixture is recorded and fails the test in afterEach. */
+function dbHolds(rows: Row[], shapes: Record<string, RegExp>) {
+  return rows.filter((row) => Object.entries(shapes).every(([column, shape]) => {
+    if (!enforceDbShape || row[column] == null || shape.test(String(row[column]))) return true;
+    refusedByDb.push(`${column}=${String(row[column])}`);
+    return false;
+  }));
+}
+
 async function fakeFetch(input: string | URL | Request, init: RequestInit = {}): Promise<Response> {
   const url = new URL(String(input));
   if (url.origin === STORE) {
@@ -93,8 +126,10 @@ async function fakeFetch(input: string | URL | Request, init: RequestInit = {}):
     if (storeDown) return new Response("down", { status: 503 });
     const table = url.pathname.replace("/rest/v1/", "");
     const method = init.method ?? "GET";
-    if (table === "foundation_compile_jobs") return Response.json(filterRows(jobs, url.searchParams));
-    if (table === "foundation_active_worlds") return Response.json(filterRows(pointers, url.searchParams));
+    if (table === "foundation_compile_jobs") {
+      return Response.json(select(dbHolds(jobs, { candidate_manifest_digest: DB_SHAPE.candidate, collection_id: DB_SHAPE.collection }), url.searchParams));
+    }
+    if (table === "foundation_active_worlds") return Response.json(select(dbHolds(pointers, { manifest_digest: DB_SHAPE.active }), url.searchParams));
     if (table !== "foundation_change_notifications") throw new Error(`unexpected table ${table}`);
     if (method === "POST") {
       const inserted: Row[] = [];
@@ -121,11 +156,7 @@ async function fakeFetch(input: string | URL | Request, init: RequestInit = {}):
       }
       return Response.json(matched.map((row) => ({ ...row })));
     }
-    const limit = Number(url.searchParams.get("limit") ?? "1000");
-    const due = filterRows(outbox, url.searchParams)
-      .sort((left, right) => Date.parse(String(left.available_at)) - Date.parse(String(right.available_at)))
-      .slice(0, limit);
-    return Response.json(due.map((row) => structuredClone(row)));
+    return Response.json(select(outbox, url.searchParams));
   }
   const delivery: Sent = { host: url.host, headers: new Headers(init.headers), body: String(init.body), signal: init.signal };
   sent.push(delivery);
@@ -147,6 +178,8 @@ beforeEach(() => {
   pointers = [];
   outbox = [];
   storeDown = false;
+  enforceDbShape = true;
+  refusedByDb = [];
   storeReads = [];
   sent = [];
   receivers = { "hooks.alpha.example": ok, "hooks.beta.example": ok };
@@ -154,6 +187,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  expect(refusedByDb, "a fixture the database would refuse").toEqual([]);
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
@@ -203,6 +237,52 @@ describe("the rollout switch", () => {
     expect(allowed.status).toBe(200);
     expect(await allowed.json()).toEqual({ code: "CHANGE_NOTIFY_DISABLED", enabled: false });
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("answers 503 when switched on but unable to run, so a cron monitor sees the bad setup", async () => {
+    const { GET } = await import("../app/api/internal/change-notify/run/route");
+    const call = () => GET(new Request("https://tavonel.com/api/internal/change-notify/run", { headers: { authorization: `Bearer ${"w".repeat(48)}` } }));
+    vi.stubEnv("FOUNDATION_WORKER_SECRET", "w".repeat(48));
+    vi.stubEnv("CRON_SECRET", "");
+    vi.stubEnv("TAVONEL_CHANGE_NOTIFY_ENABLED", "1");
+    vi.stubEnv("TAVONEL_CHANGE_NOTIFY_SECRET", "");
+    const missing = await call();
+    expect(missing.status).toBe(503);
+    expect(await missing.json()).toEqual({ code: "CHANGE_NOTIFY_SECRET_MISSING", enabled: false });
+    vi.stubEnv("TAVONEL_CHANGE_NOTIFY_SECRET", SECRET);
+    vi.stubEnv("TAVONEL_CHANGE_NOTIFY_ENDPOINTS", "not json");
+    const invalid = await call();
+    expect(invalid.status).toBe(503);
+    expect(await invalid.json()).toEqual({ code: "CHANGE_NOTIFY_ENDPOINTS_INVALID", enabled: false });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("the shapes the database holds", () => {
+  it("detects a change on digests in the form the migrations store, and publishes that form in /docs", async () => {
+    expect(DB_SHAPE.candidate.test(DIGEST("c")) && DB_SHAPE.active.test(DIGEST("1"))).toBe(true);
+    jobs = [job(A, COLLECTION_A, DIGEST("c"))];
+    pointers = [{ workspace_key: A, collection_id: COLLECTION_A, manifest_digest: DIGEST("1") }];
+    expect(await runChangeNotifyTurn(env())).toMatchObject({ code: "OK", enqueued: 1, delivered: 1 });
+    expect(JSON.parse(sent[0]!.body)).toMatchObject({ candidateManifestDigest: DIGEST("c"), activeManifestDigest: DIGEST("1") });
+
+    const table = findDocsSection("run-events")!.blocks.find((block) =>
+      block.kind === "table" && block.rows.some(([field]) => field === "candidateManifestDigest")) as { rows: string[][] };
+    const meaning = (field: string) => table.rows.find(([name]) => name === field)![1]!;
+    expect(meaning("candidateManifestDigest")).toContain("sha256: followed by 64 hex characters");
+    expect(meaning("activeManifestDigest")).toContain("same format");
+  });
+
+  it("names a row whose digest it cannot read instead of skipping it quietly", async () => {
+    // A database whose shape moved away from the sender's (bare hex, for the sake of the test).
+    enforceDbShape = false;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    jobs = [job(A, COLLECTION_A, "c".repeat(64)), job(B, COLLECTION_B, DIGEST("d"))];
+    pointers = [{ workspace_key: B, collection_id: COLLECTION_B, manifest_digest: "1".repeat(64) }];
+    const turn = await runChangeNotifyTurn(env());
+    expect(turn).toMatchObject({ code: "CHANGE_NOTIFY_INCOMPLETE", enqueued: 0, errors: ["CHANGE_NOTIFY_JOB_ROW_INVALID", "CHANGE_NOTIFY_POINTER_ROW_INVALID"] });
+    // B's active World is unreadable, so it is not announced as "nothing active" either.
+    expect(sent).toEqual([]);
   });
 });
 
@@ -281,9 +361,21 @@ describe("tenant isolation", () => {
   it("never reads or sends an unregistered workspace's changes", async () => {
     jobs = [job(A, COLLECTION_A, DIGEST("c")), job(B, COLLECTION_B, DIGEST("d"))];
     await runChangeNotifyTurn(env({ [A]: HOOK[A] }));
-    expect(storeReads.find((read) => read.includes("foundation_compile_jobs"))).toContain(`workspace_key=in.%28${A}%29`);
+    const sweeps = storeReads.filter((read) => read.includes("foundation_compile_jobs"));
+    expect(sweeps).toHaveLength(1);
+    expect(sweeps[0]).toContain(`workspace_key=eq.${A}&`);
+    expect(storeReads.join("\n")).not.toContain(B);
     expect(sent.map((delivery) => delivery.host)).toEqual(["hooks.alpha.example"]);
     expect(outbox.map((row) => row.workspace_key)).toEqual([A]);
+  });
+
+  it("reads each workspace on its own, so a busy workspace cannot push another's change out of the sweep", async () => {
+    jobs = [
+      ...Array.from({ length: 60 }, (_, index) => ({ ...job(A, COLLECTION_A, DIGEST("e")), updated_at: new Date(clock - 60_000 + index).toISOString() })),
+      { ...job(B, COLLECTION_B, DIGEST("d")), updated_at: new Date(clock - 3_600_000).toISOString() },
+    ];
+    await runChangeNotifyTurn(env());
+    expect(sent.map((delivery) => delivery.host).sort()).toEqual(["hooks.alpha.example", "hooks.beta.example"]);
   });
 
   it("buries a row whose workspace has no endpoint, or whose event names another workspace, without sending it anywhere", async () => {
@@ -334,6 +426,14 @@ describe("failure paths", () => {
     expect(await runChangeNotifyTurn(env())).toMatchObject({ retrying: 1 });
     expect(sent[0]!.signal).toBeInstanceOf(AbortSignal);
     expect(outbox[0]).toMatchObject({ state: "pending", attempt: 1, last_status: null, last_error: "EGRESS_REQUEST_FAILED" });
+  });
+
+  it("counts a 2xx with a body over 4 KiB as a failed attempt, as /docs tells the receiver", async () => {
+    receivers["hooks.alpha.example"] = () => new Response("x".repeat(5_000), { status: 200 });
+    expect(await runChangeNotifyTurn(env())).toMatchObject({ retrying: 1, delivered: 0 });
+    expect(outbox[0]).toMatchObject({ state: "pending", attempt: 1, last_status: null, last_error: "EGRESS_RESPONSE_TOO_LARGE" });
+    const retries = findDocsSection("run-events")!.blocks.find((block) => block.kind === "prose" && block.text.startsWith("Delivery is at least once.")) as { text: string };
+    expect(retries.text).toContain("A response body over 4 KiB counts as a failure");
   });
 
   it("does not follow a redirect", async () => {
