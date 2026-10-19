@@ -17,8 +17,10 @@ import {
   ArenaSpeedQualityPlot,
 } from "@/components/benchmarks/arena-charts";
 import {
+  LOCAL_PATH_MASK,
   arenaBars,
   arenaDots,
+  maskLocalPaths,
   modelArenaBoard,
   settledModels,
   unsettledModels,
@@ -293,13 +295,23 @@ export default function BenchmarksPage() {
                       makes a receipt stop receipting. So they are carried byte for byte and put
                       behind a disclosure, where the reader who wants to know why a row is a
                       reference row finds the answer in the words the run recorded.
+
+                      EN-0, the one exception: an absolute path on the scoring machine is printed
+                      as LOCAL_PATH_MASK, and the fold says so. The artifact keeps the bytes.
                     */}
                     {model.notes.length > 0 ? (
                       <details className="status-fold">
                         <summary>Why, in the campaign&rsquo;s own words</summary>
                         {model.notes.map((note) => (
-                          <pre className={styles.verbatim} key={note}>{note}</pre>
+                          <pre className={styles.verbatim} key={note}>{maskLocalPaths(note)}</pre>
                         ))}
+                        {model.notes.some((note) => maskLocalPaths(note) !== note) ? (
+                          <p className="fine">
+                            A file path on the machine that scored this run is shown as{" "}
+                            {LOCAL_PATH_MASK}. The committed board keeps the note as recorded, under
+                            the same sha256.
+                          </p>
+                        ) : null}
                       </details>
                     ) : null}
                   </article>
