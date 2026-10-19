@@ -16,7 +16,7 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
   The whole feature is behind `TAVONEL_CHANGE_NOTIFY_ENABLED === "1"`, unset in production. Off,
   `runChangeNotifyTurn` reads nothing and sends nothing. On, it still refuses to run unless the
   signing secret and the endpoint registry are both present and valid, and the outbox table
-  (`supabase/migrations/20261019150000_change_notify_outbox.sql`) has to exist -- a store error is
+  (`supabase/migrations/20261019100000_change_notify_outbox.sql`) has to exist -- a store error is
   reported, never papered over.
 
   Detection is a comparison, not a guess: the compile job's recorded candidate digest against the

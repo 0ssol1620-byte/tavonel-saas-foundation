@@ -13,7 +13,7 @@ Ships **off**. With `TAVONEL_CHANGE_NOTIFY_ENABLED` unset, the cron route
 
 Follows `RELEASE_ORDER.md`: migration first, then the environment that reaches it.
 
-1. **Apply** `supabase/migrations/20261019150000_change_notify_outbox.sql` to production (founder;
+1. **Apply** `supabase/migrations/20261019100000_change_notify_outbox.sql` to production (founder;
    production database writes are not an agent's call). It creates only
    `foundation_change_notifications` (service_role SELECT/INSERT/UPDATE, RLS on).
 2. **Set the secret** `TAVONEL_CHANGE_NOTIFY_SECRET` (32+ characters) in the Vercel project. The name

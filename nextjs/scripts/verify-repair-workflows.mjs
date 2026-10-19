@@ -642,7 +642,7 @@ assert(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'] === 'cc03d8ecb69d4291
     && JSON.stringify(CHANGE_NOTIFY_AFFECTED_BROWSER_FILES) === JSON.stringify(browsers) && JSON.stringify(owner.browserFiles) === JSON.stringify(browsers)
     && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
     && paths.every(p => owner.match.test('nextjs/' + p))
-    && ['nextjs/app/api/internal/change-notify/replay/route.ts', 'nextjs/lib/change-notify-store.ts', 'nextjs/vercel.json.bak', 'vercel.json', 'nextjs/lib/docs-content.ts', 'supabase/migrations/20261019150000_change_notify_outbox.sql'].every(p => !owner.match.test(p))
+    && ['nextjs/app/api/internal/change-notify/replay/route.ts', 'nextjs/lib/change-notify-store.ts', 'nextjs/vercel.json.bak', 'vercel.json', 'nextjs/lib/docs-content.ts', 'supabase/migrations/20261019100000_change_notify_outbox.sql'].every(p => !owner.match.test(p))
     && sharedMap.includes("\n  ['e2e/change-notify-docs.spec.ts', ['390']],"),
     'change-notify owner must keep its six exact paths, nine direct suites and the 390 change-notify-docs browser row');
 }

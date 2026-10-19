@@ -7647,7 +7647,7 @@ test('affected change-notify owner: 6 exact paths select 9 direct suites and 1 b
   // The lane's other three paths keep the owners they already had.
   for (const [path, owners] of [
     ['nextjs/lib/docs-content.ts', ['docs']],
-    ['supabase/migrations/20261019150000_change_notify_outbox.sql', ['database-contract']],
+    ['supabase/migrations/20261019100000_change_notify_outbox.sql', ['database-contract']],
     ['supabase/tests/service_role_grant_matrix.sql', ['database-contract']],
   ]) assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), owners, path);
   for (const adjacent of ['nextjs/app/api/internal/change-notify/replay/route.ts', 'nextjs/lib/change-notify-store.ts', 'nextjs/lib/change-notify.tsx', 'nextjs/e2e/change-notify.spec.ts', 'nextjs/vercel.json.bak', 'vercel.json', 'nextjs/lib/security/route-classification.test.json']) {
