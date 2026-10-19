@@ -7355,6 +7355,7 @@ test('affected benchmarks path mask owner: four exact paths select seven direct 
 });
 
 // B-01 (2026-10-19): the UX program's four finite owners, each restated independently of the exported constants.
+import { REMOTE_MCP_AFFECTED_PATHS, REMOTE_MCP_AFFECTED_UNIT_FILES, REMOTE_MCP_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES, TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_PATHS, SPECIMEN_STRIP_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_BROWSER_FILES, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 test('affected ux-billing-checkout owner: 18 exact paths select 10 direct suites and 2 browser suites; neighbours stay unmapped', () => {
   const suites = ['lib/billing-binding.test.ts', 'lib/billing-gate-enforce-route.test.ts', 'lib/checkout-intent.test.ts', 'lib/checkout-policy.test.ts', 'lib/cta-truth.test.ts', 'lib/entitlement-wait.test.ts', 'lib/paddle-billing-event.test.ts', 'lib/production-posture.test.ts', 'lib/self-service-trial-device-rotation.test.ts', 'lib/use-checkout.test.ts'];
@@ -7427,6 +7428,25 @@ test('affected launch-qa-release-scripts owner: 5 exact paths select 3 direct su
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[...suites].sort(), [...browsers].sort(), false, false]);
   assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), []);
   for (const adjacent of ['nextjs/scripts/launch-qa/internal-links.mjs', 'nextjs/scripts/launch-qa/lighthouse-budgets.test.mjs', 'nextjs/scripts/release-manifest.mjs', 'nextjs/scripts/release-gate-check-2.mjs', 'nextjs/lib/release-gate-check.test.ts', 'lib/launch-qa-script-ratchet.test.ts.bak']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
+test('affected remote-mcp owner: 12 exact paths select 16 direct suites and 1 browser suite in launch-chromium; neighbours stay unmapped', () => {
+  const suites = ['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/funnel-events.test.ts', 'lib/mcp-server.test.ts', 'lib/output-escaping.test.ts', 'lib/page-metadata.test.ts', 'lib/production-posture.test.ts', 'lib/production-route-surface.test.ts', 'lib/prohibited-phrases.test.ts', 'lib/remote-mcp.test.ts', 'lib/route-canonical-metadata.test.ts', 'lib/route-classification.test.ts', 'lib/seo-surface.test.ts', 'lib/tenant-isolation-negative.test.ts', 'lib/workspace-tenancy.test.ts'];
+  const browsers = ['e2e/launch-qa-remote-mcp.spec.ts'];
+  assert.deepEqual([[...REMOTE_MCP_AFFECTED_PATHS], [...REMOTE_MCP_AFFECTED_UNIT_FILES], [...REMOTE_MCP_AFFECTED_BROWSER_FILES]], [['app/.well-known/oauth-authorization-server/route.ts', 'app/.well-known/oauth-protected-resource/[[...resource]]/route.ts', 'app/api/mcp/oauth/authorize/route.ts', 'app/api/mcp/oauth/register/route.ts', 'app/api/mcp/oauth/token/route.ts', 'app/api/mcp/route.ts', 'app/oauth/authorize/layout.tsx', 'app/oauth/authorize/page.tsx', 'e2e/launch-qa-remote-mcp.spec.ts', 'lib/remote-mcp.test.ts', 'lib/remote-mcp.ts', 'lib/security/route-classification.json'], suites, browsers]);
+  for (const path of REMOTE_MCP_AFFECTED_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['remote-mcp'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['remote-mcp'], [], [...suites].sort(), [...browsers].sort(), []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const plan = affectedAskPlan(affectedMap(REMOTE_MCP_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[...suites].sort(), [...browsers].sort(), false, false]);
+  assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['launch-chromium']);
+  for (const adjacent of [...['nextjs/app/api/mcp/other/route.ts', 'nextjs/app/api/mcp/oauth/revoke/route.ts', 'nextjs/app/.well-known/security.txt/route.ts', 'nextjs/app/oauth/callback/page.tsx', 'nextjs/lib/remote-mcp-tools.ts', 'nextjs/lib/security/route-classification.md', 'nextjs/e2e/launch-qa-remote-mcp-2.spec.ts'], 'lib/remote-mcp.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);

@@ -3,6 +3,7 @@ const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
 
 import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
 import { resolve } from "node:path";
 
@@ -47,7 +48,7 @@ test("remote MCP is a 404 everywhere while the switch is off", async ({ request,
 
 test.describe("remote MCP with the switch on (fixture env)", () => {
   test.describe.configure({ mode: "serial" });
-  test.skip(Boolean(process.env.PLAYWRIGHT_BASE_URL?.trim()), "starts a second server from the local build");
+  test.skip(!existsSync(resolve(".next/BUILD_ID")), "starts a second server from the local production build");
 
   let server: ChildProcess | null = null;
   let base = "";
