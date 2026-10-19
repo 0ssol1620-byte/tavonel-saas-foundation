@@ -156,19 +156,32 @@ export default function DevelopersPage() {
               */}
               {activationPolicy.customerData.enabled ? null : (
                 <p className="fine" data-capability-gate="customerData">
-                  {activationPolicy.customerData.reason}{" "}
-                  <Link href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link> ·{" "}
-                  <Link href="/contact">Discuss your sources</Link>
+                  {activationPolicy.customerData.reason}
+                  {/* Phase 4 (a): a wrapping row of 44px targets, not two links on adjacent lines. */}
+                  <span className="dev-actions">
+                    <Link href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
+                    <Link href="/contact">Discuss your sources</Link>
+                  </span>
                 </p>
               )}
 
-              <p className="fine">
-                The endpoint reference, the error catalogue and the package format are in{" "}
-                <Link href="/docs">the documentation</Link>. If you are deciding between live
-                MCP/API access and a portable package, start with{" "}
-                <Link href={"/docs/use-with-ai" as Route}>Use your results with AI</Link>. Current
-                availability is on the <Link href={"/status" as Route}>status page</Link>.
-              </p>
+              {/*
+                Phase 4 (a): one sentence per item, so no two of these links share adjacent lines at
+                any width and their 44px targets cannot overlap (app/product-polish.css, .dev-refs).
+              */}
+              <ul className="fine dev-refs">
+                <li>
+                  The endpoint reference, the error catalogue and the package format are in{" "}
+                  <Link href="/docs">the documentation</Link>.
+                </li>
+                <li>
+                  If you are deciding between live MCP/API access and a portable package, start
+                  with <Link href={"/docs/use-with-ai" as Route}>Use your results with AI</Link>.
+                </li>
+                <li>
+                  Current availability is on the <Link href={"/status" as Route}>status page</Link>.
+                </li>
+              </ul>
 
               {/* EN-4. What a reader can run here today, before the key the next section asks for. */}
               <KeylessTryIt />
@@ -228,21 +241,28 @@ export default function DevelopersPage() {
                   <article className="tile"><h3>Export verifier</h3><p>Checks a downloaded archive offline: the Ed25519 signature against a fingerprint you fetch separately, every file against the digest we signed, and nothing added. Node.js 20+, no dependency.</p><a className="btn ghost" href="/developer/tavonel-verify-export.mjs" download>Download export verifier</a></article>
                   <article className="tile"><h3>Package verifier</h3><p>Checks what is inside the archive: relations resolve, every region sits inside its page in the 0-1000 frame, and the Turtle, JSON-LD and CSV describe the same graph. Add <code>tavonel-verify-roundtrip.py</code> to load it into SQLite and query the ids back.</p><a className="btn ghost" href="/developer/tavonel-verify-package.mjs" download>Download package verifier</a></article>
                 </div>
-                <p className="fine">Verify versions and SHA-256 values against <a href="/developer/channel.json">the public distribution channel</a>. The <a href="/developer/README.md">setup and safety contract</a> documents scopes, secret handling and fail-closed behavior.</p>
+                <ul className="fine dev-refs">
+                  <li>Verify versions and SHA-256 values against <a href="/developer/channel.json">the public distribution channel</a>.</li>
+                  <li>The <a href="/developer/README.md">setup and safety contract</a> documents scopes, secret handling and fail-closed behavior.</li>
+                </ul>
                 {/*
                   G3-017. The two recipe scripts /docs/integration-recipes tells a reader to run
                   were in a private repository, so a page whose premise is "these recipes are
                   executed, so a drifted one fails a check rather than your afternoon" asked the
                   reader to take that on trust. They are in the channel now, pinned like the rest.
                 */}
-                <p className="fine">
-                  The two runnable recipes are published too:{" "}
-                  <a href="/developer/tavonel-public-sample.py" download>tavonel-public-sample.py</a>{" "}
-                  reads the public sample World with no key, and{" "}
-                  <a href="/developer/tavonel-recipe-smoke.mjs" download>tavonel-recipe-smoke.mjs</a>{" "}
-                  runs all three against a deployment. Every request either one makes is an
-                  unauthenticated GET.
-                </p>
+                <p className="fine">The two runnable recipes are published too.</p>
+                <ul className="fine dev-refs">
+                  <li>
+                    <a href="/developer/tavonel-public-sample.py" download>tavonel-public-sample.py</a>{" "}
+                    reads the public sample World with no key.
+                  </li>
+                  <li>
+                    <a href="/developer/tavonel-recipe-smoke.mjs" download>tavonel-recipe-smoke.mjs</a>{" "}
+                    runs all three against a deployment.
+                  </li>
+                  <li>Every request either one makes is an unauthenticated GET.</li>
+                </ul>
               </div>
 
               <div className="stack">

@@ -155,6 +155,14 @@ jobs:
           pnpm exec playwright test
           --project=1440 --project=390 --project=360 --project=reduced-motion
           --project=audit --project=audit-768 --project=audit-1280
+      # Phase 4 follow-ups (f), the RSC-leak probe. PR #157 found a scoring machine's absolute path, OS user name
+      # included, in the /benchmarks HTML and again in its RSC payload, where no browser check can see it. The probe reads
+      # every prerendered HTML document and RSC payload that the step above built under .next (the fixture env of
+      # playwright.config.ts) and fails on a drive-letter path, /Users/, /home/ or this runner's OS user name, read from
+      # the environment. It runs even when a browser check failed, so a leak is never hidden behind another red step.
+      - name: Probe the built HTML and RSC payloads for machine paths
+        if: ${{ !cancelled() }}
+        run: node scripts/launch-qa/rsc-leak-probe.mjs --reuse-build
       - name: Preserve product failure evidence
         if: always()
         uses: actions/upload-artifact@v4

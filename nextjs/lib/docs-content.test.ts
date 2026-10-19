@@ -544,3 +544,65 @@ describe("the getting-started surfaces state no time to a first result", () => {
     ]) expect(durationClaims(allowed), allowed).toEqual([]);
   });
 });
+
+/*
+  Phase 4 follow-up (b), REVIEW-ENABLEMENT-2026-10-17 founder hands: /docs/mcp printed the Claude
+  Desktop path as `%APPDATA%\\Claude\\…` -- two backslashes per separator, because the data
+  escaped them twice -- and in running prose, whose sans stack falls back to Malgun Gothic, a face
+  that draws U+005C as a won sign. A backslash belongs inside backticks, where it renders as code
+  in the site's mono face (`app/product-polish.css`), and a path writes one per separator.
+*/
+describe("backslashes in the documentation", () => {
+  const BACKSLASH = String.fromCharCode(92);
+  const outsideCode = (text: string) => text.split(/`[^`]+`/g).join(" ");
+  const rendered = DOCS_SECTIONS.flatMap((section) => section.blocks.flatMap((block) => {
+    switch (block.kind) {
+      case "prose":
+      case "note":
+        return [{ slug: section.slug, text: block.text }];
+      case "steps":
+        return block.items.map((text) => ({ slug: section.slug, text }));
+      case "table":
+        return [...block.head, ...block.rows.flat()].map((text) => ({ slug: section.slug, text }));
+      default:
+        return [];
+    }
+  }));
+
+  it("sits inside inline code wherever prose prints one", () => {
+    const offenders = rendered.filter(({ text }) => outsideCode(text).includes(BACKSLASH));
+    expect(offenders.map(({ slug, text }) => `${slug}: ${text.slice(0, 80)}`)).toEqual([]);
+    expect(outsideCode(`reads %APPDATA%${BACKSLASH}Claude on Windows`)).toContain(BACKSLASH);
+    expect(outsideCode(`reads \`%APPDATA%${BACKSLASH}Claude\` on Windows`)).not.toContain(BACKSLASH);
+  });
+
+  it("separates a Windows path with one backslash, on /docs/mcp and the integration recipes alike", () => {
+    const windowsPaths = rendered.flatMap(({ slug, text }) => [...text.matchAll(/%APPDATA%[^\s`]*/g)].map((match) => ({ slug, path: match[0] })));
+    expect(windowsPaths.map(({ slug }) => slug).sort()).toEqual(["integration-recipes", "mcp"]);
+    for (const { slug, path } of windowsPaths) {
+      expect(path, slug).toBe(`%APPDATA%${BACKSLASH}Claude${BACKSLASH}claude_desktop_config.json`);
+    }
+  });
+
+  it("is drawn in the code face, never the generic monospace a Korean-locale browser maps to GulimChe", () => {
+    const polish = readFileSync(resolve(import.meta.dirname, "../app/product-polish.css"), "utf8");
+    const stack = (/\.scene\.doc code \{ font-family: ([^;]+); \}/.exec(polish)?.[1] ?? "").split(",").map((family) => family.trim());
+    expect(stack[0], "the stack leads with IBM Plex Mono").toBe('"IBM Plex Mono"');
+    // var(--font-mono) carries next/font's "IBM Plex Mono Fallback", which is local("Arial"): proportional.
+    expect(stack.filter((family) => /font-mono|Fallback|Arial/.test(family))).toEqual([]);
+    expect(stack.at(-1), "the generic family is the last resort, not the first").toBe("monospace");
+    // Plex is display: optional; on Windows and Linux the next named face has to be a real one.
+    expect(stack.indexOf("Consolas")).toBeGreaterThan(0);
+    expect(stack.indexOf('"Liberation Mono"')).toBeGreaterThan(0);
+    expect(stack.filter((family) => family === "monospace")).toHaveLength(1);
+  });
+
+  it("shows an MCP args placeholder that is not a machine path", () => {
+    const configs = DOCS_SECTIONS.flatMap((section) => section.blocks.flatMap((block) => (block.kind === "code" && block.body.includes("mcpServers") ? [block.body] : [])));
+    expect(configs.length).toBeGreaterThan(1);
+    for (const body of configs) {
+      expect(body).toContain('"args": ["/absolute/path/to/tavonel-mcp.mjs"]');
+      expect(body).not.toMatch(/\b[A-Za-z]:[\\/]|\/Users\/|\/home\//);
+    }
+  });
+});

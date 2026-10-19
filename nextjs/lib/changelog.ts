@@ -73,6 +73,166 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   /*
+    Phase 4 follow-ups backfill, 2026-10-19: every main merge from #143 to #160 that changed
+    something a visitor or a downloaded client can meet. Each entry is dated by the Asia/Seoul day
+    its own production deployment reached tavonel.com and timed by that deployment's READY time,
+    read from Vercel with `vercel ls --prod` and `vercel inspect` (receipt:
+    ux-program-20261017/phase4/FOLLOWUPS/production-deployments-143-160.json). The deployments:
+      #160 dpl_3rwc77Jiwxr7fByrCBM4UnvcKhMY   #159 dpl_EG331q9ZCj4VmrVpf6eBF6cHpDaH
+      #157 dpl_4ZGdna6chWuvqezDqn6Gh3GA7Bji   #151 dpl_AKih8eHDjTz9jpqhrnSVhuqZotX7
+      #149 dpl_4eqGTMU6SxLbfmUCP6e5tTqEZZh5   #148 dpl_7171DiJqoHWEve7Tipmrh9QopSRy
+      #147 dpl_LqYr9TrsotpscjVUgJbgUFKkbaxW   #146 dpl_ANthMstY9u8D5NXtegiNLYykPyms
+      #145 dpl_HSLwHfWTMaV34arJuC1xaupxV7Yj   #144 dpl_H5SJ7cGnkcCFWA62V6vpz2zLdz11
+      #143 dpl_G8Cp59cMYMqf3yyDdp81U3GjXy3b
+    #150 has its entry already (2026-10-16). By docs/CHANGELOG_ENTRY_RULE.md these have none: #152
+    (OCR page ranges, behind flags that are off in production), #153 (decision records), #154 and
+    #156 (internal failure codes and a review-receipt version, met only in a workspace with your
+    own documents, which is closed in production), #155 (a worker image) and #158 (ADR citations).
+    Worded from each merge's diff and description; what a rollout switch keeps off is not listed.
+  */
+  {
+    date: "2026-10-19",
+    releasedAt: "2026-10-19T12:15:39Z",
+    id: "2026-10-19-design-system",
+    title: "One design system across the public pages, a sharper Evidence Line, and checkout messages written for people",
+    surfaces: ["Website", "Billing"],
+    improved: [
+      "Every public page is built from one set of colour tokens, one type scale in Wanted Sans and one page container, and follows one of six page templates. From 900px the header carries its main action beside the navigation.",
+      "On Home, the Evidence Line outlines the region it points at on the source page, and its coordinate label is set in ink. A line opened from the keyboard appears at once, and with reduced motion nothing on the workbench animates.",
+      "Sign-in says whether the plan you picked can be bought online: Team reads “Team is not sold online today.” with Request Team access beside it. When the purchase state cannot be read, the heading is “Sign in to TAVONEL.” and the page promises no checkout.",
+      "Checkout, billing-portal and pilot-access refusals are shown as sentences without the raw error code, and screen readers announce them as alerts.",
+    ],
+  },
+  {
+    date: "2026-10-19",
+    releasedAt: "2026-10-19T08:40:38Z",
+    id: "2026-10-19-guide",
+    title: "A product guide in English and Korean, three recorded walkthroughs, and the API to try without a key",
+    surfaces: ["Website", "Developer tools", "API"],
+    added: [
+      "/guide and /ko/guide walk through the public product chapter by chapter, from opening the public World to connecting the MCP bridge, with a glossary. Every quoted sentence on them is the live text of the page it quotes.",
+      "Three recorded walkthroughs, of Explore, the MCP bridge and the first API and CLI calls, each in a desktop and a phone take with English and Korean captions and a transcript. They are screen recordings, and none of them plays by itself.",
+      "Try it, with no key opens /docs/quickstart and sits on /developers too: three unauthenticated reads that run from the page, and where a response sends a Content-Digest the page checks it over the bytes received.",
+    ],
+    improved: [
+      "The cookbooks index is linked from /resources and from the documentation hub, and listed in the sitemap.",
+      "Every changelog entry is anchored at the date it shows, a fragment published earlier still opens its entry, and the Atom feed takes its date from its newest entry.",
+      "The getting-started pages state no time to a first result.",
+    ],
+  },
+  {
+    date: "2026-10-19",
+    releasedAt: "2026-10-19T06:37:45Z",
+    id: "2026-10-19-benchmarks-notes",
+    title: "Campaign notes on Benchmarks show machine paths as “[local path removed]”",
+    surfaces: ["Website"],
+    fixed: [
+      "A campaign note on /benchmarks shows the scoring machine's absolute path as “[local path removed]”, and the fold says so. The committed campaign board keeps the note as recorded, under the same sha256.",
+    ],
+  },
+  {
+    date: "2026-10-19",
+    releasedAt: "2026-10-19T02:15:45Z",
+    id: "2026-10-19-documents-contract",
+    title: "The document list reports what it could not read, and the OpenAPI document matches the routes",
+    surfaces: ["API", "Workspace"],
+    added: [
+      "GET /api/documents answers 503 with QUARANTINE_LIST_UNAVAILABLE when the document listing cannot be read, and its response carries a partial marker naming the documents that could not be loaded. The workspace shows both states as such.",
+      "The OpenAPI document publishes the upload confirmation operation and developer key creation.",
+    ],
+    improved: [
+      "The upload capability, upload confirmation, developer key create and rotate, and audit operations publish the response bodies those routes return.",
+      "Sources still being processed appear in the document list as stored.",
+    ],
+  },
+  {
+    date: "2026-10-15",
+    releasedAt: "2026-10-15T14:32:11Z",
+    id: "2026-10-15-home-first-screen",
+    title: "Home: “Knowledge your AI can trust.”, a consent card that waits, and the Evidence Line",
+    surfaces: ["Website"],
+    improved: [
+      "The headline is “Knowledge your AI can trust.”, and “AI가 믿고 사용하는 지식.” on the Korean entry page.",
+      "The analytics consent card appears once you scroll down the page or after eight seconds, whichever comes first, and Analytics preferences in the footer opens it at once. Analytics still loads only after consent.",
+      "Each film stage's reading line quotes text that is on screen in that stage.",
+      "On a desktop, hovering or focusing a source region draws a line from the passage to that region's box on the page, labelled with the record's page and coordinates.",
+      "The phone menu is a single icon control, the phone footer is a two-column grid, and cards share one corner radius.",
+    ],
+  },
+  {
+    date: "2026-10-15",
+    releasedAt: "2026-10-15T03:03:49Z",
+    id: "2026-10-15-home-film",
+    title: "The four-stage film under the title, with Fit and Focus",
+    surfaces: ["Website"],
+    improved: [
+      "The four-stage film, Files, Organize, Updates and Use with AI, plays directly under the title.",
+      "Fit, the whole frame, is the default at every width. Focus is a zoom you choose, and on a narrow screen its controls sit in a toolbar outside the film.",
+    ],
+  },
+  {
+    date: "2026-10-13",
+    releasedAt: "2026-10-13T11:54:48Z",
+    id: "2026-10-13-source-recording",
+    title: "Home opens on a recording of a real source being inspected",
+    surfaces: ["Website"],
+    improved: [
+      "Below the headline, a recording of a prepared source inspection, with its own crop on a phone. Nothing is decoded until you press play.",
+      "Product presents the public World and the outputs bound to its sources, and How it works keeps the six-step process. Long source, method and version descriptions are folded into disclosures.",
+      "The GDP.pdf result moves from Home to Benchmarks, where its report and conditions are unchanged.",
+    ],
+  },
+  {
+    date: "2026-10-13",
+    releasedAt: "2026-10-13T03:21:10Z",
+    id: "2026-10-13-how-it-works",
+    title: "How it works gets its own page, and Home shows its film and a negative result",
+    surfaces: ["Website"],
+    added: [
+      "/how-it-works follows a source through six steps, from a versioned input to a new version when the source changes, and it is in the navigation and the sitemap.",
+      "Home prints the GDP.pdf two-arm result, in which compiled context scored below the PDF alone, labelled with its historical, unofficial conditions.",
+    ],
+    improved: [
+      "The four-cut illustrative film plays directly below the headline, and the source workbench follows it as the second scene.",
+      "Product presents what the outputs are used for.",
+    ],
+  },
+  {
+    date: "2026-10-13",
+    releasedAt: "2026-10-13T00:07:58Z",
+    id: "2026-10-13-public-ui",
+    title: "Public pages centred on the real filing, with one typography and navigation",
+    surfaces: ["Website"],
+    improved: [
+      "Home centres the real filing and its selectable passages, and its source, rights and version details open as disclosures.",
+      "Public pages share one typography, one set of surfaces and one navigation. Evidence prose has a readable width, and changelog links keep their 44px touch targets.",
+    ],
+  },
+  {
+    date: "2026-10-12",
+    releasedAt: "2026-10-12T13:17:34Z",
+    title: "Home shows a source page beside its passage, and evaluations have their own page",
+    surfaces: ["Website"],
+    added: [
+      "/evaluation and /ko/evaluation set out how an evaluation of your documents is agreed: permissions, questions, limits, costs and evidence quality before processing begins. Both have share cards and are in the sitemap.",
+    ],
+    improved: [
+      "Home opens on a source page beside the passage read from it, with region selection linked between the two and the context the passage needs stated beside it. The illustrative walkthrough is a closed disclosure.",
+    ],
+  },
+  {
+    date: "2026-10-07",
+    releasedAt: "2026-10-07T09:35:56Z",
+    title: "The Compiled World and Continuous Knowledge product pages",
+    surfaces: ["Website"],
+    added: [
+      "/product/compiled-world lists the files emitted for the public sample behind Explore, with each file's format, size and content digest and a preview of its content.",
+    ],
+    improved: [
+      "/product/continuous-knowledge opens on “See what changed before you activate it.”: compile a candidate, compare the versions, and choose what becomes current, with the replaced version kept intact and readable.",
+    ],
+  },
+  /*
     EN-0 backfill, 2026-10-19. Both entries are dated by the production deployment that put them
     on tavonel.com, read from Vercel: dpl_3JjTwcBhpjARzmQ6xGYR8JU2cdm2 (main bcba7173, PR #150)
     READY 2026-10-16T05:52:06Z, and dpl_7fEfTdmcPi8FfDyrXs17dMiF9gm2 (main 4c80bb30, PR #141)
