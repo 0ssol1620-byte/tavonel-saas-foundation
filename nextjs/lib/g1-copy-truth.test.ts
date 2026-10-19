@@ -136,6 +136,24 @@ describe("G1-COPY: developer docs and files", () => {
     expect(summary).not.toMatch(/verified/i);
     expect(summary).toBe("From an API key to an evidence-bound answer, with the one step no key can take.");
   });
+
+  /*
+    Review B1 (2026-10-19). /llms.txt, which /docs links as the site index for AI agents, is a
+    hand-kept copy of the docs summaries and the page descriptions, so N-5 and S6-17 #1 were only
+    half done while it still said "verified" and "connect today". This binds its quickstart line to
+    the summary the page renders and keeps the connector tense out of the whole file.
+  */
+  it("N-5 / S6-17 #1. llms.txt repeats the quickstart summary and says nothing connects today", () => {
+    const llms = read("public/llms.txt");
+    const summary = DOCS_SECTIONS.find((section) => section.slug === "quickstart")!.summary;
+    const prefix = "- [Quickstart](https://tavonel.com/docs/quickstart): ";
+    const line = llms.split(/\r?\n/).find((entry) => entry.startsWith(prefix));
+    expect(line, "llms.txt lists the quickstart").toBeDefined();
+    const description = line!.slice(prefix.length);
+    expect(description).not.toMatch(/verified/i);
+    expect(description).toBe(summary);
+    expect(llms).not.toMatch(/connects? today/i);
+  });
 });
 
 describe("G1-COPY: /status and /api/readyz", () => {
