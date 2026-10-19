@@ -141,7 +141,7 @@ describe("the board this page reads", () => {
 
 describe("maskLocalPaths", () => {
   it("masks an absolute path on a scoring machine and nothing else", () => {
-    expect(maskLocalPaths("Soft-skip installed: `omnidoc_raw/glm_ocr/` and `C:/Users/yspow/box_omnidoc_results/`."))
+    expect(maskLocalPaths("Soft-skip installed: `omnidoc_raw/glm_ocr/` and `C:/Users/example/box_omnidoc_results/`."))
       .toBe(`Soft-skip installed: \`omnidoc_raw/glm_ocr/\` and \`${LOCAL_PATH_MASK}\`.`);
     expect(maskLocalPaths("from D:\\CodexProjects\\research\\run.json done")).toBe(`from ${LOCAL_PATH_MASK} done`);
     expect(maskLocalPaths("see /Users/someone/x.json and /home/runner/out/")).toBe(`see ${LOCAL_PATH_MASK} and ${LOCAL_PATH_MASK}`);
