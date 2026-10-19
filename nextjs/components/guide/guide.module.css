@@ -11,27 +11,3 @@
 @media (pointer: coarse), (max-width: 1079px) {
   .where a { min-height: 44px; display: inline-flex; align-items: center; }
 }
-
-/*
-  A recording. Two takes, CSS shows the one that fits.
-*/
-.media { display: grid; gap: 10px; margin: 0; min-width: 0; }
-.media video {
-  display: none;
-  max-width: 100%;
-  height: auto;
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-paper-lg);
-  background-color: var(--g1);
-}
-.desktop { width: 100%; aspect-ratio: 1280 / 800; }
-.phone { width: min(100%, calc(88svh * 390 / 844)); aspect-ratio: 390 / 844; justify-self: center; }
-@media (min-width: 641px) {
-  .media .desktop { display: block; }
-}
-@media (max-width: 640px) {
-  .media .phone { display: block; }
-}
-.media figcaption { font-size: 14px; line-height: 1.5; color: var(--text-mid); }
-.transcript > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: 14px; color: var(--text-mid); }
-.transcript ol { margin: 0; padding-left: 1.25em; display: grid; gap: 6px; font-size: 15px; line-height: 1.6; }

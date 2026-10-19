@@ -508,7 +508,7 @@ describe("the getting-started surfaces state no time to a first result", () => {
     "app/developers/page.tsx",
     "app/cookbooks/page.tsx",
     "app/cookbooks/[slug]/page.tsx",
-    "components/docs/api-try-it.tsx",
+    "components/api-try-it.tsx",
     "components/docs/keyless-try-it.tsx",
     "lib/keyless-read.ts",
     // EN-1: the product guide is a getting-started surface too, in both languages.

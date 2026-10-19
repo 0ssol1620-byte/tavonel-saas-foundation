@@ -24,7 +24,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 const { KeylessTryIt, KEYLESS_READS, recipeBody } = await import("../components/docs/keyless-try-it");
-const { ReadResult } = await import("../components/docs/api-try-it");
+const { ReadResult } = await import("../components/api-try-it");
 const { default: DocsSectionPage } = await import("../app/docs/[section]/page");
 const { default: DevelopersPage } = await import("../app/developers/page");
 const { default: ApiReferencePage } = await import("../app/api/page");

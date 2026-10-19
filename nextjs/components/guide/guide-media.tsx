@@ -8,7 +8,7 @@ import {
   type GuideMediaBlock,
   type GuideVideo,
 } from "@/lib/guide-content";
-import styles from "./guide.module.css";
+import styles from "./guide-media.module.css";
 
 /*
   A guide recording (EN-1's media block), in a module of its own so a page that shows one --

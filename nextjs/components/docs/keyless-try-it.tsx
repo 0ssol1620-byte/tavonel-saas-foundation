@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { DocsCopyButton } from "@/components/docs-copy-button";
 import { CodeTokens } from "@/components/docs/code-tokens";
-import { ApiTryIt, type TryItRoute } from "@/components/docs/api-try-it";
+import { ApiTryIt, type TryItRoute } from "@/components/api-try-it";
 import { findDocsSection } from "@/lib/docs-content";
 import { EXPLORE_CTA } from "@/lib/site-navigation";
 import styles from "./api-try-it.module.css";

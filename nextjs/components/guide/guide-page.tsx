@@ -1,3 +1,11 @@
+/*
+  First, on purpose: import order is stylesheet order, and the player's stylesheet leading the
+  guide's list is one of the two facts that keep Next's CSS chunking where main has it (the other
+  is where components/api-try-it.tsx lives; see there). Measured on PR #159: without them /explore,
+  which uses neither, loaded nine stylesheets instead of seven and its Lighthouse LCP went from
+  about 2,750 ms to 3,095 ms, over the 3,000 ms budget.
+*/
+import { GuideMedia } from "./guide-media";
 import Link from "next/link";
 import type { Route } from "next";
 import DocumentLangKo from "@/app/ko/document-lang";
@@ -15,7 +23,6 @@ import {
   type GuideChapter,
   type GuideLanguage,
 } from "@/lib/guide-content";
-import { GuideMedia } from "./guide-media";
 import styles from "./guide.module.css";
 
 /*

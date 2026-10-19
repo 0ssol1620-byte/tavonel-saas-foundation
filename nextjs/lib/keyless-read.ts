@@ -9,7 +9,7 @@
   the trimmed header against `sha-256=:<base64 of SHA-256(body)>:`. A header naming only another
   algorithm is a mismatch, not a pass, because this page cannot check it.
 
-  It is loaded by `components/docs/api-try-it.tsx` on the first Run, not with the page, so the
+  It is loaded by `components/api-try-it.tsx` on the first Run, not with the page, so the
   three routes that never press Run do not carry it (the §22 script budget).
 */
 

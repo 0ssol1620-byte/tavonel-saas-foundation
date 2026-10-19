@@ -2,7 +2,17 @@
 
 import { useState } from "react";
 import type { DigestCheck, KeylessRead } from "@/lib/keyless-read";
-import styles from "./api-try-it.module.css";
+/*
+  Why this file is in components/ and not components/docs/ (EN-FIX-1).
+
+  Next orders a page's client imports by path, so the stylesheet of an island under components/docs/
+  sorts after components/docs-search.tsx's. On /docs/quickstart that put this stylesheet second
+  where /api and /developers have it first, and Next's loose CSS chunking, which starts its shared
+  chunk from the module with the lowest summed position, then started it elsewhere: across the site
+  pages loaded more stylesheets, /explore nine instead of main's seven, and /explore's Lighthouse LCP
+  went over budget (3,095 ms against 3,000). Here it sorts first on all three mounts, as on main.
+*/
+import styles from "./docs/api-try-it.module.css";
 
 /*
   A try-it, bounded to the three routes that take no credential (G3-008).
