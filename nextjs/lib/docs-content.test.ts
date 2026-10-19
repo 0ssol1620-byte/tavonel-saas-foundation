@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { API_VERSION } from "./api-version";
 import { COMPILE_MAX_DOCUMENTS, COMPILE_MIN_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 import { DEVELOPER_SCOPES } from "./developer-contracts";
+import { COOKBOOKS } from "./cookbook-content";
 import { DOCS_GROUPS, DOCS_SECTIONS, DOCS_VERSION, docsSearchIndex, findDocsSection } from "./docs-content";
 import { curlFor, pythonFor, readDocsEndpoints, snippetFor, SNIPPET_LANGUAGES, typescriptFor } from "./docs-endpoints";
 // The docs table is checked against the tool list of the server people actually download.
@@ -478,5 +479,68 @@ describe("founder-locked copy on the docs surfaces", () => {
       expect(locked, `"${phrase}" is no longer in the founder-locked list this copy tracks`)
         .toContain(`"${phrase}"`);
     }
+  });
+});
+
+/*
+  EN-0 / ENABLEMENT-GAP 4e. No time-to-first-result figure until one has been measured.
+
+  Competitors print "in 5 minutes" and "~5 minutes" on their quickstarts; those are their claims,
+  and TAVONEL has not timed its own first result. The figure goes on the quickstart only with a
+  TTFR receipt beside it (lane EN-6), so until then a duration on the getting-started surfaces is
+  a number without a receipt. This reads the evaluated section data, the cookbooks and the source
+  of every docs-side page, so a template literal cannot hide one.
+*/
+const TIME_TO_RESULT: readonly RegExp[] = [
+  /\b\d+(?:[.,]\d+)?\s*(?:-|–|to)?\s*(?:\d+\s*)?(?:min|mins|minutes?)\b/i,
+  /~\s*\d+\s*(?:s|sec|secs|seconds?)\b/i,
+  /\b(?:a few|few|several|within|in under|under a|less than a|about a)\s+minutes?\b/i,
+  /\btime to (?:complete|first result)\b/i,
+  /\d+\s*분/,
+];
+const durationClaims = (text: string) =>
+  TIME_TO_RESULT.flatMap((pattern) => text.match(new RegExp(pattern.source, `${pattern.flags}g`)) ?? []);
+
+describe("the getting-started surfaces state no time to a first result", () => {
+  const sources = [
+    "app/docs/page.tsx",
+    "app/docs/[section]/page.tsx",
+    "app/developers/page.tsx",
+    "app/cookbooks/page.tsx",
+    "app/cookbooks/[slug]/page.tsx",
+    "components/api-try-it.tsx",
+    "components/docs/keyless-try-it.tsx",
+    "lib/keyless-read.ts",
+    // EN-1: the product guide is a getting-started surface too, in both languages.
+    "lib/guide-content.ts",
+    "components/guide/guide-page.tsx",
+    "public/developer/README.md",
+    "public/llms.txt",
+  ];
+
+  it("in the evaluated documentation and cookbook data", () => {
+    expect(durationClaims(JSON.stringify(DOCS_SECTIONS)), "a duration in docs-content").toEqual([]);
+    expect(durationClaims(JSON.stringify(COOKBOOKS)), "a duration in a cookbook").toEqual([]);
+  });
+
+  it.each(sources)("in %s", (surface) => {
+    expect(durationClaims(readFileSync(resolve(import.meta.dirname, "..", surface), "utf8"))).toEqual([]);
+  });
+
+  it("recognises the competitors' phrasings and leaves the rate-limit window alone", () => {
+    for (const planted of [
+      "Parse your first document in 5 minutes.",
+      "Time to complete: ~5 minutes",
+      "about 5 minutes from login",
+      "a first answer in under a minute",
+      "첫 결과까지 5분",
+      "takes 2-3 min",
+    ]) expect(durationClaims(planted), planted).not.toEqual([]);
+    for (const allowed of [
+      "a per-minute allowance held per key",
+      "free again at the top of the next minute",
+      "Requests per minute, per key",
+      "honour Retry-After: 60",
+    ]) expect(durationClaims(allowed), allowed).toEqual([]);
   });
 });

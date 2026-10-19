@@ -2091,6 +2091,41 @@ export const LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/launch-qa-script-ratchet.test.ts',
   'lib/release-gate-check-script.test.ts',
 ]);
+// Enablement batch (codex/enablement-20261017, EN-0 to EN-5 and the guide recordings): the fifty-three changed endpoints no owner
+// listed -- the changelog and its feed, the cookbooks index and card, the resources hub,
+// the keyless try-it's digest check, its island (moved to components/ in EN-FIX-1) and its mounts on /api and /developers, the product guide at /guide and /ko/guide with its
+// media player, and the twenty-four recordings, posters and captions with their sha256 manifest under public/guide. Each selects
+// the twenty suites that read those files directly (rendered pages, source walks, the sitemap, the manifest rehash, the nav model's
+// page-exists walk, listed here since EN-FIX-1). No browser
+// suite of its own: e2e/keyless-try-it.spec.ts runs with the full Playwright suite, and the docs and marketing paths this batch also
+// changed keep their existing owners. Product code, so never nativeReuse.
+export const ENABLEMENT_AFFECTED_PATHS = Object.freeze([
+  'app/api/page.tsx', 'app/changelog/feed.xml/route.ts', 'app/cookbooks/opengraph-image.tsx',
+  'app/cookbooks/page.tsx', 'app/developers/page.tsx', 'app/guide/opengraph-image.tsx', 'app/guide/page.tsx',
+  'app/ko/guide/opengraph-image.tsx', 'app/ko/guide/page.tsx', 'app/product-polish.css', 'app/resources/page.tsx',
+  'components/api-try-it.tsx', 'components/changelog-list.tsx', 'components/guide/guide-media.module.css', 'components/guide/guide-media.tsx', 'components/guide/guide-page.tsx',
+  'components/guide/guide.module.css', 'e2e/keyless-try-it.spec.ts', 'lib/changelog.test.ts',
+  'lib/changelog.ts', 'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts',
+  'lib/guide-content.ts', 'lib/keyless-read.test.ts', 'lib/keyless-read.ts', 'lib/keyless-try-it.test.ts',
+  'lib/resources-hub.test.ts',
+  'public/guide/guide-1-explore-desktop.en.vtt', 'public/guide/guide-1-explore-desktop.jpg',
+  'public/guide/guide-1-explore-desktop.ko.vtt', 'public/guide/guide-1-explore-desktop.mp4',
+  'public/guide/guide-1-explore-phone.en.vtt', 'public/guide/guide-1-explore-phone.jpg',
+  'public/guide/guide-1-explore-phone.ko.vtt', 'public/guide/guide-1-explore-phone.mp4',
+  'public/guide/guide-2-mcp-desktop.en.vtt', 'public/guide/guide-2-mcp-desktop.jpg', 'public/guide/guide-2-mcp-desktop.ko.vtt',
+  'public/guide/guide-2-mcp-desktop.mp4', 'public/guide/guide-2-mcp-phone.en.vtt', 'public/guide/guide-2-mcp-phone.jpg',
+  'public/guide/guide-2-mcp-phone.ko.vtt', 'public/guide/guide-2-mcp-phone.mp4', 'public/guide/guide-3-api-desktop.en.vtt',
+  'public/guide/guide-3-api-desktop.jpg', 'public/guide/guide-3-api-desktop.ko.vtt', 'public/guide/guide-3-api-desktop.mp4',
+  'public/guide/guide-3-api-phone.en.vtt', 'public/guide/guide-3-api-phone.jpg', 'public/guide/guide-3-api-phone.ko.vtt',
+  'public/guide/guide-3-api-phone.mp4', 'public/guide/manifest.json',
+]);
+export const ENABLEMENT_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/changelog.test.ts',
+  'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/design-tokens.test.ts', 'lib/developer-snippets.test.ts',
+  'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/guide-content.test.ts', 'lib/keyless-read.test.ts',
+  'lib/keyless-try-it.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts',
+  'lib/product-claims-sync.test.ts', 'lib/resources-hub.test.ts', 'lib/seo-surface.test.ts', 'lib/site-nav-model.test.ts', 'lib/trust-page-answers.test.ts',
+]);
 // Exact literal alternation: every regular-expression metacharacter is escaped, not only '.', because the cookbook route
 // carries a literal [slug] segment that would otherwise be read as a character class.
 const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
@@ -2107,21 +2142,19 @@ const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}(
 // first, then take the 'Approve maximum & upload' fallback, on both the per-file and the whole-set approval path.
 // UX program 2026-10-17 (phase 2 lanes P2-01..P2-21 and the phase 3 fixes, B-01): the public routes, stylesheets, shared public
 // components, the consent-gated Vercel collector and funnel module, the claims registry, the Playwright config and the public
-// specs and suites the program changed join these exact endpoints (135 now). They add their direct suites below and the
+// specs and suites the program changed join these exact endpoints (129 now; the six of them main's enablement owner
+// holds since PR #159 stay with that owner). They add their direct suites below and the
 // templates, type-scale, site-alignment, brand-tokens, benchmarks, film-line and solutions browser suites, each with its reviewed
 // project row in run-repair-check.mjs. Still exact paths, no wildcard and no default owner.
 export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "docs/gtm/CLAIMS_REGISTRY.yaml",
-  "nextjs/app/api/page.tsx",
   "nextjs/app/arena/page.tsx",
   "nextjs/app/benchmarks/benchmarks.module.css",
   "nextjs/app/benchmarks/gdp-pdf/gdp-pdf.module.css",
   "nextjs/app/benchmarks/gdp-pdf/page.tsx",
   "nextjs/app/changelog/page.tsx",
   "nextjs/app/contact/page.tsx",
-  "nextjs/app/cookbooks/page.tsx",
   "nextjs/app/demo/page.tsx",
-  "nextjs/app/developers/page.tsx",
   "nextjs/app/enterprise/page.tsx",
   "nextjs/app/evaluation/opengraph-image.tsx",
   "nextjs/app/evidence/page.tsx",
@@ -2139,14 +2172,12 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/app/layout.tsx",
   "nextjs/app/not-found.tsx",
   "nextjs/app/paper-product.css",
-  "nextjs/app/product-polish.css",
   "nextjs/app/product/compiled-world/page.tsx",
   "nextjs/app/product/continuous-knowledge/page.tsx",
   "nextjs/app/product/document-understanding/page.tsx",
   "nextjs/app/product/page.tsx",
   "nextjs/app/reproducibility/page.tsx",
   "nextjs/app/research/page.tsx",
-  "nextjs/app/resources/page.tsx",
   "nextjs/app/security/page.tsx",
   "nextjs/app/sitemap.ts",
   "nextjs/app/solutions/page.tsx",
@@ -2221,7 +2252,6 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/lib/benchmark-registry.ts",
   "nextjs/lib/brand-copy.test.ts",
   "nextjs/lib/brand-tokens.test.ts",
-  "nextjs/lib/copy-trust-guard.test.ts",
   "nextjs/lib/funnel-events.ts",
   "nextjs/lib/landing-v2-hero-statement.test.ts",
   "nextjs/lib/landing-v2-motion.test.ts",
@@ -2492,6 +2522,10 @@ export const AFFECTED_GROUPS = Object.freeze([
   // paper-product.css route ownership: the two exact components above select three direct suites and the Explore and Pricing suites.
   affectedGroup('paper-product-route-css', new RegExp(`^nextjs/(?:${exactPathAlternation(PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS)})$`),
     { unitFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, browserFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES }),
+  // Enablement batch: the fifty-three exact paths above select twenty direct suites and no browser suite. The /benchmarks
+  // path mask left this owner when PR #157 brought the same change to main under benchmarks-path-mask.
+  affectedGroup('enablement-20261017', new RegExp(`^nextjs/(?:${exactPathAlternation(ENABLEMENT_AFFECTED_PATHS)})$`),
+    { unitFiles: ENABLEMENT_AFFECTED_UNIT_FILES }),
   // PR #141 fix round 3: the fourteen exact paths above select their direct suites and the site chrome browser suite.
   affectedGroup('pr141-fix-round-3', new RegExp(`^nextjs/(?:${exactPathAlternation(FIX_ROUND_3_AFFECTED_PATHS)})$`),
     { unitFiles: FIX_ROUND_3_AFFECTED_UNIT_FILES, browserFiles: FIX_ROUND_3_AFFECTED_BROWSER_FILES }),

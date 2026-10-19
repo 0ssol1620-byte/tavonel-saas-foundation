@@ -250,6 +250,18 @@ describe("Docs hub reading layout", () => {
   });
 });
 
+/*
+  EN-0. The six task guides were reachable from no documentation page. The hub lists them beside the
+  two featured starting points, as one link to the index -- never to a draft record directly.
+*/
+describe("the docs hub reaches the cookbooks", () => {
+  it("links the cookbooks index from the featured starting points, and no record", () => {
+    const intro = docsHub.slice(docsHub.indexOf('<div className="stack docs-hub-intro">'), docsHub.indexOf('<div className="stack docs-hub-index">'));
+    expect(intro).toContain('href={"/cookbooks" as Route}');
+    expect(docsHub).not.toContain("/cookbooks/");
+  });
+});
+
 describe("documentation section index", () => {
   it("lists every group and every section, from the documentation data", () => {
     expect(docsToc).toContain("DOCS_GROUPS.map");

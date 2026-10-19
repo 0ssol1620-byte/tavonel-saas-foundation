@@ -46,6 +46,9 @@ const COPY_MODULES = [
   "components/pricing-page-client.tsx",
   "components/workspace-getting-started.tsx",
   "components/public-site-chrome.tsx",
+  // EN-1: the product guide's copy and the component that arranges it, both languages.
+  "lib/guide-content.ts",
+  "components/guide/guide-page.tsx",
 ] as const;
 
 /** The marketing routes named in the campaign brief, each as the file that carries its copy. */

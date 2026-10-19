@@ -29,9 +29,9 @@ import { ACCESS_CTA } from "@/lib/site-navigation";
   `/cookbooks` is the index, and this page's breadcrumb names it (BA-210). The argument that used
   to stand here -- every record is a draft, a draft is not linked from Resources as a
   representative case, so an index listing six drafts is that link with extra steps -- produced six
-  pages reachable from nowhere, each emitting a one-node trail for a parent that answered 404. The
-  index carries the same `noindex` the records do, which is the honest half of that argument
-  without the unreachability.
+  pages reachable from nowhere, each emitting a one-node trail for a parent that answered 404. Each
+  record keeps `noindex`; the index is advertised (EN-0) because it says on its face that every
+  guide is published ahead of a recorded run.
 
   There is no image, no video and no raw-HTML sink here except the breadcrumb graph the whole
   site emits. Only a real capture of a real run may illustrate one of these workflows and none

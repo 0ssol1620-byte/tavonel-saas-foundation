@@ -98,7 +98,7 @@ describe("the global menu's destinations", () => {
 
   it("advertises no draft route", () => {
     // A draft cookbook is not offered to a reader from the site's own menu.
-    expect(navHrefs().filter((href) => href.startsWith("/cookbooks"))).toEqual([]);
+    expect(navHrefs().filter((href) => href.startsWith("/cookbooks/"))).toEqual([]);
   });
 
   /*
@@ -256,6 +256,8 @@ describe("the Resources panel", () => {
     // a tag added for an unrelated reason.
     expect(RESOURCE_LINKS.filter((link) => !link.column).map((link) => link.href)).toEqual([
       "/docs",
+      // EN-0: the cookbooks index is a hub entry, beside the documentation it complements.
+      "/cookbooks",
       "/api",
       "/evidence",
       "/reproducibility",

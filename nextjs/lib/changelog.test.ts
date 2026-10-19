@@ -11,6 +11,8 @@ import {
   changelogSections,
   changelogUpdatedAt,
 } from "./changelog";
+import channel from "../public/developer/channel.json";
+import { GET as openApi } from "@/app/api/openapi/route";
 
 /*
   A changelog is the one public page where a plausible line and a true one look identical.
@@ -47,10 +49,31 @@ describe("every entry", () => {
     const ids = CHANGELOG.map(changelogEntryId);
     expect(new Set(ids).size).toBe(ids.length);
     expect(CHANGELOG.filter((entry) => entry.date === "2026-09-18").map(changelogEntryId))
-      .toEqual(["2026-09-16", "2026-09-14"]);
-    expect(CHANGELOG.find((entry) => entry.id === "2026-09-19")?.date).toBe("2026-09-20");
-    expect(CHANGELOG.find((entry) => entry.id === "2026-09-19")?.releasedAt)
+      .toEqual(["2026-09-18", "2026-09-18-pricing"]);
+    expect(CHANGELOG.find((entry) => entry.previousId === "2026-09-19")?.date).toBe("2026-09-20");
+    expect(CHANGELOG.find((entry) => entry.previousId === "2026-09-19")?.releasedAt)
       .toBe("2026-09-19T22:41:11Z");
+  });
+
+  /*
+    EN-0. The anchor said one date and the heading another: `#2026-09-14` opened on an entry
+    headed 18 September, and the fragments ran 09-16, 09-14, 09-15 down the page. An anchor is
+    now the date its entry shows, with a suffix when two releases share a date, and the fragment
+    an entry was first published under is kept as `previousId` so an old link still lands on it.
+  */
+  it("anchors every entry at the date it shows", () => {
+    for (const entry of CHANGELOG) {
+      const id = changelogEntryId(entry);
+      expect(id === entry.date || id.startsWith(`${entry.date}-`), `#${id} is headed ${entry.date}`).toBe(true);
+    }
+  });
+
+  it("keeps every fragment it has published resolving", () => {
+    const anchors = CHANGELOG.flatMap((entry) => [changelogEntryId(entry), ...(entry.previousId ? [entry.previousId] : [])]);
+    expect(new Set(anchors).size, "a previous fragment collides with a current anchor").toBe(anchors.length);
+    for (const published of ["2026-09-23", "2026-09-19", "2026-09-16", "2026-09-14", "2026-09-15", "2026-09-03", "2026-09-02", "2026-09-01"]) {
+      expect(anchors, `#${published} was published and no longer resolves`).toContain(published);
+    }
   });
 
   it("promises nothing", () => {
@@ -104,6 +127,35 @@ describe("ordering and filtering", () => {
   it("lists the newest first", () => {
     const dates = changelogEntries().map((entry) => entry.date);
     expect(dates).toEqual([...dates].sort().reverse());
+    // Two releases on one calendar date: the later deployment is the newer entry.
+    const times = changelogEntries().map(changelogEntryUpdatedAt);
+    expect(times).toEqual([...times].sort().reverse());
+  });
+
+  /*
+    EN-0 / ENABLEMENT-GAP 2.12. The developer channel at /developer/channel.json moved to a version
+    the changelog never named, so the one release a reader is told to pin had no entry. This reads
+    the served manifest, so the next channel bump fails here until it has an entry of its own.
+  */
+  it("has an entry for the developer channel version tavonel.com serves", () => {
+    const entry = CHANGELOG.find((candidate) => candidate.version === channel.version);
+    expect(entry, `channel.json ${channel.version} has no changelog entry`).toBeDefined();
+    expect(entry!.surfaces).toContain("Developer tools");
+    // A deployment cannot be recorded before the release it shipped was cut.
+    expect(changelogEntryUpdatedAt(entry!) >= channel.releasedAt).toBe(true);
+  });
+
+  /*
+    EN-5. The same rule for the API contract. /api/openapi serves info.version, and a contract
+    version no entry names is a contract change nobody was told about. It is read from the served
+    document rather than from API_VERSION, so the check follows whatever the route publishes.
+  */
+  it("has an entry for the API contract version /api/openapi serves", async () => {
+    const response = await openApi(new Request("https://tavonel.com/api/openapi"));
+    const { info } = (await response.json()) as { info: { version: string } };
+    const entry = CHANGELOG.find((candidate) => candidate.apiVersion === info.version);
+    expect(entry, `OpenAPI info.version ${info.version} has no changelog entry`).toBeDefined();
+    expect(entry!.surfaces).toContain("API");
   });
 
   it("filters to one surface without losing an entry that touches two", () => {
@@ -137,6 +189,26 @@ describe("the feed", () => {
     expect(xml).toContain(`<updated>${changelogUpdatedAt()}</updated>`);
   });
 
+  it("dates itself by its newest entry", async () => {
+    const newest = CHANGELOG.map(changelogEntryUpdatedAt).sort().at(-1);
+    expect(changelogUpdatedAt()).toBe(newest);
+    const xml = await feedRoute().text();
+    expect(xml.slice(0, xml.indexOf("<entry>"))).toContain(`<updated>${newest}</updated>`);
+    // The feed's own date is not older than the developer release it carries.
+    expect(changelogUpdatedAt() >= channel.releasedAt).toBe(true);
+  });
+
+  it("keeps the Atom id an entry was first published under", async () => {
+    // A feed reader keys an entry by its id; a new id would be a second copy of the same release.
+    const xml = await feedRoute().text();
+    const moved = CHANGELOG.filter((candidate) => candidate.previousId);
+    expect(moved.length).toBeGreaterThan(0);
+    for (const entry of moved) {
+      expect(xml).toContain(`<id>https://tavonel.com/changelog#${entry.previousId}</id>`);
+      expect(xml).toContain(`<link rel="alternate" href="https://tavonel.com/changelog#${changelogEntryId(entry)}"/>`);
+    }
+  });
+
   it("is well-formed Atom with an escaped body", async () => {
     const response = feedRoute();
     expect(response.headers.get("content-type")).toContain("application/atom+xml");
@@ -166,7 +238,9 @@ describe("the page that renders it", () => {
     expect(list).toContain("changelog-filter");
     expect(list).toContain("id={changelogEntryId(entry)}");
     expect(list).toContain('href={`#${changelogEntryId(entry)}`}');
+    expect(list, "a previously published fragment must still land on its entry").toContain("id={entry.previousId}");
     expect(list).toContain("changelog-breaking");
+    expect(list, "an entry that moved the contract prints the version it moved to").toContain("entry.apiVersion");
   });
 
   it("renders every entry on the server and hides the filtered ones", () => {

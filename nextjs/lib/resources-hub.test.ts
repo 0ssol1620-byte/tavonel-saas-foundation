@@ -79,11 +79,26 @@ describe("the resources hub can be narrowed by purpose and workflow", () => {
 
   it("links only to pages that exist, and never to a draft cookbook", () => {
     const app = resolve(import.meta.dirname, "../app");
+    // EN-0: the cookbooks index is on the hub; a draft record never is.
+    expect(RESOURCE_LINKS.map((link) => link.href)).toContain("/cookbooks");
     for (const link of RESOURCE_LINKS) {
-      expect(link.href, "the hub does not link to a proposed route").not.toContain("/cookbooks");
+      expect(link.href, "the hub does not link a draft cookbook").not.toContain("/cookbooks/");
       expect(existsSync(resolve(app, `${link.href.slice(1)}/page.tsx`)), `${link.href} has no page`)
         .toBe(true);
     }
+  });
+
+  /*
+    Script budget (§22): the hub's tiles are in its first viewport, and the /guide and /cookbooks
+    entries the enablement batch added prefetched 6,214 transferred script bytes of their route
+    chunks (review N-2). Those two are linked without prefetch; the entries main already had are not
+    changed here.
+  */
+  it("does not prefetch the guide or the cookbooks index from the hub", () => {
+    const page = read("../app/resources/page.tsx");
+    expect(page).toContain('const NOT_PREFETCHED = new Set(["/guide", "/cookbooks"]);');
+    expect(page).toContain("<Link href={link.href as Route} prefetch={NOT_PREFETCHED.has(link.href) ? false : undefined}>");
+    expect(RESOURCE_LINKS.map((link) => link.href)).toEqual(expect.arrayContaining(["/guide", "/cookbooks"]));
   });
 
   it("marks a representative case only where a real compiled result is published", () => {
@@ -155,7 +170,7 @@ describe("nothing links a draft cookbook", () => {
 
   it.each(linkSources)("%s names no cookbook route outside a comment", (file) => {
     const source = withoutComments(read(file));
-    expect(source, `${file} links a draft cookbook`).not.toContain("/cookbooks");
+    expect(source, `${file} links a draft cookbook`).not.toContain("/cookbooks/");
     // The stripper has to be doing something, or this test is vacuous on the two files that
     // discuss the route in prose.
     if (file.endsWith("page.tsx")) expect(source.length).toBeLessThan(read(file).length);
@@ -164,14 +179,14 @@ describe("nothing links a draft cookbook", () => {
   it("offers no draft cookbook through customer navigation or calls to action", () => {
     expect(destinations.length).toBeGreaterThan(0);
     for (const href of destinations) {
-      expect(href, "customer navigation links a draft cookbook").not.toContain("/cookbooks");
+      expect(href, "customer navigation links a draft cookbook").not.toContain("/cookbooks/");
     }
   });
 
   it("guards both footer language switch destinations", () => {
     for (const link of [FOOTER_LEGAL_ROW.language, FOOTER_LEGAL_ROW.languageBack]) {
       expect(destinations, "footer language switch is missing from the destination inventory").toContain(link.href);
-      expect(link.href, "footer language switch links a draft cookbook").not.toContain("/cookbooks");
+      expect(link.href, "footer language switch links a draft cookbook").not.toContain("/cookbooks/");
     }
   });
 
@@ -179,7 +194,7 @@ describe("nothing links a draft cookbook", () => {
     expect(NAV_GROUPS.length).toBeGreaterThan(0);
     for (const group of NAV_GROUPS) {
       expect(destinations, `${group.section} overview is missing from the destination inventory`).toContain(group.overviewHref);
-      expect(group.overviewHref, `${group.section} overview links a draft cookbook`).not.toContain("/cookbooks");
+      expect(group.overviewHref, `${group.section} overview links a draft cookbook`).not.toContain("/cookbooks/");
     }
   });
 });

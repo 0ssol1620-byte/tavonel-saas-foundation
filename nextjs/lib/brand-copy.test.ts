@@ -86,6 +86,11 @@ const COPY_SURFACES = [
   "lib/docs-content.ts",
   "app/docs/[section]/page.tsx",
   "app/docs/page.tsx",
+  // EN-1: the product guide. Its words are in guide-content.ts; the two routes carry the heads.
+  "lib/guide-content.ts",
+  "components/guide/guide-page.tsx",
+  "app/guide/page.tsx",
+  "app/ko/guide/page.tsx",
   "app/pricing/page.tsx",
   "app/product/page.tsx",
   "app/product/knowledge-compiler/page.tsx",

@@ -4,7 +4,9 @@ import type { Route } from "next";
 import { PublicPageShell } from "@/components/public-page-shell";
 import { DocsCopyButton } from "@/components/docs-copy-button";
 import { DocsSnippet } from "@/components/docs-snippet";
-import { ApiTryIt, type TryItRoute } from "@/components/docs/api-try-it";
+import { KeylessTryIt } from "@/components/docs/keyless-try-it";
+import { GuideMedia } from "@/components/guide/guide-media";
+import { guideMediaBlock } from "@/lib/guide-content";
 import { withMarks } from "@/components/docs/marks";
 import { CodeTokens } from "@/components/docs/code-tokens";
 import { PageToc, tocEntries } from "@/components/docs/page-toc";
@@ -44,32 +46,6 @@ export const metadata: Metadata = {
   alternates: { canonical: "/api" },
   openGraph: { url: "/api" },
 };
-
-/*
-  The unauthenticated routes, and nothing else.
-
-  Each is a GET carrying no tenant, no document and no credential, which is why it can be called
-  from a browser at all. /reproducibility/sample-world is included because it is the one that
-  shows the shape of an answer -- object, evidence, source version, page, region -- without
-  anyone having compiled anything.
-*/
-const TRY_IT: TryItRoute[] = [
-  {
-    path: "/api/v1/capabilities",
-    label: "What TAVONEL can read",
-    note: "The same list the upload route validates against. A format absent from it is refused at upload rather than accepted and dropped.",
-  },
-  {
-    path: "/api/status",
-    label: "What is open right now",
-    note: "The deployment's own state, including whether compiling your own files is open here.",
-  },
-  {
-    path: "/reproducibility/sample-world",
-    label: "The shape of an answer",
-    note: "A deterministic product fixture, unsigned and labelled as such in its own disclosure field. Build against the shape; do not judge extraction from it.",
-  },
-];
 
 const LANGUAGE_LABELS = { curl: "cURL", python: "Python", typescript: "TypeScript" } as const;
 
@@ -227,6 +203,8 @@ export default async function ApiReferencePage() {
             decisions, and no scope grants them.
           </p>
 
+          {/* The guide recording of the try-it below and the same reads from a terminal (/guide, §4b). */}
+          <div className={styles.recording}><GuideMedia block={guideMediaBlock("guide-3-api")} language="en" /></div>
         </div>
 
         {/*
@@ -240,7 +218,7 @@ export default async function ApiReferencePage() {
           the reference spends the width.
         */}
         <div className={styles.full}>
-          <ApiTryIt routes={TRY_IT} />
+          <KeylessTryIt />
 
           <nav className={styles.index} aria-label="Operations by group">
             {reference.groups.map((group) => (

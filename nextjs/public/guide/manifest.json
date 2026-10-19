@@ -1,0 +1,194 @@
+{
+  "schema": "tavonel.guide-media.v1",
+  "truthClass": "T0",
+  "generatedWithAI": false,
+  "source": "https://tavonel.com",
+  "sourceRelease": "4c80bb3028fb73dc88e929c25baf0bec97bee4e7",
+  "sourceReleaseBasis": "Inferred: the production deployment serving tavonel.com when these were recorded (dpl_7fEfTdmcPi8FfDyrXs17dMiF9gm2) was created 12 s after this main commit and carries the git-main alias. Not read from the deployment's own metadata.",
+  "creator": "TAVONEL first-party browser recording (Playwright chromium, scripted clicks on the live site)",
+  "rights": "First-party recording of public tavonel.com pages and of the public sample World. The /explore sample keeps its own public-sample rights boundary; nothing here grants rights to arbitrary source uploads.",
+  "allowedUse": "TAVONEL enablement guides (/guide, /ko/guide and the documentation). No claim of a customer result, a new compile run, a benchmark, or a capability the public site does not offer today.",
+  "howRecorded": [
+    "Browser scenes: live https://tavonel.com in Playwright chromium with context.recordVideo; desktop 1280x800 (dpr 1), phone 390x844 (dpr 2, isMobile, hasTouch). No fixture build, no request interception, no response edit.",
+    "One declared DOM addition: a synthetic cursor element (#__guide_cursor, pointer-events:none) the recorder moves before each action. Every click is a real pointer click at the cursor position, and the recorder refuses to click when the element under the cursor is not the one named.",
+    "The analytics notice on each first page is declined with its own No thanks button, on camera.",
+    "Terminal scenes: a local page generated only from terminal/<session>.json, a capture of real Git Bash commands run in an empty directory with no TAVONEL_* variable set. Each step shows its real exit code, wall-clock duration and start time.",
+    "No voice, no burned-in caption text. Captions are WebVTT (ko, en) from GUIDE-SCRIPTS.json; each cue runs from its scene's logged start to the next scene's start."
+  ],
+  "files": [
+    {
+      "file": "guide-1-explore-desktop.en.vtt",
+      "bytes": 1981,
+      "sha256": "259be4884a8ca91d9962f4d39b27ec39b7d19ce0ddd3fc50b0c6d8eb6aeab7fb",
+      "cues": 18
+    },
+    {
+      "file": "guide-1-explore-desktop.jpg",
+      "bytes": 136709,
+      "sha256": "efe4c2b5ed7005a1cec8504876aebb2385b097c3ab496551da0679a75d934ec7"
+    },
+    {
+      "file": "guide-1-explore-desktop.ko.vtt",
+      "bytes": 2210,
+      "sha256": "2328598ca0b73741477a386dcbc0214a177aeca406285bcb4dfc1594fe3b14cd",
+      "cues": 18
+    },
+    {
+      "file": "guide-1-explore-desktop.mp4",
+      "bytes": 2553707,
+      "sha256": "15610083e4303ca9ff5a36337c87ed5c05f7c9b1fc9a01e26c5f76578e13d565",
+      "guide": "guide-1-explore",
+      "variant": "desktop",
+      "width": 1280,
+      "height": 800,
+      "durationSeconds": 115.08,
+      "codec": "H.264 Constrained Baseline (libx264 crf 32), yuv420p, 25 fps, no audio",
+      "recordedAt": "2026-10-19T01:04:05.601Z"
+    },
+    {
+      "file": "guide-1-explore-phone.en.vtt",
+      "bytes": 1981,
+      "sha256": "59f7057527ff10443052114584e47f52a3ff899c01617480fa6a7817d4e39d6f",
+      "cues": 18
+    },
+    {
+      "file": "guide-1-explore-phone.jpg",
+      "bytes": 53018,
+      "sha256": "6c77469020741aceb1c07475633ee4ebbd75b3dd704f60dd787cb7f36b279537"
+    },
+    {
+      "file": "guide-1-explore-phone.ko.vtt",
+      "bytes": 2210,
+      "sha256": "d467e856469088454bc4f1020984a7fc7fbce9805fcbcec16183a8d57fc2b97a",
+      "cues": 18
+    },
+    {
+      "file": "guide-1-explore-phone.mp4",
+      "bytes": 1884995,
+      "sha256": "267ce646e12f7a48c77d4531fc0fb275c412ed7fa8cf3e2cda8abeba4727a8a4",
+      "guide": "guide-1-explore",
+      "variant": "phone",
+      "width": 390,
+      "height": 844,
+      "durationSeconds": 114.72,
+      "codec": "H.264 Constrained Baseline (libx264 crf 26), yuv420p, 25 fps, no audio",
+      "recordedAt": "2026-10-19T01:06:02.951Z"
+    },
+    {
+      "file": "guide-2-mcp-desktop.en.vtt",
+      "bytes": 1898,
+      "sha256": "bf96a857d2fb78d39d4592459a6401f2761f45152a76de7c412750c13e2044f2",
+      "cues": 18
+    },
+    {
+      "file": "guide-2-mcp-desktop.jpg",
+      "bytes": 133676,
+      "sha256": "78bae9c28595cb326a94e1a9a33d9095411b9686686a555b4713b5f9ae2e533f"
+    },
+    {
+      "file": "guide-2-mcp-desktop.ko.vtt",
+      "bytes": 2280,
+      "sha256": "b60f4359c3fc3986daed1c69bb39fe892a0d3c1cea0ea9094fc143d3f265555f",
+      "cues": 18
+    },
+    {
+      "file": "guide-2-mcp-desktop.mp4",
+      "bytes": 2565487,
+      "sha256": "beeb04ae5892db1453f5aceccfd243ed5bfbff10666d0c94ed99a6acb826287c",
+      "guide": "guide-2-mcp",
+      "variant": "desktop",
+      "width": 1280,
+      "height": 800,
+      "durationSeconds": 127.28,
+      "codec": "H.264 Constrained Baseline (libx264 crf 34), yuv420p, 25 fps, no audio",
+      "recordedAt": "2026-10-19T01:07:57.377Z"
+    },
+    {
+      "file": "guide-2-mcp-phone.en.vtt",
+      "bytes": 1898,
+      "sha256": "441c45eb4f0e435e435495e9fbed945ca9ce32002c8386cf0ba964a5f0c47c8d",
+      "cues": 18
+    },
+    {
+      "file": "guide-2-mcp-phone.jpg",
+      "bytes": 97287,
+      "sha256": "1fb9845d0300d39066d10016ec0a99b4d23990c664564415a511d5c9cac58aa7"
+    },
+    {
+      "file": "guide-2-mcp-phone.ko.vtt",
+      "bytes": 2280,
+      "sha256": "463724e8b7fba5bcdfe33b26917857c73bcf3cfb9b2aa32986d2c0ae7b290414",
+      "cues": 18
+    },
+    {
+      "file": "guide-2-mcp-phone.mp4",
+      "bytes": 2365206,
+      "sha256": "b4863d0c12a262c2baecb419ee32cbe1b4832629262ef5682222ad037e8ff195",
+      "guide": "guide-2-mcp",
+      "variant": "phone",
+      "width": 390,
+      "height": 844,
+      "durationSeconds": 128.64,
+      "codec": "H.264 Constrained Baseline (libx264 crf 26), yuv420p, 25 fps, no audio",
+      "recordedAt": "2026-10-19T01:10:08.068Z"
+    },
+    {
+      "file": "guide-3-api-desktop.en.vtt",
+      "bytes": 1563,
+      "sha256": "fd7fa8ce8af2a3aa76329fea967d093da913eae7fa238cfada1a8b4512c6ee59",
+      "cues": 13
+    },
+    {
+      "file": "guide-3-api-desktop.jpg",
+      "bytes": 81554,
+      "sha256": "bf83d08d1c9c3ef4ac0cdd0e63eb00e1c516c7a0b170c670eb3ed2c4df93abad"
+    },
+    {
+      "file": "guide-3-api-desktop.ko.vtt",
+      "bytes": 1776,
+      "sha256": "642511e6a74d927413ea2148955923036776a7b319dbfd62af7e6723dd4d2be9",
+      "cues": 13
+    },
+    {
+      "file": "guide-3-api-desktop.mp4",
+      "bytes": 2474839,
+      "sha256": "85f845bc3bfe752d19a3ed2ada947dbb0a3230e3df7536539d3c404fcb57c7e1",
+      "guide": "guide-3-api",
+      "variant": "desktop",
+      "width": 1280,
+      "height": 800,
+      "durationSeconds": 105.16,
+      "codec": "H.264 Constrained Baseline (libx264 crf 28), yuv420p, 25 fps, no audio",
+      "recordedAt": "2026-10-19T01:12:17.632Z"
+    },
+    {
+      "file": "guide-3-api-phone.en.vtt",
+      "bytes": 1563,
+      "sha256": "49910ddc17e7bd3f51880553092d810e88def5b4ea06df90b245b8d98c264010",
+      "cues": 13
+    },
+    {
+      "file": "guide-3-api-phone.jpg",
+      "bytes": 55367,
+      "sha256": "512d019cd47106aaad29ab8e0eb75b3329063c393738a9fe6793012ce95dfb47"
+    },
+    {
+      "file": "guide-3-api-phone.ko.vtt",
+      "bytes": 1776,
+      "sha256": "28e567161f757f255beec0513bdc0b81c6786d55b7bfe3d349894e3a56816293",
+      "cues": 13
+    },
+    {
+      "file": "guide-3-api-phone.mp4",
+      "bytes": 1615170,
+      "sha256": "12ad1332077d772654a62b3bc2b13fd1cb5b68c66b6283ba5456b5b44bdb8a89",
+      "guide": "guide-3-api",
+      "variant": "phone",
+      "width": 390,
+      "height": 844,
+      "durationSeconds": 104.88,
+      "codec": "H.264 Constrained Baseline (libx264 crf 26), yuv420p, 25 fps, no audio",
+      "recordedAt": "2026-10-19T01:14:04.161Z"
+    }
+  ]
+}

@@ -16,10 +16,11 @@ import { EXPLORE_CTA } from "@/lib/site-navigation";
   not from each other -- each emitting a one-node breadcrumb trail for a parent that returned 404.
   Honesty about publication state does not require unreachability.
 
-  So: an index, and the same publication state the records already carry. It is `noindex` and it
-  stays out of the sitemap and llms.txt, exactly as the six do, because a hub whose every entry is
-  a draft is not a page to advertise -- it is the page that makes the six navigable for a reader
-  who was sent one of them, and the parent their breadcrumb names.
+  So: an index. EN-0 (2026-10-19) made it a page the site advertises -- in the sitemap, on
+  /resources and on the docs hub -- because the enablement gap (§4.0-1) asked for the task guides
+  to be findable, and a guide cannot be found from a page the site hides. What it advertises is the lede below, which says that every
+  guide is published ahead of a recorded run, and six titles. The six records keep their own
+  `noindex` and stay out of the sitemap and llms.txt until each one is approved.
 
   What it does not do is dress six drafts as six cases. There is no outcome number, no customer, no
   logo and no "featured" row; each card is the record's title, its workflow family, and the first
@@ -32,12 +33,6 @@ export const metadata: Metadata = {
     "Six task guides: compile a document set into reviewable work, trace a figure to its source, answer from your manuals, connect an external AI, hand over a signed package, apply a source revision.",
   alternates: { canonical: "/cookbooks" },
   openGraph: { url: "/cookbooks" },
-  /*
-    The index follows its entries. Every record is a draft, so the hub declares the same refusal
-    the six declare -- one flag, in the same place, for the same reason. It flips when a record is
-    approved, which is a founder act with a run behind it and the sitemap work that goes with it.
-  */
-  robots: { index: false, follow: true },
 };
 
 /** The first sentence of a record's outcome, which is what the card is for. */

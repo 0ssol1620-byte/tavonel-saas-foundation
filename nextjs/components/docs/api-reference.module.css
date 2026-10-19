@@ -136,6 +136,9 @@
   min-width: 0;
 }
 
+/* The guide recording in the header: the docs reading column's measure, not the shell's 1216px. */
+.recording { width: 100%; max-width: 800px; min-width: 0; }
+
 /*
   pages-24. The examples disclosure: a grid row that keeps the operation's own rhythm when open,
   and a summary that is a real 44px control rather than a line of text with a triangle.

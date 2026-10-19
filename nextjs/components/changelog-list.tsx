@@ -47,9 +47,11 @@ export function ChangelogList() {
             id={changelogEntryId(entry)}
             hidden={surface !== null && !entry.surfaces.includes(surface)}
           >
+            {/* EN-0: the fragment this entry was first published under still lands here. */}
+            {entry.previousId ? <span id={entry.previousId} aria-hidden="true" /> : null}
             {/*
               BQ-136. The date is the visible permalink label, and the surface chips are gone.
-              Corrected release dates retain their old fragment IDs so published links resolve.
+              The anchor is the date shown (EN-0); a corrected entry keeps its old fragment above.
 
               The link to an entry was a bare "#" pushed to the right-hand end of the row: a
               one-character target with an aria-label doing all the work, which a screen
@@ -78,6 +80,7 @@ export function ChangelogList() {
                 that carry a version.
               */}
               {entry.version ? <b>Release {entry.version}</b> : null}
+              {entry.apiVersion ? <b>API {entry.apiVersion}</b> : null}
             </header>
             <h2>{entry.title}</h2>
 

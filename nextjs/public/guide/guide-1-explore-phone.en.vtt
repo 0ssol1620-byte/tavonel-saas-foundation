@@ -1,0 +1,73 @@
+WEBVTT
+
+1
+00:00.001 --> 00:11.180
+First, the analytics notice: No thanks.
+
+2
+00:11.180 --> 00:18.193
+A public sample World that opens without signing up: a read-only sample compiled from Apple's public SEC filings.
+
+3
+00:18.193 --> 00:24.651
+Prepared retrieval results from this artifact. Free-form AI queries are not running in this public demo.
+
+4
+00:24.651 --> 00:28.651
+Pick one of the prepared questions.
+
+5
+00:28.651 --> 00:37.044
+The answer is a source passage chosen by retrieval. Under it, the page says it is a quotation, not an independently checked conclusion.
+
+6
+00:37.044 --> 00:42.414
+Each excerpt names its source file and page. Choosing a row opens that page.
+
+7
+00:42.414 --> 00:47.003
+The source page opens, with the region the excerpt came from marked on it.
+
+8
+00:47.003 --> 00:53.159
+The source version is pinned by its content hash, and each piece of evidence has a permanent link.
+
+9
+00:53.159 --> 00:58.550
+The evidence inspector opens one object beside the source region that supports it.
+
+10
+00:58.550 --> 01:05.890
+Next steps through the source regions behind this object, one at a time.
+
+11
+01:05.890 --> 01:12.304
+Change sets the World built from the annual filing beside the same World after later filings arrived.
+
+12
+01:12.304 --> 01:16.314
+Each filing that arrived is shown with its source page.
+
+13
+01:16.314 --> 01:24.756
+The comparison runs object by object and counts rebuilt and unchanged identities separately. It is a comparison recorded in this sample.
+
+14
+01:24.756 --> 01:29.726
+A page with no region is marked as such, and nothing in this World stands on it.
+
+15
+01:29.726 --> 01:35.235
+The Evidence page shows every region a World read from one page.
+
+16
+01:35.235 --> 01:40.265
+Each region carries a locator: its page, its box coordinates and the source hash.
+
+17
+01:40.265 --> 01:46.074
+Open this region in Explore takes the same region back into Explore.
+
+18
+01:46.074 --> 01:53.771
+We arrange intake for your own sources with you.
