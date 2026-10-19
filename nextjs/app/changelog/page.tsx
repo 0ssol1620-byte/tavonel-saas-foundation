@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { ChangelogList } from "@/components/changelog-list";
+import { changelogEntries } from "@/lib/changelog";
 import { PublicPageShell } from "@/components/public-page-shell";
 
 export const metadata: Metadata = {
@@ -42,7 +43,7 @@ export default function ChangelogPage() {
       child breaks the grid on every long-form page that shares this shell.
     */}
     <div className="stack">
-      <ChangelogList />
+      <ChangelogList entries={changelogEntries()} />
       <div className="actions">
         <a className="btn" href="/changelog/feed.xml">Subscribe to the Atom feed</a>
         <Link className="btn ghost" href={"/docs/errors" as Route}>Read the API contract</Link>

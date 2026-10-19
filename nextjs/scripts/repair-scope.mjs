@@ -2162,12 +2162,31 @@ export const ENABLEMENT_AFFECTED_PATHS = Object.freeze([
   'public/guide/guide-3-api-phone.mp4', 'public/guide/manifest.json',
 ]);
 export const ENABLEMENT_AFFECTED_UNIT_FILES = Object.freeze([
-  'lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/changelog.test.ts',
+  'lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/brand-tokens.test.ts', 'lib/changelog.test.ts',
   'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/design-tokens.test.ts', 'lib/developer-snippets.test.ts',
   'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/guide-content.test.ts', 'lib/keyless-read.test.ts',
   'lib/keyless-try-it.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts',
   'lib/product-claims-sync.test.ts', 'lib/resources-hub.test.ts', 'lib/seo-surface.test.ts', 'lib/site-nav-model.test.ts', 'lib/trust-page-answers.test.ts',
 ]);
+// Phase 4 follow-ups (DELTA-REVIEW-2026-10-19 N-3): the browser suites that read this owner's pages. A change to only
+// components/guide/* or app/product-polish.css selected no browser suite, so the /guide T3 template rule (templates), the token
+// sweep (brand-tokens, whose unit twin lib/brand-tokens.test.ts reads app/product-polish.css and joins the units above), the
+// keyless try-it this owner mounts on /developers, and the p4 spec's /developers, /docs/mcp and /guide checks could all regress
+// unselected. Each has exactly one row in run-repair-check.mjs.
+export const ENABLEMENT_AFFECTED_BROWSER_FILES = Object.freeze([
+  'e2e/brand-tokens.spec.ts', 'e2e/keyless-try-it.spec.ts', 'e2e/p4-followups.spec.ts', 'e2e/templates.spec.ts',
+]);
+// Phase 4 follow-ups (codex/p4-followups-20261019): the four new or changed paths no owner listed. The RSC-leak probe and its
+// fixture suite, the phase's browser spec, and lib/developer-snippets.ts (the MCP placeholder path). They select the probe suite,
+// the two suites that read the snippets, the docs suite that pins the placeholder, the p4 spec and visual-refinement, which
+// imports the snippets. Product code, so never nativeReuse.
+export const P4_FOLLOWUPS_AFFECTED_PATHS = Object.freeze([
+  'e2e/p4-followups.spec.ts', 'lib/developer-snippets.ts', 'lib/rsc-leak-probe.test.ts', 'scripts/launch-qa/rsc-leak-probe.mjs',
+]);
+export const P4_FOLLOWUPS_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/developer-snippets.test.ts', 'lib/docs-content.test.ts', 'lib/keyless-try-it.test.ts', 'lib/rsc-leak-probe.test.ts',
+]);
+export const P4_FOLLOWUPS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/p4-followups.spec.ts', 'e2e/visual-refinement.spec.ts']);
 // Exact literal alternation: every regular-expression metacharacter is escaped, not only '.', because the cookbook route
 // carries a literal [slug] segment that would otherwise be read as a character class.
 const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
@@ -2564,10 +2583,13 @@ export const AFFECTED_GROUPS = Object.freeze([
   // paper-product.css route ownership: the two exact components above select three direct suites and the Explore and Pricing suites.
   affectedGroup('paper-product-route-css', new RegExp(`^nextjs/(?:${exactPathAlternation(PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS)})$`),
     { unitFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, browserFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES }),
-  // Enablement batch: the fifty-three exact paths above select twenty direct suites and no browser suite. The /benchmarks
-  // path mask left this owner when PR #157 brought the same change to main under benchmarks-path-mask.
+  // Enablement batch: the fifty-three exact paths above select twenty-one direct suites and four browser suites (Phase 4, N-3).
+  // The /benchmarks path mask left this owner when PR #157 brought the same change to main under benchmarks-path-mask.
   affectedGroup('enablement-20261017', new RegExp(`^nextjs/(?:${exactPathAlternation(ENABLEMENT_AFFECTED_PATHS)})$`),
-    { unitFiles: ENABLEMENT_AFFECTED_UNIT_FILES }),
+    { unitFiles: ENABLEMENT_AFFECTED_UNIT_FILES, browserFiles: ENABLEMENT_AFFECTED_BROWSER_FILES }),
+  // Phase 4 follow-ups: the four exact paths above select four direct suites and two browser suites.
+  affectedGroup('p4-followups-20261019', new RegExp(`^nextjs/(?:${exactPathAlternation(P4_FOLLOWUPS_AFFECTED_PATHS)})$`),
+    { unitFiles: P4_FOLLOWUPS_AFFECTED_UNIT_FILES, browserFiles: P4_FOLLOWUPS_AFFECTED_BROWSER_FILES }),
   // PR #141 fix round 3: the fourteen exact paths above select their direct suites and the site chrome browser suite.
   affectedGroup('pr141-fix-round-3', new RegExp(`^nextjs/(?:${exactPathAlternation(FIX_ROUND_3_AFFECTED_PATHS)})$`),
     { unitFiles: FIX_ROUND_3_AFFECTED_UNIT_FILES, browserFiles: FIX_ROUND_3_AFFECTED_BROWSER_FILES }),

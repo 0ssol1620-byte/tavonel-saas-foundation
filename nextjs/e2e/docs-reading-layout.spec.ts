@@ -211,3 +211,115 @@ test("MCP reading controls and title clear the shared header with either consent
   await dismissConsent(page);
   await expectReadingPosition(false);
 });
+
+/*
+  R1 on the docs routes, inside the docs owner's own browser suite (Phase 4 follow-ups (g), DELTA-REVIEW-2026-10-19 N-3).
+
+  UX-PLAN-2026-10-17 section 5.3 R1: the header wordmark, the H1 and the content under it share one left edge (+/-1px), the one
+  the tokens define (`--tv-page-w`: min(1320px, 100% - 2 x clamp(24px, 5vw, 72px)), centred). e2e/site-alignment.spec.ts
+  measures it on every public route, but the Repair-scope `docs` owner did not select that suite, so a change to only
+  app/docs/[section]/page.tsx or components/docs/* could move the /docs title row off the edge (the B-09 layout) and pass.
+  The owner's paths sit in the 5dd95ed8 affected-integration fixtures, where site-alignment.spec.ts did not exist yet, so
+  the docs routes' R1 is measured here, in the suite the owner already selects. "Content" is measured as
+  site-alignment.spec.ts measures it: the first block below the H1's hero, its leftmost in-flow text or replaced element,
+  or the painted card or rule inside that block it sits in. The leftmost one has to be on the edge.
+  Driven at all seven widths from the 1440 project, as site-alignment.spec.ts does.
+*/
+const R1_DOCS_ROUTES = ["/docs", "/docs/quickstart", "/docs/mcp"] as const;
+const R1_WIDTHS = [1920, 1440, 1280, 1024, 768, 390, 360] as const;
+const containerEdge = (viewport: number) => Math.max(Math.min(Math.max(viewport * 0.05, 24), 72), (viewport - 1320) / 2);
+
+/** Runs in the page; self-contained because Playwright serialises it. */
+function docsEdges() {
+  const visible = (el: Element) => {
+    const box = el.getBoundingClientRect();
+    if (box.width <= 1 || box.height <= 1) return false;
+    const style = getComputedStyle(el);
+    return style.visibility !== "hidden" && style.display !== "none";
+  };
+  const replaced = new Set(["IMG", "SVG", "VIDEO", "CANVAS", "PICTURE", "INPUT", "SELECT", "TEXTAREA", "IFRAME"]);
+  const header = [...document.querySelectorAll("header")].find((el) => !el.closest("footer") && el.querySelector(".wordmark") && visible(el));
+  const wordmark = header ? [...header.querySelectorAll(".wordmark")].find(visible) : undefined;
+  const h1 = [...document.querySelectorAll("main h1")].find(visible);
+  if (!wordmark || !h1) return { viewport: document.documentElement.clientWidth, wordmark: null, h1: null, content: null, from: "missing wordmark or H1" };
+  const main = h1.closest("main")!;
+  const outOfFlow = (el: Element, root: Element) => {
+    for (let at: Element | null = el; at && at !== root; at = at.parentElement) {
+      const position = getComputedStyle(at).position;
+      if (position === "absolute" || position === "fixed") return true;
+    }
+    return false;
+  };
+  const painted = (el: Element) => {
+    const style = getComputedStyle(el);
+    const opaque = (colour: string) => colour !== "transparent" && !/rgba\(.*,\s*0\)$/.test(colour);
+    return opaque(style.backgroundColor) || (parseFloat(style.borderLeftWidth) > 0 && style.borderLeftStyle !== "none" && opaque(style.borderLeftColor));
+  };
+  const leavesOf = (root: Element) => [...root.querySelectorAll("*")].filter((el) => {
+    if (el.parentElement?.closest("svg") || el.closest("[aria-hidden=\"true\"]")) return false;
+    const leaf = replaced.has(el.tagName.toUpperCase()) || [...el.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && (node.textContent ?? "").trim() !== "");
+    return leaf && visible(el) && !outOfFlow(el, root);
+  });
+  // The first block below the hero, climbing out of the hero's wrappers until <main> (site-alignment.spec.ts).
+  const hero = h1.closest("section, header") ?? h1.parentElement ?? main;
+  const heroBottom = hero.getBoundingClientRect().bottom;
+  let block: Element | null = null;
+  let leaves: Element[] = [];
+  for (let at: Element | null = hero; at && at !== main && !block; at = at.parentElement) {
+    for (let next = at.nextElementSibling; next; next = next.nextElementSibling) {
+      if (!visible(next) || next.getBoundingClientRect().top < heroBottom - 1) continue;
+      leaves = leavesOf(next);
+      if (leaves.length) { block = next; break; }
+    }
+  }
+  const root = block ?? hero;
+  if (!block) leaves = leavesOf(hero);
+  // A painted card or rule counts up to the block, not past it: a full-bleed band is not a column edge.
+  const edgeOf = (leaf: Element) => {
+    let edge = leaf.getBoundingClientRect().left;
+    for (let at = leaf.parentElement; at && at !== root; at = at.parentElement) if (painted(at)) edge = Math.min(edge, at.getBoundingClientRect().left);
+    return edge;
+  };
+  let content: number | null = null, from = "no content below the H1";
+  for (const el of leaves) {
+    const edge = edgeOf(el);
+    if (content === null || edge < content) {
+      content = edge;
+      from = `${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? "." + el.className.trim().split(/\s+/)[0] : ""}`;
+    }
+  }
+  return { viewport: document.documentElement.clientWidth, wordmark: wordmark.getBoundingClientRect().left, h1: h1.getBoundingClientRect().left, content, from };
+}
+
+test.describe("R1 on the docs routes: wordmark, H1 and content on the container edge", () => {
+  test.beforeEach(async ({}, testInfo) => {
+    test.skip(testInfo.project.name !== "1440", "drives all seven widths from the 1440 project");
+  });
+  for (const width of R1_WIDTHS) {
+    for (const route of R1_DOCS_ROUTES) {
+      test(`${route} at ${width}`, async ({ page }) => {
+        await page.setViewportSize({ width, height: width <= 390 ? 844 : 900 });
+        const response = await page.goto(route);
+        expect(response?.status(), `${route} answers`).toBeLessThan(400);
+        await page.evaluate(() => document.fonts.ready);
+        const m = await page.evaluate(docsEdges);
+        const edge = containerEdge(m.viewport);
+        const at = `${route} @${m.viewport}: wordmark ${m.wordmark}, H1 ${m.h1}, content ${m.content} (${m.from}), edge ${edge}`;
+        expect(m.wordmark, at).not.toBeNull();
+        expect(m.h1, at).not.toBeNull();
+        expect(m.content, at).not.toBeNull();
+        expect.soft(Math.abs(m.wordmark! - edge), `wordmark off the container edge. ${at}`).toBeLessThanOrEqual(1);
+        expect.soft(Math.abs(m.h1! - m.wordmark!), `|wordmark - H1| > 1px. ${at}`).toBeLessThanOrEqual(1);
+        expect.soft(Math.abs(m.content! - m.h1!), `|H1 - content| > 1px. ${at}`).toBeLessThanOrEqual(1);
+      });
+    }
+  }
+
+  test("the measurement catches a title row moved off the edge", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/docs/quickstart");
+    await page.locator("main h1").first().evaluate((h1) => { (h1 as HTMLElement).style.marginLeft = "24px"; });
+    const m = await page.evaluate(docsEdges);
+    expect(Math.abs(m.h1! - m.wordmark!)).toBeGreaterThan(1);
+  });
+});
