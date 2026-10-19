@@ -79,7 +79,10 @@ RUN /opt/venv/bin/pip install --no-cache-dir \
     && /opt/venv/bin/python -c "from importlib.metadata import version as v; e={'paddlepaddle-gpu':'3.2.1','paddlex':'3.7.2','huggingface-hub':'1.17.0'}; a={k: v(k) for k in e}; assert a == e, a"
 
 COPY weights.manifest /opt/tavonel/weights.manifest
-RUN /opt/venv/bin/hf download "${MODEL_REPO}" --revision "${MODEL_REVISION}" --local-dir "${MODEL_DIR}" \
+# A Windows checkout (core.autocrlf) hands the manifest over with CRLF; a stray
+# CR would make every path miss.
+RUN sed -i 's/\r$//' /opt/tavonel/weights.manifest \
+    && /opt/venv/bin/hf download "${MODEL_REPO}" --revision "${MODEL_REVISION}" --local-dir "${MODEL_DIR}" \
     && rm -rf "${MODEL_DIR}/.cache" \
     && cd "${MODEL_DIR}" \
     && expected=0 \
