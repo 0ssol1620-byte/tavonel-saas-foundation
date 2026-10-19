@@ -151,22 +151,48 @@ export type BenchmarkFailure = { label: string; detail: string };
  */
 export type BenchmarkComparisonBasis = "same_condition" | "quoted";
 
+/**
+ * Which system produced the predictions a record scores (competitor protocol AT-4).
+ *
+ * `tavonel_live` is the product path, `tavonel_research` a research pipeline that is not the
+ * product, and `vendor` a third-party service run by us under the preregistered conditions. The
+ * two TAVONEL values are kept apart because a research arm's figure is not a product claim.
+ */
+export const SYSTEMS_UNDER_TEST = ["tavonel_live", "tavonel_research", "vendor"] as const;
+export type SystemUnderTest = (typeof SYSTEMS_UNDER_TEST)[number];
+
+/**
+ * The explicit answer for a field that has no meaning for an arm (AT-4).
+ *
+ * A vendor arm compiles no world and runs no TAVONEL compiler, and a TAVONEL arm accepted no
+ * vendor's terms. Leaving those fields blank would be indistinguishable from forgetting them, and
+ * filling them with something plausible would be invented data, so the record says this instead.
+ * It is accepted only where `RECEIPT_FIELDS` declares it, and refused everywhere else.
+ */
+export const NOT_APPLICABLE = "notApplicable";
+
 export type BenchmarkReceipt = {
   datasetName: string;
   datasetVersion: string;
   corpusDigest: string;
   denominator: BenchmarkDenominator;
+  armId: string;
+  systemUnderTest: SystemUnderTest;
   modelId: string;
   modelRevision: string;
   inputMode: string;
   promptDigest: string;
   configDigest: string;
+  /** `NOT_APPLICABLE` for a vendor arm, the TAVONEL build otherwise. */
   compilerVersion: string;
   hardware: string;
   gpu: string;
   runtime: string;
   priceSnapshot: string;
+  /** A sha256 digest for a vendor arm, `NOT_APPLICABLE` otherwise. */
+  vendorTermsSnapshotDigest: string;
   rawResultDigest: string;
+  /** `NOT_APPLICABLE` for a vendor arm, a sha256 digest otherwise. */
   worldDigest: string;
   runReceiptDigest: string;
   date: string;
@@ -177,36 +203,45 @@ export type BenchmarkReceipt = {
   quotedSource?: string;
 };
 
-type ReceiptFieldKind = "text" | "digest" | "date" | "denominator" | "metrics" | "basis" | "failures";
+type ReceiptFieldKind = "text" | "digest" | "date" | "denominator" | "metrics" | "basis" | "failures" | "system";
+
+/** Which side of a comparison a field means nothing on. The TAVONEL side is both TAVONEL systems. */
+type ArmSide = "vendor" | "tavonel";
 
 /**
- * Every field of a receipt, what it pins, and how it is checked. Blueprint section 38.
+ * Every field of a receipt, what it pins, and how it is checked. Blueprint section 38, extended
+ * by competitor protocol AT-4 with the arm, the system under test and the vendor terms digest.
  *
  * The page renders `label` and `pins`; the validator switches on `kind`. One list, so the promise
- * on the public page and the rule in the build are the same fourteen lines.
+ * on the public page and the rule in the build are the same lines. `notApplicableFor` names the
+ * side on which the field must be `NOT_APPLICABLE` instead of its kind.
  */
 export const RECEIPT_FIELDS: readonly {
   key: Exclude<keyof BenchmarkReceipt, "quotedSource">;
   label: string;
   pins: string;
   kind: ReceiptFieldKind;
+  notApplicableFor?: ArmSide;
 }[] = [
   { key: "datasetName", label: "Dataset", pins: "Which corpus was read.", kind: "text" },
   { key: "datasetVersion", label: "Dataset version", pins: "Which cut of it, because corpora are edited.", kind: "text" },
   { key: "corpusDigest", label: "Corpus digest", pins: "sha256 over the corpus, so “the same dataset” is a checkable statement rather than a claim.", kind: "digest" },
   { key: "denominator", label: "Denominator", pins: "The population every rate in the record was measured over, and how many members it has.", kind: "denominator" },
+  { key: "armId", label: "Arm", pins: "Which arm of the preregistered comparison produced the predictions, by the name the preregistration gives it.", kind: "text" },
+  { key: "systemUnderTest", label: "System under test", pins: "tavonel_live for the product path, tavonel_research for a research pipeline, vendor for a third-party service we ran under the same conditions.", kind: "system" },
   { key: "modelId", label: "Model id", pins: "The exact model, never the vendor or the family name.", kind: "text" },
   { key: "modelRevision", label: "Model revision", pins: "The revision served on the day. Two runs of “the same model” are not the same run.", kind: "text" },
   { key: "inputMode", label: "Input mode", pins: "What the model was actually given: the page image, extracted text, or both.", kind: "text" },
   { key: "promptDigest", label: "Prompt digest", pins: "sha256 of the prompt, frozen before the run started.", kind: "digest" },
   { key: "configDigest", label: "Config digest", pins: "sha256 of the run configuration: schema, decoding, retries, thresholds.", kind: "digest" },
-  { key: "compilerVersion", label: "Compiler version", pins: "The TAVONEL build that compiled the world the metrics were read from.", kind: "text" },
+  { key: "compilerVersion", label: "Compiler version", pins: "The TAVONEL build that compiled the world the metrics were read from, or “notApplicable” for a vendor arm, which compiles none.", kind: "text", notApplicableFor: "vendor" },
   { key: "hardware", label: "Hardware", pins: "The machine. Latency and cost are properties of a machine, not of a model.", kind: "text" },
   { key: "gpu", label: "GPU", pins: "The accelerator, or “none” for a CPU run. The field is answered, never left blank.", kind: "text" },
   { key: "runtime", label: "Runtime", pins: "The serving runtime and its version.", kind: "text" },
   { key: "priceSnapshot", label: "Price snapshot", pins: "The prices in force on the day, because every cost figure expires.", kind: "text" },
+  { key: "vendorTermsSnapshotDigest", label: "Vendor terms digest", pins: "sha256 of the vendor's service terms as captured for the run, or “notApplicable” for an arm that is not a vendor's.", kind: "digest", notApplicableFor: "tavonel" },
   { key: "rawResultDigest", label: "Raw result digest", pins: "sha256 of the unaggregated predictions, so an average can be recomputed by someone else.", kind: "digest" },
-  { key: "worldDigest", label: "World digest", pins: "sha256 of the compiled world the metrics were read from.", kind: "digest" },
+  { key: "worldDigest", label: "World digest", pins: "sha256 of the compiled world the metrics were read from, or “notApplicable” for a vendor arm, which compiles none.", kind: "digest", notApplicableFor: "vendor" },
   { key: "runReceiptDigest", label: "Run receipt digest", pins: "sha256 of the receipt that ties all of the above to one execution.", kind: "digest" },
   { key: "date", label: "Date", pins: "The day the run happened, as YYYY-MM-DD.", kind: "date" },
   { key: "metrics", label: "Metrics", pins: "Every figure, with its family, its unit, and its own denominator.", kind: "metrics" },
@@ -305,6 +340,12 @@ function failureProblems(value: unknown): string[] {
   return problems;
 }
 
+function armSideOf(system: unknown): ArmSide | null {
+  if (system === "vendor") return "vendor";
+  if (system === "tavonel_live" || system === "tavonel_research") return "tavonel";
+  return null;
+}
+
 /**
  * Decide whether a candidate may be published in the given role.
  *
@@ -319,9 +360,25 @@ export function validateBenchmarkReceipt(
   if (!isRecord(candidate)) return { ok: false, problems: ["the record is not an object"] };
 
   const problems: string[] = [];
+  const side = armSideOf(candidate.systemUnderTest);
   for (const field of RECEIPT_FIELDS) {
     const value = candidate[field.key];
+    if (field.notApplicableFor === side) {
+      if (value !== NOT_APPLICABLE) {
+        problems.push(`${field.key} must be "${NOT_APPLICABLE}" for a ${String(candidate.systemUnderTest)} arm`);
+      }
+      continue;
+    }
+    if (value === NOT_APPLICABLE) {
+      // Otherwise a text field would accept the marker as ordinary text, e.g. a modelId nobody pinned.
+      problems.push(`${field.key} may not be "${NOT_APPLICABLE}" for this arm`);
+      continue;
+    }
     switch (field.kind) {
+      case "system": {
+        if (side === null) problems.push(`systemUnderTest is not one of ${SYSTEMS_UNDER_TEST.join(", ")}`);
+        break;
+      }
       case "text": {
         const problem = textProblem(value, field.key);
         if (problem) problems.push(problem);
@@ -371,6 +428,99 @@ export function validateBenchmarkReceipt(
   if (problems.length > 0) return { ok: false, problems };
   return { ok: true, receipt: candidate as unknown as BenchmarkReceipt };
 }
+
+/* ------------------------------------------------------------------ verdicts */
+
+/*
+  The comparison verdicts of competitor protocol §4.5, as code (AT-4).
+
+  The rules and their order are the ones in VENDOR-COMPARISON-PREREG.json
+  (`tavonel.vendor_comparison.v1`, DRAFT_PROPOSED, sha256 d68e0027…16c9), statistics.d_axis_verdict
+  and a_axis_verdict. They are deliberately asymmetric: being ahead needs a margin, being behind
+  does not. The margin, δ and α are arguments rather than constants because the preregistration
+  only proposes them (founder decision FD-6); a value typed here would read as a sealed one.
+
+  Δ is always oriented so that a positive value favours TAVONEL (a lower-is-better metric is
+  flipped by the caller), and BEHIND is tested first because §4.5's WITHIN and BEHIND overlap
+  (CI [−1.5, −0.2] with δ 2 is both); the preregistration resolves that toward BEHIND.
+
+  Bad input throws. A verdict computed from a NaN bound or an inverted interval would be a
+  published sentence standing on nothing, which is worse than no verdict.
+*/
+
+export const COMPARISON_VERDICTS = ["AHEAD", "WITHIN", "BEHIND", "INCONCLUSIVE"] as const;
+export type ComparisonVerdict = (typeof COMPARISON_VERDICTS)[number];
+
+/** A 95% paired-bootstrap interval for Δ = TAVONEL − vendor. */
+export type DifferenceInterval = { lower: number; upper: number };
+
+function checkInterval(ci: DifferenceInterval): void {
+  if (!Number.isFinite(ci.lower) || !Number.isFinite(ci.upper)) {
+    throw new Error("the confidence interval has a bound that is not a finite number");
+  }
+  if (ci.lower > ci.upper) throw new Error("the confidence interval's lower bound is above its upper bound");
+}
+
+function checkPositive(value: number, name: string): void {
+  if (!Number.isFinite(value) || value <= 0) throw new Error(`${name} must be a positive finite number`);
+}
+
+/**
+ * The document-reading axis (D-T-* against D-V-*): one metric, one corpus, one vendor arm.
+ *
+ * `ci` is `null` when the evaluator's aggregate does not decompose by document, so no interval
+ * exists; the preregistration makes that metric INCONCLUSIVE rather than inventing an aggregate.
+ */
+export function documentAxisVerdict(ci: DifferenceInterval | null, delta: number): ComparisonVerdict {
+  checkPositive(delta, "delta");
+  if (ci === null) return "INCONCLUSIVE";
+  checkInterval(ci);
+  if (ci.upper < 0) return "BEHIND";
+  if (ci.lower > delta) return "AHEAD";
+  if (ci.lower >= -delta && ci.upper <= delta) return "WITHIN";
+  return "INCONCLUSIVE";
+}
+
+/** The answer axis (A-T against A-V-*): the paired macro all-pass difference, in percentage points. */
+export type AnswerAxisDifference = { point: number; ci: DifferenceInterval; mcnemarP: number };
+
+/**
+ * AHEAD needs all three of the preregistered conditions: the point difference reaches the margin,
+ * the interval excludes zero, and the exact McNemar test clears α. WITHIN uses the same margin.
+ */
+export function answerAxisVerdict(
+  difference: AnswerAxisDifference,
+  rule: { marginPp: number; alpha: number },
+): ComparisonVerdict {
+  checkPositive(rule.marginPp, "marginPp");
+  if (!(rule.alpha > 0 && rule.alpha < 1)) throw new Error("alpha must lie strictly between 0 and 1");
+  if (!Number.isFinite(difference.point)) throw new Error("the point difference is not a finite number");
+  if (!(difference.mcnemarP >= 0 && difference.mcnemarP <= 1)) throw new Error("mcnemarP is not a probability");
+  checkInterval(difference.ci);
+  const { point, ci, mcnemarP } = difference;
+  if (ci.upper < 0) return "BEHIND";
+  if (point >= rule.marginPp && ci.lower > 0 && mcnemarP < rule.alpha) return "AHEAD";
+  if (ci.lower >= -rule.marginPp && ci.upper <= rule.marginPp) return "WITHIN";
+  return "INCONCLUSIVE";
+}
+
+/**
+ * Competitor protocol §4.9: the sentence form each outcome permits, verbatim from the
+ * preregistration's `publication.sentence_templates_ko` (the test pins the bytes).
+ *
+ * PROPOSED, NOT APPROVED. Whether a public page may compare against a vendor at all is founder
+ * decision FD-7, and until it is made no page or component may import this map -- the test
+ * fails if one does. Lift that by deleting the check in a commit that cites the decision.
+ */
+export const PERMITTED_SENTENCES_KO: Readonly<Record<ComparisonVerdict | "completion" | "quoted" | "general_better", string>> = {
+  AHEAD: "〈corpus@rev, 평가기 rev(+patch sha), N문서〉에서 TAVONEL 제품 경로(배포 〈ID〉, 〈날짜〉)는 〈벤더 구성, 날짜〉보다 M이 Δ(95% CI a–b) 높았다. — 같은 자리에 다른 모든 지표를 함께 싣는다",
+  WITHIN: "…에서 M의 차이는 ±δ 범위 안이었다(Δ, CI).",
+  BEHIND: "…에서 M이 Δ(CI) 낮았다. — 표·수식이 원인이면 '현재 제품은 표·수식을 추출하지 않는다(capabilities no_table_or_formula_extraction)'를 덧붙인다. 반드시 게시한다",
+  INCONCLUSIVE: "이 조건에서 차이는 입증되지 않았다.",
+  completion: "제공한 N개 중 n개가 출력을 냈다(완료율).",
+  quoted: "〈벤더〉는 〈날짜〉 〈출처〉에서 …라고 발표했다(분모, 조건; 우리가 재현하지 않음).",
+  general_better: "해당 축의 사전등록 1차 지표에서 실행된 모든 벤더 arm에 대해 AHEAD이고, BEHIND를 포함한 모든 지표를 같은 자리에 게시하고, corpus와 날짜로 범위를 한정하고, FD-7 승인을 받은 경우에만",
+};
 
 /* ------------------------------------------------------------------ registry */
 

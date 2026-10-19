@@ -32,8 +32,9 @@ test("publishes the compilation protocol and source-bound recovery without an un
   }
   await expect(page.locator(".tile")).toHaveCount(FAMILIES.length);
 
-  // The receipt contract, as many rows as the registry declares fields.
-  await expect(page.locator("dl dt")).toHaveCount(21);
+  // The receipt contract, as many rows as the registry declares fields. 24 since competitor
+  // protocol AT-4 (P2-21) added the arm, the system under test and the vendor terms digest.
+  await expect(page.locator("dl dt")).toHaveCount(24);
   await expect(page.locator("dl dt").filter({ hasText: "Corpus digest" })).toHaveCount(1);
   await expect(page.locator("dl dt").filter({ hasText: "Published failures" })).toHaveCount(1);
 

@@ -19,6 +19,13 @@
  *   2. The page ceiling cannot be checked at intake, because intake deliberately never decodes
  *      the document. It is disclosed rather than enforced, which is why it appears in
  *      `knownLimitations` and in the refusal a customer reads, and not in an admission check.
+ *   3. The processors restate these numbers in trees that cannot import this file: the worker's
+ *      `MAX_SOURCE_BYTES` and its OCR result page bound (`src/ocr.ts`), the rasterizer's
+ *      `MAX_INPUT_BYTES` and `MAX_PAGES`, and the GPU reader's `MAX_PAGES`. The bounds sized
+ *      against an 80-page source sit beside them: the rasterizer's `MAX_OUTPUT_BYTES`, the GPU
+ *      reader's `MAX_INPUT_BYTES`, and the worker's OCR text, region and stored `ocr.json` bounds.
+ *      `nextjs/lib/intake-ceiling-cross-tree.test.ts` reads every one of them as text and fails
+ *      when one disagrees, so changing any of them is a change to that test too.
  */
 
 /** Bytes the Cloudflare worker will read (`src/keys.ts` MAX_SOURCE_BYTES). */
