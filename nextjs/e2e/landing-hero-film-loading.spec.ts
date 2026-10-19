@@ -201,8 +201,9 @@ async function posterContract(page: Page, engine: string) {
   return result;
 }
 
-test("serves the re-cut posters as AVIF within 140,000 bytes, with a WebP fallback, and bars that cover the eyebrow", async ({ page, playwright, baseURL }, testInfo) => {
+test("serves the re-cut posters as AVIF within 140,000 bytes, with a WebP fallback, and bars that cover the eyebrow", async ({ page, playwright, baseURL, browserName }, testInfo) => {
   test.skip(testInfo.project.name !== "390", "run the poster contract once, at the phone viewport");
+  test.skip(browserName !== "chromium", "the page fixture is the Chromium half; WebKit is launched below");
   test.setTimeout(120_000);
   await page.emulateMedia({ reducedMotion: "reduce" });
   const chromium = await posterContract(page, "chromium");
