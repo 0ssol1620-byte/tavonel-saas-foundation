@@ -80,7 +80,7 @@ jobs:
         run: pnpm exec playwright test e2e/marketing-consent.spec.ts
       - name: Preserve browser failure evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: launch-qa-${{ matrix.browser }}
           path: |
@@ -165,7 +165,7 @@ jobs:
         run: node scripts/launch-qa/rsc-leak-probe.mjs --reuse-build
       - name: Preserve product failure evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: product-qa
           path: |
