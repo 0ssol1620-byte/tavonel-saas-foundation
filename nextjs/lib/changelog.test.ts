@@ -12,6 +12,7 @@ import {
   changelogUpdatedAt,
 } from "./changelog";
 import channel from "../public/developer/channel.json";
+import { GET as openApi } from "@/app/api/openapi/route";
 
 /*
   A changelog is the one public page where a plausible line and a true one look identical.
@@ -144,6 +145,19 @@ describe("ordering and filtering", () => {
     expect(changelogEntryUpdatedAt(entry!) >= channel.releasedAt).toBe(true);
   });
 
+  /*
+    EN-5. The same rule for the API contract. /api/openapi serves info.version, and a contract
+    version no entry names is a contract change nobody was told about. It is read from the served
+    document rather than from API_VERSION, so the check follows whatever the route publishes.
+  */
+  it("has an entry for the API contract version /api/openapi serves", async () => {
+    const response = await openApi(new Request("https://tavonel.com/api/openapi"));
+    const { info } = (await response.json()) as { info: { version: string } };
+    const entry = CHANGELOG.find((candidate) => candidate.apiVersion === info.version);
+    expect(entry, `OpenAPI info.version ${info.version} has no changelog entry`).toBeDefined();
+    expect(entry!.surfaces).toContain("API");
+  });
+
   it("filters to one surface without losing an entry that touches two", () => {
     const api = changelogEntries("API");
     expect(api.length).toBeGreaterThan(0);
@@ -226,6 +240,7 @@ describe("the page that renders it", () => {
     expect(list).toContain('href={`#${changelogEntryId(entry)}`}');
     expect(list, "a previously published fragment must still land on its entry").toContain("id={entry.previousId}");
     expect(list).toContain("changelog-breaking");
+    expect(list, "an entry that moved the contract prints the version it moved to").toContain("entry.apiVersion");
   });
 
   it("renders every entry on the server and hides the filtered ones", () => {

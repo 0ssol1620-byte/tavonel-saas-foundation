@@ -80,6 +80,7 @@ export function ChangelogList() {
                 that carry a version.
               */}
               {entry.version ? <b>Release {entry.version}</b> : null}
+              {entry.apiVersion ? <b>API {entry.apiVersion}</b> : null}
             </header>
             <h2>{entry.title}</h2>
 

@@ -13,6 +13,25 @@
   What is deliberately absent: entries for anything not in this repository. A changelog is the
   one page where a plausible-sounding line is indistinguishable from a true one, and there is no
   receipt behind it to check.
+
+  What gets an entry (ENABLEMENT-GAP 4d; the same rule for authors is docs/CHANGELOG_ENTRY_RULE.md).
+  The cadence is the deployment, not the calendar. A production deployment that changes any of
+  these has an entry, dated the Asia/Seoul day it reached tavonel.com:
+    - a public page or its wording, added, changed or removed;
+    - a published contract: the OpenAPI document, whose info.version the entry names in
+      `apiVersion`, an error code or a response shape; a breaking one sets `breaking` and
+      `migration`;
+    - a developer asset: a file under /developer/, and the channel.json version, which the entry
+      names in `version`;
+    - a limit or a format tier;
+    - price wording, and only ever the strings the founder set;
+    - a manual revision, a guide video re-recorded, a benchmark or a negative result published.
+  What does not: an internal refactor, CI, a documentation typo, a style change nobody can see,
+  research that was not published.
+
+  The part of this a machine can hold without a clock is held in `lib/changelog.test.ts`: the
+  version /developer/channel.json serves and the info.version /api/openapi serves each have an
+  entry here, so neither can move on the site without one.
 */
 
 export type ChangelogSurface = "Workspace" | "API" | "Developer tools" | "Website" | "Billing";
@@ -40,6 +59,8 @@ export type ChangelogEntry = {
   title: string;
   /** The released version, where the thing released carries one. */
   version?: string;
+  /** The OpenAPI info.version this release put on /api/openapi, when it moved the contract. */
+  apiVersion?: string;
   surfaces: ChangelogSurface[];
   added?: string[];
   improved?: string[];
@@ -244,10 +265,21 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     breaking: "The MCP tool names changed. list_documents, get_collection, get_active_world and ask_active_world are now list_sources, get_world and ask_world.",
     migration: "Update the tool names your agent calls, then re-register the server. Pin the release you registered: node tavonel-mcp.mjs --version prints it, and the sha256 of every asset is in the distribution channel.",
   },
+  /*
+    EN-5. This release moved the API contract from 2026-08-30.1 to 2026-09-02.1: commit 68215e58
+    (2 September) changed info.version and added /runs/{runId}/events and /reviews in the same
+    change that wrote this entry's text, and the contract has carried 2026-09-02.1 since (it moved
+    into lib/api-version.ts unchanged in 129af2eb). The entry never named it, so /api/openapi
+    served a version no entry recorded.
+  */
   {
     date: "2026-09-02",
     title: "Run events and page-based quotes",
-    surfaces: ["Workspace", "Billing"],
+    apiVersion: "2026-09-02.1",
+    surfaces: ["Workspace", "API", "Billing"],
+    added: [
+      "API contract 2026-09-02.1 adds GET /runs/{runId}/events, which replays a run's persisted events after Last-Event-ID and then streams new ones, and POST /reviews, which records an Accept, Edit or Reject decision on a piece of evidence from a signed-in browser session.",
+    ],
     improved: [
       "Compile progress is derived from persisted run events rather than from a timer, so a reload shows where the run actually is.",
       "A page estimate shows both the standard and the maximum processing boundary before a compile starts.",
