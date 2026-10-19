@@ -301,7 +301,9 @@ describe("the route publishes a draft as a draft", () => {
   it("declares noindex on the route and stays out of the sitemap and llms.txt", () => {
     expect(PAGE).toMatch(/robots:.*index: false/s);
     expect(sitemap().map((entry) => new URL(entry.url).pathname).filter((path) => path.startsWith("/cookbooks/"))).toEqual([]);
-    expect(read("public/llms.txt")).not.toContain("/cookbooks");
+    // The index is in llms.txt, as it is in the sitemap (EN-FIX-1, review N-10); no record is.
+    expect(read("public/llms.txt")).not.toContain("/cookbooks/");
+    expect(read("public/llms.txt")).toContain("(https://tavonel.com/cookbooks):");
   });
 
   it("renders every body through the sanitiser and opens no raw-HTML sink", () => {
@@ -383,6 +385,15 @@ describe("the copy guards cover the new surfaces", () => {
     for (const pattern of ["<img", "<Image", "next/image", "<form", 'type="email"']) {
       expect(index, pattern + ": the index gates nothing and illustrates nothing").not.toContain(pattern);
     }
+  });
+
+  /*
+    Script budget (§22): the docs hub tile is in /docs's first viewport, and prefetching the index
+    from there added its 2,943-byte route chunk and took /docs to 202,846 transferred script bytes,
+    over the 200,000-byte ratchet (review B-1). The guide tile beside it was already unprefetched.
+  */
+  it("is linked from the docs hub without prefetch", () => {
+    expect(read("app/docs/page.tsx")).toContain('<Link href={"/cookbooks" as Route} prefetch={false}>Cookbooks</Link>');
   });
 
   it("registers the content as a claim surface", () => {

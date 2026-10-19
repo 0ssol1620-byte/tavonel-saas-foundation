@@ -17,8 +17,8 @@ import { EXPLORE_CTA } from "@/lib/site-navigation";
   Honesty about publication state does not require unreachability.
 
   So: an index. EN-0 (2026-10-19) made it a page the site advertises -- in the sitemap, on
-  /resources and on the docs hub -- because the user manual links it and a manual cannot send a
-  reader to a page the site hides. What it advertises is the lede below, which says that every
+  /resources and on the docs hub -- because the enablement gap (§4.0-1) asked for the task guides
+  to be findable, and a guide cannot be found from a page the site hides. What it advertises is the lede below, which says that every
   guide is published ahead of a recorded run, and six titles. The six records keep their own
   `noindex` and stay out of the sitemap and llms.txt until each one is approved.
 

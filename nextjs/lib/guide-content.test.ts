@@ -410,12 +410,13 @@ describe("the recordings", () => {
     expect(vttCueText("WEBVTT\n")).toEqual([]);
   });
 
-  it("renders a player only when every file is there, and never one that moves by itself", () => {
+  it("refuses to render a player with a file missing, and never renders one that moves by itself", () => {
     const root = mkdtempSync(join(tmpdir(), "guide-media-"));
     try {
       const block = { kind: "media", video: "guide-2-mcp", title: "A recording" } as const;
       expect(guideVideoReady("guide-2-mcp", root)).toBe(false);
-      expect(renderToStaticMarkup(createElement(GuideMedia, { block, language: "en", root }))).toBe("");
+      expect(() => renderToStaticMarkup(createElement(GuideMedia, { block, language: "en", root })))
+        .toThrow(/guide-2-mcp is missing guide-2-mcp-desktop\.mp4, .*guide-2-mcp-phone\.ko\.vtt from public\/guide/);
       for (const variant of GUIDE_VIDEO_VARIANTS) {
         for (const file of Object.values(guideVideoFiles("guide-2-mcp", variant))) writeFileSync(join(root, file), vtt);
       }

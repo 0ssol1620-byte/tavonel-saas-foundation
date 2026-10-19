@@ -19,10 +19,12 @@ import styles from "./guide.module.css";
 const GUIDE_PUBLIC = join(process.cwd(), "public", "guide");
 
 /*
-  A recording renders only when every file of both takes is in `public/guide/` (the video lane
-  delivers them; EN-1 references them by name). Until then the block renders nothing rather than
-  a player whose poster and source 404. Half a delivery is not a state this page shows:
-  `lib/guide-content.test.ts` fails when some of a recording's files are present and some are not.
+  A recording renders only when every file of both takes is in `public/guide/`. The files are
+  committed (MOUNT) and pinned by `public/guide/manifest.json`, so a missing one is a broken
+  delivery, not a recording still to come: the player throws, which fails the static render of
+  /guide, /ko/guide, /docs/quickstart, /docs/mcp and /api at build time, rather than leaving a page
+  that looks complete without its player (review N-9). `lib/guide-content.test.ts` checks the same
+  files against the manifest in CI.
 */
 export function guideVideoReady(video: GuideVideo, root: string = GUIDE_PUBLIC): boolean {
   return GUIDE_VIDEO_VARIANTS.every((variant) =>
@@ -63,7 +65,11 @@ export function vttCueText(vtt: string): string[] {
   play, which is also the whole of the reduced-motion rule here -- there is no motion to reduce.
 */
 export function GuideMedia({ block, language, root = GUIDE_PUBLIC }: { block: GuideMediaBlock; language: GuideLanguage; root?: string }) {
-  if (!guideVideoReady(block.video, root)) return null;
+  if (!guideVideoReady(block.video, root)) {
+    const missing = GUIDE_VIDEO_VARIANTS.flatMap((variant) => Object.values(guideVideoFiles(block.video, variant)))
+      .filter((file) => !existsSync(join(root, file)));
+    throw new Error(`GuideMedia: ${block.video} is missing ${missing.join(", ")} from public/guide`);
+  }
   const ui = GUIDE_UI[language];
   const titleId = `${block.video}-title`;
   const transcript = vttCueText(readFileSync(join(root, guideVideoFiles(block.video, "desktop")[language]), "utf8"));

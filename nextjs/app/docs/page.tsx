@@ -68,10 +68,12 @@ export default function DocsPage() {
             {/*
               EN-0. The task guides, beside the two starting points: one piece of work start to
               finish, where the sections above are the reference. One link to their index; a
-              draft record is linked from nowhere on this page.
+              draft record is linked from nowhere on this page. Not prefetched, like the guide tile
+              beside it: prefetching the route in this first viewport added 2,943 script bytes and
+              took /docs over the 200,000-byte ratchet (review B-1).
             */}
             <article className="tile">
-              <h2><Link href={"/cookbooks" as Route}>Cookbooks</Link></h2>
+              <h2><Link href={"/cookbooks" as Route} prefetch={false}>Cookbooks</Link></h2>
               <p>Task guides that take one piece of work through the product, each published ahead of a recorded run.</p>
             </article>
             {/* EN-1. The product guide: the screens a reader can use today, in English and Korean. Not prefetched: this tile is in the first viewport and prefetching the route added 3,065 script bytes to /docs. */}

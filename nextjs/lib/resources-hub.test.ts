@@ -88,6 +88,19 @@ describe("the resources hub can be narrowed by purpose and workflow", () => {
     }
   });
 
+  /*
+    Script budget (§22): the hub's tiles are in its first viewport, and the /guide and /cookbooks
+    entries the enablement batch added prefetched 6,214 transferred script bytes of their route
+    chunks (review N-2). Those two are linked without prefetch; the entries main already had are not
+    changed here.
+  */
+  it("does not prefetch the guide or the cookbooks index from the hub", () => {
+    const page = read("../app/resources/page.tsx");
+    expect(page).toContain('const NOT_PREFETCHED = new Set(["/guide", "/cookbooks"]);');
+    expect(page).toContain("<Link href={link.href as Route} prefetch={NOT_PREFETCHED.has(link.href) ? false : undefined}>");
+    expect(RESOURCE_LINKS.map((link) => link.href)).toEqual(expect.arrayContaining(["/guide", "/cookbooks"]));
+  });
+
   it("marks a representative case only where a real compiled result is published", () => {
     const representative = RESOURCE_LINKS.filter((link) => link.representativeCase);
     expect(representative.map((link) => link.href)).toEqual(["/explore"]);

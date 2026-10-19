@@ -777,7 +777,7 @@ const KO: GuideChapter[] = [
     title: "도움 받기",
     blocks: [
       { kind: "prose", text: `“${SUPPORT_ACKNOWLEDGEMENT}” support@tavonel.com으로 보낸 메일은 KST 기준 1영업일 안에 접수를 확인합니다. 이는 접수 확인 목표이며 해결 시간이 아닙니다. 해결 시간은 약속하지 않으며, security@tavonel.com으로 보낸 보안 제보는 제품 문의 뒤에 쌓이지 않고 먼저 읽습니다.` },
-      { kind: "prose", text: "모든 문서 섹션은 **Report an issue with this page**로 끝납니다. 누르면 support@tavonel.com으로 가는 메일이 열리고, 제목에 그 페이지가 적힙니다. 이 가이드도 같은 링크로 끝납니다." },
+      { kind: "prose", text: "모든 문서 섹션은 **Report an issue with this page**로 끝납니다. 누르면 support@tavonel.com으로 가는 메일이 열리고, 제목에 그 페이지가 적힙니다. 이 가이드는 같은 메일을 여는 **이 페이지의 문제 알리기** 링크로 끝납니다." },
     ],
     links: [
       { href: "mailto:support@tavonel.com", label: "support@tavonel.com" },
