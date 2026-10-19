@@ -1,0 +1,68 @@
+{
+  "specimenId": "fixture-table-p001",
+  "slot": "table",
+  "documentId": "fixture-table",
+  "title": "Synthetic fixture: page with a table",
+  "lang": "en",
+  "sourcePageUrl": "https://fixture.invalid/specimens/table",
+  "sourceUrl": "https://fixture.invalid/specimens/table.pdf",
+  "acquiredFrom": "TAVONEL-authored synthetic fixture, nextjs/e2e/fixtures/specimens",
+  "representationKind": "synthetic_fixture",
+  "originalSha256": "sha256:0000000000000000000000000000000000000000000000000000000000000006",
+  "extractedPdfSha256": "sha256:0000000000000000000000000000000000000000000000000000000000000007",
+  "pageCount": 1,
+  "page": 1,
+  "capturedOn": "2026-10-19",
+  "rights": {
+    "basis": "TAVONEL-authored synthetic fixture",
+    "jurisdiction": "Not applicable: no third-party work",
+    "attribution": "TAVONEL test fixture",
+    "publication": "public_sample",
+    "licence": {
+      "id": "TAVONEL-FIXTURE",
+      "markingScope": "item",
+      "markingText": "Synthetic fixture for layout tests; never published.",
+      "markingUrl": "https://fixture.invalid/specimens/table",
+      "retrievedOn": "2026-10-19",
+      "snapshotSha256": "sha256:0000000000000000000000000000000000000000000000000000000000000008"
+    }
+  },
+  "mustNotImply": [
+    "a reader run",
+    "any accuracy",
+    "a real document"
+  ],
+  "region": {
+    "regionId": "fixture-table-r1",
+    "bbox1000": [
+      180,
+      280,
+      820,
+      440
+    ]
+  },
+  "crop": {
+    "path": "fixture-table.svg",
+    "sha256": "sha256:b40d6638e73ef391f707b9755407a71eee33b521c1af672bf352deb5a44a9a22",
+    "width": 1000,
+    "height": 400,
+    "bytes": 651,
+    "window1000": [
+      100,
+      200,
+      900,
+      520
+    ]
+  },
+  "extractedText": "SYNTHETIC FIXTURE: a page that holds a table.\nThe reader returns its rows as lines of text,\nnot as cells, rows or columns.\nRow A, its first value, its second value\nRow B, its first value, its second value\nNothing in this text is a measured figure.",
+  "reader": {
+    "id": "foundation_ocr_gpu_v1",
+    "imageDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000009"
+  },
+  "runAt": "2026-10-19T00:00:00Z",
+  "runReceiptSha256": "sha256:0000000000000000000000000000000000000000000000000000000000000010",
+  "runReceiptUrl": "https://fixture.invalid/specimens/table.receipt.json",
+  "limitationTokens": [
+    "no_table_or_formula_extraction"
+  ]
+}

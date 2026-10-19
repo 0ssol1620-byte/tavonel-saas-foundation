@@ -10,6 +10,7 @@ import {
 } from "@/lib/landing-experiments";
 import { landingV2Copy } from "@/lib/landing-v2-copy";
 import { pageMetadata } from "@/lib/page-seo";
+import { SPECIMEN_FIXTURE_COOKIE } from "@/lib/specimen-sources";
 
 /*
   한국어 진입 페이지. Landing V2, 2026-09-19.
@@ -65,9 +66,11 @@ export default async function KoreanEntryPage({
     cookie: (await cookies()).get(LANDING_VARIANT_COOKIE)?.value,
     query: Array.isArray(query) ? query[0] : query,
   });
+  // P2-08: honoured only by the local test server (lib/specimen-sources.ts); a deployment ignores it.
+  const specimenFixtures = (await cookies()).get(SPECIMEN_FIXTURE_COOKIE)?.value === "1";
   return (
     <>
-      <LandingPage korean experiment={experiment}>
+      <LandingPage korean experiment={experiment} specimenFixtures={specimenFixtures}>
         <DocumentLangKo />
         <BreadcrumbJsonLd trail={[{ name: "한국어 안내", path: "/ko" }]} />
       </LandingPage>

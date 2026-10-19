@@ -93,6 +93,10 @@ const PHONE = "(max-width: 899.98px)";
   the sheet cleared the frame but covered the line under it, and on a phone in Fit the line now sits
   above the frame. The clear-of region runs from the higher top to the lower bottom of the two
   boxes; the sheet may show when that region ends above its zone or starts below the screen.
+
+  P2-08 / UX-L4 (UX-PLAN-2026-10-17 §3.3): and the specimen strip's crop and reader text, when Home
+  renders one. The strip sits above the film, so the region now runs from the crop's top. A strip box
+  with no size (a cell that is not laid out) is not a place the sheet could cover, and is left out.
 */
 export function homeSheetClear(boxes: readonly { top: number; bottom: number }[], viewportHeight: number): boolean {
   if (boxes.length === 0) return true;
@@ -177,19 +181,26 @@ export default function MarketingConsent() {
 
   useEffect(() => {
     const film = document.querySelector("[data-home-ia] #s1 .compile-film-viewport");
-    if (!film) { setFilmClear(true); return; }
+    const strip = document.querySelector("[data-home-ia] #s1 [data-specimen-strip]");
+    if (!film && !strip) { setFilmClear(true); return; }
     const line = document.querySelector("[data-home-ia] #s1 [data-film-reading]");
+    const specimen = strip ? [...strip.querySelectorAll("[data-specimen-crop], [data-specimen-text]")] : [];
     const phone = window.matchMedia(PHONE);
     const check = () => {
-      const boxes = [film, line].flatMap(node => (node ? [node.getBoundingClientRect()] : []));
+      const boxes = [
+        ...[film, line].flatMap(node => (node ? [node.getBoundingClientRect()] : [])),
+        ...specimen.map(node => node.getBoundingClientRect()).filter(box => box.width > 0 && box.height > 0),
+      ];
       setFilmClear(!phone.matches || homeSheetClear(boxes, window.innerHeight));
     };
     check();
     window.addEventListener("scroll", check, { passive: true });
     window.addEventListener("resize", check);
     // A stage change or a Focus press moves the frame and the line without a scroll.
+    // So does "Show full text", which lengthens the strip and moves the film under it.
     const resize = new ResizeObserver(check);
-    resize.observe(film.closest(".compile-film-sequence") ?? film);
+    if (film) resize.observe(film.closest(".compile-film-sequence") ?? film);
+    if (strip) resize.observe(strip);
     return () => { window.removeEventListener("scroll", check); window.removeEventListener("resize", check); resize.disconnect(); };
   }, [pathname]);
 

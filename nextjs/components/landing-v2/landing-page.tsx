@@ -10,6 +10,7 @@ import HomeMeasures from "./home-measures";
 import heroStyles from "./landing-hero.module.css";
 import sourceStyles from "./source-first-home.module.css";
 import LandingAnalytics from "./landing-analytics";
+import SpecimenStrip from "./specimen-strip";
 import RecompileScene from "./scenes/recompile";
 import StartScene from "./scenes/start";
 import TrustScene from "./scenes/trust";
@@ -36,6 +37,7 @@ import {
 } from "@/lib/home-evidence-view";
 import { KO_CHROME, SAMPLE_CTA } from "@/lib/site-navigation";
 import { primaryCallToAction } from "@/lib/commercial-state";
+import { homeSpecimens } from "@/lib/specimen-sources";
 import {
   landingVariantState,
   type LandingVariantState,
@@ -226,10 +228,17 @@ export default function LandingPage({
     props at all.
   */
   experiment = landingVariantState({ experiment: null }),
+  /*
+    P2-08: whether this request asked for the synthetic specimen fixtures. They render only on the
+    local test server (lib/specimen-sources.ts); everywhere else the strip reads the committed
+    receipts, and with none committed it renders nothing.
+  */
+  specimenFixtures = false,
   children,
 }: {
   korean?: boolean;
   experiment?: LandingVariantState;
+  specimenFixtures?: boolean;
   /** `/ko`'s document-language effect and breadcrumb. Rendered inside the landmark, as today. */
   children?: React.ReactNode;
 }) {
@@ -312,6 +321,12 @@ export default function LandingPage({
                       scene="1" ctaOrderVariant={experiment.ctaOrderVariant} />
                     <p className={sourceStyles.intake}>{page.intake}</p>
                 </div>
+                {/*
+                  P2-08 / UX-L4 (UX-PLAN §3.2-§3.3; critic D-03's default place): real pages beside
+                  the reader's text, between the actions and the illustrative film. Nothing renders
+                  until a receipt does.
+                */}
+                <SpecimenStrip specimens={homeSpecimens({ fixtures: specimenFixtures })} korean={korean} />
                 <HeroFilm korean={korean} />
               </HeroStatement>
             </div>

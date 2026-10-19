@@ -1,0 +1,66 @@
+{
+  "specimenId": "fixture-scan-p001",
+  "slot": "degraded_scan",
+  "documentId": "fixture-scan",
+  "title": "Synthetic fixture: scanned page",
+  "lang": "en",
+  "sourcePageUrl": "https://fixture.invalid/specimens/scan",
+  "sourceUrl": "https://fixture.invalid/specimens/scan.pdf",
+  "acquiredFrom": "TAVONEL-authored synthetic fixture, nextjs/e2e/fixtures/specimens",
+  "representationKind": "synthetic_fixture",
+  "originalSha256": "sha256:0000000000000000000000000000000000000000000000000000000000000001",
+  "extractedPdfSha256": "sha256:0000000000000000000000000000000000000000000000000000000000000002",
+  "pageCount": 1,
+  "page": 1,
+  "capturedOn": "2026-10-19",
+  "rights": {
+    "basis": "TAVONEL-authored synthetic fixture",
+    "jurisdiction": "Not applicable: no third-party work",
+    "attribution": "TAVONEL test fixture",
+    "publication": "public_sample",
+    "licence": {
+      "id": "TAVONEL-FIXTURE",
+      "markingScope": "item",
+      "markingText": "Synthetic fixture for layout tests; never published.",
+      "markingUrl": "https://fixture.invalid/specimens/scan",
+      "retrievedOn": "2026-10-19",
+      "snapshotSha256": "sha256:0000000000000000000000000000000000000000000000000000000000000003"
+    }
+  },
+  "mustNotImply": [
+    "a reader run",
+    "any accuracy",
+    "a real document"
+  ],
+  "region": {
+    "regionId": "fixture-scan-r1",
+    "bbox1000": [
+      180,
+      280,
+      820,
+      440
+    ]
+  },
+  "crop": {
+    "path": "fixture-scan.svg",
+    "sha256": "sha256:0b0064bae4c5014a71db47ddaf976b6fff9a464692f320c2970cea4e66a4278b",
+    "width": 1000,
+    "height": 400,
+    "bytes": 653,
+    "window1000": [
+      100,
+      200,
+      900,
+      520
+    ]
+  },
+  "extractedText": "SYNTHETIC FIXTURE: layout test only.\nNo document was read to produce this text.\nIt stands where a reader's lines would stand,\nwith the line breaks the reader returned.\nA fifth line gives the clamp something to fold.\nA sixth line is seen only in the full text.",
+  "reader": {
+    "id": "foundation_ocr_gpu_v1",
+    "imageDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000004"
+  },
+  "runAt": "2026-10-19T00:00:00Z",
+  "runReceiptSha256": "sha256:0000000000000000000000000000000000000000000000000000000000000005",
+  "runReceiptUrl": "https://fixture.invalid/specimens/scan.receipt.json",
+  "limitationTokens": []
+}

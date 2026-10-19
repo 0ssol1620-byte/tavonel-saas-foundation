@@ -1,0 +1,161 @@
+/*
+  P2-08 / UX-L4 (UX-PLAN-2026-10-17 §3.3-§3.4): the specimen strip.
+
+  1024px and up: the cells side by side, one column each. Below: a radio row of tabs and one cell,
+  the others stacked in the same grid area with `visibility: hidden`, so the area is the tallest
+  cell's and choosing a tab moves nothing under the strip (CLS 0 without a measurement).
+
+  Ink and paper only. The accent paints the chosen tab's marker, the focus ring and an active
+  cell's region outline -- three of the four places DESIGN_MASTER_V3 §6.2 allows. No motion: a
+  tab swap is instant for everyone, so reduced motion has nothing to remove.
+*/
+
+.strip {
+  margin: 0 0 24px;
+  text-align: start;
+  color: var(--tv-ink);
+}
+
+.tabs {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  border-bottom: 1px solid var(--tv-rule);
+}
+
+.tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 4px 6px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--tv-ink-muted);
+  font: 500 14px/1.25 var(--f-sans);
+  text-align: center;
+  cursor: pointer;
+}
+
+/* The radio covers its label, so a press anywhere on the tab is a press on it. */
+.tab input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.tab:has(input:checked) { color: var(--tv-ink); border-bottom-color: var(--tv-action); }
+.tab:has(input:focus-visible) { outline: 2px solid var(--tv-action); outline-offset: -2px; }
+
+.cells {
+  display: grid;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cell { grid-area: 1 / 1; min-width: 0; }
+
+@media (max-width: 1023.98px) {
+  /* The tab names the cell, so its own kind line is not repeated under it. */
+  .kind { display: none; }
+  .cell:not(:first-child) { visibility: hidden; }
+  .strip:has(.tab:nth-child(2) input:checked) .cell:first-child,
+  .strip:has(.tab:nth-child(3) input:checked) .cell:first-child { visibility: hidden; }
+  .strip:has(.tab:nth-child(2) input:checked) .cell:nth-child(2),
+  .strip:has(.tab:nth-child(3) input:checked) .cell:nth-child(3) { visibility: visible; }
+}
+
+@media (min-width: 1024px) {
+  .strip { margin-bottom: 32px; }
+  .tabs { display: none; }
+  .cells { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 24px; margin-top: 0; }
+  .cell { grid-area: auto; }
+}
+
+.kind {
+  margin: 0;
+  color: var(--tv-ink-muted);
+  font: 500 13px/1.5 var(--f-sans);
+}
+
+.chip {
+  margin: 4px 0 0;
+  color: var(--tv-ink);
+  font: 500 12px/1.5 var(--tv-font-mono);
+  overflow-wrap: anywhere;
+}
+.chip code { font: inherit; }
+.chip span { color: var(--tv-ink-muted); font-family: var(--f-sans); }
+
+.crop { margin: 6px 0 0; }
+
+.frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--tv-rule-strong);
+  border-radius: 4px;
+  background: var(--tv-paper-sunk);
+}
+.frame img { display: block; width: 100%; height: auto; }
+
+/* The reader's region, where the reader put it inside the window. */
+.region {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid var(--tv-ink);
+  background: color-mix(in srgb, var(--tv-ink) 6%, transparent);
+  pointer-events: none;
+}
+.cell:is(:hover, :focus-within) .region { border: 2px solid var(--tv-action); }
+
+/*
+  Home makes every link in main a 44px target (source-first-home.module.css), so this one-line
+  caption is a 44px row with its text centred: that is the space between the crop, the caption and
+  the reader's text, and no margin is added to it. UX §3.3's phone budget is spent here.
+*/
+.source {
+  margin: 0;
+  color: var(--tv-ink-muted);
+  font: 13px/1.5 var(--f-sans);
+}
+.source a { color: var(--tv-ink); }
+
+/* The reader's text as returned: its own line breaks and spacing, cut to four lines (five from 1024). */
+.text {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--tv-ink);
+  font: 400 16px/24px var(--f-sans);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+@media (min-width: 1024px) {
+  .text { -webkit-line-clamp: 5; line-clamp: 5; }
+}
+.cell:has(.more[open]) .text { display: block; overflow: visible; -webkit-line-clamp: unset; line-clamp: none; }
+
+.more summary {
+  padding: 10px 0;
+  color: var(--tv-ink);
+  font: 500 14px/24px var(--f-sans);
+  cursor: pointer;
+}
+.more[open] .closed, .more:not([open]) .open { display: none; }
+
+.run, .limits {
+  margin: 0;
+  color: var(--tv-ink-muted);
+  font: 13px/1.5 var(--f-sans);
+}
+.run a { color: inherit; }
+.limits { margin-top: 4px; color: var(--tv-ink); font-weight: 500; }
