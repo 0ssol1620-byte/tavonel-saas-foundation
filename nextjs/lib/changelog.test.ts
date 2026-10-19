@@ -61,6 +61,23 @@ describe("every entry", () => {
     now the date its entry shows, with a suffix when two releases share a date, and the fragment
     an entry was first published under is kept as `previousId` so an old link still lands on it.
   */
+  /*
+    docs/CHANGELOG_ENTRY_RULE.md: an entry is dated by the Asia/Seoul day of the production
+    deployment that shipped it, and `releasedAt` is that deployment's UTC READY time. Every entry
+    from the #143-#160 backfill on carries one (no entry without its READY date), and wherever an
+    entry carries one, its date is that instant's Seoul calendar day.
+  */
+  it("dates an entry by the Seoul day of the deployment that shipped it", () => {
+    const seoulDay = (instant: string) => new Date(Date.parse(instant) + 9 * 3_600_000).toISOString().slice(0, 10);
+    for (const entry of CHANGELOG) {
+      if (entry.date >= "2026-10-07") expect(entry.releasedAt, `${changelogEntryId(entry)} has no READY time`).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+      if (entry.releasedAt) expect(seoulDay(entry.releasedAt), changelogEntryId(entry)).toBe(entry.date);
+    }
+    // The planted pair: 23:32 in Seoul is still the 15th, and 15:00 UTC on the 15th is already the 16th there.
+    expect(seoulDay("2026-10-15T14:32:11Z")).toBe("2026-10-15");
+    expect(seoulDay("2026-10-15T15:00:00Z")).toBe("2026-10-16");
+  });
+
   it("anchors every entry at the date it shows", () => {
     for (const entry of CHANGELOG) {
       const id = changelogEntryId(entry);
@@ -247,6 +264,17 @@ describe("the page that renders it", () => {
     // `hidden` rather than a filtered map: the page has its whole history without JavaScript,
     // and a permalink resolves whatever the filter happens to be set to.
     expect(list).toContain("hidden={surface !== null");
-    expect(list).toContain("changelogEntries()");
+    // Every entry, unfiltered, from the server: the page hands the list the whole history.
+    expect(page).toContain("<ChangelogList entries={changelogEntries()} />");
+  });
+
+  /*
+    Phase 4 follow-ups (e). The client island read `changelogEntries()` itself, which put the
+    whole CHANGELOG array into its script: /changelog sat 1,419 B under the §22 ratchet, and the
+    #143-#160 backfill alone is larger than that. The data now arrives as a prop.
+  */
+  it("keeps the history out of the client island's script", () => {
+    expect(list).toContain('"use client"');
+    expect(list).not.toMatch(/\bchangelogEntries\b|\bCHANGELOG\b(?!_)/);
   });
 });

@@ -22,7 +22,6 @@ import { BILLING_OFFERS, isBillingOfferCode, type BillingOfferCode } from "./bil
 
 const KEY = "tavonel.checkout-intent";
 
-/** Where a signed-out visitor goes when they pick an offer. */
 /**
  * Whether /login may promise this offer's checkout (B-07). The one predicate the intent notice and
  * the H1 both read, so they cannot disagree.
@@ -36,6 +35,7 @@ export function checkoutSellable(offerCode: BillingOfferCode, purchaseOpen: bool
   return purchaseOpen === null ? null : purchaseOpen && BILLING_OFFERS[offerCode].saleChannel === "self_serve";
 }
 
+/** Where a signed-out visitor goes when they pick an offer. */
 export function loginUrlForOffer(offerCode: BillingOfferCode) {
   return `/login?next=checkout&offer=${encodeURIComponent(offerCode)}`;
 }

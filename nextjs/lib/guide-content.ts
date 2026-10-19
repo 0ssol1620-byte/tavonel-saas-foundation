@@ -53,6 +53,44 @@ export type GuideChapter = {
 export type GuideLanguage = "en" | "ko";
 
 /*
+  Whether a chapter's steps need an API key (ENABLEMENT-GAP-2026-10-17 §4.0-1, second half: "각
+  가이드가 키 없이 도는지 표시합니다"). One table for both languages, keyed by the chapter id they
+  share, so /guide and /ko/guide cannot disagree. "none": every step in the chapter works without a
+  key. "some": the chapter reaches a step that needs one, and the chapter's own sentence says which
+  (`lib/guide-content.test.ts` holds each "some" to that sentence and each "none" to its absence).
+  No chapter is "all": the guide covers only what anyone can use today.
+*/
+export type GuideApiKey = "none" | "some";
+
+const CHAPTER_API_KEY: Readonly<Record<string, GuideApiKey>> = {
+  "what-this-guide-covers": "none",
+  "what-tavonel-makes": "none",
+  "open-the-public-world": "none",
+  "read-the-evidence": "none",
+  "see-what-changed": "none",
+  "relations": "none",
+  "verify-a-signed-package": "some",
+  "call-the-api-without-a-key": "none",
+  "get-the-developer-files": "some",
+  "connect-the-mcp-bridge": "some",
+  "estimate-a-cost": "none",
+  "status-and-trust": "none",
+  "start-with-your-files": "none",
+  "getting-help": "none",
+  "glossary": "none",
+};
+
+/** The marker a chapter carries. Fails closed: a chapter nobody classified renders nothing at all. */
+export function guideChapterApiKey(id: string): GuideApiKey {
+  const value = CHAPTER_API_KEY[id];
+  if (!value) throw new Error(`guide chapter ${id} does not say whether it needs an API key`);
+  return value;
+}
+
+/** Every id the table classifies, for the test that holds it to the chapter list. */
+export const GUIDE_API_KEY_CHAPTERS: readonly string[] = Object.keys(CHAPTER_API_KEY);
+
+/*
   The first edition. Moved by a person when the content changes, never derived at render time --
   the same rule as `DOCS_REVIEWED`.
 */
@@ -82,6 +120,7 @@ export const GUIDE_UI: Record<GuideLanguage, {
   feedbackLink: string;
   feedbackSubject: string;
   englishOnly: string;
+  apiKey: Record<GuideApiKey, string>;
 }> = {
   en: {
     title: "Product guide",
@@ -94,6 +133,7 @@ export const GUIDE_UI: Record<GuideLanguage, {
     feedbackLink: "Report an issue with this page",
     feedbackSubject: "Guide feedback: Product guide",
     englishOnly: "",
+    apiKey: { none: "No API key needed for this chapter.", some: "Some steps in this chapter need an API key." },
   },
   ko: {
     title: "제품 가이드",
@@ -107,6 +147,7 @@ export const GUIDE_UI: Record<GuideLanguage, {
     feedbackSubject: "Guide feedback: 제품 가이드",
     // The /ko pages' own convention for a link to an English-only page (`app/ko/pricing/page.tsx`).
     englishOnly: " (영문)",
+    apiKey: { none: "이 장은 API 키 없이 따라 할 수 있습니다.", some: "이 장의 일부 단계에는 API 키가 필요합니다." },
   },
 };
 
@@ -828,6 +869,7 @@ export function guideText(language: GuideLanguage): string[] {
     ui.lede,
     ...GUIDE[language].flatMap((chapter) => [
       chapter.title,
+      ui.apiKey[guideChapterApiKey(chapter.id)],
       ...chapter.links.map((link) => link.label),
       ...chapter.blocks.flatMap((block) => {
         switch (block.kind) {
