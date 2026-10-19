@@ -1988,7 +1988,8 @@ export const PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/
 // listed -- the changelog and its feed, the benchmarks page and its notes mask, the cookbooks index and card, the resources hub,
 // the keyless try-it's digest check and its mounts on /api and /developers, the product guide at /guide and /ko/guide with its
 // media player, and the twenty-four recordings, posters and captions with their sha256 manifest under public/guide. Each selects
-// the nineteen suites that read those files directly (rendered pages, source walks, the sitemap, the manifest rehash). No browser
+// the twenty suites that read those files directly (rendered pages, source walks, the sitemap, the manifest rehash, the nav model's
+// page-exists walk, listed here since EN-FIX-1). No browser
 // suite of its own: e2e/keyless-try-it.spec.ts runs with the full Playwright suite, and the docs and marketing paths this batch also
 // changed keep their existing owners. Product code, so never nativeReuse.
 export const ENABLEMENT_AFFECTED_PATHS = Object.freeze([
@@ -2016,7 +2017,7 @@ export const ENABLEMENT_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/design-tokens.test.ts', 'lib/developer-snippets.test.ts',
   'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/guide-content.test.ts', 'lib/keyless-read.test.ts',
   'lib/keyless-try-it.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts',
-  'lib/product-claims-sync.test.ts', 'lib/resources-hub.test.ts', 'lib/seo-surface.test.ts', 'lib/trust-page-answers.test.ts',
+  'lib/product-claims-sync.test.ts', 'lib/resources-hub.test.ts', 'lib/seo-surface.test.ts', 'lib/site-nav-model.test.ts', 'lib/trust-page-answers.test.ts',
 ]);
 // Exact literal alternation: every regular-expression metacharacter is escaped, not only '.', because the cookbook route
 // carries a literal [slug] segment that would otherwise be read as a character class.
@@ -2311,7 +2312,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // paper-product.css route ownership: the two exact components above select three direct suites and the Explore and Pricing suites.
   affectedGroup('paper-product-route-css', new RegExp(`^nextjs/(?:${exactPathAlternation(PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS)})$`),
     { unitFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, browserFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES }),
-  // Enablement batch: the fifty-five exact paths above select nineteen direct suites and no browser suite.
+  // Enablement batch: the fifty-five exact paths above select twenty direct suites and no browser suite.
   affectedGroup('enablement-20261017', new RegExp(`^nextjs/(?:${exactPathAlternation(ENABLEMENT_AFFECTED_PATHS)})$`),
     { unitFiles: ENABLEMENT_AFFECTED_UNIT_FILES }),
   // PR #141 fix round 3: the fourteen exact paths above select their direct suites and the site chrome browser suite.
