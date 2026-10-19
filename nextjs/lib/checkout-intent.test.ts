@@ -144,6 +144,20 @@ describe("decideCheckoutResume: terms -> launch -> checkout (D-14)", () => {
     expect(decideCheckoutResume("observer_access", true, released)).toBe("open");
   });
 
+  /*
+    Review B1 (2026-10-19): a released workspace whose trial was refused (expired, a second account on
+    the device, review required, trials off) answers ACCESS_READY_NO_ENTITLEMENT with no file access of
+    its own, and buying is its way forward. Released means the production stage, which bootstrap sends
+    only when the workspace gate is open -- not the trial's file access.
+  */
+  it("opens for a released workspace with no entitlement: the trial-refused buyer is not held", () => {
+    const unentitledReleased: ResumeAccess = { ...newAccount, sourcePending: null, processingStage: "production" };
+    expect(decideCheckoutResume("observer_access", true, unentitledReleased)).toBe("open");
+    // Not released: still held, whatever else is true.
+    expect(decideCheckoutResume("observer_access", true, { ...unentitledReleased, processingStage: "qualification" })).toBe("hold_release");
+    expect(decideCheckoutResume("observer_access", true, { ...unentitledReleased, processingStage: null })).toBe("hold_release");
+  });
+
   it("holds for the processing terms before anything else", () => {
     expect(decideCheckoutResume("observer_access", true, newAccount)).toBe("hold_terms");
   });

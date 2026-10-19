@@ -509,6 +509,48 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     expect(posts).toHaveLength(1);
   });
 
+  /*
+    Review B1 (2026-10-19): a trial that ended (or was refused) leaves a released workspace with no
+    entitlement and no file access, and bootstrap answers ACCESS_READY_NO_ENTITLEMENT. Buying is that
+    person's way forward, so the held offer resumes once the stage is production -- and stays held
+    while the workspace is only qualified.
+  */
+  test("a trial-expired buyer in a released workspace resumes the held checkout exactly once (review B1)", async ({ page }) => {
+    await declineAnalytics(page);
+    await servePosture(page, "switch-on");
+    const paddle = await installFakePaddle(page);
+    await installFixtureSession(page);
+    await installWorkspaceRoutes(page, { accessSource: "unentitled", customerDataEnabled: false });
+    const noEntitlement = (processingStage: "production" | "qualification") => ({
+      code: "ACCESS_READY_NO_ENTITLEMENT",
+      access: { source: "unentitled", accessPlan: null, billingExempt: false, expiresAt: null, limits: null, customerDataEnabled: false, processingStage },
+    });
+    const state = { bootstrap: noEntitlement("qualification"), reads: 0 };
+    await page.route("**/api/access/bootstrap", (route) => (state.reads += 1, route.fulfill({ json: state.bootstrap })));
+    const posts = await answerCheckout(page, () => ({ status: 200, json: SANDBOX_CHECKOUT_READY }));
+    const held = region(page, "status", "Developer is held for you.");
+
+    // Qualified, not released: held, nothing sent.
+    await page.goto("/workspace?checkout=observer_access", { waitUntil: "domcontentloaded" });
+    await expect(held).toBeVisible();
+    expect(posts).toEqual([]);
+
+    // Released for production with the trial over: one checkout, as an offer code and nothing else.
+    state.bootstrap = noEntitlement("production");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(region(page, "status", "Developer sandbox checkout opened. Only a verified webhook can change entitlements.")).toBeVisible();
+    await expect(held).toHaveCount(0);
+    expect(posts).toEqual([{ offerCode: "observer_access" }]);
+    expect(paddle.loads()).toBe(1);
+
+    // Spent: the next visit reads access again and sends nothing.
+    const reads = state.reads;
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect.poll(() => state.reads).toBeGreaterThan(reads);
+    await expect(held).toHaveCount(0);
+    expect(posts).toHaveLength(1);
+  });
+
   test("a signed-in upgrade opens the overlay over /pricing, in that page's language and scheme (A11)", async ({ page }) => {
     await declineAnalytics(page);
     await servePosture(page, "switch-on");
