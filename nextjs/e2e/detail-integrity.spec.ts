@@ -158,9 +158,10 @@ test('source endpoints stay attached after a width change, without a page reload
 test('API reference is scannable while endpoint contracts stay reachable by keyboard', async ({ page }) => {
   await page.goto('/api');
   const operations = page.locator('article[id]');
-  // While the approval lineage is off the route publishes main's 33 operations (review 3, CI-TI-1); its six
-  // approved-upload operations join them only with the switch on.
-  await expect(operations).toHaveCount(INTAKE_APPROVAL_ROLLOUT_ENABLED ? 39 : 33);
+  // While the approval lineage is off the route publishes 35 operations: main's 33 (review 3, CI-TI-1) plus the
+  // per-file /uploads/confirm and POST /developer/keys (G1, SERVICE-DEFINITION 2026-10-17 sections 2.2 A14 and
+  // 2.4 C5). With the switch on, five approved-upload operations join them and confirm becomes the approved one.
+  await expect(operations).toHaveCount(INTAKE_APPROVAL_ROLLOUT_ENABLED ? 40 : 35);
   const operation = operations.first();
   const details = operation.locator('details').first();
   await expect(details).not.toHaveAttribute('open');

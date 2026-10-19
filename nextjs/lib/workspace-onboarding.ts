@@ -1,5 +1,6 @@
 import type { WorkspaceSurface } from "@/components/workspace-ultimate-shell";
 import type { CompileState } from "./compile-job-store";
+import type { DocumentListPartial } from "./pipeline";
 
 /*
   One derivation of "what is true about this workspace, and what should be said about it".
@@ -20,6 +21,8 @@ export type WorkspaceStateInput = {
   customerDataAccess: "checking" | "open" | "closed" | "unavailable";
   /** Whether the source inventory is known. Never assume "loading" means "empty". */
   inventoryState: WorkspaceInventoryState;
+  /** `/api/documents`'s `partial` marker: the inventory loaded but is known to be incomplete. */
+  inventoryPartial?: DocumentListPartial | null;
   documentCount: number;
   readyDocumentCount: number;
   operatorReviewCount: number;
@@ -73,7 +76,9 @@ export type WorkspaceStateView = {
 export function deriveWorkspaceMode(input: WorkspaceStateInput): WorkspaceMode {
   if (input.inventoryState === "loading") return "loading";
   if (input.inventoryState === "unavailable") return "unavailable";
+  // An incomplete inventory with nothing listed is not an empty workspace; it is a failed read.
   const untouched =
+    !input.inventoryPartial &&
     input.documentCount === 0 &&
     !input.hasCandidate &&
     input.activeRevision === null &&
@@ -175,6 +180,14 @@ export function deriveWorkspaceState(input: WorkspaceStateInput): WorkspaceState
     return { mode, stateTitle: "The last compile stopped.",
       stateDescription: "The run did not finish. Inspect its recorded status before retrying; no error detail was provided.",
       nextAction: { label: "Open activity", surface: "activity" } };
+  }
+
+  // Below the live and decided states, above every "here is what you could do next" branch: none
+  // of those counts is trustworthy while the inventory says it is missing sources.
+  if (input.inventoryPartial) {
+    return { mode, stateTitle: "Some sources could not be loaded.",
+      stateDescription: incompleteInventorySentence(input.inventoryPartial),
+      nextAction: { label: "Retry loading sources", intent: "refresh" } };
   }
 
   if (input.customerDataAccess !== "open") {
@@ -282,8 +295,22 @@ export function deriveOnboardingSteps(input: WorkspaceStateInput): OnboardingSte
   ];
 }
 
+/** What to say about an incomplete inventory. Never a raw code; the count is the server's. */
+export function incompleteInventorySentence(partial: DocumentListPartial): string {
+  const count = partial.documentIds.length;
+  const unread = count > 0
+    ? `${count} source${count === 1 ? "" : "s"} in this workspace could not be fully read, so the list below is incomplete.`
+    : "";
+  // The listing stops early without knowing what lies past it -- refused, still being
+  // prepared or already prepared -- so this says only that something may be missing.
+  const truncated = partial.truncated
+    ? "The source listing stopped before its end, so some sources may not be shown."
+    : "";
+  return [unread, truncated, "Retry; nothing was changed."].filter(Boolean).join(" ");
+}
+
 export type AttentionItem = {
-  id: "candidate-review" | "operator-review" | "refused" | "compile-failed";
+  id: "inventory-incomplete" | "candidate-review" | "operator-review" | "refused" | "compile-failed";
   /** Rendered as text, not as a colour. */
   label: string;
   detail: string;
@@ -296,6 +323,15 @@ export type AttentionItem = {
  */
 export function deriveAttentionItems(input: WorkspaceStateInput): AttentionItem[] {
   const items: AttentionItem[] = [];
+
+  if (input.inventoryPartial) {
+    items.push({
+      id: "inventory-incomplete",
+      label: "Incomplete",
+      detail: incompleteInventorySentence(input.inventoryPartial),
+      action: { label: "Retry loading sources", intent: "refresh" },
+    });
+  }
 
   if (input.collectionReviewRequired) {
     items.push({

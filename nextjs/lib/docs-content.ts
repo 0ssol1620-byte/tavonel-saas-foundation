@@ -667,6 +667,8 @@ console.log("compile job:", accepted.jobId);` },
     blocks: [
       { kind: "heading", text: "Getting a key" },
       { kind: "prose", text: "Keys are created in the workspace, under **Developers**. The plaintext is shown once, at creation, and is not recoverable afterwards — store it before you close the dialog. Creating, rotating and revoking a key each write an audit row, readable through the audit endpoint below. A request with no key, or with a key TAVONEL did not issue, is refused with 401 and the code **AUTH_REQUIRED**: that is the first error most integrations see, and it means the credential rather than the request." },
+      // G1 (SERVICE-DEFINITION 2026-10-17 section 2.4 C5): key creation, now in the contract.
+      { kind: "endpoint", operationId: "createDeveloperApiKey" },
       { kind: "heading", text: "Sending the key" },
       { kind: "prose", text: "Send the key as a bearer token. Keys are workspace-scoped and carry an explicit scope set; a request outside its scopes is refused with 403 and API_SCOPE_REQUIRED rather than silently returning less." },
       { kind: "code", label: "Every request", language: "bash", body: `curl -sS https://tavonel.com/api/v1/documents -H "${KEY_HEADER}"` },
@@ -822,6 +824,8 @@ console.log("compile job:", accepted.jobId);` },
           },
         ],
       },
+      // G1 (SERVICE-DEFINITION 2026-10-17 section 2.2 A14): the per-file confirmation the contract now publishes.
+      ...(INTAKE_APPROVAL_ROLLOUT_ENABLED ? [] : [{ kind: "endpoint", operationId: "confirmDirectUpload" }] satisfies DocsBlock[]),
       { kind: "heading", text: "How long the URL lives, and what happens when it does not" },
       { kind: "note", text: "expiresAt in the capability response is the authority, and it is an absolute instant rather than a duration — read it, do not assume a number. The window is deliberately short: a signed URL is a credential that travels, and a long-lived one is a long-lived credential. After it passes, object storage refuses the PUT with its own expiry error and nothing was written; request a fresh capability for the same file. A document id issued for a capability that was never used carries no bytes, is never compiled, and needs no cleaning up." },
       { kind: "heading", text: "The codes these endpoints return" },
