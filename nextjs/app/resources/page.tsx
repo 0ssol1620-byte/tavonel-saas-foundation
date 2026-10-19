@@ -27,6 +27,7 @@ const DESCRIPTIONS: Record<string, string> = {
   "/explore": "Follow a result from an answer back to the exact source location it came from, without signing in.",
   "/knowledge-compiler": "What a Knowledge Compiler is, and how it differs from a parser, a RAG pipeline and a graph database.",
   "/docs": "Quickstart, concepts, supported files, compiling, review, and using a world through Ask, the API and MCP.",
+  "/cookbooks": "Task guides that take one piece of work through the product, each published ahead of a recorded run.",
   "/api": "Endpoints, authentication, errors and limits, with the machine-readable OpenAPI document alongside.",
   "/changelog": "What changed, in the order it changed, written for the people using it.",
   "/research": "The open problems in compiling documents into evidence-bound, versioned knowledge.",
@@ -40,8 +41,8 @@ const DESCRIPTIONS: Record<string, string> = {
 
   The filter is a fragment link per tag and `:target` in `resources.module.css` -- no client
   component, no query string, and every one of the nine descriptions stays in the HTML at every
-  filter state (WG-074). Nothing here links to a page that does not exist: `/cookbooks/*` is a
-  proposal, and a draft cookbook is not linked from this hub as a representative case.
+  filter state (WG-074). Nothing here links to a page that does not exist, and no draft cookbook
+  is linked as a representative case: the cookbooks index is one entry (EN-0), the records are not.
 */
 /*
   pages-17: "Everything" is the clear-all, not a filter group of one.

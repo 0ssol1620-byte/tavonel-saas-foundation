@@ -41,6 +41,9 @@ export const PUBLIC_MARKETING_PATHS = new Set([
   */
   "/solutions",
   "/trust",
+  // EN-0: the cookbooks index is in the sitemap and on /resources, so it is measured; its six
+  // draft records are not, for the reason below.
+  "/cookbooks",
   /*
     BA-211's other half, decided rather than left open: the six `/cookbooks/*` drafts are **not**
     here, and that is the answer, not an omission.

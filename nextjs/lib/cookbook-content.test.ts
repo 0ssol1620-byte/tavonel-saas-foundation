@@ -300,7 +300,7 @@ describe("the route publishes a draft as a draft", () => {
 
   it("declares noindex on the route and stays out of the sitemap and llms.txt", () => {
     expect(PAGE).toMatch(/robots:.*index: false/s);
-    expect(sitemap().map((entry) => new URL(entry.url).pathname).filter((path) => path.startsWith("/cookbooks"))).toEqual([]);
+    expect(sitemap().map((entry) => new URL(entry.url).pathname).filter((path) => path.startsWith("/cookbooks/"))).toEqual([]);
     expect(read("public/llms.txt")).not.toContain("/cookbooks");
   });
 
@@ -375,7 +375,10 @@ describe("the copy guards cover the new surfaces", () => {
       expect(index, record.slug + " is hand-written into the index").not.toContain('"' + record.slug + '"');
       expect(index, record.title + " is hand-written into the index").not.toContain(record.title);
     }
-    expect(index).toMatch(/robots:.*index: false/s);
+    // EN-0: the index is advertised; the records it lists are not (see the slug route above).
+    expect(index).not.toMatch(/index: false/);
+    expect(index, "the index says what a reader is holding").toContain("Every guide is published ahead of a recorded run");
+    expect(sitemap().map((entry) => new URL(entry.url).pathname)).toContain("/cookbooks");
     expect(index, "a figure on a card is a result, and there is no run").not.toMatch(/d+s?%|$s?d/);
     for (const pattern of ["<img", "<Image", "next/image", "<form", 'type="email"']) {
       expect(index, pattern + ": the index gates nothing and illustrates nothing").not.toContain(pattern);

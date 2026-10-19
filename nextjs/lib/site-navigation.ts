@@ -367,6 +367,17 @@ export const RESOURCE_LINKS: readonly ResourceLink[] = [
     purposes: ["build"],
     workflows: ["compile-and-review", "use-elsewhere", "handle-a-revision"],
   },
+  /*
+    EN-0: the six task guides, as one entry for their index. A draft record is never linked from
+    here (`lib/resources-hub.test.ts`); the index says on its face that each guide is published
+    ahead of a recorded run. Hub-only, like Documentation beside it.
+  */
+  {
+    href: "/cookbooks",
+    label: "Cookbooks",
+    purposes: ["build"],
+    workflows: ["compile-and-review", "use-elsewhere", "handle-a-revision"],
+  },
   { href: "/api", label: "API", purposes: ["build"], workflows: ["use-elsewhere"] },
   { href: "/changelog", label: "Changelog", purposes: ["build"], workflows: [], column: "verify" },
   /*

@@ -65,6 +65,15 @@ export default function DocsPage() {
                 </article>
               );
             })}
+            {/*
+              EN-0. The task guides, beside the two starting points: one piece of work start to
+              finish, where the sections above are the reference. One link to their index; a
+              draft record is linked from nowhere on this page.
+            */}
+            <article className="tile">
+              <h2><Link href={"/cookbooks" as Route}>Cookbooks</Link></h2>
+              <p>Task guides that take one piece of work through the product, each published ahead of a recorded run.</p>
+            </article>
           </div>
         </div>
         <div className="stack docs-hub-index">

@@ -661,8 +661,18 @@ describe("public surface: the draft cookbooks", () => {
     for (const path of ["/cookbooks", ...cookbookPaths]) expect(isRealRoute(path), path).toBe(true);
   });
 
-  it("keeps the index out of search while every record it lists is a draft", () => {
-    expect(isNoindex("/cookbooks"), "a hub of six drafts is not a page to advertise").toBe(true);
+  /*
+    EN-0 (ENABLEMENT-GAP 4.0 item 1). The index is advertised; the six records are not.
+
+    The hub was noindex because every entry is a draft, which left it reachable from nowhere a
+    reader looks -- the user manual this release prepares links it, and a manual cannot send a
+    reader to a page the site itself hides. The index states on its own first screen that every
+    guide is published ahead of a recorded run, so advertising it publishes that sentence and the
+    six titles, not a result. Each record keeps its own noindex until it is approved.
+  */
+  it("advertises the index, which says on its face that every guide is ahead of a recorded run", () => {
+    expect(isNoindex("/cookbooks"), "the index is linked from Resources and the docs hub, so it may not opt out of search").toBe(false);
+    expect(sitemapPaths).toContain("/cookbooks");
     expect(heads.get("/cookbooks")?.alternates?.canonical).toBe("/cookbooks");
   });
 
@@ -677,9 +687,9 @@ describe("public surface: the draft cookbooks", () => {
   it("advertises none of them while every record is a draft", () => {
     const drafts = COOKBOOKS.filter((record) => record.publication === "draft").map((record) => `/cookbooks/${record.slug}`);
     expect(drafts).toEqual(cookbookPaths);
-    // Both routes: the six records and the index that lists them.
-    expect(sitemapPaths.filter((path) => path.startsWith("/cookbooks"))).toEqual([]);
-    expect(llmsPaths.filter((path) => path.startsWith("/cookbooks"))).toEqual([]);
+    // The six records only; the index above is advertised on purpose.
+    expect(sitemapPaths.filter((path) => path.startsWith("/cookbooks/"))).toEqual([]);
+    expect(llmsPaths.filter((path) => path.startsWith("/cookbooks/"))).toEqual([]);
   });
 
 });
