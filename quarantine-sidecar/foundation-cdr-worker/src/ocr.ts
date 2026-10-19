@@ -1,5 +1,5 @@
 import { cdrRequestSignature, hmacSecretIsConfigured, sha256DigestHeader } from "./hmac";
-import { ocrProgressSiblingKey, ocrSiblingKey } from "./keys";
+import { ocrPageRangeSiblingKey, ocrProgressSiblingKey, ocrSiblingKey } from "./keys";
 import { RetryableError } from "./errors";
 import { parseReaderBinding, readerBindingSha256 } from "../../../shared/completedReadReceipt";
 
@@ -27,7 +27,8 @@ export type OcrFailureCode =
   | "OCR_RESPONSE_NOT_JSON"
   | "OCR_RESPONSE_INVALID"
   | "OCR_PERSISTED_RESULT_INVALID"
-  | "OCR_RESULT_WRITE_FAILED";
+  | "OCR_RESULT_WRITE_FAILED"
+  | "OCR_PAGES_INCOMPLETE";
 
 /**
  * A pod that died and a model that was wrong are different problems.
@@ -55,6 +56,9 @@ export const OCR_FAILURE_CATEGORY: Record<OcrFailureCode, { kind: OcrFailureKind
   OCR_HTTP_UNAVAILABLE: { kind: "transport", retryCategory: "provider_5xx" },
   OCR_SOURCE_MISSING: { kind: "transport", retryCategory: "download_timeout" },
   OCR_RESULT_WRITE_FAILED: { kind: "transport", retryCategory: "provider_5xx" },
+  // A page range has no durable answer yet, so nothing was assembled. The ranges that were read
+  // stay stored create-once, and the next delivery asks only for the missing ones.
+  OCR_PAGES_INCOMPLETE: { kind: "transport", retryCategory: "download_timeout" },
   // The reader answered, or the source itself is the problem. A person decides what happens next.
   OCR_HTTP_REJECTED: { kind: "semantic", retryCategory: "unsupported_file" },
   OCR_SOURCE_EMPTY: { kind: "semantic", retryCategory: "unsupported_file" },
@@ -94,6 +98,13 @@ export type OcrDispatchEnv = {
   FOUNDATION_COMPLETED_READ_BINDING?: string;
   /** Opt-in only for a pinned v3 reader; a v2 create-once winner cannot satisfy it. */
   FOUNDATION_OCR_CONFLICT_V3_REQUIRED?: string;
+  /**
+   * Pages per OCR request. Unset (every deployment today) keeps the one whole-document request.
+   * Set, the PDF is read range by range and `ocr.json` is assembled from the ranges. The reader
+   * must have `TAVONEL_OCR_PAGE_RANGES_ENABLED`. There is no default: the size comes from a
+   * measured seconds-per-page figure (table/limits design A4.1), and none is measured yet.
+   */
+  FOUNDATION_OCR_PAGE_RANGE_SIZE?: string;
 };
 
 /** Must stay retryable even after the queue's cold-start retry budget. */
@@ -540,6 +551,7 @@ export async function dispatchOcrAfterSanitize(
   if (!looksLikeFoundationOcrUrl(url)) {
     return { status: "skipped", reason: "OCR URL is not a Foundation target", computeCredits: 0 };
   }
+  const rangeSize = ocrPageRangeSize(env);
 
   const ocrKey = ocrSiblingKey(immutablePdfKey);
   let existingOcr: Awaited<ReturnType<OcrR2Bucket["get"]>>;
@@ -565,7 +577,14 @@ export async function dispatchOcrAfterSanitize(
   }
 
   const inputSha256 = await sha256DigestHeader(bytes);
-  if (existingOcr) return inspectPersistedOcr(env, immutablePdfKey, inputSha256, "exists");
+  let rangeReadOnly = false;
+  if (existingOcr) {
+    const persisted = await inspectPersistedOcr(env, immutablePdfKey, inputSha256, "exists");
+    if (rangeSize === null || persisted.status !== "failed") return persisted;
+    // A document longer than one reader answer fails the whole-document check by its page count
+    // alone. It is proven against its stored ranges instead, without asking the reader again.
+    rangeReadOnly = true;
+  }
   const binding = env.FOUNDATION_COMPLETED_READ_ENABLED === "true"
     ? parseReaderBinding(env.FOUNDATION_COMPLETED_READ_BINDING, url) : null;
   if (env.FOUNDATION_OCR_CONFLICT_V3_REQUIRED === "true" && !binding) {
@@ -574,65 +593,16 @@ export async function dispatchOcrAfterSanitize(
   if (env.FOUNDATION_COMPLETED_READ_ENABLED === "true" && !binding) {
     throw new OcrEvidenceRetryableError("qualified immutable OCR reader binding is missing");
   }
-  const timestamp = now().toISOString();
-  const requestId = newRequestId();
-  const hmac = (env.TAVONEL_OCR_HMAC || env.TAVONEL_CDR_HMAC || "").trim();
-  const headers: Record<string, string> = {
-    "x-tavonel-input-sha256": inputSha256,
-    // Ask for the per-page view. A worker that does not implement it ignores this and answers
-    // with JSON exactly as before, which is why there is no capability check here.
-    accept: `${NDJSON_MEDIA_TYPE}, application/json`,
-  };
-  const runpodKey = (env.RUNPOD_API_KEY || "").trim();
-  if (runpodKey) {
-    headers.Authorization = `Bearer ${runpodKey}`;
+  const reader: ReaderPost = { env, url, ocrKey, bytes, inputSha256, binding, fetcher, now, newRequestId, timeoutMs };
+  if (rangeSize !== null) {
+    return dispatchOcrRanges({ ...reader, immutablePdfKey, size: rangeSize, readOnly: rangeReadOnly,
+      provenance: binding ? { readerRevision: binding.readerRevision, readerBindingSha256: await readerBindingSha256(binding) } : {} });
   }
-  if (hmacSecretIsConfigured(hmac) && REQUEST_ID_PATTERN.test(requestId)) {
-    headers["x-tavonel-ocr-timestamp"] = timestamp;
-    headers["x-tavonel-ocr-request-id"] = requestId;
-    headers["x-tavonel-ocr-signature"] = await cdrRequestSignature(
-      hmac,
-      timestamp,
-      requestId,
-      inputSha256,
-    );
-  }
-
-  const form = new FormData();
-  form.append("source", new Blob([bytes], { type: "application/pdf" }), "sanitized.pdf");
-
-  let response: Response;
-  try {
-    response = await fetcher(url, {
-      method: "POST",
-      headers,
-      body: form,
-      // A qualification attests this endpoint only; following a redirect invalidates attribution.
-      ...(binding ? { redirect: "error" as const } : {}),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-  } catch {
-    return { status: "failed", key: ocrKey, reasonCode: "OCR_TIMEOUT_OR_NETWORK", reason: "OCR request timed out or failed", requestId, inputSha256, computeCredits: 0 };
-  }
-  let responseEndpointMatches = false;
-  if (binding) {
-    try { responseEndpointMatches = new URL(response.url).href === new URL(binding.endpoint).href; } catch { /* fail closed */ }
-  }
-  if (binding && (response.redirected || !responseEndpointMatches
-    || (response.status >= 300 && response.status < 400))) {
-    throw new OcrEvidenceRetryableError("OCR response endpoint provenance is not qualified");
-  }
-  const responseRevision = response.headers.get("x-tavonel-reader-revision");
-  if (binding && responseRevision !== null && responseRevision !== binding.readerRevision) {
-    throw new OcrEvidenceRetryableError("OCR response reader revision conflicts with qualification");
-  }
-  if (!response.ok) {
-    // 5xx and 429 are the endpoint being unavailable, not an answer about this document.
-    const unavailable = response.status >= 500 || response.status === 429;
-    return unavailable
-      ? { status: "failed", key: ocrKey, reasonCode: "OCR_HTTP_UNAVAILABLE", reason: `OCR returned HTTP ${response.status}`, requestId, inputSha256, computeCredits: 0 }
-      : { status: "failed", key: ocrKey, reasonCode: "OCR_HTTP_REJECTED", reason: `OCR returned HTTP ${response.status}`, requestId, inputSha256, computeCredits: 2 };
-  }
+  // Ask for the per-page view. A worker that does not implement it ignores this and answers
+  // with JSON exactly as before, which is why there is no capability check here.
+  const posted = await postToReader(reader, `${NDJSON_MEDIA_TYPE}, application/json`);
+  if ("failed" in posted) return posted.failed;
+  const { response, requestId } = posted;
 
   /*
    * Two ways to read the same answer.
@@ -690,10 +660,108 @@ export async function dispatchOcrAfterSanitize(
   if (!qualified) {
     return { status: "failed", key: ocrKey, reasonCode: "OCR_RESPONSE_INVALID", reason: "OCR response contract is invalid", requestId, inputSha256, computeCredits: 2 };
   }
-  if (qualified.schemaVersion === OCR_RESULT_SCHEMA_V3 && !binding) {
+  await assertReaderAnswer(env, payload, qualified.schemaVersion, binding);
+
+  const persistedBytes = await persistedOcrBody(qualified, immutablePdfKey, binding);
+  if (persistedBytes.byteLength > MAX_PERSISTED_OCR_BYTES) {
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_RESPONSE_INVALID", computeCredits: 2 };
+  }
+  return putOcrJsonCreateOnce(env, ocrKey, persistedBytes, { requestId, inputSha256 },
+    (status) => inspectPersistedOcr(env, immutablePdfKey, inputSha256, status));
+}
+
+type ReaderBinding = NonNullable<ReturnType<typeof parseReaderBinding>>;
+
+type ReaderPost = {
+  env: OcrDispatchEnv;
+  url: string;
+  ocrKey: string;
+  bytes: ArrayBuffer;
+  inputSha256: string;
+  binding: ReaderBinding | null;
+  fetcher: typeof fetch;
+  now: () => Date;
+  newRequestId: () => string;
+  timeoutMs: number;
+};
+
+/**
+ * One signed POST of the sanitized PDF to the reader.
+ *
+ * A failure comes back exactly as the whole-document request has always reported it; a range
+ * request is the same POST with one more header. Provenance violations throw retryable, as before.
+ */
+async function postToReader(
+  post: ReaderPost, accept: string, pageRange?: string,
+): Promise<{ response: Response; requestId: string } | { failed: OcrDispatchResult }> {
+  const { env, ocrKey, inputSha256, binding } = post;
+  const timestamp = post.now().toISOString();
+  const requestId = post.newRequestId();
+  const hmac = (env.TAVONEL_OCR_HMAC || env.TAVONEL_CDR_HMAC || "").trim();
+  const headers: Record<string, string> = { "x-tavonel-input-sha256": inputSha256, accept };
+  // Not signed: the answer echoes the range it read, and the caller refuses any other range.
+  if (pageRange) headers["x-tavonel-ocr-page-range"] = pageRange;
+  const runpodKey = (env.RUNPOD_API_KEY || "").trim();
+  if (runpodKey) {
+    headers.Authorization = `Bearer ${runpodKey}`;
+  }
+  if (hmacSecretIsConfigured(hmac) && REQUEST_ID_PATTERN.test(requestId)) {
+    headers["x-tavonel-ocr-timestamp"] = timestamp;
+    headers["x-tavonel-ocr-request-id"] = requestId;
+    headers["x-tavonel-ocr-signature"] = await cdrRequestSignature(
+      hmac,
+      timestamp,
+      requestId,
+      inputSha256,
+    );
+  }
+
+  const form = new FormData();
+  form.append("source", new Blob([post.bytes], { type: "application/pdf" }), "sanitized.pdf");
+
+  let response: Response;
+  try {
+    response = await post.fetcher(post.url, {
+      method: "POST",
+      headers,
+      body: form,
+      // A qualification attests this endpoint only; following a redirect invalidates attribution.
+      ...(binding ? { redirect: "error" as const } : {}),
+      signal: AbortSignal.timeout(post.timeoutMs),
+    });
+  } catch {
+    return { failed: { status: "failed", key: ocrKey, reasonCode: "OCR_TIMEOUT_OR_NETWORK", reason: "OCR request timed out or failed", requestId, inputSha256, computeCredits: 0 } };
+  }
+  let responseEndpointMatches = false;
+  if (binding) {
+    try { responseEndpointMatches = new URL(response.url).href === new URL(binding.endpoint).href; } catch { /* fail closed */ }
+  }
+  if (binding && (response.redirected || !responseEndpointMatches
+    || (response.status >= 300 && response.status < 400))) {
+    throw new OcrEvidenceRetryableError("OCR response endpoint provenance is not qualified");
+  }
+  const responseRevision = response.headers.get("x-tavonel-reader-revision");
+  if (binding && responseRevision !== null && responseRevision !== binding.readerRevision) {
+    throw new OcrEvidenceRetryableError("OCR response reader revision conflicts with qualification");
+  }
+  if (!response.ok) {
+    // 5xx and 429 are the endpoint being unavailable, not an answer about this document.
+    const unavailable = response.status >= 500 || response.status === 429;
+    return { failed: unavailable
+      ? { status: "failed", key: ocrKey, reasonCode: "OCR_HTTP_UNAVAILABLE", reason: `OCR returned HTTP ${response.status}`, requestId, inputSha256, computeCredits: 0 }
+      : { status: "failed", key: ocrKey, reasonCode: "OCR_HTTP_REJECTED", reason: `OCR returned HTTP ${response.status}`, requestId, inputSha256, computeCredits: 2 } };
+  }
+  return { response, requestId };
+}
+
+/** What every qualified reader answer must also satisfy before it is stored, whole or in ranges. */
+async function assertReaderAnswer(
+  env: OcrDispatchEnv, payload: unknown, schemaVersion: QualifiedOcrResult["schemaVersion"], binding: ReaderBinding | null,
+): Promise<void> {
+  if (schemaVersion === OCR_RESULT_SCHEMA_V3 && !binding) {
     throw new OcrEvidenceRetryableError("v3 OCR result has no qualified completed-read binding");
   }
-  if (env.FOUNDATION_OCR_CONFLICT_V3_REQUIRED === "true" && qualified.schemaVersion !== OCR_RESULT_SCHEMA_V3) {
+  if (env.FOUNDATION_OCR_CONFLICT_V3_REQUIRED === "true" && schemaVersion !== OCR_RESULT_SCHEMA_V3) {
     throw new OcrEvidenceRetryableError("v2 OCR response lacks required v3 conflict evidence");
   }
 
@@ -705,8 +773,13 @@ export async function dispatchOcrAfterSanitize(
       throw new OcrEvidenceRetryableError("OCR result reader provenance conflicts with qualification");
     }
   }
+}
 
-  const body = JSON.stringify({
+/** The one serialization of `ocr.json`, so a document assembled from ranges is the same bytes. */
+async function persistedOcrBody(
+  qualified: QualifiedOcrResult, immutablePdfKey: string, binding: ReaderBinding | null,
+): Promise<Uint8Array> {
+  return new TextEncoder().encode(JSON.stringify({
     schemaVersion: qualified.schemaVersion,
     status: qualified.status,
     text: qualified.text,
@@ -717,12 +790,16 @@ export async function dispatchOcrAfterSanitize(
     sourceImmutableKey: immutablePdfKey,
     inputSha256: qualified.inputSha256,
     ...(binding ? { readerRevision: binding.readerRevision, readerBindingSha256: await readerBindingSha256(binding) } : {}),
-  });
-  const persistedBytes = new TextEncoder().encode(body);
-  if (persistedBytes.byteLength > MAX_PERSISTED_OCR_BYTES) {
-    return { status: "failed", key: ocrKey, reasonCode: "OCR_RESPONSE_INVALID", computeCredits: 2 };
-  }
+  }));
+}
 
+async function putOcrJsonCreateOnce(
+  env: OcrDispatchEnv,
+  ocrKey: string,
+  persistedBytes: Uint8Array,
+  failure: { requestId?: string; inputSha256: string },
+  inspect: (status: "exists" | "written") => Promise<OcrDispatchResult>,
+): Promise<OcrDispatchResult> {
   try {
     await env.FOUNDATION_QUARANTINE.put(ocrKey, persistedBytes, {
       httpMetadata: { contentType: "application/json" },
@@ -732,14 +809,318 @@ export async function dispatchOcrAfterSanitize(
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (/precondition|already exists|conflict/iu.test(message)) {
-      return inspectPersistedOcr(env, immutablePdfKey, inputSha256, "exists");
+      return inspect("exists");
     }
     if (env.FOUNDATION_COMPLETED_READ_ENABLED === "true") {
       throw new OcrEvidenceRetryableError("OCR persistence is incomplete; retry required");
     }
-    return { status: "failed", key: ocrKey, reasonCode: "OCR_RESULT_WRITE_FAILED", reason: "ocr.json write failed", requestId, inputSha256, computeCredits: 0 };
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_RESULT_WRITE_FAILED", reason: "ocr.json write failed", ...failure, computeCredits: 0 };
   }
   // R2 may return null on a failed condition instead of throwing. Read the durable winner on
   // every path; the response candidate and its serialization are never the receipt digest.
-  return inspectPersistedOcr(env, immutablePdfKey, inputSha256, "written");
+  return inspect("written");
+}
+
+/*
+ * Page-range reading (table/limits design 2026-10-17, A4.1). Off unless
+ * FOUNDATION_OCR_PAGE_RANGE_SIZE is set.
+ *
+ * One whole-document request has to finish inside OCR_REQUEST_TIMEOUT_MS, and a measured 73-page
+ * scan took 182.9 s (design A2 #11, F5-GPU-OCR-RECEIPT.json `documentMode`). So the PDF is sent
+ * once per range of pages instead, each answer is stored
+ * create-once under `ocr-pages/`, and `ocr.json` is assembled only when every range is stored.
+ * A range with no durable answer leaves nothing assembled and reports OCR_PAGES_INCOMPLETE; a
+ * redelivery reads the stored ranges back and asks the reader only for the missing ones.
+ *
+ * Joining the ranges in page order and numbering `order` across them gives the regions a
+ * whole-document request returns, and `persistedOcrBody` serializes both, so for a document a
+ * whole-document request could read, the two paths write the same bytes.
+ *
+ * ponytail: every range runs inside one queue delivery, so ranges x OCR_REQUEST_TIMEOUT_MS must
+ * fit the 15-minute consumer wall; one queue message per range (A4.1) lifts that. The live view
+ * (ocr-progress.json) is not written in range mode.
+ */
+const PAGE_RANGE_SCHEMA = "tavonel.ocr_page_range.v1";
+/**
+ * The longest document range mode will plan reads for. A loop bound, not a capability: the
+ * intake ceiling (`shared/intakeCeiling.ts`, the CDR's MAX_PAGES) still refuses a longer source
+ * before OCR, and the reader keeps its own page bound. This only stops a reader that misreports
+ * `pageCount` from driving an unbounded run of requests. 500 is the stage-2 page target the
+ * table/limits design proposes (A4.5) -- proposed, not measured.
+ */
+const MAX_RANGE_DOCUMENT_PAGES = 500;
+
+/**
+ * Pages per range request, or null for the one whole-document request. A value that is set but
+ * malformed is refused, never ignored: a flag that fell back silently would look switched on.
+ */
+export function ocrPageRangeSize(env: Pick<OcrDispatchEnv, "FOUNDATION_OCR_PAGE_RANGE_SIZE">): number | null {
+  const raw = (env.FOUNDATION_OCR_PAGE_RANGE_SIZE ?? "").trim();
+  if (!raw) return null;
+  if (!/^[1-9]\d{0,2}$/u.test(raw)) {
+    throw new OcrEvidenceRetryableError("FOUNDATION_OCR_PAGE_RANGE_SIZE is not a whole number of pages");
+  }
+  return Number(raw);
+}
+
+type ReaderProvenance = { readerRevision?: string; readerBindingSha256?: string };
+type PageStatus = { pageNumber1: number; pageStatus: "ok" | "no_text" };
+
+export type QualifiedPageRange = {
+  resultSchemaVersion: QualifiedOcrResult["schemaVersion"];
+  pageCount: number;
+  start0: number;
+  end0: number;
+  pages: PageStatus[];
+  regions: OcrRegion[];
+  recognitionConflictCount: number;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+/**
+ * A reader's answer for pages [start0, min(start0 + size, pageCount)), or null.
+ *
+ * Every rule a whole-document answer obeys is applied by `qualifyOcrResult` itself, to the range
+ * re-based as if it were the whole document: region shape, identity, order, bbox, confidence,
+ * conflict evidence, and the bounds on pages, text and regions per answer. On top of that, every
+ * page of the range is listed exactly once, and `no_text` exactly when it yielded no region.
+ */
+export function qualifyOcrPageRange(
+  payload: unknown,
+  expectedInputSha256: string,
+  start0: number,
+  size: number,
+  persisted?: { sourceImmutableKey: string; provenance: ReaderProvenance },
+): QualifiedPageRange | null {
+  if (!isRecord(payload)) return null;
+  const v3 = payload.resultSchemaVersion === OCR_RESULT_SCHEMA_V3;
+  if (!v3 && payload.resultSchemaVersion !== OCR_RESULT_SCHEMA_V2) return null;
+  if (!exactKeys(payload, [
+    "schemaVersion", "status", "resultSchemaVersion", "inputSha256", "pageCount", "pageRange", "pages", "regions",
+    ...(v3 ? ["recognitionConflictCount"] : []),
+    ...(persisted ? ["sourceImmutableKey", ...Object.keys(persisted.provenance)] : []),
+  ])) return null;
+  if (persisted && payload.sourceImmutableKey !== persisted.sourceImmutableKey) return null;
+  const { pageCount, pageRange, pages, regions } = payload;
+  if (payload.schemaVersion !== PAGE_RANGE_SCHEMA || payload.status !== "ok"
+    || payload.inputSha256 !== expectedInputSha256 || !SHA256_PATTERN.test(expectedInputSha256)
+    || typeof pageCount !== "number" || !Number.isInteger(pageCount) || pageCount < 1
+    || pageCount > MAX_RANGE_DOCUMENT_PAGES || start0 >= pageCount) return null;
+  const end0 = Math.min(start0 + size, pageCount);
+  if (!isRecord(pageRange) || !exactKeys(pageRange, ["start0", "end0"])
+    || pageRange.start0 !== start0 || pageRange.end0 !== end0) return null;
+  if (!Array.isArray(regions) || !Array.isArray(pages) || pages.length !== end0 - start0) return null;
+  if (!regions.every((region) => isRecord(region) && typeof region.pageIndex0 === "number"
+    && region.pageIndex0 >= start0 && region.pageIndex0 < end0)) return null;
+  const read = new Set(regions.map((region) => (region as OcrRegion).pageIndex0));
+  if (!pages.every((page, offset) => isRecord(page) && exactKeys(page, ["pageNumber1", "pageStatus"])
+    && page.pageNumber1 === start0 + offset + 1
+    && page.pageStatus === (read.has(start0 + offset) ? "ok" : "no_text"))) return null;
+  const recognitionConflictCount = v3 ? payload.recognitionConflictCount : 0;
+  if (regions.length === 0 && recognitionConflictCount !== 0) return null;
+  if (regions.length > 0) {
+    const shift = (value: unknown) => (typeof value === "number" ? value - start0 : value);
+    const rebased = (regions as Record<string, unknown>[]).map((region) => ({
+      ...region,
+      pageIndex0: shift(region.pageIndex0),
+      pageNumber1: shift(region.pageNumber1),
+      ...(isRecord(region.recognitionConflict) ? {
+        recognitionConflict: { ...region.recognitionConflict, pageIndex0: shift(region.recognitionConflict.pageIndex0) },
+      } : {}),
+    }));
+    const asDocument = {
+      schemaVersion: payload.resultSchemaVersion, status: "ok",
+      text: (regions as OcrRegion[]).map((region) => region.text).join("\n").trim(),
+      pageCount: end0 - start0, inputSha256: expectedInputSha256, regions: rebased,
+      ...(v3 ? { recognitionConflictCount } : {}),
+    };
+    if (!qualifyOcrResult(asDocument, expectedInputSha256)) return null;
+  }
+  return {
+    resultSchemaVersion: payload.resultSchemaVersion as QualifiedPageRange["resultSchemaVersion"],
+    pageCount, start0, end0,
+    pages: pages as PageStatus[],
+    regions: regions as OcrRegion[],
+    recognitionConflictCount: recognitionConflictCount as number,
+  };
+}
+
+type RangeRun = ReaderPost & {
+  immutablePdfKey: string;
+  size: number;
+  /** ocr.json already exists: prove it from stored ranges, and never ask the reader. */
+  readOnly: boolean;
+  /** The reader provenance every stored range and the assembled ocr.json must carry. */
+  provenance: ReaderProvenance;
+};
+
+function rangeFailure(
+  run: RangeRun, reasonCode: OcrFailureCode, reason: string, computeCredits: 0 | 2, requestId?: string,
+): OcrDispatchResult {
+  return { status: "failed", key: run.ocrKey, reasonCode, reason, ...(requestId ? { requestId } : {}),
+    inputSha256: run.inputSha256, computeCredits };
+}
+
+async function readStoredRange(run: RangeRun, key: string, start0: number): Promise<QualifiedPageRange | OcrDispatchResult | "missing"> {
+  let bytes: ArrayBuffer;
+  try {
+    const object = await run.env.FOUNDATION_QUARANTINE.get(key);
+    if (!object) return "missing";
+    if (object.size !== undefined && (object.size < 1 || object.size > MAX_PERSISTED_OCR_BYTES)) {
+      return rangeFailure(run, "OCR_PERSISTED_RESULT_INVALID", "stored OCR page range is out of bounds", 2);
+    }
+    bytes = await object.arrayBuffer();
+  } catch {
+    throw new OcrEvidenceRetryableError("stored OCR page range cannot be read; retry required");
+  }
+  let payload: unknown = null;
+  try { payload = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); } catch { /* refused below */ }
+  const fields = isRecord(payload) ? payload : null;
+  if (fields && Object.entries(run.provenance).some(([name, value]) => fields[name] !== value)) {
+    throw new OcrEvidenceRetryableError("stored OCR page range reader provenance is not qualified");
+  }
+  const range = qualifyOcrPageRange(payload, run.inputSha256, start0, run.size,
+    { sourceImmutableKey: run.immutablePdfKey, provenance: run.provenance });
+  if (!range) {
+    return rangeFailure(run, "OCR_PERSISTED_RESULT_INVALID", "stored OCR page range does not match the sanitized source", 2);
+  }
+  if (run.env.FOUNDATION_OCR_CONFLICT_V3_REQUIRED === "true" && range.resultSchemaVersion !== OCR_RESULT_SCHEMA_V3) {
+    throw new OcrEvidenceRetryableError("stored v2 OCR page range lacks required v3 conflict evidence");
+  }
+  return range;
+}
+
+const agrees = (range: QualifiedPageRange, first?: QualifiedPageRange) => !first
+  || (range.pageCount === first.pageCount && range.resultSchemaVersion === first.resultSchemaVersion);
+
+/**
+ * The stored answer for the range starting at `start0`, asking the reader only when none is
+ * stored. `first` is the document as the first range described it; every range must agree.
+ */
+async function obtainRange(
+  run: RangeRun, start0: number, first?: QualifiedPageRange,
+): Promise<QualifiedPageRange | OcrDispatchResult> {
+  const key = ocrPageRangeSiblingKey(run.immutablePdfKey, start0, start0 + run.size);
+  const stored = await readStoredRange(run, key, start0);
+  if (stored !== "missing") {
+    return "status" in stored || agrees(stored, first) ? stored
+      : rangeFailure(run, "OCR_PERSISTED_RESULT_INVALID", "stored OCR page ranges disagree about the document", 2);
+  }
+  const pages = `pages from ${start0 + 1}`;
+  if (run.readOnly) {
+    return rangeFailure(run, "OCR_PERSISTED_RESULT_INVALID", `ocr.json exists but its ${pages} are not stored`, 2);
+  }
+
+  const posted = await postToReader(run, "application/json", `${start0}-${start0 + run.size}`);
+  if ("failed" in posted) {
+    // An answer that did not hold is that answer; a request that never got one is a missing range.
+    return ocrFailureKind(posted.failed.reasonCode) === "transport"
+      ? rangeFailure(run, "OCR_PAGES_INCOMPLETE", `${pages} were not read (${posted.failed.reasonCode})`, 0, posted.failed.requestId)
+      : posted.failed;
+  }
+  const { requestId } = posted;
+  let payload: unknown;
+  try {
+    payload = await readBoundedOcrJson(posted.response);
+  } catch {
+    return rangeFailure(run, "OCR_RESPONSE_NOT_JSON", `OCR response for ${pages} is not JSON`, 2, requestId);
+  }
+  const answer = qualifyOcrPageRange(payload, run.inputSha256, start0, run.size);
+  if (!answer || !agrees(answer, first)) {
+    return rangeFailure(run, "OCR_RESPONSE_INVALID", `OCR response for ${pages} does not hold the page-range contract`, 2, requestId);
+  }
+  await assertReaderAnswer(run.env, payload, answer.resultSchemaVersion, run.binding);
+
+  const body = new TextEncoder().encode(JSON.stringify({
+    schemaVersion: PAGE_RANGE_SCHEMA,
+    status: "ok",
+    resultSchemaVersion: answer.resultSchemaVersion,
+    inputSha256: run.inputSha256,
+    pageCount: answer.pageCount,
+    pageRange: { start0: answer.start0, end0: answer.end0 },
+    pages: answer.pages,
+    regions: answer.regions,
+    ...(answer.resultSchemaVersion === OCR_RESULT_SCHEMA_V3 ? { recognitionConflictCount: answer.recognitionConflictCount } : {}),
+    sourceImmutableKey: run.immutablePdfKey,
+    ...run.provenance,
+  }));
+  try {
+    await run.env.FOUNDATION_QUARANTINE.put(key, body, {
+      httpMetadata: { contentType: "application/json" },
+      customMetadata: { stage: "ocr-page-range" },
+      onlyIf: { etagDoesNotMatch: "*" },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (!/precondition|already exists|conflict/iu.test(message)) {
+      return rangeFailure(run, "OCR_PAGES_INCOMPLETE", `${pages} could not be stored`, 0, requestId);
+    }
+  }
+  // As for ocr.json: the durable winner is the answer, never the candidate just sent.
+  const durable = await readStoredRange(run, key, start0);
+  return durable === "missing"
+    ? rangeFailure(run, "OCR_PAGES_INCOMPLETE", `${pages} are not durable after the write`, 0, requestId)
+    : durable;
+}
+
+async function dispatchOcrRanges(run: RangeRun): Promise<OcrDispatchResult> {
+  const ranges: QualifiedPageRange[] = [];
+  for (let start0 = 0; ranges.length === 0 || start0 < ranges[0].pageCount; start0 += run.size) {
+    const range = await obtainRange(run, start0, ranges[0]);
+    if ("status" in range) return range;
+    ranges.push(range);
+  }
+
+  const { pageCount, resultSchemaVersion } = ranges[0];
+  const regions = ranges.flatMap((range) => range.regions).map((region, order) => ({ ...region, order }));
+  if (regions.length === 0) {
+    // Read in one request, this document is refused with 422: no page has text. Say the same.
+    return rangeFailure(run, "OCR_HTTP_REJECTED", "OCR found no text on any page", 2);
+  }
+  const assembled: QualifiedOcrResult = {
+    schemaVersion: resultSchemaVersion,
+    status: "ok",
+    text: regions.map((region) => region.text).join("\n").trim(),
+    pageCount,
+    inputSha256: run.inputSha256,
+    regions,
+    ...(resultSchemaVersion === OCR_RESULT_SCHEMA_V3 ?
+      { recognitionConflictCount: ranges.reduce((sum, range) => sum + range.recognitionConflictCount, 0) } : {}),
+  };
+  // The whole-document bounds on text, regions, identity and conflicts, checked by the
+  // whole-document qualifier on the assembled regions seen as one page. Page membership was
+  // checked range by range, so the page count is the only bound range mode does not share.
+  const onePage = { ...assembled, pageCount: 1, regions: regions.map((region) => ({ ...region, pageIndex0: 0, pageNumber1: 1,
+    ...(region.recognitionConflict ? { recognitionConflict: { ...region.recognitionConflict, pageIndex0: 0 } } : {}) })) };
+  if (!qualifyOcrResult(onePage, run.inputSha256)) {
+    return rangeFailure(run, "OCR_RESPONSE_INVALID", "assembled OCR exceeds the whole-document bounds", 2);
+  }
+  const persistedBytes = await persistedOcrBody(assembled, run.immutablePdfKey, run.binding);
+  if (persistedBytes.byteLength > MAX_PERSISTED_OCR_BYTES) {
+    return rangeFailure(run, "OCR_RESPONSE_INVALID", "assembled OCR exceeds the stored result bound", 2);
+  }
+  const inspect = (status: "exists" | "written") => inspectAssembledOcr(run, persistedBytes, pageCount, status);
+  return run.readOnly ? inspect("exists") : putOcrJsonCreateOnce(run.env, run.ocrKey, persistedBytes, { inputSha256: run.inputSha256 }, inspect);
+}
+
+/** The durable ocr.json holds exactly the assembly of its stored ranges, or it is not this document's. */
+async function inspectAssembledOcr(
+  run: RangeRun, expected: Uint8Array, pageCount: number, status: "exists" | "written",
+): Promise<OcrDispatchResult> {
+  let bytes: ArrayBuffer;
+  try {
+    const object = await run.env.FOUNDATION_QUARANTINE.get(run.ocrKey);
+    if (!object) throw new Error("missing");
+    bytes = await object.arrayBuffer();
+  } catch {
+    throw new OcrEvidenceRetryableError("persisted OCR cannot be read; retry required");
+  }
+  const durable = new Uint8Array(bytes);
+  if (durable.byteLength !== expected.byteLength || durable.some((byte, index) => byte !== expected[index])) {
+    return rangeFailure(run, "OCR_PERSISTED_RESULT_INVALID", "persisted OCR is not the assembly of its page ranges", 2);
+  }
+  return { status, key: run.ocrKey, inputSha256: run.inputSha256, outputSha256: await sha256DigestHeader(bytes),
+    observedPageCount: pageCount, ...run.provenance, computeCredits: 2 };
 }

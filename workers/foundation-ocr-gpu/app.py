@@ -8,6 +8,7 @@ import os
 import re
 from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from queue import Queue
 from threading import Lock, Thread
 from time import monotonic
 from collections.abc import Iterator
@@ -31,6 +32,11 @@ OCR_ENGINE_RELEASE: Final = "rapidocr-3.9.2-ko-pass-nocls-v3-selftest"
 # This must be paired with the CDR's v3-required binding. Off preserves clean v2,
 # but refuses a discovered disagreement rather than laundering it into v2.
 OCR_CONFLICT_V3_ENABLED: Final = os.getenv("TAVONEL_OCR_CONFLICT_V3_ENABLED") == "true"
+# Page-range reading (`x-tavonel-ocr-page-range: start0-end0`) is off unless this is set, so an
+# image built from this source answers every request exactly as before until it is switched on.
+OCR_PAGE_RANGES_ENABLED: Final = os.getenv("TAVONEL_OCR_PAGE_RANGES_ENABLED") == "true"
+PAGE_RANGE: Final = re.compile(r"^(\d{1,6})-(\d{1,6})$")
+PAGE_RANGE_SCHEMA: Final = "tavonel.ocr_page_range.v1"
 OCR_MODEL_SHA256: Final = {
     "general-det": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f",
     "general-rec": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884",
@@ -537,6 +543,32 @@ def reject_non_pdf(filename: str | None, mime: str | None, payload: bytes) -> No
 PageObserver = "object"
 
 
+def read_pages(document, indexes, on_page=None) -> list[OcrRegion]:
+    """Reads the given pages in order. `order` counts from 0 over these pages only."""
+    page_count = len(document)
+    regions: list[OcrRegion] = []
+    for index in indexes:
+        page = document[index]
+        textpage = page.get_textpage()
+        try:
+            text = textpage.get_text_bounded().strip()
+            region = native_page_region(page, textpage, text, index, len(regions)) if text else None
+        finally:
+            textpage.close()
+            page.close()
+        if on_page is not None:
+            on_page(index + 1, page_count, "native", [region] if region else [])
+        if region:
+            regions.append(region)
+            continue
+        # No usable embedded text on this page, whatever the other pages carry. The raster
+        # pass re-reads it, so it reports the page again rather than leaving the observer
+        # stuck on its empty native view. A page with usable native text is never rasterized.
+        for raster_region in raster_regions(document, on_page, (index,)):
+            regions.append({**raster_region, "order": len(regions)})
+    return regions
+
+
 def extract_text(payload: bytes, on_page=None) -> tuple[str, int, list[OcrRegion]]:
     """Extracts text, optionally reporting each page as it is finished.
 
@@ -552,32 +584,37 @@ def extract_text(payload: bytes, on_page=None) -> tuple[str, int, list[OcrRegion
         page_count = len(document)
         if page_count < 1 or page_count > MAX_PAGES:
             raise HTTPException(422, "OCR source page count is not qualified")
-        regions: list[OcrRegion] = []
-        for index in range(page_count):
-            page = document[index]
-            textpage = page.get_textpage()
-            try:
-                text = textpage.get_text_bounded().strip()
-                region = native_page_region(page, textpage, text, index, len(regions)) if text else None
-            finally:
-                textpage.close()
-                page.close()
-            if on_page is not None:
-                on_page(index + 1, page_count, "native", [region] if region else [])
-            if region:
-                regions.append(region)
-                continue
-            # No usable embedded text on this page, whatever the other pages carry. The raster
-            # pass re-reads it, so it reports the page again rather than leaving the observer
-            # stuck on its empty native view. A page with usable native text is never rasterized.
-            for raster_region in raster_regions(document, on_page, (index,)):
-                regions.append({**raster_region, "order": len(regions)})
+        regions = read_pages(document, range(page_count), on_page)
         text = "\n".join(region["text"] for region in regions).strip()
         if sum("recognitionConflict" in region for region in regions) > 128:
             raise HTTPException(422, "OCR recognition conflict count exceeds bound")
         if not text:
             raise HTTPException(422, "OCR source has no extractable text regions")
         return text, page_count, regions
+    finally:
+        document.close()
+
+
+def extract_page_range(payload: bytes, start0: int, end0: int) -> tuple[int, int, list[OcrRegion]]:
+    """Reads pages [start0, end0) of the document; the end stops at the last page.
+
+    The document page bound is the same as for a whole-document request, so switching ranges on
+    reads nothing a whole-document request would refuse. What changes is the empty page: a range
+    whose pages carry no text is an answer (every page `no_text`), not a 422, because one blank
+    page must not refuse the document it belongs to.
+    """
+    try:
+        document = pdfium.PdfDocument(payload)
+    except Exception as exc:
+        raise HTTPException(422, "OCR renderer rejected this PDF") from exc
+    try:
+        page_count = len(document)
+        if page_count < 1 or page_count > MAX_PAGES:
+            raise HTTPException(422, "OCR source page count is not qualified")
+        if start0 >= page_count:
+            raise HTTPException(422, "OCR page range starts after the last page")
+        end0 = min(end0, page_count)
+        return page_count, end0, read_pages(document, range(start0, end0))
     finally:
         document.close()
 
@@ -698,6 +735,31 @@ def ocr_result_body(text: str, page_count: int, regions: list[OcrRegion], input_
     }
 
 
+def page_range_body(page_count: int, start0: int, end0: int, regions: list[OcrRegion], input_sha256: str) -> dict:
+    """One range of the document, in a schema that can never pass for a whole-document result.
+
+    Regions are built and stamped by `ocr_result_body`, so the caller that joins the ranges in
+    page order and renumbers `order` gets the regions a whole-document request returns. Every
+    page in the range is listed: `ok` when it yielded a region, `no_text` when it yielded none.
+    """
+    result = ocr_result_body("", page_count, regions, input_sha256)
+    read = {region["pageIndex0"] for region in result["regions"]}
+    return {
+        "schemaVersion": PAGE_RANGE_SCHEMA,
+        "status": "ok",
+        "resultSchemaVersion": result["schemaVersion"],
+        "inputSha256": input_sha256,
+        "pageCount": page_count,
+        "pageRange": {"start0": start0, "end0": end0},
+        "pages": [
+            {"pageNumber1": index + 1, "pageStatus": "ok" if index in read else "no_text"}
+            for index in range(start0, end0)
+        ],
+        "regions": result["regions"],
+        **({"recognitionConflictCount": result["recognitionConflictCount"]} if "recognitionConflictCount" in result else {}),
+    }
+
+
 # The two response classes are a union, which FastAPI cannot turn into a response model;
 # the endpoint returns Response objects directly, so there is no model to generate.
 @app.post("/v1/ocr", response_model=None)
@@ -708,6 +770,7 @@ def ocr(
     x_tavonel_ocr_timestamp: str | None = Header(default=None),
     x_tavonel_ocr_request_id: str | None = Header(default=None),
     x_tavonel_ocr_signature: str | None = Header(default=None),
+    x_tavonel_ocr_page_range: str | None = Header(default=None),
 ) -> JSONResponse | StreamingResponse:
     """Reads a PDF. Same contract as before, plus an optional per-page view of the reading.
 
@@ -718,6 +781,10 @@ def ocr(
 
     Authentication, the digest check and the PDF check all happen before either path begins, so
     streaming never becomes a way to get a partial answer out of an unqualified request.
+
+    A request carrying `x-tavonel-ocr-page-range: start0-end0` (0-based, end exclusive) reads only
+    those pages and answers with `page_range_body`, always as plain JSON. It is refused with 501
+    unless `TAVONEL_OCR_PAGE_RANGES_ENABLED` is set.
     """
     expected_digest = require_authentication(
         x_tavonel_input_sha256,
@@ -733,6 +800,19 @@ def ocr(
     finally:
         source.file.close()
 
+    if x_tavonel_ocr_page_range is not None:
+        # The reader did not run, so this is unavailability rather than an answer about the PDF.
+        if not OCR_PAGE_RANGES_ENABLED:
+            raise HTTPException(501, "OCR page ranges are not enabled on this reader")
+        match = PAGE_RANGE.fullmatch(x_tavonel_ocr_page_range)
+        if not match or int(match[1]) >= int(match[2]):
+            raise HTTPException(422, "OCR page range is invalid")
+        page_count, end0, regions = extract_page_range(payload, int(match[1]), int(match[2]))
+        return JSONResponse(
+            content=page_range_body(page_count, int(match[1]), end0, regions, expected_digest),
+            headers={"cache-control": "no-store"},
+        )
+
     wants_stream = NDJSON_MEDIA_TYPE in (request.headers.get("accept") or "").lower()
     if not wants_stream:
         text, page_count, regions = extract_text(payload)
@@ -742,14 +822,20 @@ def ocr(
         )
 
     def lines() -> Iterator[bytes]:
-        events: list[dict] = []
+        # The document is read on its own thread, which hands each page over the moment it is
+        # done, so that page's line is on the wire while the next page is still being read.
+        # Collecting the events and writing them after the last page made the first byte of an
+        # 80-page stream arrive at 216.6 s (T7, PRODUCT-PATH-OCR-TIMING.md finding 5).
+        # ponytail: a client that hangs up does not stop the read, exactly as before; it runs to
+        # the end on that thread. Add a cancel flag checked between pages if that costs GPU time.
+        handoff: Queue[dict | tuple[str, int, list[OcrRegion]] | BaseException] = Queue()
 
         def on_page(page_number1: int, page_count: int, path: str, regions: list[OcrRegion]) -> None:
             # What a reader can be shown about a page: where it is, how much was found, how
             # confident the reader is, and where on the page each line sits. No page is reported
             # before it has been read, and nothing is estimated.
             confidences = [r["confidence"] for r in regions]
-            events.append({
+            handoff.put({
                 "schemaVersion": "tavonel.ocr_progress.v1",
                 "type": "page",
                 "pageNumber1": page_number1,
@@ -771,21 +857,35 @@ def ocr(
                 ],
             })
 
-        try:
-            text, page_count, regions = extract_text(payload, on_page)
-        except HTTPException as exc:
-            # A refusal is part of the stream, not a broken connection. The status line is the
-            # last thing a reader sees, and it says why.
-            yield (json.dumps({
-                "schemaVersion": "tavonel.ocr_progress.v1",
-                "type": "refused",
-                "status": exc.status_code,
-                "detail": exc.detail,
-            }, ensure_ascii=False) + NEWLINE).encode("utf-8")
-            return
+        def read() -> None:
+            # Every way out of the read puts exactly one last item, so the stream never waits on
+            # a reader that has already stopped.
+            try:
+                handoff.put(extract_text(payload, on_page))
+            except BaseException as exc:  # noqa: BLE001 -- handed to the stream below, which raises it
+                handoff.put(exc)
 
-        for event in events:
-            yield (json.dumps(event, ensure_ascii=False) + NEWLINE).encode("utf-8")
-        yield (json.dumps(ocr_result_body(text, page_count, regions, expected_digest), ensure_ascii=False) + NEWLINE).encode("utf-8")
+        Thread(target=read, name="ocr-stream-read", daemon=True).start()
+        while True:
+            item = handoff.get()
+            if isinstance(item, dict):
+                yield (json.dumps(item, ensure_ascii=False) + NEWLINE).encode("utf-8")
+                continue
+            if isinstance(item, HTTPException):
+                # A refusal is part of the stream, not a broken connection. The status line is the
+                # last thing a reader sees, and it says why.
+                yield (json.dumps({
+                    "schemaVersion": "tavonel.ocr_progress.v1",
+                    "type": "refused",
+                    "status": item.status_code,
+                    "detail": item.detail,
+                }, ensure_ascii=False) + NEWLINE).encode("utf-8")
+                return
+            if isinstance(item, BaseException):
+                # Anything else is a fault, not an answer: it breaks the stream, as it always did.
+                raise item
+            text, page_count, regions = item
+            yield (json.dumps(ocr_result_body(text, page_count, regions, expected_digest), ensure_ascii=False) + NEWLINE).encode("utf-8")
+            return
 
     return StreamingResponse(lines(), media_type=NDJSON_MEDIA_TYPE, headers={"cache-control": "no-store"})
