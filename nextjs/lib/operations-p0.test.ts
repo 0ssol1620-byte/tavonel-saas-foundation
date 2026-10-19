@@ -137,6 +137,29 @@ describe("P0 operational contracts", () => {
         reasonCode: "MADE_UP",
       })
     ).toEqual({ ok: false, code: "CREDIT_RELEASE_INVALID" });
+    // PR #152's page-range OCR ends a missing range as OCR_PAGES_INCOMPLETE, a zero-credit transport failure.
+    expect(
+      buildCreditRelease({
+        workspaceKey: "ws_abcdefgh",
+        documentId: id,
+        terminalState: "failed_terminal",
+        reasonCode: "OCR_PAGES_INCOMPLETE",
+      })
+    ).toMatchObject({
+      ok: true,
+      settlement: { outcome: "released", actualCredits: 0, reasonCode: "OCR_PAGES_INCOMPLETE" },
+    });
+    // The CDR worker's two other codes (ocr.ts OCR_FAILURE_CATEGORY): OCR_HTTP_UNAVAILABLE is a transport
+    // failure recorded at zero credits; OCR_PERSISTED_RESULT_INVALID is semantic and held for review.
+    for (const [terminalState, reasonCode] of [
+      ["failed_terminal", "OCR_HTTP_UNAVAILABLE"],
+      ["operator_review", "OCR_PERSISTED_RESULT_INVALID"],
+    ] as const) {
+      expect(buildCreditRelease({ workspaceKey: "ws_abcdefgh", documentId: id, terminalState, reasonCode })).toMatchObject({
+        ok: true,
+        settlement: { outcome: "released", actualCredits: 0, reasonCode },
+      });
+    }
   });
 
   it("issues deletion and restore evidence only after independent checks pass", () => {

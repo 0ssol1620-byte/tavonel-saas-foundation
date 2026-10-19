@@ -9,7 +9,7 @@ import {
   type DocumentListPartial,
   type PipelineDocument,
 } from "@/lib/pipeline";
-import { validateOcrReviewReceipt } from "@/lib/processing-receipts";
+import { checkOcrReviewReceipt } from "@/lib/processing-receipts";
 import { getWorkspaceOcrReviewJson, listImmutableWorkspaceObjects } from "@/lib/r2-objects";
 import {
   getFoundationQuarantineReject,
@@ -129,13 +129,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ code: "QUARANTINE_LIST_UNAVAILABLE" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
   // A review receipt that was listed and then could not be read or validated is not "no reason":
-  // the row stays, without the reason, and its id is reported in `partial`.
+  // the row stays and its id is reported in `partial`. One that could not be read carries no reason;
+  // one that loaded and was refused carries the refusal's code instead of the worker's reason.
   const reasonCodes = new Map<string, string>();
   const unreadReviewDocumentIds: string[] = [];
   for (const item of reviewReceipts) {
-    const receipt = item.loaded.ok ? validateOcrReviewReceipt(item.loaded.json, item.immutableKey) : null;
-    if (receipt) reasonCodes.set(`${item.documentId}/${item.versionKey}`, receipt.reasonCode);
-    else unreadReviewDocumentIds.push(item.documentId);
+    const checked = item.loaded.ok ? checkOcrReviewReceipt(item.loaded.json, item.immutableKey) : null;
+    if (checked) reasonCodes.set(`${item.documentId}/${item.versionKey}`, checked.ok ? checked.receipt.reasonCode : checked.code);
+    if (!checked?.ok) unreadReviewDocumentIds.push(item.documentId);
   }
   const hydrated: PipelineDocument[] = documents.map((item) => ({
     ...item,
