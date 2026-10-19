@@ -7,6 +7,7 @@ import {
 import { type KeyboardEvent, type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import Logomark from "@/components/logomark";
 import { useDialogFocus } from "@/components/world-visual/use-dialog-focus";
+import type { ResumeAccess } from "@/lib/checkout-intent";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import styles from "@/app/workspace/workspace-ultimate.module.css";
 
@@ -63,6 +64,8 @@ type AccessSummary = {
   expiresAt: string | null;
   limits: { files: number; pages: number; worlds: number } | null;
   customerDataEnabled: boolean;
+  /** Sent with an open workspace: a qualification grant processes files but is never billable. */
+  processingStage?: "production" | "qualification" | null;
 };
 /** The v2 bootstrap's reason a closed workspace is closed; absent from v1, where it stays null. */
 export type SourcePendingReason = "terms_acceptance_required" | "release_pending" | "workspace_refused";
@@ -88,7 +91,7 @@ type Props = {
   stateHero?: boolean;
   nextAction: { label: string; surface?: WorkspaceSurface; run?: () => void };
   /** The access source from /api/access/bootstrap, so the page can gate surface bodies the same way the rail is gated. */
-  onAccess?: (source: AccessSummary["source"] | null, customerDataEnabled: boolean | null, sourcePending: SourcePendingReason | null) => void;
+  onAccess?: (source: AccessSummary["source"] | null, customerDataEnabled: boolean | null, sourcePending: SourcePendingReason | null, resume: ResumeAccess | null) => void;
   /** Changing this re-runs the bootstrap read, e.g. after the owner records the processing terms. */
   accessEpoch?: number;
   onNavigate: (surface: WorkspaceSurface) => void;
@@ -144,7 +147,7 @@ export default function WorkspaceUltimateShell({
       const client = getSupabaseBrowserClient();
       const { data } = client ? await client.auth.getSession() : { data: { session: null } };
       const token = data.session?.access_token;
-      if (!token) { if (current) onAccess?.(null, null, null); return; }
+      if (!token) { if (current) onAccess?.(null, null, null, null); return; }
       const response = await fetch("/api/access/bootstrap", {
         method: "POST",
         credentials: "same-origin",
@@ -157,9 +160,15 @@ export default function WorkspaceUltimateShell({
           : null;
         setAccess(body.access);
         setSourcePending(reason);
-        onAccess?.(body.access.source, body.access.customerDataEnabled === true, reason);
-      } else if (current) onAccess?.(null, null, null);
-    })().catch(() => { if (current) onAccess?.(null, null, null); });
+        const { source, billingExempt, processingStage } = body.access;
+        const customerDataEnabled = body.access.customerDataEnabled === true;
+        // P2-29: what a held checkout needs to know, read from the same bootstrap and nothing else.
+        onAccess?.(source, customerDataEnabled, reason, {
+          source, billingExempt: billingExempt === true, customerDataEnabled, sourcePending: reason,
+          processingStage: processingStage === "production" || processingStage === "qualification" ? processingStage : null,
+        });
+      } else if (current) onAccess?.(null, null, null, null);
+    })().catch(() => { if (current) onAccess?.(null, null, null, null); });
     return () => { current = false; };
     // onAccess is the page's handler; bootstrap runs once per mount and again only when the page
     // bumps accessEpoch, never because a handler identity changed.

@@ -10,10 +10,12 @@ import { failureSentence } from "@/lib/workspace-failure-copy";
 import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion } from "@/lib/workspace-ask-copy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
-import { useCheckout, type NoticeTone } from "@/lib/use-checkout";
+import { OWNER_ACCESS_ACTIVE_SENTENCE, useCheckout, type NoticeTone } from "@/lib/use-checkout";
 import type { BillingStatusAccount, EntitlementWaitResult } from "@/lib/entitlement-wait";
 import { formatCount, formatTimestamp } from "@/lib/format";
-import { readOfferParam, takeCheckoutIntent } from "@/lib/checkout-intent";
+import { decideCheckoutResume, heldOfferSentence, readOfferParam, rememberCheckoutIntent, takeCheckoutIntent, type ResumeAccess } from "@/lib/checkout-intent";
+import type { BillingOfferCode } from "@/lib/billing-catalog";
+import { parsePublicStatusV2 } from "@/lib/public-status-contract";
 import { putWithProgress } from "@/lib/upload-transfer";
 import {
   estimateBillablePages,
@@ -325,6 +327,34 @@ export default function WorkspacePage() {
     if (wait.outcome === "active") setAccessEpoch((epoch) => epoch + 1);
   }, []);
   const { start: buy } = useCheckout(notifyCheckout, settleEntitlement);
+  /*
+    P2-29 (register D-14): an offer carried in from /login waits here until the workspace has read
+    its access and the deployment its sale state (undefined = not read yet), then goes where
+    `decideCheckoutResume` says. A hold keeps it in this tab, so a reload or the moment access opens
+    -- terms accepted, release recorded -- resumes it once. Where nothing is sold online the request
+    goes out as on main without waiting for access.
+  */
+  const [resumeOffer, setResumeOffer] = useState<BillingOfferCode | null>(null);
+  const [resumeAccess, setResumeAccess] = useState<ResumeAccess | null>(null);
+  const [purchaseOpen, setPurchaseOpen] = useState<boolean | null | undefined>(undefined);
+  useEffect(() => {
+    if (!resumeOffer || purchaseOpen === undefined) return;
+    if (purchaseOpen === true && customerDataAccess === "checking") return;
+    const decision = decideCheckoutResume(resumeOffer, purchaseOpen, resumeAccess);
+    if (decision === "hold_terms" || decision === "hold_release") {
+      rememberCheckoutIntent(resumeOffer);
+      setNotice(heldOfferSentence(resumeOffer));
+      return;
+    }
+    takeCheckoutIntent(); // the copy a hold kept, if any
+    setResumeOffer(null);
+    if (decision === "drop_owner") {
+      setNotice(OWNER_ACCESS_ACTIVE_SENTENCE);
+      return;
+    }
+    trackFunnel("checkout_opened", { offer: resumeOffer });
+    void buy(resumeOffer);
+  }, [resumeOffer, purchaseOpen, customerDataAccess, resumeAccess, buy]);
   // Read from the URL on mount so a linked or reloaded workspace opens on the same view.
   const [tab, setTab] = useState<WorkspaceTab>("overview");
   const [surface, setSurface] = useState<WorkspaceSurface>("home");
@@ -700,14 +730,16 @@ export default function WorkspacePage() {
   /*
     The shell's /api/access/bootstrap read, including the v2 reason a closed workspace is closed:
     whether the owner still has to accept the processing terms, has accepted and is waiting on
-    release, or was refused. v1 sends no reason; that is "legacy" and keeps the terms review on
-    offer. The page never reads bootstrap itself -- after an acceptance, or when the owner asks to
-    check again, it bumps accessEpoch and the shell reads once more.
+    release, or was refused. v1 sends no reason; that is "legacy", and since D-19 it offers no terms
+    review: the v1 gate never reads an acceptance, so the panel would collect a consent with no
+    effect (journey defect D-14). The page never reads bootstrap itself -- after an acceptance, or
+    when the owner asks to check again, it bumps accessEpoch and the shell reads once more.
   */
-  const applyAccess = (source: typeof accessSource, enabled: boolean | null, reason: SourcePendingReason | null) => {
+  const applyAccess = (source: typeof accessSource, enabled: boolean | null, reason: SourcePendingReason | null, resume: ResumeAccess | null) => {
     setAccessSource(source);
     setCustomerDataAccess(enabled === null ? "unavailable" : enabled ? "open" : "closed");
     setSourcePending(reason ?? "legacy");
+    setResumeAccess(resume);
     setAccessRecheck((current) => current === "checking" ? "done" : current);
   };
   const refreshAccess = () => setAccessEpoch((epoch) => epoch + 1);
@@ -960,15 +992,19 @@ export default function WorkspacePage() {
        * R1, last half. Someone who picked a plan before signing in arrives here carrying it --
        * in the URL if they came straight through, in sessionStorage if Google's redirect ate the
        * query string. The parameter is stripped before the checkout opens, so a reload or a
-       * back-navigation cannot fire a second checkout.
+       * back-navigation cannot fire a second checkout. P2-29: it is handed to the resume effect
+       * above with the deployment's sale state, not opened here.
        */
       const resume = readOfferParam(window.location.search) ?? takeCheckoutIntent();
       if (resume) {
         const url = new URL(window.location.href);
         url.searchParams.delete("checkout");
         window.history.replaceState(null, "", url.toString());
-        trackFunnel("checkout_opened", { offer: resume });
-        void buy(resume);
+        setResumeOffer(resume);
+        // Fail closed to "not answered" (null): the request then goes out and the server decides.
+        void fetch("/api/status/v2", { cache: "no-store" })
+          .then(async (response) => response.ok ? parsePublicStatusV2(await response.json()) : null)
+          .then((status) => setPurchaseOpen(status?.availableActions.purchasePlan.enabled ?? null), () => setPurchaseOpen(null));
       }
     })();
     // This is the mount sequence and it must run exactly once. Re-running it would re-resolve the
@@ -3065,8 +3101,9 @@ export default function WorkspacePage() {
                       <span><b>03</b> Organize</span><span><b>04</b> Use with AI</span>
                     </div>
                   ) : null}
+                  {/* D-19: the terms review only where the gate reads it (v2); v1 ("legacy") gets the example path. */}
                   {customerDataAccess === "closed" ? (
-                    sourcePending === "terms_acceptance_required" || sourcePending === "legacy" ? (
+                    sourcePending === "terms_acceptance_required" ? (
                       <ProcessingConsentPanel getToken={getAuthToken} onAccepted={refreshAccess}>
                         <Link className="btn ghost" href="/explore">Explore a compiled World</Link>
                       </ProcessingConsentPanel>
