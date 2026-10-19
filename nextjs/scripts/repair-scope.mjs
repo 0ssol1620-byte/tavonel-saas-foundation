@@ -1899,6 +1899,15 @@ export const PR151_SERVICE_TRUTH_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/api-error-codes.test.ts', 'lib/documents-route.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/pipeline.test.ts',
   'lib/r2-synthetic-canary.test.ts', 'lib/workspace-onboarding.test.ts',
 ]);
+// OCR_PAGES_INCOMPLETE: the CDR page-range code (PR #152) joins the OCR review receipt codes and the credit release reasons.
+// The four endpoints no owner listed select their two direct suites, plus documents-route, which runs the receipt validator
+// through the documents listing. No browser suite of its own. Product code, so never nativeReuse.
+export const OCR_PAGES_INCOMPLETE_AFFECTED_PATHS = Object.freeze([
+  'lib/operations-p0.test.ts', 'lib/operations-p0.ts', 'lib/processing-receipts.test.ts', 'lib/processing-receipts.ts',
+]);
+export const OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/documents-route.test.ts', 'lib/operations-p0.test.ts', 'lib/processing-receipts.test.ts',
+]);
 // PR #141's merge of main bcba7173 (Home Release 3, PR #150): the thirty changed endpoints no owner listed -- the Home and
 // Korean entry pages, the receipted measurement band (component, styles, data, its claims pack and suite, its receipt and research
 // note), the re-cut film posters with their lock file and README, the stage and copy modules, the evidence record, the public
@@ -2280,6 +2289,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // PR #151 service truth: the nine exact paths above select six direct suites and no browser suite.
   affectedGroup('pr151-service-truth', new RegExp(`^nextjs/(?:${exactPathAlternation(PR151_SERVICE_TRUTH_AFFECTED_PATHS)})$`),
     { unitFiles: PR151_SERVICE_TRUTH_AFFECTED_UNIT_FILES }),
+  // OCR_PAGES_INCOMPLETE: the four exact paths above select three direct suites and no browser suite.
+  affectedGroup('ocr-pages-incomplete-code', new RegExp(`^nextjs/(?:${exactPathAlternation(OCR_PAGES_INCOMPLETE_AFFECTED_PATHS)})$`),
+    { unitFiles: OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.

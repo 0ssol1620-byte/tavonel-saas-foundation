@@ -137,6 +137,18 @@ describe("P0 operational contracts", () => {
         reasonCode: "MADE_UP",
       })
     ).toEqual({ ok: false, code: "CREDIT_RELEASE_INVALID" });
+    // PR #152's page-range OCR ends a missing range as OCR_PAGES_INCOMPLETE, a zero-credit transport failure.
+    expect(
+      buildCreditRelease({
+        workspaceKey: "ws_abcdefgh",
+        documentId: id,
+        terminalState: "failed_terminal",
+        reasonCode: "OCR_PAGES_INCOMPLETE",
+      })
+    ).toMatchObject({
+      ok: true,
+      settlement: { outcome: "released", actualCredits: 0, reasonCode: "OCR_PAGES_INCOMPLETE" },
+    });
   });
 
   it("issues deletion and restore evidence only after independent checks pass", () => {
