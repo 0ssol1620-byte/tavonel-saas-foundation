@@ -2093,6 +2093,43 @@ export const LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/launch-qa-script-ratchet.test.ts',
   'lib/release-gate-check-script.test.ts',
 ]);
+// G1-COPY (codex/p4-copy-20261019; DECISION-REGISTER-2026-10-17 S6-17, S6-16, D-01, D-07, D-33, N-5): the six changed endpoints
+// no owner listed -- the plan catalog whose included-pages bullet lost "verified", the developer-file purposes (the CLI line),
+// the operations record whose billing row now reads the purchasable state, the published MCP bridge whose download_package text
+// names the verifier the channel ships, its suite, and the one-test-per-sentence suite. Exactly these six paths select the
+// seventeen suites that read them directly (the plan, pricing, posture, claims-sync and hedge suites for the catalog; the
+// distribution, compiler-contract, docs and guide suites for the file list; the operations, probe and legal suites for the
+// record; the MCP, prompt-injection and tenant suites for the bridge) and the pricing-plan-overview (1440, 390) and
+// docs-reading-layout (1440, 390, reduced-motion) browser suites, each through its existing reviewed project row. The other
+// thirteen paths this lane changed keep their existing owners. Product copy and a published asset, so never nativeReuse.
+export const G1_COPY_TRUTH_AFFECTED_PATHS = Object.freeze([
+  'lib/billing-catalog.ts',
+  'lib/g1-copy-truth.test.ts',
+  'lib/mcp-server.test.ts',
+  'lib/mcp-tools.ts',
+  'lib/operations.ts',
+  'public/developer/tavonel-mcp.mjs',
+]);
+export const G1_COPY_TRUTH_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/billing-catalog.test.ts',
+  'lib/compiler-contract.test.ts',
+  'lib/copy-trust-guard.test.ts',
+  'lib/developer-distribution.test.ts',
+  'lib/docs-content.test.ts',
+  'lib/g1-copy-truth.test.ts',
+  'lib/guide-content.test.ts',
+  'lib/legal-terms-consistency.test.ts',
+  'lib/mcp-server.test.ts',
+  'lib/operations.test.ts',
+  'lib/plan-entitlement.test.ts',
+  'lib/pricing-plan-overview.test.ts',
+  'lib/product-claims-sync.test.ts',
+  'lib/production-posture.test.ts',
+  'lib/prompt-injection.test.ts',
+  'lib/synthetic-probe.test.ts',
+  'lib/tenant-isolation-negative.test.ts',
+]);
+export const G1_COPY_TRUTH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/docs-reading-layout.spec.ts', 'e2e/pricing-plan-overview.spec.ts']);
 // Enablement batch (codex/enablement-20261017, EN-0 to EN-5 and the guide recordings): the fifty-three changed endpoints no owner
 // listed -- the changelog and its feed, the cookbooks index and card, the resources hub,
 // the keyless try-it's digest check, its island (moved to components/ in EN-FIX-1) and its mounts on /api and /developers, the product guide at /guide and /ko/guide with its
@@ -2558,6 +2595,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // launch-qa-release-scripts: the 5 exact paths above select 3 direct suites and no browser suite.
   affectedGroup('launch-qa-release-scripts', new RegExp(`^nextjs/(?:${exactPathAlternation(LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS)})$`),
     { unitFiles: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES }),
+  // g1-copy-truth: the 6 exact paths above select 17 direct suites and 2 browser suites.
+  affectedGroup('g1-copy-truth', new RegExp(`^nextjs/(?:${exactPathAlternation(G1_COPY_TRUTH_AFFECTED_PATHS)})$`),
+    { unitFiles: G1_COPY_TRUTH_AFFECTED_UNIT_FILES, browserFiles: G1_COPY_TRUTH_AFFECTED_BROWSER_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.
