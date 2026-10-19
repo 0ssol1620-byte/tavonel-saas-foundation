@@ -426,8 +426,6 @@ export const FOOTER_GROUPS: readonly { title: string; links: readonly SiteLink[]
     title: "Product",
     links: [
       { href: "/product", label: "Product" },
-      // EN-1: how to use what is open today, screen by screen. /ko pages link /ko/guide.
-      { href: "/guide", label: "Product guide" },
       // BA-039: the section, not one of its five pages. Same change as `PRIMARY_NAV` above.
       { href: "/solutions", label: "Solutions" },
       { href: "/integrations", label: "Integrations" },
@@ -470,6 +468,14 @@ export const FOOTER_GROUPS: readonly { title: string; links: readonly SiteLink[]
     title: "Developers",
     links: [
       { href: "/docs", label: "Docs" },
+      /*
+        EN-1: how to use what is open today, screen by screen. /ko pages link /ko/guide. Here rather
+        than under Product: the phone footer is two columns, and Product is already its tallest
+        group, so one more link there added a 44px row and took the footer past its height bar
+        (public-layout-balance.spec, 940 px against 928 at 390). Developers sits beside Trust, which
+        has five links, so a fifth here adds no row.
+      */
+      { href: "/guide", label: "Product guide" },
       { href: "/api", label: "API" },
       { href: "/developers", label: "MCP and agents" },
       { href: "/changelog", label: "Changelog" },
