@@ -1050,6 +1050,16 @@ test('unit runner preserves empty-selection failure and live browser env strips 
   assert.equal(env.PATH, 'test-path');
 });
 
+// PR #151: Playwright's default CI git-info plugin read pull_request.base.sha from GITHUB_EVENT_PATH and ran
+// `git fetch origin <base> --depth=1` in the checkout. .git/shallow then held the PR base, so the baseline, reachable only
+// through that merge's second parent, was no longer an ancestor and the final gate refused the head.
+test('affected browser runner withholds the PR event so Playwright cannot shallow-fetch the PR base into the checkout', () => {
+  const env = liveBrowserEnv({ GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: '/home/runner/work/_temp/_github_workflow/event.json', PATH: 'test-path' });
+  assert.equal(Object.hasOwn(env, 'GITHUB_EVENT_PATH'), false);
+  assert.equal(env.GITHUB_ACTIONS, 'true');
+  assert.equal(env.PATH, 'test-path');
+});
+
 test('detail-integrity is not repeated in the incompatible audit project', () => {
   assert.deepEqual(auditBrowserFiles([
     'e2e/detail-integrity.spec.ts', 'e2e/failure-states-audit.spec.ts',
