@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { sharedBrowserProjectsMapExcludesExplore, NATIVE_RACE_ADDITIONS, NATIVE_RACE_CONFIG_PATHS, NATIVE_RACE_CHANGED_PATHS, NATIVE_RACE_MAIN_OVERLAYS, NATIVE_RACE_MAIN_OVERLAY_PROVENANCE } from './repair-collector-only.mjs';
 import { PR141_MAIN_MERGE_BCBA_AFFECTED_PATHS, PR141_MAIN_MERGE_BCBA_AFFECTED_UNIT_FILES, PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { AFFECTED_GROUPS, HOME_AFFECTED_BROWSER_FILE, HOME_AFFECTED_PATHS, HOME_AFFECTED_UNIT_FILES, HOME_READER_HEADING_CSS_AFFECTED_PATHS, HOME_READER_HEADING_CSS_AFFECTED_UNIT_FILES, REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE, RECIPE_CONTINUATION_AFFECTED_BROWSER_FILES, RECIPE_CONTINUATION_AFFECTED_PATHS, RECIPE_CONTINUATION_AFFECTED_UNIT_FILES, VITEST_DISCOVERY_CONFIG_PATH, vitestDiscoveryConfigFailures, COMPILE_SOURCE_OBSERVATIONS_AFFECTED_PATHS, COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES, WORLD_EXPLORER_NAVIGATION_AFFECTED_PATHS, WORLD_EXPLORER_NAVIGATION_AFFECTED_UNIT_FILES, WORLD_VERSION_DIFF_AFFECTED_PATHS, WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES, INTAKE_APPROVAL_ROLLOUT_AFFECTED_PATHS, INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_PATHS, SOLUTIONS_PROOF_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES, EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS, EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES, EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_PATHS, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_UNIT_FILES, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_BROWSER_FILES, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES, FIX_ROUND_3_AFFECTED_PATHS, FIX_ROUND_3_AFFECTED_UNIT_FILES, FIX_ROUND_3_AFFECTED_BROWSER_FILES, FIX_ROUND_4_AFFECTED_PATHS, FIX_ROUND_4_AFFECTED_UNIT_FILES, PR151_SERVICE_TRUTH_AFFECTED_PATHS, PR151_SERVICE_TRUTH_AFFECTED_UNIT_FILES, OCR_PAGES_INCOMPLETE_AFFECTED_PATHS, OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES, BENCHMARKS_PATH_MASK_AFFECTED_PATHS, BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES, TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_PATHS, SPECIMEN_STRIP_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_BROWSER_FILES, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES, PUBLIC_MARKETING_AFFECTED_BROWSER_FILES, MARKETING_TOOLING_POSTIMAGES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
 const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -579,6 +580,51 @@ const currentOwnerBindings = [
     && runner.includes("['e2e/home-measures.spec.ts', ['1440', '390', 'reduced-motion']]") && runner.includes("['e2e/overflow-audit.spec.ts', ['audit']]"),
     'PR #141 main merge bcba7173 owner must keep its thirty exact paths, their direct suites and six browser suites');
 }
+// B-01 (2026-10-19): the UX program's four finite owners, restated independently: exact paths, direct suites, browser suites with
+// their reviewed project rows, no neighbour admission and no lane flag. Plus the reviewed package.json postimage.
+for (const binding of [
+  { group: 'ux-billing-checkout', prefix: 'nextjs/', exportedPaths: UX_BILLING_CHECKOUT_AFFECTED_PATHS, exportedSuites: UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES,
+    exportedBrowsers: UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES,
+    paths: ['app/api/internal/billing/gate-enforce/route.ts', 'components/checkout-intent-notice.tsx', 'e2e/fixtures/paddle-fixture.ts', 'e2e/login-capability.spec.ts', 'e2e/self-serve-journey.spec.ts', 'lib/billing-binding.test.ts', 'lib/billing-binding.ts', 'lib/checkout-intent.test.ts', 'lib/checkout-intent.ts', 'lib/cta-truth.test.ts', 'lib/entitlement-wait.test.ts', 'lib/entitlement-wait.ts', 'lib/paddle-billing-event.test.ts', 'lib/paddle-billing-event.ts', 'lib/self-service-trial-device-rotation.test.ts', 'lib/self-service-trial.ts', 'lib/use-checkout.test.ts', 'lib/use-checkout.ts'],
+    suites: ['lib/billing-binding.test.ts', 'lib/billing-gate-enforce-route.test.ts', 'lib/checkout-intent.test.ts', 'lib/checkout-policy.test.ts', 'lib/cta-truth.test.ts', 'lib/entitlement-wait.test.ts', 'lib/paddle-billing-event.test.ts', 'lib/production-posture.test.ts', 'lib/self-service-trial-device-rotation.test.ts', 'lib/use-checkout.test.ts'],
+    browsers: ['e2e/login-capability.spec.ts', 'e2e/self-serve-journey.spec.ts'],
+    rows: ["['e2e/self-serve-journey.spec.ts', ['audit']],", "['e2e/login-capability.spec.ts', ['1440']],"],
+    neighbors: ['nextjs/app/api/internal/billing/other/route.ts', 'nextjs/components/checkout-intent-notice.test.tsx', 'nextjs/e2e/fixtures/paddle-fixture-2.ts', 'nextjs/lib/billing-catalog.ts', 'nextjs/lib/checkout-policy.ts', 'nextjs/lib/use-checkout.tsx', 'nextjs/lib/self-service-trial.test.ts'] },
+  { group: 'table-read-intake-ceiling', prefix: '', exportedPaths: TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, exportedSuites: TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['nextjs/lib/fixtures/table-read/synthetic-no-table.json', 'nextjs/lib/fixtures/table-read/synthetic-read-table-and-formula.json', 'nextjs/lib/fixtures/table-read/synthetic-unreadable-truncated.json', 'nextjs/lib/table-read-contract.test.ts', 'shared/intakeCeiling.ts', 'shared/tableReadContract.ts'],
+    suites: ['lib/copy-trust-guard.test.ts', 'lib/intake-ceiling-cross-tree.test.ts', 'lib/pipeline.test.ts', 'lib/plan-limit-fit.test.ts', 'lib/preflight-report.test.ts', 'lib/production-posture.test.ts', 'lib/r2-presign.test.ts', 'lib/table-read-contract.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['shared/capabilityManifest.ts', 'shared/intakeCeiling.test.ts', 'shared/tableReadContract.js', 'nextjs/shared/intakeCeiling.ts', 'nextjs/lib/fixtures/table-read/other.json', 'nextjs/lib/table-read-contract.ts'] },
+  { group: 'specimen-strip', prefix: 'nextjs/', exportedPaths: SPECIMEN_STRIP_AFFECTED_PATHS, exportedSuites: SPECIMEN_STRIP_AFFECTED_UNIT_FILES,
+    exportedBrowsers: SPECIMEN_STRIP_AFFECTED_BROWSER_FILES,
+    paths: ['components/landing-v2/specimen-strip.module.css', 'components/landing-v2/specimen-strip.tsx', 'e2e/fixtures/specimens/fixture-korean.json', 'e2e/fixtures/specimens/fixture-korean.svg', 'e2e/fixtures/specimens/fixture-scan.json', 'e2e/fixtures/specimens/fixture-scan.svg', 'e2e/fixtures/specimens/fixture-table.json', 'e2e/fixtures/specimens/fixture-table.svg', 'e2e/specimen-strip.spec.ts', 'lib/specimen-sources.test.ts', 'lib/specimen-sources.ts'],
+    suites: ['lib/specimen-sources.test.ts'],
+    browsers: ['e2e/specimen-strip.spec.ts'],
+    rows: ["['e2e/specimen-strip.spec.ts', ['1440', '390']],"],
+    neighbors: ['nextjs/components/landing-v2/specimen-strip.test.tsx', 'nextjs/e2e/fixtures/specimens/fixture-chart.json', 'nextjs/e2e/fixtures/specimens/fixture-scan.png', 'nextjs/lib/specimen-sources.tsx', 'nextjs/public/landing/v2/specimen-scan.webp'] },
+  { group: 'launch-qa-release-scripts', prefix: 'nextjs/', exportedPaths: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, exportedSuites: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['lib/launch-qa-script-ratchet.test.ts', 'lib/release-gate-check-script.test.ts', 'scripts/launch-qa/lighthouse-budgets.mjs', 'scripts/release-gate-check.mjs', 'scripts/release-gate-check.test.mjs'],
+    suites: ['lib/client-route-weight.test.ts', 'lib/launch-qa-script-ratchet.test.ts', 'lib/release-gate-check-script.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/scripts/launch-qa/internal-links.mjs', 'nextjs/scripts/launch-qa/lighthouse-budgets.test.mjs', 'nextjs/scripts/release-manifest.mjs', 'nextjs/scripts/release-gate-check-2.mjs', 'nextjs/lib/release-gate-check.test.ts'] },
+]) {
+  const owners = AFFECTED_GROUPS.filter(owner => owner.group === binding.group), [owner] = owners;
+  assert(owners.length === 1 && JSON.stringify(binding.exportedPaths) === JSON.stringify(binding.paths)
+    && JSON.stringify(binding.exportedSuites) === JSON.stringify(binding.suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(binding.suites)
+    && JSON.stringify([...binding.exportedBrowsers]) === JSON.stringify(binding.browsers) && JSON.stringify(owner.browserFiles) === JSON.stringify(binding.browsers)
+    && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
+    && binding.paths.every(p => owner.match.test(binding.prefix + p)) && binding.neighbors.every(p => !owner.match.test(p))
+    && binding.rows.every(row => sharedMap.includes('\n  ' + row)),
+    'UX program owner must retain exact paths, direct suites, reviewed browser rows and no broad neighbor admission: ' + binding.group);
+}
+assert(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'] === 'cc03d8ecb69d42916a5a4c72d54ff2817df90436f5111b2731ee6a8e248b7a59'
+  && ['e2e/benchmarks.spec.ts', 'e2e/brand-tokens.spec.ts', 'e2e/film-line-stability.spec.ts', 'e2e/site-alignment.spec.ts', 'e2e/solutions-workflows.spec.ts', 'e2e/templates.spec.ts', 'e2e/type-scale.spec.ts'].every(file => PUBLIC_MARKETING_AFFECTED_BROWSER_FILES.includes(file))
+  && ["['e2e/templates.spec.ts', ['1440']],", "['e2e/type-scale.spec.ts', ['1440']],", "['e2e/site-alignment.spec.ts', ['1440']],", "['e2e/brand-tokens.spec.ts', ['1440']],", "['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/film-line-stability.spec.ts', ['390']],"].every(row => sharedMap.includes('\n  ' + row)),
+  'Public marketing owner must keep the reviewed package.json postimage and a reviewed project row for each UX program browser suite');
 for (const binding of currentOwnerBindings) {
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === binding.group), [owner] = owners;
   assert(owners.length === 1 && JSON.stringify(binding.exportedPaths) === JSON.stringify(binding.paths)
@@ -643,8 +689,11 @@ assert(JSON.stringify(RECIPE_CONTINUATION_AFFECTED_PATHS)===JSON.stringify(recip
   &&recipeOwners.length===1&&JSON.stringify(recipeOwner.unitFiles)===JSON.stringify(recipeSuites)&&JSON.stringify(recipeOwner.browserFiles)===JSON.stringify(recipeBrowsers)
   &&!recipeOwner.nativeReuse&&!recipeOwner.selector&&!recipeOwner.worker&&!recipeOwner.database&&!recipeOwner.databaseTests.length
   &&recipePaths.every(p=>AFFECTED_GROUPS.filter(owner=>owner.match.test('nextjs/'+p)).map(owner=>owner.group).join()==='recipe-continuation')
-  &&['app/cookbooks/s/page.tsx','app/cookbooks/[id]/page.tsx','app/cookbooks/[slug]/pageXtsx','app/cookbooks/page.tsx','app/login/layout.tsx','app/auth/callback/route.ts','lib/checkout-intent.ts',
-    'lib/recipe-intent.spec.ts','e2e/login-capability.spec.ts','e2e/recipe-continuation-extra.spec.ts'].every(p=>!AFFECTED_GROUPS.some(owner=>owner.match.test('nextjs/'+p)))
+  &&['app/cookbooks/s/page.tsx','app/cookbooks/[id]/page.tsx','app/cookbooks/[slug]/pageXtsx','app/login/layout.tsx','app/auth/callback/route.ts',
+    'lib/recipe-intent.spec.ts','e2e/recipe-continuation-extra.spec.ts'].every(p=>!AFFECTED_GROUPS.some(owner=>owner.match.test('nextjs/'+p)))
+  // B-01: three former neighbours changed in the UX program; each now has exactly one owner, never recipe-continuation.
+  &&[['app/cookbooks/page.tsx','public-marketing-surface'],['lib/checkout-intent.ts','ux-billing-checkout'],['e2e/login-capability.spec.ts','ux-billing-checkout']]
+    .every(([p,group])=>AFFECTED_GROUPS.filter(owner=>owner.match.test('nextjs/'+p)).map(owner=>owner.group).join()===group)
   &&sharedMap.split("\n  ['e2e/recipe-continuation.spec.ts', ['1440', '390', '360', 'reduced-motion']],").length===2&&sharedMap.split("\n  ['e2e/login-capability.spec.ts', ['1440']],").length===2
   &&recipeBrowsers.every(file=>sharedMap.split(file).length===2)
   &&[...recipeSuites,...recipeBrowsers].every(file=>existsSync(resolve(repo,'nextjs',file))),

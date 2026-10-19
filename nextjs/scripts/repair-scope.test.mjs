@@ -3897,6 +3897,7 @@ test('affected Explore admission: unknown siblings, bad spellings, bad modes and
   for (const path of ['nextjs/components/explore/ask-overlay.test.tsx','nextjs/components/explore/other.tsx','nextjs/components/explore/evidence-workbench.module.css','nextjs/components/explore/index.ts',
     'nextjs/components/explore/evidence-workbench.test.ts','nextjs/components/Explore/ask-overlay.tsx','nextjs/lib/explore-sample.ts.bak','nextjs/lib/explore-samples.ts','nextjs/lib/explore-sample.tsx','nextjs/lib/explore-entry-proof.ts',
     'nextjs/lib/explore-story.spec.ts','nextjs/lib/explore.ts','nextjs/e2e/explore-extra.spec.ts','nextjs/e2e/explore.spec.tsx','nextjs/app/explore/page.tsx','lib/explore-sample.ts','nextjs/nextjs/lib/explore-story.ts']) {
+    if (assertUxProgramEndpoint(path)) continue;
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
     assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
@@ -4492,7 +4493,7 @@ test('affected recipe continuation admission: the bracketed cookbook route is li
     'nextjs/app/auth/callback/route.ts','nextjs/app/auth/page.tsx','nextjs/components/recipe-preflight.test.tsx','nextjs/components/recipe-preflight.module.css','nextjs/lib/recipe-intent.tsx',
     'nextjs/lib/recipe-intent.spec.ts','nextjs/lib/recipe-intents.ts','nextjs/lib/checkout-intent.ts','nextjs/lib/checkout-intent.test.ts','nextjs/lib/funnel-events.test.ts','nextjs/lib/seo-surface.test.ts',
     'nextjs/e2e/login-capability.spec.ts','nextjs/e2e/recipe-continuation.spec.tsx','nextjs/e2e/recipe-continuation-extra.spec.ts','app/login/page.tsx','nextjs/nextjs/app/login/page.tsx']) {
-    if (assertNewReviewedMarketingEndpoint(path)) continue;
+    if (assertUxProgramEndpoint(path)) continue;
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
@@ -4503,7 +4504,11 @@ test('affected recipe continuation admission: the bracketed cookbook route is li
   for (const [status,oldMode,newMode] of [['A','000000','120000'],['M','100644','120000'],['M','160000','160000'],['D','100644','100644']])
     assert.deepEqual(affectedMap([affectedRecord(status,['nextjs/app/login/page.tsx'],oldMode,newMode)]).failures,[`unsupported file mode ${oldMode} -> ${newMode}: nextjs/app/login/page.tsx`]);
   assert.match(affectedMap([affectedRecord('C075',['nextjs/lib/recipe-intent.ts','nextjs/app/login/page.tsx'])]).failures[0],/^unsupported change status C075:/);
-  for (const paths of [['nextjs/lib/recipe-intent.ts','nextjs/lib/recipe-intents.ts'],['nextjs/lib/checkout-intent.ts','nextjs/app/login/page.tsx']]) {
+  // B-01: checkout-intent.ts is the ux-billing-checkout owner's now, so its rename into the login page unions both owners; the
+  // unknown-endpoint case keeps an unregistered checkout-intent sibling.
+  const ownedRename=affectedMap([affectedRecord('R090',['nextjs/lib/checkout-intent.ts','nextjs/app/login/page.tsx'])]);
+  assert.deepEqual([ownedRename.failures,ownedRename.unmappedPaths,ownedRename.groups],[[],[],['recipe-continuation','ux-billing-checkout']]);
+  for (const paths of [['nextjs/lib/recipe-intent.ts','nextjs/lib/recipe-intents.ts'],['nextjs/lib/checkout-intents.ts','nextjs/app/login/page.tsx']]) {
     const unknown=paths.find(path=>!AFFECTED_RECIPE_PATHS.includes(path)),map=affectedMap([affectedRecord('R090',paths)]);
     assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],paths.join(' -> '));
     assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,paths.join(' -> '));
@@ -5965,6 +5970,7 @@ test('affected preflight report admission: lookalikes, operations, pipeline, API
     'nextjs/app/api/v1/preflight-report/route.ts','nextjs/app/api/preflight-report/route.ts',
     'shared/capabilityManifest.ts','shared/intakeCeiling.ts','shared/qualifiedDocumentInputs.ts',
     'nextjs/nextjs/lib/preflight-report.ts','lib/preflight-report.ts','lib/preflight-report.test.ts','preflight-report.ts']) {
+    if (assertUxProgramEndpoint(path)) continue;
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[]],path);
@@ -7339,10 +7345,118 @@ test('affected benchmarks path mask owner: four exact paths select seven direct 
   for (const adjacent of ['nextjs/app/benchmarks/page.ts', 'nextjs/app/benchmarks/gdp-pdf/page.tsx', 'nextjs/lib/model-arena-page-data.tsx',
     'nextjs/lib/model-arena-page-data-v2.ts', 'nextjs/lib/benchmarks-page.test.tsx', 'nextjs/components/benchmarks/arena-charts.tsx',
     'nextjs/content/benchmarks/model-arena-20260903.json', 'lib/model-arena-page-data.ts']) {
+    if (assertUxProgramEndpoint(adjacent)) continue;
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
+});
+
+// B-01 (2026-10-19): the UX program's four finite owners, each restated independently of the exported constants.
+import { UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES, TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_PATHS, SPECIMEN_STRIP_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_BROWSER_FILES, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected ux-billing-checkout owner: 18 exact paths select 10 direct suites and 2 browser suites; neighbours stay unmapped', () => {
+  const suites = ['lib/billing-binding.test.ts', 'lib/billing-gate-enforce-route.test.ts', 'lib/checkout-intent.test.ts', 'lib/checkout-policy.test.ts', 'lib/cta-truth.test.ts', 'lib/entitlement-wait.test.ts', 'lib/paddle-billing-event.test.ts', 'lib/production-posture.test.ts', 'lib/self-service-trial-device-rotation.test.ts', 'lib/use-checkout.test.ts'];
+  const browsers = ['e2e/login-capability.spec.ts', 'e2e/self-serve-journey.spec.ts'];
+  assert.deepEqual([[...UX_BILLING_CHECKOUT_AFFECTED_PATHS], [...UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES], [...UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES]], [['app/api/internal/billing/gate-enforce/route.ts', 'components/checkout-intent-notice.tsx', 'e2e/fixtures/paddle-fixture.ts', 'e2e/login-capability.spec.ts', 'e2e/self-serve-journey.spec.ts', 'lib/billing-binding.test.ts', 'lib/billing-binding.ts', 'lib/checkout-intent.test.ts', 'lib/checkout-intent.ts', 'lib/cta-truth.test.ts', 'lib/entitlement-wait.test.ts', 'lib/entitlement-wait.ts', 'lib/paddle-billing-event.test.ts', 'lib/paddle-billing-event.ts', 'lib/self-service-trial-device-rotation.test.ts', 'lib/self-service-trial.ts', 'lib/use-checkout.test.ts', 'lib/use-checkout.ts'], suites, browsers]);
+  for (const path of UX_BILLING_CHECKOUT_AFFECTED_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['ux-billing-checkout'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['ux-billing-checkout'], [], [...suites].sort(), [...browsers].sort(), []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const plan = affectedAskPlan(affectedMap(UX_BILLING_CHECKOUT_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[...suites].sort(), [...browsers].sort(), false, false]);
+  assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440', 'audit']);
+  for (const adjacent of ['nextjs/app/api/internal/billing/other/route.ts', 'nextjs/components/checkout-intent-notice.test.tsx', 'nextjs/e2e/fixtures/paddle-fixture-2.ts', 'nextjs/lib/billing-catalog.ts', 'nextjs/lib/checkout-policy.ts', 'nextjs/lib/use-checkout.tsx', 'nextjs/lib/self-service-trial.test.ts', 'app/api/internal/billing/gate-enforce/route.ts.bak']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
+test('affected table-read-intake-ceiling owner: 6 exact paths select 8 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const suites = ['lib/copy-trust-guard.test.ts', 'lib/intake-ceiling-cross-tree.test.ts', 'lib/pipeline.test.ts', 'lib/plan-limit-fit.test.ts', 'lib/preflight-report.test.ts', 'lib/production-posture.test.ts', 'lib/r2-presign.test.ts', 'lib/table-read-contract.test.ts'];
+  const browsers = [];
+  assert.deepEqual([[...TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS], [...TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES], [...[]]], [['nextjs/lib/fixtures/table-read/synthetic-no-table.json', 'nextjs/lib/fixtures/table-read/synthetic-read-table-and-formula.json', 'nextjs/lib/fixtures/table-read/synthetic-unreadable-truncated.json', 'nextjs/lib/table-read-contract.test.ts', 'shared/intakeCeiling.ts', 'shared/tableReadContract.ts'], suites, browsers]);
+  for (const path of TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('' + path)).map(o => o.group), ['table-read-intake-ceiling'], path);
+    const map = affectedMap([affectedRecord('M', ['' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['table-read-intake-ceiling'], [], [...suites].sort(), [...browsers].sort(), []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const plan = affectedAskPlan(affectedMap(TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS.map(path => affectedRecord('M', ['' + path]))));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[...suites].sort(), [...browsers].sort(), false, false]);
+  assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), []);
+  for (const adjacent of ['shared/capabilityManifest.ts', 'shared/intakeCeiling.test.ts', 'shared/tableReadContract.js', 'nextjs/shared/intakeCeiling.ts', 'nextjs/lib/fixtures/table-read/other.json', 'nextjs/lib/table-read-contract.ts', 'nextjs/lib/fixtures/table-read/synthetic-no-table.json.bak']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
+test('affected specimen-strip owner: 11 exact paths select 1 direct suite and 1 browser suite; neighbours stay unmapped', () => {
+  const suites = ['lib/specimen-sources.test.ts'];
+  const browsers = ['e2e/specimen-strip.spec.ts'];
+  assert.deepEqual([[...SPECIMEN_STRIP_AFFECTED_PATHS], [...SPECIMEN_STRIP_AFFECTED_UNIT_FILES], [...SPECIMEN_STRIP_AFFECTED_BROWSER_FILES]], [['components/landing-v2/specimen-strip.module.css', 'components/landing-v2/specimen-strip.tsx', 'e2e/fixtures/specimens/fixture-korean.json', 'e2e/fixtures/specimens/fixture-korean.svg', 'e2e/fixtures/specimens/fixture-scan.json', 'e2e/fixtures/specimens/fixture-scan.svg', 'e2e/fixtures/specimens/fixture-table.json', 'e2e/fixtures/specimens/fixture-table.svg', 'e2e/specimen-strip.spec.ts', 'lib/specimen-sources.test.ts', 'lib/specimen-sources.ts'], suites, browsers]);
+  for (const path of SPECIMEN_STRIP_AFFECTED_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['specimen-strip'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['specimen-strip'], [], [...suites].sort(), [...browsers].sort(), []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const plan = affectedAskPlan(affectedMap(SPECIMEN_STRIP_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[...suites].sort(), [...browsers].sort(), false, false]);
+  assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440', '390']);
+  for (const adjacent of ['nextjs/components/landing-v2/specimen-strip.test.tsx', 'nextjs/e2e/fixtures/specimens/fixture-chart.json', 'nextjs/e2e/fixtures/specimens/fixture-scan.png', 'nextjs/lib/specimen-sources.tsx', 'nextjs/public/landing/v2/specimen-scan.webp', 'components/landing-v2/specimen-strip.module.css.bak']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
+test('affected launch-qa-release-scripts owner: 5 exact paths select 3 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const suites = ['lib/client-route-weight.test.ts', 'lib/launch-qa-script-ratchet.test.ts', 'lib/release-gate-check-script.test.ts'];
+  const browsers = [];
+  assert.deepEqual([[...LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS], [...LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES], [...[]]], [['lib/launch-qa-script-ratchet.test.ts', 'lib/release-gate-check-script.test.ts', 'scripts/launch-qa/lighthouse-budgets.mjs', 'scripts/release-gate-check.mjs', 'scripts/release-gate-check.test.mjs'], suites, browsers]);
+  for (const path of LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['launch-qa-release-scripts'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['launch-qa-release-scripts'], [], [...suites].sort(), [...browsers].sort(), []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const plan = affectedAskPlan(affectedMap(LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[...suites].sort(), [...browsers].sort(), false, false]);
+  assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), []);
+  for (const adjacent of ['nextjs/scripts/launch-qa/internal-links.mjs', 'nextjs/scripts/launch-qa/lighthouse-budgets.test.mjs', 'nextjs/scripts/release-manifest.mjs', 'nextjs/scripts/release-gate-check-2.mjs', 'nextjs/lib/release-gate-check.test.ts', 'lib/launch-qa-script-ratchet.test.ts.bak']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
+// Old negative lists (Explore, recipe continuation, preflight report, benchmarks path mask) name paths the UX program changed and
+// B-01 registered. Each such exact path is asserted positively instead -- one owner, the one B-01 names, with that owner's exact
+// suites and fresh native debt -- as published024 did with assertNewReviewedMarketingEndpoint. Every other listed path still refuses.
+const UX_PROGRAM_OWNER_ROWS = [
+  ['ux-billing-checkout', 'nextjs/', UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES],
+  ['table-read-intake-ceiling', '', TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES, []],
+  ['specimen-strip', 'nextjs/', SPECIMEN_STRIP_AFFECTED_PATHS, SPECIMEN_STRIP_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_BROWSER_FILES],
+  ['launch-qa-release-scripts', 'nextjs/', LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES, []],
+];
+function assertUxProgramEndpoint(path) {
+  if (assertNewReviewedMarketingEndpoint(path)) return true;
+  const row = UX_PROGRAM_OWNER_ROWS.find(([, prefix, paths]) => paths.some(p => prefix + p === path));
+  if (!row) return false;
+  const [group, , , suites, browsers] = row, map = affectedMap([affectedRecord('M', [path])]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles], [[], [group], [], [...suites].sort(), [...browsers].sort()], path);
+  assert.equal(map.nativeEvidence.disposition, 'fresh-seven-case-native-run-required', path);
+  return true;
+}
+test('affected UX program head: the reviewed package.json postimage is pinned and each new browser suite has exactly one reviewed project row', () => {
+  assert.equal(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'], 'cc03d8ecb69d42916a5a4c72d54ff2817df90436f5111b2731ee6a8e248b7a59');
+  assert.equal(MARKETING_TOOLING_POSTIMAGES['nextjs/pnpm-lock.yaml'], 'a814e2ff45e2c563949ebd917df8036bcd7bde2c2a8a98480386fab0ea79be04');
+  const runner = readFileSync(fileURLToPath(new URL('./run-repair-check.mjs', import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
+  for (const row of ["['e2e/templates.spec.ts', ['1440']],", "['e2e/type-scale.spec.ts', ['1440']],", "['e2e/site-alignment.spec.ts', ['1440']],", "['e2e/brand-tokens.spec.ts', ['1440']],", "['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/film-line-stability.spec.ts', ['390']],", "['e2e/specimen-strip.spec.ts', ['1440', '390']],", "['e2e/self-serve-journey.spec.ts', ['audit']],"]) {
+    assert.equal(runner.split('\n').filter(line => line.trim() === row).length, 1, row);
+  }
+  for (const file of ['e2e/benchmarks.spec.ts', 'e2e/brand-tokens.spec.ts', 'e2e/film-line-stability.spec.ts', 'e2e/site-alignment.spec.ts', 'e2e/solutions-workflows.spec.ts', 'e2e/templates.spec.ts', 'e2e/type-scale.spec.ts']) assert.ok(PUBLIC_MARKETING_AFFECTED_BROWSER_FILES.includes(file), file);
+  assert.equal(PUBLIC_MARKETING_AFFECTED_BROWSER_FILES.includes('e2e/specimen-strip.spec.ts'), false);
 });
 
 test('affected durable worker contract has one existing compile owner and keeps its three direct checks', () => {
@@ -7357,13 +7471,13 @@ test('affected durable worker contract has one existing compile owner and keeps 
 
 // Regression for exact024 source-admission failures. No product/browser execution in these selector tests.
 import { PUBLIC_MARKETING_AFFECTED_PATHS, PUBLIC_MARKETING_AFFECTED_UNIT_FILES, PUBLIC_MARKETING_AFFECTED_BROWSER_FILES, MARKETING_TOOLING_POSTIMAGES } from './repair-scope.mjs';
-const reviewedMarketingPaths = ["nextjs/app/evaluation/opengraph-image.tsx", "nextjs/app/how-it-works/opengraph-image.tsx", "nextjs/app/how-it-works/page.tsx", "nextjs/app/ko/evaluation/opengraph-image.tsx", "nextjs/app/ko/pricing/opengraph-image.tsx", "nextjs/app/landing-v2.css", "nextjs/app/layout.tsx", "nextjs/app/product/page.tsx", "nextjs/app/sitemap.ts", "nextjs/components/evaluation-page.module.css", "nextjs/components/evidence/region-highlight.module.css", "nextjs/components/font-outline-probe.tsx", "nextjs/components/landing-v2/hero-statement.tsx", "nextjs/components/landing-v2/home-measurement.tsx", "nextjs/components/landing-v2/scenes/recompile.module.css", "nextjs/components/landing-v2/scenes/recompile.tsx", "nextjs/components/landing-v2/scenes/start.tsx", "nextjs/components/landing-v2/scenes/trust.tsx", "nextjs/components/landing-v2/source-first-home.module.css", "nextjs/components/landing-v2/source-inspection-film.tsx", "nextjs/components/marketing-consent.module.css", "nextjs/components/marketing-story.module.css", "nextjs/components/mobile-primary-nav.tsx", "nextjs/components/public-site-chrome.module.css", "nextjs/components/public-site-chrome.tsx", "nextjs/components/site-nav/desktop-primary-nav.tsx", "nextjs/e2e/compiler-contract.spec.ts", "nextjs/e2e/detail-integrity.spec.ts", "nextjs/e2e/dialog-focus-audit.spec.ts", "nextjs/e2e/evidence-first.spec.ts", "nextjs/e2e/explore-guided-entry.spec.ts", "nextjs/e2e/failure-states-audit.spec.ts", "nextjs/e2e/hero-four-stage-restoration.spec.ts", "nextjs/e2e/hero-home-responsive.spec.ts", "nextjs/e2e/home-evidence-line.spec.ts", "nextjs/e2e/home-source-routes.spec.ts", "nextjs/e2e/landing-hero-mobile.spec.ts", "nextjs/e2e/launch-qa-accessibility.spec.ts", "nextjs/e2e/launch-qa-mobile-nav.spec.ts", "nextjs/e2e/marketing-consent.spec.ts", "nextjs/e2e/marketing-story.spec.ts", "nextjs/e2e/mobile-landing.spec.ts", "nextjs/e2e/premium-craft.spec.ts", "nextjs/e2e/pricing-plan-overview.spec.ts", "nextjs/e2e/production-hardening.spec.ts", "nextjs/e2e/public-composition.spec.ts", "nextjs/e2e/public-layout-balance.spec.ts", "nextjs/e2e/public-package-proof.spec.ts", "nextjs/e2e/site-chrome-v2.spec.ts", "nextjs/e2e/site-nav.spec.ts", "nextjs/e2e/sources.spec.ts", "nextjs/e2e/ux-polish.spec.ts", "nextjs/e2e/visual-continuity.spec.ts", "nextjs/e2e/visual-refinement.spec.ts", "nextjs/lib/brand-copy.test.ts", "nextjs/lib/landing-v2-hero-statement.test.ts", "nextjs/lib/landing-v2-motion.test.ts", "nextjs/lib/landing-v2-start.test.ts", "nextjs/lib/landing-v2-trust.test.ts", "nextjs/lib/marketing-consent-reveal.test.ts", "nextjs/lib/marketing-story.test.ts", "nextjs/lib/og-card-frame.test.ts", "nextjs/lib/product-left-column.test.ts", "nextjs/lib/seo-surface.test.ts", "nextjs/lib/site-nav-model.test.ts", "nextjs/lib/site-navigation.ts", "nextjs/lib/visual-refinement.test.ts", "nextjs/public/film/source-inspection/desktop.webm", "nextjs/public/film/source-inspection/desktop.webp", "nextjs/public/film/source-inspection/en.vtt", "nextjs/public/film/source-inspection/ko.vtt", "nextjs/public/film/source-inspection/manifest.json", "nextjs/public/film/source-inspection/mobile.webm", "nextjs/public/film/source-inspection/mobile.webp", "nextjs/public/llms.txt"];
+const reviewedMarketingPaths = ["docs/gtm/CLAIMS_REGISTRY.yaml", "nextjs/app/api/page.tsx", "nextjs/app/arena/page.tsx", "nextjs/app/benchmarks/benchmarks.module.css", "nextjs/app/benchmarks/gdp-pdf/gdp-pdf.module.css", "nextjs/app/benchmarks/gdp-pdf/page.tsx", "nextjs/app/changelog/page.tsx", "nextjs/app/contact/page.tsx", "nextjs/app/cookbooks/page.tsx", "nextjs/app/demo/page.tsx", "nextjs/app/developers/page.tsx", "nextjs/app/enterprise/page.tsx", "nextjs/app/evaluation/opengraph-image.tsx", "nextjs/app/evidence/page.tsx", "nextjs/app/explore/page.tsx", "nextjs/app/how-it-works/opengraph-image.tsx", "nextjs/app/how-it-works/page.tsx", "nextjs/app/integrations/page.tsx", "nextjs/app/knowledge-compiler/page.tsx", "nextjs/app/ko/contact/page.tsx", "nextjs/app/ko/evaluation/opengraph-image.tsx", "nextjs/app/ko/pricing/opengraph-image.tsx", "nextjs/app/ko/pricing/page.tsx", "nextjs/app/ko/pricing/pricing.module.css", "nextjs/app/landing-v2.css", "nextjs/app/layout.tsx", "nextjs/app/not-found.tsx", "nextjs/app/paper-product.css", "nextjs/app/product-polish.css", "nextjs/app/product/compiled-world/page.tsx", "nextjs/app/product/continuous-knowledge/page.tsx", "nextjs/app/product/document-understanding/page.tsx", "nextjs/app/product/page.tsx", "nextjs/app/reproducibility/page.tsx", "nextjs/app/research/page.tsx", "nextjs/app/resources/page.tsx", "nextjs/app/security/page.tsx", "nextjs/app/sitemap.ts", "nextjs/app/solutions/page.tsx", "nextjs/app/solutions/solutions.module.css", "nextjs/app/sources/page.tsx", "nextjs/app/status/page.tsx", "nextjs/app/trust/page.tsx", "nextjs/components/evaluation-page.module.css", "nextjs/components/evidence/region-highlight.module.css", "nextjs/components/explore/evidence-workbench.module.css", "nextjs/components/explore/explore-stage.module.css", "nextjs/components/font-outline-probe.tsx", "nextjs/components/landing-v2/hero-statement.tsx", "nextjs/components/landing-v2/home-measurement.tsx", "nextjs/components/landing-v2/scenes/recompile.module.css", "nextjs/components/landing-v2/scenes/recompile.tsx", "nextjs/components/landing-v2/scenes/start.tsx", "nextjs/components/landing-v2/scenes/trust.tsx", "nextjs/components/landing-v2/source-first-home.module.css", "nextjs/components/landing-v2/source-inspection-film.tsx", "nextjs/components/marketing-consent.module.css", "nextjs/components/marketing-story.module.css", "nextjs/components/mobile-primary-nav.tsx", "nextjs/components/policy-layout.tsx", "nextjs/components/pricing-plan-overview.module.css", "nextjs/components/public-package-proof.tsx", "nextjs/components/public-page-shell.tsx", "nextjs/components/public-proof-registry.module.css", "nextjs/components/public-proof-registry.tsx", "nextjs/components/public-site-chrome.module.css", "nextjs/components/public-site-chrome.tsx", "nextjs/components/signed-product-demo.module.css", "nextjs/components/site-nav/desktop-primary-nav.tsx", "nextjs/components/vercel-collector.tsx", "nextjs/e2e/benchmarks.spec.ts", "nextjs/e2e/brand-tokens.spec.ts", "nextjs/e2e/compiler-contract.spec.ts", "nextjs/e2e/detail-integrity.spec.ts", "nextjs/e2e/dialog-focus-audit.spec.ts", "nextjs/e2e/evidence-first.spec.ts", "nextjs/e2e/explore-guided-entry.spec.ts", "nextjs/e2e/failure-states-audit.spec.ts", "nextjs/e2e/film-line-stability.spec.ts", "nextjs/e2e/hero-four-stage-restoration.spec.ts", "nextjs/e2e/hero-home-responsive.spec.ts", "nextjs/e2e/home-evidence-line.spec.ts", "nextjs/e2e/home-source-routes.spec.ts", "nextjs/e2e/landing-hero-mobile.spec.ts", "nextjs/e2e/launch-qa-accessibility.spec.ts", "nextjs/e2e/launch-qa-mobile-nav.spec.ts", "nextjs/e2e/marketing-consent.spec.ts", "nextjs/e2e/marketing-story.spec.ts", "nextjs/e2e/mobile-landing.spec.ts", "nextjs/e2e/premium-craft.spec.ts", "nextjs/e2e/pricing-plan-overview.spec.ts", "nextjs/e2e/production-hardening.spec.ts", "nextjs/e2e/public-composition.spec.ts", "nextjs/e2e/public-layout-balance.spec.ts", "nextjs/e2e/public-package-proof.spec.ts", "nextjs/e2e/site-alignment.spec.ts", "nextjs/e2e/site-chrome-v2.spec.ts", "nextjs/e2e/site-nav.spec.ts", "nextjs/e2e/solutions-workflows.spec.ts", "nextjs/e2e/sources.spec.ts", "nextjs/e2e/support/overflow.ts", "nextjs/e2e/templates.spec.ts", "nextjs/e2e/type-scale.spec.ts", "nextjs/e2e/ux-polish.spec.ts", "nextjs/e2e/visual-continuity.spec.ts", "nextjs/e2e/visual-refinement.spec.ts", "nextjs/lib/benchmark-registry.test.ts", "nextjs/lib/benchmark-registry.ts", "nextjs/lib/brand-copy.test.ts", "nextjs/lib/brand-tokens.test.ts", "nextjs/lib/copy-trust-guard.test.ts", "nextjs/lib/funnel-events.ts", "nextjs/lib/landing-v2-hero-statement.test.ts", "nextjs/lib/landing-v2-motion.test.ts", "nextjs/lib/landing-v2-start.test.ts", "nextjs/lib/landing-v2-tokens.test.ts", "nextjs/lib/landing-v2-trust.test.ts", "nextjs/lib/marketing-consent-reveal.test.ts", "nextjs/lib/marketing-story.test.ts", "nextjs/lib/og-card-frame.test.ts", "nextjs/lib/product-left-column.test.ts", "nextjs/lib/production-posture.test.ts", "nextjs/lib/seo-surface.test.ts", "nextjs/lib/site-nav-model.test.ts", "nextjs/lib/site-navigation.ts", "nextjs/lib/visual-refinement.test.ts", "nextjs/playwright.config.ts", "nextjs/public/film/source-inspection/desktop.webm", "nextjs/public/film/source-inspection/desktop.webp", "nextjs/public/film/source-inspection/en.vtt", "nextjs/public/film/source-inspection/ko.vtt", "nextjs/public/film/source-inspection/manifest.json", "nextjs/public/film/source-inspection/mobile.webm", "nextjs/public/film/source-inspection/mobile.webp", "nextjs/public/llms.txt"];
 const marketingMap = (records, overrides = {}) => buildAffectedMap({headSha:affectedHeadSha, records,
   headHasFile:path=>existsSync(resolve(process.cwd(),'..',path)),
   readHeadFile:path=>readFileSync(resolve(process.cwd(),'..',path),'utf8'), ...overrides});
-test('affected published024 marketing admission: all 77 explicit endpoints retain executing checks and fresh native debt', () => {
+test('affected published024 marketing admission: all 137 explicit endpoints retain executing checks and fresh native debt', () => {
   assert.deepEqual(PUBLIC_MARKETING_AFFECTED_PATHS,reviewedMarketingPaths);
-  assert.equal(PUBLIC_MARKETING_AFFECTED_PATHS.length,75);
+  assert.equal(PUBLIC_MARKETING_AFFECTED_PATHS.length,135);
   const endpoints=[...reviewedMarketingPaths,...Object.keys(MARKETING_TOOLING_POSTIMAGES)];
   const map=marketingMap(endpoints.map(path=>affectedRecord('M',[path])));
   assert.deepEqual(map.failures,[]); assert.deepEqual(map.unmappedPaths,[]);
