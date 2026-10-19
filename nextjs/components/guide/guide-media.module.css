@@ -21,5 +21,9 @@
   .media .phone { display: block; }
 }
 .media figcaption { font-size: 14px; line-height: 1.5; color: var(--text-mid); }
-.transcript > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: 14px; color: var(--text-mid); }
+.transcript > summary { min-height: 44px; display: flex; align-items: center; gap: 8px; list-style: none; cursor: pointer; font-size: 14px; color: var(--text-mid); }
+/* UX-L7 (P2-11): a flex summary loses the native triangle, so it draws the plus/minus the API reference's disclosures use. */
+.transcript > summary::-webkit-details-marker { display: none; }
+.transcript > summary::before { content: "+"; font: 12px var(--f-mono); }
+.transcript[open] > summary::before { content: "−"; }
 .transcript ol { margin: 0; padding-left: 1.25em; display: grid; gap: 6px; font-size: 15px; line-height: 1.6; }
