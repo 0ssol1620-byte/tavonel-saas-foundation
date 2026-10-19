@@ -309,9 +309,8 @@ export default function BenchmarksPage() {
                         ))}
                         {model.notes.some((note) => maskLocalPaths(note) !== note) ? (
                           <p className="fine">
-                            A file path on the machine that scored this run is shown as{" "}
-                            {LOCAL_PATH_MASK}. The committed board keeps the note as recorded, under
-                            the same sha256.
+                            A scoring-machine path is shown as {LOCAL_PATH_MASK}; the committed
+                            board keeps the note as recorded, under the same sha256.
                           </p>
                         ) : null}
                       </details>
