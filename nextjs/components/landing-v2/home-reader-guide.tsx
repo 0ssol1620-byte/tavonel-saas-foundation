@@ -23,6 +23,7 @@ const COPY = {
       ["Can I use my own documents?", "Own-source intake is by arrangement. Use the access action on this page to discuss your documents. The public sample does not upload or process your files."],
     ],
     back: "Return to the source and passage",
+    specimens: ["Where do the pages at the top come from?", "Each is one page of a public document, read on a one-page extract by the same OCR image the product runs. The outlined region is the first one the reader returned that meets a crop window drawn before the run, and its text is printed exactly as returned, errors included. No accuracy figure is claimed. Each cell links to its run receipt."],
   },
   ko: {
     title: "AI 답변을 믿기 전에",
@@ -40,10 +41,16 @@ const COPY = {
       ["내 문서를 사용할 수 있나요?", "자체 자료 도입은 별도 협의가 필요합니다. 이 페이지의 이용 안내를 통해 문서에 관해 상담하세요. 공개 샘플은 사용자의 파일을 업로드하거나 처리하지 않습니다."],
     ],
     back: "출처와 구절로 돌아가기",
+    specimens: ["맨 위의 페이지들은 어디에서 왔나요?", "각각 공개 문서의 한 쪽이며, 제품이 쓰는 것과 같은 OCR 이미지가 그 한 쪽 추출본을 읽었습니다. 표시한 영역은 판독기가 돌려준 영역 가운데 실행 전에 정해 둔 크롭 범위와 처음 겹치는 것이고, 그 텍스트는 오류까지 포함해 돌려받은 그대로 싣습니다. 정확도 수치는 주장하지 않습니다. 실행 receipt는 각 칸에 연결되어 있습니다."],
   },
 };
 
-export default function HomeReaderGuide({ korean = false, faqOnly = false }: { korean?: boolean; faqOnly?: boolean }) {
+/*
+  P2-32 (D-06): while the specimen strip renders, the FAQ says where its pages come from, by what
+  rule the region was chosen, and gives each approved full source line (the KOGL sentence on /ko).
+  With no strip -- production today -- `specimenSources` is empty and nothing is added.
+*/
+export default function HomeReaderGuide({ korean = false, faqOnly = false, specimenSources = [] }: { korean?: boolean; faqOnly?: boolean; specimenSources?: readonly string[] }) {
   const copy = COPY[korean ? "ko" : "en"];
   return (
     <div className={styles.readerGuide} role="region" aria-labelledby={faqOnly ? "home-faq-title" : "home-reader-title"} data-home-reader-guide>
@@ -65,6 +72,13 @@ export default function HomeReaderGuide({ korean = false, faqOnly = false }: { k
                 <p>{answer}</p>
               </details>
             ))}
+            {specimenSources.length > 0 ? (
+              <details data-specimen-faq="">
+                <summary>{copy.specimens[0]}</summary>
+                <p>{copy.specimens[1]}</p>
+                {specimenSources.map(line => <p key={line} data-derived="1">{line}</p>)}
+              </details>
+            ) : null}
           </div>
         </div>
       </div>

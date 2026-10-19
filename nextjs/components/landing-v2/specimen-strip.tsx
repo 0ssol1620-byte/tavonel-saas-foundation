@@ -21,8 +21,13 @@ import styles from "./specimen-strip.module.css";
   moves nothing below it. "Show full text" is a `<details>` toggle. Nothing here adds to the §22
   script budget, rendered or not.
 
-  Renders nothing without a cell: `homeSpecimens` refuses every incomplete receipt, and none are
-  committed yet (lib/specimen-sources.ts).
+  Renders nothing without a cell: `homeSpecimens` refuses every incomplete receipt, and renders
+  the committed ones only where the rollout switch allows (lib/specimen-sources.ts).
+
+  P2-32 (D-06): beside each crop, the short source line and its link; the approved full line
+  (SPECIMEN-CANDIDATES §4.4, the KOGL sentence on /ko) opens with "Show full text". The first crop
+  is the strip's largest paint on a phone, so it is fetched at high priority and the others lazily
+  (SYNTHESIS §7, LCP).
 */
 
 const COPY = {
@@ -37,7 +42,7 @@ const COPY = {
     receipt: "receipt",
     more: "Show full text",
     less: "Show less",
-    crop: (title: string, page: number) => `Page ${page} of ${title}, the window around the region the reader read`,
+    crop: (kind: string) => `${kind}: the window around the region the reader read`,
   },
   ko: {
     strip: "판독기가 읽은 페이지",
@@ -50,7 +55,7 @@ const COPY = {
     receipt: "receipt",
     more: "전체 보기",
     less: "접기",
-    crop: (title: string, page: number) => `${title} ${page}쪽, 판독기가 읽은 영역을 둘러싼 부분`,
+    crop: (kind: string) => `${kind}: 판독기가 읽은 영역을 둘러싼 부분`,
   },
 };
 
@@ -83,7 +88,8 @@ export default function SpecimenStrip({ specimens, korean = false }: { specimens
         </div>
       ) : null}
       <ol className={styles.cells}>
-        {specimens.map(specimen => {
+        {specimens.map((specimen, index) => {
+          const caption = specimen.caption[korean ? "ko" : "en"];
           // UX §3.4-2: the coordinates as stored, then the same place for a reader who does not read them.
           const [r0, s0, r1, s1] = specimen.region.bbox1000;
           const [x0, y0, x1, y1] = specimen.crop.window1000;
@@ -101,17 +107,19 @@ export default function SpecimenStrip({ specimens, korean = false }: { specimens
                 <div className={styles.frame}>
                   {/* eslint-disable-next-line @next/next/no-img-element -- a fixed crop with its receipt's own size; no optimizer may re-encode source pixels (specimen §4.5) */}
                   <img src={specimen.cropSrc} width={specimen.crop.width} height={specimen.crop.height}
-                    alt={copy.crop(specimen.title, specimen.page)} decoding="async" />
+                    alt={copy.crop(copy.kind[specimen.slot])} decoding="async"
+                    fetchPriority={index === 0 ? "high" : undefined} loading={index === 0 ? undefined : "lazy"} />
                   <span className={styles.region} style={outline(specimen)} data-specimen-region={specimen.region.regionId} aria-hidden="true" />
                 </div>
                 <figcaption className={styles.source}>
                   {copy.asPrinted} · {copy.source}:{" "}
-                  <a href={specimen.sourcePageUrl} rel="noopener noreferrer" data-specimen-source="">{specimen.rights.attribution}</a>
+                  <a href={specimen.sourcePageUrl} rel="noopener noreferrer" data-specimen-source="" data-derived="1">{caption.short}</a>
                 </figcaption>
               </figure>
               <p className={styles.text} lang={specimen.lang} data-specimen-text="" data-derived="1">{specimen.extractedText}</p>
               <details className={styles.more}>
                 <summary><span className={styles.closed}>{copy.more}</span><span className={styles.open}>{copy.less}</span></summary>
+                <p className={styles.full} data-specimen-licence="" data-derived="1">{caption.full}</p>
               </details>
               <p className={styles.run}>
                 <span>{copy.unedited}</span>

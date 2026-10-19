@@ -3,15 +3,20 @@ import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
+import HomeReaderGuide from "../components/landing-v2/home-reader-guide";
 import SpecimenStrip from "../components/landing-v2/specimen-strip";
 import {
   COMMITTED_SPECIMENS,
   MAX_CROP_BYTES,
+  QUALIFIED_OCR_IMAGE_DIGESTS,
+  SPECIMEN_STRIP_ROLLOUT,
   cropDigestProblem,
   homeSpecimens,
   isFixtureServer,
   readSpecimens,
   specimenProblem,
+  specimenStripLive,
   type Specimen,
   type SpecimenReceipt,
 } from "./specimen-sources";
@@ -37,13 +42,108 @@ function changed(edit: (receipt: SpecimenReceipt & Record<string, unknown>) => v
 
 afterEach(() => vi.restoreAllMocks());
 
+const PRODUCTION_ENV = { VERCEL: "1", VERCEL_ENV: "production" };
+const PREVIEW_ENV = { VERCEL: "1", VERCEL_ENV: "preview" };
+const committed = () => structuredClone(COMMITTED_SPECIMENS) as (SpecimenReceipt & Record<string, unknown>)[];
+const digest = (bytes: Uint8Array) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+const publicFile = (path: string) => readFileSync(join(process.cwd(), "public", path));
+
 describe("the committed specimens", () => {
-  it("are none today, so a production build renders no specimen cell and no strip", () => {
-    // P2-32 commits the reader-run receipts; until then this list is empty and stays empty.
-    expect(COMMITTED_SPECIMENS).toEqual([]);
-    expect(homeSpecimens()).toEqual([]);
-    expect(homeSpecimens({ fixtures: true }, {})).toEqual([]);
-    expect(renderToStaticMarkup(createElement(SpecimenStrip, { specimens: homeSpecimens() }))).toBe("");
+  it("are two (D-04: a degraded scan and a Korean page, no table cell), and production renders neither", () => {
+    expect(COMMITTED_SPECIMENS.map(receipt => (receipt as SpecimenReceipt).specimenId)).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+    // The posture: Vercel production, a server with no VERCEL_ENV, and any request that is not the test server's.
+    expect(SPECIMEN_STRIP_ROLLOUT).toBe("preview");
+    for (const env of [PRODUCTION_ENV, {}, { VERCEL: "1" }, { VERCEL_ENV: "production" }, { VERCEL_ENV: "preview" }]) {
+      expect(homeSpecimens({}, env), JSON.stringify(env)).toEqual([]);
+      expect(homeSpecimens({ committed: true }, env), JSON.stringify(env)).toEqual([]);
+      expect(homeSpecimens({ fixtures: true }, env), JSON.stringify(env)).toEqual([]);
+    }
+    expect(homeSpecimens({ committed: true }, { ...FIXTURE_ENV, VERCEL: "1", VERCEL_ENV: "production" })).toEqual([]);
+    expect(renderToStaticMarkup(createElement(SpecimenStrip, { specimens: homeSpecimens({}, PRODUCTION_ENV) }))).toBe("");
+    expect(renderToStaticMarkup(createElement(HomeReaderGuide, { faqOnly: true }))).not.toContain("data-specimen-faq");
+  });
+
+  it("render on a preview deployment, and on the test server only for a request that asks", () => {
+    const ids = (cells: Specimen[]) => cells.map(cell => cell.specimenId);
+    expect(ids(homeSpecimens({}, PREVIEW_ENV))).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+    expect(ids(homeSpecimens({ committed: true }, FIXTURE_ENV))).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+    expect(homeSpecimens({}, FIXTURE_ENV)).toEqual([]);
+    expect(homeSpecimens({ committed: true }, PREVIEW_ENV).every(cell => !cell.synthetic)).toBe(true);
+  });
+
+  it("follow the switch: off renders nowhere, on everywhere, preview on Vercel preview only", () => {
+    for (const env of [PREVIEW_ENV, PRODUCTION_ENV, {}]) {
+      expect(specimenStripLive(env, "off")).toBe(false);
+      expect(specimenStripLive(env, "on")).toBe(true);
+    }
+    // { VERCEL_ENV: "preview" } alone is the unit-test runner (vitest.config.ts), not a deployment.
+    expect([PREVIEW_ENV, PRODUCTION_ENV, {}, { VERCEL: "1" }, { VERCEL_ENV: "preview" }, { VERCEL: "1", VERCEL_ENV: "development" }].map(env => specimenStripLive(env, "preview")))
+      .toEqual([true, false, false, false, false, false]);
+  });
+
+  it("hold their contract rows: source, licence, reader, region, crop and the approved source lines (D-05, D-06)", () => {
+    const [scan, korean] = committed();
+    const row = (r: SpecimenReceipt) => ({
+      slot: r.slot, lang: r.lang, page: r.page, pageCount: r.pageCount, sourcePageUrl: r.sourcePageUrl,
+      licence: [r.rights.licence.id, r.rights.licence.markingScope, r.rights.licence.markingText, r.rights.licence.snapshotSha256],
+      jurisdiction: r.rights.jurisdiction, caption: r.caption, reader: r.reader.imageDigest,
+      region: [r.region.regionId, ...r.region.bbox1000], text: r.extractedText, crop: [r.crop.path, r.crop.width, r.crop.height, ...r.crop.window1000],
+      limits: r.limitationTokens, receipt: r.runReceiptUrl,
+    });
+    expect(row(scan!)).toEqual({
+      slot: "degraded_scan", lang: "en", page: 1, pageCount: 92, sourcePageUrl: "https://ntrs.nasa.gov/citations/19930086148",
+      licence: ["US-GOV-WORK", "item", "Work of the US Gov. Public Use Permitted.", "sha256:9107cd70f084d9f836bfb98221dc6d47e8c969bfb44aa6de08c34a51c38c0eb5"],
+      jurisdiction: "Public domain in the United States; status abroad not separately assessed",
+      caption: {
+        en: { short: "NACA RM L50C03 (1950)", full: "Source: NACA RM L50C03 (1950), NASA Technical Reports Server. U.S. government work." },
+        ko: { short: "NACA RM L50C03(1950)", full: "출처: NACA RM L50C03(1950), NASA 기술보고서 서버(NTRS). 미국 연방정부 저작물." },
+      },
+      reader: QUALIFIED_OCR_IMAGE_DIGESTS[0],
+      region: ["ocr-p0001-l00015", 77, 600, 469, 623], text: "CLASSIFICATIONCANCELLED",
+      crop: ["/proof-collection/specimens/naca-rm-l50c03-p001-960.webp", 960, 384, 19, 551, 600, 730],
+      limits: [], receipt: "/proof-collection/specimens/naca-rm-l50c03-p001.run.json",
+    });
+    expect(row(korean!)).toEqual({
+      slot: "korean", lang: "ko", page: 1, pageCount: 32, sourcePageUrl: "https://www.kma.go.kr/kma/news/press.jsp?bid=press&mode=view&num=1194749",
+      licence: ["KOGL-1", "item", "공공누리 1유형(출처명시) 공공저작물 자유이용허락", "sha256:7b2b75fcf4953f94cf236a18dacca3347669491f4f38b3ce76d48a6156d03fe7"],
+      jurisdiction: "Republic of Korea public work released under KOGL Type 1; status abroad not separately assessed",
+      caption: {
+        en: { short: "KMA press release (2026)", full: "Source: Korea Meteorological Administration, \"September 2026 climate characteristics\" press release (2026), KOGL Type 1." },
+        ko: { short: "기상청 보도자료(2026)", full: "본 저작물은 '기상청'에서 '2026년' 작성하여 공공누리 제1유형으로 개방한 '[2026년 9월 기후특성] 보도자료(작성자: 기상청 기후변화감시과)'를 이용하였으며, 해당 저작물은 '기상청, www.kma.go.kr'에서 무료로 다운받으실 수 있습니다." },
+      },
+      reader: QUALIFIED_OCR_IMAGE_DIGESTS[0],
+      region: ["ocr-p0001-l00004", 370, 187, 640, 212], text: "[2026년9월 기후특성]",
+      crop: ["/proof-collection/specimens/kma-2026-09-climate-p001-960.webp", 960, 384, 90, 152, 906, 383],
+      limits: [], receipt: "/proof-collection/specimens/kma-2026-09-climate-p001.run.json",
+    });
+    // The fixture's 2.5:1 crop, which the phone layout's sheet margin was measured against (SYNTHESIS §7).
+    for (const r of [scan!, korean!]) expect(r.crop.width / r.crop.height).toBe(2.5);
+  });
+
+  it("are bound to the served run receipt, the served extract and the reader's own region, chosen by the rule fixed before the run", () => {
+    for (const receipt of committed()) {
+      const bytes = publicFile(receipt.runReceiptUrl);
+      expect(digest(bytes), receipt.specimenId).toBe(receipt.runReceiptSha256);
+      // One line: git's line-ending conversion has nothing to rewrite, so the digest holds on every checkout.
+      expect(bytes.includes(0x0a), receipt.specimenId).toBe(false);
+      const run = JSON.parse(bytes.toString("utf8")) as {
+        specimenId: string; source: { sha256: string; pages: number }; extract: { path: string; sha256: string };
+        reader: { imageDigest: string }; run: { runAt: string; httpStatus: number; resultStatus: string };
+        regions: { regionId: string; bbox1000: number[]; text: string }[];
+        selection: { regionId: string; draftWindow1000: number[] }; crop: { sha256: string; window1000: number[] }; notClaimed: string[];
+      };
+      expect([run.specimenId, run.source.sha256, run.source.pages, run.extract.sha256, run.reader.imageDigest, run.run.runAt, run.run.httpStatus, run.run.resultStatus, run.crop.sha256, run.crop.window1000])
+        .toEqual([receipt.specimenId, receipt.originalSha256, receipt.pageCount, receipt.extractedPdfSha256, receipt.reader.imageDigest, receipt.runAt, 200, "ok", receipt.crop.sha256, receipt.crop.window1000]);
+      expect(digest(publicFile(run.extract.path)), receipt.specimenId).toBe(receipt.extractedPdfSha256);
+      // The rule: the first region, in the reader's order, that meets the draft recorded on 2026-10-17.
+      const [d0, d1, d2, d3] = run.selection.draftWindow1000 as [number, number, number, number];
+      const first = run.regions.find(({ bbox1000: [a, b, c, e] }) => a! < d2 && d0 < c! && b! < d3 && d1 < e!)!;
+      expect([first.regionId, first.bbox1000, first.text]).toEqual([receipt.region.regionId, receipt.region.bbox1000, receipt.extractedText]);
+      expect(run.selection.regionId).toBe(receipt.region.regionId);
+      expect(run.notClaimed).toContain("any accuracy figure");
+      // A public DTO: no reader confidence, no worker-internal fields.
+      expect(Object.keys(run.regions[0]!).sort()).toEqual(["bbox1000", "pageNumber1", "regionId", "text"]);
+    }
   });
 
   it("each parse as production receipts and name the exact crop bytes under public/", () => {
@@ -78,6 +178,43 @@ describe("the fixture gate", () => {
     expect(rejected.map(entry => entry.reason)).toEqual(
       fixtures().map(() => "representationKind is not page_extract (production)"),
     );
+  });
+});
+
+describe("a production receipt that does not hold is not rendered", () => {
+  const cases: [string, (receipt: SpecimenReceipt & Record<string, unknown>) => void, string][] = [
+    ["a reader image outside the qualified list", r => { r.reader.imageDigest = `sha256:${"1".repeat(64)}`; }, "reader.imageDigest is not a qualified OCR image"],
+    ["a licence the strip may not show", r => { r.rights.licence.id = "KOGL-2"; }, "rights.licence.id is not a licence the strip may show"],
+    ["nothing listed to keep out of the crop", r => { r.avoidInCrop = []; }, "avoidInCrop is empty"],
+    ["a crop window that meets an avoided box", r => { r.avoidInCrop = [{ label: "NACA library stamp", bbox1000: [590, 665, 890, 730] }]; }, "the crop window meets NACA library stamp"],
+    ["an avoided box that is not a box", r => { r.avoidInCrop = [{ label: "emblem", bbox1000: [750, 120, 270, 235] }]; }, "avoidInCrop is not a list of labelled boxes"],
+    ["no Korean source line", r => { delete (r.caption as Partial<SpecimenReceipt["caption"]>).ko; }, "caption.ko is not a short and a full source line"],
+    ["an empty full source line", r => { r.caption.en.full = " "; }, "caption.en is not a short and a full source line"],
+    ["a board-level licence marking", r => { r.rights.licence.markingScope = "board" as never; }, "rights.licence.markingScope is not item, site or site+statute"],
+    ["a run receipt link off the site", r => { r.runReceiptUrl = "//attacker.example/receipt.json"; }, "runReceiptUrl is neither https nor a site path"],
+  ];
+
+  it("accepts both committed receipts as they are", () => {
+    expect(readSpecimens(committed(), "production")).toMatchObject({ rejected: [] });
+    expect(readSpecimens(committed(), "production").specimens).toHaveLength(2);
+  });
+
+  it.each(cases)("%s", (_, edit, reason) => {
+    const [scan, korean] = committed();
+    edit(scan!);
+    expect(specimenProblem(scan, "production")).toBe(reason);
+    const { specimens, rejected } = readSpecimens([scan, korean], "production");
+    expect(rejected).toEqual([{ id: "naca-rm-l50c03-p001", reason }]);
+    expect(specimens.map(cell => cell.specimenId)).toEqual(["kma-2026-09-climate-p001"]);
+  });
+
+  it("refuses a committed crop or run receipt whose bytes moved", () => {
+    const [scan] = committed();
+    const crop = Buffer.from(publicFile(scan!.crop.path));
+    crop[100] ^= 1;
+    expect(cropDigestProblem(scan!, crop)).toMatch(/^crop digest sha256:[0-9a-f]{64} is not the receipt's/);
+    const receipt = Buffer.concat([publicFile(scan!.runReceiptUrl), Buffer.from("\n")]);
+    expect(digest(receipt)).not.toBe(scan!.runReceiptSha256);
   });
 });
 
@@ -189,6 +326,29 @@ describe("the specimen strip", () => {
     expect(markup).not.toContain("<section");
     expect(markup.match(/type="radio"/g)).toHaveLength(3);
     expect(markup.match(/checked=""/g)).toHaveLength(1);
+  });
+
+  it("prints the committed cells' short source line, the approved full line under the toggle, and fetches the first crop first", () => {
+    const real = homeSpecimens({}, PREVIEW_ENV);
+    const en = renderToStaticMarkup(createElement(SpecimenStrip, { specimens: real }));
+    const ko = renderToStaticMarkup(createElement(SpecimenStrip, { specimens: real, korean: true }));
+    expect(en).toContain('data-specimen-source="" data-derived="1">NACA RM L50C03 (1950)</a>');
+    expect(en).toContain('data-specimen-source="" data-derived="1">KMA press release (2026)</a>');
+    expect(ko).toContain('data-specimen-source="" data-derived="1">기상청 보도자료(2026)</a>');
+    // Home contract rule 4: no digit in an alt.
+    for (const alt of [...en.matchAll(/alt="([^"]*)"/g), ...ko.matchAll(/alt="([^"]*)"/g)].map(match => match[1])) expect(alt).not.toMatch(/\d/);
+    expect(en).toContain("Source: Korea Meteorological Administration, &quot;September 2026 climate characteristics&quot; press release (2026), KOGL Type 1.</p>");
+    expect(ko).toContain("본 저작물은 &#x27;기상청&#x27;에서 &#x27;2026년&#x27; 작성하여 공공누리 제1유형으로 개방한");
+    // React hoists a preload for each eager image; only the first crop's is high priority, and the rest load lazily.
+    const tags = en.match(/<(?:link|img)\b[^>]*>/g)!;
+    expect(tags.filter(tag => /fetchpriority="high"/i.test(tag)).map(tag => tag.slice(1, 5) + (tag.includes("naca-rm-l50c03-p001-960") ? " naca" : " other")))
+      .toEqual(["link naca", "img  naca"]);
+    expect(tags.filter(tag => tag.includes("kma-2026-09-climate-p001-960"))).toEqual([expect.stringMatching(/^<img [^>]*loading="lazy"/)]);
+    expect(en).toContain('href="/proof-collection/specimens/naca-rm-l50c03-p001.run.json"');
+    expect(en).not.toMatch(/synthetic fixture|accuracy|정확도/i);
+    const faq = renderToStaticMarkup(createElement(HomeReaderGuide, { faqOnly: true, korean: true, specimenSources: real.map(cell => cell.caption.ko.full) }));
+    expect(faq).toContain("data-specimen-faq");
+    expect(faq).toContain('<p data-derived="1">출처: NACA RM L50C03(1950), NASA 기술보고서 서버(NTRS). 미국 연방정부 저작물.</p>');
   });
 
   it("marks a synthetic fixture as one", () => {

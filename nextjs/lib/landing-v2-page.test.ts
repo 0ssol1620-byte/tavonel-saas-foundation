@@ -103,7 +103,8 @@ describe("Home reading guide integration", () => {
     const text = readable(guide);
     expect(elements(guide, "li")).toHaveLength(0);
     const disclosures = [...guide.matchAll(/<details(?:\s[^>]*)?>([\s\S]*?)<\/details>/g)];
-    expect(disclosures).toHaveLength(3);
+    // P2-32: one more, "where do the pages at the top come from", exactly while the specimen strip renders.
+    expect(disclosures).toHaveLength(main.includes("data-specimen-strip") ? 4 : 3);
     for (const disclosure of disclosures) {
       expect(disclosure[0]).not.toMatch(/<details[^>]*\sopen(?:=|\s|>)/);
       expect(disclosure[1]).toMatch(/^<summary>[\s\S]+<\/summary><p>[\s\S]+<\/p>$/);
@@ -149,6 +150,13 @@ describe("Home reading guide integration", () => {
 
 const render = (locale: LandingV2Locale) =>
   renderToStaticMarkup(createElement(LandingPage, { korean: locale === "ko" }));
+
+/** The page without the specimen strip and its FAQ entry (P2-32), which carry their own receipts and suite. */
+function withoutSpecimens(main: string): string {
+  return main
+    .replace(/<div[^>]*\sdata-specimen-strip=""[\s\S]*?<\/ol><\/div>/, "")
+    .replace(/<details data-specimen-faq=""[\s\S]*?<\/details>/, "");
+}
 
 /** The landing itself: everything the header and footer contribute is another lane's contract. */
 function mainOf(html: string): string {
@@ -319,6 +327,37 @@ function homeCase(): EvidenceCase {
   expect(value, "a case bound to the committed hero page").not.toBeNull();
   return value!;
 }
+
+/*
+  P2-32. Production renders no specimen strip (SPECIMEN_STRIP_ROLLOUT "preview"), so every test in
+  this file reads the production posture. This one renders the preview posture -- the page a
+  Vercel preview serves, and the page every deployment serves once the switch reads "on" -- and
+  holds it to the same composition rules, so that flipping the switch changes no test here.
+*/
+describe("landing v2 -- the composition with the specimen strip rendered", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each(LOCALES)("%s keeps every figure declared, every alt figure-free and the reserved case absent", locale => {
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    const main = mainOf(render(locale));
+    expect([...main.matchAll(/data-specimen-cell="([^"]+)"/g)].map(match => match[1])).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+    expect(undeclaredText(main)).not.toMatch(/\d/);
+    const hero = sceneOf(main, "s1");
+    for (const open of elements(main, "img")) {
+      expect(attr(open, "alt")).toBeDefined();
+      expect(attr(open, "alt")).not.toMatch(/\d/);
+      expect(attr(open, "decoding")).toBe("async");
+      if (!hero.includes(open)) expect(attr(open, "loading")).toBe("lazy");
+    }
+    for (const absent of ["Landsat", "USGS", "NASA", "Cloud = No", "Collection 1"]) expect(readable(withoutSpecimens(main))).not.toContain(absent);
+    const guide = main.slice(main.indexOf("data-home-reader-guide"), main.indexOf('<section id="s6"'));
+    expect([...guide.matchAll(/<details(?:\s[^>]*)?>/g)]).toHaveLength(4);
+    // The strip sits between the hero's actions and the film (D-03), and the film is unchanged below it.
+    expect(hero.indexOf("data-specimen-strip")).toBeGreaterThan(hero.indexOf('data-testid="landing-hero-actions"'));
+    expect(hero.indexOf("data-specimen-strip")).toBeLessThan(hero.indexOf("compile-film"));
+  });
+});
 
 describe("landing v2 -- the composition", () => {
   it.each(LOCALES)(
@@ -540,9 +579,11 @@ describe("landing v2 -- the composition", () => {
         ? "아직 처리, 적격 판정, 권리 허가를 거치지 않았으므로 그 내용은 보여 주지 않습니다."
         : "It has not been processed, qualified or rights-cleared, so nothing from it is shown."
     );
+    // P2-32: a specimen's source line may name NASA's report server (NACA RM L50C03); nothing else on the page may.
     for (const absent of ["Landsat", "USGS", "NASA", "Cloud = No", "Collection 1"]) {
-      expect(readable(main), `the page mentions "${absent}"`).not.toContain(absent);
+      expect(readable(withoutSpecimens(main)), `the page mentions "${absent}"`).not.toContain(absent);
     }
+    for (const absent of ["Landsat", "USGS", "Cloud = No", "Collection 1"]) expect(readable(main)).not.toContain(absent);
   });
 
   /*

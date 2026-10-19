@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { expect, test, type Page, type PlaywrightWorkerArgs } from "@playwright/test";
 import { SPECIMEN_FIXTURE_COOKIE, SPECIMEN_SLOTS, type SpecimenReceipt } from "../lib/specimen-sources";
@@ -15,6 +16,10 @@ import { SPECIMEN_FIXTURE_COOKIE, SPECIMEN_SLOTS, type SpecimenReceipt } from ".
 
   Every scenario sets its own browser and viewport from project 390, the pattern the phone specs
   use: chromium and webkit at 360x780, 390x844, 430x932 (UX §3.3's three phones) and 1440x900.
+
+  P2-32: the committed receipts (lib/specimen-sources.json) render on Vercel previews only
+  (SPECIMEN_STRIP_ROLLOUT "preview"); this server shows them for a request whose cookie says
+  "committed", and the same first-screen acceptance is read against the real crops and text.
 */
 
 const PRODUCTION_SERVER = process.env.SPECIMEN_SERVER === "production";
@@ -23,6 +28,7 @@ const FIXTURES = readdirSync(FIXTURE_DIR)
   .filter(name => name.endsWith(".json"))
   .map(name => JSON.parse(readFileSync(new URL(name, FIXTURE_DIR), "utf8")) as SpecimenReceipt)
   .sort((a, b) => SPECIMEN_SLOTS.indexOf(a.slot) - SPECIMEN_SLOTS.indexOf(b.slot));
+const COMMITTED = JSON.parse(readFileSync(new URL("../lib/specimen-sources.json", import.meta.url), "utf8")) as SpecimenReceipt[];
 const VIEWPORTS = [[360, 780], [390, 844], [430, 932], [1440, 900]] as const;
 const BROWSERS = ["chromium", "webkit"] as const;
 type BrowserName = (typeof BROWSERS)[number];
@@ -41,7 +47,7 @@ async function withPage(
   viewport: { width: number; height: number },
   path: string,
   run: (page: Page) => Promise<void>,
-  options: { reducedMotion?: "reduce" | "no-preference"; initScript?: () => void } = {},
+  options: { reducedMotion?: "reduce" | "no-preference"; initScript?: () => void; cookie?: "1" | "committed" } = {},
 ) {
   const type = playwright[browserName];
   // Chromium launches headless through its shell build, which executablePath() does not name.
@@ -49,7 +55,7 @@ async function withPage(
   const browser = await type.launch();
   try {
     const context = await browser.newContext({ viewport, baseURL, reducedMotion: options.reducedMotion ?? "no-preference" });
-    await context.addCookies([{ name: SPECIMEN_FIXTURE_COOKIE, value: "1", url: baseURL! }]);
+    await context.addCookies([{ name: SPECIMEN_FIXTURE_COOKIE, value: options.cookie ?? "1", url: baseURL! }]);
     const page = await context.newPage();
     if (options.initScript) await page.addInitScript(options.initScript);
     await page.goto(path);
@@ -84,6 +90,9 @@ function measure(page: Page) {
         region: box(crop.querySelector("[data-specimen-region]")!),
         window: crop.dataset.cropWindow!.split(",").map(Number),
         source: box(crop.querySelector("figcaption")!),
+        sourceText: crop.querySelector("[data-specimen-source]")!.textContent,
+        fetchPriority: crop.querySelector("img")!.getAttribute("fetchpriority"),
+        loaded: (crop.querySelector("img") as HTMLImageElement).naturalWidth,
         // Lines, not the box: a phone link is a 44px touch target however many lines it holds.
         sourceLines: (() => {
           // The text's own line boxes: a range over the whole caption would add the link's box.
@@ -275,6 +284,111 @@ for (const browserName of BROWSERS) {
   }
 }
 
+for (const browserName of BROWSERS) {
+  for (const [width, height] of VIEWPORTS) {
+    for (const path of ["/", "/ko"]) {
+      test(`${browserName} ${width}x${height} ${path}: the committed crops and the reader's text hold the first screen`, async ({ playwright, baseURL }, testInfo) => {
+        fixturesOnly();
+        test.skip(testInfo.project.name !== "390", "sets its own browser and viewport");
+        await withPage({ playwright, baseURL }, browserName, { width, height }, path, async page => {
+          const lang = path === "/ko" ? "ko" : "en";
+          const cells = await measure(page);
+          expect(cells.map(cell => cell.id)).toEqual(COMMITTED.map(receipt => receipt.specimenId));
+          for (const [index, cell] of cells.entries()) {
+            const receipt = COMMITTED[index]!;
+            expect([cell.text, cell.lang, cell.sourceText, cell.window], cell.id).toEqual([receipt.extractedText, receipt.lang, receipt.caption[lang].short, [...receipt.crop.window1000]]);
+            // The first crop is fetched first (SYNTHESIS §7, LCP); the rest wait.
+            expect(cell.fetchPriority, cell.id).toBe(index === 0 ? "high" : null);
+          }
+          const visible = cells.filter(cell => cell.visible);
+          expect(visible.map(cell => cell.id)).toEqual(width >= 1024 ? COMMITTED.map(r => r.specimenId) : [COMMITTED[0]!.specimenId]);
+          for (const cell of visible) {
+            const receipt = COMMITTED.find(r => r.specimenId === cell.id)!;
+            expect(cell.fontSize, `${cell.id} reads at 15px or more (UX §3.1-1)`).toBeGreaterThanOrEqual(15);
+            // The 2.5:1 crop the layout was measured against, and the reader's region inside its window.
+            expect(Math.abs(cell.image.width / cell.image.height - 2.5)).toBeLessThanOrEqual(0.02);
+            const [x0, y0, x1, y1] = receipt.crop.window1000;
+            const [r0, s0, r1, s1] = receipt.region.bbox1000;
+            expect(Math.abs(cell.region.left - (cell.image.left + ((r0 - x0) / (x1 - x0)) * cell.image.width))).toBeLessThanOrEqual(1);
+            expect(Math.abs(cell.region.top - (cell.image.top + ((s0 - y0) / (y1 - y0)) * cell.image.height))).toBeLessThanOrEqual(1);
+            expect(Math.abs(cell.region.right - (cell.image.left + ((r1 - x0) / (x1 - x0)) * cell.image.width))).toBeLessThanOrEqual(1);
+            expect(Math.abs(cell.region.bottom - (cell.image.top + ((s1 - y0) / (y1 - y0)) * cell.image.height))).toBeLessThanOrEqual(1);
+            // SYNTHESIS §7: WebKit on the Windows QA machine does not load same-origin images, so the bytes are read on chromium.
+            if (browserName === "chromium") expect(cell.loaded, `${cell.id} crop decoded`).toBe(receipt.crop.width);
+            expect(cell.sourceLines, `${cell.id}: the short source line is one line (D-06)`).toBe(1);
+          }
+          const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+          expect(overflow, "no horizontal overflow").toBeLessThanOrEqual(0);
+
+          const [first] = visible;
+          if (width >= 1024) {
+            for (const cell of visible) {
+              expect(cell.image.bottom, `${cell.id} crop above the fold`).toBeLessThanOrEqual(height);
+              expect(cell.firstLine.bottom, `${cell.id} reader text above the fold`).toBeLessThanOrEqual(height);
+            }
+            return;
+          }
+          const cta = await page.locator('[data-testid="landing-hero-actions"] a').first().boundingBox();
+          const sheet = await sheetTop(page);
+          expect(sheet, "the sheet opens in its zone").toBeGreaterThanOrEqual(height - SHEET_ZONE);
+          testInfo.annotations.push({ type: "committed-geometry", description: JSON.stringify({ browserName, width, path, sheet, cta: cta!.y + cta!.height, crop: first!.image, source: first!.source, firstLine: first!.firstLine, sheetMargin: sheet - first!.firstLine.bottom }) });
+          expect(cta!.y + cta!.height, "the primary action is above the sheet (UX §3.3)").toBeLessThanOrEqual(sheet);
+          if (width === 360) {
+            expect(first!.image.top + 96, "96px of the crop above the sheet").toBeLessThanOrEqual(sheet);
+          } else {
+            expect(first!.image.bottom, "the crop is above the sheet").toBeLessThanOrEqual(sheet);
+            expect(first!.source.bottom, "the source line is above the sheet").toBeLessThanOrEqual(sheet);
+            // The fixture layout left 13.8px here on WebKit 390 EN (SYNTHESIS §7); the real cell may not leave less.
+            expect(sheet - first!.firstLine.bottom, "the reader's first line clears the sheet by the fixture's margin").toBeGreaterThanOrEqual(13.8);
+          }
+        }, { cookie: "committed" });
+      });
+    }
+  }
+
+  test(`${browserName} 390: the committed cells' "Show full text" opens the approved full source line`, async ({ playwright, baseURL }, testInfo) => {
+    fixturesOnly();
+    test.skip(testInfo.project.name !== "390", "sets its own browser and viewport");
+    for (const [path, lang] of [["/", "en"], ["/ko", "ko"]] as const) {
+      await withPage({ playwright, baseURL }, browserName, { width: 390, height: 844 }, path, async page => {
+        await page.locator("[data-specimen-strip] label").nth(1).click();
+        const cell = page.locator(`[data-specimen-cell="${COMMITTED[1]!.specimenId}"]`);
+        const full = cell.locator("[data-specimen-licence]");
+        await expect(full).toBeHidden();
+        await cell.locator("summary").click();
+        await expect(full).toBeVisible();
+        await expect(full).toHaveText(COMMITTED[1]!.caption[lang].full);
+        await expect(cell.locator("[data-specimen-source]")).toHaveAttribute("href", COMMITTED[1]!.sourcePageUrl);
+      }, { cookie: "committed" });
+    }
+  });
+}
+
+test("the committed cells' run receipts, extracts and crops are served byte for byte", async ({ request }, testInfo) => {
+  test.skip(testInfo.project.name !== "390", "one request is enough");
+  const digest = (bytes: Buffer) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+  for (const receipt of COMMITTED) {
+    const run = await request.get(receipt.runReceiptUrl);
+    expect(run.status(), receipt.runReceiptUrl).toBe(200);
+    const runBytes = await run.body();
+    expect(digest(runBytes)).toBe(receipt.runReceiptSha256);
+    const extract = await request.get((JSON.parse(runBytes.toString("utf8")) as { extract: { path: string } }).extract.path);
+    expect(digest(await extract.body())).toBe(receipt.extractedPdfSha256);
+    expect(digest(await (await request.get(receipt.crop.path)).body())).toBe(receipt.crop.sha256);
+  }
+});
+
+test("the test server renders the committed cells for a request that asks, with no script needed to read them", async ({ request }, testInfo) => {
+  fixturesOnly();
+  test.skip(testInfo.project.name !== "390", "one request is enough");
+  for (const path of ["/", "/ko"]) {
+    const html = await (await request.get(path, { headers: { cookie: `${SPECIMEN_FIXTURE_COOKIE}=committed` } })).text();
+    expect([...html.matchAll(/data-specimen-cell="([^"]+)"/g)].map(match => match[1]), path).toEqual(COMMITTED.map(r => r.specimenId));
+    expect(html).not.toContain(path === "/" ? "synthetic fixture" : "합성 픽스처");
+    expect(html).toContain("data-specimen-faq");
+  }
+});
+
 test("the server renders the fixture cells for a request that asks, with no script needed to read them", async ({ request }, testInfo) => {
   fixturesOnly();
   test.skip(testInfo.project.name !== "390", "one request is enough");
@@ -286,10 +400,11 @@ test("the server renders the fixture cells for a request that asks, with no scri
 });
 
 /*
-  The no-receipt half of the acceptance: with no committed receipt, Home renders no cell -- on the
-  fixture server for a request that does not ask, and on a production server for one that does.
+  The production half of the acceptance: a request that asks for nothing gets no cell on the test
+  server (it is not a Vercel preview, so the "preview" switch is off there), and a production
+  server renders none whatever the request asks.
 */
-test("with no committed receipt, Home renders no specimen cell to a request that does not ask for fixtures", async ({ request }, testInfo) => {
+test("with the rollout switch off here, Home renders no specimen cell to a request that does not ask", async ({ request }, testInfo) => {
   test.skip(testInfo.project.name !== "390", "one request is enough");
   for (const path of ["/", "/ko"]) {
     const response = await request.get(path);
@@ -302,8 +417,10 @@ test("a production server ignores the fixture cookie and renders no specimen cel
   test.skip(!PRODUCTION_SERVER, "needs a server started without PLAYWRIGHT_LOCAL_HTTP; run with SPECIMEN_SERVER=production");
   test.skip(testInfo.project.name !== "390", "one request is enough");
   for (const path of ["/", "/ko"]) {
-    const response = await request.get(path, { headers: { cookie: `${SPECIMEN_FIXTURE_COOKIE}=1` } });
-    expect(response.status()).toBe(200);
-    expect(await response.text(), path).not.toContain("data-specimen-");
+    for (const value of ["1", "committed"]) {
+      const response = await request.get(path, { headers: { cookie: `${SPECIMEN_FIXTURE_COOKIE}=${value}` } });
+      expect(response.status()).toBe(200);
+      expect(await response.text(), `${path} ${value}`).not.toContain("data-specimen-");
+    }
   }
 });
