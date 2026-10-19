@@ -3,8 +3,9 @@ import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { GET as openApiRoute } from "@/app/api/openapi/route";
 import { intakePricingFingerprint, quoteIntakeManifest } from "./usage-pricing";
-// The 39-operation surface below is the whole-set approval lineage's. With the switch off (production) the
-// route publishes main's 33 operations, pinned by lib/openapi-routes.switch-off.test.ts (review 3, CI-TI-1).
+// The 40-operation surface below is the whole-set approval lineage's 39 plus POST /developer/keys (G1,
+// SERVICE-DEFINITION 2026-10-17 section 2.4 C5). With the switch off (production) the route publishes 35:
+// main's 33, the per-file /uploads/confirm and key creation (review 3, CI-TI-1; G1, section 2.2 A14).
 vi.mock("@/lib/intake-approval-rollout", () => ({ INTAKE_APPROVAL_ROLLOUT_ENABLED: true }));
 
 /*
@@ -54,7 +55,7 @@ const EXPECTED_OPERATION_IDS = [
   "askActiveWorld", "streamRunEvents", "recordEvidenceReview", "searchActiveWorld", "getWorldReadModel",
   "getWorldLens", "getManifestStatus", "listConnections", "createConnection", "revokeConnection",
   "applyConnectionBatch", "listOAuthConnectors", "startOAuthConnectorAuthorization", "revokeOAuthConnector",
-  "rotateDeveloperApiKey", "listDeveloperAuditEvents",
+  "createDeveloperApiKey", "rotateDeveloperApiKey", "listDeveloperAuditEvents",
 ].sort();
 const APPROVED_UPLOAD_OPERATIONS = [
   ["quoteApprovedUploadSet", "post", "/uploads/quote"],
@@ -113,10 +114,10 @@ describe("the published OpenAPI document", () => {
     for (const entry of compile) expect(entry.server, entry.path).toMatch(/\/api$/);
   });
 
-  it("publishes the exact 39-operation surface, including all six approved-upload operations", async () => {
+  it("publishes the exact 40-operation surface, including all six approved-upload operations", async () => {
     const spec = await document();
     const actual = operations(spec);
-    expect(actual).toHaveLength(39);
+    expect(actual).toHaveLength(40);
     expect(actual.map(({ operation }) => operation.operationId).sort()).toEqual(EXPECTED_OPERATION_IDS);
     for (const [operationId, method, path] of APPROVED_UPLOAD_OPERATIONS) {
       const entry = actual.find((candidate) => candidate.operation.operationId === operationId);

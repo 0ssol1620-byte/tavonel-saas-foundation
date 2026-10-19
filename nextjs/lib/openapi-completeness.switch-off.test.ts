@@ -42,7 +42,9 @@ describe("OpenAPI completeness", () => {
   it("gives every operation an id, a summary, a known tag and a description", async () => {
     const { spec, list } = await operations();
     const tagNames = new Set(spec.tags.map((tag) => tag.name));
-    expect(list.length).toBe(33);
+    // 35, not main's 33: G1 (SERVICE-DEFINITION 2026-10-17 section 2.2 A14, section 2.4 C5) publishes the
+    // per-file /uploads/confirm the route serves with the switch off, and POST /developer/keys.
+    expect(list.length).toBe(35);
     for (const { path, method, operation } of list) {
       const where = `${method.toUpperCase()} ${path}`;
       expect(operation.operationId, where).toBeTruthy();

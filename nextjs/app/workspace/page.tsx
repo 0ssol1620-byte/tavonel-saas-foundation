@@ -48,7 +48,7 @@ import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "@/lib/intake-approval-rollout";
 import { collectDroppedWorkspaceFiles, prepareWorkspaceSelection, type WorkspaceSelection, type WorkspaceUploadFile } from "@/lib/workspace-intake";
 import { qualifiedDocumentInputs, sourceFamilyChips, uploadAcceptAttribute, validateQualifiedDocumentInput, normalizeDocumentMimeType } from "@/lib/qualified-input";
 import { runBounded } from "@/lib/concurrent";
-import { buildPipeline, type LocalUpload } from "@/lib/pipeline";
+import { buildPipeline, type DocumentListPartial, type LocalUpload } from "@/lib/pipeline";
 import { clearSourceVersionUnavailable, filterPollableSourceVersions, isCurrentSourceObservation, markSourceVersionUnavailable, matchesSanitizedSourceDigest, pruneUnavailableSourceVersions, qualifyProgress, qualifySourceVersionDescriptor, type OcrProgress, type VerifiedSourceObservation } from "@/lib/ocr-progress";
 import PipelineBoard from "@/components/pipeline-board";
 import CompileStage from "@/components/compile-stage";
@@ -396,6 +396,7 @@ export default function WorkspacePage() {
   const [dropActive, setDropActive] = useState(false);
   const [documents, setDocuments] = useState<DocumentListItem[] | null>(null);
   const [documentInventoryState, setDocumentInventoryState] = useState<"loading" | "ready" | "unavailable">("loading");
+  const [documentInventoryPartial, setDocumentInventoryPartial] = useState<DocumentListPartial | null>(null);
   const [workspaceStartupReady, setWorkspaceStartupReady] = useState(false);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   useEffect(() => {
@@ -763,9 +764,10 @@ export default function WorkspacePage() {
         setDocumentInventoryState("unavailable");
         return [];
       }
-      const json = (await response.json()) as { documents?: DocumentListItem[] };
+      const json = (await response.json()) as { documents?: DocumentListItem[]; partial?: DocumentListPartial };
       const next = json.documents ?? [];
       setDocuments(next);
+      setDocumentInventoryPartial(json.partial ?? null);
       setSelectedDocumentIds((current) => current.filter((documentId) =>
         next.some((item) => item.documentId === documentId && item.hasOcrJson),
       ));
@@ -2722,6 +2724,8 @@ export default function WorkspacePage() {
   const workspaceStateInput: WorkspaceStateInput = {
     customerDataAccess,
     inventoryState: documentInventoryState,
+    // A marker from an earlier load says nothing once the inventory is unavailable again.
+    inventoryPartial: documentInventoryState === "ready" ? documentInventoryPartial : null,
     documentCount,
     readyDocumentCount,
     operatorReviewCount,
