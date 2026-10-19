@@ -116,3 +116,7 @@ nextjs/public/policy/processing-terms-2026-09-30.json text eol=lf
 # The public claims pack, copied byte-for-byte from the evidence repository. lib/home-measures.test.ts
 # pins its sha256; like the research receipts it is evidence, so git rewrites it in neither direction.
 nextjs/content/evidence/*.json -text
+
+# The guide recordings, their posters and captions (lane EN-2-3), served byte-for-byte from /guide/ and
+# pinned by sha256 in public/guide/manifest.json, which lib/guide-content.test.ts rehashes.
+nextjs/public/guide/** -text

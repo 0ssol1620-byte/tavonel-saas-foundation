@@ -512,7 +512,10 @@ describe("public surface: the Korean subtree", () => {
   const koreanPages = pages.filter((page) => page.route === "/ko" || page.route.startsWith("/ko/"));
 
   it("includes the Korean entry and its inquiry destination", () => {
-    expect(koreanPages.map((page) => page.route).sort()).toEqual(["/ko", "/ko/contact", "/ko/evaluation", "/ko/pricing"]);
+    expect(koreanPages.map((page) => page.route).sort()).toEqual(["/ko", "/ko/contact", "/ko/evaluation", "/ko/guide", "/ko/pricing"]);
+    // EN-1: the product guide's Korean edition, indexable like the other four.
+    expect(sitemapPaths).toContain("/ko/guide");
+    expect(isNoindex("/ko/guide")).toBe(false);
     expect(sitemapPaths).toContain("/ko");
     expect(sitemapPaths).toContain("/ko/contact");
     expect(sitemapPaths).toContain("/evaluation");
@@ -661,8 +664,18 @@ describe("public surface: the draft cookbooks", () => {
     for (const path of ["/cookbooks", ...cookbookPaths]) expect(isRealRoute(path), path).toBe(true);
   });
 
-  it("keeps the index out of search while every record it lists is a draft", () => {
-    expect(isNoindex("/cookbooks"), "a hub of six drafts is not a page to advertise").toBe(true);
+  /*
+    EN-0 (ENABLEMENT-GAP 4.0 item 1). The index is advertised; the six records are not.
+
+    The hub was noindex because every entry is a draft, which left it reachable from nowhere a
+    reader looks -- the user manual this release prepares links it, and a manual cannot send a
+    reader to a page the site itself hides. The index states on its own first screen that every
+    guide is published ahead of a recorded run, so advertising it publishes that sentence and the
+    six titles, not a result. Each record keeps its own noindex until it is approved.
+  */
+  it("advertises the index, which says on its face that every guide is ahead of a recorded run", () => {
+    expect(isNoindex("/cookbooks"), "the index is linked from Resources and the docs hub, so it may not opt out of search").toBe(false);
+    expect(sitemapPaths).toContain("/cookbooks");
     expect(heads.get("/cookbooks")?.alternates?.canonical).toBe("/cookbooks");
   });
 
@@ -677,9 +690,9 @@ describe("public surface: the draft cookbooks", () => {
   it("advertises none of them while every record is a draft", () => {
     const drafts = COOKBOOKS.filter((record) => record.publication === "draft").map((record) => `/cookbooks/${record.slug}`);
     expect(drafts).toEqual(cookbookPaths);
-    // Both routes: the six records and the index that lists them.
-    expect(sitemapPaths.filter((path) => path.startsWith("/cookbooks"))).toEqual([]);
-    expect(llmsPaths.filter((path) => path.startsWith("/cookbooks"))).toEqual([]);
+    // The six records only; the index above is advertised on purpose.
+    expect(sitemapPaths.filter((path) => path.startsWith("/cookbooks/"))).toEqual([]);
+    expect(llmsPaths.filter((path) => path.startsWith("/cookbooks/"))).toEqual([]);
   });
 
 });
@@ -699,7 +712,7 @@ describe("public surface: the draft cookbooks", () => {
   which is what makes it true of the six draft cookbooks as well.
 */
 describe("hreflang is declared only where a counterpart exists", () => {
-  const PAIRED = ["app/contact/page.tsx", "app/ko/contact/page.tsx", "app/ko/page.tsx", "app/page.tsx", "app/pricing/page.tsx", "app/ko/pricing/page.tsx", "app/evaluation/page.tsx", "app/ko/evaluation/page.tsx"];
+  const PAIRED = ["app/contact/page.tsx", "app/ko/contact/page.tsx", "app/ko/page.tsx", "app/page.tsx", "app/pricing/page.tsx", "app/ko/pricing/page.tsx", "app/evaluation/page.tsx", "app/ko/evaluation/page.tsx", "app/guide/page.tsx", "app/ko/guide/page.tsx"];
   const relativeFile = (file: string) => relative(resolve(import.meta.dirname, ".."), file).split(sep).join("/");
 
   it("is not on the root layout, where every page would inherit it", () => {
@@ -709,7 +722,7 @@ describe("hreflang is declared only where a counterpart exists", () => {
       .not.toMatch(/^\s*languages:/m);
   });
 
-  it("is declared only by the four complete English/Korean page pairs", () => {
+  it("is declared only by the complete English/Korean page pairs", () => {
     const declaring = pages
       .filter((page) => /languages:/.test(readFileSync(page.file, "utf8")))
       .map((page) => relativeFile(page.file))
@@ -717,8 +730,8 @@ describe("hreflang is declared only where a counterpart exists", () => {
     expect(declaring).toEqual([...PAIRED].sort());
     for (const file of PAIRED) {
       const source = readFileSync(resolve(import.meta.dirname, "..", file), "utf8");
-      const korean = file.includes("contact") ? "/ko/contact" : file.includes("pricing") ? "/ko/pricing" : file.includes("evaluation") ? "/ko/evaluation" : "/ko";
-      const english = file.includes("contact") ? "/contact" : file.includes("pricing") ? "/pricing" : file.includes("evaluation") ? "/evaluation" : "/";
+      const korean = file.includes("contact") ? "/ko/contact" : file.includes("pricing") ? "/ko/pricing" : file.includes("evaluation") ? "/ko/evaluation" : file.includes("guide") ? "/ko/guide" : "/ko";
+      const english = file.includes("contact") ? "/contact" : file.includes("pricing") ? "/pricing" : file.includes("evaluation") ? "/evaluation" : file.includes("guide") ? "/guide" : "/";
       expect(source, `${file} must name its Korean counterpart`).toContain(`ko: "${korean}"`);
       expect(source, `${file} must name its English counterpart`).toContain(`en: "${english}"`);
       expect(source, `${file} must name a default`).toContain(`"x-default": "${english}"`);

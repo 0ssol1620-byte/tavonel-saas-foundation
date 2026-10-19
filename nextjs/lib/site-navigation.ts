@@ -60,7 +60,7 @@ export const HEADER_NAV: readonly SiteLink[] = CUSTOMER_NAV.filter((link) => lin
   header marks `aria-current="page"` only on the item's own URL.
 */
 const NAV_ALSO_OWNS: Readonly<Record<string, readonly string[]>> = {
-  "/resources": ["/research", "/evidence", "/reproducibility", "/benchmarks", "/changelog"],
+  "/resources": ["/research", "/evidence", "/reproducibility", "/benchmarks", "/changelog", "/guide"],
 };
 
 export function customerNavCurrent(href: string, pathname: string): "page" | "location" | undefined {
@@ -177,6 +177,7 @@ export const KO_CHROME = {
   */
   footerLinks: {
     "/product": "제품",
+    "/guide": "제품 가이드",
     "/solutions": "솔루션",
     "/integrations": "연동",
     "/sources": "지원 파일",
@@ -361,9 +362,31 @@ export const RESOURCE_LINKS: readonly ResourceLink[] = [
     column: "learn",
   },
   { href: "/knowledge-compiler", label: "Knowledge Compiler guide", purposes: ["learn"], workflows: [], column: "learn" },
+  /*
+    EN-1: the product guide, EN and KO. Every chapter ends at the screen where the open product
+    stops, so it is an "evaluate" entry as much as a "learn" one.
+  */
+  {
+    href: "/guide",
+    label: "Product guide",
+    purposes: ["evaluate", "learn"],
+    workflows: ["compile-and-review", "use-elsewhere"],
+    column: "learn",
+  },
   {
     href: "/docs",
     label: "Documentation",
+    purposes: ["build"],
+    workflows: ["compile-and-review", "use-elsewhere", "handle-a-revision"],
+  },
+  /*
+    EN-0: the six task guides, as one entry for their index. A draft record is never linked from
+    here (`lib/resources-hub.test.ts`); the index says on its face that each guide is published
+    ahead of a recorded run. Hub-only, like Documentation beside it.
+  */
+  {
+    href: "/cookbooks",
+    label: "Cookbooks",
     purposes: ["build"],
     workflows: ["compile-and-review", "use-elsewhere", "handle-a-revision"],
   },
@@ -445,6 +468,14 @@ export const FOOTER_GROUPS: readonly { title: string; links: readonly SiteLink[]
     title: "Developers",
     links: [
       { href: "/docs", label: "Docs" },
+      /*
+        EN-1: how to use what is open today, screen by screen. /ko pages link /ko/guide. Here rather
+        than under Product: the phone footer is two columns, and Product is already its tallest
+        group, so one more link there added a 44px row and took the footer past its height bar
+        (public-layout-balance.spec, 940 px against 928 at 390). Developers sits beside Trust, which
+        has five links, so a fifth here adds no row.
+      */
+      { href: "/guide", label: "Product guide" },
       { href: "/api", label: "API" },
       { href: "/developers", label: "MCP and agents" },
       { href: "/changelog", label: "Changelog" },
@@ -675,8 +706,14 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     columns: [
       // An approved execution guide belongs in this column. `/cookbooks` is a draft route in
       // another lane and a draft is not advertised, so nothing links to it from here yet.
-      { title: "Learn and do", items: resourceColumn("learn") },
-      { title: "Verify and compare", items: resourceColumn("verify") },
+      /*
+        PURE: no component renders NAV_GROUPS, so the minifier drops it from the client bundle, but
+        it kept these two calls as possible side effects, and with them all of RESOURCE_LINKS
+        (purposes, workflows) on every page: about 280 gzipped script bytes. EN-1 measured it
+        when the guide's nav entries took /docs/quickstart past the 200,000-byte script ratchet.
+      */
+      { title: "Learn and do", items: /*#__PURE__*/ resourceColumn("learn") },
+      { title: "Verify and compare", items: /*#__PURE__*/ resourceColumn("verify") },
     ],
     featured: { href: "/resources", label: "All resources" },
   },
@@ -712,6 +749,7 @@ const SECTION_BY_PATH: Readonly<Record<string, NavSection>> = {
   "/api": "developers",
   "/resources": "resources",
   "/explore": "resources",
+  "/guide": "resources",
   "/knowledge-compiler": "resources",
   "/benchmarks": "resources",
   "/benchmarks/gdp-pdf": "resources",

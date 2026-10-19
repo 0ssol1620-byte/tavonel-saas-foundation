@@ -26,6 +26,7 @@ Indexing: public product, documentation, research and trust pages are indexable.
 - [Developers](https://tavonel.com/developers): API, MCP, retrieval packages and signed exports.
 - [Documentation](https://tavonel.com/docs): Product and developer documentation. Every section is listed under Documentation below.
 - [API reference](https://tavonel.com/api): The HTTP interface — its operations, parameters and error codes. The machine-readable specification it is rendered from is served at /openapi.json.
+- [Cookbooks](https://tavonel.com/cookbooks): Task guides that take one piece of work through the product, each published ahead of a recorded run. The guides themselves are drafts and are not listed here.
 - [Changelog](https://tavonel.com/changelog): What changed in the product and the public interfaces. The same entries are served as an Atom feed at /changelog/feed.xml.
 - [Pricing](https://tavonel.com/pricing): Free Evaluation, Developer, Team and Enterprise access.
 - [Sources](https://tavonel.com/sources): The capability manifest this deployment reads — every accepted format, its support tier, what survives into the Compiled World, and what does not.

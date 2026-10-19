@@ -1,0 +1,13 @@
+/* The guide's additions to the docs reading surface. Everything else is the docs classes. */
+
+/* Chapters are long; a rule between them says where one ends without a kicker over each. */
+.chapter { min-width: 0; }
+.chapter + .chapter { padding-top: 28px; border-top: 1px solid var(--hairline); }
+
+/* Where the chapter happens in the product: a label, then the links, wrapping on a phone. */
+.where { display: flex; flex-wrap: wrap; align-items: center; column-gap: 16px; row-gap: 4px; margin: 0; }
+.where > span { color: var(--text-mid); }
+.where a { overflow-wrap: anywhere; }
+@media (pointer: coarse), (max-width: 1079px) {
+  .where a { min-height: 44px; display: inline-flex; align-items: center; }
+}

@@ -4486,9 +4486,11 @@ test('affected recipe continuation admission: planBrowserRuns runs the continuat
   assert.equal((runner.match(/recipe-continuation/g)??[]).length,1);assert.equal((runner.match(/login-capability/g)??[]).length,1);
 });
 test('affected recipe continuation admission: the bracketed cookbook route is literal and non-owned lookalikes, spellings and rename endpoints refuse', () => {
+  // The cookbooks index is the enablement owner's (EN-0a), never recipe continuation's: it left the lookalike list below.
+  assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test('nextjs/app/cookbooks/page.tsx')).map(o=>o.group),['enablement-20261017']);
   // [slug] is a literal segment: an unescaped class would admit s, l, u or g, and an unescaped '.' would admit any character.
   for (const path of ['nextjs/app/cookbooks/s/page.tsx','nextjs/app/cookbooks/g/page.tsx','nextjs/app/cookbooks/[id]/page.tsx','nextjs/app/cookbooks/[slug]/layout.tsx','nextjs/app/cookbooks/[slug]/page.ts',
-    'nextjs/app/cookbooks/[slug]/pageXtsx','nextjs/app/cookbooks/page.tsx','nextjs/app/cookbooks/[slug]/nested/page.tsx','nextjs/app/login/page.test.tsx','nextjs/app/login/layout.tsx','nextjs/app/Login/page.tsx',
+    'nextjs/app/cookbooks/[slug]/pageXtsx','nextjs/app/cookbooks/[slug]/nested/page.tsx','nextjs/app/login/page.test.tsx','nextjs/app/login/layout.tsx','nextjs/app/Login/page.tsx',
     'nextjs/app/auth/callback/route.ts','nextjs/app/auth/page.tsx','nextjs/components/recipe-preflight.test.tsx','nextjs/components/recipe-preflight.module.css','nextjs/lib/recipe-intent.tsx',
     'nextjs/lib/recipe-intent.spec.ts','nextjs/lib/recipe-intents.ts','nextjs/lib/checkout-intent.ts','nextjs/lib/checkout-intent.test.ts','nextjs/lib/funnel-events.test.ts','nextjs/lib/seo-surface.test.ts',
     'nextjs/e2e/login-capability.spec.ts','nextjs/e2e/recipe-continuation.spec.tsx','nextjs/e2e/recipe-continuation-extra.spec.ts','app/login/page.tsx','nextjs/nextjs/app/login/page.tsx']) {
@@ -7481,4 +7483,31 @@ test('OCR v3 admission owns exactly the seven newly encountered endpoints and se
   }
   const oldOwner = AFFECTED_GROUPS.filter(owner => owner.match.test('nextjs/lib/collection-compile-run.ts'));
   assert.deepEqual(oldOwner.map(owner => owner.group), ['compile-source-observations']);
+});
+
+test('affected enablement owner: fifty-three exact paths select twenty direct suites and no browser suite; neighbours stay unmapped', async () => {
+  const { ENABLEMENT_AFFECTED_PATHS: paths, ENABLEMENT_AFFECTED_UNIT_FILES: units } = await import('./repair-scope.mjs');
+  const suites = ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/changelog.test.ts', 'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/design-tokens.test.ts', 'lib/developer-snippets.test.ts', 'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/guide-content.test.ts', 'lib/keyless-read.test.ts', 'lib/keyless-try-it.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/product-claims-sync.test.ts', 'lib/resources-hub.test.ts', 'lib/seo-surface.test.ts', 'lib/site-nav-model.test.ts', 'lib/trust-page-answers.test.ts'];
+  assert.equal(paths.length, 53);
+  assert.deepEqual([...units], suites);
+  assert.deepEqual(paths.filter(path => path.startsWith('public/guide/')).length, 25);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['enablement-20261017'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['enablement-20261017'], [], suites, [], []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false], path);
+  }
+  const plan = affectedAskPlan(affectedMap(paths.map(path => affectedRecord('M', ['nextjs/' + path]))));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
+  for (const adjacent of ['nextjs/app/guide/layout.tsx', 'nextjs/components/guide/guide-media.test.tsx', 'nextjs/lib/changelog.tsx',
+    'nextjs/lib/keyless-read-v2.ts', 'nextjs/public/guide/guide-4-new-desktop.mp4', 'nextjs/public/guide/README.md',
+    'nextjs/app/benchmarks/[slug]/page.tsx', 'lib/guide-content.ts', 'nextjs/public/guide/manifest.json.bak']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+  // The docs and marketing paths this batch also changed keep their existing owners.
+  for (const [path, owner] of [['nextjs/app/docs/[section]/page.tsx', 'docs'], ['nextjs/app/sitemap.ts', 'public-marketing-surface']]) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), [owner], path);
+  }
 });

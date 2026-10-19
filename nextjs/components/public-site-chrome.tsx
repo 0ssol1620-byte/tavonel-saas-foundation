@@ -117,6 +117,9 @@ export function PublicSiteHeader({
  * `.nav > nav` child selectors two sheets rely on), which is what puts the wordmark on the same
  * left edge as the content below it.
  */
+/* The footer destinations that have a /ko page of their own; every other link says it is English. EN-1 added /guide. */
+const KO_FOOTER_PAGES = new Set(["/contact", "/pricing", "/guide"]);
+
 export function PublicSiteFooter({ korean = false, onePath = false, languageHref }: { korean?: boolean; onePath?: boolean; languageHref?: string } = {}) {
   /* chrome-06: the switch points at the language the reader is not reading. */
   const language = korean ? FOOTER_LEGAL_ROW.languageBack : FOOTER_LEGAL_ROW.language;
@@ -132,7 +135,7 @@ export function PublicSiteFooter({ korean = false, onePath = false, languageHref
               <p className="site-footer-title">{korean ? KO_CHROME.footerGroups[group.title] ?? group.title : group.title}</p>
               {/* T1-014: the footer is always below the fold; prefetching every group wasted ~185KB on a cold home load. */}
               {group.links.map((link) => (
-                <Link key={link.href} href={(korean && (link.href === "/contact" || link.href === "/pricing") ? `/ko${link.href}` : link.href) as Route} hrefLang={korean && link.href !== "/contact" && link.href !== "/pricing" ? "en" : undefined} prefetch={false}>{korean ? KO_CHROME.footerLinks[link.href] ?? link.label : link.label}</Link>
+                <Link key={link.href} href={(korean && KO_FOOTER_PAGES.has(link.href) ? `/ko${link.href}` : link.href) as Route} hrefLang={korean && !KO_FOOTER_PAGES.has(link.href) ? "en" : undefined} prefetch={false}>{korean ? KO_CHROME.footerLinks[link.href] ?? link.label : link.label}</Link>
               ))}
             </nav>
           ))}
