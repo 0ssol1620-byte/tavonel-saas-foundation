@@ -54,7 +54,25 @@
 .status code[data-kind="ok"] { color: var(--text-hi); }
 .status code[data-kind="error"] { color: var(--text-hi); text-decoration: underline; text-underline-offset: 3px; }
 
-.digest { overflow-wrap: anywhere; }
+/*
+  EN-4. The digest outcome is a sentence, so it is read rather than decoded from a colour. A
+  mismatch is the one that must stop a reader: it gets the failure token as a rule around it and
+  on its first words, and the body below it is withheld rather than tinted.
+*/
+.digest { margin: 0; display: grid; gap: 4px; font-size: 12px; line-height: 1.6; color: var(--text-mid); overflow-wrap: anywhere; }
+.digest p { margin: 0; }
+.digest code { font: 12px var(--f-mono); color: var(--text-hi); }
+.digest[data-digest="mismatch"] { padding: 10px 12px; border: 1px solid var(--failed); color: var(--text-hi); }
+.digest[data-digest="mismatch"] strong { color: var(--failed); font-weight: 600; }
+
+/*
+  Block, not grid: a <details> laid out as a grid sized its track to the longest recipe line and
+  pushed the whole try-it past a 360px viewport (and past its column at 1440 in WebKit). In block
+  flow the figure takes the column's width and its <pre> scrolls, as every other code block does.
+*/
+.terminal { min-width: 0; }
+.terminal > * + * { margin-top: 10px; }
+.terminal summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; font-size: 14px; color: var(--text-hi); }
 
 .failed { margin: 0; font-size: 13px; color: var(--text-hi); }
 

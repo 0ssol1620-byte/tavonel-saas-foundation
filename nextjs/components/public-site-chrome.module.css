@@ -113,6 +113,8 @@
     --changed: #8c5217;
     --changed-deep: #f5e9d4;
     --unresolved: #a72d23;
+    /* EN-4: the dark-ground --failed (#e9877e) is 2.44:1 on this ground; this is 6.61:1. */
+    --failed: #a72d23;
     --f-sans: "Wanted Sans Variable", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
     color-scheme: light !important;
     color: var(--text-hi) !important;

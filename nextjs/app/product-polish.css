@@ -611,6 +611,8 @@
   --verified: #226849;
   --changed: #8a5a00;
   --unresolved: #b42318;
+  /* The dark-ground --failed (#e9877e) is 2.55:1 on white and this one 6.57:1; a failure must read as one here too. */
+  --failed: #b42318;
   background: #fff;
   color: #171c20;
   padding-top: clamp(40px, 4vw, 50px);

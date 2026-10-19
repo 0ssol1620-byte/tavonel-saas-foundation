@@ -509,6 +509,8 @@ describe("the getting-started surfaces state no time to a first result", () => {
     "app/cookbooks/page.tsx",
     "app/cookbooks/[slug]/page.tsx",
     "components/docs/api-try-it.tsx",
+    "components/docs/keyless-try-it.tsx",
+    "lib/keyless-read.ts",
     "public/developer/README.md",
     "public/llms.txt",
   ];

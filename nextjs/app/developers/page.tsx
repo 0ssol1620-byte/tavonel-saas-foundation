@@ -11,6 +11,7 @@ import { MCP_TOOL_COUNT_WORD, MCP_TOOL_NAMES } from "@/lib/mcp-tools";
 import { FIRST_CALL_SNIPPETS } from "@/lib/developer-snippets";
 import { activationPolicy } from "@/lib/activation-policy";
 import { EXPLORE_CTA } from "@/lib/site-navigation";
+import { KeylessTryIt } from "@/components/docs/keyless-try-it";
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -168,6 +169,9 @@ export default function DevelopersPage() {
                 <Link href={"/docs/use-with-ai" as Route}>Use your results with AI</Link>. Current
                 availability is on the <Link href={"/status" as Route}>status page</Link>.
               </p>
+
+              {/* EN-4. What a reader can run here today, before the key the next section asks for. */}
+              <KeylessTryIt />
 
               <div className="stack">
                 <h2 id={sections[2].id}>Public tooling</h2>

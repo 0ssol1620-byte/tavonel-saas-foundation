@@ -18,6 +18,7 @@ import {
 } from "@/lib/docs-content";
 import { readDocsEndpoints, snippetFor, SNIPPET_LANGUAGES, type DocsEndpoint } from "@/lib/docs-endpoints";
 import { WorldLifecycle } from "@/components/docs/world-lifecycle";
+import { KeylessTryIt } from "@/components/docs/keyless-try-it";
 import { DocsToc } from "@/components/docs/docs-toc";
 import { DocsTableFilter } from "@/components/docs/docs-table-filter";
 import { PageToc, slugify, tocEntries } from "@/components/docs/page-toc";
@@ -229,6 +230,11 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
                 </aside>
               ) : null}
               <div className={`stack ${layout.articleContent}`}>
+                {/*
+                  EN-4. The quickstart opens on the one result a reader can get today, with no
+                  key, above the note that says why the seven steps below wait for intake.
+                */}
+                {section === "quickstart" ? <KeylessTryIt /> : null}
                 {entry.blocks.map((block, position) => (
                   <Block key={position} block={block} endpoints={endpoints} id={anchorIds.get(position)} />
                 ))}

@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import type { Route } from "next";
 import { useState } from "react";
+import type { DigestCheck, KeylessRead } from "@/lib/keyless-read";
 import styles from "./api-try-it.module.css";
 
 /*
@@ -20,123 +19,134 @@ import styles from "./api-try-it.module.css";
   story and no proxy: the page is served from the origin it is calling.
 
   What it deliberately does not do: no request builder, no parameter editor, no history, no
-  saved state. It is a GET and a <pre>. A reader who wants to change the request has curl, and
-  the curl is on the page above it.
+  saved state. It is a GET and a <pre>. The heading, the copy and the terminal recipes around it
+  are server-rendered by `keyless-try-it.tsx`, which is the one thing every page mounts, so this
+  island carries only what has to run in the browser.
+
+  EN-4. Each run now checks the response's own `Content-Digest` over the bytes received
+  (`lib/keyless-read.ts`), and shows one of three outcomes. A mismatch withholds the body: bytes
+  that are not the bytes the header describes are not shown as if they were an answer.
 */
 
 export type TryItRoute = { path: string; label: string; note: string };
 
-type Result = { status: number; ms: number; body: string; digest: string | null } | { error: string };
-
-export function ApiTryIt({ routes }: { routes: TryItRoute[] }) {
+export function ApiTryIt({ routes }: { routes: readonly TryItRoute[] }) {
   const [active, setActive] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
-  const [results, setResults] = useState<Record<string, Result>>({});
+  const [results, setResults] = useState<Record<string, KeylessRead>>({});
 
   async function run(path: string) {
     setActive(path);
     setPending(path);
-    const started = performance.now();
+    let result: KeylessRead;
     try {
-      const response = await fetch(path, { headers: { accept: "application/json" } });
-      const text = await response.text();
-      let body = text;
-      try {
-        // Pretty-print where it is JSON; show it verbatim where it is not, rather than
-        // reporting a parse failure the reader cannot act on.
-        body = JSON.stringify(JSON.parse(text), null, 2);
-      } catch {
-        /* Not JSON. The raw body is the honest thing to show. */
-      }
-      setResults((current) => ({
-        ...current,
-        [path]: {
-          status: response.status,
-          ms: Math.round(performance.now() - started),
-          // Long payloads are truncated with the fact stated, never silently.
-          body: body.length > 4000 ? `${body.slice(0, 4000)}\n\n… truncated at 4,000 characters. Fetch the URL for the whole body.` : body,
-          digest: response.headers.get("content-digest"),
-        },
-      }));
-    } catch (error) {
-      setResults((current) => ({
-        ...current,
-        [path]: { error: error instanceof Error ? error.message : "The request did not complete." },
-      }));
-    } finally {
-      setPending(null);
+      // Loaded on the first Run rather than with the page: the §22 script budget.
+      const { runKeylessRead } = await import("@/lib/keyless-read");
+      result = await runKeylessRead(path);
+    } catch {
+      result = { error: "the check itself did not load. Reload the page and run it again." };
     }
+    setResults((current) => ({ ...current, [path]: result }));
+    setPending(null);
   }
 
   return (
-    <section className={styles.tryIt} aria-labelledby="try-it-heading">
-      <h2 id="try-it-heading" className={styles.heading}>Try it, with no key</h2>
-      <p className={styles.lede}>
-        Three unauthenticated reads, run from this page against TAVONEL. No signup, no
-        credential, nothing that spends. The same three are a copy-pasteable curl recipe on{" "}
-        <Link href={"/docs/integration-recipes" as Route}>Integration recipes</Link>.
-      </p>
-      <ul className={styles.routes}>
-        {routes.map((route) => {
-          const result = results[route.path];
-          const open = active === route.path;
-          return (
-            <li key={route.path} className={styles.route}>
-              <div className={styles.row}>
-                <div>
-                  <p className={styles.label}>{route.label}</p>
-                  <code className={styles.path}>GET {route.path}</code>
-                </div>
-                <button
-                  type="button"
-                  className="btn ghost"
-                  onClick={() => run(route.path)}
-                  disabled={pending === route.path}
-                  aria-expanded={open}
-                >
-                  {pending === route.path ? "Running…" : result ? "Run again" : "Run"}
-                </button>
+    <ul className={styles.routes}>
+      {routes.map((route) => {
+        const result = results[route.path];
+        return (
+          <li key={route.path} className={styles.route}>
+            <div className={styles.row}>
+              <div>
+                <p className={styles.label}>{route.label}</p>
+                <code className={styles.path}>GET {route.path}</code>
               </div>
-              <p className={styles.note}>{route.note}</p>
-              {/*
-                BQ-137. The live region is the one-line outcome, not the response body.
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => run(route.path)}
+                disabled={pending === route.path}
+                aria-expanded={active === route.path}
+              >
+                {pending === route.path ? "Running…" : result ? "Run again" : "Run"}
+              </button>
+            </div>
+            <p className={styles.note}>{route.note}</p>
+            {/*
+              BQ-137. The live region is the one-line outcome, not the response body.
 
-                `role="status"` was on the whole result block, and that block holds up to
-                4,000 characters of JSON in a <pre>. A screen reader announced the entire
-                body on every run, uninterruptibly, for a control whose news is "200, 143
-                ms". The region is also mounted from the start rather than inserted with the
-                result: a live region that appears at the same moment as its content is not
-                reliably announced at all, which is the other half of the same bug.
-              */}
-              <p className={styles.announce} role="status">{announcement(route.label, pending === route.path, result)}</p>
-              {result ? (
-                <div className={styles.result}>
-                  {"error" in result ? (
-                    <p className={styles.failed}>The request did not complete: {result.error}</p>
-                  ) : (
-                    <>
-                      <p className={styles.status}>
-                        <code data-kind={result.status < 400 ? "ok" : "error"}>{result.status}</code>
-                        <span>{result.ms} ms</span>
-                        {result.digest ? <span className={styles.digest}>{result.digest}</span> : null}
-                      </p>
-                      <pre><code>{result.body}</code></pre>
-                    </>
-                  )}
-                </div>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+              `role="status"` was on the whole result block, and that block holds up to
+              4,000 characters of JSON in a <pre>. A screen reader announced the entire
+              body on every run, uninterruptibly, for a control whose news is "200, 143
+              ms". The region is also mounted from the start rather than inserted with the
+              result: a live region that appears at the same moment as its content is not
+              reliably announced at all, which is the other half of the same bug.
+            */}
+            <p className={styles.announce} role="status">{announcement(route.label, pending === route.path, result)}</p>
+            {result ? <ReadResult result={result} /> : null}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
+/** One finished run. Exported for the render test of the three digest outcomes. */
+export function ReadResult({ result }: { result: KeylessRead }) {
+  if ("error" in result) {
+    return (
+      <div className={styles.result}>
+        <p className={styles.failed}>The request did not complete: {result.error}</p>
+      </div>
+    );
+  }
+  return (
+    <div className={styles.result}>
+      <p className={styles.status}>
+        <code data-kind={result.status < 400 ? "ok" : "error"}>{result.status}</code>
+        <span>{result.ms} ms</span>
+        <span>{result.bytes.toLocaleString("en-US")} bytes</span>
+      </p>
+      <Digest check={result.digest} bytes={result.bytes} />
+      {result.digest.state === "mismatch" ? null : <pre><code>{result.body}</code></pre>}
+    </div>
+  );
+}
+
+function Digest({ check, bytes }: { check: DigestCheck; bytes: number }) {
+  if (check.state === "match") {
+    return (
+      <p className={styles.digest} data-digest="match">
+        Content-Digest matches the {bytes.toLocaleString("en-US")} bytes received:{" "}
+        <code>{check.value}</code>
+      </p>
+    );
+  }
+  if (check.state === "absent") {
+    return (
+      <p className={styles.digest} data-digest="absent">
+        No Content-Digest header on this response, so its bytes have nothing to be checked against.
+      </p>
+    );
+  }
+  return (
+    <div className={styles.digest} data-digest="mismatch">
+      <p>
+        <strong>Content-Digest does not match these bytes.</strong> The body is withheld, because
+        it is not the body the header describes.
+      </p>
+      <p>Served <code>{check.served}</code></p>
+      <p>Computed <code>{check.computed}</code></p>
+    </div>
+  );
+}
+
+const DIGEST_SAID = { match: "digest matches", mismatch: "digest does not match", absent: "no digest header" } as const;
+
 /** What a run is worth saying out loud: the outcome, never the body it returned. */
-function announcement(label: string, running: boolean, result: Result | undefined) {
+function announcement(label: string, running: boolean, result: KeylessRead | undefined) {
   if (running) return `${label}: running.`;
   if (!result) return "";
   if ("error" in result) return `${label}: the request did not complete.`;
-  return `${label}: ${result.status} in ${result.ms} ms.`;
+  return `${label}: ${result.status} in ${result.ms} ms, ${DIGEST_SAID[result.digest.state]}.`;
 }
