@@ -104,6 +104,13 @@ describe("a receipt that does not hold is not rendered", () => {
     ["a run time that is not an instant", r => { r.runAt = "2026-10-19"; }, "runAt is not a UTC instant"],
     ["nothing it must not imply", r => { r.mustNotImply = []; }, "mustNotImply is empty"],
     ["a receipt link that is neither https nor a site path", r => { r.runReceiptUrl = "javascript:alert(1)"; }, "runReceiptUrl is neither https nor a site path"],
+    // B-04: a protocol-relative URL, and one the browser normalises to it, point at another host.
+    ["a protocol-relative receipt link", r => { r.runReceiptUrl = "//attacker.example/receipt.json"; }, "runReceiptUrl is neither https nor a site path"],
+    ["a backslash receipt link the browser reads as another host", r => { r.runReceiptUrl = "/\\attacker.example/receipt.json"; }, "runReceiptUrl is neither https nor a site path"],
+    // B-06 M2/M2b: a date of the right shape that is not a day of the calendar is not a date.
+    ["M2: a run day that does not exist", r => { r.runAt = "2026-02-31T00:00:00Z"; }, "runAt is not a UTC instant"],
+    ["M2b: a capture month that does not exist", r => { r.capturedOn = "2026-13-45"; }, "capturedOn is not a date"],
+    ["M2b: a licence retrieval day zero", r => { r.rights.licence.retrievedOn = "2026-00-00"; }, "rights.licence.retrievedOn is not a date"],
   ];
 
   it.each(cases)("%s", (_, edit, reason) => {

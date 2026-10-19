@@ -107,6 +107,12 @@ type Rec = Record<string, unknown>;
 const rec = (value: unknown): Rec | null =>
   value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Rec) : null;
 const filled = (value: unknown): value is string => typeof value === "string" && value.trim() !== "";
+// B-06: the calendar decides, not the shape. Date.parse rolls 2026-02-31 into March, and toISOString
+// throws on an Invalid Date (readSpecimens does not catch), so NaN is filtered first and nothing throws.
+const realDay = (value: unknown): boolean => {
+  const time = DAY.test(String(value)) ? Date.parse(`${String(value)}T00:00:00Z`) : Number.NaN;
+  return !Number.isNaN(time) && new Date(time).toISOString().slice(0, 10) === value;
+};
 const https = (value: unknown) => filled(value) && /^https:\/\/\S+$/.test(value);
 const integerBox = (value: unknown): value is Bbox1000 =>
   Array.isArray(value) && value.every(Number.isInteger) && isSourceRegionBox(value);
@@ -126,7 +132,8 @@ export function specimenProblem(raw: unknown, mode: SpecimenMode): string | null
   if (s.lang !== "en" && s.lang !== "ko") return "lang is not en or ko";
   if (s.slot === "korean" && s.lang !== "ko") return "the korean slot's text is not lang ko";
   if (!https(s.sourcePageUrl) || !https(s.sourceUrl)) return "a source URL is not https";
-  if (!https(s.runReceiptUrl) && !(filled(s.runReceiptUrl) && /^\/\S+$/.test(s.runReceiptUrl))) {
+  // B-04: a site path is one slash then neither a slash nor a backslash; "//host" and "/\host" leave the site.
+  if (!https(s.runReceiptUrl) && !(filled(s.runReceiptUrl) && /^\/(?![\/\\])\S+$/.test(s.runReceiptUrl))) {
     return "runReceiptUrl is neither https nor a site path";
   }
   const kind = mode === "fixture" ? "synthetic_fixture" : "page_extract";
@@ -138,8 +145,8 @@ export function specimenProblem(raw: unknown, mode: SpecimenMode): string | null
   if (!Number.isInteger(pageCount) || !Number.isInteger(page) || (page as number) < 1 || (page as number) > (pageCount as number)) {
     return "page is not a page of the original";
   }
-  if (!DAY.test(String(s.capturedOn))) return "capturedOn is not a date";
-  if (!INSTANT.test(String(s.runAt)) || Number.isNaN(Date.parse(String(s.runAt)))) return "runAt is not a UTC instant";
+  if (!realDay(s.capturedOn)) return "capturedOn is not a date";
+  if (!INSTANT.test(String(s.runAt)) || Number.isNaN(Date.parse(String(s.runAt))) || !realDay(String(s.runAt).slice(0, 10))) return "runAt is not a UTC instant";
 
   const rights = rec(s.rights), licence = rec(rights?.licence);
   if (!rights || !licence) return "rights or rights.licence is missing";
@@ -149,7 +156,7 @@ export function specimenProblem(raw: unknown, mode: SpecimenMode): string | null
   // D-05: a board-level marking is not accepted for the strip; only one on the item or the site.
   if (!MARKING_SCOPES.has(String(licence.markingScope))) return "rights.licence.markingScope is not item, site or site+statute";
   if (!https(licence.markingUrl)) return "rights.licence.markingUrl is not https";
-  if (!DAY.test(String(licence.retrievedOn))) return "rights.licence.retrievedOn is not a date";
+  if (!realDay(licence.retrievedOn)) return "rights.licence.retrievedOn is not a date";
   if (!SHA.test(String(licence.snapshotSha256))) return "rights.licence.snapshotSha256 is not a sha256 digest";
   if (!Array.isArray(s.mustNotImply) || s.mustNotImply.length === 0 || !s.mustNotImply.every(filled)) {
     return "mustNotImply is empty";
