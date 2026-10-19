@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import artifact from "../content/benchmarks/model-arena-20260903.json";
 import {
   ARENA_STATUSES,
+  LOCAL_PATH_MASK,
   arenaBars,
   arenaDots,
   arenaModel,
   modelArenaBoard,
   settledModels,
   unsettledModels,
+  maskLocalPaths,
   validateArenaArtifact,
   type ArenaStatus,
 } from "./model-arena-page-data";
@@ -134,6 +136,23 @@ describe("the board this page reads", () => {
     for (const model of unsettledModels()) {
       expect(`${model.status_note ?? ""}${model.notes.join(" ")}`.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("maskLocalPaths", () => {
+  it("masks an absolute path on a scoring machine and nothing else", () => {
+    expect(maskLocalPaths("Soft-skip installed: `omnidoc_raw/glm_ocr/` and `C:/Users/example/box_omnidoc_results/`."))
+      .toBe(`Soft-skip installed: \`omnidoc_raw/glm_ocr/\` and \`${LOCAL_PATH_MASK}\`.`);
+    expect(maskLocalPaths("from D:\\CodexProjects\\research\\run.json done")).toBe(`from ${LOCAL_PATH_MASK} done`);
+    expect(maskLocalPaths("see /Users/someone/x.json and /home/runner/out/")).toBe(`see ${LOCAL_PATH_MASK} and ${LOCAL_PATH_MASK}`);
+  });
+
+  it("leaves relative paths, URLs and prose alone", () => {
+    for (const unchanged of [
+      "backed up under `omnidoc_raw/glm_ocr/BACKUP_pre_success_only/`.",
+      "https://huggingface.co/zai-org/GLM-OCR",
+      "text Edit **0.0444**, pages **1599**, ratio 3:2",
+    ]) expect(maskLocalPaths(unchanged)).toBe(unchanged);
   });
 });
 
