@@ -1998,9 +1998,11 @@ export const PR141_MAIN_MERGE_BCBA_AFFECTED_UNIT_FILES = Object.freeze([
 export const PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/hero-home-responsive.spec.ts', 'e2e/home-measures.spec.ts', 'e2e/landing-v2.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/production-hardening.spec.ts', 'e2e/public-package-proof.spec.ts']);
 // UX program 2026-10-17 billing and checkout tracks (P2-10 CTA truth, P2-12..P2-16, B-07/B-08): the HMAC-previous verification in
 // the billing event, binding, gate route and trial, the checkout hook and its entitlement wait, the intent carried across sign-in and
-// its notice, the CTA truth table, the fake Paddle fixture and the two browser journeys. Exactly these eighteen paths select their
-// ten direct suites (checkout-policy and billing-gate-enforce-route for the gate, production-posture for the switches) and the
-// login-capability (1440) and self-serve-journey (audit) browser suites. Product billing code, so never nativeReuse.
+// its notice, the CTA truth table, the fake Paddle fixture and the two browser journeys. Phase 4 LAUNCH (P2-29 / D-13 / D-19) adds the
+// D-19 launch canary in processing-workspace-grant.ts and the two suites that pin it and D-13's launch-approval precedence. Exactly these
+// twenty-two paths select their seventeen direct suites (checkout-policy and billing-gate-enforce-route for the gate, the four gate-v2
+// admission suites for the canary, processing-consent-panel for the v1 terms panel, production-posture for the switches) and the login-capability (1440) and self-serve-journey (audit)
+// browser suites. Product billing code, so never nativeReuse.
 export const UX_BILLING_CHECKOUT_AFFECTED_PATHS = Object.freeze([
   'app/api/internal/billing/gate-enforce/route.ts',
   'components/checkout-intent-notice.tsx',
@@ -2011,25 +2013,36 @@ export const UX_BILLING_CHECKOUT_AFFECTED_PATHS = Object.freeze([
   'lib/billing-binding.ts',
   'lib/checkout-intent.test.ts',
   'lib/checkout-intent.ts',
+  'lib/commercial-state.test.ts',
   'lib/cta-truth.test.ts',
+  'lib/customer-data-admission.test.ts',
   'lib/entitlement-wait.test.ts',
   'lib/entitlement-wait.ts',
   'lib/paddle-billing-event.test.ts',
   'lib/paddle-billing-event.ts',
+  'lib/processing-consent-panel.test.ts',
+  'lib/processing-workspace-grant.ts',
   'lib/self-service-trial-device-rotation.test.ts',
   'lib/self-service-trial.ts',
   'lib/use-checkout.test.ts',
   'lib/use-checkout.ts',
 ]);
 export const UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/access-bootstrap-admission.test.ts',
   'lib/billing-binding.test.ts',
   'lib/billing-gate-enforce-route.test.ts',
+  'lib/checkout-customer-data-gate.test.ts',
   'lib/checkout-intent.test.ts',
   'lib/checkout-policy.test.ts',
+  'lib/commercial-state.test.ts',
   'lib/cta-truth.test.ts',
+  'lib/customer-data-admission.test.ts',
   'lib/entitlement-wait.test.ts',
   'lib/paddle-billing-event.test.ts',
+  'lib/processing-consent-panel.test.ts',
+  'lib/processing-workspace-grant.test.ts',
   'lib/production-posture.test.ts',
+  'lib/scoped-admission-boundaries.test.ts',
   'lib/self-service-trial-device-rotation.test.ts',
   'lib/use-checkout.test.ts',
 ]);
@@ -2546,7 +2559,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.
   affectedGroup('benchmarks-path-mask', new RegExp(`^nextjs/(?:${exactPathAlternation(BENCHMARKS_PATH_MASK_AFFECTED_PATHS)})$`),
     { unitFiles: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES }),
-  // ux-billing-checkout: the 18 exact paths above select 10 direct suites and 2 browser suites.
+  // ux-billing-checkout: the 22 exact paths above select 17 direct suites and 2 browser suites.
   affectedGroup('ux-billing-checkout', new RegExp(`^nextjs/(?:${exactPathAlternation(UX_BILLING_CHECKOUT_AFFECTED_PATHS)})$`),
     { unitFiles: UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, browserFiles: UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES }),
   // table-read-intake-ceiling: the 6 exact paths above select 8 direct suites and no browser suite.
