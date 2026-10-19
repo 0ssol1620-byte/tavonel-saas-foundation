@@ -84,6 +84,24 @@
         551,
         600,
         730
+      ],
+      "sources": [
+        {
+          "path": "/proof-collection/specimens/naca-rm-l50c03-p001-720.avif",
+          "type": "image/avif",
+          "sha256": "sha256:35b9ee32692eeed0ed584540c1dee351198c2052df62c2781e58141f75af8ac9",
+          "width": 720,
+          "height": 288,
+          "bytes": 20373
+        },
+        {
+          "path": "/proof-collection/specimens/naca-rm-l50c03-p001-960.avif",
+          "type": "image/avif",
+          "sha256": "sha256:dd36aa14a4721ccc0a3e142f05e2a3ca15e8e5d92aef1162ca094aafaa2441ff",
+          "width": 960,
+          "height": 384,
+          "bytes": 30304
+        }
       ]
     },
     "extractedText": "CLASSIFICATIONCANCELLED",
@@ -92,7 +110,7 @@
       "imageDigest": "sha256:8e6f6fa777fd9949745ce67b25d04f0a1aa74dfbf791204baf2b6b16c3931bd8"
     },
     "runAt": "2026-10-19T12:27:25.717Z",
-    "runReceiptSha256": "sha256:1c0479bdbf1adce72fbd52367740bfac48974bbf409df987eb5b48f0f2753787",
+    "runReceiptSha256": "sha256:d1f3ea1532d0fef9ad9b7fc0e273717d789915ade7976199065a45636a84cb3d",
     "runReceiptUrl": "/proof-collection/specimens/naca-rm-l50c03-p001.run.json",
     "limitationTokens": []
   },
@@ -181,6 +199,24 @@
         152,
         906,
         383
+      ],
+      "sources": [
+        {
+          "path": "/proof-collection/specimens/kma-2026-09-climate-p001-720.avif",
+          "type": "image/avif",
+          "sha256": "sha256:7e3a0697bf9b121e1c5eea840e40db15741f6ecaca3f4232fd989588ece6f236",
+          "width": 720,
+          "height": 288,
+          "bytes": 21351
+        },
+        {
+          "path": "/proof-collection/specimens/kma-2026-09-climate-p001-960.avif",
+          "type": "image/avif",
+          "sha256": "sha256:838a518da9337bf9c7e4fcc948b6cd5614c9905ad380ac9261a61bb846112e74",
+          "width": 960,
+          "height": 384,
+          "bytes": 29367
+        }
       ]
     },
     "extractedText": "[2026년9월 기후특성]",
@@ -189,7 +225,7 @@
       "imageDigest": "sha256:8e6f6fa777fd9949745ce67b25d04f0a1aa74dfbf791204baf2b6b16c3931bd8"
     },
     "runAt": "2026-10-19T12:27:29.687Z",
-    "runReceiptSha256": "sha256:01f733335dadb4d885d5e40351c212eb36dc227b7da5aab426b2b8b79a0da322",
+    "runReceiptSha256": "sha256:a13f8b1c39dc6cbd6b3b3cf8e9950103ef3b23c346ec193fe29f1aa5d3c1a2c5",
     "runReceiptUrl": "/proof-collection/specimens/kma-2026-09-climate-p001.run.json",
     "limitationTokens": []
   }

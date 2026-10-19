@@ -102,6 +102,7 @@
   border-radius: 4px;
   background: var(--tv-paper-sunk);
 }
+.frame picture { display: block; }
 .frame img { display: block; width: 100%; height: auto; }
 
 /* The reader's region, where the reader put it inside the window. */

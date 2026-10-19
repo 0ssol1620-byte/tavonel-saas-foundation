@@ -152,6 +152,12 @@ describe("the committed specimens", () => {
     for (const specimen of specimens) {
       const bytes = readFileSync(join(process.cwd(), "public", specimen.crop.path));
       expect(cropDigestProblem(specimen, bytes), specimen.specimenId).toBeNull();
+      // P2-32 LCP: the AVIF encodings <picture> offers first, each the file its receipt names.
+      expect(specimen.crop.sources!.map(source => [source.width, source.height])).toEqual([[720, 288], [960, 384]]);
+      for (const source of specimen.crop.sources!) {
+        const file = readFileSync(join(process.cwd(), "public", source.path));
+        expect([file.length, digest(file)], source.path).toEqual([source.bytes, source.sha256]);
+      }
     }
   });
 });
@@ -192,6 +198,11 @@ describe("a production receipt that does not hold is not rendered", () => {
     ["an empty full source line", r => { r.caption.en.full = " "; }, "caption.en is not a short and a full source line"],
     ["a board-level licence marking", r => { r.rights.licence.markingScope = "board" as never; }, "rights.licence.markingScope is not item, site or site+statute"],
     ["a run receipt link off the site", r => { r.runReceiptUrl = "//attacker.example/receipt.json"; }, "runReceiptUrl is neither https nor a site path"],
+    ["a crop source at another aspect ratio", r => { r.crop.sources![0]!.height = 300; }, "a crop source is not the crop's aspect ratio"],
+    ["a crop source that is not AVIF", r => { r.crop.sources![0]!.path = "/proof-collection/specimens/naca-rm-l50c03-p001-720.webp"; }, "a crop source is not a production AVIF path"],
+    ["a crop source off the specimen folder", r => { r.crop.sources![0]!.path = "/landing/v2/naca-720.avif"; }, "a crop source is not a production AVIF path"],
+    ["two crop sources of one width", r => { r.crop.sources![1]!.width = 720; r.crop.sources![1]!.height = 288; }, "two crop sources share a width"],
+    ["a crop source over the per-cell budget", r => { r.crop.sources![1]!.bytes = MAX_CROP_BYTES + 1; }, `a crop source is over ${MAX_CROP_BYTES} bytes`],
   ];
 
   it("accepts both committed receipts as they are", () => {
@@ -232,6 +243,7 @@ describe("a receipt that does not hold is not rendered", () => {
     ["a region that is not a box", r => { r.region.bbox1000 = [820, 280, 180, 440]; }, "region is not a reader region"],
     ["a crop over the per-cell budget", r => { r.crop.bytes = MAX_CROP_BYTES + 1; }, `crop is over ${MAX_CROP_BYTES} bytes`],
     ["a crop path outside the fixture set", r => { r.crop.path = "../../../package.json"; }, "crop.path is not a fixture crop path"],
+    ["a fixture crop with encodings", r => { r.crop.sources = [{ path: "/proof-collection/specimens/fixture-720.avif", type: "image/avif", sha256: `sha256:${"0".repeat(64)}`, width: 720, height: 288, bytes: 1 }]; }, "a fixture crop carries no sources"],
     ["a board-level licence marking", r => { r.rights.licence.markingScope = "board" as never; }, "rights.licence.markingScope is not item, site or site+statute"],
     ["no attribution", r => { r.rights.attribution = ""; }, "rights.attribution is empty"],
     ["a publication other than public_sample", r => { r.rights.publication = "cleared" as never; }, "rights.publication is not public_sample"],
@@ -339,11 +351,15 @@ describe("the specimen strip", () => {
     for (const alt of [...en.matchAll(/alt="([^"]*)"/g), ...ko.matchAll(/alt="([^"]*)"/g)].map(match => match[1])) expect(alt).not.toMatch(/\d/);
     expect(en).toContain("Source: Korea Meteorological Administration, &quot;September 2026 climate characteristics&quot; press release (2026), KOGL Type 1.</p>");
     expect(ko).toContain("본 저작물은 &#x27;기상청&#x27;에서 &#x27;2026년&#x27; 작성하여 공공누리 제1유형으로 개방한");
-    // React hoists a preload for each eager image; only the first crop's is high priority, and the rest load lazily.
-    const tags = en.match(/<(?:link|img)\b[^>]*>/g)!;
+    // Only the first crop is high priority, and the rest load lazily. Inside <picture> React hoists no preload;
+    // the browser's preload scanner finds the <source> (Lighthouse: requested with the document's first bytes).
+    const tags = en.match(/<(?:link|img|source)\b[^>]*>/g)!;
     expect(tags.filter(tag => /fetchpriority="high"/i.test(tag)).map(tag => tag.slice(1, 5) + (tag.includes("naca-rm-l50c03-p001-960") ? " naca" : " other")))
-      .toEqual(["link naca", "img  naca"]);
-    expect(tags.filter(tag => tag.includes("kma-2026-09-climate-p001-960"))).toEqual([expect.stringMatching(/^<img [^>]*loading="lazy"/)]);
+      .toEqual(["img  naca"]);
+    expect(en).toContain('<picture><source type="image/avif" sizes="(min-width: 1024px) 50vw, calc(100vw - 32px)" srcSet="/proof-collection/specimens/naca-rm-l50c03-p001-720.avif 720w, /proof-collection/specimens/naca-rm-l50c03-p001-960.avif 960w"/><img src="/proof-collection/specimens/naca-rm-l50c03-p001-960.webp" width="960" height="384"');
+    expect(tags.filter(tag => /<link\b[^>]*preload/.test(tag))).toEqual([]);
+    expect(tags.filter(tag => tag.startsWith("<img") && tag.includes("kma-2026-09-climate-p001-960"))).toEqual([expect.stringMatching(/^<img [^>]*loading="lazy"/)]);
+    expect(tags.filter(tag => tag.startsWith("<source") && tag.includes("kma-2026-09-climate-p001-720.avif 720w"))).toHaveLength(1);
     expect(en).toContain('href="/proof-collection/specimens/naca-rm-l50c03-p001.run.json"');
     expect(en).not.toMatch(/synthetic fixture|accuracy|정확도/i);
     const faq = renderToStaticMarkup(createElement(HomeReaderGuide, { faqOnly: true, korean: true, specimenSources: real.map(cell => cell.caption.ko.full) }));

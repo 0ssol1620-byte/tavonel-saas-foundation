@@ -292,6 +292,7 @@ export default function CompileStagePlayer({
   compact = false,
   stageDisclosureLabel,
   priorityPoster = false,
+  lazyPoster = false,
   korean = false,
   initialMobileFilmView = "fit",
   storyLayout = false,
@@ -308,6 +309,8 @@ export default function CompileStagePlayer({
   stageDisclosureLabel?: string;
   /** Mark an above-the-fold poster as the page's priority image without changing its bytes. */
   priorityPoster?: boolean;
+  /** Load a poster that sits below the first screen lazily (P2-32: Home while the specimen strip renders above it). */
+  lazyPoster?: boolean;
   /** BQ-013. Name the controls and the fallback in the page's language. The stage list carries its own. */
   korean?: boolean;
   /** The view a narrow frame opens on. Defaults to "fit"; the visitor's toggle still switches it. */
@@ -718,7 +721,7 @@ export default function CompileStagePlayer({
                it decodes costs the same on /film as it does on /. */
             decoding="async"
             fetchPriority={priorityPoster ? "high" : undefined}
-            loading={priorityPoster ? "eager" : undefined}
+            loading={priorityPoster ? "eager" : lazyPoster ? "lazy" : undefined}
           />
         ) : live ? (
           <div className="compile-film-live" aria-hidden="true"><LiveFilm /></div>

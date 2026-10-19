@@ -93,6 +93,7 @@ function measure(page: Page) {
         sourceText: crop.querySelector("[data-specimen-source]")!.textContent,
         fetchPriority: crop.querySelector("img")!.getAttribute("fetchpriority"),
         loaded: (crop.querySelector("img") as HTMLImageElement).naturalWidth,
+        currentSrc: new URL((crop.querySelector("img") as HTMLImageElement).currentSrc || "about:blank").pathname,
         // Lines, not the box: a phone link is a 44px touch target however many lines it holds.
         sourceLines: (() => {
           // The text's own line boxes: a range over the whole caption would add the link's box.
@@ -314,7 +315,15 @@ for (const browserName of BROWSERS) {
             expect(Math.abs(cell.region.right - (cell.image.left + ((r1 - x0) / (x1 - x0)) * cell.image.width))).toBeLessThanOrEqual(1);
             expect(Math.abs(cell.region.bottom - (cell.image.top + ((s1 - y0) / (y1 - y0)) * cell.image.height))).toBeLessThanOrEqual(1);
             // SYNTHESIS §7: WebKit on the Windows QA machine does not load same-origin images, so the bytes are read on chromium.
-            if (browserName === "chromium") expect(cell.loaded, `${cell.id} crop decoded`).toBe(receipt.crop.width);
+            // The decoded file is one the receipt names (the WEBP or an AVIF source), at the width the receipt gives it.
+            if (browserName === "chromium") {
+              const file = [receipt.crop, ...(receipt.crop.sources ?? [])].find(entry => entry.path === cell.currentSrc);
+              expect(file, `${cell.id} crop ${cell.currentSrc} is a receipt file`).toBeDefined();
+              // naturalWidth of a w-descriptor source is density-corrected (the slot width), so only the WEBP fallback is compared
+              // with its file width; the served-bytes test below binds every file to its digest.
+              if (file!.path.endsWith(".webp")) expect(cell.loaded, `${cell.id} crop decoded`).toBe(file!.width);
+              else expect(cell.loaded, `${cell.id} crop decoded`).toBeGreaterThan(0);
+            }
             expect(cell.sourceLines, `${cell.id}: the short source line is one line (D-06)`).toBe(1);
           }
           const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -374,7 +383,9 @@ test("the committed cells' run receipts, extracts and crops are served byte for 
     expect(digest(runBytes)).toBe(receipt.runReceiptSha256);
     const extract = await request.get((JSON.parse(runBytes.toString("utf8")) as { extract: { path: string } }).extract.path);
     expect(digest(await extract.body())).toBe(receipt.extractedPdfSha256);
-    expect(digest(await (await request.get(receipt.crop.path)).body())).toBe(receipt.crop.sha256);
+    for (const file of [receipt.crop, ...(receipt.crop.sources ?? [])]) {
+      expect(digest(await (await request.get(file.path)).body()), file.path).toBe(file.sha256);
+    }
   }
 });
 

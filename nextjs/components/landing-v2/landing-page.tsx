@@ -328,7 +328,7 @@ export default function LandingPage({
                   until a receipt does.
                 */}
                 <SpecimenStrip specimens={specimens} korean={korean} />
-                <HeroFilm korean={korean} />
+                <HeroFilm korean={korean} priority={specimens.length === 0} />
               </HeroStatement>
             </div>
             <div className={sourceStyles.formats}>

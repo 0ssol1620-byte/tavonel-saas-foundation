@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { CAPABILITY_MANIFEST } from "../../shared/capabilityManifest";
 import type { Bbox1000, SourceRights } from "./home-evidence-view";
 import { isSourceRegionBox } from "./source-region-box";
-import committedReceipts from "./specimen-sources.json";
+// The attribute lets Node (the Playwright spec imports this module) load the JSON as Next and Vitest do.
+import committedReceipts from "./specimen-sources.json" with { type: "json" };
 
 /*
   P2-08 (UX-PLAN-2026-10-17 §3.4 and §8.2 UX-L4; PHASE1-CRITIC-2026-10-17 §3.2 and §5.4): the one
@@ -73,7 +74,8 @@ export type SpecimenReceipt = {
   /** The reader's own region, as it returned it. Never widened to fit the crop. */
   region: { regionId: string; bbox1000: Bbox1000 };
   /** A window of the source page in the cell's ratio, holding the region. */
-  crop: { path: string; sha256: string; width: number; height: number; bytes: number; window1000: Bbox1000 };
+  /** `sources` (production only): the same window as AVIF, offered first by <picture>; `path` is the fallback. */
+  crop: { path: string; sha256: string; width: number; height: number; bytes: number; window1000: Bbox1000; sources?: CropSource[] };
   /** The reader's output for the region, byte for byte: errors and spacing are not corrected. */
   extractedText: string;
   reader: { id: "foundation_ocr_gpu_v1"; imageDigest: string };
@@ -84,6 +86,7 @@ export type SpecimenReceipt = {
   limitationTokens: string[];
 };
 
+export type CropSource = { path: string; type: "image/avif"; sha256: string; width: number; height: number; bytes: number };
 export type Specimen = SpecimenReceipt & { cropSrc: string; synthetic: boolean };
 export type SpecimenRejection = { id: string; reason: string };
 
@@ -215,6 +218,22 @@ export function specimenProblem(raw: unknown, mode: SpecimenMode): string | null
   }
   if ((crop.bytes as number) > MAX_CROP_BYTES) return `crop is over ${MAX_CROP_BYTES} bytes`;
   if (!integerBox(crop.window1000)) return "crop.window1000 is not a region box";
+  if (crop.sources !== undefined) {
+    if (mode !== "production") return "a fixture crop carries no sources";
+    if (!Array.isArray(crop.sources) || crop.sources.length === 0) return "crop.sources is not a list of encodings";
+    const widths = new Set<number>();
+    for (const source of crop.sources as Record<string, unknown>[]) {
+      if (!CROP_PATH.production.test(String(source?.path)) || !String(source.path).endsWith(".avif")) return "a crop source is not a production AVIF path";
+      if (source.type !== "image/avif") return "a crop source is not image/avif";
+      if (!SHA.test(String(source.sha256))) return "a crop source sha256 is not a sha256 digest";
+      if (!Number.isInteger(source.width) || !Number.isInteger(source.height) || (source.width as number) < 1 || (source.height as number) < 1 || !Number.isInteger(source.bytes) || (source.bytes as number) < 1) return "a crop source size is not positive integers";
+      // The same window: the aspect ratio is the fallback's, so the region outline holds on every encoding.
+      if ((source.width as number) * (crop.height as number) !== (source.height as number) * (crop.width as number)) return "a crop source is not the crop's aspect ratio";
+      if ((source.bytes as number) > MAX_CROP_BYTES) return `a crop source is over ${MAX_CROP_BYTES} bytes`;
+      if (widths.has(source.width as number)) return "two crop sources share a width";
+      widths.add(source.width as number);
+    }
+  }
   if (!inside(region.bbox1000, crop.window1000)) return "the reader region is not inside the crop window";
   const avoid = s.avoidInCrop;
   if (!Array.isArray(avoid) || !avoid.every(item => filled(rec(item)?.label) && integerBox(rec(item)?.bbox1000))) {

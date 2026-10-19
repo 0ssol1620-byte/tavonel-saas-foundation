@@ -353,6 +353,12 @@ describe("landing v2 -- the composition with the specimen strip rendered", () =>
     for (const absent of ["Landsat", "USGS", "NASA", "Cloud = No", "Collection 1"]) expect(readable(withoutSpecimens(main))).not.toContain(absent);
     const guide = main.slice(main.indexOf("data-home-reader-guide"), main.indexOf('<section id="s6"'));
     expect([...guide.matchAll(/<details(?:\s[^>]*)?>/g)]).toHaveLength(4);
+    // The strip's first crop is the first screen's priority image; the film poster below it loads lazily, unpreloaded.
+    const poster = elements(hero, "img").filter(open => open.includes("compile-film-still"));
+    expect(poster).toHaveLength(1);
+    expect([attr(poster[0]!, "loading"), attr(poster[0]!, "fetchpriority")]).toEqual(["lazy", undefined]);
+    expect(main).not.toMatch(/<link[^>]*rel="preload"[^>]*poster-1/);
+    expect(elements(hero, "img").filter(open => attr(open, "fetchpriority") === "high")).toHaveLength(1);
     // The strip sits between the hero's actions and the film (D-03), and the film is unchanged below it.
     expect(hero.indexOf("data-specimen-strip")).toBeGreaterThan(hero.indexOf('data-testid="landing-hero-actions"'));
     expect(hero.indexOf("data-specimen-strip")).toBeLessThan(hero.indexOf("compile-film"));

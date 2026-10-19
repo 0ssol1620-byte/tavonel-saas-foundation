@@ -13,15 +13,18 @@ export const LANDING_MOBILE_FILM_VIEW: MobileFilmView = "fit";
 export default function HeroFilmDisclosure({
   korean,
   stages,
+  priority = true,
 }: {
   korean: boolean;
   stages: CompileStage[];
+  /** False while the specimen strip renders above the film (see hero-film.tsx). */
+  priority?: boolean;
 }) {
   // Next supports resource hints in an SSR client component, before hydration.
   // With a 1x copy the preload carries the same srcset and sizes as the <img>, so a phone fetches one file.
   const opening = stages[0];
   const openingSrcSet = opening && filmPosterSrcSet(opening);
-  if (opening?.poster) {
+  if (priority && opening?.poster) {
     preload(opening.poster, openingSrcSet
       ? { as: "image", fetchPriority: "high", imageSrcSet: openingSrcSet, imageSizes: FILM_POSTER_SIZES }
       : { as: "image", fetchPriority: "high" });
@@ -32,7 +35,7 @@ export default function HeroFilmDisclosure({
       data-testid="landing-hero-film"
     >
         <div className={`lv2-film ${styles.filmBody}`}>
-          <CompileStagePlayer stages={stages} preferVideo priorityPoster korean={korean} initialMobileFilmView={LANDING_MOBILE_FILM_VIEW} storyLayout />
+          <CompileStagePlayer stages={stages} preferVideo priorityPoster={priority} lazyPoster={!priority} korean={korean} initialMobileFilmView={LANDING_MOBILE_FILM_VIEW} storyLayout />
         </div>
       <figcaption className="fine">{korean ? "제품 흐름 예시 · 실제 고객 결과가 아닙니다." : "Illustrative product demo · examples, not customer results."}</figcaption>
     </figure>

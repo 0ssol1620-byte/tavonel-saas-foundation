@@ -27,8 +27,12 @@ import styles from "./specimen-strip.module.css";
   P2-32 (D-06): beside each crop, the short source line and its link; the approved full line
   (SPECIMEN-CANDIDATES §4.4, the KOGL sentence on /ko) opens with "Show full text". The first crop
   is the strip's largest paint on a phone, so it is fetched at high priority and the others lazily
-  (SYNTHESIS §7, LCP).
+  (SYNTHESIS §7, LCP). It is offered as AVIF at 720 and 960 px first, so a phone takes the 720 px
+  file; the WEBP is the fallback. CROP_SIZES is the cell: the content width on a phone, half the
+  row from 1024 px.
 */
+
+const CROP_SIZES = "(min-width: 1024px) 50vw, calc(100vw - 32px)";
 
 const COPY = {
   en: {
@@ -105,10 +109,16 @@ export default function SpecimenStrip({ specimens, korean = false }: { specimens
               </p>
               <figure className={styles.crop} data-specimen-crop="" data-crop-window={`${x0},${y0},${x1},${y1}`}>
                 <div className={styles.frame}>
-                  {/* eslint-disable-next-line @next/next/no-img-element -- a fixed crop with its receipt's own size; no optimizer may re-encode source pixels (specimen §4.5) */}
-                  <img src={specimen.cropSrc} width={specimen.crop.width} height={specimen.crop.height}
-                    alt={copy.crop(copy.kind[specimen.slot])} decoding="async"
-                    fetchPriority={index === 0 ? "high" : undefined} loading={index === 0 ? undefined : "lazy"} />
+                  {/* Plain <picture>, not next/image: a fixed crop with its receipt's own size; no optimizer may re-encode source pixels (specimen §4.5). */}
+                  <picture>
+                    {specimen.crop.sources?.length ? (
+                      <source type="image/avif" sizes={CROP_SIZES}
+                        srcSet={specimen.crop.sources.map(source => `${source.path} ${source.width}w`).join(", ")} />
+                    ) : null}
+                    <img src={specimen.cropSrc} width={specimen.crop.width} height={specimen.crop.height}
+                      alt={copy.crop(copy.kind[specimen.slot])} decoding="async"
+                      fetchPriority={index === 0 ? "high" : undefined} loading={index === 0 ? undefined : "lazy"} />
+                  </picture>
                   <span className={styles.region} style={outline(specimen)} data-specimen-region={specimen.region.regionId} aria-hidden="true" />
                 </div>
                 <figcaption className={styles.source}>
