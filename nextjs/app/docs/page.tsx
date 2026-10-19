@@ -74,6 +74,11 @@ export default function DocsPage() {
               <h2><Link href={"/cookbooks" as Route}>Cookbooks</Link></h2>
               <p>Task guides that take one piece of work through the product, each published ahead of a recorded run.</p>
             </article>
+            {/* EN-1. The product guide: the screens a reader can use today, in English and Korean. Not prefetched: this tile is in the first viewport and prefetching the route added 3,065 script bytes to /docs. */}
+            <article className="tile">
+              <h2><Link href={"/guide" as Route} prefetch={false}>Product guide</Link></h2>
+              <p>How to use what TAVONEL offers today, screen by screen, and where each screen stops. In English and Korean.</p>
+            </article>
           </div>
         </div>
         <div className="stack docs-hub-index">

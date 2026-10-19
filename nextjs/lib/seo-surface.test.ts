@@ -512,7 +512,10 @@ describe("public surface: the Korean subtree", () => {
   const koreanPages = pages.filter((page) => page.route === "/ko" || page.route.startsWith("/ko/"));
 
   it("includes the Korean entry and its inquiry destination", () => {
-    expect(koreanPages.map((page) => page.route).sort()).toEqual(["/ko", "/ko/contact", "/ko/evaluation", "/ko/pricing"]);
+    expect(koreanPages.map((page) => page.route).sort()).toEqual(["/ko", "/ko/contact", "/ko/evaluation", "/ko/guide", "/ko/pricing"]);
+    // EN-1: the product guide's Korean edition, indexable like the other four.
+    expect(sitemapPaths).toContain("/ko/guide");
+    expect(isNoindex("/ko/guide")).toBe(false);
     expect(sitemapPaths).toContain("/ko");
     expect(sitemapPaths).toContain("/ko/contact");
     expect(sitemapPaths).toContain("/evaluation");
@@ -709,7 +712,7 @@ describe("public surface: the draft cookbooks", () => {
   which is what makes it true of the six draft cookbooks as well.
 */
 describe("hreflang is declared only where a counterpart exists", () => {
-  const PAIRED = ["app/contact/page.tsx", "app/ko/contact/page.tsx", "app/ko/page.tsx", "app/page.tsx", "app/pricing/page.tsx", "app/ko/pricing/page.tsx", "app/evaluation/page.tsx", "app/ko/evaluation/page.tsx"];
+  const PAIRED = ["app/contact/page.tsx", "app/ko/contact/page.tsx", "app/ko/page.tsx", "app/page.tsx", "app/pricing/page.tsx", "app/ko/pricing/page.tsx", "app/evaluation/page.tsx", "app/ko/evaluation/page.tsx", "app/guide/page.tsx", "app/ko/guide/page.tsx"];
   const relativeFile = (file: string) => relative(resolve(import.meta.dirname, ".."), file).split(sep).join("/");
 
   it("is not on the root layout, where every page would inherit it", () => {
@@ -719,7 +722,7 @@ describe("hreflang is declared only where a counterpart exists", () => {
       .not.toMatch(/^\s*languages:/m);
   });
 
-  it("is declared only by the four complete English/Korean page pairs", () => {
+  it("is declared only by the complete English/Korean page pairs", () => {
     const declaring = pages
       .filter((page) => /languages:/.test(readFileSync(page.file, "utf8")))
       .map((page) => relativeFile(page.file))
@@ -727,8 +730,8 @@ describe("hreflang is declared only where a counterpart exists", () => {
     expect(declaring).toEqual([...PAIRED].sort());
     for (const file of PAIRED) {
       const source = readFileSync(resolve(import.meta.dirname, "..", file), "utf8");
-      const korean = file.includes("contact") ? "/ko/contact" : file.includes("pricing") ? "/ko/pricing" : file.includes("evaluation") ? "/ko/evaluation" : "/ko";
-      const english = file.includes("contact") ? "/contact" : file.includes("pricing") ? "/pricing" : file.includes("evaluation") ? "/evaluation" : "/";
+      const korean = file.includes("contact") ? "/ko/contact" : file.includes("pricing") ? "/ko/pricing" : file.includes("evaluation") ? "/ko/evaluation" : file.includes("guide") ? "/ko/guide" : "/ko";
+      const english = file.includes("contact") ? "/contact" : file.includes("pricing") ? "/pricing" : file.includes("evaluation") ? "/evaluation" : file.includes("guide") ? "/guide" : "/";
       expect(source, `${file} must name its Korean counterpart`).toContain(`ko: "${korean}"`);
       expect(source, `${file} must name its English counterpart`).toContain(`en: "${english}"`);
       expect(source, `${file} must name a default`).toContain(`"x-default": "${english}"`);

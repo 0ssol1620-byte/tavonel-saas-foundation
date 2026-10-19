@@ -29,6 +29,8 @@ export const PUBLIC_MARKETING_PATHS = new Set([
   // path being listed is what makes a consented page view possible, never what makes it exempt.
   "/ko",
   "/ko/contact", "/ko/pricing",
+  // EN-1: the product guide, both languages; both are in the sitemap.
+  "/guide", "/ko/guide",
   "/evaluation", "/ko/evaluation",
   /*
     The two pages the 2026-09-11 campaign published, found at integration by the guard in

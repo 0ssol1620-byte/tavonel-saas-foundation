@@ -511,6 +511,9 @@ describe("the getting-started surfaces state no time to a first result", () => {
     "components/docs/api-try-it.tsx",
     "components/docs/keyless-try-it.tsx",
     "lib/keyless-read.ts",
+    // EN-1: the product guide is a getting-started surface too, in both languages.
+    "lib/guide-content.ts",
+    "components/guide/guide-page.tsx",
     "public/developer/README.md",
     "public/llms.txt",
   ];

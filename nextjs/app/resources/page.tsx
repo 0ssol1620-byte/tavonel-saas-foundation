@@ -25,6 +25,7 @@ export const metadata: Metadata = {
 
 const DESCRIPTIONS: Record<string, string> = {
   "/explore": "Follow a result from an answer back to the exact source location it came from, without signing in.",
+  "/guide": "How to use what TAVONEL offers today, screen by screen, and where each screen stops. In English and Korean.",
   "/knowledge-compiler": "What a Knowledge Compiler is, and how it differs from a parser, a RAG pipeline and a graph database.",
   "/docs": "Quickstart, concepts, supported files, compiling, review, and using a world through Ask, the API and MCP.",
   "/cookbooks": "Task guides that take one piece of work through the product, each published ahead of a recorded run.",
