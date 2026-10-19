@@ -1962,6 +1962,40 @@ export const PR141_MAIN_MERGE_BCBA_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/trust-page-answers.test.ts',
 ]);
 export const PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/hero-home-responsive.spec.ts', 'e2e/home-measures.spec.ts', 'e2e/landing-v2.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/production-hardening.spec.ts', 'e2e/public-package-proof.spec.ts']);
+// Enablement batch (codex/enablement-20261017, EN-0 to EN-5 and the guide recordings): the fifty-five changed endpoints no owner
+// listed -- the changelog and its feed, the benchmarks page and its notes mask, the cookbooks index and card, the resources hub,
+// the keyless try-it's digest check and its mounts on /api and /developers, the product guide at /guide and /ko/guide with its
+// media player, and the twenty-four recordings, posters and captions with their sha256 manifest under public/guide. Each selects
+// the nineteen suites that read those files directly (rendered pages, source walks, the sitemap, the manifest rehash). No browser
+// suite of its own: e2e/keyless-try-it.spec.ts runs with the full Playwright suite, and the docs and marketing paths this batch also
+// changed keep their existing owners. Product code, so never nativeReuse.
+export const ENABLEMENT_AFFECTED_PATHS = Object.freeze([
+  'app/api/page.tsx', 'app/benchmarks/page.tsx', 'app/changelog/feed.xml/route.ts', 'app/cookbooks/opengraph-image.tsx',
+  'app/cookbooks/page.tsx', 'app/developers/page.tsx', 'app/guide/opengraph-image.tsx', 'app/guide/page.tsx',
+  'app/ko/guide/opengraph-image.tsx', 'app/ko/guide/page.tsx', 'app/product-polish.css', 'app/resources/page.tsx',
+  'components/changelog-list.tsx', 'components/guide/guide-media.tsx', 'components/guide/guide-page.tsx',
+  'components/guide/guide.module.css', 'e2e/keyless-try-it.spec.ts', 'lib/benchmarks-page.test.ts', 'lib/changelog.test.ts',
+  'lib/changelog.ts', 'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts',
+  'lib/guide-content.ts', 'lib/keyless-read.test.ts', 'lib/keyless-read.ts', 'lib/keyless-try-it.test.ts',
+  'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts', 'lib/resources-hub.test.ts',
+  'public/guide/guide-1-explore-desktop.en.vtt', 'public/guide/guide-1-explore-desktop.jpg',
+  'public/guide/guide-1-explore-desktop.ko.vtt', 'public/guide/guide-1-explore-desktop.mp4',
+  'public/guide/guide-1-explore-phone.en.vtt', 'public/guide/guide-1-explore-phone.jpg',
+  'public/guide/guide-1-explore-phone.ko.vtt', 'public/guide/guide-1-explore-phone.mp4',
+  'public/guide/guide-2-mcp-desktop.en.vtt', 'public/guide/guide-2-mcp-desktop.jpg', 'public/guide/guide-2-mcp-desktop.ko.vtt',
+  'public/guide/guide-2-mcp-desktop.mp4', 'public/guide/guide-2-mcp-phone.en.vtt', 'public/guide/guide-2-mcp-phone.jpg',
+  'public/guide/guide-2-mcp-phone.ko.vtt', 'public/guide/guide-2-mcp-phone.mp4', 'public/guide/guide-3-api-desktop.en.vtt',
+  'public/guide/guide-3-api-desktop.jpg', 'public/guide/guide-3-api-desktop.ko.vtt', 'public/guide/guide-3-api-desktop.mp4',
+  'public/guide/guide-3-api-phone.en.vtt', 'public/guide/guide-3-api-phone.jpg', 'public/guide/guide-3-api-phone.ko.vtt',
+  'public/guide/guide-3-api-phone.mp4', 'public/guide/manifest.json',
+]);
+export const ENABLEMENT_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/changelog.test.ts',
+  'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/design-tokens.test.ts', 'lib/developer-snippets.test.ts',
+  'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/guide-content.test.ts', 'lib/keyless-read.test.ts',
+  'lib/keyless-try-it.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts',
+  'lib/product-claims-sync.test.ts', 'lib/resources-hub.test.ts', 'lib/seo-surface.test.ts', 'lib/trust-page-answers.test.ts',
+]);
 // Exact literal alternation: every regular-expression metacharacter is escaped, not only '.', because the cookbook route
 // carries a literal [slug] segment that would otherwise be read as a character class.
 const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
@@ -2255,6 +2289,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // paper-product.css route ownership: the two exact components above select three direct suites and the Explore and Pricing suites.
   affectedGroup('paper-product-route-css', new RegExp(`^nextjs/(?:${exactPathAlternation(PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS)})$`),
     { unitFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, browserFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES }),
+  // Enablement batch: the fifty-five exact paths above select nineteen direct suites and no browser suite.
+  affectedGroup('enablement-20261017', new RegExp(`^nextjs/(?:${exactPathAlternation(ENABLEMENT_AFFECTED_PATHS)})$`),
+    { unitFiles: ENABLEMENT_AFFECTED_UNIT_FILES }),
   // PR #141 fix round 3: the fourteen exact paths above select their direct suites and the site chrome browser suite.
   affectedGroup('pr141-fix-round-3', new RegExp(`^nextjs/(?:${exactPathAlternation(FIX_ROUND_3_AFFECTED_PATHS)})$`),
     { unitFiles: FIX_ROUND_3_AFFECTED_UNIT_FILES, browserFiles: FIX_ROUND_3_AFFECTED_BROWSER_FILES }),
