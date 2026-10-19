@@ -277,6 +277,16 @@
     .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] .compile-film-mobile-tools) { column-gap: 0; }
   }
   @media (max-width: 899px) {
+    /*
+      G1-COPY (D-01 / P2-30): from 768 to 899px the register's EN support line sets in three lines
+      instead of two (+31px), and the phone sheet's reveal scroll of 300px then found the film and its
+      reading line inside the sheet's zone at 768x900 (reach 778.9 -> 809.9 against 796), so the sheet
+      waited and never opened. The stack pays here too: support to actions and actions to film are
+      16px instead of 24 and 32 (reach 785.9; KO 795.7 -> 771.7). Below 768 the phone rules further
+      down set both to 8px. Windows Chromium, phase4/G1-COPY/hero-geometry.
+    */
+    .home.home :global(.lv2-hero-support) { margin-bottom: 16px; }
+    .heroAside { margin: 16px auto 16px; }
     .home.home :global(#s5 .lv2-proof-list) { grid-template-columns: minmax(0, 1fr); margin-top: 32px; }
     .home.home :global(#s5 .lv2-proof-label) { font-size: 20px; }
   }
