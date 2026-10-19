@@ -106,6 +106,8 @@ describe("the RSC-leak probe", () => {
   it("names no user and no machine of its own", () => {
     const source = readFileSync(script, "utf8");
     expect(source).not.toContain(userInfo().username);
+    // GitHub-hosted runners run as `runner`: the CI name must not be in the prose either, or CI scans its own source.
+    expect(source).not.toMatch(/runner/i);
     expect(source).toContain("env.USER, env.USERNAME, env.LOGNAME");
   });
 });

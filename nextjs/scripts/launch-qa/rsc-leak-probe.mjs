@@ -13,7 +13,7 @@
     - `/Users/` (macOS) and `/home/` (Linux);
     - the OS user name of the account running the probe, read from USER, USERNAME or LOGNAME at
       run time. It is never written here: a name in this file would be the leak it looks for, and
-      the CI runner's account is not the author's.
+      the CI machine's account is not the author's.
 
   How it runs:
     node scripts/launch-qa/rsc-leak-probe.mjs              rm -rf .next, build with the fixture env, scan
