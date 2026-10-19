@@ -526,11 +526,11 @@ const currentOwnerBindings = [
     && runner.includes("['e2e/world-lifecycle.spec.ts', ['1440', '390', 'reduced-motion']]"),
     'Evidence viewer overlay owner must keep its one exact stylesheet, its direct suite and the world-lifecycle browser suite');
 }
-// Launch QA Product QA repins: six exact paths, the compile-stage suite and two mapped browser suites.
+// Launch QA Product QA repins: seven exact paths, the compile-stage suite and two mapped browser suites.
 {
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'launch-qa-product-repins'), [owner] = owners;
   const paths = ['components/compile-stage.test.tsx', 'components/compile-stage.tsx', 'e2e/change-inbox.spec.ts',
-    'e2e/landing-hero-film-loading.spec.ts', 'e2e/pipeline-board.spec.ts', 'e2e/workspace-preflight-audit.spec.ts'];
+    'e2e/landing-hero-film-loading.spec.ts', 'e2e/pipeline-board.spec.ts', 'e2e/workspace-admission-state.spec.ts', 'e2e/workspace-preflight-audit.spec.ts'];
   const suites = ['components/compile-stage.test.tsx'], browsers = ['e2e/landing-hero-film-loading.spec.ts', 'e2e/workspace-source-observation.spec.ts'];
   assert(owners.length === 1 && JSON.stringify(LAUNCH_QA_PRODUCT_REPINS_AFFECTED_PATHS) === JSON.stringify(paths)
     && JSON.stringify(LAUNCH_QA_PRODUCT_REPINS_AFFECTED_UNIT_FILES) === JSON.stringify(suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(suites)

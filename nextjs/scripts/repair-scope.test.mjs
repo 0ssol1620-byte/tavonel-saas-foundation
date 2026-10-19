@@ -7230,7 +7230,7 @@ test('affected PR #141 fix owners: intake approval rollout, solutions proof and 
   }
   assert.deepEqual([[...LAUNCH_QA_PRODUCT_REPINS_AFFECTED_PATHS], [...LAUNCH_QA_PRODUCT_REPINS_AFFECTED_UNIT_FILES], [...LAUNCH_QA_PRODUCT_REPINS_AFFECTED_BROWSER_FILES]],
     [['components/compile-stage.test.tsx', 'components/compile-stage.tsx', 'e2e/change-inbox.spec.ts', 'e2e/landing-hero-film-loading.spec.ts',
-      'e2e/pipeline-board.spec.ts', 'e2e/workspace-preflight-audit.spec.ts'],
+      'e2e/pipeline-board.spec.ts', 'e2e/workspace-admission-state.spec.ts', 'e2e/workspace-preflight-audit.spec.ts'],
     ['components/compile-stage.test.tsx'], ['e2e/landing-hero-film-loading.spec.ts', 'e2e/workspace-source-observation.spec.ts']]);
   assert.deepEqual([[...PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS], [...PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES], [...PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES]],
     [['components/explore/explore-stage.tsx', 'components/pricing-page-client.tsx'],

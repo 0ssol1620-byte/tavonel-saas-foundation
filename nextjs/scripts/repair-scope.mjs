@@ -1843,10 +1843,12 @@ export const EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES = Object.freeze(['e2
 // Launch QA Product QA repins (PR #141 fix round 2): the compile stage's result-less rule and its direct suite, and the four
 // Product QA specs re-pointed to behaviour the PR changed on purpose. Selects the compile-stage suite and the two mapped browser
 // suites (the source-observation stage at 1440, the Home film loading contract at 390). change-inbox, pipeline-board and
-// workspace-preflight-audit have no reviewed Repair project row; Launch QA's Product QA job runs all four on every push.
+// workspace-preflight-audit have no reviewed Repair project row; Launch QA's Product QA job runs all four on every push. Phase 4
+// LAUNCH (D-19) adds workspace-admission-state, re-pointed to the v1 workspace without the terms review; it has no reviewed
+// Repair project row either, and Product QA runs it at every width on every push.
 export const LAUNCH_QA_PRODUCT_REPINS_AFFECTED_PATHS = Object.freeze([
   'components/compile-stage.test.tsx', 'components/compile-stage.tsx', 'e2e/change-inbox.spec.ts',
-  'e2e/landing-hero-film-loading.spec.ts', 'e2e/pipeline-board.spec.ts', 'e2e/workspace-preflight-audit.spec.ts',
+  'e2e/landing-hero-film-loading.spec.ts', 'e2e/pipeline-board.spec.ts', 'e2e/workspace-admission-state.spec.ts', 'e2e/workspace-preflight-audit.spec.ts',
 ]);
 export const LAUNCH_QA_PRODUCT_REPINS_AFFECTED_UNIT_FILES = Object.freeze(['components/compile-stage.test.tsx']);
 export const LAUNCH_QA_PRODUCT_REPINS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/landing-hero-film-loading.spec.ts', 'e2e/workspace-source-observation.spec.ts']);
