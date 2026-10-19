@@ -7,6 +7,7 @@ const FAILURE_CODES = new Set([
   "OCR_RESPONSE_NOT_JSON",
   "OCR_RESPONSE_INVALID",
   "OCR_RESULT_WRITE_FAILED",
+  "OCR_PAGES_INCOMPLETE",
 ]);
 
 export type OcrReviewReceipt = {
