@@ -179,14 +179,21 @@ describe("sample marketing admission: once means once, and only for once events"
     return JSON.parse(session.get("tavonel.funnel-log") ?? "[]");
   }
 
-  it("sample marketing admission: a repeated trackFunnelOnce emits one record and one collector call", async () => {
+  /*
+    P2-07 (ANALYTICS-ACTIVATION-2026-10-17 §4.4 G2, §5 step 2): `trackFunnel` no longer calls the
+    Vercel `track()` itself. Both collectors are fed from the `tavonel:funnel` record, through the
+    consented relays (the Vercel one is `components/vercel-collector.tsx`, counted in
+    `lib/marketing-analytics.test.ts`).
+    So "one collector call" is now "one record, which the relay admits once": the direct call
+    count is pinned at zero, and the record count is what these cases measure.
+  */
+  it("sample marketing admission: a repeated trackFunnelOnce emits one record and one relayed event", async () => {
     const { trackFunnelOnce } = await import("./funnel-events");
     trackFunnelOnce("explore_entered");
     trackFunnelOnce("explore_entered");
     trackFunnelOnce("explore_entered");
 
-    expect(trackMock).toHaveBeenCalledTimes(1);
-    expect(trackMock.mock.calls[0][0]).toBe("explore_entered");
+    expect(trackMock).not.toHaveBeenCalled();
     expect(funnelRecords()).toHaveLength(1);
     expect(sessionLog()).toHaveLength(1);
     const relayed = funnelRecords().map((event) => marketingEventPayload(true, "/explore", event.detail)).filter(Boolean);
@@ -198,7 +205,7 @@ describe("sample marketing admission: once means once, and only for once events"
     trackFunnel("explore_evidence_opened");
     trackFunnel("explore_evidence_opened");
 
-    expect(trackMock).toHaveBeenCalledTimes(2);
+    expect(trackMock).not.toHaveBeenCalled();
     expect(funnelRecords()).toHaveLength(2);
     expect(sessionLog()).toHaveLength(2);
     const relayed = funnelRecords().map((event) => marketingEventPayload(true, "/explore", event.detail)).filter(Boolean);

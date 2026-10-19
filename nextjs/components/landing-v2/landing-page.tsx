@@ -1,10 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import {
-  PublicSiteFooter,
-  PublicSiteHeader,
-  SAMPLE_CTA,
-} from "@/components/public-site-chrome";
+import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
 import HeroFilm from "./hero-film";
 import HeroActions from "./hero-actions";
 import HeroSourceCard from "./hero-source-card";
@@ -14,6 +10,7 @@ import HomeMeasures from "./home-measures";
 import heroStyles from "./landing-hero.module.css";
 import sourceStyles from "./source-first-home.module.css";
 import LandingAnalytics from "./landing-analytics";
+import SpecimenStrip from "./specimen-strip";
 import RecompileScene from "./scenes/recompile";
 import StartScene from "./scenes/start";
 import TrustScene from "./scenes/trust";
@@ -38,8 +35,9 @@ import {
   type EvidenceCase,
   type EvidenceRegion,
 } from "@/lib/home-evidence-view";
-import { KO_CHROME } from "@/lib/site-navigation";
+import { KO_CHROME, SAMPLE_CTA } from "@/lib/site-navigation";
 import { primaryCallToAction } from "@/lib/commercial-state";
+import { homeSpecimens } from "@/lib/specimen-sources";
 import {
   landingVariantState,
   type LandingVariantState,
@@ -230,10 +228,17 @@ export default function LandingPage({
     props at all.
   */
   experiment = landingVariantState({ experiment: null }),
+  /*
+    P2-08: whether this request asked for the synthetic specimen fixtures. They render only on the
+    local test server (lib/specimen-sources.ts); everywhere else the strip reads the committed
+    receipts, and with none committed it renders nothing.
+  */
+  specimenFixtures = false,
   children,
 }: {
   korean?: boolean;
   experiment?: LandingVariantState;
+  specimenFixtures?: boolean;
   /** `/ko`'s document-language effect and breadcrumb. Rendered inside the landmark, as today. */
   children?: React.ReactNode;
 }) {
@@ -273,8 +278,8 @@ export default function LandingPage({
   };
 
   return (
-    <div className={`page lv2 ${sourceStyles.home}`} lang={korean ? "ko" : "en"}>
-      <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.90.woff2" crossOrigin="anonymous" />
+    <div className={`page lv2 ${sourceStyles.home}`} lang={korean ? "ko" : "en"} data-template="T0">
+      {/* The Latin file (split.90) is preloaded by the root layout on every route (B-02). */}
       {korean ? <>
         <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.73.woff2" crossOrigin="anonymous" />
         <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.86.woff2" crossOrigin="anonymous" />
@@ -316,6 +321,12 @@ export default function LandingPage({
                       scene="1" ctaOrderVariant={experiment.ctaOrderVariant} />
                     <p className={sourceStyles.intake}>{page.intake}</p>
                 </div>
+                {/*
+                  P2-08 / UX-L4 (UX-PLAN §3.2-§3.3; critic D-03's default place): real pages beside
+                  the reader's text, between the actions and the illustrative film. Nothing renders
+                  until a receipt does.
+                */}
+                <SpecimenStrip specimens={homeSpecimens({ fixtures: specimenFixtures })} korean={korean} />
                 <HeroFilm korean={korean} />
               </HeroStatement>
             </div>
@@ -438,9 +449,9 @@ export default function LandingPage({
                   <Link className={heroStyles.diffLink} href={record.hrefs.evidence as Route} prefetch={false} data-analytics="source-open">
                     {page.receive.openRegion}
                   </Link>
+                  {/* The committed bytes on this origin, so no ↗: that mark is for leaving the site (UX §5.3 R7). */}
                   <a className={heroStyles.diffLink} href={record.hrefs.original}>
                     {copy.evidence.openOriginal}
-                    <span aria-hidden="true">↗</span>
                   </a>
                 </p>
               </article>

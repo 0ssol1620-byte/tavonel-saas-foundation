@@ -1,7 +1,9 @@
 .page { min-height: 100vh; background: var(--ground); color: var(--text); }
 /* D33 -- one container. The 7vw side padding put this page's H1 at x=101 while its own header
-   wordmark sat at x=30; the shared shell formula puts them on the same gutter. */
-.hero { width: min(100%, var(--shell-wide)); min-height: clamp(520px, 58vh, 700px); margin: 0 auto; display: grid; grid-template-columns: minmax(0, .94fr) minmax(0, 1.06fr); align-items: center; gap: clamp(48px, 7vw, 112px); padding: clamp(112px, 10vw, 156px) var(--gutter) clamp(64px, 7vw, 104px); border-bottom: 1px solid var(--hairline-hi); }
+   wordmark sat at x=30; the shared shell formula puts them on the same gutter. UX-L2 (UX-PLAN-2026-10-17
+   §4.5, R1): that gutter is the site's one container edge now (app/chrome-v2.css --chrome-edge), and
+   the hero is full-bleed so its rule still crosses the page. */
+.hero { width: 100%; min-height: clamp(520px, 58vh, 700px); margin: 0 auto; display: grid; grid-template-columns: minmax(0, .94fr) minmax(0, 1.06fr); align-items: center; gap: clamp(48px, 7vw, 112px); padding: clamp(112px, 10vw, 156px) var(--chrome-edge) clamp(64px, 7vw, 104px); border-bottom: 1px solid var(--hairline-hi); }
 /* The kicker is the global `.eyebrow`; what belongs to this layout is the gap under it. */
 .heroLead { display: grid; gap: 18px; }
 /*
@@ -11,12 +13,16 @@
   stacked lines roughly 700px tall, and the hero's own summary sat beside it in a column
   more than twice as wide. 18ch is still a display measure -- two or three lines for a
   headline of this length -- and it is the column the rest of the page is built on.
+
+  UX-L3 (UX-PLAN-2026-10-17 §5.3 R2): the size, leading and tracking are the H1 role in
+  tavonel.css. /knowledge-compiler (T1) and /reproducibility (T5) set it at 77.76px in Geist while
+  every other route in those templates measured 51.84-59.04px.
 */
-.hero h1 { max-width: 18ch; margin: 0; color: var(--text-hi); font-size: clamp(48px, 5.4vw, 84px); line-height: .94; letter-spacing: -.055em; text-wrap: balance; }
+.hero h1 { max-width: 18ch; margin: 0; color: var(--text-hi); text-wrap: balance; }
 .hero aside { width: min(100%, 620px); display: grid; gap: 20px; padding-bottom: 4px; }
 .hero aside p { max-width: 62ch; margin: 0; color: var(--text-lo); font-size: 15px; line-height: 1.72; text-wrap: pretty; }
 .status { width: fit-content; max-width: 100%; padding: 5px 8px; border: 1px solid var(--changed); color: var(--changed); font: 12px/1.5 var(--f-mono); letter-spacing: .12em; overflow-wrap: anywhere; }
-.body { max-width: var(--shell-wide); margin: 0 auto; padding: 0 var(--gutter) 110px; }
+.body { margin: 0 auto; padding: 0 var(--chrome-edge) 110px; }
 .row { display: grid; grid-template-columns: minmax(180px, .38fr) minmax(0, 1fr); gap: 8vw; padding: 42px 0; border-bottom: 1px solid var(--hairline); }
 /*
   pages-01 / regressions-04. A row carrying a figure is one column.
@@ -28,7 +34,9 @@
   content width, which is the same rule D32 applies to the rest of the site.
 */
 .row:has(> * > figure) { grid-template-columns: minmax(0, 1fr); gap: 22px; }
-.row h2 { margin: 0; color: var(--text-hi); font-size: clamp(23px, 3vw, 42px); letter-spacing: -.035em; }
+/* UX-L7 (UX-PLAN-2026-10-17 §5.3 R3): a section head is Title 1 on every T1-T5 route, the h2 role in
+   tavonel.css. This clamp set 42px at 1440 where the rest of T1 and T5 measured 33.84px. */
+.row h2 { margin: 0; color: var(--text-hi); }
 .rowBody { min-width: 0; display: grid; gap: 18px; }
 .rowBody > p { max-width: 760px; margin: 0; color: var(--text-lo); font-size: 13px; line-height: 1.7; }
 .protocol { min-width: 0; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--hairline); }
@@ -80,8 +88,12 @@
 .index a { display: inline-flex; align-items: center; min-height: 44px; color: var(--text-lo); font-size: 13px; }
 .index a::before { content: counter(section) ". "; margin-right: 4px; color: var(--text-lo); font-size: 12px; }
 @media (hover: hover) and (pointer: fine) { .index a:hover { color: var(--text-hi); } }
-.disclosure summary { display: flex; align-items: center; min-height: 44px; color: var(--text-mid); font-size: 13px; letter-spacing: 0; }
-@media (hover: hover) and (pointer: fine) { .disclosure summary:hover { color: var(--verified); } }
+/* UX-L7 (§5.3 R8): the disclosure shows its marker. `display: flex` dropped it, so three headed sections
+   of /knowledge-compiler opened from a line of text with nothing saying it opens. list-item keeps the
+   native triangle; align-content centres the line in the 44px box. Hover is ink, not the verification
+   colour: this is a control, not a state (§4.2). */
+.disclosure summary { display: list-item; align-content: center; min-height: 44px; color: var(--text-mid); font-size: 13px; letter-spacing: 0; cursor: pointer; }
+@media (hover: hover) and (pointer: fine) { .disclosure summary:hover { color: var(--text-hi); } }
 .disclosure[open] summary { margin-bottom: 10px; color: var(--text-hi); }
 .empty { padding: 22px 0; border-top: 1px solid var(--hairline-hi); border-bottom: 1px solid var(--hairline-hi); color: var(--text-lo); font-size: 12px; line-height: 1.7; }
 .empty strong { display: block; margin-bottom: 7px; color: var(--text-hi); font: 12px var(--f-mono); letter-spacing: .1em; }
@@ -91,9 +103,8 @@
   .hero aside { max-width: 680px; }
 }
 @media (max-width: 760px) {
-  .hero { gap: 30px; padding: 86px 18px 52px; }
-  .hero h1 { font-size: clamp(46px, 15vw, 68px); }
-  .body { padding: 0 18px 80px; }
+  .hero { gap: 30px; padding: 86px var(--chrome-edge) 52px; }
+  .body { padding: 0 var(--chrome-edge) 80px; }
   .row { grid-template-columns: minmax(0, 1fr); gap: 22px; }
   .protocol li { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 }

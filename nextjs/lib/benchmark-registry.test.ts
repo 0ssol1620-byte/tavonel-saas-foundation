@@ -1,13 +1,19 @@
-import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   BENCHMARK_FAMILIES,
   NORTH_STAR,
+  NOT_APPLICABLE,
+  PERMITTED_SENTENCES_KO,
   RECEIPT_FIELDS,
+  answerAxisVerdict,
+  documentAxisVerdict,
   qualifiedBenchmarkRecords,
   readBenchmarkRecords,
   validateBenchmarkReceipt,
   type BenchmarkReceipt,
+  type ComparisonVerdict,
 } from "./benchmark-registry";
 
 /**
@@ -32,6 +38,9 @@ const SHAPE_FIXTURE: BenchmarkReceipt = {
   datasetVersion: "0",
   corpusDigest: `sha256:${"a".repeat(64)}`,
   denominator: { population: "fixture pages", count: 3 },
+  armId: "FIXTURE-ONLY arm",
+  systemUnderTest: "tavonel_live",
+  vendorTermsSnapshotDigest: NOT_APPLICABLE,
   modelId: "fixture-model",
   modelRevision: "fixture-revision",
   inputMode: "page image",
@@ -53,9 +62,24 @@ const SHAPE_FIXTURE: BenchmarkReceipt = {
   publishedFailures: [{ label: "Fixture", detail: "This record measures nothing." }],
 };
 
+/*
+  The same shape for a vendor arm (competitor protocol AT-4): the vendor accepted terms, so that
+  digest is required, and it compiled no world with no TAVONEL build, so those two say so.
+*/
+const VENDOR_FIXTURE: BenchmarkReceipt = {
+  ...SHAPE_FIXTURE,
+  armId: "FIXTURE-ONLY vendor arm",
+  systemUnderTest: "vendor",
+  vendorTermsSnapshotDigest: `sha256:${"9".repeat(64)}`,
+  compilerVersion: NOT_APPLICABLE,
+  worldDigest: NOT_APPLICABLE,
+  hardware: "vendor_hosted",
+  gpu: "vendor_hosted",
+};
+
 /** The fixture minus one key, as plain data the validator has to reject. */
-function without(key: string): unknown {
-  const copy: Record<string, unknown> = { ...SHAPE_FIXTURE };
+function without(key: string, base: BenchmarkReceipt = SHAPE_FIXTURE): unknown {
+  const copy: Record<string, unknown> = { ...base };
   delete copy[key];
   return copy;
 }
@@ -76,7 +100,13 @@ describe("benchmark receipt validation", () => {
   });
 
   it("rejects a record missing any one of its six digests", () => {
-    const digestFields = RECEIPT_FIELDS.filter((field) => field.kind === "digest").map((field) => field.key);
+    /*
+      AT-4 added a seventh digest field, vendorTermsSnapshotDigest, which a TAVONEL arm answers
+      with NOT_APPLICABLE. The six a TAVONEL arm must carry are unchanged and still listed by
+      name; the vendor arm's six are checked in the AT-4 block below.
+    */
+    const digestFields = RECEIPT_FIELDS.filter((field) => field.kind === "digest" && field.notApplicableFor !== "tavonel")
+      .map((field) => field.key);
     expect(digestFields).toEqual([
       "corpusDigest",
       "promptDigest",
@@ -171,6 +201,178 @@ describe("benchmark receipt validation", () => {
   });
 });
 
+describe("comparison arms (competitor protocol AT-4)", () => {
+  it("accepts a vendor arm that marks the world and the compiler as not applicable", () => {
+    expect(problemsOf(VENDOR_FIXTURE)).toEqual([]);
+  });
+
+  it("accepts a research arm on the same terms as the product path", () => {
+    expect(problemsOf(withOverride({ systemUnderTest: "tavonel_research" }))).toEqual([]);
+  });
+
+  it("rejects a vendor arm missing any one of its six digests", () => {
+    const digestFields = RECEIPT_FIELDS.filter((field) => field.kind === "digest" && field.notApplicableFor !== "vendor")
+      .map((field) => field.key);
+    expect(digestFields).toEqual([
+      "corpusDigest",
+      "promptDigest",
+      "configDigest",
+      "vendorTermsSnapshotDigest",
+      "rawResultDigest",
+      "runReceiptDigest",
+    ]);
+    for (const field of digestFields) {
+      expect(problemsOf(without(field, VENDOR_FIXTURE)), field).toContain(`${field} is not a sha256 digest`);
+    }
+  });
+
+  it("refuses a vendor arm that claims a compiled world or a TAVONEL build", () => {
+    expect(problemsOf({ ...VENDOR_FIXTURE, worldDigest: `sha256:${"e".repeat(64)}` }))
+      .toContain('worldDigest must be "notApplicable" for a vendor arm');
+    expect(problemsOf({ ...VENDOR_FIXTURE, compilerVersion: "fixture-compiler" }))
+      .toContain('compilerVersion must be "notApplicable" for a vendor arm');
+    // Left out is not the same as answered.
+    expect(problemsOf(without("worldDigest", VENDOR_FIXTURE)))
+      .toContain('worldDigest must be "notApplicable" for a vendor arm');
+  });
+
+  it("refuses a TAVONEL arm that skips its world or build, or carries a vendor's terms", () => {
+    expect(problemsOf(withOverride({ worldDigest: NOT_APPLICABLE })))
+      .toContain('worldDigest may not be "notApplicable" for this arm');
+    expect(problemsOf(withOverride({ compilerVersion: NOT_APPLICABLE })))
+      .toContain('compilerVersion may not be "notApplicable" for this arm');
+    expect(problemsOf(withOverride({ vendorTermsSnapshotDigest: `sha256:${"9".repeat(64)}` })))
+      .toContain('vendorTermsSnapshotDigest must be "notApplicable" for a tavonel_live arm');
+  });
+
+  it("accepts notApplicable nowhere else, so a model nobody pinned cannot pass as text", () => {
+    for (const fixture of [SHAPE_FIXTURE, VENDOR_FIXTURE]) {
+      expect(problemsOf({ ...fixture, modelId: NOT_APPLICABLE })).toContain('modelId may not be "notApplicable" for this arm');
+      expect(problemsOf({ ...fixture, promptDigest: NOT_APPLICABLE })).toContain('promptDigest may not be "notApplicable" for this arm');
+    }
+  });
+
+  it("requires a named arm and a known system under test", () => {
+    expect(problemsOf(without("armId"))).toContain("armId is missing");
+    const unknown = "systemUnderTest is not one of tavonel_live, tavonel_research, vendor";
+    expect(problemsOf(without("systemUnderTest"))).toContain(unknown);
+    expect(problemsOf(withOverride({ systemUnderTest: "tavonel" }))).toContain(unknown);
+    expect(problemsOf(withOverride({ systemUnderTest: NOT_APPLICABLE })))
+      .toContain('systemUnderTest may not be "notApplicable" for this arm');
+  });
+});
+
+/*
+  The verdict functions, against the preregistration's own vectors.
+
+  The two tables are copied verbatim from VENDOR-COMPARISON-PREREG.json (sha256
+  d68e0027e8c43fbcbe5c7bdfb77a27ee6ebf6ba5292b8ef992cde0c6354916c9), statistics.d_axis_verdict
+  .test_vectors and a_axis_verdict.test_vectors, which the preregistration says this function
+  must follow. The rows after them are the boundaries the vectors do not reach.
+*/
+describe("comparison verdicts (competitor protocol §4.5)", () => {
+  const D_AXIS: Array<[[number, number], number, ComparisonVerdict]> = [
+    [[2.01, 5], 2, "AHEAD"],
+    [[2, 5], 2, "INCONCLUSIVE"],
+    [[-2, 2], 2, "WITHIN"],
+    [[-0.5, 0], 2, "WITHIN"],
+    [[-1.5, -0.2], 2, "BEHIND"],
+    [[-5, -3], 2, "BEHIND"],
+    [[-2.5, 1], 2, "INCONCLUSIVE"],
+    [[0.5, 2.5], 2, "INCONCLUSIVE"],
+    [[0.011, 0.03], 0.01, "AHEAD"],
+  ];
+
+  it.each(D_AXIS)("document axis: CI %j with delta %d is %s (preregistered vector)", ([lower, upper], delta, expected) => {
+    expect(documentAxisVerdict({ lower, upper }, delta)).toBe(expected);
+  });
+
+  it.each<[[number, number], ComparisonVerdict]>([
+    [[-2.0001, 2], "INCONCLUSIVE"], // one tick outside the margin on the low side
+    [[-2, 2.0001], "INCONCLUSIVE"], // and on the high side
+    [[-3, 0], "INCONCLUSIVE"], // an upper bound of exactly zero is not behind
+    [[-3, -0.0001], "BEHIND"],
+    [[2.0001, 2.0001], "AHEAD"],
+  ])("document axis boundary: CI %j with delta 2 is %s", ([lower, upper], expected) => {
+    expect(documentAxisVerdict({ lower, upper }, 2)).toBe(expected);
+  });
+
+  it("calls a metric with no interval inconclusive rather than reading its point estimate", () => {
+    expect(documentAxisVerdict(null, 2)).toBe("INCONCLUSIVE");
+  });
+
+  it("refuses to judge a broken interval or a margin that is not positive", () => {
+    expect(() => documentAxisVerdict({ lower: Number.NaN, upper: 1 }, 2)).toThrow(/not a finite number/);
+    expect(() => documentAxisVerdict({ lower: 0, upper: Number.POSITIVE_INFINITY }, 2)).toThrow(/not a finite number/);
+    expect(() => documentAxisVerdict({ lower: 3, upper: 1 }, 2)).toThrow(/lower bound is above its upper bound/);
+    for (const delta of [0, -2, Number.NaN]) {
+      expect(() => documentAxisVerdict({ lower: 3, upper: 5 }, delta)).toThrow(/delta must be a positive finite number/);
+      expect(() => documentAxisVerdict(null, delta)).toThrow(/delta must be a positive finite number/);
+    }
+  });
+
+  const A_AXIS: Array<[number, [number, number], number, ComparisonVerdict]> = [
+    [6, [1, 11], 0.03, "AHEAD"],
+    [6, [1, 11], 0.06, "INCONCLUSIVE"],
+    [4, [0.5, 8], 0.01, "INCONCLUSIVE"],
+    [-2, [-4, -0.5], 0.04, "BEHIND"],
+    [1, [-3, 4.5], 0.5, "WITHIN"],
+    [5, [0.2, 5], 0.04, "AHEAD"],
+  ];
+  const RULE = { marginPp: 5, alpha: 0.05 };
+
+  it.each(A_AXIS)("answer axis: point %d, CI %j, p %d is %s (preregistered vector)", (point, [lower, upper], mcnemarP, expected) => {
+    expect(answerAxisVerdict({ point, ci: { lower, upper }, mcnemarP }, RULE)).toBe(expected);
+  });
+
+  it.each<[number, [number, number], number, ComparisonVerdict]>([
+    [6, [1, 11], 0.05, "INCONCLUSIVE"], // p equal to alpha is not significant
+    [6, [0, 5], 0.01, "WITHIN"], // a lower bound of exactly zero does not exclude zero
+    [4.9999, [1, 5], 0.01, "WITHIN"], // just under the margin is not ahead
+    [3, [-1, 5.0001], 0.01, "INCONCLUSIVE"],
+  ])("answer axis boundary: point %d, CI %j, p %d is %s", (point, [lower, upper], mcnemarP, expected) => {
+    expect(answerAxisVerdict({ point, ci: { lower, upper }, mcnemarP }, RULE)).toBe(expected);
+  });
+
+  it("refuses to judge the answer axis on input that is not a measurement", () => {
+    const fine = { point: 6, ci: { lower: 1, upper: 11 }, mcnemarP: 0.03 };
+    expect(() => answerAxisVerdict({ ...fine, point: Number.NaN }, RULE)).toThrow(/point difference/);
+    expect(() => answerAxisVerdict({ ...fine, mcnemarP: 1.2 }, RULE)).toThrow(/not a probability/);
+    expect(() => answerAxisVerdict({ ...fine, mcnemarP: Number.NaN }, RULE)).toThrow(/not a probability/);
+    expect(() => answerAxisVerdict({ ...fine, ci: { lower: 11, upper: 1 } }, RULE)).toThrow(/lower bound/);
+    expect(() => answerAxisVerdict(fine, { marginPp: 0, alpha: 0.05 })).toThrow(/marginPp/);
+    expect(() => answerAxisVerdict(fine, { marginPp: 5, alpha: 0 })).toThrow(/alpha/);
+    expect(() => answerAxisVerdict(fine, { marginPp: 5, alpha: 1 })).toThrow(/alpha/);
+  });
+});
+
+describe("the §4.9 sentence map", () => {
+  it("is the preregistration's sentence_templates_ko, byte for byte", () => {
+    /*
+      sha256 of JSON.stringify(publication.sentence_templates_ko) in VENDOR-COMPARISON-PREREG.json
+      (file sha256 d68e0027…16c9). Editing a sentence here without a new preregistration fails.
+    */
+    const digest = createHash("sha256").update(JSON.stringify(PERMITTED_SENTENCES_KO), "utf8").digest("hex");
+    expect(digest).toBe("5df763587d7a16a091236b84e4a80a20c3e9b522cc23f5cf2cf0d0f89bb85453");
+    for (const verdict of ["AHEAD", "WITHIN", "BEHIND", "INCONCLUSIVE"] as const) {
+      expect(PERMITTED_SENTENCES_KO[verdict].length, verdict).toBeGreaterThan(10);
+    }
+  });
+
+  it("is rendered by no page or component until founder decision FD-7 allows a vendor comparison", () => {
+    const root = new URL("../", import.meta.url);
+    for (const directory of ["app", "components"]) {
+      const files = readdirSync(new URL(directory, root), { recursive: true, encoding: "utf8" })
+        .filter((path) => /\.(tsx?|mjs|js)$/.test(path));
+      for (const file of files) {
+        const source = readFileSync(new URL(`${directory}/${file.replaceAll("\\", "/")}`, root), "utf8");
+        expect(source, `${directory}/${file} renders a comparison sentence FD-7 has not approved`)
+          .not.toContain("PERMITTED_SENTENCES_KO");
+      }
+    }
+  });
+});
+
 describe("the receipt contract and the family taxonomy", () => {
   it("describes every field of a receipt, so the page cannot promise less than the validator checks", () => {
     const described = RECEIPT_FIELDS.map((field) => field.key).sort();
@@ -236,7 +438,7 @@ describe("the committed registry", () => {
 
   A visitor at /benchmarks reads two files. `app/benchmarks/page.tsx` holds the headings and the
   prose around each block; this file's `BENCHMARK_FAMILIES`, `RECEIPT_FIELDS` and `NORTH_STAR`
-  hold the eight family labels and definitions, the twenty-one field labels and their `pins`
+  hold the eight family labels and definitions, the twenty-four field labels and their `pins`
   sentences, and the North Star definition -- the larger half of the page by word count.
 
   Neither existing gate crosses that boundary on its own. `brand-copy.test.ts` reads each

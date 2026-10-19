@@ -7,6 +7,7 @@ import {
   landingVariantState,
 } from "@/lib/landing-experiments";
 import { BRAND_LINE } from "@/lib/site-navigation";
+import { SPECIMEN_FIXTURE_COOKIE } from "@/lib/specimen-sources";
 
 /**
  * The English entry point, and one half of the site's only hreflang pair.
@@ -84,9 +85,11 @@ export default async function HomePage({
     cookie: (await cookies()).get(LANDING_VARIANT_COOKIE)?.value,
     query: Array.isArray(query) ? query[0] : query,
   });
+  // P2-08: honoured only by the local test server (lib/specimen-sources.ts); a deployment ignores it.
+  const specimenFixtures = (await cookies()).get(SPECIMEN_FIXTURE_COOKIE)?.value === "1";
   return (
     <>
-      <LandingPage experiment={experiment} />
+      <LandingPage experiment={experiment} specimenFixtures={specimenFixtures} />
     </>
   );
 }

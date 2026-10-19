@@ -178,7 +178,7 @@ const PARTS: readonly Part[] = [
 
 export default function CompiledWorldPage() {
   return (
-    <PublicSitePage>
+    <PublicSitePage template="T1">
       <BreadcrumbJsonLd trail={[{ name: "Product", path: "/product" }, { name: "Compiled World", path: "/product/compiled-world" }]} />
       <section className="scene doc">
         <div className="shell">

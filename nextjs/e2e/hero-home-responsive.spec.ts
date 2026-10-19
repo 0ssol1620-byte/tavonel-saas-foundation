@@ -547,14 +547,24 @@ test("every stage that opens cropped keeps ink in both panes of its whole window
   frame top was 633 at 360 (as on Windows) and 633 at 390 (609 on Windows), per the CI stage-1
   screenshots (fix3/GEOMETRY.json ciLinux).
 */
+/*
+  UX-L2 (lane P2-04, UX-PLAN-2026-10-17 §4.5 and rule R1): Home's side margin became the shared
+  --tv-page-margin, clamp(24px, 5vw, 72px) (DESIGN_MASTER_V3 §6.4), instead of 20px, so on a phone
+  the frame is 8px narrower (chromium 320/350/372/390 -> 312/342/364/382px; Windows WebKit 310/340/
+  362/380 -> 302/332/354/372px). Each floor below is the one above times (new width / old width)^2,
+  rounded down -- the plan changed the frame's width and nothing else, so a frame that slides under
+  the fold still trips the 1%. Previous floors, chromium EN 51,516 / 75,516 / 85,470 / 93,896 and
+  KO 62,646 / 75,864 / 85,470 / 94,284; WebKit EN 43,495 / 68,640 / 81,000 / 89,302 and KO 59,290 /
+  71,402 / 81,000 / 89,302.
+*/
 const LCP_FLOOR: Record<string, Record<string, Record<number, number>>> = {
   chromium: {
-    "/": { 360: 51_516, 390: 75_516, 412: 85_470, 430: 93_896 },
-    "/ko": { 360: 62_646, 390: 75_864, 412: 85_470, 430: 94_284 },
+    "/": { 360: 48_972, 390: 72_103, 412: 81_833, 430: 90_083 },
+    "/ko": { 360: 59_552, 390: 72_435, 412: 81_833, 430: 90_455 },
   },
   webkit: {
-    "/": { 360: 43_495, 390: 68_640, 412: 81_000, 430: 89_302 },
-    "/ko": { 360: 59_290, 390: 71_402, 412: 81_000, 430: 89_302 },
+    "/": { 360: 41_279, 390: 65_447, 412: 77_459, 430: 85_581 },
+    "/ko": { 360: 56_269, 390: 68_081, 412: 77_459, 430: 85_581 },
   },
 };
 for (const path of ["/", "/ko"]) {

@@ -1,8 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { COOKBOOKS } from "./cookbook-content";
-import { MARKETING_EVENTS, NAV_OPEN_EVENT, PUBLIC_MARKETING_PATHS, consentCopy, consentSurface, publicPageLocation, readConsent, referralOrigin } from "./marketing-analytics";
+import { CONSENT_KEY, MARKETING_EVENTS, NAV_OPEN_EVENT, PUBLIC_MARKETING_PATHS, consentCopy, consentSurface, publicPageLocation, readConsent, referralOrigin, vercelBeforeSend } from "./marketing-analytics";
+import { trackFunnel, type FunnelEvent } from "./funnel-events";
+
+// P2-07: the Vercel SDK is the only stand-in. Nothing here contacts a collector or is evidence
+// about a live visitor; it is the decision in code, counted at the two calls that would send.
+const trackMock = vi.hoisted(() => vi.fn());
+const analyticsMock = vi.hoisted(() => vi.fn((_props: { beforeSend?: unknown }) => null));
+vi.mock("@vercel/analytics", () => ({ track: trackMock }));
+vi.mock("@vercel/analytics/next", () => ({ Analytics: analyticsMock }));
+vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
+const { default: MarketingConsent } = await import("../components/marketing-consent");
+const { default: VercelCollector, relayToVercel } = await import("../components/vercel-collector");
 
 describe("public marketing analytics boundary", () => {
   it("refuses private, unknown and user-supplied URLs", () => {
@@ -151,5 +164,178 @@ describe("the consent banner speaks the page's language", () => {
     for (const word of [EN.prompt, EN.refuse, EN.allow, EN.settings, KO.prompt]) {
       expect(component, "a string written into the component cannot be translated").not.toContain(word);
     }
+  });
+});
+
+/*
+  P2-07 (ANALYTICS-ACTIVATION-2026-10-17 §4.4 G1-G2, §5 steps 1-2): the Vercel collector on the
+  Google tag's terms.
+
+  /privacy says nothing in the analytics rows is set before you choose and that a refusal sends no
+  analytics request, and the Vercel row is one of those rows. With the collector mounted at the
+  root behind the build flag alone, turning the flag on would have made that sentence false. So
+  every case below runs with the flag ON: the flag is necessary, and never sufficient.
+*/
+describe("P2-07: the Vercel collector waits for consent on a public page", () => {
+  const FLAG = "NEXT_PUBLIC_TAVONEL_ANALYTICS_ENABLED";
+  const HOME = "https://tavonel.com/";
+  const later = () => Date.now() + 180 * 24 * 60 * 60 * 1000;
+  const yes = () => JSON.stringify({ allowed: true, expires: later() });
+
+  beforeEach(() => {
+    trackMock.mockClear();
+    analyticsMock.mockClear();
+    vi.stubEnv(FLAG, "1");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  function renders(props: { ready: boolean; consent: boolean | null; location: string | null }) {
+    renderToStaticMarkup(createElement(VercelCollector, props));
+    return analyticsMock.mock.calls.length;
+  }
+
+  /*
+    One page: `trackFunnel` dispatching on it and the relay listening exactly as MarketingConsent's
+    effect wires it, for one stored answer on one pathname. "throw" is storage that refuses to be
+    read. Returns the unsubscribe, or undefined when nothing listens, and a way to navigate.
+  */
+  function page(stored: string | null, pathname: string) {
+    const target = new EventTarget();
+    vi.stubGlobal("window", {
+      sessionStorage: { getItem: () => null, setItem: () => {} },
+      dispatchEvent: (event: Event) => target.dispatchEvent(event),
+    });
+    const consent = readConsent({
+      getItem: (key: string) => {
+        if (stored === "throw") throw new Error("SecurityError");
+        return key === CONSENT_KEY ? stored : null;
+      },
+    });
+    let current = pathname;
+    const stop = relayToVercel({ ready: true, consent, location: publicPageLocation(pathname) }, target, () => current);
+    return { stop, navigate: (next: string) => { current = next; } };
+  }
+
+  it("renders no <Analytics> before a stored yes, with the flag on", () => {
+    expect(renderToStaticMarkup(createElement(MarketingConsent)), "the first paint holds nothing").toBe("");
+    for (const state of [
+      { ready: false, consent: true, location: HOME }, // storage not read yet
+      { ready: true, consent: null, location: HOME }, // not answered
+      { ready: true, consent: false, location: HOME }, // refused
+      { ready: true, consent: true, location: null }, // yes, but on an unlisted page (workspace, login)
+    ]) expect(renders(state), JSON.stringify(state)).toBe(0);
+    expect(analyticsMock).not.toHaveBeenCalled();
+  });
+
+  it("renders it once after a yes on a listed page, with the path gate attached", () => {
+    expect(renders({ ready: true, consent: true, location: HOME })).toBe(1);
+    expect(analyticsMock.mock.calls[0][0].beforeSend).toBe(vercelBeforeSend);
+  });
+
+  it("still needs the flag: a yes without it renders nothing", () => {
+    for (const value of ["", "0", "true"]) {
+      vi.stubEnv(FLAG, value);
+      expect(renders({ ready: true, consent: true, location: HOME }), JSON.stringify(value)).toBe(0);
+    }
+  });
+
+  it("calls track() zero times before a yes, after a refusal, or when storage cannot be read", () => {
+    for (const stored of [null, JSON.stringify({ allowed: false, expires: later() }), JSON.stringify({ allowed: true, expires: 1 }), "broken", "throw"]) {
+      expect(page(stored, "/").stop, `${stored}: nothing listens`).toBeUndefined();
+      trackFunnel("hero_primary_click");
+      trackFunnel("cta_clicked", { cta: "explore", scene: "hero" });
+    }
+    expect(relayToVercel({ ready: false, consent: true, location: HOME }, new EventTarget(), () => "/"), "storage not read yet").toBeUndefined();
+    expect(trackMock).not.toHaveBeenCalled();
+  });
+
+  it("never calls track() from trackFunnel itself: a yes with the flag off sends nothing", () => {
+    vi.stubEnv(FLAG, "");
+    expect(page(yes(), "/").stop).toBeUndefined();
+    trackFunnel("hero_primary_click");
+    expect(trackMock).not.toHaveBeenCalled();
+    const funnel = readFileSync(resolve(import.meta.dirname, "funnel-events.ts"), "utf8");
+    expect(funnel, "the funnel module reaches no collector of its own").not.toContain("@vercel/analytics");
+  });
+
+  it("after a yes on a listed page, sends the marketing name with allowlisted properties only", () => {
+    const { stop } = page(yes(), "/");
+    trackFunnel("hero_primary_click");
+    trackFunnel("cta_clicked", { cta: "explore", scene: "hero" });
+    // Any script can dispatch this event: unlisted keys and non-strings are dropped, a throwing
+    // detail is dropped, and nothing of the detail but allowlisted string states is forwarded.
+    window.dispatchEvent(new CustomEvent("tavonel:funnel", { detail: { event: "cta_clicked", cta: "start", question: "Q-SENTINEL", collectionId: "C-SENTINEL", scene: 3 } }));
+    window.dispatchEvent(new CustomEvent("tavonel:funnel", { detail: { get event() { throw new Error("hostile"); } } }));
+    window.dispatchEvent(new CustomEvent("tavonel:funnel", { detail: { event: "cta_clicked", get cta() { throw new Error("hostile"); } } }));
+    expect(trackMock.mock.calls).toEqual([
+      ["hero_primary_click", undefined],
+      ["cta_clicked", { cta: "explore", scene: "hero" }],
+      ["cta_clicked", { cta: "start" }],
+    ]);
+    stop!();
+    trackFunnel("hero_primary_click");
+    expect(trackMock, "an unsubscribed relay sends nothing").toHaveBeenCalledTimes(3);
+  });
+
+  it("sends no workspace, sign-in, checkout or question event, on any path, even after a yes", () => {
+    const privateNames: FunnelEvent[] = [
+      "workspace_first_source_added", "workspace_compile_started", "workspace_compile_failed", "workspace_candidate_ready",
+      "workspace_review_required", "workspace_world_activated", "workspace_first_ask", "workspace_ai_connect_opened",
+      "signed_in", "login_reached_with_intent", "checkout_opened", "checkout_completed", "source_filter_changed", "explore_ask_used",
+    ];
+    for (const pathname of ["/workspace", "/workspace/sources", "/login", "/auth/callback"]) {
+      expect(page(yes(), pathname).stop, `${pathname}: nothing listens`).toBeUndefined();
+      for (const name of privateNames) trackFunnel(name, { status: "ok" });
+    }
+    // Listening on a public page: a private name is refused there too, and after a client-side
+    // navigation into the workspace (the listener can outlive the page it was installed on) a
+    // marketing name is refused as well.
+    const { navigate } = page(yes(), "/");
+    for (const name of privateNames) trackFunnel(name, { status: "ok" });
+    navigate("/workspace");
+    trackFunnel("hero_primary_click");
+    expect(trackMock).not.toHaveBeenCalled();
+  });
+
+  it("vercelBeforeSend drops private and unlisted pages and strips the query from a listed one", () => {
+    for (const url of [
+      "https://tavonel.com/workspace", "https://tavonel.com/workspace/sources?id=7", "https://tavonel.com/login",
+      "https://tavonel.com/login?offer=team", "https://tavonel.com/auth/callback#access_token=x", "https://tavonel.com/api/contact",
+      "https://tavonel.com/cookbooks/unlisted", "https://tavonel.com/pricing/", "/evaluation", "not a url", "",
+    ]) {
+      expect(vercelBeforeSend({ type: "pageview", url }), url).toBeNull();
+      expect(vercelBeforeSend({ type: "event", url }), url).toBeNull();
+    }
+    const event = { type: "pageview" as const, url: "https://tavonel.com/evaluation?utm_source=x&email=a%40b.example#form" };
+    expect(vercelBeforeSend(event)).toEqual({ type: "pageview", url: "https://tavonel.com/evaluation" });
+    expect(event.url, "the incoming event is not mutated").toContain("?utm_source");
+    expect(vercelBeforeSend({ type: "event", url: "https://tavonel.com/ko/evaluation?ref=home" })).toEqual({ type: "event", url: "https://tavonel.com/ko/evaluation" });
+    expect(vercelBeforeSend({ type: "pageview", url: "https://tavonel.com/arena?x=1" })).toEqual({ type: "pageview", url: "https://tavonel.com/arena" });
+    // A preview keeps its own host: Vercel separates environments, and the preview check reads it.
+    expect(vercelBeforeSend({ type: "pageview", url: "https://tavonel-git-x.vercel.app/?q=1" })).toEqual({ type: "pageview", url: "https://tavonel-git-x.vercel.app/" });
+  });
+
+  it("is mounted by the consent component only, and a withdrawal also unloads it", () => {
+    const layout = readFileSync(resolve(import.meta.dirname, "../app/layout.tsx"), "utf8");
+    expect(layout, "the root layout mounts no collector of its own").not.toContain("<Analytics");
+    expect(layout).not.toContain("@vercel/analytics");
+    expect(layout).not.toContain("vercel-collector");
+    const consent = readFileSync(resolve(import.meta.dirname, "../components/marketing-consent.tsx"), "utf8");
+    expect(consent).toContain('if (!allowed && (document.getElementById("tavonel-google-tag") || (window as AnalyticsWindow).va)) window.location.reload();');
+    // Fetched only once it may run, and never statically: a static import of the SDK put it in
+    // every page's script and broke the §22 ratchet (P2-07's receipt).
+    expect(consent).toContain('const VercelCollector = lazy(() => import("@/components/vercel-collector")');
+    expect(consent).toContain('{process.env.NEXT_PUBLIC_TAVONEL_ANALYTICS_ENABLED === "1" && ready && consent === true && location');
+    expect(consent, "the consent component imports none of the Vercel SDK").not.toContain("@vercel/analytics");
+    const collector = readFileSync(resolve(import.meta.dirname, "../components/vercel-collector.tsx"), "utf8");
+    expect(collector).toContain("useEffect(() => relayToVercel({ ready, consent, location }, window, () => window.location.pathname), [consent, location, ready]);");
+  });
+
+  it("admits the two public click names G3 adds, and not the question one", () => {
+    for (const name of ["cta_clicked", "explore_object_selected"]) expect(MARKETING_EVENTS.has(name), name).toBe(true);
+    expect(MARKETING_EVENTS.has("explore_ask_used")).toBe(false);
   });
 });

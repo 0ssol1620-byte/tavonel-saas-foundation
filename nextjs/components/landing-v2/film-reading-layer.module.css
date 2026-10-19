@@ -32,7 +32,7 @@
 }
 
 .panes li[data-marked] {
-  border-top-color: var(--home-cobalt, #244ac8);
+  border-top-color: var(--home-cobalt, var(--tv-action));
   color: var(--home-ink, #15191d);
 }
 
@@ -52,7 +52,7 @@
 }
 
 .panes button:focus-visible {
-  outline: 2px solid var(--home-cobalt, #244ac8);
+  outline: 2px solid var(--home-cobalt, var(--tv-action));
   outline-offset: 2px;
 }
 
@@ -83,20 +83,6 @@
   .line,
   .quote {
     font-size: 15px;
-  }
-
-  /*
-    Fix round 5 (R4-MJ1): in phone Fit the line sits above the frame, so a stage whose line wraps
-    to one line more or less moved the film by 22.5px -- on every ~18 s auto-advance, with no
-    input (critic4/cls4-after.json: single layout shifts up to 0.0624). The block reserves the
-    longest line's height and sets the text on its foot, 8px over the frame, so the frame's top
-    no longer depends on the stage. Three lines at 15px x 1.5 is the maximum: measured at 360-430
-    x EN/KO in Chrome and in Windows WebKit (310-410px columns), the longest line (stage 4 EN)
-    needs 266px for three lines and every column is 310px or wider (fix4/frames-*.json, min3).
-  */
-  .story[data-mobile-view="fit"] .reading {
-    min-height: 67.5px;
-    align-content: end;
   }
 }
 
@@ -169,7 +155,7 @@
   }
 
   .story[data-narrow="0"] .viewControl:focus-visible {
-    outline: 2px solid var(--home-cobalt, #244ac8);
+    outline: 2px solid var(--home-cobalt, var(--tv-action));
     outline-offset: 2px;
   }
 
@@ -246,5 +232,46 @@
     border-color: var(--home-ink, #15191d);
     background: rgb(21 25 29 / 7%);
     box-shadow: inset 0 0 0 1px var(--home-ink, #15191d);
+  }
+
+  /*
+    Fix round 5 (R4-MJ1): in Fit the line sits above the frame, so a stage whose line wraps to one
+    line more or less moved the film -- on every ~18 s auto-advance, with no input (critic4/
+    cls4-after.json: single layout shifts up to 0.0624). The block reserves the longest line's
+    height and sets the text on its foot, 8px over the frame, so the frame's top no longer depends
+    on the stage.
+
+    UX-L6 (UX-PLAN-2026-10-17 §3.6, §8.2): the reservation covers the whole range where Fit puts
+    the line above the frame -- this query, the player's NARROW_FRAME -- instead of stopping at
+    767px. From 768px the line is 16px x 1.5 and its longest stage takes two lines, so 768-899 and
+    a coarse pointer to 1023 moved the frame 24px on every advance (EN 768: 602.7 / 578.7 / 602.7 /
+    602.7; KO 820: 619.5 / 595.5 x3, Chrome; p2-06-film-line/band-base.txt). Two lines is the
+    measured maximum there (768-899 x EN/KO, Chrome and Windows WebKit; one line at 900-1023 under
+    a coarse pointer, band-coarse-after.txt); the phone's three lines are set in the block below.
+
+    The quoted filename's own line-height is 1 here: at 1.5 its IBM Plex Mono box stands 0.5px
+    taller than the sans line and grew stage 1's three lines to 68px in WebKit, which moved the
+    frame 0.5px when stage 1 came and went. At 1 the box sits inside the line, in both engines.
+  */
+  .story[data-mobile-view="fit"] .reading {
+    min-height: 48px;
+    align-content: end;
+  }
+
+  .story[data-mobile-view="fit"] .mono {
+    line-height: 1;
+  }
+}
+
+/*
+  Fix round 5 (R4-MJ1): three lines at 15px x 1.5 is the phone maximum. Measured at 360-430 x
+  EN/KO in Chrome and in Windows WebKit, the longest line (stage 4 EN) needs 266px for three lines
+  and every phone column is 302px or wider (302 = Windows WebKit at 360, whose classic scrollbar
+  takes 10px; fix4/frames-*.json, p2-06-film-line/band-*.txt). After the 768+ rule above, so it
+  wins below 768px.
+*/
+@media (max-width: 767px) {
+  .story[data-mobile-view="fit"] .reading {
+    min-height: 67.5px;
   }
 }

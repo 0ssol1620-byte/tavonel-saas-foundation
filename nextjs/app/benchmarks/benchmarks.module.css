@@ -69,13 +69,14 @@
   writing the metric chips as prose (BA-094) took most of the length out. What was still missing
   is a step between the 48px h1 and the 10px tracked mono labels, so a section title is a
   readable size here with the label rule under it rather than instead of it.
+
+  UX-L3 (UX-PLAN-2026-10-17 §4.4, §5.3 R3): size, tracking and weight now come from the role. At
+  16px the eight section H2s sat in the same column as a 30px "Next: Reproducibility" H2; an H2
+  here is Title 1 and an H3 is the card level, both from tavonel.css.
 */
 .sectionTitle {
   font-family: var(--f-sans);
-  font-size: 16px;
-  letter-spacing: -0.008em;
   text-transform: none;
-  font-variation-settings: "wght" 560;
   text-wrap: initial;
   color: var(--text-hi);
 }

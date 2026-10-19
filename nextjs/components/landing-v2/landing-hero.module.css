@@ -7,7 +7,8 @@
   Shared chrome and global sheets are not touched; every `:global` hook below re-inks existing
   statement, action or scene markup, and only inside `.home`.
 
-  Warm paper and near-black ink; cobalt is for actions only, amber only marks evidence. No
+  Warm paper and near-black ink; the accent is for actions only, and evidence is marked in ink
+  (UX-L1; the legacy tokens below read the --tv-* values the mounted root uses). No
   radius anywhere: rules and one raised sheet separate things, not nested rounded cards.
 */
 
@@ -17,11 +18,11 @@
   --home-sheet: #fffdf8;
   --home-ink: #14171a;
   --home-muted: #4b5057;
-  --home-cobalt: #2347b8;
-  --home-cobalt-deep: #1b3891;
-  --home-amber: #f2b73a;
-  --home-amber-wash: #fff1c7;
-  --home-amber-ink: #8a5a00;
+  --home-cobalt: var(--tv-action);
+  --home-cobalt-deep: var(--tv-action-hover);
+  --home-amber: var(--tv-rule-strong);
+  --home-amber-wash: var(--tv-paper-sunk);
+  --home-amber-ink: var(--tv-ink-muted);
   --home-rule: rgb(20 23 26 / 0.16);
   --home-rule-strong: rgb(20 23 26 / 0.32);
   --home-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
@@ -390,9 +391,10 @@ a.diffLink:focus-visible {
   outline-offset: 1px;
 }
 
+/* A translucent ink wash, so the scan under the selected region stays readable (UX-L1, §4.2-2). */
 .box[data-selected="1"] {
   outline: 2px solid var(--home-ink);
-  background: rgb(242 183 58 / 0.3);
+  background: var(--tv-rule);
 }
 
 .boxMark {
@@ -494,7 +496,7 @@ a.evidenceLink {
   list-style: none;
 }
 
-/* Native buttons; the pressed one carries the amber mark. Selection itself is instant. */
+/* Native buttons; the pressed one carries the region wash and an ink edge. Selection itself is instant. */
 .regionButton {
   display: grid;
   grid-template-columns: 1.75rem minmax(0, 1fr);
@@ -621,15 +623,18 @@ a.evidenceLink {
   border-top: 1px solid var(--home-rule);
 }
 
-/* Brief move 5: the Evidence Line's label on the passage card, where the line itself is not drawn. */
+/*
+  Brief move 5: the Evidence Line's label on the passage card, where the line itself is not drawn.
+  Ink, like the line's own chip: the accent is for the line and its region outline (UX §4.2-1).
+*/
 .lineLabel {
   margin: 0.5rem 0 0;
-  color: var(--home-cobalt);
+  color: var(--home-ink);
   font: 500 0.75rem/1.45 var(--home-mono);
   letter-spacing: 0;
   overflow-wrap: anywhere;
 }
-.lineLabel span { font-family: var(--f-sans); color: var(--home-ink); }
+.lineLabel span { font-family: var(--f-sans); }
 .lineLabel code { font: inherit; }
 @media (min-width: 960px) { .lineLabel { display: none; } }
 
@@ -1321,9 +1326,28 @@ section.receive {
 }
 
 /*
+  UX-L10 (UX-PLAN-2026-10-17 §4.6, §8.2): under reduced motion nothing in the workbench transitions,
+  not even the opacity fade app/landing-v2.css keeps on `.lv2 *` (an !important rule in
+  `@layer components`, so the unlayered `transition: none` above loses to it). No workbench element
+  fades, so nothing is lost. Declared in the same layer, where `article.bench *` outranks `.lv2 *`.
+*/
+@layer components {
+  @media (prefers-reduced-motion: reduce) {
+    article.bench,
+    article.bench::before,
+    article.bench::after,
+    article.bench *,
+    article.bench *::before,
+    article.bench *::after {
+      transition: none !important;
+    }
+  }
+}
+
+/*
   The walkthrough film at the foot of scene 02 (`hero-film-disclosure.tsx`). It sits on the
-  stone ground now, so the rules are ink-tinted and the marker is the evidence amber; the focus
-  ring is the action cobalt like every other control on Home.
+  stone ground now, so the rules are ink-tinted and the marker is the muted evidence ink; the
+  focus ring is the action accent like every other control on Home.
 */
 .film {
   --film-rule: var(--home-rule-strong);

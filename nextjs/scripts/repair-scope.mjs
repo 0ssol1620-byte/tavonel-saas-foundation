@@ -1996,6 +1996,103 @@ export const PR141_MAIN_MERGE_BCBA_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/trust-page-answers.test.ts',
 ]);
 export const PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/hero-home-responsive.spec.ts', 'e2e/home-measures.spec.ts', 'e2e/landing-v2.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/production-hardening.spec.ts', 'e2e/public-package-proof.spec.ts']);
+// UX program 2026-10-17 billing and checkout tracks (P2-10 CTA truth, P2-12..P2-16, B-07/B-08): the HMAC-previous verification in
+// the billing event, binding, gate route and trial, the checkout hook and its entitlement wait, the intent carried across sign-in and
+// its notice, the CTA truth table, the fake Paddle fixture and the two browser journeys. Exactly these eighteen paths select their
+// ten direct suites (checkout-policy and billing-gate-enforce-route for the gate, production-posture for the switches) and the
+// login-capability (1440) and self-serve-journey (audit) browser suites. Product billing code, so never nativeReuse.
+export const UX_BILLING_CHECKOUT_AFFECTED_PATHS = Object.freeze([
+  'app/api/internal/billing/gate-enforce/route.ts',
+  'components/checkout-intent-notice.tsx',
+  'e2e/fixtures/paddle-fixture.ts',
+  'e2e/login-capability.spec.ts',
+  'e2e/self-serve-journey.spec.ts',
+  'lib/billing-binding.test.ts',
+  'lib/billing-binding.ts',
+  'lib/checkout-intent.test.ts',
+  'lib/checkout-intent.ts',
+  'lib/cta-truth.test.ts',
+  'lib/entitlement-wait.test.ts',
+  'lib/entitlement-wait.ts',
+  'lib/paddle-billing-event.test.ts',
+  'lib/paddle-billing-event.ts',
+  'lib/self-service-trial-device-rotation.test.ts',
+  'lib/self-service-trial.ts',
+  'lib/use-checkout.test.ts',
+  'lib/use-checkout.ts',
+]);
+export const UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/billing-binding.test.ts',
+  'lib/billing-gate-enforce-route.test.ts',
+  'lib/checkout-intent.test.ts',
+  'lib/checkout-policy.test.ts',
+  'lib/cta-truth.test.ts',
+  'lib/entitlement-wait.test.ts',
+  'lib/paddle-billing-event.test.ts',
+  'lib/production-posture.test.ts',
+  'lib/self-service-trial-device-rotation.test.ts',
+  'lib/use-checkout.test.ts',
+]);
+export const UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/login-capability.spec.ts', 'e2e/self-serve-journey.spec.ts']);
+// Table track and intake ceiling (P2-18..P2-21): the two shared cross-tree contracts, the table-read contract suite and its three
+// synthetic fixtures. Repository-relative, because shared/ is outside nextjs/. Exactly these six paths select the table-read and
+// intake-ceiling cross-tree suites and every suite that imports the ceiling (pipeline, plan-limit-fit, preflight-report,
+// r2-presign, copy-trust-guard for its sentence, production-posture for the ceiling as posture). No browser suite. Never nativeReuse.
+export const TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS = Object.freeze([
+  'nextjs/lib/fixtures/table-read/synthetic-no-table.json',
+  'nextjs/lib/fixtures/table-read/synthetic-read-table-and-formula.json',
+  'nextjs/lib/fixtures/table-read/synthetic-unreadable-truncated.json',
+  'nextjs/lib/table-read-contract.test.ts',
+  'shared/intakeCeiling.ts',
+  'shared/tableReadContract.ts',
+]);
+export const TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/copy-trust-guard.test.ts',
+  'lib/intake-ceiling-cross-tree.test.ts',
+  'lib/pipeline.test.ts',
+  'lib/plan-limit-fit.test.ts',
+  'lib/preflight-report.test.ts',
+  'lib/production-posture.test.ts',
+  'lib/r2-presign.test.ts',
+  'lib/table-read-contract.test.ts',
+]);
+// Specimen strip (P2-08, B-04/B-06): the strip, its fail-closed receipt contract and suite, the three synthetic fixtures with their
+// crops and the browser spec. Exactly these eleven paths select the receipt-contract suite and the specimen-strip browser suite
+// (390 only: every test in the spec skips outside project 390, because each one sets its own browser and viewport or
+// needs one request; a 1440 row selects a file with no executed test, which the report reader refuses). No production
+// receipt is committed, so no public crop path is admitted here. Product UI, so never nativeReuse.
+export const SPECIMEN_STRIP_AFFECTED_PATHS = Object.freeze([
+  'components/landing-v2/specimen-strip.module.css',
+  'components/landing-v2/specimen-strip.tsx',
+  'e2e/fixtures/specimens/fixture-korean.json',
+  'e2e/fixtures/specimens/fixture-korean.svg',
+  'e2e/fixtures/specimens/fixture-scan.json',
+  'e2e/fixtures/specimens/fixture-scan.svg',
+  'e2e/fixtures/specimens/fixture-table.json',
+  'e2e/fixtures/specimens/fixture-table.svg',
+  'e2e/specimen-strip.spec.ts',
+  'lib/specimen-sources.test.ts',
+  'lib/specimen-sources.ts',
+]);
+export const SPECIMEN_STRIP_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/specimen-sources.test.ts',
+]);
+export const SPECIMEN_STRIP_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/specimen-strip.spec.ts']);
+// Launch QA and release scripts (P2-02 script ratchet, P2-17 release-decision check): the Lighthouse budget script and its ratchet
+// suite, the read-only release-gate check, its Node suite and the Vitest wrapper that runs that suite here. Exactly these five
+// paths select the ratchet, client-route-weight and wrapper suites; no browser, database or build lane. Never nativeReuse.
+export const LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS = Object.freeze([
+  'lib/launch-qa-script-ratchet.test.ts',
+  'lib/release-gate-check-script.test.ts',
+  'scripts/launch-qa/lighthouse-budgets.mjs',
+  'scripts/release-gate-check.mjs',
+  'scripts/release-gate-check.test.mjs',
+]);
+export const LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/client-route-weight.test.ts',
+  'lib/launch-qa-script-ratchet.test.ts',
+  'lib/release-gate-check-script.test.ts',
+]);
 // Enablement batch (codex/enablement-20261017, EN-0 to EN-5 and the guide recordings): the fifty-three changed endpoints no owner
 // listed -- the changelog and its feed, the cookbooks index and card, the resources hub,
 // the keyless try-it's digest check, its island (moved to components/ in EN-FIX-1) and its mounts on /api and /developers, the product guide at /guide and /ko/guide with its
@@ -2045,18 +2142,55 @@ const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}(
 // explore.spec.ts in 1440. failure-states-audit has its browser row again (audit, audit-768, audit-1280, as its
 // Playwright width list declares): since the PR #141 fix of 2026-10-16 its workspace-intake cases open the source review
 // first, then take the 'Approve maximum & upload' fallback, on both the per-file and the whole-set approval path.
+// UX program 2026-10-17 (phase 2 lanes P2-01..P2-21 and the phase 3 fixes, B-01): the public routes, stylesheets, shared public
+// components, the consent-gated Vercel collector and funnel module, the claims registry, the Playwright config and the public
+// specs and suites the program changed join these exact endpoints (129 now; the six of them main's enablement owner
+// holds since PR #159 stay with that owner). They add their direct suites below and the
+// templates, type-scale, site-alignment, brand-tokens, benchmarks, film-line and solutions browser suites, each with its reviewed
+// project row in run-repair-check.mjs. Still exact paths, no wildcard and no default owner.
 export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
+  "docs/gtm/CLAIMS_REGISTRY.yaml",
+  "nextjs/app/arena/page.tsx",
+  "nextjs/app/benchmarks/benchmarks.module.css",
+  "nextjs/app/benchmarks/gdp-pdf/gdp-pdf.module.css",
+  "nextjs/app/benchmarks/gdp-pdf/page.tsx",
+  "nextjs/app/changelog/page.tsx",
+  "nextjs/app/contact/page.tsx",
+  "nextjs/app/demo/page.tsx",
+  "nextjs/app/enterprise/page.tsx",
   "nextjs/app/evaluation/opengraph-image.tsx",
+  "nextjs/app/evidence/page.tsx",
+  "nextjs/app/explore/page.tsx",
   "nextjs/app/how-it-works/opengraph-image.tsx",
   "nextjs/app/how-it-works/page.tsx",
+  "nextjs/app/integrations/page.tsx",
+  "nextjs/app/knowledge-compiler/page.tsx",
+  "nextjs/app/ko/contact/page.tsx",
   "nextjs/app/ko/evaluation/opengraph-image.tsx",
   "nextjs/app/ko/pricing/opengraph-image.tsx",
+  "nextjs/app/ko/pricing/page.tsx",
+  "nextjs/app/ko/pricing/pricing.module.css",
   "nextjs/app/landing-v2.css",
   "nextjs/app/layout.tsx",
+  "nextjs/app/not-found.tsx",
+  "nextjs/app/paper-product.css",
+  "nextjs/app/product/compiled-world/page.tsx",
+  "nextjs/app/product/continuous-knowledge/page.tsx",
+  "nextjs/app/product/document-understanding/page.tsx",
   "nextjs/app/product/page.tsx",
+  "nextjs/app/reproducibility/page.tsx",
+  "nextjs/app/research/page.tsx",
+  "nextjs/app/security/page.tsx",
   "nextjs/app/sitemap.ts",
+  "nextjs/app/solutions/page.tsx",
+  "nextjs/app/solutions/solutions.module.css",
+  "nextjs/app/sources/page.tsx",
+  "nextjs/app/status/page.tsx",
+  "nextjs/app/trust/page.tsx",
   "nextjs/components/evaluation-page.module.css",
   "nextjs/components/evidence/region-highlight.module.css",
+  "nextjs/components/explore/evidence-workbench.module.css",
+  "nextjs/components/explore/explore-stage.module.css",
   "nextjs/components/font-outline-probe.tsx",
   "nextjs/components/landing-v2/hero-statement.tsx",
   "nextjs/components/landing-v2/home-measurement.tsx",
@@ -2069,15 +2203,26 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/components/marketing-consent.module.css",
   "nextjs/components/marketing-story.module.css",
   "nextjs/components/mobile-primary-nav.tsx",
+  "nextjs/components/policy-layout.tsx",
+  "nextjs/components/pricing-plan-overview.module.css",
+  "nextjs/components/public-package-proof.tsx",
+  "nextjs/components/public-page-shell.tsx",
+  "nextjs/components/public-proof-registry.module.css",
+  "nextjs/components/public-proof-registry.tsx",
   "nextjs/components/public-site-chrome.module.css",
   "nextjs/components/public-site-chrome.tsx",
+  "nextjs/components/signed-product-demo.module.css",
   "nextjs/components/site-nav/desktop-primary-nav.tsx",
+  "nextjs/components/vercel-collector.tsx",
+  "nextjs/e2e/benchmarks.spec.ts",
+  "nextjs/e2e/brand-tokens.spec.ts",
   "nextjs/e2e/compiler-contract.spec.ts",
   "nextjs/e2e/detail-integrity.spec.ts",
   "nextjs/e2e/dialog-focus-audit.spec.ts",
   "nextjs/e2e/evidence-first.spec.ts",
   "nextjs/e2e/explore-guided-entry.spec.ts",
   "nextjs/e2e/failure-states-audit.spec.ts",
+  "nextjs/e2e/film-line-stability.spec.ts",
   "nextjs/e2e/hero-four-stage-restoration.spec.ts",
   "nextjs/e2e/hero-home-responsive.spec.ts",
   "nextjs/e2e/home-evidence-line.spec.ts",
@@ -2094,25 +2239,37 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/e2e/public-composition.spec.ts",
   "nextjs/e2e/public-layout-balance.spec.ts",
   "nextjs/e2e/public-package-proof.spec.ts",
+  "nextjs/e2e/site-alignment.spec.ts",
   "nextjs/e2e/site-chrome-v2.spec.ts",
   "nextjs/e2e/site-nav.spec.ts",
+  "nextjs/e2e/solutions-workflows.spec.ts",
   "nextjs/e2e/sources.spec.ts",
+  "nextjs/e2e/support/overflow.ts",
+  "nextjs/e2e/templates.spec.ts",
+  "nextjs/e2e/type-scale.spec.ts",
   "nextjs/e2e/ux-polish.spec.ts",
   "nextjs/e2e/visual-continuity.spec.ts",
   "nextjs/e2e/visual-refinement.spec.ts",
+  "nextjs/lib/benchmark-registry.test.ts",
+  "nextjs/lib/benchmark-registry.ts",
   "nextjs/lib/brand-copy.test.ts",
+  "nextjs/lib/brand-tokens.test.ts",
+  "nextjs/lib/funnel-events.ts",
   "nextjs/lib/landing-v2-hero-statement.test.ts",
   "nextjs/lib/landing-v2-motion.test.ts",
   "nextjs/lib/landing-v2-start.test.ts",
+  "nextjs/lib/landing-v2-tokens.test.ts",
   "nextjs/lib/landing-v2-trust.test.ts",
   "nextjs/lib/marketing-consent-reveal.test.ts",
   "nextjs/lib/marketing-story.test.ts",
   "nextjs/lib/og-card-frame.test.ts",
   "nextjs/lib/product-left-column.test.ts",
+  "nextjs/lib/production-posture.test.ts",
   "nextjs/lib/seo-surface.test.ts",
   "nextjs/lib/site-nav-model.test.ts",
   "nextjs/lib/site-navigation.ts",
   "nextjs/lib/visual-refinement.test.ts",
+  "nextjs/playwright.config.ts",
   "nextjs/public/film/source-inspection/desktop.webm",
   "nextjs/public/film/source-inspection/desktop.webp",
   "nextjs/public/film/source-inspection/en.vtt",
@@ -2123,30 +2280,66 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/public/llms.txt",
 ]);
 export const PUBLIC_MARKETING_AFFECTED_UNIT_FILES = Object.freeze([
+  "lib/benchmark-registry.test.ts",
+  "lib/benchmarks-page.test.ts",
   "lib/brand-copy.test.ts",
+  "lib/brand-tokens.test.ts",
+  "lib/category-guide.test.ts",
+  "lib/changelog.test.ts",
+  "lib/contact-qualification.test.ts",
+  "lib/cookbook-content.test.ts",
+  "lib/copy-trust-guard.test.ts",
+  "lib/developer-snippets.test.ts",
+  "lib/docs-navigation.test.ts",
+  "lib/evidence-regions.test.ts",
+  "lib/explore-sample-labels.test.ts",
+  "lib/explore-sample.test.ts",
+  "lib/explore-story.test.ts",
+  "lib/funnel-events.test.ts",
+  "lib/gdp-pdf-page-data.test.ts",
   "lib/landing-v2-hero-statement.test.ts",
   "lib/landing-v2-motion.test.ts",
   "lib/landing-v2-page.test.ts",
   "lib/landing-v2-start.test.ts",
+  "lib/landing-v2-tokens.test.ts",
   "lib/landing-v2-trust.test.ts",
+  "lib/legal-terms-consistency.test.ts",
   "lib/marketing-analytics.test.ts",
   "lib/marketing-consent-reveal.test.ts",
   "lib/marketing-story.test.ts",
   "lib/og-card-frame.test.ts",
   "lib/one-path-contract.test.ts",
   "lib/pilot-evaluation-worksheet.test.ts",
+  "lib/pricing-plan-overview.test.ts",
+  "lib/product-claims-sync.test.ts",
   "lib/product-left-column.test.ts",
+  "lib/production-hardening.test.ts",
+  "lib/production-posture.test.ts",
+  "lib/prohibited-phrases.test.ts",
   "lib/public-package-proof.test.ts",
+  "lib/resources-hub.test.ts",
+  "lib/sample-analytics-admission.test.ts",
   "lib/seo-surface.test.ts",
   "lib/site-nav-model.test.ts",
+  "lib/solutions-hub.test.ts",
+  "lib/solutions-thumbnails.test.ts",
+  "lib/status-probe.test.ts",
+  "lib/structured-data.test.ts",
+  "lib/support-targets.test.ts",
+  "lib/trust-page-answers.test.ts",
+  "lib/trust-provisions.test.ts",
+  "lib/ui-sweep-2026-09-22.test.ts",
   "lib/visual-refinement.test.ts",
 ]);
 export const PUBLIC_MARKETING_AFFECTED_BROWSER_FILES = Object.freeze([
+  "e2e/benchmarks.spec.ts",
+  "e2e/brand-tokens.spec.ts",
   "e2e/compiler-contract.spec.ts",
   "e2e/detail-integrity.spec.ts",
   "e2e/dialog-focus-audit.spec.ts",
   "e2e/evidence-first.spec.ts",
   "e2e/failure-states-audit.spec.ts",
+  "e2e/film-line-stability.spec.ts",
   "e2e/hero-four-stage-restoration.spec.ts",
   "e2e/hero-home-responsive.spec.ts",
   "e2e/home-evidence-line.spec.ts",
@@ -2163,17 +2356,24 @@ export const PUBLIC_MARKETING_AFFECTED_BROWSER_FILES = Object.freeze([
   "e2e/public-composition.spec.ts",
   "e2e/public-layout-balance.spec.ts",
   "e2e/public-package-proof.spec.ts",
+  "e2e/site-alignment.spec.ts",
   "e2e/site-chrome-v2.spec.ts",
   "e2e/site-nav.spec.ts",
+  "e2e/solutions-workflows.spec.ts",
   "e2e/sources.spec.ts",
+  "e2e/templates.spec.ts",
+  "e2e/type-scale.spec.ts",
   "e2e/ux-polish.spec.ts",
   "e2e/visual-continuity.spec.ts",
   "e2e/visual-refinement.spec.ts",
 ]);
 // The only package delta reviewed here adds two already locked ESLint plugins as direct devDependencies.
 // Pin both Git postimages; any further dependency change requires a new reviewed owner, not admission by filename.
+// B-01 (2026-10-19): package.json re-pinned after review of the one later delta, P2-17 daf71ecb: `test:scripts` also runs
+// scripts/release-gate-check.test.mjs, and a `release:gate-check` script runs the read-only check. Two script lines, no
+// dependency, lockfile or engine change; the lockfile pin is unchanged.
 export const MARKETING_TOOLING_POSTIMAGES = Object.freeze({
-  "nextjs/package.json": "d82ceef9173c0347669211698368d4af46c7a340e99eb17e78c4a8de1087bef1",
+  "nextjs/package.json": "cc03d8ecb69d42916a5a4c72d54ff2817df90436f5111b2731ee6a8e248b7a59",
   "nextjs/pnpm-lock.yaml": "a814e2ff45e2c563949ebd917df8036bcd7bde2c2a8a98480386fab0ea79be04"
 });
 // Shared test discovery: the exact global Vitest config, edited by the product author. A change is admitted only when every
@@ -2346,6 +2546,18 @@ export const AFFECTED_GROUPS = Object.freeze([
   // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.
   affectedGroup('benchmarks-path-mask', new RegExp(`^nextjs/(?:${exactPathAlternation(BENCHMARKS_PATH_MASK_AFFECTED_PATHS)})$`),
     { unitFiles: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES }),
+  // ux-billing-checkout: the 18 exact paths above select 10 direct suites and 2 browser suites.
+  affectedGroup('ux-billing-checkout', new RegExp(`^nextjs/(?:${exactPathAlternation(UX_BILLING_CHECKOUT_AFFECTED_PATHS)})$`),
+    { unitFiles: UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, browserFiles: UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES }),
+  // table-read-intake-ceiling: the 6 exact paths above select 8 direct suites and no browser suite.
+  affectedGroup('table-read-intake-ceiling', new RegExp(`^(?:${exactPathAlternation(TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS)})$`),
+    { unitFiles: TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES }),
+  // specimen-strip: the 11 exact paths above select 1 direct suite and 1 browser suite.
+  affectedGroup('specimen-strip', new RegExp(`^nextjs/(?:${exactPathAlternation(SPECIMEN_STRIP_AFFECTED_PATHS)})$`),
+    { unitFiles: SPECIMEN_STRIP_AFFECTED_UNIT_FILES, browserFiles: SPECIMEN_STRIP_AFFECTED_BROWSER_FILES }),
+  // launch-qa-release-scripts: the 5 exact paths above select 3 direct suites and no browser suite.
+  affectedGroup('launch-qa-release-scripts', new RegExp(`^nextjs/(?:${exactPathAlternation(LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS)})$`),
+    { unitFiles: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.

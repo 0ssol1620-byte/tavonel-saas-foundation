@@ -85,6 +85,18 @@ export const MARKETING_EVENTS = new Set([
   "source_open", "world_explore_60s", "integration_open", "trust_open", "pricing_open",
   "request_access_start", "request_access_complete",
   "scroll_scene_25", "scroll_scene_50", "scroll_scene_75", "scroll_scene_100",
+  /*
+    P2-07 (ANALYTICS-ACTIVATION-2026-10-17 §4.4 G3): two names that fire on public pages and,
+    until this set became the Vercel collector's allowlist too, were meant for that collector
+    alone. `cta_clicked` is a Home CTA click carrying the CTA and the scene; `explore_object_selected`
+    is a click on an /explore object carrying its kind. Both are clicks on public pages, which is
+    what the prompt says is measured, and both details are enumerated UI states.
+
+    `explore_ask_used` is the third G3 name and is deliberately not here: this file's tests and
+    `lib/sample-analytics-admission.test.ts` pin it out as a question event, and admitting it is
+    a decision about questions, not a list edit.
+  */
+  "cta_clicked", "explore_object_selected",
 ]);
 
 export function publicPageLocation(path: string): string | null {
@@ -102,8 +114,11 @@ export function publicPageLocation(path: string): string | null {
 
   The pathname is the page the reader is on when the event fires, not one captured earlier, and it
   is a pathname: a query or a fragment is not a listed path, so it is refused rather than trimmed.
-  This is only the Google relay. The cookieless collector `trackFunnel` also posts to is a
-  separate, explicitly flagged choice in the root layout and is not gated here.
+
+  P2-07 (ANALYTICS-ACTIVATION-2026-10-17 §4.4 G2): this is also the Vercel collector's decision.
+  `relayToVercel` in `components/vercel-collector.tsx` asks it before it calls `track()`, so
+  one consent, one path set and one name list decide both vendors and a workspace event reaches
+  neither.
 */
 export type MarketingEventPayload = {
   readonly name: string;
@@ -120,6 +135,24 @@ export function marketingEventPayload(consent: boolean | null, pathname: string,
   } catch { return null; }
   if (typeof name !== "string" || !MARKETING_EVENTS.has(name)) return null;
   return { name, params: { page_location: location, page_title: "TAVONEL" } };
+}
+
+/*
+  P2-07 (ANALYTICS-ACTIVATION-2026-10-17 §4.4 G1, §5 step 1): what the Vercel collector may send.
+
+  The collector is mounted only after consent on a listed page, and it stays loaded when a
+  client-side navigation leaves that page. So every page view and event it is about to send is
+  checked here as well: a path outside `PUBLIC_MARKETING_PATHS` (the workspace, /login,
+  /auth/callback, anything unlisted) is dropped, and a listed one is sent with its query and
+  fragment removed. The origin is kept, not rewritten to tavonel.com: Vercel separates preview from
+  production itself, and the preview check (§5 step 9) needs to see its own host. An unparseable
+  URL is dropped, never passed through.
+*/
+export function vercelBeforeSend<E extends { url: string }>(event: E): E | null {
+  try {
+    const url = new URL(event.url);
+    return PUBLIC_MARKETING_PATHS.has(url.pathname) ? { ...event, url: url.origin + url.pathname } : null;
+  } catch { return null; }
 }
 
 /*

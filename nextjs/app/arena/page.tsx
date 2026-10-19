@@ -27,7 +27,7 @@ export const metadata: Metadata = {
 
 export default function ArenaPage() {
   return (
-    <PublicSitePage>
+    <PublicSitePage template={null}>
       <section className="scene doc">
         <div className="shell">
           <div className="body">

@@ -62,7 +62,7 @@ const FIXTURES: readonly { key: string; name: string; digest: string }[] = [
 const short = (digest: string) => `${digest.slice(0, 8)}…${digest.slice(-7)}`;
 
 export default function ReproducibilityPage() {
-  return <PublicProofRegistry footer={<>
+  return <PublicProofRegistry template="T5" footer={<>
     {/*
       BA-080. The four cross-links the hero used to print as bare slugs, as links, at the foot.
     */}

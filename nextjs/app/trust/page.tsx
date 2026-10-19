@@ -38,7 +38,7 @@ const DESTINATIONS: Array<[string, string, Route]> = [
 
 export default function TrustCenterPage() {
   return (
-    <PublicSitePage>
+    <PublicSitePage template="T5">
       <section className="scene doc">
         <div className="shell">
           <div className="body policy-copy"><IndexedPolicyBody>

@@ -115,7 +115,7 @@ export function GuidePage({ language }: { language: GuideLanguage }) {
     : [{ name: "Resources", path: "/resources" }, { name: ui.title, path: "/guide" }];
 
   return (
-    <PublicSitePage korean={korean} languageHref={korean ? "/guide" : "/ko/guide"}>
+    <PublicSitePage template="T3" korean={korean} languageHref={korean ? "/guide" : "/ko/guide"}>
       {korean ? <DocumentLangKo /> : null}
       <BreadcrumbJsonLd trail={trail} />
       <section className="scene doc docs-reading-surface" aria-labelledby="guide-title">

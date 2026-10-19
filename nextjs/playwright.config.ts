@@ -15,8 +15,11 @@ const widths = [1920, 1440, 1280, 1024, 768, 390, 360] as const;
   media it needs from inside the test, so running them once per width project would repeat the
   same measurement seven times. `auditWidthSpecs` is the subset for which the viewport is the
   variable rather than something the spec sets itself.
+
+  `self-serve-journey` (journey A7, JOURNEY-MAP-2026-10-17 §8.1) joins the set for the same reason:
+  it runs once at 1440 and opens its own 360/390/430 contexts for the phone checks.
 */
-const auditSpecs = /(overflow-audit|contrast-zoom-audit|dialog-focus-audit|film-fallback-audit|film-motion-control-audit|failure-states-audit|billing-lifecycle|cross-tenant-negative|compile-resume|workspace-intake-triage)\.spec\.ts/;
+const auditSpecs = /(overflow-audit|contrast-zoom-audit|dialog-focus-audit|film-fallback-audit|film-motion-control-audit|failure-states-audit|billing-lifecycle|cross-tenant-negative|compile-resume|workspace-intake-triage|self-serve-journey)\.spec\.ts/;
 const auditWidthSpecs = /(contrast-zoom-audit|failure-states-audit|billing-lifecycle)\.spec\.ts/;
 const testPort = Number(process.env.PLAYWRIGHT_PORT ?? "3117");
 /*
@@ -48,6 +51,23 @@ export default defineConfig({
       name: `${width}`,
       testIgnore: [/launch-qa.*\.spec\.ts/, auditSpecs],
       use: { viewport: { width, height: width <= 390 ? 844 : 900 } },
+    })),
+    /*
+      UX-L6 (UX-PLAN-2026-10-17 sections 3.6 and 8.2, R4-MJ2): the two wide phones, for the consent
+      spec only.
+
+      At 390x844 and 360x844 the hero film reaches the bottom sheet's 104px zone, so the 8 s sheet
+      always waits and the checks of what it may cover never ran there. At 430x932 the frame ends
+      above the zone and the sheet opens; 412x915 sits at the zone's edge (frame bottom 811-824px
+      against a zone from 811, EN/KO). Both are the devices' own CSS viewports.
+      Scoped to marketing-consent.spec.ts instead of joining `widths`: the other phone checks set
+      their own 412/430 viewports from project 390, and two more width projects would run every
+      other spec twice more. launch-qa's consent step runs all projects, so it runs these.
+    */
+    ...([[412, 915], [430, 932]] as const).map(([width, height]) => ({
+      name: `${width}`,
+      testMatch: /marketing-consent\.spec\.ts/,
+      use: { viewport: { width, height } },
     })),
     {
       name: "reduced-motion",

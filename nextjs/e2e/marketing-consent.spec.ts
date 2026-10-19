@@ -115,8 +115,9 @@ test("analytics remains optional, persists refusal, and fits the viewport", asyn
   await expect(panel).toBeVisible();
 });
 
-test("the consent notice never covers homepage or pricing actions at 1440, 390 and 360", async ({ page }, testInfo) => {
-  test.skip(!["1440", "390", "360"].includes(testInfo.project.name), "focused visual contract widths");
+// UX-L6 (UX-PLAN-2026-10-17 §8.2, R4-MJ2): also in the 412x915 and 430x932 projects.
+test("the consent notice never covers homepage or pricing actions at 1440, 430, 412, 390 and 360", async ({ page }, testInfo) => {
+  test.skip(!["1440", "430", "412", "390", "360"].includes(testInfo.project.name), "focused visual contract widths");
   for (const route of ["/", "/pricing"]) {
     await page.goto(route);
     const panel = page.getByRole("region", { name: "Optional analytics" });
@@ -176,9 +177,12 @@ test("on Home from 900px the 8 s prompt covers no title, support, action or film
   Fix round 4 (M3): the zone is kept clear of the frame and the stage's reading line together (at
   430 the 8 s sheet cleared the frame and covered the line under it). Both boxes are checked on
   both paths.
+
+  UX-L6 (UX-PLAN-2026-10-17 §8.2, R4-MJ2): the 412 and 430 projects (412x915, 430x932) run it too,
+  so the branch where the 8 s sheet opens is taken by a width project, not only by (a) below.
 */
 test("on a Home phone the prompt never opens over the hero film", async ({ page }, testInfo) => {
-  test.skip(!["390", "360"].includes(testInfo.project.name), "the phone bottom sheet");
+  test.skip(!["430", "412", "390", "360"].includes(testInfo.project.name), "the phone bottom sheet");
   await page.clock.install();
   await page.goto("/");
   const panel = page.getByRole("region", PANEL);

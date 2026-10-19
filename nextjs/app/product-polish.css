@@ -586,11 +586,16 @@
   `.docs-body h2` is 22px above, which is the same decision one surface further in.
 
   The root fix is the type scale in `tavonel.css`; it is in the report for L1.
+
+  UX-L3 (UX-PLAN-2026-10-17 §4.4, §5.3 R3) landed it: a section H2 is Title 1 everywhere, so this
+  rule names the token instead of its own clamp. It stays because `.policy-copy h2` (18px and
+  --t-h2-sm in tavonel.css's components layer) would otherwise outrank the base h2 inside the
+  same column, and /developers measured 30 and 32px for two sibling sections.
 */
 .scene.doc .body > .stack > h2 {
-  font-size: clamp(22px, 2.2vw, 30px);
-  line-height: 1.22;
-  letter-spacing: -.02em;
+  font-size: var(--tv-fs-title);
+  line-height: var(--tv-lh-title);
+  letter-spacing: var(--tv-track-title);
 }
 
 
@@ -606,13 +611,15 @@
   --text-hi: #171c20;
   --text-mid: #53606a;
   --text-lo: #53606a;
-  --source: #2447b3;
-  --relation: #5f42e0;
-  --verified: #226849;
-  --changed: #8a5a00;
-  --unresolved: #b42318;
-  /* The dark-ground --failed (#e9877e) is 2.55:1 on white and this one 6.57:1; a failure must read as one here too. */
-  --failed: #b42318;
+  /* UX-L1 (UX-PLAN-2026-10-17 §4.2): the one accent, one value per state, and no violet. */
+  --source: var(--tv-action);
+  --relation: var(--tv-ink-muted);
+  --verified: var(--tv-verified);
+  --changed: var(--tv-changed);
+  --unresolved: var(--tv-unresolved);
+  /* EN-4 (main 94379187): the dark-ground --failed (#e9877e) is 2.55:1 on white; a failure must read as one here too.
+     UX-L1 keeps one value per state, so it is the light-ground unresolved red (--tv-unresolved #a72d23, 6.56:1 on paper). */
+  --failed: var(--tv-unresolved);
   background: #fff;
   color: #171c20;
   padding-top: clamp(40px, 4vw, 50px);
@@ -629,11 +636,13 @@
   --text-hi: #f4f6fa;
   --text-mid: #bac3d0;
   --text-lo: #a3afbf;
-  --source: #7da7ff;
-  --relation: #a996ff;
-  --verified: #7be0be;
-  --changed: #f2a65a;
-  --unresolved: #f07d73;
+  /* The code block is an instrument face on a paper page: its tab marker and copy feedback read
+     the dark-ground accent, its relation a neutral (UX-L1, §4.2-1). */
+  --source: var(--tv-action-on-dark);
+  --relation: var(--tv-on-inst-muted);
+  --verified: var(--tv-action-on-dark);
+  --changed: var(--tv-changed-on-dark);
+  --unresolved: var(--tv-unresolved-on-dark);
   border-color: #2e353b;
   background: #101721;
   color: #f4f6fa;

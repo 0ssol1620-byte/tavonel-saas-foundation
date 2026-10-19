@@ -178,7 +178,7 @@ export default async function ApiReferencePage() {
   const groups = tocEntries(reference.groups.map((group) => group.name));
 
   return (
-    <PublicPageShell>
+    <PublicPageShell template="T3">
       <section className="scene doc"><div className="shell"><div className="body">
         <div className="stack">
           <h1 className="document-title">Every operation, from the contract itself.</h1>

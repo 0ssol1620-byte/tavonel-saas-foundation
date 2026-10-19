@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Route } from "next";
 import Link from "next/link";
-import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
+import { PublicSiteFooter, PublicSiteHeader, type PageTemplate } from "@/components/public-site-chrome";
 import styles from "./public-proof-registry.module.css";
 
 export type RegistryRow = { key: string; description: string; state: string };
@@ -42,7 +42,9 @@ const sectionId = (title: string) =>
  * a page about an absence. A section with nothing to show is now simply not shown, and the
  * `empty` prop is kept only so callers do not have to change.
  */
-export default function PublicProofRegistry({ title, eyebrow, summary, state, index, sections, footer }: {
+export default function PublicProofRegistry({ template, title, eyebrow, summary, state, index, sections, footer }: {
+  /** /knowledge-compiler is T1 and /reproducibility T5 (UX-PLAN-2026-10-17 §5.4); both are paper. */
+  template: Extract<PageTemplate, "T1" | "T5">;
   title: string;
   eyebrow: string;
   summary: string;
@@ -96,7 +98,12 @@ export default function PublicProofRegistry({ title, eyebrow, summary, state, in
   */
   footer?: ReactNode;
 }) {
-  return <div className={styles.page}>
+  /*
+    UX-L7 (§5.1): T1 and T5 are PAPER. This layout was the last public one on the instrument ground,
+    because its root was a module class only: the paper tokens in public-site-chrome.module.css are
+    keyed on the global `.page` that holds the site header, which every other public root carries.
+  */
+  return <div className={`page ${styles.page}`} data-template={template}>
     {/* BA-232 (nav-global CROSS-LANE 2): the header's action is resolved here now. The
         placeholder-then-replace client fallback that used to supply it is gone. */}
     <PublicSiteHeader />

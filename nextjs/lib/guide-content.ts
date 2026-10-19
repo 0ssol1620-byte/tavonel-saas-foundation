@@ -738,12 +738,12 @@ const KO: GuideChapter[] = [
         kind: "steps",
         items: [
           "**/status**는 설정과 활성화 상태, 예약된 의존성 점검, 장애 이력을 보여 줍니다.",
-          "**/trust**는 갖춘 것, 준비 중인 것, 없는 것을 나열하고, 각 행을 그것을 밝힌 페이지에 연결합니다.",
+          "**/trust**는 갖춘 것, 앞으로 갖출 것, 없는 것을 나열하고, 각 행을 그것을 밝힌 페이지에 연결합니다.",
           "**/security**는 문서 처리를 어떻게 통제하는지 설명합니다. 강제되는 처리 경계와, 믿고 기댈 수 있는 통제입니다.",
           "**/benchmarks/gdp-pdf**는 공개 GDP.pdf 과제 세트로 돌린 두 갈래 실행을 게시하며, 그 결과를 페이지 제목으로 보여 줍니다.",
         ],
       },
-      { kind: "note", text: "“No SOC 2 report, ISO 27001 certificate or independent penetration-test report exists yet.” SOC 2 보고서, ISO 27001 인증서, 독립 침투 테스트 보고서는 아직 없습니다." },
+      { kind: "note", text: "“No SOC 2 report, ISO 27001 certificate or independent penetration-test report exists yet.” SOC 2 보고서, ISO 27001 인증서, 독립 침투 테스트 보고서는 없습니다." },
     ],
     links: [
       { href: "/status", label: "상태" },
@@ -793,7 +793,7 @@ const KO: GuideChapter[] = [
         head: ["용어", "뜻"],
         rows: [
           ["Compiled World", "원문 묶음을 컴파일한 결과입니다. 의미 객체, 객체 사이의 관계, 각 객체가 기대는 근거로 이루어집니다."],
-          ["후보", "아직 아무도 받아들이지 않은 컴파일 결과입니다."],
+          ["후보", "받아들여지기 전의 컴파일 결과입니다."],
           ["활성화", "후보를 활성 버전, 즉 답이 나오는 버전으로 만드는 일입니다. 로그인한 세션에서 사람이 하며, API 키로는 할 수 없습니다."],
           ["근거", "페이지 하나와 그 페이지 위의 영역이며, 다이제스트로 원문 버전에 묶입니다."],
           ["영역", "발췌를 읽은 페이지의 부분이며, 페이지의 0-1000 좌표계 안의 상자로 나타냅니다."],

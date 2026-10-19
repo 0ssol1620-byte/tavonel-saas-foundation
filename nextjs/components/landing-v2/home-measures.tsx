@@ -10,6 +10,10 @@ import styles from "./home-measures.module.css";
   receipt it is bound to. `lib/landing-v2-page.test.ts` reads those two attributes against its
   allowlist and the receipt bytes, and fails on any other digit on the page. No motion: the band is
   a static record, so reduced motion has nothing to remove.
+
+  UX-L3 (UX-PLAN-2026-10-17 §5.3 R3): the band's head is Home's one section head -- `lv2-h2` and
+  `lv2-scene-support`, the classes s2-s6 use -- so its H2 is the same size as its siblings. It was a
+  24px title beside five 51.84px section H2s on the same page.
 */
 const COPY = {
   en: {
@@ -38,9 +42,9 @@ export default function HomeMeasures({ korean = false }: { korean?: boolean }) {
   return (
     <section className={styles.band} aria-labelledby="home-measures-title" data-home-measures>
       <div className="lv2-wrap">
-        <div className={styles.head}>
-          <h2 className={styles.title} id="home-measures-title">{copy.title}</h2>
-          <p className={styles.scope}>{copy.scope}</p>
+        <div className="lv2-scene-head">
+          <h2 className="lv2-h2" id="home-measures-title">{copy.title}</h2>
+          <p className="lv2-scene-support">{copy.scope}</p>
         </div>
         <ul className={styles.facts}>
           {HOME_MEASURES.map(measure => {

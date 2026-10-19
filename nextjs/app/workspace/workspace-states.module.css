@@ -5,6 +5,13 @@
   .notices ul { display: grid; gap: 8px; margin: 0; padding-left: 18px; }
   .notices li { line-height: 1.5; }
 
+  /*
+    Journey A9 (D-08). A live region is rendered before its sentence arrives. Empty, it leaves the
+    flow so it adds no gap between its neighbours, while staying in the accessibility tree --
+    `display: none` would take it out, and a region that is not there is not listened to.
+  */
+  .noticeRegion:empty { position: absolute; }
+
   /* The answer to "Check file access again", kept visibly apart from the action row above it. */
   .recheck { margin: 12px 0 0; color: var(--text-mid); font-size: 14px; }
 

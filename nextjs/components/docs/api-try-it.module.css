@@ -72,7 +72,11 @@
 */
 .terminal { min-width: 0; }
 .terminal > * + * { margin-top: 10px; }
-.terminal summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; font-size: 14px; color: var(--text-hi); }
+.terminal summary { display: flex; align-items: center; gap: 8px; min-height: 44px; list-style: none; cursor: pointer; font-size: 14px; color: var(--text-hi); }
+/* UX-L7 (P2-11): a flex summary loses the native triangle, so it draws the plus/minus the API reference's disclosures use. */
+.terminal summary::-webkit-details-marker { display: none; }
+.terminal summary::before { content: "+"; font: 12px var(--f-mono); }
+.terminal[open] summary::before { content: "−"; }
 
 /* The keyless try-it's copy row and its two recipes: the docs code-block look, without its class (see keyless-try-it.tsx). */
 .copies { display: flex; flex-wrap: wrap; gap: 8px; }

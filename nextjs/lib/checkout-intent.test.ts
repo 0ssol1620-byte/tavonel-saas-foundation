@@ -11,6 +11,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BILLING_OFFERS } from "./billing-catalog";
 import {
+  checkoutSellable,
   loginUrlForOffer,
   readOfferParam,
   rememberCheckoutIntent,
@@ -30,6 +31,24 @@ function installStorage() {
   });
   return map;
 }
+
+describe("checkoutSellable: the one predicate /login's notice and H1 both read (B-07)", () => {
+  it("promises nothing before the deployment has answered", () => {
+    for (const code of OFFER_CODES) expect(checkoutSellable(code, null)).toBeNull();
+  });
+
+  it("sells nothing on a deployment where no plan can be bought", () => {
+    for (const code of OFFER_CODES) expect(checkoutSellable(code, false)).toBe(false);
+  });
+
+  it("sells, on an open deployment, exactly the offers whose sale channel is self_serve", () => {
+    for (const code of OFFER_CODES) {
+      expect(checkoutSellable(code, true), code).toBe(BILLING_OFFERS[code].saleChannel === "self_serve");
+    }
+    expect(checkoutSellable("studio_access", true)).toBe(false);
+    expect(checkoutSellable("observer_access", true)).toBe(true);
+  });
+});
 
 describe("checkout intent", () => {
   beforeEach(() => vi.unstubAllGlobals());

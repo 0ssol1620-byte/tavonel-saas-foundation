@@ -21,24 +21,21 @@
         the sake of moving. Transitions exist where something genuinely changed, and
         the reduced-motion block below removes them wholesale without removing content.
 
-     Type: Geist is the text and display face (landing V2 blueprint §6), loaded by
-     app/layout.tsx through next/font/google and self-hosted by the build, so no webfont
-     host is contacted for it either. Wanted Sans Variable stays behind it in --f-sans as
-     the fallback, self-hosted from public/fonts (see the @font-face blocks below): it is
-     vendored under the OFL, carries a real 400-1000 weight axis and carries Hangul, which
-     is what /ko renders if the Geist file has not arrived. Instrument Serif is the
-     editorial accent (--f-serif) and appears on the landing only -- one phrase of the H1
-     and the manifesto line, never a paragraph. IBM Plex Mono carries the instrument voice:
-     counts, clocks, state labels, keys, source locations.
+     Type: Wanted Sans Variable is the one text and display face (decision.md G-B;
+     UX-PLAN-2026-10-17 §4.4, lane UX-L3), self-hosted from public/fonts (see the
+     @font-face blocks below and app/wanted-sans-korean.css): it is vendored under the OFL,
+     carries a real 400-1000 weight axis and draws Latin and Hangul as one design. Geist and
+     Instrument Serif were removed with UX-L3 -- hierarchy comes from size and weight, not
+     from a second face. IBM Plex Mono carries coordinates, digests, IDs, file names and code.
      ============================================================================ */
 
   /* --------------------------------------------------------------------------
      Wanted Sans Variable -- SIL Open Font License 1.1, licence vendored beside the
      files at public/fonts/OFL.txt. Two Latin subsets from the upstream split build:
      [90] basic Latin + punctuation + currency, [89] Latin Extended. The English page
-     downloads [90] only. Nothing preloads either of them: since 2026-09-19 Wanted Sans is
-     the fallback behind Geist in --f-sans, and font-display: optional means a client that
-     has not got the file simply keeps the face above it rather than waiting.
+     downloads [90] only, and app/layout.tsx preloads it on every route: font-display is
+     optional (no swap repaint, so no CLS), and an optional face that is not preloaded seldom
+     arrives inside the block period. [89] loads on demand.
      -------------------------------------------------------------------------- */
   @font-face {
     font-family: "Wanted Sans Variable";
@@ -182,8 +179,10 @@
     --border-dark: rgba(255, 255, 255, 0.1);
     --source: #7da7ff;
     --relation: #a996ff;
-    /* Paper-ground siblings. Text on paper needs 4.5:1 and the dark-ground accents give 2.1-2.4:1. */
-    --source-ink: #2259ce;
+    /* Paper-ground siblings. Text on paper needs 4.5:1 and the dark-ground accents give 2.1-2.4:1.
+       --source-ink was #2259ce, a fourth blue at 265°: UX-PLAN-2026-10-17 §4.2-5 retires it, and a
+       location on paper reads the one accent (UX-L1). */
+    --source-ink: var(--tv-action);
     --relation-ink: #5f42e0;
     --unresolved-ink: #b82a1e;
     --verified-ink: #1a6d51;
@@ -211,17 +210,11 @@
     --ease-scene: cubic-bezier(0.16, 1, 0.3, 1);
 
     /*
-      Geist is the text and display face, loaded by app/layout.tsx through next/font/google and
-      self-hosted by the build, so no webfont host is contacted. Wanted Sans Variable stays behind
-      it as the fallback: its @font-face blocks above are unchanged and it is what renders if the
-      Geist file has not arrived, which matters because Wanted Sans carries Hangul and /ko is a
-      real page. Instrument Serif is an editorial accent -- one phrase of the landing H1 and the
-      manifesto line -- and nothing else; --f-serif exists so no component reaches for a font
-      name directly.
+      UX-L3 (UX-PLAN-2026-10-17 §4.4): one sans stack, read from the --tv-* block below. It used
+      to lead with Geist, so every route that did not override --f-sans on its own wrapper
+      rendered Geist; --f-serif went with Instrument Serif, which no stylesheet used.
     */
-    --f-sans: var(--font-geist), "Wanted Sans Variable", -apple-system, BlinkMacSystemFont,
-      "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --f-serif: var(--font-serif), "Instrument Serif", Georgia, serif;
+    --f-sans: var(--tv-font-sans);
     --f-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 
     /*
@@ -237,7 +230,7 @@
     --t-6: 20px;
     --t-7: 24px;
     --t-8: 32px;
-    --t-9: clamp(38px, 4vw, 56px);
+    /* --t-9 (the 38-56px H1) is gone: the H1 role reads --tv-fs-h1 since UX-L3. */
     /*
       BQ-006. Two display sizes that sit between the h1 and `--t-8`, because a landing section
       heading is a band that owns a screen and a card heading is not. They are named rather than
@@ -297,6 +290,143 @@
     --dur-3: 200ms;
     --dur-4: 280ms;
   }
+
+  /* ------------------------------------------------------------------ UX-L1, 2026-10-17
+
+     The --tv-* tokens (UX-PLAN-2026-10-17 §4.3), opened under a new prefix so that adding them
+     changed no screen. One paper, one instrument, one accent -- decision.md G-H's 255°, written
+     as the hex CSS gamut mapping draws at the sRGB chroma boundary, so the contrast is the same
+     on every screen -- the 210° evidence hue for INSTRUMENT faces only (§4.2-3), and one value per
+     state, always set beside words (§4.2-4).
+
+     The surface copies the public pages carried (§4.1) read these through var() instead of a hex
+     of their own, and the values §4.2-5 retires are gone from every sheet. The ratios noted here
+     are token-contrast-20261017.txt's; lib/brand-tokens.test.ts recomputes them from this block
+     and scans app/ and components/ for a retired value, and e2e/brand-tokens.spec.ts reads what
+     every T0-T5 route actually paints.
+
+     The type, space, layout, radius and motion families are declared for the lanes that consume
+     them (UX-L2, UX-L3); nothing reads them yet.
+     ------------------------------------------------------------------ */
+  :root {
+    /* PAPER: marketing, docs, pricing, trust and the Explore reading face. */
+    --tv-paper: #faf9f6;          /* the one light ground (today's Home) */
+    --tv-paper-raised: #ffffff;   /* a source crop, a sheet, the inside of a card */
+    --tv-paper-sunk: #f2f0eb;     /* code, a quote, a source region's wash */
+    --tv-ink: #15191d;            /* 16.78:1 on paper */
+    --tv-ink-muted: #58606a;      /*  6.05:1 on paper: the floor for support text and 13px meta */
+    --tv-rule: rgb(21 25 29 / 0.12);         /* the alpha hairline (DESIGN_MASTER §6.3) */
+    --tv-rule-strong: rgb(21 25 29 / 0.24);  /* a source region's outline */
+
+    /* INSTRUMENT: the film stage, the footer, the workspace, sign-in. */
+    --tv-inst-0: #090d14;         /* ground (today's --ground) */
+    --tv-inst-1: #0e1013;         /* film stage and footer (today's Home obsidian) */
+    --tv-inst-2: #17202c;         /* a raised panel (today's --g2) */
+    --tv-on-inst: #edf2f5;        /* 16.89:1 on inst-1 */
+    --tv-on-inst-muted: #9ba0a8;  /*  7.25:1 on inst-1 */
+    --tv-rule-inst: rgb(255 255 255 / 0.09);
+
+    /* ACCENT: decision.md G-H 255°, at the sRGB chroma boundary. */
+    --tv-action: #005bb3;         /* oklch(48% .158 255): white on it 6.67:1, on paper 6.34:1 */
+    --tv-action-hover: #0169cd;   /* oklch(53% .174 255): white on it 5.38:1 */
+    --tv-action-press: #004b96;   /* oklch(42% .138 255): white on it 8.58:1 */
+    --tv-action-on-dark: #65a7fa; /* oklch(72% .14 255): 7.68:1 on inst-1 (focus, links) */
+
+    /* EVIDENCE 210°: INSTRUMENT faces only (§4.2-3). */
+    --tv-evidence: #0590a2;         /* lines and fills only: 3.62:1 on paper (non-text, >= 3:1) */
+    --tv-evidence-ink: #026470;     /* text: 6.52:1 on paper */
+    --tv-evidence-wash: #d9f5fa;
+    --tv-evidence-on-dark: #51cade; /* 9.85:1 on inst-1 */
+
+    /* STATE: only ever beside the words that say it. */
+    --tv-verified: #1a6d51;   /* 5.95:1 on paper */
+    --tv-changed: #8c5217;    /* 5.98:1 on paper */
+    --tv-unresolved: #a72d23; /* 6.56:1 on paper */
+    /* The same three on an INSTRUMENT face: the dark-ground values §4.3 quotes beside them, named
+       so a dark panel on a public page reads them rather than carrying a hex of its own. */
+    --tv-verified-on-dark: #7be0be;
+    --tv-changed-on-dark: #f2a65a;
+    --tv-unresolved-on-dark: #f07d73;
+
+    /* TYPE (decision.md G-B: Wanted Sans Variable, non-integer weights). */
+    --tv-font-sans: "Wanted Sans Variable", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    --tv-font-mono: var(--font-mono), "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --tv-fs-display: clamp(32px, calc(4.4vw + 15px), 72px); /* Display 1: the Home H1, once per page */
+    --tv-fs-h1: clamp(32px, calc(2.4vw + 18px), 52px);      /* Display 2: T1-T5 H1, a Home section H2 */
+    --tv-fs-title: clamp(24px, calc(1.1vw + 18px), 34px);   /* Title 1: a T1-T5 section H2 */
+    --tv-fs-h3: clamp(20px, calc(0.4vw + 18px), 24px);      /* Title 2 */
+    --tv-fs-lead: clamp(17px, calc(0.3vw + 16px), 20px);
+    --tv-fs-body: clamp(16px, calc(0.1vw + 15.5px), 17px);
+    --tv-fs-small: 15px;
+    --tv-fs-meta: 13px;   /* the microcopy floor (today's 11-12px grey goes up to it) */
+    --tv-fs-label: 12px;  /* mono: coordinates, digests, IDs and file names only */
+    --tv-lh-display: 1.05;
+    --tv-lh-title: 1.2;
+    --tv-lh-body: 1.6;
+    --tv-track-display: -0.03em;
+    --tv-track-title: -0.02em;
+    --tv-track-label: 0.08em;
+    --tv-w-display: 590;  /* 620 -> 590 (decision.md G-B) */
+    --tv-w-title: 510;    /* 600 -> 510 */
+    --tv-w-ui: 560;       /* buttons, tabs, navigation */
+    --tv-w-body: 400;     /* UX-PLAN §4.4, weight note */
+
+    /* SPACE (DESIGN_MASTER §6.1: multiples of 4px only). */
+    --tv-s-1: 4px;
+    --tv-s-2: 8px;
+    --tv-s-3: 12px;
+    --tv-s-4: 16px;
+    --tv-s-5: 24px;
+    --tv-s-6: 32px;
+    --tv-s-7: 48px;
+    --tv-s-8: 64px;
+    --tv-s-9: 96px;
+    --tv-s-10: 128px;
+    --tv-s-11: 160px;
+    --tv-s-12: 200px;
+
+    /* LAYOUT (DESIGN_MASTER §6.4). */
+    --tv-page-max: 1320px;
+    --tv-page-margin: clamp(24px, 5vw, 72px);
+    --tv-page-w: min(var(--tv-page-max), calc(100% - 2 * var(--tv-page-margin)));
+    --tv-measure: 68ch;   /* EN: 60-72 characters */
+    --tv-header-h: 64px;
+    --tv-section-pad-top: 128px;
+    --tv-section-pad-bottom: 160px;
+
+    /* RADIUS (five tokens only). */
+    --tv-r-paper: 2px;
+    --tv-r-paper-lg: 4px;
+    --tv-r-inst: 6px;
+    --tv-r-inst-lg: 8px;
+    --tv-r-media: 12px;
+
+    /* MOTION (DESIGN_MASTER §6.1, §10). */
+    --tv-t-1: 90ms;
+    --tv-t-2: 140ms;
+    --tv-t-3: 200ms;
+    --tv-t-4: 280ms;
+    --tv-t-5: 420ms;
+    --tv-t-move: var(--tv-t-4);
+    --tv-e-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --tv-e-inout: cubic-bezier(0.77, 0, 0.175, 1);
+    --tv-e-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  @media (max-width: 899.98px) {
+    :root { --tv-header-h: 56px; --tv-section-pad-top: 72px; --tv-section-pad-bottom: 88px; }
+  }
+  /*
+    KO (DESIGN_MASTER §7.5), on the element that carries the language. The plan's `:lang(ko)`
+    matches every element of a Korean page, so it would reset a container's own --tv-measure on
+    each of its children; the attribute sets it once and lets it inherit.
+  */
+  [lang|="ko"] {
+    --tv-measure: 40em;           /* KO: 34-40 characters */
+    --tv-lh-body: 1.75;
+    --tv-track-display: -0.012em;
+    --tv-track-label: 0;          /* no capital tracking on Hangul */
+  }
+  /* Under reduced motion --tv-t-move is 0ms: that lives in the site's one reduced-motion block below. */
 
   /* The bar is real here, and only here. */
   .workspace-body,
@@ -496,15 +626,22 @@
     The scale had two display sizes and then a cliff: h1 52, h2 43, h3 19, body 15. The
     h2-to-h3 drop was 24px with nothing in between, and on /docs it read as a 43px heading
     followed immediately by 17px prose -- a flat hierarchy with a shout at the top of it, which is
-    the template tell. The steps are 56 / 32 / 20 / 15 now, each about 1.6x the one below, taken
-    from the --t-* scale. Display 1 is the landing page's alone; every other h1, /explore
-    included, is Display 2. Heading leading is 1.08 at display sizes.
+    the template tell. Display 1 is the landing page's alone; every other h1, /explore included,
+    is Display 2.
+
+    UX-L3 (UX-PLAN-2026-10-17 §4.4, §5.3 R2/R3) puts the roles on the --tv-* scale: Display 2
+    (52 at 1440, 32 at 390, weight 510) for the H1 and `.document-title` of every T1-T5 route,
+    Title 1 (34 / 24, weight 510) for a section H2. Before it the same role measured 51.84, 56,
+    59.04, 77.76 and 112px on five T1 routes, because each page sized its own H1; those per-page
+    sizes are deleted, so the role is declared here once. The weights are decision.md G-B's
+    non-integer cuts (600 -> 510). The tracking tokens become -0.012em under :lang(ko).
   */
-  h1 {
-    font-size: var(--t-9);
-    line-height: 1.08;
-    letter-spacing: -0.032em;
-    font-variation-settings: "wght" 600;
+  h1, .document-title {
+    font-size: var(--tv-fs-h1);
+    line-height: 1.12;
+    letter-spacing: var(--tv-track-display);
+    font-weight: var(--tv-w-title);
+    font-variation-settings: "wght" var(--tv-w-title);
   }
   .landing-page h1 {
     font-size: clamp(40px, 5.2vw, 68px);
@@ -517,18 +654,13 @@
   h1 .line.dim { color: var(--text-lo); }
 
   h2 {
-    font-size: clamp(24px, 2.6vw, 32px);
-    line-height: 1.12;
-    letter-spacing: -0.025em;
-    font-variation-settings: "wght" 600;
+    font-size: var(--tv-fs-title);
+    line-height: var(--tv-lh-title);
+    letter-spacing: var(--tv-track-title);
+    font-weight: var(--tv-w-title);
+    font-variation-settings: "wght" var(--tv-w-title);
   }
-  .document-title {
-    font-size: var(--t-9);
-    line-height: 1.08;
-    letter-spacing: -0.038em;
-    font-variation-settings: "wght" 590;
-    text-wrap: pretty;
-  }
+  .document-title { text-wrap: pretty; }
   /* Narrative type is distinct from compact evidence instrumentation. */
   .scene.doc > .shell > .lede {
     font-size: clamp(16px, 1.3vw, 18px);
@@ -3233,6 +3365,8 @@
   */
   @media (prefers-reduced-motion: reduce) {
     :root { --dur-1: 0ms; --dur-2: 0ms; --dur-3: 0ms; --dur-4: 0ms; }
+    /* UX-L1 (UX-PLAN-2026-10-17 §4.3): movement lands on its final state at once; fades of 140ms or less stay (§10.4). */
+    :root { --tv-t-move: 0ms; }
     html { scroll-behavior: auto; }
     html.landing-scroll { scroll-snap-type: none; }
     *, *::before, *::after {
@@ -3462,7 +3596,9 @@
     horizontal scroll nobody finds, so each row becomes a stacked card and each cell prints its
     column name from the `data-label` the component already writes for accessibility.
   */
-  .src-scroll { overflow-x: auto; margin: 0 -2px; }
+  /* The -2px keeps a focus ring clear of the scroll clip; the matching padding keeps the table on the
+     container edge (UX-L2, R1: it sat 2px left of the H1). */
+  .src-scroll { overflow-x: auto; margin: 0 -2px; padding: 0 2px; }
 
   .src-matrix {
     width: 100%;
@@ -4023,10 +4159,19 @@
     .skip {
       min-height: 44px;
     }
-    :is(.docs-langs button, .changelog-filter button, .tag, summary, .site-links a) {
+    :is(.docs-langs button, .changelog-filter button, .tag, .site-links a) {
       display: inline-flex;
       align-items: center;
     }
+    /*
+      UX-L7 (UX-PLAN-2026-10-17 §5.3 R8): a <summary> keeps its marker. It was in the inline-flex list
+      above, and inline-flex drops the disclosure triangle (::marker in Chromium, the details marker in
+      WebKit), so below 1080px every summary that relied on the native marker -- the 33 endpoint
+      disclosures on /api, "Method and limits" on /benchmarks -- opened from a bare line of text. A
+      summary with a drawn +/- sets its own display and keeps it; the rest keep the browser's
+      list-item. align-content centres the line in the 44px box the rule above still sets.
+    */
+    summary { align-content: center; }
     /* A target is two-dimensional. These chips already had the 44px row and still measured 40px
        across on the shortest label ("All" on /changelog at 360), which fails the same guideline
        on the other axis. */

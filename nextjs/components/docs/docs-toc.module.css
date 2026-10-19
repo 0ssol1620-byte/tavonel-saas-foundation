@@ -18,7 +18,8 @@
   .disclosure { display: none; }
 }
 .disclosure { margin: 0; border: 1px solid var(--hairline); border-radius: var(--r-paper-lg); background: var(--g1); }
-.disclosure > summary { min-height: 44px; display: flex; align-items: center; padding: 0 14px; cursor: pointer; font-family: var(--f-sans); font-size: var(--t-2); font-weight: 500; letter-spacing: 0; color: var(--text-mid); }
+/* UX-L7 (UX-PLAN-2026-10-17 §5.3 R8): list-item keeps the disclosure marker that flex dropped. */
+.disclosure > summary { min-height: 44px; display: list-item; align-content: center; padding: 0 14px; cursor: pointer; font-family: var(--f-sans); font-size: var(--t-2); font-weight: 500; letter-spacing: 0; color: var(--text-mid); }
 /* Hover is gated: on a touch screen an un-gated :hover sticks after a tap (token contract). */
 @media (hover: hover) and (pointer: fine) { .disclosure > summary:hover { color: var(--text-hi); } }
 .disclosure > nav { padding: 4px 14px 14px; }
@@ -67,8 +68,31 @@
 .rail :global(.docs-search-count) { white-space: nowrap; }
 /* A result excerpt is prose, not a title: let it use the two lines it needs. */
 .rail :global(.docs-search-results span) { display: block; }
-.layout > :global(.body) > :global(.stack) { min-width: 0; width: 100%; }
-.layout :global(.document-title) { width: 100%; max-width: 100%; font-size: clamp(34px, 3.5vw, 50px); line-height: 1.08; }
+/*
+  B-09: the body's first stack is the article now that the title row sits above the columns, and
+  tavonel.css (base layer) pins `.body > .stack:first-child` sticky above 1321px for the two-column
+  title composition. An article is not a title, so it stays in flow. Until B-09 product-polish.css's
+  breadcrumb + title :has() condition did this, and gave the body's lists the 68ch measure below.
+*/
+.layout > :global(.body) > :global(.stack) { min-width: 0; width: 100%; position: static; }
+.layout > :global(.body) :global(:is(li, dd, blockquote)) { max-width: 68ch; }
+/*
+  B-09: the title row (breadcrumb + H1), full width above the rail and the reading column. Its
+  space below is the body's own title-to-article gap (28px, 22px on a phone) that it used to sit in.
+*/
+.heading { min-width: 0; margin-bottom: 28px; }
+@media (max-width: 600px) { .heading { margin-bottom: 22px; } }
+/*
+  B-09: the header is fixed, and this surface starts its content clamp(40px, 4vw, 50px) (32px at
+  760 and below, product-polish.css) plus the shell's 18px below the top of the page -- less than
+  the header's height between 900 and 1150px and at 760 and below. The rail, first until B-09, hid
+  that behind its own inset; the breadcrumb is first now, so the row clears the header by the 4px
+  it has at 1440 (68 against 64) and adds nothing where the surface already clears it.
+*/
+.heading { padding-top: max(0px, calc(var(--tv-header-h) + 4px - 18px - clamp(40px, 4vw, 50px))); }
+@media (max-width: 760px) { .heading { padding-top: max(0px, calc(var(--tv-header-h) + 4px - 18px - 32px)); } }
+/* UX-L3 (UX-PLAN-2026-10-17 §5.3 R2): size and leading are the T3 H1 role in tavonel.css; /docs measured 56px, a chapter 50px. */
+.heading :global(.document-title) { width: 100%; max-width: 100%; }
 .layout :global(.docs-body) { max-width: 100%; width: 100%; }
 .layout :global(.docs-body p), .layout :global(.docs-steps) { font-size: 17px; line-height: 1.7; }
 .layout :global(.docs-body .lede) { font-size: 18px; line-height: 1.6; }

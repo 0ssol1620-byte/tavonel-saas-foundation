@@ -53,14 +53,42 @@ const routes = ["/", "/privacy", "/security", "/pricing", "/ko/pricing", "/ko/co
   a number nobody has measured. Their summary lines print on every run like the others, and they
   move into `routes` above with the first run that shows they clear the budgets -- which is the
   same discipline `/explore` is held to below, and not a ceiling bent to fit.
+
+  `/ko` joined this list with the script ratchet below (UX-L0), and it joined here, not `routes`,
+  because its first run did not clear: largest-contentful-paint median 3,093.6 ms against the
+  3,000 ceiling (2026-10-17, BASELINE-L0.json; every other budget passed). That is an existing
+  defect this list had never measured, not one the ratchet introduced. The script ratchet gates
+  `/ko` already; the other budgets start gating it with the first run that shows the LCP cleared.
 */
-const measureOnlyRoutes = ["/login", "/auth/callback"];
+const measureOnlyRoutes = ["/ko", "/login", "/auth/callback"];
 const runsPerRoute = 3;
 const maxAttemptsPerRoute = 6;
 const budgets = {
   categories: { performance: 0.8, accessibility: 0.95, "best-practices": 0.9, seo: 0.9 },
   audits: { "largest-contentful-paint": 3_000, "cumulative-layout-shift": 0.1, "total-blocking-time": 300 },
 };
+/*
+  Script ratchet for the two front doors (UX-L0, UX-PLAN-2026-10-17 §8.2 and §8.4).
+
+  Until this, the live site had no script-byte gate: the 200,000-byte ratchet CLAUDE.md names
+  lives in the core repository's apps/web/lighthouserc.json and never ran against this app. These
+  two numbers were RE-DERIVED FROM MEASUREMENT, not carried over and not raised: Lighthouse 12.8.2
+  resource-summary script transferSize (bytes on the wire -- compressed body plus response headers
+  -- of every script request the page made) against a production `next build` served by
+  `next start`, three runs per route, exactly as this script measures. The receipt, with every
+  sample and the rule, is BASELINE-L0.json in the core repository's
+  outputs/tavonel-research-replan-20261013/ux-program-20261017/.
+
+  Rule: ratchet = the largest measured sample, rounded up to the next 1,024 bytes. The rounding is
+  the only headroom; it absorbs HTTP framing noise, not new code. The run's median is what is
+  compared, like every other audit here.
+
+  A lane that adds script to / or /ko and lands over these reduces first. If a page is deliberately
+  changed so that it must weigh more, the ratchet is re-derived from a new measurement recorded
+  beside BASELINE-L0.json, and the commit says which of the two acts it is. It is never raised to
+  make a run go green. A ratcheted route fails the run whatever its `enforced` flag says.
+*/
+const scriptRatchetBytes = { "/": 160_768, "/ko": 160_768 };
 
 try {
   const health = await fetch(`${baseUrl}/api/healthz`);
@@ -77,9 +105,14 @@ const median = (values) => {
   return ordered[Math.floor(ordered.length / 2)];
 };
 
+// resource-summary's script row. A report without one is an incomplete sample, never zero bytes.
+const scriptTransferBytes = (report) =>
+  report.audits?.["resource-summary"]?.details?.items?.find((item) => item.resourceType === "script")?.transferSize;
+
 function completeReport(report) {
   return Object.keys(budgets.categories).every((name) => typeof report.categories?.[name]?.score === "number")
-    && Object.keys(budgets.audits).every((name) => typeof report.audits?.[name]?.numericValue === "number");
+    && Object.keys(budgets.audits).every((name) => typeof report.audits?.[name]?.numericValue === "number")
+    && typeof scriptTransferBytes(report) === "number";
 }
 
 try {
@@ -135,7 +168,18 @@ try {
       and is enforced above; the two sign-in routes are, until a run shows they clear.)
     */
     const enforced = !measureOnlyRoutes.includes(route);
-    const summary = { route, runs: runsPerRoute, enforced, categories: {}, audits: {}, over: [] };
+    const scriptTransferSamples = samples.map(scriptTransferBytes);
+    const summary = {
+      route, runs: runsPerRoute, enforced, categories: {}, audits: {},
+      scriptTransferBytes: median(scriptTransferSamples), scriptTransferSamples,
+      scriptRatchetBytes: scriptRatchetBytes[route] ?? null,
+      over: [],
+    };
+    if (summary.scriptRatchetBytes !== null && summary.scriptTransferBytes > summary.scriptRatchetBytes) {
+      const miss = `${route} script-transfer-bytes ${summary.scriptTransferBytes} > ${summary.scriptRatchetBytes}`;
+      summary.over.push(miss);
+      failures.push(miss);
+    }
     for (const [name, minimum] of Object.entries(budgets.categories)) {
       const score = median(samples.map((report) => report.categories[name].score));
       summary.categories[name] = score;
@@ -153,8 +197,10 @@ try {
       if (enforced) failures.push(miss);
     }
     process.stdout.write(`${JSON.stringify(summary)}\n`);
-    if (!enforced && summary.over.length > 0) {
-      process.stderr.write(`LIGHTHOUSE_MEASURED_NOT_ENFORCED:\n${summary.over.map((item) => `- ${item}`).join("\n")}\n`);
+    // The script ratchet already went to `failures`; only the misses that really are ignored print here.
+    const ignored = summary.over.filter((item) => !failures.includes(item));
+    if (!enforced && ignored.length > 0) {
+      process.stderr.write(`LIGHTHOUSE_MEASURED_NOT_ENFORCED:\n${ignored.map((item) => `- ${item}`).join("\n")}\n`);
     }
   }
 } finally {

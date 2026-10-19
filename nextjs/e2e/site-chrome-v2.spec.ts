@@ -163,7 +163,9 @@ test.describe("at 1440", () => {
   test("aligns the wordmark and footer on the shared fluid content edge", async ({ page }) => {
     await page.goto("/product");
     const width = page.viewportSize()!.width;
-    const edge = Math.max(Math.min(Math.max(width * .025, 20), 32), (width - 1280) / 2);
+    // UX-PLAN-2026-10-17 §4.5 (UX-L2): the one container is DESIGN_MASTER_V3 §6.4's 1320px with a
+    // clamp(24px, 5vw, 72px) margin; it was 1280px with clamp(20px, 2.5vw, 32px).
+    const edge = Math.max(Math.min(Math.max(width * .05, 24), 72), (width - 1320) / 2);
     const wordmark = await page.locator(`${HEADER} .wordmark`).first().boundingBox();
     expect(wordmark).not.toBeNull();
     expect(Math.abs((wordmark?.x ?? 0) - edge), `wordmark x ${wordmark?.x}`).toBeLessThanOrEqual(1);
@@ -309,7 +311,9 @@ test.describe("Home keeps main's header and footer colours", () => {
     await page.goto("/pricing");
     await expect(page.locator("footer.site")).toHaveCSS("background-color", "rgb(247, 245, 239)");
     await expect(page.locator("footer.site .site-footer-groups a").first()).toHaveCSS("color", "rgb(83, 96, 106)");
-    expect(await page.locator(HEADER).evaluate((element) => getComputedStyle(element).getPropertyValue("--source").trim())).toBe("#2447b3");
+    // UX-L1 (UX-PLAN-2026-10-17 §4.2-5, §8.2): the paper header's --source was the retired 265° #2447b3; it reads
+    // var(--tv-action) now, the same 255° accent Home's header carries above.
+    expect(await page.locator(HEADER).evaluate((element) => getComputedStyle(element).getPropertyValue("--source").trim())).toBe("#005bb3");
     if (testInfo.project.name === "1440") {
       await expect(page.locator(HEADER)).toHaveCSS("min-height", "64px");
     } else {

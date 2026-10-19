@@ -59,6 +59,8 @@ const MARKETING_PAGES = [
   "app/knowledge-compiler/page.tsx",
   "app/explore/page.tsx",
   "app/pricing/page.tsx",
+  // P2-10: the Korean twin of /pricing (UX-PLAN §5.3 R12), now that the list below reads Korean.
+  "app/ko/pricing/page.tsx",
   "app/enterprise/page.tsx",
   "app/solutions/page.tsx",
   "app/integrations/page.tsx",
@@ -131,6 +133,22 @@ const HEDGES = [
   "published roadmap",
 ] as const;
 
+/*
+  The same register in Korean (UX program 2026-10-17, lane P2-10; PHASE1-CRITIC §3.4 and "missing
+  3"). The list above is English only, so a Korean hedge on `/ko` -- the first-impression surface
+  this file guards -- passed CI while breaking the rule the file states: "아직" is "not yet",
+  "준비 중" and "추후" are "coming soon" and "for the time being", "최선을 다해" is "best effort",
+  and "지원하지 않습니다" is the refusal sentence that belongs on a disclosure surface (`/sources`),
+  not in a hero. Phrases, not words, for the same reason as above.
+*/
+const KO_HEDGES = ["아직", "준비 중", "추후", "최선을 다해", "지원하지 않습니다"] as const;
+
+/** The hedges a source carries, in either language; the failure-path test below calls it too. */
+function hedgesIn(source: string) {
+  const lower = source.toLowerCase();
+  return [...HEDGES, ...KO_HEDGES].filter((hedge) => lower.includes(hedge));
+}
+
 /** Comments explain what was removed and must not themselves count as the thing (as the purge). */
 function prose(relative: string) {
   const url = new URL(relative, ROOT);
@@ -151,9 +169,16 @@ describe("copy trust guard", () => {
   });
 
   it.each(GUARDED)("keeps the hedge register off %s", (file) => {
-    const source = prose(file)!.toLowerCase();
-    const found = HEDGES.filter((hedge) => source.includes(hedge));
+    const found = hedgesIn(prose(file)!);
     expect(found, `${file} hedges: ${found.join(", ")}`).toEqual([]);
+  });
+
+  /* A guard that matches nothing passes everything. The first sentence is the kind KB-F6 proposed for `/ko`. */
+  it("catches a Korean hedge", () => {
+    expect(hedgesIn("한국어 문서 품질은 아직 측정하지 않았습니다. 표 추출은 준비 중이며 추후 지원합니다."))
+      .toEqual(["아직", "준비 중", "추후"]);
+    expect(hedgesIn("BEST EFFORT 형식은 최선을 다해 읽으며, 일부는 지원하지 않습니다."))
+      .toEqual(["best effort", "최선을 다해", "지원하지 않습니다"]);
   });
 
   /*

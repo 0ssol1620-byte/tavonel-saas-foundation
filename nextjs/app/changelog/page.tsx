@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 */
 
 export default function ChangelogPage() {
-  return <PublicPageShell><section className="scene doc"><div className="shell"><div className="body">
+  return <PublicPageShell template="T3"><section className="scene doc"><div className="shell"><div className="body">
     <div className="stack">
       <h1 className="document-title">What changed, without the noise.</h1>
       {/*

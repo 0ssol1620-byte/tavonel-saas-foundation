@@ -135,7 +135,7 @@ export default async function CookbookPage({ params }: { params: Promise<{ slug:
   const trail = [{ name: "Cookbooks", path: "/cookbooks" }, { name: record.title, path: `/cookbooks/${record.slug}` }];
 
   return (
-    <PublicPageShell>
+    <PublicPageShell template="T3">
       <BreadcrumbJsonLd trail={trail} />
       <section className="scene doc"><div className="shell"><div className="body">
         <div className="stack">

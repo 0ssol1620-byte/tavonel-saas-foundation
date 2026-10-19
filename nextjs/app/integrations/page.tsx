@@ -142,7 +142,7 @@ export default function IntegrationsPage() {
   const sections = tocEntries(SECTIONS);
 
   return (
-    <PublicPageShell>
+    <PublicPageShell template="T1">
       <section className="scene doc"><div className="shell">
         <div className="body">
           <div className="stack">

@@ -5,17 +5,8 @@ import MobilePrimaryNav from "@/components/mobile-primary-nav";
 import DesktopPrimaryNav, { HeaderCta } from "@/components/site-nav/desktop-primary-nav";
 import HeaderScrollState from "@/components/site-nav/header-scroll-state";
 import { MarketingConsentLink } from "@/components/marketing-consent";
-import { BRAND_LINE, EXPLORE_CTA, FOOTER_GROUPS, FOOTER_LEGAL_ROW, KO_CHROME } from "@/lib/site-navigation";
+import { BRAND_LINE, FOOTER_GROUPS, FOOTER_LEGAL_ROW, KO_CHROME, SAMPLE_CTA } from "@/lib/site-navigation";
 import chrome from "./public-site-chrome.module.css";
-
-/**
- * The one primary action, spelled once (brief 2026-10-15, move 1).
- *
- * The public sample is the action every reader can take today, so the header's filled button,
- * the Home hero and the Home close all say this, in this colour. Read by `landing-page.tsx`.
- */
-/* Fix round 3 (judge gap 4): a verb that does something today -- /explore opens the compiled public sample. */
-export const SAMPLE_CTA = { href: EXPLORE_CTA.href, label: "Open the compiled sample", ko: "컴파일된 샘플 열기" } as const;
 
 /**
  * The header, once, for every public surface including the three that used to hand-roll one.
@@ -206,7 +197,22 @@ export function PublicSiteFooter({ korean = false, onePath = false, languageHref
   );
 }
 
-export function PublicSitePage({ children, korean = false, languageHref }: { children: React.ReactNode; korean?: boolean; languageHref?: string }) {
+/**
+ * UX-L7 (UX-PLAN-2026-10-17 §5.1, §5.4): the page templates, declared on the page root.
+ *
+ * T0 Home, T1 Story (Product/Solutions), T2 Conversion (Pricing/Evaluation/Contact), T3 Reference
+ * (Docs/Developers), T4 Explore, T5 Trust/Editorial. T6, the workspace app shell, is not a public
+ * page and is not declared here. A route says which template it is as `data-template` on its page root
+ * (the element that holds <main>, or <main> itself on /explore), so a template-wide rule has one
+ * selector and `e2e/templates.spec.ts` can read the inventory off the browser and compare it with §5.4.
+ */
+export type PageTemplate = "T0" | "T1" | "T2" | "T3" | "T4" | "T5";
+
+/*
+  `template` is required: a new public page has to say which template it is, and a page outside
+  §5.4's inventory (the 404, the noindex /arena) says so with `null` rather than by forgetting.
+*/
+export function PublicSitePage({ children, template, korean = false, languageHref }: { children: React.ReactNode; template: PageTemplate | null; korean?: boolean; languageHref?: string }) {
   /*
     The commercial posture, read once per page rather than fetched once per visitor.
 
@@ -217,7 +223,7 @@ export function PublicSitePage({ children, korean = false, languageHref }: { chi
     the closed posture.
   */
   return (
-    <div className="page public-page" lang={korean ? "ko" : undefined}>
+    <div className="page public-page" lang={korean ? "ko" : undefined} data-template={template ?? undefined}>
       <PublicSiteHeader korean={korean} />
       <main id="main" tabIndex={-1}>{children}</main>
       <PublicSiteFooter korean={korean} languageHref={languageHref} />

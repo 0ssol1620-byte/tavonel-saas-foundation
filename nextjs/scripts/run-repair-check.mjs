@@ -232,6 +232,14 @@ const browserProjectsByFile = new Map([
   ['e2e/login-capability.spec.ts', ['1440']],
   ['e2e/home-measures.spec.ts', ['1440', '390', 'reduced-motion']],
   ['e2e/overflow-audit.spec.ts', ['audit']],
+  ['e2e/templates.spec.ts', ['1440']],
+  ['e2e/type-scale.spec.ts', ['1440']],
+  ['e2e/site-alignment.spec.ts', ['1440']],
+  ['e2e/brand-tokens.spec.ts', ['1440']],
+  ['e2e/benchmarks.spec.ts', ['1440']],
+  ['e2e/film-line-stability.spec.ts', ['390']],
+  ['e2e/specimen-strip.spec.ts', ['390']],
+  ['e2e/self-serve-journey.spec.ts', ['audit']],
 ]);
 
 const SOLUTIONS_ROUTES=['ai-ready-knowledge','document-intelligence','knowledge-graph','source-grounded-assistants','knowledge-operations'];

@@ -1,0 +1,66 @@
+{
+  "specimenId": "fixture-korean-p001",
+  "slot": "korean",
+  "documentId": "fixture-korean",
+  "title": "합성 픽스처: 한국어 페이지",
+  "lang": "ko",
+  "sourcePageUrl": "https://fixture.invalid/specimens/korean",
+  "sourceUrl": "https://fixture.invalid/specimens/korean.pdf",
+  "acquiredFrom": "TAVONEL-authored synthetic fixture, nextjs/e2e/fixtures/specimens",
+  "representationKind": "synthetic_fixture",
+  "originalSha256": "sha256:0000000000000000000000000000000000000000000000000000000000000011",
+  "extractedPdfSha256": "sha256:0000000000000000000000000000000000000000000000000000000000000012",
+  "pageCount": 1,
+  "page": 1,
+  "capturedOn": "2026-10-19",
+  "rights": {
+    "basis": "TAVONEL-authored synthetic fixture",
+    "jurisdiction": "Not applicable: no third-party work",
+    "attribution": "TAVONEL test fixture",
+    "publication": "public_sample",
+    "licence": {
+      "id": "TAVONEL-FIXTURE",
+      "markingScope": "item",
+      "markingText": "Synthetic fixture for layout tests; never published.",
+      "markingUrl": "https://fixture.invalid/specimens/korean",
+      "retrievedOn": "2026-10-19",
+      "snapshotSha256": "sha256:0000000000000000000000000000000000000000000000000000000000000013"
+    }
+  },
+  "mustNotImply": [
+    "a reader run",
+    "any accuracy",
+    "a real document"
+  ],
+  "region": {
+    "regionId": "fixture-korean-r1",
+    "bbox1000": [
+      180,
+      280,
+      820,
+      440
+    ]
+  },
+  "crop": {
+    "path": "fixture-korean.svg",
+    "sha256": "sha256:4fbc50ca773673b336a087d9068e51edab2055b70bad5df1834981167474d766",
+    "width": 1000,
+    "height": 400,
+    "bytes": 652,
+    "window1000": [
+      100,
+      200,
+      900,
+      520
+    ]
+  },
+  "extractedText": "합성 픽스처: 배치 시험 전용입니다.\n이 문장은 판독기가 읽은 결과가 아닙니다.\n판독기 출력이 놓일 자리를 같은 줄바꿈으로 채웁니다.\n네 번째 줄까지 폰 패널의 높이를 정합니다.\n다섯 번째 줄은 접힘 규칙이 가립니다.\n여섯 번째 줄은 전체 보기에서만 보입니다.",
+  "reader": {
+    "id": "foundation_ocr_gpu_v1",
+    "imageDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000014"
+  },
+  "runAt": "2026-10-19T00:00:00Z",
+  "runReceiptSha256": "sha256:0000000000000000000000000000000000000000000000000000000000000015",
+  "runReceiptUrl": "https://fixture.invalid/specimens/korean.receipt.json",
+  "limitationTokens": []
+}

@@ -149,3 +149,14 @@
 /* The site's one disclosure marker, the same +/- the contact fold and the workspace use. */
 .examples > summary::before { content: "+"; font: 12px var(--f-mono); }
 .examples[open] > summary::before { content: "−"; }
+/*
+  UX-L7 (UX-PLAN-2026-10-17 §5.3 R8). The operation's own disclosure, which `app/api/page.tsx` already
+  named and this file never styled: below 1080px it lost the browser's triangle to the site-wide
+  inline-flex rule, and at every width its status codes ran into the label ("responses200 · 4"). It
+  takes the same +/- as the examples fold inside it, so one card has one marker.
+*/
+.operationDetails > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 44px; list-style: none; cursor: pointer; color: var(--text-hi); }
+.operationDetails > summary::-webkit-details-marker { display: none; }
+.operationDetails > summary::before { content: "+"; font: 12px var(--f-mono); color: var(--text-mid); }
+.operationDetails[open] > summary::before { content: "−"; }
+.operationDetails > summary > span { color: var(--text-lo); font: 12px/1.5 var(--f-mono); }

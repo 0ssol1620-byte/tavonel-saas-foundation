@@ -33,7 +33,7 @@ export default function ProductPage() {
   const sample = selectHomeCase([buildHomeEvidenceCase(buildHeroView(), buildProofTabs())]);
   const region = sample?.regions.find(item => item.id === sample.selectedRegionId && item.status === "extracted" && item.passage && item.href);
   const source = region && sample?.sources.find(item => item.id === region.sourceId);
-  return <PublicPageShell>
+  return <PublicPageShell template="T1">
     <section className={`scene doc product-overview ${styles.product}`}>
       <div className="shell">
         <div className={styles.lead}>

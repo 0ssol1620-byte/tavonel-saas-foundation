@@ -583,7 +583,8 @@ describe("the Evidence Line", () => {
 
   it("runs from the passage card's left edge to the box's right edge, relative to the overlay", () => {
     const line = workbenchLineGeometry(rect(100, 1000, 1200, 800), rect(900, 1100, 400, 300), rect(150, 1400, 500, 60));
-    expect(line).toEqual({ ax: 800, ay: 128, bx: 550, by: 430, top: 400 });
+    // UX-L10 (UX-PLAN-2026-10-17 §4.2-1): `left` and `bottom` place the accent outline on that same box.
+    expect(line).toEqual({ ax: 800, ay: 128, bx: 550, by: 430, top: 400, left: 50, bottom: 460 });
   });
 
   it("draws nothing when the layout is stacked or an end has no size", () => {
@@ -599,5 +600,6 @@ describe("the Evidence Line", () => {
     expect(markup).toContain('data-evidence-line="none"');
     expect(markup).toContain("position:absolute");
     expect(markup).not.toContain("<line");
+    expect(markup).not.toContain("<rect");
   });
 });

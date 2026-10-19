@@ -457,8 +457,9 @@ describe("the two pages", () => {
         expect(html).toContain(`href="#${chapter.id}"`);
       }
     }
-    expect(ko).toContain('class="page public-page" lang="ko"');
-    expect(en).toContain('<div class="page public-page">');
+    // UX-L7 (P2-11): every public root declares its template; the guide reads as T3 Reference, like /docs.
+    expect(ko).toContain('<div class="page public-page" lang="ko" data-template="T3">');
+    expect(en).toContain('<div class="page public-page" data-template="T3">');
   });
 
   it("send a Korean reader to the Korean page where one exists, and say when a link is English", () => {

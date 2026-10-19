@@ -52,7 +52,7 @@ export default function ContactPage() {
   const formats = describeAcceptedFormats(CAPABILITY_MANIFEST);
   const access = primaryCallToAction();
   return (
-    <PublicSitePage languageHref="/ko/contact">
+    <PublicSitePage template="T2" languageHref="/ko/contact">
       <section className="scene doc contact-page">
           <div className="shell">
             <div className="body">

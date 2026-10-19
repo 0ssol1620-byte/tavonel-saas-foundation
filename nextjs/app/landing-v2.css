@@ -12,7 +12,7 @@
   --lv2-meta: 13px;
   --lv2-gutter: var(--chrome-gutter);
   --space-section: clamp(56px, 5.2vw, 88px);
-  --lv2-film-summary-accent: #2447b3;
+  --lv2-film-summary-accent: var(--tv-action);
   --lv2-paper-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
   color: var(--text-hi);
   font-family: var(--f-sans);
@@ -98,7 +98,7 @@
   --hairline: var(--border-paper);
   --hairline-hi: var(--border-paper-hi);
   --source: var(--source-ink);
-  --relation: var(--relation-ink);
+  --relation: var(--tv-ink-muted); /* no violet on paper (UX-L1, UX-PLAN §4.2-5) */
   --unresolved: var(--unresolved-ink);
   --verified: var(--verified-ink);
   --changed: var(--changed-ink);

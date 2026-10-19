@@ -106,6 +106,20 @@ export const SELF_SERVE_CTA: SiteLink = { href: "/login", label: "Start with you
 export const EXPLORE_CTA: SiteLink = { href: "/explore", label: "Explore a Compiled World" };
 
 /**
+ * The one primary action, spelled once (brief 2026-10-15, move 1).
+ *
+ * The public sample is the action every reader can take today, so the header's filled button,
+ * the Home hero and the Home close all say this, in this colour. Fix round 3 (judge gap 4): a verb
+ * that does something today -- /explore opens the compiled public sample.
+ *
+ * It lives here rather than in `components/public-site-chrome.tsx` because UX-PLAN §6.3 rule 2
+ * reads every CTA label from this one file (P2-10). Its label and `EXPLORE_CTA`'s still differ:
+ * merging them (UX-PLAN §5.3 R6) changes what /pricing and the Product panel print, which the
+ * P2-10 truth table pins to main, so that is a later copy change and not part of this move.
+ */
+export const SAMPLE_CTA = { href: EXPLORE_CTA.href, label: "Open the compiled sample", ko: "컴파일된 샘플 열기" } as const;
+
+/**
  * The positioning line, once.
  *
  * Five different sentences were carrying it — one in the hero, one in the footer, one in the OG

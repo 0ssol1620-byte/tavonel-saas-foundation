@@ -194,7 +194,7 @@ export default function BenchmarksPage() {
   if (!recovery?.receipt) throw new Error("The published recovery result requires receipt R-01");
 
   return (
-    <PublicSitePage>
+    <PublicSitePage template="T5">
       <section className={"scene doc " + styles.benchmarkScene}>
         <div className="shell">
           <div className="body">

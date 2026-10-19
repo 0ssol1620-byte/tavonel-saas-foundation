@@ -210,6 +210,32 @@ describe("billing gate enforcement", () => {
     }
   });
 
+  it("recognises a subscription bound before a key rotation only through the configured previous key", async () => {
+    const OLD = "billing-old-secret-that-is-at-least-32-characters";
+    const boundBeforeRotation = createCheckoutBinding(
+      { userId: baseCandidate.userId, workspaceId: baseCandidate.workspaceKey, offerCode: "observer_access" }, OLD);
+    const read = live(subscription({ customData: boundBeforeRotation }));
+
+    const withoutPrevious = memoryStore();
+    const unrotated = deps(withoutPrevious, REFUSED, read);
+    await runBillingGateEnforcement(unrotated);
+    expect(withoutPrevious.records[0].outcome).toBe("identity_mismatch");
+    expect(unrotated.pauseSubscription).not.toHaveBeenCalled();
+
+    const withPrevious = memoryStore();
+    const rotated = { ...deps(withPrevious, REFUSED, read), previousBindingSecret: OLD };
+    await runBillingGateEnforcement(rotated);
+    expect(withPrevious.records[0]).toMatchObject({ outcome: "paused" });
+    expect(rotated.pauseSubscription).toHaveBeenCalledWith(baseCandidate.subscriptionId);
+
+    // The previous key never stands in for a missing current key.
+    const noCurrent = memoryStore();
+    const missing = { ...deps(noCurrent, REFUSED, read), bindingSecret: "", previousBindingSecret: OLD };
+    await runBillingGateEnforcement(missing);
+    expect(noCurrent.records[0].outcome).toBe("identity_mismatch");
+    expect(missing.pauseSubscription).not.toHaveBeenCalled();
+  });
+
   it("keeps the intent after a failed pause and creates no notice", async () => {
     const memory = memoryStore();
     const d = deps(memory, REFUSED, live(subscription()), { ok: false, code: "PADDLE_SUBSCRIPTION_PAUSE_FAILED" });

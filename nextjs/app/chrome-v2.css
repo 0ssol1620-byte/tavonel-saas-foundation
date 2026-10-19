@@ -1,8 +1,19 @@
 
+/*
+  UX-L2 (UX-PLAN-2026-10-17 §4.5, rule R1): one container. The header, every public body measure
+  and the footer read DESIGN_MASTER_V3 §6.4's container -- --tv-page-max 1320px and --tv-page-margin
+  clamp(24px, 5vw, 72px), app/tavonel.css -- through the two names their rules already use, so no
+  surface carries a number of its own. It was 1280px / clamp(20px, 2.5vw, 32px) here and 1200px on
+  Home, which moved the wordmark 40px when a reader left Home. The header is --tv-header-h tall:
+  64px from 900px, 56px below, where the row is the wordmark and Menu (§5.2).
+*/
 :root {
-  --chrome-gutter: clamp(20px, 2.5vw, 32px);
-  --chrome-measure: 1280px;
-  --chrome-header-height: 64px;
+  --chrome-gutter: var(--tv-page-margin);
+  --chrome-measure: var(--tv-page-max);
+  --chrome-header-height: var(--tv-header-h);
+  /* The container's left edge as inline padding on a full-bleed row. Resolved here, at the root, so
+     no subtree re-measures it; the 100% is the using row's containing block. */
+  --chrome-edge: max(var(--chrome-gutter), calc((100% - var(--chrome-measure)) / 2));
 }
 
 
@@ -14,9 +25,9 @@
   padding-inline: 0;
 }
 .nav.chrome-v2-header {
-  height: 64px;
+  height: var(--chrome-header-height);
   padding-block: 0;
-  padding-inline: max(var(--chrome-gutter), calc((100% - var(--chrome-measure)) / 2));
+  padding-inline: var(--chrome-edge);
   background: #f7f5ef;
   border-bottom: 1px solid #d8ddd9;
 }
@@ -30,12 +41,12 @@
   main's Home header computes min-height 0px at 1440.
 */
 .nav.chrome-v2-header:where(:not(.lv2 > header)) {
-  min-height: 64px;
+  min-height: var(--chrome-header-height);
   color: #171c20;
   --text-hi: #171c20;
   --text-mid: #53606a;
   --text-lo: #53606a;
-  --source: #2447b3;
+  --source: var(--tv-action);
 }
 .nav.chrome-v2-header[data-scrolled="1"] {
   background: #f7f5ef;
@@ -63,9 +74,21 @@
 .nav.chrome-v2-header .one-path-mobile-nav:not([open]) > nav {
   display: none;
 }
+/*
+  UX-L2 (§5.2): /login's own header row takes the same geometry -- the container edge and the
+  header height -- so the wordmark does not jump between the site and the sign-in page.
+  (/explore's stage header does the same in components/explore/explore-stage.module.css.)
+*/
+.auth > header {
+  min-height: var(--chrome-header-height);
+  padding-block: 0;
+  padding-inline: var(--chrome-edge);
+}
+/* The 56px phone row starts below 900 now (--tv-header-h), not below 768: UX-L2, §5.2. */
+@media (max-width: 899.98px) {
+  .nav.chrome-v2-header { min-height: var(--chrome-header-height); }
+}
 @media (max-width: 767px) {
-  :root { --chrome-header-height: 56px; }
-  .nav.chrome-v2-header { height: 56px; min-height: 56px; }
   body:not(:has([data-marketing-consent-panel])) .paper-product .lv2-hero { padding-top: 76px; }
 }
 @media (max-width: 1249px) {
@@ -92,7 +115,7 @@
     background: currentColor;
   }
 }
-.nav.chrome-v2-header:where(:not(.lv2 > header)) .nav-actions .btn { color: #fff; background: #2447b3; border-color: #2447b3; }
+.nav.chrome-v2-header:where(:not(.lv2 > header)) .nav-actions .btn { color: #fff; background: var(--tv-action); border-color: var(--tv-action); }
 @media (min-width: 1250px) {
   .mobile-primary-nav.one-path-mobile-nav { display: none; }
 }
@@ -123,7 +146,7 @@
 .one-path-primary-nav .site-nav-direct[aria-current="location"] {
   color: var(--text-hi);
   text-decoration: underline;
-  text-decoration-color: #2447b3;
+  text-decoration-color: var(--tv-action);
   text-decoration-thickness: 2px;
   text-underline-offset: 7px;
 }
@@ -140,7 +163,7 @@
 .one-path-mobile-nav .mobile-nav-direct[aria-current="page"],
 .one-path-mobile-nav .mobile-nav-direct[aria-current="location"] {
   color: var(--text-hi);
-  box-shadow: inset 2px 0 0 #2447b3;
+  box-shadow: inset 2px 0 0 var(--tv-action);
 }
 .one-path-mobile-nav .mobile-nav-signin {
   border-top: 1px solid var(--border-dark, var(--hairline));
@@ -254,9 +277,16 @@ body .skip { min-height: 44px; display: inline-flex; align-items: center; }
 .chrome-v2-header .wordmark b, .chrome-v2-footer .wordmark b { font-family: var(--f-sans); font-size: 15px; font-weight: 650; letter-spacing: .12em; }
 .chrome-v2-footer .site-footer-groups a { font-size: 14px; }
 
-/* The header, public article grid and footer share one outer alignment. */
+/*
+  The header, public article grid and footer share one outer alignment. UX-L2 (R1) adds the four
+  policy pages (/privacy, /terms, /refunds, /subprocessors), whose PolicyLayout root is a bare
+  `.page`: their body and their legal footer sat on the shared .shell's 1640px cap and 30px gutter,
+  42px left of the wordmark at 1440.
+*/
 .public-page main .shell,
-.pricing-page main .shell {
+.pricing-page main .shell,
+.policy-page > .shell,
+.page:has(> main > .policy-page) > footer.site > .shell {
   width: min(var(--chrome-measure), calc(100% - 2 * var(--chrome-gutter)));
   max-width: var(--chrome-measure);
   margin-inline: auto;

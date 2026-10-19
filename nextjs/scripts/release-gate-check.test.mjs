@@ -1,0 +1,266 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+
+import {
+  RELEASE_GATE_REPORT_SCHEMA,
+  RELEASE_MAX_AGE_MS,
+  checkReleaseGate,
+  parseOptions,
+  readReleaseRows,
+  run,
+} from "./release-gate-check.mjs";
+
+// After the import above: the script registered the extensionless-import resolver.
+const gate = await import("../../shared/scopedCustomerDataGate.ts");
+
+const SHA = "a".repeat(40);
+const OTHER_SHA = "b".repeat(40);
+const NOW = new Date("2026-10-17T12:00:00.000Z");
+const DAY = 86_400_000;
+const at = (ms) => new Date(ms).toISOString();
+const ENV = {
+  NEXT_PUBLIC_SUPABASE_URL: "https://project.example.supabase.co",
+  SUPABASE_SERVICE_ROLE_KEY: "service-role-key-for-tests-only-0123456789",
+};
+
+const evidenceFor = (facts, checkedAt) =>
+  facts.map((precondition) => ({ precondition, satisfied: true, evidence: `receipt:${precondition}`, checkedAt }));
+
+/** A stored production row whose digest the gate itself computed. */
+function productionRow({ scope = "direct_upload", sha = SHA, evaluatedMs, recordedMs = evaluatedMs } = {}) {
+  const evaluatedAt = at(evaluatedMs);
+  const evidence = evidenceFor(gate.requiredReleaseEvidence(scope), at(evaluatedMs - DAY));
+  const decision = gate.evaluateScopedRelease({ scope, releaseRevision: sha, evidence, now: evaluatedAt });
+  assert.equal(decision.allowed, true);
+  return {
+    schema_version: gate.SCOPED_CUSTOMER_DATA_GATE_SCHEMA, stage: "production", scope, release_revision: sha,
+    allowed: true, receipt_sha256: decision.receiptSha256, evidence, missing: [],
+    evaluated_at: evaluatedAt, recorded_at: at(recordedMs),
+    qualification_workspace_key: null, qualification_expires_at: null,
+  };
+}
+
+function qualificationRow({ evaluatedMs, workspaceId = "pilot-969dc192daa24119" }) {
+  const evaluatedAt = at(evaluatedMs);
+  const expiresAt = at(evaluatedMs + 45 * 60_000);
+  const facts = gate.requiredReleaseEvidence("direct_upload").filter((fact) => fact !== gate.QUALIFICATION_PENDING);
+  const evidence = evidenceFor(facts, at(evaluatedMs - DAY));
+  const decision = gate.evaluateQualificationRelease({
+    releaseRevision: SHA, workspaceId, expiresAt, evidence, now: evaluatedAt,
+  });
+  assert.equal(decision.allowed, true);
+  return {
+    schema_version: gate.QUALIFICATION_GATE_SCHEMA, stage: "qualification", scope: "direct_upload",
+    release_revision: SHA, allowed: true, receipt_sha256: decision.receiptSha256, evidence,
+    missing: [gate.QUALIFICATION_PENDING], evaluated_at: evaluatedAt, recorded_at: evaluatedAt,
+    qualification_workspace_key: workspaceId, qualification_expires_at: expiresAt,
+  };
+}
+
+const check = (rows, extra = {}) =>
+  checkReleaseGate({ rows, sha: SHA, scopes: ["direct_upload"], now: NOW, ...extra });
+
+test("a verified production release for the SHA is ready and says when it expires", () => {
+  const evaluatedMs = NOW.getTime() - 2 * DAY;
+  const report = check([productionRow({ evaluatedMs })]);
+  assert.equal(report.schemaVersion, RELEASE_GATE_REPORT_SCHEMA);
+  assert.equal(report.releaseRevision, SHA);
+  assert.equal(report.ready, true);
+  assert.deepEqual(report.missingScopes, []);
+  assert.deepEqual(report.expiringScopes, []);
+  assert.deepEqual(report.scopes, [{
+    scope: "direct_upload", status: "released", evaluatedAt: at(evaluatedMs),
+    expiresAt: at(evaluatedMs + RELEASE_MAX_AGE_MS), remainingHours: 28 * 24,
+  }]);
+});
+
+test("a scope without a row for this SHA is reported missing with the facts it needs", () => {
+  const evaluatedMs = NOW.getTime() - DAY;
+  const rows = [
+    productionRow({ evaluatedMs }),
+    // A connector release for another deployment says nothing about this one.
+    productionRow({ scope: "connector", sha: OTHER_SHA, evaluatedMs }),
+  ];
+  const report = check(rows, { scopes: ["direct_upload", "connector"] });
+  assert.equal(report.ready, false);
+  assert.deepEqual(report.missingScopes, ["connector"]);
+  const connector = report.scopes.find((entry) => entry.scope === "connector");
+  assert.equal(connector.status, "missing");
+  assert.equal(connector.code, "SCOPED_RELEASE_NOT_FOUND");
+  assert.deepEqual(connector.requiredFacts, [...gate.requiredReleaseEvidence("connector")]);
+  assert.equal(connector.requiredFacts.length, 17);
+
+  const none = check([productionRow({ sha: OTHER_SHA, evaluatedMs })]);
+  assert.deepEqual(none.missingScopes, ["direct_upload"]);
+  assert.equal(none.scopes[0].requiredFacts.length, 12);
+  assert.ok(none.scopes[0].requiredFacts.includes("founder_approval_receipt_recorded"));
+});
+
+test("a release inside the warning window is expiring, not ready; the window is configurable", () => {
+  const evaluatedMs = NOW.getTime() - 25 * DAY;
+  const report = check([productionRow({ evaluatedMs })], { warnDays: 7 });
+  assert.equal(report.ready, false);
+  assert.deepEqual(report.missingScopes, []);
+  assert.deepEqual(report.expiringScopes, ["direct_upload"]);
+  assert.equal(report.scopes[0].status, "expiring");
+  assert.equal(report.scopes[0].remainingHours, 5 * 24);
+  assert.equal(check([productionRow({ evaluatedMs })], { warnDays: 4 }).ready, true);
+});
+
+test("a release older than 30 days is expired and counts as missing", () => {
+  const report = check([productionRow({ evaluatedMs: NOW.getTime() - 31 * DAY })]);
+  assert.deepEqual(report.missingScopes, ["direct_upload"]);
+  assert.equal(report.scopes[0].status, "expired");
+  assert.equal(report.scopes[0].code, "SCOPED_RELEASE_STALE");
+});
+
+test("the expiry constant is the gate's: valid at exactly 30 days, stale one millisecond later", () => {
+  const evaluatedMs = NOW.getTime() - 10 * DAY;
+  const row = productionRow({ evaluatedMs });
+  const subject = { scope: "direct_upload", releaseRevision: SHA, workspaceId: "" };
+  assert.equal(gate.verifyStoredRelease(row, subject, evaluatedMs + RELEASE_MAX_AGE_MS).ok, true);
+  assert.deepEqual(gate.verifyStoredRelease(row, subject, evaluatedMs + RELEASE_MAX_AGE_MS + 1),
+    { ok: false, code: "SCOPED_RELEASE_STALE" });
+});
+
+test("a later refusal outranks an earlier release and names only known missing facts", () => {
+  const evaluatedMs = NOW.getTime() - 3 * DAY;
+  const refusal = {
+    ...productionRow({ evaluatedMs }), allowed: false, receipt_sha256: null, evidence: [],
+    missing: ["founder_approval_receipt_recorded", "not_a_fact\u001b[31m"],
+    recorded_at: at(evaluatedMs + 60_000),
+  };
+  const report = check([productionRow({ evaluatedMs }), refusal]);
+  assert.deepEqual(report.missingScopes, ["direct_upload"]);
+  assert.deepEqual(report.scopes[0], {
+    scope: "direct_upload", status: "refused", code: "SCOPED_RELEASE_REFUSED",
+    missingFacts: ["founder_approval_receipt_recorded"],
+  });
+  // Recorded in the same instant, the refusal still wins (the gate orders `allowed.asc`).
+  const tie = check([productionRow({ evaluatedMs }), { ...refusal, recorded_at: at(evaluatedMs) }]);
+  assert.equal(tie.scopes[0].status, "refused");
+});
+
+test("a row whose digest does not verify is invalid, never released", () => {
+  const row = { ...productionRow({ evaluatedMs: NOW.getTime() - DAY }), receipt_sha256: `sha256:${"0".repeat(64)}` };
+  const report = check([row]);
+  assert.deepEqual(report.missingScopes, ["direct_upload"]);
+  assert.deepEqual(report.scopes[0], { scope: "direct_upload", status: "invalid", code: "SCOPED_RELEASE_INVALID" });
+});
+
+test("a qualification row is reported as qualification only, never as a release", () => {
+  const evaluatedMs = NOW.getTime() - 10 * 60_000;
+  const report = check([qualificationRow({ evaluatedMs })]);
+  assert.equal(report.ready, false);
+  assert.deepEqual(report.missingScopes, ["direct_upload"]);
+  assert.equal(report.scopes[0].status, "qualification_only");
+  assert.equal(report.scopes[0].workspaceKey, "pilot-969dc192daa24119");
+  assert.deepEqual(report.scopes[0].missingFacts, [gate.QUALIFICATION_PENDING]);
+  assert.equal(report.scopes[0].expiresAt, at(evaluatedMs + 45 * 60_000));
+});
+
+test("the report never carries evidence text, so a receipt string cannot leak through it", () => {
+  const report = check([productionRow({ evaluatedMs: NOW.getTime() - DAY })], { scopes: ["direct_upload", "connector"] });
+  assert.equal(JSON.stringify(report).includes("receipt:"), false);
+});
+
+test("options fail closed: SHA shape, scope names, warning window, unknown flags", () => {
+  assert.deepEqual(parseOptions(["--sha", SHA]), { sha: SHA, scopes: ["direct_upload"], warnDays: 7 });
+  assert.deepEqual(parseOptions(["--", "--sha", SHA, "--scope", "connector", "--scope", "connector", "--warn-days", "0"]),
+    { sha: SHA, scopes: ["connector"], warnDays: 0 });
+  assert.throws(() => parseOptions([]), /--sha/);
+  assert.throws(() => parseOptions(["--sha", SHA.toUpperCase()]), /--sha/);
+  assert.throws(() => parseOptions(["--sha", SHA.slice(1)]), /--sha/);
+  assert.throws(() => parseOptions(["--sha", SHA, "--scope", "everything"]), /--scope/);
+  assert.throws(() => parseOptions(["--sha", SHA, "--warn-days", "31"]), /--warn-days/);
+  assert.throws(() => parseOptions(["--sha", SHA, "--warn-days", "1.5"]), /--warn-days/);
+  assert.throws(() => parseOptions(["--sha", SHA, "--write"]), /Unknown option/);
+  assert.throws(() => checkReleaseGate({ rows: [], sha: "HEAD", scopes: ["direct_upload"], now: NOW }), /--sha/);
+});
+
+/** Records every request the CLI path makes; answers with `respond`. */
+function recordFetch(respond) {
+  const calls = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    calls.push({ url: String(url), method: (init.method ?? "GET").toUpperCase(), body: init.body });
+    return respond(String(url));
+  };
+  return { calls, restore: () => { globalThis.fetch = original; } };
+}
+const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+
+test("the CLI path makes exactly one GET per scope with the gate's query, and zero write calls", async () => {
+  const row = productionRow({ evaluatedMs: NOW.getTime() - DAY });
+  const fake = recordFetch((url) => json(url.includes("scope=eq.direct_upload") ? [row] : []));
+  try {
+    const report = await run(["--sha", SHA, "--scope", "direct_upload", "--scope", "connector"], ENV, NOW);
+    assert.deepEqual(report.missingScopes, ["connector"]);
+    assert.equal(report.scopes[0].status, "released");
+  } finally {
+    fake.restore();
+  }
+  assert.equal(fake.calls.length, 2);
+  assert.equal(fake.calls.filter((call) => call.method !== "GET").length, 0, "write calls");
+  for (const call of fake.calls) {
+    const url = new URL(call.url);
+    assert.equal(call.body, undefined);
+    assert.equal(url.pathname, "/rest/v1/customer_data_release_decisions");
+    assert.equal(url.searchParams.get("select"), gate.RELEASE_COLUMNS);
+    assert.equal(url.searchParams.get("release_revision"), `eq.${SHA}`);
+    assert.equal(url.searchParams.get("order"), "recorded_at.desc,allowed.asc,evaluated_at.desc");
+    assert.equal(url.searchParams.get("limit"), "1");
+  }
+});
+
+test("a store failure aborts the check instead of reporting a missing release, still with zero writes", async () => {
+  const failing = recordFetch(() => json({ message: "secret detail" }, 503));
+  try {
+    await assert.rejects(run(["--sha", SHA], ENV, NOW), (error) => {
+      assert.match(error.message, /HTTP 503/);
+      assert.equal(error.message.includes("secret detail"), false);
+      return true;
+    });
+  } finally {
+    failing.restore();
+  }
+  assert.equal(failing.calls.length, 1);
+  assert.equal(failing.calls[0].method, "GET");
+
+  const malformed = recordFetch(() => json({ rows: [] }));
+  try {
+    await assert.rejects(run(["--sha", SHA], ENV, NOW), /unexpected response body/);
+  } finally {
+    malformed.restore();
+  }
+  assert.equal(malformed.calls.every((call) => call.method === "GET"), true);
+});
+
+test("without store credentials nothing is requested", async () => {
+  const fake = recordFetch(() => json([]));
+  try {
+    await assert.rejects(run(["--sha", SHA], {}, NOW), /SUPABASE_SERVICE_ROLE_KEY/);
+    await assert.rejects(
+      readReleaseRows({ url: "https://x.example", serviceRoleKey: "k".repeat(32) }, SHA, ["direct_upload"],
+        async () => new Response("no", { status: 401 })),
+      /HTTP 401/,
+    );
+  } finally {
+    fake.restore();
+  }
+  assert.equal(fake.calls.length, 0);
+});
+
+test("the CLI exits 2 with no report when it cannot run", () => {
+  const script = fileURLToPath(new URL("./release-gate-check.mjs", import.meta.url));
+  const result = spawnSync(process.execPath, ["--experimental-strip-types", "--no-warnings", script, "--sha", SHA], {
+    env: { PATH: process.env.PATH ?? "", SYSTEMROOT: process.env.SYSTEMROOT ?? "" },
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  assert.equal(result.status, 2);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /SUPABASE_SERVICE_ROLE_KEY/);
+});

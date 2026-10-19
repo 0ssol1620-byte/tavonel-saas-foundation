@@ -73,13 +73,14 @@ export default function EvidenceConnector({ minWidth = 900 }: { minWidth?: numbe
 /* --------------------------------------------------------- brief move 5: the workbench's line */
 
 type Rect = Pick<DOMRect, "left" | "top" | "right" | "width" | "height">;
-export type WorkbenchLine = { ax: number; ay: number; bx: number; by: number; top: number };
+export type WorkbenchLine = { ax: number; ay: number; bx: number; by: number; top: number; left: number; bottom: number };
 
 /**
  * Where the workbench's Evidence Line runs, relative to `root`: from the left edge of the passage
  * card or region button (`origin`) to the right edge of that region's box on the page, plus the
- * box's top for the label. Null unless the origin sits wholly to the right of the box, which is
- * the side-by-side layout; stacked, a line would have to cross the page it points into.
+ * box's top for the label and its left and bottom for the outline. Null unless the origin sits
+ * wholly to the right of the box, which is the side-by-side layout; stacked, a line would have to
+ * cross the page it points into.
  */
 export function workbenchLineGeometry(root: Rect, origin: Rect, box: Rect): WorkbenchLine | null {
   if (origin.width <= 0 || origin.height <= 0 || box.width <= 0 || box.height <= 0) return null;
@@ -90,10 +91,13 @@ export function workbenchLineGeometry(root: Rect, origin: Rect, box: Rect): Work
     bx: box.right - root.left,
     by: box.top + box.height / 2 - root.top,
     top: box.top - root.top,
+    left: box.left - root.left,
+    bottom: box.top + box.height - root.top,
   };
 }
 
-const COBALT = "var(--action, #244ac8)";
+const COBALT = "var(--action, var(--tv-action))";
+const GEOMETRY_KEYS = ["ax", "ay", "bx", "by", "top", "left", "bottom"] as const;
 type LineState = { line: (WorkbenchLine & { id: string }) | null; retired: readonly string[] };
 
 /*
@@ -101,13 +105,17 @@ type LineState = { line: (WorkbenchLine & { id: string }) | null; retired: reado
   of the workbench element; it overlays that element and listens to it.
 
   Hovering or focusing an element marked `data-line-region="<region id>"` (the passage card, the
-  A/B/C region buttons) draws one 1px cobalt line from that element to the page box marked
-  `data-region-id="<same id>"`, with the region's coordinates at the box's corner. The line exists
-  only between a passage and its own coordinates: no region id, no box, or no label, no line.
+  A/B/C region buttons) draws one 1px accent line from that element to the page box marked
+  `data-region-id="<same id>"`, outlines that box in the accent at 2px, and sets the region's
+  coordinate chip at the box's corner. The line exists only between a passage and its own
+  coordinates: no region id, no box, or no label, no line.
   The first time a region's line is shown, a plain "page 4 · region A" sits above the coordinates.
 
-  - Motion: the line draws from the passage to the box in 240ms, ease-out, once per new line. With
-    `prefers-reduced-motion: reduce` it appears whole, with no transition.
+  - Colour (UX-PLAN-2026-10-17 §4.2-1, §4.9): the line and the outline of the region it points at
+    are two of the four places the accent is painted. The chip is ink on paper, like the card chip.
+  - Motion (§4.6): a line a pointer starts draws from the passage to the box in 240ms (at most
+    --tv-t-4), ease-out, once per new line. A line the keyboard starts appears whole, because a
+    keyboard-driven action is not animated; so does every line under `prefers-reduced-motion`.
   - Below `minWidth`, or whenever the layout is stacked, nothing is drawn; the workbench prints the
     same label on the passage card instead.
   - Layout: an absolutely positioned, pointer-transparent overlay, so it never moves content (CLS 0).
@@ -123,6 +131,8 @@ export function WorkbenchEvidenceLine({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const lineRef = useRef<SVGLineElement>(null);
+  /** Whether the current origin is the hovered element (pointer) rather than the focused one. */
+  const pointerRef = useRef(false);
   const [origin, setOrigin] = useState<HTMLElement | null>(null);
   const [state, setState] = useState<LineState>({ line: null, retired: [] });
 
@@ -133,7 +143,10 @@ export function WorkbenchEvidenceLine({
     let focused: HTMLElement | null = null;
     const pick = (target: EventTarget | null) =>
       target instanceof Element ? target.closest<HTMLElement>("[data-line-region]") : null;
-    const update = () => setOrigin(hovered ?? focused);
+    const update = () => {
+      pointerRef.current = hovered !== null;
+      setOrigin(hovered ?? focused);
+    };
     const over = (event: Event) => { hovered = pick(event.target); update(); };
     const leave = () => { hovered = null; update(); };
     const focusIn = (event: Event) => { focused = pick(event.target); update(); };
@@ -169,7 +182,7 @@ export function WorkbenchEvidenceLine({
         const retired = left && !previous.retired.includes(left) ? [...previous.retired, left] : previous.retired;
         const kept = previous.line;
         const same = line !== null && kept !== null && kept.id === line.id &&
-          (["ax", "ay", "bx", "by", "top"] as const).every(key => Math.abs(line[key] - kept[key]) < 0.1);
+          GEOMETRY_KEYS.every(key => Math.abs(line[key] - kept[key]) < 0.1);
         if (retired === previous.retired && (same || (!line && !kept))) return previous;
         return { line: same ? kept : line, retired };
       });
@@ -194,7 +207,8 @@ export function WorkbenchEvidenceLine({
   useEffect(() => {
     const line = lineRef.current;
     if (!lineId || !line || typeof line.animate !== "function") return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // §4.6: a keyboard-driven action lands instantly; only a pointer-started line is drawn.
+    if (!pointerRef.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     line.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 240, easing: "ease-out" });
   }, [lineId]);
 
@@ -221,6 +235,17 @@ export function WorkbenchEvidenceLine({
               stroke={COBALT}
               strokeWidth={1}
             />
+            {/* The region's outline in the accent while its line is shown, centred on the box's own 1-3px outline. */}
+            <rect
+              data-evidence-line-box=""
+              x={line.left - 2}
+              y={line.top - 2}
+              width={line.bx - line.left + 4}
+              height={line.bottom - line.top + 4}
+              fill="none"
+              stroke={COBALT}
+              strokeWidth={2}
+            />
           </svg>
           <span
             data-derived="1"
@@ -231,16 +256,16 @@ export function WorkbenchEvidenceLine({
               top: line.top - 4,
               transform: "translate(-100%, -100%)",
               padding: "2px 6px",
-              border: `1px solid ${COBALT}`,
+              border: "1px solid var(--home-rule-strong, var(--tv-rule-strong))",
               background: "var(--home-paper, #faf9f6)",
-              color: COBALT,
+              color: "var(--home-ink, #15191d)",
               font: "500 12px/1.45 var(--home-mono, ui-monospace, monospace)",
               letterSpacing: 0,
               whiteSpace: "nowrap",
             }}
           >
             {state.retired.includes(line.id) ? null : (
-              <span style={{ display: "block", font: "500 13px/1.45 var(--f-sans, sans-serif)", color: "var(--home-ink, #15191d)" }}>
+              <span style={{ display: "block", font: "500 13px/1.45 var(--f-sans, sans-serif)" }}>
                 {label.human}
               </span>
             )}

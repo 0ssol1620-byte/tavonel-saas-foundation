@@ -6,7 +6,8 @@
     (`--brand oklch(48% 0.20 255)`, hover 53%, dark ground 72% / 0.14); it wins over the brief's
     #244ac8, which is 265.7°. Chroma 0.20 is outside sRGB at 48% / 255°, so each token is
     decision.md's lightness and hue at the sRGB chroma boundary -- what CSS gamut mapping draws for
-    it -- written as hex so the contrast is the same on every screen:
+    it -- written as hex so the contrast is the same on every screen. Since UX-L1 the hexes live once,
+    as --tv-action* in app/tavonel.css, and these names read them:
       --action          oklch(48% 0.158 255)  white on it 6.67:1, on paper 6.34:1
       --action-hover    oklch(53% 0.174 255)  white on it 5.38:1
       --action-on-dark  oklch(72% 0.139 255)  7.68:1 on obsidian (the focus ring on the footer)
@@ -16,45 +17,54 @@
     `.home` -- the layout's skip link and the consent card -- read the same values.
   */
   :global(body):has(.home) {
-    --action: #005bb3;
-    --action-hover: #0169cd;
-    --action-on-dark: #65a7fa;
+    --action: var(--tv-action);
+    --action-hover: var(--tv-action-hover);
+    --action-on-dark: var(--tv-action-on-dark);
   }
   :global(body):has(.home) > :global(.skip) { border-color: var(--action); outline-color: var(--action); }
 
   /* Brief 2026-10-15 §4: one container, one paper, one ink. Header, hero, film and every
-     section share --page-w, so at 1440 they all run x=120-1320 and at 390 x=20-370. */
+     section share --page-w. UX-L2 (UX-PLAN-2026-10-17 §4.5, R1): that container is the site's,
+     not Home's own 1200px -- --tv-page-max / --tv-page-margin -- so at 1440 they all run
+     x=72-1368 and at 390 x=24-366, on the same edge as every other page. */
   .home {
-    --page-max: 1200px;
-    --page-pad: clamp(20px, 2.5vw, 32px);
+    --page-max: var(--tv-page-max);
+    --page-pad: var(--tv-page-margin);
     --page-w: min(var(--page-max), calc(100% - 2 * var(--page-pad)));
     --measure: 64ch;
     --hero-measure: 1040px;
     --chrome-measure: var(--page-max);
     --chrome-gutter: var(--page-pad);
-    --paper: #faf9f6;
-    --ink: #15191d;
-    --ink-muted: #58606a;
+    --paper: var(--tv-paper);
+    --ink: var(--tv-ink);
+    --ink-muted: var(--tv-ink-muted);
     --rule: #d8ddd9;
-    --obsidian: #0e1013;
-    --on-obsidian: #edf2f5;
-    --on-obsidian-muted: #9ba0a8;
+    --obsidian: var(--tv-inst-1);
+    --on-obsidian: var(--tv-on-inst);
+    --on-obsidian-muted: var(--tv-on-inst-muted);
     --home-paper: var(--paper);
     --home-stone: var(--paper);
-    --home-sheet: #ffffff;
+    --home-sheet: var(--tv-paper-raised);
     --home-ink: var(--ink);
     --home-muted: var(--ink-muted);
     --home-cobalt: var(--action);
     --home-cobalt-deep: var(--action-hover);
-    --home-amber: #f2b73a;
-    --home-amber-wash: #fff1c7;
-    --home-amber-ink: #795400; /* §4.3 --source: source regions only. The shared `--source` token (Evidence Line, focus) is --action, below. */
+    /*
+      Source regions. UX-L1 (UX-PLAN-2026-10-17 §4.2-2) draws them in ink rather than amber: amber
+      keeps one meaning on the site, "changed", and the accent above stays the only hue on Home.
+      The names are kept so the consumers in landing-hero.module.css are unchanged; the values are
+      the plan's outline, wash and a muted ink for the region marks. This reverses Release 3's
+      delegated choice (brief §4.3) toward decision.md, and the founder's veto stays open.
+    */
+    --home-amber: var(--tv-rule-strong);
+    --home-amber-wash: var(--tv-paper-sunk);
+    --home-amber-ink: var(--tv-ink-muted);
     --home-rule: var(--rule);
     --home-rule-strong: rgb(21 25 29 / 32%);
     /*
       The shared landing and chrome tokens that painted a second and third blue (#2259ce, #7da7ff),
       a violet fan, a mint focus ring, a brown "changed" count and a navy-tinted ink on Home,
-      re-pointed so the accent above is the only hue CSS paints here besides the source amber.
+      re-pointed so the accent above is the only hue CSS paints here.
     */
     --source: var(--action);
     --source-ink: var(--action);
@@ -239,8 +249,22 @@
       194.5px in Windows WebKit (310px column), where it wrapped to a third line and dropped the
       frame 21.5px on stage 4 (fix4/cap-*.txt). A 4px column gap here and 6px toggle padding below
       give the caption 216.5 / 206.5px.
+
+      UX-L6 (UX-PLAN-2026-10-17 §3.6): the one-face change (UX-L3) set the toggle's "Focus details"
+      in Wanted Sans, 8px wider (99.5px), and the 24px phone margin (UX-L2) leaves Windows WebKit a
+      302px column at 360 (its classic scrollbar takes 10px). The caption had 208.5px in Chrome and
+      198.5px in WebKit against the 200.5px stage 4 needs for two lines, so WebKit wrapped it to a
+      third line and dropped the frame 21.2px on stage 4 (p2-06-film-line/caption-need-base.txt). A
+      2px gap here and 4px toggle padding below give back 6px: 214.5 / 204.5px.
     */
-    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"]) { gap: 8px 4px; }
+    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"]) { gap: 8px 2px; }
+    /*
+      UX-L6: the caption box fills its row and centres its text inside, instead of being centred in
+      the row itself, so a caption that goes from one line to two (KO 430) changes the box's height
+      and not its top. With the caption <p> keyed by stage (compile-stage-player.tsx) an
+      auto-advance moves nothing that was already on screen. Same place on screen as before.
+    */
+    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] .compile-film-caption) { align-self: stretch; align-items: center; }
     .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] [data-film-reading]) { grid-row: 3; }
     .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] .compile-film-viewport) { grid-row: 4; }
     /*
@@ -295,7 +319,12 @@
       WebKit column), caption 15/1.45 beside the toggle at an 8px gap (two lines at 360 with 16px to
       spare), 16px rhythm.
       Before/after: redesign-r3-20261015/fix3/GEOMETRY.json and fix3/LCP-*.json.
+
+      UX-L2 (UX-PLAN-2026-10-17 §4.5): the container's 24px phone margin leaves the tab row 312px at
+      360, and four equal 78px columns wrapped "Use with AI" to two lines in WebKit. The tracks size
+      to their labels and share the rest, so every label holds one line.
     */
+    .home.home :global(#s1 .compile-film-stages) { grid-template-columns: repeat(4, auto); }
     .home.home :global(#s1) { padding-top: 64px; padding-bottom: 48px; }
     .home.home :global(.lv2-hero-eyebrow) { margin-bottom: 8px; line-height: 1.3; }
     .home.home :global(.lv2-hero-h1) { font-size: 32px; line-height: 1.04; margin-bottom: 10px; }
@@ -304,7 +333,7 @@
     .home[lang="ko"].home :global(.lv2-hero-support) { line-height: 1.6; }
     .home.home :global(#s1 .compile-film-stages button) { font-size: 14px; padding-block: 10px; padding-inline: 2px; min-height: 44px; }
     .home.home :global(#s1 .compile-film-caption p) { font-size: 15px; line-height: 1.45; }
-    .home.home :global(#s1 .compile-film-focus-control) { padding: 8px 6px; border: 1px solid var(--home-rule-strong); border-radius: 4px; color: var(--home-ink); font: 560 14px/1.4 var(--f-sans); }
+    .home.home :global(#s1 .compile-film-focus-control) { padding: 8px 4px; border: 1px solid var(--home-rule-strong); border-radius: 4px; color: var(--home-ink); font: 560 14px/1.4 var(--f-sans); }
     .heroAside { margin: 16px auto 16px; gap: 4px; }
     .heroAside :global(.lv2-actions) { display: grid; grid-template-columns: minmax(0, 1fr); width: min(100%, 320px); gap: 0; }
     .heroAside :global(.lv2-text-link) { min-height: 44px; }

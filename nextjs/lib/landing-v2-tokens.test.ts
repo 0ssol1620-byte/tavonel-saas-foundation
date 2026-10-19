@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 /*
@@ -21,10 +21,10 @@ const layout = read("app/layout.tsx");
 
 const stripComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, "");
 
-/** The declarations of the first `:root` block, by token name. */
-function rootTokens(css: string): Map<string, string> {
+/** The declarations of the first `:root` block -- or of the `:root` block declaring `declaring` -- by token name. */
+function rootTokens(css: string, declaring?: string): Map<string, string> {
   const code = stripComments(css);
-  const start = code.indexOf(":root {");
+  const start = declaring ? code.lastIndexOf(":root {", code.indexOf(`${declaring}:`)) : code.indexOf(":root {");
   expect(start, "tavonel.css has a :root block").toBeGreaterThan(-1);
   let depth = 0;
   let end = start;
@@ -47,6 +47,12 @@ function rootTokens(css: string): Map<string, string> {
 }
 
 const tokens = rootTokens(tavonel);
+/*
+  UX-L1 (UX-PLAN-2026-10-17 §4.3, §8.2). The --tv-* block is the one place an accent's hex lives now,
+  and a family token that reads it -- `--source-ink: var(--tv-action)` -- is measured at the value
+  it resolves to. One hop, into that block only, and the end must be a literal hex.
+*/
+const tvTokens = rootTokens(tavonel, "--tv-paper");
 
 /* ---------------------------------------------------------------- WCAG 2.x, recomputed */
 
@@ -75,7 +81,11 @@ function contrast(a: string, b: string): number {
 function token(name: string): string {
   const value = tokens.get(name);
   expect(value, `${name} is declared in tavonel.css :root`).toBeTruthy();
-  return value as string;
+  const alias = /^var\((--tv-[\w-]+)\)$/.exec(value as string);
+  if (!alias) return value as string;
+  const resolved = tvTokens.get(alias[1]);
+  expect(resolved, `${name} reads ${alias[1]}, which must be a literal hex in the --tv-* block`).toMatch(/^#[0-9a-f]{6}$/i);
+  return resolved as string;
 }
 
 /** Hue in degrees, which is how "in the coral family" is checked rather than by eye. */
@@ -171,11 +181,16 @@ describe("landing V2 design tokens", () => {
     expect(contrast("--text-muted-paper", "--paper-50")).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("puts Geist in front of the sans stack and gives the serif accent a token", () => {
-    expect(token("--f-sans").startsWith("var(--font-geist)"), "--f-sans leads with Geist").toBe(true);
-    // The fallback that carries Hangul is still behind it: /ko renders it when Geist has not arrived.
-    expect(token("--f-sans")).toContain('"Wanted Sans Variable"');
-    expect(token("--f-serif").startsWith("var(--font-serif)"), "--f-serif leads with Instrument Serif").toBe(true);
+  /*
+    UX-L3 (UX-PLAN-2026-10-17 §4.4) retired Geist and Instrument Serif: Wanted Sans Variable is the
+    one text face (decision.md G-B). This case pinned the old stack -- Geist first, a serif token --
+    and now pins the new one, with the negative: the sheet's code names neither retired face.
+  */
+  it("reads the one sans stack from --tv-font-sans, which leads with Wanted Sans and names no retired face", () => {
+    expect(tokens.get("--f-sans"), "--f-sans is the --tv-* stack, not a second copy of it").toBe("var(--tv-font-sans)");
+    expect(tvTokens.get("--tv-font-sans")?.startsWith('"Wanted Sans Variable"'), "--tv-font-sans leads with Wanted Sans").toBe(true);
+    expect(tokens.has("--f-serif"), "--f-serif went with Instrument Serif").toBe(false);
+    expect(stripComments(tavonel)).not.toMatch(/geist|instrument serif|--font-serif|--f-serif/i);
     expect(token("--f-mono").startsWith("var(--font-mono)")).toBe(true);
     // The self-hosted fallback faces are still declared; removing them would take /ko's Hangul.
     expect(tavonel).toContain('font-family: "Wanted Sans Variable"');
@@ -236,20 +251,32 @@ describe("app/landing-v2.css", () => {
 });
 
 describe("app/layout.tsx fonts", () => {
-  it("loads the three faces through next/font and puts their variables on <html>", () => {
-    expect(layout).toContain('import { Geist, IBM_Plex_Mono, Instrument_Serif } from "next/font/google";');
-    for (const [call, variable] of [
-      ["Geist({", "--font-geist"],
-      ["Instrument_Serif({", "--font-serif"],
-      ["IBM_Plex_Mono({", "--font-mono"],
-    ]) {
-      expect(layout, `${call} is loaded`).toContain(call);
-      expect(layout, `${variable} is declared`).toContain(`variable: "${variable}"`);
-    }
-    expect(layout).toContain("className={`${sans.variable} ${serif.variable} ${mono.variable}`}");
-    // Landing-only accent: preloading it would spend first-paint budget on 28 routes that never
-    // render it.
-    expect(layout).toMatch(/Instrument_Serif\(\{[\s\S]*?preload: false/);
+  /*
+    UX-L3 (UX-PLAN-2026-10-17 §4.4): this case pinned three next/font faces. Two were retired, so it
+    pins the one that stays, the deletion of the other two (in code, not in the comment that
+    explains it) and the preload that keeps the optional Wanted Sans face from painting the fallback.
+  */
+  it("loads only IBM Plex Mono through next/font and preloads the Wanted Sans Latin file on every route", () => {
+    expect(layout).toContain('import { IBM_Plex_Mono } from "next/font/google";');
+    expect(layout).toContain("IBM_Plex_Mono({");
+    expect(layout).toContain('variable: "--font-mono"');
+    expect(layout).toContain("<html lang=\"en\" className={mono.variable}>");
+    const code = layout.replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(code, "no retired face is loaded").not.toMatch(/Geist|Instrument_Serif|--font-geist|--font-serif/);
+    expect(layout).toContain('const WANTED_SANS_LATIN = "/fonts/WantedSansVariable.split.90.woff2";');
+    /*
+      B-02 (2026-10-19): the Latin preload is a <link> element, which React hoists into <head> after
+      the route's stylesheets. ReactDOM's preload() put it first in <head>, where its 45 KB took the
+      throttled bandwidth the render-blocking CSS needed: /explore LCP (an <h1>) 3,150 ms median
+      against the 3,000 ms budget, 2,665 ms with the element. A preload() call coming back fails here.
+    */
+    expect(layout).toContain('<link rel="preload" as="font" type="font/woff2" href={WANTED_SANS_LATIN} crossOrigin="anonymous" />');
+    expect(code, "no ReactDOM preload() call: it is emitted ahead of the stylesheets").not.toMatch(/\bpreload\(|from "react-dom"/);
+    // One Latin preload per page: Home no longer repeats the layout's.
+    expect(read("components/landing-v2/landing-page.tsx")).not.toContain('href="/fonts/WantedSansVariable.split.90.woff2"');
+    expect(existsSync(new URL("../public/fonts/WantedSansVariable.split.90.woff2", import.meta.url)), "the preloaded file ships").toBe(true);
+    // The preloaded file is the one tavonel.css declares for basic Latin, not a stray copy.
+    expect(tavonel).toContain('src: url("/fonts/WantedSansVariable.split.90.woff2") format("woff2-variations");');
     // No webfont host: the CSP is font-src 'self' data: and a <link> to Google would just fail.
     // The href, not the word -- the comment above the font calls names the host it avoids.
     expect(layout).not.toMatch(/href=\{?["']https:\/\/fonts\.(googleapis|gstatic)\.com/);

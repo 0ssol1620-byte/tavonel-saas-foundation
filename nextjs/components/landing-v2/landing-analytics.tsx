@@ -144,6 +144,13 @@ export default function LandingAnalytics({ variant }: { variant?: LandingVariant
       scrolling past it" -- because renaming it would have broken the one funnel column that
       measures that engagement, for a change that did not change what is being counted.
 
+      WIDENED 2026-10-19 (P2-08, PHASE1-CRITIC-2026-10-17 §3.3): the specimen strip in scene 01
+      counts through its page tabs (labels of a radio group, so a pointer over one or focus on its
+      radio) and its "Show full text" toggles. The population changes on that date, as it did with
+      decision A, so counts before and after it are not directly comparable; the date is recorded in
+      CLM-043's evidence. The strip renders only with a committed reader receipt (none yet), so on
+      this deployment the arm has nothing to match and the population is unchanged until one lands.
+
       Pointer and keyboard focus alike, because both controls are reachable both ways and an event
       that counted only the mouse would report the keyboard path as unused. `trackFunnelOnce` is
       what keeps a reader who sweeps a pointer across the strip from producing a hundred rows.
@@ -151,7 +158,7 @@ export default function LandingAnalytics({ variant }: { variant?: LandingVariant
     const onDemo = (event: Event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
-      if (target.closest("#s1 [data-source-inspection-film] button, #s1 .compile-film-sequence button, #s2 .compile-film-sequence button, #s2 [data-compiler-specimen] button, #s2 [data-source-digest] button[aria-pressed][aria-controls]")) {
+      if (target.closest("#s1 [data-source-inspection-film] button, #s1 .compile-film-sequence button, #s2 .compile-film-sequence button, #s2 [data-compiler-specimen] button, #s2 [data-source-digest] button[aria-pressed][aria-controls], #s1 [data-specimen-strip] label, #s1 [data-specimen-strip] summary")) {
         trackFunnelOnce("hero_demo_interact", arm);
       }
     };
