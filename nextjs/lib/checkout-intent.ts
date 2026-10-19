@@ -83,10 +83,14 @@ export type CheckoutResume = "open" | "hold_terms" | "hold_release" | "drop_owne
  * terms or been released, so a first purchase on a switched-on deployment ended in a certain
  * refusal and spent the intent on it.
  *
- *   open          send the checkout request. Also where the plan is not sold online here (purchase
- *                 closed, a contact-only plan, or the deployment did not answer): there is nothing
- *                 to hold, and the request goes out exactly as on main so the server's refusal is
- *                 the sentence. That is production today, where `purchasePlan` is off.
+ *   open          send the checkout request: this workspace is released for production processing.
+ *                 That is the stage, not file access -- a released workspace whose trial was refused
+ *                 (ACCESS_READY_NO_ENTITLEMENT) has no file access and buys to get it (review B1);
+ *                 bootstrap sends the stage only when the workspace gate is open. Also where the plan
+ *                 is not sold online here (purchase closed, a contact-only plan, or the deployment did
+ *                 not answer): there is nothing to hold, and the request goes out as on main, after the
+ *                 /api/status/v2 read, so the server's refusal is the sentence. That is production
+ *                 today, where `purchasePlan` is off.
  *   drop_owner    a billing-exempt owner never needs a checkout.
  *   hold_terms    keep the offer; the owner still has to accept the processing terms.
  *   hold_release  keep the offer; terms accepted (or gate v1) but this workspace is not released for
@@ -99,7 +103,7 @@ export function decideCheckoutResume(
 ): CheckoutResume {
   if (checkoutSellable(offer, purchaseOpen) !== true) return "open";
   if (access?.source === "owner" && access.billingExempt) return "drop_owner";
-  if (access?.customerDataEnabled === true && access.processingStage === "production") return "open";
+  if (access?.processingStage === "production") return "open";
   return access?.sourcePending === "terms_acceptance_required" ? "hold_terms" : "hold_release";
 }
 
