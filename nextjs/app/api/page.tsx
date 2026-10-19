@@ -204,7 +204,7 @@ export default async function ApiReferencePage() {
           </p>
 
           {/* The guide recording of the try-it below and the same reads from a terminal (/guide, §4b). */}
-          <GuideMedia block={guideMediaBlock("guide-3-api")} language="en" />
+          <div className={styles.recording}><GuideMedia block={guideMediaBlock("guide-3-api")} language="en" /></div>
         </div>
 
         {/*

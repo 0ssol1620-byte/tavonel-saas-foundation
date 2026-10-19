@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { DOCS_SECTIONS } from "./docs-content";
 import { DEEP_LINK_ACTS } from "./explore-story";
-import { GUIDE, GUIDE_UI, GUIDE_VIDEOS, GUIDE_VIDEO_VARIANTS, guideText, guideVideoFiles, type GuideLanguage } from "./guide-content";
+import { GUIDE, GUIDE_UI, GUIDE_VIDEOS, GUIDE_VIDEO_VARIANTS, guideMediaBlock, guideText, guideVideoFiles, type GuideLanguage } from "./guide-content";
 import { koTermDrift } from "./ko-terms";
 import { tocEntries } from "../components/docs/page-toc";
 
@@ -509,12 +509,14 @@ describe("the recordings on the docs pages", () => {
     expect(html.indexOf("data-keyless-try-it")).toBeLessThan(at);
     expect(at).toBeLessThan(html.indexOf("Before you start."));
     expect(html).toContain('src="/guide/guide-3-api-desktop.mp4"');
-    expect(html).toContain(`<figcaption id="guide-3-api-title">${GUIDE.en.flatMap((chapter) => chapter.blocks).find((block) => block.kind === "media" && block.video === "guide-3-api")!.title}</figcaption>`);
+    expect(html).toContain(`<figcaption id="guide-3-api-title">${guideMediaBlock("guide-3-api").title}</figcaption>`);
   });
 
   it("show the MCP recording on /docs/mcp and the API recording on /api", async () => {
     expect(recordings(await section("mcp"))).toEqual(["guide-2-mcp"]);
     expect(recordings(renderToStaticMarkup(await ApiReferencePage()))).toEqual(["guide-3-api"]);
+    // A page cannot name a recording the guide does not carry: the lookup throws rather than render an untitled player.
+    expect(() => guideMediaBlock("guide-4-upload" as never)).toThrow("the en guide has no media block for guide-4-upload");
   });
 
   it("leave every other section without one", async () => {
