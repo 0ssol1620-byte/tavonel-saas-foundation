@@ -9,6 +9,7 @@ import {
   type ReleaseStage,
   type WorkspaceGrant,
 } from "../../shared/scopedCustomerDataGate";
+import { activationPolicy } from "./activation-policy";
 import { loadPublishedProcessingTerms, type ProcessingTermsManifest } from "./processing-terms-acceptance";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 
@@ -66,13 +67,24 @@ export function processingTermsReceiptSha256(kind: "terms" | "processing", accep
  * bounded rollout. Unset adds no restriction. Set, it is an extra AND on every grant and every
  * processing authorization read, per scope -- it never admits anything by itself. An empty or
  * malformed value (wildcards and prefixes included) admits nobody.
+ *
+ * D-19 (register 2026-10-17): while the self-serve launch switch is on
+ * (`activationPolicy.customerData.enabled`, flipped only by P2-37), processing runs under gate v2
+ * inside a canary of one to LAUNCH_CANARY_MAX_WORKSPACES named workspaces. An unset cohort, a wider
+ * list or any gate other than v2 is then a configuration error and admits nobody. While the switch
+ * is off -- production today -- this adds nothing. Widening past the canary is a reviewed change here.
  */
+export const LAUNCH_CANARY_MAX_WORKSPACES = 3;
 export function processingCohortRefusal(workspaceKey: string, env: Env = process.env):
   "PROCESSING_COHORT_EXCLUDED" | "PROCESSING_COHORT_CONFIG_INVALID" | null {
   const raw = env.TAVONEL_PROCESSING_WORKSPACE_COHORT;
+  const launch: boolean = activationPolicy.customerData.enabled;
+  if (launch && (raw === undefined || env.TAVONEL_CUSTOMER_DATA_GATE_VERSION !== "v2")) return "PROCESSING_COHORT_CONFIG_INVALID";
   if (raw === undefined) return null;
   const ids = raw.split(",").map((id) => id.trim());
-  if (ids.length > 20 || !ids.every((id) => WORKSPACE.test(id))) return "PROCESSING_COHORT_CONFIG_INVALID";
+  if (ids.length > (launch ? LAUNCH_CANARY_MAX_WORKSPACES : 20) || !ids.every((id) => WORKSPACE.test(id))) {
+    return "PROCESSING_COHORT_CONFIG_INVALID";
+  }
   return ids.includes(workspaceKey) ? null : "PROCESSING_COHORT_EXCLUDED";
 }
 
