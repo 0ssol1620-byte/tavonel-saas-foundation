@@ -275,6 +275,25 @@ export const settledModels = (): readonly ArenaModel[] =>
 export const unsettledModels = (): readonly ArenaModel[] =>
   modelArenaBoard().models.filter((model) => model.status !== "settled");
 
+/* ------------------------------------------------------------------ rendering a note */
+
+/** What a masked path reads as on the page. */
+export const LOCAL_PATH_MASK = "[local path removed]";
+
+/*
+  EN-0. The campaign's notes are rendered as the run recorded them, and one of them named a
+  directory on the machine that scored it -- an OS user name included. The note is masked where it
+  is printed and nowhere else: the artifact, and the sha256 `MODEL_ARENA_ARTIFACT_SHA256` pins it
+  by, stay byte-identical, so the receipt still receipts. Only an absolute path on a machine is
+  matched (a drive letter, or /Users/ and /home/); a relative path names a file in the campaign's
+  own tree and is kept.
+*/
+const LOCAL_PATH = /(?<![A-Za-z0-9])[A-Za-z]:[\\/][^\s`'"]*|(?<![\w.:/-])\/(?:Users|home)\/[^\s`'"]*/g;
+
+export function maskLocalPaths(note: string): string {
+  return note.replace(LOCAL_PATH, LOCAL_PATH_MASK);
+}
+
 /* ------------------------------------------------------------------ chart geometry */
 
 export type ArenaBar = Readonly<{

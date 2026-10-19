@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import io
+import math
 import os
 import secrets
 import subprocess
 import sys
+import tempfile
 import unittest
 import zipfile
 from datetime import UTC, datetime
@@ -15,6 +17,7 @@ from unittest.mock import patch
 
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from PIL import Image
 
@@ -34,6 +37,7 @@ for _name, _value in FakeClamd("clean").start().env().items():
 import app as app_module  # noqa: E402
 from app import (  # noqa: E402
     MAX_INPUT_BYTES,
+    MAX_PAGES,
     MAX_RENDER_PIXELS_PER_PAGE,
     MAX_RENDER_PIXELS_TOTAL,
     MIN_RENDER_SCALE,
@@ -41,8 +45,24 @@ from app import (  # noqa: E402
     app,
     cdr_request_signature,
     qualified_render_scale,
+    rasterize_to_pdf,
     validate_input,
 )
+
+A4 = (595.276, 841.89)
+LETTER = (612.0, 792.0)
+
+
+def blank_pdf(pages: int, width: float, height: float) -> bytes:
+    document = pdfium.PdfDocument.new()
+    try:
+        for _ in range(pages):
+            document.new_page(width, height).close()
+        stream = BytesIO()
+        document.save(stream)
+        return stream.getvalue()
+    finally:
+        document.close()
 
 
 class PdfRasterCdrTest(unittest.TestCase):
@@ -201,6 +221,87 @@ class PdfRasterCdrTest(unittest.TestCase):
     def test_document_requiring_subminimum_scale_is_rejected(self) -> None:
         with self.assertRaisesRegex(Exception, "rendering budget is not qualified"):
             qualified_render_scale([(20_000.0, 20_000.0)])
+
+    # T7 (table-limits-receipts/PRODUCT-PATH-OCR-TIMING.md, finding 4): the scale was qualified on
+    # fractional pixels while the renderer rounds each side up, so every A4 document of 71-80 pages
+    # (Letter 74-80) was refused whatever it contained. The budget must hold for the bitmaps the
+    # renderer actually allocates, on the page sizes PDFium reports.
+    def test_every_qualified_page_count_fits_the_budget_at_the_rendered_size(self) -> None:
+        for name, (width, height) in {"A4": A4, "Letter": LETTER}.items():
+            document = pdfium.PdfDocument.new()
+            page = document.new_page(width, height)
+            try:
+                size = tuple(float(value) for value in page.get_size())
+                for pages in range(1, MAX_PAGES + 1):
+                    with self.subTest(format=name, pages=pages):
+                        scale = qualified_render_scale([size] * pages)
+                        self.assertGreaterEqual(scale, MIN_RENDER_SCALE)
+                        self.assertLessEqual(scale, RENDER_SCALE)
+                        bitmap = page.render(scale=scale)
+                        try:
+                            pixels = bitmap.width * bitmap.height
+                        finally:
+                            bitmap.close()
+                        self.assertLessEqual(pixels, MAX_RENDER_PIXELS_PER_PAGE)
+                        self.assertLessEqual(pixels * pages, MAX_RENDER_PIXELS_TOTAL)
+            finally:
+                page.close()
+                document.close()
+
+    def test_the_qualified_scale_is_the_largest_that_fits(self) -> None:
+        # Fitting is not enough: a scale smaller than the budget allows costs resolution for nothing.
+        # Below RENDER_SCALE, one floating-point step larger must render bitmaps over the budget.
+        below: dict[str, list[int]] = {}
+        for name, (width, height) in {"A4": A4, "Letter": LETTER}.items():
+            document = pdfium.PdfDocument.new()
+            page = document.new_page(width, height)
+            try:
+                page_width, page_height = page.get_size()
+                size = (float(page_width), float(page_height))
+                for pages in range(1, MAX_PAGES + 1):
+                    scale = qualified_render_scale([size] * pages)
+                    if scale == RENDER_SCALE:
+                        continue
+                    below.setdefault(name, []).append(pages)
+                    with self.subTest(format=name, pages=pages):
+                        bitmap = page.render(scale=math.nextafter(scale, math.inf))
+                        try:
+                            pixels = bitmap.width * bitmap.height
+                        finally:
+                            bitmap.close()
+                        self.assertTrue(
+                            pixels > MAX_RENDER_PIXELS_PER_PAGE or pixels * pages > MAX_RENDER_PIXELS_TOTAL
+                        )
+            finally:
+                page.close()
+                document.close()
+        # The page counts the bisection serves (T7 finding 4); the check above is not vacuous.
+        self.assertEqual(below, {"A4": list(range(71, 81)), "Letter": list(range(74, 81))})
+
+    def test_an_80_page_a4_document_is_rasterized_not_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as work:
+            source, target = Path(work) / "source.pdf", Path(work) / "sanitized.pdf"
+            source.write_bytes(blank_pdf(80, *A4))
+            size = rasterize_to_pdf(source, target)
+            self.assertEqual(size, target.stat().st_size)
+            output = pdfium.PdfDocument(target)
+            try:
+                self.assertEqual(len(output), 80)
+            finally:
+                output.close()
+
+    def test_a_document_over_budget_at_the_rendered_size_is_still_refused(self) -> None:
+        # Fractionally this fits at a scale just above the minimum. Rounded up the way the renderer
+        # rounds, even the minimum scale needs 1,000 x 1,001 px a page: 80,080,000 px in all.
+        pages = [(999.9, 1000.05)] * 80
+        with self.assertRaisesRegex(HTTPException, "rendering budget is not qualified"):
+            qualified_render_scale(pages)
+        with tempfile.TemporaryDirectory() as work:
+            source, target = Path(work) / "source.pdf", Path(work) / "sanitized.pdf"
+            source.write_bytes(blank_pdf(80, *pages[0]))
+            with self.assertRaisesRegex(HTTPException, "rendering budget is not qualified"):
+                rasterize_to_pdf(source, target)
+            self.assertFalse(target.exists())
 
     def test_replayed_authenticated_request_is_rejected_before_second_render(self) -> None:
         source = self.pdf_fixture()

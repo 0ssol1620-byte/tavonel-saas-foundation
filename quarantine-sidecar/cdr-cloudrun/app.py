@@ -572,8 +572,33 @@ def qualified_render_scale(page_sizes: list[tuple[float, float]]) -> float:
     )
     if scale < MIN_RENDER_SCALE:
         raise HTTPException(422, "CDR source rendering budget is not qualified")
-    # Stay below the hard pixel ceilings after integer conversion and floating-point rounding.
-    return scale if scale == RENDER_SCALE else scale * 0.999999
+    if renders_within_budget(page_sizes, scale):
+        return scale
+    # The estimate above is fractional; the renderer rounds each side up, which can put the
+    # bitmaps a few pixels over the ceiling. Pixel counts never shrink as the scale grows, so
+    # bisect for the largest scale whose rounded bitmaps fit, and refuse if even the minimum
+    # scale does not.
+    low, high = MIN_RENDER_SCALE, scale
+    if not renders_within_budget(page_sizes, low):
+        raise HTTPException(422, "CDR source rendering budget is not qualified")
+    for _ in range(64):
+        middle = (low + high) / 2
+        if renders_within_budget(page_sizes, middle):
+            low = middle
+        else:
+            high = middle
+    return low
+
+
+def renders_within_budget(page_sizes: list[tuple[float, float]], scale: float) -> bool:
+    """The pixel ceilings, applied to the bitmaps `PdfPage.render(scale=...)` allocates.
+
+    pypdfium2 (5.13.0, no crop or extra rotation) sizes each bitmap at ceil(side * scale) per
+    side of `get_size()`. rasterize_to_pdf still checks every rendered bitmap against the same
+    ceilings, so a renderer that rounded differently would be refused there, not let through.
+    """
+    pixels = [math.ceil(width * scale) * math.ceil(height * scale) for width, height in page_sizes]
+    return max(pixels) <= MAX_RENDER_PIXELS_PER_PAGE and sum(pixels) <= MAX_RENDER_PIXELS_TOTAL
 
 
 def rasterize_to_pdf(source: Path, target: Path) -> int:

@@ -87,6 +87,12 @@ import {
   parseAffectedRawDiff,
   buildAffectedMap,
   collectAffectedChanges,
+  PR151_SERVICE_TRUTH_AFFECTED_PATHS,
+  PR151_SERVICE_TRUTH_AFFECTED_UNIT_FILES,
+  OCR_PAGES_INCOMPLETE_AFFECTED_PATHS,
+  OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES,
+  BENCHMARKS_PATH_MASK_AFFECTED_PATHS,
+  BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES,
 } from './repair-scope.mjs';
 import { buildRepairReceipt, requireCompletedReadRehearsal } from './repair-scope-gate.mjs';
 import { auditBrowserFiles, browserRunOutputDir, buildNodeTestArgs, buildUnitArgs, collectWorkspaceIntakeCaptures, WORKSPACE_INTAKE_CAPTURE_NAMES, MAX_MOUNTED_PNG_BYTES, validateMountedPngMetadata, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, runBrowserGroups, validateNodeTapReport, validateSelectedPath } from './run-repair-check.mjs';
@@ -1045,6 +1051,16 @@ test('unit runner preserves empty-selection failure and live browser env strips 
   assert.equal(Object.hasOwn(env, 'PADDLE_SANDBOX'), false);
   assert.equal(Object.hasOwn(env, 'VERCEL_ENV'), false);
   assert.equal(env.COMMERCIAL_MODE, 'live');
+  assert.equal(env.PATH, 'test-path');
+});
+
+// PR #151: Playwright's default CI git-info plugin read pull_request.base.sha from GITHUB_EVENT_PATH and ran
+// `git fetch origin <base> --depth=1` in the checkout. .git/shallow then held the PR base, so the baseline, reachable only
+// through that merge's second parent, was no longer an ancestor and the final gate refused the head.
+test('affected browser runner withholds the PR event so Playwright cannot shallow-fetch the PR base into the checkout', () => {
+  const env = liveBrowserEnv({ GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: '/home/runner/work/_temp/_github_workflow/event.json', PATH: 'test-path' });
+  assert.equal(Object.hasOwn(env, 'GITHUB_EVENT_PATH'), false);
+  assert.equal(env.GITHUB_ACTIONS, 'true');
   assert.equal(env.PATH, 'test-path');
 });
 
@@ -5944,7 +5960,7 @@ test('affected preflight report admission: lookalikes, operations, pipeline, API
     'nextjs/lib/preflight-reports.ts','nextjs/lib/preflight-reporter.ts','nextjs/lib/preflight.ts','nextjs/lib/preflight-report-v2.ts','nextjs/lib/preflight-report/index.ts',
     'nextjs/lib/Preflight-Report.ts','nextjs/lib/preflight-report-server.ts','nextjs/lib/preflight-report.d.ts',
     'nextjs/lib/preflight-report.spec.ts','nextjs/lib/preflight-report.test.tsx','nextjs/lib/preflight-reportXtest.ts','nextjs/lib/preflight-report-copy.test.ts',
-    'nextjs/lib/__snapshots__/preflight-report.test.ts.snap','nextjs/lib/pipeline.ts','nextjs/lib/pipeline.test.ts',
+    'nextjs/lib/__snapshots__/preflight-report.test.ts.snap','nextjs/lib/pipeline.tsx','nextjs/lib/pipeline-v2.test.ts',
     'nextjs/components/operations-ultimate.tsx','nextjs/components/preflight-report.tsx','nextjs/e2e/preflight-report.spec.ts',
     'nextjs/app/api/v1/preflight-report/route.ts','nextjs/app/api/preflight-report/route.ts',
     'shared/capabilityManifest.ts','shared/intakeCeiling.ts','shared/qualifiedDocumentInputs.ts',
@@ -5955,8 +5971,9 @@ test('affected preflight report admission: lookalikes, operations, pipeline, API
     assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
   }
   // Known paths of earlier owners, the intake-triage neighbours, and the SQL and worker neighbours keep exactly their prior selection;
-  // the new owner and its suite never join them.
+  // the new owner and its suite never join them. The pipeline sibling and its suite are PR #151's owner now, never the preflight owner.
   const prior=[...AFFECTED_LIFECYCLE_PATHS.map(path=>[path,[AFFECTED_LIFECYCLE_GROUP],AFFECTED_LIFECYCLE_SUITES]),
+    ...['nextjs/lib/pipeline.ts','nextjs/lib/pipeline.test.ts'].map(path=>[path,['pr151-service-truth'],PR151_SERVICE_TRUTH_AFFECTED_UNIT_FILES]),
     ...AFFECTED_WORLD_DIFF_PATHS.map(path=>[path,[AFFECTED_WORLD_DIFF_GROUP],AFFECTED_WORLD_DIFF_SUITES]),
     ...AFFECTED_CONSUMER_PATHS.map(path=>[path,[AFFECTED_CONSUMER_GROUP],AFFECTED_CONSUMER_SUITES]),
     ...AFFECTED_ANALYTICS_PATHS.map(path=>[path,[AFFECTED_ANALYTICS_GROUP],AFFECTED_ANALYTICS_SUITES]),
@@ -5992,7 +6009,7 @@ test('affected preflight report admission: known plus unknown or an unowned rena
   assert.deepEqual([mixed.groups,mixed.unitFiles],[[AFFECTED_PREFLIGHT_GROUP],AFFECTED_PREFLIGHT_SUITES],'diagnostic selection is retained beside the failure');
   assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/);
   for (const paths of [[AFFECTED_PREFLIGHT_MODEL,'nextjs/lib/preflight-report-v2.ts'],['nextjs/components/operations-ultimate.tsx',AFFECTED_PREFLIGHT_MODEL],
-    [AFFECTED_PREFLIGHT_TEST,'nextjs/lib/preflight-report.spec.ts'],['nextjs/lib/pipeline.ts',AFFECTED_PREFLIGHT_TEST]]) {
+    [AFFECTED_PREFLIGHT_TEST,'nextjs/lib/preflight-report.spec.ts'],['nextjs/lib/pipeline-v2.ts',AFFECTED_PREFLIGHT_TEST]]) {
     const unknown=paths.find(path=>!AFFECTED_PREFLIGHT_PATHS.includes(path)),map=affectedMap([affectedRecord('R090',paths)]);
     assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],paths.join(' -> '));
     assert.deepEqual([map.entries.map(entry=>entry.groups),map.unitFiles],[[[AFFECTED_PREFLIGHT_GROUP]],AFFECTED_PREFLIGHT_SUITES],paths.join(' -> '));
@@ -7074,6 +7091,85 @@ test('affected CPU OCR synthetic binding owns exactly four paths and defers its 
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+test('affected CDR Cloud Run service owns exactly its app and wiring suite and defers its exact-head malware-scan qualification', () => {
+  const paths = ['quarantine-sidecar/cdr-cloudrun/app.py', 'quarantine-sidecar/cdr-cloudrun/tests/test_app.py'];
+  const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'cdr-cloudrun-service');
+  assert.equal(owners.length, 1);
+  assert.deepEqual([owners[0].unitFiles, owners[0].browserFiles, owners[0].databaseTests, Boolean(owners[0].worker), Boolean(owners[0].selector), Boolean(owners[0].database), owners[0].nativeReuse],
+    [[], [], [], false, false, false, false]);
+  for (const path of paths) assert.deepEqual(AFFECTED_GROUPS.filter(owner => owner.match.test(path)).map(owner => owner.group), ['cdr-cloudrun-service'], path);
+  const records = paths.map(path => affectedRecord('M', [path]));
+  const map = affectedMap(records);
+  assert.deepEqual([map.failures, map.unmappedPaths, map.groups, map.changedPaths], [[], [], ['cdr-cloudrun-service'], paths]);
+  assert.deepEqual([map.unitFiles, map.browserFiles, map.databaseTests], [[], [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  assert.deepEqual([map.nativeEvidence.disposition, map.nativeEvidence.invalidatingPaths], ['fresh-seven-case-native-run-required', paths]);
+  const plan = affectedAskPlan(map);
+  assert.deepEqual(plan.deferredGroups, ['native-world-race-fresh-run', 'cdr-cloudrun-service']);
+  assert.ok(plan.pendingDebt.includes('cdr-cloudrun-service'));
+  assert.equal(plan.runCdrWorkerChecks, false);
+  const obligation = plan.qualificationReasons.filter(reason => reason.includes('malware-scan-qualification.yml'));
+  assert.equal(obligation.length, 1);
+  assert.ok(obligation[0].startsWith('cdr-cloudrun-service is pending independent verification') && obligation[0].includes(`exact head ${plan.headSha}`));
+  // A claimed local pass never clears the deferred service debt or earns a pass anchor.
+  const receipt = buildRepairReceipt(plan, { headSha: plan.headSha, executedChecks: { cdrWorker: 'success', 'cdr-cloudrun-service': 'passed in this run' } });
+  assert.deepEqual([receipt.gate, receipt.runResults['cdr-cloudrun-service'], 'cdr-cloudrun-service' in receipt.passedGroupAnchors], ['passed-scoped-only', 'pending-deferred', false]);
+  assert.ok(receipt.pendingDebt.includes('cdr-cloudrun-service'));
+  // The TypeScript CDR worker keeps its own owner and check; neither owner joins the other.
+  const withWorker = affectedAskPlan(affectedMap([...records, affectedRecord('M', ['quarantine-sidecar/foundation-cdr-worker/src/ocr.ts'])]));
+  assert.equal(withWorker.runCdrWorkerChecks, true);
+  assert.deepEqual(withWorker.affectedIntegration.entries.map(entry => entry.groups), [['cdr-cloudrun-service'], ['cdr-cloudrun-service'], ['ocr-worker']]);
+  assert.ok(withWorker.deferredGroups.includes('cdr-cloudrun-service') && !withWorker.deferredGroups.includes('ocr-worker'));
+  for (const adjacent of [
+    'quarantine-sidecar/cdr-cloudrun/malware.py', 'quarantine-sidecar/cdr-cloudrun/Dockerfile', 'quarantine-sidecar/cdr-cloudrun/requirements.txt',
+    'quarantine-sidecar/cdr-cloudrun/service.yaml', 'quarantine-sidecar/cdr-cloudrun/app_v2.py', 'quarantine-sidecar/cdr-cloudrun/test_app.py',
+    'quarantine-sidecar/cdr-cloudrun/tests/test_app_v2.py', 'quarantine-sidecar/cdr-cloudrun/tests/test_malware_clamd.py', 'quarantine-sidecar/cdr-cloudrun/tests/conftest.py',
+    'nextjs/quarantine-sidecar/cdr-cloudrun/app.py',
+  ]) {
+    const unknown = affectedMap([...records, affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
+test('affected table GPU worker owns exactly its Dockerfile and weights manifest and defers the unbuilt image as pending qualification', () => {
+  const paths = ['workers/foundation-table-gpu/Dockerfile', 'workers/foundation-table-gpu/weights.manifest'];
+  const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'table-gpu-worker');
+  assert.equal(owners.length, 1);
+  assert.deepEqual([owners[0].unitFiles, owners[0].browserFiles, owners[0].databaseTests, Boolean(owners[0].worker), Boolean(owners[0].selector), Boolean(owners[0].database), owners[0].nativeReuse],
+    [[], [], [], false, false, false, false]);
+  for (const path of paths) assert.deepEqual(AFFECTED_GROUPS.filter(owner => owner.match.test(path)).map(owner => owner.group), ['table-gpu-worker'], path);
+  const records = paths.map(path => affectedRecord('A', [path], '000000'));
+  const map = affectedMap(records);
+  assert.deepEqual([map.failures, map.unmappedPaths, map.groups, map.changedPaths], [[], [], ['table-gpu-worker'], paths]);
+  assert.deepEqual([map.unitFiles, map.browserFiles, map.databaseTests], [[], [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  assert.deepEqual([map.nativeEvidence.disposition, map.nativeEvidence.invalidatingPaths], ['fresh-seven-case-native-run-required', paths]);
+  const plan = affectedAskPlan(map);
+  assert.deepEqual(plan.deferredGroups, ['native-world-race-fresh-run', 'table-gpu-worker']);
+  assert.ok(plan.pendingDebt.includes('table-gpu-worker'));
+  assert.deepEqual([plan.runCdrWorkerChecks, plan.runWorkflowStaticGate, plan.runFullHermeticVitest, plan.unitFiles, plan.browserFiles], [false, false, false, [], []]);
+  // No workflow builds this image, so the obligation names the missing build instead of an external job.
+  const obligation = plan.qualificationReasons.filter(reason => reason.startsWith('table-gpu-worker '));
+  assert.equal(obligation.length, 1);
+  assert.ok(obligation[0].includes('no workflow builds') && obligation[0].includes(`exact head ${plan.headSha}`));
+  // A claimed local pass never clears the deferred image debt or earns a pass anchor.
+  const receipt = buildRepairReceipt(plan, { headSha: plan.headSha, executedChecks: { cdrWorker: 'success', 'table-gpu-worker': 'passed in this run' } });
+  assert.deepEqual([receipt.gate, receipt.runResults['table-gpu-worker'], 'table-gpu-worker' in receipt.passedGroupAnchors], ['passed-scoped-only', 'pending-deferred', false]);
+  assert.ok(receipt.pendingDebt.includes('table-gpu-worker'));
+  // The OCR GPU worker keeps its own owner and obligation; neither owner joins the other.
+  const withOcrGpu = affectedAskPlan(affectedMap([...records, affectedRecord('M', ['workers/foundation-ocr-gpu/app.py'])]));
+  assert.deepEqual(withOcrGpu.affectedIntegration.entries.map(entry => entry.groups), [['table-gpu-worker'], ['table-gpu-worker'], ['ocr-gpu-worker']]);
+  assert.deepEqual(withOcrGpu.deferredGroups, ['native-world-race-fresh-run', 'ocr-gpu-worker', 'table-gpu-worker']);
+  for (const adjacent of [
+    'workers/foundation-table-gpu/app.py', 'workers/foundation-table-gpu/requirements.txt', 'workers/foundation-table-gpu/Dockerfile.dev',
+    'workers/foundation-table-gpu/dockerfile', 'workers/foundation-table-gpu/weights.manifest.bak', 'workers/foundation-table-gpu/README.md',
+    'workers/foundation-table-gpu/tests/test_app.py', 'workers/foundation-table-gpu-v2/Dockerfile', 'nextjs/workers/foundation-table-gpu/Dockerfile',
+  ]) {
+    const unknown = affectedMap([...records, affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
 test('affected pilot worksheet runner admits the exact registered component suite and refuses unregistered siblings', async () => {
   const { buildUnitArgs, validateSelectedPath } = await import('./run-repair-check.mjs');
   const file = 'components/evaluation-page.test.tsx';
@@ -7185,6 +7281,67 @@ test('affected PR #141 fix owners: intake approval rollout, solutions proof and 
   for (const adjacent of ['nextjs/lib/api-error-codes.test.ts.bak', 'nextjs/app/solutions/[slug]/layout.tsx', 'nextjs/lib/upload-confirm-route-v2.test.ts']) {
     const refused = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual(refused.failures, [`unmapped changed endpoint: ${adjacent}`], adjacent);
+  }
+});
+test('affected PR #151 service truth owner: nine exact paths select six direct suites and no browser suite; neighbours stay unmapped', () => {
+  const suites = ['lib/api-error-codes.test.ts', 'lib/documents-route.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/pipeline.test.ts',
+    'lib/r2-synthetic-canary.test.ts', 'lib/workspace-onboarding.test.ts'];
+  assert.deepEqual([[...PR151_SERVICE_TRUTH_AFFECTED_PATHS], [...PR151_SERVICE_TRUTH_AFFECTED_UNIT_FILES]], [['app/api/documents/route.ts',
+    'lib/documents-route.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/pipeline.test.ts', 'lib/pipeline.ts', 'lib/r2-synthetic-canary.test.ts',
+    'lib/r2-synthetic-canary.ts', 'lib/workspace-onboarding.test.ts', 'lib/workspace-onboarding.ts'], suites]);
+  for (const path of PR151_SERVICE_TRUTH_AFFECTED_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['pr151-service-truth'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['pr151-service-truth'], [], suites, [], []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const plan = affectedAskPlan(affectedMap(PR151_SERVICE_TRUTH_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
+  for (const adjacent of ['nextjs/app/api/documents/route.tsx', 'nextjs/app/api/documents/[id]/route.ts', 'nextjs/lib/pipeline.tsx', 'nextjs/lib/pipeline-v2.test.ts',
+    'nextjs/lib/r2-synthetic-canary-2.ts', 'nextjs/lib/workspace-onboarding.test.tsx', 'nextjs/lib/openapi-handler-contract.switch-off.test.ts', 'lib/pipeline.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
+test('affected OCR_PAGES_INCOMPLETE owner: four exact paths select three direct suites and no browser suite; neighbours stay unmapped', () => {
+  const suites = ['lib/documents-route.test.ts', 'lib/operations-p0.test.ts', 'lib/processing-receipts.test.ts'];
+  assert.deepEqual([[...OCR_PAGES_INCOMPLETE_AFFECTED_PATHS], [...OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES]], [['lib/operations-p0.test.ts',
+    'lib/operations-p0.ts', 'lib/processing-receipts.test.ts', 'lib/processing-receipts.ts'], suites]);
+  for (const path of OCR_PAGES_INCOMPLETE_AFFECTED_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['ocr-pages-incomplete-code'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['ocr-pages-incomplete-code'], [], suites, [], []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const plan = affectedAskPlan(affectedMap(OCR_PAGES_INCOMPLETE_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
+  for (const adjacent of ['nextjs/lib/operations-p0.tsx', 'nextjs/lib/operations-p0-v2.ts', 'nextjs/lib/processing-receipts.test.tsx',
+    'nextjs/lib/processing-receipts-v2.ts', 'nextjs/app/api/operations/p0/credits/release/route.ts', 'nextjs/e2e/operations-p0.spec.ts', 'lib/operations-p0.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
+test('affected benchmarks path mask owner: four exact paths select seven direct suites and no browser suite; neighbours stay unmapped', () => {
+  const suites = ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts',
+    'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/trust-page-answers.test.ts'];
+  assert.deepEqual([[...BENCHMARKS_PATH_MASK_AFFECTED_PATHS], [...BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES]], [['app/benchmarks/page.tsx',
+    'lib/benchmarks-page.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts'], suites]);
+  for (const path of BENCHMARKS_PATH_MASK_AFFECTED_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['benchmarks-path-mask'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['benchmarks-path-mask'], [], suites, [], []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const plan = affectedAskPlan(affectedMap(BENCHMARKS_PATH_MASK_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
+  for (const adjacent of ['nextjs/app/benchmarks/page.ts', 'nextjs/app/benchmarks/gdp-pdf/page.tsx', 'nextjs/lib/model-arena-page-data.tsx',
+    'nextjs/lib/model-arena-page-data-v2.ts', 'nextjs/lib/benchmarks-page.test.tsx', 'nextjs/components/benchmarks/arena-charts.tsx',
+    'nextjs/content/benchmarks/model-arena-20260903.json', 'lib/model-arena-page-data.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
 

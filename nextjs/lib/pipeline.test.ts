@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import { PROCESSING_CEILING_SENTENCE } from "../../shared/intakeCeiling";
-import { buildPipeline, summarize, type LocalUpload, type PipelineDocument } from "./pipeline";
+import { buildPipeline, storedPipelineDocument, summarize, type LocalUpload, type PipelineDocument } from "./pipeline";
 
 function doc(overrides: Partial<PipelineDocument> = {}): PipelineDocument {
   return {
@@ -226,6 +226,34 @@ describe("a refused source", () => {
 
   it("leaves a document with no refusal exactly as it was", () => {
     const rows = buildPipeline([], [doc({ sanitizedKey: "k/sanitized.pdf" })]);
+    expect(states(rows)).toEqual(["done", "done", "active", "waiting"]);
+  });
+});
+
+/*
+ * G2: a source stored in quarantine with nothing after it used to vanish on reload. It now comes
+ * back as `stored`, and the board shows exactly what it showed the uploading browser: the
+ * transfer landed, preparation has not produced anything yet, and nothing further is claimed.
+ */
+describe("a stored source with nothing after it", () => {
+  it("survives a reload as one row that is uploaded and not yet prepared", () => {
+    const rows = buildPipeline([], [storedPipelineDocument("doc-7")]);
+    expect(rows.map((row) => row.id)).toEqual(["doc-7"]);
+    expect(states(rows)).toEqual(["done", "active", "waiting", "waiting"]);
+    expect(rows[0].stages[0].detail).toBe("stored");
+    expect(rows[0].observedAt).toBeNull();
+  });
+
+  it("reads the same as no server row for this browser's own upload, and never advances it", () => {
+    const local = [upload({ documentId: "doc-1", phase: "stored", loaded: 2 * 1024 * 1024 })];
+    expect(buildPipeline(local, [storedPipelineDocument("doc-1")])).toEqual(buildPipeline(local, []));
+    const uncertain = [upload({ documentId: "doc-1", phase: "uncertain" })];
+    expect(states(buildPipeline(uncertain, [storedPipelineDocument("doc-1")]))).toEqual(["held", "waiting", "waiting", "waiting"]);
+  });
+
+  it("never outranks a document version that does exist", () => {
+    const rows = buildPipeline([], [doc({ sanitizedKey: "k/sanitized.pdf" }), storedPipelineDocument("doc-1")]);
+    expect(rows).toHaveLength(1);
     expect(states(rows)).toEqual(["done", "done", "active", "waiting"]);
   });
 });
