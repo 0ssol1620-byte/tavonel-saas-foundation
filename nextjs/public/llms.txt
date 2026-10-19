@@ -30,7 +30,7 @@ Indexing: public product, documentation, research and trust pages are indexable.
 - [Changelog](https://tavonel.com/changelog): What changed in the product and the public interfaces. The same entries are served as an Atom feed at /changelog/feed.xml.
 - [Pricing](https://tavonel.com/pricing): Free Evaluation, Developer, Team and Enterprise access.
 - [Sources](https://tavonel.com/sources): The capability manifest this deployment reads — every accepted format, its support tier, what survives into the Compiled World, and what does not.
-- [Integrations](https://tavonel.com/integrations): Which source systems connect today, which are not supported, and how the customer-run agent behaves.
+- [Integrations](https://tavonel.com/integrations): Which source systems have a connector, which are not supported, and how the customer-run agent behaves.
 - [Trust Center](https://tavonel.com/trust): The index of what this deployment publishes about itself, and what it does not.
 - [Security](https://tavonel.com/security): Data path, tenant isolation, retention and security controls.
 - [Enterprise](https://tavonel.com/enterprise): What an enterprise engagement covers today, and what is not provided.
@@ -56,7 +56,7 @@ Indexing: public product, documentation, research and trust pages are indexable.
 
 ## Documentation
 
-- [Quickstart](https://tavonel.com/docs/quickstart): From an API key to a verified evidence-bound answer, with the one step no key can take.
+- [Quickstart](https://tavonel.com/docs/quickstart): From an API key to an evidence-bound answer, with the one step no key can take.
 - [Use your results with AI](https://tavonel.com/docs/use-with-ai): Choose live MCP/API access or the signed portable package, and keep answers grounded in the same evidence.
 - [Use the ontology output](https://tavonel.com/docs/ontology-output): Import the Compiled World ontology into RDF, linked-data and graph systems without losing validation, evidence or stable identity.
 - [Concepts](https://tavonel.com/docs/concepts): Sources, Compiled Worlds, candidate and active versions, and evidence.
