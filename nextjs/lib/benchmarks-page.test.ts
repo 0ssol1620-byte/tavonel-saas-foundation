@@ -17,7 +17,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 const { default: BenchmarksPage } = await import("../app/benchmarks/page");
-import { arenaBars, arenaDots, modelArenaBoard, settledModels, unsettledModels } from "./model-arena-page-data";
+import { LOCAL_PATH_MASK, arenaBars, arenaDots, modelArenaBoard, settledModels, unsettledModels } from "./model-arena-page-data";
 
 /*
   The guard over the rendered /benchmarks page.
@@ -121,6 +121,19 @@ describe("the rendered /benchmarks page", () => {
     for (const name of ["Reducto", "LlamaParse", "LlamaIndex", "Mistral OCR", "Unstructured"]) {
       expect(text).not.toContain(name);
     }
+  });
+
+  /*
+    EN-0. A campaign note named a directory on the machine that scored it, user name included, and
+    the page printed it. The note is carried as the run recorded it except for that path, which is
+    masked at render time only: the artifact and the sha256 it is pinned by do not change.
+  */
+  it("prints no local filesystem path, and says where one was masked", () => {
+    expect(html).not.toContain("C:/");
+    expect(html).not.toContain("Users/");
+    expect(text).toContain(LOCAL_PATH_MASK);
+    expect(JSON.stringify(modelArenaBoard().models.flatMap((model) => model.notes)), "the artifact itself is unchanged")
+      .toContain("C:/Users/");
   });
 
   it("carries the campaign's own caveats verbatim", () => {
