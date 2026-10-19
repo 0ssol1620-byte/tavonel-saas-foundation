@@ -2093,6 +2093,31 @@ export const LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/launch-qa-script-ratchet.test.ts',
   'lib/release-gate-check-script.test.ts',
 ]);
+// G8 CHANGE-NOTIFY (phase 4, DECISION-REGISTER S6-15): the switched-off notifier, its cron route, the route's classification row,
+// the cron entry in vercel.json and the receiver-contract browser spec. Exactly these six paths select the notifier's own suite, the
+// classification and route-surface suites for the new route, and every suite that reads vercel.json (production-posture among
+// them), plus the change-notify-docs browser suite in project 390. The docs text itself stays with the docs owner, and the outbox
+// migration and grant-matrix row with database-contract. Product code, so never nativeReuse.
+export const CHANGE_NOTIFY_AFFECTED_PATHS = Object.freeze([
+  'app/api/internal/change-notify/run/route.ts',
+  'e2e/change-notify-docs.spec.ts',
+  'lib/change-notify.test.ts',
+  'lib/change-notify.ts',
+  'lib/security/route-classification.json',
+  'vercel.json',
+]);
+export const CHANGE_NOTIFY_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/change-notify.test.ts',
+  'lib/cta-truth.test.ts',
+  'lib/durable-compile-orchestration.test.ts',
+  'lib/operational-sli-alert-route.test.ts',
+  'lib/production-posture.test.ts',
+  'lib/production-route-surface.test.ts',
+  'lib/route-classification.test.ts',
+  'lib/source-deletion-route.test.ts',
+  'lib/synthetic-probe.test.ts',
+]);
+export const CHANGE_NOTIFY_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/change-notify-docs.spec.ts']);
 // Enablement batch (codex/enablement-20261017, EN-0 to EN-5 and the guide recordings): the fifty-three changed endpoints no owner
 // listed -- the changelog and its feed, the cookbooks index and card, the resources hub,
 // the keyless try-it's digest check, its island (moved to components/ in EN-FIX-1) and its mounts on /api and /developers, the product guide at /guide and /ko/guide with its
@@ -2558,6 +2583,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // launch-qa-release-scripts: the 5 exact paths above select 3 direct suites and no browser suite.
   affectedGroup('launch-qa-release-scripts', new RegExp(`^nextjs/(?:${exactPathAlternation(LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS)})$`),
     { unitFiles: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES }),
+  // change-notify: the 6 exact paths above select 9 direct suites and 1 browser suite.
+  affectedGroup('change-notify', new RegExp(`^nextjs/(?:${exactPathAlternation(CHANGE_NOTIFY_AFFECTED_PATHS)})$`),
+    { unitFiles: CHANGE_NOTIFY_AFFECTED_UNIT_FILES, browserFiles: CHANGE_NOTIFY_AFFECTED_BROWSER_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.

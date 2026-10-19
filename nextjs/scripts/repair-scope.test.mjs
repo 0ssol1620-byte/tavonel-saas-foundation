@@ -7625,3 +7625,34 @@ test('affected enablement owner: fifty-three exact paths select twenty direct su
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), [owner], path);
   }
 });
+import { CHANGE_NOTIFY_AFFECTED_PATHS, CHANGE_NOTIFY_AFFECTED_UNIT_FILES, CHANGE_NOTIFY_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+// G8 CHANGE-NOTIFY (phase 4): six exact paths, nine direct suites, one browser suite in project 390. The docs text keeps the docs
+// owner and the outbox migration and grant-matrix row keep database-contract; neither joins this owner.
+test('affected change-notify owner: 6 exact paths select 9 direct suites and 1 browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/api/internal/change-notify/run/route.ts', 'e2e/change-notify-docs.spec.ts', 'lib/change-notify.test.ts', 'lib/change-notify.ts', 'lib/security/route-classification.json', 'vercel.json'];
+  const suites = ['lib/change-notify.test.ts', 'lib/cta-truth.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/production-posture.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/source-deletion-route.test.ts', 'lib/synthetic-probe.test.ts'];
+  const browsers = ['e2e/change-notify-docs.spec.ts'];
+  assert.deepEqual([[...CHANGE_NOTIFY_AFFECTED_PATHS], [...CHANGE_NOTIFY_AFFECTED_UNIT_FILES], [...CHANGE_NOTIFY_AFFECTED_BROWSER_FILES]], [paths, suites, browsers]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['change-notify'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['change-notify'], [], [...suites].sort(), [...browsers].sort(), []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const plan = affectedAskPlan(affectedMap(paths.map(path => affectedRecord('M', ['nextjs/' + path]))));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[...suites].sort(), [...browsers].sort(), false, false]);
+  assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['390']);
+  const runner = readFileSync(fileURLToPath(new URL('./run-repair-check.mjs', import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
+  assert.equal(runner.split('\n').filter(line => line.trim() === "['e2e/change-notify-docs.spec.ts', ['390']],").length, 1);
+  // The lane's other three paths keep the owners they already had.
+  for (const [path, owners] of [
+    ['nextjs/lib/docs-content.ts', ['docs']],
+    ['supabase/migrations/20261019100000_change_notify_outbox.sql', ['database-contract']],
+    ['supabase/tests/service_role_grant_matrix.sql', ['database-contract']],
+  ]) assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), owners, path);
+  for (const adjacent of ['nextjs/app/api/internal/change-notify/replay/route.ts', 'nextjs/lib/change-notify-store.ts', 'nextjs/lib/change-notify.tsx', 'nextjs/e2e/change-notify.spec.ts', 'nextjs/vercel.json.bak', 'vercel.json', 'nextjs/lib/security/route-classification.test.json']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});

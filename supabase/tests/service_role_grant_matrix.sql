@@ -18,7 +18,7 @@
 -- foundation_connection_inventory_* tables (20261002100000) also expect `{}`: RPC-only.
 
 begin;
-select plan(70);
+select plan(71);
 
 -- ---------------------------------------------------------------------------
 -- 1. Every table in public, in catalog order.
@@ -48,6 +48,7 @@ select table_privs_are('public', 'foundation_api_keys', 'service_role', array['S
 select table_privs_are('public', 'foundation_api_rate_windows', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE']::text[]);
 select table_privs_are('public', 'foundation_billing_accounts', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE']::text[]);
 select table_privs_are('public', 'foundation_billing_events', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE']::text[]);
+select table_privs_are('public', 'foundation_change_notifications', 'service_role', array['SELECT', 'INSERT', 'UPDATE']::text[]);
 select table_privs_are('public', 'foundation_compile_job_events', 'service_role', array['SELECT', 'INSERT']::text[]);
 select table_privs_are('public', 'foundation_compile_jobs', 'service_role', array['SELECT', 'INSERT', 'UPDATE']::text[]);
 select table_privs_are('public', 'foundation_compute_reservations', 'service_role', array['SELECT', 'INSERT', 'UPDATE']::text[]);
