@@ -7127,6 +7127,45 @@ test('affected CDR Cloud Run service owns exactly its app and wiring suite and d
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+test('affected table GPU worker owns exactly its Dockerfile and weights manifest and defers the unbuilt image as pending qualification', () => {
+  const paths = ['workers/foundation-table-gpu/Dockerfile', 'workers/foundation-table-gpu/weights.manifest'];
+  const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'table-gpu-worker');
+  assert.equal(owners.length, 1);
+  assert.deepEqual([owners[0].unitFiles, owners[0].browserFiles, owners[0].databaseTests, Boolean(owners[0].worker), Boolean(owners[0].selector), Boolean(owners[0].database), owners[0].nativeReuse],
+    [[], [], [], false, false, false, false]);
+  for (const path of paths) assert.deepEqual(AFFECTED_GROUPS.filter(owner => owner.match.test(path)).map(owner => owner.group), ['table-gpu-worker'], path);
+  const records = paths.map(path => affectedRecord('A', [path], '000000'));
+  const map = affectedMap(records);
+  assert.deepEqual([map.failures, map.unmappedPaths, map.groups, map.changedPaths], [[], [], ['table-gpu-worker'], paths]);
+  assert.deepEqual([map.unitFiles, map.browserFiles, map.databaseTests], [[], [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  assert.deepEqual([map.nativeEvidence.disposition, map.nativeEvidence.invalidatingPaths], ['fresh-seven-case-native-run-required', paths]);
+  const plan = affectedAskPlan(map);
+  assert.deepEqual(plan.deferredGroups, ['native-world-race-fresh-run', 'table-gpu-worker']);
+  assert.ok(plan.pendingDebt.includes('table-gpu-worker'));
+  assert.deepEqual([plan.runCdrWorkerChecks, plan.runWorkflowStaticGate, plan.runFullHermeticVitest, plan.unitFiles, plan.browserFiles], [false, false, false, [], []]);
+  // No workflow builds this image, so the obligation names the missing build instead of an external job.
+  const obligation = plan.qualificationReasons.filter(reason => reason.startsWith('table-gpu-worker '));
+  assert.equal(obligation.length, 1);
+  assert.ok(obligation[0].includes('no workflow builds') && obligation[0].includes(`exact head ${plan.headSha}`));
+  // A claimed local pass never clears the deferred image debt or earns a pass anchor.
+  const receipt = buildRepairReceipt(plan, { headSha: plan.headSha, executedChecks: { cdrWorker: 'success', 'table-gpu-worker': 'passed in this run' } });
+  assert.deepEqual([receipt.gate, receipt.runResults['table-gpu-worker'], 'table-gpu-worker' in receipt.passedGroupAnchors], ['passed-scoped-only', 'pending-deferred', false]);
+  assert.ok(receipt.pendingDebt.includes('table-gpu-worker'));
+  // The OCR GPU worker keeps its own owner and obligation; neither owner joins the other.
+  const withOcrGpu = affectedAskPlan(affectedMap([...records, affectedRecord('M', ['workers/foundation-ocr-gpu/app.py'])]));
+  assert.deepEqual(withOcrGpu.affectedIntegration.entries.map(entry => entry.groups), [['table-gpu-worker'], ['table-gpu-worker'], ['ocr-gpu-worker']]);
+  assert.deepEqual(withOcrGpu.deferredGroups, ['native-world-race-fresh-run', 'ocr-gpu-worker', 'table-gpu-worker']);
+  for (const adjacent of [
+    'workers/foundation-table-gpu/app.py', 'workers/foundation-table-gpu/requirements.txt', 'workers/foundation-table-gpu/Dockerfile.dev',
+    'workers/foundation-table-gpu/dockerfile', 'workers/foundation-table-gpu/weights.manifest.bak', 'workers/foundation-table-gpu/README.md',
+    'workers/foundation-table-gpu/tests/test_app.py', 'workers/foundation-table-gpu-v2/Dockerfile', 'nextjs/workers/foundation-table-gpu/Dockerfile',
+  ]) {
+    const unknown = affectedMap([...records, affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
 test('affected pilot worksheet runner admits the exact registered component suite and refuses unregistered siblings', async () => {
   const { buildUnitArgs, validateSelectedPath } = await import('./run-repair-check.mjs');
   const file = 'components/evaluation-page.test.tsx';

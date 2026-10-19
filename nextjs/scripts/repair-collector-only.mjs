@@ -1642,10 +1642,10 @@ export function verifyAffectedSource({headSha,intent=classifyAffectedIntent({hea
 export function affectedPlan(normal,proof){
  const map=proof?.map;
  if(!proof?.eligible||proof.profile!==AFFECTED_PROFILE||!map||map.failures.length||map.headSha!==normal.headSha||proof.headSha!==normal.headSha||normal.repairAnchorSha!==FULL_ANCHOR)throw Error('Affected plan requires a clean fail-closed map for the exact head.');
- const fresh=map.nativeEvidence.disposition===NATIVE_FRESH_RUN_REQUIRED,h=AFFECTED_HISTORICAL_EVIDENCE,cpu=map.groups.includes('ocr-cpu-worker'),gpu=map.groups.includes('ocr-gpu-worker'),cdrService=map.groups.includes('cdr-cloudrun-service');
+ const fresh=map.nativeEvidence.disposition===NATIVE_FRESH_RUN_REQUIRED,h=AFFECTED_HISTORICAL_EVIDENCE,cpu=map.groups.includes('ocr-cpu-worker'),gpu=map.groups.includes('ocr-gpu-worker'),cdrService=map.groups.includes('cdr-cloudrun-service'),tableGpu=map.groups.includes('table-gpu-worker');
  // Deferred, never passed here: the race group name stays distinct from the exact race profile's own hosted group.
  // The GPU worker is qualified only by its external image workflow; no local CPU/CDR check stands in for it.
- const deferredGroups=[...(map.databaseChanged?['database-contract']:[]),...(fresh?['native-world-race-fresh-run']:[]),...(cpu?['ocr-cpu-worker']:[]),...(gpu?['ocr-gpu-worker']:[]),...(cdrService?['cdr-cloudrun-service']:[])];
+ const deferredGroups=[...(map.databaseChanged?['database-contract']:[]),...(fresh?['native-world-race-fresh-run']:[]),...(cpu?['ocr-cpu-worker']:[]),...(gpu?['ocr-gpu-worker']:[]),...(cdrService?['cdr-cloudrun-service']:[]),...(tableGpu?['table-gpu-worker']:[])];
  const debt=[...new Set([...deferredGroups,...EXPLORE_REPAIR_PENDING_DEBT])].sort();
  return{schemaVersion:1,repository:normal.repository,pullRequest:normal.pullRequest,pullRequestBaseSha:normal.pullRequestBaseSha,repairAnchorSha:normal.repairAnchorSha,headSha:normal.headSha,
   selector:'affected-integration-v1',source:'verified-baseline incremental affected map; cumulative PR/full release debt tracked separately',affectedIntegration:map,
@@ -1664,6 +1664,7 @@ export function affectedPlan(normal,proof){
    ...(cpu?[`ocr-cpu-worker is pending independent verification: the external .github/workflows/foundation-ocr-cpu-raster.yml job must run on exact head ${normal.headSha} with the worker pytest and zero skips; Repair neither executes nor inherits it, and no CDR or GPU pass substitutes for it.`]:[]),
    ...(gpu?[`ocr-gpu-worker is pending independent verification: the external .github/workflows/foundation-ocr-gpu-image.yml job candidate must run on exact head ${normal.headSha} with the worker pytest and the non-publishing CUDA image build plus provider/runtime checks; Repair neither executes nor inherits it, and no local CPU/CDR pass substitutes for it.`]:[]),
    ...(cdrService?[`cdr-cloudrun-service is pending independent verification: the external .github/workflows/malware-scan-qualification.yml qualify job must pass for exact head ${normal.headSha}, running the service pytest against the digest-pinned clamd and tests/test_app.py inside the service image built from that checkout; Repair neither executes nor inherits it, and no CDR worker, CPU or GPU pass substitutes for it.`]:[]),
+   ...(tableGpu?[`table-gpu-worker is pending qualification: no workflow builds or pushes workers/foundation-table-gpu/, so its Dockerfile and weights.manifest at exact head ${normal.headSha} are unbuilt text whose first image build is their first test; Repair neither executes nor inherits a build, and no CDR, CPU or GPU OCR pass substitutes for it.`]:[]),
    'Cumulative PR/full release debt stays pending separately.']};
 }
 // Only the final-gate CLI, at the repository's nextjs cwd, may qualify its generated plan; every other caller gets source proof only.
