@@ -2093,6 +2093,46 @@ export const LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/launch-qa-script-ratchet.test.ts',
   'lib/release-gate-check-script.test.ts',
 ]);
+// G11 remote MCP (codex/p4-remote-mcp-20261019, DECISION-REGISTER S6-09/S6-10): the switch-gated endpoint, its OAuth routes and
+// well-known metadata, the consent page, the shared module and its suite, the route classification entries and the browser spec.
+// Exactly these twelve paths select the sixteen suites that read them -- the module suite, the stdio bridge suite whose table the
+// endpoint imports, the tenant-isolation probe of the routes it dispatches to, the posture lock, and the suites that walk app/ or
+// read the classification (route classification, CSRF matrix, route surface, canonical and page metadata, SEO, copy trust, output
+// escaping, prohibited phrases, funnel events, workspace tenancy, brand copy) -- and the remote MCP browser suite in launch-chromium.
+// Product code, so never nativeReuse.
+export const REMOTE_MCP_AFFECTED_PATHS = Object.freeze([
+  'app/.well-known/oauth-authorization-server/route.ts',
+  'app/.well-known/oauth-protected-resource/[[...resource]]/route.ts',
+  'app/api/mcp/oauth/authorize/route.ts',
+  'app/api/mcp/oauth/register/route.ts',
+  'app/api/mcp/oauth/token/route.ts',
+  'app/api/mcp/route.ts',
+  'app/oauth/authorize/layout.tsx',
+  'app/oauth/authorize/page.tsx',
+  'e2e/launch-qa-remote-mcp.spec.ts',
+  'lib/remote-mcp.test.ts',
+  'lib/remote-mcp.ts',
+  'lib/security/route-classification.json',
+]);
+export const REMOTE_MCP_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/brand-copy.test.ts',
+  'lib/copy-trust-guard.test.ts',
+  'lib/csrf-shape-matrix.test.ts',
+  'lib/funnel-events.test.ts',
+  'lib/mcp-server.test.ts',
+  'lib/output-escaping.test.ts',
+  'lib/page-metadata.test.ts',
+  'lib/production-posture.test.ts',
+  'lib/production-route-surface.test.ts',
+  'lib/prohibited-phrases.test.ts',
+  'lib/remote-mcp.test.ts',
+  'lib/route-canonical-metadata.test.ts',
+  'lib/route-classification.test.ts',
+  'lib/seo-surface.test.ts',
+  'lib/tenant-isolation-negative.test.ts',
+  'lib/workspace-tenancy.test.ts',
+]);
+export const REMOTE_MCP_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/launch-qa-remote-mcp.spec.ts']);
 // Enablement batch (codex/enablement-20261017, EN-0 to EN-5 and the guide recordings): the fifty-three changed endpoints no owner
 // listed -- the changelog and its feed, the cookbooks index and card, the resources hub,
 // the keyless try-it's digest check, its island (moved to components/ in EN-FIX-1) and its mounts on /api and /developers, the product guide at /guide and /ko/guide with its
@@ -2558,6 +2598,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // launch-qa-release-scripts: the 5 exact paths above select 3 direct suites and no browser suite.
   affectedGroup('launch-qa-release-scripts', new RegExp(`^nextjs/(?:${exactPathAlternation(LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS)})$`),
     { unitFiles: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES }),
+  // remote-mcp: the 12 exact paths above select 16 direct suites and 1 browser suite.
+  affectedGroup('remote-mcp', new RegExp(`^nextjs/(?:${exactPathAlternation(REMOTE_MCP_AFFECTED_PATHS)})$`),
+    { unitFiles: REMOTE_MCP_AFFECTED_UNIT_FILES, browserFiles: REMOTE_MCP_AFFECTED_BROWSER_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.

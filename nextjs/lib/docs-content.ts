@@ -1155,6 +1155,37 @@ console.log("compile job:", accepted.jobId);` },
       { kind: "note", text: "There is no write tool and there is no activation tool. Activation is the moment a candidate becomes the World an organisation answers from, and it stays with a person in a browser; the server refuses to start if a tool that writes is ever added to it." },
       { kind: "note", text: "list_worlds lists only active Worlds, over `GET /v1/collections`. Candidates are excluded: a discovery list mixing accepted and unaccepted output would present both as organizational truth." },
       { kind: "note", text: "download_package returns a descriptor rather than the archive: the URL, the size, the signed manifest digest and the signing key id. The bytes are fetched over HTTP with the same key and checked with the verifier on the CLI page." },
+      /*
+        G11 REMOTE-MCP (DECISION-REGISTER S6-09, S6-10). The endpoint is built behind
+        TAVONEL_REMOTE_MCP_ENABLED, which production leaves unset, so this subsection leads with
+        that fact: a reader must not take the URL below for something tavonel.com answers.
+      */
+      { kind: "heading", text: "Remote MCP endpoint (not enabled in production)" },
+      { kind: "note", text: "**Not enabled in production.** The remote endpoint is built and tested behind a rollout switch that is off on tavonel.com, so every URL in this subsection answers 404 there. Until the switch is on, connect through the stdio server above." },
+      { kind: "prose", text: `With the switch on, the same ${MCP_TOOL_COUNT_WORD} read-only tools are served over MCP Streamable HTTP, protocol revision 2025-06-18, at /api/mcp — for clients that connect by URL instead of launching a local process, such as ChatGPT connectors and other web agents. The tool table is the stdio server's own file, so the two cannot list different tools, and neither has a write tool. initialize and tools/list answer without a token; every tools/call needs one.` },
+      { kind: "heading", text: "Connecting ChatGPT or a web agent" },
+      {
+        kind: "steps",
+        items: [
+          "In the client's connector settings, add a custom remote MCP server with the URL https://tavonel.com/api/mcp and choose OAuth as its authentication.",
+          "The client finds the rest itself. A tool call without a token answers 401 with a pointer to /.well-known/oauth-protected-resource/api/mcp, which names TAVONEL as the authorization server; /.well-known/oauth-authorization-server lists its endpoints.",
+          "The client registers itself and opens TAVONEL's consent page in your browser. Sign in, check the client's name and the address the token is sent to, and allow read-only access.",
+          "The client receives an access token and lists the tools. Ask it to run list_worlds first, then search_world or ask_world with a collection id from that list.",
+        ],
+      },
+      { kind: "heading", text: "The OAuth flow" },
+      {
+        kind: "table",
+        head: ["Step", "Endpoint", "What happens"],
+        rows: [
+          ["Discovery", "GET /.well-known/oauth-protected-resource/api/mcp, GET /.well-known/oauth-authorization-server", "RFC 9728 resource metadata and RFC 8414 authorization server metadata."],
+          ["Registration", "POST /api/mcp/oauth/register", "RFC 7591 dynamic registration. Public clients only, with no client secret; redirect URIs are https or a loopback http address."],
+          ["Consent", "/oauth/authorize", "Authorization code with PKCE S256, required. A signed-in workspace member allows or denies. A free evaluation cannot connect, the same rule as for API keys."],
+          ["Token", "POST /api/mcp/oauth/token", "The code and its verifier become an access token scoped to documents:read, collections:read, worlds:read, ask:read and collections:download. It expires after an hour and no refresh token is issued, so the client asks again."],
+          ["Tool calls", "POST /api/mcp", "Bearer token on every tools/call: 401 without one or with an expired one, 403 for a scope the token does not hold."],
+        ],
+      },
+      { kind: "note", text: "The access token is a developer API key minted for the connection. It is listed under Workspace › Developers with the client's name and can be revoked there, and the remote endpoint refuses any key that carries a write scope. Rate limits and tenant scoping are the API's own, per key and per scope." },
     ],
   },
   {
