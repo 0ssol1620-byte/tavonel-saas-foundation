@@ -110,8 +110,9 @@ Three separate questions, three files, none of which reads a network.
 
 ```bash
 # Is this archive intact, and signed by the key we publish?
-# The fingerprint comes from the trust endpoint, not from the archive.
-fingerprint=$(curl -fsS https://tavonel.com/api/export/trust | jq -r .publicKeySpkiSha256)
+# The fingerprint comes from the trust endpoint, not from the archive. The record is trust
+# v2: the active key's fingerprint sits under keys[], beside activeKeyId.
+fingerprint=$(curl -fsS https://tavonel.com/api/export/trust | jq -r '.activeKeyId as $id | .keys[] | select(.keyId == $id) | .publicKeySpkiSha256')
 node tavonel-verify-export.mjs --archive world.zip --trusted-fingerprint "$fingerprint"
 
 # Is what is inside it a coherent Compiled World?

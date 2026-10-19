@@ -70,16 +70,24 @@ const INFRA = [
   Each answer below is read off `public/developer/tavonel-source-agent.py` and
   `public/developer/channel.json` rather than described from intent. Two of them are the ones
   a reader will be surprised by, so they are stated plainly instead of softened: one run is
-  one sync and exits, so the customer's scheduler is the whole schedule; and there is no retry
-  inside the agent, so the customer's scheduler is also the whole retry. The long form, with
+  one sync and exits unless --watch keeps it resident, so the customer's scheduler or supervisor is
+  the whole schedule; and the agent's own retry is bounded by --retry-limit, past which the
+  customer's scheduler is the whole retry (S6-16, G1-COPY). The long form, with
   the error-message table, is served at /developer/source-agent-operations.md (copied verbatim
   from docs/runbooks/ at integration) and linked from the panel below.
 */
 const AGENT_OPERATIONS: Array<[string, string]> = [
   ["Install", "Python 3.12 or newer. Verify the download against the sha256 in the distribution record at /developer/channel.json, create the connection in Workspace to get its id, and put the API key in the TAVONEL_API_KEY environment variable \u2014 the agent reads it from nowhere else. S3-compatible mode additionally needs boto3, which you install; the agent stops and says so if it is missing."],
   ["Permissions", "Read on the directory tree, or ListObjectsV2 and GetObject on the bucket and prefix. Nothing more: the agent never writes to your source. Storage credentials are resolved on your host and are never sent to us. It skips symbolic links and refuses a path that resolves outside the root you gave it. Outbound HTTPS only, no inbound port."],
-  ["One run", "One invocation performs one sync and exits. It is not a service and has no internal timer: cron, a systemd timer or Task Scheduler is what makes it periodic, and that interval is your import latency. Do not run two against one connection at once."],
-  ["Restart and network outage", "The local cursor file is written only after we have committed the batch, so a killed process, a reboot or a dropped connection leaves it untouched and the next run sends the same work again; per-file upload keys are derived from the connection, path and revision, so a repeat resolves to the same document rather than a duplicate. There is no retry inside the agent: a failure exits non-zero and waits for your scheduler."],
+  /*
+    S6-16 (DECISION-REGISTER-2026-10-17, G1-COPY). This row said the agent "is not a service and
+    has no internal timer". The agent has a resident mode: --watch, --poll-seconds and --max-cycles
+    in parser() and the loop in run() of tavonel-source-agent.py. The row names it, and because
+    nothing on our side notices a watch that has stopped (no G7 heartbeat exists), it promises no
+    unattended operation.
+  */
+  ["Runs", "By default one invocation performs one sync and exits; cron, a systemd timer or Task Scheduler is what makes it periodic, and that interval is your import latency. With --watch it stays resident and repeats the sync every --poll-seconds until it is stopped. Nothing on our side notices a watch that has stopped, so it is not an unattended service: run it under a supervisor that restarts it and reports when it exits. Do not run two against one connection at once."],
+  ["Restart and network outage", "The local cursor file is written only after we have committed the batch, so a killed process, a reboot or a dropped connection leaves it untouched and the next run sends the same work again; per-file upload keys are derived from the connection, path and revision, so a repeat resolves to the same document rather than a duplicate. A transient network or HTTP error is retried within the run up to --retry-limit times; a failure past that exits non-zero and waits for your scheduler."],
   ["Update", "The distribution record at /developer/channel.json carries the current version, the minimum Python and the sha256 of the agent. Compare, download, verify the hash, replace the file, keep the cursor state. There is no self-update and no notification, so checking that record is a task you schedule."],
   ["Responsibility", "The host, its uptime, the scheduler, the credentials and noticing a failed run are yours, because the agent runs inside your network on your machine. We do not monitor it: an agent that stopped looks to us like a source with no changes. We are responsible for the API it calls, the upload capability, the cursor commit and everything after the upload."],
   /*
@@ -136,7 +144,7 @@ const NO_CONNECTOR = ["Confluence", "Notion", "Slack", "GitHub", "Box", "Jira"] 
   so naming the three sections is the whole of the fix. The section headings below already sit in
   their own title columns -- only the H1 column was empty.
 */
-const SECTIONS = ["What connects today", "Cloud document systems", "File and object storage"] as const;
+const SECTIONS = ["What connects", "Cloud document systems", "File and object storage"] as const;
 
 export default function IntegrationsPage() {
   const sections = tocEntries(SECTIONS);
@@ -150,7 +158,13 @@ export default function IntegrationsPage() {
             <PageToc entries={sections} />
           </div>
           <div className="stack">
-            <p className="lede">Connect a source once. TAVONEL discovers and imports read-only, then tracks revisions so the compiled World can stay traceable to the system it came from.</p>
+            {/*
+              S6-17 item 2 (G1-COPY). "Connect a source once. TAVONEL discovers and imports
+              read-only, then tracks revisions" described a resync that does not run: an import is
+              started by hand, there is no resync cron or provider webhook, and an import does not
+              start a compile (SERVICE-DEFINITION A7, A9, A10).
+            */}
+            <p className="lede">Connect a source read-only and start each import yourself. TAVONEL records the revision of every file it imports, so the compiled World stays traceable to the system it came from, and nothing is compiled until you start the compile.</p>
             {/*
               BA-070. The unspaced em dash collided with its neighbours in mono
               ("health—configured"), and every other page on the site -- /sources, /evidence --
@@ -176,7 +190,7 @@ export default function IntegrationsPage() {
         </div>
 
         <div className="body">
-          <div className="stack"><h2 id={sections[0].id}>What connects today.</h2></div>
+          <div className="stack"><h2 id={sections[0].id}>What connects.</h2></div>
           <div className="stack">
             {/*
               BQ-106. One presentation, not two.
@@ -193,8 +207,14 @@ export default function IntegrationsPage() {
               when a provider has no row, so the completeness check is untouched by not rendering
               it, and the count below is read from it rather than typed.
             */}
+            {/*
+              S6-17 item 1 (G1-COPY). "5 source systems connect today" sold a connection a new
+              customer cannot make (SERVICE-DEFINITION A6, D19; masterplan v5 #48). The sentence is
+              the SERVICE-DEFINITION 4.3 pilot-layer wording, and the list names the systems that
+              have a connector with neither a count nor a "today".
+            */}
             <p>
-              {SUPPORT_ROWS.length} source systems connect today:{" "}
+              Compiling your own sources is set up with us. The systems with a connector are{" "}
               {SUPPORT_ROWS.slice(0, -1).map(([name]) => name).join(", ")} and{" "}
               {SUPPORT_ROWS.at(-1)![0]}. Each is described below, with the access it is given and
               what happens when a file moves or disappears.
@@ -202,8 +222,8 @@ export default function IntegrationsPage() {
             <p className="fine">
               That is the whole list. {NO_CONNECTOR.slice(0, -1).join(", ")} and{" "}
               {NO_CONNECTOR.at(-1)} have no connector here. Where such a system keeps its files in
-              one of the cloud drives below, or exports to a directory or a bucket, that path works
-              today; the system&rsquo;s own API is not read.
+              one of the cloud drives below, or exports to a directory or a bucket, that path works;
+              the system&rsquo;s own API is not read.
             </p>
             {/*
               BQ-106. The legend for the tier chip every card below carries.

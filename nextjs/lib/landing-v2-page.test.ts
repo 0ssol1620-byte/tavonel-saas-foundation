@@ -712,8 +712,8 @@ describe("landing v2 -- the lead and the workbench", () => {
     expect(supportAt).toBeLessThan(actionsAt);
     expect(readable(hero)).toContain(
       locale === "ko"
-        ? "TAVONEL은 문서를 AI와 에이전트를 위한 맥락으로 컴파일하며, 각 진술은 그것이 나온 페이지와 영역에 연결됩니다."
-        : "TAVONEL compiles your documents into context for AI and agents, with each statement linked to the page and region it came from.",
+        ? "TAVONEL은 PDF·스캔·오피스 문서를 읽어 AI와 에이전트가 쓰는 맥락으로 컴파일하고, 각 진술에 그것이 나온 페이지와 영역을 남깁니다."
+        : "TAVONEL reads your PDFs, scans and office files and compiles them into context for AI and agents — each statement keeps the page and region it came from.",
     );
     expect(hero).toContain("/film/poster-1-t3.00-2x.webp");
     expect(elements(hero, "button").filter(open => attr(open, "role") === "tab")).toHaveLength(4);
