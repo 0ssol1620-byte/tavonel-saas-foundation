@@ -238,7 +238,7 @@ const browserProjectsByFile = new Map([
   ['e2e/brand-tokens.spec.ts', ['1440']],
   ['e2e/benchmarks.spec.ts', ['1440']],
   ['e2e/film-line-stability.spec.ts', ['390']],
-  ['e2e/specimen-strip.spec.ts', ['1440', '390']],
+  ['e2e/specimen-strip.spec.ts', ['390']],
   ['e2e/self-serve-journey.spec.ts', ['audit']],
 ]);
 

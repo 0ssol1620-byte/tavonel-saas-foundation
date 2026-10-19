@@ -606,7 +606,7 @@ for (const binding of [
     paths: ['components/landing-v2/specimen-strip.module.css', 'components/landing-v2/specimen-strip.tsx', 'e2e/fixtures/specimens/fixture-korean.json', 'e2e/fixtures/specimens/fixture-korean.svg', 'e2e/fixtures/specimens/fixture-scan.json', 'e2e/fixtures/specimens/fixture-scan.svg', 'e2e/fixtures/specimens/fixture-table.json', 'e2e/fixtures/specimens/fixture-table.svg', 'e2e/specimen-strip.spec.ts', 'lib/specimen-sources.test.ts', 'lib/specimen-sources.ts'],
     suites: ['lib/specimen-sources.test.ts'],
     browsers: ['e2e/specimen-strip.spec.ts'],
-    rows: ["['e2e/specimen-strip.spec.ts', ['1440', '390']],"],
+    rows: ["['e2e/specimen-strip.spec.ts', ['390']],"],
     neighbors: ['nextjs/components/landing-v2/specimen-strip.test.tsx', 'nextjs/e2e/fixtures/specimens/fixture-chart.json', 'nextjs/e2e/fixtures/specimens/fixture-scan.png', 'nextjs/lib/specimen-sources.tsx', 'nextjs/public/landing/v2/specimen-scan.webp'] },
   { group: 'launch-qa-release-scripts', prefix: 'nextjs/', exportedPaths: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, exportedSuites: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],

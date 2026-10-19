@@ -7406,7 +7406,7 @@ test('affected specimen-strip owner: 11 exact paths select 1 direct suite and 1 
   }
   const plan = affectedAskPlan(affectedMap(SPECIMEN_STRIP_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[...suites].sort(), [...browsers].sort(), false, false]);
-  assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440', '390']);
+  assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['390']);
   for (const adjacent of ['nextjs/components/landing-v2/specimen-strip.test.tsx', 'nextjs/e2e/fixtures/specimens/fixture-chart.json', 'nextjs/e2e/fixtures/specimens/fixture-scan.png', 'nextjs/lib/specimen-sources.tsx', 'nextjs/public/landing/v2/specimen-scan.webp', 'components/landing-v2/specimen-strip.module.css.bak']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
@@ -7454,7 +7454,7 @@ test('affected UX program head: the reviewed package.json postimage is pinned an
   assert.equal(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'], 'cc03d8ecb69d42916a5a4c72d54ff2817df90436f5111b2731ee6a8e248b7a59');
   assert.equal(MARKETING_TOOLING_POSTIMAGES['nextjs/pnpm-lock.yaml'], 'a814e2ff45e2c563949ebd917df8036bcd7bde2c2a8a98480386fab0ea79be04');
   const runner = readFileSync(fileURLToPath(new URL('./run-repair-check.mjs', import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
-  for (const row of ["['e2e/templates.spec.ts', ['1440']],", "['e2e/type-scale.spec.ts', ['1440']],", "['e2e/site-alignment.spec.ts', ['1440']],", "['e2e/brand-tokens.spec.ts', ['1440']],", "['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/film-line-stability.spec.ts', ['390']],", "['e2e/specimen-strip.spec.ts', ['1440', '390']],", "['e2e/self-serve-journey.spec.ts', ['audit']],"]) {
+  for (const row of ["['e2e/templates.spec.ts', ['1440']],", "['e2e/type-scale.spec.ts', ['1440']],", "['e2e/site-alignment.spec.ts', ['1440']],", "['e2e/brand-tokens.spec.ts', ['1440']],", "['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/film-line-stability.spec.ts', ['390']],", "['e2e/specimen-strip.spec.ts', ['390']],", "['e2e/self-serve-journey.spec.ts', ['audit']],"]) {
     assert.equal(runner.split('\n').filter(line => line.trim() === row).length, 1, row);
   }
   for (const file of ['e2e/benchmarks.spec.ts', 'e2e/brand-tokens.spec.ts', 'e2e/film-line-stability.spec.ts', 'e2e/site-alignment.spec.ts', 'e2e/solutions-workflows.spec.ts', 'e2e/templates.spec.ts', 'e2e/type-scale.spec.ts']) assert.ok(PUBLIC_MARKETING_AFFECTED_BROWSER_FILES.includes(file), file);

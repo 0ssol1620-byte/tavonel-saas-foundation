@@ -2058,7 +2058,9 @@ export const TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES = Object.freeze([
 ]);
 // Specimen strip (P2-08, B-04/B-06): the strip, its fail-closed receipt contract and suite, the three synthetic fixtures with their
 // crops and the browser spec. Exactly these eleven paths select the receipt-contract suite and the specimen-strip browser suite
-// (1440 and 390). No production receipt is committed, so no public crop path is admitted here. Product UI, so never nativeReuse.
+// (390 only: every test in the spec skips outside project 390, because each one sets its own browser and viewport or
+// needs one request; a 1440 row selects a file with no executed test, which the report reader refuses). No production
+// receipt is committed, so no public crop path is admitted here. Product UI, so never nativeReuse.
 export const SPECIMEN_STRIP_AFFECTED_PATHS = Object.freeze([
   'components/landing-v2/specimen-strip.module.css',
   'components/landing-v2/specimen-strip.tsx',
