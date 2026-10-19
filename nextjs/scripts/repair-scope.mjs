@@ -2002,16 +2002,19 @@ export const PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/
 // the billing event, binding, gate route and trial, the checkout hook and its entitlement wait, the intent carried across sign-in and
 // its notice, the CTA truth table, the fake Paddle fixture and the two browser journeys. Phase 4 LAUNCH (P2-29 / D-13 / D-19) adds the
 // D-19 launch canary in processing-workspace-grant.ts, its suite's canary-aware fixture, and the suites that pin it and D-13's launch-approval precedence; P2-37 adds
-// the launch switch itself (activation-policy.ts) with the eight suites that pin its value in public copy and status. Exactly these
-// twenty-four paths select their twenty-five direct suites (checkout-policy and billing-gate-enforce-route for the gate, the four gate-v2
+// the launch switch itself (activation-policy.ts) with the eight suites that pin its value in public copy and status; the review-B1
+// fix adds the bootstrap route that carries the release stage to a held checkout, and its admission suite. Exactly these
+// twenty-six paths select their twenty-five direct suites (checkout-policy and billing-gate-enforce-route for the gate, the four gate-v2
 // admission suites for the canary, processing-consent-panel for the v1 terms panel, production-posture for the switches) and the login-capability (1440) and self-serve-journey (audit)
 // browser suites. Product billing code, so never nativeReuse.
 export const UX_BILLING_CHECKOUT_AFFECTED_PATHS = Object.freeze([
+  'app/api/access/bootstrap/route.ts',
   'app/api/internal/billing/gate-enforce/route.ts',
   'components/checkout-intent-notice.tsx',
   'e2e/fixtures/paddle-fixture.ts',
   'e2e/login-capability.spec.ts',
   'e2e/self-serve-journey.spec.ts',
+  'lib/access-bootstrap-admission.test.ts',
   'lib/activation-policy.ts',
   'lib/billing-binding.test.ts',
   'lib/billing-binding.ts',
@@ -2594,7 +2597,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.
   affectedGroup('benchmarks-path-mask', new RegExp(`^nextjs/(?:${exactPathAlternation(BENCHMARKS_PATH_MASK_AFFECTED_PATHS)})$`),
     { unitFiles: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES }),
-  // ux-billing-checkout: the 24 exact paths above select 25 direct suites and 2 browser suites.
+  // ux-billing-checkout: the 26 exact paths above select 25 direct suites and 2 browser suites.
   affectedGroup('ux-billing-checkout', new RegExp(`^nextjs/(?:${exactPathAlternation(UX_BILLING_CHECKOUT_AFFECTED_PATHS)})$`),
     { unitFiles: UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, browserFiles: UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES }),
   // table-read-intake-ceiling: the 6 exact paths above select 8 direct suites and no browser suite.
