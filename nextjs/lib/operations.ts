@@ -17,8 +17,13 @@ export const LEGAL_EFFECTIVE_DATE = "2026-08-30";
   contract dated 2026-09-11, with no way to tell which was current. The effective date is the day
   the terms began to apply and does not move when wording changes; this is the day the wording
   last changed, and it is the date of the commit that changed it.
+
+  2026-10-19 (P2-34, D-21): /privacy and /subprocessors gained the Vercel Web Analytics notice
+  (ANALYTICS-ACTIVATION-2026-10-17 §4.5 items 1-3, 5). Item 6 names the founder's approval day,
+  2026-10-17, as the date; this keeps the rule above instead, because a "last updated" date earlier
+  than the words it dates would be printed on a page that did not yet say them. Founder veto open.
 */
-export const LEGAL_LAST_UPDATED = "2026-09-30";
+export const LEGAL_LAST_UPDATED = "2026-10-19";
 
 /*
   SD-07. One draft label, on every legal document, until counsel signs it off.
