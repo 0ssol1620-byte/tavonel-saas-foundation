@@ -37,7 +37,7 @@ describe("production posture @ 4c80bb30", () => {
       cdr: true,
       ocrGpu: true,
       candidatePromotion: false,
-      customerData: false,
+      customerData: true, // P2-37 (register D-12): the one switch this PR moves
     });
   });
 
