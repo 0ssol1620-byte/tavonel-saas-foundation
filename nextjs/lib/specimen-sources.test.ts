@@ -65,10 +65,15 @@ describe("the committed specimens", () => {
 
   it("render on a preview deployment, and on the test server only for a request that asks", () => {
     const ids = (cells: Specimen[]) => cells.map(cell => cell.specimenId);
-    expect(ids(homeSpecimens({}, PREVIEW_ENV))).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
-    expect(ids(homeSpecimens({ committed: true }, FIXTURE_ENV))).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
-    expect(homeSpecimens({}, FIXTURE_ENV)).toEqual([]);
-    expect(homeSpecimens({ committed: true }, PREVIEW_ENV).every(cell => !cell.synthetic)).toBe(true);
+    expect(ids(homeSpecimens({}, PREVIEW_ENV, "preview"))).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+    expect(ids(homeSpecimens({ committed: true }, FIXTURE_ENV, "preview"))).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+    expect(homeSpecimens({}, FIXTURE_ENV, "preview")).toEqual([]);
+    expect(homeSpecimens({ committed: true }, PREVIEW_ENV, "preview").every(cell => !cell.synthetic)).toBe(true);
+    // The test server's cookie gate holds with the switch off, and "on" renders the committed cells to every request.
+    expect(homeSpecimens({}, FIXTURE_ENV, "off")).toEqual([]);
+    expect(ids(homeSpecimens({ committed: true }, FIXTURE_ENV, "off"))).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+    for (const env of [PRODUCTION_ENV, {}, PREVIEW_ENV]) expect(homeSpecimens({}, env, "off"), JSON.stringify(env)).toEqual([]);
+    for (const env of [PRODUCTION_ENV, {}, PREVIEW_ENV, FIXTURE_ENV]) expect(ids(homeSpecimens({}, env, "on")), JSON.stringify(env)).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
   });
 
   it("follow the switch: off renders nowhere, on everywhere, preview on Vercel preview only", () => {
@@ -171,8 +176,8 @@ describe("the fixture gate", () => {
   });
 
   it("renders the three fixtures only when the request asks and the server is the test server", () => {
-    expect(homeSpecimens({ fixtures: false }, FIXTURE_ENV)).toEqual([]);
-    expect(homeSpecimens({ fixtures: true }, { PLAYWRIGHT_LOCAL_HTTP: "1", VERCEL: "1" })).toEqual([]);
+    expect(homeSpecimens({ fixtures: false }, FIXTURE_ENV, "preview")).toEqual([]);
+    expect(homeSpecimens({ fixtures: true }, { PLAYWRIGHT_LOCAL_HTTP: "1", VERCEL: "1" }, "preview")).toEqual([]);
     const cells = homeSpecimens({ fixtures: true }, FIXTURE_ENV);
     expect(cells.map(cell => cell.slot)).toEqual(["degraded_scan", "table", "korean"]);
     expect(cells.every(cell => cell.synthetic && cell.cropSrc.startsWith("data:image/svg+xml;base64,"))).toBe(true);

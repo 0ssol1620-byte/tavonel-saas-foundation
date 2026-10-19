@@ -331,6 +331,8 @@ function readFixtureSpecimens(root: string) {
 export function homeSpecimens(
   { fixtures = false, committed = false }: { fixtures?: boolean; committed?: boolean } = {},
   env: Record<string, string | undefined> = process.env,
+  // The gate's own tests name the posture they test, so the follow-up flip changes only the constant and its pin.
+  rollout: typeof SPECIMEN_STRIP_ROLLOUT = SPECIMEN_STRIP_ROLLOUT,
 ): Specimen[] {
   let result: ReturnType<typeof readSpecimens>;
   if (fixtures && isFixtureServer(env)) {
@@ -340,7 +342,7 @@ export function homeSpecimens(
       console.error("[TAVONEL] specimen fixtures could not be read; none render", error);
       return [];
     }
-  } else if (specimenStripLive(env) || (committed && isFixtureServer(env))) {
+  } else if (specimenStripLive(env, rollout) || (committed && isFixtureServer(env))) {
     result = readSpecimens(COMMITTED_SPECIMENS, "production");
   } else {
     return [];
