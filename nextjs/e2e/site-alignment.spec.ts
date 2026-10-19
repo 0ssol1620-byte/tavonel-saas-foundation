@@ -51,6 +51,15 @@ const viewportOf = (width: number) => ({ width, height: width <= 390 ? 844 : 900
 /** The container's left edge as the tokens define it: max(clamp(24px, 5vw, 72px), (100% - 1320px) / 2). */
 const edgeFor = (viewport: number) => Math.max(Math.min(Math.max(viewport * 0.05, 24), 72), (viewport - 1320) / 2);
 const headerHeightFor = (viewport: number) => (viewport >= 900 ? 64 : 56);
+/*
+  B-09 (delegated decision 2, 2026-10-19). Below 821px the /explore stage header is two rows: the
+  wordmark with the crumb, then its two actions. Each row holds controls on the 44px touch floor
+  (e2e/explore-touch-targets.spec.ts), so two rows cannot fit inside the 56px header row -- 2 x 44 =
+  88 > 56 with no gap at all -- and neither shrinking a target nor hiding a label is allowed. Its
+  ceiling is therefore the two-row geometry it has, 44 + 8 + 44 + 8 + 1 (border) = 105px: no third
+  row, and no label in it cut (no ellipsis, nothing wider than its box).
+*/
+const EXPLORE_TWO_ROW_HEADER = 105;
 
 type Edges = {
   viewport: number;
@@ -60,6 +69,8 @@ type Edges = {
   content: number | null;
   contentFrom: string;
   cta: string | null;
+  /** Header labels that are cut: an ellipsis, or text wider than its box. */
+  headerClipped: string[];
 };
 
 /** Runs in the page; self-contained because Playwright serialises it. */
@@ -145,8 +156,14 @@ function measure(): Edges {
       contentFrom = `${name(section)} (no content)`;
     }
   }
+  const headerClipped = header
+    ? [...header.querySelectorAll("a, button, p, span, b")].filter(visible).filter((el) =>
+      getComputedStyle(el).textOverflow === "ellipsis" || el.scrollWidth > el.clientWidth + 1,
+    ).map((el) => `${name(el)} "${(el.textContent ?? "").trim().slice(0, 40)}"`)
+    : [];
   return {
     viewport,
+    headerClipped,
     wordmark: wordmark ? wordmark.getBoundingClientRect().left : null,
     headerHeight: header ? header.getBoundingClientRect().height : null,
     h1: h1 ? h1.getBoundingClientRect().left : null,
@@ -172,15 +189,11 @@ for (const width of WIDTHS) test.describe(`one container (UX-L2, R1) at ${width}
   for (const route of ROUTES) {
     test(`${route}: wordmark, H1 and first section share the container edge`, async ({ page }) => {
       /*
-        KNOWN FAILURE, not an exemption. A /docs chapter page puts its rail (search + index) at the
-        container edge from 1080px and its H1 in the reading column beside it -- the T3 chapter rail of
-        UX §5.1 and DESIGN_MASTER_V3's editorial route -- so R1's wordmark = H1 cannot hold there
-        without moving the title above the rail, which e2e/docs-reading-layout.spec.ts's rail-position
-        guard forbids today. That is a template decision for UX-L7 (P2-11), recorded as this lane's
-        residual. test.fail keeps it measured: the day the H1 reaches the edge this test turns red
-        and the annotation has to go.
+        B-09: no known failure left. A /docs chapter page holds R1 at every width: its title row
+        spans the chapter rail and the reading column, so the H1 stands on the container edge with
+        the wordmark and the rail under it (delegated decision 2, 2026-10-19). It was a test.fail at
+        1080px and up, which also swallowed a 500 or a missing H1 on those routes.
       */
-      test.fail(route.startsWith("/docs/") && width >= 1080, "R1 vs the T3 chapter rail: UX-L7 (P2-11) decides");
       const m = await edgesOf(page, route);
       const edge = edgeFor(m.viewport);
       const at = `${route} @${m.viewport}: wordmark ${m.wordmark}, H1 ${m.h1}, content ${m.content} (${m.contentFrom}), edge ${edge}`;
@@ -190,8 +203,12 @@ for (const width of WIDTHS) test.describe(`one container (UX-L2, R1) at ${width}
       expect.soft(Math.abs(m.wordmark! - edge), `wordmark off the container edge. ${at}`).toBeLessThanOrEqual(1);
       expect.soft(Math.abs(m.wordmark! - m.h1!), `|wordmark − H1| > 1px. ${at}`).toBeLessThanOrEqual(1);
       expect.soft(Math.abs(m.h1! - m.content!), `|H1 − first section| > 1px. ${at}`).toBeLessThanOrEqual(1);
-      // The /explore stage header still wraps its actions to a second row below 821px (residual, UX-L7 T4).
-      if (route !== "/explore" || m.viewport > 820) {
+      if (route === "/explore" && m.viewport <= 820) {
+        // B-09: two rows are allowed below 821px, within the two-row ceiling and with no label cut.
+        expect.soft(m.headerHeight!, `/explore header height ${m.headerHeight} @${m.viewport}`).toBeGreaterThanOrEqual(headerHeightFor(m.viewport) - 1);
+        expect.soft(m.headerHeight!, `/explore header height ${m.headerHeight} @${m.viewport}`).toBeLessThanOrEqual(EXPLORE_TWO_ROW_HEADER + 1);
+        expect.soft(m.headerClipped, `/explore header labels cut @${m.viewport}`).toEqual([]);
+      } else {
         expect.soft(Math.abs(m.headerHeight! - headerHeightFor(m.viewport)), `header height ${m.headerHeight} on ${route}`).toBeLessThanOrEqual(1);
       }
       // §5.2: the one filled action from 900px, never on the page it points at; wordmark + Menu below 900.

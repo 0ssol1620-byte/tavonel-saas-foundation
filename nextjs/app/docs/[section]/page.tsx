@@ -212,14 +212,21 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
   return (
     <PublicPageShell template="T3">
       <BreadcrumbJsonLd trail={trail} />
-      <section className="scene doc docs-reading-surface"><div className="shell"><div className={layout.layout}>
+      <section className="scene doc docs-reading-surface"><div className="shell">
+        {/*
+          B-09 (UX-PLAN-2026-10-17 §5.3 R1; delegated decision 2, 2026-10-19). The title row is the
+          page's first block, full width above the chapter rail and the reading column, so the H1 is
+          first in DOM and reading order at every width and stands on the container edge with the
+          header wordmark. From 1080px it used to sit in the reading column beside the rail, 263px in
+          from the wordmark at 1440. The rail keeps its place at the container edge, under the title.
+        */}
+        <div className={`stack ${layout.heading}`}>
+          <DocBreadcrumb trail={trail} />
+          <h1 className="document-title">{entry.title}</h1>
+        </div>
+        <div className={layout.layout}>
         <DocsToc current={section} />
         <div className="body">
-          <div className="stack">
-            <DocBreadcrumb trail={trail} />
-            <h1 className="document-title">{entry.title}</h1>
-          </div>
-
           <div className="stack">
             <div className={`stack docs-body ${layout.readingLayout}`}>
               <p className="lede">{entry.summary}</p>

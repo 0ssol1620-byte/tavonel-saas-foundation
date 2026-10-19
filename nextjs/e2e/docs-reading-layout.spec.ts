@@ -15,7 +15,11 @@ for (const route of ["/docs/quickstart", "/docs/ask", "/docs/cli", "/docs/mcp"])
       const paragraph = prose.querySelector("p:not(.docs-note):not(.lede)");
       const indices = document.querySelectorAll('.docs-body nav[aria-label="On this page"]');
       const index = indices[0]?.getBoundingClientRect();
+      // The chapter rail (search + index): the parent of the index disclosure, at every width.
+      const rail = document.querySelector(".docs-reading-surface details")!.parentElement!.getBoundingClientRect();
       return {width: innerWidth, titleBottom:t.bottom, summaryTop:s.top, summaryBottom:s.bottom,
+        railLeft:rail.left, railRight:rail.right, railTop:rail.top,
+        titleBeforeRail: Boolean(title.compareDocumentPosition(document.querySelector(".docs-reading-surface details")!) & Node.DOCUMENT_POSITION_FOLLOWING),
         titleLeft:t.left, summaryLeft:s.left, articleTop:article.top, articleRight:article.right,
         articleWidth:article.width, indexCount:indices.length,
         index:index ? {left:index.left, top:index.top, bottom:index.bottom, width:index.width} : null,
@@ -23,7 +27,20 @@ for (const route of ["/docs/quickstart", "/docs/ask", "/docs/cli", "/docs/mcp"])
         paragraphSize:paragraph ? parseFloat(getComputedStyle(paragraph).fontSize) : null};
     });
     expect(result.summaryTop).toBeGreaterThanOrEqual(result.titleBottom);
-    expect(Math.abs(result.titleLeft-result.summaryLeft)).toBeLessThan(2);
+    /*
+      B-09 (delegated decision 2, 2026-10-19): the title row comes first, in the DOM and on screen,
+      above the chapter rail. From 1080px it spans both columns -- the H1 on the rail's edge, which is
+      the container edge, and the summary opening the reading column beside the rail, under the
+      title. Below 1080 the page is one column and title and summary share its edge, as before.
+    */
+    expect(result.titleBeforeRail).toBe(true);
+    expect(result.railTop).toBeGreaterThanOrEqual(result.titleBottom);
+    if (result.width >= 1080) {
+      expect(Math.abs(result.titleLeft-result.railLeft)).toBeLessThan(2);
+      expect(result.summaryLeft).toBeGreaterThanOrEqual(result.railRight);
+    } else {
+      expect(Math.abs(result.titleLeft-result.summaryLeft)).toBeLessThan(2);
+    }
     expect(result.overflow).toBeLessThanOrEqual(1);
     if (result.width >= 1280) expect(result.articleWidth).toBeGreaterThan(580);
     if (result.paragraphSize !== null) expect(result.paragraphSize).toBeGreaterThanOrEqual(result.width <= 600 ? 16 : 17);
@@ -151,15 +168,22 @@ test("MCP reading controls and title clear the shared header with either consent
     expect(layout.indexVisible).toBe(true);
     expect(hasVisibleArea(layout.search)).toBe(true);
     expect(hasVisibleArea(layout.index)).toBe(true);
-    expect(layout.search.top - layout.header.bottom).toBeLessThanOrEqual(layout.width <= 600 ? 64 : 80);
-    expect(layout.search.top).toBeGreaterThanOrEqual(layout.header.bottom - 1);
+    /*
+      B-09: the title row is first now, so the reading controls sit under the title rather than
+      under the header. The same reach, measured from the block that is above them: the title
+      within 64/80px of the header, the search within 64/80px of the title.
+    */
+    expect(layout.title.top - layout.header.bottom).toBeLessThanOrEqual(layout.width <= 600 ? 64 : 80);
+    expect(layout.search.top - layout.title.bottom).toBeLessThanOrEqual(layout.width <= 600 ? 64 : 80);
+    expect(layout.search.top).toBeGreaterThanOrEqual(layout.title.bottom - 1);
     expect(hasVisibleArea(layout.title)).toBe(true);
     expect(layout.title.top).toBeGreaterThanOrEqual(layout.header.bottom - 1);
     expect(layout.title.top).toBeLessThan(layout.height);
     expect(layout.summary.top).toBeGreaterThanOrEqual(layout.title.bottom);
     expect(hasVisibleArea(layout.summary)).toBe(true);
     expect(layout.paragraphSize).toBeGreaterThanOrEqual(layout.width <= 600 ? 16 : 17);
-    if (layout.width <= 1079) expect(layout.title.top).toBeGreaterThanOrEqual(layout.index.bottom - 1);
+    // B-09: the index control (the rail's column from 1080, its disclosure below) is under the title at every width.
+    expect(layout.index.top).toBeGreaterThanOrEqual(layout.title.bottom - 1);
     /*
       Release 2: the card sits at the viewport's bottom edge, below the header, and must clear the
       search, title and summary; the Docs index starts above it (at 1440 it is the full-height
