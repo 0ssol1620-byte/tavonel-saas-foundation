@@ -623,15 +623,18 @@ a.evidenceLink {
   border-top: 1px solid var(--home-rule);
 }
 
-/* Brief move 5: the Evidence Line's label on the passage card, where the line itself is not drawn. */
+/*
+  Brief move 5: the Evidence Line's label on the passage card, where the line itself is not drawn.
+  Ink, like the line's own chip: the accent is for the line and its region outline (UX §4.2-1).
+*/
 .lineLabel {
   margin: 0.5rem 0 0;
-  color: var(--home-cobalt);
+  color: var(--home-ink);
   font: 500 0.75rem/1.45 var(--home-mono);
   letter-spacing: 0;
   overflow-wrap: anywhere;
 }
-.lineLabel span { font-family: var(--f-sans); color: var(--home-ink); }
+.lineLabel span { font-family: var(--f-sans); }
 .lineLabel code { font: inherit; }
 @media (min-width: 960px) { .lineLabel { display: none; } }
 
@@ -1319,6 +1322,25 @@ section.receive {
   section.hero .actionsBlock :global(.btn.lv2-cta):active,
   .regionButton:active {
     transform: none;
+  }
+}
+
+/*
+  UX-L10 (UX-PLAN-2026-10-17 §4.6, §8.2): under reduced motion nothing in the workbench transitions,
+  not even the opacity fade app/landing-v2.css keeps on `.lv2 *` (an !important rule in
+  `@layer components`, so the unlayered `transition: none` above loses to it). No workbench element
+  fades, so nothing is lost. Declared in the same layer, where `article.bench *` outranks `.lv2 *`.
+*/
+@layer components {
+  @media (prefers-reduced-motion: reduce) {
+    article.bench,
+    article.bench::before,
+    article.bench::after,
+    article.bench *,
+    article.bench *::before,
+    article.bench *::after {
+      transition: none !important;
+    }
   }
 }
 
