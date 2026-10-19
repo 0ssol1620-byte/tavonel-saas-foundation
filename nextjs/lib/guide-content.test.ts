@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -33,9 +34,11 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-const { GuideMedia, guideVideoReady, vttCueText } = await import("../components/guide/guide-page");
+const { GuideMedia, guideVideoReady, vttCueText } = await import("../components/guide/guide-media");
 const { default: EnglishGuide } = await import("../app/guide/page");
 const { default: KoreanGuide } = await import("../app/ko/guide/page");
+const { default: DocsSectionPage } = await import("../app/docs/[section]/page");
+const { default: ApiReferencePage } = await import("../app/api/page");
 
 const nextjs = resolve(import.meta.dirname, "..");
 const app = join(nextjs, "app");
@@ -339,13 +342,64 @@ describe("the recordings", () => {
     );
   });
 
-  /* Half a delivery would render as no player at all while looking delivered in the tree. */
-  it("is delivered whole or not at all", () => {
+  /*
+    Half a delivery would render as no player at all while looking delivered in the tree. The
+    files are committed now (MOUNT), so none missing is the only passing state: a player that
+    vanished from /guide and the docs pages because its files went would otherwise stay green.
+  */
+  it("is delivered whole", () => {
     const root = join(nextjs, "public", "guide");
     for (const video of GUIDE_VIDEOS) {
       const files = GUIDE_VIDEO_VARIANTS.flatMap((variant) => Object.values(guideVideoFiles(video, variant)));
-      const present = files.filter((file) => existsSync(join(root, file)));
-      expect([0, files.length], `${video}: ${present.length} of ${files.length} files in public/guide`).toContain(present.length);
+      const missing = files.filter((file) => !existsSync(join(root, file)));
+      expect(missing, `${video}: missing from public/guide`).toEqual([]);
+    }
+  });
+
+  /*
+    public/guide/manifest.json pins every served file by sha256 (ENABLEMENT-GAP §4b "완료 기준"),
+    copied from the video lane's VIDEO-MANIFEST.json with its local paths left out. A file whose
+    bytes moved, a file the manifest does not list, and a listed file that is gone each fail.
+  */
+  function manifestFailures(root: string): string[] {
+    const manifest = JSON.parse(readFileSync(join(root, "manifest.json"), "utf8")) as { files: { file: string; bytes: number; sha256: string }[] };
+    const listed = new Set(manifest.files.map((entry) => entry.file));
+    const failures = readdirSync(root).filter((file) => file !== "manifest.json" && !listed.has(file)).map((file) => `${file}: not in the manifest`);
+    for (const { file, bytes, sha256 } of manifest.files) {
+      if (!existsSync(join(root, file))) { failures.push(`${file}: listed, not present`); continue; }
+      const body = readFileSync(join(root, file));
+      const digest = createHash("sha256").update(body).digest("hex");
+      if (digest !== sha256 || body.length !== bytes) failures.push(`${file}: ${body.length} B sha256 ${digest}, manifest ${bytes} B ${sha256}`);
+    }
+    return failures;
+  }
+
+  it("matches its manifest byte for byte, and the manifest names every file the player loads", () => {
+    const root = join(nextjs, "public", "guide");
+    expect(manifestFailures(root)).toEqual([]);
+    const listed = (JSON.parse(readFileSync(join(root, "manifest.json"), "utf8")) as { files: { file: string }[] }).files.map((entry) => entry.file).sort();
+    expect(listed).toEqual(GUIDE_VIDEOS.flatMap((video) => GUIDE_VIDEO_VARIANTS.flatMap((variant) => Object.values(guideVideoFiles(video, variant)))).sort());
+    expect(readFileSync(join(root, "manifest.json"), "utf8")).not.toMatch(/\b[A-Z]:[\\/]|\/Users\/|yspow/);
+  });
+
+  it("fails on a changed byte, an unlisted file and a missing one", () => {
+    const root = mkdtempSync(join(tmpdir(), "guide-manifest-"));
+    try {
+      const sha256 = createHash("sha256").update("abc").digest("hex");
+      writeFileSync(join(root, "manifest.json"), JSON.stringify({ files: [{ file: "a.vtt", bytes: 3, sha256 }, { file: "b.vtt", bytes: 3, sha256 }] }));
+      writeFileSync(join(root, "a.vtt"), "abd");
+      writeFileSync(join(root, "c.vtt"), "abc");
+      expect(manifestFailures(root)).toEqual([
+        "c.vtt: not in the manifest",
+        `a.vtt: 3 B sha256 ${createHash("sha256").update("abd").digest("hex")}, manifest 3 B ${sha256}`,
+        "b.vtt: listed, not present",
+      ]);
+      writeFileSync(join(root, "a.vtt"), "abc");
+      rmSync(join(root, "c.vtt"));
+      writeFileSync(join(root, "b.vtt"), "abc");
+      expect(manifestFailures(root)).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 
@@ -434,5 +488,38 @@ describe("the two pages", () => {
     expect(en).toContain("mailto:support@tavonel.com?subject=Guide%20feedback%3A%20Product%20guide");
     expect(en).toContain("Reviewed 19 October 2026");
     expect(ko).toContain("검토일 2026년 10월 19일");
+  });
+});
+
+/* ------------------------------------------------------------------------ docs pages */
+
+/*
+  MOUNT (ENABLEMENT-GAP §4b): the API recording under the quickstart's try-it and on /api, the
+  MCP recording on /docs/mcp, each the guide's own player, files and title. Every other docs
+  section carries none.
+*/
+describe("the recordings on the docs pages", () => {
+  const section = async (slug: string) => renderToStaticMarkup(await DocsSectionPage({ params: Promise.resolve({ section: slug }) }));
+  const recordings = (html: string) => [...html.matchAll(/data-guide-video="([a-z0-9-]+)"/g)].map((match) => match[1]);
+
+  it("show the API recording on the quickstart, below the try-it and above the intake note", async () => {
+    const html = await section("quickstart");
+    expect(recordings(html)).toEqual(["guide-3-api"]);
+    const at = html.indexOf("data-guide-video");
+    expect(html.indexOf("data-keyless-try-it")).toBeLessThan(at);
+    expect(at).toBeLessThan(html.indexOf("Before you start."));
+    expect(html).toContain('src="/guide/guide-3-api-desktop.mp4"');
+    expect(html).toContain(`<figcaption id="guide-3-api-title">${GUIDE.en.flatMap((chapter) => chapter.blocks).find((block) => block.kind === "media" && block.video === "guide-3-api")!.title}</figcaption>`);
+  });
+
+  it("show the MCP recording on /docs/mcp and the API recording on /api", async () => {
+    expect(recordings(await section("mcp"))).toEqual(["guide-2-mcp"]);
+    expect(recordings(renderToStaticMarkup(await ApiReferencePage()))).toEqual(["guide-3-api"]);
+  });
+
+  it("leave every other section without one", async () => {
+    for (const { slug } of DOCS_SECTIONS.filter((entry) => !["quickstart", "mcp"].includes(entry.slug))) {
+      expect(recordings(await section(slug)), slug).toEqual([]);
+    }
   });
 });

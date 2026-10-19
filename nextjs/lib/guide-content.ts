@@ -812,6 +812,14 @@ const KO: GuideChapter[] = [
 
 export const GUIDE: Record<GuideLanguage, readonly GuideChapter[]> = { en: EN, ko: KO };
 
+/** The guide's own block for a recording, so a docs page that shows it uses the guide's title. */
+export function guideMediaBlock(video: GuideVideo, language: GuideLanguage = "en"): GuideMediaBlock {
+  for (const chapter of GUIDE[language]) {
+    for (const block of chapter.blocks) if (block.kind === "media" && block.video === video) return block;
+  }
+  throw new Error(`the ${language} guide has no media block for ${video}`);
+}
+
 /** Every sentence of one language's guide, for the guards and for a reader that wants the text. */
 export function guideText(language: GuideLanguage): string[] {
   const ui = GUIDE_UI[language];

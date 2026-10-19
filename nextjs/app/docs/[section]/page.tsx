@@ -19,6 +19,8 @@ import {
 import { readDocsEndpoints, snippetFor, SNIPPET_LANGUAGES, type DocsEndpoint } from "@/lib/docs-endpoints";
 import { WorldLifecycle } from "@/components/docs/world-lifecycle";
 import { KeylessTryIt } from "@/components/docs/keyless-try-it";
+import { GuideMedia } from "@/components/guide/guide-media";
+import { guideMediaBlock, type GuideVideo } from "@/lib/guide-content";
 import { DocsToc } from "@/components/docs/docs-toc";
 import { DocsTableFilter } from "@/components/docs/docs-table-filter";
 import { PageToc, slugify, tocEntries } from "@/components/docs/page-toc";
@@ -111,6 +113,13 @@ function Endpoint({ endpoint, id }: { endpoint: DocsEndpoint; id?: string }) {
   Code blocks and endpoints keep no anchor of their own: each one sits under the heading that
   introduces it, which is the destination a reader wants anyway.
 */
+/*
+  The guide recording that walks a section on the live site (ENABLEMENT-GAP-2026-10-17 §4b): the
+  keyless API and CLI calls under the quickstart's try-it, the MCP bridge as far as it goes
+  without a key at the top of the MCP page. The same player and files as /guide.
+*/
+const SECTION_RECORDINGS: Partial<Record<string, GuideVideo>> = { quickstart: "guide-3-api", mcp: "guide-2-mcp" };
+
 function headingLabel(block: DocsBlock): string | null {
   return block.kind === "heading" ? block.text : null;
 }
@@ -209,6 +218,7 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
   const index = DOCS_SECTIONS.findIndex((item) => item.slug === section);
   const previous = DOCS_SECTIONS[index - 1];
   const next = DOCS_SECTIONS[index + 1];
+  const recording = SECTION_RECORDINGS[section];
 
   return (
     <PublicPageShell>
@@ -235,6 +245,7 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
                   key, above the note that says why the seven steps below wait for intake.
                 */}
                 {section === "quickstart" ? <KeylessTryIt /> : null}
+                {recording ? <GuideMedia block={guideMediaBlock(recording)} language="en" /> : null}
                 {entry.blocks.map((block, position) => (
                   <Block key={position} block={block} endpoints={endpoints} id={anchorIds.get(position)} />
                 ))}

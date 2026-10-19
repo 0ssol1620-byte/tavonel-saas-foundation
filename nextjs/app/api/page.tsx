@@ -5,6 +5,8 @@ import { PublicPageShell } from "@/components/public-page-shell";
 import { DocsCopyButton } from "@/components/docs-copy-button";
 import { DocsSnippet } from "@/components/docs-snippet";
 import { KeylessTryIt } from "@/components/docs/keyless-try-it";
+import { GuideMedia } from "@/components/guide/guide-media";
+import { guideMediaBlock } from "@/lib/guide-content";
 import { withMarks } from "@/components/docs/marks";
 import { CodeTokens } from "@/components/docs/code-tokens";
 import { PageToc, tocEntries } from "@/components/docs/page-toc";
@@ -201,6 +203,8 @@ export default async function ApiReferencePage() {
             decisions, and no scope grants them.
           </p>
 
+          {/* The guide recording of the try-it below and the same reads from a terminal (/guide, §4b). */}
+          <GuideMedia block={guideMediaBlock("guide-3-api")} language="en" />
         </div>
 
         {/*
