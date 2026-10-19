@@ -167,7 +167,8 @@ export function isStructurallyValidLatex(latex: string): boolean {
   // eslint-disable-next-line no-control-regex
   if (!latex.trim() || latex.length > MAX_TEXT || /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(latex)) return false;
   const open: string[] = [];
-  for (const [token, begin, end] of latex.matchAll(/\\begin\{([A-Za-z*]+)\}|\\end\{([A-Za-z*]+)\}|\\left(?![A-Za-z])|\\right(?![A-Za-z])|\\[\\{}$]|[{}$]/g)) {
+  // Array.from: the root tsconfig sets no target, so a for-of over the matchAll iterator fails TS2802 there.
+  for (const [token, begin, end] of Array.from(latex.matchAll(/\\begin\{([A-Za-z*]+)\}|\\end\{([A-Za-z*]+)\}|\\left(?![A-Za-z])|\\right(?![A-Za-z])|\\[\\{}$]|[{}$]/g))) {
     if (begin) open.push(`env:${begin}`);
     else if (end) { if (open.pop() !== `env:${end}`) return false; }
     else if (token === "\\left") open.push("left");
