@@ -7355,7 +7355,7 @@ test('affected benchmarks path mask owner: four exact paths select seven direct 
 });
 
 // B-01 (2026-10-19): the UX program's four finite owners, each restated independently of the exported constants.
-import { UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES, TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_PATHS, SPECIMEN_STRIP_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_BROWSER_FILES, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES, TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_PATHS, SPECIMEN_STRIP_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_BROWSER_FILES, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES, G1_COPY_TRUTH_AFFECTED_PATHS, G1_COPY_TRUTH_AFFECTED_UNIT_FILES, G1_COPY_TRUTH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 test('affected ux-billing-checkout owner: 18 exact paths select 10 direct suites and 2 browser suites; neighbours stay unmapped', () => {
   const suites = ['lib/billing-binding.test.ts', 'lib/billing-gate-enforce-route.test.ts', 'lib/checkout-intent.test.ts', 'lib/checkout-policy.test.ts', 'lib/cta-truth.test.ts', 'lib/entitlement-wait.test.ts', 'lib/paddle-billing-event.test.ts', 'lib/production-posture.test.ts', 'lib/self-service-trial-device-rotation.test.ts', 'lib/use-checkout.test.ts'];
   const browsers = ['e2e/login-capability.spec.ts', 'e2e/self-serve-journey.spec.ts'];
@@ -7370,6 +7370,8 @@ test('affected ux-billing-checkout owner: 18 exact paths select 10 direct suites
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[...suites].sort(), [...browsers].sort(), false, false]);
   assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440', 'audit']);
   for (const adjacent of ['nextjs/app/api/internal/billing/other/route.ts', 'nextjs/components/checkout-intent-notice.test.tsx', 'nextjs/e2e/fixtures/paddle-fixture-2.ts', 'nextjs/lib/billing-catalog.ts', 'nextjs/lib/checkout-policy.ts', 'nextjs/lib/use-checkout.tsx', 'nextjs/lib/self-service-trial.test.ts', 'app/api/internal/billing/gate-enforce/route.ts.bak']) {
+    // G1-COPY registered the plan catalog to g1-copy-truth: still not this owner's, now asserted positively to its one owner.
+    if (assertUxProgramEndpoint(adjacent)) { assert.equal(UX_BILLING_CHECKOUT_AFFECTED_PATHS.some(path => 'nextjs/' + path === adjacent), false, adjacent); continue; }
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
@@ -7432,6 +7434,25 @@ test('affected launch-qa-release-scripts owner: 5 exact paths select 3 direct su
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+test('affected g1-copy-truth owner: 6 exact paths select 17 direct suites and 2 browser suites; neighbours stay unmapped', () => {
+  const suites = ['lib/billing-catalog.test.ts', 'lib/compiler-contract.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/developer-distribution.test.ts', 'lib/docs-content.test.ts', 'lib/g1-copy-truth.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/mcp-server.test.ts', 'lib/operations.test.ts', 'lib/plan-entitlement.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-posture.test.ts', 'lib/prompt-injection.test.ts', 'lib/synthetic-probe.test.ts', 'lib/tenant-isolation-negative.test.ts'];
+  const browsers = ['e2e/docs-reading-layout.spec.ts', 'e2e/pricing-plan-overview.spec.ts'];
+  assert.deepEqual([[...G1_COPY_TRUTH_AFFECTED_PATHS], [...G1_COPY_TRUTH_AFFECTED_UNIT_FILES], [...G1_COPY_TRUTH_AFFECTED_BROWSER_FILES]], [['lib/billing-catalog.ts', 'lib/g1-copy-truth.test.ts', 'lib/mcp-server.test.ts', 'lib/mcp-tools.ts', 'lib/operations.ts', 'public/developer/tavonel-mcp.mjs'], suites, browsers]);
+  for (const path of G1_COPY_TRUTH_AFFECTED_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['g1-copy-truth'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['g1-copy-truth'], [], [...suites].sort(), [...browsers].sort(), []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const plan = affectedAskPlan(affectedMap(G1_COPY_TRUTH_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[...suites].sort(), [...browsers].sort(), false, false]);
+  assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440', '390', 'reduced-motion']);
+  for (const adjacent of ['nextjs/lib/billing-catalog.test.tsx', 'nextjs/lib/operations-v2.ts', 'nextjs/lib/mcp-tools.tsx', 'nextjs/lib/g1-copy-truth.ts', 'nextjs/public/developer/tavonel-mcp-2.mjs', 'nextjs/public/developer/tavonel-cli.mjs', 'lib/operations.ts.bak']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
 // Old negative lists (Explore, recipe continuation, preflight report, benchmarks path mask) name paths the UX program changed and
 // B-01 registered. Each such exact path is asserted positively instead -- one owner, the one B-01 names, with that owner's exact
 // suites and fresh native debt -- as published024 did with assertNewReviewedMarketingEndpoint. Every other listed path still refuses.
@@ -7440,6 +7461,8 @@ const UX_PROGRAM_OWNER_ROWS = [
   ['table-read-intake-ceiling', '', TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES, []],
   ['specimen-strip', 'nextjs/', SPECIMEN_STRIP_AFFECTED_PATHS, SPECIMEN_STRIP_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_BROWSER_FILES],
   ['launch-qa-release-scripts', 'nextjs/', LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES, []],
+  // G1-COPY (phase 4): the same positive assertion for the six endpoints it registered.
+  ['g1-copy-truth', 'nextjs/', G1_COPY_TRUTH_AFFECTED_PATHS, G1_COPY_TRUTH_AFFECTED_UNIT_FILES, G1_COPY_TRUTH_AFFECTED_BROWSER_FILES],
 ];
 function assertUxProgramEndpoint(path) {
   if (assertNewReviewedMarketingEndpoint(path)) return true;

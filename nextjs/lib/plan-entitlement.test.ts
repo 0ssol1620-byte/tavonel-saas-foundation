@@ -100,7 +100,8 @@ describe("plan entitlement", () => {
 
   it("states included pages on the card and in the ledger as one number", () => {
     for (const offer of Object.values(BILLING_OFFERS)) {
-      const claim = offer.features.find((feature) => feature.includes("verified standard pages"));
+      // D-07 / C3 (G1-COPY): "verified" was deleted from the bullet; the number and the rest stay.
+      const claim = offer.features.find((feature) => feature.endsWith(" standard pages"));
       expect(claim, `${offer.label} must state its included pages`).toBeDefined();
       expect(claim).toContain(offer.includedPages.toLocaleString("en-US"));
     }

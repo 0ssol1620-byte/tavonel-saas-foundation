@@ -464,7 +464,7 @@ claims:
     review_date: "2026-12-07"
 
   - claimId: CLM-022
-    claim: "Developer: $29/month, 500 standard verified pages, compile your own worlds, evidence/Ask/signed export, API and MCP access."
+    claim: "Developer: $29/month, 500 standard pages, compile your own worlds, evidence/Ask/signed export, API and MCP access."
     surface: "/pricing"
     evidence: "lib/billing-catalog.ts BILLING_OFFERS.observer_access (priceUsd 29, includedPages 500)"
     artifact: "nextjs/lib/billing-catalog.ts"
@@ -475,12 +475,12 @@ claims:
     public_private: PUBLIC
     owner: founder
     expiry_or_revalidation: "On any change to BILLING_OFFERS."
-    supportedBuild: "38d957d"
-    lastVerifiedAt: "2026-09-11"
+    supportedBuild: "ed4a158"
+    lastVerifiedAt: "2026-10-19"
     review_date: "2026-12-07"
 
   - claimId: CLM-023
-    claim: "Team: $99/month, 2,500 standard verified pages, review queue and version history, guided corpus onboarding."
+    claim: "Team: $99/month, 2,500 standard pages, review queue and version history, guided corpus onboarding."
     surface: "/pricing"
     evidence: "lib/billing-catalog.ts BILLING_OFFERS.studio_access (priceUsd 99, includedPages 2500)"
     artifact: "nextjs/lib/billing-catalog.ts"
@@ -491,8 +491,8 @@ claims:
     public_private: PUBLIC
     owner: founder
     expiry_or_revalidation: "When saleChannel flips to self_serve, or when seat accounting ships."
-    supportedBuild: "38d957d"
-    lastVerifiedAt: "2026-09-11"
+    supportedBuild: "ed4a158"
+    lastVerifiedAt: "2026-10-19"
     review_date: "2026-12-07"
 
   - claimId: CLM-024
@@ -972,4 +972,24 @@ claims:
     expiry_or_revalidation: "Any change to LIVE_PRESERVED or LIVE_LIMITS, or a page that states a reading limit in its own words instead of reading the manifest."
     supportedBuild: "38d957d"
     lastVerifiedAt: "2026-09-11"
+    review_date: "2026-12-07"
+
+  # G1-COPY, 2026-10-19 (DECISION-REGISTER-2026-10-17 D-33 and S6-17). CLM-022 and CLM-023 lost the
+  # word "verified" under conflict rule C3 (PRICING_COPY_DELETION_ONLY): no format is verified, so
+  # the qualifier was an unsupported claim; the price, the page counts and every other word are
+  # unchanged. CLM-050 is the Korean disclosure D-33 publishes on /sources and not on /ko.
+  - claimId: CLM-050
+    claim: "한국어 문서 품질은 아직 측정하지 않았습니다. 한국어 PDF도 위 표의 PDF 행과 같은 'Best effort' 등급으로 처리됩니다. / HWP/HWPX: 지원하지 않음 · 측정 안 함. 두 형식 모두 위 표에 없으며, 업로드 단계에서 거부됩니다."
+    surface: "/sources"
+    evidence: "D-33 (KB-F6, KB-F7). No Korean benchmark receipt exists (KOREAN-BENCHMARK-DESIGN-2026-10-17 S0). shared/capabilityManifest.ts carries application/pdf as BEST_EFFORT and has no HWP or HWPX entry; shared/qualifiedDocumentInputs.ts refuses a filename whose extension its MIME does not list."
+    artifact: "shared/capabilityManifest.ts; shared/qualifiedDocumentInputs.ts; nextjs/app/sources/page.tsx"
+    runtime: "Any deployment built from this tree. The tier is read from the manifest rows, and the page refuses to render the HWP/HWPX sentence beside a manifest that lists either format."
+    scope: "An absence disclosure in Korean: no Korean quality measurement, and no HWP or HWPX reader."
+    limitations: "Says that nothing was measured, so it says nothing about how well Korean is read in either direction. It is not for /ko, the first-impression surface (conflict C1). A KB1 receipt that clears the publication bar replaces the first sentence."
+    status: SUPPORTED
+    public_private: PUBLIC
+    owner: founder
+    expiry_or_revalidation: "A published Korean benchmark receipt, an HWP or HWPX manifest entry, or a change to the PDF row's tier."
+    supportedBuild: "ed4a158"
+    lastVerifiedAt: "2026-10-19"
     review_date: "2026-12-07"

@@ -97,10 +97,16 @@ const HOME_COPY = {
       sentence (input, verb, output), read from the copy deck rather than typed here. The support
       line is unchanged: what the page below shows, a statement bound to its page and region. No
       figure, no "verified", no "every source". Open to founder veto.
+
+      D-01 / P2-30 (DECISION-REGISTER-2026-10-17): promise A stays, and the support line is the
+      strengthened one the register approves verbatim (SERVICE-DEFINITION 4.2, UX-PLAN A): it names
+      the formats the manifest reads -- PDF, images, OOXML and ODF, with no "every" -- and keeps the
+      page-and-region binding. "your" is only true through the pilot path, which is why the intake
+      sentence below stays on the same screen.
     */
     eyebrow: "The Knowledge Compiler for AI",
     support:
-      "TAVONEL compiles your documents into context for AI and agents, with each statement linked to the page and region it came from.",
+      "TAVONEL reads your PDFs, scans and office files and compiles them into context for AI and agents — each statement keeps the page and region it came from.",
     /* Fix round 3 (judge gap 4): an offer, not a refusal -- the copy deck's own intake sentence. */
     intake: "We arrange intake for your own sources with you.",
     bringOwn: "Bring your own documents",
@@ -156,8 +162,9 @@ const HOME_COPY = {
   ko: {
     // D12 literal translation: KO_TERMS spells "Knowledge Compiler" 지식 컴파일러 and claim/statement 진술.
     eyebrow: "AI를 위한 지식 컴파일러",
+    // D-01 (P2-30): the register's Korean support line, verbatim (SERVICE-DEFINITION 4.2).
     support:
-      "TAVONEL은 문서를 AI와 에이전트를 위한 맥락으로 컴파일하며, 각 진술은 그것이 나온 페이지와 영역에 연결됩니다.",
+      "TAVONEL은 PDF·스캔·오피스 문서를 읽어 AI와 에이전트가 쓰는 맥락으로 컴파일하고, 각 진술에 그것이 나온 페이지와 영역을 남깁니다.",
     // The copy deck's Korean for the same intake sentence (lib/landing-v2-copy.ts, hero.support).
     intake: "내 자료의 연결과 컴파일은 상담 후 함께 설정합니다.",
     bringOwn: "내 문서 가져오기",

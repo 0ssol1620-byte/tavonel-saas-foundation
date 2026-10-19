@@ -4,6 +4,7 @@ import { readCommercialState } from "@/lib/commercial-state";
 import { readExportSignerEnv } from "@/lib/export-signing";
 import { readPaddleApiConfig } from "@/lib/paddle-api";
 import { readProductCoreV2Env } from "@/lib/core-runtime-v2";
+import { readPublicStatusV2 } from "@/lib/public-status";
 import { FOUNDATION_R2_BUCKET, readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { readSupabaseAdminConfig } from "@/lib/supabase-admin";
 
@@ -47,7 +48,14 @@ export const LEGAL_DRAFT_NOTICE =
 export function readPublicOperations() {
   const commercial = readCommercialState();
   const sandbox = commercial.provider === "sandbox";
-  const billingLaunchApproved = commercial.liveChargesEnabled;
+  /*
+    S6-17 item 7 (G1-COPY, SERVICE-DEFINITION D17). This read `commercial.liveChargesEnabled` alone,
+    so with the launch flag on /status printed "configured — Paddle live checkout" and /api/readyz
+    "billingLive": true while /api/status said "liveCheckout": false, because purchasePlan also
+    needs self-service access and an open customer-data path. Billing is "live" here exactly when
+    a plan can be bought, which is the one predicate /api/status, checkout and this row now share.
+  */
+  const billingLaunchApproved = readPublicStatusV2().availableActions.purchasePlan.enabled;
   const auth = Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().startsWith("https://") &&
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim(),
@@ -110,7 +118,10 @@ export function readPublicOperations() {
           ? "Paddle sandbox; no real charge"
           : billingLaunchApproved
             ? "Paddle live checkout"
-            : "Paddle live checkout configured; launch approval pending",
+            // G1-COPY: with the launch flag on and the purchase path closed, "launch approval pending" was false.
+            : commercial.liveChargesEnabled
+              ? "Paddle live checkout configured; checkout is closed and no plan can be bought"
+              : "Paddle live checkout configured; launch approval pending",
       },
       export: {
         state: readExportSignerEnv() ? "configured" : "not_configured",

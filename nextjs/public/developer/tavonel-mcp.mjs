@@ -245,7 +245,7 @@ export const TOOLS = [
     description:
       "Where the signed Compiled World Package is, how large it is, and what its signed manifest " +
       "hashes to. The archive itself is fetched over HTTP with the same key and checked with " +
-      "scripts/verify-signed-export.mjs; the bytes do not travel through this transport.",
+      "tavonel-verify-export.mjs; the bytes do not travel through this transport.",
     inputSchema: {
       type: "object",
       properties: { collectionId: collectionProperty },
@@ -418,7 +418,7 @@ export function createClient({ baseUrl, apiKey, fetcher = fetch, context = null 
         manifestSha256: response.headers.get("x-tavonel-export-manifest-sha256"),
         signingKeyId: response.headers.get("x-tavonel-export-key-id"),
         candidatePromotion: response.headers.get("x-tavonel-candidate-promotion"),
-        verifyWith: "node scripts/verify-signed-export.mjs --archive <file> --trusted-fingerprint sha256:<64 hex>",
+        verifyWith: "node tavonel-verify-export.mjs --archive <file> --trusted-fingerprint sha256:<64 hex>",
       };
       await response.body?.cancel?.();
       if (!response.ok) throw new Error(`API_ERROR_${response.status}`);
