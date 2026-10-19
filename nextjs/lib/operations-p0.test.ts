@@ -149,6 +149,17 @@ describe("P0 operational contracts", () => {
       ok: true,
       settlement: { outcome: "released", actualCredits: 0, reasonCode: "OCR_PAGES_INCOMPLETE" },
     });
+    // The CDR worker's two other codes (ocr.ts OCR_FAILURE_CATEGORY): OCR_HTTP_UNAVAILABLE is a transport
+    // failure recorded at zero credits; OCR_PERSISTED_RESULT_INVALID is semantic and held for review.
+    for (const [terminalState, reasonCode] of [
+      ["failed_terminal", "OCR_HTTP_UNAVAILABLE"],
+      ["operator_review", "OCR_PERSISTED_RESULT_INVALID"],
+    ] as const) {
+      expect(buildCreditRelease({ workspaceKey: "ws_abcdefgh", documentId: id, terminalState, reasonCode })).toMatchObject({
+        ok: true,
+        settlement: { outcome: "released", actualCredits: 0, reasonCode },
+      });
+    }
   });
 
   it("issues deletion and restore evidence only after independent checks pass", () => {
