@@ -31,11 +31,11 @@ const WORKSPACE = "pilot-1111111111114111";
 const OTHER = "pilot-2222222222224222";
 /*
   D-19: once the launch switch is on (activationPolicy.customerData.enabled), issuance also requires gate
-  v2 and a named cohort of at most three. Every fixture here describes a workspace inside that canary, so
+  v2 and a named cohort of at most three. Both fixture workspaces sit inside that canary, so
   the env carries it whenever the switch is on; with the switch off (main) it adds nothing.
 */
 const CANARY: Record<string, string> = activationPolicy.customerData.enabled
-  ? { TAVONEL_CUSTOMER_DATA_GATE_VERSION: "v2", TAVONEL_PROCESSING_WORKSPACE_COHORT: WORKSPACE } : {};
+  ? { TAVONEL_CUSTOMER_DATA_GATE_VERSION: "v2", TAVONEL_PROCESSING_WORKSPACE_COHORT: `${WORKSPACE},${OTHER}` } : {};
 const OWNER = "11111111-1111-4111-8111-111111111111";
 const evaluatedAt = "2026-09-29T00:00:00.000Z";
 const now = new Date("2026-09-30T00:00:00.000Z");
