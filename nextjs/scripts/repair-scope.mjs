@@ -2314,6 +2314,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // GPU OCR worker: only its two actual application/test paths. No worker flag (never the CDR/CPU checks) and not nativeReuse; its
   // qualification is the external foundation-ocr-gpu-image candidate job, which affectedPlan defers as pending debt.
   affectedGroup('ocr-gpu-worker', /^workers\/foundation-ocr-gpu\/(?:app\.py|tests\/(?:test_app|test_gpu_ocr_v3_contract)\.py)$/),
+  // PaddleOCR-VL shadow table worker (D-25/T8a): only its Dockerfile and weights manifest. No worker flag and not nativeReuse, like
+  // ocr-gpu-worker; no workflow builds or pushes this image, so affectedPlan defers it as pending qualification debt.
+  affectedGroup('table-gpu-worker', /^workers\/foundation-table-gpu\/(?:Dockerfile|weights\.manifest)$/),
   // CDR Cloud Run service (PR #152): only its app and wiring suite. No worker flag (the CDR worker check is the TypeScript worker,
   // not this service) and not nativeReuse; its qualification is the external malware-scan-qualification workflow, which runs this
   // suite against the digest-pinned clamd and inside the service image built from the checkout, and which affectedPlan defers as pending debt.

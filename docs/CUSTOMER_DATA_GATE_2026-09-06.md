@@ -535,3 +535,105 @@ full CI for the latest receipt-wording update remains pending.
   (20260927102000/103000), so the tombstone delete would hit that table's foreign key. The reset
   aborts, failing closed. This predates 10.2 and is not changed here.
 - A production synthetic canary through the closure, including one object refused by the R2 lock.
+
+---
+
+## 11. Addendum 2026-10-17 — FD-15: a public-domain fixture run is not customer-data processing
+
+Appended; nothing above is changed. Decision register row **FD-15** (alias S6-04), class
+`agent-now`, lane `FD15-RECORD`.
+
+**The question**, as `CA_FOUNDER_QUEUE_2026-09-11.md` row FD-15 asked it (origin: ops lane report,
+FOUNDER ITEMS F-O02-1):
+
+> 내부 probe workspace에서 공개 도메인 fixture PDF를 실제 파이프라인으로 돌리는 것이 `activationPolicy.customerData`상 "고객 데이터 처리"에 해당하는지
+
+The same row's state column, verbatim:
+
+> fixture는 고객 소유가 아니므로 정직한 답은 "아니오"이나 이 게이트 판단은 에이전트 권한 밖
+
+Its "막는 것" column reads `없음(O02 fixture E2E 검증이 이 결정 없이는 진행 불가)`. Its 권고안
+column reads `없음`: the "no" comes from the state column, not from a written recommendation. The
+ops report (F-O02-1) puts it as: "The fixture belongs to no customer, so the honest reading is no —
+but the run would exercise every path that gate covers, and no agent decides that gate."
+
+**Who decided.** The founder, on 2026-10-17, by adopting every default in the decision register:
+"파운더 결정은 모두 실서비스에서 업계 1위 될 수 있도록 너가 추천한 방향으로 진행해서 완료할 수
+있도록해줘" (register header, 근거). That message adopts the FD-15 default. It does not approve this
+section's wording, and this section is not a founder approval receipt: §6 item 8 stands, and no
+agent creates one.
+
+**The answer, as adopted** (register FD-15 `adoptedDefault`, verbatim):
+
+> 아니오 — fixture는 고객 소유가 아니다(CA_FOUNDER_QUEUE_2026-09-11 FD-15 "정직한 답은 아니오"). 실행은 운영 고객 데이터와 섞지 않는 D-30 평가 tenant에서만
+
+No. Running a public-domain fixture PDF through the real pipeline is not customer-data processing
+under `activationPolicy.customerData`, because the fixture belongs to no customer. The run happens
+only in the D-30 evaluation tenant, which is kept apart from production customer data.
+
+**What it binds.**
+
+1. **Classification only.** A fixture run of this kind is not customer data. That is the whole decision.
+2. **Place.** Only the evaluation tenant of register row D-30 ("운영과 분리된 평가 tenant"). A fixture
+   is never run in a workspace that holds production customer data, and the evaluation workspace
+   never receives a document a customer supplied.
+3. **Scope.** A document that belongs to no customer, which is what the question asks about. This
+   section does not extend the answer to anything a customer or a third party sent.
+4. **The switch does not move.** `activationPolicy.customerData.enabled` stays `false`
+   (`nextjs/lib/activation-policy.ts:85` at main `4c80bb30`; the 2026-09-11 sources cite `:44`
+   against that date's file). No precondition in §2 changes state, `buildProductCoreV2Request`
+   keeps its `foundation_synthetic_only` literal, and this section creates no
+   `customer_data_release_decisions` row.
+5. **No gate is skipped.** The run still passes every check the deployed code enforces, as
+   `docs/runbooks/full-journey-proof.md` already requires: "do not change a subscription, mint a
+   grant, forge a session, or update the database merely to make a demonstration pass." The answer
+   settles which policy question applies. It does not admit a workspace.
+
+**What it unblocks.** O02 fixture end-to-end verification no longer waits on a founder decision.
+That was the only blocker the queue named, and `docs/runbooks/full-journey-proof.md:41` says the
+same ("O02 fixture verification is blocked until this is answered"). Register row D-30 lists FD-15
+as its prerequisite, and that prerequisite is now met. SERVICE-DEFINITION §5 G3 and §6 item 4 name
+this answer as a G3 precondition ("이 답이 G3의 선행 조건입니다"); it is answered.
+
+**What still waits.**
+
+- **FH-01, founder hands (register D-30).** The evaluation tenant itself. Register §4 FH-01: sign
+  in to tavonel.com with an evaluation-only account and create a new workspace with no production
+  customer data; insert the decision that opens that one workspace into the production
+  `customer_data_release_decisions` (the `qualification_only` form in `RELEASE_ORDER.md`, with
+  expiry; the register read that row from branch `codex/ux-bill-20261017`, and main `4c80bb30`'s
+  copy of the runbook does not have it yet); cap GPU spend at USD 25 in total, USD 20 or less for D-T-live alone, with a RunPod
+  Billing limit if one can be set; hand the agent the workspace ID only. Today there is no
+  evaluation tenant (register D-30 `statusToday`: "평가 tenant 없음, GPU 지출 0"). The stage that
+  row uses is defined by `supabase/migrations/20260930070000_processing_qualification_stage.sql`:
+  `direct_upload` only, one `pilot-` workspace key, expiry at most one hour after evaluation,
+  recorded by a `delegated-operator:` actor.
+- **The probe is not built.** This is engineering, not a decision. With
+  `TAVONEL_PROBE_FIXTURE_E2E=1` the probe still answers `refused` with
+  `PROBE_FIXTURE_E2E_NOT_IMPLEMENTED` (`nextjs/lib/synthetic-probe.ts:137`, `:338`), shown on
+  `/status` as "Full pipeline check" (`nextjs/app/status/page.tsx:153`). The ops report gives the
+  reason: one bounded invocation cannot observe an asynchronous, cron-driven pipeline, so it "needs
+  a durable probe job spanning invocations". The register assigns the `/status` full-pipeline probe
+  design to G3-RUN under FD-59.
+- **FD-59 / FH-02.** The G1 full run is its own founder-hands item; this answer does not approve it.
+  `docs/runbooks/full-journey-proof.md:44-46` already keeps them apart: turning customer data on "is
+  a separate decision from FD-15 and from FD-59."
+- **Precondition 17.** Unchanged: MISSING by design until the founder records an approval receipt.
+- **Not decided here.** F-O02-1 attached two conditions to a "yes": the probe workspace key, and
+  confirmation that its artifacts may be deleted after each run. The answer is "no", so this
+  decision requires neither. The workspace comes from FH-01. Whether evaluation-tenant artifacts are
+  deleted after each run is not settled by FD-15 or by D-30.
+
+**Sources.**
+
+| Source | Where | sha256 |
+|---|---|---|
+| Founder queue row FD-15 | `D:\CodexProjects\audit-lanes\CA_FOUNDER_QUEUE_2026-09-11.md` line 27 | `0d1a2e4700905d24f7ac7b8125ad2f37e24a93ecd070dd7f93fb5f69331c7072` |
+| Ops report, F-O02-1 and O02 NOT DONE | `D:\CodexProjects\audit-lanes\reports\CA_LANE_REPORT_ops.md` lines 22, 199-208, 241-246 | `df4fb15eaf150ddedaf75b48ed04f3dcad0b0d2709b857955c3133d8f2f12c1a` |
+| Register rows FD-15, D-30, FD-59; FH-01; conflict C13 | `D:\CodexProjects\ai-knowledge-compiler\outputs\tavonel-research-replan-20261013\ux-program-20261017\DECISION-REGISTER-2026-10-17.md` lines 3, 7, 31, 59, 60, 97, 132 | `5935276d245d230857fa632dcb6555d25756470d37f404fc6c3c00dc71d7c6dc` |
+| Register, machine copy | same folder, `DECISION-REGISTER-2026-10-17.json` | `86234c9397cec2d0ac8160276e525943857e7b2ec21e5e3a3b9891cc394120d3` |
+| Service definition §5 G3, §6 item 4 | same folder, `SERVICE-DEFINITION-2026-10-17.md` lines 358, 379 | `c7783dd718713b7564697ce6df7e6abbad9ffc2489624b3ad3705e610b528dee` |
+| Runbook FD-15 row, separation, run rules | `docs/runbooks/full-journey-proof.md` lines 41, 44-46, 50-54 | main `4c80bb30` |
+| Live policy row | `nextjs/lib/activation-policy.ts:85` | main `4c80bb30` |
+| Fixture probe refusal | `nextjs/lib/synthetic-probe.ts:137`, `:338`; `nextjs/app/status/page.tsx:153` | main `4c80bb30` |
+| Qualification stage | `supabase/migrations/20260930070000_processing_qualification_stage.sql` | main `4c80bb30` |
