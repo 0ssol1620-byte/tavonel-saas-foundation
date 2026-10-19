@@ -37,7 +37,7 @@ const TEMPLATES = {
   T2: ["/pricing", "/ko/pricing", "/evaluation", "/ko/evaluation", "/contact", "/ko/contact"],
   T3: [
     "/docs", "/docs/quickstart", "/developers", "/api", "/cookbooks", "/cookbooks/documents-to-grounded-work", "/sources",
-    "/changelog", "/resources",
+    "/changelog", "/resources", "/guide", "/ko/guide",
   ],
   T4: ["/explore"],
   T5: [
