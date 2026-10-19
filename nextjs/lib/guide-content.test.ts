@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { DOCS_SECTIONS } from "./docs-content";
 import { DEEP_LINK_ACTS } from "./explore-story";
-import { GUIDE, GUIDE_UI, GUIDE_VIDEOS, GUIDE_VIDEO_VARIANTS, guideMediaBlock, guideText, guideVideoFiles, type GuideLanguage } from "./guide-content";
+import { GUIDE, GUIDE_API_KEY_CHAPTERS, GUIDE_UI, GUIDE_VIDEOS, GUIDE_VIDEO_VARIANTS, guideChapterApiKey, guideMediaBlock, guideText, guideVideoFiles, type GuideLanguage } from "./guide-content";
 import { koTermDrift } from "./ko-terms";
 import { tocEntries } from "../components/docs/page-toc";
 
@@ -524,6 +524,66 @@ describe("the recordings on the docs pages", () => {
   it("leave every other section without one", async () => {
     for (const { slug } of DOCS_SECTIONS.filter((entry) => !["quickstart", "mcp"].includes(entry.slug))) {
       expect(recordings(await section(slug)), slug).toEqual([]);
+    }
+  });
+});
+
+/* ------------------------------------------------------------------------- API key marker */
+
+/*
+  ENABLEMENT-GAP-2026-10-17 §4.0-1, second half: each chapter says whether its steps need an API
+  key. The marker is data (`guideChapterApiKey`), and a "some" has to be earned by the chapter's
+  own English sentence naming the step that needs one; a "none" may not sit over such a sentence.
+  Korean renders the same table, so the two pages cannot disagree.
+*/
+describe("each chapter says whether its steps need an API key", () => {
+  const NEEDS_KEY = /\b(?:takes|needs|requires?) an API key\b|required except status|API_KEY_MISSING|checks the key\b/i;
+  const chapterText = (chapter: (typeof GUIDE)["en"][number]) => chapter.blocks.flatMap((block) => {
+    switch (block.kind) {
+      case "prose":
+      case "note":
+        return [block.text];
+      case "steps":
+        return block.items;
+      case "table":
+        return [...block.head, ...block.rows.flat()];
+      case "code":
+        return [block.label, block.body];
+      case "media":
+        return [block.title];
+    }
+  }).join("\n");
+
+  it("classifies every chapter of both pages, and nothing that is not a chapter", () => {
+    for (const language of LANGUAGES) {
+      expect([...GUIDE_API_KEY_CHAPTERS].sort(), language).toEqual(GUIDE[language].map((chapter) => chapter.id).sort());
+    }
+    expect(() => guideChapterApiKey("a-new-chapter")).toThrow("guide chapter a-new-chapter does not say whether it needs an API key");
+  });
+
+  it("marks a chapter as needing a key exactly where the chapter says which step needs one", () => {
+    const some = GUIDE.en.filter((chapter) => guideChapterApiKey(chapter.id) === "some").map((chapter) => chapter.id);
+    expect(some).toEqual(["verify-a-signed-package", "get-the-developer-files", "connect-the-mcp-bridge"]);
+    for (const chapter of GUIDE.en) {
+      expect(NEEDS_KEY.test(chapterText(chapter)), `${chapter.id} is marked ${guideChapterApiKey(chapter.id)}`).toBe(guideChapterApiKey(chapter.id) === "some");
+    }
+    // The planted pair: the pattern finds the sentence when it is there, and not in a keyless one.
+    expect(NEEDS_KEY.test("downloading an archive of a World takes an API key with the collections:download scope.")).toBe(true);
+    expect(NEEDS_KEY.test("node tavonel-cli.mjs status prints the public status and needs no key.")).toBe(false);
+  });
+
+  it("prints the marker under every chapter heading, in each page's own language", () => {
+    for (const [Page, language] of [[EnglishGuide, "en"], [KoreanGuide, "ko"]] as const) {
+      const html = renderToStaticMarkup(createElement(Page));
+      expect((html.match(/data-api-key="(?:none|some)"/g) ?? []).length, language).toBe(GUIDE[language].length);
+      for (const chapter of GUIDE[language]) {
+        const key = guideChapterApiKey(chapter.id);
+        const at = html.indexOf(`<section id="${chapter.id}"`);
+        const marker = html.indexOf(`data-api-key="${key}">${GUIDE_UI[language].apiKey[key]}</p>`, at);
+        expect(marker, `${language} ${chapter.id}`).toBeGreaterThan(html.indexOf(`id="${chapter.id}-heading"`, at));
+        const next = html.indexOf("<section id=", at + 1);
+        if (next > 0) expect(marker, `${language} ${chapter.id} is inside its own section`).toBeLessThan(next);
+      }
     }
   });
 });

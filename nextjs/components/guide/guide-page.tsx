@@ -19,6 +19,7 @@ import {
   GUIDE,
   GUIDE_REVIEWED,
   GUIDE_UI,
+  guideChapterApiKey,
   type GuideBlock,
   type GuideChapter,
   type GuideLanguage,
@@ -137,6 +138,10 @@ export function GuidePage({ language }: { language: GuideLanguage }) {
                 {chapters.map((chapter) => (
                   <section key={chapter.id} id={chapter.id} className={`stack ${styles.chapter}`} aria-labelledby={`${chapter.id}-heading`}>
                     <h2 id={`${chapter.id}-heading`}>{chapter.title}</h2>
+                    {/* Whether this chapter's steps need an API key (ENABLEMENT-GAP §4.0-1), from guide-content.ts. */}
+                    <p className={`fine ${styles.apiKey}`} data-api-key={guideChapterApiKey(chapter.id)}>
+                      {ui.apiKey[guideChapterApiKey(chapter.id)]}
+                    </p>
                     {chapter.blocks.map((block, index) => <Block key={index} block={block} language={language} />)}
                     <p className={`fine ${styles.where}`}>
                       <span>{ui.where}</span>

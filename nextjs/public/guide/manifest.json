@@ -13,7 +13,8 @@
     "One declared DOM addition: a synthetic cursor element (#__guide_cursor, pointer-events:none) the recorder moves before each action. Every click is a real pointer click at the cursor position, and the recorder refuses to click when the element under the cursor is not the one named.",
     "The analytics notice on each first page is declined with its own No thanks button, on camera.",
     "Terminal scenes: a local page generated only from terminal/<session>.json, a capture of real Git Bash commands run in an empty directory with no TAVONEL_* variable set. Each step shows its real exit code, wall-clock duration and start time.",
-    "No voice, no burned-in caption text. Captions are WebVTT (ko, en) from GUIDE-SCRIPTS.json; each cue runs from its scene's logged start to the next scene's start."
+    "No voice, no burned-in caption text. Captions are WebVTT (ko, en) from GUIDE-SCRIPTS.json; each cue runs from its scene's logged start to the next scene's start.",
+    "guide-2-mcp (both takes) was re-recorded on 2026-10-19 from a local production build of the pull request that fixed /developers and /docs/mcp, not from tavonel.com: its recordedFrom field says so. Its terminal scenes replay the same captured session as before."
   ],
   "files": [
     {
@@ -77,60 +78,62 @@
     {
       "file": "guide-2-mcp-desktop.en.vtt",
       "bytes": 1898,
-      "sha256": "bf96a857d2fb78d39d4592459a6401f2761f45152a76de7c412750c13e2044f2",
+      "sha256": "9ee377b98b7f477333f2d5c278a818ea4d99d11f80fff2e52ffa0387b3a48dcf",
       "cues": 18
     },
     {
       "file": "guide-2-mcp-desktop.jpg",
-      "bytes": 133676,
-      "sha256": "78bae9c28595cb326a94e1a9a33d9095411b9686686a555b4713b5f9ae2e533f"
+      "bytes": 134766,
+      "sha256": "b2330f7c1e2f47b2ad3eacb2951f91d752b36e155f7fa618a518d9089f8d73c9"
     },
     {
       "file": "guide-2-mcp-desktop.ko.vtt",
       "bytes": 2280,
-      "sha256": "b60f4359c3fc3986daed1c69bb39fe892a0d3c1cea0ea9094fc143d3f265555f",
+      "sha256": "9db4f10bad104fab9187ad5f67141a2788a810a44831e688f0206a0053eab9a5",
       "cues": 18
     },
     {
       "file": "guide-2-mcp-desktop.mp4",
-      "bytes": 2565487,
-      "sha256": "beeb04ae5892db1453f5aceccfd243ed5bfbff10666d0c94ed99a6acb826287c",
+      "bytes": 2631438,
+      "sha256": "1057e084d90ea45357316d67d2ccd393f8850f326b971fbe47dc23f3777a2732",
       "guide": "guide-2-mcp",
       "variant": "desktop",
       "width": 1280,
       "height": 800,
-      "durationSeconds": 127.28,
+      "durationSeconds": 127.56,
       "codec": "H.264 Constrained Baseline (libx264 crf 34), yuv420p, 25 fps, no audio",
-      "recordedAt": "2026-10-19T01:07:57.377Z"
+      "recordedAt": "2026-10-19T14:25:35.550Z",
+      "recordedFrom": "Re-recorded 2026-10-19 for Phase 4 follow-ups (a) and (b): a local next start of this pull request's head (main ed4a1583 plus the /developers and /docs/mcp fixes), fixture environment, live commercial posture, before tavonel.com served those fixes. Same recorder, captions, terminal capture and encoder as the other takes; the phone tap on the channel link no longer needs an offset."
     },
     {
       "file": "guide-2-mcp-phone.en.vtt",
       "bytes": 1898,
-      "sha256": "441c45eb4f0e435e435495e9fbed945ca9ce32002c8386cf0ba964a5f0c47c8d",
+      "sha256": "23f2b62cf93f19331c5fbb32906e1fd92a93dd2093f9e94803dda66c17ca77fe",
       "cues": 18
     },
     {
       "file": "guide-2-mcp-phone.jpg",
-      "bytes": 97287,
-      "sha256": "1fb9845d0300d39066d10016ec0a99b4d23990c664564415a511d5c9cac58aa7"
+      "bytes": 97464,
+      "sha256": "05394610128f61faf8af2651b207d38740e41d2fca65b66653c3dd414f75d53f"
     },
     {
       "file": "guide-2-mcp-phone.ko.vtt",
       "bytes": 2280,
-      "sha256": "463724e8b7fba5bcdfe33b26917857c73bcf3cfb9b2aa32986d2c0ae7b290414",
+      "sha256": "02cd62d2fc410980b693f2f274a15cf82821df469575238d87e16d914d58d7d3",
       "cues": 18
     },
     {
       "file": "guide-2-mcp-phone.mp4",
-      "bytes": 2365206,
-      "sha256": "b4863d0c12a262c2baecb419ee32cbe1b4832629262ef5682222ad037e8ff195",
+      "bytes": 2298389,
+      "sha256": "a4324b37135db8b95e72d47abf71610314c6e7e84f944de5f5d790eb2cb89f03",
       "guide": "guide-2-mcp",
       "variant": "phone",
       "width": 390,
       "height": 844,
-      "durationSeconds": 128.64,
+      "durationSeconds": 127.68,
       "codec": "H.264 Constrained Baseline (libx264 crf 26), yuv420p, 25 fps, no audio",
-      "recordedAt": "2026-10-19T01:10:08.068Z"
+      "recordedAt": "2026-10-19T14:44:41.247Z",
+      "recordedFrom": "Re-recorded 2026-10-19 for Phase 4 follow-ups (a) and (b): a local next start of this pull request's head (main ed4a1583 plus the /developers and /docs/mcp fixes), fixture environment, live commercial posture, before tavonel.com served those fixes. Same recorder, captions, terminal capture and encoder as the other takes; the phone tap on the channel link no longer needs an offset."
     },
     {
       "file": "guide-3-api-desktop.en.vtt",
