@@ -91,6 +91,8 @@ import {
   PR151_SERVICE_TRUTH_AFFECTED_UNIT_FILES,
   OCR_PAGES_INCOMPLETE_AFFECTED_PATHS,
   OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES,
+  BENCHMARKS_PATH_MASK_AFFECTED_PATHS,
+  BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES,
 } from './repair-scope.mjs';
 import { buildRepairReceipt, requireCompletedReadRehearsal } from './repair-scope-gate.mjs';
 import { auditBrowserFiles, browserRunOutputDir, buildNodeTestArgs, buildUnitArgs, collectWorkspaceIntakeCaptures, WORKSPACE_INTAKE_CAPTURE_NAMES, MAX_MOUNTED_PNG_BYTES, validateMountedPngMetadata, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, runBrowserGroups, validateNodeTapReport, validateSelectedPath } from './run-repair-check.mjs';
@@ -7277,6 +7279,27 @@ test('affected OCR_PAGES_INCOMPLETE owner: four exact paths select three direct 
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
   for (const adjacent of ['nextjs/lib/operations-p0.tsx', 'nextjs/lib/operations-p0-v2.ts', 'nextjs/lib/processing-receipts.test.tsx',
     'nextjs/lib/processing-receipts-v2.ts', 'nextjs/app/api/operations/p0/credits/release/route.ts', 'nextjs/e2e/operations-p0.spec.ts', 'lib/operations-p0.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
+test('affected benchmarks path mask owner: four exact paths select seven direct suites and no browser suite; neighbours stay unmapped', () => {
+  const suites = ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts',
+    'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/trust-page-answers.test.ts'];
+  assert.deepEqual([[...BENCHMARKS_PATH_MASK_AFFECTED_PATHS], [...BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES]], [['app/benchmarks/page.tsx',
+    'lib/benchmarks-page.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts'], suites]);
+  for (const path of BENCHMARKS_PATH_MASK_AFFECTED_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['benchmarks-path-mask'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['benchmarks-path-mask'], [], suites, [], []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const plan = affectedAskPlan(affectedMap(BENCHMARKS_PATH_MASK_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
+  for (const adjacent of ['nextjs/app/benchmarks/page.ts', 'nextjs/app/benchmarks/gdp-pdf/page.tsx', 'nextjs/lib/model-arena-page-data.tsx',
+    'nextjs/lib/model-arena-page-data-v2.ts', 'nextjs/lib/benchmarks-page.test.tsx', 'nextjs/components/benchmarks/arena-charts.tsx',
+    'nextjs/content/benchmarks/model-arena-20260903.json', 'lib/model-arena-page-data.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);

@@ -1908,6 +1908,18 @@ export const OCR_PAGES_INCOMPLETE_AFFECTED_PATHS = Object.freeze([
 export const OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/documents-route.test.ts', 'lib/operations-p0.test.ts', 'lib/processing-receipts.test.ts',
 ]);
+// EN-0c benchmarks path mask: /benchmarks masks an absolute scoring-machine path in the Model Arena notes at render time
+// (the artifact and its pinned sha256 are unchanged). The four endpoints no owner listed select their two direct suites plus
+// the five that read the changed files: benchmark-registry, brand-copy, copy-trust-guard and trust-page-answers read the page
+// source, and model-arena-artifact-builder imports the pinned digest from the page data. No browser suite of its own.
+// Product code, so never nativeReuse.
+export const BENCHMARKS_PATH_MASK_AFFECTED_PATHS = Object.freeze([
+  'app/benchmarks/page.tsx', 'lib/benchmarks-page.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts',
+]);
+export const BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts',
+  'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/trust-page-answers.test.ts',
+]);
 // PR #141's merge of main bcba7173 (Home Release 3, PR #150): the thirty changed endpoints no owner listed -- the Home and
 // Korean entry pages, the receipted measurement band (component, styles, data, its claims pack and suite, its receipt and research
 // note), the re-cut film posters with their lock file and README, the stage and copy modules, the evidence record, the public
@@ -2292,6 +2304,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // OCR_PAGES_INCOMPLETE: the four exact paths above select three direct suites and no browser suite.
   affectedGroup('ocr-pages-incomplete-code', new RegExp(`^nextjs/(?:${exactPathAlternation(OCR_PAGES_INCOMPLETE_AFFECTED_PATHS)})$`),
     { unitFiles: OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES }),
+  // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.
+  affectedGroup('benchmarks-path-mask', new RegExp(`^nextjs/(?:${exactPathAlternation(BENCHMARKS_PATH_MASK_AFFECTED_PATHS)})$`),
+    { unitFiles: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.
