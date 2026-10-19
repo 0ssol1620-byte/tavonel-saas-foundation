@@ -58,7 +58,7 @@ const MCP_FIRST_CALL = `{
   "mcpServers": {
     "tavonel": {
       "command": "node",
-      "args": ["C:/absolute/path/tavonel-mcp.mjs"],
+      "args": ["/absolute/path/to/tavonel-mcp.mjs"],
       "env": {
         "TAVONEL_API_KEY": "tvnl_live_...",
         "TAVONEL_BASE_URL": "https://tavonel.com"

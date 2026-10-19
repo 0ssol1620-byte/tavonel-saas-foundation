@@ -4,8 +4,8 @@ import { useState } from "react";
 import {
   CHANGELOG_SURFACES,
   changelogEntryId,
-  changelogEntries,
   changelogSections,
+  type ChangelogEntry,
   type ChangelogSurface,
 } from "@/lib/changelog";
 
@@ -18,10 +18,13 @@ import {
  *
  * Every entry is rendered on the server and hidden by the filter, not fetched — so the page has
  * its whole history without JavaScript, and the permalinks resolve whatever is selected.
+ *
+ * The page passes the entries in (`app/changelog/page.tsx`). Reading them here shipped the
+ * whole changelog in this island's script, so every new entry raised /changelog's
+ * §22 script bytes; as a prop the history travels in the server payload, which §22 does not count.
  */
-export function ChangelogList() {
+export function ChangelogList({ entries }: { entries: readonly ChangelogEntry[] }) {
   const [surface, setSurface] = useState<ChangelogSurface | null>(null);
-  const entries = changelogEntries();
 
   return (
     <>
