@@ -240,8 +240,8 @@ describe("pilot evaluation worksheet: rights, scope, cost, retention and exit st
       expect(exit).not.toMatch(/\b(?:has been|have been|was|were) (?:deleted|revoked)\b|\bguarantee/i);
     });
   }
-  it("leaves the customer-data and promotion gates closed in the live activation policy", () => {
-    expect(activationPolicy.customerData.enabled).toBe(false);
+  it("leaves the promotion gate closed; customer data is open only by the P2-37 switch (register D-12)", () => {
+    expect(activationPolicy.customerData.enabled).toBe(true);
     expect(activationPolicy.candidatePromotion.enabled).toBe(false);
   });
 });
