@@ -8,6 +8,9 @@
 .where { display: flex; flex-wrap: wrap; align-items: center; column-gap: 16px; row-gap: 4px; margin: 0; }
 .where > span { color: var(--text-mid); }
 .where a { overflow-wrap: anywhere; }
+
+/* Whether the chapter needs an API key: a quiet line under its heading, not a badge. */
+.apiKey { margin: 0; color: var(--text-mid); }
 @media (pointer: coarse), (max-width: 1079px) {
   .where a { min-height: 44px; display: inline-flex; align-items: center; }
 }

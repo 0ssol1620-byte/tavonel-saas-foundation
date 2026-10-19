@@ -7621,20 +7621,28 @@ test('OCR v3 admission owns exactly the seven newly encountered endpoints and se
   assert.deepEqual(oldOwner.map(owner => owner.group), ['compile-source-observations']);
 });
 
-test('affected enablement owner: fifty-three exact paths select twenty direct suites and no browser suite; neighbours stay unmapped', async () => {
-  const { ENABLEMENT_AFFECTED_PATHS: paths, ENABLEMENT_AFFECTED_UNIT_FILES: units } = await import('./repair-scope.mjs');
-  const suites = ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/changelog.test.ts', 'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/design-tokens.test.ts', 'lib/developer-snippets.test.ts', 'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/guide-content.test.ts', 'lib/keyless-read.test.ts', 'lib/keyless-try-it.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/product-claims-sync.test.ts', 'lib/resources-hub.test.ts', 'lib/seo-surface.test.ts', 'lib/site-nav-model.test.ts', 'lib/trust-page-answers.test.ts'];
+test('affected enablement owner: fifty-three exact paths select twenty-one direct suites and four browser suites; neighbours stay unmapped', async () => {
+  const { ENABLEMENT_AFFECTED_PATHS: paths, ENABLEMENT_AFFECTED_UNIT_FILES: units, ENABLEMENT_AFFECTED_BROWSER_FILES: exportedBrowsers } = await import('./repair-scope.mjs');
+  const suites = ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/brand-tokens.test.ts', 'lib/changelog.test.ts', 'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/design-tokens.test.ts', 'lib/developer-snippets.test.ts', 'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/guide-content.test.ts', 'lib/keyless-read.test.ts', 'lib/keyless-try-it.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/product-claims-sync.test.ts', 'lib/resources-hub.test.ts', 'lib/seo-surface.test.ts', 'lib/site-nav-model.test.ts', 'lib/trust-page-answers.test.ts'];
+  // Phase 4 follow-ups (DELTA-REVIEW-2026-10-19 N-3): a change to only components/guide/* or app/product-polish.css selects
+  // the /guide template rule, the token sweep and its unit twin, the keyless try-it and the p4 spec.
+  const browsers = ['e2e/brand-tokens.spec.ts', 'e2e/keyless-try-it.spec.ts', 'e2e/p4-followups.spec.ts', 'e2e/templates.spec.ts'];
+  assert.deepEqual([...exportedBrowsers], browsers);
   assert.equal(paths.length, 53);
   assert.deepEqual([...units], suites);
   assert.deepEqual(paths.filter(path => path.startsWith('public/guide/')).length, 25);
   for (const path of paths) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['enablement-20261017'], path);
     const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
-    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['enablement-20261017'], [], suites, [], []], path);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['enablement-20261017'], [], suites, browsers, []], path);
     assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false], path);
   }
   const plan = affectedAskPlan(affectedMap(paths.map(path => affectedRecord('M', ['nextjs/' + path]))));
-  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, browsers, false, false]);
+  for (const path of ['app/product-polish.css', 'components/guide/guide-page.tsx', 'components/guide/guide.module.css']) {
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.ok(map.unitFiles.includes('lib/brand-tokens.test.ts') && map.browserFiles.includes('e2e/templates.spec.ts') && map.browserFiles.includes('e2e/brand-tokens.spec.ts'), path);
+  }
   for (const adjacent of ['nextjs/app/guide/layout.tsx', 'nextjs/components/guide/guide-media.test.tsx', 'nextjs/lib/changelog.tsx',
     'nextjs/lib/keyless-read-v2.ts', 'nextjs/public/guide/guide-4-new-desktop.mp4', 'nextjs/public/guide/README.md',
     'nextjs/app/benchmarks/[slug]/page.tsx', 'lib/guide-content.ts', 'nextjs/public/guide/manifest.json.bak']) {
@@ -7646,4 +7654,43 @@ test('affected enablement owner: fifty-three exact paths select twenty direct su
   for (const [path, owner] of [['nextjs/app/docs/[section]/page.tsx', 'docs'], ['nextjs/app/sitemap.ts', 'public-marketing-surface']]) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), [owner], path);
   }
+});
+
+test('affected p4 follow-ups owner: four exact paths select four direct suites and two browser suites; neighbours stay unmapped', async () => {
+  const { P4_FOLLOWUPS_AFFECTED_PATHS: paths, P4_FOLLOWUPS_AFFECTED_UNIT_FILES: units, P4_FOLLOWUPS_AFFECTED_BROWSER_FILES: browsersOut } = await import('./repair-scope.mjs');
+  const suites = ['lib/developer-snippets.test.ts', 'lib/docs-content.test.ts', 'lib/keyless-try-it.test.ts', 'lib/rsc-leak-probe.test.ts'];
+  const browsers = ['e2e/p4-followups.spec.ts', 'e2e/visual-refinement.spec.ts'];
+  assert.deepEqual([[...paths], [...units], [...browsersOut]], [['e2e/p4-followups.spec.ts', 'lib/developer-snippets.ts', 'lib/rsc-leak-probe.test.ts', 'scripts/launch-qa/rsc-leak-probe.mjs'], suites, browsers]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['p4-followups-20261019'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['p4-followups-20261019'], [], suites, browsers, []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition === 'historical-input-reuse'], [false, false, false, false], path);
+  }
+  for (const adjacent of ['nextjs/e2e/p4-followups-2.spec.ts', 'nextjs/lib/developer-snippets.tsx', 'nextjs/lib/rsc-leak-probe.test.mjs',
+    'nextjs/scripts/launch-qa/rsc-leak-probe.test.mjs', 'nextjs/scripts/launch-qa/rsc-leak-probe.js', 'scripts/launch-qa/rsc-leak-probe.mjs']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+  // The Launch QA step that runs the probe, in the product-qa job after its Playwright build.
+  const launch = readFileSync(resolve(affectedRepoRoot, '.github/workflows/launch-qa.yml'), 'utf8').replace(/\r\n/g, '\n');
+  const productQa = launch.slice(launch.indexOf('\n  product-qa:\n'), launch.indexOf('\n  lighthouse:\n'));
+  assert.ok(productQa.includes('run: node scripts/launch-qa/rsc-leak-probe.mjs --reuse-build'));
+  assert.ok(productQa.indexOf('rsc-leak-probe.mjs') > productQa.indexOf('pnpm exec playwright test'));
+});
+
+// Phase 4 follow-ups (g), N-3: the docs owner's browser suite carries R1 for the docs routes. The owner cannot select
+// e2e/site-alignment.spec.ts itself: its paths sit in the 5dd95ed8 affected-integration fixtures, where that spec did not
+// exist, and carrying it there would admit public-marketing-surface and fifteen more checks into a docs-only replay.
+test('affected docs owner: its one browser suite measures R1 on the docs routes at seven widths', () => {
+  const docs = AFFECTED_GROUPS.filter(owner => owner.group === 'docs');
+  assert.ok(docs.length >= 1 && docs.every(owner => JSON.stringify(owner.browserFiles) === JSON.stringify(['e2e/docs-reading-layout.spec.ts'])));
+  for (const path of ['nextjs/app/docs/[section]/page.tsx', 'nextjs/components/docs/docs-toc.module.css', 'nextjs/lib/docs-content.ts']) {
+    assert.deepEqual(affectedMap([affectedRecord('M', [path])]).browserFiles, ['e2e/docs-reading-layout.spec.ts'], path);
+  }
+  const spec = readFileSync(resolve(affectedRepoRoot, 'nextjs/e2e/docs-reading-layout.spec.ts'), 'utf8');
+  assert.ok(spec.includes('R1 on the docs routes: wordmark, H1 and content on the container edge'));
+  assert.ok(spec.includes('const R1_DOCS_ROUTES = ["/docs", "/docs/quickstart", "/docs/mcp"] as const;'));
+  assert.ok(spec.includes('const R1_WIDTHS = [1920, 1440, 1280, 1024, 768, 390, 360] as const;'));
+  assert.ok(spec.includes('the measurement catches a title row moved off the edge'));
 });
