@@ -7,8 +7,9 @@ test("closed workspace offers a public example without offering an upload", asyn
   await page.goto("/workspace", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByRole("heading", { name: "See how a source becomes usable knowledge" })).toBeVisible();
-  // A v1 bootstrap names no pending reason, so the self-service terms review stands in for the old contact link.
-  await expect(page.getByRole("button", { name: "Review processing terms" })).toHaveAttribute("aria-expanded", "false");
+  // D-19 (register 2026-10-17): a v1 bootstrap names no pending reason and gate v1 never reads an acceptance, so no terms
+  // review is offered; the public example stands in. v2's terms review is pinned in processing-consent.spec.ts.
+  await expect(page.getByRole("button", { name: "Review processing terms" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Request source access" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Explore a compiled World" })).toHaveAttribute("href", "/explore");
   await expect(page.locator(".workspace-example-path span")).toHaveCount(4);
@@ -52,14 +53,14 @@ test("closed workspace does not sell AI connection access as an available plan",
   await expect(page.getByRole("link", { name: "See Developer access" })).toHaveCount(0);
 });
 
-test("an unentitled workspace home points to the public example and the processing terms", async ({ page }) => {
+test("an unentitled workspace home points to the public example; gate v1 offers no processing terms (D-19)", async ({ page }) => {
   await installFixtureSession(page);
   await installWorkspaceRoutes(page, { accessSource: "unentitled", customerDataEnabled: false });
   await page.goto("/workspace", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByText("Your account is ready. File processing is not active", { exact: false })).toBeVisible();
   await expect(page.getByRole("link", { name: "Explore a compiled World" })).toHaveAttribute("href", "/explore");
-  await expect(page.getByRole("button", { name: "Review processing terms" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Review processing terms" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Request source access" })).toHaveCount(0);
 });
 
