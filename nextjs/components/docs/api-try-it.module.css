@@ -74,6 +74,15 @@
 .terminal > * + * { margin-top: 10px; }
 .terminal summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; font-size: 14px; color: var(--text-hi); }
 
+/* The keyless try-it's copy row and its two recipes: the docs code-block look, without its class (see keyless-try-it.tsx). */
+.copies { display: flex; flex-wrap: wrap; gap: 8px; }
+.recipe { min-width: 0; margin: 0; border: 1px solid var(--hairline-hi); }
+.recipe figcaption { padding: 8px 12px; border-bottom: 1px solid var(--hairline); color: var(--text-lo); font: var(--t-1) var(--f-sans); letter-spacing: .06em; }
+.recipe pre { max-width: 100%; min-width: 0; margin: 0; padding: 14px 12px; overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--hairline-hi) transparent; color: var(--text-hi); font: 12px/1.65 var(--f-mono); }
+.recipe pre:focus-visible { outline-offset: -2px; }
+.recipe :global(.tok-com) { color: var(--text-lo); }
+.recipe :global(.tok-str) { color: var(--text-mid); }
+
 .failed { margin: 0; font-size: 13px; color: var(--text-hi); }
 
 /*

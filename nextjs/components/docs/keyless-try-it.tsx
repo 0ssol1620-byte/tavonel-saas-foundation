@@ -64,20 +64,27 @@ export function KeylessTryIt() {
         header, this page hashes the bytes it received and says whether they match.
       </p>
       <ApiTryIt routes={KEYLESS_READS} />
+      {/*
+        The two copy buttons are on the page, not inside the disclosure (gap §4c.3 asks for the
+        buttons; reading the commands is the optional step). Inside a closed <details> they were the
+        first copy controls on the quickstart and could not be seen or pressed until it was opened
+        (premium-craft.spec). The recipes are not `figure.docs-code` blocks: on /developers that
+        figure is the page's one first-request sample (visual-refinement.spec), and these two are a
+        reading aid for the buttons above them, copied from /docs/integration-recipes.
+      */}
+      <div className={styles.copies}>
+        {RECIPES.map(({ language, label }) => (
+          <DocsCopyButton key={label} value={recipeBody(label)} label={`Copy ${language}`} />
+        ))}
+      </div>
       <details className={styles.terminal}>
         <summary>The same checks from a terminal</summary>
-        {RECIPES.map(({ language, recipe, label }) => {
-          const body = recipeBody(label);
-          return (
-            <figure className="docs-code" key={recipe}>
-              <figcaption>
-                <span>{language} · {recipe}</span>
-                <DocsCopyButton value={body} label={`Copy ${language}`} />
-              </figcaption>
-              <pre tabIndex={0} role="group" aria-label={label}><code><CodeTokens body={body} /></code></pre>
-            </figure>
-          );
-        })}
+        {RECIPES.map(({ language, recipe, label }) => (
+          <figure className={styles.recipe} key={recipe}>
+            <figcaption>{language} · {recipe}</figcaption>
+            <pre tabIndex={0} role="group" aria-label={label}><code><CodeTokens body={recipeBody(label)} /></code></pre>
+          </figure>
+        ))}
         <p className={styles.note}>
           Both are from <Link href={"/docs/integration-recipes" as Route}>Integration recipes</Link>,
           which says what each one proves.

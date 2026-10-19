@@ -81,6 +81,22 @@ describe("the keyless try-it mount", () => {
     expect(() => recipeBody("A recipe nobody wrote")).toThrow(/no code block labelled/);
   });
 
+  /*
+    Both copy buttons are on the page, ahead of the closed disclosure that holds the commands to read:
+    inside it they were the quickstart's first copy controls and hidden (premium-craft.spec). And the
+    try-it adds no `figure.docs-code`, which on /developers is the one first-request sample
+    (visual-refinement.spec), on any of its three mounts.
+  */
+  it("shows its copy buttons outside the disclosure and adds no docs code-block figure", () => {
+    const details = html.indexOf("<details");
+    expect(details).toBeGreaterThan(-1);
+    const copies = [...html.matchAll(/class="docs-copy"/g)].map((match) => match.index!);
+    expect(copies).toHaveLength(2);
+    for (const at of copies) expect(at).toBeLessThan(details);
+    expect(html).not.toContain('class="docs-code"');
+    expect(pages["/developers"].match(/<figure class="docs-code"/g)).toHaveLength(1);
+  });
+
   it("links the human view of the same shape, without prefetching the Explore route's scripts", () => {
     expect(html).toContain('href="/explore"');
     // In the quickstart's first viewport a prefetching link loads Explore's chunks with the page:
