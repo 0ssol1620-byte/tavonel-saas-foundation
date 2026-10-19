@@ -1908,6 +1908,18 @@ export const OCR_PAGES_INCOMPLETE_AFFECTED_PATHS = Object.freeze([
 export const OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/documents-route.test.ts', 'lib/operations-p0.test.ts', 'lib/processing-receipts.test.ts',
 ]);
+// EN-0c benchmarks path mask: /benchmarks masks an absolute scoring-machine path in the Model Arena notes at render time
+// (the artifact and its pinned sha256 are unchanged). The four endpoints no owner listed select their two direct suites plus
+// the five that read the changed files: benchmark-registry, brand-copy, copy-trust-guard and trust-page-answers read the page
+// source, and model-arena-artifact-builder imports the pinned digest from the page data. No browser suite of its own.
+// Product code, so never nativeReuse.
+export const BENCHMARKS_PATH_MASK_AFFECTED_PATHS = Object.freeze([
+  'app/benchmarks/page.tsx', 'lib/benchmarks-page.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts',
+]);
+export const BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts',
+  'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/trust-page-answers.test.ts',
+]);
 // PR #141's merge of main bcba7173 (Home Release 3, PR #150): the thirty changed endpoints no owner listed -- the Home and
 // Korean entry pages, the receipted measurement band (component, styles, data, its claims pack and suite, its receipt and research
 // note), the re-cut film posters with their lock file and README, the stage and copy modules, the evidence record, the public
@@ -1984,8 +1996,8 @@ export const PR141_MAIN_MERGE_BCBA_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/trust-page-answers.test.ts',
 ]);
 export const PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/hero-home-responsive.spec.ts', 'e2e/home-measures.spec.ts', 'e2e/landing-v2.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/production-hardening.spec.ts', 'e2e/public-package-proof.spec.ts']);
-// Enablement batch (codex/enablement-20261017, EN-0 to EN-5 and the guide recordings): the fifty-seven changed endpoints no owner
-// listed -- the changelog and its feed, the benchmarks page and its notes mask, the cookbooks index and card, the resources hub,
+// Enablement batch (codex/enablement-20261017, EN-0 to EN-5 and the guide recordings): the fifty-three changed endpoints no owner
+// listed -- the changelog and its feed, the cookbooks index and card, the resources hub,
 // the keyless try-it's digest check, its island (moved to components/ in EN-FIX-1) and its mounts on /api and /developers, the product guide at /guide and /ko/guide with its
 // media player, and the twenty-four recordings, posters and captions with their sha256 manifest under public/guide. Each selects
 // the twenty suites that read those files directly (rendered pages, source walks, the sitemap, the manifest rehash, the nav model's
@@ -1993,14 +2005,14 @@ export const PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/
 // suite of its own: e2e/keyless-try-it.spec.ts runs with the full Playwright suite, and the docs and marketing paths this batch also
 // changed keep their existing owners. Product code, so never nativeReuse.
 export const ENABLEMENT_AFFECTED_PATHS = Object.freeze([
-  'app/api/page.tsx', 'app/benchmarks/page.tsx', 'app/changelog/feed.xml/route.ts', 'app/cookbooks/opengraph-image.tsx',
+  'app/api/page.tsx', 'app/changelog/feed.xml/route.ts', 'app/cookbooks/opengraph-image.tsx',
   'app/cookbooks/page.tsx', 'app/developers/page.tsx', 'app/guide/opengraph-image.tsx', 'app/guide/page.tsx',
   'app/ko/guide/opengraph-image.tsx', 'app/ko/guide/page.tsx', 'app/product-polish.css', 'app/resources/page.tsx',
   'components/api-try-it.tsx', 'components/changelog-list.tsx', 'components/guide/guide-media.module.css', 'components/guide/guide-media.tsx', 'components/guide/guide-page.tsx',
-  'components/guide/guide.module.css', 'e2e/keyless-try-it.spec.ts', 'lib/benchmarks-page.test.ts', 'lib/changelog.test.ts',
+  'components/guide/guide.module.css', 'e2e/keyless-try-it.spec.ts', 'lib/changelog.test.ts',
   'lib/changelog.ts', 'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts',
   'lib/guide-content.ts', 'lib/keyless-read.test.ts', 'lib/keyless-read.ts', 'lib/keyless-try-it.test.ts',
-  'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts', 'lib/resources-hub.test.ts',
+  'lib/resources-hub.test.ts',
   'public/guide/guide-1-explore-desktop.en.vtt', 'public/guide/guide-1-explore-desktop.jpg',
   'public/guide/guide-1-explore-desktop.ko.vtt', 'public/guide/guide-1-explore-desktop.mp4',
   'public/guide/guide-1-explore-phone.en.vtt', 'public/guide/guide-1-explore-phone.jpg',
@@ -2312,7 +2324,8 @@ export const AFFECTED_GROUPS = Object.freeze([
   // paper-product.css route ownership: the two exact components above select three direct suites and the Explore and Pricing suites.
   affectedGroup('paper-product-route-css', new RegExp(`^nextjs/(?:${exactPathAlternation(PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS)})$`),
     { unitFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, browserFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES }),
-  // Enablement batch: the fifty-seven exact paths above select twenty direct suites and no browser suite.
+  // Enablement batch: the fifty-three exact paths above select twenty direct suites and no browser suite. The /benchmarks
+  // path mask left this owner when PR #157 brought the same change to main under benchmarks-path-mask.
   affectedGroup('enablement-20261017', new RegExp(`^nextjs/(?:${exactPathAlternation(ENABLEMENT_AFFECTED_PATHS)})$`),
     { unitFiles: ENABLEMENT_AFFECTED_UNIT_FILES }),
   // PR #141 fix round 3: the fourteen exact paths above select their direct suites and the site chrome browser suite.
@@ -2330,6 +2343,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // OCR_PAGES_INCOMPLETE: the four exact paths above select three direct suites and no browser suite.
   affectedGroup('ocr-pages-incomplete-code', new RegExp(`^nextjs/(?:${exactPathAlternation(OCR_PAGES_INCOMPLETE_AFFECTED_PATHS)})$`),
     { unitFiles: OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES }),
+  // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.
+  affectedGroup('benchmarks-path-mask', new RegExp(`^nextjs/(?:${exactPathAlternation(BENCHMARKS_PATH_MASK_AFFECTED_PATHS)})$`),
+    { unitFiles: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.

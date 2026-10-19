@@ -91,6 +91,8 @@ import {
   PR151_SERVICE_TRUTH_AFFECTED_UNIT_FILES,
   OCR_PAGES_INCOMPLETE_AFFECTED_PATHS,
   OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES,
+  BENCHMARKS_PATH_MASK_AFFECTED_PATHS,
+  BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES,
 } from './repair-scope.mjs';
 import { buildRepairReceipt, requireCompletedReadRehearsal } from './repair-scope-gate.mjs';
 import { auditBrowserFiles, browserRunOutputDir, buildNodeTestArgs, buildUnitArgs, collectWorkspaceIntakeCaptures, WORKSPACE_INTAKE_CAPTURE_NAMES, MAX_MOUNTED_PNG_BYTES, validateMountedPngMetadata, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, runBrowserGroups, validateNodeTapReport, validateSelectedPath } from './run-repair-check.mjs';
@@ -7323,6 +7325,27 @@ test('affected OCR_PAGES_INCOMPLETE owner: four exact paths select three direct 
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+test('affected benchmarks path mask owner: four exact paths select seven direct suites and no browser suite; neighbours stay unmapped', () => {
+  const suites = ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts',
+    'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/trust-page-answers.test.ts'];
+  assert.deepEqual([[...BENCHMARKS_PATH_MASK_AFFECTED_PATHS], [...BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES]], [['app/benchmarks/page.tsx',
+    'lib/benchmarks-page.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts'], suites]);
+  for (const path of BENCHMARKS_PATH_MASK_AFFECTED_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['benchmarks-path-mask'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['benchmarks-path-mask'], [], suites, [], []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const plan = affectedAskPlan(affectedMap(BENCHMARKS_PATH_MASK_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
+  for (const adjacent of ['nextjs/app/benchmarks/page.ts', 'nextjs/app/benchmarks/gdp-pdf/page.tsx', 'nextjs/lib/model-arena-page-data.tsx',
+    'nextjs/lib/model-arena-page-data-v2.ts', 'nextjs/lib/benchmarks-page.test.tsx', 'nextjs/components/benchmarks/arena-charts.tsx',
+    'nextjs/content/benchmarks/model-arena-20260903.json', 'lib/model-arena-page-data.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
 
 test('affected durable worker contract has one existing compile owner and keeps its three direct checks', () => {
   const path = 'nextjs/lib/compile-job-worker.test.ts';
@@ -7462,10 +7485,10 @@ test('OCR v3 admission owns exactly the seven newly encountered endpoints and se
   assert.deepEqual(oldOwner.map(owner => owner.group), ['compile-source-observations']);
 });
 
-test('affected enablement owner: fifty-seven exact paths select twenty direct suites and no browser suite; neighbours stay unmapped', async () => {
+test('affected enablement owner: fifty-three exact paths select twenty direct suites and no browser suite; neighbours stay unmapped', async () => {
   const { ENABLEMENT_AFFECTED_PATHS: paths, ENABLEMENT_AFFECTED_UNIT_FILES: units } = await import('./repair-scope.mjs');
   const suites = ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/changelog.test.ts', 'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/design-tokens.test.ts', 'lib/developer-snippets.test.ts', 'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/guide-content.test.ts', 'lib/keyless-read.test.ts', 'lib/keyless-try-it.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/product-claims-sync.test.ts', 'lib/resources-hub.test.ts', 'lib/seo-surface.test.ts', 'lib/site-nav-model.test.ts', 'lib/trust-page-answers.test.ts'];
-  assert.equal(paths.length, 57);
+  assert.equal(paths.length, 53);
   assert.deepEqual([...units], suites);
   assert.deepEqual(paths.filter(path => path.startsWith('public/guide/')).length, 25);
   for (const path of paths) {
