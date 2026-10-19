@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
+import { checkoutSellable } from "@/lib/checkout-intent";
 
 /**
  * What /login tells a reader who arrived by choosing a plan (JOURNEY-MAP D-02, A2; lane P2-10).
@@ -13,6 +14,10 @@ import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
  *   false  the plan is not sold online, and the same contact path `/pricing` offers for it
  *   null   the deployment has not answered yet, so nothing is promised either way
  *
+ * B-07: "true" is per offer, not per deployment. An offer whose saleChannel is "contact" (Team) is
+ * never promised a checkout, because the checkout it would open refuses it; it gets the closed
+ * sentence and the same contact path. The decision is `checkoutSellable`, which the H1 reads too.
+ *
  * Its own module because a Next.js page may not export a component, and the sentence is what the
  * CTA truth table (`lib/cta-truth.test.ts`) renders in each commercial state.
  */
@@ -24,8 +29,9 @@ export default function CheckoutIntentNotice({
   purchaseOpen: boolean | null;
 }) {
   const plan = BILLING_OFFERS[offer].label;
-  if (purchaseOpen === null) return null;
-  if (purchaseOpen) {
+  const sellable = checkoutSellable(offer, purchaseOpen);
+  if (sellable === null) return null;
+  if (sellable) {
     return (
       <p className="notice static" role="status">
         <strong>{plan} is held for you.</strong> Checkout opens by

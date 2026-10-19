@@ -380,7 +380,12 @@ describe("the checkout-intent notice", () => {
     const { default: CheckoutIntentNotice } = await import("../components/checkout-intent-notice");
     const closed = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "studio_access", purchaseOpen: false })));
     expect(closed).toBe("Team is not sold online today. Nothing is charged by signing in. Request Team access");
+    // B-07 / CLM-023: Team's saleChannel is "contact", so an open deployment still does not sell it
+    // online, and the checkout it would promise answers 403 BILLING_OFFER_CONTACT_REQUIRED.
     const open = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "studio_access", purchaseOpen: true })));
-    expect(open).toBe(OPEN_INTENT.replace("Developer", "Team"));
+    expect(open).toBe("Team is not sold online today. Nothing is charged by signing in. Request Team access");
+    expect(open).not.toContain("Checkout opens by itself");
+    const developer = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "observer_access", purchaseOpen: true })));
+    expect(developer).toBe(OPEN_INTENT);
   }, RENDER_TIMEOUT);
 });

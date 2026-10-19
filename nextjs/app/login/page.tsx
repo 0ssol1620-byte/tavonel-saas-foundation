@@ -19,7 +19,7 @@ import { useEffect, useState } from "react";
 import CheckoutIntentNotice from "@/components/checkout-intent-notice";
 import Logomark from "@/components/logomark";
 import { RecipeContinuation, RecipePreflight } from "@/components/recipe-preflight";
-import { readOfferParam, rememberCheckoutIntent, takeCheckoutIntent } from "@/lib/checkout-intent";
+import { checkoutSellable, readOfferParam, rememberCheckoutIntent, takeCheckoutIntent } from "@/lib/checkout-intent";
 import { trackFunnel } from "@/lib/funnel-events";
 import {
   readRecipeParams,
@@ -144,8 +144,9 @@ export default function LoginPage() {
         setAuthState(body.availableActions.signIn.enabled ? "ready" : "unconfigured");
       } catch {
         // Fail closed: if the deployment cannot be asked, do not offer a control that will fail.
+        // B-08: purchaseOpen stays null. The page never read the sale state, so it neither promises
+        // a checkout nor says a plan is "not sold online today"; the unavailable notice says why.
         if (!cancelled) {
-          setPurchaseOpen(false);
           setSelfService(false);
           setAuthState("unconfigured");
         }
@@ -198,7 +199,7 @@ export default function LoginPage() {
             that is true in every state.
           */}
           <h1>
-            {intent && purchaseOpen ? "One step before checkout."
+            {intent && checkoutSellable(intent, purchaseOpen) ? "One step before checkout."
               : signedIn && recipe ? "Continue your recipe."
               : recipe ? "One step before you run this."
                 : "Sign in to TAVONEL."}
