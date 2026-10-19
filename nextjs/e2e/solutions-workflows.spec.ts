@@ -35,7 +35,8 @@ async function ctaStates(page: Page, info: TestInfo, name: string, width: number
   await expect.poll(() => contrast(cta)).toBeGreaterThanOrEqual(4.5);
   await capture(cta, info, `solutions-${name}-${width}-cta-normal.png`);
   await cta.hover();
-  await expect(cta).toHaveCSS("background-color", "rgb(27, 53, 134)");
+  // decision.md G-H: hover is --tv-action-hover #0169cd (tavonel.css), adopted by solutions.module.css in P2-03.
+  await expect(cta).toHaveCSS("background-color", "rgb(1, 105, 205)");
   await expect.poll(() => contrast(cta)).toBeGreaterThanOrEqual(4.5);
   await capture(cta, info, `solutions-${name}-${width}-cta-hover.png`);
   await page.mouse.move(0, 0);
