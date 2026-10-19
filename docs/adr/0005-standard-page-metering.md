@@ -32,11 +32,13 @@ meter. Four things have to be settled before any number is chosen:
 
 Every number in this ADR sits beside one of three kinds of source.
 
-- A `path:line` in this tree. Paths are repo-relative. As in ADR-0004, `WORKER/` is
+- A `path:line` in this tree. `path:line` references below are taken at `main` `e1de1248`,
+  re-pinned after PR #152 shifted lines. Paths are repo-relative. As in ADR-0004, `WORKER/` is
   `quarantine-sidecar/foundation-cdr-worker/`, `CDR/` is `quarantine-sidecar/cdr-cloudrun/` and
   `GPU/` is `workers/foundation-ocr-gpu/`. A bare `:line` refers to the last path before it.
 - An `ocr-branch:path:line` on branch `codex/ocr-page-range-20261017` at `de305b10` (T5 and its
-  fixes, not on `main`, not deployed; `T5`).
+  fixes; not on `main` and not deployed when this ADR was drafted, merged to `main` since by PR
+  #152; `T5`).
 - A receipt alias from the table below, followed by the field that holds the value.
 
 **[calc]** marks arithmetic on sourced numbers. Arithmetic is not measurement.
@@ -77,10 +79,10 @@ literals.
 | P2 | Upload capability (legacy path) | The larger of the client's number and the server's ceiling fallback | `nextjs/app/api/uploads/capability/route.ts:259-265` | A reservation size, "not a page count" (`:254`) |
 | P3 | Approval row | `page_basis` and `approved_max_pages`, held between 1 and 80; an `unknown` basis must equal 80 | `supabase/migrations/20261003120000_intake_approval_budget_invariants.sql:75`; `:95` | A ceiling the customer approved |
 | P4 | Reservation | Pages × `STANDARD_UNITS_PER_PAGE` held, pages × `MAX_UNITS_PER_PAGE` as the maximum. One reservation per document | `nextjs/lib/compute-reservation.ts:670`; `:685-686`; `nextjs/lib/usage-pricing.ts:113-124`; `supabase/migrations/0009_foundation_billing_compute_reservations.sql:15` | A hold, in credits |
-| P5 | Rasterizer | `len(source_doc)`, refused outside 1 to `MAX_PAGES`; then a pixel total under a document budget | `CDR/app.py:591-593`; `:52`; `:603-620` | An observation. It never leaves the rasterizer: the clean response carries digests and a scan record, no page count (`CDR/app.py:742-746`), and `rasterize_to_pdf` returns the byte size (`CDR/app.py:726`) |
-| P6 | GPU reader | `len(document)` of the sanitized PDF, refused outside 1 to `MAX_PAGES` | `GPU/app.py:551-554`; `GPU/app.py:25` | An observation of the same bytes the worker sent |
-| P7 | OCR result | `pageCount`, an integer from 1 to 80 | `WORKER/src/ocr.ts:388-390` | The reader's observation, qualified |
-| P8 | Persisted result | `observedPageCount: result.pageCount`, beside `outputSha256` and `computeCredits: 2` | `WORKER/src/ocr.ts:128-130` | The page count is observed. The charge ignores it |
+| P5 | Rasterizer | `len(source_doc)`, refused outside 1 to `MAX_PAGES`; then a pixel total under a document budget | `CDR/app.py:616-618`; `:52`; `:628-645` | An observation. It never leaves the rasterizer: the clean response carries digests and a scan record, no page count (`CDR/app.py:767-771`), and `rasterize_to_pdf` returns the byte size (`CDR/app.py:751`) |
+| P6 | GPU reader | `len(document)` of the sanitized PDF, refused outside 1 to `MAX_PAGES` | `GPU/app.py:583-586`; `GPU/app.py:26` | An observation of the same bytes the worker sent |
+| P7 | OCR result | `pageCount`, an integer from 1 to 80 | `WORKER/src/ocr.ts:399-401` | The reader's observation, qualified |
+| P8 | Persisted result | `observedPageCount: result.pageCount`, beside `outputSha256` and `computeCredits: 2` | `WORKER/src/ocr.ts:139-141` | The page count is observed. The charge ignores it |
 | P9 | Settlement | `actualCredits` typed `0 \| 2`. The page count travels only inside the flag-gated completed-read proof, capped at 80, which also requires `actualCredits === 2` | `WORKER/src/settlement.ts:68`; `WORKER/src/index.ts:84`; `shared/completedReadReceipt.ts:50`; `:66`; `WORKER/src/settlement.ts:84-85`; `nextjs/app/api/internal/billing/settle/route.ts:118` | "Pages are observations; credits remain the fixed 0\|2 ledger facts" (`shared/completedReadReceipt.ts:1`) |
 | P10 | Ledger | One settlement per reservation. A repeat with the same state and credits is a duplicate; anything else conflicts. The completed-read proof table, still a draft migration, holds `settled_credits = 2` | `supabase/migrations/20260911120000_compute_settlement_expired_terminal.sql:64-73`; `supabase/drafts/migrations/20261005130000_foundation_completed_read_proof.sql:32` | Idempotent per document, in credits |
 | P11 | Trial quota | The trial's `page_limit` multiplied by a literal copy of `STANDARD_UNITS_PER_PAGE`, compared with reserved plus settled credits | `supabase/migrations/0046_trial_reservation_lifetime_guard.sql:28`; `:35-48`; `supabase/migrations/20260911120000_compute_settlement_expired_terminal.sql:99-103` | Pages, converted to credits |
@@ -90,7 +92,7 @@ literals.
 
 1. **The quote is in pages. The settlement is per document.** A reservation holds credits per page
    (P4). OCR settles the per-document constant `computeCredits: 2` whatever the length
-   (`WORKER/src/ocr.ts:130`), which is ADR-0004's row B19 (`ADR4`). The settlement releases the
+   (`WORKER/src/ocr.ts:141`), which is ADR-0004's row B19 (`ADR4`). The settlement releases the
    rest of the hold (`supabase/migrations/20260911120000_compute_settlement_expired_terminal.sql:115`).
    The ledger function itself already accepts any amount up to the reservation's maximum
    (`supabase/migrations/20260911120000_compute_settlement_expired_terminal.sql:47`; `:120-121`), so
@@ -122,7 +124,7 @@ endpoint, not the production endpoint (`T7` `endpoint.productionEndpointTouched`
   2.316 to 2.689 s of execution per page (`T7` `aggregates.documentModeFit85s.executionSecondsPerPageRange`).
   80 pages took 218.507 s and 10 pages took 25.970 s, both from direct input (`T7` `runs[3].totalSeconds`,
   `runs[4].totalSeconds`). [calc] Eight times the pages took 8.41 times the time, under one
-  unchanged per-document charge (`WORKER/src/ocr.ts:130`).
+  unchanged per-document charge (`WORKER/src/ocr.ts:141`).
 - **Splitting does not create pages.** Eight 10-page ranges of the 80-page input took 202.142 s in
   total, no request above 85 s (`T7` `aggregates.range10_80p`). Ten one-page requests took 31.279 s
   against 27.825 s for the same 10 pages in one request (`T7` `aggregates.page1_10p`). The extra
@@ -133,19 +135,20 @@ endpoint, not the production endpoint (`T7` `endpoint.productionEndpointTouched`
 - **A cold request was never answered.** Both requests that triggered a cold start got no answer
   from the test endpoint (`T7` `coldStart.reading`), and T7 says this shows nothing about the
   production cold path. A failed attempt reads no page.
-- **The pixel budget refuses long A4 documents for a rounding reason.** In the replica, A4 fails the
-  rasterizer's budget from 71 pages (`SWEEP` `results["A4 ISO 595.276x841.89"].firstFailingPages`),
-  because each page is rounded up to whole pixels after the scale was fitted to the budget
-  (`CDR/app.py:564-576`; `:612-619`). A fix exists on the T5 branch, commit `1a534d72`, not on
-  `main`.
+- **Before PR #152, the pixel budget refused long A4 documents for a rounding reason.** In the
+  replica, A4 fails the rasterizer's budget from 71 pages (`SWEEP` `results["A4 ISO 595.276x841.89"].firstFailingPages`),
+  because each page was rounded up to whole pixels after the scale was fitted to the budget. The
+  fix, commit `1a534d72`, reached `main` with PR #152, and `SWEEP` predates it: the scale is now
+  bisected until the rounded bitmaps fit (`CDR/app.py:575-601`), and every rendered bitmap is
+  still checked against the same ceilings (`:637-644`).
 
 ## Candidates for "standard page"
 
 | ID | Candidate | For | Against |
 | --- | --- | --- | --- |
-| C1 | **A page of the sanitized PDF, counted from its page tree** | The count is a property of immutable bytes the system already hashes (`WORKER/src/ocr.ts:128-130`). The reader already observes it (P6, P7, P8). Re-reading the same bytes with a new reader revision gives the same count. A customer can check it: open the PDF and count. Office formats are counted after conversion, which is what the code already promises for spreadsheets (`nextjs/lib/usage-pricing.ts:24-26`) and requires before a DOCX count may be called verified (`:46-48`). One count per document, so it is idempotent with the reservation (P4, P10) | A blank page counts. A large-format page counts the same as a small one. For an Office source the count belongs to the converter's pagination, not to the original file, and can differ from the count quoted at intake (P1) |
-| C2 | **A rasterised page**: a page the rasterizer rendered to a bitmap | Counts work that was done. Matches how an image source is already counted, one frame per page (`CDR/app.py:400`) | Today the rasterizer renders every page it accepts (`CDR/app.py:595-620`), so the number equals C1 and adds a definition without adding information. It inherits every renderer refusal: an A4 document from 71 pages is refused for a rounding reason (`SWEEP`), so a document the customer can count would meter as nothing. The rasterizer sends no page count today (P5) |
-| C3 | **A pixel budget**: rendered pixels against a reference page | Follows the rasterizer's real constraint, the per-page and per-document pixel ceilings (`CDR/app.py:55-56`). Sees page size, which C1 cannot | The render scale is chosen by the budget itself (`CDR/app.py:564-576`). The 10-page replica rendered at scale 1.5 to 11,300,160 px (`T7` `cdrReplica.rows[0].renderScale`, `.renderedPixels`), while a long A4 document is squeezed to fit the same budget, so a page's pixel count depends on how many other pages share the document. The GPU reader renders at its own scale (`GPU/app.py:29`), so "pixels" means two different things in one pipeline. A customer cannot check it before paying, and every renderer constant change would reprice past work |
+| C1 | **A page of the sanitized PDF, counted from its page tree** | The count is a property of immutable bytes the system already hashes (`WORKER/src/ocr.ts:139-141`). The reader already observes it (P6, P7, P8). Re-reading the same bytes with a new reader revision gives the same count. A customer can check it: open the PDF and count. Office formats are counted after conversion, which is what the code already promises for spreadsheets (`nextjs/lib/usage-pricing.ts:24-26`) and requires before a DOCX count may be called verified (`:46-48`). One count per document, so it is idempotent with the reservation (P4, P10) | A blank page counts. A large-format page counts the same as a small one. For an Office source the count belongs to the converter's pagination, not to the original file, and can differ from the count quoted at intake (P1) |
+| C2 | **A rasterised page**: a page the rasterizer rendered to a bitmap | Counts work that was done. Matches how an image source is already counted, one frame per page (`CDR/app.py:400`) | Today the rasterizer renders every page it accepts (`CDR/app.py:620-645`), so the number equals C1 and adds a definition without adding information. It inherits every renderer refusal: an A4 document from 71 pages was refused for a rounding reason before PR #152 (`SWEEP`), so a document the customer can count would meter as nothing. The rasterizer sends no page count today (P5) |
+| C3 | **A pixel budget**: rendered pixels against a reference page | Follows the rasterizer's real constraint, the per-page and per-document pixel ceilings (`CDR/app.py:55-56`). Sees page size, which C1 cannot | The render scale is chosen by the budget itself (`CDR/app.py:564-590`). The 10-page replica rendered at scale 1.5 to 11,300,160 px (`T7` `cdrReplica.rows[0].renderScale`, `.renderedPixels`), while a long A4 document is squeezed to fit the same budget, so a page's pixel count depends on how many other pages share the document. The GPU reader renders at its own scale (`GPU/app.py:30`), so "pixels" means two different things in one pipeline. A customer cannot check it before paying, and every renderer constant change would reprice past work |
 | C4 | **OCR regions** emitted by the reader | Tracks payload and downstream compile size, which ADR-0004 lists among the limits that bind on the way to longer documents (`ADR4`, "What breaks first" items 2 and 4). Sees density, which C1 cannot | A model's output, not a property of the document: a new reader revision bills the same bytes differently. A reader that misses text would bill less, which pays for being wrong. Known only after the work, so it cannot be quoted or reserved against (P4). T7 has one density, so there is no evidence yet that time follows regions (`T7` `notProven`). A region count is not accuracy (`T7` `recordLabel`) |
 
 GPU seconds are a cost, not a unit for the customer. `creditsForObservedGpuSeconds` exists
@@ -175,10 +178,10 @@ durable and before settlement is dispatched (`WORKER/src/index.ts:73-104`).
 | --- | --- | --- |
 | `schemaVersion` | `tavonel.page_meter.v1` | constant |
 | `workspaceKey`, `documentId`, `reservationId` | the document's identity and its one reservation | `WORKER/src/keys.ts:36`; `supabase/migrations/0009_foundation_billing_compute_reservations.sql:15` |
-| `sanitizedSha256` | digest of the sanitized PDF | the OCR result's `inputSha256` (`WORKER/src/ocr.ts:129`) |
-| `ocrSha256`, `readerRevision`, `readerBindingSha256` | which result, and which qualified reader, produced the count | `WORKER/src/ocr.ts:128-140` |
+| `sanitizedSha256` | digest of the sanitized PDF | the OCR result's `inputSha256` (`WORKER/src/ocr.ts:140`) |
+| `ocrSha256`, `readerRevision`, `readerBindingSha256` | which result, and which qualified reader, produced the count | `WORKER/src/ocr.ts:139-151` |
 | `meterBasis` | `sanitized_pdf_page_tree` | this ADR |
-| `standardPages` | integer, at least 1 | `observedPageCount` (`WORKER/src/ocr.ts:130`) |
+| `standardPages` | integer, at least 1 | `observedPageCount` (`WORKER/src/ocr.ts:141`) |
 | `noTextPages` | integer, or `null` when the reader did not report page status | per-page `no_text` from the T5 range reader (`ocr-branch:workers/foundation-ocr-gpu/app.py:743`; `:755`) |
 | `rasterizerPages`, `renderedPixels` | integer, or `null` with a reason, until the rasterizer reports them | P5. Today always `null` |
 | `regionCount` | integer | the persisted result's regions |
@@ -194,7 +197,7 @@ Integrity rules, all fail-closed and visible:
   reported), they must be equal. A mismatch writes no meter value: the record carries
   `status: "count_conflict"`, and the document goes to operator review. The meter never picks one.
 - A transport failure meters nothing, the same rule that already makes it cost nothing
-  (`WORKER/src/ocr.ts:41-47`). A range that never answered is not a page
+  (`WORKER/src/ocr.ts:42-48`). A range that never answered is not a page
   (`ocr-branch:quarantine-sidecar/foundation-cdr-worker/src/ocr.ts:1019-1020`: a range lost in
   transport reports `OCR_PAGES_INCOMPLETE` and settles nothing).
 - No field is inferred. An unknown value is `null` with a reason, never a default.
@@ -203,7 +206,7 @@ Integrity rules, all fail-closed and visible:
 
 - In shadow, the record is an immutable sibling of `ocr.json`, `…/{sanitizedSha256}/page-meter.json`,
   derived the way `ocrSiblingKey` derives `ocr.json` (`WORKER/src/keys.ts:76-81`). It is written with
-  the same refuse-to-overwrite condition (`WORKER/src/ocr.ts:730`). A redelivered message that finds an
+  the same refuse-to-overwrite condition (`WORKER/src/ocr.ts:807`). A redelivered message that finds an
   identical record is a duplicate and writes nothing. One that finds a different record is a
   conflict, fails closed and overwrites nothing. This mirrors the ledger's own duplicate and
   conflict rule (`supabase/migrations/20260911120000_compute_settlement_expired_terminal.sql:64-73`).
@@ -233,9 +236,9 @@ Integrity rules, all fail-closed and visible:
 
 | Stage | What runs | Billing effect | Exit |
 | --- | --- | --- | --- |
-| S0 — record (*agent* builds; deploy is the founder's) | The worker writes `page-meter.json` for every settled document. A failed meter write is logged with its reason and counted, and settlement proceeds unchanged, because in shadow the meter is not an input to the charge | None. Settlement still sends the constant (`WORKER/src/ocr.ts:130`) | Records exist for the FOUNDER-SET shadow sample (N-5 below) |
+| S0 — record (*agent* builds; deploy is the founder's) | The worker writes `page-meter.json` for every settled document. A failed meter write is logged with its reason and counted, and settlement proceeds unchanged, because in shadow the meter is not an input to the charge | None. Settlement still sends the constant (`WORKER/src/ocr.ts:141`) | Records exist for the FOUNDER-SET shadow sample (N-5 below) |
 | S1 — compare (*agent* writes the report script; running it against production data is the founder's) | A read-only report joins each meter record with the ledger's settled credits and the approval row's `page_basis` and `approved_max_pages` (P3). It writes a receipt with: count conflicts, which must be zero; how far a `declared` intake count differed from the metered count, per format; pages per document by format; and observed seconds per page against regions per page | None. Read-only | Zero count conflicts, and a same-condition cost receipt covering more than one density (T7 has one) |
-| S2 — bind (founder only) | The founder sets the numbers below. Settlement charges `standardPages` × the FOUNDER-SET units. A new migration replaces the `settled_credits = 2` check (`supabase/drafts/migrations/20261005130000_foundation_completed_read_proof.sql:32`). Code replaces the `0 \| 2` wire type (`WORKER/src/settlement.ts:68`; `WORKER/src/ocr.ts:83`) and the settle route's `actualCredits !== 2` check (`nextjs/app/api/internal/billing/settle/route.ts:118`). The trial quota (P11) and the public copy (P12) change in the same release | Live | The usual ladder: compatibility contract, shadow, benchmark, canary, rollout, deprecate. The per-document charge stays authoritative until the bound meter has run in canary without a conflict |
+| S2 — bind (founder only) | The founder sets the numbers below. Settlement charges `standardPages` × the FOUNDER-SET units. A new migration replaces the `settled_credits = 2` check (`supabase/drafts/migrations/20261005130000_foundation_completed_read_proof.sql:32`). Code replaces the `0 \| 2` wire type (`WORKER/src/settlement.ts:68`; `WORKER/src/ocr.ts:87`) and the settle route's `actualCredits !== 2` check (`nextjs/app/api/internal/billing/settle/route.ts:118`). The trial quota (P11) and the public copy (P12) change in the same release | Live | The usual ladder: compatibility contract, shadow, benchmark, canary, rollout, deprecate. The per-document charge stays authoritative until the bound meter has run in canary without a conflict |
 
 The page ceiling moves under ADR-0004, not here. One cap the meter depends on is not in the P2-18
 cross-tree list: `observedPageCount` is held to at most 80 in the completed-read proof
