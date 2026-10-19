@@ -1,4 +1,4 @@
-import { changelogEntries, changelogEntryId, changelogEntryUpdatedAt, changelogSections, changelogUpdatedAt } from "@/lib/changelog";
+import { changelogEntries, changelogEntryId, changelogEntryUpdatedAt, changelogFeedId, changelogSections, changelogUpdatedAt } from "@/lib/changelog";
 
 /*
   The Atom feed masterplan 13.3 asks for.
@@ -29,7 +29,7 @@ export function GET() {
       ...changelogSections(entry).flatMap(([label, items]) => [`${label}:`, ...items.map((item) => `- ${item}`)]),
     ];
     return `  <entry>
-    <id>${ORIGIN}/changelog#${changelogEntryId(entry)}</id>
+    <id>${ORIGIN}/changelog#${changelogFeedId(entry)}</id>
     <title>${escapeXml(entry.title)}</title>
     <link rel="alternate" href="${ORIGIN}/changelog#${changelogEntryId(entry)}"/>
     <updated>${changelogEntryUpdatedAt(entry)}</updated>

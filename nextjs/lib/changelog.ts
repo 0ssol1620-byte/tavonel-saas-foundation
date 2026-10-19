@@ -26,8 +26,17 @@ export type ChangelogEntry = {
   date: string;
   /** Exact UTC deployment timestamp where a production receipt is available. */
   releasedAt?: string;
-  /** Preserve an older published fragment when correcting a release date. */
+  /**
+   * The anchor, when two releases share a date: the date plus a suffix. Absent means the date.
+   * `lib/changelog.test.ts` holds every anchor to the date its entry shows.
+   */
   id?: string;
+  /**
+   * The fragment this entry was first published under, before its date was corrected. The page
+   * keeps it as a second anchor so an old link still lands here, and the feed keeps it as the
+   * Atom id so a subscriber does not receive the same release twice.
+   */
+  previousId?: string;
   title: string;
   /** The released version, where the thing released carries one. */
   version?: string;
@@ -42,6 +51,46 @@ export type ChangelogEntry = {
 };
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
+  /*
+    EN-0 backfill, 2026-10-19. Both entries are dated by the production deployment that put them
+    on tavonel.com, read from Vercel: dpl_3JjTwcBhpjARzmQ6xGYR8JU2cdm2 (main bcba7173, PR #150)
+    READY 2026-10-16T05:52:06Z, and dpl_7fEfTdmcPi8FfDyrXs17dMiF9gm2 (main 4c80bb30, PR #141)
+    READY 2026-10-16T12:33:49Z (receipt: ux-program-20261017/enablement/EN-0/). The developer
+    channel's own manifest dates 2026.10.2.1 to 2 October; it reached the site with PR #141.
+    Worded from the two merge diffs; the rollout switches PR #141 carried are off in production,
+    so only what a visitor or a downloaded client can meet is listed.
+  */
+  {
+    date: "2026-10-16",
+    releasedAt: "2026-10-16T12:33:49Z",
+    id: "2026-10-16-developer-channel",
+    title: "Developer files 2026.10.2.1: an optional consumer context for the CLI and the MCP server",
+    version: "2026.10.2.1",
+    surfaces: ["Developer tools"],
+    added: [
+      "consumer-context.mjs joins the files published at /developer/, pinned by sha256 in channel.json like the others. The CLI and the MCP server load it from their own directory, so install every file channel.json lists into one directory and check each digest.",
+      "The CLI and the MCP server accept an optional consumer context in TAVONEL_CONSUMER_CONTEXT and send it with every request. With TAVONEL_CONSUMER_CONTEXT_REQUIRED=true they refuse any read whose response does not acknowledge that context. This is local synthetic evidence only: the production API does not acknowledge the context headers, so the required mode refuses every read made against it.",
+    ],
+    improved: [
+      "With neither variable set, the CLI and the MCP server send no context headers and do not load consumer-context.mjs.",
+      "The source agent and the developer README are republished with new digests in the same channel. Intake for your own sources is arranged with us, as the quickstart says.",
+    ],
+  },
+  {
+    date: "2026-10-16",
+    releasedAt: "2026-10-16T05:52:06Z",
+    title: "A homepage that states its outcome, with the published research results and their receipts beneath it",
+    surfaces: ["Website"],
+    added: [
+      "Beneath the headline, a band of published research results, each printed with its denominator, the condition its claim has to carry and a link to the receipt it came from. The figures are read from the generated claims pack rather than typed into the page, and the low-quality-scan result is printed with the others.",
+    ],
+    improved: [
+      "The headline is the outcome, “Turn documents into context your AI can cite.”, with “The Knowledge Compiler for AI” above it. The Korean entry page carries its literal translation, and the browser tab and link previews use the same sentence.",
+      "The first action, in the header and on the page, opens the public sample (“Open the compiled sample”). “Bring your own documents” goes to the contact page, where intake for your own sources is arranged with you.",
+      "The four recorded film cuts are unchanged, and their still frames are new frames taken from the same cuts. On a desktop each stage opens on the enlarged reading view where both panes carry content, and on the full frame where they do not; Focus details switches between the two.",
+      "On a phone the passage being read is printed as text directly above the film, and the analytics consent notice stays clear of both.",
+    ],
+  },
   /*
     The release-candidate copy on three entries was left behind after their changes reached main.
     The API and commerce work deployed successfully as 22e47f5 at 2026-09-18T04:35:46Z; the
@@ -64,7 +113,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: "2026-09-20",
     releasedAt: "2026-09-19T22:41:11Z",
-    id: "2026-09-19",
+    previousId: "2026-09-19",
     title: "A rebuilt entry page: nine scenes, and every figure on them read out of the public Compiled World",
     surfaces: ["Website"],
     added: [
@@ -87,7 +136,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: "2026-09-18",
     releasedAt: "2026-09-18T04:35:46Z",
-    id: "2026-09-16",
+    previousId: "2026-09-16",
     title: "A rendered API reference, published error codes, and the limits that were already enforced",
     surfaces: ["API", "Developer tools", "Website", "Billing"],
     added: [
@@ -116,7 +165,8 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: "2026-09-18",
     releasedAt: "2026-09-18T04:35:46Z",
-    id: "2026-09-14",
+    id: "2026-09-18-pricing",
+    previousId: "2026-09-14",
     title: "Pricing, legal texts and trust surfaces",
     surfaces: ["Website", "Billing"],
     added: [
@@ -219,9 +269,14 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   },
 ];
 
-/** A published fragment remains stable if the entry's release date was corrected. */
+/** The entry's anchor on the page: its date, or its date and a suffix when two share one. */
 export function changelogEntryId(entry: ChangelogEntry): string {
   return entry.id ?? entry.date;
+}
+
+/** The Atom id, which never changes once published: the first fragment the entry had. */
+export function changelogFeedId(entry: ChangelogEntry): string {
+  return entry.previousId ?? changelogEntryId(entry);
 }
 
 /** Older date-only entries keep their existing feed timestamp until a receipt is recovered. */
@@ -229,12 +284,15 @@ export function changelogEntryUpdatedAt(entry: ChangelogEntry): string {
   return entry.releasedAt ?? `${entry.date}T00:00:00Z`;
 }
 
-/** Newest first, which is the order the page and the feed both want. */
+/**
+ * Newest first, which is the order the page and the feed both want: by date, then by deployment
+ * time when two releases share a date, then in the order they are declared (the sort is stable).
+ */
 export function changelogEntries(surface?: ChangelogSurface): ChangelogEntry[] {
   // `filter` already copies, so the sort is not mutating the exported array.
   return CHANGELOG
     .filter((entry) => !surface || entry.surfaces.includes(surface))
-    .sort((left, right) => right.date.localeCompare(left.date) || changelogEntryId(right).localeCompare(changelogEntryId(left)));
+    .sort((left, right) => right.date.localeCompare(left.date) || changelogEntryUpdatedAt(right).localeCompare(changelogEntryUpdatedAt(left)));
 }
 
 export function changelogSections(entry: ChangelogEntry): Array<[string, string[]]> {
@@ -247,5 +305,5 @@ export function changelogSections(entry: ChangelogEntry): Array<[string, string[
 
 /** The most recent change, which is what a feed's own timestamp should be. */
 export function changelogUpdatedAt() {
-  return changelogEntryUpdatedAt(changelogEntries()[0]);
+  return CHANGELOG.map(changelogEntryUpdatedAt).sort().at(-1)!;
 }
