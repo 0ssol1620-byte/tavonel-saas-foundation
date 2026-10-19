@@ -155,7 +155,7 @@ jobs:
 
       # Pinned to the version the repository already runs locally. `latest` would let a CLI
       # release change what this receipt means without a commit saying so.
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: 2.116.0
 
@@ -1038,7 +1038,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: 2.116.0
       - name: Use official Docker Hub images for this disposable stack
@@ -1129,7 +1129,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: 2.116.0
       - name: Use official Docker Hub image for the disposable stack
