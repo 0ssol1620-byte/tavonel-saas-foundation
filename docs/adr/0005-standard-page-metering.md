@@ -284,7 +284,7 @@ Each row is FOUNDER-SET. This ADR proposes no value for any of them, and the sha
 
 ## Not verified
 
-- That the deployed rasterizer and reader run the code at `4c80bb30`. The worker's CDR target and
+- That the deployed rasterizer and reader run the code at `e1de1248` (the citation pin above). The worker's CDR target and
   the production RunPod endpoint were not read for this ADR.
 - That the converter's page count for DOCX, PPTX and XLSX sources matches what a customer would
   count. No receipt covers Office pagination.
