@@ -264,7 +264,16 @@ describe("app/layout.tsx fonts", () => {
     const code = layout.replace(/\/\*[\s\S]*?\*\//g, "");
     expect(code, "no retired face is loaded").not.toMatch(/Geist|Instrument_Serif|--font-geist|--font-serif/);
     expect(layout).toContain('const WANTED_SANS_LATIN = "/fonts/WantedSansVariable.split.90.woff2";');
-    expect(layout).toContain('preload(WANTED_SANS_LATIN, { as: "font", type: "font/woff2", crossOrigin: "anonymous" });');
+    /*
+      B-02 (2026-10-19): the Latin preload is a <link> element, which React hoists into <head> after
+      the route's stylesheets. ReactDOM's preload() put it first in <head>, where its 45 KB took the
+      throttled bandwidth the render-blocking CSS needed: /explore LCP (an <h1>) 3,150 ms median
+      against the 3,000 ms budget, 2,665 ms with the element. A preload() call coming back fails here.
+    */
+    expect(layout).toContain('<link rel="preload" as="font" type="font/woff2" href={WANTED_SANS_LATIN} crossOrigin="anonymous" />');
+    expect(code, "no ReactDOM preload() call: it is emitted ahead of the stylesheets").not.toMatch(/\bpreload\(|from "react-dom"/);
+    // One Latin preload per page: Home no longer repeats the layout's.
+    expect(read("components/landing-v2/landing-page.tsx")).not.toContain('href="/fonts/WantedSansVariable.split.90.woff2"');
     expect(existsSync(new URL("../public/fonts/WantedSansVariable.split.90.woff2", import.meta.url)), "the preloaded file ships").toBe(true);
     // The preloaded file is the one tavonel.css declares for basic Latin, not a stray copy.
     expect(tavonel).toContain('src: url("/fonts/WantedSansVariable.split.90.woff2") format("woff2-variations");');

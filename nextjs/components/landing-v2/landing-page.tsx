@@ -279,7 +279,7 @@ export default function LandingPage({
 
   return (
     <div className={`page lv2 ${sourceStyles.home}`} lang={korean ? "ko" : "en"} data-template="T0">
-      <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.90.woff2" crossOrigin="anonymous" />
+      {/* The Latin file (split.90) is preloaded by the root layout on every route (B-02). */}
       {korean ? <>
         <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.73.woff2" crossOrigin="anonymous" />
         <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.86.woff2" crossOrigin="anonymous" />

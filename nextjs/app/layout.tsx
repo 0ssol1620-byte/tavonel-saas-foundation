@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono } from "next/font/google";
-import { preload } from "react-dom";
 import FontOutlineProbe from "@/components/font-outline-probe";
 import MarketingConsent from "@/components/marketing-consent";
 import SkipLink from "@/components/skip-link";
@@ -34,8 +33,17 @@ import "./landing-v2.css";
  * CLS 0.2351 at 1024 and 0.3059 at 768. An optional face that nobody preloads seldom arrives
  * inside the block period, and then the whole page view paints in the system fallback. Geist did
  * not have that problem because next/font preloaded it; Wanted Sans [90] (basic Latin, 44,356
- * bytes) takes over that preload. Home already hinted the same file, and React dedupes a preload
- * by href. [89] (Latin Extended) and the Hangul ranges stay on demand; /ko preloads its own four.
+ * bytes) takes over that preload. [89] (Latin Extended) and the Hangul ranges stay on demand; /ko
+ * preloads its own four.
+ *
+ * WHY IT IS A <link> ELEMENT AND NOT ReactDOM's preload() (B-02, 2026-10-19). preload() is emitted
+ * first in <head>, ahead of the stylesheets, so on a throttled first load the 45 KB font took the
+ * bandwidth the render-blocking CSS needed and the last stylesheet arrived ~600 ms later. /explore,
+ * whose LCP element is its <h1>, measured 3,150 ms median against the 3,000 ms Lighthouse budget
+ * (env-less production build, Lighthouse 12.8.2, devtools throttling, three runs). React hoists a
+ * <link rel="preload"> element into <head> after the stylesheets instead: /explore 2,665 ms, / 2,518,
+ * /ko 2,735, script bytes unchanged. Lowering the preload to fetchPriority "low" did not help
+ * (3,226 ms, phase 3 review). Home used to repeat this element; one per page now.
  *
  * IBM Plex Mono is unchanged: coordinates, digests, IDs, file names and code (UX-PLAN §5.3 R10).
  * `display: "optional"` for the same CLS reason.
@@ -126,10 +134,10 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  preload(WANTED_SANS_LATIN, { as: "font", type: "font/woff2", crossOrigin: "anonymous" });
   return (
     <html lang="en" className={mono.variable}>
       <body>
+        <link rel="preload" as="font" type="font/woff2" href={WANTED_SANS_LATIN} crossOrigin="anonymous" />
         {/* The mono variable is on <html> so `--f-mono` in tavonel.css resolves everywhere,
             including in a portal rendered outside <body>. */}
         {/*
