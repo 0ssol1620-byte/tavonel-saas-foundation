@@ -87,6 +87,8 @@ import {
   parseAffectedRawDiff,
   buildAffectedMap,
   collectAffectedChanges,
+  PR151_SERVICE_TRUTH_AFFECTED_PATHS,
+  PR151_SERVICE_TRUTH_AFFECTED_UNIT_FILES,
 } from './repair-scope.mjs';
 import { buildRepairReceipt, requireCompletedReadRehearsal } from './repair-scope-gate.mjs';
 import { auditBrowserFiles, browserRunOutputDir, buildNodeTestArgs, buildUnitArgs, collectWorkspaceIntakeCaptures, WORKSPACE_INTAKE_CAPTURE_NAMES, MAX_MOUNTED_PNG_BYTES, validateMountedPngMetadata, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, runBrowserGroups, validateNodeTapReport, validateSelectedPath } from './run-repair-check.mjs';
@@ -1045,6 +1047,16 @@ test('unit runner preserves empty-selection failure and live browser env strips 
   assert.equal(Object.hasOwn(env, 'PADDLE_SANDBOX'), false);
   assert.equal(Object.hasOwn(env, 'VERCEL_ENV'), false);
   assert.equal(env.COMMERCIAL_MODE, 'live');
+  assert.equal(env.PATH, 'test-path');
+});
+
+// PR #151: Playwright's default CI git-info plugin read pull_request.base.sha from GITHUB_EVENT_PATH and ran
+// `git fetch origin <base> --depth=1` in the checkout. .git/shallow then held the PR base, so the baseline, reachable only
+// through that merge's second parent, was no longer an ancestor and the final gate refused the head.
+test('affected browser runner withholds the PR event so Playwright cannot shallow-fetch the PR base into the checkout', () => {
+  const env = liveBrowserEnv({ GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: '/home/runner/work/_temp/_github_workflow/event.json', PATH: 'test-path' });
+  assert.equal(Object.hasOwn(env, 'GITHUB_EVENT_PATH'), false);
+  assert.equal(env.GITHUB_ACTIONS, 'true');
   assert.equal(env.PATH, 'test-path');
 });
 
@@ -5944,7 +5956,7 @@ test('affected preflight report admission: lookalikes, operations, pipeline, API
     'nextjs/lib/preflight-reports.ts','nextjs/lib/preflight-reporter.ts','nextjs/lib/preflight.ts','nextjs/lib/preflight-report-v2.ts','nextjs/lib/preflight-report/index.ts',
     'nextjs/lib/Preflight-Report.ts','nextjs/lib/preflight-report-server.ts','nextjs/lib/preflight-report.d.ts',
     'nextjs/lib/preflight-report.spec.ts','nextjs/lib/preflight-report.test.tsx','nextjs/lib/preflight-reportXtest.ts','nextjs/lib/preflight-report-copy.test.ts',
-    'nextjs/lib/__snapshots__/preflight-report.test.ts.snap','nextjs/lib/pipeline.ts','nextjs/lib/pipeline.test.ts',
+    'nextjs/lib/__snapshots__/preflight-report.test.ts.snap','nextjs/lib/pipeline.tsx','nextjs/lib/pipeline-v2.test.ts',
     'nextjs/components/operations-ultimate.tsx','nextjs/components/preflight-report.tsx','nextjs/e2e/preflight-report.spec.ts',
     'nextjs/app/api/v1/preflight-report/route.ts','nextjs/app/api/preflight-report/route.ts',
     'shared/capabilityManifest.ts','shared/intakeCeiling.ts','shared/qualifiedDocumentInputs.ts',
@@ -5955,8 +5967,9 @@ test('affected preflight report admission: lookalikes, operations, pipeline, API
     assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
   }
   // Known paths of earlier owners, the intake-triage neighbours, and the SQL and worker neighbours keep exactly their prior selection;
-  // the new owner and its suite never join them.
+  // the new owner and its suite never join them. The pipeline sibling and its suite are PR #151's owner now, never the preflight owner.
   const prior=[...AFFECTED_LIFECYCLE_PATHS.map(path=>[path,[AFFECTED_LIFECYCLE_GROUP],AFFECTED_LIFECYCLE_SUITES]),
+    ...['nextjs/lib/pipeline.ts','nextjs/lib/pipeline.test.ts'].map(path=>[path,['pr151-service-truth'],PR151_SERVICE_TRUTH_AFFECTED_UNIT_FILES]),
     ...AFFECTED_WORLD_DIFF_PATHS.map(path=>[path,[AFFECTED_WORLD_DIFF_GROUP],AFFECTED_WORLD_DIFF_SUITES]),
     ...AFFECTED_CONSUMER_PATHS.map(path=>[path,[AFFECTED_CONSUMER_GROUP],AFFECTED_CONSUMER_SUITES]),
     ...AFFECTED_ANALYTICS_PATHS.map(path=>[path,[AFFECTED_ANALYTICS_GROUP],AFFECTED_ANALYTICS_SUITES]),
@@ -5992,7 +6005,7 @@ test('affected preflight report admission: known plus unknown or an unowned rena
   assert.deepEqual([mixed.groups,mixed.unitFiles],[[AFFECTED_PREFLIGHT_GROUP],AFFECTED_PREFLIGHT_SUITES],'diagnostic selection is retained beside the failure');
   assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/);
   for (const paths of [[AFFECTED_PREFLIGHT_MODEL,'nextjs/lib/preflight-report-v2.ts'],['nextjs/components/operations-ultimate.tsx',AFFECTED_PREFLIGHT_MODEL],
-    [AFFECTED_PREFLIGHT_TEST,'nextjs/lib/preflight-report.spec.ts'],['nextjs/lib/pipeline.ts',AFFECTED_PREFLIGHT_TEST]]) {
+    [AFFECTED_PREFLIGHT_TEST,'nextjs/lib/preflight-report.spec.ts'],['nextjs/lib/pipeline-v2.ts',AFFECTED_PREFLIGHT_TEST]]) {
     const unknown=paths.find(path=>!AFFECTED_PREFLIGHT_PATHS.includes(path)),map=affectedMap([affectedRecord('R090',paths)]);
     assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],paths.join(' -> '));
     assert.deepEqual([map.entries.map(entry=>entry.groups),map.unitFiles],[[[AFFECTED_PREFLIGHT_GROUP]],AFFECTED_PREFLIGHT_SUITES],paths.join(' -> '));
@@ -7185,6 +7198,27 @@ test('affected PR #141 fix owners: intake approval rollout, solutions proof and 
   for (const adjacent of ['nextjs/lib/api-error-codes.test.ts.bak', 'nextjs/app/solutions/[slug]/layout.tsx', 'nextjs/lib/upload-confirm-route-v2.test.ts']) {
     const refused = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual(refused.failures, [`unmapped changed endpoint: ${adjacent}`], adjacent);
+  }
+});
+test('affected PR #151 service truth owner: nine exact paths select six direct suites and no browser suite; neighbours stay unmapped', () => {
+  const suites = ['lib/api-error-codes.test.ts', 'lib/documents-route.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/pipeline.test.ts',
+    'lib/r2-synthetic-canary.test.ts', 'lib/workspace-onboarding.test.ts'];
+  assert.deepEqual([[...PR151_SERVICE_TRUTH_AFFECTED_PATHS], [...PR151_SERVICE_TRUTH_AFFECTED_UNIT_FILES]], [['app/api/documents/route.ts',
+    'lib/documents-route.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/pipeline.test.ts', 'lib/pipeline.ts', 'lib/r2-synthetic-canary.test.ts',
+    'lib/r2-synthetic-canary.ts', 'lib/workspace-onboarding.test.ts', 'lib/workspace-onboarding.ts'], suites]);
+  for (const path of PR151_SERVICE_TRUTH_AFFECTED_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['pr151-service-truth'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['pr151-service-truth'], [], suites, [], []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const plan = affectedAskPlan(affectedMap(PR151_SERVICE_TRUTH_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
+  for (const adjacent of ['nextjs/app/api/documents/route.tsx', 'nextjs/app/api/documents/[id]/route.ts', 'nextjs/lib/pipeline.tsx', 'nextjs/lib/pipeline-v2.test.ts',
+    'nextjs/lib/r2-synthetic-canary-2.ts', 'nextjs/lib/workspace-onboarding.test.tsx', 'nextjs/lib/openapi-handler-contract.switch-off.test.ts', 'lib/pipeline.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
 

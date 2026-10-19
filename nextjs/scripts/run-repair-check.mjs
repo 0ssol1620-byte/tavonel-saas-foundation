@@ -54,6 +54,10 @@ export function liveBrowserEnv(sourceEnv = process.env) {
   const env = { ...sourceEnv };
   delete env.PADDLE_SANDBOX;
   delete env.VERCEL_ENV;
+  // Playwright's default CI git-info plugin reads pull_request.base.sha from GITHUB_EVENT_PATH and runs
+  // `git fetch origin <base> --depth=1` in this checkout. That writes .git/shallow at the PR base and cuts the baseline
+  // ancestry the final gate re-derives. Neither the server nor the browser checks read the event payload.
+  delete env.GITHUB_EVENT_PATH;
   Object.assign(env, {
     COMMERCIAL_MODE: 'live',
     TAVONEL_BILLING_LAUNCH_APPROVED: 'true',

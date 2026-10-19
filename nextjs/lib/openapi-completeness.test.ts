@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { GET as openApiRoute } from "@/app/api/openapi/route";
 import { API_ERROR_CODE_NAMES } from "./api-error-codes";
 import { DOCS_SECTIONS } from "./docs-content";
-// 39 operations is the approval lineage's surface. With the switch off (production) the route publishes
-// main's 33, pinned by lib/openapi-completeness.switch-off.test.ts (review 3, CI-TI-1).
+// 40 operations is the approval lineage's surface: its 39 plus POST /developer/keys, which G1
+// (SERVICE-DEFINITION 2026-10-17 section 2.4 C5) added to the contract. With the switch off (production) the
+// route publishes 35, pinned by lib/openapi-completeness.switch-off.test.ts (review 3, CI-TI-1; G1).
 vi.mock("@/lib/intake-approval-rollout", () => ({ INTAKE_APPROVAL_ROLLOUT_ENABLED: true }));
 
 /*
@@ -46,7 +47,7 @@ describe("OpenAPI completeness", () => {
   it("gives every operation an id, a summary, a known tag and a description", async () => {
     const { spec, list } = await operations();
     const tagNames = new Set(spec.tags.map((tag) => tag.name));
-    expect(list.length).toBe(39);
+    expect(list.length).toBe(40);
     for (const { path, method, operation } of list) {
       const where = `${method.toUpperCase()} ${path}`;
       expect(operation.operationId, where).toBeTruthy();
