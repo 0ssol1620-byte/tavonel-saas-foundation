@@ -666,4 +666,37 @@
     gap: 24px;
   }
 }
+
+/*
+  Phase 4 follow-ups (2026-10-19), two rules this sheet owns for the doc template.
+
+  1. Code is set in the code face. A `<code>` takes the user agent's `font-family: monospace`, not
+  the `<pre>` around it, so every docs code block and every inline code span was drawn in whatever
+  the browser's generic monospace was -- Consolas here, and GulimChe on a Korean-locale Chrome,
+  which draws U+005C as a won sign. The curl continuation lines and the Windows config path on
+  /docs/mcp read as "₩" there (REVIEW-ENABLEMENT-2026-10-17 founder hands). Code now names IBM Plex
+  Mono first. Plex is `display: optional`, so a first visit usually falls through the stack, and
+  the stack skips var(--font-mono) on purpose: next/font's "IBM Plex Mono Fallback" face is
+  local("Arial") at size-adjust 134.59%, a proportional face, so code drew in large Arial there.
+  ui-monospace, SFMono-Regular and Menlo exist only on Apple systems; Consolas (Windows) and
+  Liberation Mono (Linux) are named before the generic family, and neither maps U+005C to a won
+  sign in any locale.
+
+  2. /developers, tap targets that do not overlap (same review, "/developers 390px link overlap").
+  The 44px floor in tavonel.css grows an inline link by 12.5px above and below its line, which is
+  sound for one link in a sentence. Two links on adjacent lines are 22.5px apart, so each one's
+  grown box covered the lower half of the other's text and a tap there opened the wrong page. The
+  page now keeps every link off its neighbour's line: the two gate actions are a wrapping row of
+  44px targets, and each link-bearing sentence is its own item, 25px (the two 12.5px growths)
+  from the next under the same media query the floor uses. `e2e/p4-followups.spec.ts` measures
+  every pair of targets at 360, 390 and 430.
+*/
+.scene.doc code { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+.dev-actions { display: flex; flex-wrap: wrap; column-gap: 24px; margin-top: 4px; }
+/* Outranks the floor selector (:is(.fine, ...) a:not(.tile, .link), same layer): its -12.5px pull-back stacks wrapped rows 25px into each other. */
+.fine .dev-actions a:not(.tile, .link) { display: inline-flex; align-items: center; min-height: 44px; padding-block: 0; margin-block: 0; }
+.dev-refs { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+@media (pointer: coarse), (max-width: 1079px) {
+  .dev-refs { gap: 25px; }
+}
 }
