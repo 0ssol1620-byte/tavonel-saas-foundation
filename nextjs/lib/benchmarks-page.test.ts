@@ -134,6 +134,14 @@ describe("the rendered /benchmarks page", () => {
     expect(text).toContain(LOCAL_PATH_MASK);
     expect(JSON.stringify(modelArenaBoard().models.flatMap((model) => model.notes)), "the artifact itself is unchanged")
       .toContain("C:/Users/");
+    /*
+      The markup above is not all a server page ships: React keys travel in the RSC payload, which
+      renderToStaticMarkup does not produce. The built page leaked the path through `key={note}`
+      while this HTML was clean, so the notes are masked before anything -- key included -- reads
+      them. The browser check over the built page is in the EN-0 receipts.
+    */
+    expect(read("app/benchmarks/page.tsx")).toContain("model.notes.map(maskLocalPaths).map(");
+    expect(read("app/benchmarks/page.tsx")).not.toContain("key={note}>{maskLocalPaths");
   });
 
   it("carries the campaign's own caveats verbatim", () => {
