@@ -1984,9 +1984,9 @@ export const PR141_MAIN_MERGE_BCBA_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/trust-page-answers.test.ts',
 ]);
 export const PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/hero-home-responsive.spec.ts', 'e2e/home-measures.spec.ts', 'e2e/landing-v2.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/production-hardening.spec.ts', 'e2e/public-package-proof.spec.ts']);
-// Enablement batch (codex/enablement-20261017, EN-0 to EN-5 and the guide recordings): the fifty-five changed endpoints no owner
+// Enablement batch (codex/enablement-20261017, EN-0 to EN-5 and the guide recordings): the fifty-seven changed endpoints no owner
 // listed -- the changelog and its feed, the benchmarks page and its notes mask, the cookbooks index and card, the resources hub,
-// the keyless try-it's digest check and its mounts on /api and /developers, the product guide at /guide and /ko/guide with its
+// the keyless try-it's digest check, its island (moved to components/ in EN-FIX-1) and its mounts on /api and /developers, the product guide at /guide and /ko/guide with its
 // media player, and the twenty-four recordings, posters and captions with their sha256 manifest under public/guide. Each selects
 // the twenty suites that read those files directly (rendered pages, source walks, the sitemap, the manifest rehash, the nav model's
 // page-exists walk, listed here since EN-FIX-1). No browser
@@ -1996,7 +1996,7 @@ export const ENABLEMENT_AFFECTED_PATHS = Object.freeze([
   'app/api/page.tsx', 'app/benchmarks/page.tsx', 'app/changelog/feed.xml/route.ts', 'app/cookbooks/opengraph-image.tsx',
   'app/cookbooks/page.tsx', 'app/developers/page.tsx', 'app/guide/opengraph-image.tsx', 'app/guide/page.tsx',
   'app/ko/guide/opengraph-image.tsx', 'app/ko/guide/page.tsx', 'app/product-polish.css', 'app/resources/page.tsx',
-  'components/changelog-list.tsx', 'components/guide/guide-media.tsx', 'components/guide/guide-page.tsx',
+  'components/api-try-it.tsx', 'components/changelog-list.tsx', 'components/guide/guide-media.module.css', 'components/guide/guide-media.tsx', 'components/guide/guide-page.tsx',
   'components/guide/guide.module.css', 'e2e/keyless-try-it.spec.ts', 'lib/benchmarks-page.test.ts', 'lib/changelog.test.ts',
   'lib/changelog.ts', 'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts',
   'lib/guide-content.ts', 'lib/keyless-read.test.ts', 'lib/keyless-read.ts', 'lib/keyless-try-it.test.ts',
@@ -2312,7 +2312,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // paper-product.css route ownership: the two exact components above select three direct suites and the Explore and Pricing suites.
   affectedGroup('paper-product-route-css', new RegExp(`^nextjs/(?:${exactPathAlternation(PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS)})$`),
     { unitFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, browserFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES }),
-  // Enablement batch: the fifty-five exact paths above select twenty direct suites and no browser suite.
+  // Enablement batch: the fifty-seven exact paths above select twenty direct suites and no browser suite.
   affectedGroup('enablement-20261017', new RegExp(`^nextjs/(?:${exactPathAlternation(ENABLEMENT_AFFECTED_PATHS)})$`),
     { unitFiles: ENABLEMENT_AFFECTED_UNIT_FILES }),
   // PR #141 fix round 3: the fourteen exact paths above select their direct suites and the site chrome browser suite.

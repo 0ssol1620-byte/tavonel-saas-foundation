@@ -7462,10 +7462,10 @@ test('OCR v3 admission owns exactly the seven newly encountered endpoints and se
   assert.deepEqual(oldOwner.map(owner => owner.group), ['compile-source-observations']);
 });
 
-test('affected enablement owner: fifty-five exact paths select twenty direct suites and no browser suite; neighbours stay unmapped', async () => {
+test('affected enablement owner: fifty-seven exact paths select twenty direct suites and no browser suite; neighbours stay unmapped', async () => {
   const { ENABLEMENT_AFFECTED_PATHS: paths, ENABLEMENT_AFFECTED_UNIT_FILES: units } = await import('./repair-scope.mjs');
   const suites = ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/changelog.test.ts', 'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/design-tokens.test.ts', 'lib/developer-snippets.test.ts', 'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/guide-content.test.ts', 'lib/keyless-read.test.ts', 'lib/keyless-try-it.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/product-claims-sync.test.ts', 'lib/resources-hub.test.ts', 'lib/seo-surface.test.ts', 'lib/site-nav-model.test.ts', 'lib/trust-page-answers.test.ts'];
-  assert.equal(paths.length, 55);
+  assert.equal(paths.length, 57);
   assert.deepEqual([...units], suites);
   assert.deepEqual(paths.filter(path => path.startsWith('public/guide/')).length, 25);
   for (const path of paths) {
