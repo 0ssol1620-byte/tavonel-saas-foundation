@@ -6809,7 +6809,7 @@ test('affected pilot worksheet admission: adjacent and lookalike paths, other lo
     'supabase/functions/contact/index.ts','supabase/functions/evaluation-request/index.ts',
     'components/evaluation-page.tsx','public/evaluation/pilot-worksheet.en.md','lib/pilot-evaluation-worksheet.test.ts','components/evaluation-page.test.tsx',
     'evaluation/pilot-worksheet.ko.md','nextjs/nextjs/components/evaluation-page.tsx']) {
-    if (assertNewReviewedMarketingEndpoint(path)) continue;
+    if (assertNewReviewedMarketingEndpoint(path) || assertLaunchSwitchEndpoint(path)) continue;
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
@@ -7356,10 +7356,10 @@ test('affected benchmarks path mask owner: four exact paths select seven direct 
 
 // B-01 (2026-10-19): the UX program's four finite owners, each restated independently of the exported constants.
 import { UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES, TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_PATHS, SPECIMEN_STRIP_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_BROWSER_FILES, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
-test('affected ux-billing-checkout owner: 23 exact paths select 17 direct suites and 2 browser suites; neighbours stay unmapped', () => {
-  const suites = ['lib/access-bootstrap-admission.test.ts', 'lib/billing-binding.test.ts', 'lib/billing-gate-enforce-route.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-intent.test.ts', 'lib/checkout-policy.test.ts', 'lib/commercial-state.test.ts', 'lib/cta-truth.test.ts', 'lib/customer-data-admission.test.ts', 'lib/entitlement-wait.test.ts', 'lib/paddle-billing-event.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/processing-workspace-grant.test.ts', 'lib/production-posture.test.ts', 'lib/scoped-admission-boundaries.test.ts', 'lib/self-service-trial-device-rotation.test.ts', 'lib/use-checkout.test.ts'];
+test('affected ux-billing-checkout owner: 24 exact paths select 25 direct suites and 2 browser suites; neighbours stay unmapped', () => {
+  const suites = ['lib/access-bootstrap-admission.test.ts', 'lib/billing-binding.test.ts', 'lib/billing-gate-enforce-route.test.ts', 'lib/brand-copy.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-intent.test.ts', 'lib/checkout-policy.test.ts', 'lib/commercial-state.test.ts', 'lib/cta-truth.test.ts', 'lib/customer-data-admission.test.ts', 'lib/customer-data-live-path.test.ts', 'lib/entitlement-wait.test.ts', 'lib/landing-v2-use.test.ts', 'lib/operations.test.ts', 'lib/paddle-billing-event.test.ts', 'lib/page-seo.test.ts', 'lib/pilot-evaluation-worksheet.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/processing-workspace-grant.test.ts', 'lib/production-posture.test.ts', 'lib/public-status.test.ts', 'lib/scoped-admission-boundaries.test.ts', 'lib/self-service-trial-device-rotation.test.ts', 'lib/status-route-contract.test.ts', 'lib/use-checkout.test.ts'];
   const browsers = ['e2e/login-capability.spec.ts', 'e2e/self-serve-journey.spec.ts'];
-  assert.deepEqual([[...UX_BILLING_CHECKOUT_AFFECTED_PATHS], [...UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES], [...UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES]], [['app/api/internal/billing/gate-enforce/route.ts', 'components/checkout-intent-notice.tsx', 'e2e/fixtures/paddle-fixture.ts', 'e2e/login-capability.spec.ts', 'e2e/self-serve-journey.spec.ts', 'lib/billing-binding.test.ts', 'lib/billing-binding.ts', 'lib/checkout-intent.test.ts', 'lib/checkout-intent.ts', 'lib/commercial-state.test.ts', 'lib/cta-truth.test.ts', 'lib/customer-data-admission.test.ts', 'lib/entitlement-wait.test.ts', 'lib/entitlement-wait.ts', 'lib/paddle-billing-event.test.ts', 'lib/paddle-billing-event.ts', 'lib/processing-consent-panel.test.ts', 'lib/processing-workspace-grant.test.ts', 'lib/processing-workspace-grant.ts', 'lib/self-service-trial-device-rotation.test.ts', 'lib/self-service-trial.ts', 'lib/use-checkout.test.ts', 'lib/use-checkout.ts'], suites, browsers]);
+  assert.deepEqual([[...UX_BILLING_CHECKOUT_AFFECTED_PATHS], [...UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES], [...UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES]], [['app/api/internal/billing/gate-enforce/route.ts', 'components/checkout-intent-notice.tsx', 'e2e/fixtures/paddle-fixture.ts', 'e2e/login-capability.spec.ts', 'e2e/self-serve-journey.spec.ts', 'lib/activation-policy.ts', 'lib/billing-binding.test.ts', 'lib/billing-binding.ts', 'lib/checkout-intent.test.ts', 'lib/checkout-intent.ts', 'lib/commercial-state.test.ts', 'lib/cta-truth.test.ts', 'lib/customer-data-admission.test.ts', 'lib/entitlement-wait.test.ts', 'lib/entitlement-wait.ts', 'lib/paddle-billing-event.test.ts', 'lib/paddle-billing-event.ts', 'lib/processing-consent-panel.test.ts', 'lib/processing-workspace-grant.test.ts', 'lib/processing-workspace-grant.ts', 'lib/self-service-trial-device-rotation.test.ts', 'lib/self-service-trial.ts', 'lib/use-checkout.test.ts', 'lib/use-checkout.ts'], suites, browsers]);
   for (const path of UX_BILLING_CHECKOUT_AFFECTED_PATHS) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['ux-billing-checkout'], path);
     const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
@@ -7518,6 +7518,16 @@ test('affected published024 marketing admission: discovery duplicate cleanup pre
   assert.ok(vitestDiscoveryConfigFailures(duplicate).includes('include is duplicated: components/landing-v2/hero-source-card.test.tsx'));
   assert.ok(vitestDiscoveryConfigFailures(source.replace('environment: "node"','environment: "jsdom"')).some(x=>x.includes('changed outside its include list')));
 });
+
+// Phase 4 LAUNCH (P2-37 / register D-12) gave the launch switch one finite owner. An older owner's negative list keeps it out of its own
+// selection and asserts exactly that owner instead of an unmapped path.
+function assertLaunchSwitchEndpoint(path) {
+  if(path!=='nextjs/lib/activation-policy.ts') return false;
+  const map=affectedMap([affectedRecord('M',[path])]);
+  assert.deepEqual([map.failures,map.groups,map.unmappedPaths],[[],['ux-billing-checkout'],[]],path);
+  assert.ok(map.unitFiles.includes('lib/production-posture.test.ts') && map.unitFiles.includes('lib/pilot-evaluation-worksheet.test.ts'),path);
+  return true;
+}
 
 // Old-owner negative lists include paths deliberately registered by published024. Keep positive finite ownership
 // and the unreadable tooling rejection explicit; every other spelling/path still runs its original rejection.
