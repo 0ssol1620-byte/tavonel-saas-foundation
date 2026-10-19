@@ -59,10 +59,15 @@ export const CHANGE_NOTIFY_MAX_ATTEMPTS = CHANGE_NOTIFY_RETRY_DELAYS_SECONDS.len
 
 const WORKSPACE_KEY = /^pilot-[A-Za-z0-9]{1,16}$/;
 const COLLECTION_ID = /^collection-[a-f0-9]{32}$/;
-const SHA256 = /^[a-f0-9]{64}$/;
+// The form both digest columns hold: foundation_compile_jobs_candidate_digest_shape
+// (20260911120200) and foundation_world_versions.manifest_digest (0007), which the active pointer
+// references. The test's fake store reads those CHECKs from the migration files.
+const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const DELIVERY_ID = /^dlv_[a-f0-9]{32}$/;
 const MAX_ENDPOINTS = 50;
 const SWEEP_WINDOW_MS = 24 * 60 * 60 * 1_000;
+// Per workspace. ponytail: a workspace with more than 50 compiles in 24 h can still push one of its
+// own collections out of the window; page the sweep when a workspace gets there.
 const SWEEP_LIMIT = 50;
 const DELIVERY_LIMIT = 5;
 const DELIVERY_TIMEOUT_MS = 5_000;
@@ -176,25 +181,31 @@ export async function runChangeNotifyTurn(
   if (endpoints.size === 0) return result;
 
   // 1. Detect: newest candidate per (workspace, collection) whose digest is not the active one.
-  // Only registered workspaces are read, and every event is built from its own row's workspace.
+  // Each registered workspace is read on its own, so a busy one cannot push another's change out
+  // of the sweep, and every event is built from its own row's workspace.
   const workspaces = [...endpoints.keys()];
   const since = new Date(now().getTime() - SWEEP_WINDOW_MS).toISOString();
-  const jobs = await rows(store, `/rest/v1/foundation_compile_jobs?${new URLSearchParams({
+  const sweeps = await Promise.all(workspaces.map((workspace) => rows(store, `/rest/v1/foundation_compile_jobs?${new URLSearchParams({
     select: "workspace_key,collection_id,candidate_manifest_digest,state,updated_at",
-    workspace_key: `in.(${workspaces.join(",")})`,
+    workspace_key: `eq.${workspace}`,
     state: "in.(ready,review_required)",
     candidate_manifest_digest: "not.is.null",
     updated_at: `gte.${since}`,
     order: "updated_at.desc",
     limit: String(SWEEP_LIMIT),
-  })}`);
-  if (!jobs) result.errors.push("CHANGE_NOTIFY_SWEEP_READ_FAILED");
+  })}`)));
+  if (sweeps.includes(null)) result.errors.push("CHANGE_NOTIFY_SWEEP_READ_FAILED");
   const newest = new Map<string, Record<string, unknown>>();
-  for (const job of jobs ?? []) {
+  let unreadableJob = false;
+  for (const job of sweeps.flatMap((sweep) => sweep ?? [])) {
     const ws = String(job.workspace_key), collection = String(job.collection_id), digest = String(job.candidate_manifest_digest);
-    if (!endpoints.has(ws) || !COLLECTION_ID.test(collection) || !SHA256.test(digest)) continue;
+    if (!endpoints.has(ws)) continue;
+    // A row in a shape the sender cannot read is named, never skipped quietly: a skipped row is a
+    // change nobody is told about, in a turn that still says OK.
+    if (!COLLECTION_ID.test(collection) || !SHA256.test(digest)) { unreadableJob = true; continue; }
     if (!newest.has(`${ws}/${collection}`)) newest.set(`${ws}/${collection}`, job);
   }
+  if (unreadableJob) result.errors.push("CHANGE_NOTIFY_JOB_ROW_INVALID");
   if (newest.size > 0) {
     const collections = [...new Set([...newest.values()].map((job) => String(job.collection_id)))];
     const pointers = await rows(store, `/rest/v1/foundation_active_worlds?${new URLSearchParams({
@@ -205,8 +216,11 @@ export async function runChangeNotifyTurn(
     if (!pointers) result.errors.push("CHANGE_NOTIFY_POINTER_READ_FAILED");
     else {
       const active = new Map(pointers.map((row) => [`${row.workspace_key}/${row.collection_id}`, String(row.manifest_digest)]));
+      let unreadablePointer = false;
       const fresh = [...newest.entries()].flatMap(([pair, job]) => {
         const activeDigest = active.get(pair);
+        // An active World the sender cannot read is not "nothing active": that pair waits, named.
+        if (activeDigest !== undefined && !SHA256.test(activeDigest)) { unreadablePointer = true; return []; }
         const candidate = String(job.candidate_manifest_digest);
         if (activeDigest === candidate) return [];
         const workspaceKey = String(job.workspace_key), collectionId = String(job.collection_id);
@@ -214,13 +228,14 @@ export async function runChangeNotifyTurn(
         const event: ChangeNotificationEvent = {
           type: CHANGE_NOTIFY_EVENT_TYPE, deliveryId, workspaceKey, collectionId,
           candidateManifestDigest: candidate,
-          activeManifestDigest: activeDigest && SHA256.test(activeDigest) ? activeDigest : null,
+          activeManifestDigest: activeDigest ?? null,
           processedAt: String(job.updated_at),
           reviewRequired: job.state === "review_required",
           activation: "explicit_human_decision",
         };
         return [{ delivery_id: deliveryId, workspace_key: workspaceKey, event }];
       });
+      if (unreadablePointer) result.errors.push("CHANGE_NOTIFY_POINTER_ROW_INVALID");
       if (fresh.length > 0) {
         // The primary key is the delivery id: a change already enqueued, delivered or dead is a no-op.
         const inserted = await rows(store, `${TABLE}?on_conflict=delivery_id`, {

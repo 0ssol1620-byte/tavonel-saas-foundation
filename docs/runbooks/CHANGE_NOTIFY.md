@@ -31,7 +31,13 @@ Follows `RELEASE_ORDER.md`: migration first, then the environment that reaches i
 ## Operating it
 
 - The cron route returns the turn: `enqueued`, `delivered`, `retrying`, `dead`, `errors`. Any error
-  makes it `CHANGE_NOTIFY_INCOMPLETE` with HTTP 503 and a `console.error` line.
+  makes it `CHANGE_NOTIFY_INCOMPLETE` with HTTP 503 and a `console.error` line; that includes a
+  compile-job or active-World row whose digest is not `sha256:` + 64 hex
+  (`CHANGE_NOTIFY_JOB_ROW_INVALID`, `CHANGE_NOTIFY_POINTER_ROW_INVALID`). Switched on without a
+  usable secret or registry is also a 503 (`CHANGE_NOTIFY_SECRET_MISSING`,
+  `CHANGE_NOTIFY_ENDPOINTS_INVALID`). Only `CHANGE_NOTIFY_DISABLED` and `OK` answer 200.
+- The sweep reads each registered workspace's newest 50 finished compiles of the last 24 hours on
+  its own; a workspace with more than that can push one of its own collections out of the window.
 - Six attempts (delays 60, 300, 1,800, 7,200, 21,600 s, at cron granularity), then `state = 'dead'`
   with `dead_letter_receipt` (attempts, last status and error, body sha256). A dead row is never
   resent.

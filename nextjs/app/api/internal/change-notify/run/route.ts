@@ -20,7 +20,10 @@ async function run(request: Request) {
     return NextResponse.json({ code: "CHANGE_NOTIFY_NOT_AUTHORIZED" }, { status: 401, headers: HEADERS });
   }
   const turn = await runChangeNotifyTurn();
-  return NextResponse.json(turn, { status: turn.code === "CHANGE_NOTIFY_INCOMPLETE" ? 503 : 200, headers: HEADERS });
+  // Off and a clean turn are the only 200s. Switched on but unable to run (no secret, a bad
+  // registry, a store error) is a 503 a cron monitor sees.
+  const quiet = turn.code === "OK" || turn.code === "CHANGE_NOTIFY_DISABLED";
+  return NextResponse.json(turn, { status: quiet ? 200 : 503, headers: HEADERS });
 }
 
 export const GET = run;
