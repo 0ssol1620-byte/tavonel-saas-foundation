@@ -6,6 +6,7 @@ import {
   bearerChallenge,
   checkBearer,
   remoteMcpEnabled,
+  requestOrigin,
 } from "@/lib/remote-mcp";
 import { GET as listSources } from "../v1/documents/route";
 import { GET as listWorlds } from "../v1/collections/route";
@@ -60,7 +61,7 @@ function rpcError(status: number, id: unknown, code: number, message: string, he
 
 export async function POST(request: Request) {
   if (!remoteMcpEnabled()) return new NextResponse(null, { status: 404 });
-  const origin = new URL(request.url).origin;
+  const origin = requestOrigin(request);
   // Streamable HTTP: servers MUST validate Origin. Server-side clients send none.
   const from = request.headers.get("origin");
   if (from !== null && from !== origin) return rpcError(403, null, -32000, "MCP_ORIGIN_REFUSED");

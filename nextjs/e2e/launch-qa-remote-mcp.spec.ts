@@ -4,6 +4,7 @@ const { expect, test } = "test" in playwrightModule ? playwrightModule : playwri
 
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
+import { createServer } from "node:net";
 import { createHash, randomBytes } from "node:crypto";
 import { resolve } from "node:path";
 
@@ -54,8 +55,14 @@ test.describe("remote MCP with the switch on (fixture env)", () => {
   let base = "";
 
   test.beforeAll(async ({}, testInfo) => {
-    testInfo.setTimeout(120_000);
-    const port = 3127 + testInfo.workerIndex;
+    testInfo.setTimeout(240_000);
+    // A port the OS hands out, not a fixed one: other lanes on the same machine run servers too.
+    const port = await new Promise<number>((settle) => {
+      const probe = createServer().listen(0, "127.0.0.1", () => {
+        const { port: free } = probe.address() as { port: number };
+        probe.close(() => settle(free));
+      });
+    });
     base = `http://127.0.0.1:${port}`;
     server = spawn(process.execPath, [resolve("node_modules/next/dist/bin/next"), "start", "--hostname", "127.0.0.1", "--port", String(port)], {
       cwd: process.cwd(),
@@ -68,15 +75,27 @@ test.describe("remote MCP with the switch on (fixture env)", () => {
         TAVONEL_REMOTE_MCP_SIGNING_SECRET: randomBytes(32).toString("base64url"),
       },
     });
-    for (const deadline = Date.now() + 100_000; Date.now() < deadline;) {
+    let ready = false;
+    for (const deadline = Date.now() + 100_000; !ready && Date.now() < deadline;) {
       try {
-        if ((await fetch(`${base}/api/healthz`)).ok) return;
+        ready = (await fetch(`${base}/api/healthz`)).ok;
       } catch {
         // not listening yet
       }
-      await new Promise((settle) => setTimeout(settle, 500));
+      if (!ready) await new Promise((settle) => setTimeout(settle, 500));
     }
-    throw new Error(`the switch-on server did not answer on ${base}`);
+    if (!ready) throw new Error(`the switch-on server did not answer on ${base}`);
+    /*
+      `next start` preloads every route entry just after it reports ready, and on a slow disk (a
+      Windows runner with on-access scanning) that blocks requests for tens of seconds. Spend it
+      here, inside the hook's budget: ready means three consecutive quick answers.
+    */
+    await new Promise((settle) => setTimeout(settle, 5_000));
+    for (let quick = 0; quick < 3;) {
+      const started = Date.now();
+      await fetch(`${base}/api/healthz`);
+      quick = Date.now() - started < 1_500 ? quick + 1 : 0;
+    }
   });
 
   test.afterAll(() => {
@@ -112,7 +131,7 @@ test.describe("remote MCP with the switch on (fixture env)", () => {
     expect([badCode.status(), (await badCode.json()).error]).toEqual([401, "invalid_client"]);
   });
 
-  test("shows a registered client's consent request, signed out, at three phone widths", async ({ request, page }, testInfo) => {
+  test("shows a registered client's consent request and asks a signed-out person to sign in, at three phone widths", async ({ request, page }, testInfo) => {
     const registered = await request.post(`${base}/api/mcp/oauth/register`, {
       data: { client_name: "Fixture agent", redirect_uris: ["https://client.example/oauth/callback"] },
     });
@@ -130,10 +149,14 @@ test.describe("remote MCP with the switch on (fixture env)", () => {
       await page.setViewportSize({ width, height: 844 });
       const response = await page.goto(`${base}/oauth/authorize?${query}`);
       expect(response?.status()).toBe(200);
-      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in to connect an AI client.");
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Connect an AI client.");
       await expect(page.getByText("Fixture agent", { exact: true })).toBeVisible();
       await expect(page.getByText("https://client.example", { exact: true })).toBeVisible();
+      // No session in this browser: allowing asks for a sign-in and grants nothing.
+      await page.getByRole("button", { name: "Allow read-only access" }).click();
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in to connect an AI client.");
       await expect(page.getByRole("link", { name: "Sign in in a new tab" })).toBeVisible();
+      expect(page.url()).toContain("/oauth/authorize");
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow, `horizontal overflow at ${width}`).toBeLessThanOrEqual(0);
       await testInfo.attach(`remote-mcp-consent-${width}.png`, { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });

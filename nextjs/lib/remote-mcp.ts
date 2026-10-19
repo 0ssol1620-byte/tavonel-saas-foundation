@@ -55,6 +55,22 @@ export const REMOTE_MCP_SCOPES: readonly DeveloperScope[] = [...new Set(Object.v
 export const REMOTE_MCP_CODE_TTL_SECONDS = 120;
 export const REMOTE_MCP_TOKEN_TTL_SECONDS = 3600;
 
+const HOST = /^[A-Za-z0-9.-]{1,253}(?::[0-9]{1,5})?$/;
+
+/**
+ * The origin the client actually addressed: issuer, resource and redirect `iss` must equal the URL
+ * it discovered them from (RFC 8414 §3.3). On Vercel the forwarded host is the routed domain;
+ * `next start` reports `localhost` in `request.url` whatever the client used, so the Host header
+ * is read first and the URL is the fallback for a request that carries none (unit tests).
+ */
+export function requestOrigin(request: Request): string {
+  const url = new URL(request.url);
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  const forwarded = request.headers.get("x-forwarded-proto");
+  const scheme = forwarded === "https" || forwarded === "http" ? forwarded : url.protocol.slice(0, -1);
+  return host && HOST.test(host) ? `${scheme}://${host}` : url.origin;
+}
+
 export function remoteMcpUrls(origin: string) {
   return {
     issuer: origin,

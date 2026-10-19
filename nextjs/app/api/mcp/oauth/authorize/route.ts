@@ -6,6 +6,7 @@ import {
   issueAuthorizationCode,
   remoteMcpEnabled,
   remoteMcpSealingKey,
+  requestOrigin,
   type AuthorizationParameters,
 } from "@/lib/remote-mcp";
 
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
   if (!remoteMcpEnabled()) return new NextResponse(null, { status: 404 });
   const key = remoteMcpSealingKey();
   if (!key) return NextResponse.json({ code: "REMOTE_MCP_NOT_CONFIGURED" }, { status: 503, headers: NO_STORE });
-  const origin = new URL(request.url).origin;
+  const origin = requestOrigin(request);
   const text = await request.text();
   if (text.length > 16_384) return NextResponse.json({ code: "REQUEST_TOO_LARGE" }, { status: 413, headers: NO_STORE });
   let body: { decision?: unknown; request?: Record<string, unknown> };

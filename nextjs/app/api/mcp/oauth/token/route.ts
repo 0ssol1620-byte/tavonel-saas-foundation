@@ -7,6 +7,7 @@ import {
   keyNameFor,
   remoteMcpEnabled,
   remoteMcpSealingKey,
+  requestOrigin,
   type RemoteMcpTokenResponse,
 } from "@/lib/remote-mcp";
 
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
   }
   const text = await request.text();
   if (text.length > 16_384) return oauthError(400, "invalid_request", "The token request is too large.");
-  const checked = checkTokenRequest(new URLSearchParams(text), key, new URL(request.url).origin);
+  const checked = checkTokenRequest(new URLSearchParams(text), key, requestOrigin(request));
   if (!checked.ok) return oauthError(checked.status, checked.error, checked.error_description);
   const { grant } = checked;
 

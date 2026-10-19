@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { remoteMcpEnabled, resourceMetadata } from "@/lib/remote-mcp";
+import { remoteMcpEnabled, requestOrigin, resourceMetadata } from "@/lib/remote-mcp";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -14,5 +14,5 @@ export async function GET(request: Request, context: { params: Promise<{ resourc
   if (!remoteMcpEnabled()) return new NextResponse(null, { status: 404 });
   const { resource = [] } = await context.params;
   if (resource.length > 0 && resource.join("/") !== "api/mcp") return new NextResponse(null, { status: 404 });
-  return NextResponse.json(resourceMetadata(new URL(request.url).origin), { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(resourceMetadata(requestOrigin(request)), { headers: { "Cache-Control": "no-store" } });
 }

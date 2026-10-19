@@ -73,7 +73,7 @@ import { GET as protectedResource } from "../app/.well-known/oauth-protected-res
 import { GET as authorizationServer } from "../app/.well-known/oauth-authorization-server/route";
 import OAuthAuthorizeLayout from "../app/oauth/authorize/layout";
 import { TOOLS } from "../public/developer/tavonel-mcp.mjs";
-import { REMOTE_MCP_SCOPES, REMOTE_MCP_TOOL_SCOPES } from "./remote-mcp";
+import { REMOTE_MCP_SCOPES, REMOTE_MCP_TOOL_SCOPES, requestOrigin } from "./remote-mcp";
 
 const VERIFIER = "remote-mcp-pkce-verifier-0123456789-abcdefghij";
 const CHALLENGE = createHash("sha256").update(VERIFIER).digest("base64url");
@@ -291,6 +291,17 @@ describe("a token for one workspace reads nothing of another", () => {
     expect(result.isError).toBe(false);
     expect(JSON.parse(result.content[0]!.text).collections).toHaveLength(1);
     expect(mocks.listWorlds).toHaveBeenCalledWith(MINE, { limit: 5, cursor: null });
+  });
+});
+
+describe("the origin metadata is bound to", () => {
+  it("is the host the client addressed, with the forwarded scheme, and the URL when no host is sent", () => {
+    const at = (headers: Record<string, string>) => requestOrigin(new Request("http://localhost:3000/api/mcp", { headers }));
+    expect(at({ host: "127.0.0.1:3471" })).toBe("http://127.0.0.1:3471");
+    expect(at({ host: "tavonel.com", "x-forwarded-proto": "https" })).toBe("https://tavonel.com");
+    expect(at({ host: "internal:3000", "x-forwarded-host": "preview.tavonel.test", "x-forwarded-proto": "https" })).toBe("https://preview.tavonel.test");
+    expect(at({ host: "evil.test/path?x" , "x-forwarded-proto": "javascript" })).toBe("http://localhost:3000");
+    expect(at({})).toBe("http://localhost:3000");
   });
 });
 

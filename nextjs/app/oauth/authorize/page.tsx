@@ -8,6 +8,10 @@
  * decision with the bearer. The server decides everything that matters -- whether the client and
  * its redirect URI verify, what may be granted, whether this workspace may hold a key -- and this
  * page only shows the answer and navigates where the server says.
+ *
+ * The Supabase client is imported on the click that needs a session, not on load: it is the
+ * largest chunk on the page, and loading it up front put the route over the 200,000 B script
+ * budget (§22). A signed-out person sees the request first and is asked to sign in when they allow.
  */
 
 import Link from "next/link";
@@ -70,8 +74,7 @@ export default function OAuthAuthorizePage() {
         setPhase({ kind: "invalid", description: typeof body.description === "string" ? body.description : failureSentence(String(body.code ?? ""), status) });
         return;
       }
-      const view = { client: body.client, scopes: body.scopes } as View;
-      setPhase({ kind: (await sessionToken()) ? "consent" : "signed-out", view });
+      setPhase({ kind: "consent", view: { client: body.client, scopes: body.scopes } as View });
     } catch {
       setPhase({ kind: "invalid", description: failureSentence(null, 503) });
     }
@@ -82,7 +85,12 @@ export default function OAuthAuthorizePage() {
   const submit = async (decision: "approve" | "deny", view: View) => {
     setPhase({ kind: "working", view });
     try {
-      const { status, body } = await decide(decision, decision === "approve" ? await sessionToken() : null);
+      const token = decision === "approve" ? await sessionToken() : null;
+      if (decision === "approve" && !token) {
+        setPhase({ kind: "signed-out", view });
+        return;
+      }
+      const { status, body } = await decide(decision, token);
       if (leave(body.redirectTo)) return;
       if (status === 401) setPhase({ kind: "signed-out", view });
       else setPhase({ kind: "unavailable", code: String(body.code ?? ""), status });
