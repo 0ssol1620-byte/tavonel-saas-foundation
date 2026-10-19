@@ -158,6 +158,8 @@ describe("G1-COPY: /status and /api/readyz", () => {
     expect(operations.readiness.billingLive).toBe(purchasable);
     expect(operations.components.billing.state).toBe("disabled");
     expect(operations.components.billing.detail).not.toBe("Paddle live checkout");
+    // The launch flag is on here, so the row may not say approval is what it waits for.
+    expect(operations.components.billing.detail).toBe("Paddle live checkout configured; checkout is closed and no plan can be bought");
   });
 });
 

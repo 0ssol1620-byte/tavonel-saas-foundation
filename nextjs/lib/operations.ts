@@ -118,7 +118,10 @@ export function readPublicOperations() {
           ? "Paddle sandbox; no real charge"
           : billingLaunchApproved
             ? "Paddle live checkout"
-            : "Paddle live checkout configured; launch approval pending",
+            // G1-COPY: with the launch flag on and the purchase path closed, "launch approval pending" was false.
+            : commercial.liveChargesEnabled
+              ? "Paddle live checkout configured; checkout is closed and no plan can be bought"
+              : "Paddle live checkout configured; launch approval pending",
       },
       export: {
         state: readExportSignerEnv() ? "configured" : "not_configured",
