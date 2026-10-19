@@ -49,10 +49,45 @@ export type DocumentRefusal = {
   occurredAt: string;
 };
 
+/**
+ * `stored`: the source is in quarantine and nothing after it is recorded -- no immutable object
+ * and no refusal. That is a document still being prepared, or one whose preparation stopped
+ * without writing anything; the listing cannot tell the two apart, so it says only what it saw.
+ */
 export type PipelineDocument = Omit<DocumentListItem, "processingState"> & {
-  processingState: DocumentListItem["processingState"] | "refused";
+  processingState: DocumentListItem["processingState"] | "refused" | "stored";
   refusal?: DocumentRefusal;
 };
+
+/**
+ * `/api/documents`'s marker for a listing it could not complete. Absent when nothing failed.
+ *
+ * `documentIds` are documents the listing knows exist but could not fully read: a refusal or
+ * review receipt that failed to load or validate. One that is also in `documents` is listed
+ * without the detail that failed; one that is not could not be described at all. `truncated`
+ * means the quarantine listing hit its bound, so sources past it -- of any state -- may be missing.
+ */
+export type DocumentListPartial = {
+  documentIds: string[];
+  truncated: boolean;
+};
+
+export function storedPipelineDocument(documentId: string): PipelineDocument {
+  return {
+    documentId,
+    // No immutable version exists yet, so there is no version key: absence, not a placeholder.
+    versionKey: "",
+    sanitizedKey: null,
+    sanitizedSize: null,
+    sanitizedObservedAt: null,
+    ocrJsonKey: null,
+    ocrJsonSize: null,
+    hasOcrJson: false,
+    cdrReceiptKey: null,
+    ocrReviewKey: null,
+    processingState: "stored",
+  };
+}
 
 export function ambiguousPipelineDocument(documentId: string): PipelineDocument {
   return {
@@ -176,16 +211,17 @@ export function buildPipeline(
   const compiled = new Set(compiledDocumentIds);
   const byDocumentId = new Map<string, PipelineDocument>();
   const listed = documents ?? [];
+  const noVersion = (state: PipelineDocument["processingState"]) => state === "refused" || state === "stored";
   const immutable = listed.filter(
     (item): item is PipelineDocument & { processingState: DocumentListItem["processingState"] } =>
-      item.processingState !== "refused",
+      !noVersion(item.processingState),
   );
   const selected = selectCurrentDocumentVersions(immutable);
   for (const item of selected.documents) byDocumentId.set(item.documentId, item);
   for (const documentId of selected.ambiguousDocumentIds) {
     byDocumentId.set(documentId, ambiguousPipelineDocument(documentId));
   }
-  for (const item of listed.filter((candidate) => candidate.processingState === "refused")) {
+  for (const item of listed.filter((candidate) => noVersion(candidate.processingState))) {
     if (!byDocumentId.has(item.documentId)) byDocumentId.set(item.documentId, item);
   }
 
@@ -244,7 +280,8 @@ function quarantineStage(upload: LocalUpload | null, server: PipelineDocument | 
 
 function sanitizeStage(previous: StageState, server: PipelineDocument | null): Stage {
   if (previous === "failed") return stage("sanitize", "waiting");
-  if (!server) {
+  // A stored source says the transfer landed and nothing more, which is what no server row says.
+  if (!server || server.processingState === "stored") {
     return previous === "done"
       ? stage("sanitize", "active", "preparing a safe source copy")
       : stage("sanitize", "waiting");

@@ -1886,6 +1886,28 @@ export const FIX_ROUND_4_AFFECTED_PATHS = Object.freeze([
   'lib/openapi-routes.test.ts',
 ]);
 export const FIX_ROUND_4_AFFECTED_UNIT_FILES = Object.freeze([...FIX_ROUND_4_AFFECTED_PATHS]);
+// PR #151 service truth: the documents listing pages the quarantine listing, fails closed on a broken one and reports a partial
+// load (route, R2 listing, pipeline `stored` row, workspace inventory state), and the OpenAPI handler contract suite. The nine
+// endpoints no owner listed select their direct suites, plus api-error-codes, which scans app/api/documents for every code it
+// returns. No browser suite of its own: the workspace page and its specs keep their existing owners. Product code, so never nativeReuse.
+export const PR151_SERVICE_TRUTH_AFFECTED_PATHS = Object.freeze([
+  'app/api/documents/route.ts', 'lib/documents-route.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/pipeline.test.ts',
+  'lib/pipeline.ts', 'lib/r2-synthetic-canary.test.ts', 'lib/r2-synthetic-canary.ts', 'lib/workspace-onboarding.test.ts',
+  'lib/workspace-onboarding.ts',
+]);
+export const PR151_SERVICE_TRUTH_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/api-error-codes.test.ts', 'lib/documents-route.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/pipeline.test.ts',
+  'lib/r2-synthetic-canary.test.ts', 'lib/workspace-onboarding.test.ts',
+]);
+// OCR_PAGES_INCOMPLETE: the CDR page-range code (PR #152) joins the OCR review receipt codes and the credit release reasons.
+// The four endpoints no owner listed select their two direct suites, plus documents-route, which runs the receipt validator
+// through the documents listing. No browser suite of its own. Product code, so never nativeReuse.
+export const OCR_PAGES_INCOMPLETE_AFFECTED_PATHS = Object.freeze([
+  'lib/operations-p0.test.ts', 'lib/operations-p0.ts', 'lib/processing-receipts.test.ts', 'lib/processing-receipts.ts',
+]);
+export const OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/documents-route.test.ts', 'lib/operations-p0.test.ts', 'lib/processing-receipts.test.ts',
+]);
 // PR #141's merge of main bcba7173 (Home Release 3, PR #150): the thirty changed endpoints no owner listed -- the Home and
 // Korean entry pages, the receipted measurement band (component, styles, data, its claims pack and suite, its receipt and research
 // note), the re-cut film posters with their lock file and README, the stage and copy modules, the evidence record, the public
@@ -2301,6 +2323,12 @@ export const AFFECTED_GROUPS = Object.freeze([
   // PR #141 fix round 4: the seven exact OpenAPI suites above select themselves.
   affectedGroup('pr141-fix-round-4', new RegExp(`^nextjs/(?:${exactPathAlternation(FIX_ROUND_4_AFFECTED_PATHS)})$`),
     { unitFiles: FIX_ROUND_4_AFFECTED_UNIT_FILES }),
+  // PR #151 service truth: the nine exact paths above select six direct suites and no browser suite.
+  affectedGroup('pr151-service-truth', new RegExp(`^nextjs/(?:${exactPathAlternation(PR151_SERVICE_TRUTH_AFFECTED_PATHS)})$`),
+    { unitFiles: PR151_SERVICE_TRUTH_AFFECTED_UNIT_FILES }),
+  // OCR_PAGES_INCOMPLETE: the four exact paths above select three direct suites and no browser suite.
+  affectedGroup('ocr-pages-incomplete-code', new RegExp(`^nextjs/(?:${exactPathAlternation(OCR_PAGES_INCOMPLETE_AFFECTED_PATHS)})$`),
+    { unitFiles: OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.
@@ -2308,6 +2336,10 @@ export const AFFECTED_GROUPS = Object.freeze([
   // GPU OCR worker: only its two actual application/test paths. No worker flag (never the CDR/CPU checks) and not nativeReuse; its
   // qualification is the external foundation-ocr-gpu-image candidate job, which affectedPlan defers as pending debt.
   affectedGroup('ocr-gpu-worker', /^workers\/foundation-ocr-gpu\/(?:app\.py|tests\/(?:test_app|test_gpu_ocr_v3_contract)\.py)$/),
+  // CDR Cloud Run service (PR #152): only its app and wiring suite. No worker flag (the CDR worker check is the TypeScript worker,
+  // not this service) and not nativeReuse; its qualification is the external malware-scan-qualification workflow, which runs this
+  // suite against the digest-pinned clamd and inside the service image built from the checkout, and which affectedPlan defers as pending debt.
+  affectedGroup('cdr-cloudrun-service', /^quarantine-sidecar\/cdr-cloudrun\/(?:app\.py|tests\/test_app\.py)$/),
   affectedGroup('dropbox-connector', /^nextjs\/lib\/(?:dropbox-[a-z-]+|connector-(?:oauth-adapters|page-integrity|provider-isolation|source-identity|sync-page|replay-world-currency-migration)|sync-worker|source-import|source-version-guard)(?:\.test)?\.ts$/,
     { unitFiles: ['lib/dropbox-source-reconciliation.test.ts', 'lib/connector-oauth-adapters.test.ts', 'lib/sync-worker.test.ts', 'lib/source-import.test.ts',
       'lib/connector-page-integrity.test.ts', 'lib/connector-sync-page.test.ts', 'lib/connector-provider-isolation.test.ts', 'lib/connector-source-identity.test.ts',

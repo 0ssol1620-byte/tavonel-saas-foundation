@@ -3,8 +3,13 @@ import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@
 import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
 import { readTombstonedUploadDocumentIds } from "@/lib/customer-source-lifecycle";
 import { groupImmutableDocuments, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
-import { ambiguousPipelineDocument, type PipelineDocument } from "@/lib/pipeline";
-import { validateOcrReviewReceipt } from "@/lib/processing-receipts";
+import {
+  ambiguousPipelineDocument,
+  storedPipelineDocument,
+  type DocumentListPartial,
+  type PipelineDocument,
+} from "@/lib/pipeline";
+import { checkOcrReviewReceipt } from "@/lib/processing-receipts";
 import { getWorkspaceOcrReviewJson, listImmutableWorkspaceObjects } from "@/lib/r2-objects";
 import {
   getFoundationQuarantineReject,
@@ -26,22 +31,31 @@ export const runtime = "nodejs";
  *
  * A refusal never overrides a document that does have immutable objects. If both exist, the
  * objects are the stronger evidence and the refusal is stale.
+ *
+ * The same listing shows the sources that are stored with nothing after them yet, and those are
+ * joined in as `stored` for the same reason: before, an upload still being prepared vanished on
+ * reload. A listing that fails is `ok: false` and the caller refuses the whole response -- an
+ * empty array here used to make a broken store look like a workspace with no refusals. A receipt
+ * that fails to load is reported by id in `failedDocumentIds`, never turned into a row.
  */
-async function listRefusedDocuments(
+async function listQuarantineDocuments(
   signer: R2SignerEnv,
   workspaceId: string,
   alreadyListed: ReadonlySet<string>,
-): Promise<PipelineDocument[]> {
+): Promise<
+  | { ok: false }
+  | { ok: true; documents: PipelineDocument[]; failedDocumentIds: string[]; truncated: boolean }
+> {
   const listed = await listFoundationQuarantineRejects(signer, workspaceId);
-  if (!listed.ok) return [];
-  const candidates = listed.documentIds.filter((documentId) => !alreadyListed.has(documentId));
+  if (!listed.ok) return { ok: false };
+  const unlisted = (documentId: string) => !alreadyListed.has(documentId.toLowerCase());
   const loaded = await Promise.all(
-    candidates.map(async (documentId) => ({
+    listed.documentIds.filter(unlisted).map(async (documentId) => ({
       documentId,
       result: await getFoundationQuarantineReject(signer, workspaceId, documentId),
     })),
   );
-  return loaded.flatMap(({ documentId, result }) => result.ok
+  const refused = loaded.flatMap(({ documentId, result }) => result.ok
     ? [{
       documentId,
       // A refused source has no sanitized version, so it has no version key either. The empty
@@ -62,6 +76,12 @@ async function listRefusedDocuments(
       },
     } satisfies PipelineDocument]
     : []);
+  return {
+    ok: true,
+    documents: [...refused, ...listed.storedDocumentIds.filter(unlisted).map(storedPipelineDocument)],
+    failedDocumentIds: loaded.flatMap(({ documentId, result }) => (result.ok ? [] : [documentId])),
+    truncated: listed.truncated,
+  };
 }
 
 export async function GET(request: Request) {
@@ -92,27 +112,48 @@ export async function GET(request: Request) {
     headers: { "Cache-Control": "no-store" },
   });
   const reviewDocuments = documents.filter((item) => item.processingState === "operator_review" && item.ocrReviewKey && item.sanitizedKey).slice(0, 20);
-  const [reviewReceipts, refused] = await Promise.all([
+  const [reviewReceipts, quarantine] = await Promise.all([
     Promise.all(reviewDocuments.map(async (item) => ({
       documentId: item.documentId,
       versionKey: item.versionKey,
       immutableKey: item.sanitizedKey!,
       loaded: await getWorkspaceOcrReviewJson(signer, workspaceId, item.ocrReviewKey!),
     }))),
-    listRefusedDocuments(signer, workspaceId, new Set([...visibleDocumentIds, ...tombstoned.ids])),
+    listQuarantineDocuments(
+      signer,
+      workspaceId,
+      new Set([...visibleDocumentIds, ...tombstoned.ids].map((id) => id.toLowerCase())),
+    ),
   ]);
-  const reasonCodes = new Map(reviewReceipts.flatMap((item) => {
-    if (!item.loaded.ok) return [];
-    const receipt = validateOcrReviewReceipt(item.loaded.json, item.immutableKey);
-    return receipt ? [[`${item.documentId}/${item.versionKey}`, receipt.reasonCode] as const] : [];
-  }));
+  if (!quarantine.ok) {
+    return NextResponse.json({ code: "QUARANTINE_LIST_UNAVAILABLE" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  }
+  // A review receipt that was listed and then could not be read or validated is not "no reason":
+  // the row stays and its id is reported in `partial`. One that could not be read carries no reason;
+  // one that loaded and was refused carries the refusal's code instead of the worker's reason.
+  const reasonCodes = new Map<string, string>();
+  const unreadReviewDocumentIds: string[] = [];
+  for (const item of reviewReceipts) {
+    const checked = item.loaded.ok ? checkOcrReviewReceipt(item.loaded.json, item.immutableKey) : null;
+    if (checked) reasonCodes.set(`${item.documentId}/${item.versionKey}`, checked.ok ? checked.receipt.reasonCode : checked.code);
+    if (!checked?.ok) unreadReviewDocumentIds.push(item.documentId);
+  }
   const hydrated: PipelineDocument[] = documents.map((item) => ({
     ...item,
     ...(reasonCodes.has(`${item.documentId}/${item.versionKey}`)
       ? { ocrReviewReasonCode: reasonCodes.get(`${item.documentId}/${item.versionKey}`) }
       : {}),
   }));
-  const returnedDocumentIds = [...visibleDocumentIds, ...refused.map((item) => item.documentId)];
+  const incompleteDocumentIds = [...unreadReviewDocumentIds, ...quarantine.failedDocumentIds];
+  const partial: DocumentListPartial | null = incompleteDocumentIds.length > 0 || quarantine.truncated
+    ? { documentIds: incompleteDocumentIds, truncated: quarantine.truncated }
+    : null;
+  // Every id the response names is access-checked, including the ones `partial` reports.
+  const returnedDocumentIds = [
+    ...visibleDocumentIds,
+    ...quarantine.documents.map((item) => item.documentId),
+    ...quarantine.failedDocumentIds,
+  ];
   const currentAccess = await checkConnectorSourceAccessForViewer(workspaceId, returnedDocumentIds, auth.principal.userId);
   if (!currentAccess.ok) return NextResponse.json({ code: currentAccess.code }, {
     status: currentAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
@@ -129,7 +170,8 @@ export async function GET(request: Request) {
     {
       code: "OK",
       workspaceId,
-      documents: [...hydrated, ...ambiguousDocumentIds.map(ambiguousPipelineDocument), ...refused],
+      documents: [...hydrated, ...ambiguousDocumentIds.map(ambiguousPipelineDocument), ...quarantine.documents],
+      ...(partial ? { partial } : {}),
     },
     { headers: { "Cache-Control": "no-store" } },
   );
