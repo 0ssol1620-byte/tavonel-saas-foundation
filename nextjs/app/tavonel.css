@@ -4159,10 +4159,19 @@
     .skip {
       min-height: 44px;
     }
-    :is(.docs-langs button, .changelog-filter button, .tag, summary, .site-links a) {
+    :is(.docs-langs button, .changelog-filter button, .tag, .site-links a) {
       display: inline-flex;
       align-items: center;
     }
+    /*
+      UX-L7 (UX-PLAN-2026-10-17 §5.3 R8): a <summary> keeps its marker. It was in the inline-flex list
+      above, and inline-flex drops the disclosure triangle (::marker in Chromium, the details marker in
+      WebKit), so below 1080px every summary that relied on the native marker -- the 33 endpoint
+      disclosures on /api, "Method and limits" on /benchmarks -- opened from a bare line of text. A
+      summary with a drawn +/- sets its own display and keeps it; the rest keep the browser's
+      list-item. align-content centres the line in the 44px box the rule above still sets.
+    */
+    summary { align-content: center; }
     /* A target is two-dimensional. These chips already had the 44px row and still measured 40px
        across on the shortest label ("All" on /changelog at 360), which fails the same guideline
        on the other axis. */

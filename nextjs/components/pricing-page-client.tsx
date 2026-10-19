@@ -805,7 +805,7 @@ export default function PricingPageClient({
     Boolean(plan.offerCode) && liveCheckout && signedIn && !ownerBillingExempt;
 
   return (
-    <div className="page pricing-page paper-product">
+    <div className="page pricing-page paper-product" data-template="T2">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdHtml(pricingJsonLd(initialLiveCheckout, faqRows)) }}

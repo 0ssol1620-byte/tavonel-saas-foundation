@@ -113,7 +113,8 @@ export default function PublicPackageProof({ artifact, sources, runtime }: {
       </ul>
     </details>
     <nav className={styles.actions} aria-label="Explore the sample package">
-      <Link href="/explore">Inspect the source evidence <span aria-hidden="true">↗</span></Link>
+      {/* UX-L7 (UX-PLAN-2026-10-17 §5.3 R7): ↗ marks a link that leaves the site; /explore does not. */}
+      <Link href="/explore">Inspect the source evidence</Link>
       <Link href="/docs/ontology-output">Read the output formats</Link>
       <Link href="/docs/use-with-ai">Use a World with AI</Link>
     </nav>

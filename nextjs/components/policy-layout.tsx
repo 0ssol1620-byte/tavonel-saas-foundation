@@ -73,7 +73,7 @@ export function PolicyDocument({
 
 export default function PolicyLayout(props: PolicyDocumentProps) {
   return (
-    <div className="page">
+    <div className="page" data-template="T5">
       {/*
         The site's header, not a two-link one of its own.
 

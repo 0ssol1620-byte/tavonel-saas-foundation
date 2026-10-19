@@ -26,7 +26,9 @@
   .world { margin: 0 0 clamp(48px, 6vw, 80px); }
   .outcomes { display: grid; gap: 0; }
   .outcome { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: clamp(32px, 5vw, 64px); border-top: 1px solid var(--hairline-hi); padding: clamp(32px, 3.5vw, 48px) 0; }
-  .outcome h2 { margin: 0; font: 560 clamp(24px, 2.5vw, 36px)/1.2 var(--f-sans); letter-spacing: -0.025em; }
+  /* UX-L7 (UX-PLAN-2026-10-17 §5.3 R3): a T1 section head is Title 1, as on the rest of T1-T5; this
+     clamp set /product's three at 36px. */
+  .outcome h2 { margin: 0; font-size: var(--tv-fs-title); line-height: var(--tv-lh-title); letter-spacing: var(--tv-track-title); font-weight: var(--tv-w-title); font-variation-settings: "wght" var(--tv-w-title); }
   .outcome p { max-width: 60ch; margin: 0 0 12px; font: 17px/1.6 var(--f-sans); color: var(--text-mid); }
   .proof { margin: 20px 0; padding-left: 20px; border-left: 2px solid var(--source); overflow-wrap: anywhere; }
   .proof blockquote { margin: 0 0 12px; font: 16px/1.6 var(--f-sans); }

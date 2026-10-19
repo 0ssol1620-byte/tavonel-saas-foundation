@@ -75,7 +75,7 @@ export default function SourcesPage() {
   const census = capabilityCensus();
 
   return (
-    <PublicSitePage>
+    <PublicSitePage template="T3">
       <section className="scene doc">
         <div className="shell">
           <div className="body">

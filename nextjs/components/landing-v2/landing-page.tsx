@@ -278,7 +278,7 @@ export default function LandingPage({
   };
 
   return (
-    <div className={`page lv2 ${sourceStyles.home}`} lang={korean ? "ko" : "en"}>
+    <div className={`page lv2 ${sourceStyles.home}`} lang={korean ? "ko" : "en"} data-template="T0">
       <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.90.woff2" crossOrigin="anonymous" />
       {korean ? <>
         <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.73.woff2" crossOrigin="anonymous" />
@@ -449,9 +449,9 @@ export default function LandingPage({
                   <Link className={heroStyles.diffLink} href={record.hrefs.evidence as Route} prefetch={false} data-analytics="source-open">
                     {page.receive.openRegion}
                   </Link>
+                  {/* The committed bytes on this origin, so no ↗: that mark is for leaving the site (UX §5.3 R7). */}
                   <a className={heroStyles.diffLink} href={record.hrefs.original}>
                     {copy.evidence.openOriginal}
-                    <span aria-hidden="true">↗</span>
                   </a>
                 </p>
               </article>

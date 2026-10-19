@@ -46,7 +46,7 @@ export const metadata: Metadata = {
  */
 export default function ResearchNotesPage() {
   return (
-    <PublicSitePage>
+    <PublicSitePage template="T5">
       <section className="scene doc">
         <div className="shell">
           <div className="body">

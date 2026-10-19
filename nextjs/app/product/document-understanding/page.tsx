@@ -163,7 +163,7 @@ const PARTS = [
 
 export default function DocumentUnderstandingPage() {
   return (
-    <PublicSitePage>
+    <PublicSitePage template="T1">
       <BreadcrumbJsonLd trail={[{ name: "Product", path: "/product" }, { name: "Document understanding", path: "/product/document-understanding" }]} />
       <section className="scene doc">
         <div className="shell">

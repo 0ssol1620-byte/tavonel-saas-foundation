@@ -115,7 +115,7 @@ export default async function StatusPage() {
     they are seeing rather than wait for it to appear -- then offered them a link to a
     marketing index. The reporting route is the closing action.
   */
-  return <PublicSitePage><PolicyDocument closing={<Link className="btn" href={"/contact" as Route}>Report an outage</Link>} title="TAVONEL service status" intro={<>The first group below is TAVONEL&rsquo;s live configuration and activation state, read {CHECKED_AT.format(new Date(status.generatedAt))} KST when this page rendered. &ldquo;Configured&rdquo; means the component is configured and its gate is open; it does not mean a request recently succeeded. Scheduled checks report request outcomes separately further down. Report an outage you are seeing rather than waiting for it to appear here.</>}>
+  return <PublicSitePage template="T5"><PolicyDocument closing={<Link className="btn" href={"/contact" as Route}>Report an outage</Link>} title="TAVONEL service status" intro={<>The first group below is TAVONEL&rsquo;s live configuration and activation state, read {CHECKED_AT.format(new Date(status.generatedAt))} KST when this page rendered. &ldquo;Configured&rdquo; means the component is configured and its gate is open; it does not mean a request recently succeeded. Scheduled checks report request outcomes separately further down. Report an outage you are seeing rather than waiting for it to appear here.</>}>
     {/*
       The five sections in source order, laid out by status.module.css: the two status grids keep
       the full width, the incident record and the subscription path share a row on desktop, and a

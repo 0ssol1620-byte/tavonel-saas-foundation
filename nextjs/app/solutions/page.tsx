@@ -20,7 +20,7 @@ const ENTRIES = Object.entries(SOLUTIONS);
 
 export default function SolutionsPage() {
   return (
-    <PublicPageShell>
+    <PublicPageShell template="T1">
       <section className={`scene doc ${styles.surface}`}><div className="shell">
         <div className={styles.hubIntro}>
           <h1 className="document-title">Start with the work you need to do.</h1>

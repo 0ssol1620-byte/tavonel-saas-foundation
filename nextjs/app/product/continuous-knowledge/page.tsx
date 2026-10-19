@@ -79,7 +79,7 @@ const TRAIL = [
 
 export default function ContinuousKnowledgePage() {
   return (
-    <PublicSitePage>
+    <PublicSitePage template="T1">
       <BreadcrumbJsonLd trail={TRAIL} />
       <section className="scene doc">
         <div className="shell">

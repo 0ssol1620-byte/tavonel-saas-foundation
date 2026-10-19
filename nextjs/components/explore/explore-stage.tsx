@@ -347,7 +347,7 @@ export default function ExploreStage({ access, model, layout, change, answers, t
   };
 
   return (
-    <main id="main" className={`${styles.page} paper-product`}>
+    <main id="main" className={`${styles.page} paper-product`} data-template="T4">
       <header className={styles.header}>
         {/*
           chrome-01. One wordmark everywhere. The header, the footer and the share card set

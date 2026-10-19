@@ -43,7 +43,7 @@ export default function EvidenceWorkbench({ model, answers, technical, capturedO
   return <div className={styles.workbench} data-evidence-workbench="">
     <div className={styles.intro}>
       <div><p className={styles.eyebrow}>Explore / public knowledge sample</p><h1>A result is only the beginning.<br /><span>Follow it to the source.</span></h1></div>
-      <p className={styles.scope}>Read-only sample · sources captured {capturedOn}<br />{technical.documents.length} public filings · Apple SEC documents<br /><Link href="/reproducibility">View the sample manifest ↗</Link></p>
+      <p className={styles.scope}>Read-only sample · sources captured {capturedOn}<br />{technical.documents.length} public filings · Apple SEC documents<br /><Link href="/reproducibility">View the sample manifest</Link></p>
     </div>
     <div className={styles.tabs} aria-label="Explore views">
       <button type="button" aria-pressed={tab === "content"} onClick={() => setTab("content")}>Content & evidence</button>
@@ -81,7 +81,7 @@ export default function EvidenceWorkbench({ model, answers, technical, capturedO
               : <p className={styles.answerNote} role="status">{EXPLORE_COPY.askAbstentions[answer.reason]}</p>}
             <div className={styles.citations} aria-label="Source evidence">{regions.map(region => <button type="button" key={region.id} aria-pressed={active?.id === region.id} onClick={() => {setRegionId(region.id); setMobilePane("source");}}><span>{region.filename}</span><strong>Page {region.page} →</strong></button>)}</div>
           </> : <p>No prepared answer is available in this artifact.</p>}
-          {active ? <div className={styles.version}><span>Source version</span><code title={active.sourceVersionId}>{active.sourceVersionId}</code><button type="button" onClick={() => onOpenRegion(active.id)}>Open full evidence inspector ↗</button><Link href={`/explore?act=evidence&evidence=${encodeURIComponent(active.id)}` as Route}>Permanent evidence link ↗</Link></div> : <p role="status">No source region is available. Choose another sample question.</p>}
+          {active ? <div className={styles.version}><span>Source version</span><code title={active.sourceVersionId}>{active.sourceVersionId}</code><button type="button" onClick={() => onOpenRegion(active.id)}>Open full evidence inspector ↗</button><Link href={`/explore?act=evidence&evidence=${encodeURIComponent(active.id)}` as Route}>Permanent evidence link</Link></div> : <p role="status">No source region is available. Choose another sample question.</p>}
         </article>
         <aside className={styles.source} aria-label="Original source viewer">
           <header><span>{active ? sourcePageQualifier(active.representationKind) : "Source"}</span><span>{active ? `Page ${active.page}` : "Unavailable"}</span></header>

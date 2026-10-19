@@ -54,7 +54,7 @@ export default function KoreanPricingPage() {
     : { href: access.href, label: KO_CHROME.cta[access.href] ?? access.label };
   const purchaseOpen = readPublicStatusV2().availableActions.purchasePlan.enabled;
   return (
-    <PublicSitePage korean languageHref="/pricing">
+    <PublicSitePage template="T2" korean languageHref="/pricing">
       <DocumentLangKo />
       <BreadcrumbJsonLd trail={[{ name: "한국어 안내", path: "/ko" }, { name: "요금", path: "/ko/pricing" }]} />
       <section className={`scene doc pricing-page ${styles.scene}`} aria-labelledby="ko-pricing-title">

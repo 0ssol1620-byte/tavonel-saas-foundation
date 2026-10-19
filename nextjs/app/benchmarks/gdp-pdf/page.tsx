@@ -63,7 +63,7 @@ export default function GdpPdfBenchmarkPage() {
   const truncated = report.packet_size?.packets_truncated_by_budget;
 
   return (
-    <PublicSitePage>
+    <PublicSitePage template="T5">
       <section className="scene doc">
         <div className="shell">
           <div className="body">

@@ -18,7 +18,8 @@
   .disclosure { display: none; }
 }
 .disclosure { margin: 0; border: 1px solid var(--hairline); border-radius: var(--r-paper-lg); background: var(--g1); }
-.disclosure > summary { min-height: 44px; display: flex; align-items: center; padding: 0 14px; cursor: pointer; font-family: var(--f-sans); font-size: var(--t-2); font-weight: 500; letter-spacing: 0; color: var(--text-mid); }
+/* UX-L7 (UX-PLAN-2026-10-17 §5.3 R8): list-item keeps the disclosure marker that flex dropped. */
+.disclosure > summary { min-height: 44px; display: list-item; align-content: center; padding: 0 14px; cursor: pointer; font-family: var(--f-sans); font-size: var(--t-2); font-weight: 500; letter-spacing: 0; color: var(--text-mid); }
 /* Hover is gated: on a touch screen an un-gated :hover sticks after a tap (token contract). */
 @media (hover: hover) and (pointer: fine) { .disclosure > summary:hover { color: var(--text-hi); } }
 .disclosure > nav { padding: 4px 14px 14px; }

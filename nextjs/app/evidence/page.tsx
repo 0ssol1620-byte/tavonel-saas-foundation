@@ -129,7 +129,7 @@ const CONTRACTED_LOCATORS = [
 
 export default function EvidencePage() {
   return (
-    <PublicSitePage>
+    <PublicSitePage template="T5">
       <section className="scene doc">
         <div className="shell">
           <div className="body">

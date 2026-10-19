@@ -8,7 +8,7 @@ import { KO_CHROME } from "@/lib/site-navigation";
 import styles from "./evaluation-page.module.css";
 
 export default function EvaluationPage({ korean = false }: { korean?: boolean }) {
-  return <div className={`page evaluation-page ${styles.page}`} lang={korean ? "ko" : "en"}>
+  return <div className={`page evaluation-page ${styles.page}`} lang={korean ? "ko" : "en"} data-template="T2">
     <PublicSiteHeader korean={korean} />
     <main id="main" className="evaluation-shell">
       <section className="evaluation-intro">
@@ -16,7 +16,8 @@ export default function EvaluationPage({ korean = false }: { korean?: boolean })
         <h1>{korean ? <>내 AI가 믿고 사용할 지식,<br />직접 검증하세요.</> : <>Find out what your AI<br />can actually rely on.</>}</h1>
         <p>{korean ? "사용 허가된 작은 문서 묶음과 실제 질문으로 시작합니다. 처리 전에 범위와 비용을 합의하고, 결과와 누락된 근거 및 남은 한계를 함께 확인합니다." : "Start with a small, permitted document set and real questions. Agree on the scope and cost before any processing, then inspect the results, missing evidence, and remaining limitations."}</p>
         <p className="evaluation-gate">{korean ? KO_CHROME.customerDataGate : activationPolicy.customerData.reason}</p>
-        <Link href="/explore">{korean ? "먼저 공개 샘플 살펴보기 (영문) ↗" : "Inspect the public sample first ↗"}</Link>
+        {/* UX-L7 (§5.3 R7): no ↗ on a link that stays on the site. The label itself is R6's, for a copy lane. */}
+        <Link href="/explore">{korean ? "먼저 공개 샘플 살펴보기 (영문)" : "Inspect the public sample first"}</Link>
         {/* A plain same-origin file download with no client state. Following the link is an ordinary GET that retrieves the blank static file; it submits no worksheet or form contents. */}
         <p className="fine">{korean
           ? <>파일럿을 준비하신다면 빈 기록지로 업무, 문서 사용 허가, 질문과 기대 답변, 결과 집계 방식을 미리 정리할 수 있습니다. 내용이 비어 있는 양식이며, 내려받기는 빈 파일을 받아 오는 것일 뿐 자료 처리, 외부 연결, 결제를 시작하지 않습니다. 내려받은 파일을 작성하는 것만으로는 그 내용이 저희에게 전송되지 않습니다. <a href="/evaluation/pilot-worksheet.ko.md" download="tavonel-pilot-worksheet.ko.md" type="text/markdown">빈 파일럿 근거 기록지 내려받기 (Markdown, 한국어)</a></>

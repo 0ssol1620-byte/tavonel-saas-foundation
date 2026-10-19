@@ -44,7 +44,7 @@ export default function DocsPage() {
   const groups = tocEntries(DOCS_GROUPS);
 
   return (
-    <PublicPageShell>
+    <PublicPageShell template="T3">
       <section className="scene doc docs-reading-surface docs-hub"><div className="shell"><div className="body docs-hub-body">
         <div className="stack docs-hub-intro">
           <h1 className="document-title">From sources to a Compiled World.</h1>

@@ -194,7 +194,22 @@ export function PublicSiteFooter({ korean = false, onePath = false, languageHref
   );
 }
 
-export function PublicSitePage({ children, korean = false, languageHref }: { children: React.ReactNode; korean?: boolean; languageHref?: string }) {
+/**
+ * UX-L7 (UX-PLAN-2026-10-17 §5.1, §5.4): the page templates, declared on the page root.
+ *
+ * T0 Home, T1 Story (Product/Solutions), T2 Conversion (Pricing/Evaluation/Contact), T3 Reference
+ * (Docs/Developers), T4 Explore, T5 Trust/Editorial. T6, the workspace app shell, is not a public
+ * page and is not declared here. A route says which template it is as `data-template` on its page root
+ * (the element that holds <main>, or <main> itself on /explore), so a template-wide rule has one
+ * selector and `e2e/templates.spec.ts` can read the inventory off the browser and compare it with §5.4.
+ */
+export type PageTemplate = "T0" | "T1" | "T2" | "T3" | "T4" | "T5";
+
+/*
+  `template` is required: a new public page has to say which template it is, and a page outside
+  §5.4's inventory (the 404, the noindex /arena) says so with `null` rather than by forgetting.
+*/
+export function PublicSitePage({ children, template, korean = false, languageHref }: { children: React.ReactNode; template: PageTemplate | null; korean?: boolean; languageHref?: string }) {
   /*
     The commercial posture, read once per page rather than fetched once per visitor.
 
@@ -205,7 +220,7 @@ export function PublicSitePage({ children, korean = false, languageHref }: { chi
     the closed posture.
   */
   return (
-    <div className="page public-page" lang={korean ? "ko" : undefined}>
+    <div className="page public-page" lang={korean ? "ko" : undefined} data-template={template ?? undefined}>
       <PublicSiteHeader korean={korean} />
       <main id="main" tabIndex={-1}>{children}</main>
       <PublicSiteFooter korean={korean} languageHref={languageHref} />

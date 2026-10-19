@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 export default function DemoPage() {
   return (
-    <PublicSitePage>
+    <PublicSitePage template="T1">
       <SignedProductDemo demo={signedProductDemo} />
     </PublicSitePage>
   );

@@ -19,7 +19,7 @@ const STEPS = [
 ] as const;
 
 export default function HowItWorksPage() {
-  return <PublicSitePage>
+  return <PublicSitePage template="T1">
     <section className={`scene doc ${styles.process}`}>
       <div className="shell">
         <div className={styles.lead}>

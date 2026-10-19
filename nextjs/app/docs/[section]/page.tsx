@@ -210,7 +210,7 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
   const next = DOCS_SECTIONS[index + 1];
 
   return (
-    <PublicPageShell>
+    <PublicPageShell template="T3">
       <BreadcrumbJsonLd trail={trail} />
       <section className="scene doc docs-reading-surface"><div className="shell"><div className={layout.layout}>
         <DocsToc current={section} />
