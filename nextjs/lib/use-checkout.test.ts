@@ -16,11 +16,14 @@
    test harness rather than a component, in order to assert on the real implementation. */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { failureSentence } from "./workspace-failure-copy";
+import { ENTITLEMENT_PENDING_SENTENCE, type BillingStatusAccount, type EntitlementWaitResult } from "./entitlement-wait";
 
 /* ---------------------------------------------------------------- module doubles */
 
 const session = { token: null as string | null };
-const paddle = { opened: [] as unknown[], init: null as unknown };
+type PaddleEvent = { name: string };
+const paddle = { opened: [] as unknown[], init: null as unknown, eventCallback: null as null | ((event: PaddleEvent) => void) };
 
 vi.mock("./supabase-browser", () => ({
   getSupabaseBrowserClient: () => ({
@@ -31,7 +34,10 @@ vi.mock("./supabase-browser", () => ({
 }));
 
 vi.mock("./paddle-browser", () => ({
-  initializePaddleBrowser: async () => paddle.init,
+  initializePaddleBrowser: async (options: { eventCallback?: (event: PaddleEvent) => void }) => {
+    paddle.eventCallback = options.eventCallback ?? null;
+    return paddle.init;
+  },
 }));
 
 /* ------------------------------------------------------------------- harness */
@@ -40,7 +46,7 @@ vi.mock("./paddle-browser", () => ({
  * Drives the hook without a DOM. `useCallback`/`useState` are the only React features it uses,
  * so a two-hook dispatcher is enough and keeps the test free of a renderer dependency.
  */
-async function runCheckout(offer: string) {
+async function runCheckout(offer: string, onEntitlement?: (wait: EntitlementWaitResult) => void) {
   const notices: string[] = [];
   const React = await import("react");
   const states: unknown[] = [];
@@ -69,7 +75,7 @@ async function runCheckout(offer: string) {
 
   let start: (code: string) => Promise<void>;
   try {
-    const hook = useCheckout((m) => notices.push(m)) as { start: (code: string) => Promise<void> };
+    const hook = useCheckout((m, tone) => { notices.push(m); tones.push(tone); }, onEntitlement) as { start: (code: string) => Promise<void> };
     start = hook.start;
   } finally {
     if (internals && "H" in internals) internals.H = previous;
@@ -83,24 +89,41 @@ async function runCheckout(offer: string) {
 /* ---------------------------------------------------------------------- tests */
 
 const fetchCalls: Array<{ url: string; init: RequestInit }> = [];
+/** The tone of every notice, in order, beside the sentence `runCheckout` returns (journey A9). */
+const tones: string[] = [];
 
-function respondWith(body: unknown, ok = true) {
+function respondWith(body: unknown, ok = true, status = ok ? 200 : 402) {
   globalThis.fetch = (async (url: string, init: RequestInit) => {
     fetchCalls.push({ url: String(url), init });
-    return { ok, status: ok ? 200 : 402, json: async () => body } as unknown as Response;
+    return { ok, status, json: async () => body } as unknown as Response;
   }) as unknown as typeof fetch;
 }
 
+/**
+ * The page the overlay opens over: the `lang` the nearest ancestor of `#main` carries and the
+ * `color-scheme` `#main` computes to. Only the three DOM reads `use-checkout` makes exist.
+ */
+const page = { lang: "en", scheme: "dark" };
+
 beforeEach(() => {
   fetchCalls.length = 0;
+  tones.length = 0;
   paddle.opened.length = 0;
+  paddle.eventCallback = null;
   paddle.init = { Checkout: { open: (args: unknown) => paddle.opened.push(args) } };
   session.token = "session-token";
+  page.lang = "en";
+  page.scheme = "dark";
+  const main = { closest: (selector: string) => (selector === "[lang]" ? { getAttribute: () => page.lang } : null) };
+  vi.stubGlobal("document", { getElementById: (id: string) => (id === "main" ? main : null), documentElement: main });
+  vi.stubGlobal("getComputedStyle", () => ({ colorScheme: page.scheme }));
   respondWith({});
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("checkout", () => {
@@ -194,5 +217,244 @@ describe("checkout", () => {
     expect(said).toMatch(/live checkout opened/);
     expect(said).toMatch(/webhook/);
     expect(said).not.toMatch(/sandbox checkout opened/);
+  });
+});
+
+/*
+  Journey A1, U1 (JOURNEY-MAP-2026-10-17 D-03). `/api/billing/checkout` refuses with six codes a
+  customer can meet, and the hook used to print each one raw: "Checkout is unavailable
+  (BILLING_LAUNCH_PENDING)." Each now reads as the sentence the failure-copy table holds for it.
+*/
+describe("checkout refusals", () => {
+  const REFUSALS = [
+    ["BILLING_LAUNCH_PENDING", 503],
+    ["CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE", 403],
+    ["PROCESSING_QUALIFICATION_NOT_BILLABLE", 403],
+    ["BILLING_OFFER_CONTACT_REQUIRED", 403],
+    ["PILOT_ACCESS_REQUIRED", 403],
+    ["BILLING_NOT_CONFIGURED", 503],
+  ] as const;
+
+  for (const [code, status] of REFUSALS) {
+    it(`turns ${code} into a sentence with no raw code`, async () => {
+      respondWith({ code }, false, status);
+      const notices = await runCheckout("observer_access");
+
+      expect(paddle.opened).toHaveLength(0);
+      expect(notices).toEqual([`Checkout is unavailable. ${failureSentence(code, status)}`]);
+      expect(notices[0]).not.toContain(code);
+      expect(notices[0]).not.toContain("Reference");
+      expect(notices[0], "no parenthetical code or status").not.toMatch(/\([A-Z0-9_]+\)|\(\d{3}\)/);
+    });
+  }
+
+  it("still names a code it has no sentence for, as a reference rather than dropping it", async () => {
+    respondWith({ code: "BILLING_OFFER_INVALID" }, false, 400);
+    const notices = await runCheckout("observer_access");
+
+    expect(paddle.opened).toHaveLength(0);
+    expect(notices[0]).toBe("Checkout is unavailable. This request was refused. (Reference BILLING_OFFER_INVALID.)");
+  });
+
+  it("says nothing was opened or charged when an ok response is incomplete", async () => {
+    respondWith({ code: "CHECKOUT_READY", environment: "sandbox", offer: { priceId: "p" }, customData: {} });
+    const notices = await runCheckout("observer_access");
+
+    expect(paddle.opened).toHaveLength(0);
+    expect(notices[0]).toMatch(/nothing was opened or charged/);
+    expect(notices[0]).not.toContain("CHECKOUT_READY");
+  });
+});
+
+/*
+  Journey A11 (D-09). The overlay was always `theme: "dark", locale: "en"`. It follows the page now:
+  the `lang` above `#main` and the `color-scheme` `#main` computes to.
+*/
+describe("checkout overlay look", () => {
+  const ready = { clientToken: "ct", environment: "sandbox", offer: { priceId: "pri_1" }, customData: { u: "1" } };
+  const settingsOf = (opened: unknown) => (opened as { settings: Record<string, string> }).settings;
+
+  for (const [where, lang, scheme, expected] of [
+    ["/ko on a paper page", "ko", "light", { displayMode: "overlay", theme: "light", locale: "ko" }],
+    ["/pricing on a paper page", "en", "light", { displayMode: "overlay", theme: "light", locale: "en" }],
+    ["the dark workspace", "en", "dark", { displayMode: "overlay", theme: "dark", locale: "en" }],
+    ["a ko-KR page", "ko-KR", "dark", { displayMode: "overlay", theme: "dark", locale: "ko" }],
+    ["a page that declares no scheme", "en", "normal", { displayMode: "overlay", theme: "light", locale: "en" }],
+  ] as const) {
+    it(`matches ${where}`, async () => {
+      page.lang = lang;
+      page.scheme = scheme;
+      respondWith(ready);
+      await runCheckout("observer_access");
+
+      expect(paddle.opened).toHaveLength(1);
+      expect(settingsOf(paddle.opened[0])).toEqual(expected);
+    });
+  }
+
+  it("sends only the two languages the site is written in", async () => {
+    page.lang = "ja";
+    respondWith(ready);
+    await runCheckout("observer_access");
+
+    expect(settingsOf(paddle.opened[0]).locale).toBe("en");
+  });
+
+  it("opens nothing when the page cannot be read, and says no entitlement changed", async () => {
+    vi.stubGlobal("getComputedStyle", () => { throw new Error("no layout"); });
+    respondWith(ready);
+    const notices = await runCheckout("observer_access");
+
+    expect(paddle.opened).toHaveLength(0);
+    expect(notices.join(" ")).toMatch(/could not be opened\. No entitlement was changed/);
+  });
+});
+
+
+/*
+  Journey A4, U7 wiring (JOURNEY-MAP-2026-10-17 D-04). After `checkout.completed` the hook reads
+  /api/billing/status again within the caps of `entitlement-wait.ts` and ends in a stated outcome.
+  Nothing is read before Paddle reports the payment.
+*/
+describe("waiting for the entitlement after checkout", () => {
+  const ready = { clientToken: "ct", environment: "sandbox", offer: { priceId: "pri_1", label: "Developer" }, customData: { u: "1" } };
+  const inactive = {
+    accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0,
+    billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null,
+  } satisfies BillingStatusAccount;
+  const active = { ...inactive, accessPlan: "observer_access", subscriptionStatus: "active", creditBalance: 2_000, paddleCustomerId: "ctm_1" };
+
+  /** The checkout POST answers `ready`; each billing-status read takes the next answer, the last one repeating. */
+  function serve(statusAnswers: Array<{ ok: boolean; status: number; body: unknown }>) {
+    let reads = 0;
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      fetchCalls.push({ url: String(url), init });
+      if (String(url) !== "/api/billing/status") return { ok: true, status: 200, json: async () => ready } as unknown as Response;
+      const answer = statusAnswers[Math.min(reads++, statusAnswers.length - 1)];
+      return { ok: answer.ok, status: answer.status, json: async () => answer.body } as unknown as Response;
+    }) as unknown as typeof fetch;
+  }
+  const statusReads = () => fetchCalls.filter((call) => call.url === "/api/billing/status");
+
+  async function completeCheckout(statusAnswers: Parameters<typeof serve>[0]) {
+    serve(statusAnswers);
+    const settled: EntitlementWaitResult[] = [];
+    const notices = await runCheckout("observer_access", (wait) => settled.push(wait));
+    expect(paddle.opened).toHaveLength(1);
+    vi.useFakeTimers();
+    paddle.eventCallback?.({ name: "checkout.completed" });
+    await vi.advanceTimersByTimeAsync(120_000);
+    return { notices, settled };
+  }
+
+  it("reads nothing before Paddle reports the payment, and nothing on other Paddle events", async () => {
+    serve([{ ok: true, status: 200, body: { account: active } }]);
+    await runCheckout("observer_access");
+    vi.useFakeTimers();
+    paddle.eventCallback?.({ name: "checkout.closed" });
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(statusReads()).toHaveLength(0);
+  });
+
+  it("stops reading once the plan is active, says so and hands the account to the page", async () => {
+    const { notices, settled } = await completeCheckout([
+      { ok: true, status: 200, body: { account: inactive } },
+      { ok: true, status: 200, body: { account: active } },
+    ]);
+
+    expect(statusReads()).toHaveLength(2);
+    expect((statusReads()[0].init.headers as Record<string, string>).authorization).toBe("Bearer session-token");
+    expect(notices.at(-2)).toMatch(/remain pending until the signed webhook is persisted/);
+    expect(notices.at(-1)).toBe("Developer access is active. The signed webhook was persisted.");
+    expect(settled).toEqual([{ outcome: "active", account: active }]);
+  });
+
+  it("ends in the pending sentence when the webhook never arrives, after five reads", async () => {
+    const { notices, settled } = await completeCheckout([{ ok: true, status: 200, body: { account: inactive } }]);
+
+    expect(statusReads()).toHaveLength(5);
+    expect(notices.at(-1)).toBe(ENTITLEMENT_PENDING_SENTENCE);
+    expect(notices.join(" ")).not.toMatch(/access is active/i);
+    expect(settled).toEqual([{ outcome: "pending", account: inactive }]);
+  });
+
+  it("does not take a refused status read for an arrival", async () => {
+    const { notices, settled } = await completeCheckout([{ ok: false, status: 503, body: { code: "BILLING_STORE_UNAVAILABLE", account: active } }]);
+
+    expect(statusReads()).toHaveLength(5);
+    expect(notices.at(-1)).toBe(ENTITLEMENT_PENDING_SENTENCE);
+    expect(settled).toEqual([{ outcome: "pending", account: null }]);
+  });
+});
+
+/*
+  Journey A9 (JOURNEY-MAP-2026-10-17 D-08). A refusal is announced at once, in the page's
+  `role="alert"` region; progress waits its turn in `role="status"`. The hook is the only place
+  that knows which sentence is which, so the tone is asserted here, sentence by sentence.
+*/
+describe("notice tone", () => {
+  const ready = { clientToken: "ct", environment: "sandbox", offer: { priceId: "pri_1", label: "Developer" }, customData: { u: "1" } };
+
+  for (const [code, status] of [
+    ["BILLING_LAUNCH_PENDING", 503],
+    ["PILOT_ACCESS_REQUIRED", 403],
+    ["BILLING_OFFER_INVALID", 400],
+  ] as const) {
+    it(`announces the ${code} refusal as an alert`, async () => {
+      respondWith({ code }, false, status);
+      const notices = await runCheckout("observer_access");
+      expect(notices).toEqual([`Checkout is unavailable. ${failureSentence(code, status)}`]);
+      expect(tones).toEqual(["alert"]);
+    });
+  }
+
+  it("announces a missing session as an alert", async () => {
+    session.token = null;
+    await runCheckout("observer_access");
+    expect(tones).toEqual(["alert"]);
+  });
+
+  it("announces an incomplete response as an alert", async () => {
+    respondWith({ clientToken: "ct", environment: "sandbox", offer: {}, customData: {} });
+    await runCheckout("observer_access");
+    expect(tones).toEqual(["alert"]);
+  });
+
+  it("announces a Paddle that will not initialize as an alert", async () => {
+    paddle.init = null;
+    respondWith(ready);
+    await runCheckout("observer_access");
+    expect(tones).toEqual(["alert"]);
+  });
+
+  it("announces an overlay that could not be opened as an alert", async () => {
+    vi.stubGlobal("getComputedStyle", () => { throw new Error("no layout"); });
+    respondWith(ready);
+    await runCheckout("observer_access");
+    expect(tones).toEqual(["alert"]);
+  });
+
+  it("keeps an owner who needs no checkout in status, not alert", async () => {
+    respondWith({ code: "OWNER_ACCESS_ACTIVE" });
+    const notices = await runCheckout("observer_access");
+    expect(notices[0]).toMatch(/Owner access is already active/);
+    expect(tones).toEqual(["status"]);
+  });
+
+  it("keeps an opened checkout and the wait after it in status, through to the pending sentence", async () => {
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      fetchCalls.push({ url: String(url), init });
+      if (String(url) === "/api/billing/status") return { ok: true, status: 200, json: async () => ({ account: null }) } as unknown as Response;
+      return { ok: true, status: 200, json: async () => ready } as unknown as Response;
+    }) as unknown as typeof fetch;
+    const notices = await runCheckout("observer_access");
+    vi.useFakeTimers();
+    paddle.eventCallback?.({ name: "checkout.completed" });
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(notices).toHaveLength(3);
+    expect(notices.at(-1)).toBe(ENTITLEMENT_PENDING_SENTENCE);
+    expect(tones).toEqual(["status", "status", "status"]);
   });
 });

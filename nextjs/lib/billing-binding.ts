@@ -33,6 +33,23 @@ function signature(value: Omit<CheckoutBinding, "tavonel_binding">, secret: stri
   return createHmac("sha256", secret).update(bindingPayload(value), "utf8").digest("hex");
 }
 
+function signedWith(binding: CheckoutBinding, secret: string) {
+  const expected = Buffer.from(signature(binding, secret), "hex");
+  const received = Buffer.from(binding.tavonel_binding, "hex");
+  return received.length === expected.length && timingSafeEqual(received, expected);
+}
+
+/**
+ * The verification-only key of a FOUNDATION_BILLING_HMAC rotation (journey map D-06, A6): the
+ * replaced key, kept so metadata Paddle stored under it still authenticates until it is removed.
+ * Nothing signs with it -- createCheckoutBinding and the trial device token take only the current
+ * key. Absent, blank or shorter than a qualified key, it is not configured and changes nothing.
+ */
+export function previousBillingHmac(env: Readonly<Record<string, string | undefined>> = process.env) {
+  const previous = env.FOUNDATION_BILLING_HMAC_PREVIOUS?.trim() ?? "";
+  return previous.length >= 32 ? previous : undefined;
+}
+
 export function createCheckoutBinding(
   input: { userId: string; workspaceId: string; offerCode: BillingOfferCode },
   secret: string,
@@ -51,8 +68,15 @@ export function createCheckoutBinding(
   return { ...unsigned, tavonel_binding: signature(unsigned, secret) };
 }
 
-/** Authenticates durable provider metadata without requiring the original checkout to remain fresh. */
-export function authenticateCheckoutBinding(value: unknown, secret: string | undefined): CheckoutBinding | null {
+/**
+ * Authenticates durable provider metadata without requiring the original checkout to remain fresh.
+ * `previousSecret` is tried only after the current key fails, and never stands in for a missing one.
+ */
+export function authenticateCheckoutBinding(
+  value: unknown,
+  secret: string | undefined,
+  previousSecret?: string,
+): CheckoutBinding | null {
   if (!value || typeof value !== "object" || !secret || secret.length < 32) return null;
   const input = value as Record<string, unknown>;
   if (
@@ -75,9 +99,8 @@ export function authenticateCheckoutBinding(value: unknown, secret: string | und
     return null;
   }
   const signedBinding = input as CheckoutBinding;
-  const expected = Buffer.from(signature(signedBinding, secret), "hex");
-  const received = Buffer.from(signedBinding.tavonel_binding, "hex");
-  if (received.length !== expected.length || !timingSafeEqual(received, expected)) return null;
+  if (!signedWith(signedBinding, secret) &&
+    !(previousSecret && previousSecret.length >= 32 && signedWith(signedBinding, previousSecret))) return null;
   return input.tavonel_binding_version === "v2"
     ? { ...signedBinding, tavonel_policy_version: "legacy-v2" }
     : signedBinding;

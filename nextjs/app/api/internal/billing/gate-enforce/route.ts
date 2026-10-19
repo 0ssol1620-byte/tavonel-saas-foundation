@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { previousBillingHmac } from "@/lib/billing-binding";
 import { createSupabaseGateEnforcementStore, runBillingGateEnforcement } from "@/lib/billing-gate-enforcement";
 import { readCommercialState } from "@/lib/commercial-state";
 import { authorizationStage, readCustomerSourceAuthorization } from "@/lib/customer-data-admission";
@@ -53,6 +54,8 @@ async function enforce(request: Request) {
     pauseSubscription: id => pausePaddleSubscriptionImmediately(id),
     expectedEnvironment: commercial.provider,
     bindingSecret,
+    // Only verifies subscriptions bound before a key rotation; it never admits a missing current key.
+    previousBindingSecret: previousBillingHmac(),
     now: () => new Date(),
     deadline: Date.now() + 40_000,
   });

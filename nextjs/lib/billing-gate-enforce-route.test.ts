@@ -60,6 +60,18 @@ describe("internal billing gate enforcement route", () => {
     expect(run.mock.calls[0][0]).toMatchObject({ expectedEnvironment: "production" });
   });
 
+  it("passes the previous binding key for verification only when one is configured, and never in place of the current key", async () => {
+    vi.stubEnv("FOUNDATION_BILLING_HMAC_PREVIOUS", "");
+    await call();
+    expect(run.mock.calls[0][0]).toMatchObject({ bindingSecret: "h".repeat(40), previousBindingSecret: undefined });
+    vi.stubEnv("FOUNDATION_BILLING_HMAC_PREVIOUS", ` ${"p".repeat(40)} `);
+    await call();
+    expect(run.mock.calls[1][0]).toMatchObject({ bindingSecret: "h".repeat(40), previousBindingSecret: "p".repeat(40) });
+    vi.stubEnv("FOUNDATION_BILLING_HMAC", "");
+    expect((await call()).status).toBe(503);
+    expect(run).toHaveBeenCalledTimes(2);
+  });
+
   it("answers 503 when the durable store cannot list candidates", async () => {
     run.mockResolvedValue({ ok: false, code: "BILLING_GATE_STORE_FAILED" });
     expect((await call()).status).toBe(503);

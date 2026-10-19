@@ -1,6 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { isIP } from "node:net";
 import { getFoundationAccountGrant, getFoundationSelfServiceTrial } from "./account-grants";
+import { previousBillingHmac } from "./billing-binding";
 import { billingProductDecision, type ProductAccessLevel } from "./billing-product-access";
 import { getFoundationBillingAccount } from "./billing-store";
 import { readAccessMode } from "./foundation-pilot";
@@ -61,8 +62,7 @@ function verifyDeviceCookie(value: string | null, secret: string) {
   return id;
 }
 
-function issueDeviceCookie(secret: string) {
-  const id = randomBytes(16).toString("hex");
+function issueDeviceCookie(secret: string, id = randomBytes(16).toString("hex")) {
   const signature = hmac(secret, "tavonel-trial-device-token/v1", id);
   return {
     id,
@@ -171,10 +171,15 @@ export async function bootstrapFoundationSelfServiceTrial(
   const secret = readTrialSecret();
   if (!secret) return { ok: false, code: "TRIAL_RISK_GATE_NOT_CONFIGURED", status: 503 };
 
-  let deviceId = verifyDeviceCookie(readCookie(request, DEVICE_COOKIE), secret);
+  const cookie = readCookie(request, DEVICE_COOKIE);
+  let deviceId = verifyDeviceCookie(cookie, secret);
   let setCookie: string | undefined;
   if (!deviceId) {
-    const issued = issueDeviceCookie(secret);
+    // A token signed before a FOUNDATION_BILLING_HMAC rotation keeps its device id and is re-signed
+    // with the current key at once: the previous key only ever verifies.
+    const previous = previousBillingHmac();
+    const rotated = previous ? verifyDeviceCookie(cookie, previous) : null;
+    const issued = issueDeviceCookie(secret, rotated ?? undefined);
     deviceId = issued.id;
     setCookie = issued.header;
   }

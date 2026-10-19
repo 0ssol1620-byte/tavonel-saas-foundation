@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { BILLING_OFFERS, findOfferByPriceId, type BillingOfferCode } from "./billing-catalog";
-import { authenticateCheckoutBinding, type CheckoutBinding } from "./billing-binding";
+import { authenticateCheckoutBinding, previousBillingHmac, type CheckoutBinding } from "./billing-binding";
 
 const EVENT_ID = /^evt_[a-z0-9]{26}$/;
 const TRANSACTION_ID = /^txn_[a-z0-9]{26}$/;
@@ -138,7 +138,7 @@ export function parsePaddleBillingAction(
   const { data, common } = envelope;
 
   if (common.eventType === "transaction.completed") {
-    const binding = authenticateCheckoutBinding(data.custom_data, env.FOUNDATION_BILLING_HMAC);
+    const binding = authenticateCheckoutBinding(data.custom_data, env.FOUNDATION_BILLING_HMAC, previousBillingHmac(env));
     const transactionId = typeof data.id === "string" ? data.id : "";
     const customerId = typeof data.customer_id === "string" ? data.customer_id : "";
     const subscriptionId = typeof data.subscription_id === "string" ? data.subscription_id : "";
@@ -167,7 +167,7 @@ export function parsePaddleBillingAction(
   }
 
   if (SUBSCRIPTION_EVENTS.has(common.eventType)) {
-    const binding = authenticateCheckoutBinding(data.custom_data, env.FOUNDATION_BILLING_HMAC);
+    const binding = authenticateCheckoutBinding(data.custom_data, env.FOUNDATION_BILLING_HMAC, previousBillingHmac(env));
     const subscriptionId = typeof data.id === "string" ? data.id : "";
     const customerId = typeof data.customer_id === "string" ? data.customer_id : "";
     const status = typeof data.status === "string" ? data.status : "";

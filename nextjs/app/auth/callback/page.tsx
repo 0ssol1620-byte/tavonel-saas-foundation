@@ -16,6 +16,7 @@ import Logomark from "@/components/logomark";
 import { takeCheckoutIntent } from "@/lib/checkout-intent";
 import { trackFunnel } from "@/lib/funnel-events";
 import { resumeDestination, takeRecipeIntent } from "@/lib/recipe-intent";
+import { failureSentence } from "@/lib/workspace-failure-copy";
 
 type Phase = "working" | "unconfigured" | "session-failed" | "access-failed";
 
@@ -157,6 +158,12 @@ export default function AuthCallbackPage() {
   };
 
   const failed = phase !== "working" && phase !== "unconfigured";
+  /*
+    Journey A1 (D-13). An account outside the pilot allow-list is refused by a rule, not by an
+    outage, so "Try again" repeated a check that could never pass. That one refusal now says what
+    it is and offers the contact page instead of the retry; every other access failure keeps it.
+  */
+  const notAdmitted = phase === "access-failed" && failureCode === "PILOT_ACCESS_REQUIRED";
 
   return (
     <main id="main" className="auth" tabIndex={-1}>
@@ -184,15 +191,20 @@ export default function AuthCallbackPage() {
                   ? "No auth provider is configured, so sign-in cannot be completed here."
                   : phase === "session-failed"
                     ? "Google returned, but no session was established. Please try again."
-                    : retrying
-                      ? "Checking workspace access again. Your sign-in and anything you started before it are kept."
-                      : "Your Google session is valid, but the workspace access check could not be completed. Please try again or contact support if the account should have access."}
+                    : notAdmitted
+                      ? failureSentence(failureCode, 403)
+                      : retrying
+                        ? "Checking workspace access again. Your sign-in and anything you started before it are kept."
+                        : "Your Google session is valid, but the workspace access check could not be completed. Please try again or contact support if the account should have access."}
               </p>
               {failureCode ? <p className="fine">Reference: {failureCode}</p> : null}
               <div className="auth-actions">
                 {/* Session and configuration failures still start over at /login; an access
-                    failure retries the access check here, with the session it already has. */}
-                {phase === "access-failed" ? (
+                    failure retries the access check here, with the session it already has;
+                    an account the pilot does not admit is sent to the contact page. */}
+                {notAdmitted ? (
+                  <Link className="btn" href="/contact">Contact us</Link>
+                ) : phase === "access-failed" ? (
                   <button
                     className="btn"
                     type="button"

@@ -4,11 +4,11 @@
 import "@/app/paper-product.css";
 import Link from "next/link";
 import type { Route } from "next";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
 import PricingPlanOverview, { pricingPlanDestinationClass, pricingPlanId } from "./pricing-plan-overview";
 import tableStyles from "@/components/docs/docs-table.module.css";
-import { useCheckout } from "@/lib/use-checkout";
+import { useCheckout, type NoticeTone } from "@/lib/use-checkout";
 import { loginUrlForOffer } from "@/lib/checkout-intent";
 import {
   BILLING_OFFERS,
@@ -666,7 +666,9 @@ export default function PricingPageClient({
   gates: readonly PurchaseGate[];
   planCapabilities: readonly PlanCapabilityRow[];
 }) {
-  const [notice, setNotice] = useState<string | null>(null);
+  /* Journey A9 (D-08): the checkout hook says whether a sentence is progress or a refusal. */
+  const [notice, setNotice] = useState<{ text: string; tone: NoticeTone } | null>(null);
+  const notify = useCallback((text: string, tone: NoticeTone) => setNotice({ text, tone }), []);
   const [signedIn, setSignedIn] = useState(false);
   const [ownerBillingExempt, setOwnerBillingExempt] = useState(false);
   // SD-01: the same `activationPolicy` row the fine print under the grid prints.
@@ -710,7 +712,7 @@ export default function PricingPageClient({
   const [sources, setSources] = useState<number>(25);
   const [pagesPerSource, setPagesPerSource] = useState<number>(20);
   const fit = corpusFit(sources, pagesPerSource);
-  const { start: startCheckout, busy: billingBusy } = useCheckout(setNotice);
+  const { start: startCheckout, busy: billingBusy } = useCheckout(notify);
   const estimate = estimatorRows(fit.pages);
 
   /*
@@ -1373,7 +1375,17 @@ export default function PricingPageClient({
               <Link href="/evidence">how evidence is bound</Link> ·{" "}
               <Link href={"/refunds" as Route}>cancellation and refunds</Link>.
             </p>
-            {notice ? <p className="notice" role="status">{notice}</p> : null}
+            {/*
+              Journey A9 (D-08). Both regions are in the page before any sentence arrives -- a
+              region that mounts together with its text is often not read at all -- and a refusal
+              is announced at once rather than queued behind the page. `.notice` is the fixed
+              toast, so an empty region is a zero-height block at the end of this column.
+            */}
+            {(["status", "alert"] as const).map((region) => (
+              <div key={region} role={region}>
+                {notice?.tone === region ? <p className="notice">{notice.text}</p> : null}
+              </div>
+            ))}
           </div>
         </section>
       </main>
