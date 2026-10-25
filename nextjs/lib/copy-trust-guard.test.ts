@@ -49,6 +49,8 @@ const COPY_MODULES = [
   // EN-1: the product guide's copy and the component that arranges it, both languages.
   "lib/guide-content.ts",
   "components/guide/guide-page.tsx",
+  // COPY review N2 (2026-10-19): the Home support line, EN and KO, lives here and no list read it.
+  "components/landing-v2/landing-page.tsx",
 ] as const;
 
 /** The marketing routes named in the campaign brief, each as the file that carries its copy. */
@@ -154,7 +156,9 @@ function prose(relative: string) {
   const url = new URL(relative, ROOT);
   if (!existsSync(url)) return null;
   return readFileSync(url, "utf8")
-    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, " ")
+    // A JSX comment's body cannot contain "*/". Without that, an object literal "{" followed by a
+    // block comment ran on to the next "*/}" and dropped HOME_COPY, EN and KO (COPY review N2).
+    .replace(/\{\s*\/\*(?:(?!\*\/)[\s\S])*\*\/\s*\}/g, " ")
     .replace(/\/\*[\s\S]*?\*\//g, " ")
     .replace(/^[ \t]*\/\/.*$/gm, " ");
 }

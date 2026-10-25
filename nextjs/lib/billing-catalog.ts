@@ -30,7 +30,7 @@ export const BILLING_OFFERS = {
     saleChannel: "self_serve",
     description: "For builders shipping source-grounded AI.",
     features: [
-      "500 verified standard pages",
+      "500 standard pages",
       "Compile your own worlds",
       "Evidence, Ask and signed export",
       "API and MCP access",
@@ -69,7 +69,7 @@ export const BILLING_OFFERS = {
     */
     description: "The higher-volume plan for a single-member workspace, with guided review and onboarding.",
     features: [
-      "2,500 verified standard pages",
+      "2,500 standard pages",
       "Everything in Developer",
       "Review queue and version history",
       "Guided corpus onboarding",
