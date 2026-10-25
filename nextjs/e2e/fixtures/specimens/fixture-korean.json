@@ -32,6 +32,17 @@
     "any accuracy",
     "a real document"
   ],
+  "caption": {
+    "en": {
+      "short": "TAVONEL test fixture",
+      "full": "Synthetic fixture for layout tests; never published."
+    },
+    "ko": {
+      "short": "TAVONEL 테스트 픽스처",
+      "full": "배치 시험용 합성 픽스처이며 게시하지 않습니다."
+    }
+  },
+  "avoidInCrop": [],
   "region": {
     "regionId": "fixture-korean-r1",
     "bbox1000": [
