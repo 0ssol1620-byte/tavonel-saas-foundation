@@ -9,7 +9,7 @@
   "rights": "First-party recording of public tavonel.com pages and of the public sample World. The /explore sample keeps its own public-sample rights boundary; nothing here grants rights to arbitrary source uploads.",
   "allowedUse": "TAVONEL enablement guides (/guide, /ko/guide and the documentation). No claim of a customer result, a new compile run, a benchmark, or a capability the public site does not offer today.",
   "howRecorded": [
-    "Browser scenes: live https://tavonel.com in Playwright chromium with context.recordVideo; desktop 1280x800 (dpr 1), phone 390x844 (dpr 2, isMobile, hasTouch). No fixture build, no request interception, no response edit.",
+    "Browser scenes: Playwright chromium with context.recordVideo; desktop 1280x800 (dpr 1), phone 390x844 (dpr 2, isMobile, hasTouch). guide-1-explore and guide-3-api were recorded on live https://tavonel.com with no fixture build; guide-2-mcp is the exception in the last line. No request interception, no response edit.",
     "One declared DOM addition: a synthetic cursor element (#__guide_cursor, pointer-events:none) the recorder moves before each action. Every click is a real pointer click at the cursor position, and the recorder refuses to click when the element under the cursor is not the one named.",
     "The analytics notice on each first page is declined with its own No thanks button, on camera.",
     "Terminal scenes: a local page generated only from terminal/<session>.json, a capture of real Git Bash commands run in an empty directory with no TAVONEL_* variable set. Each step shows its real exit code, wall-clock duration and start time.",
