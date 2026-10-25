@@ -243,3 +243,23 @@ describe("G1-COPY: Korean measurement and HWP wording on /sources (D-33 / P2-33)
     }
   });
 });
+
+/*
+  FOLLOW-UPS review NB-7 (2026-10-19). The README served at /developer/README.md showed the MCP args as a Windows machine
+  path. It now carries the placeholder /docs/mcp and the snippets use. The README is not a channel asset (channel.json pins
+  no README url), so its bytes moving reissues no digest. Kept here, not in developer-distribution.test.ts: that suite is
+  shared by several owners and a change to it is refused by the affected selector on purpose.
+*/
+describe("FOLLOW-UPS NB-7: the developer README's MCP args", () => {
+  it("shows the placeholder the docs use, not a machine path, on every args line", () => {
+    const readme = read("public/developer/README.md");
+    const args = readme.split("\n").filter((line) => line.includes('"args"'));
+    expect(args.length).toBeGreaterThan(0);
+    for (const line of args) {
+      expect(line).toContain('"args": ["/absolute/path/to/tavonel-mcp.mjs"]');
+      expect(line).not.toMatch(/\b[A-Za-z]:[\\/]|\/Users\/|\/home\//);
+    }
+    const channel = JSON.parse(read("public/developer/channel.json")) as { assets: Record<string, { url: string }> };
+    expect(Object.values(channel.assets).map((asset) => asset.url)).not.toContain("https://tavonel.com/developer/README.md");
+  });
+});
