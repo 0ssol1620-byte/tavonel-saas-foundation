@@ -12,7 +12,7 @@
     },
     "mcp": {
       "url": "https://tavonel.com/developer/tavonel-mcp.mjs",
-      "sha256": "sha256:698f6a4d4cd91f32c42ad3e32a3cdf688a2d86485096469fbe26e5aaa5966526"
+      "sha256": "sha256:5fe95ee2cc10ce101151f2ba621d1baa1ad5fb4bfa231db136869b5860bedb68"
     },
     "consumerContext": {
       "url": "https://tavonel.com/developer/consumer-context.mjs",

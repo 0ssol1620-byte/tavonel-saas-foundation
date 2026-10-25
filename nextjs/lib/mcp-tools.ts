@@ -48,7 +48,8 @@ export const MCP_TOOL_COUNT_WORD = spellNumber(MCP_TOOLS.length);
  * when an added asset went uncounted on three surfaces.
  */
 export const DEVELOPER_FILES: ReadonlyArray<{ key: string; file: string; purpose: string }> = [
-  { key: "cli", file: "tavonel-cli.mjs", purpose: "The upload and compile path from a terminal." },
+  // S6-17 item 4 (G1-COPY, SERVICE-DEFINITION C12): the CLI has no upload command; uploads go through the API or the source agent.
+  { key: "cli", file: "tavonel-cli.mjs", purpose: "The read and compile path from a terminal." },
   { key: "mcp", file: "tavonel-mcp.mjs", purpose: "The read-only MCP bridge, with a --doctor preflight." },
   { key: "consumerContext", file: "consumer-context.mjs", purpose: "The shared context sidecar a context-enabled CLI or MCP server loads from beside itself." },
   { key: "sourceAgent", file: "tavonel-source-agent.py", purpose: "Walks a folder or an S3-compatible bucket and pushes what it finds." },

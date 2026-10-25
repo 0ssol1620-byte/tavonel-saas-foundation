@@ -2056,11 +2056,12 @@ export const TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/r2-presign.test.ts',
   'lib/table-read-contract.test.ts',
 ]);
-// Specimen strip (P2-08, B-04/B-06): the strip, its fail-closed receipt contract and suite, the three synthetic fixtures with their
-// crops and the browser spec. Exactly these eleven paths select the receipt-contract suite and the specimen-strip browser suite
-// (390 only: every test in the spec skips outside project 390, because each one sets its own browser and viewport or
-// needs one request; a 1440 row selects a file with no executed test, which the report reader refuses). No production
-// receipt is committed, so no public crop path is admitted here. Product UI, so never nativeReuse.
+// Specimen strip (P2-08, B-04/B-06; P2-31/P2-32): the strip, its fail-closed receipt contract and suite, the three synthetic
+// fixtures with their crops, the browser spec, and the two committed receipts with their ten served files (WEBP crop, two AVIF
+// encodings, one-page extract and run receipt each, under public/proof-collection/specimens/). Exactly these twenty-two paths select the receipt-contract suite, the
+// Home composition suite (which renders the committed cells in the preview posture) and the specimen-strip browser suite (390 only:
+// every test in the spec skips outside project 390, because each one sets its own browser and viewport or needs one request; a 1440
+// row selects a file with no executed test, which the report reader refuses). Product UI, so never nativeReuse.
 export const SPECIMEN_STRIP_AFFECTED_PATHS = Object.freeze([
   'components/landing-v2/specimen-strip.module.css',
   'components/landing-v2/specimen-strip.tsx',
@@ -2071,10 +2072,22 @@ export const SPECIMEN_STRIP_AFFECTED_PATHS = Object.freeze([
   'e2e/fixtures/specimens/fixture-table.json',
   'e2e/fixtures/specimens/fixture-table.svg',
   'e2e/specimen-strip.spec.ts',
+  'lib/specimen-sources.json',
   'lib/specimen-sources.test.ts',
   'lib/specimen-sources.ts',
+  'public/proof-collection/specimens/kma-2026-09-climate-p001-720.avif',
+  'public/proof-collection/specimens/kma-2026-09-climate-p001-960.avif',
+  'public/proof-collection/specimens/kma-2026-09-climate-p001-960.webp',
+  'public/proof-collection/specimens/kma-2026-09-climate-p001.pdf',
+  'public/proof-collection/specimens/kma-2026-09-climate-p001.run.json',
+  'public/proof-collection/specimens/naca-rm-l50c03-p001-720.avif',
+  'public/proof-collection/specimens/naca-rm-l50c03-p001-960.avif',
+  'public/proof-collection/specimens/naca-rm-l50c03-p001-960.webp',
+  'public/proof-collection/specimens/naca-rm-l50c03-p001.pdf',
+  'public/proof-collection/specimens/naca-rm-l50c03-p001.run.json',
 ]);
 export const SPECIMEN_STRIP_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/landing-v2-page.test.ts',
   'lib/specimen-sources.test.ts',
 ]);
 export const SPECIMEN_STRIP_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/specimen-strip.spec.ts']);
@@ -2093,6 +2106,44 @@ export const LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/launch-qa-script-ratchet.test.ts',
   'lib/release-gate-check-script.test.ts',
 ]);
+// G1-COPY (codex/p4-copy-20261019; DECISION-REGISTER-2026-10-17 S6-17, S6-16, D-01, D-07, D-33, N-5): the six changed endpoints
+// no owner listed -- the plan catalog whose included-pages bullet lost "verified", the developer-file purposes (the CLI line),
+// the operations record whose billing row now reads the purchasable state, the published MCP bridge whose download_package text
+// names the verifier the channel ships, its suite, and the one-test-per-sentence suite. Exactly these six paths select the
+// seventeen suites that read them directly (the plan, pricing, posture, claims-sync and hedge suites for the catalog; the
+// distribution, compiler-contract, docs and guide suites for the file list; the operations, probe and legal suites for the
+// record; the MCP, prompt-injection and tenant suites for the bridge) and the pricing-plan-overview (1440, 390) and
+// docs-reading-layout (1440, 390, reduced-motion) browser suites, each through its existing reviewed project row. Every
+// other path this lane changed keeps its existing owner. Product copy and a published asset, so never nativeReuse.
+// lib/operations.ts is also a consent-poster path (PR #163): a change to it selects both owners, the union of their suites.
+export const G1_COPY_TRUTH_AFFECTED_PATHS = Object.freeze([
+  'lib/billing-catalog.ts',
+  'lib/g1-copy-truth.test.ts',
+  'lib/mcp-server.test.ts',
+  'lib/mcp-tools.ts',
+  'lib/operations.ts',
+  'public/developer/tavonel-mcp.mjs',
+]);
+export const G1_COPY_TRUTH_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/billing-catalog.test.ts',
+  'lib/compiler-contract.test.ts',
+  'lib/copy-trust-guard.test.ts',
+  'lib/developer-distribution.test.ts',
+  'lib/docs-content.test.ts',
+  'lib/g1-copy-truth.test.ts',
+  'lib/guide-content.test.ts',
+  'lib/legal-terms-consistency.test.ts',
+  'lib/mcp-server.test.ts',
+  'lib/operations.test.ts',
+  'lib/plan-entitlement.test.ts',
+  'lib/pricing-plan-overview.test.ts',
+  'lib/product-claims-sync.test.ts',
+  'lib/production-posture.test.ts',
+  'lib/prompt-injection.test.ts',
+  'lib/synthetic-probe.test.ts',
+  'lib/tenant-isolation-negative.test.ts',
+]);
+export const G1_COPY_TRUTH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/docs-reading-layout.spec.ts', 'e2e/pricing-plan-overview.spec.ts']);
 // G8 CHANGE-NOTIFY (phase 4, DECISION-REGISTER S6-15): the switched-off notifier, its cron route, the route's classification row,
 // the cron entry in vercel.json and the receiver-contract browser spec. Exactly these six paths select the notifier's own suite, the
 // classification and route-surface suites for the new route, and every suite that reads vercel.json (production-posture among
@@ -2629,12 +2680,15 @@ export const AFFECTED_GROUPS = Object.freeze([
   // table-read-intake-ceiling: the 6 exact paths above select 8 direct suites and no browser suite.
   affectedGroup('table-read-intake-ceiling', new RegExp(`^(?:${exactPathAlternation(TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS)})$`),
     { unitFiles: TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES }),
-  // specimen-strip: the 11 exact paths above select 1 direct suite and 1 browser suite.
+  // specimen-strip: the 22 exact paths above select 2 direct suites and 1 browser suite.
   affectedGroup('specimen-strip', new RegExp(`^nextjs/(?:${exactPathAlternation(SPECIMEN_STRIP_AFFECTED_PATHS)})$`),
     { unitFiles: SPECIMEN_STRIP_AFFECTED_UNIT_FILES, browserFiles: SPECIMEN_STRIP_AFFECTED_BROWSER_FILES }),
   // launch-qa-release-scripts: the 5 exact paths above select 3 direct suites and no browser suite.
   affectedGroup('launch-qa-release-scripts', new RegExp(`^nextjs/(?:${exactPathAlternation(LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS)})$`),
     { unitFiles: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES }),
+  // g1-copy-truth: the 6 exact paths above select 17 direct suites and 2 browser suites.
+  affectedGroup('g1-copy-truth', new RegExp(`^nextjs/(?:${exactPathAlternation(G1_COPY_TRUTH_AFFECTED_PATHS)})$`),
+    { unitFiles: G1_COPY_TRUTH_AFFECTED_UNIT_FILES, browserFiles: G1_COPY_TRUTH_AFFECTED_BROWSER_FILES }),
   // change-notify: the 6 exact paths above select 9 direct suites and 1 browser suite.
   affectedGroup('change-notify', new RegExp(`^nextjs/(?:${exactPathAlternation(CHANGE_NOTIFY_AFFECTED_PATHS)})$`),
     { unitFiles: CHANGE_NOTIFY_AFFECTED_UNIT_FILES, browserFiles: CHANGE_NOTIFY_AFFECTED_BROWSER_FILES }),

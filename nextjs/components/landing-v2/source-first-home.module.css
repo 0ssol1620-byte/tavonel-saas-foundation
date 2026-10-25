@@ -277,6 +277,16 @@
     .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] .compile-film-mobile-tools) { column-gap: 0; }
   }
   @media (max-width: 899px) {
+    /*
+      G1-COPY (D-01 / P2-30): from 768 to 899px the register's EN support line sets in three lines
+      instead of two (+31px), and the phone sheet's reveal scroll of 300px then found the film and its
+      reading line inside the sheet's zone at 768x900 (reach 778.9 -> 809.9 against 796), so the sheet
+      waited and never opened. The stack pays here too: support to actions and actions to film are
+      16px instead of 24 and 32 (reach 785.9; KO 795.7 -> 771.7). Below 768 the phone rules further
+      down set both to 8px. Windows Chromium, phase4/G1-COPY/hero-geometry.
+    */
+    .home.home :global(.lv2-hero-support) { margin-bottom: 16px; }
+    .heroAside { margin: 16px auto 16px; }
     .home.home :global(#s5 .lv2-proof-list) { grid-template-columns: minmax(0, 1fr); margin-top: 32px; }
     .home.home :global(#s5 .lv2-proof-label) { font-size: 20px; }
   }
@@ -323,18 +333,26 @@
       UX-L2 (UX-PLAN-2026-10-17 §4.5): the container's 24px phone margin leaves the tab row 312px at
       360, and four equal 78px columns wrapped "Use with AI" to two lines in WebKit. The tracks size
       to their labels and share the rest, so every label holds one line.
+
+      G1-COPY (D-01 / P2-30): the register's support line is one line longer than the one it
+      replaced at 360 (EN 4 -> 5, KO 3 -> 4) and at 430 (EN 3 -> 4), which pushed the frame down
+      25-27px: under the 360 LCP floor and into the 430 sheet zone. The stack pays for it again --
+      support 16/1.5 and an 8px rhythm from the H1 to the frame -- so no frame top sits lower than
+      it did on main ed4a1583 by more than 2px (EN 430 391 -> 393, reach 820.1 -> 821.6 against the
+      zone at 828) and every other one sits higher (EN 360 450 -> 426, KO 360 404 -> 381; Windows
+      Chromium, phase4/G1-COPY/hero-geometry).
     */
     .home.home :global(#s1 .compile-film-stages) { grid-template-columns: repeat(4, auto); }
     .home.home :global(#s1) { padding-top: 64px; padding-bottom: 48px; }
     .home.home :global(.lv2-hero-eyebrow) { margin-bottom: 8px; line-height: 1.3; }
-    .home.home :global(.lv2-hero-h1) { font-size: 32px; line-height: 1.04; margin-bottom: 10px; }
+    .home.home :global(.lv2-hero-h1) { font-size: 32px; line-height: 1.04; margin-bottom: 8px; }
     .home[lang="ko"].home :global(.lv2-hero-h1) { font-size: 32px; line-height: 1.16; letter-spacing: -0.02em; }
-    .home.home :global(.lv2-hero-support) { font-size: 17px; line-height: 1.5; margin-bottom: 16px; }
+    .home.home :global(.lv2-hero-support) { font-size: 16px; line-height: 1.5; margin-bottom: 8px; }
     .home[lang="ko"].home :global(.lv2-hero-support) { line-height: 1.6; }
     .home.home :global(#s1 .compile-film-stages button) { font-size: 14px; padding-block: 10px; padding-inline: 2px; min-height: 44px; }
     .home.home :global(#s1 .compile-film-caption p) { font-size: 15px; line-height: 1.45; }
     .home.home :global(#s1 .compile-film-focus-control) { padding: 8px 4px; border: 1px solid var(--home-rule-strong); border-radius: 4px; color: var(--home-ink); font: 560 14px/1.4 var(--f-sans); }
-    .heroAside { margin: 16px auto 16px; gap: 4px; }
+    .heroAside { margin: 8px auto 8px; gap: 4px; }
     .heroAside :global(.lv2-actions) { display: grid; grid-template-columns: minmax(0, 1fr); width: min(100%, 320px); gap: 0; }
     .heroAside :global(.lv2-text-link) { min-height: 44px; }
     .heroAside :global(.lv2-actions a) { width: 100%; justify-content: center; }
