@@ -273,10 +273,16 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
   it("serves the stage-1 re-cut poster at 2x for the crop and 1x for a phone in Fit, masked only on its own frame", () => {
     const en = renderToStaticMarkup(<HeroFilm />);
     const still = en.match(/<img[^>]*class="compile-film-still"[^>]*>/)?.[0] ?? "";
-    expect(still).toContain('src="/film/poster-1-t3.00-2x.webp"');
-    expect(still).toMatch(/srcSet="\/film\/poster-1-t3\.00\.webp 1440w, \/film\/poster-1-t3\.00-2x\.webp 2880w"/i);
+    // POSTER-RECUT (D-11): the WebP pair of t = 8.16s is the <img>, the fallback inside the <picture>.
+    expect(still).toContain('src="/film/poster-1-t8.16-2x.webp"');
+    expect(still).toMatch(/srcSet="\/film\/poster-1-t8\.16\.webp 1440w, \/film\/poster-1-t8\.16-2x\.webp 2880w"/i);
     expect(still).toContain(`sizes="${FILM_POSTER_SIZES}"`);
-    expect(en).toContain('data-poster-mask="/film/poster-1-t3.00-2x.webp"');
+    // ...and the AVIF pair of the same frame is the <source> ahead of it, with the same sizes.
+    const picture = en.match(/<picture[^>]*>([\s\S]*?)<\/picture>/)?.[1] ?? "";
+    expect(picture.indexOf("<source")).toBe(0);
+    expect(picture).toMatch(/<source type="image\/avif" srcSet="\/film\/poster-1-t8\.16\.avif 1440w, \/film\/poster-1-t8\.16-2x\.avif 2880w" sizes="[^"]+"\/?>/i);
+    expect(picture).toContain(still);
+    expect(en).toContain('data-poster-mask="/film/poster-1-t8.16-2x.webp"');
     // The mask is bound to the poster it was measured on: any other stage-1 poster draws none.
     expect(renderToStaticMarkup(<CompileStagePlayer storyLayout />)).not.toContain("data-poster-mask");
     expect(STAGE_FRAMES.sources!.posterMask!.rects.every(rect => rect.x + rect.w <= 2880 && rect.y + rect.h <= 1800)).toBe(true);

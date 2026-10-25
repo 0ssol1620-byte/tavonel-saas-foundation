@@ -77,8 +77,28 @@ const COOKIES: ReadonlyArray<readonly [string, string, string, string]> = [
   [
     "Vercel website analytics",
     "Vercel, same-origin",
-    "Aggregate page-view measurement. Sets no cookie and stores nothing on your device",
+    "Counts page views and selected clicks on public marketing pages, only after you allow analytics. Sets no cookie and stores nothing on your device",
     "No cookie",
+  ],
+  /*
+    P2-34 (ANALYTICS-ACTIVATION-2026-10-17 §4.5 item 5, approved under D-21). The two "similar
+    storage" keys the site writes itself. Both are sessionStorage and neither is read by anything
+    that sends: `tavonel.funnel-log` is `lib/funnel-events.ts` `LOG_KEY` (written by
+    `trackFunnel`, read by nothing outside it), and `tavonel.first-touch.v1` is
+    `lib/recipe-intent.ts` `ATTRIBUTION_KEY` (written on /login by `rememberFirstTouch`, read only
+    by `readFirstTouch` in the same file). `lib/legal-terms-consistency.test.ts` (P2-34) holds both facts.
+  */
+  [
+    "tavonel.funnel-log",
+    "Ours, session storage",
+    "A record of the interactions in this tab. Not sent",
+    "Until you close the tab",
+  ],
+  [
+    "tavonel.first-touch.v1",
+    "Ours, session storage",
+    "The campaign parameters of the sign-in address you arrived on, if it had any. Not sent",
+    "Until you close the tab",
   ],
   [
     "Sign-in session",
@@ -145,7 +165,7 @@ export default function PrivacyPage() {
         where their documents are processed. The values are the ones /subprocessors publishes. */}
     <h2>International processing</h2><p>Supabase is configured in Seoul, and so are the Vercel serverless functions that serve this site. The content-disarm service that rasterizes and scans every source — the first thing to touch your document bytes — runs on Google Cloud Run in Seoul, orchestrated by a Cloudflare worker on Cloudflare&apos;s edge. The GPU OCR that reads the sanitized result runs on a RunPod endpoint with no pinned region, so we do not state one. Cloudflare, RunPod, Resend, Google and Paddle may process limited data through global infrastructure or support systems outside Korea. The exact processor, purpose, data category and region are listed on the subprocessors page. Cloudflare R2 location hints are best-effort and are not a promise of Korean data residency, and no data residency is guaranteed.</p>
     <p>The processing addendum does not execute the European Commission&apos;s Standard Contractual Clauses, the UK International Data Transfer Addendum or a transfer impact assessment for you. Where a transfer of personal data in a customer&apos;s documents requires one of those or another transfer instrument, we agree it with that customer before processing the affected documents, and the self-service terms exclude that data until it is agreed. Ask <a href="mailto:privacy@tavonel.com">privacy@tavonel.com</a> to arrange it and for details of the providers relevant to your use.</p>
-    <h2>Optional website analytics</h2><p>With your permission, Google Analytics uses first-party cookies to measure visits and selected interactions on public marketing pages. It receives a pseudonymous browser identifier, device information, a public page address without query parameters, and the referring website origin. We do not send document contents, filenames, questions, account identifiers or workspace events to Google Analytics. Advertising personalization and Google signals are disabled. Your choice and analytics cookies expire after 180 days. You can decline without affecting the service, or withdraw permission using Analytics preferences on a public page. Google may process analytics data outside Korea. Our separate Vercel website analytics uses no analytics cookies.</p>
+    <h2>Optional website analytics</h2><p>With your permission, Google Analytics uses first-party cookies to measure visits and selected interactions on public marketing pages. It receives a pseudonymous browser identifier, device information, a public page address without query parameters, and the referring website origin. We do not send document contents, filenames, questions, account identifiers or workspace events to Google Analytics. Advertising personalization and Google signals are disabled. Your choice and analytics cookies expire after 180 days. You can decline without affecting the service, or withdraw permission using Analytics preferences on a public page. Google may process analytics data outside Korea. With the same permission, Vercel Web Analytics, run by our hosting provider, counts page views and the same selected interactions on public marketing pages without cookies or storage on your device. It receives the page address without query parameters, the referring address, your browser, operating system and device type, and an approximate location derived from the request; Vercel tells visits apart with a hash of the request that it discards after 24 hours. We do not send document contents, filenames, questions, account identifiers or workspace events to Vercel Web Analytics.</p>
     {/* G2-020. The cookie table the analytics paragraph above was standing in for. */}
     <h2>Cookies and similar storage</h2>
     <div className="table-scroll">

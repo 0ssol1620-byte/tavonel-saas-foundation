@@ -110,7 +110,139 @@
       "cutSha256": "480c7479ca2a7f3ab73291016c4d64c20bee6e6967f43444bde44e117e0cf732",
       "frameSeconds": 17.96,
       "framePngSha256": "f6eab683949c55a50454cecd0759f2a45a18acd0c33cb6dbea3ba832cdf7cf3b"
+    },
+    {
+      "file": "poster-1-t8.16-2x.avif",
+      "width": 2880,
+      "height": 1800,
+      "bytes": 137967,
+      "sha256": "65e6fe5df0fd486ee09286952f8b2cccf0b671eb83f4ad15df3c43440ed292bb",
+      "cut": "compile-cut.mp4",
+      "cutSha256": "1406a9a8d6e537eadd97012c94c89ffc792276628f30fa8313ea892c8dd169b9",
+      "frameSeconds": 8.16,
+      "framePngSha256": "ea96053750dc68fb950303c08d7b8e384f7fe2bd6424428948767467c0978a55"
+    },
+    {
+      "file": "poster-1-t8.16.avif",
+      "width": 1440,
+      "height": 900,
+      "bytes": 57712,
+      "sha256": "6bc6b2f44261e58c0372df907e5d63e14ed20aa3c915ce5c0f6edfd918564789",
+      "cut": "compile-cut.mp4",
+      "cutSha256": "1406a9a8d6e537eadd97012c94c89ffc792276628f30fa8313ea892c8dd169b9",
+      "frameSeconds": 8.16,
+      "framePngSha256": "ea96053750dc68fb950303c08d7b8e384f7fe2bd6424428948767467c0978a55"
+    },
+    {
+      "file": "poster-1-t8.16-2x.webp",
+      "width": 2880,
+      "height": 1800,
+      "bytes": 259554,
+      "sha256": "58d0ff0e87c526d64620d5e9e6e4a699122f3599b59deb107bef3ea74e721867",
+      "cut": "compile-cut.mp4",
+      "cutSha256": "1406a9a8d6e537eadd97012c94c89ffc792276628f30fa8313ea892c8dd169b9",
+      "frameSeconds": 8.16,
+      "framePngSha256": "ea96053750dc68fb950303c08d7b8e384f7fe2bd6424428948767467c0978a55"
+    },
+    {
+      "file": "poster-1-t8.16.webp",
+      "width": 1440,
+      "height": 900,
+      "bytes": 105678,
+      "sha256": "810e078271d88d033784a3db376cffac526fc21f56e40406bc986ada59eb953b",
+      "cut": "compile-cut.mp4",
+      "cutSha256": "1406a9a8d6e537eadd97012c94c89ffc792276628f30fa8313ea892c8dd169b9",
+      "frameSeconds": 8.16,
+      "framePngSha256": "ea96053750dc68fb950303c08d7b8e384f7fe2bd6424428948767467c0978a55"
+    },
+    {
+      "file": "poster-2-t9.28-2x.avif",
+      "width": 2880,
+      "height": 1800,
+      "bytes": 139884,
+      "sha256": "88dda2be90413f323f4906b3c0bcfe8616a6456d7919c508580a0cf93355cb17",
+      "cut": "compile-cut-2.mp4",
+      "cutSha256": "d0496e6e80f83b9a11ccb647c1b23de54d7ad22d7163f2ddd4f0ae58d7152c6d",
+      "frameSeconds": 9.28,
+      "framePngSha256": "249f42e4d30f0ec49ffdccbc6a20b1d76c323ff3ac3910719a8ff4bc8d713fe8"
+    },
+    {
+      "file": "poster-2-t9.28.avif",
+      "width": 1440,
+      "height": 900,
+      "bytes": 61273,
+      "sha256": "3d24e7d4241de0813fa6a8694a63cecaf64f301cba20eb636e51d94fe8554d87",
+      "cut": "compile-cut-2.mp4",
+      "cutSha256": "d0496e6e80f83b9a11ccb647c1b23de54d7ad22d7163f2ddd4f0ae58d7152c6d",
+      "frameSeconds": 9.28,
+      "framePngSha256": "249f42e4d30f0ec49ffdccbc6a20b1d76c323ff3ac3910719a8ff4bc8d713fe8"
+    },
+    {
+      "file": "poster-2-t9.28-2x.webp",
+      "width": 2880,
+      "height": 1800,
+      "bytes": 300132,
+      "sha256": "4a5f55bbbed4fed89b02bbb6a57ade0ac73878475bcfcff01498df080bbaf3e6",
+      "cut": "compile-cut-2.mp4",
+      "cutSha256": "d0496e6e80f83b9a11ccb647c1b23de54d7ad22d7163f2ddd4f0ae58d7152c6d",
+      "frameSeconds": 9.28,
+      "framePngSha256": "249f42e4d30f0ec49ffdccbc6a20b1d76c323ff3ac3910719a8ff4bc8d713fe8"
+    },
+    {
+      "file": "poster-2-t9.28.webp",
+      "width": 1440,
+      "height": 900,
+      "bytes": 121612,
+      "sha256": "91525f1fe19efd09f4634ac5e015dd81b75284834279c52fbe0e3e32c02629e3",
+      "cut": "compile-cut-2.mp4",
+      "cutSha256": "d0496e6e80f83b9a11ccb647c1b23de54d7ad22d7163f2ddd4f0ae58d7152c6d",
+      "frameSeconds": 9.28,
+      "framePngSha256": "249f42e4d30f0ec49ffdccbc6a20b1d76c323ff3ac3910719a8ff4bc8d713fe8"
+    },
+    {
+      "file": "poster-3-t17.96-2x.avif",
+      "width": 2880,
+      "height": 1800,
+      "bytes": 92398,
+      "sha256": "3f54bf18e675927595d06b1ace591533905e03c31d36c289f4ccc772f003d2e7",
+      "cut": "compile-cut-3.mp4",
+      "cutSha256": "c6d35a3a43f08e54381e7e15cb86908a70184d51726baebc52b766ac9d7f54a0",
+      "frameSeconds": 17.96,
+      "framePngSha256": "de8a2079bcc277bf4ede1cd4575199d3600d48c2adbff34b4f2556ca666d7083"
+    },
+    {
+      "file": "poster-3-t17.96.avif",
+      "width": 1440,
+      "height": 900,
+      "bytes": 41075,
+      "sha256": "7baaaccdb016665c5c4976879f9fad4029873b129732022243461c5e29711dd8",
+      "cut": "compile-cut-3.mp4",
+      "cutSha256": "c6d35a3a43f08e54381e7e15cb86908a70184d51726baebc52b766ac9d7f54a0",
+      "frameSeconds": 17.96,
+      "framePngSha256": "de8a2079bcc277bf4ede1cd4575199d3600d48c2adbff34b4f2556ca666d7083"
+    },
+    {
+      "file": "poster-4-t17.96-2x.avif",
+      "width": 2880,
+      "height": 1800,
+      "bytes": 101480,
+      "sha256": "862b712d8769812e4fc1f36ab16e24d3cd1d881eee8df49cdd8b448d10b0232f",
+      "cut": "compile-cut-4.mp4",
+      "cutSha256": "480c7479ca2a7f3ab73291016c4d64c20bee6e6967f43444bde44e117e0cf732",
+      "frameSeconds": 17.96,
+      "framePngSha256": "0ade2f490662ce1c69510f8863189c038dc33a4e1f6720a2ac42980dc868998a"
+    },
+    {
+      "file": "poster-4-t17.96.avif",
+      "width": 1440,
+      "height": 900,
+      "bytes": 46419,
+      "sha256": "a30e783022041b97523bc3fe6d73f7de949e6b098f0f6d68efc69f542a6123fb",
+      "cut": "compile-cut-4.mp4",
+      "cutSha256": "480c7479ca2a7f3ab73291016c4d64c20bee6e6967f43444bde44e117e0cf732",
+      "frameSeconds": 17.96,
+      "framePngSha256": "0ade2f490662ce1c69510f8863189c038dc33a4e1f6720a2ac42980dc868998a"
     }
   ],
-  "posterEncoder": "sharp 0.35.4 (libwebp 1.6.0, libvips 8.18.6); webp quality 82, smartSubsample, effort 6; 1x = lanczos3 resize of the same frame"
+  "posterEncoder": "sharp 0.35.4 (libwebp 1.6.0, libvips 8.18.6); webp quality 82, smartSubsample, effort 6; 1x = lanczos3 resize of the same frame. POSTER-RECUT (D-11): frames by ffmpeg 8.1.2 (input seek to t, BT.601 limited -> full range); AVIF = sharp 0.35.4 (libaom 3.14.1, libheif 1.23.2) quality 50, chromaSubsampling 4:4:4, effort 6, 1x = lanczos3 resize; the recut WebP files use the Release 3 WebP settings"
 }
