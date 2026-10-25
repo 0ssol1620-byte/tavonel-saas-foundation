@@ -9,6 +9,11 @@
  * its redirect URI verify, what may be granted, whether this workspace may hold a key -- and this
  * page only shows the answer and navigates where the server says.
  *
+ * It navigates only on a person's click (REVIEW-2026-10-19 B1, RFC 9700 §4.11.2). Registration is
+ * open, so no redirect URI is trusted: a request the server rejects is shown here with the client's
+ * address, and the error goes back only if the person clicks "Return to …". Deny and Allow are
+ * clicks already, and the server answers them only for the redirect URI exactly as registered.
+ *
  * The Supabase client is imported on the click that needs a session, not on load: it is the
  * largest chunk on the page, and loading it up front put the route over the 200,000 B script
  * budget (§22). A signed-out person sees the request first and is asked to sign in when they allow.
@@ -22,7 +27,7 @@ import { failureSentence } from "@/lib/workspace-failure-copy";
 type View = { client: { name: string; redirectOrigin: string }; scopes: string[] };
 type Phase =
   | { kind: "checking" }
-  | { kind: "invalid"; description: string }
+  | { kind: "invalid"; description: string; back: { href: string; origin: string } | null }
   | { kind: "signed-out"; view: View }
   | { kind: "consent"; view: View }
   | { kind: "working"; view: View }
@@ -69,16 +74,20 @@ export default function OAuthAuthorizePage() {
     setPhase({ kind: "checking" });
     try {
       const { status, body } = await decide("describe", null);
-      if (body.code === "AUTHORIZATION_REQUEST_REJECTED" && leave(body.redirectTo)) return;
       if (body.code !== "AUTHORIZATION_REQUEST_VALID") {
-        setPhase({ kind: "invalid", description: typeof body.description === "string" ? body.description : failureSentence(String(body.code ?? ""), status) });
+        const back = body.code === "AUTHORIZATION_REQUEST_REJECTED" && typeof body.redirectTo === "string" ? body.redirectTo : null;
+        setPhase({
+          kind: "invalid",
+          description: typeof body.description === "string" ? body.description : failureSentence(String(body.code ?? ""), status),
+          back: back ? { href: back, origin: new URL(back).origin } : null,
+        });
         return;
       }
       setPhase({ kind: "consent", view: { client: body.client, scopes: body.scopes } as View });
     } catch {
-      setPhase({ kind: "invalid", description: failureSentence(null, 503) });
+      setPhase({ kind: "invalid", description: failureSentence(null, 503), back: null });
     }
-  }, [leave]);
+  }, []);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -121,6 +130,18 @@ export default function OAuthAuthorizePage() {
 
           {phase.kind === "invalid" ? (
             <p className="notice static" role="alert"><strong>Nothing was granted.</strong> {phase.description}</p>
+          ) : null}
+
+          {phase.kind === "invalid" && phase.back ? (
+            <>
+              <p className="lead">
+                The client asked for the answer to go to <b>{phase.back.origin}</b>. Go back only if you started this
+                connection there.
+              </p>
+              <div className="auth-actions">
+                <a className="btn ghost" href={phase.back.href} rel="noreferrer">Return to {phase.back.origin}</a>
+              </div>
+            </>
           ) : null}
 
           {phase.kind === "unavailable" ? (
