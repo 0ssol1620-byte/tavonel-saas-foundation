@@ -175,15 +175,16 @@ test("the film opens each stage on its scanned default view and reads at 9px or 
   const measurements: Record<string, unknown>[] = [];
   const FILM = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]';
   const drawnScale = (film: import("@playwright/test").Locator) =>
-    film.locator(".compile-film-viewport > :is(img.compile-film-still, video.compile-film-video)").first().evaluate(media => media.getBoundingClientRect().width / 2880);
+    film.locator(".compile-film-viewport :is(img.compile-film-still, video.compile-film-video)").first().evaluate(media => media.getBoundingClientRect().width / 2880);
   // Drawn width over laid-out width: 2 on the crop, 1 on the whole frame (the transform leaves layout alone).
   const zoom = (film: import("@playwright/test").Locator) =>
-    film.locator(".compile-film-viewport > :is(img.compile-film-still, video.compile-film-video)").first().evaluate(media => media.getBoundingClientRect().width / (media as HTMLElement).offsetWidth);
+    film.locator(".compile-film-viewport :is(img.compile-film-still, video.compile-film-video)").first().evaluate(media => media.getBoundingClientRect().width / (media as HTMLElement).offsetWidth);
   // The stage-1 Tier 2 bars must land on the eyebrow in the contained picture, not on the (letterboxed)
   // still box: each bar's drawn rect against its source rect mapped through the still's contain fit.
   const expectMaskOnPicture = async (film: import("@playwright/test").Locator) => {
     const offsets = await film.locator(".compile-film-mask").evaluate(node => {
-      const still = node.parentElement!.querySelector<HTMLImageElement>(":scope > img.compile-film-still")!;
+      // D-11: the still sits in a display: contents <picture>, so it is a descendant of the viewport, not a child.
+      const still = node.parentElement!.querySelector<HTMLImageElement>(":scope img.compile-film-still")!;
       const box = still.getBoundingClientRect();
       const scale = Math.min(box.width / still.naturalWidth, box.height / still.naturalHeight);
       const width = still.naturalWidth * scale, height = still.naturalHeight * scale;
@@ -595,7 +596,9 @@ for (const path of ["/", "/ko"]) {
         const last = entries[entries.length - 1]!;
         return { url: last.url ?? "", size: last.size ?? 0, still: Boolean(last.element?.matches("img.compile-film-still")) };
       });
-      expect(new URL(lcp.url).pathname, `LCP at ${width}`).toBe("/film/poster-1-t3.00.webp");
+      // POSTER-RECUT (D-11): the 1x stage-1 poster, AVIF where the engine decodes it, the WebP fallback where it does not.
+      expect(new URL(lcp.url).pathname, `LCP at ${width}`).toMatch(/^\/film\/poster-1-t8\.16\.(avif|webp)$/);
+      if (browserName === "chromium") expect(new URL(lcp.url).pathname, `LCP at ${width}`).toBe("/film/poster-1-t8.16.avif");
       expect(lcp.still, `LCP element at ${width}`).toBe(true);
       expect(lcp.size, `LCP area at ${width}`).toBeGreaterThanOrEqual(LCP_FLOOR[browserName]![path]![width]! * 0.99);
       for (let stage = 0; stage < 4; stage++) {

@@ -7432,6 +7432,28 @@ test('affected launch-qa-release-scripts owner: 5 exact paths select 3 direct su
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+// Phase 4 consent-poster lane (P2-34, D-11): one finite owner, restated independently of the exported constants.
+import { CONSENT_POSTER_AFFECTED_PATHS, CONSENT_POSTER_AFFECTED_UNIT_FILES, CONSENT_POSTER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+test('affected consent-poster owner: 16 exact paths select 5 direct suites and 2 browser suites; neighbours stay unmapped', () => {
+  const suites = ['lib/legal-terms-consistency.test.ts', 'lib/one-path-contract.test.ts', 'lib/operations.test.ts', 'lib/production-posture.test.ts', 'lib/trust-page-answers.test.ts'];
+  const browsers = ['e2e/landing-hero-film-loading.spec.ts', 'e2e/templates.spec.ts'];
+  assert.deepEqual([[...CONSENT_POSTER_AFFECTED_PATHS], [...CONSENT_POSTER_AFFECTED_UNIT_FILES], [...CONSENT_POSTER_AFFECTED_BROWSER_FILES]], [['app/privacy/page.tsx', 'app/subprocessors/page.tsx', 'lib/legal-terms-consistency.test.ts', 'lib/operations.ts', 'public/film/poster-1-t8.16-2x.avif', 'public/film/poster-1-t8.16-2x.webp', 'public/film/poster-1-t8.16.avif', 'public/film/poster-1-t8.16.webp', 'public/film/poster-2-t9.28-2x.avif', 'public/film/poster-2-t9.28-2x.webp', 'public/film/poster-2-t9.28.avif', 'public/film/poster-2-t9.28.webp', 'public/film/poster-3-t17.96-2x.avif', 'public/film/poster-3-t17.96.avif', 'public/film/poster-4-t17.96-2x.avif', 'public/film/poster-4-t17.96.avif'], suites, browsers]);
+  for (const path of CONSENT_POSTER_AFFECTED_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['consent-poster'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['consent-poster'], [], [...suites].sort(), [...browsers].sort(), []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const plan = affectedAskPlan(affectedMap(CONSENT_POSTER_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[...suites].sort(), [...browsers].sort(), false, false]);
+  assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440', '390']);
+  for (const adjacent of ['nextjs/app/privacy/opengraph-image.tsx', 'nextjs/app/subprocessors/layout.tsx', 'nextjs/lib/operations.test.ts', 'nextjs/lib/operations-copy.ts', 'nextjs/public/film/poster-1-t8.16-3x.avif', 'nextjs/public/film/poster-5-t1.00.avif', 'nextjs/public/film/compile-cut.mp4', 'app/privacy/page.tsx.bak']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    if (unknown.groups.length) { assert.ok(!unknown.groups.includes('consent-poster'), adjacent); continue; }
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
 // Old negative lists (Explore, recipe continuation, preflight report, benchmarks path mask) name paths the UX program changed and
 // B-01 registered. Each such exact path is asserted positively instead -- one owner, the one B-01 names, with that owner's exact
 // suites and fresh native debt -- as published024 did with assertNewReviewedMarketingEndpoint. Every other listed path still refuses.
