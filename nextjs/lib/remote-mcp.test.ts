@@ -436,11 +436,17 @@ describe("consent", () => {
     expect(destination(granted.redirectTo)).toEqual([REDIRECT, "a", ["code", "iss", "state", "tenant"]]);
   });
 
-  it("refuses a state longer than 512 characters instead of cutting it", async () => {
+  it("refuses a state longer than 512 characters on the page, without cutting it or sending the client anywhere", async () => {
     const clientId = await registeredClient();
-    const long = await (await consent("describe", authorizationRequest(clientId, { state: "s".repeat(513) }))).json() as { code: string; error: string; redirectTo: string };
-    expect([long.code, long.error]).toEqual(["AUTHORIZATION_REQUEST_REJECTED", "invalid_request"]);
-    expect(new URL(long.redirectTo).searchParams.has("state")).toBe(false);
+    // REMOTE-MCP re-review N1: an error response must echo the state it was sent (RFC 6749 §4.1.2.1), and this one cannot,
+    // so the refusal stays on the page, like a request whose client or redirect URI did not verify.
+    for (const decision of ["describe", "deny", "approve"] as const) {
+      const response = await consent(decision, authorizationRequest(clientId, { state: "s".repeat(513) }));
+      const long = await response.json() as { code: string; error: string; description: string; redirectTo?: string };
+      expect([response.status, long.code, long.error], decision).toEqual([400, "AUTHORIZATION_REQUEST_INVALID", "invalid_request"]);
+      expect(long.description).toBe("The state parameter is longer than 512 characters.");
+      expect(long, decision).not.toHaveProperty("redirectTo");
+    }
     const longest = await (await consent("deny", authorizationRequest(clientId, { state: "s".repeat(512) }))).json() as { redirectTo: string };
     expect(new URL(longest.redirectTo).searchParams.get("state")).toBe("s".repeat(512));
   });
