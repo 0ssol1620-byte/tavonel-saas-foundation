@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { sharedBrowserProjectsMapExcludesExplore, NATIVE_RACE_ADDITIONS, NATIVE_RACE_CONFIG_PATHS, NATIVE_RACE_CHANGED_PATHS, NATIVE_RACE_MAIN_OVERLAYS, NATIVE_RACE_MAIN_OVERLAY_PROVENANCE } from './repair-collector-only.mjs';
 import { PR141_MAIN_MERGE_BCBA_AFFECTED_PATHS, PR141_MAIN_MERGE_BCBA_AFFECTED_UNIT_FILES, PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+import { CHANGE_NOTIFY_AFFECTED_PATHS, CHANGE_NOTIFY_AFFECTED_UNIT_FILES, CHANGE_NOTIFY_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { AFFECTED_GROUPS, HOME_AFFECTED_BROWSER_FILE, HOME_AFFECTED_PATHS, HOME_AFFECTED_UNIT_FILES, HOME_READER_HEADING_CSS_AFFECTED_PATHS, HOME_READER_HEADING_CSS_AFFECTED_UNIT_FILES, REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE, RECIPE_CONTINUATION_AFFECTED_BROWSER_FILES, RECIPE_CONTINUATION_AFFECTED_PATHS, RECIPE_CONTINUATION_AFFECTED_UNIT_FILES, VITEST_DISCOVERY_CONFIG_PATH, vitestDiscoveryConfigFailures, COMPILE_SOURCE_OBSERVATIONS_AFFECTED_PATHS, COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES, WORLD_EXPLORER_NAVIGATION_AFFECTED_PATHS, WORLD_EXPLORER_NAVIGATION_AFFECTED_UNIT_FILES, WORLD_VERSION_DIFF_AFFECTED_PATHS, WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES, INTAKE_APPROVAL_ROLLOUT_AFFECTED_PATHS, INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_PATHS, SOLUTIONS_PROOF_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES, EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS, EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES, EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_PATHS, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_UNIT_FILES, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_BROWSER_FILES, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES, FIX_ROUND_3_AFFECTED_PATHS, FIX_ROUND_3_AFFECTED_UNIT_FILES, FIX_ROUND_3_AFFECTED_BROWSER_FILES, FIX_ROUND_4_AFFECTED_PATHS, FIX_ROUND_4_AFFECTED_UNIT_FILES, PR151_SERVICE_TRUTH_AFFECTED_PATHS, PR151_SERVICE_TRUTH_AFFECTED_UNIT_FILES, OCR_PAGES_INCOMPLETE_AFFECTED_PATHS, OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES, BENCHMARKS_PATH_MASK_AFFECTED_PATHS, BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES, ENABLEMENT_AFFECTED_PATHS, ENABLEMENT_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { REMOTE_MCP_AFFECTED_PATHS, REMOTE_MCP_AFFECTED_UNIT_FILES, REMOTE_MCP_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { CONSENT_POSTER_AFFECTED_PATHS, CONSENT_POSTER_AFFECTED_UNIT_FILES, CONSENT_POSTER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
@@ -669,6 +670,22 @@ assert(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'] === 'cc03d8ecb69d4291
   && ['e2e/benchmarks.spec.ts', 'e2e/brand-tokens.spec.ts', 'e2e/film-line-stability.spec.ts', 'e2e/site-alignment.spec.ts', 'e2e/solutions-workflows.spec.ts', 'e2e/templates.spec.ts', 'e2e/type-scale.spec.ts'].every(file => PUBLIC_MARKETING_AFFECTED_BROWSER_FILES.includes(file))
   && ["['e2e/templates.spec.ts', ['1440']],", "['e2e/type-scale.spec.ts', ['1440']],", "['e2e/site-alignment.spec.ts', ['1440']],", "['e2e/brand-tokens.spec.ts', ['1440']],", "['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/film-line-stability.spec.ts', ['390']],"].every(row => sharedMap.includes('\n  ' + row)),
   'Public marketing owner must keep the reviewed package.json postimage and a reviewed project row for each UX program browser suite');
+// G8 CHANGE-NOTIFY (phase 4), restated independently: six exact paths, nine direct suites, one browser suite with its reviewed
+// 390 row, no neighbour admission and no lane flag. The docs text and the outbox SQL keep their existing owners.
+{
+  const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'change-notify'), [owner] = owners;
+  const paths = ['app/api/internal/change-notify/run/route.ts', 'e2e/change-notify-docs.spec.ts', 'lib/change-notify.test.ts', 'lib/change-notify.ts', 'lib/security/route-classification.json', 'vercel.json'];
+  const suites = ['lib/change-notify.test.ts', 'lib/cta-truth.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/production-posture.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/source-deletion-route.test.ts', 'lib/synthetic-probe.test.ts'];
+  const browsers = ['e2e/change-notify-docs.spec.ts'];
+  assert(owners.length === 1 && JSON.stringify(CHANGE_NOTIFY_AFFECTED_PATHS) === JSON.stringify(paths)
+    && JSON.stringify(CHANGE_NOTIFY_AFFECTED_UNIT_FILES) === JSON.stringify(suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(suites)
+    && JSON.stringify(CHANGE_NOTIFY_AFFECTED_BROWSER_FILES) === JSON.stringify(browsers) && JSON.stringify(owner.browserFiles) === JSON.stringify(browsers)
+    && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
+    && paths.every(p => owner.match.test('nextjs/' + p))
+    && ['nextjs/app/api/internal/change-notify/replay/route.ts', 'nextjs/lib/change-notify-store.ts', 'nextjs/vercel.json.bak', 'vercel.json', 'nextjs/lib/docs-content.ts', 'supabase/migrations/20261019100000_change_notify_outbox.sql'].every(p => !owner.match.test(p))
+    && sharedMap.includes("\n  ['e2e/change-notify-docs.spec.ts', ['390']],"),
+    'change-notify owner must keep its six exact paths, nine direct suites and the 390 change-notify-docs browser row');
+}
 for (const binding of currentOwnerBindings) {
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === binding.group), [owner] = owners;
   assert(owners.length === 1 && JSON.stringify(binding.exportedPaths) === JSON.stringify(binding.paths)

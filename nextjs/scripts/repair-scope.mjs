@@ -2173,6 +2173,32 @@ export const G1_COPY_TRUTH_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/tenant-isolation-negative.test.ts',
 ]);
 export const G1_COPY_TRUTH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/docs-reading-layout.spec.ts', 'e2e/pricing-plan-overview.spec.ts']);
+// G8 CHANGE-NOTIFY (phase 4, DECISION-REGISTER S6-15): the switched-off notifier, its cron route, the route's classification row,
+// the cron entry in vercel.json and the receiver-contract browser spec. Exactly these six paths select the notifier's own suite, the
+// classification and route-surface suites for the new route, and every suite that reads vercel.json (production-posture among
+// them), plus the change-notify-docs browser suite in project 390. The docs text itself stays with the docs owner, and the outbox
+// migration and grant-matrix row with database-contract. Product code, so never nativeReuse.
+// lib/security/route-classification.json is also a remote-mcp path (PR #167): a change to it selects both owners, the union of their suites.
+export const CHANGE_NOTIFY_AFFECTED_PATHS = Object.freeze([
+  'app/api/internal/change-notify/run/route.ts',
+  'e2e/change-notify-docs.spec.ts',
+  'lib/change-notify.test.ts',
+  'lib/change-notify.ts',
+  'lib/security/route-classification.json',
+  'vercel.json',
+]);
+export const CHANGE_NOTIFY_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/change-notify.test.ts',
+  'lib/cta-truth.test.ts',
+  'lib/durable-compile-orchestration.test.ts',
+  'lib/operational-sli-alert-route.test.ts',
+  'lib/production-posture.test.ts',
+  'lib/production-route-surface.test.ts',
+  'lib/route-classification.test.ts',
+  'lib/source-deletion-route.test.ts',
+  'lib/synthetic-probe.test.ts',
+]);
+export const CHANGE_NOTIFY_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/change-notify-docs.spec.ts']);
 // G11 remote MCP (codex/p4-remote-mcp-20261019, DECISION-REGISTER S6-09/S6-10): the switch-gated endpoint, its OAuth routes and
 // well-known metadata, the consent page, the shared module and its suite, the route classification entries and the browser spec.
 // Exactly these twelve paths select the sixteen suites that read them -- the module suite, the stdio bridge suite whose table the
@@ -2180,6 +2206,7 @@ export const G1_COPY_TRUTH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/docs-rea
 // read the classification (route classification, CSRF matrix, route surface, canonical and page metadata, SEO, copy trust, output
 // escaping, prohibited phrases, funnel events, workspace tenancy, brand copy) -- and the remote MCP browser suite in launch-chromium.
 // Product code, so never nativeReuse.
+// lib/security/route-classification.json is also a change-notify path (PR #164): a change to it selects both owners, the union of their suites.
 export const REMOTE_MCP_AFFECTED_PATHS = Object.freeze([
   'app/.well-known/oauth-authorization-server/route.ts',
   'app/.well-known/oauth-protected-resource/[[...resource]]/route.ts',
@@ -2733,6 +2760,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // g1-copy-truth: the 6 exact paths above select 17 direct suites and 2 browser suites.
   affectedGroup('g1-copy-truth', new RegExp(`^nextjs/(?:${exactPathAlternation(G1_COPY_TRUTH_AFFECTED_PATHS)})$`),
     { unitFiles: G1_COPY_TRUTH_AFFECTED_UNIT_FILES, browserFiles: G1_COPY_TRUTH_AFFECTED_BROWSER_FILES }),
+  // change-notify: the 6 exact paths above select 9 direct suites and 1 browser suite.
+  affectedGroup('change-notify', new RegExp(`^nextjs/(?:${exactPathAlternation(CHANGE_NOTIFY_AFFECTED_PATHS)})$`),
+    { unitFiles: CHANGE_NOTIFY_AFFECTED_UNIT_FILES, browserFiles: CHANGE_NOTIFY_AFFECTED_BROWSER_FILES }),
   // remote-mcp: the 12 exact paths above select 16 direct suites and 1 browser suite.
   affectedGroup('remote-mcp', new RegExp(`^nextjs/(?:${exactPathAlternation(REMOTE_MCP_AFFECTED_PATHS)})$`),
     { unitFiles: REMOTE_MCP_AFFECTED_UNIT_FILES, browserFiles: REMOTE_MCP_AFFECTED_BROWSER_FILES }),

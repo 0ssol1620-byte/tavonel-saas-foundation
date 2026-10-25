@@ -33,6 +33,10 @@
     {
       "path": "/api/internal/billing/gate-enforce",
       "schedule": "11,26,41,56 * * * *"
+    },
+    {
+      "path": "/api/internal/change-notify/run",
+      "schedule": "2-57/5 * * * *"
     }
   ],
   "headers": [
