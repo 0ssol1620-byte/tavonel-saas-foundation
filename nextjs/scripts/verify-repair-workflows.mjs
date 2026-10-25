@@ -670,12 +670,12 @@ assert(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'] === 'cc03d8ecb69d4291
   && ['e2e/benchmarks.spec.ts', 'e2e/brand-tokens.spec.ts', 'e2e/film-line-stability.spec.ts', 'e2e/site-alignment.spec.ts', 'e2e/solutions-workflows.spec.ts', 'e2e/templates.spec.ts', 'e2e/type-scale.spec.ts'].every(file => PUBLIC_MARKETING_AFFECTED_BROWSER_FILES.includes(file))
   && ["['e2e/templates.spec.ts', ['1440']],", "['e2e/type-scale.spec.ts', ['1440']],", "['e2e/site-alignment.spec.ts', ['1440']],", "['e2e/brand-tokens.spec.ts', ['1440']],", "['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/film-line-stability.spec.ts', ['390']],"].every(row => sharedMap.includes('\n  ' + row)),
   'Public marketing owner must keep the reviewed package.json postimage and a reviewed project row for each UX program browser suite');
-// G8 CHANGE-NOTIFY (phase 4), restated independently: six exact paths, nine direct suites, one browser suite with its reviewed
+// G8 CHANGE-NOTIFY (phase 4), restated independently: six exact paths, ten direct suites, one browser suite with its reviewed
 // 390 row, no neighbour admission and no lane flag. The docs text and the outbox SQL keep their existing owners.
 {
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'change-notify'), [owner] = owners;
   const paths = ['app/api/internal/change-notify/run/route.ts', 'e2e/change-notify-docs.spec.ts', 'lib/change-notify.test.ts', 'lib/change-notify.ts', 'lib/security/route-classification.json', 'vercel.json'];
-  const suites = ['lib/change-notify.test.ts', 'lib/cta-truth.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/production-posture.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/source-deletion-route.test.ts', 'lib/synthetic-probe.test.ts'];
+  const suites = ['lib/change-notify.test.ts', 'lib/commercial-state.test.ts', 'lib/cta-truth.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/production-posture.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/source-deletion-route.test.ts', 'lib/synthetic-probe.test.ts'];
   const browsers = ['e2e/change-notify-docs.spec.ts'];
   assert(owners.length === 1 && JSON.stringify(CHANGE_NOTIFY_AFFECTED_PATHS) === JSON.stringify(paths)
     && JSON.stringify(CHANGE_NOTIFY_AFFECTED_UNIT_FILES) === JSON.stringify(suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(suites)
@@ -684,7 +684,7 @@ assert(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'] === 'cc03d8ecb69d4291
     && paths.every(p => owner.match.test('nextjs/' + p))
     && ['nextjs/app/api/internal/change-notify/replay/route.ts', 'nextjs/lib/change-notify-store.ts', 'nextjs/vercel.json.bak', 'vercel.json', 'nextjs/lib/docs-content.ts', 'supabase/migrations/20261019100000_change_notify_outbox.sql'].every(p => !owner.match.test(p))
     && sharedMap.includes("\n  ['e2e/change-notify-docs.spec.ts', ['390']],"),
-    'change-notify owner must keep its six exact paths, nine direct suites and the 390 change-notify-docs browser row');
+    'change-notify owner must keep its six exact paths, ten direct suites and the 390 change-notify-docs browser row');
 }
 for (const binding of currentOwnerBindings) {
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === binding.group), [owner] = owners;

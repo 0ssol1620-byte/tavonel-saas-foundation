@@ -2178,6 +2178,7 @@ export const G1_COPY_TRUTH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/docs-rea
 // classification and route-surface suites for the new route, and every suite that reads vercel.json (production-posture among
 // them), plus the change-notify-docs browser suite in project 390. The docs text itself stays with the docs owner, and the outbox
 // migration and grant-matrix row with database-contract. Product code, so never nativeReuse.
+// lib/commercial-state.test.ts joined after #161 added its D-13 test, which reads vercel.json's env (PR #164 merge review N1).
 // lib/security/route-classification.json is also a remote-mcp path (PR #167): a change to it selects both owners, the union of their suites.
 export const CHANGE_NOTIFY_AFFECTED_PATHS = Object.freeze([
   'app/api/internal/change-notify/run/route.ts',
@@ -2189,6 +2190,7 @@ export const CHANGE_NOTIFY_AFFECTED_PATHS = Object.freeze([
 ]);
 export const CHANGE_NOTIFY_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/change-notify.test.ts',
+  'lib/commercial-state.test.ts',
   'lib/cta-truth.test.ts',
   'lib/durable-compile-orchestration.test.ts',
   'lib/operational-sli-alert-route.test.ts',
@@ -2760,7 +2762,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // g1-copy-truth: the 6 exact paths above select 17 direct suites and 2 browser suites.
   affectedGroup('g1-copy-truth', new RegExp(`^nextjs/(?:${exactPathAlternation(G1_COPY_TRUTH_AFFECTED_PATHS)})$`),
     { unitFiles: G1_COPY_TRUTH_AFFECTED_UNIT_FILES, browserFiles: G1_COPY_TRUTH_AFFECTED_BROWSER_FILES }),
-  // change-notify: the 6 exact paths above select 9 direct suites and 1 browser suite.
+  // change-notify: the 6 exact paths above select 10 direct suites and 1 browser suite.
   affectedGroup('change-notify', new RegExp(`^nextjs/(?:${exactPathAlternation(CHANGE_NOTIFY_AFFECTED_PATHS)})$`),
     { unitFiles: CHANGE_NOTIFY_AFFECTED_UNIT_FILES, browserFiles: CHANGE_NOTIFY_AFFECTED_BROWSER_FILES }),
   // remote-mcp: the 12 exact paths above select 16 direct suites and 1 browser suite.

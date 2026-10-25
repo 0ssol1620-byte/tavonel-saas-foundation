@@ -7721,11 +7721,11 @@ test('affected enablement owner: fifty-three exact paths select twenty-one direc
   }
 });
 import { CHANGE_NOTIFY_AFFECTED_PATHS, CHANGE_NOTIFY_AFFECTED_UNIT_FILES, CHANGE_NOTIFY_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
-// G8 CHANGE-NOTIFY (phase 4): six exact paths, nine direct suites, one browser suite in project 390. The docs text keeps the docs
+// G8 CHANGE-NOTIFY (phase 4): six exact paths, ten direct suites, one browser suite in project 390. The docs text keeps the docs
 // owner and the outbox migration and grant-matrix row keep database-contract; neither joins this owner.
-test('affected change-notify owner: 6 exact paths select 9 direct suites and 1 browser suite; neighbours stay unmapped', () => {
+test('affected change-notify owner: 6 exact paths select 10 direct suites and 1 browser suite; neighbours stay unmapped', () => {
   const paths = ['app/api/internal/change-notify/run/route.ts', 'e2e/change-notify-docs.spec.ts', 'lib/change-notify.test.ts', 'lib/change-notify.ts', 'lib/security/route-classification.json', 'vercel.json'];
-  const suites = ['lib/change-notify.test.ts', 'lib/cta-truth.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/production-posture.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/source-deletion-route.test.ts', 'lib/synthetic-probe.test.ts'];
+  const suites = ['lib/change-notify.test.ts', 'lib/commercial-state.test.ts', 'lib/cta-truth.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/production-posture.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/source-deletion-route.test.ts', 'lib/synthetic-probe.test.ts'];
   const browsers = ['e2e/change-notify-docs.spec.ts'];
   assert.deepEqual([[...CHANGE_NOTIFY_AFFECTED_PATHS], [...CHANGE_NOTIFY_AFFECTED_UNIT_FILES], [...CHANGE_NOTIFY_AFFECTED_BROWSER_FILES]], [paths, suites, browsers]);
   // lib/security/route-classification.json is also a remote-mcp path (PR #167): both owners select it, with the union of their suites.
