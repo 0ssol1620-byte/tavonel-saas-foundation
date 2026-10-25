@@ -666,7 +666,7 @@ for (const binding of [
     && binding.rows.every(row => sharedMap.includes('\n  ' + row)),
     'UX program owner must retain exact paths, direct suites, reviewed browser rows and no broad neighbor admission: ' + binding.group);
 }
-assert(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'] === 'cc03d8ecb69d42916a5a4c72d54ff2817df90436f5111b2731ee6a8e248b7a59'
+assert(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'] === '1dd2de781dacc2269c794559da1366c8d13a2adbad91e538fb19433096f6dce7'
   && ['e2e/benchmarks.spec.ts', 'e2e/brand-tokens.spec.ts', 'e2e/film-line-stability.spec.ts', 'e2e/site-alignment.spec.ts', 'e2e/solutions-workflows.spec.ts', 'e2e/templates.spec.ts', 'e2e/type-scale.spec.ts'].every(file => PUBLIC_MARKETING_AFFECTED_BROWSER_FILES.includes(file))
   && ["['e2e/templates.spec.ts', ['1440']],", "['e2e/type-scale.spec.ts', ['1440']],", "['e2e/site-alignment.spec.ts', ['1440']],", "['e2e/brand-tokens.spec.ts', ['1440']],", "['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/film-line-stability.spec.ts', ['390']],"].every(row => sharedMap.includes('\n  ' + row)),
   'Public marketing owner must keep the reviewed package.json postimage and a reviewed project row for each UX program browser suite');

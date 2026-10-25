@@ -2575,9 +2575,12 @@ export const PUBLIC_MARKETING_AFFECTED_BROWSER_FILES = Object.freeze([
 // B-01 (2026-10-19): package.json re-pinned after review of the one later delta, P2-17 daf71ecb: `test:scripts` also runs
 // scripts/release-gate-check.test.mjs, and a `release:gate-check` script runs the read-only check. Two script lines, no
 // dependency, lockfile or engine change; the lockfile pin is unchanged.
+// SEC (2026-10-25): both pins re-pinned after review of the next 15.5.24 → 15.5.28 security bump (GHSA-2464-fhr4-w9xw): package.json range
+// ^15.5.9 → ^15.5.28; the lockfile moves only next, sharp 0.35.4 → 0.35.5, @img/sharp-libvips-* 1.3.3 → 1.3.4 and next's own caniuse-lite,
+// nanoid and source-map-js. Lockfile-only resolution, no source change.
 export const MARKETING_TOOLING_POSTIMAGES = Object.freeze({
-  "nextjs/package.json": "cc03d8ecb69d42916a5a4c72d54ff2817df90436f5111b2731ee6a8e248b7a59",
-  "nextjs/pnpm-lock.yaml": "a814e2ff45e2c563949ebd917df8036bcd7bde2c2a8a98480386fab0ea79be04"
+  "nextjs/package.json": "1dd2de781dacc2269c794559da1366c8d13a2adbad91e538fb19433096f6dce7",
+  "nextjs/pnpm-lock.yaml": "3b521a81e581df2273ea6ee78fea3df8bc7008db5b0517818d9d95056b5c6cea"
 });
 // Shared test discovery: the exact global Vitest config, edited by the product author. A change is admitted only when every
 // existing include survives, the additions are the registered mobile-view suite and the five PR suites that the repair-only
