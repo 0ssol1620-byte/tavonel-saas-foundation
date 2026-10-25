@@ -85,11 +85,11 @@ export default async function HomePage({
     cookie: (await cookies()).get(LANDING_VARIANT_COOKIE)?.value,
     query: Array.isArray(query) ? query[0] : query,
   });
-  // P2-08: honoured only by the local test server (lib/specimen-sources.ts); a deployment ignores it.
-  const specimenFixtures = (await cookies()).get(SPECIMEN_FIXTURE_COOKIE)?.value === "1";
+  // P2-08 and P2-32: honoured only by the local test server (lib/specimen-sources.ts); a deployment ignores it.
+  const specimenRequest = (await cookies()).get(SPECIMEN_FIXTURE_COOKIE)?.value;
   return (
     <>
-      <LandingPage experiment={experiment} specimenFixtures={specimenFixtures} />
+      <LandingPage experiment={experiment} specimenRequest={specimenRequest} />
     </>
   );
 }

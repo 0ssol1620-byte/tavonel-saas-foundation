@@ -102,6 +102,7 @@
   border-radius: 4px;
   background: var(--tv-paper-sunk);
 }
+.frame picture { display: block; }
 .frame img { display: block; width: 100%; height: auto; }
 
 /* The reader's region, where the reader put it inside the window. */
@@ -151,6 +152,13 @@
   cursor: pointer;
 }
 .more[open] .closed, .more:not([open]) .open { display: none; }
+/* D-06: the approved full source line, under "Show full text". */
+.full {
+  margin: 0 0 8px;
+  color: var(--tv-ink-muted);
+  font: 13px/1.5 var(--f-sans);
+  overflow-wrap: anywhere;
+}
 
 .run, .limits {
   margin: 0;
