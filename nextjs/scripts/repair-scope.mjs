@@ -1677,10 +1677,11 @@ export const HOME_AFFECTED_PATHS = Object.freeze([
   'lib/home-evidence-view.test.ts', 'lib/home-evidence-view.ts', 'lib/home-player-main304-parity.test.ts', 'lib/landing-v2-page.test.ts',
   'lib/landing-v2-proof.ts', 'lib/landing-v2-runtime.test.ts', 'lib/landing-v2-runtime.ts', 'lib/landing-v2-snapshot.json', 'lib/one-path-contract.test.ts',
 ]);
+// lib/copy-trust-guard.test.ts reads landing-page.tsx (its COPY_MODULES) since the G1-COPY fix round, so Home selects it (COPY re-review R2-N2).
 export const HOME_AFFECTED_UNIT_FILES = Object.freeze([
   'components/compile-stage-player.mobile-view.test.tsx', 'components/landing-v2/hero-source-card.test.tsx', 'lib/home-evidence-view.test.ts',
   'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts', 'lib/film-motion-control.test.ts', 'lib/marketing-analytics.test.ts',
-  'lib/home-player-main304-parity.test.ts', 'lib/landing-v2-runtime.test.ts',
+  'lib/home-player-main304-parity.test.ts', 'lib/landing-v2-runtime.test.ts', 'lib/copy-trust-guard.test.ts',
 ]);
 export const HOME_AFFECTED_BROWSER_FILE = 'e2e/landing-v2.spec.ts';
 // Portable source contracts for the exact reviewed reader-heading CSS correction. Additive to Home's existing owner.
@@ -2087,7 +2088,8 @@ export const TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES = Object.freeze([
 ]);
 // Specimen strip (P2-08, B-04/B-06; P2-31/P2-32): the strip, its fail-closed receipt contract and suite, the three synthetic
 // fixtures with their crops, the browser spec, and the two committed receipts with their ten served files (WEBP crop, two AVIF
-// encodings, one-page extract and run receipt each, under public/proof-collection/specimens/). Exactly these twenty-two paths select the receipt-contract suite, the
+// encodings, one-page extract and run receipt each, under public/proof-collection/specimens/), and the collection's PROVENANCE.md, which the
+// receipt-contract suite holds to those receipts. Exactly these twenty-three paths select the receipt-contract suite, the
 // Home composition suite (which renders the committed cells in the preview posture) and the specimen-strip browser suite (390 only:
 // every test in the spec skips outside project 390, because each one sets its own browser and viewport or needs one request; a 1440
 // row selects a file with no executed test, which the report reader refuses). Product UI, so never nativeReuse.
@@ -2104,6 +2106,7 @@ export const SPECIMEN_STRIP_AFFECTED_PATHS = Object.freeze([
   'lib/specimen-sources.json',
   'lib/specimen-sources.test.ts',
   'lib/specimen-sources.ts',
+  'public/proof-collection/PROVENANCE.md',
   'public/proof-collection/specimens/kma-2026-09-climate-p001-720.avif',
   'public/proof-collection/specimens/kma-2026-09-climate-p001-960.avif',
   'public/proof-collection/specimens/kma-2026-09-climate-p001-960.webp',
@@ -2178,6 +2181,7 @@ export const G1_COPY_TRUTH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/docs-rea
 // classification and route-surface suites for the new route, and every suite that reads vercel.json (production-posture among
 // them), plus the change-notify-docs browser suite in project 390. The docs text itself stays with the docs owner, and the outbox
 // migration and grant-matrix row with database-contract. Product code, so never nativeReuse.
+// lib/commercial-state.test.ts joined after #161 added its D-13 test, which reads vercel.json's env (PR #164 merge review N1).
 // lib/security/route-classification.json is also a remote-mcp path (PR #167): a change to it selects both owners, the union of their suites.
 export const CHANGE_NOTIFY_AFFECTED_PATHS = Object.freeze([
   'app/api/internal/change-notify/run/route.ts',
@@ -2189,6 +2193,7 @@ export const CHANGE_NOTIFY_AFFECTED_PATHS = Object.freeze([
 ]);
 export const CHANGE_NOTIFY_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/change-notify.test.ts',
+  'lib/commercial-state.test.ts',
   'lib/cta-truth.test.ts',
   'lib/durable-compile-orchestration.test.ts',
   'lib/operational-sli-alert-route.test.ts',
@@ -2475,6 +2480,7 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/public/film/source-inspection/mobile.webp",
   "nextjs/public/llms.txt",
 ]);
+// lib/g1-copy-truth.test.ts pins public/llms.txt's quickstart and integrations lines since the G1-COPY fix round (COPY re-review R2-N2).
 export const PUBLIC_MARKETING_AFFECTED_UNIT_FILES = Object.freeze([
   "lib/benchmark-registry.test.ts",
   "lib/benchmarks-page.test.ts",
@@ -2492,6 +2498,7 @@ export const PUBLIC_MARKETING_AFFECTED_UNIT_FILES = Object.freeze([
   "lib/explore-sample.test.ts",
   "lib/explore-story.test.ts",
   "lib/funnel-events.test.ts",
+  "lib/g1-copy-truth.test.ts",
   "lib/gdp-pdf-page-data.test.ts",
   "lib/landing-v2-hero-statement.test.ts",
   "lib/landing-v2-motion.test.ts",
@@ -2657,7 +2664,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // of the shared map. Separate from the historical 424 Explore repair report, which keeps its own planExploreRepairBrowserRuns.
   affectedGroup('explore-answer', /^nextjs\/(?:lib\/explore-(?:(?:sample|story)(?:\.test)?|entry-proof\.test)\.ts|components\/explore\/(?:ask-overlay|evidence-workbench(?:\.test)?)\.tsx|e2e\/explore\.spec\.ts)$/,
     { unitFiles: ['lib/explore-entry-proof.test.ts', 'lib/explore-sample.test.ts', 'lib/explore-story.test.ts', 'lib/visual-world-model.test.ts', 'components/explore/evidence-workbench.test.tsx'], browserFiles: ['e2e/explore.spec.ts'] }),
-  // Ordinary Home landing: the twenty-six exact paths above select nine direct suites and one browser suite, which runs only in
+  // Ordinary Home landing: the twenty-six exact paths above select ten direct suites and one browser suite, which runs only in
   // projects 1440, 390, 360 and reduced-motion of the shared map.
   affectedGroup('home-landing', new RegExp(`^nextjs/(?:${HOME_AFFECTED_PATHS.map(path => path.replaceAll('.', '\\.')).join('|')})$`),
     { unitFiles: HOME_AFFECTED_UNIT_FILES, browserFiles: [HOME_AFFECTED_BROWSER_FILE] }),
@@ -2754,7 +2761,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // table-read-intake-ceiling: the 6 exact paths above select 8 direct suites and no browser suite.
   affectedGroup('table-read-intake-ceiling', new RegExp(`^(?:${exactPathAlternation(TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS)})$`),
     { unitFiles: TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES }),
-  // specimen-strip: the 22 exact paths above select 2 direct suites and 1 browser suite.
+  // specimen-strip: the 23 exact paths above select 2 direct suites and 1 browser suite.
   affectedGroup('specimen-strip', new RegExp(`^nextjs/(?:${exactPathAlternation(SPECIMEN_STRIP_AFFECTED_PATHS)})$`),
     { unitFiles: SPECIMEN_STRIP_AFFECTED_UNIT_FILES, browserFiles: SPECIMEN_STRIP_AFFECTED_BROWSER_FILES }),
   // launch-qa-release-scripts: the 5 exact paths above select 3 direct suites and no browser suite.
@@ -2763,7 +2770,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // g1-copy-truth: the 6 exact paths above select 17 direct suites and 2 browser suites.
   affectedGroup('g1-copy-truth', new RegExp(`^nextjs/(?:${exactPathAlternation(G1_COPY_TRUTH_AFFECTED_PATHS)})$`),
     { unitFiles: G1_COPY_TRUTH_AFFECTED_UNIT_FILES, browserFiles: G1_COPY_TRUTH_AFFECTED_BROWSER_FILES }),
-  // change-notify: the 6 exact paths above select 9 direct suites and 1 browser suite.
+  // change-notify: the 6 exact paths above select 10 direct suites and 1 browser suite.
   affectedGroup('change-notify', new RegExp(`^nextjs/(?:${exactPathAlternation(CHANGE_NOTIFY_AFFECTED_PATHS)})$`),
     { unitFiles: CHANGE_NOTIFY_AFFECTED_UNIT_FILES, browserFiles: CHANGE_NOTIFY_AFFECTED_BROWSER_FILES }),
   // remote-mcp: the 12 exact paths above select 16 direct suites and 1 browser suite.

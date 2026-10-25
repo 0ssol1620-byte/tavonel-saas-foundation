@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import CompileStagePlayer, { FILM_POSTER_SIZES, STAGE_FRAMES, nextWideChoice, toggleMobileFilmFit, wideChoiceOnStageChange, type MobileFilmView, type WideView } from "@/components/compile-stage-player";
+import CompileStagePlayer, { FILM_POSTER_SIZES, STAGE_FRAMES, nextWideChoice, stillTookAvif, toggleMobileFilmFit, wideChoiceOnStageChange, type MobileFilmView, type WideView } from "@/components/compile-stage-player";
 import HeroFilm from "@/components/landing-v2/hero-film";
 import { LANDING_MOBILE_FILM_VIEW } from "@/components/landing-v2/hero-film-disclosure";
 import { COMPILE_STAGES } from "@/lib/compile-stages";
@@ -286,5 +286,23 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
     // The mask is bound to the poster it was measured on: any other stage-1 poster draws none.
     expect(renderToStaticMarkup(<CompileStagePlayer storyLayout />)).not.toContain("data-poster-mask");
     expect(STAGE_FRAMES.sources!.posterMask!.rects.every(rect => rect.x + rect.w <= 2880 && rect.y + rect.h <= 1800)).toBe(true);
+  });
+
+  /*
+    SPECIMEN merge review A1 (2026-10-25). The <video poster> names the still's format only once the
+    still has reported AVIF, and the mount effect reads `currentSrc` once -- empty in Chromium until
+    the image has data. With the specimen strip on, the poster is lazy and unpreloaded, so it often
+    has no data yet at mount, and the <video> would fetch the WebP copy of a frame it already holds.
+    The still's own load event reports the format too.
+  */
+  it("takes the still's AVIF format from its load event as well as at mount (merge review A1)", () => {
+    expect(stillTookAvif({ currentSrc: "https://tavonel.com/film/poster-1-t8.16-2x.avif" })).toBe(true);
+    expect(stillTookAvif({ currentSrc: "https://tavonel.com/film/poster-1-t8.16-2x.webp" })).toBe(false);
+    // Chromium before the image has data: nothing chosen yet, so nothing recorded.
+    expect(stillTookAvif({ currentSrc: "" })).toBe(false);
+    expect(stillTookAvif(null)).toBe(false);
+    const source = readFileSync(new URL("./compile-stage-player.tsx", import.meta.url), "utf8");
+    expect(source).toContain("if (still && stillTookAvif(stillRef.current)) setPosterAvifTaken(true);");
+    expect(source).toContain("onLoad={(event) => { if (stillTookAvif(event.currentTarget)) setPosterAvifTaken(true); }}");
   });
 });

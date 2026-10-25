@@ -320,16 +320,18 @@ export function checkAuthorizationRequest(params: AuthorizationParameters, key: 
     return { ok: false, redirectTo: null, error: "invalid_request", description: "The redirect URI is not one this client registered." };
   }
   const state = typeof params.state === "string" && params.state.length > 0 ? params.state : null;
-  // NB5: a longer state is refused, never cut -- a cut one fails the client's own CSRF check -- and
-  // is not echoed back.
-  const echoed = state !== null && state.length <= 512 ? state : null;
+  // NB5: a longer state is refused, never cut -- a cut one fails the client's own CSRF check. An error
+  // sent back must carry the state it was sent (RFC 6749 §4.1.2.1), which this one cannot, so the
+  // refusal stays on the page (re-review N1).
+  if (state !== null && state.length > 512) {
+    return { ok: false, redirectTo: null, error: "invalid_request", description: "The state parameter is longer than 512 characters." };
+  }
   const refuse = (error: string, description: string): AuthorizationCheck => ({
     ok: false,
-    redirectTo: redirectWith(redirectUri, origin, { error, error_description: description, state: echoed }),
+    redirectTo: redirectWith(redirectUri, origin, { error, error_description: description, state }),
     error,
     description,
   });
-  if (state !== echoed) return refuse("invalid_request", "The state parameter is longer than 512 characters.");
   if (params.response_type !== "code") return refuse("unsupported_response_type", "Only response_type=code is supported.");
   if (params.code_challenge_method !== "S256" || !PKCE_CHALLENGE.test(params.code_challenge ?? "")) {
     return refuse("invalid_request", "PKCE with code_challenge_method=S256 is required.");

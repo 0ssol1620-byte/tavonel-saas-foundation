@@ -73,6 +73,101 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   /*
+    Phase 4 post-batch, 2026-10-25: the seven phase-4 merges now in production, one entry each. Each is dated by the
+    Asia/Seoul day its production deployment reached tavonel.com and timed by that deployment's READY time, read with
+    Vercel get_deployment on the ledger's deployment ids (receipt:
+    ux-program-20261017/phase4/POST-BATCH/impl-2026-10-25/production-deployments-161-168.json):
+      #168 dpl_FJkdCc2U5cs59tvXoXePtTS6L7M9   #163 dpl_9FE1PG1jVgiT2Jg5w8nvqF1qyv2f
+      #166 dpl_6hSsFjnE2er13oqqwgG1oDiw68zq   #165 dpl_DgFWZBrAHzYG4TA77fQj6u9ZRZiU
+      #161 dpl_HTFfKXQUcc5a6ZQsaeVp4iR1sf5X   #164 dpl_xBFcWGTZ9UCgyt7DNMYDiXHYh6xa
+      #167 dpl_F2vPJoGpok7kc4KEYPaGdzwq3GLa
+    Worded from each merge's diff and description. #161, #164 and #167 switched nothing on: their entries name what a
+    visitor can read or see now and say that the rest is off on tavonel.com; #166's strip renders on preview deployments only.
+  */
+  {
+    date: "2026-10-25",
+    releasedAt: "2026-10-25T10:59:38Z",
+    id: "2026-10-25-remote-mcp-docs",
+    title: "/docs/mcp documents the remote MCP endpoint, which is switched off on tavonel.com",
+    surfaces: ["Developer tools"],
+    added: [
+      "/docs/mcp has a section on the remote MCP endpoint, for clients that connect by URL instead of launching a local process, such as ChatGPT connectors and other web agents: how to connect, the OAuth flow step by step and the read-only scopes a connection gets. Its heading and its first note say it is not enabled in production, and on tavonel.com every URL in that section answers 404, so connect through the stdio server on the same page.",
+    ],
+  },
+  {
+    date: "2026-10-25",
+    releasedAt: "2026-10-25T10:10:30Z",
+    id: "2026-10-25-change-notifications",
+    title: "/docs/run-events sets out the change-notification contract, with sending switched off",
+    surfaces: ["API"],
+    added: [
+      "/docs/run-events describes change notifications: one signed POST to the endpoint registered for a workspace when a finished compile's candidate differs from the World your AI reads, with the field table, a Node.js snippet that verifies the signature, and how retries and duplicate deliveries behave.",
+      "A notification activates nothing: the candidate waits for a person to approve it in the workspace. Notifications are set up per workspace with us, and on tavonel.com sending is switched off and no endpoint is registered, so none are sent.",
+    ],
+  },
+  {
+    date: "2026-10-25",
+    releasedAt: "2026-10-25T09:34:17Z",
+    id: "2026-10-25-processing-terms",
+    title: "The workspace offers the processing terms only where accepting them opens processing",
+    surfaces: ["Workspace"],
+    improved: [
+      "The workspace shows the processing-terms review only where accepting the terms is the step that opens processing for your files. Elsewhere, including a released workspace whose evaluation was refused or has ended, it offers Explore a compiled World. Nothing is switched on by this release, and online purchase stays closed on tavonel.com.",
+    ],
+  },
+  {
+    date: "2026-10-25",
+    releasedAt: "2026-10-25T08:42:25Z",
+    id: "2026-10-25-copy-truth",
+    title: "Public pages and developer files say what the product does",
+    surfaces: ["Website", "Developer tools", "Billing"],
+    improved: [
+      "/integrations says that compiling your own sources is set up with us, that you start each read-only import yourself, and that nothing is compiled until you start the compile. Its description of the source agent covers the --watch mode, which repeats the sync until it is stopped, and the retries inside a run, bounded by --retry-limit.",
+      "/pricing describes each plan's page allowance as standard pages, without “verified”.",
+      "/docs/upload shows the fields the upload capability returns, uploadUrl, expiresInSeconds, declaredMimeType and contentLength, in its prose and in the cURL, Python and TypeScript examples.",
+      "The quickstart, the CLI page, the integration recipes and the developer README read the signing key's fingerprint from the v2 trust record, under keys[] for the active key.",
+      "The MCP server's download_package names tavonel-verify-export.mjs, the verifier the developer channel ships, and channel.json carries the server's new digest.",
+      "/status reports billing from whether a plan can be bought online, so on tavonel.com it says that checkout is closed and no plan can be bought.",
+      "Home's support line says TAVONEL reads your PDFs, scans and office files, in English and Korean. /sources says in Korean that Korean document quality has not been measured and that HWP and HWPX are not supported, and /llms.txt uses the same wording as the pages it summarises.",
+    ],
+  },
+  {
+    date: "2026-10-25",
+    releasedAt: "2026-10-25T07:05:33Z",
+    id: "2026-10-25-specimens",
+    title: "Two public pages read by the OCR image the product runs, with their run receipts",
+    surfaces: ["Website"],
+    added: [
+      "/proof-collection/specimens/ publishes two one-page extracts, each read once by the OCR image the product runs: page 1 of NACA Research Memorandum RM L50C03 (1950), a U.S. government work, and page 1 of the Korea Meteorological Administration's September 2026 climate press release, under KOGL Type 1. Each comes with its crops and a run receipt that records the reader image digest, every region the reader returned, the crop rule fixed before the run, and what the run does not claim, any accuracy figure among it.",
+      "Home shows the two pages as a strip under its actions on preview deployments only; tavonel.com does not render it.",
+    ],
+  },
+  {
+    date: "2026-10-25",
+    releasedAt: "2026-10-25T06:07:30Z",
+    id: "2026-10-25-analytics-notice",
+    title: "The privacy notice names what Vercel Web Analytics receives, and the Home film stills are AVIF",
+    surfaces: ["Website"],
+    improved: [
+      "/privacy and /subprocessors describe Vercel Web Analytics, run by our hosting provider: what it counts and receives once you allow analytics, that it uses no cookies or storage on your device, and what it is never sent. The cookie table lists the two session-storage entries the site keeps in your tab and does not send.",
+      "Home's four film stills are AVIF files, with a WebP copy of the same frame for a browser without AVIF. The first two stages show a new frame from the same recording.",
+    ],
+  },
+  {
+    date: "2026-10-20",
+    releasedAt: "2026-10-19T17:51:42Z",
+    id: "2026-10-20-developers-mcp-guide",
+    title: "Separate link targets on /developers, code set as code on /docs/mcp, and a re-recorded MCP walkthrough",
+    surfaces: ["Website", "Developer tools"],
+    improved: [
+      "On a phone, each link on /developers is a full-size tap target clear of its neighbours: the two gate actions sit in a row of their own, and each reference sentence is its own list item.",
+      "/docs/mcp prints the Windows configuration path with one backslash between folders and sets file paths as code, drawn in a monospace face on every system, Korean Windows included. Its configuration examples use /absolute/path/to/tavonel-mcp.mjs as the placeholder.",
+      "Each chapter of /guide and /ko/guide says under its heading whether its steps need an API key.",
+      "The MCP bridge walkthrough is re-recorded in its desktop and phone takes, with the same English and Korean captions, so it shows /developers and /docs/mcp as they are now. The takes come from a local production build of that release rather than from tavonel.com, and the guide's manifest says so.",
+      "/changelog lists the releases from 7 to 19 October, each dated by the day it reached tavonel.com.",
+    ],
+  },
+  /*
     Phase 4 follow-ups backfill, 2026-10-19: every main merge from #143 to #160 that changed
     something a visitor or a downloaded client can meet. Each entry is dated by the Asia/Seoul day
     its own production deployment reached tavonel.com and timed by that deployment's READY time,

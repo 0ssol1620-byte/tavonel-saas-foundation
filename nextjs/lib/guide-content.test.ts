@@ -382,6 +382,20 @@ describe("the recordings", () => {
     expect(readFileSync(join(root, "manifest.json"), "utf8")).not.toMatch(/\b[A-Z]:[\\/]|\/Users\/|yspow/);
   });
 
+  /*
+    FOLLOW-UPS review NB-2 (2026-10-19). The first recording line spoke for every take -- live tavonel.com, no fixture build --
+    while guide-2's two takes came from a local production build of PR #168 in the fixture environment. A take recorded
+    anywhere else carries `recordedFrom`, and the first line names its video as the exception.
+  */
+  it("names on its first recording line every video whose takes were not recorded from tavonel.com", () => {
+    const manifest = JSON.parse(readFileSync(join(nextjs, "public", "guide", "manifest.json"), "utf8")) as { howRecorded: string[]; files: { file: string; recordedFrom?: string }[] };
+    const elsewhere = [...new Set(manifest.files.filter((entry) => entry.recordedFrom).map((entry) => entry.file.replace(/-(?:desktop|phone)\.mp4$/, "")))];
+    expect(elsewhere).toEqual(["guide-2-mcp"]);
+    for (const video of elsewhere) expect(manifest.howRecorded[0], video).toContain(video);
+    // The unqualified "No fixture build, ..." spoke for guide-2 too.
+    expect(manifest.howRecorded[0]).not.toContain("No fixture build,");
+  });
+
   it("fails on a changed byte, an unlisted file and a missing one", () => {
     const root = mkdtempSync(join(tmpdir(), "guide-manifest-"));
     try {

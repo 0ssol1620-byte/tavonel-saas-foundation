@@ -12,5 +12,8 @@
 /* Whether the chapter needs an API key: a quiet line under its heading, not a badge. */
 .apiKey { margin: 0; color: var(--text-mid); }
 @media (pointer: coarse), (max-width: 1079px) {
-  .where a { min-height: 44px; display: inline-flex; align-items: center; }
+  /* The site's tap floor (tavonel.css, `overrides` layer) adds 12.5px of padding and takes it back with -12.5px of margin, which
+     cancels only on an inline box. On a flex item the margin box sizes the row, so wrapped rows overlapped by 21px (FOLLOW-UPS
+     review NB-1). min-height gives the 44px target; the pair is reset here, as `.dev-actions` does on /developers. */
+  .where a { min-height: 44px; display: inline-flex; align-items: center; padding-block: 0; margin-block: 0; }
 }

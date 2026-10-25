@@ -47,7 +47,10 @@ describe("workspace bootstrap source admission", () => {
     const response = await POST(new Request("https://tavonel.test/api/access/bootstrap", { method: "POST" }));
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    await expect(response.json()).resolves.toMatchObject({ access: { customerDataEnabled: enabled } });
+    const body = await response.json();
+    expect(body).toMatchObject({ access: { customerDataEnabled: enabled } });
+    // LAUNCH re-review R2-N1: checkout resumes on the stage alone, so a closed gate must send none.
+    expect(body.access.processingStage ?? null).toBe(enabled ? "production" : null);
     expect(gate).toHaveBeenCalledWith("pilot-11111111", "direct_upload");
   });
 
@@ -56,10 +59,12 @@ describe("workspace bootstrap source admission", () => {
     gate.mockResolvedValue({ ok: false, code: "CUSTOMER_DATA_GATE_RECEIPT_NOT_FOUND" });
     const response = await POST(new Request("https://tavonel.test/api/access/bootstrap", { method: "POST" }));
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
+    const body = await response.json();
+    expect(body).toMatchObject({
       code: "ACCESS_READY_SOURCE_PENDING",
       access: { source: "unentitled", limits: null, expiresAt: null, customerDataEnabled: false },
     });
+    expect(body.access.processingStage ?? null).toBeNull();
     expect(bootstrap).not.toHaveBeenCalled();
     expect(authorize).toHaveBeenCalledWith("pilot-11111111", "11111111-1111-4111-8111-111111111111", "observer");
   });

@@ -260,6 +260,8 @@ export const filmPosterSrcSet = (stage: Pick<CompileStage, "poster" | "poster1x"
 /* The same srcset in AVIF (D-11), only when the stage has both AVIF files. */
 export const filmPosterAvifSrcSet = (stage: Pick<CompileStage, "posterAvif" | "posterAvif1x">) =>
   stage.posterAvif && stage.posterAvif1x ? `${stage.posterAvif1x} 1440w, ${stage.posterAvif} 2880w` : undefined;
+/* Whether the still's <picture> took its AVIF source. `currentSrc` is empty until the browser has chosen one. */
+export const stillTookAvif = (image: Pick<HTMLImageElement, "currentSrc"> | null) => Boolean(image?.currentSrc.endsWith(".avif"));
 
 /** The mobile-tools toggle, Fit full frame <-> Focus details. Pure, so the transition is tested without a DOM. */
 export function toggleMobileFilmFit(fit: boolean): boolean {
@@ -543,7 +545,7 @@ export default function CompileStagePlayer({
   const live = !preferVideo && canvasReady && !narrow && !(reducedMotion && playRequested);
   const still = !autoplay || paused || !inView || !documentVisible || videoError;
   useEffect(() => {
-    if (still && stillRef.current?.currentSrc.endsWith(".avif")) setPosterAvifTaken(true);
+    if (still && stillTookAvif(stillRef.current)) setPosterAvifTaken(true);
   }, [still, active]);
   const control = filmMotionControl({ reducedMotion, saveData, paused, playRequested, ended });
   const preferredVideoSrc = narrow && active.phoneSrc ? active.phoneSrc : active.src;
@@ -743,6 +745,8 @@ export default function CompileStagePlayer({
             decoding="async"
             fetchPriority={priorityPoster ? "high" : undefined}
             loading={priorityPoster ? "eager" : lazyPoster ? "lazy" : undefined}
+            /* A lazy still often has no data at mount; its load reports the format the effect above missed (merge review A1). */
+            onLoad={(event) => { if (stillTookAvif(event.currentTarget)) setPosterAvifTaken(true); }}
           />;
           /* D-11: AVIF first, the WebP <img> as the fallback. `display: contents` keeps the <img> the grid item. */
           return posterAvifSrcSet

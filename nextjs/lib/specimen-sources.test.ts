@@ -165,6 +165,22 @@ describe("the committed specimens", () => {
       }
     }
   });
+
+  /*
+    The collection's PROVENANCE.md, served beside the files, describes specimens/ from the committed receipts: each cell's
+    page, licence, run time, run receipt and the rights snapshot it was cleared on. A receipt that moves fails here until the
+    page moves with it.
+  */
+  it("is described in public/proof-collection/PROVENANCE.md from its own receipts", () => {
+    const provenance = readFileSync(join(process.cwd(), "public", "proof-collection", "PROVENANCE.md"), "utf8");
+    for (const raw of COMMITTED_SPECIMENS) {
+      const receipt = raw as SpecimenReceipt;
+      for (const fact of [receipt.specimenId, `${receipt.specimenId}.run.json`, `page ${receipt.page} of ${receipt.pageCount}`, receipt.rights.licence.id,
+        receipt.runAt, receipt.runReceiptSha256, receipt.rights.licence.snapshotSha256, receipt.rights.licence.retrievedOn]) {
+        expect(provenance, `${receipt.specimenId}: ${fact}`).toContain(fact);
+      }
+    }
+  });
 });
 
 describe("the fixture gate", () => {

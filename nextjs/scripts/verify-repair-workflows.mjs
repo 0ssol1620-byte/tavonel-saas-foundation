@@ -422,7 +422,7 @@ for(const suite of ['nextjs/scripts/repair-scope.test.mjs','nextjs/scripts/repai
 assert((readFileSync(resolve(repo,'nextjs/scripts/db/native-world-race-ci.test.mjs'),'utf8').match(/^test\('affected /gm)??[]).length>=1 && /test\('native world race static: affected /.test(readFileSync(resolve(repo,'nextjs/scripts/db/native-world-race-ci.test.mjs'),'utf8')), 'affected native selector and report patterns must select actual tests');
 assert(repair.includes('run: pnpm install --frozen-lockfile')&&repair.includes('run: pnpm scan:secrets')&&repair.includes('run: pnpm check')&&repair.includes('run: pnpm exec next build')&&!/run: pnpm (?:run )?build\b/.test(repair), 'frozen install, secrets, global type/lint and the direct browser build (no full Vitest prehook) stay unchanged');
 assert(raceHelper.includes('export function admitAffectedSource(')&&raceHelper.indexOf('const baselineIntent=classifyAffected({headSha:head,exec});')<raceHelper.indexOf('const intent=classify({headSha:head,exec});')&&raceHelper.includes('classifyAffected=classifyAffectedIntent, affected=verifyAffectedSource'), 'PR 141 race admission routes verified-baseline descendants to the collector affected proof before any exact race increment');
-// Ordinary Home admission, restated independently: one finite twenty-six-path owner with nine direct suites (the mobile-view TSX is
+// Ordinary Home admission, restated independently: one finite twenty-six-path owner with ten direct suites (the mobile-view TSX is
 // registered above) and one browser suite, a single shared-map row for exactly 1440, 390, 360 and reduced-motion. The exact CSS owner adds one reviewed stylesheet overlap. No legacy Home profile.
 const homePaths=['components/compile-stage-player.frame-strings.json','components/compile-stage-player.mobile-view.test.tsx','components/compile-stage-player.tsx',
   'components/landing-v2/evidence-connector.tsx','components/landing-v2/film-reading-layer.module.css','components/landing-v2/hero-actions.tsx','components/landing-v2/hero-film-disclosure.tsx',
@@ -431,7 +431,7 @@ const homePaths=['components/compile-stage-player.frame-strings.json','component
   'lib/film-motion-control.test.ts','lib/home-evidence-view.test.ts','lib/home-evidence-view.ts','lib/home-player-main304-parity.test.ts','lib/landing-v2-page.test.ts',
   'lib/landing-v2-proof.ts','lib/landing-v2-runtime.test.ts','lib/landing-v2-runtime.ts','lib/landing-v2-snapshot.json','lib/one-path-contract.test.ts'];
 const homeSuites=['components/compile-stage-player.mobile-view.test.tsx','components/landing-v2/hero-source-card.test.tsx','lib/home-evidence-view.test.ts','lib/landing-v2-page.test.ts',
-  'lib/one-path-contract.test.ts','lib/film-motion-control.test.ts','lib/marketing-analytics.test.ts','lib/home-player-main304-parity.test.ts','lib/landing-v2-runtime.test.ts'];
+  'lib/one-path-contract.test.ts','lib/film-motion-control.test.ts','lib/marketing-analytics.test.ts','lib/home-player-main304-parity.test.ts','lib/landing-v2-runtime.test.ts','lib/copy-trust-guard.test.ts'];
 const homeOwners=AFFECTED_GROUPS.filter(owner=>owner.group==='home-landing'),[homeOwner]=homeOwners;
 const homeCssPaths=['components/landing-v2/landing-hero.module.css','app/tavonel.css','lib/home-reader-heading-css-contract.test.ts','lib/home-reader-heading-css-registration.test.ts',
   'scripts/fixtures/home-reader-heading-css-baseline.json','scripts/repair-scope.mjs'];
@@ -445,7 +445,7 @@ assert(JSON.stringify(HOME_AFFECTED_PATHS)===JSON.stringify(homePaths)&&JSON.str
   &&['components/landing-v2/other.tsx','components/landing-v2/hero-actions.test.tsx','components/compile-stage-player.test.tsx','e2e/landing-v2-extra.spec.ts','lib/home-evidence-view.tsx','components/landing-v2/landing-hero.css',
     'lib/film-motion-control.ts','lib/marketing-analytics.test.ts'].every(p=>!homeOwner.match.test('nextjs/'+p))
   &&(sharedMap.match(/landing-v2/g)??[]).length===1&&sharedMap.includes("\n  ['e2e/landing-v2.spec.ts', ['1440', '390', '360', 'reduced-motion']],")
-  &&!AFFECTED_GROUPS.some(owner=>(/^home-/.test(owner.group)&&!['home-landing','home-reader-heading-css'].includes(owner.group))||/legacy/.test(owner.group)), 'Home retains its exact twenty-six-path owner, nine suites and four-project browser row with only the exact reader stylesheet overlap');
+  &&!AFFECTED_GROUPS.some(owner=>(/^home-/.test(owner.group)&&!['home-landing','home-reader-heading-css'].includes(owner.group))||/legacy/.test(owner.group)), 'Home retains its exact twenty-six-path owner, ten suites and four-project browser row with only the exact reader stylesheet overlap');
 assert(homeCssOwners.length===1&&JSON.stringify(HOME_READER_HEADING_CSS_AFFECTED_PATHS)===JSON.stringify(homeCssPaths)
   &&JSON.stringify(HOME_READER_HEADING_CSS_AFFECTED_UNIT_FILES)===JSON.stringify(homeCssSuites)&&JSON.stringify(homeCssOwner.unitFiles)===JSON.stringify(homeCssSuites)
   &&!homeCssOwner.browserFiles.length&&!homeCssOwner.databaseTests.length&&!homeCssOwner.nativeReuse&&!homeCssOwner.selector&&!homeCssOwner.worker&&!homeCssOwner.database
@@ -603,11 +603,11 @@ for (const binding of [
     neighbors: ['shared/capabilityManifest.ts', 'shared/intakeCeiling.test.ts', 'shared/tableReadContract.js', 'nextjs/shared/intakeCeiling.ts', 'nextjs/lib/fixtures/table-read/other.json', 'nextjs/lib/table-read-contract.ts'] },
   { group: 'specimen-strip', prefix: 'nextjs/', exportedPaths: SPECIMEN_STRIP_AFFECTED_PATHS, exportedSuites: SPECIMEN_STRIP_AFFECTED_UNIT_FILES,
     exportedBrowsers: SPECIMEN_STRIP_AFFECTED_BROWSER_FILES,
-    paths: ['components/landing-v2/specimen-strip.module.css', 'components/landing-v2/specimen-strip.tsx', 'e2e/fixtures/specimens/fixture-korean.json', 'e2e/fixtures/specimens/fixture-korean.svg', 'e2e/fixtures/specimens/fixture-scan.json', 'e2e/fixtures/specimens/fixture-scan.svg', 'e2e/fixtures/specimens/fixture-table.json', 'e2e/fixtures/specimens/fixture-table.svg', 'e2e/specimen-strip.spec.ts', 'lib/specimen-sources.json', 'lib/specimen-sources.test.ts', 'lib/specimen-sources.ts', 'public/proof-collection/specimens/kma-2026-09-climate-p001-720.avif', 'public/proof-collection/specimens/kma-2026-09-climate-p001-960.avif', 'public/proof-collection/specimens/kma-2026-09-climate-p001-960.webp', 'public/proof-collection/specimens/kma-2026-09-climate-p001.pdf', 'public/proof-collection/specimens/kma-2026-09-climate-p001.run.json', 'public/proof-collection/specimens/naca-rm-l50c03-p001-720.avif', 'public/proof-collection/specimens/naca-rm-l50c03-p001-960.avif', 'public/proof-collection/specimens/naca-rm-l50c03-p001-960.webp', 'public/proof-collection/specimens/naca-rm-l50c03-p001.pdf', 'public/proof-collection/specimens/naca-rm-l50c03-p001.run.json'],
+    paths: ['components/landing-v2/specimen-strip.module.css', 'components/landing-v2/specimen-strip.tsx', 'e2e/fixtures/specimens/fixture-korean.json', 'e2e/fixtures/specimens/fixture-korean.svg', 'e2e/fixtures/specimens/fixture-scan.json', 'e2e/fixtures/specimens/fixture-scan.svg', 'e2e/fixtures/specimens/fixture-table.json', 'e2e/fixtures/specimens/fixture-table.svg', 'e2e/specimen-strip.spec.ts', 'lib/specimen-sources.json', 'lib/specimen-sources.test.ts', 'lib/specimen-sources.ts', 'public/proof-collection/PROVENANCE.md', 'public/proof-collection/specimens/kma-2026-09-climate-p001-720.avif', 'public/proof-collection/specimens/kma-2026-09-climate-p001-960.avif', 'public/proof-collection/specimens/kma-2026-09-climate-p001-960.webp', 'public/proof-collection/specimens/kma-2026-09-climate-p001.pdf', 'public/proof-collection/specimens/kma-2026-09-climate-p001.run.json', 'public/proof-collection/specimens/naca-rm-l50c03-p001-720.avif', 'public/proof-collection/specimens/naca-rm-l50c03-p001-960.avif', 'public/proof-collection/specimens/naca-rm-l50c03-p001-960.webp', 'public/proof-collection/specimens/naca-rm-l50c03-p001.pdf', 'public/proof-collection/specimens/naca-rm-l50c03-p001.run.json'],
     suites: ['lib/landing-v2-page.test.ts', 'lib/specimen-sources.test.ts'],
     browsers: ['e2e/specimen-strip.spec.ts'],
     rows: ["['e2e/specimen-strip.spec.ts', ['390']],"],
-    neighbors: ['nextjs/components/landing-v2/specimen-strip.test.tsx', 'nextjs/e2e/fixtures/specimens/fixture-chart.json', 'nextjs/e2e/fixtures/specimens/fixture-scan.png', 'nextjs/lib/specimen-sources.tsx', 'nextjs/public/landing/v2/specimen-scan.webp', 'nextjs/public/proof-collection/specimens/naca-rm-l50c03-p002.pdf', 'nextjs/public/proof-collection/specimens/other.run.json', 'nextjs/public/proof-collection/specimens/naca-rm-l50c03-p001-480.avif', 'nextjs/public/proof-collection/dart-jtc-page-4.pdf', 'nextjs/lib/specimen-sources.v2.json'] },
+    neighbors: ['nextjs/components/landing-v2/specimen-strip.test.tsx', 'nextjs/e2e/fixtures/specimens/fixture-chart.json', 'nextjs/e2e/fixtures/specimens/fixture-scan.png', 'nextjs/lib/specimen-sources.tsx', 'nextjs/public/landing/v2/specimen-scan.webp', 'nextjs/public/proof-collection/specimens/naca-rm-l50c03-p002.pdf', 'nextjs/public/proof-collection/specimens/other.run.json', 'nextjs/public/proof-collection/specimens/naca-rm-l50c03-p001-480.avif', 'nextjs/public/proof-collection/dart-jtc-page-4.pdf', 'nextjs/lib/specimen-sources.v2.json', 'nextjs/public/proof-collection/specimens/PROVENANCE.md'] },
   // G11 remote MCP (codex/p4-remote-mcp-20261019): twelve exact paths, sixteen direct suites, one browser suite in launch-chromium.
   { group: 'remote-mcp', prefix: 'nextjs/', exportedPaths: REMOTE_MCP_AFFECTED_PATHS, exportedSuites: REMOTE_MCP_AFFECTED_UNIT_FILES,
     exportedBrowsers: REMOTE_MCP_AFFECTED_BROWSER_FILES,
@@ -670,12 +670,19 @@ assert(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'] === '1dd2de781dacc226
   && ['e2e/benchmarks.spec.ts', 'e2e/brand-tokens.spec.ts', 'e2e/film-line-stability.spec.ts', 'e2e/site-alignment.spec.ts', 'e2e/solutions-workflows.spec.ts', 'e2e/templates.spec.ts', 'e2e/type-scale.spec.ts'].every(file => PUBLIC_MARKETING_AFFECTED_BROWSER_FILES.includes(file))
   && ["['e2e/templates.spec.ts', ['1440']],", "['e2e/type-scale.spec.ts', ['1440']],", "['e2e/site-alignment.spec.ts', ['1440']],", "['e2e/brand-tokens.spec.ts', ['1440']],", "['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/film-line-stability.spec.ts', ['390']],"].every(row => sharedMap.includes('\n  ' + row)),
   'Public marketing owner must keep the reviewed package.json postimage and a reviewed project row for each UX program browser suite');
-// G8 CHANGE-NOTIFY (phase 4), restated independently: six exact paths, nine direct suites, one browser suite with its reviewed
+// COPY re-review R2-N2, restated independently: public/llms.txt selects g1-copy-truth through public-marketing-surface, and
+// landing-page.tsx selects copy-trust-guard through home-landing. Each path keeps exactly its one owner.
+for (const [path, group, suite] of [['nextjs/public/llms.txt', 'public-marketing-surface', 'lib/g1-copy-truth.test.ts'],
+  ['nextjs/components/landing-v2/landing-page.tsx', 'home-landing', 'lib/copy-trust-guard.test.ts']]) {
+  const owners = AFFECTED_GROUPS.filter(owner => owner.match.test(path));
+  assert(owners.length === 1 && owners[0].group === group && owners[0].unitFiles.includes(suite), `${path} must select ${suite} through ${group} (COPY re-review R2-N2)`);
+}
+// G8 CHANGE-NOTIFY (phase 4), restated independently: six exact paths, ten direct suites, one browser suite with its reviewed
 // 390 row, no neighbour admission and no lane flag. The docs text and the outbox SQL keep their existing owners.
 {
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'change-notify'), [owner] = owners;
   const paths = ['app/api/internal/change-notify/run/route.ts', 'e2e/change-notify-docs.spec.ts', 'lib/change-notify.test.ts', 'lib/change-notify.ts', 'lib/security/route-classification.json', 'vercel.json'];
-  const suites = ['lib/change-notify.test.ts', 'lib/cta-truth.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/production-posture.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/source-deletion-route.test.ts', 'lib/synthetic-probe.test.ts'];
+  const suites = ['lib/change-notify.test.ts', 'lib/commercial-state.test.ts', 'lib/cta-truth.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/production-posture.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/source-deletion-route.test.ts', 'lib/synthetic-probe.test.ts'];
   const browsers = ['e2e/change-notify-docs.spec.ts'];
   assert(owners.length === 1 && JSON.stringify(CHANGE_NOTIFY_AFFECTED_PATHS) === JSON.stringify(paths)
     && JSON.stringify(CHANGE_NOTIFY_AFFECTED_UNIT_FILES) === JSON.stringify(suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(suites)
@@ -684,7 +691,7 @@ assert(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'] === '1dd2de781dacc226
     && paths.every(p => owner.match.test('nextjs/' + p))
     && ['nextjs/app/api/internal/change-notify/replay/route.ts', 'nextjs/lib/change-notify-store.ts', 'nextjs/vercel.json.bak', 'vercel.json', 'nextjs/lib/docs-content.ts', 'supabase/migrations/20261019100000_change_notify_outbox.sql'].every(p => !owner.match.test(p))
     && sharedMap.includes("\n  ['e2e/change-notify-docs.spec.ts', ['390']],"),
-    'change-notify owner must keep its six exact paths, nine direct suites and the 390 change-notify-docs browser row');
+    'change-notify owner must keep its six exact paths, ten direct suites and the 390 change-notify-docs browser row');
 }
 for (const binding of currentOwnerBindings) {
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === binding.group), [owner] = owners;
