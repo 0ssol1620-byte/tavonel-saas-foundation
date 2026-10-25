@@ -822,13 +822,13 @@ claims:
     artifact: "nextjs/lib/marketing-analytics.ts; nextjs/components/marketing-consent.tsx; nextjs/components/vercel-collector.tsx; nextjs/lib/funnel-events.ts; nextjs/lib/marketing-analytics.test.ts; nextjs/components/landing-v2/landing-analytics.tsx"
     runtime: "Public marketing pages on tavonel.com only, and only for a visitor who has said yes."
     scope: "Opt-in analytics on public pages. Registered here because this lane owns the claims registry and the copy is live; the code and its tests belong to the lane that shipped PR #36."
-    limitations: "Choice and analytics cookies expire after 180 days. Google may process the data outside Korea. This says nothing about the separate Vercel analytics, which the same paragraph states uses no analytics cookies. N-12's gap -- a signed-in surface instrumented with no notice -- is closed for the public pages by this paragraph; whether the workspace funnel events need their own sentence is a question for the analytics lane. That lane's answer (P2-07): they are sent to neither vendor, so there is nothing for a sentence to disclose. What Vercel Web Analytics receives after consent is not described on /privacy yet; that wording is founder-only (ANALYTICS-ACTIVATION-2026-10-17 §4.5, D-21) and lands in P2-34. The Vercel collector stays off in this deployment (flag unset, Web Analytics not enabled) until D-22."
+    limitations: "Choice and analytics cookies expire after 180 days. Google may process the data outside Korea. This says nothing about the separate Vercel analytics, which the same paragraph now describes in its own sentences (below). N-12's gap -- a signed-in surface instrumented with no notice -- is closed for the public pages by this paragraph; whether the workspace funnel events need their own sentence is a question for the analytics lane. That lane's answer (P2-07): they are sent to neither vendor, so there is nothing for a sentence to disclose. P2-34 (2026-10-19, commit 49484ae4, marker CONSENT_TEXT_FROM_RECOMMENDATION): /privacy now says what Vercel Web Analytics receives after consent, and the cookie table and /subprocessors say the same, in ANALYTICS-ACTIVATION-2026-10-17 §4.5 items 1-3 verbatim (D-21, pinned by lib/legal-terms-consistency.test.ts); the cookie table also lists the two session-storage keys (item 5). The consent banner keeps its Google-only sentence: item 4 measured 110.8px at 360/390/430 in Chromium and WebKit against the 96px phone cap, so D-21's rule keeps the current banner. The Vercel collector stays off in this deployment (flag unset, Web Analytics not enabled) until D-22."
     status: SUPPORTED
     public_private: PUBLIC
     owner: founder
     expiry_or_revalidation: "On any change to what marketing-analytics.ts sends, or to the consent gate."
-    supportedBuild: "f5629ec"
-    lastVerifiedAt: "2026-10-17"
+    supportedBuild: "49484ae"
+    lastVerifiedAt: "2026-10-19"
     review_date: "2026-12-07"
 
   - claimId: CLM-044

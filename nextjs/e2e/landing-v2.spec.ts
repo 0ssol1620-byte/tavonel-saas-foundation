@@ -206,10 +206,12 @@ test("server-renders the visible film poster as its priority image", async ({ re
   const preloads = [...head.matchAll(/<link[^>]*rel="preload"[^>]*as="image"[^>]*>/g)].map(match => match[0]);
   expect(preloads).toHaveLength(1);
   expect(preloads[0]).toMatch(/fetchpriority="high"/i);
-  expect(preloads[0]).toMatch(/imagesrcset="\/film\/poster-1-t3\.00\.webp 1440w, \/film\/poster-1-t3\.00-2x\.webp 2880w"/i);
+  // POSTER-RECUT (D-11): the one hint is the AVIF srcset, typed so a browser without AVIF skips it.
+  expect(preloads[0]).toMatch(/imagesrcset="\/film\/poster-1-t8\.16\.avif 1440w, \/film\/poster-1-t8\.16-2x\.avif 2880w"/i);
+  expect(preloads[0]).toMatch(/type="image\/avif"/i);
   const high = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => /fetchpriority="high"/i.test(tag));
-  expect(high).toHaveLength(1); expect(high[0]).toContain('src="/film/poster-1-t3.00-2x.webp"');
-  expect(high[0]).toMatch(/srcset="\/film\/poster-1-t3\.00\.webp 1440w, \/film\/poster-1-t3\.00-2x\.webp 2880w"/i);
+  expect(high).toHaveLength(1); expect(high[0]).toContain('src="/film/poster-1-t8.16-2x.webp"');
+  expect(high[0]).toMatch(/srcset="\/film\/poster-1-t8\.16\.webp 1440w, \/film\/poster-1-t8\.16-2x\.webp 2880w"/i);
   expect(high[0]).toMatch(/loading="eager"/i); expect(high[0]).toMatch(/ width="[1-9]\d*"/); expect(high[0]).toMatch(/ height="[1-9]\d*"/);
   const sourceImages = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => tag.includes("apple-2026-q1-10-q-reference-p004"));
   expect(sourceImages).toHaveLength(1);
