@@ -1168,7 +1168,7 @@ console.log("compile job:", accepted.jobId);` },
         kind: "steps",
         items: [
           "In the client's connector settings, add a custom remote MCP server with the URL https://tavonel.com/api/mcp and choose OAuth as its authentication.",
-          "The client finds the rest itself. A tool call without a token answers 401 with a pointer to /.well-known/oauth-protected-resource/api/mcp, which names TAVONEL as the authorization server; /.well-known/oauth-authorization-server lists its endpoints.",
+          "A client that implements MCP authorization is expected to find the rest itself; no real client has been connected yet. A tool call without a token answers 401 with a pointer to /.well-known/oauth-protected-resource/api/mcp, which names TAVONEL as the authorization server; /.well-known/oauth-authorization-server lists its endpoints.",
           "The client registers itself and opens TAVONEL's consent page in your browser. Sign in, check the client's name and the address the token is sent to, and allow read-only access.",
           "The client receives an access token and lists the tools. Ask it to run list_worlds first, then search_world or ask_world with a collection id from that list.",
         ],
