@@ -2100,8 +2100,8 @@ export const LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES = Object.freeze([
 // seventeen suites that read them directly (the plan, pricing, posture, claims-sync and hedge suites for the catalog; the
 // distribution, compiler-contract, docs and guide suites for the file list; the operations, probe and legal suites for the
 // record; the MCP, prompt-injection and tenant suites for the bridge) and the pricing-plan-overview (1440, 390) and
-// docs-reading-layout (1440, 390, reduced-motion) browser suites, each through its existing reviewed project row. The other
-// thirteen paths this lane changed keep their existing owners. Product copy and a published asset, so never nativeReuse.
+// docs-reading-layout (1440, 390, reduced-motion) browser suites, each through its existing reviewed project row. Every
+// other path this lane changed keeps its existing owner. Product copy and a published asset, so never nativeReuse.
 export const G1_COPY_TRUTH_AFFECTED_PATHS = Object.freeze([
   'lib/billing-catalog.ts',
   'lib/g1-copy-truth.test.ts',
