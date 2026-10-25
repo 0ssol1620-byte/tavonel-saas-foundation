@@ -7,7 +7,8 @@
     "C-webhook": "Privilege comes from a signature over the raw request body. Requires raw-body verification, a replay window, and event dedupe.",
     "E-signed-service": "Bodyless service request signed over method, fixed path/audience, timestamp and request ID. Requires body refusal, durable replay prevention and issuance budget; no cookie authority.",
     "D-oauth-callback": "Provider redirect. Requires state, PKCE, and a fixed redirect policy.",
-    "P-public": "Accepts no credential and grants no tenant privilege. Nothing exists for a forged request to ride, so origin checks here are anti-abuse, not CSRF defence."
+    "P-public": "Accepts no credential and grants no tenant privilege. Nothing exists for a forged request to ride, so origin checks here are anti-abuse, not CSRF defence.",
+    "F-oauth-token": "TAVONEL as the OAuth 2.1 authorization server of the remote MCP. The credential is an authorization code in the form body, sealed to one client and bound to a PKCE S256 verifier, so nothing ambient exists for a forged request to ride. Requires: single-use code, PKCE, exact redirect binding."
   },
   "corsPosture": "No route sets any Access-Control-Allow-* header, and next.config.mjs adds none. There is therefore no credentialed cross-origin access and no wildcard origin anywhere on the API surface. lib/route-classification.test.ts asserts this.",
   "cookies": "The only Set-Cookie on the API surface is the self-service trial device cookie (lib/self-service-trial.ts:69, HttpOnly; Secure; SameSite=Lax). It is an abuse signal consumed by bootstrap_foundation_self_service_trial, never an authorization credential: app/api/access/bootstrap/route.ts rejects the request with AUTH_REQUIRED before reading it unless a Bearer JWT is present.",
@@ -612,6 +613,39 @@
       ],
       "credential": "bearer:shared-secret",
       "note": "FOUNDATION_WORKER_SECRET / CRON_SECRET, closed when unset. Cross-tenant scheduled enforcement verifies provider identity and signed workspace binding before pausing a subscription whose processing admission is unavailable."
+    },
+    "app/api/mcp/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "credential": "bearer:api-key",
+      "note": "Remote MCP (G11), 404 while TAVONEL_REMOTE_MCP_ENABLED is off. Read-only tool table from the stdio bridge; tools/call needs a read-only developer key, initialize and tools/list answer without one. A present Origin must equal the server's own."
+    },
+    "app/api/mcp/oauth/authorize/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "Remote MCP consent (G11), 404 while off. describe and deny take no credential and grant nothing; approve issues a code only for a Supabase bearer that requireFoundationSession accepts and that is not a free evaluation."
+    },
+    "app/api/mcp/oauth/register/route.ts": {
+      "type": "P-public",
+      "methods": [
+        "POST"
+      ],
+      "credential": "none",
+      "note": "RFC 7591 registration for the remote MCP (G11), 404 while off. Stateless sealed client id; writes nothing and grants nothing until a person consents."
+    },
+    "app/api/mcp/oauth/token/route.ts": {
+      "type": "F-oauth-token",
+      "methods": [
+        "POST"
+      ],
+      "credential": "oauth:authorization-code+pkce",
+      "note": "Remote MCP token endpoint (G11), 404 while off. Mints a developer key holding only the granted read scopes, expiring with the token, through the authorization-revision-checked key RPC."
     }
   }
 }
