@@ -2178,6 +2178,7 @@ export const G1_COPY_TRUTH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/docs-rea
 // classification and route-surface suites for the new route, and every suite that reads vercel.json (production-posture among
 // them), plus the change-notify-docs browser suite in project 390. The docs text itself stays with the docs owner, and the outbox
 // migration and grant-matrix row with database-contract. Product code, so never nativeReuse.
+// lib/security/route-classification.json is also a remote-mcp path (PR #167): a change to it selects both owners, the union of their suites.
 export const CHANGE_NOTIFY_AFFECTED_PATHS = Object.freeze([
   'app/api/internal/change-notify/run/route.ts',
   'e2e/change-notify-docs.spec.ts',
@@ -2198,6 +2199,47 @@ export const CHANGE_NOTIFY_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/synthetic-probe.test.ts',
 ]);
 export const CHANGE_NOTIFY_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/change-notify-docs.spec.ts']);
+// G11 remote MCP (codex/p4-remote-mcp-20261019, DECISION-REGISTER S6-09/S6-10): the switch-gated endpoint, its OAuth routes and
+// well-known metadata, the consent page, the shared module and its suite, the route classification entries and the browser spec.
+// Exactly these twelve paths select the sixteen suites that read them -- the module suite, the stdio bridge suite whose table the
+// endpoint imports, the tenant-isolation probe of the routes it dispatches to, the posture lock, and the suites that walk app/ or
+// read the classification (route classification, CSRF matrix, route surface, canonical and page metadata, SEO, copy trust, output
+// escaping, prohibited phrases, funnel events, workspace tenancy, brand copy) -- and the remote MCP browser suite in launch-chromium.
+// Product code, so never nativeReuse.
+// lib/security/route-classification.json is also a change-notify path (PR #164): a change to it selects both owners, the union of their suites.
+export const REMOTE_MCP_AFFECTED_PATHS = Object.freeze([
+  'app/.well-known/oauth-authorization-server/route.ts',
+  'app/.well-known/oauth-protected-resource/[[...resource]]/route.ts',
+  'app/api/mcp/oauth/authorize/route.ts',
+  'app/api/mcp/oauth/register/route.ts',
+  'app/api/mcp/oauth/token/route.ts',
+  'app/api/mcp/route.ts',
+  'app/oauth/authorize/layout.tsx',
+  'app/oauth/authorize/page.tsx',
+  'e2e/launch-qa-remote-mcp.spec.ts',
+  'lib/remote-mcp.test.ts',
+  'lib/remote-mcp.ts',
+  'lib/security/route-classification.json',
+]);
+export const REMOTE_MCP_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/brand-copy.test.ts',
+  'lib/copy-trust-guard.test.ts',
+  'lib/csrf-shape-matrix.test.ts',
+  'lib/funnel-events.test.ts',
+  'lib/mcp-server.test.ts',
+  'lib/output-escaping.test.ts',
+  'lib/page-metadata.test.ts',
+  'lib/production-posture.test.ts',
+  'lib/production-route-surface.test.ts',
+  'lib/prohibited-phrases.test.ts',
+  'lib/remote-mcp.test.ts',
+  'lib/route-canonical-metadata.test.ts',
+  'lib/route-classification.test.ts',
+  'lib/seo-surface.test.ts',
+  'lib/tenant-isolation-negative.test.ts',
+  'lib/workspace-tenancy.test.ts',
+]);
+export const REMOTE_MCP_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/launch-qa-remote-mcp.spec.ts']);
 // Phase 4 consent-poster lane (P2-34/D-21 analytics notice, POSTER-RECUT/D-11): the two policy pages and the legal date with the
 // suite that pins the approved wording, and the twelve re-cut AVIF/WebP posters. Exactly these sixteen paths select the wording,
 // locked-asset, operations, posture and trust suites, the poster contract (390) and the policy-page template suite (1440).
@@ -2721,6 +2763,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // change-notify: the 6 exact paths above select 9 direct suites and 1 browser suite.
   affectedGroup('change-notify', new RegExp(`^nextjs/(?:${exactPathAlternation(CHANGE_NOTIFY_AFFECTED_PATHS)})$`),
     { unitFiles: CHANGE_NOTIFY_AFFECTED_UNIT_FILES, browserFiles: CHANGE_NOTIFY_AFFECTED_BROWSER_FILES }),
+  // remote-mcp: the 12 exact paths above select 16 direct suites and 1 browser suite.
+  affectedGroup('remote-mcp', new RegExp(`^nextjs/(?:${exactPathAlternation(REMOTE_MCP_AFFECTED_PATHS)})$`),
+    { unitFiles: REMOTE_MCP_AFFECTED_UNIT_FILES, browserFiles: REMOTE_MCP_AFFECTED_BROWSER_FILES }),
   // consent-poster: the 16 exact paths above select 5 direct suites and 2 browser suites.
   affectedGroup('consent-poster', new RegExp(`^nextjs/(?:${exactPathAlternation(CONSENT_POSTER_AFFECTED_PATHS)})$`),
     { unitFiles: CONSENT_POSTER_AFFECTED_UNIT_FILES, browserFiles: CONSENT_POSTER_AFFECTED_BROWSER_FILES }),

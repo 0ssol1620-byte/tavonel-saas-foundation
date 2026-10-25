@@ -241,6 +241,7 @@ const browserProjectsByFile = new Map([
   ['e2e/specimen-strip.spec.ts', ['390']],
   ['e2e/self-serve-journey.spec.ts', ['audit']],
   ['e2e/change-notify-docs.spec.ts', ['390']],
+  ['e2e/launch-qa-remote-mcp.spec.ts', ['launch-chromium']],
   ['e2e/keyless-try-it.spec.ts', ['1440', '390']],
   ['e2e/p4-followups.spec.ts', ['1440']],
 ]);
