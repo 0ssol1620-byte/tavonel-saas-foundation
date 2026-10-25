@@ -36,6 +36,11 @@ type Phase =
 
 const PARAMETERS = ["response_type", "client_id", "redirect_uri", "code_challenge", "code_challenge_method", "state", "scope", "resource"];
 
+// A client's address is self-registered and can be one unbroken host of 253 characters; it wraps
+// instead of widening a phone screen. An attribute, not a stylesheet rule: the auth sheets are
+// sealed by other owners, and the CSP allows style attributes (style-src-attr).
+const WRAP = { overflowWrap: "anywhere" } as const;
+
 function requestFromQuery() {
   const query = new URLSearchParams(window.location.search);
   return Object.fromEntries(PARAMETERS.flatMap((name) => (query.has(name) ? [[name, query.get(name) ?? ""]] : [])));
@@ -135,11 +140,11 @@ export default function OAuthAuthorizePage() {
           {phase.kind === "invalid" && phase.back ? (
             <>
               <p className="lead">
-                The client asked for the answer to go to <b>{phase.back.origin}</b>. Go back only if you started this
-                connection there.
+                The client asked for the answer to go to <b style={WRAP}>{phase.back.origin}</b>. Go back only if you started
+                this connection there.
               </p>
               <div className="auth-actions">
-                <a className="btn ghost" href={phase.back.href} rel="noreferrer">Return to {phase.back.origin}</a>
+                <a className="btn ghost" style={WRAP} href={phase.back.href} rel="noreferrer">Return to {phase.back.origin}</a>
               </div>
             </>
           ) : null}
@@ -156,8 +161,8 @@ export default function OAuthAuthorizePage() {
           {view ? (
             <>
               <p className="lead">
-                <b>{view.client.name}</b> asks to read this workspace through the read-only MCP endpoint. The access token
-                goes to <b>{view.client.redirectOrigin}</b>.
+                <b style={WRAP}>{view.client.name}</b> asks to read this workspace through the read-only MCP endpoint. The access token
+                goes to <b style={WRAP}>{view.client.redirectOrigin}</b>.
               </p>
               <ul className="auth-facts">
                 <li><b>Read only.</b> It can list sources and active Worlds, search, ask and read evidence. It cannot upload, compile, activate, roll back or change billing.</li>
