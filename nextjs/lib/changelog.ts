@@ -73,6 +73,33 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   /*
+    PR #170, phase 4 post-batch: production deployment dpl_2WMiVjsxeoa7WUAz1K7stgA91JFK (main 5d8417a1), READY
+    2026-10-25T13:49:52Z, 22:49:52 in Seoul, read with Vercel get_deployment (receipt:
+    ux-program-20261017/phase4/POST-BATCH/CHANGELOG-170/RECEIPT-2026-10-25.md). By docs/CHANGELOG_ENTRY_RULE.md these
+    have no bullet: the sha256: prefix set as code in one /docs/run-events table cell (formatting, the words unchanged),
+    the seven changelog entries themselves (each is on the page and in the feed under its own date), the remote MCP
+    authorize page (404 on tavonel.com) and tests, repair-scope owners and the RSC-leak probe (internal). No version:
+    /developer/README.md is not a channel.json asset and channel.json did not move.
+  */
+  {
+    date: "2026-10-25",
+    releasedAt: "2026-10-25T13:49:52Z",
+    id: "2026-10-25-guide-rows-and-provenance",
+    title: "Separate tap targets in the /guide chapter links, monospace code before the webfont loads, and provenance for the specimens",
+    surfaces: ["Website", "Developer tools"],
+    added: [
+      "/proof-collection/PROVENANCE.md has a Specimens section on the two pages in /proof-collection/specimens/: the public document each comes from and its licence, when it was read, what each cell holds, what its run receipt does not claim, and the SHA-256 that pins each run receipt and rights snapshot.",
+    ],
+    improved: [
+      "The guide's manifest, /guide/manifest.json, says in its first recording line that guide-1-explore and guide-3-api were recorded on live tavonel.com, and that guide-2-mcp is the exception its last line describes.",
+      "The MCP configuration example in the developer README, /developer/README.md, uses /absolute/path/to/tavonel-mcp.mjs as the placeholder for the server's path, as /docs/mcp does.",
+    ],
+    fixed: [
+      "On a touch screen or below 1080 px, each “where” link under a chapter of /guide and /ko/guide is a full-size tap target, and a row that wraps sits clear of the row above it.",
+      "Code, digests, IDs and coordinates are drawn in your system's monospace face whenever IBM Plex Mono has not loaded.",
+    ],
+  },
+  /*
     Phase 4 post-batch, 2026-10-25: the seven phase-4 merges now in production, one entry each. Each is dated by the
     Asia/Seoul day its production deployment reached tavonel.com and timed by that deployment's READY time, read with
     Vercel get_deployment on the ledger's deployment ids (receipt:
