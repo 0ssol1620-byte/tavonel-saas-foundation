@@ -7528,8 +7528,8 @@ function assertUxProgramEndpoint(path) {
   return true;
 }
 test('affected UX program head: the reviewed package.json postimage is pinned and each new browser suite has exactly one reviewed project row', () => {
-  assert.equal(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'], 'cc03d8ecb69d42916a5a4c72d54ff2817df90436f5111b2731ee6a8e248b7a59');
-  assert.equal(MARKETING_TOOLING_POSTIMAGES['nextjs/pnpm-lock.yaml'], 'a814e2ff45e2c563949ebd917df8036bcd7bde2c2a8a98480386fab0ea79be04');
+  assert.equal(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'], '1dd2de781dacc2269c794559da1366c8d13a2adbad91e538fb19433096f6dce7');
+  assert.equal(MARKETING_TOOLING_POSTIMAGES['nextjs/pnpm-lock.yaml'], '3b521a81e581df2273ea6ee78fea3df8bc7008db5b0517818d9d95056b5c6cea');
   const runner = readFileSync(fileURLToPath(new URL('./run-repair-check.mjs', import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
   for (const row of ["['e2e/templates.spec.ts', ['1440']],", "['e2e/type-scale.spec.ts', ['1440']],", "['e2e/site-alignment.spec.ts', ['1440']],", "['e2e/brand-tokens.spec.ts', ['1440']],", "['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/film-line-stability.spec.ts', ['390']],", "['e2e/specimen-strip.spec.ts', ['390']],", "['e2e/self-serve-journey.spec.ts', ['audit']],"]) {
     assert.equal(runner.split('\n').filter(line => line.trim() === row).length, 1, row);
