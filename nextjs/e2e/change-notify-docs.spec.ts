@@ -40,6 +40,8 @@ for (const browserName of BROWSERS) {
         const fields = article.locator("table.docs-table").filter({ hasText: "candidateManifestDigest" });
         await expect(fields.locator("tbody tr")).toHaveCount(9);
         await expect(fields).toContainText("explicit_human_decision");
+        // CHANGE-NOTIFY review NB3: the digest prefix is a token the receiver compares, so it is set as code.
+        await expect(fields.locator("tbody tr", { hasText: "candidateManifestDigest" }).locator("code", { hasText: /^sha256:$/ })).toHaveCount(1);
 
         const snippet = article.getByRole("group", { name: "Verify a change notification — Node.js" });
         await expect(snippet).toContainText("tavonel-signature");

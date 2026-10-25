@@ -269,7 +269,7 @@ describe("the shapes the database holds", () => {
     const table = findDocsSection("run-events")!.blocks.find((block) =>
       block.kind === "table" && block.rows.some(([field]) => field === "candidateManifestDigest")) as { rows: string[][] };
     const meaning = (field: string) => table.rows.find(([name]) => name === field)![1]!;
-    expect(meaning("candidateManifestDigest")).toContain("sha256: followed by 64 hex characters");
+    expect(meaning("candidateManifestDigest")).toContain("written `sha256:` followed by 64 hex characters");
     expect(meaning("activeManifestDigest")).toContain("same format");
   });
 
