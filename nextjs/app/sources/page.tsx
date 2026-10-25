@@ -73,6 +73,19 @@ export default function SourcesPage() {
     off the client and a denominator is no reason to start sending them.
   */
   const census = capabilityCensus();
+  /*
+    D-33 / P2-33 (DECISION-REGISTER-2026-10-17, KB-F6 and KB-F7; conflict C1). The Korean reader's
+    two answers, published here and not on /ko, which is a first-impression surface the hedge guard
+    keeps clear: no Korean quality measurement exists, and HWP/HWPX has no reader. The PDF tier is
+    read from the same rows the table prints, and the HWP/HWPX sentence refuses to render beside a
+    manifest that has gained either format, so neither can go on being said after it stops being
+    true.
+  */
+  const pdfTier = rows.find((row) => row.mime === "application/pdf")?.tier;
+  if (!pdfTier) throw new Error("/sources: the manifest has no PDF row to state the Korean PDF tier from");
+  if (rows.some((row) => row.extensions.some((extension) => /^hwpx?$/i.test(extension)))) {
+    throw new Error("/sources: the manifest lists HWP or HWPX, so 'HWP/HWPX: 지원하지 않음' is no longer true");
+  }
 
   return (
     <PublicSitePage template="T3">
@@ -127,6 +140,17 @@ export default function SourcesPage() {
               </dl>
 
               <SourceCapabilityTable rows={rows} />
+
+              <div className="stack" lang="ko">
+                <p className="src-para">
+                  <b>한국어 문서.</b> 한국어 문서 품질은 아직 측정하지 않았습니다. 한국어 PDF도 위
+                  표의 PDF 행과 같은 &lsquo;{pdfTier}&rsquo; 등급으로 처리됩니다.
+                </p>
+                <p className="src-para">
+                  <b>HWP/HWPX: 지원하지 않음 · 측정 안 함.</b> 두 형식 모두 위 표에 없으며,
+                  업로드 단계에서 거부됩니다.
+                </p>
+              </div>
 
               {/*
                 The four paragraphs explaining the table are technical detail, and §14.3 asks for

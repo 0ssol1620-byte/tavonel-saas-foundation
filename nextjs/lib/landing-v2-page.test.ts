@@ -582,7 +582,8 @@ describe("landing v2 -- the composition", () => {
     const text = readable(sceneOf(main, "s2"));
     expect(text).toContain(
       locale === "ko"
-        ? "아직 처리, 적격 판정, 권리 허가를 거치지 않았으므로 그 내용은 보여 주지 않습니다."
+        // The sentence boundary is part of the pin, so a hedge put back before the verb fails it.
+        ? "예약해 두었습니다. 처리, 적격 판정, 권리 허가를 거치지 않았으므로 그 내용은 보여 주지 않습니다."
         : "It has not been processed, qualified or rights-cleared, so nothing from it is shown."
     );
     // P2-32: a specimen's source line may name NASA's report server (NACA RM L50C03); nothing else on the page may.
@@ -759,8 +760,8 @@ describe("landing v2 -- the lead and the workbench", () => {
     expect(supportAt).toBeLessThan(actionsAt);
     expect(readable(hero)).toContain(
       locale === "ko"
-        ? "TAVONEL은 문서를 AI와 에이전트를 위한 맥락으로 컴파일하며, 각 진술은 그것이 나온 페이지와 영역에 연결됩니다."
-        : "TAVONEL compiles your documents into context for AI and agents, with each statement linked to the page and region it came from.",
+        ? "TAVONEL은 PDF·스캔·오피스 문서를 읽어 AI와 에이전트가 쓰는 맥락으로 컴파일하고, 각 진술에 그것이 나온 페이지와 영역을 남깁니다."
+        : "TAVONEL reads your PDFs, scans and office files and compiles them into context for AI and agents — each statement keeps the page and region it came from.",
     );
     expect(hero).toContain("/film/poster-1-t8.16-2x.webp");
     expect(hero).toContain("/film/poster-1-t8.16-2x.avif");

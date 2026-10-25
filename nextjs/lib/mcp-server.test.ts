@@ -243,7 +243,9 @@ describe("each tool makes the request it declares", () => {
     expect(descriptor.sizeBytes).toBe(104857);
     expect(descriptor.manifestSha256).toBe(`sha256:${"e".repeat(64)}`);
     expect(descriptor.signingKeyId).toBe("tavonel-export-2026");
-    expect(descriptor.verifyWith).toContain("verify-signed-export.mjs");
+    // S6-17 item 12 (G1-COPY): the verifier a downloaded client actually has, as channel.json names it.
+    expect(descriptor.verifyWith).toContain("node tavonel-verify-export.mjs");
+    expect(descriptor.verifyWith).not.toContain("scripts/");
   });
 });
 
