@@ -20,7 +20,8 @@ import { readPublicStatusV2 } from "./public-status";
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 /** Rendered prose only: comments say why a sentence went, and must not count as the sentence. */
 const copy = (path: string) => read(path)
-  .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, " ")
+  // A JSX comment's body cannot contain "*/" (the same fix as copy-trust-guard's prose(), review N2).
+  .replace(/\{\s*\/\*(?:(?!\*\/)[\s\S])*\*\/\s*\}/g, " ")
   .replace(/\/\*[\s\S]*?\*\//g, " ")
   .replace(/^[ \t]*\/\/.*$/gm, " ")
   .replace(/\s+/g, " ");
@@ -223,6 +224,16 @@ describe("G1-COPY: Korean measurement and HWP wording on /sources (D-33 / P2-33)
     expect(sources).toContain(`lang="ko"`);
     expect(sources).toContain(sentence);
     expect(sources).toContain("HWP/HWPX: 지원하지 않음 · 측정 안 함");
+  });
+
+  // Review N3: the two sentences are a public claim, so the registry entry that backs them must stay.
+  it("D-33. binds the /sources sentences to CLM-050 in the claims registry", () => {
+    const registry = readFileSync(new URL("../../docs/gtm/CLAIMS_REGISTRY.yaml", import.meta.url), "utf8");
+    const entry = registry.split("claimId: CLM-050")[1]?.split("claimId:")[0];
+    expect(entry, "CLAIMS_REGISTRY carries CLM-050").toBeDefined();
+    expect(entry).toContain(sentence);
+    expect(entry).toContain("HWP/HWPX: 지원하지 않음 · 측정 안 함");
+    expect(entry).toContain('surface: "/sources"');
   });
 
   it("D-33. keeps it off the Korean home, which is a first-impression surface (C1)", () => {
