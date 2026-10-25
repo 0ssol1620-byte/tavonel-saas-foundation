@@ -340,7 +340,8 @@ describe("landing v2 -- the composition with the specimen strip rendered", () =>
   it.each(LOCALES)("%s keeps every figure declared, every alt figure-free and the reserved case absent", locale => {
     vi.stubEnv("VERCEL", "1");
     vi.stubEnv("VERCEL_ENV", "preview");
-    const main = mainOf(render(locale));
+    const page = render(locale);
+    const main = mainOf(page);
     expect([...main.matchAll(/data-specimen-cell="([^"]+)"/g)].map(match => match[1])).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
     expect(undeclaredText(main)).not.toMatch(/\d/);
     const hero = sceneOf(main, "s1");
@@ -357,11 +358,16 @@ describe("landing v2 -- the composition with the specimen strip rendered", () =>
     const poster = elements(hero, "img").filter(open => open.includes("compile-film-still"));
     expect(poster).toHaveLength(1);
     expect([attr(poster[0]!, "loading"), attr(poster[0]!, "fetchpriority")]).toEqual(["lazy", undefined]);
-    expect(main).not.toMatch(/<link[^>]*rel="preload"[^>]*poster-1/);
+    // The whole render, not <main>: React writes a preload() hint ahead of the content (merge review A2).
+    const posterPreload = /<link[^>]*rel="preload"[^>]*poster-1/;
+    expect(page).not.toMatch(posterPreload);
     expect(elements(hero, "img").filter(open => attr(open, "fetchpriority") === "high")).toHaveLength(1);
     // The strip sits between the hero's actions and the film (D-03), and the film is unchanged below it.
     expect(hero.indexOf("data-specimen-strip")).toBeGreaterThan(hero.indexOf('data-testid="landing-hero-actions"'));
     expect(hero.indexOf("data-specimen-strip")).toBeLessThan(hero.indexOf("compile-film"));
+    // The same check finds the hint where it belongs: the production posture preloads the poster.
+    vi.unstubAllEnvs();
+    expect(render(locale)).toMatch(posterPreload);
   });
 });
 
