@@ -13,7 +13,8 @@
     - `/Users/` (macOS) and `/home/` (Linux);
     - the OS user name of the account running the probe, read from USER, USERNAME or LOGNAME at
       run time. It is never written here: a name in this file would be the leak it looks for, and
-      the CI machine's account is not the author's.
+      the CI machine's account is not the author's. The hosted CI account's name is a common word,
+      so it is matched only inside a path (see HOSTED_CI_ACCOUNT_SHA256).
 
   How it runs:
     node scripts/launch-qa/rsc-leak-probe.mjs              rm -rf .next, build with the fixture env, scan
@@ -28,6 +29,7 @@
   read is a failure, because a probe that read nothing has proved nothing.
 */
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -51,6 +53,15 @@ export function userNameFromEnv(env = process.env) {
 
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/*
+  The account a hosted CI machine runs as is an ordinary English word that names nobody, so matching it anywhere fails a
+  page for an ordinary sentence (FOLLOW-UPS review NB-4). It is held by its sha256, not written: this file is itself checked
+  for the name of the machine that runs the check. For that name the needle is the name between path separators, which a
+  real path on that machine still carries; the path needles above it are unchanged, and any other name is matched as a word.
+*/
+const HOSTED_CI_ACCOUNT_SHA256 = new Set(["527aa9f431539da8e151d5434d1d5e611d973f601d8e970790882624554146b0"]);
+const isHostedCiAccount = (userName) => HOSTED_CI_ACCOUNT_SHA256.has(createHash("sha256").update(userName.toLowerCase()).digest("hex"));
+
 /**
  * The needles, with the user name matched as a whole name rather than inside a longer word.
  * @param {string | null} userName
@@ -58,11 +69,14 @@ const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
  */
 export function leakPatterns(userName) {
   if (!userName) throw new Error("rsc-leak-probe: no OS user name in USER, USERNAME or LOGNAME");
+  const name = escapeRegExp(userName);
   return [
     ["a drive-letter path", /(?<![A-Za-z0-9])[A-Za-z]:[\\/]/g],
     ["a macOS home path", /\/Users\//g],
     ["a Linux home path", /\/home\//g],
-    ["the OS user name", new RegExp(`(?<![A-Za-z0-9_.-])${escapeRegExp(userName)}(?![A-Za-z0-9_-])`, "gi")],
+    ["the OS user name", isHostedCiAccount(userName)
+      ? new RegExp(`(?<=[\\\\/])${name}(?=[\\\\/])`, "gi")
+      : new RegExp(`(?<![A-Za-z0-9_.-])${name}(?![A-Za-z0-9_-])`, "gi")],
   ];
 }
 

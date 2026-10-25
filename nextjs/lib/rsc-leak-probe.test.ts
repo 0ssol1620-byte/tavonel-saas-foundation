@@ -81,10 +81,36 @@ describe("the RSC-leak probe", () => {
   });
 
   it("matches the user name as a name, not inside a longer word", () => {
+    const [, , , [, pattern]] = leakPatterns("ana");
+    expect("built by ana on CI".match(pattern)).toHaveLength(1);
+    expect("/home/ana/work".match(pattern)).toHaveLength(1);
+    expect("a banana bread analysis".match(pattern)).toBeNull();
+  });
+
+  /*
+    FOLLOW-UPS review NB-4. GitHub's hosted machines run as `runner`, an ordinary English word, so matching it anywhere would
+    fail a page for "a test runner". That one account name is matched only inside a path; a real path still fails, through
+    the path needles and through the name between separators, and every other account name is still a leak as a bare word.
+  */
+  it("passes the hosted CI account's name as a word and still fails a real path on that machine", () => {
     const [, , , [, pattern]] = leakPatterns("runner");
-    expect("built by runner on CI".match(pattern)).toHaveLength(1);
-    expect("/home/runner/work".match(pattern)).toHaveLength(1);
-    expect("a frontrunners' race".match(pattern)).toBeNull();
+    expect("built by runner on CI".match(pattern)).toBeNull();
+    expect("/opt/runner/work".match(pattern)).toHaveLength(1);
+    const prose = plantBuild({ ...CLEAN, "server/app/docs/cli.html": "<p>Run it from a test runner or a task Runner.</p>" });
+    expect(scanBuild(prose, { userName: "runner" }).hits).toEqual([]);
+    expect(runCli(prose, { USER: "runner" }).code).toBe(0);
+    for (const [leak, label] of [
+      ['0:["$","li","C:/Users/runner/work/x",{}]', "a drive-letter path"],
+      [`0:["$","li","D:${BACKSLASH}${BACKSLASH}a${BACKSLASH}${BACKSLASH}runner${BACKSLASH}${BACKSLASH}x",{}]`, "a drive-letter path"],
+      ['0:["$","li","/home/runner/work/tavonel",{}]', "a Linux home path"],
+      ['0:["$","li","/opt/runner/work/tavonel",{}]', "the OS user name"],
+    ]) {
+      const leaky = plantBuild({ ...CLEAN, "server/app/benchmarks.rsc": leak });
+      expect(scanBuild(leaky, { userName: "runner" }).hits.map((hit) => hit.label), leak).toContain(label);
+      expect(runCli(leaky, { USER: "runner" }).code, leak).toBe(1);
+    }
+    // Any other account name is still a leak as a bare word.
+    expect(scanBuild(prose, { userName: "task" }).hits.map((hit) => hit.label)).toEqual(["the OS user name"]);
   });
 
   it("fails closed: no user name to look for, no build, or nothing to read", () => {
