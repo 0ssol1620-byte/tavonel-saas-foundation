@@ -55,6 +55,9 @@ const mono = IBM_Plex_Mono({
   weight: ["400", "500", "600"],
   variable: "--font-mono",
   display: "optional",
+  // Not next/font's local("Arial") fallback face: code and digests stay monospace until Plex loads (FOLLOW-UPS NB-6).
+  adjustFontFallback: false,
+  fallback: ["ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", "monospace"],
 });
 
 /**

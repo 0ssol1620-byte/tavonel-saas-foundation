@@ -252,6 +252,23 @@ describe("app/landing-v2.css", () => {
 
 describe("app/layout.tsx fonts", () => {
   /*
+    FOLLOW-UPS review NB-6 (2026-10-19). Plex is display: optional, so a first visit usually paints the next face in
+    var(--font-mono). next/font's default adjustFontFallback made that face "IBM Plex Mono Fallback", local("Arial") at
+    size-adjust 134.59%, so coordinates, digests and code drew in a large proportional face wherever the variable is used.
+    The variable now falls to monospace faces: Consolas (Windows) and Liberation Mono (Linux) come before the generic
+    family, which a Korean-locale browser maps to GulimChe, where U+005C draws as a won sign.
+  */
+  it("falls from IBM Plex Mono to monospace faces, not to next/font's Arial fallback", () => {
+    const call = /IBM_Plex_Mono\(\{([\s\S]*?)\}\);/.exec(layout)?.[1] ?? "";
+    expect(call).toContain("adjustFontFallback: false");
+    const fallback = JSON.parse(/fallback: (\[[^\]]*\])/.exec(call)?.[1] ?? "[]") as string[];
+    expect(fallback.at(-1), "the generic family is the last resort").toBe("monospace");
+    expect(fallback.filter((family) => family === "monospace")).toHaveLength(1);
+    expect(fallback.indexOf("Consolas")).toBeGreaterThan(-1);
+    expect(fallback.indexOf("Liberation Mono")).toBeGreaterThan(-1);
+    expect(fallback.filter((family) => /Arial|Fallback/.test(family))).toEqual([]);
+  });
+  /*
     UX-L3 (UX-PLAN-2026-10-17 §4.4): this case pinned three next/font faces. Two were retired, so it
     pins the one that stays, the deletion of the other two (in code, not in the comment that
     explains it) and the preload that keeps the optional Wanted Sans face from painting the fallback.
