@@ -118,8 +118,9 @@ describe("checkout intent", () => {
 
 /*
   P2-29 (register D-14, journey defect D-01): processing terms, then the production launch, then
-  checkout. A held offer resumes only into a workspace whose files may be processed in production;
-  until then it is kept, never spent on a refusal the server is certain to give.
+  checkout. A held offer resumes only into a workspace released for production processing (the
+  stage, not file access: review B1); until then it is kept, never spent on a refusal the server is
+  certain to give.
 */
 describe("decideCheckoutResume: terms -> launch -> checkout (D-14)", () => {
   const newAccount: ResumeAccess = {
