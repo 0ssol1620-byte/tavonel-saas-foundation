@@ -116,7 +116,8 @@ export async function POST(request: Request) {
   if (!access.ok) {
     // A rejected free-compute grant is not a rejected identity. Keep the authenticated user in
     // their workspace so they can inspect the access state or purchase a plan, without issuing
-    // trial limits or opening the separately verified customer-data gate.
+    // trial limits or opening the separately verified customer-data gate. The gate is open on this
+    // branch, so the stage is sent: a released workspace's held checkout must resume (review B1).
     if (readAccessMode() === "self_service" && (access.status === 403 || access.status === 429)
       && NO_ENTITLEMENT_TRIAL_CODES.has(access.code)) {
       return NextResponse.json({
@@ -128,6 +129,7 @@ export async function POST(request: Request) {
           expiresAt: null,
           limits: null,
           customerDataEnabled: false,
+          processingStage,
         },
       }, { headers });
     }

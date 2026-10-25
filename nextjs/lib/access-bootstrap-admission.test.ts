@@ -124,7 +124,9 @@ describe("workspace bootstrap source admission", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       code: "ACCESS_READY_NO_ENTITLEMENT",
-      access: { source: "unentitled", accessPlan: null, limits: null, customerDataEnabled: false },
+      // The gate is open on this branch (a v1 decision is production): the stage says the workspace is
+      // released, so a held checkout can resume (review B1). File access stays closed.
+      access: { source: "unentitled", accessPlan: null, limits: null, customerDataEnabled: false, processingStage: "production" },
     });
     expect(gate).toHaveBeenCalledWith("pilot-11111111", "direct_upload");
   });
@@ -182,6 +184,18 @@ describe("v2 workspace grant during bootstrap", () => {
     gate.mockResolvedValue({ ok: true, decision: { allowed: true, schemaVersion: "tavonel.customer_data_gate.v2",
       stage: "production", release: { stage: "production" }, grant: { stage: "production" } } });
     await expect((await post()).json()).resolves.toMatchObject({ access: { processingStage: "production" } });
+  });
+
+  it.each(["qualification", "production"] as const)("carries the %s stage when the trial is refused but the gate is open (review B1)", async (stage) => {
+    gate.mockResolvedValue({ ok: true, decision: { allowed: true, schemaVersion: "tavonel.customer_data_gate.v2",
+      stage, release: { stage }, grant: { stage } } });
+    bootstrap.mockResolvedValue({ ok: false, code: "TRIAL_NOT_ACTIVE", status: 403 });
+    const response = await post();
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ code: "ACCESS_READY_NO_ENTITLEMENT",
+      access: { source: "unentitled", limits: null, customerDataEnabled: false, processingStage: stage } });
+    expect(body).not.toHaveProperty("sourcePending");
   });
 
   it.each([

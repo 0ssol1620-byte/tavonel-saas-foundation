@@ -18,10 +18,12 @@
  * is a stub at the non-existent e2e Supabase URL, Paddle is `installFakePaddle`, the object store
  * and the billing portal are fixture hosts. Nothing is charged and no account is created.
  *
+ * The hold (journey A3, lane P2-29, register D-14) is driven in the switch-on posture: a resumed
+ * checkout waits for the processing terms and the production release, and survives a reload. In
+ * today's posture nothing is sold online, so the resumed request still goes out as on main and ends
+ * in the server's refusal sentence.
+ *
  * Not here, on purpose:
- *   - "checkout before release: the plan is held" -- the hold is journey A3 (lane P2-29), which
- *     waits on founder decision D-14. Today a resumed checkout fires at mount; asserting a hold
- *     would be a test of code that does not exist.
  *   - the login page's "Checkout opens by itself" sentence while purchase is closed (journey A2,
  *     V5) belongs to lane P2-10, which is not in this branch.
  *   - compile → review → activate → Ask → export are driven by world-lifecycle and compile-resume;
@@ -129,6 +131,8 @@ const bootstrapFor = (source: "trial" | "paid") => ({
     expiresAt: source === "trial" ? new Date(Date.now() + 7 * 86_400_000).toISOString() : null,
     limits: source === "trial" ? { files: 3, pages: 80, worlds: 1 } : null,
     customerDataEnabled: true,
+    // What app/api/access/bootstrap/route.ts sends with every open workspace; a held checkout reads it (P2-29).
+    processingStage: "production",
   },
 });
 
@@ -449,6 +453,102 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     await expect(page).toHaveURL(FIXTURE_PORTAL_URL);
     expect(portal).toEqual([FIXTURE_PORTAL_URL]);
     expect(posts, "one checkout for one offer").toHaveLength(1);
+  });
+
+  /*
+    Journey A3 / defect D-01 (lane P2-29, register D-14): terms -> launch -> checkout. Before this
+    the resumed checkout fired at mount, into a certain CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE
+    refusal, and the intent was spent on it. Each stage is a reload, so the intent has to survive one.
+  */
+  test("checkout before release: the plan is held through terms and release, survives a reload, then opens once (D-01)", async ({ page }) => {
+    test.setTimeout(90_000);
+    await declineAnalytics(page);
+    await servePosture(page, "switch-on");
+    const paddle = await installFakePaddle(page);
+    await installFixtureSession(page);
+    await installWorkspaceRoutes(page, { accessSource: "unentitled", customerDataEnabled: false });
+    const state: { bootstrap: unknown; reads: number } = { bootstrap: TODAY_NEW_ACCOUNT, reads: 0 };
+    await page.route("**/api/access/bootstrap", (route) => (state.reads += 1, route.fulfill({ json: state.bootstrap })));
+    const posts = await answerCheckout(page, () => ({ status: 200, json: SANDBOX_CHECKOUT_READY }));
+    const held = region(page, "status", "Developer is held for you.");
+    const reload = async (bootstrap: unknown) => {
+      state.bootstrap = bootstrap;
+      await page.reload({ waitUntil: "domcontentloaded" });
+    };
+
+    // H6, terms not accepted: held beside the terms review, with the live sentence and not its promise.
+    await page.goto("/workspace?checkout=observer_access", { waitUntil: "domcontentloaded" });
+    await expect(held).toBeVisible();
+    await expect(page).toHaveURL(/\/workspace$/);
+    await expect(page.getByRole("button", { name: "Review processing terms" })).toBeVisible();
+    await expect(page.getByText("Checkout opens by itself", { exact: false })).toHaveCount(0);
+
+    // Terms accepted, no production release yet: still held, from this tab's copy alone.
+    await reload({ ...TODAY_NEW_ACCOUNT, sourcePending: "release_pending" });
+    await expect(held).toBeVisible();
+    await expect(page.getByText("File access for this workspace is awaiting release", { exact: false })).toBeVisible();
+
+    // A qualification grant processes files but is never billable: still held.
+    const open = bootstrapFor("trial");
+    await reload({ ...open, access: { ...open.access, processingStage: "qualification" } });
+    await expect(held).toBeVisible();
+    expect(posts, "nothing is sent while the plan is held").toEqual([]);
+    expect(paddle.loads()).toBe(0);
+
+    // Released for production: the held offer resumes once, as an offer code and nothing else.
+    await reload(open);
+    await expect(region(page, "status", "Developer sandbox checkout opened. Only a verified webhook can change entitlements.")).toBeVisible();
+    expect(posts).toEqual([{ offerCode: "observer_access" }]);
+    expect(paddle.loads()).toBe(1);
+
+    // Spent: the next visit reads access and opens nothing.
+    const reads = state.reads;
+    await reload(open);
+    await expect.poll(() => state.reads).toBeGreaterThan(reads);
+    await expect(held).toHaveCount(0);
+    expect(posts).toHaveLength(1);
+  });
+
+  /*
+    Review B1 (2026-10-19): a trial that ended (or was refused) leaves a released workspace with no
+    entitlement and no file access, and bootstrap answers ACCESS_READY_NO_ENTITLEMENT. Buying is that
+    person's way forward, so the held offer resumes once the stage is production -- and stays held
+    while the workspace is only qualified.
+  */
+  test("a trial-expired buyer in a released workspace resumes the held checkout exactly once (review B1)", async ({ page }) => {
+    await declineAnalytics(page);
+    await servePosture(page, "switch-on");
+    const paddle = await installFakePaddle(page);
+    await installFixtureSession(page);
+    await installWorkspaceRoutes(page, { accessSource: "unentitled", customerDataEnabled: false });
+    const noEntitlement = (processingStage: "production" | "qualification") => ({
+      code: "ACCESS_READY_NO_ENTITLEMENT",
+      access: { source: "unentitled", accessPlan: null, billingExempt: false, expiresAt: null, limits: null, customerDataEnabled: false, processingStage },
+    });
+    const state = { bootstrap: noEntitlement("qualification"), reads: 0 };
+    await page.route("**/api/access/bootstrap", (route) => (state.reads += 1, route.fulfill({ json: state.bootstrap })));
+    const posts = await answerCheckout(page, () => ({ status: 200, json: SANDBOX_CHECKOUT_READY }));
+    const held = region(page, "status", "Developer is held for you.");
+
+    // Qualified, not released: held, nothing sent.
+    await page.goto("/workspace?checkout=observer_access", { waitUntil: "domcontentloaded" });
+    await expect(held).toBeVisible();
+    expect(posts).toEqual([]);
+
+    // Released for production with the trial over: one checkout, as an offer code and nothing else.
+    state.bootstrap = noEntitlement("production");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(region(page, "status", "Developer sandbox checkout opened. Only a verified webhook can change entitlements.")).toBeVisible();
+    await expect(held).toHaveCount(0);
+    expect(posts).toEqual([{ offerCode: "observer_access" }]);
+    expect(paddle.loads()).toBe(1);
+
+    // Spent: the next visit reads access again and sends nothing.
+    const reads = state.reads;
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect.poll(() => state.reads).toBeGreaterThan(reads);
+    await expect(held).toHaveCount(0);
+    expect(posts).toHaveLength(1);
   });
 
   test("a signed-in upgrade opens the overlay over /pricing, in that page's language and scheme (A11)", async ({ page }) => {

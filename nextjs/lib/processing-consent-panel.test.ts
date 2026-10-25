@@ -132,6 +132,11 @@ describe("workspace integration", () => {
     expect(page).toMatch(/<ProcessingConsentPanel getToken=\{getAuthToken\} onAccepted=\{refreshAccess\}>\s*<Link className="btn ghost" href="\/explore">Explore a compiled World<\/Link>/);
     expect(page).not.toContain('<Link className="btn ghost" href="/contact">Request source access</Link>');
     expect(page).not.toContain("arrange source access with us");
-    expect(page).toContain('sourcePending === "terms_acceptance_required" || sourcePending === "legacy"');
+    // D-19 (register 2026-10-17): the review renders only where the gate reads an acceptance (v2's
+    // terms_acceptance_required). Gate v1 ("legacy") never reads one, so it is not offered there.
+    expect(page).toMatch(/sourcePending === "terms_acceptance_required" \? \(\s*<ProcessingConsentPanel /);
+    expect(page.match(/<ProcessingConsentPanel /g)).toHaveLength(1);
+    expect(page).not.toMatch(/sourcePending === "legacy"[^\n]*\? \(\s*<ProcessingConsentPanel /);
+    expect(page).not.toContain('sourcePending === "terms_acceptance_required" || sourcePending === "legacy"');
   });
 });
