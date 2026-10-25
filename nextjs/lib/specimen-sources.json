@@ -1,0 +1,232 @@
+[
+  {
+    "specimenId": "naca-rm-l50c03-p001",
+    "slot": "degraded_scan",
+    "documentId": "naca-rm-l50c03",
+    "title": "NACA Research Memorandum RM L50C03 (1950)",
+    "lang": "en",
+    "sourcePageUrl": "https://ntrs.nasa.gov/citations/19930086148",
+    "sourceUrl": "https://ntrs.nasa.gov/api/citations/19930086148/downloads/19930086148.pdf",
+    "acquiredFrom": "NASA Technical Reports Server citation 19930086148",
+    "representationKind": "page_extract",
+    "originalSha256": "sha256:6401df2511122de1b8ba890be7fb0a9f8f623c8391525a8ed3f2ebec67040807",
+    "extractedPdfSha256": "sha256:2211652c17b890037178079a1e4800e7d39087548620c723f829658ed2b0a09f",
+    "pageCount": 92,
+    "page": 1,
+    "capturedOn": "2026-10-19",
+    "rights": {
+      "basis": "U.S. federal government work (17 U.S.C. 105); the NTRS record states \"Work of the US Gov. Public Use Permitted.\" and \"Distribution Limits: Public\".",
+      "jurisdiction": "Public domain in the United States; status abroad not separately assessed",
+      "attribution": "Source: NACA RM L50C03 (1950), NASA Technical Reports Server. U.S. government work.",
+      "publication": "public_sample",
+      "licence": {
+        "id": "US-GOV-WORK",
+        "markingScope": "item",
+        "markingText": "Work of the US Gov. Public Use Permitted.",
+        "markingUrl": "https://ntrs.nasa.gov/citations/19930086148",
+        "retrievedOn": "2026-10-17",
+        "snapshotSha256": "sha256:9107cd70f084d9f836bfb98221dc6d47e8c969bfb44aa6de08c34a51c38c0eb5"
+      }
+    },
+    "caption": {
+      "en": {
+        "short": "NACA RM L50C03 (1950)",
+        "full": "Source: NACA RM L50C03 (1950), NASA Technical Reports Server. U.S. government work."
+      },
+      "ko": {
+        "short": "NACA RM L50C03(1950)",
+        "full": "출처: NACA RM L50C03(1950), NASA 기술보고서 서버(NTRS). 미국 연방정부 저작물."
+      }
+    },
+    "mustNotImply": [
+      "that the document is still classified",
+      "NASA endorsement of TAVONEL",
+      "that the stamps and handwriting were read correctly",
+      "any accuracy figure"
+    ],
+    "avoidInCrop": [
+      {
+        "label": "NACA wings emblem (NASA insignia and identifiers are not in the public domain)",
+        "bbox1000": [
+          270,
+          120,
+          750,
+          235
+        ]
+      },
+      {
+        "label": "NACA library stamp",
+        "bbox1000": [
+          604,
+          665,
+          890,
+          730
+        ]
+      }
+    ],
+    "region": {
+      "regionId": "ocr-p0001-l00015",
+      "bbox1000": [
+        77,
+        600,
+        469,
+        623
+      ]
+    },
+    "crop": {
+      "path": "/proof-collection/specimens/naca-rm-l50c03-p001-960.webp",
+      "sha256": "sha256:76a8f6c86ef43fe981bfc71fcd1d3730428e9acf66bb8363018084ef2c6a2288",
+      "width": 960,
+      "height": 384,
+      "bytes": 41420,
+      "window1000": [
+        19,
+        551,
+        600,
+        730
+      ],
+      "sources": [
+        {
+          "path": "/proof-collection/specimens/naca-rm-l50c03-p001-720.avif",
+          "type": "image/avif",
+          "sha256": "sha256:35b9ee32692eeed0ed584540c1dee351198c2052df62c2781e58141f75af8ac9",
+          "width": 720,
+          "height": 288,
+          "bytes": 20373
+        },
+        {
+          "path": "/proof-collection/specimens/naca-rm-l50c03-p001-960.avif",
+          "type": "image/avif",
+          "sha256": "sha256:dd36aa14a4721ccc0a3e142f05e2a3ca15e8e5d92aef1162ca094aafaa2441ff",
+          "width": 960,
+          "height": 384,
+          "bytes": 30304
+        }
+      ]
+    },
+    "extractedText": "CLASSIFICATIONCANCELLED",
+    "reader": {
+      "id": "foundation_ocr_gpu_v1",
+      "imageDigest": "sha256:8e6f6fa777fd9949745ce67b25d04f0a1aa74dfbf791204baf2b6b16c3931bd8"
+    },
+    "runAt": "2026-10-19T12:27:25.717Z",
+    "runReceiptSha256": "sha256:d1f3ea1532d0fef9ad9b7fc0e273717d789915ade7976199065a45636a84cb3d",
+    "runReceiptUrl": "/proof-collection/specimens/naca-rm-l50c03-p001.run.json",
+    "limitationTokens": []
+  },
+  {
+    "specimenId": "kma-2026-09-climate-p001",
+    "slot": "korean",
+    "documentId": "kma-2026-09-climate",
+    "title": "기상청 보도자료 [2026년 9월 기후특성] (2026-10-02)",
+    "lang": "ko",
+    "sourcePageUrl": "https://www.kma.go.kr/kma/news/press.jsp?bid=press&mode=view&num=1194749",
+    "sourceUrl": "https://www.kma.go.kr/kma/servlet/NeoboardProcess?mode=download&bid=press&num=1194749&fno=3&callback=https%3a%2f%2fwww.kma.go.kr%2fkma%2fnews%2fpress.jsp&ses=USERSESSION&k=ATC202610020918393_bdb8f495-b2ea-405f-82bc-a5f20bbae676.pdf",
+    "acquiredFrom": "Korea Meteorological Administration press release post 1194749, PDF attachment",
+    "representationKind": "page_extract",
+    "originalSha256": "sha256:4fe5861d29938c4f36484c54edcf0857ceca5a83b073864187d91eff10351b4d",
+    "extractedPdfSha256": "sha256:240f8b058b0082d28fe19de86b16f154ac2d2ae949c713634a18a2821ef39e7e",
+    "pageCount": 32,
+    "page": 1,
+    "capturedOn": "2026-10-19",
+    "rights": {
+      "basis": "Korea Open Government License Type 1 (attribution), marked on the KMA press-release post itself: \"공공누리 1유형(출처명시) 공공저작물 자유이용허락\".",
+      "jurisdiction": "Republic of Korea public work released under KOGL Type 1; status abroad not separately assessed",
+      "attribution": "Source: Korea Meteorological Administration, \"September 2026 climate characteristics\" press release (2026), KOGL Type 1.",
+      "publication": "public_sample",
+      "licence": {
+        "id": "KOGL-1",
+        "markingScope": "item",
+        "markingText": "공공누리 1유형(출처명시) 공공저작물 자유이용허락",
+        "markingUrl": "https://www.kma.go.kr/kma/news/press.jsp?bid=press&mode=view&num=1194749",
+        "retrievedOn": "2026-10-17",
+        "snapshotSha256": "sha256:7b2b75fcf4953f94cf236a18dacca3347669491f4f38b3ce76d48a6156d03fe7"
+      }
+    },
+    "caption": {
+      "en": {
+        "short": "KMA press release (2026)",
+        "full": "Source: Korea Meteorological Administration, \"September 2026 climate characteristics\" press release (2026), KOGL Type 1."
+      },
+      "ko": {
+        "short": "기상청 보도자료(2026)",
+        "full": "본 저작물은 '기상청'에서 '2026년' 작성하여 공공누리 제1유형으로 개방한 '[2026년 9월 기후특성] 보도자료(작성자: 기상청 기후변화감시과)'를 이용하였으며, 해당 저작물은 '기상청, www.kma.go.kr'에서 무료로 다운받으실 수 있습니다."
+      }
+    },
+    "mustNotImply": [
+      "KMA sponsorship or a special relationship with KMA (KOGL Type 1 condition)",
+      "that the figures on the page are TAVONEL's",
+      "edited statistics",
+      "any accuracy figure"
+    ],
+    "avoidInCrop": [
+      {
+        "label": "Government symbol",
+        "bbox1000": [
+          150,
+          85,
+          260,
+          125
+        ]
+      },
+      {
+        "label": "'대체불가 대한민국' slogan image",
+        "bbox1000": [
+          740,
+          85,
+          820,
+          125
+        ]
+      }
+    ],
+    "region": {
+      "regionId": "ocr-p0001-l00004",
+      "bbox1000": [
+        370,
+        187,
+        640,
+        212
+      ]
+    },
+    "crop": {
+      "path": "/proof-collection/specimens/kma-2026-09-climate-p001-960.webp",
+      "sha256": "sha256:9e5c39b6e04b8286c7d5500208cf89da9bdeb0aed9d5cfed588067dc752b5f3a",
+      "width": 960,
+      "height": 384,
+      "bytes": 43102,
+      "window1000": [
+        90,
+        152,
+        906,
+        383
+      ],
+      "sources": [
+        {
+          "path": "/proof-collection/specimens/kma-2026-09-climate-p001-720.avif",
+          "type": "image/avif",
+          "sha256": "sha256:7e3a0697bf9b121e1c5eea840e40db15741f6ecaca3f4232fd989588ece6f236",
+          "width": 720,
+          "height": 288,
+          "bytes": 21351
+        },
+        {
+          "path": "/proof-collection/specimens/kma-2026-09-climate-p001-960.avif",
+          "type": "image/avif",
+          "sha256": "sha256:838a518da9337bf9c7e4fcc948b6cd5614c9905ad380ac9261a61bb846112e74",
+          "width": 960,
+          "height": 384,
+          "bytes": 29367
+        }
+      ]
+    },
+    "extractedText": "[2026년9월 기후특성]",
+    "reader": {
+      "id": "foundation_ocr_gpu_v1",
+      "imageDigest": "sha256:8e6f6fa777fd9949745ce67b25d04f0a1aa74dfbf791204baf2b6b16c3931bd8"
+    },
+    "runAt": "2026-10-19T12:27:29.687Z",
+    "runReceiptSha256": "sha256:a13f8b1c39dc6cbd6b3b3cf8e9950103ef3b23c346ec193fe29f1aa5d3c1a2c5",
+    "runReceiptUrl": "/proof-collection/specimens/kma-2026-09-climate-p001.run.json",
+    "limitationTokens": []
+  }
+]

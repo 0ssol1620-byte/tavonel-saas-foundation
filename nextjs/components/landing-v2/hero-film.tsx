@@ -68,6 +68,12 @@ function heroStages(korean: boolean): CompileStage[] {
   }));
 }
 
-export default function HeroFilm({ korean = false }: { korean?: boolean }) {
-  return <HeroFilmDisclosure korean={korean} stages={heroStages(korean)} />;
+/*
+  P2-32: `priority` is false only while the specimen strip renders above the film. On a phone the
+  strip's first crop is then the first screen's largest image and the poster sits at or below the
+  fold, so the poster gives up its preload and high fetch priority and loads lazily instead of
+  taking the bandwidth the crop and the render-blocking styles need. Same bytes, same frame.
+*/
+export default function HeroFilm({ korean = false, priority = true }: { korean?: boolean; priority?: boolean }) {
+  return <HeroFilmDisclosure korean={korean} stages={heroStages(korean)} priority={priority} />;
 }
