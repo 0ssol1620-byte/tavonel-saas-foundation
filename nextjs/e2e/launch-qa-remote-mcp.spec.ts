@@ -19,7 +19,8 @@ import { resolve } from "node:path";
   On: a second `next start` of the same build with the switch on and a throwaway sealing secret
   (fixture env: the fake Supabase origin, no service role, so no key can authenticate). It
   proves what can be proved without a database: discovery, the nine-tool list, the 401 that
-  starts OAuth, registration, and the consent page's signed-out state at three phone widths.
+  starts OAuth, registration, the consent page's signed-out state at three phone widths, and
+  that the page leaves for a client's redirect URI only on a person's click.
 */
 
 const OFF_PATHS: ReadonlyArray<readonly ["GET" | "POST", string]> = [
@@ -161,5 +162,70 @@ test.describe("remote MCP with the switch on (fixture env)", () => {
       expect(overflow, `horizontal overflow at ${width}`).toBeLessThanOrEqual(0);
       await testInfo.attach(`remote-mcp-consent-${width}.png`, { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
     }
+  });
+
+  /*
+    REVIEW-2026-10-19 B1, RFC 9700 §4.11.2. Registration is open, so anyone can register any https
+    redirect URI and send a deliberately wrong request: the page must show the refusal and go
+    nowhere until the person clicks. The third-party origin is stubbed so a navigation, if one
+    happens, is recorded instead of failing on DNS.
+  */
+  test("never leaves for the client on a rejected request; only the person's click returns the error", async ({ request, page }) => {
+    const redirectUri = "https://phish.example/landing";
+    const registered = await request.post(`${base}/api/mcp/oauth/register`, { data: { client_name: "Fixture agent", redirect_uris: [redirectUri] } });
+    expect(registered.status()).toBe(201);
+    const { client_id } = await registered.json() as { client_id: string };
+    const thirdParty: string[] = [];
+    await page.route("https://phish.example/**", async (route) => {
+      thirdParty.push(route.request().url());
+      await route.fulfill({ status: 200, contentType: "text/html", body: "<!doctype html><title>client</title>" });
+    });
+    const query = new URLSearchParams({ response_type: "token", client_id, redirect_uri: redirectUri, state: "fixture-state" });
+    await page.goto(`${base}/oauth/authorize?${query}`);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("This connection request is not valid.");
+    await expect(page.locator(".auth-card [role=alert]")).toHaveText("Nothing was granted. Only response_type=code is supported.");
+    await expect(page.getByText("https://phish.example", { exact: true })).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    expect(new URL(page.url()).pathname).toBe("/oauth/authorize");
+    expect(thirdParty).toEqual([]);
+
+    await page.getByRole("link", { name: "Return to https://phish.example" }).click();
+    await page.waitForURL(/^https:\/\/phish\.example\/landing\?/);
+    const back = new URL(page.url());
+    expect([back.origin + back.pathname, back.searchParams.get("error"), back.searchParams.get("state"), back.searchParams.get("iss")])
+      .toEqual([redirectUri, "unsupported_response_type", "fixture-state", base]);
+    expect(thirdParty).toHaveLength(1);
+  });
+
+  test("Deny leaves only on the click, for exactly the registered redirect URI", async ({ request, page }) => {
+    const redirectUri = "https://client.example/oauth/callback?tenant=a";
+    const registered = await request.post(`${base}/api/mcp/oauth/register`, { data: { client_name: "Fixture agent", redirect_uris: [redirectUri] } });
+    expect(registered.status()).toBe(201);
+    const { client_id } = await registered.json() as { client_id: string };
+    const thirdParty: string[] = [];
+    await page.route("https://client.example/**", async (route) => {
+      thirdParty.push(route.request().url());
+      await route.fulfill({ status: 200, contentType: "text/html", body: "<!doctype html><title>client</title>" });
+    });
+    const query = new URLSearchParams({
+      response_type: "code",
+      client_id,
+      redirect_uri: redirectUri,
+      code_challenge: createHash("sha256").update("v".repeat(43)).digest("base64url"),
+      code_challenge_method: "S256",
+      state: "fixture-state",
+    });
+    await page.goto(`${base}/oauth/authorize?${query}`);
+    await expect(page.getByRole("button", { name: "Deny" })).toBeEnabled();
+    await page.waitForLoadState("networkidle");
+    expect(thirdParty).toEqual([]);
+
+    await page.getByRole("button", { name: "Deny" }).click();
+    await page.waitForURL(/^https:\/\/client\.example\/oauth\/callback\?/);
+    const back = new URL(page.url());
+    expect([back.origin + back.pathname, back.searchParams.get("tenant"), back.searchParams.get("error"), back.searchParams.get("state")])
+      .toEqual(["https://client.example/oauth/callback", "a", "access_denied", "fixture-state"]);
+    expect(back.searchParams.has("code")).toBe(false);
+    expect(thirdParty).toHaveLength(1);
   });
 });

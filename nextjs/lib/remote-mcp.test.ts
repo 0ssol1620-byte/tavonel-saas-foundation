@@ -344,6 +344,9 @@ describe("OAuth 2.1 metadata and registration", () => {
     const attempt = (body: unknown) => register(new Request(`${ORIGIN}/api/mcp/oauth/register`, { method: "POST", body: JSON.stringify(body) }));
     expect((await attempt({ redirect_uris: ["http://client.example/cb"] })).status).toBe(400);
     expect((await attempt({ redirect_uris: ["https://client.example/cb#frag"] })).status).toBe(400);
+    expect((await attempt({ redirect_uris: ["https://user@client.example/cb"] })).status).toBe(400);
+    expect((await attempt({ redirect_uris: ["https://user:pass@client.example/cb"] })).status).toBe(400);
+    expect((await attempt({ redirect_uris: ["javascript:alert(1)"] })).status).toBe(400);
     expect((await attempt({ redirect_uris: [REDIRECT], token_endpoint_auth_method: "client_secret_basic" })).status).toBe(400);
     expect((await attempt({ redirect_uris: ["http://127.0.0.1:33418/callback"] })).status).toBe(201);
   });
@@ -370,6 +373,76 @@ describe("consent", () => {
       expect(response.status).toBe(400);
       expect(await response.json()).not.toHaveProperty("redirectTo");
     }
+  });
+
+  /*
+    REVIEW-2026-10-19 B1. Registration is open, so the registered string is the only thing a
+    redirect may go to: compared exactly, never normalised, for every decision -- and a mismatch
+    never reaches the session check.
+  */
+  it("matches the redirect URI exactly as registered, for describe, deny and approve", async () => {
+    const clientId = await registeredClient();
+    const variants = [
+      `${REDIRECT}/`,
+      `${REDIRECT}?next=1`,
+      `${REDIRECT}?`,
+      `${REDIRECT}#fragment`,
+      "https://user@client.example/oauth/callback",
+      "https://user:pass@client.example/oauth/callback",
+      "http://client.example/oauth/callback",
+      "https://client.example:8443/oauth/callback",
+      "https://client.example:443/oauth/callback",
+      "https://CLIENT.example/oauth/callback",
+      "https://client.example/oauth/Callback",
+      "https://client.example/oauth/callback/..",
+      "https://client.example.attacker.test/oauth/callback",
+      "",
+    ];
+    for (const variant of variants) {
+      for (const decision of ["describe", "deny", "approve"]) {
+        const response = await consent(decision, authorizationRequest(clientId, { redirect_uri: variant }), "supabase-session");
+        const body = await response.json();
+        expect([response.status, body.code], `${decision} ${variant}`).toEqual([400, "AUTHORIZATION_REQUEST_INVALID"]);
+        expect(body, `${decision} ${variant}`).not.toHaveProperty("redirectTo");
+      }
+    }
+    const missing: Record<string, string> = { ...authorizationRequest(clientId) };
+    delete missing.redirect_uri;
+    expect((await consent("describe", missing)).status).toBe(400);
+    expect(mocks.session).not.toHaveBeenCalled();
+  });
+
+  it("keeps a registered query exactly, and sends Deny and Allow to that URI and nowhere else", async () => {
+    const withQuery = "https://client.example/oauth/callback?tenant=a";
+    const registered = await register(new Request(`${ORIGIN}/api/mcp/oauth/register`, {
+      method: "POST",
+      body: JSON.stringify({ client_name: "Query agent", redirect_uris: [withQuery] }),
+    }));
+    const { client_id: clientId } = await registered.json() as { client_id: string };
+    for (const variant of [REDIRECT, "https://client.example/oauth/callback?tenant=b", "https://client.example/oauth/callback?tenant=a&x=1"]) {
+      expect((await consent("describe", authorizationRequest(clientId, { redirect_uri: variant }))).status, variant).toBe(400);
+    }
+    const request = authorizationRequest(clientId, { redirect_uri: withQuery });
+    expect((await (await consent("describe", request)).json()).code).toBe("AUTHORIZATION_REQUEST_VALID");
+    const destination = (redirectTo: string) => {
+      const url = new URL(redirectTo);
+      return [url.origin + url.pathname, url.searchParams.get("tenant"), [...url.searchParams.keys()].sort()];
+    };
+    const denied = await (await consent("deny", request)).json() as { redirectTo: string };
+    expect(destination(denied.redirectTo)).toEqual([REDIRECT, "a", ["error", "error_description", "iss", "state", "tenant"]]);
+    mocks.session.mockResolvedValueOnce({ ok: true, principal: { kind: "session", workspaceKey: MINE, userId: USER, scopes: [], accessSource: "paid", authorizationRevision: 4, workspaceRole: "owner" } });
+    const granted = await (await consent("approve", request, "supabase-session")).json() as { code: string; redirectTo: string };
+    expect(granted.code).toBe("AUTHORIZATION_GRANTED");
+    expect(destination(granted.redirectTo)).toEqual([REDIRECT, "a", ["code", "iss", "state", "tenant"]]);
+  });
+
+  it("refuses a state longer than 512 characters instead of cutting it", async () => {
+    const clientId = await registeredClient();
+    const long = await (await consent("describe", authorizationRequest(clientId, { state: "s".repeat(513) }))).json() as { code: string; error: string; redirectTo: string };
+    expect([long.code, long.error]).toEqual(["AUTHORIZATION_REQUEST_REJECTED", "invalid_request"]);
+    expect(new URL(long.redirectTo).searchParams.has("state")).toBe(false);
+    const longest = await (await consent("deny", authorizationRequest(clientId, { state: "s".repeat(512) }))).json() as { redirectTo: string };
+    expect(new URL(longest.redirectTo).searchParams.get("state")).toBe("s".repeat(512));
   });
 
   it("sends PKCE, scope and resource errors back to the client with state and issuer", async () => {
