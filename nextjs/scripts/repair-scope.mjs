@@ -2106,6 +2106,44 @@ export const LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/launch-qa-script-ratchet.test.ts',
   'lib/release-gate-check-script.test.ts',
 ]);
+// G1-COPY (codex/p4-copy-20261019; DECISION-REGISTER-2026-10-17 S6-17, S6-16, D-01, D-07, D-33, N-5): the six changed endpoints
+// no owner listed -- the plan catalog whose included-pages bullet lost "verified", the developer-file purposes (the CLI line),
+// the operations record whose billing row now reads the purchasable state, the published MCP bridge whose download_package text
+// names the verifier the channel ships, its suite, and the one-test-per-sentence suite. Exactly these six paths select the
+// seventeen suites that read them directly (the plan, pricing, posture, claims-sync and hedge suites for the catalog; the
+// distribution, compiler-contract, docs and guide suites for the file list; the operations, probe and legal suites for the
+// record; the MCP, prompt-injection and tenant suites for the bridge) and the pricing-plan-overview (1440, 390) and
+// docs-reading-layout (1440, 390, reduced-motion) browser suites, each through its existing reviewed project row. Every
+// other path this lane changed keeps its existing owner. Product copy and a published asset, so never nativeReuse.
+// lib/operations.ts is also a consent-poster path (PR #163): a change to it selects both owners, the union of their suites.
+export const G1_COPY_TRUTH_AFFECTED_PATHS = Object.freeze([
+  'lib/billing-catalog.ts',
+  'lib/g1-copy-truth.test.ts',
+  'lib/mcp-server.test.ts',
+  'lib/mcp-tools.ts',
+  'lib/operations.ts',
+  'public/developer/tavonel-mcp.mjs',
+]);
+export const G1_COPY_TRUTH_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/billing-catalog.test.ts',
+  'lib/compiler-contract.test.ts',
+  'lib/copy-trust-guard.test.ts',
+  'lib/developer-distribution.test.ts',
+  'lib/docs-content.test.ts',
+  'lib/g1-copy-truth.test.ts',
+  'lib/guide-content.test.ts',
+  'lib/legal-terms-consistency.test.ts',
+  'lib/mcp-server.test.ts',
+  'lib/operations.test.ts',
+  'lib/plan-entitlement.test.ts',
+  'lib/pricing-plan-overview.test.ts',
+  'lib/product-claims-sync.test.ts',
+  'lib/production-posture.test.ts',
+  'lib/prompt-injection.test.ts',
+  'lib/synthetic-probe.test.ts',
+  'lib/tenant-isolation-negative.test.ts',
+]);
+export const G1_COPY_TRUTH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/docs-reading-layout.spec.ts', 'e2e/pricing-plan-overview.spec.ts']);
 // G11 remote MCP (codex/p4-remote-mcp-20261019, DECISION-REGISTER S6-09/S6-10): the switch-gated endpoint, its OAuth routes and
 // well-known metadata, the consent page, the shared module and its suite, the route classification entries and the browser spec.
 // Exactly these twelve paths select the sixteen suites that read them -- the module suite, the stdio bridge suite whose table the
@@ -2663,6 +2701,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // launch-qa-release-scripts: the 5 exact paths above select 3 direct suites and no browser suite.
   affectedGroup('launch-qa-release-scripts', new RegExp(`^nextjs/(?:${exactPathAlternation(LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS)})$`),
     { unitFiles: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES }),
+  // g1-copy-truth: the 6 exact paths above select 17 direct suites and 2 browser suites.
+  affectedGroup('g1-copy-truth', new RegExp(`^nextjs/(?:${exactPathAlternation(G1_COPY_TRUTH_AFFECTED_PATHS)})$`),
+    { unitFiles: G1_COPY_TRUTH_AFFECTED_UNIT_FILES, browserFiles: G1_COPY_TRUTH_AFFECTED_BROWSER_FILES }),
   // remote-mcp: the 12 exact paths above select 16 direct suites and 1 browser suite.
   affectedGroup('remote-mcp', new RegExp(`^nextjs/(?:${exactPathAlternation(REMOTE_MCP_AFFECTED_PATHS)})$`),
     { unitFiles: REMOTE_MCP_AFFECTED_UNIT_FILES, browserFiles: REMOTE_MCP_AFFECTED_BROWSER_FILES }),

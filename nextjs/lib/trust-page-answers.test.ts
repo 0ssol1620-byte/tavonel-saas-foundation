@@ -661,14 +661,20 @@ describe("CA S04 the privacy notice states deletion mechanics and no invented nu
   yet an answer. The two facts a customer is most likely to be surprised by are that one run is
   one sync, and that the agent never retries -- so those are the two this test refuses to let a
   later edit soften into something that sounds managed.
+
+  S6-16 (G1-COPY, 2026-10-19). Both facts had stopped being true of the script: it gained a
+  resident --watch mode and a retry bounded by --retry-limit, and the page went on denying both.
+  The pins below now hold what the script does -- one sync by default, a resident mode, a bounded
+  retry -- and still refuse any wording that makes the agent sound managed or watched by us.
 */
 describe("CA I04 /integrations states how the customer-run agent actually behaves", () => {
   const page = read("app/integrations/page.tsx");
 
   it.each([
-    ["one run is one sync", "One invocation performs one sync and exits"],
-    ["no internal schedule", "has no internal timer"],
-    ["no retry", "There is no retry inside the agent"],
+    ["one run is one sync by default", "By default one invocation performs one sync and exits"],
+    ["the resident mode the agent has", "With --watch it stays resident"],
+    ["no unattended operation promised", "it is not an unattended service"],
+    ["the bounded retry", "retried within the run up to --retry-limit times"],
     ["cursor written last", "written only after we have committed the batch"],
     ["update channel", "/developer/channel.json"],
     ["who is responsible", "are yours, because the agent runs inside your network"],

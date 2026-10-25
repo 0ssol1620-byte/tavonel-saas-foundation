@@ -46,7 +46,7 @@ const PATHS = [
   {
     kind: "Live",
     title: "MCP and the API",
-    body: `Read the active World over HTTP, or give an agent the read-only MCP server: ${MCP_TOOL_COUNT_WORD} tools over sources, Worlds, one World, search, Ask, objects, relations, evidence and package. Always the current revision, with no copy to keep in step.`,
+    body: `Read the active World over HTTP, or give an agent the read-only MCP server: ${MCP_TOOL_COUNT_WORD} tools over sources, Worlds, one World, search, Ask, objects, relations, evidence and package. Always the current active revision, with no copy to keep in step.`,
     detail: "No write tool, and the server refuses to start if one is added.",
   },
   {
