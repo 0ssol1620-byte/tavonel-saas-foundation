@@ -106,7 +106,9 @@ export const STAGE_FRAMES: Record<string, { panes: readonly [string, string, str
     readingTarget: { pane: 1, text: "WORKING COPY.md", mono: true, line: "The ORIGINAL pane opens one source page at a time; EXTRACT writes it out in {q}.", lineKo: "ORIGINAL 패널은 원문 페이지를 한 장씩 열고, EXTRACT 패널은 그 내용을 {q}에 옮겨 적습니다." },
     crop: { x: 0.25, y: 0.5 },
     wideView: "crop",
-    posterMask: { poster: "/film/poster-1-t3.00-2x.webp", color: "#f2eee7", rects: [{ x: 796, y: 206, w: 282, h: 11 }, { x: 1499, y: 204, w: 278, h: 9 }] },
+    /* POSTER-RECUT (D-11): t = 8.16s shows the same document as t = 3.00s, and its eyebrow and title rows and
+       columns measured identical (the same rects; README "Home posters -- POSTER-RECUT"). */
+    posterMask: { poster: "/film/poster-1-t8.16-2x.webp", color: "#f2eee7", rects: [{ x: 796, y: 206, w: 282, h: 11 }, { x: 1499, y: 204, w: 278, h: 9 }] },
   },
   read: { panes: ["NODES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 1, text: "# Payment terms", mono: true, line: "Look for {q} in the MARKDOWN pane.", lineKo: "MARKDOWN 패널에서 {q} 줄을 찾아보세요." }, crop: { x: 0.25, y: 0.25 }, wideView: "crop" },
   structure: { panes: ["SOURCES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 0, text: "CHANGED", mono: false, line: "In the SOURCES pane, {q} marks the edited file and TOUCHED marks the files it reaches.", lineKo: "SOURCES 패널에서 {q}는 수정된 파일, TOUCHED는 그 변경이 닿는 파일을 표시합니다." }, crop: { x: 0, y: 0 }, wideView: "crop" },
@@ -255,6 +257,9 @@ export const FILM_POSTER_SIZES = "(min-width: 900px) 2400px, 100vw";
 export const FILM_POSTER_FOCUS_SIZES = "1960px";
 export const filmPosterSrcSet = (stage: Pick<CompileStage, "poster" | "poster1x">) =>
   stage.poster1x ? `${stage.poster1x} 1440w, ${stage.poster} 2880w` : undefined;
+/* The same srcset in AVIF (D-11), only when the stage has both AVIF files. */
+export const filmPosterAvifSrcSet = (stage: Pick<CompileStage, "posterAvif" | "posterAvif1x">) =>
+  stage.posterAvif && stage.posterAvif1x ? `${stage.posterAvif1x} 1440w, ${stage.posterAvif} 2880w` : undefined;
 
 /** The mobile-tools toggle, Fit full frame <-> Focus details. Pure, so the transition is tested without a DOM. */
 export function toggleMobileFilmFit(fit: boolean): boolean {
@@ -367,6 +372,9 @@ export default function CompileStagePlayer({
   const frameRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const stillRef = useRef<HTMLImageElement | null>(null);
+  /* D-11: whether this browser took the still's AVIF source. It is a capability, so once true it stays true. */
+  const [posterAvifTaken, setPosterAvifTaken] = useState(false);
   /*
     Route-level compositions may supply a narrowed stage list. Rendering must remain fail-safe if
     that list is temporarily empty or malformed during a server/client boundary transition: a
@@ -531,6 +539,9 @@ export default function CompileStagePlayer({
   */
   const live = !preferVideo && canvasReady && !narrow && !(reducedMotion && playRequested);
   const still = !autoplay || paused || !inView || !documentVisible || videoError;
+  useEffect(() => {
+    if (still && stillRef.current?.currentSrc.endsWith(".avif")) setPosterAvifTaken(true);
+  }, [still, active]);
   const control = filmMotionControl({ reducedMotion, saveData, paused, playRequested, ended });
   const preferredVideoSrc = narrow && active.phoneSrc ? active.phoneSrc : active.src;
   const fallbackVideoSrc = narrow
@@ -547,7 +558,16 @@ export default function CompileStagePlayer({
   */
   const posterSizes = narrow && !mobileFilmFit ? FILM_POSTER_FOCUS_SIZES : FILM_POSTER_SIZES;
   const posterSrcSet = filmPosterSrcSet(active);
+  const posterAvifSrcSet = filmPosterAvifSrcSet(active);
   const mask = stageFrame?.posterMask?.poster === active.poster ? stageFrame.posterMask : undefined;
+  /*
+    D-11: the <video poster> attribute cannot negotiate a format, so it names the file the still already
+    chose -- AVIF where the <picture> took AVIF, WebP otherwise -- and a browser fetches one poster, not two.
+    `posterAvifTaken` is read off the still's `currentSrc`, which the browser sets when it selects a source.
+  */
+  const videoPoster = posterAvifTaken && active.posterAvif
+    ? (narrow && active.posterAvif1x ? active.posterAvif1x : active.posterAvif)
+    : (narrow && active.poster1x ? active.poster1x : active.poster);
 
   const stageTabs = !compact ? <div className={storyLayout ? `compile-film-stages ${readingStyles.tabs}` : "compile-film-stages"} role="tablist" aria-label={text.stages} onKeyDown={onKeyDown}>
     {stages.map((stage, position) => (
@@ -702,9 +722,10 @@ export default function CompileStagePlayer({
         setVisiblePane(Math.min(3, Math.round(scrollLeft / (scrollWidth / 4))));
       } : undefined}>
         <div className="compile-film-panes" aria-hidden="true"><span /><span /><span /><span /></div>
-        {still ? (
+        {still ? (() => {
           // eslint-disable-next-line @next/next/no-img-element
-          <img
+          const image = <img
+            ref={stillRef}
             className="compile-film-still"
             src={active.poster}
             srcSet={posterSrcSet}
@@ -719,8 +740,12 @@ export default function CompileStagePlayer({
             decoding="async"
             fetchPriority={priorityPoster ? "high" : undefined}
             loading={priorityPoster ? "eager" : undefined}
-          />
-        ) : live ? (
+          />;
+          /* D-11: AVIF first, the WebP <img> as the fallback. `display: contents` keeps the <img> the grid item. */
+          return posterAvifSrcSet
+            ? <picture className={readingStyles.picture}><source type="image/avif" srcSet={posterAvifSrcSet} sizes={posterSizes} />{image}</picture>
+            : image;
+        })() : live ? (
           <div className="compile-film-live" aria-hidden="true"><LiveFilm /></div>
         ) : (
           /*
@@ -739,7 +764,7 @@ export default function CompileStagePlayer({
             survives, so nothing is torn down mid-fetch, and there is still exactly one decoder
             open on a phone.
           */
-          <video ref={videoRef} className="compile-film-video" src={videoSrc} data-active={1} muted autoPlay playsInline preload="metadata" disablePictureInPicture disableRemotePlayback poster={narrow && active.poster1x ? active.poster1x : active.poster} aria-label={`${active.label} — ${active.line}`} onLoadedMetadata={(event) => { event.currentTarget.playbackRate = Math.max(0.1, playbackRate); }} onEnded={onEnded} onError={() => {
+          <video ref={videoRef} className="compile-film-video" src={videoSrc} data-active={1} muted autoPlay playsInline preload="metadata" disablePictureInPicture disableRemotePlayback poster={videoPoster} aria-label={`${active.label} — ${active.line}`} onLoadedMetadata={(event) => { event.currentTarget.playbackRate = Math.max(0.1, playbackRate); }} onEnded={onEnded} onError={() => {
             if (videoSrc === preferredVideoSrc && fallbackVideoSrc) {
               setFailedPreferredSrc(preferredVideoSrc);
               return;

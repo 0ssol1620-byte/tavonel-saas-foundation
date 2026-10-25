@@ -36,12 +36,20 @@ const HERO_CUT = {
   file sha256 are rows in public/film/README.md and lib/locked-film-assets.json `posters`, whose
   bytes one-path-contract.test.ts holds. New names, not new bytes under old names: /film/* is
   served immutable for a year.
+
+  POSTER-RECUT (D-11, DECISION-REGISTER-2026-10-17; DESIGN_MASTER_V3 §22 "Hero poster <= 140KB AVIF"):
+  each still is served as AVIF with the WebP pair as its fallback, and every AVIF is at most 140,000
+  bytes. The 2880px stage-1 file went from 256,358 bytes of WebP to 137,967 of AVIF. No frame of cut 1
+  or cut 2 fits at the Release 3 frame, so those two are re-cut: stage 1 is t = 8.16s (the same document
+  as t = 3.00s, so the Tier 2 bars are unchanged), stage 2 is t = 9.28s. Stages 3 and 4 keep t = 17.96s:
+  their end frames fit as AVIF and carry no overprint. The selection rule, the frame scan and the
+  sha256 of every file are in public/film/README.md.
 */
 const HOME_POSTERS = [
-  { poster: "/film/poster-1-t3.00-2x.webp", poster1x: "/film/poster-1-t3.00.webp" },
-  { poster: "/film/poster-2-t17.96-2x.webp", poster1x: "/film/poster-2-t17.96.webp" },
-  { poster: "/film/poster-3-t17.96-2x.webp", poster1x: "/film/poster-3-t17.96.webp" },
-  { poster: "/film/poster-4-t17.96-2x.webp", poster1x: "/film/poster-4-t17.96.webp" },
+  { poster: "/film/poster-1-t8.16-2x.webp", poster1x: "/film/poster-1-t8.16.webp", posterAvif: "/film/poster-1-t8.16-2x.avif", posterAvif1x: "/film/poster-1-t8.16.avif" },
+  { poster: "/film/poster-2-t9.28-2x.webp", poster1x: "/film/poster-2-t9.28.webp", posterAvif: "/film/poster-2-t9.28-2x.avif", posterAvif1x: "/film/poster-2-t9.28.avif" },
+  { poster: "/film/poster-3-t17.96-2x.webp", poster1x: "/film/poster-3-t17.96.webp", posterAvif: "/film/poster-3-t17.96-2x.avif", posterAvif1x: "/film/poster-3-t17.96.avif" },
+  { poster: "/film/poster-4-t17.96-2x.webp", poster1x: "/film/poster-4-t17.96.webp", posterAvif: "/film/poster-4-t17.96-2x.avif", posterAvif1x: "/film/poster-4-t17.96.avif" },
 ] as const;
 
 /** URL of the opening poster (stage 1, 2880px file). */

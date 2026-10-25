@@ -50,7 +50,7 @@ export const metadata: Metadata = {
 */
 const PROCESSORS = [
   ["Supabase", "Authentication, database and authorization metadata", "Account, workspace, entitlement and proof metadata", "Seoul (project region)"],
-  ["Vercel", "Website and serverless application hosting; cookieless website analytics", "Requests, operational logs, application metadata and aggregate page-view counts", "Seoul (icn1) for serverless functions, set in deployment configuration; requests reach it through Vercel's global edge network"],
+  ["Vercel", "Website and serverless application hosting; consent-based cookieless website analytics", "Requests, operational logs, application metadata and, with analytics consent, public-page views and selected interactions (no workspace events)", "Seoul (icn1) for serverless functions, set in deployment configuration; requests reach it through Vercel's global edge network"],
   ["Cloudflare", "DNS, R2 object storage, and the worker that orchestrates content disarm", "Uploaded source bytes and sanitized derivatives", "The R2 bucket carries an Asia-Pacific location hint, which is best-effort and is not a residency guarantee; the worker runs on Cloudflare's edge network"],
   ["Google Cloud", "Content disarm and reconstruction: the IAM-only PDFium and ClamAV service that rasterizes and scans every source before anything downstream reads it", "Uploaded source bytes and the sanitized PDF produced from them", "Seoul (asia-northeast3), set in the service configuration"],
   ["RunPod", "Scale-to-zero GPU OCR", "Sanitized document candidates and processing telemetry", "Not pinned. The endpoint is addressed by id and TAVONEL sets no region for it, so we do not state one."],
