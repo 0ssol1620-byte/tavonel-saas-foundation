@@ -537,7 +537,8 @@ describe("landing v2 -- the composition", () => {
     const text = readable(sceneOf(main, "s2"));
     expect(text).toContain(
       locale === "ko"
-        ? "아직 처리, 적격 판정, 권리 허가를 거치지 않았으므로 그 내용은 보여 주지 않습니다."
+        // The sentence boundary is part of the pin, so a hedge put back before the verb fails it.
+        ? "예약해 두었습니다. 처리, 적격 판정, 권리 허가를 거치지 않았으므로 그 내용은 보여 주지 않습니다."
         : "It has not been processed, qualified or rights-cleared, so nothing from it is shown."
     );
     for (const absent of ["Landsat", "USGS", "NASA", "Cloud = No", "Collection 1"]) {
