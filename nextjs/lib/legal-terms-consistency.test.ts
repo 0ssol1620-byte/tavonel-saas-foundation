@@ -135,7 +135,8 @@ describe("the old drafts are archived everywhere they are reachable", () => {
 
   it("the in-place notice no longer calls the pages Draft v1 beside a versioned agreement", async () => {
     const { LEGAL_DRAFT_NOTICE, LEGAL_LAST_UPDATED } = await import("./operations");
-    expect(LEGAL_LAST_UPDATED).toBe("2026-09-30");
+    // P2-34 (D-21): the Vercel Web Analytics notice changed /privacy and /subprocessors on 2026-10-19.
+    expect(LEGAL_LAST_UPDATED).toBe("2026-10-19");
     expect(LEGAL_DRAFT_NOTICE).not.toContain("Draft v1");
     expect(LEGAL_DRAFT_NOTICE).toContain("versioned self-service terms and processing addendum");
   });
@@ -153,6 +154,42 @@ describe("/privacy, /trust and /refunds state the same terms", () => {
     const trust = withoutComments(read("app/trust/page.tsx"));
     expect(trust).not.toContain("remains clearly labelled as a draft");
     expect(trust.match(/TAVONEL_DPA_v2_2026-09-23\.md/g)).toHaveLength(1);
+  });
+
+  /*
+    P2-34 (D-21; ANALYTICS-ACTIVATION-2026-10-17 §4.5 items 1-3 and 5, approved 2026-10-17). The Vercel
+    Web Analytics notice is the approved draft word for word, and the two session-storage rows name
+    keys the code really writes, only to sessionStorage, and hands to nothing that sends.
+  */
+  it("/privacy and /subprocessors state what Vercel Web Analytics receives, in the approved words", () => {
+    const privacy = withoutComments(read("app/privacy/page.tsx"));
+    expect(privacy).toContain("With the same permission, Vercel Web Analytics, run by our hosting provider, counts page views and the same selected interactions on public marketing pages without cookies or storage on your device. It receives the page address without query parameters, the referring address, your browser, operating system and device type, and an approximate location derived from the request; Vercel tells visits apart with a hash of the request that it discards after 24 hours. We do not send document contents, filenames, questions, account identifiers or workspace events to Vercel Web Analytics.");
+    expect(privacy).not.toContain("Our separate Vercel website analytics uses no analytics cookies.");
+    expect(privacy).toContain('"Counts page views and selected clicks on public marketing pages, only after you allow analytics. Sets no cookie and stores nothing on your device",');
+    expect(withoutComments(read("app/subprocessors/page.tsx"))).toContain('["Vercel", "Website and serverless application hosting; consent-based cookieless website analytics", "Requests, operational logs, application metadata and, with analytics consent, public-page views and selected interactions (no workspace events)",');
+  });
+
+  it("/privacy lists only session-storage keys the code writes and never sends", () => {
+    const privacy = withoutComments(read("app/privacy/page.tsx"));
+    expect(privacy.split('"Ours, session storage",')).toHaveLength(3);
+    for (const [key, constant, file] of [
+      ["tavonel.funnel-log", "LOG_KEY", "lib/funnel-events.ts"],
+      ["tavonel.first-touch.v1", "ATTRIBUTION_KEY", "lib/recipe-intent.ts"],
+    ] as const) {
+      const source = read(file);
+      expect(privacy).toContain(`"${key}",`);
+      expect(source).toContain(`const ${constant} = "${key}";`);
+      // Every other use of the key is a sessionStorage read or write: nothing hands it to a request.
+      const count = (needle: string) => source.split(needle).length - 1;
+      const storage = count(`window.sessionStorage.getItem(${constant})`) + count(`window.sessionStorage.setItem(${constant},`);
+      expect(storage, `${constant} is read and written`).toBe(2);
+      expect(count(constant), `${constant}: its declaration and sessionStorage calls only`).toBe(storage + 1);
+    }
+    // The first-touch record leaves lib/recipe-intent.ts once, to /login, which discards it.
+    const login = read("app/login/page.tsx");
+    expect(login.split("rememberFirstTouch(")).toHaveLength(2);
+    expect(login).toMatch(/^\s*rememberFirstTouch\(window\.location\.search\);\r?$/m);
+    expect(login).not.toContain("readFirstTouch");
   });
 
   it("/refunds pauses renewal on unavailability in both templates and promises no automatic refund", () => {

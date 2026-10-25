@@ -2133,6 +2133,36 @@ export const REMOTE_MCP_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/workspace-tenancy.test.ts',
 ]);
 export const REMOTE_MCP_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/launch-qa-remote-mcp.spec.ts']);
+// Phase 4 consent-poster lane (P2-34/D-21 analytics notice, POSTER-RECUT/D-11): the two policy pages and the legal date with the
+// suite that pins the approved wording, and the twelve re-cut AVIF/WebP posters. Exactly these sixteen paths select the wording,
+// locked-asset, operations, posture and trust suites, the poster contract (390) and the policy-page template suite (1440).
+// The cuts themselves stay locked under their own owner; a new poster name is a new review. Product UI, so never nativeReuse.
+export const CONSENT_POSTER_AFFECTED_PATHS = Object.freeze([
+  'app/privacy/page.tsx',
+  'app/subprocessors/page.tsx',
+  'lib/legal-terms-consistency.test.ts',
+  'lib/operations.ts',
+  'public/film/poster-1-t8.16-2x.avif',
+  'public/film/poster-1-t8.16-2x.webp',
+  'public/film/poster-1-t8.16.avif',
+  'public/film/poster-1-t8.16.webp',
+  'public/film/poster-2-t9.28-2x.avif',
+  'public/film/poster-2-t9.28-2x.webp',
+  'public/film/poster-2-t9.28.avif',
+  'public/film/poster-2-t9.28.webp',
+  'public/film/poster-3-t17.96-2x.avif',
+  'public/film/poster-3-t17.96.avif',
+  'public/film/poster-4-t17.96-2x.avif',
+  'public/film/poster-4-t17.96.avif',
+]);
+export const CONSENT_POSTER_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/legal-terms-consistency.test.ts',
+  'lib/one-path-contract.test.ts',
+  'lib/operations.test.ts',
+  'lib/production-posture.test.ts',
+  'lib/trust-page-answers.test.ts',
+]);
+export const CONSENT_POSTER_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/landing-hero-film-loading.spec.ts', 'e2e/templates.spec.ts']);
 // Enablement batch (codex/enablement-20261017, EN-0 to EN-5 and the guide recordings): the fifty-three changed endpoints no owner
 // listed -- the changelog and its feed, the cookbooks index and card, the resources hub,
 // the keyless try-it's digest check, its island (moved to components/ in EN-FIX-1) and its mounts on /api and /developers, the product guide at /guide and /ko/guide with its
@@ -2623,6 +2653,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // remote-mcp: the 12 exact paths above select 16 direct suites and 1 browser suite.
   affectedGroup('remote-mcp', new RegExp(`^nextjs/(?:${exactPathAlternation(REMOTE_MCP_AFFECTED_PATHS)})$`),
     { unitFiles: REMOTE_MCP_AFFECTED_UNIT_FILES, browserFiles: REMOTE_MCP_AFFECTED_BROWSER_FILES }),
+  // consent-poster: the 16 exact paths above select 5 direct suites and 2 browser suites.
+  affectedGroup('consent-poster', new RegExp(`^nextjs/(?:${exactPathAlternation(CONSENT_POSTER_AFFECTED_PATHS)})$`),
+    { unitFiles: CONSENT_POSTER_AFFECTED_UNIT_FILES, browserFiles: CONSENT_POSTER_AFFECTED_BROWSER_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.
