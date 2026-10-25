@@ -2173,6 +2173,31 @@ export const G1_COPY_TRUTH_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/tenant-isolation-negative.test.ts',
 ]);
 export const G1_COPY_TRUTH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/docs-reading-layout.spec.ts', 'e2e/pricing-plan-overview.spec.ts']);
+// G8 CHANGE-NOTIFY (phase 4, DECISION-REGISTER S6-15): the switched-off notifier, its cron route, the route's classification row,
+// the cron entry in vercel.json and the receiver-contract browser spec. Exactly these six paths select the notifier's own suite, the
+// classification and route-surface suites for the new route, and every suite that reads vercel.json (production-posture among
+// them), plus the change-notify-docs browser suite in project 390. The docs text itself stays with the docs owner, and the outbox
+// migration and grant-matrix row with database-contract. Product code, so never nativeReuse.
+export const CHANGE_NOTIFY_AFFECTED_PATHS = Object.freeze([
+  'app/api/internal/change-notify/run/route.ts',
+  'e2e/change-notify-docs.spec.ts',
+  'lib/change-notify.test.ts',
+  'lib/change-notify.ts',
+  'lib/security/route-classification.json',
+  'vercel.json',
+]);
+export const CHANGE_NOTIFY_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/change-notify.test.ts',
+  'lib/cta-truth.test.ts',
+  'lib/durable-compile-orchestration.test.ts',
+  'lib/operational-sli-alert-route.test.ts',
+  'lib/production-posture.test.ts',
+  'lib/production-route-surface.test.ts',
+  'lib/route-classification.test.ts',
+  'lib/source-deletion-route.test.ts',
+  'lib/synthetic-probe.test.ts',
+]);
+export const CHANGE_NOTIFY_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/change-notify-docs.spec.ts']);
 // Phase 4 consent-poster lane (P2-34/D-21 analytics notice, POSTER-RECUT/D-11): the two policy pages and the legal date with the
 // suite that pins the approved wording, and the twelve re-cut AVIF/WebP posters. Exactly these sixteen paths select the wording,
 // locked-asset, operations, posture and trust suites, the poster contract (390) and the policy-page template suite (1440).
@@ -2693,6 +2718,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // g1-copy-truth: the 6 exact paths above select 17 direct suites and 2 browser suites.
   affectedGroup('g1-copy-truth', new RegExp(`^nextjs/(?:${exactPathAlternation(G1_COPY_TRUTH_AFFECTED_PATHS)})$`),
     { unitFiles: G1_COPY_TRUTH_AFFECTED_UNIT_FILES, browserFiles: G1_COPY_TRUTH_AFFECTED_BROWSER_FILES }),
+  // change-notify: the 6 exact paths above select 9 direct suites and 1 browser suite.
+  affectedGroup('change-notify', new RegExp(`^nextjs/(?:${exactPathAlternation(CHANGE_NOTIFY_AFFECTED_PATHS)})$`),
+    { unitFiles: CHANGE_NOTIFY_AFFECTED_UNIT_FILES, browserFiles: CHANGE_NOTIFY_AFFECTED_BROWSER_FILES }),
   // consent-poster: the 16 exact paths above select 5 direct suites and 2 browser suites.
   affectedGroup('consent-poster', new RegExp(`^nextjs/(?:${exactPathAlternation(CONSENT_POSTER_AFFECTED_PATHS)})$`),
     { unitFiles: CONSENT_POSTER_AFFECTED_UNIT_FILES, browserFiles: CONSENT_POSTER_AFFECTED_BROWSER_FILES }),
