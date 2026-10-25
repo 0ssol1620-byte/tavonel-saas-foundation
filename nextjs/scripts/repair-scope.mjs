@@ -1677,10 +1677,11 @@ export const HOME_AFFECTED_PATHS = Object.freeze([
   'lib/home-evidence-view.test.ts', 'lib/home-evidence-view.ts', 'lib/home-player-main304-parity.test.ts', 'lib/landing-v2-page.test.ts',
   'lib/landing-v2-proof.ts', 'lib/landing-v2-runtime.test.ts', 'lib/landing-v2-runtime.ts', 'lib/landing-v2-snapshot.json', 'lib/one-path-contract.test.ts',
 ]);
+// lib/copy-trust-guard.test.ts reads landing-page.tsx (its COPY_MODULES) since the G1-COPY fix round, so Home selects it (COPY re-review R2-N2).
 export const HOME_AFFECTED_UNIT_FILES = Object.freeze([
   'components/compile-stage-player.mobile-view.test.tsx', 'components/landing-v2/hero-source-card.test.tsx', 'lib/home-evidence-view.test.ts',
   'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts', 'lib/film-motion-control.test.ts', 'lib/marketing-analytics.test.ts',
-  'lib/home-player-main304-parity.test.ts', 'lib/landing-v2-runtime.test.ts',
+  'lib/home-player-main304-parity.test.ts', 'lib/landing-v2-runtime.test.ts', 'lib/copy-trust-guard.test.ts',
 ]);
 export const HOME_AFFECTED_BROWSER_FILE = 'e2e/landing-v2.spec.ts';
 // Portable source contracts for the exact reviewed reader-heading CSS correction. Additive to Home's existing owner.
@@ -2477,6 +2478,7 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/public/film/source-inspection/mobile.webp",
   "nextjs/public/llms.txt",
 ]);
+// lib/g1-copy-truth.test.ts pins public/llms.txt's quickstart and integrations lines since the G1-COPY fix round (COPY re-review R2-N2).
 export const PUBLIC_MARKETING_AFFECTED_UNIT_FILES = Object.freeze([
   "lib/benchmark-registry.test.ts",
   "lib/benchmarks-page.test.ts",
@@ -2494,6 +2496,7 @@ export const PUBLIC_MARKETING_AFFECTED_UNIT_FILES = Object.freeze([
   "lib/explore-sample.test.ts",
   "lib/explore-story.test.ts",
   "lib/funnel-events.test.ts",
+  "lib/g1-copy-truth.test.ts",
   "lib/gdp-pdf-page-data.test.ts",
   "lib/landing-v2-hero-statement.test.ts",
   "lib/landing-v2-motion.test.ts",
@@ -2656,7 +2659,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // of the shared map. Separate from the historical 424 Explore repair report, which keeps its own planExploreRepairBrowserRuns.
   affectedGroup('explore-answer', /^nextjs\/(?:lib\/explore-(?:(?:sample|story)(?:\.test)?|entry-proof\.test)\.ts|components\/explore\/(?:ask-overlay|evidence-workbench(?:\.test)?)\.tsx|e2e\/explore\.spec\.ts)$/,
     { unitFiles: ['lib/explore-entry-proof.test.ts', 'lib/explore-sample.test.ts', 'lib/explore-story.test.ts', 'lib/visual-world-model.test.ts', 'components/explore/evidence-workbench.test.tsx'], browserFiles: ['e2e/explore.spec.ts'] }),
-  // Ordinary Home landing: the twenty-six exact paths above select nine direct suites and one browser suite, which runs only in
+  // Ordinary Home landing: the twenty-six exact paths above select ten direct suites and one browser suite, which runs only in
   // projects 1440, 390, 360 and reduced-motion of the shared map.
   affectedGroup('home-landing', new RegExp(`^nextjs/(?:${HOME_AFFECTED_PATHS.map(path => path.replaceAll('.', '\\.')).join('|')})$`),
     { unitFiles: HOME_AFFECTED_UNIT_FILES, browserFiles: [HOME_AFFECTED_BROWSER_FILE] }),

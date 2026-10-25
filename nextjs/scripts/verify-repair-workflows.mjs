@@ -422,7 +422,7 @@ for(const suite of ['nextjs/scripts/repair-scope.test.mjs','nextjs/scripts/repai
 assert((readFileSync(resolve(repo,'nextjs/scripts/db/native-world-race-ci.test.mjs'),'utf8').match(/^test\('affected /gm)??[]).length>=1 && /test\('native world race static: affected /.test(readFileSync(resolve(repo,'nextjs/scripts/db/native-world-race-ci.test.mjs'),'utf8')), 'affected native selector and report patterns must select actual tests');
 assert(repair.includes('run: pnpm install --frozen-lockfile')&&repair.includes('run: pnpm scan:secrets')&&repair.includes('run: pnpm check')&&repair.includes('run: pnpm exec next build')&&!/run: pnpm (?:run )?build\b/.test(repair), 'frozen install, secrets, global type/lint and the direct browser build (no full Vitest prehook) stay unchanged');
 assert(raceHelper.includes('export function admitAffectedSource(')&&raceHelper.indexOf('const baselineIntent=classifyAffected({headSha:head,exec});')<raceHelper.indexOf('const intent=classify({headSha:head,exec});')&&raceHelper.includes('classifyAffected=classifyAffectedIntent, affected=verifyAffectedSource'), 'PR 141 race admission routes verified-baseline descendants to the collector affected proof before any exact race increment');
-// Ordinary Home admission, restated independently: one finite twenty-six-path owner with nine direct suites (the mobile-view TSX is
+// Ordinary Home admission, restated independently: one finite twenty-six-path owner with ten direct suites (the mobile-view TSX is
 // registered above) and one browser suite, a single shared-map row for exactly 1440, 390, 360 and reduced-motion. The exact CSS owner adds one reviewed stylesheet overlap. No legacy Home profile.
 const homePaths=['components/compile-stage-player.frame-strings.json','components/compile-stage-player.mobile-view.test.tsx','components/compile-stage-player.tsx',
   'components/landing-v2/evidence-connector.tsx','components/landing-v2/film-reading-layer.module.css','components/landing-v2/hero-actions.tsx','components/landing-v2/hero-film-disclosure.tsx',
@@ -431,7 +431,7 @@ const homePaths=['components/compile-stage-player.frame-strings.json','component
   'lib/film-motion-control.test.ts','lib/home-evidence-view.test.ts','lib/home-evidence-view.ts','lib/home-player-main304-parity.test.ts','lib/landing-v2-page.test.ts',
   'lib/landing-v2-proof.ts','lib/landing-v2-runtime.test.ts','lib/landing-v2-runtime.ts','lib/landing-v2-snapshot.json','lib/one-path-contract.test.ts'];
 const homeSuites=['components/compile-stage-player.mobile-view.test.tsx','components/landing-v2/hero-source-card.test.tsx','lib/home-evidence-view.test.ts','lib/landing-v2-page.test.ts',
-  'lib/one-path-contract.test.ts','lib/film-motion-control.test.ts','lib/marketing-analytics.test.ts','lib/home-player-main304-parity.test.ts','lib/landing-v2-runtime.test.ts'];
+  'lib/one-path-contract.test.ts','lib/film-motion-control.test.ts','lib/marketing-analytics.test.ts','lib/home-player-main304-parity.test.ts','lib/landing-v2-runtime.test.ts','lib/copy-trust-guard.test.ts'];
 const homeOwners=AFFECTED_GROUPS.filter(owner=>owner.group==='home-landing'),[homeOwner]=homeOwners;
 const homeCssPaths=['components/landing-v2/landing-hero.module.css','app/tavonel.css','lib/home-reader-heading-css-contract.test.ts','lib/home-reader-heading-css-registration.test.ts',
   'scripts/fixtures/home-reader-heading-css-baseline.json','scripts/repair-scope.mjs'];
@@ -445,7 +445,7 @@ assert(JSON.stringify(HOME_AFFECTED_PATHS)===JSON.stringify(homePaths)&&JSON.str
   &&['components/landing-v2/other.tsx','components/landing-v2/hero-actions.test.tsx','components/compile-stage-player.test.tsx','e2e/landing-v2-extra.spec.ts','lib/home-evidence-view.tsx','components/landing-v2/landing-hero.css',
     'lib/film-motion-control.ts','lib/marketing-analytics.test.ts'].every(p=>!homeOwner.match.test('nextjs/'+p))
   &&(sharedMap.match(/landing-v2/g)??[]).length===1&&sharedMap.includes("\n  ['e2e/landing-v2.spec.ts', ['1440', '390', '360', 'reduced-motion']],")
-  &&!AFFECTED_GROUPS.some(owner=>(/^home-/.test(owner.group)&&!['home-landing','home-reader-heading-css'].includes(owner.group))||/legacy/.test(owner.group)), 'Home retains its exact twenty-six-path owner, nine suites and four-project browser row with only the exact reader stylesheet overlap');
+  &&!AFFECTED_GROUPS.some(owner=>(/^home-/.test(owner.group)&&!['home-landing','home-reader-heading-css'].includes(owner.group))||/legacy/.test(owner.group)), 'Home retains its exact twenty-six-path owner, ten suites and four-project browser row with only the exact reader stylesheet overlap');
 assert(homeCssOwners.length===1&&JSON.stringify(HOME_READER_HEADING_CSS_AFFECTED_PATHS)===JSON.stringify(homeCssPaths)
   &&JSON.stringify(HOME_READER_HEADING_CSS_AFFECTED_UNIT_FILES)===JSON.stringify(homeCssSuites)&&JSON.stringify(homeCssOwner.unitFiles)===JSON.stringify(homeCssSuites)
   &&!homeCssOwner.browserFiles.length&&!homeCssOwner.databaseTests.length&&!homeCssOwner.nativeReuse&&!homeCssOwner.selector&&!homeCssOwner.worker&&!homeCssOwner.database
@@ -670,6 +670,13 @@ assert(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'] === 'cc03d8ecb69d4291
   && ['e2e/benchmarks.spec.ts', 'e2e/brand-tokens.spec.ts', 'e2e/film-line-stability.spec.ts', 'e2e/site-alignment.spec.ts', 'e2e/solutions-workflows.spec.ts', 'e2e/templates.spec.ts', 'e2e/type-scale.spec.ts'].every(file => PUBLIC_MARKETING_AFFECTED_BROWSER_FILES.includes(file))
   && ["['e2e/templates.spec.ts', ['1440']],", "['e2e/type-scale.spec.ts', ['1440']],", "['e2e/site-alignment.spec.ts', ['1440']],", "['e2e/brand-tokens.spec.ts', ['1440']],", "['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/film-line-stability.spec.ts', ['390']],"].every(row => sharedMap.includes('\n  ' + row)),
   'Public marketing owner must keep the reviewed package.json postimage and a reviewed project row for each UX program browser suite');
+// COPY re-review R2-N2, restated independently: public/llms.txt selects g1-copy-truth through public-marketing-surface, and
+// landing-page.tsx selects copy-trust-guard through home-landing. Each path keeps exactly its one owner.
+for (const [path, group, suite] of [['nextjs/public/llms.txt', 'public-marketing-surface', 'lib/g1-copy-truth.test.ts'],
+  ['nextjs/components/landing-v2/landing-page.tsx', 'home-landing', 'lib/copy-trust-guard.test.ts']]) {
+  const owners = AFFECTED_GROUPS.filter(owner => owner.match.test(path));
+  assert(owners.length === 1 && owners[0].group === group && owners[0].unitFiles.includes(suite), `${path} must select ${suite} through ${group} (COPY re-review R2-N2)`);
+}
 // G8 CHANGE-NOTIFY (phase 4), restated independently: six exact paths, ten direct suites, one browser suite with its reviewed
 // 390 row, no neighbour admission and no lane flag. The docs text and the outbox SQL keep their existing owners.
 {
