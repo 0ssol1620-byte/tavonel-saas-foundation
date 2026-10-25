@@ -64,6 +64,23 @@ describe("developer distribution", () => {
     }
   });
 
+  /*
+    FOLLOW-UPS review NB-7 (2026-10-19). The README served at /developer/README.md showed the MCP args as a Windows
+    machine path. It now carries the same placeholder as /docs/mcp and the snippets. The README is not a channel
+    asset (the test above lists every asset channel.json pins), so its bytes moving reissues no digest.
+  */
+  it("shows the MCP args placeholder the docs use, not a machine path, in the developer README", () => {
+    const readme = readFileSync(developerAsset("README.md"), "utf8");
+    const args = readme.split("\n").filter((line) => line.includes('"args"'));
+    expect(args.length).toBeGreaterThan(0);
+    for (const line of args) {
+      expect(line).toContain('"args": ["/absolute/path/to/tavonel-mcp.mjs"]');
+      expect(line).not.toMatch(/\b[A-Za-z]:[\\/]|\/Users\/|\/home\//);
+    }
+    const channel = JSON.parse(readFileSync(developerAsset("channel.json"), "utf8")) as { assets: Record<string, { url: string }> };
+    expect(Object.values(channel.assets).map((asset) => asset.url)).not.toContain("https://tavonel.com/developer/README.md");
+  });
+
   it("completes a real MCP initialize and exposes read-only tools only", () => {
     const message = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } } });
     const child = spawnSync(process.execPath, [developerAsset("tavonel-mcp.mjs")], { input: `${message}\n`, encoding: "utf8", timeout: 5_000 });
