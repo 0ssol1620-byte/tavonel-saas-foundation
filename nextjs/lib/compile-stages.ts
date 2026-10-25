@@ -14,6 +14,12 @@ export type CompileStage = {
   poster: string;
   /** A 1440px copy of `poster` (which is then the 2880px file), so a phone in Fit can take the smaller one. */
   poster1x?: string;
+  /**
+   * AVIF encodes of the same frame as `poster` and `poster1x`, same sizes (POSTER-RECUT, D-11). With both, the
+   * still is a <picture> whose AVIF source a browser takes when it can decode it; the WebP pair is the fallback.
+   */
+  posterAvif?: string;
+  posterAvif1x?: string;
 };
 
 /*

@@ -125,6 +125,11 @@
   display: none;
 }
 
+/* D-11: the AVIF <picture> around the still lays out as if absent, so the <img> stays the viewport's grid item. */
+.picture {
+  display: contents;
+}
+
 /* The SVG's viewBox and xMidYMid meet give it the still's contain fit inside the same box. */
 .mask {
   grid-area: 1 / 1;
