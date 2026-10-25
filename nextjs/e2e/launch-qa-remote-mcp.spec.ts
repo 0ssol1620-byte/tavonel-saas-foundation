@@ -228,4 +228,19 @@ test.describe("remote MCP with the switch on (fixture env)", () => {
     expect(back.searchParams.has("code")).toBe(false);
     expect(thirdParty).toHaveLength(1);
   });
+
+  // The client chooses its own name and address; an unbroken one wraps instead of widening a phone screen.
+  test("wraps a self-registered long name and host at 360 px, on the consent and the rejected screen", async ({ request, page }) => {
+    const redirectUri = `https://${"a".repeat(60)}.example/cb`;
+    const registered = await request.post(`${base}/api/mcp/oauth/register`, { data: { client_name: "N".repeat(48), redirect_uris: [redirectUri] } });
+    const { client_id } = await registered.json() as { client_id: string };
+    await page.setViewportSize({ width: 360, height: 844 });
+    const valid = { response_type: "code", code_challenge: createHash("sha256").update("v".repeat(43)).digest("base64url"), code_challenge_method: "S256" };
+    for (const [extra, ready] of [[valid, "button"], [{ response_type: "token" }, "link"]] as const) {
+      await page.goto(`${base}/oauth/authorize?${new URLSearchParams({ ...extra, client_id, redirect_uri: redirectUri })}`);
+      await expect(ready === "button" ? page.getByRole("button", { name: "Deny" }) : page.getByRole("link", { name: /^Return to / })).toBeVisible();
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow, extra.response_type).toBeLessThanOrEqual(0);
+    }
+  });
 });
