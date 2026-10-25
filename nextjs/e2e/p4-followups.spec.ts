@@ -90,6 +90,31 @@ test.describe("(a) /developers link targets", () => {
   });
 });
 
+/*
+  FOLLOW-UPS review NB-1 (2026-10-19). Each /guide chapter ends on a "where" row of links, a flex row with a 44px floor. The
+  same tap-floor rule as (a) gave every link 12.5px of padding and -12.5px of margin, and on a flex item the margin box sizes
+  the line, so wrapped rows sat 21px into each other at 360-430 (5-13 pairs, live main as well as the PR).
+*/
+test.describe("(a) /guide link targets", () => {
+  for (const route of ["/guide", "/ko/guide"]) {
+    for (const width of PHONES) {
+      test(`${route} does not overlap at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 844 });
+        await page.goto(route);
+        const boxes = await linkBoxes(page);
+        expect(boxes.length).toBeGreaterThan(20);
+        expect(overlaps(boxes)).toEqual([]);
+        const heights = await page.locator("main section[id] > p:last-child a").evaluateAll((links) => links.map((link) => link.getBoundingClientRect().height));
+        expect(heights.length).toBeGreaterThan(14);
+        for (const height of heights) expect(height).toBeGreaterThanOrEqual(44);
+        const overflow = await page.evaluate(measureOverflow);
+        expect(overflow.documentOverflow).toBeLessThanOrEqual(0);
+        expect(overflow.offenders).toEqual([]);
+      });
+    }
+  }
+});
+
 test.describe("(b) /docs/mcp code", () => {
   test("prints the Windows path with one backslash, in the code face", async ({ page, browserName }) => {
     await page.setViewportSize({ width: 390, height: 844 });
