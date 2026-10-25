@@ -88,7 +88,9 @@ test("a closed workspace home describes saved sources without promising compilat
   await testInfo.attach("closed-workspace-home", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
   await page.getByRole("button", { name: "View saved sources" }).click();
   await expect(page).toHaveURL(/\/workspace\/sources$/);
-  await expect(page.getByRole("button", { name: "Review processing terms" })).toBeVisible();
+  // D-19: this mock is gate v1 (no sourcePending), which reads no acceptance -- so no terms review, the example path instead.
+  await expect(page.getByRole("button", { name: "Review processing terms" })).toHaveCount(0);
+  await expect(page.locator(".workspace-intake-closed").getByRole("link", { name: "Explore a compiled World" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Request source access" })).toHaveCount(0);
 });
 
@@ -99,7 +101,9 @@ test("a closed workspace shows saved sources without an actionable compile contr
   await expect(readySource.locator(".board-row-status")).toHaveText("Source ready");
   await expect(readySource.getByRole("checkbox")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Compile selected documents" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Review processing terms" })).toBeVisible();
+  // D-19: this mock is gate v1 (no sourcePending), which reads no acceptance -- so no terms review, the example path instead.
+  await expect(page.getByRole("button", { name: "Review processing terms" })).toHaveCount(0);
+  await expect(page.locator(".workspace-intake-closed").getByRole("link", { name: "Explore a compiled World" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Request source access" })).toHaveCount(0);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
