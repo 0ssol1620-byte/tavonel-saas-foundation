@@ -48,6 +48,9 @@ function overlayLook(): { theme: "light" | "dark"; locale: "ko" | "en" } {
 */
 export type NoticeTone = "status" | "alert";
 
+/** What a billing-exempt owner is told instead of a checkout; the workspace says it too when it drops a held offer (P2-29). */
+export const OWNER_ACCESS_ACTIVE_SENTENCE = "Owner access is already active. No checkout or payment is required for this account.";
+
 /**
  * `onEntitlement` hears how the bounded wait after `checkout.completed` ended (journey A4), so a
  * page that shows billing can show the account the wait read without a reload.
@@ -79,7 +82,7 @@ export function useCheckout(notify: (message: string, tone: NoticeTone) => void,
         });
         const checkout = (await response.json()) as CheckoutResponse;
         if (checkout.code === "OWNER_ACCESS_ACTIVE") {
-          notify("Owner access is already active. No checkout or payment is required for this account.", "status");
+          notify(OWNER_ACCESS_ACTIVE_SENTENCE, "status");
           return;
         }
         // Journey A1 (D-03): a refusal is a sentence from the one failure-copy table, never a raw

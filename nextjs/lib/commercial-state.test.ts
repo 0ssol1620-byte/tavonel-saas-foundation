@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { activationPolicy } from "./activation-policy";
 import { isLiveCommerce, primaryCallToAction, readCommercialState } from "./commercial-state";
@@ -78,4 +80,43 @@ describe("readCommercialState", () => {
     surfaces that still state the gate verbatim -- /pricing, /security, /integrations, the /docs
     first-run notes and Scene 09 -- are guarded where they render it, not here.
   */
+});
+
+/*
+  D-13 (register 2026-10-17): launch approval moves out of `vercel.json` into the Foundation
+  project's production environment, so approving a launch is an act separate from merging code.
+
+  The runtime read is already environment-first: `readCommercialState` sees `process.env` and
+  nothing else, and no runtime path opens `vercel.json`. What the file does is take part in how a
+  deployment's environment is built: Vercel applies the project's variables and then the file's
+  legacy `env` over them. So while the file carries the key, the file wins, and the move is two
+  acts in this order -- the production variable first (founder, docs/runbooks/LAUNCH_WINDOW.md),
+  then the PR that deletes the line. Deleting the line first would close checkout in production.
+
+  This models that merge with the real file. It is a model of Vercel's precedence, not a reading of
+  a deployment, and it asserts no production value (only variable names were read, 2026-10-19).
+*/
+describe("D-13: launch approval read from the deployment environment", () => {
+  const file = (JSON.parse(readFileSync(resolve(import.meta.dirname, "../vercel.json"), "utf8")) as { env?: Record<string, string> }).env ?? {};
+  // Project variables first, the file's legacy `env` over them; a production deployment on the live provider.
+  const deployed = (project: Record<string, string>, fileEnv: Record<string, string> = file) =>
+    readCommercialState({ ...project, ...fileEnv, PADDLE_SANDBOX: "false", VERCEL_ENV: "production" });
+
+  it("today vercel.json carries the approval, so it wins over whatever the project variable says", () => {
+    expect(file.TAVONEL_BILLING_LAUNCH_APPROVED).toBe("true");
+    const projects: Record<string, string>[] = [{}, { TAVONEL_BILLING_LAUNCH_APPROVED: "false" }, { TAVONEL_BILLING_LAUNCH_APPROVED: "" }, { TAVONEL_BILLING_LAUNCH_APPROVED: "true" }];
+    for (const project of projects) {
+      expect(deployed(project).liveChargesEnabled, JSON.stringify(project)).toBe(true);
+    }
+  });
+
+  it("after the line is deleted, only an exact production value approves; unset closes", () => {
+    const { TAVONEL_BILLING_LAUNCH_APPROVED: moved, ...remaining } = file;
+    expect(moved).toBe("true");
+    expect(deployed({ TAVONEL_BILLING_LAUNCH_APPROVED: "true" }, remaining).liveChargesEnabled).toBe(true);
+    for (const value of [undefined, "", "false", "TRUE", " true", "true\n", "1"]) {
+      const project: Record<string, string> = value === undefined ? {} : { TAVONEL_BILLING_LAUNCH_APPROVED: value };
+      expect(deployed(project, remaining).liveChargesEnabled, JSON.stringify(value)).toBe(false);
+    }
+  });
 });

@@ -1843,10 +1843,12 @@ export const EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES = Object.freeze(['e2
 // Launch QA Product QA repins (PR #141 fix round 2): the compile stage's result-less rule and its direct suite, and the four
 // Product QA specs re-pointed to behaviour the PR changed on purpose. Selects the compile-stage suite and the two mapped browser
 // suites (the source-observation stage at 1440, the Home film loading contract at 390). change-inbox, pipeline-board and
-// workspace-preflight-audit have no reviewed Repair project row; Launch QA's Product QA job runs all four on every push.
+// workspace-preflight-audit have no reviewed Repair project row; Launch QA's Product QA job runs all four on every push. Phase 4
+// LAUNCH (D-19) adds workspace-admission-state, re-pointed to the v1 workspace without the terms review; it has no reviewed
+// Repair project row either, and Product QA runs it at every width on every push.
 export const LAUNCH_QA_PRODUCT_REPINS_AFFECTED_PATHS = Object.freeze([
   'components/compile-stage.test.tsx', 'components/compile-stage.tsx', 'e2e/change-inbox.spec.ts',
-  'e2e/landing-hero-film-loading.spec.ts', 'e2e/pipeline-board.spec.ts', 'e2e/workspace-preflight-audit.spec.ts',
+  'e2e/landing-hero-film-loading.spec.ts', 'e2e/pipeline-board.spec.ts', 'e2e/workspace-admission-state.spec.ts', 'e2e/workspace-preflight-audit.spec.ts',
 ]);
 export const LAUNCH_QA_PRODUCT_REPINS_AFFECTED_UNIT_FILES = Object.freeze(['components/compile-stage.test.tsx']);
 export const LAUNCH_QA_PRODUCT_REPINS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/landing-hero-film-loading.spec.ts', 'e2e/workspace-source-observation.spec.ts']);
@@ -1998,39 +2000,66 @@ export const PR141_MAIN_MERGE_BCBA_AFFECTED_UNIT_FILES = Object.freeze([
 export const PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/hero-home-responsive.spec.ts', 'e2e/home-measures.spec.ts', 'e2e/landing-v2.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/production-hardening.spec.ts', 'e2e/public-package-proof.spec.ts']);
 // UX program 2026-10-17 billing and checkout tracks (P2-10 CTA truth, P2-12..P2-16, B-07/B-08): the HMAC-previous verification in
 // the billing event, binding, gate route and trial, the checkout hook and its entitlement wait, the intent carried across sign-in and
-// its notice, the CTA truth table, the fake Paddle fixture and the two browser journeys. Exactly these eighteen paths select their
-// ten direct suites (checkout-policy and billing-gate-enforce-route for the gate, production-posture for the switches) and the
-// login-capability (1440) and self-serve-journey (audit) browser suites. Product billing code, so never nativeReuse.
+// its notice, the CTA truth table, the fake Paddle fixture and the two browser journeys. Phase 4 LAUNCH (P2-29 / D-13 / D-19) adds the
+// D-19 launch canary in processing-workspace-grant.ts, its suite's canary-aware fixture, and the suites that pin it and D-13's launch-approval precedence; P2-37 adds
+// the launch switch itself (activation-policy.ts) with the eight suites that pin its value in public copy and status; the review-B1
+// fix adds the bootstrap route that carries the release stage to a held checkout, and its admission suite. Exactly these
+// twenty-six paths select their twenty-five direct suites (checkout-policy and billing-gate-enforce-route for the gate, the four gate-v2
+// admission suites for the canary, processing-consent-panel for the v1 terms panel, production-posture for the switches) and the login-capability (1440) and self-serve-journey (audit)
+// browser suites. Product billing code, so never nativeReuse.
 export const UX_BILLING_CHECKOUT_AFFECTED_PATHS = Object.freeze([
+  'app/api/access/bootstrap/route.ts',
   'app/api/internal/billing/gate-enforce/route.ts',
   'components/checkout-intent-notice.tsx',
   'e2e/fixtures/paddle-fixture.ts',
   'e2e/login-capability.spec.ts',
   'e2e/self-serve-journey.spec.ts',
+  'lib/access-bootstrap-admission.test.ts',
+  'lib/activation-policy.ts',
   'lib/billing-binding.test.ts',
   'lib/billing-binding.ts',
   'lib/checkout-intent.test.ts',
   'lib/checkout-intent.ts',
+  'lib/commercial-state.test.ts',
   'lib/cta-truth.test.ts',
+  'lib/customer-data-admission.test.ts',
   'lib/entitlement-wait.test.ts',
   'lib/entitlement-wait.ts',
   'lib/paddle-billing-event.test.ts',
   'lib/paddle-billing-event.ts',
+  'lib/processing-consent-panel.test.ts',
+  'lib/processing-workspace-grant.test.ts',
+  'lib/processing-workspace-grant.ts',
   'lib/self-service-trial-device-rotation.test.ts',
   'lib/self-service-trial.ts',
   'lib/use-checkout.test.ts',
   'lib/use-checkout.ts',
 ]);
 export const UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/access-bootstrap-admission.test.ts',
   'lib/billing-binding.test.ts',
   'lib/billing-gate-enforce-route.test.ts',
+  'lib/brand-copy.test.ts',
+  'lib/checkout-customer-data-gate.test.ts',
   'lib/checkout-intent.test.ts',
   'lib/checkout-policy.test.ts',
+  'lib/commercial-state.test.ts',
   'lib/cta-truth.test.ts',
+  'lib/customer-data-admission.test.ts',
+  'lib/customer-data-live-path.test.ts',
   'lib/entitlement-wait.test.ts',
+  'lib/landing-v2-use.test.ts',
+  'lib/operations.test.ts',
   'lib/paddle-billing-event.test.ts',
+  'lib/page-seo.test.ts',
+  'lib/pilot-evaluation-worksheet.test.ts',
+  'lib/processing-consent-panel.test.ts',
+  'lib/processing-workspace-grant.test.ts',
   'lib/production-posture.test.ts',
+  'lib/public-status.test.ts',
+  'lib/scoped-admission-boundaries.test.ts',
   'lib/self-service-trial-device-rotation.test.ts',
+  'lib/status-route-contract.test.ts',
   'lib/use-checkout.test.ts',
 ]);
 export const UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/login-capability.spec.ts', 'e2e/self-serve-journey.spec.ts']);
@@ -2674,7 +2703,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.
   affectedGroup('benchmarks-path-mask', new RegExp(`^nextjs/(?:${exactPathAlternation(BENCHMARKS_PATH_MASK_AFFECTED_PATHS)})$`),
     { unitFiles: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES }),
-  // ux-billing-checkout: the 18 exact paths above select 10 direct suites and 2 browser suites.
+  // ux-billing-checkout: the 26 exact paths above select 25 direct suites and 2 browser suites.
   affectedGroup('ux-billing-checkout', new RegExp(`^nextjs/(?:${exactPathAlternation(UX_BILLING_CHECKOUT_AFFECTED_PATHS)})$`),
     { unitFiles: UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, browserFiles: UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES }),
   // table-read-intake-ceiling: the 6 exact paths above select 8 direct suites and no browser suite.
