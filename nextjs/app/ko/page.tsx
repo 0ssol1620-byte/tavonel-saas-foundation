@@ -66,11 +66,11 @@ export default async function KoreanEntryPage({
     cookie: (await cookies()).get(LANDING_VARIANT_COOKIE)?.value,
     query: Array.isArray(query) ? query[0] : query,
   });
-  // P2-08: honoured only by the local test server (lib/specimen-sources.ts); a deployment ignores it.
-  const specimenFixtures = (await cookies()).get(SPECIMEN_FIXTURE_COOKIE)?.value === "1";
+  // P2-08 and P2-32: honoured only by the local test server (lib/specimen-sources.ts); a deployment ignores it.
+  const specimenRequest = (await cookies()).get(SPECIMEN_FIXTURE_COOKIE)?.value;
   return (
     <>
-      <LandingPage korean experiment={experiment} specimenFixtures={specimenFixtures}>
+      <LandingPage korean experiment={experiment} specimenRequest={specimenRequest}>
         <DocumentLangKo />
         <BreadcrumbJsonLd trail={[{ name: "한국어 안내", path: "/ko" }]} />
       </LandingPage>

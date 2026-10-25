@@ -236,16 +236,16 @@ export default function LandingPage({
   */
   experiment = landingVariantState({ experiment: null }),
   /*
-    P2-08: whether this request asked for the synthetic specimen fixtures. They render only on the
-    local test server (lib/specimen-sources.ts); everywhere else the strip reads the committed
-    receipts, and with none committed it renders nothing.
+    P2-08 / P2-32: what this request asked for with SPECIMEN_FIXTURE_COOKIE -- "1" for the synthetic
+    fixtures, "committed" for the committed receipts. Only the local test server honours either
+    (lib/specimen-sources.ts); everywhere else the rollout switch decides.
   */
-  specimenFixtures = false,
+  specimenRequest,
   children,
 }: {
   korean?: boolean;
   experiment?: LandingVariantState;
-  specimenFixtures?: boolean;
+  specimenRequest?: string;
   /** `/ko`'s document-language effect and breadcrumb. Rendered inside the landmark, as today. */
   children?: React.ReactNode;
 }) {
@@ -267,6 +267,7 @@ export default function LandingPage({
       </Link>
     ) : null;
   const formats = korean ? copy.hero.microProofFormats.replace(" or ", " 또는 ") : copy.hero.microProofFormats;
+  const specimens = homeSpecimens({ fixtures: specimenRequest === "1", committed: specimenRequest === "committed" });
 
   /*
     A reader can inspect the sample before choosing a plan. The access action is resolved from
@@ -333,8 +334,8 @@ export default function LandingPage({
                   the reader's text, between the actions and the illustrative film. Nothing renders
                   until a receipt does.
                 */}
-                <SpecimenStrip specimens={homeSpecimens({ fixtures: specimenFixtures })} korean={korean} />
-                <HeroFilm korean={korean} />
+                <SpecimenStrip specimens={specimens} korean={korean} />
+                <HeroFilm korean={korean} priority={specimens.length === 0} />
               </HeroStatement>
             </div>
             <div className={sourceStyles.formats}>
@@ -500,7 +501,7 @@ export default function LandingPage({
           sceneIndex={4}
         />
         <TrustScene locale={locale} copy={copy.trust} sectionId="s5" sceneIndex={5} />
-        <HomeReaderGuide korean={korean} faqOnly />
+        <HomeReaderGuide korean={korean} faqOnly specimenSources={specimens.map(specimen => specimen.caption[locale].full)} />
         <StartScene locale={locale} copy={copy.start} actions={heroActions} sectionId="s6" sceneIndex={6} />
       </main>
       <PublicSiteFooter korean={korean} />
