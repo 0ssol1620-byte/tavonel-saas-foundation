@@ -15,7 +15,7 @@ import { expect, test, type Page } from "@playwright/test";
   - R3. Sibling H2s on a page are one size. Siblings are the headings of sections that share a
     parent: an H2's section is its nearest <section>, <article> or <aside> (or the H2 itself when it
     has none), and two H2s are siblings when those sections are children of one element. That is
-    the case the plan names -- Home's 24px 'Measured, with receipts.' (now 'Every research figure has a receipt.') beside five 51.84px section
+    the case the plan names -- Home's 24px 'Measured, with receipts.' (now 'Research figures, with receipts.') beside five 51.84px section
     H2s -- and it leaves a card's heading inside a section alone, because the card is not the
     section's sibling.
   - The /ko meta line takes no capital tracking (§4.4 KO rules).
@@ -238,7 +238,7 @@ test.describe("the type-scale detector", () => {
     await set(page, "#home-measures-title", "font-size", "24px");
     const mixed = mixedSiblings(await page.evaluate(read));
     expect(mixed).toHaveLength(1);
-    expect(mixed[0]).toContain("24px «Every research figure has a receipt.»");
+    expect(mixed[0]).toContain("24px «Research figures, with receipts.»");
 
     // FINAL-SPEC 2026-10-26 deleted `.lv2-scene-support`; the workbench's heading is the element set in a retired face.
     await set(page, "#s2 h2", "font-family", "Geist, sans-serif");

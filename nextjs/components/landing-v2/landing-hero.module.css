@@ -289,11 +289,11 @@ section.hero .actionsBlock :global(.lv2-actions a:focus-visible) {
 }
 
 /*
-  Home's one content link (Release 3). These rules were scoped to this sheet's `.home`, which no
-  element carries (the Home root is source-first-home.module.css's), so the workbench and record
-  links drew as plain text with no underline. They now match the s5 "Read" links and the scene
-  text links: ink on a 1px underline. Cobalt stays with the filled action, the active film tab,
-  the Evidence Line and focus rings.
+  Home's content links (Release 3), the same as the scene text links: ink, and since design critique
+  2026-10-26 B1 (audit T8) no underline at rest -- hover and focus-visible draw a 1px one. The workbench's
+  two arrowed links set their arrow on a no-break space with no flex gap, so that line runs unbroken under
+  label and arrow (an inline-flex link decorates each flex item on its own). Cobalt stays with the filled
+  action, the active film tab, the Evidence Line and focus rings.
 */
 a.quietLink,
 a.evidenceLink,
@@ -304,23 +304,29 @@ a.diffLink {
   min-height: 44px;
   color: var(--home-ink);
   font-weight: 500;
-  text-decoration: underline;
+  text-decoration-line: none;
   text-decoration-thickness: 1px;
-  text-decoration-color: var(--home-rule-strong);
-  text-underline-offset: 0.25em;
+  text-decoration-color: currentColor;
+  text-underline-offset: 5px;
+}
+
+a.quietLink,
+a.evidenceLink {
+  gap: 0;
 }
 
 @media (hover: hover) and (pointer: fine) {
   a.quietLink:hover,
   a.evidenceLink:hover,
   a.diffLink:hover {
-    text-decoration-color: currentColor;
+    text-decoration-line: underline;
   }
 }
 
 a.quietLink:focus-visible,
 a.evidenceLink:focus-visible,
 a.diffLink:focus-visible {
+  text-decoration-line: underline;
   outline: 2px solid var(--home-cobalt);
   outline-offset: 2px;
 }
@@ -416,22 +422,28 @@ a.diffLink:focus-visible {
   font-weight: 560;
 }
 
-/* A label of what the text is, in ink -- deliberately not a coloured badge. */
+/*
+  Design critique 2026-10-26 B3 (spec §3.6: no card in a card, one border per element). The pane is the one
+  card; inside it the label is muted text, not a bordered chip, and the crop+passage unit draws no box of its
+  own. The only line inside is the crop's, round the page image.
+*/
 .extracted {
-  padding: 0.125rem 0.5rem;
-  border: 1px solid var(--home-rule-strong);
+  padding: 0;
+  border: 0;
+  color: var(--home-muted);
 }
 
 /* The page region and the passage read from it, one unit: crop above, extractor's text below. */
 .passageMatch {
-  overflow: hidden;
-  border: 1px solid var(--home-rule);
-  border-radius: 8px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
 }
 
 .crop {
   padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--home-rule);
+  border: 1px solid var(--home-rule);
+  border-radius: 4px;
   background: #fff;
 }
 
@@ -555,7 +567,17 @@ a.evidenceLink {
   .regionList { display: flex; gap: 8px; border-bottom: 0; }
   .regionList > li { flex: 0 0 auto; }
   .regionButton { grid-template-columns: 1fr; width: 48px; min-width: 48px; padding: 0; place-items: center; border-top: 0; }
-  .regionButton .regionLetter { width: 44px; height: 44px; font-size: 15px; }
+  /* Design critique 2026-10-26 B3: an outlined letter, not a filled key cap; the pressed one alone is ink, and the
+     row wash is off, so the selection reads from one mark. */
+  .regionButton .regionLetter {
+    width: 44px; height: 44px;
+    border: 1px solid var(--tv-rule-strong); border-radius: 8px;
+    background: transparent; color: var(--home-ink);
+    font: 560 15px/1 var(--f-sans);
+  }
+  .regionButton[aria-pressed="true"] .regionLetter { border-color: var(--home-ink); background: var(--home-ink); color: #fff; }
+  .regionButton[aria-pressed="true"],
+  .regionButton:hover { background: transparent; }
   .regionText { display: none; }
 }
 
@@ -787,6 +809,13 @@ section.receive {
   border-bottom: 1px solid var(--tv-rule);
 }
 
+/* Design critique 2026-10-26 B4: below 768px the three-line region shrinks to ~3px type, which reads as a broken
+   image; the record's own page and region stay in its fields, and its quote is the region's text. Important: the
+   window's own inline style is display: block (SourceRegionWindow). */
+@media (max-width: 767.98px) {
+  .recordCrop { display: none !important; }
+}
+
 .recordCrop img {
   position: absolute;
   display: block;
@@ -808,9 +837,21 @@ section.receive {
   margin: 24px 0 0;
 }
 
+/*
+  Design critique 2026-10-26 B4: the filename and the digest break only where they may -- the filename at
+  its " · " spaces, the digest anywhere (break-all) -- so Source and Version get the room: the full width
+  below 900px, and at 900px and up the widest tracks (the digest in two lines).
+*/
 @media (min-width: 900px) {
   .recordFields {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: 1.4fr 0.6fr 1fr 2fr;
+  }
+}
+
+@media (max-width: 899.98px) {
+  .recordFields > div:first-child,
+  .recordFields > div:last-child {
+    grid-column: 1 / -1;
   }
 }
 
@@ -827,7 +868,7 @@ section.receive {
 .recordFields dd {
   margin: 4px 0 0;
   font: 500 12px/1.45 var(--f-mono);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 
 .recordFields code {
@@ -924,15 +965,15 @@ section.receive {
   }
 }
 
+/*
+  Design critique 2026-10-26 B2(b): a round, borderless mark of the instrument ground at 72%, the same round
+  shape as the view toggle beside it, instead of an opaque square with a 60% white edge over the pane's text.
+*/
 .film :global(.compile-film-viewport) > :global(.compile-film-motion-control) {
-  border-color: rgb(255 255 255 / 0.6);
-  background: var(--home-ink);
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--tv-inst-0) 72%, transparent);
   color: #fff;
-  opacity: 0.88;
-}
-
-.film :global(.compile-film-viewport) > :global(.compile-film-motion-control[data-control="play"]),
-.film :global(.compile-film-viewport) > :global(.compile-film-motion-control):focus-visible {
   opacity: 1;
 }
 
@@ -940,12 +981,6 @@ section.receive {
   outline: 2px solid var(--home-cobalt);
   outline-offset: 2px;
   box-shadow: 0 0 0 2px #fff;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .film :global(.compile-film-viewport:hover) > :global(.compile-film-motion-control) {
-    opacity: 1;
-  }
 }
 
 /* The accepted concept's reading guide, with the current sample's status and real access path. */

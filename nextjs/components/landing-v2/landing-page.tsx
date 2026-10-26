@@ -81,10 +81,11 @@ function homeData(): HomeData {
 
 /**
  * Home's quote length for the record (FINAL-SPEC §2.4). §2.9 lever 1: the measured page was over the word
- * budget, so the quote drops from 160 to 120 characters. Same record, same rule, the source text is not
- * edited; `EXCERPT_LIMIT` (240) stays for its other callers.
+ * budget, so the quote drops from 160 to 120 characters, and to 90 in review 2026-10-26 B-1 (EN 532 words at
+ * 1440 against the 520 cap). Same record, same rule, the source text is not edited; `EXCERPT_LIMIT` (240)
+ * stays for its other callers.
  */
-export const RECORD_EXCERPT = 120;
+export const RECORD_EXCERPT = 90;
 
 /*
   The words only this composition says, in both languages. No figure in any of them: every digit
@@ -98,7 +99,8 @@ const HOME_COPY = {
     intake: "We arrange intake for your own sources with you.",
     bringOwn: "Evaluate your documents",
     receive: {
-      title: "You receive a record like this.",
+      /* Review 2026-10-26 B-1: the section's name, as the reader guide called it ("What you receive"). */
+      title: "What you receive.",
       kind: (kind: string) => kind,
       /* F-3: the rights sentence, verbatim. Printed under the s2 source window (orchestrator decision 2026-10-26). */
       rights:

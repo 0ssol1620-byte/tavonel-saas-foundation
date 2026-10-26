@@ -34,8 +34,8 @@ import { expect, test, type Page } from "@playwright/test";
 */
 const FILM = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]';
 const POSTER = /^\/film\/poster-1-t8\.16-pane1-684x855\.(avif|webp)$/;
-/** The 1440px stage-1 frame a phone no longer asks for on the first screen (acceptance 25). */
-const FRAME_POSTER = /^\/film\/poster-1-t8\.16(-2x)?\.avif$/;
+/** The 1440/2880px stage-1 frame, in either format, that a phone never asks for on the first screen (acceptance 25). */
+const FRAME_POSTER = /^\/film\/poster-1-t8\.16(-2x)?\.(avif|webp)$/;
 const LOCALES = [
   { path: "/", language: "English", play: "Play the compilation film", focus: "Focus details" },
   { path: "/ko", language: "Korean", play: "컴파일 영상 재생", focus: "세부 내용 확대" },
@@ -83,6 +83,16 @@ for (const locale of LOCALES) {
       await expect(film.locator("video")).toHaveCount(1);
       await expect.poll(() => requests.some(isRecording), "the recording is requested").toBe(true);
       expect(requests.findIndex(isPoster), "the poster is asked for before the recording").toBeLessThan(requests.findIndex(isRecording));
+      /*
+        Review 2026-10-26 B-2: in both motion preferences the playing cut asks for no frame poster. The <video> carries no
+        poster attribute on a phone pane, and the pane's own still stays over the cut until its first frame, then goes.
+        Until this check, the frame-poster count ran only under reduced motion, and a motion-allowed phone fetched two.
+      */
+      const video = film.locator("video");
+      await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState >= 2), "the cut's first frame").toBe(true);
+      expect(await video.getAttribute("poster"), "no frame poster on the phone pane's video").toBeNull();
+      await expect(film.locator("[data-pane-hold]"), "the pane still is released at the first frame").toHaveCount(0);
+      expect(requests.filter(url => FRAME_POSTER.test(new URL(url).pathname)), "a phone asks for one first-screen poster, the pane").toEqual([]);
 
       const sequence = film.locator(".compile-film-sequence");
       const focusControl = film.locator(".compile-film-focus-control");

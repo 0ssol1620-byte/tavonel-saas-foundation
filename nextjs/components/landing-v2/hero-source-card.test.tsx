@@ -61,7 +61,9 @@ describe("the Home workbench -- status truthfulness", () => {
     const text = readable(render(homeCase()));
     expect(text).toContain("Published claims");
     expect(text).toContain("None. A verified claim needs every region it rests on, its period and unit cited, and a qualified run.");
-    expect(text).toContain("Context required:");
+    // Review 2026-10-26 B-1 cut the "Context required:" label; the note still says why the passage needs context, and
+    // that interpretation has not run.
+    expect(text).toContain("Headings and units are separate regions. Interpretation has not run.");
   });
 });
 
@@ -232,7 +234,7 @@ describe("the Home workbench -- region selection", () => {
       expect(readable(details)).toContain(region.bbox1000.join(","));
       const box = html.match(/<span\s[^>]*data-selected="1"[^>]*>/)?.[0] ?? "";
       expect(attr(box, "data-region-id")).toBe(escaped(region.id));
-      const note = region.role === "selected" ? "Context required:" : "Shown as printed, for context.";
+      const note = region.role === "selected" ? "Headings and units are separate regions." : "Shown as printed, for context.";
       expect(readable(html)).toContain(note);
     }
   });

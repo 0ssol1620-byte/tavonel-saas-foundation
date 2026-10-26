@@ -16,7 +16,8 @@ import styles from "./home-measures.module.css";
   its detail and must-say verbatim, then the receipt chip (`R-0x · date · sha256 xxxxxxxx`).
 */
 const COPY = {
-  en: { title: "Every research figure has a receipt." },
+  /* Review 2026-10-26 B-1 (word budget): still says "research" -- the scope the deleted paragraph carried. */
+  en: { title: "Research figures, with receipts." },
   ko: { title: "연구 측정값마다 영수증이 있습니다." },
 };
 

@@ -136,6 +136,8 @@
   .home.home :global(.lv2-h1-line) { display: block; }
   /* The hero support sentence: this is its one rule. */
   .home.home :global(.lv2-hero-support) { max-width: 40ch; margin: 24px 0 0; text-align: start; color: var(--ink-muted); font: 400 20px/1.5 var(--f-sans); letter-spacing: 0; }
+  /* Design critique 2026-10-26 B5: EN balances its two lines, so no word sits alone ("... page and / region."). */
+  .home.home :global(.lv2-hero-support:lang(en)) { text-wrap: balance; }
   /* Six h2 on Home, one size and one colour (§3.2): no two-tone accent line. */
   .home.home :global(.lv2-h2) { margin: 0; font: 510 var(--lv2-fs-h2)/1.1 var(--f-sans); letter-spacing: -0.022em; color: var(--ink); }
   .home.home :global(.lv2-h2:lang(en)) { text-wrap: balance; }
@@ -186,9 +188,17 @@
   /* §3.6: the filled action is a pill; 44px in a row at 1440, 48px full width on a phone. */
   .home.home :global(.lv2-cta) { min-height: 44px; border-radius: 999px; background: var(--action); color: white; border-color: var(--action); padding: 10px 24px; font: 560 15px/1.5 var(--f-sans); }
   .home.home :global(.lv2-cta:hover) { background: var(--home-cobalt-deep); }
-  .home.home :global(.lv2-text-link) { color: var(--ink); font: 560 15px/1.45 var(--f-sans); }
-  /* A link's hover darkens its own underline; the accent is not a link colour. */
-  .home.home :global(.lv2-text-link:hover) { text-decoration-color: currentColor; }
+  /*
+    Design critique 2026-10-26 B1 (audit T8): a text link carries no underline at rest. Hover (on a device that
+    hovers) and focus-visible draw one, 1px at a 5px offset, in the link's own colour; the accent is not a link
+    colour. Every Home link is inline-flex, which decorates each flex item on its own, so a flex gap split the line
+    under the label from the line under its arrow. The arrow sits on its own no-break space instead, with no gap.
+  */
+  .home.home :global(.lv2-text-link) { gap: 0; color: var(--ink); font: 560 15px/1.45 var(--f-sans); text-decoration-line: none; }
+  .home.home :global(.lv2-text-link:focus-visible) { text-decoration-line: underline; text-decoration-thickness: 1px; text-decoration-color: currentColor; text-underline-offset: 5px; }
+  @media (hover: hover) {
+    .home.home :global(.lv2-text-link:hover) { text-decoration-line: underline; text-decoration-thickness: 1px; text-decoration-color: currentColor; text-underline-offset: 5px; }
+  }
   .heroAside :global(.lv2-text-link) { min-height: 44px; }
   .film { margin: 0; min-width: 0; }
   .filmFrame { position: relative; overflow: hidden; background: #f0f0eb; border: 1px solid #79827b; border-radius: 8px; aspect-ratio: 16 / 10; }
@@ -299,6 +309,11 @@
     .filmFrame { aspect-ratio: 390 / 270; }
     .play { right: 12px; bottom: 12px; }
     .film figcaption { font-size: 13px; }
+  }
+  /* Design critique 2026-10-26 B2(c): at 360 "Use with AI" ended about 1px from the view toggle. */
+  @media (max-width: 379.98px) {
+    .home.home :global(#s1 .compile-film-stages) { column-gap: 12px; }
+    .home.home :global(#s1 .compile-film-sequence) { column-gap: 12px; }
   }
   @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
     .heroAside :global(a:not(:focus-visible)),

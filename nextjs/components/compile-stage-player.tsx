@@ -362,6 +362,8 @@ export default function CompileStagePlayer({
      (nextWideChoice / wideChoiceOnStageChange). */
   const [wideChoice, setWideChoice] = useState<WideView | null>(null);
   const [videoError, setVideoError] = useState(false);
+  /* The recording whose first frame is on screen (`loadeddata`); until then a phone pane keeps its own still over it. */
+  const [framedSrc, setFramedSrc] = useState<string | null>(null);
   const [failedPreferredSrc, setFailedPreferredSrc] = useState<string | null>(null);
   /*
     WCAG 2.2.2. A cut runs ~18s and then advances on its own — auto-playing motion well past the
@@ -571,6 +573,8 @@ export default function CompileStagePlayer({
   useEffect(() => {
     if (still && stillTookAvif(stillRef.current)) setPosterAvifTaken(true);
   }, [still, active]);
+  /* A still unmounts the <video>; the next one starts without a frame, so the pane hold applies again. */
+  useEffect(() => { if (still) setFramedSrc(null); }, [still]);
   const control = filmMotionControl({ reducedMotion, saveData, paused, playRequested, ended });
   const preferredVideoSrc = narrow && active.phoneSrc ? active.phoneSrc : active.src;
   const fallbackVideoSrc = narrow
@@ -589,12 +593,23 @@ export default function CompileStagePlayer({
   const posterSrcSet = filmPosterSrcSet(active);
   const posterAvifSrcSet = filmPosterAvifSrcSet(active);
   const mask = stageFrame?.posterMask?.poster === active.poster ? stageFrame.posterMask : undefined;
+  /* Home phone in Focus details: from 768px the frame pans across its four panes; below it shows one pane. */
+  const paneView = storyLayout && phoneFrame && !mobileFilmFit;
+  const panning = storyLayout && narrow && !mobileFilmFit && !paneView;
+  /* The phone pane's own still, decided from state alone (SSR); the <source media> keeps it off a desktop. */
+  const panePoster = storyLayout && !mobileFilmFit && active.phonePosterAvif ? active : undefined;
   /*
     D-11: the <video poster> attribute cannot negotiate a format, so it names the file the still already
     chose -- AVIF where the <picture> took AVIF, WebP otherwise -- and a browser fetches one poster, not two.
     `posterAvifTaken` is read off the still's `currentSrc`, which the browser sets when it selects a source.
   */
-  const videoPoster = posterAvifTaken && active.posterAvif
+  /*
+    Review 2026-10-26 B-2 (acceptance 25, D-11 "one poster"): a phone showing the pane's own still gives the
+    <video> no poster -- the attribute could only name the 1440px frame, a second first-screen request -- and
+    keeps that still (already in the cache) over the recording until its first frame is up (`paneHold`).
+  */
+  const paneHold = paneView && panePoster && framedSrc !== videoSrc ? panePoster : undefined;
+  const videoPoster = paneView && panePoster ? undefined : posterAvifTaken && active.posterAvif
     ? (narrow && active.posterAvif1x ? active.posterAvif1x : active.posterAvif)
     : (narrow && active.poster1x ? active.poster1x : active.poster);
 
@@ -604,11 +619,6 @@ export default function CompileStagePlayer({
     ))}
   </div> : null;
 
-  /* Home phone in Focus details: from 768px the frame pans across its four panes; below it shows one pane. */
-  const paneView = storyLayout && phoneFrame && !mobileFilmFit;
-  const panning = storyLayout && narrow && !mobileFilmFit && !paneView;
-  /* The phone pane's own still, decided from state alone (SSR); the <source media> keeps it off a desktop. */
-  const panePoster = storyLayout && !mobileFilmFit && active.phonePosterAvif ? active : undefined;
   const panTo = (pane: number) => {
     const viewport = viewportRef.current;
     viewport?.scrollTo({ left: Math.round((viewport.scrollWidth / 4) * pane), top: viewport.scrollTop, behavior: reducedMotion ? "auto" : "smooth" });
@@ -803,7 +813,7 @@ export default function CompileStagePlayer({
             survives, so nothing is torn down mid-fetch, and there is still exactly one decoder
             open on a phone.
           */
-          <video ref={videoRef} className="compile-film-video" src={videoSrc} data-active={1} muted autoPlay playsInline preload="metadata" disablePictureInPicture disableRemotePlayback poster={videoPoster} aria-label={`${active.label} — ${active.line}`} onLoadedMetadata={(event) => { event.currentTarget.playbackRate = Math.max(0.1, playbackRate); }} onEnded={onEnded} onError={() => {
+          <video ref={videoRef} className="compile-film-video" src={videoSrc} data-active={1} muted autoPlay playsInline preload="metadata" disablePictureInPicture disableRemotePlayback poster={videoPoster} aria-label={`${active.label} — ${active.line}`} onLoadedMetadata={(event) => { event.currentTarget.playbackRate = Math.max(0.1, playbackRate); }} onLoadedData={() => setFramedSrc(videoSrc)} onEnded={onEnded} onError={() => {
             if (videoSrc === preferredVideoSrc && fallbackVideoSrc) {
               setFailedPreferredSrc(preferredVideoSrc);
               return;
@@ -812,6 +822,12 @@ export default function CompileStagePlayer({
             setPaused(true);
           }} />
         )}
+        {!still && !live && paneHold ? (
+          <picture className={readingStyles.picture} data-pane-hold="">
+            <source type="image/avif" srcSet={paneHold.phonePosterAvif} />
+            <img className="compile-film-still" src={paneHold.phonePoster ?? paneHold.phonePosterAvif} width={684} height={855} alt="" decoding="async" />
+          </picture>
+        ) : null}
         {still && mask ? (
           <svg className={`compile-film-mask ${readingStyles.mask}`} aria-hidden="true" focusable="false" data-poster-mask={mask.poster} viewBox="0 0 2880 1800" preserveAspectRatio="xMidYMid meet">
             {mask.rects.map(rect => <rect key={`${rect.x}-${rect.y}`} x={rect.x} y={rect.y} width={rect.w} height={rect.h} fill={mask.color} />)}

@@ -167,10 +167,11 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
   the frame-strings table, measured on the poster frames); on screen it is that times the drawn
   media width / 2880. "Equivalent type size" is that x-height divided by the x-height ratio of the
   page's own sans, measured here in the same browser. Targets: >= 11px at 1440 on every stage that
-  opens cropped (fix round 3: stage 4 opens on Fit, see blankScan) and >= 9px at 390 (phone Focus
-  details; the phone still opens on Fit).
+  opens cropped (fix round 3: stage 4 opens on Fit, see blankScan), >= 9px where Focus pans (800px), and
+  on the 390 phone pane >= 9px on stages 1 and 4 with a ratchet at the measured size on stages 2 and 3
+  (review 2026-10-26 B-4; the waiver for those two stages below 768px is recorded in FIX-2026-10-26.md).
 */
-test("the film opens each stage on its scanned default view and reads at 9px or more in phone Focus", async ({ page }, testInfo) => {
+test("the film opens each stage on its scanned default view and Focus reads at 9px or more, phone pane stages 2-3 held at their measured 7.2px", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "1440", "sets its own viewports");
   const table = JSON.parse(readFileSync(resolve(process.cwd(), "components/compile-stage-player.frame-strings.json"), "utf8")) as {
     cropCheck: { stages: Record<string, { smallestXHeight: { px: number } }> };
@@ -329,9 +330,12 @@ test("the film opens each stage on its scanned default view and reads at 9px or 
       FINAL-SPEC 2026-10-26 §2.1. The Release 3 floor -- >= 9px equivalent in Focus -- was measured on the 1960px pan
       surface, and from 768 to 899px Focus is still that surface, so the floor is held there, at 800px, on every stage.
       Below 768px Focus is the source pane: the 2880px cut drawn at the frame's width / 684 per source pixel (the spec's
-      scale, asserted exactly below). At 390 that scale is 0.52 against the pan's 0.68, so the 9px floor is not this
-      view's; phone legibility of the pane is a person's judgment on the founder's device (spec §9 #27), and the
-      equivalent sizes are recorded for it (`smallestXHeight` is the crop window's, an upper bound for the pane).
+      scale, asserted exactly below). At 390 that scale is 0.52 against the pan's 0.68. Review 2026-10-26 B-4: main held
+      >= 9px here, and the pane still meets it on stages 1 and 4 (9.28 / 11.34 measured), so it stays asserted there.
+      Stages 2 and 3 measure 7.21 (7px source x-height x 0.5205 = 3.643px drawn, over the sans' 0.505): a ratchet holds
+      that drawn x-height at 3.64px, so the pane cannot get smaller. It is asserted in drawn pixels because those depend
+      on layout alone, while the sans ratio is a platform's font measurement. Phone legibility of the pane is still a
+      person's judgment on the founder's device (spec §9 #27); `smallestXHeight` is the crop window's, an upper bound.
     */
     await page.setViewportSize({ width: 800, height: 1024 });
     await page.goto("/");
@@ -367,6 +371,8 @@ test("the film opens each stage on its scanned default view and reads at 9px or 
       expect(Math.abs(pane.drawn - (pane.paneFile ? pane.frameWidth : pane.frameWidth * 2880 / 684)), `pane scale, stage ${stage + 1}`).toBeLessThanOrEqual(2);
       const xHeight = smallest[stage]! * scale;
       measurements.push({ width: 390, reduced, stage: stage + 1, view: "pane", drawnPxPerSourcePx: scale, smallestSourceXHeight: smallest[stage], renderedXHeight: xHeight, sansXHeightRatio: ratio, equivalentPx: xHeight / ratio });
+      if (stage === 1 || stage === 2) expect(xHeight, `390 pane stage ${stage + 1}: ratchet at the measured 3.643px x-height (7.21px equivalent)`).toBeGreaterThanOrEqual(3.64);
+      else expect(xHeight / ratio, `390 pane stage ${stage + 1}`).toBeGreaterThanOrEqual(9);
     }
     // A press shows the whole cut (Fit), where the stage-1 bars still land on the eyebrow; a second press returns.
     await phone.getByRole("tab").first().click();

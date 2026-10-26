@@ -54,7 +54,7 @@ type Copy = {
   openRegion: string;
   openFull: string;
   filing: { open: string; original: string; render: string };
-  fields: { source: string; version: string; location: string };
+  fields: { source: string; version: string };
   record: {
     passage: [string, string];
     version: [string, string];
@@ -80,8 +80,9 @@ const COPY: Record<"en" | "ko", Copy> = {
       "statement-heading": "Statement heading",
       "column-headings": "Column headings",
     },
+    /* Review 2026-10-26 B-1 (word budget): the "Context required:" label is cut; the note still says why. */
     selectedNote:
-      "Context required: headings and units are separate regions. Interpretation has not run.",
+      "Headings and units are separate regions. Interpretation has not run.",
     contextNote: "Shown as printed, for context. It has not been joined to the selected passage.",
     regions: "Regions on this page",
     openRegion: "Open in Explore",
@@ -91,7 +92,7 @@ const COPY: Record<"en" | "ko", Copy> = {
       original: "The original HTML filing, as submitted.",
       render: "The page shown here is a reference render of it.",
     },
-    fields: { source: "Source", version: "Filing", location: "Location" },
+    fields: { source: "Source", version: "Filing" },
     record: {
       passage: ["Source-bound passage", "Quoted exactly as extracted, bound to its page and region."],
       version: ["Source version", "The digest every region on this page is bound to."],
@@ -123,7 +124,7 @@ const COPY: Record<"en" | "ko", Copy> = {
       "column-headings": "열 제목",
     },
     selectedNote:
-      "맥락 확인 필요: 열 제목과 단위는 별도 영역입니다. 해석은 아직 실행하지 않았습니다.",
+      "열 제목과 단위는 별도 영역입니다. 해석은 아직 실행하지 않았습니다.",
     contextNote: "맥락 확인용으로 인쇄된 그대로 보여 줍니다. 선택한 구절과 묶지 않았습니다.",
     regions: "이 페이지의 영역",
     openRegion: "Explore에서 열기",
@@ -133,7 +134,7 @@ const COPY: Record<"en" | "ko", Copy> = {
       original: "제출된 그대로의 원본 HTML 공시입니다.",
       render: "여기 보이는 페이지는 그 공시의 기준 렌더입니다.",
     },
-    fields: { source: "원문", version: "공시", location: "위치" },
+    fields: { source: "원문", version: "공시" },
     record: {
       passage: ["원문에 묶인 구절", "추출된 그대로 인용하며, 페이지와 영역에 묶여 있습니다."],
       version: ["원문 버전", "이 페이지의 모든 영역이 묶인 다이제스트입니다."],
@@ -226,7 +227,6 @@ export default function HeroSourceCard({
         <div className={`${styles.locator} ${styles.step}`} data-step={t.steps.source}>
           <p className={styles.filename} data-derived="1">{source.filename}</p>
           <p className={styles.locatorMeta}>
-            <span className={styles.metaField}>{t.fields.location}</span>{" "}
             <span data-derived="1">
               {`${korean ? `${source.pageCount}쪽 중 ${active.page}쪽` : `page ${active.page} of ${source.pageCount}`} · ${qualifier}`}
             </span>
@@ -278,7 +278,7 @@ export default function HeroSourceCard({
             {source.officialFiling ? (
               <a className={styles.quietLink} href={source.officialFiling.href} data-full-filing>
                 {t.filing.open}
-                <span aria-hidden="true">↗</span>
+                <span aria-hidden="true">&nbsp;↗</span>
               </a>
             ) : null}
           </p>

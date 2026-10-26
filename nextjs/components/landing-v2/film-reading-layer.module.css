@@ -136,11 +136,11 @@
     outline-offset: 2px;
   }
 
-  /* A toggle shows its state as well as announcing it (fix round 3, M1): pressed = Focus on. */
+  /* A toggle shows its state as well as announcing it (fix round 3, M1): pressed = Focus on. Design critique
+     2026-10-26 B2(a): the state is the edge alone -- ink when pressed, rule-strong when not -- with no fill and no
+     inset ring, so the default (pressed) toggle is not the heaviest object on the first screen. */
   .story[data-narrow="0"] .viewControl[aria-pressed="true"] {
     border-color: var(--home-ink, #15191d);
-    background: rgb(21 25 29 / 7%);
-    box-shadow: inset 0 0 0 1px var(--home-ink, #15191d);
   }
 
   .story[data-narrow="0"][data-wide-view="crop"] :is(:global(.compile-film-video), :global(.compile-film-still), .mask) {
@@ -188,10 +188,9 @@
     display: none;
   }
 
+  /* Design critique 2026-10-26 B2(a): the pressed state is the 1px ink edge (rule-strong when not pressed). */
   .story :global(.compile-film-focus-control)[aria-pressed="true"] {
     border-color: var(--home-ink, #15191d);
-    background: rgb(21 25 29 / 7%);
-    box-shadow: inset 0 0 0 1px var(--home-ink, #15191d);
   }
 }
 
@@ -240,11 +239,11 @@
     display: none;
   }
 
-  /* The play/pause control stays on the panel, bottom right (the Fit overlay's place). */
+  /* The play/pause control stays on the panel, bottom right (the Fit overlay's place), 10px in (critique B2). */
   .story[data-mobile-view="focus"] :global(.compile-film-viewport) > :global(.compile-film-motion-control) {
     position: absolute;
-    right: 12px;
-    bottom: 12px;
+    right: 10px;
+    bottom: 10px;
     left: auto;
     margin: 0;
   }

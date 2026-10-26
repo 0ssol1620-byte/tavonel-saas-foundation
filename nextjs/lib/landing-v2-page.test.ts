@@ -159,9 +159,17 @@ describe("Home reading guide integration", () => {
     const control = css.match(/\.film :global\(\.compile-film-viewport\) > :global\(\.compile-film-motion-control\) \{([^}]+)\}/)?.[1];
     expect(control, "a Home-scoped motion control treatment").toBeDefined();
     expect(control).toMatch(/color:\s*#fff;/);
-    const plateVar = control!.match(/background:\s*var\((--[a-z-]+)\)/)![1];
-    const plate = css.match(new RegExp(`${plateVar}:\\s*#([0-9a-f]{6})`, "i"))![1]!;
-    const alpha = Number(control!.match(/opacity:\s*([\d.]+)/)![1]);
+    /*
+      Design critique 2026-10-26 B2: the plate is the instrument ground mixed toward transparent
+      (`color-mix(in oklab, var(--tv-inst-0) 72%, transparent)`), at opacity 1. Its alpha is the mix share times the
+      opacity, and its colour is the token's hex in app/tavonel.css; the 3:1 rule over a black and a white scene is
+      the same as before.
+    */
+    const mix = control!.match(/background:\s*color-mix\(in oklab,\s*var\((--[a-z0-9-]+)\)\s+(\d+)%,\s*transparent\)/)!;
+    const plateVar = mix[1]!;
+    const tokens = readFileSync(new URL("../app/tavonel.css", import.meta.url), "utf8");
+    const plate = tokens.match(new RegExp(`${plateVar}:\\s*#([0-9a-f]{6})`, "i"))![1]!;
+    const alpha = (Number(mix[2]) / 100) * Number(control!.match(/opacity:\s*([\d.]+)/)![1]);
     const linear = (value: number) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
     const luminance = (channels: number[]) => channels.map(linear).reduce((sum, value, i) => sum + value * [0.2126, 0.7152, 0.0722][i]!, 0);
     const plateChannels = plate.match(/../g)!.map(channel => parseInt(channel, 16) / 255);
@@ -910,12 +918,13 @@ describe("landing v2 -- difficulty and record", () => {
   });
 
   // FINAL-SPEC 2026-10-26 §2.4: same record and rule, four fields, its own region, no links. The quote is the
-  // §2.9 lever-1 length (120): the record's own label cut by excerptPreview, never edited text.
+  // §2.9 lever-1 length, 120 and then 90 (review 2026-10-26 B-1): the record's own label cut by excerptPreview, never
+  // edited text.
   it.each(LOCALES)("%s prints the sample record with its own status, version and region", locale => {
     const receive = sceneOf(mainOf(render(locale)), "s3");
     const record = buildReceiveRecord();
     const text = readable(receive);
-    expect(RECORD_EXCERPT).toBe(120);
+    expect(RECORD_EXCERPT).toBe(90);
     const preview = excerptPreview(record.claim.label, RECORD_EXCERPT);
     const quote = receive.match(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/)?.[1];
     expect(quote).toBe(escaped(preview.text) + (preview.truncated ? "…" : ""));

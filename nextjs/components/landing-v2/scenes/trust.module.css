@@ -96,26 +96,27 @@
   margin: 0;
 }
 
-/* The one next action (§39): 15/560, an ink underline. */
+/* The one next action (§39): 15/560. Its underline is the Home text-link rule's: hover and focus only (critique B1). */
 .next {
   font-size: 15px;
   font-weight: 560;
-  text-decoration-color: currentColor;
 }
 
-/* The footnote: one word, 13px muted, still a 44px control. */
+/* The footnote: one word, 13px muted, still a 44px control. No underline at rest (design critique 2026-10-26 B1). */
 .status {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
   color: var(--tv-on-inst-muted);
   font-size: 13px;
-  text-decoration: underline;
+  text-decoration-line: none;
   text-decoration-thickness: 1px;
-  text-decoration-color: var(--tv-rule-inst);
+  text-decoration-color: currentColor;
   text-underline-offset: 4px;
 }
 
+.status:focus-visible { text-decoration-line: underline; }
+
 @media (hover: hover) and (pointer: fine) {
-  .status:hover { color: var(--tv-on-inst); }
+  .status:hover { color: var(--tv-on-inst); text-decoration-line: underline; }
 }
