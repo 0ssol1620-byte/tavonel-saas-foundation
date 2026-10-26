@@ -159,29 +159,29 @@
       "file": "poster-1-t8.16-pane1-684x855.avif",
       "width": 684,
       "height": 855,
-      "bytes": 39926,
-      "sha256": "16d7c3a981ca43d921cee355c4ab083e64b4aef3727a749a2f146280c927c284",
+      "bytes": 43696,
+      "sha256": "e32d5aa0f412717896b65b271f0c00623afb1ba650171a953ba99e90923a6677",
       "cut": "compile-cut.mp4",
       "cutSha256": "1406a9a8d6e537eadd97012c94c89ffc792276628f30fa8313ea892c8dd169b9",
       "frameSeconds": 8.16,
       "framePngSha256": "ea96053750dc68fb950303c08d7b8e384f7fe2bd6424428948767467c0978a55",
       "cropOf": "poster-1-t8.16-2x.webp",
       "cropOfSha256": "58d0ff0e87c526d64620d5e9e6e4a699122f3599b59deb107bef3ea74e721867",
-      "cropRect": {"x": 746, "y": 252, "width": 684, "height": 855}
+      "cropRect": {"x": 746, "y": 380, "width": 684, "height": 855}
     },
     {
       "file": "poster-1-t8.16-pane1-684x855.webp",
       "width": 684,
       "height": 855,
-      "bytes": 68676,
-      "sha256": "ef85bc5e8489596bd901d491b8c66756392afc1e3943468456e375366a67bfde",
+      "bytes": 74308,
+      "sha256": "eae2fd2fb5908012d280397dffb033e0a9ecfaa76b750322de13d2d73f76831b",
       "cut": "compile-cut.mp4",
       "cutSha256": "1406a9a8d6e537eadd97012c94c89ffc792276628f30fa8313ea892c8dd169b9",
       "frameSeconds": 8.16,
       "framePngSha256": "ea96053750dc68fb950303c08d7b8e384f7fe2bd6424428948767467c0978a55",
       "cropOf": "poster-1-t8.16-2x.webp",
       "cropOfSha256": "58d0ff0e87c526d64620d5e9e6e4a699122f3599b59deb107bef3ea74e721867",
-      "cropRect": {"x": 746, "y": 252, "width": 684, "height": 855}
+      "cropRect": {"x": 746, "y": 380, "width": 684, "height": 855}
     },
     {
       "file": "poster-2-t9.28-2x.avif",

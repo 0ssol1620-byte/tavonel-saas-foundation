@@ -163,9 +163,15 @@ describe("Home reading guide integration", () => {
       Design critique 2026-10-26 B2: the plate is the instrument ground mixed toward transparent
       (`color-mix(in oklab, var(--tv-inst-0) 72%, transparent)`), at opacity 1. Its alpha is the mix share times the
       opacity, and its colour is the token's hex in app/tavonel.css; the 3:1 rule over a black and a white scene is
-      the same as before.
+      the same as before. R3 (critique N3): the plate is now the control's ::before, a 36px disc inside the 44px hit
+      area, and the control itself is transparent -- so the plate is read from ::before, the opacity from the control
+      (which multiplies its pseudo-element), and the control must not paint a second, unmeasured background.
     */
-    const mix = control!.match(/background:\s*color-mix\(in oklab,\s*var\((--[a-z0-9-]+)\)\s+(\d+)%,\s*transparent\)/)!;
+    expect(control).toMatch(/background:\s*transparent;/);
+    const plateRule = css.match(/\.film :global\(\.compile-film-viewport\) > :global\(\.compile-film-motion-control\)::before \{([^}]+)\}/)?.[1];
+    expect(plateRule, "the drawn disc").toBeDefined();
+    expect(plateRule).toMatch(/inset:\s*4px;/);
+    const mix = plateRule!.match(/background:\s*color-mix\(in oklab,\s*var\((--[a-z0-9-]+)\)\s+(\d+)%,\s*transparent\)/)!;
     const plateVar = mix[1]!;
     const tokens = readFileSync(new URL("../app/tavonel.css", import.meta.url), "utf8");
     const plate = tokens.match(new RegExp(`${plateVar}:\\s*#([0-9a-f]{6})`, "i"))![1]!;
@@ -458,6 +464,18 @@ describe("landing v2 -- the composition", () => {
           ? "문서를 AI가 인용할 수 있는 맥락으로 바꿉니다."
           : "Turn documents into context your AI can cite.";
       expect(bare(heading.replace(/<[^>]*>/g, ""))).toBe(bare(expected));
+      /*
+        R3 (design critique R2-B1): /ko holds "인용할 수 있는" on one line (.lv2-keep, nowrap on Home) so 수 never ends a
+        line apart from 있는, and "맥락으로 바꿉니다." so 바꿉니다. never ends the h1 alone; the words are the translation's
+        own and the h1's text is exactly BRAND_LINE's KO line. / carries no keep span.
+      */
+      if (locale === "ko") {
+        expect(LANDING_V2_COPY.ko.hero.headline).toBe(expected);
+        expect(heading).toContain('<span class="lv2-keep">인용할 수 있는</span> <span class="lv2-keep">맥락으로 바꿉니다.</span>');
+        expect(heading.replace(/<[^>]*>/g, "")).toBe(LANDING_V2_COPY.ko.hero.headline);
+      } else {
+        expect(heading).not.toContain("lv2-keep");
+      }
     }
   );
 
@@ -716,7 +734,17 @@ describe("landing v2 -- the lead and the workbench", () => {
       // The whole digest is in the markup (inside Source details), not only a `data-` attribute.
       expect(view.source.digest.length).toBeGreaterThan(0);
       expect(text).toContain(view.source.digest);
+      /*
+        R3 (design critique N9, D-grade copy in the veto block): the location line is the page and the page count from
+        the data, without the pipeline word "reference render"; Source details still states the representation
+        (components/landing-v2/hero-source-card.test.tsx holds it), so a render never passes as the original.
+      */
       expect(text).toContain(
+        locale === "ko"
+          ? `${view.source.pageCount}쪽 중 ${view.source.page}쪽`
+          : `page ${view.source.page} of ${view.source.pageCount}`
+      );
+      expect(text).not.toContain(
         locale === "ko"
           ? `${view.source.pageCount}쪽 중 ${view.source.page}쪽 · ${view.source.qualifierKo}`
           : `page ${view.source.page} of ${view.source.pageCount} · ${view.source.qualifier}`

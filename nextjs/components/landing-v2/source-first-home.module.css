@@ -77,6 +77,8 @@
     --text-on-paper: var(--ink);
     --text-muted-paper: var(--ink-muted);
     --home-mono: ui-monospace, Consolas, monospace;
+    /* R3 (design critique N12): the meta/detail size; Korean reads it at 14px (below), Latin at the spec's 13. */
+    --home-meta-fs: 13px;
     --home-ease: cubic-bezier(0.23, 1, 0.32, 1);
     /* One card corner on Home: the recompile cards and the revision card read --radius-md. */
     --radius-md: 8px;
@@ -87,6 +89,7 @@
     color: var(--ink);
     font-family: var(--f-sans);
   }
+  .home[lang="ko"] { --home-meta-fs: 14px; }
   .home.home > footer { --ink: var(--on-obsidian); --text-hi: var(--on-obsidian); --text-mid: #b7c3d2; --text-lo: #b7c3d2; --action: var(--action-on-dark); }
   /* One focus ring on Home: the accent at 2px. On the footer --action is the dark-ground accent. */
   .home.home :global(:is(a, button, summary, [tabindex]):focus-visible) { outline-color: var(--action); }
@@ -147,6 +150,14 @@
   /* §4.5: no uppercase tracking on Hangul. */
   .home[lang="ko"].home :global(:is(.lv2-meta, [class*="eyebrow"], .compile-film-stages button, .lv2-revision-title, #s1 figure figcaption)) { letter-spacing: 0; text-transform: none; }
   .home[lang="ko"].home :global(.lv2-hero-h1) { line-height: 1.16; letter-spacing: -0.012em; word-break: keep-all; }
+  /*
+    R3 (design critique R2-B1): KO holds "인용할 수 있는" and "맥락으로 바꿉니다." each on one line (hero-statement.tsx keep prop),
+    so the dependent noun 수 never ends a line apart from 있는 and 바꿉니다. never sits alone: 1440 and 412 set
+    §2.1's "문서를 AI가 인용할 수 있는 / 맥락으로 바꿉니다.", 390 and 360 "문서를 AI가 / 인용할 수 있는 / 맥락으로
+    바꿉니다.". The KO h1 still inherits text-wrap: balance (app/tavonel.css h1-h3; §3.2 names :lang(en) only), but with
+    the phrases held there is one reading break at each width either way. The words and textContent are unchanged.
+  */
+  .home[lang="ko"].home :global(.lv2-hero-h1 .lv2-keep) { white-space: nowrap; }
   .home[lang="ko"].home :global(.lv2-h2) { line-height: 1.24; letter-spacing: -0.01em; word-break: keep-all; }
   .home[lang="ko"].home :global(.lv2-hero-support) { line-height: 1.65; word-break: keep-all; }
   /* WEIGHT-HOOK-START */
@@ -180,7 +191,7 @@
   .home.home :global(#s1 .compile-film-mobile-tools) { grid-column: 2; grid-row: 1; align-self: center; margin: 0; }
   /* The film's own failure sentence (the caption row that carried it is gone): full width, under the frame. */
   .home.home :global(#s1 .compile-film-inline-error) { grid-column: 1 / -1; margin: 0; color: var(--home-ink); font: 400 15px/1.5 var(--f-sans); }
-  .home.home :global(#s1 .lv2-film-story > figcaption) { max-width: none; margin-top: 12px; color: var(--home-muted); font: 13px/1.5 var(--f-sans); text-align: start; }
+  .home.home :global(#s1 .lv2-film-story > figcaption) { max-width: none; margin-top: 12px; color: var(--home-muted); font: var(--home-meta-fs, 13px)/1.5 var(--f-sans); text-align: start; }
   /* FINAL-SPEC 2026-10-26 §2.1 rhythm at 1440: support -> actions 40, actions -> film tabs 56. */
   .heroAside { min-width: 0; max-width: none; margin: 40px 0 56px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
   .heroAside :global(.lv2-actions) { display: flex; flex-direction: row; justify-content: flex-start; align-items: center; gap: 8px 24px; margin-top: 0; }

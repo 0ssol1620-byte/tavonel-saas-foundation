@@ -17,9 +17,9 @@ const crossCheck = JSON.parse(readFileSync(new URL("./compile-stage-player.frame
   cropCheck: { stages: Record<string, { text: string; box: { x: number; w: number; h: number }; yAt: Record<string, number[]> }> };
   blankScan: { threshold: number; blankAt: number; stages: Record<string, { crop: { x: number; y: number }; frames: number; inkBoth: number; share: number; defaultView: "crop" | "fit" }> };
   phonePaneScan: {
-    threshold: number; blankAt: number; rect: { w: number; h: number };
-    stages: Record<string, { phonePane: { x: number; y: number }; frames: number; blankFrames: number; share: number }>;
-    rejected: Record<string, { phonePane: { x: number; y: number }; frames: number; blankFrames: number; share: number }>;
+    threshold: number; blankAt: number; rect: string;
+    stages: Record<string, { phonePane: { x: number; y: number; w: number }; frames: number; blankFrames: number; share: number }>;
+    rejected: Record<string, { phonePane: { x: number; y: number; w: number }; frames: number; blankFrames: number; share: number }>;
   };
 };
 
@@ -298,7 +298,7 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
     // FINAL-SPEC 2026-10-26 §2.1: ahead of them, the stage-1 pane still for a screen below 768px, AVIF then WebP.
     expect(picture).toMatch(/^<source media="\(max-width: 767\.98px\)" type="image\/avif" srcSet="\/film\/poster-1-t8\.16-pane1-684x855\.avif"\/><source media="\(max-width: 767\.98px\)" type="image\/webp" srcSet="\/film\/poster-1-t8\.16-pane1-684x855\.webp"\/><source type="image\/avif"/);
     expect(en).toContain('data-pane-poster="1"');
-    expect(en).toContain("--pane-x:746;--pane-y:252");
+    expect(en).toContain("--pane-x:746;--pane-y:380;--pane-w:684");
     expect(en).toContain('data-poster-mask="/film/poster-1-t8.16-2x.webp"');
     // The mask is bound to the poster it was measured on: any other stage-1 poster draws none.
     expect(renderToStaticMarkup(<CompileStagePlayer storyLayout />)).not.toContain("data-poster-mask");
@@ -312,15 +312,24 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
   */
   it("opens a phone on a pane only where the pane's own blank scan clears the threshold", () => {
     const scan = crossCheck.phonePaneScan;
-    expect([scan.threshold, scan.blankAt, scan.rect]).toEqual([crossCheck.blankScan.threshold, crossCheck.blankScan.blankAt, { w: 684, h: 855 }]);
+    expect([scan.threshold, scan.blankAt]).toEqual([crossCheck.blankScan.threshold, crossCheck.blankScan.blankAt]);
     for (const stage of COMPILE_STAGES) {
       const pane = STAGE_FRAMES[stage.id]!.phonePane;
       const row = scan.stages[stage.id];
+      // The scan is of this exact rect, width included: a rect that was not scanned fails here.
       expect(row?.phonePane, stage.id).toEqual(pane);
       expect(row!.share, stage.id).toBeCloseTo((row!.frames - row!.blankFrames) / row!.frames, 3);
       expect(row!.share, stage.id).toBeGreaterThanOrEqual(scan.threshold);
-      expect(pane.x >= 0 && pane.y >= 0 && pane.x + scan.rect.w <= 2880 && pane.y + scan.rect.h <= 1800, stage.id).toBe(true);
+      // 4:5 in whole source pixels, inside the frame, and never wider than the spec's 684px pane (a wider rect draws smaller type).
+      expect((pane.w * 5) % 4, stage.id).toBe(0);
+      expect(pane.w <= 684 && pane.x >= 0 && pane.y >= 0 && pane.x + pane.w <= 2880 && pane.y + (pane.w * 5) / 4 <= 1800, stage.id).toBe(true);
     }
+    // R3: the stage-1 pane still is cut from the same rect the playing cut is drawn at, so still and video match pixel for pixel.
+    const posters = (JSON.parse(readFileSync(new URL("../lib/locked-film-assets.json", import.meta.url), "utf8")) as { posters: { file: string; cropRect?: { x: number; y: number; width: number; height: number } }[] }).posters;
+    const pane1 = STAGE_FRAMES.sources!.phonePane;
+    const crops = posters.filter(poster => poster.file.startsWith("poster-1-t8.16-pane1-"));
+    expect(crops.map(poster => poster.file).sort()).toEqual(["poster-1-t8.16-pane1-684x855.avif", "poster-1-t8.16-pane1-684x855.webp"]);
+    for (const poster of crops) expect(poster.cropRect, poster.file).toEqual({ x: pane1.x, y: pane1.y, width: pane1.w, height: (pane1.w * 5) / 4 });
     // The failure path this guards: the spec's stage-4 rect left the ASSISTANT pane blank in 98 of 448 frames.
     expect(scan.rejected.world!.share).toBeLessThan(scan.threshold);
     expect(STAGE_FRAMES.world!.phonePane).not.toEqual(scan.rejected.world!.phonePane);

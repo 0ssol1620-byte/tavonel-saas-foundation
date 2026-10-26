@@ -78,19 +78,19 @@
     }
   },
   "phonePaneScan": {
-    "method": "FINAL-SPEC 2026-10-26 §2.1 / §9 #29. The blankScan cell rule over one rect: every presented frame of each locked cut at 1x (Chrome channel, requestVideoFrameCallback), drawn at 2880x1800; the 684x855 source-px rect at the stage's phonePane is cut into 24x24 cells from the rect origin, a cell holds ink when its luma range (sampled every 2px) is >= 48, and a frame is blank when >= blankAt of the rect's cells hold none. share = frames not blank / frames; a phonePane is used only when share >= threshold.",
-    "receipt": "outputs/tavonel-research-replan-20261013/redesign-20261026/review/impl-2026-10-26/pane-scan/pane-scan.json and pane-scan-world-candidates.json (ai-knowledge-compiler), tool pane-scan/pane-scan.cjs",
+    "method": "FINAL-SPEC 2026-10-26 §2.1 / §9 #29. The blankScan cell rule over one rect: every presented frame of each locked cut at 1x (Chrome channel, requestVideoFrameCallback), drawn at 2880x1800; the w x w*5/4 source-px rect at the stage's phonePane is cut into 24x24 cells from the rect origin, a cell holds ink when its luma range (sampled every 2px) is >= 48, and a frame is blank when >= blankAt of the rect's cells hold none. share = frames not blank / frames; a phonePane is used only when share >= threshold. Fix round R3 (review 2026-10-26 B-4): stages 2 and 3 are 520px wide, so their 7px source text reads >= 9px equivalent on a 390 phone; stage 1 starts at row 380, below the scan_0140 photo box. All four rows are one run of the R3 tool; the presented-frame count varies by a few frames between runs.",
+    "receipt": "outputs/tavonel-research-replan-20261013/redesign-20261026/review/impl-2026-10-26-R3/pane-scan/pane-scan-final.json and pane-scan-candidates.json (ai-knowledge-compiler), tool pane-scan/pane-scan-w.cjs; the R1 rects: review/impl-2026-10-26/pane-scan/pane-scan.json",
     "blankAt": 0.99,
     "threshold": 0.85,
-    "rect": {"w": 684, "h": 855},
+    "rect": "per stage: phonePane.w x phonePane.w * 5 / 4 source px (4:5)",
     "stages": {
-      "sources": {"phonePane": {"x": 746, "y": 252}, "frames": 446, "blankFrames": 0, "share": 1},
-      "read": {"phonePane": {"x": 752, "y": 190}, "frames": 449, "blankFrames": 0, "share": 1},
-      "structure": {"phonePane": {"x": 44, "y": 180}, "frames": 449, "blankFrames": 0, "share": 1},
-      "world": {"phonePane": {"x": 44, "y": 180}, "frames": 447, "blankFrames": 17, "share": 0.962}
+      "sources": {"phonePane": {"x": 746, "y": 380, "w": 684}, "frames": 443, "blankFrames": 0, "share": 1},
+      "read": {"phonePane": {"x": 820, "y": 238, "w": 520}, "frames": 447, "blankFrames": 0, "share": 1},
+      "structure": {"phonePane": {"x": 60, "y": 186, "w": 520}, "frames": 449, "blankFrames": 0, "share": 1},
+      "world": {"phonePane": {"x": 44, "y": 180, "w": 684}, "frames": 447, "blankFrames": 19, "share": 0.957}
     },
     "rejected": {
-      "world": {"phonePane": {"x": 44, "y": 516}, "frames": 448, "blankFrames": 98, "share": 0.781, "why": "the ASSISTANT answer rows are empty until the question is asked; the spec's D3 rect, below threshold"}
+      "world": {"phonePane": {"x": 44, "y": 516, "w": 684}, "frames": 448, "blankFrames": 98, "share": 0.781, "why": "the ASSISTANT answer rows are empty until the question is asked; the spec's D3 rect, below threshold"}
     }
   }
 }

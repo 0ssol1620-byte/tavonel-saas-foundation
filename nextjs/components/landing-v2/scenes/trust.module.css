@@ -51,6 +51,45 @@
   .layout :global(.lv2-proof) { min-height: 96px; }
 }
 
+/*
+  R3 (design critique N6): from 900px the training proof's verbatim note (F-2, wording unchanged) is one full-width
+  line under the 2x2 grid, so the four cells are equal. Position only, and only where the grid has two columns: the
+  note stays inside its own <li> (the DOM and a phone's reading order are unchanged). That li spans the whole grid as
+  a subgrid -- its label in row 1, column 1; its note in row 3 across both columns -- and the other three proofs take
+  the three remaining cells. The copy deck lists the training proof first (lib/landing-v2-trust.test.ts).
+*/
+@media (min-width: 900px) {
+  .layout > :global(.lv2-proof-list) { grid-template-rows: auto auto auto; }
+  .layout :global(.lv2-proof:has(> .lv2-proof-note)) {
+    grid-column: 1 / -1;
+    grid-row: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-template-rows: subgrid;
+    min-height: 0;
+    padding: 0;
+    border-top: 0;
+  }
+  .layout :global(.lv2-proof:has(> .lv2-proof-note) > .lv2-proof-label) {
+    grid-column: 1;
+    grid-row: 1;
+    min-height: 96px;
+    padding: 20px 0 16px;
+    border-top: 1px solid var(--tv-rule-inst);
+  }
+  .layout :global(.lv2-proof:has(> .lv2-proof-note) > .lv2-proof-note) {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    max-width: none;
+    margin: 0;
+    padding-top: 20px;
+    border-top: 1px solid var(--tv-rule-inst);
+  }
+  .layout :global(.lv2-proof-list > .lv2-proof:nth-child(2)) { grid-column: 2; grid-row: 1; }
+  .layout :global(.lv2-proof-list > .lv2-proof:nth-child(3)) { grid-column: 1; grid-row: 2; }
+  .layout :global(.lv2-proof-list > .lv2-proof:nth-child(4)) { grid-column: 2; grid-row: 2; }
+}
+
 .layout :global(.lv2-proof-label) {
   margin: 0;
   color: var(--tv-on-inst);
@@ -102,13 +141,17 @@
   font-weight: 560;
 }
 
-/* The footnote: one word, 13px muted, still a 44px control. No underline at rest (design critique 2026-10-26 B1). */
+/*
+  The footnote: one word, still a 44px control. No underline at rest (design critique 2026-10-26 B1). R3 (design
+  critique N16): the same 15/560 as the Trust Center link beside it, in the same ink, so it does not read as disabled.
+*/
 .status {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  color: var(--tv-on-inst-muted);
-  font-size: 13px;
+  color: var(--tv-on-inst);
+  font-size: 15px;
+  font-weight: 560;
   text-decoration-line: none;
   text-decoration-thickness: 1px;
   text-decoration-color: currentColor;
@@ -118,5 +161,5 @@
 .status:focus-visible { text-decoration-line: underline; }
 
 @media (hover: hover) and (pointer: fine) {
-  .status:hover { color: var(--tv-on-inst); text-decoration-line: underline; }
+  .status:hover { text-decoration-line: underline; }
 }

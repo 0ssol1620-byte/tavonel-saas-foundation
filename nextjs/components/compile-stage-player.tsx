@@ -101,17 +101,23 @@ export type PosterMask = { poster: string; color: string; rects: readonly { x: n
 
 /*
   Phone pane (FINAL-SPEC 2026-10-26 §2.1). Below 768px the Home film opens on Focus as ONE pane, a
-  684 x 855 (4:5) rect of the 2880 x 1800 frame whose top-left corner is `phonePane`, in source px.
-  The CSS (film-reading-layer.module.css) draws the poster and the playing cut at 2880/684 of the
+  w x w*5/4 (4:5) rect of the 2880 x 1800 frame whose top-left corner is `phonePane`, in source px.
+  The CSS (film-reading-layer.module.css) draws the poster and the playing cut at 2880/w of the
   panel's width and shifts both by the same corner, so the still and the video show the same pixels
-  and an auto-advance changes only --pane-x / --pane-y: no layout moves.
+  and an auto-advance changes only --pane-x / --pane-y / --pane-w: the panel stays 4:5, no layout moves.
 
   Each rect holds ink in >= 85% of the presented frames of its cut (the blankScan rule above, over the
   rect alone; phonePaneScan in compile-stage-player.frame-strings.json). Stage 4's first rect, the
   ASSISTANT pane at y 516, scored 78.1% -- the answer rows are empty until the question is asked -- so
   stage 4 uses the same pane at y 180, where the MCP session opens (96.2%).
+
+  Fix round R3 (review 2026-10-26 B-4): the phone Focus view reads >= 9px equivalent on every stage, as
+  main asserted. Stages 2 and 3 hold 7 source-px text, which a 684px rect draws at 7.21px on a 390 phone,
+  so their rects are 520px wide: the same 4:5 panel, 684/520 times closer (9.49px). Stage 1 starts at row
+  380, under the "photo · no text layer" box of the scan_0140 page, so its first row is that page's
+  "Handwritten · 12 March 2026 · Warehouse B" line; its pane still is cut from that same rect.
 */
-export type PhonePane = { x: number; y: number };
+export type PhonePane = { x: number; y: number; w: number };
 
 export const STAGE_FRAMES: Record<string, { panes: readonly [string, string, string, string]; readingTarget: ReadingTarget; crop: FilmCrop; wideView: WideView; phonePane: PhonePane; posterMask?: PosterMask }> = {
   sources: {
@@ -119,14 +125,14 @@ export const STAGE_FRAMES: Record<string, { panes: readonly [string, string, str
     readingTarget: { pane: 1, text: "WORKING COPY.md" },
     crop: { x: 0.25, y: 0.5 },
     wideView: "crop",
-    phonePane: { x: 746, y: 252 },
+    phonePane: { x: 746, y: 380, w: 684 },
     /* POSTER-RECUT (D-11): t = 8.16s shows the same document as t = 3.00s, and its eyebrow and title rows and
        columns measured identical (the same rects; README "Home posters -- POSTER-RECUT"). */
     posterMask: { poster: "/film/poster-1-t8.16-2x.webp", color: "#f2eee7", rects: [{ x: 796, y: 206, w: 282, h: 11 }, { x: 1499, y: 204, w: 278, h: 9 }] },
   },
-  read: { panes: ["NODES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 1, text: "# Payment terms" }, crop: { x: 0.25, y: 0.25 }, wideView: "crop", phonePane: { x: 752, y: 190 } },
-  structure: { panes: ["SOURCES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 0, text: "CHANGED" }, crop: { x: 0, y: 0 }, wideView: "crop", phonePane: { x: 44, y: 180 } },
-  world: { panes: ["ASSISTANT · MCP", "EDITOR", "TERMINAL", "WORLD"], readingTarget: { pane: 3, text: "nodes lit" }, crop: { x: 0.5, y: 0.45 }, wideView: "fit", phonePane: { x: 44, y: 180 } },
+  read: { panes: ["NODES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 1, text: "# Payment terms" }, crop: { x: 0.25, y: 0.25 }, wideView: "crop", phonePane: { x: 820, y: 238, w: 520 } },
+  structure: { panes: ["SOURCES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 0, text: "CHANGED" }, crop: { x: 0, y: 0 }, wideView: "crop", phonePane: { x: 60, y: 186, w: 520 } },
+  world: { panes: ["ASSISTANT · MCP", "EDITOR", "TERMINAL", "WORLD"], readingTarget: { pane: 3, text: "nodes lit" }, crop: { x: 0.5, y: 0.45 }, wideView: "fit", phonePane: { x: 44, y: 180, w: 684 } },
 };
 
 /*
@@ -734,7 +740,7 @@ export default function CompileStagePlayer({
   return (
     /* Below 900px the horizontal gesture pans the film (G1-012). The separate tab strip chooses
        the cut and may sit behind a native disclosure on the landing page. */
-    <div className={storyLayout ? `compile-film-sequence rv ${readingStyles.story}` : "compile-film-sequence rv"} ref={frameRef} {...(narrow ? {} : touchHandlers)} data-story-layout={storyLayout ? 1 : undefined} data-wide-view={storyLayout ? (wideFit ? "fit" : "crop") : undefined} data-pane-poster={panePoster ? 1 : undefined} style={stageFrame ? ({ "--film-crop-x": `${stageFrame.crop.x * 100}%`, "--film-crop-y": `${stageFrame.crop.y * 100}%`, "--pane-x": String(stageFrame.phonePane.x), "--pane-y": String(stageFrame.phonePane.y) } as React.CSSProperties) : undefined} data-film-renderer={live ? "live-canvas" : "video-fallback"} data-video-src={videoSrc} data-video-primary-src={preferredVideoSrc} data-compact={compact ? 1 : 0} data-narrow={narrow ? 1 : 0} data-mobile-view={mobileFilmFit ? "fit" : "focus"} data-mobile-focus-pane={focusPane}>
+    <div className={storyLayout ? `compile-film-sequence rv ${readingStyles.story}` : "compile-film-sequence rv"} ref={frameRef} {...(narrow ? {} : touchHandlers)} data-story-layout={storyLayout ? 1 : undefined} data-wide-view={storyLayout ? (wideFit ? "fit" : "crop") : undefined} data-pane-poster={panePoster ? 1 : undefined} style={stageFrame ? ({ "--film-crop-x": `${stageFrame.crop.x * 100}%`, "--film-crop-y": `${stageFrame.crop.y * 100}%`, "--pane-x": String(stageFrame.phonePane.x), "--pane-y": String(stageFrame.phonePane.y), "--pane-w": String(stageFrame.phonePane.w) } as React.CSSProperties) : undefined} data-film-renderer={live ? "live-canvas" : "video-fallback"} data-video-src={videoSrc} data-video-primary-src={preferredVideoSrc} data-compact={compact ? 1 : 0} data-narrow={narrow ? 1 : 0} data-mobile-view={mobileFilmFit ? "fit" : "focus"} data-mobile-focus-pane={focusPane}>
       {stageDisclosureLabel && stageTabs ? <details className="compile-film-stage-disclosure">
         <summary>{stageDisclosureLabel}</summary>
         {stageTabs}

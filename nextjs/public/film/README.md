@@ -83,22 +83,24 @@ DESIGN_MASTER_V3 §22 budgets the hero poster at **≤ 140KB AVIF**, and the reg
 
 ## Home phone pane (FINAL-SPEC 2026-10-26 §2.1)
 
-Below 768px the Home film opens on Focus as one readable pane: a 684×855 (4:5) rect of the 2880×1800 frame at `STAGE_FRAMES[stage].phonePane` (`components/compile-stage-player.tsx`), drawn at 380×475 CSS px on a 412px phone. The poster and the playing cut are both scaled to 2880/684 of the panel's width and shifted by the same corner, so the still and the video show the same pixels; the four `compile-cut*.mp4` files are unchanged and play at their locked 2880×1800.
+Below 768px the Home film opens on Focus as one readable pane: a w×(w·5/4) (4:5) rect of the 2880×1800 frame at `STAGE_FRAMES[stage].phonePane` (`components/compile-stage-player.tsx`; w is 684 on stages 1 and 4 and 520 on stages 2 and 3), drawn at 380×475 CSS px on a 412px phone. The poster and the playing cut are both scaled to 2880/w of the panel's width and shifted by the same corner, so the still and the video show the same pixels; the four `compile-cut*.mp4` files are unchanged and play at their locked 2880×1800.
 
-Stage 1 has its own still of that rect, so a phone's first image is 39,926 bytes instead of the 1440px frame. It is a crop of the locked `poster-1-t8.16-2x.webp`, not a new decode of the cut: ffmpeg was not on the producing host, so the WebP is the source and the crop carries one more lossy generation. sharp 0.35.4 `extract(rect)`, then AVIF quality 50, chroma 4:4:4, effort 6 and WebP quality 82, smartSubsample, effort 6 (the POSTER-RECUT settings). The rect starts at row 252, below the eyebrow overprint rows 206–218, so it needs no mask; a variant starting at row 130 (with the pane header) showed the overprint residue above the title and was rejected. Stages 2–4 have no pane file: their 2x posters are cropped by the same CSS.
+Stage 1 has its own still of that rect, so a phone's first image is 43,696 bytes instead of the 1440px frame. It is a crop of the locked `poster-1-t8.16-2x.webp`, not a new decode of the cut: ffmpeg was not on the producing host, so the WebP is the source and the crop carries one more lossy generation. sharp 0.35.4 `extract(rect)`, then AVIF quality 50, chroma 4:4:4, effort 6 and WebP quality 82, smartSubsample, effort 6 (the POSTER-RECUT settings). The rect starts at row 380 (fix round R3, 2026-10-27): the cut's scan_0140 page then opens on its "Handwritten · 12 March 2026 · Warehouse B" line instead of its grey "photo · no text layer" box (border rows 277–375), and the still opens on the last two rows of the Operations Manual table. It is below the eyebrow overprint rows 206–218, so it needs no mask. Earlier rects: row 252 (R1, opened on the photo box while the cut played) and row 130 (with the pane header; the overprint residue showed above the title). Stages 2–4 have no pane file: their 2x posters are cropped by the same CSS.
 
 | File | Stage | Format | Size | Bytes | sha256 | Crop of | Rect (x, y, w, h) |
 |---|---|---|---|---|---|---|---|
-| `poster-1-t8.16-pane1-684x855.avif` | 1 | AVIF | 684×855 | 39,926 | `16d7c3a981ca43d921cee355c4ab083e64b4aef3727a749a2f146280c927c284` | `poster-1-t8.16-2x.webp` (`58d0ff0e87c526d64620d5e9e6e4a699122f3599b59deb107bef3ea74e721867`) | 746, 252, 684, 855 |
-| `poster-1-t8.16-pane1-684x855.webp` | 1 | WebP | 684×855 | 68,676 | `ef85bc5e8489596bd901d491b8c66756392afc1e3943468456e375366a67bfde` | `poster-1-t8.16-2x.webp` (`58d0ff0e87c526d64620d5e9e6e4a699122f3599b59deb107bef3ea74e721867`) | 746, 252, 684, 855 |
+| `poster-1-t8.16-pane1-684x855.avif` | 1 | AVIF | 684×855 | 43,696 | `e32d5aa0f412717896b65b271f0c00623afb1ba650171a953ba99e90923a6677` | `poster-1-t8.16-2x.webp` (`58d0ff0e87c526d64620d5e9e6e4a699122f3599b59deb107bef3ea74e721867`) | 746, 380, 684, 855 |
+| `poster-1-t8.16-pane1-684x855.webp` | 1 | WebP | 684×855 | 74,308 | `eae2fd2fb5908012d280397dffb033e0a9ecfaa76b750322de13d2d73f76831b` | `poster-1-t8.16-2x.webp` (`58d0ff0e87c526d64620d5e9e6e4a699122f3599b59deb107bef3ea74e721867`) | 746, 380, 684, 855 |
 
 **Pane rects and their blank scan.** Each rect must hold ink in ≥ 85% of the presented frames of its cut, by the Release 3 blank-scan cell rule applied to the rect alone (`phonePaneScan` in `components/compile-stage-player.frame-strings.json`, which the unit test holds `phonePane` to):
 
-| Stage | Pane | phonePane (x, y) | Frames | Blank | Ink share |
+| Stage | Pane | phonePane (x, y, w) | Frames | Blank | Ink share |
 |---|---|---|---|---|---|
-| 1 Files | ORIGINAL | 746, 252 | 446 | 0 | 100% |
-| 2 Organize | MARKDOWN | 752, 190 | 449 | 0 | 100% |
-| 3 Updates | SOURCES | 44, 180 | 449 | 0 | 100% |
-| 4 Use with AI | ASSISTANT · MCP | **44, 180** | 447 | 17 | 96.2% |
+| 1 Files | ORIGINAL | 746, 380, 684 | 443 | 0 | 100% |
+| 2 Organize | MARKDOWN | 820, 238, 520 | 447 | 0 | 100% |
+| 3 Updates | SOURCES | 60, 186, 520 | 449 | 0 | 100% |
+| 4 Use with AI | ASSISTANT · MCP | **44, 180**, 684 | 447 | 19 | 95.7% |
+
+Stages 2 and 3 are 520px wide since fix round R3 (review 2026-10-26 B-4): their smallest text is 7 source px, which a 684px rect draws at 7.21px equivalent on a 390px phone; 520px draws it at 9.49px, the ≥ 9px floor main held on every stage. Stage 2 starts at the MARKDOWN body's first column (x 820, right of the line numbers) and loses the last ~50px of its longest lines; stage 3 keeps the file names and the TOUCHED/CHANGED row bands, and its right-hand badges fall outside the rect. Candidates scanned (all 100% ink): 540, 520 and 500px for each (`pane-scan-candidates.json` in the R3 receipts).
 
 Stage 4's rect in the spec (44, 516) scored 78.1% (98 of 448 frames blank: the answer rows are empty until the question is asked), so it moved up the same pane to row 180, where the MCP session opens (`initialize`, `tools/list`, the grounded `ask_world` answer with its citation).

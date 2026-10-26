@@ -196,9 +196,10 @@
 
 /*
   FINAL-SPEC 2026-10-26 §2.1, phone pane: below 768px Focus is one 4:5 panel, 16px wider than the
-  column (8px into each gutter). The poster and the playing cut are drawn at 2880/684 of the panel's
-  width and moved by the stage's --pane-x / --pane-y (source px, set by the player), so the still and
-  the video show the same rect and an auto-advance only changes the two numbers: no layout shift.
+  column (8px into each gutter). The poster and the playing cut are drawn at 2880/--pane-w of the panel's
+  width and moved by the stage's --pane-x / --pane-y (source px, set by the player, STAGE_FRAMES[].phonePane),
+  so the still and the video show the same rect and an auto-advance only changes the three numbers: the
+  panel stays 4:5, no layout shift.
   Stage 1's own pane still (data-pane-poster) fills the panel as is. After the Focus rules above, so
   it wins at the same specificity. `overflow: clip`, not hidden: a clipped box is not a scroll
   container, so the shared Focus scrollTo cannot move the picture.
@@ -222,10 +223,10 @@
   .story[data-mobile-view="focus"] :is(:global(.compile-film-video), :global(.compile-film-still)) {
     position: absolute;
     inset: 0 auto auto 0;
-    width: calc(100cqw * 2880 / 684);
+    width: calc(100cqw * 2880 / var(--pane-w));
     height: auto;
     max-width: none;
-    transform: translate(calc(-100cqw * var(--pane-x) / 684), calc(-100cqw * var(--pane-y) / 684));
+    transform: translate(calc(-100cqw * var(--pane-x) / var(--pane-w)), calc(-100cqw * var(--pane-y) / var(--pane-w)));
   }
 
   .story[data-mobile-view="focus"][data-pane-poster="1"] :global(.compile-film-still) {

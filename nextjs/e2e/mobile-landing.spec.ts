@@ -45,7 +45,10 @@ test("nothing on the narrow landing is laid out outside the viewport", async ({ 
       const overflowX = getComputedStyle(frame).overflowX;
       const frameBox = frame.getBoundingClientRect();
       if ((overflowX !== "hidden" && overflowX !== "clip") || frameBox.left < -1 || frameBox.right > innerWidth + 1) return false;
-      return getComputedStyle(element).position === "absolute" && Math.abs(element.offsetWidth - frame.clientWidth * 2880 / 684) <= 2;
+      // w = the stage's rect width (--pane-w, at most the spec's 684; e2e/support/overflow.ts states the same rule).
+      const paneW = Number(getComputedStyle(frame.closest(".compile-film-sequence")!).getPropertyValue("--pane-w"));
+      if (!(paneW > 0 && paneW <= 684)) return false;
+      return getComputedStyle(element).position === "absolute" && Math.abs(element.offsetWidth - frame.clientWidth * 2880 / paneW) <= 2;
     };
     for (const element of document.querySelectorAll<HTMLElement>("header.nav *, main *, footer.site *")) {
       const box = element.getBoundingClientRect();

@@ -168,17 +168,20 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
   media width / 2880. "Equivalent type size" is that x-height divided by the x-height ratio of the
   page's own sans, measured here in the same browser. Targets: >= 11px at 1440 on every stage that
   opens cropped (fix round 3: stage 4 opens on Fit, see blankScan), >= 9px where Focus pans (800px), and
-  on the 390 phone pane >= 9px on stages 1 and 4 with a ratchet at the measured size on stages 2 and 3
-  (review 2026-10-26 B-4; the waiver for those two stages below 768px is recorded in FIX-2026-10-26.md).
+  >= 9px on all four stages of the 390 phone pane, whose scale is the frame's width over the stage's own
+  source rect width (STAGE_FRAMES[].phonePane.w, held to its scan in phonePaneScan).
 */
-test("the film opens each stage on its scanned default view and Focus reads at 9px or more, phone pane stages 2-3 held at their measured 7.2px", async ({ page }, testInfo) => {
+test("the film opens each stage on its scanned default view and Focus reads at 9px or more on every stage, the 390 phone pane included", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "1440", "sets its own viewports");
   const table = JSON.parse(readFileSync(resolve(process.cwd(), "components/compile-stage-player.frame-strings.json"), "utf8")) as {
     cropCheck: { stages: Record<string, { smallestXHeight: { px: number } }> };
     blankScan: BlankScan;
+    phonePaneScan: { stages: Record<string, { phonePane: { x: number; y: number; w: number } }> };
   };
   const ids = ["sources", "read", "structure", "world"];
   const smallest = ids.map(id => table.cropCheck.stages[id]!.smallestXHeight.px);
+  // Each stage's scanned phone rect; the unit test holds STAGE_FRAMES[].phonePane to these rows.
+  const paneRects = ids.map(id => table.phonePaneScan.stages[id]!.phonePane);
   const scan = table.blankScan;
   const measurements: Record<string, unknown>[] = [];
   const FILM = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]';
@@ -329,13 +332,12 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
     /*
       FINAL-SPEC 2026-10-26 §2.1. The Release 3 floor -- >= 9px equivalent in Focus -- was measured on the 1960px pan
       surface, and from 768 to 899px Focus is still that surface, so the floor is held there, at 800px, on every stage.
-      Below 768px Focus is the source pane: the 2880px cut drawn at the frame's width / 684 per source pixel (the spec's
-      scale, asserted exactly below). At 390 that scale is 0.52 against the pan's 0.68. Review 2026-10-26 B-4: main held
-      >= 9px here, and the pane still meets it on stages 1 and 4 (9.28 / 11.34 measured), so it stays asserted there.
-      Stages 2 and 3 measure 7.21 (7px source x-height x 0.5205 = 3.643px drawn, over the sans' 0.505): a ratchet holds
-      that drawn x-height at 3.64px, so the pane cannot get smaller. It is asserted in drawn pixels because those depend
-      on layout alone, while the sans ratio is a platform's font measurement. Phone legibility of the pane is still a
-      person's judgment on the founder's device (spec §9 #27); `smallestXHeight` is the crop window's, an upper bound.
+      Below 768px Focus is the source pane: the 2880px cut drawn at the frame's width / w per source pixel, w being the
+      stage's own rect width (STAGE_FRAMES[].phonePane.w, the --pane-w the player sets; asserted exactly below). main
+      held >= 9px here on all four stages and so does this test. A 684px rect reads 9.28 / 11.34px on stages 1 and 4 at
+      390, but stages 2 and 3 hold 7px source text, which 684px drew at 7.21px; their rects are 520px wide (the same 4:5
+      panel, scanned in phonePaneScan), 9.49px. Phone legibility of the pane is still a person's judgment on the
+      founder's device (spec §9 #27); `smallestXHeight` is the stage's desktop crop window's, a proxy for the pane's.
     */
     await page.setViewportSize({ width: 800, height: 1024 });
     await page.goto("/");
@@ -364,15 +366,17 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
       const pane = await phone.locator(".compile-film-viewport").evaluate(frame => {
         const media = frame.querySelector<HTMLElement>("img.compile-film-still, video.compile-film-video")!;
         const paneFile = frame.closest("[data-pane-poster]") !== null && media.matches("img");
-        return { frameWidth: frame.clientWidth, drawn: media.getBoundingClientRect().width, paneFile };
+        const paneW = Number(getComputedStyle(frame.closest(".compile-film-sequence")!).getPropertyValue("--pane-w"));
+        return { frameWidth: frame.clientWidth, drawn: media.getBoundingClientRect().width, paneFile, paneW };
       });
-      const scale = pane.frameWidth / 684;
-      // The pane's own file fills the frame; the cut is drawn at 2880/684 of it. Either way one source pixel is frame / 684.
-      expect(Math.abs(pane.drawn - (pane.paneFile ? pane.frameWidth : pane.frameWidth * 2880 / 684)), `pane scale, stage ${stage + 1}`).toBeLessThanOrEqual(2);
+      const rectW = paneRects[stage]!.w;
+      expect(pane.paneW, `--pane-w, stage ${stage + 1}`).toBe(rectW);
+      const scale = pane.frameWidth / rectW;
+      // Stage 1's own file fills the frame (its rect is 684 wide); the cut is drawn at 2880/w of it. Either way one source pixel is frame / w.
+      expect(Math.abs(pane.drawn - (pane.paneFile ? pane.frameWidth * 684 / rectW : pane.frameWidth * 2880 / rectW)), `pane scale, stage ${stage + 1}`).toBeLessThanOrEqual(2);
       const xHeight = smallest[stage]! * scale;
-      measurements.push({ width: 390, reduced, stage: stage + 1, view: "pane", drawnPxPerSourcePx: scale, smallestSourceXHeight: smallest[stage], renderedXHeight: xHeight, sansXHeightRatio: ratio, equivalentPx: xHeight / ratio });
-      if (stage === 1 || stage === 2) expect(xHeight, `390 pane stage ${stage + 1}: ratchet at the measured 3.643px x-height (7.21px equivalent)`).toBeGreaterThanOrEqual(3.64);
-      else expect(xHeight / ratio, `390 pane stage ${stage + 1}`).toBeGreaterThanOrEqual(9);
+      measurements.push({ width: 390, reduced, stage: stage + 1, view: "pane", paneRect: paneRects[stage], drawnPxPerSourcePx: scale, smallestSourceXHeight: smallest[stage], renderedXHeight: xHeight, sansXHeightRatio: ratio, equivalentPx: xHeight / ratio });
+      expect(xHeight / ratio, `390 pane stage ${stage + 1}`).toBeGreaterThanOrEqual(9);
     }
     // A press shows the whole cut (Fit), where the stage-1 bars still land on the eyebrow; a second press returns.
     await phone.getByRole("tab").first().click();
@@ -597,15 +601,21 @@ test("every stage that opens cropped keeps ink in both panes of its whole window
   KO 106,378 / 145,347 / 169,464 / 186,438; review/impl-2026-10-26/qa/lcp-measure.json). Each floor is that area
   rounded down to the thousand, and the 1% margin stays.
   WebKit keeps its own floors (Windows WebKit's 10px classic scrollbar narrows the column), measured the same way.
+  Review R2 fix round R3 re-derived one cell, /ko at 390x844, because the frame moved on purpose: design critique
+  R2-B1 holds "인용할 수 있는" and "맥락으로 바꿉니다." each on one line, so the KO h1 takes three lines at 390 (as
+  EN already does) instead of breaking inside 인용할 수 / 있는, and the frame's top moves from 422.9 to 462.4. Re-measured
+  on that build (review/impl-2026-10-26-R3/qa/lcp-measure.json): chromium 135,508 and Windows WebKit 131,701; every
+  other cell measured the same as before. It is not lowered to pass: the frame still starts above the fold with
+  its tabs directly above it, which the assertions below hold at every width.
 */
 const LCP_FLOOR: Record<string, Record<string, Record<number, number>>> = {
   chromium: {
     "/": { 360: 106_000, 390: 131_000, 412: 178_000, 430: 194_000 },
-    "/ko": { 360: 109_000, 390: 149_000, 412: 178_000, 430: 196_000 },
+    "/ko": { 360: 109_000, 390: 135_000, 412: 178_000, 430: 196_000 },
   },
   webkit: {
     "/": { 360: 102_000, 390: 127_000, 412: 161_000, 430: 186_000 },
-    "/ko": { 360: 106_000, 390: 145_000, 412: 169_000, 430: 186_000 },
+    "/ko": { 360: 106_000, 390: 131_000, 412: 169_000, 430: 186_000 },
   },
 };
 for (const path of ["/", "/ko"]) {

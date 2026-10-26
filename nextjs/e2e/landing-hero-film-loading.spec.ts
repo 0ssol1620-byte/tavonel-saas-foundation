@@ -98,7 +98,7 @@ for (const locale of LOCALES) {
       const focusControl = film.locator(".compile-film-focus-control");
       const hint = film.locator(".compile-film-mobile-tools p");
       const stages = film.getByRole("tab");
-      const pane = () => sequence.evaluate(node => ["--pane-x", "--pane-y"].map(name => (node as HTMLElement).style.getPropertyValue(name)));
+      const pane = () => sequence.evaluate(node => ["--pane-x", "--pane-y", "--pane-w"].map(name => (node as HTMLElement).style.getPropertyValue(name)));
 
       // The phone player opens on the stage's source pane: Focus, pressed, named in the page's language.
       await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
@@ -108,18 +108,18 @@ for (const locale of LOCALES) {
 
       /*
         The pane follows the stage the visitor chose (STAGE_FRAMES.*.phonePane, 2880px source pixels): Updates opens
-        {44, 180}, Files {746, 252}. A playing film advances by itself, so each check follows a stage the visitor chose.
+        {60, 186} 520 wide, Files {746, 380} 684 wide (fix round R3). A playing film advances by itself, so each check follows a stage the visitor chose.
         The reading target pane (`data-mobile-focus-pane`) is the stage's own, as before.
       */
       await stages.nth(2).click();
       await expect(stages.nth(2)).toHaveAttribute("aria-selected", "true");
       await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "0");
-      await expect.poll(pane).toEqual(["44", "180"]);
+      await expect.poll(pane).toEqual(["60", "186", "520"]);
       await stages.nth(0).click();
       await expect(stages.nth(0)).toHaveAttribute("aria-selected", "true");
       await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
       await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "1");
-      await expect.poll(pane).toEqual(["746", "252"]);
+      await expect.poll(pane).toEqual(["746", "380", "684"]);
 
       // A press opens the whole frame (Fit), and changing stages in Fit keeps the visitor's choice.
       // Release 3 fix round 3, M1: one WAI-ARIA toggle whose name never changes; aria-pressed names the state.

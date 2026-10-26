@@ -156,11 +156,13 @@ const COPY: Record<"en" | "ko", Copy> = {
   },
 };
 
-/** `sourcePageQualifier`'s two spellings, inlined so the client bundle skips the page manifest. */
-const QUALIFIER = {
-  en: { reference_render: "reference render", original: "original PDF" },
-  ko: { reference_render: "기준 렌더", original: "원본 PDF" },
-} as const;
+/*
+  `sourcePageQualifier`'s spelling for an original PDF, inlined so the client bundle skips the page manifest. R3 (design
+  critique N9, D-grade copy, veto block): the location line no longer prints "reference render" -- it is a pipeline term;
+  Source details states the representation in a sentence and the page image's alt calls it a rendered page. An original
+  PDF is still named as one, so the line never lets a render pass as the original, nor the original as a render.
+*/
+const ORIGINAL_PDF = { en: "original PDF", ko: "원본 PDF" } as const;
 
 const letter = (index: number) => String.fromCharCode(65 + index);
 
@@ -197,7 +199,7 @@ export default function HeroSourceCard({
   const page = view.pages.find(item => item.sourceId === active?.sourceId && item.page === active?.page);
   if (!active || !source || !page) return null;
 
-  const qualifier = source.representation === "reference_render" ? QUALIFIER[locale].reference_render : QUALIFIER[locale].original;
+  const qualifier = source.representation === "reference_render" ? "" : ` · ${ORIGINAL_PDF[locale]}`;
   const where = (region: EvidenceRegion) =>
     `${korean ? `${region.page}쪽` : `p.${region.page}`} · bbox ${region.bbox1000.join(",")}`;
   /* Brief move 5: one data-derived label per region, by the letter the workbench prints beside it. */
@@ -224,11 +226,11 @@ export default function HeroSourceCard({
       </header>
 
       <div className={styles.benchGrid}>
-        <div className={`${styles.locator} ${styles.step}`} data-step={t.steps.source}>
+        <div className={styles.locator} data-step={t.steps.source}>
           <p className={styles.filename} data-derived="1">{source.filename}</p>
           <p className={styles.locatorMeta}>
             <span data-derived="1">
-              {`${korean ? `${source.pageCount}쪽 중 ${active.page}쪽` : `page ${active.page} of ${source.pageCount}`} · ${qualifier}`}
+              {`${korean ? `${source.pageCount}쪽 중 ${active.page}쪽` : `page ${active.page} of ${source.pageCount}`}${qualifier}`}
             </span>
           </p>
         </div>
@@ -286,7 +288,7 @@ export default function HeroSourceCard({
           {rightsNote ? <p className={styles.rightsNote}>{rightsNote}</p> : null}
         </div>
 
-        <div className={`${styles.passagePane} ${styles.step}`} data-step={t.steps.passage} id={passageId} aria-live="polite" data-line-region={active.id}>
+        <div className={styles.passagePane} data-step={t.steps.passage} id={passageId} aria-live="polite" data-line-region={active.id}>
           <p className={styles.paneLabel}>
             <span className={styles.extracted}>{t.existing}</span>
           </p>
@@ -346,7 +348,7 @@ export default function HeroSourceCard({
         </div>
       </div>
 
-      <footer className={`${styles.record} ${styles.step}`} data-step={t.steps.record}>
+      <footer className={styles.record} data-step={t.steps.record}>
         <details className={styles.details}>
           <summary className={styles.detailsSummary}>{t.details}</summary>
           {source.fullSourceHref ? (

@@ -652,4 +652,10 @@
 @media (hover: hover) and (pointer: fine) {
   .lv2 header.nav .nav-actions .btn:hover { box-shadow: inset 0 0 0 1px var(--tv-ink) !important; }
 }
+/*
+  R3 (review 2026-10-26 N-3, §3.3): the /ko header's Hangul (요금 and 로그인 on the first screen at 1440) is drawn in
+  the KO Home subset like the rest of the page, not in the 90-split variable face that `.header.header` names with
+  `!important` in `@layer overrides` (the same reversed layer order as above). Latin skips the subset (unicode-range).
+*/
+.lv2[lang="ko"] header.nav { font-family: var(--f-sans) !important; }
 }

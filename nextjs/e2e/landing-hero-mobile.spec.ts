@@ -34,7 +34,7 @@ test.describe("phone four-stage film", () => {
     const video = film.locator("video");
     await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.currentTime)).toBeGreaterThan(1);
     expect(await video.evaluate((node: HTMLVideoElement) => node.currentSrc)).toContain("/film/compile-cut.mp4");
-    // The pane draws the 2880px cut at 2880/684 of its width and clips it (FINAL-SPEC §2.1), so what a reader sees is the
+    // The pane draws the 2880px cut at 2880/w of its width (w = the stage's rect width) and clips it (FINAL-SPEC §2.1), so what a reader sees is the
     // frame: it, not the media's untransformed box, is what stays inside the phone's width.
     const box = (await film.locator(".compile-film-viewport").boundingBox())!;
     expect(box.x).toBeGreaterThanOrEqual(0);

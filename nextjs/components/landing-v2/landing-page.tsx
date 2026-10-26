@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
 import HeroFilm from "./hero-film";
 import HeroActions from "./hero-actions";
@@ -210,6 +211,7 @@ export default function LandingPage({
                 copy={{ ...copy.hero, eyebrow: "", headlineExperiment: undefined, support: page.support }}
                 titleId="lv2-hero-title"
                 headlineVariant={experiment.headlineVariant}
+                keep={korean ? ["인용할 수 있는", "맥락으로 바꿉니다."] : undefined}
               >
                 <div className={sourceStyles.heroAside} data-testid="landing-hero-actions">
                     <HeroActions {...heroActions} startLabel={heroStart.label} startHref={heroStart.href}
@@ -279,11 +281,24 @@ export default function LandingPage({
               <dl className={heroStyles.recordFields}>
                 <div>
                   <dt>{copy.evidence.fields.source}</dt>
-                  <dd data-derived="1" lang="en">{record.source.filename} · {record.source.form} · {record.source.filingDate}</dd>
+                  {/*
+                    R3 (design critique B4): one unbreakable span per " · " token, the separator kept with the token before
+                    it, so the value wraps only after a separator -- never inside the date ("2025-" / "10-31") and never
+                    onto a line that starts with "·". The text is the record's own; textContent is unchanged.
+                  */}
+                  <dd data-derived="1" lang="en">
+                    {[record.source.filename, record.source.form, record.source.filingDate].map((token, index, tokens) => (
+                      <Fragment key={index}>
+                        {index > 0 ? " " : null}
+                        <span className={heroStyles.recordToken}>{index < tokens.length - 1 ? `${token} ·` : token}</span>
+                      </Fragment>
+                    ))}
+                  </dd>
                 </div>
                 <div>
                   <dt>{copy.evidence.fields.page}</dt>
-                  <dd data-derived="1">
+                  {/* KO: the value is a sentence with Hangul ("80쪽 중 4쪽"), so it is set in the KO Home sans, not in Plex Mono. */}
+                  <dd data-derived="1" className={korean ? heroStyles.recordPageKo : undefined}>
                     {korean
                       ? `${record.source.pageCount}쪽 중 ${record.source.page}쪽`
                       : `${record.source.page} of ${record.source.pageCount}`}
@@ -291,7 +306,7 @@ export default function LandingPage({
                 </div>
                 <div>
                   <dt>{copy.evidence.fields.region}</dt>
-                  <dd><span data-derived="1">bbox {record.region.bbox1000.join(",")}</span></dd>
+                  <dd><span data-derived="1" className={heroStyles.recordToken}>bbox {record.region.bbox1000.join(",")}</span></dd>
                 </div>
                 <div>
                   <dt>{copy.evidence.fields.version}</dt>

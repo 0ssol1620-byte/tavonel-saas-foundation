@@ -75,7 +75,11 @@ describe("the Home workbench -- source and passage", () => {
     const text = readable(render(value, korean));
     expect(text).toContain(view.source.filename);
     expect(text).toContain(`${source.form} · ${source.filingDate}`);
+    // R3 (critique N9, veto block): the location is the data's page and count; the representation is in Source details.
     expect(text).toContain(korean
+      ? `${view.source.pageCount}쪽 중 ${view.source.page}쪽`
+      : `page ${view.source.page} of ${view.source.pageCount}`);
+    expect(text).not.toContain(korean
       ? `${view.source.pageCount}쪽 중 ${view.source.page}쪽 · ${view.source.qualifierKo}`
       : `page ${view.source.page} of ${view.source.pageCount} · ${view.source.qualifier}`);
     expect(view.source.digest.length).toBeGreaterThan(0);
@@ -325,9 +329,16 @@ describe("the Home workbench -- full filing", () => {
     const details = readable(html.match(/<details[\s\S]*?<\/details>/)![0]);
     expect(details).toContain(korean ? "제출된 그대로의 원본 HTML 공시입니다." : "The original HTML filing, as submitted.");
     expect(details).toContain(korean ? "여기 보이는 페이지는 그 공시의 기준 렌더입니다." : "The page shown here is a reference render of it.");
-    // The visible location line still names the page's own representation.
+    /*
+      R3 (design critique N9, D-grade copy in the veto block): the visible location line no longer prints the pipeline
+      term "reference render". Re-pinned rule, unchanged: a reference render never presents itself as the original --
+      Source details states it is a reference render (above), the page image's alt calls it a rendered page, and no
+      visible text outside the details calls this page an original PDF.
+    */
     const outside = readable(html.replace(/<details[\s\S]*?<\/details>/, ""));
-    expect(outside).toContain(korean ? "기준 렌더" : "reference render");
+    expect(outside).not.toContain(korean ? "원본 PDF" : "original PDF");
+    expect(outside).toContain(korean ? "30쪽 중 4쪽" : "page 4 of 30");
+    expect(html).toContain(korean ? 'alt="구절을 추출한 공시 문서의 페이지 렌더입니다."' : 'alt="A rendered page of the filing the passage was extracted from."');
   });
 
   it("keeps every exact region link alongside the filing", () => {

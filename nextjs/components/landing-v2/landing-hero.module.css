@@ -215,7 +215,7 @@ section.hero .actionsBlock :global(.lv2-actions a:focus-visible) {
   gap: 0.5rem;
   margin: 0;
   color: var(--home-muted);
-  font: 500 13px/1.45 var(--f-sans);
+  font: 500 var(--home-meta-fs, 13px)/1.45 var(--f-sans);
 }
 
 .runStatus::before {
@@ -268,7 +268,7 @@ section.hero .actionsBlock :global(.lv2-actions a:focus-visible) {
 .locatorMeta {
   margin: 4px 0 0;
   color: var(--home-muted);
-  font-size: 13px;
+  font-size: var(--home-meta-fs, 13px);
   line-height: 1.5;
 }
 
@@ -276,7 +276,7 @@ section.hero .actionsBlock :global(.lv2-actions a:focus-visible) {
 .metaField,
 .extracted,
 .regionsLabel {
-  font: 500 13px/1.45 var(--f-sans);
+  font: 500 var(--home-meta-fs, 13px)/1.45 var(--f-sans);
   letter-spacing: 0;
   text-transform: none;
 }
@@ -418,7 +418,7 @@ a.diffLink:focus-visible {
   align-items: center;
   gap: 0.375rem 0.75rem;
   margin: 0 0 0.75rem;
-  font-size: 13px;
+  font-size: var(--home-meta-fs, 13px);
   font-weight: 560;
 }
 
@@ -448,6 +448,18 @@ a.diffLink:focus-visible {
 }
 
 /*
+  R3 (design critique R2 N13): below 768px the s2 region crop is hidden, as the s3 record crop is. The cited rows
+  span 891/1000 of the page's width, so the crop is width-bound, not height-bound: at 412 it draws 296 x 34px for four
+  table rows (2.5px x-height, about 5 eq px), and a two-row crop of the same width draws the same type size. Reaching
+  9 eq px would need ~540px of width, or a crop that drops the value columns and so no longer shows the cited region.
+  The passage below it is the region's text as extracted, and the coordinate label stays on the card. Important: the
+  crop's own inline style is display: flex (SourceRegionCrop).
+*/
+@media (max-width: 767.98px) {
+  .crop { display: none !important; }
+}
+
+/*
   The extractor's text, as extracted: its own line breaks kept (brief move 8). FINAL-SPEC 2026-10-26
   §2.3 sets it in the body face at 17/1.55 (16 on a phone): mono is for file names, coordinates,
   hashes and dates (§3.1).
@@ -464,7 +476,7 @@ a.diffLink:focus-visible {
 .citation {
   margin: 0.625rem 0 0;
   color: var(--home-muted);
-  font: 0.8125rem/1.5 var(--home-mono);
+  font: var(--home-meta-fs, 13px)/1.5 var(--home-mono);
   overflow-wrap: anywhere;
 }
 
@@ -472,7 +484,7 @@ a.diffLink:focus-visible {
   max-width: 46ch;
   margin: 16px 0 0;
   color: var(--home-muted);
-  font-size: 13px;
+  font-size: var(--home-meta-fs, 13px);
   line-height: 1.55;
 }
 
@@ -586,7 +598,7 @@ a.evidenceLink {
   max-width: 72ch;
   margin: 8px 0 0;
   color: var(--home-muted);
-  font-size: 13px;
+  font-size: var(--home-meta-fs, 13px);
   line-height: 1.55;
 }
 
@@ -786,7 +798,7 @@ section.receive {
   flex-wrap: wrap;
   gap: 4px 12px;
   margin: 0;
-  font: 560 13px/1.5 var(--f-sans);
+  font: 560 var(--home-meta-fs, 13px)/1.5 var(--f-sans);
   letter-spacing: 0;
 }
 
@@ -849,6 +861,11 @@ section.receive {
 }
 
 @media (max-width: 899.98px) {
+  /* R3: Page takes its own width and Region the rest, so "bbox 30,234,971,268" holds one line at 360. */
+  .recordFields {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
   .recordFields > div:first-child,
   .recordFields > div:last-child {
     grid-column: 1 / -1;
@@ -861,7 +878,7 @@ section.receive {
 
 .recordFields dt {
   color: var(--home-muted);
-  font: 560 13px/1.5 var(--f-sans);
+  font: 560 var(--home-meta-fs, 13px)/1.5 var(--f-sans);
   letter-spacing: 0;
 }
 
@@ -874,6 +891,16 @@ section.receive {
 .recordFields code {
   font: inherit;
   word-break: break-all;
+}
+
+/* R3 (design critique B4): a record value token never breaks inside itself; the value wraps between tokens only. */
+.recordToken {
+  white-space: nowrap;
+}
+
+/* R3 (design critique N2): the KO page value is a Hangul sentence ("80쪽 중 4쪽"), set in the KO Home sans, not Plex Mono. */
+.recordFields dd.recordPageKo {
+  font: 500 14px/1.45 var(--f-sans);
 }
 
 /* The FAQ's own disclosure keeps a visible marker (the shared sheet turns summaries inline-flex). */
@@ -970,11 +997,26 @@ section.receive {
   shape as the view toggle beside it, instead of an opaque square with a 60% white edge over the pane's text.
 */
 .film :global(.compile-film-viewport) > :global(.compile-film-motion-control) {
+  isolation: isolate;
   border: 0;
   border-radius: 999px;
-  background: color-mix(in oklab, var(--tv-inst-0) 72%, transparent);
+  background: transparent;
   color: #fff;
   opacity: 1;
+}
+
+/*
+  R3 (design critique N3): the 44x44 hit area stays; the drawn disc is 36px (inset 4px), so it covers less of the
+  pane's line ends. The mark (an SVG child) paints above it: the disc sits at z-index -1 inside the control's own
+  stacking context (isolation).
+*/
+.film :global(.compile-film-viewport) > :global(.compile-film-motion-control)::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  z-index: -1;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--tv-inst-0) 72%, transparent);
 }
 
 .film :global(.compile-film-viewport) > :global(.compile-film-motion-control):focus-visible {

@@ -683,7 +683,7 @@ const KO: LandingV2Copy = {
     ],
     links: [
       { label: "보안", href: "/security" },
-      { label: "Trust Center", href: "/trust" },
+      { label: "신뢰 센터", href: "/trust" },
       { label: "하위 처리자", href: "/subprocessors" },
       { label: "상태", href: "/status" },
       { label: "근거", href: "/evidence" },

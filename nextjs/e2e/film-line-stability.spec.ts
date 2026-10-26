@@ -145,8 +145,8 @@ for (const [width, height] of [[390, 844], [430, 932]] as const) {
 /*
   The failure path: the same watch, with a stage-dependent height put above the frame through the
   CSSOM (the page's CSP allows no injected stylesheet). The tab row is given a floor of 0.3px per
-  source pixel of the stage's pane offset (`--pane-y`: 252 / 190 / 180 / 180), so it stands
-  75.6 / 57 / 54 / 54px by stage and any three consecutive advances include a change of height:
+  source pixel of the stage's pane offset (`--pane-y`: 380 / 238 / 186 / 180 since fix round R3), so it stands
+  114 / 71.4 / 55.8 / 54px by stage and any three consecutive advances include a change of height:
   the frame has to move and the shift has to be recorded. If this passes with the assertions above,
   the watch can see nothing.
 */

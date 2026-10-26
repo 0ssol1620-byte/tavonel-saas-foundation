@@ -41,7 +41,7 @@
   max-width: 60ch;
   margin: 0;
   color: var(--tv-on-inst-muted);
-  font-size: 13px;
+  font-size: var(--home-meta-fs, 13px);
   line-height: 1.55;
 }
 

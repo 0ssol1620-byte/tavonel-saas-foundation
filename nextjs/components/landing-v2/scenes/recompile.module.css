@@ -44,7 +44,7 @@
 
 .panelLabel {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--home-meta-fs, 13px);
   line-height: 1.5;
   font-weight: 560;
   color: var(--tv-on-inst-muted);
@@ -106,7 +106,7 @@
 }
 
 .count span {
-  font-size: 13px;
+  font-size: var(--home-meta-fs, 13px);
   line-height: 1.5;
   color: var(--tv-on-inst-muted);
 }
@@ -139,7 +139,7 @@
 
 .qualifier {
   margin: -16px 0 0;
-  font-size: 13px;
+  font-size: var(--home-meta-fs, 13px);
   line-height: 1.5;
   color: var(--tv-on-inst-muted);
   max-width: 60ch;
