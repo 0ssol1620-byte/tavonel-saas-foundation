@@ -73,6 +73,27 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   /*
+    PR #172, Home redesign (FINAL-SPEC 2026-10-26): production deployment dpl_rqgoRU7DNuSr3L8qQSTs6biW71ts (main 5ecb6051, merge of head
+    0f0d156e), READY 2026-10-26T17:49:51Z, 02:49:51 in Seoul, read from the Vercel deployment record (receipt:
+    redesign-20261026/review/merge-2026-10-27/). Independent review R3 APPROVE (REVIEW-2026-10-26-R3.md) and design
+    critique R3 PASS. By docs/CHANGELOG_ENTRY_RULE.md these have no bullet: the e2e re-pins, the repair-scope
+    registrations, the pane-crop receipts and the re-derived LCP floor (internal); the specimen strip (preview only,
+    unchanged). No version: channel.json and /api/openapi did not move.
+  */
+  {
+    date: "2026-10-27",
+    releasedAt: "2026-10-26T17:49:51Z",
+    id: "2026-10-27-home-product-as-hero",
+    title: "The home page opens on the compiler",
+    surfaces: ["Website"],
+    improved: [
+      "/ and /ko open on a two-line statement, one sentence of support, one button with a link to evaluate your documents beside it, and the compilation film. On a phone the film opens on one pane of the source page, with the full frame one tap away.",
+      "Below the film, the research figures are three rows, each with its receipt id, date and digest; the sample record shows its source, page, region and version; the change counts compare two complete compiles. The FAQ, the reading-difficulty notes, the Read links under each boundary and the link rows under the source workbench and the sample record have left the home page, and the home footer is compact.",
+      "The customer-data sentence, the training-data statement and the rights sentence stay on the home page in their existing wording.",
+      "/ko sets its home-page Hangul in a static subset of Wanted Sans in two weights, and / loads no Korean font.",
+    ],
+  },
+  /*
     PR #170, phase 4 post-batch: production deployment dpl_2WMiVjsxeoa7WUAz1K7stgA91JFK (main 5d8417a1), READY
     2026-10-25T13:49:52Z, 22:49:52 in Seoul, read with Vercel get_deployment (receipt:
     ux-program-20261017/phase4/POST-BATCH/CHANGELOG-170/RECEIPT-2026-10-25.md). By docs/CHANGELOG_ENTRY_RULE.md these
