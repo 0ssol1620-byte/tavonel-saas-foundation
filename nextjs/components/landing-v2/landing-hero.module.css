@@ -174,28 +174,18 @@ section.hero .actionsBlock :global(.lv2-actions a:focus-visible) {
   outline-offset: 3px;
 }
 
-.intakeNote {
-  margin: 0;
-  color: var(--home-muted);
-  font-size: 1rem;
-  line-height: 1.5;
+/*
+  FINAL-SPEC 2026-10-26 §2.3: s2 is the workbench. Its title is the section's h2 (Home's one h2 rule,
+  `lv2-h2`), the run status sits at the head's right edge, and the rule above the section is the
+  container's (source-first-home.module.css), so the bench draws none of its own.
+*/
+.sourceScene {
+  color: var(--home-ink);
 }
 
-/* The accepted formats, under the workbench rather than in the first screen's stack. */
-section.hero .intake {
-  margin: 0;
-  color: var(--home-muted);
-  font-family: inherit;
-  font-size: 1rem;
-  line-height: 1.55;
-  text-align: start;
-}
-
-/* The workbench: one top rule (the page's one rule weight, 1px), no nested panels. */
 .bench {
   position: relative;
   min-width: 0;
-  border-top: 1px solid var(--home-rule);
   color: var(--home-ink);
   text-align: start;
 }
@@ -205,17 +195,12 @@ section.hero .intake {
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 0.25rem 1.5rem;
-  padding-block: 0.75rem;
-  border-bottom: 1px solid var(--home-rule);
+  gap: 12px 24px;
+  padding-bottom: 48px;
 }
 
 .benchTitle {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: 0;
 }
 
 /* The shared `h1, h2, h3` rule sets light `--text-hi` on the h2 itself, so it never inherits `.bench` ink. */
@@ -244,39 +229,27 @@ section.hero .intake {
 
 .benchGrid {
   display: grid;
-  gap: 1.25rem;
-  padding-top: 1.25rem;
+  grid-template-areas: "locator" "page" "regions" "passage";
+  gap: 16px;
 }
-
 
 @media (min-width: 960px) {
   .benchGrid {
     grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
     grid-template-areas:
-      "locator passage"
-      "page passage"
-      "page regions";
+      "locator regions"
+      "page regions"
+      "page passage";
     grid-template-rows: auto auto 1fr;
-    column-gap: 0;
-    row-gap: 1rem;
-  }
-
-  .locator { grid-area: locator; }
-  .passagePane { grid-area: passage; }
-  .pageFrame { grid-area: page; }
-  .regionPane { grid-area: regions; align-self: end; }
-
-  .locator,
-  .pageFrame {
-    padding-right: clamp(1.5rem, 3vw, 3rem);
-  }
-
-  .passagePane,
-  .regionPane {
-    padding-left: clamp(1.5rem, 3vw, 3rem);
-    border-left: 1px solid var(--home-rule);
+    column-gap: 24px;
+    row-gap: 16px;
   }
 }
+
+.locator { grid-area: locator; }
+.passagePane { grid-area: passage; }
+.pageFrame { grid-area: page; }
+.regionPane { grid-area: regions; }
 
 .locator,
 .passagePane,
@@ -285,18 +258,17 @@ section.hero .intake {
   min-width: 0;
 }
 
+/* §3.1: Plex Mono for the file name; the location in the 13px meta size. */
 .filename {
   margin: 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-  line-height: 1.35;
+  font: 500 12px/1.45 var(--f-mono);
   overflow-wrap: anywhere;
 }
 
 .locatorMeta {
-  margin: 0.25rem 0 0;
+  margin: 4px 0 0;
   color: var(--home-muted);
-  font-size: 1rem;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -361,9 +333,9 @@ a.diffLink:focus-visible {
 .pageWindow {
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--home-rule);
-  border-radius: 8px;
-  background: #fff;
+  border: 1px solid var(--tv-rule);
+  border-radius: var(--tv-r-paper-lg);
+  background: var(--tv-paper-raised);
 }
 
 .pageWindow::after {
@@ -387,14 +359,19 @@ a.diffLink:focus-visible {
 
 .box {
   position: absolute;
-  outline: 1.5px dashed var(--home-amber-ink);
+  border-radius: var(--tv-r-paper);
+  outline: 1px dashed var(--tv-rule-strong);
   outline-offset: 1px;
 }
 
-/* A translucent ink wash, so the scan under the selected region stays readable (UX-L1, §4.2-2). */
+/*
+  FINAL-SPEC 2026-10-26 §2.3 / §3.4: the selected region is one of the accent's five places (the
+  filled action, the active tab marker, the focus ring, the selected region, the Evidence Line).
+  The wash is 8%, so the scan under it stays readable.
+*/
 .box[data-selected="1"] {
-  outline: 2px solid var(--home-ink);
-  background: var(--tv-rule);
+  outline: 2px solid var(--tv-action);
+  background: color-mix(in oklab, var(--tv-action) 8%, transparent);
 }
 
 .boxMark {
@@ -422,14 +399,21 @@ a.diffLink:focus-visible {
   color: var(--home-muted);
 }
 
+.passagePane {
+  padding: 24px;
+  border: 1px solid var(--tv-rule);
+  border-radius: var(--tv-r-inst-lg);
+  background: var(--tv-paper-raised);
+}
+
 .paneLabel {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.375rem 0.75rem;
   margin: 0 0 0.75rem;
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 560;
 }
 
 /* A label of what the text is, in ink -- deliberately not a coloured badge. */
@@ -451,13 +435,15 @@ a.diffLink:focus-visible {
   background: #fff;
 }
 
-/* The extractor's text, as extracted: mono, its own line breaks kept (brief move 8). */
+/*
+  The extractor's text, as extracted: its own line breaks kept (brief move 8). FINAL-SPEC 2026-10-26
+  §2.3 sets it in the body face at 17/1.55 (16 on a phone): mono is for file names, coordinates,
+  hashes and dates (§3.1).
+*/
 .quote {
   margin: 0;
-  padding: 1rem 1.125rem;
-  border-left: 3px solid var(--home-amber);
-  background: var(--home-sheet);
-  font: 0.9375rem/1.6 var(--home-mono);
+  padding: 16px 0 0;
+  font: 400 17px/1.55 var(--f-sans);
   font-variant-numeric: tabular-nums;
   white-space: pre-wrap;
   overflow-wrap: break-word;
@@ -472,10 +458,9 @@ a.diffLink:focus-visible {
 
 .contextNote {
   max-width: 46ch;
-  margin: 1rem 0 0;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--home-rule);
-  font-size: 1rem;
+  margin: 16px 0 0;
+  color: var(--home-muted);
+  font-size: 13px;
   line-height: 1.55;
 }
 
@@ -490,10 +475,11 @@ a.evidenceLink {
 
 .regionList {
   display: grid;
-  gap: 0.5rem;
+  gap: 0;
   margin: 0;
   padding: 0;
   list-style: none;
+  border-bottom: 1px solid var(--tv-rule);
 }
 
 /* Native buttons; the pressed one carries the region wash and an ink edge. Selection itself is instant. */
@@ -503,10 +489,11 @@ a.evidenceLink {
   align-items: center;
   gap: 0.75rem;
   width: 100%;
-  min-height: 3rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--home-rule-strong);
-  border-radius: 8px;
+  min-height: 48px;
+  padding: 4px 8px;
+  border: 0;
+  border-top: 1px solid var(--tv-rule);
+  border-radius: 0;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -516,9 +503,7 @@ a.evidenceLink {
 }
 
 .regionButton[aria-pressed="true"] {
-  border-color: var(--home-ink);
   background: var(--home-amber-wash);
-  box-shadow: inset 3px 0 0 var(--home-amber);
 }
 
 .regionButton:active {
@@ -532,7 +517,7 @@ a.evidenceLink {
 
 @media (hover: hover) and (pointer: fine) {
   .regionButton:hover {
-    border-color: var(--home-ink);
+    background: var(--home-amber-wash);
   }
 }
 
@@ -557,15 +542,18 @@ a.evidenceLink {
 }
 
 .regionRole {
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 560;
   line-height: 1.35;
 }
 
-.regionWhere {
+/* F-3 (orchestrator decision 2026-10-26): the rights sentence, one caption line under the source window. */
+.rightsNote {
+  max-width: 72ch;
+  margin: 8px 0 0;
   color: var(--home-muted);
-  font: 500 13px/1.45 var(--f-sans);
-  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 /* The record strip: what a reader can take away from this one passage. */
@@ -638,13 +626,7 @@ a.evidenceLink {
 .lineLabel code { font: inherit; }
 @media (min-width: 960px) { .lineLabel { display: none; } }
 
-/* s2's second disclosure is a row under the first, drawn the same way. */
-.contextDisclosure {
-  border-top: 1px solid var(--home-rule);
-}
-
-.detailsSummary,
-.contextDisclosure > summary {
+.detailsSummary {
   display: flex;
   align-items: center;
   gap: 0.625rem;
@@ -655,13 +637,11 @@ a.evidenceLink {
   list-style: none;
 }
 
-.detailsSummary::-webkit-details-marker,
-.contextDisclosure > summary::-webkit-details-marker {
+.detailsSummary::-webkit-details-marker {
   display: none;
 }
 
-.detailsSummary::before,
-.contextDisclosure > summary::before {
+.detailsSummary::before {
   content: "";
   flex: none;
   border-block: 0.3125rem solid transparent;
@@ -669,13 +649,11 @@ a.evidenceLink {
   transition: transform 150ms var(--home-ease);
 }
 
-.details[open] > .detailsSummary::before,
-.contextDisclosure[open] > summary::before {
+.details[open] > .detailsSummary::before {
   transform: rotate(90deg);
 }
 
-.detailsSummary:focus-visible,
-.contextDisclosure > summary:focus-visible {
+.detailsSummary:focus-visible {
   outline: 2px solid var(--home-cobalt);
   outline-offset: 2px;
 }
@@ -737,204 +715,51 @@ a.evidenceLink {
   font-size: 1rem;
 }
 
-/* -------------------------------------------------------------- 02 why this case is difficult */
-
-/* Paper, not a stone band: section boundaries are one 1px rule (brief 2026-10-15, move 4). */
-section.difficulty {
-  /* It ends on two disclosure rows, not on a block: 120px under them read as an empty band. */
-  padding-bottom: 72px;
-  background: var(--home-paper);
-  color: var(--home-ink);
-}
-
-@media (max-width: 767px) {
-  section.difficulty {
-    padding-bottom: 48px;
-  }
-}
-
-.split {
-  display: grid;
-  gap: clamp(1.5rem, 4vw, 3.5rem);
-}
-
-@media (min-width: 960px) {
-  .split {
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  }
-
-  .reserved,
-  .filmSlot {
-    grid-column: 1 / -1;
-  }
-}
-
-.splitHead,
-.receiveHead {
-  min-width: 0;
-}
-
-/* The head stands clear of the bench's rule by the same step s3 leaves above its record. */
-.splitHead {
-  margin-bottom: clamp(1.75rem, 4vw, 3rem);
-}
-
-.splitHead :global(.lv2-scene-support),
-.receiveHead :global(.lv2-scene-support) {
-  color: var(--home-muted);
-  font-size: 1.0625rem;
-  line-height: 1.55;
-}
-
-.diffList {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* One column on a phone; from 960px the difficulties stand side by side under one rule each. */
-.diffList > li {
-  padding-block: 24px;
-  border-top: 1px solid var(--home-rule);
-}
-
-@media (min-width: 960px) {
-  .diffList {
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
-    column-gap: 48px;
-  }
-}
-
-/* The context sentence above the list keeps the body measure, not the 1200px container. */
-.contextDisclosure > p:not(.reserved) {
-  max-width: 64ch;
-  margin: 8px 0 32px;
-  color: var(--home-muted);
-}
-
-/* Home's one H3 and one body size (brief §4.4): 24/1.25 and 17/1.65; 20px under 768px. */
-.diffList h3,
-.noteList h3,
-.method h3 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-}
-
-@media (max-width: 767px) {
-  .diffList h3,
-  .noteList h3,
-  .method h3 {
-    font-size: 20px;
-  }
-}
-
-.diffList p,
-.contextDisclosure > p:not(.reserved),
-.noteList p,
-.method ol,
-.rights,
+/* The reader guide (home-reader-guide.tsx, not mounted on Home since FINAL-SPEC 2026-10-26 F-1) keeps its body type. */
 .readerGuide p {
   font-size: 17px;
   line-height: 1.65;
 }
 
-.diffList p:lang(ko),
-.contextDisclosure > p:not(.reserved):lang(ko),
-.noteList p:lang(ko),
-.method ol:lang(ko),
-.rights:lang(ko),
 .readerGuide p:lang(ko) {
   line-height: 1.75;
   word-break: keep-all;
 }
 
-:is(.diffList, .noteList, .method) h3:lang(ko) {
-  letter-spacing: 0;
-  word-break: keep-all;
-}
-
-.diffList p {
-  max-width: 52ch;
-  margin: 8px 0 0;
-  color: var(--home-muted);
-}
-
-.diffList b {
-  color: var(--home-ink);
-}
-
-.diffList .diffLinks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 1.25rem;
-  margin-top: 0.125rem;
-}
-
-.reserved {
-  max-width: 72ch;
-  margin: 0;
-  padding-top: 1rem;
-  border-top: 1px dashed var(--home-rule-strong);
-  color: var(--home-muted);
-  font-size: 1rem;
-  line-height: 1.55;
-}
-
-.filmSlot {
-  min-width: 0;
-}
-
 /* ------------------------------------------------------------------- 03 what you receive */
 
+/*
+  FINAL-SPEC 2026-10-26 §2.4: one record sheet, nine of twelve columns (966px at 1440): the kind and
+  its state, the record's own region from its page, the quote, and four fields. No links.
+*/
 section.receive {
   background: var(--home-paper);
   color: var(--home-ink);
 }
 
-.receiveHead {
-  max-width: 52rem;
-}
-
-.receiveGrid {
-  display: grid;
-  align-items: start;
-  gap: clamp(1.5rem, 4vw, 3.5rem);
-  margin-top: clamp(1.75rem, 4vw, 3rem);
-}
-
-@media (min-width: 960px) {
-  .receiveGrid {
-    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-  }
-}
-
-/* A record, set like a sheet of paper: the page's one card shape (1px rule, 8px corners, no shadow). */
 .recordSheet {
   min-width: 0;
-  padding: clamp(1.25rem, 3vw, 2.25rem);
-  border: 1px solid var(--home-rule);
-  border-radius: 8px;
-  background: var(--home-sheet);
+  max-width: 966px;
+  margin-top: 48px;
+  padding: 40px;
+  border: 1px solid var(--tv-rule);
+  border-radius: var(--tv-r-inst-lg);
+  background: var(--tv-paper-raised);
 }
 
 .recordKind {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 0.25rem 1rem;
-  margin: 0 0 1rem;
-  font: 500 13px/1.45 var(--f-sans);
+  gap: 4px 12px;
+  margin: 0;
+  font: 560 13px/1.5 var(--f-sans);
   letter-spacing: 0;
 }
 
 /* The state vocabulary is stored upper case ("PUBLISHED SAMPLE"); as a label it reads in sentence case. */
 .recordState {
   color: var(--home-muted);
+  font-weight: 400;
   text-transform: lowercase;
 }
 
@@ -942,130 +767,68 @@ section.receive {
   text-transform: uppercase;
 }
 
+/* The record's region, windowed from its committed page raster (SourceRegionWindow). */
+.recordCrop {
+  position: relative;
+  overflow: hidden;
+  margin-top: 16px;
+  border-bottom: 1px solid var(--tv-rule);
+}
+
+.recordCrop img {
+  position: absolute;
+  display: block;
+  max-width: none;
+}
+
 .recordQuote {
-  margin: 0;
-  padding-left: 1rem;
-  border-left: 3px solid var(--home-amber);
-  font-size: clamp(1.25rem, 1rem + 1vw, 1.625rem);
-  line-height: 1.4;
-  letter-spacing: -0.01em;
+  max-width: 60ch;
+  margin: 24px 0 0;
+  padding: 0;
+  font: 400 17px/1.55 var(--f-sans);
+  letter-spacing: 0;
 }
 
 .recordFields {
   display: grid;
-  gap: 0.625rem;
-  margin: 1.5rem 0 0;
-  padding-top: 1rem;
-  border-top: 1px solid var(--home-rule);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+  margin: 24px 0 0;
+}
+
+@media (min-width: 900px) {
+  .recordFields {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .recordFields > div {
-  display: grid;
-  grid-template-columns: 6.5rem minmax(0, 1fr);
-  gap: 0.75rem;
+  min-width: 0;
 }
 
 .recordFields dt {
   color: var(--home-muted);
-  font: 500 13px/1.6 var(--f-sans);
+  font: 560 13px/1.5 var(--f-sans);
   letter-spacing: 0;
 }
 
 .recordFields dd {
-  margin: 0;
-  font-size: 1rem;
-  line-height: 1.5;
+  margin: 4px 0 0;
+  font: 500 12px/1.45 var(--f-mono);
   overflow-wrap: anywhere;
 }
 
 .recordFields code {
-  font: 0.8125rem/1.5 var(--home-mono);
+  font: inherit;
   word-break: break-all;
 }
 
-.recordLinks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 1.5rem;
-  margin: 1rem 0 0;
-}
-
-.receiveNotes {
-  min-width: 0;
-}
-
-/*
-  What stays folded keeps a visible marker. The shared sheet turns every summary into inline-flex
-  on touch and below 1080px, which drops ::marker; list-item restores it, padding holds 44px.
-*/
-.receiveNotes > summary,
+/* The FAQ's own disclosure keeps a visible marker (the shared sheet turns summaries inline-flex). */
 .readerFaq summary {
   display: list-item;
   min-height: 44px;
   padding-block: 0.625rem;
   cursor: pointer;
-}
-
-.noteList {
-  display: grid;
-  gap: 1.25rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.noteList li {
-  padding-top: 16px;
-  border-top: 1px solid var(--home-rule);
-}
-
-.noteList p {
-  margin: 8px 0 0;
-  color: var(--home-muted);
-}
-
-.method {
-  margin-top: 2rem;
-  padding-top: 0.875rem;
-  border-top: 1px solid var(--home-rule);
-}
-
-.method ol {
-  display: grid;
-  gap: 12px;
-  margin: 12px 0 0;
-  padding-left: 1.25rem;
-  color: var(--home-muted);
-}
-
-.method b {
-  color: var(--home-ink);
-}
-
-.rights {
-  margin: 24px 0 0;
-  color: var(--home-muted);
-}
-
-/* ---------------------------------------------- 04-06 keep their grounds; vary their scale */
-
-.home section[data-scene="4"] {
-  padding-block: clamp(4rem, 8vw, 7rem);
-}
-
-.home section[data-scene="5"] :global(.lv2-h2) {
-  font-size: clamp(1.75rem, 1.2rem + 1.6vw, 2.375rem);
-}
-
-@media (min-width: 1200px) {
-  .home section[data-scene="5"] :global(.lv2-proof-list) {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-.home section[data-scene="6"] :global(.lv2-h2) {
-  font-size: clamp(2.25rem, 1.4rem + 3.6vw, 4.25rem);
-  line-height: 1.02;
 }
 
 /* ------------------------------------------------------------------------------- phones */
@@ -1108,19 +871,15 @@ section.receive {
     padding-inline: 1.125rem;
   }
 
+  /*
+    FINAL-SPEC 2026-10-26 §2.3 at 412: the workbench title is s2's h2 and stays visible -- it is the
+    section's name now, not a repeat of the hero's. h2, then the status, then the source.
+  */
   .benchHead {
-    padding-block: 0.25rem;
-  }
-
-  /* The headline above already says what this is; the h2 stays for the article's accessible name. */
-  .benchTitle {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding-bottom: 32px;
   }
 
   /* In the page's sans the status fits one line at 390px; in mono it wraps to two. */
@@ -1128,36 +887,26 @@ section.receive {
     font-family: inherit;
   }
 
-  .benchGrid {
-    gap: 1rem;
-    padding-top: 0.25rem;
-  }
-
-
-  .filename {
-    font-size: 1rem;
-  }
-
-  .locatorMeta {
-    margin-top: 0.125rem;
-    font-size: 1rem;
-    line-height: 1.4;
-  }
-
-  .locator + .pageFrame {
-    margin-top: -0.5rem;
+  .passagePane {
+    padding: 20px;
   }
 
   .quote {
-    padding: 0.75rem 0.875rem;
-    font-size: 0.875rem;
+    font-size: 16px;
   }
 
+  .recordSheet {
+    margin-top: 32px;
+    padding: 20px;
+  }
+
+  .recordQuote {
+    font-size: 16px;
+  }
 }
 
 @media (max-width: 479.98px) {
-  .detailList > div,
-  .recordFields > div {
+  .detailList > div {
     grid-template-columns: minmax(0, 1fr);
     gap: 0.125rem;
   }

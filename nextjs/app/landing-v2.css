@@ -13,7 +13,14 @@
   --lv2-gutter: var(--chrome-gutter);
   --space-section: clamp(56px, 5.2vw, 88px);
   --lv2-film-summary-accent: var(--tv-action);
-  --lv2-paper-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
+  /*
+    FINAL-SPEC 2026-10-26 §3.2: Home's three fluid sizes. 390 -> 34 / 28 / 36, 412 -> 34.6 / 28.3 /
+    36.2, 1440 -> 64 / 40 / 44. One scale for / and /ko (T0): the Korean page no longer sizes its
+    h1 on its own steps.
+  */
+  --lv2-fs-display: clamp(34px, calc(2.857vw + 22.86px), 64px);
+  --lv2-fs-h2: clamp(28px, calc(1.143vw + 23.54px), 40px);
+  --lv2-fs-figure: clamp(36px, calc(0.762vw + 33.03px), 44px);
   color: var(--text-hi);
   font-family: var(--f-sans);
 }
@@ -85,9 +92,28 @@
   letter-spacing: inherit;
   color: var(--source);
 }
+/*
+  FINAL-SPEC 2026-10-26 §3.4: the obsidian scenes really are dark -- the instrument ground and its
+  ink. The text, rule and Home ink tokens are re-declared on the section itself, because a token
+  that names another (`--text-hi: var(--ink)` on the page root) is resolved where it is declared
+  and inherited as a value.
+*/
 .lv2-obsidian {
-  background: var(--ink-950);
-  color: var(--text-hi);
+  background: var(--tv-inst-0);
+  color: var(--tv-on-inst);
+  --ink: var(--tv-on-inst);
+  --ink-muted: var(--tv-on-inst-muted);
+  --text-hi: var(--tv-on-inst);
+  --text-mid: var(--tv-on-inst-muted);
+  --text-lo: var(--tv-on-inst-muted);
+  --hairline: var(--tv-rule-inst);
+  --hairline-hi: var(--tv-on-inst-muted);
+  --border-dark: var(--tv-rule-inst);
+  --rule: var(--tv-rule-inst);
+  --home-ink: var(--tv-on-inst);
+  --home-muted: var(--tv-on-inst-muted);
+  --home-rule: var(--tv-rule-inst);
+  --home-rule-strong: var(--tv-on-inst-muted);
 }
 .lv2-paper {
   background: var(--paper-50);
@@ -172,16 +198,8 @@
 }
 .lv2-scene-head { max-width: 840px; }
 .lv2-split .lv2-scene-head { max-width: none; }
-.lv2-eyebrow {
-  margin: 0 0 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-mid);
-}
 .lv2-h2 { margin: 0; }
 .lv2-h2-line { display: block; }
-.lv2-h2-accent { color: var(--text-mid); }
-.lv2-h2-accent.lv2-emphasis { color: var(--text-mid); }
 .lv2-scene-support { margin: 20px 0 0; color: var(--text-mid); max-width: 64ch; }
 .lv2-scene-note { margin: 14px 0 0; color: var(--text-lo); max-width: 72ch; }
 .lv2-text-link {
@@ -284,14 +302,6 @@
   gap: 12px 28px;
   margin-top: 24px;
 }
-.lv2-hero-intake {
-  margin: 18px auto 0;
-  color: var(--text-lo);
-  max-width: none;
-  overflow-wrap: normal;
-  text-align: center;
-}
-.lv2-hero-intake-tail { white-space: nowrap; }
 .lv2-film-story {
   width: min(100%, 1120px);
   margin: 28px auto 0;
@@ -461,7 +471,6 @@
   display: block;
   overflow: hidden;
   border-radius: var(--r-paper-lg);
-  box-shadow: var(--lv2-paper-shadow);
 }
 .lv2-page-img { display: block; width: 100%; height: auto; }
 .lv2-region { position: absolute; border: 1px solid var(--source); border-radius: 2px; }
@@ -498,23 +507,13 @@
   overflow-wrap: anywhere;
 }
 .lv2[lang="ko"] { --lv2-h2: clamp(24px, 6.4vw, 28px); }
-.lv2[lang="ko"] .lv2-hero-h1 { font-size: clamp(28px, 7.3vw, 32px); max-width: none; }
 @media (min-width: 768px) {
   .lv2[lang="ko"] { --lv2-h2: clamp(30px, 2.6vw, 38px); }
-  .lv2[lang="ko"] .lv2-hero-h1 { font-size: clamp(38px, 4.5vw, 48px); }
-}
-@media (min-width: 1200px) {
-  .lv2[lang="ko"] .lv2-hero-h1 { font-size: clamp(48px, 4vw, 60px); }
 }
 
 /* Visual hierarchy: paper is reserved for actual source evidence. */
 .lv2-surface { background: var(--ink-900); border-block: 1px solid var(--border-dark); }
-.lv2-hero-h1 { font-synthesis: weight; font-weight: 600; font-variation-settings: "wght" 600; }
-.lv2-hero-intake {
-  font-family: var(--f-sans); font-size: 14px; letter-spacing: 0; line-height: 1.55;
-}
 .lv2-film .compile-film-stages button { font-size: 14px; letter-spacing: 0; }
-.lv2 .lv2-eyebrow { font-family: var(--f-sans); font-size: 13px; font-weight: 600; letter-spacing: .1em; }
 .lv2-proof-note { max-width: 62ch; }
 @media (min-width: 1600px) {
   .lv2-film { --lv2-film-w: 1280px; }
@@ -626,5 +625,26 @@
   font-size: 13px;
   line-height: 1.5;
   color: var(--text-lo);
+}
+
+/*
+  FINAL-SPEC 2026-10-26 §2.8 / §3.7: Home's header action is a ghost pill -- the hero and the close
+  carry the one filled action per screen. `public-site-chrome.module.css` paints `.header .cta`
+  with `!important` in `@layer overrides`; an important declaration in this earlier layer wins
+  over it (important layer order is reversed), which is the reason for the `!important` here.
+*/
+.lv2 header.nav .nav-actions .btn {
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 16px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  box-shadow: inset 0 0 0 1px var(--tv-rule-strong) !important;
+  color: var(--tv-ink) !important;
+  font: 560 14px/1.2 var(--f-sans) !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  .lv2 header.nav .nav-actions .btn:hover { box-shadow: inset 0 0 0 1px var(--tv-ink) !important; }
 }
 }

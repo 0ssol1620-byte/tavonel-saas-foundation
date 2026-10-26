@@ -91,6 +91,7 @@
   .home.home > footer { --ink: var(--on-obsidian); --text-hi: var(--on-obsidian); --text-mid: #b7c3d2; --text-lo: #b7c3d2; --action: var(--action-on-dark); }
   /* One focus ring on Home: the accent at 2px. On the footer --action is the dark-ground accent. */
   .home.home :global(:is(a, button, summary, [tabindex]):focus-visible) { outline-color: var(--action); }
+  .home.home :global(.lv2-obsidian :is(a, button, summary, [tabindex]):focus-visible) { outline-color: var(--action-on-dark); }
   .intro { display: block; }
   /* Main304 has unlayered shared chrome; carry the reviewed header fixes only on Home. */
   .home.home > header { background: var(--paper) !important; color: var(--ink); border-bottom: 1px solid var(--home-rule) !important; }
@@ -106,44 +107,53 @@
   .home.home > header :global(.wordmark), .home.home > header :global(.wordmark) :is(b, svg),
   .home.home > header :global(.site-nav-direct), .home.home > header :global(.nav-actions) > a { color: var(--ink); }
   .home.home :global(.lv2-wrap) { width: var(--page-w); max-width: none; margin-inline: auto; padding-inline: 0; }
-  /* No alternating bands: every section is paper, separated by one 1px rule. */
-  .home.home :global(.lv2-scene) { min-height: 0; padding-block: 120px; background: var(--paper); color: var(--ink); border-block: 0; border-bottom: 1px solid var(--rule); }
-  .home.home :global(#s1) { padding-top: 112px; padding-bottom: 72px; }
+  /*
+    FINAL-SPEC 2026-10-26 §2.0 / §3.5: paper for s1-s3, the instrument ground for s4-s6 (`.lv2-obsidian`
+    in app/landing-v2.css). Each section's own rhythm, 4px steps; a 1px rule only where §2 draws one.
+  */
+  .home.home :global(.lv2-scene) { min-height: 0; padding-block: 96px; border-block: 0; }
+  .home.home :global(.lv2-scene:not(.lv2-obsidian)) { background: var(--paper); color: var(--ink); }
+  .home.home :global(#s1) { padding-block: 88px 96px; }
+  .home.home :global(#s2) { padding-block: 0 64px; }
+  .home.home :global(#s2 > .lv2-wrap) { padding-top: 128px; border-top: 1px solid var(--tv-rule); }
+  .home.home :global(#s3) { padding-block: 64px 128px; }
+  .home.home :global(#s4) { padding-block: 128px 96px; }
+  .home.home :global(#s5) { padding-block: 96px; border-top: 1px solid var(--tv-rule-inst); }
+  .home.home :global(#s6) { padding-block: 160px; border-top: 1px solid var(--tv-rule-inst); }
   .home.home :global(#s1 > .lv2-wrap) { display: block; }
   .home.home :global(.lv2-hero-grid), .home.home :global(.lv2-hero-text) { display: block; max-width: none; }
-  /* §4.4 display: Wanted Sans 600 / 0.98 / -0.035em. Fix round 3 (judge gap 1): the H1 is the
-     outcome sentence (BRAND_LINE.headline, 46 characters) under the category eyebrow. It measures
-     the container rather than --hero-measure and is set at clamp(44px, 4.2vw, 60px) so it holds one
-     line from 1024 up (1,186px of 1,200 at 1440): the eyebrow and a second H1 line would otherwise
-     push the film -- the LCP element -- 110px down the first screen (fix2/LCP-*.json). Balance keeps
-     a phone's three lines even. */
-  .home.home :global(.lv2-hero-eyebrow) {
-    margin: 0 auto 12px; text-align: center; color: var(--home-muted);
-    font: 600 13px/1.4 var(--f-sans); letter-spacing: 0.08em; text-transform: uppercase;
-  }
+  /*
+    FINAL-SPEC 2026-10-26 §2.1 / §3.2: the statement is left-aligned on the container edge, 510 rather
+    than 600 (no synthesis, no axis pin), 64px at 1440 and 34px at 390 from one token, and the same
+    computed size on / and /ko (T0). EN breaks "Turn documents into / context your AI can cite." at
+    14em; Korean keeps its words whole.
+  */
   .home.home :global(.lv2-hero-h1) {
-    max-width: none; margin: 0 auto 16px; text-align: center; text-wrap: balance;
-    font: 600 clamp(44px, 4.2vw, 60px)/0.98 var(--f-sans); font-variation-settings: "wght" 600; font-synthesis: none; letter-spacing: -0.035em;
+    max-width: 14em; margin: 0; text-align: start;
+    font: 510 var(--lv2-fs-display)/1.04 var(--f-sans); letter-spacing: -0.032em;
   }
+  .home.home :global(.lv2-hero-h1:lang(en)) { text-wrap: balance; }
   .home.home :global(.lv2-h1-line) { display: block; }
-  /* The hero support sentence: this is its one rule (the !important chain in landing-hero.module.css is gone). */
-  .home.home :global(.lv2-hero-support) { max-width: 40rem; margin: 0 auto 24px; text-align: center; text-wrap: balance; color: var(--ink-muted); font: 400 20px/1.55 var(--f-sans); letter-spacing: 0; }
-  .home.home :global(.lv2-h2) { font: 600 clamp(32px, 3.6vw, 52px)/1.04 var(--f-sans); font-variation-settings: "wght" 600; letter-spacing: -0.03em; color: var(--ink); }
-  .home.home :global(.lv2-scene-support) { max-width: var(--measure); color: var(--ink-muted); font: 17px/1.65 var(--f-sans); }
+  /* The hero support sentence: this is its one rule. */
+  .home.home :global(.lv2-hero-support) { max-width: 40ch; margin: 24px 0 0; text-align: start; color: var(--ink-muted); font: 400 20px/1.5 var(--f-sans); letter-spacing: 0; }
+  /* Six h2 on Home, one size and one colour (§3.2): no two-tone accent line. */
+  .home.home :global(.lv2-h2) { margin: 0; font: 510 var(--lv2-fs-h2)/1.1 var(--f-sans); letter-spacing: -0.022em; color: var(--ink); }
+  .home.home :global(.lv2-h2:lang(en)) { text-wrap: balance; }
   /* Meta is sans 500 at 13px; mono is kept for derived coordinates, versions, dates and hashes. */
   .home.home :global(main .lv2-meta) { font: 500 13px/1.45 var(--f-sans); letter-spacing: 0; text-transform: none; }
   .home.home :global(main .lv2-meta[data-derived="1"]) { font-family: var(--f-mono); }
   /* §4.5: no uppercase tracking on Hangul. */
   .home[lang="ko"].home :global(:is(.lv2-meta, [class*="eyebrow"], .compile-film-stages button, .lv2-revision-title)) { letter-spacing: 0; text-transform: none; }
-  .home[lang="ko"].home :global(.lv2-hero-h1) { line-height: 1.08; letter-spacing: -0.02em; word-break: keep-all; }
-  .home[lang="ko"].home :global(.lv2-h2) { line-height: 1.2; letter-spacing: -0.015em; word-break: keep-all; }
-  .home[lang="ko"].home :global(.lv2-hero-support) { line-height: 1.75; word-break: keep-all; }
+  .home[lang="ko"].home :global(.lv2-hero-h1) { line-height: 1.16; letter-spacing: -0.012em; word-break: keep-all; }
+  .home[lang="ko"].home :global(.lv2-h2) { line-height: 1.24; letter-spacing: -0.01em; word-break: keep-all; }
+  .home[lang="ko"].home :global(.lv2-hero-support) { line-height: 1.65; word-break: keep-all; }
   /* WEIGHT-HOOK-START */
   /* Playwright WebKit on Windows applies the wght axis to advances (HVAR) but draws every outline
      at the 400 default, so 600 renders thin there. `data-static-wght` is set only by a measured
      ink test (HANDOFF.md, font outline probe); where the axis draws, nothing below matches.
-     The stroke is this font's stem difference: l is 0.082em at 400, 0.112em at 560, 0.120em at 600. */
-  :global(html[data-static-wght="1"]) .home.home :global(:is(.lv2-hero-h1, .lv2-h2, [data-home-reader-guide] h2, #s5 .lv2-proof-label)) { -webkit-text-stroke: 0.038em currentColor; }
+     The stroke is this font's stem difference: l is 0.082em at 400, 0.112em at 560, 0.120em at 600.
+     FINAL-SPEC 2026-10-26: the headings are 510 now, so the stroke starts from 0.012em (§3.2). */
+  :global(html[data-static-wght="1"]) .home.home :global(:is(.lv2-hero-h1, .lv2-h2, [data-home-reader-guide] h2, #s5 .lv2-proof-label)) { -webkit-text-stroke: 0.012em currentColor; }
   :global(html[data-static-wght="1"]) .home.home :global(:is(#s1 .compile-film-stages button, .lv2-cta)) { -webkit-text-stroke: 0.03em currentColor; }
   /* WEIGHT-HOOK-END */
   .home.home :global(main a) { display: inline-flex; align-items: center; min-height: 44px; }
@@ -152,16 +162,16 @@
      Brief move 2(a): the film takes the whole container, not a narrower 1040px column. */
   .home.home :global(#s1 .lv2-film-story) { margin: 0 auto !important; border: 0 !important; width: 100%; max-width: none; }
   .home.home :global(#s1 .lv2-film) { --lv2-film-w: var(--page-max); margin-top: 0 !important; padding-bottom: 0 !important; }
-  .home.home :global(#s1 .compile-film-sequence) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 20px; }
+  .home.home :global(#s1 .compile-film-sequence) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px 20px; }
   .home.home :global(#s1 .compile-film-stages) { grid-column: 1 / -1; border: 0; }
   .home.home :global(#s1 .compile-film-stages button) {
-    color: var(--home-muted); font: 560 15px/1.4 var(--f-sans); letter-spacing: -0.01em;
+    color: var(--home-muted); font: 560 14px/1.2 var(--f-sans); letter-spacing: 0;
     padding: 12px 8px; border: 0; border-bottom: 2px solid transparent; box-shadow: none;
   }
   .home[lang="ko"].home :global(#s1 .compile-film-stages button) { letter-spacing: 0; text-transform: none; }
   .home.home :global(#s1 .compile-film-stages button[data-active="1"]) { color: var(--home-ink); border-bottom-color: var(--home-cobalt); }
   /* The film stage is one of the page's two dark surfaces (the other is the footer). */
-  .home.home :global(#s1 .compile-film-viewport) { grid-column: 1 / -1; grid-row: 3; border-radius: 8px; border-color: var(--home-rule-strong); background: var(--obsidian); }
+  .home.home :global(#s1 .compile-film-viewport) { grid-column: 1 / -1; grid-row: 3; border-radius: var(--tv-r-media); border: 1px solid var(--tv-rule); background: var(--tv-inst-1); }
   /* A legacy unlayered cover rule crops the still even when the player says fit. */
   .home.home :global(#s1 .compile-film-sequence[data-mobile-view="fit"] .compile-film-still) { object-fit: contain !important; }
   .home.home :global(#s1 .compile-film-caption) { grid-column: 1; grid-row: 2; align-self: center; gap: 12px; align-items: start; }
@@ -169,22 +179,18 @@
   .home.home :global(#s1 .compile-film-mobile-tools) { grid-column: 2; grid-row: 2; align-self: center; margin: 0; }
   .home.home :global(#s1 .compile-film-mobile-tools p) { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .home.home :global(#s1 .compile-film-progress) { display: none; }
-  .home.home :global(#s1 .lv2-film-story > figcaption) { max-width: none; margin-top: 12px; color: var(--home-muted); font: 13px/1.5 var(--f-sans); text-align: center; }
-  /* §4.2 hero rhythm, tightened in fix round 3 to pay for the eyebrow: H1 -> support 16,
-     support -> actions 24, actions -> film tabs 32. */
-  .heroAside { min-width: 0; max-width: var(--hero-measure); margin: 24px auto 32px; display: flex; flex-direction: column; gap: 8px; align-items: center; }
-  .heroAside :global(.lv2-actions) { display: flex; flex-direction: row; justify-content: center; gap: 16px; margin-top: 0; }
+  .home.home :global(#s1 .lv2-film-story > figcaption) { max-width: none; margin-top: 12px; color: var(--home-muted); font: 13px/1.5 var(--f-sans); text-align: start; }
+  /* FINAL-SPEC 2026-10-26 §2.1 rhythm at 1440: support -> actions 40, actions -> film tabs 56. */
+  .heroAside { min-width: 0; max-width: none; margin: 40px 0 56px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+  .heroAside :global(.lv2-actions) { display: flex; flex-direction: row; justify-content: flex-start; align-items: center; gap: 8px 24px; margin-top: 0; }
   .home.home :global(.btn), .play { min-height: 48px; border-radius: 4px; }
-  .home.home :global(.lv2-cta) { background: var(--action); color: white; border-color: var(--action); padding: 12px 24px; font: 560 15px/1.5 var(--f-sans); }
+  /* §3.6: the filled action is a pill; 44px in a row at 1440, 48px full width on a phone. */
+  .home.home :global(.lv2-cta) { min-height: 44px; border-radius: 999px; background: var(--action); color: white; border-color: var(--action); padding: 10px 24px; font: 560 15px/1.5 var(--f-sans); }
   .home.home :global(.lv2-cta:hover) { background: var(--home-cobalt-deep); }
-  .home.home :global(.lv2-text-link) { color: var(--ink); font-family: var(--f-sans); }
+  .home.home :global(.lv2-text-link) { color: var(--ink); font: 560 15px/1.45 var(--f-sans); }
   /* A link's hover darkens its own underline; the accent is not a link colour. */
   .home.home :global(.lv2-text-link:hover) { text-decoration-color: currentColor; }
-  .heroAside :global(.lv2-text-link) { min-height: 48px; }
-  .intake { margin: 0; color: var(--home-muted); font: 13px/1.6 var(--f-sans); text-align: center; }
-  /* Brief move 3: the accepted formats are substance, so they are printed, not folded. */
-  .formats { margin: 24px 0 0; font: 13px/1.6 var(--f-sans); color: var(--home-muted); }
-  .formats p { max-width: 68ch; margin: 0 auto; }
+  .heroAside :global(.lv2-text-link) { min-height: 44px; }
   .film { margin: 0; min-width: 0; }
   .filmFrame { position: relative; overflow: hidden; background: #f0f0eb; border: 1px solid #79827b; border-radius: 8px; aspect-ratio: 16 / 10; }
   .filmFrame picture, .filmFrame img, .filmFrame video { display: block; width: 100%; height: 100%; }
@@ -199,27 +205,8 @@
   /* A disclosure keeps its marker: list-item, not inline-flex (which drops ::marker). */
   .transcript summary { cursor: pointer; display: list-item; min-height: 44px; padding-block: 11px; }
   .transcript p { margin-top: 8px; max-width: 64ch; }
-  /* #s4 and #s5 carry `lv2-obsidian`; on Home they are paper, so their shared dark-ground
-     tokens are re-pointed. The recompile fan was --relation (violet); it is a neutral rule here. */
-  .home.home :global(#s4), .home.home :global(#s5) { --ink-900: #ffffff; --hairline: var(--rule); --hairline-hi: #c7cdc7; --relation: var(--home-rule-strong); }
-  .home.home :global(#s4 .lv2-h2-accent) { color: var(--ink); font-style: normal; }
-  .home.home :global(#s4 .lv2-body-l), .home.home :global(#s5 .lv2-body-l) { color: var(--ink-muted); }
-  .home.home :global(#s4 .lv2-split) { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 64px; }
-  .home.home :global(#s4 .lv2-inline-link) { color: var(--ink); font-weight: 500; text-decoration-color: var(--home-rule-strong); }
-  .home.home :global(#s4 .lv2-meta), .home.home :global(#s5 .lv2-meta) { color: var(--ink-muted); }
-  /* The four proofs: an editorial two-column list over the full container -- a title, its scope
-     sentence, and a quiet ink "Read" link. Not blue underlined titles in a half-empty column. */
-  .home.home :global(#s5 .lv2-proof-list) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 64px; max-width: none; margin-top: 48px; }
-  .home.home :global(#s5 .lv2-proof) { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; border-top: 1px solid var(--rule); padding-block: 24px 32px; }
-  .home.home :global(#s5 .lv2-proof-label) { margin: 0; color: var(--ink); font: 600 24px/1.25 var(--f-sans); letter-spacing: -0.01em; }
-  .home.home :global(#s5 .lv2-proof-note) { max-width: 52ch; margin: 0; color: var(--ink-muted); font: 17px/1.65 var(--f-sans); }
-  .home.home :global(#s5 .lv2-proof-read) { margin: 0; }
-  .home.home :global(#s5 .lv2-proof-read .lv2-inline-link) { gap: 6px; color: var(--ink); font: 500 15px/1.45 var(--f-sans); text-decoration-color: var(--home-rule-strong); }
-  .home.home :global(#s5 .lv2-proof-read .lv2-inline-link:hover) { text-decoration-color: currentColor; }
+  /* s4-s6 are the instrument ground (§3.4); their blocks are styled by their own modules (§3.7). */
   .home[lang="ko"].home :global(#s5 :is(.lv2-proof-label, .lv2-proof-note)) { word-break: keep-all; }
-  .home[lang="ko"].home :global(#s5 .lv2-proof-note) { line-height: 1.75; }
-  .home.home :global(#s6 .lv2-h2), .home.home :global(#s6 .lv2-h2-accent) { color: var(--ink); font-style: normal; }
-  .home.home :global(#s6 .lv2-scene-support) { color: var(--ink-muted); }
   @media (max-width: 899px), (pointer: coarse) and (max-width: 1023px) {
     /* Shared unlayered pan rules otherwise block vertical inspection and keep ghost snap
        panes wider than Fit. Restrict both corrections to the Home story opt-in. */
@@ -285,28 +272,11 @@
       16px instead of 24 and 32 (reach 785.9; KO 795.7 -> 771.7). Below 768 the phone rules further
       down set both to 8px. Windows Chromium, phase4/G1-COPY/hero-geometry.
     */
-    .home.home :global(.lv2-hero-support) { margin-bottom: 16px; }
-    .heroAside { margin: 16px auto 16px; }
-    .home.home :global(#s5 .lv2-proof-list) { grid-template-columns: minmax(0, 1fr); margin-top: 32px; }
-    .home.home :global(#s5 .lv2-proof-label) { font-size: 20px; }
-  }
-  /* From 1024 the intake offer reads beside the action it explains, on the actions' row. */
-  @media (min-width: 1024px) {
-    .heroAside { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 8px 24px; }
+    /* FINAL-SPEC 2026-10-26 §2.1 at 412, which 768-899 shares: support -> CTA 24, link -> tabs 24. */
+    .heroAside { margin: 24px 0 24px; }
   }
   @media (max-width: 1023px) {
     .heroAside :global(.lv2-actions) { flex-direction: row; flex-wrap: wrap; }
-    .home.home :global(#s4 .lv2-split) { grid-template-columns: 1fr; gap: 32px; }
-  }
-  /* s4's H2 takes the whole row like every other section's, so it sets in two lines rather than
-     four in the 5fr column; the support and note sit beside the impact view under it. */
-  @media (min-width: 1024px) {
-    .home.home :global(#s4 .lv2-split) { grid-template-rows: auto auto 1fr; row-gap: 0; }
-    .home.home :global(#s4 .lv2-split > .lv2-scene-head) { display: contents; }
-    .home.home :global(#s4 .lv2-split > .lv2-scene-head > .lv2-h2) { grid-column: 1 / -1; margin-bottom: 48px; }
-    .home.home :global(#s4 .lv2-split > .lv2-scene-head > p) { grid-column: 1; }
-    .home.home :global(#s4 .lv2-split > .lv2-scene-head > .lv2-scene-support) { margin-top: 0; }
-    .home.home :global(#s4 .lv2-split > .lv2-scene-head + *) { grid-column: 2; grid-row: 2 / span 2; }
   }
   @media (min-width: 900px) {
     .home.home :global(#s1 .compile-film-sequence[data-mobile-view="fit"] .compile-film-viewport) { height: auto; min-height: 0; max-height: none; aspect-ratio: 8 / 5; }
@@ -315,6 +285,12 @@
   @media (max-width: 767px) {
     .home.home > header { height: 56px !important; min-height: 56px; }
     .home.home :global(.lv2-scene) { padding-block: 72px; }
+    .home.home :global(#s1) { padding-block: 40px 80px; }
+    .home.home :global(#s2) { padding-block: 0 48px; }
+    .home.home :global(#s2 > .lv2-wrap) { padding-top: 72px; }
+    .home.home :global(#s3) { padding-block: 48px 72px; }
+    .home.home :global(#s4), .home.home :global(#s5) { padding-block: 72px; }
+    .home.home :global(#s6) { padding-block: 96px; }
     /*
       Fix round 3: the eyebrow and a three-line outcome H1 are paid for in the hero's own spacing,
       so the film's top on the first screen does not move down at 360-430 (EN 633/609/574/545px,
@@ -344,18 +320,15 @@
     */
     .home.home :global(#s1 .compile-film-stages) { grid-template-columns: repeat(4, auto); }
     .home.home :global(#s1) { padding-top: 64px; padding-bottom: 48px; }
-    .home.home :global(.lv2-hero-eyebrow) { margin-bottom: 8px; line-height: 1.3; }
-    .home.home :global(.lv2-hero-h1) { font-size: 32px; line-height: 1.04; margin-bottom: 8px; }
-    .home[lang="ko"].home :global(.lv2-hero-h1) { font-size: 32px; line-height: 1.16; letter-spacing: -0.02em; }
-    .home.home :global(.lv2-hero-support) { font-size: 16px; line-height: 1.5; margin-bottom: 8px; }
-    .home[lang="ko"].home :global(.lv2-hero-support) { line-height: 1.6; }
-    .home.home :global(#s1 .compile-film-stages button) { font-size: 14px; padding-block: 10px; padding-inline: 2px; min-height: 44px; }
+    .home.home :global(.lv2-hero-support) { margin-top: 16px; font-size: 17px; line-height: 1.5; }
+    .home.home :global(#s1 .compile-film-stages button) { font-size: 13px; padding-block: 10px; padding-inline: 2px; min-height: 44px; }
     .home.home :global(#s1 .compile-film-caption p) { font-size: 15px; line-height: 1.45; }
     .home.home :global(#s1 .compile-film-focus-control) { padding: 8px 4px; border: 1px solid var(--home-rule-strong); border-radius: 4px; color: var(--home-ink); font: 560 14px/1.4 var(--f-sans); }
-    .heroAside { margin: 8px auto 8px; gap: 4px; }
-    .heroAside :global(.lv2-actions) { display: grid; grid-template-columns: minmax(0, 1fr); width: min(100%, 320px); gap: 0; }
-    .heroAside :global(.lv2-text-link) { min-height: 44px; }
-    .heroAside :global(.lv2-actions a) { width: 100%; justify-content: center; }
+    /* §2.1 at 412: the filled action full width at 48px, the quieter link a 44px row on the left edge. */
+    .heroAside { align-items: stretch; gap: 0; }
+    .heroAside :global(.lv2-actions) { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; gap: 8px; }
+    .heroAside :global(.lv2-actions .lv2-cta) { width: 100%; min-height: 48px; justify-content: center; }
+    .heroAside :global(.lv2-text-link) { min-height: 44px; justify-self: start; }
     .filmFrame { aspect-ratio: 390 / 270; }
     .play { right: 12px; bottom: 12px; }
     .film figcaption { font-size: 13px; }

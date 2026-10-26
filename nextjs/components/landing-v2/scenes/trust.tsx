@@ -76,9 +76,9 @@ export default function Scene({ locale, copy, sectionId = "trust", sceneIndex }:
       data-scene={String(sceneIndex ?? SCENE_INDEX)}
       tabIndex={-1}
       aria-labelledby={TITLE_ID}
-      className="lv2-scene lv2-scene--compact lv2-obsidian lv2-surface"
+      className="lv2-scene lv2-scene--compact lv2-obsidian"
     >
-      <div className="lv2-wrap">
+      <div className={`lv2-wrap ${styles.layout}`}>
         <div className="lv2-scene-head">
           <h2 className="lv2-h2" id={TITLE_ID}>
             <span className="lv2-h2-line">{copy.headline}</span>
