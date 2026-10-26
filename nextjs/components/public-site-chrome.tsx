@@ -57,10 +57,16 @@ import chrome from "./public-site-chrome.module.css";
 export function PublicSiteHeader({
   signedIn,
   korean = false,
+  ghostCta = false,
 }: {
   signedIn?: boolean;
   /** Korean entry, pricing, and contact share the localized chrome. */
   korean?: boolean;
+  /**
+   * FINAL-SPEC 2026-10-26 §2.8: on Home the header action is a ghost pill (the hero and the close carry
+   * the one filled action per screen), so it is marked as the ghost it is rather than as a filled `.btn`.
+   */
+  ghostCta?: boolean;
 }) {
   const pricingLabel = korean ? KO_CHROME.nav["/pricing"] : "Pricing";
   return (
@@ -85,7 +91,7 @@ export function PublicSiteHeader({
         {signedIn ? null : <Link className="nav-signin chrome-v2-signin" href="/login">{korean ? KO_CHROME.signIn : "Sign in"}</Link>}
         {/* Desktop only: below the switch the header is the wordmark and Menu, and the hero carries this.
             Absent on the sample itself (/explore, /ko/explore): an action may not point at its own page. */}
-        <HeaderCta className={`btn ${chrome.cta}`} href={SAMPLE_CTA.href} label={korean ? SAMPLE_CTA.ko : SAMPLE_CTA.label} />
+        <HeaderCta className={`btn${ghostCta ? " btn-ghost" : ""} ${chrome.cta}`} href={SAMPLE_CTA.href} label={korean ? SAMPLE_CTA.ko : SAMPLE_CTA.label} />
       </span>
     </header>
   );

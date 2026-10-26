@@ -79,8 +79,12 @@ function homeData(): HomeData {
   });
 }
 
-/** Home's quote length for the record (FINAL-SPEC §2.4). `EXCERPT_LIMIT` (240) stays for its other callers. */
-const RECORD_EXCERPT = 160;
+/**
+ * Home's quote length for the record (FINAL-SPEC §2.4). §2.9 lever 1: the measured page was over the word
+ * budget, so the quote drops from 160 to 120 characters. Same record, same rule, the source text is not
+ * edited; `EXCERPT_LIMIT` (240) stays for its other callers.
+ */
+export const RECORD_EXCERPT = 120;
 
 /*
   The words only this composition says, in both languages. No figure in any of them: every digit
@@ -179,7 +183,7 @@ export default function LandingPage({
         <link rel="preload" as="font" type="font/woff2" href="/fonts/wanted-sans-ko-home-400.woff2" crossOrigin="" />
         <link rel="preload" as="font" type="font/woff2" href="/fonts/wanted-sans-ko-home-510.woff2" crossOrigin="" />
       </> : null}
-      <PublicSiteHeader korean={korean} />
+      <PublicSiteHeader korean={korean} ghostCta />
       <main id="main" tabIndex={-1} data-home-ia="outcome-v1.1">
         {children}
         {/*

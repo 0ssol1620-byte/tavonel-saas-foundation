@@ -547,6 +547,18 @@ a.evidenceLink {
   line-height: 1.35;
 }
 
+/*
+  FINAL-SPEC 2026-10-26 §2.9 lever 2: on a phone the three region buttons are their letter badges, the same
+  letters the page window draws on its boxes; each button keeps its full name (role and page) as aria-label.
+*/
+@media (max-width: 767.98px) {
+  .regionList { display: flex; gap: 8px; border-bottom: 0; }
+  .regionList > li { flex: 0 0 auto; }
+  .regionButton { grid-template-columns: 1fr; width: 48px; min-width: 48px; padding: 0; place-items: center; border-top: 0; }
+  .regionButton .regionLetter { width: 44px; height: 44px; font-size: 15px; }
+  .regionText { display: none; }
+}
+
 /* F-3 (orchestrator decision 2026-10-26): the rights sentence, one caption line under the source window. */
 .rightsNote {
   max-width: 72ch;

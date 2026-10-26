@@ -28,7 +28,8 @@ test("the homepage Verify frame opens the no-login Compiled World sample on its 
     homepage's proof opens the sample on the real record behind it -- so it is asserted there.
   */
   await page.goto("/");
-  const cta = page.locator("#s3 a[data-analytics=\"source-open\"]").first();
+  // FINAL-SPEC 2026-10-26 §2.3-2.4: the record (s3) has no links; the workbench's "Open in Explore" (s2) is the link.
+  const cta = page.locator("#s2 a[data-analytics=\"source-open\"]").first();
   await cta.scrollIntoViewIfNeeded();
   await expect(cta).toBeVisible();
   await cta.click();

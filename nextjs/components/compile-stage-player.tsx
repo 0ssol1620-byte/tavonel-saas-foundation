@@ -825,6 +825,8 @@ export default function CompileStagePlayer({
       {!storyLayout ? mobileTools : null}
 
       {compact && videoError ? <p className="compile-film-inline-error" role="status">{text.error}</p> : null}
+      {/* Home prints no caption row (FINAL-SPEC 2026-10-26), so a film that cannot play says so here instead: never a silent poster. */}
+      {storyLayout && videoError ? <p className="compile-film-inline-error" role="status">{text.errorLong}</p> : null}
       {!storyLayout ? stageCaption : null}
     </div>
   );

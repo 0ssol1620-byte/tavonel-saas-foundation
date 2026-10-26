@@ -55,7 +55,7 @@ vi.mock("./commercial-state", async importOriginal => {
   };
 });
 
-import LandingPage from "../components/landing-v2/landing-page";
+import LandingPage, { RECORD_EXCERPT } from "../components/landing-v2/landing-page";
 import HomeReaderGuide from "../components/landing-v2/home-reader-guide";
 import { compactFooterLinks } from "../components/public-site-chrome";
 import { SAMPLE_BOUNDARY } from "../components/landing-v2/scenes/start";
@@ -909,12 +909,14 @@ describe("landing v2 -- difficulty and record", () => {
     expect(readable(mainOf(render(locale))).split(rights).length - 1).toBe(1);
   });
 
-  // FINAL-SPEC 2026-10-26 §2.4: same record and rule, a 160-character quote, four fields, its own region, no links.
+  // FINAL-SPEC 2026-10-26 §2.4: same record and rule, four fields, its own region, no links. The quote is the
+  // §2.9 lever-1 length (120): the record's own label cut by excerptPreview, never edited text.
   it.each(LOCALES)("%s prints the sample record with its own status, version and region", locale => {
     const receive = sceneOf(mainOf(render(locale)), "s3");
     const record = buildReceiveRecord();
     const text = readable(receive);
-    const preview = excerptPreview(record.claim.label, 160);
+    expect(RECORD_EXCERPT).toBe(120);
+    const preview = excerptPreview(record.claim.label, RECORD_EXCERPT);
     const quote = receive.match(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/)?.[1];
     expect(quote).toBe(escaped(preview.text) + (preview.truncated ? "…" : ""));
     expect(record.claim.label.startsWith(preview.text)).toBe(true);

@@ -4,10 +4,11 @@ const BENCH = "#s2 article[data-case-status]";
 const FILM = '#s1 figure[data-testid="landing-hero-film"]';
 const SECTIONS = ["s1", "s2", "s3", "s4", "s5", "s6"];
 /* While the server resolves access to /contact, the hero offers the document evaluation instead,
-   named as the start path it is (fix round 3, judge gap 4). */
+   named as the start path it is (fix round 3, judge gap 4). FINAL-SPEC 2026-10-26 §2.1 (D, veto): the
+   label is "Evaluate your documents" / "내 문서 평가", its arrow an aria-hidden glyph outside the name. */
 const EVALUATION = {
-  "/": { href: "/evaluation", label: "Bring your own documents" },
-  "/ko": { href: "/ko/evaluation", label: "내 문서 가져오기" },
+  "/": { href: "/evaluation", label: "Evaluate your documents" },
+  "/ko": { href: "/ko/evaluation", label: "내 문서 평가" },
 } as const;
 async function visibleFilm(page: Page) {
   await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /./);
@@ -20,11 +21,14 @@ for (const route of ["/", "/ko"]) {
   test(`${route} offers the next action before the source and difficult context`, async ({ page }) => {
     await page.goto(route);
     const actions = await page.locator("#s1 .lv2-actions").boundingBox();
-    const source = await page.locator(BENCH).boundingBox();
+    const bench = await page.locator(BENCH).boundingBox();
+    // FINAL-SPEC 2026-10-26 §2.3: the section heading is the workbench's own title, so the heading leads the
+    // source page it introduces (the page window) inside the same article.
+    const source = await page.locator(`${BENCH} [data-page-window]`).first().boundingBox();
     const context = await page.locator("#s2 h2").first().boundingBox();
-    expect(actions).not.toBeNull(); expect(source).not.toBeNull(); expect(context).not.toBeNull();
+    expect(actions).not.toBeNull(); expect(bench).not.toBeNull(); expect(source).not.toBeNull(); expect(context).not.toBeNull();
     expect((await page.getByTestId("landing-hero-film").boundingBox())!.y).toBeLessThan(page.viewportSize()!.height);
-    expect(actions!.y + actions!.height).toBeLessThan(source!.y);
+    expect(actions!.y + actions!.height).toBeLessThan(bench!.y);
     expect(context!.y).toBeLessThan(source!.y);
     await expect(page.locator("[data-compiler-specimen]")).toHaveCount(0);
   });
@@ -47,7 +51,10 @@ for (const route of ["/", "/ko"]) {
     await expect(page.locator("main#main")).toHaveCount(1);
     await expect(page.locator("main section section")).toHaveCount(0);
     await expect(page.locator("h1")).toHaveCount(1);
-    await expect(page.locator("main > [data-home-reader-guide]")).toHaveCount(1);
+    // FINAL-SPEC 2026-10-26 §11 F-1 (orchestrator decision: yes): the FAQ and the reader guide leave Home; the
+    // customer-data gate they carried is printed verbatim in the close (s6). No FAQ region is left.
+    await expect(page.locator("main > [data-home-reader-guide]")).toHaveCount(0);
+    await expect(page.locator("main details[data-specimen-faq], main #home-faq-title")).toHaveCount(0);
   });
   test(`${route} has no duplicate ids, broken targets or horizontal overflow`, async ({ page }) => {
     await page.goto(route);
@@ -88,22 +95,31 @@ for (const route of ["/", "/ko"]) {
     await expect(details.locator('a[href^="/explore?act=evidence"]')).toHaveCount(3);
     await expect(details).toContainText((await bench.getAttribute("data-source-digest"))!);
   });
+  /*
+    FINAL-SPEC 2026-10-26 §2.4: the record (s3) is a sheet to read, with no links; the same kind of move is the
+    workbench's (s2) "Open in Explore", which opens the selected passage's region in the sample, beside the full
+    filing at its source (SEC). So the record keeps its version and quote, and the region and original page are
+    asserted where they are opened now.
+  */
   test(`${route} opens the received record at its region and its original page`, async ({ page }) => {
     await page.goto(route);
     const record = page.locator("#s3 article");
     await expect(record).toHaveCount(1);
     await expect(record.locator("blockquote")).toHaveAttribute("lang", "en");
-    await expect(record.locator('[data-analytics="source-open"]')).toHaveAttribute("href", /^\/explore\?act=evidence&evidence=/);
-    await expect(record.locator('a[href^="/explore-sample/"]')).toHaveAttribute("href", /\.pdf#page=\d+$/);
+    await expect(record.locator("a")).toHaveCount(0);
     await expect(record.locator("code")).toHaveText(/^sha256:[0-9a-f]{64}$/);
+    const bench = page.locator(BENCH);
+    await expect(bench.locator('[data-analytics="source-open"]')).toHaveAttribute("href", /^\/explore\?act=evidence&evidence=/);
+    await expect(bench.locator("a[data-full-filing]")).toHaveAttribute("href", /^https:\/\/www\.sec\.gov\/Archives\/edgar\/data\//);
   });
   test(`${route} links the source change to the actual change record and its contract`, async ({ page }) => {
     await page.goto(route);
     const change = page.locator("#s4");
-    await expect(change.locator("a.lv2-text-link")).toHaveCount(1);
-    await expect(change.locator("a.lv2-text-link")).toHaveAttribute("href", "/explore?act=change");
-    await expect(change.locator("a.lv2-inline-link")).toHaveAttribute("href", "/product/continuous-knowledge");
-    await change.locator("a.lv2-text-link").click();
+    // FINAL-SPEC 2026-10-26 §2.5: the contract link leaves the deleted note and sits beside the change link as a
+    // text link of its own; the two destinations, in that order, are unchanged.
+    expect(await change.locator("a.lv2-text-link").evaluateAll(links => links.map(link => link.getAttribute("href"))))
+      .toEqual(["/product/continuous-knowledge", "/explore?act=change"]);
+    await change.locator('a.lv2-text-link[href="/explore?act=change"]').click();
     await expect(page).toHaveURL(/\/explore\?act=change$/);
   });
   /*
@@ -130,7 +146,8 @@ for (const route of ["/", "/ko"]) {
     if (resolved === EVALUATION[path].href) {
       const evaluation = EVALUATION[path];
       await expect(access).toHaveAttribute("href", evaluation.href);
-      await expect(access).toHaveText(evaluation.label);
+      await expect(access).toHaveAccessibleName(evaluation.label);
+      await expect(access).toContainText(evaluation.label);
       expect((await page.request.get(evaluation.href)).status(), `${evaluation.href} is a real route`).toBe(200);
       await access.click();
       await expect(page).toHaveURL(new RegExp(`${evaluation.href.replace(/\//g, "\\/")}$`));
@@ -143,10 +160,12 @@ for (const route of ["/", "/ko"]) {
 test("keeps the English brand line as the single H1", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("h1#lv2-hero-title")).toHaveCount(1);
-  // Fix round 3 (judge gap 1): the outcome sentence, with the category as the eyebrow above it.
+  // Fix round 3 (judge gap 1): the outcome sentence. FINAL-SPEC 2026-10-26 (D, veto): the category leaves the eyebrow
+  // above it and names the close instead, as its heading -- printed once, not twice.
   expect((await page.locator("h1").innerText()).replace(/\s+/g, " ").trim()).toBe("Turn documents into context your AI can cite.");
-  await expect(page.locator("#s1 .lv2-hero-eyebrow + h1#lv2-hero-title")).toHaveCount(1);
-  await expect(page.locator("#s1 .lv2-hero-eyebrow")).toHaveText("The Knowledge Compiler for AI");
+  await expect(page.locator("#s1 .lv2-hero-eyebrow")).toHaveCount(0);
+  await expect(page.locator("#s1 h1#lv2-hero-title + .lv2-hero-support")).toHaveCount(1);
+  await expect(page.locator("#s6 h2")).toHaveText("The Knowledge Compiler for AI");
 });
 test("Korean close repeats the public-sample action and keeps Korean pricing", async ({ page }) => {
   await page.goto("/ko");
@@ -186,7 +205,7 @@ test("four-stage video stays static with reduced motion until explicit play and 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/"); const film = await visibleFilm(page);
   await expect(film.locator("video")).toHaveCount(0);
-  await expect(film).toContainText("Illustrative product demo · examples, not customer results.");
+  await expect(film).toContainText("Illustrative demo · not customer results.");
   await film.getByRole("button", { name: "Play the compilation film", exact: true }).click();
   const video = film.locator("video");
   await expect(video).toBeVisible();
@@ -200,12 +219,19 @@ test("server-renders the visible film poster as its priority image", async ({ re
   // Release 3: the poster is a 1x/2x srcset (a phone in Fit takes the 1440px file). React does not put a
   // srcset preload in the HTTP Link header, so the hint is the first-party <link rel=preload> in the
   // streamed <head>, ahead of the body; the header must not point at a superseded poster either.
+  /*
+    FINAL-SPEC 2026-10-26 §2.1: a phone's first image is the stage-1 pane, one file rather than a srcset, so React puts
+    its preload in the HTTP Link header, scoped to phones by `media`. It is the one poster the header may name; the
+    head keeps the desktop srcset hint, scoped to 768px and up, so neither screen fetches the other's poster.
+  */
   const posterHint = response.headers()["link"] ?? "";
-  expect(posterHint).not.toMatch(/\/film\/poster-/);
+  expect(posterHint.match(/\/film\/poster-[^>]+/g) ?? []).toEqual(["/film/poster-1-t8.16-pane1-684x855.avif"]);
+  expect(posterHint).toMatch(/<\/film\/poster-1-t8\.16-pane1-684x855\.avif>;[^,]*media="\(max-width: 767\.98px\)"/);
   const head = html.slice(0, html.indexOf("</head>"));
   const preloads = [...head.matchAll(/<link[^>]*rel="preload"[^>]*as="image"[^>]*>/g)].map(match => match[0]);
   expect(preloads).toHaveLength(1);
   expect(preloads[0]).toMatch(/fetchpriority="high"/i);
+  expect(preloads[0]).toMatch(/media="\(min-width: 768px\)"/i);
   // POSTER-RECUT (D-11): the one hint is the AVIF srcset, typed so a browser without AVIF skips it.
   expect(preloads[0]).toMatch(/imagesrcset="\/film\/poster-1-t8\.16\.avif 1440w, \/film\/poster-1-t8\.16-2x\.avif 2880w"/i);
   expect(preloads[0]).toMatch(/type="image\/avif"/i);

@@ -15,7 +15,7 @@ import { expect, test, type Page } from "@playwright/test";
   - R3. Sibling H2s on a page are one size. Siblings are the headings of sections that share a
     parent: an H2's section is its nearest <section>, <article> or <aside> (or the H2 itself when it
     has none), and two H2s are siblings when those sections are children of one element. That is
-    the case the plan names -- Home's 24px 'Measured, with receipts.' beside five 51.84px section
+    the case the plan names -- Home's 24px 'Measured, with receipts.' (now 'Every research figure has a receipt.') beside five 51.84px section
     H2s -- and it leaves a card's heading inside a section alone, because the card is not the
     section's sibling.
   - The /ko meta line takes no capital tracking (§4.4 KO rules).
@@ -113,7 +113,14 @@ function read(): Reading {
     }]);
   }
 
-  const meta = [...document.querySelectorAll("main .lv2-meta")].filter(visible);
+  /*
+    FINAL-SPEC 2026-10-26: Home no longer uses `.lv2-meta`; its small label lines (the workbench status, the record's
+    field names, the change panel's label, the receipt chips) are module classes. A meta line is read as what it is:
+    a visible element whose own text holds Hangul and is set at 14px or less.
+  */
+  const meta = [...document.querySelectorAll<HTMLElement>("main *")].filter((el) => visible(el)
+    && [...el.childNodes].some((child) => child.nodeType === Node.TEXT_NODE && /[\uac00-\ud7a3]/.test(child.textContent ?? ""))
+    && Number.parseFloat(getComputedStyle(el).fontSize) <= 14);
   const tracked = meta
     .map((el) => getComputedStyle(el).letterSpacing)
     .filter((spacing) => spacing !== "normal" && Number.parseFloat(spacing) !== 0);
@@ -231,9 +238,10 @@ test.describe("the type-scale detector", () => {
     await set(page, "#home-measures-title", "font-size", "24px");
     const mixed = mixedSiblings(await page.evaluate(read));
     expect(mixed).toHaveLength(1);
-    expect(mixed[0]).toContain("24px «Measured, with receipts.»");
+    expect(mixed[0]).toContain("24px «Every research figure has a receipt.»");
 
-    await set(page, "#s2 .lv2-scene-support", "font-family", "Geist, sans-serif");
+    // FINAL-SPEC 2026-10-26 deleted `.lv2-scene-support`; the workbench's heading is the element set in a retired face.
+    await set(page, "#s2 h2", "font-family", "Geist, sans-serif");
     expect((await page.evaluate(read)).retiredFaces).toHaveLength(1);
   });
 

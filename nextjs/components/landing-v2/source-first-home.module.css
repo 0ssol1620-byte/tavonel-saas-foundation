@@ -112,7 +112,8 @@
   */
   .home.home :global(.lv2-scene) { min-height: 0; padding-block: 96px; border-block: 0; }
   .home.home :global(.lv2-scene:not(.lv2-obsidian)) { background: var(--paper); color: var(--ink); }
-  .home.home :global(#s1) { padding-block: 88px 96px; }
+  /* §2.1 places h1 at y 152: the fixed 64px header plus the 88px the spec draws under it. */
+  .home.home :global(#s1) { padding-block: 152px 96px; }
   .home.home :global(#s2) { padding-block: 0 64px; }
   .home.home :global(#s2 > .lv2-wrap) { padding-top: 128px; border-top: 1px solid var(--tv-rule); }
   .home.home :global(#s3) { padding-block: 64px 128px; }
@@ -142,7 +143,7 @@
   .home.home :global(main .lv2-meta) { font: 500 13px/1.45 var(--f-sans); letter-spacing: 0; text-transform: none; }
   .home.home :global(main .lv2-meta[data-derived="1"]) { font-family: var(--f-mono); }
   /* §4.5: no uppercase tracking on Hangul. */
-  .home[lang="ko"].home :global(:is(.lv2-meta, [class*="eyebrow"], .compile-film-stages button, .lv2-revision-title)) { letter-spacing: 0; text-transform: none; }
+  .home[lang="ko"].home :global(:is(.lv2-meta, [class*="eyebrow"], .compile-film-stages button, .lv2-revision-title, #s1 figure figcaption)) { letter-spacing: 0; text-transform: none; }
   .home[lang="ko"].home :global(.lv2-hero-h1) { line-height: 1.16; letter-spacing: -0.012em; word-break: keep-all; }
   .home[lang="ko"].home :global(.lv2-h2) { line-height: 1.24; letter-spacing: -0.01em; word-break: keep-all; }
   .home[lang="ko"].home :global(.lv2-hero-support) { line-height: 1.65; word-break: keep-all; }
@@ -175,6 +176,8 @@
   /* A legacy unlayered cover rule crops the still even when the player says fit. */
   .home.home :global(#s1 .compile-film-sequence[data-mobile-view="fit"] .compile-film-still) { object-fit: contain !important; }
   .home.home :global(#s1 .compile-film-mobile-tools) { grid-column: 2; grid-row: 1; align-self: center; margin: 0; }
+  /* The film's own failure sentence (the caption row that carried it is gone): full width, under the frame. */
+  .home.home :global(#s1 .compile-film-inline-error) { grid-column: 1 / -1; margin: 0; color: var(--home-ink); font: 400 15px/1.5 var(--f-sans); }
   .home.home :global(#s1 .lv2-film-story > figcaption) { max-width: none; margin-top: 12px; color: var(--home-muted); font: 13px/1.5 var(--f-sans); text-align: start; }
   /* FINAL-SPEC 2026-10-26 §2.1 rhythm at 1440: support -> actions 40, actions -> film tabs 56. */
   .heroAside { min-width: 0; max-width: none; margin: 40px 0 56px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
@@ -249,7 +252,8 @@
   @media (max-width: 767px) {
     .home.home > header { height: 56px !important; min-height: 56px; }
     .home.home :global(.lv2-scene) { padding-block: 72px; }
-    .home.home :global(#s1) { padding-block: 40px 80px; }
+    /* §2.1 (412): h1 at y 96, the fixed 56px header plus 40. */
+    .home.home :global(#s1) { padding-block: 96px 80px; }
     .home.home :global(#s2) { padding-block: 0 48px; }
     .home.home :global(#s2 > .lv2-wrap) { padding-top: 72px; }
     .home.home :global(#s3) { padding-block: 48px 72px; }

@@ -213,7 +213,8 @@ test.describe("production posture today (S1: account creation open, purchase and
 
     // H0. The hero's access action is the evaluation request, a contact form.
     await page.goto("/");
-    await expect(page.getByRole("link", { name: "Bring your own documents" })).toHaveAttribute("href", "/evaluation");
+    // FINAL-SPEC 2026-10-26 §2.1 (D, veto): the hero's second action is named "Evaluate your documents".
+    await expect(page.getByRole("link", { name: "Evaluate your documents" })).toHaveAttribute("href", "/evaluation");
     await expectNoCheckoutDoor(page);
     await page.goto("/evaluation");
     await expect(page.locator("form.contact-form")).toBeVisible();

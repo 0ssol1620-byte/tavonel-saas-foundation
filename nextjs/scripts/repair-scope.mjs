@@ -2349,7 +2349,7 @@ const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}(
 // first, then take the 'Approve maximum & upload' fallback, on both the per-file and the whole-set approval path.
 // UX program 2026-10-17 (phase 2 lanes P2-01..P2-21 and the phase 3 fixes, B-01): the public routes, stylesheets, shared public
 // components, the consent-gated Vercel collector and funnel module, the claims registry, the Playwright config and the public
-// specs and suites the program changed join these exact endpoints (134 now; the six of them main's enablement owner
+// specs and suites the program changed join these exact endpoints (135 now; the six of them main's enablement owner
 // holds since PR #159 stay with that owner). They add their direct suites below and the
 // templates, type-scale, site-alignment, brand-tokens, benchmarks, film-line and solutions browser suites, each with its reviewed
 // project row in run-repair-check.mjs. Still exact paths, no wildcard and no default owner.
@@ -2455,6 +2455,7 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/e2e/support/overflow.ts",
   "nextjs/e2e/templates.spec.ts",
   "nextjs/e2e/type-scale.spec.ts",
+  "nextjs/e2e/ultimate-blueprint.spec.ts",
   "nextjs/e2e/ux-polish.spec.ts",
   "nextjs/e2e/visual-continuity.spec.ts",
   "nextjs/e2e/visual-refinement.spec.ts",

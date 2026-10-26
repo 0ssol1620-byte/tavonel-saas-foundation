@@ -322,8 +322,8 @@ export default function HeroSourceCard({
         </div>
 
         <div className={styles.regionPane}>
-          <p className="sr-only" id={`${passageId}-regions`}>{t.regions}</p>
-          <ul className={styles.regionList} aria-labelledby={`${passageId}-regions`}>
+          {/* The list's name is its own aria-label: same words for assistive technology, no hidden text node in the page copy. */}
+          <ul className={styles.regionList} aria-label={t.regions}>
             {regions.map((region, index) => (
               <li key={region.id}>
                 <button

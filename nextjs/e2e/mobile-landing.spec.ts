@@ -35,10 +35,22 @@ test("nothing on the narrow landing is laid out outside the viewport", async ({ 
       }
       return false;
     };
+    /* FINAL-SPEC 2026-10-26 §2.1: the film's own media inside the declared phone pane, which clips it on purpose
+       (the same conditions as `declaredPhonePane` in e2e/support/overflow.ts): the frame clips and lies inside the
+       viewport, and the media's untransformed width is exactly the pane scale. Anything else still counts. */
+    const declaredPhonePane = (element: HTMLElement) => {
+      if (!element.matches("video.compile-film-video, img.compile-film-still")) return false;
+      const frame = element.closest('.compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-viewport');
+      if (!frame || innerWidth >= 768) return false;
+      const overflowX = getComputedStyle(frame).overflowX;
+      const frameBox = frame.getBoundingClientRect();
+      if ((overflowX !== "hidden" && overflowX !== "clip") || frameBox.left < -1 || frameBox.right > innerWidth + 1) return false;
+      return getComputedStyle(element).position === "absolute" && Math.abs(element.offsetWidth - frame.clientWidth * 2880 / 684) <= 2;
+    };
     for (const element of document.querySelectorAll<HTMLElement>("header.nav *, main *, footer.site *")) {
       const box = element.getBoundingClientRect();
       if (!box.width || !box.height) continue;
-      if ((box.left < -1 || box.right > innerWidth + 1) && !clippedByScroller(element)) result.push(`${element.tagName}.${String(element.className).slice(0, 36)}`);
+      if ((box.left < -1 || box.right > innerWidth + 1) && !clippedByScroller(element) && !declaredPhonePane(element)) result.push(`${element.tagName}.${String(element.className).slice(0, 36)}`);
     }
     return result;
   });
@@ -243,10 +255,19 @@ test.describe("on a touch screen", () => {
         // Only the source workbench's intended image crop is exempt vertically; width is still checked.
         const pageWindowCrop = element.hasAttribute("data-page-window") &&
           element.closest("article[data-case-status]") !== null && element.querySelector("img") !== null;
-        if (!pageWindowCrop && hides(style.overflowY) && element.scrollHeight - element.clientHeight > 2) {
+        /* FINAL-SPEC 2026-10-26 §2.4: the record's region window (SourceRegionWindow) is a declared crop of a page
+           raster to the cited box, on both axes: it carries the window it shows (`data-crop1000`), holds one image
+           and no text, so nothing a reader reads can be cut by it. A window holding text still counts. */
+        const regionWindow = element.hasAttribute("data-crop1000") && element.closest("#s3 article") !== null &&
+          element.querySelectorAll("img").length === 1 && !(element.textContent ?? "").trim();
+        /* FINAL-SPEC 2026-10-26 §2.1: below 768px the film's frame is the declared phone pane, which clips the 2880px
+           cut to one source panel (`overflow: clip`) on both axes. Exempt only while it holds no text of its own. */
+        const phonePane = innerWidth < 768 && element.matches('.compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-viewport') &&
+          style.overflowX === "clip" && !(element.innerText ?? "").trim();
+        if (!pageWindowCrop && !regionWindow && !phonePane && hides(style.overflowY) && element.scrollHeight - element.clientHeight > 2) {
           result.push({ selector, axis: "y", hidden: element.scrollHeight - element.clientHeight });
         }
-        if (hides(style.overflowX) && element.scrollWidth - element.clientWidth > 2) {
+        if (!regionWindow && !phonePane && hides(style.overflowX) && element.scrollWidth - element.clientWidth > 2) {
           result.push({ selector, axis: "x", hidden: element.scrollWidth - element.clientWidth });
         }
       }

@@ -396,7 +396,10 @@ test("the test server renders the committed cells for a request that asks, with 
     const html = await (await request.get(path, { headers: { cookie: `${SPECIMEN_FIXTURE_COOKIE}=committed` } })).text();
     expect([...html.matchAll(/data-specimen-cell="([^"]+)"/g)].map(match => match[1]), path).toEqual(COMMITTED.map(r => r.specimenId));
     expect(html).not.toContain(path === "/" ? "synthetic fixture" : "합성 픽스처");
-    expect(html).toContain("data-specimen-faq");
+    // FINAL-SPEC 2026-10-26 §11 F-1: the FAQ left Home, so the approved full source line of each committed cell is the
+    // one in the strip itself ("Show full text"), server-rendered: one per cell, and no FAQ copy of it.
+    expect(html.match(/data-specimen-licence=""/g) ?? [], path).toHaveLength(COMMITTED.length);
+    expect(html).not.toContain("data-specimen-faq");
   }
 });
 

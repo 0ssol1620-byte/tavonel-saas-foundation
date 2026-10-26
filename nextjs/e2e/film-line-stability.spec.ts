@@ -14,10 +14,18 @@ import { expect, test, type Page } from "@playwright/test";
   the layout-shift entries the browser records. §4.6 keeps the auto-advance only on that condition.
 
   Every scenario sets its own viewport from project 390, the pattern the phone specs already use.
+
+  FINAL-SPEC 2026-10-26 (§2.1, D-7): the reading line is gone, and a phone opens on one source pane
+  (Focus) rather than on Fit. The rule this file guards is unchanged -- the frame does not move when
+  the film changes stage by itself -- so the stage is read from the tab the film selects
+  (`aria-selected`), and the detector takes away the one thing that now keeps the frame still: a
+  tab row whose height does not depend on the stage.
 */
 
 const FILM = '#s1 figure[data-testid="landing-hero-film"]';
-const QUOTES = ["WORKING COPY.md", "# Payment terms", "CHANGED", "nodes lit"] as const;
+const STAGE_COUNT = 4;
+/** The stage on screen: the index of the tab the film selected. */
+const selectedStage = (page: Page) => page.locator(`${FILM} [role="tab"]`).evaluateAll(tabs => tabs.findIndex(tab => tab.getAttribute("aria-selected") === "true"));
 // The lane's acceptance (UX-PLAN §8.2, UX-L6): frame.top within ±0.5px, layout-shift sum <= 0.001.
 const TOP_TOLERANCE = 0.5;
 const SHIFT_BUDGET = 0.001;
@@ -56,15 +64,15 @@ async function watchAutoAdvance(page: Page, advances: number, before?: () => Pro
   const film = page.locator(FILM);
   const sequence = film.locator(".compile-film-sequence");
   await expect(sequence).toHaveAttribute("data-narrow", "1");
-  await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
+  await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
   // Motion on: the cut plays, so the stage will advance without input.
   const video = film.locator("video.compile-film-video");
   await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.readyState >= 2 && !node.paused && node.currentTime > 0), { timeout: 30_000 }).toBe(true);
   await page.evaluate(() => document.fonts.ready);
   if (before) await before();
-  const quote = film.locator("[data-film-reading] p q");
-  const first = QUOTES.indexOf((await quote.textContent()) as (typeof QUOTES)[number]);
-  expect(first, "the reading line names one of the four stages").toBeGreaterThanOrEqual(0);
+  await expect(film.locator("[data-film-reading] p"), "no reading line on Home (D-7)").toHaveCount(0);
+  const first = await selectedStage(page);
+  expect(first, "the film selects one of the four stages").toBeGreaterThanOrEqual(0);
   const startTime = await page.evaluate(() => {
     const store = window as unknown as { __frameTop: FrameTop };
     const frame = document.querySelector("#s1 .compile-film-viewport")!;
@@ -85,7 +93,7 @@ async function watchAutoAdvance(page: Page, advances: number, before?: () => Pro
   const tops = [(await frame.boundingBox())!.y];
   for (let step = 1; step <= advances; step++) {
     // 18 s per cut (lib/film-script.ts FILM_DURATION); the cut's own `ended` may come first.
-    await expect(quote, `auto-advance ${step}`).toHaveText(QUOTES[(first + step) % QUOTES.length]!, { timeout: 30_000 });
+    await expect.poll(() => selectedStage(page), { message: `auto-advance ${step}`, timeout: 30_000 }).toBe((first + step) % STAGE_COUNT);
     tops.push((await frame.boundingBox())!.y);
   }
   // Layout-shift entries are delivered after the frame that shifted; let the last one arrive.
@@ -135,19 +143,21 @@ for (const [width, height] of [[390, 844], [430, 932]] as const) {
 }
 
 /*
-  The failure path: the same watch, with the reservation taken away through the CSSOM (the page's
-  CSP allows no injected stylesheet). At 390 EN the line takes 3 / 2 / 3 / 3 lines by stage, so any
-  three consecutive advances include a change of line count, and the frame has to move and the
-  shift has to be recorded. If this passes with the assertions above, the watch can see nothing.
+  The failure path: the same watch, with a stage-dependent height put above the frame through the
+  CSSOM (the page's CSP allows no injected stylesheet). The tab row is given a floor of 0.3px per
+  source pixel of the stage's pane offset (`--pane-y`: 252 / 190 / 180 / 180), so it stands
+  75.6 / 57 / 54 / 54px by stage and any three consecutive advances include a change of height:
+  the frame has to move and the shift has to be recorded. If this passes with the assertions above,
+  the watch can see nothing.
 */
-test("the watch records the shift when the reading block reserves nothing (detector)", async ({ page }, testInfo) => {
+test("the watch records the shift when the row above the frame changes height by stage (detector)", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "390", "sets its own viewport");
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await recordShifts(page);
   await page.goto("/");
-  const run = await watchAutoAdvance(page, 3, () => page.locator(`${FILM} [data-film-reading]`).evaluate(node => { (node as HTMLElement).style.minHeight = "0px"; }));
+  const run = await watchAutoAdvance(page, 3, () => page.locator(`${FILM} .compile-film-stages`).evaluate(node => { (node as HTMLElement).style.minHeight = "calc(var(--pane-y) * 0.3px)"; }));
   await testInfo.attach("auto-advance-detector-en-390", { body: JSON.stringify(run, null, 2), contentType: "application/json" });
   expect(run.inputShifts, "no input during the watch").toBe(0);
   expect(Math.max(...run.tops.map(top => Math.abs(top - run.tops[0]!))), "the unreserved frame moves with the line").toBeGreaterThan(TOP_TOLERANCE);
@@ -175,12 +185,12 @@ async function frameTopByStage(page: Page, path: string) {
   const film = page.locator(FILM);
   const sequence = film.locator(".compile-film-sequence");
   await expect(sequence).toHaveAttribute("data-narrow", "1");
-  await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
+  await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
   await page.evaluate(() => document.fonts.ready);
   const tops: number[] = [];
-  for (let stage = 0; stage < QUOTES.length; stage++) {
+  for (let stage = 0; stage < STAGE_COUNT; stage++) {
     await film.getByRole("tab").nth(stage).click();
-    await expect(film.locator("[data-film-reading] p q")).toHaveText(QUOTES[stage]!);
+    await expect.poll(() => selectedStage(page)).toBe(stage);
     tops.push((await film.locator(".compile-film-viewport").boundingBox())!.y);
   }
   return tops;

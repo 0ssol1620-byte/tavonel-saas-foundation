@@ -52,6 +52,27 @@ export function measureOverflow(): { documentOverflow: number; offenders: Offend
     if (frameBox.left < -1 || frameBox.right > limit + 1) return false;
     return getComputedStyle(element).transform !== "none" && (element as HTMLElement).offsetWidth <= frameBox.width + 1;
   };
+  /*
+    FINAL-SPEC 2026-10-26 §2.1: the Home phone pane, and nothing else. Below 768px the film opens on one source panel
+    (`.compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"]`): the 2880px cut is drawn at 2880/684 of
+    the 4:5 frame's width and translated by the stage's pane offset, and the frame clips it (`overflow: clip`). The
+    same conditions as the desktop crop, restated for the pane: the pane is declared, the frame clips and lies inside
+    the viewport, the media is the film's own (video or still), absolutely positioned and translated, and its
+    untransformed width is exactly the pane scale of the frame -- so a pane drawn at any other size, or a frame that
+    outgrows the page, still fails.
+  */
+  const declaredPhonePane = (element: Element) => {
+    if (!element.matches("video.compile-film-video, img.compile-film-still")) return false;
+    const frame = element.closest('.compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-viewport');
+    if (!frame || limit >= 768) return false;
+    const frameStyle = getComputedStyle(frame);
+    if (frameStyle.overflowX !== "hidden" && frameStyle.overflowX !== "clip") return false;
+    const frameBox = frame.getBoundingClientRect();
+    if (frameBox.left < -1 || frameBox.right > limit + 1) return false;
+    const style = getComputedStyle(element);
+    if (style.position !== "absolute" || style.transform === "none") return false;
+    return Math.abs((element as HTMLElement).offsetWidth - frame.clientWidth * 2880 / 684) <= 2;
+  };
 
   const offenders: Offender[] = [];
   for (const element of document.querySelectorAll("body *")) {
@@ -65,7 +86,7 @@ export function measureOverflow(): { documentOverflow: number; offenders: Offend
     const inFlow = style.position === "static" || style.position === "relative";
     const pastEdge = inFlow && box.right > limit + 1;
     if (!wider && !pastEdge) continue;
-    if (clippedByScroller(element) || declaredFilmCrop(element)) continue;
+    if (clippedByScroller(element) || declaredFilmCrop(element) || declaredPhonePane(element)) continue;
     offenders.push({
       selector: describe(element),
       reason: wider ? `wider than the ${limit}px viewport` : `extends ${Math.round(box.right - limit)}px past the right edge`,
