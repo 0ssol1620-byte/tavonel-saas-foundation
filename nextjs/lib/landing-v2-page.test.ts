@@ -54,6 +54,7 @@ vi.mock("./commercial-state", async importOriginal => {
 
 import LandingPage from "../components/landing-v2/landing-page";
 import HomeReaderGuide from "../components/landing-v2/home-reader-guide";
+import { compactFooterLinks } from "../components/public-site-chrome";
 import { SAMPLE_BOUNDARY } from "../components/landing-v2/scenes/start";
 import EvaluationPage from "../components/evaluation-page";
 import HeroActions from "../components/landing-v2/hero-actions";
@@ -72,7 +73,7 @@ import {
   RETIRED_NAMES,
 } from "./landing-v2-copy.test";
 import { koTermDrift } from "./ko-terms";
-import { ACCESS_CTA, EXPLORE_CTA, KO_CHROME, SELF_SERVE_CTA } from "./site-navigation";
+import { ACCESS_CTA, EXPLORE_CTA, FOOTER_GROUPS, KO_CHROME, SELF_SERVE_CTA } from "./site-navigation";
 import { EVIDENCE } from "./evidence-record";
 import claimsPack from "../content/evidence/public-claims-pack.json";
 
@@ -1031,5 +1032,37 @@ describe("the entry-page figure allowlist still fails closed", () => {
     expect(undeclaredText(link("Receipt R-01 · 2026-08-08 · sha256 1f5b6220"))).not.toMatch(/\d/);
     expect(undeclaredText(link("Receipt R-01 · 2026-08-08 · sha256 1f5b6220 · 3x faster"))).toMatch(/\d/);
     expect(() => undeclaredText(link("Receipt R-01 · sha256 1f5b6220"))).toThrow();
+  });
+});
+
+/*
+  FINAL-SPEC 2026-10-26 §2.8: Home's compact footer. Seven of the footer's own links, labelled by
+  FOOTER_GROUPS / KO_CHROME.footerLinks (no new string), no group titles and no tagline, and the
+  legal row unchanged. A missing route fails the render instead of printing a link the full
+  footer does not have.
+*/
+describe("Home compact footer", () => {
+  const ORDER = ["/knowledge-compiler", "/enterprise", "/trust", "/security", "/status", "/subprocessors", "/contact"];
+  it.each(LOCALES)("%s prints the seven footer links in order, with the footer's own labels", locale => {
+    const html = render(locale);
+    const footer = html.slice(html.indexOf('<footer class="site'), html.lastIndexOf("</footer>"));
+    const links = [...footer.matchAll(/<a(\s[^>]*)>([\s\S]*?)<\/a>/g)].filter(([, open]) => !/wordmark/.test(open!) && !/mailto:/.test(open!));
+    const nav = links.slice(0, ORDER.length);
+    expect(nav.map(([, open]) => attr(open!, "href"))).toEqual(ORDER.map(href => (locale === "ko" && href === "/contact" ? "/ko/contact" : href)));
+    const all = FOOTER_GROUPS.flatMap(group => group.links);
+    for (const [index, [, , label]] of nav.entries()) {
+      const href = ORDER[index]!;
+      expect(readable(label!)).toBe(locale === "ko" ? KO_CHROME.footerLinks[href] : all.find(link => link.href === href)!.label);
+    }
+    expect(footer).not.toContain("site-footer-title");
+    expect(footer).not.toContain("site-footer-tagline");
+    expect(footer).toContain("site-footer-legal");
+  });
+
+  it("fails closed when a compact link is not a footer route", () => {
+    const without = FOOTER_GROUPS.map(group => ({ ...group, links: group.links.filter(link => link.href !== "/status") }));
+    expect(() => compactFooterLinks(false, without)).toThrow(/\/status/);
+    expect(() => compactFooterLinks(true, without)).toThrow(/\/status/);
+    expect(compactFooterLinks(false).map(link => link.href)).toEqual(ORDER);
   });
 });

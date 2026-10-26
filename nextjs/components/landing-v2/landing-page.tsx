@@ -304,7 +304,7 @@ export default function LandingPage({
         <TrustScene locale={locale} copy={copy.trust} sectionId="s5" sceneIndex={5} />
         <StartScene locale={locale} copy={copy.start} actions={heroActions} sectionId="s6" sceneIndex={6} />
       </main>
-      <PublicSiteFooter korean={korean} />
+      <PublicSiteFooter korean={korean} compact />
     </div>
   );
 }

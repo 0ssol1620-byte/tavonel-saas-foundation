@@ -268,3 +268,55 @@
   whole group column, so the per-label spans are gone.
 */
 .footer .footerGroups.footerGroups a { overflow-wrap: normal; word-break: keep-all; }
+
+/*
+  FINAL-SPEC 2026-10-26 §2.8: Home's compact footer (`PublicSiteFooter compact`). One row at 900
+  and up -- the wordmark left, the seven links right on one line -- and on a phone the wordmark,
+  then the links on a two-column grid of 44px rows, then the legal row. The links stay inside
+  `.site-footer-groups`, so they keep the footer's own link colour. After the rules above so it
+  wins their grid-template-columns at equal or higher specificity.
+*/
+.footer.compact {
+  padding-top: 40px;
+  padding-bottom: calc(var(--bar, 0px) + 40px);
+}
+
+.compactRow {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.footer .compactLinks.compactLinks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 14px;
+  margin: 0;
+}
+
+.footer .compactLinks.compactLinks a {
+  align-items: center;
+  padding: 0;
+  font-weight: 500;
+}
+
+@media (min-width: 900px) {
+  .footer.compact {
+    padding-top: 48px;
+    padding-bottom: calc(var(--bar, 0px) + 48px);
+  }
+
+  .compactRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+  }
+
+  .footer .compactLinks.compactLinks {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0 24px;
+  }
+}
