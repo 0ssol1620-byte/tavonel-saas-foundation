@@ -1664,8 +1664,9 @@ export const DROPBOX_DATABASE_DEPENDENCIES = Object.freeze({
   'supabase/tests/connector_document_bindings.sql': 'dropbox-connector: connector document binding recorded by source-import',
   'supabase/tests/connector_source_suspensions.sql': 'dropbox-connector: source suspension written by sync-worker',
 });
-// Ordinary Home landing owner: exactly these twenty-eight nextjs-relative paths, no glob. Product UI, so never nativeReuse.
-// FINAL-SPEC 2026-10-26 (Home redesign, C5) adds the two static KO Home subset files /ko preloads.
+// Ordinary Home landing owner: exactly these thirty nextjs-relative paths, no glob. Product UI, so never nativeReuse.
+// FINAL-SPEC 2026-10-26 (Home redesign) adds the two static KO Home subset files /ko preloads (C5) and the
+// stage-1 phone pane still as AVIF and WebP (C6).
 // Home Release 2 (main dbe22b1e, PR #149) added the player frame strings, the film reading layer, the evidence connector and
 // source region, and the receive record in landing-v2-proof with its runtime snapshot; landing-v2-runtime.test.ts is their suite.
 export const HOME_AFFECTED_PATHS = Object.freeze([
@@ -1678,6 +1679,7 @@ export const HOME_AFFECTED_PATHS = Object.freeze([
   'lib/home-evidence-view.test.ts', 'lib/home-evidence-view.ts', 'lib/home-player-main304-parity.test.ts', 'lib/landing-v2-page.test.ts',
   'lib/landing-v2-proof.ts', 'lib/landing-v2-runtime.test.ts', 'lib/landing-v2-runtime.ts', 'lib/landing-v2-snapshot.json', 'lib/one-path-contract.test.ts',
   'public/fonts/wanted-sans-ko-home-400.woff2', 'public/fonts/wanted-sans-ko-home-510.woff2',
+  'public/film/poster-1-t8.16-pane1-684x855.avif', 'public/film/poster-1-t8.16-pane1-684x855.webp',
 ]);
 // lib/copy-trust-guard.test.ts reads landing-page.tsx (its COPY_MODULES) since the G1-COPY fix round, so Home selects it (COPY re-review R2-N2).
 export const HOME_AFFECTED_UNIT_FILES = Object.freeze([
@@ -2672,7 +2674,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // of the shared map. Separate from the historical 424 Explore repair report, which keeps its own planExploreRepairBrowserRuns.
   affectedGroup('explore-answer', /^nextjs\/(?:lib\/explore-(?:(?:sample|story)(?:\.test)?|entry-proof\.test)\.ts|components\/explore\/(?:ask-overlay|evidence-workbench(?:\.test)?)\.tsx|e2e\/explore\.spec\.ts)$/,
     { unitFiles: ['lib/explore-entry-proof.test.ts', 'lib/explore-sample.test.ts', 'lib/explore-story.test.ts', 'lib/visual-world-model.test.ts', 'components/explore/evidence-workbench.test.tsx'], browserFiles: ['e2e/explore.spec.ts'] }),
-  // Ordinary Home landing: the twenty-eight exact paths above select ten direct suites and one browser suite, which runs only in
+  // Ordinary Home landing: the thirty exact paths above select ten direct suites and one browser suite, which runs only in
   // projects 1440, 390, 360 and reduced-motion of the shared map.
   affectedGroup('home-landing', new RegExp(`^nextjs/(?:${HOME_AFFECTED_PATHS.map(path => path.replaceAll('.', '\\.')).join('|')})$`),
     { unitFiles: HOME_AFFECTED_UNIT_FILES, browserFiles: [HOME_AFFECTED_BROWSER_FILE] }),

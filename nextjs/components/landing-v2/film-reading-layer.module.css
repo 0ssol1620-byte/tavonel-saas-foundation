@@ -1,7 +1,7 @@
 /*
-  Home film reading layer (brief 2026-10-15 move 2b/2c). Sits below the frame (above it on a phone
-  in Fit, fix round 4), outside the locked pixels, spanning the same width so the four cells line
-  up under the four panes. The reading line is 15-16px HTML text; nothing here animates.
+  Home film pane strip (brief 2026-10-15 move 2b/2c). Sits below the frame, outside the locked pixels,
+  spanning the same width so the four cells line up under the four panes; nothing here animates.
+  FINAL-SPEC 2026-10-26 removed the reading line it used to carry; a phone pane hides the strip.
 */
 .reading {
   grid-column: 1 / -1;
@@ -56,36 +56,6 @@
   outline-offset: 2px;
 }
 
-.line {
-  margin: 0;
-  color: var(--home-ink, #15191d);
-  font: 500 16px/1.5 var(--f-sans);
-}
-
-/* A quoted on-screen label (CHANGED, nodes lit) stays in the sans; only a quoted filename or
-   source line takes mono (brief §4.4: mono for filenames and coordinates only). */
-.quote {
-  font: 600 16px/1.5 var(--f-sans);
-}
-
-/*
-  Fix round 4 (M2): the stack names the face and then the system monospaces, skipping next/font's
-  "IBM Plex Mono Fallback" -- Arial at size-adjust 134.59%. With `display: optional` a face that
-  misses the block period leaves that fallback in place for the whole page view, and on a cold
-  phone load it drew "WORKING COPY.md" as ~20px Arial inside a 15px line. A filename never breaks.
-*/
-.mono {
-  font: 500 15px/1.5 "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  white-space: nowrap;
-}
-
-@media (max-width: 767px) {
-  .line,
-  .quote {
-    font-size: 15px;
-  }
-}
-
 /*
   Stage tabs on the Home story layout, 900px and up: a compact left-aligned group instead of four
   equal columns across the 1200px container. Unlayered on purpose: the four-column grid comes from
@@ -120,6 +90,9 @@
   the window's corner sits on the box's corner. "Fit full frame" (viewControl) returns the whole
   frame; a phone keeps its own Fit/Focus button, so exactly one of the two is ever displayed. No
   transition: the change of view is the visitor's press, not an animation.
+
+  FINAL-SPEC 2026-10-26 §2.1: the toggle is a 36px drawn mark at the right end of the tab row, named
+  by its aria-label ("Focus details").
 */
 .viewControl {
   display: none;
@@ -141,21 +114,20 @@
 
 @media (min-width: 900px) {
   .story[data-narrow="0"] .viewControl {
-    display: inline-flex;
-    align-items: center;
+    display: inline-grid;
+    place-items: center;
     grid-column: 2;
-    grid-row: 2;
+    grid-row: 1;
     align-self: center;
     justify-self: end;
-    min-height: 44px;
+    width: 36px;
+    height: 36px;
     margin: 0;
-    padding: 8px 14px;
+    padding: 0;
     border: 1px solid var(--home-rule-strong, rgb(21 25 29 / 32%));
-    border-radius: 4px;
+    border-radius: 999px;
     background: transparent;
     color: var(--home-ink, #15191d);
-    font: 560 15px/1.4 var(--f-sans);
-    white-space: nowrap;
     cursor: pointer;
   }
 
@@ -169,10 +141,6 @@
     border-color: var(--home-ink, #15191d);
     background: rgb(21 25 29 / 7%);
     box-shadow: inset 0 0 0 1px var(--home-ink, #15191d);
-  }
-
-  .story[data-narrow="0"] :global(.compile-film-caption) {
-    grid-column: 1;
   }
 
   .story[data-narrow="0"][data-wide-view="crop"] :is(:global(.compile-film-video), :global(.compile-film-still), .mask) {
@@ -212,25 +180,12 @@
   }
 
   /*
-    Phone Fit (fix round 3, judge gap 2): the stage's text is read without pressing Focus. Fix round
-    4 (M2) moves the line directly above the frame (grid rows in source-first-home.module.css) and
-    sets it one step under the caption above it -- regular weight, muted ink (#58606a on #faf9f6,
-    6.05:1, measured) -- with the quoted on-screen string kept in ink, so caption, pointer and
-    quote read in that order instead of as one paragraph. The pane strip is aria-hidden in Fit and
-    only repeats the pane the line already names; at 77-85px a quarter it also broke MARKDOWN and
-    ASSISTANT · MCP mid-word. Focus keeps it: there it is the pane indicator.
+    Phone Fit: the pane strip is aria-hidden there and only names panes the whole frame already
+    shows; at 77-85px a quarter it also broke MARKDOWN and ASSISTANT · MCP mid-word. Focus from
+    768px keeps it: there it is the pane indicator.
   */
   .story[data-mobile-view="fit"] .panes {
     display: none;
-  }
-
-  .story[data-mobile-view="fit"] .line {
-    color: var(--home-muted, #58606a);
-    font-weight: 400;
-  }
-
-  .story[data-mobile-view="fit"] .line q {
-    color: var(--home-ink, #15191d);
   }
 
   .story :global(.compile-film-focus-control)[aria-pressed="true"] {
@@ -238,45 +193,59 @@
     background: rgb(21 25 29 / 7%);
     box-shadow: inset 0 0 0 1px var(--home-ink, #15191d);
   }
-
-  /*
-    Fix round 5 (R4-MJ1): in Fit the line sits above the frame, so a stage whose line wraps to one
-    line more or less moved the film -- on every ~18 s auto-advance, with no input (critic4/
-    cls4-after.json: single layout shifts up to 0.0624). The block reserves the longest line's
-    height and sets the text on its foot, 8px over the frame, so the frame's top no longer depends
-    on the stage.
-
-    UX-L6 (UX-PLAN-2026-10-17 §3.6, §8.2): the reservation covers the whole range where Fit puts
-    the line above the frame -- this query, the player's NARROW_FRAME -- instead of stopping at
-    767px. From 768px the line is 16px x 1.5 and its longest stage takes two lines, so 768-899 and
-    a coarse pointer to 1023 moved the frame 24px on every advance (EN 768: 602.7 / 578.7 / 602.7 /
-    602.7; KO 820: 619.5 / 595.5 x3, Chrome; p2-06-film-line/band-base.txt). Two lines is the
-    measured maximum there (768-899 x EN/KO, Chrome and Windows WebKit; one line at 900-1023 under
-    a coarse pointer, band-coarse-after.txt); the phone's three lines are set in the block below.
-
-    The quoted filename's own line-height is 1 here: at 1.5 its IBM Plex Mono box stands 0.5px
-    taller than the sans line and grew stage 1's three lines to 68px in WebKit, which moved the
-    frame 0.5px when stage 1 came and went. At 1 the box sits inside the line, in both engines.
-  */
-  .story[data-mobile-view="fit"] .reading {
-    min-height: 48px;
-    align-content: end;
-  }
-
-  .story[data-mobile-view="fit"] .mono {
-    line-height: 1;
-  }
 }
 
 /*
-  Fix round 5 (R4-MJ1): three lines at 15px x 1.5 is the phone maximum. Measured at 360-430 x
-  EN/KO in Chrome and in Windows WebKit, the longest line (stage 4 EN) needs 266px for three lines
-  and every phone column is 302px or wider (302 = Windows WebKit at 360, whose classic scrollbar
-  takes 10px; fix4/frames-*.json, p2-06-film-line/band-*.txt). After the 768+ rule above, so it
-  wins below 768px.
+  FINAL-SPEC 2026-10-26 §2.1, phone pane: below 768px Focus is one 4:5 panel, 16px wider than the
+  column (8px into each gutter). The poster and the playing cut are drawn at 2880/684 of the panel's
+  width and moved by the stage's --pane-x / --pane-y (source px, set by the player), so the still and
+  the video show the same rect and an auto-advance only changes the two numbers: no layout shift.
+  Stage 1's own pane still (data-pane-poster) fills the panel as is. After the Focus rules above, so
+  it wins at the same specificity. `overflow: clip`, not hidden: a clipped box is not a scroll
+  container, so the shared Focus scrollTo cannot move the picture.
 */
-@media (max-width: 767px) {
-  .story[data-mobile-view="fit"] .reading {
-    min-height: 67.5px;
+@media (max-width: 767.98px) {
+  .story[data-mobile-view="focus"] :global(.compile-film-viewport) {
+    container-type: inline-size;
+    position: relative;
+    width: calc(100% + 16px);
+    margin-inline: -8px;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    aspect-ratio: 4 / 5;
+    overflow: clip;
+    border-radius: var(--tv-r-media);
+    border: 1px solid var(--tv-rule);
+    background: var(--tv-inst-1);
+  }
+
+  .story[data-mobile-view="focus"] :is(:global(.compile-film-video), :global(.compile-film-still)) {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: calc(100cqw * 2880 / 684);
+    height: auto;
+    max-width: none;
+    transform: translate(calc(-100cqw * var(--pane-x) / 684), calc(-100cqw * var(--pane-y) / 684));
+  }
+
+  .story[data-mobile-view="focus"][data-pane-poster="1"] :global(.compile-film-still) {
+    width: 100%;
+    height: 100%;
+    transform: none;
+    object-fit: cover;
+  }
+
+  .story[data-mobile-view="focus"] :is(:global(.compile-film-panes), .panes, .mask) {
+    display: none;
+  }
+
+  /* The play/pause control stays on the panel, bottom right (the Fit overlay's place). */
+  .story[data-mobile-view="focus"] :global(.compile-film-viewport) > :global(.compile-film-motion-control) {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    left: auto;
+    margin: 0;
   }
 }

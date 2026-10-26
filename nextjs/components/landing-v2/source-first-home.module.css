@@ -162,7 +162,8 @@
   .home.home :global(#s1 .lv2-film-story) { margin: 0 auto !important; border: 0 !important; width: 100%; max-width: none; }
   .home.home :global(#s1 .lv2-film) { --lv2-film-w: var(--page-max); margin-top: 0 !important; padding-bottom: 0 !important; }
   .home.home :global(#s1 .compile-film-sequence) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px 20px; }
-  .home.home :global(#s1 .compile-film-stages) { grid-column: 1 / -1; border: 0; }
+  /* FINAL-SPEC 2026-10-26 §2.1: tabs, then the view toggle at the row's right end; the frame below. */
+  .home.home :global(#s1 .compile-film-stages) { grid-column: 1; grid-row: 1; border: 0; }
   .home.home :global(#s1 .compile-film-stages button) {
     color: var(--home-muted); font: 560 14px/1.2 var(--f-sans); letter-spacing: 0;
     padding: 12px 8px; border: 0; border-bottom: 2px solid transparent; box-shadow: none;
@@ -170,14 +171,10 @@
   .home[lang="ko"].home :global(#s1 .compile-film-stages button) { letter-spacing: 0; text-transform: none; }
   .home.home :global(#s1 .compile-film-stages button[data-active="1"]) { color: var(--home-ink); border-bottom-color: var(--home-cobalt); }
   /* The film stage is one of the page's two dark surfaces (the other is the footer). */
-  .home.home :global(#s1 .compile-film-viewport) { grid-column: 1 / -1; grid-row: 3; border-radius: var(--tv-r-media); border: 1px solid var(--tv-rule); background: var(--tv-inst-1); }
+  .home.home :global(#s1 .compile-film-viewport) { grid-column: 1 / -1; grid-row: 2; border-radius: var(--tv-r-media); border: 1px solid var(--tv-rule); background: var(--tv-inst-1); }
   /* A legacy unlayered cover rule crops the still even when the player says fit. */
   .home.home :global(#s1 .compile-film-sequence[data-mobile-view="fit"] .compile-film-still) { object-fit: contain !important; }
-  .home.home :global(#s1 .compile-film-caption) { grid-column: 1; grid-row: 2; align-self: center; gap: 12px; align-items: start; }
-  .home.home :global(#s1 .compile-film-caption p) { color: var(--home-ink); font: 500 17px/1.5 var(--f-sans); }
-  .home.home :global(#s1 .compile-film-mobile-tools) { grid-column: 2; grid-row: 2; align-self: center; margin: 0; }
-  .home.home :global(#s1 .compile-film-mobile-tools p) { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .home.home :global(#s1 .compile-film-progress) { display: none; }
+  .home.home :global(#s1 .compile-film-mobile-tools) { grid-column: 2; grid-row: 1; align-self: center; margin: 0; }
   .home.home :global(#s1 .lv2-film-story > figcaption) { max-width: none; margin-top: 12px; color: var(--home-muted); font: 13px/1.5 var(--f-sans); text-align: start; }
   /* FINAL-SPEC 2026-10-26 §2.1 rhythm at 1440: support -> actions 40, actions -> film tabs 56. */
   .heroAside { min-width: 0; max-width: none; margin: 40px 0 56px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
@@ -209,13 +206,20 @@
   @media (max-width: 899px), (pointer: coarse) and (max-width: 1023px) {
     /* Shared unlayered pan rules otherwise block vertical inspection and keep ghost snap
        panes wider than Fit. Restrict both corrections to the Home story opt-in. */
-    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-viewport) { overflow: auto !important; grid-row: 4; }
+    /* FINAL-SPEC 2026-10-26 §2.1: the pan surface scrolls from 768px only. Below it Focus is one clipped
+       pane (film-reading-layer.module.css), and an !important auto here would beat its `overflow: clip`. */
+    @media (min-width: 768px) {
+      .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-viewport) { overflow: auto !important; }
+    }
     .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] .compile-film-panes) { display: none !important; }
-    /* Inspection controls sit above the pan surface; they cannot permanently cover a quote. */
-    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-caption) { grid-column: 1 / -1; }
-    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-mobile-tools) {
-      grid-column: 1 / -1; grid-row: 3; display: flex !important; flex-wrap: wrap;
-      align-items: center; justify-content: space-between; gap: 6px 12px;
+    /* The tools hold the view toggle (and, panning from 768px, the motion control) at the tab row's end. */
+    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"] .compile-film-mobile-tools) {
+      display: flex; align-items: center; justify-content: flex-end; gap: 8px; width: auto; margin: 0;
+    }
+    /* §2.1: the view toggle is a 44px drawn mark on a phone, named by its aria-label. */
+    .home.home :global(#s1 .compile-film-focus-control) {
+      display: inline-grid; place-items: center; width: 44px; height: 44px; min-height: 44px; padding: 0;
+      border: 1px solid var(--home-rule-strong); border-radius: 999px; background: transparent; color: var(--home-ink);
     }
     .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-mobile-tools .compile-film-motion-control) {
       position: static !important; margin: 0; flex: none; min-width: 44px; min-height: 44px;
@@ -223,44 +227,6 @@
       background: var(--home-ink) !important; color: #ffffff !important; border-color: var(--home-ink) !important;
     }
     .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-mobile-tools .compile-film-motion-control:focus-visible) { outline: 2px solid var(--home-cobalt) !important; outline-offset: 3px; }
-    /*
-      Fix round 4 (M2, 4/4 judges): in Fit the stage's reading line sits between the caption row and
-      the frame, so a 360-430px first screen shows readable text and the film together. Under the
-      frame it started at 848px on a 390x844 screen (854px at 360x800). Grid placement only: the
-      DOM order (frame, then line) and the desktop and Focus layouts are unchanged.
-    */
-    /*
-      Fix round 5 (R4-MJ1): the caption row is the other half of a stage-independent frame top. Stage
-      4's caption needs 201px for two lines; beside the toggle it had 204.5px in Chrome at 360 and
-      194.5px in Windows WebKit (310px column), where it wrapped to a third line and dropped the
-      frame 21.5px on stage 4 (fix4/cap-*.txt). A 4px column gap here and 6px toggle padding below
-      give the caption 216.5 / 206.5px.
-
-      UX-L6 (UX-PLAN-2026-10-17 §3.6): the one-face change (UX-L3) set the toggle's "Focus details"
-      in Wanted Sans, 8px wider (99.5px), and the 24px phone margin (UX-L2) leaves Windows WebKit a
-      302px column at 360 (its classic scrollbar takes 10px). The caption had 208.5px in Chrome and
-      198.5px in WebKit against the 200.5px stage 4 needs for two lines, so WebKit wrapped it to a
-      third line and dropped the frame 21.2px on stage 4 (p2-06-film-line/caption-need-base.txt). A
-      2px gap here and 4px toggle padding below give back 6px: 214.5 / 204.5px.
-    */
-    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"]) { gap: 8px 2px; }
-    /*
-      UX-L6: the caption box fills its row and centres its text inside, instead of being centred in
-      the row itself, so a caption that goes from one line to two (KO 430) changes the box's height
-      and not its top. With the caption <p> keyed by stage (compile-stage-player.tsx) an
-      auto-advance moves nothing that was already on screen. Same place on screen as before.
-    */
-    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] .compile-film-caption) { align-self: stretch; align-items: center; }
-    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] [data-film-reading]) { grid-row: 3; }
-    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] .compile-film-viewport) { grid-row: 4; }
-    /*
-      In Fit the tools hold the toggle alone (the hint <p> is visually hidden and absolute), so the
-      shared tools grid's 12px column gap only widened the auto column (119.5px for a 107.5px
-      button) and left stage 1's caption 4.7px of slack at 360. Linux Chromium (CI) wrapped it to a
-      third line and pushed the frame from 633 to 651 at 360 (CI screenshots of 2c7fba3 and
-      2412bed). Without the gap the caption column is 204.5px and the first line needs 187.8px.
-    */
-    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] .compile-film-mobile-tools) { column-gap: 0; }
   }
   @media (max-width: 899px) {
     /*
@@ -279,7 +245,6 @@
   }
   @media (min-width: 900px) {
     .home.home :global(#s1 .compile-film-sequence[data-mobile-view="fit"] .compile-film-viewport) { height: auto; min-height: 0; max-height: none; aspect-ratio: 8 / 5; }
-    .home.home :global(#s1 .compile-film-caption) { grid-column: 1 / -1; }
   }
   @media (max-width: 767px) {
     .home.home > header { height: 56px !important; min-height: 56px; }
@@ -317,12 +282,11 @@
       zone at 828) and every other one sits higher (EN 360 450 -> 426, KO 360 404 -> 381; Windows
       Chromium, phase4/G1-COPY/hero-geometry).
     */
-    .home.home :global(#s1 .compile-film-stages) { grid-template-columns: repeat(4, auto); }
-    .home.home :global(#s1) { padding-top: 64px; padding-bottom: 48px; }
+    /* FINAL-SPEC 2026-10-26 §2.1 at 412: tabs at their content width, 16px apart, one line each; 12px to the panel. */
+    .home.home :global(#s1 .compile-film-sequence) { gap: 12px 8px; }
+    .home.home :global(#s1 .compile-film-stages) { grid-template-columns: repeat(4, auto); justify-content: start; column-gap: 16px; }
     .home.home :global(.lv2-hero-support) { margin-top: 16px; font-size: 17px; line-height: 1.5; }
-    .home.home :global(#s1 .compile-film-stages button) { font-size: 13px; padding-block: 10px; padding-inline: 2px; min-height: 44px; }
-    .home.home :global(#s1 .compile-film-caption p) { font-size: 15px; line-height: 1.45; }
-    .home.home :global(#s1 .compile-film-focus-control) { padding: 8px 4px; border: 1px solid var(--home-rule-strong); border-radius: 4px; color: var(--home-ink); font: 560 14px/1.4 var(--f-sans); }
+    .home.home :global(#s1 .compile-film-stages button) { font-size: 13px; padding-block: 10px; padding-inline: 2px; min-height: 44px; white-space: nowrap; }
     /* §2.1 at 412: the filled action full width at 48px, the quieter link a 44px row on the left edge. */
     .heroAside { align-items: stretch; gap: 0; }
     .heroAside :global(.lv2-actions) { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; gap: 8px; }

@@ -80,3 +80,25 @@ DESIGN_MASTER_V3 §22 budgets the hero poster at **≤ 140KB AVIF**, and the reg
 | `poster-3-t17.96.avif` | 3 | 1x | AVIF | 1440×900 | 41,075 | `7baaaccdb016665c5c4976879f9fad4029873b129732022243461c5e29711dd8` | `compile-cut-3.mp4` | 17.96 s | `de8a2079bcc277bf4ede1cd4575199d3600d48c2adbff34b4f2556ca666d7083` |
 | `poster-4-t17.96-2x.avif` | 4 | 2x | AVIF | 2880×1800 | 101,480 | `862b712d8769812e4fc1f36ab16e24d3cd1d881eee8df49cdd8b448d10b0232f` | `compile-cut-4.mp4` | 17.96 s | `0ade2f490662ce1c69510f8863189c038dc33a4e1f6720a2ac42980dc868998a` |
 | `poster-4-t17.96.avif` | 4 | 1x | AVIF | 1440×900 | 46,419 | `a30e783022041b97523bc3fe6d73f7de949e6b098f0f6d68efc69f542a6123fb` | `compile-cut-4.mp4` | 17.96 s | `0ade2f490662ce1c69510f8863189c038dc33a4e1f6720a2ac42980dc868998a` |
+
+## Home phone pane (FINAL-SPEC 2026-10-26 §2.1)
+
+Below 768px the Home film opens on Focus as one readable pane: a 684×855 (4:5) rect of the 2880×1800 frame at `STAGE_FRAMES[stage].phonePane` (`components/compile-stage-player.tsx`), drawn at 380×475 CSS px on a 412px phone. The poster and the playing cut are both scaled to 2880/684 of the panel's width and shifted by the same corner, so the still and the video show the same pixels; the four `compile-cut*.mp4` files are unchanged and play at their locked 2880×1800.
+
+Stage 1 has its own still of that rect, so a phone's first image is 39,926 bytes instead of the 1440px frame. It is a crop of the locked `poster-1-t8.16-2x.webp`, not a new decode of the cut: ffmpeg was not on the producing host, so the WebP is the source and the crop carries one more lossy generation. sharp 0.35.4 `extract(rect)`, then AVIF quality 50, chroma 4:4:4, effort 6 and WebP quality 82, smartSubsample, effort 6 (the POSTER-RECUT settings). The rect starts at row 252, below the eyebrow overprint rows 206–218, so it needs no mask; a variant starting at row 130 (with the pane header) showed the overprint residue above the title and was rejected. Stages 2–4 have no pane file: their 2x posters are cropped by the same CSS.
+
+| File | Stage | Format | Size | Bytes | sha256 | Crop of | Rect (x, y, w, h) |
+|---|---|---|---|---|---|---|---|
+| `poster-1-t8.16-pane1-684x855.avif` | 1 | AVIF | 684×855 | 39,926 | `16d7c3a981ca43d921cee355c4ab083e64b4aef3727a749a2f146280c927c284` | `poster-1-t8.16-2x.webp` (`58d0ff0e87c526d64620d5e9e6e4a699122f3599b59deb107bef3ea74e721867`) | 746, 252, 684, 855 |
+| `poster-1-t8.16-pane1-684x855.webp` | 1 | WebP | 684×855 | 68,676 | `ef85bc5e8489596bd901d491b8c66756392afc1e3943468456e375366a67bfde` | `poster-1-t8.16-2x.webp` (`58d0ff0e87c526d64620d5e9e6e4a699122f3599b59deb107bef3ea74e721867`) | 746, 252, 684, 855 |
+
+**Pane rects and their blank scan.** Each rect must hold ink in ≥ 85% of the presented frames of its cut, by the Release 3 blank-scan cell rule applied to the rect alone (`phonePaneScan` in `components/compile-stage-player.frame-strings.json`, which the unit test holds `phonePane` to):
+
+| Stage | Pane | phonePane (x, y) | Frames | Blank | Ink share |
+|---|---|---|---|---|---|
+| 1 Files | ORIGINAL | 746, 252 | 446 | 0 | 100% |
+| 2 Organize | MARKDOWN | 752, 190 | 449 | 0 | 100% |
+| 3 Updates | SOURCES | 44, 180 | 449 | 0 | 100% |
+| 4 Use with AI | ASSISTANT · MCP | **44, 180** | 447 | 17 | 96.2% |
+
+Stage 4's rect in the spec (44, 516) scored 78.1% (98 of 448 frames blank: the answer rows are empty until the question is asked), so it moved up the same pane to row 180, where the MCP session opens (`initialize`, `tools/list`, the grounded `ask_world` answer with its citation).

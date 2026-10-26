@@ -16,6 +16,11 @@ const crossCheck = JSON.parse(readFileSync(new URL("./compile-stage-player.frame
   stages: Record<string, { cut: string; strings: Record<string, { pane: string; visibleAt: number[] }> }>;
   cropCheck: { stages: Record<string, { text: string; box: { x: number; w: number; h: number }; yAt: Record<string, number[]> }> };
   blankScan: { threshold: number; blankAt: number; stages: Record<string, { crop: { x: number; y: number }; frames: number; inkBoth: number; share: number; defaultView: "crop" | "fit" }> };
+  phonePaneScan: {
+    threshold: number; blankAt: number; rect: { w: number; h: number };
+    stages: Record<string, { phonePane: { x: number; y: number }; frames: number; blankFrames: number; share: number }>;
+    rejected: Record<string, { phonePane: { x: number; y: number }; frames: number; blankFrames: number; share: number }>;
+  };
 };
 
 describe("film reading layer (brief 2026-10-15 move 2b/2c)", () => {
@@ -28,13 +33,6 @@ describe("film reading layer (brief 2026-10-15 move 2b/2c)", () => {
       expect(row, `${stage.id}: "${target.text}" is not in the cross-check table`).toBeDefined();
       expect(row!.visibleAt.length / crossCheck.times.length, stage.id).toBeGreaterThanOrEqual(0.8);
       expect(frame!.panes, stage.id).toContain(row!.pane);
-      // Both lines carry the quote exactly once and name the pane it sits in; KO quotes the frame.
-      for (const line of [target.line, target.lineKo]) {
-        expect(line.split("{q}"), `${stage.id}: ${line}`).toHaveLength(2);
-        expect(line, stage.id).toContain(row!.pane);
-        // Entry pages carry no unreceipted figures (lib/landing-v2-page.test.ts).
-        expect(line, stage.id).not.toMatch(/\d/);
-      }
     }
   });
 
@@ -42,17 +40,21 @@ describe("film reading layer (brief 2026-10-15 move 2b/2c)", () => {
     for (const stage of COMPILE_STAGES) expect(stage.src).toBe(`/film/${crossCheck.stages[stage.id]!.cut}`);
   });
 
-  it("renders the reading line below the frame only on the Home story layout", () => {
+  /*
+    FINAL-SPEC 2026-10-26 (§6 #6, T13): the HTML reading line under the frame is gone; the pane strip
+    that marks the target pane stays, below the frame, on the Home story layout only.
+  */
+  it("renders the pane strip below the frame only on the Home story layout, and no reading line", () => {
     const story = renderToStaticMarkup(<CompileStagePlayer storyLayout />);
     expect(story).toContain("data-film-reading");
-    expect(story).toMatch(/The ORIGINAL pane opens one source page at a time; EXTRACT writes it out in <q[^>]*>WORKING COPY\.md<\/q>\./);
     expect(story.indexOf("data-film-reading")).toBeGreaterThan(story.indexOf('class="compile-film-viewport"'));
-    // The strip only repeats the line's pane name outside a panning phone.
+    // The strip only names the panes outside a panning phone.
     expect(story).toMatch(/<ol[^>]*aria-hidden="true"[^>]*><li>SOURCES<\/li><li data-marked="1"[^>]*>ORIGINAL<\/li>/);
     expect(renderToStaticMarkup(<CompileStagePlayer />)).not.toContain("data-film-reading");
-
-    const ko = renderToStaticMarkup(<CompileStagePlayer storyLayout korean />);
-    expect(ko).toMatch(/EXTRACT 패널은 그 내용을 <q[^>]*lang="en"[^>]*>WORKING COPY\.md<\/q>에 옮겨 적습니다\./);
+    for (const markup of [story, renderToStaticMarkup(<CompileStagePlayer storyLayout korean />)]) {
+      expect(markup).not.toContain("<q");
+      expect(markup).not.toContain("WORKING COPY.md");
+    }
   });
 
   it("gives only the Home tab row the compact-group class", () => {
@@ -66,13 +68,15 @@ describe("film reading layer (brief 2026-10-15 move 2b/2c)", () => {
     expect(STAGE_FRAMES.sources!.panes[1]).toBe("ORIGINAL");
   });
 
-  it("keeps the hero's illustrative label and adds the reading line in both locales", () => {
+  it("keeps the hero's illustrative label in both locales, with no reading line or hint paragraph", () => {
     const en = renderToStaticMarkup(<HeroFilm />);
     expect(en).toContain("Illustrative demo · not customer results.");
-    expect(en).toContain("WORKING COPY.md");
     const ko = renderToStaticMarkup(<HeroFilm korean />);
     expect(ko).toContain("제품 흐름 예시 · 고객 결과가 아닙니다.");
-    expect(ko).toContain("옮겨 적습니다");
+    for (const markup of [en, ko]) {
+      expect(markup).not.toContain("compile-film-caption");
+      expect(markup).not.toMatch(/<p aria-live="polite">/);
+    }
   });
 });
 
@@ -103,11 +107,14 @@ describe("mobile film view", () => {
     expectFit(renderToStaticMarkup(<CompileStagePlayer />));
   });
 
-  it("the landing disclosure selects fit explicitly", () => {
-    expect(LANDING_MOBILE_FILM_VIEW).toBe("fit");
+  /* FINAL-SPEC 2026-10-26 §2.1: the landing asks for Focus, explicitly; every other caller still opens on Fit. */
+  it("the landing disclosure selects focus explicitly", () => {
+    expect(LANDING_MOBILE_FILM_VIEW).toBe("focus");
     const source = readFileSync(new URL("./landing-v2/hero-film-disclosure.tsx", import.meta.url), "utf8");
     expect(source).toContain("initialMobileFilmView={LANDING_MOBILE_FILM_VIEW}");
-    expectFit(renderToStaticMarkup(<CompileStagePlayer preferVideo initialMobileFilmView={LANDING_MOBILE_FILM_VIEW} />));
+    const markup = renderToStaticMarkup(<CompileStagePlayer preferVideo initialMobileFilmView={LANDING_MOBILE_FILM_VIEW} />);
+    expect(markup).toContain('data-mobile-view="focus"');
+    expect(focusControl(markup)).toEqual({ attrs: expect.stringContaining('aria-pressed="true"'), label: "Focus details" });
   });
 
   it("opens on focus only when a caller asks for it", () => {
@@ -171,13 +178,19 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
     expect(en).toContain('data-wide-view="crop"');
     expect(en).toContain("--film-crop-x:25%;--film-crop-y:50%");
     // Fix round 3 (M1): the pressed state is the visible state -- the crop is on screen, so pressed.
-    expect(en).toMatch(/<button type="button" class="compile-film-view-control [^"]+" aria-controls="[^"]+" aria-pressed="true">Focus details<\/button>/);
+    // FINAL-SPEC 2026-10-26 (§6 #7, G15): the name stays "Focus details", as an aria-label on a drawn mark.
+    expect(en).toMatch(/<button type="button" class="compile-film-view-control [^"]+" aria-controls="[^"]+" aria-pressed="true" aria-label="Focus details"><svg class="compile-film-view-mark"[^>]*aria-hidden="true"[^>]*>.*?<\/svg><\/button>/);
     expect(en).toMatch(/<li>SOURCES<\/li><li data-marked="1" data-in-crop="1">ORIGINAL<\/li><li data-in-crop="1">EXTRACT<\/li><li>WORLD<\/li>/);
-    // The phone keeps Fit as its default (brief §2); only the desktop view starts cropped (R3-D1).
-    expect(en).toContain('data-mobile-view="fit"');
-    // The phone toggle in Fit: same label, not pressed.
-    expect(focusControl(en)).toEqual({ attrs: expect.stringContaining('aria-pressed="false"'), label: "Focus details" });
-    expect(renderToStaticMarkup(<HeroFilm korean />)).toMatch(/class="compile-film-view-control [^"]+" aria-controls="[^"]+" aria-pressed="true">세부 내용 확대<\/button>/);
+    // FINAL-SPEC 2026-10-26 §2.1: the phone opens on Focus (one pane below 768px); the desktop view still starts cropped.
+    expect(en).toContain('data-mobile-view="focus"');
+    // The phone toggle in Focus: pressed, the same name, a drawn mark instead of the words.
+    const phone = en.match(/<button([^>]*class="compile-film-focus-control"[^>]*)>(.*?)<\/button>/);
+    expect(phone?.[1]).toContain('aria-pressed="true"');
+    expect(phone?.[1]).toContain('aria-label="Focus details"');
+    expect(phone?.[2]).toMatch(/^<svg class="compile-film-view-mark"[^>]*aria-hidden="true"/);
+    const ko = renderToStaticMarkup(<HeroFilm korean />);
+    expect(ko).toMatch(/class="compile-film-view-control [^"]+" aria-controls="[^"]+" aria-pressed="true" aria-label="세부 내용 확대"><svg/);
+    expect(ko).toMatch(/class="compile-film-focus-control"[^>]*aria-label="세부 내용 확대"><svg/);
     // On Home the motion control names its next action and carries no pressed state (M1).
     expect(en).toMatch(/<button type="button" class="compile-film-motion-control" data-control="pause" aria-label="Pause the compilation film">/);
     const plain = renderToStaticMarkup(<CompileStagePlayer />);
@@ -282,10 +295,40 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
     expect(picture.indexOf("<source")).toBe(0);
     expect(picture).toMatch(/<source type="image\/avif" srcSet="\/film\/poster-1-t8\.16\.avif 1440w, \/film\/poster-1-t8\.16-2x\.avif 2880w" sizes="[^"]+"\/?>/i);
     expect(picture).toContain(still);
+    // FINAL-SPEC 2026-10-26 §2.1: ahead of them, the stage-1 pane still for a screen below 768px, AVIF then WebP.
+    expect(picture).toMatch(/^<source media="\(max-width: 767\.98px\)" type="image\/avif" srcSet="\/film\/poster-1-t8\.16-pane1-684x855\.avif"\/><source media="\(max-width: 767\.98px\)" type="image\/webp" srcSet="\/film\/poster-1-t8\.16-pane1-684x855\.webp"\/><source type="image\/avif"/);
+    expect(en).toContain('data-pane-poster="1"');
+    expect(en).toContain("--pane-x:746;--pane-y:252");
     expect(en).toContain('data-poster-mask="/film/poster-1-t8.16-2x.webp"');
     // The mask is bound to the poster it was measured on: any other stage-1 poster draws none.
     expect(renderToStaticMarkup(<CompileStagePlayer storyLayout />)).not.toContain("data-poster-mask");
     expect(STAGE_FRAMES.sources!.posterMask!.rects.every(rect => rect.x + rect.w <= 2880 && rect.y + rect.h <= 1800)).toBe(true);
+  });
+
+  /*
+    FINAL-SPEC 2026-10-26 §2.1 / §9 #29. A phone pane is used only where the blank scan of that exact
+    rect over every presented frame of its cut clears the threshold; a new rect fails here until it is
+    scanned and recorded. Fit has no pane: no pane source and no pane flag.
+  */
+  it("opens a phone on a pane only where the pane's own blank scan clears the threshold", () => {
+    const scan = crossCheck.phonePaneScan;
+    expect([scan.threshold, scan.blankAt, scan.rect]).toEqual([crossCheck.blankScan.threshold, crossCheck.blankScan.blankAt, { w: 684, h: 855 }]);
+    for (const stage of COMPILE_STAGES) {
+      const pane = STAGE_FRAMES[stage.id]!.phonePane;
+      const row = scan.stages[stage.id];
+      expect(row?.phonePane, stage.id).toEqual(pane);
+      expect(row!.share, stage.id).toBeCloseTo((row!.frames - row!.blankFrames) / row!.frames, 3);
+      expect(row!.share, stage.id).toBeGreaterThanOrEqual(scan.threshold);
+      expect(pane.x >= 0 && pane.y >= 0 && pane.x + scan.rect.w <= 2880 && pane.y + scan.rect.h <= 1800, stage.id).toBe(true);
+    }
+    // The failure path this guards: the spec's stage-4 rect left the ASSISTANT pane blank in 98 of 448 frames.
+    expect(scan.rejected.world!.share).toBeLessThan(scan.threshold);
+    expect(STAGE_FRAMES.world!.phonePane).not.toEqual(scan.rejected.world!.phonePane);
+
+    const fit = renderToStaticMarkup(<CompileStagePlayer stages={[{ ...COMPILE_STAGES[0]!, phonePoster: "/film/poster-1-t8.16-pane1-684x855.webp", phonePosterAvif: "/film/poster-1-t8.16-pane1-684x855.avif" }]} storyLayout />);
+    expect(fit).toContain('data-mobile-view="fit"');
+    expect(fit).not.toContain("data-pane-poster");
+    expect(fit).not.toContain("767.98px");
   });
 
   /*

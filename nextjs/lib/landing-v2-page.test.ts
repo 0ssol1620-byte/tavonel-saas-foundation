@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import CompileStagePlayer from "../components/compile-stage-player";
+import { COMPILE_STAGES } from "./compile-stages";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /*
@@ -24,10 +25,12 @@ describe("Home story presentation is opt-in", () => {
     expect(normal.indexOf('class="compile-film-caption"')).toBeGreaterThan(normal.indexOf('class="compile-film-viewport"'));
   });
 
-  it("puts the Home explanation before its media without dropping stages or controls", () => {
+  /* FINAL-SPEC 2026-10-26 (§6 #5, T13): Home prints no caption row; the stage's sentence stays in the still's alt. */
+  it("drops the Home caption row, keeping the stage sentence in the alt, without dropping stages or controls", () => {
     const story = renderToStaticMarkup(createElement(CompileStagePlayer, { storyLayout: true }));
     expect(story).toContain('data-story-layout="1"');
-    expect(story.indexOf('class="compile-film-caption"')).toBeLessThan(story.indexOf('class="compile-film-viewport"'));
+    expect(story).not.toContain('class="compile-film-caption"');
+    expect(story).toContain(`alt="Files — ${COMPILE_STAGES[0]!.line}"`);
     expect(story.match(/role="tab"/g)).toHaveLength(4);
     expect(story).toContain('class="compile-film-motion-control"');
     expect(story).toContain('class="compile-film-focus-control"');
@@ -802,7 +805,9 @@ describe("landing v2 -- the lead and the workbench", () => {
     expect(hero).toContain("/film/poster-1-t8.16-2x.webp");
     expect(hero).toContain("/film/poster-1-t8.16-2x.avif");
     expect(elements(hero, "button").filter(open => attr(open, "role") === "tab")).toHaveLength(4);
-    expect(hero).toContain('data-mobile-view="fit"');
+    // FINAL-SPEC 2026-10-26 §2.1: the phone opens on one readable pane (Focus), its own still first.
+    expect(hero).toContain('data-mobile-view="focus"');
+    expect(hero).toContain("/film/poster-1-t8.16-pane1-684x855.avif");
     expect(hero).not.toContain('data-source-inspection-film');
     // The not-customer-results disclosure stays (FINAL-SPEC D-9 shortens its wording only).
     expect(readable(hero)).toContain(locale === "ko" ? "고객 결과가 아닙니다" : "not customer results");

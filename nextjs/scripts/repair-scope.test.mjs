@@ -3969,7 +3969,7 @@ test('affected Explore admission: readAffectedExecution rereads the five-unit an
     assert.equal(readAffectedExecution(root,plan).units.passed,5,'the restored actual reports qualify again');
   } finally { rmSync(root,{recursive:true,force:true}); }
 });
-// ---- Affected Home admission: twenty-eight exact paths, ten direct suites and one browser suite in 1440/390/360/reduced-motion; the global
+// ---- Affected Home admission: thirty exact paths, ten direct suites and one browser suite in 1440/390/360/reduced-motion; the global
 // Vitest config is admitted apart from Home as finite shared test-discovery configuration ----
 import { HOME_AFFECTED_PATHS, HOME_AFFECTED_UNIT_FILES, HOME_AFFECTED_BROWSER_FILE, HOME_READER_HEADING_CSS_AFFECTED_PATHS, HOME_READER_HEADING_CSS_AFFECTED_UNIT_FILES, REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE, VITEST_DISCOVERY_CONFIG_PATH, VITEST_DISCOVERY_INCLUDES, vitestDiscoveryConfigFailures } from './repair-scope.mjs';
 const AFFECTED_HOME_PATHS=Object.freeze(['nextjs/components/compile-stage-player.frame-strings.json','nextjs/components/compile-stage-player.mobile-view.test.tsx','nextjs/components/compile-stage-player.tsx',
@@ -3979,7 +3979,8 @@ const AFFECTED_HOME_PATHS=Object.freeze(['nextjs/components/compile-stage-player
   'nextjs/components/landing-v2/source-region.tsx','nextjs/e2e/landing-v2.spec.ts',
   'nextjs/lib/film-motion-control.test.ts','nextjs/lib/home-evidence-view.test.ts','nextjs/lib/home-evidence-view.ts','nextjs/lib/home-player-main304-parity.test.ts','nextjs/lib/landing-v2-page.test.ts',
   'nextjs/lib/landing-v2-proof.ts','nextjs/lib/landing-v2-runtime.test.ts','nextjs/lib/landing-v2-runtime.ts','nextjs/lib/landing-v2-snapshot.json','nextjs/lib/one-path-contract.test.ts',
-  'nextjs/public/fonts/wanted-sans-ko-home-400.woff2','nextjs/public/fonts/wanted-sans-ko-home-510.woff2']);
+  'nextjs/public/fonts/wanted-sans-ko-home-400.woff2','nextjs/public/fonts/wanted-sans-ko-home-510.woff2',
+  'nextjs/public/film/poster-1-t8.16-pane1-684x855.avif','nextjs/public/film/poster-1-t8.16-pane1-684x855.webp']);
 const AFFECTED_HOME_SUITES=Object.freeze(['components/compile-stage-player.mobile-view.test.tsx','components/landing-v2/hero-source-card.test.tsx','lib/copy-trust-guard.test.ts','lib/film-motion-control.test.ts','lib/home-evidence-view.test.ts',
   'lib/home-player-main304-parity.test.ts','lib/landing-v2-page.test.ts','lib/landing-v2-runtime.test.ts','lib/marketing-analytics.test.ts','lib/one-path-contract.test.ts']);
 const AFFECTED_HOME_SPEC='e2e/landing-v2.spec.ts',AFFECTED_HOME_TSX='components/compile-stage-player.mobile-view.test.tsx',AFFECTED_HOME_PROJECTS=Object.freeze(['1440','390','360','reduced-motion']);
@@ -4065,8 +4066,8 @@ const AFFECTED_HOME_FRAME_FAILURE='changed outside its include list (root, runti
 const affectedHomeSwap=(text,from,to)=>{assert.ok(text.includes(from),'fixture anchor: '+from);return text.replace(from,to);};
 const affectedHomeConfigMap=(records,source=AFFECTED_HOME_FINAL_CONFIG,headHasFile)=>buildAffectedMap({headSha:affectedHeadSha,records,headHasFile,
   readHeadFile:path=>{assert.equal(path,VITEST_DISCOVERY_CONFIG_PATH);return source;}});
-test('affected Home admission: exactly twenty-eight owner paths retain ten suites and add only the exact reader CSS overlap', () => {
-  assert.deepEqual(HOME_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_HOME_PATHS);assert.equal(new Set(AFFECTED_HOME_PATHS).size,28);
+test('affected Home admission: exactly thirty owner paths retain ten suites and add only the exact reader CSS overlap', () => {
+  assert.deepEqual(HOME_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_HOME_PATHS);assert.equal(new Set(AFFECTED_HOME_PATHS).size,30);
   // The film-motion-control, main304 parity and Release 2 runtime suites are both owner endpoints and selected suites; the selection does not grow past nine.
   assert.ok(AFFECTED_HOME_PATHS.includes('nextjs/lib/film-motion-control.test.ts')&&AFFECTED_HOME_SUITES.includes('lib/film-motion-control.test.ts'));
   assert.ok(!AFFECTED_HOME_PATHS.includes('nextjs/lib/marketing-analytics.test.ts'),'marketing-analytics stays a selected suite only');

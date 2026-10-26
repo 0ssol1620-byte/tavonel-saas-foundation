@@ -76,5 +76,21 @@
       "structure": {"crop": {"x": 0, "y": 0}, "frames": 377, "inkBoth": 377, "share": 1, "lastBlankT": null, "defaultView": "crop"},
       "world": {"crop": {"x": 0.5, "y": 0.45}, "frames": 424, "inkBoth": 169, "share": 0.399, "lastBlankT": 10.76, "defaultView": "fit"}
     }
+  },
+  "phonePaneScan": {
+    "method": "FINAL-SPEC 2026-10-26 §2.1 / §9 #29. The blankScan cell rule over one rect: every presented frame of each locked cut at 1x (Chrome channel, requestVideoFrameCallback), drawn at 2880x1800; the 684x855 source-px rect at the stage's phonePane is cut into 24x24 cells from the rect origin, a cell holds ink when its luma range (sampled every 2px) is >= 48, and a frame is blank when >= blankAt of the rect's cells hold none. share = frames not blank / frames; a phonePane is used only when share >= threshold.",
+    "receipt": "outputs/tavonel-research-replan-20261013/redesign-20261026/review/impl-2026-10-26/pane-scan/pane-scan.json and pane-scan-world-candidates.json (ai-knowledge-compiler), tool pane-scan/pane-scan.cjs",
+    "blankAt": 0.99,
+    "threshold": 0.85,
+    "rect": {"w": 684, "h": 855},
+    "stages": {
+      "sources": {"phonePane": {"x": 746, "y": 252}, "frames": 446, "blankFrames": 0, "share": 1},
+      "read": {"phonePane": {"x": 752, "y": 190}, "frames": 449, "blankFrames": 0, "share": 1},
+      "structure": {"phonePane": {"x": 44, "y": 180}, "frames": 449, "blankFrames": 0, "share": 1},
+      "world": {"phonePane": {"x": 44, "y": 180}, "frames": 447, "blankFrames": 17, "share": 0.962}
+    },
+    "rejected": {
+      "world": {"phonePane": {"x": 44, "y": 516}, "frames": 448, "blankFrames": 98, "share": 0.781, "why": "the ASSISTANT answer rows are empty until the question is asked; the spec's D3 rect, below threshold"}
+    }
   }
 }

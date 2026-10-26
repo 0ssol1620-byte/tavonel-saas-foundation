@@ -20,6 +20,13 @@ export type CompileStage = {
    */
   posterAvif?: string;
   posterAvif1x?: string;
+  /**
+   * The phone pane still (FINAL-SPEC 2026-10-26 §2.1): one 684x855 source-px rect of `poster`, the pane a phone
+   * below 768px shows in Focus (STAGE_FRAMES[].phonePane), as WebP and AVIF. A stage without one is cropped from
+   * `poster` by CSS instead.
+   */
+  phonePoster?: string;
+  phonePosterAvif?: string;
 };
 
 /*
