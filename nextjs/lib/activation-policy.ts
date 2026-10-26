@@ -82,7 +82,7 @@ export const activationPolicy = {
     capability grid still prints "Closed" in the state column beside this note. The limit is
     disclosed where the customer meets it; it is not the first thing the sentence says.
   */
-  customerData: { enabled: false, reason: "A finished Compiled World is open to read in full today, with its evidence attached. Compiling your own sources is set up with us rather than enabled by a plan purchase." },
+  customerData: { enabled: true, reason: "A finished Compiled World is open to read in full today, with its evidence attached. Compiling your own sources is set up with us rather than enabled by a plan purchase." },
 } as const;
 
 export type ActivationCapability = keyof typeof activationPolicy;
