@@ -1664,7 +1664,9 @@ export const DROPBOX_DATABASE_DEPENDENCIES = Object.freeze({
   'supabase/tests/connector_document_bindings.sql': 'dropbox-connector: connector document binding recorded by source-import',
   'supabase/tests/connector_source_suspensions.sql': 'dropbox-connector: source suspension written by sync-worker',
 });
-// Ordinary Home landing owner: exactly these twenty-six nextjs-relative paths, no glob. Product UI, so never nativeReuse.
+// Ordinary Home landing owner: exactly these thirty nextjs-relative paths, no glob. Product UI, so never nativeReuse.
+// FINAL-SPEC 2026-10-26 (Home redesign) adds the two static KO Home subset files /ko preloads (C5) and the
+// stage-1 phone pane still as AVIF and WebP (C6).
 // Home Release 2 (main dbe22b1e, PR #149) added the player frame strings, the film reading layer, the evidence connector and
 // source region, and the receive record in landing-v2-proof with its runtime snapshot; landing-v2-runtime.test.ts is their suite.
 export const HOME_AFFECTED_PATHS = Object.freeze([
@@ -1676,6 +1678,8 @@ export const HOME_AFFECTED_PATHS = Object.freeze([
   'components/landing-v2/landing-hero.module.css', 'components/landing-v2/landing-page.tsx', 'components/landing-v2/source-region.tsx', 'e2e/landing-v2.spec.ts', 'lib/film-motion-control.test.ts',
   'lib/home-evidence-view.test.ts', 'lib/home-evidence-view.ts', 'lib/home-player-main304-parity.test.ts', 'lib/landing-v2-page.test.ts',
   'lib/landing-v2-proof.ts', 'lib/landing-v2-runtime.test.ts', 'lib/landing-v2-runtime.ts', 'lib/landing-v2-snapshot.json', 'lib/one-path-contract.test.ts',
+  'public/fonts/wanted-sans-ko-home-400.woff2', 'public/fonts/wanted-sans-ko-home-510.woff2',
+  'public/film/poster-1-t8.16-pane1-684x855.avif', 'public/film/poster-1-t8.16-pane1-684x855.webp',
 ]);
 // lib/copy-trust-guard.test.ts reads landing-page.tsx (its COPY_MODULES) since the G1-COPY fix round, so Home selects it (COPY re-review R2-N2).
 export const HOME_AFFECTED_UNIT_FILES = Object.freeze([
@@ -2345,7 +2349,7 @@ const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}(
 // first, then take the 'Approve maximum & upload' fallback, on both the per-file and the whole-set approval path.
 // UX program 2026-10-17 (phase 2 lanes P2-01..P2-21 and the phase 3 fixes, B-01): the public routes, stylesheets, shared public
 // components, the consent-gated Vercel collector and funnel module, the claims registry, the Playwright config and the public
-// specs and suites the program changed join these exact endpoints (129 now; the six of them main's enablement owner
+// specs and suites the program changed join these exact endpoints (135 now; the six of them main's enablement owner
 // holds since PR #159 stay with that owner). They add their direct suites below and the
 // templates, type-scale, site-alignment, brand-tokens, benchmarks, film-line and solutions browser suites, each with its reviewed
 // project row in run-repair-check.mjs. Still exact paths, no wildcard and no default owner.
@@ -2388,6 +2392,7 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/app/sources/page.tsx",
   "nextjs/app/status/page.tsx",
   "nextjs/app/trust/page.tsx",
+  "nextjs/app/wanted-sans-korean.css",
   "nextjs/components/evaluation-page.module.css",
   "nextjs/components/evidence/region-highlight.module.css",
   "nextjs/components/explore/evidence-workbench.module.css",
@@ -2397,7 +2402,9 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/components/landing-v2/home-measurement.tsx",
   "nextjs/components/landing-v2/scenes/recompile.module.css",
   "nextjs/components/landing-v2/scenes/recompile.tsx",
+  "nextjs/components/landing-v2/scenes/start.module.css",
   "nextjs/components/landing-v2/scenes/start.tsx",
+  "nextjs/components/landing-v2/scenes/trust.module.css",
   "nextjs/components/landing-v2/scenes/trust.tsx",
   "nextjs/components/landing-v2/source-first-home.module.css",
   "nextjs/components/landing-v2/source-inspection-film.tsx",
@@ -2448,6 +2455,7 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/e2e/support/overflow.ts",
   "nextjs/e2e/templates.spec.ts",
   "nextjs/e2e/type-scale.spec.ts",
+  "nextjs/e2e/ultimate-blueprint.spec.ts",
   "nextjs/e2e/ux-polish.spec.ts",
   "nextjs/e2e/visual-continuity.spec.ts",
   "nextjs/e2e/visual-refinement.spec.ts",
@@ -2458,6 +2466,8 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/lib/funnel-events.ts",
   "nextjs/lib/landing-v2-hero-statement.test.ts",
   "nextjs/lib/landing-v2-motion.test.ts",
+  "nextjs/lib/landing-v2-recompile.test.ts",
+  "nextjs/lib/landing-v2-recompile.ts",
   "nextjs/lib/landing-v2-start.test.ts",
   "nextjs/lib/landing-v2-tokens.test.ts",
   "nextjs/lib/landing-v2-trust.test.ts",
@@ -2503,6 +2513,7 @@ export const PUBLIC_MARKETING_AFFECTED_UNIT_FILES = Object.freeze([
   "lib/landing-v2-hero-statement.test.ts",
   "lib/landing-v2-motion.test.ts",
   "lib/landing-v2-page.test.ts",
+  "lib/landing-v2-recompile.test.ts",
   "lib/landing-v2-start.test.ts",
   "lib/landing-v2-tokens.test.ts",
   "lib/landing-v2-trust.test.ts",
@@ -2664,7 +2675,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // of the shared map. Separate from the historical 424 Explore repair report, which keeps its own planExploreRepairBrowserRuns.
   affectedGroup('explore-answer', /^nextjs\/(?:lib\/explore-(?:(?:sample|story)(?:\.test)?|entry-proof\.test)\.ts|components\/explore\/(?:ask-overlay|evidence-workbench(?:\.test)?)\.tsx|e2e\/explore\.spec\.ts)$/,
     { unitFiles: ['lib/explore-entry-proof.test.ts', 'lib/explore-sample.test.ts', 'lib/explore-story.test.ts', 'lib/visual-world-model.test.ts', 'components/explore/evidence-workbench.test.tsx'], browserFiles: ['e2e/explore.spec.ts'] }),
-  // Ordinary Home landing: the twenty-six exact paths above select ten direct suites and one browser suite, which runs only in
+  // Ordinary Home landing: the thirty exact paths above select ten direct suites and one browser suite, which runs only in
   // projects 1440, 390, 360 and reduced-motion of the shared map.
   affectedGroup('home-landing', new RegExp(`^nextjs/(?:${HOME_AFFECTED_PATHS.map(path => path.replaceAll('.', '\\.')).join('|')})$`),
     { unitFiles: HOME_AFFECTED_UNIT_FILES, browserFiles: [HOME_AFFECTED_BROWSER_FILE] }),

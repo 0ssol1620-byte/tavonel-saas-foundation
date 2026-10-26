@@ -57,10 +57,16 @@ import chrome from "./public-site-chrome.module.css";
 export function PublicSiteHeader({
   signedIn,
   korean = false,
+  ghostCta = false,
 }: {
   signedIn?: boolean;
   /** Korean entry, pricing, and contact share the localized chrome. */
   korean?: boolean;
+  /**
+   * FINAL-SPEC 2026-10-26 §2.8: on Home the header action is a ghost pill (the hero and the close carry
+   * the one filled action per screen), so it is marked as the ghost it is rather than as a filled `.btn`.
+   */
+  ghostCta?: boolean;
 }) {
   const pricingLabel = korean ? KO_CHROME.nav["/pricing"] : "Pricing";
   return (
@@ -85,7 +91,7 @@ export function PublicSiteHeader({
         {signedIn ? null : <Link className="nav-signin chrome-v2-signin" href="/login">{korean ? KO_CHROME.signIn : "Sign in"}</Link>}
         {/* Desktop only: below the switch the header is the wordmark and Menu, and the hero carries this.
             Absent on the sample itself (/explore, /ko/explore): an action may not point at its own page. */}
-        <HeaderCta className={`btn ${chrome.cta}`} href={SAMPLE_CTA.href} label={korean ? SAMPLE_CTA.ko : SAMPLE_CTA.label} />
+        <HeaderCta className={`btn${ghostCta ? " btn-ghost" : ""} ${chrome.cta}`} href={SAMPLE_CTA.href} label={korean ? SAMPLE_CTA.ko : SAMPLE_CTA.label} />
       </span>
     </header>
   );
@@ -111,15 +117,49 @@ export function PublicSiteHeader({
 /* The footer destinations that have a /ko page of their own; every other link says it is English. EN-1 added /guide. */
 const KO_FOOTER_PAGES = new Set(["/contact", "/pricing", "/guide"]);
 
-export function PublicSiteFooter({ korean = false, onePath = false, languageHref }: { korean?: boolean; onePath?: boolean; languageHref?: string } = {}) {
+/*
+  FINAL-SPEC 2026-10-26 §2.8: Home's compact footer -- seven of the footer's own links, in this
+  order, labelled exactly as `FOOTER_GROUPS` (English) and `KO_CHROME.footerLinks` (Korean) label
+  them, so the compact row introduces no string. A route missing from either fails the render
+  rather than printing a link the full footer does not have.
+*/
+const COMPACT_FOOTER_HREFS = ["/knowledge-compiler", "/enterprise", "/trust", "/security", "/status", "/subprocessors", "/contact"] as const;
+
+export function compactFooterLinks(korean: boolean, groups: typeof FOOTER_GROUPS = FOOTER_GROUPS) {
+  const all = groups.flatMap((group) => group.links);
+  return COMPACT_FOOTER_HREFS.map((href) => {
+    const link = all.find((candidate) => candidate.href === href);
+    const label = korean ? KO_CHROME.footerLinks[href] : link?.label;
+    if (!link || !label) throw new Error(`compact footer: ${href} has no ${link ? "Korean label" : "FOOTER_GROUPS entry"}`);
+    return {
+      href: korean && KO_FOOTER_PAGES.has(href) ? `/ko${href}` : href,
+      label,
+      hrefLang: korean && !KO_FOOTER_PAGES.has(href) ? "en" : undefined,
+    };
+  });
+}
+
+export function PublicSiteFooter({ korean = false, onePath = false, languageHref, compact = false }: { korean?: boolean; onePath?: boolean; languageHref?: string; compact?: boolean } = {}) {
   /* chrome-06: the switch points at the language the reader is not reading. */
   const language = korean ? FOOTER_LEGAL_ROW.languageBack : FOOTER_LEGAL_ROW.language;
+  /* BQ-131: the wordmark at the bottom of a page is where a reader goes home from. It was
+     a bare <span> -- the one instance of the lockup on the site that was not a link. */
+  const wordmark = <Link href={korean ? "/ko" : "/"} className={`wordmark ${chrome.wordmark}`} aria-label={korean ? "TAVONEL 홈" : "TAVONEL home"}><Logomark /><b>TAVONEL</b></Link>;
   return (
-    <footer className={`${onePath ? "site one-path-footer" : "site"} chrome-v2-footer ${chrome.footer}`}>
+    <footer className={`${onePath ? "site one-path-footer" : "site"} chrome-v2-footer ${chrome.footer}${compact ? ` ${chrome.compact}` : ""}`}>
       <div className={`${onePath ? "one-path-wrap" : "shell"} chrome-v2-wrap`}>
-        {/* BQ-131: the wordmark at the bottom of a page is where a reader goes home from. It was
-            a bare <span> -- the one instance of the lockup on the site that was not a link. */}
-        <Link href={korean ? "/ko" : "/"} className={`wordmark ${chrome.wordmark}`} aria-label={korean ? "TAVONEL 홈" : "TAVONEL home"}><Logomark /><b>TAVONEL</b></Link>
+        {compact ? (
+          /* Home only: one row, no group titles and no tagline; the legal row below is unchanged. */
+          <div className={chrome.compactRow}>
+            {wordmark}
+            <nav className={`site-footer-groups ${chrome.footerGroups} ${chrome.compactLinks}`}>
+              {compactFooterLinks(korean).map((link) => (
+                <Link key={link.href} href={link.href as Route} hrefLang={link.hrefLang} prefetch={false}>{link.label}</Link>
+              ))}
+            </nav>
+          </div>
+        ) : <>
+        {wordmark}
         <div className={`site-footer-groups ${chrome.footerGroups}`}>
           {FOOTER_GROUPS.map((group) => (
             <nav key={group.title} aria-label={group.title}>
@@ -140,6 +180,7 @@ export function PublicSiteFooter({ korean = false, onePath = false, languageHref
           own row, its own tone.
         */}
         <p className="fine site-footer-tagline">{korean ? KO_CHROME.tagline : BRAND_LINE.descriptor}</p>
+        </>}
         {/*
           THE DEPLOYMENT GATE IS NOT IN THE CHROME. 2026-09-19, hero/chrome fix round.
 

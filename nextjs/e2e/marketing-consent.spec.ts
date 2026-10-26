@@ -180,6 +180,11 @@ test("on Home from 900px the 8 s prompt covers no title, support, action or film
 
   UX-L6 (UX-PLAN-2026-10-17 §8.2, R4-MJ2): the 412 and 430 projects (412x915, 430x932) run it too,
   so the branch where the 8 s sheet opens is taken by a width project, not only by (a) below.
+
+  FINAL-SPEC 2026-10-26 (§2.1, D-7): a phone opens on the source pane and Home prints no reading line,
+  so below 768px the film's own box is the whole of what the sheet must clear. The sheet still checks
+  the reading block (`[data-film-reading]`), which holds the pane strip from 768px; (b) below keeps a
+  scenario where that block alone decides.
 */
 test("on a Home phone the prompt never opens over the hero film", async ({ page }, testInfo) => {
   test.skip(!["430", "412", "390", "360"].includes(testInfo.project.name), "the phone bottom sheet");
@@ -191,26 +196,23 @@ test("on a Home phone the prompt never opens over the hero film", async ({ page 
   await expect(panel).toHaveCount(0);
   await page.clock.fastForward(8_000);
   await page.clock.runFor(500);
+  await expect(page.locator("#s1 [data-film-reading] p"), "no reading line on Home (D-7)").toHaveCount(0);
   const film = (await page.locator("#s1 .compile-film-viewport").boundingBox())!;
-  const line = (await page.locator("#s1 [data-film-reading] p").boundingBox())!;
   const height = page.viewportSize()!.height;
   if (await panel.count()) {
     const box = (await panel.boundingBox())!;
     expect(overlaps(box, film), "the 8 s sheet covers the film").toBe(false);
-    expect(overlaps(box, line), "the 8 s sheet covers the reading line").toBe(false);
   } else {
-    // Waiting, because the film and its line reach into the sheet's 104px zone at the foot of the screen.
-    expect(Math.max(film.y + film.height, line.y + line.height)).toBeGreaterThan(height - 104);
-    expect(Math.min(film.y, line.y)).toBeLessThan(height);
+    // Waiting, because the film reaches into the sheet's 104px zone at the foot of the screen.
+    expect(film.y + film.height).toBeGreaterThan(height - 104);
+    expect(film.y).toBeLessThan(height);
   }
   await page.evaluate(() => window.scrollTo(0, 300));
   await expect(panel).toBeVisible();
   await settle(panel);
   const box = (await panel.boundingBox())!;
   const moved = (await page.locator("#s1 .compile-film-viewport").boundingBox())!;
-  const movedLine = (await page.locator("#s1 [data-film-reading] p").boundingBox())!;
   expect(overlaps(box, moved), "the scrolled sheet covers the film").toBe(false);
-  expect(overlaps(box, movedLine), "the scrolled sheet covers the reading line").toBe(false);
   expect(box.y + box.height).toBeGreaterThan(height - 40);
   await testInfo.attach("home-phone-sheet", { body: await page.screenshot(), contentType: "image/png" });
 });
@@ -239,16 +241,15 @@ for (const [width, height] of [[430, 932], [412, 915]] as const) {
     await page.clock.fastForward(8_000);
     await page.clock.runFor(500);
     expect(await page.evaluate(() => window.scrollY), `${width}: unscrolled`).toBe(0);
+    // FINAL-SPEC 2026-10-26: no reading line under or over the phone pane, so the film's box is the reach. The 4:5 pane
+    // is taller than the old 16:10 frame, so whether the sheet opens at 8 s is read from the boxes, both ways, at both widths.
     const film = (await page.locator("#s1 .compile-film-viewport").boundingBox())!;
-    const line = (await page.locator("#s1 [data-film-reading] p").boundingBox())!;
-    const reach = Math.max(film.y + film.height, line.y + line.height);
-    if (width === 430 || reach <= height - 104) {
-      expect(reach, `${width}: film and line clear of the sheet's zone`).toBeLessThanOrEqual(height - 104);
+    const reach = film.y + film.height;
+    if (reach <= height - 104) {
       await expect(panel, `${width}: the 8 s sheet opens`).toBeVisible();
       await settle(panel);
       const box = (await panel.boundingBox())!;
       expect(overlaps(box, film), `${width}: the 8 s sheet covers the film`).toBe(false);
-      expect(overlaps(box, line), `${width}: the 8 s sheet covers the reading line`).toBe(false);
     } else {
       await expect(panel, `${width}: the sheet waits while the film reaches its zone`).toHaveCount(0);
     }
@@ -257,23 +258,30 @@ for (const [width, height] of [[430, 932], [412, 915]] as const) {
 }
 
 /*
-  (b) 430x932 in Focus details, scrolled 300px: the frame (about 237-717) is above the zone from
-  828 and only the reading block under it (about 729-834) reaches in. This is the one path where
-  the sheet's check of [data-film-reading] decides alone; without it the sheet opens on the line
-  (verified in fix round 5 by removing `line` from the boxes in marketing-consent.tsx: this test
-  failed, fix4/mutation-*.log).
+  (b) The one path where the sheet's check of [data-film-reading] decides alone; without it the sheet
+  opens on the block (verified in fix round 5 by removing `line` from the boxes in
+  marketing-consent.tsx: this test failed, fix4/mutation-*.log).
+
+  It was 430x932 in Focus details, scrolled 300px, with the reading line under the frame. FINAL-SPEC
+  2026-10-26 removed the line and a phone's reading block is empty, so the scenario moves to the band
+  where the block still has a box: 768-899px, the pan surface, with the pane strip under the frame
+  and the bottom sheet still in use (the sheet's phone query runs to 899px). At 800x800 the page is
+  scrolled until the frame's bottom is 4px above the zone, past the 200px trigger; the strip under
+  it then reaches into the zone.
 */
-test("on a wide Home phone in Focus the scrolled sheet never covers the reading line", async ({ page }, testInfo) => {
+test("in the 768-899 band in Focus the scrolled sheet never covers the reading block", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "390", "sets its own viewport");
-  const [width, height] = [430, 932];
+  const [width, height] = [800, 800];
   await page.setViewportSize({ width, height });
   await page.goto("/");
   const film = page.locator('#s1 figure[data-testid="landing-hero-film"]');
   await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-narrow", "1");
-  await film.getByRole("button", { name: "Focus details", exact: true }).click();
   await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
-  await page.evaluate(() => window.scrollTo(0, 300));
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(300);
+  const frameBottom = await film.locator(".compile-film-viewport").evaluate(node => node.getBoundingClientRect().bottom + scrollY);
+  const scroll = Math.round(frameBottom - (height - 104) + 4);
+  expect(scroll, "past the 200px reveal").toBeGreaterThan(200);
+  await page.evaluate(y => window.scrollTo(0, y), scroll);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scroll);
   const frame = (await film.locator(".compile-film-viewport").boundingBox())!;
   const reading = (await film.locator("[data-film-reading]").boundingBox())!;
   // The scenario: the frame is out of the zone and only the reading block reaches into it.
@@ -287,7 +295,7 @@ test("on a wide Home phone in Focus the scrolled sheet never covers the reading 
     const box = (await panel.boundingBox())!;
     expect(overlaps(box, reading), "the scrolled sheet covers the reading line").toBe(false);
   }
-  await testInfo.attach("home-phone-sheet-focus-300", { body: await page.screenshot(), contentType: "image/png" });
+  await testInfo.attach("home-band-sheet-focus", { body: await page.screenshot(), contentType: "image/png" });
 });
 
 /*

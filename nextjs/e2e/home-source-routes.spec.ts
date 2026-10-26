@@ -25,8 +25,10 @@ test("the entry page keeps its public product routes actionable, with no console
 
   await page.goto("/");
 
-  // The six-beat page keeps the public sample reachable from the proof and closing scenes.
-  const proof = page.locator("section#s3");
+  // The six-beat page keeps the public sample reachable from the proof and closing scenes. FINAL-SPEC 2026-10-26
+  // §2.3-2.4: the proof's link is the workbench's (s2) "Open in Explore"; the record (s3) is a sheet with no links.
+  await expect(page.locator("section#s3 a")).toHaveCount(0);
+  const proof = page.locator("section#s2");
   await proof.scrollIntoViewIfNeeded();
   const proofLinks = proof.locator('a[href="/explore"], a[href^="/explore?"], a[href^="/explore#"]');
   expect(await proofLinks.count()).toBeGreaterThan(0);
@@ -53,7 +55,9 @@ test("the entry page keeps its public product routes actionable, with no console
   const sourceDetails = proof.locator("article details");
   await expect(sourceDetails).toHaveCount(1);
   await sourceDetails.locator("summary").click();
-  await expect(sourceDetails.locator("dl")).toBeVisible();
+  // The record list and the region list (FINAL-SPEC 2026-10-26 §2.3: the workbench's details hold both).
+  await expect(sourceDetails.locator("dl")).toHaveCount(2);
+  for (const list of await sourceDetails.locator("dl").all()) await expect(list).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
 });

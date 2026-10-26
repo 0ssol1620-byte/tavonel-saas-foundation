@@ -56,8 +56,12 @@ for (const path of ["/", "/ko"]) {
     await expect(disclosure).toBeVisible();
     await expect(disclosure.locator(".compile-film-viewport")).toBeVisible();
     const film = (await disclosure.locator(".compile-film-viewport").boundingBox())!;
-    expect(film.x).toBeGreaterThanOrEqual(filmWrap!.x - 1);
-    expect(film.x + film.width).toBeLessThanOrEqual(filmWrap!.x + filmWrap!.width + 1);
+    // FINAL-SPEC 2026-10-26 §2.1: below 768px the source pane is the column plus 16px (8px each side), and nothing more.
+    const bleed = page.viewportSize()!.width < 768 ? 8 : 0;
+    expect(film.x).toBeGreaterThanOrEqual(filmWrap!.x - bleed - 1);
+    expect(film.x + film.width).toBeLessThanOrEqual(filmWrap!.x + filmWrap!.width + bleed + 1);
+    expect(film.x).toBeGreaterThanOrEqual(0);
+    expect(film.x + film.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   });
 }
 

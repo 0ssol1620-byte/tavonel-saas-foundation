@@ -42,7 +42,12 @@
   font: inherit;
 }
 /* Home sets Wanted Sans on its own wrapper; this card mounts outside it, so it would fall back to the root Geist. */
-:global(body:has([data-home-ia])) .panel { font-family: "Wanted Sans Variable", Arial, "Malgun Gothic", sans-serif; }
+/*
+  FINAL-SPEC 2026-10-26 §3.3: on /ko the sheet's Hangul is drawn from the same preloaded KO Home subset as the
+  page (its Korean copy is inside the subset; lib/landing-v2-page.test.ts checks it), not from a system face on a
+  first visit. The subset holds Hangul syllables only, so the English sheet on / fetches nothing from it.
+*/
+:global(body:has([data-home-ia])) .panel { font-family: "Wanted Sans KO Home", "Wanted Sans Variable", Arial, "Malgun Gothic", sans-serif; }
 /* Home has one accent (`--action`, on <body> while Home is mounted): the card's focus ring uses it. */
 :global(body:has([data-home-ia])) .panel { --verified: var(--action); }
 

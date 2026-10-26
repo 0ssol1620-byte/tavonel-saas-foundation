@@ -202,14 +202,16 @@ describe("G1-COPY: /pricing (D-07, C3 deletion only)", () => {
 });
 
 describe("G1-COPY: Home promise A (D-01 / P2-30)", () => {
-  it("D-01. carries the approved support line in both languages, with the intake sentence beside it", () => {
+  /*
+    FINAL-SPEC 2026-10-26 D-2 (founder veto open) replaced the D-01 support sentence with its binding half alone.
+    What this pin keeps: the support line still states the page-and-region binding in both languages, names no
+    format list, no "every" and no figure, and the intake sentence and the headline constant are unchanged.
+  */
+  it("D-01 / FINAL-SPEC D-2. carries the page-and-region support line in both languages, and keeps the intake sentence", () => {
     const home = read("components/landing-v2/landing-page.tsx");
-    expect(home).toContain(
-      "TAVONEL reads your PDFs, scans and office files and compiles them into context for AI and agents — each statement keeps the page and region it came from.",
-    );
-    expect(home).toContain(
-      "TAVONEL은 PDF·스캔·오피스 문서를 읽어 AI와 에이전트가 쓰는 맥락으로 컴파일하고, 각 진술에 그것이 나온 페이지와 영역을 남깁니다.",
-    );
+    expect(home).toContain('support: "Each statement keeps its source page and region."');
+    expect(home).toContain('support: "각 진술에 원문 페이지와 영역이 남습니다."');
+    expect(home).not.toContain("TAVONEL reads your PDFs");
     expect(home).toContain('intake: "We arrange intake for your own sources with you."');
     expect(home).toContain('intake: "내 자료의 연결과 컴파일은 상담 후 함께 설정합니다."');
     expect(read("lib/site-navigation.ts")).toContain('headline: "Turn documents into context your AI can cite."');

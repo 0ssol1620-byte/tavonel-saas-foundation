@@ -61,7 +61,9 @@ describe("the Home workbench -- status truthfulness", () => {
     const text = readable(render(homeCase()));
     expect(text).toContain("Published claims");
     expect(text).toContain("None. A verified claim needs every region it rests on, its period and unit cited, and a qualified run.");
-    expect(text).toContain("Context required:");
+    // Review 2026-10-26 B-1 cut the "Context required:" label; the note still says why the passage needs context, and
+    // that interpretation has not run.
+    expect(text).toContain("Headings and units are separate regions. Interpretation has not run.");
   });
 });
 
@@ -73,7 +75,11 @@ describe("the Home workbench -- source and passage", () => {
     const text = readable(render(value, korean));
     expect(text).toContain(view.source.filename);
     expect(text).toContain(`${source.form} · ${source.filingDate}`);
+    // R3 (critique N9, veto block): the location is the data's page and count; the representation is in Source details.
     expect(text).toContain(korean
+      ? `${view.source.pageCount}쪽 중 ${view.source.page}쪽`
+      : `page ${view.source.page} of ${view.source.pageCount}`);
+    expect(text).not.toContain(korean
       ? `${view.source.pageCount}쪽 중 ${view.source.page}쪽 · ${view.source.qualifierKo}`
       : `page ${view.source.page} of ${view.source.pageCount} · ${view.source.qualifier}`);
     expect(view.source.digest.length).toBeGreaterThan(0);
@@ -157,12 +163,12 @@ describe("the Home workbench -- source and passage", () => {
     expect(attr(sheet, "style")).toBe(`transform:translateY(-${start! / 10}%)`);
   });
 
-  it("keeps the full page and every exact region link reachable as native links", () => {
+  // FINAL-SPEC 2026-10-26 D-14: "Open full page" left; every exact region link stays a native link.
+  it("keeps every exact region link reachable as native links", () => {
     const value = homeCase();
     const html = render(value);
     const links = [...html.matchAll(/<a(\s[^>]*)>/g)].map(match => match[1]!);
     const hrefs = links.map(open => attr(open, "href"));
-    expect(hrefs).toContain(escaped(value.pages[0]!.image!.src));
     for (const region of value.regions) expect(hrefs).toContain(escaped(region.href!));
     const evidence = links.find(open => /\sdata-hero-evidence/.test(open));
     expect(evidence, "the passage's own region link").toBeDefined();
@@ -226,12 +232,13 @@ describe("the Home workbench -- region selection", () => {
       const pressed = buttonsOf(html).filter(([, open]) => attr(open!, "aria-pressed") === "true");
       expect(pressed).toHaveLength(1);
       expect(attr(pressed[0]![1]!, "aria-label")).toContain(region.bbox1000.join(","));
-      expect(readable(pressed[0]![2]!)).toContain(`Page ${region.page}`);
+      // FINAL-SPEC 2026-10-26 D-14: the page now lives in the button's name only, not in its visible text.
+      expect(attr(pressed[0]![1]!, "aria-label")).toContain(`p.${region.page}`);
       const details = html.match(/<details(?:\s[^>]*)?>([\s\S]*?)<\/details>/)?.[1] ?? "";
       expect(readable(details)).toContain(region.bbox1000.join(","));
       const box = html.match(/<span\s[^>]*data-selected="1"[^>]*>/)?.[0] ?? "";
       expect(attr(box, "data-region-id")).toBe(escaped(region.id));
-      const note = region.role === "selected" ? "Context required:" : "Shown as printed, for context.";
+      const note = region.role === "selected" ? "Headings and units are separate regions." : "Shown as printed, for context.";
       expect(readable(html)).toContain(note);
     }
   });
@@ -289,13 +296,12 @@ describe("the Home workbench -- responsive delivery", () => {
     }
     expect(attr(img, "sizes")).toMatch(/calc\(100vw - \d+px\)/);
     expect(attr(img, "src")).toBe(escaped(image.src));
-    expect(anchorsOf(html).map(([, open]) => attr(open!, "href"))).toContain(escaped(image.src));
     expect(html).toContain(`data-source-digest="${escaped(value.sources[0]!.digest)}"`);
   });
 });
 
 describe("the Home workbench -- full filing", () => {
-  it.each([false, true])("links the full SEC filing beside the page, next to the full page, in so many words (korean: %s)", korean => {
+  it.each([false, true])("links the full SEC filing beside the page, in so many words (korean: %s)", korean => {
     const value = homeCase();
     const html = render(value, korean);
     const filings = anchorsOf(html).filter(([, open]) => /\sdata-full-filing/.test(open!));
@@ -311,8 +317,9 @@ describe("the Home workbench -- full filing", () => {
     const passagePane = html.search(/<div\s[^>]*aria-live="polite"/);
     expect(at).toBeGreaterThan(html.indexOf("<img"));
     expect(at).toBeLessThan(passagePane);
+    // FINAL-SPEC 2026-10-26 D-14: the SEC filing is the one link under the page window.
     const row = html.slice(html.lastIndexOf("<p", at), html.indexOf("</p>", at));
-    expect(row).toContain(`href="${escaped(value.pages[0]!.image!.src)}"`);
+    expect(anchorsOf(row)).toHaveLength(1);
     const details = html.match(/<details[\s\S]*?<\/details>/)![0];
     expect(details).not.toContain(SEC_FILING_HREF);
   });
@@ -322,16 +329,22 @@ describe("the Home workbench -- full filing", () => {
     const details = readable(html.match(/<details[\s\S]*?<\/details>/)![0]);
     expect(details).toContain(korean ? "제출된 그대로의 원본 HTML 공시입니다." : "The original HTML filing, as submitted.");
     expect(details).toContain(korean ? "여기 보이는 페이지는 그 공시의 기준 렌더입니다." : "The page shown here is a reference render of it.");
-    // The visible location line still names the page's own representation.
+    /*
+      R3 (design critique N9, D-grade copy in the veto block): the visible location line no longer prints the pipeline
+      term "reference render". Re-pinned rule, unchanged: a reference render never presents itself as the original --
+      Source details states it is a reference render (above), the page image's alt calls it a rendered page, and no
+      visible text outside the details calls this page an original PDF.
+    */
     const outside = readable(html.replace(/<details[\s\S]*?<\/details>/, ""));
-    expect(outside).toContain(korean ? "기준 렌더" : "reference render");
+    expect(outside).not.toContain(korean ? "원본 PDF" : "original PDF");
+    expect(outside).toContain(korean ? "30쪽 중 4쪽" : "page 4 of 30");
+    expect(html).toContain(korean ? 'alt="구절을 추출한 공시 문서의 페이지 렌더입니다."' : 'alt="A rendered page of the filing the passage was extracted from."');
   });
 
-  it("keeps the full page and every exact region link alongside the filing", () => {
+  it("keeps every exact region link alongside the filing", () => {
     const value = homeCase();
     const hrefs = anchorsOf(render(value)).map(([, open]) => attr(open!, "href"));
     expect(hrefs).toContain(SEC_FILING_HREF);
-    expect(hrefs).toContain(escaped(value.pages[0]!.image!.src));
     for (const region of value.regions) expect(hrefs).toContain(escaped(region.href!));
     // The filing is not dressed as the page raster, nor the raster as the filing.
     expect(value.pages[0]!.image!.src).not.toBe(SEC_FILING_HREF);

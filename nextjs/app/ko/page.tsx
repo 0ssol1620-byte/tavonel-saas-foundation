@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import LandingPage from "@/components/landing-v2/landing-page";
@@ -56,6 +56,15 @@ export const metadata: Metadata = pageMetadata({
   실험이 꺼져 있으면(기본값) 쿠키는 존재하지 않고 언제나 arm "a"이며, 어떤 이벤트에도 `variant`
   속성이 붙지 않는다. 두 진입 페이지가 같은 함수를 쓰므로 한쪽만 다른 헤드라인을 보일 수 없다.
 */
+/*
+  FINAL-SPEC 2026-10-26 §4: Home is a paper page, so the address bar and task-switcher card read
+  paper (`--tv-paper`, #FAF9F6) here. The layout's dark `#090D14` stays on every other route.
+*/
+export const viewport: Viewport = {
+  themeColor: "#FAF9F6",
+  colorScheme: "light",
+};
+
 export default async function KoreanEntryPage({
   searchParams,
 }: {

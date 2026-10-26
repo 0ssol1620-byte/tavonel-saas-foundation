@@ -85,7 +85,9 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
     const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
     await expect(film).toBeVisible();
     await expect(film.getByRole("tab")).toHaveCount(4);
-    await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
+    // FINAL-SPEC 2026-10-26 §2.1: Home's player state is Focus at every width (the source pane below 768px, the pan
+    // surface to 899px, the desktop's 2x crop from 900px).
+    await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
     await page.evaluate(() => document.fonts.ready);
     const geometry = await page.locator("#s1").evaluate(section => {
       const title = section.querySelector("h1")!;
@@ -110,10 +112,14 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
       }
       for (const rect of rects) expect(rect.width).toBeGreaterThanOrEqual(44);
     }
-    // Release 2: the reading line under the film, at least 15px, at every width.
+    /*
+      Release 2 put a reading line under the film, at least 15px. FINAL-SPEC 2026-10-26 (D-7) removes it: the stage's
+      sentence is the poster's alt (hero-film.tsx, `${label} — ${line}`), read where it is needed and printed nowhere
+      else. What stays visible is held to its own floors: the tabs and actions below (44px), the disclosure (13px).
+    */
     const reading = film.locator("[data-film-reading] p");
-    await expect(reading).toBeVisible();
-    expect(parseFloat(await reading.evaluate(node => getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(15);
+    await expect(reading).toHaveCount(0);
+    expect(parseFloat(await film.locator("figcaption").evaluate(node => getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(13);
     for (const target of [...geometry.tabs, ...geometry.actions]) {
       expect(target.rect.height).toBeGreaterThanOrEqual(44);
       expect(target.rect.left).toBeGreaterThanOrEqual(0);
@@ -128,9 +134,9 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
     await page.reload();
     await expect(film.getByRole("button", { name: "Play the compilation film", exact: true })).toBeVisible();
     await expect(film.locator("video")).toHaveCount(0);
-    // ... and under reduced motion.
-    await expect(reading).toBeVisible();
-    expect(parseFloat(await reading.evaluate(node => getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(15);
+    // ... and under reduced motion, where the poster carries the stage's sentence as its alt.
+    await expect(reading).toHaveCount(0);
+    await expect(film.locator("img.compile-film-still")).toHaveAttribute("alt", /^Files — \S/);
     await page.screenshot({ path: testInfo.outputPath(`home-en-${width}-reduced.png`) });
     if (width === 1440 || width === 390) {
       for (let index = 0; index < 4; index++) {
@@ -145,7 +151,8 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
     await page.goto("/ko");
     const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
     await expect(film.getByRole("tab")).toHaveCount(4);
-    await expect(film.locator("figcaption")).toHaveText("제품 흐름 예시 · 실제 고객 결과가 아닙니다.");
+    // FINAL-SPEC 2026-10-26 D-9: the disclosure stays; its wording is the redesign's.
+    await expect(film.locator("figcaption")).toHaveText("제품 흐름 예시 · 고객 결과가 아닙니다.");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: testInfo.outputPath(`home-ko-${width}.png`) });
   }
@@ -160,17 +167,21 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
   the frame-strings table, measured on the poster frames); on screen it is that times the drawn
   media width / 2880. "Equivalent type size" is that x-height divided by the x-height ratio of the
   page's own sans, measured here in the same browser. Targets: >= 11px at 1440 on every stage that
-  opens cropped (fix round 3: stage 4 opens on Fit, see blankScan) and >= 9px at 390 (phone Focus
-  details; the phone still opens on Fit).
+  opens cropped (fix round 3: stage 4 opens on Fit, see blankScan), >= 9px where Focus pans (800px), and
+  >= 9px on all four stages of the 390 phone pane, whose scale is the frame's width over the stage's own
+  source rect width (STAGE_FRAMES[].phonePane.w, held to its scan in phonePaneScan).
 */
-test("the film opens each stage on its scanned default view and reads at 9px or more in phone Focus", async ({ page }, testInfo) => {
+test("the film opens each stage on its scanned default view and Focus reads at 9px or more on every stage, the 390 phone pane included", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "1440", "sets its own viewports");
   const table = JSON.parse(readFileSync(resolve(process.cwd(), "components/compile-stage-player.frame-strings.json"), "utf8")) as {
     cropCheck: { stages: Record<string, { smallestXHeight: { px: number } }> };
     blankScan: BlankScan;
+    phonePaneScan: { stages: Record<string, { phonePane: { x: number; y: number; w: number } }> };
   };
   const ids = ["sources", "read", "structure", "world"];
   const smallest = ids.map(id => table.cropCheck.stages[id]!.smallestXHeight.px);
+  // Each stage's scanned phone rect; the unit test holds STAGE_FRAMES[].phonePane to these rows.
+  const paneRects = ids.map(id => table.phonePaneScan.stages[id]!.phonePane);
   const scan = table.blankScan;
   const measurements: Record<string, unknown>[] = [];
   const FILM = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]';
@@ -213,7 +224,7 @@ test("the film opens each stage on its scanned default view and reads at 9px or 
     const film = page.locator(FILM);
     const sequence = film.locator(".compile-film-sequence");
     await expect(sequence).toHaveAttribute("data-wide-view", "crop");
-    await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
+    await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
     const ratio = await xHeightRatio();
     expect(ratio).toBeGreaterThan(0.4);
     expect(ratio).toBeLessThan(0.65);
@@ -225,7 +236,11 @@ test("the film opens each stage on its scanned default view and reads at 9px or 
     await expect(toggle).toBeVisible();
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
     await expect(film.getByRole("button", { name: "Fit full frame", exact: true })).toHaveCount(0);
-    expect((await toggle.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    // FINAL-SPEC 2026-10-26 §2.1: on a desktop the toggle is a 36x36 drawn mark at the tab row's end (a fine pointer;
+    // WCAG 2.5.8 asks 24px), named by its aria-label. A phone keeps 44x44 (asserted in landing-hero-mobile.spec.ts).
+    const toggleBox = (await toggle.boundingBox())!;
+    expect(toggleBox.height).toBeGreaterThanOrEqual(36);
+    expect(toggleBox.width).toBeGreaterThanOrEqual(36);
     // The crop sits inside the frame: the frame's box does not grow, nothing below it moves.
     const box = (await film.locator(".compile-film-viewport").boundingBox())!;
     expect(Math.abs(box.width / box.height - 1.6)).toBeLessThan(0.01);
@@ -257,10 +272,11 @@ test("the film opens each stage on its scanned default view and reads at 9px or 
       expect(xHeight / ratio, `stage ${stage + 1}`).toBeGreaterThanOrEqual(11);
       // Only the window's two panes are named under it.
       await expect(film.locator("[data-film-reading] li:visible")).toHaveCount(2);
-      // The pane names and the view control are read at 15px or more on a desktop.
-      const sizes = await film.locator("[data-film-reading] li:visible, .compile-film-view-control").evaluateAll(nodes => nodes.map(node => parseFloat(getComputedStyle(node).fontSize)));
-      expect(sizes).toHaveLength(3);
+      // The pane names are read at 15px or more on a desktop; the view control is a mark named "Focus details".
+      const sizes = await film.locator("[data-film-reading] li:visible").evaluateAll(nodes => nodes.map(node => parseFloat(getComputedStyle(node).fontSize)));
+      expect(sizes).toHaveLength(2);
       for (const size of sizes) expect(size).toBeGreaterThanOrEqual(15);
+      await expect(film.locator(".compile-film-view-control")).toHaveAccessibleName("Focus details");
     }
     // Stage 1 again: a press shows the whole cut and un-presses the toggle; Enter presses it back.
     await film.getByRole("tab").first().click();
@@ -268,7 +284,7 @@ test("the film opens each stage on its scanned default view and reads at 9px or 
     await toggle.click();
     await expect(sequence).toHaveAttribute("data-wide-view", "fit");
     await expect(toggle).toHaveAttribute("aria-pressed", "false");
-    await expect(toggle).toHaveText("Focus details");
+    await expect(toggle).toHaveAccessibleName("Focus details");
     expect(await zoom(film)).toBeCloseTo(1, 2);
     await expect(film.locator("[data-film-reading] li:visible")).toHaveCount(4);
     if (reduced) await expectMaskOnPicture(film);
@@ -313,27 +329,66 @@ test("the film opens each stage on its scanned default view and reads at 9px or 
     await expect(sequence).toHaveAttribute("data-wide-view", "fit");
     await page.screenshot({ path: testInfo.outputPath(`film-1440${reduced ? "-reduced" : ""}.png`) });
 
+    /*
+      FINAL-SPEC 2026-10-26 §2.1. The Release 3 floor -- >= 9px equivalent in Focus -- was measured on the 1960px pan
+      surface, and from 768 to 899px Focus is still that surface, so the floor is held there, at 800px, on every stage.
+      Below 768px Focus is the source pane: the 2880px cut drawn at the frame's width / w per source pixel, w being the
+      stage's own rect width (STAGE_FRAMES[].phonePane.w, the --pane-w the player sets; asserted exactly below). main
+      held >= 9px here on all four stages and so does this test. A 684px rect reads 9.28 / 11.34px on stages 1 and 4 at
+      390, but stages 2 and 3 hold 7px source text, which 684px drew at 7.21px; their rects are 520px wide (the same 4:5
+      panel, scanned in phonePaneScan), 9.49px. Phone legibility of the pane is still a person's judgment on the
+      founder's device (spec §9 #27); `smallestXHeight` is the stage's desktop crop window's, a proxy for the pane's.
+    */
+    await page.setViewportSize({ width: 800, height: 1024 });
+    await page.goto("/");
+    const band = page.locator(FILM);
+    await expect(band.locator(".compile-film-sequence")).toHaveAttribute("data-narrow", "1");
+    await expect(band.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
+    await expect(band.getByRole("button", { name: "Focus details", exact: true })).toHaveAttribute("aria-pressed", "true");
+    for (let stage = 0; stage < 4; stage++) {
+      await band.getByRole("tab").nth(stage).click();
+      const scale = await drawnScale(band);
+      const xHeight = smallest[stage]! * scale;
+      measurements.push({ width: 800, reduced, stage: stage + 1, view: "focus-pan", drawnPxPerSourcePx: scale, smallestSourceXHeight: smallest[stage], renderedXHeight: xHeight, sansXHeightRatio: ratio, equivalentPx: xHeight / ratio });
+      expect(xHeight / ratio, `800 stage ${stage + 1}`).toBeGreaterThanOrEqual(9);
+    }
+
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     const phone = page.locator(FILM);
-    await expect(phone.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
+    await expect(phone.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
     const phoneToggle = phone.getByRole("button", { name: "Focus details", exact: true });
     await expect(phoneToggle).toHaveCount(1);
+    await expect(phoneToggle).toHaveAttribute("aria-pressed", "true");
+    await expect(phoneToggle).toHaveAccessibleName("Focus details");
+    for (let stage = 0; stage < 4; stage++) {
+      await phone.getByRole("tab").nth(stage).click();
+      const pane = await phone.locator(".compile-film-viewport").evaluate(frame => {
+        const media = frame.querySelector<HTMLElement>("img.compile-film-still, video.compile-film-video")!;
+        const paneFile = frame.closest("[data-pane-poster]") !== null && media.matches("img");
+        const paneW = Number(getComputedStyle(frame.closest(".compile-film-sequence")!).getPropertyValue("--pane-w"));
+        return { frameWidth: frame.clientWidth, drawn: media.getBoundingClientRect().width, paneFile, paneW };
+      });
+      const rectW = paneRects[stage]!.w;
+      expect(pane.paneW, `--pane-w, stage ${stage + 1}`).toBe(rectW);
+      const scale = pane.frameWidth / rectW;
+      // Stage 1's own file fills the frame (its rect is 684 wide); the cut is drawn at 2880/w of it. Either way one source pixel is frame / w.
+      expect(Math.abs(pane.drawn - (pane.paneFile ? pane.frameWidth * 684 / rectW : pane.frameWidth * 2880 / rectW)), `pane scale, stage ${stage + 1}`).toBeLessThanOrEqual(2);
+      const xHeight = smallest[stage]! * scale;
+      measurements.push({ width: 390, reduced, stage: stage + 1, view: "pane", paneRect: paneRects[stage], drawnPxPerSourcePx: scale, smallestSourceXHeight: smallest[stage], renderedXHeight: xHeight, sansXHeightRatio: ratio, equivalentPx: xHeight / ratio });
+      expect(xHeight / ratio, `390 pane stage ${stage + 1}`).toBeGreaterThanOrEqual(9);
+    }
+    // A press shows the whole cut (Fit), where the stage-1 bars still land on the eyebrow; a second press returns.
+    await phone.getByRole("tab").first().click();
+    await phoneToggle.click();
+    await expect(phone.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
     await expect(phoneToggle).toHaveAttribute("aria-pressed", "false");
     if (reduced) await expectMaskOnPicture(phone);
     await phoneToggle.click();
     await expect(phone.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
     await expect(phoneToggle).toHaveAttribute("aria-pressed", "true");
-    await expect(phoneToggle).toHaveText("Focus details");
-    for (let stage = 0; stage < 4; stage++) {
-      await phone.getByRole("tab").nth(stage).click();
-      const scale = await drawnScale(phone);
-      const xHeight = smallest[stage]! * scale;
-      measurements.push({ width: 390, reduced, stage: stage + 1, view: "focus", drawnPxPerSourcePx: scale, smallestSourceXHeight: smallest[stage], renderedXHeight: xHeight, sansXHeightRatio: ratio, equivalentPx: xHeight / ratio });
-      expect(xHeight / ratio, `stage ${stage + 1}`).toBeGreaterThanOrEqual(9);
-    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: testInfo.outputPath(`film-390-focus${reduced ? "-reduced" : ""}.png`) });
+    await page.screenshot({ path: testInfo.outputPath(`film-390-pane${reduced ? "-reduced" : ""}.png`) });
   }
   await testInfo.attach("film-legibility", { body: JSON.stringify(measurements, null, 2), contentType: "application/json" });
 });
@@ -528,51 +583,45 @@ test("every stage that opens cropped keeps ink in both panes of its whole window
 });
 
 /*
-  Release 3 fix round 3 (judge gap 2). A phone opens on Fit -- the poster stays the LCP element --
-  and the stage's reading line is HTML at 15px or more, so the stage's text is read without pressing
-  Focus details. Asserted in English and Korean, under reduced motion (where the frame is the
-  poster) for every stage.
+  Release 3 fix round 3 (judge gap 2) put the stage's reading line, HTML at 15px or more, directly above a
+  phone's Fit frame, with the poster as the LCP element and a floor on its area so the frame could not slide
+  under the fold (fix rounds 4-5, UX-L2: floors re-derived each time the frame's geometry changed on purpose).
 
-  Fix round 4 (M2, 4/4 judges): under the frame the line started below the fold (top 848 of 844 at
-  390, 854 of 800 at 360; critic3/phone.json), so the first screen held the four-pane miniature and
-  no readable line. It now sits directly above the frame, and its bottom edge and the frame's top
-  edge are both on the first screen at 360, 390, 412 and 430. The poster's LCP area may not shrink
-  below the 2c7fba3 measurement (fix2/LCP-after.json, same viewports, reduced motion) by more than
-  1%: the same fully visible 348px-wide frame reads 75,516 or 75,864 px² depending on where its top
-  lands between pixels (one row), and the frame sliding under the fold costs far more (an 80px slide
-  at 360x800 is -43%). Fix round 4 measured EN 52,470 / 75,516 / 85,470 / 93,896 and KO 63,282 /
-  75,516 / 85,470 / 94,284 (fix3/LCP-after.json). The floors are per engine: Windows WebKit lays the
-  page out beside a 10px classic scrollbar (310-410px of content), so its areas are their own
-  baseline, measured on the 2c7fba3 preview (fix3/LCP-webkit-before-2c7fba3.json). CI's Linux
-  Chromium shares the chromium floors, which are at least as strict as its own 2c7fba3 layout: its
-  frame top was 633 at 360 (as on Windows) and 633 at 390 (609 on Windows), per the CI stage-1
-  screenshots (fix3/GEOMETRY.json ciLinux).
-*/
-/*
-  UX-L2 (lane P2-04, UX-PLAN-2026-10-17 §4.5 and rule R1): Home's side margin became the shared
-  --tv-page-margin, clamp(24px, 5vw, 72px) (DESIGN_MASTER_V3 §6.4), instead of 20px, so on a phone
-  the frame is 8px narrower (chromium 320/350/372/390 -> 312/342/364/382px; Windows WebKit 310/340/
-  362/380 -> 302/332/354/372px). Each floor below is the one above times (new width / old width)^2,
-  rounded down -- the plan changed the frame's width and nothing else, so a frame that slides under
-  the fold still trips the 1%. Previous floors, chromium EN 51,516 / 75,516 / 85,470 / 93,896 and
-  KO 62,646 / 75,864 / 85,470 / 94,284; WebKit EN 43,495 / 68,640 / 81,000 / 89,302 and KO 59,290 /
-  71,402 / 81,000 / 89,302.
+  FINAL-SPEC 2026-10-26 §2.1 (acceptance 23-25) replaces Fit with the source pane on a phone and removes the
+  reading line (D-7). What this test holds now, for each stage, in English and Korean, under reduced motion:
+  - the phone opens on the pane (Focus), whose own 684x855 file is the LCP element (AVIF in Chromium);
+  - no reading line; the selected tab names the stage, and the tab row sits directly above the frame (only the
+    16px gap), both on the first screen, unscrolled, the tab text at 13px or more and 4.5:1 on the paper;
+  - the frame is 4:5 and the column plus 16px, inside the viewport, and its top does not move with the stage;
+  - at 412x915 the frame's top is at most 480 (EN) / 430 (KO), and KO's bottom is on the first screen.
+  The LCP floors below are re-derived from a new measurement, not raised or lowered to pass: the pane is a
+  different element from the Fit frame they were written for. Measured on this build (chromium, reduced motion,
+  the visible part of the pane at 360x800 / 390x844 / 412x915 / 430x932: chromium EN 106,250 / 131,692 / 178,794 /
+  194,411 and KO 109,744 / 149,520 / 178,658 / 196,020; Windows WebKit EN 102,991 / 127,992 / 161,552 / 186,438 and
+  KO 106,378 / 145,347 / 169,464 / 186,438; review/impl-2026-10-26/qa/lcp-measure.json). Each floor is that area
+  rounded down to the thousand, and the 1% margin stays.
+  WebKit keeps its own floors (Windows WebKit's 10px classic scrollbar narrows the column), measured the same way.
+  Review R2 fix round R3 re-derived one cell, /ko at 390x844, because the frame moved on purpose: design critique
+  R2-B1 holds "인용할 수 있는" and "맥락으로 바꿉니다." each on one line, so the KO h1 takes three lines at 390 (as
+  EN already does) instead of breaking inside 인용할 수 / 있는, and the frame's top moves from 422.9 to 462.4. Re-measured
+  on that build (review/impl-2026-10-26-R3/qa/lcp-measure.json): chromium 135,508 and Windows WebKit 131,701; every
+  other cell measured the same as before. It is not lowered to pass: the frame still starts above the fold with
+  its tabs directly above it, which the assertions below hold at every width.
 */
 const LCP_FLOOR: Record<string, Record<string, Record<number, number>>> = {
   chromium: {
-    "/": { 360: 48_972, 390: 72_103, 412: 81_833, 430: 90_083 },
-    "/ko": { 360: 59_552, 390: 72_435, 412: 81_833, 430: 90_455 },
+    "/": { 360: 106_000, 390: 131_000, 412: 178_000, 430: 194_000 },
+    "/ko": { 360: 109_000, 390: 135_000, 412: 178_000, 430: 196_000 },
   },
   webkit: {
-    "/": { 360: 41_279, 390: 65_447, 412: 77_459, 430: 85_581 },
-    "/ko": { 360: 56_269, 390: 68_081, 412: 77_459, 430: 85_581 },
+    "/": { 360: 102_000, 390: 127_000, 412: 161_000, 430: 186_000 },
+    "/ko": { 360: 106_000, 390: 131_000, 412: 169_000, 430: 186_000 },
   },
 };
 for (const path of ["/", "/ko"]) {
-  test(`a phone in Fit reads each stage's line directly above the frame, on the first screen (${path})`, async ({ page, browserName }, testInfo) => {
+  test(`a phone opens on the stage's source pane with its tabs directly above it, on the first screen (${path})`, async ({ page, browserName }, testInfo) => {
     test.skip(testInfo.project.name !== "390", "sets its own viewports");
     test.setTimeout(120_000);
-    const quotes = ["WORKING COPY.md", "# Payment terms", "CHANGED", "nodes lit"];
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.addInitScript(() => {
       (window as unknown as { __lcp: PerformanceEntry[] }).__lcp = [];
@@ -588,61 +637,56 @@ for (const path of ["/", "/ko"]) {
       const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
       const sequence = film.locator(".compile-film-sequence");
       await expect(sequence).toHaveAttribute("data-narrow", "1");
-      await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
-      // Fit stays the default, so the opening poster (1x on a phone) stays the LCP element.
+      await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
       await expect.poll(() => page.evaluate(() => (window as unknown as { __lcp: (PerformanceEntry & { url?: string; element?: Element | null })[] }).__lcp.length)).toBeGreaterThan(0);
       const lcp = await page.evaluate(() => {
         const entries = (window as unknown as { __lcp: (PerformanceEntry & { url?: string; size?: number; element?: Element | null })[] }).__lcp;
         const last = entries[entries.length - 1]!;
         return { url: last.url ?? "", size: last.size ?? 0, still: Boolean(last.element?.matches("img.compile-film-still")) };
       });
-      // POSTER-RECUT (D-11): the 1x stage-1 poster, AVIF where the engine decodes it, the WebP fallback where it does not.
-      expect(new URL(lcp.url).pathname, `LCP at ${width}`).toMatch(/^\/film\/poster-1-t8\.16\.(avif|webp)$/);
-      if (browserName === "chromium") expect(new URL(lcp.url).pathname, `LCP at ${width}`).toBe("/film/poster-1-t8.16.avif");
+      expect(new URL(lcp.url).pathname, `LCP at ${width}`).toMatch(/^\/film\/poster-1-t8\.16-pane1-684x855\.(avif|webp)$/);
+      if (browserName === "chromium") expect(new URL(lcp.url).pathname, `LCP at ${width}`).toBe("/film/poster-1-t8.16-pane1-684x855.avif");
       expect(lcp.still, `LCP element at ${width}`).toBe(true);
       expect(lcp.size, `LCP area at ${width}`).toBeGreaterThanOrEqual(LCP_FLOOR[browserName]![path]![width]! * 0.99);
+      const column = (await page.locator("#s1 .lv2-wrap").boundingBox())!;
       for (let stage = 0; stage < 4; stage++) {
-        await film.getByRole("tab").nth(stage).click();
-        const line = film.locator("[data-film-reading] p");
-        await expect(line).toBeVisible();
-        await expect(line.locator("q")).toHaveText(quotes[stage]!);
-        expect(parseFloat(await line.evaluate(node => getComputedStyle(node).fontSize)), `${width} stage ${stage + 1}`).toBeGreaterThanOrEqual(15);
-        // WCAG 1.4.3 on the paper ground, for the line and for its quote.
-        const contrast = await line.evaluate(node => {
+        const tab = film.getByRole("tab").nth(stage);
+        await tab.click();
+        await expect(tab).toHaveAttribute("aria-selected", "true");
+        await expect(film.locator("[data-film-reading] p"), "no reading line (D-7)").toHaveCount(0);
+        expect(parseFloat(await tab.evaluate(node => getComputedStyle(node).fontSize)), `${width} stage ${stage + 1}: tab type`).toBeGreaterThanOrEqual(13);
+        // WCAG 1.4.3 on the paper ground, for the selected tab's label.
+        const contrast = await tab.evaluate(node => {
           const rgb = (value: string) => (value.match(/[\d.]+/g) ?? []).map(Number);
           const lum = (c: number[]) => { const f = (v: number) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]!) + 0.7152 * f(c[1]!) + 0.0722 * f(c[2]!); };
-          const ratio = (a: number[], b: number[]) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x! + 0.05) / (y! + 0.05); };
-          const ground = rgb(getComputedStyle(document.querySelector("#s1")!).backgroundColor);
-          return [node, node.querySelector("q")!].map(el => ratio(rgb(getComputedStyle(el).color), ground));
+          const [x, y] = [lum(rgb(getComputedStyle(node).color)), lum(rgb(getComputedStyle(document.querySelector("#s1")!).backgroundColor))].sort((m, n) => n - m);
+          return (x! + 0.05) / (y! + 0.05);
         });
-        for (const value of contrast) expect(value, `${width} stage ${stage + 1}: contrast`).toBeGreaterThanOrEqual(4.5);
-        // Directly above the frame: only the grid gap between them, no pane strip in Fit.
-        await expect(film.locator("[data-film-reading] ol")).toBeHidden();
+        expect(contrast, `${width} stage ${stage + 1}: tab contrast`).toBeGreaterThanOrEqual(4.5);
         const frame = (await film.locator(".compile-film-viewport").boundingBox())!;
-        const text = (await line.boundingBox())!;
-        expect(frame.y - (text.y + text.height), `${width} stage ${stage + 1}: gap above the frame`).toBeGreaterThanOrEqual(0);
-        expect(frame.y - (text.y + text.height), `${width} stage ${stage + 1}: gap above the frame`).toBeLessThanOrEqual(16);
-        // The first screen holds the readable line and the top of the film together.
+        const tabs = (await film.locator(".compile-film-stages").boundingBox())!;
+        expect(frame.y - (tabs.y + tabs.height), `${width} stage ${stage + 1}: gap above the frame`).toBeGreaterThanOrEqual(0);
+        expect(frame.y - (tabs.y + tabs.height), `${width} stage ${stage + 1}: gap above the frame`).toBeLessThanOrEqual(16);
         expect(await page.evaluate(() => scrollY), `${width} stage ${stage + 1}: no scroll`).toBe(0);
-        expect(text.y + text.height, `${width} stage ${stage + 1}: line on the first screen`).toBeLessThanOrEqual(heights[width]!);
+        expect(tabs.y + tabs.height, `${width} stage ${stage + 1}: tabs on the first screen`).toBeLessThanOrEqual(heights[width]!);
         expect(frame.y, `${width} stage ${stage + 1}: film top on the first screen`).toBeLessThan(heights[width]!);
-        expect(text.x).toBeGreaterThanOrEqual(0);
-        expect(text.x + text.width).toBeLessThanOrEqual(width);
-        measured.push({ width, stage: stage + 1, lineTop: text.y, lineBottom: text.y + text.height, frameTop: frame.y, frameBottom: frame.y + frame.height, fold: heights[width], contrast, lcpSize: lcp.size });
+        expect(Math.abs(frame.width / frame.height - 0.8), `${width}: a 4:5 pane`).toBeLessThan(0.01);
+        expect(Math.abs(frame.width - (column.width + 16)), `${width}: the column plus 16px`).toBeLessThanOrEqual(1);
+        expect(frame.x).toBeGreaterThanOrEqual(0);
+        expect(frame.x + frame.width).toBeLessThanOrEqual(width);
+        measured.push({ width, stage: stage + 1, tabsBottom: tabs.y + tabs.height, frameTop: frame.y, frameBottom: frame.y + frame.height, fold: heights[width], contrast, lcpSize: lcp.size });
         frameTops.push(frame.y);
       }
-      /*
-        Fix round 5 (R4-MJ1): the frame does not move with the stage. The line above it wrapped to
-        1-3 lines by stage and pushed the frame 22.5px on every auto-advance (EN 360 629.5 / 607 /
-        629.5 / 629.5, EN 430 548.2 / 525.7 / 548.2 / 570.7, KO 360 583.5 / 561 / 561 / 561;
-        critic4/phone4-chrome.json). The reading block now reserves three lines, and the frame
-        sits at EN 629.5 / 596.2 / 570.7 / 570.7 and KO 583.5 / 583.5 / 583.5 / 583.5 at
-        360 / 390 / 412 / 430 on all four stages (fix4/frames-after-chrome.json).
-      */
       for (const [stage, top] of frameTops.entries()) expect(Math.abs(top - frameTops[0]!), `${width} stage ${stage + 1}: frame top as on stage 1`).toBeLessThanOrEqual(0.5);
+      if (width === 412) {
+        // Acceptance 24: the pane's top at most 480 (EN) / 430 (KO), and the whole KO pane on the first screen.
+        const frame = (await film.locator(".compile-film-viewport").boundingBox())!;
+        expect(frame.y, "412 frame top").toBeLessThanOrEqual(path === "/" ? 480 : 430);
+        if (path === "/ko") expect(frame.y + frame.height, "412 KO frame bottom").toBeLessThanOrEqual(915);
+      }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-      await page.screenshot({ path: testInfo.outputPath(`phone-${path === "/" ? "en" : "ko"}-${width}-fit-line.png`) });
+      await page.screenshot({ path: testInfo.outputPath(`phone-${path === "/" ? "en" : "ko"}-${width}-pane.png`) });
     }
-    await testInfo.attach(`phone-fit-line-${path === "/" ? "en" : "ko"}`, { body: JSON.stringify(measured, null, 2), contentType: "application/json" });
+    await testInfo.attach(`phone-pane-${path === "/" ? "en" : "ko"}`, { body: JSON.stringify(measured, null, 2), contentType: "application/json" });
   });
 }

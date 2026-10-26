@@ -1,8 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
-import RevisionBadge from "../revision-badge";
 import { LANDING_V2_SCENE_ORDER, type LandingV2RecompileCopy } from "@/lib/landing-v2-copy";
-import { landingV2StateWord, type RecompileView } from "@/lib/landing-v2-runtime";
+import type { RecompileView } from "@/lib/landing-v2-runtime";
 import { RECOMPILE_ACTIONS, RECOMPILE_COUNTS_QUALIFIER } from "@/lib/landing-v2-recompile";
 import styles from "./recompile.module.css";
 
@@ -12,9 +11,8 @@ import styles from "./recompile.module.css";
   WHAT THIS SCENE IS NOT
   It is not a document diff. Section 15 asks for a dependency impact view, and the difference
   matters commercially: a before/after of two renderings of a page is what a document parser
-  shows, and this scene's subject is which compiled OBJECTS the arriving filings reached. So the
-  left column is the corpus as it stood and what landed on it, the right column is objects, and
-  the only thing between them is the relation that connects the two.
+  shows, and this scene's subject is what the arriving filings did to the compiled World. So the
+  panel lists the filings that arrived and the three counts the comparison measured.
 
   THREE TRUTH CONSTRAINTS, ALL OF WHICH CHANGE THE PICTURE (contract rule 7)
 
@@ -22,42 +20,20 @@ import styles from "./recompile.module.css";
      word on every row is "arrived", which is RevisionBadge's own rule.
   2. The comparison is between two COMPLETE compiles. This deployment does not perform a
      selective rebuild (lib/claim-state.ts records dependency-aware recompilation as Direction),
-     so the scene prints copy.contractNote with the heading and links the contract, and there is
-     no equivalence badge -- exploreChangeStory.equivalence.state is not_yet.
+     so the scene's one sentence says the counts compare two complete compiles and the compiler
+     contract is a link, and there is no equivalence badge -- exploreChangeStory.equivalence.state
+     is not_yet.
   3. Section 15 draws per-object state words (REBUILT / REVIEW / UNCHANGED). This World has none
-     of them: toVisualWorldModel gives every object of the deterministic public sample the state
-     candidate, which the product names PUBLISHED SAMPLE. Painting six rows amber and mint to
-     match the storyboard would be inventing a state the data does not hold, so the rows carry
-     the World's own word in the neutral colour and the semantic accents stay where the data
-     really does record a change: amber on the filings that arrived, and on the count of the
-     objects the arrivals rebuilt.
+     of them, so FINAL-SPEC 2026-10-26 prints no object rows at all (the four quoted objects read
+     as extraction errors, T5): the semantic accent stays where the data really does record a
+     change, on the count of the objects the arrivals rebuilt.
 
-  SERVER COMPONENT. RecompileView is a flat projection of the compiled World, the fan is one SVG
-  path, and the draw is a scroll-driven CSS animation whose base state is the drawn one -- so
-  there is nothing here for a browser to hydrate and nothing that needs JavaScript to finish.
+  SERVER COMPONENT. RecompileView is a flat projection of the compiled World, so there is nothing
+  here for a browser to hydrate.
 */
 
 /** This scene's id, spelled once. `LandingV2Scene.id` is a plain string, so it cannot index. */
 const SCENE_ID = "recompile" as const;
-
-/** `0 0 100 100`, stretched: the fan is decoration between two columns, not a measured figure. */
-const FAN_VIEWBOX = "0 0 100 100";
-
-/**
- * One path holding every connector, so the fan is a single animated object (section 23, 3 max).
- *
- * Each subpath leaves the source side at the vertical middle and arrives at the middle of its
- * row. The rows are equal-height by CSS, so evenly spaced endpoints land on them at every width
- * the fan is visible at; the curve is a cubic with horizontal handles, which is what keeps the
- * lines from crossing when the fan opens wide.
- */
-function fanPath(rows: number): string {
-  if (rows < 1) return "";
-  return Array.from({ length: rows }, (_, index) => {
-    const y = ((index + 0.5) / rows) * 100;
-    return `M0,50 C40,50 60,${y} 100,${y}`;
-  }).join(" ");
-}
 
 export default function Scene({
   locale,
@@ -74,30 +50,10 @@ export default function Scene({
   sceneIndex?: number;
 }) {
   const titleId = `lv2-${SCENE_ID}-title`;
-  const countsId = `lv2-${SCENE_ID}-counts`;
-  const objectsId = `lv2-${SCENE_ID}-objects`;
+  const arrivalsId = `lv2-${SCENE_ID}-arrivals`;
   const actions = RECOMPILE_ACTIONS[locale];
-  /* D5: one state word for the column when the sample agrees, per-row when it does not. */
-  const states = new Set(data.affectedSample.map((node) => node.state));
-  const sharedState = states.size === 1 ? data.affectedSample[0]?.state : undefined;
-
-  /*
-    The snapshot labels, assembled the way hero-compiler-demo.tsx assembles them so the two
-    places on this page that name the same two snapshots cannot disagree -- and, since round 4,
-    from the same two measured fields rather than from a typed label.
-
-    exploreChangeStory's own before/after labels are NOT used, and that is the point: both are
-    string literals in lib/explore-change.ts. The before label spelled the baseline year in
-    English on /ko and would keep spelling 2025 after the baseline moved; the after label carries
-    the word "four" and would keep carrying it over five listed arrivals. Everything printed here
-    is either a record field (form, year) or the length of the array rendered underneath it.
-  */
-  const beforeLabel = copy.snapshotBeforeFormat
-    .replace("{year}", data.before.year)
-    .replace("{form}", data.before.form);
-  const afterLabel = copy.snapshotAfterFormat
-    .replace("{before}", beforeLabel)
-    .replace("{count}", String(data.arrivals.length));
+  /* The contract page is English-only: a Korean reader is told before following the link (D12). */
+  const english = locale === "ko" ? { hrefLang: "en", "aria-label": `${actions.contract} (영문 페이지)` } : {};
 
   /* Removed is omitted when it is zero: a count of nothing is not a finding (contract rule 4). */
   const counts = [
@@ -106,34 +62,6 @@ export default function Scene({
     { key: "removed", value: data.counts.removed, label: copy.countLabels.removed, tone: styles.removed },
     { key: "untouched", value: data.counts.untouched, label: copy.countLabels.untouched, tone: styles.untouched },
   ].filter((count) => count.key !== "removed" || count.value > 0);
-
-  const impact = <>
-    <div className={styles.columns}>
-      <RevisionBadge beforeLabel={beforeLabel} afterLabel={afterLabel} arrivalsLabel={copy.arrivalsLabel}
-        arrivals={data.arrivals} className={styles.source} />
-      <svg className={styles.fan} viewBox={FAN_VIEWBOX} preserveAspectRatio="none" aria-hidden="true">
-        <path d={fanPath(data.affectedSample.length)} pathLength={1} vectorEffect="non-scaling-stroke" />
-      </svg>
-      <div className={styles.objects}>
-        <p className="lv2-meta" id={objectsId}>{copy.affectedLabel}{sharedState ? ` · ${landingV2StateWord(sharedState, locale)}` : ""}</p>
-        <ul className={styles.objectList} aria-labelledby={objectsId}>
-          {data.affectedSample.map(node => <li key={node.id} className={styles.object}>
-            <span className={styles.objectLabel} data-derived="1">{node.label}</span>
-            {sharedState ? null : <span className={`lv2-meta ${styles.objectState}`}>{landingV2StateWord(node.state, locale)}</span>}
-          </li>)}
-        </ul>
-      </div>
-    </div>
-    <div className={styles.counts}>
-      <p className="lv2-meta" id={countsId}>{copy.compareLabel}</p>
-      <ul className={styles.countList} aria-labelledby={countsId}>
-        {counts.map(count => <li key={count.key} className={`${styles.count} ${count.tone}`}>
-          <b data-derived="1">{count.value.toLocaleString("en-US")}</b><span className="lv2-meta">{count.label}</span>
-        </li>)}
-      </ul>
-      <p className={`lv2-meta ${styles.qualifier}`}>{RECOMPILE_COUNTS_QUALIFIER[locale]}</p>
-    </div>
-  </>;
 
   return (
     <section
@@ -144,45 +72,45 @@ export default function Scene({
       className="lv2-scene lv2-scene--proof lv2-obsidian"
     >
       <div className="lv2-wrap">
-        <div className="lv2-split">
-          <div className="lv2-scene-head">
-            <h2 className="lv2-h2" id={titleId}>
-              <span className="lv2-h2-line">{copy.headline}</span>
-              {copy.headlineAccent ? (
-                <span className="lv2-h2-line lv2-h2-accent">{copy.headlineAccent}</span>
-              ) : null}
-            </h2>
-            <p className="lv2-scene-support lv2-body-l">{copy.support}</p>
-            {/*
-              D6: one terminal action per scene. The compiler contract used to be a second link
-              in the action row, competing with the change record for the same decision; it is
-              the sentence above it that needs the reference, so it is an inline link inside that
-              sentence now -- content, not a choice.
+        <h2 className="lv2-h2" id={titleId}>
+          <span className="lv2-h2-line">{copy.headline}</span>
+          {copy.headlineAccent ? <>{" "}<span className="lv2-h2-line">{copy.headlineAccent}</span></> : null}
+        </h2>
 
-              P3 QA round 1: it was a bare <Link> with no class, so it inherited nothing and
-              measured 18px at 390 and 38px at 1440 against contract rule 8's 44px floor. Being
-              inline in a sentence does not exempt a control from the floor, and `.lv2-inline-
-              link` is the class that carries it -- not `.lv2-text-link`, which is the scene's
-              one terminal action and whose count this scene's test pins at one.
-            */}
-            <p className="lv2-scene-note lv2-small">
-              {copy.contractNote}{" "}
-              <Link className="lv2-inline-link" href={data.hrefs.contract as Route} prefetch={false}>
-                {actions.contract}
-              </Link>
-            </p>
+        {/*
+          FINAL-SPEC 2026-10-26 §2.5: one panel. The filings that arrived, as record fields; the three
+          counts the comparison measured, coloured only where the data records a change; the one
+          sentence that says what the counts compare; and the engine qualifier that travels with them.
+        */}
+        <div className={styles.panel}>
+          <div className={styles.arrivals}>
+            <p className={styles.panelLabel} id={arrivalsId}>{copy.arrivalsLabel}</p>
+            <ul className={styles.arrivalList} aria-labelledby={arrivalsId}>
+              {data.arrivals.map((arrival) => (
+                <li key={`${arrival.form}-${arrival.filingDate}`} data-derived="1">{arrival.form} · {arrival.filingDate}</li>
+              ))}
+            </ul>
           </div>
-
-          <div className={styles.impact}>
-            {impact}
-
-            <p className={styles.actions}>
-              <Link className="lv2-text-link" href={data.hrefs.change as Route} prefetch={false}>
-                {actions.change}
-              </Link>
-            </p>
+          <div className={styles.counts}>
+            <ul className={styles.countList} aria-label={copy.compareLabel}>
+              {counts.map(count => <li key={count.key} className={`${styles.count} ${count.tone}`}>
+                <b data-derived="1">{count.value.toLocaleString("en-US")}</b><span>{count.label}</span>
+              </li>)}
+            </ul>
+            <p className={styles.compared}>{copy.compared}</p>
+            <p className={styles.qualifier}>{RECOMPILE_COUNTS_QUALIFIER[locale]}</p>
           </div>
         </div>
+
+        {/* Two text links, the contract first: the selective rebuild is specified there, not run here. */}
+        <p className={styles.actions}>
+          <Link className="lv2-text-link" href={data.hrefs.contract as Route} prefetch={false} {...english}>
+            {actions.contract}<span aria-hidden="true">&nbsp;→</span>
+          </Link>
+          <Link className="lv2-text-link" href={data.hrefs.change as Route} prefetch={false}>
+            {actions.change}<span aria-hidden="true">&nbsp;→</span>
+          </Link>
+        </p>
       </div>
     </section>
   );

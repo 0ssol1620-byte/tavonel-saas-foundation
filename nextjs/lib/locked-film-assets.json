@@ -156,6 +156,34 @@
       "framePngSha256": "ea96053750dc68fb950303c08d7b8e384f7fe2bd6424428948767467c0978a55"
     },
     {
+      "file": "poster-1-t8.16-pane1-684x855.avif",
+      "width": 684,
+      "height": 855,
+      "bytes": 43696,
+      "sha256": "e32d5aa0f412717896b65b271f0c00623afb1ba650171a953ba99e90923a6677",
+      "cut": "compile-cut.mp4",
+      "cutSha256": "1406a9a8d6e537eadd97012c94c89ffc792276628f30fa8313ea892c8dd169b9",
+      "frameSeconds": 8.16,
+      "framePngSha256": "ea96053750dc68fb950303c08d7b8e384f7fe2bd6424428948767467c0978a55",
+      "cropOf": "poster-1-t8.16-2x.webp",
+      "cropOfSha256": "58d0ff0e87c526d64620d5e9e6e4a699122f3599b59deb107bef3ea74e721867",
+      "cropRect": {"x": 746, "y": 380, "width": 684, "height": 855}
+    },
+    {
+      "file": "poster-1-t8.16-pane1-684x855.webp",
+      "width": 684,
+      "height": 855,
+      "bytes": 74308,
+      "sha256": "eae2fd2fb5908012d280397dffb033e0a9ecfaa76b750322de13d2d73f76831b",
+      "cut": "compile-cut.mp4",
+      "cutSha256": "1406a9a8d6e537eadd97012c94c89ffc792276628f30fa8313ea892c8dd169b9",
+      "frameSeconds": 8.16,
+      "framePngSha256": "ea96053750dc68fb950303c08d7b8e384f7fe2bd6424428948767467c0978a55",
+      "cropOf": "poster-1-t8.16-2x.webp",
+      "cropOfSha256": "58d0ff0e87c526d64620d5e9e6e4a699122f3599b59deb107bef3ea74e721867",
+      "cropRect": {"x": 746, "y": 380, "width": 684, "height": 855}
+    },
+    {
       "file": "poster-2-t9.28-2x.avif",
       "width": 2880,
       "height": 1800,
@@ -244,5 +272,5 @@
       "framePngSha256": "0ade2f490662ce1c69510f8863189c038dc33a4e1f6720a2ac42980dc868998a"
     }
   ],
-  "posterEncoder": "sharp 0.35.4 (libwebp 1.6.0, libvips 8.18.6); webp quality 82, smartSubsample, effort 6; 1x = lanczos3 resize of the same frame. POSTER-RECUT (D-11): frames by ffmpeg 8.1.2 (input seek to t, BT.601 limited -> full range); AVIF = sharp 0.35.4 (libaom 3.14.1, libheif 1.23.2) quality 50, chromaSubsampling 4:4:4, effort 6, 1x = lanczos3 resize; the recut WebP files use the Release 3 WebP settings"
+  "posterEncoder": "sharp 0.35.4 (libwebp 1.6.0, libvips 8.18.6); webp quality 82, smartSubsample, effort 6; 1x = lanczos3 resize of the same frame. POSTER-RECUT (D-11): frames by ffmpeg 8.1.2 (input seek to t, BT.601 limited -> full range); AVIF = sharp 0.35.4 (libaom 3.14.1, libheif 1.23.2) quality 50, chromaSubsampling 4:4:4, effort 6, 1x = lanczos3 resize; the recut WebP files use the Release 3 WebP settings. Phone pane crops (FINAL-SPEC 2026-10-26, cropOf/cropRect): sharp 0.35.4 extract(cropRect) of the locked 2x WebP named in cropOf -- one more lossy generation, since ffmpeg was not on the producing host -- then AVIF quality 50, chromaSubsampling 4:4:4, effort 6 and WebP quality 82, smartSubsample, effort 6"
 }

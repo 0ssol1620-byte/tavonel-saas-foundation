@@ -1,76 +1,86 @@
-/* Release 3 move 7: the receipted measurement band. Paper, ink and one 1px rule like every Home
-   section; cobalt only on the receipt links (the band's one action). Figures are tabular.
-   UX-L3 (UX-PLAN-2026-10-17 §5.3 R3): the head is Home's section head (`lv2-h2`, `lv2-scene-support`,
-   styled in source-first-home.module.css), so this sheet no longer sizes a title of its own, and
-   the band keeps the scene rhythm its siblings keep (120px, 72px below 768). */
+/*
+  The receipted measurement band (Release 3 move 7), as a ledger (FINAL-SPEC 2026-10-26 §2.2).
+
+  Paper and ink. One 1px rule over the container, the h2 32px under it, and one rule over each of the
+  three rows. At 900 and up a row is the figure in columns 1-3 and its label, detail, must-say and
+  receipt in columns 5-11; below 900 they stack in that order. No cards, no vertical rules, no fill.
+  The receipt chip is muted mono with no underline until it is hovered or focused. The figures are
+  tabular. The head is Home's section head (`lv2-h2`, styled in source-first-home.module.css).
+*/
 .band {
-  padding-block: 120px;
-  border-bottom: 1px solid var(--rule);
+  /* R3 (design critique N11): 96, so the gap to the s2 heading matches the other section gaps at 1440. */
+  padding-block: 0 96px;
   background: var(--paper);
   color: var(--ink);
 }
+.band > :global(.lv2-wrap) {
+  padding-top: 32px;
+  border-top: 1px solid var(--tv-rule);
+}
+.title {
+  margin: 0;
+}
 .facts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0 48px;
-  margin: 32px 0 0;
+  margin: 48px 0 0;
   padding: 0;
   list-style: none;
 }
 .fact {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: 24px;
   min-width: 0;
-  padding-top: 20px;
-  border-top: 1px solid var(--ink);
+  padding-block: 32px;
+  border-top: 1px solid var(--tv-rule);
 }
-.statement { margin: 0; }
 .figure {
-  display: block;
+  grid-column: 1 / span 3;
+  margin: 0;
   color: var(--ink);
-  font: 600 clamp(40px, 4vw, 56px)/1 var(--f-sans);
-  font-variation-settings: "wght" 600;
+  font: 510 var(--lv2-fs-figure)/1 var(--f-sans);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
+}
+.body {
+  grid-column: 5 / span 7;
+  min-width: 0;
 }
 .label {
-  display: block;
-  margin-top: 12px;
+  max-width: 48ch;
+  margin: 0;
   color: var(--ink);
-  font: 500 17px/1.45 var(--f-sans);
+  font: 560 17px/1.45 var(--f-sans);
 }
 .detail {
-  margin: 0;
+  max-width: 64ch;
+  margin: 8px 0 0;
   color: var(--ink-muted);
-  font: 15px/1.6 var(--f-sans);
+  font: var(--home-meta-fs, 13px)/1.55 var(--f-sans);
 }
-/* Pushed to the foot of the cell so the three receipts share one baseline at desktop width. */
-.receipt { margin: auto 0 0; }
-/* Block-level wrapping instead of Home's inline-flex links, still at least 44px tall. Hangul in
-   "영수증" falls through to the sans face instead of a wide system mono. */
+.receipt { margin: 12px 0 0; }
+/* At least 44px tall, still a chip: no fill and no rule; ink and an underline only on hover or focus. */
 .receipt a {
-  display: inline-block;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.4em;
   min-height: 44px;
-  padding-block: 13px;
-  color: var(--action);
-  font: 13px/18px ui-monospace, Consolas, "Wanted Sans Variable", monospace;
-  text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--action) 40%, transparent);
+  color: var(--ink-muted);
+  font: 500 12px/1.45 var(--f-mono);
+  text-decoration: none;
   text-underline-offset: 3px;
 }
 .receipt a span { white-space: nowrap; }
-.receipt a:hover { text-decoration-color: currentColor; }
+.receipt a:hover,
+.receipt a:focus-visible { color: var(--ink); text-decoration: underline; text-decoration-thickness: 1px; }
 .receipt a:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
 .band :lang(ko) { word-break: keep-all; }
-/* Same measured WebKit weight hook as source-first-home.module.css (Release 2 font outline probe). */
-:global(html[data-static-wght="1"]) .figure { -webkit-text-stroke: 0.038em currentColor; }
+/* Same measured WebKit weight hook as source-first-home.module.css, re-measured for 510 (§3.2). */
+:global(html[data-static-wght="1"]) .figure { -webkit-text-stroke: 0.012em currentColor; }
 
-@media (max-width: 767px) {
-  .band { padding-block: 72px; }
-}
 @media (max-width: 899px) {
-  .facts { grid-template-columns: minmax(0, 1fr); gap: 0; margin-top: 24px; }
-  .fact { padding-block: 20px 24px; }
-  .figure { font-size: 40px; }
+  .band { padding-bottom: 72px; }
+  .facts { margin-top: 32px; }
+  .fact { display: block; padding-block: 24px; }
+  .label { margin-top: 12px; font-size: 16px; }
 }

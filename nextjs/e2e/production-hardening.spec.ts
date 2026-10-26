@@ -89,7 +89,8 @@ test("landing scenes flow continuously without artificial viewport oceans", asyn
     the list now, so the same three rules apply to it: it butts against s1 and s2, it is not
     collapsed, and it is not an ocean.
   */
-  expect(geometry.map(item => item.id)).toEqual(["s1", "measures", "s2", "s3", "s4", "s5", "reader-guide", "s6"]);
+  // FINAL-SPEC 2026-10-26 §11 F-1: the reader guide (FAQ) leaves Home, so s5 butts against s6.
+  expect(geometry.map(item => item.id)).toEqual(["s1", "measures", "s2", "s3", "s4", "s5", "s6"]);
   for (let index = 1; index < geometry.length; index += 1) {
     expect(Math.abs(geometry[index].top - geometry[index - 1].bottom), `${geometry[index - 1].id} → ${geometry[index].id}`).toBeLessThanOrEqual(2);
   }

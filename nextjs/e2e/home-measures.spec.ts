@@ -9,7 +9,8 @@ import { expect, test, type Page } from "@playwright/test";
   moving under reduced motion, and receipt links that land on a note that prints the whole digest.
 */
 
-const RECEIPTS = ["R-02", "R-01", "R-03"] as const;
+// FINAL-SPEC 2026-10-26 §2.2: R-01 (80.6) -> R-02 (0) -> R-03 (36.9%); the 36.9% row is still printed.
+const RECEIPTS = ["R-01", "R-02", "R-03"] as const;
 
 async function seedRefusal(page: Page) {
   // Not a consent spec: a stored refusal keeps the delayed card from covering a measurement.
@@ -40,7 +41,8 @@ for (const route of ["/", "/ko"]) {
       return { min: Math.min(...sizes), figure: Number.parseFloat(getComputedStyle(figure).fontSize), numeric: getComputedStyle(figure).fontVariantNumeric };
     });
     expect(text.min, "type floor").toBeGreaterThanOrEqual(12);
-    expect(text.figure).toBeGreaterThanOrEqual(40);
+    // §2.2: the figure is 44px at 1440 and 36px on a phone (412/390), still the band's largest type.
+    expect(text.figure).toBeGreaterThanOrEqual(testInfo.project.name === "390" ? 36 : 40);
     expect(text.numeric).toContain("tabular-nums");
     await band.scrollIntoViewIfNeeded();
     await testInfo.attach(`home-measures-${route === "/" ? "en" : "ko"}-${testInfo.project.name}`, { body: await band.screenshot(), contentType: "image/png" });

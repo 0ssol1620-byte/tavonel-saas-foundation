@@ -195,7 +195,9 @@ for (const path of ["/sources", "/contact"]) {
 }
 
 test("Research stays footer-reachable under its Resources owner", async ({ page }) => {
-  await page.goto("/");
+  // FINAL-SPEC 2026-10-26 §2.8: Home's footer is compact (seven links, no directory), so the footer that
+  // carries Research is the one every other public page prints, one bar link from Home ("Product").
+  await page.goto("/product");
   const researchLink = page.locator('footer.site a[href="/research"]').first();
   await researchLink.scrollIntoViewIfNeeded();
   await expect(researchLink).toBeVisible();

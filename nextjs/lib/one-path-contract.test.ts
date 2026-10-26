@@ -105,7 +105,8 @@ describe("approved one-path experience", () => {
     expect(layout).not.toContain("grid-template-columns");
     /* The workbench takes the case the server selected, so the reserved case can never lead it. */
     expect(page).toContain("selectHomeCase([buildHomeEvidenceCase(buildHeroView(), buildProofTabs()), HOME_RESERVED_CASE])");
-    expect(page).toContain("{home ? <HeroSourceCard view={home} korean={korean} /> : null}");
+    // FINAL-SPEC 2026-10-26: the workbench title is s2's h2, and the rights sentence rides under its page.
+    expect(page).toContain('{home ? <HeroSourceCard view={home} korean={korean} titleId="lv2-difficulty-title" rightsNote={page.receive.rights} /> : null}');
     expect(page).toContain("tabIndex={-1}");
     expect(page).toContain('aria-labelledby="lv2-hero-title"');
     for (const gone of ['id="top"', 'id="compile"', 'id="how-it-works"', 'id="connect"', "one-path-works-film", "one-path-film-note"]) {
@@ -125,8 +126,10 @@ describe("approved one-path experience", () => {
     expect(disclosure).toContain("<CompileStagePlayer");
     expect(disclosure).toContain("preferVideo");
     expect(disclosure).toContain("priorityPoster");
-    expect(disclosure).toContain("Illustrative product demo · examples, not customer results.");
-    expect(disclosure).toContain('LANDING_MOBILE_FILM_VIEW: MobileFilmView = "fit"');
+    // FINAL-SPEC 2026-10-26 D-9: shorter wording, same disclosure (illustrative, not customer results).
+    expect(disclosure).toContain("Illustrative demo · not customer results.");
+    // FINAL-SPEC 2026-10-26 §2.1: Home opens a phone on Focus, the one readable pane.
+    expect(disclosure).toContain('LANDING_MOBILE_FILM_VIEW: MobileFilmView = "focus"');
     expect(film).toContain("COMPILE_STAGES.map");
     expect(film, "internal recreation disclaimers do not belong on the customer route")
       .not.toContain("landingV2HeroExtra");
@@ -179,7 +182,8 @@ describe("approved one-path experience", () => {
     expect(card).toContain("aria-controls={passageId}");
     expect(card).toContain('aria-live="polite"');
     expect(card).toContain("data-hero-evidence");
-    expect(card).toContain("href={page.image.src}");
+    // FINAL-SPEC 2026-10-26 D-14: the raster is no longer a link; the official filing is.
+    expect(card).not.toContain("href={page.image.src}");
     expect(card).toContain("href={source.officialFiling.href}");
     expect(card).toContain('"Open full filing (SEC)"');
     expect(card).toContain('"Prepared demonstration / processing not yet run"');

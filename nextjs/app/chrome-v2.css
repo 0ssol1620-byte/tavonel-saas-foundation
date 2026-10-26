@@ -299,3 +299,13 @@ body .skip { min-height: 44px; display: inline-flex; align-items: center; }
 @media (max-width: 480px) {
   .chrome-v2-footer .site-footer-groups a[href="/subprocessors"] { grid-column: 1 / -1; }
 }
+
+/*
+  FINAL-SPEC 2026-10-26 §2.8: the one Hangul word on an English page is the language switch
+  ("한국어"). It names the Korean page in Korean, so it is drawn in the platform's Korean face
+  rather than pulling a Wanted Sans Hangul split onto `/` for one word: an English page fetches no
+  Hangul font at all (A-03). Only a link that both points at a Korean page and is marked Korean.
+*/
+a[hreflang="ko"][lang="ko"] {
+  font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+}

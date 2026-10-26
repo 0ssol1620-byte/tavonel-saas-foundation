@@ -109,8 +109,14 @@ const activateLink = async (page: Page, link: ReturnType<Page["locator"]>) => {
   await link.click();
 };
 
+/*
+  FINAL-SPEC 2026-10-26 §2.8: Home's footer is compact -- seven links, no directory -- so the directory a trail starts
+  from is the footer every other public page prints, one bar link from Home ("Product"). The rule is the same: every
+  destination that left the bar is a footer row, and its second hop is a link inside `main`.
+*/
+const DIRECTORY_START = "/product";
 const followTrail = async (page: Page, trail: readonly string[]) => {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.goto(DIRECTORY_START, { waitUntil: "domcontentloaded" });
   const first = page.locator(`footer.site a[href="${trail[0]}"]`).first();
   await first.scrollIntoViewIfNeeded();
   await expect(first).toBeVisible();

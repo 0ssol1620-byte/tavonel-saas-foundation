@@ -61,15 +61,23 @@ describe("landing scene 08 -- trust", () => {
     expect(html).toContain('tabindex="-1"');
   });
 
-  it.each(LOCALES)("%s states §18's four proofs and nothing beyond them", (locale) => {
+  /*
+    FINAL-SPEC 2026-10-26 §2.6: four labels, each the link to its page; one note open on Home, the
+    training-data sentence, verbatim (F-2, orchestrator decision 2026-10-26). The other three notes
+    are not rendered here and stay in the deck and on their pages ("binds each proof" below).
+  */
+  it.each(LOCALES)("%s states §18's four proofs, with the training sentence verbatim, and nothing beyond them", (locale) => {
     const html = render(locale);
     const copy = landingV2Copy(locale === "ko").trust;
     expect(copy.proofs).toHaveLength(4);
     for (const proof of copy.proofs) {
       expect(html).toContain(proof.label);
-      expect(html).toContain(proof.note);
+      if (proof.id === "training") expect(html).toContain(proof.note);
+      else expect(html).not.toContain(proof.note);
     }
+    if (locale === "en") expect(html).toContain(TRAINING_DATA_CLAIM.body);
     expect(html.match(/class="lv2-proof"/g)).toHaveLength(4);
+    expect(html.match(/class="lv2-proof-note/g)).toHaveLength(1);
   });
 
   /*
@@ -171,15 +179,23 @@ describe("landing scene 08 -- trust", () => {
   });
 
   /*
-    Redesign R2 (2026-10-15): each proof's title is a plain heading and its link is a quiet "Read"
-    under the scope sentence, whose accessible name still starts with that word and carries the title.
+    FINAL-SPEC 2026-10-26 D-24: the "Read" row left. Each proof's heading IS its link, named by the
+    label itself; a Korean link to an English page says so in its name, as before.
   */
-  it.each(LOCALES)("%s titles each proof as a heading, not a link, and names its Read link by the title", (locale) => {
+  it.each(LOCALES)("%s makes each proof heading the link to its page, named by its label", (locale) => {
     const html = render(locale);
-    const read = locale === "ko" ? "읽기" : "Read";
-    expect(html.match(/<h3 class="lv2-proof-label">[^<]+<\/h3>/g)).toHaveLength(4);
-    expect(html.match(new RegExp(`aria-label="${read}: [^"]+"`, "g"))).toHaveLength(4);
-    expect(html.match(/class="lv2-proof-read"/g)).toHaveLength(4);
+    const copy = landingV2Copy(locale === "ko").trust;
+    const headings = [...html.matchAll(/<h3 class="lv2-proof-label">([\s\S]*?)<\/h3>/g)].map((match) => match[1]!);
+    expect(headings).toHaveLength(4);
+    for (const [index, heading] of headings.entries()) {
+      const proof = copy.proofs[index]!;
+      expect(heading.match(/<a\s/g)).toHaveLength(1);
+      expect(heading.replace(/<span aria-hidden="true">[\s\S]*?<\/span>/g, "").replace(/<[^>]*>/g, "")).toBe(proof.label);
+      const english = locale === "ko" && proof.href !== "/contact";
+      expect(heading.includes(`aria-label="${proof.label} (영문 페이지)"`)).toBe(english);
+    }
+    expect(html).not.toContain("lv2-proof-read");
+    expect(html).not.toMatch(/>\s*(Read|읽기)\s*</);
   });
 
   it.each(LOCALES)("%s prints no figure, because this scene measured nothing", (locale) => {

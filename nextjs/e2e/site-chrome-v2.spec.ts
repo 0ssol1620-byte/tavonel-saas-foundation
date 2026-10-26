@@ -292,7 +292,12 @@ test.describe("Home keeps main's header and footer colours", () => {
       const header = page.locator(HEADER);
       await expect(header).toHaveCSS("color", "rgb(21, 25, 29)");
       expect(await header.evaluate((element) => getComputedStyle(element).getPropertyValue("--source").trim())).toBe("#005bb3");
-      await expect(header.locator(".nav-actions .btn")).toHaveCSS("background-color", "rgb(0, 91, 179)");
+      // FINAL-SPEC 2026-10-26 §2.8 / acceptance 6: Home's header action is the ghost pill -- transparent, a 1px inset
+      // rule, ink text -- so the hero's and the close's filled action is the one filled button on a screen.
+      const cta = header.locator(".nav-actions .btn");
+      await expect(cta).toHaveClass(/\bbtn-ghost\b/);
+      await expect(cta).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      await expect(cta).toHaveCSS("color", "rgb(21, 25, 29)");
       if (testInfo.project.name === "1440") {
         await expect(header.locator(".site-nav-direct").first()).toHaveCSS("color", "rgb(66, 73, 81)");
         await expect(header.locator(".nav-signin")).toHaveCSS("color", "rgb(21, 25, 29)");

@@ -24,12 +24,21 @@ import { expect, test, type Page } from "@playwright/test";
   /film/poster-1-t8.16.avif (1440w) and -2x.avif (2880w), with the WebP pair of the same frame as the
   fallback. The poster this contract asks for first is the 1440px file of that frame, in whichever of
   the two formats the engine decodes (the last test below pins which).
+
+  FINAL-SPEC 2026-10-26 §2.1 (acceptance 23-25, 28): below 768px Home opens on one source pane --
+  Focus, pressed -- and the poster a phone asks for first is that pane's own 684x855 file, AVIF where
+  the engine decodes it, never the 1440px frame. The view toggle is an icon named by its aria-label
+  (the same localized "Focus details"), Home prints no hint paragraph (the strings stay for the
+  player's other callers), and a press opens the whole frame (Fit). The pane follows the selected
+  stage through `--pane-x` / `--pane-y` (STAGE_FRAMES.*.phonePane) instead of a scroll offset.
 */
 const FILM = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]';
-const POSTER = /^\/film\/poster-1-t8\.16\.(avif|webp)$/;
+const POSTER = /^\/film\/poster-1-t8\.16-pane1-684x855\.(avif|webp)$/;
+/** The 1440/2880px stage-1 frame, in either format, that a phone never asks for on the first screen (acceptance 25). */
+const FRAME_POSTER = /^\/film\/poster-1-t8\.16(-2x)?\.(avif|webp)$/;
 const LOCALES = [
-  { path: "/", language: "English", play: "Play the compilation film", focus: "Focus details", fittedHint: "Full frame · Focus details to inspect small type.", focusedHint: "Focused view · Swipe or use arrow keys to inspect the frame." },
-  { path: "/ko", language: "Korean", play: "컴파일 영상 재생", focus: "세부 내용 확대", fittedHint: "전체 프레임 · 작은 글자는 세부 내용 확대에서 확인하세요.", focusedHint: "확대 보기 · 옆으로 밀거나 방향키로 화면을 살펴보세요." },
+  { path: "/", language: "English", play: "Play the compilation film", focus: "Focus details" },
+  { path: "/ko", language: "Korean", play: "컴파일 영상 재생", focus: "세부 내용 확대" },
 ] as const;
 const MOTION_PREFERENCES = [
   { preference: "reduce" as const, name: "reduced motion" },
@@ -62,6 +71,7 @@ for (const locale of LOCALES) {
         await expect(poster).toBeVisible();
         await expect.poll(() => poster.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
         expect(await poster.evaluate((image: HTMLImageElement) => new URL(image.currentSrc).pathname)).toMatch(POSTER);
+        expect(requests.filter(url => FRAME_POSTER.test(new URL(url).pathname)), "a phone asks for one first-screen poster, the pane").toEqual([]);
         await expect(film.locator("video")).toHaveCount(0);
         expect(requests.filter(isRecording), "no recording loads before the visitor asks").toEqual([]);
 
@@ -73,47 +83,51 @@ for (const locale of LOCALES) {
       await expect(film.locator("video")).toHaveCount(1);
       await expect.poll(() => requests.some(isRecording), "the recording is requested").toBe(true);
       expect(requests.findIndex(isPoster), "the poster is asked for before the recording").toBeLessThan(requests.findIndex(isRecording));
+      /*
+        Review 2026-10-26 B-2: in both motion preferences the playing cut asks for no frame poster. The <video> carries no
+        poster attribute on a phone pane, and the pane's own still stays over the cut until its first frame, then goes.
+        Until this check, the frame-poster count ran only under reduced motion, and a motion-allowed phone fetched two.
+      */
+      const video = film.locator("video");
+      await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState >= 2), "the cut's first frame").toBe(true);
+      expect(await video.getAttribute("poster"), "no frame poster on the phone pane's video").toBeNull();
+      await expect(film.locator("[data-pane-hold]"), "the pane still is released at the first frame").toHaveCount(0);
+      expect(requests.filter(url => FRAME_POSTER.test(new URL(url).pathname)), "a phone asks for one first-screen poster, the pane").toEqual([]);
 
       const sequence = film.locator(".compile-film-sequence");
       const focusControl = film.locator(".compile-film-focus-control");
-      const viewport = film.locator(".compile-film-viewport");
       const hint = film.locator(".compile-film-mobile-tools p");
       const stages = film.getByRole("tab");
+      const pane = () => sequence.evaluate(node => ["--pane-x", "--pane-y", "--pane-w"].map(name => (node as HTMLElement).style.getPropertyValue(name)));
 
-      // The phone player starts fitted and exposes the localized action and explanation.
-      await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
-      await expect(focusControl).toHaveAttribute("aria-pressed", "false");
-      await expect(focusControl).toHaveText(locale.focus);
-      await expect(hint).toHaveText(locale.fittedHint);
-
-      /*
-        Focus is an explicit opt-in and pans to the selected stage's authored pane. The pane is the stage's reading target in
-        components/compile-stage-player.tsx STAGE_FRAMES (Files 1, Organize 1, Updates 0, Use with AI 3 on Release 2), not
-        the stage's position, and a playing film advances by itself, so each check follows a stage the visitor chose.
-      */
-      await focusControl.click();
+      // The phone player opens on the stage's source pane: Focus, pressed, named in the page's language.
       await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
       await expect(focusControl).toHaveAttribute("aria-pressed", "true");
-      // Release 3 fix round 3, M1 (main bcba7173, components/compile-stage-player.tsx): one WAI-ARIA toggle whose label
-      // names the action and never changes; aria-pressed names the state. The "Fit full frame" label is gone.
-      await expect(focusControl).toHaveText(locale.focus);
-      await expect(hint).toHaveText(locale.focusedHint);
+      await expect(focusControl).toHaveAccessibleName(locale.focus);
+      await expect(hint, "Home prints no hint paragraph").toHaveCount(0);
+
+      /*
+        The pane follows the stage the visitor chose (STAGE_FRAMES.*.phonePane, 2880px source pixels): Updates opens
+        {60, 186} 520 wide, Files {746, 380} 684 wide (fix round R3). A playing film advances by itself, so each check follows a stage the visitor chose.
+        The reading target pane (`data-mobile-focus-pane`) is the stage's own, as before.
+      */
       await stages.nth(2).click();
       await expect(stages.nth(2)).toHaveAttribute("aria-selected", "true");
       await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "0");
-      await expect.poll(() => viewport.evaluate((element) => element.scrollLeft)).toBe(0);
+      await expect.poll(pane).toEqual(["60", "186", "520"]);
       await stages.nth(0).click();
       await expect(stages.nth(0)).toHaveAttribute("aria-selected", "true");
       await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
       await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "1");
-      await expect.poll(() => viewport.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+      await expect.poll(pane).toEqual(["746", "380", "684"]);
 
-      // Returning to fit works, and changing stages in fit mode keeps the visitor's choice.
+      // A press opens the whole frame (Fit), and changing stages in Fit keeps the visitor's choice.
+      // Release 3 fix round 3, M1: one WAI-ARIA toggle whose name never changes; aria-pressed names the state.
       await focusControl.click();
       await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
       await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "1");
       await expect(focusControl).toHaveAttribute("aria-pressed", "false");
-      await expect(focusControl).toHaveText(locale.focus);
+      await expect(focusControl).toHaveAccessibleName(locale.focus);
       await stages.nth(2).click();
       await expect(stages.nth(2)).toHaveAttribute("aria-selected", "true");
       await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
@@ -140,6 +154,7 @@ for (const locale of LOCALES) {
   that is true and does not claim the rest.
 */
 const RECUT_AVIF = [
+  "/film/poster-1-t8.16-pane1-684x855.avif",
   "/film/poster-1-t8.16-2x.avif", "/film/poster-1-t8.16.avif", "/film/poster-2-t9.28-2x.avif", "/film/poster-2-t9.28.avif",
   "/film/poster-3-t17.96-2x.avif", "/film/poster-3-t17.96.avif", "/film/poster-4-t17.96-2x.avif", "/film/poster-4-t17.96.avif",
 ];
@@ -187,8 +202,10 @@ async function posterContract(page: Page, engine: string) {
   }, { avif: RECUT_AVIF });
 
   for (const [url, bytes] of Object.entries(result.sizes)) expect(bytes, `${engine} ${url} within the §22 AVIF budget`).toBeLessThanOrEqual(140_000);
-  // The still is one of the two formats of the re-cut frame, AVIF exactly when the engine decodes it.
-  expect(result.currentSrc, `${engine} still`).toMatch(new RegExp(`^/film/poster-1-t8\\.16(-2x)?\\.${result.avifDecodes ? "avif" : "webp"}$`));
+  // The still is one of the two formats of the re-cut frame, AVIF exactly when the engine decodes it; below 768px it is
+  // the stage-1 pane's own file (FINAL-SPEC 2026-10-26 §2.1), above it the 1440/2880px frame.
+  const phone = (page.viewportSize()?.width ?? 1440) < 768;
+  expect(result.currentSrc, `${engine} still`).toMatch(new RegExp(`^/film/poster-1-t8\\.16${phone ? "-pane1-684x855" : "(-2x)?"}\\.${result.avifDecodes ? "avif" : "webp"}$`));
   expect(result.maskPoster).toBe("/film/poster-1-t8.16-2x.webp");
   expect(result.rects).toHaveLength(2);
   for (const [url, label] of Object.entries(result.labels)) {
@@ -208,7 +225,7 @@ test("serves the re-cut posters as AVIF within 140,000 bytes, with a WebP fallba
   await page.emulateMedia({ reducedMotion: "reduce" });
   const chromium = await posterContract(page, "chromium");
   expect(chromium.avifDecodes, "Chromium decodes AVIF").toBe(true);
-  expect(chromium.currentSrc, "a phone in Fit takes the 1440px AVIF").toBe("/film/poster-1-t8.16.avif");
+  expect(chromium.currentSrc, "a phone takes the stage-1 pane AVIF").toBe("/film/poster-1-t8.16-pane1-684x855.avif");
   const measured: Record<string, unknown> = { chromium };
   if (existsSync(playwright.webkit.executablePath())) {
     const browser = await playwright.webkit.launch();

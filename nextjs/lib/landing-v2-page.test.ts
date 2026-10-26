@@ -1,8 +1,9 @@
 import { createElement } from "react";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import CompileStagePlayer from "../components/compile-stage-player";
+import { COMPILE_STAGES } from "./compile-stages";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /*
@@ -24,10 +25,12 @@ describe("Home story presentation is opt-in", () => {
     expect(normal.indexOf('class="compile-film-caption"')).toBeGreaterThan(normal.indexOf('class="compile-film-viewport"'));
   });
 
-  it("puts the Home explanation before its media without dropping stages or controls", () => {
+  /* FINAL-SPEC 2026-10-26 (§6 #5, T13): Home prints no caption row; the stage's sentence stays in the still's alt. */
+  it("drops the Home caption row, keeping the stage sentence in the alt, without dropping stages or controls", () => {
     const story = renderToStaticMarkup(createElement(CompileStagePlayer, { storyLayout: true }));
     expect(story).toContain('data-story-layout="1"');
-    expect(story.indexOf('class="compile-film-caption"')).toBeLessThan(story.indexOf('class="compile-film-viewport"'));
+    expect(story).not.toContain('class="compile-film-caption"');
+    expect(story).toContain(`alt="Files — ${COMPILE_STAGES[0]!.line}"`);
     expect(story.match(/role="tab"/g)).toHaveLength(4);
     expect(story).toContain('class="compile-film-motion-control"');
     expect(story).toContain('class="compile-film-focus-control"');
@@ -52,14 +55,20 @@ vi.mock("./commercial-state", async importOriginal => {
   };
 });
 
-import LandingPage from "../components/landing-v2/landing-page";
+import LandingPage, { RECORD_EXCERPT } from "../components/landing-v2/landing-page";
+import HomeReaderGuide from "../components/landing-v2/home-reader-guide";
+import { compactFooterLinks } from "../components/public-site-chrome";
+import { SAMPLE_BOUNDARY } from "../components/landing-v2/scenes/start";
 import EvaluationPage from "../components/evaluation-page";
 import HeroActions from "../components/landing-v2/hero-actions";
 import { primaryCallToAction } from "./commercial-state";
 import { buildHomeEvidenceCase, type EvidenceCase } from "./home-evidence-view";
 import { LANDING_V2_COPY, type LandingV2Locale } from "./landing-v2-copy";
 import { landingV2HeroExtra } from "./landing-v2-hero-copy";
-import { buildHeroView, buildProofTabs, buildReceiveRecord, landingV2StateWord } from "./landing-v2-runtime";
+import { buildHeroView, buildProofTabs, buildReceiveRecord, buildRecompileView, landingV2StateWord } from "./landing-v2-runtime";
+import { excerptPreview } from "./explore-entry-proof";
+import { activationPolicy } from "./activation-policy";
+import { TRAINING_DATA_CLAIM } from "./security-claims";
 import {
   BARRED,
   LANDING_V2_FORBIDDEN,
@@ -67,7 +76,8 @@ import {
   RETIRED_NAMES,
 } from "./landing-v2-copy.test";
 import { koTermDrift } from "./ko-terms";
-import { ACCESS_CTA, EXPLORE_CTA, KO_CHROME, SELF_SERVE_CTA } from "./site-navigation";
+import { consentCopy } from "./marketing-analytics";
+import { ACCESS_CTA, EXPLORE_CTA, FOOTER_GROUPS, KO_CHROME, SELF_SERVE_CTA } from "./site-navigation";
 import { EVIDENCE } from "./evidence-record";
 import claimsPack from "../content/evidence/public-claims-pack.json";
 
@@ -92,19 +102,35 @@ const LOCALES: LandingV2Locale[] = ["en", "ko"];
 const HOME_SCENES = ["s1", "s2", "s3", "s4", "s5", "s6"] as const;
 const REMOVED_HOME_SCENES = ["sources", "evidence", "why", "use"] as const;
 
+/*
+  FINAL-SPEC 2026-10-26 F-1 (orchestrator decision, founder may reverse): the FAQ leaves Home. Its
+  customer-data answers are F-grade, so two things are held instead of its position:
+  - the component still carries every answer verbatim, closed and link-free (rendered on its own here);
+  - Home states the boundary itself, verbatim and once each, in s6: the sample boundary sentence the
+    third answer ends on, and `activationPolicy.customerData.reason` / `KO_CHROME.customerDataGate`.
+*/
 describe("Home reading guide integration", () => {
-  it.each(LOCALES)("%s explains source checks and sample limits before the real close", locale => {
+  it.each(LOCALES)("%s mounts no FAQ, and states the customer-data boundary in s6 verbatim, once", locale => {
     const main = mainOf(render(locale));
-    const start = main.indexOf("data-home-reader-guide");
-    const close = main.indexOf('<section id="s6"');
-    expect(start).toBeGreaterThan(main.indexOf('<section id="s5"'));
-    expect(close).toBeGreaterThan(start);
-    const guide = main.slice(start, close);
+    expect(main).not.toContain("data-home-reader-guide");
+    const text = readable(main);
+    const gate = locale === "ko" ? KO_CHROME.customerDataGate : activationPolicy.customerData.reason;
+    expect(gate).toBe(LANDING_V2_COPY[locale].start.microtext);
+    for (const sentence of [gate, SAMPLE_BOUNDARY[locale]]) {
+      expect(text.split(sentence).length - 1, `once on Home: ${sentence}`).toBe(1);
+      expect(readable(sceneOf(main, "s6"))).toContain(sentence);
+    }
+    expect(text).not.toContain(locale === "ko" ? "별도 협의" : "by arrangement");
+  });
+
+  it.each(LOCALES)("%s keeps the FAQ's source checks and sample limits verbatim in its component", locale => {
+    const guide = renderToStaticMarkup(createElement(HomeReaderGuide, { korean: locale === "ko", faqOnly: true }));
     const text = readable(guide);
     expect(elements(guide, "li")).toHaveLength(0);
     const disclosures = [...guide.matchAll(/<details(?:\s[^>]*)?>([\s\S]*?)<\/details>/g)];
-    // P2-32: one more, "where do the pages at the top come from", exactly while the specimen strip renders.
-    expect(disclosures).toHaveLength(main.includes("data-specimen-strip") ? 4 : 3);
+    expect(disclosures).toHaveLength(3);
+    // The sentence s6 prints is the third answer's own last sentence, byte for byte.
+    expect(text).toContain(SAMPLE_BOUNDARY[locale]);
     for (const disclosure of disclosures) {
       expect(disclosure[0]).not.toMatch(/<details[^>]*\sopen(?:=|\s|>)/);
       expect(disclosure[1]).toMatch(/^<summary>[\s\S]+<\/summary><p>[\s\S]+<\/p>$/);
@@ -133,9 +159,23 @@ describe("Home reading guide integration", () => {
     const control = css.match(/\.film :global\(\.compile-film-viewport\) > :global\(\.compile-film-motion-control\) \{([^}]+)\}/)?.[1];
     expect(control, "a Home-scoped motion control treatment").toBeDefined();
     expect(control).toMatch(/color:\s*#fff;/);
-    const plateVar = control!.match(/background:\s*var\((--[a-z-]+)\)/)![1];
-    const plate = css.match(new RegExp(`${plateVar}:\\s*#([0-9a-f]{6})`, "i"))![1]!;
-    const alpha = Number(control!.match(/opacity:\s*([\d.]+)/)![1]);
+    /*
+      Design critique 2026-10-26 B2: the plate is the instrument ground mixed toward transparent
+      (`color-mix(in oklab, var(--tv-inst-0) 72%, transparent)`), at opacity 1. Its alpha is the mix share times the
+      opacity, and its colour is the token's hex in app/tavonel.css; the 3:1 rule over a black and a white scene is
+      the same as before. R3 (critique N3): the plate is now the control's ::before, a 36px disc inside the 44px hit
+      area, and the control itself is transparent -- so the plate is read from ::before, the opacity from the control
+      (which multiplies its pseudo-element), and the control must not paint a second, unmeasured background.
+    */
+    expect(control).toMatch(/background:\s*transparent;/);
+    const plateRule = css.match(/\.film :global\(\.compile-film-viewport\) > :global\(\.compile-film-motion-control\)::before \{([^}]+)\}/)?.[1];
+    expect(plateRule, "the drawn disc").toBeDefined();
+    expect(plateRule).toMatch(/inset:\s*4px;/);
+    const mix = plateRule!.match(/background:\s*color-mix\(in oklab,\s*var\((--[a-z0-9-]+)\)\s+(\d+)%,\s*transparent\)/)!;
+    const plateVar = mix[1]!;
+    const tokens = readFileSync(new URL("../app/tavonel.css", import.meta.url), "utf8");
+    const plate = tokens.match(new RegExp(`${plateVar}:\\s*#([0-9a-f]{6})`, "i"))![1]!;
+    const alpha = (Number(mix[2]) / 100) * Number(control!.match(/opacity:\s*([\d.]+)/)![1]);
     const linear = (value: number) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
     const luminance = (channels: number[]) => channels.map(linear).reduce((sum, value, i) => sum + value * [0.2126, 0.7152, 0.0722][i]!, 0);
     const plateChannels = plate.match(/../g)!.map(channel => parseInt(channel, 16) / 255);
@@ -352,8 +392,9 @@ describe("landing v2 -- the composition with the specimen strip rendered", () =>
       if (!hero.includes(open)) expect(attr(open, "loading")).toBe("lazy");
     }
     for (const absent of ["Landsat", "USGS", "NASA", "Cloud = No", "Collection 1"]) expect(readable(withoutSpecimens(main))).not.toContain(absent);
-    const guide = main.slice(main.indexOf("data-home-reader-guide"), main.indexOf('<section id="s6"'));
-    expect([...guide.matchAll(/<details(?:\s[^>]*)?>/g)]).toHaveLength(4);
+    // F-1: no FAQ on Home, so the strip's own licence line is each cell's full attribution (P2-32, D-06).
+    expect(main).not.toContain("data-home-reader-guide");
+    expect(main.match(/data-specimen-licence=""/g)).toHaveLength(2);
     // The strip's first crop is the first screen's priority image; the film poster below it loads lazily, unpreloaded.
     const poster = elements(hero, "img").filter(open => open.includes("compile-film-still"));
     expect(poster).toHaveLength(1);
@@ -423,6 +464,18 @@ describe("landing v2 -- the composition", () => {
           ? "문서를 AI가 인용할 수 있는 맥락으로 바꿉니다."
           : "Turn documents into context your AI can cite.";
       expect(bare(heading.replace(/<[^>]*>/g, ""))).toBe(bare(expected));
+      /*
+        R3 (design critique R2-B1): /ko holds "인용할 수 있는" on one line (.lv2-keep, nowrap on Home) so 수 never ends a
+        line apart from 있는, and "맥락으로 바꿉니다." so 바꿉니다. never ends the h1 alone; the words are the translation's
+        own and the h1's text is exactly BRAND_LINE's KO line. / carries no keep span.
+      */
+      if (locale === "ko") {
+        expect(LANDING_V2_COPY.ko.hero.headline).toBe(expected);
+        expect(heading).toContain('<span class="lv2-keep">인용할 수 있는</span> <span class="lv2-keep">맥락으로 바꿉니다.</span>');
+        expect(heading.replace(/<[^>]*>/g, "")).toBe(LANDING_V2_COPY.ko.hero.headline);
+      } else {
+        expect(heading).not.toContain("lv2-keep");
+      }
     }
   );
 
@@ -433,8 +486,8 @@ describe("landing v2 -- the composition", () => {
       const levels = [...main.matchAll(/<h([1-6])(\s[^>]*)?>/g)].map(match =>
         Number(match[1])
       );
-      // Six scenes, the receipted measurement band (Release 3 move 7) and the FAQ.
-      expect(levels.filter(level => level === 2)).toHaveLength(8);
+      // FINAL-SPEC 2026-10-26: the band, the s2 workbench title (s2's own h2), s3, s4, s5 and s6. No FAQ.
+      expect(levels.filter(level => level === 2)).toHaveLength(6);
       expect(levels[0]).toBe(1);
       // An h3 may only appear under a heading one level above it: no h1 -> h3 jump anywhere.
       levels.reduce((previous, level) => {
@@ -488,9 +541,12 @@ describe("landing v2 -- the composition", () => {
     const band = main.slice(main.lastIndexOf("<section", main.indexOf("data-home-measures")), main.indexOf('<section id="s2"'));
     expect(main.indexOf("data-home-measures")).toBeGreaterThan(main.indexOf('<section id="s1"'));
     expect(main.indexOf("data-home-measures")).toBeLessThan(main.indexOf('<section id="s2"'));
-    expect([...band.matchAll(/data-claim-id="([^"]+)"/g)].map(match => match[1])).toEqual(Object.keys(HOME_CLAIM_ALLOWLIST));
+    // FINAL-SPEC 2026-10-26 D-12: the same three allowlisted claims, in receipt order R-01, R-02, R-03.
+    const ids = [...band.matchAll(/data-claim-id="([^"]+)"/g)].map(match => match[1]);
+    expect(ids).toEqual(["recovery-contribution-olmocr", "compilation-guarantees", "accuracy-by-document-type"]);
+    expect([...ids].sort()).toEqual(Object.keys(HOME_CLAIM_ALLOWLIST).sort());
     const receipts = elements(band, "a").filter(open => attr(open, "data-receipt")).map(open => [attr(open, "href"), attr(open, "data-receipt")]);
-    expect(receipts).toEqual([["/research/notes#R-02", "R-02"], ["/research/notes#R-01", "R-01"], ["/research/notes#R-03", "R-03"]]);
+    expect(receipts).toEqual([["/research/notes#R-01", "R-01"], ["/research/notes#R-02", "R-02"], ["/research/notes#R-03", "R-03"]]);
     expect(readable(band)).toContain(locale === "ko" ? "저품질 스캔본" : "low-quality scans");
     expect(band).toContain('data-claim-sha="4d75ae96e70c7c1c425b991df0f1c356ec6393e73914aaed27f5f54b0048a559">36.9</span>');
     // The completion share is never called accuracy, and is not on the band without a served receipt.
@@ -573,7 +629,8 @@ describe("landing v2 -- the composition", () => {
       for (const tab of buildProofTabs()) expect(text).not.toContain(tab.question);
       expect(text).not.toMatch(/verified answer/i);
       expect(text).not.toContain(locale === "ko" ? "백만 달러" : "USD millions");
-      expect(main).toContain(locale === "ko" ? "TIF 또는 GIF" : "TIF or GIF");
+      // FINAL-SPEC 2026-10-26 D-5: the formats line left Home; no format list of any kind is typed here.
+      expect(readable(main)).not.toMatch(/Accepted at upload|업로드에서 허용하는 형식|\bCSV\b|\.csv/);
       // Only the workbench's source page may ask for priority; nothing below it competes.
       expect(main.slice(main.indexOf('<section id="s2"'))).not.toMatch(/fetchpriority="high"/i);
     }
@@ -583,15 +640,10 @@ describe("landing v2 -- the composition", () => {
     The reserved hard case is a slot in the model, not content: no packet was readable, so the
     page may say a case is reserved and must not name, picture or answer it.
   */
-  it.each(LOCALES)("%s says the reserved case is unprocessed and shows nothing from it", locale => {
+  // FINAL-SPEC 2026-10-26 D-15: the reserved-case sentence left Home; nothing from that case may appear either.
+  it.each(LOCALES)("%s shows nothing from the reserved case", locale => {
     const main = mainOf(render(locale));
-    const text = readable(sceneOf(main, "s2"));
-    expect(text).toContain(
-      locale === "ko"
-        // The sentence boundary is part of the pin, so a hedge put back before the verb fails it.
-        ? "예약해 두었습니다. 처리, 적격 판정, 권리 허가를 거치지 않았으므로 그 내용은 보여 주지 않습니다."
-        : "It has not been processed, qualified or rights-cleared, so nothing from it is shown."
-    );
+    expect(readable(main)).not.toContain(locale === "ko" ? "예약해 두었습니다" : "reserved for this place");
     // P2-32: a specimen's source line may name NASA's report server (NACA RM L50C03); nothing else on the page may.
     for (const absent of ["Landsat", "USGS", "NASA", "Cloud = No", "Collection 1"]) {
       expect(readable(withoutSpecimens(main)), `the page mentions "${absent}"`).not.toContain(absent);
@@ -637,14 +689,23 @@ describe("landing v2 -- the composition", () => {
     asserted in the rendered text, and asserted to be /explore's own sentence rather than a second
     spelling of it.
   */
+  /*
+    FINAL-SPEC 2026-10-26 §0.2: the caveat moves with the labels it qualifies. Home now prints no
+    World object labels at all -- s3's record is a Claim and s4 lists no objects -- so the caveat is
+    not printed; if any object label comes back (an Entity record, or s4's object rows), the caveat
+    must come back with it, exactly once, in visible text.
+  */
   it.each(LOCALES)(
-    "%s prints the Entity caveat where a reader can see it",
+    "%s prints the Entity caveat exactly when it prints an object label",
     locale => {
-      const html = mainOf(render(locale));
+      const text = mainOf(render(locale)).replace(/<[^>]*>/g, " ");
       const caveat = landingV2HeroExtra(locale === "ko").entityDisclaimer;
-      expect(html).toContain(caveat);
-      // Visible text, not an attribute value: the sentence survives the tag strip.
-      expect(html.replace(/<[^>]*>/g, " ")).toContain(caveat);
+      const record = buildReceiveRecord();
+      const objects = buildRecompileView().affectedSample.map(node => node.label);
+      expect(objects.length, "the sample has object labels to look for").toBeGreaterThan(0);
+      const shown = objects.filter(label => text.includes(label)).length + (record.claim.kind === "Claim" ? 0 : 1);
+      expect(text.split(caveat).length - 1).toBe(shown > 0 ? 1 : 0);
+      expect(shown, "no object label on Home today").toBe(0);
     }
   );
 
@@ -673,7 +734,17 @@ describe("landing v2 -- the lead and the workbench", () => {
       // The whole digest is in the markup (inside Source details), not only a `data-` attribute.
       expect(view.source.digest.length).toBeGreaterThan(0);
       expect(text).toContain(view.source.digest);
+      /*
+        R3 (design critique N9, D-grade copy in the veto block): the location line is the page and the page count from
+        the data, without the pipeline word "reference render"; Source details still states the representation
+        (components/landing-v2/hero-source-card.test.tsx holds it), so a render never passes as the original.
+      */
       expect(text).toContain(
+        locale === "ko"
+          ? `${view.source.pageCount}쪽 중 ${view.source.page}쪽`
+          : `page ${view.source.page} of ${view.source.pageCount}`
+      );
+      expect(text).not.toContain(
         locale === "ko"
           ? `${view.source.pageCount}쪽 중 ${view.source.page}쪽 · ${view.source.qualifierKo}`
           : `page ${view.source.page} of ${view.source.pageCount} · ${view.source.qualifier}`
@@ -733,24 +804,23 @@ describe("landing v2 -- the lead and the workbench", () => {
     }
   );
 
-  // Fix round 3 (judge gap 4): the intake line is an offer, not "by arrangement".
-  it.each(LOCALES)("%s offers own-source intake beside the actions", locale => {
+  // FINAL-SPEC 2026-10-26 F-1: the hero carries no intake sentence; the action row is the actions alone.
+  it.each(LOCALES)("%s keeps the hero to the statement, the actions and the film", locale => {
     const hero = sceneOf(mainOf(render(locale)), "s1");
     const text = readable(hero);
-    const offer = locale === "ko" ? "내 자료의 연결과 컴파일은 상담 후 함께 설정합니다." : "We arrange intake for your own sources with you.";
-    expect(text).toContain(offer);
+    expect(text).not.toContain(locale === "ko" ? "내 자료의 연결과 컴파일은 상담 후 함께 설정합니다." : "We arrange intake for your own sources with you.");
     expect(text).not.toContain(locale === "ko" ? "별도 협의" : "by arrangement");
-    // Before the workbench in reading order, so it is part of the lead, not a footnote.
-    expect(text.indexOf(offer)).toBeLessThan(readable(mainOf(render(locale))).indexOf(buildHeroView().source.filename));
+    expect(elements(hero, "p").filter(open => /lv2-hero-intake|intake/.test(attr(open, "class") ?? ""))).toHaveLength(0);
   });
 
-  // Fix round 3 (judge gap 1): the category is the eyebrow, directly above the outcome H1.
-  it.each(LOCALES)("%s names the category in the eyebrow above the H1", locale => {
-    const hero = sceneOf(mainOf(render(locale)), "s1");
-    expect(hero).toMatch(/<p class="lv2-eyebrow lv2-hero-eyebrow">([^<]+)<\/p><h1/);
-    expect(hero.match(/<p class="lv2-eyebrow lv2-hero-eyebrow">([^<]+)<\/p>/)![1]).toBe(
-      locale === "ko" ? "AI를 위한 지식 컴파일러" : "The Knowledge Compiler for AI",
-    );
+  // FINAL-SPEC 2026-10-26 D-1: the category name left the eyebrow and is s6's h2, word for word.
+  it.each(LOCALES)("%s names the category once, as the closing h2", locale => {
+    const main = mainOf(render(locale));
+    expect(main).not.toContain("lv2-eyebrow");
+    expect(sceneOf(main, "s1")).toMatch(/<div class="lv2-hero-text"><h1/);
+    const name = locale === "ko" ? "AI를 위한 지식 컴파일러" : "The Knowledge Compiler for AI";
+    expect(sceneOf(main, "s6").match(/<h2[^>]*>([\s\S]*?)<\/h2>/)![1]!.replace(/<[^>]*>/g, "")).toBe(name);
+    expect(readable(main).split(name).length - 1).toBe(1);
   });
 
   it.each(LOCALES)("%s shows four demo stages immediately after the headline", locale => {
@@ -764,17 +834,19 @@ describe("landing v2 -- the lead and the workbench", () => {
     const supportAt = hero.indexOf('class="lv2-hero-support lv2-body-l"');
     expect(supportAt).toBeGreaterThan(hero.indexOf('</h1>'));
     expect(supportAt).toBeLessThan(actionsAt);
+    // FINAL-SPEC 2026-10-26 D-2: the support sentence is the page-and-region binding alone.
     expect(readable(hero)).toContain(
-      locale === "ko"
-        ? "TAVONEL은 PDF·스캔·오피스 문서를 읽어 AI와 에이전트가 쓰는 맥락으로 컴파일하고, 각 진술에 그것이 나온 페이지와 영역을 남깁니다."
-        : "TAVONEL reads your PDFs, scans and office files and compiles them into context for AI and agents — each statement keeps the page and region it came from.",
+      locale === "ko" ? "각 진술에 원문 페이지와 영역이 남습니다." : "Each statement keeps its source page and region.",
     );
     expect(hero).toContain("/film/poster-1-t8.16-2x.webp");
     expect(hero).toContain("/film/poster-1-t8.16-2x.avif");
     expect(elements(hero, "button").filter(open => attr(open, "role") === "tab")).toHaveLength(4);
-    expect(hero).toContain('data-mobile-view="fit"');
+    // FINAL-SPEC 2026-10-26 §2.1: the phone opens on one readable pane (Focus), its own still first.
+    expect(hero).toContain('data-mobile-view="focus"');
+    expect(hero).toContain("/film/poster-1-t8.16-pane1-684x855.avif");
     expect(hero).not.toContain('data-source-inspection-film');
-    expect(readable(hero)).toContain(locale === "ko" ? "실제 고객 결과가 아닙니다" : "Illustrative product demo");
+    // The not-customer-results disclosure stays (FINAL-SPEC D-9 shortens its wording only).
+    expect(readable(hero)).toContain(locale === "ko" ? "고객 결과가 아닙니다" : "not customer results");
     expect(sceneOf(main, "s2")).not.toContain('data-testid="landing-hero-film"');
   });
 });
@@ -793,6 +865,8 @@ describe("landing v2 -- hero actions by commercial state", () => {
 
   const action = (hero: string, name: string) =>
     hero.match(new RegExp(`<a\\s[^>]*data-analytics="${name}"[^>]*>([\\s\\S]*?)</a>`));
+  /* The visible label without its aria-hidden arrow (FINAL-SPEC 2026-10-26 §2.1): what the access action is called. */
+  const label = (inner: string) => readable(inner.replace(/<span aria-hidden="true">[\s\S]*?<\/span>/g, "")).trim();
 
   it.each(LOCALES)("%s sends the primary action to the public sample", locale => {
     for (const live of [false, true]) {
@@ -815,7 +889,7 @@ describe("landing v2 -- hero actions by commercial state", () => {
       expect(secondary).not.toBeNull();
       expect(attr(secondary![0], "href")).toBe(locale === "ko" ? "/ko/evaluation" : "/evaluation");
       // Fix round 3 (judge gap 4): the quiet secondary is the start path, to the same evaluation route.
-      expect(readable(secondary![1]!).trim()).toBe(locale === "ko" ? "내 문서 가져오기" : "Bring your own documents");
+      expect(label(secondary![1]!)).toBe(locale === "ko" ? "내 문서 평가" : "Evaluate your documents");
       // Brief 2026-10-15 move 1: the close fills the hero's public-sample action beside the price link, in both languages.
       const close = elements(sceneOf(main, "s6"), "a").map(open => attr(open, "href"));
       expect(close).toEqual([EXPLORE_CTA.href, locale === "ko" ? "/ko/pricing" : "/pricing"]);
@@ -832,7 +906,7 @@ describe("landing v2 -- hero actions by commercial state", () => {
       const secondary = action(sceneOf(main, "s1"), "hero-secondary");
       expect(secondary).not.toBeNull();
       expect(attr(secondary![0], "href")).toBe(escaped(SELF_SERVE_CTA.href));
-      expect(readable(secondary![1]!).trim()).toBe(
+      expect(label(secondary![1]!)).toBe(
         locale === "ko" ? KO_CHROME.cta[SELF_SERVE_CTA.href] : SELF_SERVE_CTA.label
       );
       expect(main).not.toMatch(/href="(?:\/ko)?\/evaluation"/);
@@ -850,46 +924,59 @@ describe("landing v2 -- hero actions by commercial state", () => {
   one real record of the sample World with the World's own status word -- never "verified".
 */
 describe("landing v2 -- difficulty and record", () => {
-  it.each(LOCALES)("%s links each difficulty to a region the workbench shows", locale => {
-    const difficulty = sceneOf(mainOf(render(locale)), "s2");
+  // FINAL-SPEC 2026-10-26: the difficulty list left; every region link in s2 is still one the workbench shows.
+  it.each(LOCALES)("%s links only regions the workbench shows, every one of them", locale => {
+    const s2 = sceneOf(mainOf(render(locale)), "s2");
     const hrefs = new Set(homeCase().regions.map(region => escaped(region.href!)));
-    const links = elements(difficulty, "a").filter(open => attr(open, "href")?.startsWith("/explore?"));
+    const links = elements(s2, "a").filter(open => attr(open, "href")?.startsWith("/explore?"));
     expect(links.length).toBeGreaterThan(0);
     for (const open of links) expect(hrefs.has(attr(open, "href")!)).toBe(true);
-    // Every region of the case is reachable from the difficulties, not just the selected one.
     expect(new Set(links.map(open => attr(open, "href"))).size).toBe(hrefs.size);
-    // The page's region count is read from the page view, inside a receipt.
-    expect(difficulty).toContain(`<b data-derived="1">${buildHeroView().regions.length}</b>`);
   });
 
-  it.each(LOCALES)("%s prints the sample record with its own status, version and links", locale => {
+  // F-3 (orchestrator decision 2026-10-26): the rights sentence stays visible, verbatim, outside any disclosure.
+  it.each(LOCALES)("%s prints the rights sentence under the source window, outside Source details", locale => {
+    const s2 = sceneOf(mainOf(render(locale)), "s2");
+    const rights = locale === "ko"
+      ? "보여 주는 원문은 이 사이트의 샘플에 이미 게시된 공개 공시 문서입니다. 다른 원문은 권리 허가를 거친 뒤에만 여기에 표시됩니다."
+      : "The sources shown are public filings already published in this site's sample. Other sources need rights clearance before they appear here.";
+    const outside = readable(s2.replace(/<details[\s\S]*?<\/details>/g, ""));
+    expect(outside).toContain(rights);
+    expect(readable(mainOf(render(locale))).split(rights).length - 1).toBe(1);
+  });
+
+  // FINAL-SPEC 2026-10-26 §2.4: same record and rule, four fields, its own region, no links. The quote is the
+  // §2.9 lever-1 length, 120 and then 90 (review 2026-10-26 B-1): the record's own label cut by excerptPreview, never
+  // edited text.
+  it.each(LOCALES)("%s prints the sample record with its own status, version and region", locale => {
     const receive = sceneOf(mainOf(render(locale)), "s3");
     const record = buildReceiveRecord();
     const text = readable(receive);
+    expect(RECORD_EXCERPT).toBe(90);
+    const preview = excerptPreview(record.claim.label, RECORD_EXCERPT);
     const quote = receive.match(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/)?.[1];
-    expect(quote).toBe(escaped(record.claim.excerpt) + (record.claim.excerptTruncated ? "…" : ""));
-    expect(text).toContain(record.claim.excerpt);
+    expect(quote).toBe(escaped(preview.text) + (preview.truncated ? "…" : ""));
+    expect(record.claim.label.startsWith(preview.text)).toBe(true);
     expect(text).toContain(landingV2StateWord(record.status.state, locale));
     expect(text).toContain(record.version.digest);
     expect(text).toContain(record.source.filename);
-    const hrefs = elements(receive, "a").map(open => attr(open, "href"));
-    expect(hrefs).toContain(escaped(record.hrefs.evidence));
-    expect(hrefs).toContain(escaped(record.hrefs.original));
+    expect(text).toContain(`bbox ${record.region.bbox1000.join(",")}`);
+    expect(receive).toContain(`data-bbox1000="${record.region.bbox1000.join(",")}"`);
+    expect(elements(receive, "a")).toHaveLength(0);
     expect(text).not.toMatch(/verified answer/i);
     expect(receive).not.toMatch(/>\s*(verified|검증됨)\s*</i);
   });
 
-  it.each(LOCALES)("%s separates extraction, interpretation and verification", locale => {
-    const text = readable(sceneOf(mainOf(render(locale)), "s3"));
-    const steps = locale === "ko" ? ["추출", "해석", "검증"] : ["Extraction", "Interpretation", "Verification"];
-    const at = steps.map(step => text.indexOf(step));
-    for (const index of at) expect(index).toBeGreaterThan(-1);
-    expect([...at].sort((a, b) => a - b)).toEqual(at);
-    expect(text).toContain(
-      locale === "ko"
-        ? "값을 기간, 단위, 버전과 묶습니다. 이 미리보기에서는 실행하지 않았습니다."
-        : "Joins a value to its period, unit or version. Not run for this preview."
-    );
+  /*
+    FINAL-SPEC 2026-10-26 D-17: the three-step method left s3. What it guarded stays visible on the
+    workbench: the status line says processing was not run, and the selected passage says
+    interpretation has not run -- so nothing on Home reads as interpreted or verified.
+  */
+  it.each(LOCALES)("%s still says interpretation and processing have not run", locale => {
+    const text = readable(sceneOf(mainOf(render(locale)), "s2"));
+    expect(text).toContain(locale === "ko" ? "준비된 시연 / 아직 처리를 실행하지 않음" : "Prepared demonstration / processing not yet run");
+    expect(text).toContain(locale === "ko" ? "해석은 아직 실행하지 않았습니다." : "Interpretation has not run.");
+    expect(readable(mainOf(render(locale)))).not.toMatch(/>\s*(verified|검증됨)\s*</i);
   });
 });
 
@@ -936,25 +1023,24 @@ describe("current-main bounded evaluation entry", () => {
 
 describe("Home substance renders expanded (redesign brief 2026-10-15, move 3)", () => {
   for (const korean of [false, true]) {
-    it(`${korean ? "/ko" : "/"} prints the affected objects, the four scopes and the formats unfolded`, () => {
+    /*
+      FINAL-SPEC 2026-10-26: what Home prints it prints unfolded, and it opens no disclosure for the
+      reader (no `<details open>` anywhere). s4 keeps its counts in the open with their list name;
+      s5 keeps one note open, the training-data sentence (F-2), verbatim.
+    */
+    it(`${korean ? "/ko" : "/"} prints the counts and the training sentence unfolded, and opens no disclosure`, () => {
       const html = renderToStaticMarkup(createElement(LandingPage, { korean }));
       const scene = (id: string, end: string) => html.slice(html.indexOf(`id="${id}"`), html.indexOf(end));
-      const s1 = scene("s1", 'id="s2"');
       const s4 = scene("s4", 'id="s5"');
-      const s5 = scene("s5", "data-home-reader-guide");
+      const s5 = scene("s5", 'id="s6"');
       expect(s4).not.toContain("<details");
-      expect(s4).toContain('id="lv2-recompile-objects"');
-      expect(s4).toContain('id="lv2-recompile-counts"');
+      expect(s4).toContain(`aria-label="${escaped(LANDING_V2_COPY[korean ? "ko" : "en"].recompile.compareLabel)}"`);
       expect(s5).not.toContain("<details");
-      expect(s5.match(/class="lv2-proof-note/g)).toHaveLength(4);
-      expect(s1).not.toMatch(/<summary>(Supported source formats|지원하는 원문 형식)<\/summary>/);
-      expect(s1).toContain(korean ? "업로드에서 허용하는 형식" : "Accepted at upload");
-      // Release 2: the s3 record notes print in the right column, and s2 ends on its context, not a folded label.
-      const s2 = scene("s2", 'id="s3"');
-      const s3 = scene("s3", 'id="s4"');
-      expect(s3).not.toMatch(/<summary>(Read the record|기록 읽기)<\/summary>/);
-      expect(s3).toContain('class="');
-      expect(s2).toMatch(/<details[^>]*\sopen=""[^>]*><summary>(The context this passage needs|이 구절에 필요한 맥락)<\/summary>/);
+      const notes = [...s5.matchAll(/<p class="lv2-proof-note[^"]*">([\s\S]*?)<\/p>/g)].map(match => readable(match[1]!));
+      expect(notes).toEqual([LANDING_V2_COPY[korean ? "ko" : "en"].trust.proofs[0]!.note]);
+      if (!korean) expect(notes[0]).toBe(TRAINING_DATA_CLAIM.body);
+      expect(html).not.toMatch(/<details[^>]*\sopen(?:=|\s|>)/);
+      expect(html).not.toMatch(/<summary>(Read the record|기록 읽기|The context this passage needs|이 구절에 필요한 맥락)<\/summary>/);
     });
   }
 });
@@ -991,5 +1077,122 @@ describe("the entry-page figure allowlist still fails closed", () => {
     expect(undeclaredText(link("Receipt R-01 · 2026-08-08 · sha256 1f5b6220"))).not.toMatch(/\d/);
     expect(undeclaredText(link("Receipt R-01 · 2026-08-08 · sha256 1f5b6220 · 3x faster"))).toMatch(/\d/);
     expect(() => undeclaredText(link("Receipt R-01 · sha256 1f5b6220"))).toThrow();
+  });
+});
+
+/*
+  FINAL-SPEC 2026-10-26 §2.8: Home's compact footer. Seven of the footer's own links, labelled by
+  FOOTER_GROUPS / KO_CHROME.footerLinks (no new string), no group titles and no tagline, and the
+  legal row unchanged. A missing route fails the render instead of printing a link the full
+  footer does not have.
+*/
+describe("Home compact footer", () => {
+  const ORDER = ["/knowledge-compiler", "/enterprise", "/trust", "/security", "/status", "/subprocessors", "/contact"];
+  it.each(LOCALES)("%s prints the seven footer links in order, with the footer's own labels", locale => {
+    const html = render(locale);
+    const footer = html.slice(html.indexOf('<footer class="site'), html.lastIndexOf("</footer>"));
+    const links = [...footer.matchAll(/<a(\s[^>]*)>([\s\S]*?)<\/a>/g)].filter(([, open]) => !/wordmark/.test(open!) && !/mailto:/.test(open!));
+    const nav = links.slice(0, ORDER.length);
+    expect(nav.map(([, open]) => attr(open!, "href"))).toEqual(ORDER.map(href => (locale === "ko" && href === "/contact" ? "/ko/contact" : href)));
+    const all = FOOTER_GROUPS.flatMap(group => group.links);
+    for (const [index, [, , label]] of nav.entries()) {
+      const href = ORDER[index]!;
+      expect(readable(label!)).toBe(locale === "ko" ? KO_CHROME.footerLinks[href] : all.find(link => link.href === href)!.label);
+    }
+    expect(footer).not.toContain("site-footer-title");
+    expect(footer).not.toContain("site-footer-tagline");
+    expect(footer).toContain("site-footer-legal");
+  });
+
+  it("fails closed when a compact link is not a footer route", () => {
+    const without = FOOTER_GROUPS.map(group => ({ ...group, links: group.links.filter(link => link.href !== "/status") }));
+    expect(() => compactFooterLinks(false, without)).toThrow(/\/status/);
+    expect(() => compactFooterLinks(true, without)).toThrow(/\/status/);
+    expect(compactFooterLinks(false).map(link => link.href)).toEqual(ORDER);
+  });
+});
+
+/*
+  FINAL-SPEC 2026-10-26 §3.3: /ko's Hangul is drawn from one static subset of Wanted Sans, two
+  instances ("Wanted Sans KO Home" 400 and 510), declared in app/wanted-sans-korean.css. A syllable
+  the subset does not hold falls through to the 90 optional splits, and a first visit can then draw
+  it in a different face from its neighbours -- so every syllable /ko can render must be inside the
+  subset's unicode-range, and this fails on the first one that is not.
+
+  What /ko can render: the page's own markup (header, menu sheet, every scene, footer), every Korean
+  chrome string, the consent banner's Korean copy and the film player's Korean strings (its source,
+  which holds every state's label). A superset is safe; a missing syllable is the failure.
+
+  Regenerating after a copy change: run this file with TAVONEL_DUMP_KO_SYLLABLES=<path> to write the
+  set, then the recipe in the comment above the two faces (fontTools subset, instancer, merge).
+*/
+const KO_HOME_FACE = '"Wanted Sans KO Home"';
+
+function koHomeSyllables(): number[] {
+  const texts = [
+    renderToStaticMarkup(createElement(LandingPage, { korean: true })),
+    JSON.stringify(KO_CHROME),
+    JSON.stringify(consentCopy("/ko")),
+    readFileSync(new URL("../components/compile-stage-player.tsx", import.meta.url), "utf8"),
+  ];
+  return [...new Set(texts.join("").match(/[\uac00-\ud7a3]/g) ?? [])].map(ch => ch.codePointAt(0)!).sort((a, b) => a - b);
+}
+
+function koHomeFaces() {
+  const css = readFileSync(new URL("../app/wanted-sans-korean.css", import.meta.url), "utf8");
+  return [...css.matchAll(/@font-face\s*\{([^}]*)\}/g)].map(match => match[1]!).filter(face => face.includes(KO_HOME_FACE)).map(face => ({
+    weight: face.match(/font-weight:\s*(\d+)\s*;/)?.[1],
+    display: face.match(/font-display:\s*([a-z]+)/)?.[1],
+    src: face.match(/url\("([^"]+)"\)/)?.[1],
+    range: face.match(/unicode-range:\s*([^;]+);/)?.[1]?.trim() ?? "",
+  }));
+}
+
+const rangesOf = (range: string) => range.split(",").map(part => part.trim().replace(/^U\+/i, "").split("-").map(hex => parseInt(hex, 16)) as [number, number?]);
+const uncovered = (syllables: readonly number[], range: string) =>
+  syllables.filter(cp => !rangesOf(range).some(([from, to = from]) => cp >= from && cp <= to));
+
+describe("KO Home subset font coverage (FINAL-SPEC 2026-10-26 §3.3)", () => {
+  it("declares exactly the 400 and 510 instances, optional, over one shared range, with committed files", () => {
+    const faces = koHomeFaces();
+    expect(faces.map(face => face.weight)).toEqual(["400", "510"]);
+    for (const face of faces) {
+      expect(face.display).toBe("optional");
+      expect(face.src).toBe(`/fonts/wanted-sans-ko-home-${face.weight}.woff2`);
+      expect(face.range).toBe(faces[0]!.range);
+      expect(rangesOf(face.range).every(([from, to = from]) => from >= 0xac00 && to <= 0xd7a3 && from <= to), "Hangul syllables only").toBe(true);
+    }
+    // The bytes the recipe produced are the bytes that ship: each file's sha256 is recorded beside its face.
+    const css = readFileSync(new URL("../app/wanted-sans-korean.css", import.meta.url), "utf8");
+    for (const weight of ["400", "510"]) {
+      const recorded = css.match(new RegExp(`wanted-sans-ko-home-${weight}\\.woff2 sha256 ([0-9a-f]{64})`))?.[1];
+      const bytes = readFileSync(new URL(`../public/fonts/wanted-sans-ko-home-${weight}.woff2`, import.meta.url));
+      expect(createHash("sha256").update(bytes).digest("hex"), `wanted-sans-ko-home-${weight}.woff2`).toBe(recorded);
+    }
+  });
+
+  it("covers every Hangul syllable /ko can render", () => {
+    const syllables = koHomeSyllables();
+    if (process.env.TAVONEL_DUMP_KO_SYLLABLES) writeFileSync(process.env.TAVONEL_DUMP_KO_SYLLABLES, String.fromCodePoint(...syllables), "utf8");
+    expect(syllables.length, "the page has Korean to cover").toBeGreaterThan(100);
+    const missing = uncovered(syllables, koHomeFaces()[0]?.range ?? "");
+    expect(missing.map(cp => String.fromCodePoint(cp)).join(""), "syllables outside the KO Home subset").toBe("");
+  });
+
+  it("fails closed: a syllable outside the subset is reported, not passed", () => {
+    const range = koHomeFaces()[0]!.range;
+    let outside = 0xac00;
+    while (uncovered([outside], range).length === 0) outside += 1;
+    expect(uncovered([...koHomeSyllables(), outside], range)).toEqual([outside]);
+    expect(uncovered([0xac00], "")).toEqual([0xac00]);
+  });
+
+  it("preloads the two subset files on /ko only, and no Hangul split", () => {
+    const ko = renderToStaticMarkup(createElement(LandingPage, { korean: true }));
+    const en = renderToStaticMarkup(createElement(LandingPage, { korean: false }));
+    const preloads = (html: string) => [...html.matchAll(/<link rel="preload" as="font"[^>]*href="([^"]+)"/g)].map(match => match[1]);
+    expect(preloads(ko)).toEqual(["/fonts/wanted-sans-ko-home-400.woff2", "/fonts/wanted-sans-ko-home-510.woff2"]);
+    expect(preloads(en)).toEqual([]);
+    expect(ko).not.toMatch(/WantedSansVariable\.split\.\d+\.woff2/);
   });
 });

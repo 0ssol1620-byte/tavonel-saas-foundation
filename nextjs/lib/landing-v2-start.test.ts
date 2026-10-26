@@ -4,7 +4,10 @@ import { describe, expect, it } from "vitest";
 import StartScene, { type StartActions } from "../components/landing-v2/scenes/start";
 import { landingV2Copy, type LandingV2Locale } from "./landing-v2-copy";
 import { LANDING_V2_FORBIDDEN } from "./landing-v2-copy.test";
-import { EXPLORE_CTA } from "./site-navigation";
+import { readFileSync } from "node:fs";
+import { SAMPLE_BOUNDARY } from "../components/landing-v2/scenes/start";
+import { activationPolicy } from "./activation-policy";
+import { EXPLORE_CTA, KO_CHROME } from "./site-navigation";
 
 /*
   The guard over Scene 09 (§19, D5, D6).
@@ -80,6 +83,21 @@ describe("landing scene 09 -- start", () => {
     const html = render(locale);
     expect(html).not.toContain('data-customer-data="arranged"');
     expect(html).toContain(`href="${locale === "ko" ? "/ko/pricing" : "/pricing"}"`);
+  });
+
+  /*
+    G12 / FINAL-SPEC 2026-10-26 §2.7: the customer-data gate is printed here, verbatim and once, in
+    the deployment's own words (`activationPolicy.customerData.reason`, its one Korean translation in
+    `KO_CHROME.customerDataGate`). F-1 (orchestrator decision 2026-10-26): the sample boundary the FAQ
+    stated is printed under the price link, byte for byte the last sentence of the FAQ's answer.
+  */
+  it.each(LOCALES)("%s prints the customer-data gate and the sample boundary verbatim, once each", (locale) => {
+    const plain = text(render(locale)).replace(/\s+/g, " ");
+    const gate = locale === "ko" ? KO_CHROME.customerDataGate : activationPolicy.customerData.reason;
+    expect(activationPolicy.customerData.enabled).toBe(false);
+    for (const sentence of [gate, SAMPLE_BOUNDARY[locale]]) expect(plain.split(sentence).length - 1, sentence).toBe(1);
+    const faq = readFileSync(new URL("../components/landing-v2/home-reader-guide.tsx", import.meta.url), "utf8");
+    expect(faq).toContain(` ${SAMPLE_BOUNDARY[locale]}"]`);
   });
 
   it.each(LOCALES)("%s prints no figure, because this scene measured nothing", (locale) => {

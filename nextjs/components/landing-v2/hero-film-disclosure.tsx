@@ -2,12 +2,15 @@
 
 import { preload } from "react-dom";
 
-import CompileStagePlayer, { FILM_POSTER_SIZES, filmPosterAvifSrcSet, filmPosterSrcSet, type MobileFilmView } from "@/components/compile-stage-player";
+import CompileStagePlayer, { FILM_POSTER_SIZES, PHONE_PANE_MEDIA, filmPosterAvifSrcSet, filmPosterSrcSet, type MobileFilmView } from "@/components/compile-stage-player";
 import type { CompileStage } from "@/lib/compile-stages";
 import styles from "./landing-hero.module.css";
 
-/** The landing opens a phone on the whole frame; "Focus details" stays one tap away. */
-export const LANDING_MOBILE_FILM_VIEW: MobileFilmView = "fit";
+/**
+ * FINAL-SPEC 2026-10-26 §2.1: Home opens a phone on Focus. Below 768px that is one readable 4:5 pane of the frame
+ * (STAGE_FRAMES[].phonePane); 768-899 keeps the existing pan surface. The view toggle returns the whole frame.
+ */
+export const LANDING_MOBILE_FILM_VIEW: MobileFilmView = "focus";
 
 /** Visible hero media; the existing player owns visibility, reduced motion and playback. */
 export default function HeroFilmDisclosure({
@@ -31,7 +34,14 @@ export default function HeroFilmDisclosure({
   */
   const openingAvifSrcSet = opening && filmPosterAvifSrcSet(opening);
   if (priority && opening?.posterAvif && openingAvifSrcSet) {
-    preload(opening.posterAvif, { as: "image", type: "image/avif", fetchPriority: "high", imageSrcSet: openingAvifSrcSet, imageSizes: FILM_POSTER_SIZES });
+    /*
+      FINAL-SPEC 2026-10-26 §2.1: the two hints never overlap -- the full frame from 768px, the pane still below --
+      so a device fetches one poster.
+      ponytail: 768-899 takes this full-frame hint (1x/2x srcset) while its Focus surface draws the 2x file, so only
+      that band can fetch twice. If it matters, move the media boundary to NARROW_FRAME.
+    */
+    preload(opening.posterAvif, { as: "image", type: "image/avif", fetchPriority: "high", imageSrcSet: openingAvifSrcSet, imageSizes: FILM_POSTER_SIZES, media: "(min-width: 768px)" });
+    if (opening.phonePosterAvif) preload(opening.phonePosterAvif, { as: "image", type: "image/avif", fetchPriority: "high", media: PHONE_PANE_MEDIA });
   } else if (priority && opening?.poster) {
     preload(opening.poster, openingSrcSet
       ? { as: "image", fetchPriority: "high", imageSrcSet: openingSrcSet, imageSizes: FILM_POSTER_SIZES }
@@ -45,7 +55,7 @@ export default function HeroFilmDisclosure({
         <div className={`lv2-film ${styles.filmBody}`}>
           <CompileStagePlayer stages={stages} preferVideo priorityPoster={priority} lazyPoster={!priority} korean={korean} initialMobileFilmView={LANDING_MOBILE_FILM_VIEW} storyLayout />
         </div>
-      <figcaption className="fine">{korean ? "제품 흐름 예시 · 실제 고객 결과가 아닙니다." : "Illustrative product demo · examples, not customer results."}</figcaption>
+      <figcaption className="fine">{korean ? "제품 흐름 예시 · 고객 결과가 아닙니다." : "Illustrative demo · not customer results."}</figcaption>
     </figure>
   );
 }

@@ -44,9 +44,13 @@ const HERO_CUT = {
   as t = 3.00s, so the Tier 2 bars are unchanged), stage 2 is t = 9.28s. Stages 3 and 4 keep t = 17.96s:
   their end frames fit as AVIF and carry no overprint. The selection rule, the frame scan and the
   sha256 of every file are in public/film/README.md.
+
+  FINAL-SPEC 2026-10-26 §2.1: a phone below 768px opens the film on one readable pane, 4:5, instead of the
+  whole frame at 3-4px type. Stage 1 has its own still of that pane (`phonePoster*`, a crop of the 2x WebP,
+  README "Home phone pane"); stages 2-4 are drawn from their 2x posters by the same CSS crop the video uses.
 */
 const HOME_POSTERS = [
-  { poster: "/film/poster-1-t8.16-2x.webp", poster1x: "/film/poster-1-t8.16.webp", posterAvif: "/film/poster-1-t8.16-2x.avif", posterAvif1x: "/film/poster-1-t8.16.avif" },
+  { poster: "/film/poster-1-t8.16-2x.webp", poster1x: "/film/poster-1-t8.16.webp", posterAvif: "/film/poster-1-t8.16-2x.avif", posterAvif1x: "/film/poster-1-t8.16.avif", phonePoster: "/film/poster-1-t8.16-pane1-684x855.webp", phonePosterAvif: "/film/poster-1-t8.16-pane1-684x855.avif" },
   { poster: "/film/poster-2-t9.28-2x.webp", poster1x: "/film/poster-2-t9.28.webp", posterAvif: "/film/poster-2-t9.28-2x.avif", posterAvif1x: "/film/poster-2-t9.28.avif" },
   { poster: "/film/poster-3-t17.96-2x.webp", poster1x: "/film/poster-3-t17.96.webp", posterAvif: "/film/poster-3-t17.96-2x.avif", posterAvif1x: "/film/poster-3-t17.96.avif" },
   { poster: "/film/poster-4-t17.96-2x.webp", poster1x: "/film/poster-4-t17.96.webp", posterAvif: "/film/poster-4-t17.96-2x.avif", posterAvif1x: "/film/poster-4-t17.96.avif" },

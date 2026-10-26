@@ -37,22 +37,21 @@ const STAGE_MS = FILM_DURATION * 1_000;
 const MOBILE_FOCUS_PANE = [0, 1, 0, 0] as const;
 
 /*
-  Home reading layer (redesign brief 2026-10-15, move 2b/2c). The cuts' own type is 8-10px and
-  the micro-labels are baked into the pixels, so each stage prints ONE reading line as HTML below
-  the frame. Keyed by stage id, not position, so a narrowed stage list cannot point a stage at
-  another cut's string.
+  Home reading target (redesign brief 2026-10-15, move 2b/2c). The cuts' own type is 8-10px and the
+  micro-labels are baked into the pixels, so each stage names the ONE string a reader should find, and
+  the pane it sits in. Keyed by stage id, not position, so a narrowed stage list cannot point a stage
+  at another cut's string.
 
-  The line has to be true for the whole loop, not for one frame (Release 1 critic: "Site visit
-  notes" is on screen for 2 of 10 sampled seconds of cut 1). So `text` is a string that is on
-  screen in `pane` at >= 80% of the sampled timestamps, proven in
-  `compile-stage-player.frame-strings.json` (derived from the frame cross-check table
-  FILM-STRING-CROSSCHECK.md, redesign-r2-20261015), and `line`/`lineKo` say what the pane shows
-  for the whole cut with `{q}` where the quote goes. The cuts are recorded once, in English, so
-  the quote is the same characters in both locales; a translated quote would not be in the frame.
-  `mono` marks a quote that is a filename or source line (set in mono); labels stay in the sans.
-  Focus details opens on `pane` on Home.
+  The string has to be true for the whole loop, not for one frame (Release 1 critic: "Site visit
+  notes" is on screen for 2 of 10 sampled seconds of cut 1). So `text` is on screen in `pane` at
+  >= 80% of the sampled timestamps, proven in `compile-stage-player.frame-strings.json` (derived from
+  the frame cross-check table FILM-STRING-CROSSCHECK.md, redesign-r2-20261015), and the desktop crop
+  window below is chosen to hold it. The pane strip under the frame marks `pane`.
+
+  FINAL-SPEC 2026-10-26 (§6 #6, T13): the HTML reading line that quoted `text` under the frame is no
+  longer printed; the frame is the product, and its caption and alt still say what it shows.
 */
-export type ReadingTarget = { pane: 0 | 1 | 2 | 3; text: string; mono: boolean; line: string; lineKo: string };
+export type ReadingTarget = { pane: 0 | 1 | 2 | 3; text: string };
 
 /*
   Home Focus crop (Release 3, brief move 2c). At 1200px the whole 2880x1800 cut draws its 7-9px
@@ -100,19 +99,40 @@ export type WideView = "crop" | "fit";
 */
 export type PosterMask = { poster: string; color: string; rects: readonly { x: number; y: number; w: number; h: number }[] };
 
-export const STAGE_FRAMES: Record<string, { panes: readonly [string, string, string, string]; readingTarget: ReadingTarget; crop: FilmCrop; wideView: WideView; posterMask?: PosterMask }> = {
+/*
+  Phone pane (FINAL-SPEC 2026-10-26 §2.1). Below 768px the Home film opens on Focus as ONE pane, a
+  w x w*5/4 (4:5) rect of the 2880 x 1800 frame whose top-left corner is `phonePane`, in source px.
+  The CSS (film-reading-layer.module.css) draws the poster and the playing cut at 2880/w of the
+  panel's width and shifts both by the same corner, so the still and the video show the same pixels
+  and an auto-advance changes only --pane-x / --pane-y / --pane-w: the panel stays 4:5, no layout moves.
+
+  Each rect holds ink in >= 85% of the presented frames of its cut (the blankScan rule above, over the
+  rect alone; phonePaneScan in compile-stage-player.frame-strings.json). Stage 4's first rect, the
+  ASSISTANT pane at y 516, scored 78.1% -- the answer rows are empty until the question is asked -- so
+  stage 4 uses the same pane at y 180, where the MCP session opens (96.2%).
+
+  Fix round R3 (review 2026-10-26 B-4): the phone Focus view reads >= 9px equivalent on every stage, as
+  main asserted. Stages 2 and 3 hold 7 source-px text, which a 684px rect draws at 7.21px on a 390 phone,
+  so their rects are 520px wide: the same 4:5 panel, 684/520 times closer (9.49px). Stage 1 starts at row
+  380, under the "photo · no text layer" box of the scan_0140 page, so its first row is that page's
+  "Handwritten · 12 March 2026 · Warehouse B" line; its pane still is cut from that same rect.
+*/
+export type PhonePane = { x: number; y: number; w: number };
+
+export const STAGE_FRAMES: Record<string, { panes: readonly [string, string, string, string]; readingTarget: ReadingTarget; crop: FilmCrop; wideView: WideView; phonePane: PhonePane; posterMask?: PosterMask }> = {
   sources: {
     panes: ["SOURCES", "ORIGINAL", "EXTRACT", "WORLD"],
-    readingTarget: { pane: 1, text: "WORKING COPY.md", mono: true, line: "The ORIGINAL pane opens one source page at a time; EXTRACT writes it out in {q}.", lineKo: "ORIGINAL 패널은 원문 페이지를 한 장씩 열고, EXTRACT 패널은 그 내용을 {q}에 옮겨 적습니다." },
+    readingTarget: { pane: 1, text: "WORKING COPY.md" },
     crop: { x: 0.25, y: 0.5 },
     wideView: "crop",
+    phonePane: { x: 746, y: 380, w: 684 },
     /* POSTER-RECUT (D-11): t = 8.16s shows the same document as t = 3.00s, and its eyebrow and title rows and
        columns measured identical (the same rects; README "Home posters -- POSTER-RECUT"). */
     posterMask: { poster: "/film/poster-1-t8.16-2x.webp", color: "#f2eee7", rects: [{ x: 796, y: 206, w: 282, h: 11 }, { x: 1499, y: 204, w: 278, h: 9 }] },
   },
-  read: { panes: ["NODES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 1, text: "# Payment terms", mono: true, line: "Look for {q} in the MARKDOWN pane.", lineKo: "MARKDOWN 패널에서 {q} 줄을 찾아보세요." }, crop: { x: 0.25, y: 0.25 }, wideView: "crop" },
-  structure: { panes: ["SOURCES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 0, text: "CHANGED", mono: false, line: "In the SOURCES pane, {q} marks the edited file and TOUCHED marks the files it reaches.", lineKo: "SOURCES 패널에서 {q}는 수정된 파일, TOUCHED는 그 변경이 닿는 파일을 표시합니다." }, crop: { x: 0, y: 0 }, wideView: "crop" },
-  world: { panes: ["ASSISTANT · MCP", "EDITOR", "TERMINAL", "WORLD"], readingTarget: { pane: 3, text: "nodes lit", mono: false, line: "In the WORLD pane, {q} counts the nodes the current answer cites; it falls to zero when nothing is cited.", lineKo: "WORLD 패널의 {q}는 지금 답이 인용한 노드 수입니다. 인용이 없으면 하나도 켜지지 않습니다." }, crop: { x: 0.5, y: 0.45 }, wideView: "fit" },
+  read: { panes: ["NODES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 1, text: "# Payment terms" }, crop: { x: 0.25, y: 0.25 }, wideView: "crop", phonePane: { x: 820, y: 238, w: 520 } },
+  structure: { panes: ["SOURCES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 0, text: "CHANGED" }, crop: { x: 0, y: 0 }, wideView: "crop", phonePane: { x: 60, y: 186, w: 520 } },
+  world: { panes: ["ASSISTANT · MCP", "EDITOR", "TERMINAL", "WORLD"], readingTarget: { pane: 3, text: "nodes lit" }, crop: { x: 0.5, y: 0.45 }, wideView: "fit", phonePane: { x: 44, y: 180, w: 684 } },
 };
 
 /*
@@ -144,6 +164,9 @@ export const STAGE_FRAMES: Record<string, { panes: readonly [string, string, str
   loop at devicePixelRatio 2-3. At 1024 and above with a fine pointer the canvas returns.
 */
 const NARROW_FRAME = "(max-width: 899px), (pointer: coarse) and (max-width: 1023px)";
+
+/* Below this the Home film's Focus view is one 4:5 pane (STAGE_FRAMES[].phonePane), not the pan surface. */
+export const PHONE_PANE_MEDIA = "(max-width: 767.98px)";
 
 /*
   What the one motion control says, and therefore what it does (film-01, film-02).
@@ -334,6 +357,8 @@ export default function CompileStagePlayer({
   const [reducedMotion, setReducedMotion] = useState(false);
   const [canvasReady, setCanvasReady] = useState(false);
   const [narrow, setNarrow] = useState(false);
+  /* Below PHONE_PANE_MEDIA: Home's Focus view is one fixed pane, which neither pans nor scrolls. */
+  const [phoneFrame, setPhoneFrame] = useState(false);
   // The single-stage film plays once and stops on its last frame; the control then offers a replay.
   const [ended, setEnded] = useState(false);
   const [saveData, setSaveData] = useState(false);
@@ -343,6 +368,8 @@ export default function CompileStagePlayer({
      (nextWideChoice / wideChoiceOnStageChange). */
   const [wideChoice, setWideChoice] = useState<WideView | null>(null);
   const [videoError, setVideoError] = useState(false);
+  /* The recording whose first frame is on screen (`loadeddata`); until then a phone pane keeps its own still over it. */
+  const [framedSrc, setFramedSrc] = useState<string | null>(null);
   const [failedPreferredSrc, setFailedPreferredSrc] = useState<string | null>(null);
   /*
     WCAG 2.2.2. A cut runs ~18s and then advances on its own — auto-playing motion well past the
@@ -401,12 +428,16 @@ export default function CompileStagePlayer({
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
     const frame = window.matchMedia(NARROW_FRAME);
+    const phone = window.matchMedia(PHONE_PANE_MEDIA);
     const apply = () => setReducedMotion(query.matches);
     const applyFrame = () => setNarrow(frame.matches);
+    const applyPhone = () => setPhoneFrame(phone.matches);
     apply();
     applyFrame();
+    applyPhone();
     query.addEventListener("change", apply);
     frame.addEventListener("change", applyFrame);
+    phone.addEventListener("change", applyPhone);
     const probe = document.createElement("canvas");
     setCanvasReady(Boolean(probe.getContext("2d")));
     /*
@@ -419,6 +450,7 @@ export default function CompileStagePlayer({
     return () => {
       query.removeEventListener("change", apply);
       frame.removeEventListener("change", applyFrame);
+      phone.removeEventListener("change", applyPhone);
     };
   }, []);
 
@@ -547,6 +579,8 @@ export default function CompileStagePlayer({
   useEffect(() => {
     if (still && stillTookAvif(stillRef.current)) setPosterAvifTaken(true);
   }, [still, active]);
+  /* A still unmounts the <video>; the next one starts without a frame, so the pane hold applies again. */
+  useEffect(() => { if (still) setFramedSrc(null); }, [still]);
   const control = filmMotionControl({ reducedMotion, saveData, paused, playRequested, ended });
   const preferredVideoSrc = narrow && active.phoneSrc ? active.phoneSrc : active.src;
   const fallbackVideoSrc = narrow
@@ -565,12 +599,23 @@ export default function CompileStagePlayer({
   const posterSrcSet = filmPosterSrcSet(active);
   const posterAvifSrcSet = filmPosterAvifSrcSet(active);
   const mask = stageFrame?.posterMask?.poster === active.poster ? stageFrame.posterMask : undefined;
+  /* Home phone in Focus details: from 768px the frame pans across its four panes; below it shows one pane. */
+  const paneView = storyLayout && phoneFrame && !mobileFilmFit;
+  const panning = storyLayout && narrow && !mobileFilmFit && !paneView;
+  /* The phone pane's own still, decided from state alone (SSR); the <source media> keeps it off a desktop. */
+  const panePoster = storyLayout && !mobileFilmFit && active.phonePosterAvif ? active : undefined;
   /*
     D-11: the <video poster> attribute cannot negotiate a format, so it names the file the still already
     chose -- AVIF where the <picture> took AVIF, WebP otherwise -- and a browser fetches one poster, not two.
     `posterAvifTaken` is read off the still's `currentSrc`, which the browser sets when it selects a source.
   */
-  const videoPoster = posterAvifTaken && active.posterAvif
+  /*
+    Review 2026-10-26 B-2 (acceptance 25, D-11 "one poster"): a phone showing the pane's own still gives the
+    <video> no poster -- the attribute could only name the 1440px frame, a second first-screen request -- and
+    keeps that still (already in the cache) over the recording until its first frame is up (`paneHold`).
+  */
+  const paneHold = paneView && panePoster && framedSrc !== videoSrc ? panePoster : undefined;
+  const videoPoster = paneView && panePoster ? undefined : posterAvifTaken && active.posterAvif
     ? (narrow && active.posterAvif1x ? active.posterAvif1x : active.posterAvif)
     : (narrow && active.poster1x ? active.poster1x : active.poster);
 
@@ -580,8 +625,6 @@ export default function CompileStagePlayer({
     ))}
   </div> : null;
 
-  /* Home phone in Focus details: the frame pans across its four panes. */
-  const panning = storyLayout && narrow && !mobileFilmFit;
   const panTo = (pane: number) => {
     const viewport = viewportRef.current;
     viewport?.scrollTo({ left: Math.round((viewport.scrollWidth / 4) * pane), top: viewport.scrollTop, behavior: reducedMotion ? "auto" : "smooth" });
@@ -620,28 +663,39 @@ export default function CompileStagePlayer({
     flipped the label while pressed, which read "Fit full frame, pressed" with the frame focused.
     A first render in Fit is unchanged for every caller ("Focus details", aria-pressed="false"), so
     main304's server markup still holds (home-player-main304-parity.test.ts).
+
+    FINAL-SPEC 2026-10-26 (§6 #6-7, T7/T13/T15): on Home both toggles are one 16px drawn mark with the
+    same name as an aria-label, and the phone's hint paragraph is not printed. Other callers keep the
+    label and the hint, which main304's markup holds.
   */
+  const viewLabel = MOBILE_FILM_VIEW[korean ? "ko" : "en"].focus;
+  const viewMark = (
+    <svg className="compile-film-view-mark" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" focusable="false">
+      <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" />
+    </svg>
+  );
   const mobileTools = (<div className="compile-film-mobile-tools">
         <button
           type="button"
           className="compile-film-focus-control"
           aria-controls={panelId}
           aria-pressed={!mobileFilmFit}
+          aria-label={storyLayout ? viewLabel : undefined}
           onClick={() => setMobileFilmFit(toggleMobileFilmFit)}
         >
-          {MOBILE_FILM_VIEW[korean ? "ko" : "en"].focus}
+          {storyLayout ? viewMark : viewLabel}
         </button>
         {panning ? motionControl : null}
-        <p aria-live="polite">
+        {storyLayout ? null : <p aria-live="polite">
           {mobileFilmFit
             ? MOBILE_FILM_VIEW[korean ? "ko" : "en"].fittedHint
             : MOBILE_FILM_VIEW[korean ? "ko" : "en"].focusedHint}
-        </p>
+        </p>}
       </div>);
   /* Home desktop: the same toggle as the phone, on its own crop state (CSS shows one of the two). */
   const viewControl = storyLayout ? (
-    <button type="button" className={`compile-film-view-control ${readingStyles.viewControl}`} aria-controls={panelId} aria-pressed={!wideFit} onClick={() => setWideChoice(nextWideChoice(wideFit ? "fit" : "crop", stageFrame?.wideView ?? "crop"))}>
-      {MOBILE_FILM_VIEW[korean ? "ko" : "en"].focus}
+    <button type="button" className={`compile-film-view-control ${readingStyles.viewControl}`} aria-controls={panelId} aria-pressed={!wideFit} aria-label={viewLabel} onClick={() => setWideChoice(nextWideChoice(wideFit ? "fit" : "crop", stageFrame?.wideView ?? "crop"))}>
+      {viewMark}
     </button>
   ) : null;
   const stageCaption = !compact ? <div className="compile-film-caption">
@@ -664,10 +718,9 @@ export default function CompileStagePlayer({
 
   /*
     Below the frame, outside the source pixels: the four pane headers as a strip aligned under the
-    panes, the target pane marked, then the one string to read. On a panning phone the strip is the
-    pane indicator -- real buttons, the visible pane `aria-current` -- for the snap targets that are
-    aria-hidden; elsewhere it only repeats the line's pane name and is hidden from assistive tech.
-    Always rendered, so a reduced-motion poster keeps its reading line under it.
+    panes, the target pane marked. On a panning phone the strip is the pane indicator -- real
+    buttons, the visible pane `aria-current` -- for the snap targets that are aria-hidden; elsewhere
+    it only names the panes in view and is hidden from assistive tech. A phone pane hides it (CSS).
   */
   const markedPane = panning ? visiblePane : target?.pane;
   const readingLayer = stageFrame && target ? (
@@ -681,29 +734,18 @@ export default function CompileStagePlayer({
           </li>
         ))}
       </ol>
-      {(() => {
-        const [before, after] = (korean ? target.lineKo : target.line).split("{q}");
-        /*
-          Keyed by stage (fix round 5, R4-MJ1): a stage's line is new text, not the last stage's
-          text moved. Reused, its text nodes reflowed by one line on each auto-advance and scored
-          as layout shifts without input (up to 0.0192 at KO 360 with the frame already fixed,
-          fix4/cls4-after-local.json).
-        */
-        return <p key={active.id} className={readingStyles.line}>{before}<q className={target.mono ? readingStyles.mono : readingStyles.quote} lang={korean ? "en" : undefined}>{target.text}</q>{after}</p>;
-      })()}
     </div>
   ) : null;
 
   return (
     /* Below 900px the horizontal gesture pans the film (G1-012). The separate tab strip chooses
        the cut and may sit behind a native disclosure on the landing page. */
-    <div className={storyLayout ? `compile-film-sequence rv ${readingStyles.story}` : "compile-film-sequence rv"} ref={frameRef} {...(narrow ? {} : touchHandlers)} data-story-layout={storyLayout ? 1 : undefined} data-wide-view={storyLayout ? (wideFit ? "fit" : "crop") : undefined} style={crop ? ({ "--film-crop-x": `${crop.x * 100}%`, "--film-crop-y": `${crop.y * 100}%` } as React.CSSProperties) : undefined} data-film-renderer={live ? "live-canvas" : "video-fallback"} data-video-src={videoSrc} data-video-primary-src={preferredVideoSrc} data-compact={compact ? 1 : 0} data-narrow={narrow ? 1 : 0} data-mobile-view={mobileFilmFit ? "fit" : "focus"} data-mobile-focus-pane={focusPane}>
+    <div className={storyLayout ? `compile-film-sequence rv ${readingStyles.story}` : "compile-film-sequence rv"} ref={frameRef} {...(narrow ? {} : touchHandlers)} data-story-layout={storyLayout ? 1 : undefined} data-wide-view={storyLayout ? (wideFit ? "fit" : "crop") : undefined} data-pane-poster={panePoster ? 1 : undefined} style={stageFrame ? ({ "--film-crop-x": `${stageFrame.crop.x * 100}%`, "--film-crop-y": `${stageFrame.crop.y * 100}%`, "--pane-x": String(stageFrame.phonePane.x), "--pane-y": String(stageFrame.phonePane.y), "--pane-w": String(stageFrame.phonePane.w) } as React.CSSProperties) : undefined} data-film-renderer={live ? "live-canvas" : "video-fallback"} data-video-src={videoSrc} data-video-primary-src={preferredVideoSrc} data-compact={compact ? 1 : 0} data-narrow={narrow ? 1 : 0} data-mobile-view={mobileFilmFit ? "fit" : "focus"} data-mobile-focus-pane={focusPane}>
       {stageDisclosureLabel && stageTabs ? <details className="compile-film-stage-disclosure">
         <summary>{stageDisclosureLabel}</summary>
         {stageTabs}
       </details> : stageTabs}
 
-      {storyLayout ? stageCaption : null}
       {storyLayout ? mobileTools : null}
       {viewControl}
 
@@ -748,9 +790,15 @@ export default function CompileStagePlayer({
             /* A lazy still often has no data at mount; its load reports the format the effect above missed (merge review A1). */
             onLoad={(event) => { if (stillTookAvif(event.currentTarget)) setPosterAvifTaken(true); }}
           />;
-          /* D-11: AVIF first, the WebP <img> as the fallback. `display: contents` keeps the <img> the grid item. */
-          return posterAvifSrcSet
-            ? <picture className={readingStyles.picture}><source type="image/avif" srcSet={posterAvifSrcSet} sizes={posterSizes} />{image}</picture>
+          /* D-11: AVIF first, the WebP <img> as the fallback. `display: contents` keeps the <img> the grid item.
+             FINAL-SPEC 2026-10-26: ahead of them, a phone pane's own still for a screen below PHONE_PANE_MEDIA. */
+          return posterAvifSrcSet || panePoster
+            ? <picture className={readingStyles.picture}>
+                {panePoster ? <source media={PHONE_PANE_MEDIA} type="image/avif" srcSet={panePoster.phonePosterAvif} /> : null}
+                {panePoster?.phonePoster ? <source media={PHONE_PANE_MEDIA} type="image/webp" srcSet={panePoster.phonePoster} /> : null}
+                {posterAvifSrcSet ? <source type="image/avif" srcSet={posterAvifSrcSet} sizes={posterSizes} /> : null}
+                {image}
+              </picture>
             : image;
         })() : live ? (
           <div className="compile-film-live" aria-hidden="true"><LiveFilm /></div>
@@ -771,7 +819,7 @@ export default function CompileStagePlayer({
             survives, so nothing is torn down mid-fetch, and there is still exactly one decoder
             open on a phone.
           */
-          <video ref={videoRef} className="compile-film-video" src={videoSrc} data-active={1} muted autoPlay playsInline preload="metadata" disablePictureInPicture disableRemotePlayback poster={videoPoster} aria-label={`${active.label} — ${active.line}`} onLoadedMetadata={(event) => { event.currentTarget.playbackRate = Math.max(0.1, playbackRate); }} onEnded={onEnded} onError={() => {
+          <video ref={videoRef} className="compile-film-video" src={videoSrc} data-active={1} muted autoPlay playsInline preload="metadata" disablePictureInPicture disableRemotePlayback poster={videoPoster} aria-label={`${active.label} — ${active.line}`} onLoadedMetadata={(event) => { event.currentTarget.playbackRate = Math.max(0.1, playbackRate); }} onLoadedData={() => setFramedSrc(videoSrc)} onEnded={onEnded} onError={() => {
             if (videoSrc === preferredVideoSrc && fallbackVideoSrc) {
               setFailedPreferredSrc(preferredVideoSrc);
               return;
@@ -780,6 +828,12 @@ export default function CompileStagePlayer({
             setPaused(true);
           }} />
         )}
+        {!still && !live && paneHold ? (
+          <picture className={readingStyles.picture} data-pane-hold="">
+            <source type="image/avif" srcSet={paneHold.phonePosterAvif} />
+            <img className="compile-film-still" src={paneHold.phonePoster ?? paneHold.phonePosterAvif} width={684} height={855} alt="" decoding="async" />
+          </picture>
+        ) : null}
         {still && mask ? (
           <svg className={`compile-film-mask ${readingStyles.mask}`} aria-hidden="true" focusable="false" data-poster-mask={mask.poster} viewBox="0 0 2880 1800" preserveAspectRatio="xMidYMid meet">
             {mask.rects.map(rect => <rect key={`${rect.x}-${rect.y}`} x={rect.x} y={rect.y} width={rect.w} height={rect.h} fill={mask.color} />)}
@@ -793,6 +847,8 @@ export default function CompileStagePlayer({
       {!storyLayout ? mobileTools : null}
 
       {compact && videoError ? <p className="compile-film-inline-error" role="status">{text.error}</p> : null}
+      {/* Home prints no caption row (FINAL-SPEC 2026-10-26), so a film that cannot play says so here instead: never a silent poster. */}
+      {storyLayout && videoError ? <p className="compile-film-inline-error" role="status">{text.errorLong}</p> : null}
       {!storyLayout ? stageCaption : null}
     </div>
   );

@@ -1,46 +1,165 @@
 /*
-  Scene 08's two rows of links. Token-only, and small on purpose: everything else this scene
-  needs (`.lv2-proof-list`, `.lv2-proof`, `.lv2-text-link`) is already in `app/landing-v2.css`.
-*/
+  Scene 08 on Home (FINAL-SPEC 2026-10-26 §2.6), on the dark ground. Token-only.
 
-/* D6: one link on this row now. The 44px touch floor comes from `.lv2-text-link`'s own
-   min-height, so the row only supplies the spacing. */
-.links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 28px;
-  margin: 28px 0 0;
+  At 900 and up the h2 takes columns 1-4 and the four proofs a 2x2 grid in 5-12, with the two links
+  under the grid. Each cell is one rule, its label-link (20/1.35/510, no underline until hover or
+  focus, the arrow muted) and, for the training proof only, its verbatim note (F-2). Below 900 the
+  four rows stack, 64px each at least.
+*/
+.layout {
+  display: grid;
+  gap: 32px;
+}
+
+@media (min-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+    column-gap: 24px;
+    row-gap: 32px;
+  }
+
+  .layout > :global(.lv2-scene-head) { grid-column: 1; grid-row: 1 / span 2; }
+  .layout > :global(.lv2-proof-list),
+  .layout > .links { grid-column: 2; }
+}
+
+.layout > :global(.lv2-scene-head) { max-width: none; }
+
+.layout > :global(.lv2-proof-list) {
+  display: grid;
+  gap: 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 900px) {
+  .layout > :global(.lv2-proof-list) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 24px;
+  }
+}
+
+.layout :global(.lv2-proof) {
+  min-height: 64px;
+  padding: 20px 0 16px;
+  border-top: 1px solid var(--tv-rule-inst);
+}
+
+@media (min-width: 900px) {
+  .layout :global(.lv2-proof) { min-height: 96px; }
 }
 
 /*
-  C4's proof-label link is `.lv2-inline-link` in `app/landing-v2.css` now, not a rule of this
-  module: Scene 05's contract reference needed the identical box and affordance, and two copies of
-  the 44px floor is two places for it to drift out of the contract.
+  R3 (design critique N6): from 900px the training proof's verbatim note (F-2, wording unchanged) is one full-width
+  line under the 2x2 grid, so the four cells are equal. Position only, and only where the grid has two columns: the
+  note stays inside its own <li> (the DOM and a phone's reading order are unchanged). That li spans the whole grid as
+  a subgrid -- its label in row 1, column 1; its note in row 3 across both columns -- and the other three proofs take
+  the three remaining cells. The copy deck lists the training proof first (lib/landing-v2-trust.test.ts).
 */
-
-/* The one next action (§39). Ink underline against the others' hairline -- hierarchy without a
-   second filled button and without spending an accent colour, whose meanings are taken. */
-.next {
-  text-decoration-color: currentColor;
+@media (min-width: 900px) {
+  .layout > :global(.lv2-proof-list) { grid-template-rows: auto auto auto; }
+  .layout :global(.lv2-proof:has(> .lv2-proof-note)) {
+    grid-column: 1 / -1;
+    grid-row: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-template-rows: subgrid;
+    min-height: 0;
+    padding: 0;
+    border-top: 0;
+  }
+  .layout :global(.lv2-proof:has(> .lv2-proof-note) > .lv2-proof-label) {
+    grid-column: 1;
+    grid-row: 1;
+    min-height: 96px;
+    padding: 20px 0 16px;
+    border-top: 1px solid var(--tv-rule-inst);
+  }
+  .layout :global(.lv2-proof:has(> .lv2-proof-note) > .lv2-proof-note) {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    max-width: none;
+    margin: 0;
+    padding-top: 20px;
+    border-top: 1px solid var(--tv-rule-inst);
+  }
+  .layout :global(.lv2-proof-list > .lv2-proof:nth-child(2)) { grid-column: 2; grid-row: 1; }
+  .layout :global(.lv2-proof-list > .lv2-proof:nth-child(3)) { grid-column: 1; grid-row: 2; }
+  .layout :global(.lv2-proof-list > .lv2-proof:nth-child(4)) { grid-column: 2; grid-row: 2; }
 }
 
-/* The footnote row: /status, then the two §18 references D6 took out of the action row. */
-.footnote {
+.layout :global(.lv2-proof-label) {
+  margin: 0;
+  color: var(--tv-on-inst);
+  font: 510 18px/1.35 var(--f-sans);
+  letter-spacing: -0.01em;
+}
+
+@media (min-width: 900px) {
+  .layout :global(.lv2-proof-label) { font-size: 20px; }
+}
+
+.layout :global(.lv2-proof-label .lv2-inline-link) {
+  min-height: 44px;
+  color: inherit;
+  text-decoration-line: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+
+.layout :global(.lv2-proof-label .lv2-inline-link):focus-visible { text-decoration-color: currentColor; }
+
+@media (hover: hover) and (pointer: fine) {
+  .layout :global(.lv2-proof-label .lv2-inline-link):hover { text-decoration-color: currentColor; }
+}
+
+.layout :global(.lv2-proof-label .lv2-inline-link) span { color: var(--tv-on-inst-muted); }
+
+.layout :global(.lv2-proof-note) {
+  max-width: 52ch;
+  margin: 4px 0 0;
+  color: var(--tv-on-inst-muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+/* The next action and the status footnote, under the grid. */
+.links {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0 24px;
-  margin: 4px 0 0;
-  color: var(--text-lo);
+  margin: 0;
 }
 
-/* A footnote is still a reachable control: 44px, visibly underlined, focusable like any link. */
-.footnoteLink {
+/* The one next action (§39): 15/560. Its underline is the Home text-link rule's: hover and focus only (critique B1). */
+.next {
+  font-size: 15px;
+  font-weight: 560;
+}
+
+/*
+  The footnote: one word, still a 44px control. No underline at rest (design critique 2026-10-26 B1). R3 (design
+  critique N16): the same 15/560 as the Trust Center link beside it, in the same ink, so it does not read as disabled.
+*/
+.status {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   min-height: 44px;
-  text-decoration: underline;
-  text-underline-offset: 4px;
+  color: var(--tv-on-inst);
+  font-size: 15px;
+  font-weight: 560;
+  text-decoration-line: none;
   text-decoration-thickness: 1px;
-  text-decoration-color: var(--hairline-hi);
+  text-decoration-color: currentColor;
+  text-underline-offset: 4px;
+}
+
+.status:focus-visible { text-decoration-line: underline; }
+
+@media (hover: hover) and (pointer: fine) {
+  .status:hover { text-decoration-line: underline; }
 }

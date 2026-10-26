@@ -52,10 +52,9 @@ type Copy = {
   contextNote: string;
   regions: string;
   openRegion: string;
-  openPage: string;
   openFull: string;
   filing: { open: string; original: string; render: string };
-  fields: { source: string; version: string; location: string };
+  fields: { source: string; version: string };
   record: {
     passage: [string, string];
     version: [string, string];
@@ -72,7 +71,7 @@ type Copy = {
 const COPY: Record<"en" | "ko", Copy> = {
   en: {
     label: "Source, passage and record",
-    title: "Inspect one passage at its source",
+    title: "Follow a passage to its source.",
     status: { not_run: "Prepared demonstration / processing not yet run", qualified: "Prepared demonstration" },
     steps: { source: "Source", passage: "Passage", record: "Record" },
     existing: "Existing extracted passage",
@@ -81,19 +80,19 @@ const COPY: Record<"en" | "ko", Copy> = {
       "statement-heading": "Statement heading",
       "column-headings": "Column headings",
     },
+    /* Review 2026-10-26 B-1 (word budget): the "Context required:" label is cut; the note still says why. */
     selectedNote:
-      "Context required: headings and units are separate regions. Interpretation has not run.",
+      "Headings and units are separate regions. Interpretation has not run.",
     contextNote: "Shown as printed, for context. It has not been joined to the selected passage.",
     regions: "Regions on this page",
-    openRegion: "Open this region in Explore",
-    openPage: "Open full page",
+    openRegion: "Open in Explore",
     openFull: "Open full source",
     filing: {
       open: "Open full filing (SEC)",
       original: "The original HTML filing, as submitted.",
       render: "The page shown here is a reference render of it.",
     },
-    fields: { source: "Source", version: "Filing", location: "Location" },
+    fields: { source: "Source", version: "Filing" },
     record: {
       passage: ["Source-bound passage", "Quoted exactly as extracted, bound to its page and region."],
       version: ["Source version", "The digest every region on this page is bound to."],
@@ -115,7 +114,7 @@ const COPY: Record<"en" | "ko", Copy> = {
   },
   ko: {
     label: "원문, 구절, 기록",
-    title: "원문에서 구절 하나 확인하기",
+    title: "구절 하나를 원문까지 따라가 보세요.",
     status: { not_run: "준비된 시연 / 아직 처리를 실행하지 않음", qualified: "준비된 시연" },
     steps: { source: "원문", passage: "구절", record: "기록" },
     existing: "기존 추출 구절",
@@ -125,18 +124,17 @@ const COPY: Record<"en" | "ko", Copy> = {
       "column-headings": "열 제목",
     },
     selectedNote:
-      "맥락 확인 필요: 열 제목과 단위는 별도 영역입니다. 해석은 아직 실행하지 않았습니다.",
+      "열 제목과 단위는 별도 영역입니다. 해석은 아직 실행하지 않았습니다.",
     contextNote: "맥락 확인용으로 인쇄된 그대로 보여 줍니다. 선택한 구절과 묶지 않았습니다.",
     regions: "이 페이지의 영역",
-    openRegion: "Explore에서 이 영역 열기",
-    openPage: "전체 페이지 열기",
+    openRegion: "Explore에서 열기",
     openFull: "원문 전체 열기",
     filing: {
       open: "전체 공시 열기 (SEC)",
       original: "제출된 그대로의 원본 HTML 공시입니다.",
       render: "여기 보이는 페이지는 그 공시의 기준 렌더입니다.",
     },
-    fields: { source: "원문", version: "공시", location: "위치" },
+    fields: { source: "원문", version: "공시" },
     record: {
       passage: ["원문에 묶인 구절", "추출된 그대로 인용하며, 페이지와 영역에 묶여 있습니다."],
       version: ["원문 버전", "이 페이지의 모든 영역이 묶인 다이제스트입니다."],
@@ -158,11 +156,13 @@ const COPY: Record<"en" | "ko", Copy> = {
   },
 };
 
-/** `sourcePageQualifier`'s two spellings, inlined so the client bundle skips the page manifest. */
-const QUALIFIER = {
-  en: { reference_render: "reference render", original: "original PDF" },
-  ko: { reference_render: "기준 렌더", original: "원본 PDF" },
-} as const;
+/*
+  `sourcePageQualifier`'s spelling for an original PDF, inlined so the client bundle skips the page manifest. R3 (design
+  critique N9, D-grade copy, veto block): the location line no longer prints "reference render" -- it is a pipeline term;
+  Source details states the representation in a sentence and the page image's alt calls it a rendered page. An original
+  PDF is still named as one, so the line never lets a render pass as the original, nor the original as a render.
+*/
+const ORIGINAL_PDF = { en: "original PDF", ko: "원본 PDF" } as const;
 
 const letter = (index: number) => String.fromCharCode(65 + index);
 
@@ -176,7 +176,19 @@ function pageSrcSet(image: { src: string; width: number; height: number }) {
   return [...copies, `${image.src} ${image.width}w`].join(", ");
 }
 
-export default function HeroSourceCard({ view, korean = false }: { view: EvidenceCase; korean?: boolean }) {
+export default function HeroSourceCard({
+  view,
+  korean = false,
+  titleId,
+  rightsNote,
+}: {
+  view: EvidenceCase;
+  korean?: boolean;
+  /** The id the enclosing section is labelled by (FINAL-SPEC 2026-10-26 §2.3: the workbench title is s2's h2). */
+  titleId?: string;
+  /** The rights sentence, printed verbatim under the source page (F-3). */
+  rightsNote?: string;
+}) {
   const locale = korean ? "ko" : "en";
   const t = COPY[locale];
   const passageId = useId();
@@ -187,7 +199,7 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
   const page = view.pages.find(item => item.sourceId === active?.sourceId && item.page === active?.page);
   if (!active || !source || !page) return null;
 
-  const qualifier = source.representation === "reference_render" ? QUALIFIER[locale].reference_render : QUALIFIER[locale].original;
+  const qualifier = source.representation === "reference_render" ? "" : ` · ${ORIGINAL_PDF[locale]}`;
   const where = (region: EvidenceRegion) =>
     `${korean ? `${region.page}쪽` : `p.${region.page}`} · bbox ${region.bbox1000.join(",")}`;
   /* Brief move 5: one data-derived label per region, by the letter the workbench prints beside it. */
@@ -195,6 +207,7 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
     regions.map((region, index) => [region.id, evidenceLineLabel(source, region, letter(index), korean)]),
   );
   const activeLabel = lineLabels[active.id]!;
+  const headingId = titleId ?? `${passageId}-title`;
   /* The page window spans the regions plus a margin each way, so every selectable box is in view. */
   const windowStart = Math.max(0, Math.min(...regions.map(region => region.bbox1000[1])) - 80);
   const windowEnd = Math.min(1000, Math.max(...regions.map(region => region.bbox1000[3])) + 80);
@@ -205,20 +218,19 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
       data-source-digest={source.digest}
       data-source-page={active.page}
       data-case-status={caseStatus(view)}
-      aria-labelledby={`${passageId}-title`}
+      aria-labelledby={headingId}
     >
       <header className={styles.benchHead}>
-        <h2 className={styles.benchTitle} id={`${passageId}-title`}>{t.title}</h2>
+        <h2 className={`lv2-h2 ${styles.benchTitle}`} id={headingId}>{t.title}</h2>
         <p className={styles.runStatus} data-run={view.run}>{t.status[view.run]}</p>
       </header>
 
       <div className={styles.benchGrid}>
-        <div className={`${styles.locator} ${styles.step}`} data-step={t.steps.source}>
+        <div className={styles.locator} data-step={t.steps.source}>
           <p className={styles.filename} data-derived="1">{source.filename}</p>
           <p className={styles.locatorMeta}>
-            <span className={styles.metaField}>{t.fields.location}</span>{" "}
             <span data-derived="1">
-              {`${korean ? `${source.pageCount}쪽 중 ${active.page}쪽` : `page ${active.page} of ${source.pageCount}`} · ${qualifier}`}
+              {`${korean ? `${source.pageCount}쪽 중 ${active.page}쪽` : `page ${active.page} of ${source.pageCount}`}${qualifier}`}
             </span>
           </p>
         </div>
@@ -265,29 +277,24 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
             <p className={styles.pageAbsent}>{t.pageAbsent}</p>
           )}
           <p className={styles.sourceLinks}>
-            {source.fullSourceHref ? (
-              <a className={styles.quietLink} href={source.fullSourceHref}>{t.openFull}</a>
-            ) : null}
-            {page.image ? (
-              <a className={styles.quietLink} href={page.image.src}>{t.openPage}</a>
-            ) : null}
             {source.officialFiling ? (
               <a className={styles.quietLink} href={source.officialFiling.href} data-full-filing>
                 {t.filing.open}
-                <span aria-hidden="true">↗</span>
+                <span aria-hidden="true">&nbsp;↗</span>
               </a>
             ) : null}
           </p>
+          {/* F-3, verbatim: one caption line under the source window (orchestrator decision 2026-10-26). */}
+          {rightsNote ? <p className={styles.rightsNote}>{rightsNote}</p> : null}
         </div>
 
-        <div className={`${styles.passagePane} ${styles.step}`} data-step={t.steps.passage} id={passageId} aria-live="polite" data-line-region={active.id}>
+        <div className={styles.passagePane} data-step={t.steps.passage} id={passageId} aria-live="polite" data-line-region={active.id}>
           <p className={styles.paneLabel}>
             <span className={styles.extracted}>{t.existing}</span>
-            <span>{t.roles[active.role]}</span>
           </p>
           {/* Where no line can be drawn (below 960px the grid stacks), the line's label sits on the card. */}
           <p className={styles.lineLabel} data-derived="1" data-evidence-card-label="">
-            <span>{activeLabel.human}</span> <code>{activeLabel.coordinates}</code>
+            <code>{activeLabel.coordinates}</code>
           </p>
           {/*
             Brief move 8: the page region the passage was read from, cut out of the same committed
@@ -311,14 +318,14 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
           <p className={styles.contextNote}>{active.role === "selected" ? t.selectedNote : t.contextNote}</p>
           {active.href ? (
             <Link className={styles.evidenceLink} href={active.href as Route} prefetch={false} data-hero-evidence data-analytics="source-open">
-              {t.openRegion}
+              {t.openRegion}<span aria-hidden="true">&nbsp;→</span>
             </Link>
           ) : null}
         </div>
 
         <div className={styles.regionPane}>
-          <p className={styles.regionsLabel} id={`${passageId}-regions`}>{t.regions}</p>
-          <ul className={styles.regionList} aria-labelledby={`${passageId}-regions`}>
+          {/* The list's name is its own aria-label: same words for assistive technology, no hidden text node in the page copy. */}
+          <ul className={styles.regionList} aria-label={t.regions}>
             {regions.map((region, index) => (
               <li key={region.id}>
                 <button
@@ -333,7 +340,6 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
                   <span className={styles.regionLetter} aria-hidden="true">{letter(index)}</span>
                   <span className={styles.regionText}>
                     <span className={styles.regionRole}>{t.roles[region.role]}</span>
-                    <span className={styles.regionWhere} data-derived="1">{korean ? `${region.page}쪽` : `Page ${region.page}`}</span>
                   </span>
                 </button>
               </li>
@@ -342,9 +348,12 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
         </div>
       </div>
 
-      <footer className={`${styles.record} ${styles.step}`} data-step={t.steps.record}>
+      <footer className={styles.record} data-step={t.steps.record}>
         <details className={styles.details}>
           <summary className={styles.detailsSummary}>{t.details}</summary>
+          {source.fullSourceHref ? (
+            <p className={styles.sourceLinks}><a className={styles.quietLink} href={source.fullSourceHref}>{t.openFull}</a></p>
+          ) : null}
         <dl className={styles.recordList}>
           <div>
             <dt>{t.record.passage[0]}</dt>

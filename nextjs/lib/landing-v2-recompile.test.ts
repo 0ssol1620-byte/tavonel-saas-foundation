@@ -53,11 +53,16 @@ describe("Scene 05 recompile", () => {
     is stricter than before rather than looser: it now pins that exactly ONE link carries the
     terminal `.lv2-text-link` treatment, which is the rule the old two-action row broke.
   */
-  it.each(locales)("offers one terminal action, with the contract inline in the note (%s)", (locale) => {
+  /*
+    FINAL-SPEC 2026-10-26 D-19/D-20: the contract note paragraph left, so the contract is the second
+    text link in the one action row. Still exactly these two destinations, contract first.
+  */
+  it.each(locales)("offers the contract and the change record as its only two links (%s)", (locale) => {
     const html = render(locale);
     const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1]);
     expect(hrefs).toEqual([view.hrefs.contract, view.hrefs.change]);
-    expect(html.match(/lv2-text-link/g)).toHaveLength(1);
+    expect(html.match(/lv2-text-link/g)).toHaveLength(2);
+    if (locale === "ko") expect(html).toMatch(/hrefLang="en"[^>]*aria-label="[^"]*\(영문 페이지\)"|aria-label="[^"]*\(영문 페이지\)"[^>]*hrefLang="en"/i);
     expect(html).toContain(RECOMPILE_ACTIONS[locale].change);
     expect(html).toContain(RECOMPILE_ACTIONS[locale].contract);
     // Below the fold: neither link may cost a prefetch (T1-014).
@@ -93,14 +98,16 @@ describe("Scene 05 recompile", () => {
     rendered in English on /ko. `RecompileView` carries the baseline's form and year now, and the
     sentence around them is the copy deck's format in the locale being rendered.
   */
-  it.each(locales)("names both snapshots from the record, in the page's language (%s)", (locale) => {
+  /*
+    FINAL-SPEC 2026-10-26 D-21: the before/after step line left; the arrivals are listed as record
+    fields under the deck's own label. Neither typed label in lib/explore-change.ts may reach the page.
+  */
+  it.each(locales)("lists the arrivals from the record, under the deck's label (%s)", (locale) => {
     const html = render(locale);
     const copy = LANDING_V2_COPY[locale].recompile;
-    const before = copy.snapshotBeforeFormat
-      .replace("{year}", view.before.year)
-      .replace("{form}", view.before.form);
-    expect(html).toContain(before);
-    expect(html).toContain(copy.snapshotAfterFormat.replace("{before}", before).replace("{count}", String(view.arrivals.length)));
+    expect(html).toContain(copy.arrivalsLabel);
+    expect(html).toContain(copy.compared);
+    expect(html).not.toContain(exploreChangeStory.before.label);
     /*
       The record's own labels are typed strings and neither may reach the page as a string.
 
@@ -125,7 +132,8 @@ describe("Scene 05 recompile", () => {
       expect(html).toContain(`>${key.toLocaleString("en-US")}</b>`);
       expect(html).toContain(label);
     }
-    expect(html).toContain(copy.compareLabel);
+    // The list keeps its noun as its accessible name (FINAL-SPEC 2026-10-26 §2.5).
+    expect(html).toContain(`aria-label="${copy.compareLabel}"`);
     // BA-034: the qualifier travels with the figures, and it is /explore's own sentence.
     expect(RECOMPILE_COUNTS_QUALIFIER.en).toBe(EXPLORE_COPY.countsQualifier);
     expect(html).toContain(EXPLORE_COPY.countsQualifier);
@@ -147,13 +155,19 @@ describe("Scene 05 recompile", () => {
 
     D5 also pins the quotation shape: four objects, each a whole sentence, no ellipsis.
   */
-  it("states the sample's one state word once, quotes whole sentences, and claims no equivalence", () => {
+  /*
+    FINAL-SPEC 2026-10-26 D-21: the object column left Home (its quotes read as extraction errors, T5).
+    The data invariants stay pinned for /explore and any future return; the scene prints no object
+    label and no state word, and still claims no equivalence.
+  */
+  it("prints no object label or state word, keeps the sample's quoting rule, and claims no equivalence", () => {
     const html = render("en");
     expect(view.affectedSample.length).toBeGreaterThan(0);
     expect(view.affectedSample.length).toBeLessThanOrEqual(4);
     const states = new Set(view.affectedSample.map((node) => node.state));
     expect(states.size).toBe(1);
-    expect(html.split(view.affectedSample[0]!.stateLabel).length - 1).toBe(1);
+    expect(html).not.toContain(view.affectedSample[0]!.stateLabel);
+    for (const node of view.affectedSample) expect(html).not.toContain(node.label);
     for (const node of view.affectedSample) {
       expect(node.labelTruncated).toBe(false);
       expect(node.label).toMatch(/[.!?]$/);
@@ -164,12 +178,13 @@ describe("Scene 05 recompile", () => {
     expect(html).not.toContain(view.equivalence.reason);
   });
 
-  it("translates the state words and the qualifier rather than leaving them in English", () => {
+  it("translates the sentence and the qualifier rather than leaving them in English", () => {
     const html = render("ko");
     const state = view.affectedSample[0]!.state;
-    expect(html).toContain(landingV2StateWord(state, "ko"));
-    // And the English word is not also on the page: one state, one spelling (D12).
+    // No state word is printed any more (D-21); the English one may never be (D12).
     expect(html).not.toContain(landingV2StateWord(state, "en"));
+    expect(html).toContain(LANDING_V2_COPY.ko.recompile.compared);
+    expect(koTermDrift(LANDING_V2_COPY.ko.recompile.compared)).toEqual([]);
     expect(html).toContain(RECOMPILE_COUNTS_QUALIFIER.ko);
     expect(koTermDrift(RECOMPILE_COUNTS_QUALIFIER.ko)).toEqual([]);
     expect(koTermDrift(Object.values(RECOMPILE_ACTIONS.ko).join(" "))).toEqual([]);

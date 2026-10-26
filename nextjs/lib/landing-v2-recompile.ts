@@ -18,8 +18,8 @@ import { EXPLORE_COPY } from "./explore-story";
  * which record it opens rather than repeating the site's single Explore action (contract rule 6).
  */
 export const RECOMPILE_ACTIONS = {
-  en: { change: "Open the change record", contract: "Read the compiler contract" },
-  ko: { change: "변경 기록 열기", contract: "컴파일러 계약 읽기" },
+  en: { change: "Change record", contract: "Compiler contract" },
+  ko: { change: "변경 기록", contract: "컴파일러 계약" },
 } as const;
 
 /**

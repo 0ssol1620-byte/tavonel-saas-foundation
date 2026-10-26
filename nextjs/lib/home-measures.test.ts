@@ -20,9 +20,11 @@ describe("Home measurement band data", () => {
       const copy = HOME_MEASURES[index]![locale];
       return [...copy.figure, ...copy.label, ...copy.detail].map(part => (typeof part === "string" ? part : formatFigure(part))).join("");
     };
-    expect(text(0, "en")).toBe("0broken links in compiled outputOf 1,000 documents offered, 596 compiled and 404 were refused for a link that could not be resolved. These guarantees describe the structure of the compiled output. They are a separate measure from whether the extracted text is correct.");
-    expect(text(1, "en")).toContain("80.6olmOCR-Bench score with recovery; 53.7 with only recovery switched off");
-    expect(text(1, "en")).toContain("1,403 documents, 8,413 checks.");
+    // FINAL-SPEC 2026-10-26 D-12: R-01 first, then R-02 -- the same facts, word for word, in receipt order.
+    expect(HOME_MEASURES.map(measure => measure.receipt.id)).toEqual(["R-01", "R-02", "R-03"]);
+    expect(text(1, "en")).toBe("0broken links in compiled outputOf 1,000 documents offered, 596 compiled and 404 were refused for a link that could not be resolved. These guarantees describe the structure of the compiled output. They are a separate measure from whether the extracted text is correct.");
+    expect(text(0, "en")).toContain("80.6olmOCR-Bench score with recovery; 53.7 with only recovery switched off");
+    expect(text(0, "en")).toContain("1,403 documents, 8,413 checks.");
     expect(text(2, "en")).toContain("36.9%of checks passed on low-quality scans194 of 526 checks on low-quality scans; 1,380 of 1,394 on standard digital documents.");
     expect(text(2, "en")).toContain("The spread runs from 99.0% to 36.9%.");
     expect(text(2, "ko")).toContain("저품질 스캔본 검사 526개 중 194개");

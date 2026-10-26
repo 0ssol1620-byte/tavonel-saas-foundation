@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import LandingPage from "@/components/landing-v2/landing-page";
 import {
@@ -75,6 +75,15 @@ export const dynamic = "force-dynamic";
 
   With no experiment active this reads a cookie that is never set and returns the frozen default.
 */
+/*
+  FINAL-SPEC 2026-10-26 §4: Home is a paper page, so the address bar and task-switcher card read
+  paper (`--tv-paper`, #FAF9F6) here. The layout's dark `#090D14` stays on every other route.
+*/
+export const viewport: Viewport = {
+  themeColor: "#FAF9F6",
+  colorScheme: "light",
+};
+
 export default async function HomePage({
   searchParams,
 }: {
