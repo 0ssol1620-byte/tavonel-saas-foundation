@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import CompileStagePlayer from "../components/compile-stage-player";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -73,6 +73,7 @@ import {
   RETIRED_NAMES,
 } from "./landing-v2-copy.test";
 import { koTermDrift } from "./ko-terms";
+import { consentCopy } from "./marketing-analytics";
 import { ACCESS_CTA, EXPLORE_CTA, FOOTER_GROUPS, KO_CHROME, SELF_SERVE_CTA } from "./site-navigation";
 import { EVIDENCE } from "./evidence-record";
 import claimsPack from "../content/evidence/public-claims-pack.json";
@@ -1064,5 +1065,90 @@ describe("Home compact footer", () => {
     expect(() => compactFooterLinks(false, without)).toThrow(/\/status/);
     expect(() => compactFooterLinks(true, without)).toThrow(/\/status/);
     expect(compactFooterLinks(false).map(link => link.href)).toEqual(ORDER);
+  });
+});
+
+/*
+  FINAL-SPEC 2026-10-26 §3.3: /ko's Hangul is drawn from one static subset of Wanted Sans, two
+  instances ("Wanted Sans KO Home" 400 and 510), declared in app/wanted-sans-korean.css. A syllable
+  the subset does not hold falls through to the 90 optional splits, and a first visit can then draw
+  it in a different face from its neighbours -- so every syllable /ko can render must be inside the
+  subset's unicode-range, and this fails on the first one that is not.
+
+  What /ko can render: the page's own markup (header, menu sheet, every scene, footer), every Korean
+  chrome string, the consent banner's Korean copy and the film player's Korean strings (its source,
+  which holds every state's label). A superset is safe; a missing syllable is the failure.
+
+  Regenerating after a copy change: run this file with TAVONEL_DUMP_KO_SYLLABLES=<path> to write the
+  set, then the recipe in the comment above the two faces (fontTools subset, instancer, merge).
+*/
+const KO_HOME_FACE = '"Wanted Sans KO Home"';
+
+function koHomeSyllables(): number[] {
+  const texts = [
+    renderToStaticMarkup(createElement(LandingPage, { korean: true })),
+    JSON.stringify(KO_CHROME),
+    JSON.stringify(consentCopy("/ko")),
+    readFileSync(new URL("../components/compile-stage-player.tsx", import.meta.url), "utf8"),
+  ];
+  return [...new Set(texts.join("").match(/[\uac00-\ud7a3]/g) ?? [])].map(ch => ch.codePointAt(0)!).sort((a, b) => a - b);
+}
+
+function koHomeFaces() {
+  const css = readFileSync(new URL("../app/wanted-sans-korean.css", import.meta.url), "utf8");
+  return [...css.matchAll(/@font-face\s*\{([^}]*)\}/g)].map(match => match[1]!).filter(face => face.includes(KO_HOME_FACE)).map(face => ({
+    weight: face.match(/font-weight:\s*(\d+)\s*;/)?.[1],
+    display: face.match(/font-display:\s*([a-z]+)/)?.[1],
+    src: face.match(/url\("([^"]+)"\)/)?.[1],
+    range: face.match(/unicode-range:\s*([^;]+);/)?.[1]?.trim() ?? "",
+  }));
+}
+
+const rangesOf = (range: string) => range.split(",").map(part => part.trim().replace(/^U\+/i, "").split("-").map(hex => parseInt(hex, 16)) as [number, number?]);
+const uncovered = (syllables: readonly number[], range: string) =>
+  syllables.filter(cp => !rangesOf(range).some(([from, to = from]) => cp >= from && cp <= to));
+
+describe("KO Home subset font coverage (FINAL-SPEC 2026-10-26 §3.3)", () => {
+  it("declares exactly the 400 and 510 instances, optional, over one shared range, with committed files", () => {
+    const faces = koHomeFaces();
+    expect(faces.map(face => face.weight)).toEqual(["400", "510"]);
+    for (const face of faces) {
+      expect(face.display).toBe("optional");
+      expect(face.src).toBe(`/fonts/wanted-sans-ko-home-${face.weight}.woff2`);
+      expect(face.range).toBe(faces[0]!.range);
+      expect(rangesOf(face.range).every(([from, to = from]) => from >= 0xac00 && to <= 0xd7a3 && from <= to), "Hangul syllables only").toBe(true);
+    }
+    // The bytes the recipe produced are the bytes that ship: each file's sha256 is recorded beside its face.
+    const css = readFileSync(new URL("../app/wanted-sans-korean.css", import.meta.url), "utf8");
+    for (const weight of ["400", "510"]) {
+      const recorded = css.match(new RegExp(`wanted-sans-ko-home-${weight}\\.woff2 sha256 ([0-9a-f]{64})`))?.[1];
+      const bytes = readFileSync(new URL(`../public/fonts/wanted-sans-ko-home-${weight}.woff2`, import.meta.url));
+      expect(createHash("sha256").update(bytes).digest("hex"), `wanted-sans-ko-home-${weight}.woff2`).toBe(recorded);
+    }
+  });
+
+  it("covers every Hangul syllable /ko can render", () => {
+    const syllables = koHomeSyllables();
+    if (process.env.TAVONEL_DUMP_KO_SYLLABLES) writeFileSync(process.env.TAVONEL_DUMP_KO_SYLLABLES, String.fromCodePoint(...syllables), "utf8");
+    expect(syllables.length, "the page has Korean to cover").toBeGreaterThan(100);
+    const missing = uncovered(syllables, koHomeFaces()[0]?.range ?? "");
+    expect(missing.map(cp => String.fromCodePoint(cp)).join(""), "syllables outside the KO Home subset").toBe("");
+  });
+
+  it("fails closed: a syllable outside the subset is reported, not passed", () => {
+    const range = koHomeFaces()[0]!.range;
+    let outside = 0xac00;
+    while (uncovered([outside], range).length === 0) outside += 1;
+    expect(uncovered([...koHomeSyllables(), outside], range)).toEqual([outside]);
+    expect(uncovered([0xac00], "")).toEqual([0xac00]);
+  });
+
+  it("preloads the two subset files on /ko only, and no Hangul split", () => {
+    const ko = renderToStaticMarkup(createElement(LandingPage, { korean: true }));
+    const en = renderToStaticMarkup(createElement(LandingPage, { korean: false }));
+    const preloads = (html: string) => [...html.matchAll(/<link rel="preload" as="font"[^>]*href="([^"]+)"/g)].map(match => match[1]);
+    expect(preloads(ko)).toEqual(["/fonts/wanted-sans-ko-home-400.woff2", "/fonts/wanted-sans-ko-home-510.woff2"]);
+    expect(preloads(en)).toEqual([]);
+    expect(ko).not.toMatch(/WantedSansVariable\.split\.\d+\.woff2/);
   });
 });

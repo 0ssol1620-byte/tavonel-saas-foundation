@@ -422,14 +422,15 @@ for(const suite of ['nextjs/scripts/repair-scope.test.mjs','nextjs/scripts/repai
 assert((readFileSync(resolve(repo,'nextjs/scripts/db/native-world-race-ci.test.mjs'),'utf8').match(/^test\('affected /gm)??[]).length>=1 && /test\('native world race static: affected /.test(readFileSync(resolve(repo,'nextjs/scripts/db/native-world-race-ci.test.mjs'),'utf8')), 'affected native selector and report patterns must select actual tests');
 assert(repair.includes('run: pnpm install --frozen-lockfile')&&repair.includes('run: pnpm scan:secrets')&&repair.includes('run: pnpm check')&&repair.includes('run: pnpm exec next build')&&!/run: pnpm (?:run )?build\b/.test(repair), 'frozen install, secrets, global type/lint and the direct browser build (no full Vitest prehook) stay unchanged');
 assert(raceHelper.includes('export function admitAffectedSource(')&&raceHelper.indexOf('const baselineIntent=classifyAffected({headSha:head,exec});')<raceHelper.indexOf('const intent=classify({headSha:head,exec});')&&raceHelper.includes('classifyAffected=classifyAffectedIntent, affected=verifyAffectedSource'), 'PR 141 race admission routes verified-baseline descendants to the collector affected proof before any exact race increment');
-// Ordinary Home admission, restated independently: one finite twenty-six-path owner with ten direct suites (the mobile-view TSX is
+// Ordinary Home admission, restated independently: one finite twenty-eight-path owner with ten direct suites (the mobile-view TSX is
 // registered above) and one browser suite, a single shared-map row for exactly 1440, 390, 360 and reduced-motion. The exact CSS owner adds one reviewed stylesheet overlap. No legacy Home profile.
 const homePaths=['components/compile-stage-player.frame-strings.json','components/compile-stage-player.mobile-view.test.tsx','components/compile-stage-player.tsx',
   'components/landing-v2/evidence-connector.tsx','components/landing-v2/film-reading-layer.module.css','components/landing-v2/hero-actions.tsx','components/landing-v2/hero-film-disclosure.tsx',
   'components/landing-v2/hero-film.tsx','components/landing-v2/hero-source-card.test.tsx','components/landing-v2/hero-source-card.tsx','components/landing-v2/landing-analytics.tsx',
   'components/landing-v2/home-reader-guide.tsx','components/landing-v2/landing-hero.module.css','components/landing-v2/landing-page.tsx','components/landing-v2/source-region.tsx','e2e/landing-v2.spec.ts',
   'lib/film-motion-control.test.ts','lib/home-evidence-view.test.ts','lib/home-evidence-view.ts','lib/home-player-main304-parity.test.ts','lib/landing-v2-page.test.ts',
-  'lib/landing-v2-proof.ts','lib/landing-v2-runtime.test.ts','lib/landing-v2-runtime.ts','lib/landing-v2-snapshot.json','lib/one-path-contract.test.ts'];
+  'lib/landing-v2-proof.ts','lib/landing-v2-runtime.test.ts','lib/landing-v2-runtime.ts','lib/landing-v2-snapshot.json','lib/one-path-contract.test.ts',
+  'public/fonts/wanted-sans-ko-home-400.woff2','public/fonts/wanted-sans-ko-home-510.woff2'];
 const homeSuites=['components/compile-stage-player.mobile-view.test.tsx','components/landing-v2/hero-source-card.test.tsx','lib/home-evidence-view.test.ts','lib/landing-v2-page.test.ts',
   'lib/one-path-contract.test.ts','lib/film-motion-control.test.ts','lib/marketing-analytics.test.ts','lib/home-player-main304-parity.test.ts','lib/landing-v2-runtime.test.ts','lib/copy-trust-guard.test.ts'];
 const homeOwners=AFFECTED_GROUPS.filter(owner=>owner.group==='home-landing'),[homeOwner]=homeOwners;
@@ -441,11 +442,11 @@ assert(JSON.stringify(HOME_AFFECTED_PATHS)===JSON.stringify(homePaths)&&JSON.str
   &&homeOwners.length===1&&JSON.stringify(homeOwner.unitFiles)===JSON.stringify(homeSuites)&&JSON.stringify(homeOwner.browserFiles)===JSON.stringify(['e2e/landing-v2.spec.ts'])
   &&!homeOwner.nativeReuse&&!homeOwner.selector&&!homeOwner.worker&&!homeOwner.database&&!homeOwner.databaseTests.length
   &&homePaths.every(p=>AFFECTED_GROUPS.filter(owner=>owner.match.test('nextjs/'+p)).map(owner=>owner.group).join()===(p==='components/landing-v2/landing-hero.module.css'?'home-landing,home-reader-heading-css':'home-landing'))
-  &&homePaths.length===26&&new Set(homePaths).size===26&&!homePaths.includes('lib/marketing-analytics.test.ts')
+  &&homePaths.length===28&&new Set(homePaths).size===28&&!homePaths.includes('lib/marketing-analytics.test.ts')
   &&['components/landing-v2/other.tsx','components/landing-v2/hero-actions.test.tsx','components/compile-stage-player.test.tsx','e2e/landing-v2-extra.spec.ts','lib/home-evidence-view.tsx','components/landing-v2/landing-hero.css',
     'lib/film-motion-control.ts','lib/marketing-analytics.test.ts'].every(p=>!homeOwner.match.test('nextjs/'+p))
   &&(sharedMap.match(/landing-v2/g)??[]).length===1&&sharedMap.includes("\n  ['e2e/landing-v2.spec.ts', ['1440', '390', '360', 'reduced-motion']],")
-  &&!AFFECTED_GROUPS.some(owner=>(/^home-/.test(owner.group)&&!['home-landing','home-reader-heading-css'].includes(owner.group))||/legacy/.test(owner.group)), 'Home retains its exact twenty-six-path owner, ten suites and four-project browser row with only the exact reader stylesheet overlap');
+  &&!AFFECTED_GROUPS.some(owner=>(/^home-/.test(owner.group)&&!['home-landing','home-reader-heading-css'].includes(owner.group))||/legacy/.test(owner.group)), 'Home retains its exact twenty-eight-path owner, ten suites and four-project browser row with only the exact reader stylesheet overlap');
 assert(homeCssOwners.length===1&&JSON.stringify(HOME_READER_HEADING_CSS_AFFECTED_PATHS)===JSON.stringify(homeCssPaths)
   &&JSON.stringify(HOME_READER_HEADING_CSS_AFFECTED_UNIT_FILES)===JSON.stringify(homeCssSuites)&&JSON.stringify(homeCssOwner.unitFiles)===JSON.stringify(homeCssSuites)
   &&!homeCssOwner.browserFiles.length&&!homeCssOwner.databaseTests.length&&!homeCssOwner.nativeReuse&&!homeCssOwner.selector&&!homeCssOwner.worker&&!homeCssOwner.database

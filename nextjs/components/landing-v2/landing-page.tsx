@@ -170,12 +170,14 @@ export default function LandingPage({
 
   return (
     <div className={`page lv2 ${sourceStyles.home}`} lang={korean ? "ko" : "en"} data-template="T0">
-      {/* The Latin file (split.90) is preloaded by the root layout on every route (B-02). */}
+      {/*
+        The Latin file (split.90) is preloaded by the root layout on every route (B-02). /ko adds the
+        two static instances of its Hangul subset (FINAL-SPEC 2026-10-26 §3.3, app/wanted-sans-korean.css)
+        in place of four of the 90 optional splits: one face for every syllable the page can render.
+      */}
       {korean ? <>
-        <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.73.woff2" crossOrigin="anonymous" />
-        <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.86.woff2" crossOrigin="anonymous" />
-        <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.87.woff2" crossOrigin="anonymous" />
-        <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.88.woff2" crossOrigin="anonymous" />
+        <link rel="preload" as="font" type="font/woff2" href="/fonts/wanted-sans-ko-home-400.woff2" crossOrigin="" />
+        <link rel="preload" as="font" type="font/woff2" href="/fonts/wanted-sans-ko-home-510.woff2" crossOrigin="" />
       </> : null}
       <PublicSiteHeader korean={korean} />
       <main id="main" tabIndex={-1} data-home-ia="outcome-v1.1">

@@ -80,7 +80,6 @@
     --home-ease: cubic-bezier(0.23, 1, 0.32, 1);
     /* One card corner on Home: the recompile cards and the revision card read --radius-md. */
     --radius-md: 8px;
-    --f-sans: "Wanted Sans Variable", Arial, "Malgun Gothic", sans-serif;
     --text-hi: var(--ink);
     --text-mid: var(--ink-muted);
     --text-lo: var(--ink-muted);

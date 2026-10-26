@@ -21,6 +21,11 @@
   --lv2-fs-display: clamp(34px, calc(2.857vw + 22.86px), 64px);
   --lv2-fs-h2: clamp(28px, calc(1.143vw + 23.54px), 40px);
   --lv2-fs-figure: clamp(36px, calc(0.762vw + 33.03px), 44px);
+  /*
+    §3.3: the KO Home subset first, then the site stack. The subset holds Hangul syllables only, so
+    / and /ko resolve the same faces for Latin (T0) and an English page never fetches it.
+  */
+  --f-sans: "Wanted Sans KO Home", var(--tv-font-sans);
   color: var(--text-hi);
   font-family: var(--f-sans);
 }
