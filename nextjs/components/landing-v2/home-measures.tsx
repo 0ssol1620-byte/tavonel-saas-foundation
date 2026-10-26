@@ -17,12 +17,12 @@ import styles from "./home-measures.module.css";
 */
 const COPY = {
   en: {
-    title: "Measured, with receipts.",
+    title: "Every research figure has a receipt.",
     scope: "Research runs on fixed document sets, each figure with its date and receipt. They describe those runs, not this service's live rates.",
     receipt: "Receipt",
   },
   ko: {
-    title: "영수증이 붙은 측정값.",
+    title: "연구 측정값마다 영수증이 있습니다.",
     scope: "고정된 문서 세트에서 실행한 연구 측정이며, 각 수치에 날짜와 영수증이 붙어 있습니다. 해당 실행의 결과이며 이 서비스의 실시간 지표가 아닙니다.",
     receipt: "영수증",
   },

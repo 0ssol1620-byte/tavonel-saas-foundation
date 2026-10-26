@@ -68,10 +68,10 @@ describe("film reading layer (brief 2026-10-15 move 2b/2c)", () => {
 
   it("keeps the hero's illustrative label and adds the reading line in both locales", () => {
     const en = renderToStaticMarkup(<HeroFilm />);
-    expect(en).toContain("Illustrative product demo · examples, not customer results.");
+    expect(en).toContain("Illustrative demo · not customer results.");
     expect(en).toContain("WORKING COPY.md");
     const ko = renderToStaticMarkup(<HeroFilm korean />);
-    expect(ko).toContain("제품 흐름 예시 · 실제 고객 결과가 아닙니다.");
+    expect(ko).toContain("제품 흐름 예시 · 고객 결과가 아닙니다.");
     expect(ko).toContain("옮겨 적습니다");
   });
 });

@@ -205,12 +205,12 @@ const CLOSED = {
   headerKo: SAMPLE_KO,
   home: {
     primary: SAMPLE,
-    secondary: { href: "/evaluation", label: "Bring your own documents" },
+    secondary: { href: "/evaluation", label: "Evaluate your documents" },
     close: SAMPLE,
   },
   homeKo: {
     primary: SAMPLE_KO,
-    secondary: { href: "/ko/evaluation", label: "내 문서 가져오기" },
+    secondary: { href: "/ko/evaluation", label: "내 문서 평가" },
     close: SAMPLE_KO,
   },
   pricing: [

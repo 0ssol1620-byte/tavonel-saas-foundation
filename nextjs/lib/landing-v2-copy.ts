@@ -177,6 +177,8 @@ export type LandingV2RecompileCopy = LandingV2Scene & {
   countLabels: { rebuilt: string; added: string; removed: string; untouched: string };
   contractNote: string;
   contractHref: string;
+  /** FINAL-SPEC 2026-10-26 D-19: the one sentence Home prints under the counts. No figure. */
+  compared: string;
 };
 
 export type LandingV2WhyCopy = LandingV2Scene & {
@@ -388,6 +390,7 @@ const EN: LandingV2Copy = {
     contractNote:
       "Every snapshot here is a complete compile of the corpus, and the comparison names what the arriving filings changed. A selective rebuild — recompiling only what depends on a changed source — is the compiler contract, published clause by clause.",
     contractHref: "/product/continuous-knowledge",
+    compared: "These counts compare two complete compiles.",
   },
 
   why: {
@@ -456,7 +459,7 @@ const EN: LandingV2Copy = {
   trust: {
     id: "trust",
     eyebrow: "CHECK THE BOUNDARIES",
-    headline: "Read what TAVONEL does.",
+    headline: "Where TAVONEL draws the line.",
     support: "Four things TAVONEL does, each written down where it can be checked.",
     /*
       The four §18 proofs, and where each one is backed.
@@ -516,8 +519,8 @@ const EN: LandingV2Copy = {
   start: {
     id: "start",
     eyebrow: "CHOOSE THE NEXT STEP",
-    headline: "Inspect the public result.",
-    headlineAccent: "See the plan that fits.",
+    /* FINAL-SPEC 2026-10-26 D-1/D-25: the category name, moved from the hero eyebrow. A name, so no full stop. */
+    headline: "The Knowledge Compiler for AI",
     support: "Read the finished Compiled World, then check the plan and current access conditions that fit your sources.",
     /* D5: the gate sentence is the deployment's own, verbatim, not a paraphrase of it. */
     microtext: activationPolicy.customerData.reason,
@@ -620,6 +623,7 @@ const KO: LandingV2Copy = {
     contractNote:
       "여기의 모든 스냅샷은 자료 전체를 컴파일한 결과이고, 비교 결과가 도착한 공시 문서가 무엇을 바꿨는지 알려 줍니다. 바뀐 원문에 의존하는 부분만 다시 컴파일하는 선택적 재빌드는 컴파일러의 계약이며, 조항별로 공개되어 있습니다.",
     contractHref: "/product/continuous-knowledge",
+    compared: "두 번의 전체 컴파일을 비교한 수치입니다.",
   },
 
   why: {
@@ -669,7 +673,7 @@ const KO: LandingV2Copy = {
   trust: {
     id: "trust",
     eyebrow: "경계 확인하기",
-    headline: "TAVONEL이 하는 일을 읽어 보세요.",
+    headline: "TAVONEL이 지키는 선.",
     support: "TAVONEL이 하는 네 가지이며, 각각 확인할 수 있는 곳에 적혀 있습니다.",
     proofs: [
       { id: "training", label: "고객의 자료는 학습 데이터가 아닙니다", note: "고객의 문서는 공용 모델 학습에 사용되지 않습니다. 모델은 World를 컴파일하기 위해서만 원문을 읽습니다.", href: "/security" },
@@ -689,8 +693,7 @@ const KO: LandingV2Copy = {
   start: {
     id: "start",
     eyebrow: "다음 단계 선택하기",
-    headline: "공개 결과를 살펴보세요.",
-    headlineAccent: "맞는 요금제를 확인하세요.",
+    headline: "AI를 위한 지식 컴파일러",
     support: "완성된 Compiled World를 읽어 본 뒤, 내 자료에 맞는 요금과 현재 이용 조건을 확인하세요.",
     /*
       The English microtext is `activationPolicy.customerData.reason` verbatim; this is its one

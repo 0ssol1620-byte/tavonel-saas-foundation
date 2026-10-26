@@ -764,17 +764,17 @@ describe("landing v2 -- the lead and the workbench", () => {
     const supportAt = hero.indexOf('class="lv2-hero-support lv2-body-l"');
     expect(supportAt).toBeGreaterThan(hero.indexOf('</h1>'));
     expect(supportAt).toBeLessThan(actionsAt);
+    // FINAL-SPEC 2026-10-26 D-2: the support sentence is the page-and-region binding alone.
     expect(readable(hero)).toContain(
-      locale === "ko"
-        ? "TAVONEL은 PDF·스캔·오피스 문서를 읽어 AI와 에이전트가 쓰는 맥락으로 컴파일하고, 각 진술에 그것이 나온 페이지와 영역을 남깁니다."
-        : "TAVONEL reads your PDFs, scans and office files and compiles them into context for AI and agents — each statement keeps the page and region it came from.",
+      locale === "ko" ? "각 진술에 원문 페이지와 영역이 남습니다." : "Each statement keeps its source page and region.",
     );
     expect(hero).toContain("/film/poster-1-t8.16-2x.webp");
     expect(hero).toContain("/film/poster-1-t8.16-2x.avif");
     expect(elements(hero, "button").filter(open => attr(open, "role") === "tab")).toHaveLength(4);
     expect(hero).toContain('data-mobile-view="fit"');
     expect(hero).not.toContain('data-source-inspection-film');
-    expect(readable(hero)).toContain(locale === "ko" ? "실제 고객 결과가 아닙니다" : "Illustrative product demo");
+    // The not-customer-results disclosure stays (FINAL-SPEC D-9 shortens its wording only).
+    expect(readable(hero)).toContain(locale === "ko" ? "고객 결과가 아닙니다" : "not customer results");
     expect(sceneOf(main, "s2")).not.toContain('data-testid="landing-hero-film"');
   });
 });
@@ -793,6 +793,8 @@ describe("landing v2 -- hero actions by commercial state", () => {
 
   const action = (hero: string, name: string) =>
     hero.match(new RegExp(`<a\\s[^>]*data-analytics="${name}"[^>]*>([\\s\\S]*?)</a>`));
+  /* The visible label without its aria-hidden arrow (FINAL-SPEC 2026-10-26 §2.1): what the access action is called. */
+  const label = (inner: string) => readable(inner.replace(/<span aria-hidden="true">[\s\S]*?<\/span>/g, "")).trim();
 
   it.each(LOCALES)("%s sends the primary action to the public sample", locale => {
     for (const live of [false, true]) {
@@ -815,7 +817,7 @@ describe("landing v2 -- hero actions by commercial state", () => {
       expect(secondary).not.toBeNull();
       expect(attr(secondary![0], "href")).toBe(locale === "ko" ? "/ko/evaluation" : "/evaluation");
       // Fix round 3 (judge gap 4): the quiet secondary is the start path, to the same evaluation route.
-      expect(readable(secondary![1]!).trim()).toBe(locale === "ko" ? "내 문서 가져오기" : "Bring your own documents");
+      expect(label(secondary![1]!)).toBe(locale === "ko" ? "내 문서 평가" : "Evaluate your documents");
       // Brief 2026-10-15 move 1: the close fills the hero's public-sample action beside the price link, in both languages.
       const close = elements(sceneOf(main, "s6"), "a").map(open => attr(open, "href"));
       expect(close).toEqual([EXPLORE_CTA.href, locale === "ko" ? "/ko/pricing" : "/pricing"]);
@@ -832,7 +834,7 @@ describe("landing v2 -- hero actions by commercial state", () => {
       const secondary = action(sceneOf(main, "s1"), "hero-secondary");
       expect(secondary).not.toBeNull();
       expect(attr(secondary![0], "href")).toBe(escaped(SELF_SERVE_CTA.href));
-      expect(readable(secondary![1]!).trim()).toBe(
+      expect(label(secondary![1]!)).toBe(
         locale === "ko" ? KO_CHROME.cta[SELF_SERVE_CTA.href] : SELF_SERVE_CTA.label
       );
       expect(main).not.toMatch(/href="(?:\/ko)?\/evaluation"/);

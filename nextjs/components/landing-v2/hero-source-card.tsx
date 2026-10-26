@@ -72,7 +72,7 @@ type Copy = {
 const COPY: Record<"en" | "ko", Copy> = {
   en: {
     label: "Source, passage and record",
-    title: "Inspect one passage at its source",
+    title: "Follow a passage to its source.",
     status: { not_run: "Prepared demonstration / processing not yet run", qualified: "Prepared demonstration" },
     steps: { source: "Source", passage: "Passage", record: "Record" },
     existing: "Existing extracted passage",
@@ -85,7 +85,7 @@ const COPY: Record<"en" | "ko", Copy> = {
       "Context required: headings and units are separate regions. Interpretation has not run.",
     contextNote: "Shown as printed, for context. It has not been joined to the selected passage.",
     regions: "Regions on this page",
-    openRegion: "Open this region in Explore",
+    openRegion: "Open in Explore",
     openPage: "Open full page",
     openFull: "Open full source",
     filing: {
@@ -115,7 +115,7 @@ const COPY: Record<"en" | "ko", Copy> = {
   },
   ko: {
     label: "원문, 구절, 기록",
-    title: "원문에서 구절 하나 확인하기",
+    title: "구절 하나를 원문까지 따라가 보세요.",
     status: { not_run: "준비된 시연 / 아직 처리를 실행하지 않음", qualified: "준비된 시연" },
     steps: { source: "원문", passage: "구절", record: "기록" },
     existing: "기존 추출 구절",
@@ -128,7 +128,7 @@ const COPY: Record<"en" | "ko", Copy> = {
       "맥락 확인 필요: 열 제목과 단위는 별도 영역입니다. 해석은 아직 실행하지 않았습니다.",
     contextNote: "맥락 확인용으로 인쇄된 그대로 보여 줍니다. 선택한 구절과 묶지 않았습니다.",
     regions: "이 페이지의 영역",
-    openRegion: "Explore에서 이 영역 열기",
+    openRegion: "Explore에서 열기",
     openPage: "전체 페이지 열기",
     openFull: "원문 전체 열기",
     filing: {

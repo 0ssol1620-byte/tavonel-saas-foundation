@@ -105,11 +105,11 @@ const HOME_COPY = {
       sentence below stays on the same screen.
     */
     eyebrow: "The Knowledge Compiler for AI",
-    support:
-      "TAVONEL reads your PDFs, scans and office files and compiles them into context for AI and agents — each statement keeps the page and region it came from.",
+    /* FINAL-SPEC 2026-10-26 D-2 (founder veto open): the page-and-region binding, eight words. */
+    support: "Each statement keeps its source page and region.",
     /* Fix round 3 (judge gap 4): an offer, not a refusal -- the copy deck's own intake sentence. */
     intake: "We arrange intake for your own sources with you.",
-    bringOwn: "Bring your own documents",
+    bringOwn: "Evaluate your documents",
     difficulty: {
       eyebrow: "Why this passage is hard",
       title: "A value is printed in one place. What it counts is printed in another.",
@@ -136,7 +136,7 @@ const HOME_COPY = {
     },
     receive: {
       eyebrow: "What you receive",
-      title: "Connected knowledge. With its sources attached.",
+      title: "You receive a record like this.",
       support:
         "Inspect the records and the original passages behind them.",
       kind: (kind: string) => kind,
@@ -163,11 +163,10 @@ const HOME_COPY = {
     // D12 literal translation: KO_TERMS spells "Knowledge Compiler" 지식 컴파일러 and claim/statement 진술.
     eyebrow: "AI를 위한 지식 컴파일러",
     // D-01 (P2-30): the register's Korean support line, verbatim (SERVICE-DEFINITION 4.2).
-    support:
-      "TAVONEL은 PDF·스캔·오피스 문서를 읽어 AI와 에이전트가 쓰는 맥락으로 컴파일하고, 각 진술에 그것이 나온 페이지와 영역을 남깁니다.",
+    support: "각 진술에 원문 페이지와 영역이 남습니다.",
     // The copy deck's Korean for the same intake sentence (lib/landing-v2-copy.ts, hero.support).
     intake: "내 자료의 연결과 컴파일은 상담 후 함께 설정합니다.",
-    bringOwn: "내 문서 가져오기",
+    bringOwn: "내 문서 평가",
     difficulty: {
       eyebrow: "이 구절이 어려운 이유",
       title: "값은 한곳에, 그 값이 무엇인지는 다른 곳에 인쇄되어 있습니다.",
@@ -194,7 +193,7 @@ const HOME_COPY = {
     },
     receive: {
       eyebrow: "받게 되는 것",
-      title: "연결된 지식. 함께 남는 원문.",
+      title: "이런 기록을 받습니다.",
       support:
         "기록과 그 근거가 된 원문 구절을 함께 확인하세요.",
       kind: (kind: string) => (kind === "Claim" ? "진술" : kind),
@@ -360,7 +359,7 @@ export default function LandingPage({
         >
           <div className={`lv2-wrap ${heroStyles.proofLayout}`}>
             <div className={heroStyles.splitHead}>
-              <h2 className="lv2-h2" id="lv2-difficulty-title">{korean ? "구절에서 원문까지, 직접 확인하세요." : "Follow a passage to its source."}</h2>
+              <h2 className="lv2-h2" id="lv2-difficulty-title">{korean ? "구절 하나를 원문까지 따라가 보세요." : "Follow a passage to its source."}</h2>
               <p className="lv2-scene-support">{korean ? "인용에는 문서 버전, 페이지와 좌표가 함께 남습니다." : "The document version, page and coordinates stay with the citation."}</p>
             </div>
             {home ? <HeroSourceCard view={home} korean={korean} /> : null}
