@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { LANDING_V2_SCENE_ORDER, type LandingV2Locale, type LandingV2StartCopy } from "@/lib/landing-v2-copy";
+import { activationPolicy } from "@/lib/activation-policy";
 import styles from "./start.module.css";
 
 /*
@@ -45,6 +46,16 @@ const TITLE_ID = "lv2-start-title";
 */
 const PRICING_LABEL: Record<LandingV2Locale, string> = { en: "See pricing", ko: "요금 보기" };
 
+/*
+  F-1 (orchestrator decision 2026-10-26): the sample boundary the Home FAQ used to answer, verbatim --
+  the last sentence of `home-reader-guide.tsx`'s "Can I use my own documents?" answer, byte for byte
+  (lib/landing-v2-start.test.ts holds the two together). It sits under the price link, before the gate.
+*/
+export const SAMPLE_BOUNDARY: Record<LandingV2Locale, string> = {
+  en: "The public sample does not upload or process your files.",
+  ko: "공개 샘플은 사용자의 파일을 업로드하거나 처리하지 않습니다.",
+};
+
 /**
  * The two site-wide actions, already resolved by the server.
  *
@@ -79,19 +90,11 @@ export default function Scene({
       aria-labelledby={TITLE_ID}
       className="lv2-scene lv2-obsidian"
     >
-      <div className="lv2-wrap">
-        {/* D9: one centred column, 760px, for the only scene on the page with no visual. */}
-        <div className={styles.close}>
-          <div className="lv2-scene-head">
-            <h2 className="lv2-h2" id={TITLE_ID}>
-              <span className="lv2-h2-line">{copy.headline}</span>
-              {copy.headlineAccent ? (
-                <span className="lv2-h2-line lv2-h2-accent">{copy.headlineAccent}</span>
-              ) : null}
-            </h2>
-            <p className="lv2-scene-support lv2-body-l">{copy.support}</p>
-          </div>
+      <div className={`lv2-wrap ${styles.close}`}>
+        {/* FINAL-SPEC 2026-10-26 §2.7: the category name closes the page. A name, so no full stop. */}
+        <h2 className="lv2-h2" id={TITLE_ID}>{copy.headline}</h2>
 
+        <div className={styles.end}>
           <div className={styles.row}>
             {/* §39's one next action for this scene, and the page's conversion. */}
             <Link
@@ -104,10 +107,12 @@ export default function Scene({
             </Link>
             <Link className={`lv2-text-link ${styles.link}`} href={(locale === "ko" ? "/ko/pricing" : "/pricing") as Route} prefetch={false}>
               {PRICING_LABEL[locale]}
-              <span aria-hidden="true">→</span>
+              <span aria-hidden="true">&nbsp;→</span>
             </Link>
           </div>
-
+          <p className={styles.boundary}>{SAMPLE_BOUNDARY[locale]}</p>
+          {/* G12: the customer-data gate, `activationPolicy.customerData.reason` / `KO_CHROME.customerDataGate`, verbatim. */}
+          {activationPolicy.customerData.enabled ? null : <p className={styles.gate}>{copy.microtext}</p>}
         </div>
       </div>
     </section>

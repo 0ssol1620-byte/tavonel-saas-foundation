@@ -1,39 +1,34 @@
-import Link from "next/link";
-import type { Route } from "next";
 import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
 import HeroFilm from "./hero-film";
 import HeroActions from "./hero-actions";
 import HeroSourceCard from "./hero-source-card";
 import HeroStatement from "./hero-statement";
-import HomeReaderGuide from "./home-reader-guide";
 import HomeMeasures from "./home-measures";
 import heroStyles from "./landing-hero.module.css";
 import sourceStyles from "./source-first-home.module.css";
 import LandingAnalytics from "./landing-analytics";
 import SpecimenStrip from "./specimen-strip";
+import { SourceRegionWindow } from "./source-region";
 import RecompileScene from "./scenes/recompile";
 import StartScene from "./scenes/start";
 import TrustScene from "./scenes/trust";
 import { landingV2Copy } from "@/lib/landing-v2-copy";
-import { landingV2HeroExtra } from "@/lib/landing-v2-hero-copy";
+import { landingV2PageImage } from "@/lib/landing-v2-assets";
+import { excerptPreview } from "@/lib/explore-entry-proof";
 import {
   buildHeroView,
   buildProofTabs,
   buildReceiveRecord,
   buildRecompileView,
   landingV2StateWord,
-  SOURCES_COPY,
   type ReceiveRecord,
   type RecompileView,
 } from "@/lib/landing-v2-runtime";
 import {
   buildHomeEvidenceCase,
-  caseStatus,
-  displayableRegions,
   HOME_RESERVED_CASE,
   selectHomeCase,
   type EvidenceCase,
-  type EvidenceRegion,
 } from "@/lib/home-evidence-view";
 import { KO_CHROME, SAMPLE_CTA } from "@/lib/site-navigation";
 import { primaryCallToAction } from "@/lib/commercial-state";
@@ -44,18 +39,20 @@ import {
 } from "@/lib/landing-experiments";
 
 /*
-  Home, structural candidate 2026-10-08. One composition, two languages.
+  Home, FINAL-SPEC 2026-10-26 ("product as hero"). One composition, two languages.
 
-  Six beats: a short lead and visible film, then one source workbench (source -> highlighted passage -> record),
-  why that passage is difficult, what a reader receives, what changed in the sources, method and
-  trust, and the close. Scene ids `s1`-`s6` and their focusable landmarks are unchanged.
+  Six beats, unchanged in id and ground: the statement and the compile film (s1), the receipted
+  measures, one passage followed to its source (s2), the record a reader receives (s3), what changed
+  when new filings arrived (s4), where TAVONEL draws the line (s5), and the close (s6). Each beat says
+  at most one sentence of its own; the rest is the product's own data, its receipts and the fixed
+  disclosures (the not-customer-results caption, the workbench status line, the rights sentence, the
+  training-data sentence and the customer-data gate), which stay visible verbatim.
 
-  WHAT LEFT THE PAGE, AND WHY
-  The compiler specimen printed a period, unit and value typed by hand beside the operating-expense
-  passage -- a solved answer nothing on the page had checked -- and the proof tabs framed the same
-  passage as the answer to an R&D question. Both are gone from Home. The passage stays, labelled
-  for what it is: an existing extracted passage, with the context it lacks pointed at rather than
-  filled in.
+  WHAT LEFT THE PAGE (FINAL-SPEC §6), AND WHERE IT STILL LIVES
+  The hero eyebrow is now s6's h2. The intake sentence and the FAQ are not mounted here; the FAQ keeps
+  its F-grade answers in `home-reader-guide.tsx`, and s6 prints the customer-data gate and the sample
+  boundary in their own words. The difficulty disclosure, the record's notes and the three-step method
+  are gone; their facts stay on the workbench status line, in Source details and in the copy deck.
 
   WHY THIS IS A SERVER COMPONENT
   The public World is a committed snapshot. This file reads it once and hands each beat a flat,
@@ -72,8 +69,6 @@ type HomeData = {
   /** "What you receive": the first sample claim `selectReceiveClaim` accepts. */
   record: ReceiveRecord;
   recompile: RecompileView;
-  /** How many extracted regions the workbench's page holds, read from the page view. */
-  pageRegionCount: number;
 };
 let homeMemo: HomeData | undefined;
 function homeData(): HomeData {
@@ -81,9 +76,11 @@ function homeData(): HomeData {
     home: selectHomeCase([buildHomeEvidenceCase(buildHeroView(), buildProofTabs()), HOME_RESERVED_CASE]),
     record: buildReceiveRecord(),
     recompile: buildRecompileView(),
-    pageRegionCount: buildHeroView().regions.length,
   });
 }
+
+/** Home's quote length for the record (FINAL-SPEC §2.4). `EXCERPT_LIMIT` (240) stays for its other callers. */
+const RECORD_EXCERPT = 160;
 
 /*
   The words only this composition says, in both languages. No figure in any of them: every digit
@@ -91,136 +88,33 @@ function homeData(): HomeData {
 */
 const HOME_COPY = {
   en: {
-    /*
-      Release 3 hero. Fix round 3 (judge gap 1): the category -- the constitution's North Star, "the
-      Knowledge Compiler for AI" -- is the eyebrow, and the H1 is `BRAND_LINE.headline`, one outcome
-      sentence (input, verb, output), read from the copy deck rather than typed here. The support
-      line is unchanged: what the page below shows, a statement bound to its page and region. No
-      figure, no "verified", no "every source". Open to founder veto.
-
-      D-01 / P2-30 (DECISION-REGISTER-2026-10-17): promise A stays, and the support line is the
-      strengthened one the register approves verbatim (SERVICE-DEFINITION 4.2, UX-PLAN A): it names
-      the formats the manifest reads -- PDF, images, OOXML and ODF, with no "every" -- and keeps the
-      page-and-region binding. "your" is only true through the pilot path, which is why the intake
-      sentence below stays on the same screen.
-    */
-    eyebrow: "The Knowledge Compiler for AI",
     /* FINAL-SPEC 2026-10-26 D-2 (founder veto open): the page-and-region binding, eight words. */
     support: "Each statement keeps its source page and region.",
-    /* Fix round 3 (judge gap 4): an offer, not a refusal -- the copy deck's own intake sentence. */
+    /* Not rendered on Home since FINAL-SPEC 2026-10-26 (F-1); the copy deck's intake sentence, kept as the one spelling. */
     intake: "We arrange intake for your own sources with you.",
     bringOwn: "Evaluate your documents",
-    difficulty: {
-      eyebrow: "Why this passage is hard",
-      title: "A value is printed in one place. What it counts is printed in another.",
-      support:
-        "Reading this page correctly takes more than extracting one region. These difficulties are visible in the page itself; this preview shows them and does not claim to have resolved them.",
-      items: {
-        values: {
-          title: "Values without headings",
-          body: "The selected passage lists two values for each line item, with no column heading or unit beside them.",
-        },
-        conditions: {
-          title: "Conditions printed elsewhere",
-          body: "The statement heading and the column headings sit in separate regions above the passage, on the same page.",
-        },
-        neighbours: {
-          title: "Similar passages nearby",
-          before: "This one page holds",
-          after: "extracted regions, several of them rows of paired values.",
-        },
-      },
-      open: (mark: string) => `Open region ${mark}`,
-      reserved:
-        "A harder multi-page case is reserved for this place. It has not been processed, qualified or rights-cleared, so nothing from it is shown.",
-    },
     receive: {
-      eyebrow: "What you receive",
       title: "You receive a record like this.",
-      support:
-        "Inspect the records and the original passages behind them.",
       kind: (kind: string) => kind,
-      notes: [
-        { title: "Versioned", body: "Bound to the digest of the exact source version it was read from." },
-        { title: "Source-bound", body: "The text is the source's own wording, not a rewrite of it." },
-        { title: "Inspectable", body: "Page and region coordinates open the place it came from." },
-      ],
-      openRegion: "Open this region in Explore",
-      methodTitle: "Three separate steps",
-      method: [
-        { title: "Extraction", body: "Reads a region's text and binds it to its page. The passages on this page are extracted." },
-        { title: "Interpretation", body: "Joins a value to its period, unit or version. Not run for this preview." },
-        {
-          title: "Verification",
-          body: "Needs every material claim cited to complete regions, with its conditions, from a qualified run. Nothing here is presented as verified.",
-        },
-      ],
+      /* F-3: the rights sentence, verbatim. Printed under the s2 source window (orchestrator decision 2026-10-26). */
       rights:
         "The sources shown are public filings already published in this site's sample. Other sources need rights clearance before they appear here.",
     },
   },
   ko: {
-    // D12 literal translation: KO_TERMS spells "Knowledge Compiler" 지식 컴파일러 and claim/statement 진술.
-    eyebrow: "AI를 위한 지식 컴파일러",
-    // D-01 (P2-30): the register's Korean support line, verbatim (SERVICE-DEFINITION 4.2).
+    // FINAL-SPEC 2026-10-26 D-2: the Korean of the same line (D12 literal translation).
     support: "각 진술에 원문 페이지와 영역이 남습니다.",
     // The copy deck's Korean for the same intake sentence (lib/landing-v2-copy.ts, hero.support).
     intake: "내 자료의 연결과 컴파일은 상담 후 함께 설정합니다.",
     bringOwn: "내 문서 평가",
-    difficulty: {
-      eyebrow: "이 구절이 어려운 이유",
-      title: "값은 한곳에, 그 값이 무엇인지는 다른 곳에 인쇄되어 있습니다.",
-      support:
-        "이 페이지를 올바르게 읽으려면 영역 하나를 추출하는 것으로는 부족합니다. 아래 어려움은 페이지 자체에서 보이며, 이 미리보기는 이를 보여 줄 뿐 해결했다고 주장하지 않습니다.",
-      items: {
-        values: {
-          title: "제목 없는 값",
-          body: "선택한 구절은 항목마다 값 두 개를 나열하지만, 그 옆에 열 제목이나 단위가 없습니다.",
-        },
-        conditions: {
-          title: "다른 곳에 인쇄된 조건",
-          body: "재무제표 제목과 열 제목은 같은 페이지에서 이 구절 위의 별도 영역에 있습니다.",
-        },
-        neighbours: {
-          title: "가까이 있는 비슷한 구절",
-          before: "이 한 페이지에 추출된 영역이",
-          after: "개 있고, 그중 여럿이 값 두 개가 짝을 이룬 행입니다.",
-        },
-      },
-      open: (mark: string) => `영역 ${mark} 열기`,
-      reserved:
-        "여러 페이지에 걸친 더 어려운 사례를 이 자리에 예약해 두었습니다. 처리, 적격 판정, 권리 허가를 거치지 않았으므로 그 내용은 보여 주지 않습니다.",
-    },
     receive: {
-      eyebrow: "받게 되는 것",
       title: "이런 기록을 받습니다.",
-      support:
-        "기록과 그 근거가 된 원문 구절을 함께 확인하세요.",
       kind: (kind: string) => (kind === "Claim" ? "진술" : kind),
-      notes: [
-        { title: "버전 관리", body: "읽어 온 원문 버전의 다이제스트에 묶여 있습니다." },
-        { title: "원문에 묶임", body: "문장은 원문 그대로이며, 다시 쓴 것이 아닙니다." },
-        { title: "확인 가능", body: "페이지와 영역 좌표로 그것이 나온 위치를 열 수 있습니다." },
-      ],
-      openRegion: "Explore에서 이 영역 열기",
-      methodTitle: "서로 다른 세 단계",
-      method: [
-        { title: "추출", body: "영역의 텍스트를 읽고 그 페이지에 묶습니다. 이 페이지의 구절은 추출된 것입니다." },
-        { title: "해석", body: "값을 기간, 단위, 버전과 묶습니다. 이 미리보기에서는 실행하지 않았습니다." },
-        {
-          title: "검증",
-          body: "모든 핵심 진술이 조건과 함께 완전한 영역에 인용되고, 적격 판정을 받은 실행에서 나와야 합니다. 여기의 어떤 것도 검증된 것으로 제시하지 않습니다.",
-        },
-      ],
       rights:
         "보여 주는 원문은 이 사이트의 샘플에 이미 게시된 공개 공시 문서입니다. 다른 원문은 권리 허가를 거친 뒤에만 여기에 표시됩니다.",
     },
   },
 };
-
-/** The workbench's letter for a region: its position among the displayable regions, as printed there. */
-const regionMark = (home: EvidenceCase, region: EvidenceRegion) =>
-  String.fromCharCode(65 + displayableRegions(home).indexOf(region));
 
 export default function LandingPage({
   korean = false,
@@ -253,19 +147,9 @@ export default function LandingPage({
   const locale = korean ? "ko" : "en";
   const page = HOME_COPY[locale];
   const { home, record } = data;
-  const byRole = (role: EvidenceRegion["role"]) =>
-    home ? displayableRegions(home).find(region => region.role === role) : undefined;
-  const selected = byRole("selected");
-  const conditionRegions = [byRole("statement-heading"), byRole("column-headings")].filter(
-    (region): region is EvidenceRegion => region !== undefined,
-  );
-  const regionLink = (region: EvidenceRegion) =>
-    home && region.href ? (
-      <Link key={region.id} className={heroStyles.diffLink} href={region.href as Route} prefetch={false}>
-        {page.difficulty.open(regionMark(home, region))}
-      </Link>
-    ) : null;
-  const formats = korean ? copy.hero.microProofFormats.replace(" or ", " 또는 ") : copy.hero.microProofFormats;
+  const quote = excerptPreview(record.claim.label, RECORD_EXCERPT);
+  /* The record's own page raster, by the same digest and page the record builder bound it to. */
+  const recordPage = landingV2PageImage(record.version.digest, record.source.page);
   const specimens = homeSpecimens({ fixtures: specimenRequest === "1", committed: specimenRequest === "committed" });
 
   /*
@@ -304,11 +188,7 @@ export default function LandingPage({
         */}
         <LandingAnalytics variant={experiment.tracked} />
 
-        {/*
-          01 Lead and workbench. A short statement with one filled action and the quieter
-          commercial one, then the workbench at the full content width: the source page, the
-          highlighted passage, and the record it belongs to.
-        */}
+        {/* s1: the statement, one filled action and the quieter one, then the compile film. */}
         <section
           id="s1"
           data-scene="1"
@@ -319,14 +199,13 @@ export default function LandingPage({
           <div className="lv2-wrap">
             <div className={sourceStyles.intro}>
               <HeroStatement
-                copy={{ ...copy.hero, eyebrow: page.eyebrow, headlineExperiment: undefined, support: page.support }}
+                copy={{ ...copy.hero, eyebrow: "", headlineExperiment: undefined, support: page.support }}
                 titleId="lv2-hero-title"
                 headlineVariant={experiment.headlineVariant}
               >
                 <div className={sourceStyles.heroAside} data-testid="landing-hero-actions">
                     <HeroActions {...heroActions} startLabel={heroStart.label} startHref={heroStart.href}
                       scene="1" ctaOrderVariant={experiment.ctaOrderVariant} />
-                    <p className={sourceStyles.intake}>{page.intake}</p>
                 </div>
                 {/*
                   P2-08 / UX-L4 (UX-PLAN §3.2-§3.3; critic D-03's default place): real pages beside
@@ -337,9 +216,6 @@ export default function LandingPage({
                 <HeroFilm korean={korean} priority={specimens.length === 0} />
               </HeroStatement>
             </div>
-            <div className={sourceStyles.formats}>
-              <p className={`lv2-hero-intake lv2-meta ${heroStyles.intake}`}>{SOURCES_COPY[locale].formatsLabel} · {formats}</p>
-            </div>
           </div>
         </section>
 
@@ -347,62 +223,25 @@ export default function LandingPage({
         <HomeMeasures korean={korean} />
 
         {/*
-          02 Why this case is difficult. Every difficulty points at a region the workbench above
-          already shows; none of them is claimed as solved.
+          s2: one passage followed to its source. The workbench's own title is the section's h2, and
+          its status line says what was and was not run. The rights sentence sits under the page.
         */}
         <section
           id="s2"
           data-scene="2"
           tabIndex={-1}
           aria-labelledby="lv2-difficulty-title"
-          className={`lv2-scene lv2-paper ${heroStyles.difficulty}`}
+          className={`lv2-scene lv2-paper ${heroStyles.sourceScene}`}
         >
-          <div className={`lv2-wrap ${heroStyles.proofLayout}`}>
-            <div className={heroStyles.splitHead}>
-              <h2 className="lv2-h2" id="lv2-difficulty-title">{korean ? "구절 하나를 원문까지 따라가 보세요." : "Follow a passage to its source."}</h2>
-              <p className="lv2-scene-support">{korean ? "인용에는 문서 버전, 페이지와 좌표가 함께 남습니다." : "The document version, page and coordinates stay with the citation."}</p>
-            </div>
-            {home ? <HeroSourceCard view={home} korean={korean} /> : null}
-            <details className={heroStyles.contextDisclosure} open>
-              <summary>{korean ? "이 구절에 필요한 맥락" : "The context this passage needs"}</summary>
-              <p>{page.difficulty.support}</p>
-            {home && selected ? (
-              <ol className={heroStyles.diffList}>
-                <li>
-                  <h3>{page.difficulty.items.values.title}</h3>
-                  <p>{page.difficulty.items.values.body}</p>
-                  <p className={heroStyles.diffLinks}>{regionLink(selected)}</p>
-                </li>
-                {conditionRegions.length > 0 ? (
-                  <li>
-                    <h3>{page.difficulty.items.conditions.title}</h3>
-                    <p>{page.difficulty.items.conditions.body}</p>
-                    <p className={heroStyles.diffLinks}>{conditionRegions.map(regionLink)}</p>
-                  </li>
-                ) : null}
-                <li>
-                  <h3>{page.difficulty.items.neighbours.title}</h3>
-                  <p>
-                    {page.difficulty.items.neighbours.before}{" "}
-                    <b data-derived="1">{data.pageRegionCount}</b>
-                    {korean ? "" : " "}
-                    {page.difficulty.items.neighbours.after}
-                  </p>
-                </li>
-              </ol>
-            ) : null}
-            {caseStatus(HOME_RESERVED_CASE) === "prepared" ? (
-              <p className={heroStyles.reserved}>{page.difficulty.reserved}</p>
-            ) : null}
-            </details>
-
+          <div className="lv2-wrap">
+            {home ? <HeroSourceCard view={home} korean={korean} titleId="lv2-difficulty-title" rightsNote={page.receive.rights} /> : null}
           </div>
         </section>
 
         {/*
-          03 What you receive: one record of the published sample World, as large as a page, with
-          the three things that make it knowledge rather than text beside it. Its status is the
-          World's own word; nothing here is presented as verified.
+          s3: the record a reader receives -- one record of the published sample World, its region cut
+          from the page, its quote, and four fields. Its status is the World's own word; nothing here is
+          presented as verified. No link: s2's "Open in Explore" is the same move.
         */}
         <section
           id="s3"
@@ -412,95 +251,57 @@ export default function LandingPage({
           className={`lv2-scene lv2-paper ${heroStyles.receive}`}
         >
           <div className="lv2-wrap">
-            <div className={heroStyles.receiveHead}>
-              <h2 className="lv2-h2" id="lv2-receive-title">{page.receive.title}</h2>
-              <p className="lv2-scene-support">{page.receive.support}</p>
-            </div>
-            <div className={heroStyles.receiveGrid}>
-              <article className={heroStyles.recordSheet} aria-labelledby="lv2-record-kind">
-                <p className={heroStyles.recordKind} id="lv2-record-kind">
-                  <span>{page.receive.kind(record.claim.kind)}</span>
-                  <span className={heroStyles.recordState}>{landingV2StateWord(record.status.state, locale)}</span>
-                </p>
-                <blockquote className={heroStyles.recordQuote} lang="en" data-derived="1">
-                  {record.claim.excerpt}{record.claim.excerptTruncated ? "…" : ""}
-                </blockquote>
-                <details className={heroStyles.details}>
-                  <summary className={heroStyles.detailsSummary}>{korean ? "원문 상세" : "Source details"}</summary>
-                <dl className={heroStyles.recordFields}>
-                  <div>
-                    <dt>{copy.evidence.fields.source}</dt>
-                    <dd data-derived="1">{record.source.filename} · {record.source.form} · {record.source.filingDate}</dd>
-                  </div>
-                  <div>
-                    <dt>{copy.evidence.fields.page}</dt>
-                    <dd data-derived="1">
-                      {korean
-                        ? `${record.source.pageCount}쪽 중 ${record.source.page}쪽`
-                        : `page ${record.source.page} of ${record.source.pageCount}`}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>{copy.evidence.fields.region}</dt>
-                    <dd>
-                      <span data-derived="1">bbox {record.region.bbox1000.join(",")}</span> · {copy.evidence.regionUnit}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>{copy.evidence.fields.version}</dt>
-                    <dd><code data-derived="1">{record.version.digest}</code></dd>
-                  </div>
-                </dl>
-                </details>
-                <p className={heroStyles.recordLinks}>
-                  <Link className={heroStyles.diffLink} href={record.hrefs.evidence as Route} prefetch={false} data-analytics="source-open">
-                    {page.receive.openRegion}
-                  </Link>
-                  {/* The committed bytes on this origin, so no ↗: that mark is for leaving the site (UX §5.3 R7). */}
-                  <a className={heroStyles.diffLink} href={record.hrefs.original}>
-                    {copy.evidence.openOriginal}
-                  </a>
-                </p>
-              </article>
-
-              <div className={heroStyles.receiveNotes}>
-                <ul className={heroStyles.noteList}>
-                  {page.receive.notes.map(note => (
-                    <li key={note.title}>
-                      <h3>{note.title}</h3>
-                      <p>{note.body}</p>
-                    </li>
-                  ))}
-                </ul>
-                <div className={heroStyles.method}>
-                  <h3>{page.receive.methodTitle}</h3>
-                  <ol>
-                    {page.receive.method.map(step => (
-                      <li key={step.title}>
-                        <b>{step.title}</b> {step.body}
-                      </li>
-                    ))}
-                  </ol>
+            <h2 className="lv2-h2" id="lv2-receive-title">{page.receive.title}</h2>
+            <article className={heroStyles.recordSheet} aria-labelledby="lv2-record-kind">
+              <p className={heroStyles.recordKind} id="lv2-record-kind">
+                <span>{page.receive.kind(record.claim.kind)}</span>
+                <span className={heroStyles.recordState}>{landingV2StateWord(record.status.state, locale)}</span>
+              </p>
+              {recordPage ? (
+                <SourceRegionWindow
+                  className={heroStyles.recordCrop}
+                  image={recordPage}
+                  bbox1000={record.region.bbox1000}
+                  sizes="(min-width: 900px) 886px, calc(100vw - 88px)"
+                />
+              ) : null}
+              <blockquote className={heroStyles.recordQuote} lang="en" data-derived="1">
+                {quote.text}{quote.truncated ? "…" : ""}
+              </blockquote>
+              <dl className={heroStyles.recordFields}>
+                <div>
+                  <dt>{copy.evidence.fields.source}</dt>
+                  <dd data-derived="1" lang="en">{record.source.filename} · {record.source.form} · {record.source.filingDate}</dd>
                 </div>
-                <p className={heroStyles.rights}>{page.receive.rights}</p>
-              </div>
-            </div>
-            <p className="lv2-scene-note lv2-small">{landingV2HeroExtra(korean).entityDisclaimer}</p>
+                <div>
+                  <dt>{copy.evidence.fields.page}</dt>
+                  <dd data-derived="1">
+                    {korean
+                      ? `${record.source.pageCount}쪽 중 ${record.source.page}쪽`
+                      : `${record.source.page} of ${record.source.pageCount}`}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{copy.evidence.fields.region}</dt>
+                  <dd><span data-derived="1">bbox {record.region.bbox1000.join(",")}</span></dd>
+                </div>
+                <div>
+                  <dt>{copy.evidence.fields.version}</dt>
+                  <dd><code data-derived="1">{record.version.digest}</code></dd>
+                </div>
+              </dl>
+            </article>
           </div>
         </section>
 
         <RecompileScene
           locale={locale}
-          copy={{ ...copy.recompile,
-            support: korean ? "새 공시로 만든 World를 이전 버전과 비교합니다." : "Compare the World compiled from new filings with its previous version.",
-            contractNote: korean ? "공개 샘플은 전체 자료를 다시 컴파일한 결과입니다. 선택적 재컴파일의 범위는 컴파일러 계약에서 확인하세요." : "The public sample compares full-corpus compiles. Selective rebuild is specified in the compiler contract."
-          }}
+          copy={copy.recompile}
           data={data.recompile}
           sectionId="s4"
           sceneIndex={4}
         />
         <TrustScene locale={locale} copy={copy.trust} sectionId="s5" sceneIndex={5} />
-        <HomeReaderGuide korean={korean} faqOnly specimenSources={specimens.map(specimen => specimen.caption[locale].full)} />
         <StartScene locale={locale} copy={copy.start} actions={heroActions} sectionId="s6" sceneIndex={6} />
       </main>
       <PublicSiteFooter korean={korean} />

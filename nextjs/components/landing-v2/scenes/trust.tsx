@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { LANDING_V2_SCENE_ORDER, type LandingV2Locale, type LandingV2TrustCopy } from "@/lib/landing-v2-copy";
+import { KO_CHROME } from "@/lib/site-navigation";
 import styles from "./trust.module.css";
 
 /*
@@ -51,37 +52,12 @@ import styles from "./trust.module.css";
 const NEXT_HREF = "/trust";
 
 /*
-  The §18 route that is a reference rather than the next step.
-
-  It was two (P3 QA round 1). /security was here AND on the `training` proof above, so the scene
-  rendered two anchors to the same page, and the `review` proof pointed at /trust, which is the
-  scene's one next action. Two anchors to one destination are not two competing actions, but in a
-  scene this short they are a reader choosing twice between identical links, and
-  `e2e/landing-v2.spec.ts` pins each §18 route at exactly one anchor for that reason. Every
-  destination §18 names is still one click away and none of them twice: /security on the training
-  proof, /evidence and /docs/exports on theirs, /trust as the next action, /status and
-  /subprocessors in the footnote.
+  FINAL-SPEC 2026-10-26 §2.6: the footnote is the one word "Status" -- the label the site's footer
+  already gives /status (`KO_CHROME.footerLinks` in Korean) -- and the reference row is gone; /security,
+  /evidence, /contact and /docs/exports are the four proofs' own links, /trust the next action, and
+  /subprocessors stays in the footer on every route.
 */
-const REFERENCE_HREFS = ["/subprocessors"] as const;
-
-/*
-  The footnote, in both languages.
-
-  It is not in `lib/landing-v2-copy.ts` because this is the only surface that says it and the
-  copy module is shared deck; if a second scene ever needs the sentence it moves there rather
-  than being spelled twice. Korean is the literal translation of the English above it (D12).
-
-  What it links to is exactly what `/status` is: that page's own intro says each row is this
-  deployment's live configuration and activation state, component by component. It is a footnote
-  and not a proof because the reader does not have to open it to believe the four above.
-*/
-const FOOTNOTE: Record<LandingV2Locale, string> = {
-  en: "What TAVONEL runs, and what it does not, component by component",
-  ko: "TAVONEL이 무엇을 실행하고 무엇을 실행하지 않는지, 구성 요소별로",
-};
-
-/* The per-proof link text. The accessible name adds the proof's label after it. */
-const READ: Record<LandingV2Locale, string> = { en: "Read", ko: "읽기" };
+const STATUS_LABEL: Record<LandingV2Locale, string> = { en: "Status", ko: KO_CHROME.footerLinks["/status"] ?? "Status" };
 
 const SCENE_INDEX = LANDING_V2_SCENE_ORDER.indexOf("trust") + 1;
 const TITLE_ID = "lv2-trust-title";
@@ -92,11 +68,8 @@ export default function Scene({ locale, copy, sectionId = "trust", sceneIndex }:
   sectionId?: string;
   sceneIndex?: number;
 }) {
-  const byHref = (href: string) => copy.links.find((link) => link.href === href);
-  const next = byHref(NEXT_HREF);
-  const references = REFERENCE_HREFS.map(byHref).filter(
-    (link): link is { label: string; href: string } => Boolean(link),
-  );
+  const next = copy.links.find((link) => link.href === NEXT_HREF);
+  const korean = locale === "ko";
   return (
     <section
       id={sectionId}
@@ -110,68 +83,50 @@ export default function Scene({ locale, copy, sectionId = "trust", sceneIndex }:
           <h2 className="lv2-h2" id={TITLE_ID}>
             <span className="lv2-h2-line">{copy.headline}</span>
           </h2>
-          <p className="lv2-scene-support lv2-body-l">{copy.support}</p>
         </div>
         <ul className="lv2-proof-list">
-          {copy.proofs.map((proof) => (
-            <li key={proof.id} className="lv2-proof">
-              {/*
-                C4: the proof's own label is the link to where it is written down. The support
-                line above says "each written down where it can be checked" and, until that
-                round, three of the four had nowhere to go. A link on the label rather than a
-                fourth row of "read more" links: the claim and its receipt are one thing.
-
-                ALL FOUR ARE LINKS NOW, IN ONE STYLE (F7, 2026-09-19). P3 QA round 1 left the
-                `review` proof as plain text because its destination was /trust, which is also
-                this scene's one next action, and two anchors to one route is a reader choosing
-                twice between identical links. What that bought was a scene where one proof in
-                four looked different for a reason nothing on the page explains. So the route
-                moved instead of the markup: /contact publishes the same sentence in the FAQ D6
-                moved there, every proof is an `lv2-inline-link`, and no destination is twice.
-
-                REDESIGN R2 (2026-10-15): the label is a plain heading again and the link is a
-                quiet "Read" under the scope sentence. Four blue underlined titles read as a terms
-                page. The link's name still carries the label, so the receipt stays one thing.
-              */}
-              <h3 className="lv2-proof-label">{proof.label}</h3>
-              <p className="lv2-proof-note lv2-small">{proof.note}</p>
-              <p className="lv2-proof-read">
-                <Link className="lv2-inline-link"
-                  href={(locale === "ko" && proof.href === "/contact" ? "/ko/contact" : proof.href) as Route}
-                  hrefLang={locale === "ko" && proof.href !== "/contact" ? "en" : undefined}
-                  aria-label={`${READ[locale]}: ${proof.label}${locale === "ko" && proof.href !== "/contact" ? " (영문 페이지)" : ""}`}
-                  prefetch={false}>
-                  {READ[locale]}
-                  <span aria-hidden="true">→</span>
-                </Link>
-              </p>
-            </li>
-          ))}
+          {copy.proofs.map((proof) => {
+            /* KO: /contact has a Korean page; every other proof page is English and says so (D12). */
+            const english = korean && proof.href !== "/contact";
+            return (
+              <li key={proof.id} className="lv2-proof">
+                {/*
+                  FINAL-SPEC 2026-10-26: the label is the link to where it is written down -- the claim
+                  and its receipt are one thing -- and the "Read" row is gone. One note stays: the
+                  training-data sentence, verbatim (F-2, orchestrator decision 2026-10-26). The other
+                  three notes are on their destination pages and in the copy deck.
+                */}
+                <h3 className="lv2-proof-label">
+                  <Link className="lv2-inline-link"
+                    href={(korean && proof.href === "/contact" ? "/ko/contact" : proof.href) as Route}
+                    hrefLang={english ? "en" : undefined}
+                    aria-label={english ? `${proof.label} (영문 페이지)` : undefined}
+                    prefetch={false}>
+                    {proof.label}<span aria-hidden="true">&nbsp;→</span>
+                  </Link>
+                </h3>
+                {proof.id === "training" ? <p className="lv2-proof-note lv2-small">{proof.note}</p> : null}
+              </li>
+            );
+          })}
         </ul>
-        {next ? (
-          <p className={styles.links}>
+        <p className={styles.links}>
+          {next ? (
             <Link
               className={`lv2-text-link ${styles.next}`}
               href={next.href as Route}
-              hrefLang={locale === "ko" ? "en" : undefined}
-              aria-label={locale === "ko" ? `${next.label} (영문 페이지)` : undefined}
+              hrefLang={korean ? "en" : undefined}
+              aria-label={korean ? `${next.label} (영문 페이지)` : undefined}
               prefetch={false}
               data-scene-next="trust"
             >
               {next.label}
-              <span aria-hidden="true">→</span>
+              <span aria-hidden="true">&nbsp;→</span>
             </Link>
-          </p>
-        ) : null}
-        <p className={`lv2-meta ${styles.footnote}`}>
-          <Link className={styles.footnoteLink} href={"/status" as Route} hrefLang={locale === "ko" ? "en" : undefined} prefetch={false}>
-            {FOOTNOTE[locale]}
+          ) : null}
+          <Link className={styles.status} href={"/status" as Route} hrefLang={korean ? "en" : undefined} prefetch={false}>
+            {STATUS_LABEL[locale]}
           </Link>
-          {references.map((link) => (
-            <Link key={link.href} className={styles.footnoteLink} href={link.href as Route} hrefLang={locale === "ko" ? "en" : undefined} prefetch={false}>
-              {link.label}
-            </Link>
-          ))}
         </p>
       </div>
     </section>

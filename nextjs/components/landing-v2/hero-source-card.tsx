@@ -52,7 +52,6 @@ type Copy = {
   contextNote: string;
   regions: string;
   openRegion: string;
-  openPage: string;
   openFull: string;
   filing: { open: string; original: string; render: string };
   fields: { source: string; version: string; location: string };
@@ -86,7 +85,6 @@ const COPY: Record<"en" | "ko", Copy> = {
     contextNote: "Shown as printed, for context. It has not been joined to the selected passage.",
     regions: "Regions on this page",
     openRegion: "Open in Explore",
-    openPage: "Open full page",
     openFull: "Open full source",
     filing: {
       open: "Open full filing (SEC)",
@@ -129,7 +127,6 @@ const COPY: Record<"en" | "ko", Copy> = {
     contextNote: "맥락 확인용으로 인쇄된 그대로 보여 줍니다. 선택한 구절과 묶지 않았습니다.",
     regions: "이 페이지의 영역",
     openRegion: "Explore에서 열기",
-    openPage: "전체 페이지 열기",
     openFull: "원문 전체 열기",
     filing: {
       open: "전체 공시 열기 (SEC)",
@@ -176,7 +173,19 @@ function pageSrcSet(image: { src: string; width: number; height: number }) {
   return [...copies, `${image.src} ${image.width}w`].join(", ");
 }
 
-export default function HeroSourceCard({ view, korean = false }: { view: EvidenceCase; korean?: boolean }) {
+export default function HeroSourceCard({
+  view,
+  korean = false,
+  titleId,
+  rightsNote,
+}: {
+  view: EvidenceCase;
+  korean?: boolean;
+  /** The id the enclosing section is labelled by (FINAL-SPEC 2026-10-26 §2.3: the workbench title is s2's h2). */
+  titleId?: string;
+  /** The rights sentence, printed verbatim under the source page (F-3). */
+  rightsNote?: string;
+}) {
   const locale = korean ? "ko" : "en";
   const t = COPY[locale];
   const passageId = useId();
@@ -195,6 +204,7 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
     regions.map((region, index) => [region.id, evidenceLineLabel(source, region, letter(index), korean)]),
   );
   const activeLabel = lineLabels[active.id]!;
+  const headingId = titleId ?? `${passageId}-title`;
   /* The page window spans the regions plus a margin each way, so every selectable box is in view. */
   const windowStart = Math.max(0, Math.min(...regions.map(region => region.bbox1000[1])) - 80);
   const windowEnd = Math.min(1000, Math.max(...regions.map(region => region.bbox1000[3])) + 80);
@@ -205,10 +215,10 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
       data-source-digest={source.digest}
       data-source-page={active.page}
       data-case-status={caseStatus(view)}
-      aria-labelledby={`${passageId}-title`}
+      aria-labelledby={headingId}
     >
       <header className={styles.benchHead}>
-        <h2 className={styles.benchTitle} id={`${passageId}-title`}>{t.title}</h2>
+        <h2 className={`lv2-h2 ${styles.benchTitle}`} id={headingId}>{t.title}</h2>
         <p className={styles.runStatus} data-run={view.run}>{t.status[view.run]}</p>
       </header>
 
@@ -265,12 +275,6 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
             <p className={styles.pageAbsent}>{t.pageAbsent}</p>
           )}
           <p className={styles.sourceLinks}>
-            {source.fullSourceHref ? (
-              <a className={styles.quietLink} href={source.fullSourceHref}>{t.openFull}</a>
-            ) : null}
-            {page.image ? (
-              <a className={styles.quietLink} href={page.image.src}>{t.openPage}</a>
-            ) : null}
             {source.officialFiling ? (
               <a className={styles.quietLink} href={source.officialFiling.href} data-full-filing>
                 {t.filing.open}
@@ -278,16 +282,17 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
               </a>
             ) : null}
           </p>
+          {/* F-3, verbatim: one caption line under the source window (orchestrator decision 2026-10-26). */}
+          {rightsNote ? <p className={styles.rightsNote}>{rightsNote}</p> : null}
         </div>
 
         <div className={`${styles.passagePane} ${styles.step}`} data-step={t.steps.passage} id={passageId} aria-live="polite" data-line-region={active.id}>
           <p className={styles.paneLabel}>
             <span className={styles.extracted}>{t.existing}</span>
-            <span>{t.roles[active.role]}</span>
           </p>
           {/* Where no line can be drawn (below 960px the grid stacks), the line's label sits on the card. */}
           <p className={styles.lineLabel} data-derived="1" data-evidence-card-label="">
-            <span>{activeLabel.human}</span> <code>{activeLabel.coordinates}</code>
+            <code>{activeLabel.coordinates}</code>
           </p>
           {/*
             Brief move 8: the page region the passage was read from, cut out of the same committed
@@ -311,13 +316,13 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
           <p className={styles.contextNote}>{active.role === "selected" ? t.selectedNote : t.contextNote}</p>
           {active.href ? (
             <Link className={styles.evidenceLink} href={active.href as Route} prefetch={false} data-hero-evidence data-analytics="source-open">
-              {t.openRegion}
+              {t.openRegion}<span aria-hidden="true">&nbsp;→</span>
             </Link>
           ) : null}
         </div>
 
         <div className={styles.regionPane}>
-          <p className={styles.regionsLabel} id={`${passageId}-regions`}>{t.regions}</p>
+          <p className="sr-only" id={`${passageId}-regions`}>{t.regions}</p>
           <ul className={styles.regionList} aria-labelledby={`${passageId}-regions`}>
             {regions.map((region, index) => (
               <li key={region.id}>
@@ -333,7 +338,6 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
                   <span className={styles.regionLetter} aria-hidden="true">{letter(index)}</span>
                   <span className={styles.regionText}>
                     <span className={styles.regionRole}>{t.roles[region.role]}</span>
-                    <span className={styles.regionWhere} data-derived="1">{korean ? `${region.page}쪽` : `Page ${region.page}`}</span>
                   </span>
                 </button>
               </li>
@@ -345,6 +349,9 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
       <footer className={`${styles.record} ${styles.step}`} data-step={t.steps.record}>
         <details className={styles.details}>
           <summary className={styles.detailsSummary}>{t.details}</summary>
+          {source.fullSourceHref ? (
+            <p className={styles.sourceLinks}><a className={styles.quietLink} href={source.fullSourceHref}>{t.openFull}</a></p>
+          ) : null}
         <dl className={styles.recordList}>
           <div>
             <dt>{t.record.passage[0]}</dt>

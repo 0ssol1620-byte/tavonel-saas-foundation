@@ -100,7 +100,26 @@ const weakest = row("Low-quality scans");
 const standard = row("Standard digital documents");
 const vault = r02.vault_compilation;
 
+/* FINAL-SPEC 2026-10-26 §0.3-10: receipts in their own order, R-01 -> R-02 -> R-03, so a phone does not open on "0". */
 export const HOME_MEASURES: readonly HomeMeasure[] = [
+  {
+    claim: "recovery-contribution-olmocr",
+    receipt: recovery.receipt,
+    en: {
+      figure: [fig(recovery.numbers.with_recovery, 1)],
+      label: ["olmOCR-Bench score with recovery; ", fig(recovery.numbers.without_recovery, 1), " with only recovery switched off"],
+      detail: [
+        fig(r01.held_constant.input_count), " documents, ", fig(r01.held_constant.test_count), " checks. ", ...recovery.mustSay.en,
+      ],
+    },
+    ko: {
+      figure: [fig(recovery.numbers.with_recovery, 1)],
+      label: ["복구를 켠 olmOCR-Bench 점수. 복구만 끄면 ", fig(recovery.numbers.without_recovery, 1)],
+      detail: [
+        "문서 ", fig(r01.held_constant.input_count), "건, 검사 ", fig(r01.held_constant.test_count), "개. ", ...recovery.mustSay.ko,
+      ],
+    },
+  },
   {
     claim: "compilation-guarantees",
     receipt: structure.receipt,
@@ -120,24 +139,6 @@ export const HOME_MEASURES: readonly HomeMeasure[] = [
         "제공된 문서 ", fig(structure.numbers.documents_exercised), "건 중 ", fig(vault.documents_compiled),
         "건을 컴파일했고, 확인할 수 없는 링크가 있는 ", fig(vault.documents_refused_for_broken_links),
         "건은 내보내지 않고 거부했습니다. ", ...structure.mustSay.ko,
-      ],
-    },
-  },
-  {
-    claim: "recovery-contribution-olmocr",
-    receipt: recovery.receipt,
-    en: {
-      figure: [fig(recovery.numbers.with_recovery, 1)],
-      label: ["olmOCR-Bench score with recovery; ", fig(recovery.numbers.without_recovery, 1), " with only recovery switched off"],
-      detail: [
-        fig(r01.held_constant.input_count), " documents, ", fig(r01.held_constant.test_count), " checks. ", ...recovery.mustSay.en,
-      ],
-    },
-    ko: {
-      figure: [fig(recovery.numbers.with_recovery, 1)],
-      label: ["복구를 켠 olmOCR-Bench 점수. 복구만 끄면 ", fig(recovery.numbers.without_recovery, 1)],
-      detail: [
-        "문서 ", fig(r01.held_constant.input_count), "건, 검사 ", fig(r01.held_constant.test_count), "개. ", ...recovery.mustSay.ko,
       ],
     },
   },

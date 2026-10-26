@@ -127,3 +127,59 @@ export function SourceRegionCrop({
     </span>
   );
 }
+
+/*
+  FINAL-SPEC 2026-10-26 §2.4: the same window as SourceRegionCrop -- the cited box grown by
+  `marginPx` raster pixels, the box's true aspect -- drawn with a lazy <img> instead of a CSS
+  background, for a crop that sits well below the first screen: a background is fetched as soon as
+  the element renders, a lazy <img> only when a reader nears it. The caller's class positions the
+  image absolutely inside a clipping box (`position: relative; overflow: hidden`); the inline
+  offsets put the window on that box. Decorative, like SourceRegionCrop: the quote is the text.
+*/
+export function SourceRegionWindow({
+  image,
+  bbox1000,
+  sizes,
+  marginPx = CROP_MARGIN_PX,
+  className,
+}: {
+  /** The committed page raster's derivative set (`landingV2PageImage`). */
+  image: { src: string; width: number; height: number; srcSet: string; avifSrcSet: string };
+  bbox1000: readonly number[];
+  sizes: string;
+  marginPx?: number;
+  className?: string;
+}) {
+  if (!isSourceRegionBox(bbox1000)) return null;
+  const mx = (1000 * marginPx) / image.width;
+  const my = (1000 * marginPx) / image.height;
+  const x0 = Math.max(0, bbox1000[0]! - mx);
+  const y0 = Math.max(0, bbox1000[1]! - my);
+  const w = Math.min(1000, bbox1000[2]! + mx) - x0;
+  const h = Math.min(1000, bbox1000[3]! + my) - y0;
+  return (
+    <span
+      className={className}
+      aria-hidden="true"
+      data-derived="1"
+      data-bbox1000={bbox1000.join(",")}
+      data-crop1000={[x0, y0, x0 + w, y0 + h].join(",")}
+      style={{ display: "block", aspectRatio: String((w * image.width) / (h * image.height)) }}
+    >
+      <picture>
+        {image.avifSrcSet ? <source type="image/avif" srcSet={image.avifSrcSet} sizes={sizes} /> : null}
+        <img
+          src={image.src}
+          srcSet={image.srcSet}
+          sizes={sizes}
+          width={image.width}
+          height={image.height}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          style={{ left: `${(-100 * x0) / w}%`, top: `${(-100 * y0) / h}%`, width: `${1e5 / w}%`, height: `${1e5 / h}%` }}
+        />
+      </picture>
+    </span>
+  );
+}

@@ -438,18 +438,20 @@ describe("the landing plays no sound and reveals nothing it would hide without J
       `@supports (animation-timeline: view())`, so no engine and no motion setting can end
       anywhere but the finished picture.
     */
+    /*
+      FINAL-SPEC 2026-10-26 D-21: the fan left with the object column, so Scene 05 has no scroll-driven
+      draw at all. What this case guards is unchanged: no content waits on a reveal.
+    */
     const recompile = stripComments(read(`${SCENE_DIR}/recompile.module.css`));
-    expect(recompile).toContain("@supports (animation-timeline: view())");
-    expect(recompile).toMatch(/\.fan path\s*\{[^}]*stroke-dashoffset:\s*0/);
+    expect(recompile).not.toContain("animation-timeline");
+    expect(recompile).not.toMatch(/@keyframes|animation:/);
+    expect(read(`${SCENE_DIR}/recompile.tsx`)).not.toContain("<svg");
     /*
       Release 3: the dash is measured in path lengths, not user units. Without pathLength="1" the
       "1" was one user unit and the fan rested as a dotted line; one dash and two gaps hide the
       whole fan at offset 1 however many subpaths it has. Forwards fill from entry 0% keeps the
       drawn base before the range, so a page captured at its top still shows the finished fan.
     */
-    expect(read(`${SCENE_DIR}/recompile.tsx`)).toContain("pathLength={1}");
-    expect(recompile).toMatch(/\.fan path\s*\{[^}]*stroke-dasharray:\s*1 2;/);
-    expect(recompile).toMatch(/animation:\s*draw linear forwards;/);
     for (const sheet of MODULE_SHEETS) {
       const css = stripComments(read(sheet));
       for (const rule of blocks(css)) {
