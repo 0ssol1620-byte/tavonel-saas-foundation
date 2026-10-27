@@ -1033,5 +1033,2628 @@
     "runReceiptSha256": "sha256:a13f8b1c39dc6cbd6b3b3cf8e9950103ef3b23c346ec193fe29f1aa5d3c1a2c5",
     "runReceiptUrl": "/proof-collection/specimens/kma-2026-09-climate-p001.run.json",
     "limitationTokens": []
+  },
+  {
+    "specimenId": "nasa-sp-5079-p039",
+    "slot": "drawing",
+    "documentId": "nasa-sp-5079",
+    "title": "NASA Special Publication SP-5079 (1968)",
+    "lang": "en",
+    "sourcePageUrl": "https://ntrs.nasa.gov/citations/19680010155",
+    "sourceUrl": "https://ntrs.nasa.gov/api/citations/19680010155/downloads/19680010155.pdf",
+    "acquiredFrom": "NASA Technical Reports Server citation 19680010155",
+    "representationKind": "page_extract",
+    "originalSha256": "sha256:77e6a80db0f9c3e8a6ea23dfafd6a663c4c52f6b39f7b612b55fbd6e28b820f6",
+    "extractedPdfSha256": "sha256:77a7eae0e1e2f33617c6842791ed1be224485d1b59813aaaf5db7bade2e16c00",
+    "pageCount": 78,
+    "page": 39,
+    "capturedOn": "2026-10-27",
+    "rights": {
+      "basis": "U.S. federal government work (17 U.S.C. 105); the NTRS record states \"Work of the US Gov. Public Use Permitted.\" and \"Distribution Limits: Public\".",
+      "jurisdiction": "Public domain in the United States; status abroad not separately assessed",
+      "attribution": "Source: NASA SP-5079 (1968), NASA Technical Reports Server. U.S. government work.",
+      "publication": "public_sample",
+      "licence": {
+        "id": "US-GOV-WORK",
+        "markingScope": "item",
+        "markingText": "Work of the US Gov. Public Use Permitted.",
+        "markingUrl": "https://ntrs.nasa.gov/citations/19680010155",
+        "retrievedOn": "2026-10-27",
+        "snapshotSha256": "sha256:1b9e846c7d6005a436fc6de3bb7716007eb9aaf83a15839db0b744a79909a24a"
+      }
+    },
+    "caption": {
+      "en": {
+        "short": "NASA SP-5079 (1968)",
+        "full": "Source: NASA SP-5079 (1968), NASA Technical Reports Server. U.S. government work."
+      },
+      "ko": {
+        "short": "NASA SP-5079(1968)",
+        "full": "출처: NASA SP-5079(1968), NASA 기술보고서 서버(NTRS). 미국 연방정부 저작물."
+      }
+    },
+    "mustNotImply": [
+      "NASA endorsement of TAVONEL",
+      "that the circuit's connections were read (the reader returns text lines with boxes, not drawing topology)",
+      "that the whole of Figure 26 is on this page (it spans PDF pages 38 and 39)",
+      "any accuracy figure"
+    ],
+    "avoidInCrop": [
+      {
+        "label": "Cut edge of the two-page spread: Figure 26 continues from PDF page 38, so components here are drawn only in part",
+        "bbox1000": [
+          0,
+          0,
+          100,
+          1000
+        ]
+      }
+    ],
+    "region": {
+      "regionId": "ocr-p0001-l00005",
+      "bbox1000": [
+        402,
+        140,
+        434,
+        153
+      ]
+    },
+    "crop": {
+      "path": "/proof-collection/specimens/nasa-sp-5079-p039-960.webp",
+      "sha256": "sha256:bb61eb87310d933565b69afe5d7585de3a527ed5deb97fb6e13c2f4056b6dfcc",
+      "width": 960,
+      "height": 384,
+      "bytes": 31438,
+      "window1000": [
+        125,
+        54,
+        707,
+        233
+      ],
+      "sources": [
+        {
+          "path": "/proof-collection/specimens/nasa-sp-5079-p039-720.avif",
+          "type": "image/avif",
+          "sha256": "sha256:133b43b7967dfb0038f8f896c32e4b7d8e52cf82f9d6e705ee733624bd5b59e8",
+          "width": 720,
+          "height": 288,
+          "bytes": 15583
+        },
+        {
+          "path": "/proof-collection/specimens/nasa-sp-5079-p039-960.avif",
+          "type": "image/avif",
+          "sha256": "sha256:ea30c8f21045601a85ba647a5802af1de8a596d5a1ec44a3be3669a6ed8722c6",
+          "width": 960,
+          "height": 384,
+          "bytes": 22155
+        }
+      ]
+    },
+    "fullPage": {
+      "path": "/proof-collection/specimens/nasa-sp-5079-p039-page-480.webp",
+      "sha256": "sha256:c1d3f34805ab948f98607136ea81ac00205f5ba1ec1fd50f18a7409933514c83",
+      "width": 480,
+      "height": 623,
+      "bytes": 12854,
+      "sources": [
+        {
+          "path": "/proof-collection/specimens/nasa-sp-5079-p039-page-720.avif",
+          "type": "image/avif",
+          "sha256": "sha256:1b80fd330042f8caf4c90dfa19df1bebfc09e3bb558262e324d9ce775e1bb097",
+          "width": 720,
+          "height": 935,
+          "bytes": 10999
+        },
+        {
+          "path": "/proof-collection/specimens/nasa-sp-5079-p039-page-960.avif",
+          "type": "image/avif",
+          "sha256": "sha256:d0ef92adc3e68ed76db6fc2698270a6aa5465f852417d9c84829791eeffa2eb9",
+          "width": 960,
+          "height": 1246,
+          "bytes": 15815
+        }
+      ],
+      "method": "Page 1 of the extract rendered by pypdfium2 5.13.0 at scale 3 with a white fill (the CDR rasterizer pin); every avoidInCrop box painted white before encoding; resized with lanczos3; AVIF q35 e6 at 720 and 960 px, WEBP q80 e6 at 480 px (sharp 0.35.4). No colour, contrast or sharpening step.",
+      "regions": [
+        {
+          "regionId": "ocr-p0001-l00001",
+          "bbox1000": [
+            77,
+            133,
+            95,
+            143
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00002",
+          "bbox1000": [
+            403,
+            135,
+            420,
+            145
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00003",
+          "bbox1000": [
+            214,
+            138,
+            230,
+            148
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00004",
+          "bbox1000": [
+            76,
+            140,
+            104,
+            152
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00005",
+          "bbox1000": [
+            402,
+            140,
+            434,
+            153
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00006",
+          "bbox1000": [
+            220,
+            145,
+            248,
+            156
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00007",
+          "bbox1000": [
+            600,
+            150,
+            618,
+            160
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00008",
+          "bbox1000": [
+            152,
+            152,
+            168,
+            162
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00009",
+          "bbox1000": [
+            285,
+            153,
+            301,
+            162
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00010",
+          "bbox1000": [
+            596,
+            157,
+            621,
+            167
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00011",
+          "bbox1000": [
+            755,
+            159,
+            777,
+            171
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00012",
+          "bbox1000": [
+            514,
+            165,
+            536,
+            177
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00013",
+          "bbox1000": [
+            555,
+            168,
+            575,
+            179
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00014",
+          "bbox1000": [
+            753,
+            169,
+            776,
+            177
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00015",
+          "bbox1000": [
+            514,
+            174,
+            540,
+            184
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00016",
+          "bbox1000": [
+            752,
+            174,
+            780,
+            186
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00017",
+          "bbox1000": [
+            343,
+            177,
+            355,
+            185
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00018",
+          "bbox1000": [
+            430,
+            177,
+            445,
+            201
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00019",
+          "bbox1000": [
+            453,
+            179,
+            468,
+            198
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00020",
+          "bbox1000": [
+            469,
+            179,
+            484,
+            204
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00021",
+          "bbox1000": [
+            707,
+            179,
+            731,
+            193
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00022",
+          "bbox1000": [
+            708,
+            188,
+            730,
+            200
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00023",
+          "bbox1000": [
+            754,
+            188,
+            778,
+            201
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00024",
+          "bbox1000": [
+            343,
+            193,
+            363,
+            201
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00025",
+          "bbox1000": [
+            629,
+            193,
+            647,
+            203
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00026",
+          "bbox1000": [
+            66,
+            196,
+            80,
+            205
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00027",
+          "bbox1000": [
+            246,
+            197,
+            259,
+            217
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00028",
+          "bbox1000": [
+            471,
+            202,
+            484,
+            218
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00029",
+          "bbox1000": [
+            752,
+            207,
+            773,
+            217
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00030",
+          "bbox1000": [
+            788,
+            208,
+            808,
+            218
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00031",
+          "bbox1000": [
+            557,
+            209,
+            572,
+            217
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00032",
+          "bbox1000": [
+            778,
+            211,
+            789,
+            227
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00033",
+          "bbox1000": [
+            786,
+            213,
+            811,
+            227
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00034",
+          "bbox1000": [
+            648,
+            215,
+            674,
+            223
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00035",
+          "bbox1000": [
+            554,
+            216,
+            574,
+            225
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00036",
+          "bbox1000": [
+            687,
+            216,
+            708,
+            227
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00037",
+          "bbox1000": [
+            148,
+            217,
+            172,
+            226
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00038",
+          "bbox1000": [
+            248,
+            219,
+            258,
+            231
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00039",
+          "bbox1000": [
+            280,
+            222,
+            297,
+            231
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00040",
+          "bbox1000": [
+            754,
+            222,
+            777,
+            234
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00041",
+          "bbox1000": [
+            148,
+            225,
+            165,
+            235
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00042",
+          "bbox1000": [
+            383,
+            239,
+            399,
+            246
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00043",
+          "bbox1000": [
+            752,
+            242,
+            773,
+            254
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00044",
+          "bbox1000": [
+            421,
+            249,
+            441,
+            259
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00045",
+          "bbox1000": [
+            386,
+            250,
+            408,
+            262
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00046",
+          "bbox1000": [
+            416,
+            256,
+            446,
+            268
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00047",
+          "bbox1000": [
+            388,
+            259,
+            406,
+            270
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00048",
+          "bbox1000": [
+            152,
+            268,
+            173,
+            278
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00049",
+          "bbox1000": [
+            146,
+            275,
+            176,
+            287
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00050",
+          "bbox1000": [
+            454,
+            290,
+            474,
+            300
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00051",
+          "bbox1000": [
+            548,
+            290,
+            570,
+            302
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00052",
+          "bbox1000": [
+            453,
+            298,
+            477,
+            310
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00053",
+          "bbox1000": [
+            461,
+            312,
+            484,
+            324
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00054",
+          "bbox1000": [
+            463,
+            327,
+            486,
+            339
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00055",
+          "bbox1000": [
+            55,
+            331,
+            75,
+            343
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00056",
+          "bbox1000": [
+            54,
+            340,
+            74,
+            352
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00057",
+          "bbox1000": [
+            486,
+            342,
+            510,
+            352
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00058",
+          "bbox1000": [
+            489,
+            348,
+            524,
+            360
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00059",
+          "bbox1000": [
+            378,
+            353,
+            400,
+            365
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00060",
+          "bbox1000": [
+            422,
+            357,
+            433,
+            367
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00061",
+          "bbox1000": [
+            493,
+            357,
+            528,
+            367
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00062",
+          "bbox1000": [
+            375,
+            369,
+            404,
+            381
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00063",
+          "bbox1000": [
+            337,
+            398,
+            358,
+            407
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00064",
+          "bbox1000": [
+            465,
+            405,
+            487,
+            417
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00065",
+          "bbox1000": [
+            333,
+            406,
+            358,
+            417
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00066",
+          "bbox1000": [
+            406,
+            409,
+            439,
+            423
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00067",
+          "bbox1000": [
+            585,
+            409,
+            608,
+            421
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00068",
+          "bbox1000": [
+            577,
+            411,
+            589,
+            427
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00069",
+          "bbox1000": [
+            466,
+            412,
+            489,
+            425
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00070",
+          "bbox1000": [
+            542,
+            417,
+            562,
+            427
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00071",
+          "bbox1000": [
+            588,
+            419,
+            608,
+            429
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00072",
+          "bbox1000": [
+            535,
+            423,
+            561,
+            449
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00073",
+          "bbox1000": [
+            584,
+            426,
+            620,
+            439
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00074",
+          "bbox1000": [
+            629,
+            471,
+            652,
+            484
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00075",
+          "bbox1000": [
+            676,
+            471,
+            700,
+            484
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00076",
+          "bbox1000": [
+            201,
+            490,
+            248,
+            503
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00077",
+          "bbox1000": [
+            34,
+            491,
+            61,
+            503
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00078",
+          "bbox1000": [
+            566,
+            493,
+            602,
+            506
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00079",
+          "bbox1000": [
+            476,
+            494,
+            512,
+            505
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00080",
+          "bbox1000": [
+            654,
+            497,
+            675,
+            510
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00081",
+          "bbox1000": [
+            209,
+            499,
+            239,
+            510
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00082",
+          "bbox1000": [
+            482,
+            502,
+            508,
+            514
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00083",
+          "bbox1000": [
+            46,
+            656,
+            67,
+            670
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00084",
+          "bbox1000": [
+            84,
+            657,
+            109,
+            669
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00085",
+          "bbox1000": [
+            27,
+            697,
+            50,
+            719
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00086",
+          "bbox1000": [
+            317,
+            775,
+            661,
+            797
+          ]
+        }
+      ],
+      "seconds": 1.98
+    },
+    "extractedText": "68N6",
+    "reader": {
+      "id": "foundation_ocr_gpu_v1",
+      "imageDigest": "sha256:8e6f6fa777fd9949745ce67b25d04f0a1aa74dfbf791204baf2b6b16c3931bd8"
+    },
+    "runAt": "2026-10-27T02:28:08.610Z",
+    "runReceiptSha256": "sha256:3084b786343d9ffe6c0d81ccb77f6060c9b17f9bf052161f7dd3d5fc2c87879a",
+    "runReceiptUrl": "/proof-collection/specimens/nasa-sp-5079-p039.run.json",
+    "limitationTokens": [
+      "no_native_structure_reader_yet"
+    ]
+  },
+  {
+    "specimenId": "nasa-sp-5079-p074",
+    "slot": "table",
+    "documentId": "nasa-sp-5079",
+    "title": "NASA Special Publication SP-5079 (1968)",
+    "lang": "en",
+    "sourcePageUrl": "https://ntrs.nasa.gov/citations/19680010155",
+    "sourceUrl": "https://ntrs.nasa.gov/api/citations/19680010155/downloads/19680010155.pdf",
+    "acquiredFrom": "NASA Technical Reports Server citation 19680010155",
+    "representationKind": "page_extract",
+    "originalSha256": "sha256:77e6a80db0f9c3e8a6ea23dfafd6a663c4c52f6b39f7b612b55fbd6e28b820f6",
+    "extractedPdfSha256": "sha256:578f533cc20f7df423f1b5c62e363ccc3cb9338a3d2c6bd6dacd9022bac04887",
+    "pageCount": 78,
+    "page": 74,
+    "capturedOn": "2026-10-27",
+    "rights": {
+      "basis": "U.S. federal government work (17 U.S.C. 105); the NTRS record states \"Work of the US Gov. Public Use Permitted.\" and \"Distribution Limits: Public\".",
+      "jurisdiction": "Public domain in the United States; status abroad not separately assessed",
+      "attribution": "Source: NASA SP-5079 (1968), NASA Technical Reports Server. U.S. government work.",
+      "publication": "public_sample",
+      "licence": {
+        "id": "US-GOV-WORK",
+        "markingScope": "item",
+        "markingText": "Work of the US Gov. Public Use Permitted.",
+        "markingUrl": "https://ntrs.nasa.gov/citations/19680010155",
+        "retrievedOn": "2026-10-27",
+        "snapshotSha256": "sha256:1b9e846c7d6005a436fc6de3bb7716007eb9aaf83a15839db0b744a79909a24a"
+      }
+    },
+    "caption": {
+      "en": {
+        "short": "NASA SP-5079 (1968)",
+        "full": "Source: NASA SP-5079 (1968), NASA Technical Reports Server. U.S. government work."
+      },
+      "ko": {
+        "short": "NASA SP-5079(1968)",
+        "full": "출처: NASA SP-5079(1968), NASA 기술보고서 서버(NTRS). 미국 연방정부 저작물."
+      }
+    },
+    "mustNotImply": [
+      "NASA endorsement of TAVONEL",
+      "endorsement by any manufacturer named in the parts list",
+      "that the table's rows and columns were read (the reader returns text lines with boxes, not cells)",
+      "any accuracy figure"
+    ],
+    "avoidInCrop": [
+      {
+        "label": "Vertical binding/scanner marks at the bottom edge, right of centre (an artefact of the scan, not of the printed page)",
+        "bbox1000": [
+          647,
+          948,
+          678,
+          1000
+        ]
+      }
+    ],
+    "region": {
+      "regionId": "ocr-p0001-l00010",
+      "bbox1000": [
+        345,
+        175,
+        597,
+        189
+      ]
+    },
+    "crop": {
+      "path": "/proof-collection/specimens/nasa-sp-5079-p074-960.webp",
+      "sha256": "sha256:c3191819d4e071c04ce7e3ba2999d6a460042339fd48b7a1de1b617a6acd7aaa",
+      "width": 960,
+      "height": 384,
+      "bytes": 30720,
+      "window1000": [
+        177,
+        89,
+        759,
+        268
+      ],
+      "sources": [
+        {
+          "path": "/proof-collection/specimens/nasa-sp-5079-p074-720.avif",
+          "type": "image/avif",
+          "sha256": "sha256:d2e404db10e8e7734f488d80bdab75bd08d7a3cbebca192fd895333a1e03bbcc",
+          "width": 720,
+          "height": 288,
+          "bytes": 15187
+        },
+        {
+          "path": "/proof-collection/specimens/nasa-sp-5079-p074-960.avif",
+          "type": "image/avif",
+          "sha256": "sha256:ee5b5dd1a205ff0be531475182d1790911c9d6cbd01fd4fc62c4865df5901905",
+          "width": 960,
+          "height": 384,
+          "bytes": 22945
+        }
+      ]
+    },
+    "fullPage": {
+      "path": "/proof-collection/specimens/nasa-sp-5079-p074-page-480.webp",
+      "sha256": "sha256:a324696af4f50bc34baa50deb70329b4679e9a9e6a78e6595d4d794f998e89e0",
+      "width": 480,
+      "height": 623,
+      "bytes": 33094,
+      "sources": [
+        {
+          "path": "/proof-collection/specimens/nasa-sp-5079-p074-page-720.avif",
+          "type": "image/avif",
+          "sha256": "sha256:c7374a16776b6fc8cc6dc72330dd94bc8129bdd7d3ffe7d5fc9301d87732732c",
+          "width": 720,
+          "height": 935,
+          "bytes": 27701
+        },
+        {
+          "path": "/proof-collection/specimens/nasa-sp-5079-p074-page-960.avif",
+          "type": "image/avif",
+          "sha256": "sha256:c83a8d6e64d7c891253ae728d3114f0e2c605c8634943c224d28f093f6300c45",
+          "width": 960,
+          "height": 1246,
+          "bytes": 43190
+        }
+      ],
+      "method": "Page 1 of the extract rendered by pypdfium2 5.13.0 at scale 3 with a white fill (the CDR rasterizer pin); every avoidInCrop box painted white before encoding; resized with lanczos3; AVIF q35 e6 at 720 and 960 px, WEBP q80 e6 at 480 px (sharp 0.35.4). No colour, contrast or sharpening step.",
+      "regions": [
+        {
+          "regionId": "ocr-p0001-l00001",
+          "bbox1000": [
+            131,
+            66,
+            165,
+            84
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00002",
+          "bbox1000": [
+            367,
+            70,
+            643,
+            83
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00003",
+          "bbox1000": [
+            308,
+            109,
+            666,
+            126
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00004",
+          "bbox1000": [
+            254,
+            138,
+            290,
+            152
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00005",
+          "bbox1000": [
+            143,
+            144,
+            203,
+            159
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00006",
+          "bbox1000": [
+            503,
+            144,
+            584,
+            158
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00007",
+          "bbox1000": [
+            784,
+            144,
+            837,
+            159
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00008",
+          "bbox1000": [
+            245,
+            151,
+            301,
+            164
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00009",
+          "bbox1000": [
+            169,
+            175,
+            185,
+            189
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00010",
+          "bbox1000": [
+            345,
+            175,
+            597,
+            189
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00011",
+          "bbox1000": [
+            777,
+            175,
+            844,
+            190
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00012",
+          "bbox1000": [
+            346,
+            188,
+            598,
+            203
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00013",
+          "bbox1000": [
+            777,
+            188,
+            808,
+            202
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00014",
+          "bbox1000": [
+            344,
+            199,
+            620,
+            215
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00015",
+          "bbox1000": [
+            170,
+            201,
+            184,
+            215
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00016",
+          "bbox1000": [
+            778,
+            201,
+            843,
+            215
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00017",
+          "bbox1000": [
+            777,
+            213,
+            801,
+            227
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00018",
+          "bbox1000": [
+            170,
+            213,
+            184,
+            226
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00019",
+          "bbox1000": [
+            345,
+            213,
+            627,
+            227
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00020",
+          "bbox1000": [
+            777,
+            225,
+            801,
+            240
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00021",
+          "bbox1000": [
+            170,
+            225,
+            184,
+            239
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00022",
+          "bbox1000": [
+            345,
+            225,
+            604,
+            240
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00023",
+          "bbox1000": [
+            168,
+            238,
+            184,
+            253
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00024",
+          "bbox1000": [
+            345,
+            238,
+            604,
+            253
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00025",
+          "bbox1000": [
+            777,
+            238,
+            837,
+            253
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00026",
+          "bbox1000": [
+            345,
+            251,
+            604,
+            265
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00027",
+          "bbox1000": [
+            777,
+            251,
+            843,
+            266
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00028",
+          "bbox1000": [
+            777,
+            263,
+            843,
+            278
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00029",
+          "bbox1000": [
+            346,
+            265,
+            604,
+            277
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00030",
+          "bbox1000": [
+            777,
+            276,
+            802,
+            290
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00031",
+          "bbox1000": [
+            170,
+            277,
+            183,
+            289
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00032",
+          "bbox1000": [
+            345,
+            277,
+            626,
+            290
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00033",
+          "bbox1000": [
+            168,
+            288,
+            184,
+            302
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00034",
+          "bbox1000": [
+            776,
+            288,
+            830,
+            303
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00035",
+          "bbox1000": [
+            345,
+            289,
+            597,
+            303
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00036",
+          "bbox1000": [
+            776,
+            301,
+            802,
+            316
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00037",
+          "bbox1000": [
+            344,
+            301,
+            596,
+            316
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00038",
+          "bbox1000": [
+            343,
+            312,
+            497,
+            329
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00039",
+          "bbox1000": [
+            229,
+            313,
+            277,
+            328
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00040",
+          "bbox1000": [
+            169,
+            314,
+            183,
+            328
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00041",
+          "bbox1000": [
+            776,
+            314,
+            807,
+            328
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00042",
+          "bbox1000": [
+            229,
+            326,
+            258,
+            341
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00043",
+          "bbox1000": [
+            344,
+            326,
+            497,
+            341
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00044",
+          "bbox1000": [
+            776,
+            326,
+            802,
+            342
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00045",
+          "bbox1000": [
+            169,
+            327,
+            183,
+            340
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00046",
+          "bbox1000": [
+            344,
+            338,
+            496,
+            352
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00047",
+          "bbox1000": [
+            229,
+            339,
+            269,
+            352
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00048",
+          "bbox1000": [
+            777,
+            340,
+            799,
+            352
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00049",
+          "bbox1000": [
+            169,
+            340,
+            183,
+            352
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00050",
+          "bbox1000": [
+            343,
+            350,
+            496,
+            366
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00051",
+          "bbox1000": [
+            229,
+            351,
+            269,
+            365
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00052",
+          "bbox1000": [
+            776,
+            351,
+            800,
+            366
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00053",
+          "bbox1000": [
+            169,
+            352,
+            183,
+            364
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00054",
+          "bbox1000": [
+            343,
+            362,
+            497,
+            379
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00055",
+          "bbox1000": [
+            775,
+            364,
+            829,
+            379
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00056",
+          "bbox1000": [
+            169,
+            364,
+            183,
+            378
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00057",
+          "bbox1000": [
+            228,
+            364,
+            269,
+            378
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00058",
+          "bbox1000": [
+            167,
+            376,
+            184,
+            391
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00059",
+          "bbox1000": [
+            344,
+            376,
+            497,
+            391
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00060",
+          "bbox1000": [
+            775,
+            376,
+            830,
+            392
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00061",
+          "bbox1000": [
+            228,
+            377,
+            270,
+            391
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00062",
+          "bbox1000": [
+            343,
+            388,
+            496,
+            405
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00063",
+          "bbox1000": [
+            775,
+            390,
+            801,
+            404
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00064",
+          "bbox1000": [
+            228,
+            402,
+            290,
+            416
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00065",
+          "bbox1000": [
+            344,
+            402,
+            659,
+            416
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00066",
+          "bbox1000": [
+            169,
+            403,
+            182,
+            415
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00067",
+          "bbox1000": [
+            776,
+            403,
+            799,
+            415
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00068",
+          "bbox1000": [
+            775,
+            414,
+            829,
+            429
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00069",
+          "bbox1000": [
+            168,
+            415,
+            182,
+            427
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00070",
+          "bbox1000": [
+            229,
+            415,
+            289,
+            428
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00071",
+          "bbox1000": [
+            344,
+            415,
+            649,
+            428
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00072",
+          "bbox1000": [
+            344,
+            426,
+            649,
+            441
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00073",
+          "bbox1000": [
+            776,
+            427,
+            799,
+            441
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00074",
+          "bbox1000": [
+            342,
+            439,
+            606,
+            455
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00075",
+          "bbox1000": [
+            227,
+            440,
+            301,
+            453
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00076",
+          "bbox1000": [
+            775,
+            440,
+            798,
+            453
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00077",
+          "bbox1000": [
+            168,
+            441,
+            181,
+            453
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00078",
+          "bbox1000": [
+            343,
+            453,
+            504,
+            467
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00079",
+          "bbox1000": [
+            775,
+            453,
+            806,
+            467
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00080",
+          "bbox1000": [
+            168,
+            453,
+            181,
+            466
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00081",
+          "bbox1000": [
+            775,
+            465,
+            800,
+            480
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00082",
+          "bbox1000": [
+            168,
+            466,
+            182,
+            478
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00083",
+          "bbox1000": [
+            343,
+            466,
+            503,
+            480
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00084",
+          "bbox1000": [
+            775,
+            477,
+            799,
+            492
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00085",
+          "bbox1000": [
+            343,
+            478,
+            503,
+            492
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00086",
+          "bbox1000": [
+            168,
+            479,
+            182,
+            491
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00087",
+          "bbox1000": [
+            343,
+            491,
+            503,
+            505
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00088",
+          "bbox1000": [
+            775,
+            491,
+            798,
+            504
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00089",
+          "bbox1000": [
+            168,
+            491,
+            182,
+            504
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00090",
+          "bbox1000": [
+            775,
+            503,
+            799,
+            518
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00091",
+          "bbox1000": [
+            343,
+            503,
+            504,
+            518
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00092",
+          "bbox1000": [
+            168,
+            504,
+            182,
+            516
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00093",
+          "bbox1000": [
+            775,
+            515,
+            799,
+            530
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00094",
+          "bbox1000": [
+            343,
+            516,
+            504,
+            530
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00095",
+          "bbox1000": [
+            168,
+            516,
+            181,
+            529
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00096",
+          "bbox1000": [
+            168,
+            529,
+            181,
+            541
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00097",
+          "bbox1000": [
+            343,
+            529,
+            504,
+            543
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00098",
+          "bbox1000": [
+            775,
+            529,
+            798,
+            542
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00099",
+          "bbox1000": [
+            343,
+            540,
+            504,
+            555
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00100",
+          "bbox1000": [
+            775,
+            540,
+            798,
+            554
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00101",
+          "bbox1000": [
+            168,
+            541,
+            181,
+            554
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00102",
+          "bbox1000": [
+            342,
+            551,
+            504,
+            568
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00103",
+          "bbox1000": [
+            775,
+            552,
+            798,
+            568
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00104",
+          "bbox1000": [
+            168,
+            553,
+            181,
+            566
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00105",
+          "bbox1000": [
+            342,
+            565,
+            502,
+            580
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00106",
+          "bbox1000": [
+            228,
+            566,
+            304,
+            579
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00107",
+          "bbox1000": [
+            775,
+            566,
+            798,
+            579
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00108",
+          "bbox1000": [
+            168,
+            566,
+            181,
+            579
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00109",
+          "bbox1000": [
+            226,
+            578,
+            270,
+            593
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00110",
+          "bbox1000": [
+            343,
+            578,
+            549,
+            593
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00111",
+          "bbox1000": [
+            775,
+            578,
+            808,
+            593
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00112",
+          "bbox1000": [
+            167,
+            579,
+            181,
+            592
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00113",
+          "bbox1000": [
+            342,
+            590,
+            543,
+            605
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00114",
+          "bbox1000": [
+            167,
+            592,
+            181,
+            604
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00115",
+          "bbox1000": [
+            227,
+            592,
+            270,
+            605
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00116",
+          "bbox1000": [
+            775,
+            592,
+            808,
+            605
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00117",
+          "bbox1000": [
+            342,
+            602,
+            625,
+            618
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00118",
+          "bbox1000": [
+            229,
+            604,
+            296,
+            617
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00119",
+          "bbox1000": [
+            775,
+            604,
+            807,
+            617
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00120",
+          "bbox1000": [
+            167,
+            604,
+            181,
+            617
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00121",
+          "bbox1000": [
+            342,
+            615,
+            650,
+            631
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00122",
+          "bbox1000": [
+            226,
+            616,
+            283,
+            631
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00123",
+          "bbox1000": [
+            774,
+            616,
+            842,
+            631
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00124",
+          "bbox1000": [
+            160,
+            616,
+            181,
+            630
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00125",
+          "bbox1000": [
+            342,
+            628,
+            649,
+            643
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00126",
+          "bbox1000": [
+            775,
+            628,
+            841,
+            643
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00127",
+          "bbox1000": [
+            343,
+            641,
+            649,
+            656
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00128",
+          "bbox1000": [
+            775,
+            642,
+            840,
+            655
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00129",
+          "bbox1000": [
+            342,
+            653,
+            651,
+            669
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00130",
+          "bbox1000": [
+            774,
+            654,
+            805,
+            668
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00131",
+          "bbox1000": [
+            342,
+            665,
+            649,
+            681
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00132",
+          "bbox1000": [
+            774,
+            666,
+            841,
+            681
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00133",
+          "bbox1000": [
+            342,
+            678,
+            649,
+            694
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00134",
+          "bbox1000": [
+            774,
+            679,
+            835,
+            692
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00135",
+          "bbox1000": [
+            341,
+            691,
+            646,
+            706
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00136",
+          "bbox1000": [
+            774,
+            691,
+            805,
+            706
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00137",
+          "bbox1000": [
+            227,
+            692,
+            281,
+            705
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00138",
+          "bbox1000": [
+            167,
+            693,
+            180,
+            705
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00139",
+          "bbox1000": [
+            342,
+            705,
+            643,
+            718
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00140",
+          "bbox1000": [
+            773,
+            705,
+            804,
+            718
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00141",
+          "bbox1000": [
+            166,
+            705,
+            180,
+            718
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00142",
+          "bbox1000": [
+            227,
+            705,
+            280,
+            718
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00143",
+          "bbox1000": [
+            341,
+            717,
+            616,
+            732
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00144",
+          "bbox1000": [
+            773,
+            717,
+            804,
+            731
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00145",
+          "bbox1000": [
+            227,
+            718,
+            282,
+            730
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00146",
+          "bbox1000": [
+            166,
+            718,
+            180,
+            730
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00147",
+          "bbox1000": [
+            226,
+            729,
+            311,
+            744
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00148",
+          "bbox1000": [
+            773,
+            729,
+            804,
+            744
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00149",
+          "bbox1000": [
+            166,
+            730,
+            180,
+            744
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00150",
+          "bbox1000": [
+            343,
+            730,
+            599,
+            744
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00151",
+          "bbox1000": [
+            774,
+            742,
+            804,
+            756
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00152",
+          "bbox1000": [
+            166,
+            742,
+            180,
+            756
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00153",
+          "bbox1000": [
+            227,
+            742,
+            295,
+            756
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00154",
+          "bbox1000": [
+            342,
+            742,
+            630,
+            757
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00155",
+          "bbox1000": [
+            342,
+            755,
+            630,
+            770
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00156",
+          "bbox1000": [
+            773,
+            755,
+            804,
+            769
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00157",
+          "bbox1000": [
+            340,
+            766,
+            631,
+            783
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00158",
+          "bbox1000": [
+            773,
+            768,
+            804,
+            782
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00159",
+          "bbox1000": [
+            773,
+            780,
+            803,
+            794
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00160",
+          "bbox1000": [
+            343,
+            781,
+            631,
+            795
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00161",
+          "bbox1000": [
+            341,
+            792,
+            632,
+            807
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00162",
+          "bbox1000": [
+            773,
+            792,
+            804,
+            807
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00163",
+          "bbox1000": [
+            773,
+            805,
+            804,
+            819
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00164",
+          "bbox1000": [
+            226,
+            806,
+            281,
+            819
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00165",
+          "bbox1000": [
+            342,
+            806,
+            642,
+            820
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00166",
+          "bbox1000": [
+            166,
+            806,
+            180,
+            819
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00167",
+          "bbox1000": [
+            772,
+            818,
+            804,
+            832
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00168",
+          "bbox1000": [
+            226,
+            818,
+            314,
+            833
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00169",
+          "bbox1000": [
+            342,
+            818,
+            601,
+            833
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00170",
+          "bbox1000": [
+            166,
+            819,
+            180,
+            832
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00171",
+          "bbox1000": [
+            771,
+            830,
+            805,
+            845
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00172",
+          "bbox1000": [
+            341,
+            830,
+            626,
+            845
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00173",
+          "bbox1000": [
+            166,
+            831,
+            180,
+            844
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00174",
+          "bbox1000": [
+            227,
+            831,
+            282,
+            844
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00175",
+          "bbox1000": [
+            145,
+            867,
+            391,
+            880
+          ]
+        }
+      ],
+      "seconds": 2.635
+    },
+    "extractedText": "Resistor, fixed comp., 51K, 1/4w 5%",
+    "reader": {
+      "id": "foundation_ocr_gpu_v1",
+      "imageDigest": "sha256:8e6f6fa777fd9949745ce67b25d04f0a1aa74dfbf791204baf2b6b16c3931bd8"
+    },
+    "runAt": "2026-10-27T02:28:10.592Z",
+    "runReceiptSha256": "sha256:eabc62d892bd130696de47fbcc52fbc80bc130aa9bb9b3087bb399c509de989e",
+    "runReceiptUrl": "/proof-collection/specimens/nasa-sp-5079-p074.run.json",
+    "limitationTokens": [
+      "no_table_or_formula_extraction"
+    ]
   }
 ]

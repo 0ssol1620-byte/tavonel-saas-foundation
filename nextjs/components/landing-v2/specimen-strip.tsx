@@ -55,7 +55,7 @@ const COPY = {
     crop: (kind: string) => `${kind}: the window around the region the reader read`,
     page: (kind: string) => `${kind}: the whole page, every region the reader returned outlined`,
     count: (regions: number, seconds: number) => `${regions} regions · ${seconds} s`,
-    masked: " · dashed: marks left out for rights",
+    masked: " · dashed: painted out",
   },
   ko: {
     strip: "판독기가 읽은 페이지",
@@ -71,7 +71,7 @@ const COPY = {
     crop: (kind: string) => `${kind}: 판독기가 읽은 영역을 둘러싼 부분`,
     page: (kind: string) => `${kind}: 판독기가 반환한 모든 영역을 표시한 페이지 전체`,
     count: (regions: number, seconds: number) => `영역 ${regions}개 · ${seconds}초`,
-    masked: " · 점선: 권리상 가린 표시",
+    masked: " · 점선: 흰색으로 가림",
   },
 };
 

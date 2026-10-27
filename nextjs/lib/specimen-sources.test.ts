@@ -51,8 +51,8 @@ const digest = (bytes: Uint8Array) => `sha256:${createHash("sha256").update(byte
 const publicFile = (path: string) => readFileSync(join(process.cwd(), "public", path));
 
 describe("the committed specimens", () => {
-  it("are two (D-04: a degraded scan and a Korean page, no table cell), and production renders neither", () => {
-    expect(COMMITTED_SPECIMENS.map(receipt => (receipt as SpecimenReceipt).specimenId)).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+  it("are four (D-04: a degraded scan and a Korean page; hard-proof 2026-10-27: a schematic and a parts list), and production renders none", () => {
+    expect(COMMITTED_SPECIMENS.map(receipt => (receipt as SpecimenReceipt).specimenId)).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001", "nasa-sp-5079-p039", "nasa-sp-5079-p074"]);
     // The posture: Vercel production, a server with no VERCEL_ENV, and any request that is not the test server's.
     expect(SPECIMEN_STRIP_ROLLOUT).toBe("preview");
     for (const env of [PRODUCTION_ENV, {}, { VERCEL: "1" }, { VERCEL_ENV: "production" }, { VERCEL_ENV: "preview" }]) {
@@ -67,15 +67,16 @@ describe("the committed specimens", () => {
 
   it("render on a preview deployment, and on the test server only for a request that asks", () => {
     const ids = (cells: Specimen[]) => cells.map(cell => cell.specimenId);
-    expect(ids(homeSpecimens({}, PREVIEW_ENV, "preview"))).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
-    expect(ids(homeSpecimens({ committed: true }, FIXTURE_ENV, "preview"))).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+    // Slot order (drawing, table, degraded scan, Korean), whatever order the JSON lists them in.
+    expect(ids(homeSpecimens({}, PREVIEW_ENV, "preview"))).toEqual(["nasa-sp-5079-p039", "nasa-sp-5079-p074", "naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+    expect(ids(homeSpecimens({ committed: true }, FIXTURE_ENV, "preview"))).toEqual(["nasa-sp-5079-p039", "nasa-sp-5079-p074", "naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
     expect(homeSpecimens({}, FIXTURE_ENV, "preview")).toEqual([]);
     expect(homeSpecimens({ committed: true }, PREVIEW_ENV, "preview").every(cell => !cell.synthetic)).toBe(true);
     // The test server's cookie gate holds with the switch off, and "on" renders the committed cells to every request.
     expect(homeSpecimens({}, FIXTURE_ENV, "off")).toEqual([]);
-    expect(ids(homeSpecimens({ committed: true }, FIXTURE_ENV, "off"))).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+    expect(ids(homeSpecimens({ committed: true }, FIXTURE_ENV, "off"))).toEqual(["nasa-sp-5079-p039", "nasa-sp-5079-p074", "naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
     for (const env of [PRODUCTION_ENV, {}, PREVIEW_ENV]) expect(homeSpecimens({}, env, "off"), JSON.stringify(env)).toEqual([]);
-    for (const env of [PRODUCTION_ENV, {}, PREVIEW_ENV, FIXTURE_ENV]) expect(ids(homeSpecimens({}, env, "on")), JSON.stringify(env)).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+    for (const env of [PRODUCTION_ENV, {}, PREVIEW_ENV, FIXTURE_ENV]) expect(ids(homeSpecimens({}, env, "on")), JSON.stringify(env)).toEqual(["nasa-sp-5079-p039", "nasa-sp-5079-p074", "naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
   });
 
   it("follow the switch: off renders nowhere, on everywhere, preview on Vercel preview only", () => {
@@ -267,9 +268,9 @@ describe("a production receipt that does not hold is not rendered", () => {
     ["a page with no run time", r => { r.fullPage!.seconds = 0; }, "fullPage.seconds is not a positive number"],
   ];
 
-  it("accepts both committed receipts as they are", () => {
+  it("accepts every committed receipt as it is", () => {
     expect(readSpecimens(committed(), "production")).toMatchObject({ rejected: [] });
-    expect(readSpecimens(committed(), "production").specimens).toHaveLength(2);
+    expect(readSpecimens(committed(), "production").specimens).toHaveLength(4);
   });
 
   it.each(cases)("%s", (_, edit, reason) => {

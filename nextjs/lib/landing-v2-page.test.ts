@@ -382,7 +382,7 @@ describe("landing v2 -- the composition with the specimen strip rendered", () =>
     vi.stubEnv("VERCEL_ENV", "preview");
     const page = render(locale);
     const main = mainOf(page);
-    expect([...main.matchAll(/data-specimen-cell="([^"]+)"/g)].map(match => match[1])).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+    expect([...main.matchAll(/data-specimen-cell="([^"]+)"/g)].map(match => match[1])).toEqual(["nasa-sp-5079-p039", "nasa-sp-5079-p074", "naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
     expect(undeclaredText(main)).not.toMatch(/\d/);
     const hero = sceneOf(main, "s1");
     for (const open of elements(main, "img")) {
@@ -394,7 +394,7 @@ describe("landing v2 -- the composition with the specimen strip rendered", () =>
     for (const absent of ["Landsat", "USGS", "NASA", "Cloud = No", "Collection 1"]) expect(readable(withoutSpecimens(main))).not.toContain(absent);
     // F-1: no FAQ on Home, so the strip's own licence line is each cell's full attribution (P2-32, D-06).
     expect(main).not.toContain("data-home-reader-guide");
-    expect(main.match(/data-specimen-licence=""/g)).toHaveLength(2);
+    expect(main.match(/data-specimen-licence=""/g)).toHaveLength(4);
     /*
       hard-proof 2026-10-27 (FINAL-SPEC-HARD-PROOF §2): the strip closes s2, after the workbench, so s1 is the same
       in both postures -- the film poster is the first screen's one priority image and is preloaded -- and nothing

@@ -2094,7 +2094,7 @@ export const TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES = Object.freeze([
 // fixtures with their crops, the browser spec, and the two committed receipts with their ten served files (WEBP crop, two AVIF
 // encodings, one-page extract and run receipt each, under public/proof-collection/specimens/), and the collection's PROVENANCE.md, which the
 // receipt-contract suite holds to those receipts. hard-proof 2026-10-27 (C4) adds each committed cell's whole page (a 480 px WEBP and
-// 720 / 960 px AVIF, -page-*). Exactly these twenty-nine paths select the receipt-contract suite, the
+// 720 / 960 px AVIF, -page-*) and lane B the two NASA SP-5079 cells (p039, p074), eight files each. Exactly these forty-five paths select the receipt-contract suite, the
 // Home composition suite (which renders the committed cells in the preview posture) and the specimen-strip browser suite (390 only:
 // every test in the spec skips outside project 390, because each one sets its own browser and viewport or needs one request; a 1440
 // row selects a file with no executed test, which the report reader refuses). Product UI, so never nativeReuse.
@@ -2128,6 +2128,22 @@ export const SPECIMEN_STRIP_AFFECTED_PATHS = Object.freeze([
   'public/proof-collection/specimens/naca-rm-l50c03-p001-page-960.avif',
   'public/proof-collection/specimens/naca-rm-l50c03-p001.pdf',
   'public/proof-collection/specimens/naca-rm-l50c03-p001.run.json',
+  'public/proof-collection/specimens/nasa-sp-5079-p039-720.avif',
+  'public/proof-collection/specimens/nasa-sp-5079-p039-960.avif',
+  'public/proof-collection/specimens/nasa-sp-5079-p039-960.webp',
+  'public/proof-collection/specimens/nasa-sp-5079-p039-page-480.webp',
+  'public/proof-collection/specimens/nasa-sp-5079-p039-page-720.avif',
+  'public/proof-collection/specimens/nasa-sp-5079-p039-page-960.avif',
+  'public/proof-collection/specimens/nasa-sp-5079-p039.pdf',
+  'public/proof-collection/specimens/nasa-sp-5079-p039.run.json',
+  'public/proof-collection/specimens/nasa-sp-5079-p074-720.avif',
+  'public/proof-collection/specimens/nasa-sp-5079-p074-960.avif',
+  'public/proof-collection/specimens/nasa-sp-5079-p074-960.webp',
+  'public/proof-collection/specimens/nasa-sp-5079-p074-page-480.webp',
+  'public/proof-collection/specimens/nasa-sp-5079-p074-page-720.avif',
+  'public/proof-collection/specimens/nasa-sp-5079-p074-page-960.avif',
+  'public/proof-collection/specimens/nasa-sp-5079-p074.pdf',
+  'public/proof-collection/specimens/nasa-sp-5079-p074.run.json',
 ]);
 export const SPECIMEN_STRIP_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/landing-v2-page.test.ts',
