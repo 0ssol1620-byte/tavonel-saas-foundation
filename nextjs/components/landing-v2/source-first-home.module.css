@@ -212,16 +212,12 @@
   }
   .heroAside :global(.lv2-text-link) { min-height: 44px; }
   /*
-    2026-10-27, founder ask: the hero's drop entry (hero-actions.tsx HeroDrop). A dashed hairline box at the actions'
-    height, the page's own ink, 4px like every other Home control. The input covers the box, so a click or a tap opens
-    the picker; a file carried over the first section turns the edge solid in the action colour.
+    2026-10-27, founder ask: the hero's upload entry (hero-actions.tsx HeroUpload). A solid hairline box at the actions'
+    height, the page's own ink, 4px like every other Home control; solid, not dashed, because it is a way in and not a
+    drop zone.
   */
-  .heroAside :global(.lv2-drop) { position: relative; display: inline-flex; align-items: center; gap: 10px; min-height: 48px; margin-top: 4px; padding: 10px 18px; border: 1px dashed var(--home-rule-strong); border-radius: 4px; color: var(--ink); font: 560 15px/1.45 var(--f-sans); cursor: pointer; }
-  .heroAside :global(.lv2-drop input) { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
-  .heroAside :global(.lv2-drop:hover), .heroAside :global(.lv2-drop[data-state="over"]) { border-style: solid; border-color: var(--action); color: var(--action); }
-  .heroAside :global(.lv2-drop[data-state="over"]) { outline: 2px solid var(--action); outline-offset: 2px; }
-  .heroAside :global(.lv2-drop:has(input:focus-visible)) { outline: 3px solid var(--action); outline-offset: 3px; }
-  .heroAside :global(.lv2-drop-error) { margin: 4px 0 0; color: var(--home-ink); font: 400 15px/1.5 var(--f-sans); }
+  .heroAside :global(.lv2-upload) { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; margin-top: 4px; padding: 10px 18px; border: 1px solid var(--home-rule-strong); border-radius: 4px; color: var(--ink); font: 560 15px/1.45 var(--f-sans); text-decoration: none; }
+  .heroAside :global(.lv2-upload:hover) { border-color: var(--action); color: var(--action); }
   .film { margin: 0; min-width: 0; }
   .filmFrame { position: relative; overflow: hidden; background: #f0f0eb; border: 1px solid #79827b; border-radius: 8px; aspect-ratio: 16 / 10; }
   .filmFrame picture, .filmFrame img, .filmFrame video { display: block; width: 100%; height: 100%; }
@@ -328,7 +324,7 @@
     .heroAside :global(.lv2-actions) { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; gap: 8px; }
     .heroAside :global(.lv2-actions .lv2-cta) { width: 100%; min-height: 48px; justify-content: center; }
     .heroAside :global(.lv2-text-link) { min-height: 44px; justify-self: start; }
-    .heroAside :global(.lv2-drop) { justify-content: center; margin-top: 8px; }
+    .heroAside :global(.lv2-upload) { justify-content: center; margin-top: 8px; }
     .filmFrame { aspect-ratio: 390 / 270; }
     .play { right: 12px; bottom: 12px; }
     .film figcaption { font-size: 13px; }

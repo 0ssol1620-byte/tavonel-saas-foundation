@@ -49,7 +49,6 @@ import {
 import type { TriageProcessingQuote } from "@/lib/intake-triage-client";
 import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "@/lib/intake-approval-rollout";
 import { collectDroppedWorkspaceFiles, prepareWorkspaceSelection, type WorkspaceSelection, type WorkspaceUploadFile } from "@/lib/workspace-intake";
-import { takeHomeDrop } from "@/lib/home-drop-handoff";
 import { qualifiedDocumentInputs, sourceFamilyChips, uploadAcceptAttribute, validateQualifiedDocumentInput, normalizeDocumentMimeType } from "@/lib/qualified-input";
 import { runBounded } from "@/lib/concurrent";
 import { buildPipeline, type DocumentListPartial, type LocalUpload } from "@/lib/pipeline";
@@ -2155,22 +2154,6 @@ export default function WorkspacePage() {
       }
     }
   };
-
-  /*
-    A PDF dropped on Home (lib/home-drop-handoff) waits in this browser through sign-in. Once source
-    access is known it goes to the same staging a drop here takes -- intake-closed guard included, so a
-    closed workspace prints its closed sentence and nothing is staged -- and the record is gone either way.
-  */
-  const homeDropTaken = useRef(false);
-  // The latest render's staging, so its guard reads the current `intakeOpen` when the record arrives.
-  const stageHomeDrop = useRef(stageWorkspaceFiles);
-  stageHomeDrop.current = stageWorkspaceFiles;
-  useEffect(() => {
-    if (customerDataAccess === "checking" || homeDropTaken.current) return;
-    homeDropTaken.current = true;
-    // ponytail: a browser that cannot open IndexedDB here could not have stored a drop on Home either.
-    void takeHomeDrop().then((files) => { if (files.length > 0) void stageHomeDrop.current(files); }, () => {});
-  }, [customerDataAccess]);
 
   const stagedEstimates = stagedSelection?.files.map((entry, index) => {
     const measured = stagedPageCounts?.[index];

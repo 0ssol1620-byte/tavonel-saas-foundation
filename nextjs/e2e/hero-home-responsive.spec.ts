@@ -635,7 +635,7 @@ test("every stage that opens cropped keeps ink in both panes of its whole window
   from a new measurement, by the same rule (the area rounded down to the thousand, the 1% margin kept). (1) "영상은
   축소상태가 디폴트여야": a phone opens compact, the whole 16:10 frame, and its LCP element is that still, the 1440px
   stage-1 file (AVIF in Chromium) -- a different, smaller element than the pane, as the pane was than Fit before it.
-  (2) "pdf 어디에 올리라는거야?": the drop entry under the actions moves the film down by its 48px and 8px gap. Measured
+  (2) "pdf 어디에 올리라는거야?": the upload entry under the actions moves the film down by its 48px and 8px gap. Measured
   on this build (homeux/m1, the LCP entry's size; chromium EN 59,830 / 72,080 / 82,174 / 90,440 and KO 60,140 /
   72,420 / 81,812 / 90,440 at 360 / 390 / 412 / 430; Windows WebKit, reduced motion, EN and KO 56,250 / 68,062 /
   77,440 / 85,562). The pane is one press of "Focus details" away and is held below exactly as before, tabs directly
@@ -723,7 +723,7 @@ for (const path of ["/", "/ko"]) {
       }
       for (const [stage, top] of frameTops.entries()) expect(Math.abs(top - frameTops[0]!), `${width} stage ${stage + 1}: frame top as on stage 1`).toBeLessThanOrEqual(0.5);
       if (width === 412) {
-        // Acceptance 24, re-derived 2026-10-27 because the frame moved on purpose (the drop entry above it): the frame's top --
+        // Acceptance 24, re-derived 2026-10-27 because the frame moved on purpose (the upload entry above it): the frame's top --
         // the same in Fit and in Focus -- at most 496 (EN) / 481 (KO), measured 495.0 / 480.4 (was 480 / 430), and the whole
         // frame the phone opens on (Fit) on the first screen in EN and KO. The KO pane's bottom (955) is past 915: founder veto.
         const frame = (await film.locator(".compile-film-viewport").boundingBox())!;

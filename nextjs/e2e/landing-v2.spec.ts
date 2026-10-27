@@ -290,16 +290,16 @@ test("Korean pricing carries the selected plan into the inquiry", async ({ page 
   Founder asks 2026-10-27 changed what the phone's first screen holds, on purpose, so the 390x844 fold is re-derived
   from a new measurement -- not raised to go green; the 1440 fold and both bodies are unchanged. (1) The film opens
   compact, so at 390 its figure ends above the fold and the fixed disclosure under it ("Illustrative demo · not
-  customer results." / "제품 흐름 예시 · 고객 결과가 아닙니다.", 6 / 7 tokens) is on the first screen. (2) The drop entry
-  ("Drop or choose a PDF" / "PDF를 끌어다 놓거나 선택하세요", 5 / 4). Same method, production build of
-  codex/home-ux-20261027 in fixture posture, chromium (receipt: outputs/.../ux-20261027/IMPL.md and measure-raw.json):
-    1440x900  EN fold 35, body 656   KO fold 29, body 559   h2 6
-    390x844   EN fold 41             KO fold 36
-  Rule for the re-derived cell: the measured fold, no headroom. The 1440 fold stays 35 and is met exactly.
+  customer results." / "제품 흐름 예시 · 고객 결과가 아닙니다.", 6 / 7 tokens) is on the first screen. (2) The upload
+  entry ("Upload a PDF" / "PDF 올리기", 3 / 2). Same method, production build of codex/home-ux-20261027 in fixture
+  posture, chromium (receipt: outputs/.../ux-20261027/IMPL.md and impl-r2-measure-raw.json):
+    1440x900  EN fold 33, body 654   KO fold 27, body 557   h2 6
+    390x844   EN fold 39             KO fold 34
+  Rule for the re-derived cell: the measured fold, no headroom. The 1440 fold stays 35.
 */
 const WORD_BUDGET = {
-  "/": { fold: { 1440: 35, 390: 41 }, body: 659 },
-  "/ko": { fold: { 1440: 35, 390: 36 }, body: 564 },
+  "/": { fold: { 1440: 35, 390: 39 }, body: 659 },
+  "/ko": { fold: { 1440: 35, 390: 34 }, body: 564 },
 } as const;
 for (const route of ["/", "/ko"] as const) {
   test(`${route} stays within its re-derived word budget, with six h2`, async ({ page }, testInfo) => {
