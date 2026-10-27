@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { GATE_SURFACE_RULES_PATH, gateSurfaceDigest, gateSurfaceOfCommit } from "./gate-surface.mjs";
 import {
   RELEASE_GATE_REPORT_SCHEMA,
   RELEASE_MAX_AGE_MS,
@@ -324,4 +326,80 @@ test("with a surface digest the CLI sends the gate's OR query, still GET only", 
   const url = new URL(`https://x.example${calls[0].path}`);
   assert.equal(url.searchParams.get("or"), `(release_revision.eq.${SHA},gate_surface_sha256.eq."${SURFACE}")`);
   assert.equal(url.searchParams.get("release_revision"), null);
+});
+
+// D-05 gate surface (scripts/gate-surface.mjs). Here so the lib/release-gate-check-script.test.ts wrapper runs it too.
+const repositoryRoot = fileURLToPath(new URL("../..", import.meta.url));
+const surfaceRules = JSON.parse(readFileSync(new URL("./gate-surface-rules.json", import.meta.url), "utf8"));
+const SURFACE_DIGEST = /^sha256:[0-9a-f]{64}$/;
+const surfaceTree = (entries) =>
+  entries.map(([path, n]) => `100644 blob ${String(n).padStart(40, "0")}\t${path}`).join("\0") + "\0";
+const SURFACE_BASE = [
+  [GATE_SURFACE_RULES_PATH, 1],
+  ["shared/scopedCustomerDataGate.ts", 2],
+  ["nextjs/components/landing-v2/landing-page.tsx", 3],
+  ["docs/policy/TERMS.md", 4],
+  ["nextjs/app/benchmarks/gdp-pdf/page.tsx", 5],
+  ["supabase/migrations/20260930070000_processing_qualification_stage.sql", 6],
+];
+const surfaceChange = (path, n) => surfaceTree(SURFACE_BASE.map(([p, b]) => [p, p === path ? n : b]));
+const inSurface = (path) => surfaceRules.alwaysSurface.some((source) => new RegExp(source).test(path)) ||
+  !surfaceRules.presentational.some((source) => new RegExp(source).test(path));
+
+test("gate surface: a presentational change keeps the digest; a gate, policy or rules change moves it", () => {
+  const before = gateSurfaceDigest(surfaceRules, surfaceTree(SURFACE_BASE));
+  assert.match(before, SURFACE_DIGEST);
+  assert.equal(gateSurfaceDigest(surfaceRules, surfaceChange("nextjs/components/landing-v2/landing-page.tsx", 9)), before);
+  assert.equal(gateSurfaceDigest(surfaceRules, surfaceChange("nextjs/app/benchmarks/gdp-pdf/page.tsx", 9)), before);
+  for (const path of ["shared/scopedCustomerDataGate.ts", "docs/policy/TERMS.md", GATE_SURFACE_RULES_PATH,
+    "supabase/migrations/20260930070000_processing_qualification_stage.sql"]) {
+    assert.notEqual(gateSurfaceDigest(surfaceRules, surfaceChange(path, 9)), before, path);
+  }
+  // A new server path anywhere is surface by default, and so is a route under a presentational folder.
+  assert.notEqual(gateSurfaceDigest(surfaceRules, surfaceTree([...SURFACE_BASE, ["nextjs/lib/new-upload-path.ts", 7]])), before);
+  assert.notEqual(gateSurfaceDigest(surfaceRules, surfaceTree([...SURFACE_BASE, ["nextjs/app/benchmarks/x/route.ts", 7]])), before);
+  assert.equal(gateSurfaceDigest(surfaceRules, surfaceTree([...SURFACE_BASE, ["nextjs/e2e/new.spec.ts", 7]])), before);
+});
+
+test("gate surface: no rules file, foreign rules or a malformed tree yields null, which inherits nothing", () => {
+  assert.equal(gateSurfaceDigest(surfaceRules, surfaceTree(SURFACE_BASE.slice(1))), null);
+  assert.equal(gateSurfaceDigest({ ...surfaceRules, schemaVersion: "other" }, surfaceTree(SURFACE_BASE)), null);
+  assert.equal(gateSurfaceDigest({ ...surfaceRules, presentational: "x" }, surfaceTree(SURFACE_BASE)), null);
+  assert.equal(gateSurfaceDigest(surfaceRules, "no-tab-here\0"), null);
+  assert.equal(gateSurfaceOfCommit(repositoryRoot, "0".repeat(40)), null);
+  assert.equal(gateSurfaceOfCommit(repositoryRoot, "HEAD"), null);
+});
+
+test("gate surface: PR #174's own changes are presentational; the gate's files are surface", () => {
+  for (const path of [
+    "nextjs/app/benchmarks/gdp-pdf/page.tsx", "nextjs/app/wanted-sans-korean.css",
+    "nextjs/components/landing-v2/specimen-strip.tsx", "nextjs/e2e/specimen-strip.spec.ts",
+    "nextjs/lib/changelog.ts", "nextjs/lib/compiler-release.ts", "nextjs/lib/gdp-pdf-page-data.ts",
+    "nextjs/lib/specimen-sources.json", "nextjs/lib/specimen-sources.ts", "nextjs/lib/brand-copy.test.ts",
+    "nextjs/scripts/repair-scope.mjs", "nextjs/public/film/poster.avif",
+  ]) assert.equal(inSurface(path), false, path);
+  for (const path of [
+    "shared/scopedCustomerDataGate.ts", "shared/uskcEnums.ts", "nextjs/lib/customer-data-admission.ts",
+    "nextjs/lib/scoped-customer-data-gate-store.ts", "nextjs/lib/processing-workspace-grant.ts",
+    "nextjs/lib/archive-expand.ts", "nextjs/app/api/access/bootstrap/route.ts", "nextjs/next.config.mjs",
+    "nextjs/vercel.json", "nextjs/package.json", "nextjs/pnpm-lock.yaml",
+    "nextjs/public/policy/processing-terms-2026-09-30.json", "docs/policy/FOUNDER_PACKET_CA_2026-09-11.md",
+    "supabase/migrations/20261027120000_release_gate_surface_continuity.sql",
+    "supabase/tests/release_gate_surface_continuity.sql", "nextjs/scripts/gate-surface.mjs", GATE_SURFACE_RULES_PATH,
+    "nextjs/app/workspace/page.tsx",
+  ]) assert.equal(inSurface(path), true, path);
+});
+
+// A build without Git (the Vercel prebuild runs this suite) has no history to hash; the gate then reads
+// the exact SHA only, so there is nothing to assert. With Git, HEAD must have a digest.
+let checkoutHead = null;
+try {
+  checkoutHead = execFileSync("git", ["-C", repositoryRoot, "rev-parse", "HEAD"],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+} catch { /* no Git */ }
+test("gate surface: this checkout's HEAD has a digest, computed from blob ids", { skip: checkoutHead === null }, () => {
+  const head = checkoutHead;
+  const digest = gateSurfaceOfCommit(repositoryRoot, head);
+  assert.match(digest, SURFACE_DIGEST);
+  assert.equal(gateSurfaceOfCommit(repositoryRoot, head), digest);
 });
