@@ -215,7 +215,7 @@ export default function LandingPage({
               >
                 <div className={sourceStyles.heroAside} data-testid="landing-hero-actions">
                     <HeroActions {...heroActions} startLabel={heroStart.label} startHref={heroStart.href}
-                      scene="1" ctaOrderVariant={experiment.ctaOrderVariant} />
+                      scene="1" ctaOrderVariant={experiment.ctaOrderVariant} entry />
                 </div>
                 {/* The film's poster is the first screen's priority image: the specimen strip closes s2. */}
                 <HeroFilm korean={korean} />

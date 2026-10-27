@@ -45,7 +45,7 @@ const HERO_CUT = {
   their end frames fit as AVIF and carry no overprint. The selection rule, the frame scan and the
   sha256 of every file are in public/film/README.md.
 
-  FINAL-SPEC 2026-10-26 §2.1: a phone below 768px opens the film on one readable pane, 4:5, instead of the
+  FINAL-SPEC 2026-10-26 §2.1: a phone below 768px shows Focus as one readable pane, 4:5, instead of the
   whole frame at 3-4px type. Stage 1 has its own still of that pane (`phonePoster*`, a crop of the 2x WebP,
   README "Home phone pane"); stages 2-4 are drawn from their 2x posters by the same CSS crop the video uses.
 */

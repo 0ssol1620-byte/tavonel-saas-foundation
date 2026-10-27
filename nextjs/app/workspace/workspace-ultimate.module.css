@@ -68,7 +68,7 @@
 */
 .content { max-width: 1520px; width: 100%; margin: 0; }
 .surfaceTitle { margin: 0 0 4px; color: var(--text-hi); font-size: clamp(22px, 2vw, 28px); font-weight: 600; line-height: 1.15; letter-spacing: -.02em; }
-.stateHero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 24px; padding: 8px 0 24px; border-bottom: 1px solid var(--hairline-hi); }
+.stateHero { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: end; gap: 24px; padding: 8px 0 24px; border-bottom: 1px solid var(--hairline-hi); }
 .stateHero > div { display: grid; gap: 8px; }
 .stateHero h1 { max-width: 24ch; margin: 0; color: var(--text-hi); font-size: clamp(26px, 2.4vw, 34px); line-height: 1.12; letter-spacing: -.02em; text-wrap: balance; }
 .stateHero span { max-width: 62ch; color: var(--text-lo); font-size: 15px; line-height: 1.55; }
@@ -79,6 +79,8 @@
 
 .stateHero > button:active { transform: scale(.98); }
 .stateHero > button:disabled { color: var(--text-lo); background: transparent; border-color: var(--hairline); cursor: not-allowed; opacity: 1; }
+/* AUDIT C3: the upload beside the next action, outlined so the next action stays the one filled control. */
+.stateHero > button.stateUpload { min-width: 0; background: transparent; color: var(--text-hi); border-color: var(--hairline-hi); }
 
 .paletteBackdrop { position: fixed; inset: 0; z-index: 80; display: grid; place-items: start center; padding: 12vh 18px 18px; background: color-mix(in srgb, var(--ground) 64%, transparent); }
 .palette { width: min(620px, 100%); border: 1px solid var(--hairline-hi); border-radius: var(--r-media, 12px); background: var(--ground); box-shadow: var(--depth-overlay); overflow: hidden; }
@@ -169,6 +171,7 @@
   .commandButton:hover { color: var(--text-hi); background: var(--g1); }
   .accessStrip a:hover { border-color: var(--text-lo); }
   .stateHero > button:hover:not(:disabled) { background: #fff; color: var(--ground); }
+  .stateHero > button.stateUpload:hover { background: var(--g2); color: var(--text-hi); }
   .paletteResults button:hover { color: var(--text-hi); background: var(--g2); }
 }
 

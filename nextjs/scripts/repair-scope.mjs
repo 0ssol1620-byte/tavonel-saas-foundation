@@ -2714,6 +2714,10 @@ export const AFFECTED_GROUPS = Object.freeze([
   // of the shared map. Separate from the historical 424 Explore repair report, which keeps its own planExploreRepairBrowserRuns.
   affectedGroup('explore-answer', /^nextjs\/(?:lib\/explore-(?:(?:sample|story)(?:\.test)?|entry-proof\.test)\.ts|components\/explore\/(?:ask-overlay|evidence-workbench(?:\.test)?)\.tsx|e2e\/explore\.spec\.ts)$/,
     { unitFiles: ['lib/explore-entry-proof.test.ts', 'lib/explore-sample.test.ts', 'lib/explore-story.test.ts', 'lib/visual-world-model.test.ts', 'components/explore/evidence-workbench.test.tsx'], browserFiles: ['e2e/explore.spec.ts'] }),
+  // File intake (founder ask 2026-10-27): the shared drop reader and the first-screen upload entries' end-to-end spec.
+  // Product intake behaviour, so never nativeReuse; the spec runs in 1440 and 390 (run-repair-check).
+  affectedGroup('file-intake', /^nextjs\/(?:lib\/workspace-intake(?:\.test)?\.ts|e2e\/upload-entry\.spec\.ts)$/,
+    { unitFiles: ['lib/workspace-intake.test.ts'], browserFiles: ['e2e/upload-entry.spec.ts'] }),
   // Ordinary Home landing: the thirty exact paths above select ten direct suites and one browser suite, which runs only in
   // projects 1440, 390, 360 and reduced-motion of the shared map.
   affectedGroup('home-landing', new RegExp(`^nextjs/(?:${HOME_AFFECTED_PATHS.map(path => path.replaceAll('.', '\\.')).join('|')})$`),
