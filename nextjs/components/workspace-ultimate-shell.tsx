@@ -361,6 +361,9 @@ export default function WorkspaceUltimateShell({
               </div>
               {/* While the workspace state is still resolving there is no honest next action, so
                   the control says so and stays inert rather than offering a guess. */}
+              {/* Founder 2026-10-27 (AUDIT C3): adding a source is one press from the state, in every mode. onUpload
+                  keeps the intake-closed guard: a closed workspace gets its closed sentence, not a picker. */}
+              <button type="button" className={styles.stateUpload} onClick={onUpload}>Upload sources</button>
               <button type="button" disabled={!nextAction.surface && !nextAction.run} onClick={() => runAction(nextAction)}>{nextAction.label}</button>
             </section>
           ) : surface === "home" ? null : (
