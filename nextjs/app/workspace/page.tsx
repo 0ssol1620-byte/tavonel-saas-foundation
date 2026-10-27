@@ -431,6 +431,23 @@ export default function WorkspacePage() {
   }, []);
   const compileLimits = compileLimitsNotice(archiveCeilingMb);
   const [dropActive, setDropActive] = useState(false);
+  // A file dropped outside the intake section would open in the tab and leave the workspace. The section handles its
+  // own drop (and prevents the default first); any other drop is cancelled and the section is brought into view.
+  useEffect(() => {
+    const hasFiles = (event: DragEvent) => event.dataTransfer?.types.includes("Files") ?? false;
+    const onDragOver = (event: DragEvent) => { if (hasFiles(event)) event.preventDefault(); };
+    const onDrop = (event: DragEvent) => {
+      if (event.defaultPrevented || !hasFiles(event)) return;
+      event.preventDefault();
+      document.querySelector(".workspace-intake")?.scrollIntoView({ block: "start" });
+    };
+    document.addEventListener("dragover", onDragOver);
+    document.addEventListener("drop", onDrop);
+    return () => {
+      document.removeEventListener("dragover", onDragOver);
+      document.removeEventListener("drop", onDrop);
+    };
+  }, []);
   const [documents, setDocuments] = useState<DocumentListItem[] | null>(null);
   const [documentInventoryState, setDocumentInventoryState] = useState<"loading" | "ready" | "unavailable">("loading");
   const [documentInventoryPartial, setDocumentInventoryPartial] = useState<DocumentListPartial | null>(null);

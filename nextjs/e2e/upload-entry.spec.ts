@@ -11,10 +11,12 @@ import { fixtureDocument, installFixtureSession, installWorkspaceRoutes, sseFram
     promise. Customer file processing is not open to a visitor, so the box is the hero's access action (the
     document evaluation), never an upload label in front of a sign-in page that says processing is not open
     (PR #177 review round 1, code B1 and design B1). It is not a drop zone: a public intake and its wording are
-    the founder's;
+    the founder's. A file dropped on Home is not opened in the tab and not kept; focus moves to the box (review
+    round 2, nit 1);
   - on /workspace after a cancelled run, at 1440 and 390: the intake is on the first screen and takes a drop,
     and the state's "Upload sources" opens the file picker -- or, where the intake is closed, says why and
-    opens nothing (the customerDataAccess guard).
+    opens nothing (the customerDataAccess guard). A file dropped outside the intake is cancelled, not opened in
+    the tab, and not staged.
   Staging is not upload: the preflight region appears, and the upload stays behind its own approval.
 */
 
@@ -37,6 +39,21 @@ async function dropPdf(page: Page, selector: string, name = "report.pdf") {
   await page.locator(selector).dispatchEvent("dragenter", { dataTransfer: transfer });
   await page.locator(selector).dispatchEvent("dragover", { dataTransfer: transfer });
   await page.locator(selector).dispatchEvent("drop", { dataTransfer: transfer });
+}
+
+/** Drops one PDF on `selector` from inside the page; returns whether dragover and drop had their default prevented. */
+async function dropPdfPrevented(page: Page, selector: string) {
+  return page.evaluate(({ body, target }) => {
+    const data = new DataTransfer();
+    data.items.add(new File([body], "report.pdf", { type: "application/pdf" }));
+    const node = document.querySelector(target)!;
+    const fire = (type: string) => {
+      const event = new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: data });
+      node.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    return { dragover: fire("dragover"), drop: fire("drop") };
+  }, { body: PDF, target: selector });
 }
 
 /** A returning workspace whose selected compile was cancelled: the founder's 2026-10-27 screenshot, in fixtures. */
@@ -81,6 +98,23 @@ for (const [path, label, href] of [["/", "Evaluate your documents", "/evaluation
     await page.waitForURL(`**${href}`);
     await expect(page.locator("main")).toBeVisible();
     await expect(page.locator("body"), "the entry does not lead to a closed door").not.toContainText(/not open yet|열려 있지 않/);
+  });
+}
+
+for (const path of ["/", "/ko"]) {
+  test(`a file dropped on Home does not open in the tab, is not kept, and moves focus to the document entry (${path})`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "1440" && testInfo.project.name !== "390", "1440 and 390");
+    await page.goto(path);
+    const entry = page.locator("#s1 a.lv2-entry");
+    await expect(entry).toHaveCount(1);
+    const stored = () => page.evaluate(async () => ({ local: localStorage.length, session: sessionStorage.length, databases: (await indexedDB.databases()).length }));
+    const before = await stored();
+    // The listener is attached after hydration: retry until the drop is cancelled.
+    await expect.poll(async () => (await dropPdfPrevented(page, "#lv2-hero-title")).drop, { timeout: 10_000 }).toBe(true);
+    expect(await dropPdfPrevented(page, "footer"), "dragover and drop are cancelled anywhere on the page").toEqual({ dragover: true, drop: true });
+    expect(new URL(page.url()).pathname, "the visitor stays on Home").toBe(path);
+    await expect(entry).toBeFocused();
+    expect(await stored(), "Home keeps no file").toEqual(before);
   });
 }
 
@@ -131,4 +165,16 @@ test("where the intake is closed, Upload sources says why and opens no picker", 
   await expect(page.getByText("Source processing is not active for this workspace yet. Your files stay on your device.").first()).toBeVisible();
   expect(opened, "no picker behind a closed intake").toBe(false);
   await expect(page.locator(".workspace-preflight")).toHaveCount(0);
+});
+
+test("a file dropped outside the workspace intake does not open in the tab and is not staged", async ({ page, baseURL }, testInfo) => {
+  test.skip(testInfo.project.name !== "1440", "once");
+  await local(page, baseURL);
+  await installFixtureSession(page);
+  await cancelledRun(page);
+  const before = page.url();
+  expect(await dropPdfPrevented(page, "section.workspace-compile-job"), "dragover and drop are cancelled outside the intake").toEqual({ dragover: true, drop: true });
+  expect(page.url(), "the visitor stays on the workspace").toBe(before);
+  await expect(page.locator(".workspace-intake")).toBeInViewport();
+  await expect(page.locator(".workspace-preflight"), "a drop outside the intake stages nothing").toHaveCount(0);
 });
