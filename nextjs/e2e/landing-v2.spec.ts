@@ -287,20 +287,14 @@ test("Korean pricing carries the selected plan into the inquiry", async ({ page 
     1440x900  EN fold 30, body 649 (strip 133)   KO fold 25, body 554 (strip 116)   h2 6
     390x844   EN fold 30, body 538               KO fold 25, body 458
   Budgets: EN body 659, KO body 564 at 1440x900 (every cell shows there); fold 35 at 1440x900 and 390x844.
-  Founder asks 2026-10-27 changed what the phone's first screen holds, on purpose, so the 390x844 fold is re-derived
-  from a new measurement -- not raised to go green; the 1440 fold and both bodies are unchanged. (1) The film opens
-  compact, so at 390 its figure ends above the fold and the fixed disclosure under it ("Illustrative demo · not
-  customer results." / "제품 흐름 예시 · 고객 결과가 아닙니다.", 6 / 7 tokens) is on the first screen. (2) The upload
-  entry ("Upload a PDF" / "PDF 올리기", 3 / 2). Same method, production build of codex/home-ux-20261027 in fixture
-  posture, chromium (receipt: outputs/.../ux-20261027/IMPL.md and impl-r2-measure-raw.json):
-    1440x900  EN fold 33, body 654   KO fold 27, body 557   h2 6
-    390x844   EN fold 39             KO fold 34
-  Rule for the re-derived cell: the measured fold, no headroom. The 1440 fold stays 35.
+  Founder asks 2026-10-27 (codex/home-ux-20261027) leave every budget where it was. The film opens compact, so at
+  390x844 the fixed disclosure under it ("Illustrative demo · not customer results." / "제품 흐름 예시 · 고객 결과가
+  아닙니다.", 6 / 7 tokens) is on the first screen; the hero's access action became the document entry box with no
+  arrow glyph and no third action (PR #177 review round 1). Same method, fixture posture, chromium:
+    1440x900  EN fold 29, body 650   KO fold 24, body 554   h2 6
+    390x844   EN fold 35             KO fold 31
 */
-const WORD_BUDGET = {
-  "/": { fold: { 1440: 35, 390: 39 }, body: 659 },
-  "/ko": { fold: { 1440: 35, 390: 34 }, body: 564 },
-} as const;
+const WORD_BUDGET = { "/": { fold: 35, body: 659 }, "/ko": { fold: 35, body: 564 } } as const;
 for (const route of ["/", "/ko"] as const) {
   test(`${route} stays within its re-derived word budget, with six h2`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440" && testInfo.project.name !== "390", "measured at 1440x900 (fold and body) and 390x844 (fold)");
@@ -323,7 +317,7 @@ for (const route of ["/", "/ko"] as const) {
       const consent = document.querySelector<HTMLElement>("[data-marketing-consent-panel]");
       return { fold, body: count(document.body.innerText) - (consent ? count(consent.innerText) : 0), h2: document.querySelectorAll("h2").length };
     });
-    expect(words.fold, `${route} fold words`).toBeLessThanOrEqual(WORD_BUDGET[route].fold[testInfo.project.name === "1440" ? 1440 : 390]);
+    expect(words.fold, `${route} fold words`).toBeLessThanOrEqual(WORD_BUDGET[route].fold);
     if (testInfo.project.name === "1440") expect(words.body, `${route} body words`).toBeLessThanOrEqual(WORD_BUDGET[route].body);
     expect(words.h2).toBe(6);
   });

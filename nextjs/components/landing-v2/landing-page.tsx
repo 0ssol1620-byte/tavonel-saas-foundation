@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
 import HeroFilm from "./hero-film";
-import HeroActions, { HeroUpload } from "./hero-actions";
+import HeroActions from "./hero-actions";
 import HeroSourceCard from "./hero-source-card";
 import HeroStatement from "./hero-statement";
 import HomeMeasures from "./home-measures";
@@ -215,8 +215,7 @@ export default function LandingPage({
               >
                 <div className={sourceStyles.heroAside} data-testid="landing-hero-actions">
                     <HeroActions {...heroActions} startLabel={heroStart.label} startHref={heroStart.href}
-                      scene="1" ctaOrderVariant={experiment.ctaOrderVariant} />
-                    <HeroUpload korean={korean} />
+                      scene="1" ctaOrderVariant={experiment.ctaOrderVariant} entry />
                 </div>
                 {/* The film's poster is the first screen's priority image: the specimen strip closes s2. */}
                 <HeroFilm korean={korean} />

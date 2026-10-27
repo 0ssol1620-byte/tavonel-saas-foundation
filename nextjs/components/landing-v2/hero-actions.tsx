@@ -9,6 +9,8 @@ type HeroActionsProps = {
   exploreHref: string;
   scene: string;
   ctaOrderVariant?: "a" | "b" | "c";
+  /** Scene 1 only: the access action is drawn as the hero's document entry (see the note at the end of this file). */
+  entry?: boolean;
 } & (
   | { startLabel: string; startHref: string }
   | { pricingLabel: string; pricingHref?: string }
@@ -16,7 +18,7 @@ type HeroActionsProps = {
 
 /** Accept the resolved Home access action while preserving existing pricing callers. */
 export default function HeroActions(props: HeroActionsProps) {
-  const { exploreLabel, exploreHref, scene, ctaOrderVariant = "a" } = props;
+  const { exploreLabel, exploreHref, scene, ctaOrderVariant = "a", entry = false } = props;
   const explore = { label: exploreLabel, href: exploreHref, cta: "explore" } as const;
   const access = "startLabel" in props
     ? { label: props.startLabel, href: props.startHref, cta: "start" as const }
@@ -33,28 +35,31 @@ export default function HeroActions(props: HeroActionsProps) {
         onClick={onSelect(primary)} data-analytics="hero-primary">
         {primary.label}
       </Link>
-      <Link className="lv2-text-link" href={secondary.href as Route} prefetch={false}
-        onClick={onSelect(secondary)} data-analytics="hero-secondary">
-        {secondary.label}<span aria-hidden="true">&nbsp;→</span>
-      </Link>
+      {entry && secondary === access ? (
+        <Link className="lv2-entry" href={secondary.href as Route} prefetch={false}
+          onClick={onSelect(secondary)} data-analytics="hero-secondary">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" focusable="false">
+            <path d="M3.5 1.5h6l3 3v10h-9zM9.5 1.5v3h3" />
+          </svg>
+          {secondary.label}
+        </Link>
+      ) : (
+        <Link className="lv2-text-link" href={secondary.href as Route} prefetch={false}
+          onClick={onSelect(secondary)} data-analytics="hero-secondary">
+          {secondary.label}<span aria-hidden="true">&nbsp;→</span>
+        </Link>
+      )}
     </div>
   );
 }
 
 /*
-  Founder ask 2026-10-27 ("pdf 어디에 올리라는거야?"): Home's first screen names where a PDF goes. The workspace
-  intake is behind sign-in, so this is a way in, not a drop zone: a Home drop would have to keep the visitor's
-  file before sign-in, and how that is told to the visitor is consent wording (founder-only). /login sends a
-  signed-in visitor straight on to /workspace, whose intake is the first block of its Home tab.
+  The hero's document entry (`entry`), PR #177 review round 1 (code B1, design B1). Founder ask 2026-10-27 ("pdf
+  어디에 올리라는거야?"): Home's first screen names where your documents go, with one box -- and the box keeps the
+  promise of the screen it opens. Customer file processing is not open to a visitor
+  (activationPolicy.customerData.enabled=false), so the box is the hero's own access action ("Evaluate your
+  documents" / "내 문서 평가" to /evaluation or /ko/evaluation while access resolves to /contact), not an upload label
+  in front of a sign-in page whose first sentence is that processing is not open. It replaces the text link rather
+  than adding a third action (DESIGN_MASTER_V3 §12.2) and draws no arrow: the box is the control. A public intake and
+  its wording are the founder's call; until then the drop zone is the workspace's (app/workspace/page.tsx).
 */
-export function HeroUpload({ korean }: { korean: boolean }) {
-  return (
-    <Link className="lv2-upload" href={"/login?next=/workspace" as Route} prefetch={false} data-analytics="hero-upload"
-      onClick={() => trackFunnel("cta_clicked", { cta: "upload", scene: "1" })}>
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" focusable="false">
-        <path d="M8 10.5V2.5M4.5 6 8 2.5 11.5 6M2.5 10.5v3h11v-3" />
-      </svg>
-      <span>{korean ? "PDF 올리기" : "Upload a PDF"}</span>
-    </Link>
-  );
-}

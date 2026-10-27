@@ -7,8 +7,11 @@ import { fixtureDocument, installFixtureSession, installWorkspaceRoutes, sseFram
   the intake below the status, Activity, Needs attention and the cancelled run's parts).
 
   What this file holds, against fixtures (no provider account, no customer document, a loopback server only):
-  - Home's first screen names where a PDF goes: one entry, unscrolled, that leads to the workspace through
-    /login. It is not a drop zone (keeping a visitor's file before sign-in needs consent wording, founder-only);
+  - Home's first screen names where your documents go: one box, unscrolled, and the screen it opens keeps its
+    promise. Customer file processing is not open to a visitor, so the box is the hero's access action (the
+    document evaluation), never an upload label in front of a sign-in page that says processing is not open
+    (PR #177 review round 1, code B1 and design B1). It is not a drop zone: a public intake and its wording are
+    the founder's;
   - on /workspace after a cancelled run, at 1440 and 390: the intake is on the first screen and takes a drop,
     and the state's "Upload sources" opens the file picker -- or, where the intake is closed, says why and
     opens nothing (the customerDataAccess guard).
@@ -61,17 +64,23 @@ async function onFirstScreen(page: Page, control: Locator, what: string, minHeig
   expect(box.height, `${what} is a ${minHeight}px target`).toBeGreaterThanOrEqual(minHeight);
 }
 
-for (const [path, label] of [["/", "Upload a PDF"], ["/ko", "PDF 올리기"]] as const) {
-  test(`Home's first screen names where a PDF goes, and it leads to the workspace through sign-in (${path})`, async ({ page }, testInfo) => {
+for (const [path, label, href] of [["/", "Evaluate your documents", "/evaluation"], ["/ko", "내 문서 평가", "/ko/evaluation"]] as const) {
+  test(`Home's first screen names where your documents go, and the screen it opens keeps that promise (${path})`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440" && testInfo.project.name !== "390", "1440 and 390");
+    // A first visit: no session, no fixture user.
     await page.goto(path);
-    const entry = page.locator("#s1 a.lv2-upload");
+    const entry = page.locator("#s1 a.lv2-entry");
     await expect(entry).toHaveCount(1);
     await expect(entry).toHaveText(label);
-    await expect(entry).toHaveAttribute("href", "/login?next=/workspace");
-    await onFirstScreen(page, entry, "the upload entry", 44);
+    await expect(entry).toHaveAttribute("href", href);
+    await onFirstScreen(page, entry, "the document entry", 44);
+    // Two hero actions, not three (DESIGN_MASTER_V3 §12.2), and none of them promises an upload behind sign-in.
+    await expect(page.locator("#s1 [data-testid='landing-hero-actions'] a")).toHaveCount(2);
+    await expect(page.locator("#s1 a[href^='/login']")).toHaveCount(0);
     await entry.click();
-    await page.waitForURL("**/login?next=/workspace");
+    await page.waitForURL(`**${href}`);
+    await expect(page.locator("main")).toBeVisible();
+    await expect(page.locator("body"), "the entry does not lead to a closed door").not.toContainText(/not open yet|열려 있지 않/);
   });
 }
 
@@ -93,12 +102,13 @@ for (const [width, height] of [[1440, 900], [390, 844]] as const) {
     const upload = page.getByRole("button", { name: "Upload sources", exact: true });
     await onFirstScreen(page, upload, `"Upload sources" at ${width}`, 40);
     // The intake comes before the cancelled run's parts.
+    await expect(page.locator("section.workspace-compile-job"), "the cancelled run's parts render").toHaveCount(1);
     const order = await page.evaluate(() => {
       const intakeNode = document.querySelector(".workspace-intake")!;
-      const job = document.querySelector("section.workspace-compile-job");
-      return job ? Boolean(intakeNode.compareDocumentPosition(job) & Node.DOCUMENT_POSITION_FOLLOWING) : null;
+      const job = document.querySelector("section.workspace-compile-job")!;
+      return Boolean(intakeNode.compareDocumentPosition(job) & Node.DOCUMENT_POSITION_FOLLOWING);
     });
-    if (order !== null) expect(order, "the intake precedes the compile").toBe(true);
+    expect(order, "the intake precedes the compile").toBe(true);
     await page.screenshot({ path: testInfo.outputPath(`workspace-cancelled-${width}.png`) });
     const chooser = page.waitForEvent("filechooser");
     await upload.click();
