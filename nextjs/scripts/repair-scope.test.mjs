@@ -7506,18 +7506,20 @@ test('affected gdp-pdf-runs owner: 3 exact paths select 2 direct suites and 2 br
 });
 // hard-proof 2026-10-27 C3: the Compiler 1 release record, one finite owner, restated independently of the exported constants.
 import { COMPILER_RELEASE_AFFECTED_PATHS, COMPILER_RELEASE_AFFECTED_UNIT_FILES, COMPILER_RELEASE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
-test('affected compiler-release owner: 1 exact path selects 3 direct suites and 2 browser suites; neighbours stay unmapped', () => {
+test('affected compiler-release owner: 2 exact paths select 3 direct suites and 2 browser suites; neighbours stay unmapped', () => {
   const suites = ['lib/brand-copy.test.ts', 'lib/changelog.test.ts', 'lib/gdp-pdf-page-data.test.ts'];
   const browsers = ['e2e/benchmarks.spec.ts', 'e2e/templates.spec.ts'];
-  assert.deepEqual([[...COMPILER_RELEASE_AFFECTED_PATHS], [...COMPILER_RELEASE_AFFECTED_UNIT_FILES], [...COMPILER_RELEASE_AFFECTED_BROWSER_FILES]], [['lib/compiler-release.ts'], suites, browsers]);
-  assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/lib/compiler-release.ts')).map(o => o.group), ['compiler-release']);
-  const map = affectedMap([affectedRecord('M', ['nextjs/lib/compiler-release.ts'])]);
+  assert.deepEqual([[...COMPILER_RELEASE_AFFECTED_PATHS], [...COMPILER_RELEASE_AFFECTED_UNIT_FILES], [...COMPILER_RELEASE_AFFECTED_BROWSER_FILES]], [['lib/compiler-release.ts', 'public/proof-collection/compiler-releases/core-v2-health-2026-10-27T09-28-53Z.json'], suites, browsers]);
+  for (const path of ['nextjs/lib/compiler-release.ts', 'nextjs/public/proof-collection/compiler-releases/core-v2-health-2026-10-27T09-28-53Z.json']) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['compiler-release'], path);
+  }
+  const map = affectedMap([affectedRecord('M', ['nextjs/lib/compiler-release.ts', 'nextjs/public/proof-collection/compiler-releases/core-v2-health-2026-10-27T09-28-53Z.json'])]);
   assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['compiler-release'], [], suites, browsers, []]);
   assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
   const plan = affectedAskPlan(map);
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, browsers, false, false]);
   assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440']);
-  for (const adjacent of ['nextjs/lib/compiler-release.test.ts', 'nextjs/lib/compiler-releases.ts', 'nextjs/lib/compiler-release.tsx', 'nextjs/lib/compiler-release.json', 'lib/compiler-release.ts']) {
+  for (const adjacent of ['nextjs/lib/compiler-release.test.ts', 'nextjs/lib/compiler-releases.ts', 'nextjs/lib/compiler-release.tsx', 'nextjs/lib/compiler-release.json', 'lib/compiler-release.ts', 'nextjs/public/proof-collection/compiler-releases/core-v2-health.json', 'nextjs/public/proof-collection/compiler-releases/other.json', 'public/proof-collection/compiler-releases/core-v2-health-2026-10-27T09-28-53Z.json']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);

@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ChangelogList } from "@/components/changelog-list";
-import { COMPILER_RELEASE, COMPILER_RELEASE_DEFINITION } from "./compiler-release";
+import { COMPILER_RELEASE, COMPILER_RELEASE_1_1, COMPILER_RELEASES } from "./compiler-release";
 import { GET as feedRoute } from "@/app/changelog/feed.xml/route";
 import {
   CHANGELOG,
@@ -285,31 +285,60 @@ describe("the page that renders it", () => {
 });
 
 /*
-  hard-proof 2026-10-27 (FINAL-SPEC-HARD-PROOF §1): an entry that shipped a compiler release prints
-  it as a line under its title. The first such line on the page is the name's first mention, so it
-  carries the definition; a later one prints the name and the digest only.
+  hard-proof 2026-10-27 (FINAL-SPEC-HARD-PROOF §1 and its §7 addendum): an entry that shipped a
+  compiler release prints it as a line under its title. Each release's first line on the page is
+  that name's first mention, so it carries that release's own definition; a later line of the same
+  release prints the name and the digest only.
+
+  What the page shows: newest first, the Core receipt fix (Compiler 1.1) sits above the 2026-10-27
+  website release (Compiler 1). So the first "Compiler 1" a reader meets is "TAVONEL Compiler 1.1",
+  defined by its own sentence, and Compiler 1's line below it still carries Compiler 1's sentence.
 */
 describe("the compiler release line", () => {
   const entry = (id: string, compilerRelease?: ChangelogEntry["compilerRelease"]): ChangelogEntry => ({
     date: "2026-10-28", id, title: "A release that shipped a compiler", surfaces: ["Website"], added: ["One line."], compilerRelease,
   });
   const html = renderToStaticMarkup(createElement(ChangelogList, {
-    entries: [entry("2026-10-28-a"), entry("2026-10-28-b", "compiler-1"), entry("2026-10-28-c", "compiler-1")],
+    entries: [
+      entry("2026-10-28-a"), entry("2026-10-28-b", "compiler-1-1"), entry("2026-10-28-c", "compiler-1"),
+      entry("2026-10-28-d", "compiler-1"), entry("2026-10-28-e", "compiler-1-1"),
+    ],
   })).replace(/&#x27;/g, "'");
 
-  it("is printed only for an entry that names a release, and the first one defines the name", () => {
+  it("is printed only for an entry that names a release, and each release's first line defines it", () => {
+    expect(html.match(/data-compiler-release="compiler-1-1"/g)).toHaveLength(2);
     expect(html.match(/data-compiler-release="compiler-1"/g)).toHaveLength(2);
-    expect(html.split(COMPILER_RELEASE_DEFINITION.en)).toHaveLength(2);
+    for (const release of COMPILER_RELEASES) {
+      expect(html.split(release.definition.en), release.id).toHaveLength(2);
+      expect(html.split(`TAVONEL ${release.name} · `), release.id).toHaveLength(2);
+      expect(html).toContain(`<code title="${release.digest}">${release.digest.slice(7, 15)}</code>`);
+    }
+    // Each definition sits on its release's first line: 1.1's on b, 1's on c, none on d or e.
+    expect(html.indexOf(COMPILER_RELEASE_1_1.definition.en)).toBeLessThan(html.indexOf('id="2026-10-28-c"'));
+    expect(html.indexOf(COMPILER_RELEASE.definition.en)).toBeGreaterThan(html.indexOf('id="2026-10-28-c"'));
+    expect(html.indexOf(COMPILER_RELEASE.definition.en)).toBeLessThan(html.indexOf('id="2026-10-28-d"'));
     // The first mention of the name on the page is the defined one.
     expect(html.indexOf(COMPILER_RELEASE.name)).toBe(html.indexOf(`TAVONEL ${COMPILER_RELEASE.name}`) + "TAVONEL ".length);
-    expect(html.indexOf(COMPILER_RELEASE_DEFINITION.en)).toBeLessThan(html.indexOf('id="2026-10-28-c"'));
-    expect(html).toContain(`<code title="${COMPILER_RELEASE.digest}">${COMPILER_RELEASE.digest.slice(7, 15)}</code>`);
   });
 
-  it("prints no release line on the committed history, which names none yet", () => {
-    expect(CHANGELOG.filter((item) => item.compilerRelease)).toEqual([]);
-    const committed = renderToStaticMarkup(createElement(ChangelogList, { entries: changelogEntries() }));
-    expect(committed).not.toContain("data-compiler-release");
-    expect(committed).not.toContain(COMPILER_RELEASE.name);
+  it("shows Compiler 1.1 above Compiler 1 on the committed history, each defined once", () => {
+    expect(changelogEntries().filter((item) => item.compilerRelease).map((item) => [changelogEntryId(item), item.compilerRelease]))
+      .toEqual([["2026-10-27-scanned-documents-compile", "compiler-1-1"], ["2026-10-27-hard-pages-on-home", "compiler-1"]]);
+    const committed = renderToStaticMarkup(createElement(ChangelogList, { entries: changelogEntries() })).replace(/&#x27;/g, "'");
+    expect(committed.match(/data-compiler-release=/g)).toHaveLength(2);
+    for (const release of COMPILER_RELEASES) {
+      expect(committed.split(`TAVONEL ${release.name} · `), release.id).toHaveLength(2);
+      expect(committed.split(release.definition.en), release.id).toHaveLength(2);
+    }
+    // The page's first "Compiler 1" is Compiler 1.1's defined line; Compiler 1's defined line comes after it.
+    expect(committed.indexOf(COMPILER_RELEASE.name)).toBe(committed.indexOf(`TAVONEL ${COMPILER_RELEASE_1_1.name} · `) + "TAVONEL ".length);
+    expect(committed.indexOf(COMPILER_RELEASE_1_1.definition.en)).toBeLessThan(committed.indexOf(COMPILER_RELEASE.definition.en));
+  });
+
+  it("names releases lib/compiler-release.ts defines, each on a deployment that shipped it", () => {
+    for (const item of CHANGELOG.filter((candidate) => candidate.compilerRelease)) {
+      expect(COMPILER_RELEASES.map((release) => release.id), changelogEntryId(item)).toContain(item.compilerRelease);
+      expect(item.releasedAt, changelogEntryId(item)).toBeTruthy();
+    }
   });
 });

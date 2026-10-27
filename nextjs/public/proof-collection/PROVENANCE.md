@@ -68,3 +68,29 @@ SHA-256:
 `lib/specimen-sources.ts` refuses a production receipt whose licence is not
 `US-GOV-WORK`, `KOGL-0` or `KOGL-1`. tavonel.com renders the strip at the end of
 Home's second scene (`SPECIMEN_STRIP_ROLLOUT` is `"on"` since 2026-10-27).
+
+## Compiler releases
+
+`compiler-releases/` holds what the Core pins in `lib/compiler-release.ts` are
+read from. The reader pins of both releases are read from the specimen run
+receipts above.
+
+- `core-v2-health-2026-10-27T09-28-53Z.json`: the body of
+  `GET https://tavonel-product-core-v2.vercel.app/health`, byte for byte as
+  curl saved it (224 bytes, SHA-256
+  `365fb7d28ad49aeef1faf6158639fbc53538f6d5e2980b6c5404263009fe4133`). Captured
+  at 2026-10-27T09:28:53Z: `date -u` read 09:28:52Z before the request and
+  09:28:53Z after it, and the response's `x-vercel-id` carries
+  2026-10-27T09:28:53.126Z. The response's own `Date` header read
+  2026-10-27 09:21:46 GMT; it is recorded here and not used as the capture time.
+  Its `coreReleaseDigest`,
+  `sha256:b787dd86f6f57f92b76d91dcce1cba2d8064f5a75445f24010db0cc55f4598cd`, is
+  Compiler 1.1's Core pin, served by deployment
+  `dpl_AsvGT4RAKac6XdC88rNqomf2b2Z4` (READY 2026-10-27T09:21:44.349Z).
+- Compiler 1's Core pin,
+  `sha256:ceed3860d3da5efad5b6dab199f131fa4925aa48a60c0ad62805d6b1958f211e`, has
+  no file here. It was read from the same `/health` at 2026-10-27T08:04:58Z,
+  before that deployment, and the value was written down without the response
+  bytes. It was also re-derived by re-hashing the 134 files of the staged Core
+  release. Both records are in the hard-proof campaign's working receipts, which
+  are not committed to any repository.
