@@ -220,18 +220,18 @@ test("server-renders the visible film poster as its priority image", async ({ re
   // srcset preload in the HTTP Link header, so the hint is the first-party <link rel=preload> in the
   // streamed <head>, ahead of the body; the header must not point at a superseded poster either.
   /*
-    FINAL-SPEC 2026-10-26 §2.1: a phone's first image is the stage-1 pane, one file rather than a srcset, so React puts
-    its preload in the HTTP Link header, scoped to phones by `media`. It is the one poster the header may name; the
-    head keeps the desktop srcset hint, scoped to 768px and up, so neither screen fetches the other's poster.
+    Founder ask 2026-10-27 (compact by default): every width opens on the whole frame, so the one hint is the frame's
+    srcset with no `media` -- a phone takes its 1440px file, a desktop the 2880px one -- and the phone pane's still,
+    which only Focus details shows, is preloaded nowhere. The header names no poster (React keeps srcset hints in the head).
   */
   const posterHint = response.headers()["link"] ?? "";
-  expect(posterHint.match(/\/film\/poster-[^>]+/g) ?? []).toEqual(["/film/poster-1-t8.16-pane1-684x855.avif"]);
-  expect(posterHint).toMatch(/<\/film\/poster-1-t8\.16-pane1-684x855\.avif>;[^,]*media="\(max-width: 767\.98px\)"/);
+  expect(posterHint.match(/\/film\/poster-[^>]+/g) ?? []).toEqual([]);
   const head = html.slice(0, html.indexOf("</head>"));
+  expect(head).not.toContain("poster-1-t8.16-pane1-684x855");
   const preloads = [...head.matchAll(/<link[^>]*rel="preload"[^>]*as="image"[^>]*>/g)].map(match => match[0]);
   expect(preloads).toHaveLength(1);
   expect(preloads[0]).toMatch(/fetchpriority="high"/i);
-  expect(preloads[0]).toMatch(/media="\(min-width: 768px\)"/i);
+  expect(preloads[0]).not.toMatch(/ media=/i);
   // POSTER-RECUT (D-11): the one hint is the AVIF srcset, typed so a browser without AVIF skips it.
   expect(preloads[0]).toMatch(/imagesrcset="\/film\/poster-1-t8\.16\.avif 1440w, \/film\/poster-1-t8\.16-2x\.avif 2880w"/i);
   expect(preloads[0]).toMatch(/type="image\/avif"/i);
@@ -287,8 +287,20 @@ test("Korean pricing carries the selected plan into the inquiry", async ({ page 
     1440x900  EN fold 30, body 649 (strip 133)   KO fold 25, body 554 (strip 116)   h2 6
     390x844   EN fold 30, body 538               KO fold 25, body 458
   Budgets: EN body 659, KO body 564 at 1440x900 (every cell shows there); fold 35 at 1440x900 and 390x844.
+  Founder asks 2026-10-27 changed what the phone's first screen holds, on purpose, so the 390x844 fold is re-derived
+  from a new measurement -- not raised to go green; the 1440 fold and both bodies are unchanged. (1) The film opens
+  compact, so at 390 its figure ends above the fold and the fixed disclosure under it ("Illustrative demo · not
+  customer results." / "제품 흐름 예시 · 고객 결과가 아닙니다.", 6 / 7 tokens) is on the first screen. (2) The drop entry
+  ("Drop or choose a PDF" / "PDF를 끌어다 놓거나 선택하세요", 5 / 4). Same method, production build of
+  codex/home-ux-20261027 in fixture posture, chromium (receipt: outputs/.../ux-20261027/IMPL.md and measure-raw.json):
+    1440x900  EN fold 35, body 656   KO fold 29, body 559   h2 6
+    390x844   EN fold 41             KO fold 36
+  Rule for the re-derived cell: the measured fold, no headroom. The 1440 fold stays 35 and is met exactly.
 */
-const WORD_BUDGET = { "/": { fold: 35, body: 659 }, "/ko": { fold: 35, body: 564 } } as const;
+const WORD_BUDGET = {
+  "/": { fold: { 1440: 35, 390: 41 }, body: 659 },
+  "/ko": { fold: { 1440: 35, 390: 36 }, body: 564 },
+} as const;
 for (const route of ["/", "/ko"] as const) {
   test(`${route} stays within its re-derived word budget, with six h2`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440" && testInfo.project.name !== "390", "measured at 1440x900 (fold and body) and 390x844 (fold)");
@@ -311,7 +323,7 @@ for (const route of ["/", "/ko"] as const) {
       const consent = document.querySelector<HTMLElement>("[data-marketing-consent-panel]");
       return { fold, body: count(document.body.innerText) - (consent ? count(consent.innerText) : 0), h2: document.querySelectorAll("h2").length };
     });
-    expect(words.fold, `${route} fold words`).toBeLessThanOrEqual(WORD_BUDGET[route].fold);
+    expect(words.fold, `${route} fold words`).toBeLessThanOrEqual(WORD_BUDGET[route].fold[testInfo.project.name === "1440" ? 1440 : 390]);
     if (testInfo.project.name === "1440") expect(words.body, `${route} body words`).toBeLessThanOrEqual(WORD_BUDGET[route].body);
     expect(words.h2).toBe(6);
   });

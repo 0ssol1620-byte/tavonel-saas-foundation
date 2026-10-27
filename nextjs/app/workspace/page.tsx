@@ -49,6 +49,7 @@ import {
 import type { TriageProcessingQuote } from "@/lib/intake-triage-client";
 import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "@/lib/intake-approval-rollout";
 import { collectDroppedWorkspaceFiles, prepareWorkspaceSelection, type WorkspaceSelection, type WorkspaceUploadFile } from "@/lib/workspace-intake";
+import { takeHomeDrop } from "@/lib/home-drop-handoff";
 import { qualifiedDocumentInputs, sourceFamilyChips, uploadAcceptAttribute, validateQualifiedDocumentInput, normalizeDocumentMimeType } from "@/lib/qualified-input";
 import { runBounded } from "@/lib/concurrent";
 import { buildPipeline, type DocumentListPartial, type LocalUpload } from "@/lib/pipeline";
@@ -2155,6 +2156,22 @@ export default function WorkspacePage() {
     }
   };
 
+  /*
+    A PDF dropped on Home (lib/home-drop-handoff) waits in this browser through sign-in. Once source
+    access is known it goes to the same staging a drop here takes -- intake-closed guard included, so a
+    closed workspace prints its closed sentence and nothing is staged -- and the record is gone either way.
+  */
+  const homeDropTaken = useRef(false);
+  // The latest render's staging, so its guard reads the current `intakeOpen` when the record arrives.
+  const stageHomeDrop = useRef(stageWorkspaceFiles);
+  stageHomeDrop.current = stageWorkspaceFiles;
+  useEffect(() => {
+    if (customerDataAccess === "checking" || homeDropTaken.current) return;
+    homeDropTaken.current = true;
+    // ponytail: a browser that cannot open IndexedDB here could not have stored a drop on Home either.
+    void takeHomeDrop().then((files) => { if (files.length > 0) void stageHomeDrop.current(files); }, () => {});
+  }, [customerDataAccess]);
+
   const stagedEstimates = stagedSelection?.files.map((entry, index) => {
     const measured = stagedPageCounts?.[index];
     return estimateBillablePages({
@@ -2930,106 +2947,11 @@ export default function WorkspacePage() {
           ))}
 
           {/*
-            §13.6. Review required, operator action, refused and failed each get their own row
-            with its own written label -- the state is legible without reading a colour, and a
-            second blocked state can no longer hide behind the first one's heading.
+            Founder 2026-10-27 ("이렇게 되어있는데 어떻게 pdf를 어디에 올리라는거야?"): the way to add a source is the
+            first block under the state, in every mode -- a returning workspace, a run in flight, a cancelled
+            run. The whole section takes a drop; the attention queue, the compile and the result follow it.
           */}
-          {tab === "overview" && surface === "home" && attentionItems.length > 0 ? (
-            <section className="workspace-attention" role="alert" aria-labelledby="workspace-attention-title">
-              <div>
-                <h2 id="workspace-attention-title">Needs attention</h2>
-                <ul className="workspace-attention-items">
-                  {attentionItems.map((item) => (
-                    <li key={item.id}>
-                      <strong>{item.label}</strong>
-                      <p>{item.detail}</p>
-                      {item.action ? (
-                        <button
-                          type="button"
-                          onClick={() => { if (item.action?.surface) navigateSurface(item.action.surface); else runIntent(item.action?.intent); }}
-                        >
-                          {item.action.label}
-                        </button>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              {/*
-                A held candidate stays inspectable. When a World is already active the panel
-                below is showing that World's actions, so the held candidate's package would
-                otherwise have no control of its own on Home.
-              */}
-              {collectionReviewRequired && activeWorld ? (
-                <div className="workspace-attention-actions">
-                  <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download signed knowledge package"}</button>
-                </div>
-              ) : null}
-            </section>
-          ) : null}
-
-          {/*
-            Home, in flight: the compile is the top block. The result block and the intake bar
-            follow; nothing else competes with the picture of what is happening right now.
-          */}
-          {tab === "overview" && surface === "home" && (compileJob || activePipelineCount > 0) ? compileBlock : null}
-
-          {tab === "overview" && surface === "home" && collectionResult ? (
-            /*
-              A candidate is not a world yet, and the completion panel now says which one you have.
-
-              It announced "Your Compiled World is ready" for both, including a candidate sitting
-              in `review_required` with reasons attached. The Ask button was disabled underneath
-              with a tooltip explaining that the candidate had to be activated first — so the
-              heading claimed a finished world while the controls contradicted it. The whole
-              point of the candidate stage is that automated extraction is not yet organizational
-              truth; a heading that skips it undoes the guarantee.
-            */
-            <section className="workspace-complete" aria-labelledby="workspace-complete-title">
-              <div>
-                <h2 id="workspace-complete-title">
-                  {activeWorld ? "Your Compiled World is ready." : "Your compiled candidate is ready for review."}
-                </h2>
-                <p>{collectionResult.validation.counts.documents} sources became {collectionResult.validation.counts.entities} entities, {collectionResult.validation.counts.claims} claims, and {collectionResult.validation.counts.relations} evidence-bound relations.</p>
-                {activeWorld ? null : (
-                  <p className="fine">
-                    Nothing is active until you approve it. Review the evidence, then activate the
-                    candidate to make it the World that Ask, the API and MCP read.
-                  </p>
-                )}
-              </div>
-              <div className="workspace-complete-actions">
-                {activeWorld ? (
-                  <>
-                    <button type="button" onClick={() => navigateSurface("ask")}>Ask your World</button>
-                    <button type="button" onClick={() => navigateSurface("world")}>Open World</button>
-                    <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download signed package"}</button>
-                    <button type="button" onClick={() => navigateSurface("review")}>View evidence</button>
-                    <button type="button" onClick={() => navigateSettings("trust")}>Verify export</button>
-                  </>
-                ) : (
-                  <>
-                    <button type="button" onClick={() => navigateSurface("review")}>Review items</button>
-                    <button type="button" onClick={() => navigateSurface("world")}>Inspect candidate</button>
-                    <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download signed knowledge package"}</button>
-                  </>
-                )}
-              </div>
-              {/*
-                §16.2/§16.3 in the place the question is actually asked -- beside the result, not
-                only behind a docs link. The file list is generated from the same constant the
-                exporter writes from, so it cannot advertise an artifact the ZIP does not hold.
-              */}
-              <WorkspaceUseWithAi
-                onOpen={() => {
-                  trackFunnel("workspace_ai_connect_opened");
-                }}
-              />
-            </section>
-          ) : null}
-
           {tab === "overview" && surface !== "runs" && surface !== "activity" ? (
-          <>
           <section
               className="workspace-intake"
               data-compact={workspaceState.mode === "returning" ? 1 : 0}
@@ -3140,9 +3062,8 @@ export default function WorkspacePage() {
                 {workspaceState.mode === "new" && surface === "home" ? (
                   <h1 id="workspace-intake-title">Drop files, folders or ZIP here</h1>
                 ) : (
-                  <h2 id="workspace-intake-title">
-                    {workspaceState.mode === "new" ? "Drop files, folders or ZIP here" : "Add files, folders or ZIP"}
-                  </h2>
+                  /* Founder 2026-10-27: the returning bar names the drop too (the whole section takes one), in the new box's words. */
+                  <h2 id="workspace-intake-title">Drop files, folders or ZIP here</h2>
                 )}
                 <p>
                   {workspaceState.mode === "new"
@@ -3330,6 +3251,109 @@ export default function WorkspacePage() {
                 </div>
               ) : null}
             </section>
+          ) : null}
+
+          {/*
+            §13.6. Review required, operator action, refused and failed each get their own row
+            with its own written label -- the state is legible without reading a colour, and a
+            second blocked state can no longer hide behind the first one's heading.
+          */}
+          {tab === "overview" && surface === "home" && attentionItems.length > 0 ? (
+            <section className="workspace-attention" role="alert" aria-labelledby="workspace-attention-title">
+              <div>
+                <h2 id="workspace-attention-title">Needs attention</h2>
+                <ul className="workspace-attention-items">
+                  {attentionItems.map((item) => (
+                    <li key={item.id}>
+                      <strong>{item.label}</strong>
+                      <p>{item.detail}</p>
+                      {item.action ? (
+                        <button
+                          type="button"
+                          onClick={() => { if (item.action?.surface) navigateSurface(item.action.surface); else runIntent(item.action?.intent); }}
+                        >
+                          {item.action.label}
+                        </button>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              {/*
+                A held candidate stays inspectable. When a World is already active the panel
+                below is showing that World's actions, so the held candidate's package would
+                otherwise have no control of its own on Home.
+              */}
+              {collectionReviewRequired && activeWorld ? (
+                <div className="workspace-attention-actions">
+                  <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download signed knowledge package"}</button>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
+          {/*
+            Home, in flight: the compile follows the intake bar and the attention queue (founder
+            2026-10-27). The result block follows the compile.
+          */}
+          {tab === "overview" && surface === "home" && (compileJob || activePipelineCount > 0) ? compileBlock : null}
+
+          {tab === "overview" && surface === "home" && collectionResult ? (
+            /*
+              A candidate is not a world yet, and the completion panel now says which one you have.
+
+              It announced "Your Compiled World is ready" for both, including a candidate sitting
+              in `review_required` with reasons attached. The Ask button was disabled underneath
+              with a tooltip explaining that the candidate had to be activated first — so the
+              heading claimed a finished world while the controls contradicted it. The whole
+              point of the candidate stage is that automated extraction is not yet organizational
+              truth; a heading that skips it undoes the guarantee.
+            */
+            <section className="workspace-complete" aria-labelledby="workspace-complete-title">
+              <div>
+                <h2 id="workspace-complete-title">
+                  {activeWorld ? "Your Compiled World is ready." : "Your compiled candidate is ready for review."}
+                </h2>
+                <p>{collectionResult.validation.counts.documents} sources became {collectionResult.validation.counts.entities} entities, {collectionResult.validation.counts.claims} claims, and {collectionResult.validation.counts.relations} evidence-bound relations.</p>
+                {activeWorld ? null : (
+                  <p className="fine">
+                    Nothing is active until you approve it. Review the evidence, then activate the
+                    candidate to make it the World that Ask, the API and MCP read.
+                  </p>
+                )}
+              </div>
+              <div className="workspace-complete-actions">
+                {activeWorld ? (
+                  <>
+                    <button type="button" onClick={() => navigateSurface("ask")}>Ask your World</button>
+                    <button type="button" onClick={() => navigateSurface("world")}>Open World</button>
+                    <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download signed package"}</button>
+                    <button type="button" onClick={() => navigateSurface("review")}>View evidence</button>
+                    <button type="button" onClick={() => navigateSettings("trust")}>Verify export</button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" onClick={() => navigateSurface("review")}>Review items</button>
+                    <button type="button" onClick={() => navigateSurface("world")}>Inspect candidate</button>
+                    <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download signed knowledge package"}</button>
+                  </>
+                )}
+              </div>
+              {/*
+                §16.2/§16.3 in the place the question is actually asked -- beside the result, not
+                only behind a docs link. The file list is generated from the same constant the
+                exporter writes from, so it cannot advertise an artifact the ZIP does not hold.
+              */}
+              <WorkspaceUseWithAi
+                onOpen={() => {
+                  trackFunnel("workspace_ai_connect_opened");
+                }}
+              />
+            </section>
+          ) : null}
+
+          {tab === "overview" && surface !== "runs" && surface !== "activity" ? (
+          <>
           {/*
             The guide sits under the work, not above it. It is reopenable from here at any time,
             and every step's state comes from workspace facts (lib/workspace-onboarding.ts).
