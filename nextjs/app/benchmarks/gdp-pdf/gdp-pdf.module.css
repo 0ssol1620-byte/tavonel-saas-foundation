@@ -240,3 +240,65 @@
     gap: 4px;
   }
 }
+
+/* ------------------------------------------------------------------ figures */
+
+/*
+  The two inline figures (the two-arm design and the paired pass bars). The drawing is 320 units
+  wide with 12-unit text, so at a 360px phone it renders at about 12px and the cap below keeps it
+  from growing past 1.5x on a wide screen. Text, boxes and bars take the page's own text and
+  hairline tokens; the compiled arm is the darker bar only because it is the arm the page is
+  about, not because it did better.
+*/
+.figureFrame {
+  margin: 0;
+  max-width: 480px;
+  display: grid;
+  gap: 8px;
+}
+.figure {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.figBox {
+  fill: none;
+  stroke: var(--hairline-hi);
+  stroke-width: 1;
+}
+.figLine {
+  fill: none;
+  stroke: var(--text-lo);
+  stroke-width: 1;
+}
+.figText {
+  fill: var(--text-hi);
+  font: 400 12px/1 var(--f-sans);
+}
+.figHead {
+  fill: var(--text-mid);
+  font: 500 12px/1 var(--f-sans);
+}
+.figMono {
+  fill: var(--text-mid);
+  font: 400 12px/1 var(--f-mono);
+}
+.figTrack {
+  fill: var(--g1);
+  stroke: var(--hairline);
+  stroke-width: 1;
+}
+.figBarNative {
+  fill: var(--text-lo);
+}
+.figBarCompiled {
+  fill: var(--text-hi);
+}
+.figCaption {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-lo);
+  max-width: 72ch;
+}

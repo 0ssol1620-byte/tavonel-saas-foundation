@@ -8,18 +8,76 @@ import {
   GDP_PDF_ARTIFACT_SHA256,
   GDP_PDF_PAGE_ARMS,
   gdpPdfDeltaSentence,
+  gdpPdfDesignFigure,
   gdpPdfDeviations,
   gdpPdfFailureNotes,
   gdpPdfHeadline,
+  gdpPdfPassFigure,
   gdpPdfPercent,
   gdpPdfPoints,
+  gdpPdfPreviousRuns,
   gdpPdfReport,
   gdpPdfSeconds,
   gdpPdfTokens,
   gdpPdfUsd,
   gdpPdfVerdict,
+  type GdpPdfPassGroup,
 } from "@/lib/gdp-pdf-page-data";
 import styles from "./gdp-pdf.module.css";
+
+/*
+  The two figures are inline SVG drawn from the report, with the alt text the same functions write
+  (`gdpPdfDesignFigure`, `gdpPdfPassFigure`). No chart library and no script: the page stays a
+  server render. Text is set in viewBox units on a 320-unit-wide drawing, so a 360px phone draws it
+  at about its CSS size and the figure is capped wider up (gdp-pdf.module.css).
+*/
+function DesignFigure({ figure }: { figure: ReturnType<typeof gdpPdfDesignFigure> }) {
+  const arm = (x: number, label: string) => (
+    <g>
+      <rect className={styles.figBox} x={x} y={76} width={154} height={48} rx={4} />
+      <text className={styles.figText} x={x + 77} y={96} textAnchor="middle">{label}</text>
+      <text className={styles.figMono} x={x + 77} y={114} textAnchor="middle">{figure.model}</text>
+    </g>
+  );
+  return (
+    <svg className={styles.figure} viewBox="0 0 320 212" role="img" aria-label={figure.alt} data-gdp-figure="design">
+      <rect className={styles.figBox} x={90} y={4} width={140} height={36} rx={4} />
+      <text className={styles.figText} x={160} y={27} textAnchor="middle">{`Same PDF · ${figure.tasks} tasks`}</text>
+      <path className={styles.figLine} d="M160 40 L79 76 M160 40 L241 76 M79 124 L140 160 M241 124 L180 160" />
+      {arm(2, GDP_PDF_ARM_LABEL.native_pdf)}
+      {arm(164, GDP_PDF_ARM_LABEL.compiled_context_pdf)}
+      <rect className={styles.figBox} x={70} y={160} width={180} height={48} rx={4} />
+      <text className={styles.figText} x={160} y={180} textAnchor="middle">Same judge, same rubric</text>
+      <text className={styles.figMono} x={160} y={198} textAnchor="middle">{figure.judge}</text>
+    </svg>
+  );
+}
+
+const BAR_MAX = 200;
+
+function PassFigure({ figure }: { figure: ReturnType<typeof gdpPdfPassFigure> }) {
+  const heading = (group: GdpPdfPassGroup) =>
+    group.id === "all" ? `All ${group.n} tasks` : `The ${group.n} tasks with a compiled packet`;
+  const height = figure.groups.length * 104;
+  return (
+    <svg className={styles.figure} viewBox={`0 0 320 ${height}`} role="img" aria-label={figure.alt} data-gdp-figure="pass">
+      {figure.groups.map((group, g) => (
+        <g key={group.id} transform={`translate(0 ${g * 104})`}>
+          <text className={styles.figHead} x={0} y={14}>{heading(group)}</text>
+          {group.bars.map((bar, b) => (
+            <g key={bar.arm} transform={`translate(0 ${24 + b * 40})`}>
+              <text className={styles.figText} x={0} y={12}>{GDP_PDF_ARM_LABEL[bar.arm]}</text>
+              <rect className={styles.figTrack} x={0} y={18} width={BAR_MAX} height={14} />
+              <rect className={bar.arm === "native_pdf" ? styles.figBarNative : styles.figBarCompiled}
+                x={0} y={18} width={(bar.count / bar.n) * BAR_MAX} height={14} data-count={bar.count} data-n={bar.n} />
+              <text className={styles.figText} x={BAR_MAX + 8} y={30}>{`${bar.count} of ${bar.n}`}</text>
+            </g>
+          ))}
+        </g>
+      ))}
+    </svg>
+  );
+}
 
 /*
   The two-arm GDP.pdf run, published whichever way it came out.
@@ -61,6 +119,9 @@ export default function GdpPdfBenchmarkPage() {
   const hardest = report.hardest_documents ?? [];
   const subset = report.compiled_available_subset;
   const truncated = report.packet_size?.packets_truncated_by_budget;
+  const design = gdpPdfDesignFigure(report);
+  const pass = gdpPdfPassFigure(report);
+  const previousRuns = gdpPdfPreviousRuns();
 
   return (
     <PublicSitePage template="T5">
@@ -94,6 +155,15 @@ export default function GdpPdfBenchmarkPage() {
                 may be quoted beside a leaderboard row, and no figure on this page is a
                 reproduction of anyone else&rsquo;s.
               </p>
+
+              <figure className={styles.figureFrame}>
+                <DesignFigure figure={design} />
+                <figcaption className={styles.figCaption}>
+                  The two arms. Each task&rsquo;s PDF goes to the same model twice, once alone and
+                  once with TAVONEL&rsquo;s compiled context added, and one judge grades both
+                  answers against the task&rsquo;s rubric.
+                </figcaption>
+              </figure>
 
               <h2 className={styles.sectionTitle}>The conditions this was run under</h2>
               <p className={styles.para}>
@@ -134,6 +204,16 @@ export default function GdpPdfBenchmarkPage() {
               <p className={styles.finding} data-verdict={verdict}>
                 {gdpPdfDeltaSentence(macroDelta, pairedN, "the all-criteria pass rate")}
               </p>
+              <figure className={styles.figureFrame}>
+                <PassFigure figure={pass} />
+                <figcaption className={styles.figCaption}>
+                  Tasks where every rubric criterion passed, per arm, each over its own
+                  denominator.
+                  {pass.groups.length > 1
+                    ? " The second pair counts only the tasks whose compiled packet could be assembled."
+                    : null}
+                </figcaption>
+              </figure>
               <p className={styles.para}>
                 <b>Macro</b> is the share of tasks where every rubric criterion passed &mdash; the
                 official headline metric, and a hard one: one missed criterion out of eighteen
@@ -385,6 +465,53 @@ export default function GdpPdfBenchmarkPage() {
                   <li key={note}>{note}</li>
                 ))}
               </ul>
+
+              {/*
+                Every run before the newest stays on the page, with its counts, denominators and
+                artifact digest, so a later result cannot replace an earlier one by being newer.
+                Empty while one run is published (`gdpPdfPreviousRuns`), and then not printed.
+              */}
+              {previousRuns.length > 0 ? (
+                <>
+                  <h2 className={styles.sectionTitle}>Previous runs</h2>
+                  <div className={styles.tableScroll}>
+                    <table className={styles.table}>
+                      <caption>Earlier runs, newest first, each read from its own report</caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Run</th>
+                          <th scope="col">Subject model</th>
+                          <th scope="col">PDF alone</th>
+                          <th scope="col">PDF + compiled context</th>
+                          <th scope="col">Macro delta</th>
+                          <th scope="col">Deviations</th>
+                          <th scope="col">Artifact</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {previousRuns.map((run) => (
+                          <tr key={run.id} data-gdp-previous-run={run.id}>
+                            <th scope="row">{run.id} · <code>{run.seed}</code></th>
+                            <td><code>{run.model}</code></td>
+                            <td className={styles.value}>{run.native.count} of {run.native.n}</td>
+                            <td className={styles.value}>{run.compiled.count} of {run.compiled.n}</td>
+                            <td className={styles.value}>
+                              {gdpPdfPoints(run.macroDeltaPp)}{" "}
+                              <span className={styles.over}>(over {run.pairedN} paired)</span>
+                            </td>
+                            <td className={styles.value}>{run.deviations}</td>
+                            <td>
+                              <code>{run.path}</code>
+                              <br />
+                              <code className={styles.digest}>sha256:{run.sha256}</code>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : null}
 
               <h2 className={styles.sectionTitle}>Receipts</h2>
               <details className="status-fold">

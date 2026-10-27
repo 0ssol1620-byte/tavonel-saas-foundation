@@ -15,20 +15,26 @@ import {
   GDP_PDF_ARTIFACT_PATH,
   GDP_PDF_ARTIFACT_SHA256,
   GDP_PDF_PAGE_ARMS,
+  GDP_PDF_RUNS,
   gdpPdfDeltaSentence,
+  gdpPdfDesignFigure,
   gdpPdfDeviations,
   gdpPdfFailureNotes,
   gdpPdfHeadline,
+  gdpPdfPassFigure,
+  gdpPdfPreviousRuns,
   gdpPdfReport,
   gdpPdfVerdict,
   validateGdpPdfReport,
+  type GdpPdfRun,
 } from "./gdp-pdf-page-data";
 import GdpPdfBenchmarkPage from "../app/benchmarks/gdp-pdf/page";
 import { metadata } from "../app/benchmarks/gdp-pdf/page";
 import sitemap from "../app/sitemap";
 import { publicPageLocation } from "./marketing-analytics";
 
-const artifactPath = resolve(import.meta.dirname, "../content/benchmarks/gdp-pdf.json");
+/** A run's committed file, from its repository path (`nextjs/...`). */
+const runFile = (run: GdpPdfRun) => resolve(import.meta.dirname, "..", run.path.replace(/^nextjs\//, ""));
 
 /* A summary that passes, as the base every refusal case mutates one field of. */
 const summary = () => ({
@@ -211,22 +217,109 @@ describe("gdpPdfDeltaSentence", () => {
   Windows working tree and on the CI runner; when it is not, the failure prints the value to
   paste.
 */
-describe("the committed artifact", () => {
-  it("hashes to the digest the page publishes", () => {
-    const bytes = readFileSync(artifactPath);
-    expect(createHash("sha256").update(bytes).digest("hex")).toBe(GDP_PDF_ARTIFACT_SHA256);
+describe("the committed artifacts", () => {
+  it.each(GDP_PDF_RUNS.map((run) => [run.id, run] as const))("%s hashes to the digest the page publishes", (_, run) => {
+    const bytes = readFileSync(runFile(run));
+    expect(createHash("sha256").update(bytes).digest("hex")).toBe(run.sha256);
   });
 
-  it("is stored with LF line endings, so the digest is platform-independent", () => {
-    expect(readFileSync(artifactPath, "utf8")).not.toContain("\r\n");
+  it.each(GDP_PDF_RUNS.map((run) => [run.id, run] as const))("%s is stored with LF line endings under content/benchmarks/", (_, run) => {
+    expect(run.path).toMatch(/^nextjs\/content\/benchmarks\/[a-z0-9-]+\.json$/);
+    expect(readFileSync(runFile(run), "utf8")).not.toContain("\r\n");
   });
 
-  it("names its own path", () => {
-    expect(GDP_PDF_ARTIFACT_PATH).toBe("nextjs/content/benchmarks/gdp-pdf.json");
+  it.each(GDP_PDF_RUNS.map((run) => [run.id, run] as const))("%s passes the validator it is rendered through", (_, run) => {
+    expect(() => gdpPdfReport(run)).not.toThrow();
   });
 
-  it("passes the validator it is rendered through", () => {
-    expect(() => gdpPdfReport()).not.toThrow();
+  it("names each run once, and the page's artifact is the newest run's", () => {
+    expect(new Set(GDP_PDF_RUNS.map((run) => run.id)).size).toBe(GDP_PDF_RUNS.length);
+    expect(new Set(GDP_PDF_RUNS.map((run) => run.path)).size).toBe(GDP_PDF_RUNS.length);
+    expect([GDP_PDF_ARTIFACT_PATH, GDP_PDF_ARTIFACT_SHA256]).toEqual([GDP_PDF_RUNS[0]!.path, GDP_PDF_RUNS[0]!.sha256]);
+    expect(gdpPdfReport()).toBe(GDP_PDF_RUNS[0]!.report);
+  });
+
+  /*
+    v2 is historical evidence: the negative two-arm result stays published, under its own name and
+    bytes, whatever is added above it. Removing it or rewriting its file fails here.
+  */
+  it("keeps v2 in the list, oldest, at its own path and digest", () => {
+    expect(GDP_PDF_RUNS.at(-1)).toMatchObject({
+      id: "v2",
+      path: "nextjs/content/benchmarks/gdp-pdf.json",
+      sha256: "0302712c8a0570492347d604c00a8090bff13b92cd96190d3844798aa258f953",
+    });
+  });
+
+  it("refuses a run whose report does not hold, naming the run's own path", () => {
+    expect(() => gdpPdfReport({ id: "bad", path: "nextjs/content/benchmarks/bad.json", sha256: "0".repeat(64), report: {} }))
+      .toThrow(/^nextjs\/content\/benchmarks\/bad\.json is not a publishable run report/);
+  });
+});
+
+describe("gdpPdfPreviousRuns", () => {
+  const newer: GdpPdfRun = { id: "next", path: "nextjs/content/benchmarks/next.json", sha256: "e".repeat(64), report: validReport() };
+
+  it("is empty while one run is published, so the page prints no table", () => {
+    expect(GDP_PDF_RUNS).toHaveLength(1);
+    expect(gdpPdfPreviousRuns()).toEqual([]);
+  });
+
+  it("lists every run after the newest, each read from its own report with its denominators", () => {
+    const v2 = GDP_PDF_RUNS.at(-1)!;
+    const report = gdpPdfReport(v2);
+    expect(gdpPdfPreviousRuns([newer, v2])).toEqual([{
+      id: "v2",
+      path: v2.path,
+      sha256: v2.sha256,
+      seed: report.manifest.seed,
+      model: report.manifest.surface.declared_model,
+      native: { count: report.arms.native_pdf.macro_all_pass_count, n: report.arms.native_pdf.n },
+      compiled: { count: report.arms.compiled_context_pdf.macro_all_pass_count, n: report.arms.compiled_context_pdf.n },
+      macroDeltaPp: report.pairwise_delta.macro_delta_pp,
+      pairedN: report.pairwise_delta.paired_n,
+      deviations: gdpPdfDeviations(report).length,
+    }]);
+  });
+
+  it("refuses a previous run whose report does not hold, rather than dropping its row", () => {
+    expect(() => gdpPdfPreviousRuns([newer, { ...newer, id: "broken", report: { ...validReport(), arms: {} } }])).toThrow(/is not a publishable run report/);
+  });
+});
+
+/*
+  THE FIGURES. Both are drawn from the report, and their alt text is written by the same function,
+  so a figure cannot show a count its text does not state.
+*/
+describe("the two figures", () => {
+  const report = gdpPdfReport();
+
+  it("draws the two-arm design from the manifest", () => {
+    const figure = gdpPdfDesignFigure(report);
+    expect(figure).toMatchObject({ tasks: report.manifest.tasks_attempted, model: report.manifest.surface.declared_model });
+    expect(report.manifest.judge.startsWith(figure.judge)).toBe(true);
+    expect(figure.alt).toContain(`For each of ${report.manifest.tasks_attempted} tasks`);
+    expect(figure.alt).toContain("compiled context");
+  });
+
+  it("draws every arm's all-criteria count over its denominator, and the compiled-available subset beside it", () => {
+    const figure = gdpPdfPassFigure(report);
+    const subset = report.compiled_available_subset!;
+    expect(figure.groups.map((group) => [group.id, group.n, group.bars.map((bar) => [bar.arm, bar.count, bar.n])])).toEqual([
+      ["all", report.arms.native_pdf.n, GDP_PDF_PAGE_ARMS.map((arm) => [arm, report.arms[arm].macro_all_pass_count, report.arms[arm].n])],
+      ["compiled_available", subset.n, GDP_PDF_PAGE_ARMS.map((arm) => [arm, subset[arm]!.macro_all_pass_count, subset[arm]!.n])],
+    ]);
+    for (const group of figure.groups) for (const bar of group.bars) expect(figure.alt).toContain(`${bar.count} of ${bar.n}`);
+  });
+
+  it("drops the subset pair when the report carries no subset counts, rather than inventing them", () => {
+    const { compiled_available_subset: _, ...rest } = report;
+    expect(gdpPdfPassFigure(rest as typeof report).groups.map((group) => group.id)).toEqual(["all"]);
+  });
+
+  it("refuses a subset arm that does not hold", () => {
+    const broken = { ...validReport(), compiled_available_subset: { n: 4, native_pdf: { ...summary(), macro_all_pass: 0.9 } } };
+    expect(validateGdpPdfReport(broken)).toContain("compiled_available_subset.native_pdf.macro_all_pass: rate does not equal macro_all_pass_count / n");
   });
 });
 
@@ -315,6 +408,24 @@ describe("the rendered page", () => {
     }
     /* The restricted run store's own path is not a public fact. */
     expect(html).not.toContain("CodexData");
+  });
+
+  it("draws both figures as inline SVG whose alt text states the counts", () => {
+    const svgs = [...html.matchAll(/<svg [^>]*role="img"[^>]*aria-label="([^"]*)"[^>]*data-gdp-figure="([a-z]+)"/g)].map((match) => [match[2], match[1]]);
+    expect(svgs.map(([id]) => id)).toEqual(["design", "pass"]);
+    const unescape = (text: string) => text.replace(/&#x27;/g, "'").replace(/&amp;/g, "&");
+    expect(unescape(svgs[0]![1]!)).toBe(gdpPdfDesignFigure(report).alt);
+    expect(unescape(svgs[1]![1]!)).toBe(gdpPdfPassFigure(report).alt);
+    // Bar widths are counts over their own denominators, at the drawing's 200-unit scale.
+    for (const group of gdpPdfPassFigure(report).groups) for (const bar of group.bars) {
+      expect(html).toContain(`width="${(bar.count / bar.n) * 200}" height="14" data-count="${bar.count}" data-n="${bar.n}"`);
+    }
+    expect(html).not.toContain("<script");
+  });
+
+  it("prints no previous-runs table while one run is published", () => {
+    expect(html).not.toContain("Previous runs");
+    expect(html).not.toContain("data-gdp-previous-run");
   });
 
   it("claims no lift while the committed delta is not positive", () => {

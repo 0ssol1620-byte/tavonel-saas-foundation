@@ -7482,6 +7482,28 @@ test('affected g1-copy-truth owner: 6 exact paths select 17 direct suites and 2 
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+// hard-proof 2026-10-27 C1: the GDP.pdf runs list, one finite owner, restated independently of the exported constants.
+import { GDP_PDF_RUNS_AFFECTED_PATHS, GDP_PDF_RUNS_AFFECTED_UNIT_FILES, GDP_PDF_RUNS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+test('affected gdp-pdf-runs owner: 3 exact paths select 2 direct suites and 2 browser suites; v2 and the neighbours stay unmapped', () => {
+  const suites = ['lib/gdp-pdf-page-data.test.ts', 'lib/marketing-story.test.ts'];
+  const browsers = ['e2e/benchmarks.spec.ts', 'e2e/marketing-story.spec.ts'];
+  assert.deepEqual([[...GDP_PDF_RUNS_AFFECTED_PATHS], [...GDP_PDF_RUNS_AFFECTED_UNIT_FILES], [...GDP_PDF_RUNS_AFFECTED_BROWSER_FILES]], [['content/benchmarks/gdp-pdf-v3.json', 'lib/gdp-pdf-page-data.test.ts', 'lib/gdp-pdf-page-data.ts'], suites, browsers]);
+  for (const path of GDP_PDF_RUNS_AFFECTED_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['gdp-pdf-runs'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['gdp-pdf-runs'], [], [...suites].sort(), [...browsers].sort(), []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const plan = affectedAskPlan(affectedMap(GDP_PDF_RUNS_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[...suites].sort(), [...browsers].sort(), false, false]);
+  assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440', '390', 'reduced-motion']);
+  // v2's report is historical evidence: an edit to it maps to no owner and fails the map closed.
+  for (const adjacent of ['nextjs/content/benchmarks/gdp-pdf.json', 'nextjs/content/benchmarks/gdp-pdf-v4.json', 'nextjs/content/benchmarks/gdp-pdf-v3.json.bak', 'nextjs/lib/gdp-pdf-page-data.tsx', 'nextjs/lib/gdp-pdf-eval.ts', 'nextjs/lib/gdp-pdf-runs.ts', 'content/benchmarks/gdp-pdf-v3.json']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
 // Phase 4 consent-poster lane (P2-34, D-11): one finite owner, restated independently of the exported constants.
 import { CONSENT_POSTER_AFFECTED_PATHS, CONSENT_POSTER_AFFECTED_UNIT_FILES, CONSENT_POSTER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 test('affected consent-poster owner: 16 exact paths select 5 direct suites and 2 browser suites; neighbours stay unmapped', () => {

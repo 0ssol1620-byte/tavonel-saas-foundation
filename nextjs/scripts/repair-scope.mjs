@@ -2127,6 +2127,17 @@ export const SPECIMEN_STRIP_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/specimen-sources.test.ts',
 ]);
 export const SPECIMEN_STRIP_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/specimen-strip.spec.ts']);
+// GDP.pdf runs (hard-proof 2026-10-27, C1): the list of published run reports newest first, its suite, and the reserved path of
+// the next report (content/benchmarks/*.json is eol=lf, like v2). Exactly these three paths select the list's suite, the
+// marketing-story suite (the Home GDP block reads the same list) and the two browser suites that read /benchmarks/gdp-pdf. The page
+// and its stylesheet keep public-marketing-surface; v2's report itself never changes and stays unmapped, so an edit to it fails closed.
+export const GDP_PDF_RUNS_AFFECTED_PATHS = Object.freeze([
+  'content/benchmarks/gdp-pdf-v3.json',
+  'lib/gdp-pdf-page-data.test.ts',
+  'lib/gdp-pdf-page-data.ts',
+]);
+export const GDP_PDF_RUNS_AFFECTED_UNIT_FILES = Object.freeze(['lib/gdp-pdf-page-data.test.ts', 'lib/marketing-story.test.ts']);
+export const GDP_PDF_RUNS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmarks.spec.ts', 'e2e/marketing-story.spec.ts']);
 // Launch QA and release scripts (P2-02 script ratchet, P2-17 release-decision check): the Lighthouse budget script and its ratchet
 // suite, the read-only release-gate check, its Node suite and the Vitest wrapper that runs that suite here. Exactly these five
 // paths select the ratchet, client-route-weight and wrapper suites; no browser, database or build lane. Never nativeReuse.
@@ -2775,6 +2786,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // specimen-strip: the 23 exact paths above select 2 direct suites and 1 browser suite.
   affectedGroup('specimen-strip', new RegExp(`^nextjs/(?:${exactPathAlternation(SPECIMEN_STRIP_AFFECTED_PATHS)})$`),
     { unitFiles: SPECIMEN_STRIP_AFFECTED_UNIT_FILES, browserFiles: SPECIMEN_STRIP_AFFECTED_BROWSER_FILES }),
+  // gdp-pdf-runs: the 3 exact paths above select 2 direct suites and 2 browser suites.
+  affectedGroup('gdp-pdf-runs', new RegExp(`^nextjs/(?:${exactPathAlternation(GDP_PDF_RUNS_AFFECTED_PATHS)})$`),
+    { unitFiles: GDP_PDF_RUNS_AFFECTED_UNIT_FILES, browserFiles: GDP_PDF_RUNS_AFFECTED_BROWSER_FILES }),
   // launch-qa-release-scripts: the 5 exact paths above select 3 direct suites and no browser suite.
   affectedGroup('launch-qa-release-scripts', new RegExp(`^nextjs/(?:${exactPathAlternation(LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS)})$`),
     { unitFiles: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES }),
