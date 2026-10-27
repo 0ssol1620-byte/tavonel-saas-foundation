@@ -70,8 +70,13 @@ const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../.."
  * For next.config.mjs: a Vercel production build of its own commit only. A preview or local build
  * claims no surface, so a pushed, unreviewed branch never inherits a production release; and HEAD
  * must be VERCEL_GIT_COMMIT_SHA, the SHA the gate binds to. The digest comes from HEAD's blob ids,
- * not from the bytes being built, so a working tree with any change (an uncommitted edit, an
- * untracked file, a local `vercel build --prod` deployed with `--prebuilt`) claims nothing either.
+ * not from the bytes being built, so this claims nothing when Git can see that the tracked or
+ * untracked, not ignored, bytes differ from HEAD: an edited, staged or untracked file (a local
+ * `vercel build --prod` deployed with `--prebuilt`), or any index entry marked skip-worktree or
+ * assume-unchanged, which `git status` would otherwise not report. Git cannot see ignored inputs
+ * (node_modules, .env*, build caches). Those are closed only by keeping every file the production
+ * build runs before this point on the surface (release-gate-check.test.mjs, "the production build
+ * runs no presentational code"), not by this check.
  */
 export function deploymentGateSurface(env = process.env, repositoryRoot = REPOSITORY_ROOT) {
   const claimed = env.VERCEL_GIT_COMMIT_SHA?.trim().toLowerCase();
@@ -82,6 +87,9 @@ export function deploymentGateSurface(env = process.env, repositoryRoot = REPOSI
   try {
     head = git("rev-parse", "HEAD").trim().toLowerCase();
     if (claimed !== head || git("status", "--porcelain").length > 0) return null;
+    // `ls-files -v` tags a skip-worktree entry S and an assume-unchanged one in lower case.
+    if (git("ls-files", "-v", "-z").split("\0").some((entry) => /^(S|[a-z])/.test(entry))) return null;
+    git("diff-index", "--cached", "--quiet", "HEAD", "--"); // exit 1 (throws) when the index is not HEAD
   } catch {
     return null;
   }

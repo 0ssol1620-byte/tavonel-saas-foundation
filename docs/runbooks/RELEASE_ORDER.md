@@ -140,15 +140,21 @@ NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
   게이트 표면 digest다: `cd nextjs; node scripts/gate-surface.mjs --sha <40자 SHA>`. 그 커밋이 로컬에 있어야 한다.
 - 표면을 넣어 기록한 출시는 **digest가 같은 이후 배포 전부**를 덮는다. 원래 행의 `evaluated_at`부터 30일까지다.
   `nextjs/scripts/gate-surface-rules.json`이 presentational로 정한 경로만 바꾼 배포는 새 기록이 필요 없다.
-  그 경로는 문서, 테스트와 e2e, 정적 미디어(이미지·영상·폰트·PDF), `nextjs/components/landing-v2/`,
+  그 경로는 문서, e2e와 production 빌드에서 돌지 않는 테스트, 정적 미디어(이미지·영상·폰트·PDF), `nextjs/components/landing-v2/`,
   `nextjs/app/(benchmarks|changelog)/`, 그리고 changelog·compiler-release·GDP 페이지 데이터뿐이다.
 - 표면 경로를 하나라도 바꾼 배포는 digest가 달라서 아무것도 상속하지 않는다. 이전처럼 그 SHA에 대한 새 기록이
   필요하다. 표면에는 migration, `shared/`, `nextjs/lib/`의 서버 코드, API route, 의존성, 정책 문서, 규칙 파일
   자체가 들어간다. 동의·업로드·원본·키·계정 화면을 포함한 `landing-v2/` 밖의 모든 컴포넌트, 전역 CSS,
   `nextjs/content/`, 그리고 `public/developer/` 폴더 전체(고객이 실행하는 클라이언트와 설치·안전 계약 `.md`)도
   표면이다. presentational 가드 테스트(`scripts/release-gate-check.test.mjs`)와 그 wrapper도 표면이다.
+  production 빌드는 digest를 계산하기 전에 빌드 머신에서 prebuild(`pnpm check`, hermetic vitest)를 실행한다.
+  그래서 `vitest.config.ts` include에 걸리는 테스트 전부, prebuild 스크립트, vitest·eslint·tsconfig·next 설정,
+  `package.json`도 표면이다. presentational 모듈을 import하는 테스트 25개는 production 빌드의 prebuild에서
+  빠지고(`run-hermetic-vitest.mjs`의 `PREBUILD_EXCLUDED_SUITES`) CI에서만 돈다.
 - Vercel **production** 빌드이고 작업 트리가 깨끗할 때(`git status --porcelain`이 빔)만 digest를 주장한다.
   preview와 로컬 빌드, 수정되거나 추적하지 않는 파일이 있는 빌드는 `none`이고 정확한 SHA만 읽는다.
+  skip-worktree나 assume-unchanged가 걸린 항목이 하나라도 있거나 index가 HEAD와 다른 빌드도 `none`이다.
+  git은 무시되는 입력(`node_modules`, `.env*`)을 볼 수 없다. 그 입력은 빌드가 표면 코드만 실행한다는 규칙으로만 지킨다.
   그래서 push만 한 브랜치나 로컬에서 `--prebuilt`로 올린 빌드는 production 출시를 이어받지 못한다.
 - digest는 v2 형식(`tavonel.gate_surface_digest.v2`, 표면 항목마다 JSON 배열 한 줄)이다. `d8b3ec3c`까지의 v1 형식으로
   계산해 둔 값은 쓰지 않는다. 값은 늘 아래 명령으로 다시 계산한다.
@@ -162,9 +168,11 @@ NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
 ### 순서
 
 1. migration `20261027120000_release_gate_surface_continuity`를 production에 적용한다. **창업자 작업.**
-2. 이 코드를 배포한다. Vercel 빌드 로그에서 `customer-data gate surface: sha256:…` 줄을 확인한다.
-   production 빌드인데 `none (exact-SHA release only)`이면 빌드에서 git을 쓸 수 없다는 뜻이다. 그때는 오늘처럼
-   SHA마다 기록한다. preview 빌드는 항상 `none`이다.
+2. 이 코드를 배포한다. **이 코드의 첫 production 빌드 로그에 `customer-data gate surface: sha256:…` 줄이 비어 있지 않은
+   digest로 찍혀야 한다.** 이 줄을 확인하기 전에는 표면을 넣은 행을 기록하지 않는다.
+   production 빌드인데 `none (exact-SHA release only)`이면 빌드에서 git을 쓸 수 없거나 작업 트리가 깨끗하지 않다는
+   뜻이다(예: prebuild가 무시되지 않는 파일을 남김). 그때는 기능이 꺼진 것이므로 오늘처럼 SHA마다 기록하고, 원인을
+   고친 뒤 다음 production 빌드에서 다시 확인한다. preview 빌드는 항상 `none`이다.
 3. 빌드 로그의 digest와 `node scripts/gate-surface.mjs --sha <배포 SHA>`(nextjs에서)의 출력이 같은지 본다.
 4. 그 SHA의 production 결정을 `gate_surface_sha256`을 넣어 기록한다. **창업자 작업**(SQL editor에서 Run).
    receipt는 evaluator로 계산하고, 손으로 치거나 복사하지 않는다.
@@ -183,6 +191,9 @@ NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
    `gate_surface_sha256`과 다르거나, 그 revision을 fetch하지 않아 계산할 수 없으면 `surface_mismatch`
    (`SCOPED_RELEASE_SURFACE_MISMATCH`)이고 exit 1이다. 앞의 경우는 다른 빌드의 digest를 붙여 넣은 행이다.
    그 표면을 거절하고(아래 "거절") 올바른 digest로 다시 기록한다. 뒤의 경우는 `git fetch` 뒤 다시 돌린다.
+   **상속한 행은 이 재계산을 통과한 뒤에만 출시로 센다.** 런타임 gate는 행에 적힌 digest를 그대로 믿고 다시
+   계산하지 않는다. 그래서 표면을 넣은 행을 기록할 때마다, 그리고 상속을 출시로 보고하기 전에 이 check가 exit 0으로
+   `released`와 `inheritedFrom`을 내는지 확인한다.
 
 migration은 다시 적용할 수 없다. 두 번째 적용은 `column "gate_surface_sha256" already exists`로 실패하고
 `begin/commit` 안에서 통째로 롤백된다. SQL editor에 두 번 붙여 넣어도 상태는 바뀌지 않는다.
