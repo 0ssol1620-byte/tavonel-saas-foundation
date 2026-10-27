@@ -663,11 +663,11 @@ for (const binding of [
   // hard-proof 2026-10-27 C3: the Compiler 1 release record, read by the changelog list, the GDP.pdf receipt row and the copy guard.
   { group: 'compiler-release', prefix: 'nextjs/', exportedPaths: COMPILER_RELEASE_AFFECTED_PATHS, exportedSuites: COMPILER_RELEASE_AFFECTED_UNIT_FILES,
     exportedBrowsers: COMPILER_RELEASE_AFFECTED_BROWSER_FILES,
-    paths: ['lib/compiler-release.ts'],
+    paths: ['lib/compiler-release.ts', 'public/proof-collection/compiler-releases/core-v2-health-2026-10-27T09-28-53Z.json'],
     suites: ['lib/brand-copy.test.ts', 'lib/changelog.test.ts', 'lib/gdp-pdf-page-data.test.ts'],
     browsers: ['e2e/benchmarks.spec.ts', 'e2e/templates.spec.ts'],
     rows: ["['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/templates.spec.ts', ['1440']],"],
-    neighbors: ['nextjs/lib/compiler-release.test.ts', 'nextjs/lib/compiler-releases.ts', 'nextjs/lib/compiler-release.tsx', 'lib/compiler-release.ts'] },
+    neighbors: ['nextjs/lib/compiler-release.test.ts', 'nextjs/lib/compiler-releases.ts', 'nextjs/lib/compiler-release.tsx', 'lib/compiler-release.ts', 'nextjs/public/proof-collection/compiler-releases/other.json'] },
   // Phase 4 consent-poster lane (P2-34 analytics notice, D-11 poster re-cut).
   { group: 'consent-poster', prefix: 'nextjs/', exportedPaths: CONSENT_POSTER_AFFECTED_PATHS, exportedSuites: CONSENT_POSTER_AFFECTED_UNIT_FILES,
     exportedBrowsers: CONSENT_POSTER_AFFECTED_BROWSER_FILES,
