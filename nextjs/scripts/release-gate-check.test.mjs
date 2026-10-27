@@ -1,8 +1,15 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, posix } from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
+import {
+  GATE_SURFACE_RULES_PATH, deploymentGateSurface, gateSurfaceDigest, gateSurfaceOfCommit,
+} from "./gate-surface.mjs";
 import {
   RELEASE_GATE_REPORT_SCHEMA,
   RELEASE_MAX_AGE_MS,
@@ -11,6 +18,7 @@ import {
   readReleaseRows,
   run,
 } from "./release-gate-check.mjs";
+import { PREBUILD_EXCLUDED_SUITES, vitestArguments } from "./run-hermetic-vitest.mjs";
 
 // After the import above: the script registered the extensionless-import resolver.
 const gate = await import("../../shared/scopedCustomerDataGate.ts");
@@ -264,3 +272,491 @@ test("the CLI exits 2 with no report when it cannot run", () => {
   assert.equal(result.stdout, "");
   assert.match(result.stderr, /SUPABASE_SERVICE_ROLE_KEY/);
 });
+
+// D-05 (docs/adr/0006): a production row recorded with a gate-surface digest covers equal-surface SHAs.
+const SURFACE = `sha256:${"5".repeat(64)}`;
+function surfacedRow({ sha = OTHER_SHA, evaluatedMs, surface = SURFACE }) {
+  const evaluatedAt = at(evaluatedMs);
+  const evidence = evidenceFor(gate.requiredReleaseEvidence("direct_upload"), at(evaluatedMs - DAY));
+  const decision = gate.evaluateScopedRelease({ scope: "direct_upload", releaseRevision: sha, evidence, now: evaluatedAt,
+    gateSurfaceSha256: surface });
+  assert.equal(decision.allowed, true);
+  return { ...productionRow({ sha, evaluatedMs }), receipt_sha256: decision.receiptSha256, evidence,
+    gate_surface_sha256: surface };
+}
+
+test("a SHA whose gate surface equals a released one is released, and says which revision it inherits", () => {
+  const evaluatedMs = NOW.getTime() - 2 * DAY;
+  const asked = [];
+  const report = check([surfacedRow({ evaluatedMs })], { gateSurfaceSha256: SURFACE,
+    surfaceOfCommit: (revision) => { asked.push(revision); return SURFACE; } });
+  assert.equal(report.ready, true);
+  assert.equal(report.gateSurfaceSha256, SURFACE);
+  assert.deepEqual(report.scopes, [{
+    scope: "direct_upload", status: "released", evaluatedAt: at(evaluatedMs),
+    expiresAt: at(evaluatedMs + RELEASE_MAX_AGE_MS), remainingHours: 28 * 24, inheritedFrom: OTHER_SHA,
+  }]);
+  // The inherited row's digest was recomputed from the revision the founder recorded.
+  assert.deepEqual(asked, [OTHER_SHA]);
+});
+
+test("an inherited row whose digest is not its own revision's is a surface mismatch, never released", () => {
+  const rows = [surfacedRow({ evaluatedMs: NOW.getTime() - 2 * DAY })];
+  // A digest pasted from another build, and a recorded revision this checkout cannot hash.
+  for (const recomputed of [`sha256:${"7".repeat(64)}`, null]) {
+    const report = check(rows, { gateSurfaceSha256: SURFACE, surfaceOfCommit: () => recomputed });
+    assert.equal(report.ready, false);
+    assert.deepEqual(report.missingScopes, ["direct_upload"]);
+    assert.deepEqual(report.scopes, [{
+      scope: "direct_upload", status: "surface_mismatch", code: "SCOPED_RELEASE_SURFACE_MISMATCH",
+      inheritedFrom: OTHER_SHA, recordedGateSurfaceSha256: SURFACE, recomputedGateSurfaceSha256: recomputed,
+    }]);
+  }
+  // The default recomputes from this checkout's Git, where OTHER_SHA does not exist: not released.
+  assert.equal(check(rows, { gateSurfaceSha256: SURFACE }).scopes[0].status, "surface_mismatch");
+  // An exact-SHA release is not recomputed: its binding is the SHA itself.
+  const exact = check([surfacedRow({ sha: SHA, evaluatedMs: NOW.getTime() - DAY })],
+    { gateSurfaceSha256: SURFACE, surfaceOfCommit: () => { throw new Error("not called"); } });
+  assert.equal(exact.scopes[0].status, "released");
+});
+
+test("a SHA whose gate surface changed, or is unknown, inherits nothing", () => {
+  const rows = [surfacedRow({ evaluatedMs: NOW.getTime() - 2 * DAY })];
+  for (const gateSurfaceSha256 of [`sha256:${"6".repeat(64)}`, null]) {
+    const report = check(rows, { gateSurfaceSha256 });
+    assert.equal(report.ready, false);
+    assert.equal(report.scopes[0].status, "missing");
+  }
+});
+
+test("an inherited release still expires 30 days after the founder's evaluation", () => {
+  const report = check([surfacedRow({ evaluatedMs: NOW.getTime() - 31 * DAY })], { gateSurfaceSha256: SURFACE });
+  assert.equal(report.scopes[0].status, "expired");
+});
+
+test("a later refusal naming the surface, or a later exact-SHA decision, outranks the inherited release", () => {
+  const evaluatedMs = NOW.getTime() - 3 * DAY;
+  const refusal = { ...surfacedRow({ evaluatedMs }), allowed: false, receipt_sha256: null, evidence: [],
+    missing: ["founder_approval_receipt_recorded"], recorded_at: at(evaluatedMs + 60_000) };
+  assert.equal(check([surfacedRow({ evaluatedMs }), refusal], { gateSurfaceSha256: SURFACE }).scopes[0].status, "refused");
+  const exact = { ...productionRow({ evaluatedMs }), recorded_at: at(evaluatedMs + 60_000) };
+  const report = check([surfacedRow({ evaluatedMs }), exact], { gateSurfaceSha256: SURFACE });
+  assert.equal(report.scopes[0].status, "released");
+  assert.equal("inheritedFrom" in report.scopes[0], false);
+});
+
+test("with a surface digest the CLI sends the gate's OR query, still GET only", async () => {
+  const row = surfacedRow({ evaluatedMs: NOW.getTime() - DAY });
+  const calls = [];
+  const rows = await readReleaseRows({ url: "https://x.example", serviceRoleKey: "k".repeat(32) }, SHA, ["direct_upload"],
+    async (_config, path, init) => { calls.push({ path, method: init.method }); return json([row]); }, SURFACE);
+  assert.deepEqual(rows, [row]);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].method, "GET");
+  const url = new URL(`https://x.example${calls[0].path}`);
+  assert.equal(url.searchParams.get("or"), `(release_revision.eq.${SHA},gate_surface_sha256.eq."${SURFACE}")`);
+  assert.equal(url.searchParams.get("release_revision"), null);
+});
+
+// D-05 gate surface (scripts/gate-surface.mjs). Here so the lib/release-gate-check-script.test.ts wrapper runs it too.
+const repositoryRoot = fileURLToPath(new URL("../..", import.meta.url));
+const surfaceRules = JSON.parse(readFileSync(new URL("./gate-surface-rules.json", import.meta.url), "utf8"));
+const SURFACE_DIGEST = /^sha256:[0-9a-f]{64}$/;
+const surfaceTree = (entries) =>
+  entries.map(([path, n]) => `100644 blob ${String(n).padStart(40, "0")}\t${path}`).join("\0") + "\0";
+const SURFACE_BASE = [
+  [GATE_SURFACE_RULES_PATH, 1],
+  ["shared/scopedCustomerDataGate.ts", 2],
+  ["nextjs/components/landing-v2/landing-page.tsx", 3],
+  ["docs/policy/TERMS.md", 4],
+  ["nextjs/app/benchmarks/gdp-pdf/page.tsx", 5],
+  ["supabase/migrations/20260930070000_processing_qualification_stage.sql", 6],
+];
+const surfaceChange = (path, n) => surfaceTree(SURFACE_BASE.map(([p, b]) => [p, p === path ? n : b]));
+const inSurface = (path) => surfaceRules.alwaysSurface.some((source) => new RegExp(source).test(path)) ||
+  !surfaceRules.presentational.some((source) => new RegExp(source).test(path));
+
+test("gate surface: a presentational change keeps the digest; a gate, policy or rules change moves it", () => {
+  const before = gateSurfaceDigest(surfaceRules, surfaceTree(SURFACE_BASE));
+  assert.match(before, SURFACE_DIGEST);
+  assert.equal(gateSurfaceDigest(surfaceRules, surfaceChange("nextjs/components/landing-v2/landing-page.tsx", 9)), before);
+  assert.equal(gateSurfaceDigest(surfaceRules, surfaceChange("nextjs/app/benchmarks/gdp-pdf/page.tsx", 9)), before);
+  for (const path of ["shared/scopedCustomerDataGate.ts", "docs/policy/TERMS.md", GATE_SURFACE_RULES_PATH,
+    "supabase/migrations/20260930070000_processing_qualification_stage.sql"]) {
+    assert.notEqual(gateSurfaceDigest(surfaceRules, surfaceChange(path, 9)), before, path);
+  }
+  // A new server path anywhere is surface by default, and so is a route under a presentational folder.
+  assert.notEqual(gateSurfaceDigest(surfaceRules, surfaceTree([...SURFACE_BASE, ["nextjs/lib/new-upload-path.ts", 7]])), before);
+  assert.notEqual(gateSurfaceDigest(surfaceRules, surfaceTree([...SURFACE_BASE, ["nextjs/app/benchmarks/x/route.ts", 7]])), before);
+  assert.equal(gateSurfaceDigest(surfaceRules, surfaceTree([...SURFACE_BASE, ["nextjs/e2e/new.spec.ts", 7]])), before);
+});
+
+test("gate surface: no rules file, foreign rules or a malformed tree yields null, which inherits nothing", () => {
+  assert.equal(gateSurfaceDigest(surfaceRules, surfaceTree(SURFACE_BASE.slice(1))), null);
+  assert.equal(gateSurfaceDigest({ ...surfaceRules, schemaVersion: "other" }, surfaceTree(SURFACE_BASE)), null);
+  assert.equal(gateSurfaceDigest({ ...surfaceRules, presentational: "x" }, surfaceTree(SURFACE_BASE)), null);
+  assert.equal(gateSurfaceDigest(surfaceRules, "no-tab-here\0"), null);
+  assert.equal(gateSurfaceOfCommit(repositoryRoot, "0".repeat(40)), null);
+  assert.equal(gateSurfaceOfCommit(repositoryRoot, "HEAD"), null);
+});
+
+test("gate surface: PR #174's landing, benchmark and media changes are presentational; the gate's files are surface", () => {
+  for (const path of [
+    "nextjs/app/benchmarks/gdp-pdf/page.tsx", "nextjs/components/landing-v2/specimen-strip.tsx",
+    "nextjs/components/landing-v2/specimen-strip.module.css", "nextjs/e2e/specimen-strip.spec.ts",
+    "nextjs/lib/changelog.ts", "nextjs/lib/compiler-release.ts", "nextjs/lib/gdp-pdf-page-data.ts",
+    "nextjs/lib/specimen-sources.json", "nextjs/e2e/landing-v2.spec.ts", "nextjs/scripts/repair-scope.mjs",
+    "nextjs/public/film/poster.avif", "nextjs/public/proof-collection/specimens/nasa-sp-5079-p074.pdf",
+    "nextjs/public/proof-collection/specimens/nasa-sp-5079-p074.run.json",
+  ]) assert.equal(inSurface(path), false, path);
+  // Consent, upload, source, key and account UI, any global CSS, the server-side specimen reader, content
+  // and the clients customers download and run are surface: changing them needs a new founder release.
+  for (const path of [
+    "nextjs/components/processing-consent-panel.tsx", "nextjs/components/processing-consent-panel.module.css",
+    "nextjs/components/workspace-ultimate-shell.tsx", "nextjs/components/world-studio-ultimate.tsx",
+    "nextjs/components/developer-panel.tsx", "nextjs/components/founder-test-reset-panel.tsx",
+    "nextjs/app/wanted-sans-korean.css", "nextjs/app/globals.css", "nextjs/lib/specimen-sources.ts",
+    "nextjs/content/trust/provisions.ts", "nextjs/public/developer/tavonel-mcp.mjs",
+    "nextjs/public/developer/tavonel-cli.mjs", "nextjs/public/llms.txt", "nextjs/public/icon.svg",
+  ]) assert.equal(inSurface(path), true, path);
+  for (const path of [
+    "shared/scopedCustomerDataGate.ts", "shared/uskcEnums.ts", "nextjs/lib/customer-data-admission.ts",
+    "nextjs/lib/scoped-customer-data-gate-store.ts", "nextjs/lib/processing-workspace-grant.ts",
+    "nextjs/lib/archive-expand.ts", "nextjs/app/api/access/bootstrap/route.ts", "nextjs/next.config.mjs",
+    "nextjs/vercel.json", "nextjs/package.json", "nextjs/pnpm-lock.yaml",
+    "nextjs/public/policy/processing-terms-2026-09-30.json", "docs/policy/FOUNDER_PACKET_CA_2026-09-11.md",
+    "supabase/migrations/20261027120000_release_gate_surface_continuity.sql",
+    "supabase/tests/release_gate_surface_continuity.sql", "nextjs/scripts/gate-surface.mjs", GATE_SURFACE_RULES_PATH,
+    "nextjs/app/workspace/page.tsx",
+    // The guard suite, its vitest wrapper and the developer contract (R2 S2, S4).
+    "nextjs/scripts/release-gate-check.test.mjs", "nextjs/lib/release-gate-check-script.test.ts",
+    "nextjs/public/developer/README.md", "nextjs/public/developer/source-agent-operations.md",
+    // Suites the production prebuild runs (R3 S-B1).
+    "nextjs/lib/hermetic-prebuild.test.ts", "nextjs/scripts/run-hermetic-vitest.mjs", "nextjs/vitest.config.ts",
+  ]) assert.equal(inSurface(path), true, path);
+});
+
+// A build without Git (the Vercel prebuild runs this suite) has no history to hash; the gate then reads
+// the exact SHA only, so there is nothing to assert. With Git, HEAD must have a digest.
+let checkoutHead = null;
+try {
+  checkoutHead = execFileSync("git", ["-C", repositoryRoot, "rev-parse", "HEAD"],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+} catch { /* no Git */ }
+test("gate surface: this checkout's HEAD has a digest, computed from blob ids", { skip: checkoutHead === null }, () => {
+  const head = checkoutHead;
+  const digest = gateSurfaceOfCommit(repositoryRoot, head);
+  assert.match(digest, SURFACE_DIGEST);
+  assert.equal(gateSurfaceOfCommit(repositoryRoot, head), digest);
+});
+
+// Throwaway repositories, so a test never depends on (or dirties) this checkout. Paths go in through
+// `update-index -z`, so a path holding LF or invalid UTF-8 exists as a real Git tree entry.
+let gitBinary = true;
+try { execFileSync("git", ["--version"], { stdio: "ignore" }); } catch { gitBinary = false; }
+const rulesSource = readFileSync(new URL("./gate-surface-rules.json", import.meta.url));
+const scratchGit = (dir, args, input) => execFileSync("git", ["-c", "core.autocrlf=false", "-c", "core.protectNTFS=false",
+  "-c", "user.name=gate-test", "-c", "user.email=gate-test@example.invalid", "-C", dir, ...args],
+{ input, stdio: ["pipe", "pipe", "ignore"] }).toString("utf8").trim();
+const blobId = (content) => createHash("sha1").update(`blob ${Buffer.byteLength(content)}\0`).update(content).digest("hex");
+/** One commit whose tree is exactly `files` ([path (string or Buffer), content]); no working tree needed. */
+function commitTree(dir, files) {
+  const index = join(dir, ".git", `index-${Math.random().toString(16).slice(2)}`);
+  const records = files.map(([path, content]) => Buffer.concat([
+    Buffer.from(`100644 ${scratchGit(dir, ["hash-object", "-w", "--stdin"], content)}\t`), Buffer.from(path), Buffer.from([0]),
+  ]));
+  execFileSync("git", ["-c", "core.protectNTFS=false", "-C", dir, "update-index", "--add", "-z", "--index-info"],
+    { input: Buffer.concat(records), env: { ...process.env, GIT_INDEX_FILE: index }, stdio: ["pipe", "ignore", "ignore"] });
+  const tree = execFileSync("git", ["-C", dir, "write-tree"], { env: { ...process.env, GIT_INDEX_FILE: index } })
+    .toString().trim();
+  return scratchGit(dir, ["commit-tree", tree, "-m", "gate surface fixture"], "");
+}
+function withScratchRepo(body) {
+  const dir = mkdtempSync(join(tmpdir(), "gate-surface-"));
+  try {
+    scratchGit(dir, ["init", "-q"]);
+    return body(dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+/** Digest v1 as shipped in d8b3ec3c: raw lines joined with LF. Kept here only to prove the fixtures collide. */
+function digestV1(rules, tree) {
+  const keep = (path) => rules.alwaysSurface.some((source) => new RegExp(source).test(path)) ||
+    !rules.presentational.some((source) => new RegExp(source).test(path));
+  // A -z record is the v1 line itself: `mode type object<TAB>path`.
+  const lines = tree.split("\0").filter(Boolean).filter((record) => keep(record.slice(record.indexOf("\t") + 1))).sort();
+  return createHash("sha256").update(`tavonel.gate_surface.v1\n${lines.join("\n")}\n`).digest("hex");
+}
+
+test("gate surface: a path holding LF cannot stand in for the surface files it deletes or adds (R2 S1)", () => {
+  const id = (c) => c.repeat(40);
+  const tree = (entries) => entries.map(([o, p]) => `100644 blob ${o}\t${p}`).join("\0") + "\0";
+  // Deletion: middleware.ts and the gate itself are gone; one LF path carries both of their v1 lines.
+  const released = [[id("1"), GATE_SURFACE_RULES_PATH], [id("a"), "nextjs/middleware.ts"],
+    [id("b"), "shared/scopedCustomerDataGate.ts"], [id("c"), "nextjs/lib/auth-guard.ts"]];
+  const deleted = [released[0], released[3],
+    [id("a"), `nextjs/middleware.ts\n100644 blob ${id("b")}\tshared/scopedCustomerDataGate.ts`]];
+  // Addition: a planted LF path is later split into two real files, one of them a route that was never released.
+  const planted = [[id("1"), GATE_SURFACE_RULES_PATH],
+    [id("a"), `nextjs/lib/x.ts\n100644 blob ${id("e")}\tnextjs/app/api/evil/route.ts`]];
+  const split = [[id("1"), GATE_SURFACE_RULES_PATH], [id("a"), "nextjs/lib/x.ts"], [id("e"), "nextjs/app/api/evil/route.ts"]];
+  for (const [before, after] of [[released, deleted], [planted, split]]) {
+    // The fixtures are the review's collision: digest v1 cannot tell the two trees apart.
+    assert.equal(digestV1(surfaceRules, tree(before)), digestV1(surfaceRules, tree(after)));
+    const a = gateSurfaceDigest(surfaceRules, tree(before));
+    const b = gateSurfaceDigest(surfaceRules, tree(after));
+    assert.match(a, SURFACE_DIGEST);
+    assert.match(b, SURFACE_DIGEST);
+    assert.notEqual(a, b);
+  }
+});
+
+test("gate surface: the LF collision on real Git commits, and a path that is not UTF-8 (R2 S1)", { skip: !gitBinary }, () => {
+  withScratchRepo((dir) => {
+    const gateFile = "// gate\n";
+    // Pick middleware bytes whose blob id sorts right before the gate's with no other line between them,
+    // so the two v1 lines are neighbours, as the review's commits were.
+    const between = (x, lo, hi) => lo < x && x < hi;
+    let middleware = "";
+    for (let k = 0; ; k += 1) {
+      middleware = `export function middleware() { /* auth ${k} */ }\n`;
+      const [m, g, r] = [blobId(middleware), blobId(gateFile), blobId(rulesSource)];
+      if (m < g && !between(r, m, g)) break;
+    }
+    const files = [[GATE_SURFACE_RULES_PATH, rulesSource], ["nextjs/middleware.ts", middleware],
+      ["shared/scopedCustomerDataGate.ts", gateFile]];
+    const released = commitTree(dir, files);
+    const deleted = commitTree(dir, [files[0],
+      [`nextjs/middleware.ts\n100644 blob ${blobId(gateFile)}\tshared/scopedCustomerDataGate.ts`, middleware]]);
+    const lsTree = (sha) => scratchGit(dir, ["ls-tree", "-r", "-z", "--full-tree", sha]) + "\0";
+    assert.equal(digestV1(surfaceRules, lsTree(released)), digestV1(surfaceRules, lsTree(deleted)));
+    const [a, b] = [gateSurfaceOfCommit(dir, released), gateSurfaceOfCommit(dir, deleted)];
+    assert.match(a, SURFACE_DIGEST);
+    assert.match(b, SURFACE_DIGEST);
+    assert.notEqual(a, b);
+    // Two different byte paths that a lossy decoder would both read as "nextjs/lib/x�.ts": no digest.
+    const notUtf8 = commitTree(dir, [files[0], [Buffer.from([...Buffer.from("nextjs/lib/x"), 0xff, ...Buffer.from(".ts")]), "x\n"]]);
+    assert.equal(gateSurfaceOfCommit(dir, notUtf8), null);
+  });
+});
+
+test("gate surface: only a clean Vercel production build of HEAD claims a digest (R2 S6)", { skip: !gitBinary }, () => {
+  withScratchRepo((dir) => {
+    mkdirSync(join(dir, "nextjs", "scripts"), { recursive: true });
+    writeFileSync(join(dir, GATE_SURFACE_RULES_PATH), rulesSource);
+    writeFileSync(join(dir, "nextjs", "x.ts"), "export const x = 1;\n");
+    scratchGit(dir, ["add", "-A"]);
+    scratchGit(dir, ["commit", "-q", "-m", "fixture"]);
+    const head = scratchGit(dir, ["rev-parse", "HEAD"]);
+    const production = { VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: head };
+    const digest = gateSurfaceOfCommit(dir, head);
+    assert.match(digest, SURFACE_DIGEST);
+    assert.equal(deploymentGateSurface(production, dir), digest);
+    assert.equal(deploymentGateSurface({ ...production, VERCEL_GIT_COMMIT_SHA: head.toUpperCase() }, dir), digest);
+    // Fail closed: a preview or local build, no claimed SHA, a SHA other than HEAD, or no Git claims nothing.
+    for (const env of [
+      { ...production, VERCEL_ENV: "preview" }, { ...production, VERCEL_ENV: undefined },
+      { VERCEL_GIT_COMMIT_SHA: head }, { VERCEL_ENV: "production" }, { ...production, VERCEL_GIT_COMMIT_SHA: " " },
+      { ...production, VERCEL_GIT_COMMIT_SHA: "0".repeat(40) },
+    ]) assert.equal(deploymentGateSurface(env, dir), null, JSON.stringify(env));
+    // The bytes being built are not HEAD's: an edited tracked file, then an untracked one.
+    writeFileSync(join(dir, "nextjs", "x.ts"), "export const x = 2;\n");
+    assert.equal(deploymentGateSurface(production, dir), null);
+    scratchGit(dir, ["checkout", "--", "nextjs/x.ts"]);
+    assert.equal(deploymentGateSurface(production, dir), digest);
+    writeFileSync(join(dir, "nextjs", "untracked.ts"), "export const y = 1;\n");
+    assert.equal(deploymentGateSurface(production, dir), null);
+  });
+  const noGit = mkdtempSync(join(tmpdir(), "gate-surface-"));
+  try {
+    assert.equal(deploymentGateSurface({ VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: "a".repeat(40) }, noGit), null);
+  } finally {
+    rmSync(noGit, { recursive: true, force: true });
+  }
+});
+
+test("gate surface: an index entry hidden from git status, or an index that is not HEAD, claims nothing (R3 S-B1)",
+  { skip: !gitBinary }, () => {
+    withScratchRepo((dir) => {
+      mkdirSync(join(dir, "nextjs", "scripts"), { recursive: true });
+      writeFileSync(join(dir, GATE_SURFACE_RULES_PATH), rulesSource);
+      writeFileSync(join(dir, "nextjs", "middleware.ts"), "export const gate = 'closed';\n");
+      scratchGit(dir, ["add", "-A"]);
+      scratchGit(dir, ["commit", "-q", "-m", "released"]);
+      const head = scratchGit(dir, ["rev-parse", "HEAD"]);
+      const production = { VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: head };
+      const digest = gateSurfaceOfCommit(dir, head);
+      assert.equal(deploymentGateSurface(production, dir), digest);
+      // The review's prebuild tamper: rewrite a tracked surface file and hide it from `git status`.
+      for (const flag of ["skip-worktree", "assume-unchanged"]) {
+        scratchGit(dir, ["update-index", `--${flag}`, "nextjs/middleware.ts"]);
+        writeFileSync(join(dir, "nextjs", "middleware.ts"), "export const gate = 'OPEN';\n");
+        assert.equal(scratchGit(dir, ["status", "--porcelain"]), "", flag);
+        assert.equal(deploymentGateSurface(production, dir), null, flag);
+        // The flag alone is enough: Git no longer vouches for that file's bytes.
+        writeFileSync(join(dir, "nextjs", "middleware.ts"), "export const gate = 'closed';\n");
+        assert.equal(deploymentGateSurface(production, dir), null, flag);
+        scratchGit(dir, ["update-index", `--no-${flag}`, "nextjs/middleware.ts"]);
+        assert.equal(deploymentGateSurface(production, dir), digest, flag);
+      }
+      // A staged change: the index is not HEAD.
+      writeFileSync(join(dir, "nextjs", "middleware.ts"), "export const gate = 'OPEN';\n");
+      scratchGit(dir, ["add", "nextjs/middleware.ts"]);
+      assert.equal(deploymentGateSurface(production, dir), null);
+    });
+  });
+
+test("gate surface: a refusal naming the surface also closes a rollback to the released SHA", () => {
+  // The DB refuses a surface-less refusal of an inheriting SHA (refusal_requires_surface); this is what
+  // the reader then sees for the released revision itself.
+  const evaluatedMs = NOW.getTime() - 3 * DAY;
+  const released = surfacedRow({ sha: SHA, evaluatedMs });
+  const refusal = { ...surfacedRow({ sha: "c".repeat(40), evaluatedMs }), allowed: false, receipt_sha256: null,
+    evidence: [], missing: ["founder_approval_receipt_recorded"], recorded_at: at(evaluatedMs + 60_000) };
+  assert.equal(check([released], { gateSurfaceSha256: SURFACE }).scopes[0].status, "released");
+  assert.equal(check([released, refusal], { gateSurfaceSha256: SURFACE }).scopes[0].status, "refused");
+});
+
+// Presentational code ships to the same origin as the consent and upload routes, so it must not be able to
+// talk to them or to the server side on its own. A guardrail against the accident, not an import-graph proof.
+const SHIPPED_CODE = /^nextjs\/(app|components|lib)\/.*\.(ts|tsx|js|jsx|mjs|cjs)$/;
+const FORBIDDEN_IMPORT = /^node:|^(fs|child_process|http|https|net)$|server-only|supabase|^next\/(headers|server)$/;
+const FORBIDDEN_CODE = [/\bfetch\s*\(/, /sendBeacon/, /XMLHttpRequest/, /new\s+(WebSocket|EventSource)\b/,
+  /process\.env/, /document\.cookie/, /\.(requestSubmit|submit)\s*\(/, /^\s*["']use server["']/m,
+  // Server components run at build time too: no Node capability without an import (process.getBuiltinModule, eval).
+  /\bprocess\s*(\.[A-Za-z_$]|\[)/, /\bglobalThis\b/, /\brequire\s*\(/, /\beval\s*\(/, /\bFunction\s*\(/,
+  /\bimport\s*\(\s*[^"'\s)]/];
+// benchmarks and changelog pages are server components, so a presentational file must not import the gate,
+// grant, admission, intake or release-store code either (R2 S3). shared/ is closed except for named
+// pure-data modules a presentational file already reads.
+const GATE_MODULE = /^shared\/|^nextjs\/lib\/(processing-workspace-grant|customer-data-|intake-|scoped-customer-data-gate-store|[^/]*-gate\b)/;
+const PURE_SHARED = new Set(["shared/capabilityManifest"]);
+/** The repository path an import names (`@/` is nextjs/), or null for a package. */
+const importTarget = (from, specifier) => {
+  if (specifier.startsWith("@/")) return posix.normalize(`nextjs/${specifier.slice(2)}`);
+  return specifier.startsWith(".") ? posix.normalize(posix.join(posix.dirname(from), specifier)) : null;
+};
+const importsGateModule = (from, specifier) => {
+  const target = importTarget(from, specifier)?.replace(/\.(ts|tsx|js|jsx|mjs|cjs)$/, "");
+  return target !== undefined && target !== null && GATE_MODULE.test(target) && !PURE_SHARED.has(target);
+};
+test("gate surface: presentational shipped code cannot reach the server side or the network itself", () => {
+  const files = ["app", "components", "lib"]
+    .flatMap((dir) => readdirSync(join(repositoryRoot, "nextjs", dir), { recursive: true })
+      .map((entry) => `nextjs/${dir}/${String(entry).replaceAll("\\", "/")}`))
+    .filter((path) => SHIPPED_CODE.test(path) && !inSurface(path) && !/\.(test|spec)\./.test(path));
+  assert.ok(files.length > 20, `found ${files.length} presentational source files`);
+  const violations = [];
+  for (const path of files) {
+    const source = readFileSync(join(repositoryRoot, path), "utf8");
+    for (const [, specifier] of source.matchAll(/(?:\bfrom|\bimport)\s*\(?\s*["']([^"']+)["']/g)) {
+      if (FORBIDDEN_IMPORT.test(specifier) || importsGateModule(path, specifier)) {
+        violations.push(`${path}: import ${specifier}`);
+      }
+    }
+    for (const pattern of FORBIDDEN_CODE) if (pattern.test(source)) violations.push(`${path}: ${pattern}`);
+  }
+  assert.deepEqual(violations, []);
+  // The check itself fails when it should.
+  assert.equal(FORBIDDEN_CODE.some((pattern) => pattern.test('useEffect(() => { fetch("/api/access/processing-terms") })')), true);
+  assert.equal(FORBIDDEN_IMPORT.test("@/lib/supabase-admin"), true);
+  for (const code of ['process.getBuiltinModule("node:fs")', "globalThis.process", "import(`node:${name}`)", 'eval("x")']) {
+    assert.equal(FORBIDDEN_CODE.some((pattern) => pattern.test(code)), true, code);
+  }
+  assert.equal(FORBIDDEN_CODE.some((pattern) => pattern.test("does not upload or process your files.")), false);
+  const page = "nextjs/app/changelog/page.tsx";
+  for (const specifier of ["@/lib/processing-workspace-grant", "@/lib/customer-data-admission", "@/lib/intake-triage-stream",
+    "@/lib/scoped-customer-data-gate-store", "@/lib/world-gate", "../../lib/processing-workspace-grant.ts",
+    "../../../shared/scopedCustomerDataGate", "@/../shared/uskcEnums"]) {
+    assert.equal(importsGateModule(page, specifier), true, specifier);
+  }
+  for (const specifier of ["@/lib/changelog", "@/lib/site-navigation", "next/link", "react",
+    "../../../shared/capabilityManifest"]) {
+    assert.equal(importsGateModule("nextjs/components/landing-v2/specimen-strip.tsx", specifier), false, specifier);
+  }
+});
+
+// R3 SEC B1. The production build runs `prebuild` (pnpm check, then the hermetic vitest include) on the build
+// machine before next.config.mjs computes the digest. A presentational file it ran could rewrite a surface file
+// or an ignored input (node_modules, .env*) that Git cannot see, and the digest would still be the released one.
+// So everything that run executes, each suite and every module it imports, must be surface.
+const nextjsPackage = JSON.parse(readFileSync(join(repositoryRoot, "nextjs", "package.json"), "utf8"));
+/** The repository files a package script runs with `node`, following `pnpm <script>` references. */
+const scriptEntryPoints = (name, seen = new Set()) => {
+  if (seen.has(name) || !nextjsPackage.scripts[name]) return [];
+  seen.add(name);
+  const command = nextjsPackage.scripts[name];
+  return [...[...command.matchAll(/\bnode\s+(?:--\S+\s+)*(\S+\.(?:m?js|ts))/g)].map(([, file]) => `nextjs/${file}`),
+    ...[...command.matchAll(/\bpnpm\s+(?:run\s+)?([\w:.-]+)/g)].flatMap(([, script]) => scriptEntryPoints(script, seen))];
+};
+const EXECUTABLE = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
+const IMPORT_SPECIFIER = /(?:\bfrom|\bimport|\brequire|\bimportActual)\s*\(?\s*["'`]([^"'`$]+)["'`]/g;
+/** Every tracked module reachable from `roots` by literal import specifiers (`@/` is nextjs/). Over-approximates. */
+function reachableModules(roots, tracked) {
+  const resolveImport = (from, specifier) => {
+    const target = importTarget(from, specifier);
+    if (target === null) return null;
+    for (const base of [target, target.replace(/\.(m?js|jsx)$/, "")]) {
+      for (const suffix of ["", ".ts", ".tsx", ".mts", ".js", ".mjs", ".jsx", "/index.ts", "/index.tsx", "/index.js"]) {
+        if (tracked.has(base + suffix)) return base + suffix;
+      }
+    }
+    return null;
+  };
+  const via = new Map(roots.map((root) => [root, null]));
+  const pending = [...roots];
+  while (pending.length > 0) {
+    const path = pending.pop();
+    if (!EXECUTABLE.test(path) || !tracked.has(path)) continue;
+    for (const [, specifier] of readFileSync(join(repositoryRoot, path), "utf8").matchAll(IMPORT_SPECIFIER)) {
+      const target = resolveImport(path, specifier);
+      if (target !== null && !via.has(target)) {
+        via.set(target, path);
+        pending.push(target);
+      }
+    }
+  }
+  return via;
+}
+const presentationalCode = (via) => [...via.keys()].filter((path) => EXECUTABLE.test(path) && !inSurface(path));
+test("gate surface: the production build runs no presentational code before the digest (R3 S-B1)",
+  { skip: checkoutHead === null || typeof posix.matchesGlob !== "function" }, async () => {
+    const tracked = new Set(execFileSync("git", ["-C", repositoryRoot, "ls-files", "-z"], { encoding: "utf8" })
+      .split("\0").filter(Boolean));
+    const { default: vitestConfig } = await import(pathToFileURL(join(repositoryRoot, "nextjs", "vitest.config.ts")).href);
+    const include = vitestConfig.test.include;
+    assert.ok(include.length > 5, "the real vitest include");
+    const suites = [...tracked].filter((path) => path.startsWith("nextjs/") &&
+      include.some((glob) => posix.matchesGlob(path.slice("nextjs/".length), glob)));
+    assert.ok(suites.length > 100, `${suites.length} suites`);
+    // 1. Every suite the include selects is surface, by the rules alone.
+    assert.deepEqual(suites.filter((path) => !inSurface(path)), []);
+    // 2. In a production build (the only one that claims a digest) the wrapper leaves out exactly the suites
+    //    that reach presentational code; each listed suite exists, is selected by the include and does reach it.
+    assert.match(nextjsPackage.scripts.prebuild, /node scripts\/run-hermetic-vitest\.mjs$/);
+    const excludes = (env) => vitestArguments(env, []).filter((_, index, all) => all[index - 1] === "--exclude");
+    assert.deepEqual(excludes({ VERCEL_ENV: "production" }), [...PREBUILD_EXCLUDED_SUITES]);
+    for (const env of [{}, { VERCEL_ENV: "preview" }]) assert.deepEqual(vitestArguments(env, ["x"]), ["x"]);
+    const excluded = PREBUILD_EXCLUDED_SUITES.map((suite) => `nextjs/${suite}`);
+    for (const suite of excluded) {
+      assert.ok(suites.includes(suite), `${suite} is not a suite the include selects`);
+      assert.notDeepEqual(presentationalCode(reachableModules([suite], tracked)), [],
+        `${suite} reaches no presentational code; run it in the prebuild again`);
+    }
+    // 3. Nothing the prebuild and the config load run reaches a presentational module.
+    const configs = [...tracked].filter((path) => /^nextjs\/[^/]+\.config\.(m?js|cjs|ts)$/.test(path));
+    const entryPoints = ["preinstall", "install", "postinstall", "prepare", "prebuild", "build"]
+      .flatMap((name) => scriptEntryPoints(name));
+    assert.ok(entryPoints.includes("nextjs/scripts/run-hermetic-vitest.mjs"), entryPoints.join(", "));
+    assert.ok(entryPoints.includes("nextjs/scripts/build-brand-assets.mjs"), entryPoints.join(", "));
+    const roots = [...configs, ...entryPoints, ...suites.filter((suite) => !excluded.includes(suite))];
+    for (const path of [...roots, "nextjs/package.json", "nextjs/tsconfig.json", "nextjs/pnpm-lock.yaml"]) {
+      assert.equal(inSurface(path), true, path);
+    }
+    const via = reachableModules(roots, tracked);
+    assert.deepEqual(presentationalCode(via).map((path) => `${path} <- ${via.get(path)}`), []);
+    // The walk itself finds what it should: a landing suite reaches the landing page.
+    assert.ok(reachableModules(["nextjs/lib/landing-v2-page.test.ts"], tracked)
+      .has("nextjs/components/landing-v2/landing-page.tsx"));
+  });

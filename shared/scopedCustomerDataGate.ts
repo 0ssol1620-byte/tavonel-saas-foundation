@@ -41,6 +41,7 @@ const REVISION = /^[0-9a-f]{40}$/;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const WORKSPACE = /^pilot-[A-Za-z0-9]{1,16}$/;
 const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const DIGEST = /^sha256:[0-9a-f]{64}$/;
 
 function instant(value: string): number | null {
   if (!INSTANT.test(value)) return null;
@@ -76,6 +77,12 @@ export type ScopedReleaseDecision = {
   evaluatedAt: string;
   /** Qualification only: the one recorded operator workspace and the hard stop. */
   qualification: { workspaceId: string; expiresAt: string } | null;
+  /**
+   * Production only, optional (D-05, docs/adr/0006): the gate-surface digest of releaseRevision. The
+   * decision then also covers a deployment whose own surface digest is equal; null covers only
+   * releaseRevision itself.
+   */
+  gateSurfaceSha256?: string | null;
 };
 
 function checkEvidence(
@@ -99,16 +106,23 @@ function checkEvidence(
 
 const digest = (value: unknown) => `sha256:${createHash("sha256").update(JSON.stringify(value)).digest("hex")}`;
 
-/** A digest never crosses scopes or release revisions. Extra and duplicate evidence fail closed. */
+/**
+ * A digest never crosses scopes or release revisions. Extra and duplicate evidence fail closed. A
+ * gate-surface digest, when given, is part of the receipt; without one the canonical form is
+ * byte-identical to before, so every receipt recorded earlier still verifies.
+ */
 export function evaluateScopedRelease(input: {
   scope: CustomerDataScope;
   releaseRevision: string;
   evidence: readonly ReleaseEvidence[];
   now: string;
+  gateSurfaceSha256?: string | null;
 }): ScopedReleaseDecision {
   const required = requiredReleaseEvidence(input.scope);
   const evaluated = instant(input.now);
-  const validSubject = REVISION.test(input.releaseRevision) && evaluated !== null;
+  const surface = input.gateSurfaceSha256 ?? null;
+  const validSubject = REVISION.test(input.releaseRevision) && evaluated !== null &&
+    (surface === null || DIGEST.test(surface));
   const { missing, exact, canonical } = checkEvidence(required, input.evidence, evaluated);
   const allowed = validSubject && exact && missing.length === 0;
   return {
@@ -125,9 +139,11 @@ export function evaluateScopedRelease(input: {
       releaseRevision: input.releaseRevision,
       evaluatedAt: new Date(evaluated!).toISOString(),
       evidence: canonical(),
+      ...(surface === null ? {} : { gateSurfaceSha256: surface }),
     }) : null,
     evaluatedAt: input.now,
     qualification: null,
+    gateSurfaceSha256: surface,
   };
 }
 
@@ -175,12 +191,34 @@ export function evaluateQualificationRelease(input: {
     }) : null,
     evaluatedAt: input.now,
     qualification: allowed ? { workspaceId: input.workspaceId, expiresAt: input.expiresAt } : null,
+    gateSurfaceSha256: null,
   };
 }
 
 /** The release-ledger columns verifyStoredRelease reads; every reader selects exactly these. */
 export const RELEASE_COLUMNS = "schema_version,stage,scope,release_revision,allowed,receipt_sha256,evidence,missing," +
-  "evaluated_at,recorded_at,qualification_workspace_key,qualification_expires_at";
+  "evaluated_at,recorded_at,qualification_workspace_key,qualification_expires_at,gate_surface_sha256";
+/** The gate's order: the latest recorded row is the decision, and a refusal wins a tie. */
+export const RELEASE_ORDER = "recorded_at.desc,allowed.asc,evaluated_at.desc";
+
+/**
+ * The one release query every reader sends. Without a gate-surface digest it is the exact-SHA query
+ * it always was. With one, the latest row naming this SHA or this surface is the decision, so a
+ * later refusal of either, and a later exact-SHA decision, outranks an inherited release.
+ */
+export function releaseDecisionQuery(
+  scope: CustomerDataScope, releaseRevision: string, gateSurfaceSha256: string | null,
+): URLSearchParams {
+  const query = new URLSearchParams({ select: RELEASE_COLUMNS, scope: `eq.${scope}` });
+  if (gateSurfaceSha256 !== null && DIGEST.test(gateSurfaceSha256)) {
+    query.set("or", `(release_revision.eq.${releaseRevision},gate_surface_sha256.eq."${gateSurfaceSha256}")`);
+  } else {
+    query.set("release_revision", `eq.${releaseRevision}`);
+  }
+  query.set("order", RELEASE_ORDER);
+  query.set("limit", "1");
+  return query;
+}
 const EVIDENCE_KEYS = ["checkedAt", "evidence", "precondition", "satisfied"].join();
 const isoText = (value: unknown): value is string => typeof value === "string" && Number.isFinite(Date.parse(value));
 
@@ -197,13 +235,21 @@ export type StoredReleaseFailure =
  */
 export function verifyStoredRelease(
   row: Record<string, unknown>,
-  subject: { scope: CustomerDataScope; releaseRevision: string; workspaceId: string },
+  subject: { scope: CustomerDataScope; releaseRevision: string; workspaceId: string; gateSurfaceSha256?: string | null },
   now: number,
 ): { ok: true; release: ScopedReleaseDecision } | { ok: false; code: StoredReleaseFailure } {
   const fail = (code: StoredReleaseFailure) => ({ ok: false as const, code });
   const stage = row.stage;
+  // D-05: a production row covers this deployment by its exact SHA or by an equal gate-surface
+  // digest. A qualification row never carries one, so it never leaves its own SHA.
+  const surface = row.gate_surface_sha256 ?? null;
+  if (surface !== null && (typeof surface !== "string" || !DIGEST.test(surface) || stage !== "production")) {
+    return fail("SCOPED_RELEASE_INVALID");
+  }
+  const covers = row.release_revision === subject.releaseRevision ||
+    (surface !== null && surface === subject.gateSurfaceSha256);
   if ((stage !== "production" && stage !== "qualification") || row.schema_version !== stageSchema(stage) ||
-    row.scope !== subject.scope || row.release_revision !== subject.releaseRevision ||
+    row.scope !== subject.scope || !covers || typeof row.release_revision !== "string" ||
     !isoText(row.evaluated_at) || !isoText(row.recorded_at) ||
     Date.parse(row.recorded_at) < Date.parse(row.evaluated_at) || Date.parse(row.recorded_at) > now) {
     return fail("SCOPED_RELEASE_INVALID");
@@ -226,8 +272,8 @@ export function verifyStoredRelease(
     if (row.missing.length !== 0 || row.qualification_workspace_key != null || row.qualification_expires_at != null) {
       return fail("SCOPED_RELEASE_INVALID");
     }
-    release = evaluateScopedRelease({ scope: subject.scope, releaseRevision: subject.releaseRevision, evidence,
-      now: row.evaluated_at });
+    release = evaluateScopedRelease({ scope: subject.scope, releaseRevision: row.release_revision, evidence,
+      now: row.evaluated_at, gateSurfaceSha256: surface });
   } else {
     const pending: readonly string[] | undefined = QUALIFICATION_PENDING_BY_SCOPE[subject.scope];
     if (!pending || row.missing.length !== pending.length || row.missing.some((item, index) => item !== pending[index]) ||
@@ -268,7 +314,6 @@ export type WorkspaceGrant = {
   grantReceiptSha256: string;
 };
 
-const DIGEST = /^sha256:[0-9a-f]{64}$/;
 const canonicalInstant = (value: string): string => {
   const parsed = instant(value);
   return parsed === null ? value : new Date(parsed).toISOString();

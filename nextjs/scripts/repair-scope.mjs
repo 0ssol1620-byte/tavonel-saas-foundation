@@ -2181,6 +2181,33 @@ export const LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/launch-qa-script-ratchet.test.ts',
   'lib/release-gate-check-script.test.ts',
 ]);
+// D-05 gate release continuity (docs/adr/0006): the shared release evaluator and verifier, the gate reader and its suite, the
+// build config that inlines the deployment's gate-surface digest, and the surface computation with its rules. Exactly these six
+// repo-relative paths select the nine suites that read them directly: the four gate-v2 suites (reader, issuer, admission,
+// authorization) and the compile path that carries a release, the Node wrapper that runs the gate-check and surface suite, and
+// the three suites that import next.config.mjs. No browser lane. The migration and its pgTAP file keep their database owner.
+// Gate code, so never nativeReuse.
+export const GATE_RELEASE_CONTINUITY_AFFECTED_PATHS = Object.freeze([
+  'nextjs/lib/scoped-customer-data-gate-store.test.ts',
+  'nextjs/lib/scoped-customer-data-gate-store.ts',
+  'nextjs/next.config.mjs',
+  'nextjs/scripts/gate-surface-rules.json',
+  'nextjs/scripts/gate-surface.mjs',
+  'nextjs/scripts/run-hermetic-vitest.mjs',
+  'shared/scopedCustomerDataGate.ts',
+]);
+export const GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/collection-compile-run.test.ts',
+  'lib/customer-data-admission.test.ts',
+  'lib/customer-data-authorization.test.ts',
+  'lib/hermetic-prebuild.test.ts',
+  'lib/processing-workspace-grant.test.ts',
+  'lib/release-gate-check-script.test.ts',
+  'lib/route-classification.test.ts',
+  'lib/scoped-customer-data-gate-store.test.ts',
+  'lib/security-headers.test.ts',
+  'lib/seo-surface.test.ts',
+]);
 // G1-COPY (codex/p4-copy-20261019; DECISION-REGISTER-2026-10-17 S6-17, S6-16, D-01, D-07, D-33, N-5): the six changed endpoints
 // no owner listed -- the plan catalog whose included-pages bullet lost "verified", the developer-file purposes (the CLI line),
 // the operations record whose billing row now reads the purchasable state, the published MCP bridge whose download_package text
@@ -2823,6 +2850,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // launch-qa-release-scripts: the 5 exact paths above select 3 direct suites and no browser suite.
   affectedGroup('launch-qa-release-scripts', new RegExp(`^nextjs/(?:${exactPathAlternation(LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS)})$`),
     { unitFiles: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES }),
+  // gate-release-continuity (D-05): the 7 exact repo-relative paths above select 10 direct suites and no browser suite.
+  affectedGroup('gate-release-continuity', new RegExp(`^(?:${exactPathAlternation(GATE_RELEASE_CONTINUITY_AFFECTED_PATHS)})$`),
+    { unitFiles: GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES }),
   // g1-copy-truth: the 6 exact paths above select 17 direct suites and 2 browser suites.
   affectedGroup('g1-copy-truth', new RegExp(`^nextjs/(?:${exactPathAlternation(G1_COPY_TRUTH_AFFECTED_PATHS)})$`),
     { unitFiles: G1_COPY_TRUTH_AFFECTED_UNIT_FILES, browserFiles: G1_COPY_TRUTH_AFFECTED_BROWSER_FILES }),

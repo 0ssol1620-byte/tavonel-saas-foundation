@@ -335,3 +335,73 @@ describe("connector qualification at the gate reader", () => {
     await expect(readConnector()).resolves.toEqual({ ok: false, code: "SCOPED_WORKSPACE_INVALID" });
   });
 });
+
+describe("D-05: a release recorded for a gate surface covers a deployment with the same surface", () => {
+  const deployed = "c".repeat(40);
+  const surface = `sha256:${"5".repeat(64)}`;
+  const otherSurface = `sha256:${"6".repeat(64)}`;
+  const surfaced = evaluateScopedRelease({ scope, releaseRevision: revision, evidence, now: evaluatedAt,
+    gateSurfaceSha256: surface });
+  if (!surfaced.allowed || !surfaced.receiptSha256) throw new Error("invalid surfaced release fixture");
+  const sGrantUnsigned = { ...unsignedGrant, releaseReceiptSha256: surfaced.receiptSha256 };
+  const sGrant: WorkspaceGrant = { ...sGrantUnsigned, grantReceiptSha256: workspaceGrantSha256(sGrantUnsigned) };
+  const sRow = releaseRow({ receipt_sha256: surfaced.receiptSha256, gate_surface_sha256: surface });
+  const sGrantRow = grantRow({ release_receipt_sha256: sGrant.releaseReceiptSha256,
+    grant_receipt_sha256: sGrant.grantReceiptSha256 });
+  const env = (value: string | undefined) => ({ ...process.env, TAVONEL_GATE_SURFACE_SHA256: value });
+  const readDeployed = (deploymentSurface: string | undefined, at = now) =>
+    readVerifiedScopedCustomerDataGate(WORKSPACE, WORKSPACE, scope, deployed, at, env(deploymentSurface), root);
+
+  it("admits a later deployment whose surface digest equals the released one, bound to the released revision", async () => {
+    serve({ release: [sRow], grant: [sGrantRow] });
+    const result = await readDeployed(surface);
+    expect(result).toMatchObject({ ok: true, stage: "production", releaseReceiptSha256: surfaced.receiptSha256 });
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.authorization.release.releaseRevision).toBe(revision);
+    expect(result.authorization.release.gateSurfaceSha256).toBe(surface);
+    expect(authorizationAdmitsCustomerData(result.authorization, WORKSPACE, WORKSPACE, now, scope)).toBe(true);
+    const releasePath = decodeURIComponent(call(RELEASES)![1] as string);
+    expect(releasePath).toContain(`or=(release_revision.eq.${deployed},gate_surface_sha256.eq."${surface}")`);
+    expect(releasePath).not.toContain("release_revision=eq.");
+  });
+
+  it("a deployment that changed a gate-surface path inherits nothing", async () => {
+    // The store answers the OR query honestly: nothing names this SHA or this surface.
+    serve({ release: [], grant: [sGrantRow] });
+    await expect(readDeployed(otherSurface)).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_NOT_FOUND" });
+    // Even a store that returned the other surface's row is refused by the verifier.
+    serve({ release: [sRow], grant: [sGrantRow] });
+    await expect(readDeployed(otherSurface)).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_INVALID" });
+  });
+
+  it("a build without a surface digest reads only its exact SHA, as before", async () => {
+    for (const missing of [undefined, "", "sha256:short", surface.toUpperCase()]) {
+      serve({ release: [sRow], grant: [sGrantRow] });
+      await expect(readDeployed(missing)).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_INVALID" });
+      const releasePath = decodeURIComponent(call(RELEASES)![1] as string);
+      expect(releasePath).toContain(`release_revision=eq.${deployed}`);
+      expect(releasePath).not.toContain("gate_surface_sha256.eq");
+    }
+  });
+
+  it("an inherited release still expires 30 days after the founder's evaluation", async () => {
+    serve({ release: [sRow], grant: [sGrantRow] });
+    const late = new Date(Date.parse(evaluatedAt) + 30 * 24 * 3_600_000 + 1);
+    await expect(readDeployed(surface, late)).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_STALE" });
+  });
+
+  it("a surface added to a row whose receipt does not bind it, or to a qualification row, is invalid", async () => {
+    serve({ release: [releaseRow({ gate_surface_sha256: surface })], grant: [grantRow()] });
+    await expect(readDeployed(surface)).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_INVALID" });
+    serve({ release: [{ ...sRow, stage: "qualification" }], grant: [sGrantRow] });
+    await expect(readDeployed(surface)).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_INVALID" });
+    serve({ release: [{ ...sRow, gate_surface_sha256: 42 }], grant: [sGrantRow] });
+    await expect(readDeployed(surface)).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_INVALID" });
+  });
+
+  it("a later refusal that names the surface ends the inherited release", async () => {
+    serve({ release: [{ ...sRow, allowed: false, receipt_sha256: null, evidence: [],
+      missing: ["founder_approval_receipt_recorded"], recorded_at: "2026-09-29T00:30:00.000Z" }], grant: [sGrantRow] });
+    await expect(readDeployed(surface)).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_REFUSED" });
+  });
+});

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "tavonel.gate_surface.v1",
+  "comment": "Paths that cannot change what the server does with customer data, nor the consent, upload, source, key or account UI in front of it: docs, tests, static media and the public landing, benchmark and changelog pages. Every other tracked path, this file and gate-surface.mjs included, is the gate surface. Shipped code on this list may not fetch, read process.env, run on the server-only side, or import supabase, node: modules, shared/ gate code or the grant, admission, intake and release-store modules (release-gate-check.test.mjs); that test, its vitest wrapper and the developer setup and safety contract under public/developer/ are surface, so weakening them moves the digest. The production build runs its prebuild (pnpm check, then the hermetic vitest include of vitest.config.ts) on the build machine before next.config.mjs computes the digest, so everything it runs is surface: the last five alwaysSurface rules are that include, and suites that import presentational modules are left out of the prebuild run (run-hermetic-vitest.mjs PREBUILD_EXCLUDED_SUITES). Widening this list changes the digest, so it needs a new founder release once. docs/adr/0006-release-continuity-by-gate-surface.md.",
+  "alwaysSurface": [
+    "^docs/policy/",
+    "^nextjs/public/policy/",
+    "^nextjs/public/\\.well-known/",
+    "/route\\.(ts|tsx|js|mjs)$",
+    "^nextjs/scripts/gate-surface",
+    "^nextjs/scripts/release-gate-check\\.test\\.mjs$",
+    "^nextjs/lib/release-gate-check-script\\.test\\.ts$",
+    "^nextjs/public/developer/",
+    "^nextjs/lib/.*\\.(test|spec)\\.ts$",
+    "^nextjs/eval/(.*/)?metrics\\.test\\.ts$",
+    "^nextjs/components/.*\\.test\\.tsx?$",
+    "^nextjs/app/api/(documents/.*|compile-jobs)/route\\.test\\.ts$",
+    "^nextjs/scripts/(router|billing)/[^/]+\\.test\\.mjs$"
+  ],
+  "presentational": [
+    "^docs/",
+    "\\.md$",
+    "\\.(test|spec)\\.(ts|tsx|mts|js|mjs)$",
+    "^nextjs/e2e/",
+    "^nextjs/public/.*\\.(avif|webp|jpe?g|png|gif|ico|mp4|webm|vtt|woff2|pdf)$",
+    "^nextjs/public/proof-collection/specimens/[^/]+\\.json$",
+    "^nextjs/components/landing-v2/",
+    "^design-system/",
+    "^nextjs/app/(benchmarks|changelog)/",
+    "^nextjs/lib/(changelog|compiler-release|gdp-pdf-page-data)\\.ts$",
+    "^nextjs/lib/specimen-sources\\.json$",
+    "^nextjs/scripts/(repair-scope|verify-repair-workflows)\\.mjs$"
+  ]
+}
