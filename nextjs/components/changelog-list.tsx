@@ -8,6 +8,7 @@ import {
   type ChangelogEntry,
   type ChangelogSurface,
 } from "@/lib/changelog";
+import { COMPILER_RELEASE, COMPILER_RELEASE_DEFINITION } from "@/lib/compiler-release";
 
 /**
  * The changelog, filtered by the surface a reader owns.
@@ -25,6 +26,8 @@ import {
  */
 export function ChangelogList({ entries }: { entries: readonly ChangelogEntry[] }) {
   const [surface, setSurface] = useState<ChangelogSurface | null>(null);
+  /* The name's first mention on the page carries its definition (FINAL-SPEC-HARD-PROOF §1). */
+  const firstRelease = entries.findIndex((entry) => entry.compilerRelease);
 
   return (
     <>
@@ -43,7 +46,7 @@ export function ChangelogList({ entries }: { entries: readonly ChangelogEntry[] 
       </div>
 
       <div className="stack">
-        {entries.map((entry) => (
+        {entries.map((entry, index) => (
           <article
             className="policy-section changelog-entry"
             key={changelogEntryId(entry)}
@@ -86,6 +89,13 @@ export function ChangelogList({ entries }: { entries: readonly ChangelogEntry[] 
               {entry.apiVersion ? <b>API {entry.apiVersion}</b> : null}
             </header>
             <h2>{entry.title}</h2>
+            {entry.compilerRelease ? (
+              <p className="fine" data-compiler-release={entry.compilerRelease}>
+                {index === firstRelease ? "TAVONEL " : null}{COMPILER_RELEASE.name} ·{" "}
+                <code title={COMPILER_RELEASE.digest}>{COMPILER_RELEASE.digest.slice(7, 15)}</code>
+                {index === firstRelease ? <> &mdash; {COMPILER_RELEASE_DEFINITION.en}</> : null}
+              </p>
+            ) : null}
 
             {entry.breaking ? (
               <p className="changelog-breaking">

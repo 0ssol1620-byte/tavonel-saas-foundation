@@ -16,6 +16,7 @@ import {
   GDP_PDF_ARTIFACT_SHA256,
   GDP_PDF_PAGE_ARMS,
   GDP_PDF_RUNS,
+  gdpPdfCompilerRelease,
   gdpPdfDeltaSentence,
   gdpPdfDesignFigure,
   gdpPdfDeviations,
@@ -32,6 +33,7 @@ import GdpPdfBenchmarkPage from "../app/benchmarks/gdp-pdf/page";
 import { metadata } from "../app/benchmarks/gdp-pdf/page";
 import sitemap from "../app/sitemap";
 import { publicPageLocation } from "./marketing-analytics";
+import { COMPILER_RELEASE, COMPILER_RELEASE_DEFINITION } from "./compiler-release";
 
 /** A run's committed file, from its repository path (`nextjs/...`). */
 const runFile = (run: GdpPdfRun) => resolve(import.meta.dirname, "..", run.path.replace(/^nextjs\//, ""));
@@ -481,5 +483,34 @@ describe("the route's public surface", () => {
 
   it("is measured, because what is advertised is what is measured", () => {
     expect(publicPageLocation("/benchmarks/gdp-pdf")).toBe("https://tavonel.com/benchmarks/gdp-pdf");
+  });
+});
+
+/*
+  hard-proof 2026-10-27 (FINAL-SPEC-HARD-PROOF §1): the "Compiler release" receipt row renders only
+  for a report that names the release its compiled arm ran on. v2 names none, so its page has no
+  row; a report naming a release this site does not define is refused, not rendered without it.
+*/
+describe("the compiler release row", () => {
+  it("is absent for v2, which names no release", () => {
+    expect(gdpPdfReport().compilerRelease).toBeUndefined();
+    expect(gdpPdfCompilerRelease()).toBeNull();
+    const html = renderToStaticMarkup(createElement(GdpPdfBenchmarkPage));
+    expect(html).not.toContain("data-compiler-release");
+    expect(html).not.toContain(COMPILER_RELEASE.name);
+  });
+
+  it("names the release, its digest and the definition for a report that carries it", () => {
+    const report = { ...validReport(), compilerRelease: "compiler-1" };
+    expect(validateGdpPdfReport(report)).toEqual([]);
+    expect(gdpPdfCompilerRelease(report as never)).toEqual({
+      label: "TAVONEL Compiler 1", digest: COMPILER_RELEASE.digest, definition: COMPILER_RELEASE_DEFINITION.en,
+    });
+  });
+
+  it("refuses a report that names a release this site does not define", () => {
+    for (const compilerRelease of ["compiler-2", "T1", "", 1]) {
+      expect(validateGdpPdfReport({ ...validReport(), compilerRelease })).toContain("compilerRelease: not a release lib/compiler-release.ts defines");
+    }
   });
 });

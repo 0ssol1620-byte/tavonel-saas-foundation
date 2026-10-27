@@ -2138,6 +2138,11 @@ export const GDP_PDF_RUNS_AFFECTED_PATHS = Object.freeze([
 ]);
 export const GDP_PDF_RUNS_AFFECTED_UNIT_FILES = Object.freeze(['lib/gdp-pdf-page-data.test.ts', 'lib/marketing-story.test.ts']);
 export const GDP_PDF_RUNS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmarks.spec.ts', 'e2e/marketing-story.spec.ts']);
+// Compiler 1 (hard-proof 2026-10-27, C3): the one release record. It is read by the changelog list, the GDP.pdf receipt row and the
+// copy guard, so it selects those three suites and the two browser suites that open /benchmarks/gdp-pdf and /changelog.
+export const COMPILER_RELEASE_AFFECTED_PATHS = Object.freeze(['lib/compiler-release.ts']);
+export const COMPILER_RELEASE_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/changelog.test.ts', 'lib/gdp-pdf-page-data.test.ts']);
+export const COMPILER_RELEASE_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmarks.spec.ts', 'e2e/templates.spec.ts']);
 // Launch QA and release scripts (P2-02 script ratchet, P2-17 release-decision check): the Lighthouse budget script and its ratchet
 // suite, the read-only release-gate check, its Node suite and the Vitest wrapper that runs that suite here. Exactly these five
 // paths select the ratchet, client-route-weight and wrapper suites; no browser, database or build lane. Never nativeReuse.
@@ -2789,6 +2794,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // gdp-pdf-runs: the 3 exact paths above select 2 direct suites and 2 browser suites.
   affectedGroup('gdp-pdf-runs', new RegExp(`^nextjs/(?:${exactPathAlternation(GDP_PDF_RUNS_AFFECTED_PATHS)})$`),
     { unitFiles: GDP_PDF_RUNS_AFFECTED_UNIT_FILES, browserFiles: GDP_PDF_RUNS_AFFECTED_BROWSER_FILES }),
+  // compiler-release: 1 exact path selects 3 direct suites and 2 browser suites.
+  affectedGroup('compiler-release', new RegExp(`^nextjs/(?:${exactPathAlternation(COMPILER_RELEASE_AFFECTED_PATHS)})$`),
+    { unitFiles: COMPILER_RELEASE_AFFECTED_UNIT_FILES, browserFiles: COMPILER_RELEASE_AFFECTED_BROWSER_FILES }),
   // launch-qa-release-scripts: the 5 exact paths above select 3 direct suites and no browser suite.
   affectedGroup('launch-qa-release-scripts', new RegExp(`^nextjs/(?:${exactPathAlternation(LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS)})$`),
     { unitFiles: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES }),

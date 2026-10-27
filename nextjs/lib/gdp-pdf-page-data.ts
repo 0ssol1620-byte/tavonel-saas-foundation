@@ -29,6 +29,7 @@
 
 import v2 from "../content/benchmarks/gdp-pdf.json";
 import protocol from "../eval/gdp-pdf/protocol.json";
+import { compilerRelease, COMPILER_RELEASE_DEFINITION } from "./compiler-release";
 
 /* ------------------------------------------------------------------ the artifacts */
 
@@ -162,6 +163,11 @@ export type GdpPdfReport = Readonly<{
     the run, published beside the result rather than argued against it.
   */
   packet_size?: Readonly<{ n: number; packets_truncated_by_budget?: number }>;
+  /*
+    The compiler release the run's compiled arm ran on (lib/compiler-release.ts), when the report
+    names one. v2 does not; a report naming a release this site does not define is refused.
+  */
+  compilerRelease?: string;
 }>;
 
 /* ------------------------------------------------------------------ validation */
@@ -345,6 +351,10 @@ export function validateGdpPdfReport(value: unknown): string[] {
     }
   }
 
+  if (value.compilerRelease !== undefined && compilerRelease(value.compilerRelease) === null) {
+    problems.push("compilerRelease: not a release lib/compiler-release.ts defines");
+  }
+
   if (typeof value.official_comparable !== "boolean") problems.push("official_comparable: missing");
   if (!isFiniteNumber(value.cells_recorded) || value.cells_recorded < 0) {
     problems.push("cells_recorded: missing count");
@@ -420,6 +430,15 @@ export function gdpPdfPreviousRuns(runs: readonly GdpPdfRun[] = GDP_PDF_RUNS): G
       deviations: gdpPdfDeviations(report).length,
     };
   });
+}
+
+/**
+ * The receipt row "Compiler release", or null when the run names none -- and the row is then not
+ * printed. The name's first mention on the page is this row, so it carries the definition.
+ */
+export function gdpPdfCompilerRelease(run: GdpPdfReport = gdpPdfReport()) {
+  const release = compilerRelease(run.compilerRelease);
+  return release && { label: `TAVONEL ${release.name}`, digest: release.digest, definition: COMPILER_RELEASE_DEFINITION.en };
 }
 
 /* ------------------------------------------------------------------ the two figures */

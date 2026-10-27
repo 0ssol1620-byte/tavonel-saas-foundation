@@ -7,6 +7,7 @@ import {
   GDP_PDF_ARTIFACT_PATH,
   GDP_PDF_ARTIFACT_SHA256,
   GDP_PDF_PAGE_ARMS,
+  gdpPdfCompilerRelease,
   gdpPdfDeltaSentence,
   gdpPdfDesignFigure,
   gdpPdfDeviations,
@@ -122,6 +123,7 @@ export default function GdpPdfBenchmarkPage() {
   const design = gdpPdfDesignFigure(report);
   const pass = gdpPdfPassFigure(report);
   const previousRuns = gdpPdfPreviousRuns();
+  const release = gdpPdfCompilerRelease(report);
 
   return (
     <PublicSitePage template="T5">
@@ -525,6 +527,16 @@ export default function GdpPdfBenchmarkPage() {
                       <code className={styles.digest}>sha256:{GDP_PDF_ARTIFACT_SHA256}</code>
                     </dd>
                   </div>
+                  {/* Only when the report names the release it ran on (v2 does not). */}
+                  {release ? (
+                    <div className={styles.receiptRow} data-compiler-release="">
+                      <dt>Compiler release</dt>
+                      <dd>
+                        {release.label} · <code className={styles.digest}>{release.digest}</code>
+                        <span className={styles.note}>{release.definition}</span>
+                      </dd>
+                    </div>
+                  ) : null}
                   <div className={styles.receiptRow}>
                     <dt>Subject model</dt>
                     <dd><code>{report.manifest.surface.declared_model}</code></dd>

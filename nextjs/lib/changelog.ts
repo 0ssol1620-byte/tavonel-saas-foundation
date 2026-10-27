@@ -34,6 +34,8 @@
   entry here, so neither can move on the site without one.
 */
 
+import type { CompilerReleaseId } from "./compiler-release";
+
 export type ChangelogSurface = "Workspace" | "API" | "Developer tools" | "Website" | "Billing";
 
 export const CHANGELOG_SURFACES: readonly ChangelogSurface[] = [
@@ -61,6 +63,12 @@ export type ChangelogEntry = {
   version?: string;
   /** The OpenAPI info.version this release put on /api/openapi, when it moved the contract. */
   apiVersion?: string;
+  /**
+   * The pinned compiler release this deployment shipped (lib/compiler-release.ts), when it shipped
+   * one. Printed as a line under the title; the first such line on the page carries the definition.
+   * Not `version`, which is the channel.json version a developer pins.
+   */
+  compilerRelease?: CompilerReleaseId;
   surfaces: ChangelogSurface[];
   added?: string[];
   improved?: string[];

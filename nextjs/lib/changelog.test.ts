@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { ChangelogList } from "@/components/changelog-list";
+import { COMPILER_RELEASE, COMPILER_RELEASE_DEFINITION } from "./compiler-release";
 import { GET as feedRoute } from "@/app/changelog/feed.xml/route";
 import {
   CHANGELOG,
@@ -10,6 +14,7 @@ import {
   changelogEntries,
   changelogSections,
   changelogUpdatedAt,
+  type ChangelogEntry,
 } from "./changelog";
 import channel from "../public/developer/channel.json";
 import { GET as openApi } from "@/app/api/openapi/route";
@@ -276,5 +281,35 @@ describe("the page that renders it", () => {
   it("keeps the history out of the client island's script", () => {
     expect(list).toContain('"use client"');
     expect(list).not.toMatch(/\bchangelogEntries\b|\bCHANGELOG\b(?!_)/);
+  });
+});
+
+/*
+  hard-proof 2026-10-27 (FINAL-SPEC-HARD-PROOF §1): an entry that shipped a compiler release prints
+  it as a line under its title. The first such line on the page is the name's first mention, so it
+  carries the definition; a later one prints the name and the digest only.
+*/
+describe("the compiler release line", () => {
+  const entry = (id: string, compilerRelease?: ChangelogEntry["compilerRelease"]): ChangelogEntry => ({
+    date: "2026-10-28", id, title: "A release that shipped a compiler", surfaces: ["Website"], added: ["One line."], compilerRelease,
+  });
+  const html = renderToStaticMarkup(createElement(ChangelogList, {
+    entries: [entry("2026-10-28-a"), entry("2026-10-28-b", "compiler-1"), entry("2026-10-28-c", "compiler-1")],
+  })).replace(/&#x27;/g, "'");
+
+  it("is printed only for an entry that names a release, and the first one defines the name", () => {
+    expect(html.match(/data-compiler-release="compiler-1"/g)).toHaveLength(2);
+    expect(html.split(COMPILER_RELEASE_DEFINITION.en)).toHaveLength(2);
+    // The first mention of the name on the page is the defined one.
+    expect(html.indexOf(COMPILER_RELEASE.name)).toBe(html.indexOf(`TAVONEL ${COMPILER_RELEASE.name}`) + "TAVONEL ".length);
+    expect(html.indexOf(COMPILER_RELEASE_DEFINITION.en)).toBeLessThan(html.indexOf('id="2026-10-28-c"'));
+    expect(html).toContain(`<code title="${COMPILER_RELEASE.digest}">${COMPILER_RELEASE.digest.slice(7, 15)}</code>`);
+  });
+
+  it("prints no release line on the committed history, which names none yet", () => {
+    expect(CHANGELOG.filter((item) => item.compilerRelease)).toEqual([]);
+    const committed = renderToStaticMarkup(createElement(ChangelogList, { entries: changelogEntries() }));
+    expect(committed).not.toContain("data-compiler-release");
+    expect(committed).not.toContain(COMPILER_RELEASE.name);
   });
 });
