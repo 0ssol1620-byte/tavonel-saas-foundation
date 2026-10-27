@@ -129,6 +129,18 @@
 .frame picture { display: block; }
 .frame img { display: block; width: 100%; height: auto; }
 
+/*
+  From 1024px the whole page is held to 280px tall; its frame, and so the region overlay drawn over
+  the frame, shrink to the image. With the page at the cell's full width the four cells made s2
+  1,878px tall at 1440x900 (CI Product QA on 038cfad9, 2026-10-27), past the two viewports
+  e2e/production-hardening.spec.ts allows a scene ("landing scenes flow continuously without
+  artificial viewport oceans"). The crop under it keeps the cell's width.
+*/
+@media (min-width: 1024px) {
+  .page .frame { width: fit-content; max-width: 100%; }
+  .page .frame img { width: auto; max-width: 100%; max-height: 280px; }
+}
+
 /* The reader's region, where the reader put it inside the window. */
 .region {
   position: absolute;
