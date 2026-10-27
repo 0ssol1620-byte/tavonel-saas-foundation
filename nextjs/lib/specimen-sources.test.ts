@@ -11,6 +11,7 @@ import {
   MAX_CROP_BYTES,
   MAX_PAGE_BYTES,
   QUALIFIED_OCR_IMAGE_DIGESTS,
+  SPECIMEN_LIMIT_LABEL_KO,
   SPECIMEN_SLOTS,
   SPECIMEN_STRIP_ROLLOUT,
   cropDigestProblem,
@@ -268,6 +269,10 @@ describe("a production receipt that does not hold is not rendered", () => {
     ["a page that names a region twice", r => { r.fullPage!.regions = [...r.fullPage!.regions, r.fullPage!.regions[0]!]; }, "fullPage.regions names a region twice"],
     ["a page with no regions", r => { r.fullPage!.regions = []; }, "fullPage.regions is not a list of reader regions"],
     ["a page with no run time", r => { r.fullPage!.seconds = 0; }, "fullPage.seconds is not a positive number"],
+    // PR #174 review B2 and B4: the hatching is named on both pages, and no limit reaches /ko in English.
+    ["an avoided box with no legend", r => { delete r.avoidInCrop[0]!.legend; }, "an avoidInCrop box has no legend in en and ko"],
+    ["an avoided box with no Korean legend", r => { r.avoidInCrop[1]!.legend = { en: "library stamp", ko: " " }; }, "an avoidInCrop box has no legend in en and ko"],
+    ["a limit with no Korean label", r => { r.limitationTokens = ["no_visual_native_reconciliation"]; }, "the limitation token no_visual_native_reconciliation has no Korean label"],
   ];
 
   it("accepts every committed receipt as it is", () => {
@@ -379,20 +384,39 @@ describe("the specimen strip", () => {
     }
   });
 
-  it("labels the reader output as unedited and the crop as the source as printed, in both languages", () => {
-    expect(html()).toContain("Reader output, unedited");
-    expect(html()).toContain("As printed · Source: ");
-    expect(html(true)).toContain("원문 그대로 · 출처: ");
-    expect(html(true)).toContain("판독기 출력, 수정 없음");
+  /*
+    PR #174 review B3: "As printed · Source: …" sat right above the output, so the reader's misreading
+    (68N6 for a printed 6BN6) read as the print. The crop is captioned by its source only, and the
+    output's own label sits directly above the output, in every cell and both languages.
+  */
+  it("labels the reader output as unedited directly above it, and the crop by its source only, in both languages", () => {
+    for (const [korean, label, source] of [[false, "Reader output, unedited", "Source: "], [true, "판독기 출력, 수정 없음", "출처: "]] as const) {
+      const markup = html(korean);
+      expect(markup).not.toMatch(/As printed|원문 그대로/);
+      for (const cell of markup.split("data-specimen-cell=").slice(1)) {
+        const at = (needle: string) => cell.indexOf(needle);
+        expect(at(`>${source}<a `) > at("data-specimen-crop")).toBe(true);
+        // Crop, its source, the label, then the output: nothing between the label and the output.
+        expect(at(`data-specimen-label="">${label}</p>`)).toBeGreaterThan(at("</figure>"));
+        const between = cell.slice(at(`${label}</p>`) + label.length + 4, at("data-specimen-text"));
+        expect(between, "nothing between the label and the output").toMatch(/^<p class="[^"]*" lang="(?:en|ko)" $/);
+      }
+    }
   });
 
-  it("carries the crop window, the region's coordinates and the run line, and draws the region inside the window", () => {
+  it("carries the crop window and one meta line, and keeps the region's coordinates under the toggle", () => {
     const markup = html();
     expect(markup).toContain('data-crop-window="100,200,900,520"');
     // [180,280,820,440] inside [100,200,900,520]: 10% / 25% / 80% / 50% of the window.
     expect(markup).toContain('style="left:10.000%;top:25.000%;width:80.000%;height:50.000%"');
-    expect(markup).toContain("<code>p.1 · [180,280 → 820,440]</code> <span>page 1 · region A</span>");
-    expect(markup).toMatch(/2026-10-19 · receipt 0{8}<\/a>/);
+    // A fixture has no whole page, so its meta line is the page and the receipt link.
+    expect(markup).toContain('data-specimen-meta="">p.1 · <a href="https://fixture.invalid/specimens/');
+    expect(markup).toMatch(/data-specimen-receipt="">receipt<\/a><\/p>/);
+    expect(markup).not.toMatch(/page 1 · region A|· receipt 0{8}/);
+    const details = markup.slice(markup.indexOf("<details"), markup.indexOf("</details>"));
+    expect(details).toContain("Region <code>[180,280 → 820,440]</code>");
+    expect(html(true)).toContain("영역 <code>[180,280 → 820,440]</code>");
+    expect(html(true)).toMatch(/data-specimen-receipt="">기록<\/a><\/p>/);
   });
 
   it("puts the manifest's own label on the table cell, and no table structure anywhere", () => {
@@ -400,6 +424,11 @@ describe("the specimen strip", () => {
     const table = markup.slice(markup.indexOf('data-slot="table"'), markup.indexOf('data-slot="korean"'));
     expect(table).toContain(">No table or formula extraction</p>");
     expect(markup).not.toMatch(/<table|role="grid"|role="cell"|accuracy|정확도/i);
+    // PR #174 review B4: /ko prints the limit in Korean, never the English label.
+    const ko = html(true);
+    const koTable = ko.slice(ko.indexOf('data-slot="table"'), ko.indexOf('data-slot="korean"'));
+    expect(koTable).toContain(`data-specimen-limits="">${SPECIMEN_LIMIT_LABEL_KO.no_table_or_formula_extraction}</p>`);
+    expect(ko).not.toContain("No table or formula extraction");
   });
 
   it("ships no script and opens no scene of its own", () => {
@@ -461,7 +490,8 @@ describe("the specimen strip", () => {
         expect(cell).toContain(`data-region="${specimen.region.regionId}" data-selected=""`);
         expect(cell.match(/data-masked=""/g)).toHaveLength(specimen.avoidInCrop.length);
         const count = korean ? `영역 ${page.regions.length}개 · ${page.seconds}초` : `${page.regions.length} regions · ${page.seconds} s`;
-        expect(cell).toContain(`data-derived="1" data-specimen-count="">${count}`);
+        expect(cell).toContain(`data-specimen-meta="">p.${specimen.page} · <span class=`);
+        expect(cell).toContain(`data-specimen-count="">${count}</span> · <a href="${specimen.runReceiptUrl}"`);
         // The text equals the receipt's bytes (React escapes only &, <, > and quotes).
         const text = cell.match(/data-specimen-text="" data-derived="1">([^<]*)<\/p>/)![1]!.replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
         expect(text, specimen.specimenId).toBe(specimen.extractedText);
@@ -474,6 +504,48 @@ describe("the specimen strip", () => {
     expect(html()).not.toContain("data-specimen-page");
   });
 
+  /*
+    PR #174 review B2: what the page view paints out is hatched -- the box and every region the reader returned
+    inside it -- and named under the page from the receipt's own legend, in each language. Nothing in the strip is
+    dashed any more: dashed means "not chosen" in the s2 workbench above it.
+  */
+  it("hatches each painted-out box and the regions inside it, and names it from the receipt's legend", () => {
+    const real = homeSpecimens({}, PREVIEW_ENV);
+    const underMask: Record<string, number> = {};
+    for (const korean of [false, true]) {
+      const markup = renderToStaticMarkup(createElement(SpecimenStrip, { specimens: real, korean }));
+      expect(markup.match(/<pattern id="specimen-hatch"/g)).toHaveLength(1);
+      const cells = markup.split("data-specimen-cell=").slice(1);
+      for (const [index, specimen] of real.entries()) {
+        const cell = cells[index]!;
+        const masked = [...cell.matchAll(/<rect [^>]*data-masked=""[^>]*>/g)].map(match => match[0]);
+        expect(masked).toHaveLength(specimen.avoidInCrop.length);
+        for (const rect of masked) expect(rect).toContain('fill="url(#specimen-hatch)"');
+        const under = [...cell.matchAll(/<rect [^>]*data-region="[^"]+"[^>]*>/g)].map(match => match[0]).filter(rect => rect.includes("data-under-mask"));
+        for (const rect of under) expect(rect).toContain('fill="url(#specimen-hatch)"');
+        underMask[specimen.specimenId] = under.length;
+        const legend = specimen.avoidInCrop.map(item => item.legend![korean ? "ko" : "en"]).join(", ");
+        expect(cell).toContain(`data-specimen-legend="">${korean ? `빗금: 지운 부분(${legend})` : `Hatched: painted out (${legend})`}</figcaption>`);
+      }
+      expect(markup).not.toMatch(/painted out<|점선|dashed/);
+    }
+    // SPECIMENS.md (hard-proof A1A): 9 of p039's 86 regions meet its cut-edge box and 0 of p074's 175 meet its scan marks;
+    // counted from the receipts on 2026-10-27, 4 of the NACA scan's 35 meet its emblem or stamp and 1 of KMA's 48 its symbols.
+    expect(underMask).toEqual({ "nasa-sp-5079-p039": 9, "nasa-sp-5079-p074": 0, "naca-rm-l50c03-p001": 4, "kma-2026-09-climate-p001": 1 });
+    const css = readFileSync(join(process.cwd(), "components", "landing-v2", "specimen-strip.module.css"), "utf8");
+    expect(css).not.toContain("stroke-dasharray");
+    expect(readSpecimens(committed(), "production").specimens.find(cell => cell.specimenId === "nasa-sp-5079-p039")!.avoidInCrop[0]!.legend)
+      .toEqual({ en: "cut edge of the spread", ko: "펼침면의 잘린 가장자리" });
+  });
+
+  // PR #174 review B4: no English sentence, and no English "receipt", in the /ko strip.
+  it("prints the /ko strip's limits and receipt link in Korean", () => {
+    const ko = renderToStaticMarkup(createElement(SpecimenStrip, { specimens: homeSpecimens({}, PREVIEW_ENV), korean: true }));
+    expect(ko).not.toMatch(/No native structure reader yet|No table or formula extraction|>receipt</);
+    expect(ko).toContain(`>${SPECIMEN_LIMIT_LABEL_KO.no_native_structure_reader_yet}</p>`);
+    expect(ko).not.toContain('lang="en" data-specimen-limits');
+  });
+
   it("names a repeated slot's tabs by page, so two cells of one kind are told apart", () => {
     const [scan, korean] = committed();
     const table = { ...structuredClone(scan!), specimenId: "naca-copy-table", slot: "table" as const, limitationTokens: ["no_table_or_formula_extraction"] };
@@ -482,7 +554,8 @@ describe("the specimen strip", () => {
     expect(rejected).toEqual([]);
     const markup = renderToStaticMarkup(createElement(SpecimenStrip, { specimens }));
     const labels = [...markup.matchAll(/<label[^>]*>([\s\S]*?)<\/label>/g)].map(match => match[1]!.replace(/<input[^>]*>/, "").replace(/<[^>]*>/g, ""));
-    expect(labels).toEqual(["Table page · p.1", "Table page · p.1", "Scanned page", "Korean document"]);
+    // PR #174 review B1: the phone tabs carry the short names, one line each.
+    expect(labels).toEqual(["Table · p.1", "Table · p.1", "Scan", "Korean"]);
     expect(markup.match(/<span data-derived="1"> · p\.1<\/span>/g)).toHaveLength(2);
   });
 

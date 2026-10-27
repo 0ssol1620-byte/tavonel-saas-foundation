@@ -20,25 +20,37 @@
   color: var(--tv-ink);
 }
 
-/* As many tabs to a row as fit at 96px; a fifth tab starts a second row rather than squeezing the rest. */
+/*
+  The hero's tab grammar (source-first-home.module.css, #s1 .compile-film-stages below 640px): each
+  tab at its label's width, one line, 13px at 560, 16px apart (12px under 380px), 44px tall, so the
+  marker sits under its own label (a one-syllable tab is narrow; the gap keeps the next target clear,
+  as on the hero's tabs). PR #174 review B1: 1fr columns of at least 96px could not hold four tabs in
+  the 312-382px content width of a 360-430px phone, so they wrapped 3 + 1 and the long labels broke.
+  The names are the short ones (COPY.tab); four of them take about 230px at 360.
+*/
 .tabs {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  display: flex;
+  justify-content: flex-start;
+  column-gap: 16px;
   border-bottom: 1px solid var(--tv-rule);
+}
+@media (max-width: 379.98px) {
+  .tabs { column-gap: 12px; }
 }
 
 .tab {
   position: relative;
   display: flex;
+  flex: none;
   align-items: center;
   justify-content: center;
   min-height: 44px;
-  padding: 4px 6px;
+  padding: 10px 2px;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   color: var(--tv-ink-muted);
-  font: 500 14px/1.25 var(--f-sans);
-  text-align: center;
+  font: 560 13px/1.2 var(--f-sans);
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -90,14 +102,28 @@
   font: 500 13px/1.5 var(--f-sans);
 }
 
-.chip {
+/*
+  PR #174 review B3: one mono line of what the run was -- page, regions, seconds, the receipt link --
+  above the page, instead of a count line, a coordinate chip and a run line spread around the cell.
+  On /ko the line is set in the KO Home sans: the mono face has no Hangul, and a line half in each
+  spaced its dots unevenly.
+*/
+.meta {
   margin: 4px 0 0;
-  color: var(--tv-ink);
+  color: var(--tv-ink-muted);
   font: 500 12px/1.5 var(--tv-font-mono);
   overflow-wrap: anywhere;
 }
-.chip code { font: inherit; }
-.chip span { color: var(--tv-ink-muted); font-family: var(--f-sans); }
+.meta:lang(ko) { font-family: var(--f-sans); }
+.meta a { color: var(--tv-ink); }
+
+/* The region's stored coordinates, under "Show full text". */
+.chip {
+  margin: 0 0 4px;
+  color: var(--tv-ink-muted);
+  font: 13px/1.5 var(--f-sans);
+}
+.chip code { color: var(--tv-ink); font: 500 12px/1.5 var(--tv-font-mono); }
 
 .crop { margin: 6px 0 0; }
 
@@ -110,10 +136,19 @@
   height: 100%;
   pointer-events: none;
 }
-.regions rect { fill: none; stroke: var(--tv-ink-muted); stroke-width: 1px; }
+/*
+  PR #174 review B2: what the page view paints out is hatched, not dashed -- a dashed box along the
+  frame read as a second border, and dashed means "not chosen" in the s2 workbench above. The box
+  and each region inside it carry fill="url(#specimen-hatch)" (the strip's one <pattern>); CSS sets
+  no fill on them, so the attribute holds.
+*/
+.regions rect { stroke: var(--tv-ink-muted); stroke-width: 1px; }
+.regions rect:not([fill]) { fill: none; }
 .regions rect[data-selected] { stroke: var(--tv-ink); stroke-width: 2px; }
-.regions rect[data-masked] { stroke: var(--tv-ink-muted); stroke-dasharray: 4 3; }
-.count {
+.regions rect[data-masked] { stroke: none; }
+.defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.hatch { fill: none; stroke: var(--tv-ink-muted); stroke-width: 5; stroke-opacity: 0.6; }
+.legend {
   margin: 4px 0 0;
   color: var(--tv-ink-muted);
   font: 13px/1.5 var(--f-sans);
@@ -153,8 +188,10 @@
 
 /*
   Home makes every link in main a 44px target (source-first-home.module.css), so this one-line
-  caption is a 44px row with its text centred: that is the space between the crop, the caption and
-  the reader's text, and no margin is added to it. UX §3.3's phone budget is spent here.
+  caption is a 44px row with its text centred: that is the space between the crop and its caption,
+  and no margin is added to it. UX §3.3's phone budget is spent here. It names the crop's source
+  only: "As printed" sat here, right above the output, and read as if the output were the print
+  (PR #174 review B3); the output's own label now sits directly above it.
 */
 .source {
   margin: 0;
@@ -196,10 +233,10 @@
   overflow-wrap: anywhere;
 }
 
-.run, .limits {
+/* The output's label directly above the output; under the output, the manifest's limit for this kind of page. */
+.unedited, .limits {
   margin: 0;
   color: var(--tv-ink-muted);
-  font: 13px/1.5 var(--f-sans);
+  font: 500 13px/1.5 var(--f-sans);
 }
-.run a { color: inherit; }
-.limits { margin-top: 4px; color: var(--tv-ink); font-weight: 500; }
+.limits { margin-top: 4px; }

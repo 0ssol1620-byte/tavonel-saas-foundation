@@ -76,8 +76,12 @@ export type SpecimenReceipt = {
   mustNotImply: string[];
   /** D-06: a one-line source beside the crop, and the approved full line (§4.4) under "Show full text". */
   caption: Record<"en" | "ko", { short: string; full: string }>;
-  /** D-05: what must stay out of the crop (insignia, symbols, third-party matter); the window may meet none. */
-  avoidInCrop: { label: string; bbox1000: Bbox1000 }[];
+  /**
+   * D-05: what must stay out of the crop (insignia, symbols, third-party matter); the window may meet none.
+   * `legend` (production): the label's own subject, short, in both languages -- what the strip names
+   * under a whole page where the box is painted out (hatched), so the hatching says why it is there.
+   */
+  avoidInCrop: { label: string; legend?: Record<"en" | "ko", string>; bbox1000: Bbox1000 }[];
   /** The reader's own region, as it returned it. Never widened to fit the crop. */
   region: { regionId: string; bbox1000: Bbox1000 };
   /** A window of the source page in the cell's ratio, holding the region. */
@@ -91,8 +95,18 @@ export type SpecimenReceipt = {
   runAt: string;
   runReceiptSha256: string;
   runReceiptUrl: string;
-  /** Capability manifest tokens, printed through `capabilityTokenLabel`. */
+  /** Capability manifest tokens, printed through `capabilityTokenLabel` (EN) and `SPECIMEN_LIMIT_LABEL_KO` (KO). */
   limitationTokens: string[];
+};
+
+/*
+  The Korean label of each limitation token a cell may carry: /ko prints the manifest's limit in Korean,
+  not the English label (PR #174 review B4). A token with no label here is refused by specimenProblem,
+  so a new token cannot reach /ko in English.
+*/
+export const SPECIMEN_LIMIT_LABEL_KO: Readonly<Record<string, string>> = {
+  no_native_structure_reader_yet: "원본 구조 판독기는 아직 없음",
+  no_table_or_formula_extraction: "표·수식은 추출하지 않음",
 };
 
 export type CropSource = { path: string; type: "image/avif"; sha256: string; width: number; height: number; bytes: number };
@@ -193,7 +207,7 @@ const integerBox = (value: unknown): value is Bbox1000 =>
   Array.isArray(value) && value.every(Number.isInteger) && isSourceRegionBox(value);
 const inside = (inner: Bbox1000, outer: Bbox1000) =>
   inner[0] >= outer[0] && inner[1] >= outer[1] && inner[2] <= outer[2] && inner[3] <= outer[3];
-const meets = (a: Bbox1000, b: Bbox1000) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+export const meets = (a: Bbox1000, b: Bbox1000) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
 const positive = (value: unknown) => Number.isInteger(value) && (value as number) >= 1;
 
 /**
@@ -313,6 +327,9 @@ export function specimenProblem(raw: unknown, mode: SpecimenMode): string | null
   if (mode === "production" && avoid.length === 0) return "avoidInCrop is empty";
   const met = (avoid as { label: string; bbox1000: Bbox1000 }[]).find(item => meets(item.bbox1000, crop.window1000 as Bbox1000));
   if (met) return `the crop window meets ${met.label}`;
+  if (mode === "production" && !avoid.every(item => filled(rec(rec(item)?.legend)?.en) && filled(rec(rec(item)?.legend)?.ko))) {
+    return "an avoidInCrop box has no legend in en and ko";
+  }
   if (mode === "fixture" && s.fullPage !== undefined) return "a fixture carries no fullPage";
   if (mode === "production") {
     const fullPage = rec(s.fullPage);
@@ -330,6 +347,8 @@ export function specimenProblem(raw: unknown, mode: SpecimenMode): string | null
   if (!Array.isArray(tokens) || !tokens.every(token => typeof token === "string" && PDF_LIMITATIONS.has(token))) {
     return "a limitation token is not one the PDF manifest entry carries";
   }
+  const unlabelled = (tokens as string[]).find(token => !Object.hasOwn(SPECIMEN_LIMIT_LABEL_KO, token));
+  if (unlabelled) return `the limitation token ${unlabelled} has no Korean label`;
   // The table cell shows a page with a table, and the reader returns its lines, never its cells.
   if (s.slot === "table" && !tokens.includes("no_table_or_formula_extraction")) {
     return "the table slot does not carry no_table_or_formula_extraction";

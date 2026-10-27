@@ -47,6 +47,10 @@
     "avoidInCrop": [
       {
         "label": "NACA wings emblem (NASA insignia and identifiers are not in the public domain)",
+        "legend": {
+          "en": "NACA emblem",
+          "ko": "NACA 휘장"
+        },
         "bbox1000": [
           270,
           120,
@@ -56,6 +60,10 @@
       },
       {
         "label": "NACA library stamp",
+        "legend": {
+          "en": "library stamp",
+          "ko": "도서관 도장"
+        },
         "bbox1000": [
           604,
           665,
@@ -506,6 +514,10 @@
     "avoidInCrop": [
       {
         "label": "Government symbol",
+        "legend": {
+          "en": "government symbol",
+          "ko": "정부상징"
+        },
         "bbox1000": [
           150,
           85,
@@ -515,6 +527,10 @@
       },
       {
         "label": "'대체불가 대한민국' slogan image",
+        "legend": {
+          "en": "slogan image",
+          "ko": "표어 이미지"
+        },
         "bbox1000": [
           740,
           85,
@@ -1082,6 +1098,10 @@
     "avoidInCrop": [
       {
         "label": "Cut edge of the two-page spread: Figure 26 continues from PDF page 38, so components here are drawn only in part",
+        "legend": {
+          "en": "cut edge of the spread",
+          "ko": "펼침면의 잘린 가장자리"
+        },
         "bbox1000": [
           0,
           0,
@@ -1993,6 +2013,10 @@
     "avoidInCrop": [
       {
         "label": "Vertical binding/scanner marks at the bottom edge, right of centre (an artefact of the scan, not of the printed page)",
+        "legend": {
+          "en": "scan marks",
+          "ko": "스캔 자국"
+        },
         "bbox1000": [
           647,
           948,

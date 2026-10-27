@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { capabilityTokenLabel } from "../../../shared/capabilityManifest";
-import type { Specimen, SpecimenSlot } from "@/lib/specimen-sources";
+import { meets, SPECIMEN_LIMIT_LABEL_KO, type Specimen, type SpecimenSlot } from "@/lib/specimen-sources";
 import styles from "./specimen-strip.module.css";
 
 /*
@@ -36,6 +36,15 @@ import styles from "./specimen-strip.module.css";
   heavier), the boxes the receipt keeps off Home dashed where they were painted out, and a count
   line "N regions · T s" read from the receipt. A slot may hold several cells; when it does, each
   tab adds its cell's page so the names differ.
+
+  PR #174 review round 1 (B1-B4): a cell reads top to bottom as one mono line of what the run was
+  (page · regions · seconds · receipt), the whole page, the crop and its source, then the label
+  "Reader output, unedited" directly above the output, the manifest's limit under it where the cell
+  has one, then "Show full text"; the region's stored
+  coordinates moved under that toggle. What the page view paints out is hatched -- the box and every
+  region the reader returned inside it -- and named under the page from the receipt's own legend.
+  Phone tabs use short names at their content width on one line, the hero's tab grammar. /ko prints
+  the limits and the receipt link in Korean.
 */
 
 const CROP_SIZES = "(min-width: 1024px) 50vw, calc(100vw - 32px)";
@@ -45,35 +54,43 @@ const COPY = {
     strip: "Pages read by the reader",
     choose: "Specimen page",
     kind: { drawing: "Schematic page", degraded_scan: "Scanned page", table: "Table page", korean: "Korean document" } satisfies Record<SpecimenSlot, string>,
+    tab: { drawing: "Drawing", degraded_scan: "Scan", table: "Table", korean: "Korean" } satisfies Record<SpecimenSlot, string>,
     synthetic: "synthetic fixture",
-    asPrinted: "As printed",
     source: "Source",
     unedited: "Reader output, unedited",
     receipt: "receipt",
+    box: "Region",
     more: "Show full text",
     less: "Show less",
     crop: (kind: string) => `${kind}: the window around the region the reader read`,
     page: (kind: string) => `${kind}: the whole page, every region the reader returned outlined`,
     count: (regions: number, seconds: number) => `${regions} regions · ${seconds} s`,
-    masked: " · dashed: painted out",
+    painted: (what: string) => `Hatched: painted out (${what})`,
+    limit: capabilityTokenLabel,
   },
   ko: {
     strip: "판독기가 읽은 페이지",
     choose: "표본 페이지",
     kind: { drawing: "회로도 페이지", degraded_scan: "스캔한 페이지", table: "표가 있는 페이지", korean: "한국어 문서" } satisfies Record<SpecimenSlot, string>,
+    tab: { drawing: "회로도", degraded_scan: "스캔", table: "표", korean: "한국어" } satisfies Record<SpecimenSlot, string>,
     synthetic: "합성 픽스처",
-    asPrinted: "원문 그대로",
     source: "출처",
     unedited: "판독기 출력, 수정 없음",
-    receipt: "receipt",
+    receipt: "기록",
+    box: "영역",
     more: "전체 보기",
     less: "접기",
     crop: (kind: string) => `${kind}: 판독기가 읽은 영역을 둘러싼 부분`,
     page: (kind: string) => `${kind}: 판독기가 반환한 모든 영역을 표시한 페이지 전체`,
     count: (regions: number, seconds: number) => `영역 ${regions}개 · ${seconds}초`,
-    masked: " · 점선: 흰색으로 가림",
+    painted: (what: string) => `빗금: 지운 부분(${what})`,
+    // specimenProblem refuses a token without a Korean label, so this never prints undefined.
+    limit: (token: string) => SPECIMEN_LIMIT_LABEL_KO[token]!,
   },
 };
+
+/** One hatch for every painted-out box, defined once in the strip and referenced by each page's SVG. */
+const HATCH = "specimen-hatch";
 
 /** The region's place inside the crop, as percentages of the crop's box. */
 function outline({ region, crop }: Specimen): CSSProperties {
@@ -97,12 +114,22 @@ export default function SpecimenStrip({ specimens, korean = false }: { specimens
   const repeated = (slot: SpecimenSlot) => specimens.filter(cell => cell.slot === slot).length > 1;
   return (
     <div className={styles.strip} role="region" aria-label={copy.strip} data-specimen-strip="" data-cells={specimens.length}>
+      {specimens.some(specimen => specimen.fullPage) ? (
+        // Not display:none: a pattern under a display:none SVG paints nothing in Chromium and Gecko.
+        <svg className={styles.defs} width="0" height="0" aria-hidden="true" focusable="false">
+          <defs>
+            <pattern id={HATCH} patternUnits="userSpaceOnUse" width="24" height="24">
+              <path className={styles.hatch} d="M-6,6 L6,-6 M0,24 L24,0 M18,30 L30,18" />
+            </pattern>
+          </defs>
+        </svg>
+      ) : null}
       {specimens.length > 1 ? (
         <div className={styles.tabs} role="radiogroup" aria-label={copy.choose}>
           {specimens.map((specimen, index) => (
             <label className={styles.tab} key={specimen.specimenId}>
               <input type="radio" name="specimen-page" value={specimen.specimenId} defaultChecked={index === 0} data-specimen-tab="" />
-              {copy.kind[specimen.slot]}
+              {copy.tab[specimen.slot]}
               {repeated(specimen.slot) ? <span data-derived="1">{` · p.${specimen.page}`}</span> : null}
             </label>
           ))}
@@ -111,15 +138,21 @@ export default function SpecimenStrip({ specimens, korean = false }: { specimens
       <ol className={styles.cells}>
         {specimens.map(specimen => {
           const caption = specimen.caption[korean ? "ko" : "en"];
-          // UX §3.4-2: the coordinates as stored, then the same place for a reader who does not read them.
+          // UX §3.4-2: the coordinates as stored; under "Show full text" since PR #174 review B3.
           const [r0, s0, r1, s1] = specimen.region.bbox1000;
           const [x0, y0, x1, y1] = specimen.crop.window1000;
           const page = specimen.fullPage;
+          const painted = specimen.avoidInCrop.map(item => item.legend?.[korean ? "ko" : "en"]).filter(Boolean).join(", ");
           return (
             <li className={styles.cell} key={specimen.specimenId} data-specimen-cell={specimen.specimenId} data-slot={specimen.slot}>
               <p className={styles.kind}>
                 {copy.kind[specimen.slot]}
                 {specimen.synthetic ? <span> · {copy.synthetic}</span> : null}
+              </p>
+              <p className={styles.meta} data-derived="1" data-specimen-meta="">
+                {`p.${specimen.page} · `}
+                {page ? <><span className={styles.count} data-specimen-count="">{copy.count(page.regions.length, page.seconds)}</span>{" · "}</> : null}
+                <a href={specimen.runReceiptUrl} rel="noopener noreferrer" data-specimen-receipt="">{copy.receipt}</a>
               </p>
               {page ? (
                 <figure className={styles.page} data-specimen-page="">
@@ -133,25 +166,23 @@ export default function SpecimenStrip({ specimens, korean = false }: { specimens
                     </picture>
                     {/* bbox1000 is the page's own 0-1000 space on both axes, so the SVG stretches with the image. */}
                     <svg className={styles.regions} viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-                      {page.regions.map(region => (
-                        <rect key={region.regionId} {...rect(region.bbox1000)} vectorEffect="non-scaling-stroke" data-region={region.regionId}
-                          data-selected={region.regionId === specimen.region.regionId ? "" : undefined} />
-                      ))}
+                      {/* The painted-out boxes first, hatched; a region the reader returned inside one is hatched with it. */}
                       {specimen.avoidInCrop.map((item, index) => (
-                        <rect key={index} {...rect(item.bbox1000)} vectorEffect="non-scaling-stroke" data-masked="" />
+                        <rect key={index} {...rect(item.bbox1000)} fill={`url(#${HATCH})`} data-masked="" />
                       ))}
+                      {page.regions.map(region => {
+                        const masked = specimen.avoidInCrop.some(item => meets(region.bbox1000, item.bbox1000));
+                        return (
+                          <rect key={region.regionId} {...rect(region.bbox1000)} vectorEffect="non-scaling-stroke" data-region={region.regionId}
+                            fill={masked ? `url(#${HATCH})` : undefined} data-under-mask={masked ? "" : undefined}
+                            data-selected={region.regionId === specimen.region.regionId ? "" : undefined} />
+                        );
+                      })}
                     </svg>
                   </div>
-                  <figcaption className={styles.count} data-derived="1" data-specimen-count="">
-                    {copy.count(page.regions.length, page.seconds)}
-                    {specimen.avoidInCrop.length > 0 ? copy.masked : null}
-                  </figcaption>
+                  {painted ? <figcaption className={styles.legend} data-specimen-legend="">{copy.painted(painted)}</figcaption> : null}
                 </figure>
               ) : null}
-              <p className={styles.chip} data-derived="1">
-                <code>{`p.${specimen.page} · [${r0},${s0} → ${r1},${s1}]`}</code>{" "}
-                <span>{korean ? `${specimen.page}쪽 · 영역 A` : `page ${specimen.page} · region A`}</span>
-              </p>
               <figure className={styles.crop} data-specimen-crop="" data-crop-window={`${x0},${y0},${x1},${y1}`}>
                 <div className={styles.frame}>
                   {/* Plain <picture>, not next/image: a fixed crop with its receipt's own size; no optimizer may re-encode source pixels (specimen §4.5). */}
@@ -166,27 +197,22 @@ export default function SpecimenStrip({ specimens, korean = false }: { specimens
                   <span className={styles.region} style={outline(specimen)} data-specimen-region={specimen.region.regionId} aria-hidden="true" />
                 </div>
                 <figcaption className={styles.source}>
-                  {copy.asPrinted} · {copy.source}:{" "}
+                  {copy.source}:{" "}
                   <a href={specimen.sourcePageUrl} rel="noopener noreferrer" data-specimen-source="" data-derived="1">{caption.short}</a>
                 </figcaption>
               </figure>
+              <p className={styles.unedited} data-specimen-label="">{copy.unedited}</p>
               <p className={styles.text} lang={specimen.lang} data-specimen-text="" data-derived="1">{specimen.extractedText}</p>
-              <details className={styles.more}>
-                <summary><span className={styles.closed}>{copy.more}</span><span className={styles.open}>{copy.less}</span></summary>
-                <p className={styles.full} data-specimen-licence="" data-derived="1">{caption.full}</p>
-              </details>
-              <p className={styles.run}>
-                <span>{copy.unedited}</span>
-                {" · "}
-                <a href={specimen.runReceiptUrl} rel="noopener noreferrer" data-derived="1" data-specimen-receipt="">
-                  {specimen.runAt.slice(0, 10)} · {copy.receipt} {specimen.runReceiptSha256.slice(7, 15)}
-                </a>
-              </p>
               {specimen.limitationTokens.length > 0 ? (
-                <p className={styles.limits} lang="en">
-                  {specimen.limitationTokens.map(capabilityTokenLabel).join(" · ")}
+                <p className={styles.limits} data-specimen-limits="">
+                  {specimen.limitationTokens.map(copy.limit).join(" · ")}
                 </p>
               ) : null}
+              <details className={styles.more}>
+                <summary><span className={styles.closed}>{copy.more}</span><span className={styles.open}>{copy.less}</span></summary>
+                <p className={styles.chip} data-derived="1">{copy.box} <code>{`[${r0},${s0} → ${r1},${s1}]`}</code></p>
+                <p className={styles.full} data-specimen-licence="" data-derived="1">{caption.full}</p>
+              </details>
             </li>
           );
         })}

@@ -116,6 +116,9 @@ function measure(page: Page) {
           return tops.filter((top, index) => index === 0 || top - tops[index - 1]! > 10).length;
         })(),
         firstLine: { top: lines[0]!.top, bottom: lines[0]!.bottom },
+        // PR #174 review B3: the output's label sits directly above the output, under the crop's source line.
+        label: box(cell.querySelector("[data-specimen-label]")!),
+        textTop: box(text).top,
         // The whole page (committed cells only): every region drawn over it, the chosen one, and the count line.
         page: (() => {
           const figure = cell.querySelector("[data-specimen-page]");
@@ -125,7 +128,21 @@ function measure(page: Page) {
             rects: [...figure.querySelectorAll("rect[data-region]")].map(rect => rect.getAttribute("data-region")),
             masked: figure.querySelectorAll("rect[data-masked]").length,
             selected: box(figure.querySelector("rect[data-selected]")!),
-            count: figure.querySelector("[data-specimen-count]")!.textContent,
+            // PR #174 review B3: the count is part of the cell's one meta line, above the page.
+            count: cell.querySelector("[data-specimen-meta] [data-specimen-count]")!.textContent,
+            metaLines: (() => {
+              const meta = cell.querySelector("[data-specimen-meta]")!;
+              const range = document.createRange();
+              range.selectNodeContents(meta);
+              const centres = [...range.getClientRects()].filter(rect => rect.width > 0).map(rect => rect.top + rect.height / 2).sort((x, y) => x - y);
+              // A new line is a step of more than half a 12px line; the 44px receipt link is centred on the text's line.
+              return centres.filter((centre, index) => index === 0 || centre - centres[index - 1]! > 10).length;
+            })(),
+            // PR #174 review B2: the painted-out boxes are hatched (a pattern fill), never a dashed outline.
+            maskPaint: [...figure.querySelectorAll("rect[data-masked], rect[data-under-mask]")].map(rect => {
+              const style = getComputedStyle(rect);
+              return { fill: style.fill, dash: style.strokeDasharray };
+            }),
           };
         })(),
       };
@@ -346,6 +363,28 @@ for (const browserName of BROWSERS) {
             const count = lang === "ko" ? `영역 ${whole.regions.length}개 · ${whole.seconds}초` : `${whole.regions.length} regions · ${whole.seconds} s`;
             expect(cell.page!.count!.startsWith(count), `${cell.id} count line "${cell.page!.count}"`).toBe(true);
           }
+          for (const cell of visible) {
+            expect(cell.label.top, `${cell.id}: the label is under the crop's source line`).toBeGreaterThanOrEqual(cell.source.bottom - 1);
+            expect(cell.textTop, `${cell.id}: the output is under its label`).toBeGreaterThanOrEqual(cell.label.bottom - 1);
+            expect(cell.page!.metaLines, `${cell.id}: the meta line is one line`).toBe(1);
+            for (const paint of cell.page!.maskPaint) {
+              expect(paint.fill, `${cell.id}: a painted-out box is hatched`).toMatch(/url\(.*#specimen-hatch.*\)/);
+              expect(paint.dash, `${cell.id}: and not dashed`).toMatch(/^(?:none|)$/);
+            }
+          }
+          // PR #174 review B1: below 1024px the tabs are one row at their content width, each name on one line, inside the strip.
+          if (width < 1024) {
+            const row = await page.evaluate(() => {
+              const strip = document.querySelector("[data-specimen-strip]")!.getBoundingClientRect();
+              return { right: strip.right, tabs: [...document.querySelectorAll("[data-specimen-strip] label")].map(label => {
+                const { top, right, height } = label.getBoundingClientRect();
+                return { top, right, height, wraps: label.scrollWidth > label.clientWidth + 1 };
+              }) };
+            });
+            expect(new Set(row.tabs.map(tab => Math.round(tab.top))).size, "one row of tabs").toBe(1);
+            expect(new Set(row.tabs.map(tab => Math.round(tab.height))).size, "every tab name on one line").toBe(1);
+            expect(row.tabs.every(tab => !tab.wraps && tab.right <= row.right + 0.5), "every tab inside the strip").toBe(true);
+          }
           const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
           expect(overflow, "no horizontal overflow").toBeLessThanOrEqual(0);
           expect(await place(page), "the strip closes s2, after the workbench").toEqual({ s1: false, s2: true, afterBench: true });
@@ -409,7 +448,7 @@ test("the server renders the fixture cells for a request that asks, with no scri
   for (const path of ["/", "/ko"]) {
     const html = await (await request.get(path, { headers: { cookie: `${SPECIMEN_FIXTURE_COOKIE}=1` } })).text();
     expect(html.match(/data-specimen-cell="/g), path).toHaveLength(FIXTURES.length);
-    expect(html).toContain(path === "/" ? "Reader output, unedited" : "원문 그대로");
+    expect(html).toContain(path === "/" ? "Reader output, unedited" : "판독기 출력, 수정 없음");
   }
 });
 
