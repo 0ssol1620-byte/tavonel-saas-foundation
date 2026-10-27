@@ -225,6 +225,7 @@ const browserProjectsByFile = new Map([
   ['e2e/workspace-intake-layout.spec.ts', ['1440']],
   ['e2e/world-lifecycle.spec.ts', ['1440', '390', 'reduced-motion']],
   ['e2e/explore.spec.ts', ['1440']],
+  ['e2e/home-drop-intake.spec.ts', ['1440', '390']],
   ['e2e/landing-v2.spec.ts', ['1440', '390', '360', 'reduced-motion']],
   ['e2e/home-evidence-line.spec.ts', ['1440', '390', '360', 'reduced-motion']],
   ['e2e/sources.spec.ts', ['1440']],
