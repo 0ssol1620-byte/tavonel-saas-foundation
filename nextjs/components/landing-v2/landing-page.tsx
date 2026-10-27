@@ -217,13 +217,8 @@ export default function LandingPage({
                     <HeroActions {...heroActions} startLabel={heroStart.label} startHref={heroStart.href}
                       scene="1" ctaOrderVariant={experiment.ctaOrderVariant} />
                 </div>
-                {/*
-                  P2-08 / UX-L4 (UX-PLAN §3.2-§3.3; critic D-03's default place): real pages beside
-                  the reader's text, between the actions and the illustrative film. Nothing renders
-                  until a receipt does.
-                */}
-                <SpecimenStrip specimens={specimens} korean={korean} />
-                <HeroFilm korean={korean} priority={specimens.length === 0} />
+                {/* The film's poster is the first screen's priority image: the specimen strip closes s2. */}
+                <HeroFilm korean={korean} />
               </HeroStatement>
             </div>
           </div>
@@ -245,6 +240,12 @@ export default function LandingPage({
         >
           <div className="lv2-wrap">
             {home ? <HeroSourceCard view={home} korean={korean} titleId="lv2-difficulty-title" rightsNote={page.receive.rights} /> : null}
+            {/*
+              P2-08 / UX-L4, moved by hard-proof 2026-10-27 (FINAL-SPEC-HARD-PROOF §2, over D-03's place
+              in s1): real pages beside the reader's text, after the workbench. No heading of its own,
+              so the page keeps six h2. Nothing renders until a receipt does.
+            */}
+            <SpecimenStrip specimens={specimens} korean={korean} />
           </div>
         </section>
 

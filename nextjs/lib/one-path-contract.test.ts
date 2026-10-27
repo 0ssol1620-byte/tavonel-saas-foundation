@@ -95,7 +95,9 @@ describe("approved one-path experience", () => {
     ].map(token => page.indexOf(token));
     expect(order.every((at, index) => at >= 0 && (index === 0 || at > order[index - 1]!))).toBe(true);
     const hero = page.slice(page.indexOf('id="s1"'), page.indexOf('id="s2"'));
-    expect(hero, "the four-stage film follows the title inside the hero").toContain("<HeroFilm korean={korean} priority={specimens.length === 0} />");
+    // hard-proof 2026-10-27: the specimen strip closes s2, so the film keeps its default priority in every posture.
+    expect(hero, "the four-stage film follows the title inside the hero").toContain("<HeroFilm korean={korean} />");
+    expect(hero).not.toContain("<SpecimenStrip");
     expect(hero.indexOf("<HeroFilm")).toBeGreaterThan(hero.indexOf("<HeroStatement"));
     expect(hero).not.toContain("<SourceInspectionFilm");
     /* The hero layout grid sets no columns of its own. */

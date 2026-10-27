@@ -33,7 +33,9 @@ errors included.
   자유이용허락". Read at 2026-10-19T12:27:29.687Z.
 
 Each cell has its extract (`<id>.pdf`), its crop as 720 px and 960 px AVIF with a
-960 px WebP fallback, and its run receipt (`<id>.run.json`,
+960 px WebP fallback, the whole page as 720 px and 960 px AVIF with a 480 px WebP
+fallback (`<id>-page-*`, added 2026-10-27; each box `avoidInCrop` lists is painted
+white in these files, as the receipt's `fullPage.method` records), and its run receipt (`<id>.run.json`,
 `tavonel.specimen_run_receipt.v1`). The run receipt records the source and its
 SHA-256, the extract, the reader image digest, the run, every region the reader
 returned, the selection rule fixed before the run, the crop, and what it does not

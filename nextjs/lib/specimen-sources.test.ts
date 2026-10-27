@@ -9,7 +9,9 @@ import SpecimenStrip from "../components/landing-v2/specimen-strip";
 import {
   COMMITTED_SPECIMENS,
   MAX_CROP_BYTES,
+  MAX_PAGE_BYTES,
   QUALIFIED_OCR_IMAGE_DIGESTS,
+  SPECIMEN_SLOTS,
   SPECIMEN_STRIP_ROLLOUT,
   cropDigestProblem,
   homeSpecimens,
@@ -167,6 +169,33 @@ describe("the committed specimens", () => {
   });
 
   /*
+    hard-proof 2026-10-27 (FINAL-SPEC-HARD-PROOF §2): the whole page and every region on it. The regions and the
+    time are the run receipt's own, the files are the ones the receipt names, and each is under the per-page cap.
+  */
+  it("carry the whole page with every region and the run time their run receipt holds", () => {
+    for (const receipt of committed()) {
+      const run = JSON.parse(publicFile(receipt.runReceiptUrl).toString("utf8")) as {
+        run: { seconds: number; regionCount: number }; regions: { regionId: string; bbox1000: number[] }[];
+      };
+      const page = receipt.fullPage!;
+      expect(page.regions, receipt.specimenId).toEqual(run.regions.map(({ regionId, bbox1000 }) => ({ regionId, bbox1000 })));
+      expect([page.regions.length, page.seconds], receipt.specimenId).toEqual([run.run.regionCount, run.run.seconds]);
+      // AVIF at 720 px, and 960 px where the page fits the cap at a quality its method names; the WEBP fallback is no wider.
+      expect(page.sources.map(source => source.width).filter(width => width !== 720 && width !== 960), receipt.specimenId).toEqual([]);
+      expect(page.sources.some(source => source.width === 720), receipt.specimenId).toBe(true);
+      expect(page.width, receipt.specimenId).toBeLessThanOrEqual(Math.min(...page.sources.map(source => source.width)));
+      for (const file of [page, ...page.sources]) {
+        const bytes = publicFile(file.path);
+        expect([bytes.length, digest(bytes)], file.path).toEqual([file.bytes, file.sha256]);
+        expect(file.bytes, file.path).toBeLessThanOrEqual(MAX_PAGE_BYTES);
+      }
+      // D-05 on a whole page: what the crop window kept clear of is painted out of the page's pixels, and the receipt says so.
+      expect(page.method).toContain("every avoidInCrop box painted white before encoding");
+      expect(receipt.avoidInCrop.length, receipt.specimenId).toBeGreaterThan(0);
+    }
+  });
+
+  /*
     The collection's PROVENANCE.md, served beside the files, describes specimens/ from the committed receipts: each cell's
     page, licence, run time, run receipt and the rights snapshot it was cleared on. A receipt that moves fails here until the
     page moves with it.
@@ -195,7 +224,7 @@ describe("the fixture gate", () => {
     expect(homeSpecimens({ fixtures: false }, FIXTURE_ENV, "preview")).toEqual([]);
     expect(homeSpecimens({ fixtures: true }, { PLAYWRIGHT_LOCAL_HTTP: "1", VERCEL: "1" }, "preview")).toEqual([]);
     const cells = homeSpecimens({ fixtures: true }, FIXTURE_ENV);
-    expect(cells.map(cell => cell.slot)).toEqual(["degraded_scan", "table", "korean"]);
+    expect(cells.map(cell => cell.slot)).toEqual(["table", "degraded_scan", "korean"]);
     expect(cells.every(cell => cell.synthetic && cell.cropSrc.startsWith("data:image/svg+xml;base64,"))).toBe(true);
   });
 
@@ -224,6 +253,18 @@ describe("a production receipt that does not hold is not rendered", () => {
     ["a crop source off the specimen folder", r => { r.crop.sources![0]!.path = "/landing/v2/naca-720.avif"; }, "a crop source is not a production AVIF path"],
     ["two crop sources of one width", r => { r.crop.sources![1]!.width = 720; r.crop.sources![1]!.height = 288; }, "two crop sources share a width"],
     ["a crop source over the per-cell budget", r => { r.crop.sources![1]!.bytes = MAX_CROP_BYTES + 1; }, `a crop source is over ${MAX_CROP_BYTES} bytes`],
+    // hard-proof 2026-10-27: the whole page.
+    ["no whole page", r => { delete r.fullPage; }, "fullPage is missing"],
+    ["a page fallback that is not WEBP", r => { r.fullPage!.path = "/proof-collection/specimens/naca-rm-l50c03-p001-page-480.avif"; }, "fullPage.path is not a production WEBP path"],
+    ["a page over the per-page cap", r => { r.fullPage!.bytes = MAX_PAGE_BYTES + 1; }, `fullPage is over ${MAX_PAGE_BYTES} bytes`],
+    ["a page source over the per-page cap", r => { r.fullPage!.sources[1]!.bytes = MAX_PAGE_BYTES + 1; }, `a page source is over ${MAX_PAGE_BYTES} bytes`],
+    ["a page source at another aspect ratio", r => { r.fullPage!.sources[0]!.height = 900; }, "a page source is not the page's aspect ratio"],
+    ["a page with no method", r => { r.fullPage!.method = " "; }, "fullPage.method is empty"],
+    ["a page without the chosen region", r => { r.fullPage!.regions = r.fullPage!.regions.filter(item => item.regionId !== r.region.regionId); }, "the reader region is not one of fullPage.regions"],
+    ["a page whose chosen region moved", r => { r.fullPage!.regions = r.fullPage!.regions.map(item => item.regionId === r.region.regionId ? { ...item, bbox1000: [77, 600, 470, 623] } : item); }, "the reader region is not one of fullPage.regions"],
+    ["a page that names a region twice", r => { r.fullPage!.regions = [...r.fullPage!.regions, r.fullPage!.regions[0]!]; }, "fullPage.regions names a region twice"],
+    ["a page with no regions", r => { r.fullPage!.regions = []; }, "fullPage.regions is not a list of reader regions"],
+    ["a page with no run time", r => { r.fullPage!.seconds = 0; }, "fullPage.seconds is not a positive number"],
   ];
 
   it("accepts both committed receipts as they are", () => {
@@ -256,7 +297,8 @@ describe("a receipt that does not hold is not rendered", () => {
     ["no original digest", r => { r.originalSha256 = "sha256:abc"; }, "originalSha256 is not a sha256 digest"],
     ["empty reader text", r => { r.extractedText = "  \n"; }, "extractedText is empty"],
     ["CRLF in the reader text", r => { r.extractedText = "line one\r\nline two"; }, "extractedText holds a carriage return"],
-    ["an unknown slot", r => { r.slot = "chart" as never; }, "slot is not one of degraded_scan, table, korean"],
+    ["an unknown slot", r => { r.slot = "chart" as never; }, "slot is not one of drawing, table, degraded_scan, korean"],
+    ["a fixture that carries a whole page", r => { r.fullPage = (COMMITTED_SPECIMENS[0] as SpecimenReceipt).fullPage; }, "a fixture carries no fullPage"],
     ["a Korean cell whose text is not Korean", r => { r.slot = "korean"; r.lang = "en"; }, "the korean slot's text is not lang ko"],
     ["a table cell without the manifest's table limit", r => { r.slot = "table"; r.limitationTokens = []; }, "the table slot does not carry no_table_or_formula_extraction"],
     ["a limitation the PDF entry does not carry", r => { r.limitationTokens = ["accurate_tables"]; }, "a limitation token is not one the PDF manifest entry carries"],
@@ -300,11 +342,16 @@ describe("a receipt that does not hold is not rendered", () => {
     expect(readSpecimens(fixtures(), "fixture", sameLength).rejected[0]!.reason).toMatch(/^crop digest sha256:[0-9a-f]{64} is not the receipt's/);
   });
 
-  it("keeps one cell a slot", () => {
-    const [first] = fixtures();
-    const { specimens, rejected } = readSpecimens([first, { ...first!, specimenId: "second" }], "fixture", cropBytes);
-    expect(specimens).toHaveLength(1);
-    expect(rejected).toEqual([{ id: "second", reason: "a second receipt for slot korean" }]);
+  // hard-proof 2026-10-27: a slot holds any number of cells (the table slot will hold two), in receipt order.
+  it("keeps several cells a slot in receipt order, and one cell a specimenId", () => {
+    const [first, second, third] = fixtures();
+    const { specimens, rejected } = readSpecimens([first, { ...first!, specimenId: "second" }, second, third, { ...first! }], "fixture", cropBytes);
+    // fixtures() is in file-name order: korean, scan, table. The slots sort them; within korean, receipt order holds.
+    expect(SPECIMEN_SLOTS).toEqual(["drawing", "table", "degraded_scan", "korean"]);
+    expect(specimens.map(cell => [cell.slot, cell.specimenId])).toEqual([
+      ["table", third!.specimenId], ["degraded_scan", second!.specimenId], ["korean", first!.specimenId], ["korean", "second"],
+    ]);
+    expect(rejected).toEqual([{ id: first!.specimenId, reason: "a second receipt with this specimenId" }]);
   });
 
   it("says why on the server log instead of dropping a cell in silence", () => {
@@ -361,7 +408,7 @@ describe("the specimen strip", () => {
     expect(markup.match(/checked=""/g)).toHaveLength(1);
   });
 
-  it("prints the committed cells' short source line, the approved full line under the toggle, and fetches the first crop first", () => {
+  it("prints the committed cells' short source line, the approved full line under the toggle, and asks priority for no image", () => {
     const real = homeSpecimens({}, PREVIEW_ENV);
     const en = renderToStaticMarkup(createElement(SpecimenStrip, { specimens: real }));
     const ko = renderToStaticMarkup(createElement(SpecimenStrip, { specimens: real, korean: true }));
@@ -372,11 +419,11 @@ describe("the specimen strip", () => {
     for (const alt of [...en.matchAll(/alt="([^"]*)"/g), ...ko.matchAll(/alt="([^"]*)"/g)].map(match => match[1])) expect(alt).not.toMatch(/\d/);
     expect(en).toContain("Source: Korea Meteorological Administration, &quot;September 2026 climate characteristics&quot; press release (2026), KOGL Type 1.</p>");
     expect(ko).toContain("본 저작물은 &#x27;기상청&#x27;에서 &#x27;2026년&#x27; 작성하여 공공누리 제1유형으로 개방한");
-    // Only the first crop is high priority, and the rest load lazily. Inside <picture> React hoists no preload;
-    // the browser's preload scanner finds the <source> (Lighthouse: requested with the document's first bytes).
+    // hard-proof 2026-10-27: the strip closes s2, below the fold, so no image in it asks for priority and every one
+    // loads lazily; the film poster in s1 is the first screen's priority image. React hoists no preload from <picture>.
     const tags = en.match(/<(?:link|img|source)\b[^>]*>/g)!;
-    expect(tags.filter(tag => /fetchpriority="high"/i.test(tag)).map(tag => tag.slice(1, 5) + (tag.includes("naca-rm-l50c03-p001-960") ? " naca" : " other")))
-      .toEqual(["img  naca"]);
+    expect(tags.filter(tag => /fetchpriority/i.test(tag))).toEqual([]);
+    expect(tags.filter(tag => tag.startsWith("<img") && !/\sloading="lazy"/.test(tag))).toEqual([]);
     expect(en).toContain('<picture><source type="image/avif" sizes="(min-width: 1024px) 50vw, calc(100vw - 32px)" srcSet="/proof-collection/specimens/naca-rm-l50c03-p001-720.avif 720w, /proof-collection/specimens/naca-rm-l50c03-p001-960.avif 960w"/><img src="/proof-collection/specimens/naca-rm-l50c03-p001-960.webp" width="960" height="384"');
     expect(tags.filter(tag => /<link\b[^>]*preload/.test(tag))).toEqual([]);
     expect(tags.filter(tag => tag.startsWith("<img") && tag.includes("kma-2026-09-climate-p001-960"))).toEqual([expect.stringMatching(/^<img [^>]*loading="lazy"/)]);
@@ -386,6 +433,62 @@ describe("the specimen strip", () => {
     const faq = renderToStaticMarkup(createElement(HomeReaderGuide, { faqOnly: true, korean: true, specimenSources: real.map(cell => cell.caption.ko.full) }));
     expect(faq).toContain("data-specimen-faq");
     expect(faq).toContain('<p data-derived="1">출처: NACA RM L50C03(1950), NASA 기술보고서 서버(NTRS). 미국 연방정부 저작물.</p>');
+  });
+
+  /*
+    hard-proof 2026-10-27 (FINAL-SPEC-HARD-PROOF §6): each committed cell draws every region its receipt holds over the
+    whole page, the chosen one marked, the kept-out boxes dashed, and prints the receipt's count and time as they are.
+  */
+  it("draws every region of the receipt over the whole page, with the receipt's count, time and text", () => {
+    const real = homeSpecimens({}, PREVIEW_ENV);
+    for (const korean of [false, true]) {
+      const markup = renderToStaticMarkup(createElement(SpecimenStrip, { specimens: real, korean }));
+      const cells = markup.split("data-specimen-cell=").slice(1);
+      expect(cells).toHaveLength(real.length);
+      for (const [index, specimen] of real.entries()) {
+        const cell = cells[index]!;
+        const page = specimen.fullPage!;
+        const regions = [...cell.matchAll(/<rect [^>]*data-region="([^"]+)"[^>]*>/g)];
+        expect(regions.map(match => match[1]), specimen.specimenId).toEqual(page.regions.map(region => region.regionId));
+        for (const [at, match] of regions.entries()) {
+          const [x0, y0, x1, y1] = page.regions[at]!.bbox1000;
+          expect(match[0]).toContain(`x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}"`);
+        }
+        expect(cell.match(/data-selected=""/g)).toHaveLength(1);
+        expect(cell).toContain(`data-region="${specimen.region.regionId}" data-selected=""`);
+        expect(cell.match(/data-masked=""/g)).toHaveLength(specimen.avoidInCrop.length);
+        const count = korean ? `영역 ${page.regions.length}개 · ${page.seconds}초` : `${page.regions.length} regions · ${page.seconds} s`;
+        expect(cell).toContain(`data-derived="1" data-specimen-count="">${count}`);
+        // The text equals the receipt's bytes (React escapes only &, <, > and quotes).
+        const text = cell.match(/data-specimen-text="" data-derived="1">([^<]*)<\/p>/)![1]!.replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+        expect(text, specimen.specimenId).toBe(specimen.extractedText);
+        expect(cell).toContain(`<img src="${page.path}" width="${page.width}" height="${page.height}"`);
+        expect(cell).toContain(`srcSet="${page.sources.map(source => `${source.path} ${source.width}w`).join(", ")}"`);
+      }
+      expect(markup).not.toContain("<script");
+    }
+    // A fixture has no page, so it draws none.
+    expect(html()).not.toContain("data-specimen-page");
+  });
+
+  it("names a repeated slot's tabs by page, so two cells of one kind are told apart", () => {
+    const [scan, korean] = committed();
+    const table = { ...structuredClone(scan!), specimenId: "naca-copy-table", slot: "table" as const, limitationTokens: ["no_table_or_formula_extraction"] };
+    const second = { ...structuredClone(table), specimenId: "naca-copy-table-2" };
+    const { specimens, rejected } = readSpecimens([scan, korean, table, second], "production");
+    expect(rejected).toEqual([]);
+    const markup = renderToStaticMarkup(createElement(SpecimenStrip, { specimens }));
+    const labels = [...markup.matchAll(/<label[^>]*>([\s\S]*?)<\/label>/g)].map(match => match[1]!.replace(/<input[^>]*>/, "").replace(/<[^>]*>/g, ""));
+    expect(labels).toEqual(["Table page · p.1", "Table page · p.1", "Scanned page", "Korean document"]);
+    expect(markup.match(/<span data-derived="1"> · p\.1<\/span>/g)).toHaveLength(2);
+  });
+
+  // The phone layout names tabs and cells one by one: it must name as many as there are committed cells, and the five FINAL-SPEC §2 lists.
+  it("covers every committed cell in the phone layout's tab rules", () => {
+    const css = readFileSync(join(process.cwd(), "components", "landing-v2", "specimen-strip.module.css"), "utf8");
+    for (let n = 2; n <= Math.max(5, COMMITTED_SPECIMENS.length); n += 1) {
+      expect(css, `tab ${n}`).toContain(`.strip:has(.tab:nth-child(${n}) input:checked) .cell:nth-child(${n})`);
+    }
   });
 
   it("marks a synthetic fixture as one", () => {

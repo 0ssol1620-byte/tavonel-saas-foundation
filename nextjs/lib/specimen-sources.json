@@ -104,6 +104,350 @@
         }
       ]
     },
+    "fullPage": {
+      "path": "/proof-collection/specimens/naca-rm-l50c03-p001-page-480.webp",
+      "sha256": "sha256:692d9f6fcabd1dcd672d238382f0526cae5c54f6e7f9e7ec7f68d2a2193082aa",
+      "width": 480,
+      "height": 623,
+      "bytes": 28076,
+      "sources": [
+        {
+          "path": "/proof-collection/specimens/naca-rm-l50c03-p001-page-720.avif",
+          "type": "image/avif",
+          "sha256": "sha256:af3b19495b60f826ec4bf995fc77978a82e5926a7fd8ef352c1b787cc934e00b",
+          "width": 720,
+          "height": 935,
+          "bytes": 24314
+        },
+        {
+          "path": "/proof-collection/specimens/naca-rm-l50c03-p001-page-960.avif",
+          "type": "image/avif",
+          "sha256": "sha256:13c1b29b9e19d02ff09360eb428fc6b7b39194e05aa35a4a55b02d6260abb10f",
+          "width": 960,
+          "height": 1246,
+          "bytes": 35451
+        }
+      ],
+      "method": "Page 1 of the extract rendered by pypdfium2 5.13.0 at scale 3 with a white fill (the CDR rasterizer pin); every avoidInCrop box painted white before encoding; resized with lanczos3; AVIF q35 e6 at 720 and 960 px, WEBP q80 e6 at 480 px (sharp 0.35.4). No colour, contrast or sharpening step.",
+      "regions": [
+        {
+          "regionId": "ocr-p0001-l00001",
+          "bbox1000": [
+            608,
+            6,
+            943,
+            49
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00002",
+          "bbox1000": [
+            795,
+            35,
+            852,
+            56
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00003",
+          "bbox1000": [
+            389,
+            38,
+            628,
+            66
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00004",
+          "bbox1000": [
+            795,
+            52,
+            916,
+            71
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00005",
+          "bbox1000": [
+            81,
+            74,
+            108,
+            221
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00006",
+          "bbox1000": [
+            443,
+            82,
+            571,
+            111
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00007",
+          "bbox1000": [
+            390,
+            145,
+            604,
+            193
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00008",
+          "bbox1000": [
+            135,
+            251,
+            878,
+            292
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00009",
+          "bbox1000": [
+            207,
+            361,
+            815,
+            381
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00010",
+          "bbox1000": [
+            267,
+            396,
+            754,
+            416
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00011",
+          "bbox1000": [
+            375,
+            431,
+            643,
+            451
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00012",
+          "bbox1000": [
+            284,
+            464,
+            735,
+            485
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00013",
+          "bbox1000": [
+            344,
+            499,
+            679,
+            520
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00014",
+          "bbox1000": [
+            361,
+            516,
+            657,
+            538
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00015",
+          "bbox1000": [
+            77,
+            600,
+            469,
+            623
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00016",
+          "bbox1000": [
+            461,
+            605,
+            552,
+            619
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00017",
+          "bbox1000": [
+            415,
+            628,
+            593,
+            638
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00018",
+          "bbox1000": [
+            413,
+            634,
+            592,
+            644
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00019",
+          "bbox1000": [
+            486,
+            647,
+            592,
+            657
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00020",
+          "bbox1000": [
+            476,
+            654,
+            593,
+            664
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00021",
+          "bbox1000": [
+            461,
+            659,
+            590,
+            669
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00022",
+          "bbox1000": [
+            414,
+            660,
+            465,
+            669
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00023",
+          "bbox1000": [
+            412,
+            673,
+            591,
+            683
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00024",
+          "bbox1000": [
+            666,
+            673,
+            856,
+            695
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00025",
+          "bbox1000": [
+            412,
+            679,
+            591,
+            689
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00026",
+          "bbox1000": [
+            64,
+            682,
+            382,
+            711
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00027",
+          "bbox1000": [
+            604,
+            693,
+            884,
+            712
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00028",
+          "bbox1000": [
+            412,
+            712,
+            490,
+            720
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00029",
+          "bbox1000": [
+            785,
+            712,
+            809,
+            724
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00030",
+          "bbox1000": [
+            205,
+            732,
+            804,
+            761
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00031",
+          "bbox1000": [
+            342,
+            766,
+            666,
+            793
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00032",
+          "bbox1000": [
+            422,
+            802,
+            587,
+            821
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00033",
+          "bbox1000": [
+            439,
+            824,
+            577,
+            844
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00034",
+          "bbox1000": [
+            389,
+            867,
+            617,
+            896
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00035",
+          "bbox1000": [
+            692,
+            880,
+            894,
+            915
+          ]
+        }
+      ],
+      "seconds": 3.968
+    },
     "extractedText": "CLASSIFICATIONCANCELLED",
     "reader": {
       "id": "foundation_ocr_gpu_v1",
@@ -218,6 +562,467 @@
           "bytes": 29367
         }
       ]
+    },
+    "fullPage": {
+      "path": "/proof-collection/specimens/kma-2026-09-climate-p001-page-480.webp",
+      "sha256": "sha256:45fa012f40d72cf4c59fa7d7a133ef038c34ef728ebdd8506603400dfc1b283b",
+      "width": 480,
+      "height": 678,
+      "bytes": 48828,
+      "sources": [
+        {
+          "path": "/proof-collection/specimens/kma-2026-09-climate-p001-page-720.avif",
+          "type": "image/avif",
+          "sha256": "sha256:b8e181b90d799a3d4a5992e0aaaad459d955a8a3f4d322fab7599591f4e026ac",
+          "width": 720,
+          "height": 1018,
+          "bytes": 40494
+        },
+        {
+          "path": "/proof-collection/specimens/kma-2026-09-climate-p001-page-960.avif",
+          "type": "image/avif",
+          "sha256": "sha256:e2dfdd38353c494e6ce5be270667cadd93746a98057e7fab62a3367b74516529",
+          "width": 960,
+          "height": 1357,
+          "bytes": 56565
+        }
+      ],
+      "method": "Page 1 of the extract rendered by pypdfium2 5.13.0 at scale 3 with a white fill (the CDR rasterizer pin); every avoidInCrop box painted white before encoding; resized with lanczos3; AVIF q35 e6 at 720 and 960 px, WEBP q80 e6 at 480 px (sharp 0.35.4). No colour, contrast or sharpening step.",
+      "regions": [
+        {
+          "regionId": "ocr-p0001-l00001",
+          "bbox1000": [
+            193,
+            92,
+            255,
+            114
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00002",
+          "bbox1000": [
+            432,
+            93,
+            534,
+            118
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00003",
+          "bbox1000": [
+            373,
+            131,
+            898,
+            149
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00004",
+          "bbox1000": [
+            370,
+            187,
+            640,
+            212
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00005",
+          "bbox1000": [
+            146,
+            212,
+            861,
+            237
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00006",
+          "bbox1000": [
+            109,
+            245,
+            858,
+            266
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00007",
+          "bbox1000": [
+            131,
+            266,
+            882,
+            285
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00008",
+          "bbox1000": [
+            131,
+            285,
+            523,
+            307
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00009",
+          "bbox1000": [
+            109,
+            305,
+            893,
+            326
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00010",
+          "bbox1000": [
+            108,
+            325,
+            892,
+            346
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00011",
+          "bbox1000": [
+            92,
+            359,
+            904,
+            380
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00012",
+          "bbox1000": [
+            133,
+            384,
+            345,
+            405
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00013",
+          "bbox1000": [
+            93,
+            432,
+            903,
+            452
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00014",
+          "bbox1000": [
+            129,
+            457,
+            905,
+            476
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00015",
+          "bbox1000": [
+            129,
+            481,
+            907,
+            502
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00016",
+          "bbox1000": [
+            129,
+            505,
+            798,
+            528
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00017",
+          "bbox1000": [
+            132,
+            536,
+            843,
+            553
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00018",
+          "bbox1000": [
+            96,
+            566,
+            839,
+            586
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00019",
+          "bbox1000": [
+            269,
+            587,
+            387,
+            607
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00020",
+          "bbox1000": [
+            164,
+            589,
+            238,
+            607
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00021",
+          "bbox1000": [
+            397,
+            589,
+            513,
+            607
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00022",
+          "bbox1000": [
+            554,
+            589,
+            613,
+            607
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00023",
+          "bbox1000": [
+            673,
+            589,
+            747,
+            607
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00024",
+          "bbox1000": [
+            801,
+            589,
+            875,
+            607
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00025",
+          "bbox1000": [
+            791,
+            612,
+            883,
+            631
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00026",
+          "bbox1000": [
+            142,
+            612,
+            258,
+            630
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00027",
+          "bbox1000": [
+            270,
+            612,
+            387,
+            630
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00028",
+          "bbox1000": [
+            397,
+            612,
+            513,
+            630
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00029",
+          "bbox1000": [
+            657,
+            612,
+            761,
+            630
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00030",
+          "bbox1000": [
+            524,
+            613,
+            641,
+            631
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00031",
+          "bbox1000": [
+            111,
+            614,
+            129,
+            628
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00032",
+          "bbox1000": [
+            183,
+            628,
+            218,
+            647
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00033",
+          "bbox1000": [
+            310,
+            628,
+            345,
+            647
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00034",
+          "bbox1000": [
+            434,
+            628,
+            477,
+            647
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00035",
+          "bbox1000": [
+            545,
+            631,
+            621,
+            649
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00036",
+          "bbox1000": [
+            671,
+            631,
+            748,
+            650
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00037",
+          "bbox1000": [
+            800,
+            631,
+            875,
+            650
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00038",
+          "bbox1000": [
+            94,
+            658,
+            905,
+            675
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00039",
+          "bbox1000": [
+            122,
+            678,
+            619,
+            697
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00040",
+          "bbox1000": [
+            105,
+            713,
+            906,
+            734
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00041",
+          "bbox1000": [
+            139,
+            741,
+            906,
+            760
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00042",
+          "bbox1000": [
+            140,
+            767,
+            906,
+            787
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00043",
+          "bbox1000": [
+            141,
+            794,
+            905,
+            813
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00044",
+          "bbox1000": [
+            141,
+            820,
+            907,
+            839
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00045",
+          "bbox1000": [
+            139,
+            847,
+            908,
+            868
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00046",
+          "bbox1000": [
+            140,
+            873,
+            907,
+            894
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00047",
+          "bbox1000": [
+            139,
+            900,
+            635,
+            921
+          ]
+        },
+        {
+          "regionId": "ocr-p0001-l00048",
+          "bbox1000": [
+            473,
+            942,
+            524,
+            957
+          ]
+        }
+      ],
+      "seconds": 3.964
     },
     "extractedText": "[2026년9월 기후특성]",
     "reader": {

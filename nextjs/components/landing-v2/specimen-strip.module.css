@@ -1,7 +1,11 @@
 /*
   P2-08 / UX-L4 (UX-PLAN-2026-10-17 §3.3-§3.4): the specimen strip.
 
-  1024px and up: the cells side by side, one column each. Below: a radio row of tabs and one cell,
+  hard-proof 2026-10-27: it closes s2, under the source workbench; from 1024px the cells sit side by
+  side, as many to a row as fit at 280px or more. The phone rules below name tabs and cells 2 to 6:
+  lib/specimen-sources.test.ts fails when the committed cells outnumber them.
+
+  1024px and up: the cells side by side. Below: a radio row of tabs and one cell,
   the others stacked in the same grid area with `visibility: hidden`, so the area is the tallest
   cell's and choosing a tab moves nothing under the strip (CLS 0 without a measurement).
 
@@ -11,15 +15,15 @@
 */
 
 .strip {
-  margin: 0 0 24px;
+  margin: 32px 0 0;
   text-align: start;
   color: var(--tv-ink);
 }
 
+/* As many tabs to a row as fit at 96px; a fifth tab starts a second row rather than squeezing the rest. */
 .tabs {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   border-bottom: 1px solid var(--tv-rule);
 }
 
@@ -65,16 +69,18 @@
   /* The tab names the cell, so its own kind line is not repeated under it. */
   .kind { display: none; }
   .cell:not(:first-child) { visibility: hidden; }
-  .strip:has(.tab:nth-child(2) input:checked) .cell:first-child,
-  .strip:has(.tab:nth-child(3) input:checked) .cell:first-child { visibility: hidden; }
+  .strip:has(.tab:not(:first-child) input:checked) .cell:first-child { visibility: hidden; }
   .strip:has(.tab:nth-child(2) input:checked) .cell:nth-child(2),
-  .strip:has(.tab:nth-child(3) input:checked) .cell:nth-child(3) { visibility: visible; }
+  .strip:has(.tab:nth-child(3) input:checked) .cell:nth-child(3),
+  .strip:has(.tab:nth-child(4) input:checked) .cell:nth-child(4),
+  .strip:has(.tab:nth-child(5) input:checked) .cell:nth-child(5),
+  .strip:has(.tab:nth-child(6) input:checked) .cell:nth-child(6) { visibility: visible; }
 }
 
 @media (min-width: 1024px) {
-  .strip { margin-bottom: 32px; }
+  .strip { margin-top: 48px; }
   .tabs { display: none; }
-  .cells { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 24px; margin-top: 0; }
+  .cells { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px 24px; margin-top: 0; }
   .cell { grid-area: auto; }
 }
 
@@ -94,6 +100,24 @@
 .chip span { color: var(--tv-ink-muted); font-family: var(--f-sans); }
 
 .crop { margin: 6px 0 0; }
+
+/* The whole page and every region the reader returned. Ink only: the chosen region is heavier, not coloured. */
+.page { margin: 6px 0 0; }
+.regions {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.regions rect { fill: none; stroke: var(--tv-ink-muted); stroke-width: 1px; }
+.regions rect[data-selected] { stroke: var(--tv-ink); stroke-width: 2px; }
+.regions rect[data-masked] { stroke: var(--tv-ink-muted); stroke-dasharray: 4 3; }
+.count {
+  margin: 4px 0 0;
+  color: var(--tv-ink-muted);
+  font: 13px/1.5 var(--f-sans);
+}
 
 .frame {
   position: relative;
