@@ -281,9 +281,14 @@ test("Korean pricing carries the selected plan into the inquiry", async ({ page 
   outputs/tavonel-research-replan-20261013/hard-proof-20261027/impl/MEASURE.json in the Core repository.
     1440x900  EN fold 30, body 694 (strip 178)   KO fold 25, body 604 (strip 166)   h2 6
     390x844   EN fold 30, body 552               KO fold 25, body 475
-  Budgets: EN body 704, KO body 614 at 1440x900 (every cell shows there); fold 35 at 1440x900 and 390x844.
+  Budgets then: EN body 704, KO body 614.
+  Re-measured after PR #174 review round 1 (the strip's cells lost the "As printed" caption, the coordinate chip
+  and the run line; same build posture, same method, same receipt file), so re-derived DOWN by the same rule:
+    1440x900  EN fold 30, body 649 (strip 133)   KO fold 25, body 554 (strip 116)   h2 6
+    390x844   EN fold 30, body 538               KO fold 25, body 458
+  Budgets: EN body 659, KO body 564 at 1440x900 (every cell shows there); fold 35 at 1440x900 and 390x844.
 */
-const WORD_BUDGET = { "/": { fold: 35, body: 704 }, "/ko": { fold: 35, body: 614 } } as const;
+const WORD_BUDGET = { "/": { fold: 35, body: 659 }, "/ko": { fold: 35, body: 564 } } as const;
 for (const route of ["/", "/ko"] as const) {
   test(`${route} stays within its re-derived word budget, with six h2`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440" && testInfo.project.name !== "390", "measured at 1440x900 (fold and body) and 390x844 (fold)");
