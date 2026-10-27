@@ -1756,6 +1756,16 @@ describe("Compiler 1, the release name", () => {
 
   it("identifies the release by the digest of its pins", () => {
     expect(COMPILER_RELEASE.digest).toBe(`sha256:${sha256(canonicalize(COMPILER_RELEASE.pins))}`);
-    for (const pin of Object.values(COMPILER_RELEASE.pins)) expect(pin).toMatch(/^sha256:[0-9a-f]{64}$/);
+    const { ocrImageDigest, coreReleaseDigest, engineRelease, modelSha256 } = COMPILER_RELEASE.pins;
+    for (const pin of [ocrImageDigest, coreReleaseDigest]) expect(pin).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(Object.keys(modelSha256).length).toBeGreaterThan(0);
+    for (const hex of Object.values(modelSha256)) expect(hex).toMatch(/^[0-9a-f]{64}$/);
+    // hard-proof 2026-10-27: the reader pins are read from the run receipts that recorded the reader's /health, never typed.
+    for (const receipt of ["nasa-sp-5079-p039", "nasa-sp-5079-p074"]) {
+      const run = JSON.parse(read(`public/proof-collection/specimens/${receipt}.run.json`)) as {
+        reader: { imageDigest: string; engineRelease: string; modelSha256: Record<string, string> };
+      };
+      expect([run.reader.imageDigest, run.reader.engineRelease, run.reader.modelSha256], receipt).toEqual([ocrImageDigest, engineRelease, modelSha256]);
+    }
   });
 });
