@@ -20,7 +20,20 @@ import { expect, test, type Page } from "@playwright/test";
   the film changes stage by itself -- so the stage is read from the tab the film selects
   (`aria-selected`), and the detector takes away the one thing that now keeps the frame still: a
   tab row whose height does not depend on the stage.
+
+  Founder ask 2026-10-27: Home now opens compact (Fit) at every width and "Focus details" expands it. The
+  watch with no input therefore watches Fit, the view a visitor gets without touching anything, and the
+  pane is watched too, after the one press that opens it (taken before the watch starts, so no shift the
+  watch records follows an input). The tab-press measurements below run in both views.
 */
+type FilmView = "fit" | "focus";
+/** Opens the view: Fit is the default; Focus is one press of the toggle, as a visitor would ask for it. */
+async function openView(page: Page, view: FilmView) {
+  const sequence = page.locator(`${FILM} .compile-film-sequence`);
+  await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
+  if (view === "focus") await page.locator(`${FILM} .compile-film-focus-control`).click();
+  await expect(sequence).toHaveAttribute("data-mobile-view", view);
+}
 
 const FILM = '#s1 figure[data-testid="landing-hero-film"]';
 const STAGE_COUNT = 4;
@@ -60,11 +73,11 @@ async function recordShifts(page: Page) {
   a shift in the record is one the film made. `before` runs once the film plays, before the
   watch starts (the detector below uses it to take the reservation away).
 */
-async function watchAutoAdvance(page: Page, advances: number, before?: () => Promise<void>) {
+async function watchAutoAdvance(page: Page, advances: number, before?: () => Promise<void>, view: FilmView = "fit") {
   const film = page.locator(FILM);
   const sequence = film.locator(".compile-film-sequence");
   await expect(sequence).toHaveAttribute("data-narrow", "1");
-  await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
+  await openView(page, view);
   // Motion on: the cut plays, so the stage will advance without input.
   const video = film.locator("video.compile-film-video");
   await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.readyState >= 2 && !node.paused && node.currentTime > 0), { timeout: 30_000 }).toBe(true);
@@ -118,17 +131,17 @@ async function watchAutoAdvance(page: Page, advances: number, before?: () => Pro
   (the acceptance asks for two). 430x932 is the width where the consent sheet opens at 8 s, so
   its arrival falls inside the watch as well.
 */
-for (const [width, height] of [[390, 844], [430, 932]] as const) {
-  for (const path of ["/", "/ko"]) {
-    test(`with motion on, three auto-advances leave the phone film where it was (${path} ${width}x${height})`, async ({ page }, testInfo) => {
+for (const [width, height, views] of [[390, 844, ["fit", "focus"]], [430, 932, ["fit"]]] as const) {
+  for (const path of ["/", "/ko"]) for (const view of views) {
+    test(`with motion on, three auto-advances leave the phone film where it was (${path} ${width}x${height}, ${view})`, async ({ page }, testInfo) => {
       test.skip(testInfo.project.name !== "390", "sets its own viewport");
       test.setTimeout(180_000);
       await page.setViewportSize({ width, height });
       await page.emulateMedia({ reducedMotion: "no-preference" });
       await recordShifts(page);
       await page.goto(path);
-      const run = await watchAutoAdvance(page, 3);
-      await testInfo.attach(`auto-advance-${path === "/" ? "en" : "ko"}-${width}`, { body: JSON.stringify({ width, height, path, ...run }, null, 2), contentType: "application/json" });
+      const run = await watchAutoAdvance(page, 3, undefined, view);
+      await testInfo.attach(`auto-advance-${path === "/" ? "en" : "ko"}-${width}-${view}`, { body: JSON.stringify({ width, height, path, view, ...run }, null, 2), contentType: "application/json" });
       expect(run.scrollY, "unscrolled").toBe(0);
       expect(run.inputShifts, "no input during the watch").toBe(0);
       expect(run.sampled.frames, "the frame was sampled between advances").toBeGreaterThan(60);
@@ -180,12 +193,12 @@ test("the watch records the shift when the row above the frame changes height by
 const BAND: readonly (readonly [number, number])[] = [[768, 1024], [820, 1180], [899, 1024]];
 const PHONES: readonly (readonly [number, number])[] = [[360, 800], [390, 844], [412, 915], [430, 932]];
 
-async function frameTopByStage(page: Page, path: string) {
+async function frameTopByStage(page: Page, path: string, view: FilmView) {
   await page.goto(path);
   const film = page.locator(FILM);
   const sequence = film.locator(".compile-film-sequence");
   await expect(sequence).toHaveAttribute("data-narrow", "1");
-  await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
+  await openView(page, view);
   await page.evaluate(() => document.fonts.ready);
   const tops: number[] = [];
   for (let stage = 0; stage < STAGE_COUNT; stage++) {
@@ -209,10 +222,10 @@ test("from 768px to the edge of Fit the frame top is the same on every stage", a
   const measured: Record<string, number[]> = {};
   for (const [width, height] of BAND) {
     await page.setViewportSize({ width, height });
-    for (const path of ["/", "/ko"]) {
-      const tops = await frameTopByStage(page, path);
-      measured[`${path} ${width}`] = tops;
-      expectOneTop(tops, `${path} ${width}`);
+    for (const path of ["/", "/ko"]) for (const view of ["fit", "focus"] as const) {
+      const tops = await frameTopByStage(page, path, view);
+      measured[`${path} ${width} ${view}`] = tops;
+      expectOneTop(tops, `${path} ${width} ${view}`);
     }
   }
   await testInfo.attach("band-frame-tops-chromium", { body: JSON.stringify(measured, null, 2), contentType: "application/json" });
@@ -228,10 +241,10 @@ test("webkit: the frame top is the same on every stage from 360px to the edge of
     for (const [width, height] of [...PHONES, ...BAND]) {
       const context = await browser.newContext({ baseURL, viewport: { width, height }, reducedMotion: "reduce" });
       const page = await context.newPage();
-      for (const path of ["/", "/ko"]) {
-        const tops = await frameTopByStage(page, path);
-        measured[`${path} ${width}`] = tops;
-        expectOneTop(tops, `webkit ${path} ${width}`);
+      for (const path of ["/", "/ko"]) for (const view of ["fit", "focus"] as const) {
+        const tops = await frameTopByStage(page, path, view);
+        measured[`${path} ${width} ${view}`] = tops;
+        expectOneTop(tops, `webkit ${path} ${width} ${view}`);
       }
       await context.close();
     }

@@ -276,6 +276,9 @@ test("in the 768-899 band in Focus the scrolled sheet never covers the reading b
   await page.goto("/");
   const film = page.locator('#s1 figure[data-testid="landing-hero-film"]');
   await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-narrow", "1");
+  // Home opens compact (founder 2026-10-27); Focus, the taller frame this guards, is one press of Focus details.
+  await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
+  await film.locator(".compile-film-focus-control").click();
   await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
   const frameBottom = await film.locator(".compile-film-viewport").evaluate(node => node.getBoundingClientRect().bottom + scrollY);
   const scroll = Math.round(frameBottom - (height - 104) + 4);
