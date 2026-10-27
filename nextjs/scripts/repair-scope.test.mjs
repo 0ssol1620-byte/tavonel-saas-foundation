@@ -7399,10 +7399,10 @@ test('affected table-read-intake-ceiling owner: 6 exact paths select 8 direct su
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
-test('affected specimen-strip owner: 23 exact paths select 2 direct suites and 1 browser suite; neighbours stay unmapped', () => {
+test('affected specimen-strip owner: 45 exact paths select 2 direct suites and 1 browser suite; neighbours stay unmapped', () => {
   const suites = ['lib/landing-v2-page.test.ts', 'lib/specimen-sources.test.ts'];
   const browsers = ['e2e/specimen-strip.spec.ts'];
-  assert.deepEqual([[...SPECIMEN_STRIP_AFFECTED_PATHS], [...SPECIMEN_STRIP_AFFECTED_UNIT_FILES], [...SPECIMEN_STRIP_AFFECTED_BROWSER_FILES]], [['components/landing-v2/specimen-strip.module.css', 'components/landing-v2/specimen-strip.tsx', 'e2e/fixtures/specimens/fixture-korean.json', 'e2e/fixtures/specimens/fixture-korean.svg', 'e2e/fixtures/specimens/fixture-scan.json', 'e2e/fixtures/specimens/fixture-scan.svg', 'e2e/fixtures/specimens/fixture-table.json', 'e2e/fixtures/specimens/fixture-table.svg', 'e2e/specimen-strip.spec.ts', 'lib/specimen-sources.json', 'lib/specimen-sources.test.ts', 'lib/specimen-sources.ts', 'public/proof-collection/PROVENANCE.md', 'public/proof-collection/specimens/kma-2026-09-climate-p001-720.avif', 'public/proof-collection/specimens/kma-2026-09-climate-p001-960.avif', 'public/proof-collection/specimens/kma-2026-09-climate-p001-960.webp', 'public/proof-collection/specimens/kma-2026-09-climate-p001.pdf', 'public/proof-collection/specimens/kma-2026-09-climate-p001.run.json', 'public/proof-collection/specimens/naca-rm-l50c03-p001-720.avif', 'public/proof-collection/specimens/naca-rm-l50c03-p001-960.avif', 'public/proof-collection/specimens/naca-rm-l50c03-p001-960.webp', 'public/proof-collection/specimens/naca-rm-l50c03-p001.pdf', 'public/proof-collection/specimens/naca-rm-l50c03-p001.run.json'], suites, browsers]);
+  assert.deepEqual([[...SPECIMEN_STRIP_AFFECTED_PATHS], [...SPECIMEN_STRIP_AFFECTED_UNIT_FILES], [...SPECIMEN_STRIP_AFFECTED_BROWSER_FILES]], [['components/landing-v2/specimen-strip.module.css', 'components/landing-v2/specimen-strip.tsx', 'e2e/fixtures/specimens/fixture-korean.json', 'e2e/fixtures/specimens/fixture-korean.svg', 'e2e/fixtures/specimens/fixture-scan.json', 'e2e/fixtures/specimens/fixture-scan.svg', 'e2e/fixtures/specimens/fixture-table.json', 'e2e/fixtures/specimens/fixture-table.svg', 'e2e/specimen-strip.spec.ts', 'lib/specimen-sources.json', 'lib/specimen-sources.test.ts', 'lib/specimen-sources.ts', 'public/proof-collection/PROVENANCE.md', 'public/proof-collection/specimens/kma-2026-09-climate-p001-720.avif', 'public/proof-collection/specimens/kma-2026-09-climate-p001-960.avif', 'public/proof-collection/specimens/kma-2026-09-climate-p001-960.webp', 'public/proof-collection/specimens/kma-2026-09-climate-p001-page-480.webp', 'public/proof-collection/specimens/kma-2026-09-climate-p001-page-720.avif', 'public/proof-collection/specimens/kma-2026-09-climate-p001-page-960.avif', 'public/proof-collection/specimens/kma-2026-09-climate-p001.pdf', 'public/proof-collection/specimens/kma-2026-09-climate-p001.run.json', 'public/proof-collection/specimens/naca-rm-l50c03-p001-720.avif', 'public/proof-collection/specimens/naca-rm-l50c03-p001-960.avif', 'public/proof-collection/specimens/naca-rm-l50c03-p001-960.webp', 'public/proof-collection/specimens/naca-rm-l50c03-p001-page-480.webp', 'public/proof-collection/specimens/naca-rm-l50c03-p001-page-720.avif', 'public/proof-collection/specimens/naca-rm-l50c03-p001-page-960.avif', 'public/proof-collection/specimens/naca-rm-l50c03-p001.pdf', 'public/proof-collection/specimens/naca-rm-l50c03-p001.run.json', 'public/proof-collection/specimens/nasa-sp-5079-p039-720.avif', 'public/proof-collection/specimens/nasa-sp-5079-p039-960.avif', 'public/proof-collection/specimens/nasa-sp-5079-p039-960.webp', 'public/proof-collection/specimens/nasa-sp-5079-p039-page-480.webp', 'public/proof-collection/specimens/nasa-sp-5079-p039-page-720.avif', 'public/proof-collection/specimens/nasa-sp-5079-p039-page-960.avif', 'public/proof-collection/specimens/nasa-sp-5079-p039.pdf', 'public/proof-collection/specimens/nasa-sp-5079-p039.run.json', 'public/proof-collection/specimens/nasa-sp-5079-p074-720.avif', 'public/proof-collection/specimens/nasa-sp-5079-p074-960.avif', 'public/proof-collection/specimens/nasa-sp-5079-p074-960.webp', 'public/proof-collection/specimens/nasa-sp-5079-p074-page-480.webp', 'public/proof-collection/specimens/nasa-sp-5079-p074-page-720.avif', 'public/proof-collection/specimens/nasa-sp-5079-p074-page-960.avif', 'public/proof-collection/specimens/nasa-sp-5079-p074.pdf', 'public/proof-collection/specimens/nasa-sp-5079-p074.run.json'], suites, browsers]);
   for (const path of SPECIMEN_STRIP_AFFECTED_PATHS) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['specimen-strip'], path);
     const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
@@ -7412,7 +7412,7 @@ test('affected specimen-strip owner: 23 exact paths select 2 direct suites and 1
   const plan = affectedAskPlan(affectedMap(SPECIMEN_STRIP_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[...suites].sort(), [...browsers].sort(), false, false]);
   assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['390']);
-  for (const adjacent of ['nextjs/components/landing-v2/specimen-strip.test.tsx', 'nextjs/e2e/fixtures/specimens/fixture-chart.json', 'nextjs/e2e/fixtures/specimens/fixture-scan.png', 'nextjs/lib/specimen-sources.tsx', 'nextjs/public/landing/v2/specimen-scan.webp', 'nextjs/public/proof-collection/specimens/naca-rm-l50c03-p002.pdf', 'nextjs/public/proof-collection/specimens/other.run.json', 'nextjs/public/proof-collection/specimens/naca-rm-l50c03-p001-480.avif', 'nextjs/public/proof-collection/dart-jtc-page-4.pdf', 'nextjs/lib/specimen-sources.v2.json', 'components/landing-v2/specimen-strip.module.css.bak', 'nextjs/public/proof-collection/specimens/PROVENANCE.md', 'nextjs/public/proof-collection/PROVENANCE.txt']) {
+  for (const adjacent of ['nextjs/components/landing-v2/specimen-strip.test.tsx', 'nextjs/e2e/fixtures/specimens/fixture-chart.json', 'nextjs/e2e/fixtures/specimens/fixture-scan.png', 'nextjs/lib/specimen-sources.tsx', 'nextjs/public/landing/v2/specimen-scan.webp', 'nextjs/public/proof-collection/specimens/naca-rm-l50c03-p002.pdf', 'nextjs/public/proof-collection/specimens/other.run.json', 'nextjs/public/proof-collection/specimens/naca-rm-l50c03-p001-page-1200.avif', 'nextjs/public/proof-collection/specimens/kma-2026-09-climate-p001-page-480.png', 'nextjs/public/proof-collection/specimens/naca-rm-l50c03-p001-480.avif', 'nextjs/public/proof-collection/dart-jtc-page-4.pdf', 'nextjs/lib/specimen-sources.v2.json', 'components/landing-v2/specimen-strip.module.css.bak', 'nextjs/public/proof-collection/specimens/PROVENANCE.md', 'nextjs/public/proof-collection/PROVENANCE.txt']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
@@ -7477,6 +7477,47 @@ test('affected g1-copy-truth owner: 6 exact paths select 17 direct suites and 2 
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [affectedUnion(suites, CONSENT_POSTER_AFFECTED_UNIT_FILES), affectedUnion(browsers, CONSENT_POSTER_AFFECTED_BROWSER_FILES), false, false]);
   assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440', '390', 'reduced-motion']);
   for (const adjacent of ['nextjs/lib/billing-catalog.test.tsx', 'nextjs/lib/operations-v2.ts', 'nextjs/lib/mcp-tools.tsx', 'nextjs/lib/g1-copy-truth.ts', 'nextjs/public/developer/tavonel-mcp-2.mjs', 'nextjs/public/developer/tavonel-cli.mjs', 'lib/operations.ts.bak']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
+// hard-proof 2026-10-27 C1: the GDP.pdf runs list, one finite owner, restated independently of the exported constants.
+import { GDP_PDF_RUNS_AFFECTED_PATHS, GDP_PDF_RUNS_AFFECTED_UNIT_FILES, GDP_PDF_RUNS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+test('affected gdp-pdf-runs owner: 3 exact paths select 2 direct suites and 2 browser suites; v2 and the neighbours stay unmapped', () => {
+  const suites = ['lib/gdp-pdf-page-data.test.ts', 'lib/marketing-story.test.ts'];
+  const browsers = ['e2e/benchmarks.spec.ts', 'e2e/marketing-story.spec.ts'];
+  assert.deepEqual([[...GDP_PDF_RUNS_AFFECTED_PATHS], [...GDP_PDF_RUNS_AFFECTED_UNIT_FILES], [...GDP_PDF_RUNS_AFFECTED_BROWSER_FILES]], [['content/benchmarks/gdp-pdf-v3.json', 'lib/gdp-pdf-page-data.test.ts', 'lib/gdp-pdf-page-data.ts'], suites, browsers]);
+  for (const path of GDP_PDF_RUNS_AFFECTED_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['gdp-pdf-runs'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['gdp-pdf-runs'], [], [...suites].sort(), [...browsers].sort(), []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const plan = affectedAskPlan(affectedMap(GDP_PDF_RUNS_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[...suites].sort(), [...browsers].sort(), false, false]);
+  assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440', '390', 'reduced-motion']);
+  // v2's report is historical evidence: an edit to it maps to no owner and fails the map closed.
+  for (const adjacent of ['nextjs/content/benchmarks/gdp-pdf.json', 'nextjs/content/benchmarks/gdp-pdf-v4.json', 'nextjs/content/benchmarks/gdp-pdf-v3.json.bak', 'nextjs/lib/gdp-pdf-page-data.tsx', 'nextjs/lib/gdp-pdf-eval.ts', 'nextjs/lib/gdp-pdf-runs.ts', 'content/benchmarks/gdp-pdf-v3.json']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
+// hard-proof 2026-10-27 C3: the Compiler 1 release record, one finite owner, restated independently of the exported constants.
+import { COMPILER_RELEASE_AFFECTED_PATHS, COMPILER_RELEASE_AFFECTED_UNIT_FILES, COMPILER_RELEASE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+test('affected compiler-release owner: 1 exact path selects 3 direct suites and 2 browser suites; neighbours stay unmapped', () => {
+  const suites = ['lib/brand-copy.test.ts', 'lib/changelog.test.ts', 'lib/gdp-pdf-page-data.test.ts'];
+  const browsers = ['e2e/benchmarks.spec.ts', 'e2e/templates.spec.ts'];
+  assert.deepEqual([[...COMPILER_RELEASE_AFFECTED_PATHS], [...COMPILER_RELEASE_AFFECTED_UNIT_FILES], [...COMPILER_RELEASE_AFFECTED_BROWSER_FILES]], [['lib/compiler-release.ts'], suites, browsers]);
+  assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/lib/compiler-release.ts')).map(o => o.group), ['compiler-release']);
+  const map = affectedMap([affectedRecord('M', ['nextjs/lib/compiler-release.ts'])]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['compiler-release'], [], suites, browsers, []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  const plan = affectedAskPlan(map);
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, browsers, false, false]);
+  assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440']);
+  for (const adjacent of ['nextjs/lib/compiler-release.test.ts', 'nextjs/lib/compiler-releases.ts', 'nextjs/lib/compiler-release.tsx', 'nextjs/lib/compiler-release.json', 'lib/compiler-release.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);

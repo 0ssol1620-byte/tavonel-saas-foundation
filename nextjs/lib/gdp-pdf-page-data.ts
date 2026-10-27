@@ -1,10 +1,11 @@
 /**
- * The committed GDP.pdf run report, and the rules that decide whether it may be rendered.
+ * The committed GDP.pdf run reports, and the rules that decide whether one may be rendered.
  *
- * `content/benchmarks/gdp-pdf.json` is a copy of the run report the evaluation lane produced. It
- * is not edited here: the page reads it, this module validates it, and
- * `gdp-pdf-page-data.test.ts` recomputes its sha256 against `GDP_PDF_ARTIFACT_SHA256` so a
- * silently swapped artifact fails the suite rather than the reader.
+ * Each file under `content/benchmarks/` named in `GDP_PDF_RUNS` is a copy of a run report the
+ * evaluation lane produced. None is edited here: the page reads them, this module validates them,
+ * and `gdp-pdf-page-data.test.ts` recomputes every sha256 in the list so a silently swapped
+ * artifact fails the suite rather than the reader. A new run is a new file and a new first row;
+ * an older report is never rewritten (historical evidence is not overwritten).
  *
  * Three things this file exists to prevent, all of them constitution rules rather than taste:
  *
@@ -26,22 +27,47 @@
  * render a partial page.
  */
 
-import report from "../content/benchmarks/gdp-pdf.json";
+import v2 from "../content/benchmarks/gdp-pdf.json";
 import protocol from "../eval/gdp-pdf/protocol.json";
+import { compilerRelease, COMPILER_RELEASE_DEFINITION } from "./compiler-release";
 
-/* ------------------------------------------------------------------ the artifact */
+/* ------------------------------------------------------------------ the artifacts */
+
+export type GdpPdfRun = Readonly<{
+  /** The run's own name on the page. */
+  id: string;
+  /** Repository path of the committed report. */
+  path: string;
+  /**
+   * The sha256 of that file as committed, LF-normalised (`.gitattributes` pins `eol=lf` for
+   * `content/benchmarks/*.json`, so the working tree, the commit and CI hash the same bytes). The
+   * test prints the value it computed, so a stale digest names its own fix.
+   */
+  sha256: string;
+  /** The parsed report, untrusted until `validateGdpPdfReport` passes it. */
+  report: unknown;
+}>;
 
 /**
- * The sha256 of `content/benchmarks/gdp-pdf.json` as committed, LF-normalised (`.gitattributes`
- * pins `eol=lf` so the working tree, the commit and CI hash the same bytes).
+ * Every published run, NEWEST FIRST. The page renders the first in full and the rest in its
+ * "Previous runs" table. The reports carry no run timestamp (only `manifest.seed`), so the order
+ * is this list's, set by the commit that adds a run.
  *
- * Replacing the artifact means replacing this line in the same commit. The test prints the value
- * it computed, so a stale digest names its own fix.
+ * v2 is the 2026-09-21 two-arm run (seed gdp-pdf-20260921). Its file keeps its name and its bytes
+ * for good: a later run is added above it, and v2 stays on the page as a previous run.
  */
-export const GDP_PDF_ARTIFACT_SHA256 =
-  "0302712c8a0570492347d604c00a8090bff13b92cd96190d3844798aa258f953" as const;
+export const GDP_PDF_RUNS: readonly GdpPdfRun[] = [
+  {
+    id: "v2",
+    path: "nextjs/content/benchmarks/gdp-pdf.json",
+    sha256: "0302712c8a0570492347d604c00a8090bff13b92cd96190d3844798aa258f953",
+    report: v2,
+  },
+];
 
-export const GDP_PDF_ARTIFACT_PATH = "nextjs/content/benchmarks/gdp-pdf.json" as const;
+/** The newest run's artifact, under the names the page and its receipts already use. */
+export const GDP_PDF_ARTIFACT_SHA256 = GDP_PDF_RUNS[0]!.sha256;
+export const GDP_PDF_ARTIFACT_PATH = GDP_PDF_RUNS[0]!.path;
 
 /* ------------------------------------------------------------------ shape */
 
@@ -137,6 +163,11 @@ export type GdpPdfReport = Readonly<{
     the run, published beside the result rather than argued against it.
   */
   packet_size?: Readonly<{ n: number; packets_truncated_by_budget?: number }>;
+  /*
+    The compiler release the run's compiled arm ran on (lib/compiler-release.ts), when the report
+    names one. v2 does not; a report naming a release this site does not define is refused.
+  */
+  compilerRelease?: string;
 }>;
 
 /* ------------------------------------------------------------------ validation */
@@ -311,6 +342,19 @@ export function validateGdpPdfReport(value: unknown): string[] {
     }
   }
 
+  /* The subset is optional, but an arm it does carry is drawn in figure 2, so it is held like any other. */
+  const subset = value.compiled_available_subset;
+  if (subset !== undefined) {
+    if (!isRecord(subset)) problems.push("compiled_available_subset: expected an object");
+    else for (const arm of GDP_PDF_PAGE_ARMS) {
+      if (subset[arm] !== undefined) validateSummary(`compiled_available_subset.${arm}`, subset[arm], problems);
+    }
+  }
+
+  if (value.compilerRelease !== undefined && compilerRelease(value.compilerRelease) === null) {
+    problems.push("compilerRelease: not a release lib/compiler-release.ts defines");
+  }
+
   if (typeof value.official_comparable !== "boolean") problems.push("official_comparable: missing");
   if (!isFiniteNumber(value.cells_recorded) || value.cells_recorded < 0) {
     problems.push("cells_recorded: missing count");
@@ -344,12 +388,97 @@ export function validateGdpPdfReport(value: unknown): string[] {
  * The validated report, or a throw. There is no third outcome: a page that cannot prove its
  * numbers does not render a reduced version of itself.
  */
-export function gdpPdfReport(): GdpPdfReport {
-  const problems = validateGdpPdfReport(report);
+export function gdpPdfReport(run: GdpPdfRun = GDP_PDF_RUNS[0]!): GdpPdfReport {
+  const problems = validateGdpPdfReport(run.report);
   if (problems.length > 0) {
-    throw new Error(`${GDP_PDF_ARTIFACT_PATH} is not a publishable run report:\n- ${problems.join("\n- ")}`);
+    throw new Error(`${run.path} is not a publishable run report:\n- ${problems.join("\n- ")}`);
   }
-  return report as unknown as GdpPdfReport;
+  return run.report as GdpPdfReport;
+}
+
+export type GdpPdfPreviousRun = Readonly<{
+  id: string;
+  path: string;
+  sha256: string;
+  seed: string;
+  model: string;
+  native: Readonly<{ count: number; n: number }>;
+  compiled: Readonly<{ count: number; n: number }>;
+  macroDeltaPp: number;
+  pairedN: number;
+  deviations: number;
+}>;
+
+/**
+ * The "Previous runs" table: every run after the newest, each validated like the newest and read
+ * from its own report. Empty while one run is published, and the page then prints no table.
+ */
+export function gdpPdfPreviousRuns(runs: readonly GdpPdfRun[] = GDP_PDF_RUNS): GdpPdfPreviousRun[] {
+  return runs.slice(1).map((run) => {
+    const report = gdpPdfReport(run);
+    const { native_pdf: native, compiled_context_pdf: compiled } = report.arms;
+    return {
+      id: run.id,
+      path: run.path,
+      sha256: run.sha256,
+      seed: report.manifest.seed,
+      model: report.manifest.surface.declared_model,
+      native: { count: native.macro_all_pass_count, n: native.n },
+      compiled: { count: compiled.macro_all_pass_count, n: compiled.n },
+      macroDeltaPp: report.pairwise_delta.macro_delta_pp,
+      pairedN: report.pairwise_delta.paired_n,
+      deviations: gdpPdfDeviations(report).length,
+    };
+  });
+}
+
+/**
+ * The receipt row "Compiler release", or null when the run names none -- and the row is then not
+ * printed. The name's first mention on the page is this row, so it carries the definition.
+ */
+export function gdpPdfCompilerRelease(run: GdpPdfReport = gdpPdfReport()) {
+  const release = compilerRelease(run.compilerRelease);
+  return release && { label: `TAVONEL ${release.name}`, digest: release.digest, definition: COMPILER_RELEASE_DEFINITION.en };
+}
+
+/* ------------------------------------------------------------------ the two figures */
+
+/**
+ * Figure 1, the two-arm design, read from the manifest: one PDF per task, the same model in both
+ * arms, one judge. The judge string carries a parenthetical about the official protocol, which the
+ * conditions table prints in full; the figure names the model only.
+ */
+export function gdpPdfDesignFigure(run: GdpPdfReport = gdpPdfReport()) {
+  const tasks = run.manifest.tasks_attempted;
+  const model = run.manifest.surface.declared_model;
+  const judge = run.manifest.judge.split(" ")[0]!;
+  return {
+    tasks,
+    model,
+    judge,
+    alt: `Two-arm design. For each of ${tasks} tasks the same PDF goes to ${model} alone and to ${model} with TAVONEL's compiled context added; one judge, ${judge}, grades both answers against the task's rubric.`,
+  };
+}
+
+export type GdpPdfPassBar = Readonly<{ arm: GdpPdfPageArm; count: number; n: number }>;
+export type GdpPdfPassGroup = Readonly<{ id: "all" | "compiled_available"; n: number; bars: readonly GdpPdfPassBar[] }>;
+
+/**
+ * Figure 2, all-criteria pass per arm: every task run, and beside it the subset whose compiled
+ * packet could be assembled, when the report carries that subset with its counts. Each bar is a
+ * count over its own denominator, never a rate without one.
+ */
+export function gdpPdfPassFigure(run: GdpPdfReport = gdpPdfReport()) {
+  const group = (id: GdpPdfPassGroup["id"], pair: Partial<GdpPdfArmPair>): GdpPdfPassGroup | null => {
+    const bars = GDP_PDF_PAGE_ARMS.map((arm) => pair[arm]).filter((summary): summary is GdpPdfSummary => summary !== undefined);
+    if (bars.length !== GDP_PDF_PAGE_ARMS.length || bars.some((summary) => summary.n !== bars[0]!.n)) return null;
+    return { id, n: bars[0]!.n, bars: GDP_PDF_PAGE_ARMS.map((arm, index) => ({ arm, count: bars[index]!.macro_all_pass_count, n: bars[index]!.n })) };
+  };
+  const groups = [group("all", run.arms), run.compiled_available_subset ? group("compiled_available", run.compiled_available_subset) : null]
+    .filter((entry): entry is GdpPdfPassGroup => entry !== null);
+  const phrase = ({ id, n, bars }: GdpPdfPassGroup) =>
+    `${id === "all" ? `over all ${n} tasks` : `over the ${n} tasks whose compiled packet could be assembled`}, ${bars.map((bar) => `${GDP_PDF_ARM_LABEL[bar.arm]} ${bar.count} of ${bar.n}`).join(", ")}`;
+  return { groups, alt: `All-criteria pass per arm: ${groups.map(phrase).join("; ")}.` };
 }
 
 /* ------------------------------------------------------------------ the headline sentence */

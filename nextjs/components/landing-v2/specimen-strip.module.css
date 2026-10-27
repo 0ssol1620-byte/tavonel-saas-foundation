@@ -1,7 +1,11 @@
 /*
   P2-08 / UX-L4 (UX-PLAN-2026-10-17 §3.3-§3.4): the specimen strip.
 
-  1024px and up: the cells side by side, one column each. Below: a radio row of tabs and one cell,
+  hard-proof 2026-10-27: it closes s2, under the source workbench; from 1024px the cells sit side by
+  side, as many to a row as fit at 280px or more. The phone rules below name tabs and cells 2 to 6:
+  lib/specimen-sources.test.ts fails when the committed cells outnumber them.
+
+  1024px and up: the cells side by side. Below: a radio row of tabs and one cell,
   the others stacked in the same grid area with `visibility: hidden`, so the area is the tallest
   cell's and choosing a tab moves nothing under the strip (CLS 0 without a measurement).
 
@@ -11,30 +15,42 @@
 */
 
 .strip {
-  margin: 0 0 24px;
+  margin: 32px 0 0;
   text-align: start;
   color: var(--tv-ink);
 }
 
+/*
+  The hero's tab grammar (source-first-home.module.css, #s1 .compile-film-stages below 640px): each
+  tab at its label's width, one line, 13px at 560, 16px apart (12px under 380px), 44px tall, so the
+  marker sits under its own label (a one-syllable tab is narrow; the gap keeps the next target clear,
+  as on the hero's tabs). PR #174 review B1: 1fr columns of at least 96px could not hold four tabs in
+  the 312-382px content width of a 360-430px phone, so they wrapped 3 + 1 and the long labels broke.
+  The names are the short ones (COPY.tab); four of them take about 230px at 360.
+*/
 .tabs {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  display: flex;
+  justify-content: flex-start;
+  column-gap: 16px;
   border-bottom: 1px solid var(--tv-rule);
+}
+@media (max-width: 379.98px) {
+  .tabs { column-gap: 12px; }
 }
 
 .tab {
   position: relative;
   display: flex;
+  flex: none;
   align-items: center;
   justify-content: center;
   min-height: 44px;
-  padding: 4px 6px;
+  padding: 10px 2px;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   color: var(--tv-ink-muted);
-  font: 500 14px/1.25 var(--f-sans);
-  text-align: center;
+  font: 560 13px/1.2 var(--f-sans);
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -65,16 +81,18 @@
   /* The tab names the cell, so its own kind line is not repeated under it. */
   .kind { display: none; }
   .cell:not(:first-child) { visibility: hidden; }
-  .strip:has(.tab:nth-child(2) input:checked) .cell:first-child,
-  .strip:has(.tab:nth-child(3) input:checked) .cell:first-child { visibility: hidden; }
+  .strip:has(.tab:not(:first-child) input:checked) .cell:first-child { visibility: hidden; }
   .strip:has(.tab:nth-child(2) input:checked) .cell:nth-child(2),
-  .strip:has(.tab:nth-child(3) input:checked) .cell:nth-child(3) { visibility: visible; }
+  .strip:has(.tab:nth-child(3) input:checked) .cell:nth-child(3),
+  .strip:has(.tab:nth-child(4) input:checked) .cell:nth-child(4),
+  .strip:has(.tab:nth-child(5) input:checked) .cell:nth-child(5),
+  .strip:has(.tab:nth-child(6) input:checked) .cell:nth-child(6) { visibility: visible; }
 }
 
 @media (min-width: 1024px) {
-  .strip { margin-bottom: 32px; }
+  .strip { margin-top: 48px; }
   .tabs { display: none; }
-  .cells { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 24px; margin-top: 0; }
+  .cells { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px 24px; margin-top: 0; }
   .cell { grid-area: auto; }
 }
 
@@ -84,16 +102,57 @@
   font: 500 13px/1.5 var(--f-sans);
 }
 
-.chip {
+/*
+  PR #174 review B3: one mono line of what the run was -- page, regions, seconds, the receipt link --
+  above the page, instead of a count line, a coordinate chip and a run line spread around the cell.
+  On /ko the line is set in the KO Home sans: the mono face has no Hangul, and a line half in each
+  spaced its dots unevenly.
+*/
+.meta {
   margin: 4px 0 0;
-  color: var(--tv-ink);
+  color: var(--tv-ink-muted);
   font: 500 12px/1.5 var(--tv-font-mono);
   overflow-wrap: anywhere;
 }
-.chip code { font: inherit; }
-.chip span { color: var(--tv-ink-muted); font-family: var(--f-sans); }
+.meta:lang(ko) { font-family: var(--f-sans); }
+.meta a { color: var(--tv-ink); }
+
+/* The region's stored coordinates, under "Show full text". */
+.chip {
+  margin: 0 0 4px;
+  color: var(--tv-ink-muted);
+  font: 13px/1.5 var(--f-sans);
+}
+.chip code { color: var(--tv-ink); font: 500 12px/1.5 var(--tv-font-mono); }
 
 .crop { margin: 6px 0 0; }
+
+/* The whole page and every region the reader returned. Ink only: the chosen region is heavier, not coloured. */
+.page { margin: 6px 0 0; }
+.regions {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+/*
+  PR #174 review B2: what the page view paints out is hatched, not dashed -- a dashed box along the
+  frame read as a second border, and dashed means "not chosen" in the s2 workbench above. The box
+  and each region inside it carry fill="url(#specimen-hatch)" (the strip's one <pattern>); CSS sets
+  no fill on them, so the attribute holds.
+*/
+.regions rect { stroke: var(--tv-ink-muted); stroke-width: 1px; }
+.regions rect:not([fill]) { fill: none; }
+.regions rect[data-selected] { stroke: var(--tv-ink); stroke-width: 2px; }
+.regions rect[data-masked] { stroke: none; }
+.defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.hatch { fill: none; stroke: var(--tv-ink-muted); stroke-width: 5; stroke-opacity: 0.6; }
+.legend {
+  margin: 4px 0 0;
+  color: var(--tv-ink-muted);
+  font: 13px/1.5 var(--f-sans);
+}
 
 .frame {
   position: relative;
@@ -104,6 +163,18 @@
 }
 .frame picture { display: block; }
 .frame img { display: block; width: 100%; height: auto; }
+
+/*
+  From 1024px the whole page is held to 280px tall; its frame, and so the region overlay drawn over
+  the frame, shrink to the image. With the page at the cell's full width the four cells made s2
+  1,878px tall at 1440x900 (CI Product QA on 038cfad9, 2026-10-27), past the two viewports
+  e2e/production-hardening.spec.ts allows a scene ("landing scenes flow continuously without
+  artificial viewport oceans"). The crop under it keeps the cell's width.
+*/
+@media (min-width: 1024px) {
+  .page .frame { width: fit-content; max-width: 100%; }
+  .page .frame img { width: auto; max-width: 100%; max-height: 280px; }
+}
 
 /* The reader's region, where the reader put it inside the window. */
 .region {
@@ -117,8 +188,10 @@
 
 /*
   Home makes every link in main a 44px target (source-first-home.module.css), so this one-line
-  caption is a 44px row with its text centred: that is the space between the crop, the caption and
-  the reader's text, and no margin is added to it. UX §3.3's phone budget is spent here.
+  caption is a 44px row with its text centred: that is the space between the crop and its caption,
+  and no margin is added to it. UX §3.3's phone budget is spent here. It names the crop's source
+  only: "As printed" sat here, right above the output, and read as if the output were the print
+  (PR #174 review B3); the output's own label now sits directly above it.
 */
 .source {
   margin: 0;
@@ -160,10 +233,10 @@
   overflow-wrap: anywhere;
 }
 
-.run, .limits {
+/* The output's label directly above the output; under the output, the manifest's limit for this kind of page. */
+.unedited, .limits {
   margin: 0;
   color: var(--tv-ink-muted);
-  font: 13px/1.5 var(--f-sans);
+  font: 500 13px/1.5 var(--f-sans);
 }
-.run a { color: inherit; }
-.limits { margin-top: 4px; color: var(--tv-ink); font-weight: 500; }
+.limits { margin-top: 4px; }

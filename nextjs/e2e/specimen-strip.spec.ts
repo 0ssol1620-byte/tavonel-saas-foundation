@@ -5,7 +5,13 @@ import { SPECIMEN_FIXTURE_COOKIE, SPECIMEN_SLOTS, type SpecimenReceipt } from ".
 
 /*
   P2-08 / UX-L4 (UX-PLAN-2026-10-17 §3.3, §3.4, §3.7; PHASE1-CRITIC-2026-10-17 §5.4): the specimen
-  strip on the Home first screen, read against the consent sheet as it opens.
+  strip on Home.
+
+  hard-proof 2026-10-27 (FINAL-SPEC-HARD-PROOF §2): the strip moved from the first screen to the end
+  of s2, after the source workbench, so the first-screen and consent-sheet geometry it was held to
+  went with the old place; the hero's own specs keep the first screen. What is read here now: the
+  strip's place, the receipt's text byte for byte, the region inside the crop, every region of the
+  receipt over the whole page with the count line, no overflow, and an in-place tab swap.
 
   The strip renders the synthetic receipts in e2e/fixtures/specimens/ only on the local test server
   (a `PLAYWRIGHT_LOCAL_HTTP=1` build, as playwright.config.ts starts it) and only for a request that
@@ -15,11 +21,12 @@ import { SPECIMEN_FIXTURE_COOKIE, SPECIMEN_SLOTS, type SpecimenReceipt } from ".
   cookie must change nothing.
 
   Every scenario sets its own browser and viewport from project 390, the pattern the phone specs
-  use: chromium and webkit at 360x780, 390x844, 430x932 (UX §3.3's three phones) and 1440x900.
+  use: chromium and webkit at 360x780, 390x844, 412x915, 430x932 and 1440x900 (FINAL-SPEC-HARD-PROOF §6).
 
-  P2-32: the committed receipts (lib/specimen-sources.json) render on Vercel previews only
-  (SPECIMEN_STRIP_ROLLOUT "preview"); this server shows them for a request whose cookie says
-  "committed", and the same first-screen acceptance is read against the real crops and text.
+  P2-32: the committed receipts (lib/specimen-sources.json) render on every server since hard-proof
+  2026-10-27 (SPECIMEN_STRIP_ROLLOUT "on"); this server shows them to a request whose cookie says
+  "committed" or that carries no cookie, and the same acceptance is read against the real crops,
+  pages and text. A cookie of "1" still gets the synthetic fixtures here, and only here.
 */
 
 const PRODUCTION_SERVER = process.env.SPECIMEN_SERVER === "production";
@@ -28,12 +35,12 @@ const FIXTURES = readdirSync(FIXTURE_DIR)
   .filter(name => name.endsWith(".json"))
   .map(name => JSON.parse(readFileSync(new URL(name, FIXTURE_DIR), "utf8")) as SpecimenReceipt)
   .sort((a, b) => SPECIMEN_SLOTS.indexOf(a.slot) - SPECIMEN_SLOTS.indexOf(b.slot));
-const COMMITTED = JSON.parse(readFileSync(new URL("../lib/specimen-sources.json", import.meta.url), "utf8")) as SpecimenReceipt[];
-const VIEWPORTS = [[360, 780], [390, 844], [430, 932], [1440, 900]] as const;
+// In the strip's order: slot order, receipt order within a slot (readSpecimens), whatever order the JSON lists them in.
+const COMMITTED = (JSON.parse(readFileSync(new URL("../lib/specimen-sources.json", import.meta.url), "utf8")) as SpecimenReceipt[])
+  .sort((a, b) => SPECIMEN_SLOTS.indexOf(a.slot) - SPECIMEN_SLOTS.indexOf(b.slot));
+const VIEWPORTS = [[360, 780], [390, 844], [412, 915], [430, 932], [1440, 900]] as const;
 const BROWSERS = ["chromium", "webkit"] as const;
 type BrowserName = (typeof BROWSERS)[number];
-/** UX §3.3: the phone sheet's zone is its 96px two-row cap plus the 8px inset. */
-const SHEET_ZONE = 104;
 
 type Box = { top: number; bottom: number; left: number; right: number; width: number; height: number };
 
@@ -109,32 +116,69 @@ function measure(page: Page) {
           return tops.filter((top, index) => index === 0 || top - tops[index - 1]! > 10).length;
         })(),
         firstLine: { top: lines[0]!.top, bottom: lines[0]!.bottom },
-        thirdLine: lines[2] ? { top: lines[2].top, bottom: lines[2].bottom } : null,
+        // PR #174 review B3: the output's label sits directly above the output, under the crop's source line.
+        label: box(cell.querySelector("[data-specimen-label]")!),
+        textTop: box(text).top,
+        // The whole page (committed cells only): every region drawn over it, the chosen one, and the count line.
+        page: (() => {
+          const figure = cell.querySelector("[data-specimen-page]");
+          if (!figure) return null;
+          return {
+            image: box(figure.querySelector("img")!),
+            rects: [...figure.querySelectorAll("rect[data-region]")].map(rect => rect.getAttribute("data-region")),
+            masked: figure.querySelectorAll("rect[data-masked]").length,
+            selected: box(figure.querySelector("rect[data-selected]")!),
+            // PR #174 review B3: the count is part of the cell's one meta line, above the page.
+            count: cell.querySelector("[data-specimen-meta] [data-specimen-count]")!.textContent,
+            metaLines: (() => {
+              const meta = cell.querySelector("[data-specimen-meta]")!;
+              const range = document.createRange();
+              range.selectNodeContents(meta);
+              const centres = [...range.getClientRects()].filter(rect => rect.width > 0).map(rect => rect.top + rect.height / 2).sort((x, y) => x - y);
+              // A new line is a step of more than half a 12px line; the 44px receipt link is centred on the text's line.
+              return centres.filter((centre, index) => index === 0 || centre - centres[index - 1]! > 10).length;
+            })(),
+            // PR #174 review B2: the painted-out boxes are hatched (a pattern fill), never a dashed outline.
+            maskPaint: [...figure.querySelectorAll("rect[data-masked], rect[data-under-mask]")].map(rect => {
+              const style = getComputedStyle(rect);
+              return { fill: style.fill, dash: style.strokeDasharray };
+            }),
+          };
+        })(),
       };
     });
   });
 }
 
-/*
-  "With the consent UI open" (UX §3.1-4, §3.3). On a Home phone the sheet waits while the film,
-  its reading line or the strip's crop and text are in its zone, so it is opened where it may open
-  -- the foot of the page -- and its fixed top is read there. That is the line the first screen is
-  held to.
-*/
-async function sheetTop(page: Page): Promise<number> {
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  const panel = page.locator("section[data-marketing-consent-panel]");
-  await expect(panel).toBeVisible();
-  await panel.evaluate(element => Promise.all(element.getAnimations().map(animation => animation.finished)));
-  const top = await panel.evaluate(element => element.getBoundingClientRect().top);
-  await page.evaluate(() => window.scrollTo(0, 0));
-  return top;
+/** Where the strip is: inside s2, after the source workbench, and not in the hero. */
+function place(page: Page) {
+  return page.evaluate(() => {
+    const strip = document.querySelector("[data-specimen-strip]")!;
+    const bench = document.querySelector("#s2 article[data-source-digest]");
+    return {
+      s1: strip.closest("#s1") !== null,
+      s2: strip.closest("#s2") !== null,
+      afterBench: bench !== null && (bench.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+    };
+  });
+}
+
+/** Lazy images load near the viewport: bring each visible cell's crop and page into view and wait for them. */
+async function loadVisibleImages(page: Page) {
+  const ids = await page.evaluate(() => [...document.querySelectorAll("[data-specimen-cell]")]
+    .filter(cell => getComputedStyle(cell).visibility === "visible").map(cell => cell.getAttribute("data-specimen-cell")!));
+  for (const id of ids) {
+    for (const image of await page.locator(`[data-specimen-cell="${id}"] img`).all()) {
+      await image.scrollIntoViewIfNeeded();
+      await expect.poll(() => image.evaluate(element => (element as HTMLImageElement).complete)).toBe(true);
+    }
+  }
 }
 
 for (const browserName of BROWSERS) {
   for (const [width, height] of VIEWPORTS) {
     for (const path of ["/", "/ko"]) {
-      test(`${browserName} ${width}x${height} ${path}: the crop and the reader's first line are on the first screen, with the fixture's own text`, async ({ playwright, baseURL }, testInfo) => {
+      test(`${browserName} ${width}x${height} ${path}: the strip closes s2 after the workbench, with the fixture's own text`, async ({ playwright, baseURL }, testInfo) => {
         fixturesOnly();
         test.skip(testInfo.project.name !== "390", "sets its own browser and viewport");
         await withPage({ playwright, baseURL }, browserName, { width, height }, path, async page => {
@@ -161,32 +205,11 @@ for (const browserName of BROWSERS) {
           }
           const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
           expect(overflow, "no horizontal overflow").toBeLessThanOrEqual(0);
-
-          const [first] = visible;
-          if (width >= 1024) {
-            // UX §3.2: three cells, each crop and its first three lines above the 900px fold.
-            for (const cell of visible) {
-              expect(cell.image.bottom, `${cell.id} crop above the fold`).toBeLessThanOrEqual(height);
-              expect(cell.thirdLine!.bottom, `${cell.id} third line above the fold`).toBeLessThanOrEqual(height);
-            }
-            return;
-          }
-          const cta = await page.locator('[data-testid="landing-hero-actions"] a').first().boundingBox();
-          const sheet = await sheetTop(page);
-          expect(sheet, "the sheet opens in its zone").toBeGreaterThanOrEqual(height - SHEET_ZONE);
-          testInfo.annotations.push({ type: "geometry", description: JSON.stringify({ browserName, width, path, sheet, cta: cta!.y + cta!.height, crop: first!.image, source: first!.source, firstLine: first!.firstLine }) });
-          expect(cta!.y + cta!.height, "the primary action is above the sheet (UX §3.3)").toBeLessThanOrEqual(sheet);
+          expect(await place(page), "the strip closes s2, after the workbench").toEqual({ s1: false, s2: true, afterBench: true });
           // The short source line is one line (critic §3.2, D-06), and sits between the crop and the text.
-          expect(first!.sourceLines, "the source line is one line").toBe(1);
-          if (width === 360) {
-            // UX §3.3 for 360: at least the crop's top 96px above the sheet.
-            expect(first!.image.top + 96, "96px of the crop above the sheet").toBeLessThanOrEqual(sheet);
-          } else {
-            // The acceptance: at 390 and 430 the crop and the reader's first line are above the sheet.
-            expect(first!.image.bottom, "the crop is above the sheet").toBeLessThanOrEqual(sheet);
-            expect(first!.source.bottom, "the source line is above the sheet").toBeLessThanOrEqual(sheet);
-            expect(first!.firstLine.bottom, "the reader's first line is above the sheet").toBeLessThanOrEqual(sheet);
-          }
+          for (const cell of visible) expect(cell.sourceLines, `${cell.id}: the source line is one line`).toBe(1);
+          // A fixture has no whole page.
+          expect(cells.every(cell => cell.page === null)).toBe(true);
         });
       });
     }
@@ -197,8 +220,9 @@ for (const browserName of BROWSERS) {
       fixturesOnly();
       test.skip(testInfo.project.name !== "390", "sets its own browser and viewport");
       await withPage({ playwright, baseURL }, browserName, { width: 390, height: 844 }, "/", async page => {
+        // The strip closes s2, so what must not move is the next scene.
         const below = () => page.evaluate(() => {
-          const film = document.querySelector("#s1 .compile-film-viewport")!.getBoundingClientRect().top + window.scrollY;
+          const film = document.querySelector("#s3")!.getBoundingClientRect().top + window.scrollY;
           const strip = document.querySelector("[data-specimen-strip]")!.getBoundingClientRect().height;
           return { film, strip };
         });
@@ -228,7 +252,7 @@ for (const browserName of BROWSERS) {
         await expect(tabs.nth(2)).toBeChecked();
         expect(await visibleIds()).toEqual([FIXTURES[2]!.specimenId]);
         const after = await below();
-        expect(Math.abs(after.film - before.film), "the film below does not move").toBeLessThanOrEqual(0.5);
+        expect(Math.abs(after.film - before.film), "the scene below does not move").toBeLessThanOrEqual(0.5);
         expect(Math.abs(after.strip - before.strip), "the strip keeps its height").toBeLessThanOrEqual(0.5);
         const { motion, shift } = await page.evaluate(() => {
           const store = window as unknown as { __motion: string[]; __shift: number };
@@ -288,18 +312,19 @@ for (const browserName of BROWSERS) {
 for (const browserName of BROWSERS) {
   for (const [width, height] of VIEWPORTS) {
     for (const path of ["/", "/ko"]) {
-      test(`${browserName} ${width}x${height} ${path}: the committed crops and the reader's text hold the first screen`, async ({ playwright, baseURL }, testInfo) => {
+      test(`${browserName} ${width}x${height} ${path}: the committed pages, crops and reader's text, every region drawn`, async ({ playwright, baseURL }, testInfo) => {
         fixturesOnly();
         test.skip(testInfo.project.name !== "390", "sets its own browser and viewport");
         await withPage({ playwright, baseURL }, browserName, { width, height }, path, async page => {
           const lang = path === "/ko" ? "ko" : "en";
+          await loadVisibleImages(page);
           const cells = await measure(page);
           expect(cells.map(cell => cell.id)).toEqual(COMMITTED.map(receipt => receipt.specimenId));
           for (const [index, cell] of cells.entries()) {
             const receipt = COMMITTED[index]!;
             expect([cell.text, cell.lang, cell.sourceText, cell.window], cell.id).toEqual([receipt.extractedText, receipt.lang, receipt.caption[lang].short, [...receipt.crop.window1000]]);
-            // The first crop is fetched first (SYNTHESIS §7, LCP); the rest wait.
-            expect(cell.fetchPriority, cell.id).toBe(index === 0 ? "high" : null);
+            // Below the fold: no image in the strip asks for priority (the film poster in s1 does).
+            expect(cell.fetchPriority, cell.id).toBe(null);
           }
           const visible = cells.filter(cell => cell.visible);
           expect(visible.map(cell => cell.id)).toEqual(width >= 1024 ? COMMITTED.map(r => r.specimenId) : [COMMITTED[0]!.specimenId]);
@@ -325,31 +350,45 @@ for (const browserName of BROWSERS) {
               else expect(cell.loaded, `${cell.id} crop decoded`).toBeGreaterThan(0);
             }
             expect(cell.sourceLines, `${cell.id}: the short source line is one line (D-06)`).toBe(1);
+            // Every region the receipt holds is drawn over the whole page, the chosen one where the reader put it.
+            const whole = receipt.fullPage!;
+            expect(cell.page!.rects, `${cell.id} regions`).toEqual(whole.regions.map(region => region.regionId));
+            expect(cell.page!.masked, `${cell.id} kept-out boxes`).toBe(receipt.avoidInCrop.length);
+            const [p0, q0, p1, q1] = receipt.region.bbox1000;
+            const image = cell.page!.image;
+            expect(Math.abs(cell.page!.selected.left - (image.left + (p0 / 1000) * image.width))).toBeLessThanOrEqual(1);
+            expect(Math.abs(cell.page!.selected.top - (image.top + (q0 / 1000) * image.height))).toBeLessThanOrEqual(1);
+            expect(Math.abs(cell.page!.selected.right - (image.left + (p1 / 1000) * image.width))).toBeLessThanOrEqual(1);
+            expect(Math.abs(cell.page!.selected.bottom - (image.top + (q1 / 1000) * image.height))).toBeLessThanOrEqual(1);
+            const count = lang === "ko" ? `영역 ${whole.regions.length}개 · ${whole.seconds}초` : `${whole.regions.length} regions · ${whole.seconds} s`;
+            expect(cell.page!.count!.startsWith(count), `${cell.id} count line "${cell.page!.count}"`).toBe(true);
+          }
+          for (const cell of visible) {
+            expect(cell.label.top, `${cell.id}: the label is under the crop's source line`).toBeGreaterThanOrEqual(cell.source.bottom - 1);
+            expect(cell.textTop, `${cell.id}: the output is under its label`).toBeGreaterThanOrEqual(cell.label.bottom - 1);
+            expect(cell.page!.metaLines, `${cell.id}: the meta line is one line`).toBe(1);
+            for (const paint of cell.page!.maskPaint) {
+              expect(paint.fill, `${cell.id}: a painted-out box is hatched`).toMatch(/url\(.*#specimen-hatch.*\)/);
+              expect(paint.dash, `${cell.id}: and not dashed`).toMatch(/^(?:none|)$/);
+            }
+          }
+          // PR #174 review B1: below 1024px the tabs are one row at their content width, each name on one line, inside the strip.
+          if (width < 1024) {
+            const row = await page.evaluate(() => {
+              const strip = document.querySelector("[data-specimen-strip]")!.getBoundingClientRect();
+              return { right: strip.right, tabs: [...document.querySelectorAll("[data-specimen-strip] label")].map(label => {
+                const { top, right, height } = label.getBoundingClientRect();
+                return { top, right, height, wraps: label.scrollWidth > label.clientWidth + 1 };
+              }) };
+            });
+            expect(new Set(row.tabs.map(tab => Math.round(tab.top))).size, "one row of tabs").toBe(1);
+            expect(new Set(row.tabs.map(tab => Math.round(tab.height))).size, "every tab name on one line").toBe(1);
+            expect(row.tabs.every(tab => !tab.wraps && tab.right <= row.right + 0.5), "every tab inside the strip").toBe(true);
           }
           const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
           expect(overflow, "no horizontal overflow").toBeLessThanOrEqual(0);
-
-          const [first] = visible;
-          if (width >= 1024) {
-            for (const cell of visible) {
-              expect(cell.image.bottom, `${cell.id} crop above the fold`).toBeLessThanOrEqual(height);
-              expect(cell.firstLine.bottom, `${cell.id} reader text above the fold`).toBeLessThanOrEqual(height);
-            }
-            return;
-          }
-          const cta = await page.locator('[data-testid="landing-hero-actions"] a').first().boundingBox();
-          const sheet = await sheetTop(page);
-          expect(sheet, "the sheet opens in its zone").toBeGreaterThanOrEqual(height - SHEET_ZONE);
-          testInfo.annotations.push({ type: "committed-geometry", description: JSON.stringify({ browserName, width, path, sheet, cta: cta!.y + cta!.height, crop: first!.image, source: first!.source, firstLine: first!.firstLine, sheetMargin: sheet - first!.firstLine.bottom }) });
-          expect(cta!.y + cta!.height, "the primary action is above the sheet (UX §3.3)").toBeLessThanOrEqual(sheet);
-          if (width === 360) {
-            expect(first!.image.top + 96, "96px of the crop above the sheet").toBeLessThanOrEqual(sheet);
-          } else {
-            expect(first!.image.bottom, "the crop is above the sheet").toBeLessThanOrEqual(sheet);
-            expect(first!.source.bottom, "the source line is above the sheet").toBeLessThanOrEqual(sheet);
-            // The fixture layout left 13.8px here on WebKit 390 EN (SYNTHESIS §7); the real cell may not leave less.
-            expect(sheet - first!.firstLine.bottom, "the reader's first line clears the sheet by the fixture's margin").toBeGreaterThanOrEqual(13.8);
-          }
+          expect(await place(page), "the strip closes s2, after the workbench").toEqual({ s1: false, s2: true, afterBench: true });
+          testInfo.annotations.push({ type: "committed-geometry", description: JSON.stringify({ browserName, width, path, cells: visible.map(cell => ({ id: cell.id, page: cell.page!.image, crop: cell.image })) }) });
         }, { cookie: "committed" });
       });
     }
@@ -373,7 +412,7 @@ for (const browserName of BROWSERS) {
   });
 }
 
-test("the committed cells' run receipts, extracts and crops are served byte for byte", async ({ request }, testInfo) => {
+test("the committed cells' run receipts, extracts, crops and pages are served byte for byte", async ({ request }, testInfo) => {
   test.skip(testInfo.project.name !== "390", "one request is enough");
   const digest = (bytes: Buffer) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
   for (const receipt of COMMITTED) {
@@ -383,7 +422,7 @@ test("the committed cells' run receipts, extracts and crops are served byte for 
     expect(digest(runBytes)).toBe(receipt.runReceiptSha256);
     const extract = await request.get((JSON.parse(runBytes.toString("utf8")) as { extract: { path: string } }).extract.path);
     expect(digest(await extract.body())).toBe(receipt.extractedPdfSha256);
-    for (const file of [receipt.crop, ...(receipt.crop.sources ?? [])]) {
+    for (const file of [receipt.crop, ...(receipt.crop.sources ?? []), receipt.fullPage!, ...receipt.fullPage!.sources]) {
       expect(digest(await (await request.get(file.path)).body()), file.path).toBe(file.sha256);
     }
   }
@@ -409,32 +448,36 @@ test("the server renders the fixture cells for a request that asks, with no scri
   for (const path of ["/", "/ko"]) {
     const html = await (await request.get(path, { headers: { cookie: `${SPECIMEN_FIXTURE_COOKIE}=1` } })).text();
     expect(html.match(/data-specimen-cell="/g), path).toHaveLength(FIXTURES.length);
-    expect(html).toContain(path === "/" ? "Reader output, unedited" : "원문 그대로");
+    expect(html).toContain(path === "/" ? "Reader output, unedited" : "판독기 출력, 수정 없음");
   }
 });
 
 /*
-  The production half of the acceptance: a request that asks for nothing gets no cell on the test
-  server (it is not a Vercel preview, so the "preview" switch is off there), and a production
-  server renders none whatever the request asks.
+  The production half of the acceptance (FINAL-SPEC-HARD-PROOF §2 Rollout, "on"): a request that asks
+  for nothing gets the committed cells, and a production server renders the committed cells whatever
+  the request asks -- never a synthetic fixture.
 */
-test("with the rollout switch off here, Home renders no specimen cell to a request that does not ask", async ({ request }, testInfo) => {
+test("with the rollout switch on, Home renders the committed cells to a request that does not ask", async ({ request }, testInfo) => {
   test.skip(testInfo.project.name !== "390", "one request is enough");
   for (const path of ["/", "/ko"]) {
     const response = await request.get(path);
     expect(response.status()).toBe(200);
-    expect(await response.text(), path).not.toContain("data-specimen-");
+    const html = await response.text();
+    expect([...html.matchAll(/data-specimen-cell="([^"]+)"/g)].map(match => match[1]), path).toEqual(COMMITTED.map(r => r.specimenId));
+    expect(html, path).not.toContain(path === "/" ? "synthetic fixture" : "합성 픽스처");
   }
 });
 
-test("a production server ignores the fixture cookie and renders no specimen cell", async ({ request }, testInfo) => {
+test("a production server ignores the fixture cookie and renders the committed cells, never a fixture", async ({ request }, testInfo) => {
   test.skip(!PRODUCTION_SERVER, "needs a server started without PLAYWRIGHT_LOCAL_HTTP; run with SPECIMEN_SERVER=production");
   test.skip(testInfo.project.name !== "390", "one request is enough");
   for (const path of ["/", "/ko"]) {
     for (const value of ["1", "committed"]) {
       const response = await request.get(path, { headers: { cookie: `${SPECIMEN_FIXTURE_COOKIE}=${value}` } });
       expect(response.status()).toBe(200);
-      expect(await response.text(), `${path} ${value}`).not.toContain("data-specimen-");
+      const html = await response.text();
+      expect([...html.matchAll(/data-specimen-cell="([^"]+)"/g)].map(match => match[1]), `${path} ${value}`).toEqual(COMMITTED.map(r => r.specimenId));
+      expect(html, `${path} ${value}`).not.toContain(path === "/" ? "synthetic fixture" : "합성 픽스처");
     }
   }
 });

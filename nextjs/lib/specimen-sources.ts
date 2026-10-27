@@ -25,7 +25,13 @@ import committedReceipts from "./specimen-sources.json" with { type: "json" };
   P2-31/P2-32 (register D-03-D-06): two receipts are committed in `specimen-sources.json`, one
   degraded scan and one Korean page (D-04: no table cell until D-29), each read by the deployed OCR
   image on a one-page extract (run receipts under public/proof-collection/specimens/). They render
-  only where `SPECIMEN_STRIP_ROLLOUT` lets them (see `specimenStripLive`). Production renders none.
+  only where `SPECIMEN_STRIP_ROLLOUT` lets them (see `specimenStripLive`); since hard-proof 2026-10-27
+  that is every server, production included.
+
+  hard-proof 2026-10-27 (FINAL-SPEC-HARD-PROOF §2): a production receipt also carries `fullPage`, the whole
+  page the reader ran on with every region it returned, so the strip draws all of them and not one;
+  a slot holds any number of cells (the table slot will hold two), in receipt order; and a slot
+  `drawing` joins for schematic pages.
 
   FIXTURES. The synthetic receipts in `e2e/fixtures/specimens/` render only on the local test
   server (`PLAYWRIGHT_LOCAL_HTTP=1`, which no deployment sets) and only for a request that asks for
@@ -33,7 +39,8 @@ import committedReceipts from "./specimen-sources.json" with { type: "json" };
   word, so a fixture cannot become a specimen by being copied into the committed list either.
 */
 
-export const SPECIMEN_SLOTS = ["degraded_scan", "table", "korean"] as const;
+/* The strip's order (FINAL-SPEC-HARD-PROOF §2): drawing, table, degraded scan, Korean. */
+export const SPECIMEN_SLOTS = ["drawing", "table", "degraded_scan", "korean"] as const;
 export type SpecimenSlot = (typeof SPECIMEN_SLOTS)[number];
 export type SpecimenMode = "production" | "fixture";
 
@@ -69,24 +76,50 @@ export type SpecimenReceipt = {
   mustNotImply: string[];
   /** D-06: a one-line source beside the crop, and the approved full line (§4.4) under "Show full text". */
   caption: Record<"en" | "ko", { short: string; full: string }>;
-  /** D-05: what must stay out of the crop (insignia, symbols, third-party matter); the window may meet none. */
-  avoidInCrop: { label: string; bbox1000: Bbox1000 }[];
+  /**
+   * D-05: what must stay out of the crop (insignia, symbols, third-party matter); the window may meet none.
+   * `legend` (production): the label's own subject, short, in both languages -- what the strip names
+   * under a whole page where the box is painted out (hatched), so the hatching says why it is there.
+   */
+  avoidInCrop: { label: string; legend?: Record<"en" | "ko", string>; bbox1000: Bbox1000 }[];
   /** The reader's own region, as it returned it. Never widened to fit the crop. */
   region: { regionId: string; bbox1000: Bbox1000 };
   /** A window of the source page in the cell's ratio, holding the region. */
   /** `sources` (production only): the same window as AVIF, offered first by <picture>; `path` is the fallback. */
   crop: { path: string; sha256: string; width: number; height: number; bytes: number; window1000: Bbox1000; sources?: CropSource[] };
+  /** The whole page (production only): required there, absent from a fixture. Not `page`, the page number above. */
+  fullPage?: SpecimenPage;
   /** The reader's output for the region, byte for byte: errors and spacing are not corrected. */
   extractedText: string;
   reader: { id: "foundation_ocr_gpu_v1"; imageDigest: string };
   runAt: string;
   runReceiptSha256: string;
   runReceiptUrl: string;
-  /** Capability manifest tokens, printed through `capabilityTokenLabel`. */
+  /** Capability manifest tokens, printed through `capabilityTokenLabel` (EN) and `SPECIMEN_LIMIT_LABEL_KO` (KO). */
   limitationTokens: string[];
 };
 
+/*
+  The Korean label of each limitation token a cell may carry: /ko prints the manifest's limit in Korean,
+  not the English label (PR #174 review B4). A token with no label here is refused by specimenProblem,
+  so a new token cannot reach /ko in English.
+*/
+export const SPECIMEN_LIMIT_LABEL_KO: Readonly<Record<string, string>> = {
+  no_native_structure_reader_yet: "원본 구조 판독기 없음",
+  no_table_or_formula_extraction: "표·수식은 추출하지 않음",
+};
+
 export type CropSource = { path: string; type: "image/avif"; sha256: string; width: number; height: number; bytes: number };
+/**
+ * The page the reader ran on, whole: `path` is the WEBP fallback and `sources` the AVIF encodings, the
+ * same image. Every `avoidInCrop` box is painted out of its pixels (`method` says how), because the
+ * page view cannot keep a window clear of them. `regions` are every region the run receipt holds, in
+ * the reader's order, and `seconds` the run's own time; the strip prints both as they are here.
+ */
+export type SpecimenPage = {
+  path: string; sha256: string; width: number; height: number; bytes: number; sources: CropSource[];
+  method: string; regions: { regionId: string; bbox1000: Bbox1000 }[]; seconds: number;
+};
 export type Specimen = SpecimenReceipt & { cropSrc: string; synthetic: boolean };
 export type SpecimenRejection = { id: string; reason: string };
 
@@ -95,15 +128,21 @@ export const COMMITTED_SPECIMENS: readonly unknown[] = committedReceipts;
 
 /*
   The rollout switch for the committed cells (P2-32). Code-owned: turning them on everywhere is a
-  reviewed one-line change to "on", made after the founder has seen a preview deployment.
+  reviewed one-line change to "on".
 
-  "preview" (today): Vercel preview deployments render the committed cells, so the founder can see
-  them live; Vercel production renders none, and neither does any other server -- except the
-  Playwright test server for a request that asks with SPECIMEN_FIXTURE_COOKIE=committed. Both of
-  Vercel's own variables must say so (VERCEL=1, VERCEL_ENV=preview): a missing one is not a preview,
-  and the unit-test runner, which sets VERCEL_ENV=preview alone (vitest.config.ts), renders nothing.
+  "on" (since hard-proof 2026-10-27, FINAL-SPEC-HARD-PROOF §2 Rollout, under the founder's 2026-10-27
+  instruction and the 2026-10-17 delegation; founder veto open): every server renders the committed
+  cells to every request, Vercel production included. On the Playwright test server a request that
+  asks with SPECIMEN_FIXTURE_COOKIE=1 still gets the synthetic fixtures instead.
+
+  "preview" (the posture before): Vercel preview deployments render the committed cells and nothing
+  else does, except the Playwright test server for a request that asks with
+  SPECIMEN_FIXTURE_COOKIE=committed. Both of Vercel's own variables must say so (VERCEL=1,
+  VERCEL_ENV=preview): a missing one is not a preview, and the unit-test runner, which sets
+  VERCEL_ENV=preview alone (vitest.config.ts), renders nothing. "off" renders the committed cells
+  nowhere. Either is the one-line rollback.
 */
-export const SPECIMEN_STRIP_ROLLOUT: "off" | "preview" | "on" = "preview";
+export const SPECIMEN_STRIP_ROLLOUT: "off" | "preview" | "on" = "on";
 
 export function specimenStripLive(
   env: Record<string, string | undefined> = process.env,
@@ -128,6 +167,17 @@ export const SPECIMEN_FIXTURE_COOKIE = "tavonel.specimen-fixture";
 
 /** UX §3.4: at most 45 KB a cell. */
 export const MAX_CROP_BYTES = 45_000;
+
+/*
+  At most 60,000 B for each encoding of a whole page (FINAL-SPEC-HARD-PROOF §2), measured
+  2026-10-27 on the two committed pages, masked, at the settings their receipts' `method` names
+  (AVIF q35 e6 at 720 / 960 px, WEBP q80 e6 at 480 px, sharp 0.35.4):
+    naca-rm-l50c03-p001       WEBP 480  28,076   AVIF 720  24,314   AVIF 960  35,451
+    kma-2026-09-climate-p001  WEBP 480  48,828   AVIF 720  40,494   AVIF 960  56,565
+  The crop settings (AVIF q55 e4) put the KMA page at 81,407 B at 960 px. A denser page is encoded
+  at a lower AVIF quality, recorded in its own `method`; the cap is not raised to fit it.
+*/
+export const MAX_PAGE_BYTES = 60_000;
 
 const SHA = /^sha256:[0-9a-f]{64}$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -157,7 +207,53 @@ const integerBox = (value: unknown): value is Bbox1000 =>
   Array.isArray(value) && value.every(Number.isInteger) && isSourceRegionBox(value);
 const inside = (inner: Bbox1000, outer: Bbox1000) =>
   inner[0] >= outer[0] && inner[1] >= outer[1] && inner[2] <= outer[2] && inner[3] <= outer[3];
-const meets = (a: Bbox1000, b: Bbox1000) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+export const meets = (a: Bbox1000, b: Bbox1000) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+const positive = (value: unknown) => Number.isInteger(value) && (value as number) >= 1;
+
+/**
+ * Why a list of AVIF encodings is not the image `base` names, or null. `slack` is the rounding, in
+ * pixels of height, an encoding resized from the full-resolution page may differ from the fallback's
+ * ratio by; a crop's encodings are cut to the ratio exactly.
+ */
+function sourcesProblem(what: "crop" | "page", sources: unknown, base: Rec, max: number, slack: number): string | null {
+  if (!Array.isArray(sources) || sources.length === 0) return `${what}.sources is not a list of encodings`;
+  const widths = new Set<number>();
+  for (const source of sources as Record<string, unknown>[]) {
+    if (!CROP_PATH.production.test(String(source?.path)) || !String(source.path).endsWith(".avif")) return `a ${what} source is not a production AVIF path`;
+    if (source.type !== "image/avif") return `a ${what} source is not image/avif`;
+    if (!SHA.test(String(source.sha256))) return `a ${what} source sha256 is not a sha256 digest`;
+    if (!positive(source.width) || !positive(source.height) || !positive(source.bytes)) return `a ${what} source size is not positive integers`;
+    // The same window: the aspect ratio is the fallback's, so the region outline holds on every encoding.
+    if (Math.abs((source.width as number) * (base.height as number) - (source.height as number) * (base.width as number)) > slack * (base.width as number)) {
+      return `a ${what} source is not the ${what}'s aspect ratio`;
+    }
+    if ((source.bytes as number) > max) return `a ${what} source is over ${max} bytes`;
+    if (widths.has(source.width as number)) return `two ${what} sources share a width`;
+    widths.add(source.width as number);
+  }
+  return null;
+}
+
+/** Why a receipt's whole page does not hold, or null. */
+function pageProblem(page: Rec, region: { regionId: string; bbox1000: Bbox1000 }): string | null {
+  if (!CROP_PATH.production.test(String(page.path)) || !String(page.path).endsWith(".webp")) return "fullPage.path is not a production WEBP path";
+  if (!SHA.test(String(page.sha256))) return "fullPage.sha256 is not a sha256 digest";
+  for (const key of ["width", "height", "bytes"]) if (!positive(page[key])) return `fullPage.${key} is not a positive integer`;
+  if ((page.bytes as number) > MAX_PAGE_BYTES) return `fullPage is over ${MAX_PAGE_BYTES} bytes`;
+  const sources = sourcesProblem("page", page.sources, page, MAX_PAGE_BYTES, 2);
+  if (sources) return sources;
+  if (!filled(page.method)) return "fullPage.method is empty";
+  const regions = page.regions;
+  if (!Array.isArray(regions) || regions.length === 0 || !regions.every(item => filled(rec(item)?.regionId) && integerBox(rec(item)?.bbox1000))) {
+    return "fullPage.regions is not a list of reader regions";
+  }
+  const ids = (regions as { regionId: string }[]).map(item => item.regionId);
+  if (new Set(ids).size !== ids.length) return "fullPage.regions names a region twice";
+  const chosen = (regions as { regionId: string; bbox1000: Bbox1000 }[]).find(item => item.regionId === region.regionId);
+  if (!chosen || chosen.bbox1000.join() !== region.bbox1000.join()) return "the reader region is not one of fullPage.regions";
+  if (typeof page.seconds !== "number" || !Number.isFinite(page.seconds) || page.seconds <= 0) return "fullPage.seconds is not a positive number";
+  return null;
+}
 
 /** Why a receipt may not render, or null when every field holds. */
 export function specimenProblem(raw: unknown, mode: SpecimenMode): string | null {
@@ -220,19 +316,8 @@ export function specimenProblem(raw: unknown, mode: SpecimenMode): string | null
   if (!integerBox(crop.window1000)) return "crop.window1000 is not a region box";
   if (crop.sources !== undefined) {
     if (mode !== "production") return "a fixture crop carries no sources";
-    if (!Array.isArray(crop.sources) || crop.sources.length === 0) return "crop.sources is not a list of encodings";
-    const widths = new Set<number>();
-    for (const source of crop.sources as Record<string, unknown>[]) {
-      if (!CROP_PATH.production.test(String(source?.path)) || !String(source.path).endsWith(".avif")) return "a crop source is not a production AVIF path";
-      if (source.type !== "image/avif") return "a crop source is not image/avif";
-      if (!SHA.test(String(source.sha256))) return "a crop source sha256 is not a sha256 digest";
-      if (!Number.isInteger(source.width) || !Number.isInteger(source.height) || (source.width as number) < 1 || (source.height as number) < 1 || !Number.isInteger(source.bytes) || (source.bytes as number) < 1) return "a crop source size is not positive integers";
-      // The same window: the aspect ratio is the fallback's, so the region outline holds on every encoding.
-      if ((source.width as number) * (crop.height as number) !== (source.height as number) * (crop.width as number)) return "a crop source is not the crop's aspect ratio";
-      if ((source.bytes as number) > MAX_CROP_BYTES) return `a crop source is over ${MAX_CROP_BYTES} bytes`;
-      if (widths.has(source.width as number)) return "two crop sources share a width";
-      widths.add(source.width as number);
-    }
+    const sources = sourcesProblem("crop", crop.sources, crop, MAX_CROP_BYTES, 0);
+    if (sources) return sources;
   }
   if (!inside(region.bbox1000, crop.window1000)) return "the reader region is not inside the crop window";
   const avoid = s.avoidInCrop;
@@ -242,6 +327,16 @@ export function specimenProblem(raw: unknown, mode: SpecimenMode): string | null
   if (mode === "production" && avoid.length === 0) return "avoidInCrop is empty";
   const met = (avoid as { label: string; bbox1000: Bbox1000 }[]).find(item => meets(item.bbox1000, crop.window1000 as Bbox1000));
   if (met) return `the crop window meets ${met.label}`;
+  if (mode === "production" && !avoid.every(item => filled(rec(rec(item)?.legend)?.en) && filled(rec(rec(item)?.legend)?.ko))) {
+    return "an avoidInCrop box has no legend in en and ko";
+  }
+  if (mode === "fixture" && s.fullPage !== undefined) return "a fixture carries no fullPage";
+  if (mode === "production") {
+    const fullPage = rec(s.fullPage);
+    if (!fullPage) return "fullPage is missing";
+    const problem = pageProblem(fullPage, region as { regionId: string; bbox1000: Bbox1000 });
+    if (problem) return problem;
+  }
 
   const reader = rec(s.reader);
   if (reader?.id !== "foundation_ocr_gpu_v1" || !SHA.test(String(reader.imageDigest))) return "reader is not the pinned OCR image";
@@ -252,6 +347,8 @@ export function specimenProblem(raw: unknown, mode: SpecimenMode): string | null
   if (!Array.isArray(tokens) || !tokens.every(token => typeof token === "string" && PDF_LIMITATIONS.has(token))) {
     return "a limitation token is not one the PDF manifest entry carries";
   }
+  const unlabelled = (tokens as string[]).find(token => !Object.hasOwn(SPECIMEN_LIMIT_LABEL_KO, token));
+  if (unlabelled) return `the limitation token ${unlabelled} has no Korean label`;
   // The table cell shows a page with a table, and the reader returns its lines, never its cells.
   if (s.slot === "table" && !tokens.includes("no_table_or_formula_extraction")) {
     return "the table slot does not carry no_table_or_formula_extraction";
@@ -267,7 +364,7 @@ export function cropDigestProblem(receipt: Pick<SpecimenReceipt, "crop">, bytes:
 }
 
 /**
- * The cells that may render, in slot order, one per slot; and every receipt refused, with why.
+ * The cells that may render, in slot order (receipt order within a slot); and every receipt refused, with why.
  *
  * `cropBytes` is given for fixtures, whose crops are read here and inlined. A committed crop is a
  * public file the server function cannot read, so `specimen-sources.test.ts` checks its bytes.
@@ -293,7 +390,7 @@ export function readSpecimens(
         reason = `crop could not be read: ${(error as Error).message}`;
       }
     }
-    if (!reason && specimens.some(cell => cell.slot === receipt.slot)) reason = `a second receipt for slot ${receipt.slot}`;
+    if (!reason && specimens.some(cell => cell.specimenId === receipt.specimenId)) reason = "a second receipt with this specimenId";
     if (reason) rejected.push({ id, reason });
     else specimens.push({ ...receipt, cropSrc, synthetic: receipt.representationKind === "synthetic_fixture" });
   }

@@ -369,10 +369,10 @@ function homeCase(): EvidenceCase {
 }
 
 /*
-  P2-32. Production renders no specimen strip (SPECIMEN_STRIP_ROLLOUT "preview"), so every test in
-  this file reads the production posture. This one renders the preview posture -- the page a
-  Vercel preview serves, and the page every deployment serves once the switch reads "on" -- and
-  holds it to the same composition rules, so that flipping the switch changes no test here.
+  P2-32. Since hard-proof 2026-10-27 production renders the specimen strip (SPECIMEN_STRIP_ROLLOUT
+  "on"), so every test in this file reads a page with it. This one stubs a Vercel preview, the
+  posture it was written for while the switch read "preview", and holds the strip to the same
+  composition rules; with the switch "on" the preview page and the production page are the same.
 */
 describe("landing v2 -- the composition with the specimen strip rendered", () => {
   afterEach(() => vi.unstubAllEnvs());
@@ -382,7 +382,7 @@ describe("landing v2 -- the composition with the specimen strip rendered", () =>
     vi.stubEnv("VERCEL_ENV", "preview");
     const page = render(locale);
     const main = mainOf(page);
-    expect([...main.matchAll(/data-specimen-cell="([^"]+)"/g)].map(match => match[1])).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+    expect([...main.matchAll(/data-specimen-cell="([^"]+)"/g)].map(match => match[1])).toEqual(["nasa-sp-5079-p039", "nasa-sp-5079-p074", "naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
     expect(undeclaredText(main)).not.toMatch(/\d/);
     const hero = sceneOf(main, "s1");
     for (const open of elements(main, "img")) {
@@ -394,21 +394,28 @@ describe("landing v2 -- the composition with the specimen strip rendered", () =>
     for (const absent of ["Landsat", "USGS", "NASA", "Cloud = No", "Collection 1"]) expect(readable(withoutSpecimens(main))).not.toContain(absent);
     // F-1: no FAQ on Home, so the strip's own licence line is each cell's full attribution (P2-32, D-06).
     expect(main).not.toContain("data-home-reader-guide");
-    expect(main.match(/data-specimen-licence=""/g)).toHaveLength(2);
-    // The strip's first crop is the first screen's priority image; the film poster below it loads lazily, unpreloaded.
+    expect(main.match(/data-specimen-licence=""/g)).toHaveLength(4);
+    /*
+      hard-proof 2026-10-27 (FINAL-SPEC-HARD-PROOF §2): the strip closes s2, after the workbench, so s1 is the same
+      in both postures -- the film poster is the first screen's one priority image and is preloaded -- and nothing
+      from s2 on asks for priority.
+    */
     const poster = elements(hero, "img").filter(open => open.includes("compile-film-still"));
     expect(poster).toHaveLength(1);
-    expect([attr(poster[0]!, "loading"), attr(poster[0]!, "fetchpriority")]).toEqual(["lazy", undefined]);
+    expect([attr(poster[0]!, "loading"), attr(poster[0]!, "fetchpriority")]).toEqual(["eager", "high"]);
     // The whole render, not <main>: React writes a preload() hint ahead of the content (merge review A2).
     const posterPreload = /<link[^>]*rel="preload"[^>]*poster-1/;
-    expect(page).not.toMatch(posterPreload);
+    expect(page).toMatch(posterPreload);
     expect(elements(hero, "img").filter(open => attr(open, "fetchpriority") === "high")).toHaveLength(1);
-    // The strip sits between the hero's actions and the film (D-03), and the film is unchanged below it.
-    expect(hero.indexOf("data-specimen-strip")).toBeGreaterThan(hero.indexOf('data-testid="landing-hero-actions"'));
-    expect(hero.indexOf("data-specimen-strip")).toBeLessThan(hero.indexOf("compile-film"));
-    // The same check finds the hint where it belongs: the production posture preloads the poster.
+    expect(hero).not.toContain("data-specimen-strip");
+    const source = sceneOf(main, "s2");
+    expect(source.indexOf("data-specimen-strip")).toBeGreaterThan(source.indexOf("data-source-digest"));
+    expect(main.slice(main.indexOf('<section id="s2"'))).not.toMatch(/fetchpriority="high"/i);
+    // No heading of its own: the page keeps six h2 with the strip rendered.
+    expect(main.match(/<h2[\s>]/g)).toHaveLength(6);
+    // The hero is the production posture's, byte for byte.
     vi.unstubAllEnvs();
-    expect(render(locale)).toMatch(posterPreload);
+    expect(sceneOf(mainOf(render(locale)), "s1")).toBe(hero);
   });
 });
 

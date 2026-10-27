@@ -269,3 +269,50 @@ test("Korean pricing carries the selected plan into the inquiry", async ({ page 
   await expect(page.locator("[data-plan-intent]")).toHaveText("Developer 요금제 문의");
   await expect(page.locator('input[name="plan"]')).toHaveValue("Developer");
 });
+
+/*
+  Home's word budgets (FINAL-SPEC 2026-10-26 §9: fold <= 35, EN <= 520, KO <= 460), RE-DERIVED by
+  FINAL-SPEC-HARD-PROOF-2026-10-27 §2 -- not raised to go green. The 2026-10-26 budgets were set before the
+  specimen strip rendered; its cells are data labels (page, region count and time, source, the reader's text).
+  Rule: the built page's measured words + 10; the fold budget is unchanged (the strip is below it).
+  Measurement, 2026-10-27, hard-proof lane B: production build of codex/hard-proof-20261027 with the strip
+  "on", chromium, r3.cjs PAGE_METRICS (redesign-20261026 R3 tools) -- body = body.innerText words minus the
+  consent panel, details closed; fold = visible text words inside <main> on the first viewport. Receipt:
+  outputs/tavonel-research-replan-20261013/hard-proof-20261027/impl/MEASURE.json in the Core repository.
+    1440x900  EN fold 30, body 694 (strip 178)   KO fold 25, body 604 (strip 166)   h2 6
+    390x844   EN fold 30, body 552               KO fold 25, body 475
+  Budgets then: EN body 704, KO body 614.
+  Re-measured after PR #174 review round 1 (the strip's cells lost the "As printed" caption, the coordinate chip
+  and the run line; same build posture, same method, same receipt file), so re-derived DOWN by the same rule:
+    1440x900  EN fold 30, body 649 (strip 133)   KO fold 25, body 554 (strip 116)   h2 6
+    390x844   EN fold 30, body 538               KO fold 25, body 458
+  Budgets: EN body 659, KO body 564 at 1440x900 (every cell shows there); fold 35 at 1440x900 and 390x844.
+*/
+const WORD_BUDGET = { "/": { fold: 35, body: 659 }, "/ko": { fold: 35, body: 564 } } as const;
+for (const route of ["/", "/ko"] as const) {
+  test(`${route} stays within its re-derived word budget, with six h2`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "1440" && testInfo.project.name !== "390", "measured at 1440x900 (fold and body) and 390x844 (fold)");
+    await page.goto(route);
+    await page.evaluate(() => document.fonts.ready);
+    const words = await page.evaluate(() => {
+      const count = (text: string | null) => (text ?? "").trim().split(/\s+/).filter(Boolean).length;
+      const consentSelector = "[data-marketing-consent-panel], [data-consent-anchor-panel], [role='region'][aria-label*='onsent'], [aria-labelledby*='consent']";
+      let fold = 0;
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const parent = node.parentElement;
+        if (!parent || !node.textContent?.trim() || parent.closest("script,style,noscript,template") || parent.closest(consentSelector)) continue;
+        const style = getComputedStyle(parent);
+        if (style.display === "none" || style.visibility === "hidden") continue;
+        const range = document.createRange(); range.selectNodeContents(node);
+        const box = range.getBoundingClientRect();
+        if ((box.width || box.height) && box.top < innerHeight && box.bottom > 0 && parent.closest("main") && !parent.closest("header")) fold += count(node.textContent);
+      }
+      const consent = document.querySelector<HTMLElement>("[data-marketing-consent-panel]");
+      return { fold, body: count(document.body.innerText) - (consent ? count(consent.innerText) : 0), h2: document.querySelectorAll("h2").length };
+    });
+    expect(words.fold, `${route} fold words`).toBeLessThanOrEqual(WORD_BUDGET[route].fold);
+    if (testInfo.project.name === "1440") expect(words.body, `${route} body words`).toBeLessThanOrEqual(WORD_BUDGET[route].body);
+    expect(words.h2).toBe(6);
+  });
+}

@@ -150,6 +150,8 @@ export default function LandingAnalytics({ variant }: { variant?: LandingVariant
       decision A, so counts before and after it are not directly comparable; the date is recorded in
       CLM-043's evidence. The strip renders only with a committed reader receipt (none yet), so on
       this deployment the arm has nothing to match and the population is unchanged until one lands.
+      MOVED 2026-10-27 (hard-proof, FINAL-SPEC-HARD-PROOF §2): the strip now closes scene 02, so the
+      arm reads #s2; what it counts is unchanged.
 
       Pointer and keyboard focus alike, because both controls are reachable both ways and an event
       that counted only the mouse would report the keyboard path as unused. `trackFunnelOnce` is
@@ -158,7 +160,7 @@ export default function LandingAnalytics({ variant }: { variant?: LandingVariant
     const onDemo = (event: Event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
-      if (target.closest("#s1 [data-source-inspection-film] button, #s1 .compile-film-sequence button, #s2 .compile-film-sequence button, #s2 [data-compiler-specimen] button, #s2 [data-source-digest] button[aria-pressed][aria-controls], #s1 [data-specimen-strip] label, #s1 [data-specimen-strip] summary")) {
+      if (target.closest("#s1 [data-source-inspection-film] button, #s1 .compile-film-sequence button, #s2 .compile-film-sequence button, #s2 [data-compiler-specimen] button, #s2 [data-source-digest] button[aria-pressed][aria-controls], #s2 [data-specimen-strip] label, #s2 [data-specimen-strip] summary")) {
         trackFunnelOnce("hero_demo_interact", arm);
       }
     };

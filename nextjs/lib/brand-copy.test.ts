@@ -3,6 +3,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { activationPolicy } from "./activation-policy";
+import { canonicalize, sha256 } from "./collection-compiler";
+import { COMPILER_RELEASE, COMPILER_RELEASE_DEFINITION } from "./compiler-release";
 import { primaryCallToAction } from "./commercial-state";
 import { EXPLORE_COPY } from "./explore-story";
 import {
@@ -1684,5 +1686,86 @@ describe("the site's own vocabulary", () => {
       chrome,
       "the header takes the resolved action rather than a component that guesses it"
     ).not.toContain("PublicPrimaryCta");
+  });
+});
+
+/*
+  Compiler 1 (hard-proof 2026-10-27, FINAL-SPEC-HARD-PROOF §1; NAMING-T1 §5): the name of a pinned
+  compiler release, never of a model. TAVONEL trains no model, attaches no accuracy figure to the
+  name, and does not name a product or engine "T1" -- in the v4 trust ladder (masterplan §2.7)
+  "T1 PARSED" is the lowest usable tier, so "T1" on a receipt would read as "tier 1, unreviewed".
+
+  Swept over the source of app/, components/, lib/ and ../shared, tests excepted (a test names the
+  phrase it bars, as this one does). "T1" alone is not barred: the page-template ids
+  (template="T1", T1-T5) and the work ids in comments (T1-006, T1-014) were here first and name
+  nothing a reader buys. What is barred is "T1" beside a product noun.
+*/
+const COMPILER_NAME_BARS: readonly (readonly [RegExp, string])[] = [
+  [/\bCompiler 1(?:'s|’s|의)?\s+(?:model|모델)/i, "Compiler 1 is a release, not a model"],
+  [/\bCompiler 1(?:'s|’s|의)?\s+(?:accuracy|정확도)/i, "no accuracy figure is attached to the release name"],
+  [/\btrained\b/i, "TAVONEL trains no model"],
+  [/\b(?:TAVONEL|compiler|engine|release|reader)\s+T1\b|\bT1\s+(?:compiler|engine|model|release|reader|parser)\b/i, "T1 is not a product or engine name"],
+];
+
+function compilerNameSources(directory: string, found: string[] = []): string[] {
+  for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
+    const path = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) compilerNameSources(path, found);
+    else if (/\.(?:tsx?|mjs|js|css|json|md)$/.test(entry.name) && !/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(entry.name)) found.push(path);
+  }
+  return found;
+}
+
+const compilerNameViolations = (source: string) =>
+  COMPILER_NAME_BARS.filter(([bar]) => bar.test(source)).map(([, why]) => why);
+
+describe("Compiler 1, the release name", () => {
+  const sources = ["app", "components", "lib", "../shared"].flatMap((directory) => compilerNameSources(directory));
+
+  it("walks every source directory it guards", () => {
+    for (const path of ["lib/compiler-release.ts", "components/changelog-list.tsx", "app/benchmarks/gdp-pdf/page.tsx", "../shared/capabilityManifest.ts"]) {
+      expect(sources, path).toContain(path);
+    }
+  });
+
+  it.each(["app", "components", "lib", "../shared"])("keeps %s free of a model, an accuracy figure, training and T1 as a product name", (directory) => {
+    const found = sources
+      .filter((path) => path.startsWith(`${directory}/`))
+      .flatMap((path) => compilerNameViolations(read(path)).map((why) => `${path}: ${why}`));
+    expect(found).toEqual([]);
+  });
+
+  /* A guard that matches nothing passes everything: each bar catches the phrase it is for, and lets the existing ids through. */
+  it("catches each barred form and passes the template and work ids", () => {
+    expect(compilerNameViolations("the Compiler 1 model")).toEqual(["Compiler 1 is a release, not a model"]);
+    expect(compilerNameViolations("Compiler 1의 정확도")).toEqual(["no accuracy figure is attached to the release name"]);
+    expect(compilerNameViolations("a parser trained on filings")).toEqual(["TAVONEL trains no model"]);
+    expect(compilerNameViolations("TAVONEL T1 reads it")).toEqual(["T1 is not a product or engine name"]);
+    expect(compilerNameViolations("the T1 engine")).toEqual(["T1 is not a product or engine name"]);
+    for (const allowed of ['<PublicSitePage template="T1">', "the T1-T5 H1", "T1-014: the footer", "/knowledge-compiler (T1)", "Compiler 1은 모델이 아니라", "not used for training"]) {
+      expect(compilerNameViolations(allowed), allowed).toEqual([]);
+    }
+  });
+
+  it("defines the name in one sentence a language, within the word budget, and says it is not a model", () => {
+    expect(COMPILER_RELEASE_DEFINITION.en.split(/\s+/)).toHaveLength(25);
+    expect(COMPILER_RELEASE_DEFINITION.ko.split(/\s+/).length).toBeLessThanOrEqual(25);
+    expect(COMPILER_RELEASE_DEFINITION.en.startsWith(`${COMPILER_RELEASE.name} is a pinned TAVONEL compiler release, not a model:`)).toBe(true);
+    expect(COMPILER_RELEASE_DEFINITION.ko.startsWith(`${COMPILER_RELEASE.name}은 모델이 아니라`)).toBe(true);
+  });
+
+  it("identifies the release by the digest of its pins", () => {
+    expect(COMPILER_RELEASE.digest).toBe(`sha256:${sha256(canonicalize(COMPILER_RELEASE.pins))}`);
+    const { ocrImageDigest, coreReleaseDigest, engineRelease, modelSha256 } = COMPILER_RELEASE.pins;
+    for (const pin of [ocrImageDigest, coreReleaseDigest]) expect(pin).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(Object.keys(modelSha256).length).toBeGreaterThan(0);
+    for (const hex of Object.values(modelSha256)) expect(hex).toMatch(/^[0-9a-f]{64}$/);
+    // hard-proof 2026-10-27: the reader pins are read from the run receipts that recorded the reader's /health, never typed.
+    for (const receipt of ["nasa-sp-5079-p039", "nasa-sp-5079-p074"]) {
+      const run = JSON.parse(read(`public/proof-collection/specimens/${receipt}.run.json`)) as {
+        reader: { imageDigest: string; engineRelease: string; modelSha256: Record<string, string> };
+      };
+      expect([run.reader.imageDigest, run.reader.engineRelease, run.reader.modelSha256], receipt).toEqual([ocrImageDigest, engineRelease, modelSha256]);
+    }
   });
 });

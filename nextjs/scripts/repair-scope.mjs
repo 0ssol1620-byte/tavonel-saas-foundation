@@ -2093,7 +2093,8 @@ export const TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES = Object.freeze([
 // Specimen strip (P2-08, B-04/B-06; P2-31/P2-32): the strip, its fail-closed receipt contract and suite, the three synthetic
 // fixtures with their crops, the browser spec, and the two committed receipts with their ten served files (WEBP crop, two AVIF
 // encodings, one-page extract and run receipt each, under public/proof-collection/specimens/), and the collection's PROVENANCE.md, which the
-// receipt-contract suite holds to those receipts. Exactly these twenty-three paths select the receipt-contract suite, the
+// receipt-contract suite holds to those receipts. hard-proof 2026-10-27 (C4) adds each committed cell's whole page (a 480 px WEBP and
+// 720 / 960 px AVIF, -page-*) and lane B the two NASA SP-5079 cells (p039, p074), eight files each. Exactly these forty-five paths select the receipt-contract suite, the
 // Home composition suite (which renders the committed cells in the preview posture) and the specimen-strip browser suite (390 only:
 // every test in the spec skips outside project 390, because each one sets its own browser and viewport or needs one request; a 1440
 // row selects a file with no executed test, which the report reader refuses). Product UI, so never nativeReuse.
@@ -2114,19 +2115,57 @@ export const SPECIMEN_STRIP_AFFECTED_PATHS = Object.freeze([
   'public/proof-collection/specimens/kma-2026-09-climate-p001-720.avif',
   'public/proof-collection/specimens/kma-2026-09-climate-p001-960.avif',
   'public/proof-collection/specimens/kma-2026-09-climate-p001-960.webp',
+  'public/proof-collection/specimens/kma-2026-09-climate-p001-page-480.webp',
+  'public/proof-collection/specimens/kma-2026-09-climate-p001-page-720.avif',
+  'public/proof-collection/specimens/kma-2026-09-climate-p001-page-960.avif',
   'public/proof-collection/specimens/kma-2026-09-climate-p001.pdf',
   'public/proof-collection/specimens/kma-2026-09-climate-p001.run.json',
   'public/proof-collection/specimens/naca-rm-l50c03-p001-720.avif',
   'public/proof-collection/specimens/naca-rm-l50c03-p001-960.avif',
   'public/proof-collection/specimens/naca-rm-l50c03-p001-960.webp',
+  'public/proof-collection/specimens/naca-rm-l50c03-p001-page-480.webp',
+  'public/proof-collection/specimens/naca-rm-l50c03-p001-page-720.avif',
+  'public/proof-collection/specimens/naca-rm-l50c03-p001-page-960.avif',
   'public/proof-collection/specimens/naca-rm-l50c03-p001.pdf',
   'public/proof-collection/specimens/naca-rm-l50c03-p001.run.json',
+  'public/proof-collection/specimens/nasa-sp-5079-p039-720.avif',
+  'public/proof-collection/specimens/nasa-sp-5079-p039-960.avif',
+  'public/proof-collection/specimens/nasa-sp-5079-p039-960.webp',
+  'public/proof-collection/specimens/nasa-sp-5079-p039-page-480.webp',
+  'public/proof-collection/specimens/nasa-sp-5079-p039-page-720.avif',
+  'public/proof-collection/specimens/nasa-sp-5079-p039-page-960.avif',
+  'public/proof-collection/specimens/nasa-sp-5079-p039.pdf',
+  'public/proof-collection/specimens/nasa-sp-5079-p039.run.json',
+  'public/proof-collection/specimens/nasa-sp-5079-p074-720.avif',
+  'public/proof-collection/specimens/nasa-sp-5079-p074-960.avif',
+  'public/proof-collection/specimens/nasa-sp-5079-p074-960.webp',
+  'public/proof-collection/specimens/nasa-sp-5079-p074-page-480.webp',
+  'public/proof-collection/specimens/nasa-sp-5079-p074-page-720.avif',
+  'public/proof-collection/specimens/nasa-sp-5079-p074-page-960.avif',
+  'public/proof-collection/specimens/nasa-sp-5079-p074.pdf',
+  'public/proof-collection/specimens/nasa-sp-5079-p074.run.json',
 ]);
 export const SPECIMEN_STRIP_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/landing-v2-page.test.ts',
   'lib/specimen-sources.test.ts',
 ]);
 export const SPECIMEN_STRIP_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/specimen-strip.spec.ts']);
+// GDP.pdf runs (hard-proof 2026-10-27, C1): the list of published run reports newest first, its suite, and the reserved path of
+// the next report (content/benchmarks/*.json is eol=lf, like v2). Exactly these three paths select the list's suite, the
+// marketing-story suite (the Home GDP block reads the same list) and the two browser suites that read /benchmarks/gdp-pdf. The page
+// and its stylesheet keep public-marketing-surface; v2's report itself never changes and stays unmapped, so an edit to it fails closed.
+export const GDP_PDF_RUNS_AFFECTED_PATHS = Object.freeze([
+  'content/benchmarks/gdp-pdf-v3.json',
+  'lib/gdp-pdf-page-data.test.ts',
+  'lib/gdp-pdf-page-data.ts',
+]);
+export const GDP_PDF_RUNS_AFFECTED_UNIT_FILES = Object.freeze(['lib/gdp-pdf-page-data.test.ts', 'lib/marketing-story.test.ts']);
+export const GDP_PDF_RUNS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmarks.spec.ts', 'e2e/marketing-story.spec.ts']);
+// Compiler 1 (hard-proof 2026-10-27, C3): the one release record. It is read by the changelog list, the GDP.pdf receipt row and the
+// copy guard, so it selects those three suites and the two browser suites that open /benchmarks/gdp-pdf and /changelog.
+export const COMPILER_RELEASE_AFFECTED_PATHS = Object.freeze(['lib/compiler-release.ts']);
+export const COMPILER_RELEASE_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/changelog.test.ts', 'lib/gdp-pdf-page-data.test.ts']);
+export const COMPILER_RELEASE_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmarks.spec.ts', 'e2e/templates.spec.ts']);
 // Launch QA and release scripts (P2-02 script ratchet, P2-17 release-decision check): the Lighthouse budget script and its ratchet
 // suite, the read-only release-gate check, its Node suite and the Vitest wrapper that runs that suite here. Exactly these five
 // paths select the ratchet, client-route-weight and wrapper suites; no browser, database or build lane. Never nativeReuse.
@@ -2775,6 +2814,12 @@ export const AFFECTED_GROUPS = Object.freeze([
   // specimen-strip: the 23 exact paths above select 2 direct suites and 1 browser suite.
   affectedGroup('specimen-strip', new RegExp(`^nextjs/(?:${exactPathAlternation(SPECIMEN_STRIP_AFFECTED_PATHS)})$`),
     { unitFiles: SPECIMEN_STRIP_AFFECTED_UNIT_FILES, browserFiles: SPECIMEN_STRIP_AFFECTED_BROWSER_FILES }),
+  // gdp-pdf-runs: the 3 exact paths above select 2 direct suites and 2 browser suites.
+  affectedGroup('gdp-pdf-runs', new RegExp(`^nextjs/(?:${exactPathAlternation(GDP_PDF_RUNS_AFFECTED_PATHS)})$`),
+    { unitFiles: GDP_PDF_RUNS_AFFECTED_UNIT_FILES, browserFiles: GDP_PDF_RUNS_AFFECTED_BROWSER_FILES }),
+  // compiler-release: 1 exact path selects 3 direct suites and 2 browser suites.
+  affectedGroup('compiler-release', new RegExp(`^nextjs/(?:${exactPathAlternation(COMPILER_RELEASE_AFFECTED_PATHS)})$`),
+    { unitFiles: COMPILER_RELEASE_AFFECTED_UNIT_FILES, browserFiles: COMPILER_RELEASE_AFFECTED_BROWSER_FILES }),
   // launch-qa-release-scripts: the 5 exact paths above select 3 direct suites and no browser suite.
   affectedGroup('launch-qa-release-scripts', new RegExp(`^nextjs/(?:${exactPathAlternation(LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS)})$`),
     { unitFiles: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES }),
