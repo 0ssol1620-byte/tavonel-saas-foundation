@@ -13,7 +13,9 @@
  * D-05 (docs/adr/0006): a production row recorded with a gate-surface digest also covers every SHA
  * whose own digest is equal. The check computes the SHA's digest from the local Git history
  * (scripts/gate-surface.mjs) and sends the gate's own OR query; a covered SHA is reported
- * `released` with `inheritedFrom` naming the revision the founder recorded. When the digest cannot
+ * `released` with `inheritedFrom` naming the revision the founder recorded, but only after the row's
+ * digest is recomputed from that revision and matches; otherwise it is `surface_mismatch`, not
+ * released (a digest pasted from another build, or a revision not fetched here). When the digest cannot
  * be computed (commit not fetched, or older than the rules file) `gateSurfaceSha256` is null and
  * only the exact SHA is read, which can report `missing` for a covered SHA but never `released`
  * for an uncovered one.
@@ -24,7 +26,8 @@
  *   pnpm release:gate-check --sha <40 hex> [--scope direct_upload] [--scope connector] [--warn-days 7]
  *
  * Exit 0: every requested scope is released for the SHA and none expires inside the window.
- * Exit 1: a requested scope is missing, refused, invalid, expired, qualification-only or expiring.
+ * Exit 1: a requested scope is missing, refused, invalid, surface-mismatched, expired, qualification-only
+ *         or expiring.
  * Exit 2: the check could not run (arguments, credentials, store). No report is printed then, so a
  *         store outage is never reported as a missing release.
  */
@@ -61,7 +64,7 @@ const latestFirst = (a, b) =>
   desc(time(a.evaluated_at), time(b.evaluated_at));
 const iso = (ms) => (Number.isFinite(ms) ? new Date(ms).toISOString() : null);
 
-function checkScope(scope, sha, rows, now, warnMs, surface) {
+function checkScope(scope, sha, rows, now, warnMs, surface, surfaceOfCommit) {
   const required = gate.requiredReleaseEvidence(scope);
   const row = rows.filter((entry) => entry && entry.scope === scope && (entry.release_revision === sha ||
     (surface !== null && entry.gate_surface_sha256 === surface)))
@@ -97,6 +100,18 @@ function checkScope(scope, sha, rows, now, warnMs, surface) {
     return { scope, status: "qualification_only", code: "SCOPED_RELEASE_QUALIFICATION_ONLY",
       workspaceKey: release.qualification.workspaceId, missingFacts: [...release.missing], ...timing };
   }
+  if (release.releaseRevision !== sha) {
+    // The DB and the gate trust the digest the founder typed into the row. Before reporting an
+    // inheritance, check that it is the digest of the row's own revision: a digest pasted from
+    // another deployment's build log would otherwise open a surface nobody released. A revision
+    // that is not fetched here cannot be checked, and an unchecked inheritance is not reported.
+    const recomputed = surfaceOfCommit(release.releaseRevision);
+    if (recomputed !== row.gate_surface_sha256) {
+      return { scope, status: "surface_mismatch", code: "SCOPED_RELEASE_SURFACE_MISMATCH",
+        inheritedFrom: release.releaseRevision, recordedGateSurfaceSha256: row.gate_surface_sha256,
+        recomputedGateSurfaceSha256: recomputed };
+    }
+  }
   return { scope, status: expires - now.getTime() <= warnMs ? "expiring" : "released", ...timing,
     ...(release.releaseRevision === sha ? {} : { inheritedFrom: release.releaseRevision }) };
 }
@@ -104,11 +119,14 @@ function checkScope(scope, sha, rows, now, warnMs, surface) {
 /**
  * Pure: release-decision rows, one SHA and that SHA's gate-surface digest (or null) in, report out.
  * Rows naming neither the SHA nor the digest, and rows for other scopes, are ignored.
+ * `surfaceOfCommit` recomputes an inherited row's own digest (local Git by default).
  */
-export function checkReleaseGate({ rows, sha, scopes, now, warnDays = DEFAULT_WARN_DAYS, gateSurfaceSha256 = null }) {
+export function checkReleaseGate({ rows, sha, scopes, now, warnDays = DEFAULT_WARN_DAYS, gateSurfaceSha256 = null,
+  surfaceOfCommit = (revision) => gateSurfaceOfCommit(repositoryRoot, revision) }) {
   if (!REVISION.test(sha)) throw new Error("--sha must be a 40-character lowercase hex Git SHA");
   if (!Array.isArray(rows)) throw new Error("rows must be an array");
-  const checked = scopes.map((scope) => checkScope(scope, sha, rows, now, warnDays * DAY, gateSurfaceSha256));
+  const checked = scopes.map((scope) =>
+    checkScope(scope, sha, rows, now, warnDays * DAY, gateSurfaceSha256, surfaceOfCommit));
   const missingScopes = checked.filter((entry) => entry.status !== "released" && entry.status !== "expiring")
     .map((entry) => entry.scope);
   const expiringScopes = checked.filter((entry) => entry.status === "expiring").map((entry) => entry.scope);

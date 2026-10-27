@@ -1,12 +1,15 @@
 {
   "schemaVersion": "tavonel.gate_surface.v1",
-  "comment": "Paths that cannot change what the server does with customer data, nor the consent, upload, source, key or account UI in front of it: docs, tests, static media and the public landing, benchmark and changelog pages. Every other tracked path, this file and gate-surface.mjs included, is the gate surface. Shipped code on this list may not fetch, read process.env, run on the server-only side or import supabase or node: modules (release-gate-check.test.mjs). Widening this list changes the digest, so it needs a new founder release once. docs/adr/0006-release-continuity-by-gate-surface.md.",
+  "comment": "Paths that cannot change what the server does with customer data, nor the consent, upload, source, key or account UI in front of it: docs, tests, static media and the public landing, benchmark and changelog pages. Every other tracked path, this file and gate-surface.mjs included, is the gate surface. Shipped code on this list may not fetch, read process.env, run on the server-only side, or import supabase, node: modules, shared/ gate code or the grant, admission, intake and release-store modules (release-gate-check.test.mjs); that test, its vitest wrapper and the developer setup and safety contract under public/developer/ are surface, so weakening them moves the digest. Widening this list changes the digest, so it needs a new founder release once. docs/adr/0006-release-continuity-by-gate-surface.md.",
   "alwaysSurface": [
     "^docs/policy/",
     "^nextjs/public/policy/",
     "^nextjs/public/\\.well-known/",
     "/route\\.(ts|tsx|js|mjs)$",
-    "^nextjs/scripts/gate-surface"
+    "^nextjs/scripts/gate-surface",
+    "^nextjs/scripts/release-gate-check\\.test\\.mjs$",
+    "^nextjs/lib/release-gate-check-script\\.test\\.ts$",
+    "^nextjs/public/developer/"
   ],
   "presentational": [
     "^docs/",

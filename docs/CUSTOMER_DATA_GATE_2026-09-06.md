@@ -670,9 +670,15 @@ PR #174는 게이트 코드를 하나도 바꾸지 않았다. 오늘의 규칙�
 `nextjs/scripts/release-gate-check.test.mjs`(gate-surface 테스트 포함)가 다음을 고정한다.
 
 - 표면 경로가 바뀐 배포는 상속하지 않는다.
-- 동의·업로드·원본·키·계정 컴포넌트, 전역 CSS, `public/developer/` 클라이언트는 표면이다. presentational 배포
-  코드는 `fetch`, `process.env`, `supabase`, `node:` 같은 서버·네트워크 경로를 쓸 수 없다.
-- preview·로컬 빌드, `VERCEL_GIT_COMMIT_SHA`가 없거나 `HEAD`와 다른 빌드, git이 없는 빌드는 digest가 없다.
+- 동의·업로드·원본·키·계정 컴포넌트, 전역 CSS, `public/developer/` 폴더 전체, presentational 가드 테스트는
+  표면이다. presentational 배포 코드는 `fetch`, `process.env`, `supabase`, `node:` 같은 서버·네트워크 경로도,
+  `shared/`와 grant·admission·intake·release store 모듈 import도 쓸 수 없다.
+- 표면 digest는 단사다(v2, 항목마다 JSON 배열 한 줄). LF가 든 경로로 표면 파일을 지우거나 더한 트리는 다른
+  digest를 낸다. UTF-8이 아닌 경로가 있는 트리는 digest가 없다(합성 트리와 실제 Git 커밋 양쪽 회귀 테스트).
+- preview·로컬 빌드, `VERCEL_GIT_COMMIT_SHA`가 없거나 `HEAD`와 다른 빌드, git이 없는 빌드, 작업 트리가 깨끗하지
+  않은 빌드는 digest가 없다.
+- `release-gate-check`는 상속 행의 digest를 그 revision에서 다시 계산한다. 다르거나 계산할 수 없으면
+  `surface_mismatch`이고 released가 아니다.
 - 30일이 지난 출시는 상속해도 열리지 않는다.
 - 표면을 이름 붙인 나중의 거절이 상속을 끝낸다. 출시한 SHA로 rollback해도 닫혀 있다.
 - 상속 중일 수 있는 SHA를 표면 없이 거절하면 DB가 거부한다.

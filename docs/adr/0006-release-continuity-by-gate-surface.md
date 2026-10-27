@@ -31,16 +31,32 @@ gate v2에서 출시 결정(`customer_data_release_decisions`)과 작업공간 g
    presentational은 고객 데이터를 서버가 어떻게 다루는지도, 그 앞의 동의·업로드·원본·키·계정 화면도 바꿀 수
    없는 경로로 한정한다(R1 보안 리뷰 B1). 문서, 테스트와 e2e, 정적 미디어, `nextjs/components/landing-v2/`,
    `nextjs/app/(benchmarks|changelog)/`, 그리고 페이지 데이터 파일 몇 개다. 나머지 컴포넌트, 전역 CSS,
-   `nextjs/content/`, `public/developer/`의 고객 실행 클라이언트, 서버 쪽 specimen reader는 표면이다.
+   `nextjs/content/`, 서버 쪽 specimen reader는 표면이다. `nextjs/public/developer/`는 `.md`를 포함해
+   폴더 전체가 표면이다. 고객이 따르는 설치·안전 계약 문서가 거기 있기 때문이다(R2 보안 리뷰 S4).
    presentational 목록에 걸리는 배포 코드는 `fetch`, `sendBeacon`, `process.env`, `"use server"`,
-   `server-only`, `supabase`, `node:` import를 쓸 수 없다. `release-gate-check.test.mjs`가 막는다.
-2. **digest.** `git ls-tree -r <sha>`의 (mode, type, blob id, path) 중 표면에 속한 줄을 정렬해
-   sha256을 낸다(`tavonel.gate_surface.v1`). 작업 트리 바이트가 아니라 blob id를 쓰므로, Windows
+   `server-only`, `supabase`, `node:` import를 쓸 수 없다. `shared/`(순수 데이터 `shared/capabilityManifest`만
+   예외), grant·admission·intake·release store 모듈, `*-gate` lib 모듈도 import할 수 없다(R2 보안 리뷰 S3).
+   `release-gate-check.test.mjs`가 막는다. 이 테스트와 그 vitest wrapper(`lib/release-gate-check-script.test.ts`)는
+   `alwaysSurface`에 있다. 그래서 가드를 약하게 바꾸면 digest가 바뀐다(R2 보안 리뷰 S2).
+2. **digest.** `git ls-tree -r -z <sha>`의 (mode, type, blob id, path) 중 표면에 속한 항목을 하나씩
+   JSON 배열 `[mode,type,object,path]` 한 줄로 쓰고, 줄을 정렬해 sha256을 낸다
+   (`tavonel.gate_surface_digest.v2`). 작업 트리 바이트가 아니라 blob id를 쓰므로, Windows
    CRLF 체크아웃과 Vercel 빌드가 같은 값을 낸다. 규칙은 **그 커밋 안의** 규칙 파일에서 읽는다. 따라서
    digest는 커밋 하나만으로 정해진다. 규칙 파일이 없는 커밋(이 PR 이전 전부)은 `null`이다.
+   - **단사성.** `-z` 레코드는 NUL로 끝나고 Git 경로에는 NUL이 없다. mode, type, object에는 탭도 공백도
+     없으므로 첫 탭이 경계다. `JSON.stringify`는 LF를 포함한 모든 제어 문자를 escape한다. 그래서 어느 줄에도
+     날 LF가 없고, LF로 나누면 줄이 정확히 복원되며, 각 줄은 자기 항목 하나로만 parse된다. 정렬된 줄 목록과
+     표면 항목의 multiset은 일대일이다. 경로가 UTF-8로 손실 없이 decode되지 않으면(fatal decoder) 그 트리는
+     `null`이다. 손실 decode는 서로 다른 바이트 경로 둘을 같은 문자열로 만들 수 있기 때문이다.
+   - v1(`d8b3ec3c`까지)은 `mode type object<TAB>path` 줄을 LF로 이었다. LF가 든 경로 하나가 이웃 줄
+     여럿을 흉내 낼 수 있어서, 표면 파일을 지우거나 더해도 digest가 같았다(R2 보안 리뷰 S1). 회귀 테스트가
+     합성 트리와 실제 Git 커밋 양쪽에서 이 충돌을 재현하고, v2가 두 트리를 구별하는지 확인한다.
 3. **배포가 자기 digest를 안다.** `nextjs/next.config.mjs`가 빌드할 때 자기 커밋의 digest를 계산하고
    `env.TAVONEL_GATE_SURFACE_SHA256`로 inline한다. Vercel production 빌드(`VERCEL_ENV=production`)가
    아니거나, `VERCEL_GIT_COMMIT_SHA`가 없거나 `HEAD`와 다르거나, git이 없거나, 규칙 파일이 없으면 `""`이다.
+   `git status --porcelain`이 비어 있지 않아도 `""`이다. digest는 HEAD의 blob id에서 나오므로, 수정된 추적
+   파일이나 추적하지 않는 파일이 있는 작업 트리(로컬 `vercel build --prod` 뒤 `--prebuilt` 배포 등)는 자기가
+   빌드한 바이트를 주장할 수 없다(R2 보안 리뷰 S6).
    그래서 push만 한 브랜치의 preview 빌드는 production 출시를 이어받지 못한다(R1 보안 리뷰 B2). 그러면 상속은 없고 지금과 똑같이 정확한 SHA의 행만 읽는다.
    빌드 로그에 `customer-data gate surface: …` 한 줄을 남긴다.
 4. **출시 행이 표면을 이름 붙인다.** 새 열 `gate_surface_sha256`(migration `20261027120000`)은
@@ -68,7 +84,9 @@ gate v2에서 출시 결정(`customer_data_release_decisions`)과 작업공간 g
    - 허용되고 30일이 안 지난 표면 출시가 있으면 그 scope에서 qualification을 받지 않는다
      (`qualification_over_surface_release`). qualification은 자기 SHA의 최신 행이 되므로, 상속받은
      배포 위에서 다른 모든 작업공간을 닫는다. 20260930070000의 이유가 revision을 넘어 적용된 것이다.
-   - 기록 전에 읽는 문장은 READ COMMITTED에서만 받는다. 기존 규칙과 같다.
+   - 기록 전에 읽는 문장은 READ COMMITTED에서만 받는다. 기존 규칙과 같다. 다른 격리 수준의 qualification은
+     `qualification_requires_read_committed`(이름 그대로), 표면 없는 production 거절은
+     `refusal_requires_read_committed`로 거부한다.
 
 ## 검토한 선택지
 
@@ -93,15 +111,23 @@ gate v2에서 출시 결정(`customer_data_release_decisions`)과 작업공간 g
 - **qualification 그림자.** trigger가 막는다(위 7).
 - **거절 우회.** 표면을 적지 않은 거절도 자기 revision의 표면을 물려받고, 상속 중일 수 있는 SHA의 표면 없는
   거절은 DB가 거부한다(위 7).
+- **정규화 충돌.** LF가 든 경로로 표면 파일을 몰래 지우거나 더하는 공격은 digest v2의 JSON 줄 인코딩이
+  막는다(위 2). UTF-8이 아닌 경로가 있는 트리는 digest가 없다.
 - **preview 빌드.** production 빌드만 digest를 주장하므로, 병합하지 않은 브랜치의 preview는 상속하지 않는다. 리더는 "가장 최근 행" 규칙 하나만 쓴다.
 - **만료.** 상속은 원래 행의 `evaluated_at`을 쓴다. 30일 한도, grant 만료, `founder_approval_receipt_recorded`의
   30일 신선도 규칙이 전부 그대로다.
 
 ## 남는 한계
 
-- **presentational 코드는 같은 origin에서 돈다.** `landing-v2/`와 benchmarks·changelog 페이지는 동의 route와
-  같은 origin의 브라우저에서 실행된다. 금지 토큰 테스트는 실수를 막는 장치이지 import 그래프 증명이 아니다.
-  표면 모듈을 import해서 새로 호출하는 변경은 잡지 못한다. 이 경로의 변경도 독립 리뷰를 거친다.
+- **presentational 코드는 같은 origin에서, 서버에서도 돈다.** `landing-v2/`는 동의 route와 같은 origin의
+  브라우저에서 실행되고, benchmarks·changelog의 `page.tsx`는 server component라 서버에서도 실행된다. 금지 토큰
+  테스트는 게이트·grant·admission·intake·release store 모듈과 `shared/`의 직접 import를 막는다. 그래도 import
+  그래프 증명은 아니다. 허용된 표면 모듈이 다시 게이트 모듈을 부르는 간접 경로나, 정규식이 못 읽는 import
+  형태는 잡지 못한다. 이 경로의 변경도 독립 리뷰를 거친다.
+- **runbook의 digest 대조는 기록 뒤에도 한다.** DB와 gate는 행에 적힌 digest를 믿는다. `release-gate-check`는
+  상속을 보고하기 전에 그 행 `release_revision`의 digest를 로컬 Git으로 다시 계산한다. 다르거나 계산할 수
+  없으면 `surface_mismatch`(released 아님)로 보고한다(R2 보안 리뷰 S5). 런타임 gate는 git이 없어 이 대조를
+  하지 못한다. 그래서 잘못 붙여 넣은 digest는 운영자가 check를 돌릴 때 드러난다.
 
 - **보수적인 목록.** 오늘의 규칙을 최근 `main` 병합 16개(`4252bead`까지)에 적용하면 3개(#173, #171, #158)가
   상속한다. R1 리뷰 전 목록으로는 #174를 더해 4개였다. 목록을 좁힌 뒤 #174는 상속하지 않는다. 전역 CSS

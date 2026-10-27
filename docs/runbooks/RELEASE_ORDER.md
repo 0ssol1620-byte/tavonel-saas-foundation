@@ -145,9 +145,13 @@ NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
 - 표면 경로를 하나라도 바꾼 배포는 digest가 달라서 아무것도 상속하지 않는다. 이전처럼 그 SHA에 대한 새 기록이
   필요하다. 표면에는 migration, `shared/`, `nextjs/lib/`의 서버 코드, API route, 의존성, 정책 문서, 규칙 파일
   자체가 들어간다. 동의·업로드·원본·키·계정 화면을 포함한 `landing-v2/` 밖의 모든 컴포넌트, 전역 CSS,
-  `nextjs/content/`, 고객이 내려받아 실행하는 `public/developer/` 클라이언트도 표면이다.
-- Vercel **production** 빌드만 digest를 주장한다. preview와 로컬 빌드는 `none`이고 정확한 SHA만 읽는다.
-  그래서 push만 한 브랜치는 production 출시를 이어받지 못한다.
+  `nextjs/content/`, 그리고 `public/developer/` 폴더 전체(고객이 실행하는 클라이언트와 설치·안전 계약 `.md`)도
+  표면이다. presentational 가드 테스트(`scripts/release-gate-check.test.mjs`)와 그 wrapper도 표면이다.
+- Vercel **production** 빌드이고 작업 트리가 깨끗할 때(`git status --porcelain`이 빔)만 digest를 주장한다.
+  preview와 로컬 빌드, 수정되거나 추적하지 않는 파일이 있는 빌드는 `none`이고 정확한 SHA만 읽는다.
+  그래서 push만 한 브랜치나 로컬에서 `--prebuilt`로 올린 빌드는 production 출시를 이어받지 못한다.
+- digest는 v2 형식(`tavonel.gate_surface_digest.v2`, 표면 항목마다 JSON 배열 한 줄)이다. `d8b3ec3c`까지의 v1 형식으로
+  계산해 둔 값은 쓰지 않는다. 값은 늘 아래 명령으로 다시 계산한다.
 - 결정은 여전히 가장 최근 행이다. 대상은 이 SHA를 이름 붙인 행과 이 표면을 이름 붙인 행이다. 표면을
   적지 않은 거절은 그 revision 자기 행의 표면을 물려받는다. 자기 표면 행이 없는 SHA, 즉 상속 중일 수 있는
   SHA를 표면 없이 거절하면 DB가 `refusal_requires_surface`로 거부한다. 그 SHA만 닫으면 다음 같은 표면 배포나
@@ -175,6 +179,10 @@ NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
 5. `pnpm release:gate-check --sha <배포 SHA>`가 exit 0인지 본다. 상속한 SHA는 `released`이고
    `inheritedFrom`에 창업자가 기록한 SHA가 찍힌다. 보고서 맨 위의 `gateSurfaceSha256`이 `null`이면
    그 커밋을 fetch하지 않았거나 규칙 파일 이전 커밋이다. 그때는 정확한 SHA만 읽으므로, 덮인 SHA도 `missing`으로 보일 수 있다.
+   상속을 보고하기 전에 check는 행의 `release_revision` digest를 로컬 Git으로 다시 계산한다. 결과가 행의
+   `gate_surface_sha256`과 다르거나, 그 revision을 fetch하지 않아 계산할 수 없으면 `surface_mismatch`
+   (`SCOPED_RELEASE_SURFACE_MISMATCH`)이고 exit 1이다. 앞의 경우는 다른 빌드의 digest를 붙여 넣은 행이다.
+   그 표면을 거절하고(아래 "거절") 올바른 digest로 다시 기록한다. 뒤의 경우는 `git fetch` 뒤 다시 돌린다.
 
 migration은 다시 적용할 수 없다. 두 번째 적용은 `column "gate_surface_sha256" already exists`로 실패하고
 `begin/commit` 안에서 통째로 롤백된다. SQL editor에 두 번 붙여 넣어도 상태는 바뀌지 않는다.
@@ -182,11 +190,23 @@ migration은 다시 적용할 수 없다. 두 번째 적용은 `column "gate_sur
 ### 거절 (표면 출시 기간)
 
 1. `pnpm release:gate-check --sha <거절할 배포 SHA>`를 실행하고 보고서 맨 위의 `gateSurfaceSha256`을 본다.
+   DB 자격 증명 없이 digest만 필요하면 `cd nextjs; node scripts/gate-surface.mjs --sha <거절할 배포 SHA>`로 바로
+   계산한다. 긴급 거절이 digest를 찾느라 늦어지지 않게 하는 명령이다.
 2. 값이 있으면 거절 행의 `gate_surface_sha256`에 그 값을 넣어 기록한다. **창업자 작업.** 그러면 이 SHA와 같은
    표면의 모든 배포, 그리고 출시한 SHA로의 rollback이 닫힌다.
+   - trigger가 이것을 강제하지 않는 경우가 하나 있다. 그 SHA가 표면 출시보다 **새로운** 자기 행(표면 없는 정확한
+     출시)을 가지면 DB는 표면 없는 거절도 받는다. 그 SHA만 닫히고, 같은 표면의 다른 배포와 출시한 SHA로의
+     rollback은 표면 출시를 계속 읽는다. 열린 쪽으로 새는 것은 아니지만(정확한 SHA 시절과 같은 의미), 표면 전체를
+     닫으려면 이 경우에도 값을 넣어 기록한다.
 3. 값이 `null`이면(규칙 파일 이전 커밋) 그 배포는 표면을 읽지 않는다. 표면 없이 거절해서 DB가
    `refusal_requires_surface`로 거부하면, 살아 있는 표면 출시의 digest를 넣어 거절한다. 그 표면 전체가 닫힌다.
    닫힌 쪽이다. 필요한 배포는 그 뒤에 다시 기록한다.
+4. 거절은 READ COMMITTED(SQL editor 기본값)에서 기록한다. 다른 격리 수준이면 DB가 표면 없는 거절을
+   `refusal_requires_read_committed`로, qualification을 `qualification_requires_read_committed`로 거부한다.
+
+표면 없이 기록된 예전 정확한 SHA 거절은, 같은 표면을 이름 붙인 **나중의** 허용 출시에 진다. 최신 행이 결정이라는
+규칙 그대로다. 표면이 같으므로 창업자의 새 결정이 같은 코드에 대한 것이다. 예전 거절을 유지하려면 그 표면을
+넣어 다시 거절한다.
 
 ### 하지 말 것
 

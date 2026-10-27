@@ -22,7 +22,9 @@
 --   * no qualification while an allowed, unexpired surface release exists for the scope: a
 --     qualification is the latest row for its SHA, so over an inherited release it would close every
 --     other workspace (the 20260930070000 rationale, across revisions);
---   * statements that read before inserting run only under READ COMMITTED, as before.
+--   * statements that read before inserting run only under READ COMMITTED, as before: a qualification
+--     outside it is qualification_requires_read_committed (unchanged), a surface-less production
+--     refusal outside it is refusal_requires_read_committed.
 --
 -- Additive: existing rows have no digest and behave exactly as before; production receipt digests
 -- without a surface are byte-identical. Code before this migration never selects the column. Code
@@ -52,10 +54,13 @@ begin
     hashtextextended('customer_data_release_decisions:' || new.scope || ':' || new.release_revision, 0));
   -- Decision order is acquisition order, not transaction start time or caller-supplied history.
   new.recorded_at := clock_timestamp();
-  if new.stage = 'qualification'
-    or (new.stage = 'production' and not new.allowed and new.gate_surface_sha256 is null) then
-    if current_setting('transaction_isolation') <> 'read committed' then
+  -- Both reads below must see rows committed while this writer waited on the locks above.
+  if current_setting('transaction_isolation') <> 'read committed' then
+    if new.stage = 'qualification' then
       raise exception 'qualification_requires_read_committed';
+    end if;
+    if new.stage = 'production' and not new.allowed and new.gate_surface_sha256 is null then
+      raise exception 'refusal_requires_read_committed';
     end if;
   end if;
   if new.stage = 'production' and not new.allowed and new.gate_surface_sha256 is null then

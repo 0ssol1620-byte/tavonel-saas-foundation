@@ -11,10 +11,20 @@ import { parseArgs } from "node:util";
  * Windows CRLF checkout and the Vercel build agree. A production release recorded with this digest
  * also covers a deployment whose own digest is equal. Anything that cannot be computed is null,
  * and null inherits nothing: the gate then needs a release for the exact SHA, as before.
+ *
+ * The hashed text is injective in the surface entries. `git ls-tree -z` ends each record with NUL,
+ * which no Git path can contain; mode, type and object hold neither tab nor space, so the first tab
+ * ends them. Each surface entry is then one JSON array [mode, type, object, path]: JSON.stringify
+ * escapes every control character, LF included, so no line holds a raw LF, the lines split back
+ * exactly and each parses back to its own entry. A path that is not valid UTF-8 cannot be decoded
+ * without loss, so that tree has no digest. (Digest v1 joined raw `mode type object<TAB>path` text
+ * with LF, and one path holding LF could stand in for neighbouring entries: two trees, one digest.)
  */
 export const GATE_SURFACE_RULES_PATH = "nextjs/scripts/gate-surface-rules.json";
 const REVISION = /^[0-9a-f]{40}$/;
 const SCHEMA = "tavonel.gate_surface.v1";
+/** The hashed text's own version; v2 is one JSON array per surface entry. */
+const DIGEST_SCHEMA = "tavonel.gate_surface_digest.v2";
 
 /** Pure. `rules` as in gate-surface-rules.json; `tree` is `git ls-tree -r -z --full-tree` output. */
 export function gateSurfaceDigest(rules, tree) {
@@ -23,25 +33,29 @@ export function gateSurfaceDigest(rules, tree) {
   const always = rules.alwaysSurface.map((source) => new RegExp(source));
   const presentational = rules.presentational.map((source) => new RegExp(source));
   const lines = [];
+  let rulesFile = false;
   for (const record of tree.split("\0").filter(Boolean)) {
     const tab = record.indexOf("\t");
-    const [mode, type, object] = record.slice(0, tab).split(" ");
+    const [mode, type, object, extra] = record.slice(0, tab).split(" ");
     const path = record.slice(tab + 1);
-    if (tab < 0 || !mode || !type || !object) return null;
+    if (tab < 0 || !mode || !type || !object || extra !== undefined || !path) return null;
     if (always.some((rule) => rule.test(path)) || !presentational.some((rule) => rule.test(path))) {
-      lines.push(`${mode} ${type} ${object}\t${path}`);
+      lines.push(JSON.stringify([mode, type, object, path]));
+      rulesFile ||= path === GATE_SURFACE_RULES_PATH;
     }
   }
-  if (!lines.some((line) => line.endsWith(`\t${GATE_SURFACE_RULES_PATH}`))) return null;
+  if (!rulesFile) return null;
   lines.sort();
-  return `sha256:${createHash("sha256").update(`${SCHEMA}\n${lines.join("\n")}\n`).digest("hex")}`;
+  return `sha256:${createHash("sha256").update(`${DIGEST_SCHEMA}\n${lines.join("\n")}\n`).digest("hex")}`;
 }
 
 /** The digest of one commit in `repositoryRoot`, or null (no git, unknown commit, no rules file). */
 export function gateSurfaceOfCommit(repositoryRoot, sha) {
   if (!REVISION.test(sha ?? "")) return null;
-  const git = (...args) => execFileSync("git", ["-C", repositoryRoot, ...args],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 });
+  // Fatal decoding: a lossy one would map two different byte paths onto one string.
+  const utf8 = new TextDecoder("utf-8", { fatal: true });
+  const git = (...args) => utf8.decode(execFileSync("git", ["-C", repositoryRoot, ...args],
+    { stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 }));
   try {
     const rules = JSON.parse(git("show", `${sha}:${GATE_SURFACE_RULES_PATH}`));
     return gateSurfaceDigest(rules, git("ls-tree", "-r", "-z", "--full-tree", sha));
@@ -55,19 +69,23 @@ const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../.."
 /**
  * For next.config.mjs: a Vercel production build of its own commit only. A preview or local build
  * claims no surface, so a pushed, unreviewed branch never inherits a production release; and HEAD
- * must be VERCEL_GIT_COMMIT_SHA, the SHA the gate binds to.
+ * must be VERCEL_GIT_COMMIT_SHA, the SHA the gate binds to. The digest comes from HEAD's blob ids,
+ * not from the bytes being built, so a working tree with any change (an uncommitted edit, an
+ * untracked file, a local `vercel build --prod` deployed with `--prebuilt`) claims nothing either.
  */
 export function deploymentGateSurface(env = process.env, repositoryRoot = REPOSITORY_ROOT) {
   const claimed = env.VERCEL_GIT_COMMIT_SHA?.trim().toLowerCase();
   if (env.VERCEL_ENV !== "production" || !claimed) return null;
+  const git = (...args) => execFileSync("git", ["-C", repositoryRoot, ...args],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 });
   let head;
   try {
-    head = execFileSync("git", ["-C", repositoryRoot, "rev-parse", "HEAD"],
-      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim().toLowerCase();
+    head = git("rev-parse", "HEAD").trim().toLowerCase();
+    if (claimed !== head || git("status", "--porcelain").length > 0) return null;
   } catch {
     return null;
   }
-  return claimed === head ? gateSurfaceOfCommit(repositoryRoot, head) : null;
+  return gateSurfaceOfCommit(repositoryRoot, head);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
