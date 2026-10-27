@@ -51,6 +51,10 @@ const COPY_MODULES = [
   "components/guide/guide-page.tsx",
   // COPY review N2 (2026-10-19): the Home support line, EN and KO, lives here and no list read it.
   "components/landing-v2/landing-page.tsx",
+  // PR #174 review R2 B1: the specimen strip's labels (COPY, en and ko) and the Korean limit labels
+  // render on `/` and `/ko`, and no list read either file, so a hedge reached /ko through a limit label.
+  "components/landing-v2/specimen-strip.tsx",
+  "lib/specimen-sources.ts",
 ] as const;
 
 /** The marketing routes named in the campaign brief, each as the file that carries its copy. */
@@ -183,6 +187,28 @@ describe("copy trust guard", () => {
       .toEqual(["아직", "준비 중", "추후"]);
     expect(hedgesIn("BEST EFFORT 형식은 최선을 다해 읽으며, 일부는 지원하지 않습니다."))
       .toEqual(["best effort", "최선을 다해", "지원하지 않습니다"]);
+    // PR #174 review R2 B1: the /ko limit label that shipped in 3975156c, which the list above now reads.
+    expect(hedgesIn("원본 구조 판독기는 아직 없음")).toEqual(["아직"]);
+  });
+
+  /*
+    The strip's captions and legends are copy too, but they live in the receipts JSON beside the
+    reader's own output. Only the copy fields are read: `extractedText` is the reader's bytes,
+    published unedited whatever they say, and a guard that rewrote them would break the receipt.
+  */
+  it("keeps the hedge register off the specimen strip's captions and legends", () => {
+    type Copy = { en: string; ko: string };
+    type Entry = { specimenId: string; caption: { en: { short: string; full: string }; ko: { short: string; full: string } }; avoidInCrop?: { legend?: Copy }[] };
+    const entries = JSON.parse(readFileSync(new URL("lib/specimen-sources.json", ROOT), "utf8")) as Entry[];
+    expect(entries.length).toBeGreaterThan(0);
+    for (const entry of entries) {
+      const copy = [
+        entry.caption.en.short, entry.caption.en.full, entry.caption.ko.short, entry.caption.ko.full,
+        ...(entry.avoidInCrop ?? []).flatMap(box => (box.legend ? [box.legend.en, box.legend.ko] : [])),
+      ];
+      const found = copy.flatMap(hedgesIn);
+      expect(found, `${entry.specimenId} captions hedge: ${found.join(", ")}`).toEqual([]);
+    }
   });
 
   /*

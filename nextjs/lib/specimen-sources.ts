@@ -105,7 +105,7 @@ export type SpecimenReceipt = {
   so a new token cannot reach /ko in English.
 */
 export const SPECIMEN_LIMIT_LABEL_KO: Readonly<Record<string, string>> = {
-  no_native_structure_reader_yet: "원본 구조 판독기는 아직 없음",
+  no_native_structure_reader_yet: "원본 구조 판독기 없음",
   no_table_or_formula_extraction: "표·수식은 추출하지 않음",
 };
 
