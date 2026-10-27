@@ -3,7 +3,7 @@
 -- its surface, no qualification can shadow a live surface release, and an unchanged grant writer
 -- still issues only from an allowed, unexpired release (so an expired founder receipt grants nobody).
 begin;
-select plan(12);
+select plan(16);
 
 insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
@@ -95,7 +95,27 @@ select throws_ok($$ select pg_temp.issue(repeat('2', 40), 'sha256:' || repeat('d
   'P0001', 'workspace_grant_release_changed',
   'the writer never grants a revision that has no release row of its own');
 
--- 8-9: refusing the revision also refuses its surface.
+-- 8-11: refusing a SHA that may be inheriting closes the surface, not only that SHA. Revision 3 has no
+-- row of its own; its deployment reads the surface release of revision 1.
+create function pg_temp.refuse(p_revision text, p_surface text default null) returns void language sql as $$
+  insert into public.customer_data_release_decisions (scope, release_revision, allowed, missing, evaluated_at,
+    operator_actor, decision_reason, gate_surface_sha256)
+  values ('direct_upload', p_revision, false, array['founder_approval_receipt_recorded'], now(),
+    'founder:sql-editor', 'revision refused', p_surface);
+$$;
+select throws_ok($$ select pg_temp.refuse(repeat('3', 40)) $$, 'P0001', 'refusal_requires_surface',
+  'a refusal of a SHA that may inherit a live surface release must name its surface');
+select lives_ok($$ select pg_temp.refuse(repeat('3', 40), 'sha256:' || repeat('5', 64)) $$,
+  'the same refusal naming the deployment''s surface is recorded');
+select is((select allowed from public.customer_data_release_decisions
+    where scope = 'direct_upload' and (release_revision = repeat('1', 40) or gate_surface_sha256 = 'sha256:' || repeat('5', 64))
+    order by recorded_at desc, allowed asc, evaluated_at desc limit 1),
+  false, 'so a rollback to the released SHA, or any equal-surface deploy, reads the refusal');
+do $$ begin perform pg_temp.release(repeat('8', 40), 'sha256:' || repeat('c', 64), null); end $$;
+select lives_ok($$ select pg_temp.refuse(repeat('8', 40)) $$,
+  'a SHA decided by its own newer row is still refused without a surface, as before');
+
+-- 12-13: refusing the revision also refuses its surface.
 insert into public.customer_data_release_decisions (scope, release_revision, allowed, missing, evaluated_at,
   operator_actor, decision_reason)
 values ('direct_upload', repeat('1', 40), false, array['founder_approval_receipt_recorded'], now(),
@@ -108,13 +128,13 @@ select is((select allowed from public.customer_data_release_decisions
     order by recorded_at desc, allowed asc, evaluated_at desc limit 1),
   false, 'so the latest decision any equal-surface deployment reads is the refusal');
 
--- 10-11: an expired founder receipt never releases: the writer refuses it, inherited or not.
+-- 14-15: an expired founder receipt never releases: the writer refuses it, inherited or not.
 select lives_ok($$ select pg_temp.release(repeat('4', 40), 'sha256:' || repeat('e', 64), 'sha256:' || repeat('7', 64),
   now() - interval '31 days') $$, 'an old release row can be recorded (the ledger is history)');
 select throws_ok($$ select pg_temp.issue(repeat('4', 40), 'sha256:' || repeat('e', 64)) $$,
   'P0001', 'workspace_grant_release_changed', 'a release evaluated more than 30 days ago grants nobody');
 
--- 12: every release insert holds the scope-wide lock until commit.
+-- 16: every release insert holds the scope-wide lock until commit.
 select ok(exists (select 1 from pg_locks where locktype = 'advisory' and pid = pg_backend_pid() and granted
     and ((classid::bigint << 32) | objid::bigint)
       = hashtextextended('customer_data_release_decisions:direct_upload', 0)),

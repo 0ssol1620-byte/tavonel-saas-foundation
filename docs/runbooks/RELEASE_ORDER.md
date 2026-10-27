@@ -137,33 +137,56 @@ NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
 ### 무엇이 바뀌나
 
 - production 출시 행에 `gate_surface_sha256`을 넣을 수 있다(migration `20261027120000`). 값은 그 SHA의
-  게이트 표면 digest다: `cd nextjs; pnpm release:gate-surface --sha <40자 SHA>`. 그 커밋이 로컬에 있어야 한다.
+  게이트 표면 digest다: `cd nextjs; node scripts/gate-surface.mjs --sha <40자 SHA>`. 그 커밋이 로컬에 있어야 한다.
 - 표면을 넣어 기록한 출시는 **digest가 같은 이후 배포 전부**를 덮는다. 원래 행의 `evaluated_at`부터 30일까지다.
-  홈 화면, 그림, 문서, e2e처럼 `nextjs/scripts/gate-surface-rules.json`이 presentational로 정한 경로만 바꾼
-  배포는 새 기록이 필요 없다.
-- 표면 경로를 하나라도 바꾼 배포(migration, `shared/`, `nextjs/lib/`의 서버 코드, API route, 의존성,
-  정책 문서, 규칙 파일 자체)는 digest가 달라서 아무것도 상속하지 않는다. 이전처럼 그 SHA에 대한 새 기록이 필요하다.
+  `nextjs/scripts/gate-surface-rules.json`이 presentational로 정한 경로만 바꾼 배포는 새 기록이 필요 없다.
+  그 경로는 문서, 테스트와 e2e, 정적 미디어(이미지·영상·폰트·PDF), `nextjs/components/landing-v2/`,
+  `nextjs/app/(benchmarks|changelog)/`, 그리고 changelog·compiler-release·GDP 페이지 데이터뿐이다.
+- 표면 경로를 하나라도 바꾼 배포는 digest가 달라서 아무것도 상속하지 않는다. 이전처럼 그 SHA에 대한 새 기록이
+  필요하다. 표면에는 migration, `shared/`, `nextjs/lib/`의 서버 코드, API route, 의존성, 정책 문서, 규칙 파일
+  자체가 들어간다. 동의·업로드·원본·키·계정 화면을 포함한 `landing-v2/` 밖의 모든 컴포넌트, 전역 CSS,
+  `nextjs/content/`, 고객이 내려받아 실행하는 `public/developer/` 클라이언트도 표면이다.
+- Vercel **production** 빌드만 digest를 주장한다. preview와 로컬 빌드는 `none`이고 정확한 SHA만 읽는다.
+  그래서 push만 한 브랜치는 production 출시를 이어받지 못한다.
 - 결정은 여전히 가장 최근 행이다. 대상은 이 SHA를 이름 붙인 행과 이 표면을 이름 붙인 행이다. 표면을
-  적지 않은 거절도 그 revision의 표면을 물려받는다. 그래서 revision 하나를 거절하면 같은 표면의 모든 배포가 닫힌다.
+  적지 않은 거절은 그 revision 자기 행의 표면을 물려받는다. 자기 표면 행이 없는 SHA, 즉 상속 중일 수 있는
+  SHA를 표면 없이 거절하면 DB가 `refusal_requires_surface`로 거부한다. 그 SHA만 닫으면 다음 같은 표면 배포나
+  출시한 SHA로의 rollback이 다시 열리기 때문이다. 아래 "거절" 절차대로 표면을 넣어 기록하면 같은 표면의 모든 배포가 닫힌다.
 - 허용된 표면 출시가 30일 안에 있으면 그 scope에서는 qualification을 기록할 수 없다(`qualification_over_surface_release`).
+  나중의 거절이 그 표면 출시를 끝냈어도 30일 동안은 그렇다. 닫힌 쪽이다.
 
 ### 순서
 
 1. migration `20261027120000_release_gate_surface_continuity`를 production에 적용한다. **창업자 작업.**
 2. 이 코드를 배포한다. Vercel 빌드 로그에서 `customer-data gate surface: sha256:…` 줄을 확인한다.
-   `none (exact-SHA release only)`이면 빌드에서 git을 쓸 수 없다는 뜻이다. 그때는 오늘처럼 SHA마다 기록한다.
-3. 빌드 로그의 digest와 `pnpm release:gate-surface --sha <배포 SHA>`의 출력이 같은지 본다.
+   production 빌드인데 `none (exact-SHA release only)`이면 빌드에서 git을 쓸 수 없다는 뜻이다. 그때는 오늘처럼
+   SHA마다 기록한다. preview 빌드는 항상 `none`이다.
+3. 빌드 로그의 digest와 `node scripts/gate-surface.mjs --sha <배포 SHA>`(nextjs에서)의 출력이 같은지 본다.
 4. 그 SHA의 production 결정을 `gate_surface_sha256`을 넣어 기록한다. **창업자 작업**(SQL editor에서 Run).
    receipt는 evaluator로 계산하고, 손으로 치거나 복사하지 않는다.
 
+   저장소 루트에서 실행한다. 저장소에 있는 TS loader를 쓰므로 네트워크에서 받는 도구가 없다.
+
    ```sh
-   npx tsx -e 'import("./shared/scopedCustomerDataGate.ts").then(m => console.log(JSON.stringify(m.evaluateScopedRelease(JSON.parse(process.argv[1])), null, 2)))' '{"scope":"direct_upload","releaseRevision":"<SHA>","gateSurfaceSha256":"<digest>","now":"<evaluatedAt ISO>","evidence":[<12개 사실>]}'
+   node --experimental-strip-types --import ./nextjs/scripts/router/register-ts-loader.mjs --input-type=module -e 'const m = await import("./shared/scopedCustomerDataGate.ts"); console.log(JSON.stringify(m.evaluateScopedRelease(JSON.parse(process.argv[1])), null, 2))' '{"scope":"direct_upload","releaseRevision":"<SHA>","gateSurfaceSha256":"<digest>","now":"<evaluatedAt ISO>","evidence":[<12개 사실>]}'
    ```
 
    출력이 `"allowed": true`일 때만 넣는다. 열은 기존 production 행과 같고 `gate_surface_sha256`만 추가된다.
 5. `pnpm release:gate-check --sha <배포 SHA>`가 exit 0인지 본다. 상속한 SHA는 `released`이고
    `inheritedFrom`에 창업자가 기록한 SHA가 찍힌다. 보고서 맨 위의 `gateSurfaceSha256`이 `null`이면
    그 커밋을 fetch하지 않았거나 규칙 파일 이전 커밋이다. 그때는 정확한 SHA만 읽으므로, 덮인 SHA도 `missing`으로 보일 수 있다.
+
+migration은 다시 적용할 수 없다. 두 번째 적용은 `column "gate_surface_sha256" already exists`로 실패하고
+`begin/commit` 안에서 통째로 롤백된다. SQL editor에 두 번 붙여 넣어도 상태는 바뀌지 않는다.
+
+### 거절 (표면 출시 기간)
+
+1. `pnpm release:gate-check --sha <거절할 배포 SHA>`를 실행하고 보고서 맨 위의 `gateSurfaceSha256`을 본다.
+2. 값이 있으면 거절 행의 `gate_surface_sha256`에 그 값을 넣어 기록한다. **창업자 작업.** 그러면 이 SHA와 같은
+   표면의 모든 배포, 그리고 출시한 SHA로의 rollback이 닫힌다.
+3. 값이 `null`이면(규칙 파일 이전 커밋) 그 배포는 표면을 읽지 않는다. 표면 없이 거절해서 DB가
+   `refusal_requires_surface`로 거부하면, 살아 있는 표면 출시의 digest를 넣어 거절한다. 그 표면 전체가 닫힌다.
+   닫힌 쪽이다. 필요한 배포는 그 뒤에 다시 기록한다.
 
 ### 하지 말 것
 

@@ -14,6 +14,11 @@
 --     every revision a surface release covers;
 --   * a production refusal that names no digest takes the digest of its revision's latest
 --     digest-bearing row, so refusing a revision also refuses the surface it released;
+--   * a production refusal that still has no digest is refused while an allowed, unexpired surface
+--     release newer than every row of its revision exists in the scope: that revision may be reading
+--     the surface release, and closing only its own SHA would let the next equal-surface deploy (or a
+--     rollback to the released SHA) reopen it. The refusal names the deployment's digest instead
+--     (refusal_requires_surface);
 --   * no qualification while an allowed, unexpired surface release exists for the scope: a
 --     qualification is the latest row for its SHA, so over an inherited release it would close every
 --     other workspace (the 20260930070000 rationale, across revisions);
@@ -60,6 +65,17 @@ begin
        and d.gate_surface_sha256 is not null
      order by d.recorded_at desc
      limit 1;
+    if new.gate_surface_sha256 is null and exists (
+      select 1 from public.customer_data_release_decisions r
+       where r.scope = new.scope and r.stage = 'production' and r.allowed and r.gate_surface_sha256 is not null
+         and r.evaluated_at > clock_timestamp() - interval '30 days'
+         and r.recorded_at > coalesce((
+           select max(o.recorded_at) from public.customer_data_release_decisions o
+            where o.scope = new.scope and o.release_revision = new.release_revision), '-infinity')
+    ) then
+      raise exception 'refusal_requires_surface'
+        using hint = 'set gate_surface_sha256 to the digest release-gate-check reports for this SHA';
+    end if;
   end if;
   if new.stage = 'qualification' then
     if exists (

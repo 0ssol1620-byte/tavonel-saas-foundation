@@ -651,25 +651,31 @@ this answer as a G3 precondition ("이 답이 G3의 선행 조건입니다"); it
 검증, `evaluated_at`부터 30일이라는 한도는 바뀌지 않는다. 설계는 `docs/adr/0006-release-continuity-by-gate-surface.md`에 있다.
 
 **왜.** 2026-10-27 PR #174(`4252bead`)가 배포된 뒤 창업자 작업공간의 bootstrap이 `release_pending`을 돌려주었다.
-PR #174는 게이트 경로를 하나도 바꾸지 않았다. 오늘의 규칙을 최근 `main` 병합 16개에 적용하면 그중 4개가
-새 기록 없이 열린 채 남았을 것이다.
+PR #174는 게이트 코드를 하나도 바꾸지 않았다. 오늘의 규칙을 최근 `main` 병합 16개에 적용하면 그중 3개
+(#173, #171, #158)가 새 기록 없이 열린 채 남았을 것이다. #174 자체는 R1 리뷰 뒤 좁힌 목록으로는 상속하지
+않는다. 전역 CSS, 랜딩 밖의 컴포넌트, 서버 쪽 specimen reader를 바꿨기 때문이다.
 
 **바뀌지 않는 것.**
 
 - `guard_customer_data_release_stage` trigger와 `verifyStoredRelease`가 계속 권한을 쥔다. trigger는 scope 전체를
-  잠그고, 표면을 적지 않은 거절에 그 revision의 표면을 붙이고, 살아 있는 표면 출시 위에 qualification이
-  올라오지 못하게 막는다.
+  잠그고, 표면을 적지 않은 거절에 그 revision의 표면을 붙이고, 상속 중일 수 있는 SHA의 표면 없는 거절을
+  거부하고(`refusal_requires_surface`), 살아 있는 표면 출시 위에 qualification이 올라오지 못하게 막는다.
+- digest는 Vercel production 빌드만 주장한다. preview와 로컬 빌드는 정확한 SHA만 읽는다.
 - `issue_customer_data_workspace_grant`는 바뀌지 않는다. 상속한 배포의 grant는 창업자가 기록한 revision을
   이름 붙이고, 그 함수가 잠금 아래에서 그 revision의 최신 행을 다시 확인한다.
 - `activationPolicy.customerData.enabled`, 게이트 버전, cohort, 결제 스위치는 움직이지 않는다.
 
 **실패 경로(테스트).** `supabase/tests/release_gate_surface_continuity.sql`,
 `nextjs/lib/scoped-customer-data-gate-store.test.ts`, `nextjs/lib/processing-workspace-grant.test.ts`,
-`nextjs/scripts/release-gate-check.test.mjs`, `nextjs/scripts/gate-surface.test.mjs`가 다음을 고정한다.
+`nextjs/scripts/release-gate-check.test.mjs`(gate-surface 테스트 포함)가 다음을 고정한다.
 
 - 표면 경로가 바뀐 배포는 상속하지 않는다.
+- 동의·업로드·원본·키·계정 컴포넌트, 전역 CSS, `public/developer/` 클라이언트는 표면이다. presentational 배포
+  코드는 `fetch`, `process.env`, `supabase`, `node:` 같은 서버·네트워크 경로를 쓸 수 없다.
+- preview·로컬 빌드, `VERCEL_GIT_COMMIT_SHA`가 없거나 `HEAD`와 다른 빌드, git이 없는 빌드는 digest가 없다.
 - 30일이 지난 출시는 상속해도 열리지 않는다.
-- 표면을 이름 붙인 나중의 거절이 상속을 끝낸다.
+- 표면을 이름 붙인 나중의 거절이 상속을 끝낸다. 출시한 SHA로 rollback해도 닫혀 있다.
+- 상속 중일 수 있는 SHA를 표면 없이 거절하면 DB가 거부한다.
 - qualification 행은 표면을 가질 수 없다.
 - receipt에 묶이지 않은 표면은 무효다.
 - digest가 없는 빌드는 정확한 SHA만 읽는다.

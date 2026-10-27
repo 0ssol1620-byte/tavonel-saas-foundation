@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { GATE_SURFACE_RULES_PATH, gateSurfaceDigest, gateSurfaceOfCommit } from "./gate-surface.mjs";
+import {
+  GATE_SURFACE_RULES_PATH, deploymentGateSurface, gateSurfaceDigest, gateSurfaceOfCommit,
+} from "./gate-surface.mjs";
 import {
   RELEASE_GATE_REPORT_SCHEMA,
   RELEASE_MAX_AGE_MS,
@@ -370,14 +374,25 @@ test("gate surface: no rules file, foreign rules or a malformed tree yields null
   assert.equal(gateSurfaceOfCommit(repositoryRoot, "HEAD"), null);
 });
 
-test("gate surface: PR #174's own changes are presentational; the gate's files are surface", () => {
+test("gate surface: PR #174's landing, benchmark and media changes are presentational; the gate's files are surface", () => {
   for (const path of [
-    "nextjs/app/benchmarks/gdp-pdf/page.tsx", "nextjs/app/wanted-sans-korean.css",
-    "nextjs/components/landing-v2/specimen-strip.tsx", "nextjs/e2e/specimen-strip.spec.ts",
+    "nextjs/app/benchmarks/gdp-pdf/page.tsx", "nextjs/components/landing-v2/specimen-strip.tsx",
+    "nextjs/components/landing-v2/specimen-strip.module.css", "nextjs/e2e/specimen-strip.spec.ts",
     "nextjs/lib/changelog.ts", "nextjs/lib/compiler-release.ts", "nextjs/lib/gdp-pdf-page-data.ts",
-    "nextjs/lib/specimen-sources.json", "nextjs/lib/specimen-sources.ts", "nextjs/lib/brand-copy.test.ts",
-    "nextjs/scripts/repair-scope.mjs", "nextjs/public/film/poster.avif",
+    "nextjs/lib/specimen-sources.json", "nextjs/lib/brand-copy.test.ts", "nextjs/scripts/repair-scope.mjs",
+    "nextjs/public/film/poster.avif", "nextjs/public/proof-collection/specimens/nasa-sp-5079-p074.pdf",
+    "nextjs/public/proof-collection/specimens/nasa-sp-5079-p074.run.json",
   ]) assert.equal(inSurface(path), false, path);
+  // Consent, upload, source, key and account UI, any global CSS, the server-side specimen reader, content
+  // and the clients customers download and run are surface: changing them needs a new founder release.
+  for (const path of [
+    "nextjs/components/processing-consent-panel.tsx", "nextjs/components/processing-consent-panel.module.css",
+    "nextjs/components/workspace-ultimate-shell.tsx", "nextjs/components/world-studio-ultimate.tsx",
+    "nextjs/components/developer-panel.tsx", "nextjs/components/founder-test-reset-panel.tsx",
+    "nextjs/app/wanted-sans-korean.css", "nextjs/app/globals.css", "nextjs/lib/specimen-sources.ts",
+    "nextjs/content/trust/provisions.ts", "nextjs/public/developer/tavonel-mcp.mjs",
+    "nextjs/public/developer/tavonel-cli.mjs", "nextjs/public/llms.txt", "nextjs/public/icon.svg",
+  ]) assert.equal(inSurface(path), true, path);
   for (const path of [
     "shared/scopedCustomerDataGate.ts", "shared/uskcEnums.ts", "nextjs/lib/customer-data-admission.ts",
     "nextjs/lib/scoped-customer-data-gate-store.ts", "nextjs/lib/processing-workspace-grant.ts",
@@ -402,4 +417,61 @@ test("gate surface: this checkout's HEAD has a digest, computed from blob ids", 
   const digest = gateSurfaceOfCommit(repositoryRoot, head);
   assert.match(digest, SURFACE_DIGEST);
   assert.equal(gateSurfaceOfCommit(repositoryRoot, head), digest);
+});
+
+test("gate surface: only a Vercel production build of HEAD claims a digest", { skip: checkoutHead === null }, () => {
+  const head = checkoutHead;
+  const production = { VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: head };
+  assert.equal(deploymentGateSurface(production, repositoryRoot), gateSurfaceOfCommit(repositoryRoot, head));
+  assert.equal(deploymentGateSurface({ ...production, VERCEL_GIT_COMMIT_SHA: head.toUpperCase() }, repositoryRoot),
+    gateSurfaceOfCommit(repositoryRoot, head));
+  // Fail closed: a preview or local build, no claimed SHA, a SHA other than HEAD, or no Git claims nothing.
+  for (const env of [
+    { ...production, VERCEL_ENV: "preview" }, { ...production, VERCEL_ENV: undefined },
+    { VERCEL_GIT_COMMIT_SHA: head }, { VERCEL_ENV: "production" }, { ...production, VERCEL_GIT_COMMIT_SHA: " " },
+    { ...production, VERCEL_GIT_COMMIT_SHA: "0".repeat(40) },
+  ]) assert.equal(deploymentGateSurface(env, repositoryRoot), null, JSON.stringify(env));
+  const noGit = mkdtempSync(join(tmpdir(), "gate-surface-"));
+  try {
+    assert.equal(deploymentGateSurface(production, noGit), null);
+  } finally {
+    rmSync(noGit, { recursive: true, force: true });
+  }
+});
+
+test("gate surface: a refusal naming the surface also closes a rollback to the released SHA", () => {
+  // The DB refuses a surface-less refusal of an inheriting SHA (refusal_requires_surface); this is what
+  // the reader then sees for the released revision itself.
+  const evaluatedMs = NOW.getTime() - 3 * DAY;
+  const released = surfacedRow({ sha: SHA, evaluatedMs });
+  const refusal = { ...surfacedRow({ sha: "c".repeat(40), evaluatedMs }), allowed: false, receipt_sha256: null,
+    evidence: [], missing: ["founder_approval_receipt_recorded"], recorded_at: at(evaluatedMs + 60_000) };
+  assert.equal(check([released], { gateSurfaceSha256: SURFACE }).scopes[0].status, "released");
+  assert.equal(check([released, refusal], { gateSurfaceSha256: SURFACE }).scopes[0].status, "refused");
+});
+
+// Presentational code ships to the same origin as the consent and upload routes, so it must not be able to
+// talk to them or to the server side on its own. A guardrail against the accident, not an import-graph proof.
+const SHIPPED_CODE = /^nextjs\/(app|components|lib)\/.*\.(ts|tsx|js|jsx|mjs|cjs)$/;
+const FORBIDDEN_IMPORT = /^node:|^(fs|child_process|http|https|net)$|server-only|supabase|^next\/(headers|server)$/;
+const FORBIDDEN_CODE = [/\bfetch\s*\(/, /sendBeacon/, /XMLHttpRequest/, /new\s+(WebSocket|EventSource)\b/,
+  /process\.env/, /document\.cookie/, /\.(requestSubmit|submit)\s*\(/, /^\s*["']use server["']/m];
+test("gate surface: presentational shipped code cannot reach the server side or the network itself", () => {
+  const files = ["app", "components", "lib"]
+    .flatMap((dir) => readdirSync(join(repositoryRoot, "nextjs", dir), { recursive: true })
+      .map((entry) => `nextjs/${dir}/${String(entry).replaceAll("\\", "/")}`))
+    .filter((path) => SHIPPED_CODE.test(path) && !inSurface(path) && !/\.(test|spec)\./.test(path));
+  assert.ok(files.length > 20, `found ${files.length} presentational source files`);
+  const violations = [];
+  for (const path of files) {
+    const source = readFileSync(join(repositoryRoot, path), "utf8");
+    for (const [, specifier] of source.matchAll(/(?:\bfrom|\bimport)\s*\(?\s*["']([^"']+)["']/g)) {
+      if (FORBIDDEN_IMPORT.test(specifier)) violations.push(`${path}: import ${specifier}`);
+    }
+    for (const pattern of FORBIDDEN_CODE) if (pattern.test(source)) violations.push(`${path}: ${pattern}`);
+  }
+  assert.deepEqual(violations, []);
+  // The check itself fails when it should.
+  assert.equal(FORBIDDEN_CODE.some((pattern) => pattern.test('useEffect(() => { fetch("/api/access/processing-terms") })')), true);
+  assert.equal(FORBIDDEN_IMPORT.test("@/lib/supabase-admin"), true);
 });

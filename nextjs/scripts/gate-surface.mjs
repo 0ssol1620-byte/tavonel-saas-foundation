@@ -50,9 +50,16 @@ export function gateSurfaceOfCommit(repositoryRoot, sha) {
   }
 }
 
-/** For next.config.mjs: the deployment's own commit only. HEAD must be VERCEL_GIT_COMMIT_SHA when set. */
-export function deploymentGateSurface(env = process.env) {
-  const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+
+/**
+ * For next.config.mjs: a Vercel production build of its own commit only. A preview or local build
+ * claims no surface, so a pushed, unreviewed branch never inherits a production release; and HEAD
+ * must be VERCEL_GIT_COMMIT_SHA, the SHA the gate binds to.
+ */
+export function deploymentGateSurface(env = process.env, repositoryRoot = REPOSITORY_ROOT) {
+  const claimed = env.VERCEL_GIT_COMMIT_SHA?.trim().toLowerCase();
+  if (env.VERCEL_ENV !== "production" || !claimed) return null;
   let head;
   try {
     head = execFileSync("git", ["-C", repositoryRoot, "rev-parse", "HEAD"],
@@ -60,18 +67,16 @@ export function deploymentGateSurface(env = process.env) {
   } catch {
     return null;
   }
-  const claimed = env.VERCEL_GIT_COMMIT_SHA?.trim().toLowerCase();
-  if (claimed && claimed !== head) return null;
-  return gateSurfaceOfCommit(repositoryRoot, head);
+  return claimed === head ? gateSurfaceOfCommit(repositoryRoot, head) : null;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2);
   const { values } = parseArgs({ args: args[0] === "--" ? args.slice(1) : args, strict: true,
     options: { sha: { type: "string" } } });
-  const digest = gateSurfaceOfCommit(resolve(dirname(fileURLToPath(import.meta.url)), "../.."), values.sha ?? "");
+  const digest = gateSurfaceOfCommit(REPOSITORY_ROOT, values.sha ?? "");
   if (!digest) {
-    process.stderr.write("usage: pnpm release:gate-surface --sha <40 hex>; the commit must exist locally and carry the rules file\n");
+    process.stderr.write("usage: node scripts/gate-surface.mjs --sha <40 hex> (from nextjs/); the commit must exist locally and carry the rules file\n");
     process.exitCode = 2;
   } else {
     process.stdout.write(`${digest}\n`);

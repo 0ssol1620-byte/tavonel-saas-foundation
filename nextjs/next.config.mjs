@@ -7,8 +7,9 @@ const localHttpPlaywright = process.env.PLAYWRIGHT_LOCAL_HTTP === "1";
 /*
   D-05 (docs/adr/0006). The gate-surface digest of this build's own commit, inlined as
   process.env.TAVONEL_GATE_SURFACE_SHA256. A production release recorded with the same digest
-  covers this deployment; "" (no git, HEAD not VERCEL_GIT_COMMIT_SHA, no rules file) covers nothing,
-  and the gate then needs a release for the exact SHA, as before. Printed so the build log shows it.
+  covers this deployment; "" (not a Vercel production build, no git, HEAD not VERCEL_GIT_COMMIT_SHA,
+  no rules file) covers nothing, and the gate then needs a release for the exact SHA, as before.
+  Printed so the build log shows it.
 */
 const gateSurface = deploymentGateSurface() ?? "";
 console.log(`customer-data gate surface: ${gateSurface || "none (exact-SHA release only)"}`);
