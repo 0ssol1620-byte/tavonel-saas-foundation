@@ -12,11 +12,12 @@ test.describe("phone four-stage film", () => {
     await expect(film).toBeVisible();
     const still = () => film.locator("img.compile-film-still").evaluate((image: HTMLImageElement) => new URL(image.currentSrc).pathname);
     const column = (await page.locator("#s1 .lv2-wrap").boundingBox())!;
-    // Founder ask 2026-10-27: a phone opens compact -- the whole 16:10 frame of the locked stage-1 poster, inside the viewport.
+    // Founder ask 2026-10-27: a phone opens compact -- the whole frame of the locked stage-1 poster, inside the viewport.
     await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
     expect(await still()).toMatch(/^\/film\/poster-1-t8\.16(-2x)?\.(avif|webp)$/);
     const fit = (await film.locator(".compile-film-viewport").boundingBox())!;
-    expect(Math.abs(fit.width / fit.height - 1.6), "the whole 16:10 frame").toBeLessThan(0.01);
+    const drawn = await film.locator("img.compile-film-still").evaluate(image => image.getBoundingClientRect().width);
+    expect(Math.abs(drawn - fit.width), "the whole frame at the frame's width, no crop").toBeLessThanOrEqual(2);
     expect(fit.x).toBeGreaterThanOrEqual(0);
     expect(fit.x + fit.width).toBeLessThanOrEqual(page.viewportSize()!.width);
     // FINAL-SPEC 2026-10-26 §2.1 (acceptance 23, 25), now after the press: one source pane, the stage-1 pane's own 684x855

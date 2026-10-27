@@ -682,9 +682,10 @@ for (const path of ["/", "/ko"]) {
       expect(lcp.still, `LCP element at ${width}`).toBe(true);
       expect(lcp.size, `LCP area at ${width}`).toBeGreaterThanOrEqual(LCP_FLOOR[browserName]![path]![width]! * 0.99);
       const column = (await page.locator("#s1 .lv2-wrap").boundingBox())!;
-      // The compact frame: the whole 16:10 cut, wholly on the first screen, unscrolled, inside the viewport.
+      // The compact frame: the whole cut drawn at the frame's width (no crop), wholly on the first screen, unscrolled, inside the viewport.
       const fit = (await film.locator(".compile-film-viewport").boundingBox())!;
-      expect(Math.abs(fit.width / fit.height - 1.6), `${width}: the whole 16:10 frame`).toBeLessThan(0.01);
+      const drawn = await film.locator(".compile-film-viewport :is(img.compile-film-still, video.compile-film-video)").first().evaluate(media => media.getBoundingClientRect().width);
+      expect(Math.abs(drawn - fit.width), `${width}: the whole cut at the frame's width`).toBeLessThanOrEqual(2);
       expect(fit.y + fit.height, `${width}: the compact frame wholly on the first screen`).toBeLessThanOrEqual(heights[width]!);
       expect(fit.x).toBeGreaterThanOrEqual(0);
       expect(fit.x + fit.width).toBeLessThanOrEqual(width);
