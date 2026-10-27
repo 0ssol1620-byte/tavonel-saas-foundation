@@ -645,11 +645,11 @@ for (const binding of [
     browsers: [],
     rows: [],
     neighbors: ['nextjs/scripts/launch-qa/internal-links.mjs', 'nextjs/scripts/launch-qa/lighthouse-budgets.test.mjs', 'nextjs/scripts/release-manifest.mjs', 'nextjs/scripts/release-gate-check-2.mjs', 'nextjs/lib/release-gate-check.test.ts'] },
-  // D-05 gate release continuity: six exact repo-relative paths selecting nine direct suites, no browser suite.
+  // D-05 gate release continuity: seven exact repo-relative paths selecting ten direct suites, no browser suite.
   { group: 'gate-release-continuity', prefix: '', exportedPaths: GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, exportedSuites: GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
-    paths: ['nextjs/lib/scoped-customer-data-gate-store.test.ts', 'nextjs/lib/scoped-customer-data-gate-store.ts', 'nextjs/next.config.mjs', 'nextjs/scripts/gate-surface-rules.json', 'nextjs/scripts/gate-surface.mjs', 'shared/scopedCustomerDataGate.ts'],
-    suites: ['lib/collection-compile-run.test.ts', 'lib/customer-data-admission.test.ts', 'lib/customer-data-authorization.test.ts', 'lib/processing-workspace-grant.test.ts', 'lib/release-gate-check-script.test.ts', 'lib/route-classification.test.ts', 'lib/scoped-customer-data-gate-store.test.ts', 'lib/security-headers.test.ts', 'lib/seo-surface.test.ts'],
+    paths: ['nextjs/lib/scoped-customer-data-gate-store.test.ts', 'nextjs/lib/scoped-customer-data-gate-store.ts', 'nextjs/next.config.mjs', 'nextjs/scripts/gate-surface-rules.json', 'nextjs/scripts/gate-surface.mjs', 'nextjs/scripts/run-hermetic-vitest.mjs', 'shared/scopedCustomerDataGate.ts'],
+    suites: ['lib/collection-compile-run.test.ts', 'lib/customer-data-admission.test.ts', 'lib/customer-data-authorization.test.ts', 'lib/hermetic-prebuild.test.ts', 'lib/processing-workspace-grant.test.ts', 'lib/release-gate-check-script.test.ts', 'lib/route-classification.test.ts', 'lib/scoped-customer-data-gate-store.test.ts', 'lib/security-headers.test.ts', 'lib/seo-surface.test.ts'],
     browsers: [],
     rows: [],
     neighbors: ['nextjs/next.config.ts', 'nextjs/scripts/gate-surface.test.mjs', 'nextjs/scripts/gate-surface-rules.yaml', 'shared/scopedCustomerDataGate.test.ts', 'shared/customerDataAuthorization.ts', 'nextjs/lib/scoped-customer-data-gate.ts', 'scopedCustomerDataGate.ts'] },

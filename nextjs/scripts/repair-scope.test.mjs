@@ -7525,11 +7525,12 @@ test('affected compiler-release owner: 1 exact path selects 3 direct suites and 
 });
 // D-05 gate release continuity (docs/adr/0006): one finite owner over repo-relative paths, restated independently.
 import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
-test('affected gate-release-continuity owner: 6 exact paths select 9 direct suites and no browser suite; neighbours stay unmapped', () => {
+test('affected gate-release-continuity owner: 7 exact paths select 10 direct suites and no browser suite; neighbours stay unmapped', () => {
   const paths = ['nextjs/lib/scoped-customer-data-gate-store.test.ts', 'nextjs/lib/scoped-customer-data-gate-store.ts', 'nextjs/next.config.mjs',
-    'nextjs/scripts/gate-surface-rules.json', 'nextjs/scripts/gate-surface.mjs', 'shared/scopedCustomerDataGate.ts'];
+    'nextjs/scripts/gate-surface-rules.json', 'nextjs/scripts/gate-surface.mjs', 'nextjs/scripts/run-hermetic-vitest.mjs',
+    'shared/scopedCustomerDataGate.ts'];
   const suites = ['lib/collection-compile-run.test.ts', 'lib/customer-data-admission.test.ts', 'lib/customer-data-authorization.test.ts',
-    'lib/processing-workspace-grant.test.ts', 'lib/release-gate-check-script.test.ts', 'lib/route-classification.test.ts',
+    'lib/hermetic-prebuild.test.ts', 'lib/processing-workspace-grant.test.ts', 'lib/release-gate-check-script.test.ts', 'lib/route-classification.test.ts',
     'lib/scoped-customer-data-gate-store.test.ts', 'lib/security-headers.test.ts', 'lib/seo-surface.test.ts'];
   assert.deepEqual([[...GATE_RELEASE_CONTINUITY_AFFECTED_PATHS], [...GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES]], [paths, suites]);
   for (const path of paths) {

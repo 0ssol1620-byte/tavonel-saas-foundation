@@ -2193,12 +2193,14 @@ export const GATE_RELEASE_CONTINUITY_AFFECTED_PATHS = Object.freeze([
   'nextjs/next.config.mjs',
   'nextjs/scripts/gate-surface-rules.json',
   'nextjs/scripts/gate-surface.mjs',
+  'nextjs/scripts/run-hermetic-vitest.mjs',
   'shared/scopedCustomerDataGate.ts',
 ]);
 export const GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/collection-compile-run.test.ts',
   'lib/customer-data-admission.test.ts',
   'lib/customer-data-authorization.test.ts',
+  'lib/hermetic-prebuild.test.ts',
   'lib/processing-workspace-grant.test.ts',
   'lib/release-gate-check-script.test.ts',
   'lib/route-classification.test.ts',
@@ -2848,7 +2850,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // launch-qa-release-scripts: the 5 exact paths above select 3 direct suites and no browser suite.
   affectedGroup('launch-qa-release-scripts', new RegExp(`^nextjs/(?:${exactPathAlternation(LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS)})$`),
     { unitFiles: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES }),
-  // gate-release-continuity (D-05): the 6 exact repo-relative paths above select 9 direct suites and no browser suite.
+  // gate-release-continuity (D-05): the 7 exact repo-relative paths above select 10 direct suites and no browser suite.
   affectedGroup('gate-release-continuity', new RegExp(`^(?:${exactPathAlternation(GATE_RELEASE_CONTINUITY_AFFECTED_PATHS)})$`),
     { unitFiles: GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES }),
   // g1-copy-truth: the 6 exact paths above select 17 direct suites and 2 browser suites.
