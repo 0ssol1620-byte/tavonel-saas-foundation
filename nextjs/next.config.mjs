@@ -1,8 +1,17 @@
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { deploymentGateSurface } from "./scripts/gate-surface.mjs";
 
 const packageRoot = dirname(fileURLToPath(import.meta.url));
 const localHttpPlaywright = process.env.PLAYWRIGHT_LOCAL_HTTP === "1";
+/*
+  D-05 (docs/adr/0006). The gate-surface digest of this build's own commit, inlined as
+  process.env.TAVONEL_GATE_SURFACE_SHA256. A production release recorded with the same digest
+  covers this deployment; "" (no git, HEAD not VERCEL_GIT_COMMIT_SHA, no rules file) covers nothing,
+  and the gate then needs a release for the exact SHA, as before. Printed so the build log shows it.
+*/
+const gateSurface = deploymentGateSurface() ?? "";
+console.log(`customer-data gate surface: ${gateSurface || "none (exact-SHA release only)"}`);
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -114,6 +123,7 @@ const securityHeaders = [
 const nextConfig = {
   poweredByHeader: false,
   typedRoutes: true,
+  env: { TAVONEL_GATE_SURFACE_SHA256: gateSurface },
   /*
     T1-002 / G2-033 -- the <head> is in the <head>, for everyone.
 

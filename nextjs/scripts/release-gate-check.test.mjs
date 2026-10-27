@@ -264,3 +264,64 @@ test("the CLI exits 2 with no report when it cannot run", () => {
   assert.equal(result.stdout, "");
   assert.match(result.stderr, /SUPABASE_SERVICE_ROLE_KEY/);
 });
+
+// D-05 (docs/adr/0006): a production row recorded with a gate-surface digest covers equal-surface SHAs.
+const SURFACE = `sha256:${"5".repeat(64)}`;
+function surfacedRow({ sha = OTHER_SHA, evaluatedMs, surface = SURFACE }) {
+  const evaluatedAt = at(evaluatedMs);
+  const evidence = evidenceFor(gate.requiredReleaseEvidence("direct_upload"), at(evaluatedMs - DAY));
+  const decision = gate.evaluateScopedRelease({ scope: "direct_upload", releaseRevision: sha, evidence, now: evaluatedAt,
+    gateSurfaceSha256: surface });
+  assert.equal(decision.allowed, true);
+  return { ...productionRow({ sha, evaluatedMs }), receipt_sha256: decision.receiptSha256, evidence,
+    gate_surface_sha256: surface };
+}
+
+test("a SHA whose gate surface equals a released one is released, and says which revision it inherits", () => {
+  const evaluatedMs = NOW.getTime() - 2 * DAY;
+  const report = check([surfacedRow({ evaluatedMs })], { gateSurfaceSha256: SURFACE });
+  assert.equal(report.ready, true);
+  assert.equal(report.gateSurfaceSha256, SURFACE);
+  assert.deepEqual(report.scopes, [{
+    scope: "direct_upload", status: "released", evaluatedAt: at(evaluatedMs),
+    expiresAt: at(evaluatedMs + RELEASE_MAX_AGE_MS), remainingHours: 28 * 24, inheritedFrom: OTHER_SHA,
+  }]);
+});
+
+test("a SHA whose gate surface changed, or is unknown, inherits nothing", () => {
+  const rows = [surfacedRow({ evaluatedMs: NOW.getTime() - 2 * DAY })];
+  for (const gateSurfaceSha256 of [`sha256:${"6".repeat(64)}`, null]) {
+    const report = check(rows, { gateSurfaceSha256 });
+    assert.equal(report.ready, false);
+    assert.equal(report.scopes[0].status, "missing");
+  }
+});
+
+test("an inherited release still expires 30 days after the founder's evaluation", () => {
+  const report = check([surfacedRow({ evaluatedMs: NOW.getTime() - 31 * DAY })], { gateSurfaceSha256: SURFACE });
+  assert.equal(report.scopes[0].status, "expired");
+});
+
+test("a later refusal naming the surface, or a later exact-SHA decision, outranks the inherited release", () => {
+  const evaluatedMs = NOW.getTime() - 3 * DAY;
+  const refusal = { ...surfacedRow({ evaluatedMs }), allowed: false, receipt_sha256: null, evidence: [],
+    missing: ["founder_approval_receipt_recorded"], recorded_at: at(evaluatedMs + 60_000) };
+  assert.equal(check([surfacedRow({ evaluatedMs }), refusal], { gateSurfaceSha256: SURFACE }).scopes[0].status, "refused");
+  const exact = { ...productionRow({ evaluatedMs }), recorded_at: at(evaluatedMs + 60_000) };
+  const report = check([surfacedRow({ evaluatedMs }), exact], { gateSurfaceSha256: SURFACE });
+  assert.equal(report.scopes[0].status, "released");
+  assert.equal("inheritedFrom" in report.scopes[0], false);
+});
+
+test("with a surface digest the CLI sends the gate's OR query, still GET only", async () => {
+  const row = surfacedRow({ evaluatedMs: NOW.getTime() - DAY });
+  const calls = [];
+  const rows = await readReleaseRows({ url: "https://x.example", serviceRoleKey: "k".repeat(32) }, SHA, ["direct_upload"],
+    async (_config, path, init) => { calls.push({ path, method: init.method }); return json([row]); }, SURFACE);
+  assert.deepEqual(rows, [row]);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].method, "GET");
+  const url = new URL(`https://x.example${calls[0].path}`);
+  assert.equal(url.searchParams.get("or"), `(release_revision.eq.${SHA},gate_surface_sha256.eq."${SURFACE}")`);
+  assert.equal(url.searchParams.get("release_revision"), null);
+});

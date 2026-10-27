@@ -637,3 +637,39 @@ this answer as a G3 precondition ("이 답이 G3의 선행 조건입니다"); it
 | Live policy row | `nextjs/lib/activation-policy.ts:85` | main `4c80bb30` |
 | Fixture probe refusal | `nextjs/lib/synthetic-probe.ts:137`, `:338`; `nextjs/app/status/page.tsx:153` | main `4c80bb30` |
 | Qualification stage | `supabase/migrations/20260930070000_processing_qualification_stage.sql` | main `4c80bb30` |
+
+---
+
+## 12. 추가 2026-10-27 — D-05: 출시 결정을 게이트 표면에 묶는다
+
+위 내용은 바꾸지 않았다. §6 8번은 그대로다. 사전조건 17(`founder_approval_receipt_recorded`)은 창업자만 기록한다.
+이 절은 그 영수증을 만들지 않고, 에이전트나 CI가 그 영수증을 복사하는 경로도 만들지 않는다.
+
+**무엇.** production 출시 행에 게이트 표면 digest(`gate_surface_sha256`)를 넣을 수 있다. 표면은
+`nextjs/scripts/gate-surface-rules.json`의 presentational 경로를 뺀 모든 추적 파일이다. 표면이 같은 이후
+배포는 같은 결정을 읽는다. 기록되는 행은 그대로 창업자의 행 하나다. 사실 12개(connector 17개), 증거
+검증, `evaluated_at`부터 30일이라는 한도는 바뀌지 않는다. 설계는 `docs/adr/0006-release-continuity-by-gate-surface.md`에 있다.
+
+**왜.** 2026-10-27 PR #174(`4252bead`)가 배포된 뒤 창업자 작업공간의 bootstrap이 `release_pending`을 돌려주었다.
+PR #174는 게이트 경로를 하나도 바꾸지 않았다. 오늘의 규칙을 최근 `main` 병합 16개에 적용하면 그중 4개가
+새 기록 없이 열린 채 남았을 것이다.
+
+**바뀌지 않는 것.**
+
+- `guard_customer_data_release_stage` trigger와 `verifyStoredRelease`가 계속 권한을 쥔다. trigger는 scope 전체를
+  잠그고, 표면을 적지 않은 거절에 그 revision의 표면을 붙이고, 살아 있는 표면 출시 위에 qualification이
+  올라오지 못하게 막는다.
+- `issue_customer_data_workspace_grant`는 바뀌지 않는다. 상속한 배포의 grant는 창업자가 기록한 revision을
+  이름 붙이고, 그 함수가 잠금 아래에서 그 revision의 최신 행을 다시 확인한다.
+- `activationPolicy.customerData.enabled`, 게이트 버전, cohort, 결제 스위치는 움직이지 않는다.
+
+**실패 경로(테스트).** `supabase/tests/release_gate_surface_continuity.sql`,
+`nextjs/lib/scoped-customer-data-gate-store.test.ts`, `nextjs/lib/processing-workspace-grant.test.ts`,
+`nextjs/scripts/release-gate-check.test.mjs`, `nextjs/scripts/gate-surface.test.mjs`가 다음을 고정한다.
+
+- 표면 경로가 바뀐 배포는 상속하지 않는다.
+- 30일이 지난 출시는 상속해도 열리지 않는다.
+- 표면을 이름 붙인 나중의 거절이 상속을 끝낸다.
+- qualification 행은 표면을 가질 수 없다.
+- receipt에 묶이지 않은 표면은 무효다.
+- digest가 없는 빌드는 정확한 SHA만 읽는다.

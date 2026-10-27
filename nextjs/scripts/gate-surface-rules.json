@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "tavonel.gate_surface.v1",
+  "comment": "Paths that cannot change what the server does with customer data. Every other tracked path, this file and gate-surface.mjs included, is the gate surface. Widening this list changes the digest, so it needs a new founder release once. docs/adr/0006-release-continuity-by-gate-surface.md.",
+  "alwaysSurface": [
+    "^docs/policy/",
+    "^nextjs/public/policy/",
+    "^nextjs/public/\\.well-known/",
+    "/route\\.(ts|tsx|js|mjs)$",
+    "^nextjs/scripts/gate-surface"
+  ],
+  "presentational": [
+    "^docs/",
+    "\\.md$",
+    "\\.css$",
+    "\\.(test|spec)\\.(ts|tsx|mts|js|mjs)$",
+    "^nextjs/e2e/",
+    "^nextjs/public/",
+    "^nextjs/components/",
+    "^nextjs/content/",
+    "^design-system/",
+    "^nextjs/app/(benchmarks|changelog)/",
+    "^nextjs/lib/(changelog|compiler-release|gdp-pdf-page-data|specimen-sources)\\.(ts|json)$",
+    "^nextjs/scripts/(repair-scope|verify-repair-workflows)\\.mjs$"
+  ]
+}
