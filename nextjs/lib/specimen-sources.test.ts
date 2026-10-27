@@ -51,17 +51,19 @@ const digest = (bytes: Uint8Array) => `sha256:${createHash("sha256").update(byte
 const publicFile = (path: string) => readFileSync(join(process.cwd(), "public", path));
 
 describe("the committed specimens", () => {
-  it("are four (D-04: a degraded scan and a Korean page; hard-proof 2026-10-27: a schematic and a parts list), and production renders none", () => {
+  it("are four (D-04: a degraded scan and a Korean page; hard-proof 2026-10-27: a schematic and a parts list), and every server renders all four", () => {
     expect(COMMITTED_SPECIMENS.map(receipt => (receipt as SpecimenReceipt).specimenId)).toEqual(["naca-rm-l50c03-p001", "kma-2026-09-climate-p001", "nasa-sp-5079-p039", "nasa-sp-5079-p074"]);
-    // The posture: Vercel production, a server with no VERCEL_ENV, and any request that is not the test server's.
-    expect(SPECIMEN_STRIP_ROLLOUT).toBe("preview");
+    // The posture (FINAL-SPEC-HARD-PROOF §2 Rollout): Vercel production, a server with no VERCEL_ENV, and any request.
+    expect(SPECIMEN_STRIP_ROLLOUT).toBe("on");
+    const ids = (cells: Specimen[]) => cells.map(cell => cell.specimenId);
     for (const env of [PRODUCTION_ENV, {}, { VERCEL: "1" }, { VERCEL_ENV: "production" }, { VERCEL_ENV: "preview" }]) {
-      expect(homeSpecimens({}, env), JSON.stringify(env)).toEqual([]);
-      expect(homeSpecimens({ committed: true }, env), JSON.stringify(env)).toEqual([]);
-      expect(homeSpecimens({ fixtures: true }, env), JSON.stringify(env)).toEqual([]);
+      expect(ids(homeSpecimens({}, env)), JSON.stringify(env)).toEqual(["nasa-sp-5079-p039", "nasa-sp-5079-p074", "naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+      expect(ids(homeSpecimens({ committed: true }, env)), JSON.stringify(env)).toEqual(["nasa-sp-5079-p039", "nasa-sp-5079-p074", "naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+      // The fixture cookie still reaches no fixture off the test server: the request gets the committed cells.
+      expect(homeSpecimens({ fixtures: true }, env).map(cell => [cell.specimenId, cell.synthetic]), JSON.stringify(env)).toEqual(["nasa-sp-5079-p039", "nasa-sp-5079-p074", "naca-rm-l50c03-p001", "kma-2026-09-climate-p001"].map(id => [id, false]));
     }
-    expect(homeSpecimens({ committed: true }, { ...FIXTURE_ENV, VERCEL: "1", VERCEL_ENV: "production" })).toEqual([]);
-    expect(renderToStaticMarkup(createElement(SpecimenStrip, { specimens: homeSpecimens({}, PRODUCTION_ENV) }))).toBe("");
+    expect(ids(homeSpecimens({ fixtures: true }, { ...FIXTURE_ENV, VERCEL: "1", VERCEL_ENV: "production" }))).toEqual(["nasa-sp-5079-p039", "nasa-sp-5079-p074", "naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+    expect(renderToStaticMarkup(createElement(SpecimenStrip, { specimens: homeSpecimens({}, PRODUCTION_ENV) })).match(/data-specimen-cell=/g)).toHaveLength(4);
     expect(renderToStaticMarkup(createElement(HomeReaderGuide, { faqOnly: true }))).not.toContain("data-specimen-faq");
   });
 

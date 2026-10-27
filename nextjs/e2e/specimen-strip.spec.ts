@@ -23,9 +23,10 @@ import { SPECIMEN_FIXTURE_COOKIE, SPECIMEN_SLOTS, type SpecimenReceipt } from ".
   Every scenario sets its own browser and viewport from project 390, the pattern the phone specs
   use: chromium and webkit at 360x780, 390x844, 412x915, 430x932 and 1440x900 (FINAL-SPEC-HARD-PROOF §6).
 
-  P2-32: the committed receipts (lib/specimen-sources.json) render on Vercel previews only
-  (SPECIMEN_STRIP_ROLLOUT "preview"); this server shows them for a request whose cookie says
-  "committed", and the same acceptance is read against the real crops, pages and text.
+  P2-32: the committed receipts (lib/specimen-sources.json) render on every server since hard-proof
+  2026-10-27 (SPECIMEN_STRIP_ROLLOUT "on"); this server shows them to a request whose cookie says
+  "committed" or that carries no cookie, and the same acceptance is read against the real crops,
+  pages and text. A cookie of "1" still gets the synthetic fixtures here, and only here.
 */
 
 const PRODUCTION_SERVER = process.env.SPECIMEN_SERVER === "production";
@@ -413,27 +414,31 @@ test("the server renders the fixture cells for a request that asks, with no scri
 });
 
 /*
-  The production half of the acceptance: a request that asks for nothing gets no cell on the test
-  server (it is not a Vercel preview, so the "preview" switch is off there), and a production
-  server renders none whatever the request asks.
+  The production half of the acceptance (FINAL-SPEC-HARD-PROOF §2 Rollout, "on"): a request that asks
+  for nothing gets the committed cells, and a production server renders the committed cells whatever
+  the request asks -- never a synthetic fixture.
 */
-test("with the rollout switch off here, Home renders no specimen cell to a request that does not ask", async ({ request }, testInfo) => {
+test("with the rollout switch on, Home renders the committed cells to a request that does not ask", async ({ request }, testInfo) => {
   test.skip(testInfo.project.name !== "390", "one request is enough");
   for (const path of ["/", "/ko"]) {
     const response = await request.get(path);
     expect(response.status()).toBe(200);
-    expect(await response.text(), path).not.toContain("data-specimen-");
+    const html = await response.text();
+    expect([...html.matchAll(/data-specimen-cell="([^"]+)"/g)].map(match => match[1]), path).toEqual(COMMITTED.map(r => r.specimenId));
+    expect(html, path).not.toContain(path === "/" ? "synthetic fixture" : "합성 픽스처");
   }
 });
 
-test("a production server ignores the fixture cookie and renders no specimen cell", async ({ request }, testInfo) => {
+test("a production server ignores the fixture cookie and renders the committed cells, never a fixture", async ({ request }, testInfo) => {
   test.skip(!PRODUCTION_SERVER, "needs a server started without PLAYWRIGHT_LOCAL_HTTP; run with SPECIMEN_SERVER=production");
   test.skip(testInfo.project.name !== "390", "one request is enough");
   for (const path of ["/", "/ko"]) {
     for (const value of ["1", "committed"]) {
       const response = await request.get(path, { headers: { cookie: `${SPECIMEN_FIXTURE_COOKIE}=${value}` } });
       expect(response.status()).toBe(200);
-      expect(await response.text(), `${path} ${value}`).not.toContain("data-specimen-");
+      const html = await response.text();
+      expect([...html.matchAll(/data-specimen-cell="([^"]+)"/g)].map(match => match[1]), `${path} ${value}`).toEqual(COMMITTED.map(r => r.specimenId));
+      expect(html, `${path} ${value}`).not.toContain(path === "/" ? "synthetic fixture" : "합성 픽스처");
     }
   }
 });

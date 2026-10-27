@@ -369,10 +369,10 @@ function homeCase(): EvidenceCase {
 }
 
 /*
-  P2-32. Production renders no specimen strip (SPECIMEN_STRIP_ROLLOUT "preview"), so every test in
-  this file reads the production posture. This one renders the preview posture -- the page a
-  Vercel preview serves, and the page every deployment serves once the switch reads "on" -- and
-  holds it to the same composition rules, so that flipping the switch changes no test here.
+  P2-32. Since hard-proof 2026-10-27 production renders the specimen strip (SPECIMEN_STRIP_ROLLOUT
+  "on"), so every test in this file reads a page with it. This one stubs a Vercel preview, the
+  posture it was written for while the switch read "preview", and holds the strip to the same
+  composition rules; with the switch "on" the preview page and the production page are the same.
 */
 describe("landing v2 -- the composition with the specimen strip rendered", () => {
   afterEach(() => vi.unstubAllEnvs());

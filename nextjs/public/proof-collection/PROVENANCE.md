@@ -66,6 +66,5 @@ SHA-256:
 | `nasa-sp-5079-p074.run.json` | `sha256:eabc62d892bd130696de47fbcc52fbc80bc130aa9bb9b3087bb399c509de989e` | `sha256:1b9e846c7d6005a436fc6de3bb7716007eb9aaf83a15839db0b744a79909a24a` |
 
 `lib/specimen-sources.ts` refuses a production receipt whose licence is not
-`US-GOV-WORK`, `KOGL-0` or `KOGL-1`. tavonel.com does not render the strip
-(`SPECIMEN_STRIP_ROLLOUT` is `"preview"`); these files are served there all the
-same.
+`US-GOV-WORK`, `KOGL-0` or `KOGL-1`. tavonel.com renders the strip at the end of
+Home's second scene (`SPECIMEN_STRIP_ROLLOUT` is `"on"` since 2026-10-27).

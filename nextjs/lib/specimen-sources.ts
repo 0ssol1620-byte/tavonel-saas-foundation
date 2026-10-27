@@ -25,7 +25,8 @@ import committedReceipts from "./specimen-sources.json" with { type: "json" };
   P2-31/P2-32 (register D-03-D-06): two receipts are committed in `specimen-sources.json`, one
   degraded scan and one Korean page (D-04: no table cell until D-29), each read by the deployed OCR
   image on a one-page extract (run receipts under public/proof-collection/specimens/). They render
-  only where `SPECIMEN_STRIP_ROLLOUT` lets them (see `specimenStripLive`). Production renders none.
+  only where `SPECIMEN_STRIP_ROLLOUT` lets them (see `specimenStripLive`); since hard-proof 2026-10-27
+  that is every server, production included.
 
   hard-proof 2026-10-27 (FINAL-SPEC-HARD-PROOF §2): a production receipt also carries `fullPage`, the whole
   page the reader ran on with every region it returned, so the strip draws all of them and not one;
@@ -113,15 +114,21 @@ export const COMMITTED_SPECIMENS: readonly unknown[] = committedReceipts;
 
 /*
   The rollout switch for the committed cells (P2-32). Code-owned: turning them on everywhere is a
-  reviewed one-line change to "on", made after the founder has seen a preview deployment.
+  reviewed one-line change to "on".
 
-  "preview" (today): Vercel preview deployments render the committed cells, so the founder can see
-  them live; Vercel production renders none, and neither does any other server -- except the
-  Playwright test server for a request that asks with SPECIMEN_FIXTURE_COOKIE=committed. Both of
-  Vercel's own variables must say so (VERCEL=1, VERCEL_ENV=preview): a missing one is not a preview,
-  and the unit-test runner, which sets VERCEL_ENV=preview alone (vitest.config.ts), renders nothing.
+  "on" (since hard-proof 2026-10-27, FINAL-SPEC-HARD-PROOF §2 Rollout, under the founder's 2026-10-27
+  instruction and the 2026-10-17 delegation; founder veto open): every server renders the committed
+  cells to every request, Vercel production included. On the Playwright test server a request that
+  asks with SPECIMEN_FIXTURE_COOKIE=1 still gets the synthetic fixtures instead.
+
+  "preview" (the posture before): Vercel preview deployments render the committed cells and nothing
+  else does, except the Playwright test server for a request that asks with
+  SPECIMEN_FIXTURE_COOKIE=committed. Both of Vercel's own variables must say so (VERCEL=1,
+  VERCEL_ENV=preview): a missing one is not a preview, and the unit-test runner, which sets
+  VERCEL_ENV=preview alone (vitest.config.ts), renders nothing. "off" renders the committed cells
+  nowhere. Either is the one-line rollback.
 */
-export const SPECIMEN_STRIP_ROLLOUT: "off" | "preview" | "on" = "preview";
+export const SPECIMEN_STRIP_ROLLOUT: "off" | "preview" | "on" = "on";
 
 export function specimenStripLive(
   env: Record<string, string | undefined> = process.env,
