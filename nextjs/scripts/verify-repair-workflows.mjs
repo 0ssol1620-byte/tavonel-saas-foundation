@@ -653,11 +653,11 @@ for (const binding of [
     browsers: ['e2e/docs-reading-layout.spec.ts', 'e2e/pricing-plan-overview.spec.ts'],
     rows: ["['e2e/docs-reading-layout.spec.ts', ['1440', '390', 'reduced-motion']],", "['e2e/pricing-plan-overview.spec.ts', ['1440', '390']],"],
     neighbors: ['nextjs/lib/billing-catalog.test.tsx', 'nextjs/lib/operations-v2.ts', 'nextjs/lib/mcp-tools.tsx', 'nextjs/lib/g1-copy-truth.ts', 'nextjs/public/developer/tavonel-mcp-2.mjs', 'nextjs/public/developer/tavonel-cli.mjs'] },
-  // Packet delivery (codex/packet-delivery-textlayer-20261102): eight exact paths, eleven direct suites, no browser suite.
+  // Packet delivery (codex/packet-delivery-textlayer-20261102): nine exact paths, twelve direct suites, no browser suite.
   { group: 'packet-delivery-20261102', prefix: 'nextjs/', exportedPaths: PACKET_DELIVERY_AFFECTED_PATHS, exportedSuites: PACKET_DELIVERY_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
-    paths: ['app/api/collections/[id]/download/route.ts', 'lib/ai-package-guidance.ts', 'lib/b30-api-mcp-cli-parity.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/package-contents.ts', 'lib/packet-delivery.test.ts', 'public/developer/tavonel-verify-package.mjs', 'scripts/compiled-world/validate.mjs'],
-    suites: ['lib/ai-package-guidance.test.ts', 'lib/b30-api-mcp-cli-parity.test.ts', 'lib/brand-copy.test.ts', 'lib/collection-download.test.ts', 'lib/compiler-contract.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/developer-distribution.test.ts', 'lib/journey-acceptance.test.ts', 'lib/mcp-server.test.ts', 'lib/packet-delivery.test.ts', 'lib/remote-mcp.test.ts'],
+    paths: ['app/api/collections/[id]/download/route.ts', 'lib/ai-package-guidance.ts', 'lib/b30-api-mcp-cli-parity.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/export-route-authorization.test.ts', 'lib/package-contents.ts', 'lib/packet-delivery.test.ts', 'public/developer/tavonel-verify-package.mjs', 'scripts/compiled-world/validate.mjs'],
+    suites: ['lib/ai-package-guidance.test.ts', 'lib/b30-api-mcp-cli-parity.test.ts', 'lib/brand-copy.test.ts', 'lib/collection-download.test.ts', 'lib/compiler-contract.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/developer-distribution.test.ts', 'lib/export-route-authorization.test.ts', 'lib/journey-acceptance.test.ts', 'lib/mcp-server.test.ts', 'lib/packet-delivery.test.ts', 'lib/remote-mcp.test.ts'],
     browsers: [],
     rows: [],
     neighbors: ['nextjs/app/api/collections/[id]/route.ts', 'nextjs/lib/ai-package-guidance.tsx', 'nextjs/lib/packet-delivery.ts', 'nextjs/lib/consumer-context/consumer-context.ts', 'nextjs/public/developer/tavonel-verify-export.mjs', 'nextjs/scripts/compiled-world/verify-external-roundtrip.py'] },

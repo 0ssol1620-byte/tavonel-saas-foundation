@@ -7486,9 +7486,9 @@ test('affected g1-copy-truth owner: 6 exact paths select 17 direct suites and 2 
 });
 // Packet delivery (codex/packet-delivery-textlayer-20261102): one finite owner, restated independently of the exported constants.
 import { PACKET_DELIVERY_AFFECTED_PATHS, PACKET_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
-test('affected packet-delivery-20261102 owner: 8 exact paths select 11 direct suites and no browser suite; neighbours stay unmapped', () => {
-  const paths = ['app/api/collections/[id]/download/route.ts', 'lib/ai-package-guidance.ts', 'lib/b30-api-mcp-cli-parity.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/package-contents.ts', 'lib/packet-delivery.test.ts', 'public/developer/tavonel-verify-package.mjs', 'scripts/compiled-world/validate.mjs'];
-  const suites = ['lib/ai-package-guidance.test.ts', 'lib/b30-api-mcp-cli-parity.test.ts', 'lib/brand-copy.test.ts', 'lib/collection-download.test.ts', 'lib/compiler-contract.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/developer-distribution.test.ts', 'lib/journey-acceptance.test.ts', 'lib/mcp-server.test.ts', 'lib/packet-delivery.test.ts', 'lib/remote-mcp.test.ts'];
+test('affected packet-delivery-20261102 owner: 9 exact paths select 12 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/api/collections/[id]/download/route.ts', 'lib/ai-package-guidance.ts', 'lib/b30-api-mcp-cli-parity.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/export-route-authorization.test.ts', 'lib/package-contents.ts', 'lib/packet-delivery.test.ts', 'public/developer/tavonel-verify-package.mjs', 'scripts/compiled-world/validate.mjs'];
+  const suites = ['lib/ai-package-guidance.test.ts', 'lib/b30-api-mcp-cli-parity.test.ts', 'lib/brand-copy.test.ts', 'lib/collection-download.test.ts', 'lib/compiler-contract.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/developer-distribution.test.ts', 'lib/export-route-authorization.test.ts', 'lib/journey-acceptance.test.ts', 'lib/mcp-server.test.ts', 'lib/packet-delivery.test.ts', 'lib/remote-mcp.test.ts'];
   assert.deepEqual([[...PACKET_DELIVERY_AFFECTED_PATHS], [...PACKET_DELIVERY_AFFECTED_UNIT_FILES]], [paths, suites]);
   for (const path of paths) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['packet-delivery-20261102'], path);
