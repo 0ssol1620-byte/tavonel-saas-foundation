@@ -15,9 +15,13 @@ PROTOCOL-v4.md §5) moved to where no OCR witness exists yet:
   ocr:hidden-text-suspect    any glyph a reader of the render cannot see: invisible (rule 3)
                              render mode, no ink where the glyph sits (white text,
                              text under an image, clipped away), outside the page,
-                             shorter than MIN_GLYPH_PX in the render, or overlapping
+                             shorter than MIN_GLYPH_PX in the render, overlapping
                              a glyph of another text object (white text over or
-                             under visible text borrows that text's ink)
+                             under visible text borrows that text's ink), or
+                             sharing SAME_OBJECT_OVERLAP_SHARE or more of its box
+                             with a glyph of its own text object (one TJ array that
+                             steps back after every glyph stacks a sentence into
+                             one glyph cell, which the render shows as a dot)
   ocr:image-content          images cover enough of the page that it can hold text  (rule 4)
                              the layer does not have (a scan with a partial layer)
   textlayer                  everything else
@@ -34,13 +38,16 @@ the decoded text, a page beyond the character ceiling -- is not a page decision.
 to OCR, exactly as before this module existed, and the receipt says why. Nothing from a layer that
 failed this way is ever returned.
 
-No threshold here is calibrated. INK_DELTA, IMAGE_AREA_SHARE, MIN_GLYPH_PX and the zero tolerance
-are chosen, recorded in every receipt, and are what the canary measures.
+No threshold here is calibrated. INK_DELTA, IMAGE_AREA_SHARE, MIN_GLYPH_PX,
+SAME_OBJECT_OVERLAP_SHARE and the zero tolerance are chosen, recorded in every receipt, and are
+what the canary measures.
 
-What this rule still does not catch, and the shadow OCR witness measures: a hidden glyph of the
-same text object as the visible one (one TJ array cannot change colour, so it can only garble its
-own visible ink), text squashed by horizontal scaling (Tz) rather than by size, and text drawn in
-a colour close enough to its background to pass INK_DELTA but too faint to read.
+What this rule still does not catch, and the shadow OCR witness measures: glyphs of one text
+object that overlap each other by less than SAME_OBJECT_OVERLAP_SHARE of the smaller box, text
+squashed by horizontal scaling (Tz) rather than by size, and text drawn in a colour close enough
+to its background to pass INK_DELTA but too faint to read. One text object cannot change colour
+inside a TJ array, but that does not make a same-object overlap harmless: stacked glyphs hide
+the text they carry (REVIEW-PRODUCT-R2 B1).
 """
 
 from __future__ import annotations
@@ -69,6 +76,11 @@ UNSEEN_GLYPH_TOLERANCE: Final = 0
 # A letter or digit whose glyph box is shorter than this in the render is unreadable: at the
 # default 1.5 scale, 4 px is about the x-height of 5 pt type.
 MIN_GLYPH_PX: Final = 4.0
+# Two glyphs of one text object sharing at least this share of the smaller box are stacked, not
+# set. REVIEW-PRODUCT-R2 measured the largest same-object share at 0.0 for normal sentences, 8 pt
+# footnotes and kerning pairs, and 1.0 for a sentence stacked into one spot by TJ back-steps.
+# ponytail: uncalibrated, picked between those two points; the shadow measurement (ADR §8) sets it.
+SAME_OBJECT_OVERLAP_SHARE: Final = 0.5
 _OVERLAP_CELL_PT: Final = 16.0  # grid for the glyph-overlap search
 # ponytail: a cell holding more glyphs than this counts them all as overlapping instead of
 # comparing every pair; normal type above MIN_GLYPH_PX puts well under 64 glyphs in a 16 pt cell.
@@ -190,9 +202,16 @@ def _grey(page: pdfium.PdfPage, scale: float) -> Image.Image:
 
 
 def _unseen_glyphs(
-    page: pdfium.PdfPage, textpage: pdfium.PdfTextPage, chars: list[str], scale: float
+    page: pdfium.PdfPage,
+    textpage: pdfium.PdfTextPage,
+    chars: list[str],
+    scale: float,
+    removed: list[pdfium.PdfObject],
 ) -> tuple[int, int, list[str]]:
-    """(letters and digits, how many of them the render does not show, flags)."""
+    """(letters and digits, how many of them the render does not show, flags).
+
+    Every text object removed from the page is appended to `removed`; the caller closes them.
+    """
     flags: list[str] = []
     width, height = (float(v) for v in page.get_size())
     text_objects = list(page.get_objects(filter=[pdfium_c.FPDF_PAGEOBJ_TEXT], max_depth=1))
@@ -214,6 +233,7 @@ def _unseen_glyphs(
     with_text = _grey(page, scale)
     for obj in text_objects:
         page.remove_obj(obj)
+        removed.append(obj)
     without_text = _grey(page, scale)
     if with_text.size != without_text.size:
         raise TextLayerCorrupt("the page rendered at two sizes")
@@ -246,11 +266,17 @@ def _unseen_glyphs(
 
 
 def _overlapping(glyphs: list[tuple[float, float, float, float, int]], candidates: list[int]) -> set[int]:
-    """The candidate glyphs whose box overlaps the box of a glyph from a different text object.
+    """The candidate glyphs whose box overlaps another glyph's box so that a reader cannot see them.
 
-    The ink test asks whether a glyph's box holds ink, not whose ink it is: a white line drawn over
-    or under a visible one finds the visible line's ink in its boxes. Two text objects never put
-    letters on the same spot in a page a person can read, so any such pair is unseen.
+    A glyph of a different text object counts at any overlap. The ink test asks whether a glyph's
+    box holds ink, not whose ink it is: a white line drawn over or under a visible one finds the
+    visible line's ink in its boxes. Two text objects never put letters on the same spot in a page
+    a person can read, so any such pair is unseen.
+
+    A glyph of the same text object counts when the two share SAME_OBJECT_OVERLAP_SHARE or more of
+    the smaller box. One TJ array that steps back after every glyph draws a whole sentence into one
+    glyph cell: every box holds ink (its neighbours'), every box is tall enough, and no other object
+    is near, yet the render shows a dot. Kerning and italics touch at the edges and stay well under.
     """
     cells: dict[tuple[int, int], list[int]] = {}
     hit: set[int] = set()
@@ -264,7 +290,11 @@ def _overlapping(glyphs: list[tuple[float, float, float, float, int]], candidate
                     continue
                 for m in bucket:
                     l2, b2, r2, t2, o2 = glyphs[m]
-                    if o2 != owner and min(right, r2) > max(left, l2) and min(top, t2) > max(bottom, b2):
+                    w, h = min(right, r2) - max(left, l2), min(top, t2) - max(bottom, b2)
+                    if w <= 0 or h <= 0:
+                        continue
+                    smaller = min((right - left) * (top - bottom), (r2 - l2) * (t2 - b2))
+                    if o2 != owner or w * h >= SAME_OBJECT_OVERLAP_SHARE * smaller:
                         hit.update((n, m))
                 bucket.append(n)
     return hit
@@ -316,6 +346,7 @@ def _lines(
 def read_page(page: pdfium.PdfPage, scale: float) -> dict[str, object]:
     """One page's decision. Mutates the page (removes its text objects); open a throwaway copy."""
     textpage = page.get_textpage()
+    removed: list[pdfium.PdfObject] = []
     try:
         chars = _page_chars(textpage)
         text = _page_text(chars)
@@ -326,7 +357,7 @@ def read_page(page: pdfium.PdfPage, scale: float) -> dict[str, object]:
             return {**record, "path": GEOMETRY_UNSUPPORTED}
         width, height = (float(v) for v in page.get_size())
         share = _image_area_share(page, width, height)
-        letters, unseen, flags = _unseen_glyphs(page, textpage, chars, scale)
+        letters, unseen, flags = _unseen_glyphs(page, textpage, chars, scale, removed)
         record.update(letters=letters, unseenLetters=unseen, imageAreaShare=round(share, 4), flags=flags)
         if "invisible-render-mode" in flags or unseen > UNSEEN_GLYPH_TOLERANCE:
             return {**record, "path": HIDDEN_TEXT}
@@ -343,6 +374,10 @@ def read_page(page: pdfium.PdfPage, scale: float) -> dict[str, object]:
         raise TextLayerCorrupt("PDFium could not read the text layer") from exc
     finally:
         textpage.close()
+        # A removed object belongs to the caller. Closed here, after the text page and before the
+        # document, its finalizer cannot run once the document is gone (pypdfium2 5 asserts on it).
+        for obj in removed:
+            obj.close()
 
 
 def read_document(pdf_bytes: bytes, input_sha256: str, scale: float) -> dict[str, object]:
@@ -384,6 +419,7 @@ def read_document(pdf_bytes: bytes, input_sha256: str, scale: float) -> dict[str
             "imageAreaShare": IMAGE_AREA_SHARE,
             "unseenGlyphTolerance": UNSEEN_GLYPH_TOLERANCE,
             "minGlyphPx": MIN_GLYPH_PX,
+            "sameObjectOverlapShare": SAME_OBJECT_OVERLAP_SHARE,
             "renderScale": scale,
         },
         "pages": pages,

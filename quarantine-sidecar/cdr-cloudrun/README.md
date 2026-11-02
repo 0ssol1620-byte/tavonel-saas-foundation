@@ -90,7 +90,7 @@ The container suite verifies structured no-store health and disarm failure with 
 
 `TAVONEL_CDR_TEXT_LAYER_FIRST`가 `"1"`일 때만 동작한다. 미설정이나 `"0"`이면 서명 검증 뒤 503(서비스 쪽 사정이지 문서의 문제가 아니다)이고, 그 밖의 값이면 서비스가 부팅하지 않는다. `service.yaml`은 `"0"`으로 배포한다. 결정과 경계는 `docs/adr/ADR-2026-11-02-text-layer-first-cdr.md`에 있다.
 
-`/v1/disarm`과 같은 서명 요청, digest 확인, 악성코드 검사, 패키지·HTML 거부, LibreOffice 변환, 쪽·픽셀 상한을 거친 뒤 같은 프로세스에서 네트워크 없이 PDFium으로 원본의 텍스트 레이어를 읽는다(`text_layer.py`). 쪽마다 `textlayer`, `ocr:no-text-layer`, `ocr:geometry-unsupported`, `ocr:hidden-text-suspect`, `ocr:image-content` 중 하나로 정하고 JSON receipt(`tavonel.cdr_text_layer.v1`)를 돌려준다. 렌더에 보이지 않는 글자(잉크 없음, 쪽 밖, Tr 3·7, 렌더 높이 4 px 미만, 다른 텍스트 객체의 글자와 겹침)가 하나라도 있는 쪽은 OCR로 보내고 플래그를 단다. 같은 텍스트 객체 안의 겹침, Tz로 누른 글자, 아주 옅은 글자는 잡지 못한다(ADR §3.2). 깨진 레이어는 문서 전체를 `refused`로 돌려주고 텍스트를 하나도 내보내지 않는다. 문서를 만들지 않으므로 래스터 PDF는 그대로 유일한 하류 문서다. 시험은 `tests/test_text_layer.py`.
+`/v1/disarm`과 같은 서명 요청, digest 확인, 악성코드 검사, 패키지·HTML 거부, LibreOffice 변환, 쪽·픽셀 상한을 거친 뒤 같은 프로세스에서 네트워크 없이 PDFium으로 원본의 텍스트 레이어를 읽는다(`text_layer.py`). 쪽마다 `textlayer`, `ocr:no-text-layer`, `ocr:geometry-unsupported`, `ocr:hidden-text-suspect`, `ocr:image-content` 중 하나로 정하고 JSON receipt(`tavonel.cdr_text_layer.v1`)를 돌려준다. 렌더에 보이지 않는 글자(잉크 없음, 쪽 밖, Tr 3·7, 렌더 높이 4 px 미만, 다른 텍스트 객체의 글자와 겹침, 같은 텍스트 객체의 글자와 작은 상자 면적의 0.5 이상 겹침)가 하나라도 있는 쪽은 OCR로 보내고 플래그를 단다. 마지막 규칙은 TJ 배열 하나가 글자마다 뒤로 돌아가 문장 전체를 글자 한 칸에 쌓는 경우를 막는다. 이전 판이 적은 "같은 객체 안의 겹침은 자기 글자를 뭉갤 뿐"은 틀렸다(REVIEW-PRODUCT-R2 B1). 0.5 미만의 같은 객체 겹침, Tz로 누른 글자, 아주 옅은 글자는 잡지 못한다(ADR §3.2). Tz는 플래그를 켜기 전 조건이다(ADR §8). 깨진 레이어는 문서 전체를 `refused`로 돌려주고 텍스트를 하나도 내보내지 않는다. 문서를 만들지 않으므로 래스터 PDF는 그대로 유일한 하류 문서다. 시험은 `tests/test_text_layer.py`.
 
 ## Deployment gate for Google Cloud Run
 

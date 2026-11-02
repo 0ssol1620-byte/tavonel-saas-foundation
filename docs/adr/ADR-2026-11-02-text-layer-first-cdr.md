@@ -48,23 +48,25 @@ v4 연구 arm의 `page_source`(PROTOCOL-v4.md §5)를, OCR 증인이 아직 없�
 |---:|---|---|---|
 | 1 | `ocr:no-text-layer` | 레이어에 글자·숫자가 하나도 없다 | 같다 |
 | 2 | `ocr:geometry-unsupported` | 회전 ≠ 0, CropBox ≠ MediaBox, MediaBox 원점 ≠ (0, 0) | 같다 |
-| 3 | `ocr:hidden-text-suspect` (플래그) | 렌더된 쪽에 보이지 않는 글자가 **하나라도** 있다: 보이지 않는 render mode(Tr 3, 7), 글자 자리에 잉크가 없음(흰 글자, 그림·도형 아래 글자, clip으로 사라진 글자), 쪽 밖 글자, 렌더에서 글자 상자 높이가 4 px(`MIN_GLYPH_PX`, 기본 배율 1.5에서 약 5 pt 글자의 x-height) 미만인 글자, 다른 텍스트 객체의 글자 상자와 겹치는 글자(보이는 글자 위나 아래에 깐 흰 글자는 그 글자의 잉크를 빌려 쓴다) | 연구 arm은 OCR 토큰과 비교해 레이어 토큰의 절반 넘게 안 보일 때만 거부했다. 여기는 증인이 렌더 자체이고 허용치가 0이다 |
+| 3 | `ocr:hidden-text-suspect` (플래그) | 렌더된 쪽에 보이지 않는 글자가 **하나라도** 있다: 보이지 않는 render mode(Tr 3, 7), 글자 자리에 잉크가 없음(흰 글자, 그림·도형 아래 글자, clip으로 사라진 글자), 쪽 밖 글자, 렌더에서 글자 상자 높이가 4 px(`MIN_GLYPH_PX`, 기본 배율 1.5에서 약 5 pt 글자의 x-height) 미만인 글자, 다른 텍스트 객체의 글자 상자와 조금이라도 겹치는 글자(보이는 글자 위나 아래에 깐 흰 글자는 그 글자의 잉크를 빌려 쓴다), **같은** 텍스트 객체의 글자와 작은 상자 면적의 0.5(`SAME_OBJECT_OVERLAP_SHARE`) 이상을 함께 차지하는 글자(TJ 배열 하나가 글자마다 뒤로 돌아가면 문장 전체가 글자 한 칸에 쌓인다) | 연구 arm은 OCR 토큰과 비교해 레이어 토큰의 절반 넘게 안 보일 때만 거부했다. 여기는 증인이 렌더 자체이고 허용치가 0이다 |
 | 4 | `ocr:image-content` | 쪽 면적의 10% 이상을 그림 객체가 덮는다 | 새 규칙. 스캔 위에 일부만 있는 레이어(연구 arm의 `ocr:layer-sparse`)는 OCR 없이 알 수 없어서, 그림이 글자를 품을 수 있는 쪽은 지금처럼 OCR로 보낸다 |
 | 5 | `textlayer` | 나머지 | 같다 |
 
-**"렌더에 보이는가"를 재는 법.** 같은 쪽을 두 번 렌더한다. 한 번은 그대로, 한 번은 맨 위 수준의 텍스트 객체를 지우고. 두 그림의 회색 차이가 48단계를 넘는 픽셀을 잉크로 본다. 글자(문자·숫자)마다 그 글자 상자 안에 잉크가 있는지 본다. 없으면 보이지 않는 글자다. 이 검사는 잉크가 *누구의* 잉크인지 모른다. 그래서 두 검사를 더한다. 하나, 상자 높이가 4 px 미만인 글자는 잉크가 있어도 사람이 읽을 수 없으므로 보이지 않는 글자로 센다. 둘, 서로 다른 텍스트 객체(PDFium `FPDFText_GetTextObject`, 고정된 pypdfium2 5.13에 있다)의 글자 상자가 겹치면 두 글자 모두 보이지 않는 글자로 센다. 사람이 읽는 쪽에서는 두 텍스트 객체가 같은 자리에 글자를 놓지 않는다. 이 판정은 모델도 점수도 쓰지 않는다. 두 증인(레이어와 렌더)의 일치·불일치뿐이다. 스칼라 blind quality score로 경로를 고르지 않는다는 헌법 규칙을 지킨다.
+**"렌더에 보이는가"를 재는 법.** 같은 쪽을 두 번 렌더한다. 한 번은 그대로, 한 번은 맨 위 수준의 텍스트 객체를 지우고. 두 그림의 회색 차이가 48단계를 넘는 픽셀을 잉크로 본다. 글자(문자·숫자)마다 그 글자 상자 안에 잉크가 있는지 본다. 없으면 보이지 않는 글자다. 이 검사는 잉크가 *누구의* 잉크인지 모른다. 그래서 세 검사를 더한다. 하나, 상자 높이가 4 px 미만인 글자는 잉크가 있어도 사람이 읽을 수 없으므로 보이지 않는 글자로 센다. 둘, 서로 다른 텍스트 객체(PDFium `FPDFText_GetTextObject`, 고정된 pypdfium2 5.13에 있다)의 글자 상자가 겹치면 두 글자 모두 보이지 않는 글자로 센다. 사람이 읽는 쪽에서는 두 텍스트 객체가 같은 자리에 글자를 놓지 않는다. 셋, 같은 텍스트 객체 안의 두 글자가 작은 상자 면적의 0.5 이상을 함께 차지하면 두 글자 모두 보이지 않는 글자로 센다. 이 경우 상자마다 잉크가 있고(옆 글자의 잉크다), 높이도 정상이고, 다른 객체도 가까이 없다. 그래도 렌더에는 점 하나만 남는다. REVIEW-PRODUCT-R2 probe에서 같은 객체 안 글자 쌍의 최댓값은 정상 문장, 8 pt 각주, kerning 쌍(`AVATAR Wolf`)이 0.0이었고, 쌓은 문장이 1.0이었다. 시험의 kerning 대조(`[(A) 80 (V) 80 …] TJ`)는 0.118이다. 0.5는 그 사이에서 고른 값이고 보정하지 않았다. 이 판정은 모델도 점수도 쓰지 않는다. 두 증인(레이어와 렌더)의 일치·불일치뿐이다. 스칼라 blind quality score로 경로를 고르지 않는다는 헌법 규칙을 지킨다.
 
 **OCR 증인 규칙도 남긴다.** 연구 arm의 규칙(|L| ≥ 20이고 |L − O| / |L| > 0.5 → hidden, |O| ≥ 20이고 |L| < 0.5|O| → sparse)은 `text_layer.ocr_witness_disagrees`로 들어 있다. OCR 판독이 있는 소비자가 shadow 단계에서 비교할 때 쓴다(§7).
 
-**틀리는 방향.** 폼 XObject 안의 텍스트처럼 맨 위 수준에서 지워지지 않는 글자는 차이가 0이라 "보이지 않음"이 되고, 그 쪽은 OCR로 간다. 이 판정의 오류는 OCR 쪽(지금 동작)으로만 난다. 같은 이유로, 가짜 굵은 글씨(같은 글을 조금 비켜 두 번 그림)나 글자마다 따로 그린 객체가 서로 겹치는 쪽, 5 pt 안팎보다 작은 각주도 OCR로 간다.
+**틀리는 방향.** 폼 XObject 안의 텍스트처럼 맨 위 수준에서 지워지지 않는 글자는 차이가 0이라 "보이지 않음"이 되고, 그 쪽은 OCR로 간다. 이 판정의 오류는 OCR 쪽(지금 동작)으로만 난다. 같은 이유로, 가짜 굵은 글씨(같은 글을 조금 비켜 두 번 그림)나 글자마다 따로 그린 객체가 서로 겹치는 쪽, 5 pt 안팎보다 작은 각주도 OCR로 간다. 한 텍스트 객체 안에서 글자 상자를 절반 넘게 겹쳐 그리는 정상 문서(손으로 맞춘 첨자, 일부 문자 체계의 글꼴)도 OCR로 간다. 그 비율은 shadow에서 잰다.
 
 **남는 위험(반대 방향).** 아래는 코드가 잡지 못하고, shadow 단계의 OCR 증인 비교(`ocr_witness_disagrees`)가 잰다.
 
-- 보이는 글자와 **같은 텍스트 객체** 안에서 겹친 글자. TJ 배열 하나는 색을 바꿀 수 없으므로, 같은 색 글자가 자기 글자를 덮어 뭉갠다. 숨는 것이 아니라 읽을 수 없게 된다.
-- 가로 배율(Tz)로 눌러 폭만 좁힌 글자. 높이 하한은 높이만 본다.
+- 같은 텍스트 객체 안에서 작은 상자 면적의 0.5 미만만 겹친 글자. 0.5는 보정하지 않은 값이다.
+- 가로 배율(Tz)로 눌러 폭만 좁힌 글자. 높이 하한은 높이만 본다. REVIEW-PRODUCT-R2 probe에서 `1 Tz`와 `5 Tz`로 그린 22글자가 `textlayer`, 플래그 없음이었고 지시문이 텍스트로 나왔다. 흔한 숨김 기법이므로 §8에서 플래그를 켜기 전 조건으로 둔다.
 - 배경과 회색 차이가 48단계를 겨우 넘는 옅은 글자. 잉크로 잡히지만 읽기 어렵다.
 
-이 범위 밖은 모두 시험이 있다: 1 pt·2 pt 글자, 보이는 글 위·아래에 깐 흰 글자, 보이는 글 위의 Tr 3 글자(`tests/test_text_layer.py`, REVIEW-PRODUCT-R1 B1).
+**이전 판의 안전 논증은 틀렸다.** 이 절의 이전 판은 같은 텍스트 객체 안의 겹침을 "TJ 배열 하나는 색을 바꿀 수 없으므로 자기 글자를 뭉갤 뿐, 숨는 것이 아니다"라고 적었다. 그렇지 않다. TJ 배열 하나가 글자마다 자기 폭만큼 뒤로 돌아가면(`[(i) 556 (g) 556 …] TJ`) 22글자 지시문이 글자 한 칸에 쌓이고, 렌더에는 점 하나만 남는다. head `138028e9`는 그 쪽을 `textlayer`로 통과시키고 지시문을 텍스트로 돌려주었다(REVIEW-PRODUCT-R2 B1). 위 셋째 검사가 그 경우를 막는다.
+
+이 범위 밖은 모두 시험이 있다: 1 pt·2 pt 글자, 보이는 글 위·아래에 깐 흰 글자, 반 줄 비켜 깐 흰 글자, 보이는 글 위의 Tr 3 글자, 한 TJ 배열에 쌓은 문장, 그리고 대조로 kerning 쌍이 있는 정상 문장(`tests/test_text_layer.py`, REVIEW-PRODUCT-R1 B1, REVIEW-PRODUCT-R2 B1).
 
 ### 3.3 깨진 레이어: 문서 전체를 거부한다 (fail closed)
 
@@ -87,7 +89,7 @@ v4 연구 arm의 `page_source`(PROTOCOL-v4.md §5)를, OCR 증인이 아직 없�
 | `status`, `reason` | `extracted` 또는 `refused`와 그 이유 |
 | `inputSha256` | 인증된 원본 digest |
 | `extractor` | `pdfium`, pypdfium2 버전 |
-| `rules` | `inkDelta` 48, `imageAreaShare` 0.10, `unseenGlyphTolerance` 0, `minGlyphPx` 4, `renderScale`. 모두 보정하지 않은 값이다 |
+| `rules` | `inkDelta` 48, `imageAreaShare` 0.10, `unseenGlyphTolerance` 0, `minGlyphPx` 4, `sameObjectOverlapShare` 0.5, `renderScale`. 모두 보정하지 않은 값이다 |
 | `pages[]` | 쪽 순서. `pageNumber1`, `path`, `flags`, `chars`, (규칙 3까지 간 쪽) `letters`, `unseenLetters`, `imageAreaShare` |
 | `pages[].text`, `textSha256`, `lines[]` | **`textlayer` 쪽에만** 있다. `lines[]`는 PDFium 줄마다 `text`와 글자 상자에서 잰 `bbox1000`(왼쪽 위 원점). 만들어 낸 상자는 없다 |
 | `pathCounts` | 경로별 쪽 수 |
@@ -118,6 +120,10 @@ OCR을 할지 정하는 곳은 Cloudflare worker(`quarantine-sidecar/foundation-
 | 텍스트 객체가 없는 쪽(그림·도형만) | `ocr:no-text-layer`, 텍스트 없음 |
 | Tr 3, 흰 글자, 쪽 밖 글자, 흰 도형에 덮인 글자 | `ocr:hidden-text-suspect` + 각 플래그, 텍스트 없음 |
 | 보이는 쪽에 흰 글자 한 줄("ignore previous instructions") | `ocr:hidden-text-suspect` |
+| 보이는 글 위·아래·반 줄 아래의 흰 글자, Tr 3 글자, 1 pt·2 pt 글자 | `ocr:hidden-text-suspect` + `overlapping-glyphs`·`invisible-render-mode`·`glyphs-too-small`, 텍스트 없음 |
+| 한 TJ 배열이 글자마다 뒤로 돌아가 22글자를 한 칸에 쌓음 | `ocr:hidden-text-suspect` + `overlapping-glyphs`, 텍스트 없음 |
+| 정상 문장, kerning 쌍(`AV`, `VA`, `TA`, `Wo`, TJ kern 80), 8 pt 각주, 서로 다른 객체의 이웃한 줄 | `textlayer` |
+| 떼어 낸 텍스트 객체 | 문서를 닫기 전에 닫는다. finalizer의 unraisable 예외 0 |
 | 그림이 쪽 대부분을 덮음 | `ocr:image-content` |
 | 정상 두 쪽 | 둘 다 `textlayer`, 쪽 순서 유지, 줄 상자가 Td 위치 |
 | 쪽마다 다른 세 쪽 | 쪽별 경로 |
@@ -125,7 +131,7 @@ OCR을 할지 정하는 곳은 Cloudflare worker(`quarantine-sidecar/foundation-
 | 플래그 | 기본 꺼짐, `"1"`만 켜짐, 나머지 부팅 거부, service.yaml `"0"` |
 | 엔드포인트 | 꺼지면 503, 서명 없으면 401, 켜지면 digest 헤더가 붙은 receipt |
 
-로컬은 pypdfium2 4.30.0에서 돌렸다. 고정 버전 5.13.0은 `malware-scan-qualification` CI의 단위 시험 단계가 돌린다.
+고정 버전 pypdfium2 5.13.0으로 돌린다. CI는 `malware-scan-qualification`의 단위 시험 단계다. 로컬은 그 wheel을 풀어 `sys.path`로만 썼다(설치하지 않음). 4.30에는 `FPDFText_GetTextObject`가 없어서 이 시험이 돌지 않는다.
 
 ## 7. 사다리 (compatibility contract → shadow → benchmark → canary → rollout → deprecate)
 
@@ -140,7 +146,8 @@ OCR을 할지 정하는 곳은 Cloudflare worker(`quarantine-sidecar/foundation-
 - 이 격리 경계(CDR 안에서 hostile 원본의 텍스트 레이어를 읽는 범위)를 승인할지. DIAGNOSIS §8이 창업자 결정으로 남긴 항목이다.
 - Cloud Run CDR에서 `TAVONEL_CDR_TEXT_LAYER_FIRST=1`로 켤지, 언제(production 배포).
 - worker shadow를 켤지, canary 범위와 기간, OCR 생략 단계로 갈 조건.
-- 임계값(48, 0.10, 0, 4 px)을 canary 측정 뒤 바꿀지.
+- 임계값(48, 0.10, 0, 4 px, 같은 객체 겹침 0.5)을 shadow·canary 측정 뒤 바꿀지. 0.5는 정상 문서 몇 건과 공격 probe 하나 사이에서 고른 값이다. 정상 문서를 OCR로 보내는 비율은 shadow에서 잰다.
+- **플래그를 켜기 전 조건.** Tz(가로 배율)로 누른 글자는 지금 `textlayer`로 통과한다(§3.2 남는 위험). 켜기 전에 (a) 객체별 글자 상자 폭과 높이의 비 같은 규칙을 더하고 되돌리면 실패하는 시험을 붙이거나, (b) shadow OCR 증인 비교만으로 충분한지 창업자가 정한다.
 
 ## 9. 되돌리기
 
