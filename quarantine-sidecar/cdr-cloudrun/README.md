@@ -90,7 +90,16 @@ The container suite verifies structured no-store health and disarm failure with 
 
 `TAVONEL_CDR_TEXT_LAYER_FIRST`가 `"1"`일 때만 동작한다. 미설정이나 `"0"`이면 서명 검증 뒤 503(서비스 쪽 사정이지 문서의 문제가 아니다)이고, 그 밖의 값이면 서비스가 부팅하지 않는다. `service.yaml`은 `"0"`으로 배포한다. 결정과 경계는 `docs/adr/ADR-2026-11-02-text-layer-first-cdr.md`에 있다.
 
-`/v1/disarm`과 같은 서명 요청, digest 확인, 악성코드 검사, 패키지·HTML 거부, LibreOffice 변환, 쪽·픽셀 상한을 거친 뒤 같은 프로세스에서 네트워크 없이 PDFium으로 원본의 텍스트 레이어를 읽는다(`text_layer.py`). 쪽마다 `textlayer`, `ocr:no-text-layer`, `ocr:geometry-unsupported`, `ocr:hidden-text-suspect`, `ocr:image-content` 중 하나로 정하고 JSON receipt(`tavonel.cdr_text_layer.v1`)를 돌려준다. 렌더에 보이지 않는 글자(잉크 없음, 쪽 밖, Tr 3·7, 렌더 높이 4 px 미만, 다른 텍스트 객체의 글자와 겹침, 같은 텍스트 객체의 글자와 작은 상자 면적의 0.5 이상 겹침)가 하나라도 있는 쪽은 OCR로 보내고 플래그를 단다. 마지막 규칙은 TJ 배열 하나가 글자마다 뒤로 돌아가 문장 전체를 글자 한 칸에 쌓는 경우를 막는다. 이전 판이 적은 "같은 객체 안의 겹침은 자기 글자를 뭉갤 뿐"은 틀렸다(REVIEW-PRODUCT-R2 B1). 0.5 미만의 같은 객체 겹침, Tz로 누른 글자, 아주 옅은 글자는 잡지 못한다(ADR §3.2). Tz는 플래그를 켜기 전 조건이다(ADR §8). 깨진 레이어는 문서 전체를 `refused`로 돌려주고 텍스트를 하나도 내보내지 않는다. 문서를 만들지 않으므로 래스터 PDF는 그대로 유일한 하류 문서다. 시험은 `tests/test_text_layer.py`.
+`/v1/disarm`과 같은 서명 요청, digest 확인, 악성코드 검사, 패키지·HTML 거부, LibreOffice 변환, 쪽·픽셀 상한을 거친 뒤 같은 프로세스에서 네트워크 없이 PDFium으로 원본의 텍스트 레이어를 읽는다(`text_layer.py`). 쪽마다 `textlayer`, `ocr:no-text-layer`, `ocr:geometry-unsupported`, `ocr:hidden-text-suspect`, `ocr:image-content` 중 하나로 정하고 JSON receipt(`tavonel.cdr_text_layer.v1`)를 돌려준다. 아래 휴리스틱 중 하나에 걸리는 글자가 하나라도 있는 쪽은 OCR로 보내고 플래그를 단다: 잉크 없음, 잉크가 글자 픽셀 상자의 0.15 미만(얇은 띠만 남긴 clip·도형), 쪽 밖, Tr 3·7, 렌더 높이 4 px 미만(쪽 상자 높이와 텍스트 행렬로 잰 em 크기 중 작은 쪽), 다른 텍스트 객체의 글자와 겹침, 같은 텍스트 객체의 글자와 작은 상자 면적의 0.5 이상 겹침.
+
+**이것은 적대적 입력에 대한 휴리스틱이고, 완전성은 주장하지 않는다.** 이전 두 판은 실제보다 넓게 적었다(REVIEW-PRODUCT-R2 B1, R3 B1). 시도한 구성과 결과는 ADR §3.2 표에 있다. 요약하면:
+
+| 결과 | 구성 |
+|---|---|
+| 잡힘 | 보이는 글 위·아래·반 줄 아래의 흰 글자, 보이는 글 위의 Tr 3, 1–2 pt 글자, TJ·Tc·두 객체로 한 자리에 쌓은 문장, 전부 가린 clip·도형, 14 pt 글자에 0.4–3 pt 띠만 남긴 clip·흰 도형(R3부터), 1 pt 글자를 30배 늘리고 90° 돌림(R3부터), 14 pt 글자의 `1`–`15 Tz`(R3부터) |
+| 못 잡음 | 14 pt 글자에 4 pt 이상 띠를 남긴 부분 가림, `20 Tz` 이상, 회색 차이가 48보다 충분히 큰 옅은 글자(흰 바탕 0.70·0.75), 0.5 미만의 같은 객체 겹침, 글자 지도 위조(`/Differences`+`/ToUnicode`, Type3, 모양을 바꾼 임베디드 글꼴) |
+
+글자 지도 위조는 어떤 기하 규칙으로도 잡을 수 없다. 렌더 차분은 글자 자리에 잉크가 있다는 것만 보여 주고, 그 잉크가 레이어의 글자라는 것은 보여 주지 못한다. OCR 증인만 잡는다. 그래서 **`textlayer`는 경로 우선순위일 뿐 OCR 생략 허가가 아니다.** 같은 문서의 shadow OCR 증인이 그 쪽에서 일치하고 그 일치율이 창업자가 정한 임계값 이상이 되기 전에는, 텍스트 레이어가 어떤 쪽의 OCR 출력도 대신하지 않는다(ADR §3.5, §5, §8). worker 쪽은 구현하지 않았으므로 지금 OCR 생략은 0쪽이다. 깨진 레이어는 문서 전체를 `refused`로 돌려주고 텍스트를 하나도 내보내지 않는다. 문서를 만들지 않으므로 래스터 PDF는 그대로 유일한 하류 문서다. 시험은 `tests/test_text_layer.py`.
 
 ## Deployment gate for Google Cloud Run
 

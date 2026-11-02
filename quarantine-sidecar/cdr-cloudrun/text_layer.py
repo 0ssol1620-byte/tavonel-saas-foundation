@@ -12,16 +12,19 @@ PROTOCOL-v4.md §5) moved to where no OCR witness exists yet:
 
   ocr:no-text-layer          the layer has no letter or digit                       (rule 1)
   ocr:geometry-unsupported   rotation, CropBox != MediaBox or a moved origin        (rule 2)
-  ocr:hidden-text-suspect    any glyph a reader of the render cannot see: invisible (rule 3)
+  ocr:hidden-text-suspect    any glyph that trips one of these heuristics: invisible (rule 3)
                              render mode, no ink where the glyph sits (white text,
-                             text under an image, clipped away), outside the page,
-                             shorter than MIN_GLYPH_PX in the render, overlapping
-                             a glyph of another text object (white text over or
-                             under visible text borrows that text's ink), or
-                             sharing SAME_OBJECT_OVERLAP_SHARE or more of its box
-                             with a glyph of its own text object (one TJ array that
-                             steps back after every glyph stacks a sentence into
-                             one glyph cell, which the render shows as a dot)
+                             text under an image, clipped away), ink over less than
+                             MIN_INK_COVERAGE of its pixel box (a clip or a later
+                             shape leaves a thin band), outside the page, shorter
+                             than MIN_GLYPH_PX in the render by its page box or by
+                             its em size from the text matrix (a 1 pt glyph turned
+                             90 degrees and stretched), overlapping a glyph of
+                             another text object (white text over or under visible
+                             text borrows that text's ink), or sharing
+                             SAME_OBJECT_OVERLAP_SHARE or more of its box with a
+                             glyph of its own text object (one TJ array that steps
+                             back after every glyph stacks a sentence into a dot)
   ocr:image-content          images cover enough of the page that it can hold text  (rule 4)
                              the layer does not have (a scan with a partial layer)
   textlayer                  everything else
@@ -29,8 +32,9 @@ PROTOCOL-v4.md §5) moved to where no OCR witness exists yet:
 Rule 3 is stricter than the research arm. There the witness was the OCR of the render and the
 pre-registered tolerance was half the layer's tokens unseen; here the witness is the render
 itself, compared with the same page rendered with its text objects removed, and the tolerance is
-zero: a page that hides one letter goes to OCR and is flagged. `ocr_witness_disagrees` keeps the
-research rule for the consumer that does hold an OCR reading of the page (shadow mode).
+zero: a page with one glyph that trips a check goes to OCR and is flagged.
+`ocr_witness_disagrees` keeps the research rule for the consumer that does hold an OCR reading of
+the page (shadow mode).
 
 A layer that cannot be read as text -- PDFium errors, a negative character count, U+FFFD or NUL in
 the decoded text, a page beyond the character ceiling -- is not a page decision. It raises
@@ -38,16 +42,31 @@ the decoded text, a page beyond the character ceiling -- is not a page decision.
 to OCR, exactly as before this module existed, and the receipt says why. Nothing from a layer that
 failed this way is ever returned.
 
-No threshold here is calibrated. INK_DELTA, IMAGE_AREA_SHARE, MIN_GLYPH_PX,
+No threshold here is calibrated. INK_DELTA, IMAGE_AREA_SHARE, MIN_GLYPH_PX, MIN_INK_COVERAGE,
 SAME_OBJECT_OVERLAP_SHARE and the zero tolerance are chosen, recorded in every receipt, and are
 what the canary measures.
 
-What this rule still does not catch, and the shadow OCR witness measures: glyphs of one text
-object that overlap each other by less than SAME_OBJECT_OVERLAP_SHARE of the smaller box, text
-squashed by horizontal scaling (Tz) rather than by size, and text drawn in a colour close enough
-to its background to pass INK_DELTA but too faint to read. One text object cannot change colour
-inside a TJ array, but that does not make a same-object overlap harmless: stacked glyphs hide
-the text they carry (REVIEW-PRODUCT-R2 B1).
+Rule 3 is a heuristic over hostile input. Completeness is NOT claimed: a PDF has more ways to
+draw a glyph nobody can read than these checks name, and two earlier versions of this docstring
+claimed more than the code did (REVIEW-PRODUCT-R2 B1, R3 B1). What was tried, on synthetic pages
+at the pinned pypdfium2 5.13.0 (the full table is ADR §3.2):
+
+  caught      white text over, under or half a line off visible text; Tr 3 over visible text;
+              1-2 pt type; a sentence stacked into one spot by TJ back-steps, Tc or two objects;
+              a full clip or cover; a clip or white shapes leaving a 0.4-3 pt band of 14 pt
+              type (since R3); 1 pt type stretched 30x and turned 90 degrees by Tm or cm (since
+              R3); 1-15 Tz squeeze of 14 pt type (since R3, by the em-size floor)
+  not caught  a band of 4 pt or more of 14 pt type; 20 Tz and above; faint text whose grey
+              still clears INK_DELTA (0.70-0.75 on white); same-object overlap under
+              SAME_OBJECT_OVERLAP_SHARE; a glyph map that lies -- /Differences plus /ToUnicode,
+              Type3 or an edited embedded font drawing one word while the layer says another.
+              No geometry rule can catch the last one: the render proves there is ink where a
+              glyph sits, not that the ink is the glyph the layer names. Only an OCR witness can.
+
+So `textlayer` is a routing priority, never permission to skip OCR. The text-layer path does not
+replace OCR output for any page until a same-document shadow OCR witness agrees
+(`ocr_witness_disagrees`) above a founder-set threshold (ADR §3.5, §5, §8). The worker side is not
+implemented, so no page skips OCR today.
 """
 
 from __future__ import annotations
@@ -62,8 +81,8 @@ from collections.abc import Mapping
 from importlib.metadata import version
 from typing import Final
 
-import pypdfium2 as pdfium
-import pypdfium2.raw as pdfium_c
+import pypdfium2 as pdfium  # type: ignore[import-untyped, unused-ignore]
+import pypdfium2.raw as pdfium_c  # type: ignore[import-untyped, unused-ignore]
 from PIL import Image, ImageChops
 
 FLAG_ENV: Final = "TAVONEL_CDR_TEXT_LAYER_FIRST"
@@ -74,8 +93,17 @@ INK_DELTA: Final = 48  # grey levels of difference that count as ink
 IMAGE_AREA_SHARE: Final = 0.10  # of the page area, summed over top-level image objects
 UNSEEN_GLYPH_TOLERANCE: Final = 0
 # A letter or digit whose glyph box is shorter than this in the render is unreadable: at the
-# default 1.5 scale, 4 px is about the x-height of 5 pt type.
+# default 1.5 scale, 4 px is about the x-height of 5 pt type. The same floor applies to the
+# glyph's effective em size from its text matrix (smallest singular value x font size), so a
+# 1 pt glyph stretched along its baseline and rotated 90 degrees, whose page box is tall, is
+# still too small (REVIEW-PRODUCT-R3 B1).
 MIN_GLYPH_PX: Final = 4.0
+# Inked pixels over the glyph's pixel box. A clip or a later white shape that leaves a 1-2 pt band
+# of a 10 pt glyph leaves ink in every box, but only 0.02-0.12 of it; normal Helvetica, Times,
+# Courier and Helvetica-Bold, 5-72 pt, measured 0.185 (Courier 72 pt "i") and up
+# (REVIEW-PRODUCT-R3 B1). ponytail: uncalibrated, picked between those two; thin display faces
+# fall under it and go to OCR, bands wider than about 3 pt of 14 pt type pass. Shadow sets it.
+MIN_INK_COVERAGE: Final = 0.15
 # Two glyphs of one text object sharing at least this share of the smaller box are stacked, not
 # set. REVIEW-PRODUCT-R2 measured the largest same-object share at 0.0 for normal sentences, 8 pt
 # footnotes and kerning pairs, and 1.0 for a sentence stacked into one spot by TJ back-steps.
@@ -201,6 +229,26 @@ def _grey(page: pdfium.PdfPage, scale: float) -> Image.Image:
         bitmap.close()
 
 
+def _em_height(textpage: pdfium.PdfTextPage, index: int) -> float:
+    """The glyph's em size in page points along its narrowest axis.
+
+    The text matrix PDFium reports (Tm, cm and Tz together) maps the em square to a parallelogram;
+    its smallest singular value times the font size is how tall, or how narrow, the glyph is drawn,
+    whatever its rotation. The page box alone misses a 1 pt glyph turned 90 degrees and stretched.
+    """
+    m = pdfium_c.FS_MATRIX()
+    if not pdfium_c.FPDFText_GetMatrix(textpage.raw, index, ctypes.byref(m)):
+        raise TextLayerCorrupt("a glyph has no text matrix")
+    size = float(pdfium_c.FPDFText_GetFontSize(textpage.raw, index))
+    squares = m.a * m.a + m.b * m.b + m.c * m.c + m.d * m.d
+    det = abs(m.a * m.d - m.b * m.c)
+    largest = math.sqrt((squares + math.sqrt(max(0.0, squares * squares - 4 * det * det))) / 2)
+    height = det / largest * abs(size) if largest > 0 else 0.0
+    if not math.isfinite(height):
+        raise TextLayerCorrupt("a glyph has no finite text matrix")
+    return height
+
+
 def _unseen_glyphs(
     page: pdfium.PdfPage,
     textpage: pdfium.PdfTextPage,
@@ -219,6 +267,7 @@ def _unseen_glyphs(
         flags.append("invisible-render-mode")
     # Boxes and owning text objects are read before any object is removed from the page.
     glyphs: list[tuple[float, float, float, float, int]] = []
+    heights: list[float] = []  # rendered px: the lower of the page box height and the em size
     for index, char in enumerate(chars):
         if not _ALNUM.match(char):
             continue
@@ -230,6 +279,7 @@ def _unseen_glyphs(
         if owner is None:
             raise TextLayerCorrupt("a glyph has no text object")
         glyphs.append((left, bottom, right, top, owner))
+        heights.append(min(top - bottom, _em_height(textpage, index)) * scale)
     with_text = _grey(page, scale)
     for obj in text_objects:
         page.remove_obj(obj)
@@ -239,12 +289,14 @@ def _unseen_glyphs(
         raise TextLayerCorrupt("the page rendered at two sizes")
     ink = ImageChops.difference(with_text, without_text).point(lambda v: 255 if v > INK_DELTA else 0)
     pixels_w, pixels_h = ink.size
-    counts = dict.fromkeys(("off-page-glyphs", "glyphs-too-small", "overlapping-glyphs", "glyphs-without-ink"), 0)
+    counts = dict.fromkeys(
+        ("off-page-glyphs", "glyphs-too-small", "overlapping-glyphs", "glyphs-without-ink", "glyphs-partly-inked"), 0
+    )
     on_page = [
         n for n, (left, bottom, right, top, _) in enumerate(glyphs)
         if left >= 0 and bottom >= 0 and right <= width and top <= height
     ]
-    readable = [n for n in on_page if (glyphs[n][3] - glyphs[n][1]) * scale >= MIN_GLYPH_PX]
+    readable = [n for n in on_page if heights[n] >= MIN_GLYPH_PX]
     overlapping = _overlapping(glyphs, readable)
     for n, (left, bottom, right, top, _) in enumerate(glyphs):
         box = (
@@ -255,12 +307,17 @@ def _unseen_glyphs(
         )
         if not (left >= 0 and bottom >= 0 and right <= width and top <= height):
             counts["off-page-glyphs"] += 1
-        elif (top - bottom) * scale < MIN_GLYPH_PX:
+        elif heights[n] < MIN_GLYPH_PX:
             counts["glyphs-too-small"] += 1
         elif n in overlapping:
             counts["overlapping-glyphs"] += 1
-        elif box[2] <= box[0] or box[3] <= box[1] or ink.crop(box).getbbox() is None:
-            counts["glyphs-without-ink"] += 1
+        else:
+            area = (box[2] - box[0]) * (box[3] - box[1]) if box[2] > box[0] and box[3] > box[1] else 0
+            inked = ink.crop(box).histogram()[255] if area else 0
+            if inked == 0:
+                counts["glyphs-without-ink"] += 1
+            elif inked < MIN_INK_COVERAGE * area:
+                counts["glyphs-partly-inked"] += 1
     flags.extend(f"{name}:{count}" for name, count in counts.items() if count)
     return len(glyphs), sum(counts.values()), flags
 
@@ -419,6 +476,7 @@ def read_document(pdf_bytes: bytes, input_sha256: str, scale: float) -> dict[str
             "imageAreaShare": IMAGE_AREA_SHARE,
             "unseenGlyphTolerance": UNSEEN_GLYPH_TOLERANCE,
             "minGlyphPx": MIN_GLYPH_PX,
+            "minInkCoverage": MIN_INK_COVERAGE,
             "sameObjectOverlapShare": SAME_OBJECT_OVERLAP_SHARE,
             "renderScale": scale,
         },
