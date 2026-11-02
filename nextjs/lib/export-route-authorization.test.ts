@@ -1,4 +1,4 @@
-import { generateKeyPairSync } from "node:crypto";
+import { createHash, generateKeyPairSync } from "node:crypto";
 import { unzipSync } from "fflate";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { compileCollectionCandidate } from "./collection-compiler";
@@ -100,6 +100,23 @@ describe.each([["direct", direct], ["v1", versioned]] as const)("%s export autho
     expect(response.status).toBe(401);
     expect(response.headers.get("content-type")).not.toBe("application/zip");
     expect(await response.json()).toEqual({ code: "API_KEY_REVOKED" });
+    expect(mocks.release).toHaveBeenCalled();
+  });
+  // REVIEW-PRODUCT-R1 B2: the delivery copy is signed with the package, so a chunk file it cannot
+  // render whole is a refused download with the reason, never an archive.
+  it.each([
+    ["not JSON", "{not json\n", "DELIVERY_PACKET_INVALID"],
+    ["a chunk with no evidence id", `${JSON.stringify({ chunkId: "c", text: "t", sourceVersionId: "v", pageNumber1: 1, bbox1000: null })}\n`, "DELIVERY_ITEM_INVALID"],
+  ])("refuses a package whose rag/chunks.jsonl is %s with 422 and no archive", async (_, content, code) => {
+    const files = artifact.package.files.map((file) => file.path !== "rag/chunks.jsonl" ? file : {
+      ...file, content, sizeBytes: Buffer.byteLength(content), sha256: `sha256:${createHash("sha256").update(content, "utf8").digest("hex")}`,
+    });
+    mocks.load.mockResolvedValue({ ok: true, value: { artifact: { ...artifact, package: { ...artifact.package, files } } } });
+    const response = await run();
+    expect(response.status).toBe(422);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("content-type")).not.toBe("application/zip");
+    expect(await response.json()).toEqual({ code });
     expect(mocks.release).toHaveBeenCalled();
   });
 });
