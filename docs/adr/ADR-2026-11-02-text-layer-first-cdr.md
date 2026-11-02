@@ -38,7 +38,7 @@ CDR이 이미 PDFium을 여는 같은 격리 단계 안에서, 같은 프로세�
 | 입력 경계 | `/v1/disarm`과 같은 HMAC·타임스탬프·request id·입력 digest 계약(`request_boundary.py` `AUTHENTICATED_PATHS`), 같은 ClamAV 판정, 같은 Office 패키지·HTML 거부, 같은 LibreOffice 변환, 같은 쪽 수·픽셀 상한 |
 | 출력 | JSON 데이터뿐이다. 문서를 만들지 않는다. 텍스트는 실행·해석·렌더되지 않는다. 래스터 PDF에 텍스트 레이어를 다시 넣지 않는다 |
 | hostile document 규칙 | 그대로다. 문서는 적대적 데이터이고, 파싱 모델에게 도구·자격 증명·외부 네트워크가 없다. 레이어 텍스트도 같은 취급이다(하류 packet의 delivery 형식은 텍스트가 header를 위조하지 못하게 한 줄에 가둔다) |
-| 꺼짐 | 플래그가 꺼져 있으면 `/v1/text-layer`는 서명 검증 뒤 404다. 아무것도 읽지 않는다 |
+| 꺼짐 | 플래그가 꺼져 있으면 `/v1/text-layer`는 서명 검증 뒤 503이다. 아무것도 읽지 않는다. 4xx가 아닌 것은 worker의 고정 실패 분류(`sanitize.ts` `CDR_DETAIL_FAILURE_CLASS`)가 4xx를 문서에 대한 판정으로 읽기 때문이다 |
 
 ### 3.2 쪽 규칙 (위에서부터 처음 맞는 것)
 
@@ -65,6 +65,7 @@ v4 연구 arm의 `page_source`(PROTOCOL-v4.md §5)를, OCR 증인이 아직 없�
 - PDFium이 텍스트 레이어를 읽지 못한다, 글자 수가 음수이거나 쪽당 200,000자를 넘는다.
 - 코드 포인트가 U+FFFD, NUL, 짝 없는 surrogate다(코드 포인트는 pypdfium2 helper가 아니라 `FPDFText_GetUnicode`로 직접 읽는다. 4.x helper는 쪽 경계 안으로 바꿔 읽고 디코딩 오류를 버리기 때문이다).
 - 글자 상자가 유한하지 않다, 두 렌더의 크기가 다르다.
+- 그 밖에 이 서비스가 실패하면 receipt 없이 5xx다. 문서에 대한 판정으로 기록되지 않는다.
 
 이때 receipt는 `status: "refused"`, `reason`, 모든 쪽 `ocr:text-layer-refused`다. **그 레이어의 텍스트는 한 글자도 돌려주지 않는다.** 모든 쪽이 지금처럼 OCR로 간다. 조용한 fallback이 아니다: 거부와 이유가 receipt에 남는다.
 
@@ -114,7 +115,7 @@ OCR을 할지 정하는 곳은 Cloudflare worker(`quarantine-sidecar/foundation-
 | 쪽마다 다른 세 쪽 | 쪽별 경로 |
 | ToUnicode가 U+FFFD로 매핑된 글꼴 | `refused`, 모든 쪽 `ocr:text-layer-refused`, 텍스트 0 |
 | 플래그 | 기본 꺼짐, `"1"`만 켜짐, 나머지 부팅 거부, service.yaml `"0"` |
-| 엔드포인트 | 꺼지면 404, 서명 없으면 401, 켜지면 digest 헤더가 붙은 receipt |
+| 엔드포인트 | 꺼지면 503, 서명 없으면 401, 켜지면 digest 헤더가 붙은 receipt |
 
 로컬은 pypdfium2 4.30.0에서 돌렸다. 고정 버전 5.13.0은 `malware-scan-qualification` CI의 단위 시험 단계가 돌린다.
 

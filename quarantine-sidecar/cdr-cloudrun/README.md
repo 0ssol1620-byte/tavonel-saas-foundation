@@ -88,7 +88,7 @@ The container suite verifies structured no-store health and disarm failure with 
 
 ## Text-layer-first reading (`/v1/text-layer`, 기본 꺼짐)
 
-`TAVONEL_CDR_TEXT_LAYER_FIRST`가 `"1"`일 때만 동작한다. 미설정이나 `"0"`이면 서명 검증 뒤 404이고, 그 밖의 값이면 서비스가 부팅하지 않는다. `service.yaml`은 `"0"`으로 배포한다. 결정과 경계는 `docs/adr/ADR-2026-11-02-text-layer-first-cdr.md`에 있다.
+`TAVONEL_CDR_TEXT_LAYER_FIRST`가 `"1"`일 때만 동작한다. 미설정이나 `"0"`이면 서명 검증 뒤 503(서비스 쪽 사정이지 문서의 문제가 아니다)이고, 그 밖의 값이면 서비스가 부팅하지 않는다. `service.yaml`은 `"0"`으로 배포한다. 결정과 경계는 `docs/adr/ADR-2026-11-02-text-layer-first-cdr.md`에 있다.
 
 `/v1/disarm`과 같은 서명 요청, digest 확인, 악성코드 검사, 패키지·HTML 거부, LibreOffice 변환, 쪽·픽셀 상한을 거친 뒤 같은 프로세스에서 네트워크 없이 PDFium으로 원본의 텍스트 레이어를 읽는다(`text_layer.py`). 쪽마다 `textlayer`, `ocr:no-text-layer`, `ocr:geometry-unsupported`, `ocr:hidden-text-suspect`, `ocr:image-content` 중 하나로 정하고 JSON receipt(`tavonel.cdr_text_layer.v1`)를 돌려준다. 렌더에 보이지 않는 글자가 하나라도 있는 쪽은 OCR로 보내고 플래그를 단다. 깨진 레이어는 문서 전체를 `refused`로 돌려주고 텍스트를 하나도 내보내지 않는다. 문서를 만들지 않으므로 래스터 PDF는 그대로 유일한 하류 문서다. 시험은 `tests/test_text_layer.py`.
 

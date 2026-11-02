@@ -815,7 +815,9 @@ def read_text_layer(request: Request, source: UploadFile = File(...)) -> Respons
     /v1/disarm stays the only artifact a downstream reader opens.
     """
     if not text_layer.text_layer_enabled():
-        raise HTTPException(404, "CDR text layer is disabled")
+        # 503, not 4xx: "this deployment does not read layers" is a statement about the service, and
+        # the worker's frozen failure classes (sanitize.ts) reserve 4xx details for the document.
+        raise HTTPException(503, "CDR text layer is disabled")
     expected_digest = getattr(request.state, "cdr_authenticated_input_sha256", None)
     if not isinstance(expected_digest, str):
         raise HTTPException(401, "CDR request boundary authentication is required")
@@ -831,10 +833,9 @@ def read_text_layer(request: Request, source: UploadFile = File(...)) -> Respons
         reject_active_html(input_path, mime_type)
         pdf_source = convert_to_pdf(input_path, mime_type, work_dir)
         scale = qualified_text_layer_scale(pdf_source)
-        try:
-            receipt = text_layer.read_document(pdf_source.read_bytes(), expected_digest, scale)
-        except (OSError, pdfium.PdfiumError, ValueError) as exc:
-            raise HTTPException(422, "CDR text layer could not be read safely") from exc
+        # A layer PDFium cannot read is a refused receipt, not an error (text_layer.read_document);
+        # anything else raised here is this service failing, and surfaces as one.
+        receipt = text_layer.read_document(pdf_source.read_bytes(), expected_digest, scale)
     finally:
         source.file.close()
         remove_tree(work_dir)

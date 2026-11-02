@@ -189,7 +189,7 @@ class EndpointTest(unittest.TestCase):
     def test_disabled_by_default(self) -> None:
         with patch.dict(os.environ, {"TAVONEL_CDR_TEXT_LAYER_FIRST": "0"}):
             response = self.post(pdf([VISIBLE % SENTENCE]))
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 503)
         self.assertEqual(response.headers["cache-control"], "no-store")
 
     def test_requires_the_same_signed_request_as_disarm(self) -> None:
