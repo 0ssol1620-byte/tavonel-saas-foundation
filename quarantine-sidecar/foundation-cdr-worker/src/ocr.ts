@@ -84,8 +84,16 @@ export type OcrDispatchResult = {
   observedPageCount?: number;
   readerRevision?: string;
   readerBindingSha256?: string;
+  /**
+   * Range mode only: every range stored durably so far, in page order, each by the digest of its
+   * stored bytes. On a written or exists result the list covers every page and `outputSha256` is
+   * the assembled ocr.json; on a failure it is what is stored, and there is no `outputSha256`.
+   */
+  pageRanges?: OcrPageRangeReceipt[];
   computeCredits: 0 | 2;
 };
+
+export type OcrPageRangeReceipt = { start0: number; end0: number; sha256: string };
 
 export type OcrDispatchEnv = {
   FOUNDATION_QUARANTINE: OcrR2Bucket;
@@ -99,10 +107,10 @@ export type OcrDispatchEnv = {
   /** Opt-in only for a pinned v3 reader; a v2 create-once winner cannot satisfy it. */
   FOUNDATION_OCR_CONFLICT_V3_REQUIRED?: string;
   /**
-   * Pages per OCR request. Unset (every deployment today) keeps the one whole-document request.
-   * Set, the PDF is read range by range and `ocr.json` is assembled from the ranges. The reader
-   * must have `TAVONEL_OCR_PAGE_RANGES_ENABLED`. There is no default: the size comes from a
-   * measured seconds-per-page figure (table/limits design A4.1), and none is measured yet.
+   * Pages per OCR request. Unset keeps the one whole-document request. Set, the PDF is read range
+   * by range and `ocr.json` is assembled from the ranges. The reader must have
+   * `TAVONEL_OCR_PAGE_RANGES_ENABLED`. There is no default in code: the size comes from a measured
+   * seconds-per-page figure, and `wrangler.jsonc` says which measurement chose its value.
    */
   FOUNDATION_OCR_PAGE_RANGE_SIZE?: string;
 };
@@ -876,6 +884,9 @@ export type QualifiedPageRange = {
   recognitionConflictCount: number;
 };
 
+/** A range as read back from storage, with the digest of the stored object. */
+type StoredPageRange = QualifiedPageRange & { storedSha256: string };
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
@@ -963,7 +974,7 @@ function rangeFailure(
     inputSha256: run.inputSha256, computeCredits };
 }
 
-async function readStoredRange(run: RangeRun, key: string, start0: number): Promise<QualifiedPageRange | OcrDispatchResult | "missing"> {
+async function readStoredRange(run: RangeRun, key: string, start0: number): Promise<StoredPageRange | OcrDispatchResult | "missing"> {
   let bytes: ArrayBuffer;
   try {
     const object = await run.env.FOUNDATION_QUARANTINE.get(key);
@@ -989,7 +1000,7 @@ async function readStoredRange(run: RangeRun, key: string, start0: number): Prom
   if (run.env.FOUNDATION_OCR_CONFLICT_V3_REQUIRED === "true" && range.resultSchemaVersion !== OCR_RESULT_SCHEMA_V3) {
     throw new OcrEvidenceRetryableError("stored v2 OCR page range lacks required v3 conflict evidence");
   }
-  return range;
+  return { ...range, storedSha256: await sha256DigestHeader(bytes) };
 }
 
 const agrees = (range: QualifiedPageRange, first?: QualifiedPageRange) => !first
@@ -1001,7 +1012,7 @@ const agrees = (range: QualifiedPageRange, first?: QualifiedPageRange) => !first
  */
 async function obtainRange(
   run: RangeRun, start0: number, first?: QualifiedPageRange,
-): Promise<QualifiedPageRange | OcrDispatchResult> {
+): Promise<StoredPageRange | OcrDispatchResult> {
   const key = ocrPageRangeSiblingKey(run.immutablePdfKey, start0, start0 + run.size);
   const stored = await readStoredRange(run, key, start0);
   if (stored !== "missing") {
@@ -1065,8 +1076,14 @@ async function obtainRange(
     : durable;
 }
 
+/** Every result range mode returns names the ranges it stands on, so a partial read says it is partial. */
 async function dispatchOcrRanges(run: RangeRun): Promise<OcrDispatchResult> {
-  const ranges: QualifiedPageRange[] = [];
+  const ranges: StoredPageRange[] = [];
+  const result = await readAndAssembleRanges(run, ranges);
+  return { ...result, pageRanges: ranges.map((range) => ({ start0: range.start0, end0: range.end0, sha256: range.storedSha256 })) };
+}
+
+async function readAndAssembleRanges(run: RangeRun, ranges: StoredPageRange[]): Promise<OcrDispatchResult> {
   for (let start0 = 0; ranges.length === 0 || start0 < ranges[0].pageCount; start0 += run.size) {
     const range = await obtainRange(run, start0, ranges[0]);
     if ("status" in range) return range;

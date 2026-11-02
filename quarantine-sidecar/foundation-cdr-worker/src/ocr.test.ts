@@ -782,6 +782,11 @@ describe("page-range reading", () => {
   const rangeKeys = (r2: FakeR2) => [...r2.objects.keys()].filter((key) => key.startsWith(RANGES_PREFIX)).sort();
   const decode = (bytes: Uint8Array | undefined) => JSON.parse(new TextDecoder().decode(bytes));
 
+  /** The receipt entries `ranges` should produce: [start0, end0] read back from their stored keys. */
+  const storedRanges = (r2: FakeR2, ranges: Array<[number, number]>, size: number) => Promise.all(ranges.map(
+    async ([start0, end0]) => ({ start0, end0,
+      sha256: await sha256DigestHeader(new Uint8Array(r2.objects.get(`${RANGES_PREFIX}${start0}-${start0 + size}.json`)!)) })));
+
   /** The same range read differently: every region's text changes, so the answer's bytes do too. */
   const reread = (answer: Record<string, unknown>) => ({ ...answer,
     regions: (answer.regions as Array<Record<string, unknown>>).map((row) => ({ ...row, text: `${row.text} REREAD` })) });
@@ -856,7 +861,11 @@ describe("page-range reading", () => {
       assert.deepEqual(reader.calls, ["0-6", "6-12", "12-18", "18-24"]);
       // The same bytes, so the same digest, page count and provenance in the receipt facts.
       assert.deepEqual(ranged.objects.get(OCR_JSON), whole.objects.get(OCR_JSON));
-      assert.deepEqual(assembled, single);
+      const { pageRanges, ...facts } = assembled;
+      assert.deepEqual(facts, single);
+      assert.equal(single.pageRanges, undefined);
+      // The range receipt lists every range in page order, each by the digest of its stored bytes.
+      assert.deepEqual(pageRanges, await storedRanges(ranged, [[0, 6], [6, 12], [12, 18], [18, 20]], 6));
       const written = decode(ranged.objects.get(OCR_JSON));
       assert.equal(written.schemaVersion, v3 ? "tavonel.ocr_result.v3" : "tavonel.ocr_result.v2");
       if (v3) assert.equal(written.recognitionConflictCount, 2);
@@ -993,7 +1002,80 @@ describe("page-range reading", () => {
       assert.equal(result.reasonCode, "OCR_PAGES_INCOMPLETE", name);
       assert.equal(result.computeCredits, 0, name);
       assert.equal(r2.objects.has(OCR_JSON), false, name);
+      // No document digest and no page count for a partial read; the receipt names only what is stored.
+      assert.equal(result.outputSha256, undefined, name);
+      assert.equal(result.observedPageCount, undefined, name);
+      assert.deepEqual(result.pageRanges, await storedRanges(r2, [[0, 8]], 8), name);
     }
+  });
+
+  it("treats a range that times out as a missing range, and finishes it on the next delivery", async () => {
+    const r2 = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+    const healthy = syntheticReader(24);
+    // The reader never answers pages 9-16; only the request's own timeout ends the wait.
+    const stalled = (async (url: string | URL | Request, init?: RequestInit) => {
+      if (new Headers(init?.headers).get("x-tavonel-ocr-page-range") !== "8-16") return healthy.fetcher(url, init);
+      healthy.calls.push("8-16 (no answer)");
+      return new Promise<Response>((_resolve, reject) => {
+        // AbortSignal.timeout does not hold the event loop open; this timer stands in for the socket.
+        const socket = setTimeout(() => reject(new Error("the request timeout never fired")), 5_000);
+        init?.signal?.addEventListener("abort", () => { clearTimeout(socket); reject(init.signal?.reason); });
+      });
+    }) as typeof fetch;
+    const first = await dispatchOcrAfterSanitize(rangeEnv(r2, "8"), IMMUTABLE, stalled, undefined, undefined, 25);
+
+    assert.equal(first.status, "failed");
+    assert.equal(first.reasonCode, "OCR_PAGES_INCOMPLETE");
+    assert.match(first.reason ?? "", /pages from 9 were not read \(OCR_TIMEOUT_OR_NETWORK\)/);
+    assert.equal(first.computeCredits, 0);
+    assert.equal(ocrFailureKind(first.reasonCode), "transport");
+    assert.equal(first.outputSha256, undefined);
+    assert.equal(r2.objects.has(OCR_JSON), false);
+    assert.deepEqual(healthy.calls, ["0-8", "8-16 (no answer)"]);
+    assert.deepEqual(first.pageRanges, await storedRanges(r2, [[0, 8]], 8));
+
+    const redelivered = syntheticReader(24);
+    const second = await dispatchOcrAfterSanitize(rangeEnv(r2, "8"), IMMUTABLE, redelivered.fetcher);
+    assert.equal(second.status, "written");
+    assert.deepEqual(redelivered.calls, ["8-16", "16-24"]);
+    assert.equal(second.observedPageCount, 24);
+    assert.equal(second.outputSha256, await sha256DigestHeader(new Uint8Array(r2.objects.get(OCR_JSON)!)));
+    assert.deepEqual(second.pageRanges, await storedRanges(r2, [[0, 8], [8, 16], [16, 24]], 8));
+  });
+
+  it("refuses a range that answers fewer pages than it was asked for, though the pages it lists agree", async () => {
+    const r2 = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+    // Asked for pages 9-16 of 24, the reader stops after page 12 and describes exactly what it read.
+    const short = syntheticReader(24, { range: (start0, answer) => (start0 !== 8 ? undefined : withRegions(
+      { ...answer, pageRange: { start0: 8, end0: 12 }, pages: (answer.pages as unknown[]).slice(0, 4) },
+      (answer.regions as Array<Record<string, unknown>>).filter((row) => Number(row.pageIndex0) < 12))) });
+    const result = await dispatchOcrAfterSanitize(rangeEnv(r2, "8"), IMMUTABLE, short.fetcher);
+
+    assert.equal(result.status, "failed");
+    assert.equal(result.reasonCode, "OCR_RESPONSE_INVALID");
+    assert.equal(result.outputSha256, undefined);
+    assert.equal(r2.objects.has(OCR_JSON), false);
+    assert.deepEqual(rangeKeys(r2), [`${RANGES_PREFIX}0-8.json`]);
+    assert.deepEqual(result.pageRanges, await storedRanges(r2, [[0, 8]], 8));
+  });
+
+  it("assembles ranges stored out of order in page order, and asks only for the one missing", async () => {
+    const reference = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+    await dispatchOcrAfterSanitize(rangeEnv(reference, "8"), IMMUTABLE, syntheticReader(24).fetcher);
+    // Other deliveries stored the last range, then the middle one, before anyone read pages 1-8.
+    const r2 = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
+    for (const range of ["16-24", "8-16"]) {
+      r2.objects.set(`${RANGES_PREFIX}${range}.json`, reference.objects.get(`${RANGES_PREFIX}${range}.json`)!);
+    }
+    const reader = syntheticReader(24);
+    const result = await dispatchOcrAfterSanitize(rangeEnv(r2, "8"), IMMUTABLE, reader.fetcher);
+
+    assert.equal(result.status, "written");
+    assert.deepEqual(reader.calls, ["0-8"]);
+    assert.deepEqual(r2.objects.get(OCR_JSON), reference.objects.get(OCR_JSON));
+    assert.deepEqual(result.pageRanges, await storedRanges(r2, [[0, 8], [8, 16], [16, 24]], 8));
+    const regions = decode(r2.objects.get(OCR_JSON)).regions as Array<{ pageIndex0: number; order: number }>;
+    assert.ok(regions.every((row, index) => row.order === index && (index === 0 || row.pageIndex0 >= regions[index - 1].pageIndex0)));
   });
 
   it("treats a range answer that does not hold as that answer, and stores nothing for it", async () => {
