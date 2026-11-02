@@ -4,6 +4,15 @@
 
 All receivers consume `tavonel.operations_alert.v1`. Payloads contain a UUID, kind, severity, service, summary, observation time, HTTPS runbook link and deterministic dedupe key. Cost alerts also require current USD value and USD threshold. Credentials, raw document text and customer filenames are forbidden.
 
+## Wired producers
+
+| Producer | Path | Receiver |
+| --- | --- | --- |
+| Operational SLI breach (B35) | `/api/internal/sli-alerts`, every 5 minutes | `OPERATIONS_ALERT_WEBHOOK_URL` via `deliverOperationsAlert` |
+| Production smoke failure | `.github/workflows/operations-smoke.yml` | `OPERATIONS_ALERT_WEBHOOK_URL` repository secret |
+
+No other producer in this repository posts to this receiver yet. A routing row below with no producer here is defined, not sent.
+
 ## Minimum routing
 
 | Trigger                                       | Severity | Initial owner    | Escalation                             |
