@@ -3224,6 +3224,9 @@ test('affected owner groups select the initial task checks for every product own
   assert.deepEqual(lifecycle.unitFiles,['lib/visual-world-model.test.ts','lib/workspace-failure-copy.test.ts','lib/world-directory-and-ontology.test.ts','lib/world-graph-layout.test.ts']);
   const ocr=select('quarantine-sidecar/foundation-cdr-worker/src/ocr.ts');
   assert.deepEqual([ocr.groups,ocr.unitFiles,ocr.browserFiles,ocr.runCdrWorkerChecks],[['ocr-worker'],[],[],true]);
+  // The worker's deployed vars (FOUNDATION_OCR_PAGE_RANGE_SIZE) change what ocr.ts does, so they run the same suite.
+  const wrangler=select('quarantine-sidecar/foundation-cdr-worker/wrangler.jsonc');
+  assert.deepEqual([wrangler.groups,wrangler.unitFiles,wrangler.browserFiles,wrangler.runCdrWorkerChecks],[['ocr-worker'],[],[],true]);
   const dropbox=select('nextjs/lib/dropbox-source-reconciliation.ts');
   assert.deepEqual(dropbox.groups,['dropbox-connector']);assert.equal(dropbox.unitFiles.length,10);
   for (const consumer of ['lib/connector-page-integrity.test.ts','lib/connector-provider-isolation.test.ts','lib/connector-source-identity.test.ts','lib/sync-worker.test.ts','lib/connector-replay-world-currency-migration.test.ts']) assert.ok(dropbox.unitFiles.includes(consumer),consumer);
