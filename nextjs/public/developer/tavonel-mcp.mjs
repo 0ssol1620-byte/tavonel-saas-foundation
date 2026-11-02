@@ -143,7 +143,10 @@ const DELIVERY_LINE_BREAK = ` ${DELIVERY_MARKER} `;
 // a source version id has a line of its own and only has to stay one token on one line.
 const DELIVERY_EVIDENCE_ID = /^[^\s,\[\]]{1,200}$/u;
 const DELIVERY_SOURCE_ID = /^[^\s]{1,500}$/u;
-const DELIVERY_SPLIT = /\r\n|[\n\r\v\f\u0085\u2028\u2029]/;
+// Every line boundary Python's str.splitlines() honours, so a consumer that splits a part that
+// way cannot see a header at the start of a line either (\x1c-\x1e are the file, group and
+// record separators).
+const DELIVERY_SPLIT = /\r\n|[\n\r\v\f\x1c-\x1e\u0085\u2028\u2029]/;
 const DELIVERY_EST = /\s+|[A-Za-z]+|[0-9]|[^\sA-Za-z0-9]/gu;
 const DELIVERY_ANCHOR = /^\[p([0-9]+|\?)\.u([0-9]+) ev=[^\]\s]+\] /;
 const DELIVERY_ENCODER = new TextEncoder();

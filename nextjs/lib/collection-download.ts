@@ -387,12 +387,17 @@ export function buildPackageDelivery(artifact: ReviewableCollectionArtifact): Ar
   const chunks = artifact.package.files.find((file) => file.path === "rag/chunks.jsonl");
   if (!chunks) throw new DeliveryError("DELIVERY_PACKET_INVALID", "the package has no rag/chunks.jsonl");
   const units = chunks.content.split("\n").filter((line) => line.length > 0).map((line, index) => {
-    let chunk: Record<string, unknown>;
+    let parsed: unknown;
     try {
-      chunk = JSON.parse(line) as Record<string, unknown>;
+      parsed = JSON.parse(line);
     } catch {
       throw new DeliveryError("DELIVERY_PACKET_INVALID", `rag/chunks.jsonl line ${index + 1} is not JSON`);
     }
+    // `null`, a number or an array parses but is no chunk: a refusal with its reason, not a 500.
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      throw new DeliveryError("DELIVERY_PACKET_INVALID", `rag/chunks.jsonl line ${index + 1} is not a JSON object`);
+    }
+    const chunk = parsed as Record<string, unknown>;
     return {
       unitId: chunk.chunkId,
       text: chunk.text,

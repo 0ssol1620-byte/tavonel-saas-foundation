@@ -106,6 +106,7 @@ describe.each([["direct", direct], ["v1", versioned]] as const)("%s export autho
   // render whole is a refused download with the reason, never an archive.
   it.each([
     ["not JSON", "{not json\n", "DELIVERY_PACKET_INVALID"],
+    ["a null line", "null\n", "DELIVERY_PACKET_INVALID"],
     ["a chunk with no evidence id", `${JSON.stringify({ chunkId: "c", text: "t", sourceVersionId: "v", pageNumber1: 1, bbox1000: null })}\n`, "DELIVERY_ITEM_INVALID"],
   ])("refuses a package whose rag/chunks.jsonl is %s with 422 and no archive", async (_, content, code) => {
     const files = artifact.package.files.map((file) => file.path !== "rag/chunks.jsonl" ? file : {
