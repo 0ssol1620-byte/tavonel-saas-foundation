@@ -28,6 +28,7 @@ A filesystem path by itself does not grant an AI access. The AI application must
 
 ## Which files to use
 
+- \`delivery/manifest.txt\` — start here if your AI reads files. It lists numbered part files that hold every retrieval chunk in page order, each line headed by its page and evidence id, and each part small enough to be read in one go. Read every part it lists.
 - \`rag/chunks.jsonl\` — portable retrieval units for generic RAG/search systems.
 - \`rag/documents.jsonl\` — document-level retrieval records.
 - \`ontology/knowledge.jsonld\` — semantic knowledge graph for JSON-LD-capable tools.
@@ -63,6 +64,7 @@ Do not invent facts that are absent from the package. Distinguish compiled claim
 You are working with a TAVONEL portable compiled-knowledge package.
 
 1. Read \`manifest/ai-entrypoint.json\` and \`validation/report.json\` before using the knowledge files.
+   Then read \`delivery/manifest.txt\` and every part file it lists, in order: that is the whole compiled text in page order, and each part fits in one read. Cite the evidence id in each line's header.
 2. Treat \`review_required\` as non-authoritative and surface its review reasons.
 3. Prefer compiled structured knowledge for navigation, but ground factual answers in the package's evidence/provenance records.
 4. Preserve source identity, version, temporal qualifiers, and uncertainty. Never invent a missing locator, date, relationship, or claim.
@@ -80,6 +82,7 @@ You are working with a TAVONEL portable compiled-knowledge package.
     authoritativeUse: input.lifecycle === "review_required" ? "blocked_pending_review" : "verify_active_world_status",
     preferredLiveIntegration: "tavonel_mcp_or_api",
     portableEntrypoints: {
+      delivery: "delivery/manifest.txt",
       retrievalChunks: "rag/chunks.jsonl",
       retrievalDocuments: "rag/documents.jsonl",
       knowledgeJsonLd: "ontology/knowledge.jsonld",
@@ -129,6 +132,7 @@ export const AI_PACKAGE_CONTENTS = [
   { path: "manifest/candidate-world.json", purpose: "The immutable candidate this package was cut from." },
   { path: "manifest/export-manifest.json", purpose: "Path, size and sha256 of every file in the archive." },
   { path: "signatures/export-manifest.ed25519.json", purpose: "Signature over that manifest." },
+  { path: "delivery/manifest.txt", purpose: "Where an AI that reads files starts: every chunk in page order, split into parts that each fit one read." },
   { path: "rag/chunks.jsonl", purpose: "Retrieval units for a RAG or search system." },
   { path: "rag/documents.jsonl", purpose: "Document-level retrieval records." },
   { path: "ontology/knowledge.jsonld", purpose: "JSON-LD semantic projection of the compiled World." },

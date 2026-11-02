@@ -55,6 +55,10 @@ export const GRAPH_EDGE_HEADER = "id,subject_id,predicate,object_id,evidence_ids
 const PACKAGE_ROOTS = new Set([
   "source", "canonical", "obsidian", "ontology", "graph", "rag", "provenance", "validation",
   "manifest", "signatures", "README.md", "AGENTS.md",
+  // The delivery copy of rag/chunks.jsonl that `lib/collection-download.ts` writes into every
+  // download (delivery/manifest.txt + delivery/part-NNN.txt). Allowed, not required, for the
+  // same reason as README.md and AGENTS.md: a compiled artifact that never became a download has none.
+  "delivery",
 ]);
 
 const REQUIRED_FILES = [

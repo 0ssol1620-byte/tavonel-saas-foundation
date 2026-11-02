@@ -28,7 +28,7 @@ const worlds = { code: "COLLECTIONS_LISTED", collections: [pointer], page: { lim
 const objects = { code: "OK", world: pointer, objects: [{ id: `claim-${"c".repeat(32)}` }], page: { limit: 5, cursor: null, nextCursor: null, total: 1 } };
 
 type Call = { method: string; pathname: string; authorization: string; body: unknown };
-type ToolReply = { result?: { content: Array<{ type: string; text: string }>; isError: boolean } };
+type ToolReply = { result?: { content: Array<{ type: string; text: string }>; structuredContent?: unknown; isError: boolean } };
 let httpServer!: Server;
 let baseUrl = "";
 const calls: Call[] = [];
@@ -78,7 +78,7 @@ function handler(key = API_KEY) {
 async function mcp(name: string, input: Record<string, unknown>, key = API_KEY) {
   const reply = await handler(key)({ jsonrpc: "2.0", id: "b30", method: "tools/call", params: { name, arguments: input } });
   const result = reply.result!;
-  return { isError: result.isError, text: result.content[0]!.text };
+  return { isError: result.isError, text: result.content[0]!.text, structured: result.structuredContent };
 }
 
 async function cli(args: string[], key = API_KEY) {
@@ -104,8 +104,12 @@ describe("B30 API, MCP and CLI parity", () => {
       method: "POST", headers: { authorization: `Bearer ${API_KEY}`, "content-type": "application/json" },
       body: JSON.stringify({ query: SEARCH, limit: 25 }),
     }).then((response) => response.json());
-    const throughMcp = JSON.parse((await mcp("search_world", { collectionId: COLLECTION, query: SEARCH, limit: 25 })).text);
+    // The agent reads the delivery format; the envelope travels whole as structured content.
+    const mcpReply = await mcp("search_world", { collectionId: COLLECTION, query: SEARCH, limit: 25 });
+    const throughMcp = mcpReply.structured;
     const throughCli = JSON.parse((await cli(["search_world", COLLECTION, SEARCH, "--limit", "25"])).stdout);
+    expect(mcpReply.text).toContain("TAVONEL compiled context, delivery format tavonel.context_delivery.v1.");
+    expect(mcpReply.text).toContain("0 item(s) in 0 part(s)");
     expect(throughMcp).toEqual(direct);
     expect(throughCli).toEqual(direct);
     expect(calls.map((call) => call.authorization)).toEqual(Array(3).fill(`Bearer ${API_KEY}`));

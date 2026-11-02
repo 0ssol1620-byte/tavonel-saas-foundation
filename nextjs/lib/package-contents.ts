@@ -25,6 +25,7 @@ const PACKAGE_EXTRAS = [
   "manifest/candidate-world.json",
   "manifest/export-manifest.json",
   "signatures/export-manifest.ed25519.json",
+  "delivery/manifest.txt",
 ] as const;
 
 const PURPOSE: Record<string, string> = {
@@ -34,6 +35,7 @@ const PURPOSE: Record<string, string> = {
   "graph/relationships.csv": "Graph edges, with the relation each one carries.",
   "rag/documents.jsonl": "Document-level retrieval records.",
   "rag/chunks.jsonl": "Retrieval chunks, each bound to the source location it came from.",
+  "delivery/manifest.txt": "The same chunks in page order for an AI to read: the manifest lists numbered part files, each small enough for one read, with their sha256.",
   "provenance/activities.jsonl": "Lineage for every compiled artifact in the package.",
   "validation/report.json": "The validation status, and any reason the result still requires review.",
   "README.md": "Where a person starts, and which consumption path to take.",

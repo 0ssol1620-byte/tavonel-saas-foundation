@@ -3,6 +3,7 @@ import { strToU8, zipSync } from "fflate";
 import { COLLECTION_CANDIDATE_SCHEMA } from "./collection-compiler";
 import { buildAiPackageGuidance } from "./ai-package-guidance";
 import type { ExportSigner } from "./export-signing";
+import { DeliveryError, renderDelivery } from "@/public/developer/tavonel-mcp.mjs";
 
 const MAX_PACKAGE_FILES = 200;
 
@@ -372,9 +373,50 @@ export function validatePromotableCollectionArtifact(
     : null;
 }
 
+/** Where an AI with folder access starts reading: the delivery manifest, which names every part. */
+export const DELIVERY_MANIFEST_PATH = "delivery/manifest.txt";
+
+/**
+ * `rag/chunks.jsonl` in the delivery format (`renderDelivery` in public/developer/tavonel-mcp.mjs):
+ * page order, one chunk per line headed by its page and evidence id, numbered parts that each fit
+ * one Read, and a manifest naming every part with its sha256. The JSONL stays the machine format;
+ * this is the copy an agent can read in full. A chunk file that cannot be rendered whole throws
+ * DeliveryError and no archive is built -- never a truncated or partial delivery.
+ */
+export function buildPackageDelivery(artifact: ReviewableCollectionArtifact): Array<{ path: string; text: string }> {
+  const chunks = artifact.package.files.find((file) => file.path === "rag/chunks.jsonl");
+  if (!chunks) throw new DeliveryError("DELIVERY_PACKET_INVALID", "the package has no rag/chunks.jsonl");
+  const units = chunks.content.split("\n").filter((line) => line.length > 0).map((line, index) => {
+    let chunk: Record<string, unknown>;
+    try {
+      chunk = JSON.parse(line) as Record<string, unknown>;
+    } catch {
+      throw new DeliveryError("DELIVERY_PACKET_INVALID", `rag/chunks.jsonl line ${index + 1} is not JSON`);
+    }
+    return {
+      unitId: chunk.chunkId,
+      text: chunk.text,
+      sourceVersionId: chunk.sourceVersionId,
+      evidenceIds: typeof chunk.evidenceId === "string" ? [chunk.evidenceId] : [],
+      pageNumber1: chunk.pageNumber1,
+      bbox1000: chunk.bbox1000,
+    };
+  });
+  const delivery = renderDelivery(units, {
+    heading: [
+      `Collection ${artifact.collectionId}, manifest ${artifact.manifestDigest}, lifecycle ${artifact.lifecycle}.`,
+      "Every retrieval chunk in this package, not a search result.",
+    ],
+    machineFormat: "rag/chunks.jsonl in this package",
+  });
+  return [delivery.manifest, ...delivery.parts].map((file) => ({ path: `delivery/${file.name}`, text: file.text }));
+}
+
 export function buildSignedCollectionZip(artifact: ReviewableCollectionArtifact, signer: ExportSigner) {
   const entries: Record<string, Uint8Array> = {};
   for (const file of artifact.package.files) entries[file.path] = strToU8(file.content);
+  const delivery = buildPackageDelivery(artifact);
+  for (const file of delivery) entries[file.path] = strToU8(file.text);
   const candidateWorld = `${JSON.stringify(artifact, null, 2)}\n`;
   const readme = [
     `TAVONEL signed ${artifact.lifecycle === "candidate" ? "candidate" : "human-review"} knowledge package`,
@@ -412,6 +454,7 @@ export function buildSignedCollectionZip(artifact: ReviewableCollectionArtifact,
     { path: "README.md", mediaType: "text/markdown; charset=utf-8", sizeBytes: Buffer.byteLength(aiGuidance.readme, "utf8"), sha256: sha256(aiGuidance.readme) },
     { path: "AGENTS.md", mediaType: "text/markdown; charset=utf-8", sizeBytes: Buffer.byteLength(aiGuidance.agents, "utf8"), sha256: sha256(aiGuidance.agents) },
     { path: "manifest/ai-entrypoint.json", mediaType: "application/json", sizeBytes: Buffer.byteLength(aiEntrypointJson, "utf8"), sha256: sha256(aiEntrypointJson) },
+    ...delivery.map((file) => ({ path: file.path, mediaType: "text/plain; charset=utf-8", sizeBytes: Buffer.byteLength(file.text, "utf8"), sha256: sha256(file.text) })),
   ].sort((left, right) => left.path.localeCompare(right.path));
   const exportManifest = {
     schemaVersion: "tavonel.signed_export_manifest.v1",
@@ -424,7 +467,7 @@ export function buildSignedCollectionZip(artifact: ReviewableCollectionArtifact,
       requestId: artifact.coreExecution.receipt.requestId,
       outputSha256: artifact.coreExecution.receipt.outputSha256,
     },
-    formats: ["text/markdown", "application/json", "application/ld+json", "text/turtle", "text/csv", "application/x-ndjson"],
+    formats: ["text/markdown", "application/json", "application/ld+json", "text/turtle", "text/csv", "application/x-ndjson", "text/plain"],
     files,
   } as const;
   const manifestBytes = strToU8(`${JSON.stringify(exportManifest, null, 2)}\n`);
