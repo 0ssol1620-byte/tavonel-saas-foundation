@@ -37,12 +37,14 @@ recorded in every receipt, and are what the canary measures.
 
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import math
 import os
 import re
 import unicodedata
 from collections.abc import Mapping
+from importlib.metadata import version
 from typing import Final
 
 import pypdfium2 as pdfium
@@ -145,10 +147,18 @@ def _page_text(chars: list[str]) -> str:
     return _CONTROL.sub("", text.replace("\r\n", "\n").replace("\r", "\n"))
 
 
+def _bounds(obj: pdfium.PdfObject) -> tuple[float, float, float, float]:
+    # The C call, not the helper: pypdfium2 5 renamed PdfObject.get_pos, and the pinned version is 5.
+    left, bottom, right, top = (ctypes.c_float() for _ in range(4))
+    if not pdfium_c.FPDFPageObj_GetBounds(obj.raw, *(ctypes.byref(v) for v in (left, bottom, right, top))):
+        raise pdfium.PdfiumError("page object bounds are unavailable")
+    return left.value, bottom.value, right.value, top.value
+
+
 def _image_area_share(page: pdfium.PdfPage, width: float, height: float) -> float:
     covered = 0.0
     for obj in page.get_objects(filter=[pdfium_c.FPDF_PAGEOBJ_IMAGE], max_depth=1):
-        left, bottom, right, top = obj.get_pos()
+        left, bottom, right, top = _bounds(obj)
         w = max(0.0, min(right, width) - max(left, 0.0))
         h = max(0.0, min(top, height) - max(bottom, 0.0))
         covered += w * h
@@ -316,7 +326,7 @@ def read_document(pdf_bytes: bytes, input_sha256: str, scale: float) -> dict[str
         "status": status,
         "reason": reason,
         "inputSha256": input_sha256,
-        "extractor": {"engine": "pdfium", "pypdfium2": pdfium.V_PYPDFIUM2},
+        "extractor": {"engine": "pdfium", "pypdfium2": version("pypdfium2")},
         "rules": {
             "inkDelta": INK_DELTA,
             "imageAreaShare": IMAGE_AREA_SHARE,
