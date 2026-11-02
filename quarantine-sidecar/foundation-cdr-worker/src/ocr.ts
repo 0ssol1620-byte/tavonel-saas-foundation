@@ -85,9 +85,11 @@ export type OcrDispatchResult = {
   readerRevision?: string;
   readerBindingSha256?: string;
   /**
-   * Range mode only: every range stored durably so far, in page order, each by the digest of its
-   * stored bytes. On a written or exists result the list covers every page and `outputSha256` is
-   * the assembled ocr.json; on a failure it is what is stored, and there is no `outputSha256`.
+   * Set only when the range reader ran: every range stored durably so far, in page order, each by
+   * the digest of its stored bytes. On a written or exists result the list covers every page and
+   * `outputSha256` is the assembled ocr.json; on a failure it is what is stored, and there is no
+   * `outputSha256`. An ocr.json that already passes the whole-document check, and a replayed
+   * review receipt, return without it.
    */
   pageRanges?: OcrPageRangeReceipt[];
   computeCredits: 0 | 2;

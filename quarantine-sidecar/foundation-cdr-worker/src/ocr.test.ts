@@ -237,18 +237,20 @@ describe("dispatchOcrAfterSanitize", () => {
 
   it("bounds an unavailable GPU request and returns an operator-review code", async () => {
     const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    // Asserting inside the fetcher would be swallowed by the transport catch, so the reason is checked after.
+    let abortReason: unknown;
     const result = await dispatchOcrAfterSanitize(
       envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }),
       IMMUTABLE,
-      async (_input, init) => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-        assert.equal(init?.signal?.aborted, true);
-        throw new Error("aborted");
-      },
+      (_input, init) => new Promise<Response>((_resolve, reject) => {
+        const socket = setTimeout(() => reject(new Error("the request timeout never fired")), 1_000);
+        init?.signal?.addEventListener("abort", () => { clearTimeout(socket); abortReason = init.signal?.reason; reject(abortReason); });
+      }),
       () => new Date("2026-08-29T00:00:00Z"),
       () => "fixture-timeout-request",
       5,
     );
+    assert.equal((abortReason as Error | undefined)?.name, "TimeoutError");
     assert.equal(result.status, "failed");
     assert.equal(result.reasonCode, "OCR_TIMEOUT_OR_NETWORK");
     assert.equal(result.requestId, "fixture-timeout-request");
@@ -1012,18 +1014,23 @@ describe("page-range reading", () => {
   it("treats a range that times out as a missing range, and finishes it on the next delivery", async () => {
     const r2 = new CreateOnceR2({ [IMMUTABLE]: PDF_BYTES });
     const healthy = syntheticReader(24);
-    // The reader never answers pages 9-16; only the request's own timeout ends the wait.
+    // The reader holds pages 9-16; only the request's own timeout ends the wait.
+    let abortReason: unknown;
     const stalled = (async (url: string | URL | Request, init?: RequestInit) => {
       if (new Headers(init?.headers).get("x-tavonel-ocr-page-range") !== "8-16") return healthy.fetcher(url, init);
       healthy.calls.push("8-16 (no answer)");
-      return new Promise<Response>((_resolve, reject) => {
+      return new Promise<Response>((resolve, reject) => {
         // AbortSignal.timeout does not hold the event loop open; this timer stands in for the socket.
-        const socket = setTimeout(() => reject(new Error("the request timeout never fired")), 5_000);
-        init?.signal?.addEventListener("abort", () => { clearTimeout(socket); reject(init.signal?.reason); });
+        // If the timeout never fires, the reader answers late and correctly, and the read is written, so the test fails.
+        const socket = setTimeout(() => resolve(healthy.fetcher(url, init)), 1_000);
+        init?.signal?.addEventListener("abort", () => { clearTimeout(socket); abortReason = init.signal?.reason; reject(abortReason); });
       });
     }) as typeof fetch;
+    const startedAt = Date.now();
     const first = await dispatchOcrAfterSanitize(rangeEnv(r2, "8"), IMMUTABLE, stalled, undefined, undefined, 25);
 
+    assert.equal((abortReason as Error | undefined)?.name, "TimeoutError");
+    assert.ok(Date.now() - startedAt < 1_000, "the 25 ms request timeout, not the stand-in socket, ended the wait");
     assert.equal(first.status, "failed");
     assert.equal(first.reasonCode, "OCR_PAGES_INCOMPLETE");
     assert.match(first.reason ?? "", /pages from 9 were not read \(OCR_TIMEOUT_OR_NETWORK\)/);
