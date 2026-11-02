@@ -35,7 +35,10 @@ gate v2에서 출시 결정(`customer_data_release_decisions`)과 작업공간 g
    읽는 JSON과 YAML)는 디렉터리와 상관없이 표면이다. 그래서 `nextjs/components/landing-v2/`, `nextjs/app/(benchmarks|changelog)/`,
    그 페이지 데이터 lib(`changelog.ts`, `compiler-release.ts`, `gdp-pdf-page-data.ts`), e2e, 모든 테스트, `scripts/repair-scope.mjs`도
    R5부터 표면이다. `alwaysSurface`는 presentational 규칙에 걸려도 표면으로 남길 내용, 곧 정책 문서(`docs/policy/`,
-   `nextjs/public/policy/`), `.well-known`, 고객이 따르는 설치·안전 계약(`nextjs/public/developer/`, R2 보안 리뷰 S4)이다.
+   `nextjs/public/policy/`), `.well-known`, 고객이 따르는 설치·안전 계약(`nextjs/public/developer/`, R2 보안 리뷰 S4), 고객이
+   내려받는 평가 기록지의 데이터 취급 안내(`nextjs/public/evaluation/`, R6 보안 리뷰 N3)다. `.well-known` 규칙은 지금은 중복이다
+   (`security.txt`의 확장자는 public presentational 규칙에 없다). 나중에 public 규칙에 `txt`가 들어와도 보안 연락처가
+   presentational이 되지 않도록 남긴다.
    **R4까지의 방식과 버린 것.** R4까지는 `landing-v2`와 benchmarks·changelog page를 presentational로 두고, 그 배포 코드가
    `fetch`, `process.`, `globalThis`, `eval(`, `Function(`, Node builtin, 허용 밖 패키지를 쓰지 못하게 하는 정규식 가드를 걸었다.
    R5 보안 리뷰는 import도 `process` 토큰도 없는 `global["pro" + "cess"].getBuiltinModule("node:fs")`가 가드를 통과하고, prebuild
@@ -67,7 +70,8 @@ gate v2에서 출시 결정(`customer_data_release_decisions`)과 작업공간 g
    `process.execPath`가 저장소 루트나 `node_modules` 아래이면, 또는 PATH에서 처음 찾히는 `node`가 그런 디렉터리에 있으면
    빌드를 멈춘다. git은 PATH를 앞에서부터 걸으며 저장소 루트·`node_modules` 아래 항목과 상대 경로를 건너뛰고, 처음 찾은 절대
    경로로 부른다. 링크를 푼 경로로도 같은 판정을 한다. 찾지 못하면 빌드를 멈춘다. 이것은 심층 방어다. 경계는 아래 "남는 한계"의
-   build cache 설정이다.
+   build cache 설정이다. cache가 복원한 `node_modules/.bin/node`가 node 자체를 바꿔치기하면 이 검사는 돌지 않으므로 막지
+   못한다(R6 보안 리뷰 N1). 그래서 deploy 단계는 `VERCEL_FORCE_NO_BUILD_CACHE`가 `1`이 아니면 `none`을 기록한다.
 2. **digest.** `git ls-tree -r -z <sha>`의 (mode, type, blob id, path) 중 표면에 속한 항목을 하나씩
    JSON 배열 `[mode,type,object,path]` 한 줄로 쓰고, 줄을 정렬해 sha256을 낸다
    (`tavonel.gate_surface_digest.v2`). 작업 트리 바이트가 아니라 blob id를 쓰므로, Windows
@@ -163,6 +167,10 @@ gate v2에서 출시 결정(`customer_data_release_decisions`)과 작업공간 g
   **이 출시 방식은 production 빌드가 build cache를 쓰지 않는다는 설정에 기댄다.** Vercel Production env
   `VERCEL_FORCE_NO_BUILD_CACHE=1`이다. 이것은 창업자/운영 설정이고, 이 PR은 설정하지 않았다. 설정되기 전에는 표면을 넣은 행을
   기록하지 않는다(runbook 순서 2번). 설정되어 있으면 빌드 로그에 "Restored build cache"가 찍히지 않는다.
+  R6 보안 리뷰 N1이 재현한 대로, cache가 복원한 `node_modules/.bin/node`는 deploy 단계를 통째로 대신하고 기록을 위조한다. 그
+  node 아래에서는 (2)의 검사가 돌지 않으므로 deploy 단계는 이것을 막을 수 없다. 막는 것은 이 설정뿐이다. 그래서 R6부터 deploy
+  단계는 `VERCEL_FORCE_NO_BUILD_CACHE`가 `1`이 아니면 `none`을 기록하고 설정 이름을 적은 메시지를 찍는다. 위조를 막지는
+  못하지만, 설정이 빠진 정직한 빌드가 조용히 상속을 주장하지는 않는다.
 - **Vercel 설정의 build command.** 이 순서는 Vercel 기본 build command(`pnpm run build`, prebuild가 먼저 돈다)와 기본 install
   command를 전제한다. 2026-11-02 `vercel project inspect`로 본 설정은 둘 다 기본값이다. 대시보드 설정은 저장소 밖이라 테스트가
   보지 못한다(R5 보안 리뷰 N1). 바꾸면 D-05는 무효다. deploy 단계가 돌지 않으면 기록이 없으므로 digest는 `""`(닫힌 쪽)이지만,

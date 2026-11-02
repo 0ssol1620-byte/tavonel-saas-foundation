@@ -146,7 +146,8 @@ NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
   필요하다. 실행되거나 코드로 import될 수 있는 파일(`ts`, `tsx`, `js`, `mjs`, `cjs`, `mdx`, `css`, `svg`, `html`, JSON, YAML 등)은
   디렉터리와 상관없이 표면이다(R5). 그래서 landing-v2·benchmarks·changelog 페이지와 그 데이터 lib, e2e, 모든 테스트, 스크립트,
   설정, `package.json`도 표면이다. changelog 글 하나를 더하는 배포도 새 기록이 필요하다. 정책 문서, `.well-known`,
-  `public/developer/` 폴더 전체(고객이 실행하는 클라이언트와 설치·안전 계약 `.md`)는 내용이라도 표면이다.
+  `public/developer/` 폴더 전체(고객이 실행하는 클라이언트와 설치·안전 계약 `.md`), `public/evaluation/`의 평가 기록지(고객 데이터
+  취급 안내, R6 보안 리뷰 N3)는 내용이라도 표면이다.
   production 빌드의 첫 명령(`prebuild`의 `node scripts/gate-surface.mjs --deploy`)이 다른 저장소 코드보다 먼저 digest를
   계산하고, `next.config.mjs`는 그 기록을 읽기만 한다. 그 뒤의 prebuild(`pnpm check`, hermetic vitest)와 `next build`는 표면 코드만
   돌린다. symlink와 gitlink도 이름과 상관없이 표면이다.
@@ -155,7 +156,11 @@ NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
   skip-worktree나 assume-unchanged가 걸린 항목이 하나라도 있거나 index가 HEAD와 다른 빌드도 `none`이다.
   git은 무시되는 입력(`node_modules`, `.env*`, build cache)을 볼 수 없다. **production build cache는 신뢰하지 않는 입력이다.**
   이 출시 방식은 Production env `VERCEL_FORCE_NO_BUILD_CACHE=1`(창업자/운영 설정)에 기댄다. 아래 순서 2번에서 확인한다.
-  deploy 단계는 저장소나 `node_modules` 안의 `node`·`git`을 쓰지 않고, 찾으면 빌드를 멈춘다(심층 방어).
+  deploy 단계는 저장소나 `node_modules` 안의 `git`을 건너뛰고, 저장소나 `node_modules` 안의 node에서 돌거나 PATH의 첫 `node`가
+  그런 곳에 있으면 빌드를 멈춘다(심층 방어). **그러나 cache가 복원한 `node_modules/.bin/node`가 node를 바꿔치기하는 것은 deploy
+  단계가 막을 수 없다.** 그 node 아래에서는 deploy 단계의 검사가 아예 돌지 않는다(R6 보안 리뷰 N1). 그것을 막는 것은
+  `VERCEL_FORCE_NO_BUILD_CACHE=1`이다. 그래서 deploy 단계는 이 설정이 `1`이 아니면 `none`을 기록하고, 설정 이름을 적은 메시지를
+  찍는다.
   그래서 push만 한 브랜치나 로컬에서 `--prebuilt`로 올린 빌드는 production 출시를 이어받지 못한다.
 - digest는 v2 형식(`tavonel.gate_surface_digest.v2`, 표면 항목마다 JSON 배열 한 줄)이다. `d8b3ec3c`까지의 v1 형식으로
   계산해 둔 값은 쓰지 않는다. 값은 늘 아래 명령으로 다시 계산한다.
@@ -176,10 +181,15 @@ NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
      단계를 건너뛰고, 바꾼 install command는 deploy 단계보다 먼저 다른 명령을 돌릴 수 있다.
    - Production 환경 변수에 `VERCEL_FORCE_NO_BUILD_CACHE=1`이 있다(R5 보안 리뷰 B2). production build cache는 신뢰하지 않는
      입력이고, 이 출시 방식은 이 설정에 기댄다. 이 PR은 설정하지 않았다.
+   - deploy 단계는 cache가 복원한 `node_modules/.bin/node`가 자기를 대신 실행하는 것을 막을 수 없다. 막는 것은 이 설정이다
+     (R6 보안 리뷰 N1). 그래서 deploy 단계는 이 설정이 `1`이 아니면 `none`을 기록하고
+     `gate-surface --deploy: VERCEL_FORCE_NO_BUILD_CACHE is not 1 …` 메시지를 찍는다. 설정이 빠진 정직한 빌드는 조용히 상속을
+     주장하지 않는다. 다만 바꿔치기된 node는 이 검사도 건너뛰므로, 설정 자체는 여기서 눈으로 확인한다.
 3. 이 코드를 배포한다. **이 코드의 첫 production 빌드 로그에 `customer-data gate surface (deploy step): sha256:…` 줄이
    `pnpm check` 출력보다 먼저 찍혀야 한다.** 로그에 "Restored build cache"가 없어야 한다(있으면 2번 설정이 빠졌다).
-   production 빌드인데 `none (exact-SHA release only)`이면 빌드에서 git을 쓸 수 없거나 작업 트리가 깨끗하지 않다는
-   뜻이다(예: prebuild가 무시되지 않는 파일을 남김). 그때는 기능이 꺼진 것이므로 오늘처럼 SHA마다 기록하고, 원인을
+   production 빌드인데 `none (exact-SHA release only)`이면 `VERCEL_FORCE_NO_BUILD_CACHE`가 `1`이 아니거나(바로 앞에 그
+   설정 이름을 적은 메시지가 찍힌다), 빌드에서 git을 쓸 수 없거나, 작업 트리가 깨끗하지 않다는 뜻이다(예: prebuild가 무시되지
+   않는 파일을 남김). 그때는 기능이 꺼진 것이므로 오늘처럼 SHA마다 기록하고, 원인을
    고친 뒤 다음 production 빌드에서 다시 확인한다. preview 빌드는 항상 `none`이다.
    빌드가 `gate-surface --deploy:`로 시작하는 메시지로 멈추면 그 메시지가 원인이다. node나 git이 저장소·`node_modules` 안에서
    찾혔거나(cache나 PATH를 확인한다), 같은 SHA의 기록 파일이 이미 있다(메시지가 경로를 적는다. 로컬 `vercel build --prod`를

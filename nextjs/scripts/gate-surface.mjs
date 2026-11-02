@@ -87,8 +87,10 @@ const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../.."
  * It refuses when the node running it, or the first `node` the shell would have found on PATH, is inside the
  * repository or a node_modules directory, and it calls git by the absolute path of the first `git` on PATH outside
  * both. Every path is judged as given and with links resolved. Throws with the reason; the build stops.
- * Defence in depth, not the boundary: production build cache is an untrusted input, and the release depends on the
- * Production setting VERCEL_FORCE_NO_BUILD_CACHE=1 (docs/adr/0006).
+ * Defence in depth, not the boundary: production build cache is an untrusted input. A cache-restored
+ * node_modules/.bin/node runs this step in place of the real node, so none of these checks runs and nothing here can
+ * stop it; the Production setting VERCEL_FORCE_NO_BUILD_CACHE=1 is what stops it (docs/adr/0006), and
+ * deploymentGateSurface claims nothing without it.
  */
 export function resolveDeployTools(repositoryRoot = REPOSITORY_ROOT,
   { path = process.env.PATH ?? "", execPath = process.execPath, pathExt = process.env.PATHEXT } = {}) {
@@ -148,6 +150,8 @@ export function deploymentGateSurface(env = process.env, repositoryRoot = REPOSI
   const claimed = env.VERCEL_GIT_COMMIT_SHA?.trim().toLowerCase();
   if (env.VERCEL_ENV !== "production" || !claimed) return null;
   const { git: gitPath } = resolveDeployTools(repositoryRoot, toolOptions);
+  // R6 SEC N1: without the setting that keeps a restored cache out of the build, claim nothing rather than rely on it.
+  if (env.VERCEL_FORCE_NO_BUILD_CACHE !== "1") return null;
   const git = (...args) => execFileSync(gitPath, gitArguments(repositoryRoot, args),
     { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 });
   let head;
@@ -162,6 +166,9 @@ export function deploymentGateSurface(env = process.env, repositoryRoot = REPOSI
   }
   return gateSurfaceOfCommit(repositoryRoot, head, gitPath);
 }
+
+export const NO_BUILD_CACHE_REFUSAL = "gate-surface --deploy: VERCEL_FORCE_NO_BUILD_CACHE is not 1 in this production " +
+  "build, so a restored build cache could have replaced node or git; the step records none (exact-SHA release only).";
 
 /** Where the deploy step leaves its result for next.config.mjs: outside the checkout, one file per SHA. */
 export function deploymentGateSurfaceFile(env = process.env, directory = tmpdir()) {
@@ -217,6 +224,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     } catch (error) {
       process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
       process.exit(1);
+    }
+    if (digest === null && deploymentGateSurfaceFile() !== null && process.env.VERCEL_FORCE_NO_BUILD_CACHE !== "1") {
+      process.stderr.write(`${NO_BUILD_CACHE_REFUSAL}\n`);
     }
     process.stdout.write(`customer-data gate surface (deploy step): ${digest ?? "none (exact-SHA release only)"}
 `);

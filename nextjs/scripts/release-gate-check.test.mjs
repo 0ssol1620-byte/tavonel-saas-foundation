@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { builtinModules } from "node:module";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
@@ -434,6 +434,7 @@ test("gate surface: PR #174's media and data files are presentational; its code 
     "nextjs/lib/archive-expand.ts", "nextjs/app/api/access/bootstrap/route.ts", "nextjs/next.config.mjs",
     "nextjs/vercel.json", "nextjs/package.json", "nextjs/pnpm-lock.yaml",
     "nextjs/public/policy/processing-terms-2026-09-30.json", "docs/policy/FOUNDER_PACKET_CA_2026-09-11.md",
+    "nextjs/public/policy/TAVONEL_PROCESSING_ADDENDUM_2026-09-30.md", "nextjs/public/evaluation/pilot-worksheet.ko.md",
     "supabase/migrations/20261027120000_release_gate_surface_continuity.sql",
     "supabase/tests/release_gate_surface_continuity.sql", "nextjs/scripts/gate-surface.mjs", GATE_SURFACE_RULES_PATH,
     "nextjs/app/workspace/page.tsx",
@@ -563,7 +564,7 @@ test("gate surface: only a clean Vercel production build of HEAD claims a digest
     scratchGit(dir, ["add", "-A"]);
     scratchGit(dir, ["commit", "-q", "-m", "fixture"]);
     const head = scratchGit(dir, ["rev-parse", "HEAD"]);
-    const production = { VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: head };
+    const production = { VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: head, VERCEL_FORCE_NO_BUILD_CACHE: "1" };
     const digest = gateSurfaceOfCommit(dir, head);
     assert.match(digest, SURFACE_DIGEST);
     assert.equal(deploymentGateSurface(production, dir), digest);
@@ -573,6 +574,9 @@ test("gate surface: only a clean Vercel production build of HEAD claims a digest
       { ...production, VERCEL_ENV: "preview" }, { ...production, VERCEL_ENV: undefined },
       { VERCEL_GIT_COMMIT_SHA: head }, { VERCEL_ENV: "production" }, { ...production, VERCEL_GIT_COMMIT_SHA: " " },
       { ...production, VERCEL_GIT_COMMIT_SHA: "0".repeat(40) },
+      // R6 SEC N1: without VERCEL_FORCE_NO_BUILD_CACHE=1 a restored cache could stand in for node, so nothing is claimed.
+      { ...production, VERCEL_FORCE_NO_BUILD_CACHE: undefined }, { ...production, VERCEL_FORCE_NO_BUILD_CACHE: "0" },
+      { ...production, VERCEL_FORCE_NO_BUILD_CACHE: "true" },
     ]) assert.equal(deploymentGateSurface(env, dir), null, JSON.stringify(env));
     // The bytes being built are not HEAD's: an edited tracked file, then an untracked one.
     writeFileSync(join(dir, "nextjs", "x.ts"), "export const x = 2;\n");
@@ -584,7 +588,7 @@ test("gate surface: only a clean Vercel production build of HEAD claims a digest
   });
   const noGit = mkdtempSync(join(tmpdir(), "gate-surface-"));
   try {
-    assert.equal(deploymentGateSurface({ VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: "a".repeat(40) }, noGit), null);
+    assert.equal(deploymentGateSurface({ VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: "a".repeat(40), VERCEL_FORCE_NO_BUILD_CACHE: "1" }, noGit), null);
   } finally {
     rmSync(noGit, { recursive: true, force: true });
   }
@@ -599,7 +603,7 @@ test("gate surface: an index entry hidden from git status, or an index that is n
       scratchGit(dir, ["add", "-A"]);
       scratchGit(dir, ["commit", "-q", "-m", "released"]);
       const head = scratchGit(dir, ["rev-parse", "HEAD"]);
-      const production = { VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: head };
+      const production = { VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: head, VERCEL_FORCE_NO_BUILD_CACHE: "1" };
       const digest = gateSurfaceOfCommit(dir, head);
       assert.equal(deploymentGateSurface(production, dir), digest);
       // The review's prebuild tamper: rewrite a tracked surface file and hide it from `git status`.
@@ -637,7 +641,7 @@ test("gate surface: an fsmonitor hook or a replace ref cannot vouch for other by
     scratchGit(dir, ["status", "--porcelain"]);
     scratchGit(dir, ["update-index", "--fsmonitor"]);
     writeFileSync(join(dir, "nextjs", "middleware.ts"), "export const gate = 'OPEN';\n");
-    const production = { VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: released };
+    const production = { VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: released, VERCEL_FORCE_NO_BUILD_CACHE: "1" };
     assert.equal(deploymentGateSurface(production, dir), null);
     scratchGit(dir, ["config", "--unset-all", "core.fsmonitor"]);
     scratchGit(dir, ["checkout", "--", "nextjs/middleware.ts"]);
@@ -661,7 +665,7 @@ test("gate surface: the deploy step records the digest once, outside the checkou
       scratchGit(dir, ["add", "-A"]);
       scratchGit(dir, ["commit", "-q", "-m", "fixture"]);
       const head = scratchGit(dir, ["rev-parse", "HEAD"]);
-      const production = { VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: head };
+      const production = { VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: head, VERCEL_FORCE_NO_BUILD_CACHE: "1" };
       const digest = gateSurfaceOfCommit(dir, head);
       const records = mkdtempSync(join(tmpdir(), "gate-surface-record-"));
       try {
@@ -829,6 +833,10 @@ test("gate surface: the deploy step calls no node or git the checkout or a node_
     for (const execPath of [join(repoBin, "node"), join(repoTools, "node"), join(cacheBin, "node")]) {
       assert.throws(() => resolveDeployTools(repo, options([system], execPath)), /inside the repository or a node_modules/, execPath);
     }
+    if (!windows) {
+      symlinkSync(repoBin, join(base, "linked-bin"));
+      assert.deepEqual(resolveDeployTools(repo, options([join(base, "linked-bin"), system])), { git: systemGit }, "realpath");
+    }
     plant(repoBin, "node");
     assert.throws(() => resolveDeployTools(repo, options([repoBin, system])), /first node on PATH/);
     assert.deepEqual(resolveDeployTools(repo, options([system, repoBin])), { git: systemGit });
@@ -843,6 +851,81 @@ test("gate surface: the deploy step calls no node or git the checkout or a node_
     rmSync(base, { recursive: true, force: true });
   }
 });
+
+// R6 CODE B1. A git first on PATH that forges some subcommands and hands every other one to the real git: each call site
+// in the deploy step must use the git it resolved, or the forged half answers for it. POSIX only, because the wrapper is
+// a shell script and Windows resolves a bare `git` to git.exe only; CI runs this suite on Linux.
+const posixGit = process.platform === "win32" ? "a POSIX shell wrapper stands in for git; CI runs this on Linux" : !gitBinary;
+function withForgingGit(forged, body) {
+  const realGit = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+  const dir = mkdtempSync(join(tmpdir(), "gate-surface-wrapper-"));
+  const path = process.env.PATH;
+  try {
+    const wrapper = join(dir, "git");
+    writeFileSync(wrapper, `#!/bin/sh\ncase " $* " in\n${forged}\nesac\nexec '${realGit}' "$@"\n`);
+    chmodSync(wrapper, 0o755);
+    process.env.PATH = `${dir}${delimiter}${path}`;
+    // The deploy step resolves its git from the PATH without the wrapper, as a clean build machine's.
+    return body(wrapper, { path });
+  } finally {
+    process.env.PATH = path;
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+function forgeryFixture(body) {
+  withScratchRepo((dir) => {
+    mkdirSync(join(dir, "nextjs", "scripts"), { recursive: true });
+    writeFileSync(join(dir, GATE_SURFACE_RULES_PATH), rulesSource);
+    writeFileSync(join(dir, "nextjs", "x.ts"), "export const x = 1;\n");
+    scratchGit(dir, ["add", "-A"]);
+    scratchGit(dir, ["commit", "-q", "-m", "fixture"]);
+    const head = scratchGit(dir, ["rev-parse", "HEAD"]);
+    body(dir, head, { VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: head, VERCEL_FORCE_NO_BUILD_CACHE: "1" });
+  });
+}
+
+test("gate surface: a PATH git that forges only show and ls-tree cannot supply the deploy digest (R6 CODE B1)",
+  { skip: posixGit }, () => {
+    forgeryFixture((dir, head, production) => {
+      const digest = gateSurfaceOfCommit(dir, head);
+      withForgingGit(`*" show "*|*" ls-tree "*) echo forged; exit 0;;`, (wrapper, toolOptions) => {
+        assert.equal(gateSurfaceOfCommit(dir, head, wrapper), null, "the wrapper does forge the tree");
+        assert.equal(deploymentGateSurface(production, dir, toolOptions), digest);
+      });
+    });
+  });
+
+test("gate surface: a PATH git that forges only rev-parse and status cannot vouch for a dirty checkout (R6 CODE B1)",
+  { skip: posixGit }, () => {
+    forgeryFixture((dir, head, production) => {
+      writeFileSync(join(dir, "nextjs", "x.ts"), "export const x = 2;\n");
+      withForgingGit(`*" rev-parse "*) echo ${head}; exit 0;;\n*" status "*) exit 0;;`, (wrapper, toolOptions) => {
+        assert.equal(execFileSync(wrapper, ["-C", dir, "status", "--porcelain"], { encoding: "utf8" }), "",
+          "the wrapper does hide the edit");
+        assert.equal(deploymentGateSurface(production, dir, toolOptions), null);
+      });
+    });
+  });
+
+// R6 SEC N1. The CLI says which setting is missing when it records none for that reason.
+test("gate surface: a production deploy step without VERCEL_FORCE_NO_BUILD_CACHE=1 records none and names the setting",
+  { skip: checkoutHead === null }, () => {
+    const records = mkdtempSync(join(tmpdir(), "gate-surface-nocache-"));
+    try {
+      const env = { ...process.env, VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: checkoutHead,
+        TMPDIR: records, TEMP: records, TMP: records };
+      delete env.VERCEL_FORCE_NO_BUILD_CACHE;
+      const step = spawnSync(process.execPath, [fileURLToPath(new URL("./gate-surface.mjs", import.meta.url)), "--deploy"],
+        { env, encoding: "utf8" });
+      assert.equal(step.status, 0, step.stderr);
+      assert.match(step.stderr, /VERCEL_FORCE_NO_BUILD_CACHE is not 1/);
+      assert.match(step.stdout, /deploy step\): none \(exact-SHA release only\)/);
+      const [record] = readdirSync(records).map((name) => JSON.parse(readFileSync(join(records, name), "utf8")));
+      assert.equal(record.digest, null);
+    } finally {
+      rmSync(records, { recursive: true, force: true });
+    }
+  });
 
 // R4. The digest is computed by the production build's first command, before any other repository code runs
 // on the build machine, so nothing can have rewritten an ignored input (node_modules, .env*) or hidden a change

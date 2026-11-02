@@ -671,9 +671,13 @@ PR #174는 게이트 코드를 하나도 바꾸지 않았다. 다만 R5 규칙�
 
 - 표면 경로가 바뀐 배포는 상속하지 않는다.
 - 실행되거나 코드로 import될 수 있는 파일은 디렉터리와 상관없이 표면이다. presentational에는 markdown, 미디어, 폰트,
-  PDF, specimen 데이터 JSON만 남는다(R5). 정책 문서와 `public/developer/` 폴더 전체도 표면이다. 리뷰가 찾은 reflective
+  PDF, specimen 데이터 JSON만 남는다(R5). 정책 문서, `public/developer/` 폴더 전체, `public/evaluation/` 평가 기록지(R6)도
+  표면이다. 리뷰가 찾은 reflective
   payload(`global["pro" + "cess"]`)를 예전 presentational page 어디에 넣어도 digest가 바뀐다.
-- deploy 단계는 저장소나 `node_modules` 안의 `node`·`git`을 쓰지 않는다. 찾으면 빌드를 멈춘다.
+- deploy 단계는 저장소나 `node_modules` 안의 `git`을 쓰지 않고, 그런 곳의 node에서 돌면 빌드를 멈춘다. 각 git 호출 지점이
+  찾은 git을 쓰는지는 일부 하위 명령만 위조하는 PATH의 git wrapper 두 개로 고정한다(R6, POSIX에서만 돈다). cache가 복원한
+  node가 node 자체를 바꿔치기하는 것은 막지 못하므로, `VERCEL_FORCE_NO_BUILD_CACHE`가 `1`이 아닌 production 빌드는 `none`을
+  기록한다(R6).
 - 표면 digest는 단사다(v2, 항목마다 JSON 배열 한 줄). LF가 든 경로로 표면 파일을 지우거나 더한 트리는 다른
   digest를 낸다. UTF-8이 아닌 경로가 있는 트리는 digest가 없다(합성 트리와 실제 Git 커밋 양쪽 회귀 테스트).
 - preview·로컬 빌드, `VERCEL_GIT_COMMIT_SHA`가 없거나 `HEAD`와 다른 빌드, git이 없는 빌드, 작업 트리가 깨끗하지
