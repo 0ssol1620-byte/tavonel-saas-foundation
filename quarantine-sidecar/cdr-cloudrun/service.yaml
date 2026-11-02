@@ -56,6 +56,10 @@ spec:
             # by this service rather than as an infrastructure timeout by Cloud Run.
             - name: CLAMD_READ_TIMEOUT_SECONDS
               value: "20"
+            # Text-layer-first reading (docs/adr/ADR-2026-11-02-text-layer-first-cdr.md). Off:
+            # /v1/text-layer answers 404 and nothing changes. Turning it on is a founder decision.
+            - name: TAVONEL_CDR_TEXT_LAYER_FIRST
+              value: "0"
             - name: TAVONEL_CDR_HMAC
               valueFrom:
                 secretKeyRef:
