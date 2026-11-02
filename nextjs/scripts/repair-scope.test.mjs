@@ -7102,7 +7102,9 @@ test('affected CPU OCR synthetic binding owns exactly four paths and defers its 
   }
 });
 test('affected CDR Cloud Run service owns exactly its app and wiring suite and defers its exact-head malware-scan qualification', () => {
-  const paths = ['quarantine-sidecar/cdr-cloudrun/app.py', 'quarantine-sidecar/cdr-cloudrun/tests/test_app.py'];
+  // Sorted as the map reports changed paths (code-point order).
+  const paths = ['Dockerfile', 'README.md', 'app.py', 'request_boundary.py', 'service.yaml', 'tests/test_app.py', 'tests/test_text_layer.py', 'text_layer.py']
+    .map(path => `quarantine-sidecar/cdr-cloudrun/${path}`);
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'cdr-cloudrun-service');
   assert.equal(owners.length, 1);
   assert.deepEqual([owners[0].unitFiles, owners[0].browserFiles, owners[0].databaseTests, Boolean(owners[0].worker), Boolean(owners[0].selector), Boolean(owners[0].database), owners[0].nativeReuse],
@@ -7128,11 +7130,11 @@ test('affected CDR Cloud Run service owns exactly its app and wiring suite and d
   // The TypeScript CDR worker keeps its own owner and check; neither owner joins the other.
   const withWorker = affectedAskPlan(affectedMap([...records, affectedRecord('M', ['quarantine-sidecar/foundation-cdr-worker/src/ocr.ts'])]));
   assert.equal(withWorker.runCdrWorkerChecks, true);
-  assert.deepEqual(withWorker.affectedIntegration.entries.map(entry => entry.groups), [['cdr-cloudrun-service'], ['cdr-cloudrun-service'], ['ocr-worker']]);
+  assert.deepEqual(withWorker.affectedIntegration.entries.map(entry => entry.groups), [...paths.map(() => ['cdr-cloudrun-service']), ['ocr-worker']]);
   assert.ok(withWorker.deferredGroups.includes('cdr-cloudrun-service') && !withWorker.deferredGroups.includes('ocr-worker'));
   for (const adjacent of [
-    'quarantine-sidecar/cdr-cloudrun/malware.py', 'quarantine-sidecar/cdr-cloudrun/Dockerfile', 'quarantine-sidecar/cdr-cloudrun/requirements.txt',
-    'quarantine-sidecar/cdr-cloudrun/service.yaml', 'quarantine-sidecar/cdr-cloudrun/app_v2.py', 'quarantine-sidecar/cdr-cloudrun/test_app.py',
+    'quarantine-sidecar/cdr-cloudrun/malware.py', 'quarantine-sidecar/cdr-cloudrun/requirements.txt', 'quarantine-sidecar/cdr-cloudrun/text_layer_v2.py',
+    'quarantine-sidecar/cdr-cloudrun/tests/test_text_layer_v2.py', 'quarantine-sidecar/cdr-cloudrun/app_v2.py', 'quarantine-sidecar/cdr-cloudrun/test_app.py',
     'quarantine-sidecar/cdr-cloudrun/tests/test_app_v2.py', 'quarantine-sidecar/cdr-cloudrun/tests/test_malware_clamd.py', 'quarantine-sidecar/cdr-cloudrun/tests/conftest.py',
     'nextjs/quarantine-sidecar/cdr-cloudrun/app.py',
   ]) {
@@ -7477,6 +7479,24 @@ test('affected g1-copy-truth owner: 6 exact paths select 17 direct suites and 2 
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [affectedUnion(suites, CONSENT_POSTER_AFFECTED_UNIT_FILES), affectedUnion(browsers, CONSENT_POSTER_AFFECTED_BROWSER_FILES), false, false]);
   assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440', '390', 'reduced-motion']);
   for (const adjacent of ['nextjs/lib/billing-catalog.test.tsx', 'nextjs/lib/operations-v2.ts', 'nextjs/lib/mcp-tools.tsx', 'nextjs/lib/g1-copy-truth.ts', 'nextjs/public/developer/tavonel-mcp-2.mjs', 'nextjs/public/developer/tavonel-cli.mjs', 'lib/operations.ts.bak']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
+// Packet delivery (codex/packet-delivery-textlayer-20261102): one finite owner, restated independently of the exported constants.
+import { PACKET_DELIVERY_AFFECTED_PATHS, PACKET_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected packet-delivery-20261102 owner: 8 exact paths select 11 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/api/collections/[id]/download/route.ts', 'lib/ai-package-guidance.ts', 'lib/b30-api-mcp-cli-parity.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/package-contents.ts', 'lib/packet-delivery.test.ts', 'public/developer/tavonel-verify-package.mjs', 'scripts/compiled-world/validate.mjs'];
+  const suites = ['lib/ai-package-guidance.test.ts', 'lib/b30-api-mcp-cli-parity.test.ts', 'lib/brand-copy.test.ts', 'lib/collection-download.test.ts', 'lib/compiler-contract.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/developer-distribution.test.ts', 'lib/journey-acceptance.test.ts', 'lib/mcp-server.test.ts', 'lib/packet-delivery.test.ts', 'lib/remote-mcp.test.ts'];
+  assert.deepEqual([[...PACKET_DELIVERY_AFFECTED_PATHS], [...PACKET_DELIVERY_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['packet-delivery-20261102'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['packet-delivery-20261102'], [], [...suites].sort(), [], []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false], path);
+  }
+  for (const adjacent of ['nextjs/app/api/collections/[id]/route.ts', 'nextjs/lib/ai-package-guidance.tsx', 'nextjs/lib/packet-delivery.ts', 'nextjs/lib/consumer-context/consumer-context.ts', 'nextjs/public/developer/tavonel-verify-export.mjs', 'nextjs/scripts/compiled-world/verify-external-roundtrip.py', 'lib/packet-delivery.test.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
