@@ -1,33 +1,17 @@
 {
   "schemaVersion": "tavonel.gate_surface.v1",
-  "comment": "Paths that cannot change what the server does with customer data, nor the consent, upload, source, key or account UI in front of it: docs, tests, static media and the public landing, benchmark and changelog pages. Every other tracked path, this file and gate-surface.mjs included, is the gate surface. Shipped code on this list may not fetch, read process.env, use process, globalThis or eval, run on the server-only side, or import supabase, any Node builtin, a package other than react, react-dom, next, next/link and next/image, shared/ gate code or the grant, admission, intake and release-store modules (release-gate-check.test.mjs); that test, its vitest wrapper and the developer setup and safety contract under public/developer/ are surface, so weakening them moves the digest. A symlink or gitlink is surface whatever its name. The production build's first command, node scripts/gate-surface.mjs --deploy, computes the digest before any other repository code runs; next.config.mjs only reads it. What runs after it (pnpm check, the hermetic vitest include of vitest.config.ts, next build) may run surface code and presentational shipped code, and no other presentational code: the last five alwaysSurface rules are that include, and suites that import scripts/repair-scope.mjs are left out of the production prebuild (run-hermetic-vitest.mjs PREBUILD_EXCLUDED_SUITES). Widening this list changes the digest, so it needs a new founder release once. docs/adr/0006-release-continuity-by-gate-surface.md.",
+  "comment": "Presentational paths are pure content that nothing executes: markdown (no MDX loader is configured), images, fonts, video, captions, PDFs, and the two JSON data files the surface specimen reader validates before it uses them. Every other tracked path is the gate surface, this file and gate-surface.mjs included, and so is every file whose extension can run or be imported as code (ts, tsx, mts, cts, js, jsx, mjs, cjs, mdx, css, svg, html, and JSON or YAML, which build tools, config loaders and scripts read) in any directory: a denylist over executable code cannot be made safe (R5 SEC B1), so no presentational path can hold one. alwaysSurface keeps content customers rely on surface where a presentational rule would match: the policy texts and the developer setup and safety contract. A symlink or gitlink is surface whatever its name. The production build's first command, node scripts/gate-surface.mjs --deploy, computes the digest before any other repository code runs; next.config.mjs only reads it, and everything after it runs surface code only. Widening this list changes the digest, so it needs a new founder release once. docs/adr/0006-release-continuity-by-gate-surface.md.",
   "alwaysSurface": [
     "^docs/policy/",
     "^nextjs/public/policy/",
     "^nextjs/public/\\.well-known/",
-    "/route\\.(ts|tsx|js|mjs)$",
-    "^nextjs/scripts/gate-surface",
-    "^nextjs/scripts/release-gate-check\\.test\\.mjs$",
-    "^nextjs/lib/release-gate-check-script\\.test\\.ts$",
-    "^nextjs/public/developer/",
-    "^nextjs/lib/.*\\.(test|spec)\\.ts$",
-    "^nextjs/eval/(.*/)?metrics\\.test\\.ts$",
-    "^nextjs/components/.*\\.test\\.tsx?$",
-    "^nextjs/app/api/(documents(/.*)?|compile-jobs)/route\\.test\\.ts$",
-    "^nextjs/scripts/(router|billing)/[^/]+\\.test\\.mjs$"
+    "^nextjs/public/developer/"
   ],
   "presentational": [
-    "^docs/",
     "\\.md$",
-    "\\.(test|spec)\\.(ts|tsx|mts|js|mjs)$",
-    "^nextjs/e2e/",
+    "^docs/.*\\.(png|jpe?g|webp|avif|gif|pdf|txt)$",
     "^nextjs/public/.*\\.(avif|webp|jpe?g|png|gif|ico|mp4|webm|vtt|woff2|pdf)$",
-    "^nextjs/public/proof-collection/specimens/[^/]+\\.json$",
-    "^nextjs/components/landing-v2/",
-    "^design-system/",
-    "^nextjs/app/(benchmarks|changelog)/",
-    "^nextjs/lib/(changelog|compiler-release|gdp-pdf-page-data)\\.ts$",
-    "^nextjs/lib/specimen-sources\\.json$",
-    "^nextjs/scripts/(repair-scope|verify-repair-workflows)\\.mjs$"
+    "^nextjs/public/proof-collection/specimens/[^/]+\\.run\\.json$",
+    "^nextjs/lib/specimen-sources\\.json$"
   ]
 }

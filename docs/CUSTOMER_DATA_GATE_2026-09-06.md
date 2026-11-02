@@ -651,9 +651,9 @@ this answer as a G3 precondition ("이 답이 G3의 선행 조건입니다"); it
 검증, `evaluated_at`부터 30일이라는 한도는 바뀌지 않는다. 설계는 `docs/adr/0006-release-continuity-by-gate-surface.md`에 있다.
 
 **왜.** 2026-10-27 PR #174(`4252bead`)가 배포된 뒤 창업자 작업공간의 bootstrap이 `release_pending`을 돌려주었다.
-PR #174는 게이트 코드를 하나도 바꾸지 않았다. 오늘의 규칙을 최근 `main` 병합 16개에 적용하면 그중 3개
-(#173, #171, #158)가 새 기록 없이 열린 채 남았을 것이다. #174 자체는 R1 리뷰 뒤 좁힌 목록으로는 상속하지
-않는다. 전역 CSS, 랜딩 밖의 컴포넌트, 서버 쪽 specimen reader를 바꿨기 때문이다.
+PR #174는 게이트 코드를 하나도 바꾸지 않았다. 다만 R5 규칙은 실행되는 파일을 모두 표면으로 둔다. 그 규칙을 최근 `main`
+병합 16개에 적용하면 1개(#158, 문서만 바꿈)가 새 기록 없이 열린 채 남았을 것이다. #174 자체는 상속하지 않는다.
+페이지와 컴포넌트 코드를 바꿨기 때문이다.
 
 **바뀌지 않는 것.**
 
@@ -670,9 +670,10 @@ PR #174는 게이트 코드를 하나도 바꾸지 않았다. 오늘의 규칙�
 `nextjs/scripts/release-gate-check.test.mjs`(gate-surface 테스트 포함)가 다음을 고정한다.
 
 - 표면 경로가 바뀐 배포는 상속하지 않는다.
-- 동의·업로드·원본·키·계정 컴포넌트, 전역 CSS, `public/developer/` 폴더 전체, presentational 가드 테스트는
-  표면이다. presentational 배포 코드는 `fetch`, `process.env`, `supabase`, `node:` 같은 서버·네트워크 경로도,
-  `shared/`와 grant·admission·intake·release store 모듈 import도 쓸 수 없다.
+- 실행되거나 코드로 import될 수 있는 파일은 디렉터리와 상관없이 표면이다. presentational에는 markdown, 미디어, 폰트,
+  PDF, specimen 데이터 JSON만 남는다(R5). 정책 문서와 `public/developer/` 폴더 전체도 표면이다. 리뷰가 찾은 reflective
+  payload(`global["pro" + "cess"]`)를 예전 presentational page 어디에 넣어도 digest가 바뀐다.
+- deploy 단계는 저장소나 `node_modules` 안의 `node`·`git`을 쓰지 않는다. 찾으면 빌드를 멈춘다.
 - 표면 digest는 단사다(v2, 항목마다 JSON 배열 한 줄). LF가 든 경로로 표면 파일을 지우거나 더한 트리는 다른
   digest를 낸다. UTF-8이 아닌 경로가 있는 트리는 digest가 없다(합성 트리와 실제 Git 커밋 양쪽 회귀 테스트).
 - preview·로컬 빌드, `VERCEL_GIT_COMMIT_SHA`가 없거나 `HEAD`와 다른 빌드, git이 없는 빌드, 작업 트리가 깨끗하지

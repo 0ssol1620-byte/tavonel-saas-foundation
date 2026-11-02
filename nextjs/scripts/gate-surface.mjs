@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { accessSync, constants, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
@@ -60,12 +60,15 @@ export function gateSurfaceDigest(rules, tree) {
   return `sha256:${createHash("sha256").update(`${DIGEST_SCHEMA}\n${lines.join("\n")}\n`).digest("hex")}`;
 }
 
-/** The digest of one commit in `repositoryRoot`, or null (no git, unknown commit, no rules file). */
-export function gateSurfaceOfCommit(repositoryRoot, sha) {
+/**
+ * The digest of one commit in `repositoryRoot`, or null (no git, unknown commit, no rules file). `gitPath` is the git
+ * binary: PATH lookup by default (a local check), the resolved absolute path in the deploy step.
+ */
+export function gateSurfaceOfCommit(repositoryRoot, sha, gitPath = "git") {
   if (!REVISION.test(sha ?? "")) return null;
   // Fatal decoding: a lossy one would map two different byte paths onto one string.
   const utf8 = new TextDecoder("utf-8", { fatal: true });
-  const git = (...args) => utf8.decode(execFileSync("git", gitArguments(repositoryRoot, args),
+  const git = (...args) => utf8.decode(execFileSync(gitPath, gitArguments(repositoryRoot, args),
     { stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 }));
   try {
     const rules = JSON.parse(git("show", `${sha}:${GATE_SURFACE_RULES_PATH}`));
@@ -78,6 +81,59 @@ export function gateSurfaceOfCommit(repositoryRoot, sha) {
 const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 /**
+ * R5 SEC B2. pnpm puts nextjs/node_modules/.bin first on PATH, and Vercel restores node_modules from the build cache
+ * before the build runs, so a `node` or `git` found there is not the system's: whatever an earlier build left could
+ * report the released tree. The deploy step trusts neither the checkout nor any node_modules directory for its tools.
+ * It refuses when the node running it, or the first `node` the shell would have found on PATH, is inside the
+ * repository or a node_modules directory, and it calls git by the absolute path of the first `git` on PATH outside
+ * both. Every path is judged as given and with links resolved. Throws with the reason; the build stops.
+ * Defence in depth, not the boundary: production build cache is an untrusted input, and the release depends on the
+ * Production setting VERCEL_FORCE_NO_BUILD_CACHE=1 (docs/adr/0006).
+ */
+export function resolveDeployTools(repositoryRoot = REPOSITORY_ROOT,
+  { path = process.env.PATH ?? "", execPath = process.execPath, pathExt = process.env.PATHEXT } = {}) {
+  const windows = process.platform === "win32";
+  const fold = (value) => (windows ? value.toLowerCase() : value);
+  const forms = (value) => {
+    const given = resolve(value);
+    let real = given;
+    try { real = realpathSync.native(given); } catch { /* a missing path is judged as given */ }
+    return [fold(given), fold(real)];
+  };
+  const roots = forms(repositoryRoot);
+  const untrusted = (value) => forms(value).some((form) => form.split(/[\\/]/).includes("node_modules") ||
+    roots.some((root) => form === root || form.startsWith(root.endsWith(sep) ? root : root + sep)));
+  const executable = (file) => {
+    try {
+      if (!statSync(file).isFile()) return false;
+      accessSync(file, constants.X_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  if (untrusted(execPath)) {
+    throw new Error(`gate-surface --deploy: node is ${execPath}, inside the repository or a node_modules directory. The deploy ` +
+      "step runs only under a node that neither the checkout nor the build cache can supply; the build stops.");
+  }
+  const entries = path.split(delimiter).filter((entry) => entry !== "");
+  const nodeNames = windows
+    ? ["node", ...(pathExt || ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean).map((ext) => `node${ext.toLowerCase()}`)]
+    : ["node"];
+  const nodeEntry = entries.find((entry) => nodeNames.some((name) => executable(join(entry, name))));
+  if (nodeEntry !== undefined && untrusted(nodeEntry)) {
+    throw new Error(`gate-surface --deploy: the first node on PATH is in ${nodeEntry}, inside the repository or a node_modules ` +
+      "directory, so the shell may have started this step through it; the build stops.");
+  }
+  for (const entry of entries) {
+    if (!isAbsolute(entry) || untrusted(entry)) continue;
+    const file = join(entry, windows ? "git.exe" : "git");
+    if (executable(file) && !untrusted(file)) return { git: file };
+  }
+  throw new Error("gate-surface --deploy: no git on PATH outside the repository and node_modules directories; the build stops.");
+}
+
+/**
  * The first command of a Vercel production build (package.json `prebuild`, before `pnpm check` and the
  * hermetic vitest run), so no repository code but this file and the builtin-only ignoreCommand has run
  * on the build machine yet (release-gate-check.test.mjs, "the digest is the first thing the production
@@ -88,10 +144,11 @@ const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../.."
  * not ignored, file (a local `vercel build --prod` deployed with `--prebuilt`), or any index entry
  * marked skip-worktree or assume-unchanged, which `git status` would otherwise not report.
  */
-export function deploymentGateSurface(env = process.env, repositoryRoot = REPOSITORY_ROOT) {
+export function deploymentGateSurface(env = process.env, repositoryRoot = REPOSITORY_ROOT, toolOptions = {}) {
   const claimed = env.VERCEL_GIT_COMMIT_SHA?.trim().toLowerCase();
   if (env.VERCEL_ENV !== "production" || !claimed) return null;
-  const git = (...args) => execFileSync("git", gitArguments(repositoryRoot, args),
+  const { git: gitPath } = resolveDeployTools(repositoryRoot, toolOptions);
+  const git = (...args) => execFileSync(gitPath, gitArguments(repositoryRoot, args),
     { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 });
   let head;
   try {
@@ -103,7 +160,7 @@ export function deploymentGateSurface(env = process.env, repositoryRoot = REPOSI
   } catch {
     return null;
   }
-  return gateSurfaceOfCommit(repositoryRoot, head);
+  return gateSurfaceOfCommit(repositoryRoot, head, gitPath);
 }
 
 /** Where the deploy step leaves its result for next.config.mjs: outside the checkout, one file per SHA. */
@@ -118,12 +175,20 @@ export function deploymentGateSurfaceFile(env = process.env, directory = tmpdir(
  * Throws when a record for this SHA already exists: the step runs once per build, and a second run, or a
  * record something else left, is not trusted. Outside a Vercel production build it writes nothing.
  */
-export function recordDeploymentGateSurface(env = process.env, repositoryRoot = REPOSITORY_ROOT, directory = tmpdir()) {
+export function recordDeploymentGateSurface(env = process.env, repositoryRoot = REPOSITORY_ROOT, directory = tmpdir(),
+  toolOptions = {}) {
   const file = deploymentGateSurfaceFile(env, directory);
   if (file === null) return null;
-  const digest = deploymentGateSurface(env, repositoryRoot);
+  const digest = deploymentGateSurface(env, repositoryRoot, toolOptions);
   const revision = env.VERCEL_GIT_COMMIT_SHA.trim().toLowerCase();
-  writeFileSync(file, `${JSON.stringify({ schemaVersion: SCHEMA, revision, digest })}\n`, { flag: "wx" });
+  try {
+    writeFileSync(file, `${JSON.stringify({ schemaVersion: SCHEMA, revision, digest })}\n`, { flag: "wx" });
+  } catch (error) {
+    if (error?.code !== "EEXIST") throw error;
+    throw new Error(`gate-surface --deploy: ${file} already exists. The step records once per build and trusts no record it ` +
+      "did not just write, so the build stops. If an earlier local `vercel build --prod` of this SHA left it, delete that " +
+      "file and build again.", { cause: error });
+  }
   return digest;
 }
 
@@ -145,8 +210,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const { values } = parseArgs({ args: args[0] === "--" ? args.slice(1) : args, strict: true,
     options: { sha: { type: "string" }, deploy: { type: "boolean" } } });
   if (values.deploy) {
-    // Throws (exit 1, the build stops) on a second run for the same SHA.
-    const digest = recordDeploymentGateSurface();
+    // A second run for the same SHA, or a node or git the checkout or build cache could supply, stops the build (exit 1).
+    let digest;
+    try {
+      digest = recordDeploymentGateSurface();
+    } catch (error) {
+      process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+      process.exit(1);
+    }
     process.stdout.write(`customer-data gate surface (deploy step): ${digest ?? "none (exact-SHA release only)"}
 `);
     process.exit(0);

@@ -28,18 +28,23 @@ gate v2에서 출시 결정(`customer_data_release_decisions`)과 작업공간 g
    `alwaysSurface`(정책 문서, `route.*`, 표면 계산 코드)는 목록에 걸려도 표면이다. 규칙 파일과
    계산 코드(`nextjs/scripts/gate-surface.mjs`)도 표면이다. 그래서 목록을 넓히는 PR은 그 자체로
    digest를 바꾸고, 한 번은 새 출시 기록이 필요하다.
-   presentational은 고객 데이터를 서버가 어떻게 다루는지도, 그 앞의 동의·업로드·원본·키·계정 화면도 바꿀 수
-   없는 경로로 한정한다(R1 보안 리뷰 B1). 문서, e2e와 production 빌드에서 돌지 않는 테스트, 정적 미디어, `nextjs/components/landing-v2/`,
-   `nextjs/app/(benchmarks|changelog)/`, 그리고 페이지 데이터 파일 몇 개다. 나머지 컴포넌트, 전역 CSS,
-   `nextjs/content/`, 서버 쪽 specimen reader는 표면이다. `nextjs/public/developer/`는 `.md`를 포함해
-   폴더 전체가 표면이다. 고객이 따르는 설치·안전 계약 문서가 거기 있기 때문이다(R2 보안 리뷰 S4).
-   presentational 목록에 걸리는 배포 코드는 `fetch`, `sendBeacon`, `process.env`, `"use server"`,
-   `server-only`, `supabase`를 쓸 수 없다. Node builtin은 접두사와 하위 경로에 상관없이 import할 수 없다(`node:module`의
-   `builtinModules`로 판정한다. `"fs/promises"`, `"process"`, `"vm"`, `"dns"`도 막힌다). 패키지는 `react`, `react-dom`, `next`,
-   `next/link`, `next/image`만 import할 수 있다. fs를 감싼 패키지(`next/dist/compiled/fs-extra` 등)도 막기 위해서다(R4 보안 리뷰 B3). `shared/`(순수 데이터 `shared/capabilityManifest`만
-   예외), grant·admission·intake·release store 모듈, `*-gate` lib 모듈도 import할 수 없다(R2 보안 리뷰 S3).
-   `release-gate-check.test.mjs`가 막는다. 이 테스트와 그 vitest wrapper(`lib/release-gate-check-script.test.ts`)는
-   `alwaysSurface`에 있다. 그래서 가드를 약하게 바꾸면 digest가 바뀐다(R2 보안 리뷰 S2).
+   presentational은 **실행되지 않는 내용**뿐이다(R5 보안 리뷰 B1). markdown(MDX loader는 설정되어 있지 않다),
+   `docs/`와 `nextjs/public/`의 이미지·폰트·영상·자막·PDF·텍스트, 그리고 표면인 specimen reader가 검증한 뒤 읽는 JSON 데이터
+   두 종류(`nextjs/lib/specimen-sources.json`, `nextjs/public/proof-collection/specimens/*.run.json`)다. 실행되거나 코드로 import될 수
+   있는 확장자(`ts`, `tsx`, `mts`, `cts`, `js`, `jsx`, `mjs`, `cjs`, `mdx`, `css`, `svg`, `html`, 그리고 빌드 도구·설정 loader·스크립트가
+   읽는 JSON과 YAML)는 디렉터리와 상관없이 표면이다. 그래서 `nextjs/components/landing-v2/`, `nextjs/app/(benchmarks|changelog)/`,
+   그 페이지 데이터 lib(`changelog.ts`, `compiler-release.ts`, `gdp-pdf-page-data.ts`), e2e, 모든 테스트, `scripts/repair-scope.mjs`도
+   R5부터 표면이다. `alwaysSurface`는 presentational 규칙에 걸려도 표면으로 남길 내용, 곧 정책 문서(`docs/policy/`,
+   `nextjs/public/policy/`), `.well-known`, 고객이 따르는 설치·안전 계약(`nextjs/public/developer/`, R2 보안 리뷰 S4)이다.
+   **R4까지의 방식과 버린 것.** R4까지는 `landing-v2`와 benchmarks·changelog page를 presentational로 두고, 그 배포 코드가
+   `fetch`, `process.`, `globalThis`, `eval(`, `Function(`, Node builtin, 허용 밖 패키지를 쓰지 못하게 하는 정규식 가드를 걸었다.
+   R5 보안 리뷰는 import도 `process` 토큰도 없는 `global["pro" + "cess"].getBuiltinModule("node:fs")`가 가드를 통과하고, prebuild
+   vitest 안에서 기록 파일을 다른 digest로 덮어쓰는 것을 재현했다. 실행되는 코드에 대한 denylist는 안전하게 만들 수 없다.
+   그래서 가드를 넓히지 않고 **실행되는 파일을 presentational에서 없앴다.** 토큰 가드, import walk, prebuild 제외 목록
+   (`PREBUILD_EXCLUDED_SUITES`)은 지켜야 할 대상이 없어져서 지웠다. 대신 `release-gate-check.test.mjs`가 (1) 예전에
+   presentational 코드가 있던 모든 디렉터리에서 모든 코드 확장자가 표면인지, (2) 이 checkout HEAD 트리의 presentational 파일
+   중 코드 확장자가 0개이고 JSON은 위 데이터 두 종류뿐인지, (3) 리뷰의 reflective payload를 예전 presentational page 9개 어디에
+   넣어도 digest가 바뀌는지 확인한다. 이 테스트와 그 vitest wrapper(`lib/release-gate-check-script.test.ts`)는 코드이므로 표면이다.
    **digest는 production 빌드가 실행하는 첫 명령이다(R4).** R3까지는 `next.config.mjs`가 digest를 계산했다. 그 전에
    prebuild(`pnpm check`, hermetic vitest)가 빌드 머신에서 저장소 코드를 실행했다. 그 코드가 git이 보지 못하는 입력
    (`node_modules`, `.env*`)을 고치거나 fsmonitor·skip-worktree로 변경을 숨기면 digest는 출시 값과 같았다. R3·R4 리뷰는
@@ -52,17 +57,17 @@ gate v2에서 출시 결정(`customer_data_release_decisions`)과 작업공간 g
    `vercel.json`을 읽어 이 순서, install hook이 없음, `buildCommand`·`installCommand` override가 없음, deploy 스크립트와
    ignoreCommand의 import가 builtin뿐임을 확인한다.
    **digest 뒤에 도는 코드.** deploy 단계 뒤의 `pnpm check`, hermetic vitest, `next build`는 기록된 digest를 바꿀 수 없다.
-   그러나 `next build`가 컴파일할 바이트(표면 파일, `node_modules`)는 바꿀 수 있다. 그래서 이 단계는 표면 코드와
-   presentational 배포 코드(app, components, lib. 위 가드가 Node builtin, `process`, `eval`, 네트워크, 허용 밖 패키지를 막는다.
-   `next build`도 prerender할 때 어차피 실행한다)만 실행하고, 그 밖의 presentational 코드는 실행하지 않는다.
-   `vitest.config.ts` include에 걸리는 테스트는 `alwaysSurface`다. `scripts/repair-scope.mjs`(presentational이고 Node
-   스크립트)를 import하는 suite 2개만 production 빌드(`VERCEL_ENV=production`)의 prebuild에서 뺀다(`PREBUILD_EXCLUDED_SUITES`;
-   `pnpm test`와 CI는 그대로 돌린다). R3의 25개 중 나머지 23개는 가드가 걸린 presentational 배포 코드에만 닿으므로 다시 돈다.
-   `release-gate-check.test.mjs`가 실제 include glob을 추적 파일에 풀고, prebuild 스크립트·설정·suite와 모든 `app/**/page.tsx`
-   (`lib/seo-surface.test.ts`의 계산된 import가 읽는 대상)에서 import를 따라가 가드 밖 presentational 코드에 닿지 않는지,
-   뺀 suite가 정말 닿는지 확인한다. 계산된 `import(`가 있는 prebuild suite는 이름 붙인 두 파일뿐이어야 한다.
-   symlink(mode 120000)와 gitlink(160000) 항목은 이름과 상관없이 표면이다. presentational 이름의 디렉터리 symlink가
-   include 안에 다른 디렉터리를 끌어들일 수 있기 때문이다(R4 보안 리뷰 B2).
+   그러나 같은 컨테이너 안에서 기록 파일이나 `next build`가 컴파일할 바이트(표면 파일, `node_modules`)는 바꿀 수 있다. 그래서 이
+   단계는 표면 코드만 실행해야 한다. R5부터는 저장소의 모든 실행 파일이 표면이므로 이 조건은 규칙 자체에서 나온다. 제외할 suite도
+   없다. presentational 파일을 코드로 읽는 길은 표면 코드가 그것을 module로 load하는 것뿐이고, 그 load 자체가 표면 변경이다.
+   symlink(mode 120000)와 gitlink(160000) 항목은 이름과 상관없이 표면이다. presentational 이름의 링크가 다른 디렉터리를 가리킬
+   수 있기 때문이다(R4 보안 리뷰 B2).
+   **deploy 단계의 도구(R5 보안 리뷰 B2).** pnpm은 PATH 맨 앞에 `nextjs/node_modules/.bin`을 넣고, Vercel은 build cache의
+   `node_modules`를 빌드 전에 복원한다. 그래서 deploy 단계는 `node`와 `git`을 저장소나 `node_modules`에서 가져오지 않는다.
+   `process.execPath`가 저장소 루트나 `node_modules` 아래이면, 또는 PATH에서 처음 찾히는 `node`가 그런 디렉터리에 있으면
+   빌드를 멈춘다. git은 PATH를 앞에서부터 걸으며 저장소 루트·`node_modules` 아래 항목과 상대 경로를 건너뛰고, 처음 찾은 절대
+   경로로 부른다. 링크를 푼 경로로도 같은 판정을 한다. 찾지 못하면 빌드를 멈춘다. 이것은 심층 방어다. 경계는 아래 "남는 한계"의
+   build cache 설정이다.
 2. **digest.** `git ls-tree -r -z <sha>`의 (mode, type, blob id, path) 중 표면에 속한 항목을 하나씩
    JSON 배열 `[mode,type,object,path]` 한 줄로 쓰고, 줄을 정렬해 sha256을 낸다
    (`tavonel.gate_surface_digest.v2`). 작업 트리 바이트가 아니라 blob id를 쓰므로, Windows
@@ -147,33 +152,34 @@ gate v2에서 출시 결정(`customer_data_release_decisions`)과 작업공간 g
 
 ## 남는 한계
 
-- **git은 무시되는 빌드 입력을 볼 수 없다.** `node_modules`, `.env*`, 빌드 캐시는 `git status`에 나오지 않는다.
-  digest는 저장소 코드가 돌기 전에 계산하므로 그 입력이 digest를 속일 수는 없다. 그러나 digest 뒤의 단계가 그 입력을
-  고쳐 컴파일 결과를 바꿀 수는 있다. 이것은 digest 뒤에 표면 코드와 가드가 걸린 presentational 배포 코드만 돈다는
-  규칙(위 1번)으로 지킨다. 그 규칙의 테스트는 문자열 import를 따라가는 정규식 walk다. 계산된 import는 이름 붙인 suite만
-  가질 수 있다. presentational server component는 정적 생성 단계에서도 돈다. 그래서 가드가 `process.`, `globalThis`,
-  `require(`, `eval(`, `Function(`, 계산된 `import(`, Node builtin, 허용 밖 패키지를 막는다. 이것도 정규식 가드다.
-  Vercel이 복원하는 build cache(`node_modules`, `.next/cache`)도 이 모델 밖의 입력이다. 지금은 preview가
-  `ignoreCommand`로 빌드되지 않아서 다른 코드가 production cache를 채울 경로가 좁다(R4 보안 리뷰 N3).
-- **Vercel 설정의 build command.** 이 순서는 Vercel 기본 build command(`pnpm run build`, prebuild가 먼저 돈다)를 전제한다.
-  2026-11-02 `vercel project inspect`로 본 설정은 기본값이다. 대시보드에서 바꾸면 deploy 단계가 돌지 않고, 기록이 없으므로
-  digest는 `""`다. 닫힌 쪽이다.
-- **presentational 코드는 같은 origin에서, 서버에서도 돈다.** `landing-v2/`는 동의 route와 같은 origin의
-  브라우저에서 실행되고, benchmarks·changelog의 `page.tsx`는 server component라 서버에서도 실행된다. 금지 토큰
-  테스트는 게이트·grant·admission·intake·release store 모듈과 `shared/`의 직접 import를 막는다. 그래도 import
-  그래프 증명은 아니다. 허용된 표면 모듈이 다시 게이트 모듈을 부르는 간접 경로나, 정규식이 못 읽는 import
-  형태는 잡지 못한다. 이 경로의 변경도 독립 리뷰를 거친다.
+- **production build cache는 신뢰하지 않는 입력이다.** git은 `node_modules`, `.env*`, build cache를 볼 수 없다. R4까지 이 문서와
+  PR 본문은 "digest는 저장소 코드가 돌기 전에 계산하므로 그 입력이 digest를 속일 수는 없다"고 썼다. **사실이 아니었다**(R5 보안
+  리뷰 B2). Vercel은 clone 직후, ignoreCommand와 install보다 먼저 이전 배포의 build cache를 복원한다. 앞선 production 빌드가 digest
+  뒤에 `node_modules/.bin/git`을 남기면, 다음 빌드의 deploy 단계가 그 `git`으로 digest를 계산할 수 있었다. 가짜 `git`은 출시한
+  commit의 tree를 보고하면 되고, payload 커밋을 되돌린 뒤에도 cache에 남는다.
+  R5는 두 가지로 줄였다. (1) 실행되는 presentational 코드가 없으므로 digest 뒤에 도는 코드는 모두 표면이다. cache에 쓸 수 있는
+  것은 리뷰를 거친 표면 코드와 registry 의존성뿐이다. (2) deploy 단계가 저장소·`node_modules` 안의 `node`와 `git`을 쓰지 않는다
+  (위 1번). 그래도 cache 안의 다른 파일(예: `node_modules` 안의 패키지 코드, `.next/cache`)은 `next build`가 읽는다. 그래서
+  **이 출시 방식은 production 빌드가 build cache를 쓰지 않는다는 설정에 기댄다.** Vercel Production env
+  `VERCEL_FORCE_NO_BUILD_CACHE=1`이다. 이것은 창업자/운영 설정이고, 이 PR은 설정하지 않았다. 설정되기 전에는 표면을 넣은 행을
+  기록하지 않는다(runbook 순서 2번). 설정되어 있으면 빌드 로그에 "Restored build cache"가 찍히지 않는다.
+- **Vercel 설정의 build command.** 이 순서는 Vercel 기본 build command(`pnpm run build`, prebuild가 먼저 돈다)와 기본 install
+  command를 전제한다. 2026-11-02 `vercel project inspect`로 본 설정은 둘 다 기본값이다. 대시보드 설정은 저장소 밖이라 테스트가
+  보지 못한다(R5 보안 리뷰 N1). 바꾸면 D-05는 무효다. deploy 단계가 돌지 않으면 기록이 없으므로 digest는 `""`(닫힌 쪽)이지만,
+  바뀐 install command는 deploy 단계보다 먼저 저장소 밖의 명령을 돌릴 수 있다. 그래서 runbook이 기록 전에 확인한다(순서 2번).
+- **markdown은 내용으로만 읽힌다는 전제.** `.md`가 presentational인 것은 MDX나 markdown loader가 설정되어 있지 않고 어떤 표면
+  코드도 `.md`를 module로 load하지 않기 때문이다. 그런 loader나 load를 더하는 변경은 표면(`next.config.mjs`, 표면 코드)이고, 그
+  PR은 `.md`를 presentational에서 빼야 한다. 테스트는 규칙과 HEAD 트리를 고정할 뿐, 미래의 loader를 막지는 않는다.
 - **runbook의 digest 대조는 기록 뒤에도 한다.** DB와 gate는 행에 적힌 digest를 믿는다. `release-gate-check`는
   상속을 보고하기 전에 그 행 `release_revision`의 digest를 로컬 Git으로 다시 계산한다. 다르거나 계산할 수
   없으면 `surface_mismatch`(released 아님)로 보고한다(R2 보안 리뷰 S5). 런타임 gate는 git이 없어 이 대조를
   하지 못한다. 그래서 잘못 붙여 넣은 digest는 운영자가 check를 돌릴 때 드러난다.
 
-- **보수적인 목록.** 오늘의 규칙을 최근 `main` 병합 16개(`4252bead`까지)에 적용하면 3개(#173, #171, #158)가
-  상속한다. R1 리뷰 전 목록으로는 #174를 더해 4개였다. 목록을 좁힌 뒤 #174는 상속하지 않는다. 전역 CSS
-  `nextjs/app/wanted-sans-korean.css`, `nextjs/components/changelog-list.tsx`, 서버 쪽
-  `nextjs/lib/specimen-sources.ts`를 바꿨기 때문이다.
-  홈 페이지(`nextjs/app/page.tsx`, `nextjs/lib/landing-v2-*.ts`)는 표면이다. 그 파일들이 고객 데이터에
-  닿지 않는다고 리뷰가 확인하면 목록을 넓힐 수 있다. 그 PR 뒤에 한 번 다시 기록해야 한다.
+- **보수적인 목록.** R5 규칙을 최근 `main` 병합 16개(`4252bead`까지)에 적용하면 1개(#158, 문서만 바꿈)가 상속한다.
+  R4 규칙으로는 3개(#173, #171, #158)였다. #173과 #171은 changelog 항목(`nextjs/lib/changelog.ts`)을 바꿨고, 그 파일은 이제
+  코드라서 표면이다. 그러니 changelog 글 하나도 새 창업자 기록이 필요하다. 문구를 표면 밖으로 옮기려면 항목을 데이터 파일로
+  빼고 그 파일을 presentational에 넣어야 한다. 그 경우 렌더되는 링크와 문자열의 검증이 표면 코드에 있어야 하고 diff도 작지 않아서
+  이번에는 하지 않았다. 홈 랜딩 문구는 이미 표면인 `nextjs/lib/landing-v2-copy.ts`에 있다.
 - **Vercel 빌드의 git.** 빌드 로그에 "Cloning github.com/…"이 찍히고 `vercel-ignore-build.mjs`가 같은
   체크아웃에서 `git diff`를 쓴다. 하지만 `next build` 단계에서 `git ls-tree`가 되는지는 이 PR이 배포되기
   전에는 확인하지 못했다. 안 되면 digest는 `""`이고 동작은 오늘과 같다(정확한 SHA만).

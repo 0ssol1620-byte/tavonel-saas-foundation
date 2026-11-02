@@ -140,23 +140,22 @@ NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
   게이트 표면 digest다: `cd nextjs; node scripts/gate-surface.mjs --sha <40자 SHA>`. 그 커밋이 로컬에 있어야 한다.
 - 표면을 넣어 기록한 출시는 **digest가 같은 이후 배포 전부**를 덮는다. 원래 행의 `evaluated_at`부터 30일까지다.
   `nextjs/scripts/gate-surface-rules.json`이 presentational로 정한 경로만 바꾼 배포는 새 기록이 필요 없다.
-  그 경로는 문서, e2e와 production 빌드에서 돌지 않는 테스트, 정적 미디어(이미지·영상·폰트·PDF), `nextjs/components/landing-v2/`,
-  `nextjs/app/(benchmarks|changelog)/`, 그리고 changelog·compiler-release·GDP 페이지 데이터뿐이다.
+  그 경로는 **실행되지 않는 내용**뿐이다: markdown, `docs/`와 `nextjs/public/`의 이미지·폰트·영상·자막·PDF·텍스트, specimen 데이터
+  JSON 두 종류(`nextjs/lib/specimen-sources.json`, `public/proof-collection/specimens/*.run.json`).
 - 표면 경로를 하나라도 바꾼 배포는 digest가 달라서 아무것도 상속하지 않는다. 이전처럼 그 SHA에 대한 새 기록이
-  필요하다. 표면에는 migration, `shared/`, `nextjs/lib/`의 서버 코드, API route, 의존성, 정책 문서, 규칙 파일
-  자체가 들어간다. 동의·업로드·원본·키·계정 화면을 포함한 `landing-v2/` 밖의 모든 컴포넌트, 전역 CSS,
-  `nextjs/content/`, 그리고 `public/developer/` 폴더 전체(고객이 실행하는 클라이언트와 설치·안전 계약 `.md`)도
-  표면이다. presentational 가드 테스트(`scripts/release-gate-check.test.mjs`)와 그 wrapper도 표면이다.
+  필요하다. 실행되거나 코드로 import될 수 있는 파일(`ts`, `tsx`, `js`, `mjs`, `cjs`, `mdx`, `css`, `svg`, `html`, JSON, YAML 등)은
+  디렉터리와 상관없이 표면이다(R5). 그래서 landing-v2·benchmarks·changelog 페이지와 그 데이터 lib, e2e, 모든 테스트, 스크립트,
+  설정, `package.json`도 표면이다. changelog 글 하나를 더하는 배포도 새 기록이 필요하다. 정책 문서, `.well-known`,
+  `public/developer/` 폴더 전체(고객이 실행하는 클라이언트와 설치·안전 계약 `.md`)는 내용이라도 표면이다.
   production 빌드의 첫 명령(`prebuild`의 `node scripts/gate-surface.mjs --deploy`)이 다른 저장소 코드보다 먼저 digest를
-  계산하고, `next.config.mjs`는 그 기록을 읽기만 한다. 그 뒤의 prebuild(`pnpm check`, hermetic vitest)와 `next build`가 돌리는
-  코드도 표면이거나 가드가 걸린 presentational 배포 코드여야 한다. 그래서 `vitest.config.ts` include에 걸리는 테스트 전부,
-  prebuild 스크립트, vitest·eslint·tsconfig·next 설정, `package.json`도 표면이다. symlink와 gitlink도 이름과 상관없이 표면이다.
-  `scripts/repair-scope.mjs`를 import하는 테스트 2개는 production 빌드의 prebuild에서 빠지고(`run-hermetic-vitest.mjs`의
-  `PREBUILD_EXCLUDED_SUITES`) CI에서만 돈다.
+  계산하고, `next.config.mjs`는 그 기록을 읽기만 한다. 그 뒤의 prebuild(`pnpm check`, hermetic vitest)와 `next build`는 표면 코드만
+  돌린다. symlink와 gitlink도 이름과 상관없이 표면이다.
 - Vercel **production** 빌드이고 작업 트리가 깨끗할 때(`git status --porcelain`이 빔)만 digest를 주장한다.
   preview와 로컬 빌드, 수정되거나 추적하지 않는 파일이 있는 빌드는 `none`이고 정확한 SHA만 읽는다.
   skip-worktree나 assume-unchanged가 걸린 항목이 하나라도 있거나 index가 HEAD와 다른 빌드도 `none`이다.
-  git은 무시되는 입력(`node_modules`, `.env*`)을 볼 수 없다. 그 입력은 빌드가 표면 코드만 실행한다는 규칙으로만 지킨다.
+  git은 무시되는 입력(`node_modules`, `.env*`, build cache)을 볼 수 없다. **production build cache는 신뢰하지 않는 입력이다.**
+  이 출시 방식은 Production env `VERCEL_FORCE_NO_BUILD_CACHE=1`(창업자/운영 설정)에 기댄다. 아래 순서 2번에서 확인한다.
+  deploy 단계는 저장소나 `node_modules` 안의 `node`·`git`을 쓰지 않고, 찾으면 빌드를 멈춘다(심층 방어).
   그래서 push만 한 브랜치나 로컬에서 `--prebuilt`로 올린 빌드는 production 출시를 이어받지 못한다.
 - digest는 v2 형식(`tavonel.gate_surface_digest.v2`, 표면 항목마다 JSON 배열 한 줄)이다. `d8b3ec3c`까지의 v1 형식으로
   계산해 둔 값은 쓰지 않는다. 값은 늘 아래 명령으로 다시 계산한다.
@@ -170,13 +169,30 @@ NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
 ### 순서
 
 1. migration `20261027120000_release_gate_surface_continuity`를 production에 적용한다. **창업자 작업.**
-2. 이 코드를 배포한다. **이 코드의 첫 production 빌드 로그에 `customer-data gate surface (deploy step): sha256:…` 줄이
-   `pnpm check` 출력보다 먼저 찍히고, 뒤의 `customer-data gate surface: sha256:…` 줄이 같은 digest여야 한다.** 이 줄을 확인하기 전에는 표면을 넣은 행을 기록하지 않는다.
+2. **배포 전에 Vercel 설정을 확인한다. 창업자/운영 작업.** 하나라도 아니면 D-05는 무효다. 표면을 넣은 행을 기록하지 않고
+   오늘처럼 SHA마다 기록한다.
+   - `vercel project inspect tavonel-saas-foundation`에서 Root Directory가 `nextjs`이고 **Build Command와 Install Command가 둘 다
+     기본값**이다(R5 보안 리뷰 N1). 대시보드에서 바꾼 command는 저장소 밖이라 테스트가 보지 못한다. 바꾼 build command는 deploy
+     단계를 건너뛰고, 바꾼 install command는 deploy 단계보다 먼저 다른 명령을 돌릴 수 있다.
+   - Production 환경 변수에 `VERCEL_FORCE_NO_BUILD_CACHE=1`이 있다(R5 보안 리뷰 B2). production build cache는 신뢰하지 않는
+     입력이고, 이 출시 방식은 이 설정에 기댄다. 이 PR은 설정하지 않았다.
+3. 이 코드를 배포한다. **이 코드의 첫 production 빌드 로그에 `customer-data gate surface (deploy step): sha256:…` 줄이
+   `pnpm check` 출력보다 먼저 찍혀야 한다.** 로그에 "Restored build cache"가 없어야 한다(있으면 2번 설정이 빠졌다).
    production 빌드인데 `none (exact-SHA release only)`이면 빌드에서 git을 쓸 수 없거나 작업 트리가 깨끗하지 않다는
    뜻이다(예: prebuild가 무시되지 않는 파일을 남김). 그때는 기능이 꺼진 것이므로 오늘처럼 SHA마다 기록하고, 원인을
    고친 뒤 다음 production 빌드에서 다시 확인한다. preview 빌드는 항상 `none`이다.
-3. 빌드 로그의 digest와 `node scripts/gate-surface.mjs --sha <배포 SHA>`(nextjs에서)의 출력이 같은지 본다.
-4. 그 SHA의 production 결정을 `gate_surface_sha256`을 넣어 기록한다. **창업자 작업**(SQL editor에서 Run).
+   빌드가 `gate-surface --deploy:`로 시작하는 메시지로 멈추면 그 메시지가 원인이다. node나 git이 저장소·`node_modules` 안에서
+   찾혔거나(cache나 PATH를 확인한다), 같은 SHA의 기록 파일이 이미 있다(메시지가 경로를 적는다. 로컬 `vercel build --prod`를
+   두 번 돌린 경우면 그 파일을 지우고 다시 빌드한다).
+4. **필수: 세 값이 같은지 대조한다**(R5 보안 리뷰 N2). 첫 빌드만이 아니라, 표면을 넣은 행을 기록하기 전과 상속을 출시로
+   보고하기 전마다 한다. 런타임 gate는 위조를 스스로 알 수 없으므로 이 대조가 값싼 탐지 장치다.
+   - (a) 빌드 로그의 `customer-data gate surface (deploy step): …` 줄
+   - (b) 같은 로그에서 `next build`가 시작한 뒤 찍히는 `customer-data gate surface: …` 줄. prebuild의 vitest suite가 next.config를
+     import하며 찍는 같은 이름의 줄은 hermetic env라서 `none`이다. 그 줄과 헷갈리지 않는다.
+   - (c) 로컬에서 `pnpm release:gate-check --sha <배포 SHA>` 보고서 맨 위의 `gateSurfaceSha256`(DB 자격 증명이 없으면
+     `cd nextjs; node scripts/gate-surface.mjs --sha <배포 SHA>`)
+   셋 중 하나라도 다르면 기록하지 않는다. 그 SHA를 표면 digest와 함께 거절하고(아래 "거절") 원인을 찾는다.
+5. 그 SHA의 production 결정을 `gate_surface_sha256`을 넣어 기록한다. **창업자 작업**(SQL editor에서 Run).
    receipt는 evaluator로 계산하고, 손으로 치거나 복사하지 않는다.
 
    저장소 루트에서 실행한다. 저장소에 있는 TS loader를 쓰므로 네트워크에서 받는 도구가 없다.
@@ -186,7 +202,7 @@ NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
    ```
 
    출력이 `"allowed": true`일 때만 넣는다. 열은 기존 production 행과 같고 `gate_surface_sha256`만 추가된다.
-5. `pnpm release:gate-check --sha <배포 SHA>`가 exit 0인지 본다. 상속한 SHA는 `released`이고
+6. `pnpm release:gate-check --sha <배포 SHA>`가 exit 0인지 본다. 상속한 SHA는 `released`이고
    `inheritedFrom`에 창업자가 기록한 SHA가 찍힌다. 보고서 맨 위의 `gateSurfaceSha256`이 `null`이면
    그 커밋을 fetch하지 않았거나 규칙 파일 이전 커밋이다. 그때는 정확한 SHA만 읽으므로, 덮인 SHA도 `missing`으로 보일 수 있다.
    상속을 보고하기 전에 check는 행의 `release_revision` digest를 로컬 Git으로 다시 계산한다. 결과가 행의
