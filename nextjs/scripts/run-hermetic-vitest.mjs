@@ -37,23 +37,17 @@ for (const [name, value] of Object.entries(process.env)) {
 env.NODE_ENV = "test";
 
 /*
- * D-05 (docs/adr/0006): the production build runs this before next.config.mjs computes the gate
- * surface digest, so it must run surface code only. These suites import presentational modules
- * (landing, benchmark and changelog pages, repair-scope), so a Vercel production build, the only build
- * that claims a digest (gate-surface.mjs deploymentGateSurface), leaves them out. `pnpm test` and every
- * CI job, this wrapper included, still run them. release-gate-check.test.mjs fails if a build-time
- * suite reaches presentational code that is not listed here.
+ * D-05 (docs/adr/0006): the production build runs this after `gate-surface.mjs --deploy` recorded the
+ * digest, and before `next build` compiles the bytes that digest vouches for. So it may run surface code
+ * and presentational shipped code (app, components, lib; release-gate-check.test.mjs keeps that free of
+ * Node builtins, process, eval and network, and `next build` runs it anyway when it prerenders), but no
+ * other presentational code. These suites import scripts/repair-scope.mjs, presentational and a Node
+ * script, so a Vercel production build, the only build that claims a digest, leaves them out. `pnpm test`
+ * and every CI job, this wrapper included, still run them. release-gate-check.test.mjs fails if a
+ * build-time suite reaches such code and is not listed here, or is listed and does not.
  */
 export const PREBUILD_EXCLUDED_SUITES = Object.freeze([
-  "components/compile-stage-player.mobile-view.test.tsx", "components/landing-v2/hero-source-card.test.tsx",
-  "lib/benchmarks-page.test.ts", "lib/brand-copy.test.ts", "lib/changelog.test.ts", "lib/compiler-specimen.test.ts",
-  "lib/corpus-and-entity-honesty.test.ts", "lib/cta-truth.test.ts", "lib/gdp-pdf-page-data.test.ts",
-  "lib/hero-proof.test.ts", "lib/home-evidence-view.test.ts", "lib/home-reader-heading-css-registration.test.ts",
-  "lib/landing-v2-evidence.test.ts", "lib/landing-v2-hero-statement.test.ts", "lib/landing-v2-page.test.ts",
-  "lib/landing-v2-proof-scene.test.ts", "lib/landing-v2-recompile.test.ts", "lib/landing-v2-sources.test.ts",
-  "lib/landing-v2-start.test.ts", "lib/landing-v2-trust.test.ts", "lib/landing-v2-use.test.ts",
-  "lib/landing-v2-why.test.ts", "lib/marketing-story.test.ts", "lib/repair-node-gate-receipt.test.ts",
-  "lib/specimen-sources.test.ts",
+  "lib/home-reader-heading-css-registration.test.ts", "lib/repair-node-gate-receipt.test.ts",
 ]);
 
 /** Pure. The arguments after `vitest run`: a production build excludes PREBUILD_EXCLUDED_SUITES. */

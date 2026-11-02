@@ -34,17 +34,35 @@ gate v2에서 출시 결정(`customer_data_release_decisions`)과 작업공간 g
    `nextjs/content/`, 서버 쪽 specimen reader는 표면이다. `nextjs/public/developer/`는 `.md`를 포함해
    폴더 전체가 표면이다. 고객이 따르는 설치·안전 계약 문서가 거기 있기 때문이다(R2 보안 리뷰 S4).
    presentational 목록에 걸리는 배포 코드는 `fetch`, `sendBeacon`, `process.env`, `"use server"`,
-   `server-only`, `supabase`, `node:` import를 쓸 수 없다. `shared/`(순수 데이터 `shared/capabilityManifest`만
+   `server-only`, `supabase`를 쓸 수 없다. Node builtin은 접두사와 하위 경로에 상관없이 import할 수 없다(`node:module`의
+   `builtinModules`로 판정한다. `"fs/promises"`, `"process"`, `"vm"`, `"dns"`도 막힌다). 패키지는 `react`, `react-dom`, `next`,
+   `next/link`, `next/image`만 import할 수 있다. fs를 감싼 패키지(`next/dist/compiled/fs-extra` 등)도 막기 위해서다(R4 보안 리뷰 B3). `shared/`(순수 데이터 `shared/capabilityManifest`만
    예외), grant·admission·intake·release store 모듈, `*-gate` lib 모듈도 import할 수 없다(R2 보안 리뷰 S3).
    `release-gate-check.test.mjs`가 막는다. 이 테스트와 그 vitest wrapper(`lib/release-gate-check-script.test.ts`)는
    `alwaysSurface`에 있다. 그래서 가드를 약하게 바꾸면 digest가 바뀐다(R2 보안 리뷰 S2).
-   **빌드가 실행하는 코드는 모두 표면이다(R3 보안 리뷰 B1).** Vercel production 빌드는 `next.config.mjs`가 digest를
-   계산하기 전에 빌드 머신에서 prebuild(`pnpm check`, `run-hermetic-vitest.mjs`)를 실행한다. 여기서 도는
-   presentational 파일은 표면 파일을 고쳐 쓰고 skip-worktree를 걸거나, git이 보지 못하는 `node_modules`와 `.env*`를
-   쓸 수 있다. 그래도 digest는 HEAD의 값이다. 그래서 `vitest.config.ts` include에 걸리는 테스트는 `alwaysSurface`이고,
-   presentational 모듈을 import하는 suite 25개는 production 빌드(`VERCEL_ENV=production`, digest를 주장하는 유일한
-   빌드)의 prebuild 실행에서 뺀다(`PREBUILD_EXCLUDED_SUITES`; `pnpm test`와 CI는 그대로 돌린다). `release-gate-check.test.mjs`가 실제 include glob을 추적 파일에 풀고, prebuild 스크립트·설정·suite에서
-   import를 따라가 닿는 모든 실행 파일이 표면인지, 뺀 suite가 정말 presentational 코드에 닿는지 확인한다.
+   **digest는 production 빌드가 실행하는 첫 명령이다(R4).** R3까지는 `next.config.mjs`가 digest를 계산했다. 그 전에
+   prebuild(`pnpm check`, hermetic vitest)가 빌드 머신에서 저장소 코드를 실행했다. 그 코드가 git이 보지 못하는 입력
+   (`node_modules`, `.env*`)을 고치거나 fsmonitor·skip-worktree로 변경을 숨기면 digest는 출시 값과 같았다. R3·R4 리뷰는
+   그 경로를 하나씩 찾았다(계산된 경로의 page import, presentational 이름의 symlink). 그래서 경우를 세지 않고 순서를 바꿨다.
+   `package.json`의 `prebuild`는 `node scripts/gate-surface.mjs --deploy`로 시작한다. 그 앞에서 저장소 코드는
+   Vercel `ignoreCommand`(`vercel-ignore-build.mjs`, 표면, Node builtin만 import)만 돈다. `pnpm install`에는 root와
+   nextjs 모두 lifecycle script가 없다. deploy 단계는 git plumbing만 쓰고(`--no-replace-objects`, `-c core.fsmonitor=false`),
+   결과(`null` 포함)를 작업 트리 밖(`os.tmpdir()`의 SHA별 파일)에 한 번만 쓴다. 같은 SHA로 다시 돌면 `wx`가 실패해 빌드가 멈춘다.
+   `next.config.mjs`는 그 파일을 읽기만 하고 다시 계산하지 않는다. `release-gate-check.test.mjs`가 `package.json`과
+   `vercel.json`을 읽어 이 순서, install hook이 없음, `buildCommand`·`installCommand` override가 없음, deploy 스크립트와
+   ignoreCommand의 import가 builtin뿐임을 확인한다.
+   **digest 뒤에 도는 코드.** deploy 단계 뒤의 `pnpm check`, hermetic vitest, `next build`는 기록된 digest를 바꿀 수 없다.
+   그러나 `next build`가 컴파일할 바이트(표면 파일, `node_modules`)는 바꿀 수 있다. 그래서 이 단계는 표면 코드와
+   presentational 배포 코드(app, components, lib. 위 가드가 Node builtin, `process`, `eval`, 네트워크, 허용 밖 패키지를 막는다.
+   `next build`도 prerender할 때 어차피 실행한다)만 실행하고, 그 밖의 presentational 코드는 실행하지 않는다.
+   `vitest.config.ts` include에 걸리는 테스트는 `alwaysSurface`다. `scripts/repair-scope.mjs`(presentational이고 Node
+   스크립트)를 import하는 suite 2개만 production 빌드(`VERCEL_ENV=production`)의 prebuild에서 뺀다(`PREBUILD_EXCLUDED_SUITES`;
+   `pnpm test`와 CI는 그대로 돌린다). R3의 25개 중 나머지 23개는 가드가 걸린 presentational 배포 코드에만 닿으므로 다시 돈다.
+   `release-gate-check.test.mjs`가 실제 include glob을 추적 파일에 풀고, prebuild 스크립트·설정·suite와 모든 `app/**/page.tsx`
+   (`lib/seo-surface.test.ts`의 계산된 import가 읽는 대상)에서 import를 따라가 가드 밖 presentational 코드에 닿지 않는지,
+   뺀 suite가 정말 닿는지 확인한다. 계산된 `import(`가 있는 prebuild suite는 이름 붙인 두 파일뿐이어야 한다.
+   symlink(mode 120000)와 gitlink(160000) 항목은 이름과 상관없이 표면이다. presentational 이름의 디렉터리 symlink가
+   include 안에 다른 디렉터리를 끌어들일 수 있기 때문이다(R4 보안 리뷰 B2).
 2. **digest.** `git ls-tree -r -z <sha>`의 (mode, type, blob id, path) 중 표면에 속한 항목을 하나씩
    JSON 배열 `[mode,type,object,path]` 한 줄로 쓰고, 줄을 정렬해 sha256을 낸다
    (`tavonel.gate_surface_digest.v2`). 작업 트리 바이트가 아니라 blob id를 쓰므로, Windows
@@ -58,14 +76,15 @@ gate v2에서 출시 결정(`customer_data_release_decisions`)과 작업공간 g
    - v1(`d8b3ec3c`까지)은 `mode type object<TAB>path` 줄을 LF로 이었다. LF가 든 경로 하나가 이웃 줄
      여럿을 흉내 낼 수 있어서, 표면 파일을 지우거나 더해도 digest가 같았다(R2 보안 리뷰 S1). 회귀 테스트가
      합성 트리와 실제 Git 커밋 양쪽에서 이 충돌을 재현하고, v2가 두 트리를 구별하는지 확인한다.
-3. **배포가 자기 digest를 안다.** `nextjs/next.config.mjs`가 빌드할 때 자기 커밋의 digest를 계산하고
-   `env.TAVONEL_GATE_SURFACE_SHA256`로 inline한다. Vercel production 빌드(`VERCEL_ENV=production`)가
+3. **배포가 자기 digest를 안다.** production 빌드의 첫 명령 `gate-surface.mjs --deploy`가 자기 커밋의 digest를 계산해
+   기록하고, `nextjs/next.config.mjs`가 그 기록을 읽어 `env.TAVONEL_GATE_SURFACE_SHA256`로 inline한다. 기록이 없거나
+   SHA가 다르면 `""`이다. Vercel production 빌드(`VERCEL_ENV=production`)가
    아니거나, `VERCEL_GIT_COMMIT_SHA`가 없거나 `HEAD`와 다르거나, git이 없거나, 규칙 파일이 없으면 `""`이다.
    `git status --porcelain`이 비어 있지 않아도 `""`이다. digest는 HEAD의 blob id에서 나오므로, 수정된 추적
    파일이나 추적하지 않는 파일이 있는 작업 트리(로컬 `vercel build --prod` 뒤 `--prebuilt` 배포 등)는 자기가
    빌드한 바이트를 주장할 수 없다(R2 보안 리뷰 S6). `git ls-files -v`에 skip-worktree(`S`)나 assume-unchanged(소문자)
-   항목이 있거나 index가 HEAD와 다르면(`git diff-index --cached --quiet HEAD`)도 `""`이다. 이 표시는 수정된 파일을
-   `git status`에서 숨기기 때문이다(R3 보안 리뷰 B1).
+   항목이 있어도 `""`이다. 이 표시는 수정된 파일을 `git status`에서 숨기기 때문이다(R3 보안 리뷰 B1). stage한 변경은
+   `git status`가 이미 보고한다(R4에서 중복이던 `diff-index` 호출을 지웠다).
    그래서 push만 한 브랜치의 preview 빌드는 production 출시를 이어받지 못한다(R1 보안 리뷰 B2). 그러면 상속은 없고 지금과 똑같이 정확한 SHA의 행만 읽는다.
    빌드 로그에 `customer-data gate surface: …` 한 줄을 남긴다.
 4. **출시 행이 표면을 이름 붙인다.** 새 열 `gate_surface_sha256`(migration `20261027120000`)은
@@ -129,10 +148,16 @@ gate v2에서 출시 결정(`customer_data_release_decisions`)과 작업공간 g
 ## 남는 한계
 
 - **git은 무시되는 빌드 입력을 볼 수 없다.** `node_modules`, `.env*`, 빌드 캐시는 `git status`에 나오지 않는다.
-  이것은 빌드가 표면 코드만 실행한다는 규칙(위 1번)으로만 지킨다. 그 규칙의 테스트는 문자열 import를 따라가는
-  정규식 walk다. 계산된 경로로 부르는 import는 따라가지 못한다. 그런 코드는 표면 파일에만 있을 수 있으므로 창업자
-  출시를 거친다. presentational server component는 digest 계산 뒤의 정적 생성 단계에서 돈다. 그래서 가드가
-  `process.`, `globalThis`, `require(`, `eval(`, `Function(`, 계산된 `import(`도 막는다. 이것도 정규식 가드다.
+  digest는 저장소 코드가 돌기 전에 계산하므로 그 입력이 digest를 속일 수는 없다. 그러나 digest 뒤의 단계가 그 입력을
+  고쳐 컴파일 결과를 바꿀 수는 있다. 이것은 digest 뒤에 표면 코드와 가드가 걸린 presentational 배포 코드만 돈다는
+  규칙(위 1번)으로 지킨다. 그 규칙의 테스트는 문자열 import를 따라가는 정규식 walk다. 계산된 import는 이름 붙인 suite만
+  가질 수 있다. presentational server component는 정적 생성 단계에서도 돈다. 그래서 가드가 `process.`, `globalThis`,
+  `require(`, `eval(`, `Function(`, 계산된 `import(`, Node builtin, 허용 밖 패키지를 막는다. 이것도 정규식 가드다.
+  Vercel이 복원하는 build cache(`node_modules`, `.next/cache`)도 이 모델 밖의 입력이다. 지금은 preview가
+  `ignoreCommand`로 빌드되지 않아서 다른 코드가 production cache를 채울 경로가 좁다(R4 보안 리뷰 N3).
+- **Vercel 설정의 build command.** 이 순서는 Vercel 기본 build command(`pnpm run build`, prebuild가 먼저 돈다)를 전제한다.
+  2026-11-02 `vercel project inspect`로 본 설정은 기본값이다. 대시보드에서 바꾸면 deploy 단계가 돌지 않고, 기록이 없으므로
+  digest는 `""`다. 닫힌 쪽이다.
 - **presentational 코드는 같은 origin에서, 서버에서도 돈다.** `landing-v2/`는 동의 route와 같은 origin의
   브라우저에서 실행되고, benchmarks·changelog의 `page.tsx`는 server component라 서버에서도 실행된다. 금지 토큰
   테스트는 게이트·grant·admission·intake·release store 모듈과 `shared/`의 직접 import를 막는다. 그래도 import

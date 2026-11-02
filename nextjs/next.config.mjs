@@ -1,17 +1,19 @@
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { deploymentGateSurface } from "./scripts/gate-surface.mjs";
+import { readDeploymentGateSurface } from "./scripts/gate-surface.mjs";
 
 const packageRoot = dirname(fileURLToPath(import.meta.url));
 const localHttpPlaywright = process.env.PLAYWRIGHT_LOCAL_HTTP === "1";
 /*
   D-05 (docs/adr/0006). The gate-surface digest of this build's own commit, inlined as
-  process.env.TAVONEL_GATE_SURFACE_SHA256. A production release recorded with the same digest
-  covers this deployment; "" (not a Vercel production build, no git, HEAD not VERCEL_GIT_COMMIT_SHA,
-  no rules file) covers nothing, and the gate then needs a release for the exact SHA, as before.
-  Printed so the build log shows it.
+  process.env.TAVONEL_GATE_SURFACE_SHA256. The production build's first command
+  (`node scripts/gate-surface.mjs --deploy`, the head of prebuild) computed it before any other
+  repository code ran; this only reads that record, never recomputes. A production release recorded
+  with the same digest covers this deployment; "" (not a Vercel production build, no record, no git,
+  HEAD not VERCEL_GIT_COMMIT_SHA, a dirty checkout, no rules file) covers nothing, and the gate then
+  needs a release for the exact SHA, as before. Printed so the build log shows it.
 */
-const gateSurface = deploymentGateSurface() ?? "";
+const gateSurface = readDeploymentGateSurface() ?? "";
 console.log(`customer-data gate surface: ${gateSurface || "none (exact-SHA release only)"}`);
 
 const contentSecurityPolicy = [

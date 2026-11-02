@@ -2182,12 +2182,14 @@ export const LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/release-gate-check-script.test.ts',
 ]);
 // D-05 gate release continuity (docs/adr/0006): the shared release evaluator and verifier, the gate reader and its suite, the
-// build config that inlines the deployment's gate-surface digest, and the surface computation with its rules. Exactly these six
-// repo-relative paths select the nine suites that read them directly: the four gate-v2 suites (reader, issuer, admission,
+// build config that inlines the deployment's gate-surface digest, the surface computation with its rules, the hermetic prebuild
+// wrapper and the suite that pins the prebuild order (R4: the digest step runs first). Exactly these eight
+// repo-relative paths select the ten suites that read them directly: the four gate-v2 suites (reader, issuer, admission,
 // authorization) and the compile path that carries a release, the Node wrapper that runs the gate-check and surface suite, and
 // the three suites that import next.config.mjs. No browser lane. The migration and its pgTAP file keep their database owner.
 // Gate code, so never nativeReuse.
 export const GATE_RELEASE_CONTINUITY_AFFECTED_PATHS = Object.freeze([
+  'nextjs/lib/hermetic-prebuild.test.ts',
   'nextjs/lib/scoped-customer-data-gate-store.test.ts',
   'nextjs/lib/scoped-customer-data-gate-store.ts',
   'nextjs/next.config.mjs',
@@ -2655,8 +2657,10 @@ export const PUBLIC_MARKETING_AFFECTED_BROWSER_FILES = Object.freeze([
 // SEC (2026-10-25): both pins re-pinned after review of the next 15.5.24 → 15.5.28 security bump (GHSA-2464-fhr4-w9xw): package.json range
 // ^15.5.9 → ^15.5.28; the lockfile moves only next, sharp 0.35.4 → 0.35.5, @img/sharp-libvips-* 1.3.3 → 1.3.4 and next's own caniuse-lite,
 // nanoid and source-map-js. Lockfile-only resolution, no source change.
+// D-05 R4 (PR #176): package.json re-pinned after one script delta: `prebuild` now starts with
+// `node scripts/gate-surface.mjs --deploy`, the gate-surface digest step. No dependency, lockfile or engine change.
 export const MARKETING_TOOLING_POSTIMAGES = Object.freeze({
-  "nextjs/package.json": "1dd2de781dacc2269c794559da1366c8d13a2adbad91e538fb19433096f6dce7",
+  "nextjs/package.json": "5c11e634df5c2ce72c20741cd29ce89534c5cbce69f79dfe6b4c41b1b235b2b8",
   "nextjs/pnpm-lock.yaml": "3b521a81e581df2273ea6ee78fea3df8bc7008db5b0517818d9d95056b5c6cea"
 });
 // Shared test discovery: the exact global Vitest config, edited by the product author. A change is admitted only when every
@@ -2850,7 +2854,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // launch-qa-release-scripts: the 5 exact paths above select 3 direct suites and no browser suite.
   affectedGroup('launch-qa-release-scripts', new RegExp(`^nextjs/(?:${exactPathAlternation(LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS)})$`),
     { unitFiles: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES }),
-  // gate-release-continuity (D-05): the 7 exact repo-relative paths above select 10 direct suites and no browser suite.
+  // gate-release-continuity (D-05): the 8 exact repo-relative paths above select 10 direct suites and no browser suite.
   affectedGroup('gate-release-continuity', new RegExp(`^(?:${exactPathAlternation(GATE_RELEASE_CONTINUITY_AFFECTED_PATHS)})$`),
     { unitFiles: GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES }),
   // g1-copy-truth: the 6 exact paths above select 17 direct suites and 2 browser suites.

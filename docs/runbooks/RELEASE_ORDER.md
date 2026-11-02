@@ -147,10 +147,12 @@ NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
   자체가 들어간다. 동의·업로드·원본·키·계정 화면을 포함한 `landing-v2/` 밖의 모든 컴포넌트, 전역 CSS,
   `nextjs/content/`, 그리고 `public/developer/` 폴더 전체(고객이 실행하는 클라이언트와 설치·안전 계약 `.md`)도
   표면이다. presentational 가드 테스트(`scripts/release-gate-check.test.mjs`)와 그 wrapper도 표면이다.
-  production 빌드는 digest를 계산하기 전에 빌드 머신에서 prebuild(`pnpm check`, hermetic vitest)를 실행한다.
-  그래서 `vitest.config.ts` include에 걸리는 테스트 전부, prebuild 스크립트, vitest·eslint·tsconfig·next 설정,
-  `package.json`도 표면이다. presentational 모듈을 import하는 테스트 25개는 production 빌드의 prebuild에서
-  빠지고(`run-hermetic-vitest.mjs`의 `PREBUILD_EXCLUDED_SUITES`) CI에서만 돈다.
+  production 빌드의 첫 명령(`prebuild`의 `node scripts/gate-surface.mjs --deploy`)이 다른 저장소 코드보다 먼저 digest를
+  계산하고, `next.config.mjs`는 그 기록을 읽기만 한다. 그 뒤의 prebuild(`pnpm check`, hermetic vitest)와 `next build`가 돌리는
+  코드도 표면이거나 가드가 걸린 presentational 배포 코드여야 한다. 그래서 `vitest.config.ts` include에 걸리는 테스트 전부,
+  prebuild 스크립트, vitest·eslint·tsconfig·next 설정, `package.json`도 표면이다. symlink와 gitlink도 이름과 상관없이 표면이다.
+  `scripts/repair-scope.mjs`를 import하는 테스트 2개는 production 빌드의 prebuild에서 빠지고(`run-hermetic-vitest.mjs`의
+  `PREBUILD_EXCLUDED_SUITES`) CI에서만 돈다.
 - Vercel **production** 빌드이고 작업 트리가 깨끗할 때(`git status --porcelain`이 빔)만 digest를 주장한다.
   preview와 로컬 빌드, 수정되거나 추적하지 않는 파일이 있는 빌드는 `none`이고 정확한 SHA만 읽는다.
   skip-worktree나 assume-unchanged가 걸린 항목이 하나라도 있거나 index가 HEAD와 다른 빌드도 `none`이다.
@@ -168,8 +170,8 @@ NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
 ### 순서
 
 1. migration `20261027120000_release_gate_surface_continuity`를 production에 적용한다. **창업자 작업.**
-2. 이 코드를 배포한다. **이 코드의 첫 production 빌드 로그에 `customer-data gate surface: sha256:…` 줄이 비어 있지 않은
-   digest로 찍혀야 한다.** 이 줄을 확인하기 전에는 표면을 넣은 행을 기록하지 않는다.
+2. 이 코드를 배포한다. **이 코드의 첫 production 빌드 로그에 `customer-data gate surface (deploy step): sha256:…` 줄이
+   `pnpm check` 출력보다 먼저 찍히고, 뒤의 `customer-data gate surface: sha256:…` 줄이 같은 digest여야 한다.** 이 줄을 확인하기 전에는 표면을 넣은 행을 기록하지 않는다.
    production 빌드인데 `none (exact-SHA release only)`이면 빌드에서 git을 쓸 수 없거나 작업 트리가 깨끗하지 않다는
    뜻이다(예: prebuild가 무시되지 않는 파일을 남김). 그때는 기능이 꺼진 것이므로 오늘처럼 SHA마다 기록하고, 원인을
    고친 뒤 다음 production 빌드에서 다시 확인한다. preview 빌드는 항상 `none`이다.

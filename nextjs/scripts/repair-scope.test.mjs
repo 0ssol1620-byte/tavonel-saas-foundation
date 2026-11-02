@@ -7525,8 +7525,8 @@ test('affected compiler-release owner: 1 exact path selects 3 direct suites and 
 });
 // D-05 gate release continuity (docs/adr/0006): one finite owner over repo-relative paths, restated independently.
 import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
-test('affected gate-release-continuity owner: 7 exact paths select 10 direct suites and no browser suite; neighbours stay unmapped', () => {
-  const paths = ['nextjs/lib/scoped-customer-data-gate-store.test.ts', 'nextjs/lib/scoped-customer-data-gate-store.ts', 'nextjs/next.config.mjs',
+test('affected gate-release-continuity owner: 8 exact paths select 10 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['nextjs/lib/hermetic-prebuild.test.ts', 'nextjs/lib/scoped-customer-data-gate-store.test.ts', 'nextjs/lib/scoped-customer-data-gate-store.ts', 'nextjs/next.config.mjs',
     'nextjs/scripts/gate-surface-rules.json', 'nextjs/scripts/gate-surface.mjs', 'nextjs/scripts/run-hermetic-vitest.mjs',
     'shared/scopedCustomerDataGate.ts'];
   const suites = ['lib/collection-compile-run.test.ts', 'lib/customer-data-admission.test.ts', 'lib/customer-data-authorization.test.ts',
@@ -7593,7 +7593,7 @@ function assertUxProgramEndpoint(path) {
   return true;
 }
 test('affected UX program head: the reviewed package.json postimage is pinned and each new browser suite has exactly one reviewed project row', () => {
-  assert.equal(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'], '1dd2de781dacc2269c794559da1366c8d13a2adbad91e538fb19433096f6dce7');
+  assert.equal(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'], '5c11e634df5c2ce72c20741cd29ce89534c5cbce69f79dfe6b4c41b1b235b2b8');
   assert.equal(MARKETING_TOOLING_POSTIMAGES['nextjs/pnpm-lock.yaml'], '3b521a81e581df2273ea6ee78fea3df8bc7008db5b0517818d9d95056b5c6cea');
   const runner = readFileSync(fileURLToPath(new URL('./run-repair-check.mjs', import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
   for (const row of ["['e2e/templates.spec.ts', ['1440']],", "['e2e/type-scale.spec.ts', ['1440']],", "['e2e/site-alignment.spec.ts', ['1440']],", "['e2e/brand-tokens.spec.ts', ['1440']],", "['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/film-line-stability.spec.ts', ['390']],", "['e2e/specimen-strip.spec.ts', ['390']],", "['e2e/self-serve-journey.spec.ts', ['audit']],"]) {
