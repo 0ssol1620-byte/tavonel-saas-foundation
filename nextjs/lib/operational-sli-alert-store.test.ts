@@ -166,18 +166,31 @@ describe("operational SLI breach delivery", () => {
     expect(loggedText()).not.toContain("hooks.example.test");
   });
 
-  it("bounds the webhook call and treats a timeout as a failed delivery", async () => {
-    const post = vi.fn(async (_url: string, init: RequestInit) => {
-      expect(init.signal).toBeInstanceOf(AbortSignal);
-      throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
-    });
+  it("bounds the webhook call at 5 s and treats a timeout as a failed delivery", async () => {
+    // The receiver never answers; only the abort signal ends the call. Unbounded, the
+    // route would run past maxDuration and never return its 502.
+    const fired = AbortSignal.abort(new DOMException("The operation was aborted due to timeout", "TimeoutError"));
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(fired);
+    const post = vi.fn((_url: string, init: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      const signal = init.signal;
+      if (signal?.aborted) reject(signal.reason);
+      signal?.addEventListener("abort", () => reject(signal.reason));
+    }));
     vi.stubGlobal("fetch", post);
     vi.stubEnv("OPERATIONS_ALERT_WEBHOOK_URL", hook);
 
-    expect(await deliverOperationalSliBreach(evaluation, slot, now))
-      .toEqual({ breachId: operationalSliBreachId(slot), code: "ALERT_DELIVERY_FAILED" });
-    expect(operationsAlertCounters()).toMatchObject({ failed: 1, delivered: 0 });
-    expect(loggedText()).not.toContain("secret-token-value");
+    try {
+      expect(await deliverOperationalSliBreach(evaluation, slot, now))
+        .toEqual({ breachId: operationalSliBreachId(slot), code: "ALERT_DELIVERY_FAILED" });
+      expect(timeout).toHaveBeenCalledTimes(1);
+      expect(timeout).toHaveBeenCalledWith(5_000);
+      expect(post).toHaveBeenCalledTimes(1);
+      expect(post.mock.calls[0]?.[1]?.signal).toBe(fired);
+      expect(operationsAlertCounters()).toMatchObject({ failed: 1, delivered: 0 });
+      expect(loggedText()).not.toContain("secret-token-value");
+    } finally {
+      timeout.mockRestore();
+    }
   });
 
   it("derives a stable, valid UUID breach id from the slot alone", () => {
