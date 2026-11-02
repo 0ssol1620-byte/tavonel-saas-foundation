@@ -48,15 +48,23 @@ v4 연구 arm의 `page_source`(PROTOCOL-v4.md §5)를, OCR 증인이 아직 없�
 |---:|---|---|---|
 | 1 | `ocr:no-text-layer` | 레이어에 글자·숫자가 하나도 없다 | 같다 |
 | 2 | `ocr:geometry-unsupported` | 회전 ≠ 0, CropBox ≠ MediaBox, MediaBox 원점 ≠ (0, 0) | 같다 |
-| 3 | `ocr:hidden-text-suspect` (플래그) | 렌더된 쪽에 보이지 않는 글자가 **하나라도** 있다: 보이지 않는 render mode(Tr 3, 7), 글자 자리에 잉크가 없음(흰 글자, 그림·도형 아래 글자, clip으로 사라진 글자), 쪽 밖 글자 | 연구 arm은 OCR 토큰과 비교해 레이어 토큰의 절반 넘게 안 보일 때만 거부했다. 여기는 증인이 렌더 자체이고 허용치가 0이다 |
+| 3 | `ocr:hidden-text-suspect` (플래그) | 렌더된 쪽에 보이지 않는 글자가 **하나라도** 있다: 보이지 않는 render mode(Tr 3, 7), 글자 자리에 잉크가 없음(흰 글자, 그림·도형 아래 글자, clip으로 사라진 글자), 쪽 밖 글자, 렌더에서 글자 상자 높이가 4 px(`MIN_GLYPH_PX`, 기본 배율 1.5에서 약 5 pt 글자의 x-height) 미만인 글자, 다른 텍스트 객체의 글자 상자와 겹치는 글자(보이는 글자 위나 아래에 깐 흰 글자는 그 글자의 잉크를 빌려 쓴다) | 연구 arm은 OCR 토큰과 비교해 레이어 토큰의 절반 넘게 안 보일 때만 거부했다. 여기는 증인이 렌더 자체이고 허용치가 0이다 |
 | 4 | `ocr:image-content` | 쪽 면적의 10% 이상을 그림 객체가 덮는다 | 새 규칙. 스캔 위에 일부만 있는 레이어(연구 arm의 `ocr:layer-sparse`)는 OCR 없이 알 수 없어서, 그림이 글자를 품을 수 있는 쪽은 지금처럼 OCR로 보낸다 |
 | 5 | `textlayer` | 나머지 | 같다 |
 
-**"렌더에 보이는가"를 재는 법.** 같은 쪽을 두 번 렌더한다. 한 번은 그대로, 한 번은 맨 위 수준의 텍스트 객체를 지우고. 두 그림의 회색 차이가 48단계를 넘는 픽셀을 잉크로 본다. 글자(문자·숫자)마다 그 글자 상자 안에 잉크가 있는지 본다. 없으면 보이지 않는 글자다. 이 판정은 모델도 점수도 쓰지 않는다. 두 증인(레이어와 렌더)의 일치·불일치뿐이다. 스칼라 blind quality score로 경로를 고르지 않는다는 헌법 규칙을 지킨다.
+**"렌더에 보이는가"를 재는 법.** 같은 쪽을 두 번 렌더한다. 한 번은 그대로, 한 번은 맨 위 수준의 텍스트 객체를 지우고. 두 그림의 회색 차이가 48단계를 넘는 픽셀을 잉크로 본다. 글자(문자·숫자)마다 그 글자 상자 안에 잉크가 있는지 본다. 없으면 보이지 않는 글자다. 이 검사는 잉크가 *누구의* 잉크인지 모른다. 그래서 두 검사를 더한다. 하나, 상자 높이가 4 px 미만인 글자는 잉크가 있어도 사람이 읽을 수 없으므로 보이지 않는 글자로 센다. 둘, 서로 다른 텍스트 객체(PDFium `FPDFText_GetTextObject`, 고정된 pypdfium2 5.13에 있다)의 글자 상자가 겹치면 두 글자 모두 보이지 않는 글자로 센다. 사람이 읽는 쪽에서는 두 텍스트 객체가 같은 자리에 글자를 놓지 않는다. 이 판정은 모델도 점수도 쓰지 않는다. 두 증인(레이어와 렌더)의 일치·불일치뿐이다. 스칼라 blind quality score로 경로를 고르지 않는다는 헌법 규칙을 지킨다.
 
 **OCR 증인 규칙도 남긴다.** 연구 arm의 규칙(|L| ≥ 20이고 |L − O| / |L| > 0.5 → hidden, |O| ≥ 20이고 |L| < 0.5|O| → sparse)은 `text_layer.ocr_witness_disagrees`로 들어 있다. OCR 판독이 있는 소비자가 shadow 단계에서 비교할 때 쓴다(§7).
 
-**틀리는 방향.** 폼 XObject 안의 텍스트처럼 맨 위 수준에서 지워지지 않는 글자는 차이가 0이라 "보이지 않음"이 되고, 그 쪽은 OCR로 간다. 이 판정의 오류는 OCR 쪽(지금 동작)으로만 난다. 남는 위험은 반대 방향 하나다: 보이는 글자와 **정확히 같은 자리**에 숨긴 글자가 겹치면 차이가 생겨 보이는 것으로 잡힌다. render mode 검사가 그중 Tr 3·7을 잡는다. 나머지는 shadow 단계의 OCR 증인 비교가 잰다.
+**틀리는 방향.** 폼 XObject 안의 텍스트처럼 맨 위 수준에서 지워지지 않는 글자는 차이가 0이라 "보이지 않음"이 되고, 그 쪽은 OCR로 간다. 이 판정의 오류는 OCR 쪽(지금 동작)으로만 난다. 같은 이유로, 가짜 굵은 글씨(같은 글을 조금 비켜 두 번 그림)나 글자마다 따로 그린 객체가 서로 겹치는 쪽, 5 pt 안팎보다 작은 각주도 OCR로 간다.
+
+**남는 위험(반대 방향).** 아래는 코드가 잡지 못하고, shadow 단계의 OCR 증인 비교(`ocr_witness_disagrees`)가 잰다.
+
+- 보이는 글자와 **같은 텍스트 객체** 안에서 겹친 글자. TJ 배열 하나는 색을 바꿀 수 없으므로, 같은 색 글자가 자기 글자를 덮어 뭉갠다. 숨는 것이 아니라 읽을 수 없게 된다.
+- 가로 배율(Tz)로 눌러 폭만 좁힌 글자. 높이 하한은 높이만 본다.
+- 배경과 회색 차이가 48단계를 겨우 넘는 옅은 글자. 잉크로 잡히지만 읽기 어렵다.
+
+이 범위 밖은 모두 시험이 있다: 1 pt·2 pt 글자, 보이는 글 위·아래에 깐 흰 글자, 보이는 글 위의 Tr 3 글자(`tests/test_text_layer.py`, REVIEW-PRODUCT-R1 B1).
 
 ### 3.3 깨진 레이어: 문서 전체를 거부한다 (fail closed)
 
@@ -79,7 +87,7 @@ v4 연구 arm의 `page_source`(PROTOCOL-v4.md §5)를, OCR 증인이 아직 없�
 | `status`, `reason` | `extracted` 또는 `refused`와 그 이유 |
 | `inputSha256` | 인증된 원본 digest |
 | `extractor` | `pdfium`, pypdfium2 버전 |
-| `rules` | `inkDelta` 48, `imageAreaShare` 0.10, `unseenGlyphTolerance` 0, `renderScale` |
+| `rules` | `inkDelta` 48, `imageAreaShare` 0.10, `unseenGlyphTolerance` 0, `minGlyphPx` 4, `renderScale`. 모두 보정하지 않은 값이다 |
 | `pages[]` | 쪽 순서. `pageNumber1`, `path`, `flags`, `chars`, (규칙 3까지 간 쪽) `letters`, `unseenLetters`, `imageAreaShare` |
 | `pages[].text`, `textSha256`, `lines[]` | **`textlayer` 쪽에만** 있다. `lines[]`는 PDFium 줄마다 `text`와 글자 상자에서 잰 `bbox1000`(왼쪽 위 원점). 만들어 낸 상자는 없다 |
 | `pathCounts` | 경로별 쪽 수 |
@@ -132,8 +140,8 @@ OCR을 할지 정하는 곳은 Cloudflare worker(`quarantine-sidecar/foundation-
 - 이 격리 경계(CDR 안에서 hostile 원본의 텍스트 레이어를 읽는 범위)를 승인할지. DIAGNOSIS §8이 창업자 결정으로 남긴 항목이다.
 - Cloud Run CDR에서 `TAVONEL_CDR_TEXT_LAYER_FIRST=1`로 켤지, 언제(production 배포).
 - worker shadow를 켤지, canary 범위와 기간, OCR 생략 단계로 갈 조건.
-- 임계값(48, 0.10, 0)을 canary 측정 뒤 바꿀지.
+- 임계값(48, 0.10, 0, 4 px)을 canary 측정 뒤 바꿀지.
 
 ## 9. 되돌리기
 
-플래그를 `"0"`으로 둔다(요청마다 읽으므로 즉시). 코드를 되돌릴 때는 이 브랜치 커밋 하나를 revert한다. `/v1/disarm`과 래스터 경로는 바뀌지 않았다.
+플래그를 `"0"`으로 둔다(요청마다 읽으므로 즉시). 코드를 되돌릴 때는 PR #180의 text-layer 커밋(52c10d71, 8a3a0949, 024ae563, 그리고 0e9ca07c의 해당 줄과 Round 1 수정 커밋)을 함께 revert한다. 가장 간단한 것은 PR 전체 revert다. `/v1/disarm`과 래스터 경로는 바뀌지 않았다.
