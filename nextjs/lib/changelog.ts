@@ -81,6 +81,33 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   /*
+    PR #177, Home and /workspace entry (codex/home-ux-20261027, head 072806fb): production deployment
+    dpl_KzzW2z9UAfN5Sjbj7bpEb8ci7WB3 (main b2874b5842664c8f7d17f7ad9adfd2fc22842e96), READY 2026-11-03T21:25:26.405Z
+    (06:25:26 on 4 November in Seoul); `releasedAt` keeps the house format to the second. The day's last production deployment,
+    dpl_FHSs5KtrH6MXv1mrfdZRKxq3dbXZ (main 5919ecd4, READY 2026-11-03T21:32:57.291Z), added #178 (the operations alert
+    webhook) and #179 (an OCR page range for the CDR worker, which is not deployed yet); neither changed anything in the list
+    in docs/CHANGELOG_ENTRY_RULE.md, so neither has an entry. Worded from #177's description. By the same rule these have no
+    bullet: the poster preload, the e2e and unit re-specs, the re-derived phone LCP floor and CSS baseline fixture, the
+    repair-scope registrations (internal), and the Korean font subset, back to main's bytes. No version or apiVersion:
+    channel.json and /api/openapi did not move.
+  */
+  {
+    date: "2026-11-04",
+    releasedAt: "2026-11-03T21:25:26Z",
+    id: "2026-11-04-home-film-full-frame",
+    title: "Home opens the film on the full frame, and /workspace puts the upload box first",
+    surfaces: ["Website", "Workspace"],
+    improved: [
+      "/ and /ko open the compilation film on the full frame at every width. “Focus details” (“세부 내용 확대” on /ko) zooms in to one pane of the source page.",
+      "The second action on the home page, “Evaluate your documents” (“내 문서 평가” on /ko), is a bordered button with a document icon. It opens /evaluation and /ko/evaluation, as the link did.",
+      "On the Home tab of /workspace the upload box comes straight after the workspace status, ahead of Needs attention, the compile and its results, including after a cancelled run. The status area has an “Upload sources” button that opens the file picker, or says uploads are closed on an account where they are, and the upload box is headed “Drop files, folders or ZIP here” for a returning workspace too.",
+    ],
+    fixed: [
+      "Dropping a folder together with files on /workspace stages every item. Before this release only the folder was staged.",
+      "A file dropped on / or /ko, or outside the upload box on /workspace, does not open in the browser tab. The home page moves focus to “Evaluate your documents” and neither reads nor keeps the file; /workspace brings the upload box into view and stages nothing.",
+    ],
+  },
+  /*
     Core V2 release sha256:b787dd86f6f57f92b76d91dcce1cba2d8064f5a75445f24010db0cc55f4598cd: production deployment
     dpl_AsvGT4RAKac6XdC88rNqomf2b2Z4 of the Vercel project tavonel-product-core-v2, READY 2026-10-27T09:21:44.349Z (18:21:44
     in Seoul), read with Vercel get_deployment; `releasedAt` keeps the house format to the second, as the test holds every
