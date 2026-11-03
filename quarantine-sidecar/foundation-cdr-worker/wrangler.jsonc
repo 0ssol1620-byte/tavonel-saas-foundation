@@ -24,7 +24,22 @@
     "FOUNDATION_BILLING_SETTLEMENT_URL": "https://tavonel-saas-foundation.vercel.app/api/internal/billing/settle",
     // Dashboard sets FOUNDATION_OCR_URL after the GHCR image / endpoint exists.
     // Leave empty so OCR is skipped. Do not point at production.
-    "FOUNDATION_OCR_URL": "https://cohlugjzf0dk9i.api.runpod.ai/v1/ocr"
+    "FOUNDATION_OCR_URL": "https://cohlugjzf0dk9i.api.runpod.ai/v1/ocr",
+    // Pages per OCR request (src/ocr.ts ocrPageRangeSize). One request is cut at 85 s, and 9 of
+    // the 62 GDP v3 documents took longer than that read whole (research pod, 900 s timeout).
+    // 8 is the one size that meets all three bounds from those 62 receipts (1,350 pages,
+    // 3,252.6 s = 2.41 s/page; least squares seconds = 9.88 + 1.955 x pages):
+    //   - a typical range plus a ~30 s cold start stays under 60 s: 9.88 + 8 x 1.955 + 30 = 55.5 s
+    //     (10 pages: 59.4 s, no margin; 12 pages: 63.3 s);
+    //   - the slowest document per page, 32 pages in 285.6 s, still fits the 85 s request when warm:
+    //     9.88 + 8 x 8.62 = 78.8 s (10 pages: 96.0 s, a range that can never be read);
+    //   - an 80-page source is 10 ranges, and 10 x 85 s = 850 s fits the 15-minute consumer wall
+    //     even if every range runs to the timeout (7 pages: 12 x 85 s = 1,020 s does not).
+    // The reader must answer ranges first: TAVONEL_OCR_PAGE_RANGES_ENABLED=true on the RunPod
+    // endpoint, from an image built at or after 09499fd1. With the flag off a range answers 501
+    // (transport, 0 credits); an older image answers the whole document, which is refused as an
+    // invalid range answer (semantic, 2 credits). Check one signed range request before deploying.
+    "FOUNDATION_OCR_PAGE_RANGE_SIZE": "8"
   },
   "queues": {
     "consumers": [

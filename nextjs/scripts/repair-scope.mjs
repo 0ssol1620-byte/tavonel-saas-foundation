@@ -2183,6 +2183,35 @@ export const LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/launch-qa-script-ratchet.test.ts',
   'lib/release-gate-check-script.test.ts',
 ]);
+// D-05 gate release continuity (docs/adr/0006): the shared release evaluator and verifier, the gate reader and its suite, the
+// build config that inlines the deployment's gate-surface digest, the surface computation with its rules, the hermetic prebuild
+// wrapper and the suite that pins the prebuild order (R4: the digest step runs first). Exactly these eight
+// repo-relative paths select the ten suites that read them directly: the four gate-v2 suites (reader, issuer, admission,
+// authorization) and the compile path that carries a release, the Node wrapper that runs the gate-check and surface suite, and
+// the three suites that import next.config.mjs. No browser lane. The migration and its pgTAP file keep their database owner.
+// Gate code, so never nativeReuse.
+export const GATE_RELEASE_CONTINUITY_AFFECTED_PATHS = Object.freeze([
+  'nextjs/lib/hermetic-prebuild.test.ts',
+  'nextjs/lib/scoped-customer-data-gate-store.test.ts',
+  'nextjs/lib/scoped-customer-data-gate-store.ts',
+  'nextjs/next.config.mjs',
+  'nextjs/scripts/gate-surface-rules.json',
+  'nextjs/scripts/gate-surface.mjs',
+  'nextjs/scripts/run-hermetic-vitest.mjs',
+  'shared/scopedCustomerDataGate.ts',
+]);
+export const GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/collection-compile-run.test.ts',
+  'lib/customer-data-admission.test.ts',
+  'lib/customer-data-authorization.test.ts',
+  'lib/hermetic-prebuild.test.ts',
+  'lib/processing-workspace-grant.test.ts',
+  'lib/release-gate-check-script.test.ts',
+  'lib/route-classification.test.ts',
+  'lib/scoped-customer-data-gate-store.test.ts',
+  'lib/security-headers.test.ts',
+  'lib/seo-surface.test.ts',
+]);
 // G1-COPY (codex/p4-copy-20261019; DECISION-REGISTER-2026-10-17 S6-17, S6-16, D-01, D-07, D-33, N-5): the six changed endpoints
 // no owner listed -- the plan catalog whose included-pages bullet lost "verified", the developer-file purposes (the CLI line),
 // the operations record whose billing row now reads the purchasable state, the published MCP bridge whose download_package text
@@ -2320,6 +2349,11 @@ export const CONSENT_POSTER_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/trust-page-answers.test.ts',
 ]);
 export const CONSENT_POSTER_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/landing-hero-film-loading.spec.ts', 'e2e/templates.spec.ts']);
+// B35 operational SLI alert delivery (codex/ops-alert-delivery-20261102): the route that now posts a breach to the operations
+// webhook, its store module and their two suites. They select those suites, the delivery suite behind deliverOperationsAlert and
+// the suites that read every app/api route source. Product code, so never nativeReuse; no browser, database, worker or build lane.
+export const OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS = Object.freeze(['app/api/internal/sli-alerts/route.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-alert-store.test.ts', 'lib/operational-sli-alert-store.ts']);
+export const OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error-codes.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-alert-store.test.ts', 'lib/operations-p0.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts']);
 // Enablement batch (codex/enablement-20261017, EN-0 to EN-5 and the guide recordings): the fifty-three changed endpoints no owner
 // listed -- the changelog and its feed, the cookbooks index and card, the resources hub,
 // the keyless try-it's digest check, its island (moved to components/ in EN-FIX-1) and its mounts on /api and /developers, the product guide at /guide and /ko/guide with its
@@ -2630,8 +2664,10 @@ export const PUBLIC_MARKETING_AFFECTED_BROWSER_FILES = Object.freeze([
 // SEC (2026-10-25): both pins re-pinned after review of the next 15.5.24 → 15.5.28 security bump (GHSA-2464-fhr4-w9xw): package.json range
 // ^15.5.9 → ^15.5.28; the lockfile moves only next, sharp 0.35.4 → 0.35.5, @img/sharp-libvips-* 1.3.3 → 1.3.4 and next's own caniuse-lite,
 // nanoid and source-map-js. Lockfile-only resolution, no source change.
+// D-05 R4 (PR #176): package.json re-pinned after one script delta: `prebuild` now starts with
+// `node scripts/gate-surface.mjs --deploy`, the gate-surface digest step. No dependency, lockfile or engine change.
 export const MARKETING_TOOLING_POSTIMAGES = Object.freeze({
-  "nextjs/package.json": "1dd2de781dacc2269c794559da1366c8d13a2adbad91e538fb19433096f6dce7",
+  "nextjs/package.json": "5c11e634df5c2ce72c20741cd29ce89534c5cbce69f79dfe6b4c41b1b235b2b8",
   "nextjs/pnpm-lock.yaml": "3b521a81e581df2273ea6ee78fea3df8bc7008db5b0517818d9d95056b5c6cea"
 });
 // Shared test discovery: the exact global Vitest config, edited by the product author. A change is admitted only when every
@@ -2716,6 +2752,10 @@ export const AFFECTED_GROUPS = Object.freeze([
   // of the shared map. Separate from the historical 424 Explore repair report, which keeps its own planExploreRepairBrowserRuns.
   affectedGroup('explore-answer', /^nextjs\/(?:lib\/explore-(?:(?:sample|story)(?:\.test)?|entry-proof\.test)\.ts|components\/explore\/(?:ask-overlay|evidence-workbench(?:\.test)?)\.tsx|e2e\/explore\.spec\.ts)$/,
     { unitFiles: ['lib/explore-entry-proof.test.ts', 'lib/explore-sample.test.ts', 'lib/explore-story.test.ts', 'lib/visual-world-model.test.ts', 'components/explore/evidence-workbench.test.tsx'], browserFiles: ['e2e/explore.spec.ts'] }),
+  // File intake (founder ask 2026-10-27): the shared drop reader and the first-screen upload entries' end-to-end spec.
+  // Product intake behaviour, so never nativeReuse; the spec runs in 1440 and 390 (run-repair-check).
+  affectedGroup('file-intake', /^nextjs\/(?:lib\/workspace-intake(?:\.test)?\.ts|e2e\/upload-entry\.spec\.ts)$/,
+    { unitFiles: ['lib/workspace-intake.test.ts'], browserFiles: ['e2e/upload-entry.spec.ts'] }),
   // Ordinary Home landing: the thirty exact paths above select ten direct suites and one browser suite, which runs only in
   // projects 1440, 390, 360 and reduced-motion of the shared map.
   affectedGroup('home-landing', new RegExp(`^nextjs/(?:${HOME_AFFECTED_PATHS.map(path => path.replaceAll('.', '\\.')).join('|')})$`),
@@ -2825,6 +2865,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // launch-qa-release-scripts: the 5 exact paths above select 3 direct suites and no browser suite.
   affectedGroup('launch-qa-release-scripts', new RegExp(`^nextjs/(?:${exactPathAlternation(LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS)})$`),
     { unitFiles: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES }),
+  // gate-release-continuity (D-05): the 8 exact repo-relative paths above select 10 direct suites and no browser suite.
+  affectedGroup('gate-release-continuity', new RegExp(`^(?:${exactPathAlternation(GATE_RELEASE_CONTINUITY_AFFECTED_PATHS)})$`),
+    { unitFiles: GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES }),
   // g1-copy-truth: the 6 exact paths above select 17 direct suites and 2 browser suites.
   affectedGroup('g1-copy-truth', new RegExp(`^nextjs/(?:${exactPathAlternation(G1_COPY_TRUTH_AFFECTED_PATHS)})$`),
     { unitFiles: G1_COPY_TRUTH_AFFECTED_UNIT_FILES, browserFiles: G1_COPY_TRUTH_AFFECTED_BROWSER_FILES }),
@@ -2835,9 +2878,12 @@ export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('remote-mcp', new RegExp(`^nextjs/(?:${exactPathAlternation(REMOTE_MCP_AFFECTED_PATHS)})$`),
     { unitFiles: REMOTE_MCP_AFFECTED_UNIT_FILES, browserFiles: REMOTE_MCP_AFFECTED_BROWSER_FILES }),
   // consent-poster: the 16 exact paths above select 5 direct suites and 2 browser suites.
+  // operational-sli-alert-delivery: the 4 exact paths above select 8 direct suites and no browser suite.
+  affectedGroup('operational-sli-alert-delivery', new RegExp(`^nextjs/(?:${exactPathAlternation(OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS)})$`),
+    { unitFiles: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES }),
   affectedGroup('consent-poster', new RegExp(`^nextjs/(?:${exactPathAlternation(CONSENT_POSTER_AFFECTED_PATHS)})$`),
     { unitFiles: CONSENT_POSTER_AFFECTED_UNIT_FILES, browserFiles: CONSENT_POSTER_AFFECTED_BROWSER_FILES }),
-  affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
+  affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json|wrangler\.jsonc)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.
   affectedGroup('ocr-cpu-worker', /^workers\/foundation-ocr-cpu-raster\/(?:app\.py|SYNTHETIC_TABLE_BINDING\.md|tests\/fixtures\/synthetic-grid-profile\.json|tests\/(?:test_synthetic_table_caller|test_cpu_ocr_v3_contract)\.py)$/),

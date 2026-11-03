@@ -130,8 +130,9 @@ describe("approved one-path experience", () => {
     expect(disclosure).toContain("priorityPoster");
     // FINAL-SPEC 2026-10-26 D-9: shorter wording, same disclosure (illustrative, not customer results).
     expect(disclosure).toContain("Illustrative demo · not customer results.");
-    // FINAL-SPEC 2026-10-26 §2.1: Home opens a phone on Focus, the one readable pane.
-    expect(disclosure).toContain('LANDING_MOBILE_FILM_VIEW: MobileFilmView = "focus"');
+    // Founder ask 2026-10-27 (over FINAL-SPEC 2026-10-26 §2.1's Focus): Home opens compact at every width; Focus details expands.
+    expect(disclosure).toContain('LANDING_MOBILE_FILM_VIEW: MobileFilmView = "fit"');
+    expect(disclosure).toContain('LANDING_WIDE_FILM_VIEW: WideView = "fit"');
     expect(film).toContain("COMPILE_STAGES.map");
     expect(film, "internal recreation disclaimers do not belong on the customer route")
       .not.toContain("landingV2HeroExtra");

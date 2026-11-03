@@ -325,6 +325,7 @@ export default function CompileStagePlayer({
   lazyPoster = false,
   korean = false,
   initialMobileFilmView = "fit",
+  initialWideView,
   storyLayout = false,
 }: {
   stages?: readonly CompileStage[];
@@ -345,6 +346,11 @@ export default function CompileStagePlayer({
   korean?: boolean;
   /** The view a narrow frame opens on. Defaults to "fit"; the visitor's toggle still switches it. */
   initialMobileFilmView?: MobileFilmView;
+  /**
+   * Home desktop: the view the first stage opens on, held as the visitor's own choice would be
+   * (nextWideChoice). Omitted, each stage opens on STAGE_FRAMES[].wideView.
+   */
+  initialWideView?: WideView;
   /** Home-only story ordering; other callers keep their existing composition. */
   storyLayout?: boolean;
 }) {
@@ -366,7 +372,7 @@ export default function CompileStagePlayer({
   const [mobileFilmFit, setMobileFilmFit] = useState(initialMobileFilmView === "fit");
   /* Home desktop (not narrow): the visitor's own choice where it differs from the stage default
      (nextWideChoice / wideChoiceOnStageChange). */
-  const [wideChoice, setWideChoice] = useState<WideView | null>(null);
+  const [wideChoice, setWideChoice] = useState<WideView | null>(initialWideView ?? null);
   const [videoError, setVideoError] = useState(false);
   /* The recording whose first frame is on screen (`loadeddata`); until then a phone pane keeps its own still over it. */
   const [framedSrc, setFramedSrc] = useState<string | null>(null);

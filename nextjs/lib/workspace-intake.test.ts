@@ -39,4 +39,20 @@ describe("workspace intake preflight", () => {
     const result = await prepareWorkspaceSelection(dropped);
     expect(result.files.map((entry) => entry.relativePath)).toEqual(["research/a.pdf", "research/deep/b.docx"]);
   });
+
+  it("reads every dropped item before walking a folder, as the browser empties the drop after the event", async () => {
+    let dropped = false;
+    const pdf = new File(["%PDF-1.7"], "report.pdf", { type: "application/pdf" });
+    const folder = {
+      isFile: false as const,
+      isDirectory: true as const,
+      name: "empty",
+      fullPath: "/empty",
+      createReader: () => ({ readEntries: (success: (entries: never[]) => void) => { dropped = true; queueMicrotask(() => success([])); } }),
+    };
+    // Mimics the data store: once anything has been awaited, an item yields nothing.
+    const item = (value: () => unknown, file: File | null) => ({ webkitGetAsEntry: () => (dropped ? null : value()), getAsFile: () => (dropped ? null : file) });
+    const files = await collectDroppedWorkspaceFiles([item(() => folder, null), item(() => null, pdf)]);
+    expect(files).toEqual([pdf]);
+  });
 });
