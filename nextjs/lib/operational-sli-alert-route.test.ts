@@ -29,9 +29,21 @@ vi.mock("@/lib/operational-sli-alert-store", async (original) => ({
 }));
 
 const { GET } = await import("../app/api/internal/sli-alerts/route");
+const { resetOperationsAlertDelivery } = await import("./operations-p0");
 const SECRET = "s".repeat(48);
+const HOOK = "https://hooks.example.test/services/T000/B000/route-secret-token";
+const RECEIPT = {
+  evaluationKey: `sha256:${"a".repeat(64)}`,
+  payloadSha256: `sha256:${"b".repeat(64)}`,
+  windowStartedAt: "2026-09-20T12:00:00.000Z",
+  status: "recorded",
+};
+let quietErrors: { mockRestore: () => void };
 
 beforeEach(() => {
+  resetOperationsAlertDelivery();
+  quietErrors = vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.stubEnv("OPERATIONS_ALERT_WEBHOOK_URL", "");
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-09-20T12:04:59.999Z"));
   vi.stubEnv("CRON_SECRET", SECRET);
@@ -42,6 +54,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+  quietErrors.mockRestore();
   vi.clearAllMocks();
 });
 
@@ -103,6 +117,57 @@ describe("scheduled operational SLI alert route", () => {
       code: "SLI_ALERT_EVALUATION_REPLAYED",
       persisted: true,
       receipt: { status: "replayed" },
+      delivery: { code: "ALERT_DELIVERY_UNCONFIGURED" },
     });
+  });
+
+  it("delivers a recorded breach to the operations webhook after the receipt is durable", async () => {
+    vi.stubEnv("OPERATIONS_ALERT_WEBHOOK_URL", HOOK);
+    const post = vi.fn(async () => new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", post);
+    persist.mockResolvedValue({ ok: true, receipt: RECEIPT });
+
+    const response = await GET(request());
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      code: "SLI_ALERT_EVALUATION_RECORDED",
+      persisted: true,
+      delivery: { code: "ALERT_DELIVERED", breachId: expect.any(String) },
+    });
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(persist.mock.invocationCallOrder[0]).toBeLessThan(post.mock.invocationCallOrder[0]);
+    expect(JSON.stringify(body)).not.toContain("route-secret-token");
+  });
+
+  it("returns 502 with the durable receipt when the webhook rejects the breach", async () => {
+    vi.stubEnv("OPERATIONS_ALERT_WEBHOOK_URL", HOOK);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("no_service", { status: 500 })));
+    persist.mockResolvedValue({ ok: true, receipt: RECEIPT });
+
+    const response = await GET(request());
+    expect(response.status).toBe(502);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      code: "SLI_ALERT_DELIVERY_FAILED",
+      persisted: true,
+      receipt: { status: "recorded" },
+      delivery: { code: "ALERT_DELIVERY_FAILED" },
+    });
+    expect(JSON.stringify(body)).not.toContain("route-secret-token");
+  });
+
+  it("still pages when the record itself could not be persisted", async () => {
+    vi.stubEnv("OPERATIONS_ALERT_WEBHOOK_URL", HOOK);
+    const post = vi.fn(async () => new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", post);
+
+    const response = await GET(request());
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      persisted: false,
+      delivery: { code: "ALERT_DELIVERED" },
+    });
+    expect(post).toHaveBeenCalledTimes(1);
   });
 });

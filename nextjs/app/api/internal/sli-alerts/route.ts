@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { readModelProviderCircuitSnapshot } from "@/lib/model-provider-circuit-store";
 import { evaluateOperationalSli } from "@/lib/operational-sli";
-import { operationalSliAlertWindow, persistOperationalSliAlert } from "@/lib/operational-sli-alert-store";
+import {
+  deliverOperationalSliBreach,
+  operationalSliAlertWindow,
+  persistOperationalSliAlert,
+} from "@/lib/operational-sli-alert-store";
 import { authorizeSyntheticCanary, readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { RETRIEVAL_MODEL_PROVIDER } from "@/lib/retrieval-runtime-config";
 import { readProbeHistory } from "@/lib/synthetic-probe-store";
@@ -36,10 +40,18 @@ async function evaluateAndPersist(request: Request) {
   }];
   const evaluation = evaluateOperationalSli(history, { now: windowStartedAt, modelProviderCircuits });
   const persisted = await persistOperationalSliAlert(evaluation, windowStartedAt);
+  // Sent even when the record failed: a database outage is exactly the breach that must page.
+  const delivery = await deliverOperationalSliBreach(evaluation, windowStartedAt);
   if (!persisted.ok) {
     return NextResponse.json(
-      { code: persisted.code, persisted: false, evaluation },
+      { code: persisted.code, persisted: false, evaluation, delivery },
       { status: 503, headers: HEADERS },
+    );
+  }
+  if (delivery.code === "ALERT_DELIVERY_FAILED" || delivery.code === "ALERT_PAYLOAD_INVALID") {
+    return NextResponse.json(
+      { code: "SLI_ALERT_DELIVERY_FAILED", persisted: true, evaluation, receipt: persisted.receipt, delivery },
+      { status: 502, headers: HEADERS },
     );
   }
   return NextResponse.json({
@@ -49,6 +61,7 @@ async function evaluateAndPersist(request: Request) {
     persisted: true,
     evaluation,
     receipt: persisted.receipt,
+    delivery,
   }, { headers: HEADERS });
 }
 
