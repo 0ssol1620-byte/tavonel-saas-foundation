@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import {
   admitsWorkspace,
   QUALIFICATION_MAX_MS,
-  RELEASE_COLUMNS,
+  releaseDecisionQuery,
   verifyStoredRelease,
   workspaceGrantSha256,
   type CustomerDataScope,
@@ -15,8 +15,8 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
 
 /*
   Issues or renews the v2 workspace grant the scoped customer-data gate reads. The only inputs
-  are durable ones: the latest release decision for the exact deployed SHA and scope (recomputed
-  like the gate reader does), the published terms manifest (re-hashed from disk) and the current
+  are durable ones: the latest release decision for the exact deployed SHA and scope, or for the
+  deployment's gate surface (D-05, docs/adr/0006; recomputed like the gate reader does), the published terms manifest (re-hashed from disk) and the current
   owner's persisted acceptance of it, narrowed by the optional operator rollout cohort. A
   qualification release yields an hour-bounded qualification grant for its one recorded workspace,
   and only when the caller opts in (the owner's own bootstrap); billing renewal never does. It never
@@ -47,6 +47,18 @@ export type WorkspaceGrantResult =
   | { ok: false; code: WorkspaceGrantFailureCode };
 
 const fail = <C extends WorkspaceGrantFailureCode>(code: C) => ({ ok: false as const, code });
+const SURFACE = /^sha256:[0-9a-f]{64}$/;
+
+/**
+ * D-05 (docs/adr/0006): this deployment's gate-surface digest, computed from its own commit by
+ * next.config.mjs and inlined at build. The literal `process.env.…` is what the bundler replaces;
+ * an injected env (tests) is read as given. Anything malformed or absent is null, and null
+ * inherits nothing: the gate then reads only the exact-SHA release, as before.
+ */
+export function deployedGateSurface(env: Env = process.env): string | null {
+  const value = env === process.env ? process.env.TAVONEL_GATE_SURFACE_SHA256 : env.TAVONEL_GATE_SURFACE_SHA256;
+  return typeof value === "string" && SURFACE.test(value) ? value : null;
+}
 const iso = (value: unknown): value is string => typeof value === "string" && Number.isFinite(Date.parse(value));
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -191,10 +203,8 @@ export async function issueProcessingWorkspaceGrant(input: {
   const cohort = processingCohortRefusal(workspaceKey, env);
   if (cohort) return fail(cohort);
 
-  const releaseQuery = new URLSearchParams({
-    select: RELEASE_COLUMNS, scope: `eq.${scope}`, release_revision: `eq.${revision}`,
-    order: "recorded_at.desc,allowed.asc,evaluated_at.desc", limit: "1",
-  });
+  const gateSurfaceSha256 = deployedGateSurface(env);
+  const releaseQuery = releaseDecisionQuery(scope, revision, gateSurfaceSha256);
   const releaseResponse = await call(config, `/rest/v1/customer_data_release_decisions?${releaseQuery}`);
   if (!releaseResponse?.ok) return fail("WORKSPACE_GRANT_STORE_FAILED");
   const rows = await releaseResponse.json().catch(() => null) as unknown;
@@ -202,10 +212,14 @@ export async function issueProcessingWorkspaceGrant(input: {
   if (rows.length === 0) return fail("SCOPED_RELEASE_NOT_FOUND");
   if (rows.length !== 1 || !isRecord(rows[0])) return fail("SCOPED_RELEASE_INVALID");
   // The latest row is the decision: a later production refusal is final, never a cue to qualify.
-  const verified = verifyStoredRelease(rows[0], { scope, releaseRevision: revision, workspaceId: workspaceKey }, now);
+  const verified = verifyStoredRelease(rows[0],
+    { scope, releaseRevision: revision, workspaceId: workspaceKey, gateSurfaceSha256 }, now);
   if (!verified.ok) return verified;
   const { release } = verified;
   const stage: ReleaseStage = release.stage;
+  // The grant names the revision its release was recorded for: the deployed SHA itself, or the
+  // revision whose gate surface this deployment shares (D-05). The RPC rechecks that release.
+  const releaseRevision = release.releaseRevision;
   if (stage === "qualification" && !input.allowQualification) return fail("SCOPED_RELEASE_QUALIFICATION_ONLY");
 
   const expires = stage === "qualification"
@@ -213,7 +227,7 @@ export async function issueProcessingWorkspaceGrant(input: {
     : Math.min(now + MAX_AGE_MS, Date.parse(release.evaluatedAt) + MAX_AGE_MS);
   const unsigned: Omit<WorkspaceGrant, "grantReceiptSha256"> = {
     tenantId: workspaceKey, workspaceId: workspaceKey, userId: current.userId, scope, stage,
-    releaseRevision: revision, releaseReceiptSha256: release.receiptSha256!, termsVersion: manifest.version,
+    releaseRevision, releaseReceiptSha256: release.receiptSha256!, termsVersion: manifest.version,
     termsReceiptSha256: current.termsReceiptSha256,
     processingTermsReceiptSha256: current.processingTermsReceiptSha256,
     grantedAt: new Date(now).toISOString(), expiresAt: new Date(expires).toISOString(), revokedAt: null,
@@ -222,7 +236,7 @@ export async function issueProcessingWorkspaceGrant(input: {
   const grantResponse = await call(config, "/rest/v1/rpc/issue_customer_data_workspace_grant", {
     method: "POST",
     body: JSON.stringify({
-      p_workspace_key: workspaceKey, p_scope: scope, p_release_revision: revision,
+      p_workspace_key: workspaceKey, p_scope: scope, p_release_revision: releaseRevision,
       p_release_receipt_sha256: unsigned.releaseReceiptSha256, p_acceptance_id: current.acceptanceId,
       p_terms_version: manifest.version, p_terms_path: manifest.terms.path, p_terms_sha256: manifest.terms.sha256,
       p_processing_path: manifest.processing.path, p_processing_sha256: manifest.processing.sha256,
@@ -245,14 +259,14 @@ export async function issueProcessingWorkspaceGrant(input: {
     "processingTermsReceiptSha256", "grantReceiptSha256", "grantedAt", "expiresAt"] as const;
   if (keys.some((key) => typeof body[key] !== "string")) return fail("WORKSPACE_GRANT_STORE_FAILED");
   const grant: WorkspaceGrant = {
-    tenantId: workspaceKey, workspaceId: workspaceKey, scope, stage, releaseRevision: revision, revokedAt: null,
+    tenantId: workspaceKey, workspaceId: workspaceKey, scope, stage, releaseRevision, revokedAt: null,
     ...Object.fromEntries(keys.map((key) => [key, body[key] as string])) as Pick<WorkspaceGrant, (typeof keys)[number]>,
   };
   if (body.tenantId !== workspaceKey || body.workspaceId !== workspaceKey || body.scope !== scope || body.stage !== stage ||
-    body.releaseRevision !== revision || grant.userId !== current.userId ||
+    body.releaseRevision !== releaseRevision || grant.userId !== current.userId ||
     grant.termsReceiptSha256 !== unsigned.termsReceiptSha256 ||
     grant.processingTermsReceiptSha256 !== unsigned.processingTermsReceiptSha256 ||
-    !admitsWorkspace(release, grant, { tenantId: workspaceKey, workspaceId: workspaceKey, scope, releaseRevision: revision },
+    !admitsWorkspace(release, grant, { tenantId: workspaceKey, workspaceId: workspaceKey, scope, releaseRevision },
       new Date(now).toISOString())) return fail("WORKSPACE_GRANT_STORE_FAILED");
   return { ok: true, grant, idempotentReplay: body.idempotentReplay };
 }

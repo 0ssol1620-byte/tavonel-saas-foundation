@@ -1,6 +1,6 @@
 import {
   admitsWorkspace,
-  RELEASE_COLUMNS,
+  releaseDecisionQuery,
   SCOPED_CUSTOMER_DATA_GATE_SCHEMA,
   stageSchema,
   verifyStoredRelease,
@@ -10,7 +10,7 @@ import {
 } from "../../shared/scopedCustomerDataGate";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 import type { ScopedCustomerDataAuthorization } from "../../shared/customerDataAuthorization";
-import { readCurrentProcessingTermsAcceptance } from "./processing-workspace-grant";
+import { deployedGateSurface, readCurrentProcessingTermsAcceptance } from "./processing-workspace-grant";
 
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const REVISION = /^[0-9a-f]{40}$/;
@@ -78,16 +78,16 @@ export async function readVerifiedScopedCustomerDataGate(
   if (latest?.allowed === false && latest.tenant_id === tenantId && latest.workspace_id === workspaceId &&
     latest.scope === scope) return { ok: false, code: "SCOPED_WORKSPACE_REFUSED" };
 
-  const releaseQuery = new URLSearchParams({
-    select: RELEASE_COLUMNS, scope: `eq.${scope}`, release_revision: `eq.${releaseRevision}`,
-    order: "recorded_at.desc,allowed.asc,evaluated_at.desc", limit: "1",
-  });
+  // D-05: the exact deployed SHA, or a production release for this deployment's gate surface.
+  const gateSurfaceSha256 = deployedGateSurface(env);
+  const releaseQuery = releaseDecisionQuery(scope, releaseRevision, gateSurfaceSha256);
   const releaseRows = await latestRow(`/rest/v1/customer_data_release_decisions?${releaseQuery}`, env);
   if (releaseRows === null) return { ok: false, code: "SCOPED_GATE_STORE_NOT_CONFIGURED" };
   if (releaseRows === undefined) return { ok: false, code: "SCOPED_GATE_STORE_FAILED" };
   if (releaseRows.length === 0) return { ok: false, code: "SCOPED_RELEASE_NOT_FOUND" };
   if (releaseRows.length !== 1) return { ok: false, code: "SCOPED_RELEASE_INVALID" };
-  const verified = verifyStoredRelease(releaseRows[0], { scope, releaseRevision, workspaceId }, now.getTime());
+  const verified = verifyStoredRelease(releaseRows[0], { scope, releaseRevision, workspaceId, gateSurfaceSha256 },
+    now.getTime());
   if (!verified.ok) return verified;
   const { release } = verified;
 
@@ -119,7 +119,10 @@ export async function readVerifiedScopedCustomerDataGate(
     expiresAt: grantRow.expires_at as string,
     revokedAt: null,
   };
-  if (!admitsWorkspace(release, grant, { tenantId, workspaceId, scope, releaseRevision }, now.toISOString())) {
+  // The grant must name the release's own revision; verifyStoredRelease above already tied that
+  // release to this deployment (exact SHA or equal gate surface).
+  if (!admitsWorkspace(release, grant, { tenantId, workspaceId, scope, releaseRevision: release.releaseRevision },
+    now.toISOString())) {
     return { ok: false, code: "SCOPED_WORKSPACE_INVALID" };
   }
   const current = await readCurrentProcessingTermsAcceptance(config, workspaceId, scope, now.getTime(), publicDir);

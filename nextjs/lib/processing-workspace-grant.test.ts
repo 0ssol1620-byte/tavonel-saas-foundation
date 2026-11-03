@@ -437,3 +437,33 @@ describe("connector qualification grant", () => {
     expect(wroteGrant()).toBe(false);
   });
 });
+
+describe("D-05: issuance under a release recorded for this deployment's gate surface", () => {
+  const deployed = "c".repeat(40);
+  const surface = `sha256:${"5".repeat(64)}`;
+  const surfaced = evaluateScopedRelease({ scope, releaseRevision: revision, evidence, now: evaluatedAt,
+    gateSurfaceSha256: surface });
+  const sRow = releaseRow({ receipt_sha256: surfaced.receiptSha256, gate_surface_sha256: surface });
+
+  it("issues a grant naming the released revision, which the RPC then rechecks", async () => {
+    store.release = [sRow];
+    const result = await issue(now, { VERCEL_GIT_COMMIT_SHA: deployed, TAVONEL_GATE_SURFACE_SHA256: surface });
+    expect(result).toMatchObject({ ok: true, idempotentReplay: false });
+    if (!result.ok) throw new Error("unreachable");
+    const releasePath = decodeURIComponent(paths().find((path) => path.includes("customer_data_release_decisions"))!);
+    expect(releasePath).toContain(`or=(release_revision.eq.${deployed},gate_surface_sha256.eq."${surface}")`);
+    expect(rpcBody().p_release_revision).toBe(revision);
+    expect(rpcBody().p_release_receipt_sha256).toBe(surfaced.receiptSha256);
+    expect(result.grant).toMatchObject({ releaseRevision: revision, releaseReceiptSha256: surfaced.receiptSha256,
+      expiresAt: "2026-10-29T00:00:00.000Z" }); // still the founder's evaluatedAt + 30 days
+  });
+
+  it("a deployment with another surface, or none, gets no grant from that release", async () => {
+    store.release = [sRow];
+    await expect(issue(now, { VERCEL_GIT_COMMIT_SHA: deployed, TAVONEL_GATE_SURFACE_SHA256: `sha256:${"6".repeat(64)}` }))
+      .resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_INVALID" });
+    await expect(issue(now, { VERCEL_GIT_COMMIT_SHA: deployed }))
+      .resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_INVALID" });
+    expect(wroteGrant()).toBe(false);
+  });
+});

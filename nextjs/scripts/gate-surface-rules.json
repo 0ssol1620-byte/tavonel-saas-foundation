@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "tavonel.gate_surface.v1",
+  "comment": "Presentational paths are pure content that nothing executes: markdown (no MDX loader is configured), images, fonts, video, captions, PDFs, and the two JSON data files the surface specimen reader validates before it uses them. Every other tracked path is the gate surface, this file and gate-surface.mjs included, and so is every file whose extension can run or be imported as code (ts, tsx, mts, cts, js, jsx, mjs, cjs, mdx, css, svg, html, and JSON or YAML, which build tools, config loaders and scripts read) in any directory: a denylist over executable code cannot be made safe (R5 SEC B1), so no presentational path can hold one. alwaysSurface keeps content customers rely on surface where a presentational rule would match: the policy texts, the developer setup and safety contract, and the evaluation worksheets' data-handling guidance (R6 SEC N3). The .well-known rule matches nothing presentational today (security.txt has no presentational extension); it stays so that a later txt entry in the public rule cannot make the security contact presentational. A symlink or gitlink is surface whatever its name. The production build's first command, node scripts/gate-surface.mjs --deploy, computes the digest before any other repository code runs; next.config.mjs only reads it, and everything after it runs surface code only. Widening this list changes the digest, so it needs a new founder release once. docs/adr/0006-release-continuity-by-gate-surface.md.",
+  "alwaysSurface": [
+    "^docs/policy/",
+    "^nextjs/public/policy/",
+    "^nextjs/public/\\.well-known/",
+    "^nextjs/public/developer/",
+    "^nextjs/public/evaluation/"
+  ],
+  "presentational": [
+    "\\.md$",
+    "^docs/.*\\.(png|jpe?g|webp|avif|gif|pdf|txt)$",
+    "^nextjs/public/.*\\.(avif|webp|jpe?g|png|gif|ico|mp4|webm|vtt|woff2|pdf)$",
+    "^nextjs/public/proof-collection/specimens/[^/]+\\.run\\.json$",
+    "^nextjs/lib/specimen-sources\\.json$"
+  ]
+}
