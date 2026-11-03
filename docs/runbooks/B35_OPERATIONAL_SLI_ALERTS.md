@@ -12,8 +12,39 @@ evaluation. If database configuration, transport, or receipt validation fails, t
 `503`, `persisted: false`, and the bounded evaluation. A successful HTTP response therefore means
 the receipt is durable, not merely calculated in memory.
 
-This component records alert intent only. It does not call email, paging, chat, webhook, or other
-notification providers. Delivery and acknowledgement require a separately approved integration.
+## Delivery
+
+When an evaluation carries at least one alert (a breach), the route posts one
+`tavonel.operations_alert.v1` envelope to the incoming webhook named by the
+`OPERATIONS_ALERT_WEBHOOK_URL` secret, through `deliverOperationsAlert` (the same receiver the
+production smoke workflow pages). The record is attempted first; delivery is attempted even when
+the record failed, because a database outage is exactly the breach that must page.
+
+- **Breach id.** One breach per schedule slot. `alertId` is a UUID derived from the slot alone, and
+  the summary names the slot, so `dedupeKey` is stable per breach. A retry inside one slot is the
+  same breach.
+- **At-least-once.** A repeat of the same breach on the same instance is suppressed
+  (`ALERT_SUPPRESSED_DUPLICATE`). A retry that lands on another instance after a successful post can
+  page twice with the same `alertId`; receivers drop repeats by `alertId`/`dedupeKey`. A failed or
+  unconfigured delivery is never marked as sent, so the next retry tries again.
+- **Payload.** State, unique alert reasons, slot, severity (critical if any alert is critical),
+  `service: "web"` and this runbook's link. No probe bodies, provider errors, environment values,
+  credentials or the webhook URL. The URL is never logged or returned.
+
+Route outcomes (`delivery.code` in the response):
+
+| Outcome | HTTP | Meaning |
+| --- | --- | --- |
+| `NO_BREACH` | 200 | No alert in the evaluation; nothing sent. |
+| `ALERT_DELIVERED` | 200 | Receiver answered 2xx. |
+| `ALERT_SUPPRESSED_DUPLICATE` | 200 | Same breach already delivered from this instance. |
+| `ALERT_DELIVERY_UNCONFIGURED` | 200 | Secret unset or not `https://`: **record-only**. stderr carries `ALERT_RECEIVER_UNCONFIGURED`. Nobody was paged. |
+| `ALERT_DELIVERY_FAILED` | 502 | Receiver answered non-2xx, was unreachable, or exceeded the 5 s timeout. The receipt is still durable (`persisted: true`); route code `SLI_ALERT_DELIVERY_FAILED`. |
+
+A `503` (record not persisted) also carries `delivery`, so a page can go out while the store is down.
+
+Acknowledgement, escalation and on-call rotation are not part of this route. The channel behind the
+webhook is the founder's choice.
 
 Operator checks:
 
@@ -22,3 +53,6 @@ Operator checks:
    `SLI_ALERT_EVALUATION_REPLAYED` when the probe snapshot is unchanged.
 3. Query `foundation_operational_sli_evaluations` with the service role and confirm the stored
    state and alert reasons match the route receipt. Never treat a `503` response as persisted.
+4. With `OPERATIONS_ALERT_WEBHOOK_URL` set, confirm a breaching slot returns `ALERT_DELIVERED` and
+   the message arrives in the chosen channel. `ALERT_DELIVERY_UNCONFIGURED` in production means
+   alerts are still record-only.

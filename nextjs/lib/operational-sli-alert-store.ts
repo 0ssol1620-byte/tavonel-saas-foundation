@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { deliverOperationsAlert } from "./operations-p0";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 import type { OperationalSli } from "./operational-sli";
 
@@ -73,4 +75,63 @@ export async function persistOperationalSliAlert(
   return receipt
     ? { ok: true, receipt }
     : { ok: false, code: "SLI_ALERT_STORE_WRITE_FAILED" };
+}
+
+export const OPERATIONAL_SLI_RUNBOOK_URL =
+  "https://github.com/0ssol1620-byte/tavonel-saas-foundation/blob/main/docs/runbooks/B35_OPERATIONAL_SLI_ALERTS.md";
+
+export type OperationalSliAlertDelivery = {
+  breachId: string | null;
+  code:
+    | "NO_BREACH"
+    | "ALERT_DELIVERED"
+    | "ALERT_SUPPRESSED_DUPLICATE"
+    | "ALERT_DELIVERY_FAILED"
+    | "ALERT_DELIVERY_UNCONFIGURED"
+    | "ALERT_PAYLOAD_INVALID";
+};
+
+/** One breach per schedule slot: the same slot always yields the same UUID, so a retry is the same breach. */
+export function operationalSliBreachId(windowStartedAt: Date): string {
+  const hex = createHash("sha256")
+    .update(`tavonel.operational_sli.v1:${windowStartedAt.toISOString()}`)
+    .digest("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+/**
+ * Sends a breaching evaluation to the operations webhook. Only state, reasons and the slot cross
+ * this boundary -- never probe bodies, provider errors, environment values or the webhook URL.
+ * Delivery is at-least-once: the envelope carries a stable alertId and dedupeKey per slot so the
+ * receiver can drop a repeat, and deliverOperationsAlert suppresses a same-instance repeat. A
+ * failed or unconfigured delivery is never marked as sent, so the next retry tries again.
+ */
+export async function deliverOperationalSliBreach(
+  evaluation: OperationalSli,
+  windowStartedAt: Date,
+  now: number = Date.now(),
+): Promise<OperationalSliAlertDelivery> {
+  // ponytail: same-instance dedupe only (operations-p0's in-memory window). A cron retry that lands
+  // on another instance after a 2xx pages twice with the same alertId; add a delivered_at column on
+  // foundation_operational_sli_evaluations if duplicate pages become a measured problem.
+  if (evaluation.alerts.length === 0) return { breachId: null, code: "NO_BREACH" };
+  const breachId = operationalSliBreachId(windowStartedAt);
+  const slot = windowStartedAt.toISOString();
+  const reasons = [...new Set(evaluation.alerts.map((entry) => entry.reason))].join(", ");
+  const result = await deliverOperationsAlert(
+    {
+      alertId: breachId,
+      kind: "incident",
+      severity: evaluation.alerts.some((entry) => entry.severity === "critical") ? "critical" : "warning",
+      service: "web",
+      summary: `Operational SLI ${evaluation.state} at slot ${slot}: ${reasons}`.slice(0, 240),
+      observedAt: slot,
+      runbookUrl: OPERATIONAL_SLI_RUNBOOK_URL,
+    },
+    now,
+  );
+  return {
+    breachId,
+    code: result.code === "ALERT_RECEIVER_UNCONFIGURED" ? "ALERT_DELIVERY_UNCONFIGURED" : result.code,
+  };
 }

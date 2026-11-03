@@ -8,7 +8,9 @@ import { REMOTE_MCP_AFFECTED_PATHS, REMOTE_MCP_AFFECTED_UNIT_FILES, REMOTE_MCP_A
 import { GDP_PDF_RUNS_AFFECTED_PATHS, GDP_PDF_RUNS_AFFECTED_UNIT_FILES, GDP_PDF_RUNS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { PACKET_DELIVERY_AFFECTED_PATHS, PACKET_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { COMPILER_RELEASE_AFFECTED_PATHS, COMPILER_RELEASE_AFFECTED_UNIT_FILES, COMPILER_RELEASE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { CONSENT_POSTER_AFFECTED_PATHS, CONSENT_POSTER_AFFECTED_UNIT_FILES, CONSENT_POSTER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+import { OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS, OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES, TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_PATHS, SPECIMEN_STRIP_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_BROWSER_FILES, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES, PUBLIC_MARKETING_AFFECTED_BROWSER_FILES, MARKETING_TOOLING_POSTIMAGES, G1_COPY_TRUTH_AFFECTED_PATHS, G1_COPY_TRUTH_AFFECTED_UNIT_FILES, G1_COPY_TRUTH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { ENABLEMENT_AFFECTED_BROWSER_FILES, P4_FOLLOWUPS_AFFECTED_PATHS, P4_FOLLOWUPS_AFFECTED_UNIT_FILES, P4_FOLLOWUPS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 
@@ -645,6 +647,14 @@ for (const binding of [
     browsers: [],
     rows: [],
     neighbors: ['nextjs/scripts/launch-qa/internal-links.mjs', 'nextjs/scripts/launch-qa/lighthouse-budgets.test.mjs', 'nextjs/scripts/release-manifest.mjs', 'nextjs/scripts/release-gate-check-2.mjs', 'nextjs/lib/release-gate-check.test.ts'] },
+  // D-05 gate release continuity: eight exact repo-relative paths selecting ten direct suites, no browser suite.
+  { group: 'gate-release-continuity', prefix: '', exportedPaths: GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, exportedSuites: GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['nextjs/lib/hermetic-prebuild.test.ts', 'nextjs/lib/scoped-customer-data-gate-store.test.ts', 'nextjs/lib/scoped-customer-data-gate-store.ts', 'nextjs/next.config.mjs', 'nextjs/scripts/gate-surface-rules.json', 'nextjs/scripts/gate-surface.mjs', 'nextjs/scripts/run-hermetic-vitest.mjs', 'shared/scopedCustomerDataGate.ts'],
+    suites: ['lib/collection-compile-run.test.ts', 'lib/customer-data-admission.test.ts', 'lib/customer-data-authorization.test.ts', 'lib/hermetic-prebuild.test.ts', 'lib/processing-workspace-grant.test.ts', 'lib/release-gate-check-script.test.ts', 'lib/route-classification.test.ts', 'lib/scoped-customer-data-gate-store.test.ts', 'lib/security-headers.test.ts', 'lib/seo-surface.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/next.config.ts', 'nextjs/scripts/gate-surface.test.mjs', 'nextjs/scripts/gate-surface-rules.yaml', 'shared/scopedCustomerDataGate.test.ts', 'shared/customerDataAuthorization.ts', 'nextjs/lib/scoped-customer-data-gate.ts', 'scopedCustomerDataGate.ts'] },
   // G1-COPY (phase 4, codex/p4-copy-20261019): six exact paths, seventeen direct suites, two browser suites on existing rows.
   { group: 'g1-copy-truth', prefix: 'nextjs/', exportedPaths: G1_COPY_TRUTH_AFFECTED_PATHS, exportedSuites: G1_COPY_TRUTH_AFFECTED_UNIT_FILES,
     exportedBrowsers: G1_COPY_TRUTH_AFFECTED_BROWSER_FILES,
@@ -677,6 +687,14 @@ for (const binding of [
     browsers: ['e2e/benchmarks.spec.ts', 'e2e/templates.spec.ts'],
     rows: ["['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/templates.spec.ts', ['1440']],"],
     neighbors: ['nextjs/lib/compiler-release.test.ts', 'nextjs/lib/compiler-releases.ts', 'nextjs/lib/compiler-release.tsx', 'lib/compiler-release.ts'] },
+  // B35 alert delivery (codex/ops-alert-delivery-20261102): four exact paths, eight direct suites, no browser suite.
+  { group: 'operational-sli-alert-delivery', prefix: 'nextjs/', exportedPaths: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS, exportedSuites: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['app/api/internal/sli-alerts/route.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-alert-store.test.ts', 'lib/operational-sli-alert-store.ts'],
+    suites: ['lib/api-error-codes.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-alert-store.test.ts', 'lib/operations-p0.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/lib/operational-sli.ts', 'nextjs/lib/operational-sli-alert-store.tsx', 'nextjs/app/api/internal/sli-alerts/replay/route.ts', 'nextjs/lib/operational-sli-alert-delivery.ts', 'lib/operational-sli-alert-store.ts'] },
   // Phase 4 consent-poster lane (P2-34 analytics notice, D-11 poster re-cut).
   { group: 'consent-poster', prefix: 'nextjs/', exportedPaths: CONSENT_POSTER_AFFECTED_PATHS, exportedSuites: CONSENT_POSTER_AFFECTED_UNIT_FILES,
     exportedBrowsers: CONSENT_POSTER_AFFECTED_BROWSER_FILES,
@@ -695,7 +713,7 @@ for (const binding of [
     && binding.rows.every(row => sharedMap.includes('\n  ' + row)),
     'UX program owner must retain exact paths, direct suites, reviewed browser rows and no broad neighbor admission: ' + binding.group);
 }
-assert(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'] === '1dd2de781dacc2269c794559da1366c8d13a2adbad91e538fb19433096f6dce7'
+assert(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'] === '5c11e634df5c2ce72c20741cd29ce89534c5cbce69f79dfe6b4c41b1b235b2b8'
   && ['e2e/benchmarks.spec.ts', 'e2e/brand-tokens.spec.ts', 'e2e/film-line-stability.spec.ts', 'e2e/site-alignment.spec.ts', 'e2e/solutions-workflows.spec.ts', 'e2e/templates.spec.ts', 'e2e/type-scale.spec.ts'].every(file => PUBLIC_MARKETING_AFFECTED_BROWSER_FILES.includes(file))
   && ["['e2e/templates.spec.ts', ['1440']],", "['e2e/type-scale.spec.ts', ['1440']],", "['e2e/site-alignment.spec.ts', ['1440']],", "['e2e/brand-tokens.spec.ts', ['1440']],", "['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/film-line-stability.spec.ts', ['390']],"].every(row => sharedMap.includes('\n  ' + row)),
   'Public marketing owner must keep the reviewed package.json postimage and a reviewed project row for each UX program browser suite');

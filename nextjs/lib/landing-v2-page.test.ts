@@ -848,9 +848,10 @@ describe("landing v2 -- the lead and the workbench", () => {
     expect(hero).toContain("/film/poster-1-t8.16-2x.webp");
     expect(hero).toContain("/film/poster-1-t8.16-2x.avif");
     expect(elements(hero, "button").filter(open => attr(open, "role") === "tab")).toHaveLength(4);
-    // FINAL-SPEC 2026-10-26 §2.1: the phone opens on one readable pane (Focus), its own still first.
-    expect(hero).toContain('data-mobile-view="focus"');
-    expect(hero).toContain("/film/poster-1-t8.16-pane1-684x855.avif");
+    // Founder ask 2026-10-27: the film opens compact (the whole frame) at every width; the pane still waits for Focus details.
+    expect(hero).toContain('data-mobile-view="fit"');
+    expect(hero).toContain('data-wide-view="fit"');
+    expect(hero).not.toContain("/film/poster-1-t8.16-pane1-684x855.avif");
     expect(hero).not.toContain('data-source-inspection-film');
     // The not-customer-results disclosure stays (FINAL-SPEC D-9 shortens its wording only).
     expect(readable(hero)).toContain(locale === "ko" ? "고객 결과가 아닙니다" : "not customer results");

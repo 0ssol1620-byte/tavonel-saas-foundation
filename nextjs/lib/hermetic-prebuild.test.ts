@@ -11,7 +11,8 @@ describe("hermetic production prebuild", () => {
     // suite to it (the deletion drills append `pnpm test:scripts`) is not a regression.
     expect(pkg.scripts.test.startsWith("vitest run")).toBe(true);
     expect(pkg.scripts.test).not.toContain("run-hermetic-vitest");
-    expect(pkg.scripts.prebuild).toBe("pnpm check && node scripts/run-hermetic-vitest.mjs");
+    // D-05: the gate-surface deploy step is first, before any other repository code runs.
+    expect(pkg.scripts.prebuild).toBe("node scripts/gate-surface.mjs --deploy && pnpm check && node scripts/run-hermetic-vitest.mjs");
   });
 
   it("does not copy application or provider credentials into the prebuild test process", () => {
