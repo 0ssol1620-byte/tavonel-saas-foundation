@@ -2183,12 +2183,14 @@ export const LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES = Object.freeze([
 ]);
 // D-05 gate release continuity (docs/adr/0006): the shared release evaluator and verifier, the gate reader and its suite, the
 // build config that inlines the deployment's gate-surface digest, the surface computation with its rules, the hermetic prebuild
-// wrapper and the suite that pins the prebuild order (R4: the digest step runs first). Exactly these eight
-// repo-relative paths select the ten suites that read them directly: the four gate-v2 suites (reader, issuer, admission,
+// wrapper and the suite that pins the prebuild order (R4: the digest step runs first). The root .gitignore joins them (D-05
+// diagnosis): the deploy step records a digest only from a clean `git status`, and Vercel's root vercel.json is ignored there.
+// Exactly these nine repo-relative paths select the ten suites that read them directly: the four gate-v2 suites (reader, issuer, admission,
 // authorization) and the compile path that carries a release, the Node wrapper that runs the gate-check and surface suite, and
 // the three suites that import next.config.mjs. No browser lane. The migration and its pgTAP file keep their database owner.
 // Gate code, so never nativeReuse.
 export const GATE_RELEASE_CONTINUITY_AFFECTED_PATHS = Object.freeze([
+  '.gitignore',
   'nextjs/lib/hermetic-prebuild.test.ts',
   'nextjs/lib/scoped-customer-data-gate-store.test.ts',
   'nextjs/lib/scoped-customer-data-gate-store.ts',
@@ -2863,7 +2865,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // launch-qa-release-scripts: the 5 exact paths above select 3 direct suites and no browser suite.
   affectedGroup('launch-qa-release-scripts', new RegExp(`^nextjs/(?:${exactPathAlternation(LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS)})$`),
     { unitFiles: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES }),
-  // gate-release-continuity (D-05): the 8 exact repo-relative paths above select 10 direct suites and no browser suite.
+  // gate-release-continuity (D-05): the 9 exact repo-relative paths above select 10 direct suites and no browser suite.
   affectedGroup('gate-release-continuity', new RegExp(`^(?:${exactPathAlternation(GATE_RELEASE_CONTINUITY_AFFECTED_PATHS)})$`),
     { unitFiles: GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES }),
   // g1-copy-truth: the 6 exact paths above select 17 direct suites and 2 browser suites.

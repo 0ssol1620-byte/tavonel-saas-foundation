@@ -7528,8 +7528,8 @@ test('affected compiler-release owner: 1 exact path selects 3 direct suites and 
 });
 // D-05 gate release continuity (docs/adr/0006): one finite owner over repo-relative paths, restated independently.
 import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
-test('affected gate-release-continuity owner: 8 exact paths select 10 direct suites and no browser suite; neighbours stay unmapped', () => {
-  const paths = ['nextjs/lib/hermetic-prebuild.test.ts', 'nextjs/lib/scoped-customer-data-gate-store.test.ts', 'nextjs/lib/scoped-customer-data-gate-store.ts', 'nextjs/next.config.mjs',
+test('affected gate-release-continuity owner: 9 exact paths select 10 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['.gitignore', 'nextjs/lib/hermetic-prebuild.test.ts', 'nextjs/lib/scoped-customer-data-gate-store.test.ts', 'nextjs/lib/scoped-customer-data-gate-store.ts', 'nextjs/next.config.mjs',
     'nextjs/scripts/gate-surface-rules.json', 'nextjs/scripts/gate-surface.mjs', 'nextjs/scripts/run-hermetic-vitest.mjs',
     'shared/scopedCustomerDataGate.ts'];
   const suites = ['lib/collection-compile-run.test.ts', 'lib/customer-data-admission.test.ts', 'lib/customer-data-authorization.test.ts',
@@ -7542,7 +7542,7 @@ test('affected gate-release-continuity owner: 8 exact paths select 10 direct sui
     assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['gate-release-continuity'], [], suites, [], []], path);
     assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false], path);
   }
-  for (const adjacent of ['nextjs/next.config.ts', 'nextjs/scripts/gate-surface.test.mjs', 'nextjs/scripts/gate-surface-rules.yaml', 'shared/scopedCustomerDataGate.test.ts', 'scopedCustomerDataGate.ts']) {
+  for (const adjacent of ['nextjs/next.config.ts', 'nextjs/scripts/gate-surface.test.mjs', 'nextjs/scripts/gate-surface-rules.yaml', 'shared/scopedCustomerDataGate.test.ts', 'scopedCustomerDataGate.ts', 'nextjs/.gitignore', 'shared/.gitignore']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
