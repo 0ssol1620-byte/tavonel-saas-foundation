@@ -104,14 +104,19 @@ async function collectEntry(entry: DropEntry, output: File[]) {
 }
 
 export async function collectDroppedWorkspaceFiles(items: ArrayLike<DropItem>) {
-  const output: File[] = [];
-  for (const item of Array.from(items)) {
+  /*
+    Every item is read before the first await. The browser empties the drag data store once the drop
+    event returns, so an item first touched after a folder walk gives neither an entry nor a file: a
+    folder and a PDF dropped together staged the folder alone.
+  */
+  const picked = Array.from(items, (item) => {
     const candidate = item.webkitGetAsEntry?.() ?? null;
-    if (isDropEntry(candidate)) await collectEntry(candidate, output);
-    else {
-      const file = item.getAsFile();
-      if (file) output.push(file);
-    }
+    return isDropEntry(candidate) ? { entry: candidate } : { file: item.getAsFile() };
+  });
+  const output: File[] = [];
+  for (const item of picked) {
+    if (item.entry) await collectEntry(item.entry, output);
+    else if (item.file) output.push(item.file);
   }
   if (output.length > MAX_FILES) throw new Error("FILE_COUNT_LIMIT_EXCEEDED");
   return output;
