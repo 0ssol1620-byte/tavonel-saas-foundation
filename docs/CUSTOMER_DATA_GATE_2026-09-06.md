@@ -682,6 +682,15 @@ PR #174는 게이트 코드를 하나도 바꾸지 않았다. 다만 R5 규칙�
   digest를 낸다. UTF-8이 아닌 경로가 있는 트리는 digest가 없다(합성 트리와 실제 Git 커밋 양쪽 회귀 테스트).
 - preview·로컬 빌드, `VERCEL_GIT_COMMIT_SHA`가 없거나 `HEAD`와 다른 빌드, git이 없는 빌드, 작업 트리가 깨끗하지
   않은 빌드는 digest가 없다.
+- D-05 v2(2026-11-04, ADR-0006 추가 절)가 위 줄을 고친다. deploy 단계는 `git status`가 아니라 checkout 파일의 blob id로
+  digest를 낸다. v1은 모든 production 빌드에서 `none`이었다. Vercel이 clone 뒤 루트에 `vercel.json`을 쓰고,
+  `supabase/tests/foundation_approved_connection_batch_binding.sql`이 줄끝이 섞인 채 `eol=lf` 아래 커밋되어 있어서
+  `git status`가 늘 비어 있지 않았기 때문이다. `.git`이 있으면 HEAD가 주장한 SHA여야 하고, skip-worktree·assume-unchanged
+  항목이 없어야 하고, checkout digest가 HEAD의 커밋 digest와 같아야 한다. `.git`이 없으면 git 없이 checkout digest만으로
+  주장한다. 그 빌드는 checkout이 그 SHA인지 확인할 수 없고, 배포된 코드를 믿는 것과 같이 Vercel의 새 clone을 믿는다.
+  복원된 build cache는 여전히 `VERCEL_FORCE_NO_BUILD_CACHE=1`이 막는다. 테스트는 `.git` 없는 HEAD 사본의 digest가 커밋
+  digest와 같은지, 코드·새 파일·삭제·규칙·Vercel이 파생하지 않은 루트 `vercel.json`은 digest를 바꾸고 무시된 파일과
+  presentational 파일은 바꾸지 않는지, 무시 판정이 git과 같은지 고정한다.
 - `release-gate-check`는 상속 행의 digest를 그 revision에서 다시 계산한다. 다르거나 계산할 수 없으면
   `surface_mismatch`이고 released가 아니다.
 - 30일이 지난 출시는 상속해도 열리지 않는다.

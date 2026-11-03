@@ -204,3 +204,78 @@ gate v2에서 출시 결정(`customer_data_release_decisions`)과 작업공간 g
   20260930070000 본문으로 다시 만들면 된다. 열은 남겨도 이전 코드는 읽지 않는다.
 - 순서: migration을 먼저 적용하고 코드를 배포한다(`docs/runbooks/RELEASE_ORDER.md`). 코드가 먼저 가면
   `gate_surface_sha256` select가 실패해 `SCOPED_GATE_STORE_FAILED`로 닫힌다.
+
+## 추가 2026-11-04 — D-05 v2: deploy 단계는 git의 판단이 아니라 checkout 파일로 digest를 낸다
+
+### 관찰
+
+- `main` `1008bd22`의 첫 production 빌드(deployment `dpl_3eDZBMz6eoxG4ge82VrjCbj2mivU`, build `bld_bd1nizy2d`)는
+  `VERCEL_FORCE_NO_BUILD_CACHE is set so skipping build cache step`을 찍었다. 그 뒤 deploy 단계는 거절 문구 없이
+  `customer-data gate surface (deploy step): none (exact-SHA release only)`을 찍었고, `next.config`도 `none`이었다.
+  로컬에서 계산한 `1008bd22`의 digest는 `sha256:f001898d14b7fade8a4ccef19a973da4b709dd063342be5666a5df06ca9c9e2d`다.
+- 처음 세운 가설은 "Vercel 빌드에는 `.git`이 없다"였다. preview 진단 빌드 두 번으로 확인했더니 **가설은 틀렸다**
+  (`outputs/…/upload-unblock/D05-V2-DIAGNOSIS.md`). `/vercel/path0/.git`은 디렉터리로 있다(shallow clone).
+  git 2.50.1이 PATH에 있고, `git rev-parse HEAD`는 `VERCEL_GIT_COMMIT_SHA`와 같다.
+- 실제 원인은 `git status --porcelain`이 비어 있지 않다는 것이다. 빌드마다 다음 두 줄이 나온다.
+  - `?? vercel.json`: clone 직후, ignoreCommand보다 먼저 Vercel이 저장소 루트에 쓴다. 내용은 Root Directory의
+    `nextjs/vercel.json`을 parse해서 한 줄로 다시 쓴 것이다(774 B, 같은 key 순서).
+  - ` M supabase/tests/foundation_approved_connection_batch_binding.sql`: 이 blob은 줄끝이 섞여 있고(`i/mixed`),
+    `.gitattributes`는 이 경로에 `text eol=lf`를 준다. 그래서 새 checkout마다 git은 이 파일을 수정됨으로 보고한다.
+    checkout 바이트는 blob 바이트와 같다(진단의 바이트 비교에서 차이 0).
+- 그래서 v1 deploy 단계는 production 빌드마다 `null`을 기록했다. 앞의 "남는 한계 — Vercel 빌드의 git"에서 확인하지 못했다고
+  적은 것이 이것이다.
+
+### 결정
+
+1. **digest는 checkout 파일에서 낸다(`gateSurfaceOfCheckout`).** 저장소 루트 아래를 모두 걷는다. 최상위 `.git`과,
+   checkout 안의 `.gitignore` 파일들이 무시하는 경로(`node_modules`, `.next`, `.vercel`, `.env*`, `.pnpm-store` 등)를 뺀다.
+   파일마다 git blob id `sha1("blob " + size + "\0" + bytes)`를 계산한다. mode도 git과 같다. symlink는 `120000`이고 blob은
+   링크 문자열이다. 소유자 실행 비트가 있으면 `100755`, 없으면 `100644`다. 그 목록을 `git ls-tree -r -z` 형식으로 만들어
+   기존 `gateSurfaceDigest`에 넣는다. 그러므로 해시하는 텍스트와 정렬, 표면 규칙은 v1과 바이트 단위로 같다. 정확한 커밋을
+   checkout한 트리에서는 `--sha`(git ls-tree)와 같은 digest가 나온다.
+2. **Vercel이 쓴 루트 `vercel.json`.** 그 JSON이 커밋된 `nextjs/vercel.json`과 같을 때만(parse 후 같은 문자열, key 순서 포함)
+   목록에서 뺀다. 다른 루트 `vercel.json`은 목록에 남으므로 digest가 바뀐다.
+3. **`.git`이 있으면 git이 계속 보증한다.** HEAD는 `VERCEL_GIT_COMMIT_SHA`여야 한다. skip-worktree·assume-unchanged 항목이
+   없어야 한다. checkout digest는 HEAD의 커밋 digest와 같아야 한다. 하나라도 아니면 `null`이다. `git status --porcelain`
+   검사는 뺐다. 그 검사가 막던 경우(수정·stage·추적 안 된 파일, fsmonitor)는 이제 checkout digest가 커밋 digest와 달라지는
+   것으로 잡힌다. git은 위와 같이 찾은 절대 경로로만 부른다(R5 SEC B2).
+4. **`.git`이 없으면 git이 필요 없다.** deploy 단계는 git을 찾지 않는다. checkout digest만으로 주장한다.
+5. **그대로인 거절.** production 빌드만 주장한다. `VERCEL_GIT_COMMIT_SHA`가 있어야 한다. `VERCEL_FORCE_NO_BUILD_CACHE=1`이 아니면
+   `none`이고 설정 이름을 적은 문구를 찍는다. 기록은 `wx`로 SHA마다 한 번이다. 저장소나 `node_modules` 안의 node에서 돌거나
+   PATH의 첫 `node`가 그런 곳에 있으면 빌드를 멈춘다. `next.config.mjs`는 기록을 읽기만 한다.
+6. **digest를 못 내는 경우(`null`).** UTF-8이 아닌 경로, 중첩 `.git`(submodule이나 내장 저장소), 일반 파일이 아닌
+   `.gitignore`, 정확히 옮기지 못하는 `.gitignore` 줄(POSIX class, 괄호 안 escape, 닫히지 않은 괄호), 파일도 symlink도 아닌 항목.
+
+### 위협 모델 변경
+
+- **`.git` 없는 빌드.** deploy 단계는 checkout이 HEAD인지, HEAD가 `VERCEL_GIT_COMMIT_SHA`인지 확인할 수 없다. Vercel이
+  그 커밋을 새로 clone했다고 믿는다. 배포된 코드 자체를 믿는 것과 같은 믿음이다. digest는 빌드가 실제로 컴파일하는 표면 바이트의
+  digest다. 그래서 SHA 표시가 틀려도 상속은 표면 바이트가 출시한 표면과 같을 때만 일어난다. 복원된 build cache는 여전히
+  env 설정이 막는다.
+- **`.git` 있는 빌드(오늘의 Vercel).** v1보다 약해지지 않는다. git 색인이 아니라 파일 바이트를 읽으므로 skip-worktree,
+  fsmonitor, 줄끝 정규화가 digest를 속일 수 없다. HEAD·SHA 대조와 skip-worktree 검사는 그대로 남는다.
+- **무시 규칙.** git이 무시하는 경로는 v1에서도 digest 밖이었다(`node_modules`, `.env*`). 범위는 같다. 다만 이제 무시 판정을
+  이 코드가 한다. 실제보다 **많이** 무시하면 그 경로에 놓인 표면 파일을 놓친다. 그래서 테스트가 합성 트리에서 이 판정을
+  `git ls-files --others --exclude-standard`와 경로 단위로 비교한다. 옮기지 못하는 줄은 추측하지 않고 `null`이다. 대소문자는
+  Linux git처럼 구분한다.
+- **Vercel이 쓴 루트 `vercel.json`.** 커밋된 `nextjs/vercel.json`과 같은 내용일 때만 뺀다. 그 파일이 빌드 설정에 쓰이더라도
+  내용은 표면 파일 그대로다.
+- **추적되지만 무시되는 파일.** walk가 빼므로 커밋 digest와 달라진다. 닫힌 쪽(정확한 SHA만)이다. 오늘 HEAD에는 0개다.
+  HEAD 동등성 테스트가 이것도 잡는다.
+
+### 검증과 남는 한계
+
+- `release-gate-check.test.mjs`: (1) 이 checkout HEAD의 blob을 `.git` 없는 임시 트리에 쓰고, Vercel이 남기는 파일(무시되는
+  `node_modules`, `.next`, `.env.local`, `.vercel`, `.pnpm-store`, 파생된 루트 `vercel.json`)을 더하면 커밋 digest와 같고, 레코드도
+  ls-tree와 하나하나 같다. (2) 합성 저장소에서 코드 수정, 새 코드 파일, 삭제, 규칙 파일, `nextjs/vercel.json`, 파생되지 않은 루트
+  `vercel.json`, 줄끝이 섞인 파일의 정규화는 digest를 바꾸고, 무시된 의존성·env 파일과 presentational 파일은 바꾸지 않는다.
+  `.git`이 있을 때와 없을 때 둘 다 본다. (3) 무시 판정이 git과 같다. (4) POSIX에서 symlink·실행 파일의 mode와 blob id가 git과 같다.
+- 실제 Vercel 컨테이너에서도 돌렸다(진단 preview 빌드, 병합하지 않고 지운 브랜치). `d81bcfa2`에서 루트 `vercel.json` 하나만
+  ls-tree와 달랐고, 그래서 위 2번을 더했다. 최종 코드를 실은 `61f99cfd`(deployment `dpl_6Kx1ZwVPQk7Egdocab3f8c2F58Zh`)에서는
+  production env를 그 호출에만 주고 `deploymentGateSurface`를 불렀다. 결과는 `sha256:9dffe0fb…ac6a`였고, 같은 컨테이너의
+  `gateSurfaceOfCommit`, 로컬 `--sha 61f99cfd…`와 같았다. walk 레코드 2,536개가 ls-tree와 하나하나 같았다. **production 빌드
+  끝까지의 증명은 아니다.** preview env와 복원된 cache 아래였고, 아무것도 기록하지 않았다. 병합 뒤 첫 production 빌드 로그의
+  deploy 단계 줄이 `--sha` 값과 같아야 끝난다(`RELEASE_ORDER.md` 순서 4번).
+- Windows에는 실행 비트가 없다. 그래서 Windows checkout은 모든 파일을 `100644`로 본다. deploy 단계는 Linux Vercel에서만 의미가 있고,
+  오늘 저장소에는 `100644`가 아닌 항목이 없다.
+- 섞인 줄끝 파일은 고치지 않았다. 바이트를 읽으므로 v2에는 상관없다. 고치는 일은 그 파일을 맡은 lane의 일이다.

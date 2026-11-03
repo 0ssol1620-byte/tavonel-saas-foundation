@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync,
+} from "node:fs";
 import { builtinModules } from "node:module";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
@@ -9,8 +11,8 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
-  GATE_SURFACE_RULES_PATH, deploymentGateSurface, gateSurfaceDigest, gateSurfaceOfCommit, readDeploymentGateSurface,
-  recordDeploymentGateSurface, resolveDeployTools,
+  GATE_SURFACE_RULES_PATH, checkoutTree, deploymentGateSurface, gateSurfaceDigest, gateSurfaceOfCheckout, gateSurfaceOfCommit,
+  readDeploymentGateSurface, recordDeploymentGateSurface, resolveDeployTools,
 } from "./gate-surface.mjs";
 import {
   RELEASE_GATE_REPORT_SCHEMA,
@@ -845,6 +847,11 @@ test("gate surface: the deploy step calls no node or git the checkout or a node_
     mkdirSync(records);
     const production = { VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: SHA };
     assert.throws(() => recordDeploymentGateSurface(production, repo, records, options([repoBin, system])), /first node on PATH/);
+    // D-05 v2: a checkout without .git needs no git; one with .git still looks for git and refuses a planted one.
+    assert.deepEqual(resolveDeployTools(repo, { ...options([cacheBin]), git: false }), { git: null });
+    assert.throws(() => resolveDeployTools(repo, { ...options([repoBin, system]), git: false }), /first node on PATH/);
+    assert.equal(deploymentGateSurface(production, repo, options([cacheBin])), null, "no .git: no git is looked for");
+    mkdirSync(join(repo, ".git"));
     assert.throws(() => deploymentGateSurface(production, repo, options([cacheBin])), /no git on PATH/);
     assert.deepEqual(readdirSync(records), []);
   } finally {
@@ -906,6 +913,168 @@ test("gate surface: a PATH git that forges only rev-parse and status cannot vouc
       });
     });
   });
+
+// D-05 v2 (D05-V2-DIAGNOSIS.md). v1 claimed nothing on every Vercel production build: `git status --porcelain` there
+// lists the root vercel.json Vercel writes after the clone, and a file committed with mixed line endings under eol=lf.
+// The deploy step now digests the checkout's own files, with or without .git.
+/** What Vercel leaves in the checkout before prebuild: ignored install and cache output, and its root vercel.json. */
+function plantVercelBuildFiles(dir) {
+  for (const [path, content] of [["nextjs/node_modules/pkg/index.js", "module.exports = 1;\n"],
+    ["nextjs/.next/cache/x", "cache\n"], ["nextjs/.env.local", "NOT_A_SECRET=1\n"], [".vercel/project.json", "{}\n"],
+    [".pnpm-store/v10/projects/x", "x\n"]]) {
+    mkdirSync(join(dir, path, ".."), { recursive: true });
+    writeFileSync(join(dir, path), content);
+  }
+  writeFileSync(join(dir, "vercel.json"), `${JSON.stringify(JSON.parse(readFileSync(join(dir, "nextjs", "vercel.json"), "utf8")))}\n`);
+}
+
+test("gate surface v2: HEAD's files, written from its blobs into a tree without .git, give HEAD's committed digest",
+  { skip: checkoutHead === null }, () => {
+    const tree = execFileSync("git", ["-C", repositoryRoot, "ls-tree", "-r", "-z", "--full-tree", checkoutHead],
+      { maxBuffer: 64 * 1024 * 1024 }).toString("utf8").split("\0").filter(Boolean)
+      .map((record) => [record.slice(record.indexOf("\t") + 1), record.slice(0, record.indexOf("\t")).split(" ")]);
+    assert.ok(tree.every(([, [mode]]) => mode === "100644"), "this suite writes regular files only");
+    // One `cat-file --batch` for every blob: "<oid> blob <size>\n<bytes>\n" each.
+    const batch = execFileSync("git", ["-C", repositoryRoot, "cat-file", "--batch"],
+      { input: tree.map(([, [, , object]]) => `${object}\n`).join(""), maxBuffer: 1024 * 1024 * 1024 });
+    const dir = mkdtempSync(join(tmpdir(), "gate-surface-checkout-"));
+    try {
+      let offset = 0;
+      for (const [path] of tree) {
+        const header = batch.subarray(offset, batch.indexOf(10, offset)).toString("utf8");
+        const size = Number(header.split(" ")[2]);
+        const start = offset + Buffer.byteLength(header) + 1;
+        mkdirSync(join(dir, path, ".."), { recursive: true });
+        writeFileSync(join(dir, path), batch.subarray(start, start + size));
+        offset = start + size + 1;
+      }
+      plantVercelBuildFiles(dir);
+      const digest = gateSurfaceOfCommit(repositoryRoot, checkoutHead);
+      assert.match(digest, SURFACE_DIGEST);
+      assert.equal(gateSurfaceOfCheckout(dir), digest);
+      const production = { VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: checkoutHead, VERCEL_FORCE_NO_BUILD_CACHE: "1" };
+      assert.equal(deploymentGateSurface(production, dir), digest, "no .git: the files alone");
+      // The walk is the commit's tree itself, record for record, so the equality is not a coincidence of the surface.
+      const ls = new Set(tree.map(([path, [mode, type, object]]) => `${mode} ${type} ${object}\t${path}`));
+      assert.deepEqual(checkoutTree(dir).split("\0").filter(Boolean).filter((record) => !ls.has(record)), []);
+      assert.equal(checkoutTree(dir).split("\0").filter(Boolean).length, ls.size);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+test("gate surface v2: code, rules, a new file and a foreign root vercel.json move the digest; ignored and presentational files do not",
+  { skip: !gitBinary }, () => {
+    withScratchRepo((dir) => {
+      // LF bytes, so `* text=auto` stores them as written on a Windows checkout too.
+      for (const [path, content] of [[GATE_SURFACE_RULES_PATH, rulesSource.toString("utf8").replaceAll("\r\n", "\n")],
+        ["nextjs/middleware.ts", "export const gate = 'closed';\n"],
+        ["nextjs/vercel.json", '{\n  "framework": "nextjs",\n  "regions": ["icn1"]\n}\n'], ["docs/notes.md", "copy\n"],
+        ["nextjs/public/film/poster.avif", "AVIF"], [".gitignore", "**/node_modules\n.pnpm-store/\n.next\n.vercel/\n"],
+        ["nextjs/.gitignore", ".vercel\n.env*\n"], [".gitattributes", "* text=auto\nsupabase/tests/*.sql text eol=lf\n"]]) {
+        mkdirSync(join(dir, path, ".."), { recursive: true });
+        writeFileSync(join(dir, path), content);
+      }
+      scratchGit(dir, ["add", "-A"]);
+      scratchGit(dir, ["commit", "-q", "-m", "released"]);
+      // The diagnosed file: committed with mixed line endings under eol=lf, its bytes on disk are the blob's.
+      const mixed = "select 1;\r\nselect 2;\n";
+      execFileSync("git", ["-C", dir, "update-index", "--add", "--index-info"], { input:
+        `100644 ${scratchGit(dir, ["hash-object", "-w", "--stdin"], mixed)}\tsupabase/tests/mixed.sql\n`, stdio: ["pipe", "ignore", "ignore"] });
+      scratchGit(dir, ["commit", "-q", "-m", "mixed line endings"]);
+      mkdirSync(join(dir, "supabase", "tests"), { recursive: true });
+      writeFileSync(join(dir, "supabase", "tests", "mixed.sql"), mixed);
+      const head = scratchGit(dir, ["rev-parse", "HEAD"]);
+      const digest = gateSurfaceOfCommit(dir, head);
+      const production = { VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: head, VERCEL_FORCE_NO_BUILD_CACHE: "1" };
+      plantVercelBuildFiles(dir);
+      assert.equal(gateSurfaceOfCheckout(dir), digest);
+      assert.equal(deploymentGateSurface(production, dir), digest, "with .git");
+      const moved = `${dir}-git`;
+      const both = (expectEqual, label) => {
+        assert.equal(gateSurfaceOfCheckout(dir) === digest, expectEqual, label);
+        assert.equal(deploymentGateSurface(production, dir) === digest, expectEqual, `${label}, with .git`);
+        renameSync(join(dir, ".git"), moved);
+        try {
+          assert.equal(deploymentGateSurface(production, dir) === digest, expectEqual, `${label}, without .git`);
+        } finally {
+          renameSync(moved, join(dir, ".git"));
+        }
+      };
+      both(true, "the released checkout as Vercel leaves it");
+      const edit = (path, content, expectEqual, label) => {
+        const file = join(dir, path);
+        let before = null;
+        try { before = readFileSync(file); } catch { /* a new file */ }
+        mkdirSync(join(file, ".."), { recursive: true });
+        writeFileSync(file, content);
+        try {
+          both(expectEqual, label);
+        } finally {
+          if (before === null) rmSync(file); else writeFileSync(file, before);
+        }
+      };
+      edit("nextjs/middleware.ts", "export const gate = 'OPEN';\n", false, "an edited code file");
+      edit("nextjs/app/api/evil/route.ts", "export const GET = () => new Response('open');\n", false, "a new code file");
+      edit(GATE_SURFACE_RULES_PATH, `${rulesSource}\n`, false, "the rules file");
+      edit("nextjs/vercel.json", '{\n  "framework": "nextjs",\n  "regions": ["iad1"]\n}\n', false, "the committed vercel.json");
+      edit("vercel.json", '{"framework":"nextjs","regions":["icn1"],"buildCommand":"x"}\n', false, "a root vercel.json Vercel did not derive");
+      edit("supabase/tests/mixed.sql", "select 1;\nselect 2;\n", false, "the mixed file normalised");
+      edit("nextjs/node_modules/pkg/index.js", "module.exports = 2;\n", true, "an ignored dependency");
+      edit("nextjs/.env.local", "OTHER=1\n", true, "an ignored env file");
+      edit("docs/notes.md", "other copy\n", true, "a presentational file");
+      edit("nextjs/public/film/poster.avif", "AVIF2", true, "a presentational image");
+      // A deleted surface file.
+      const middleware = readFileSync(join(dir, "nextjs", "middleware.ts"));
+      rmSync(join(dir, "nextjs", "middleware.ts"));
+      try { both(false, "a deleted code file"); } finally { writeFileSync(join(dir, "nextjs", "middleware.ts"), middleware); }
+      both(true, "restored");
+      // Without .git and with another commit claimed, the files still decide; with .git, HEAD must be the claim.
+      assert.equal(deploymentGateSurface({ ...production, VERCEL_GIT_COMMIT_SHA: "0".repeat(40) }, dir), null);
+    });
+  });
+
+test("gate surface v2: the walk ignores exactly what git ignores", { skip: !gitBinary }, () => {
+  withScratchRepo((dir) => {
+    const files = ["keep.ts", "a.log", "logs/x.ts", "src/logs", "dist/out.js", "src2/dist", "src/dist/x.js", ".env", ".env.local",
+      "nextjs/.env.production", "nextjs/x.env", "deep/a/node_modules/p/i.js", "node_modules/q.js", "build.ts", "build/x",
+      "x.pyc", "x.pyd", "x.pyz", "a/b/c.tsbuildinfo", "nextjs/.e2e_modules/m", "other/nextjs/.e2e_modules/m", "keep/!x.ts",
+      "only/dir", "only/dir2/x", "#hash.ts", "sp ace.ts", "trail.ts", "neg/x.tmp", "neg/keep.tmp", "neg/sub/keep.tmp",
+      "star/a/b/z.gen", "star/z.gen", "q1.ts", "q12.ts", "nextjs/sub/.gitignore", "nextjs/sub/local.txt", "nextjs/sub/deep/local.txt",
+      "nextjs/sub/kept.txt", "anchored/root.txt", "x/anchored/root.txt", "cls/a.c1", "cls/a.c9", "cls/a.cx"];
+    const ignore = ["# comment", "", "*.log", "logs", "dist/", "/build/", ".env*", "**/node_modules", "*.py[cod]", "*.tsbuildinfo",
+      "nextjs/.e2e_modules/", "\\!x.ts", "only/dir2/", "\\#hash.ts", "trail.ts   ", "neg/*.tmp", "!neg/keep.tmp", "star/**/*.gen",
+      "q?.ts", "/anchored/root.txt", "cls/*.c[0-5]", "cls/*.c[!0-9]"];
+    for (const path of files) {
+      mkdirSync(join(dir, path, ".."), { recursive: true });
+      writeFileSync(join(dir, path), path === "nextjs/sub/.gitignore" ? "local.txt\n" : `${path}\n`);
+    }
+    writeFileSync(join(dir, ".gitignore"), `${ignore.join("\n")}\n`);
+    const walked = checkoutTree(dir).split("\0").filter(Boolean).map((record) => record.slice(record.indexOf("\t") + 1)).sort();
+    const notIgnored = scratchGit(dir, ["ls-files", "-z", "--others", "--exclude-standard"]).split("\0").filter(Boolean).sort();
+    assert.deepEqual(walked, notIgnored);
+    assert.ok(walked.includes("keep.ts") && !walked.includes("a.log") && walked.includes("neg/keep.tmp"), walked.join(","));
+    // A line the walk cannot translate exactly leaves the checkout without a digest rather than with a guessed one.
+    writeFileSync(join(dir, ".gitignore"), "[[:alpha:]].x\n");
+    assert.equal(checkoutTree(dir), null);
+  });
+});
+
+test("gate surface v2: a symlink and an executable file get git's modes and blob ids", { skip: posixGit }, () => {
+  withScratchRepo((dir) => {
+    mkdirSync(join(dir, "nextjs", "scripts"), { recursive: true });
+    writeFileSync(join(dir, GATE_SURFACE_RULES_PATH), rulesSource);
+    writeFileSync(join(dir, "run.sh"), "#!/bin/sh\necho run\n");
+    chmodSync(join(dir, "run.sh"), 0o755);
+    symlinkSync("nextjs/scripts", join(dir, "linked.png"));
+    scratchGit(dir, ["add", "-A"]);
+    scratchGit(dir, ["commit", "-q", "-m", "modes"]);
+    const ls = scratchGit(dir, ["ls-tree", "-r", "-z", "--full-tree", "HEAD"]).split("\0").filter(Boolean).sort();
+    assert.deepEqual(ls.map((record) => record.split(" ")[0]), ["100644", "100755", "120000"]);
+    assert.deepEqual(checkoutTree(dir).split("\0").filter(Boolean).sort(), ls);
+    assert.equal(gateSurfaceOfCheckout(dir), gateSurfaceOfCommit(dir, scratchGit(dir, ["rev-parse", "HEAD"])));
+  });
+});
 
 // R6 SEC N1. The CLI says which setting is missing when it records none for that reason.
 test("gate surface: a production deploy step without VERCEL_FORCE_NO_BUILD_CACHE=1 records none and names the setting",
