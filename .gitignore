@@ -123,6 +123,11 @@ temp/
 client/public/__manus__/version.json
 .project-config.json
 .vercel/
+# Vercel writes a root vercel.json at clone time, a one-line JSON copy of nextjs/vercel.json. It is
+# never committed (nextjs/vercel.json is the tracked config). The production deploy step
+# (nextjs/scripts/gate-surface.mjs --deploy) records a digest only from a clean git status, and this
+# untracked file was one of the two lines that kept it from recording one (D-05 diagnosis).
+/vercel.json
 .env.local
 
 # Agent runtime state (supervisor checkpoints, session caches). Machine-local, not project code.
