@@ -188,8 +188,12 @@ NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
 3. 이 코드를 배포한다. **이 코드의 첫 production 빌드 로그에 `customer-data gate surface (deploy step): sha256:…` 줄이
    `pnpm check` 출력보다 먼저 찍혀야 한다.** 로그에 "Restored build cache"가 없어야 한다(있으면 2번 설정이 빠졌다).
    production 빌드인데 `none (exact-SHA release only)`이면 `VERCEL_FORCE_NO_BUILD_CACHE`가 `1`이 아니거나(바로 앞에 그
-   설정 이름을 적은 메시지가 찍힌다), 빌드에서 git을 쓸 수 없거나, 작업 트리가 깨끗하지 않다는 뜻이다(예: prebuild가 무시되지
-   않는 파일을 남김). 그때는 기능이 꺼진 것이므로 오늘처럼 SHA마다 기록하고, 원인을
+   설정 이름을 적은 메시지가 찍힌다), checkout이 HEAD의 커밋과 다르다는 뜻이다. D-05 v2(2026-11-04)부터 deploy 단계는
+   `git status`를 보지 않고 checkout 파일의 blob id로 digest를 낸다. `.git`이 있으면 HEAD가 배포 SHA이고 skip-worktree 항목이
+   없고 checkout digest가 커밋 digest와 같아야 하며, `.git`이 없으면 git 없이 checkout digest만 쓴다(ADR-0006 추가 절). v1은
+   Vercel이 루트에 쓰는 `vercel.json`과 줄끝이 섞인 SQL 파일 때문에 모든 production 빌드에서 `none`이었다. 그래도 `none`이면
+   prebuild 전에 무언가가 무시되지 않는 파일을 남겼거나, 표면 파일이 바뀌었거나, digest를 낼 수 없는 트리다(UTF-8이 아닌 경로,
+   중첩 `.git`, 옮기지 못하는 `.gitignore` 줄). 그때는 기능이 꺼진 것이므로 오늘처럼 SHA마다 기록하고, 원인을
    고친 뒤 다음 production 빌드에서 다시 확인한다. preview 빌드는 항상 `none`이다.
    빌드가 `gate-surface --deploy:`로 시작하는 메시지로 멈추면 그 메시지가 원인이다. node나 git이 저장소·`node_modules` 안에서
    찾혔거나(cache나 PATH를 확인한다), 같은 SHA의 기록 파일이 이미 있다(메시지가 경로를 적는다. 로컬 `vercel build --prod`를
@@ -201,6 +205,9 @@ NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
      import하며 찍는 같은 이름의 줄은 hermetic env라서 `none`이다. 그 줄과 헷갈리지 않는다.
    - (c) 로컬에서 `pnpm release:gate-check --sha <배포 SHA>` 보고서 맨 위의 `gateSurfaceSha256`(DB 자격 증명이 없으면
      `cd nextjs; node scripts/gate-surface.mjs --sha <배포 SHA>`)
+   - D-05 v2: (a)는 빌드 머신의 checkout 파일에서, (c)는 로컬 Git의 커밋 트리에서 나온다. 계산 경로가 다르지만 같은 커밋이면
+     바이트 단위로 같은 값이어야 한다. 이 대조가 v2의 유일한 end-to-end 증명이다. v2 병합 뒤 첫 production 빌드에서 (a)가
+     `sha256:…`이고 (c)와 같은지 처음으로 확인한다. (a)가 `sha256:…`인데 (c)와 다르면 버그이거나 위조다. 기록하지 않는다.
    셋 중 하나라도 다르면 기록하지 않는다. 그 SHA를 표면 digest와 함께 거절하고(아래 "거절") 원인을 찾는다.
 5. 그 SHA의 production 결정을 `gate_surface_sha256`을 넣어 기록한다. **창업자 작업**(SQL editor에서 Run).
    receipt는 evaluator로 계산하고, 손으로 치거나 복사하지 않는다.
