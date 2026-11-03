@@ -188,9 +188,9 @@ gate v2에서 출시 결정(`customer_data_release_decisions`)과 작업공간 g
   코드라서 표면이다. 그러니 changelog 글 하나도 새 창업자 기록이 필요하다. 문구를 표면 밖으로 옮기려면 항목을 데이터 파일로
   빼고 그 파일을 presentational에 넣어야 한다. 그 경우 렌더되는 링크와 문자열의 검증이 표면 코드에 있어야 하고 diff도 작지 않아서
   이번에는 하지 않았다. 홈 랜딩 문구는 이미 표면인 `nextjs/lib/landing-v2-copy.ts`에 있다.
-- **Vercel 빌드의 git.** 빌드 로그에 "Cloning github.com/…"이 찍히고 `vercel-ignore-build.mjs`가 같은
-  체크아웃에서 `git diff`를 쓴다. 하지만 `next build` 단계에서 `git ls-tree`가 되는지는 이 PR이 배포되기
-  전에는 확인하지 못했다. 안 되면 digest는 `""`이고 동작은 오늘과 같다(정확한 SHA만).
+- **Vercel 빌드의 git.** 2026-11-04 진단으로 확인했다. 빌드에는 shallow `.git`과 git 2.50.1이 있고 `HEAD`는
+  `VERCEL_GIT_COMMIT_SHA`와 같다. 첫 production 빌드가 `none`을 기록한 원인은 git이 아니라 깨끗하지 않은 checkout이었다.
+  아래 "추가 2026-11-04"를 본다.
 - **첫 상속은 다음 기록부터다.** 이 PR 이전 커밋에는 표면이 없다. 이 PR이 배포된 SHA에 대해 창업자가
   `gate_surface_sha256`을 넣어 한 번 기록해야, 그 다음 배포부터 상속이 시작된다.
 
@@ -204,3 +204,70 @@ gate v2에서 출시 결정(`customer_data_release_decisions`)과 작업공간 g
   20260930070000 본문으로 다시 만들면 된다. 열은 남겨도 이전 코드는 읽지 않는다.
 - 순서: migration을 먼저 적용하고 코드를 배포한다(`docs/runbooks/RELEASE_ORDER.md`). 코드가 먼저 가면
   `gate_surface_sha256` select가 실패해 `SCOPED_GATE_STORE_FAILED`로 닫힌다.
+
+## 추가 2026-11-04 — D-05 진단: production checkout을 깨끗하게 만든다
+
+위 결정은 바꾸지 않았다. deploy 단계의 판정 논리도 그대로다.
+
+### 진단
+
+- `main` `1008bd22`의 첫 production 빌드(`dpl_3eDZBMz6eoxG4ge82VrjCbj2mivU`)는 deploy 단계에서
+  `none (exact-SHA release only)`을 기록했다. 거절 문구는 없었으므로 `VERCEL_FORCE_NO_BUILD_CACHE`는 `1`이었다.
+- preview 진단 빌드 세 번으로 본 사실은 이렇다.
+  - 빌드에는 shallow `.git`과 git 2.50.1이 있다.
+  - `HEAD`는 `VERCEL_GIT_COMMIT_SHA`와 같다.
+  - `resolveDeployTools`도 통과한다.
+- `none`의 원인은 `git status --porcelain`이 매 빌드 두 줄을 낸다는 것이다.
+  - `?? vercel.json`: Vercel이 clone 직후 저장소 루트에 `nextjs/vercel.json`의 한 줄 JSON 사본을 쓴다.
+  - ` M supabase/tests/foundation_approved_connection_batch_binding.sql`: 이 blob(`6401c352`)은 `text eol=lf` 아래에
+    있는데 끝의 두 줄이 CRLF였다(`git ls-files --eol`: `i/mixed`). 그래서 새 checkout마다 바이트가 blob과 같아도
+    수정으로 보인다.
+- production 빌드에서 status를 직접 찍은 것은 아니다. preview 결과를 옮긴 것이다. 두 줄 모두 커밋 내용과 Vercel clone
+  절차에서 나오므로 결정적이다.
+- "`.git`이 없다"는 처음 가설은 틀렸다. 그 가설로 만든 checkout walker(PR #181)는 독립 리뷰가 REQUEST_CHANGES로 막았다.
+  - B1: `.git`이 없을 때 추적되지만 무시되는 파일을 받아들인다.
+  - B2: non-ASCII 이름에서 git보다 많이 무시한다.
+  - 그래서 그 설계는 버렸다. PR #181은 병합 없이 닫는다.
+
+### 결정
+
+deploy 단계의 요구(깨끗한 `git status`)는 그대로 두고, checkout이 그 요구를 채우게 한다.
+
+1. SQL fixture를 LF만으로 다시 저장했다(`git add --renormalize`).
+   - 바뀐 것은 마지막 두 줄 앞의 CR 2바이트뿐이다(17,488 → 17,486 B, LF는 둘 다 269개).
+   - blob은 `45f8ef13` → `61149920`이다.
+2. 루트 `.gitignore`에 `/vercel.json`을 넣었다.
+   - 앵커를 걸어서 루트 파일만 무시한다. `nextjs/vercel.json`은 그대로 추적한다.
+   - 루트 `vercel.json`은 추적한 적이 없다(`git ls-files vercel.json`이 빈 결과).
+3. 회귀 테스트(`release-gate-check.test.mjs`)를 더했다. 명시적 `text` 속성 아래에 CRLF나 섞인 줄끝을 가진 추적 파일이
+   없어야 한다.
+   - `text=auto`는 이미 CRLF를 가진 blob을 변환하지 않으므로 checkout을 더럽히지 않는다. 그래서 세지 않는다.
+   - 오늘 `text=auto` 아래 `i/mixed`인 `nextjs/lib/api-reference.ts`가 그 경우다. LF 새 clone에서 status에 나오지 않는다.
+   - 이 테스트는 `main`의 index(`45f8ef13`)에서 실패한다.
+4. deploy 단계는 `none`을 기록할 때 비밀이 아닌 이유 한 줄을 stderr에 찍는다(R1 리뷰 N3). 형식은
+   `gate-surface --deploy: records none: …`이다.
+   - 이유는 다섯 가지다. HEAD와 주장한 SHA가 다름, `git status`가 깨끗하지 않음(경로만, 최대 20개), skip-worktree나
+     assume-unchanged 항목, git 실패, HEAD의 digest 없음.
+   - 파일 내용은 찍지 않는다. 판정 결과는 바뀌지 않는다. `VERCEL_FORCE_NO_BUILD_CACHE` 거절은 원래 문구를 그대로 쓴다.
+
+### 확인한 것
+
+- LF 새 clone(`core.autocrlf=false`, `core.eol=lf`, Linux 빌드와 같은 바이트)에 `nextjs/vercel.json`의 한 줄 JSON 사본을
+  루트에 두고 status를 보았다.
+  - `main` `5919ecd4`에서는 진단과 같은 두 줄이 나왔다. `deploymentGateSurface`는 `null`이었다.
+  - 이 변경의 코드 커밋 `7223a272`에서는 status가 비었다. `deploymentGateSurface`(synthetic production env)는
+    `gate-surface.mjs --sha`와 같은 digest를 냈다.
+- production 빌드에서 직접 본 값은 아직 없다. 병합 뒤 첫 production 빌드가 유일한 end-to-end 증명이다(runbook 순서 3, 4번).
+
+### 남는 한계
+
+- 루트 `vercel.json`은 이제 무시되는 입력이다. git은 그 파일을 보지 못한다.
+  - 로컬 `vercel build --prod` 뒤 `--prebuilt`로 올리는 위협에서, 다른 내용의 루트 `vercel.json`은 deploy 단계가 잡지 못한다.
+  - 이는 R1 리뷰 N4가 적은 무시 경로 구멍(`logs`, `build/` 등)과 같은 종류다. 그 위협은 v1부터 막지 못했다.
+  - 추적하는 설정은 `nextjs/vercel.json`이고 표면이다. Vercel이 루트 사본을 빌드에서 어떻게 쓰는지는 확인하지 않았다.
+- 명시적 `text` 속성 밖의 새 줄끝 문제(예: 다른 생성 파일)는 이 테스트가 잡지 않는다. 그때는 deploy 단계의 stderr 이유 줄이
+  경로를 알려 준다.
+- 이 변경은 표면 파일을 바꾼다. 병합하면 digest가 바뀌므로, 병합한 SHA는 상속하지 않고 새 창업자 기록이 한 번 필요하다.
+  - 표면 파일: `.gitignore`, `supabase/tests/foundation_approved_connection_batch_binding.sql`, `nextjs/scripts/gate-surface.mjs`,
+    `nextjs/scripts/release-gate-check.test.mjs`.
+  - presentational 파일: 이 ADR과 runbook(`.md`).
