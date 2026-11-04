@@ -39,6 +39,8 @@
  * base. A document is hostile data; so is a tool argument.
  */
 
+import { createHash } from "node:crypto";
+
 /**
  * Kept equal to `lib/api-version.ts` by `lib/mcp-server.test.ts`.
  *
@@ -97,6 +99,252 @@ function lensPath(collectionId, lens, input) {
   return `/api/v1/world/${collectionId}/${lens}${suffix}`;
 }
 
+/* ------------------------------------------------------------- delivery format */
+
+/**
+ * The compiled context in a form a consumer AI can read in full.
+ *
+ * The machine format is JSON, and it stays JSON. What an agent *reads* is a different question,
+ * and the GDP.pdf v3 diagnosis answered it with a measurement: the packet was one line of JSON,
+ * the subject's Read tool returns at most 25,000 tokens and cannot page a single line, so the
+ * agent saw the first ~50,000 characters -- 1,666 of 4,851 items (34.3%) -- and about half of
+ * what it saw was ids and keys rather than text (hard-proof-20261027
+ * research/beat-baseline/DIAGNOSIS.md §0.2-0.3). This is the product copy of the v4 research arm
+ * `compiled_v4_delivery` (research/gdp_pdf_v4_20261027/render.py, PROTOCOL-v4.md §3-4):
+ *
+ *   - items in page order (source, page, top edge, left edge, packet position), never rank order;
+ *   - one item per line, `[p<page>.u<n> ev=<evidence ids>] <text>`, the item's own line breaks
+ *     written as ` ⏎ `, so every line of a part starts with a header the source text cannot forge;
+ *   - the evidence ids stay in the header: they are what an answer cites and what get_evidence
+ *     resolves to a source version, page and region, so provenance survives the rendering;
+ *   - lines are packed into numbered parts whose conservative token estimate stays under a budget
+ *     derived from the measured Read ceiling, an item is never split, and a manifest names every
+ *     part with its sha256 and item range.
+ *
+ * Nothing is truncated. An item that alone exceeds the budget, an id that would break a header, or
+ * a text that already contains the line-break marker is refused with a DELIVERY_* error: a packet
+ * that cannot be delivered whole is not delivered at all. The v4 arm itself was NOT_SUPPORTED as a
+ * quality claim (REPORT-v4.md). This exists because a reader that sees a third of its context is a
+ * delivery defect whatever a benchmark says, not because a benchmark said it wins.
+ */
+
+/** The subject CLI's Read cap, measured on Claude Code 2.1.311 with synthetic files (PROTOCOL-v4.md §3). */
+export const DELIVERY_READ_CEILING_TOKENS = 25_000;
+/**
+ * The per-part budget, in `estimateTokens` units. On the three calibration files the estimate was
+ * 1.118x to 1.400x the tool's own count, so 22,000 is at most ~19,680 tool tokens; the worst-case
+ * density file at this size (est 21,839) came back whole in one Read.
+ */
+export const DELIVERY_PART_BUDGET_TOKENS = 22_000;
+export const DELIVERY_FORMAT = "tavonel.context_delivery.v1";
+const DELIVERY_MARKER = "\u23ce";
+const DELIVERY_LINE_BREAK = ` ${DELIVERY_MARKER} `;
+// An evidence id sits inside the item header, so it may not carry a space, a comma or a bracket;
+// a source version id has a line of its own and only has to stay one token on one line.
+const DELIVERY_EVIDENCE_ID = /^[^\s,\[\]]{1,200}$/u;
+const DELIVERY_SOURCE_ID = /^[^\s]{1,500}$/u;
+// Every line boundary Python's str.splitlines() honours, so a consumer that splits a part that
+// way cannot see a header at the start of a line either (\x1c-\x1e are the file, group and
+// record separators).
+const DELIVERY_SPLIT = /\r\n|[\n\r\v\f\x1c-\x1e\u0085\u2028\u2029]/;
+const DELIVERY_EST = /\s+|[A-Za-z]+|[0-9]|[^\sA-Za-z0-9]/gu;
+const DELIVERY_ANCHOR = /^\[p([0-9]+|\?)\.u([0-9]+) ev=[^\]\s]+\] /;
+const DELIVERY_ENCODER = new TextEncoder();
+
+export class DeliveryError extends Error {
+  constructor(code, detail) {
+    super(`${code}: ${detail}`);
+    this.name = "DeliveryError";
+    this.code = code;
+  }
+}
+
+/**
+ * Conservative token estimate (render.py `est_tokens`): an ASCII letter run costs one per three
+ * letters, every digit and ASCII symbol one, a whitespace run one unless a letter follows. A
+ * non-ASCII character costs its UTF-8 byte length -- stricter than the v4 arm, whose calibration
+ * files were ASCII only, and an upper bound for a byte-level tokenizer.
+ */
+export function estimateTokens(text) {
+  let total = 0;
+  for (const match of text.matchAll(DELIVERY_EST)) {
+    const run = match[0];
+    if (/^\s/u.test(run)) {
+      total += /[A-Za-z]/.test(text.charAt(match.index + run.length)) ? 0 : 1;
+    } else if (/^[A-Za-z]+$/.test(run)) {
+      total += Math.ceil(run.length / 3);
+    } else {
+      total += run.codePointAt(0) < 0x80 ? 1 : DELIVERY_ENCODER.encode(run).length;
+    }
+  }
+  return total;
+}
+
+function deliverySha256(text) {
+  return `sha256:${createHash("sha256").update(text, "utf8").digest("hex")}`;
+}
+
+function deliveryOneLine(text) {
+  if (text.includes(DELIVERY_MARKER)) {
+    throw new DeliveryError("DELIVERY_TEXT_HAS_MARKER", "a text already contains the line-break marker U+23CE");
+  }
+  return text.split(DELIVERY_SPLIT).map((line) => line.trim()).filter(Boolean).join(DELIVERY_LINE_BREAK);
+}
+
+function deliveryUnit(value, index) {
+  const unit = object(value) ? value : {};
+  const evidenceIds = Array.isArray(unit.evidenceIds) ? unit.evidenceIds : null;
+  const page = unit.pageNumber1 ?? null;
+  const bbox = unit.bbox1000 ?? null;
+  if (
+    typeof unit.unitId !== "string" || typeof unit.text !== "string" ||
+    typeof unit.sourceVersionId !== "string" || !DELIVERY_SOURCE_ID.test(unit.sourceVersionId) ||
+    !evidenceIds || evidenceIds.length === 0 ||
+    !evidenceIds.every((id) => typeof id === "string" && DELIVERY_EVIDENCE_ID.test(id)) ||
+    !(page === null || (Number.isInteger(page) && page >= 1)) ||
+    !(bbox === null || (Array.isArray(bbox) && bbox.length === 4 && bbox.every(Number.isFinite)))
+  ) {
+    throw new DeliveryError(
+      "DELIVERY_ITEM_INVALID",
+      `item ${index + 1} has no usable text, source version, evidence id, page or region`,
+    );
+  }
+  return { index, text: unit.text, sourceVersionId: unit.sourceVersionId, evidenceIds, page, bbox };
+}
+
+/** Source in order of first appearance, then page (unknown last), top edge, left edge, input position. */
+function deliveryOrder(units) {
+  const sourceRank = new Map();
+  for (const unit of units) if (!sourceRank.has(unit.sourceVersionId)) sourceRank.set(unit.sourceVersionId, sourceRank.size);
+  const key = (unit) => [
+    sourceRank.get(unit.sourceVersionId),
+    unit.page ?? Number.MAX_SAFE_INTEGER,
+    unit.bbox ? unit.bbox[1] : Number.MAX_SAFE_INTEGER,
+    unit.bbox ? unit.bbox[0] : Number.MAX_SAFE_INTEGER,
+    unit.index,
+  ];
+  return [...units].sort((left, right) => {
+    const a = key(left);
+    const b = key(right);
+    for (let i = 0; i < a.length; i += 1) if (a[i] !== b[i]) return a[i] - b[i];
+    return 0;
+  });
+}
+
+/**
+ * Render evidence-bound units into a manifest and numbered parts.
+ *
+ * `units` are ContextPacket items or package chunks: `{ unitId, text, sourceVersionId,
+ * evidenceIds, pageNumber1, bbox1000 }`. `heading` lines open the manifest (world, question);
+ * `notices` are lines it must carry rather than drop (held conflicts, abstention reasons).
+ * Returns `{ format, itemCount, manifest, parts }`; every file is `{ name, text, sha256, estTokens }`.
+ *
+ * @param {unknown[]} units
+ * @param {{ heading?: string[], notices?: string[], machineFormat?: string, budget?: number }} [options]
+ */
+export function renderDelivery(units, {
+  heading = [],
+  notices = [],
+  machineFormat = "the JSON response",
+  budget = DELIVERY_PART_BUDGET_TOKENS,
+} = {}) {
+  if (!Array.isArray(units)) throw new DeliveryError("DELIVERY_PACKET_INVALID", "the packet has no item list");
+  const ordered = deliveryOrder(units.map(deliveryUnit));
+  const sourceLabel = new Map();
+  for (const unit of ordered) {
+    if (!sourceLabel.has(unit.sourceVersionId)) sourceLabel.set(unit.sourceVersionId, `s${sourceLabel.size + 1}`);
+  }
+  const lines = ordered.map((unit, k) => {
+    const page = unit.page === null ? "?" : String(unit.page);
+    const text = `[p${page}.u${k + 1} ev=${unit.evidenceIds.join(",")}] ${deliveryOneLine(unit.text)}`;
+    return { source: unit.sourceVersionId, page, k: k + 1, text };
+  });
+
+  const groups = [];
+  let current = null;
+  for (const line of lines) {
+    const sourceLine = `## ${sourceLabel.get(line.source)} source ${line.source}`;
+    const alone = estimateTokens(`${sourceLine}\n${line.text}\n`);
+    if (alone > budget) {
+      throw new DeliveryError(
+        "DELIVERY_ITEM_OVER_PART_BUDGET",
+        `u${line.k} alone is ${alone} estimated tokens, over the ${budget} part budget; an item is never split`,
+      );
+    }
+    const cost = estimateTokens(`${line.text}\n`) + (current?.source === line.source ? 0 : estimateTokens(`${sourceLine}\n`));
+    if (!current || current.used + cost > budget) {
+      current = { lines: [], used: 0, source: null, first: line, last: line };
+      groups.push(current);
+    }
+    if (current.source !== line.source) {
+      current.lines.push(sourceLine);
+      current.used += estimateTokens(`${sourceLine}\n`);
+      current.source = line.source;
+    }
+    current.lines.push(line.text);
+    current.used += estimateTokens(`${line.text}\n`);
+    current.last = line;
+  }
+
+  const width = Math.max(3, String(groups.length).length);
+  const parts = groups.map((group, i) => {
+    const name = `part-${String(i + 1).padStart(width, "0")}.txt`;
+    const text = `${group.lines.join("\n")}\n`;
+    const estTokens = estimateTokens(text);
+    // The packing above already keeps this true; the file actually written is what is checked.
+    if (estTokens > budget) throw new DeliveryError("DELIVERY_PART_OVER_BUDGET", `${name} is ${estTokens} estimated tokens`);
+    const items = group.lines.filter((line) => DELIVERY_ANCHOR.test(line)).length;
+    return { name, text, sha256: deliverySha256(text), estTokens, items, first: group.first, last: group.last };
+  });
+  const delivered = parts.reduce((sum, part) => sum + part.items, 0);
+  if (delivered !== units.length) {
+    throw new DeliveryError("DELIVERY_ITEM_COUNT_MISMATCH", `${delivered} of ${units.length} items reached a part`);
+  }
+
+  const manifestLines = [
+    `TAVONEL compiled context, delivery format ${DELIVERY_FORMAT}.`,
+    ...heading.map((line) => deliveryOneLine(String(line))),
+    `${units.length} item(s) in ${parts.length} part(s), in page order. Read every part; each one fits in a single read.`,
+    `One item per line: [p<page>.u<item> ev=<evidence ids>] text. ${DELIVERY_MARKER} is a line break inside the item; p? means the item has no page.`,
+    "Cite the evidence ids in the header: each resolves to a source version, page and region. A '## sN source <id>' line names the source of the lines under it.",
+    `The machine-readable form of the same items is ${machineFormat}.`,
+    ...notices.map((line) => deliveryOneLine(String(line))),
+    ...parts.map((part) =>
+      `${part.name}  items u${part.first.k}-u${part.last.k}  pages ${part.first.page}-${part.last.page}  ` +
+      `${part.items} item(s)  est_tokens ${part.estTokens}  ${part.sha256}`),
+  ];
+  const manifestText = `${manifestLines.join("\n")}\n`;
+  const manifestTokens = estimateTokens(manifestText);
+  if (manifestTokens > budget) {
+    throw new DeliveryError("DELIVERY_MANIFEST_OVER_BUDGET", `the manifest is ${manifestTokens} estimated tokens`);
+  }
+  return {
+    format: DELIVERY_FORMAT,
+    itemCount: units.length,
+    manifest: { name: "manifest.txt", text: manifestText, sha256: deliverySha256(manifestText), estTokens: manifestTokens },
+    parts: parts.map(({ name, text, sha256, estTokens, items }) => ({ name, text, sha256, estTokens, items })),
+  };
+}
+
+/** The delivery rendering of a ContextPacket -- the `contextPacket` that /search returns. */
+export function renderContextPacketDelivery(packet, options = {}) {
+  if (!object(packet)) throw new DeliveryError("DELIVERY_PACKET_INVALID", "the response carries no context packet");
+  const held = Array.isArray(packet.heldConflicts) ? packet.heldConflicts : [];
+  const abstained = Array.isArray(packet.abstentionReasons) ? packet.abstentionReasons : [];
+  return renderDelivery(packet.items, {
+    heading: [
+      `World ${String(packet.worldId)} version ${String(packet.worldVersion)}, retrieval profile ${String(packet.retrievalProfile)}.`,
+      `Question: ${String(packet.question)}`,
+    ],
+    notices: [
+      ...held.map((conflict) =>
+        `Held conflict, not resolved: claims ${(Array.isArray(conflict?.claimIds) ? conflict.claimIds : []).join(", ")} -- ${String(conflict?.reason ?? "")}`),
+      ...abstained.map((reason) => `Abstention reason: ${String(reason)}`),
+    ],
+    ...options,
+  });
+}
+
 /**
  * Every tool, and the exact request it makes.
  *
@@ -146,7 +394,9 @@ export const TOOLS = [
     name: "search_world",
     description:
       "Retrieved regions with their provenance and ranks, and no generated prose. Use this when " +
-      "the agent will decide for itself; use ask_world when it wants an answer.",
+      "the agent will decide for itself; use ask_world when it wants an answer. The text result " +
+      "is the delivery format: a manifest, then every region in page order, one per line, each " +
+      "headed by its page and evidence ids. The full JSON response is the structured content.",
     inputSchema: {
       type: "object",
       properties: {
@@ -161,6 +411,9 @@ export const TOOLS = [
       method: "POST",
       path: `/api/v1/collections/${input.collectionId}/search`,
       body: input.limit === undefined ? { query: input.query } : { query: input.query, limit: input.limit },
+    }),
+    deliver: (payload) => renderContextPacketDelivery(payload.contextPacket, {
+      machineFormat: "this tool result's structured content (contextPacket)",
     }),
   },
   {
@@ -454,7 +707,27 @@ export function createServer({ call }) {
     if (!tool) throw new Error(`TOOL_NOT_FOUND: ${name}`);
     const value = validateInput(tool, input);
     const payload = validateSuccess(tool, await call(tool.request(value)));
-    return tool.select ? tool.select(payload, value) : payload;
+    return { tool, result: tool.select ? tool.select(payload, value) : payload };
+  }
+
+  /*
+    What the agent reads. For a tool with a delivery rendering that is the manifest and every part,
+    one text block each, and the JSON goes in structuredContent for a client that parses it. A tool
+    result is read in one piece, so the whole delivery has to fit one part budget; a result that
+    does not is refused with the reason rather than cut (lower `limit`).
+  */
+  function toolContent(tool, result) {
+    if (!tool.deliver) return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    const delivery = tool.deliver(result);
+    const files = [delivery.manifest, ...delivery.parts];
+    const total = files.reduce((sum, file) => sum + file.estTokens, 0);
+    if (total > DELIVERY_PART_BUDGET_TOKENS) {
+      throw new DeliveryError(
+        "DELIVERY_OVER_TOOL_RESULT_BUDGET",
+        `${delivery.itemCount} items are ${total} estimated tokens, over the ${DELIVERY_PART_BUDGET_TOKENS} a single tool result is held to; retry with a lower limit`,
+      );
+    }
+    return { content: files.map((file) => ({ type: "text", text: file.text })), structuredContent: result };
   }
 
   return async function handle(message) {
@@ -488,8 +761,8 @@ export function createServer({ call }) {
         });
       case "tools/call": {
         try {
-          const result = await callTool(params?.name, params?.arguments);
-          return reply({ content: [{ type: "text", text: JSON.stringify(result, null, 2) }], isError: false });
+          const { tool, result } = await callTool(params?.name, params?.arguments);
+          return reply({ ...toolContent(tool, result), isError: false });
         } catch (error) {
           /*
             A failed tool is a result, not a protocol error: the agent has to see what went wrong

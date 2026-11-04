@@ -209,7 +209,7 @@ type Call = {
 };
 type RpcReply = {
   id: number;
-  result?: { content?: Array<{ type: string; text: string }>; isError?: boolean; serverInfo?: { name: string } };
+  result?: { content?: Array<{ type: string; text: string }>; structuredContent?: unknown; isError?: boolean; serverInfo?: { name: string } };
 };
 
 /* ----------------------------------------------------- synthetic API boundary */
@@ -521,7 +521,8 @@ async function viaMcp(op: Op, setup: Setup, key: string, mcp = MCP): Promise<Out
   expect(initialized?.result?.serverInfo?.name).toBe("tavonel-readonly");
   const result = reply!.result!;
   const text = result.content![0]!.text;
-  return result.isError ? { ok: false, code: codeOf(text) } : { ok: true, body: JSON.parse(text) };
+  // search_world's text is the delivery format; its envelope is the structured content.
+  return result.isError ? { ok: false, code: codeOf(text) } : { ok: true, body: result.structuredContent ?? JSON.parse(text) };
 }
 
 async function surfaces(op: Op, setup: Setup, key: string = KEYS.alphaReader) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
 import { buildSignedCollectionZip, validateReviewableCollectionArtifact } from "@/lib/collection-download";
+import { DeliveryError } from "@/public/developer/tavonel-mcp.mjs";
 import { readExportSignerEnv } from "@/lib/export-signing";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { loadPreferredCollectionCandidate } from "@/lib/collection-storage";
@@ -85,7 +86,14 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         { status: 503, headers: NO_STORE },
       );
     }
-    signed = buildSignedCollectionZip(artifact, exportSigner);
+    try {
+      signed = buildSignedCollectionZip(artifact, exportSigner);
+    } catch (error) {
+      // The delivery copy is part of the signed package: one that cannot be rendered whole means
+      // no package, with the reason, never an archive whose delivery files were cut short.
+      if (!(error instanceof DeliveryError)) throw error;
+      return NextResponse.json({ code: error.code }, { status: 422, headers: NO_STORE });
+    }
   } finally {
     // Finish the potentially remote cleanup before the final authorization check.
     // The complete archive is now in memory and no longer occupies a build slot.

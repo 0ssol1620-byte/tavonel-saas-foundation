@@ -23,9 +23,11 @@ from typing import Final
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from PIL import Image, UnidentifiedImageError
 from request_boundary import CdrRequestBoundary
+
+import text_layer
 
 from malware import (
     MalwareDetectedError,
@@ -44,6 +46,9 @@ except MalwareScanError as exc:
     raise RuntimeError(
         "MALWARE_SCAN_REQUIRED must be unset or exactly '1'; this service has no scan bypass"
     ) from exc
+# The text-layer flag is read per request, so a flip needs no rebuild; a value it cannot parse
+# refuses the boot here, the same way, rather than being read as "off" (or "on") later.
+text_layer.text_layer_enabled()
 
 APP_NAME: Final = "tavonel-pdf-raster-cdr"
 SIGNATURE_TTL_SECONDS: Final = 300
@@ -672,6 +677,31 @@ def rasterize_to_pdf(source: Path, target: Path) -> int:
     return size
 
 
+def qualified_text_layer_scale(source: Path) -> float:
+    """The raster path's own page and pixel gates, for the text-layer read of the same PDF."""
+    try:
+        document = pdfium.PdfDocument(source)
+    except pdfium.PdfiumError as exc:
+        error_code = pdfium_c.FPDF_GetLastError()
+        if error_code in {pdfium_c.FPDF_ERR_PASSWORD, pdfium_c.FPDF_ERR_SECURITY}:
+            raise HTTPException(422, "CDR password-protected PDF is not qualified") from exc
+        raise HTTPException(422, "CDR source renderer rejected this document") from exc
+    try:
+        if len(document) < 1 or len(document) > MAX_PAGES:
+            raise HTTPException(422, "CDR source page count is not qualified")
+        sizes: list[tuple[float, float]] = []
+        for index in range(len(document)):
+            page = document[index]
+            try:
+                width, height = page.get_size()
+                sizes.append((float(width), float(height)))
+            finally:
+                page.close()
+    finally:
+        document.close()
+    return qualified_render_scale(sizes)
+
+
 def remove_tree(path: Path) -> None:
     shutil.rmtree(path, ignore_errors=True)
 
@@ -771,4 +801,51 @@ def disarm(
             "x-tavonel-malware-scan": json.dumps(malware_scan, separators=(",", ":")),
         },
         background=background_tasks,
+    )
+
+
+@app.post("/v1/text-layer")
+def read_text_layer(request: Request, source: UploadFile = File(...)) -> Response:
+    """Per-page text-layer receipt for a source (ADR-2026-11-02-text-layer-first-cdr).
+
+    Off unless TAVONEL_CDR_TEXT_LAYER_FIRST is "1". Same signed request, digest check, malware
+    scan, package and markup refusals and LibreOffice conversion as /v1/disarm, in the same
+    process with no network; then PDFium reads each page's layer and decides which path produces
+    the page's text (text_layer.py). It returns data, never a document: the raster from
+    /v1/disarm stays the only artifact a downstream reader opens.
+    """
+    if not text_layer.text_layer_enabled():
+        # 503, not 4xx: "this deployment does not read layers" is a statement about the service, and
+        # the worker's frozen failure classes (sanitize.ts) reserve 4xx details for the document.
+        raise HTTPException(503, "CDR text layer is disabled")
+    expected_digest = getattr(request.state, "cdr_authenticated_input_sha256", None)
+    if not isinstance(expected_digest, str):
+        raise HTTPException(401, "CDR request boundary authentication is required")
+    file_name, mime_type = validate_input(source.filename, source.content_type)
+    work_dir = Path(tempfile.mkdtemp(prefix="tavonel-cdr-text-"))
+    try:
+        input_path = work_dir / file_name
+        actual_digest, _ = copy_and_digest(source, input_path)
+        if not hmac.compare_digest(expected_digest, actual_digest):
+            raise HTTPException(422, "CDR source digest does not match the uploaded body")
+        scan_or_refuse(input_path, actual_digest)
+        reject_risky_office_package(input_path, mime_type)
+        reject_active_html(input_path, mime_type)
+        pdf_source = convert_to_pdf(input_path, mime_type, work_dir)
+        scale = qualified_text_layer_scale(pdf_source)
+        # A layer PDFium cannot read is a refused receipt, not an error (text_layer.read_document);
+        # anything else raised here is this service failing, and surfaces as one.
+        receipt = text_layer.read_document(pdf_source.read_bytes(), expected_digest, scale)
+    finally:
+        source.file.close()
+        remove_tree(work_dir)
+    body = json.dumps(receipt, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return Response(
+        content=body,
+        media_type="application/json",
+        headers={
+            "cache-control": "no-store",
+            "x-tavonel-input-sha256": expected_digest,
+            "x-tavonel-text-layer-sha256": f"sha256:{hashlib.sha256(body).hexdigest()}",
+        },
     )

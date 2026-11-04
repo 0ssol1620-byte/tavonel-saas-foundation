@@ -2166,6 +2166,18 @@ export const GDP_PDF_RUNS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmark
 export const COMPILER_RELEASE_AFFECTED_PATHS = Object.freeze(['lib/compiler-release.ts']);
 export const COMPILER_RELEASE_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/changelog.test.ts', 'lib/gdp-pdf-page-data.test.ts']);
 export const COMPILER_RELEASE_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmarks.spec.ts', 'e2e/templates.spec.ts']);
+// Packet delivery (codex/packet-delivery-textlayer-20261102): the delivery format an AI reads the compiled context in. The
+// download route and the two guidance modules that write the delivery/ files and point AGENTS.md at them, the package verifier
+// and its scripts/ copy that admit the delivery root, the delivery suite and the two parity suites whose MCP surface now reads
+// structuredContent, and the download route suite that holds its 422 refusal (Round 1). Exactly these nine paths select the suites that read the package, the MCP surfaces and the verifiers.
+// lib/collection-download.ts and public/developer/tavonel-mcp.mjs keep their existing owners. No browser suite: the one screen
+// change is a list row rendered from AI_PACKAGE_CONTENTS, which ai-package-guidance.test.ts holds. Never nativeReuse.
+export const PACKET_DELIVERY_AFFECTED_PATHS = Object.freeze([
+  'app/api/collections/[id]/download/route.ts', 'lib/ai-package-guidance.ts', 'lib/b30-api-mcp-cli-parity.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/export-route-authorization.test.ts', 'lib/package-contents.ts', 'lib/packet-delivery.test.ts', 'public/developer/tavonel-verify-package.mjs', 'scripts/compiled-world/validate.mjs',
+]);
+export const PACKET_DELIVERY_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/ai-package-guidance.test.ts', 'lib/b30-api-mcp-cli-parity.test.ts', 'lib/brand-copy.test.ts', 'lib/collection-download.test.ts', 'lib/compiler-contract.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/developer-distribution.test.ts', 'lib/export-route-authorization.test.ts', 'lib/journey-acceptance.test.ts', 'lib/mcp-server.test.ts', 'lib/packet-delivery.test.ts', 'lib/remote-mcp.test.ts',
+]);
 // Launch QA and release scripts (P2-02 script ratchet, P2-17 release-decision check): the Lighthouse budget script and its ratchet
 // suite, the read-only release-gate check, its Node suite and the Vitest wrapper that runs that suite here. Exactly these five
 // paths select the ratchet, client-route-weight and wrapper suites; no browser, database or build lane. Never nativeReuse.
@@ -2862,6 +2874,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // compiler-release: 1 exact path selects 3 direct suites and 2 browser suites.
   affectedGroup('compiler-release', new RegExp(`^nextjs/(?:${exactPathAlternation(COMPILER_RELEASE_AFFECTED_PATHS)})$`),
     { unitFiles: COMPILER_RELEASE_AFFECTED_UNIT_FILES, browserFiles: COMPILER_RELEASE_AFFECTED_BROWSER_FILES }),
+  // packet-delivery-20261102: the 9 exact paths above select 12 direct suites and no browser suite.
+  affectedGroup('packet-delivery-20261102', new RegExp(`^nextjs/(?:${exactPathAlternation(PACKET_DELIVERY_AFFECTED_PATHS)})$`),
+    { unitFiles: PACKET_DELIVERY_AFFECTED_UNIT_FILES }),
   // launch-qa-release-scripts: the 5 exact paths above select 3 direct suites and no browser suite.
   affectedGroup('launch-qa-release-scripts', new RegExp(`^nextjs/(?:${exactPathAlternation(LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS)})$`),
     { unitFiles: LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES }),
@@ -2896,7 +2911,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // CDR Cloud Run service (PR #152): only its app and wiring suite. No worker flag (the CDR worker check is the TypeScript worker,
   // not this service) and not nativeReuse; its qualification is the external malware-scan-qualification workflow, which runs this
   // suite against the digest-pinned clamd and inside the service image built from the checkout, and which affectedPlan defers as pending debt.
-  affectedGroup('cdr-cloudrun-service', /^quarantine-sidecar\/cdr-cloudrun\/(?:app\.py|tests\/test_app\.py)$/),
+  // ADR-2026-11-02 (text-layer-first CDR) adds the text-layer module and its suite, the request boundary that now also gates
+  // /v1/text-layer, and the Dockerfile, service.yaml and README that ship and describe them; malware-scan-qualification runs them all.
+  affectedGroup('cdr-cloudrun-service', /^quarantine-sidecar\/cdr-cloudrun\/(?:app\.py|request_boundary\.py|text_layer\.py|Dockerfile|service\.yaml|README\.md|tests\/test_(?:app|text_layer)\.py)$/),
   affectedGroup('dropbox-connector', /^nextjs\/lib\/(?:dropbox-[a-z-]+|connector-(?:oauth-adapters|page-integrity|provider-isolation|source-identity|sync-page|replay-world-currency-migration)|sync-worker|source-import|source-version-guard)(?:\.test)?\.ts$/,
     { unitFiles: ['lib/dropbox-source-reconciliation.test.ts', 'lib/connector-oauth-adapters.test.ts', 'lib/sync-worker.test.ts', 'lib/source-import.test.ts',
       'lib/connector-page-integrity.test.ts', 'lib/connector-sync-page.test.ts', 'lib/connector-provider-isolation.test.ts', 'lib/connector-source-identity.test.ts',

@@ -14,6 +14,9 @@ from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 AuthCheck = Callable[[str | None, str | None, str | None, str | None], str]
+# Every route that receives source bytes. /v1/text-layer reads the same hostile source as
+# /v1/disarm (ADR-2026-11-02-text-layer-first-cdr), so it sits behind the same gate.
+AUTHENTICATED_PATHS = frozenset({"/v1/disarm", "/v1/text-layer"})
 AUTH_HEADERS = (
     b"x-tavonel-input-sha256", b"x-tavonel-cdr-timestamp",
     b"x-tavonel-cdr-request-id", b"x-tavonel-cdr-signature",
@@ -34,7 +37,7 @@ class CdrRequestBoundary:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if (scope["type"] != "http" or scope.get("method") != "POST"
-                or scope.get("path", "").rstrip("/") != "/v1/disarm"):
+                or scope.get("path", "").rstrip("/") not in AUTHENTICATED_PATHS):
             await self.app(scope, receive, send)
             return
         try:
