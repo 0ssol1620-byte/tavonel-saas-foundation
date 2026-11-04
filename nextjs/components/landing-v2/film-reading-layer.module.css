@@ -80,7 +80,7 @@
   .tabs > button {
     flex: none;
     min-width: 44px;
-    min-height: 40px;
+    min-height: 44px;
     padding-inline: 18px;
     border-left: 0;
   }
