@@ -81,6 +81,81 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   /*
+    PR #177, Home and /workspace entry (codex/home-ux-20261027, head 072806fb): production deployment
+    dpl_KzzW2z9UAfN5Sjbj7bpEb8ci7WB3 (main b2874b5842664c8f7d17f7ad9adfd2fc22842e96), READY 2026-11-03T21:25:26.405Z
+    (06:25:26 on 4 November in Seoul); `releasedAt` keeps the house format to the second. The day's last production deployment,
+    dpl_FHSs5KtrH6MXv1mrfdZRKxq3dbXZ (main 5919ecd4, READY 2026-11-03T21:32:57.291Z), added #178 (the operations alert
+    webhook) and #179 (an OCR page range for the CDR worker, which is not deployed yet); neither changed anything in the list
+    in docs/CHANGELOG_ENTRY_RULE.md, so neither has an entry. Worded from #177's description. By the same rule these have no
+    bullet: the poster preload, the e2e and unit re-specs, the re-derived phone LCP floor and CSS baseline fixture, the
+    repair-scope registrations (internal), and the Korean font subset, back to main's bytes. No version or apiVersion:
+    channel.json and /api/openapi did not move.
+  */
+  {
+    date: "2026-11-04",
+    releasedAt: "2026-11-03T21:25:26Z",
+    id: "2026-11-04-home-film-full-frame",
+    title: "Home opens the film on the full frame, and /workspace puts the upload box first",
+    surfaces: ["Website", "Workspace"],
+    improved: [
+      "/ and /ko open the compilation film on the full frame at every width. “Focus details” (“세부 내용 확대” on /ko) zooms in as before: two panes on a desktop, one pane of the source page on a phone.",
+      "The second action on the home page, “Evaluate your documents” (“내 문서 평가” on /ko), is a bordered button with a document icon. It opens /evaluation and /ko/evaluation, as the link did.",
+      "On the Home tab of /workspace the upload box comes straight after the workspace status, ahead of Needs attention, the compile and its results, including after a cancelled run. The status area has an “Upload sources” button that opens the file picker, or says uploads are closed on an account where they are, and the upload box is headed “Drop files, folders or ZIP here” for a returning workspace too.",
+    ],
+    fixed: [
+      "Dropping a folder together with files on /workspace stages every item. Before this release only the folder was staged.",
+      "A file dropped on / or /ko, or outside the upload box on /workspace, does not open in the browser tab. The home page moves focus to “Evaluate your documents” and neither reads nor keeps the file; /workspace brings the upload box into view and stages nothing.",
+    ],
+  },
+  /*
+    Core V2 release sha256:b787dd86f6f57f92b76d91dcce1cba2d8064f5a75445f24010db0cc55f4598cd: production deployment
+    dpl_AsvGT4RAKac6XdC88rNqomf2b2Z4 of the Vercel project tavonel-product-core-v2, READY 2026-10-27T09:21:44.349Z (18:21:44
+    in Seoul), read with Vercel get_deployment; `releasedAt` keeps the house format to the second, as the test holds every
+    entry to. Its /health serves that digest: public/proof-collection/compiler-releases/core-v2-health-2026-10-27T09-28-53Z.json
+    (PROVENANCE.md, "Compiler releases"). Source: Core commit b18757607b8fc1f32e479e5d3ed8b3bc3356aad3 on
+    codex/core-receipt-wire-20261027 (ai-knowledge-compiler PR #146, draft). /v2/compile serialises the candidate through
+    the same integral-float normalisation it hashes, so a region confidence of exactly 1.0 passes Foundation's receipt
+    check (CORE_V2_RECEIPT_INVALID in lib/core-runtime-v2.ts). It replaced Core sha256:ceed3860..., Compiler 1's Core pin,
+    so this deployment shipped Compiler 1.1 (lib/compiler-release.ts; FINAL-SPEC-HARD-PROOF §7 addendum). Workspace and API
+    compiles call this Core; tavonel.com's own deployment did not move. The bullet carries no figure: the replica counts
+    behind the fix are research receipts outside this repository. No version or apiVersion: channel.json and /api/openapi
+    did not move, and CORE_V2_RECEIPT_INVALID is not a published error code.
+  */
+  {
+    date: "2026-10-27",
+    releasedAt: "2026-10-27T09:21:44Z",
+    id: "2026-10-27-scanned-documents-compile",
+    title: "Scanned documents compile when a region has a confidence of exactly 1.0",
+    compilerRelease: "compiler-1-1",
+    surfaces: ["Workspace", "API"],
+    fixed: [
+      "A scanned document compiles when the reader gives a region a confidence of exactly 1.0. Before this release such a compile stopped at the receipt check, so a document that stopped there compiles when you run it again.",
+    ],
+  },
+  /*
+    PR #174, hard-proof (FINAL-SPEC-HARD-PROOF 2026-10-27): production deployment dpl_G1kEiPBDYPzj3HG51mMUVyzyPe5e (main
+    4252beadfe78eadf45567e1b40a9f80a0d4a1319, merged 2026-10-27T09:10:39Z), READY 2026-10-27T09:18:36.236Z (18:18:36 in
+    Seoul), read with Vercel get_deployment. The four pages are the committed cells of public/proof-collection/specimens/
+    (PROVENANCE.md, "Specimens"); NACA TR-1135 p.22 was read and is not shown (FINAL-SPEC §2 addendum). The reader pins of
+    those runs are Compiler 1's, so the entry names Compiler 1 (§7 addendum). By docs/CHANGELOG_ENTRY_RULE.md these have no
+    bullet: the Compiler 1 record and the GDP.pdf runs list (no page shows either yet: the release line below is the
+    record's first rendering, and the Previous runs table prints only once a second run is published), the copy guards,
+    the repair-scope registrations and the re-derived word budgets (internal), and the Korean font subset re-cut (the
+    same two weights, for the strip's new syllables). No version: channel.json and /api/openapi did not move.
+  */
+  {
+    date: "2026-10-27",
+    releasedAt: "2026-10-27T09:18:36Z",
+    id: "2026-10-27-hard-pages-on-home",
+    title: "Four hard document pages on the home page, as the reader returned them",
+    compilerRelease: "compiler-1",
+    surfaces: ["Website"],
+    added: [
+      "The second section of / and /ko ends with four public-document pages read by TAVONEL's reader: a receiver schematic and its parts list from NASA SP-5079, a scanned page of a NACA research memorandum, and a Korea Meteorological Administration page in Korean. Each page shows every region box the reader returned and one region's text exactly as the reader returned it, with the page's source, its licence and its run receipt.",
+      "/benchmarks/gdp-pdf draws the run's two-arm design and its all-criteria pass counts as two figures, each read from the run's published report and described in text for screen readers.",
+    ],
+  },
+  /*
     PR #172, Home redesign (FINAL-SPEC 2026-10-26): production deployment dpl_rqgoRU7DNuSr3L8qQSTs6biW71ts (main 5ecb6051, merge of head
     0f0d156e), READY 2026-10-26T17:49:51Z, 02:49:51 in Seoul, read from the Vercel deployment record (receipt:
     redesign-20261026/review/merge-2026-10-27/). Independent review R3 APPROVE (REVIEW-2026-10-26-R3.md) and design

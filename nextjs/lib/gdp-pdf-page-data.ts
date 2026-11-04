@@ -29,7 +29,7 @@
 
 import v2 from "../content/benchmarks/gdp-pdf.json";
 import protocol from "../eval/gdp-pdf/protocol.json";
-import { compilerRelease, COMPILER_RELEASE_DEFINITION } from "./compiler-release";
+import { compilerRelease } from "./compiler-release";
 
 /* ------------------------------------------------------------------ the artifacts */
 
@@ -438,7 +438,7 @@ export function gdpPdfPreviousRuns(runs: readonly GdpPdfRun[] = GDP_PDF_RUNS): G
  */
 export function gdpPdfCompilerRelease(run: GdpPdfReport = gdpPdfReport()) {
   const release = compilerRelease(run.compilerRelease);
-  return release && { label: `TAVONEL ${release.name}`, digest: release.digest, definition: COMPILER_RELEASE_DEFINITION.en };
+  return release && { label: `TAVONEL ${release.name}`, digest: release.digest, definition: release.definition.en };
 }
 
 /* ------------------------------------------------------------------ the two figures */

@@ -33,7 +33,7 @@ import GdpPdfBenchmarkPage from "../app/benchmarks/gdp-pdf/page";
 import { metadata } from "../app/benchmarks/gdp-pdf/page";
 import sitemap from "../app/sitemap";
 import { publicPageLocation } from "./marketing-analytics";
-import { COMPILER_RELEASE, COMPILER_RELEASE_DEFINITION } from "./compiler-release";
+import { COMPILER_RELEASE, COMPILER_RELEASE_1_1, COMPILER_RELEASE_DEFINITION } from "./compiler-release";
 
 /** A run's committed file, from its repository path (`nextjs/...`). */
 const runFile = (run: GdpPdfRun) => resolve(import.meta.dirname, "..", run.path.replace(/^nextjs\//, ""));
@@ -505,6 +505,14 @@ describe("the compiler release row", () => {
     expect(validateGdpPdfReport(report)).toEqual([]);
     expect(gdpPdfCompilerRelease(report as never)).toEqual({
       label: "TAVONEL Compiler 1", digest: COMPILER_RELEASE.digest, definition: COMPILER_RELEASE_DEFINITION.en,
+    });
+  });
+
+  it("prints the definition of the release the report names, not Compiler 1's", () => {
+    const report = { ...validReport(), compilerRelease: "compiler-1-1" };
+    expect(validateGdpPdfReport(report)).toEqual([]);
+    expect(gdpPdfCompilerRelease(report as never)).toEqual({
+      label: "TAVONEL Compiler 1.1", digest: COMPILER_RELEASE_1_1.digest, definition: COMPILER_RELEASE_1_1.definition.en,
     });
   });
 

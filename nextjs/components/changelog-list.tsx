@@ -8,7 +8,7 @@ import {
   type ChangelogEntry,
   type ChangelogSurface,
 } from "@/lib/changelog";
-import { COMPILER_RELEASE, COMPILER_RELEASE_DEFINITION } from "@/lib/compiler-release";
+import { compilerRelease } from "@/lib/compiler-release";
 
 /**
  * The changelog, filtered by the surface a reader owns.
@@ -26,8 +26,14 @@ import { COMPILER_RELEASE, COMPILER_RELEASE_DEFINITION } from "@/lib/compiler-re
  */
 export function ChangelogList({ entries }: { entries: readonly ChangelogEntry[] }) {
   const [surface, setSurface] = useState<ChangelogSurface | null>(null);
-  /* The name's first mention on the page carries its definition (FINAL-SPEC-HARD-PROOF §1). */
-  const firstRelease = entries.findIndex((entry) => entry.compilerRelease);
+  /*
+    Each release name's first mention on the page carries that release's definition
+    (FINAL-SPEC-HARD-PROOF §1). Newest first, Compiler 1.1 is printed above Compiler 1, so the first
+    "Compiler 1" a reader meets is "TAVONEL Compiler 1.1" with its own sentence, and Compiler 1's
+    line further down still carries Compiler 1's sentence: both are first mentions of their name.
+  */
+  const firstMention = (entry: ChangelogEntry, index: number) =>
+    entries.findIndex((other) => other.compilerRelease === entry.compilerRelease) === index;
 
   return (
     <>
@@ -89,13 +95,7 @@ export function ChangelogList({ entries }: { entries: readonly ChangelogEntry[] 
               {entry.apiVersion ? <b>API {entry.apiVersion}</b> : null}
             </header>
             <h2>{entry.title}</h2>
-            {entry.compilerRelease ? (
-              <p className="fine" data-compiler-release={entry.compilerRelease}>
-                {index === firstRelease ? "TAVONEL " : null}{COMPILER_RELEASE.name} ·{" "}
-                <code title={COMPILER_RELEASE.digest}>{COMPILER_RELEASE.digest.slice(7, 15)}</code>
-                {index === firstRelease ? <> &mdash; {COMPILER_RELEASE_DEFINITION.en}</> : null}
-              </p>
-            ) : null}
+            <ReleaseLine id={entry.compilerRelease} defined={firstMention(entry, index)} />
 
             {entry.breaking ? (
               <p className="changelog-breaking">
@@ -116,4 +116,16 @@ export function ChangelogList({ entries }: { entries: readonly ChangelogEntry[] 
       </div>
     </>
   );
+}
+
+/** The release an entry shipped, under its title; `defined` adds "TAVONEL" and the release's definition. */
+function ReleaseLine({ id, defined }: { id: ChangelogEntry["compilerRelease"]; defined: boolean }) {
+  const release = compilerRelease(id);
+  return release ? (
+    <p className="fine" data-compiler-release={release.id}>
+      {defined ? "TAVONEL " : null}{release.name} ·{" "}
+      <code title={release.digest}>{release.digest.slice(7, 15)}</code>
+      {defined ? <> &mdash; {release.definition.en}</> : null}
+    </p>
+  ) : null;
 }

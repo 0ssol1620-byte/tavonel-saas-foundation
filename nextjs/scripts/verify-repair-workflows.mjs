@@ -682,11 +682,11 @@ for (const binding of [
   // hard-proof 2026-10-27 C3: the Compiler 1 release record, read by the changelog list, the GDP.pdf receipt row and the copy guard.
   { group: 'compiler-release', prefix: 'nextjs/', exportedPaths: COMPILER_RELEASE_AFFECTED_PATHS, exportedSuites: COMPILER_RELEASE_AFFECTED_UNIT_FILES,
     exportedBrowsers: COMPILER_RELEASE_AFFECTED_BROWSER_FILES,
-    paths: ['lib/compiler-release.ts'],
+    paths: ['lib/compiler-release.ts', 'public/proof-collection/compiler-releases/core-v2-health-2026-10-27T09-28-53Z.json'],
     suites: ['lib/brand-copy.test.ts', 'lib/changelog.test.ts', 'lib/gdp-pdf-page-data.test.ts'],
     browsers: ['e2e/benchmarks.spec.ts', 'e2e/templates.spec.ts'],
     rows: ["['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/templates.spec.ts', ['1440']],"],
-    neighbors: ['nextjs/lib/compiler-release.test.ts', 'nextjs/lib/compiler-releases.ts', 'nextjs/lib/compiler-release.tsx', 'lib/compiler-release.ts'] },
+    neighbors: ['nextjs/lib/compiler-release.test.ts', 'nextjs/lib/compiler-releases.ts', 'nextjs/lib/compiler-release.tsx', 'lib/compiler-release.ts', 'nextjs/public/proof-collection/compiler-releases/other.json'] },
   // B35 alert delivery (codex/ops-alert-delivery-20261102): four exact paths, eight direct suites, no browser suite.
   { group: 'operational-sli-alert-delivery', prefix: 'nextjs/', exportedPaths: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS, exportedSuites: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],

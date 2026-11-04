@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { activationPolicy } from "./activation-policy";
 import { canonicalize, sha256 } from "./collection-compiler";
-import { COMPILER_RELEASE, COMPILER_RELEASE_DEFINITION } from "./compiler-release";
+import { COMPILER_RELEASE, COMPILER_RELEASE_1_1, COMPILER_RELEASE_DEFINITION, COMPILER_RELEASES } from "./compiler-release";
 import { primaryCallToAction } from "./commercial-state";
 import { EXPLORE_COPY } from "./explore-story";
 import {
@@ -1752,6 +1752,13 @@ describe("Compiler 1, the release name", () => {
     expect(COMPILER_RELEASE_DEFINITION.ko.split(/\s+/).length).toBeLessThanOrEqual(25);
     expect(COMPILER_RELEASE_DEFINITION.en.startsWith(`${COMPILER_RELEASE.name} is a pinned TAVONEL compiler release, not a model:`)).toBe(true);
     expect(COMPILER_RELEASE_DEFINITION.ko.startsWith(`${COMPILER_RELEASE.name}은 모델이 아니라`)).toBe(true);
+    // hard-proof 2026-10-27 §7 addendum: every release, Compiler 1.1 included, says the same of itself.
+    for (const release of COMPILER_RELEASES) {
+      expect(release.definition.en.split(/\s+/).length, release.id).toBeLessThanOrEqual(25);
+      expect(release.definition.ko.split(/\s+/).length, release.id).toBeLessThanOrEqual(25);
+      expect(release.definition.en.startsWith(`${release.name} is a pinned TAVONEL compiler release, not a model:`), release.id).toBe(true);
+      expect(release.definition.ko.startsWith(`${release.name}은 모델이 아니라 고정된 TAVONEL 컴파일러 릴리스입니다.`), release.id).toBe(true);
+    }
   });
 
   it("identifies the release by the digest of its pins", () => {
@@ -1767,5 +1774,25 @@ describe("Compiler 1, the release name", () => {
       };
       expect([run.reader.imageDigest, run.reader.engineRelease, run.reader.modelSha256], receipt).toEqual([ocrImageDigest, engineRelease, modelSha256]);
     }
+  });
+
+  /*
+    Compiler 1.1 (FINAL-SPEC-HARD-PROOF §7 addendum): Compiler 1's reader pins, and the Core release the live Core V2
+    /health served after the receipt fix was deployed. The /health body is committed byte for byte, pinned here by its
+    sha256, and the Core pin is read from it, never typed.
+  */
+  it("identifies Compiler 1.1 by its pins: Compiler 1's reader and the Core release the committed /health served", () => {
+    expect(COMPILER_RELEASES.map((release) => release.id)).toEqual(["compiler-1-1", "compiler-1"]);
+    expect(COMPILER_RELEASE_1_1.digest).toBe(`sha256:${sha256(canonicalize(COMPILER_RELEASE_1_1.pins))}`);
+    expect(COMPILER_RELEASE_1_1.digest).not.toBe(COMPILER_RELEASE.digest);
+    const { coreReleaseDigest, ...reader } = COMPILER_RELEASE_1_1.pins;
+    const { coreReleaseDigest: compiler1Core, ...compiler1Reader } = COMPILER_RELEASE.pins;
+    expect(reader).toEqual(compiler1Reader);
+    expect(coreReleaseDigest).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(coreReleaseDigest).not.toBe(compiler1Core);
+    const body = read("public/proof-collection/compiler-releases/core-v2-health-2026-10-27T09-28-53Z.json");
+    expect(sha256(body)).toBe("365fb7d28ad49aeef1faf6158639fbc53538f6d5e2980b6c5404263009fe4133");
+    const health = JSON.parse(body) as { status: string; runtime: string; coreReleaseDigest: string };
+    expect([health.status, health.runtime, health.coreReleaseDigest]).toEqual(["ok", "tavonel-python-core-v2", coreReleaseDigest]);
   });
 });
