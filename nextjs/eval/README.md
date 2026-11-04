@@ -18,6 +18,7 @@ npx vitest run --config eval/vitest.config.ts eval/ask-eval/metrics.test.ts
 | directory | audit items | what it produces |
 |---|---|---|
 | `ask-eval/` | Q03 Q04 Q05 Q06 | A fixed 74-question set over the committed Explore corpus, run through both Ask paths; evidence precision, unsupported-answer and unnecessary-abstention rates, multi-hop coverage, in-process latency, and a 100-row CSV for human review. |
+| `ask-quality/` | E1 (PROGRAM 2026-11-04 §4.E) | The pre-registered Ask quality harness: 400 XBRL numeric + 160 unanswerable questions from four filers' 10-Ks, a human-question template, a runner with a fixture answerer and the `evidence_excerpts` baseline adapter, and a receipt with numerator, denominator and Wilson CI on every rate. Its `metrics.test.ts` is in the default `pnpm test` suite. |
 | `k08-live-engine/` | K08 | The Core V2 compile request for the same corpus, the TS fallback engine's node-kind counts, and a Python runner that puts the corpus through Core V2 in process so the two engines' counts sit side by side. |
 
 ## Three rules these harnesses keep
