@@ -116,6 +116,11 @@ function tvTokens(): Map<string, string> {
   const end = code.indexOf("}", start);
   const tokens = new Map<string, string>();
   for (const match of code.slice(start, end).matchAll(/(--tv-[\w-]+)\s*:\s*([^;]+);/g)) tokens.set(match[1], match[2].trim());
+  /* Direction C (2026-11-04): --tv-paper became an alias of --tv-canvas. A bare var() resolves to its value. */
+  for (const [name, value] of tokens) {
+    const alias = /^var\((--tv-[\w-]+)\)$/.exec(value);
+    if (alias && tokens.has(alias[1])) tokens.set(name, tokens.get(alias[1]) as string);
+  }
   return tokens;
 }
 
@@ -206,8 +211,8 @@ describe("the --tv-* block (UX-PLAN-2026-10-17 §4.3)", () => {
 
   it("declares the plan's colour values", () => {
     const expected: Record<string, string> = {
-      "--tv-paper": "#faf9f6", "--tv-paper-raised": "#ffffff", "--tv-paper-sunk": "#f2f0eb",
-      "--tv-ink": "#15191d", "--tv-ink-muted": "#58606a",
+      "--tv-paper": "#f5f3ee", "--tv-canvas": "#f5f3ee", "--tv-sand": "#ece5d8", "--tv-tint": "#e5edf9", "--tv-navy": "#12233f", "--tv-paper-raised": "#ffffff", "--tv-paper-sunk": "#f2f0eb",
+      "--tv-ink": "#15191d", "--tv-ink-muted": "#4c545d",
       "--tv-rule": "rgb(21 25 29 / 0.12)", "--tv-rule-strong": "rgb(21 25 29 / 0.24)",
       "--tv-inst-0": "#090d14", "--tv-inst-1": "#0e1013", "--tv-inst-2": "#17202c",
       "--tv-on-inst": "#edf2f5", "--tv-on-inst-muted": "#9ba0a8", "--tv-rule-inst": "rgb(255 255 255 / 0.09)",
@@ -237,21 +242,22 @@ describe("the --tv-* block (UX-PLAN-2026-10-17 §4.3)", () => {
   it("recomputes the receipt's contrast ratios from the declared values", () => {
     const hex = (name: string) => tv.get(name) as string;
     const cases: Array<[string, string, number]> = [
-      [hex("--tv-ink"), hex("--tv-paper"), 16.78],
-      [hex("--tv-ink-muted"), hex("--tv-paper"), 6.05],
-      [hex("--tv-action"), hex("--tv-paper"), 6.34],
+      // Direction C, 2026-11-04: recomputed on the warm canvas (#f5f3ee) that --tv-paper now names.
+      [hex("--tv-ink"), hex("--tv-paper"), 15.93],
+      [hex("--tv-ink-muted"), hex("--tv-paper"), 6.93], [hex("--tv-ink-muted"), hex("--tv-sand"), 6.13], [hex("--tv-ink-muted"), hex("--tv-tint"), 6.52], [hex("--tv-on-navy"), hex("--tv-navy"), 13.67], [hex("--tv-on-navy-muted"), hex("--tv-navy"), 8.76],
+      [hex("--tv-action"), hex("--tv-paper"), 6.02],
       ["#ffffff", hex("--tv-action"), 6.67],
       ["#ffffff", hex("--tv-action-hover"), 5.38],
       ["#ffffff", hex("--tv-action-press"), 8.58],
       [hex("--tv-on-inst"), hex("--tv-inst-1"), 16.89],
       [hex("--tv-on-inst-muted"), hex("--tv-inst-1"), 7.25],
       [hex("--tv-action-on-dark"), hex("--tv-inst-1"), 7.68],
-      [hex("--tv-evidence"), hex("--tv-paper"), 3.62],
-      [hex("--tv-evidence-ink"), hex("--tv-paper"), 6.52],
+      [hex("--tv-evidence"), hex("--tv-paper"), 3.43],
+      [hex("--tv-evidence-ink"), hex("--tv-paper"), 6.19],
       [hex("--tv-evidence-on-dark"), hex("--tv-inst-1"), 9.85],
-      [hex("--tv-verified"), hex("--tv-paper"), 5.95],
-      [hex("--tv-changed"), hex("--tv-paper"), 5.98],
-      [hex("--tv-unresolved"), hex("--tv-paper"), 6.56],
+      [hex("--tv-verified"), hex("--tv-paper"), 5.65],
+      [hex("--tv-changed"), hex("--tv-paper"), 5.68],
+      [hex("--tv-unresolved"), hex("--tv-paper"), 6.22],
     ];
     for (const [fg, bg, ratio] of cases) expect(Number(contrast(fg, bg).toFixed(2)), `${fg} on ${bg}`).toBe(ratio);
   });
@@ -269,6 +275,10 @@ describe("the --tv-* block (UX-PLAN-2026-10-17 §4.3)", () => {
       }
     }
     expect(contrast(hex("--tv-evidence"), hex("--tv-paper"))).toBeGreaterThanOrEqual(3);
+    // Direction C: support text keeps the 6:1 floor on every ground it is set on, the sand and tint blocks included.
+    for (const bg of ["--tv-paper", "--tv-paper-raised", "--tv-paper-sunk", "--tv-sand", "--tv-tint"]) {
+      expect(contrast(hex("--tv-ink-muted"), hex(bg)), `--tv-ink-muted on ${bg}`).toBeGreaterThanOrEqual(6);
+    }
   });
 
   it("is the sheet's only declaration of each --tv-* colour, so a later copy cannot shadow it", () => {
