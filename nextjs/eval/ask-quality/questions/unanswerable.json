@@ -25,6 +25,10 @@
    "cik": "0000021344",
    "entityName": "COCA COLA CO",
    "corpusRef": "sec-10k:0000021344",
+   "payloads": {
+    "submissionsSha256": "af45f5a76a925eac64a92f6b8deb44f12086e66736ae860472a47e7014667754",
+    "companyfactsSha256": "87a4173fcd3d662d18d19e0e885095aa5e3812b74c54d1ee55808ff1540a8081"
+   },
    "filings": [
     {
      "accession": "0001628280-26-010047",
@@ -70,6 +74,10 @@
    "cik": "0000200406",
    "entityName": "Johnson & Johnson",
    "corpusRef": "sec-10k:0000200406",
+   "payloads": {
+    "submissionsSha256": "826d25d6bf11a6a11f2a95444fd68456e913555e16a1cd416f714c2b8d32c935",
+    "companyfactsSha256": "9ce98e50414e9a6704eaf485e1868c2298c6ae36acc85a82c0a3737485303be7"
+   },
    "filings": [
     {
      "accession": "0000200406-26-000016",
@@ -115,6 +123,10 @@
    "cik": "0000789019",
    "entityName": "MICROSOFT CORP",
    "corpusRef": "sec-10k:0000789019",
+   "payloads": {
+    "submissionsSha256": "5c93fe7c62627741a3bd1ff48b9ce38e68be07f03c0b452624316f68ba69b068",
+    "companyfactsSha256": "8c1903c041f5c27e86ed15f37debb1f41882b7904bba129ef9edc76478b1e8ea"
+   },
    "filings": [
     {
      "accession": "0001193125-26-323660",
@@ -160,6 +172,10 @@
    "cik": "0000080424",
    "entityName": "PROCTER & GAMBLE Co",
    "corpusRef": "sec-10k:0000080424",
+   "payloads": {
+    "submissionsSha256": "dfac53f9f50ab750fde89a247596dd7b45592f8ff1e43585d2d918a79b2330c8",
+    "companyfactsSha256": "c6ae61e012a2b4aadeaa49400847842dd637a4a4a03cbdf4dfff27dffd78f8d1"
+   },
    "filings": [
     {
      "accession": "0000080424-26-000103",
@@ -204,7 +220,7 @@
  ],
  "unanswerableRules": {
   "OTHER_COMPANY": "for each corpus A and each other filer B, the first 10 of B's numeric questions (hash order), asked of A",
-  "OTHER_YEAR": "for each corpus A, the first 10 of A's numeric questions with the period moved to (earliest year any non-dimensional context in A's corpus touches) - 5",
+  "OTHER_YEAR": "for each corpus A, the first 10 of A's numeric questions asked of fiscal year Y = (earliest year any non-dimensional context in A's corpus touches) - 5, using A's real fiscal-year period from companyfacts (the annual 10-K duration whose end is nearest the source month/day in Y, within 10 days)",
   "limitation": "Absence is established against tagged XBRL contexts only. Untagged prose or tables could still state an OTHER_YEAR figure; a person spot-checks a sample before the set is treated as frozen (PREREG openItems)."
  },
  "questions": [
@@ -704,6 +720,7 @@
     "period": {
      "end": "2015-12-31"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2020
    }
   },
@@ -723,6 +740,7 @@
     "period": {
      "end": "2015-12-31"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2020
    }
   },
@@ -742,6 +760,7 @@
     "period": {
      "end": "2015-12-31"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2020
    }
   },
@@ -762,6 +781,7 @@
      "start": "2015-01-01",
      "end": "2015-12-31"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2020
    }
   },
@@ -781,6 +801,7 @@
     "period": {
      "end": "2015-12-31"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2020
    }
   },
@@ -801,6 +822,7 @@
      "start": "2015-01-01",
      "end": "2015-12-31"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2020
    }
   },
@@ -820,6 +842,7 @@
     "period": {
      "end": "2015-12-31"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2020
    }
   },
@@ -839,6 +862,7 @@
     "period": {
      "end": "2015-12-31"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2020
    }
   },
@@ -859,6 +883,7 @@
      "start": "2015-01-01",
      "end": "2015-12-31"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2020
    }
   },
@@ -879,6 +904,7 @@
      "start": "2015-01-01",
      "end": "2015-12-31"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2020
    }
   },
@@ -1369,15 +1395,16 @@
    "answerType": "numeric",
    "split": "holdout",
    "corpusRef": "sec-10k:0000200406",
-   "question": "What was Johnson & Johnson's Inventory, Raw Materials and Supplies, Net of Reserves as of December 28, 2013, in US dollars?",
+   "question": "What was Johnson & Johnson's Inventory, Raw Materials and Supplies, Net of Reserves as of December 29, 2013, in US dollars?",
    "gold": null,
    "generation": {
     "rule": "OTHER_YEAR",
     "sourceQuestionId": "xbrl-200406-2025-003a0d985d",
     "askedOfCik": "0000200406",
     "period": {
-     "end": "2013-12-28"
+     "end": "2013-12-29"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2018
    }
   },
@@ -1388,15 +1415,16 @@
    "answerType": "numeric",
    "split": "holdout",
    "corpusRef": "sec-10k:0000200406",
-   "question": "What was Johnson & Johnson's Deferred Tax Assets, Tax Deferred Expense, Reserves and Accruals as of December 28, 2013, in US dollars?",
+   "question": "What was Johnson & Johnson's Deferred Tax Assets, Tax Deferred Expense, Reserves and Accruals as of December 29, 2013, in US dollars?",
    "gold": null,
    "generation": {
     "rule": "OTHER_YEAR",
     "sourceQuestionId": "xbrl-200406-2025-005b63a0f6",
     "askedOfCik": "0000200406",
     "period": {
-     "end": "2013-12-28"
+     "end": "2013-12-29"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2018
    }
   },
@@ -1407,15 +1435,16 @@
    "answerType": "numeric",
    "split": "holdout",
    "corpusRef": "sec-10k:0000200406",
-   "question": "What was Johnson & Johnson's Share-based Compensation Arrangement by Share-based Payment Award, Options, Outstanding, Intrinsic Value as of December 28, 2013, in US dollars?",
+   "question": "What was Johnson & Johnson's Share-based Compensation Arrangement by Share-based Payment Award, Options, Outstanding, Intrinsic Value as of December 29, 2013, in US dollars?",
    "gold": null,
    "generation": {
     "rule": "OTHER_YEAR",
     "sourceQuestionId": "xbrl-200406-2025-0061bf5b17",
     "askedOfCik": "0000200406",
     "period": {
-     "end": "2013-12-28"
+     "end": "2013-12-29"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2018
    }
   },
@@ -1426,15 +1455,16 @@
    "answerType": "numeric",
    "split": "holdout",
    "corpusRef": "sec-10k:0000200406",
-   "question": "What was Johnson & Johnson's Long-term Debt as of December 28, 2013, in US dollars?",
+   "question": "What was Johnson & Johnson's Long-term Debt as of December 29, 2013, in US dollars?",
    "gold": null,
    "generation": {
     "rule": "OTHER_YEAR",
     "sourceQuestionId": "xbrl-200406-2025-02b62824e3",
     "askedOfCik": "0000200406",
     "period": {
-     "end": "2013-12-28"
+     "end": "2013-12-29"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2018
    }
   },
@@ -1445,15 +1475,16 @@
    "answerType": "numeric",
    "split": "calibration",
    "corpusRef": "sec-10k:0000200406",
-   "question": "What was Johnson & Johnson's Deferred Tax Assets, Valuation Allowance as of December 28, 2013, in US dollars?",
+   "question": "What was Johnson & Johnson's Deferred Tax Assets, Valuation Allowance as of December 29, 2013, in US dollars?",
    "gold": null,
    "generation": {
     "rule": "OTHER_YEAR",
     "sourceQuestionId": "xbrl-200406-2025-032b0c1c46",
     "askedOfCik": "0000200406",
     "period": {
-     "end": "2013-12-28"
+     "end": "2013-12-29"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2018
    }
   },
@@ -1464,15 +1495,16 @@
    "answerType": "numeric",
    "split": "calibration",
    "corpusRef": "sec-10k:0000200406",
-   "question": "What was Johnson & Johnson's Employee-related Liabilities, Current as of December 28, 2013, in US dollars?",
+   "question": "What was Johnson & Johnson's Employee-related Liabilities, Current as of December 29, 2013, in US dollars?",
    "gold": null,
    "generation": {
     "rule": "OTHER_YEAR",
     "sourceQuestionId": "xbrl-200406-2025-0347fc032e",
     "askedOfCik": "0000200406",
     "period": {
-     "end": "2013-12-28"
+     "end": "2013-12-29"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2018
    }
   },
@@ -1483,16 +1515,17 @@
    "answerType": "numeric",
    "split": "holdout",
    "corpusRef": "sec-10k:0000200406",
-   "question": "What was Johnson & Johnson's Revenue from Contract with Customer, Excluding Assessed Tax for the fiscal year ended December 28, 2013, in US dollars?",
+   "question": "What was Johnson & Johnson's Revenue from Contract with Customer, Excluding Assessed Tax for the fiscal year ended December 29, 2013, in US dollars?",
    "gold": null,
    "generation": {
     "rule": "OTHER_YEAR",
     "sourceQuestionId": "xbrl-200406-2025-0362f14b1d",
     "askedOfCik": "0000200406",
     "period": {
-     "start": "2012-12-30",
-     "end": "2013-12-28"
+     "start": "2012-12-31",
+     "end": "2013-12-29"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2018
    }
   },
@@ -1503,16 +1536,17 @@
    "answerType": "numeric",
    "split": "calibration",
    "corpusRef": "sec-10k:0000200406",
-   "question": "What was Johnson & Johnson's Net Cash Provided by (Used in) Financing Activities for the fiscal year ended December 28, 2013, in US dollars?",
+   "question": "What was Johnson & Johnson's Net Cash Provided by (Used in) Financing Activities for the fiscal year ended December 29, 2013, in US dollars?",
    "gold": null,
    "generation": {
     "rule": "OTHER_YEAR",
     "sourceQuestionId": "xbrl-200406-2025-03bf25c106",
     "askedOfCik": "0000200406",
     "period": {
-     "start": "2012-12-30",
-     "end": "2013-12-28"
+     "start": "2012-12-31",
+     "end": "2013-12-29"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2018
    }
   },
@@ -1523,16 +1557,17 @@
    "answerType": "numeric",
    "split": "calibration",
    "corpusRef": "sec-10k:0000200406",
-   "question": "What was Johnson & Johnson's Asset Impairment Charges for the fiscal year ended December 28, 2013, in US dollars?",
+   "question": "What was Johnson & Johnson's Asset Impairment Charges for the fiscal year ended December 29, 2013, in US dollars?",
    "gold": null,
    "generation": {
     "rule": "OTHER_YEAR",
     "sourceQuestionId": "xbrl-200406-2025-03f6d04aa6",
     "askedOfCik": "0000200406",
     "period": {
-     "start": "2012-12-30",
-     "end": "2013-12-28"
+     "start": "2012-12-31",
+     "end": "2013-12-29"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2018
    }
   },
@@ -1543,15 +1578,16 @@
    "answerType": "numeric",
    "split": "holdout",
    "corpusRef": "sec-10k:0000200406",
-   "question": "What was Johnson & Johnson's Accrued Liabilities, Current as of December 28, 2013, in US dollars?",
+   "question": "What was Johnson & Johnson's Accrued Liabilities, Current as of December 29, 2013, in US dollars?",
    "gold": null,
    "generation": {
     "rule": "OTHER_YEAR",
     "sourceQuestionId": "xbrl-200406-2025-043c10dab4",
     "askedOfCik": "0000200406",
     "period": {
-     "end": "2013-12-28"
+     "end": "2013-12-29"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2018
    }
   },
@@ -2052,6 +2088,7 @@
      "start": "2016-07-01",
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2071,6 +2108,7 @@
     "period": {
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2091,6 +2129,7 @@
      "start": "2016-07-01",
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2110,6 +2149,7 @@
     "period": {
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2129,6 +2169,7 @@
     "period": {
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2149,6 +2190,7 @@
      "start": "2016-07-01",
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2168,6 +2210,7 @@
     "period": {
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2187,6 +2230,7 @@
     "period": {
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2206,6 +2250,7 @@
     "period": {
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2225,6 +2270,7 @@
     "period": {
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2725,6 +2771,7 @@
      "start": "2016-07-01",
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2744,6 +2791,7 @@
     "period": {
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2763,6 +2811,7 @@
     "period": {
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2783,6 +2832,7 @@
      "start": "2016-07-01",
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2803,6 +2853,7 @@
      "start": "2016-07-01",
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2823,6 +2874,7 @@
      "start": "2016-07-01",
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2843,6 +2895,7 @@
      "start": "2016-07-01",
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2862,6 +2915,7 @@
     "period": {
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2881,6 +2935,7 @@
     "period": {
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   },
@@ -2900,6 +2955,7 @@
     "period": {
      "end": "2017-06-30"
     },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
     "earliestTaggedYear": 2022
    }
   }

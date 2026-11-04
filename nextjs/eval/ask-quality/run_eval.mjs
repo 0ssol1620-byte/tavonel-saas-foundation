@@ -8,12 +8,14 @@
  *   # the baseline: the evidence_excerpts Ask path of a NON-production deployment
  *   TAVONEL_EVAL_WORKSPACE_TOKEN=<workspace API token> \
  *   node --experimental-strip-types eval/ask-quality/run_eval.mjs --answerer evidence-excerpts \
- *     --base-url http://localhost:3000 --collections <corpusRef -> collectionId map.json>
+ *     --base-url http://localhost:3000 --collections <corpusRef -> collectionId map.json> \
+ *     [--allow-host <exact non-loopback host> ...]
  *
- * Fail-closed rules: a question file whose sha256 differs from PREREG.json stops the run; a set
- * PREREG has not pinned (sha256 null) is skipped and the receipt says NOT_FROZEN; a corpusRef with
- * no collection, a non-200 response or an answerMode other than evidence_excerpts aborts the run
- * with no receipt -- an operational failure is not an abstention and is never scored as one.
+ * Fail-closed rules: a question file whose sha256 or size differs from PREREG.json stops the run;
+ * a set PREREG has not pinned (sha256 null) is skipped and the receipt says NOT_FROZEN; a corpusRef
+ * with no collection, a non-200 response or an answerMode other than evidence_excerpts aborts the
+ * run with no receipt -- an operational failure is not an abstention and is never scored as one.
+ * Hosts: loopback only unless --allow-host names one, production never (live-adapter.ts).
  * The token is read from the environment only and is never written anywhere.
  */
 import { execFileSync } from "node:child_process";
@@ -25,7 +27,7 @@ import { fileURLToPath } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
-/** Load every question set PREREG names, verifying each file against its pinned sha256. */
+/** Load every question set PREREG names, verifying each file against its pinned sha256 and size. */
 export function loadQuestionSets(preregPath = path.join(HERE, "PREREG.json")) {
   const preregBytes = readFileSync(preregPath);
   const prereg = JSON.parse(preregBytes.toString("utf8"));
@@ -36,7 +38,7 @@ export function loadQuestionSets(preregPath = path.join(HERE, "PREREG.json")) {
       sets.push({ id: entry.id, path: entry.path, sha256: null, status: "NOT_FROZEN", questionsScored: 0 });
       continue;
     }
-    const bytes = readFileSync(path.join(path.dirname(preregPath), entry.path));
+    const bytes = readFileSync(path.resolve(path.dirname(preregPath), entry.path));
     const actual = sha256(bytes);
     if (actual !== entry.sha256) throw new Error(`${entry.path}: sha256 ${actual} is not the pre-registered ${entry.sha256}`);
     const file = JSON.parse(bytes.toString("utf8"));
@@ -49,60 +51,12 @@ export function loadQuestionSets(preregPath = path.join(HERE, "PREREG.json")) {
   return { prereg, preregSha256: sha256(preregBytes), sets, questions };
 }
 
-/** Hosts this harness never sends a question to. Measuring production is not an E1 lane's call. */
-export const PRODUCTION_HOSTS = [/^(?:www\.)?tavonel\.com$/, /\.tavonel\.com$/, /^tavonel-saas-foundation\.vercel\.app$/];
-
-/** The baseline adapter: POST /api/v1/collections/{id}/ask, answerMode must be evidence_excerpts. */
-export function createEvidenceExcerptsAnswerer({ baseUrl, token, collections, fetchImpl = fetch, now = () => performance.now() }) {
-  if (!token) throw new Error("TAVONEL_EVAL_WORKSPACE_TOKEN is not set");
-  if (!baseUrl) throw new Error("--base-url is required for the live answerer");
-  const host = new URL(baseUrl).hostname;
-  if (PRODUCTION_HOSTS.some((pattern) => pattern.test(host))) throw new Error(`refusing production host ${host}`);
-  return {
-    id: "evidence-excerpts-http",
-    kind: "live",
-    async ask(question, corpusRef) {
-      const collectionId = collections[corpusRef];
-      if (!collectionId) throw new Error(`no collection mapped for ${corpusRef}`);
-      const url = new URL(`/api/v1/collections/${encodeURIComponent(collectionId)}/ask`, baseUrl);
-      for (let attempt = 0; ; attempt += 1) {
-        const started = now();
-        const response = await fetchImpl(url, {
-          method: "POST",
-          headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-          body: JSON.stringify({ question }),
-        });
-        const latencyMs = Math.round(now() - started);
-        if (response.status === 429 && attempt < 3) {
-          const wait = Math.min(60, Number(response.headers.get("retry-after") ?? "5") || 5);
-          await new Promise((resolve) => setTimeout(resolve, wait * 1000));
-          continue;
-        }
-        const body = await response.json().catch(() => null);
-        if (response.status !== 200 || body === null) throw new Error(`ask ${corpusRef}: HTTP ${response.status} ${body?.code ?? ""}`.trim());
-        if (body.answerMode !== "evidence_excerpts") throw new Error(`ask ${corpusRef}: answerMode ${body.answerMode}, the baseline is evidence_excerpts`);
-        return {
-          answer: typeof body.answer === "string" ? body.answer : "",
-          numeric: null,
-          // The route exposes a 420-character `excerpt` per citation; that preview is what is scored.
-          citations: (body.citations ?? []).map((citation) => ({
-            text: typeof citation.excerpt === "string" ? citation.excerpt : "",
-            evidenceId: citation.evidenceId ?? null,
-            pageNumber1: citation.pageNumber1 ?? null,
-          })),
-          abstained: body.status !== "grounded",
-          latencyMs,
-          meta: { code: body.code ?? null, retrievalPath: body.retrievalPath ?? null, answerMode: body.answerMode, reason: body.reason ?? null },
-        };
-      }
-    },
-  };
-}
-
 function argument(name) {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : undefined;
 }
+
+const argumentsNamed = (name) => process.argv.flatMap((value, index) => (value === name ? [process.argv[index + 1]] : []));
 
 function git(args) {
   return execFileSync("git", args, { cwd: HERE, encoding: "utf8" }).trim();
@@ -119,10 +73,12 @@ async function main() {
   else if (kind === "evidence-excerpts") {
     const map = argument("--collections");
     if (!map) throw new Error("--collections <map.json> is required for the live answerer");
+    const { createEvidenceExcerptsAnswerer } = await import("./live-adapter.ts");
     answerer = createEvidenceExcerptsAnswerer({
       baseUrl: argument("--base-url"),
       token: process.env.TAVONEL_EVAL_WORKSPACE_TOKEN,
       collections: JSON.parse(readFileSync(map, "utf8")),
+      allowHosts: argumentsNamed("--allow-host"),
     });
   } else throw new Error(`unknown --answerer ${kind}`);
 
@@ -136,9 +92,10 @@ async function main() {
   if (errors.length > 0) throw new Error(`receipt failed validation: ${errors.join(", ")}`);
   const outDir = argument("--out") ?? path.join(HERE, "results");
   mkdirSync(outDir, { recursive: true });
-  const stem = path.join(outDir, `ask-quality-${answerer.id}-${runStartedAt.slice(0, 10)}`);
-  writeFileSync(`${stem}.json`, `${JSON.stringify(receipt, null, 1)}\n`);
-  writeFileSync(`${stem}.md`, score.renderMarkdown(receipt));
+  // Run time and receipt digest in the name, written with "wx": a later run never overwrites an earlier receipt.
+  const stem = path.join(outDir, `ask-quality-${answerer.id}-${runStartedAt.replace(/[:.]/g, "")}-${receipt.receiptSha256.slice(0, 12)}`);
+  writeFileSync(`${stem}.json`, `${JSON.stringify(receipt, null, 1)}\n`, { flag: "wx" });
+  writeFileSync(`${stem}.md`, score.renderMarkdown(receipt), { flag: "wx" });
   console.log(score.renderMarkdown(receipt));
   console.log(`wrote ${stem}.json`);
 }

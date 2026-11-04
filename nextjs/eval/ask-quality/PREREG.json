@@ -2,7 +2,23 @@
  "schema": "tavonel.ask_quality_prereg.v1",
  "title": "E1 Ask quality harness -- pre-registered protocol",
  "status": "IMPLEMENTED_NOT_PROVEN",
- "registeredOn": "2026-11-04",
+ "registeredOn": "2026-11-04 (v1); revision 2 on 2026-11-04",
+ "revision": 2,
+ "supersedes": {
+  "revision": 1,
+  "path": "PREREG.v1.json",
+  "sha256": "04b2044bc0306e5709923ad0b21630868a4c25da6bbac83931f0039f17f191c4",
+  "gitCommit": "64d44dcc",
+  "receiptsProducedUnderV1": "none (fixture runs only; no live receipt exists)",
+  "why": [
+   "M1: v1 numeric extraction read the day of a date and form names as numbers ('June 30, 2025' -> 30, '10-K' -> 10), so a correct answer restating its question scored NOT_A_SINGLE_VALUE. v2 strips dates, filing-form names and Item/Note/Part/Schedule/Exhibit references before extraction.",
+   "M2: v1 had no metric for abstention on answerable questions or gold-span recall, so an answerer abstaining on everything lost nothing on any registered row and E2's 'no loss of correct answers' gate could pass vacuously. v2 adds abstained_over_answerable.<set> and gold_span_recall.<set>.",
+   "m3: v1 OTHER_YEAR shifted dates by whole years, producing a non-existent J&J fiscal-year end (2013-12-28). v2 uses the filer's real fiscal-year period from companyfacts.",
+   "m4: v2 adds citation_precision_4plus_digit_spans.<set> because 3-digit gold spans collide by accident.",
+   "m5/m8: question files now record companyfacts/submissions payload sha256s and name the span index htmlCharOffset (UTF-16 code units). These change the question-set bytes, hence the new sha256s below; the 400 numeric questions themselves (ids, text, gold) are unchanged.",
+   "Revised before any live receipt, after independent review REVIEW-E1-R1, so no result informed the change."
+  ]
+ },
  "lane": "Market-No.1 program W1-L4, workstream E, item E1 (PROGRAM-2026-11-04.md §4.E)",
  "claim": "None. This protocol makes no quality claim. A number exists only as a receipt produced by run_eval.mjs against the question sets pinned below, and is read with its denominator.",
  "baseline": {
@@ -20,7 +36,7 @@
   {
    "id": "xbrl-numeric",
    "path": "questions/xbrl-numeric.json",
-   "sha256": "4e9a3d69994d5596ebb8a14af8357849d00f0a85adb7ff2d4c07bb837b7769fd",
+   "sha256": "e2bcfcbf5a3bc3cda42af2ee34cc357c30fd64b6f96d234c86ba6e956ab2c4a6",
    "n": 400,
    "status": "FROZEN",
    "source": "SEC EDGAR XBRL companyfacts + the filings' inline XBRL; filers Coca-Cola (0000021344), Johnson & Johnson (0000200406), Microsoft (0000789019), Procter & Gamble (0000080424); two 10-Ks each, 50 questions per filing",
@@ -29,10 +45,10 @@
   {
    "id": "unanswerable",
    "path": "questions/unanswerable.json",
-   "sha256": "2a20af055528c4c6edcbe342f99ae177717050ad97c9f69d0d2437dfa7c314a0",
+   "sha256": "cd4dc590891e0c32d8ba45577b230c5359db151bc3b9f8340c2d0741e9c66d5a",
    "n": 160,
    "status": "FROZEN",
-   "source": "OTHER_COMPANY 120 (4 corpora x 3 other filers x 10) + OTHER_YEAR 40 (4 corpora x 10); rules in the file's unanswerableRules",
+   "source": "OTHER_COMPANY 120 (4 corpora x 3 other filers x 10) + OTHER_YEAR 40 (4 corpora x 10, each asked of a real reported fiscal-year period from companyfacts); rules in the file's unanswerableRules",
    "generator": "gen_xbrl_questions.mjs"
   },
   {
@@ -56,29 +72,94 @@
   "implementation": "score.ts",
   "abstention": "abstained = the answerer reported abstained, or it returned an empty answer and zero citations. evidence_excerpts: abstained = status != grounded (EVIDENCE_EXCEEDS_ANSWER_LIMIT abstains with citations kept; it is an abstention).",
   "correctAnswerable": "numeric question: correct = not abstained AND numeric exact match. text question: correct = not abstained AND the normalized answer contains one of gold.acceptableAnswers (containment over-credits long answers; the human adjudication column is authoritative where it exists).",
-  "numericExactMatch": "The answer's value is its structured numeric when present, otherwise the single distinct number its text states (scale words thousand/million/billion/trillion applied; parentheses or a leading minus negate; a bare 1900-2100 integer is a year and ignored). Several distinct numbers = NOT_A_SINGLE_VALUE = no match. A unit the answer states must equal the gold unit. Value matches when |answer - gold| < 0.5 x 10^-decimals (XBRL decimals); decimals INF/null requires equality. Consequence stated in advance: evidence_excerpts returns passages, not a value, so its numeric exact match is expected to be near 0 by construction; that is the baseline being measured, not a defect of the scorer.",
-  "citationContainsGold": "A citation contains the gold span when its text contains one of gold.spans: a numeric span (digits, commas, dots) must appear as a whole number (1,394,328 does not contain 394,328); any other span is a normalized substring. For the evidence_excerpts adapter the citation text is the route's 420-character excerpt preview, so a gold span later in a long chunk is not seen.",
+  "numericExactMatch": "Before extraction, text that names something rather than states an amount is removed: month-name dates with a day ('June 30, 2025', 'Dec. 28'), ISO and slash dates, filing-form names (10-K, 10-KT, 10-Q, 8-K, 20-F, 6-K, S-1, optionally /A) and Item/Note/Part/Schedule/Exhibit references (score.ts NON_AMOUNT_PATTERNS). The answer's value is its structured numeric when present, otherwise the single distinct number its text states (scale words thousand/million/billion/trillion applied; parentheses or a leading minus negate; a bare 1900-2100 integer is a year and ignored). Several distinct numbers = NOT_A_SINGLE_VALUE = no match. A unit the answer states must equal the gold unit. Value matches when |answer - gold| < 0.5 x 10^-decimals (XBRL decimals); decimals INF/null requires equality. Consequence stated in advance: evidence_excerpts returns passages, not a value, so its numeric exact match is expected to be near 0 by construction; that is the baseline being measured, not a defect of the scorer.",
+  "citationContainsGold": "A citation contains the gold span when its text contains one of gold.spans: a numeric span (digits, commas, dots) must appear as a whole number (1,394,328 does not contain 394,328); any other span is a normalized substring. For the evidence_excerpts adapter the citation text is the route's 420-character excerpt preview, so a gold span later in a long chunk is not seen. Matching is on the full display span as a whole number, never a sub-span. 3-digit spans recur by accident across a filing's tables (133 of the 400 v1 gold spans), so citation precision is also reported on the stratum of questions whose gold spans all have >= 4 digits.",
   "latency": "client-observed milliseconds per question for the live adapter (fetch start to response); simulated for the fixture"
  },
  "metrics": [
-  { "id": "correct_over_answerable.xbrl-numeric", "numerator": "answerable xbrl-numeric questions answered correctly", "denominator": "answerable xbrl-numeric questions" },
-  { "id": "correct_over_answerable.human", "numerator": "answerable human questions answered correctly", "denominator": "answerable, humanVerified human questions" },
-  { "id": "correct_abstention_over_unanswerable", "numerator": "unanswerable questions abstained on", "denominator": "unanswerable questions" },
-  { "id": "wrong_answer_over_unanswerable", "numerator": "unanswerable questions answered anyway", "denominator": "unanswerable questions" },
-  { "id": "citation_precision.xbrl-numeric", "numerator": "citations containing a gold span", "denominator": "all citations returned for answerable xbrl-numeric questions" },
-  { "id": "citation_precision.human", "numerator": "citations containing a gold span", "denominator": "all citations returned for answerable human questions" },
-  { "id": "numeric_exact_match_over_numeric", "numerator": "exact matches at reported precision", "denominator": "answerable numeric questions (xbrl-numeric + numeric human)" },
-  { "id": "latency", "numerator": null, "denominator": "all questions asked", "statistic": "p50 and p95, nearest rank" }
+  {
+   "id": "correct_over_answerable.xbrl-numeric",
+   "numerator": "answerable xbrl-numeric questions answered correctly",
+   "denominator": "answerable xbrl-numeric questions"
+  },
+  {
+   "id": "abstained_over_answerable.xbrl-numeric",
+   "numerator": "answerable xbrl-numeric questions abstained on",
+   "denominator": "answerable xbrl-numeric questions"
+  },
+  {
+   "id": "correct_over_answerable.human",
+   "numerator": "answerable human questions answered correctly",
+   "denominator": "answerable, humanVerified human questions"
+  },
+  {
+   "id": "abstained_over_answerable.human",
+   "numerator": "answerable human questions abstained on",
+   "denominator": "answerable, humanVerified human questions"
+  },
+  {
+   "id": "correct_abstention_over_unanswerable",
+   "numerator": "unanswerable questions abstained on",
+   "denominator": "unanswerable questions"
+  },
+  {
+   "id": "wrong_answer_over_unanswerable",
+   "numerator": "unanswerable questions answered anyway",
+   "denominator": "unanswerable questions"
+  },
+  {
+   "id": "citation_precision.xbrl-numeric",
+   "numerator": "citations containing a gold span",
+   "denominator": "all citations returned for answerable xbrl-numeric questions"
+  },
+  {
+   "id": "citation_precision_4plus_digit_spans.xbrl-numeric",
+   "numerator": "citations containing a gold span",
+   "denominator": "all citations returned for answerable xbrl-numeric questions whose gold spans are all non-numeric or >= 4 digits"
+  },
+  {
+   "id": "gold_span_recall.xbrl-numeric",
+   "numerator": "answerable xbrl-numeric questions with at least one citation containing a gold span",
+   "denominator": "answerable xbrl-numeric questions"
+  },
+  {
+   "id": "citation_precision.human",
+   "numerator": "citations containing a gold span",
+   "denominator": "all citations returned for answerable human questions"
+  },
+  {
+   "id": "citation_precision_4plus_digit_spans.human",
+   "numerator": "citations containing a gold span",
+   "denominator": "all citations returned for answerable human questions whose gold spans are all non-numeric or >= 4 digits"
+  },
+  {
+   "id": "gold_span_recall.human",
+   "numerator": "answerable human questions with at least one citation containing a gold span",
+   "denominator": "answerable, humanVerified human questions"
+  },
+  {
+   "id": "numeric_exact_match_over_numeric",
+   "numerator": "exact matches at reported precision",
+   "denominator": "answerable numeric questions (xbrl-numeric + numeric human)"
+  },
+  {
+   "id": "latency",
+   "numerator": null,
+   "denominator": "all questions asked",
+   "statistic": "p50 and p95, nearest rank"
+  }
  ],
  "statistics": {
   "interval": "Wilson score interval, 95%, z = 1.959963984540054, on every rate",
   "zeroDenominator": "value null and interval null, never 0",
   "clustering": "Citation precision counts citations, which cluster within questions; the Wilson interval treats them as independent and understates the uncertainty. Stated, not corrected.",
-  "pooling": "Answerable metrics are reported per question set. No pooled figure across sets is computed (PROGRAM §4.E risk: XBRL questions may skew easy)."
+  "pooling": "Answerable metrics are reported per question set. No pooled figure across sets is computed (PROGRAM §4.E risk: XBRL questions may skew easy).",
+  "e2Gate": "Any gate judged on this harness (E2) reads correct_over_answerable, abstained_over_answerable and gold_span_recall together with wrong_answer_over_unanswerable; a lower wrong-answer rate bought by abstaining on answerable questions is visible in abstained_over_answerable and gold_span_recall."
  },
  "openItems": [
   "human set: n >= 30 human-written, humanVerified questions on the A4 documents; then pin sha256 and n here in a new PREREG revision",
   "unanswerable OTHER_YEAR: absence is established against tagged XBRL contexts only; a person spot-checks a sample against the filings before the set is cited",
+  "OTHER_YEAR periods come from companyfacts annual 10-K durations; a person confirms the 40 against the filers' own reported fiscal-year ends when spot-checking",
   "baseline receipt: no live run has been made. It needs the eight pinned 10-Ks uploaded to a non-production workspace as four collections and a workspace token",
   "a run against production is not authorised by this protocol"
  ]

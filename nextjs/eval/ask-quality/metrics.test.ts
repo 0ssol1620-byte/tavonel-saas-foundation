@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildUnanswerable, ixValue, matchSpans, parseInlineXbrl, questionText } from "./gen_xbrl_questions.mjs";
-import { PRODUCTION_HOSTS, createEvidenceExcerptsAnswerer, loadQuestionSets } from "./run_eval.mjs";
+import { checkHost, createEvidenceExcerptsAnswerer } from "./live-adapter";
+import { loadQuestionSets } from "./run_eval.mjs";
 import {
   buildReceipt,
   classifyAbstention,
@@ -64,6 +66,16 @@ describe("numeric exact match", () => {
     expect(numericExactMatch(eps, { answer: "$6.97 per diluted share" }).match).toBe(true);
     expect(numericExactMatch(eps, { answer: "$6.97" }).reason).toBe("UNIT_MISMATCH");
   });
+  // PREREG v2, review R1 M1: dates, form names and document references are not amounts.
+  it("ignores the question's own date, the form name and document references", () => {
+    const microsoft = { value: 281_724_000_000, unit: "USD", decimals: -6 };
+    expect(numericExactMatch(microsoft, { answer: "$281,724 million" }).match).toBe(true);
+    expect(numericExactMatch(microsoft, { answer: "Microsoft's revenue for the fiscal year ended June 30, 2025 was $281,724 million." }).match).toBe(true);
+    expect(numericExactMatch(microsoft, { answer: "Per the Form 10-K, revenue was $281,724 million." }).match).toBe(true);
+    expect(numericExactMatch(microsoft, { answer: "As of Dec. 28, 2025 (Item 8, Note 12; 8-K/A filed 2026-02-11): $281,724 million" }).match).toBe(true);
+    // A date never hides a second real amount.
+    expect(numericExactMatch(microsoft, { answer: "On June 30, 2025 revenue was $281,724 million and costs $90,000 million" }).reason).toBe("NOT_A_SINGLE_VALUE");
+  });
   it("demands equality when decimals is INF", () => {
     const exact = { value: 1234, unit: "shares", decimals: null };
     expect(numericExactMatch(exact, { answer: "", numeric: { value: 1234.4, unit: "shares" } }).match).toBe(false);
@@ -88,6 +100,23 @@ describe("spans and abstention", () => {
     expect(() => scoreQuestion({ ...base, kind: "unanswerable", gold: { spans: ["1"] } }, response)).toThrow(/carries gold/);
     expect(() => scoreQuestion({ ...base, kind: "answerable", gold: { spans: ["123"] } }, response)).toThrow(/numeric gold/);
     expect(() => scoreQuestion({ ...base, kind: "unanswerable", gold: null }, { ...response, latencyMs: Number.NaN })).toThrow(/latency/);
+  });
+  // PREREG v2, review R1 M2: abstaining on everything must be visible, not free.
+  it("makes an answerer that abstains on every answerable question visible", () => {
+    const question: EvalQuestion = {
+      id: "q", set: "xbrl-numeric", kind: "answerable", answerType: "numeric", corpusRef: "c", question: "?",
+      gold: { numeric: { value: 1000, unit: "USD", decimals: 0 }, spans: ["1,000"] },
+    };
+    const silent = summarize([scoreQuestion(question, { answer: "", citations: [], abstained: true, latencyMs: 1 })]);
+    const row = (id: string) => silent.find((metric) => metric.id === id);
+    expect(row("abstained_over_answerable.xbrl-numeric")).toMatchObject({ numerator: 1, denominator: 1, value: 1 });
+    expect(row("gold_span_recall.xbrl-numeric")).toMatchObject({ numerator: 0, denominator: 1, value: 0 });
+    const cited = summarize([scoreQuestion(question, { answer: "", citations: [{ text: "total 1,000" }, { text: "x" }], abstained: true, latencyMs: 1 })]);
+    expect(cited.find((metric) => metric.id === "gold_span_recall.xbrl-numeric")).toMatchObject({ numerator: 1, denominator: 1 });
+    expect(cited.find((metric) => metric.id === "citation_precision_4plus_digit_spans.xbrl-numeric")).toMatchObject({ numerator: 1, denominator: 2 });
+    const short = { ...question, gold: { numeric: { value: 212, unit: "USD", decimals: 0 }, spans: ["212"] } };
+    const stratum = summarize([scoreQuestion(short, { answer: "", citations: [{ text: "212" }], abstained: true, latencyMs: 1 })]);
+    expect(stratum.find((metric) => metric.id === "citation_precision_4plus_digit_spans.xbrl-numeric")).toMatchObject({ denominator: 0, value: null });
   });
   it("reports a rate with no denominator as null", () => {
     const human = summarize([]).find((row) => row.id === "correct_over_answerable.human");
@@ -132,13 +161,16 @@ describe("inline XBRL context / unit / period matching (v4 §16.4)", () => {
     expect(matchSpans({ start: "2025-01-01", ...instant }, "us-gaap:Assets", "USD", parsed)).toEqual([]);
     expect(matchSpans({ start: "2025-01-01", end: "2025-12-31", val: 2.47 }, "us-gaap:EarningsPerShareDiluted", "USD/shares", parsed)).toHaveLength(1);
   });
-  it("moves an OTHER_YEAR question outside every tagged year", () => {
+  // Review R1 m3: a 52/53-week filer's year ends on a different day each year; use the reported one.
+  it("asks an OTHER_YEAR question of a real reported fiscal year outside every tagged year", () => {
     const source = {
-      id: "xbrl-1", question: "q", provenance: { entityName: "ACME", label: "Assets", unit: "USD", period: { end: "2025-12-31" } },
+      id: "xbrl-1", question: "q", provenance: { entityName: "ACME", label: "Revenues", unit: "USD", period: { start: "2024-12-30", end: "2025-12-28" } },
     };
-    const [moved] = buildUnanswerable([{ cik: "0000000001", questions: [source], taggedYears: new Set([2023, 2024, 2025]) }]);
-    expect(moved.question).toBe(questionText("ACME", "Assets", "USD", { end: "2018-12-31" }));
-    expect(moved.generation).toMatchObject({ rule: "OTHER_YEAR", earliestTaggedYear: 2023 });
+    const fiscalYears = [{ start: "2012-01-02", end: "2012-12-30" }, { start: "2012-12-31", end: "2013-12-29" }, { start: "2013-12-30", end: "2014-12-28" }];
+    const [moved] = buildUnanswerable([{ cik: "0000000001", questions: [source], taggedYears: new Set([2018, 2025]), fiscalYears }]);
+    expect(moved.generation.period).toEqual({ start: "2012-12-31", end: "2013-12-29" });
+    expect(moved.question).toBe(questionText("ACME", "Revenues", "USD", { start: "2012-12-31", end: "2013-12-29" }));
+    expect(() => buildUnanswerable([{ cik: "0000000001", questions: [source], taggedYears: new Set([2018]), fiscalYears: [] }])).toThrow(/no reported fiscal year/);
   });
 });
 
@@ -165,11 +197,26 @@ describe("question sets and receipt", () => {
     expect(new Set(questions.map((question) => question.id)).size).toBe(questions.length);
   });
 
-  it("refuses a question file that does not match its pinned sha256", () => {
+  // Review R1 m1: exercise the refusal paths, not just the happy one.
+  it("refuses a question file whose sha256 or size is not the pre-registered one", () => {
     const prereg = JSON.parse(readFileSync(path.join(HERE, "PREREG.json"), "utf8"));
     expect(prereg.questionSets[0].sha256).toBe(
       createHash("sha256").update(readFileSync(path.join(HERE, prereg.questionSets[0].path))).digest("hex"),
     );
+    const dir = mkdtempSync(path.join(tmpdir(), "ask-quality-prereg-"));
+    let index = 0;
+    const variant = (change: (entry: { sha256: string; n: number; path: string }) => void) => {
+      const copy = JSON.parse(JSON.stringify(prereg));
+      for (const entry of copy.questionSets) entry.path = path.join(HERE, entry.path);
+      change(copy.questionSets[0]);
+      index += 1;
+      const file = path.join(dir, `prereg-${index}.json`);
+      writeFileSync(file, JSON.stringify(copy));
+      return file;
+    };
+    expect(() => loadQuestionSets(variant(() => undefined))).not.toThrow();
+    expect(() => loadQuestionSets(variant((entry) => { entry.sha256 = `0${entry.sha256.slice(1)}`; }))).toThrow(/is not the pre-registered/);
+    expect(() => loadQuestionSets(variant((entry) => { entry.n += 1; }))).toThrow(/PREREG says 401/);
   });
 
   it("produces the same receipt twice from the fixture answerer", async () => {
@@ -185,6 +232,7 @@ describe("question sets and receipt", () => {
     const metrics = receipt.metrics.map((row, index) => (index === 0 ? { ...row, denominator: 0 } : row));
     expect(validateReceipt({ ...receipt, metrics })).toEqual(expect.arrayContaining(["metrics.correct_over_answerable.xbrl-numeric.counts", "receiptSha256"]));
     expect(validateReceipt({ ...receipt, schema: "other" })).toContain("schema");
+    expect(validateReceipt({ ...receipt, metrics: receipt.metrics.filter((row) => !row.id.startsWith("abstained_over_answerable")) })).toContain("metrics");
   });
 
   it("writes a markdown table in which every metric row names its denominator", async () => {
@@ -199,14 +247,18 @@ describe("question sets and receipt", () => {
 
 describe("evidence_excerpts adapter", () => {
   const collections = { "sec-10k:1": "collection-0123456789abcdef0123456789abcdef" };
-  const reply = (status: number, body: unknown) => async () => new Response(JSON.stringify(body), { status });
-  const make = (fetchImpl: () => Promise<Response>, baseUrl = "http://localhost:3000") =>
+  const reply = (status: number, body: unknown) => (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
+  const make = (fetchImpl: typeof fetch, baseUrl = "http://localhost:3000") =>
     createEvidenceExcerptsAnswerer({ baseUrl, token: "t", collections, fetchImpl });
 
-  it("refuses production hosts and a missing token", () => {
+  // Review R1 m2: an allowlist. Loopback by default, other hosts only by exact name, production never.
+  it("allows loopback only, other hosts only when named, production never; needs a token", () => {
+    expect(checkHost("http://127.0.0.1:3000")).toBe("127.0.0.1");
+    expect(() => checkHost("https://staging.example.test")).toThrow(/--allow-host/);
+    expect(checkHost("https://staging.example.test", ["staging.example.test"])).toBe("staging.example.test");
     expect(() => make(reply(200, {}), "https://tavonel.com")).toThrow(/production/);
-    expect(() => make(reply(200, {}), "https://www.tavonel.com")).toThrow(/production/);
-    expect(PRODUCTION_HOSTS.some((pattern: RegExp) => pattern.test("tavonel-saas-foundation.vercel.app"))).toBe(true);
+    expect(() => checkHost("https://www.tavonel.com", ["www.tavonel.com"])).toThrow(/production/);
+    expect(() => checkHost("https://tavonel-saas-foundation-abc123-team.vercel.app", ["tavonel-saas-foundation-abc123-team.vercel.app"])).toThrow(/production/);
     expect(() => createEvidenceExcerptsAnswerer({ baseUrl: "http://localhost:3000", token: "", collections })).toThrow(/TOKEN/);
   });
 

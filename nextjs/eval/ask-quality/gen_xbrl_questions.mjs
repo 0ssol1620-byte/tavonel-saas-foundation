@@ -15,7 +15,8 @@
  * filing's own context, unit and period are matched exactly. So a companyfacts value becomes a
  * question only when the filing's inline XBRL carries a VISIBLE fact with the same concept, a
  * non-dimensional context with the same period, the same unit, and the same scaled value. The span
- * the reader would see (`displayText`, with its byte offset in the filing) is what citation
+ * the reader would see (`displayText`, with `htmlCharOffset`, its UTF-16 code-unit index in the
+ * decoded filing -- not a byte offset) is what citation
  * precision is scored against. A fact we cannot find in the document is dropped and counted, never
  * reconstructed.
  */
@@ -241,7 +242,8 @@ export function buildFilingQuestions({ cik, entityName, filing, companyfacts, ht
             documentUrl: filing.url, documentSha256: filing.sha256,
             spans: spans.map((span) => ({
               factId: span.id, contextRef: span.contextRef, unitRef: span.unitRef, decimals: span.decimals, scale: span.scale,
-              htmlOffset: span.offset, displayText: span.displayText,
+              // UTF-16 code-unit index into the UTF-8-decoded HTML (String index), not a byte offset.
+              htmlCharOffset: span.offset, displayText: span.displayText,
               // Cut at tag boundaries so a half-sliced tag never leaks markup into the reading context.
               before: stripTags(html.slice(Math.max(0, span.offset - 2000), span.offset).replace(/^[^<]*>/, "")).slice(-120),
               after: stripTags(html.slice(span.end, span.end + 2000).replace(/<[^>]*$/, "")).slice(0, 120),
@@ -274,9 +276,26 @@ export const splitOf = (id) => (parseInt(sha256(id).slice(0, 8), 16) % 2 === 0 ?
 /**
  * Unanswerable questions, by two pre-registered rules:
  *   OTHER_COMPANY  filer B's numeric question asked of filer A's corpus (A ≠ B), first k per pair.
- *   OTHER_YEAR     filer A's numeric question with its period moved to (earliest year any
- *                  non-dimensional context in A's corpus touches) − offset, first k per filer.
+ *   OTHER_YEAR     filer A's numeric question asked of a fiscal year Y = (earliest year any
+ *                  non-dimensional context in A's corpus touches) − offset, first k per filer. The
+ *                  period is A's REAL fiscal year from companyfacts (an annual 10-K duration whose end
+ *                  is nearest the source's month/day in Y), never a date shifted by whole years:
+ *                  52/53-week filers end on a different day each year (review R1 m3).
  */
+export function fiscalYearPeriods(companyfacts, rules = RULES) {
+  const periods = new Map();
+  for (const concept of Object.values(companyfacts.facts?.[rules.taxonomy] ?? {})) {
+    for (const entries of Object.values(concept.units ?? {})) {
+      for (const cf of entries) {
+        if (cf.form !== "10-K" || !cf.start) continue;
+        const days = daysBetween(cf.start, cf.end);
+        if (days >= rules.durationDays[0] && days <= rules.durationDays[1]) periods.set(`${cf.start}|${cf.end}`, { start: cf.start, end: cf.end });
+      }
+    }
+  }
+  return [...periods.values()].sort((left, right) => left.end.localeCompare(right.end));
+}
+
 export function buildUnanswerable(byFiler, rules = RULES) {
   const out = [];
   for (const target of byFiler) {
@@ -293,18 +312,24 @@ export function buildUnanswerable(byFiler, rules = RULES) {
     }
     const year = Math.min(...target.taggedYears) - rules.otherYearOffsetBelowEarliestTaggedYear;
     for (const source of target.questions.slice(0, rules.otherYearPerFiler)) {
-      const shift = year - Number(source.provenance.period.end.slice(0, 4));
-      const move = (iso) => `${Number(iso.slice(0, 4)) + shift}${iso.slice(4)}`;
-      const period = source.provenance.period.start
-        ? { start: move(source.provenance.period.start), end: move(source.provenance.period.end) }
-        : { end: move(source.provenance.period.end) };
+      const anchor = Date.parse(`${year}${source.provenance.period.end.slice(4)}`);
+      const nearest = [...target.fiscalYears].sort(
+        (left, right) => Math.abs(Date.parse(left.end) - anchor) - Math.abs(Date.parse(right.end) - anchor) || left.end.localeCompare(right.end),
+      )[0];
+      if (!nearest || Math.abs(Date.parse(nearest.end) - anchor) > 10 * 86_400_000) {
+        throw new Error(`${target.cik}: no reported fiscal year ends near ${year}${source.provenance.period.end.slice(4)}`);
+      }
+      const period = source.provenance.period.start ? { start: nearest.start, end: nearest.end } : { end: nearest.end };
       const id = `unans-yr-${source.id}`;
       out.push({
         id, set: "unanswerable", kind: "unanswerable", answerType: "numeric", split: splitOf(id),
         corpusRef: `sec-10k:${target.cik}`,
         question: questionText(source.provenance.entityName, source.provenance.label, source.provenance.unit, period),
         gold: null,
-        generation: { rule: "OTHER_YEAR", sourceQuestionId: source.id, askedOfCik: target.cik, period, earliestTaggedYear: Math.min(...target.taggedYears) },
+        generation: {
+          rule: "OTHER_YEAR", sourceQuestionId: source.id, askedOfCik: target.cik, period,
+          periodSource: "companyfacts annual 10-K duration nearest the anchor", earliestTaggedYear: Math.min(...target.taggedYears),
+        },
       });
     }
   }
@@ -336,8 +361,10 @@ async function main() {
   const byFiler = [];
   const filerManifest = [];
   for (const filer of FILERS) {
-    const submissions = JSON.parse(await cached(`submissions-${filer.cik}.json`, `https://data.sec.gov/submissions/CIK${filer.cik}.json`, options));
-    const companyfacts = JSON.parse(await cached(`companyfacts-${filer.cik}.json`, `https://data.sec.gov/api/xbrl/companyfacts/CIK${filer.cik}.json`, options));
+    const submissionsBytes = await cached(`submissions-${filer.cik}.json`, `https://data.sec.gov/submissions/CIK${filer.cik}.json`, options);
+    const companyfactsBytes = await cached(`companyfacts-${filer.cik}.json`, `https://data.sec.gov/api/xbrl/companyfacts/CIK${filer.cik}.json`, options);
+    const submissions = JSON.parse(submissionsBytes);
+    const companyfacts = JSON.parse(companyfactsBytes);
     const recent = submissions.filings.recent;
     const questions = [];
     const years = new Set();
@@ -363,8 +390,14 @@ async function main() {
       }
       filings.push({ ...filing, stats: result.stats });
     }
-    byFiler.push({ cik: filer.cik, questions, taggedYears: years });
-    filerManifest.push({ cik: filer.cik, entityName: companyfacts.entityName, corpusRef: `sec-10k:${filer.cik}`, filings });
+    byFiler.push({ cik: filer.cik, questions, taggedYears: years, fiscalYears: fiscalYearPeriods(companyfacts) });
+    // The payloads the questions were built from (review R1 m5). They change as SEC adds filings,
+    // so a refetch changes these digests -- and the file's sha256 -- even when no question does.
+    filerManifest.push({
+      cik: filer.cik, entityName: companyfacts.entityName, corpusRef: `sec-10k:${filer.cik}`,
+      payloads: { submissionsSha256: sha256(submissionsBytes), companyfactsSha256: sha256(companyfactsBytes) },
+      filings,
+    });
   }
   const header = {
     generator: "nextjs/eval/ask-quality/gen_xbrl_questions.mjs",
@@ -385,7 +418,7 @@ async function main() {
     schema: "tavonel.ask_quality_questions.v1", set: "unanswerable", ...header,
     unanswerableRules: {
       OTHER_COMPANY: `for each corpus A and each other filer B, the first ${RULES.crossCompanyPerPair} of B's numeric questions (hash order), asked of A`,
-      OTHER_YEAR: `for each corpus A, the first ${RULES.otherYearPerFiler} of A's numeric questions with the period moved to (earliest year any non-dimensional context in A's corpus touches) - ${RULES.otherYearOffsetBelowEarliestTaggedYear}`,
+      OTHER_YEAR: `for each corpus A, the first ${RULES.otherYearPerFiler} of A's numeric questions asked of fiscal year Y = (earliest year any non-dimensional context in A's corpus touches) - ${RULES.otherYearOffsetBelowEarliestTaggedYear}, using A's real fiscal-year period from companyfacts (the annual 10-K duration whose end is nearest the source month/day in Y, within 10 days)`,
       limitation: "Absence is established against tagged XBRL contexts only. Untagged prose or tables could still state an OTHER_YEAR figure; a person spot-checks a sample before the set is treated as frozen (PREREG openItems).",
     },
     questions: unanswerable,

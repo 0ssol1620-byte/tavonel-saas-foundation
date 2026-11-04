@@ -83,11 +83,32 @@ const SCALE: Record<string, number> = { thousand: 3, million: 6, billion: 9, tri
 export type ExtractedNumber = { value: number; unit: string | null };
 
 /**
- * Every number a free-text answer states, with its scale word and an inferred unit.
- * A bare 4-digit integer from 1900 to 2100 with no currency sign, scale word or separator is read
- * as a year and skipped -- "in fiscal 2025, revenue was $47,061 million" states one amount.
+ * Digits that name something rather than state an amount (PREREG v2 scoring.numericExactMatch):
+ * dates ("June 30, 2025", "Dec. 28", "2025-06-30", "6/30/2025"), filing forms ("10-K", "8-K/A")
+ * and document references ("Item 8", "Note 12"). v1 read the 30 in "fiscal year ended June 30,
+ * 2025" as a second number, so an answer that restated its own question could not match.
  */
-export function extractNumbers(text: string): ExtractedNumber[] {
+const MONTH = "(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)";
+export const NON_AMOUNT_PATTERNS: RegExp[] = [
+  new RegExp(`\\b${MONTH}\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s*\\d{4})?\\b`, "gi"),
+  /\b\d{4}-\d{2}-\d{2}\b/g,
+  /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g,
+  /\b(?:10-KT?|10-Q|8-K|20-F|6-K|S-1)(?:\/A)?\b/gi,
+  /\b(?:Item|Note|Part|Schedule|Exhibit)\s+\d{1,3}(?:\.\d+)?[A-C]?\b/gi,
+];
+
+export function stripNonAmounts(text: string): string {
+  return NON_AMOUNT_PATTERNS.reduce((current, pattern) => current.replace(pattern, " "), text);
+}
+
+/**
+ * Every number a free-text answer states, with its scale word and an inferred unit, after
+ * `stripNonAmounts`. A bare 4-digit integer from 1900 to 2100 with no currency sign, scale word or
+ * separator is read as a year and skipped -- "in fiscal 2025, revenue was $47,061 million" states
+ * one amount.
+ */
+export function extractNumbers(answer: string): ExtractedNumber[] {
+  const text = stripNonAmounts(answer);
   const pattern =
     /(\(|-|−)?\s*(\$|USD\s?)?\s*(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?\s*\)?\s*(thousand|million|billion|trillion)?(\s*(?:per (?:diluted |basic )?share|shares))?/gi;
   const out: ExtractedNumber[] = [];
@@ -162,6 +183,8 @@ export type ScoredRow = {
   citations: number;
   /** Answerable only: citations whose text contains a gold span. */
   citationsWithGoldSpan: number | null;
+  /** Answerable only: every gold span is non-numeric or has >= 4 digits (PREREG v2 stratum). */
+  goldSpanFourDigitsPlus: boolean | null;
   latencyMs: number;
   meta: Record<string, string | null> | null;
 };
@@ -204,6 +227,10 @@ export function scoreQuestion(question: EvalQuestion, response: AnswererResponse
     citationsWithGoldSpan:
       question.kind === "answerable" && gold
         ? response.citations.filter((citation) => gold.spans.some((span) => containsSpan(citation.text, span))).length
+        : null,
+    goldSpanFourDigitsPlus:
+      question.kind === "answerable" && gold
+        ? gold.spans.every((span) => !/^[\d.,]+$/.test(span.trim()) || (span.match(/\d/g) ?? []).length >= 4)
         : null,
     latencyMs: response.latencyMs,
     meta: response.meta ?? null,
@@ -259,22 +286,41 @@ function metric(id: string, label: string, numeratorLabel: string, denominatorLa
 const count = (rows: ScoredRow[], test: (row: ScoredRow) => boolean) => rows.filter(test).length;
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
 
+const SETS = ["xbrl-numeric", "human"] as const;
+
+/** Metric ids every receipt must carry, in order (PREREG v2 `metrics`). */
+export const REQUIRED_METRIC_IDS = [
+  ...SETS.flatMap((set) => [`correct_over_answerable.${set}`, `abstained_over_answerable.${set}`]),
+  "correct_abstention_over_unanswerable",
+  "wrong_answer_over_unanswerable",
+  ...SETS.flatMap((set) => [`citation_precision.${set}`, `citation_precision_4plus_digit_spans.${set}`, `gold_span_recall.${set}`]),
+  "numeric_exact_match_over_numeric",
+];
+
 /**
- * The E1 metrics, exactly as PROGRAM §4.E lists them. Answerable metrics are reported per question
- * set and never pooled into one figure (PROGRAM §4.E risk: XBRL questions skew easy).
+ * The E1 metrics: PROGRAM §4.E's list plus, from PREREG v2, abstention on answerable questions and
+ * gold-span recall -- without them an answerer that abstains on everything loses nothing on any
+ * registered row, and E2's "no loss of correct answers" gate would pass vacuously. Answerable
+ * metrics are reported per question set and never pooled (PROGRAM §4.E risk: XBRL may skew easy).
  */
 export function summarize(rows: ScoredRow[]): MetricRow[] {
   const out: MetricRow[] = [];
-  for (const set of ["xbrl-numeric", "human"] as const) {
+  for (const set of SETS) {
     const answerable = rows.filter((row) => row.set === set && row.kind === "answerable");
     out.push(metric(`correct_over_answerable.${set}`, `Correct / answerable (${set})`, "answered and correct", `answerable ${set} questions`, count(answerable, (row) => row.correct === true), answerable.length));
+    out.push(metric(`abstained_over_answerable.${set}`, `Abstained / answerable (${set})`, "abstained", `answerable ${set} questions`, count(answerable, (row) => row.abstained), answerable.length));
   }
   const unanswerable = rows.filter((row) => row.kind === "unanswerable");
   out.push(metric("correct_abstention_over_unanswerable", "Correct abstention / unanswerable", "abstained", "unanswerable questions", count(unanswerable, (row) => row.abstained), unanswerable.length));
   out.push(metric("wrong_answer_over_unanswerable", "Wrong answer / unanswerable", "answered anyway", "unanswerable questions", count(unanswerable, (row) => !row.abstained), unanswerable.length));
-  for (const set of ["xbrl-numeric", "human"] as const) {
+  for (const set of SETS) {
     const cited = rows.filter((row) => row.set === set && row.kind === "answerable");
-    out.push(metric(`citation_precision.${set}`, `Citation precision (${set})`, "citations containing a gold span", `citations returned for answerable ${set} questions`, sum(cited.map((row) => row.citationsWithGoldSpan ?? 0)), sum(cited.map((row) => row.citations))));
+    const precision = (id: string, label: string, subset: ScoredRow[], denominator: string) =>
+      metric(id, label, "citations containing a gold span", denominator, sum(subset.map((row) => row.citationsWithGoldSpan ?? 0)), sum(subset.map((row) => row.citations)));
+    out.push(precision(`citation_precision.${set}`, `Citation precision (${set})`, cited, `citations returned for answerable ${set} questions`));
+    // 3-digit spans ("212") recur by accident across a filing's tables; this stratum excludes them.
+    out.push(precision(`citation_precision_4plus_digit_spans.${set}`, `Citation precision, gold spans >= 4 digits (${set})`, cited.filter((row) => row.goldSpanFourDigitsPlus === true), `citations returned for answerable ${set} questions whose gold spans have >= 4 digits`));
+    out.push(metric(`gold_span_recall.${set}`, `Gold-span recall (${set})`, "questions with >= 1 citation containing a gold span", `answerable ${set} questions`, count(cited, (row) => (row.citationsWithGoldSpan ?? 0) > 0), cited.length));
   }
   const numeric = rows.filter((row) => row.numericMatch !== null);
   out.push(metric("numeric_exact_match_over_numeric", "Numeric exact match / numeric questions", "exact match at reported precision", "answerable numeric questions", count(numeric, (row) => row.numericMatch === true), numeric.length));
@@ -348,7 +394,7 @@ export function validateReceipt(value: unknown): string[] {
   for (const set of receipt.questionSets ?? []) {
     if (set.status === "FROZEN" && !SHA.test(set.sha256 ?? "")) errors.push(`questionSets.${set.id}.sha256`);
   }
-  if (!Array.isArray(receipt.metrics) || receipt.metrics.length === 0) errors.push("metrics");
+  if (!Array.isArray(receipt.metrics) || receipt.metrics.map((row) => row.id).join("|") !== REQUIRED_METRIC_IDS.join("|")) errors.push("metrics");
   for (const row of receipt.metrics ?? []) {
     const where = `metrics.${row.id}`;
     if (!Number.isInteger(row.numerator) || !Number.isInteger(row.denominator) || row.numerator < 0 || row.numerator > row.denominator) errors.push(`${where}.counts`);
