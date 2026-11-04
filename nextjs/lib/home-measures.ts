@@ -35,8 +35,8 @@ import r01 from "../public/research/receipts/R-01-recovery-counterfactual-olmocr
 import r02 from "../public/research/receipts/R-02-knowledge-compilation-properties-2026-08-08.json";
 import { EVIDENCE, type EvidenceReceipt } from "./evidence-record";
 
-/** sha256 of `content/evidence/public-claims-pack.json` as generated (evidence repository, 83bc709). */
-export const CLAIMS_PACK_SHA256 = "6aa0535009bc29ce37661888d2265aa9f4112d3099c8c1ebac2b777649bdffe3";
+/** sha256 of `content/evidence/public-claims-pack.json` as generated (evidence repository, 1beb4c6). */
+export const CLAIMS_PACK_SHA256 = "2b7259d8146634a21cc5db6c8034b53a2b9879ecea5f46246e1710c26c9d1055";
 
 /** A figure: a number from a claim or its receipt, and how many decimals it is printed with. */
 export type Figure = { readonly n: number; readonly d: number };
