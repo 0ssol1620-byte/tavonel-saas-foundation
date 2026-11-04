@@ -26,7 +26,7 @@ const BENCH = "section#s2 article[data-case-status]";
 
 test("the landing makes no proof-shaped claim of its own", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator("h1#lv2-hero-title")).toContainText("Turn documents into context your AI can cite.");
+  await expect(page.locator("h1#lv2-hero-title")).toContainText("Context your AI can cite, compiled from your documents.");
   await expect(page.locator("[data-proof-variant]")).toHaveCount(0);
   await expect(page.locator("[data-source-sheet]")).toHaveCount(0);
 

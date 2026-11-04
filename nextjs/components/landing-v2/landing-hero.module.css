@@ -1258,3 +1258,39 @@ section.receive {
 @layer overrides {
   .measurement :global(.lv2-h2) { color: #15191d !important; font-family: "Wanted Sans Variable", var(--f-sans), sans-serif; font-weight: 560; }
 }
+
+/*
+  Direction C, warm tactile (2026-11-04). The passage workbench sits in one tint block on the canvas --
+  the one place on Home where colour says "work you can inspect" -- with the page as a lifted sheet of
+  paper, the passage as a white panel, and the region rows as soft rows whose pressed one rises to
+  white. No box inside a box: the page and the passage pane are the only surfaces, and they separate
+  by shadow, not by a rule. The record sheet in s3 rests on the same shadow. Radii stop at 24px.
+  Unlayered, like the rules it follows: last in source order, so it wins at equal specificity.
+*/
+.bench { padding: 24px 16px; border-radius: var(--tv-r-card); background: var(--tv-tint); }
+.benchHead { padding-bottom: 24px; }
+.pageWindow {
+  border: 0; border-radius: var(--tv-r-small); background: var(--tv-sheet);
+  box-shadow: 0 1px 2px rgb(18 35 63 / 0.08), 0 24px 48px -16px rgb(18 35 63 / 0.3);
+}
+.passagePane { border: 0; border-radius: var(--tv-r-inner); background: var(--tv-sheet); box-shadow: var(--tv-shadow-1); }
+.crop { border-color: var(--tv-rule); border-radius: var(--tv-r-small); }
+.recordSheet { border: 0; border-radius: var(--tv-r-card); background: var(--tv-sheet); box-shadow: var(--tv-shadow-1); }
+@media (min-width: 768px) {
+  .bench { padding: 40px; }
+  .benchHead { padding-bottom: 32px; }
+  .regionList { display: grid; gap: 4px; border-bottom: 0; }
+  .regionButton { min-height: 52px; padding: 4px 12px; border-top: 0; border-radius: 14px; }
+  .regionButton[aria-pressed="true"] { background: var(--tv-sheet); box-shadow: var(--tv-shadow-1); }
+  .regionLetter { border-radius: 50%; background: rgb(255 255 255 / 0.7); color: var(--home-ink); font-family: var(--f-sans); }
+  .regionButton[aria-pressed="true"] .regionLetter { background: var(--tv-action); color: #fff; }
+}
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .regionButton:hover { background: rgb(255 255 255 / 0.55); }
+  .regionButton[aria-pressed="true"]:hover { background: var(--tv-sheet); }
+}
+@media (max-width: 767.98px) {
+  .regionButton .regionLetter { border-radius: 50%; border-color: var(--tv-tint-2); background: rgb(255 255 255 / 0.7); }
+  .regionButton[aria-pressed="true"] .regionLetter { border-color: var(--tv-action); background: var(--tv-action); color: #fff; }
+  .recordSheet { border-radius: var(--tv-r-inner); }
+}

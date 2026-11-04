@@ -287,8 +287,9 @@ test.describe("Home keeps main's header and footer colours", () => {
     test(`on ${path}`, async ({ page }, testInfo) => {
       await page.goto(path);
       const footer = page.locator("footer.site");
-      await expect(footer).toHaveCSS("background-color", "rgb(9, 13, 20)");
-      await expect(footer.locator(".site-footer-groups a").first()).toHaveCSS("color", "rgb(183, 195, 210)");
+      // Direction C (2026-11-04): the Home footer sits on the warm canvas in the canvas ink, not on the instrument ground.
+      await expect(footer).toHaveCSS("background-color", "rgb(245, 243, 238)");
+      await expect(footer.locator(".site-footer-groups a").first()).toHaveCSS("color", "rgb(76, 84, 93)");
       const header = page.locator(HEADER);
       await expect(header).toHaveCSS("color", "rgb(21, 25, 29)");
       expect(await header.evaluate((element) => getComputedStyle(element).getPropertyValue("--source").trim())).toBe("#005bb3");
@@ -296,7 +297,8 @@ test.describe("Home keeps main's header and footer colours", () => {
       // rule, ink text -- so the hero's and the close's filled action is the one filled button on a screen.
       const cta = header.locator(".nav-actions .btn");
       await expect(cta).toHaveClass(/\bbtn-ghost\b/);
-      await expect(cta).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      // Direction C: the quiet header action is a white pill on the warm shadow (still not the filled accent).
+      await expect(cta).toHaveCSS("background-color", "rgb(255, 255, 255)");
       await expect(cta).toHaveCSS("color", "rgb(21, 25, 29)");
       if (testInfo.project.name === "1440") {
         await expect(header.locator(".site-nav-direct").first()).toHaveCSS("color", "rgb(66, 73, 81)");

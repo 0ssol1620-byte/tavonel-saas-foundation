@@ -38,7 +38,7 @@
     --paper: var(--tv-paper);
     --ink: var(--tv-ink);
     --ink-muted: var(--tv-ink-muted);
-    --rule: #d8ddd9;
+    --rule: var(--tv-rule); /* direction C: the warm alpha hairline, not a cool #d8ddd9 */
     --obsidian: var(--tv-inst-1);
     --on-obsidian: var(--tv-on-inst);
     --on-obsidian-muted: var(--tv-on-inst-muted);
@@ -90,7 +90,8 @@
     font-family: var(--f-sans);
   }
   .home[lang="ko"] { --home-meta-fs: 14px; }
-  .home.home > footer { --ink: var(--on-obsidian); --text-hi: var(--on-obsidian); --text-mid: #b7c3d2; --text-lo: #b7c3d2; --action: var(--action-on-dark); }
+  /* Direction C (2026-11-04): the footer sits on the canvas with the page, not on the instrument ground. */
+  .home.home > footer { background: var(--tv-canvas); color: var(--tv-ink); --ground: var(--tv-canvas); --ink: var(--tv-ink); --text-hi: var(--tv-ink); --text-mid: var(--tv-ink-muted); --text-lo: var(--tv-ink-muted); --hairline: var(--tv-rule); --border-dark: var(--tv-rule); --action: var(--tv-action); }
   /* One focus ring on Home: the accent at 2px. On the footer --action is the dark-ground accent. */
   .home.home :global(:is(a, button, summary, [tabindex]):focus-visible) { outline-color: var(--action); }
   .home.home :global(.lv2-obsidian :is(a, button, summary, [tabindex]):focus-visible) { outline-color: var(--action-on-dark); }
@@ -99,9 +100,9 @@
   .home.home > header { background: var(--paper) !important; color: var(--ink); border-bottom: 1px solid var(--home-rule) !important; }
   .home.home > header :global(.one-path-mobile-nav:not([open]) > nav) { display: none !important; }
   .home.home > header :global(.one-path-mobile-nav) {
-    --ground: #ffffff; --seam: #d8ddd9; --g1: #faf9f6;
-    --text-hi: #15191d; --text-mid: #58606a; --text-lo: #58606a;
-    --hairline: #d8ddd9; --hairline-hi: #d8ddd9; --border-dark: #d8ddd9;
+    --ground: var(--tv-sheet); --seam: var(--tv-rule); --g1: var(--tv-canvas);
+    --text-hi: var(--tv-ink); --text-mid: var(--tv-ink-muted); --text-lo: var(--tv-ink-muted);
+    --hairline: var(--tv-rule); --hairline-hi: var(--tv-rule); --border-dark: var(--tv-rule);
   }
   .home.home > header :global(.one-path-mobile-nav > summary) { background: var(--paper) !important; color: var(--ink) !important; }
 
@@ -360,5 +361,77 @@
       transition-duration: 0s !important;
       transition-delay: 0s !important;
     }
+  }
+}
+
+/*
+  Direction C, warm tactile (2026-11-04; BRIEF outputs/.../design-20261104/impl/BRIEF.md). Last in the
+  overrides layer, so at equal specificity it is the word Home ends on.
+
+  One warm canvas from the header to the footer: the paper/obsidian flips are gone. Colour comes in
+  whole blocks and sparingly -- sand behind the film (the product, framed), tint behind the passage
+  workbench (work you can inspect), one navy block for the close -- and depth from the two-layer warm
+  shadow, never from a 1px box. Radii stop at 24px. One filled pill per screen; the second action is
+  an outlined pill that fills with sand under a fine pointer.
+*/
+@layer overrides {
+  :global(html):has(.home), :global(body):has(.home) { background: var(--tv-canvas); }
+  .home.home > header { background: var(--tv-canvas) !important; border-bottom-color: var(--tv-rule) !important; }
+
+  /* The statement is larger on a wide screen; the phone keeps FINAL-SPEC's size, so its first screen does not move. */
+  @media (min-width: 1200px) {
+    .home.home :global(.lv2-hero-h1) { font-size: clamp(64px, calc(3.2vw + 18px), 76px); letter-spacing: -0.038em; }
+  }
+
+  /* The one filled pill: the accent, lifted by its own shadow; pressed it gives 2% under the finger. */
+  .home.home :global(.lv2-cta) {
+    min-height: 48px; padding: 12px 26px; border-radius: var(--tv-r-pill); box-shadow: var(--tv-shadow-action);
+  }
+  .home.home :global(.lv2-cta:active) { transform: scale(0.98); }
+  /* The document entry stays the hero's second action and its drop target; quiet, so the pill above leads. */
+  .heroAside :global(.lv2-entry) {
+    min-height: 48px; padding: 10px 22px; border: 0; border-radius: var(--tv-r-pill);
+    box-shadow: inset 0 0 0 1.5px var(--tv-rule-strong); background: transparent; color: var(--tv-ink);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .home.home :global(.lv2-cta:hover) { background: var(--tv-action-hover); border-color: var(--tv-action-hover); }
+    .heroAside :global(.lv2-entry:hover) { background: var(--tv-sand); box-shadow: inset 0 0 0 1.5px var(--tv-sand-2); color: var(--tv-ink); }
+  }
+
+  /* The film, framed: a sand stage, the four chapters as one segmented control, the frame on a lifted shadow. */
+  .home.home :global(#s1 .lv2-film-story) { padding: 12px 12px 16px; border-radius: var(--tv-r-card); background: var(--tv-sand); }
+  .home.home :global(#s1 .compile-film-viewport) {
+    border: 0; border-radius: var(--tv-r-inner);
+    box-shadow: 0 3px 6px rgb(40 32 20 / 0.08), 0 30px 60px -20px rgb(40 32 20 / 0.45);
+  }
+  .home.home :global(#s1 .lv2-film-story > figcaption) { color: var(--tv-ink-muted); padding-inline: 4px; }
+  @media (min-width: 768px) {
+    .home.home :global(#s1 .lv2-film-story) { padding: 20px 32px 24px; }
+    .home.home :global(#s1 .compile-film-stages) {
+      display: inline-flex; justify-self: center; gap: 4px; padding: 4px;
+      border-radius: var(--tv-r-pill); background: rgb(255 255 255 / 0.55);
+    }
+    .home.home :global(#s1 .compile-film-stages button) {
+      min-height: 40px; padding: 9px 18px; border: 0; border-radius: var(--tv-r-pill); color: var(--tv-ink-muted);
+    }
+    .home.home :global(#s1 .compile-film-stages button[data-active="1"]) {
+      border: 0; background: var(--tv-sheet); color: var(--tv-ink); box-shadow: var(--tv-shadow-1);
+    }
+  }
+  @media (min-width: 900px) {
+    .home.home :global(#s1 .compile-film-sequence) { grid-template-columns: minmax(0, 1fr); }
+    .home.home :global(#s1 .compile-film-stages) { grid-column: 1; }
+  }
+  @media (max-width: 767px) {
+    .home.home :global(#s1 .compile-film-stages button[data-active="1"]) { border-bottom-color: var(--tv-ink); }
+  }
+
+  /* No rules between sections: the canvas and the blocks carry the rhythm. */
+  .home.home :global(#s2 > .lv2-wrap) { padding-top: 32px; border-top: 0; }
+  .home.home :global(#s5) { border-top: 0; }
+  .home.home :global(#s6) { padding-block: 48px 96px; border-top: 0; }
+  @media (max-width: 767px) {
+    .home.home :global(#s2 > .lv2-wrap) { padding-top: 16px; }
+    .home.home :global(#s6) { padding-block: 24px 72px; }
   }
 }

@@ -88,7 +88,7 @@ export default function Scene({
       data-scene={String(sceneIndex ?? SCENE_INDEX)}
       tabIndex={-1}
       aria-labelledby={TITLE_ID}
-      className="lv2-scene lv2-obsidian"
+      className="lv2-scene lv2-scene--close"
     >
       <div className={`lv2-wrap ${styles.close}`}>
         {/* FINAL-SPEC 2026-10-26 §2.7: the category name closes the page. A name, so no full stop. */}

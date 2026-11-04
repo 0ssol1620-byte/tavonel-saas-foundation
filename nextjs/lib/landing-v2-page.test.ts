@@ -332,7 +332,8 @@ const attr = (open: string, name: string): string | undefined =>
  * The first three beats are the source, its difficulty and its record, all read on paper; the
  * change, trust and close beats keep the dark grounds their own components declare.
  */
-const GROUND = ["paper", "paper", "paper", "obsidian", "obsidian", "obsidian"];
+/* Direction C (2026-11-04): one warm canvas for all six scenes; the obsidian flip at s4-s6 is gone (s6 is a navy block inside the canvas). */
+const GROUND = ["paper", "paper", "paper", "paper", "paper", "paper"];
 
 /** One scene's markup: from its own `<section>` to the next one (scenes never nest). */
 function sceneOf(main: string, id: string): string {
@@ -469,7 +470,7 @@ describe("landing v2 -- the composition", () => {
       const expected =
         locale === "ko"
           ? "문서를 AI가 인용할 수 있는 맥락으로 바꿉니다."
-          : "Turn documents into context your AI can cite.";
+          : "Context your AI can cite, compiled from your documents.";
       expect(bare(heading.replace(/<[^>]*>/g, ""))).toBe(bare(expected));
       /*
         R3 (design critique R2-B1): /ko holds "인용할 수 있는" on one line (.lv2-keep, nowrap on Home) so 수 never ends a
@@ -1036,13 +1037,15 @@ describe("Home substance renders expanded (redesign brief 2026-10-15, move 3)", 
       reader (no `<details open>` anywhere). s4 keeps its counts in the open with their list name;
       s5 keeps one note open, the training-data sentence (F-2), verbatim.
     */
-    it(`${korean ? "/ko" : "/"} prints the counts and the training sentence unfolded, and opens no disclosure`, () => {
+    it(`${korean ? "/ko" : "/"} prints the arrivals and the training sentence unfolded, and opens no disclosure`, () => {
       const html = renderToStaticMarkup(createElement(LandingPage, { korean }));
       const scene = (id: string, end: string) => html.slice(html.indexOf(`id="${id}"`), html.indexOf(end));
       const s4 = scene("s4", 'id="s5"');
       const s5 = scene("s5", 'id="s6"');
       expect(s4).not.toContain("<details");
-      expect(s4).toContain(`aria-label="${escaped(LANDING_V2_COPY[korean ? "ko" : "en"].recompile.compareLabel)}"`);
+      // Direction C (2026-11-04): s4 prints the filings that arrived, not the three counts (BRIEF item 4).
+      expect(s4).not.toContain(`aria-label="${escaped(LANDING_V2_COPY[korean ? "ko" : "en"].recompile.compareLabel)}"`);
+      expect(s4).toContain(escaped(LANDING_V2_COPY[korean ? "ko" : "en"].recompile.arrivalsLabel));
       expect(s5).not.toContain("<details");
       const notes = [...s5.matchAll(/<p class="lv2-proof-note[^"]*">([\s\S]*?)<\/p>/g)].map(match => readable(match[1]!));
       expect(notes).toEqual([LANDING_V2_COPY[korean ? "ko" : "en"].trust.proofs[0]!.note]);

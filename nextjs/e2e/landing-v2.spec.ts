@@ -162,7 +162,7 @@ test("keeps the English brand line as the single H1", async ({ page }) => {
   await expect(page.locator("h1#lv2-hero-title")).toHaveCount(1);
   // Fix round 3 (judge gap 1): the outcome sentence. FINAL-SPEC 2026-10-26 (D, veto): the category leaves the eyebrow
   // above it and names the close instead, as its heading -- printed once, not twice.
-  expect((await page.locator("h1").innerText()).replace(/\s+/g, " ").trim()).toBe("Turn documents into context your AI can cite.");
+  expect((await page.locator("h1").innerText()).replace(/\s+/g, " ").trim()).toBe("Context your AI can cite, compiled from your documents.");
   await expect(page.locator("#s1 .lv2-hero-eyebrow")).toHaveCount(0);
   await expect(page.locator("#s1 h1#lv2-hero-title + .lv2-hero-support")).toHaveCount(1);
   await expect(page.locator("#s6 h2")).toHaveText("The Knowledge Compiler for AI");
