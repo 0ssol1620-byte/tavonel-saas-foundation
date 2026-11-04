@@ -47,7 +47,7 @@ const CLIENTS = [
 type ClientId = (typeof CLIENTS)[number]["id"];
 type Availability = "checking" | "available" | "off" | "unknown";
 
-export default function ConnectAiPanel() {
+export default function ConnectAiPanel({ headingLevel: Heading = "h3" }: { headingLevel?: "h2" | "h3" }) {
   const [availability, setAvailability] = useState<Availability>("checking");
   const [origin, setOrigin] = useState("https://tavonel.com");
   const [client, setClient] = useState<ClientId>("claude");
@@ -66,7 +66,7 @@ export default function ConnectAiPanel() {
 
   return (
     <section className={styles.panel} aria-labelledby="connect-ai-title" data-testid="connect-ai-panel">
-      <h3 id="connect-ai-title">Connect Claude or ChatGPT</h3>
+      <Heading id="connect-ai-title">Connect Claude or ChatGPT</Heading>
       {availability === "off" ? (
         <p role="status">
           The hosted MCP endpoint is not switched on for this deployment yet. Until it is, use the local MCP bridge with an API key.{" "}

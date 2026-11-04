@@ -1,6 +1,6 @@
 /* W1-A1 Connect AI panel. A long origin wraps instead of widening a 360 px screen. */
 .panel { min-width: 0; margin: 0 0 20px; }
-.panel h3 { margin: 0 0 12px; font-size: var(--t-6, 20px); }
+.panel :is(h2, h3) { margin: 0 0 12px; font-size: var(--t-6, 20px); }
 .panel p { max-width: 74ch; line-height: 1.65; }
 .urlRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px 0; min-width: 0; }
 .url { flex: 1 1 16rem; min-width: 0; padding: 10px 12px; border: 1px solid var(--hairline-hi); background: var(--g1); font: 13px var(--f-mono); overflow-wrap: anywhere; }

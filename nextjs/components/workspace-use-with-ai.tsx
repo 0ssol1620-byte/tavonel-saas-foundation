@@ -37,6 +37,11 @@ export default function WorkspaceUseWithAi({ open = false, onDownload, onOpen, d
     a disclosure: on that surface the panel is the panel. Everywhere else (Home) it stays a real
     `<details>`, which is where the `onOpen` funnel event comes from.
   */
+  /*
+    W1-A1 QA (axe heading-order). Open, the panel sits under the page's h1 with no h2 between, so a
+    destination heading is an h2; inside the Home disclosure it sits under a section h2 and stays h3.
+  */
+  const Heading = open ? "h2" : "h3";
   const body = (
       <div>
         <p>Where would you like to use your knowledge?</p>
@@ -45,15 +50,15 @@ export default function WorkspaceUseWithAi({ open = false, onDownload, onOpen, d
         </div>
         <div className="one-path-ai-destination" role="tabpanel" id={`${uid}-panel`} aria-labelledby={`${uid}-${destination}`} tabIndex={0}>
           {destination === "assistant" ? <>
-            <ConnectAiPanel />
+            <ConnectAiPanel headingLevel={Heading} />
             <p>Live answers need an activated version. For a local agent with an API key instead, use the MCP bridge.</p>
             <Link className="btn btn-ghost" href="/docs/mcp">Open assistant setup</Link>
           </> : destination === "application" ? <>
-            <h3>Use the API from your application</h3>
+            <Heading>Use the API from your application</Heading>
             <p>Set up a scoped connection and test a request against your active knowledge. Keep credentials on your server, not in public client code.</p>
             <Link className="btn btn-ghost" href="/docs/quickstart">Open the API quickstart</Link>
           </> : <>
-            <h3>Take the knowledge with you</h3>
+            <Heading>Take the knowledge with you</Heading>
             <p>Download the signed package, extract it, give your agent access to the folder, and ask it to read <code>AGENTS.md</code> first.</p>
             <small>A folder path alone grants no access. Your AI needs permission and a file-reading tool. A downloaded package is a snapshot, not a live connection.</small>
             {onDownload ? <button type="button" disabled={downloading} onClick={onDownload}>{downloading ? "Preparing…" : "Download signed package"}</button> : <Link className="btn btn-ghost" href="/docs/cli">See package setup</Link>}
