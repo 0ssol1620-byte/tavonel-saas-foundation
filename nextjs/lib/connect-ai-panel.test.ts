@@ -1,7 +1,8 @@
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import ConnectAiPanel, { CONNECT_AI_SCOPES } from "./connect-ai-panel";
-import { REMOTE_MCP_SCOPES } from "@/lib/remote-mcp";
+import ConnectAiPanel, { CONNECT_AI_SCOPES } from "@/components/workspace/connect-ai-panel";
+import { REMOTE_MCP_SCOPES } from "./remote-mcp";
 
 describe("Connect AI panel (W1-A1)", () => {
   it("names exactly the scopes a remote MCP token can hold", () => {
@@ -9,7 +10,7 @@ describe("Connect AI panel (W1-A1)", () => {
   });
 
   it("shows one MCP URL, the Claude steps first, and says no client handshake was verified", () => {
-    const html = renderToStaticMarkup(<ConnectAiPanel />);
+    const html = renderToStaticMarkup(createElement(ConnectAiPanel));
     expect(html).toContain("https://tavonel.com/api/mcp");
     expect(html).toContain("Add custom connector");
     expect(html).toContain("Add to ChatGPT");

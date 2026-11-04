@@ -69,7 +69,7 @@ export default function ConnectAiPanel({ headingLevel: Heading = "h3" }: { headi
       <Heading id="connect-ai-title">Connect Claude or ChatGPT</Heading>
       {availability === "off" ? (
         <p role="status">
-          The hosted MCP endpoint is not switched on for this deployment yet. Until it is, use the local MCP bridge with an API key.{" "}
+          The hosted MCP endpoint is not switched on here yet. Until it is, use the local MCP bridge with an API key.{" "}
           <Link href="/docs/mcp">Local MCP setup</Link>
         </p>
       ) : availability === "unknown" ? (

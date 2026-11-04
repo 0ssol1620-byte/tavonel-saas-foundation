@@ -20,7 +20,7 @@ export default defineConfig({
     // stay out -- they write report files and take minutes, and live in eval/vitest.config.ts.
     // scripts/router/*, scripts/billing/*: operator CLIs whose pure planning/aggregation half is unit tested here.
     include: [
-      "lib/**/*.test.ts", "lib/**/*.spec.ts", "components/workspace/*.test.tsx", "eval/**/metrics.test.ts",
+      "lib/**/*.test.ts", "lib/**/*.spec.ts", "eval/**/metrics.test.ts",
       "components/explore/evidence-workbench.test.tsx", "components/landing-v2/hero-source-card.test.tsx", "components/evaluation-page.test.tsx",
       "components/compile-stage-player.mobile-view.test.tsx",
       "components/compile-stage.test.tsx", "components/intake-triage-review.test.tsx", "components/intake-triage-review.interaction.test.ts",
