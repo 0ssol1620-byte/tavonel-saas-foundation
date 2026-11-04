@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordServerFunnel } from "@/lib/funnel-events";
 import { createDeveloperApiKey, listDeveloperApiKeys, revokeDeveloperApiKey } from "@/lib/developer-store";
 import {
   REMOTE_MCP_TOKEN_TTL_SECONDS,
@@ -78,6 +79,7 @@ export async function POST(request: Request) {
       ? oauthError(400, "invalid_grant", "The workspace authorization changed since consent.")
       : oauthError(503, "temporarily_unavailable", minted.code);
   }
+  recordServerFunnel("mcp_token_issued");
   const response: RemoteMcpTokenResponse = {
     access_token: minted.token,
     token_type: "Bearer",

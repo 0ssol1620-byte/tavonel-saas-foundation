@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordServerFunnel } from "@/lib/funnel-events";
 import { TOOLS, assertReadOnly, createClient, createServer } from "@/public/developer/tavonel-mcp.mjs";
 import {
   REMOTE_MCP_PROTOCOL_VERSIONS,
@@ -6,7 +7,10 @@ import {
   bearerChallenge,
   checkBearer,
   cohortRefusalStatus,
+  recordRemoteMcpSli,
   remoteMcpCohortRefusal,
+  remoteMcpToolLabel,
+  toolFailureCode,
   remoteMcpEnabled,
   requestOrigin,
 } from "@/lib/remote-mcp";
@@ -61,8 +65,38 @@ function rpcError(status: number, id: unknown, code: number, message: string, he
   return NextResponse.json({ jsonrpc: "2.0", id: id ?? null, error: { code, message } }, { status, headers: { ...NO_STORE, ...headers } });
 }
 
+/*
+  Telemetry (W1-A1): one SLI line per POST (status and duration; the 5xx ratio's denominator is
+  every POST, see summarizeRemoteMcpSli), and for tools/call the funnel pair mcp_tool_called (the
+  tool ran) and mcp_tool_failed (the call was refused or the tool's result is an error), each
+  carrying only the tool's name from the closed table and the refusal's constant code.
+*/
 export async function POST(request: Request) {
   if (!remoteMcpEnabled()) return new NextResponse(null, { status: 404 });
+  const started = performance.now();
+  const seen: { method: string | null; tool: string | null } = { method: null, tool: null };
+  let response: Response;
+  try {
+    response = await answer(request, seen);
+  } catch (error) {
+    recordRemoteMcpSli({ method: seen.method, tool: seen.tool, status: 500, durationMs: performance.now() - started });
+    throw error;
+  }
+  recordRemoteMcpSli({ method: seen.method, tool: seen.tool, status: response.status, durationMs: performance.now() - started });
+  if (seen.method === "tools/call") {
+    const tool = remoteMcpToolLabel(seen.tool);
+    const body = await response.clone().json().catch(() => null) as
+      { error?: { message?: unknown }; result?: { isError?: unknown; content?: Array<{ text?: unknown }> } } | null;
+    if (response.status === 200 && body?.result) recordServerFunnel("mcp_tool_called", { tool });
+    const failure = response.status !== 200
+      ? toolFailureCode(body?.error?.message)
+      : body?.result?.isError === true ? toolFailureCode(body.result.content?.[0]?.text) : null;
+    if (failure) recordServerFunnel("mcp_tool_failed", { tool, code: failure });
+  }
+  return response;
+}
+
+async function answer(request: Request, seen: { method: string | null; tool: string | null }) {
   const origin = requestOrigin(request);
   // Streamable HTTP: servers MUST validate Origin. Server-side clients send none.
   const from = request.headers.get("origin");
@@ -85,6 +119,8 @@ export async function POST(request: Request) {
     return rpcError(400, null, -32600, "Invalid Request");
   }
   const { id, method, params: rpcParams } = message as { id?: unknown; method?: unknown; params?: { name?: unknown } };
+  seen.method = typeof method === "string" ? method : null;
+  seen.tool = typeof rpcParams?.name === "string" ? rpcParams.name : null;
 
   const bearer = await checkBearer(request.headers.get("authorization"));
   if (bearer.kind === "rejected") {

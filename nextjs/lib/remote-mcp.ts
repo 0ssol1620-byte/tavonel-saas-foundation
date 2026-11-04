@@ -474,6 +474,52 @@ export async function checkBearer(authorization: string | null): Promise<BearerC
   return { kind: "principal", token, scopes, workspaceKey: authenticated.principal.workspaceKey };
 }
 
+/* ------------------------------------------------------------------- telemetry */
+
+/** The tool's name when it is one of the nine, else "unknown": a client-chosen string never reaches a log. */
+export const remoteMcpToolLabel = (name: string | null) => (name !== null && Object.hasOwn(REMOTE_MCP_TOOL_SCOPES, name) ? name : "unknown");
+
+const CODE = /^[A-Z][A-Z0-9_]{2,63}/;
+/**
+ * The constant code a refusal or a failed tool result leads with -- for the bridge's
+ * `API_ERROR_404: WORLD_NOT_FOUND`, the API's own code after the status -- else TOOL_FAILED.
+ * Only `[A-Z0-9_]` survives, so no message text, id or question can ride along.
+ */
+export function toolFailureCode(text: unknown): string {
+  if (typeof text !== "string") return "TOOL_FAILED";
+  const api = /^API_ERROR_[0-9]{3}: ([A-Z][A-Z0-9_]{2,63})/.exec(text);
+  return api?.[1] ?? CODE.exec(text)?.[0] ?? "TOOL_FAILED";
+}
+
+export const REMOTE_MCP_SLI_SCHEMA = "tavonel.remote_mcp_sli.v1" as const;
+export type RemoteMcpSliRecord = { sli: typeof REMOTE_MCP_SLI_SCHEMA; method: string; tool: string | null; status: number; durationMs: number };
+
+/** One structured line per /api/mcp POST on the server log (the funnel's sink, read by the log drain). */
+export function recordRemoteMcpSli(input: { method: string | null; tool: string | null; status: number; durationMs: number }) {
+  const method = input.method !== null && /^[a-z/]{1,40}$/.test(input.method) ? input.method : "unknown";
+  const record: RemoteMcpSliRecord = {
+    sli: REMOTE_MCP_SLI_SCHEMA,
+    method,
+    tool: method === "tools/call" ? remoteMcpToolLabel(input.tool) : null,
+    status: input.status,
+    durationMs: Math.round(input.durationMs * 10) / 10,
+  };
+  try { console.info(JSON.stringify(record)); } catch { /* telemetry never breaks an answer */ }
+}
+
+/**
+ * p50/p95 latency and the 5xx ratio over SLI lines. The denominator is every call recorded --
+ * refusals included -- and is returned beside the ratio, never without it. Nearest-rank
+ * percentiles; null when there are no calls rather than a zero that reads as a measurement.
+ */
+export function summarizeRemoteMcpSli(records: readonly Pick<RemoteMcpSliRecord, "status" | "durationMs">[]) {
+  const calls = records.length;
+  const sorted = records.map((record) => record.durationMs).sort((a, b) => a - b);
+  const rank = (p: number) => (calls === 0 ? null : sorted[Math.max(0, Math.ceil(p * calls) - 1)]!);
+  const server5xx = records.filter((record) => record.status >= 500).length;
+  return { calls, p50Ms: rank(0.5), p95Ms: rank(0.95), server5xx, server5xxRatio: calls === 0 ? null : server5xx / calls };
+}
+
 /** RFC 6750 §3 challenge, with the RFC 9728 pointer MCP clients start discovery from. */
 export function bearerChallenge(origin: string, error?: { error: string; description: string; scope?: string }) {
   const parts = [`resource_metadata="${remoteMcpUrls(origin).resourceMetadata}"`];
