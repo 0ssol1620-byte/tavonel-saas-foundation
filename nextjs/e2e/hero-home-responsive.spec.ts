@@ -106,12 +106,13 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
     });
     expect(geometry.overflow).toBe(false);
     if (width >= 900) {
-      // Release 2: a compact left-aligned tab group, labels 32-40px apart.
+      // Release 2: a compact left-aligned tab group. Direction C (2026-11-04) draws it as one segmented track on the sand,
+      // so the labels are padded segments 2-8px apart (4px as built) rather than bare labels 32-40px apart.
       const rects = geometry.tabs.map(tab => tab.rect);
       for (let i = 1; i < rects.length; i++) {
         const gap = rects[i]!.left - rects[i - 1]!.right;
-        expect(gap).toBeGreaterThanOrEqual(32);
-        expect(gap).toBeLessThanOrEqual(40);
+        expect(gap).toBeGreaterThanOrEqual(2);
+        expect(gap).toBeLessThanOrEqual(8);
       }
       for (const rect of rects) expect(rect.width).toBeGreaterThanOrEqual(44);
     }
