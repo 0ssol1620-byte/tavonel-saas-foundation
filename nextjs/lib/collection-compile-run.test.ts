@@ -959,3 +959,94 @@ describe("private global compile admission and release binding", () => {
     expect(dispatched).not.toHaveBeenCalled();
   });
 });
+
+/*
+  B1 (TAVONEL_LIBRARY_DEDUP). The annotation is computed at intake, before the paid dispatch, and
+  in no mode does it change what is dispatched, signed or stored: the three modes are compared on
+  the Core request, the audited receipt payload and the persisted candidate.
+*/
+describe("exact-duplicate annotation at compile intake", () => {
+  const OTHER = "0d0d0d0d-0000-4000-8000-00000000000d";
+  const rpc = vi.fn(async () => new Response(JSON.stringify({
+    schemaVersion: "tavonel.source_fingerprints.v1", fingerprints: 1,
+    relations: [{ documentId: DOCUMENT, relatedDocumentId: OTHER, kind: "exact_bytes", matchedOn: ["sanitized_sha256"] }],
+  }), { status: 200 }));
+  function compilable() {
+    readyWorkspace();
+    fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v2", [{
+      regionId: "native-p0001", pageIndex0: 0, pageNumber1: 1, order: 0, blockType: "paragraph",
+      bbox1000: [0, 0, 1000, 1000], text: "The pump was inspected and the reading stayed inside the policy limits.",
+      confidence: 1, authority: "official",
+    }]) });
+    dispatched.mockResolvedValue({ ok: true, result: {
+      status: "completed", runtime: "tavonel-python-core-v2",
+      candidate: { worldStateId: "world-1", reviewReasons: [] },
+      receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, candidatePromotion: false },
+    } });
+    put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
+  }
+  async function compileWith(mode: string | undefined) {
+    vi.clearAllMocks();
+    rpc.mockClear();
+    vi.stubGlobal("fetch", rpc);
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://store.example");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "k".repeat(40));
+    if (mode !== undefined) vi.stubEnv("TAVONEL_LIBRARY_DEDUP", mode);
+    compilable();
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+    const audit = audited.mock.calls[0]?.[0] as { details: { sourceProcessingObservations: unknown } } | undefined;
+    return {
+      run,
+      core: JSON.stringify(dispatched.mock.calls[0]?.slice(0, 3)),
+      stored: put.mock.calls[0]?.[3] as Record<string, unknown> | undefined,
+      auditSources: JSON.stringify((audit?.details.sourceProcessingObservations as { sources?: unknown } | undefined)?.sources),
+    };
+  }
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("off (unset): no store call, and the response has no duplicate field", async () => {
+    const off = await compileWith(undefined);
+    expect(off.run.ok).toBe(true);
+    expect(rpc).not.toHaveBeenCalled();
+    expect(off.run.ok && "libraryDuplicates" in off.run.payload).toBe(false);
+  });
+
+  it("shadow records, and the compile is the same compile as with the flag off", async () => {
+    const off = await compileWith("off");
+    const shadow = await compileWith("shadow");
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(rpc.mock.invocationCallOrder[0]).toBeLessThan(dispatched.mock.invocationCallOrder[0]!);
+    expect(shadow.run.ok && "libraryDuplicates" in shadow.run.payload).toBe(false);
+    expect(shadow.core).toBe(off.core);
+    expect(shadow.auditSources).toBe(off.auditSources);
+    expect(Object.keys(shadow.stored ?? {})).toEqual(Object.keys(off.stored ?? {}));
+    expect(shadow.stored).not.toHaveProperty("libraryDuplicates");
+  });
+
+  it("on: the response names the copy; the stored World still does not", async () => {
+    const off = await compileWith("off");
+    const on = await compileWith("on");
+    expect(on.run.ok && on.run.payload.libraryDuplicates).toEqual([
+      { documentId: DOCUMENT, kind: "exact", duplicateOfDocumentIds: [OTHER] },
+    ]);
+    expect(on.core).toBe(off.core);
+    expect(on.stored).not.toHaveProperty("libraryDuplicates");
+  });
+
+  it("a store that is down never stops the compile", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("network"); }));
+    vi.stubEnv("TAVONEL_LIBRARY_DEDUP", "on");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://store.example");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "k".repeat(40));
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    compilable();
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+    expect(run.ok).toBe(true);
+    expect(run.ok && "libraryDuplicates" in run.payload).toBe(false);
+    expect(put).toHaveBeenCalledOnce();
+  });
+});
