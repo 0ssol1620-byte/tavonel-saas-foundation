@@ -1,4 +1,7 @@
+import { preload } from "react-dom";
 import { displayableRegions, type EvidenceCase } from "@/lib/home-evidence-view";
+import { landingV2PageImage } from "@/lib/landing-v2-assets";
+import { EMPTY_IMAGE, PHONE_HERO_FILM_MEDIA, PHONE_HERO_STILL_MEDIA } from "@/lib/hero-phone-mode";
 import heroStyles from "./landing-hero.module.css";
 import styles from "./source-first-home.module.css";
 
@@ -24,6 +27,13 @@ export default function HeroStill({ view, korean = false }: { view: EvidenceCase
   const onPage = regions.filter(region => region.sourceId === active.sourceId && region.page === active.page);
   const start = Math.max(0, Math.min(...onPage.map(region => region.bbox1000[1])) - 80);
   const end = Math.min(1000, Math.max(...onPage.map(region => region.bbox1000[3])) + 80);
+  /*
+    The phone's first-screen image (its LCP element, round 2): the committed derivative set, eager and hinted at
+    phone widths only. Above 900px the still is not drawn, so a source there fetches nothing.
+  */
+  const set = landingV2PageImage(active.digest, active.page);
+  const sizes = "calc(100vw - 64px)";
+  if (set?.avifSrcSet) preload(set.src, { as: "image", type: "image/avif", fetchPriority: "high", imageSrcSet: set.avifSrcSet, imageSizes: sizes, media: PHONE_HERO_STILL_MEDIA });
   return (
     <figure className={styles.heroStill} data-testid="landing-hero-still">
       <div
@@ -31,15 +41,21 @@ export default function HeroStill({ view, korean = false }: { view: EvidenceCase
         style={{ aspectRatio: `${page.image.width} / ${(page.image.height * (end - start)) / 1000}` }}
       >
         <div className={heroStyles.pageSheet} style={{ transform: `translateY(-${start / 10}%)` }}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- the committed raster, the same file s2 opens */}
+          <picture style={{ display: "contents" }}>
+            <source media={PHONE_HERO_FILM_MEDIA} srcSet={EMPTY_IMAGE} />
+            {set?.avifSrcSet ? <source type="image/avif" srcSet={set.avifSrcSet} sizes={sizes} /> : null}
+          {/* the committed raster, the same file s2 opens */}
           <img
             src={page.image.src}
+            srcSet={set?.srcSet || undefined}
+            sizes={set?.srcSet ? sizes : undefined}
             width={page.image.width}
             height={page.image.height}
             alt={korean ? "구절을 추출한 공시 문서의 페이지 렌더입니다." : "A rendered page of the filing the passage was extracted from."}
             decoding="async"
-            loading="lazy"
+            loading="eager"
           />
+          </picture>
           {onPage.map(region => {
             const [x, y, x2, y2] = region.bbox1000;
             return (

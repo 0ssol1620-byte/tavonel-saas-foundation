@@ -12,6 +12,17 @@
  */
 export const PHONE_HERO: "still" | "film" = "still";
 
+/** Where each hero draws while the still stands in: the still at 900px and below, the film above. */
+export const PHONE_HERO_STILL_MEDIA = "(max-width: 900px)";
+export const PHONE_HERO_FILM_MEDIA = "(min-width: 901px)";
+
+/**
+ * A 1x1 transparent GIF for a <picture> source whose image is not drawn at that width: the browser takes the
+ * source and fetches nothing, so the hidden poster on a phone (and the hidden still on a desktop) costs no bytes
+ * and does not compete with the image the first screen does paint (Lighthouse / LCP, round 2).
+ */
+export const EMPTY_IMAGE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
 /** The reason a skipped phone-film check prints. */
 export const PHONE_HERO_STILL_REASON =
   "Direction C round 2 interim: below 900px Home shows the Inspector still, not the film (lib/hero-phone-mode.ts)";

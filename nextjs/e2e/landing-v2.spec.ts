@@ -231,7 +231,7 @@ test("the phone hero shows the Inspector still in place of the film, and only th
     await expect(still).toBeVisible();
     await expect(film).toBeHidden();
     await expect(still.locator("img")).toHaveAttribute("src", /apple-2026-q1-10-q-reference-p004/);
-    await expect(still.locator("img")).toHaveAttribute("loading", "lazy");
+    await expect(still.locator("img")).toHaveAttribute("loading", "eager");
     expect((await still.boundingBox())!.y, "the still starts on the first screen").toBeLessThan(page.viewportSize()!.height);
   } else {
     await expect(still).toBeHidden();
@@ -254,10 +254,20 @@ test("server-renders the visible film poster as its priority image", async ({ re
   expect(posterHint.match(/\/film\/poster-[^>]+/g) ?? []).toEqual([]);
   const head = html.slice(0, html.indexOf("</head>"));
   expect(head).not.toContain("poster-1-t8.16-pane1-684x855");
-  const preloads = [...head.matchAll(/<link[^>]*rel="preload"[^>]*as="image"[^>]*>/g)].map(match => match[0]);
+  const allPreloads = [...head.matchAll(/<link[^>]*rel="preload"[^>]*as="image"[^>]*>/g)].map(match => match[0]);
+  /*
+    Round 2 (lib/hero-phone-mode.ts): while a phone shows the Inspector still, there are two image hints, split by width --
+    the poster's for the widths that draw the film, the still's for the phone (its LCP element) -- so neither screen
+    fetches the image it hides. With the film back on phones this is the one unscoped poster hint again.
+  */
+  const stillHints = allPreloads.filter(tag => tag.includes("apple-2026-q1-10-q-reference-p004"));
+  const preloads = allPreloads.filter(tag => !stillHints.includes(tag));
+  expect(stillHints).toHaveLength(PHONE_HERO === "still" ? 1 : 0);
+  if (PHONE_HERO === "still") expect(stillHints[0]).toMatch(/ media="\(max-width: 900px\)"/i);
   expect(preloads).toHaveLength(1);
   expect(preloads[0]).toMatch(/fetchpriority="high"/i);
-  expect(preloads[0]).not.toMatch(/ media=/i);
+  if (PHONE_HERO === "still") expect(preloads[0]).toMatch(/ media="\(min-width: 901px\)"/i);
+  else expect(preloads[0]).not.toMatch(/ media=/i);
   // POSTER-RECUT (D-11): the one hint is the AVIF srcset, typed so a browser without AVIF skips it.
   expect(preloads[0]).toMatch(/imagesrcset="\/film\/poster-1-t8\.16\.avif 1440w, \/film\/poster-1-t8\.16-2x\.avif 2880w"/i);
   expect(preloads[0]).toMatch(/type="image\/avif"/i);
@@ -270,8 +280,9 @@ test("server-renders the visible film poster as its priority image", async ({ re
   // while lib/hero-phone-mode.ts says "still", by the phone hero's still (#1) -- every copy lazy, none competing with the
   // poster for priority.
   expect(sourceImages).toHaveLength(PHONE_HERO === "still" ? 3 : 2);
-  for (const tag of sourceImages) {
-    expect(tag).toContain('loading="lazy"');
+  // s2's and s3's copies are lazy; the phone still is the phone's first-screen image, so it is eager (and hinted above).
+  for (const [index, tag] of sourceImages.entries()) {
+    expect(tag).toContain(PHONE_HERO === "still" && index === 0 ? 'loading="eager"' : 'loading="lazy"');
     expect(tag).not.toMatch(/fetchpriority="high"/i);
   }
 });
