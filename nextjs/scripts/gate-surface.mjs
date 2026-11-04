@@ -145,8 +145,11 @@ export function resolveDeployTools(repositoryRoot = REPOSITORY_ROOT,
  * claims nothing when Git can see that the checkout differs from HEAD: an edited, staged or untracked,
  * not ignored, file (a local `vercel build --prod` deployed with `--prebuilt`), or any index entry
  * marked skip-worktree or assume-unchanged, which `git status` would otherwise not report.
+ * `report` receives the reason when a production build of a claimed SHA claims nothing after the cache check: no
+ * secret, only the HEAD it saw or the paths `git status` listed (D-05 review N3). It changes no result.
  */
-export function deploymentGateSurface(env = process.env, repositoryRoot = REPOSITORY_ROOT, toolOptions = {}) {
+export function deploymentGateSurface(env = process.env, repositoryRoot = REPOSITORY_ROOT, toolOptions = {},
+  report = () => {}) {
   const claimed = env.VERCEL_GIT_COMMIT_SHA?.trim().toLowerCase();
   if (env.VERCEL_ENV !== "production" || !claimed) return null;
   const { git: gitPath } = resolveDeployTools(repositoryRoot, toolOptions);
@@ -157,14 +160,29 @@ export function deploymentGateSurface(env = process.env, repositoryRoot = REPOSI
   let head;
   try {
     head = git("rev-parse", "HEAD").trim().toLowerCase();
+    if (claimed !== head) {
+      report(`HEAD is ${head}, not VERCEL_GIT_COMMIT_SHA ${claimed}`);
+      return null;
+    }
     // `git status` compares HEAD, index and working tree, so a staged change is reported too.
-    if (claimed !== head || git("status", "--porcelain").length > 0) return null;
+    const status = git("status", "--porcelain");
+    if (status.length > 0) {
+      const paths = status.split("\n").filter(Boolean).map((line) => line.slice(3));
+      report(`git status is not clean: ${paths.slice(0, 20).join(", ")}${paths.length > 20 ? ` and ${paths.length - 20} more` : ""}`);
+      return null;
+    }
     // `ls-files -v` tags a skip-worktree entry S and an assume-unchanged one in lower case.
-    if (git("ls-files", "-v", "-z").split("\0").some((entry) => /^(S|[a-z])/.test(entry))) return null;
+    if (git("ls-files", "-v", "-z").split("\0").some((entry) => /^(S|[a-z])/.test(entry))) {
+      report("an index entry is marked skip-worktree or assume-unchanged");
+      return null;
+    }
   } catch {
+    report("git failed while checking the checkout");
     return null;
   }
-  return gateSurfaceOfCommit(repositoryRoot, head, gitPath);
+  const digest = gateSurfaceOfCommit(repositoryRoot, head, gitPath);
+  if (digest === null) report(`no gate surface digest for ${head}`);
+  return digest;
 }
 
 export const NO_BUILD_CACHE_REFUSAL = "gate-surface --deploy: VERCEL_FORCE_NO_BUILD_CACHE is not 1 in this production " +
@@ -183,10 +201,10 @@ export function deploymentGateSurfaceFile(env = process.env, directory = tmpdir(
  * record something else left, is not trusted. Outside a Vercel production build it writes nothing.
  */
 export function recordDeploymentGateSurface(env = process.env, repositoryRoot = REPOSITORY_ROOT, directory = tmpdir(),
-  toolOptions = {}) {
+  toolOptions = {}, report = () => {}) {
   const file = deploymentGateSurfaceFile(env, directory);
   if (file === null) return null;
-  const digest = deploymentGateSurface(env, repositoryRoot, toolOptions);
+  const digest = deploymentGateSurface(env, repositoryRoot, toolOptions, report);
   const revision = env.VERCEL_GIT_COMMIT_SHA.trim().toLowerCase();
   try {
     writeFileSync(file, `${JSON.stringify({ schemaVersion: SCHEMA, revision, digest })}\n`, { flag: "wx" });
@@ -220,7 +238,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     // A second run for the same SHA, or a node or git the checkout or build cache could supply, stops the build (exit 1).
     let digest;
     try {
-      digest = recordDeploymentGateSurface();
+      digest = recordDeploymentGateSurface(process.env, REPOSITORY_ROOT, tmpdir(), {},
+        (reason) => process.stderr.write(`gate-surface --deploy: records none: ${reason}\n`));
     } catch (error) {
       process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
       process.exit(1);

@@ -187,15 +187,32 @@ NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
      주장하지 않는다. 다만 바꿔치기된 node는 이 검사도 건너뛰므로, 설정 자체는 여기서 눈으로 확인한다.
 3. 이 코드를 배포한다. **이 코드의 첫 production 빌드 로그에 `customer-data gate surface (deploy step): sha256:…` 줄이
    `pnpm check` 출력보다 먼저 찍혀야 한다.** 로그에 "Restored build cache"가 없어야 한다(있으면 2번 설정이 빠졌다).
-   production 빌드인데 `none (exact-SHA release only)`이면 `VERCEL_FORCE_NO_BUILD_CACHE`가 `1`이 아니거나(바로 앞에 그
-   설정 이름을 적은 메시지가 찍힌다), 빌드에서 git을 쓸 수 없거나, 작업 트리가 깨끗하지 않다는 뜻이다(예: prebuild가 무시되지
-   않는 파일을 남김). 그때는 기능이 꺼진 것이므로 오늘처럼 SHA마다 기록하고, 원인을
-   고친 뒤 다음 production 빌드에서 다시 확인한다. preview 빌드는 항상 `none`이다.
-   빌드가 `gate-surface --deploy:`로 시작하는 메시지로 멈추면 그 메시지가 원인이다. node나 git이 저장소·`node_modules` 안에서
+   production 빌드인데 `none (exact-SHA release only)`이면 바로 앞 stderr 줄이 원인을 적는다.
+   - `VERCEL_FORCE_NO_BUILD_CACHE is not 1 …`: 2번 설정이 빠졌다.
+   - `gate-surface --deploy: records none: …`: 다음 중 하나다. 경로만 적고 파일 내용은 적지 않는다.
+     - `HEAD is …, not VERCEL_GIT_COMMIT_SHA …`
+     - `git status is not clean: <경로들>`
+     - skip-worktree나 assume-unchanged 항목
+     - git 실패
+     - HEAD의 digest 없음
+   - 그때는 기능이 꺼진 것이다. 오늘처럼 SHA마다 기록하고, 원인을 고친 뒤 다음 production 빌드에서 다시 확인한다.
+   - preview 빌드는 항상 `none`이다.
+
+   **2026-11-04 진단**(ADR 0006 "추가 2026-11-04")
+   - Vercel production 빌드에는 shallow `.git`과 git이 있다. `HEAD`는 `VERCEL_GIT_COMMIT_SHA`와 같다.
+   - `main` `1008bd22`의 `none`은 깨끗하지 않은 checkout 때문이었다. 두 줄이 나왔다.
+     - `?? vercel.json`: Vercel이 clone 직후 루트에 쓰는 파일이다. 이제 루트 `.gitignore`가 무시한다.
+     - ` M supabase/tests/foundation_approved_connection_batch_binding.sql`: 섞인 줄끝 blob이었다. 이제 LF만으로 저장한다.
+   - 이 두 변경이 병합된 뒤의 production checkout은 deploy 단계가 요구하는 깨끗한 상태를 채운다.
+     LF 새 clone에 루트 `vercel.json` 사본을 두고 확인했다.
+   - 병합 뒤에도 `git status is not clean`이 찍히면, 그 줄의 경로가 새 원인이다.
+   빌드가 `gate-surface --deploy:`로 시작하는 메시지로 멈추면(exit 1) 그 메시지가 원인이다. 위의 `records none:` 줄은 빌드를 멈추지 않는다. node나 git이 저장소·`node_modules` 안에서
    찾혔거나(cache나 PATH를 확인한다), 같은 SHA의 기록 파일이 이미 있다(메시지가 경로를 적는다. 로컬 `vercel build --prod`를
    두 번 돌린 경우면 그 파일을 지우고 다시 빌드한다).
 4. **필수: 세 값이 같은지 대조한다**(R5 보안 리뷰 N2). 첫 빌드만이 아니라, 표면을 넣은 행을 기록하기 전과 상속을 출시로
    보고하기 전마다 한다. 런타임 gate는 위조를 스스로 알 수 없으므로 이 대조가 값싼 탐지 장치다.
+   깨끗한 checkout 수정(2026-11-04)이 병합된 뒤 첫 production 빌드에서 (a)가 `sha256:…`이고 (a)·(b)·(c)가 같아야 한다.
+   이것이 이 수정의 유일한 end-to-end 증명이다. 그 전의 확인은 preview 진단과 로컬 LF clone뿐이다.
    - (a) 빌드 로그의 `customer-data gate surface (deploy step): …` 줄
    - (b) 같은 로그에서 `next build`가 시작한 뒤 찍히는 `customer-data gate surface: …` 줄. prebuild의 vitest suite가 next.config를
      import하며 찍는 같은 이름의 줄은 hermetic env라서 `none`이다. 그 줄과 헷갈리지 않는다.

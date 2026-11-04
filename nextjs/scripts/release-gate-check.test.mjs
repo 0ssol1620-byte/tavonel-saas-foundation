@@ -504,6 +504,22 @@ function digestV1(rules, tree) {
   return createHash("sha256").update(`tavonel.gate_surface.v1\n${lines.join("\n")}\n`).digest("hex");
 }
 
+// D-05 diagnosis. A blob holding CRLF under an explicit `text` attribute (`text eol=lf` here) is reported modified by
+// every fresh checkout although its bytes equal the blob, so the production deploy step, which needs a clean
+// `git status`, records no digest. `text=auto` leaves a blob that already holds CRLF alone, so only explicit text counts.
+test("gate surface: no tracked file stores CRLF under an explicit text attribute, so a fresh checkout is clean (D-05)",
+  { skip: checkoutHead === null }, () => {
+    const listing = execFileSync("git", ["-C", repositoryRoot, "ls-files", "--eol", "-z"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 });
+    const records = listing.split("\0").filter(Boolean);
+    assert.ok(records.length > 0);
+    const offending = records.filter((record) => {
+      const info = record.slice(0, record.indexOf("\t"));
+      return /^i\/(crlf|mixed)\s/.test(info) && /\battr\/text(\s|$)/.test(info);
+    }).map((record) => record.slice(record.indexOf("\t") + 1));
+    assert.deepEqual(offending, []);
+  });
+
 test("gate surface: a path holding LF cannot stand in for the surface files it deletes or adds (R2 S1)", () => {
   const id = (c) => c.repeat(40);
   const tree = (entries) => entries.map(([o, p]) => `100644 blob ${o}\t${p}`).join("\0") + "\0";
@@ -593,6 +609,52 @@ test("gate surface: only a clean Vercel production build of HEAD claims a digest
     rmSync(noGit, { recursive: true, force: true });
   }
 });
+
+// D-05 review N3. A production build of its claimed SHA that records none says why: the HEAD it saw, or the paths
+// `git status` listed, never file content. The result is unchanged; the reason only reaches the build log.
+test("gate surface: a production deploy step that claims nothing names the reason, paths only (D-05 N3)",
+  { skip: !gitBinary }, () => {
+    withScratchRepo((dir) => {
+      mkdirSync(join(dir, "nextjs", "scripts"), { recursive: true });
+      writeFileSync(join(dir, GATE_SURFACE_RULES_PATH), rulesSource);
+      writeFileSync(join(dir, "nextjs", "x.ts"), "export const x = 1;\n");
+      scratchGit(dir, ["add", "-A"]);
+      scratchGit(dir, ["commit", "-q", "-m", "fixture"]);
+      const head = scratchGit(dir, ["rev-parse", "HEAD"]);
+      const production = { VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: head, VERCEL_FORCE_NO_BUILD_CACHE: "1" };
+      const reasons = [];
+      const report = (reason) => reasons.push(reason);
+      const digest = gateSurfaceOfCommit(dir, head);
+      assert.equal(deploymentGateSurface(production, dir, {}, report), digest);
+      assert.deepEqual(reasons, []);
+      // Not asked to claim, or refused for the cache setting the CLI already names: no reason.
+      for (const env of [{ ...production, VERCEL_ENV: "preview" }, { ...production, VERCEL_FORCE_NO_BUILD_CACHE: undefined }]) {
+        assert.equal(deploymentGateSurface(env, dir, {}, report), null);
+      }
+      assert.deepEqual(reasons, []);
+      const other = "0".repeat(40);
+      assert.equal(deploymentGateSurface({ ...production, VERCEL_GIT_COMMIT_SHA: other }, dir, {}, report), null);
+      assert.deepEqual(reasons.splice(0), [`HEAD is ${head}, not VERCEL_GIT_COMMIT_SHA ${other}`]);
+      // The two lines the D-05 diagnosis found: an edited tracked file and Vercel's root vercel.json.
+      writeFileSync(join(dir, "nextjs", "x.ts"), "export const x = 'not-in-the-log';\n");
+      writeFileSync(join(dir, "vercel.json"), "{}\n");
+      assert.equal(deploymentGateSurface(production, dir, {}, report), null);
+      assert.deepEqual(reasons.splice(0), ["git status is not clean: nextjs/x.ts, vercel.json"]);
+      const records = mkdtempSync(join(tmpdir(), "gate-surface-reason-"));
+      try {
+        assert.equal(recordDeploymentGateSurface(production, dir, records, {}, report), null);
+        assert.deepEqual(reasons.splice(0), ["git status is not clean: nextjs/x.ts, vercel.json"]);
+      } finally {
+        rmSync(records, { recursive: true, force: true });
+      }
+      scratchGit(dir, ["checkout", "--", "nextjs/x.ts"]);
+      rmSync(join(dir, "vercel.json"));
+      scratchGit(dir, ["update-index", "--skip-worktree", "nextjs/x.ts"]);
+      assert.equal(deploymentGateSurface(production, dir, {}, report), null);
+      assert.deepEqual(reasons.splice(0), ["an index entry is marked skip-worktree or assume-unchanged"]);
+      assert.doesNotMatch(reasons.join("\n"), /not-in-the-log/);
+    });
+  });
 
 test("gate surface: an index entry hidden from git status, or an index that is not HEAD, claims nothing (R3 S-B1)",
   { skip: !gitBinary }, () => {
@@ -922,6 +984,24 @@ test("gate surface: a production deploy step without VERCEL_FORCE_NO_BUILD_CACHE
       assert.match(step.stdout, /deploy step\): none \(exact-SHA release only\)/);
       const [record] = readdirSync(records).map((name) => JSON.parse(readFileSync(join(records, name), "utf8")));
       assert.equal(record.digest, null);
+    } finally {
+      rmSync(records, { recursive: true, force: true });
+    }
+  });
+
+// D-05 N3. The CLI writes that reason to stderr; a claimed SHA that is not HEAD is a reason on any checkout.
+test("gate surface: the deploy step CLI writes the reason it records none to stderr (D-05 N3)",
+  { skip: checkoutHead === null }, () => {
+    const records = mkdtempSync(join(tmpdir(), "gate-surface-reason-cli-"));
+    try {
+      const claimed = "0".repeat(40);
+      const env = { ...process.env, VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: claimed,
+        VERCEL_FORCE_NO_BUILD_CACHE: "1", TMPDIR: records, TEMP: records, TMP: records };
+      const step = spawnSync(process.execPath, [fileURLToPath(new URL("./gate-surface.mjs", import.meta.url)), "--deploy"],
+        { env, encoding: "utf8" });
+      assert.equal(step.status, 0, step.stderr);
+      assert.match(step.stderr, new RegExp(`^gate-surface --deploy: records none: HEAD is [0-9a-f]{40}, not VERCEL_GIT_COMMIT_SHA ${claimed}\\n$`));
+      assert.match(step.stdout, /deploy step\): none \(exact-SHA release only\)/);
     } finally {
       rmSync(records, { recursive: true, force: true });
     }
