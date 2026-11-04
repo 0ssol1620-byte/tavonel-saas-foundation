@@ -197,6 +197,13 @@ describe("the four 402 routes", () => {
     expect(mocks.createKey).not.toHaveBeenCalled();
     expect(mocks.rotateKey).not.toHaveBeenCalled();
     expect(mocks.revokeKey).not.toHaveBeenCalled();
+    expect(lines.map((line) => JSON.parse(line))).toEqual([
+      { event: "trial_ai_access_would_allow", kind: "key_list" },
+      { event: "trial_ai_access_would_allow", kind: "key_create" },
+      { event: "trial_ai_access_would_allow", kind: "key_revoke" },
+      { event: "trial_ai_access_would_allow", kind: "key_rotate" },
+      { event: "trial_ai_access_would_allow", kind: "key_rotate" },
+    ]);
   });
 
   it("flag off: a paid session is untouched -- no shadow read, no line", async () => {

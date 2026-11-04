@@ -164,7 +164,14 @@ export type ServerFunnelEvent =
   | "grounded_task_completed"
   | "external_consumer_succeeded"
   | "export_package_signed"
-  | "subscription_started";
+  | "subscription_started"
+  /*
+    W1-A2.1 shadow: a free-evaluation request for AI access (an API key or remote MCP consent) that
+    was refused 402 with TAVONEL_TRIAL_AI_ACCESS_ENABLED off but would have been allowed with it on.
+    `kind` is the operation (key_list, key_create, key_revoke, key_rotate, mcp_authorize). It counts
+    demand for a behaviour that does not exist yet, so it is a would-allow, not an outcome.
+  */
+  | "trial_ai_access_would_allow";
 
 /*
   The property allowlist -- the enforced half of the sentence at the top of this file.

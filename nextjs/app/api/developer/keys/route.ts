@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { parseDeveloperScopes } from "@/lib/developer-contracts";
 import { requireFoundationSession, revalidateFoundationSession } from "@/lib/developer-auth";
 import { createDeveloperApiKey, listDeveloperApiKeys } from "@/lib/developer-store";
+import { recordServerFunnel } from "@/lib/funnel-events";
 import { trialAiAccess, trialScopesAllowed, type TrialAiOperation } from "@/lib/trial-ai-access";
 import type { FoundationPrincipal } from "@/lib/developer-auth";
 
@@ -13,6 +14,7 @@ const NO_STORE = { "Cache-Control": "no-store" };
 async function trialBlocked(principal: FoundationPrincipal, operation: TrialAiOperation) {
   const trial = await trialAiAccess(principal, operation);
   if (trial.ok) return null;
+  if (trial.wouldAllow) recordServerFunnel("trial_ai_access_would_allow", { kind: operation });
   return NextResponse.json({ code: trial.code }, { status: trial.status, headers: NO_STORE });
 }
 

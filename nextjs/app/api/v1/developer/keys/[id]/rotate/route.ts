@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireFoundationSession } from "@/lib/developer-auth";
 import { parseDeveloperScopes } from "@/lib/developer-contracts";
 import { rotateDeveloperApiKey } from "@/lib/developer-store";
+import { recordServerFunnel } from "@/lib/funnel-events";
 import { trialAiAccess, trialScopesAllowed } from "@/lib/trial-ai-access";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: HEADERS });
   const trial = await trialAiAccess(auth.principal, "key_rotate");
   if (!trial.ok) {
+    if (trial.wouldAllow) recordServerFunnel("trial_ai_access_would_allow", { kind: "key_rotate" });
     return NextResponse.json({ code: trial.code }, { status: trial.status, headers: HEADERS });
   }
   const { id } = await context.params;
