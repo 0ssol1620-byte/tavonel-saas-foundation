@@ -1,3 +1,4 @@
+import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { expect, test } from "@playwright/test";
 const FILM = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]';
 test.describe("phone four-stage film", () => {
@@ -7,7 +8,8 @@ test.describe("phone four-stage film", () => {
     await page.goto("/");
     await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
   });
-  test("opens compact on the locked stage-1 frame, and Focus details opens the pane, with readable stage and play controls", async ({ page }) => {
+  test("opens compact on the locked stage-1 frame, and Focus details opens the pane, with readable stage and play controls", async ({ page }, testInfo) => {
+    test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     const film = page.locator(FILM);
     await expect(film).toBeVisible();
     const still = () => film.locator("img.compile-film-still").evaluate((image: HTMLImageElement) => new URL(image.currentSrc).pathname);
@@ -37,7 +39,8 @@ test.describe("phone four-stage film", () => {
     await expect(film.locator("video")).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   });
-  test("plays the approved recording and supports Fit, Focus and keyboard stage selection", async ({ page }) => {
+  test("plays the approved recording and supports Fit, Focus and keyboard stage selection", async ({ page }, testInfo) => {
+    test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     const film = page.locator(FILM);
     await film.getByRole("button", { name: "Play the compilation film", exact: true }).click();
     const video = film.locator("video");
@@ -76,7 +79,8 @@ test.describe("phone four-stage film", () => {
     await expect(tabs.first()).toBeFocused();
     await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
   });
-  test("reduced motion stays static and failed primary and fallback playback restore the locked poster", async ({ page }) => {
+  test("reduced motion stays static and failed primary and fallback playback restore the locked poster", async ({ page }, testInfo) => {
+    test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     const film = page.locator(FILM);
     await expect(film.locator("video")).toHaveCount(0);
     const failed: string[] = [];

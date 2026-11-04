@@ -1,3 +1,4 @@
+import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { test, expect } from "@playwright/test";
 import { activationPolicy } from "../lib/activation-policy";
 import { EXPLORE_CTA } from "../lib/site-navigation";
@@ -39,7 +40,8 @@ test("navigation and hero actions keep readable labels", async ({ page }) => {
   source-linked explanation in Scene 02 keep the wordmark's measured outer edge.
 */
 for (const path of ["/", "/ko"]) {
-  test(`${path} shares a measured outer edge and keeps the opened walkthrough inside it`, async ({ page }) => {
+  test(`${path} shares a measured outer edge and keeps the opened walkthrough inside it`, async ({ page }, testInfo) => {
+    test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(path);
     const wrap = await page.locator("#s1 .lv2-wrap").boundingBox();

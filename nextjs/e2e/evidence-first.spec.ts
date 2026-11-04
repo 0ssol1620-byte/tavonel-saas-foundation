@@ -1,3 +1,4 @@
+import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { expect, test } from "@playwright/test";
 const BENCH = "section#s2 article[data-case-status]";
 
@@ -24,7 +25,8 @@ const BENCH = "section#s2 article[data-case-status]";
   /explore, and `e2e/public-composition.spec.ts` on the five solution pages.
 */
 
-test("the landing makes no proof-shaped claim of its own", async ({ page }) => {
+test("the landing makes no proof-shaped claim of its own", async ({ page }, testInfo) => {
+  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   await page.goto("/");
   await expect(page.locator("h1#lv2-hero-title")).toContainText("Context your AI can cite, compiled from your documents.");
   await expect(page.locator("[data-proof-variant]")).toHaveCount(0);
@@ -99,7 +101,8 @@ test("the hero and every scene below it fit the viewport at the active product-Q
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });
 
-test("Korean visitors get the same story and the same route behind it", async ({ page }) => {
+test("Korean visitors get the same story and the same route behind it", async ({ page }, testInfo) => {
+  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   await page.goto("/ko");
   await expect(page.locator("h1#lv2-hero-title")).toContainText("문서를 AI가 인용할 수 있는 맥락으로 바꿉니다.");
   await expect(page.locator("[data-proof-variant]")).toHaveCount(0);

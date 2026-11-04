@@ -1,3 +1,4 @@
+import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { existsSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 
@@ -60,6 +61,7 @@ const isPoster = (url: string) => POSTER.test(new URL(url).pathname);
 for (const locale of LOCALES) {
   for (const motion of MOTION_PREFERENCES) {
     test(`loads the poster first and the film on request in ${locale.language} with ${motion.name}`, async ({ page }, testInfo) => {
+      test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
       test.skip(testInfo.project.name !== "390", "run the focused media contract once at the phone viewport");
       await page.emulateMedia({ reducedMotion: motion.preference });
 

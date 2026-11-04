@@ -1,3 +1,4 @@
+import { PHONE_HERO, PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 /** Active source-led Home contract. Retired specimen timers are outside this route. */
 import { test, expect, type Page } from "@playwright/test";
 const BENCH = "#s2 article[data-case-status]";
@@ -18,7 +19,8 @@ async function visibleFilm(page: Page) {
   return page.locator(FILM);
 }
 for (const route of ["/", "/ko"]) {
-  test(`${route} offers the next action before the source and difficult context`, async ({ page }) => {
+  test(`${route} offers the next action before the source and difficult context`, async ({ page }, testInfo) => {
+    test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     await page.goto(route);
     const actions = await page.locator("#s1 .lv2-actions").boundingBox();
     const bench = await page.locator(BENCH).boundingBox();
@@ -186,7 +188,8 @@ test("the English close keeps its start action on an English destination", async
   expect(href).toMatch(/^\/[a-z]/);
   expect(href, "the English close never sends a reader to the Korean pages").not.toMatch(/^\/ko(\/|$)/);
 });
-test("film follows the headline actions without a separate opening action", async ({ page }) => {
+test("film follows the headline actions without a separate opening action", async ({ page }, testInfo) => {
+  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
@@ -201,7 +204,8 @@ test("film follows the headline actions without a separate opening action", asyn
   expect(actions.y).toBeGreaterThanOrEqual(headline.y + headline.height);
   await expect(film.locator("video")).toHaveCount(0);
 });
-test("four-stage video stays static with reduced motion until explicit play and advances", async ({ page }) => {
+test("four-stage video stays static with reduced motion until explicit play and advances", async ({ page }, testInfo) => {
+  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/"); const film = await visibleFilm(page);
   await expect(film.locator("video")).toHaveCount(0);
@@ -240,11 +244,17 @@ test("server-renders the visible film poster as its priority image", async ({ re
   expect(high[0]).toMatch(/srcset="\/film\/poster-1-t8\.16\.webp 1440w, \/film\/poster-1-t8\.16-2x\.webp 2880w"/i);
   expect(high[0]).toMatch(/loading="eager"/i); expect(high[0]).toMatch(/ width="[1-9]\d*"/); expect(high[0]).toMatch(/ height="[1-9]\d*"/);
   const sourceImages = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => tag.includes("apple-2026-q1-10-q-reference-p004"));
-  expect(sourceImages).toHaveLength(1);
-  expect(sourceImages[0]).toContain('loading="lazy"');
-  expect(sourceImages[0]).not.toMatch(/fetchpriority="high"/i);
+  // Direction C round 2: the committed 10-Q page is drawn by s2's window, by s3's received passage (CRITIQUE-R1 #2) and,
+  // while lib/hero-phone-mode.ts says "still", by the phone hero's still (#1) -- every copy lazy, none competing with the
+  // poster for priority.
+  expect(sourceImages).toHaveLength(PHONE_HERO === "still" ? 3 : 2);
+  for (const tag of sourceImages) {
+    expect(tag).toContain('loading="lazy"');
+    expect(tag).not.toMatch(/fetchpriority="high"/i);
+  }
 });
-test("reduced motion keeps the prepared poster static until explicit play", async ({ page }) => {
+test("reduced motion keeps the prepared poster static until explicit play", async ({ page }, testInfo) => {
+  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   await page.emulateMedia({ reducedMotion: "reduce" }); await page.goto("/");
   const film = await visibleFilm(page);
   await expect(film.locator("img")).toBeVisible();

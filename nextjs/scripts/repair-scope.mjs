@@ -2558,6 +2558,7 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/lib/brand-copy.test.ts",
   "nextjs/lib/brand-tokens.test.ts",
   "nextjs/lib/funnel-events.ts",
+  "nextjs/lib/hero-phone-mode.ts",
   "nextjs/lib/landing-v2-hero-statement.test.ts",
   "nextjs/lib/landing-v2-motion.test.ts",
   "nextjs/lib/landing-v2-recompile.test.ts",

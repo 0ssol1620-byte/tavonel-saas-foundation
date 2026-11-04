@@ -10,11 +10,10 @@ import styles from "./source-first-home.module.css";
   evidence case, the same one s2 renders. Above 900px this figure is not displayed and the film plays
   as before; the film's bytes and its player are untouched.
 
-  Server-rendered and inert: the boxes are drawings, the one link goes down to s2, where the page is
-  interactive. No figure outside a [data-derived] element.
+  Server-rendered and inert: the boxes are drawings, and s2 -- where the page is interactive -- follows
+  directly. No letters on the boxes and no link line: the phone fold keeps its word budget (35). No
+  figure outside a [data-derived] element. Rendered only while lib/hero-phone-mode.ts says "still".
 */
-const letter = (index: number) => String.fromCharCode(65 + index);
-
 export default function HeroStill({ view, korean = false }: { view: EvidenceCase | null; korean?: boolean }) {
   if (!view) return null;
   const regions = displayableRegions(view);
@@ -41,7 +40,7 @@ export default function HeroStill({ view, korean = false }: { view: EvidenceCase
             decoding="async"
             loading="lazy"
           />
-          {onPage.map((region, index) => {
+          {onPage.map(region => {
             const [x, y, x2, y2] = region.bbox1000;
             return (
               <span
@@ -50,9 +49,7 @@ export default function HeroStill({ view, korean = false }: { view: EvidenceCase
                 className={heroStyles.box}
                 data-selected={region.id === active.id ? "1" : undefined}
                 style={{ left: `${x / 10}%`, top: `${y / 10}%`, width: `${(x2 - x) / 10}%`, height: `${(y2 - y) / 10}%` }}
-              >
-                <span className={heroStyles.boxMark}>{letter(index)}</span>
-              </span>
+              />
             );
           })}
         </div>
@@ -60,7 +57,6 @@ export default function HeroStill({ view, korean = false }: { view: EvidenceCase
       <figcaption className={styles.heroStillCaption}>
         <span data-derived="1" lang="en">{source.filename}</span>
         <span data-derived="1">{korean ? `${active.page}쪽 · 영역 ${onPage.length}개` : `page ${active.page} · ${onPage.length} regions`}</span>
-        <a href="#s2">{korean ? "영역 따라가기" : "Follow a region below"}<span aria-hidden="true">&nbsp;↓</span></a>
       </figcaption>
     </figure>
   );

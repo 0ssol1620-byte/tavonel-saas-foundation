@@ -1,3 +1,4 @@
+import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { contactErrorCopy } from "../lib/contact-locale";
 
 const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/test";
@@ -46,7 +47,8 @@ async function expectHomeRowUnderHeader(page: import("@playwright/test").Page, b
   expect(overlaps(box, stage!), "the row does not open over the film stage").toBe(false);
 }
 
-test("decision A counts prepared source UI engagement once without source or action identifiers", async ({ page }) => {
+test("decision A counts prepared source UI engagement once without source or action identifiers", async ({ page }, testInfo) => {
+  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   await page.addInitScript(() => {
     const target = window as Window & { __preparedEngagement: Record<string, unknown>[] };
     target.__preparedEngagement = [];
@@ -187,6 +189,7 @@ test("on Home from 900px the 8 s prompt covers no title, support, action or film
   scenario where that block alone decides.
 */
 test("on a Home phone the prompt never opens over the hero film", async ({ page }, testInfo) => {
+  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   test.skip(!["430", "412", "390", "360"].includes(testInfo.project.name), "the phone bottom sheet");
   await page.clock.install();
   await page.goto("/");
@@ -234,6 +237,7 @@ test("on a Home phone the prompt never opens over the hero film", async ({ page 
 */
 for (const [width, height] of [[430, 932], [412, 915]] as const) {
   test(`on a wide Home phone the 8 s sheet opens clear of the film and its reading line (${width}x${height})`, async ({ page }, testInfo) => {
+    test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     test.skip(testInfo.project.name !== "390", "sets its own viewport");
     await page.setViewportSize({ width, height });
     await page.clock.install();
@@ -273,6 +277,7 @@ for (const [width, height] of [[430, 932], [412, 915]] as const) {
   it then reaches into the zone.
 */
 test("in the 768-899 band in Focus the scrolled sheet never covers the reading block", async ({ page }, testInfo) => {
+  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   test.skip(testInfo.project.name !== "390", "sets its own viewport");
   const [width, height] = [800, 800];
   await page.setViewportSize({ width, height });

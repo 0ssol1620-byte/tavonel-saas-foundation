@@ -439,7 +439,7 @@
   */
   .heroStill { display: none; }
   @media (max-width: 900px) {
-    .home.home :global(#s1 figure[data-testid="landing-hero-film"]) { display: none; }
+    .home.home :global(#s1:has([data-testid="landing-hero-still"]) figure[data-testid="landing-hero-film"]) { display: none; }
     .heroStill {
       display: grid; gap: 12px; margin: 24px 0 0; padding: 16px 16px 14px;
       border-radius: var(--tv-r-card); background: var(--tv-tint);
