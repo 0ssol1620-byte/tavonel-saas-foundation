@@ -7106,7 +7106,7 @@ test('affected CPU OCR synthetic binding owns exactly four paths and defers its 
 });
 test('affected CDR Cloud Run service owns exactly its app and wiring suite and defers its exact-head malware-scan qualification', () => {
   // Sorted as the map reports changed paths (code-point order).
-  const paths = ['Dockerfile', 'README.md', 'app.py', 'request_boundary.py', 'service.yaml', 'tests/test_app.py', 'tests/test_text_layer.py', 'text_layer.py']
+  const paths = ['Dockerfile', 'README.md', 'app.py', 'measure_limits.py', 'request_boundary.py', 'service.yaml', 'tests/test_app.py', 'tests/test_measure_limits.py', 'tests/test_measurement_limits.py', 'tests/test_service_definition.py', 'tests/test_text_layer.py', 'text_layer.py']
     .map(path => `quarantine-sidecar/cdr-cloudrun/${path}`);
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'cdr-cloudrun-service');
   assert.equal(owners.length, 1);
@@ -7485,6 +7485,22 @@ test('affected g1-copy-truth owner: 6 exact paths select 17 direct suites and 2 
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
+// Library dedup B1 (codex/w1-b1-20261104): one finite owner, restated independently of the exported constants.
+import { LIBRARY_DEDUP_AFFECTED_PATHS, LIBRARY_DEDUP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected library-dedup-b1 owner: 2 exact paths select 2 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['lib/source-dedup.test.ts', 'lib/source-dedup.ts'];
+  const suites = ['lib/collection-compile-run.test.ts', 'lib/source-dedup.test.ts'];
+  assert.deepEqual([[...LIBRARY_DEDUP_AFFECTED_PATHS], [...LIBRARY_DEDUP_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['library-dedup-b1'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['library-dedup-b1'], [], suites, [], []], path);
+  }
+  for (const adjacent of ['nextjs/lib/source-dedup.tsx', 'nextjs/lib/source-fingerprint.ts', 'nextjs/lib/library-organize.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
 });
 // Packet delivery (codex/packet-delivery-textlayer-20261102): one finite owner, restated independently of the exported constants.

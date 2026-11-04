@@ -7,6 +7,7 @@ import { AFFECTED_GROUPS, HOME_AFFECTED_BROWSER_FILE, HOME_AFFECTED_PATHS, HOME_
 import { REMOTE_MCP_AFFECTED_PATHS, REMOTE_MCP_AFFECTED_UNIT_FILES, REMOTE_MCP_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { GDP_PDF_RUNS_AFFECTED_PATHS, GDP_PDF_RUNS_AFFECTED_UNIT_FILES, GDP_PDF_RUNS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { PACKET_DELIVERY_AFFECTED_PATHS, PACKET_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { LIBRARY_DEDUP_AFFECTED_PATHS, LIBRARY_DEDUP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { COMPILER_RELEASE_AFFECTED_PATHS, COMPILER_RELEASE_AFFECTED_UNIT_FILES, COMPILER_RELEASE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { CONSENT_POSTER_AFFECTED_PATHS, CONSENT_POSTER_AFFECTED_UNIT_FILES, CONSENT_POSTER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
@@ -663,6 +664,14 @@ for (const binding of [
     browsers: ['e2e/docs-reading-layout.spec.ts', 'e2e/pricing-plan-overview.spec.ts'],
     rows: ["['e2e/docs-reading-layout.spec.ts', ['1440', '390', 'reduced-motion']],", "['e2e/pricing-plan-overview.spec.ts', ['1440', '390']],"],
     neighbors: ['nextjs/lib/billing-catalog.test.tsx', 'nextjs/lib/operations-v2.ts', 'nextjs/lib/mcp-tools.tsx', 'nextjs/lib/g1-copy-truth.ts', 'nextjs/public/developer/tavonel-mcp-2.mjs', 'nextjs/public/developer/tavonel-cli.mjs'] },
+  // Library dedup B1 (codex/w1-b1-20261104): two exact paths, two direct suites, no browser suite.
+  { group: 'library-dedup-b1', prefix: 'nextjs/', exportedPaths: LIBRARY_DEDUP_AFFECTED_PATHS, exportedSuites: LIBRARY_DEDUP_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['lib/source-dedup.test.ts', 'lib/source-dedup.ts'],
+    suites: ['lib/collection-compile-run.test.ts', 'lib/source-dedup.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/lib/source-dedup.tsx', 'nextjs/lib/source-fingerprint.ts', 'nextjs/lib/library-organize.ts', 'nextjs/lib/source-dedup.test.mjs'] },
   // Packet delivery (codex/packet-delivery-textlayer-20261102): nine exact paths, twelve direct suites, no browser suite.
   { group: 'packet-delivery-20261102', prefix: 'nextjs/', exportedPaths: PACKET_DELIVERY_AFFECTED_PATHS, exportedSuites: PACKET_DELIVERY_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
