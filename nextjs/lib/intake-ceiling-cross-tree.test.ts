@@ -156,6 +156,35 @@ describe("hidden copies of the intake ceiling", () => {
     expect(computed[0]).toContain(`MAX_PAGES = int(os.environ["MAX_PAGES"]), expected ${PAGES}`);
   });
 
+  /*
+    D1 stage 1 (PROGRAM-2026-11-04 §4.D). The rasterizer and the reader accept measurement
+    overrides of the literals above, for a revision or endpoint deployed for measurement only.
+    What keeps that from becoming a hidden production limit: the literals stay the defaults (the
+    site checks above), the overrides are capped at the stage-2 target, and no definition a
+    production deploy is built or applied from sets one.
+  */
+  it("caps the measurement overrides at stage 2 and keeps them out of every deploy definition", () => {
+    const cdr = fromTree(CDR);
+    const gpu = fromTree(GPU);
+    const cap = (source: string, name: string) =>
+      integerLiteral(new RegExp(`^${name}: Final = (.+)$`, "m").exec(source)?.[1] ?? "");
+    expect(cap(cdr, "MEASUREMENT_HARD_MAX_PAGES")).toBe(500);
+    expect(cap(cdr, "MEASUREMENT_HARD_MAX_INPUT_BYTES")).toBe(50 * MIB);
+    expect(cap(gpu, "MEASUREMENT_HARD_MAX_PAGES")).toBe(500);
+    for (const name of ["TAVONEL_CDR_MAX_INPUT_BYTES", "TAVONEL_CDR_MAX_PAGES", "TAVONEL_CDR_MAX_OUTPUT_BYTES", "TAVONEL_CDR_RASTER_RANGE_PAGES"]) {
+      expect(cdr, name).toContain(`"${name}"`);
+    }
+    for (const name of ["TAVONEL_OCR_MAX_INPUT_BYTES", "TAVONEL_OCR_MAX_PAGES"]) expect(gpu, name).toContain(`"${name}"`);
+    const definitions = [
+      "quarantine-sidecar/cdr-cloudrun/service.yaml", "quarantine-sidecar/cdr-cloudrun/Dockerfile",
+      "workers/foundation-ocr-gpu/Dockerfile", "workers/foundation-ocr-gpu/cloudbuild.yaml",
+      "quarantine-sidecar/foundation-cdr-worker/wrangler.jsonc",
+    ];
+    for (const file of definitions) {
+      expect(read(file), file).not.toMatch(/TAVONEL_(CDR|OCR)_(MAX_[A-Z_]+|RASTER_RANGE_PAGES)/);
+    }
+  });
+
   it("fail when intakeCeiling.ts stops stating a processor copy as a literal", () => {
     expect(integerLiteral("5 * 1024 * 1024")).toBe(5 * MIB);
     expect(integerLiteral("4_000_000")).toBe(4_000_000);
