@@ -94,3 +94,20 @@ test.describe("phone four-stage film", () => {
     await expect(film.getByRole("tab")).toHaveCount(4);
   });
 });
+
+/*
+  Direction C round 2 (lib/hero-phone-mode.ts): while the Inspector still stands in for the film below 900px, the phone's
+  first screen is the committed page and the film's poster is not fetched at all. Runs where the four checks above skip,
+  so this file always executes something on a phone; it skips itself once the film returns.
+*/
+test("while the still stands in, a phone opens on the readable page and requests no film poster", async ({ page }, testInfo) => {
+  test.skip(!["360", "390"].includes(testInfo.project.name), "phone composition");
+  test.skip(!phoneShowsStill(testInfo.project.name), "the film is the phone hero");
+  const posters: string[] = [];
+  page.on("request", request => { if (/\/film\/poster-/.test(request.url())) posters.push(request.url()); });
+  await page.goto("/", { waitUntil: "load" });
+  await expect(page.getByTestId("landing-hero-still")).toBeVisible();
+  await expect(page.locator(FILM)).toBeHidden();
+  await expect(page.getByTestId("landing-hero-still").locator("img")).toHaveJSProperty("complete", true);
+  expect(posters, "no poster request on a phone while the still stands in").toEqual([]);
+});

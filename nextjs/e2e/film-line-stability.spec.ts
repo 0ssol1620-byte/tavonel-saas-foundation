@@ -258,3 +258,22 @@ test("webkit: the frame top is the same on every stage from 360px to the edge of
     await browser.close();
   }
 });
+
+/*
+  Direction C round 2 (lib/hero-phone-mode.ts): while the Inspector still stands in for the film below 900px, the phone
+  hero is a still image, and what this file guards -- the first screen not moving under the reader -- is checked on it:
+  its top edge is where it was after load and three seconds later. Skips itself once the film returns.
+*/
+test("while the still stands in, the phone hero holds its place after load", async ({ page }, testInfo) => {
+  test.skip(!["360", "390"].includes(testInfo.project.name), "phone composition");
+  test.skip(!phoneShowsStill(testInfo.project.name), "the film is the phone hero");
+  await page.goto("/", { waitUntil: "load" });
+  const still = page.getByTestId("landing-hero-still");
+  await expect(still).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  const before = (await still.boundingBox())!;
+  await page.waitForTimeout(3000);
+  const after = (await still.boundingBox())!;
+  expect(Math.abs(after.y - before.y), "the still's top edge moved").toBeLessThanOrEqual(1);
+  expect(Math.abs(after.height - before.height), "the still's height changed").toBeLessThanOrEqual(1);
+});

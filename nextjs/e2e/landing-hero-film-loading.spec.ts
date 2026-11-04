@@ -251,3 +251,19 @@ test("serves the re-cut posters as AVIF within 140,000 bytes, with a WebP fallba
   }
   await testInfo.attach("poster-recut-contract", { body: JSON.stringify(measured, null, 2), contentType: "application/json" });
 });
+
+/*
+  Direction C round 2 (lib/hero-phone-mode.ts): while the Inspector still stands in below 900px, the phone loads the
+  still's own AVIF derivative and none of the film's bytes -- no poster, no cut -- where the checks above wait for the film.
+*/
+test("while the still stands in, a phone loads the still and no film bytes", async ({ page }, testInfo) => {
+  test.skip(!["360", "390"].includes(testInfo.project.name), "phone composition");
+  test.skip(!phoneShowsStill(testInfo.project.name), "the film is the phone hero");
+  const film: string[] = [];
+  page.on("request", request => { if (/\/film\//.test(request.url())) film.push(request.url()); });
+  await page.goto("/", { waitUntil: "load" });
+  const image = page.getByTestId("landing-hero-still").locator("img");
+  await expect(image).toHaveJSProperty("complete", true);
+  expect(await image.evaluate(element => (element as HTMLImageElement).currentSrc)).toMatch(/\/landing\/v2\/apple-2026-q1-10-q-reference-p004-\d+\.(avif|webp)$/);
+  expect(film, "no film request on a phone while the still stands in").toEqual([]);
+});
