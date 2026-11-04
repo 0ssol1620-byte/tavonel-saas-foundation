@@ -22,6 +22,12 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
   With the flag off, the shadow (A2.1) asks the same database question without consuming
   anything and reports `wouldAllow`; the route turns that into one funnel line. A shadow read that
   fails is simply not counted -- it never changes the 402.
+
+  TODO(founder, F-2): A2.2 is not an agent's call. Before TAVONEL_TRIAL_AI_ACCESS_ENABLED=true:
+  the trial terms wording for AI access (what a free evaluation's key and MCP connection may do,
+  and the four bounds as published), the bound values themselves (foundation_trial_policy
+  ai_* columns), the `customerData` launch switch (P2-37), and a founder approval receipt.
+  Until then the flag stays unset and every trial gets the 402 it got before W1.
 */
 
 type Env = Readonly<Record<string, string | undefined>>;
