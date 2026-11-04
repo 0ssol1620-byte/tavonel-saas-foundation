@@ -21,5 +21,13 @@
     .price { font: 550 17px/1.4 var(--f-sans); }
     .unit { font: 400 13px/1.5 var(--f-sans); color: #46545e; }
     .arrow { position: absolute; top: 12px; right: 10px; color: var(--tv-action); font-size: 15px; }
+    /* CRITIQUE-R1 #11: the index is one rounded white sheet with hairline seams, like every list on the page; the plan
+       name is ink, and the row itself is the control. */
+    .list { gap: 1px; overflow: hidden; border: 0; border-radius: var(--tv-r-inner); background: var(--tv-rule); box-shadow: var(--tv-shadow-1); }
+    .list li:nth-child(even), .list li:nth-child(n + 3) { border: 0; }
+    .list a { padding-right: 12px; background: var(--tv-sheet); }
+    .list a:hover { background: var(--tv-canvas); }
+    .name { color: var(--tv-ink); text-decoration: none; }
+    .arrow { display: none; }
   }
 }

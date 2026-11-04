@@ -93,3 +93,17 @@
     padding: 10px;
   }
 }
+
+/*
+  Round 2 (CRITIQUE-R1 #8), this frame only (/explore keeps its stage): the objects take the 10px inner radius the
+  sheet around them uses, and at rest only the filing-to-entity relations are drawn in the accent -- every other
+  relation steps back to 20% until an object is selected and lights its own. On a phone the stack's group divider is
+  a hairline, not a green rule on a sand card.
+*/
+.field [data-visual-node] { border-radius: var(--tv-r-small); }
+.field [data-visual-edge] { opacity: 0.2; }
+.field [data-visual-edge][data-edge-from^="document-"][data-edge-to^="entity-"] { opacity: 1; stroke: var(--tv-action); }
+.field [data-visual-edge][data-lit="1"] { opacity: 1; }
+@media (max-width: 820px) {
+  .field [data-visual-node][data-node-role="hub"] { border-top-color: var(--hairline-hi); }
+}

@@ -154,6 +154,8 @@
 .pricing-page .plan-features { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
 .pricing-page .plan-action { display: flex; flex-direction: column; gap: 10px; align-items: stretch; align-self: end; }
 .pricing-page .plan-action .btn { width: 100%; }
+/* CRITIQUE-R1 #11: a white pill on the white plan sheet showed only its shadow; it carries an edge. */
+.pricing-page .plan-action .btn.ghost { border: 1px solid var(--tv-rule-strong); }
 .pricing-page .plan-action .pricing-secondary-link {
   display: inline-flex;
   align-items: center;
@@ -717,12 +719,13 @@
     background: var(--tv-rule); box-shadow: var(--tv-shadow-1);
   }
   .page:not(.lv2) :is(.tiles > .tile, .status-list > article, .processor-list > article) { background: var(--tv-sheet); }
-  .page:not(.lv2) :is(.docs-index, .usage-estimator-fit) {
+  /* CRITIQUE-R1 #11: the run totals are the same rounded sheet as the ceiling rows above them. */
+  .page:not(.lv2) :is(.docs-index, .usage-estimator-fit, .usage-estimator > dl) {
     border: 0; border-radius: var(--tv-r-inner); overflow: hidden;
     background: var(--tv-rule); box-shadow: var(--tv-shadow-1);
   }
   .page:not(.lv2) .docs-index a { background: var(--tv-sheet); }
-  .page:not(.lv2) .usage-estimator-fit > div { background: var(--tv-sheet); }
+  .page:not(.lv2) :is(.usage-estimator-fit, .usage-estimator > dl) > div { background: var(--tv-sheet); }
   @media (hover: hover) and (pointer: fine) {
     .page:not(.lv2) .docs-index a:hover { background: var(--tv-canvas); }
   }
