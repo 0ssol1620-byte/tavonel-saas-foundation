@@ -1,6 +1,6 @@
 import { sha256DigestHeader } from "./hmac";
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, type TestContext } from "node:test";
 import { ocrPageRangeSiblingKey, ocrSiblingKey } from "./keys";
 import {
   dispatchOcrAfterSanitize,
@@ -1203,5 +1203,99 @@ describe("page-range reading", () => {
       assert.equal(result.computeCredits, 2);
       assert.equal(result.outputSha256, undefined);
     }
+  });
+});
+
+describe("OCR request logs", () => {
+  const HMAC = "foundation-ocr-hmac-fixture-secret-ok";
+  const RUNPOD_KEY = "rp_fixture_runpod_key_never_logged";
+  const secretEnv = (r2: FakeR2, size?: string) => envFor(r2, {
+    FOUNDATION_OCR_URL: FOUNDATION_OCR, TAVONEL_OCR_HMAC: HMAC, RUNPOD_API_KEY: RUNPOD_KEY,
+    ...(size ? { FOUNDATION_OCR_PAGE_RANGE_SIZE: size } : {}),
+  });
+
+  /** Runs `fetcher` with console.log captured; returns the parsed lines and every header the reader was sent. */
+  async function logged(t: TestContext, env: OcrDispatchEnv, fetcher: typeof fetch) {
+    const sent: Headers[] = [];
+    const log = t.mock.method(console, "log", () => {});
+    const result = await dispatchOcrAfterSanitize(env, IMMUTABLE, (async (url: string | URL | Request, init?: RequestInit) => {
+      sent.push(new Headers(init?.headers));
+      return fetcher(url, init);
+    }) as typeof fetch, () => new Date("2026-11-04T00:00:00Z"), () => "fixture-log-request-0001");
+    const raw = log.mock.calls.map((call) => String(call.arguments[0]));
+    return { result, raw, lines: raw.map((line) => JSON.parse(line) as Record<string, unknown>), sent };
+  }
+
+  /** Logged by design: accept, the request id and the asked range. Every other header value, and the document, never. */
+  function assertNoSecrets(raw: string[], sent: Headers[]) {
+    assert.ok(sent.length > 0);
+    const text = raw.join("\n");
+    for (const headers of sent) {
+      assert.ok(headers.get("authorization") && headers.get("x-tavonel-ocr-signature"), "the fixture sends the secret headers");
+      headers.forEach((value, name) => {
+        if (["accept", "x-tavonel-ocr-request-id", "x-tavonel-ocr-page-range"].includes(name)) return;
+        assert.equal(text.includes(value), false, `header ${name} leaked into the log`);
+      });
+    }
+    for (const secret of [HMAC, RUNPOD_KEY, "sanitized-fixture", "TAVONEL OCR", "%PDF"]) {
+      assert.equal(text.includes(secret), false, `${secret} leaked into the log`);
+    }
+  }
+
+  it("logs the dispatch, the post and the stored range on success", async (t) => {
+    const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    const digest = await sha256DigestHeader(PDF_BYTES);
+    const { result, raw, lines, sent } = await logged(t, secretEnv(r2, "8"), async () => Response.json({
+      schemaVersion: "tavonel.ocr_page_range.v1", status: "ok", resultSchemaVersion: "tavonel.ocr_result.v2",
+      inputSha256: digest, pageCount: 1, pageRange: { start0: 0, end0: 1 },
+      pages: [{ pageNumber1: 1, pageStatus: "ok" }], regions: ocrPayload(digest).regions,
+    }));
+    assert.equal(result.status, "written");
+    const prefix = digest.slice("sha256:".length, "sha256:".length + 12);
+    assert.deepEqual(lines[0], { log: "ocr_dispatch", mode: "ranges", rangeSize: 8, pageCountKnown: false,
+      readOnly: false, inputSha256: prefix, bytes: PDF_BYTES.byteLength });
+    const { ms, ...post } = lines[1];
+    assert.equal(typeof ms, "number");
+    assert.deepEqual(post, { log: "ocr_post", requestId: "fixture-log-request-0001", inputSha256: prefix,
+      bytes: PDF_BYTES.byteLength, pageRange: "0-8", accept: "application/json", outcome: "response", status: 200,
+      contentType: "application/json", responseUrlMatches: null });
+    assert.deepEqual(lines[2], { log: "ocr_range", start0: 0, end0: 1, outcome: "stored", reasonCode: null, requestId: null });
+    assert.equal(lines.length, 3);
+    assertNoSecrets(raw, sent);
+  });
+
+  it("logs a thrown fetch by name and a bounded message, and the range it left missing", async (t) => {
+    const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    const { result, raw, lines, sent } = await logged(t, secretEnv(r2, "8"), async () => {
+      throw new TypeError(`Illegal invocation ${"x".repeat(500)}`);
+    });
+    assert.equal(result.reasonCode, "OCR_PAGES_INCOMPLETE");
+    assert.equal(lines[0].mode, "ranges");
+    assert.equal(lines[1].outcome, "threw");
+    assert.equal(lines[1].pageRange, "0-8");
+    assert.equal("status" in lines[1], false);
+    const error = lines[1].error as { name: string; message: string };
+    assert.equal(error.name, "TypeError");
+    assert.equal(error.message.length, 200);
+    assert.ok(error.message.startsWith("Illegal invocation"));
+    assert.deepEqual(lines[2], { log: "ocr_range", start0: 0, end0: 8, outcome: "failed",
+      reasonCode: "OCR_PAGES_INCOMPLETE", requestId: "fixture-log-request-0001" });
+    assertNoSecrets(raw, sent);
+  });
+
+  it("logs a 5xx answer with its status on the single-request path", async (t) => {
+    const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+    const { result, raw, lines, sent } = await logged(t, secretEnv(r2),
+      async () => new Response("upstream down", { status: 503, headers: { "content-type": "text/plain" } }));
+    assert.equal(result.reasonCode, "OCR_HTTP_UNAVAILABLE");
+    assert.equal(lines[0].mode, "single");
+    assert.equal(lines[0].rangeSize, null);
+    assert.equal(lines[1].outcome, "response");
+    assert.equal(lines[1].status, 503);
+    assert.equal(lines[1].pageRange, null);
+    assert.equal(lines[1].contentType, "text/plain");
+    assert.equal(lines.length, 2);
+    assert.equal(raw.join("\n").includes("upstream down"), false);
+    assertNoSecrets(raw, sent);
   });
 });

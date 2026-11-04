@@ -604,6 +604,9 @@ export async function dispatchOcrAfterSanitize(
     throw new OcrEvidenceRetryableError("qualified immutable OCR reader binding is missing");
   }
   const reader: ReaderPost = { env, url, ocrKey, bytes, inputSha256, binding, fetcher, now, newRequestId, timeoutMs };
+  // The worker learns the page count only from the reader's first answer, never before it asks.
+  ocrLog({ log: "ocr_dispatch", mode: rangeSize === null ? "single" : "ranges", rangeSize, pageCountKnown: false,
+    readOnly: rangeReadOnly, inputSha256: digestPrefix(inputSha256), bytes: bytes.byteLength });
   if (rangeSize !== null) {
     return dispatchOcrRanges({ ...reader, immutablePdfKey, size: rangeSize, readOnly: rangeReadOnly,
       provenance: binding ? { readerRevision: binding.readerRevision, readerBindingSha256: await readerBindingSha256(binding) } : {} });
@@ -682,6 +685,16 @@ export async function dispatchOcrAfterSanitize(
 
 type ReaderBinding = NonNullable<ReturnType<typeof parseReaderBinding>>;
 
+/**
+ * One JSON line per OCR request and decision, for `wrangler tail`. Sizes, timings, status codes and
+ * a digest prefix only: never a header value, a secret, or a byte or word of the document.
+ */
+function ocrLog(fields: Record<string, unknown>): void {
+  console.log(JSON.stringify(fields));
+}
+
+const digestPrefix = (sha256: string) => sha256.replace(/^sha256:/u, "").slice(0, 12);
+
 type ReaderPost = {
   env: OcrDispatchEnv;
   url: string;
@@ -729,6 +742,10 @@ async function postToReader(
   const form = new FormData();
   form.append("source", new Blob([post.bytes], { type: "application/pdf" }), "sanitized.pdf");
 
+  const logged = { log: "ocr_post", requestId, inputSha256: digestPrefix(inputSha256), bytes: post.bytes.byteLength,
+    pageRange: pageRange ?? null, accept };
+  // Workers advance Date.now() only across I/O; the fetch is I/O, so this is its wall time.
+  const startedAt = Date.now();
   let response: Response;
   try {
     response = await post.fetcher(post.url, {
@@ -739,13 +756,20 @@ async function postToReader(
       ...(binding ? { redirect: "error" as const } : {}),
       signal: AbortSignal.timeout(post.timeoutMs),
     });
-  } catch {
+  } catch (error) {
+    const thrown = (error ?? {}) as { name?: unknown; message?: unknown };
+    ocrLog({ ...logged, ms: Date.now() - startedAt, outcome: "threw", error: {
+      name: typeof thrown.name === "string" ? thrown.name : typeof error,
+      message: typeof thrown.message === "string" ? thrown.message.slice(0, 200) : null,
+    } });
     return { failed: { status: "failed", key: ocrKey, reasonCode: "OCR_TIMEOUT_OR_NETWORK", reason: "OCR request timed out or failed", requestId, inputSha256, computeCredits: 0 } };
   }
   let responseEndpointMatches = false;
   if (binding) {
     try { responseEndpointMatches = new URL(response.url).href === new URL(binding.endpoint).href; } catch { /* fail closed */ }
   }
+  ocrLog({ ...logged, ms: Date.now() - startedAt, outcome: "response", status: response.status,
+    contentType: response.headers.get("content-type"), responseUrlMatches: binding ? responseEndpointMatches : null });
   if (binding && (response.redirected || !responseEndpointMatches
     || (response.status >= 300 && response.status < 400))) {
     throw new OcrEvidenceRetryableError("OCR response endpoint provenance is not qualified");
@@ -1088,7 +1112,10 @@ async function dispatchOcrRanges(run: RangeRun): Promise<OcrDispatchResult> {
 async function readAndAssembleRanges(run: RangeRun, ranges: StoredPageRange[]): Promise<OcrDispatchResult> {
   for (let start0 = 0; ranges.length === 0 || start0 < ranges[0].pageCount; start0 += run.size) {
     const range = await obtainRange(run, start0, ranges[0]);
-    if ("status" in range) return range;
+    const failed = "status" in range;
+    ocrLog({ log: "ocr_range", start0, end0: failed ? start0 + run.size : range.end0, outcome: failed ? "failed" : "stored",
+      reasonCode: failed ? range.reasonCode ?? null : null, requestId: failed ? range.requestId ?? null : null });
+    if (failed) return range;
     ranges.push(range);
   }
 
