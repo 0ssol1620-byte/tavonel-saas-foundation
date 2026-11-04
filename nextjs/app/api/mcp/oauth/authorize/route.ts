@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireFoundationSession } from "@/lib/developer-auth";
+import { trialAiAccess } from "@/lib/trial-ai-access";
 import {
   checkAuthorizationRequest,
   denialRedirect,
@@ -56,7 +57,10 @@ export async function POST(request: Request) {
 
   const auth = await requireFoundationSession(request, "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
-  if (auth.principal.accessSource === "trial") return NextResponse.json({ code: "TRIAL_FEATURE_NOT_INCLUDED" }, { status: 402, headers: NO_STORE });
+  const trial = await trialAiAccess(auth.principal, "mcp_authorize");
+  if (!trial.ok) {
+    return NextResponse.json({ code: trial.code }, { status: trial.status, headers: NO_STORE });
+  }
   return NextResponse.json({
     code: "AUTHORIZATION_GRANTED",
     redirectTo: issueAuthorizationCode(checked.request, auth.principal, key, origin),

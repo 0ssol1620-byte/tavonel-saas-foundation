@@ -2,22 +2,24 @@ import { NextResponse } from "next/server";
 import { parseDeveloperScopes } from "@/lib/developer-contracts";
 import { requireFoundationSession, revalidateFoundationSession } from "@/lib/developer-auth";
 import { createDeveloperApiKey, listDeveloperApiKeys } from "@/lib/developer-store";
+import { trialAiAccess, trialScopesAllowed, type TrialAiOperation } from "@/lib/trial-ai-access";
+import type { FoundationPrincipal } from "@/lib/developer-auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const NO_STORE = { "Cache-Control": "no-store" };
 
-function trialBlocked(source: string | undefined) {
-  return source === "trial"
-    ? NextResponse.json({ code: "TRIAL_FEATURE_NOT_INCLUDED" }, { status: 402, headers: NO_STORE })
-    : null;
+async function trialBlocked(principal: FoundationPrincipal, operation: TrialAiOperation) {
+  const trial = await trialAiAccess(principal, operation);
+  if (trial.ok) return null;
+  return NextResponse.json({ code: trial.code }, { status: trial.status, headers: NO_STORE });
 }
 
 export async function GET(request: Request) {
   const auth = await requireFoundationSession(request, "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
-  const blocked = trialBlocked(auth.principal.accessSource);
+  const blocked = await trialBlocked(auth.principal, "key_list");
   if (blocked) return blocked;
   const result = await listDeveloperApiKeys(auth.principal.workspaceKey);
   if (!result.ok) return NextResponse.json({ code: result.code }, { status: 503, headers: NO_STORE });
@@ -29,7 +31,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const auth = await requireFoundationSession(request, "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
-  const blocked = trialBlocked(auth.principal.accessSource);
+  const blocked = await trialBlocked(auth.principal, "key_create");
   if (blocked) return blocked;
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(declaredLength) && declaredLength > 8_192) return NextResponse.json({ code: "REQUEST_TOO_LARGE" }, { status: 413, headers: NO_STORE });
@@ -46,6 +48,10 @@ export async function POST(request: Request) {
   const expiresInDays = body.expiresInDays === null || body.expiresInDays === undefined ? null : Number(body.expiresInDays);
   if (!name || name.length > 80 || !scopes || (expiresInDays !== null && (!Number.isSafeInteger(expiresInDays) || expiresInDays < 1 || expiresInDays > 365))) {
     return NextResponse.json({ code: "API_KEY_INPUT_INVALID" }, { status: 400, headers: NO_STORE });
+  }
+  // Reached by a trial only with TRIAL_AI_ACCESS on: its one key is read-only, never a connector key.
+  if (auth.principal.accessSource === "trial" && !trialScopesAllowed(scopes)) {
+    return NextResponse.json({ code: "TRIAL_FEATURE_NOT_INCLUDED" }, { status: 402, headers: NO_STORE });
   }
   const expiresAt = expiresInDays === null ? null : new Date(Date.now() + expiresInDays * 86_400_000).toISOString();
   const result = await createDeveloperApiKey({

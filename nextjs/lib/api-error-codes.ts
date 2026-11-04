@@ -321,6 +321,8 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
       { code: "TRIAL_DISABLED", meaning: "Free evaluation is closed today.", whatToDo: "Nothing a caller can send." },
       { code: "TRIAL_CAPACITY_REACHED", meaning: "The deployment's concurrent free evaluations are full.", whatToDo: "Retry later, or move to a paid plan." },
       { code: "TRIAL_FEATURE_NOT_INCLUDED", status: 402, meaning: "The operation — key rotation among them — is not in the free evaluation.", whatToDo: "Move to a paid plan." },
+      { code: "TRIAL_LIMIT_REACHED", status: 402, meaning: "With trial AI access enabled: the free evaluation already holds its one API key, or its AI-access window, page, World or daily query bound is spent.", whatToDo: "Revoke the existing key, wait for the next UTC day, or move to a paid plan." },
+      { code: "TRIAL_AI_ACCESS_CHECK_FAILED", status: 503, meaning: "The free evaluation's AI-access bounds could not be read, so nothing was allowed.", whatToDo: "Retry; the check fails closed." },
       { code: "TRIAL_WORLD_LIMIT_REACHED", status: 402, meaning: "The free evaluation's compiled-World count is spent.", whatToDo: "Move to a paid plan." },
       { code: "TRIAL_DURABLE_COMPILE_REQUIRED", status: 402, meaning: "The free evaluation compiles through the durable job route only.", whatToDo: "Use `POST /compile-jobs` rather than `POST /collections/compile`." },
       { code: "TRIAL_SOURCE_REVIEW_REQUIRED", meaning: "A free-evaluation source was held for review by the risk gate.", whatToDo: "Nothing automatic clears it. Write to support@tavonel.com." },

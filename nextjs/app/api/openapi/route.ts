@@ -1459,7 +1459,7 @@ export async function GET(request: Request) {
           tags: ["Workspace administration"],
           "x-tavonel-auth": "browser-session",
           security: [{ TavonelUserSession: [] }],
-          description: "Creates a workspace-scoped key with an explicit scope set. The plaintext `token` is in this response and nowhere else: only its SHA-256 digest is stored. A free evaluation cannot create keys and is answered 402 TRIAL_FEATURE_NOT_INCLUDED.",
+          description: "Creates a workspace-scoped key with an explicit scope set. The plaintext `token` is in this response and nowhere else: only its SHA-256 digest is stored. A free evaluation is answered 402 TRIAL_FEATURE_NOT_INCLUDED. Where trial AI access is enabled, a free evaluation may hold one read-only key (the remote MCP scopes), and a spent evaluation bound is answered 402 TRIAL_LIMIT_REACHED.",
           requestBody: { required: true, content: { "application/json": { schema: DEVELOPER_KEY_INPUT, examples: { default: { value: { name: "ci-ingest", scopes: ["documents:read", "worlds:read"], expiresInDays: 90 } } } } } },
           responses: {
             "201": ok(
@@ -1469,7 +1469,7 @@ export async function GET(request: Request) {
             ),
             "400": err("INVALID_JSON", "API_KEY_INPUT_INVALID"),
             "401": err("AUTH_REQUIRED"),
-            "402": err("TRIAL_FEATURE_NOT_INCLUDED"),
+            "402": err("TRIAL_FEATURE_NOT_INCLUDED", "TRIAL_LIMIT_REACHED"),
             "403": err("PILOT_ACCESS_REQUIRED", "AUTHORIZATION_CHANGED_RETRY"),
             "413": err("REQUEST_TOO_LARGE"),
             "503": err("DEVELOPER_STORE_NOT_CONFIGURED", "API_KEY_CREATE_FAILED", "DEVELOPER_STORE_BINDING_INVALID"),
@@ -1496,7 +1496,7 @@ export async function GET(request: Request) {
             ),
             "400": err("API_KEY_ID_INVALID", "API_KEY_INPUT_INVALID", "INVALID_JSON"),
             "401": err("AUTH_REQUIRED"),
-            "402": err("TRIAL_FEATURE_NOT_INCLUDED"),
+            "402": err("TRIAL_FEATURE_NOT_INCLUDED", "TRIAL_LIMIT_REACHED"),
             "403": err("PILOT_ACCESS_REQUIRED", "AUTHORIZATION_CHANGED_RETRY"),
             "404": err("API_KEY_NOT_FOUND"),
             "413": err("REQUEST_TOO_LARGE"),

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireFoundationSession } from "@/lib/developer-auth";
 import { parseDeveloperScopes } from "@/lib/developer-contracts";
 import { rotateDeveloperApiKey } from "@/lib/developer-store";
+import { trialAiAccess, trialScopesAllowed } from "@/lib/trial-ai-access";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -12,8 +13,9 @@ const HEADERS = { "Cache-Control": "no-store", "X-TAVONEL-API-Version": "1" };
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await requireFoundationSession(request, "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: HEADERS });
-  if (auth.principal.accessSource === "trial") {
-    return NextResponse.json({ code: "TRIAL_FEATURE_NOT_INCLUDED" }, { status: 402, headers: HEADERS });
+  const trial = await trialAiAccess(auth.principal, "key_rotate");
+  if (!trial.ok) {
+    return NextResponse.json({ code: trial.code }, { status: trial.status, headers: HEADERS });
   }
   const { id } = await context.params;
   if (!UUID.test(id)) return NextResponse.json({ code: "API_KEY_ID_INVALID" }, { status: 400, headers: HEADERS });
@@ -27,6 +29,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const expiresInDays = body.expiresInDays === null || body.expiresInDays === undefined ? null : Number(body.expiresInDays);
   if (!name || name.length > 80 || !scopes || (expiresInDays !== null && (!Number.isSafeInteger(expiresInDays) || expiresInDays < 1 || expiresInDays > 365))) {
     return NextResponse.json({ code: "API_KEY_INPUT_INVALID" }, { status: 400, headers: HEADERS });
+  }
+  // Reached by a trial only with TRIAL_AI_ACCESS on: the replacement stays read-only.
+  if (auth.principal.accessSource === "trial" && !trialScopesAllowed(scopes)) {
+    return NextResponse.json({ code: "TRIAL_FEATURE_NOT_INCLUDED" }, { status: 402, headers: HEADERS });
   }
   const result = await rotateDeveloperApiKey({
     workspaceKey: auth.principal.workspaceKey,

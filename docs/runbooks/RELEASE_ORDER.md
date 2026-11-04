@@ -270,3 +270,14 @@ migration은 다시 적용할 수 없다. 두 번째 적용은 `column "gate_sur
   계산하므로 그 행을 `SCOPED_RELEASE_INVALID`로 읽고 닫힌다.
 - presentational 목록을 넓혀서 기록을 피하지 않는다. 목록을 넓히는 PR은 규칙 파일을 바꾸므로 그 자체로
   digest가 바뀐다. 리뷰를 거친 뒤 한 번 다시 기록한다.
+
+## 추가 2026-11-04 — W1-A2: trial AI 사용량 열 (`20261104120000_trial_ai_usage`)
+
+- 추가만 한다. `foundation_trial_policy`에 `ai_access_days`(14), `ai_page_limit`(200), `ai_world_limit`(1),
+  `ai_daily_query_limit`(200), `foundation_self_service_trials`에 `ai_query_day`, `ai_query_count`를 더하고,
+  두 테이블에 client 역할 거부 policy와 service_role 전용 함수 `foundation_trial_ai_access`를 만든다. 새 테이블은 없다.
+- 순서: **migration 먼저, 배포 나중.** 코드가 먼저 도착해도 깨지지 않는다. flag가 꺼져 있으면 shadow 읽기가
+  실패해서 아무것도 세지 않을 뿐이고(402는 그대로), flag가 켜져 있으면 503 `TRIAL_AI_ACCESS_CHECK_FAILED`로 닫힌다.
+- `TAVONEL_TRIAL_AI_ACCESS_ENABLED`는 이 migration이 production에 적용되고, 창업자 F-2(trial 약관 문구·상한)가
+  승인된 뒤에만 `true`로 둔다. 상한 값은 `foundation_trial_policy` 한 행을 바꾸면 배포 없이 바뀐다.
+- 되돌리기: env flag를 지운다(즉시, build 없음). 열은 남겨 둔다(expand만, down migration 없음).

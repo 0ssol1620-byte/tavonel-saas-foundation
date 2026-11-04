@@ -475,6 +475,13 @@ describe("consent", () => {
     mocks.session.mockResolvedValueOnce({ ok: true, principal: { workspaceKey: MINE, userId: USER, accessSource: "trial", authorizationRevision: 4 } });
     const trial = await consent("approve", authorizationRequest(clientId), "supabase-session");
     expect([trial.status, (await trial.json()).code]).toEqual([402, "TRIAL_FEATURE_NOT_INCLUDED"]);
+    // W1-A2: with trial AI access on and its bounds unreadable, consent fails closed -- no code.
+    vi.stubEnv("TAVONEL_TRIAL_AI_ACCESS_ENABLED", "true");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+    mocks.session.mockResolvedValueOnce({ ok: true, principal: { workspaceKey: MINE, userId: USER, accessSource: "trial", authorizationRevision: 4 } });
+    const unreadable = await consent("approve", authorizationRequest(clientId), "supabase-session");
+    expect([unreadable.status, (await unreadable.json()).code]).toEqual([503, "TRIAL_AI_ACCESS_CHECK_FAILED"]);
+    vi.stubEnv("TAVONEL_TRIAL_AI_ACCESS_ENABLED", "");
     const denied = await (await consent("deny", authorizationRequest(clientId))).json() as { redirectTo: string };
     expect(new URL(denied.redirectTo).searchParams.get("error")).toBe("access_denied");
     const code = await approvedCode(clientId);
