@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
 import HeroFilm from "./hero-film";
+import HeroStill from "./hero-still";
 import HeroActions from "./hero-actions";
 import HeroSourceCard from "./hero-source-card";
 import HeroStatement from "./hero-statement";
@@ -219,6 +220,8 @@ export default function LandingPage({
                 </div>
                 {/* The film's poster is the first screen's priority image: the specimen strip closes s2. */}
                 <HeroFilm korean={korean} />
+                {/* Direction C round 2: below 900px the page s2 opens on, in place of the film (hero-still.tsx). */}
+                <HeroStill view={home} korean={korean} />
               </HeroStatement>
             </div>
           </div>
