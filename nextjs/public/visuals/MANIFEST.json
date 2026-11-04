@@ -1,0 +1,193 @@
+{
+  "schema": "tavonel.visuals.manifest.v1",
+  "generatedBy": "nextjs/scripts/visuals/capture-visuals.mjs",
+  "captures": [
+    {
+      "file": "sources-board-1440.webp",
+      "surface": "Sources board",
+      "route": "/workspace/sources",
+      "fixture": "e2e pipeline-board corpus (5 sources: 3 ready, 1 reading, 1 held for review), owner access, unsigned local JWT",
+      "tokens": "direction C: fnd-C 05eb1d81 CSS diff (tokens + workspace/explore/chrome CSS) applied to this build only, not committed",
+      "width": 1440,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 2216,
+      "pixelHeight": 948,
+      "bytes": 56704,
+      "sha256": "cf8fa899ed8bd9d213d48a3724ca542719e53421ab068597e644f40d88f8cfb8",
+      "alt": "The TAVONEL Sources board with five sources in mixed states: ready to compile, one being read page by page, and one held for review."
+    },
+    {
+      "file": "sources-board-390.webp",
+      "surface": "Sources board",
+      "route": "/workspace/sources",
+      "fixture": "e2e pipeline-board corpus (5 sources: 3 ready, 1 reading, 1 held for review), owner access, unsigned local JWT",
+      "tokens": "direction C: fnd-C 05eb1d81 CSS diff (tokens + workspace/explore/chrome CSS) applied to this build only, not committed",
+      "width": 390,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 716,
+      "pixelHeight": 1538,
+      "bytes": 46026,
+      "sha256": "d3f0f7fba203efeadab68935f6260deab7ec293bea918fdf8ebf51d33572055f",
+      "alt": "The TAVONEL Sources board with five sources in mixed states: ready to compile, one being read page by page, and one held for review."
+    },
+    {
+      "file": "evidence-inspector-1440.webp",
+      "surface": "Evidence Inspector",
+      "route": "/explore?act=evidence",
+      "fixture": "public /explore sample World (SEC filings corpus, public/explore-sample)",
+      "tokens": "direction C: fnd-C 05eb1d81 CSS diff (tokens + workspace/explore/chrome CSS) applied to this build only, not committed",
+      "width": 1440,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 2880,
+      "pixelHeight": 1732,
+      "bytes": 139428,
+      "sha256": "8ef2dbd175fb0deededdc9d45dabf152db50b695f665abd4542c7127033a0424",
+      "alt": "The TAVONEL evidence view: an answer, its citation, and the highlighted region on the source page with its source version."
+    },
+    {
+      "file": "evidence-inspector-390.webp",
+      "surface": "Evidence Inspector",
+      "route": "/explore?act=evidence",
+      "fixture": "public /explore sample World (SEC filings corpus, public/explore-sample)",
+      "tokens": "direction C: fnd-C 05eb1d81 CSS diff (tokens + workspace/explore/chrome CSS) applied to this build only, not committed",
+      "width": 390,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 780,
+      "pixelHeight": 2482,
+      "bytes": 87560,
+      "sha256": "f626c3e19011ed6627c480fe0205fb78a62616ab173360fc71d1091423a72f3c",
+      "alt": "The TAVONEL evidence view: an answer, its citation, and the highlighted region on the source page with its source version."
+    },
+    {
+      "file": "compile-timeline-1440.webp",
+      "surface": "Compile timeline",
+      "route": "/dev/compile-stage",
+      "fixture": "dev harness: rows built by the production buildPipeline from fixture uploads",
+      "tokens": "direction C: fnd-C 05eb1d81 CSS diff (tokens + workspace/explore/chrome CSS) applied to this build only, not committed",
+      "width": 1440,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 2784,
+      "pixelHeight": 1082,
+      "bytes": 38448,
+      "sha256": "770a19040c36e42eb953c307df0b0ac04c8089bde8b962f0269b3e354079dbb4",
+      "alt": "The TAVONEL compile stage: each source's progress through sending, reading, review and compiled."
+    },
+    {
+      "file": "compile-timeline-390.webp",
+      "surface": "Compile timeline",
+      "route": "/dev/compile-stage",
+      "fixture": "dev harness: rows built by the production buildPipeline from fixture uploads",
+      "tokens": "direction C: fnd-C 05eb1d81 CSS diff (tokens + workspace/explore/chrome CSS) applied to this build only, not committed",
+      "width": 390,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 684,
+      "pixelHeight": 1260,
+      "bytes": 32916,
+      "sha256": "c7cf60025ebe6501d889a867bee871247b6a7a282cd1f0758dc8b1d5660b4fef",
+      "alt": "The TAVONEL compile stage: each source's progress through sending, reading, review and compiled."
+    },
+    {
+      "file": "change-center-1440.webp",
+      "surface": "World diff / Change Center",
+      "route": "/explore?act=change",
+      "fixture": "public /explore sample World (SEC filings corpus, public/explore-sample)",
+      "tokens": "direction C: fnd-C 05eb1d81 CSS diff (tokens + workspace/explore/chrome CSS) applied to this build only, not committed",
+      "width": 1440,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 2880,
+      "pixelHeight": 2200,
+      "bytes": 314104,
+      "sha256": "1102c1a4494b92a708c0e53ddbbf777da31c171913edf15f05286bcb2f0a3326",
+      "alt": "The TAVONEL change view: two revisions side by side and the objects the new revision reached."
+    },
+    {
+      "file": "change-center-390.webp",
+      "surface": "World diff / Change Center",
+      "route": "/explore?act=change",
+      "fixture": "public /explore sample World (SEC filings corpus, public/explore-sample)",
+      "tokens": "direction C: fnd-C 05eb1d81 CSS diff (tokens + workspace/explore/chrome CSS) applied to this build only, not committed",
+      "width": 390,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 780,
+      "pixelHeight": 2800,
+      "bytes": 130222,
+      "sha256": "7733b4888a0815dfaac3a667cf4934999ecf5e3820565402be156e4c25bf61ab",
+      "alt": "The TAVONEL change view: two revisions side by side and the objects the new revision reached."
+    },
+    {
+      "file": "use-with-ai-1440.webp",
+      "surface": "MCP: Use with AI",
+      "route": "/workspace/ask",
+      "fixture": "e2e pipeline-board corpus (5 sources: 3 ready, 1 reading, 1 held for review), owner access, unsigned local JWT",
+      "tokens": "direction C: fnd-C 05eb1d81 CSS diff (tokens + workspace/explore/chrome CSS) applied to this build only, not committed",
+      "width": 1440,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 2136,
+      "pixelHeight": 786,
+      "bytes": 41368,
+      "sha256": "a23ec78d556755337a558f9f8c03e93f77d0aa02aee7715b13c4859053afe024",
+      "alt": "The TAVONEL Use with AI panel: connecting the compiled knowledge to an assistant over MCP."
+    },
+    {
+      "file": "use-with-ai-390.webp",
+      "surface": "MCP: Use with AI",
+      "route": "/workspace/ask",
+      "fixture": "e2e pipeline-board corpus (5 sources: 3 ready, 1 reading, 1 held for review), owner access, unsigned local JWT",
+      "tokens": "direction C: fnd-C 05eb1d81 CSS diff (tokens + workspace/explore/chrome CSS) applied to this build only, not committed",
+      "width": 390,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 636,
+      "pixelHeight": 1004,
+      "bytes": 39666,
+      "sha256": "da2c33fcea8d29e3044b0175bcf7a2066825de05851fa41860d44cdbdb4e8290",
+      "alt": "The TAVONEL Use with AI panel: connecting the compiled knowledge to an assistant over MCP."
+    }
+  ],
+  "diagrams": [
+    {
+      "component": "CompilePipelineDiagram",
+      "file": "components/visuals/compile-pipeline-diagram.tsx",
+      "sourceBytes": 3322,
+      "sourceGzipBytes": 1225,
+      "markupBytes": 6545,
+      "markupGzipBytes": 1230
+    },
+    {
+      "component": "ProvenanceChainDiagram",
+      "file": "components/visuals/provenance-chain-diagram.tsx",
+      "sourceBytes": 4358,
+      "sourceGzipBytes": 1503,
+      "markupBytes": 7464,
+      "markupGzipBytes": 1389
+    },
+    {
+      "component": "TemporalLineageDiagram",
+      "file": "components/visuals/temporal-lineage-diagram.tsx",
+      "sourceBytes": 4460,
+      "sourceGzipBytes": 1500,
+      "markupBytes": 5965,
+      "markupGzipBytes": 1059
+    },
+    {
+      "component": "FailClosedGateDiagram",
+      "file": "components/visuals/fail-closed-gate-diagram.tsx",
+      "sourceBytes": 4429,
+      "sourceGzipBytes": 1560,
+      "markupBytes": 7631,
+      "markupGzipBytes": 1300
+    }
+  ],
+  "notCaptured": [],
+  "diagramsShared": [
+    {
+      "file": "components/visuals/diagram-frame.tsx",
+      "bytes": 2419,
+      "gzipBytes": 1162
+    },
+    {
+      "file": "components/visuals/visuals.module.css",
+      "bytes": 3314,
+      "gzipBytes": 1421
+    }
+  ]
+}
