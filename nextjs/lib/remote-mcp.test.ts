@@ -503,6 +503,37 @@ describe("consent", () => {
     }
   });
 
+  it("W1-A2 flag on: a trial inside its bounds gets a code, and over a bound gets 402 TRIAL_LIMIT_REACHED and no code", async () => {
+    const clientId = await registeredClient();
+    vi.stubEnv("TAVONEL_TRIAL_AI_ACCESS_ENABLED", "true");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://store.test");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "k".repeat(40));
+    let status = "allowed";
+    const store = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe("https://store.test/rest/v1/rpc/foundation_trial_ai_access");
+      // Consent reads the bounds; it never spends a query.
+      expect(JSON.parse(String(init?.body))).toMatchObject({ p_user_id: USER, p_workspace_key: MINE, p_consume_query: false });
+      return new Response(JSON.stringify({ status, reason: status === "allowed" ? null : "TRIAL_AI_WORLD_LIMIT" }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", store);
+    try {
+      const trialSession = { ok: true, principal: { kind: "session", workspaceKey: MINE, userId: USER, scopes: [], accessSource: "trial", authorizationRevision: 4, workspaceRole: "owner" } };
+      mocks.session.mockResolvedValueOnce(trialSession);
+      const granted = await consent("approve", authorizationRequest(clientId), "supabase-session");
+      const body = await granted.json() as { code: string; redirectTo: string };
+      expect([granted.status, body.code]).toEqual([200, "AUTHORIZATION_GRANTED"]);
+      expect(new URL(body.redirectTo).searchParams.get("code")).toMatch(/^tvmcp_code_/);
+      status = "limit_reached";
+      mocks.session.mockResolvedValueOnce(trialSession);
+      const capped = await consent("approve", authorizationRequest(clientId), "supabase-session");
+      const cappedBody = await capped.json() as Record<string, unknown>;
+      expect([capped.status, cappedBody.code, "redirectTo" in cappedBody]).toEqual([402, "TRIAL_LIMIT_REACHED", false]);
+      expect(store).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("issues a code only to a session that could hold an API key", async () => {
     const clientId = await registeredClient();
     mocks.session.mockResolvedValueOnce({ ok: false, code: "AUTH_REQUIRED", status: 401 });

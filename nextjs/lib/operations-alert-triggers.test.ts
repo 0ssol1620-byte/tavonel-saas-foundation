@@ -54,7 +54,7 @@ describe("stableAlertId", () => {
 
 describe("compile job worker pages", () => {
   it("pages a job that settled failed (the dead letter), with its code and the runbook", async () => {
-    const [sent] = await alertCompileJobTurn(JOB, { note: "failed", errorCode: "NO_DOCUMENT_COULD_BE_READ", blocked: [] }, NOW);
+    const [sent] = await alertCompileJobTurn(JOB, { note: "failed", errorCode: "NO_DOCUMENT_COULD_BE_READ", deadLettered: true, blocked: [] }, NOW);
     expect(sent).toMatchObject({ ok: true, code: "ALERT_DELIVERED" });
     expect(posts[0]).toMatchObject({
       schemaVersion: "tavonel.operations_alert.v1", kind: "incident", service: "web", severity: "warning",
@@ -62,6 +62,11 @@ describe("compile job worker pages", () => {
     });
     expect(posts[0]!.summary).toContain(JOB.jobId);
     expect(posts[0]!.summary).toContain("NO_DOCUMENT_COULD_BE_READ");
+  });
+
+  it("does not page a failed turn whose failed state was not durably written by it", async () => {
+    expect(await alertCompileJobTurn(JOB, { note: "failed", errorCode: "NO_DOCUMENT_COULD_BE_READ", blocked: [] }, NOW)).toEqual([]);
+    expect(posts).toEqual([]);
   });
 
   it("does not page a turn that compiled, waited or rested", async () => {
@@ -86,8 +91,12 @@ describe("compile job worker pages", () => {
 
 describe("OCR settlement pages", () => {
   it("pages OCR_TIMEOUT_OR_NETWORK and OCR_RESPONSE_INVALID, and nothing else", async () => {
-    expect(await alertOcrFailure({ workspaceKey: "pilot-ops01", documentId: DOC, reasonCode: "OCR_TIMEOUT_OR_NETWORK" }, NOW)).toMatchObject({ code: "ALERT_DELIVERED" });
-    expect(await alertOcrFailure({ workspaceKey: "pilot-ops01", documentId: DOC, reasonCode: "OCR_RESPONSE_INVALID" }, NOW)).toMatchObject({ code: "ALERT_DELIVERED" });
+    expect(await alertOcrFailure({ workspaceKey: "pilot-ops01", documentId: DOC, reasonCode: "OCR_TIMEOUT_OR_NETWORK", outcome: "released" }, NOW)).toMatchObject({ code: "ALERT_DELIVERED" });
+    expect(await alertOcrFailure({ workspaceKey: "pilot-ops01", documentId: DOC, reasonCode: "OCR_RESPONSE_INVALID", outcome: "operator_review" }, NOW)).toMatchObject({ code: "ALERT_DELIVERED" });
+    // The page says what the settlement did, never a state it did not report.
+    expect(posts.map((post) => String(post.summary).split("; ")[1])).toEqual([
+      "the reservation was released at no charge", "the reservation is held for operator review",
+    ]);
     for (const reasonCode of ["OCR_COMPLETED", "CDR_PERMANENT_REJECT", "GPU_NOT_DISPATCHED"]) {
       expect(await alertOcrFailure({ workspaceKey: "pilot-ops01", documentId: DOC, reasonCode }, NOW)).toBeNull();
     }
@@ -137,7 +146,7 @@ describe("RunPod daily cost", () => {
   it("is within the cap at or below it, and reads only today's bucket", async () => {
     const fetcher = billing([{ startTime: "2026-11-03T00:00:00Z", totalAmount: 500 }, { startTime: "2026-11-04T00:00:00Z", totalAmount: 25 }]);
     expect(await checkRunPodDailyCost(NOW, env, fetcher)).toMatchObject({ code: "RUNPOD_COST_WITHIN_CAP" });
-    expect(String((fetcher.mock.calls[0] as unknown as [string])[0])).toBe("https://api.runpod.io/v2/billing?bucketSize=day&lastN=1");
+    expect(String((fetcher.mock.calls[0] as unknown as [string])[0])).toBe("https://api.runpod.io/v2/billing?bucketSize=day&lastN=2");
     expect((fetcher.mock.calls[0] as unknown as [string, RequestInit])[1].headers).toEqual({ Authorization: "Bearer rp-test" });
   });
 
@@ -150,7 +159,37 @@ describe("RunPod daily cost", () => {
     expect(posts[1]).toMatchObject({ severity: "critical" });
   });
 
-  it("fails visibly on an unreadable answer and never pages on one", async () => {
+  it("picks the day bucket by the instant it covers, not by a date prefix", async () => {
+    // A bucket that starts at 15:00 UTC (another time zone's midnight) holds 09:00 UTC today.
+    expect(await checkRunPodDailyCost(NOW, env, billing([
+      { startTime: "2026-11-02T15:00:00Z", totalAmount: 400 },
+      { startTime: "2026-11-03T15:00:00Z", totalAmount: 26 },
+    ]))).toMatchObject({ code: "RUNPOD_COST_CAP_EXCEEDED", delivery: "ALERT_DELIVERED" });
+    expect(posts[0]).toMatchObject({ currentValue: 26 });
+    expect(String(posts[0]!.summary)).toContain("2026-11-03T15:00:00.000Z");
+    // No bucket holding now is no spend yet today, not yesterday's.
+    expect(await checkRunPodDailyCost(NOW, env, billing([{ startTime: "2026-11-02T00:00:00Z", totalAmount: 400 }])))
+      .toMatchObject({ code: "RUNPOD_COST_WITHIN_CAP" });
+  });
+
+  it("pages once a day, from the 00 UTC slot, when a cap is set but the billing cannot be read", async () => {
+    const midnight = Date.parse("2026-11-04T00:00:00Z");
+    for (const [label, fetcher, environment] of [
+      ["401", vi.fn(async () => new Response("no", { status: 401 })), env],
+      ["no key", vi.fn(), { TAVONEL_RUNPOD_DAILY_COST_CAP_USD: "25" }],
+    ] as const) {
+      resetOperationsAlertDelivery();
+      posts = [];
+      expect(await checkRunPodDailyCost(midnight, environment, fetcher as unknown as typeof fetch), label).toMatchObject({ delivery: "ALERT_DELIVERED" });
+      expect(posts, label).toHaveLength(1);
+      expect(posts[0], label).toMatchObject({ kind: "incident", severity: "warning", service: "runpod" });
+      // The other 23 hourly slots of the day report it and page nobody.
+      expect(await checkRunPodDailyCost(midnight + 3_600_000, environment, fetcher as unknown as typeof fetch), label).not.toHaveProperty("delivery");
+      expect(posts, label).toHaveLength(1);
+    }
+  });
+
+  it("fails visibly on an unreadable answer and never pages on one outside the daily slot", async () => {
     for (const fetcher of [
       vi.fn(async () => new Response("no", { status: 401 })),
       vi.fn(async () => { throw new Error("down"); }),
@@ -200,6 +239,14 @@ describe("release row expiry", () => {
     expect(await checkReleaseRowExpiry(NOW, env)).toMatchObject({ code: "RELEASE_STORE_UNREADABLE" });
     expect(posts).toEqual([]);
   });
+
+  it("pages a warning from its daily slot when it cannot read the row or does not know its revision", async () => {
+    const midnight = Date.parse("2026-11-04T00:00:00Z");
+    store.request.mockResolvedValueOnce(new Response("{}", { status: 500 }));
+    expect(await checkReleaseRowExpiry(midnight, env)).toMatchObject({ code: "RELEASE_STORE_UNREADABLE", delivery: "ALERT_DELIVERED" });
+    expect(await checkReleaseRowExpiry(midnight, {})).toMatchObject({ code: "RELEASE_REVISION_UNKNOWN", delivery: "ALERT_DELIVERED" });
+    expect(posts.map((post) => [post.severity, post.service])).toEqual([["warning", "web"], ["warning", "web"]]);
+  });
 });
 
 describe("scheduled cadence", () => {
@@ -215,7 +262,7 @@ describe("with no receiver configured", () => {
   it("every producer reports the unconfigured state and none of them throws", async () => {
     vi.stubEnv("OPERATIONS_ALERT_WEBHOOK_URL", "");
     vi.spyOn(console, "error").mockImplementation(() => {});
-    const [result] = await alertCompileJobTurn(JOB, { note: "failed", errorCode: "X_FAILED", blocked: [] }, NOW);
+    const [result] = await alertCompileJobTurn(JOB, { note: "failed", errorCode: "X_FAILED", deadLettered: true, blocked: [] }, NOW);
     expect(result).toMatchObject({ ok: false, code: "ALERT_RECEIVER_UNCONFIGURED" });
     expect(await alertOcrFailure({ workspaceKey: "pilot-ops01", documentId: DOC, reasonCode: "OCR_RESPONSE_INVALID" }, NOW))
       .toMatchObject({ code: "ALERT_RECEIVER_UNCONFIGURED" });

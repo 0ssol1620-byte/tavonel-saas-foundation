@@ -1,10 +1,10 @@
-import { appendServiceAuditEvent } from "./enterprise-store";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 
 /*
   W1-A3: the end-to-end timing receipt -- upload confirm -> candidate ready -> activate -> first
-  remote MCP answer -- recorded once per World as an internal operations event
-  (`enterprise_audit_events`, action `operations.e2e_timing`, actor `service`).
+  remote MCP answer -- recorded once per World as an internal operations receipt
+  (`foundation_operations_receipts`, kind `e2e_timing`). Internal means internal: it is not in
+  `enterprise_audit_events`, which a customer admin exports, and no client role can read it.
 
   Every timestamp is read back from the record that already owns it: `confirmed_at` on the
   intake admissions of the compile job's documents (the last one confirmed), the first
@@ -12,9 +12,9 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
   `updated_at` of the active World. The answer time is the request's own clock. A timestamp the
   store cannot give is null, and its interval is null -- never estimated.
 
-  "First" is the database's word, not this process's: the audit row's id is derived from
-  (workspace, action, World) and written with ignore-duplicates, so a second instance recording
-  the same World writes nothing. The in-process set only saves the reads after the first time.
+  "First" is the database's word, not this process's: the receipt is keyed by (kind, workspace,
+  World) and the writer keeps the first one, so a second instance recording the same World writes
+  nothing. The in-process set only saves the reads after the first time.
 */
 
 export const E2E_TIMING_SCHEMA = "tavonel.e2e_timing.v1";
@@ -121,18 +121,18 @@ export async function recordFirstMcpAnswerTiming(workspaceKey: string, collectio
       activatedAt: iso(world[0]?.updated_at),
       firstMcpAnswerAt: new Date(answeredAt).toISOString(),
     });
-    const written = await appendServiceAuditEvent({
-      workspaceKey,
-      action: "operations.e2e_timing",
-      targetType: "world",
-      targetId: collectionId,
-      outcome: "succeeded",
-      details: receipt,
+    const config = readSupabaseAdminConfig();
+    const response = config && await supabaseAdminRequest(config, "/rest/v1/rpc/record_foundation_operations_receipt", {
+      method: "POST",
+      body: JSON.stringify({ p_kind: "e2e_timing", p_workspace_key: workspaceKey, p_target_id: collectionId, p_details: receipt }),
+      signal: AbortSignal.timeout(5_000),
     });
-    if (!written.ok) {
+    const written = response && response.ok ? await response.json().catch(() => null) as unknown : null;
+    if (written !== true && written !== false) {
       receipted.delete(memo);
       return "not_recorded";
     }
+    if (!written) return "already_recorded";
     console.info(JSON.stringify({ event: "operations_e2e_timing", collectionId, seconds: receipt.seconds }));
     return "recorded";
   } catch {

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { assertReadOnly, createClient, createServer } from "@/public/developer/tavonel-mcp.mjs";
 import {
   REMOTE_MCP_PROTOCOL_VERSIONS,
@@ -105,6 +105,12 @@ export async function POST(request: Request) {
     }
   }
 
+  // W1-A3 telemetry runs after the response, so the alert webhook and the timing reads never sit in
+  // the tool call's latency. Each of them carries its own 5 s timeout and never throws.
+  const later = (task: () => Promise<unknown>) => {
+    // ponytail: outside a request scope (unit tests) after() throws; the task then just starts now.
+    try { after(task); } catch { void task().catch(() => undefined); }
+  };
   // W1-A3: what each tool call reached, so a 5xx behind a tool error still counts as a 5xx.
   const reached: { pathname: string; status: number }[] = [];
   const tracked = async (url: string, init: RequestInit) => {
@@ -119,14 +125,18 @@ export async function POST(request: Request) {
   try {
     answer = await handle(message);
   } catch (error) {
-    if (method === "tools/call") await recordMcpToolCall(true);
+    if (method === "tools/call") later(() => recordMcpToolCall(true));
     throw error;
   }
   if (method === "tools/call") {
-    await recordMcpToolCall(reached.some((entry) => entry.status >= 500));
+    const failed = reached.some((entry) => entry.status >= 500);
+    later(() => recordMcpToolCall(failed));
     const answered = reached.map((entry) => ({ ...entry, world: /^\/api\/v1\/collections\/([^/]+)\/(?:ask|search)$/.exec(entry.pathname)?.[1] }))
       .find((entry) => entry.world && entry.status >= 200 && entry.status < 300);
-    if (answered?.world && bearer.kind === "principal") await recordFirstMcpAnswerTiming(bearer.workspaceKey, answered.world);
+    if (answered?.world && bearer.kind === "principal") {
+      const { workspaceKey } = bearer, world = answered.world;
+      later(() => recordFirstMcpAnswerTiming(workspaceKey, world));
+    }
   }
   return NextResponse.json(answer, { headers: NO_STORE });
 }

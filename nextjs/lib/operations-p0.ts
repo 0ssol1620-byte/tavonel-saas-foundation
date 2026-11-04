@@ -372,14 +372,13 @@ const alertCounters = {
 const alertLastSentAt = new Map<string, number>();
 
 /**
- * An unconfigured receiver is a standing state, not an event: it is logged once per process per
- * hour (with how many alerts it swallowed since the last line) and counted every time. The
- * founder-held OPERATIONS_ALERT_WEBHOOK_URL may stay unset for weeks; one line per alert would
- * bury the log it is meant to be visible in.
+ * An unconfigured receiver is a standing state, not an event. While the founder-held
+ * OPERATIONS_ALERT_WEBHOOK_URL is unset, stderr is the only place an alert is visible, so every
+ * distinct alert (dedupeKey) is logged; only the same alert repeating is held to one line per
+ * process per hour, carrying how many repeats it swallowed. Every alert is counted.
  */
 export const ALERT_RECEIVER_UNCONFIGURED_LOG_INTERVAL_MS = 60 * 60_000;
-let unconfiguredLoggedAt: number | null = null;
-let unconfiguredSinceLog = 0;
+const unconfiguredLogged = new Map<string, { at: number; since: number }>();
 
 export function operationsAlertCounters() {
   return { ...alertCounters };
@@ -387,8 +386,7 @@ export function operationsAlertCounters() {
 
 export function resetOperationsAlertDelivery() {
   alertLastSentAt.clear();
-  unconfiguredLoggedAt = null;
-  unconfiguredSinceLog = 0;
+  unconfiguredLogged.clear();
   for (const key of Object.keys(alertCounters) as (keyof typeof alertCounters)[])
     alertCounters[key] = 0;
 }
@@ -434,20 +432,23 @@ export async function deliverOperationsAlert(
   const webhookUrl = process.env.OPERATIONS_ALERT_WEBHOOK_URL;
   if (!webhookUrl?.startsWith("https://")) {
     alertCounters.unconfigured += 1;
-    unconfiguredSinceLog += 1;
-    if (
-      unconfiguredLoggedAt === null ||
-      now - unconfiguredLoggedAt >= ALERT_RECEIVER_UNCONFIGURED_LOG_INTERVAL_MS
-    ) {
+    const logged = unconfiguredLogged.get(dedupeKey);
+    if (logged && now - logged.at < ALERT_RECEIVER_UNCONFIGURED_LOG_INTERVAL_MS) {
+      logged.since += 1;
+    } else {
       console.error(
         JSON.stringify({
           ...receipt,
           code: "ALERT_RECEIVER_UNCONFIGURED",
-          unconfiguredSinceLastLog: unconfiguredSinceLog,
+          unconfiguredSinceLastLog: (logged?.since ?? 0) + 1,
         })
       );
-      unconfiguredLoggedAt = now;
-      unconfiguredSinceLog = 0;
+      // ponytail: one entry per distinct alert, pruned when the map passes 1,000 (an hour-old
+      // entry with no repeats carries nothing worth keeping).
+      if (unconfiguredLogged.size >= 1_000)
+        for (const [key, entry] of unconfiguredLogged)
+          if (now - entry.at >= ALERT_RECEIVER_UNCONFIGURED_LOG_INTERVAL_MS) unconfiguredLogged.delete(key);
+      unconfiguredLogged.set(dedupeKey, { at: now, since: 0 });
     }
     return { ok: false, code: "ALERT_RECEIVER_UNCONFIGURED", dedupeKey };
   }

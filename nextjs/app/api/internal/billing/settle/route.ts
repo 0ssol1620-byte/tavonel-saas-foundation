@@ -149,7 +149,7 @@ export async function POST(request: Request) {
   // W1-A3: an OCR timeout or out-of-contract answer is paged once the settlement is durable. A
   // redelivered settlement pages again only outside the same-instance dedupe window.
   if (WORKSPACE_ID_PATTERN.test(workspaceKey) && DOCUMENT_ID_PATTERN.test(documentId)) {
-    await alertOcrFailure({ workspaceKey, documentId, reasonCode });
+    await alertOcrFailure({ workspaceKey, documentId, reasonCode, outcome: input.outcome });
   }
 
   // `sourceSha256` is the digest the worker computed over the bytes it read; the application

@@ -1,5 +1,4 @@
 import type { DeveloperScope } from "./developer-contracts";
-import { listDeveloperApiKeys } from "./developer-store";
 import { REMOTE_MCP_SCOPES } from "./remote-mcp";
 import { authorizeFoundationSessionProduct, type SessionAccessSource } from "./self-service-trial";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
@@ -19,15 +18,23 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
   Over a bound is 402 TRIAL_LIMIT_REACHED. A store that cannot answer is 503 -- a check that
   could not run never reads as an allowance.
 
-  With the flag off, the shadow (A2.1) asks the same database question without consuming
-  anything and reports `wouldAllow`; the route turns that into one funnel line. A shadow read that
-  fails is simply not counted -- it never changes the 402.
+  With the flag off, the shadow (A2.1) asks the same question the flag-on path would -- same
+  scope rule, same key count, same bounds -- without consuming anything, and reports
+  `wouldAllow`; the route turns that into one funnel line. Listing and revoking are not demand
+  and never count. A shadow read that fails is simply not counted -- it never changes the 402.
 
   TODO(founder, F-2): A2.2 is not an agent's call. Before TAVONEL_TRIAL_AI_ACCESS_ENABLED=true:
   the trial terms wording for AI access (what a free evaluation's key and MCP connection may do,
   and the four bounds as published), the bound values themselves (foundation_trial_policy
   ai_* columns), the `customerData` launch switch (P2-37), and a founder approval receipt.
   Until then the flag stays unset and every trial gets the 402 it got before W1.
+
+  Before the canary (engineering, not founder): confirm a trial principal is accepted end to end by
+  the key-create RPC (create_foundation_api_key_authorized), app/api/mcp/oauth/token/route.ts
+  (which mints the MCP key and counts as the trial's one key while it lives) and the v1 routes
+  behind MCP (ask, search, the customer-data gate). This file only decides entry. The developer
+  panel's default scopes include connector and intake scopes, so a trial needs a read-only default
+  there; and "one query" is one key-authenticated v1 call, which F-2 wording must define.
 */
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -56,8 +63,6 @@ export function trialScopesAllowed(scopes: readonly DeveloperScope[]): boolean {
   return scopes.length > 0 && scopes.every((scope) => REMOTE_MCP_SCOPES.includes(scope));
 }
 
-const MCP_KEY_PREFIX = "MCP: ";
-
 type Usage = { status: "allowed" } | { status: "limit_reached"; reason: string } | { status: "not_trial" };
 
 async function readUsage(principal: Principal, consume: boolean): Promise<Usage | null> {
@@ -82,25 +87,51 @@ async function readUsage(principal: Principal, consume: boolean): Promise<Usage 
   }
 }
 
-/** One manual key per trial. MCP tokens are keys too, but they are named, scoped and expire in an hour. */
-async function holdsManualKey(workspaceKey: string, now: number): Promise<boolean | null> {
-  const listed = await listDeveloperApiKeys(workspaceKey);
-  if (!listed.ok) return null;
-  return listed.keys.some((key) => !key.revokedAt && !key.name.startsWith(MCP_KEY_PREFIX)
-    && (key.expiresAt === null || Date.parse(key.expiresAt) > now));
+/**
+ * One key per trial, and every live key counts: a name is the caller's to choose, so "MCP: ..."
+ * proves nothing, and an MCP token is a key while it lives. One bounded read (limit 1) over the
+ * workspace's unrevoked, unexpired keys -- never a newest-N listing another key can push one out of.
+ */
+async function holdsLiveKey(workspaceKey: string, now: number): Promise<boolean | null> {
+  const config = readSupabaseAdminConfig();
+  if (!config) return null;
+  const query = new URLSearchParams({
+    select: "key_id",
+    workspace_key: `eq.${workspaceKey}`,
+    revoked_at: "is.null",
+    or: `(expires_at.is.null,expires_at.gt.${new Date(now).toISOString()})`,
+    limit: "1",
+  });
+  try {
+    const response = await supabaseAdminRequest(config, `/rest/v1/foundation_api_keys?${query}`, { signal: AbortSignal.timeout(5_000) });
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
+      return null;
+    }
+    const rows = await response.json().catch(() => null) as unknown;
+    return Array.isArray(rows) ? rows.length > 0 : null;
+  } catch {
+    return null;
+  }
 }
 
 type Evaluation = { allowed: true } | { allowed: false; code: "TRIAL_FEATURE_NOT_INCLUDED" | "TRIAL_LIMIT_REACHED" } | null;
 
-async function evaluate(principal: Principal, operation: TrialAiOperation, consume: boolean): Promise<Evaluation> {
+/** `scopes` is what a create or rotate asks for; `null` means the request did not parse. */
+type Scopes = readonly DeveloperScope[] | null;
+
+async function evaluate(principal: Principal, operation: TrialAiOperation, consume: boolean, scopes: Scopes): Promise<Evaluation> {
   // Listing and revoking a key the trial already holds are never refused for usage: revoking is
   // how a customer gets back under the one-key bound, and refusing it would trap them over it.
   if (operation === "key_list" || operation === "key_revoke") return { allowed: true };
+  if ((operation === "key_create" || operation === "key_rotate") && !trialScopesAllowed(scopes ?? [])) {
+    return { allowed: false, code: "TRIAL_FEATURE_NOT_INCLUDED" };
+  }
   if (operation === "key_create") {
-    const holds = await holdsManualKey(principal.workspaceKey, Date.now());
+    const holds = await holdsLiveKey(principal.workspaceKey, Date.now());
     if (holds === null) return null;
-    // ponytail: list-then-create, so two simultaneous creates can both pass; the key is read-only
-    // and the counter still bounds its use. A partial unique index on active manual keys closes it.
+    // ponytail: read-then-create, so two simultaneous creates can both pass; the key is read-only
+    // and the counter still bounds its use. A partial unique index on live trial keys closes it.
     if (holds) return { allowed: false, code: "TRIAL_LIMIT_REACHED" };
   }
   const usage = await readUsage(principal, consume);
@@ -113,18 +144,26 @@ async function evaluate(principal: Principal, operation: TrialAiOperation, consu
 /**
  * Decide one AI-access operation for a session principal. Not a trial: allowed, with no I/O at
  * all, so owner and paid requests are byte-for-byte what they were.
+ *
+ * A create or rotate passes the scopes it parsed (`null` when the body did not parse): the flag-on
+ * decision and the shadow then judge the same request. With the flag on, an unparsed body is left
+ * to the route's own 400.
  */
 export async function trialAiAccess(
   principal: Principal,
   operation: TrialAiOperation,
+  scopes: Scopes = null,
   env: Env = process.env,
 ): Promise<TrialAiAccessDecision> {
   if (principal.accessSource !== "trial") return { ok: true };
+  const keyRequest = operation === "key_create" || operation === "key_rotate";
   if (!trialAiAccessEnabled(env)) {
-    const shadow = await evaluate(principal, operation, false).catch(() => null);
+    const demand = operation !== "key_list" && operation !== "key_revoke" && (!keyRequest || scopes !== null);
+    const shadow = demand ? await evaluate(principal, operation, false, scopes).catch(() => null) : null;
     return { ok: false, status: 402, code: "TRIAL_FEATURE_NOT_INCLUDED", wouldAllow: shadow?.allowed === true };
   }
-  const decided = await evaluate(principal, operation, operation === "query");
+  if (keyRequest && scopes === null) return { ok: true };
+  const decided = await evaluate(principal, operation, operation === "query", scopes);
   if (decided === null) return { ok: false, status: 503, code: "TRIAL_AI_ACCESS_CHECK_FAILED", wouldAllow: false };
   return decided.allowed ? { ok: true } : { ok: false, status: 402, code: decided.code, wouldAllow: false };
 }
@@ -146,7 +185,7 @@ export async function trialAiKeyAccess(
   const session = await authorizeFoundationSessionProduct(workspaceKey, userId, minimumPlan);
   if (!session.ok || session.access.source !== "trial") return null;
   if (!trialScopesAllowed([scope])) return { ok: false, code: "TRIAL_FEATURE_NOT_INCLUDED", status: 402 };
-  const decided = await evaluate({ workspaceKey, userId, accessSource: "trial" }, "query", consume);
+  const decided = await evaluate({ workspaceKey, userId, accessSource: "trial" }, "query", consume, null);
   if (decided === null) return { ok: false, code: "TRIAL_AI_ACCESS_CHECK_FAILED", status: 503 };
   return decided.allowed ? { ok: true } : { ok: false, code: decided.code, status: 402 };
 }

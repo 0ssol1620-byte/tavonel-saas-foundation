@@ -42,7 +42,7 @@ function send(key: string, alert: Omit<Alert, "alertId" | "runbookUrl">, now: nu
 /* ------------------------------------------------------------------ compile job worker */
 
 type JobLike = { jobId: string; workspaceKey: string; blocked: readonly { documentId: string; reason: string }[] };
-type TurnLike = { note: string; errorCode?: string; blocked: readonly { documentId: string; reason: string }[] };
+type TurnLike = { note: string; errorCode?: string; deadLettered?: true; blocked: readonly { documentId: string; reason: string }[] };
 
 /**
  * A durable compile job that settled `failed` is this queue's dead letter: nothing retries it and
@@ -52,7 +52,7 @@ type TurnLike = { note: string; errorCode?: string; blocked: readonly { document
 export async function alertCompileJobTurn(job: JobLike, turn: TurnLike, now = Date.now()): Promise<AlertDelivery[]> {
   const sent: Promise<AlertDelivery>[] = [];
   const observedAt = new Date(now).toISOString();
-  if (turn.note === "failed") {
+  if (turn.note === "failed" && turn.deadLettered) {
     const code = turn.errorCode ?? "UNSPECIFIED";
     sent.push(send(`compile-job-failed:${job.jobId}`, {
       kind: "incident", severity: "warning", service: "web", observedAt,
@@ -80,11 +80,19 @@ export const ALERTED_OCR_REASON_CODES: readonly string[] = ["OCR_TIMEOUT_OR_NETW
  * unreachable after the cold-start retries; OCR_RESPONSE_INVALID is the reader answering out of
  * contract. Both are terminal for that document, which goes to operator review.
  */
-export async function alertOcrFailure(input: { workspaceKey: string; documentId: string; reasonCode: string }, now = Date.now()) {
+/** What the settlement did with the reservation, as the worker reported it -- not a guess. */
+const SETTLEMENT_STATE: Record<string, string> = {
+  operator_review: "the reservation is held for operator review",
+  released: "the reservation was released at no charge",
+  settled: "the reservation settled",
+};
+
+export async function alertOcrFailure(input: { workspaceKey: string; documentId: string; reasonCode: string; outcome?: unknown }, now = Date.now()) {
   if (!ALERTED_OCR_REASON_CODES.includes(input.reasonCode)) return null;
+  const state = typeof input.outcome === "string" && SETTLEMENT_STATE[input.outcome] ? SETTLEMENT_STATE[input.outcome] : "the settlement outcome was not stated";
   return send(`ocr-failure:${input.workspaceKey}:${input.documentId}:${input.reasonCode}`, {
     kind: "incident", severity: "warning", service: "runpod", observedAt: new Date(now).toISOString(),
-    summary: `OCR ${input.reasonCode} for document ${input.documentId} in ${input.workspaceKey}; the document is in operator review`,
+    summary: `OCR ${input.reasonCode} for document ${input.documentId} in ${input.workspaceKey}; ${state}`,
   }, now);
 }
 
@@ -126,6 +134,28 @@ export async function recordMcpToolCall(failed: boolean, now = Date.now()): Prom
 
 export type WatchResult = { check: "runpod_daily_cost" | "release_row_expiry"; code: string; delivery?: AlertDelivery["code"] };
 
+const DAY_MS = 86_400_000;
+
+/**
+ * A scheduled check that could not run says so to a person, not only in the cron's response body
+ * nobody reads. Once a day: only from the 00 UTC hour (the release check runs only then; the
+ * hourly cost check pages its failure only then), keyed by check and UTC day.
+ */
+// ponytail: a failure that starts at 01:00 UTC pages at the next 00 UTC slot, up to 23 hours later;
+// a durable "last paged" row would let it page at once without paging every hour.
+async function cannotCheck(check: WatchResult["check"], code: string, now: number): Promise<WatchResult> {
+  if (new Date(now).getUTCHours() !== 0) return { check, code };
+  const day = new Date(now).toISOString().slice(0, 10);
+  const delivery = await send(`${check}-unavailable:${day}`, {
+    kind: "incident", severity: "warning", service: check === "runpod_daily_cost" ? "runpod" : "web",
+    observedAt: new Date(now).toISOString(),
+    summary: check === "runpod_daily_cost"
+      ? `The RunPod daily cost check could not run (${code}); spend is not being watched against the cap`
+      : `The release row expiry check could not run (${code}); a lapsing direct_upload row would not page`,
+  }, now);
+  return { check, code, delivery: delivery.code };
+}
+
 /**
  * RunPod spend for the current UTC day, from RunPod's own billing (REST v2 `GET /v2/billing`,
  * every resource family). The cap is TAVONEL_RUNPOD_DAILY_COST_CAP_USD; unset means unchecked,
@@ -139,33 +169,42 @@ export async function checkRunPodDailyCost(
   const result = (code: string, delivery?: AlertDelivery) => ({ check: "runpod_daily_cost" as const, code, ...(delivery ? { delivery: delivery.code } : {}) });
   const cap = Number(env.TAVONEL_RUNPOD_DAILY_COST_CAP_USD ?? "");
   if (!Number.isFinite(cap) || cap <= 0) return result("RUNPOD_COST_CAP_UNCONFIGURED");
+  // A cap was set, so from here on a check that cannot run is a page, not a silent field.
   const apiKey = env.TAVONEL_RUNPOD_API_KEY?.trim() ?? "";
-  if (!apiKey) return result("RUNPOD_BILLING_NOT_CONFIGURED");
-  const day = new Date(now).toISOString().slice(0, 10);
+  if (!apiKey) return cannotCheck("runpod_daily_cost", "RUNPOD_BILLING_NOT_CONFIGURED", now);
   let records: unknown;
   try {
-    const response = await fetcher("https://api.runpod.io/v2/billing?bucketSize=day&lastN=1", {
+    const response = await fetcher("https://api.runpod.io/v2/billing?bucketSize=day&lastN=2", {
       headers: { Authorization: `Bearer ${apiKey}` },
       signal: AbortSignal.timeout(5_000),
     });
-    if (!response.ok) return result("RUNPOD_BILLING_UNREADABLE");
+    if (!response.ok) return cannotCheck("runpod_daily_cost", "RUNPOD_BILLING_UNREADABLE", now);
     records = ((await response.json()) as { records?: unknown }).records;
   } catch {
-    return result("RUNPOD_BILLING_UNREADABLE");
+    return cannotCheck("runpod_daily_cost", "RUNPOD_BILLING_UNREADABLE", now);
   }
-  if (!Array.isArray(records)) return result("RUNPOD_BILLING_UNREADABLE");
+  if (!Array.isArray(records)) return cannotCheck("runpod_daily_cost", "RUNPOD_BILLING_UNREADABLE", now);
+  // The day bucket is the one whose own [startTime, startTime + 1 day) holds now, compared as
+  // instants: RunPod's bucket need not start at UTC midnight, and a string prefix would then miss
+  // today's spend and read it as zero. No bucket holding now means nothing was spent yet today.
   let spent = 0;
+  let bucketStart = now - (now % DAY_MS);
   for (const record of records as Array<{ startTime?: unknown; totalAmount?: unknown }>) {
-    if (typeof record?.startTime !== "string" || typeof record.totalAmount !== "number" || !Number.isFinite(record.totalAmount)) {
-      return result("RUNPOD_BILLING_UNREADABLE");
+    const start = typeof record?.startTime === "string" ? Date.parse(record.startTime) : Number.NaN;
+    if (!Number.isFinite(start) || typeof record.totalAmount !== "number" || !Number.isFinite(record.totalAmount)) {
+      return cannotCheck("runpod_daily_cost", "RUNPOD_BILLING_UNREADABLE", now);
     }
-    if (record.startTime.slice(0, 10) === day) spent += record.totalAmount;
+    if (start <= now && now < start + DAY_MS) {
+      spent += record.totalAmount;
+      bucketStart = start;
+    }
   }
+  const day = new Date(bucketStart).toISOString().slice(0, 10);
   if (spent <= cap) return result("RUNPOD_COST_WITHIN_CAP");
   const delivery = await send(`runpod-daily-cost:${day}`, {
     kind: "cost", severity: spent >= cap * 1.2 ? "critical" : "warning", service: "runpod",
     observedAt: new Date(now).toISOString(),
-    summary: `RunPod spend for ${day} UTC is above the daily cap`,
+    summary: `RunPod spend for the billing day from ${new Date(bucketStart).toISOString()} is above the daily cap`,
     currentValue: Math.round(spent * 100) / 100, thresholdValue: cap, unit: "usd",
   }, now);
   return result("RUNPOD_COST_CAP_EXCEEDED", delivery);
@@ -182,24 +221,24 @@ export const RELEASE_EXPIRY_WARNING_MS = 7 * 86_400_000;
 export async function checkReleaseRowExpiry(now = Date.now(), env: Env = process.env): Promise<WatchResult> {
   const result = (code: string, delivery?: AlertDelivery) => ({ check: "release_row_expiry" as const, code, ...(delivery ? { delivery: delivery.code } : {}) });
   const revision = env.VERCEL_GIT_COMMIT_SHA ?? "";
-  if (!/^[0-9a-f]{40}$/.test(revision)) return result("RELEASE_REVISION_UNKNOWN");
+  if (!/^[0-9a-f]{40}$/.test(revision)) return cannotCheck("release_row_expiry", "RELEASE_REVISION_UNKNOWN", now);
   const config = readSupabaseAdminConfig(env);
-  if (!config) return result("RELEASE_STORE_NOT_CONFIGURED");
+  if (!config) return cannotCheck("release_row_expiry", "RELEASE_STORE_NOT_CONFIGURED", now);
   let rows: unknown;
   try {
     const query = releaseDecisionQuery("direct_upload", revision, deployedGateSurface(env));
     const response = await supabaseAdminRequest(config, `/rest/v1/customer_data_release_decisions?${query}`);
-    if (!response.ok) return result("RELEASE_STORE_UNREADABLE");
+    if (!response.ok) return cannotCheck("release_row_expiry", "RELEASE_STORE_UNREADABLE", now);
     rows = await response.json();
   } catch {
-    return result("RELEASE_STORE_UNREADABLE");
+    return cannotCheck("release_row_expiry", "RELEASE_STORE_UNREADABLE", now);
   }
-  if (!Array.isArray(rows)) return result("RELEASE_STORE_UNREADABLE");
+  if (!Array.isArray(rows)) return cannotCheck("release_row_expiry", "RELEASE_STORE_UNREADABLE", now);
   const row = rows[0] as { allowed?: unknown; stage?: unknown; evaluated_at?: unknown } | undefined;
   // No row, a refusal or a qualification is a gate state the release runbook owns, not an expiry.
   if (!row || row.allowed !== true || row.stage !== "production") return result("RELEASE_ROW_NOT_APPLICABLE");
   const evaluatedAt = typeof row.evaluated_at === "string" ? Date.parse(row.evaluated_at) : Number.NaN;
-  if (!Number.isFinite(evaluatedAt)) return result("RELEASE_STORE_UNREADABLE");
+  if (!Number.isFinite(evaluatedAt)) return cannotCheck("release_row_expiry", "RELEASE_STORE_UNREADABLE", now);
   const expiresAt = evaluatedAt + RELEASE_LIFE_MS;
   if (expiresAt - now > RELEASE_EXPIRY_WARNING_MS) return result("RELEASE_ROW_CURRENT");
   const lapsed = expiresAt <= now;

@@ -178,6 +178,24 @@ describe("the durable compile worker", () => {
     }
   });
 
+  it("W1-A3: pages nothing when the store refuses the failed write -- the dead letter is paged once it is durable", async () => {
+    const { resetOperationsAlertDelivery } = await import("./operations-p0");
+    resetOperationsAlertDelivery();
+    vi.stubEnv("OPERATIONS_ALERT_WEBHOOK_URL", "https://hooks.example.test/T/B/X");
+    const post = vi.fn(async () => new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", post);
+    try {
+      classifySources.mockResolvedValueOnce({ ok: true, scope: "connector" });
+      advance.mockResolvedValueOnce({ ok: false, code: "COMPILE_JOB_STORE_WRITE_FAILED" } as never);
+      const turn = await runCompileJobTurn(job());
+      expect(turn).toMatchObject({ note: "waiting", retryable: true });
+      expect(post).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("W1-A3: pages a document that never arrived once, on the turn that first blocks it", async () => {
     const { resetOperationsAlertDelivery } = await import("./operations-p0");
     resetOperationsAlertDelivery();

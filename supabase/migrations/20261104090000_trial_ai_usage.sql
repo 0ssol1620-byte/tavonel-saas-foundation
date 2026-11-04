@@ -10,7 +10,12 @@
 --   * key-authenticated queries per UTC day, default 200, counted here atomically.
 --
 -- The limits are columns on the one `foundation_trial_policy` row, so the founder can change the
--- package (F-2) without a deploy; the counter is two columns on the trial row. No new table.
+-- package (F-2) without a deploy; the counter is two columns on the trial row, not a new table.
+--
+-- W1-A3 adds one table here: `foundation_operations_receipts`, internal operations receipts (the
+-- end-to-end timing receipt first). It is not `enterprise_audit_events`, which customers export:
+-- no role holds a table privilege on it, and the one writer is a service_role-only function that
+-- keeps the first receipt per (kind, workspace, target).
 --
 -- Nothing reads this until TAVONEL_TRIAL_AI_ACCESS_ENABLED=true, except the flag-off shadow,
 -- which calls the function with p_consume_query=false and therefore writes nothing.
@@ -75,9 +80,16 @@ begin
   end if;
 
   -- The row lock serializes the counter: two concurrent queries cannot both take the last unit.
-  select * into v_trial from public.foundation_self_service_trials
-   where user_id = p_user_id and workspace_key = p_workspace_key
-   for update;
+  -- A peek (the flag-off shadow, a late re-check) takes no lock, so it never queues behind intake
+  -- or settlement on the same row.
+  if p_consume_query then
+    select * into v_trial from public.foundation_self_service_trials
+     where user_id = p_user_id and workspace_key = p_workspace_key
+     for update;
+  else
+    select * into v_trial from public.foundation_self_service_trials
+     where user_id = p_user_id and workspace_key = p_workspace_key;
+  end if;
   if not found or v_trial.status <> 'trialing' or v_trial.expires_at <= v_now then
     return jsonb_build_object('status', 'not_trial');
   end if;
@@ -127,5 +139,45 @@ $$;
 
 revoke all on function public.foundation_trial_ai_access(uuid, text, boolean) from public, anon, authenticated;
 grant execute on function public.foundation_trial_ai_access(uuid, text, boolean) to service_role;
+
+create table public.foundation_operations_receipts (
+  receipt_kind text not null check (receipt_kind in ('e2e_timing')),
+  workspace_key text not null check (workspace_key ~ '^pilot-[A-Za-z0-9]{1,32}$'),
+  target_id text not null check (length(target_id) between 1 and 128),
+  details jsonb not null check (jsonb_typeof(details) = 'object' and octet_length(details::text) <= 8192),
+  recorded_at timestamptz not null default now(),
+  primary key (receipt_kind, workspace_key, target_id)
+);
+alter table public.foundation_operations_receipts enable row level security;
+revoke all on public.foundation_operations_receipts from public, anon, authenticated, service_role;
+create policy foundation_operations_receipts_no_client_access
+  on public.foundation_operations_receipts as restrictive for all to anon, authenticated
+  using (false) with check (false);
+
+-- First receipt wins: true when this call wrote it, false when one was already there.
+create or replace function public.record_foundation_operations_receipt(
+  p_kind text,
+  p_workspace_key text,
+  p_target_id text,
+  p_details jsonb
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_written integer;
+begin
+  insert into public.foundation_operations_receipts (receipt_kind, workspace_key, target_id, details)
+  values (p_kind, p_workspace_key, p_target_id, p_details)
+  on conflict (receipt_kind, workspace_key, target_id) do nothing;
+  get diagnostics v_written = row_count;
+  return v_written = 1;
+end;
+$$;
+
+revoke all on function public.record_foundation_operations_receipt(text, text, text, jsonb) from public, anon, authenticated;
+grant execute on function public.record_foundation_operations_receipt(text, text, text, jsonb) to service_role;
 
 commit;

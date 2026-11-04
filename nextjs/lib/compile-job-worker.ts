@@ -106,6 +106,8 @@ export type CompileJobTurn = {
   note: "waiting" | "advanced" | "blocked" | "compiled" | "failed" | "resting" | "skipped";
   /** The code a `failed` turn settled with. */
   errorCode?: string;
+  /** True only when this turn durably wrote the failed state: the one turn that pages the dead letter. */
+  deadLettered?: true;
   /** True when a temporary authority-store failure should not consume the runnable batch width. */
   retryable?: true;
   documentsReady: number;
@@ -211,7 +213,14 @@ async function advanceCompileJobTurn(job: CompileJob): Promise<CompileJobTurn> {
       // be durably recorded. Never report failed as settled when the store refused the write.
       return rest("waiting", job.state, job.documentsReady, job.blocked, true);
     }
-    return { ...rest("failed", "failed", job.documentsReady, job.blocked), errorCode };
+    return { ...rest("failed", "failed", job.documentsReady, job.blocked), errorCode, deadLettered: true as const };
+  };
+  // The failed state is written first and paged only when the store says this turn changed it:
+  // a refused write pages nothing, and a redelivered turn of an already failed job pages again never.
+  const settleFailed = async (input: Parameters<typeof advanceCompileJob>[0] & { errorCode: string }, documentsReady: number, blocked: CompileBlocker[]): Promise<CompileJobTurn> => {
+    const written = await advanceCompileJob(input);
+    return { ...rest("failed", "failed", documentsReady, blocked), errorCode: input.errorCode,
+      ...(written.ok && written.value.changed ? { deadLettered: true as const } : {}) };
   };
   const deferAuthorityUnavailable = async () => {
     const reason = "COMPILE_SOURCE_AUTHORITY_UNAVAILABLE";
@@ -303,15 +312,14 @@ async function advanceCompileJobTurn(job: CompileJob): Promise<CompileJobTurn> {
   }
 
   if (classified.ready.length === 0) {
-    await advanceCompileJob({
+    return settleFailed({
       workspaceKey: job.workspaceKey,
       jobId: job.jobId,
       state: "failed",
       documentsReady: 0,
       errorCode: "NO_DOCUMENT_COULD_BE_READ",
       blocked: classified.blocked,
-    });
-    return { ...rest("failed", "failed", 0, classified.blocked), errorCode: "NO_DOCUMENT_COULD_BE_READ" };
+    }, 0, classified.blocked);
   }
 
   /*
@@ -368,15 +376,14 @@ async function advanceCompileJobTurn(job: CompileJob): Promise<CompileJobTurn> {
       );
       const attempt = (seen.ok ? seen.value : 0) + 1;
       if (attempt > MAX_READING_DEFERRALS) {
-        await advanceCompileJob({
+        return settleFailed({
           workspaceKey: job.workspaceKey,
           jobId: job.jobId,
           state: "failed",
           documentsReady: classified.ready.length,
           errorCode: READING_LISTING_DISAGREEMENT,
           blocked: classified.blocked,
-        });
-        return { ...rest("failed", "failed", classified.ready.length, classified.blocked), errorCode: READING_LISTING_DISAGREEMENT };
+        }, classified.ready.length, classified.blocked);
       }
       await recordCompileJobDeferral({
         job,
@@ -394,14 +401,13 @@ async function advanceCompileJobTurn(job: CompileJob): Promise<CompileJobTurn> {
       });
       return rest("waiting", "structuring", classified.ready.length, classified.blocked);
     }
-    await advanceCompileJob({
+    return settleFailed({
       workspaceKey: job.workspaceKey,
       jobId: job.jobId,
       state: "failed",
       errorCode: run.code,
       blocked: classified.blocked,
-    });
-    return { ...rest("failed", "failed", classified.ready.length, classified.blocked), errorCode: run.code };
+    }, classified.ready.length, classified.blocked);
   }
 
   // The digest goes on both advances, not because it is written twice -- the RPC coalesces --
