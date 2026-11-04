@@ -16,7 +16,7 @@
 -- ought to have: 0053's header names the source migration for every row. Fourteen tables expect
 -- `{}` because no migration ever granted service_role anything on them; the four
 -- foundation_connection_inventory_* tables (20261002100000) also expect `{}`: RPC-only, as do
--- source_fingerprints and document_relations (20261104120000).
+-- source_fingerprints and document_relations (20261104080000).
 
 begin;
 select plan(73);

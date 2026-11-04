@@ -5,7 +5,7 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
 
   Keyed on the CDR's sanitized-output digest -- the bytes OCR read, which the compile has already
   checked against the version key (validateCollectionOcrInput) -- and on the source digest the
-  upload confirm recorded, which the database reads itself (migration 20261104120000). Both match
+  upload confirm recorded, which the database reads itself (migration 20261104080000). Both match
   inside one workspace only; the RPC has no cross-workspace path.
 
   TAVONEL_LIBRARY_DEDUP, default off:

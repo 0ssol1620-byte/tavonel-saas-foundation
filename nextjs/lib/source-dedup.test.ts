@@ -110,8 +110,8 @@ describe("exact-duplicate recording", () => {
   });
 });
 
-describe("migration 20261104120000", () => {
-  const sql = readFileSync(resolve(import.meta.dirname, "../../supabase/migrations/20261104120000_source_fingerprints_exact_dedup.sql"), "utf8").replace(/\r\n/g, "\n");
+describe("migration 20261104080000", () => {
+  const sql = readFileSync(resolve(import.meta.dirname, "../../supabase/migrations/20261104080000_source_fingerprints_exact_dedup.sql"), "utf8").replace(/\r\n/g, "\n");
 
   it("gives every new table RLS and a deny-all client policy, and the server only the RPC", () => {
     for (const table of ["source_fingerprints", "document_relations"]) {

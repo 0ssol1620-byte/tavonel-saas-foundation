@@ -1,4 +1,4 @@
--- B1 exact-duplicate detection (migration 20261104120000).
+-- B1 exact-duplicate detection (migration 20261104080000).
 --
 -- What it proves: two documents with the same sanitized bytes find each other in one workspace
 -- and never across two; a re-upload of the same source finds the original by its confirm digest;
