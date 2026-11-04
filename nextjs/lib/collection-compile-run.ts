@@ -30,9 +30,12 @@ import { readCustomerSourceAuthorization, type SourceAuthorizationResult } from 
 import { readCustomerSourceScope } from "./customer-source-scope";
 import { appendServiceAuditEvent } from "./enterprise-store";
 import { checkCurrentSourceVersions, collectionCandidateKey, groupImmutableDocuments, selectCurrentDocumentVersions } from "./immutable-keys";
-import { getWorkspaceCollectionCandidate, getWorkspaceOcrJson, listImmutableWorkspaceObjects, putWorkspaceCollectionCandidate } from "./r2-objects";
+import { getWorkspaceCollectionCandidate, getWorkspaceOcrJson, listImmutableWorkspaceObjects, putWorkspaceCollectionCandidate, type JsonSizeLimit } from "./r2-objects";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
 import { getFoundationActiveWorld } from "./world-store";
+
+/** A size refusal keeps its detail on the failure, so the job event can name what was too large. */
+const sizeLimitPayload = (result: object) => ("sizeLimit" in result ? { sizeLimit: result.sizeLimit } : {});
 
 /*
   One compile, with no opinion about who asked for it.
@@ -201,8 +204,20 @@ export async function runCollectionCompile(
     if (globalCollection) {
       fetchedBytes += batch.reduce((sum, result) => sum + (result.ok ? (result.byteLength ?? Buffer.byteLength(JSON.stringify(result.json), "utf8")) : 0), 0);
       fetchedRegions += batch.reduce((sum, result) => sum + (result.ok && result.json && typeof result.json === "object" && Array.isArray((result.json as { regions?: unknown }).regions) ? ((result.json as { regions: unknown[] }).regions.length) : 0), 0);
-      if (fetchedBytes > GLOBAL_COLLECTION_MAX_BYTES || fetchedRegions > GLOBAL_COLLECTION_MAX_REGIONS || batch.some((result) => !result.ok && result.code === "JSON_TOO_LARGE")) return { ok: false, status: 413, code: "GLOBAL_COLLECTION_RESOURCE_LIMIT", payload: {} };
+      const refused = batch.find((result) => !result.ok && result.code === "JSON_TOO_LARGE");
+      if (fetchedBytes > GLOBAL_COLLECTION_MAX_BYTES || fetchedRegions > GLOBAL_COLLECTION_MAX_REGIONS || refused) {
+        return { ok: false, status: 413, code: "GLOBAL_COLLECTION_RESOURCE_LIMIT",
+          payload: refused ? sizeLimitPayload(refused) : {} };
+      }
     }
+  }
+  // An ocr.json over the read bound is a size refusal, not a malformed binding: say which
+  // document and how many bytes, so the failure is diagnosable from the job event alone.
+  const tooLarge = fetched.findIndex((result) => "sizeLimit" in result);
+  if (tooLarge >= 0) {
+    const { sizeLimit } = fetched[tooLarge] as { sizeLimit: JsonSizeLimit };
+    return { ok: false, status: 413, code: "JSON_TOO_LARGE",
+      payload: { sizeLimit: { ...sizeLimit, documentId: selected[tooLarge]!.documentId } } };
   }
   // An OCR result that could not be read at all is a binding failure, not a missing-region one.
   const bodies = fetched.map((result) => (result.ok ? result.json : null));
@@ -369,7 +384,7 @@ export async function runCollectionCompile(
     }
     if (active.ok) {
       const stored = await getWorkspaceCollectionCandidate(signer, workspaceId, active.world.candidateObjectKey);
-      if (!stored.ok) return { ok: false, status: 503, code: stored.code, payload: {} };
+      if (!stored.ok) return { ok: false, status: 503, code: stored.code, payload: sizeLimitPayload(stored) };
       previousActiveWorld = readRevisionCompileSnapshot(stored.json, active.world);
       if (!previousActiveWorld) {
         return {
@@ -548,7 +563,7 @@ export async function runCollectionCompile(
       code: finalAuthority.code, payload: {} };
   }
   const stored = await putWorkspaceCollectionCandidate(signer, workspaceId, key, storedArtifact);
-  if (!stored.ok) return { ok: false, status: 503, code: stored.code, payload: {} };
+  if (!stored.ok) return { ok: false, status: 503, code: stored.code, payload: sizeLimitPayload(stored) };
 
   return {
     ok: true,

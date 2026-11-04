@@ -11,8 +11,42 @@ import {
   type ImmutableObjectMeta,
 } from "./immutable-keys";
 
-const MAX_DERIVED_JSON_BYTES = 4 * 1024 * 1024;
-const MAX_COLLECTION_JSON_BYTES = 32 * 1024 * 1024;
+/*
+  The read bound for one ocr.json, equal to the worker's write bound for it.
+
+  It was 4 MiB, a sixth of what the worker persists (`MAX_PERSISTED_OCR_BYTES`, 24 MiB, in
+  quarantine-sidecar/foundation-cdr-worker/src/ocr.ts), so a source the product accepts could be
+  read, stored, and then refused at structuring on size alone. Sized from the schema
+  (tavonel.ocr_result.v2: 207 B of keys and numbers per region, plus its text, plus the same text
+  again in the top-level `text`), 2026-11-04:
+
+    12 pages x 19 regions x 60 chars ........ 75 KB (Latin) / 130 KB (Hangul)
+    80 pages x 150 regions x 40 Hangul chars . 5.4 MB  -- over the old 4 MiB, inside the ceiling
+    80 pages x 625 regions x 79 Latin chars .. 18.4 MB -- the worker's region and text caps
+    the same in Hangul ....................... 34.2 MB -- refused by the worker, never stored
+
+  Every ocr.json the worker can store is therefore readable here, and nothing larger exists to
+  read. `intake-ceiling-cross-tree.test.ts` pins the two numbers together. Regions per page in
+  production are not measured; the worker's caps stand in for the measurement.
+*/
+export const MAX_DERIVED_JSON_BYTES = 24 * 1024 * 1024;
+export const MAX_COLLECTION_JSON_BYTES = 32 * 1024 * 1024;
+
+/**
+ * Which object a JSON_TOO_LARGE refused, how big it was, and the bound it crossed.
+ *
+ * Carries no key and no content, so it can go into a job event as it is. `bytes` is exact for a
+ * buffered body; for a streamed read cut off at the bound it is the declared Content-Length, or
+ * null when the store declared none.
+ */
+export type JsonSizeLimit = { object: "ocr.json" | "candidate-world.json"; bytes: number | null; bound: number };
+type TooLarge = { ok: false; code: "JSON_TOO_LARGE"; sizeLimit: JsonSizeLimit };
+const tooLarge = (object: JsonSizeLimit["object"], bytes: number | null, bound: number): TooLarge =>
+  ({ ok: false, code: "JSON_TOO_LARGE", sizeLimit: { object, bytes, bound } });
+const declaredLength = (response: Response) => {
+  const value = Number(response.headers.get("content-length") ?? Number.NaN);
+  return Number.isSafeInteger(value) && value >= 0 ? value : null;
+};
 
 function hmac(key: Buffer | string, data: string) {
   return createHmac("sha256", key).update(data, "utf8").digest();
@@ -211,8 +245,10 @@ export async function getWorkspaceOcrJson(
   key: string,
   now = new Date(),
   maximumBytes = MAX_DERIVED_JSON_BYTES,
-): Promise<{ ok: true; json: unknown; byteLength: number } | { ok: false; code: string }> {
-  if (!Number.isSafeInteger(maximumBytes) || maximumBytes <= 0 || maximumBytes > MAX_DERIVED_JSON_BYTES) return { ok: false, code: "JSON_TOO_LARGE" };
+): Promise<{ ok: true; json: unknown; byteLength: number } | TooLarge | { ok: false; code: string }> {
+  if (!Number.isSafeInteger(maximumBytes) || maximumBytes <= 0 || maximumBytes > MAX_DERIVED_JSON_BYTES) {
+    return tooLarge("ocr.json", null, Number.isSafeInteger(maximumBytes) ? maximumBytes : 0);
+  }
   if (env.bucket !== FOUNDATION_R2_BUCKET) return { ok: false, code: "BUCKET_NOT_FOUNDATION" };
   if (!isOcrJsonKey(workspaceId, key)) return { ok: false, code: "OCR_JSON_PREFIX_REQUIRED" };
   if (key.toLowerCase().endsWith(".pdf")) return { ok: false, code: "PDF_BYTES_FORBIDDEN" };
@@ -221,7 +257,11 @@ export async function getWorkspaceOcrJson(
   if (response.status === 404) return { ok: false, code: "NOT_FOUND" };
   if (!response.ok) return { ok: false, code: "GET_FAILED" };
   const body = await readBoundedSourceBody(response, maximumBytes);
-  if (!body.ok) return { ok: false, code: body.code === "SOURCE_SIZE_UNQUALIFIED" ? "JSON_TOO_LARGE" : "GET_FAILED" };
+  if (!body.ok) {
+    return body.code === "SOURCE_SIZE_UNQUALIFIED"
+      ? tooLarge("ocr.json", declaredLength(response), maximumBytes)
+      : { ok: false, code: "GET_FAILED" };
+  }
   const bytes = Buffer.from(body.bytes);
   if (bytes.subarray(0, 4).toString("utf8") === "%PDF") return { ok: false, code: "PDF_BYTES_FORBIDDEN" };
   try {
@@ -258,11 +298,11 @@ export async function putWorkspaceCollectionCandidate(
   key: string,
   value: unknown,
   now = new Date(),
-): Promise<{ ok: true; status: "written" | "exists"; bytes: number } | { ok: false; code: string }> {
+): Promise<{ ok: true; status: "written" | "exists"; bytes: number } | TooLarge | { ok: false; code: string }> {
   if (env.bucket !== FOUNDATION_R2_BUCKET) return { ok: false, code: "BUCKET_NOT_FOUNDATION" };
   if (!isCollectionCandidateKey(workspaceId, key)) return { ok: false, code: "COLLECTION_JSON_PREFIX_REQUIRED" };
   const bytes = Buffer.from(`${JSON.stringify(value)}\n`, "utf8");
-  if (bytes.length === 0 || bytes.length > MAX_COLLECTION_JSON_BYTES) return { ok: false, code: "JSON_TOO_LARGE" };
+  if (bytes.length > MAX_COLLECTION_JSON_BYTES) return tooLarge("candidate-world.json", bytes.length, MAX_COLLECTION_JSON_BYTES);
   const response = await signedS3PutJson(env, key, bytes, now);
   if (response.status === 409 || response.status === 412) return { ok: true, status: "exists", bytes: bytes.length };
   if (!response.ok) return { ok: false, code: "PUT_FAILED" };
@@ -284,7 +324,7 @@ export async function getWorkspaceCollectionCandidate(
   if (response.status === 599) return { ok: false, code: "GET_TIMEOUT" };
   if (!response.ok) return { ok: false, code: `GET_FAILED_${response.status}` };
   const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length > MAX_COLLECTION_JSON_BYTES) return { ok: false, code: "JSON_TOO_LARGE" };
+  if (bytes.length > MAX_COLLECTION_JSON_BYTES) return tooLarge("candidate-world.json", bytes.length, MAX_COLLECTION_JSON_BYTES);
   try {
     return { ok: true, json: JSON.parse(bytes.toString("utf8")) };
   } catch {

@@ -9,6 +9,7 @@ import {
   isRestingCompileState,
   readOpenCompileJobs,
   recordCompileJobDeferral,
+  recordCompileJobSizeLimit,
 } from "./compile-job-store";
 import { groupImmutableDocuments, selectCurrentDocumentVersions } from "./immutable-keys";
 import { listImmutableWorkspaceObjects } from "./r2-objects";
@@ -380,6 +381,12 @@ export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn
         documentsReady: classified.ready.length,
       });
       return rest("waiting", "structuring", classified.ready.length, classified.blocked);
+    }
+    const sizeLimit = run.payload.sizeLimit;
+    if (sizeLimit && typeof sizeLimit === "object") {
+      // Best effort: the failure below is recorded whether or not this row lands.
+      await recordCompileJobSizeLimit({ job, state: "structuring", documentsReady: classified.ready.length,
+        blocked: classified.blocked, reason: run.code, sizeLimit: sizeLimit as Record<string, unknown> });
     }
     await advanceCompileJob({
       workspaceKey: job.workspaceKey,

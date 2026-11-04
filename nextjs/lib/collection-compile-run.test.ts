@@ -322,6 +322,16 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
     put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
   }
 
+  it("carries the candidate's byte count when the candidate write is over its bound", async () => {
+    compilableSource();
+    const sizeLimit = { object: "candidate-world.json", bytes: 32 * 1024 * 1024 + 1, bound: 32 * 1024 * 1024 };
+    put.mockResolvedValue({ ok: false, code: "JSON_TOO_LARGE", sizeLimit });
+
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+
+    expect(run).toEqual({ ok: false, status: 503, code: "JSON_TOO_LARGE", payload: { sizeLimit } });
+  });
+
   it("signs the receipt, audits it, then persists it -- in that order", async () => {
     compilableSource();
 
@@ -495,6 +505,24 @@ describe("a source read before region capture", () => {
       expect(run.payload).toEqual({ documentIds: [DOCUMENT] });
     }
     // Nothing was compiled, nothing was charged for, and nothing was written.
+    expect(dispatched).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("names the document, object and bytes when an ocr.json is over the read bound", async () => {
+    // A size refusal used to collapse into OCR_BINDING_INVALID, which says the binding is malformed.
+    readyWorkspace();
+    const sizeLimit = { object: "ocr.json", bytes: 24 * 1024 * 1024 + 1, bound: 24 * 1024 * 1024 };
+    fetched.mockResolvedValue({ ok: false, code: "JSON_TOO_LARGE", sizeLimit });
+
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+
+    expect(run.ok).toBe(false);
+    if (!run.ok) {
+      expect(run.status).toBe(413);
+      expect(run.code).toBe("JSON_TOO_LARGE");
+      expect(run.payload).toEqual({ sizeLimit: { ...sizeLimit, documentId: DOCUMENT } });
+    }
     expect(dispatched).not.toHaveBeenCalled();
     expect(put).not.toHaveBeenCalled();
   });
