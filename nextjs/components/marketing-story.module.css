@@ -32,7 +32,7 @@
   .outcome p { max-width: 60ch; margin: 0 0 12px; font: 17px/1.6 var(--f-sans); color: var(--text-mid); }
   .proof { margin: 20px 0; overflow-wrap: anywhere; }
   /* CRITIQUE-R1 #6: reader output at 14px mono on the sunk paper, under its own label. */
-  .proof .proofLabel { margin: 0 0 6px; color: var(--tv-ink-muted); font: 500 12px/1.4 var(--f-sans); letter-spacing: .02em; }
+  .proof .proofLabel { margin: 0 0 6px; color: var(--tv-ink-muted); font: 500 12px/1.4 var(--f-sans); }
   .proof blockquote { margin: 0 0 12px; padding: 14px 16px; border-radius: var(--tv-r-small); background: var(--tv-paper-sunk); font: 400 14px/1.6 var(--f-mono); }
   .proof figcaption { font: 13px/1.6 var(--f-sans); color: var(--text-mid); }
   .proof figcaption span { display: block; }

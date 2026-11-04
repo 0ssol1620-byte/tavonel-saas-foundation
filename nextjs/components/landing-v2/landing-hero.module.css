@@ -1304,7 +1304,7 @@ section.receive {
 */
 .recordSheet.recordTwo { max-width: none; display: grid; gap: 28px; padding: 32px; }
 .recordText { min-width: 0; }
-.readerLabel { margin: 20px 0 0; color: var(--tv-ink-muted); font: 500 12px/1.4 var(--f-sans); letter-spacing: 0.02em; }
+.readerLabel { margin: 20px 0 0; color: var(--tv-ink-muted); font: 500 12px/1.4 var(--f-sans); }
 .recordTwo .recordQuote {
   max-width: 64ch; margin: 8px 0 0; padding: 14px 16px; border-radius: var(--tv-r-small);
   background: var(--tv-paper-sunk); color: var(--tv-ink); font: 400 14px/1.6 var(--f-mono); overflow-wrap: anywhere;
