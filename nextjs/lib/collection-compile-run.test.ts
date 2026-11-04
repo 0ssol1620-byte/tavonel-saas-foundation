@@ -37,6 +37,7 @@ const priorCandidate = vi.fn();
 const activeWorld = vi.fn();
 
 vi.mock("./r2-objects", () => ({
+  MAX_DERIVED_JSON_BYTES: 24 * 1024 * 1024,
   listImmutableWorkspaceObjects: (...args: unknown[]) => listed(...args),
   getWorkspaceOcrJson: (...args: unknown[]) => fetched(...args),
   putWorkspaceCollectionCandidate: (...args: unknown[]) => put(...args),
@@ -80,7 +81,8 @@ vi.mock("./compile-artifact-provenance", async (importOriginal) => ({
   registerCollectionArtifact: (...args: unknown[]) => registered(...args),
 }));
 
-const { runCollectionCompile } = await import("./collection-compile-run");
+const { runCollectionCompile, COMPILE_INPUT_MAX_OCR_BYTES } = await import("./collection-compile-run");
+const { CORE_V2_MAX_REQUEST_BYTES } = await import("./core-runtime-v2");
 const { verifyCompileReceipt } = await import("./compile-receipt-signing");
 const { readExportTrustStoreEnv } = await import("./export-signing");
 
@@ -322,6 +324,17 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
     put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
   }
 
+  it("refuses a Core request over its bound by name before anything is persisted", async () => {
+    compilableSource();
+    const sizeLimit = { object: "core-request", bytes: 4_500_001, bound: 4_500_000 };
+    dispatched.mockResolvedValue({ ok: false, code: "COMPILE_INPUT_TOO_LARGE", sizeLimit });
+
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+
+    expect(run).toEqual({ ok: false, status: 413, code: "COMPILE_INPUT_TOO_LARGE", payload: { sizeLimit } });
+    expect(put).not.toHaveBeenCalled();
+  });
+
   it("carries the candidate's byte count when the candidate write is over its bound", async () => {
     compilableSource();
     const sizeLimit = { object: "candidate-world.json", bytes: 32 * 1024 * 1024 + 1, bound: 32 * 1024 * 1024 };
@@ -507,6 +520,30 @@ describe("a source read before region capture", () => {
     // Nothing was compiled, nothing was charged for, and nothing was written.
     expect(dispatched).not.toHaveBeenCalled();
     expect(put).not.toHaveBeenCalled();
+  });
+
+  it("reads within the compile's input budget and refuses a set that exceeds it, naming the document", async () => {
+    readyWorkspace();
+    fetched.mockResolvedValue({ ok: false, code: "JSON_TOO_LARGE",
+      sizeLimit: { object: "ocr.json", bytes: COMPILE_INPUT_MAX_OCR_BYTES + 1, bound: COMPILE_INPUT_MAX_OCR_BYTES } });
+
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+
+    expect(fetched.mock.calls[0]?.[4]).toBe(COMPILE_INPUT_MAX_OCR_BYTES);
+    expect(COMPILE_INPUT_MAX_OCR_BYTES).toBe(2 * CORE_V2_MAX_REQUEST_BYTES);
+    expect(run).toEqual({ ok: false, status: 413, code: "COMPILE_INPUT_TOO_LARGE", payload: { sizeLimit: {
+      object: "compile-input", bytes: COMPILE_INPUT_MAX_OCR_BYTES + 1, bound: COMPILE_INPUT_MAX_OCR_BYTES, documentId: DOCUMENT,
+    } } });
+    expect(dispatched).not.toHaveBeenCalled();
+  });
+
+  it("calls an empty ocr.json a malformed binding, not a size", async () => {
+    readyWorkspace();
+    fetched.mockResolvedValue({ ok: false, code: "NOT_JSON" });
+
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+
+    expect(run).toMatchObject({ ok: false, status: 422, code: "OCR_BINDING_INVALID" });
   });
 
   it("names the document, object and bytes when an ocr.json is over the read bound", async () => {

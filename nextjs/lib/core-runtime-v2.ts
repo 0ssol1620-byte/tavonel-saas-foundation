@@ -15,6 +15,16 @@ import { canonicalJsonWireField } from "./canonical-json-wire";
 
 export const PRODUCT_CORE_REQUEST_SCHEMA = "tavonel.product_core.compile_request.v2" as const;
 export const PRODUCT_CORE_RESPONSE_SCHEMA = "tavonel.product_core.compile_response.v2" as const;
+/**
+ * The largest compile request this side sends to Core V2.
+ *
+ * Core V2 runs as a Vercel Python function, and a Vercel function request body is bounded at
+ * 4.5 MB (documented; not measured against this deployment). Above it the platform answers with
+ * a body that carries no `code`, recorded as CORE_V2_HTTP_413 after the read and the work were
+ * already paid for. Refusing here first names the cause. Core's own bound (32 MiB,
+ * CORE_REQUEST_TOO_LARGE) is larger and so never the one that decides.
+ */
+export const CORE_V2_MAX_REQUEST_BYTES = 4_500_000;
 
 const SHA256 = /^sha256:[0-9a-f]{64}$/;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
@@ -710,7 +720,10 @@ export async function dispatchProductCoreV2(
   expectedSourceScope?: CustomerDataScope,
   logicalCollectionKey?: string,
   remainingLatencyMs = CORE_CLIENT_TIMEOUT_MS,
-): Promise<{ ok: true; result: ProductCoreV2CompileResponse } | { ok: false; code: string }> {
+): Promise<
+  | { ok: true; result: ProductCoreV2CompileResponse }
+  | { ok: false; code: string; sizeLimit?: { object: "core-request"; bytes: number; bound: number } }
+> {
   if (customerDataGate && !authorizationAdmitsCustomerData(customerDataGate, workspaceId, workspaceId, now, expectedSourceScope)) {
     return { ok: false, code: "CUSTOMER_DATA_GATE_DECISION_INVALID" };
   }
@@ -727,6 +740,11 @@ export async function dispatchProductCoreV2(
   if (!Number.isSafeInteger(remainingLatencyMs) || remainingLatencyMs < 1000) return { ok: false, code: "CORE_V2_TIME_BUDGET_INVALID" };
   envelope.route.maxLatencyMs = Math.min(envelope.route.maxLatencyMs, remainingLatencyMs);
   const body = JSON.stringify(envelope);
+  const requestBytes = Buffer.byteLength(body, "utf8");
+  if (requestBytes > CORE_V2_MAX_REQUEST_BYTES) {
+    return { ok: false, code: "COMPILE_INPUT_TOO_LARGE",
+      sizeLimit: { object: "core-request", bytes: requestBytes, bound: CORE_V2_MAX_REQUEST_BYTES } };
+  }
   const inputSha256 = `sha256:${sha256(body)}`;
   const timestamp = String(Math.floor(now.getTime() / 1000));
   const signature = createHmac("sha256", env.hmac)

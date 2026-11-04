@@ -24,18 +24,31 @@ import {
   readProductCoreV2Env,
   readRevisionCompileSnapshot,
   revisionCompileEnabled,
+  CORE_V2_MAX_REQUEST_BYTES,
   type ProductCoreV2CompileRequest,
 } from "./core-runtime-v2";
 import { readCustomerSourceAuthorization, type SourceAuthorizationResult } from "./customer-data-admission";
 import { readCustomerSourceScope } from "./customer-source-scope";
 import { appendServiceAuditEvent } from "./enterprise-store";
 import { checkCurrentSourceVersions, collectionCandidateKey, groupImmutableDocuments, selectCurrentDocumentVersions } from "./immutable-keys";
-import { getWorkspaceCollectionCandidate, getWorkspaceOcrJson, listImmutableWorkspaceObjects, putWorkspaceCollectionCandidate, type JsonSizeLimit } from "./r2-objects";
+import { getWorkspaceCollectionCandidate, getWorkspaceOcrJson, listImmutableWorkspaceObjects, MAX_DERIVED_JSON_BYTES, putWorkspaceCollectionCandidate, type JsonSizeLimit } from "./r2-objects";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
 import { getFoundationActiveWorld } from "./world-store";
 
 /** A size refusal keeps its detail on the failure, so the job event can name what was too large. */
 const sizeLimitPayload = (result: object) => ("sizeLimit" in result ? { sizeLimit: result.sizeLimit } : {});
+
+/*
+  The ocr.json bytes one compile may read before it is certain the Core request would be refused.
+
+  The request carries every region of every document (keys, numbers and text) and drops only the
+  top-level `text`, which repeats the region text. So a document's share of the request is at least
+  half its ocr.json, and a set whose ocr.json total exceeds twice the request bound cannot fit.
+  Refusing at that point, before the rest is read and parsed, keeps a 12-document job from holding
+  twelve 24 MiB bodies in one function (vercel.json sets no memory size; the platform default
+  applies). The exact check is on the serialized request, in `dispatchProductCoreV2`.
+*/
+export const COMPILE_INPUT_MAX_OCR_BYTES = 2 * CORE_V2_MAX_REQUEST_BYTES;
 
 /*
   One compile, with no opinion about who asked for it.
@@ -195,29 +208,39 @@ export async function runCollectionCompile(
   let fetchedBytes = 0;
   let fetchedRegions = 0;
   const fanout = globalCollection ? 1 : 4;
-  // Global reads consume the remaining byte budget sequentially; legacy reads use fan-out 4.
+  const budget = globalCollection ? GLOBAL_COLLECTION_MAX_BYTES : COMPILE_INPUT_MAX_OCR_BYTES;
+  // Every read is bounded by what is left of this compile's budget; global reads are sequential.
   for (let offset = 0; offset < selected.length; offset += fanout) {
-    const batch = await Promise.all(selected.slice(offset, offset + fanout).map((item) => globalCollection
-      ? getWorkspaceOcrJson(signer, workspaceId, item!.ocrJsonKey!, new Date(), GLOBAL_COLLECTION_MAX_BYTES - fetchedBytes)
-      : getWorkspaceOcrJson(signer, workspaceId, item!.ocrJsonKey!)));
+    const readBound = Math.min(MAX_DERIVED_JSON_BYTES, budget - fetchedBytes);
+    const batch = await Promise.all(selected.slice(offset, offset + fanout).map((item) =>
+      getWorkspaceOcrJson(signer, workspaceId, item!.ocrJsonKey!, new Date(), readBound)));
     fetched.push(...batch);
+    fetchedBytes += batch.reduce((sum, result) => sum + (result.ok ? (result.byteLength ?? Buffer.byteLength(JSON.stringify(result.json), "utf8")) : 0), 0);
     if (globalCollection) {
-      fetchedBytes += batch.reduce((sum, result) => sum + (result.ok ? (result.byteLength ?? Buffer.byteLength(JSON.stringify(result.json), "utf8")) : 0), 0);
       fetchedRegions += batch.reduce((sum, result) => sum + (result.ok && result.json && typeof result.json === "object" && Array.isArray((result.json as { regions?: unknown }).regions) ? ((result.json as { regions: unknown[] }).regions.length) : 0), 0);
-      const refused = batch.find((result) => !result.ok && result.code === "JSON_TOO_LARGE");
-      if (fetchedBytes > GLOBAL_COLLECTION_MAX_BYTES || fetchedRegions > GLOBAL_COLLECTION_MAX_REGIONS || refused) {
-        return { ok: false, status: 413, code: "GLOBAL_COLLECTION_RESOURCE_LIMIT",
-          payload: refused ? sizeLimitPayload(refused) : {} };
-      }
     }
-  }
-  // An ocr.json over the read bound is a size refusal, not a malformed binding: say which
-  // document and how many bytes, so the failure is diagnosable from the job event alone.
-  const tooLarge = fetched.findIndex((result) => "sizeLimit" in result);
-  if (tooLarge >= 0) {
-    const { sizeLimit } = fetched[tooLarge] as { sizeLimit: JsonSizeLimit };
-    return { ok: false, status: 413, code: "JSON_TOO_LARGE",
-      payload: { sizeLimit: { ...sizeLimit, documentId: selected[tooLarge]!.documentId } } };
+    /*
+      A size refusal ends the read here, without reading or parsing the rest. It names the
+      document, and says which bound it crossed: the ocr.json bound itself (the object is larger
+      than the worker could have stored) or this compile's budget (the object is fine, the set
+      is not). An ocr.json over a bound is a size refusal, never OCR_BINDING_INVALID.
+    */
+    const refusedAt = batch.findIndex((result) => "sizeLimit" in result);
+    if (refusedAt >= 0) {
+      const { sizeLimit } = batch[refusedAt] as { sizeLimit: JsonSizeLimit };
+      const documentId = selected[offset + refusedAt]!.documentId;
+      const objectBound = sizeLimit.bound === MAX_DERIVED_JSON_BYTES;
+      const detail = objectBound
+        ? { ...sizeLimit, documentId }
+        : { object: "compile-input" as const, bytes: sizeLimit.bytes === null ? null : fetchedBytes + sizeLimit.bytes,
+            bound: budget, documentId };
+      return { ok: false, status: 413,
+        code: globalCollection ? "GLOBAL_COLLECTION_RESOURCE_LIMIT" : objectBound ? "JSON_TOO_LARGE" : "COMPILE_INPUT_TOO_LARGE",
+        payload: { sizeLimit: detail } };
+    }
+    if (globalCollection && (fetchedBytes > GLOBAL_COLLECTION_MAX_BYTES || fetchedRegions > GLOBAL_COLLECTION_MAX_REGIONS)) {
+      return { ok: false, status: 413, code: "GLOBAL_COLLECTION_RESOURCE_LIMIT", payload: {} };
+    }
   }
   // An OCR result that could not be read at all is a binding failure, not a missing-region one.
   const bodies = fetched.map((result) => (result.ok ? result.json : null));
@@ -418,7 +441,10 @@ export async function runCollectionCompile(
       logicalCollectionKey,
       remainingMs,
     );
-    if (!compiled.ok) return { ok: false, status: 503, code: compiled.code, payload: {} };
+    if (!compiled.ok) {
+      return { ok: false, status: compiled.code === "COMPILE_INPUT_TOO_LARGE" ? 413 : 503, code: compiled.code,
+        payload: sizeLimitPayload(compiled) };
+    }
     if (globalCollection && compiled.result.receipt.coreReleaseDigest !== process.env.TAVONEL_GLOBAL_COLLECTION_CORE_RELEASE_SHA256) {
       return { ok: false, status: 502, code: "GLOBAL_COLLECTION_CORE_RELEASE_MISMATCH", payload: {} };
     }

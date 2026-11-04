@@ -4,9 +4,11 @@ import {
   assertFoundationListPrefix,
   getWorkspaceCollectionCandidate,
   getWorkspaceOcrJson,
+  getWorkspaceOcrReviewJson,
   listImmutableWorkspaceObjects,
   MAX_COLLECTION_JSON_BYTES,
   MAX_DERIVED_JSON_BYTES,
+  MAX_OCR_REVIEW_JSON_BYTES,
   putWorkspaceCollectionCandidate,
 } from "./r2-objects";
 
@@ -196,15 +198,24 @@ describe("bounded streaming OCR reads", () => {
     vi.stubGlobal("fetch", async () => response);
     expect(await getWorkspaceOcrJson(env, WS, key, new Date(), 20)).toEqual({
       ok: false, code: "JSON_TOO_LARGE",
-      sizeLimit: { object: "ocr.json", bytes: length === undefined || length === "-1" ? null : Number(length), bound: 20 },
+      // Only a declared length already over the bound is a size; "1" and "-1" say nothing true.
+      sizeLimit: { object: "ocr.json", bytes: length === "999999" ? 999999 : null, bound: 20 },
     });
     expect(cancel).toHaveBeenCalled();
   });
   it("measures fetched decompressed body bytes rather than a compressed content-length", async () => {
     vi.stubGlobal("fetch", async () => new Response("x".repeat(40), { headers: { "content-encoding": "gzip", "content-length": "1" } }));
+    // The compressed length (1) is below the bound it crossed, so it is not reported as the size.
     expect(await getWorkspaceOcrJson(env, WS, key, new Date(), 20)).toEqual({
-      ok: false, code: "JSON_TOO_LARGE", sizeLimit: { object: "ocr.json", bytes: 1, bound: 20 },
+      ok: false, code: "JSON_TOO_LARGE", sizeLimit: { object: "ocr.json", bytes: null, bound: 20 },
     });
+  });
+  it.each([
+    ["no body", () => new Response(null)],
+    ["a zero-byte body", () => new Response(new ReadableStream({ start(controller) { controller.close(); } }))],
+  ])("calls %s malformed, not too large", async (_label, response) => {
+    vi.stubGlobal("fetch", async () => response());
+    expect(await getWorkspaceOcrJson(env, WS, key)).toEqual({ ok: false, code: "NOT_JSON" });
   });
 });
 
@@ -258,6 +269,23 @@ describe("the ocr.json read bound against the intake ceiling", () => {
     });
   });
 
+  it("cuts a stream with no declared length off at the bound, not after it", async () => {
+    // An endless body: the only way this read ends is the cut-off at the bound.
+    const chunk = new Uint8Array(1024 * 1024).fill(0x20);
+    let sent = 0;
+    const cancel = vi.fn();
+    vi.stubGlobal("fetch", async () => new Response(new ReadableStream({
+      pull(controller) { controller.enqueue(chunk); sent += chunk.byteLength; },
+      cancel,
+    })));
+    expect(await getWorkspaceOcrJson(env, WS, key)).toEqual({
+      ok: false, code: "JSON_TOO_LARGE", sizeLimit: { object: "ocr.json", bytes: null, bound: MAX_DERIVED_JSON_BYTES },
+    });
+    expect(cancel).toHaveBeenCalled();
+    // The bound plus the chunk that crossed it and the stream's read-ahead -- not the whole source.
+    expect(sent).toBeLessThanOrEqual(MAX_DERIVED_JSON_BYTES + 4 * chunk.byteLength);
+  });
+
   it("refuses a candidate over its bound with the exact byte count", async () => {
     const candidateKey = `immutable/${WS}/${WS}/collections/collection-${"ab".repeat(16)}/${"cd".repeat(32)}/candidate-world.json`;
     const value = { payload: "x".repeat(MAX_COLLECTION_JSON_BYTES) };
@@ -268,5 +296,41 @@ describe("the ocr.json read bound against the intake ceiling", () => {
       ok: false, code: "JSON_TOO_LARGE", sizeLimit: { object: "candidate-world.json", bytes, bound: MAX_COLLECTION_JSON_BYTES },
     });
     expect(put).not.toHaveBeenCalled();
+  });
+});
+
+/*
+  ocr-review.json is one fixed receipt (worker src/sanitize.ts, tavonel.ocr_review_receipt.v2): no
+  field grows with the page count, so a 1-, 12- and 80-page source write the same-sized record.
+*/
+describe("the ocr-review.json read bound", () => {
+  const env = { accountId: "acct", bucket: FOUNDATION_R2_BUCKET, accessKeyId: "AKIAEXAMPLE", secretAccessKey: "secret" };
+  const key = `immutable/${WS}/${WS}/doc/${"ab".repeat(32)}/ocr-review.json`;
+  const largestReceipt = () => ({
+    schemaVersion: "tavonel.ocr_review_receipt.v2", status: "operator_review",
+    sourceKey: `quarantine/${WS}/6053d7a4-dd8d-479b-8f69-2db4e58a3fa0/source`,
+    immutableKey: `immutable/${WS}/${WS}/6053d7a4-dd8d-479b-8f69-2db4e58a3fa0/${"ab".repeat(32)}/sanitized.pdf`,
+    inputSha256: `sha256:${"ab".repeat(32)}`, reasonCode: "OCR_PAGES_INCOMPLETE",
+    reason: "\uac00".repeat(512), requestId: "r".repeat(160), occurredAt: "2026-11-04T09:42:28.206Z",
+    retryPolicy: "explicit_operator_only", candidatePromotion: false, billingDisposition: "operator_review", computeCredits: 2,
+  });
+
+  it("reads the largest legal receipt, whatever the page count, with room to spare", async () => {
+    const body = JSON.stringify(largestReceipt());
+    // 2,329 bytes here; the scratchpad sizing with a longer workspace key gives 2,368.
+    expect(Buffer.byteLength(body, "utf8")).toBeLessThan(2_400);
+    vi.stubGlobal("fetch", async () => new Response(body));
+    expect((await getWorkspaceOcrReviewJson(env, WS, key)).ok).toBe(true);
+  });
+
+  it("refuses one byte over the worker's receipt bound by name, and calls an empty one malformed", async () => {
+    expect(MAX_OCR_REVIEW_JSON_BYTES).toBe(16 * 1024);
+    vi.stubGlobal("fetch", async () => new Response(" ".repeat(MAX_OCR_REVIEW_JSON_BYTES + 1)));
+    expect(await getWorkspaceOcrReviewJson(env, WS, key)).toEqual({
+      ok: false, code: "JSON_TOO_LARGE",
+      sizeLimit: { object: "ocr-review.json", bytes: MAX_OCR_REVIEW_JSON_BYTES + 1, bound: MAX_OCR_REVIEW_JSON_BYTES },
+    });
+    vi.stubGlobal("fetch", async () => new Response(""));
+    expect(await getWorkspaceOcrReviewJson(env, WS, key)).toEqual({ ok: false, code: "NOT_JSON" });
   });
 });

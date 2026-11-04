@@ -25,10 +25,11 @@ const CDR = "quarantine-sidecar/cdr-cloudrun/app.py";
 const GPU = "workers/foundation-ocr-gpu/app.py";
 const CEILING = "shared/intakeCeiling.ts";
 const READER = "nextjs/lib/r2-objects.ts";
+const WORKER_SANITIZE = "quarantine-sidecar/foundation-cdr-worker/src/sanitize.ts";
 
 // A Windows checkout is CRLF (core.autocrlf) and CI is LF; the line anchors must see the same text.
 const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8").replace(/\r\n/g, "\n");
-const tree = new Map([WORKER_KEYS, WORKER_OCR, CDR, GPU, CEILING, READER].map((path) => [path, read(path)]));
+const tree = new Map([WORKER_KEYS, WORKER_OCR, CDR, GPU, CEILING, READER, WORKER_SANITIZE].map((path) => [path, read(path)]));
 const fromTree = (path: string) => tree.get(path) ?? "";
 
 /** `80`, `4_000_000`, `5 * 1024 * 1024`. A name, a call or anything else is NaN and never matches. */
@@ -89,6 +90,14 @@ const SITES: readonly Site[] = [
     // reads, stores, and then fails at structuring on size alone (cjob-1e8b7a0e, 2026-11-04).
     file: READER, name: "MAX_DERIVED_JSON_BYTES", pattern: /^export const MAX_DERIVED_JSON_BYTES = (.+);$/gm,
     expected: 24 * MIB, source: "pinned: equal to the worker's MAX_PERSISTED_OCR_BYTES",
+  },
+  {
+    file: WORKER_SANITIZE, name: "MAX_RECEIPT_BYTES", pattern: /^const MAX_RECEIPT_BYTES = (.+);$/gm,
+    expected: 16 * 1024, source: "pinned: the ocr-review.json receipt the worker writes",
+  },
+  {
+    file: READER, name: "MAX_OCR_REVIEW_JSON_BYTES", pattern: /^export const MAX_OCR_REVIEW_JSON_BYTES = (.+);$/gm,
+    expected: 16 * 1024, source: "pinned: equal to the worker's MAX_RECEIPT_BYTES",
   },
   {
     file: WORKER_OCR, name: "OCR result text length bound", pattern: /result\.text\.length > (\S+) \|\|/g,

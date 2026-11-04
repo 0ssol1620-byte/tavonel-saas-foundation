@@ -384,7 +384,9 @@ export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn
     }
     const sizeLimit = run.payload.sizeLimit;
     if (sizeLimit && typeof sizeLimit === "object") {
-      // Best effort: the failure below is recorded whether or not this row lands.
+      // Best effort: the failure below is recorded whether or not this row lands. Not deduplicated:
+      // if the failed advance is refused, the lease expires and a retry appends a second, identical
+      // row -- append-only and harmless, the same as the deferral rows.
       await recordCompileJobSizeLimit({ job, state: "structuring", documentsReady: classified.ready.length,
         blocked: classified.blocked, reason: run.code, sizeLimit: sizeLimit as Record<string, unknown> });
     }
