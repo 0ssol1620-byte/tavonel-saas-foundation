@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useId, useState, type KeyboardEvent } from "react";
+import ConnectAiPanel from "@/components/workspace/connect-ai-panel";
 import { AI_PACKAGE_CONTENTS, AI_PACKAGE_SUMMARY, AI_USE_JOURNEY } from "@/lib/ai-package-guidance";
 
 const DESTINATIONS = [
@@ -44,8 +45,8 @@ export default function WorkspaceUseWithAi({ open = false, onDownload, onOpen, d
         </div>
         <div className="one-path-ai-destination" role="tabpanel" id={`${uid}-panel`} aria-labelledby={`${uid}-${destination}`} tabIndex={0}>
           {destination === "assistant" ? <>
-            <h3>Connect a supported assistant</h3>
-            <p>Follow the MCP setup guide, then make a test request from your assistant. Live access requires an activated version and valid account permissions.</p>
+            <ConnectAiPanel />
+            <p>Live answers need an activated version. For a local agent with an API key instead, use the MCP bridge.</p>
             <Link className="btn btn-ghost" href="/docs/mcp">Open assistant setup</Link>
           </> : destination === "application" ? <>
             <h3>Use the API from your application</h3>
