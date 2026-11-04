@@ -271,7 +271,7 @@ migration은 다시 적용할 수 없다. 두 번째 적용은 `column "gate_sur
 - presentational 목록을 넓혀서 기록을 피하지 않는다. 목록을 넓히는 PR은 규칙 파일을 바꾸므로 그 자체로
   digest가 바뀐다. 리뷰를 거친 뒤 한 번 다시 기록한다.
 
-## 추가 2026-11-04 — W1-A2: trial AI 사용량 열 (`20261104120000_trial_ai_usage`)
+## 추가 2026-11-04 — W1-A2: trial AI 사용량 열 (`20261104090000_trial_ai_usage`)
 
 - 추가만 한다. `foundation_trial_policy`에 `ai_access_days`(14), `ai_page_limit`(200), `ai_world_limit`(1),
   `ai_daily_query_limit`(200), `foundation_self_service_trials`에 `ai_query_day`, `ai_query_count`를 더하고,

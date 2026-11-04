@@ -1,4 +1,4 @@
--- Migration 20261104120000: trial AI access entitlement and its usage counter.
+-- Migration 20261104090000: trial AI access entitlement and its usage counter.
 --
 -- One trialing user T in workspace TAI walks every bound the function owns: a peek writes
 -- nothing, a query is counted once, the daily limit refuses the next query and does not move the

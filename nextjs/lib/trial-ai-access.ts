@@ -15,7 +15,7 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
 
   With the flag on, a trial may hold one read-only key (the remote MCP scopes; no connectors) and
   authorize MCP, inside the bounds `foundation_trial_ai_access` owns in the database
-  (migration 20261104120000): an AI window, standard pages, Worlds and queries per UTC day.
+  (migration 20261104090000): an AI window, standard pages, Worlds and queries per UTC day.
   Over a bound is 402 TRIAL_LIMIT_REACHED. A store that cannot answer is 503 -- a check that
   could not run never reads as an allowance.
 

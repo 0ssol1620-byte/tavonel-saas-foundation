@@ -165,6 +165,7 @@ test("SYNTHETIC: real durable worker forwards its stored job principal and exact
     "./immutable-keys": { groupImmutableDocuments: () => [SOURCE], selectCurrentDocumentVersions: docs => ({ documents: docs, ambiguousDocumentIds: [] }) },
     "./r2-objects": { listImmutableWorkspaceObjects: async () => ({ ok: true, objects: [] }) },
     "./r2-synthetic-canary": { readR2SignerEnv: () => ({}) },
+    "./operations-alert-triggers": { alertCompileJobTurn: async () => undefined },
     "./compile-job-authority": { compileJobAuthorityEnabled: () => false, classifyCompileJobSources: async () => ({ ok: true, scope: "direct_upload" }) },
   });
   await worker.runCompileJobTurn({ jobId: JOB, workspaceKey: WS, createdByUserId: USER, documentIds: [DOC],
