@@ -7918,3 +7918,21 @@ test('affected operational-sli-alert-delivery owner: 4 exact paths select 8 dire
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
 });
+
+import { W1_TRIAL_OPS_AFFECTED_PATHS, W1_TRIAL_OPS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+// W1 trial AI access + operations alert producers (codex/w1-a2-20261104): thirteen exact paths, sixteen direct suites, no browser suite.
+test('affected w1-trial-ops owner: 13 exact paths select 16 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/api/developer/keys/[id]/route.ts', 'app/api/developer/keys/route.ts', 'app/api/internal/billing/settle/route.ts', 'app/api/v1/developer/keys/[id]/rotate/route.ts', 'lib/developer-auth.test.ts', 'lib/developer-auth.ts', 'lib/operations-alert-triggers.test.ts', 'lib/operations-alert-triggers.ts', 'lib/operations-e2e-timing.test.ts', 'lib/operations-e2e-timing.ts', 'lib/settle-route.test.ts', 'lib/trial-ai-access.test.ts', 'lib/trial-ai-access.ts'];
+  const suites = ['lib/api-error-codes.test.ts', 'lib/compile-job-worker.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/funnel-events.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operations-alert-triggers.test.ts', 'lib/operations-e2e-timing.test.ts', 'lib/operations-p0.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/remote-mcp.test.ts', 'lib/route-classification.test.ts', 'lib/settle-route.test.ts', 'lib/trial-ai-access.test.ts'];
+  assert.deepEqual([[...W1_TRIAL_OPS_AFFECTED_PATHS], [...W1_TRIAL_OPS_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['w1-trial-ops'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['w1-trial-ops'], [], [...suites].sort(), [], []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  for (const adjacent of ['nextjs/lib/trial-ai-access.tsx', 'nextjs/lib/operations-alert-trigger.ts', 'nextjs/lib/operations-e2e-timing.json', 'nextjs/app/api/developer/keys/[id]/revoke/route.ts', 'lib/trial-ai-access.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});

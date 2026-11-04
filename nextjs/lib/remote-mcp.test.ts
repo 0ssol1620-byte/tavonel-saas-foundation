@@ -33,6 +33,17 @@ const mocks = vi.hoisted(() => ({
   readModel: vi.fn(),
   loadCandidate: vi.fn(),
   signerEnv: vi.fn(),
+  toolCall: vi.fn(async () => null),
+  timing: vi.fn(async () => "not_recorded"),
+}));
+
+vi.mock("@/lib/operations-alert-triggers", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./operations-alert-triggers")>()),
+  recordMcpToolCall: mocks.toolCall,
+}));
+vi.mock("@/lib/operations-e2e-timing", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./operations-e2e-timing")>()),
+  recordFirstMcpAnswerTiming: mocks.timing,
 }));
 
 vi.mock("@/lib/developer-store", async (importOriginal) => ({
@@ -291,6 +302,30 @@ describe("a token for one workspace reads nothing of another", () => {
     expect(result.isError).toBe(false);
     expect(JSON.parse(result.content[0]!.text).collections).toHaveLength(1);
     expect(mocks.listWorlds).toHaveBeenCalledWith(MINE, { limit: 5, cursor: null });
+  });
+});
+
+describe("W1-A3 operations signals from the MCP transport", () => {
+  it("counts each tool call once, as a 5xx only when a route behind it answered 5xx", async () => {
+    mocks.listWorlds.mockResolvedValueOnce({ ok: true, worlds: [], nextCursor: null });
+    await call("list_worlds", { limit: 5 }, "tvnl_live_mine");
+    expect(mocks.toolCall).toHaveBeenLastCalledWith(false);
+
+    mocks.authorize.mockResolvedValueOnce({ ok: false, code: "DEVELOPER_STORE_READ_FAILED", status: 503 });
+    const failed = await call("list_worlds", { limit: 5 }, "tvnl_live_mine");
+    expect(failed.status).toBe(200);
+    expect(mocks.toolCall).toHaveBeenLastCalledWith(true);
+    expect(mocks.toolCall).toHaveBeenCalledTimes(2);
+
+    await rpc({ jsonrpc: "2.0", id: 3, method: "tools/list" });
+    expect(mocks.toolCall).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks for the timing receipt only after an answer tool succeeded, for the caller's workspace", async () => {
+    mocks.listWorlds.mockResolvedValueOnce({ ok: true, worlds: [], nextCursor: null });
+    await call("list_worlds", { limit: 5 }, "tvnl_live_mine");
+    await call("get_world", { collectionId: THEIR_COLLECTION }, "tvnl_live_mine");
+    expect(mocks.timing).not.toHaveBeenCalled();
   });
 });
 

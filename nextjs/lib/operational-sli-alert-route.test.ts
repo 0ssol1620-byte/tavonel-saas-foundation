@@ -170,4 +170,33 @@ describe("scheduled operational SLI alert route", () => {
     });
     expect(post).toHaveBeenCalledTimes(1);
   });
+
+  it("W1-A3: reports the hourly RunPod cost check beside the SLI result without changing its status", async () => {
+    persist.mockResolvedValue({ ok: true, receipt: RECEIPT });
+    const response = await GET(request());
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.code).toBe("SLI_ALERT_EVALUATION_RECORDED");
+    // The 12:00 slot is an hourly slot; with no cap configured the check says so and pages nobody.
+    expect(body.watch).toEqual([{ check: "runpod_daily_cost", code: "RUNPOD_COST_CAP_UNCONFIGURED" }]);
+
+    vi.setSystemTime(new Date("2026-09-20T12:09:59.999Z"));
+    expect((await (await GET(request())).json()).watch).toEqual([]);
+  });
+
+  it("W1-A3: pages a RunPod day over its cap from the hourly slot", async () => {
+    vi.stubEnv("OPERATIONS_ALERT_WEBHOOK_URL", HOOK);
+    vi.stubEnv("TAVONEL_RUNPOD_DAILY_COST_CAP_USD", "10");
+    vi.stubEnv("TAVONEL_RUNPOD_API_KEY", "rp-test");
+    const post = vi.fn(async (url: string) => url.startsWith("https://api.runpod.io/")
+      ? new Response(JSON.stringify({ records: [{ startTime: "2026-09-20T00:00:00Z", totalAmount: 11 }] }), { status: 200 })
+      : new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", post);
+    persist.mockResolvedValue({ ok: true, receipt: RECEIPT });
+    const body = await (await GET(request())).json();
+    expect(body.watch).toEqual([{ check: "runpod_daily_cost", code: "RUNPOD_COST_CAP_EXCEEDED", delivery: "ALERT_DELIVERED" }]);
+    const pages = post.mock.calls.filter(([url]) => url === HOOK).map((entry) => JSON.parse(String((entry as unknown as [string, RequestInit])[1].body)));
+    expect(pages.map((page) => page.kind)).toEqual(["incident", "cost"]);
+    expect(JSON.stringify(body)).not.toContain("rp-test");
+  });
 });

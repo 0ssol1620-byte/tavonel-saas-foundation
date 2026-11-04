@@ -6,6 +6,7 @@ import {
   operationalSliAlertWindow,
   persistOperationalSliAlert,
 } from "@/lib/operational-sli-alert-store";
+import { runScheduledOperationsChecks } from "@/lib/operations-alert-triggers";
 import { authorizeSyntheticCanary, readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { RETRIEVAL_MODEL_PROVIDER } from "@/lib/retrieval-runtime-config";
 import { readProbeHistory } from "@/lib/synthetic-probe-store";
@@ -42,15 +43,18 @@ async function evaluateAndPersist(request: Request) {
   const persisted = await persistOperationalSliAlert(evaluation, windowStartedAt);
   // Sent even when the record failed: a database outage is exactly the breach that must page.
   const delivery = await deliverOperationalSliBreach(evaluation, windowStartedAt);
+  // W1-A3: hourly RunPod daily-cost and daily release-row expiry checks ride the same slot. Their
+  // outcome is reported beside the SLI result and never changes its status code.
+  const watch = await runScheduledOperationsChecks(windowStartedAt);
   if (!persisted.ok) {
     return NextResponse.json(
-      { code: persisted.code, persisted: false, evaluation, delivery },
+      { code: persisted.code, persisted: false, evaluation, delivery, watch },
       { status: 503, headers: HEADERS },
     );
   }
   if (delivery.code === "ALERT_DELIVERY_FAILED" || delivery.code === "ALERT_PAYLOAD_INVALID") {
     return NextResponse.json(
-      { code: "SLI_ALERT_DELIVERY_FAILED", persisted: true, evaluation, receipt: persisted.receipt, delivery },
+      { code: "SLI_ALERT_DELIVERY_FAILED", persisted: true, evaluation, receipt: persisted.receipt, delivery, watch },
       { status: 502, headers: HEADERS },
     );
   }
@@ -62,6 +66,7 @@ async function evaluateAndPersist(request: Request) {
     evaluation,
     receipt: persisted.receipt,
     delivery,
+    watch,
   }, { headers: HEADERS });
 }
 

@@ -429,7 +429,7 @@ export const codeIdMarker = (codeId: string) => ` #${codeId}`;
 
 export type BearerCheck =
   | { kind: "anonymous" }
-  | { kind: "principal"; token: string; scopes: readonly DeveloperScope[] }
+  | { kind: "principal"; token: string; scopes: readonly DeveloperScope[]; workspaceKey: string }
   | { kind: "rejected"; description: string };
 
 /**
@@ -452,7 +452,7 @@ export async function checkBearer(authorization: string | null): Promise<BearerC
   if (scopes.some((scope) => !(REMOTE_MCP_SCOPES as readonly string[]).includes(scope))) {
     return { kind: "rejected", description: "The access token carries a write scope; the remote MCP endpoint accepts read-only tokens." };
   }
-  return { kind: "principal", token, scopes };
+  return { kind: "principal", token, scopes, workspaceKey: authenticated.principal.workspaceKey };
 }
 
 /** RFC 6750 §3 challenge, with the RFC 9728 pointer MCP clients start discovery from. */

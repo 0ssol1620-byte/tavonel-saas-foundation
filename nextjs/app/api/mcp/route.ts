@@ -8,6 +8,8 @@ import {
   remoteMcpEnabled,
   requestOrigin,
 } from "@/lib/remote-mcp";
+import { recordMcpToolCall } from "@/lib/operations-alert-triggers";
+import { recordFirstMcpAnswerTiming } from "@/lib/operations-e2e-timing";
 import { GET as listSources } from "../v1/documents/route";
 import { GET as listWorlds } from "../v1/collections/route";
 import { GET as getWorld } from "../v1/world/[id]/route";
@@ -103,10 +105,30 @@ export async function POST(request: Request) {
     }
   }
 
+  // W1-A3: what each tool call reached, so a 5xx behind a tool error still counts as a 5xx.
+  const reached: { pathname: string; status: number }[] = [];
+  const tracked = async (url: string, init: RequestInit) => {
+    const response = await dispatch(url, init);
+    reached.push({ pathname: new URL(url).pathname, status: response.status });
+    return response;
+  };
   const handle = createServer({
-    call: createClient({ baseUrl: origin, apiKey: bearer.kind === "principal" ? bearer.token : "", fetcher: dispatch as typeof fetch }),
+    call: createClient({ baseUrl: origin, apiKey: bearer.kind === "principal" ? bearer.token : "", fetcher: tracked as typeof fetch }),
   });
-  return NextResponse.json(await handle(message), { headers: NO_STORE });
+  let answer: unknown;
+  try {
+    answer = await handle(message);
+  } catch (error) {
+    if (method === "tools/call") await recordMcpToolCall(true);
+    throw error;
+  }
+  if (method === "tools/call") {
+    await recordMcpToolCall(reached.some((entry) => entry.status >= 500));
+    const answered = reached.map((entry) => ({ ...entry, world: /^\/api\/v1\/collections\/([^/]+)\/(?:ask|search)$/.exec(entry.pathname)?.[1] }))
+      .find((entry) => entry.world && entry.status >= 200 && entry.status < 300);
+    if (answered?.world && bearer.kind === "principal") await recordFirstMcpAnswerTiming(bearer.workspaceKey, answered.world);
+  }
+  return NextResponse.json(answer, { headers: NO_STORE });
 }
 
 /* The JSON response form only: no server-initiated SSE stream (Streamable HTTP allows 405). */

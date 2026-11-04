@@ -2367,6 +2367,12 @@ export const CONSENT_POSTER_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/landing
 // webhook, its store module and their two suites. They select those suites, the delivery suite behind deliverOperationsAlert and
 // the suites that read every app/api route source. Product code, so never nativeReuse; no browser, database, worker or build lane.
 export const OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS = Object.freeze(['app/api/internal/sli-alerts/route.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-alert-store.test.ts', 'lib/operational-sli-alert-store.ts']);
+// W1 trial AI access + operations alert producers (codex/w1-a2-20261104): the four 402 routes' key-route trio, the settle route
+// (OCR alerts), the session/key authorizer, the trial decision, the alert producers and the E2E timing receipt, with their suites.
+// They select those suites and the suites that read every app/api route source. Product code, so never nativeReuse; the
+// migration and its pgTAP file stay with database-contract. No browser, worker or build lane.
+export const W1_TRIAL_OPS_AFFECTED_PATHS = Object.freeze(['app/api/developer/keys/[id]/route.ts', 'app/api/developer/keys/route.ts', 'app/api/internal/billing/settle/route.ts', 'app/api/v1/developer/keys/[id]/rotate/route.ts', 'lib/developer-auth.test.ts', 'lib/developer-auth.ts', 'lib/operations-alert-triggers.test.ts', 'lib/operations-alert-triggers.ts', 'lib/operations-e2e-timing.test.ts', 'lib/operations-e2e-timing.ts', 'lib/settle-route.test.ts', 'lib/trial-ai-access.test.ts', 'lib/trial-ai-access.ts']);
+export const W1_TRIAL_OPS_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error-codes.test.ts', 'lib/compile-job-worker.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/funnel-events.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operations-alert-triggers.test.ts', 'lib/operations-e2e-timing.test.ts', 'lib/operations-p0.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/remote-mcp.test.ts', 'lib/route-classification.test.ts', 'lib/settle-route.test.ts', 'lib/trial-ai-access.test.ts']);
 export const OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error-codes.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-alert-store.test.ts', 'lib/operations-p0.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts']);
 // Enablement batch (codex/enablement-20261017, EN-0 to EN-5 and the guide recordings): the fifty-three changed endpoints no owner
 // listed -- the changelog and its feed, the cookbooks index and card, the resources hub,
@@ -2896,6 +2902,9 @@ export const AFFECTED_GROUPS = Object.freeze([
     { unitFiles: REMOTE_MCP_AFFECTED_UNIT_FILES, browserFiles: REMOTE_MCP_AFFECTED_BROWSER_FILES }),
   // consent-poster: the 16 exact paths above select 5 direct suites and 2 browser suites.
   // operational-sli-alert-delivery: the 4 exact paths above select 8 direct suites and no browser suite.
+  // w1-trial-ops: the 13 exact paths above select 16 direct suites and no browser suite.
+  affectedGroup('w1-trial-ops', new RegExp(`^nextjs/(?:${exactPathAlternation(W1_TRIAL_OPS_AFFECTED_PATHS)})$`),
+    { unitFiles: W1_TRIAL_OPS_AFFECTED_UNIT_FILES }),
   affectedGroup('operational-sli-alert-delivery', new RegExp(`^nextjs/(?:${exactPathAlternation(OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS)})$`),
     { unitFiles: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES }),
   affectedGroup('consent-poster', new RegExp(`^nextjs/(?:${exactPathAlternation(CONSENT_POSTER_AFFECTED_PATHS)})$`),
