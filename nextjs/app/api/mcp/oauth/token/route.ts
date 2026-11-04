@@ -4,7 +4,9 @@ import {
   REMOTE_MCP_TOKEN_TTL_SECONDS,
   checkTokenRequest,
   codeIdMarker,
+  cohortRefusalStatus,
   keyNameFor,
+  remoteMcpCohortRefusal,
   remoteMcpEnabled,
   remoteMcpSealingKey,
   requestOrigin,
@@ -43,6 +45,15 @@ export async function POST(request: Request) {
   const checked = checkTokenRequest(new URLSearchParams(text), key, requestOrigin(request));
   if (!checked.ok) return oauthError(checked.status, checked.error, checked.error_description);
   const { grant } = checked;
+  // A1.0: no token outside the processing cohort, checked at minting -- not only at consent, so a
+  // workspace removed from the cohort between consent and exchange gets nothing.
+  const cohort = remoteMcpCohortRefusal(grant.workspaceKey);
+  if (cohort) {
+    return NextResponse.json(
+      { error: cohort === "PROCESSING_COHORT_EXCLUDED" ? "access_denied" : "temporarily_unavailable", error_description: cohort, code: cohort },
+      { status: cohortRefusalStatus(cohort), headers: NO_STORE },
+    );
+  }
 
   const existing = await listDeveloperApiKeys(grant.workspaceKey);
   if (!existing.ok) return oauthError(503, "temporarily_unavailable", existing.code);

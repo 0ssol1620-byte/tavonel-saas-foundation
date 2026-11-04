@@ -132,6 +132,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("TAVONEL_REMOTE_MCP_ENABLED", "true");
   vi.stubEnv("TAVONEL_REMOTE_MCP_SIGNING_SECRET", "remote-mcp-unit-test-sealing-secret-value");
+  // A1.0: the remote MCP is a canary of the processing cohort; both test workspaces are in it.
+  vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", `${MINE},pilot-beta`);
   mocks.authenticateKey.mockResolvedValue(keyPrincipal(READ_SCOPES));
   mocks.authorize.mockResolvedValue({ ok: true, principal: { kind: "api-key", keyId: "key-1", workspaceKey: MINE, userId: USER, scopes: READ_SCOPES, authorizationRevision: 4, workspaceRole: "owner" } });
   mocks.listKeys.mockResolvedValue({ ok: true, keys: [] });
@@ -545,3 +547,95 @@ describe("token exchange", () => {
     expect([response.status, (await response.json()).error]).toEqual([400, "invalid_grant"]);
   });
 });
+
+/*
+  W1-A1.0 (PROGRAM-2026-11-04 §4.A). The remote MCP reuses the processing cohort -- no cohort flag
+  of its own -- and, being a canary, admits nobody while that cohort is unset, malformed or wider
+  than the D-19 cap of three. Checked at consent, at minting and on every call.
+*/
+describe("A1.0: the processing cohort gates every token and every call", () => {
+  const args = { collectionId: THEIR_COLLECTION };
+
+  it("refuses to mint a token for a workspace outside the cohort, with 403 PROCESSING_COHORT_EXCLUDED", async () => {
+    const clientId = await registeredClient();
+    const code = await approvedCode(clientId);
+    vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", "pilot-beta");
+    const response = await exchange({ grant_type: "authorization_code", code, client_id: clientId, code_verifier: VERIFIER });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "access_denied", error_description: "PROCESSING_COHORT_EXCLUDED", code: "PROCESSING_COHORT_EXCLUDED" });
+    expect(mocks.createKey).not.toHaveBeenCalled();
+    expect(mocks.listKeys).not.toHaveBeenCalled();
+  });
+
+  it("refuses consent for a workspace outside the cohort before any code exists", async () => {
+    const clientId = await registeredClient();
+    vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", "pilot-beta");
+    mocks.session.mockResolvedValueOnce({ ok: true, principal: { kind: "session", workspaceKey: MINE, userId: USER, scopes: [], accessSource: "paid", authorizationRevision: 4, workspaceRole: "owner" } });
+    const response = await consent("approve", authorizationRequest(clientId), "supabase-session");
+    const body = await response.json();
+    expect([response.status, body.code]).toEqual([403, "PROCESSING_COHORT_EXCLUDED"]);
+    expect(body).not.toHaveProperty("redirectTo");
+  });
+
+  it("refuses a live token's call once its workspace is outside the cohort, before any route runs", async () => {
+    vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", "pilot-beta");
+    const response = await call("get_world", args, "tvnl_live_mine");
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toEqual({ code: -32001, message: "PROCESSING_COHORT_EXCLUDED" });
+    expect(mocks.authorize).not.toHaveBeenCalled();
+    // Discovery without a token names no workspace, so it stays open.
+    expect((await rpc({ jsonrpc: "2.0", id: 1, method: "tools/list" })).status).toBe(200);
+  });
+
+  it("admits nobody when the cohort is unset, empty, malformed or wider than the canary", async () => {
+    const clientId = await registeredClient();
+    for (const value of [undefined, "", " ", "pilot-*", "pilot-alpha,", "pilot-alpha;pilot-beta", "pilot-alpha,pilot-b,pilot-c,pilot-d"]) {
+      const code = await approvedCodeUnder(clientId);
+      if (value === undefined) vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", undefined as unknown as string);
+      else vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", value);
+      const minted = await exchange({ grant_type: "authorization_code", code, client_id: clientId, code_verifier: VERIFIER });
+      expect([minted.status, (await minted.json()).code], String(value)).toEqual([503, "PROCESSING_COHORT_CONFIG_INVALID"]);
+      const called = await call("get_world", args, "tvnl_live_mine");
+      expect([called.status, (await called.json()).error.message], String(value)).toEqual([503, "PROCESSING_COHORT_CONFIG_INVALID"]);
+      vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", `${MINE},pilot-beta`);
+    }
+    expect(mocks.createKey).not.toHaveBeenCalled();
+    expect(mocks.authorize).not.toHaveBeenCalled();
+  });
+
+  it("401s an expired token and a token revoked a moment ago, with invalid_token", async () => {
+    mocks.authenticateKey.mockResolvedValueOnce({ ok: false, code: "API_KEY_EXPIRED" });
+    const expired = await call("list_worlds", {}, "tvnl_live_expired");
+    expect(expired.status).toBe(401);
+    expect(expired.headers.get("www-authenticate")).toContain('error="invalid_token", error_description="The access token has expired."');
+    // Revocation is the key row's revoked_at, read on every call: the next call after it is a 401.
+    mocks.authenticateKey.mockResolvedValueOnce(keyPrincipal(READ_SCOPES));
+    mocks.listWorlds.mockResolvedValueOnce({ ok: true, worlds: [], nextCursor: null });
+    expect((await call("list_worlds", {}, "tvnl_live_mine")).status).toBe(200);
+    mocks.authenticateKey.mockResolvedValueOnce({ ok: false, code: "API_KEY_INVALID" });
+    const revoked = await call("list_worlds", {}, "tvnl_live_mine");
+    expect(revoked.status).toBe(401);
+    expect(revoked.headers.get("www-authenticate")).toContain('error="invalid_token", error_description="The access token is not valid."');
+  });
+
+  it("refuses to load the route when the tool table it imports holds a write tool", async () => {
+    vi.resetModules();
+    vi.doMock("@/public/developer/tavonel-mcp.mjs", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("../public/developer/tavonel-mcp.mjs")>();
+      const promote = { name: "promote_world", request: () => ({ method: "POST", path: "/api/v1/collections/x/promote" }) };
+      return { ...actual, TOOLS: [...actual.TOOLS, promote] };
+    });
+    try {
+      await expect(import("../app/api/mcp/route")).rejects.toThrow("MCP_WRITE_TOOL_REFUSED");
+    } finally {
+      vi.doUnmock("@/public/developer/tavonel-mcp.mjs");
+      vi.resetModules();
+    }
+  });
+});
+
+/** A code minted while the default cohort is in force, whatever a test sets afterwards. */
+async function approvedCodeUnder(clientId: string) {
+  vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", `${MINE},pilot-beta`);
+  return approvedCode(clientId);
+}

@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
-import { assertReadOnly, createClient, createServer } from "@/public/developer/tavonel-mcp.mjs";
+import { TOOLS, assertReadOnly, createClient, createServer } from "@/public/developer/tavonel-mcp.mjs";
 import {
   REMOTE_MCP_PROTOCOL_VERSIONS,
   REMOTE_MCP_TOOL_SCOPES,
   bearerChallenge,
   checkBearer,
+  cohortRefusalStatus,
+  remoteMcpCohortRefusal,
   remoteMcpEnabled,
   requestOrigin,
 } from "@/lib/remote-mcp";
@@ -26,7 +28,7 @@ export const maxDuration = 60;
   The bridge's own server answers every message; this file is the transport around it. The
   bridge refuses to start with a write tool in its table, and so does this route.
 */
-assertReadOnly();
+assertReadOnly(TOOLS);
 
 const NO_STORE = { "Cache-Control": "no-store" };
 const MAX_BODY = 65_536;
@@ -89,6 +91,12 @@ export async function POST(request: Request) {
     return rpcError(401, id, -32001, "AUTH_INVALID", {
       "WWW-Authenticate": bearerChallenge(origin, { error: "invalid_token", description: bearer.description }),
     });
+  }
+  // A1.0: a token is only as good as its workspace's place in the processing cohort, re-read on
+  // every call, so removing a workspace from the cohort stops its live tokens at once.
+  if (bearer.kind === "principal") {
+    const cohort = remoteMcpCohortRefusal(bearer.workspaceKey);
+    if (cohort) return rpcError(cohortRefusalStatus(cohort), id, -32001, cohort);
   }
   // A notification or a response: accepted, nothing to answer.
   if (typeof method !== "string" || id === undefined || id === null) return new NextResponse(null, { status: 202 });

@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { DeveloperScope } from "./developer-contracts";
 import { authenticateDeveloperApiKey } from "./developer-store";
+import { LAUNCH_CANARY_MAX_WORKSPACES, processingCohortRefusal } from "./processing-workspace-grant";
 
 /*
   G11 REMOTE-MCP (DECISION-REGISTER S6-09, S6-10; SERVICE-DEFINITION §6 D; ENABLEMENT-GAP §4).
@@ -51,6 +52,24 @@ export const REMOTE_MCP_TOOL_SCOPES: Readonly<Record<string, DeveloperScope>> = 
 
 /** The only scopes a remote MCP token may hold. A key holding anything else is refused. */
 export const REMOTE_MCP_SCOPES: readonly DeveloperScope[] = [...new Set(Object.values(REMOTE_MCP_TOOL_SCOPES))].sort();
+
+/**
+ * W1-A1.0 (PROGRAM-2026-11-04 §4.A): the remote MCP canary is the processing cohort, not a cohort
+ * of its own. Every token issued and every authenticated call passes `processingCohortRefusal`.
+ *
+ * Stricter than processing in two ways, both because this is a canary: an unset
+ * TAVONEL_PROCESSING_WORKSPACE_COHORT admits nobody here (processing reads unset as "no extra
+ * restriction" while the launch switch is off), and so does a list longer than the D-19 canary
+ * cap. Widening past the canary (A1.4) is a reviewed change to this function, never an env value.
+ */
+export type RemoteMcpCohortRefusal = "PROCESSING_COHORT_EXCLUDED" | "PROCESSING_COHORT_CONFIG_INVALID";
+export function remoteMcpCohortRefusal(workspaceKey: string, env: Env = process.env): RemoteMcpCohortRefusal | null {
+  const raw = env.TAVONEL_PROCESSING_WORKSPACE_COHORT;
+  if (raw === undefined || raw.split(",").length > LAUNCH_CANARY_MAX_WORKSPACES) return "PROCESSING_COHORT_CONFIG_INVALID";
+  return processingCohortRefusal(workspaceKey, env);
+}
+/** Excluded is the caller's answer (403); a cohort that cannot be read is the server's (503). */
+export const cohortRefusalStatus = (code: RemoteMcpCohortRefusal) => (code === "PROCESSING_COHORT_EXCLUDED" ? 403 : 503);
 
 export const REMOTE_MCP_CODE_TTL_SECONDS = 120;
 export const REMOTE_MCP_TOKEN_TTL_SECONDS = 3600;
@@ -429,7 +448,7 @@ export const codeIdMarker = (codeId: string) => ` #${codeId}`;
 
 export type BearerCheck =
   | { kind: "anonymous" }
-  | { kind: "principal"; token: string; scopes: readonly DeveloperScope[] }
+  | { kind: "principal"; token: string; scopes: readonly DeveloperScope[]; workspaceKey: string }
   | { kind: "rejected"; description: string };
 
 /**
@@ -452,7 +471,7 @@ export async function checkBearer(authorization: string | null): Promise<BearerC
   if (scopes.some((scope) => !(REMOTE_MCP_SCOPES as readonly string[]).includes(scope))) {
     return { kind: "rejected", description: "The access token carries a write scope; the remote MCP endpoint accepts read-only tokens." };
   }
-  return { kind: "principal", token, scopes };
+  return { kind: "principal", token, scopes, workspaceKey: authenticated.principal.workspaceKey };
 }
 
 /** RFC 6750 §3 challenge, with the RFC 9728 pointer MCP clients start discovery from. */
