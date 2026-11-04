@@ -347,6 +347,8 @@ export default function LandingPage({
                   className={`${heroStyles.recordCrop} ${heroStyles.recordAside}`}
                   image={receive.image}
                   bbox1000={receive.bbox1000}
+                  marginPx={240}
+                  markClassName={heroStyles.recordMark}
                   sizes="(min-width: 900px) 420px, calc(100vw - 88px)"
                 />
               ) : null}
