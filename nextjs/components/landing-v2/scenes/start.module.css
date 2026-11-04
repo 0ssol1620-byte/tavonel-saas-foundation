@@ -31,7 +31,8 @@
     padding: 72px 64px;
     grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
     column-gap: 24px;
-    align-items: end;
+    /* CRITIQUE-R1 #9: the name and the action stack share a top edge; on the foot they sat ~120px apart. */
+    align-items: start;
   }
 }
 

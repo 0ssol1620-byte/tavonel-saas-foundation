@@ -286,3 +286,9 @@
   .actions button { justify-content: center; min-height: 44px; padding: 0 10px; }
   .floating { inset: auto auto 8px 0.5rem; }
 }
+
+/*
+  Round 2 (CRITIQUE-R1 #13): the two answers take the site's pill, the only control on the first screen that was still a
+  square box. Same geometry, same edge and same colour for both -- the choice stays un-nudged; only the shape changed.
+*/
+.actions button { border-radius: var(--tv-r-pill); }
