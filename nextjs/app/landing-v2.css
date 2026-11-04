@@ -18,7 +18,8 @@
     36.2, 1440 -> 64 / 40 / 44. One scale for / and /ko (T0): the Korean page no longer sizes its
     h1 on its own steps.
   */
-  --lv2-fs-display: clamp(34px, calc(2.857vw + 22.86px), 64px);
+  /* Direction C round 2 (CRITIQUE-R1 #5): 84px at 1440, still 34px at 390, on the same line between them. */
+  --lv2-fs-display: clamp(34px, calc(4.762vw + 15.43px), 84px);
   --lv2-fs-h2: clamp(28px, calc(1.143vw + 23.54px), 40px);
   --lv2-fs-figure: clamp(36px, calc(0.762vw + 33.03px), 44px);
   /*

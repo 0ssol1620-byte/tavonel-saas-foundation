@@ -134,7 +134,7 @@
   */
   .home.home :global(.lv2-hero-h1) {
     max-width: 14em; margin: 0; text-align: start;
-    font: 510 var(--lv2-fs-display)/1.04 var(--f-sans); letter-spacing: -0.032em;
+    font: 510 var(--lv2-fs-display)/1.02 var(--f-sans); letter-spacing: -0.03em;
   }
   .home.home :global(.lv2-hero-h1:lang(en)) { text-wrap: balance; }
   .home.home :global(.lv2-h1-line) { display: block; }
@@ -393,6 +393,10 @@
     min-height: 48px; padding: 10px 22px; border: 0; border-radius: var(--tv-r-pill);
     box-shadow: inset 0 0 0 1.5px var(--tv-rule-strong); background: transparent; color: var(--tv-ink);
   }
+  /* CRITIQUE-R1 #5: the entry reads as where a document goes -- a dashed inset edge, and while files are dragged over
+     the page it takes the accent (data-drag, set by HeroActions; a drop moves focus to it, Home keeps no file). */
+  .heroAside :global(.lv2-entry) { box-shadow: none; outline: 1.5px dashed var(--tv-rule-strong); outline-offset: -1.5px; }
+  .heroAside :global(.lv2-entry[data-drag]) { outline: 2px dashed var(--tv-action); outline-offset: -2px; background: var(--tv-tint); color: var(--tv-action); }
   @media (hover: hover) and (pointer: fine) {
     .home.home :global(.lv2-cta:hover) { background: var(--tv-action-hover); border-color: var(--tv-action-hover); }
     .heroAside :global(.lv2-entry:hover) { background: var(--tv-sand); box-shadow: inset 0 0 0 1.5px var(--tv-sand-2); color: var(--tv-ink); }
