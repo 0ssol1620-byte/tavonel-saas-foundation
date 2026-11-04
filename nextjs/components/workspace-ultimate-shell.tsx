@@ -350,7 +350,7 @@ export default function WorkspaceUltimateShell({
 
         <div className={`workspace-content ${styles.content}`}>
           {surface === "home" && stateHero ? (
-            <section className={styles.stateHero} aria-labelledby="workspace-state-title" data-activity={activityCount > 0 ? "running" : "quiet"}>
+            <section className={styles.stateHero} aria-labelledby="workspace-state-title" data-activity={activityCount > 0 ? "running" : "quiet"} data-decision={candidateReady && activityCount === 0 ? "1" : undefined}>
               <div>
                 {/* BQ-099: "Your knowledge" sat above "Loading your knowledge." / "Your published
                     knowledge · v3" / "Add your knowledge." It restated the heading in every branch,

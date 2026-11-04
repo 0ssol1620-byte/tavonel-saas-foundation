@@ -211,11 +211,11 @@
 .workspaceIdentity, .topStatus, .commandButton { border-right: 0; }
 .workspaceIdentity { padding-inline: 8px; }
 /* "N to review" is a tint pill; the published version beside it a quiet one. */
-.topStatus { flex-direction: row; align-items: center; gap: 8px; align-self: center; min-height: 40px; padding: 0 16px; border-radius: var(--tv-r-pill); background: var(--tv-canvas); }
+.topStatus { flex-direction: row; align-items: center; gap: 8px; align-self: center; min-height: 44px; padding: 0 16px; border-radius: var(--tv-r-pill); background: var(--tv-canvas); }
 .topStatus[data-review] { background: var(--tv-tint); }
 .topStatus small { letter-spacing: 0; }
 .topStatus b { color: var(--tv-action); font-weight: 600; }
-.commandButton { align-self: center; min-height: 40px; border-radius: var(--tv-r-pill); background: var(--tv-canvas); }
+.commandButton { align-self: center; min-height: 44px; border-radius: var(--tv-r-pill); background: var(--tv-canvas); }
 .accessStrip, .ownerStrip { background: var(--ground); }
 .accessStrip a { border-radius: var(--tv-r-pill); }
 .stateHero { border-bottom-color: var(--hairline); }
@@ -241,3 +241,10 @@
   .stateHero > button:hover:not(:disabled) { background: var(--tv-action-hover); color: #fff; }
   .stateHero > button.stateUpload:hover { background: var(--tv-sand-2); color: var(--text-hi); }
 }
+/*
+  Round 2 (CRITIQUE-R1 #4): when a candidate waits on the reader and nothing is still running, the state hero is the
+  activation card -- "You decide when this version becomes active" -- so it takes the sand block the attention items
+  use: the one place on the page where a person's decision is asked for.
+*/
+.stateHero[data-decision] { padding: clamp(20px, 2.4vw, 32px); border-bottom: 0; border-radius: var(--tv-r-card); background: var(--tv-sand); }
+.stateHero[data-decision] > button.stateUpload { background: var(--tv-sheet); }

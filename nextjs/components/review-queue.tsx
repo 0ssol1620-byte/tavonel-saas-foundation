@@ -111,6 +111,16 @@ export default function ReviewQueue({
         {" · "}of {queue.total} source{queue.total === 1 ? "" : "s"} in this compile
       </p>
       {/*
+        Round 2 (CRITIQUE-R1 #4): the status line above is the one line a reader scans; what limits it -- a
+        missing compile-job row, no settled time, a truncated or unread decision ledger -- is the "Why?"
+        under it, closed by default. Every sentence is the same and still in the document; only the six
+        stacked paragraphs stopped reading as a log. An unread ledger is also said once, above the list,
+        instead of on every row.
+      */}
+      {(queue.missing.includes("compile_job") || queue.missing.includes("compile_settled_at") || historyTruncated || queue.decisionsRead !== "ready") ? (
+      <details className="workspace-review-why">
+        <summary>Why some of this is not known</summary>
+      {/*
         The breakdown is only as complete as its inputs, and saying so is the whole point: a
         missing compile-job row means excluded and unread documents cannot be listed, and a
         zero in those columns would be a lie the reader has no way to check.
@@ -141,6 +151,8 @@ export default function ReviewQueue({
       ) : null}
       {queue.decisionsRead !== "ready" ? (
         <p className="fine" role="status">{UNREAD_LEDGER_COPY[queue.decisionsRead].notice}</p>
+      ) : null}
+      </details>
       ) : null}
 
       {compact ? null : (
@@ -174,6 +186,9 @@ export default function ReviewQueue({
         </div>
       )}
 
+      {queue.decisionsRead !== "ready" ? (
+        <p className="fine workspace-review-ledger">{UNREAD_LEDGER_COPY[queue.decisionsRead].row} for any document below.</p>
+      ) : null}
       <ul className="document-meta" aria-label="Documents in this compile, most at risk first">
         {rows.map((row) => {
           return (
@@ -185,7 +200,7 @@ export default function ReviewQueue({
                 {row.evidenceCount > 0 ? ` · ${row.evidenceCount} evidence region${row.evidenceCount === 1 ? "" : "s"}` : ""}
               </small>
               {row.reasons.map((value) => <small key={value}>Reason: {value}</small>)}
-              <small>{reviewTimingCopy(row, queue.decisionsRead, historyTruncated, settledKnown)}</small>
+              {queue.decisionsRead === "ready" ? <small>{reviewTimingCopy(row, queue.decisionsRead, historyTruncated, settledKnown)}</small> : null}
               {onSelectDocument && row.evidenceCount > 0 ? (
                 <button
                   type="button"

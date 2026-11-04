@@ -759,4 +759,12 @@
 }
 /* The drop zone's mark: the upload glyph the workspace already uses, in the accent, beside the zone's name. */
 .one-path-workspace .workspace-intake-copy :is(h1, h2) > svg { display: inline-block; margin-right: 10px; vertical-align: -3px; color: var(--tv-action); }
+/* Round 2 (CRITIQUE-R1 #4): the review queue's limits fold under one "Why?"; the unread-ledger line is said once. */
+.one-path-workspace .workspace-review-why { margin: 4px 0 8px; }
+.one-path-workspace .workspace-review-why > summary {
+  display: inline-flex; align-items: center; min-height: 44px; color: var(--tv-action); cursor: pointer;
+  font: 500 13px/1.4 var(--f-sans); text-decoration: underline; text-underline-offset: 3px;
+}
+.one-path-workspace .workspace-review-why > p { max-width: 72ch; }
+.one-path-workspace .workspace-review-ledger { margin: 4px 0 8px; color: var(--text-mid); }
 }

@@ -173,6 +173,12 @@ test("a processing-ceiling refusal names the code and the limit", async ({ page 
   await expect(notice).toContainText(limit);
   expect(calls()).toEqual({ capability: 1, approval: 0 });
   await expect(page.getByRole("button", { name: "Choose files", exact: true })).toBeEnabled();
+  // REVIEW-R1 B-1: the empty workspace's first intake control keeps a readable label under the pointer. Its hover
+  // painted #fff behind a --ground label, and --ground is the white sheet in the light workspace.
+  const choose = page.getByRole("button", { name: "Choose files", exact: true });
+  await choose.hover();
+  const face = await choose.evaluate((element) => { const style = getComputedStyle(element); return { color: style.color, background: style.backgroundColor }; });
+  expect(face.color, "the hovered label is not painted in its own background colour").not.toBe(face.background);
 });
 
 test("a refused whole-set approval ends in a sentence and a usable control, not a spinner", async ({ page }) => {

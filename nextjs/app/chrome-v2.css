@@ -113,6 +113,8 @@
   --failed: var(--tv-unresolved);
   --failed-dim: #d79a93;
   --failed-deep: #f6e2df;
+  /* REVIEW-R1 M-1: operations-ultimate reads --danger for failed/held stage labels; undeclared it fell back to #d96b55 (3.1:1 here). */
+  --danger: var(--tv-unresolved);
   --depth-focus: 0 0 0 1px var(--tv-action);
   --depth-overlay: var(--tv-shadow-2);
   color-scheme: light;
