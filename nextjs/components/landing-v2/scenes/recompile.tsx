@@ -78,15 +78,27 @@ export default function Scene({
           docs/evidence carries them, and the brief deletes a Home number that has none. They stay where they
           are computed and qualified, on the change record this scene links to (/explore?act=change).
         */}
+        {/*
+          Round 2 (CRITIQUE-R1 #2): the same record as a horizontal timeline -- the compile the World started
+          from, then each filing that arrived after it, in order. No count rides on a node: the per-filing
+          region counts on /product carry no docs/evidence receipt, so Home prints none (BRIEF item 4).
+        */}
         <div className={styles.panel}>
-          <div className={styles.arrivals}>
-            <p className={styles.panelLabel} id={arrivalsId}>{copy.arrivalsLabel}</p>
-            <ul className={styles.arrivalList} aria-labelledby={arrivalsId}>
-              {data.arrivals.map((arrival) => (
-                <li key={`${arrival.form}-${arrival.filingDate}`} data-derived="1">{arrival.form} · {arrival.filingDate}</li>
-              ))}
-            </ul>
-          </div>
+          <p className={styles.panelLabel} id={arrivalsId}>{copy.arrivalsLabel}</p>
+          <ol className={styles.timeline} aria-labelledby={arrivalsId}>
+            <li className={styles.origin}>
+              <span className={styles.node} aria-hidden="true" />
+              <span className={styles.when} data-derived="1">{data.before.form} · {data.before.year}</span>
+              <span className={styles.what}>{locale === "ko" ? "기존 컴파일" : "First compile"}</span>
+            </li>
+            {data.arrivals.map((arrival) => (
+              <li key={`${arrival.form}-${arrival.filingDate}`}>
+                <span className={styles.node} aria-hidden="true" />
+                <span className={styles.when} data-derived="1">{arrival.form} · {arrival.filingDate}</span>
+                <span className={styles.what}>{locale === "ko" ? "새 문서" : "Arrived"}</span>
+              </li>
+            ))}
+          </ol>
         </div>
 
         {/* Two text links, the contract first: the selective rebuild is specified there, not run here. */}
