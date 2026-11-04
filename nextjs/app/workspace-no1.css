@@ -722,9 +722,11 @@
 .one-path-workspace .workspace-intake,
 .one-path-workspace .workspace-intake[data-existing-documents="1"] { border: 1.5px dashed var(--tv-rule-strong); box-shadow: none; }
 .one-path-workspace .workspace-intake[data-active="true"] { border: 2px solid var(--verified); background: var(--verified-deep); }
-.one-path-workspace .workspace-source-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--hairline); }
+.one-path-workspace .workspace-source-choices,
+.one-path-workspace .workspace-intake[data-compact="1"] .workspace-source-choices,
+.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-source-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--hairline); }
 .one-path-workspace .workspace-source-choices button {
-  display: inline-flex; align-items: baseline; gap: 6px; min-height: 40px; padding: 0 14px;
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; white-space: nowrap;
   border: 0; border-radius: var(--tv-r-pill); background: var(--tv-canvas); box-shadow: none; font-size: 13px;
 }
 .one-path-workspace .workspace-source-choices button small::before { content: "· "; }
