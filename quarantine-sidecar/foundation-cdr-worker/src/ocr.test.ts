@@ -1299,3 +1299,29 @@ describe("OCR request logs", () => {
     assertNoSecrets(raw, sent);
   });
 });
+
+describe("the reader is fetched unbound", () => {
+  // workerd's global fetch refuses any `this` but the global scope ("Illegal invocation"); Node's does not,
+  // so a stub has to check it. Asserting inside the stub would be swallowed by the transport catch.
+  it("calls the fetcher with no receiver, on the whole-document and the range path", async () => {
+    for (const size of [undefined, "8"]) {
+      const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES });
+      const receivers: unknown[] = [];
+      const fetcher = async function (this: unknown, _url: string | URL | Request, init?: RequestInit) {
+        receivers.push(this);
+        const digest = new Headers(init?.headers).get("x-tavonel-input-sha256")!;
+        return Response.json(size === undefined ? ocrPayload(digest) : {
+          schemaVersion: "tavonel.ocr_page_range.v1", status: "ok", resultSchemaVersion: "tavonel.ocr_result.v2",
+          inputSha256: digest, pageCount: 1, pageRange: { start0: 0, end0: 1 },
+          pages: [{ pageNumber1: 1, pageStatus: "ok" }], regions: ocrPayload(digest).regions,
+        });
+      } as typeof fetch;
+      const result = await dispatchOcrAfterSanitize(envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR,
+        ...(size ? { FOUNDATION_OCR_PAGE_RANGE_SIZE: size } : {}) }), IMMUTABLE, fetcher);
+      assert.equal(receivers.length, 1);
+      assert.ok(receivers.every((receiver) => receiver === undefined || receiver === globalThis),
+        `range size ${size ?? "unset"}: fetch was called as a method`);
+      assert.equal(result.status, "written");
+    }
+  });
+});

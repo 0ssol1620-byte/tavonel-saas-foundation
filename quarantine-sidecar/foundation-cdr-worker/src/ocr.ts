@@ -746,14 +746,19 @@ async function postToReader(
     pageRange: pageRange ?? null, accept };
   // Workers advance Date.now() only across I/O; the fetch is I/O, so this is its wall time.
   const startedAt = Date.now();
+  // Called unbound, never as `post.fetcher(...)`: workerd's global fetch throws "Illegal invocation"
+  // for any other `this`, which failed every OCR post on the first page-range build.
+  const { fetcher } = post;
   let response: Response;
   try {
-    response = await post.fetcher(post.url, {
+    response = await fetcher(post.url, {
       method: "POST",
       headers,
       body: form,
       // A qualification attests this endpoint only; following a redirect invalidates attribution.
-      ...(binding ? { redirect: "error" as const } : {}),
+      // "manual", as every other fetch in this worker: workerd does not implement "error", and a 3xx
+      // that comes back is refused below exactly as a followed redirect is.
+      ...(binding ? { redirect: "manual" as const } : {}),
       signal: AbortSignal.timeout(post.timeoutMs),
     });
   } catch (error) {
