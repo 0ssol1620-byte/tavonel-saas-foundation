@@ -28,7 +28,7 @@
   height: var(--chrome-header-height);
   padding-block: 0;
   padding-inline: var(--chrome-edge);
-  background: #f7f5ef;
+  background: var(--tv-canvas);
   border-bottom: 1px solid #d8ddd9;
 }
 /*
@@ -49,7 +49,7 @@
   --source: var(--tv-action);
 }
 .nav.chrome-v2-header[data-scrolled="1"] {
-  background: #f7f5ef;
+  background: var(--tv-canvas);
   border-bottom-color: #d8ddd9;
 }
 /* main dbe22b1e's scrolled header blur, which Home still has. */
@@ -62,7 +62,7 @@
 .nav.chrome-v2-header:where(:not(.lv2 > header)) .one-path-mobile-nav {
   --ground: #fff;
   --seam: #d8ddd9;
-  --g1: #f7f5ef;
+  --g1: var(--tv-canvas);
   --text-hi: #171c20;
   --text-mid: #53606a;
   --text-lo: #53606a;
@@ -104,7 +104,7 @@
   min-height: 44px;
   border-radius: 6px;
   border-color: #88928d;
-  background: #f7f5ef;
+  background: var(--tv-canvas);
   color: #111519;
   transition: color .15s ease, border-color .15s ease;
 }
@@ -228,15 +228,15 @@
 footer.site.chrome-v2-footer {
   border-top: 1px solid var(--border-dark, var(--hairline));
 }
-/* Paper footer everywhere but Home, whose footer is Release 2's dark surface (see the header note). */
+/* Direction C (2026-11-04): the footer stands on the warm canvas with the page; Home sets the same in its own sheet. */
 footer.site.chrome-v2-footer:where(:not(.lv2 > footer)) {
-  background: #f7f5ef;
-  color: #171c20;
-  --text-hi: #171c20;
-  --text-mid: #53606a;
-  --text-lo: #53606a;
-  --hairline: #d8ddd9;
-  --border-dark: #d8ddd9;
+  background: var(--tv-canvas);
+  color: var(--tv-ink);
+  --text-hi: var(--tv-ink);
+  --text-mid: var(--tv-ink-muted);
+  --text-lo: var(--tv-ink-muted);
+  --hairline: var(--tv-rule);
+  --border-dark: var(--tv-rule);
 }
 .chrome-v2-footer .site-footer-tagline {
   font-family: var(--f-sans);

@@ -1,3 +1,4 @@
+// Direction C (2026-11-04): header, page and footer grounds are the warm canvas #f5f3ee (rgb(245, 243, 238)).
 /**
  * The V2 site chrome (blueprint 2026-09-19 §8, §29; contract D2, D9), measured in a browser.
  *
@@ -131,7 +132,7 @@ test.describe("at 1440", () => {
     await page.goto("/product");
     const header = page.locator(HEADER);
     const background = () => header.evaluate((element) => getComputedStyle(element).backgroundColor);
-    expect(await background(), "the initial bar has its readable paper surface").toBe("rgb(251, 250, 247)");
+    expect(await background(), "the initial bar has its readable paper surface").toBe("rgb(245, 243, 238)");
 
     await page.evaluate(() => window.scrollTo(0, 20));
     await expect(header).toHaveAttribute("data-scrolled", "0");
@@ -146,11 +147,11 @@ test.describe("at 1440", () => {
       on the retry, then 0.77. The threshold and the toggle were never the flake; the stopwatch
       was. This waits for the transition to land on the declared value instead.
     */
-    await expect(header).toHaveCSS("background-color", "rgb(251, 250, 247)");
+    await expect(header).toHaveCSS("background-color", "rgb(245, 243, 238)");
 
     await page.evaluate(() => window.scrollTo(0, 0));
     await expect(header).toHaveAttribute("data-scrolled", "0");
-    await expect(header).toHaveCSS("background-color", "rgb(251, 250, 247)");
+    await expect(header).toHaveCSS("background-color", "rgb(245, 243, 238)");
   });
 
   /*
@@ -251,7 +252,7 @@ test.describe("at 390", () => {
     await page.evaluate(() => window.scrollTo(0, 80));
     await expect(header).toHaveAttribute("data-scrolled", "1");
     // The phone shares the same stable paper surface as the desktop.
-    await expect(header).toHaveCSS("background-color", "rgb(251, 250, 247)");
+    await expect(header).toHaveCSS("background-color", "rgb(245, 243, 238)");
   });
 
   test("does not scroll sideways with the sheet open", async ({ page }) => {
@@ -316,7 +317,7 @@ test.describe("Home keeps main's header and footer colours", () => {
 
   test("while the reading pages keep the paper chrome", async ({ page }, testInfo) => {
     await page.goto("/pricing");
-    await expect(page.locator("footer.site")).toHaveCSS("background-color", "rgb(247, 245, 239)");
+    await expect(page.locator("footer.site")).toHaveCSS("background-color", "rgb(245, 243, 238)");
     await expect(page.locator("footer.site .site-footer-groups a").first()).toHaveCSS("color", "rgb(83, 96, 106)");
     // UX-L1 (UX-PLAN-2026-10-17 §4.2-5, §8.2): the paper header's --source was the retired 265° #2447b3; it reads
     // var(--tv-action) now, the same 255° accent Home's header carries above.

@@ -6,10 +6,14 @@
   the renderer's own `aspect-ratio` sets the height from it, so the composition is the same at
   every viewport and nothing is measured at runtime.
 */
+/* Direction C (2026-11-04): a white sheet on the warm shadow, rounded at 24px; no box around it. */
 .frame {
   margin: 0;
-  border: 1px solid var(--hairline);
-  background: var(--g1);
+  border: 0;
+  border-radius: var(--tv-r-card);
+  overflow: hidden;
+  background: var(--tv-sheet);
+  box-shadow: var(--tv-shadow-1);
 }
 
 .head {
