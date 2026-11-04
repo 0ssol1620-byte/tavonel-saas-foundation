@@ -100,6 +100,19 @@ export function processingCohortRefusal(workspaceKey: string, env: Env = process
   return ids.includes(workspaceKey) ? null : "PROCESSING_COHORT_EXCLUDED";
 }
 
+/**
+ * The canary reading of the same cohort, for surfaces that open only to named workspaces (W1: the
+ * remote MCP and signed answer receipts in `on` mode; PROGRAM-2026-11-04 appendix A). No flag of
+ * its own. Stricter than `processingCohortRefusal` in two ways: an unset cohort admits nobody, and
+ * so does a list longer than the D-19 cap. Widening past the canary is a reviewed change here.
+ */
+export function canaryCohortRefusal(workspaceKey: string, env: Env = process.env):
+  "PROCESSING_COHORT_EXCLUDED" | "PROCESSING_COHORT_CONFIG_INVALID" | null {
+  const raw = env.TAVONEL_PROCESSING_WORKSPACE_COHORT;
+  if (raw === undefined || raw.split(",").length > LAUNCH_CANARY_MAX_WORKSPACES) return "PROCESSING_COHORT_CONFIG_INVALID";
+  return processingCohortRefusal(workspaceKey, env);
+}
+
 async function call(config: Config, path: string, init?: RequestInit) {
   try { return await supabaseAdminRequest(config, path, { ...init, signal: AbortSignal.timeout(5_000) }); }
   catch { return null; }

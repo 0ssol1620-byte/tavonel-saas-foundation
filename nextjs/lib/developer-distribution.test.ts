@@ -46,6 +46,8 @@ describe("developer distribution", () => {
       verifyExport: "tavonel-verify-export.mjs",
       verifyPackage: "tavonel-verify-package.mjs",
       verifyRoundtrip: "tavonel-verify-roundtrip.py",
+      // W1-A5: the signed answer receipt's verifier. No DISTRIBUTION_VERSION: it moves on its own, like the recipes.
+      verifyAnswer: "tavonel-verify-answer.mjs",
       /*
         G3-017. /docs/integration-recipes told a reader to run these two and they lived in a
         private repository, so the page's verifiability claim -- "a recipe that has drifted from
