@@ -150,7 +150,7 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
     }
     await page.emulateMedia({ reducedMotion: "no-preference" });
   }
-  for (const width of [1440, 390]) {
+  for (const width of [1440, 390].filter(value => PHONE_HERO !== "still" || value > 900)) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
     await page.goto("/ko");
     const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');

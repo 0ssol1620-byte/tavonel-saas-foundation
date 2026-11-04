@@ -217,6 +217,28 @@ test("four-stage video stays static with reduced motion until explicit play and 
   expect(await video.evaluate((node: HTMLVideoElement) => node.error)).toBeNull();
 });
 
+/*
+  Direction C round 2 (CRITIQUE-R1 #1 interim, lib/hero-phone-mode.ts): on a phone the first screen shows the committed
+  10-Q page with its regions instead of the four-panel film; from 1024 up the film plays and the still is not drawn.
+*/
+test("the phone hero shows the Inspector still in place of the film, and only there", async ({ page }, testInfo) => {
+  test.skip(PHONE_HERO !== "still", "the phone hero is the film");
+  test.skip(!["1440", "390", "360"].includes(testInfo.project.name), "measured at 1440, 390 and 360");
+  await page.goto("/");
+  const still = page.getByTestId("landing-hero-still");
+  const film = page.getByTestId("landing-hero-film");
+  if (phoneShowsStill(testInfo.project.name)) {
+    await expect(still).toBeVisible();
+    await expect(film).toBeHidden();
+    await expect(still.locator("img")).toHaveAttribute("src", /apple-2026-q1-10-q-reference-p004/);
+    await expect(still.locator("img")).toHaveAttribute("loading", "lazy");
+    expect((await still.boundingBox())!.y, "the still starts on the first screen").toBeLessThan(page.viewportSize()!.height);
+  } else {
+    await expect(still).toBeHidden();
+    await expect(film).toBeVisible();
+  }
+});
+
 test("server-renders the visible film poster as its priority image", async ({ request }) => {
   const response = await request.get("/"); expect(response.status()).toBe(200);
   const html = await response.text();
