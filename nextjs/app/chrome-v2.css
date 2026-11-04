@@ -75,6 +75,52 @@
   display: none;
 }
 /*
+  Direction C, warm tactile (2026-11-04): the workspace and the sign-in pages leave the dark
+  instrument ground for the site's warm canvas. Their sheets read the ground and state tokens, so
+  this one remap moves them. The state values are the light-ground ones the public pages use
+  (UX-L1: one value per state, the one accent), measured on the canvas: ink 16.4:1, muted 6.93:1,
+  verified 5.65:1, changed 5.68:1, unresolved 6.22:1, each higher on the white sheet. An alias
+  :root resolves once (--warning, --depth-focus) is redeclared, because a custom property holding
+  a var() is computed where it is declared, not where it is read.
+*/
+:is(.auth, .one-path-workspace) {
+  --ground: var(--tv-canvas);
+  --g1: var(--tv-sheet);
+  --g2: var(--tv-paper-sunk);
+  --g3: var(--tv-sand);
+  --seam: #d8d5ce;
+  --hairline: var(--tv-rule);
+  --hairline-hi: #c6c3bc;
+  --border-dark: var(--tv-rule);
+  --text-hi: var(--tv-ink);
+  --text-max: #292f35;
+  --text-mid: #424951;
+  --text-lo: var(--tv-ink-muted);
+  --decor: #9a968e;
+  --reused: #c9c4ba;
+  --source: var(--tv-action);
+  --relation: var(--tv-ink-muted);
+  --verified: var(--tv-verified);
+  --verified-dim: #278366;
+  --verified-deep: #dcece4;
+  --changed: var(--tv-changed);
+  --changed-dim: #c99a5e;
+  --changed-deep: #f5e9d4;
+  --warning: var(--tv-changed);
+  --unresolved: var(--tv-unresolved);
+  --unresolved-dim: #d79a93;
+  --unresolved-deep: #f6e2df;
+  --failed: var(--tv-unresolved);
+  --failed-dim: #d79a93;
+  --failed-deep: #f6e2df;
+  --depth-focus: 0 0 0 1px var(--tv-action);
+  --depth-overlay: var(--tv-shadow-2);
+  color-scheme: light;
+  color: var(--text-hi);
+}
+.auth { background: var(--ground); }
+.auth-card { border: 0; border-radius: var(--tv-r-card); background: var(--tv-sheet); box-shadow: var(--tv-shadow-1); }
+/*
   UX-L2 (§5.2): /login's own header row takes the same geometry -- the container edge and the
   header height -- so the wordmark does not jump between the site and the sign-in page.
   (/explore's stage header does the same in components/explore/explore-stage.module.css.)

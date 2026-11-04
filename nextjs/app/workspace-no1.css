@@ -675,4 +675,38 @@
     .one-path-workspace .workspace-intake-closed { min-height: 0; }
     .one-path-workspace .workspace-example-path span { font-size: 14px; }
   }
+
+/* ---- direction C, warm tactile (2026-11-04) ---------------------------------------------------
+   The shell module remaps the tokens to the light ground (see workspace-ultimate.module.css). Here
+   the blocks take their C faces: no box is drawn with a border any more. A block is a quiet fill
+   on the white working sheet, rounded at 24px -- the canvas for a plain card and the drop zone,
+   sand for what waits on a person (needs attention, the activation card), tint for the compile in
+   progress -- and the action buttons are pills. Nothing here adds a state colour; the fills are
+   surfaces, and the state words inside them keep their own tokens. */
+.one-path-workspace { --ws-radius: var(--tv-r-inner); --ws-radius-sm: var(--tv-r-small); }
+.one-path-workspace .card { border: 0; border-radius: var(--tv-r-card); background: var(--g1); }
+.one-path-workspace .card .card { border-radius: var(--tv-r-inner); background: var(--tv-sheet); }
+.one-path-workspace .workspace-intake { border: 0; border-radius: var(--tv-r-card); background: var(--tv-canvas); box-shadow: inset 0 0 0 1.5px var(--tv-rule-strong); }
+.one-path-workspace .workspace-intake[data-active="true"] { background: var(--verified-deep); box-shadow: inset 0 0 0 1.5px var(--verified); }
+.one-path-workspace .workspace-source-choices { border-top-color: var(--hairline); }
+.one-path-workspace .workspace-source-choices button { border: 0; border-radius: var(--tv-r-inner); background: var(--tv-sheet); box-shadow: var(--tv-shadow-1); }
+.one-path-workspace .workspace-attention { padding: clamp(20px, 2.4vw, 28px); border-radius: var(--tv-r-card); background: var(--tv-sand); }
+.one-path-workspace .workspace-complete { border: 0; border-radius: var(--tv-r-card); background: var(--tv-sand); }
+.one-path-workspace .workspace-compile-block { border: 0; border-radius: var(--tv-r-card); background: var(--tv-tint-2); }
+.one-path-workspace .workspace-compile-block .workspace-compile-job { background: var(--tv-tint); }
+.one-path-workspace .notice.static { border: 0; border-radius: var(--tv-r-inner); background: var(--tv-sand); }
+.one-path-workspace .workspace-preflight dl { border: 0; border-radius: var(--tv-r-inner); background: var(--hairline); }
+.one-path-workspace .workspace-content :is(.workspace-intake-actions, .workspace-intake-gated-actions, .workspace-complete-actions, .workspace-attention-actions, .workspace-attention-items, .workspace-getting-started-actions, .compile-selection-actions, .world-actions, .review-decision-actions, .board-filters, .notice.static) :is(button, .btn, a.btn) { border-radius: var(--tv-r-pill); }
+.one-path-workspace .workspace-body > header > div:last-child > button,
+.one-path-workspace .workspace-body > header > div:last-child .proof-actions button { border-radius: var(--tv-r-pill); }
+/* Rows and empty states inside a block are white sheets on it, not a second ruled box. */
+.one-path-workspace .document-meta li { border-color: transparent; border-radius: var(--tv-r-inner); background: var(--tv-sheet); }
+.one-path-workspace :is(.empty, .world-empty) { border: 0; border-radius: var(--tv-r-inner); background: var(--tv-sheet); }
+/* Getting started is one quiet canvas row; its toggle carries no frame of its own. */
+.one-path-workspace .workspace-getting-started { border: 0; border-radius: var(--tv-r-card); background: var(--tv-canvas); }
+.one-path-workspace .workspace-getting-started-toggle { border: 0; border-radius: var(--tv-r-card); background: transparent; }
+/* The source board is one white sheet of rows divided by hairlines; a row is not a box in a box. */
+.one-path-workspace .board-list-wrap { border: 0; border-radius: var(--tv-r-inner); background: var(--tv-sheet); }
+.one-path-workspace .board-list > li { background: var(--tv-sheet); }
+.one-path-workspace .board-list .board-row-summary { border: 0; border-radius: 0; background: transparent; }
 }
