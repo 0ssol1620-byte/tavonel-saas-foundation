@@ -1322,4 +1322,4 @@ section.receive {
 .passagePane .quote { font: 400 14px/1.6 var(--f-mono) !important; letter-spacing: 0 !important; overflow-wrap: anywhere; }
 
 /* Round 2 (CRITIQUE-R1 #2): the received passage's region drawn on the page around it -- the same accent box s2 draws. */
-.recordMark { position: absolute; border: 2px solid var(--tv-action); border-radius: 4px; background: rgb(0 91 179 / 0.08); pointer-events: none; }
+.recordMark { position: absolute; border: 2px solid var(--tv-action); border-radius: 4px; background: color-mix(in srgb, var(--tv-action) 8%, transparent); pointer-events: none; }
