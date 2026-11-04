@@ -27,5 +27,5 @@ export const EMPTY_IMAGE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BA
 export const PHONE_HERO_STILL_REASON =
   "Direction C round 2 interim: below 900px Home shows the Inspector still, not the film (lib/hero-phone-mode.ts)";
 
-/** True for the phone projects while the still stands in for the film. */
-export const phoneShowsStill = (projectName: string) => PHONE_HERO === "still" && ["390", "360", "412", "430"].includes(projectName);
+/** True for the projects at 900px and below (768 and the phones) while the still stands in for the film. */
+export const phoneShowsStill = (projectName: string) => PHONE_HERO === "still" && ["768", "390", "360", "412", "430"].includes(projectName);
