@@ -219,7 +219,8 @@
 .accessStrip, .ownerStrip { background: var(--ground); }
 .accessStrip a { border-radius: var(--tv-r-pill); }
 .stateHero { border-bottom-color: var(--hairline); }
-.stateHero > button { min-height: 44px; padding: 0 22px; border-color: var(--tv-action); border-radius: var(--tv-r-pill); background: var(--tv-action); color: #fff; box-shadow: var(--tv-shadow-action); }
+/* Centred like every other pill: at 560px and below the two actions stretch to the full width, and a stretched label read left-aligned. */
+.stateHero > button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-align: center; min-height: 44px; padding: 0 22px; border-color: var(--tv-action); border-radius: var(--tv-r-pill); background: var(--tv-action); color: #fff; box-shadow: var(--tv-shadow-action); }
 .stateHero > button:disabled { box-shadow: none; }
 .stateHero > button.stateUpload { border-color: transparent; background: var(--tv-sand); box-shadow: none; }
 .palette { border: 0; border-radius: var(--tv-r-card); background: var(--tv-sheet); }
