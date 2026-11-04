@@ -11,6 +11,7 @@ import {
   remoteMcpCohortRefusal,
   remoteMcpToolLabel,
   toolFailureCode,
+  toolUpstreamStatus,
   remoteMcpEnabled,
   requestOrigin,
 } from "@/lib/remote-mcp";
@@ -82,11 +83,15 @@ export async function POST(request: Request) {
     recordRemoteMcpSli({ method: seen.method, tool: seen.tool, status: 500, durationMs: performance.now() - started });
     throw error;
   }
-  recordRemoteMcpSli({ method: seen.method, tool: seen.tool, status: response.status, durationMs: performance.now() - started });
-  if (seen.method === "tools/call") {
+  const durationMs = performance.now() - started;
+  if (seen.method !== "tools/call") {
+    recordRemoteMcpSli({ method: seen.method, tool: seen.tool, status: response.status, durationMs });
+  } else {
     const tool = remoteMcpToolLabel(seen.tool);
     const body = await response.clone().json().catch(() => null) as
       { error?: { message?: unknown }; result?: { isError?: unknown; content?: Array<{ text?: unknown }> } } | null;
+    const upstreamStatus = body?.result?.isError === true ? toolUpstreamStatus(body.result.content?.[0]?.text) : null;
+    recordRemoteMcpSli({ method: seen.method, tool: seen.tool, status: response.status, upstreamStatus, durationMs });
     if (response.status === 200 && body?.result) recordServerFunnel("mcp_tool_called", { tool });
     const failure = response.status !== 200
       ? toolFailureCode(body?.error?.message)

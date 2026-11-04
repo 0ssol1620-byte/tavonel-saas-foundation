@@ -488,16 +488,29 @@ export function toolFailureCode(text: unknown): string {
 }
 
 export const REMOTE_MCP_SLI_SCHEMA = "tavonel.remote_mcp_sli.v1" as const;
-export type RemoteMcpSliRecord = { sli: typeof REMOTE_MCP_SLI_SCHEMA; method: string; tool: string | null; status: number; durationMs: number };
+/**
+ * `status` is the HTTP status of the POST. `upstreamStatus` is the status of the API route a tool
+ * reached, when the tool failed with one (`API_ERROR_503: ...`): a tool failure travels inside a
+ * 200 JSON-RPC result, so an SLI that read the HTTP status alone would never see a 5xx from the
+ * routes behind the tools.
+ */
+export type RemoteMcpSliRecord = { sli: typeof REMOTE_MCP_SLI_SCHEMA; method: string; tool: string | null; status: number; upstreamStatus: number | null; durationMs: number };
+
+/** The route status a failed tool result names, or null. */
+export function toolUpstreamStatus(text: unknown): number | null {
+  const match = typeof text === "string" ? /^API_ERROR_([1-5][0-9]{2})\b/.exec(text) : null;
+  return match ? Number(match[1]) : null;
+}
 
 /** One structured line per /api/mcp POST on the server log (the funnel's sink, read by the log drain). */
-export function recordRemoteMcpSli(input: { method: string | null; tool: string | null; status: number; durationMs: number }) {
+export function recordRemoteMcpSli(input: { method: string | null; tool: string | null; status: number; upstreamStatus?: number | null; durationMs: number }) {
   const method = input.method !== null && /^[a-z/]{1,40}$/.test(input.method) ? input.method : "unknown";
   const record: RemoteMcpSliRecord = {
     sli: REMOTE_MCP_SLI_SCHEMA,
     method,
     tool: method === "tools/call" ? remoteMcpToolLabel(input.tool) : null,
     status: input.status,
+    upstreamStatus: input.upstreamStatus ?? null,
     durationMs: Math.round(input.durationMs * 10) / 10,
   };
   try { console.info(JSON.stringify(record)); } catch { /* telemetry never breaks an answer */ }
@@ -505,15 +518,18 @@ export function recordRemoteMcpSli(input: { method: string | null; tool: string 
 
 /**
  * p50/p95 latency and the 5xx ratio over SLI lines. The denominator is every call recorded --
- * refusals included -- and is returned beside the ratio, never without it. Nearest-rank
- * percentiles; null when there are no calls rather than a zero that reads as a measurement.
+ * refusals included -- and is returned beside the ratio, never without it. A call is a 5xx when
+ * the POST was, or when the route its tool reached was (`upstreamStatus`); `http5xx` counts the
+ * first kind alone. Nearest-rank percentiles; null when there are no calls rather than a zero
+ * that reads as a measurement.
  */
-export function summarizeRemoteMcpSli(records: readonly Pick<RemoteMcpSliRecord, "status" | "durationMs">[]) {
+export function summarizeRemoteMcpSli(records: readonly (Pick<RemoteMcpSliRecord, "status" | "durationMs"> & { upstreamStatus?: number | null })[]) {
   const calls = records.length;
   const sorted = records.map((record) => record.durationMs).sort((a, b) => a - b);
   const rank = (p: number) => (calls === 0 ? null : sorted[Math.max(0, Math.ceil(p * calls) - 1)]!);
-  const server5xx = records.filter((record) => record.status >= 500).length;
-  return { calls, p50Ms: rank(0.5), p95Ms: rank(0.95), server5xx, server5xxRatio: calls === 0 ? null : server5xx / calls };
+  const http5xx = records.filter((record) => record.status >= 500).length;
+  const server5xx = records.filter((record) => record.status >= 500 || (record.upstreamStatus ?? 0) >= 500).length;
+  return { calls, p50Ms: rank(0.5), p95Ms: rank(0.95), http5xx, server5xx, server5xxRatio: calls === 0 ? null : server5xx / calls };
 }
 
 /** RFC 6750 §3 challenge, with the RFC 9728 pointer MCP clients start discovery from. */

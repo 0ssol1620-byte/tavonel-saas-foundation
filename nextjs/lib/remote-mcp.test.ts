@@ -73,7 +73,7 @@ import { GET as protectedResource } from "../app/.well-known/oauth-protected-res
 import { GET as authorizationServer } from "../app/.well-known/oauth-authorization-server/route";
 import OAuthAuthorizeLayout from "../app/oauth/authorize/layout";
 import { TOOLS } from "../public/developer/tavonel-mcp.mjs";
-import { REMOTE_MCP_SCOPES, REMOTE_MCP_TOOL_SCOPES, requestOrigin, summarizeRemoteMcpSli, toolFailureCode } from "./remote-mcp";
+import { REMOTE_MCP_SCOPES, REMOTE_MCP_TOOL_SCOPES, requestOrigin, summarizeRemoteMcpSli, toolFailureCode, toolUpstreamStatus } from "./remote-mcp";
 
 const VERIFIER = "remote-mcp-pkce-verifier-0123456789-abcdefghij";
 const CHALLENGE = createHash("sha256").update(VERIFIER).digest("base64url");
@@ -672,8 +672,8 @@ describe("telemetry: funnel events and the SLI line carry no identifier", () => 
         { event: "mcp_tool_failed", tool: "unknown", code: "TOOL_NOT_FOUND" },
       ]);
       const sli = recorded.filter((line) => "sli" in line);
-      expect(sli.map((line) => [line.method, line.tool, line.status])).toEqual([
-        ["tools/call", "list_worlds", 200], ["tools/call", "get_world", 200], ["tools/call", "get_world", 401], ["tools/call", "unknown", 200],
+      expect(sli.map((line) => [line.method, line.tool, line.status, line.upstreamStatus])).toEqual([
+        ["tools/call", "list_worlds", 200, null], ["tools/call", "get_world", 200, 404], ["tools/call", "get_world", 401, null], ["tools/call", "unknown", 200, null],
       ]);
       for (const line of sli) expect(typeof line.durationMs).toBe("number");
       expect(JSON.stringify(recorded)).not.toContain(THEIR_COLLECTION);
@@ -687,8 +687,10 @@ describe("telemetry: funnel events and the SLI line carry no identifier", () => 
     expect(toolFailureCode("INPUT_INVALID: question must be text about pilot-alpha")).toBe("INPUT_INVALID");
     expect(toolFailureCode("a sentence with an id collection-123")).toBe("TOOL_FAILED");
     expect(toolFailureCode(undefined)).toBe("TOOL_FAILED");
-    expect(summarizeRemoteMcpSli([])).toEqual({ calls: 0, p50Ms: null, p95Ms: null, server5xx: 0, server5xxRatio: null });
-    const records = Array.from({ length: 20 }, (_, index) => ({ status: index === 0 ? 503 : 200, durationMs: index + 1 }));
-    expect(summarizeRemoteMcpSli(records)).toEqual({ calls: 20, p50Ms: 10, p95Ms: 19, server5xx: 1, server5xxRatio: 0.05 });
+    expect(summarizeRemoteMcpSli([])).toEqual({ calls: 0, p50Ms: null, p95Ms: null, http5xx: 0, server5xx: 0, server5xxRatio: null });
+    const records = Array.from({ length: 20 }, (_, index) => ({ status: index === 0 ? 503 : 200, upstreamStatus: index === 1 ? 503 : index === 2 ? 404 : null, durationMs: index + 1 }));
+    // One HTTP 5xx and one tool whose route answered 503 inside a 200: two of twenty. A 404 is not a 5xx.
+    expect(summarizeRemoteMcpSli(records)).toEqual({ calls: 20, p50Ms: 10, p95Ms: 19, http5xx: 1, server5xx: 2, server5xxRatio: 0.1 });
+    expect([toolUpstreamStatus("API_ERROR_503: SIGNER_NOT_CONFIGURED"), toolUpstreamStatus("API_ERROR_404"), toolUpstreamStatus("TOOL_NOT_FOUND: x")]).toEqual([503, 404, null]);
   });
 });
