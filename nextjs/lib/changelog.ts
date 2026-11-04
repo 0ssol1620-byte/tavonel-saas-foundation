@@ -98,7 +98,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     title: "Home opens the film on the full frame, and /workspace puts the upload box first",
     surfaces: ["Website", "Workspace"],
     improved: [
-      "/ and /ko open the compilation film on the full frame at every width. “Focus details” (“세부 내용 확대” on /ko) zooms in to one pane of the source page.",
+      "/ and /ko open the compilation film on the full frame at every width. “Focus details” (“세부 내용 확대” on /ko) zooms in as before: two panes on a desktop, one pane of the source page on a phone.",
       "The second action on the home page, “Evaluate your documents” (“내 문서 평가” on /ko), is a bordered button with a document icon. It opens /evaluation and /ko/evaluation, as the link did.",
       "On the Home tab of /workspace the upload box comes straight after the workspace status, ahead of Needs attention, the compile and its results, including after a cancelled run. The status area has an “Upload sources” button that opens the file picker, or says uploads are closed on an account where they are, and the upload box is headed “Drop files, folders or ZIP here” for a returning workspace too.",
     ],
