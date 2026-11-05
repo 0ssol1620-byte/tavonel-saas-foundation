@@ -200,7 +200,7 @@ begin
     select r.document_id, r.related_document_id, r.related_source_version_id, r.evidence->'matchedOn' as matched_on,
            r.created_at, rf.created_at as related_recorded_at
       from public.document_relations r
-      join pg_catalog.unnest(v_documents, v_versions) as c(document_id, source_version_id)
+      join rows from (pg_catalog.unnest(v_documents), pg_catalog.unnest(v_versions)) as c(document_id, source_version_id)
         on c.document_id = r.document_id and c.source_version_id = r.source_version_id
       join public.source_fingerprints rf
         on rf.workspace_key = r.workspace_key and rf.document_id = r.related_document_id
