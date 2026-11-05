@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 import { globalCollectionCompileEnabled, GLOBAL_COLLECTION_KEY_PREFIX, GLOBAL_COLLECTION_MAX_BYTES, GLOBAL_COLLECTION_MAX_REGIONS, judgeGlobalCollectionInput } from "./global-collection-compile";
-import { CORE_MAX_LATENCY_MS } from "./execution-budget";
+import { CORE_MAX_LATENCY_MS, WORKER_SETTLEMENT_RESERVE_MS } from "./execution-budget";
 import { OCR_REGIONS_REQUIRED, documentsWithoutRegions } from "../../shared/compiledWorldValidation";
 import { authorizationStage, type CustomerDataAuthorization } from "../../shared/customerDataAuthorization";
 import type { ReleaseStage } from "../../shared/scopedCustomerDataGate";
@@ -120,6 +120,8 @@ export async function runCollectionCompile(
   logicalCollectionKey?: string,
   compileJobId?: string,
   observationPrincipal?: CompileObservationPrincipal,
+  /** The invocation's wall clock, when a scheduler tick owns it: Core is given what is left of it minus the settlement reserve. */
+  deadlineAt?: number,
 ): Promise<CollectionCompileRun> {
   const startedAt = Date.now();
   // An invocation identity, distinct from a durable job (which can have several attempts).
@@ -428,7 +430,11 @@ export async function runCollectionCompile(
       return { ok: false, status: 503, code: currentGate.code, payload: {} };
     }
     customerDataGate = currentGate.decision;
-    const remainingMs = globalCollection ? CORE_MAX_LATENCY_MS - (Date.now() - startedAt) : CORE_MAX_LATENCY_MS;
+    // Bounded by the tick as well (REVIEW-PR192-R1 MINOR-10): a Core call that ran to its own 52 s
+    // limit after a late claim would leave no time to settle, and a dead lease retried every 5 min.
+    const tickRemainingMs = deadlineAt === undefined ? CORE_MAX_LATENCY_MS : deadlineAt - Date.now() - WORKER_SETTLEMENT_RESERVE_MS;
+    const remainingMs = Math.min(globalCollection ? CORE_MAX_LATENCY_MS - (Date.now() - startedAt) : CORE_MAX_LATENCY_MS,
+      tickRemainingMs);
     if (remainingMs < 1000) return { ok: false, status: 503, code: "GLOBAL_COLLECTION_TIME_BUDGET_EXHAUSTED", payload: {} };
     const compiled = await dispatchProductCoreV2(
       coreV2,

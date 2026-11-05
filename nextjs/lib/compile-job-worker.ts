@@ -346,12 +346,14 @@ export async function runCompileJobTurn(job: CompileJob, deadlineAt = Number.POS
     return rest("skipped", job.state, classified.ready.length, classified.blocked);
   }
   claimed = true;
+  // Core's budget is cut to what the tick has left minus the settlement reserve (MINOR-10).
+  const tickDeadline = Number.isFinite(deadlineAt) ? deadlineAt : undefined;
 
   const run = job.compilationMode === "global_collection"
     ? await runCollectionCompile(job.workspaceKey, classified.ready, `${GLOBAL_COLLECTION_KEY_PREFIX}${job.corpusId}`, job.jobId,
-      { userId: job.createdByUserId, provenance: "durable_job" })
+      { userId: job.createdByUserId, provenance: "durable_job" }, tickDeadline)
     : await runCollectionCompile(job.workspaceKey, classified.ready, undefined, job.jobId,
-      { userId: job.createdByUserId, provenance: "durable_job" });
+      { userId: job.createdByUserId, provenance: "durable_job" }, tickDeadline);
   if (!run.ok) {
     if (isCompileWaitingOnReading(run.code)) {
       /*

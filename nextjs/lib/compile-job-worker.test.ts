@@ -73,6 +73,7 @@ vi.mock("./immutable-keys", async (importOriginal) => {
 const { runCompileJobBatch, runCompileJobTurn, DIGEST_MIGRATION_NOT_APPLIED } =
   await import("./compile-job-worker");
 const { RESTING_COMPILE_STATES, SCHEDULER_EXCLUDED_STATES } = await import("./compile-job-store");
+const { CORE_CLIENT_TIMEOUT_MS, WORKER_SETTLEMENT_RESERVE_MS } = await import("./execution-budget");
 
 const DOCUMENT = (id: string, state: "ocr_ready" | "sanitized" | "operator_review") => ({
   documentId: id,
@@ -287,7 +288,7 @@ describe("the durable compile worker", () => {
     expect(turn.note).toBe("compiled");
     expect(turn.state).toBe("ready");
     expect(runCompile).toHaveBeenCalledWith("pilot-alpha", ["doc-a"], undefined, "cjob-00000000000000000000000000000001",
-      { userId: "00000000-0000-4000-8000-000000000001", provenance: "durable_job" });
+      { userId: "00000000-0000-4000-8000-000000000001", provenance: "durable_job" }, undefined);
   });
 
   it("names the object and its bytes in a job event before failing on JSON_TOO_LARGE", async () => {
@@ -455,6 +456,29 @@ describe("the durable compile worker", () => {
     expect(turns.map((turn) => turn.note)).toEqual(["resting", "resting", "resting", "resting", "resting", "waiting"]);
     expect(advance).toHaveBeenCalledWith(expect.objectContaining({ jobId: fresh }));
     expect(listObjects).toHaveBeenCalledTimes(1);
+  });
+
+  it("claims only while a whole Core call fits the tick, and gives Core what is left minus the settlement reserve", async () => {
+    // REVIEW-PR192-R1 MINOR-10/11: the boundary, and the budget handed to the compile.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(Date.parse("2026-11-05T09:00:00.000Z"));
+      group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
+      runCompile.mockResolvedValue({ ok: false, status: 503, code: "CORE_V2_TIMEOUT", payload: {} });
+
+      const refused = await runCompileJobTurn(job(), Date.now() + CORE_CLIENT_TIMEOUT_MS - 1_000);
+      expect(refused).toMatchObject({ note: "skipped", outOfTime: true });
+      expect(claimLease).not.toHaveBeenCalled();
+
+      const deadline = Date.now() + CORE_CLIENT_TIMEOUT_MS + WORKER_SETTLEMENT_RESERVE_MS;
+      const allowed = await runCompileJobTurn(job(), deadline);
+      expect(allowed).toMatchObject({ note: "failed", claimed: true });
+      expect(claimLease).toHaveBeenCalledOnce();
+      // The compile receives the tick deadline; collection-compile-run subtracts the reserve.
+      expect(runCompile.mock.calls[0]?.[5]).toBe(deadline);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not claim a second compile the tick cannot finish, and stops the batch there", async () => {
@@ -663,6 +687,6 @@ it("compiles every document of a qualified global job into one logical collectio
     batchIndex: 0, batchCount: 1, documentIds: ids, documentsTotal: 13 }));
   expect(turn.note).toBe("compiled");
   expect(runCompile).toHaveBeenCalledWith("pilot-alpha", ids, `global-corpus/${corpusId}`, "cjob-00000000000000000000000000000001",
-    { userId: "00000000-0000-4000-8000-000000000001", provenance: "durable_job" });
+    { userId: "00000000-0000-4000-8000-000000000001", provenance: "durable_job" }, undefined);
   vi.unstubAllEnvs();
 });

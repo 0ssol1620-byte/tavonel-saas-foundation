@@ -175,9 +175,9 @@ describe("Python Product-Core v2 dispatch", () => {
   });
 
   it("reads the Core response no further than the largest response a storable candidate implies", async () => {
-    // cjob-157f2f23: a 134,576,916 B candidate means the Core answered with far more than the
-    // documented 4.5 MB platform response cap. The response is 1.91-2.35x the package while the
-    // candidate is 1.03-1.43x (REVIEW-AKC153-R1.md §1.4), so the read bound sits above 2.35x the
+    // The bound is derived from a measurement, not from cjob-157f2f23 (whose 134,576,916 B was the
+    // candidate; its response size was never observed): the response is 1.91-2.35x the package while
+    // the candidate is 1.03-1.43x (REVIEW-AKC153-R1.md §1.4), so the read bound sits above 2.35x the
     // candidate bound -- a 30 MB storable candidate must not be refused here.
     const { MAX_COLLECTION_JSON_BYTES } = await import("./r2-objects");
     expect(CORE_V2_MAX_RESPONSE_BYTES).toBe(80 * 1024 * 1024);

@@ -327,6 +327,19 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
     put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
   }
 
+  it("gives Core no more than the tick has left minus the settlement reserve", async () => {
+    // REVIEW-PR192-R1 MINOR-10: a near-timeout Core call must not outlive the scheduler tick.
+    compilableSource();
+    await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID, undefined, Date.now() + 30_000);
+    const budget = dispatched.mock.calls[0]?.[8] as number;
+    expect(budget).toBeLessThanOrEqual(30_000 - 8_000);
+    expect(budget).toBeGreaterThan(30_000 - 8_000 - 2_000);
+
+    dispatched.mockClear();
+    await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+    expect(dispatched.mock.calls[0]?.[8]).toBe(52_000);
+  });
+
   it("refuses a Core request over its bound by name before anything is persisted", async () => {
     compilableSource();
     const sizeLimit = { object: "core-request", bytes: 4_500_001, bound: 4_500_000 };

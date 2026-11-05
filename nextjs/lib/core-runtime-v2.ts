@@ -807,9 +807,10 @@ export async function dispatchProductCoreV2(
   /*
     Read with a bound (CORE_V2_MAX_RESPONSE_BYTES: the largest response whose candidate could still
     be stored), so a larger body is refused here -- before it is held, parsed, signed, audited or
-    registered. cjob-157f2f23's 134,576,916 B candidate implies a
-    Core response far above the documented 4.5 MB platform response cap, which therefore did not
-    apply on this path. Counts are not reported: they would need the parse this bound prevents.
+    registered. The bound comes from the measured response/package ratio (1.91-2.35x, REVIEW-AKC153-R1
+    §1.4), not from cjob-157f2f23: its 134,576,916 B is the candidate's size, and that job's response
+    size was never observed (by the ratio, roughly 176-307 MB -- an estimate, not a measurement).
+    Counts are not reported on this refusal: they would need the parse this bound prevents.
   */
   const read = await readBoundedSourceBody(response, CORE_V2_MAX_RESPONSE_BYTES);
   // An oversized or malformed-length error body is the platform's failure, not an output size.
