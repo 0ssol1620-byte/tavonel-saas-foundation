@@ -3272,7 +3272,7 @@ export default function WorkspacePage() {
                 <source media="(max-width: 640px)" srcSet="/visuals/compile-timeline-390.webp 684w" sizes="calc(100vw - 32px)" width={684} height={1260} />
                 <img src="/visuals/compile-timeline-1440.webp" srcSet="/visuals/compile-timeline-1440.webp 2784w"
                   sizes="(min-width: 1024px) min(1040px, calc(100vw - 340px)), calc(100vw - 32px)" width={2784} height={1082}
-                  alt="An example compile stage at its first step: the steps Source, Read, Organize and Review & activate, with example files listed and one marked for review."
+                  alt="An example compile stage at its first step: the steps Source, Read, Organize and Review & activate, with example files and a review mark."
                   loading="lazy" decoding="async" />
               </picture>
             </figure>
