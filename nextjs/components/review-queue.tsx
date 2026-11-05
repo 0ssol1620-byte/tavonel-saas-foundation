@@ -73,6 +73,17 @@ function reviewTimingCopy(row: ReviewQueueRow, decisionsRead: ReviewLedgerStatus
     : `First review decision ${at} · elapsed not measured`;
 }
 
+/*
+  Round 3 (CRITIQUE-R2 #3): a reason reads as a chip a person understands, with the string the compile
+  recorded printed beside it unchanged. The chip names only the family the string itself announces -- a
+  safety stop or a reading (OCR) check -- and says nothing else; the recorded string stays the fact.
+*/
+function reasonFamily(value: string): string {
+  if (/^SECURITY/i.test(value)) return "Safety stop";
+  if (/^OCR_/.test(value)) return "Reading check";
+  return "Review reason";
+}
+
 export default function ReviewQueue({
   input,
   compact = false,
@@ -95,6 +106,9 @@ export default function ReviewQueue({
 
   const historyTruncated = queue.missing.includes("review_decisions");
   const settledKnown = !queue.missing.includes("compile_settled_at");
+  /* Round 3: when every row would print the same decision line, it is said once above the list instead. */
+  const timings = rows.map((row) => reviewTimingCopy(row, queue.decisionsRead, historyTruncated, settledKnown));
+  const sharedTiming = queue.decisionsRead === "ready" && timings.length > 1 && timings.every((line) => line === timings[0]) ? timings[0] : null;
 
   if (queue.total === 0) {
     return (
@@ -191,8 +205,9 @@ export default function ReviewQueue({
       {queue.decisionsRead !== "ready" ? (
         <p className="fine workspace-review-ledger">{UNREAD_LEDGER_COPY[queue.decisionsRead].row} for any document below.</p>
       ) : null}
+      {sharedTiming ? <p className="fine workspace-review-ledger">{sharedTiming} for any document below.</p> : null}
       <ul className="document-meta" aria-label="Documents in this compile, most at risk first">
-        {rows.map((row) => {
+        {rows.map((row, index) => {
           return (
             <li key={row.documentId} data-review-status={row.status} data-security={row.securityBlocked || undefined}>
               <strong>{row.name}</strong>
@@ -201,8 +216,13 @@ export default function ReviewQueue({
                 {REVIEW_QUEUE_STATUS_COPY[row.status]}
                 {row.evidenceCount > 0 ? ` · ${row.evidenceCount} evidence region${row.evidenceCount === 1 ? "" : "s"}` : ""}
               </small>
-              {row.reasons.map((value) => <small key={value}>Reason: {value}</small>)}
-              {queue.decisionsRead === "ready" ? <small>{reviewTimingCopy(row, queue.decisionsRead, historyTruncated, settledKnown)}</small> : null}
+              {row.reasons.map((value) => (
+                <small key={value} className="workspace-review-reason">
+                  <span>{reasonFamily(value)}</span>
+                  {/\s/.test(value) ? value : <code>{value}</code>}
+                </small>
+              ))}
+              {queue.decisionsRead === "ready" && !sharedTiming ? <small>{timings[index]}</small> : null}
               {onSelectDocument && row.evidenceCount > 0 ? (
                 <button
                   type="button"

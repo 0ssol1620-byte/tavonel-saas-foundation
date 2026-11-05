@@ -3312,7 +3312,8 @@ export default function WorkspacePage() {
             <section className="workspace-complete" aria-labelledby="workspace-complete-title">
               <div>
                 <h2 id="workspace-complete-title">
-                  {activeWorld ? "Your Compiled World is ready." : "Your compiled candidate is ready for review."}
+                  {/* Round 3: the state hero above already says "Ready for your review."; this card says what the candidate holds. */}
+                  {activeWorld ? "Your Compiled World is ready." : "What the candidate holds."}
                 </h2>
                 <p>{collectionResult.validation.counts.documents} sources became {collectionResult.validation.counts.entities} entities, {collectionResult.validation.counts.claims} claims, and {collectionResult.validation.counts.relations} evidence-bound relations.</p>
                 {activeWorld ? null : (
@@ -3515,7 +3516,7 @@ export default function WorkspacePage() {
               */}
               <section className="card" aria-labelledby="review-queue-title">
                 <p className="eyebrow">Review queue</p>
-                <h2 id="review-queue-title">Worst first, by the reasons already on the record.</h2>
+                <h2 id="review-queue-title">Sources waiting on you, most at risk first.</h2>
                 <ReviewQueue
                   input={reviewQueueInput}
                   selectedDocumentId={worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)?.sourceId ?? null}

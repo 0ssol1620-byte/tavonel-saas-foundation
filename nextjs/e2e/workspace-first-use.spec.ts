@@ -228,7 +228,7 @@ test.describe("workspace first use — desktop", () => {
     await expect(attention).toBeVisible();
     // Named states, not a colour: both blocked kinds are readable at once.
     await expect(attention.locator("li strong")).toHaveText(["Review required", "Operator action"]);
-    await expect(attention).toContainText("1 review item needs a decision.");
+    await expect(attention).toContainText("1 review reason needs a decision.");
     await expect(attention).toContainText("This source needs review before reading can continue.");
     await expect(page.getByRole("heading", { name: "Ready for your review." })).toBeVisible();
     // §16.2/§16.3: the journey, and only files the export actually writes.

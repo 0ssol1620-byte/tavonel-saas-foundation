@@ -339,7 +339,7 @@ export function deriveAttentionItems(input: WorkspaceStateInput): AttentionItem[
       label: "Review required",
       detail:
         input.reviewCount > 0
-          ? `${input.reviewCount} review item${input.reviewCount === 1 ? "" : "s"} need${input.reviewCount === 1 ? "s" : ""} a decision.`
+          ? `${input.reviewCount} review reason${input.reviewCount === 1 ? "" : "s"} need${input.reviewCount === 1 ? "s" : ""} a decision.`
           : "The compiled candidate requires review before it can become active.",
       action: { label: "Open review", surface: "review" },
     });

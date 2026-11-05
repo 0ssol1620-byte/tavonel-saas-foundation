@@ -208,7 +208,7 @@ describe("attention items", () => {
     }));
     expect(items.map((item) => item.id)).toEqual(["candidate-review", "operator-review", "refused", "compile-failed"]);
     expect(items.map((item) => item.label)).toEqual(["Review required", "Operator action", "Refused", "Failed"]);
-    expect(items[0].detail).toBe("1 review item needs a decision.");
+    expect(items[0].detail).toBe("1 review reason needs a decision.");
     expect(items[1].detail).toBe("2 sources need review before reading can continue.");
     expect(items[3].detail).toContain("COMPILE_CORE_UNAVAILABLE");
   });
