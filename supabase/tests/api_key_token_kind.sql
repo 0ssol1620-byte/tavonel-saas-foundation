@@ -49,8 +49,7 @@ $$;
 
 -- 1-5: shape and the client boundary.
 select col_not_null('public', 'foundation_api_keys', 'token_kind', 'every key has a kind');
-select hasnt_function('public', 'create_foundation_api_key_authorized',
-  array['text', 'text', 'text', 'text', 'text[]', 'timestamp with time zone', 'uuid', 'bigint'],
+select ok(to_regprocedure('public.create_foundation_api_key_authorized(text, text, text, text, text[], timestamptz, uuid, bigint)') is null,
   'the eight-argument create is gone, so PostgREST has one candidate to resolve');
 select ok(has_function_privilege('service_role',
   'public.create_foundation_api_key_authorized(text, text, text, text, text[], timestamptz, uuid, bigint, text)', 'EXECUTE'),
