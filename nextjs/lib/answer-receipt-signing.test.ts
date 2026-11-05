@@ -37,7 +37,7 @@ vi.mock("@/lib/retrieval-pipeline", async (importOriginal) => ({
 }));
 
 import { POST as ask } from "../app/api/collections/[id]/ask/route";
-import { applyAnswerReceipt, readAnswerReceiptMode, readAnswerReceiptSigner } from "./answer-receipt-signing";
+import { applyAnswerReceipt, readAnswerReceiptMode, readAnswerReceiptSigner, signAnswerReceipt } from "./answer-receipt-signing";
 import { buildContextPacket } from "./context-packet";
 import { readExportSignerEnv } from "./export-signing";
 import { signCompileReceipt } from "./compile-receipt-signing";
@@ -52,14 +52,14 @@ const verifier = resolve(import.meta.dirname, "../public/developer/tavonel-verif
 const scratch = mkdtempSync(join(tmpdir(), "tavonel-answer-receipt-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
-function keyEnv(keyId = "foundation-answers-2026") {
+function keyEnv(keyId = "foundation-answers-2026", lifecycle: { status?: string; expiresAt?: string } = {}) {
   const pair = generateKeyPairSync("ed25519");
   const spki = createPublicKey(pair.privateKey).export({ format: "der", type: "spki" });
   const trust = {
     schemaVersion: "tavonel.export_trust.v2", minimumSignatureVersion: 2, activeKeyId: keyId,
     keys: [{
-      keyId, keyVersion: 1, algorithm: "Ed25519", status: "active",
-      notBefore: "2026-01-01T00:00:00.000Z", expiresAt: "2030-01-01T00:00:00.000Z",
+      keyId, keyVersion: 1, algorithm: "Ed25519", status: lifecycle.status ?? "active",
+      notBefore: "2026-01-01T00:00:00.000Z", expiresAt: lifecycle.expiresAt ?? "2030-01-01T00:00:00.000Z",
       publicKeySpkiDerBase64: spki.toString("base64"),
       publicKeySpkiSha256: `sha256:${createHash("sha256").update(spki).digest("hex")}`,
     }],
@@ -102,7 +102,7 @@ function stubKey(env: Record<string, string>) {
 beforeEach(() => {
   vi.clearAllMocks();
   resetWorkspaceCostGuard();
-  vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", WORKSPACE);
+  vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", WORKSPACE);
   sourceIds.mockResolvedValue({ ok: true, documentIds: ["source-fixture"] });
   sourceAccess.mockResolvedValue({ ok: true });
   revalidate.mockImplementation(async (_request, expected) => ({ ok: true, principal: expected }));
@@ -212,10 +212,23 @@ describe("on, inside the canary cohort", () => {
     expect([v1.status, await v1.json()]).toEqual([503, { code: "ANSWER_SIGNING_UNAVAILABLE" }]);
   });
 
+  it("on with a cohort that cannot be read refuses (503), never answers unsigned (R1 M3)", async () => {
+    stubKey(KEY.env);
+    vi.stubEnv("TAVONEL_ASK_RECEIPT_SIGNED", "on");
+    for (const cohort of [undefined, "", "pilot-a,", `${WORKSPACE},pilot-b,pilot-c,pilot-d`]) {
+      vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", cohort as string);
+      expect(applyAnswerReceipt({ workspaceKey: WORKSPACE, collectionId: COLLECTION, question: QUESTION, body: { code: "X" } }), String(cohort))
+        .toEqual({ ok: false, code: "REMOTE_MCP_COHORT_CONFIG_INVALID" });
+    }
+    vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", undefined as unknown as string);
+    const response = await ask(request(), { params });
+    expect([response.status, await response.json()]).toEqual([503, { code: "REMOTE_MCP_COHORT_CONFIG_INVALID" }]);
+  });
+
   it("outside the cohort, on behaves as shadow", async () => {
     stubKey(KEY.env);
     vi.stubEnv("TAVONEL_ASK_RECEIPT_SIGNED", "on");
-    vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", "pilot-other");
+    vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", "pilot-other");
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
     try {
       expect(applyAnswerReceipt({ workspaceKey: WORKSPACE, collectionId: COLLECTION, question: QUESTION, body: { code: "X" } }))
@@ -236,8 +249,11 @@ describe("the published verifier refuses what it must", () => {
     const forged = verify(body, [], OTHER.trust);
     expect(forged.status).toBe(1);
     expect(forged.stderr).toContain("lifecycle policy");
-    const fingerprint = spawnSync(process.execPath, [verifier, "--receipt", file("r.json", body), "--trusted-fingerprint", OTHER.trust.keys[0]!.publicKeySpkiSha256], { encoding: "utf8" });
-    expect(fingerprint.status).toBe(1);
+    // A fingerprint alone cannot see revocation, so it is not accepted as the trust anchor (R1 M7).
+    const fingerprintOnly = spawnSync(process.execPath, [verifier, "--receipt", file("r.json", body), "--trusted-fingerprint", KEY.trust.keys[0]!.publicKeySpkiSha256], { encoding: "utf8" });
+    expect([fingerprintOnly.status, fingerprintOnly.stderr]).toEqual([1, expect.stringContaining("usage")]);
+    expect(verify(body, ["--trusted-fingerprint", KEY.trust.keys[0]!.publicKeySpkiSha256]).status).toBe(0);
+    expect(verify(body, ["--trusted-fingerprint", OTHER.trust.keys[0]!.publicKeySpkiSha256]).stderr).toContain("trusted fingerprint");
     // A receipt re-signed with another key but keeping the trusted key's identity fields.
     const otherSigner = readAnswerReceiptSigner(OTHER.env)!;
     const resigned = otherSigner.signPayload(Buffer.from(body.signedReceipt.payloadJson, "utf8"));
@@ -269,5 +285,50 @@ describe("the published verifier refuses what it must", () => {
     expect(verify({ ...body, signedReceipt: { ...body.signedReceipt, signature: crossScope } }).stderr).toContain("scope");
     expect(verify({ ...body, signedReceipt: { ...body.signedReceipt, signature: { ...body.signedReceipt.signature, schemaVersion: "tavonel.export_signature.v1" } } }).status).toBe(1);
     expect(verify({ payloadJson: "{}", signature: null }).status).toBe(1);
+  });
+});
+
+describe("the verifier's key lifecycle policy (review R1 M7)", () => {
+  const DAY = 86_400_000;
+  async function signedBody() {
+    stubKey(KEY.env);
+    vi.stubEnv("TAVONEL_ASK_RECEIPT_SIGNED", "on");
+    return (await ask(request(), { params })).json();
+  }
+  /** The body's receipt signed again at `at` with `env`'s key, the payload's issuedAt set to `at` and then `edit`ed. */
+  function resign(body: { signedReceipt: { payloadJson: string } }, env: Record<string, string>, at: Date, edit = (payload: Record<string, unknown>) => payload) {
+    const payload = edit({ ...JSON.parse(body.signedReceipt.payloadJson), issuedAt: at.toISOString() });
+    const signer = readAnswerReceiptSigner(env, at);
+    expect(signer).not.toBeNull();
+    return { ...body, signedReceipt: signAnswerReceipt(signer!, payload as never)! };
+  }
+
+  it("B: a key that expired after signing still verifies the receipt it signed inside its window", async () => {
+    const lapsed = keyEnv("foundation-answers-lapsed", { expiresAt: new Date(Date.now() - DAY).toISOString() });
+    const body = resign(await signedBody(), lapsed.env, new Date(Date.now() - 10 * DAY));
+    expect(verify(body, [], lapsed.trust).status).toBe(0);
+  });
+
+  it("C: refuses a payload issuedAt that is not the signing time", async () => {
+    const body = resign(await signedBody(), KEY.env, new Date(), (payload) => ({ ...payload, issuedAt: "2026-02-01T00:00:00.000Z" }));
+    expect(verify(body).stderr).toContain("not the signing time");
+  });
+
+  it("D: refuses a signing time in the future", async () => {
+    const body = resign(await signedBody(), KEY.env, new Date(Date.now() + 200 * DAY));
+    expect(verify(body).stderr).toContain("in the future");
+  });
+
+  it("F: refuses a revoked key, with or without a fingerprint pin", async () => {
+    const body = await signedBody();
+    const revoked = { ...KEY.trust, keys: [{ ...KEY.trust.keys[0]!, status: "revoked" }] };
+    expect(verify(body, [], revoked).stderr).toContain("lifecycle policy");
+    expect(verify(body, ["--trusted-fingerprint", KEY.trust.keys[0]!.publicKeySpkiSha256], revoked).stderr).toContain("lifecycle policy");
+  });
+
+  it("G: refuses a key status it does not know, and accepts retired", async () => {
+    const body = await signedBody();
+    expect(verify(body, [], { ...KEY.trust, keys: [{ ...KEY.trust.keys[0]!, status: "pending" }] }).stderr).toContain("lifecycle policy");
+    expect(verify(body, [], { ...KEY.trust, keys: [{ ...KEY.trust.keys[0]!, status: "retired" }] }).status).toBe(0);
   });
 });

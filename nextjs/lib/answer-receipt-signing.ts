@@ -5,7 +5,7 @@ import {
   type ExportSignatureV2,
   type ExportSigner,
 } from "./export-signing";
-import { canaryCohortRefusal } from "./processing-workspace-grant";
+import { remoteMcpCohortRefusal } from "./remote-mcp";
 
 /*
   W1-A5 (PROGRAM-2026-11-04 §4.A "A5"): a signed answer receipt.
@@ -117,7 +117,7 @@ export function signAnswerReceipt(signer: ExportSigner, payload: AnswerReceiptPa
 
 export type AnswerSigningOutcome =
   | { ok: true; body: Record<string, unknown> }
-  | { ok: false; code: "ANSWER_SIGNING_UNAVAILABLE" | "ANSWER_RECEIPT_MODE_INVALID" };
+  | { ok: false; code: "ANSWER_SIGNING_UNAVAILABLE" | "ANSWER_RECEIPT_MODE_INVALID" | "REMOTE_MCP_COHORT_CONFIG_INVALID" };
 
 /**
  * What the Ask route does with a 200 answer body. Pure but for the log line it writes in shadow;
@@ -135,7 +135,13 @@ export function applyAnswerReceipt(input: {
   const mode = readAnswerReceiptMode(env);
   if (mode === null) return { ok: false, code: "ANSWER_RECEIPT_MODE_INVALID" };
   if (mode === "off") return { ok: true, body: input.body };
-  const live = mode === "on" && canaryCohortRefusal(input.workspaceKey, env) === null;
+  /*
+    `on` signs inside the W1 canary cohort (TAVONEL_REMOTE_MCP_COHORT) and behaves as shadow outside
+    it. A cohort that cannot be read is not "outside": it refuses, never answers unsigned (R1 M3).
+  */
+  const cohort = mode === "on" ? remoteMcpCohortRefusal(input.workspaceKey, env) : "REMOTE_MCP_COHORT_EXCLUDED";
+  if (cohort === "REMOTE_MCP_COHORT_CONFIG_INVALID") return { ok: false, code: cohort };
+  const live = cohort === null;
   const started = performance.now();
   const now = input.now ?? new Date();
   const signer = readAnswerReceiptSigner(env, now);

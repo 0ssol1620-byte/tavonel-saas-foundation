@@ -1915,10 +1915,14 @@ export async function GET(request: Request) {
       authorization: "OAuth 2.1 authorization code with PKCE S256 and RFC 8707 resource; RFC 9728 metadata at /.well-known/oauth-protected-resource/api/mcp, RFC 8414 at /.well-known/oauth-authorization-server, RFC 7591 registration for public clients. Access tokens last 3600 s; no refresh token is issued.",
       availability: "Every path answers 404 while the deployment's remote MCP switch is off. While on, only workspaces in the pilot cohort can consent, obtain a token or call a tool.",
       statuses: {
-        "401": "No token on tools/call (AUTH_REQUIRED), or a token that is unknown, expired, revoked or carries a write scope (AUTH_INVALID, WWW-Authenticate error=invalid_token).",
+        "202": "A notification or a response from the client: accepted, no body.",
+        "400": "MCP_PROTOCOL_VERSION_UNSUPPORTED (an MCP-Protocol-Version other than 2025-06-18 or 2025-03-26), Parse error, or Invalid Request (not one JSON-RPC 2.0 message).",
+        "401": "No token on tools/call (AUTH_REQUIRED), or a token that is unknown, expired, revoked or carries a write scope (AUTH_INVALID, WWW-Authenticate error=invalid_token). The token (tvnl_mcp_) is accepted here only; the REST API answers it with 401 API_KEY_AUDIENCE_INVALID.",
         "402": "TRIAL_FEATURE_NOT_INCLUDED at consent: a free evaluation cannot hold the key a token is.",
-        "403": "PROCESSING_COHORT_EXCLUDED (the workspace is not in the pilot cohort), API_SCOPE_REQUIRED (insufficient_scope, with the scope named), or MCP_ORIGIN_REFUSED (a browser Origin other than this one).",
-        "503": "PROCESSING_COHORT_CONFIG_INVALID or REMOTE_MCP_NOT_CONFIGURED: the deployment cannot decide who is admitted, so nobody is.",
+        "403": "REMOTE_MCP_COHORT_EXCLUDED (the workspace is not in the pilot cohort), API_SCOPE_REQUIRED (insufficient_scope, with the scope named), or MCP_ORIGIN_REFUSED (a browser Origin other than this one).",
+        "405": "GET and DELETE: no server-initiated stream and no session.",
+        "413": "REQUEST_TOO_LARGE: a message over 64 KiB.",
+        "503": "REMOTE_MCP_COHORT_CONFIG_INVALID or REMOTE_MCP_NOT_CONFIGURED: the deployment cannot decide who is admitted, so nobody is.",
       },
     },
   };

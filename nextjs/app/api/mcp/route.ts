@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { TOOLS, assertReadOnly, createClient, createServer } from "@/public/developer/tavonel-mcp.mjs";
@@ -11,10 +12,10 @@ import {
   remoteMcpCohortRefusal,
   remoteMcpToolLabel,
   toolFailureCode,
-  toolUpstreamStatus,
   remoteMcpEnabled,
   requestOrigin,
 } from "@/lib/remote-mcp";
+import { withinRemoteMcpDispatch } from "@/lib/remote-mcp-dispatch";
 import { GET as listSources } from "../v1/documents/route";
 import { GET as listWorlds } from "../v1/collections/route";
 import { GET as getWorld } from "../v1/world/[id]/route";
@@ -44,8 +45,22 @@ const params = <T,>(value: T) => ({ params: Promise.resolve(value) });
  *
  * Closed set: exactly the seven requests the bridge's table makes. Anything else is refused, so
  * the dispatcher is a second read-only gate behind `assertReadOnly`.
+ *
+ * Runs inside the remote MCP dispatch context, the only place a `tvnl_mcp_` token authenticates
+ * (review R1 M1). A handler that throws is a 500 with a constant code and a request id, never the
+ * exception's text: the text would otherwise reach the client's model as a tool result (R1 M2).
  */
 async function dispatch(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await withinRemoteMcpDispatch(() => route(url, init));
+  } catch (error) {
+    const requestId = randomUUID();
+    console.error(JSON.stringify({ event: "remote_mcp_dispatch_threw", requestId, error: error instanceof Error ? error.name : "unknown" }));
+    return NextResponse.json({ code: "REMOTE_MCP_INTERNAL_ERROR", requestId }, { status: 500, headers: NO_STORE });
+  }
+}
+
+async function route(url: string, init: RequestInit): Promise<Response> {
   const { pathname } = new URL(url);
   const request = new Request(url, init);
   const method = request.method;
@@ -69,18 +84,26 @@ function rpcError(status: number, id: unknown, code: number, message: string, he
 /*
   Telemetry (W1-A1): one SLI line per POST (status and duration; the 5xx ratio's denominator is
   every POST, see summarizeRemoteMcpSli), and for tools/call the funnel pair mcp_tool_called (the
-  tool ran) and mcp_tool_failed (the call was refused or the tool's result is an error), each
-  carrying only the tool's name from the closed table and the refusal's constant code.
+  call was answered with a result, an error result included: attempts, not successes) and
+  mcp_tool_failed (the call was refused or the tool's result is an error), each carrying only the
+  tool's name from the closed table and the refusal's constant code.
+
+  A failed tool travels inside a 200 JSON-RPC result, so the SLI also carries the worst status of
+  the /api/v1 routes the call reached (`reached`, the same record W1-A3 reads): a route's 5xx --
+  a thrown handler, an unreadable body -- counts as a 5xx whatever the result text says.
 */
+type Seen = { method: string | null; tool: string | null; reached: { pathname: string; status: number }[] };
+const worstReached = (seen: Seen) => (seen.reached.length === 0 ? null : Math.max(...seen.reached.map((entry) => entry.status)));
+
 export async function POST(request: Request) {
   if (!remoteMcpEnabled()) return new NextResponse(null, { status: 404 });
   const started = performance.now();
-  const seen: { method: string | null; tool: string | null } = { method: null, tool: null };
+  const seen: Seen = { method: null, tool: null, reached: [] };
   let response: Response;
   try {
     response = await answer(request, seen);
   } catch (error) {
-    recordRemoteMcpSli({ method: seen.method, tool: seen.tool, status: 500, durationMs: performance.now() - started });
+    recordRemoteMcpSli({ method: seen.method, tool: seen.tool, status: 500, upstreamStatus: worstReached(seen), durationMs: performance.now() - started });
     throw error;
   }
   const durationMs = performance.now() - started;
@@ -90,8 +113,7 @@ export async function POST(request: Request) {
     const tool = remoteMcpToolLabel(seen.tool);
     const body = await response.clone().json().catch(() => null) as
       { error?: { message?: unknown }; result?: { isError?: unknown; content?: Array<{ text?: unknown }> } } | null;
-    const upstreamStatus = body?.result?.isError === true ? toolUpstreamStatus(body.result.content?.[0]?.text) : null;
-    recordRemoteMcpSli({ method: seen.method, tool: seen.tool, status: response.status, upstreamStatus, durationMs });
+    recordRemoteMcpSli({ method: seen.method, tool: seen.tool, status: response.status, upstreamStatus: worstReached(seen), durationMs });
     if (response.status === 200 && body?.result) recordServerFunnel("mcp_tool_called", { tool });
     const failure = response.status !== 200
       ? toolFailureCode(body?.error?.message)
@@ -101,7 +123,7 @@ export async function POST(request: Request) {
   return response;
 }
 
-async function answer(request: Request, seen: { method: string | null; tool: string | null }) {
+async function answer(request: Request, seen: Seen) {
   const origin = requestOrigin(request);
   // Streamable HTTP: servers MUST validate Origin. Server-side clients send none.
   const from = request.headers.get("origin");
@@ -152,10 +174,29 @@ async function answer(request: Request, seen: { method: string | null; tool: str
     }
   }
 
+  const tracked = async (url: string, init: RequestInit) => {
+    const response = await dispatch(url, init);
+    seen.reached.push({ pathname: new URL(url).pathname, status: response.status });
+    return response;
+  };
   const handle = createServer({
-    call: createClient({ baseUrl: origin, apiKey: bearer.kind === "principal" ? bearer.token : "", fetcher: dispatch as typeof fetch }),
+    call: createClient({ baseUrl: origin, apiKey: bearer.kind === "principal" ? bearer.token : "", fetcher: tracked as typeof fetch }),
   });
-  return NextResponse.json(await handle(message), { headers: NO_STORE });
+  return NextResponse.json(constantToolErrors(await handle(message)), { headers: NO_STORE });
+}
+
+/**
+ * A tool error result leaves this server as the bridge's constant code (`API_ERROR_500: ...`,
+ * `INPUT_INVALID: ...`), or as REMOTE_MCP_INTERNAL_ERROR when the text is anything else -- an
+ * exception's own message from inside the bridge, which may quote data or code (R1 M2).
+ */
+function constantToolErrors(answered: unknown) {
+  const result = (answered as { result?: { isError?: unknown; content?: Array<{ type?: unknown; text?: unknown }> } } | null)?.result;
+  if (result?.isError !== true) return answered;
+  const text = result.content?.[0]?.text;
+  if (typeof text === "string" && /^[A-Z][A-Z0-9_]{2,}(?::|$)/.test(text)) return answered;
+  console.error(JSON.stringify({ event: "remote_mcp_tool_error_redacted" }));
+  return { ...(answered as object), result: { ...result, content: [{ type: "text", text: "REMOTE_MCP_INTERNAL_ERROR" }] } };
 }
 
 /* The JSON response form only: no server-initiated SSE stream (Streamable HTTP allows 405). */

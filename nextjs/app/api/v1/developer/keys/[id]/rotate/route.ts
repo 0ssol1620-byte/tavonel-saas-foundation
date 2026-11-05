@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireFoundationSession } from "@/lib/developer-auth";
 import { parseDeveloperScopes } from "@/lib/developer-contracts";
 import { rotateDeveloperApiKey } from "@/lib/developer-store";
+import { reservedKeyName } from "@/lib/remote-mcp";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -25,7 +26,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const scopes = parseDeveloperScopes(body.scopes);
   const expiresInDays = body.expiresInDays === null || body.expiresInDays === undefined ? null : Number(body.expiresInDays);
-  if (!name || name.length > 80 || !scopes || (expiresInDays !== null && (!Number.isSafeInteger(expiresInDays) || expiresInDays < 1 || expiresInDays > 365))) {
+  if (!name || name.length > 80 || reservedKeyName(name) || !scopes || (expiresInDays !== null && (!Number.isSafeInteger(expiresInDays) || expiresInDays < 1 || expiresInDays > 365))) {
     return NextResponse.json({ code: "API_KEY_INPUT_INVALID" }, { status: 400, headers: HEADERS });
   }
   const result = await rotateDeveloperApiKey({

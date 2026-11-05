@@ -41,12 +41,13 @@ export default function DeveloperPanel() {
       return;
     }
     const response = await fetch("/api/developer/keys", { headers: { authorization: `Bearer ${token}` } });
-    const json = await response.json() as { code?: string; keys?: ApiKey[] };
+    const json = await response.json() as { code?: string; keys?: ApiKey[]; remoteMcpKeys?: ApiKey[] };
     if (!response.ok || !Array.isArray(json.keys)) {
       setNotice(`API keys could not be read. ${failureSentence(json.code, response.status)}`);
       return;
     }
-    setKeys(json.keys);
+    // Live remote MCP keys first, read apart from the hand-made ones so neither crowds the other out.
+    setKeys([...(json.remoteMcpKeys ?? []), ...json.keys]);
     setNotice(json.keys.length > 0 ? `${json.keys.filter((key) => !key.revokedAt).length} active key(s).` : "No API key has been issued.");
   };
 
@@ -159,7 +160,7 @@ export default function DeveloperPanel() {
             {keys?.map((key) => (
               <article key={key.keyId} data-revoked={key.revokedAt ? "true" : "false"}>
                 <KeyRound size={16} aria-hidden="true" />
-                <div><strong>{key.name}</strong><small>tvnl_live_{key.prefix}_... · {key.scopes.join(" · ")}</small><small>{key.revokedAt ? "Revoked" : key.expiresAt ? `Expires ${new Intl.DateTimeFormat().format(new Date(key.expiresAt))}` : "No expiry"}{key.lastUsedAt ? ` · last used ${new Intl.DateTimeFormat().format(new Date(key.lastUsedAt))}` : " · never used"}</small></div>
+                <div><strong>{key.name}</strong><small>{key.name.startsWith("MCP: ") ? `tvnl_mcp_${key.prefix}_... · remote MCP connection` : `tvnl_live_${key.prefix}_...`} · {key.scopes.join(" · ")}</small><small>{key.revokedAt ? "Revoked" : key.expiresAt ? `Expires ${new Intl.DateTimeFormat().format(new Date(key.expiresAt))}` : "No expiry"}{key.lastUsedAt ? ` · last used ${new Intl.DateTimeFormat().format(new Date(key.lastUsedAt))}` : " · never used"}</small></div>
                 {!key.revokedAt ? <button type="button" className="icon-action" disabled={busy} onClick={() => void revoke(key)} aria-label={`Revoke ${key.name}`}><Trash2 size={15} /></button> : null}
               </article>
             ))}

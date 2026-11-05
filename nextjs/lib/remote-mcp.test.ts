@@ -33,14 +33,19 @@ const mocks = vi.hoisted(() => ({
   readModel: vi.fn(),
   loadCandidate: vi.fn(),
   signerEnv: vi.fn(),
+  sessionProduct: vi.fn(),
 }));
 
 vi.mock("@/lib/developer-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./developer-store")>()),
   authenticateDeveloperApiKey: mocks.authenticateKey,
   createDeveloperApiKey: mocks.createKey,
-  listDeveloperApiKeys: mocks.listKeys,
+  listRecentRemoteMcpKeys: mocks.listKeys,
   revokeDeveloperApiKey: mocks.revokeKey,
+}));
+vi.mock("@/lib/self-service-trial", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./self-service-trial")>()),
+  authorizeFoundationSessionProduct: mocks.sessionProduct,
 }));
 vi.mock("@/lib/developer-auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./developer-auth")>()),
@@ -73,7 +78,9 @@ import { GET as protectedResource } from "../app/.well-known/oauth-protected-res
 import { GET as authorizationServer } from "../app/.well-known/oauth-authorization-server/route";
 import OAuthAuthorizeLayout from "../app/oauth/authorize/layout";
 import { TOOLS } from "../public/developer/tavonel-mcp.mjs";
-import { REMOTE_MCP_SCOPES, REMOTE_MCP_TOOL_SCOPES, requestOrigin, summarizeRemoteMcpSli, toolFailureCode, toolUpstreamStatus } from "./remote-mcp";
+import { REMOTE_MCP_SCOPES, REMOTE_MCP_TOOL_SCOPES, requestOrigin, summarizeRemoteMcpSli, toolFailureCode } from "./remote-mcp";
+import { POST as createKeyRoute } from "../app/api/developer/keys/route";
+import { insideRemoteMcpDispatch } from "./remote-mcp-dispatch";
 
 const VERIFIER = "remote-mcp-pkce-verifier-0123456789-abcdefghij";
 const CHALLENGE = createHash("sha256").update(VERIFIER).digest("base64url");
@@ -132,12 +139,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("TAVONEL_REMOTE_MCP_ENABLED", "true");
   vi.stubEnv("TAVONEL_REMOTE_MCP_SIGNING_SECRET", "remote-mcp-unit-test-sealing-secret-value");
-  // A1.0: the remote MCP is a canary of the processing cohort; both test workspaces are in it.
-  vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", `${MINE},pilot-beta`);
+  // A1.0: the remote MCP canary cohort (TAVONEL_REMOTE_MCP_COHORT); both test workspaces are in it.
+  vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", `${MINE},pilot-beta`);
   mocks.authenticateKey.mockResolvedValue(keyPrincipal(READ_SCOPES));
   mocks.authorize.mockResolvedValue({ ok: true, principal: { kind: "api-key", keyId: "key-1", workspaceKey: MINE, userId: USER, scopes: READ_SCOPES, authorizationRevision: 4, workspaceRole: "owner" } });
   mocks.listKeys.mockResolvedValue({ ok: true, keys: [] });
-  mocks.createKey.mockResolvedValue({ ok: true, key: { keyId: "key-9" }, token: "tvnl_live_minted" });
+  mocks.createKey.mockResolvedValue({ ok: true, key: { keyId: "key-9" }, token: "tvnl_mcp_minted" });
+  mocks.sessionProduct.mockResolvedValue({ ok: true, access: { source: "paid", accessPlan: "studio_access", billingExempt: false, expiresAt: null } });
   mocks.revokeKey.mockResolvedValue({ ok: true });
   mocks.activeWorld.mockResolvedValue({ ok: false, code: "ACTIVE_WORLD_NOT_FOUND" });
   mocks.readModel.mockResolvedValue({ ok: false, code: "WORLD_NOT_FOUND", status: 404 });
@@ -494,10 +502,10 @@ describe("token exchange", () => {
     const response = await exchange({ grant_type: "authorization_code", code, client_id: clientId, redirect_uri: REDIRECT, code_verifier: VERIFIER, resource: `${ORIGIN}/api/mcp` });
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(await response.json()).toEqual({ access_token: "tvnl_live_minted", token_type: "Bearer", expires_in: 3600, scope: READ_SCOPES.join(" ") });
+    expect(await response.json()).toEqual({ access_token: "tvnl_mcp_minted", token_type: "Bearer", expires_in: 3600, scope: READ_SCOPES.join(" ") });
     const minted = mocks.createKey.mock.calls[0]![0];
-    expect(minted).toMatchObject({ workspaceKey: MINE, userId: USER, authorizationRevision: 4, scopes: READ_SCOPES });
-    expect(minted.name).toMatch(/^MCP: Example agent #[A-Za-z0-9_-]{22}$/);
+    expect(minted).toMatchObject({ workspaceKey: MINE, userId: USER, authorizationRevision: 4, scopes: READ_SCOPES, audience: "mcp" });
+    expect(minted.name).toMatch(/^MCP: Example agent ~[0-9a-f]{12} #[A-Za-z0-9_-]{22}$/);
     expect(Date.parse(minted.expiresAt) - before).toBeGreaterThanOrEqual(3_599_000);
     expect(Date.parse(minted.expiresAt) - before).toBeLessThanOrEqual(3_601_000);
   });
@@ -556,32 +564,32 @@ describe("token exchange", () => {
 describe("A1.0: the processing cohort gates every token and every call", () => {
   const args = { collectionId: THEIR_COLLECTION };
 
-  it("refuses to mint a token for a workspace outside the cohort, with 403 PROCESSING_COHORT_EXCLUDED", async () => {
+  it("refuses to mint a token for a workspace outside the cohort, with 403 REMOTE_MCP_COHORT_EXCLUDED", async () => {
     const clientId = await registeredClient();
     const code = await approvedCode(clientId);
-    vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", "pilot-beta");
+    vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", "pilot-beta");
     const response = await exchange({ grant_type: "authorization_code", code, client_id: clientId, code_verifier: VERIFIER });
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: "access_denied", error_description: "PROCESSING_COHORT_EXCLUDED", code: "PROCESSING_COHORT_EXCLUDED" });
+    expect(await response.json()).toEqual({ error: "access_denied", error_description: "REMOTE_MCP_COHORT_EXCLUDED", code: "REMOTE_MCP_COHORT_EXCLUDED" });
     expect(mocks.createKey).not.toHaveBeenCalled();
     expect(mocks.listKeys).not.toHaveBeenCalled();
   });
 
   it("refuses consent for a workspace outside the cohort before any code exists", async () => {
     const clientId = await registeredClient();
-    vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", "pilot-beta");
+    vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", "pilot-beta");
     mocks.session.mockResolvedValueOnce({ ok: true, principal: { kind: "session", workspaceKey: MINE, userId: USER, scopes: [], accessSource: "paid", authorizationRevision: 4, workspaceRole: "owner" } });
     const response = await consent("approve", authorizationRequest(clientId), "supabase-session");
     const body = await response.json();
-    expect([response.status, body.code]).toEqual([403, "PROCESSING_COHORT_EXCLUDED"]);
+    expect([response.status, body.code]).toEqual([403, "REMOTE_MCP_COHORT_EXCLUDED"]);
     expect(body).not.toHaveProperty("redirectTo");
   });
 
   it("refuses a live token's call once its workspace is outside the cohort, before any route runs", async () => {
-    vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", "pilot-beta");
+    vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", "pilot-beta");
     const response = await call("get_world", args, "tvnl_live_mine");
     expect(response.status).toBe(403);
-    expect((await response.json()).error).toEqual({ code: -32001, message: "PROCESSING_COHORT_EXCLUDED" });
+    expect((await response.json()).error).toEqual({ code: -32001, message: "REMOTE_MCP_COHORT_EXCLUDED" });
     expect(mocks.authorize).not.toHaveBeenCalled();
     // Discovery without a token names no workspace, so it stays open.
     expect((await rpc({ jsonrpc: "2.0", id: 1, method: "tools/list" })).status).toBe(200);
@@ -591,13 +599,13 @@ describe("A1.0: the processing cohort gates every token and every call", () => {
     const clientId = await registeredClient();
     for (const value of [undefined, "", " ", "pilot-*", "pilot-alpha,", "pilot-alpha;pilot-beta", "pilot-alpha,pilot-b,pilot-c,pilot-d"]) {
       const code = await approvedCodeUnder(clientId);
-      if (value === undefined) vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", undefined as unknown as string);
-      else vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", value);
+      if (value === undefined) vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", undefined as unknown as string);
+      else vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", value);
       const minted = await exchange({ grant_type: "authorization_code", code, client_id: clientId, code_verifier: VERIFIER });
-      expect([minted.status, (await minted.json()).code], String(value)).toEqual([503, "PROCESSING_COHORT_CONFIG_INVALID"]);
+      expect([minted.status, (await minted.json()).code], String(value)).toEqual([503, "REMOTE_MCP_COHORT_CONFIG_INVALID"]);
       const called = await call("get_world", args, "tvnl_live_mine");
-      expect([called.status, (await called.json()).error.message], String(value)).toEqual([503, "PROCESSING_COHORT_CONFIG_INVALID"]);
-      vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", `${MINE},pilot-beta`);
+      expect([called.status, (await called.json()).error.message], String(value)).toEqual([503, "REMOTE_MCP_COHORT_CONFIG_INVALID"]);
+      vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", `${MINE},pilot-beta`);
     }
     expect(mocks.createKey).not.toHaveBeenCalled();
     expect(mocks.authorize).not.toHaveBeenCalled();
@@ -636,7 +644,7 @@ describe("A1.0: the processing cohort gates every token and every call", () => {
 
 /** A code minted while the default cohort is in force, whatever a test sets afterwards. */
 async function approvedCodeUnder(clientId: string) {
-  vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", `${MINE},pilot-beta`);
+  vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", `${MINE},pilot-beta`);
   return approvedCode(clientId);
 }
 
@@ -673,7 +681,7 @@ describe("telemetry: funnel events and the SLI line carry no identifier", () => 
       ]);
       const sli = recorded.filter((line) => "sli" in line);
       expect(sli.map((line) => [line.method, line.tool, line.status, line.upstreamStatus])).toEqual([
-        ["tools/call", "list_worlds", 200, null], ["tools/call", "get_world", 200, 404], ["tools/call", "get_world", 401, null], ["tools/call", "unknown", 200, null],
+        ["tools/call", "list_worlds", 200, 200], ["tools/call", "get_world", 200, 404], ["tools/call", "get_world", 401, null], ["tools/call", "unknown", 200, null],
       ]);
       for (const line of sli) expect(typeof line.durationMs).toBe("number");
       expect(JSON.stringify(recorded)).not.toContain(THEIR_COLLECTION);
@@ -691,6 +699,99 @@ describe("telemetry: funnel events and the SLI line carry no identifier", () => 
     const records = Array.from({ length: 20 }, (_, index) => ({ status: index === 0 ? 503 : 200, upstreamStatus: index === 1 ? 503 : index === 2 ? 404 : null, durationMs: index + 1 }));
     // One HTTP 5xx and one tool whose route answered 503 inside a 200: two of twenty. A 404 is not a 5xx.
     expect(summarizeRemoteMcpSli(records)).toEqual({ calls: 20, p50Ms: 10, p95Ms: 19, http5xx: 1, server5xx: 2, server5xxRatio: 0.1 });
-    expect([toolUpstreamStatus("API_ERROR_503: SIGNER_NOT_CONFIGURED"), toolUpstreamStatus("API_ERROR_404"), toolUpstreamStatus("TOOL_NOT_FOUND: x")]).toEqual([503, 404, null]);
+  });
+});
+
+describe("review R1: audience, failures, cohort, key churn, trial", () => {
+  it("M1: dispatches every tool to its /api/v1 handler inside the remote MCP context, and nothing outside it", async () => {
+    const contexts: boolean[] = [];
+    mocks.authorize.mockImplementation(async () => {
+      contexts.push(insideRemoteMcpDispatch());
+      return { ok: true, principal: { kind: "api-key", keyId: "key-1", workspaceKey: MINE, userId: USER, scopes: READ_SCOPES, authorizationRevision: 4, workspaceRole: "owner" } };
+    });
+    mocks.listWorlds.mockResolvedValueOnce({ ok: true, worlds: [], nextCursor: null });
+    await call("list_worlds", {}, "tvnl_mcp_mine");
+    expect(contexts).toEqual([true]);
+    expect(insideRemoteMcpDispatch()).toBe(false);
+  });
+
+  it("M1: with the switch off or the workspace out of the cohort, a tvnl_mcp_ token is refused at /api/mcp (the REST API refuses it always: remote-mcp-r1.test.ts)", async () => {
+    vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", "pilot-beta");
+    const out = await call("list_worlds", {}, "tvnl_mcp_mine");
+    expect([out.status, (await out.json()).error.message]).toEqual([403, "REMOTE_MCP_COHORT_EXCLUDED"]);
+    vi.stubEnv("TAVONEL_REMOTE_MCP_ENABLED", "false");
+    expect((await call("list_worlds", {}, "tvnl_mcp_mine")).status).toBe(404);
+    expect(mocks.authorize).not.toHaveBeenCalled();
+  });
+
+  it("M2: a handler that throws is a 5xx in the SLI and a constant code to the client, never the exception's text", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      mocks.authorize.mockRejectedValueOnce(new Error("connection to db-internal.example refused for pilot-alpha"));
+      const response = await call("list_worlds", {}, "tvnl_mcp_mine");
+      const body = await response.json();
+      expect(response.status).toBe(200);
+      expect(body.result).toMatchObject({ isError: true, content: [{ type: "text", text: "API_ERROR_500: REMOTE_MCP_INTERNAL_ERROR" }] });
+      expect(JSON.stringify(body)).not.toContain("db-internal");
+      const sli = info.mock.calls.map(([line]) => JSON.parse(String(line)) as Record<string, unknown>).filter((line) => "sli" in line);
+      expect(sli.map((line) => [line.status, line.upstreamStatus])).toEqual([[200, 500]]);
+      expect(summarizeRemoteMcpSli(sli as never)).toMatchObject({ calls: 1, http5xx: 0, server5xx: 1 });
+      const logged = error.mock.calls.map(([line]) => JSON.parse(String(line)));
+      expect(logged).toEqual([{ event: "remote_mcp_dispatch_threw", requestId: expect.stringMatching(/^[0-9a-f-]{36}$/), error: "Error" }]);
+    } finally { info.mockRestore(); error.mockRestore(); }
+  });
+
+  it("M5: the canary reads TAVONEL_REMOTE_MCP_COHORT, never the processing cohort", async () => {
+    vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", undefined as unknown as string);
+    vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", MINE);
+    const refused = await call("list_worlds", {}, "tvnl_mcp_mine");
+    expect([refused.status, (await refused.json()).error.message]).toEqual([503, "REMOTE_MCP_COHORT_CONFIG_INVALID"]);
+    vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", MINE);
+    vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", "pilot-beta");
+    mocks.listWorlds.mockResolvedValueOnce({ ok: true, worlds: [], nextCursor: null });
+    expect((await (await call("list_worlds", {}, "tvnl_mcp_mine")).json()).result.isError).toBe(false);
+  });
+
+  it("M6: a reconnect revokes the same client's live keys, and no other client's, expired or revoked key", async () => {
+    const clientId = await registeredClient();
+    const otherClient = await registeredClient();
+    const tag = (id: string) => createHash("sha256").update(id).digest("hex").slice(0, 12);
+    const live = new Date(Date.now() + 600_000).toISOString();
+    const gone = new Date(Date.now() - 1_000).toISOString();
+    mocks.listKeys.mockResolvedValueOnce({ ok: true, keys: [
+      { keyId: "same-live", name: `MCP: Example agent ~${tag(clientId)} #a`, expiresAt: live, revokedAt: null },
+      { keyId: "same-expired", name: `MCP: Example agent ~${tag(clientId)} #b`, expiresAt: gone, revokedAt: null },
+      { keyId: "same-revoked", name: `MCP: Example agent ~${tag(clientId)} #c`, expiresAt: live, revokedAt: gone },
+      { keyId: "other-live", name: `MCP: Example agent ~${tag(otherClient)} #d`, expiresAt: live, revokedAt: null },
+    ] });
+    const code = await approvedCode(clientId);
+    const response = await exchange({ grant_type: "authorization_code", code, client_id: clientId, code_verifier: VERIFIER });
+    expect(response.status).toBe(200);
+    expect(mocks.listKeys).toHaveBeenCalledWith(MINE, USER, expect.any(String));
+    expect(mocks.revokeKey.mock.calls.map((args) => args[3])).toEqual(["same-live"]);
+    // The new key is minted before the old one goes, so a failed revoke never leaves the client without a key.
+    expect(mocks.createKey.mock.invocationCallOrder[0]).toBeLessThan(mocks.revokeKey.mock.invocationCallOrder[0]!);
+  });
+
+  it("M6: a hand-made key may not take the MCP: name the remote MCP's own keys are listed and revoked by", async () => {
+    mocks.session.mockResolvedValue({ ok: true, principal: { kind: "session", workspaceKey: MINE, userId: USER, scopes: [], accessSource: "paid", authorizationRevision: 4, workspaceRole: "owner" } });
+    for (const name of ["MCP: Claude", "mcp:x", "  MCP:spoof"]) {
+      const response = await createKeyRoute(new Request(`${ORIGIN}/api/developer/keys`, { method: "POST", body: JSON.stringify({ name, scopes: ["worlds:read"] }) }));
+      expect([response.status, (await response.json()).code], name).toEqual([400, "API_KEY_INPUT_INVALID"]);
+    }
+    expect(mocks.createKey).not.toHaveBeenCalled();
+  });
+
+  it("refuses a free evaluation at token issue too, not only at consent, and mints nothing", async () => {
+    const clientId = await registeredClient();
+    const code = await approvedCode(clientId);
+    mocks.sessionProduct.mockResolvedValueOnce({ ok: true, access: { source: "trial", accessPlan: "observer_access", billingExempt: false, expiresAt: null } });
+    const response = await exchange({ grant_type: "authorization_code", code, client_id: clientId, code_verifier: VERIFIER });
+    expect([response.status, await response.json()]).toEqual([402, { error: "access_denied", error_description: "TRIAL_FEATURE_NOT_INCLUDED", code: "TRIAL_FEATURE_NOT_INCLUDED" }]);
+    mocks.sessionProduct.mockResolvedValueOnce({ ok: false, code: "BILLING_STORE_UNAVAILABLE", status: 503 });
+    const unknown = await exchange({ grant_type: "authorization_code", code: await approvedCode(clientId), client_id: clientId, code_verifier: VERIFIER });
+    expect([unknown.status, (await unknown.json()).error]).toEqual([503, "temporarily_unavailable"]);
+    expect(mocks.createKey).not.toHaveBeenCalled();
   });
 });

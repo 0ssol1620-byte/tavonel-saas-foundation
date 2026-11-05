@@ -7,6 +7,7 @@ import {
   trialFeatureBlocked,
   type SessionAccessSource,
 } from "./self-service-trial";
+import { insideRemoteMcpDispatch } from "./remote-mcp-dispatch";
 import { getWorkspaceMembership, type WorkspaceRole } from "./workspace-membership";
 
 export type FoundationPrincipal = {
@@ -75,13 +76,17 @@ async function resolveFoundationAuthorization(
   const authorization = request.headers.get("authorization") ?? "";
   const bearer = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
 
-  if (bearer.startsWith("tvnl_live_")) {
+  if (bearer.startsWith("tvnl_live_") || bearer.startsWith("tvnl_mcp_")) {
     // API keys remain a paid/owner Developer capability. A free evaluation may exercise the
     // product in the browser, but it never mints a reusable credential that can be scripted into
     // an unbounded client. Explicit owner grants are allowed because authorizeFoundationProduct
     // recognizes them independently of Paddle.
     const authenticated = await authenticateDeveloperApiKey(bearer);
     if (!authenticated.ok) return { ok: false as const, code: authenticated.code, status: 401 };
+    // R1 M1: a remote MCP token is for /api/mcp only, which re-checks its switch and cohort per call.
+    if (authenticated.principal.audience === "mcp" && !insideRemoteMcpDispatch()) {
+      return { ok: false as const, code: "API_KEY_AUDIENCE_INVALID", status: 401 };
+    }
     if (!authenticated.principal.scopes.includes(scope)) {
       return { ok: false as const, code: "API_SCOPE_REQUIRED", status: 403 };
     }
@@ -97,9 +102,10 @@ async function resolveFoundationAuthorization(
     if (authenticated.principal.authorizationRevision !== authority.authorizationRevision) {
       return { ok: false as const, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403 };
     }
+    const { audience: _audience, ...identity } = authenticated.principal;
     const principal: FoundationPrincipal = {
-      ...authenticated.principal,
-      scopes: [...authenticated.principal.scopes],
+      ...identity,
+      scopes: [...identity.scopes],
       authorizationRevision: authority.authorizationRevision,
       workspaceRole: authority.workspaceRole,
     };

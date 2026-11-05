@@ -5,8 +5,8 @@
  * in /developer/channel.json. Node standard library only: a verifier that needs `pnpm install`
  * is not one a customer on a clean machine can run.
  *
- *   node tavonel-verify-answer.mjs --receipt answer.json --trust-store trust.json [--question-file q.txt]
- *   node tavonel-verify-answer.mjs --receipt answer.json --trusted-fingerprint sha256:<64 hex>
+ *   node tavonel-verify-answer.mjs --receipt answer.json --trust-store trust.json
+ *     [--trusted-fingerprint sha256:<64 hex>] [--question-file q.txt]
  *
  * `--receipt` is either the whole Ask response (the JSON body that carries `signedReceipt`) or the
  * `signedReceipt` object alone. Given the whole response, the answer itself is checked too: its
@@ -16,7 +16,16 @@
  * receipt's questionSha256 (the receipt never holds the question itself).
  *
  * The trust anchor must come from somewhere other than the receipt:
- * GET https://tavonel.com/api/export/trust publishes it. Exit 0 when the receipt verifies, 1 otherwise.
+ * GET https://tavonel.com/api/export/trust publishes it. The trust store is required, because it is
+ * the only place a revoked key is named; `--trusted-fingerprint` is an additional pin, never a
+ * substitute. Exit 0 when the receipt verifies, 1 otherwise.
+ *
+ * Key lifecycle policy: a receipt is valid if its key was valid when it was signed. A key that has
+ * since expired or been retired still verifies the receipts it signed inside its validity window;
+ * a revoked key verifies nothing, and any status other than active or retired is refused. Because
+ * the signing time is written by the signer, the verifier also refuses a signing time in the
+ * future (beyond MAX_CLOCK_SKEW_MS) and a payload issuedAt that is not the signing time (beyond
+ * ISSUED_AT_TOLERANCE_MS). A key suspected of compromise must be marked revoked, not deleted.
  */
 import { createHash, createPublicKey, verify } from "node:crypto";
 import { readFile } from "node:fs/promises";
@@ -27,6 +36,9 @@ const SCHEMA = "tavonel.answer_receipt.v1";
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+const MAX_CLOCK_SKEW_MS = 5 * 60_000;
+const ISSUED_AT_TOLERANCE_MS = 5_000;
+const ACCEPTED_KEY_STATUSES = ["active", "retired"];
 const FIELDS = ["schemaVersion", "collectionId", "worldStateId", "manifestDigest", "questionSha256", "answerMode",
   "status", "citations", "answerability", "outputSha256", "issuedAt"];
 
@@ -52,7 +64,7 @@ function parseArguments(argv) {
   const receipt = args.get("receipt");
   const trustedFingerprint = args.get("trusted-fingerprint")?.toLowerCase();
   const trustStore = args.get("trust-store");
-  if (!receipt || (!trustStore && !(trustedFingerprint && SHA256.test(trustedFingerprint)))) return null;
+  if (!receipt || !trustStore || (trustedFingerprint !== undefined && !SHA256.test(trustedFingerprint))) return null;
   return { receipt, trustedFingerprint, trustStore, questionFile: args.get("question-file") };
 }
 
@@ -82,11 +94,15 @@ async function checkSignature(signature, payloadBytes, options) {
   if (signature.signatureScope !== SCOPE) throw new Error(`signature scope is not ${SCOPE}`);
   if (!Number.isSafeInteger(signature.keyVersion) || signature.keyVersion < 1 || !instant(signature.issuedAt) || !instant(signature.expiresAt)
     || Date.parse(signature.expiresAt) <= Date.parse(signature.issuedAt)) throw new Error("signature lifecycle fields are malformed");
+  if (Date.parse(signature.issuedAt) > Date.now() + MAX_CLOCK_SKEW_MS) throw new Error("signature signing time is in the future");
   const publicKeyDer = Buffer.from(String(signature.publicKeySpkiDerBase64), "base64");
   if (publicKeyDer.toString("base64") !== signature.publicKeySpkiDerBase64) throw new Error("public key is not canonical Base64");
   const fingerprint = digest(publicKeyDer);
   if (fingerprint !== signature.publicKeySpkiSha256) throw new Error("public key fingerprint does not match the signature");
-  if (options.trustStore) {
+  if (options.trustedFingerprint !== undefined && fingerprint !== options.trustedFingerprint) {
+    throw new Error("public key fingerprint does not match the trusted fingerprint");
+  }
+  {
     const trust = JSON.parse(await readFile(resolve(options.trustStore), "utf8"));
     if (trust.schemaVersion !== "tavonel.export_trust.v2" || trust.minimumSignatureVersion !== 2 || !Array.isArray(trust.keys)) {
       throw new Error("trust store is not a tavonel.export_trust.v2 document");
@@ -94,12 +110,10 @@ async function checkSignature(signature, payloadBytes, options) {
     const keys = trust.keys.filter((key) => key?.keyId === signature.keyId && key?.keyVersion === signature.keyVersion);
     const key = keys.length === 1 ? keys[0] : null;
     const issued = Date.parse(signature.issuedAt);
-    if (!key || key.status === "revoked" || key.algorithm !== "Ed25519" || key.publicKeySpkiSha256 !== fingerprint
+    if (!key || !ACCEPTED_KEY_STATUSES.includes(key.status) || key.algorithm !== "Ed25519" || key.publicKeySpkiSha256 !== fingerprint
       || key.publicKeySpkiDerBase64 !== signature.publicKeySpkiDerBase64 || !instant(key.notBefore) || !instant(key.expiresAt)
       || issued < Date.parse(key.notBefore) || issued >= Date.parse(key.expiresAt)
       || Date.parse(signature.expiresAt) > Date.parse(key.expiresAt)) throw new Error("signature key lifecycle policy rejected the receipt");
-  } else if (fingerprint !== options.trustedFingerprint) {
-    throw new Error("public key fingerprint does not match the trusted fingerprint");
   }
   if (digest(payloadBytes) !== signature.signedPayloadSha256) throw new Error("payload digest does not match the signature");
   const signatureBytes = Buffer.from(String(signature.signatureBase64), "base64");
@@ -116,7 +130,7 @@ async function checkSignature(signature, payloadBytes, options) {
     || !verify(null, Buffer.concat([Buffer.from(header, "utf8"), payloadBytes]), publicKey, signatureBytes)) {
     throw new Error("Ed25519 signature verification failed");
   }
-  return { keyId: signature.keyId, keyVersion: signature.keyVersion, fingerprint };
+  return { keyId: signature.keyId, keyVersion: signature.keyVersion, fingerprint, signedAt: signature.issuedAt };
 }
 
 /** The answer the receipt travelled with must be the answer it signed. */
@@ -142,7 +156,7 @@ function fail(message) {
 
 const options = parseArguments(process.argv.slice(2));
 if (!options) {
-  fail(`usage: node ${basename(process.argv[1] ?? "tavonel-verify-answer.mjs")} --receipt <answer.json> (--trust-store <trust.json> | --trusted-fingerprint sha256:<64 hex>) [--question-file <question.txt>]`);
+  fail(`usage: node ${basename(process.argv[1] ?? "tavonel-verify-answer.mjs")} --receipt <answer.json> --trust-store <trust.json> [--trusted-fingerprint sha256:<64 hex>] [--question-file <question.txt>]`);
 } else {
   try {
     const document = JSON.parse(await readFile(resolve(options.receipt), "utf8"));
@@ -153,6 +167,9 @@ if (!options) {
     const key = await checkSignature(signed.signature, payloadBytes, options);
     const payload = JSON.parse(signed.payloadJson);
     checkPayload(payload, signed.payloadJson);
+    if (Math.abs(Date.parse(payload.issuedAt) - Date.parse(key.signedAt)) > ISSUED_AT_TOLERANCE_MS) {
+      throw new Error("receipt issuedAt is not the signing time");
+    }
     if (response) checkAnswer(response, payload);
     if (options.questionFile) {
       const question = await readFile(resolve(options.questionFile), "utf8");

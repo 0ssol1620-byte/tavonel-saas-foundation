@@ -43,8 +43,8 @@ const FAILURE_COPY: Record<string, string> = {
   PILOT_ACCESS_REQUIRED: "This account is not admitted to a TAVONEL workspace. Access is arranged with us through the contact page.",
   PADDLE_CUSTOMER_NOT_FOUND: "No payment is linked to this account, so there is no billing to manage. A payment made a moment ago appears here once it is confirmed.",
   /* W1-A1: the processing cohort (uploads, the remote MCP). Excluded is a fact about this workspace; config-invalid is ours to fix. */
-  PROCESSING_COHORT_EXCLUDED: "This workspace is not in the current pilot group, so this is not open to it yet. Access is arranged with us through the contact page.",
-  PROCESSING_COHORT_CONFIG_INVALID: "This is paused while we correct a configuration on our side. Nothing in your workspace changed.",
+  REMOTE_MCP_COHORT_EXCLUDED: "This workspace is not in the current pilot group, so this is not open to it yet. Access is arranged with us through the contact page.",
+  REMOTE_MCP_COHORT_CONFIG_INVALID: "This is paused while we correct a configuration on our side. Nothing in your workspace changed.",
 };
 
 /** What to say when the code is not one we have written a sentence for. */

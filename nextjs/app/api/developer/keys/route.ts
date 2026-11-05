@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { parseDeveloperScopes } from "@/lib/developer-contracts";
 import { requireFoundationSession, revalidateFoundationSession } from "@/lib/developer-auth";
 import { createDeveloperApiKey, listDeveloperApiKeys } from "@/lib/developer-store";
+import { reservedKeyName } from "@/lib/remote-mcp";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
   if (!result.ok) return NextResponse.json({ code: result.code }, { status: 503, headers: NO_STORE });
   const current = await revalidateFoundationSession(request, auth.principal, "observer");
   if (!current.ok) return NextResponse.json({ code: current.code }, { status: current.status, headers: NO_STORE });
-  return NextResponse.json({ code: "OK", keys: result.keys }, { headers: NO_STORE });
+  return NextResponse.json({ code: "OK", keys: result.keys, remoteMcpKeys: result.remoteMcpKeys }, { headers: NO_STORE });
 }
 
 export async function POST(request: Request) {
@@ -44,7 +45,8 @@ export async function POST(request: Request) {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const scopes = parseDeveloperScopes(body.scopes);
   const expiresInDays = body.expiresInDays === null || body.expiresInDays === undefined ? null : Number(body.expiresInDays);
-  if (!name || name.length > 80 || !scopes || (expiresInDays !== null && (!Number.isSafeInteger(expiresInDays) || expiresInDays < 1 || expiresInDays > 365))) {
+  // `MCP: ` names the remote MCP's own keys (listed apart, revoked in bulk); a hand-made key may not take it.
+  if (!name || name.length > 80 || reservedKeyName(name) || !scopes || (expiresInDays !== null && (!Number.isSafeInteger(expiresInDays) || expiresInDays < 1 || expiresInDays > 365))) {
     return NextResponse.json({ code: "API_KEY_INPUT_INVALID" }, { status: 400, headers: NO_STORE });
   }
   const expiresAt = expiresInDays === null ? null : new Date(Date.now() + expiresInDays * 86_400_000).toISOString();

@@ -1,7 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { DeveloperScope } from "./developer-contracts";
 import { authenticateDeveloperApiKey } from "./developer-store";
-import { canaryCohortRefusal } from "./processing-workspace-grant";
 
 /*
   G11 REMOTE-MCP (DECISION-REGISTER S6-09, S6-10; SERVICE-DEFINITION §6 D; ENABLEMENT-GAP §4).
@@ -54,18 +53,24 @@ export const REMOTE_MCP_TOOL_SCOPES: Readonly<Record<string, DeveloperScope>> = 
 export const REMOTE_MCP_SCOPES: readonly DeveloperScope[] = [...new Set(Object.values(REMOTE_MCP_TOOL_SCOPES))].sort();
 
 /**
- * W1-A1.0 (PROGRAM-2026-11-04 §4.A): the remote MCP canary is the processing cohort, not a cohort
- * of its own. Every token issued and every authenticated call passes `processingCohortRefusal`,
- * through its canary reading: an unset TAVONEL_PROCESSING_WORKSPACE_COHORT admits nobody here
- * (processing reads unset as "no extra restriction" while the launch switch is off), and so does a
- * list longer than the D-19 cap. Widening past the canary (A1.4) is a reviewed code change.
+ * W1-A1 canary cohort: TAVONEL_REMOTE_MCP_COHORT, one to REMOTE_MCP_COHORT_MAX exact workspace keys,
+ * comma-separated. Every consent, every token issued and every authenticated call passes it, and so
+ * does an Ask whose receipt mode is `on` (W1-A5).
+ *
+ * Its own variable, not the processing cohort's (review R1 M5): setting the processing cohort to a
+ * canary of three would also narrow which workspaces may process sources. Unset, empty, malformed
+ * or wider than the cap admits nobody -- the canary fails closed. Widening is a reviewed change.
  */
-export type RemoteMcpCohortRefusal = "PROCESSING_COHORT_EXCLUDED" | "PROCESSING_COHORT_CONFIG_INVALID";
+export const REMOTE_MCP_COHORT_MAX = 3;
+const COHORT_WORKSPACE = /^pilot-[A-Za-z0-9]{1,16}$/;
+export type RemoteMcpCohortRefusal = "REMOTE_MCP_COHORT_EXCLUDED" | "REMOTE_MCP_COHORT_CONFIG_INVALID";
 export function remoteMcpCohortRefusal(workspaceKey: string, env: Env = process.env): RemoteMcpCohortRefusal | null {
-  return canaryCohortRefusal(workspaceKey, env);
+  const ids = (env.TAVONEL_REMOTE_MCP_COHORT ?? "").split(",").map((id) => id.trim());
+  if (ids.length > REMOTE_MCP_COHORT_MAX || !ids.every((id) => COHORT_WORKSPACE.test(id))) return "REMOTE_MCP_COHORT_CONFIG_INVALID";
+  return ids.includes(workspaceKey) ? null : "REMOTE_MCP_COHORT_EXCLUDED";
 }
 /** Excluded is the caller's answer (403); a cohort that cannot be read is the server's (503). */
-export const cohortRefusalStatus = (code: RemoteMcpCohortRefusal) => (code === "PROCESSING_COHORT_EXCLUDED" ? 403 : 503);
+export const cohortRefusalStatus = (code: RemoteMcpCohortRefusal) => (code === "REMOTE_MCP_COHORT_EXCLUDED" ? 403 : 503);
 
 export const REMOTE_MCP_CODE_TTL_SECONDS = 120;
 export const REMOTE_MCP_TOKEN_TTL_SECONDS = 3600;
@@ -401,6 +406,8 @@ export type TokenGrant = {
   authorizationRevision: number;
   scopes: DeveloperScope[];
   clientName: string;
+  /** The registered client id (sealed); its hash tags the key so a reconnect replaces its own key. */
+  clientId: string;
   /** The code's single-use marker, written into the key name. */
   codeId: string;
 };
@@ -432,12 +439,21 @@ export function checkTokenRequest(form: URLSearchParams, key: Buffer, origin: st
   if (scopes.length !== claims.s.length || scopes.length === 0) return bad("invalid_grant", "The authorization code carries a scope this server does not grant.");
   return {
     ok: true,
-    grant: { userId: claims.u, workspaceKey: claims.w, authorizationRevision: Number(claims.a), scopes, clientName: client.n, codeId: claims.j },
+    grant: { userId: claims.u, workspaceKey: claims.w, authorizationRevision: Number(claims.a), scopes, clientName: client.n, clientId, codeId: claims.j },
   };
 }
 
-/** The key name carries the code id, which is how a second redemption of one code is recognised. */
-export const keyNameFor = (grant: TokenGrant) => `MCP: ${grant.clientName} #${grant.codeId}`;
+/**
+ * Every key the remote MCP mints is named `MCP: ...`, and no other key may be (the Developers create
+ * and rotate routes refuse the prefix), so the name marks the MCP-audience rows: listed apart from
+ * manual keys and revocable in bulk (POST /api/internal/remote-mcp/revoke-all). The name carries the
+ * client's tag and the code id: the tag is how a reconnect replaces its own earlier key, the code id
+ * how a second redemption of one code is recognised.
+ */
+export const REMOTE_MCP_KEY_NAME_PREFIX = "MCP: ";
+export const reservedKeyName = (name: string) => name.trim().toUpperCase().startsWith("MCP:");
+export const clientTag = (clientId: string) => createHash("sha256").update(clientId).digest("hex").slice(0, 12);
+export const keyNameFor = (grant: TokenGrant) => `${REMOTE_MCP_KEY_NAME_PREFIX}${grant.clientName} ~${clientTag(grant.clientId)} #${grant.codeId}`;
 export const codeIdMarker = (codeId: string) => ` #${codeId}`;
 
 /* ------------------------------------------------------------- bearer at /mcp */
@@ -458,7 +474,7 @@ export type BearerCheck =
 export async function checkBearer(authorization: string | null): Promise<BearerCheck> {
   if (authorization === null || authorization === "") return { kind: "anonymous" };
   const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
-  if (!token.startsWith("tvnl_live_")) return { kind: "rejected", description: "The bearer is not a TAVONEL access token." };
+  if (!token.startsWith("tvnl_live_") && !token.startsWith("tvnl_mcp_")) return { kind: "rejected", description: "The bearer is not a TAVONEL access token." };
   const authenticated = await authenticateDeveloperApiKey(token);
   if (!authenticated.ok) {
     return { kind: "rejected", description: authenticated.code === "API_KEY_EXPIRED" ? "The access token has expired." : "The access token is not valid." };
@@ -489,18 +505,13 @@ export function toolFailureCode(text: unknown): string {
 
 export const REMOTE_MCP_SLI_SCHEMA = "tavonel.remote_mcp_sli.v1" as const;
 /**
- * `status` is the HTTP status of the POST. `upstreamStatus` is the status of the API route a tool
- * reached, when the tool failed with one (`API_ERROR_503: ...`): a tool failure travels inside a
- * 200 JSON-RPC result, so an SLI that read the HTTP status alone would never see a 5xx from the
- * routes behind the tools.
+ * `status` is the HTTP status of the POST. `upstreamStatus` is the worst status among the /api/v1
+ * routes the call dispatched to in-process (null when it reached none): a tool failure travels
+ * inside a 200 JSON-RPC result, so an SLI that read the HTTP status alone would never see a 5xx
+ * from the routes behind the tools.
  */
 export type RemoteMcpSliRecord = { sli: typeof REMOTE_MCP_SLI_SCHEMA; method: string; tool: string | null; status: number; upstreamStatus: number | null; durationMs: number };
 
-/** The route status a failed tool result names, or null. */
-export function toolUpstreamStatus(text: unknown): number | null {
-  const match = typeof text === "string" ? /^API_ERROR_([1-5][0-9]{2})\b/.exec(text) : null;
-  return match ? Number(match[1]) : null;
-}
 
 /** One structured line per /api/mcp POST on the server log (the funnel's sink, read by the log drain). */
 export function recordRemoteMcpSli(input: { method: string | null; tool: string | null; status: number; upstreamStatus?: number | null; durationMs: number }) {
