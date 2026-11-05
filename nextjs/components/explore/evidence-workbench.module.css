@@ -24,7 +24,7 @@
 .result > blockquote { margin:0 24px 20px; border-left:3px solid var(--tv-action); padding:4px 0 4px 16px; font-size:16px; line-height:1.7; max-height:290px; overflow:auto; }
 .answerNote { font-size:13px; color:#53606a; margin:0 24px 20px; line-height:1.6; }
 .citations { margin:0 24px; display:grid; gap:8px; }
-.citations button { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:48px; background:#f7f5ef; color:#171c20; padding:12px; border:1px solid #d8ddd9; border-radius:6px; text-align:left; font-size:13px; }
+.citations button { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:48px; background:var(--tv-canvas); color:#171c20; padding:12px; border:1px solid #d8ddd9; border-radius:6px; text-align:left; font-size:13px; }
 .citations span { overflow-wrap:anywhere; }
 .citations strong { white-space:nowrap; font-weight:500; }
 .citations button[aria-pressed=true] { border-color:var(--tv-action); }

@@ -1,4 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+
+// Direction C (2026-11-04): the workspace stands on the warm canvas, so the browser chrome does too.
+export const viewport: Viewport = { themeColor: "#F5F3EE", colorScheme: "light" };
 
 export const metadata: Metadata = {
   alternates: { canonical: "/workspace" },

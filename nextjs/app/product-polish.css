@@ -154,6 +154,8 @@
 .pricing-page .plan-features { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
 .pricing-page .plan-action { display: flex; flex-direction: column; gap: 10px; align-items: stretch; align-self: end; }
 .pricing-page .plan-action .btn { width: 100%; }
+/* CRITIQUE-R1 #11: a white pill on the white plan sheet showed only its shadow; it carries an edge. */
+.pricing-page .plan-action .btn.ghost { border: 1px solid var(--tv-rule-strong); }
 .pricing-page .plan-action .pricing-secondary-link {
   display: inline-flex;
   align-items: center;
@@ -601,7 +603,7 @@
 
 /* Docs is a public reading surface: paper around white pages, with code kept in ink. */
 .scene.doc.docs-reading-surface {
-  --ground: #f7f5ef;
+  --ground: var(--tv-canvas);
   --g1: #fff;
   --g2: #f0f1ec;
   --g3: #e8e5dc;
@@ -699,4 +701,36 @@
 @media (pointer: coarse), (max-width: 1079px) {
   .dev-refs { gap: 25px; }
 }
+}
+
+/*
+  Direction C, warm tactile (2026-11-04; BRIEF outputs/.../design-20261104/impl/BRIEF.md), public pages.
+
+  Every public page stands on the warm canvas (public-site-chrome.module.css repoints --ground). What
+  used to be a 1px-bordered grid of grey cells is a white sheet resting on the two-layer shadow, its
+  cells divided by the hairline the grid gap already draws, and rounded at 24px (16px for a list or a
+  table-like sheet). The sheet is the only box: nothing inside it adds a second border. Docs keep their
+  white reading column, now a sheet on the canvas rather than a white band edge to edge.
+*/
+@layer overrides {
+  .page:not(.lv2) .scene.doc.docs-reading-surface { --ground: var(--tv-sheet); background: var(--tv-canvas); }
+  .page:not(.lv2) :is(.tiles, .status-list, .processor-list) {
+    border: 0; border-radius: var(--tv-r-card); overflow: hidden;
+    background: var(--tv-rule); box-shadow: var(--tv-shadow-1);
+  }
+  .page:not(.lv2) :is(.tiles > .tile, .status-list > article, .processor-list > article) { background: var(--tv-sheet); }
+  /* CRITIQUE-R1 #11: the run totals are the same rounded sheet as the ceiling rows above them. */
+  .page:not(.lv2) :is(.docs-index, .usage-estimator-fit, .usage-estimator > dl) {
+    border: 0; border-radius: var(--tv-r-inner); overflow: hidden;
+    background: var(--tv-rule); box-shadow: var(--tv-shadow-1);
+  }
+  .page:not(.lv2) .docs-index a { background: var(--tv-sheet); }
+  .page:not(.lv2) :is(.usage-estimator-fit, .usage-estimator > dl) > div { background: var(--tv-sheet); }
+  @media (hover: hover) and (pointer: fine) {
+    .page:not(.lv2) .docs-index a:hover { background: var(--tv-canvas); }
+  }
+  .page:not(.lv2) .changelog-breaking { border-radius: var(--tv-r-small); }
+  /* The docs search is a pill field on the resting shadow, like the workspace command field. */
+  .page:not(.lv2) .docs-search-field { padding-inline: 18px; border-color: transparent; border-radius: var(--tv-r-pill); background: var(--tv-sheet); box-shadow: var(--tv-shadow-1); }
+  .page:not(.lv2) :is(.contact-field textarea, .contact-field input, .contact-field select) { border-radius: var(--tv-r-small); }
 }

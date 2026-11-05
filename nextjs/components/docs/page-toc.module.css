@@ -13,9 +13,11 @@
   max-width: 480px;
   margin: 0;
   padding: 14px 16px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-paper-lg);
-  background: var(--g1);
+  /* Direction C (2026-11-04): a white sheet on the resting shadow, not a ruled box. */
+  border: 0;
+  border-radius: var(--tv-r-inner);
+  background: var(--tv-sheet);
+  box-shadow: var(--tv-shadow-1);
 }
 
 /*

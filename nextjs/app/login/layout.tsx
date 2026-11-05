@@ -1,4 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+
+// Direction C (2026-11-04): sign-in stands on the warm canvas with the workspace it opens.
+export const viewport: Viewport = { themeColor: "#F5F3EE", colorScheme: "light" };
 
 /**
  * The page itself is a client component and cannot export metadata, so the title lives here.

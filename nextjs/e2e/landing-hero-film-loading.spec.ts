@@ -1,3 +1,4 @@
+import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { existsSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 
@@ -60,6 +61,7 @@ const isPoster = (url: string) => POSTER.test(new URL(url).pathname);
 for (const locale of LOCALES) {
   for (const motion of MOTION_PREFERENCES) {
     test(`loads the poster first and the film on request in ${locale.language} with ${motion.name}`, async ({ page }, testInfo) => {
+      test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
       test.skip(testInfo.project.name !== "390", "run the focused media contract once at the phone viewport");
       await page.emulateMedia({ reducedMotion: motion.preference });
 
@@ -228,6 +230,8 @@ async function posterContract(page: Page, engine: string) {
 
 test("serves the re-cut posters as AVIF within 140,000 bytes, with a WebP fallback, and bars that cover the eyebrow", async ({ page, playwright, baseURL, browserName }, testInfo) => {
   test.skip(testInfo.project.name !== "390", "run the poster contract once, at the phone viewport");
+  // While the still stands in below 900px the phone fetches no poster at all (an empty <source>), so the phone poster contract waits for the film.
+  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   test.skip(browserName !== "chromium", "the page fixture is the Chromium half; WebKit is launched below");
   test.setTimeout(120_000);
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -246,4 +250,20 @@ test("serves the re-cut posters as AVIF within 140,000 bytes, with a WebP fallba
     }
   }
   await testInfo.attach("poster-recut-contract", { body: JSON.stringify(measured, null, 2), contentType: "application/json" });
+});
+
+/*
+  Direction C round 2 (lib/hero-phone-mode.ts): while the Inspector still stands in below 900px, the phone loads the
+  still's own AVIF derivative and none of the film's bytes -- no poster, no cut -- where the checks above wait for the film.
+*/
+test("while the still stands in, a phone loads the still and no film bytes", async ({ page }, testInfo) => {
+  test.skip(!["360", "390"].includes(testInfo.project.name), "phone composition");
+  test.skip(!phoneShowsStill(testInfo.project.name), "the film is the phone hero");
+  const film: string[] = [];
+  page.on("request", request => { if (/\/film\//.test(request.url())) film.push(request.url()); });
+  await page.goto("/", { waitUntil: "load" });
+  const image = page.getByTestId("landing-hero-still").locator("img");
+  await expect(image).toHaveJSProperty("complete", true);
+  expect(await image.evaluate(element => (element as HTMLImageElement).currentSrc)).toMatch(/\/landing\/v2\/apple-2026-q1-10-q-reference-p004-\d+\.(avif|webp)$/);
+  expect(film, "no film request on a phone while the still stands in").toEqual([]);
 });

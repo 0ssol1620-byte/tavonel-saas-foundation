@@ -1,5 +1,5 @@
 /*
-  Scene 08 on Home (FINAL-SPEC 2026-10-26 §2.6), on the dark ground. Token-only.
+  Scene 08 on Home (FINAL-SPEC 2026-10-26 §2.6), on the warm canvas (direction C, 2026-11-04; it was the dark ground). Token-only.
 
   At 900 and up the h2 takes columns 1-4 and the four proofs a 2x2 grid in 5-12, with the two links
   under the grid. Each cell is one rule, its label-link (20/1.35/510, no underline until hover or
@@ -44,7 +44,7 @@
 .layout :global(.lv2-proof) {
   min-height: 64px;
   padding: 20px 0 16px;
-  border-top: 1px solid var(--tv-rule-inst);
+  border-top: 1px solid var(--tv-rule);
 }
 
 @media (min-width: 900px) {
@@ -75,7 +75,7 @@
     grid-row: 1;
     min-height: 96px;
     padding: 20px 0 16px;
-    border-top: 1px solid var(--tv-rule-inst);
+    border-top: 1px solid var(--tv-rule);
   }
   .layout :global(.lv2-proof:has(> .lv2-proof-note) > .lv2-proof-note) {
     grid-column: 1 / -1;
@@ -83,7 +83,7 @@
     max-width: none;
     margin: 0;
     padding-top: 20px;
-    border-top: 1px solid var(--tv-rule-inst);
+    border-top: 1px solid var(--tv-rule);
   }
   .layout :global(.lv2-proof-list > .lv2-proof:nth-child(2)) { grid-column: 2; grid-row: 1; }
   .layout :global(.lv2-proof-list > .lv2-proof:nth-child(3)) { grid-column: 1; grid-row: 2; }
@@ -92,7 +92,7 @@
 
 .layout :global(.lv2-proof-label) {
   margin: 0;
-  color: var(--tv-on-inst);
+  color: var(--tv-ink);
   font: 510 18px/1.35 var(--f-sans);
   letter-spacing: -0.01em;
 }
@@ -116,12 +116,12 @@
   .layout :global(.lv2-proof-label .lv2-inline-link):hover { text-decoration-color: currentColor; }
 }
 
-.layout :global(.lv2-proof-label .lv2-inline-link) span { color: var(--tv-on-inst-muted); }
+.layout :global(.lv2-proof-label .lv2-inline-link) span { color: var(--tv-ink-muted); }
 
 .layout :global(.lv2-proof-note) {
   max-width: 52ch;
   margin: 4px 0 0;
-  color: var(--tv-on-inst-muted);
+  color: var(--tv-ink-muted);
   font-size: 15px;
   line-height: 1.55;
 }
@@ -149,7 +149,7 @@
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  color: var(--tv-on-inst);
+  color: var(--tv-ink);
   font-size: 15px;
   font-weight: 560;
   text-decoration-line: none;
