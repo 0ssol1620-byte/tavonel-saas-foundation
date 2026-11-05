@@ -356,42 +356,6 @@
       "framePngSha256": "a07c9a49adccd69654aa86403e6415d921751c596320ecaac6307792a2384389"
     },
     {
-      "file": "poster-c1-t13.60-pane1-760x950.webp",
-      "width": 760,
-      "height": 950,
-      "bytes": 38146,
-      "sha256": "a3e8a6100113b1c0e9495a7038761d3166b82bf87175a044909af687bd568771",
-      "cut": "hero-c1.mp4",
-      "cutSha256": "64d286184e32b2fae25609bedd527d6996974486b3b76c5923f7a6fb12d0aa2c",
-      "frameSeconds": 13.6,
-      "framePngSha256": "a07c9a49adccd69654aa86403e6415d921751c596320ecaac6307792a2384389",
-      "cropOf": "poster-c1-t13.60-2x.webp (same source frame)",
-      "cropRect": {
-        "x": 1780,
-        "y": 420,
-        "width": 760,
-        "height": 950
-      }
-    },
-    {
-      "file": "poster-c1-t13.60-pane1-760x950.avif",
-      "width": 760,
-      "height": 950,
-      "bytes": 22697,
-      "sha256": "cfc01234aa21fff183b43dcc245169f6d92173b11221a91f8e7a2f52fc2b48b3",
-      "cut": "hero-c1.mp4",
-      "cutSha256": "64d286184e32b2fae25609bedd527d6996974486b3b76c5923f7a6fb12d0aa2c",
-      "frameSeconds": 13.6,
-      "framePngSha256": "a07c9a49adccd69654aa86403e6415d921751c596320ecaac6307792a2384389",
-      "cropOf": "poster-c1-t13.60-2x.webp (same source frame)",
-      "cropRect": {
-        "x": 1780,
-        "y": 420,
-        "width": 760,
-        "height": 950
-      }
-    },
-    {
       "file": "poster-c2-t4.40-2x.webp",
       "width": 2880,
       "height": 1800,
@@ -522,6 +486,42 @@
       "cutSha256": "614a4e52d859f1b15db33283739b39b9e8df26049ba5802f5ebcf803474299ca",
       "frameSeconds": 6.8,
       "framePngSha256": "2d45c7645ac7b119a0cac41959e11da24f42ef35cda9927bdd38966ce3120081"
+    },
+    {
+      "file": "poster-c1-t13.60-pane1-684x855.webp",
+      "width": 760,
+      "height": 950,
+      "bytes": 33626,
+      "sha256": "a6a6e0d95e8e692330f5f36334acd50e2675d916f4a5afbf5b221d2356ca78d3",
+      "cut": "hero-c1.mp4",
+      "cutSha256": "64d286184e32b2fae25609bedd527d6996974486b3b76c5923f7a6fb12d0aa2c",
+      "frameSeconds": 13.6,
+      "framePngSha256": "a07c9a49adccd69654aa86403e6415d921751c596320ecaac6307792a2384389",
+      "cropOf": "poster-c1-t13.60-2x.webp (same source frame)",
+      "cropRect": {
+        "x": 1780,
+        "y": 420,
+        "width": 684,
+        "height": 855
+      }
+    },
+    {
+      "file": "poster-c1-t13.60-pane1-684x855.avif",
+      "width": 760,
+      "height": 950,
+      "bytes": 20292,
+      "sha256": "c313897b5a924322a02d8ffac21691f9744e9cdfa323576beb5782d1cd3fc282",
+      "cut": "hero-c1.mp4",
+      "cutSha256": "64d286184e32b2fae25609bedd527d6996974486b3b76c5923f7a6fb12d0aa2c",
+      "frameSeconds": 13.6,
+      "framePngSha256": "a07c9a49adccd69654aa86403e6415d921751c596320ecaac6307792a2384389",
+      "cropOf": "poster-c1-t13.60-2x.webp (same source frame)",
+      "cropRect": {
+        "x": 1780,
+        "y": 420,
+        "width": 684,
+        "height": 855
+      }
     }
   ],
   "posterEncoder": "sharp 0.35.4 (libwebp 1.6.0, libvips 8.18.6); webp quality 82, smartSubsample, effort 6; 1x = lanczos3 resize of the same frame. POSTER-RECUT (D-11): frames by ffmpeg 8.1.2 (input seek to t, BT.601 limited -> full range); AVIF = sharp 0.35.4 (libaom 3.14.1, libheif 1.23.2) quality 50, chromaSubsampling 4:4:4, effort 6, 1x = lanczos3 resize; the recut WebP files use the Release 3 WebP settings. Phone pane crops (FINAL-SPEC 2026-10-26, cropOf/cropRect): sharp 0.35.4 extract(cropRect) of the locked 2x WebP named in cropOf -- one more lossy generation, since ffmpeg was not on the producing host -- then AVIF quality 50, chromaSubsampling 4:4:4, effort 6 and WebP quality 82, smartSubsample, effort 6",

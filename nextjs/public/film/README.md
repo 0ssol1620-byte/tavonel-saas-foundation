@@ -120,7 +120,7 @@ Encoded with `scripts/encode-cut-2x.sh` (ffmpeg 7.1, libx264 preset medium, crf 
 | `hero-c1-hq.mp4` | stage 1 decoder-error fallback (yuv420p, 2880x1800) | 998,730 | `049ed1f41bdadd00e6bf4c4e03610b202a8c6d988f0d848dd7ba44535364941b` |
 | `hero-c1-hq-1440.mp4` | stage 1 narrow decoder-error fallback (yuv420p, 1440x900) | 451,315 | `bf6c0975c29171acab7cd29429cee65329be88fe6655ee978ddbb77baa382e05` |
 
-Posters: one source frame of each cut (the lossless PNG the cut was encoded from), sharp 0.35.4 with the D-11 settings (AVIF quality 50, 4:4:4, effort 6, each 2x AVIF ≤ 140,000 bytes; WebP quality 82, smartSubsample, effort 6; 1x = lanczos3). No frame carries an overprint, so no stage has a Tier 2 mask. The stage-1 phone pane is a 760×950 extract of the same PNG (`STAGE_FRAMES.sources.phonePane`).
+Posters: one source frame of each cut (the lossless PNG the cut was encoded from), sharp 0.35.4 with the D-11 settings (AVIF quality 50, 4:4:4, effort 6, each 2x AVIF ≤ 140,000 bytes; WebP quality 82, smartSubsample, effort 6; 1x = lanczos3). No frame carries an overprint, so no stage has a Tier 2 mask. The stage-1 phone pane is a 684×855 extract of the same PNG (`STAGE_FRAMES.sources.phonePane`).
 
 | File | Size | Bytes | sha256 | Cut | Frame *t* | Frame PNG sha256 |
 |---|---|---|---|---|---|---|
@@ -128,8 +128,6 @@ Posters: one source frame of each cut (the lossless PNG the cut was encoded from
 | `poster-c1-t13.60.webp` | 1440×900 | 64,598 | `ca823d34f28cf7bbf5745df8d2a5db4afc76a931d788069001e27604be8c64f6` | `hero-c1.mp4` | 13.60 s | `a07c9a49adccd69654aa86403e6415d921751c596320ecaac6307792a2384389` |
 | `poster-c1-t13.60-2x.avif` | 2880×1800 | 105,891 | `9aec5e0af622be9c2dfde757562f5c9f4b72d484a194a09355fe96c09e1fce2c` | `hero-c1.mp4` | 13.60 s | `a07c9a49adccd69654aa86403e6415d921751c596320ecaac6307792a2384389` |
 | `poster-c1-t13.60.avif` | 1440×900 | 39,609 | `07e7199a6f3af8b0442de4bd861460e2b2cf25fe6454d3fa9e42e1630d5edfe8` | `hero-c1.mp4` | 13.60 s | `a07c9a49adccd69654aa86403e6415d921751c596320ecaac6307792a2384389` |
-| `poster-c1-t13.60-pane1-760x950.webp` | 760×950 | 38,146 | `a3e8a6100113b1c0e9495a7038761d3166b82bf87175a044909af687bd568771` | `hero-c1.mp4` | 13.60 s | `a07c9a49adccd69654aa86403e6415d921751c596320ecaac6307792a2384389` |
-| `poster-c1-t13.60-pane1-760x950.avif` | 760×950 | 22,697 | `cfc01234aa21fff183b43dcc245169f6d92173b11221a91f8e7a2f52fc2b48b3` | `hero-c1.mp4` | 13.60 s | `a07c9a49adccd69654aa86403e6415d921751c596320ecaac6307792a2384389` |
 | `poster-c2-t4.40-2x.webp` | 2880×1800 | 137,168 | `c9259a2defea27d731effc84c8b239c20b7099de1c48397a9b643dce8338854f` | `hero-c2.mp4` | 4.40 s | `49d73bba3f4198e6131bd666127071e0a96474273ed96fa04673286d02fef9b4` |
 | `poster-c2-t4.40.webp` | 1440×900 | 53,236 | `b86c2ad1d1c79c756a1e085c0f935fe23a03e6161d3731b02d57c9c4e7ef44a8` | `hero-c2.mp4` | 4.40 s | `49d73bba3f4198e6131bd666127071e0a96474273ed96fa04673286d02fef9b4` |
 | `poster-c2-t4.40-2x.avif` | 2880×1800 | 67,947 | `7a25a03799e9379d463c196d4de3ebfa7766ffa9fcf3c567bcc687d42c5fcc5e` | `hero-c2.mp4` | 4.40 s | `49d73bba3f4198e6131bd666127071e0a96474273ed96fa04673286d02fef9b4` |
@@ -142,5 +140,7 @@ Posters: one source frame of each cut (the lossless PNG the cut was encoded from
 | `poster-c4-t6.80.webp` | 1440×900 | 92,864 | `d04a6d20a2a46704280d37ec5fb9db826502189aa9b871c6c19e7c1c288d50d5` | `hero-c4.mp4` | 6.80 s | `2d45c7645ac7b119a0cac41959e11da24f42ef35cda9927bdd38966ce3120081` |
 | `poster-c4-t6.80-2x.avif` | 2880×1800 | 134,188 | `04c4f2a53d894d2a70b8000990356aa963a982f901d0a575c739824d6e771ee0` | `hero-c4.mp4` | 6.80 s | `2d45c7645ac7b119a0cac41959e11da24f42ef35cda9927bdd38966ce3120081` |
 | `poster-c4-t6.80.avif` | 1440×900 | 55,074 | `b784a6494cba294f843bd9a43599e38a9130c932cd08470ba39d415758a9629f` | `hero-c4.mp4` | 6.80 s | `2d45c7645ac7b119a0cac41959e11da24f42ef35cda9927bdd38966ce3120081` |
+| `poster-c1-t13.60-pane1-684x855.webp` | 760×950 | 33,626 | `a6a6e0d95e8e692330f5f36334acd50e2675d916f4a5afbf5b221d2356ca78d3` | `hero-c1.mp4` | 13.60 s | `a07c9a49adccd69654aa86403e6415d921751c596320ecaac6307792a2384389` |
+| `poster-c1-t13.60-pane1-684x855.avif` | 760×950 | 20,292 | `c313897b5a924322a02d8ffac21691f9744e9cdfa323576beb5782d1cd3fc282` | `hero-c1.mp4` | 13.60 s | `a07c9a49adccd69654aa86403e6415d921751c596320ecaac6307792a2384389` |
 
 Reading targets, crop windows, phone rects and both blank scans for these cuts are re-measured in `components/compile-stage-player.frame-strings.json`. The founder restored the earlier film on 2026-08-09; this re-record was taken under the 2026-11-04 delegation and the earlier files are kept so it can be rolled back by reverting the references.

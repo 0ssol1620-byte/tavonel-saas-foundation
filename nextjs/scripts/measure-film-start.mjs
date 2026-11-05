@@ -38,7 +38,7 @@ for (const profile of RUNS) {
       "playing",
       (event) => {
         const target = event.target;
-        if (!target.currentSrc || !target.currentSrc.includes("compile-cut.mp4")) return;
+        if (!target.currentSrc || !target.currentSrc.includes("hero-c1.mp4")) return;
         if (window.__firstFrame === undefined) window.__firstFrame = performance.now();
       },
       true,

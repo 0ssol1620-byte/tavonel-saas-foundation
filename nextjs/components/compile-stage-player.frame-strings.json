@@ -443,7 +443,7 @@
     }
   },
   "phonePaneScan": {
-    "method": "Re-record: the blankScan cell rule over one w x w*5/4 source-px rect at the stage's phonePane, on all 450 source frames; a frame is blank when >= blankAt of the rect's cells hold none. share = frames not blank / frames; a phonePane is used only when share >= threshold. All four rects are 760 px wide, so 12px CSS product type reads >= 9px equivalent on a 390 phone.",
+    "method": "Re-record: the blankScan cell rule over one w x w*5/4 source-px rect at the stage's phonePane, on all 450 source frames; a frame is blank when >= blankAt of the rect's cells hold none. share = frames not blank / frames; a phonePane is used only when share >= threshold. All four rects are 684 px wide (the spec ceiling), so 12px CSS product type draws at about 12.5px on a 390 phone.",
     "receipt": "outputs/tavonel-research-replan-20261013/design-20261104/impl/FILM-RERECORD-REPORT.md (ai-knowledge-compiler), tool scan.mjs",
     "blankAt": 0.99,
     "threshold": 0.85,
@@ -453,7 +453,7 @@
         "phonePane": {
           "x": 1780,
           "y": 420,
-          "w": 760
+          "w": 684
         },
         "frames": 450,
         "blankFrames": 0,
@@ -463,7 +463,7 @@
         "phonePane": {
           "x": 1900,
           "y": 400,
-          "w": 760
+          "w": 684
         },
         "frames": 450,
         "blankFrames": 0,
@@ -473,7 +473,7 @@
         "phonePane": {
           "x": 120,
           "y": 300,
-          "w": 760
+          "w": 684
         },
         "frames": 450,
         "blankFrames": 0,
@@ -483,7 +483,7 @@
         "phonePane": {
           "x": 160,
           "y": 300,
-          "w": 760
+          "w": 684
         },
         "frames": 450,
         "blankFrames": 0,

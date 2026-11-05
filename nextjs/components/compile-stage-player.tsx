@@ -130,10 +130,10 @@ export type PhonePane = { x: number; y: number; w: number };
   (compile-stage-player.frame-strings.json). No poster carries an overprint, so no stage has a mask.
 */
 export const STAGE_FRAMES: Record<string, { panes?: readonly [string, string, string, string]; readingTarget: ReadingTarget; crop: FilmCrop; wideView: WideView; phonePane: PhonePane; posterMask?: PosterMask }> = {
-  sources: { readingTarget: { pane: 2, text: "Extracted lines" }, crop: { x: 0.5, y: 0.2 }, wideView: "crop", phonePane: { x: 1780, y: 420, w: 760 } },
-  read: { readingTarget: { pane: 2, text: "Greater China" }, crop: { x: 0.5, y: 0.25 }, wideView: "crop", phonePane: { x: 1900, y: 400, w: 760 } },
-  structure: { readingTarget: { pane: 2, text: "filed 2026-07-31" }, crop: { x: 0.5, y: 0.4 }, wideView: "fit", phonePane: { x: 120, y: 300, w: 760 } },
-  world: { readingTarget: { pane: 0, text: "Retrieved source passage" }, crop: { x: 0, y: 0.1 }, wideView: "crop", phonePane: { x: 160, y: 300, w: 760 } },
+  sources: { readingTarget: { pane: 2, text: "Extracted lines" }, crop: { x: 0.5, y: 0.2 }, wideView: "crop", phonePane: { x: 1780, y: 420, w: 684 } },
+  read: { readingTarget: { pane: 2, text: "Greater China" }, crop: { x: 0.5, y: 0.25 }, wideView: "crop", phonePane: { x: 1900, y: 400, w: 684 } },
+  structure: { readingTarget: { pane: 2, text: "filed 2026-07-31" }, crop: { x: 0.5, y: 0.4 }, wideView: "fit", phonePane: { x: 120, y: 300, w: 684 } },
+  world: { readingTarget: { pane: 0, text: "Retrieved source passage" }, crop: { x: 0, y: 0.1 }, wideView: "crop", phonePane: { x: 160, y: 300, w: 684 } },
 };
 
 /*

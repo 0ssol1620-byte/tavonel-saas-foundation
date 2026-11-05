@@ -24,6 +24,9 @@ import HeroFilmDisclosure from "./hero-film-disclosure";
  * the pixels in each dimension. The locked master preserves the verified 2880x1800/yuv444p source
  * on every viewport and is already recorded in `lib/locked-film-assets.json`.
  */
+/** The four re-recorded cuts, in stage order (stage 1 also has the decoder-error fallbacks in HERO_CUT). */
+export const HOME_FILM_CUTS = ["/film/hero-c1.mp4", "/film/hero-c2.mp4", "/film/hero-c3.mp4", "/film/hero-c4.mp4"] as const;
+
 const HERO_CUT = {
   src: "/film/hero-c1.mp4",
   fallbackSrc: "/film/hero-c1-hq.mp4",
@@ -63,7 +66,7 @@ const HERO_CUT = {
   lib/locked-film-assets.json.
 */
 const HOME_POSTERS = [
-  { poster: "/film/poster-c1-t13.60-2x.webp", poster1x: "/film/poster-c1-t13.60.webp", posterAvif: "/film/poster-c1-t13.60-2x.avif", posterAvif1x: "/film/poster-c1-t13.60.avif", phonePoster: "/film/poster-c1-t13.60-pane1-760x950.webp", phonePosterAvif: "/film/poster-c1-t13.60-pane1-760x950.avif" },
+  { poster: "/film/poster-c1-t13.60-2x.webp", poster1x: "/film/poster-c1-t13.60.webp", posterAvif: "/film/poster-c1-t13.60-2x.avif", posterAvif1x: "/film/poster-c1-t13.60.avif", phonePoster: "/film/poster-c1-t13.60-pane1-684x855.webp", phonePosterAvif: "/film/poster-c1-t13.60-pane1-684x855.avif" },
   { poster: "/film/poster-c2-t4.40-2x.webp", poster1x: "/film/poster-c2-t4.40.webp", posterAvif: "/film/poster-c2-t4.40-2x.avif", posterAvif1x: "/film/poster-c2-t4.40.avif" },
   { poster: "/film/poster-c3-t17.96-2x.webp", poster1x: "/film/poster-c3-t17.96.webp", posterAvif: "/film/poster-c3-t17.96-2x.avif", posterAvif1x: "/film/poster-c3-t17.96.avif" },
   { poster: "/film/poster-c4-t6.80-2x.webp", poster1x: "/film/poster-c4-t6.80.webp", posterAvif: "/film/poster-c4-t6.80-2x.avif", posterAvif1x: "/film/poster-c4-t6.80.avif" },
@@ -79,6 +82,7 @@ function heroStages(korean: boolean): CompileStage[] {
   return COMPILE_STAGES.map((stage, index) => ({
     ...stage,
     ...HOME_POSTERS[index],
+    src: HOME_FILM_CUTS[index]!,
     ...(index === 0 ? HERO_CUT : {}),
     ...(korean ? LANDING_V2_FILM_STAGES_KO[index] : {}),
     line: lines[index],

@@ -116,11 +116,11 @@ describe("approved one-path experience", () => {
     }
     const film = text("components/landing-v2/hero-film.tsx");
     expect(film).not.toContain('"use client"');
-    expect(film).toContain('src: "/film/compile-cut.mp4"');
-    expect(film).toContain('fallbackSrc: "/film/compile-cut-hq.mp4"');
-    expect(film).toContain('fallbackPhoneSrc: "/film/compile-cut-hq-1440.mp4"');
-    expect(film).toContain('poster: "/film/poster-1-t8.16-2x.webp"');
-    expect(film).toContain('posterAvif: "/film/poster-1-t8.16-2x.avif"');
+    expect(film).toContain('src: "/film/hero-c1.mp4"');
+    expect(film).toContain('fallbackSrc: "/film/hero-c1-hq.mp4"');
+    expect(film).toContain('fallbackPhoneSrc: "/film/hero-c1-hq-1440.mp4"');
+    expect(film).toContain('poster: "/film/poster-c1-t13.60-2x.webp"');
+    expect(film).toContain('posterAvif: "/film/poster-c1-t13.60-2x.avif"');
     const disclosure = text("components/landing-v2/hero-film-disclosure.tsx");
     expect(film).toContain("<HeroFilmDisclosure");
     expect(disclosure).toContain('data-testid="landing-hero-film"');
