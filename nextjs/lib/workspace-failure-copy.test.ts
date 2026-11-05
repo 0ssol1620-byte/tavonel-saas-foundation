@@ -3,7 +3,7 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import AuthCallbackPage from "../app/auth/callback/page";
-import { failureSentence } from "./workspace-failure-copy";
+import { failureSentence, isSizeLimitFailure, sizeLimitFailureCopy } from "./workspace-failure-copy";
 
 const workspace = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
 const connections = readFileSync(new URL("../components/connections-panel.tsx", import.meta.url), "utf8");
@@ -25,6 +25,27 @@ describe("workspace failure copy", () => {
   it("says something useful when there is no code at all", () => {
     expect(failureSentence(null, 429)).toBe("Too many requests at once. Wait a minute and try again.");
     expect(failureSentence(undefined, 404)).not.toContain("Reference");
+  });
+
+  it("says a size refusal is a size limit that a retry will not change, in English and Korean, without numbers", () => {
+    // REVIEW-PR192-R1 MAJOR-2: these fell through to "Our servers could not complete this", which reads as transient.
+    for (const code of ["JSON_TOO_LARGE", "CORE_OUTPUT_TOO_LARGE"]) {
+      expect(isSizeLimitFailure(code)).toBe(true);
+      expect(failureSentence(code, 500)).not.toContain("Our servers");
+      expect(failureSentence(code, 500)).toMatch(/same result/);
+    }
+    expect(isSizeLimitFailure("CORE_V2_TIMEOUT")).toBe(false);
+    expect(isSizeLimitFailure(null)).toBe(false);
+    const en = sizeLimitFailureCopy(["en-US"]);
+    const ko = sizeLimitFailureCopy(["ko-KR", "en"]);
+    expect(en.sentence).toMatch(/same result/);
+    expect(en.sentence).not.toMatch(/try again|retry/i);
+    expect(ko.sentence).toContain("다시 실행해도 결과는 같습니다");
+    for (const copy of [en, ko]) expect(copy.sentence).not.toMatch(/\d/);
+    expect(sizeLimitFailureCopy([])).toEqual(en);
+    // The same selection is not offered again after a size refusal.
+    expect(workspace).toContain("disabled={busy || !judgeCorpusSet(selectedDocumentIds.length).ok || sizeRefusedSameSet}");
+    expect(workspace).toContain("isSizeLimitFailure(compileJob.errorCode)");
   });
 
   /*

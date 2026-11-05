@@ -2,7 +2,8 @@
 
 import type { BlockerResolution, CompileBlocker, CompileState } from "@/lib/compile-job-store";
 import type { CorpusProgress } from "@/lib/corpus-batching";
-import { failureSentence } from "@/lib/workspace-failure-copy";
+import type { CompileSizeLimit } from "@/lib/compile-job-client";
+import { failureSentence, isSizeLimitFailure, sizeLimitFailureCopy } from "@/lib/workspace-failure-copy";
 
 /*
   What the server is doing with a compile, and what the customer is allowed to do about it.
@@ -29,7 +30,13 @@ export type CompileJobView = {
   /* Set when this job is one part of a corpus compile (migration 0040). */
   corpusId?: string | null;
   batchIndex?: number | null;
+  /* The size refusal behind a JSON_TOO_LARGE / CORE_OUTPUT_TOO_LARGE, from the job's events. */
+  sizeLimit?: CompileSizeLimit | null;
+  /* The set this tab submitted, when it submitted it: a size refusal is not retried on the same set. */
+  documentIds?: readonly string[];
 };
+
+const formatCount = (value: number) => value.toLocaleString("en-US");
 
 /*
   One line per state, in the customer's terms.
@@ -89,8 +96,11 @@ export function CompileJobPanel({
   onResolve,
   onCancel,
   onOpenPart,
+  languages = [],
 }: {
   job: CompileJobView;
+  /** The browser's language list; Korean or English for the size-refusal copy. */
+  languages?: readonly string[];
   corpus?: (CorpusProgress & { parts: Array<{ jobId: string; batchIndex: number | null; state: CompileState }> }) | null;
   names?: Record<string, string>;
   busy?: boolean;
@@ -104,6 +114,7 @@ export function CompileJobPanel({
   const undecided = job.blocked.length > 0 && !job.blockedResolution && !settled;
   const security = job.blocked.filter((entry) => entry.kind === "security");
   const clean = Math.max(0, job.documentsTotal - job.blocked.length);
+  const sizeCopy = sizeLimitFailureCopy(languages);
 
   return (
     <section className="workspace-compile-job" aria-labelledby="workspace-compile-job-title" data-state={job.state}>
@@ -150,7 +161,44 @@ export function CompileJobPanel({
         </>
       ) : null}
       <p className="fine">{job.documentsReady} of {job.documentsTotal} read</p>
-      {job.errorCode ? <p className="fine workspace-preflight-blocked" role="alert">{failureSentence(job.errorCode, 500)}</p> : null}
+      {job.errorCode && isSizeLimitFailure(job.errorCode) ? (
+        /*
+          A size refusal is deterministic: the generic "our servers could not complete this" line
+          invited a retry that recompiles the same output and fails the same way (REVIEW-PR192-R1
+          MAJOR-2). The sentence carries no numbers; what was measured is shown beneath it.
+        */
+        <div className="workspace-compile-job-size" role="alert">
+          <p className="fine workspace-preflight-blocked">{sizeCopy.sentence}</p>
+          {job.sizeLimit ? (
+            <dl className="fine" data-sensitive="content">
+              {job.sizeLimit.bytes !== null || job.sizeLimit.bound !== null ? (
+                <>
+                  <dt>{sizeCopy.measured}</dt>
+                  <dd>
+                    {job.sizeLimit.bytes !== null ? formatCount(job.sizeLimit.bytes) : "?"}
+                    {job.sizeLimit.bound !== null ? ` / ${formatCount(job.sizeLimit.bound)}` : ""} bytes
+                  </dd>
+                </>
+              ) : null}
+              {job.sizeLimit.largestPackageFiles.length > 0 ? (
+                <>
+                  <dt>{sizeCopy.largest}</dt>
+                  {job.sizeLimit.largestPackageFiles.map((file, index) => (
+                    <dd key={index}><code>{file.path}</code> {formatCount(file.sizeBytes)} bytes</dd>
+                  ))}
+                </>
+              ) : null}
+              {Object.keys(job.sizeLimit.counts).length > 0 ? (
+                <>
+                  <dt>{sizeCopy.counts}</dt>
+                  <dd>{Object.entries(job.sizeLimit.counts).map(([name, value]) => `${name} ${formatCount(value)}`).join(" · ")}</dd>
+                </>
+              ) : null}
+            </dl>
+          ) : null}
+          <p className="fine">Reference {job.errorCode} · {job.jobId}</p>
+        </div>
+      ) : job.errorCode ? <p className="fine workspace-preflight-blocked" role="alert">{failureSentence(job.errorCode, 500)}</p> : null}
       {/*
         The sentence this whole change exists to make true. It is worth saying out loud, in the
         place where somebody is deciding whether they can close the laptop.

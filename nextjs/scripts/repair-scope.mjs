@@ -1931,6 +1931,18 @@ export const OCR_JSON_BOUND_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/global-collection-compile.test.ts', 'lib/intake-ceiling-cross-tree.test.ts', 'lib/r2-objects.test.ts',
   'lib/source-import.test.ts', 'lib/tenant-isolation-negative.test.ts', 'lib/world-rollback-source-access.test.ts',
 ]);
+// Compile-job stall (cjob-157f2f23, 2026-11-05): the read-only events stream, the sticky-terminal client, and the CAS lease and
+// post-terminal refusal suites. The store, worker and compile-run are owned above; these are the endpoints no owner listed.
+export const COMPILE_JOB_STALL_AFFECTED_PATHS = Object.freeze([
+  'app/api/compile-jobs/[jobId]/events/route.ts', 'app/api/internal/jobs/run/route.ts', 'lib/compile-job-client.test.ts', 'lib/compile-job-client.ts',
+  'lib/compile-job-events-route.test.ts', 'lib/compile-job-lease.test.ts', 'lib/durable-compile-orchestration.test.ts',
+  'components/compile-job-panel.tsx', 'lib/compile-job-panel.test.ts',
+]);
+export const COMPILE_JOB_STALL_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/compile-job-client.test.ts', 'lib/compile-job-events-route.test.ts', 'lib/compile-job-lease.test.ts',
+  'lib/compile-job-worker.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/execution-budget.test.ts',
+  'lib/compile-job-panel.test.ts', 'lib/workspace-failure-copy.test.ts',
+]);
 // EN-0c benchmarks path mask: /benchmarks masks an absolute scoring-machine path in the Model Arena notes at render time
 // (the artifact and its pinned sha256 are unchanged). The four endpoints no owner listed select their two direct suites plus
 // the five that read the changed files: benchmark-registry, brand-copy, copy-trust-guard and trust-page-answers read the page
@@ -2885,6 +2897,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // OCR JSON read bound: the seven exact paths above select fifteen direct suites and no browser suite.
   affectedGroup('ocr-json-bound', new RegExp(`^nextjs/(?:${exactPathAlternation(OCR_JSON_BOUND_AFFECTED_PATHS)})$`),
     { unitFiles: OCR_JSON_BOUND_AFFECTED_UNIT_FILES }),
+  // Compile-job stall: the nine exact paths above select eight direct suites and no browser suite.
+  affectedGroup('compile-job-stall', new RegExp(`^nextjs/(?:${exactPathAlternation(COMPILE_JOB_STALL_AFFECTED_PATHS)})$`),
+    { unitFiles: COMPILE_JOB_STALL_AFFECTED_UNIT_FILES }),
   // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.
   affectedGroup('benchmarks-path-mask', new RegExp(`^nextjs/(?:${exactPathAlternation(BENCHMARKS_PATH_MASK_AFFECTED_PATHS)})$`),
     { unitFiles: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES }),

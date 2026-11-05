@@ -1,5 +1,4 @@
 import { isTerminalCompileState, readCompileJob, readCompileJobEvents } from "@/lib/compile-job-store";
-import { runCompileJobTurn } from "@/lib/compile-job-worker";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 
 export const dynamic = "force-dynamic";
@@ -82,25 +81,16 @@ export async function GET(request: Request, context: { params: Promise<{ jobId: 
       send(ENCODER.encode(": open\nretry: 3000\n\n"));
 
       let settled = false;
-      let nudgedAt = 0;
       while (!closed && !settled && Date.now() < deadline) {
         /*
-          Give the job a push while someone is watching.
-
-          The cron turns this crank once a minute whether or not anyone has the workspace open,
-          which is what makes the compile durable. That cadence is fine for a run nobody is
-          looking at and far too slow for one somebody is. So a live viewer nudges the same
-          worker function in-process -- not a second implementation, and not a privilege the
-          browser gains: the caller was already authorized for this workspace and the turn
-          touches only this job. Remove it and the compile still finishes, a minute later.
+          A reader only. This loop used to run a compile turn in-process every 3 s, which
+          meant a 60 s stream could take the compile lease and start Core with seconds left on its
+          own clock: cjob-157f2f23 leased at 07:11:15, the stream was killed at 07:11:25, and the
+          job sat on a dead lease for five minutes. The scheduled worker (`/api/internal/jobs/run`,
+          every minute) is the only runner. A viewer waits up to a tick per step, and one more tick
+          per compile queued ahead in the same tick: the worker claims a compile only while a whole
+          Core call still fits the tick (the worker's claim deadline), so at most one runs per tick.
         */
-        if (Date.now() - nudgedAt > 3_000) {
-          nudgedAt = Date.now();
-          const current = await readCompileJob(workspaceKey, jobId);
-          if (current.ok && !isTerminalCompileState(current.value.state)) {
-            await runCompileJobTurn(current.value).catch(() => undefined);
-          }
-        }
         const events = await readCompileJobEvents(workspaceKey, jobId, cursor);
         if (!events.ok) {
           send(frame(cursor, "error", { code: events.code }));
@@ -109,7 +99,9 @@ export async function GET(request: Request, context: { params: Promise<{ jobId: 
         for (const event of events.value) {
           cursor = event.sequence;
           if (!send(frame(event.sequence, event.eventType, event))) break;
-          if (isTerminalCompileState(event.state)) settled = true;
+          // Terminal is the last word. Nothing after it is sent: a later row (cjob-157f2f23
+          // seq 159, `structuring` after `failed`) would otherwise overwrite the settled view.
+          if (isTerminalCompileState(event.state)) { settled = true; break; }
         }
         if (settled || closed) break;
         // A comment frame, so a silent job still holds the connection open through a proxy

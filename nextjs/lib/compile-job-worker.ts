@@ -2,6 +2,7 @@ import { globalCollectionCompileEnabled, GLOBAL_COLLECTION_KEY_PREFIX } from "./
 import { isCompileWaitingOnReading, runCollectionCompile } from "./collection-compile-run";
 import {
   advanceCompileJob,
+  claimCompileJobLease,
   type CompileBlocker,
   type CompileJob,
   type CompileState,
@@ -15,6 +16,7 @@ import { groupImmutableDocuments, selectCurrentDocumentVersions } from "./immuta
 import { listImmutableWorkspaceObjects } from "./r2-objects";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
 import { authorizeCompileJobSourceAccess, classifyCompileJobSources, compileJobAuthorityEnabled } from "./compile-job-authority";
+import { CORE_CLIENT_TIMEOUT_MS, WORKER_MAX_DURATION_MS } from "./execution-budget";
 
 /*
   The half of the compile that no longer needs a browser.
@@ -106,6 +108,10 @@ export type CompileJobTurn = {
   note: "waiting" | "advanced" | "blocked" | "compiled" | "failed" | "resting" | "skipped";
   /** True when a temporary authority-store failure should not consume the runnable batch width. */
   retryable?: true;
+  /** This turn took the compile lease. */
+  claimed?: true;
+  /** Skipped because the tick could no longer fit a whole Core call; the batch stops here. */
+  outOfTime?: true;
   documentsReady: number;
   blocked: CompileBlocker[];
 };
@@ -167,14 +173,16 @@ function blockersResolved(job: CompileJob, blocked: readonly CompileBlocker[]) {
   return job.blockedResolution === "continue" || job.blockedResolution === "remove_blocked";
 }
 
-export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn> {
+export async function runCompileJobTurn(job: CompileJob, deadlineAt = Number.POSITIVE_INFINITY): Promise<CompileJobTurn> {
+  let claimed = false;
   const rest = (
     note: CompileJobTurn["note"],
     state: CompileState,
     documentsReady: number,
     blocked: CompileBlocker[],
     retryable = false,
-  ): CompileJobTurn => ({ jobId: job.jobId, state, note, documentsReady, blocked, ...(retryable ? { retryable: true as const } : {}) });
+  ): CompileJobTurn => ({ jobId: job.jobId, state, note, documentsReady, blocked, ...(retryable ? { retryable: true as const } : {}),
+    ...(claimed ? { claimed: true as const } : {}) });
 
   /*
     A resting state is not an unfinished one.
@@ -306,31 +314,46 @@ export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn
     Take the lease by moving into `structuring`, and compile only if this call is the one that
     moved it. Two schedulers firing together therefore produce one compile, not two.
 
-    An exception for a stale lease: a worker that died mid-compile left the row here, and after
-    COMPILE_LEASE_MS another worker may pick it up. Repeating the compile is safe -- the
+    A stale lease is taken over the same way: a worker that died mid-compile left the row here,
+    and after COMPILE_LEASE_MS another worker may pick it up. Repeating the compile is safe -- the
     collection id is derived from the input binding and the artifact write is idempotent -- so
     the cost of being wrong about a dead worker is one wasted run, not a duplicate World.
+
+    Both are one compare-and-set on the row as this turn read it (`claimCompileJobLease`), so of
+    every runner that read the same row exactly one compiles. Before 2026-11-05 the takeover was
+    a bare clock check and the fresh lease an RPC that answers `changed` to every same-rank
+    caller; cjob-157f2f23 ran Core twice and appended a `structuring` row after `failed`.
   */
-  if (job.state !== "structuring") {
-    const leased = await advanceCompileJob({
-      workspaceKey: job.workspaceKey,
-      jobId: job.jobId,
-      state: "structuring",
-      documentsReady: classified.ready.length,
-      blocked: blockedChanged ? classified.blocked : undefined,
-    });
-    if (!leased.ok || !leased.value.changed) {
-      return rest("skipped", job.state, classified.ready.length, classified.blocked);
-    }
-  } else if (Date.now() - Date.parse(job.updatedAt) < COMPILE_LEASE_MS) {
+  if (job.state === "structuring" && Date.now() - Date.parse(job.updatedAt) < COMPILE_LEASE_MS) {
     return rest("skipped", job.state, classified.ready.length, classified.blocked);
   }
+  /*
+    Never take a lease the tick cannot finish. Core is given CORE_CLIENT_TIMEOUT_MS and settlement
+    the rest of the 60 s, so a claim is only made while a whole Core call still fits; otherwise the
+    job keeps its place at the head of the queue for the next tick. Without this a second compile
+    in one tick claimed at ~46 s, the function died at 60 s, and the lease sat dead for 5 minutes
+    (REVIEW-PR192-R1 MAJOR-1) -- cjob-157f2f23's failure, moved from the stream to the cron.
+  */
+  if (deadlineAt - Date.now() < CORE_CLIENT_TIMEOUT_MS) {
+    return { ...rest("skipped", job.state, classified.ready.length, classified.blocked), outOfTime: true };
+  }
+  const leased = await claimCompileJobLease({
+    job,
+    documentsReady: classified.ready.length,
+    blocked: blockedChanged ? classified.blocked : undefined,
+  });
+  if (!leased.ok || !leased.value.claimed) {
+    return rest("skipped", job.state, classified.ready.length, classified.blocked);
+  }
+  claimed = true;
+  // Core's budget is cut to what the tick has left minus the settlement reserve (MINOR-10).
+  const tickDeadline = Number.isFinite(deadlineAt) ? deadlineAt : undefined;
 
   const run = job.compilationMode === "global_collection"
     ? await runCollectionCompile(job.workspaceKey, classified.ready, `${GLOBAL_COLLECTION_KEY_PREFIX}${job.corpusId}`, job.jobId,
-      { userId: job.createdByUserId, provenance: "durable_job" })
+      { userId: job.createdByUserId, provenance: "durable_job" }, tickDeadline)
     : await runCollectionCompile(job.workspaceKey, classified.ready, undefined, job.jobId,
-      { userId: job.createdByUserId, provenance: "durable_job" });
+      { userId: job.createdByUserId, provenance: "durable_job" }, tickDeadline);
   if (!run.ok) {
     if (isCompileWaitingOnReading(run.code)) {
       /*
@@ -427,7 +450,11 @@ export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn
 }
 
 /** One turn across the queue: pick up whatever is due and advance each by one step. */
-export async function runCompileJobBatch(limit = 5): Promise<CompileJobTurn[]> {
+export async function runCompileJobBatch(
+  limit = 5,
+  /** The tick's wall clock: this invocation dies at WORKER_MAX_DURATION_MS. */
+  deadlineAt = Date.now() + WORKER_MAX_DURATION_MS,
+): Promise<CompileJobTurn[]> {
   // Read a bounded scan window so a handful of policy-store outages cannot monopolize the
   // oldest-first runnable window when their event or timestamp write fails. This is one metadata
   // query; retryable jobs still perform no R2 listing, OCR read, or Core dispatch.
@@ -437,8 +464,9 @@ export async function runCompileJobBatch(limit = 5): Promise<CompileJobTurn[]> {
   const turns: CompileJobTurn[] = [];
   let attempted = 0;
   for (const job of open.value) {
-    const turn = await runCompileJobTurn(job);
+    const turn = await runCompileJobTurn(job, deadlineAt);
     turns.push(turn);
+    if (turn.outOfTime) break;
     if (turn.retryable || turn.note === "resting") continue;
     attempted += 1;
     if (attempted >= workLimit) break;

@@ -36,12 +36,15 @@ const recordSizeLimit = vi.fn(
 );
 
 const openJobs = vi.fn(async (): Promise<CompileJobResult<CompileJob[]>> => ({ ok: true, value: [] }));
+const claimLease = vi.fn(async (_input: { job: CompileJob }): Promise<CompileJobResult<{ claimed: boolean }>> =>
+  ({ ok: true, value: { claimed: true } }));
 
 vi.mock("./compile-job-store", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./compile-job-store")>();
   return {
     ...actual,
     advanceCompileJob: advance,
+    claimCompileJobLease: claimLease,
     readOpenCompileJobs: openJobs,
     countCompileJobDeferrals: countDeferrals,
     recordCompileJobDeferral: recordDeferral,
@@ -70,6 +73,7 @@ vi.mock("./immutable-keys", async (importOriginal) => {
 const { runCompileJobBatch, runCompileJobTurn, DIGEST_MIGRATION_NOT_APPLIED } =
   await import("./compile-job-worker");
 const { RESTING_COMPILE_STATES, SCHEDULER_EXCLUDED_STATES } = await import("./compile-job-store");
+const { CORE_CLIENT_TIMEOUT_MS, WORKER_SETTLEMENT_RESERVE_MS } = await import("./execution-budget");
 
 const DOCUMENT = (id: string, state: "ocr_ready" | "sanitized" | "operator_review") => ({
   documentId: id,
@@ -115,6 +119,7 @@ beforeEach(() => {
     value: { state: "reading" as CompileState, changed: true },
   });
   runCompile.mockReset();
+  claimLease.mockReset().mockResolvedValue({ ok: true, value: { claimed: true } });
   listObjects.mockReset();
   jobAuthority.mockReset().mockResolvedValue({ ok: true });
   authorityEnabled.mockReset().mockReturnValue(false);
@@ -283,7 +288,7 @@ describe("the durable compile worker", () => {
     expect(turn.note).toBe("compiled");
     expect(turn.state).toBe("ready");
     expect(runCompile).toHaveBeenCalledWith("pilot-alpha", ["doc-a"], undefined, "cjob-00000000000000000000000000000001",
-      { userId: "00000000-0000-4000-8000-000000000001", provenance: "durable_job" });
+      { userId: "00000000-0000-4000-8000-000000000001", provenance: "durable_job" }, undefined);
   });
 
   it("names the object and its bytes in a job event before failing on JSON_TOO_LARGE", async () => {
@@ -329,9 +334,9 @@ describe("the durable compile worker", () => {
     expect(turn.note).toBe("compiled");
 
     const calls = advance.mock.calls as unknown as Array<[{ state: CompileState; candidateManifestDigest?: string }]>;
-    // The lease into `structuring` has no artifact yet and must not claim one.
+    // The lease into `structuring` is the compare-and-set, not an advance; it carries no digest.
+    expect(claimLease).toHaveBeenCalledOnce();
     expect(calls.map(([input]) => [input.state, input.candidateManifestDigest ?? null])).toEqual([
-      ["structuring", null],
       ["building_world", manifestDigest],
       ["ready", manifestDigest],
     ]);
@@ -356,9 +361,8 @@ describe("the durable compile worker", () => {
       payload: { collectionId: "collection-" + "b".repeat(32), manifestDigest, lifecycle: "candidate" },
     });
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
-    // Call 1 is the lease into `structuring`; call 2 is the building_world advance that carries
-    // the digest, and it is the one the old function cannot resolve.
-    advance.mockResolvedValueOnce({ ok: true, value: { state: "structuring", changed: true } });
+    // Call 1 is the building_world advance that carries the digest, and it is the one the old
+    // function cannot resolve. (The lease is the compare-and-set, not an advance.)
     advance.mockResolvedValueOnce({ ok: false, code: "COMPILE_JOB_RPC_UNDEFINED" });
 
     const turn = await runCompileJobTurn(job());
@@ -370,13 +374,12 @@ describe("the durable compile worker", () => {
     );
     const calls = advance.mock.calls as unknown as Array<[{ state: CompileState; candidateManifestDigest?: string }]>;
     expect(calls.map(([input]) => [input.state, input.candidateManifestDigest ?? "omitted"])).toEqual([
-      ["structuring", "omitted"],
       ["building_world", manifestDigest],
       // The retry names no digest at all, which is what makes it the eight-argument call.
       ["building_world", "omitted"],
       ["ready", manifestDigest],
     ]);
-    expect(calls[2][0], "the retry omits the argument rather than nulling it")
+    expect(calls[1][0], "the retry omits the argument rather than nulling it")
       .not.toHaveProperty("candidateManifestDigest", null);
     // Once, not in a loop: a second PGRST202 is a different problem.
     expect(logged).toHaveBeenCalledTimes(1);
@@ -385,10 +388,42 @@ describe("the durable compile worker", () => {
 
   it("does not compile twice when two workers pick up the same job", async () => {
     group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
-    // The lease is the transition into `structuring`: the loser's advance changes nothing.
-    advance.mockResolvedValueOnce({ ok: true, value: { state: "structuring", changed: false } });
+    // The lease is a compare-and-set on the row as read: the loser's PATCH matches nothing.
+    claimLease.mockResolvedValueOnce({ ok: true, value: { claimed: false } });
     const turn = await runCompileJobTurn(job());
     expect(turn.note).toBe("skipped");
+    expect(runCompile).not.toHaveBeenCalled();
+  });
+
+  it("takes over a stale lease only by compare-and-set, and a runner that loses the race never calls Core", async () => {
+    // cjob-157f2f23: after the 5-minute lease went stale, every runner passed a bare clock check
+    // and Core ran twice (two coreRequestIds, one coreOutputSha256).
+    group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
+    const stale = job({ state: "structuring", updatedAt: new Date(Date.now() - 6 * 60_000).toISOString() });
+    runCompile.mockResolvedValue({ ok: false, status: 503, code: "CORE_V2_TIMEOUT", payload: {} });
+    claimLease.mockResolvedValueOnce({ ok: true, value: { claimed: true } })
+      .mockResolvedValueOnce({ ok: true, value: { claimed: false } });
+
+    const [first, second] = await Promise.all([runCompileJobTurn(stale), runCompileJobTurn(stale)]);
+
+    expect([first.note, second.note].sort()).toEqual(["failed", "skipped"]);
+    expect(runCompile).toHaveBeenCalledTimes(1);
+    // Both CAS on the same token: the row as they read it.
+    expect(claimLease.mock.calls.map(([input]) => input.job.updatedAt)).toEqual([stale.updatedAt, stale.updatedAt]);
+  });
+
+  it("does not touch a live lease", async () => {
+    group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
+    const turn = await runCompileJobTurn(job({ state: "structuring", updatedAt: new Date(Date.now() - 60_000).toISOString() }));
+    expect(turn.note).toBe("skipped");
+    expect(claimLease).not.toHaveBeenCalled();
+    expect(runCompile).not.toHaveBeenCalled();
+  });
+
+  it("skips, and compiles nothing, when the lease store cannot answer", async () => {
+    group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
+    claimLease.mockResolvedValueOnce({ ok: false, code: "COMPILE_JOB_STORE_WRITE_FAILED" });
+    expect((await runCompileJobTurn(job())).note).toBe("skipped");
     expect(runCompile).not.toHaveBeenCalled();
   });
 
@@ -421,6 +456,58 @@ describe("the durable compile worker", () => {
     expect(turns.map((turn) => turn.note)).toEqual(["resting", "resting", "resting", "resting", "resting", "waiting"]);
     expect(advance).toHaveBeenCalledWith(expect.objectContaining({ jobId: fresh }));
     expect(listObjects).toHaveBeenCalledTimes(1);
+  });
+
+  it("claims only while a whole Core call fits the tick, and gives Core what is left minus the settlement reserve", async () => {
+    // REVIEW-PR192-R1 MINOR-10/11: the boundary, and the budget handed to the compile.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(Date.parse("2026-11-05T09:00:00.000Z"));
+      group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
+      runCompile.mockResolvedValue({ ok: false, status: 503, code: "CORE_V2_TIMEOUT", payload: {} });
+
+      const refused = await runCompileJobTurn(job(), Date.now() + CORE_CLIENT_TIMEOUT_MS - 1_000);
+      expect(refused).toMatchObject({ note: "skipped", outOfTime: true });
+      expect(claimLease).not.toHaveBeenCalled();
+
+      const deadline = Date.now() + CORE_CLIENT_TIMEOUT_MS + WORKER_SETTLEMENT_RESERVE_MS;
+      const allowed = await runCompileJobTurn(job(), deadline);
+      expect(allowed).toMatchObject({ note: "failed", claimed: true });
+      expect(claimLease).toHaveBeenCalledOnce();
+      // The compile receives the tick deadline; collection-compile-run subtracts the reserve.
+      expect(runCompile.mock.calls[0]?.[5]).toBe(deadline);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not claim a second compile the tick cannot finish, and stops the batch there", async () => {
+    // REVIEW-PR192-R1 MAJOR-1: J1's compile ends ~45 s into the 60 s tick; claiming J2 then would
+    // leave a dead lease for 5 minutes and pay Core twice.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const t0 = Date.parse("2026-11-05T09:00:00.000Z");
+      vi.setSystemTime(t0);
+      group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
+      const second = "cjob-" + "c".repeat(32);
+      const third = "cjob-" + "d".repeat(32);
+      openJobs.mockResolvedValue({ ok: true, value: [job(), job({ jobId: second }), job({ jobId: third })] });
+      runCompile.mockImplementation(async () => {
+        vi.setSystemTime(t0 + 45_000);
+        return { ok: true, status: 200, payload: { collectionId: "collection-" + "b".repeat(32), lifecycle: "candidate" } };
+      });
+
+      const turns = await runCompileJobBatch(5);
+
+      expect(turns.map((turn) => [turn.jobId, turn.note, turn.claimed ?? false, turn.outOfTime ?? false])).toEqual([
+        [job().jobId, "compiled", true, false],
+        [second, "skipped", false, true],
+      ]);
+      expect(runCompile).toHaveBeenCalledTimes(1);
+      expect(claimLease).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("scans past five authority-store failures to reach a healthy later job", async () => {
@@ -600,6 +687,6 @@ it("compiles every document of a qualified global job into one logical collectio
     batchIndex: 0, batchCount: 1, documentIds: ids, documentsTotal: 13 }));
   expect(turn.note).toBe("compiled");
   expect(runCompile).toHaveBeenCalledWith("pilot-alpha", ids, `global-corpus/${corpusId}`, "cjob-00000000000000000000000000000001",
-    { userId: "00000000-0000-4000-8000-000000000001", provenance: "durable_job" });
+    { userId: "00000000-0000-4000-8000-000000000001", provenance: "durable_job" }, undefined);
   vi.unstubAllEnvs();
 });
