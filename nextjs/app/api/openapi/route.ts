@@ -531,7 +531,7 @@ export async function GET(request: Request) {
             "413": err("COMPILE_INPUT_TOO_LARGE", "JSON_TOO_LARGE"),
             "415": err("METADATA_ONLY_ENDPOINT"),
             "429": err("API_RATE_LIMITED", "WORKSPACE_CONCURRENCY_LIMIT"),
-            "503": err("CORE_NOT_CONFIGURED", "CORE_UNAVAILABLE"),
+            "503": err("CORE_NOT_CONFIGURED", "CORE_UNAVAILABLE", "CORE_OUTPUT_TOO_LARGE"),
           },
         },
       },

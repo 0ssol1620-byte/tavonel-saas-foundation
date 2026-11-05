@@ -10,6 +10,7 @@ import { validateDownloadableCollectionArtifact, validatePromotableCollectionArt
 import { CONTRACT_CLAUSES, clause } from "./compiler-contract";
 import {
   CORE_V2_MAX_REQUEST_BYTES,
+  CORE_V2_MAX_RESPONSE_BYTES,
   CORE_V2_REVISION_COMPILE_FLAG,
   PRODUCT_CORE_RESPONSE_SCHEMA,
   buildProductCoreV2Request,
@@ -171,6 +172,31 @@ describe("Python Product-Core v2 dispatch", () => {
       expect(result.sizeLimit!.bytes).toBeGreaterThan(CORE_V2_MAX_REQUEST_BYTES);
     }
     expect(fetchCore).not.toHaveBeenCalled();
+  });
+
+  it("reads the Core response no further than the candidate bound, naming the request it refused", async () => {
+    // cjob-157f2f23: a 134,576,916 B candidate means the Core answered with far more than the
+    // documented 4.5 MB platform response cap. Nothing over the candidate bound can be stored.
+    expect(CORE_V2_MAX_RESPONSE_BYTES).toBe((await import("./r2-objects")).MAX_COLLECTION_JSON_BYTES);
+    const env = { url: "https://core-v2.example", hmac: "x".repeat(32) };
+    const declared = CORE_V2_MAX_RESPONSE_BYTES + 1;
+    vi.stubGlobal("fetch", async () => new Response("{}", { headers: { "content-length": String(declared) } }));
+    const byLength = await dispatchProductCoreV2(env, "pilot", inputs());
+    expect(byLength).toMatchObject({ ok: false, code: "CORE_OUTPUT_TOO_LARGE",
+      sizeLimit: { object: "core-response", bytes: declared, bound: CORE_V2_MAX_RESPONSE_BYTES } });
+    expect(byLength.ok === false && byLength.sizeLimit && "coreRequestId" in byLength.sizeLimit
+      && byLength.sizeLimit.coreRequestId).toMatch(/^core-/);
+
+    // No length, streamed past the bound: cut off there, the size stated as unknown, not guessed.
+    const chunk = new Uint8Array(4 * 1024 * 1024);
+    let sent = 0;
+    vi.stubGlobal("fetch", async () => new Response(new ReadableStream({
+      pull(controller) { sent += chunk.byteLength; controller.enqueue(chunk); },
+    })));
+    const streamed = await dispatchProductCoreV2(env, "pilot", inputs());
+    expect(streamed).toMatchObject({ ok: false, code: "CORE_OUTPUT_TOO_LARGE",
+      sizeLimit: { object: "core-response", bytes: null, bound: CORE_V2_MAX_RESPONSE_BYTES } });
+    expect(sent).toBeLessThanOrEqual(CORE_V2_MAX_RESPONSE_BYTES + 4 * chunk.byteLength);
   });
 
   it("uses a dedicated v2 HMAC so the v1 fallback can rotate independently", () => {

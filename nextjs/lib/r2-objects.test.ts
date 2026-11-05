@@ -302,7 +302,8 @@ describe("the ocr.json read bound against the intake ceiling", () => {
   it("names the five largest package files by path and size -- never their content -- when over the bound", () => {
     const files = [5, 900, 40, 7_000, 300, 2_000, 1].map((n, i) => ({ path: `pkg/f${i}.jsonl`, sizeBytes: 0, sha256: "x",
       mediaType: "application/jsonl", content: "s".repeat(n) }));
-    const value = { package: { roots: [], files }, secret: "do-not-echo" };
+    const value = { package: { roots: [], files }, secret: "do-not-echo",
+      validation: { status: "passed", counts: { claims: 40, relations: 780, contradictions: 780, evidence: 40, label: "x" } } };
     const refused = serializeCollectionCandidate(value, 1_000);
     expect(refused).toEqual({ ok: false, code: "JSON_TOO_LARGE", sizeLimit: {
       object: "candidate-world.json",
@@ -313,6 +314,7 @@ describe("the ocr.json read bound against the intake ceiling", () => {
         { path: "pkg/f1.jsonl", sizeBytes: 900 }, { path: "pkg/f4.jsonl", sizeBytes: 300 },
         { path: "pkg/f2.jsonl", sizeBytes: 40 },
       ],
+      validationCounts: { claims: 40, relations: 780, contradictions: 780, evidence: 40 },
     } });
     expect(JSON.stringify(refused)).not.toMatch(/sss|do-not-echo/);
     expect(serializeCollectionCandidate(value)).toMatchObject({ ok: true });

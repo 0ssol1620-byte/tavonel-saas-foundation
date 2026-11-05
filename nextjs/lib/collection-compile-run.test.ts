@@ -353,6 +353,20 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
     expect(put).not.toHaveBeenCalled();
   });
 
+  it("fails an oversized Core response by name before any receipt, audit or provenance", async () => {
+    compilableSource();
+    const sizeLimit = { object: "core-response", bytes: 134_576_916, bound: 32 * 1024 * 1024, coreRequestId: "core-test" };
+    dispatched.mockResolvedValue({ ok: false, code: "CORE_OUTPUT_TOO_LARGE", sizeLimit });
+
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+
+    expect(run).toEqual({ ok: false, status: 503, code: "CORE_OUTPUT_TOO_LARGE", payload: { sizeLimit } });
+    expect(serialize).not.toHaveBeenCalled();
+    expect(audited).not.toHaveBeenCalled();
+    expect(registered).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+  });
+
   it("puts exactly the bytes that passed the size check", async () => {
     compilableSource();
     expect((await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).ok).toBe(true);

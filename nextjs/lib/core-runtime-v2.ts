@@ -12,6 +12,7 @@ import {
 } from "./collection-compiler";
 import { CORE_CLIENT_TIMEOUT_MS, CORE_MAX_LATENCY_MS } from "./execution-budget";
 import { canonicalJsonWireField } from "./canonical-json-wire";
+import { readBoundedSourceBody } from "./bounded-source-body";
 
 export const PRODUCT_CORE_REQUEST_SCHEMA = "tavonel.product_core.compile_request.v2" as const;
 export const PRODUCT_CORE_RESPONSE_SCHEMA = "tavonel.product_core.compile_response.v2" as const;
@@ -25,6 +26,12 @@ export const PRODUCT_CORE_RESPONSE_SCHEMA = "tavonel.product_core.compile_respon
  * CORE_REQUEST_TOO_LARGE) is larger and so never the one that decides.
  */
 export const CORE_V2_MAX_REQUEST_BYTES = 4_500_000;
+/**
+ * The largest Core response read: the candidate bound (`MAX_COLLECTION_JSON_BYTES`, 32 MiB), since
+ * a larger output can never be stored. A literal, not that import, so suites that stub r2-objects
+ * still load this module; core-runtime-v2.test.ts pins the two equal.
+ */
+export const CORE_V2_MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
 
 const SHA256 = /^sha256:[0-9a-f]{64}$/;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
@@ -722,7 +729,8 @@ export async function dispatchProductCoreV2(
   remainingLatencyMs = CORE_CLIENT_TIMEOUT_MS,
 ): Promise<
   | { ok: true; result: ProductCoreV2CompileResponse }
-  | { ok: false; code: string; sizeLimit?: { object: "core-request"; bytes: number; bound: number } }
+  | { ok: false; code: string; sizeLimit?: { object: "core-request"; bytes: number; bound: number }
+    | { object: "core-response"; bytes: number | null; bound: number; coreRequestId: string } }
 > {
   if (customerDataGate && !authorizationAdmitsCustomerData(customerDataGate, workspaceId, workspaceId, now, expectedSourceScope)) {
     return { ok: false, code: "CUSTOMER_DATA_GATE_DECISION_INVALID" };
@@ -778,7 +786,21 @@ export async function dispatchProductCoreV2(
       && (cause.name === "TimeoutError" || cause.name === "AbortError");
     return { ok: false, code: timedOut ? "CORE_V2_TIMEOUT" : "CORE_V2_UNAVAILABLE" };
   }
-  const responseText = await response.text().catch(() => "");
+  /*
+    Read with a bound. The candidate is a copy of this response, and no candidate over
+    MAX_COLLECTION_JSON_BYTES can be written, so a larger body is refused here -- before it is
+    held, parsed, signed, audited or registered. cjob-157f2f23's 134,576,916 B candidate implies a
+    Core response far above the documented 4.5 MB platform response cap, which therefore did not
+    apply on this path. Counts are not reported: they would need the parse this bound prevents.
+  */
+  const read = await readBoundedSourceBody(response, CORE_V2_MAX_RESPONSE_BYTES);
+  if (!read.ok && read.code === "SOURCE_SIZE_UNQUALIFIED" && !read.empty) {
+    const declared = Number(response.headers.get("content-length") ?? Number.NaN);
+    return { ok: false, code: "CORE_OUTPUT_TOO_LARGE", sizeLimit: { object: "core-response",
+      bytes: Number.isSafeInteger(declared) && declared > CORE_V2_MAX_RESPONSE_BYTES ? declared : null,
+      bound: CORE_V2_MAX_RESPONSE_BYTES, coreRequestId: envelope.requestId } };
+  }
+  const responseText = read.ok ? Buffer.from(read.bytes.buffer, read.bytes.byteOffset, read.bytes.byteLength).toString("utf8") : "";
   let json: ProductCoreV2CompileResponse | { code?: unknown } | null;
   try { json = JSON.parse(responseText); } catch { json = null; }
   if (!response.ok || !json) {

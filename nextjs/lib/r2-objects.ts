@@ -64,6 +64,8 @@ export type JsonSizeLimit = {
   bound: number;
   /** Candidate only: the five largest `package.files[]` by content bytes. Paths, never content. */
   largestPackageFiles?: Array<{ path: string; sizeBytes: number }>;
+  /** Candidate only: the artifact's own `validation.counts` (numbers only). */
+  validationCounts?: Record<string, number>;
 };
 type TooLarge = { ok: false; code: "JSON_TOO_LARGE"; sizeLimit: JsonSizeLimit };
 const tooLarge = (object: JsonSizeLimit["object"], bytes: number | null, bound: number): TooLarge =>
@@ -352,6 +354,12 @@ export function serializeCollectionCandidate(
   const refused = tooLarge("candidate-world.json", body.length, bound);
   const largest = largestPackageFiles(value);
   if (largest.length > 0) refused.sizeLimit.largestPackageFiles = largest;
+  // Claims / relations / contradictions vs evidence: tells a pair blow-up from region fan-out.
+  const counts = (value as { validation?: { counts?: unknown } } | null)?.validation?.counts;
+  if (counts && typeof counts === "object") {
+    const numeric = Object.entries(counts).filter((entry): entry is [string, number] => Number.isSafeInteger(entry[1])).slice(0, 16);
+    if (numeric.length > 0) refused.sizeLimit.validationCounts = Object.fromEntries(numeric);
+  }
   return refused;
 }
 
