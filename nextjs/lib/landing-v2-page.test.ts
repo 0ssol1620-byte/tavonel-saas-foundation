@@ -984,7 +984,8 @@ describe("landing v2 -- difficulty and record", () => {
     expect(text).toContain(shown!.kindLabel);
     expect(text).toContain(shown!.citationLabel);
     expect(text).toContain(shown!.digest);
-    expect(text).toContain(`bbox ${shown!.bbox1000.join(",")}`);
+    // Page and region are said once, in the citation's pageNumber1 and bbox1000, not again in the field list.
+    expect(text).not.toContain(`bbox ${shown!.bbox1000.join(",")}`);
     expect(shown!.passage).toMatch(/^Operating expenses:/);
     expect(elements(receive, "a")).toHaveLength(0);
     expect(text).not.toMatch(/verified answer/i);

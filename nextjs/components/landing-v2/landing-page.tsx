@@ -111,7 +111,7 @@ export function receiveFromCase(view: EvidenceCase | null, korean: boolean): Rec
   return {
     kindLabel: korean ? "기존 추출 구절" : "Existing extracted passage",
     unedited: korean ? "판독기 출력, 수정 없음" : "Reader output, unedited",
-    citationLabel: korean ? "Ask 인용의 필드로 본 이 구절" : "The same passage, as four fields of an Ask citation",
+    citationLabel: korean ? "Ask 인용 필드" : "As an Ask citation",
     evidenceId: region.id,
     passage: region.passage,
     truncated: region.passageTruncated,
@@ -340,18 +340,8 @@ export default function LandingPage({
                       ))}
                     </dd>
                   </div>
-                  <div>
-                    <dt>{copy.evidence.fields.page}</dt>
-                    <dd data-derived="1" className={korean ? heroStyles.recordPageKo : undefined}>
-                      {korean
-                        ? `${receive.pageCount}쪽 중 ${receive.page}쪽`
-                        : `${receive.page} of ${receive.pageCount}`}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>{copy.evidence.fields.region}</dt>
-                    <dd><span data-derived="1" className={heroStyles.recordToken}>bbox {receive.bbox1000.join(",")}</span></dd>
-                  </div>
+                  {/* Round 3: page and region are not repeated here; the citation beside it carries them
+                      as pageNumber1 and bbox1000, and the word budget is not raised to say them twice. */}
                   <div>
                     <dt>{copy.evidence.fields.version}</dt>
                     <dd><code data-derived="1">{receive.digest}</code></dd>

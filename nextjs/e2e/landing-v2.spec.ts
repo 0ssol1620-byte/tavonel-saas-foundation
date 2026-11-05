@@ -276,10 +276,10 @@ test("server-renders the visible film poster as its priority image", async ({ re
   expect(high[0]).toMatch(/srcset="\/film\/poster-1-t8\.16\.webp 1440w, \/film\/poster-1-t8\.16-2x\.webp 2880w"/i);
   expect(high[0]).toMatch(/loading="eager"/i); expect(high[0]).toMatch(/ width="[1-9]\d*"/); expect(high[0]).toMatch(/ height="[1-9]\d*"/);
   const sourceImages = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => tag.includes("apple-2026-q1-10-q-reference-p004"));
-  // Direction C round 2: the committed 10-Q page is drawn by s2's window, by s3's received passage (CRITIQUE-R1 #2) and,
-  // while lib/hero-phone-mode.ts says "still", by the phone hero's still (#1) -- every copy lazy, none competing with the
-  // poster for priority.
-  expect(sourceImages).toHaveLength(PHONE_HERO === "still" ? 3 : 2);
+  // Direction C round 2: the committed 10-Q page is drawn by s2's window and, while lib/hero-phone-mode.ts says "still",
+  // by the phone hero's still (#1) -- every copy lazy, none competing with the poster for priority. Round 3: s3 no
+  // longer draws the page a second time; it shows the passage as the Ask citation it travels in.
+  expect(sourceImages).toHaveLength(PHONE_HERO === "still" ? 2 : 1);
   // s2's and s3's copies are lazy; the phone still is the phone's first-screen image, so it is eager (and hinted above).
   for (const [index, tag] of sourceImages.entries()) {
     expect(tag).toContain(PHONE_HERO === "still" && index === 0 ? 'loading="eager"' : 'loading="lazy"');

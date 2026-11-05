@@ -112,12 +112,7 @@ export default function Scene({
               <li key={`${arrival.form}-${arrival.filingDate}`}>
                 <span className={styles.node} aria-hidden="true" />
                 <span className={styles.when} data-derived="1">{arrival.form} · {arrival.filingDate}</span>
-                {/* Round 3 (CRITIQUE-R2 #2): the page of the filing the change record opens on, read off the record. */}
-                <span className={styles.what}>
-                  {locale === "ko" ? "새 문서" : "Arrived"}
-                  {" · "}
-                  <span data-derived="1">{locale === "ko" ? `${arrival.page}쪽` : `p.${arrival.page}`}</span>
-                </span>
+                <span className={styles.what}>{locale === "ko" ? "새 문서" : "Arrived"}</span>
               </li>
             ))}
           </ol>
