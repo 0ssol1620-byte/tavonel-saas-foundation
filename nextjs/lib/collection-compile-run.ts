@@ -442,7 +442,9 @@ export async function runCollectionCompile(
       remainingMs,
     );
     if (!compiled.ok) {
-      return { ok: false, status: compiled.code === "COMPILE_INPUT_TOO_LARGE" ? 413 : 503, code: compiled.code,
+      // CORE_OUTPUT_TOO_LARGE is deterministic -- a retry gets the same answer -- so 422, as Core says, not a retryable 503.
+      const status = compiled.code === "COMPILE_INPUT_TOO_LARGE" ? 413 : compiled.code === "CORE_OUTPUT_TOO_LARGE" ? 422 : 503;
+      return { ok: false, status, code: compiled.code,
         payload: sizeLimitPayload(compiled) };
     }
     if (globalCollection && compiled.result.receipt.coreReleaseDigest !== process.env.TAVONEL_GLOBAL_COLLECTION_CORE_RELEASE_SHA256) {

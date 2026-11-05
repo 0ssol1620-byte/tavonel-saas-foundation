@@ -216,6 +216,10 @@ describe("Python Product-Core v2 dispatch", () => {
     // A malformed body keeps the code and loses the detail rather than inventing numbers.
     vi.stubGlobal("fetch", async () => Response.json({ code: "CORE_OUTPUT_TOO_LARGE", bytes: "52MB" }, { status: 422 }));
     expect(await dispatchProductCoreV2(env, "pilot", inputs())).toEqual({ ok: false, code: "CORE_OUTPUT_TOO_LARGE" });
+
+    // An error body over the bound (or with a broken length) is the platform's failure, not an output size.
+    vi.stubGlobal("fetch", async () => new Response("x", { status: 502, headers: { "content-length": "not-a-number" } }));
+    expect(await dispatchProductCoreV2(env, "pilot", inputs())).toEqual({ ok: false, code: "CORE_V2_HTTP_502" });
   });
 
   it("uses a dedicated v2 HMAC so the v1 fallback can rotate independently", () => {

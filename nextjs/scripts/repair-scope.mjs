@@ -1934,12 +1934,12 @@ export const OCR_JSON_BOUND_AFFECTED_UNIT_FILES = Object.freeze([
 // Compile-job stall (cjob-157f2f23, 2026-11-05): the read-only events stream, the sticky-terminal client, and the CAS lease and
 // post-terminal refusal suites. The store, worker and compile-run are owned above; these are the endpoints no owner listed.
 export const COMPILE_JOB_STALL_AFFECTED_PATHS = Object.freeze([
-  'app/api/compile-jobs/[jobId]/events/route.ts', 'lib/compile-job-client.test.ts', 'lib/compile-job-client.ts',
+  'app/api/compile-jobs/[jobId]/events/route.ts', 'app/api/internal/jobs/run/route.ts', 'lib/compile-job-client.test.ts', 'lib/compile-job-client.ts',
   'lib/compile-job-events-route.test.ts', 'lib/compile-job-lease.test.ts', 'lib/durable-compile-orchestration.test.ts',
 ]);
 export const COMPILE_JOB_STALL_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/compile-job-client.test.ts', 'lib/compile-job-events-route.test.ts', 'lib/compile-job-lease.test.ts',
-  'lib/compile-job-worker.test.ts', 'lib/durable-compile-orchestration.test.ts',
+  'lib/compile-job-worker.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/execution-budget.test.ts',
 ]);
 // EN-0c benchmarks path mask: /benchmarks masks an absolute scoring-machine path in the Model Arena notes at render time
 // (the artifact and its pinned sha256 are unchanged). The four endpoints no owner listed select their two direct suites plus
@@ -2895,7 +2895,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // OCR JSON read bound: the seven exact paths above select fifteen direct suites and no browser suite.
   affectedGroup('ocr-json-bound', new RegExp(`^nextjs/(?:${exactPathAlternation(OCR_JSON_BOUND_AFFECTED_PATHS)})$`),
     { unitFiles: OCR_JSON_BOUND_AFFECTED_UNIT_FILES }),
-  // Compile-job stall: the six exact paths above select five direct suites and no browser suite.
+  // Compile-job stall: the seven exact paths above select six direct suites and no browser suite.
   affectedGroup('compile-job-stall', new RegExp(`^nextjs/(?:${exactPathAlternation(COMPILE_JOB_STALL_AFFECTED_PATHS)})$`),
     { unitFiles: COMPILE_JOB_STALL_AFFECTED_UNIT_FILES }),
   // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.

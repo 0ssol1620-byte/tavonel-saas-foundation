@@ -319,6 +319,26 @@ describe("the ocr.json read bound against the intake ceiling", () => {
     expect(JSON.stringify(refused)).not.toMatch(/sss|do-not-echo/);
     expect(serializeCollectionCandidate(value)).toMatchObject({ ok: true });
   });
+
+  it("keeps the attribution inside the 8 KiB event detail for hostile paths and keys, cutting on code points", () => {
+    // REVIEW-PR192-R1 MINOR-4: a refused event row would drop the attribution silently.
+    const hostile = "\u0000\u0001".repeat(40) + "😀".repeat(200) + "\ud800";
+    const files = Array.from({ length: 5 }, (_, i) => ({ path: `${i}${hostile}`, content: "z".repeat(10 + i) }));
+    const counts = Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`${i}${hostile}`, i]));
+    const refused = serializeCollectionCandidate({ package: { files }, validation: { counts } }, 10);
+    expect(refused.ok).toBe(false);
+    if (refused.ok) return;
+    const detail = { reason: "JSON_TOO_LARGE", sizeLimit: refused.sizeLimit, blocked: [], collectionId: null, blockedResolution: null };
+    expect(Buffer.byteLength(JSON.stringify(detail), "utf8")).toBeLessThanOrEqual(8192);
+    const { largestPackageFiles, validationCounts } = refused.sizeLimit;
+    expect(largestPackageFiles?.map((file) => file.sizeBytes)).toEqual([14, 13, 12, 11, 10]);
+    for (const text of [...largestPackageFiles!.map((file) => file.path), ...Object.keys(validationCounts!)]) {
+      expect(Buffer.from(text, "utf8").toString("utf8")).toBe(text); // no lone surrogate survives a UTF-8 round trip
+      expect(text).not.toMatch(/[\u0000-\u001f]/);
+    }
+    expect(Buffer.byteLength(largestPackageFiles![0]!.path, "utf8")).toBeLessThanOrEqual(256);
+    expect(Object.keys(validationCounts!)).toHaveLength(16);
+  });
 });
 
 /*

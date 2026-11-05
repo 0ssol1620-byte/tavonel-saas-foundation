@@ -812,6 +812,10 @@ export async function dispatchProductCoreV2(
     apply on this path. Counts are not reported: they would need the parse this bound prevents.
   */
   const read = await readBoundedSourceBody(response, CORE_V2_MAX_RESPONSE_BYTES);
+  // An oversized or malformed-length error body is the platform's failure, not an output size.
+  if (!read.ok && read.code === "SOURCE_SIZE_UNQUALIFIED" && !read.empty && !response.ok) {
+    return { ok: false, code: `CORE_V2_HTTP_${response.status}` };
+  }
   if (!read.ok && read.code === "SOURCE_SIZE_UNQUALIFIED" && !read.empty) {
     const declared = Number(response.headers.get("content-length") ?? Number.NaN);
     return { ok: false, code: "CORE_OUTPUT_TOO_LARGE", sizeLimit: { object: "core-response",

@@ -159,6 +159,7 @@ test("SYNTHETIC: real public route forwards authenticated principal instead of r
 test("SYNTHETIC: real durable worker forwards its stored job principal and exact job identity", async () => {
   let args;
   const worker = load("lib/compile-job-worker.ts", {
+    "./execution-budget": { CORE_CLIENT_TIMEOUT_MS: 52_000, WORKER_MAX_DURATION_MS: 60_000 },
     "./global-collection-compile": { globalCollectionCompileEnabled: () => true, GLOBAL_COLLECTION_KEY_PREFIX: "global:" },
     "./collection-compile-run": { isCompileWaitingOnReading: () => false, runCollectionCompile: async (...values) => { args = values;
       return { ok: false, code: "TEST_STOP", status: 422, payload: {} }; } },

@@ -364,7 +364,7 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
 
       const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
-      expect(run).toEqual({ ok: false, status: 503, code: "CORE_OUTPUT_TOO_LARGE", payload: { sizeLimit } });
+      expect(run).toEqual({ ok: false, status: 422, code: "CORE_OUTPUT_TOO_LARGE", payload: { sizeLimit } });
     }
     expect(serialize).not.toHaveBeenCalled();
     expect(audited).not.toHaveBeenCalled();

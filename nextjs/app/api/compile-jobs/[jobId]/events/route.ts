@@ -87,7 +87,9 @@ export async function GET(request: Request, context: { params: Promise<{ jobId: 
           meant a 60 s stream could take the compile lease and start Core with seconds left on its
           own clock: cjob-157f2f23 leased at 07:11:15, the stream was killed at 07:11:25, and the
           job sat on a dead lease for five minutes. The scheduled worker (`/api/internal/jobs/run`,
-          every minute) is the only runner; this stream costs the viewer at most a minute.
+          every minute) is the only runner. A viewer waits up to a tick per step, and one more tick
+          per compile queued ahead in the same tick: the worker claims a compile only while a whole
+          Core call still fits the tick (the worker's claim deadline), so at most one runs per tick.
         */
         const events = await readCompileJobEvents(workspaceKey, jobId, cursor);
         if (!events.ok) {

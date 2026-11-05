@@ -457,6 +457,35 @@ describe("the durable compile worker", () => {
     expect(listObjects).toHaveBeenCalledTimes(1);
   });
 
+  it("does not claim a second compile the tick cannot finish, and stops the batch there", async () => {
+    // REVIEW-PR192-R1 MAJOR-1: J1's compile ends ~45 s into the 60 s tick; claiming J2 then would
+    // leave a dead lease for 5 minutes and pay Core twice.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const t0 = Date.parse("2026-11-05T09:00:00.000Z");
+      vi.setSystemTime(t0);
+      group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
+      const second = "cjob-" + "c".repeat(32);
+      const third = "cjob-" + "d".repeat(32);
+      openJobs.mockResolvedValue({ ok: true, value: [job(), job({ jobId: second }), job({ jobId: third })] });
+      runCompile.mockImplementation(async () => {
+        vi.setSystemTime(t0 + 45_000);
+        return { ok: true, status: 200, payload: { collectionId: "collection-" + "b".repeat(32), lifecycle: "candidate" } };
+      });
+
+      const turns = await runCompileJobBatch(5);
+
+      expect(turns.map((turn) => [turn.jobId, turn.note, turn.claimed ?? false, turn.outOfTime ?? false])).toEqual([
+        [job().jobId, "compiled", true, false],
+        [second, "skipped", false, true],
+      ]);
+      expect(runCompile).toHaveBeenCalledTimes(1);
+      expect(claimLease).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("scans past five authority-store failures to reach a healthy later job", async () => {
     const blockedJobs = Array.from({ length: 5 }, (_, index) => job({
       jobId: `cjob-${String(index + 1).padStart(32, "0")}`,

@@ -323,6 +323,26 @@ export async function getWorkspaceOcrReviewJson(
   }
 }
 
+/**
+ * Core-chosen text for a job-event detail, at most `maxBytes` of UTF-8, cut on a code point.
+ * Control characters and lone surrogates are replaced first: Postgres jsonb refuses `\u0000`
+ * and unpaired surrogates, and escaping (6x for a control character) could push the detail past
+ * its 8 KiB check -- either way the row is refused and the attribution is lost without a trace.
+ */
+function boundedDetailText(text: string, maxBytes: number) {
+  const safe = text.replace(/[\u0000-\u001f\u007f]/g, "?")
+    .replace(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g, "�");
+  let out = "";
+  let bytes = 0;
+  for (const char of safe) {
+    const size = Buffer.byteLength(char, "utf8");
+    if (bytes + size > maxBytes) break;
+    out += char;
+    bytes += size;
+  }
+  return out;
+}
+
 /** The five largest `package.files[]` entries by content bytes. Paths and sizes only. */
 function largestPackageFiles(value: unknown) {
   const files = (value as { package?: { files?: unknown } } | null)?.package?.files;
@@ -332,8 +352,8 @@ function largestPackageFiles(value: unknown) {
       const entry = file as { path?: unknown; content?: unknown } | null;
       if (typeof entry?.path !== "string") return [];
       const content = typeof entry.content === "string" ? entry.content : JSON.stringify(entry.content ?? null);
-      // A path is Core-chosen text; capped so five always fit the 8 KiB job-event detail.
-      return [{ path: entry.path.slice(0, 256), sizeBytes: Buffer.byteLength(content, "utf8") }];
+      // Five 256 B paths (escaping at most doubles them) always fit the 8 KiB job-event detail.
+      return [{ path: boundedDetailText(entry.path, 256), sizeBytes: Buffer.byteLength(content, "utf8") }];
     })
     .sort((a, b) => b.sizeBytes - a.sizeBytes)
     .slice(0, 5);
@@ -357,7 +377,8 @@ export function serializeCollectionCandidate(
   // Claims / relations / contradictions vs evidence: tells a pair blow-up from region fan-out.
   const counts = (value as { validation?: { counts?: unknown } } | null)?.validation?.counts;
   if (counts && typeof counts === "object") {
-    const numeric = Object.entries(counts).filter((entry): entry is [string, number] => Number.isSafeInteger(entry[1])).slice(0, 16);
+    const numeric = Object.entries(counts).filter((entry): entry is [string, number] => Number.isSafeInteger(entry[1]))
+      .slice(0, 16).map(([key, count]) => [boundedDetailText(key, 64), count] as const);
     if (numeric.length > 0) refused.sizeLimit.validationCounts = Object.fromEntries(numeric);
   }
   return refused;
