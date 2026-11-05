@@ -32,7 +32,7 @@ const outcome = (response) => {
   return text.match(/^(API_ERROR_\d{3}: [A-Z_]+|[A-Z][A-Z0-9_]+)/)?.[0] ?? "TOOL_FAILED";
 };
 const keyRowFor = (store, accessToken) => {
-  const prefix = /^tvnl_live_([A-Za-z0-9_-]{12})_/.exec(accessToken ?? "")?.[1];
+  const prefix = /^tvnl_(?:live|mcp)_([A-Za-z0-9_-]{12})_/.exec(accessToken ?? "")?.[1];
   return store.tables.foundation_api_keys.find((row) => row.key_prefix === prefix);
 };
 
@@ -161,7 +161,7 @@ try {
   results.cohort = {
     consent: { status: excludedFlow.approved.status, code: excludedFlow.approved.json?.code },
     callWithLiveKey: { status: excludedCall.status, code: excludedCall.json?.error?.message },
-    pass: excludedFlow.approved.status === 403 && excludedFlow.approved.json?.code === "PROCESSING_COHORT_EXCLUDED" && excludedCall.status === 403,
+    pass: excludedFlow.approved.status === 403 && excludedFlow.approved.json?.code === "REMOTE_MCP_COHORT_EXCLUDED" && excludedCall.status === 403,
   };
 
   /* --------------------------------------------------------- read-only guard */
@@ -185,6 +185,42 @@ try {
       && unknownTool.startsWith("TOOL_NOT_FOUND") && listed.length === 9 && unit.status === 0,
   };
 
+  /* ------------------------------------------------- token audience (R1 M1) */
+  const audienceToken = (await obtainToken(base, USERS.a, { clientName: "Audience" })).accessToken;
+  const manualKey = plantKey(store, { workspaceKey: workspaceOf(USERS.a.id), userId: USERS.a.id, scopes: ["ask:read", "collections:download", "collections:read", "documents:read", "worlds:read"] });
+  const viaMcp = outcome(await call(base, audienceToken, "list_worlds", {}));
+  const direct = await http(base, "GET", "/api/v1/collections", { headers: { authorization: `Bearer ${audienceToken}` } });
+  const directManual = await http(base, "GET", "/api/v1/collections", { headers: { authorization: `Bearer ${manualKey}` } });
+  results.audience = {
+    tokenForm: audienceToken?.slice(0, 9),
+    viaMcp,
+    directToRestApi: { status: direct.status, code: direct.json?.code },
+    manualKeyDirectToRestApi: { status: directManual.status, code: directManual.json?.code ?? null },
+    pass: audienceToken?.startsWith("tvnl_mcp_") && viaMcp === "ok" && direct.status === 401 && direct.json?.code === "API_KEY_AUDIENCE_INVALID"
+      && directManual.status === 200,
+  };
+
+  /* ---------------------------------------------- bulk revoke, rollback lever (R1 M4) */
+  const liveBefore = store.tables.foundation_api_keys.filter((row) => row.name.startsWith("MCP: ") && row.revoked_at === null).length;
+  const mcpBefore = outcome(await call(base, audienceToken, "list_worlds", {}));
+  const refusedRevoke = await http(base, "POST", "/api/internal/remote-mcp/revoke-all", { headers: { authorization: "Bearer not-the-worker-secret-0123456789abcdef" } });
+  const bulkStarted = performance.now();
+  const bulk = await http(base, "POST", "/api/internal/remote-mcp/revoke-all", { headers: { authorization: `Bearer ${shadow.workerSecret}` } });
+  const bulkMs = Math.round(performance.now() - bulkStarted);
+  const mcpAfter = await call(base, audienceToken, "list_worlds", {});
+  const manualAfter = outcome(await call(base, manualKey, "list_worlds", {}));
+  results.bulkRevoke = {
+    route: "POST /api/internal/remote-mcp/revoke-all with the worker secret",
+    liveMcpKeysBefore: liveBefore, unauthorizedCall: { status: refusedRevoke.status, code: refusedRevoke.json?.code },
+    response: { status: bulk.status, code: bulk.json?.code, revoked: bulk.json?.revoked, byWorkspace: bulk.json?.byWorkspace }, responseMs: bulkMs,
+    mcpTokenBefore: mcpBefore, mcpTokenAfter: { status: mcpAfter.status },
+    liveMcpKeysAfter: store.tables.foundation_api_keys.filter((row) => row.name.startsWith("MCP: ") && row.revoked_at === null).length,
+    handMadeKeyAfter: manualAfter,
+    synthetic: "the store is in-memory; the time is this harness's, not production's",
+    pass: refusedRevoke.status === 401 && bulk.status === 200 && bulk.json?.revoked === liveBefore && mcpBefore === "ok"
+      && mcpAfter.status === 401 && manualAfter === "ok",
+  };
+
   /* -------------------------------------------------------------------- SLI */
   const sli = sliLines(shadow.lines);
   const sorted = sli.map((line) => line.durationMs).sort((left, right) => left - right);
@@ -195,7 +231,7 @@ try {
     source: "tavonel.remote_mcp_sli.v1 lines the server printed during this run (lib/remote-mcp.ts summarizeRemoteMcpSli's definition)",
     calls: sli.length, p50Ms: rank(0.5), p95Ms: rank(0.95), http5xx, server5xx, server5xxRatio: sli.length ? server5xx / sli.length : null,
     byStatus: sli.reduce((counts, line) => ({ ...counts, [line.status]: (counts[line.status] ?? 0) + 1 }), {}),
-    note: "a local machine with a synthetic store: latency here says nothing about production, and the upstream 5xx here are the shadow's missing object store and retrieval runtime (SIGNER/BINDING/LIST codes), not product faults; a regression baseline for this harness only",
+    note: "a local machine with a synthetic store: latency here says nothing about production, and the upstream 5xx here are the shadow's missing object store and retrieval runtime, not product faults; a regression baseline for this harness only",
   };
   results.funnel = funnelLines(shadow.lines).reduce((counts, line) => {
     const key = line.event === "mcp_tool_failed" ? `${line.event}{${line.code}}` : line.event;

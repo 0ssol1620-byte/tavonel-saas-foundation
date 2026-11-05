@@ -76,10 +76,13 @@ export function createStore() {
     let out = rows;
     for (const [column, raw] of params) {
       if (["select", "order", "limit", "offset"].includes(column)) continue;
-      const [op, ...rest] = raw.split(".");
+      const negate = raw.startsWith("not.");
+      const [op, ...rest] = (negate ? raw.slice(4) : raw).split(".");
       const value = rest.join(".");
-      out = out.filter((row) => {
+      const like = new RegExp(`^${value.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`);
+      out = out.filter((row) => negate !== (() => {
         const cell = row[column];
+        if (op === "like") return typeof cell === "string" && like.test(cell);
         if (op === "eq") return String(cell) === value;
         if (op === "neq") return String(cell) !== value;
         if (op === "is") return value === "null" ? cell === null || cell === undefined : String(cell) === value;
@@ -87,7 +90,7 @@ export function createStore() {
         if (op === "gt") return String(cell) > value;
         if (op === "lt") return String(cell) < value;
         return true;
-      });
+      })());
     }
     const order = params.get("order");
     if (order) {
@@ -195,6 +198,7 @@ const ALLOW = ["PATH", "Path", "SYSTEMROOT", "SystemRoot", "WINDIR", "TEMP", "TM
 
 export async function startShadow({ cohort, extraEnv = {} } = {}) {
   const store = createStore();
+  const workerSecret = randomBytes(32).toString("base64url");
   const storePort = await freePort();
   await new Promise((settle) => store.server.listen(storePort, "127.0.0.1", settle));
   const port = await freePort();
@@ -210,7 +214,8 @@ export async function startShadow({ cohort, extraEnv = {} } = {}) {
     FOUNDATION_PILOT_USER_IDS: Object.values(USERS).map((user) => user.id).join(","),
     TAVONEL_REMOTE_MCP_ENABLED: "true",
     TAVONEL_REMOTE_MCP_SIGNING_SECRET: randomBytes(32).toString("base64url"),
-    TAVONEL_PROCESSING_WORKSPACE_COHORT: cohort ?? [USERS.a, USERS.b].map((user) => workspaceOf(user.id)).join(","),
+    FOUNDATION_WORKER_SECRET: workerSecret,
+    TAVONEL_REMOTE_MCP_COHORT: cohort ?? [USERS.a, USERS.b].map((user) => workspaceOf(user.id)).join(","),
     NEXT_TELEMETRY_DISABLED: "1",
     // A synthetic object-store account; loopback-fetch.mjs sends its host to an empty bucket in the store.
     R2_ACCOUNT_ID: "0".repeat(32),
@@ -240,7 +245,7 @@ export async function startShadow({ cohort, extraEnv = {} } = {}) {
     quick = ok && Date.now() - started < 1_500 ? quick + 1 : 0;
   }
   return {
-    base, store, lines,
+    base, store, lines, workerSecret,
     async stop() { child.kill(); await new Promise((settle) => store.server.close(settle)); },
   };
 }
