@@ -38,7 +38,7 @@
   .proof figcaption span { display: block; }
   /* Round 3, placement series: each outcome's real capture, then (evidence only) the provenance diagram. */
   .capture { margin: 20px 0; }
-  .diagram { margin: 0 0 20px; }
+  .diagram { grid-column: 1 / -1; margin: 0; }
   .process a, .product a { color: var(--source); }
   /* Direction C (2026-11-04): the filled pill on its shadow; the outlined one is a white sheet on the resting shadow. */
   .process :global(.btn), .product :global(.btn) { background: var(--source); border-color: var(--source); color: white; border-radius: var(--tv-r-pill); box-shadow: var(--tv-shadow-action); }

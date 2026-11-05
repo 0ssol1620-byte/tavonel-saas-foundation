@@ -61,7 +61,6 @@ export default function ProductPage() {
             <div>
               <p>{outcome.body}</p>
               <ProductCapture className={`tv-capture ${styles.capture}`} name={outcome.capture.name} alt={outcome.capture.alt} sizes={CAPTURE_SIZES} />
-              {outcome.href === "/evidence" ? <ProvenanceChainDiagram className={styles.diagram} /> : null}
               {outcome.href === "/evidence" && region && source ? <figure className={styles.proof}>
                 {/* CRITIQUE-R1 #6: the passage as the reader returned it, in the sample columns' grammar; never re-set as a table. */}
                 <p className={styles.proofLabel}>Reader output, unedited</p>
@@ -72,6 +71,8 @@ export default function ProductPage() {
               </figure> : null}
               <Link href={(outcome.href === "/evidence" && region?.href ? region.href : outcome.href) as Route}>{outcome.action}</Link>
             </div>
+            {/* Full width, so the chain draws as one row (its wide drawing starts at 880px). */}
+            {outcome.href === "/evidence" ? <ProvenanceChainDiagram className={styles.diagram} /> : null}
           </section>)}
         </div>
         <details className={styles.boundary}>
