@@ -366,7 +366,8 @@ a[hreflang="ko"][lang="ko"] {
 .tv-capture { display: block; overflow: hidden; border-radius: var(--tv-r-inner); background: var(--tv-sheet); box-shadow: 0 0 0 1px var(--tv-rule), var(--tv-shadow-1); }
 .tv-capture img { display: block; width: 100%; height: auto; }
 /* The phone captures are tall single columns; the sheet shows their top -- what the surface opens on -- and
-   cuts the rest at 5:4, clipped by the frame, so the page never grows by several screens. */
+   cuts the rest at 5:4, so the page never grows by several screens. The image box itself is cut (object-fit),
+   not the frame: a frame that hides its own overflow is what e2e/mobile-landing.spec.ts refuses. */
 @media (max-width: 640px) {
-  .tv-capture { max-height: 125vw; }
+  .tv-capture img { max-height: 125vw; object-fit: cover; object-position: top; }
 }

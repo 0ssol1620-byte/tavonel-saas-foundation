@@ -14,7 +14,7 @@ import ProductCapture from "../product-capture";
 const CHANGE_CAPTURE = {
   en: {
     alt: "The change view on the public sample: the annual World, then each filing that arrived after it, with its filing date and an excerpt of its source page.",
-    caption: "The change record on the public sample.",
+    caption: "Change record of the public sample.",
   },
   ko: {
     alt: "공개 샘플의 변경 기록 화면: 연간 World와 그 뒤에 도착한 공시 문서, 각 문서의 제출일과 원문 페이지 일부.",
