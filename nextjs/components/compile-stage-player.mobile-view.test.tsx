@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import CompileStagePlayer, { FILM_POSTER_SIZES, STAGE_FRAMES, nextWideChoice, stillTookAvif, toggleMobileFilmFit, wideChoiceOnStageChange, type MobileFilmView, type WideView } from "@/components/compile-stage-player";
-import HeroFilm from "@/components/landing-v2/hero-film";
+import HeroFilm, { HOME_FILM_CUTS } from "@/components/landing-v2/hero-film";
 import { LANDING_MOBILE_FILM_VIEW, LANDING_WIDE_FILM_VIEW } from "@/components/landing-v2/hero-film-disclosure";
 import { COMPILE_STAGES } from "@/lib/compile-stages";
 
@@ -14,12 +14,11 @@ import { COMPILE_STAGES } from "@/lib/compile-stages";
 const crossCheck = JSON.parse(readFileSync(new URL("./compile-stage-player.frame-strings.json", import.meta.url), "utf8")) as {
   times: number[];
   stages: Record<string, { cut: string; strings: Record<string, { pane: string; visibleAt: number[] }> }>;
-  cropCheck: { stages: Record<string, { text: string; box: { x: number; w: number; h: number }; yAt: Record<string, number[]> }> };
+  cropCheck: { stages: Record<string, { text: string; box: { x: number; w: number; h: number }; yAt: Record<string, number[]>; insideWindow: number; holdsTarget: boolean }> };
   blankScan: { threshold: number; blankAt: number; stages: Record<string, { crop: { x: number; y: number }; frames: number; inkBoth: number; share: number; defaultView: "crop" | "fit" }> };
   phonePaneScan: {
     threshold: number; blankAt: number; rect: string;
     stages: Record<string, { phonePane: { x: number; y: number; w: number }; frames: number; blankFrames: number; share: number }>;
-    rejected: Record<string, { phonePane: { x: number; y: number; w: number }; frames: number; blankFrames: number; share: number }>;
   };
 };
 
@@ -32,24 +31,23 @@ describe("film reading layer (brief 2026-10-15 move 2b/2c)", () => {
       const row = crossCheck.stages[stage.id]?.strings[target.text];
       expect(row, `${stage.id}: "${target.text}" is not in the cross-check table`).toBeDefined();
       expect(row!.visibleAt.length / crossCheck.times.length, stage.id).toBeGreaterThanOrEqual(0.8);
-      expect(frame!.panes, stage.id).toContain(row!.pane);
+      // Re-record (2026-11-05): the cuts are product screens with no drawn panes; the table names the quarter column.
+      expect(frame!.panes, stage.id).toBeUndefined();
+      expect(row!.pane, stage.id).toMatch(new RegExp(`^Q${target.pane + 1} `));
     }
   });
 
-  it("names the locked cut each stage plays", () => {
-    for (const stage of COMPILE_STAGES) expect(stage.src).toBe(`/film/${crossCheck.stages[stage.id]!.cut}`);
+  it("names the re-recorded cut each Home stage plays", () => {
+    COMPILE_STAGES.forEach((stage, index) => expect(HOME_FILM_CUTS[index], stage.id).toBe(`/film/${crossCheck.stages[stage.id]!.cut}`));
   });
 
   /*
-    FINAL-SPEC 2026-10-26 (§6 #6, T13): the HTML reading line under the frame is gone; the pane strip
-    that marks the target pane stays, below the frame, on the Home story layout only.
+    FINAL-SPEC 2026-10-26 (§6 #6, T13): the HTML reading line under the frame is gone. Film re-record (2026-11-05):
+    the four cuts are product screens with their own headings, so no stage names panes and no pane strip is drawn.
   */
-  it("renders the pane strip below the frame only on the Home story layout, and no reading line", () => {
+  it("renders no pane strip and no reading line on the re-recorded cuts", () => {
     const story = renderToStaticMarkup(<CompileStagePlayer storyLayout />);
-    expect(story).toContain("data-film-reading");
-    expect(story.indexOf("data-film-reading")).toBeGreaterThan(story.indexOf('class="compile-film-viewport"'));
-    // The strip only names the panes outside a panning phone.
-    expect(story).toMatch(/<ol[^>]*aria-hidden="true"[^>]*><li>SOURCES<\/li><li data-marked="1"[^>]*>ORIGINAL<\/li>/);
+    expect(story).not.toContain("data-film-reading");
     expect(renderToStaticMarkup(<CompileStagePlayer />)).not.toContain("data-film-reading");
     for (const markup of [story, renderToStaticMarkup(<CompileStagePlayer storyLayout korean />)]) {
       expect(markup).not.toContain("<q");
@@ -62,10 +60,10 @@ describe("film reading layer (brief 2026-10-15 move 2b/2c)", () => {
     expect(renderToStaticMarkup(<CompileStagePlayer />)).toContain('<div class="compile-film-stages" role="tablist"');
   });
 
-  it("opens Focus details on the reading-target pane, not SOURCES", () => {
+  it("opens Focus details on the reading-target column", () => {
     const markup = renderToStaticMarkup(<CompileStagePlayer storyLayout preferVideo initialMobileFilmView="focus" />);
-    expect(markup).toContain('data-mobile-focus-pane="1"');
-    expect(STAGE_FRAMES.sources!.panes[1]).toBe("ORIGINAL");
+    expect(markup).toContain(`data-mobile-focus-pane="${STAGE_FRAMES.sources!.readingTarget.pane}"`);
+    expect(STAGE_FRAMES.sources!.readingTarget).toEqual({ pane: 2, text: "Extracted lines" });
   });
 
   it("keeps the hero's illustrative label in both locales, with no reading line or hint paragraph", () => {
@@ -161,7 +159,11 @@ describe("mobile film view", () => {
   it is checked against where that string sits in every sampled second of its cut (cropCheck).
 */
 describe("Home Focus crop and re-cut posters (Release 3)", () => {
-  it("keeps each quoted string inside its stage's 2x window at every sampled second", () => {
+  /*
+    Film re-record (2026-11-05): a product recording scrolls, so the window is held to the same 80% rule as the
+    reading target itself; a stage whose window does not hold its target opens on Fit (structure, 5 of 10).
+  */
+  it("keeps each quoted string inside its stage's 2x window at >= 80% of sampled seconds, or opens that stage on Fit", () => {
     for (const stage of COMPILE_STAGES) {
       const frame = STAGE_FRAMES[stage.id]!;
       const row = crossCheck.cropCheck.stages[stage.id];
@@ -173,7 +175,9 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
       expect(row!.box.x, stage.id).toBeGreaterThanOrEqual(x0);
       expect(row!.box.x + row!.box.w, stage.id).toBeLessThanOrEqual(x0 + 1440);
       const inside = crossCheck.times.filter(t => (row!.yAt[String(t)] ?? []).some(y => y >= y0 && y + row!.box.h <= y0 + 900));
-      expect(inside, stage.id).toEqual(crossCheck.times);
+      expect(inside.length, stage.id).toBe(row!.insideWindow);
+      expect(row!.holdsTarget, stage.id).toBe(inside.length / crossCheck.times.length >= 0.8);
+      if (frame.wideView === "crop") expect(row!.holdsTarget, `${stage.id} opens cropped`).toBe(true);
       // The pane the line names is one of the two the window shows.
       expect([frame.crop.x * 4, frame.crop.x * 4 + 1], stage.id).toContain(frame.readingTarget.pane);
     }
@@ -186,11 +190,11 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
   it("opens a story-layout film on the crop with a pressed Focus details toggle, and names only the window's panes", () => {
     const en = renderToStaticMarkup(<CompileStagePlayer storyLayout preferVideo initialMobileFilmView="focus" />);
     expect(en).toContain('data-wide-view="crop"');
-    expect(en).toContain("--film-crop-x:25%;--film-crop-y:50%");
+    expect(en).toContain("--film-crop-x:50%;--film-crop-y:20%");
     // Fix round 3 (M1): the pressed state is the visible state -- the crop is on screen, so pressed.
     // FINAL-SPEC 2026-10-26 (§6 #7, G15): the name stays "Focus details", as an aria-label on a drawn mark.
     expect(en).toMatch(/<button type="button" class="compile-film-view-control [^"]+" aria-controls="[^"]+" aria-pressed="true" aria-label="Focus details"><svg class="compile-film-view-mark"[^>]*aria-hidden="true"[^>]*>.*?<\/svg><\/button>/);
-    expect(en).toMatch(/<li>SOURCES<\/li><li data-marked="1" data-in-crop="1">ORIGINAL<\/li><li data-in-crop="1">EXTRACT<\/li><li>WORLD<\/li>/);
+    expect(en).not.toContain("data-film-reading");
     // The phone in Focus (one pane below 768px), as "Focus details" shows it.
     expect(en).toContain('data-mobile-view="focus"');
     // The phone toggle in Focus: pressed, the same name, a drawn mark instead of the words.
@@ -223,8 +227,8 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
       expect(phone?.[1]).toContain('aria-pressed="false"');
       expect(phone?.[1]).toContain(`aria-label="${name}"`);
       expect(phone?.[2]).toMatch(/^<svg class="compile-film-view-mark"[^>]*aria-hidden="true"/);
-      expect(home).toContain("--film-crop-x:25%;--film-crop-y:50%");
-      expect(home).toContain("--pane-x:746;--pane-y:380;--pane-w:684");
+      expect(home).toContain("--film-crop-x:50%;--film-crop-y:20%");
+      expect(home).toContain("--pane-x:1780;--pane-y:420;--pane-w:684");
     }
   });
 
@@ -247,10 +251,11 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
       expect(row!.share, stage.id).toBeCloseTo(row!.inkBoth / row!.frames, 3);
       expect(frame.wideView, stage.id).toBe(row!.defaultView);
       if (frame.wideView === "crop") expect(row!.share, `${stage.id} opens cropped`).toBeGreaterThanOrEqual(scan.threshold);
+      else expect(row!.share < scan.threshold || !crossCheck.cropCheck.stages[stage.id]!.holdsTarget, `${stage.id} opens on Fit for a reason`).toBe(true);
     }
-    // The failure path this guards: stage 4's window on "nodes lit" leaves TERMINAL blank for ~11 s.
-    expect(scan.stages.world!.share).toBeLessThan(scan.threshold);
-    expect(STAGE_FRAMES.world!.wideView).toBe("fit");
+    // The failure path this guards: stage 3 scrolls its target through any one window (5 of 10 sampled seconds).
+    expect(crossCheck.cropCheck.stages.structure!.holdsTarget).toBe(false);
+    expect(STAGE_FRAMES.structure!.wideView).toBe("fit");
   });
 
   /*
@@ -258,42 +263,42 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
     own two transitions are walked here: a press (nextWideChoice) and a stage change
     (wideChoiceOnStageChange); what the stage shows is the choice, else the stage default.
   */
-  it("keeps the view choice relative to the stage default, so stage 4 never inherits a crop", () => {
+  it("keeps the view choice relative to the stage default, so stage 3 never inherits a crop", () => {
     const ids = COMPILE_STAGES.map(stage => stage.id);
     const defaults = ids.map(id => STAGE_FRAMES[id]!.wideView);
-    expect(defaults).toEqual(["crop", "crop", "crop", "fit"]);
+    expect(defaults).toEqual(["crop", "crop", "fit", "crop"]);
     let stage = 0;
     let choice: WideView | null = null;
     const shown = () => choice ?? defaults[stage]!;
     const press = () => { choice = nextWideChoice(shown(), defaults[stage]!); };
     const go = (next: number) => { if (next !== stage) choice = wideChoiceOnStageChange(choice); stage = next; };
 
-    // The critic's walk: Fit -> Focus on stage 1, then stage 4. The round trip records nothing.
+    // The critic's walk: Fit -> Focus on stage 1, then stage 3. The round trip records nothing.
     press();
     expect([shown(), choice]).toEqual(["fit", "fit"]);
     press();
     expect([shown(), choice]).toEqual(["crop", null]);
-    go(3);
+    go(2);
     expect(shown()).toBe("fit");
 
-    // Focus asked for on stage 4 stays on stage 4 (its own tab again included) ...
+    // Focus asked for on stage 3 stays on stage 3 (its own tab again included) ...
     press();
     expect([shown(), choice]).toEqual(["crop", "crop"]);
-    go(3);
+    go(2);
     expect(shown()).toBe("crop");
-    // ... and clears with the stage: stage 1 is on its default, and stage 4 is Fit again.
+    // ... and clears with the stage: stage 1 is on its default, and stage 3 is Fit again.
     go(0);
     expect([shown(), choice]).toEqual(["crop", null]);
-    go(3);
+    go(2);
     expect(shown()).toBe("fit");
 
     // A Fit asked for holds across stages; pressing back to a stage's default clears it.
     go(1);
     press();
     expect(shown()).toBe("fit");
-    go(2);
-    expect(shown()).toBe("fit");
     go(3);
+    expect(shown()).toBe("fit");
+    go(2);
     expect(shown()).toBe("fit");
     go(0);
     press();
@@ -314,32 +319,32 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
     expect(source).toContain('const wideFit = (wideChoice ?? stageFrame?.wideView ?? "crop") === "fit";');
   });
 
-  it("serves the stage-1 re-cut poster at 2x for the crop and 1x for a phone in Fit, masked only on its own frame", () => {
+  it("serves the stage-1 re-record poster at 2x for the crop and 1x for a phone in Fit, with no mask", () => {
     const en = renderToStaticMarkup(<HeroFilm />);
     // Home opens compact (2026-10-27): no phone pane still until Focus details is pressed.
     expect(en).not.toContain("data-pane-poster");
     expect(en).not.toContain("767.98px");
-    const homeStage = { ...COMPILE_STAGES[0]!, poster: "/film/poster-1-t8.16-2x.webp", poster1x: "/film/poster-1-t8.16.webp", posterAvif: "/film/poster-1-t8.16-2x.avif", posterAvif1x: "/film/poster-1-t8.16.avif", phonePoster: "/film/poster-1-t8.16-pane1-684x855.webp", phonePosterAvif: "/film/poster-1-t8.16-pane1-684x855.avif" };
+    const homeStage = { ...COMPILE_STAGES[0]!, poster: "/film/poster-c1-t13.60-2x.webp", poster1x: "/film/poster-c1-t13.60.webp", posterAvif: "/film/poster-c1-t13.60-2x.avif", posterAvif1x: "/film/poster-c1-t13.60.avif", phonePoster: "/film/poster-c1-t13.60-pane1-684x855.webp", phonePosterAvif: "/film/poster-c1-t13.60-pane1-684x855.avif" };
     const focused = renderToStaticMarkup(<CompileStagePlayer stages={[homeStage]} storyLayout initialMobileFilmView="focus" />);
     const still = en.match(/<img[^>]*class="compile-film-still"[^>]*>/)?.[0] ?? "";
-    // POSTER-RECUT (D-11): the WebP pair of t = 8.16s is the <img>, the fallback inside the <picture>.
-    expect(still).toContain('src="/film/poster-1-t8.16-2x.webp"');
-    expect(still).toMatch(/srcSet="\/film\/poster-1-t8\.16\.webp 1440w, \/film\/poster-1-t8\.16-2x\.webp 2880w"/i);
+    // Re-record (D-11 encoders): the WebP pair of t = 13.60s is the <img>, the fallback inside the <picture>.
+    expect(still).toContain('src="/film/poster-c1-t13.60-2x.webp"');
+    expect(still).toMatch(/srcSet="\/film\/poster-c1-t13\.60\.webp 1440w, \/film\/poster-c1-t13\.60-2x\.webp 2880w"/i);
     expect(still).toContain(`sizes="${FILM_POSTER_SIZES}"`);
     // ...and the AVIF pair of the same frame is the <source> ahead of it, with the same sizes.
     const picture = en.match(/<picture[^>]*>([\s\S]*?)<\/picture>/)?.[1] ?? "";
     expect(picture.indexOf("<source")).toBe(0);
-    expect(picture).toMatch(/<source type="image\/avif" srcSet="\/film\/poster-1-t8\.16\.avif 1440w, \/film\/poster-1-t8\.16-2x\.avif 2880w" sizes="[^"]+"\/?>/i);
+    expect(picture).toMatch(/<source type="image\/avif" srcSet="\/film\/poster-c1-t13\.60\.avif 1440w, \/film\/poster-c1-t13\.60-2x\.avif 2880w" sizes="[^"]+"\/?>/i);
     expect(picture).toContain(still);
     // FINAL-SPEC 2026-10-26 §2.1, in Focus: ahead of them, the stage-1 pane still for a screen below 768px, AVIF then WebP.
     const focusedPicture = focused.match(/<picture[^>]*>([\s\S]*?)<\/picture>/)?.[1] ?? "";
-    expect(focusedPicture).toMatch(/^<source media="\(max-width: 767\.98px\)" type="image\/avif" srcSet="\/film\/poster-1-t8\.16-pane1-684x855\.avif"\/><source media="\(max-width: 767\.98px\)" type="image\/webp" srcSet="\/film\/poster-1-t8\.16-pane1-684x855\.webp"\/><source type="image\/avif"/);
+    expect(focusedPicture).toMatch(/^<source media="\(max-width: 767\.98px\)" type="image\/avif" srcSet="\/film\/poster-c1-t13\.60-pane1-684x855\.avif"\/><source media="\(max-width: 767\.98px\)" type="image\/webp" srcSet="\/film\/poster-c1-t13\.60-pane1-684x855\.webp"\/><source type="image\/avif"/);
     expect(focused).toContain('data-pane-poster="1"');
-    expect(en).toContain("--pane-x:746;--pane-y:380;--pane-w:684");
-    expect(en).toContain('data-poster-mask="/film/poster-1-t8.16-2x.webp"');
-    // The mask is bound to the poster it was measured on: any other stage-1 poster draws none.
+    expect(en).toContain("--pane-x:1780;--pane-y:420;--pane-w:684");
+    // No re-recorded frame carries an overprint, so no stage has a Tier 2 mask.
+    expect(en).not.toContain("data-poster-mask");
     expect(renderToStaticMarkup(<CompileStagePlayer storyLayout />)).not.toContain("data-poster-mask");
-    expect(STAGE_FRAMES.sources!.posterMask!.rects.every(rect => rect.x + rect.w <= 2880 && rect.y + rect.h <= 1800)).toBe(true);
+    for (const id of ["sources", "read", "structure", "world"]) expect(STAGE_FRAMES[id]!.posterMask, id).toBeUndefined();
   });
 
   /*
@@ -364,12 +369,9 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
     // R3: the stage-1 pane still is cut from the same rect the playing cut is drawn at, so still and video match pixel for pixel.
     const posters = (JSON.parse(readFileSync(new URL("../lib/locked-film-assets.json", import.meta.url), "utf8")) as { posters: { file: string; cropRect?: { x: number; y: number; width: number; height: number } }[] }).posters;
     const pane1 = STAGE_FRAMES.sources!.phonePane;
-    const crops = posters.filter(poster => poster.file.startsWith("poster-1-t8.16-pane1-"));
-    expect(crops.map(poster => poster.file).sort()).toEqual(["poster-1-t8.16-pane1-684x855.avif", "poster-1-t8.16-pane1-684x855.webp"]);
+    const crops = posters.filter(poster => poster.file.startsWith("poster-c1-t13.60-pane1-"));
+    expect(crops.map(poster => poster.file).sort()).toEqual(["poster-c1-t13.60-pane1-684x855.avif", "poster-c1-t13.60-pane1-684x855.webp"]);
     for (const poster of crops) expect(poster.cropRect, poster.file).toEqual({ x: pane1.x, y: pane1.y, width: pane1.w, height: (pane1.w * 5) / 4 });
-    // The failure path this guards: the spec's stage-4 rect left the ASSISTANT pane blank in 98 of 448 frames.
-    expect(scan.rejected.world!.share).toBeLessThan(scan.threshold);
-    expect(STAGE_FRAMES.world!.phonePane).not.toEqual(scan.rejected.world!.phonePane);
 
     const fit = renderToStaticMarkup(<CompileStagePlayer stages={[{ ...COMPILE_STAGES[0]!, phonePoster: "/film/poster-1-t8.16-pane1-684x855.webp", phonePosterAvif: "/film/poster-1-t8.16-pane1-684x855.avif" }]} storyLayout />);
     expect(fit).toContain('data-mobile-view="fit"');

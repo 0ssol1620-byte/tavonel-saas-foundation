@@ -178,7 +178,7 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
 test("the film opens each stage on its scanned default view and Focus reads at 9px or more on every stage, the 390 phone pane included", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "1440", "sets its own viewports");
   const table = JSON.parse(readFileSync(resolve(process.cwd(), "components/compile-stage-player.frame-strings.json"), "utf8")) as {
-    cropCheck: { stages: Record<string, { smallestXHeight: { px: number } }> };
+    cropCheck: { stages: Record<string, { smallestXHeight: { px: number }; holdsTarget: boolean }> };
     blankScan: BlankScan;
     phonePaneScan: { stages: Record<string, { phonePane: { x: number; y: number; w: number } }> };
   };
@@ -194,25 +194,8 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
   // Drawn width over laid-out width: 2 on the crop, 1 on the whole frame (the transform leaves layout alone).
   const zoom = (film: import("@playwright/test").Locator) =>
     film.locator(".compile-film-viewport :is(img.compile-film-still, video.compile-film-video)").first().evaluate(media => media.getBoundingClientRect().width / (media as HTMLElement).offsetWidth);
-  // The stage-1 Tier 2 bars must land on the eyebrow in the contained picture, not on the (letterboxed)
-  // still box: each bar's drawn rect against its source rect mapped through the still's contain fit.
-  const expectMaskOnPicture = async (film: import("@playwright/test").Locator) => {
-    const offsets = await film.locator(".compile-film-mask").evaluate(node => {
-      // D-11: the still sits in a display: contents <picture>, so it is a descendant of the viewport, not a child.
-      const still = node.parentElement!.querySelector<HTMLImageElement>(":scope img.compile-film-still")!;
-      const box = still.getBoundingClientRect();
-      const scale = Math.min(box.width / still.naturalWidth, box.height / still.naturalHeight);
-      const width = still.naturalWidth * scale, height = still.naturalHeight * scale;
-      const left = box.x + (box.width - width) / 2, top = box.y + (box.height - height) / 2;
-      return [...node.querySelectorAll("rect")].map(bar => {
-        const drawn = bar.getBoundingClientRect(), at = (name: string) => Number(bar.getAttribute(name));
-        const want = [left + (at("x") / 2880) * width, top + (at("y") / 1800) * height, (at("width") / 2880) * width, (at("height") / 1800) * height];
-        return Math.max(...[drawn.x, drawn.y, drawn.width, drawn.height].map((value, index) => Math.abs(value - want[index]!)));
-      });
-    });
-    expect(offsets).toHaveLength(2);
-    for (const offset of offsets) expect(offset).toBeLessThan(0.5);
-  };
+  // Film re-record (2026-11-05): the design C frames carry no overprint, so no stage draws Tier 2 bars.
+  const expectMaskOnPicture = async (film: import("@playwright/test").Locator) => expect(film.locator(".compile-film-mask")).toHaveCount(0);
   const xHeightRatio = () => page.evaluate(async () => {
     await document.fonts.ready;
     const family = getComputedStyle(document.querySelector("#s1 h1")!).fontFamily;
@@ -272,9 +255,10 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
       await expect(sequence, ids[stage]).toHaveAttribute("data-wide-view", row.defaultView);
       await expect(toggle, ids[stage]).toHaveAttribute("aria-pressed", row.defaultView === "crop" ? "true" : "false");
       if (row.defaultView === "fit") {
-        expect(row.share, `${ids[stage]} opens on Fit because its crop fails the scan`).toBeLessThan(scan.threshold);
+        // Re-record: a stage opens on Fit when its crop fails the blank scan or does not hold its reading target (structure).
+        expect(row.share < scan.threshold || !table.cropCheck.stages[ids[stage]!]!.holdsTarget, `${ids[stage]} opens on Fit for a recorded reason`).toBe(true);
         expect(await zoom(film)).toBeCloseTo(1, 2);
-        await expect(film.locator("[data-film-reading] li:visible")).toHaveCount(4);
+        await expect(film.locator("[data-film-reading]")).toHaveCount(0);
         measurements.push({ width: 1440, reduced, stage: stage + 1, view: "fit", blankScanShare: row.share });
         continue;
       }
@@ -284,12 +268,8 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
       const xHeight = smallest[stage]! * scale;
       measurements.push({ width: 1440, reduced, stage: stage + 1, view: "crop", blankScanShare: row.share, drawnPxPerSourcePx: scale, smallestSourceXHeight: smallest[stage], renderedXHeight: xHeight, sansXHeightRatio: ratio, equivalentPx: xHeight / ratio });
       expect(xHeight / ratio, `stage ${stage + 1}`).toBeGreaterThanOrEqual(11);
-      // Only the window's two panes are named under it.
-      await expect(film.locator("[data-film-reading] li:visible")).toHaveCount(2);
-      // The pane names are read at 15px or more on a desktop; the view control is a mark named "Focus details".
-      const sizes = await film.locator("[data-film-reading] li:visible").evaluateAll(nodes => nodes.map(node => parseFloat(getComputedStyle(node).fontSize)));
-      expect(sizes).toHaveLength(2);
-      for (const size of sizes) expect(size).toBeGreaterThanOrEqual(15);
+      // Re-record: the cuts are product screens with their own headings, so no pane strip is drawn under them.
+      await expect(film.locator("[data-film-reading]")).toHaveCount(0);
       await expect(film.locator(".compile-film-view-control")).toHaveAccessibleName("Focus details");
     }
     // Stage 1 again: a press shows the whole cut and un-presses the toggle; Enter presses it back.
@@ -300,7 +280,7 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
     await expect(toggle).toHaveAttribute("aria-pressed", "false");
     await expect(toggle).toHaveAccessibleName("Focus details");
     expect(await zoom(film)).toBeCloseTo(1, 2);
-    await expect(film.locator("[data-film-reading] li:visible")).toHaveCount(4);
+    await expect(film.locator("[data-film-reading]")).toHaveCount(0);
     if (reduced) await expectMaskOnPicture(film);
     await toggle.press("Enter");
     await expect(sequence).toHaveAttribute("data-wide-view", "crop");
@@ -311,8 +291,9 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
       on the window whose TERMINAL pane is blank for most of the cut: blankScan share 169/424 = 0.399
       against the 0.85 threshold (redesign-r3-20261015/fix2/BLANK-SCAN-2.json).
     */
-    await film.getByRole("tab").nth(3).click();
-    expect(scan.stages.world!.share, "stage 4's crop fails the blank scan").toBeLessThan(scan.threshold);
+    await film.getByRole("tab").nth(2).click();
+    // Re-record (2026-11-05): the Fit stage is now stage 3, whose window does not hold its target (cropCheck).
+    expect(table.cropCheck.stages.structure!.holdsTarget, "stage 3's crop does not hold its target").toBe(false);
     await expect(sequence).toHaveAttribute("data-wide-view", "fit");
     await expect(toggle).toHaveAttribute("aria-pressed", "false");
     // A Focus pressed on stage 4 itself is the visitor's: it stays while stage 4 stays, a press on
@@ -321,25 +302,25 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
     await expect(sequence).toHaveAttribute("data-wide-view", "crop");
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
     expect(await zoom(film)).toBeCloseTo(2, 2);
-    await film.getByRole("tab").nth(3).click();
+    await film.getByRole("tab").nth(2).click();
     await expect(sequence).toHaveAttribute("data-wide-view", "crop");
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
     // ... and belongs to stage 4: another stage opens on its own default, and stage 4 on Fit again.
     await film.getByRole("tab").nth(1).click();
     await expect(sequence).toHaveAttribute("data-wide-view", "crop");
-    await film.getByRole("tab").nth(3).click();
+    await film.getByRole("tab").nth(2).click();
     await expect(sequence).toHaveAttribute("data-wide-view", "fit");
     await expect(toggle).toHaveAttribute("aria-pressed", "false");
     // A Fit the visitor asks for holds across stages (Fit is never blank).
     await film.getByRole("tab").first().click();
     await toggle.click();
     await expect(sequence).toHaveAttribute("data-wide-view", "fit");
-    await film.getByRole("tab").nth(2).click();
+    await film.getByRole("tab").nth(3).click();
     await expect(sequence).toHaveAttribute("data-wide-view", "fit");
     await expect(toggle).toHaveAttribute("aria-pressed", "false");
     await toggle.click();
     await expect(sequence).toHaveAttribute("data-wide-view", "crop");
-    await film.getByRole("tab").nth(3).click();
+    await film.getByRole("tab").nth(2).click();
     await expect(sequence).toHaveAttribute("data-wide-view", "fit");
     await page.screenshot({ path: testInfo.outputPath(`film-1440${reduced ? "-reduced" : ""}.png`) });
 
@@ -448,7 +429,7 @@ for (const path of ["/", "/ko"]) {
     await expect(sequence).toHaveAttribute("data-wide-view", "crop");
     // Hold stage 1 so the cut loops in place instead of advancing mid-sample (the crop is unchanged).
     await film.getByRole("tab").first().click();
-    await expect(sequence).toHaveAttribute("data-video-primary-src", "/film/compile-cut.mp4");
+    await expect(sequence).toHaveAttribute("data-video-primary-src", "/film/hero-c1.mp4");
     const video = sequence.locator("video.compile-film-video");
     await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState >= 2 && !v.paused && v.currentTime > 0), { timeout: 20_000 }).toBe(true);
     const run = await video.evaluate(async (v: HTMLVideoElement, wanted: number) => {
@@ -508,7 +489,7 @@ for (const path of ["/", "/ko"]) {
     await testInfo.attach(`film-blank-${path === "/" ? "en" : "ko"}`, { body: JSON.stringify(run, null, 2), contentType: "application/json" });
     expect(run.samples.length).toBeGreaterThanOrEqual(12);
     for (const sample of run.samples) {
-      expect(sample.src).toContain("/film/compile-cut.mp4");
+      expect(sample.src).toContain("/film/hero-c1.mp4");
       // The drawn video is the 16:10 cut at 2x, and the first screen shows a real part of it.
       expect(Math.abs(sample.region.aspect - 1.6)).toBeLessThan(0.01);
       expect(sample.region.visibleCssRows).toBeGreaterThan(200);
@@ -532,7 +513,7 @@ test("every stage that opens cropped keeps ink in both panes of its whole window
   const table = JSON.parse(readFileSync(resolve(process.cwd(), "components/compile-stage-player.frame-strings.json"), "utf8")) as { blankScan: BlankScan };
   const scan = table.blankScan;
   const ids = ["sources", "read", "structure", "world"];
-  const cuts = ["/film/compile-cut.mp4", "/film/compile-cut-2.mp4", "/film/compile-cut-3.mp4", "/film/compile-cut-4.mp4"];
+  const cuts = ["/film/hero-c1.mp4", "/film/hero-c2.mp4", "/film/hero-c3.mp4", "/film/hero-c4.mp4"];
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
@@ -684,8 +665,8 @@ for (const path of ["/", "/ko"]) {
         const last = entries[entries.length - 1]!;
         return { url: last.url ?? "", size: last.size ?? 0, still: Boolean(last.element?.matches("img.compile-film-still")) };
       });
-      expect(new URL(lcp.url).pathname, `LCP at ${width}`).toMatch(/^\/film\/poster-1-t8\.16\.(avif|webp)$/);
-      if (browserName === "chromium") expect(new URL(lcp.url).pathname, `LCP at ${width}`).toBe("/film/poster-1-t8.16.avif");
+      expect(new URL(lcp.url).pathname, `LCP at ${width}`).toMatch(/^\/film\/poster-c1-t13\.60\.(avif|webp)$/);
+      if (browserName === "chromium") expect(new URL(lcp.url).pathname, `LCP at ${width}`).toBe("/film/poster-c1-t13.60.avif");
       expect(lcp.still, `LCP element at ${width}`).toBe(true);
       expect(lcp.size, `LCP area at ${width}`).toBeGreaterThanOrEqual(LCP_FLOOR[browserName]![path]![width]! * 0.99);
       const column = (await page.locator("#s1 .lv2-wrap").boundingBox())!;

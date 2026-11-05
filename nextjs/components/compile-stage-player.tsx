@@ -120,20 +120,20 @@ export type PosterMask = { poster: string; color: string; rects: readonly { x: n
 */
 export type PhonePane = { x: number; y: number; w: number };
 
-export const STAGE_FRAMES: Record<string, { panes: readonly [string, string, string, string]; readingTarget: ReadingTarget; crop: FilmCrop; wideView: WideView; phonePane: PhonePane; posterMask?: PosterMask }> = {
-  sources: {
-    panes: ["SOURCES", "ORIGINAL", "EXTRACT", "WORLD"],
-    readingTarget: { pane: 1, text: "WORKING COPY.md" },
-    crop: { x: 0.25, y: 0.5 },
-    wideView: "crop",
-    phonePane: { x: 746, y: 380, w: 684 },
-    /* POSTER-RECUT (D-11): t = 8.16s shows the same document as t = 3.00s, and its eyebrow and title rows and
-       columns measured identical (the same rects; README "Home posters -- POSTER-RECUT"). */
-    posterMask: { poster: "/film/poster-1-t8.16-2x.webp", color: "#f2eee7", rects: [{ x: 796, y: 206, w: 282, h: 11 }, { x: 1499, y: 204, w: 278, h: 9 }] },
-  },
-  read: { panes: ["NODES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 1, text: "# Payment terms" }, crop: { x: 0.25, y: 0.25 }, wideView: "crop", phonePane: { x: 820, y: 238, w: 520 } },
-  structure: { panes: ["SOURCES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 0, text: "CHANGED" }, crop: { x: 0, y: 0 }, wideView: "crop", phonePane: { x: 60, y: 186, w: 520 } },
-  world: { panes: ["ASSISTANT · MCP", "EDITOR", "TERMINAL", "WORLD"], readingTarget: { pane: 3, text: "nodes lit" }, crop: { x: 0.5, y: 0.45 }, wideView: "fit", phonePane: { x: 44, y: 180, w: 684 } },
+/*
+  Film re-record on design C (2026-11-05, W2). The four cuts are now recordings of the real product UI
+  -- the workspace's live OCR view, the published World, its change view and its prepared questions --
+  so a frame is one product screen, not four drawn panes. `panes` is therefore absent for these
+  stages and the pane strip is not drawn: the screen carries its own headings, at the product's own
+  type size. `readingTarget.pane` is the quarter column of the 2880 x 1800 frame the string sits in;
+  the crop, the phone rect and both scans are re-measured on the new frames
+  (compile-stage-player.frame-strings.json). No poster carries an overprint, so no stage has a mask.
+*/
+export const STAGE_FRAMES: Record<string, { panes?: readonly [string, string, string, string]; readingTarget: ReadingTarget; crop: FilmCrop; wideView: WideView; phonePane: PhonePane; posterMask?: PosterMask }> = {
+  sources: { readingTarget: { pane: 2, text: "Extracted lines" }, crop: { x: 0.5, y: 0.2 }, wideView: "crop", phonePane: { x: 1780, y: 420, w: 684 } },
+  read: { readingTarget: { pane: 2, text: "Greater China" }, crop: { x: 0.5, y: 0.25 }, wideView: "crop", phonePane: { x: 1900, y: 400, w: 684 } },
+  structure: { readingTarget: { pane: 2, text: "filed 2026-07-31" }, crop: { x: 0.5, y: 0.4 }, wideView: "fit", phonePane: { x: 120, y: 300, w: 684 } },
+  world: { readingTarget: { pane: 0, text: "Retrieved source passage" }, crop: { x: 0, y: 0.1 }, wideView: "crop", phonePane: { x: 160, y: 300, w: 684 } },
 };
 
 /*
@@ -733,7 +733,7 @@ export default function CompileStagePlayer({
     it only names the panes in view and is hidden from assistive tech. A phone pane hides it (CSS).
   */
   const markedPane = panning ? visiblePane : target?.pane;
-  const readingLayer = stageFrame && target ? (
+  const readingLayer = stageFrame?.panes && target ? (
     <div className={readingStyles.reading} data-film-reading="">
       <ol className={readingStyles.panes} lang={korean ? "en" : undefined} aria-label={panning ? MOBILE_FILM_VIEW[korean ? "ko" : "en"].panes : undefined} aria-hidden={panning ? undefined : true}>
         {stageFrame.panes.map((name, pane) => (

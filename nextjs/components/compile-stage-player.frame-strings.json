@@ -1,96 +1,494 @@
 {
-  "derivedFrom": "outputs/tavonel-research-replan-20261013/resume-20261015/redesign-r2-20261015/FILM-STRING-CROSSCHECK.md (ai-knowledge-compiler)",
-  "method": "Chrome (Playwright channel chrome) seeks each locked cut to t and draws the 2880x1800 frame to a canvas; strings transcribed by eye from the PNGs. t=18 is drawn at 17.96 s (duration 18.00 s).",
-  "times": [0, 2, 4, 6, 8, 10, 12, 14, 16, 18],
+  "derivedFrom": "Film re-record on design C, 2026-11-05 (W2). Recorder, DOM probes and scans: outputs/tavonel-research-replan-20261013/design-20261104/impl/FILM-RERECORD-REPORT.md (ai-knowledge-compiler).",
+  "method": "The cuts are recordings of the real product UI, so strings are read from the DOM, not transcribed: a probe run of the same recorder script at deviceScaleFactor 1 (CSS layout identical to the 2x capture) records, at each sampled second, every visible occurrence of each string (Range.getBoundingClientRect, x2 for source px). t=18 is frame 449 (17.96 s). pane = the quarter column of the 2880x1800 frame (the cuts have no drawn panes).",
+  "times": [
+    0,
+    2,
+    4,
+    6,
+    8,
+    10,
+    12,
+    14,
+    16,
+    18
+  ],
   "stages": {
     "sources": {
-      "cut": "compile-cut.mp4",
-      "sha256": "1406a9a8d6e537eadd97012c94c89ffc792276628f30fa8313ea892c8dd169b9",
+      "cut": "hero-c1.mp4",
+      "sha256": "64d286184e32b2fae25609bedd527d6996974486b3b76c5923f7a6fb12d0aa2c",
       "strings": {
-        "WORKING COPY.md": { "pane": "EXTRACT", "visibleAt": [0, 2, 4, 6, 8, 10, 12, 14, 16, 18] },
-        "Site visit notes": { "pane": "ORIGINAL", "visibleAt": [2, 12] }
+        "Extracted lines": {
+          "pane": "Q3 (x 1440-2159)",
+          "visibleAt": [
+            0,
+            2,
+            4,
+            6,
+            8,
+            10,
+            12,
+            14,
+            16,
+            18
+          ]
+        },
+        "apple-2026-q1-10-q-reference.pdf": {
+          "pane": "Q1 (x 0-719)",
+          "visibleAt": [
+            0,
+            2,
+            4,
+            6,
+            8,
+            10,
+            12,
+            14,
+            16,
+            18
+          ]
+        },
+        "Live OCR view": {
+          "pane": "Q2 (x 720-1439)",
+          "visibleAt": [
+            0,
+            2,
+            4,
+            6,
+            8,
+            10,
+            12,
+            14,
+            16,
+            18
+          ]
+        }
       }
     },
     "read": {
-      "cut": "compile-cut-2.mp4",
-      "sha256": "d0496e6e80f83b9a11ccb647c1b23de54d7ad22d7163f2ddd4f0ae58d7152c6d",
+      "cut": "hero-c2.mp4",
+      "sha256": "2cf527d63a6e3b66cc3a9cfaa7043fb9a11412849086da179d47201648685ce1",
       "strings": {
-        "# Payment terms": { "pane": "MARKDOWN", "visibleAt": [0, 2, 4, 6, 8, 10, 12, 14, 16, 18] }
+        "Greater China": {
+          "pane": "Q3 (x 1440-2159)",
+          "visibleAt": [
+            0,
+            2,
+            4,
+            6,
+            8,
+            10,
+            12,
+            14,
+            16,
+            18
+          ]
+        },
+        "Services": {
+          "pane": "Q3 (x 1440-2159)",
+          "visibleAt": [
+            0,
+            2,
+            4,
+            6,
+            8,
+            10,
+            12,
+            14,
+            16,
+            18
+          ]
+        },
+        "filed 2026-01-30": {
+          "pane": "Q1 (x 0-719)",
+          "visibleAt": [
+            0,
+            2,
+            4,
+            6,
+            8,
+            10,
+            12,
+            14,
+            16,
+            18
+          ]
+        }
       }
     },
     "structure": {
-      "cut": "compile-cut-3.mp4",
-      "sha256": "c6d35a3a43f08e54381e7e15cb86908a70184d51726baebc52b766ac9d7f54a0",
+      "cut": "hero-c3.mp4",
+      "sha256": "cd0ec92d892a443f155f16508e88a8fb2996f40c83a95ea7ddf25fbbcfb60682",
       "strings": {
-        "CHANGED": { "pane": "SOURCES", "visibleAt": [0, 2, 4, 6, 8, 10, 12, 14, 16, 18] },
-        "TOUCHED": { "pane": "SOURCES", "visibleAt": [0, 2, 4, 6, 8, 10, 12, 14, 16, 18] },
-        "+ fourteen (14) days’ written notice": { "pane": "MARKDOWN", "visibleAt": [18] }
+        "filed 2026-07-31": {
+          "pane": "Q3 (x 1440-2159)",
+          "visibleAt": [
+            0,
+            2,
+            4,
+            6,
+            8,
+            10,
+            12,
+            14,
+            16,
+            18
+          ]
+        },
+        "Filings that arrived": {
+          "pane": "Q1 (x 0-719)",
+          "visibleAt": [
+            0,
+            2,
+            4,
+            6,
+            8
+          ]
+        },
+        "Open the reference render": {
+          "pane": "Q1 (x 0-719)",
+          "visibleAt": [
+            0,
+            2,
+            4,
+            6,
+            8,
+            10,
+            12,
+            14
+          ]
+        }
       }
     },
     "world": {
-      "cut": "compile-cut-4.mp4",
-      "sha256": "480c7479ca2a7f3ab73291016c4d64c20bee6e6967f43444bde44e117e0cf732",
+      "cut": "hero-c4.mp4",
+      "sha256": "614a4e52d859f1b15db33283739b39b9e8df26049ba5802f5ebcf803474299ca",
       "strings": {
-        "nodes lit": { "pane": "WORLD", "visibleAt": [0, 2, 4, 6, 8, 10, 12, 14, 16, 18] },
-        "handbook-2026.pdf  p.12": { "pane": "TERMINAL", "visibleAt": [12, 14, 16, 18] }
+        "Retrieved source passage": {
+          "pane": "Q1 (x 0-719)",
+          "visibleAt": [
+            0,
+            2,
+            4,
+            6,
+            8,
+            10,
+            12,
+            14,
+            16,
+            18
+          ]
+        },
+        "reference render": {
+          "pane": "Q3 (x 1440-2159)",
+          "visibleAt": [
+            0,
+            2,
+            4,
+            6,
+            8,
+            10,
+            12,
+            14,
+            16,
+            18
+          ]
+        }
       }
     }
   },
   "cropCheck": {
-    "method": "Release 3: template match of each quoted string over the same sampled frames (redesign-r3-20261015/demo/CROP-CHECK.json). box = the string ink box in source px of the 2880x1800 frame; yAt = its top edge at each sampled second. smallestXHeight = smallest measured x-height (source px) of any text in the stage crop window, on the poster frame.",
+    "method": "Re-record: yAt = the top edge (source px) of each probed occurrence inside the crop window's columns at each sampled second; insideWindow = sampled seconds where one occurrence lies wholly inside rows crop.y*1800 .. +900. A recording scrolls, so the window is held to the same 80% rule as visibleAt: holdsTarget = insideWindow / samples >= 0.8. A stage whose window does not hold its target opens on Fit (structure). smallestXHeight: the recordings carry no text under 12px CSS, i.e. >= 11 source px of x-height at 2x.",
     "stages": {
       "sources": {
-        "text": "WORKING COPY.md",
-        "box": {"x": 1478, "w": 140, "h": 22},
-        "yAt": {"0": [1052], "2": [1052], "4": [1052], "6": [1052], "8": [1052], "10": [1052], "12": [1052], "14": [1052], "16": [1052], "18": [1052]},
-        "smallestXHeight": {"px": 9, "text": "WORKING COPY.md body line (mono)", "at": "poster-1-t3.00 x1522 y1100", "window": "rows 900-1800 since the Release 3 fix round (crop y 0.5); measured with the same row-ink profile, redesign-r3-20261015/fix/XHEIGHT-Y50.json. The y 0.2 window's 7px table cell is outside it."}
+        "text": "Extracted lines",
+        "box": {
+          "x": 1810,
+          "w": 182,
+          "h": 30
+        },
+        "yAt": {
+          "0": [
+            1754
+          ],
+          "2": [
+            1030
+          ],
+          "4": [
+            452
+          ],
+          "6": [
+            452
+          ],
+          "8": [
+            452
+          ],
+          "10": [
+            452
+          ],
+          "12": [
+            452
+          ],
+          "14": [
+            452
+          ],
+          "16": [
+            452
+          ],
+          "18": [
+            452
+          ]
+        },
+        "insideWindow": 9,
+        "holdsTarget": true,
+        "smallestXHeight": {
+          "px": 11,
+          "text": "12px CSS product type (Wanted Sans / Plex Mono), drawn at 24 source px; x-height 0.46-0.52 of the em",
+          "at": "every frame: the recording is the product UI at deviceScaleFactor 2",
+          "window": "crop x 0.5, y 0.2"
+        }
       },
       "read": {
-        "text": "# Payment terms",
-        "box": {"x": 822, "w": 178, "h": 19},
-        "yAt": {"0": [242, 1062], "2": [702, 1522], "4": [342, 1162], "6": [802], "8": [442, 1262], "10": [902], "12": [542, 1362], "14": [1002], "16": [642, 1462], "18": [302, 1122]},
-        "smallestXHeight": {"px": 7, "text": "MARKDOWN body line; TBox field rows", "at": "poster-2-t17.96 x825 y1160"}
+        "text": "Greater China",
+        "box": {
+          "x": 1967,
+          "w": 156,
+          "h": 28
+        },
+        "yAt": {
+          "0": [
+            1310
+          ],
+          "2": [
+            1310
+          ],
+          "4": [
+            1310
+          ],
+          "6": [
+            718
+          ],
+          "8": [
+            894
+          ],
+          "10": [
+            1310
+          ],
+          "12": [
+            1310
+          ],
+          "14": [
+            1310
+          ],
+          "16": [
+            1310
+          ],
+          "18": [
+            1310
+          ]
+        },
+        "insideWindow": 10,
+        "holdsTarget": true,
+        "smallestXHeight": {
+          "px": 11,
+          "text": "12px CSS product type (Wanted Sans / Plex Mono), drawn at 24 source px; x-height 0.46-0.52 of the em",
+          "at": "every frame: the recording is the product UI at deviceScaleFactor 2",
+          "window": "crop x 0.5, y 0.25"
+        }
       },
       "structure": {
-        "text": "CHANGED",
-        "box": {"x": 626, "w": 68, "h": 14},
-        "yAt": {"0": [278], "2": [278], "4": [278], "6": [618], "8": [618], "10": [448], "12": [448], "14": [720], "16": [720], "18": [720]},
-        "smallestXHeight": {"px": 7, "text": "MARKDOWN NODE.md body line", "at": "poster-3-t17.96 x815 y264"}
+        "text": "filed 2026-07-31",
+        "box": {
+          "x": 1570,
+          "w": 230,
+          "h": 28
+        },
+        "yAt": {
+          "0": [
+            1581
+          ],
+          "2": [
+            1581
+          ],
+          "4": [
+            1539
+          ],
+          "6": [
+            1101
+          ],
+          "8": [
+            1101
+          ],
+          "10": [
+            697
+          ],
+          "12": [
+            501
+          ],
+          "14": [
+            -15
+          ],
+          "16": [],
+          "18": []
+        },
+        "insideWindow": 5,
+        "holdsTarget": false,
+        "smallestXHeight": {
+          "px": 11,
+          "text": "12px CSS product type (Wanted Sans / Plex Mono), drawn at 24 source px; x-height 0.46-0.52 of the em",
+          "at": "every frame: the recording is the product UI at deviceScaleFactor 2",
+          "window": "crop x 0.5, y 0.4"
+        }
       },
       "world": {
-        "text": "nodes lit",
-        "box": {"x": 2203, "w": 112, "h": 22},
-        "yAt": {"0": [1670], "2": [1670], "4": [1670], "6": [1670], "8": [1670], "10": [1670], "12": [1670], "14": [1670], "16": [1670], "18": [1670]},
-        "smallestXHeight": {"px": 11, "text": "WORLD footer \"1 source · 1 page\"", "at": "poster-4-t17.96 x2600 y1666"}
+        "text": "Retrieved source passage",
+        "box": {
+          "x": 182,
+          "w": 309,
+          "h": 30
+        },
+        "yAt": {
+          "0": [
+            1196
+          ],
+          "2": [
+            622
+          ],
+          "4": [
+            186
+          ],
+          "6": [
+            186
+          ],
+          "8": [
+            504
+          ],
+          "10": [
+            1196
+          ],
+          "12": [
+            196
+          ],
+          "14": [
+            186
+          ],
+          "16": [
+            186
+          ],
+          "18": [
+            186
+          ]
+        },
+        "insideWindow": 8,
+        "holdsTarget": true,
+        "smallestXHeight": {
+          "px": 11,
+          "text": "12px CSS product type (Wanted Sans / Plex Mono), drawn at 24 source px; x-height 0.46-0.52 of the em",
+          "at": "every frame: the recording is the product UI at deviceScaleFactor 2",
+          "window": "crop x 0, y 0.1"
+        }
       }
     }
   },
   "blankScan": {
-    "method": "Release 3 fix round 3 (B1). Every presented frame of each locked cut at 1x (Chrome, requestVideoFrameCallback), drawn at 2880x1800, over the stage's whole 2x crop window: columns crop.x .. crop.x + 0.5 split into its two panes, rows crop.y .. crop.y + 0.5. Each pane is cut into 24x24 source-px cells from the window origin; a cell holds ink when its luma range (sampled every 2px) is >= 48, and a pane is blank when >= blankAt of its cells hold none. share = frames with neither pane blank / frames. A stage may open cropped (defaultView crop) only when share >= threshold; otherwise it opens on Fit.",
-    "receipt": "outputs/tavonel-research-replan-20261013/resume-20261015/redesign-r3-20261015/fix2/BLANK-SCAN-2.json (ai-knowledge-compiler), tool fix2/blank-scan.cjs",
+    "method": "Re-record: the Release 3 cell rule over the stage's whole 2x crop window (columns crop.x .. crop.x + 0.5 split into its two panes, rows crop.y .. crop.y + 0.5), on all 450 source PNG frames of each cut (2880x1800, the frames the cut was encoded from). 24x24 source-px cells from the window origin; a cell holds ink when its luma range (sampled every 2px) is >= 48; a pane is blank when >= blankAt of its cells hold none. share = frames with neither pane blank / frames. defaultView crop only when share >= threshold and the window holds the reading target (cropCheck.holdsTarget).",
+    "receipt": "outputs/tavonel-research-replan-20261013/design-20261104/impl/FILM-RERECORD-REPORT.md (ai-knowledge-compiler), tool scan.mjs",
     "blankAt": 0.99,
     "threshold": 0.85,
     "stages": {
-      "sources": {"crop": {"x": 0.25, "y": 0.5}, "frames": 397, "inkBoth": 397, "share": 1, "lastBlankT": null, "defaultView": "crop"},
-      "read": {"crop": {"x": 0.25, "y": 0.25}, "frames": 363, "inkBoth": 363, "share": 1, "lastBlankT": null, "defaultView": "crop"},
-      "structure": {"crop": {"x": 0, "y": 0}, "frames": 377, "inkBoth": 377, "share": 1, "lastBlankT": null, "defaultView": "crop"},
-      "world": {"crop": {"x": 0.5, "y": 0.45}, "frames": 424, "inkBoth": 169, "share": 0.399, "lastBlankT": 10.76, "defaultView": "fit"}
+      "sources": {
+        "crop": {
+          "x": 0.5,
+          "y": 0.2
+        },
+        "frames": 450,
+        "inkBoth": 450,
+        "share": 1,
+        "lastBlankT": null,
+        "defaultView": "crop"
+      },
+      "read": {
+        "crop": {
+          "x": 0.5,
+          "y": 0.25
+        },
+        "frames": 450,
+        "inkBoth": 450,
+        "share": 1,
+        "lastBlankT": null,
+        "defaultView": "crop"
+      },
+      "structure": {
+        "crop": {
+          "x": 0.5,
+          "y": 0.4
+        },
+        "frames": 450,
+        "inkBoth": 450,
+        "share": 1,
+        "lastBlankT": null,
+        "defaultView": "fit"
+      },
+      "world": {
+        "crop": {
+          "x": 0,
+          "y": 0.1
+        },
+        "frames": 450,
+        "inkBoth": 450,
+        "share": 1,
+        "lastBlankT": null,
+        "defaultView": "crop"
+      }
     }
   },
   "phonePaneScan": {
-    "method": "FINAL-SPEC 2026-10-26 §2.1 / §9 #29. The blankScan cell rule over one rect: every presented frame of each locked cut at 1x (Chrome channel, requestVideoFrameCallback), drawn at 2880x1800; the w x w*5/4 source-px rect at the stage's phonePane is cut into 24x24 cells from the rect origin, a cell holds ink when its luma range (sampled every 2px) is >= 48, and a frame is blank when >= blankAt of the rect's cells hold none. share = frames not blank / frames; a phonePane is used only when share >= threshold. Fix round R3 (review 2026-10-26 B-4): stages 2 and 3 are 520px wide, so their 7px source text reads >= 9px equivalent on a 390 phone; stage 1 starts at row 380, below the scan_0140 photo box. All four rows are one run of the R3 tool; the presented-frame count varies by a few frames between runs.",
-    "receipt": "outputs/tavonel-research-replan-20261013/redesign-20261026/review/impl-2026-10-26-R3/pane-scan/pane-scan-final.json and pane-scan-candidates.json (ai-knowledge-compiler), tool pane-scan/pane-scan-w.cjs; the R1 rects: review/impl-2026-10-26/pane-scan/pane-scan.json",
+    "method": "Re-record: the blankScan cell rule over one w x w*5/4 source-px rect at the stage's phonePane, on all 450 source frames; a frame is blank when >= blankAt of the rect's cells hold none. share = frames not blank / frames; a phonePane is used only when share >= threshold. All four rects are 684 px wide (the spec ceiling), so 12px CSS product type draws at about 12.5px on a 390 phone.",
+    "receipt": "outputs/tavonel-research-replan-20261013/design-20261104/impl/FILM-RERECORD-REPORT.md (ai-knowledge-compiler), tool scan.mjs",
     "blankAt": 0.99,
     "threshold": 0.85,
     "rect": "per stage: phonePane.w x phonePane.w * 5 / 4 source px (4:5)",
     "stages": {
-      "sources": {"phonePane": {"x": 746, "y": 380, "w": 684}, "frames": 443, "blankFrames": 0, "share": 1},
-      "read": {"phonePane": {"x": 820, "y": 238, "w": 520}, "frames": 447, "blankFrames": 0, "share": 1},
-      "structure": {"phonePane": {"x": 60, "y": 186, "w": 520}, "frames": 449, "blankFrames": 0, "share": 1},
-      "world": {"phonePane": {"x": 44, "y": 180, "w": 684}, "frames": 447, "blankFrames": 19, "share": 0.957}
-    },
-    "rejected": {
-      "world": {"phonePane": {"x": 44, "y": 516, "w": 684}, "frames": 448, "blankFrames": 98, "share": 0.781, "why": "the ASSISTANT answer rows are empty until the question is asked; the spec's D3 rect, below threshold"}
+      "sources": {
+        "phonePane": {
+          "x": 1780,
+          "y": 420,
+          "w": 684
+        },
+        "frames": 450,
+        "blankFrames": 0,
+        "share": 1
+      },
+      "read": {
+        "phonePane": {
+          "x": 1900,
+          "y": 400,
+          "w": 684
+        },
+        "frames": 450,
+        "blankFrames": 0,
+        "share": 1
+      },
+      "structure": {
+        "phonePane": {
+          "x": 120,
+          "y": 300,
+          "w": 684
+        },
+        "frames": 450,
+        "blankFrames": 0,
+        "share": 1
+      },
+      "world": {
+        "phonePane": {
+          "x": 160,
+          "y": 300,
+          "w": 684
+        },
+        "frames": 450,
+        "blankFrames": 0,
+        "share": 1
+      }
     }
   }
 }

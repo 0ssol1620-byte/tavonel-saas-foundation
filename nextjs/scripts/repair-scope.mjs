@@ -2353,6 +2353,37 @@ export const REMOTE_MCP_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/launch-qa-r
 // suite that pins the approved wording, and the twelve re-cut AVIF/WebP posters. Exactly these sixteen paths select the wording,
 // locked-asset, operations, posture and trust suites, the poster contract (390) and the policy-page template suite (1440).
 // The cuts themselves stay locked under their own owner; a new poster name is a new review. Product UI, so never nativeReuse.
+// Home film re-record on design C (W2, codex/film-rerecord-20261105): the six new cuts and eighteen posters, byte-locked in
+// lib/locked-film-assets.json, and the film-start probe that names the stage-1 cut. Exact paths, no glob.
+export const HOME_FILM_RERECORD_AFFECTED_PATHS = Object.freeze([
+  'public/film/hero-c1-hq-1440.mp4',
+  'public/film/hero-c1-hq.mp4',
+  'public/film/hero-c1.mp4',
+  'public/film/hero-c2.mp4',
+  'public/film/hero-c3.mp4',
+  'public/film/hero-c4.mp4',
+  'public/film/poster-c1-t13.60-2x.avif',
+  'public/film/poster-c1-t13.60-2x.webp',
+  'public/film/poster-c1-t13.60-pane1-684x855.avif',
+  'public/film/poster-c1-t13.60-pane1-684x855.webp',
+  'public/film/poster-c1-t13.60.avif',
+  'public/film/poster-c1-t13.60.webp',
+  'public/film/poster-c2-t4.40-2x.avif',
+  'public/film/poster-c2-t4.40-2x.webp',
+  'public/film/poster-c2-t4.40.avif',
+  'public/film/poster-c2-t4.40.webp',
+  'public/film/poster-c3-t17.96-2x.avif',
+  'public/film/poster-c3-t17.96-2x.webp',
+  'public/film/poster-c3-t17.96.avif',
+  'public/film/poster-c3-t17.96.webp',
+  'public/film/poster-c4-t6.80-2x.avif',
+  'public/film/poster-c4-t6.80-2x.webp',
+  'public/film/poster-c4-t6.80.avif',
+  'public/film/poster-c4-t6.80.webp',
+  'scripts/measure-film-start.mjs',
+]);
+export const HOME_FILM_RERECORD_AFFECTED_UNIT_FILES = Object.freeze(['components/compile-stage-player.mobile-view.test.tsx', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts']);
+export const HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/hero-four-stage-restoration.spec.ts', 'e2e/hero-home-responsive.spec.ts']);
 export const CONSENT_POSTER_AFFECTED_PATHS = Object.freeze([
   'app/privacy/page.tsx',
   'app/subprocessors/page.tsx',
@@ -2925,6 +2956,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // operational-sli-alert-delivery: the 4 exact paths above select 8 direct suites and no browser suite.
   affectedGroup('operational-sli-alert-delivery', new RegExp(`^nextjs/(?:${exactPathAlternation(OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS)})$`),
     { unitFiles: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES }),
+  // film-rerecord-20261105: the 25 exact paths above select 3 direct suites and 2 browser suites.
+  affectedGroup('film-rerecord-20261105', new RegExp(`^nextjs/(?:${exactPathAlternation(HOME_FILM_RERECORD_AFFECTED_PATHS)})$`),
+    { unitFiles: HOME_FILM_RERECORD_AFFECTED_UNIT_FILES, browserFiles: HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES }),
   affectedGroup('consent-poster', new RegExp(`^nextjs/(?:${exactPathAlternation(CONSENT_POSTER_AFFECTED_PATHS)})$`),
     { unitFiles: CONSENT_POSTER_AFFECTED_UNIT_FILES, browserFiles: CONSENT_POSTER_AFFECTED_BROWSER_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json|wrangler\.jsonc)$/, { worker: true }),

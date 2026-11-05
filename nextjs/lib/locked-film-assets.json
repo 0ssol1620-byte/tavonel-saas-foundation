@@ -20,6 +20,36 @@
       "file": "compile-cut-4.mp4",
       "bytes": 614533,
       "sha256": "480c7479ca2a7f3ab73291016c4d64c20bee6e6967f43444bde44e117e0cf732"
+    },
+    {
+      "file": "hero-c1.mp4",
+      "bytes": 1200711,
+      "sha256": "64d286184e32b2fae25609bedd527d6996974486b3b76c5923f7a6fb12d0aa2c"
+    },
+    {
+      "file": "hero-c2.mp4",
+      "bytes": 1216267,
+      "sha256": "2cf527d63a6e3b66cc3a9cfaa7043fb9a11412849086da179d47201648685ce1"
+    },
+    {
+      "file": "hero-c3.mp4",
+      "bytes": 1609792,
+      "sha256": "cd0ec92d892a443f155f16508e88a8fb2996f40c83a95ea7ddf25fbbcfb60682"
+    },
+    {
+      "file": "hero-c4.mp4",
+      "bytes": 1849553,
+      "sha256": "614a4e52d859f1b15db33283739b39b9e8df26049ba5802f5ebcf803474299ca"
+    },
+    {
+      "file": "hero-c1-hq.mp4",
+      "bytes": 998730,
+      "sha256": "049ed1f41bdadd00e6bf4c4e03610b202a8c6d988f0d848dd7ba44535364941b"
+    },
+    {
+      "file": "hero-c1-hq-1440.mp4",
+      "bytes": 451315,
+      "sha256": "bf6c0975c29171acab7cd29429cee65329be88fe6655ee978ddbb77baa382e05"
     }
   ],
   "posters": [
@@ -167,7 +197,12 @@
       "framePngSha256": "ea96053750dc68fb950303c08d7b8e384f7fe2bd6424428948767467c0978a55",
       "cropOf": "poster-1-t8.16-2x.webp",
       "cropOfSha256": "58d0ff0e87c526d64620d5e9e6e4a699122f3599b59deb107bef3ea74e721867",
-      "cropRect": {"x": 746, "y": 380, "width": 684, "height": 855}
+      "cropRect": {
+        "x": 746,
+        "y": 380,
+        "width": 684,
+        "height": 855
+      }
     },
     {
       "file": "poster-1-t8.16-pane1-684x855.webp",
@@ -181,7 +216,12 @@
       "framePngSha256": "ea96053750dc68fb950303c08d7b8e384f7fe2bd6424428948767467c0978a55",
       "cropOf": "poster-1-t8.16-2x.webp",
       "cropOfSha256": "58d0ff0e87c526d64620d5e9e6e4a699122f3599b59deb107bef3ea74e721867",
-      "cropRect": {"x": 746, "y": 380, "width": 684, "height": 855}
+      "cropRect": {
+        "x": 746,
+        "y": 380,
+        "width": 684,
+        "height": 855
+      }
     },
     {
       "file": "poster-2-t9.28-2x.avif",
@@ -270,7 +310,220 @@
       "cutSha256": "480c7479ca2a7f3ab73291016c4d64c20bee6e6967f43444bde44e117e0cf732",
       "frameSeconds": 17.96,
       "framePngSha256": "0ade2f490662ce1c69510f8863189c038dc33a4e1f6720a2ac42980dc868998a"
+    },
+    {
+      "file": "poster-c1-t13.60-2x.webp",
+      "width": 2880,
+      "height": 1800,
+      "bytes": 179292,
+      "sha256": "47a9729fbb44633d6df8a238a5eec3caa58c743e7a3e2d4872ea891628efe682",
+      "cut": "hero-c1.mp4",
+      "cutSha256": "64d286184e32b2fae25609bedd527d6996974486b3b76c5923f7a6fb12d0aa2c",
+      "frameSeconds": 13.6,
+      "framePngSha256": "a07c9a49adccd69654aa86403e6415d921751c596320ecaac6307792a2384389"
+    },
+    {
+      "file": "poster-c1-t13.60.webp",
+      "width": 1440,
+      "height": 900,
+      "bytes": 64598,
+      "sha256": "ca823d34f28cf7bbf5745df8d2a5db4afc76a931d788069001e27604be8c64f6",
+      "cut": "hero-c1.mp4",
+      "cutSha256": "64d286184e32b2fae25609bedd527d6996974486b3b76c5923f7a6fb12d0aa2c",
+      "frameSeconds": 13.6,
+      "framePngSha256": "a07c9a49adccd69654aa86403e6415d921751c596320ecaac6307792a2384389"
+    },
+    {
+      "file": "poster-c1-t13.60-2x.avif",
+      "width": 2880,
+      "height": 1800,
+      "bytes": 105891,
+      "sha256": "9aec5e0af622be9c2dfde757562f5c9f4b72d484a194a09355fe96c09e1fce2c",
+      "cut": "hero-c1.mp4",
+      "cutSha256": "64d286184e32b2fae25609bedd527d6996974486b3b76c5923f7a6fb12d0aa2c",
+      "frameSeconds": 13.6,
+      "framePngSha256": "a07c9a49adccd69654aa86403e6415d921751c596320ecaac6307792a2384389"
+    },
+    {
+      "file": "poster-c1-t13.60.avif",
+      "width": 1440,
+      "height": 900,
+      "bytes": 39609,
+      "sha256": "07e7199a6f3af8b0442de4bd861460e2b2cf25fe6454d3fa9e42e1630d5edfe8",
+      "cut": "hero-c1.mp4",
+      "cutSha256": "64d286184e32b2fae25609bedd527d6996974486b3b76c5923f7a6fb12d0aa2c",
+      "frameSeconds": 13.6,
+      "framePngSha256": "a07c9a49adccd69654aa86403e6415d921751c596320ecaac6307792a2384389"
+    },
+    {
+      "file": "poster-c2-t4.40-2x.webp",
+      "width": 2880,
+      "height": 1800,
+      "bytes": 137168,
+      "sha256": "c9259a2defea27d731effc84c8b239c20b7099de1c48397a9b643dce8338854f",
+      "cut": "hero-c2.mp4",
+      "cutSha256": "2cf527d63a6e3b66cc3a9cfaa7043fb9a11412849086da179d47201648685ce1",
+      "frameSeconds": 4.4,
+      "framePngSha256": "49d73bba3f4198e6131bd666127071e0a96474273ed96fa04673286d02fef9b4"
+    },
+    {
+      "file": "poster-c2-t4.40.webp",
+      "width": 1440,
+      "height": 900,
+      "bytes": 53236,
+      "sha256": "b86c2ad1d1c79c756a1e085c0f935fe23a03e6161d3731b02d57c9c4e7ef44a8",
+      "cut": "hero-c2.mp4",
+      "cutSha256": "2cf527d63a6e3b66cc3a9cfaa7043fb9a11412849086da179d47201648685ce1",
+      "frameSeconds": 4.4,
+      "framePngSha256": "49d73bba3f4198e6131bd666127071e0a96474273ed96fa04673286d02fef9b4"
+    },
+    {
+      "file": "poster-c2-t4.40-2x.avif",
+      "width": 2880,
+      "height": 1800,
+      "bytes": 67947,
+      "sha256": "7a25a03799e9379d463c196d4de3ebfa7766ffa9fcf3c567bcc687d42c5fcc5e",
+      "cut": "hero-c2.mp4",
+      "cutSha256": "2cf527d63a6e3b66cc3a9cfaa7043fb9a11412849086da179d47201648685ce1",
+      "frameSeconds": 4.4,
+      "framePngSha256": "49d73bba3f4198e6131bd666127071e0a96474273ed96fa04673286d02fef9b4"
+    },
+    {
+      "file": "poster-c2-t4.40.avif",
+      "width": 1440,
+      "height": 900,
+      "bytes": 29033,
+      "sha256": "71c7f2fb6747a056cc917f409367fc478401b6b62d7c407665716317ecbafa6b",
+      "cut": "hero-c2.mp4",
+      "cutSha256": "2cf527d63a6e3b66cc3a9cfaa7043fb9a11412849086da179d47201648685ce1",
+      "frameSeconds": 4.4,
+      "framePngSha256": "49d73bba3f4198e6131bd666127071e0a96474273ed96fa04673286d02fef9b4"
+    },
+    {
+      "file": "poster-c3-t17.96-2x.webp",
+      "width": 2880,
+      "height": 1800,
+      "bytes": 144384,
+      "sha256": "95fc1e3a5ae9938a420f2c3f59c131b1272140f778bca2dba2be5362b2a76028",
+      "cut": "hero-c3.mp4",
+      "cutSha256": "cd0ec92d892a443f155f16508e88a8fb2996f40c83a95ea7ddf25fbbcfb60682",
+      "frameSeconds": 17.96,
+      "framePngSha256": "6485bc9faecfbf9f5c5c7fddac29a3ee69d7f95e2567309552fb2bd9958d3da3"
+    },
+    {
+      "file": "poster-c3-t17.96.webp",
+      "width": 1440,
+      "height": 900,
+      "bytes": 57156,
+      "sha256": "a5f7ce49d79ff6acd665902f480a8fce38fe6d658c542fa128b5c997172ee778",
+      "cut": "hero-c3.mp4",
+      "cutSha256": "cd0ec92d892a443f155f16508e88a8fb2996f40c83a95ea7ddf25fbbcfb60682",
+      "frameSeconds": 17.96,
+      "framePngSha256": "6485bc9faecfbf9f5c5c7fddac29a3ee69d7f95e2567309552fb2bd9958d3da3"
+    },
+    {
+      "file": "poster-c3-t17.96-2x.avif",
+      "width": 2880,
+      "height": 1800,
+      "bytes": 66498,
+      "sha256": "010dfcedb46e35f7767ac46dfc757001ebef817f9029762d41bab4780f034ff4",
+      "cut": "hero-c3.mp4",
+      "cutSha256": "cd0ec92d892a443f155f16508e88a8fb2996f40c83a95ea7ddf25fbbcfb60682",
+      "frameSeconds": 17.96,
+      "framePngSha256": "6485bc9faecfbf9f5c5c7fddac29a3ee69d7f95e2567309552fb2bd9958d3da3"
+    },
+    {
+      "file": "poster-c3-t17.96.avif",
+      "width": 1440,
+      "height": 900,
+      "bytes": 26194,
+      "sha256": "cd57cf06ef2ea21cc6dea98d2d9064019862153b3c6f417a76c54c48fb95c224",
+      "cut": "hero-c3.mp4",
+      "cutSha256": "cd0ec92d892a443f155f16508e88a8fb2996f40c83a95ea7ddf25fbbcfb60682",
+      "frameSeconds": 17.96,
+      "framePngSha256": "6485bc9faecfbf9f5c5c7fddac29a3ee69d7f95e2567309552fb2bd9958d3da3"
+    },
+    {
+      "file": "poster-c4-t6.80-2x.webp",
+      "width": 2880,
+      "height": 1800,
+      "bytes": 233210,
+      "sha256": "4ca51b0d4faba3d844c5cc7d42eacc5857301ca2e03d53978e8ffee0444ff616",
+      "cut": "hero-c4.mp4",
+      "cutSha256": "614a4e52d859f1b15db33283739b39b9e8df26049ba5802f5ebcf803474299ca",
+      "frameSeconds": 6.8,
+      "framePngSha256": "2d45c7645ac7b119a0cac41959e11da24f42ef35cda9927bdd38966ce3120081"
+    },
+    {
+      "file": "poster-c4-t6.80.webp",
+      "width": 1440,
+      "height": 900,
+      "bytes": 92864,
+      "sha256": "d04a6d20a2a46704280d37ec5fb9db826502189aa9b871c6c19e7c1c288d50d5",
+      "cut": "hero-c4.mp4",
+      "cutSha256": "614a4e52d859f1b15db33283739b39b9e8df26049ba5802f5ebcf803474299ca",
+      "frameSeconds": 6.8,
+      "framePngSha256": "2d45c7645ac7b119a0cac41959e11da24f42ef35cda9927bdd38966ce3120081"
+    },
+    {
+      "file": "poster-c4-t6.80-2x.avif",
+      "width": 2880,
+      "height": 1800,
+      "bytes": 134188,
+      "sha256": "04c4f2a53d894d2a70b8000990356aa963a982f901d0a575c739824d6e771ee0",
+      "cut": "hero-c4.mp4",
+      "cutSha256": "614a4e52d859f1b15db33283739b39b9e8df26049ba5802f5ebcf803474299ca",
+      "frameSeconds": 6.8,
+      "framePngSha256": "2d45c7645ac7b119a0cac41959e11da24f42ef35cda9927bdd38966ce3120081"
+    },
+    {
+      "file": "poster-c4-t6.80.avif",
+      "width": 1440,
+      "height": 900,
+      "bytes": 55074,
+      "sha256": "b784a6494cba294f843bd9a43599e38a9130c932cd08470ba39d415758a9629f",
+      "cut": "hero-c4.mp4",
+      "cutSha256": "614a4e52d859f1b15db33283739b39b9e8df26049ba5802f5ebcf803474299ca",
+      "frameSeconds": 6.8,
+      "framePngSha256": "2d45c7645ac7b119a0cac41959e11da24f42ef35cda9927bdd38966ce3120081"
+    },
+    {
+      "file": "poster-c1-t13.60-pane1-684x855.webp",
+      "width": 760,
+      "height": 950,
+      "bytes": 33626,
+      "sha256": "a6a6e0d95e8e692330f5f36334acd50e2675d916f4a5afbf5b221d2356ca78d3",
+      "cut": "hero-c1.mp4",
+      "cutSha256": "64d286184e32b2fae25609bedd527d6996974486b3b76c5923f7a6fb12d0aa2c",
+      "frameSeconds": 13.6,
+      "framePngSha256": "a07c9a49adccd69654aa86403e6415d921751c596320ecaac6307792a2384389",
+      "cropOf": "poster-c1-t13.60-2x.webp (same source frame)",
+      "cropRect": {
+        "x": 1780,
+        "y": 420,
+        "width": 684,
+        "height": 855
+      }
+    },
+    {
+      "file": "poster-c1-t13.60-pane1-684x855.avif",
+      "width": 760,
+      "height": 950,
+      "bytes": 20292,
+      "sha256": "c313897b5a924322a02d8ffac21691f9744e9cdfa323576beb5782d1cd3fc282",
+      "cut": "hero-c1.mp4",
+      "cutSha256": "64d286184e32b2fae25609bedd527d6996974486b3b76c5923f7a6fb12d0aa2c",
+      "frameSeconds": 13.6,
+      "framePngSha256": "a07c9a49adccd69654aa86403e6415d921751c596320ecaac6307792a2384389",
+      "cropOf": "poster-c1-t13.60-2x.webp (same source frame)",
+      "cropRect": {
+        "x": 1780,
+        "y": 420,
+        "width": 684,
+        "height": 855
+      }
     }
   ],
-  "posterEncoder": "sharp 0.35.4 (libwebp 1.6.0, libvips 8.18.6); webp quality 82, smartSubsample, effort 6; 1x = lanczos3 resize of the same frame. POSTER-RECUT (D-11): frames by ffmpeg 8.1.2 (input seek to t, BT.601 limited -> full range); AVIF = sharp 0.35.4 (libaom 3.14.1, libheif 1.23.2) quality 50, chromaSubsampling 4:4:4, effort 6, 1x = lanczos3 resize; the recut WebP files use the Release 3 WebP settings. Phone pane crops (FINAL-SPEC 2026-10-26, cropOf/cropRect): sharp 0.35.4 extract(cropRect) of the locked 2x WebP named in cropOf -- one more lossy generation, since ffmpeg was not on the producing host -- then AVIF quality 50, chromaSubsampling 4:4:4, effort 6 and WebP quality 82, smartSubsample, effort 6"
+  "posterEncoder": "sharp 0.35.4 (libwebp 1.6.0, libvips 8.18.6); webp quality 82, smartSubsample, effort 6; 1x = lanczos3 resize of the same frame. POSTER-RECUT (D-11): frames by ffmpeg 8.1.2 (input seek to t, BT.601 limited -> full range); AVIF = sharp 0.35.4 (libaom 3.14.1, libheif 1.23.2) quality 50, chromaSubsampling 4:4:4, effort 6, 1x = lanczos3 resize; the recut WebP files use the Release 3 WebP settings. Phone pane crops (FINAL-SPEC 2026-10-26, cropOf/cropRect): sharp 0.35.4 extract(cropRect) of the locked 2x WebP named in cropOf -- one more lossy generation, since ffmpeg was not on the producing host -- then AVIF quality 50, chromaSubsampling 4:4:4, effort 6 and WebP quality 82, smartSubsample, effort 6",
+  "rerecordEncoder": "Film re-record on design C (2026-11-05, W2). Cuts: Playwright Chromium (bundled with @playwright/test in nextjs) screenshots of the real product UI at 1440x900 CSS, deviceScaleFactor 2, 25 fps x 18 s = 450 PNGs per cut, driven against the film clock; encoded by nextjs/scripts/encode-cut-2x.sh with ffmpeg 7.1 (imageio-ffmpeg essentials build, libx264, preset medium, crf 20, yuv444p, two halves at one thread, concat -c copy, +faststart). Stage-1 fallbacks: the same two-halves path at yuv420p crf 20, 2880x1800 and lanczos 1440x900. Posters: the lossless source PNG of the named frame (framePngSha256), sharp 0.35.4: WebP quality 82 smartSubsample effort 6, AVIF quality 50 chroma 4:4:4 effort 6, 1x = lanczos3 1440x900; the phone pane = sharp extract(cropRect) of that same PNG, one lossy generation."
 }
