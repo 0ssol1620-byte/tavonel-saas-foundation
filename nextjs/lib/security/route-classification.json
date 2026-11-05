@@ -288,7 +288,7 @@
         "POST"
       ],
       "credential": "bearer:shared-secret",
-      "note": "FOUNDATION_WORKER_SECRET / CRON_SECRET, constant-time compare, closed when unset. W1-A1 rollback lever: revokes every live remote MCP key (MCP: name) in one write; returns counts per workspace, no key material."
+      "note": "FOUNDATION_WORKER_SECRET / CRON_SECRET, constant-time compare, closed when unset. W1-A1 rollback lever: revokes every live remote MCP key (token_kind mcp) in one write; returns counts per workspace, no key material."
     },
     "app/api/operations/p0/admission/route.ts": {
       "type": "P-public",

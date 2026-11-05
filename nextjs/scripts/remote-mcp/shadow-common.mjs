@@ -76,6 +76,15 @@ export function createStore() {
     let out = rows;
     for (const [column, raw] of params) {
       if (["select", "order", "limit", "offset"].includes(column)) continue;
+      if (column === "or") {
+        // PostgREST or=(a.op.v,b.op.v): a row passes when any clause does. Clause values here carry no commas.
+        const clauses = raw.replace(/^\(|\)$/g, "").split(",").map((clause) => {
+          const [name, ...filter] = clause.split(".");
+          return [name, filter.join(".")];
+        });
+        out = out.filter((row) => clauses.some((clause) => filterRows([row], new URLSearchParams([clause])).length === 1));
+        continue;
+      }
       const negate = raw.startsWith("not.");
       const [op, ...rest] = (negate ? raw.slice(4) : raw).split(".");
       const value = rest.join(".");
@@ -109,7 +118,9 @@ export function createStore() {
         key_id: randomUUID(), workspace_key: body.p_workspace_key, name: body.p_name, key_prefix: body.p_key_prefix,
         token_sha256: body.p_token_sha256, scopes: body.p_scopes, expires_at: body.p_expires_at, created_at: now(),
         created_by: body.p_actor_user_id, authorization_revision: body.p_authorization_revision, last_used_at: null, revoked_at: null,
+        token_kind: body.p_token_kind ?? "live",
       };
+      if (!["live", "mcp"].includes(row.token_kind)) return [400, { message: "foundation_api_keys_token_kind_check" }];
       tables.foundation_api_keys.push(row);
       return [200, row];
     },
@@ -310,12 +321,13 @@ export function mcp(base, message, token, headers = {}) {
 }
 
 /** A developer key written straight into the synthetic store, for the credential shapes OAuth never mints. */
-export function plantKey(store, { workspaceKey, userId, scopes, expiresAt = null, revokedAt = null }) {
+export function plantKey(store, { workspaceKey, userId, scopes, expiresAt = null, revokedAt = null, name = "planted" }) {
   const prefix = randomBytes(9).toString("base64url");
   const token = `tvnl_live_${prefix}_${randomBytes(32).toString("base64url")}`;
   store.tables.foundation_api_keys.push({
-    key_id: randomUUID(), workspace_key: workspaceKey, name: "planted", key_prefix: prefix, token_sha256: hex(token), scopes,
+    key_id: randomUUID(), workspace_key: workspaceKey, name, key_prefix: prefix, token_sha256: hex(token), scopes,
     expires_at: expiresAt, created_at: new Date().toISOString(), created_by: userId, authorization_revision: 1, last_used_at: null, revoked_at: revokedAt,
+    token_kind: "live",
   });
   return token;
 }

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
@@ -49,7 +50,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-const keyRow = { key_id: KEY_ID, workspace_key: WORKSPACE, created_by: USER, scopes: ["worlds:read"], expires_at: null, revoked_at: null, authorization_revision: 7 };
+const keyRow = { key_id: KEY_ID, workspace_key: WORKSPACE, created_by: USER, scopes: ["worlds:read"], expires_at: null, revoked_at: null, authorization_revision: 7, token_kind: "mcp" };
 
 describe("M1: a remote MCP token is for /api/mcp only", () => {
   it("mints the MCP form only when asked, and the form is inside the stored digest", async () => {
@@ -60,6 +61,16 @@ describe("M1: a remote MCP token is for /api/mcp only", () => {
     expect(manual.ok && manual.token).toMatch(/^tvnl_live_/);
     const digests = seen.map((call) => (call.body as { p_token_sha256: string }).p_token_sha256);
     expect(new Set(digests).size).toBe(2);
+    // R2 N1: the kind is stored with the row, from the audience, never from the name.
+    expect(seen.map((call) => (call.body as { p_token_kind: string }).p_token_kind)).toEqual(["mcp", "live"]);
+  });
+
+  it("refuses a token whose form differs from its row's stored kind (R2 N1)", async () => {
+    answer = () => Response.json([{ ...keyRow, token_kind: "live" }]);
+    const token = `tvnl_mcp_abcdefghijkl_${"a".repeat(43)}`;
+    const request = new Request("https://tavonel.com/api/mcp", { headers: { authorization: `Bearer ${token}` } });
+    expect(await withinRemoteMcpDispatch(() => authorizeFoundationRequest(request, "worlds:read"))).toMatchObject({ ok: false, code: "API_KEY_INVALID", status: 401 });
+    expect(seen[0]!.url.searchParams.get("select")).toContain("token_kind");
   });
 
   it("refuses a tvnl_mcp_ token sent straight to the REST API, and admits it inside /api/mcp's dispatch", async () => {
@@ -81,19 +92,22 @@ describe("M1: a remote MCP token is for /api/mcp only", () => {
 });
 
 describe("M6: the Developers inventory", () => {
-  it("reads hand-made keys and live MCP keys apart, so hourly MCP keys never push a hand-made key out of view", async () => {
+  it("reads hand-made keys and live MCP keys apart by stored kind, so hourly MCP keys never push a hand-made key out of view", async () => {
     const row = (name: string) => ({ key_id: KEY_ID, name, key_prefix: "abcdefghijkl", scopes: ["worlds:read"], created_at: "2026-11-05T00:00:00.000Z", expires_at: null, last_used_at: null, revoked_at: null });
-    answer = ({ url }) => Response.json(url.searchParams.get("name") === "not.like.MCP:*" ? [row("ci")] : [row("MCP: Claude ~0123456789ab #code")]);
+    // R2 N1: a legacy hand-made key named like an MCP connection is classified by its kind, not its name.
+    answer = ({ url }) => Response.json(url.searchParams.get("token_kind") === "eq.live" ? [row("MCP: legacy hand-made")] : [row("MCP: Claude ~0123456789ab #code")]);
     const listed = await listDeveloperApiKeys(WORKSPACE);
-    expect(listed).toMatchObject({ ok: true, keys: [{ name: "ci" }], remoteMcpKeys: [{ name: "MCP: Claude ~0123456789ab #code" }] });
+    expect(listed).toMatchObject({ ok: true, keys: [{ name: "MCP: legacy hand-made" }], remoteMcpKeys: [{ name: "MCP: Claude ~0123456789ab #code" }] });
     const [manual, remote] = seen.map((call) => call.url.searchParams);
-    expect([manual!.get("name"), manual!.get("limit")]).toEqual(["not.like.MCP:*", "100"]);
-    expect([remote!.get("name"), remote!.get("revoked_at"), remote!.get("expires_at")?.startsWith("gt.")]).toEqual(["like.MCP:*", "is.null", true]);
+    expect([manual!.get("token_kind"), manual!.get("name"), manual!.get("limit")]).toEqual(["eq.live", null, "100"]);
+    expect([remote!.get("token_kind"), remote!.get("name"), remote!.get("revoked_at"), remote!.get("expires_at")]).toEqual(["eq.mcp", null, "is.null", null]);
+    // A null expiry is live, stated explicitly: on PostgreSQL `expires_at > now` alone drops it.
+    expect(remote!.get("or")).toMatch(/^\(expires_at\.is\.null,expires_at\.gt\.\d{4}-.+\)$/);
   });
 });
 
 describe("M4: the bulk revoke of remote MCP keys", () => {
-  it("revokes every live MCP: key in one write and reports them per workspace", async () => {
+  it("revokes every live MCP-kind key in one write and reports them per workspace", async () => {
     answer = () => Response.json([{ key_id: KEY_ID, workspace_key: WORKSPACE }, { key_id: USER, workspace_key: WORKSPACE }, { key_id: "k", workspace_key: "pilot-other" }]);
     const response = await revokeAll(new Request("https://tavonel.com/api/internal/remote-mcp/revoke-all", { method: "POST", headers: { authorization: `Bearer ${WORKER_SECRET}` } }));
     expect(response.status).toBe(200);
@@ -101,8 +115,8 @@ describe("M4: the bulk revoke of remote MCP keys", () => {
     expect(seen).toHaveLength(1);
     const [write] = seen;
     expect(write!.method).toBe("PATCH");
-    // Only the remote MCP's own rows, only live ones; a hand-made key cannot carry the MCP: name.
-    expect([write!.url.searchParams.get("name"), write!.url.searchParams.get("revoked_at")]).toEqual(["like.MCP:*", "is.null"]);
+    // Only the remote MCP's own rows (stored kind, not name), only live ones.
+    expect([write!.url.searchParams.get("token_kind"), write!.url.searchParams.get("name"), write!.url.searchParams.get("revoked_at")]).toEqual(["eq.mcp", null, "is.null"]);
     expect(Object.keys(write!.body as object)).toEqual(["revoked_at"]);
   });
 
@@ -115,5 +129,20 @@ describe("M4: the bulk revoke of remote MCP keys", () => {
     expect(await revokeAllRemoteMcpKeys()).toEqual({ ok: false, code: "API_KEY_REVOKE_FAILED" });
     const failed = await revokeAll(new Request("https://tavonel.com/api/internal/remote-mcp/revoke-all", { method: "POST", headers: { authorization: `Bearer ${WORKER_SECRET}` } }));
     expect([failed.status, (await failed.json()).code]).toEqual([503, "API_KEY_REVOKE_FAILED"]);
+  });
+});
+
+describe("R2 N1: the stored token kind, not the name", () => {
+  const sql = readFileSync(new URL("../../supabase/migrations/20261105090000_api_key_token_kind.sql", import.meta.url), "utf8");
+  it("adds a constrained kind every existing row reads as live, and only the create RPC writes mcp", () => {
+    expect(sql).toMatch(/add column token_kind text not null default 'live'\s+constraint \w+ check \(token_kind in \('live', 'mcp'\)\)/);
+    expect(sql).toMatch(/p_token_kind text default 'live'/);
+    expect(sql).not.toMatch(/like\s+'MCP|name\s*(?:~|like)/i);
+  });
+  it("keeps one create signature for PostgREST, granted to the server only, and refuses rotating an MCP key", () => {
+    expect(sql).toContain("drop function public.create_foundation_api_key_authorized(text, text, text, text, text[], timestamptz, uuid, bigint);");
+    expect(sql).toMatch(/grant execute on function public\.create_foundation_api_key_authorized\(\s*text, text, text, text, text\[\], timestamptz, uuid, bigint, text\s*\) to service_role/);
+    expect(sql).toMatch(/revoke all on function public\.create_foundation_api_key_authorized\(\s*text, text, text, text, text\[\], timestamptz, uuid, bigint, text\s*\) from public, anon, authenticated/);
+    expect(sql).toMatch(/or v_old\.token_kind <> 'live' then\s+raise exception 'api_key_rotation_source_invalid'/);
   });
 });

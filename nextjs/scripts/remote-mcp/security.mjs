@@ -201,24 +201,31 @@ try {
   };
 
   /* ---------------------------------------------- bulk revoke, rollback lever (R1 M4) */
-  const liveBefore = store.tables.foundation_api_keys.filter((row) => row.name.startsWith("MCP: ") && row.revoked_at === null).length;
+  const liveBefore = store.tables.foundation_api_keys.filter((row) => row.token_kind === "mcp" && row.revoked_at === null).length;
   const mcpBefore = outcome(await call(base, audienceToken, "list_worlds", {}));
+  // Review R2 N1: a hand-made key that someone named like an MCP connection, with no expiry.
+  const legacyNamed = plantKey(store, { workspaceKey: workspaceOf(USERS.a.id), userId: USERS.a.id, name: "MCP: legacy hand-made", scopes: ["collections:read"] });
   const refusedRevoke = await http(base, "POST", "/api/internal/remote-mcp/revoke-all", { headers: { authorization: "Bearer not-the-worker-secret-0123456789abcdef" } });
   const bulkStarted = performance.now();
   const bulk = await http(base, "POST", "/api/internal/remote-mcp/revoke-all", { headers: { authorization: `Bearer ${shadow.workerSecret}` } });
   const bulkMs = Math.round(performance.now() - bulkStarted);
   const mcpAfter = await call(base, audienceToken, "list_worlds", {});
   const manualAfter = outcome(await call(base, manualKey, "list_worlds", {}));
+  const legacyAfter = await http(base, "GET", "/api/v1/collections", { headers: { authorization: `Bearer ${legacyNamed}` } });
+  const listing = await http(base, "GET", "/api/developer/keys", { headers: { authorization: `Bearer ${USERS.a.session}` } });
+  const listedLegacy = (listing.json?.keys ?? []).some((key) => key.name === "MCP: legacy hand-made" && key.revokedAt === null);
+  const legacyAsMcp = (listing.json?.remoteMcpKeys ?? []).some((key) => key.name === "MCP: legacy hand-made");
   results.bulkRevoke = {
     route: "POST /api/internal/remote-mcp/revoke-all with the worker secret",
     liveMcpKeysBefore: liveBefore, unauthorizedCall: { status: refusedRevoke.status, code: refusedRevoke.json?.code },
     response: { status: bulk.status, code: bulk.json?.code, revoked: bulk.json?.revoked, byWorkspace: bulk.json?.byWorkspace }, responseMs: bulkMs,
     mcpTokenBefore: mcpBefore, mcpTokenAfter: { status: mcpAfter.status },
-    liveMcpKeysAfter: store.tables.foundation_api_keys.filter((row) => row.name.startsWith("MCP: ") && row.revoked_at === null).length,
+    liveMcpKeysAfter: store.tables.foundation_api_keys.filter((row) => row.token_kind === "mcp" && row.revoked_at === null).length,
     handMadeKeyAfter: manualAfter,
+    legacyNamedHandMadeKey: { statusAfter: legacyAfter.status, listStatus: listing.status, inManualList: listedLegacy, shownAsMcp: legacyAsMcp },
     synthetic: "the store is in-memory; the time is this harness's, not production's",
     pass: refusedRevoke.status === 401 && bulk.status === 200 && bulk.json?.revoked === liveBefore && mcpBefore === "ok"
-      && mcpAfter.status === 401 && manualAfter === "ok",
+      && mcpAfter.status === 401 && manualAfter === "ok" && legacyAfter.status === 200 && listedLegacy && !legacyAsMcp,
   };
 
   /* -------------------------------------------------------------------- SLI */

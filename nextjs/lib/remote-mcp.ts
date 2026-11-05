@@ -444,11 +444,12 @@ export function checkTokenRequest(form: URLSearchParams, key: Buffer, origin: st
 }
 
 /**
- * Every key the remote MCP mints is named `MCP: ...`, and no other key may be (the Developers create
- * and rotate routes refuse the prefix), so the name marks the MCP-audience rows: listed apart from
- * manual keys and revocable in bulk (POST /api/internal/remote-mcp/revoke-all). The name carries the
- * client's tag and the code id: the tag is how a reconnect replaces its own earlier key, the code id
- * how a second redemption of one code is recognised.
+ * Every key the remote MCP mints is named `MCP: ...`, so a member recognises it under Developers, and
+ * new hand-made keys may not take the prefix (the create and rotate routes refuse it). The name is a
+ * label only: which rows are MCP keys -- listed apart, revoked in bulk -- is their stored token_kind
+ * (lib/developer-store.ts, review R2 N1), so a legacy hand-made key named "MCP: ..." stays manual.
+ * Among MCP-kind rows the name carries the client's tag and the code id: the tag is how a reconnect
+ * replaces its own earlier key, the code id how a second redemption of one code is recognised.
  */
 export const REMOTE_MCP_KEY_NAME_PREFIX = "MCP: ";
 export const reservedKeyName = (name: string) => name.trim().toUpperCase().startsWith("MCP:");

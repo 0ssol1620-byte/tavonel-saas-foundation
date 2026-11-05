@@ -18,10 +18,10 @@ function authorized(request: Request): boolean {
   POST /api/internal/remote-mcp/revoke-all -- the remote MCP's immediate rollback lever (review R1 M4).
 
   An env change reaches a Vercel deployment only through a new build, so turning the MCP switch off
-  is not immediate. This is: it revokes every live `MCP: ` key in every workspace in one write, and
+  is not immediate. This is: it revokes every live MCP-kind key in every workspace in one write, and
   the next call with any of them is refused (authentication reads the key row on every call). It
   works with the MCP switch on or off. POST only, so a cron GET can never fire it. Hand-made keys
-  are untouched: no hand-made key may carry the `MCP: ` name.
+  are untouched: the write selects the stored token_kind, never the name (review R2 N1).
 
   No developer audit row: that table needs a member or a key as actor and an operator is neither.
   The response (counts per workspace) and the log line are the record; keep the response.

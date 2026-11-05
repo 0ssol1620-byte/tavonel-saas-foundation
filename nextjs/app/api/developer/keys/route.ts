@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const scopes = parseDeveloperScopes(body.scopes);
   const expiresInDays = body.expiresInDays === null || body.expiresInDays === undefined ? null : Number(body.expiresInDays);
-  // `MCP: ` names the remote MCP's own keys (listed apart, revoked in bulk); a hand-made key may not take it.
+  // `MCP: ` labels the remote MCP's own keys; a new hand-made key may not take it. Classification is token_kind, not this.
   if (!name || name.length > 80 || reservedKeyName(name) || !scopes || (expiresInDays !== null && (!Number.isSafeInteger(expiresInDays) || expiresInDays < 1 || expiresInDays > 365))) {
     return NextResponse.json({ code: "API_KEY_INPUT_INVALID" }, { status: 400, headers: NO_STORE });
   }

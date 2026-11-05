@@ -5,6 +5,10 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
   Two token forms over one table. `tvnl_live_` is a key made in Workspace > Developers; `tvnl_mcp_`
   is one the remote MCP's OAuth flow minted, usable only through /api/mcp (lib/remote-mcp-dispatch.ts).
   The form is inside the stored sha256, so a token cannot be relabelled from one to the other.
+
+  Which form a row holds is its stored `token_kind` (migration 20261105090000), never its name: a
+  hand-made key someone named "MCP: ..." is still a manual key in every list and every revoke
+  (review R2 N1). Authentication refuses a token whose form differs from its row's kind.
 */
 const API_KEY_PATTERN = /^tvnl_(live|mcp)_([A-Za-z0-9_-]{12})_([A-Za-z0-9_-]{43})$/;
 export type ApiKeyAudience = "api" | "mcp";
@@ -99,8 +103,9 @@ async function insertAudit(workspaceKey: string, action: string, targetId: strin
 
 /**
  * The Developers inventory, in two reads so the remote MCP's hourly keys never push a hand-made key
- * out of view (review R1 M6): `keys` is the newest 100 keys made by hand, any state; `remoteMcpKeys`
- * is the live `MCP: ` keys only. Every key either list shows is revocable from it.
+ * out of view (review R1 M6): `keys` is the newest 100 keys made by hand (`token_kind` live), any
+ * state; `remoteMcpKeys` is the live `token_kind` mcp keys only, a null expiry counting as live.
+ * Every key either list shows is revocable from it.
  */
 export async function listDeveloperApiKeys(workspaceKey: string) {
   const config = readSupabaseAdminConfig();
@@ -120,8 +125,8 @@ export async function listDeveloperApiKeys(workspaceKey: string) {
   };
   try {
     const [manual, remote] = await Promise.all([
-      read({ name: "not.like.MCP:*" }),
-      read({ name: "like.MCP:*", revoked_at: "is.null", expires_at: `gt.${new Date().toISOString()}` }),
+      read({ token_kind: "eq.live" }),
+      read({ token_kind: "eq.mcp", revoked_at: "is.null", or: `(expires_at.is.null,expires_at.gt.${new Date().toISOString()})` }),
     ]);
     if (manual === null || remote === null) return { ok: false as const, code: "DEVELOPER_STORE_READ_FAILED" };
     if (manual === undefined || remote === undefined) return { ok: false as const, code: "DEVELOPER_STORE_BINDING_INVALID" };
@@ -143,7 +148,7 @@ export async function listRecentRemoteMcpKeys(workspaceKey: string, userId: stri
     select: "key_id,name,key_prefix,scopes,created_at,expires_at,last_used_at,revoked_at",
     workspace_key: `eq.${workspaceKey}`,
     created_by: `eq.${userId}`,
-    name: "like.MCP:*",
+    token_kind: "eq.mcp",
     created_at: `gt.${since}`,
     order: "created_at.desc",
     limit: "200",
@@ -177,6 +182,7 @@ export async function createDeveloperApiKey(input: { workspaceKey: string; userI
         p_expires_at: input.expiresAt,
         p_actor_user_id: input.userId,
         p_authorization_revision: input.authorizationRevision,
+        p_token_kind: input.audience === "mcp" ? "mcp" : "live",
       }),
     });
     const body = await response.json().catch(() => ({})) as Record<string, unknown>;
@@ -193,14 +199,14 @@ export async function createDeveloperApiKey(input: { workspaceKey: string; userI
 }
 
 /**
- * Revokes every live remote MCP key (`MCP: ` name) in every workspace in one write: the operator's
+ * Revokes every live remote MCP key (`token_kind` mcp) in every workspace in one write: the operator's
  * rollback lever (app/api/internal/remote-mcp/revoke-all). Returns what it revoked, per workspace.
  */
 export async function revokeAllRemoteMcpKeys(now = new Date()) {
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "DEVELOPER_STORE_NOT_CONFIGURED" };
   const revokedAt = now.toISOString();
-  const query = new URLSearchParams({ name: "like.MCP:*", revoked_at: "is.null", select: "key_id,workspace_key" });
+  const query = new URLSearchParams({ token_kind: "eq.mcp", revoked_at: "is.null", select: "key_id,workspace_key" });
   try {
     const response = await supabaseAdminRequest(config, `/rest/v1/foundation_api_keys?${query}`, {
       method: "PATCH",
@@ -343,7 +349,7 @@ export async function authenticateDeveloperApiKey(token: string) {
   const config = readSupabaseAdminConfig();
   if (!match || !config) return { ok: false as const, code: "API_KEY_INVALID" };
   const query = new URLSearchParams({
-    select: "key_id,workspace_key,created_by,scopes,expires_at,revoked_at,authorization_revision",
+    select: "key_id,workspace_key,created_by,scopes,expires_at,revoked_at,authorization_revision,token_kind",
     key_prefix: `eq.${match[2]}`,
     token_sha256: `eq.${await tokenSha256(token)}`,
     limit: "1",
@@ -352,7 +358,7 @@ export async function authenticateDeveloperApiKey(token: string) {
     const response = await supabaseAdminRequest(config, `/rest/v1/foundation_api_keys?${query}`);
     if (!response.ok) return { ok: false as const, code: "API_KEY_INVALID" };
     const row = ((await response.json()) as Array<Record<string, unknown>>)[0];
-    if (!row || row.revoked_at || typeof row.key_id !== "string" || typeof row.workspace_key !== "string" || typeof row.created_by !== "string" || !Array.isArray(row.scopes) || !Number.isSafeInteger(row.authorization_revision) || Number(row.authorization_revision) < 1) return { ok: false as const, code: "API_KEY_INVALID" };
+    if (!row || row.revoked_at || row.token_kind !== match[1] || typeof row.key_id !== "string" || typeof row.workspace_key !== "string" || typeof row.created_by !== "string" || !Array.isArray(row.scopes) || !Number.isSafeInteger(row.authorization_revision) || Number(row.authorization_revision) < 1) return { ok: false as const, code: "API_KEY_INVALID" };
     if (typeof row.expires_at === "string" && Date.parse(row.expires_at) <= Date.now()) return { ok: false as const, code: "API_KEY_EXPIRED" };
     return {
       ok: true as const,
