@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { DocsCopyButton } from "@/components/docs-copy-button";
 import styles from "./connect-ai-panel.module.css";
 
@@ -9,10 +9,12 @@ import styles from "./connect-ai-panel.module.css";
   W1-A1 "Connect AI" (PROGRAM-2026-11-04 §4.A): one MCP URL and the steps to add it to Claude or
   ChatGPT.
 
-  Whether the remote endpoint is switched on is read from the deployment itself -- its RFC 9728
-  document answers 200 when TAVONEL_REMOTE_MCP_ENABLED is on and 404 when it is off -- so the panel
-  never offers a URL that 404s. It cannot know whether this workspace is in the canary cohort; the
-  consent page says so if it is not, and nothing is granted.
+  Whether the remote endpoint is switched on comes from the server: the workspace layout reads
+  TAVONEL_REMOTE_MCP_ENABLED and provides it here (RemoteMcpAvailability), so the panel never offers
+  a URL that 404s and never makes a request that does. A deployment's env is fixed with its build
+  (RELEASE_ORDER.md, W1-A1), which is the same value the endpoint itself reads. It cannot know
+  whether this workspace is in the canary cohort; the consent page says so if it is not, and
+  nothing is granted.
 
   The client steps are written from each vendor's documentation, not from a completed handshake:
   W1-A1.1 ran the OAuth and MCP exchange with a scripted client against a local build, not with
@@ -45,21 +47,19 @@ const CLIENTS = [
   },
 ] as const;
 type ClientId = (typeof CLIENTS)[number]["id"];
-type Availability = "checking" | "available" | "off" | "unknown";
+
+/** Whether this deployment serves /api/mcp; null where no server said (the panel then shows its steps). */
+const Availability = createContext<boolean | null>(null);
+export function RemoteMcpAvailability({ enabled, children }: { enabled: boolean; children?: ReactNode }) {
+  return <Availability.Provider value={enabled}>{children}</Availability.Provider>;
+}
 
 export default function ConnectAiPanel({ headingLevel: Heading = "h3" }: { headingLevel?: "h2" | "h3" }) {
-  const [availability, setAvailability] = useState<Availability>("checking");
+  const enabled = useContext(Availability);
   const [origin, setOrigin] = useState("https://tavonel.com");
   const [client, setClient] = useState<ClientId>("claude");
 
-  useEffect(() => {
-    setOrigin(window.location.origin);
-    let live = true;
-    fetch("/.well-known/oauth-protected-resource/api/mcp", { cache: "no-store" })
-      .then((response) => { if (live) setAvailability(response.ok ? "available" : response.status === 404 ? "off" : "unknown"); })
-      .catch(() => { if (live) setAvailability("unknown"); });
-    return () => { live = false; };
-  }, []);
+  useEffect(() => { setOrigin(window.location.origin); }, []);
 
   const url = `${origin}/api/mcp`;
   const selected = CLIENTS.find((entry) => entry.id === client)!;
@@ -67,13 +67,11 @@ export default function ConnectAiPanel({ headingLevel: Heading = "h3" }: { headi
   return (
     <section className={styles.panel} aria-labelledby="connect-ai-title" data-testid="connect-ai-panel">
       <Heading id="connect-ai-title">Connect Claude or ChatGPT</Heading>
-      {availability === "off" ? (
-        <p role="status">
-          The hosted MCP endpoint is not switched on here yet. Until it is, use the local MCP bridge with an API key.{" "}
-          <Link href="/docs/mcp">Local MCP setup</Link>
-        </p>
-      ) : availability === "unknown" ? (
-        <p role="status">We could not check whether the hosted MCP endpoint is on. Reload to try again, or use the <Link href="/docs/mcp">local MCP bridge</Link>.</p>
+      {enabled === false ? (
+        <>
+          <p role="status">The hosted MCP endpoint is not switched on here yet. Until it is, use the local MCP bridge with an API key.</p>
+          <Link className="btn btn-ghost" href="/docs/mcp">Local MCP setup</Link>
+        </>
       ) : (
         <>
           <p>One URL for any MCP client that signs in with OAuth. Your assistant reads; it cannot upload, compile, activate or change anything.</p>
@@ -81,7 +79,6 @@ export default function ConnectAiPanel({ headingLevel: Heading = "h3" }: { headi
             <code className={styles.url} aria-label="MCP URL">{url}</code>
             <DocsCopyButton value={url} label="Copy URL" />
           </div>
-          {availability === "checking" ? <p className={styles.note} role="status">Checking that the endpoint is on…</p> : null}
           <fieldset className={styles.clients}>
             <legend>Which assistant?</legend>
             {CLIENTS.map((entry) => (
