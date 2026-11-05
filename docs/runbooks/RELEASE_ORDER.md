@@ -292,9 +292,9 @@ migration은 다시 적용할 수 없다. 두 번째 적용은 `column "gate_sur
 - 리셋 범위 `20261105010000_founder_test_reset_operations_receipts`(R2-m2): founder test reset이
   `foundation_operations_receipts`도 세고, fingerprint에 넣고, 지운다. 이 파일은 `20261104090000`(테이블) **뒤에**
   적용한다. W1-B1(#187)의 `20261104091000_founder_test_reset_source_fingerprints`도 같은 세 함수 본문을 바꾼다.
-  둘 중 **나중에 merge하는 쪽이 다른 쪽의 줄을 포함**해야 한다. 그러지 않으면 나중에 적용된 본문이 먼저 들어간 테이블을
-  리셋에서 뺀다. 두 pgTAP(`founder_test_reset_operations_receipts.sql`, `founder_test_reset_source_fingerprints.sql`)과
-  `founder-test-reset-migration.test.ts`가 main에서 실패하므로 조용히 지나가지는 않는다.
+  migration은 timestamp 순서로 적용되므로 이 파일이 항상 그 뒤에 온다. 그래서 이 파일의 본문은 #187 본문의 상위집합이다
+  (#187 줄 + receipts 줄). merge 순서는 #190 → #187 → #186이다. 두 pgTAP(`founder_test_reset_operations_receipts.sql`,
+  `founder_test_reset_source_fingerprints.sql`)과 `founder-test-reset-migration.test.ts`가 이 본문에서 함께 통과한다.
 - trial 키 규칙(F-2 문구용): **trial 주체 하나당 살아 있는 키 1개. 수동 키든 MCP 키든 같다.** 키를 실제로 만드는 두 곳에서
   검사한다: `POST /api/developer/keys`와 원격 MCP token 발급(`/api/mcp/oauth/token`). consent(`authorize`)는 키를 만들지
   않으므로 검사하지 않는다. 같은 client의 재연결은 대체되는 자기 키를 세지 않는다. 그래서 재연결 뒤에도 키는 1개다.

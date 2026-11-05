@@ -7,6 +7,7 @@ import { AFFECTED_GROUPS, HOME_AFFECTED_BROWSER_FILE, HOME_AFFECTED_PATHS, HOME_
 import { REMOTE_MCP_AFFECTED_PATHS, REMOTE_MCP_AFFECTED_UNIT_FILES, REMOTE_MCP_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { GDP_PDF_RUNS_AFFECTED_PATHS, GDP_PDF_RUNS_AFFECTED_UNIT_FILES, GDP_PDF_RUNS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { PACKET_DELIVERY_AFFECTED_PATHS, PACKET_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { LIBRARY_DEDUP_AFFECTED_PATHS, LIBRARY_DEDUP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { COMPILER_RELEASE_AFFECTED_PATHS, COMPILER_RELEASE_AFFECTED_UNIT_FILES, COMPILER_RELEASE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { CONSENT_POSTER_AFFECTED_PATHS, CONSENT_POSTER_AFFECTED_UNIT_FILES, CONSENT_POSTER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
@@ -664,6 +665,14 @@ for (const binding of [
     browsers: ['e2e/docs-reading-layout.spec.ts', 'e2e/pricing-plan-overview.spec.ts'],
     rows: ["['e2e/docs-reading-layout.spec.ts', ['1440', '390', 'reduced-motion']],", "['e2e/pricing-plan-overview.spec.ts', ['1440', '390']],"],
     neighbors: ['nextjs/lib/billing-catalog.test.tsx', 'nextjs/lib/operations-v2.ts', 'nextjs/lib/mcp-tools.tsx', 'nextjs/lib/g1-copy-truth.ts', 'nextjs/public/developer/tavonel-mcp-2.mjs', 'nextjs/public/developer/tavonel-cli.mjs'] },
+  // Library dedup B1 (codex/w1-b1-20261104): three exact paths, three direct suites, no browser suite.
+  { group: 'library-dedup-b1', prefix: 'nextjs/', exportedPaths: LIBRARY_DEDUP_AFFECTED_PATHS, exportedSuites: LIBRARY_DEDUP_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['lib/founder-test-reset-migration.test.ts', 'lib/source-dedup.test.ts', 'lib/source-dedup.ts'],
+    suites: ['lib/collection-compile-run.test.ts', 'lib/founder-test-reset-migration.test.ts', 'lib/source-dedup.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/lib/source-dedup.tsx', 'nextjs/lib/source-fingerprint.ts', 'nextjs/lib/library-organize.ts', 'nextjs/lib/source-dedup.test.mjs'] },
   // Packet delivery (codex/packet-delivery-textlayer-20261102): nine exact paths, twelve direct suites, no browser suite.
   { group: 'packet-delivery-20261102', prefix: 'nextjs/', exportedPaths: PACKET_DELIVERY_AFFECTED_PATHS, exportedSuites: PACKET_DELIVERY_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
@@ -696,10 +705,10 @@ for (const binding of [
     browsers: [],
     rows: [],
     neighbors: ['nextjs/lib/operational-sli.ts', 'nextjs/lib/operational-sli-alert-store.tsx', 'nextjs/app/api/internal/sli-alerts/replay/route.ts', 'nextjs/lib/operational-sli-alert-delivery.ts', 'lib/operational-sli-alert-store.ts'] },
-  // W1 trial AI access + operations alert producers (codex/w1-a2-20261104): 11 exact paths, 17 direct suites, no browser suite.
+  // W1 trial AI access + operations alert producers (codex/w1-a2-20261104): 10 exact paths, 17 direct suites, no browser suite.
   { group: 'w1-trial-ops', prefix: 'nextjs/', exportedPaths: W1_TRIAL_OPS_AFFECTED_PATHS, exportedSuites: W1_TRIAL_OPS_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
-    paths: ['app/api/developer/keys/[id]/route.ts', 'app/api/internal/billing/settle/route.ts', 'lib/developer-auth.test.ts', 'lib/founder-test-reset-migration.test.ts', 'lib/operations-alert-triggers.test.ts', 'lib/operations-alert-triggers.ts', 'lib/operations-e2e-timing.test.ts', 'lib/operations-e2e-timing.ts', 'lib/settle-route.test.ts', 'lib/trial-ai-access.test.ts', 'lib/trial-ai-access.ts'],
+    paths: ['app/api/developer/keys/[id]/route.ts', 'app/api/internal/billing/settle/route.ts', 'lib/developer-auth.test.ts', 'lib/operations-alert-triggers.test.ts', 'lib/operations-alert-triggers.ts', 'lib/operations-e2e-timing.test.ts', 'lib/operations-e2e-timing.ts', 'lib/settle-route.test.ts', 'lib/trial-ai-access.test.ts', 'lib/trial-ai-access.ts'],
     suites: ['lib/api-error-codes.test.ts', 'lib/compile-job-worker.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/founder-test-reset-migration.test.ts', 'lib/funnel-events.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operations-alert-triggers.test.ts', 'lib/operations-e2e-timing.test.ts', 'lib/operations-p0.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/remote-mcp.test.ts', 'lib/route-classification.test.ts', 'lib/settle-route.test.ts', 'lib/trial-ai-access.test.ts'],
     browsers: [],
     rows: [],

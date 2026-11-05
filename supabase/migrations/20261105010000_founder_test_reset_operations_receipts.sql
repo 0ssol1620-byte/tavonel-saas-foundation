@@ -5,17 +5,17 @@
 -- workspace_key. Without this a reset left them behind, and the next World of the reset workspace
 -- read as already timed by a World that no longer exists.
 --
--- Bodies identical to 20261002140000 plus one line each: counted, fingerprinted, deleted. Internal
+-- Bodies identical to 20261104091000 (W1-B1, PR #187: 20261002140000 plus the source_fingerprints and
+-- document_relations lines) plus one line each: counted, fingerprinted, deleted. Internal
 -- telemetry, not archived (the archive function is not replaced). The snapshot now includes the
 -- table, so a reset prepared before this migration fails its seal with
 -- founder_test_reset_database_drift and has to be prepared again. The table gets the same sealed
 -- write fence as every other table finalize deletes from; its writer treats a refused write as
 -- "not recorded" and never fails an answer.
 --
--- Ordering with PR #187 (20261104091000_founder_test_reset_source_fingerprints.sql), which replaces
--- the same three bodies: this file sorts after it, so whichever of the two merges second carries the
--- other's lines (supabase/tests/founder_test_reset_operations_receipts.sql and #187's
--- founder_test_reset_source_fingerprints.sql each fail on main if a body drops the other's table).
+-- Migrations apply in timestamp order, so this file always runs after 20261104091000 and must be the
+-- superset of it: it keeps B1's dedup lines. Both pgTAP files (founder_test_reset_operations_receipts.sql,
+-- founder_test_reset_source_fingerprints.sql) run against these bodies.
 --
 -- Every function keeps its name, signature, language, security mode and `set search_path = ''`;
 -- create or replace keeps the owner and the existing ACL, and no grant changes.
@@ -53,6 +53,8 @@ returns text language sql stable security definer set search_path = '' as $$
     union all select 'foundation_operations_receipts',to_jsonb(x)::text from public.foundation_operations_receipts x where workspace_key=p_workspace_key
     union all select 'connector_document_bindings',to_jsonb(x)::text from public.connector_document_bindings x where workspace_key=p_workspace_key
     union all select 'connector_binding_tie_resolutions',to_jsonb(x)::text from public.connector_binding_tie_resolutions x where workspace_key=p_workspace_key
+    union all select 'source_fingerprints',to_jsonb(x)::text from public.source_fingerprints x where workspace_key=p_workspace_key
+    union all select 'document_relations',to_jsonb(x)::text from public.document_relations x where workspace_key=p_workspace_key
     union all select 'connector_source_suspensions',to_jsonb(x)::text from public.connector_source_suspensions x where workspace_key=p_workspace_key
     union all select 'sources',to_jsonb(x)::text from public.sources x where workspace_id=p_workspace_key
     union all select 'source_versions',to_jsonb(x)::text from public.source_versions x where source_id in (select source_id from public.sources where workspace_id=p_workspace_key)
@@ -109,6 +111,8 @@ returns jsonb language sql stable security definer set search_path = '' as $$
     union all select 'foundation_operations_receipts',count(*) from public.foundation_operations_receipts where workspace_key=p_workspace_key
     union all select 'connector_document_bindings',count(*) from public.connector_document_bindings where workspace_key=p_workspace_key
     union all select 'connector_binding_tie_resolutions',count(*) from public.connector_binding_tie_resolutions where workspace_key=p_workspace_key
+    union all select 'source_fingerprints',count(*) from public.source_fingerprints where workspace_key=p_workspace_key
+    union all select 'document_relations',count(*) from public.document_relations where workspace_key=p_workspace_key
     union all select 'connector_source_suspensions',count(*) from public.connector_source_suspensions where workspace_key=p_workspace_key
     union all select 'sources',count(*) from public.sources where workspace_id=p_workspace_key
     union all select 'source_versions',count(*) from public.source_versions where source_version_id in (select source_version_id from target_versions)
@@ -161,6 +165,9 @@ begin
       from public.foundation_oauth_authorizations where workspace_key=p_workspace_key and pkce_verifier_reference like 'vercel://oauth/%'
   ) s where id is not null;
   perform pg_catalog.set_config('tavonel.founder_reset_id',p_reset_id::text,true);
+  -- 20261104091000: a relation names two fingerprints; it goes first.
+  delete from public.document_relations where workspace_key=p_workspace_key;
+  delete from public.source_fingerprints where workspace_key=p_workspace_key;
 
   delete from public.source_deletion_worker_failures
     where deletion_id in (select deletion_id from public.source_deletion_tombstones where workspace_key=p_workspace_key);
