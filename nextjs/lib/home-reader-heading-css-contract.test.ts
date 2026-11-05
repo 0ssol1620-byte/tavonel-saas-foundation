@@ -187,7 +187,8 @@ describe("reviewed Home reader heading CSS source contract", () => {
     expect(declaration(globalCss, ":root", "--tv-ink")).toEqual({ value: "#15191d", important: false, layered: true });
     expect(declaration(activeRootCss, ".home", "--home-paper")).toEqual({ value: "var(--paper)", important: false, layered: true });
     expect(declaration(activeRootCss, ".home", "--paper")).toEqual({ value: "var(--tv-paper)", important: false, layered: true });
-    expect(declaration(globalCss, ":root", "--tv-paper")).toEqual({ value: "#faf9f6", important: false, layered: true });
+    // Direction C (2026-11-04): the paper is the warm canvas.
+    expect(declaration(globalCss, ":root", "--tv-paper")).toEqual({ value: "#f5f3ee", important: false, layered: true });
     const page = readFileSync(new URL("components/landing-v2/landing-page.tsx", packageRoot), "utf8");
     expect(page).toContain('className={`page lv2 ${sourceStyles.home}`}');
     expect(page).not.toContain('${heroStyles.home}');

@@ -162,7 +162,7 @@
 
 /* Solutions owns this hierarchy; no public global or cleared product surface changes. */
 .surface {
-  --ground: #f7f5ef;
+  --ground: var(--tv-canvas);
   --g1: #fff;
   --g2: #eeede7;
   --text-hi: #171c20;

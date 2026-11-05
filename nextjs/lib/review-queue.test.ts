@@ -185,6 +185,10 @@ describe("a missing compile-job row", () => {
     }));
     expect(markup).toContain("cannot be listed here");
     expect(markup).toContain("time-to-first-review is not measured");
+    // REVIEW-R2 M-1: present in the markup is not enough -- inside a closed <details> it is not on screen.
+    const warning = markup.indexOf("cannot be listed here");
+    const opened = markup.lastIndexOf("<details", warning);
+    expect(opened === -1 || markup.lastIndexOf("</details>", warning) > opened, "the compile-job warning sits outside every <details>").toBe(true);
   });
 });
 

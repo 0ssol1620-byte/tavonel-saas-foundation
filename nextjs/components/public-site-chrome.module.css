@@ -77,7 +77,9 @@
     min-height: 44px !important;
     padding: 0 18px !important;
     border: 1px solid var(--action, var(--tv-action)) !important;
-    border-radius: 4px !important;
+    /* Direction C (2026-11-04): the filled pill, lifted by its own shadow. */
+    border-radius: var(--tv-r-pill) !important;
+    box-shadow: var(--tv-shadow-action) !important;
     background: var(--action, var(--tv-action)) !important;
     color: #ffffff !important;
     font: 560 15px/1.2 var(--f-sans) !important;
@@ -102,18 +104,22 @@
   @media (max-width: 899.98px) {
     .header :global(.nav-actions) { display: none !important; }
   }
+  /*
+    Direction C (2026-11-04): every public page stands on the warm canvas. --g2 stays the white sheet a
+    card is made of, and --g3 is sand, the one colour block a public page may use for a waiting action.
+  */
   :global(.page:not(.lv2)):has(> .header) {
-    --ground: #fbfaf7;
+    --ground: var(--tv-canvas);
     --g1: var(--tv-paper-sunk);
     --g2: var(--tv-paper-raised);
-    --g3: #ece9e2;
+    --g3: var(--tv-sand);
     --seam: #d8d5ce;
     --hairline: var(--tv-rule);
     --hairline-hi: #c6c3bc;
     --text-hi: var(--tv-ink);
     --text-max: #292f35;
     --text-mid: #424951;
-    --text-lo: #555b62;
+    --text-lo: var(--tv-ink-muted);
     /* UX-L1 (UX-PLAN-2026-10-17 §4.2): one value per state, the one accent, and no violet. */
     --verified: var(--tv-verified);
     --verified-dim: #278366;
@@ -138,9 +144,9 @@
     --text-lo: #555b62;
     --g1: var(--tv-paper-raised);
     --g2: var(--tv-paper-sunk);
-    --ground: #fbfaf7;
+    --ground: var(--tv-canvas);
     --verified: var(--tv-action);
-    background: #fbfaf7 !important;
+    background: var(--tv-canvas) !important;
     color: var(--tv-ink) !important;
     border-bottom-color: var(--tv-rule) !important;
     font-family: "Wanted Sans Variable", "Malgun Gothic", sans-serif !important;
@@ -207,6 +213,14 @@
     border-color: var(--tv-action);
     background: var(--tv-action);
     color: #ffffff;
+    box-shadow: var(--tv-shadow-action);
+  }
+  /* Direction C: an outlined pill is the quiet action -- a white sheet on the canvas, on the resting shadow. */
+  :global(*):has(> .header) :global(:is(.btn.ghost, .btn-ghost, .btn-secondary):not(:disabled, [aria-disabled="true"])) {
+    border-color: transparent;
+    background: var(--tv-sheet);
+    color: var(--tv-ink);
+    box-shadow: var(--tv-shadow-1);
   }
   @media (hover: hover) and (pointer: fine) {
     :global(*):has(> .header) :global(:is(.btn, .btn-primary):not(.ghost, .btn-ghost, .btn-secondary, .btn-danger, :disabled, [aria-disabled="true"]):hover) {

@@ -18,7 +18,8 @@
     36.2, 1440 -> 64 / 40 / 44. One scale for / and /ko (T0): the Korean page no longer sizes its
     h1 on its own steps.
   */
-  --lv2-fs-display: clamp(34px, calc(2.857vw + 22.86px), 64px);
+  /* Direction C round 2 (CRITIQUE-R1 #5): 84px at 1440, still 34px at 390, on the same line between them. */
+  --lv2-fs-display: clamp(34px, calc(4.762vw + 15.43px), 84px);
   --lv2-fs-h2: clamp(28px, calc(1.143vw + 23.54px), 40px);
   --lv2-fs-figure: clamp(36px, calc(0.762vw + 33.03px), 44px);
   /*
@@ -644,13 +645,14 @@
   padding: 0 16px !important;
   border: 0 !important;
   border-radius: 999px !important;
-  background: transparent !important;
-  box-shadow: inset 0 0 0 1px var(--tv-rule-strong) !important;
+  /* Direction C (2026-11-04): a white pill resting on the warm shadow, still the quiet one beside the hero pill. */
+  background: var(--tv-sheet) !important;
+  box-shadow: var(--tv-shadow-1) !important;
   color: var(--tv-ink) !important;
   font: 560 14px/1.2 var(--f-sans) !important;
 }
 @media (hover: hover) and (pointer: fine) {
-  .lv2 header.nav .nav-actions .btn:hover { box-shadow: inset 0 0 0 1px var(--tv-ink) !important; }
+  .lv2 header.nav .nav-actions .btn:hover { box-shadow: var(--tv-shadow-2) !important; }
 }
 /*
   R3 (review 2026-10-26 N-3, §3.3): the /ko header's Hangul (요금 and 로그인 on the first screen at 1440) is drawn in

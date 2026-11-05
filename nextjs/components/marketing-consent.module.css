@@ -233,7 +233,7 @@
 */
 @media (min-width: 900px) {
   /*
-    Fix round 3 (judge gap 3): the row read as a pale band -- #faf9f6 on the #faf9f6 page, a
+    Fix round 3 (judge gap 3): the row read as a pale band -- var(--tv-canvas) on the var(--tv-canvas) page, a
     #d8ddd9 rule at 1.31:1 and answer borders at 1.6:1. It is white now with a #6b737b rule and
     answer borders (4.82:1 on white, 4.59:1 on the page paper; text stays #15191d, 17.7:1), so it
     reads as its own row under the header. e2e/marketing-consent.spec.ts measures all three.
@@ -286,3 +286,9 @@
   .actions button { justify-content: center; min-height: 44px; padding: 0 10px; }
   .floating { inset: auto auto 8px 0.5rem; }
 }
+
+/*
+  Round 2 (CRITIQUE-R1 #13): the two answers take the site's pill, the only control on the first screen that was still a
+  square box. Same geometry, same edge and same colour for both -- the choice stays un-nudged; only the shape changed.
+*/
+.actions button { border-radius: var(--tv-r-pill); }

@@ -1,10 +1,10 @@
 /* Evaluation only. Extracted from the reviewed paper-product wrapper/evaluation rules;
    this module does not change the root layout or unrelated product pages. */
 .page {
-  --ground: #f7f5ef;
+  --ground: var(--tv-canvas);
   --g2: #fff;
   --g3: #f0f1ec;
-  --ink-950: #f7f5ef;
+  --ink-950: var(--tv-canvas);
   --ink-900: #fff;
   --ink-850: #f0f1ec;
   --text-hi: #171c20;
@@ -85,7 +85,7 @@
   .page > header > :global(.one-path-mobile-nav[open]) nav a:hover { background: var(--ground); }
 }
 .page > :global(header.nav.chrome-v2-header[data-scrolled="1"]) {
-  background: #f7f5ef;
+  background: var(--tv-canvas);
   border-bottom-color: #d8ddd9;
 }
 .page > header :global(.btn) { color: #fff; background: var(--tv-action); border-color: var(--tv-action); }

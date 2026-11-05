@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { EMPTY_IMAGE } from "@/lib/hero-phone-mode";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { FILM_DURATION } from "@/lib/film-script";
 import { COMPILE_STAGES, type CompileStage } from "@/lib/compile-stages";
@@ -323,6 +324,7 @@ export default function CompileStagePlayer({
   stageDisclosureLabel,
   priorityPoster = false,
   lazyPoster = false,
+  posterSkipMedia,
   korean = false,
   initialMobileFilmView = "fit",
   initialWideView,
@@ -342,6 +344,8 @@ export default function CompileStagePlayer({
   priorityPoster?: boolean;
   /** Load a poster that sits below the first screen lazily (P2-32: Home while the specimen strip renders above it). */
   lazyPoster?: boolean;
+  /** A media query where the poster is not drawn (Home's phone still); a source there fetches nothing. */
+  posterSkipMedia?: string;
   /** BQ-013. Name the controls and the fallback in the page's language. The stage list carries its own. */
   korean?: boolean;
   /** The view a narrow frame opens on. Defaults to "fit"; the visitor's toggle still switches it. */
@@ -798,8 +802,9 @@ export default function CompileStagePlayer({
           />;
           /* D-11: AVIF first, the WebP <img> as the fallback. `display: contents` keeps the <img> the grid item.
              FINAL-SPEC 2026-10-26: ahead of them, a phone pane's own still for a screen below PHONE_PANE_MEDIA. */
-          return posterAvifSrcSet || panePoster
+          return posterAvifSrcSet || panePoster || posterSkipMedia
             ? <picture className={readingStyles.picture}>
+                {posterSkipMedia ? <source media={posterSkipMedia} srcSet={EMPTY_IMAGE} /> : null}
                 {panePoster ? <source media={PHONE_PANE_MEDIA} type="image/avif" srcSet={panePoster.phonePosterAvif} /> : null}
                 {panePoster?.phonePoster ? <source media={PHONE_PANE_MEDIA} type="image/webp" srcSet={panePoster.phonePoster} /> : null}
                 {posterAvifSrcSet ? <source type="image/avif" srcSet={posterAvifSrcSet} sizes={posterSizes} /> : null}

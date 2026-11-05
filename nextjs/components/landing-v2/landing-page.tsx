@@ -1,6 +1,8 @@
 import { Fragment } from "react";
 import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
 import HeroFilm from "./hero-film";
+import HeroStill from "./hero-still";
+import { PHONE_HERO } from "@/lib/hero-phone-mode";
 import HeroActions from "./hero-actions";
 import HeroSourceCard from "./hero-source-card";
 import HeroStatement from "./hero-statement";
@@ -15,18 +17,17 @@ import StartScene from "./scenes/start";
 import TrustScene from "./scenes/trust";
 import { landingV2Copy } from "@/lib/landing-v2-copy";
 import { landingV2PageImage } from "@/lib/landing-v2-assets";
-import { excerptPreview } from "@/lib/explore-entry-proof";
 import {
   buildHeroView,
   buildProofTabs,
   buildReceiveRecord,
   buildRecompileView,
-  landingV2StateWord,
   type ReceiveRecord,
   type RecompileView,
 } from "@/lib/landing-v2-runtime";
 import {
   buildHomeEvidenceCase,
+  displayableRegions,
   HOME_RESERVED_CASE,
   selectHomeCase,
   type EvidenceCase,
@@ -80,13 +81,44 @@ function homeData(): HomeData {
   });
 }
 
-/**
- * Home's quote length for the record (FINAL-SPEC §2.4). §2.9 lever 1: the measured page was over the word
- * budget, so the quote drops from 160 to 120 characters, and to 90 in review 2026-10-26 B-1 (EN 532 words at
- * 1440 against the 520 cap). Same record, same rule, the source text is not edited; `EXCERPT_LIMIT` (240)
- * stays for its other callers.
- */
-export const RECORD_EXCERPT = 90;
+
+/*
+  Round 2 (CRITIQUE-R1 #2): "What you receive" shows the passage s2 opened on, read from the same evidence
+  case: its extractor text exactly as stored, the source fields and the committed page it was cut from.
+  Null exactly when s2 has nothing to show (no case, no extracted region); s3 then prints no record rather
+  than a different one.
+*/
+export type ReceivePassage = {
+  kindLabel: string;
+  unedited: string;
+  passage: string;
+  truncated: boolean;
+  sourceTokens: string[];
+  page: number;
+  pageCount: number | null;
+  bbox1000: readonly number[];
+  digest: string;
+  image: ReturnType<typeof landingV2PageImage>;
+};
+export function receiveFromCase(view: EvidenceCase | null, korean: boolean): ReceivePassage | null {
+  if (!view) return null;
+  const regions = displayableRegions(view);
+  const region = regions.find(item => item.id === view.selectedRegionId) ?? regions[0];
+  const source = view.sources.find(item => item.id === region?.sourceId);
+  if (!region || !source || region.passage === null) return null;
+  return {
+    kindLabel: korean ? "기존 추출 구절" : "Existing extracted passage",
+    unedited: korean ? "판독기 출력, 수정 없음" : "Reader output, unedited",
+    passage: region.passage,
+    truncated: region.passageTruncated,
+    sourceTokens: [source.filename, source.form, source.filingDate].filter((token): token is string => Boolean(token)),
+    page: region.page,
+    pageCount: source.pageCount,
+    bbox1000: region.bbox1000,
+    digest: region.digest,
+    image: landingV2PageImage(region.digest, region.page),
+  };
+}
 
 /*
   The words only this composition says, in both languages. No figure in any of them: every digit
@@ -153,10 +185,8 @@ export default function LandingPage({
   const data = homeData();
   const locale = korean ? "ko" : "en";
   const page = HOME_COPY[locale];
-  const { home, record } = data;
-  const quote = excerptPreview(record.claim.label, RECORD_EXCERPT);
-  /* The record's own page raster, by the same digest and page the record builder bound it to. */
-  const recordPage = landingV2PageImage(record.version.digest, record.source.page);
+  const { home } = data;
+  const receive = receiveFromCase(home, korean);
   const specimens = homeSpecimens({ fixtures: specimenRequest === "1", committed: specimenRequest === "committed" });
 
   /*
@@ -219,6 +249,8 @@ export default function LandingPage({
                 </div>
                 {/* The film's poster is the first screen's priority image: the specimen strip closes s2. */}
                 <HeroFilm korean={korean} />
+                {/* Direction C round 2: below 900px the page s2 opens on, in place of the film (hero-still.tsx). */}
+                {PHONE_HERO === "still" ? <HeroStill view={home} korean={korean} /> : null}
               </HeroStatement>
             </div>
           </div>
@@ -263,58 +295,65 @@ export default function LandingPage({
         >
           <div className="lv2-wrap">
             <h2 className="lv2-h2" id="lv2-receive-title">{page.receive.title}</h2>
-            <article className={heroStyles.recordSheet} aria-labelledby="lv2-record-kind">
-              <p className={heroStyles.recordKind} id="lv2-record-kind">
-                <span>{page.receive.kind(record.claim.kind)}</span>
-                <span className={heroStyles.recordState}>{landingV2StateWord(record.status.state, locale)}</span>
-              </p>
-              {recordPage ? (
+            {/*
+              Round 2 (CRITIQUE-R1 #2): what a reader receives, shown with the passage s2 opened on -- the 10-Q
+              page-4 operating-expenses row -- instead of the first sentence the claim rule accepted (a 10-K
+              fiscal-calendar disclaimer). It is labelled as what the sample records it to be, an existing
+              extracted passage, and printed as the reader returned it: mono, unedited, never re-set as a
+              table. Beside it, the region cut from the same committed page. Every figure is [data-derived].
+            */}
+            {receive ? (
+            <article className={`${heroStyles.recordSheet} ${heroStyles.recordTwo}`} aria-labelledby="lv2-record-kind" data-receive="passage">
+              <div className={heroStyles.recordText}>
+                <p className={heroStyles.recordKind} id="lv2-record-kind">
+                  <span>{receive.kindLabel}</span>
+                </p>
+                <p className={heroStyles.readerLabel}>{receive.unedited}</p>
+                <blockquote className={heroStyles.recordQuote} lang="en" data-derived="1">
+                  {receive.passage}{receive.truncated ? "…" : ""}
+                </blockquote>
+                <dl className={heroStyles.recordFields}>
+                  <div>
+                    <dt>{copy.evidence.fields.source}</dt>
+                    <dd data-derived="1" lang="en">
+                      {receive.sourceTokens.map((token, index, tokens) => (
+                        <Fragment key={index}>
+                          {index > 0 ? " " : null}
+                          <span className={heroStyles.recordToken}>{index < tokens.length - 1 ? `${token} ·` : token}</span>
+                        </Fragment>
+                      ))}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{copy.evidence.fields.page}</dt>
+                    <dd data-derived="1" className={korean ? heroStyles.recordPageKo : undefined}>
+                      {korean
+                        ? `${receive.pageCount}쪽 중 ${receive.page}쪽`
+                        : `${receive.page} of ${receive.pageCount}`}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{copy.evidence.fields.region}</dt>
+                    <dd><span data-derived="1" className={heroStyles.recordToken}>bbox {receive.bbox1000.join(",")}</span></dd>
+                  </div>
+                  <div>
+                    <dt>{copy.evidence.fields.version}</dt>
+                    <dd><code data-derived="1">{receive.digest}</code></dd>
+                  </div>
+                </dl>
+              </div>
+              {receive.image ? (
                 <SourceRegionWindow
-                  className={heroStyles.recordCrop}
-                  image={recordPage}
-                  bbox1000={record.region.bbox1000}
-                  sizes="(min-width: 900px) 886px, calc(100vw - 88px)"
+                  className={`${heroStyles.recordCrop} ${heroStyles.recordAside}`}
+                  image={receive.image}
+                  bbox1000={receive.bbox1000}
+                  marginPx={240}
+                  markClassName={heroStyles.recordMark}
+                  sizes="(min-width: 900px) 420px, calc(100vw - 88px)"
                 />
               ) : null}
-              <blockquote className={heroStyles.recordQuote} lang="en" data-derived="1">
-                {quote.text}{quote.truncated ? "…" : ""}
-              </blockquote>
-              <dl className={heroStyles.recordFields}>
-                <div>
-                  <dt>{copy.evidence.fields.source}</dt>
-                  {/*
-                    R3 (design critique B4): one unbreakable span per " · " token, the separator kept with the token before
-                    it, so the value wraps only after a separator -- never inside the date ("2025-" / "10-31") and never
-                    onto a line that starts with "·". The text is the record's own; textContent is unchanged.
-                  */}
-                  <dd data-derived="1" lang="en">
-                    {[record.source.filename, record.source.form, record.source.filingDate].map((token, index, tokens) => (
-                      <Fragment key={index}>
-                        {index > 0 ? " " : null}
-                        <span className={heroStyles.recordToken}>{index < tokens.length - 1 ? `${token} ·` : token}</span>
-                      </Fragment>
-                    ))}
-                  </dd>
-                </div>
-                <div>
-                  <dt>{copy.evidence.fields.page}</dt>
-                  {/* KO: the value is a sentence with Hangul ("80쪽 중 4쪽"), so it is set in the KO Home sans, not in Plex Mono. */}
-                  <dd data-derived="1" className={korean ? heroStyles.recordPageKo : undefined}>
-                    {korean
-                      ? `${record.source.pageCount}쪽 중 ${record.source.page}쪽`
-                      : `${record.source.page} of ${record.source.pageCount}`}
-                  </dd>
-                </div>
-                <div>
-                  <dt>{copy.evidence.fields.region}</dt>
-                  <dd><span data-derived="1" className={heroStyles.recordToken}>bbox {record.region.bbox1000.join(",")}</span></dd>
-                </div>
-                <div>
-                  <dt>{copy.evidence.fields.version}</dt>
-                  <dd><code data-derived="1">{record.version.digest}</code></dd>
-                </div>
-              </dl>
             </article>
+            ) : null}
           </div>
         </section>
 

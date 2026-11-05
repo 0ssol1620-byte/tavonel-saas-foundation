@@ -77,6 +77,18 @@ describe("document derived-data source access", () => {
     expect(sourceAccess).toHaveBeenCalledTimes(2);
   });
 
+  it("reads no more than one response can carry and refuses a larger document as a named 413", async () => {
+    const sizeLimit = { object: "ocr.json", bytes: 5_000_000, bound: 4 * 1024 * 1024 };
+    getOcr.mockResolvedValue({ ok: false, code: "JSON_TOO_LARGE", sizeLimit });
+    const response = await candidatesGET(
+      new Request(`https://tavonel.com/api/documents/${documentId}/candidates`),
+      { params: Promise.resolve({ id: documentId }) },
+    );
+    expect(getOcr.mock.calls[0]?.[4]).toBe(4 * 1024 * 1024);
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({ code: "JSON_TOO_LARGE", sizeLimit });
+  });
+
   it("returns no OCR data if the session expires while the object loads", async () => {
     getUser.mockResolvedValueOnce({ id: userId }).mockResolvedValueOnce(null);
     const response = await candidatesGET(

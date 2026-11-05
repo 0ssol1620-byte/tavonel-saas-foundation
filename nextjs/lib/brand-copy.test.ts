@@ -460,7 +460,7 @@ describe("public copy", () => {
   it("keeps the brand line the hero is written from, and writes it in no second place", () => {
     // Fix round 3 (2026-10-16, delegated authority, founder veto open): the outcome sentence.
     expect(BRAND_LINE.headline).toBe(
-      "Turn documents into context your AI can cite."
+      "Context your AI can cite, compiled from your documents."
     );
     expect(BRAND_LINE.descriptor).toBe(
       "Knowledge compiled with a traceable path back to every source."

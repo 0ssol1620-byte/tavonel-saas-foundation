@@ -1,6 +1,7 @@
 "use client";
 
 import { preload } from "react-dom";
+import { PHONE_HERO, PHONE_HERO_FILM_MEDIA, PHONE_HERO_STILL_MEDIA } from "@/lib/hero-phone-mode";
 
 import CompileStagePlayer, { FILM_POSTER_SIZES, filmPosterAvifSrcSet, filmPosterSrcSet, type MobileFilmView, type WideView } from "@/components/compile-stage-player";
 import type { CompileStage } from "@/lib/compile-stages";
@@ -37,12 +38,14 @@ export default function HeroFilmDisclosure({
     (a phone takes the 1440px file, a desktop the 2880px one); the phone pane's still loads only once Focus is pressed.
   */
   const openingAvifSrcSet = opening && filmPosterAvifSrcSet(opening);
+  // Round 2: while a phone shows the Inspector still, the poster's hint names the widths that draw the film.
+  const media = PHONE_HERO === "still" ? { media: PHONE_HERO_FILM_MEDIA } : {};
   if (priority && opening?.posterAvif && openingAvifSrcSet) {
-    preload(opening.posterAvif, { as: "image", type: "image/avif", fetchPriority: "high", imageSrcSet: openingAvifSrcSet, imageSizes: FILM_POSTER_SIZES });
+    preload(opening.posterAvif, { as: "image", type: "image/avif", fetchPriority: "high", imageSrcSet: openingAvifSrcSet, imageSizes: FILM_POSTER_SIZES, ...media });
   } else if (priority && opening?.poster) {
     preload(opening.poster, openingSrcSet
-      ? { as: "image", fetchPriority: "high", imageSrcSet: openingSrcSet, imageSizes: FILM_POSTER_SIZES }
-      : { as: "image", fetchPriority: "high" });
+      ? { as: "image", fetchPriority: "high", imageSrcSet: openingSrcSet, imageSizes: FILM_POSTER_SIZES, ...media }
+      : { as: "image", fetchPriority: "high", ...media });
   }
   return (
     <figure
@@ -50,7 +53,7 @@ export default function HeroFilmDisclosure({
       data-testid="landing-hero-film"
     >
         <div className={`lv2-film ${styles.filmBody}`}>
-          <CompileStagePlayer stages={stages} preferVideo priorityPoster={priority} lazyPoster={!priority} korean={korean} initialMobileFilmView={LANDING_MOBILE_FILM_VIEW} initialWideView={LANDING_WIDE_FILM_VIEW} storyLayout />
+          <CompileStagePlayer stages={stages} preferVideo priorityPoster={priority} lazyPoster={!priority} posterSkipMedia={PHONE_HERO === "still" ? PHONE_HERO_STILL_MEDIA : undefined} korean={korean} initialMobileFilmView={LANDING_MOBILE_FILM_VIEW} initialWideView={LANDING_WIDE_FILM_VIEW} storyLayout />
         </div>
       <figcaption className="fine">{korean ? "제품 흐름 예시 · 고객 결과가 아닙니다." : "Illustrative demo · not customer results."}</figcaption>
     </figure>

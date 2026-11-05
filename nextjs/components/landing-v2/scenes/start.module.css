@@ -1,5 +1,6 @@
 /*
-  Scene 09 on Home, the close (FINAL-SPEC 2026-10-26 §2.7), on the dark ground. Token-only.
+  Scene 09 on Home, the close (FINAL-SPEC 2026-10-26 §2.7), in the one navy block the page has (direction C, 2026-11-04;
+  it was the dark ground). Token-only.
 
   At 900 and up the category name takes columns 1-7, left-aligned, and columns 8-12 hold the action
   stack on the foot of the row: the filled action and the price link, then the sample boundary and
@@ -13,13 +14,25 @@
 .close {
   display: grid;
   gap: 32px;
+  padding: 40px 24px;
+  border-radius: var(--tv-r-card);
+  background: var(--tv-navy);
+  color: var(--tv-on-navy);
 }
+/* The Home sheet sets every h2 and text link in the canvas ink from a layer; this unlayered rule wins. */
+.close :global(.lv2-h2) { color: var(--tv-on-navy); }
+.close :global(.lv2-text-link) { color: var(--tv-on-navy); }
+.close :global(:is(a, button)):focus-visible { outline-color: var(--tv-on-navy); }
+/* The filled pill on navy: the same accent, lifted off the block by a hairline of light. */
+.close .cta { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.16), 0 0 0 1px rgb(255 255 255 / 0.12); }
 
 @media (min-width: 900px) {
   .close {
+    padding: 72px 64px;
     grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
     column-gap: 24px;
-    align-items: end;
+    /* CRITIQUE-R1 #9: the name and the action stack share a top edge; on the foot they sat ~120px apart. */
+    align-items: start;
   }
 }
 
@@ -40,7 +53,7 @@
 .gate {
   max-width: 60ch;
   margin: 0;
-  color: var(--tv-on-inst-muted);
+  color: var(--tv-on-navy-muted);
   font-size: var(--home-meta-fs, 13px);
   line-height: 1.55;
 }
