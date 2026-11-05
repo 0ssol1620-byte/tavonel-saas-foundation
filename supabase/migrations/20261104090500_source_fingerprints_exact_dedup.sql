@@ -2,7 +2,7 @@
 --
 -- Two additive tables and one RPC. Nothing reads them on a customer path yet: the compile intake
 -- writes a fingerprint per source version and gets back the exact-duplicate relations, and what
--- happens with that answer is TAVONEL_LIBRARY_DEDUP's business (off | shadow | on, default off;
+-- happens with that answer is TAVONEL_SOURCE_DEDUP_MODE's business (off | shadow | on, default off;
 -- nextjs/lib/source-dedup.ts). With the flag off the app never calls the RPC.
 --
 --   * source_fingerprints: one row per (workspace, document, source version). The key is the
@@ -100,8 +100,15 @@ create policy document_relations_no_client_access on public.document_relations
   compiles of the same workspace, so two copies of one document compiled concurrently still find
   each other. Items are processed in order, so two copies inside one call find each other too.
 
-  Returns every exact relation held by a document of this call, both directions, live documents
-  only: {"schemaVersion": "tavonel.source_fingerprints.v1", "fingerprints": n, "relations": [...]}.
+  Returns the exact relations held by the source versions of this call (not a document's earlier
+  versions), live documents only, plus what this call added, so shadow telemetry counts a pair once
+  and not once per re-compile:
+    {"schemaVersion": "tavonel.source_fingerprints.v1", "fingerprints": n, "relations": [...],
+     "newRelations": rows this call created for its own versions,
+     "reusableReadDocumentIds": documents of this call that gained a sanitized-digest match against
+       a fingerprint recorded by an earlier call -- an OCR read of these exact bytes already existed}.
+  "Earlier" is the clock after the workspace lock, so a concurrent compile of the same workspace
+  is either wholly before or wholly after; two copies inside one call count as neither.
 */
 create function public.record_source_fingerprints(p_workspace_key text, p_fingerprints jsonb)
 returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -113,7 +120,11 @@ declare
   v_content text;
   v_existing public.source_fingerprints%rowtype;
   v_documents uuid[] := '{}';
+  v_versions text[] := '{}';
   v_relations jsonb;
+  v_started timestamptz;
+  v_new integer;
+  v_reusable jsonb;
 begin
   if p_workspace_key is null or p_workspace_key !~ '^pilot-[A-Za-z0-9]{1,32}$'
     or p_fingerprints is null or pg_catalog.jsonb_typeof(p_fingerprints) <> 'array'
@@ -123,6 +134,7 @@ begin
 
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(
     'tavonel.source_fingerprints.v1' || pg_catalog.chr(10) || p_workspace_key, 0));
+  v_started := pg_catalog.clock_timestamp();
 
   for v_item in select value from pg_catalog.jsonb_array_elements(p_fingerprints) loop
     if pg_catalog.jsonb_typeof(v_item) <> 'object'
@@ -181,20 +193,33 @@ begin
     on conflict do nothing;
 
     v_documents := v_documents || v_document_id;
+    v_versions := v_versions || v_version;
   end loop;
 
+  with x as (
+    select r.document_id, r.related_document_id, r.related_source_version_id, r.evidence->'matchedOn' as matched_on,
+           r.created_at, rf.created_at as related_recorded_at
+      from public.document_relations r
+      join pg_catalog.unnest(v_documents, v_versions) as c(document_id, source_version_id)
+        on c.document_id = r.document_id and c.source_version_id = r.source_version_id
+      join public.source_fingerprints rf
+        on rf.workspace_key = r.workspace_key and rf.document_id = r.related_document_id
+       and rf.source_version_id = r.related_source_version_id and rf.fingerprint_version = 'exact:v1'
+     where r.workspace_key = p_workspace_key and r.kind = 'exact_bytes' and r.method_version = 'exact:v1'
+       and not public.source_fingerprint_document_tombstoned(p_workspace_key, r.related_document_id))
   select coalesce(pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
-           'documentId', r.document_id, 'relatedDocumentId', r.related_document_id,
-           'kind', r.kind, 'matchedOn', r.evidence->'matchedOn')
-           order by r.document_id, r.related_document_id), '[]'::jsonb)
-    into v_relations
-    from public.document_relations r
-   where r.workspace_key = p_workspace_key and r.kind = 'exact_bytes'
-     and r.document_id = any(v_documents)
-     and not public.source_fingerprint_document_tombstoned(p_workspace_key, r.related_document_id);
+           'documentId', x.document_id, 'relatedDocumentId', x.related_document_id,
+           'kind', 'exact_bytes', 'matchedOn', x.matched_on)
+           order by x.document_id, x.related_document_id, x.related_source_version_id), '[]'::jsonb),
+         count(*) filter (where x.created_at >= v_started),
+         coalesce(pg_catalog.jsonb_agg(distinct x.document_id) filter (where x.created_at >= v_started
+           and x.related_recorded_at < v_started and x.matched_on ? 'sanitized_sha256'), '[]'::jsonb)
+    into v_relations, v_new, v_reusable
+    from x;
 
   return pg_catalog.jsonb_build_object('schemaVersion', 'tavonel.source_fingerprints.v1',
-    'fingerprints', pg_catalog.cardinality(v_documents), 'relations', v_relations);
+    'fingerprints', pg_catalog.cardinality(v_documents), 'relations', v_relations,
+    'newRelations', v_new, 'reusableReadDocumentIds', v_reusable);
 end;
 $$;
 

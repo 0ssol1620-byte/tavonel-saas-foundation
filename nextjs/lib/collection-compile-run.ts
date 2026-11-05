@@ -73,7 +73,7 @@ export type CollectionCompileSuccess = {
   signedReceipt: SignedCompileReceipt;
   /** The stage of the grant that admitted the dispatch; `qualification` is not release evidence by itself. */
   customerDataGateStage: ReleaseStage;
-  /** B1: present only when TAVONEL_LIBRARY_DEDUP=on and a document of this compile has an exact copy. */
+  /** B1: present only when TAVONEL_SOURCE_DEDUP_MODE=on and a document of this compile has an exact copy the viewer may read. */
   libraryDuplicates?: readonly ExactDuplicateNote[];
 };
 
@@ -299,7 +299,9 @@ export async function runCollectionCompile(
   }
 
   // B1 intake annotation. Off by default; in no mode does it change what is dispatched or stored.
-  const duplicateNotes = await detectExactDuplicatesAtIntake(workspaceId, verifiedInputs);
+  // `on` names only documents this principal may read; with no bound principal it names none.
+  const duplicateNotes = await detectExactDuplicatesAtIntake(workspaceId, verifiedInputs, process.env,
+    principalBound ? observationPrincipal!.userId! : null);
 
   const expectedVersions = selected.map((item) => ({ documentId: item!.documentId, versionKey: item!.versionKey }));
   const revalidate = async (phase: "before_core" | "after_core"): Promise<CollectionCompileRun | null> => {

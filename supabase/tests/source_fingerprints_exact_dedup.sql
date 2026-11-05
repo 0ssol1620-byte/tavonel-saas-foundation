@@ -4,12 +4,19 @@
 -- and never across two; a re-upload of the same source finds the original by its confirm digest;
 -- redelivery returns the same answer and writes nothing twice; the rows are unreachable from any
 -- client role and from service_role except through the RPC; and a source deletion's derived
--- closure erases the deleted document's rows while the other copy keeps its own.
+-- closure erases the deleted document's rows while the other copy keeps its own, and neither the
+-- other copy nor another workspace's row with the same document id.
+--
+-- Also: a call reports only what it added (newRelations, reusableReadDocumentIds), so a re-compile
+-- does not count a known pair again, and it answers for the versions it was given, not for a
+-- document's earlier versions.
+--
+-- Not provable here: the workspace advisory lock against a concurrent session (one transaction).
 --
 -- Two self-service workspaces are bootstrapped by the auth.users insert (20260920121000):
 -- pilot-b1b1b1b1b1b14b1b (owner b1b1...) and pilot-c2c2c2c2c2c24c2c (owner c2c2...).
 begin;
-select plan(32);
+select plan(44);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -64,8 +71,21 @@ select throws_ok($$select 1 from public.source_fingerprints$$, '42501', null, 'a
 select throws_ok($$select 1 from public.document_relations$$, '42501', null, 'a workspace owner cannot read relations');
 reset role;
 
+set local role anon;
+select throws_ok($$select 1 from public.source_fingerprints$$, '42501', null, 'anon cannot read fingerprints');
+select throws_ok($$select 1 from public.document_relations$$, '42501', null, 'anon cannot read relations');
+reset role;
+
 set local role service_role;
 select throws_ok($$select 1 from public.source_fingerprints$$, '42501', null, 'the server reads fingerprints only through the RPC');
+select throws_ok($$select 1 from public.document_relations$$, '42501', null, 'nor relations');
+select throws_ok($$insert into public.document_relations (workspace_key, document_id, source_version_id, related_document_id,
+    related_source_version_id, kind, method, method_version, evidence)
+  values ('pilot-b1b1b1b1b1b14b1b', '0a000000-0000-4000-8000-00000000000a', repeat('a', 64),
+    '0b000000-0000-4000-8000-00000000000b', repeat('a', 64), 'exact_bytes', 'exact_digest', 'exact:v1', '{}')$$,
+  '42501', null, 'nor writes a relation directly');
+select throws_ok($$update public.document_relations set state = 'rejected'$$, '42501', null, 'nor updates one');
+select throws_ok($$delete from public.document_relations$$, '42501', null, 'nor deletes one');
 
 -- ---------------------------------------------------------------------------
 -- 2. Identical bytes, the same source twice, redelivery.
@@ -80,21 +100,30 @@ select is((select r->'relations' from second_copy), jsonb_build_array(jsonb_buil
   'documentId', '0b000000-0000-4000-8000-00000000000b', 'relatedDocumentId', '0a000000-0000-4000-8000-00000000000a',
   'kind', 'exact_bytes', 'matchedOn', jsonb_build_array('sanitized_sha256', 'source_sha256'))),
   'identical bytes match on both digests');
-select is(public.record_source_fingerprints('pilot-b1b1b1b1b1b14b1b',
-  jsonb_build_array(public.b1_test_fp('0b000000-0000-4000-8000-00000000000b', 'a'))), (select r from second_copy),
-  'a redelivered call returns the same answer');
+select is((select jsonb_build_object('n', r->'newRelations', 'reuse', r->'reusableReadDocumentIds') from second_copy),
+  '{"n":1,"reuse":["0b000000-0000-4000-8000-00000000000b"]}'::jsonb,
+  'the copy is one new relation, and its OCR read could have been the original''s');
+create temp table redelivered as select public.record_source_fingerprints('pilot-b1b1b1b1b1b14b1b',
+  jsonb_build_array(public.b1_test_fp('0b000000-0000-4000-8000-00000000000b', 'a'))) as r;
+select is((select r->'relations' from redelivered), (select r->'relations' from second_copy),
+  'a redelivered call returns the same relations');
+select is((select jsonb_build_object('n', r->'newRelations', 'reuse', r->'reusableReadDocumentIds') from redelivered),
+  '{"n":0,"reuse":[]}'::jsonb, 'and reports nothing new, so a re-compile does not count the pair again');
 select is(public.record_source_fingerprints('pilot-b1b1b1b1b1b14b1b',
   jsonb_build_array(public.b1_test_fp('0a000000-0000-4000-8000-00000000000a', 'a')))->'relations'->0->>'relatedDocumentId',
   '0b000000-0000-4000-8000-00000000000b', 'the original names its copy as well');
 
-select is(public.record_source_fingerprints('pilot-b1b1b1b1b1b14b1b',
-  jsonb_build_array(public.b1_test_fp('0d000000-0000-4000-8000-00000000000d', 'd')))->'relations',
+create temp table resanitized as select public.record_source_fingerprints('pilot-b1b1b1b1b1b14b1b',
+  jsonb_build_array(public.b1_test_fp('0d000000-0000-4000-8000-00000000000d', 'd'))) as r;
+select is((select r->'relations' from resanitized),
   jsonb_build_array(
     jsonb_build_object('documentId', '0d000000-0000-4000-8000-00000000000d', 'relatedDocumentId', '0a000000-0000-4000-8000-00000000000a',
       'kind', 'exact_bytes', 'matchedOn', jsonb_build_array('source_sha256')),
     jsonb_build_object('documentId', '0d000000-0000-4000-8000-00000000000d', 'relatedDocumentId', '0b000000-0000-4000-8000-00000000000b',
       'kind', 'exact_bytes', 'matchedOn', jsonb_build_array('source_sha256'))),
   'the same source re-sanitized differently is found by its confirm digest alone');
+select is((select jsonb_build_object('n', r->'newRelations', 'reuse', r->'reusableReadDocumentIds') from resanitized),
+  '{"n":2,"reuse":[]}'::jsonb, 'two new relations, and no reusable read: OCR read different bytes');
 select is(public.record_source_fingerprints('pilot-b1b1b1b1b1b14b1b',
   jsonb_build_array(public.b1_test_fp('0e000000-0000-4000-8000-00000000000e', 'e')))->'relations', '[]'::jsonb,
   'an unrelated document matches nothing');
@@ -105,6 +134,10 @@ select is(public.record_source_fingerprints('pilot-b1b1b1b1b1b14b1b',
 select is(public.record_source_fingerprints('pilot-c2c2c2c2c2c24c2c',
   jsonb_build_array(public.b1_test_fp('0c000000-0000-4000-8000-00000000000c', 'a')))->'relations', '[]'::jsonb,
   'the same bytes in another workspace are never a duplicate');
+-- A's document id in the other workspace (no admission there, other bytes): the deletion below must spare it.
+select is(public.record_source_fingerprints('pilot-c2c2c2c2c2c24c2c',
+  jsonb_build_array(public.b1_test_fp('0a000000-0000-4000-8000-00000000000a', '9')))->'fingerprints', '1'::jsonb,
+  'the other workspace records a fingerprint under the same document id');
 
 -- ---------------------------------------------------------------------------
 -- 4. Refusals.
@@ -136,10 +169,21 @@ set local role service_role;
 select throws_ok($$select public.record_source_fingerprints('pilot-b1b1b1b1b1b14b1b',
   jsonb_build_array(public.b1_test_fp('0e000000-0000-4000-8000-00000000000e', 'e')))$$,
   'P0001', 'source_fingerprint_conflict', 'a recorded source digest that changed is an integrity fault');
+
+-- A second version of A (re-sanitized, same confirm digest). The answer is for that version only:
+-- A's first version's relations (A->B, A->D) are not repeated.
+select is(public.record_source_fingerprints('pilot-b1b1b1b1b1b14b1b',
+  jsonb_build_array(public.b1_test_fp('0a000000-0000-4000-8000-00000000000a', 'f')))->'relations',
+  jsonb_build_array(
+    jsonb_build_object('documentId', '0a000000-0000-4000-8000-00000000000a', 'relatedDocumentId', '0b000000-0000-4000-8000-00000000000b',
+      'kind', 'exact_bytes', 'matchedOn', jsonb_build_array('source_sha256')),
+    jsonb_build_object('documentId', '0a000000-0000-4000-8000-00000000000a', 'relatedDocumentId', '0d000000-0000-4000-8000-00000000000d',
+      'kind', 'exact_bytes', 'matchedOn', jsonb_build_array('source_sha256'))),
+  'a new version answers for itself, not for the document''s earlier version');
 reset role;
 
-select is((select count(*)::integer from public.document_relations where workspace_key = 'pilot-b1b1b1b1b1b14b1b'), 6,
-  'A<->B, D->A, D->B and their reverses: six rows, nothing written twice');
+select is((select count(*)::integer from public.document_relations where workspace_key = 'pilot-b1b1b1b1b1b14b1b'), 10,
+  'A<->B, D->A, D->B, A(v2)->B, A(v2)->D and their reverses: ten rows, nothing written twice');
 select is((select count(*)::integer from public.document_relations where workspace_key = 'pilot-c2c2c2c2c2c24c2c'), 0,
   'and none in the other workspace');
 
@@ -165,12 +209,14 @@ select public.attest_source_deletion_inventory((select r->>'deletionId' from req
     'sha256', 'sha256:' || repeat('1', 64), 'sizeBytes', 10)));
 select is(public.close_source_deletion_derived()->>'status', 'recorded', 'the derived closure records');
 
-select is((select count(*)::integer from public.source_fingerprints
-  where document_id = '0a000000-0000-4000-8000-00000000000a'), 0, 'the deleted document''s fingerprint is erased');
-select is((select count(*)::integer from public.document_relations
-  where '0a000000-0000-4000-8000-00000000000a' in (document_id, related_document_id)), 0, 'and every relation naming it');
+select is((select count(*)::integer from public.source_fingerprints where workspace_key = 'pilot-b1b1b1b1b1b14b1b'
+  and document_id = '0a000000-0000-4000-8000-00000000000a'), 0, 'both versions of the deleted document''s fingerprint are erased');
+select is((select count(*)::integer from public.document_relations where workspace_key = 'pilot-b1b1b1b1b1b14b1b'
+  and '0a000000-0000-4000-8000-00000000000a' in (document_id, related_document_id)), 0, 'and every relation naming it');
 select is((select count(*)::integer from public.source_fingerprints
   where document_id = '0b000000-0000-4000-8000-00000000000b'), 1, 'the surviving copy keeps its own fingerprint');
+select is((select count(*)::integer from public.source_fingerprints where workspace_key = 'pilot-c2c2c2c2c2c24c2c'), 2,
+  'the other workspace keeps both its fingerprints, including the one under the same document id');
 
 select * from finish();
 rollback;
