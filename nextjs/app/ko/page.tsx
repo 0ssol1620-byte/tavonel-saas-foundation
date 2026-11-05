@@ -58,10 +58,10 @@ export const metadata: Metadata = pageMetadata({
 */
 /*
   FINAL-SPEC 2026-10-26 §4: Home is a paper page, so the address bar and task-switcher card read
-  paper (`--tv-paper`, #FAF9F6) here. The layout's dark `#090D14` stays on every other route.
+  paper (`--tv-paper`, the warm canvas #F5F3EE since direction C) here. The layout's dark `#090D14` stays on every other route.
 */
 export const viewport: Viewport = {
-  themeColor: "#FAF9F6",
+  themeColor: "#F5F3EE",
   colorScheme: "light",
 };
 

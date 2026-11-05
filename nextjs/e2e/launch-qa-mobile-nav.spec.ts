@@ -267,7 +267,8 @@ const PUBLIC_HEADER_ROUTES = ["/", "/pricing", "/docs", "/docs/quickstart", "/pr
   rgb(21, 25, 29). The contrast assertions below measure against the surface the control actually sits on.
 */
 const HOME_ROUTES: readonly string[] = ["/", "/ko"];
-const HOME_PAPER = "rgb(250, 249, 246)";
+// Direction C (2026-11-04): Home paints the warm canvas #f5f3ee.
+const HOME_PAPER = "rgb(245, 243, 238)";
 
 for (const route of PUBLIC_HEADER_ROUTES) {
   test(`the mobile menu has a high-contrast paper surface on ${route}`, async ({ page }) => {

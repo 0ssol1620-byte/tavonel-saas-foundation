@@ -309,12 +309,34 @@
      them (UX-L2, UX-L3); nothing reads them yet.
      ------------------------------------------------------------------ */
   :root {
-    /* PAPER: marketing, docs, pricing, trust and the Explore reading face. */
-    --tv-paper: #faf9f6;          /* the one light ground (today's Home) */
-    --tv-paper-raised: #ffffff;   /* a source crop, a sheet, the inside of a card */
+    /*
+      WARM CANVAS (direction C, 2026-11-04). The site sits on one warm canvas; a white sheet lifts
+      off it on two shadow layers, and colour arrives in whole blocks -- sand for an action that
+      waits on a person, tint for work in progress, navy once per page at most. --tv-paper stays
+      as the name 28 surfaces read and now holds the canvas value; --tv-canvas names the same ground. Ratios are recomputed in
+      lib/brand-tokens.test.ts from these values.
+    */
+    --tv-paper: #f5f3ee;          /* the one light ground: the canvas (was #faf9f6) */
+    --tv-canvas: var(--tv-paper); /* the same ground under its direction-C name */
+    --tv-paper-raised: #ffffff;   /* the sheet: a source crop, a card, the workspace surface */
+    --tv-sheet: var(--tv-paper-raised);
     --tv-paper-sunk: #f2f0eb;     /* code, a quote, a source region's wash */
-    --tv-ink: #15191d;            /* 16.78:1 on paper */
-    --tv-ink-muted: #58606a;      /*  6.05:1 on paper: the floor for support text and 13px meta */
+    --tv-sand: #ece5d8;           /* a block that waits on a person (review, activation) */
+    --tv-sand-2: #e2d8c6;         /* sand's hover and its divider; never a text ground */
+    --tv-tint: #e5edf9;           /* a block of work in progress; the 255° accent, washed */
+    --tv-tint-2: #d2e0f5;         /* tint's divider and track; never a text ground */
+    --tv-navy: #12233f;           /* deep: at most one block per page */
+    --tv-on-navy: #f2efe8;        /* 13.67:1 on navy */
+    --tv-on-navy-muted: #b9c2d3;  /*  8.76:1 on navy */
+    --tv-ink: #15191d;            /* 15.93:1 on canvas, 14.10:1 on sand */
+    /* #58606a -> #4c545d with the canvas: 6.93:1 on canvas, 6.13:1 on sand, 6.52:1 on tint, 7.68:1
+       on the sheet. The 6:1 floor for support text and 13px meta holds on every C ground. */
+    --tv-ink-muted: #4c545d;
+    /* Depth, two layers: a resting sheet (s1) and a lifted one (s2). Warm umber shadow, never black. */
+    --tv-shadow-1: 0 1px 2px rgb(40 32 20 / 0.06), 0 2px 8px rgb(40 32 20 / 0.04);
+    --tv-shadow-2: 0 2px 4px rgb(40 32 20 / 0.05), 0 14px 36px -8px rgb(40 32 20 / 0.18);
+    /* The filled pill: an inner highlight and a 255° drop, so it reads as pressable on the canvas. */
+    --tv-shadow-action: inset 0 1px 0 rgb(255 255 255 / 0.16), 0 1px 2px rgb(0 40 110 / 0.28), 0 6px 16px -6px rgb(0 70 180 / 0.45);
     --tv-rule: rgb(21 25 29 / 0.12);         /* the alpha hairline (DESIGN_MASTER §6.3) */
     --tv-rule-strong: rgb(21 25 29 / 0.24);  /* a source region's outline */
 
@@ -327,21 +349,21 @@
     --tv-rule-inst: rgb(255 255 255 / 0.09);
 
     /* ACCENT: decision.md G-H 255°, at the sRGB chroma boundary. */
-    --tv-action: #005bb3;         /* oklch(48% .158 255): white on it 6.67:1, on paper 6.34:1 */
+    --tv-action: #005bb3;         /* oklch(48% .158 255): white on it 6.67:1, on the canvas 6.02:1, on sand 5.33:1 */
     --tv-action-hover: #0169cd;   /* oklch(53% .174 255): white on it 5.38:1 */
     --tv-action-press: #004b96;   /* oklch(42% .138 255): white on it 8.58:1 */
     --tv-action-on-dark: #65a7fa; /* oklch(72% .14 255): 7.68:1 on inst-1 (focus, links) */
 
     /* EVIDENCE 210°: INSTRUMENT faces only (§4.2-3). */
-    --tv-evidence: #0590a2;         /* lines and fills only: 3.62:1 on paper (non-text, >= 3:1) */
-    --tv-evidence-ink: #026470;     /* text: 6.52:1 on paper */
+    --tv-evidence: #0590a2;         /* lines and fills only: 3.43:1 on the canvas (non-text, >= 3:1) */
+    --tv-evidence-ink: #026470;     /* text: 6.19:1 on the canvas */
     --tv-evidence-wash: #d9f5fa;
     --tv-evidence-on-dark: #51cade; /* 9.85:1 on inst-1 */
 
     /* STATE: only ever beside the words that say it. */
-    --tv-verified: #1a6d51;   /* 5.95:1 on paper */
-    --tv-changed: #8c5217;    /* 5.98:1 on paper */
-    --tv-unresolved: #a72d23; /* 6.56:1 on paper */
+    --tv-verified: #1a6d51;   /* 5.65:1 on the canvas */
+    --tv-changed: #8c5217;    /* 5.68:1 on the canvas */
+    --tv-unresolved: #a72d23; /* 6.22:1 on the canvas */
     /* The same three on an INSTRUMENT face: the dark-ground values §4.3 quotes beside them, named
        so a dark panel on a public page reads them rather than carrying a hex of its own. */
     --tv-verified-on-dark: #7be0be;
@@ -400,6 +422,11 @@
     --tv-r-inst: 6px;
     --tv-r-inst-lg: 8px;
     --tv-r-media: 12px;
+    /* Direction C's object radii (cap 24): a card or block, a row or inner panel, a small control. */
+    --tv-r-card: 24px;
+    --tv-r-inner: 16px;
+    --tv-r-small: 10px;
+    --tv-r-pill: 999px;
 
     /* MOTION (DESIGN_MASTER §6.1, §10). */
     --tv-t-1: 90ms;
@@ -913,7 +940,8 @@
     justify-content: center;
     text-align: center;
     border: 1px solid var(--text-hi);
-    border-radius: var(--r-inst);
+    /* Direction C (2026-11-04): every button is a pill; one filled pill per screen, the rest outlined or text. */
+    border-radius: var(--tv-r-pill);
     background: var(--text-hi);
     color: var(--ground);
     font-family: var(--f-sans);

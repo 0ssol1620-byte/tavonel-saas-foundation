@@ -4,7 +4,7 @@ import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-acce
 import { admitsDerivedCustomerData, DERIVED_DATA_REFUSED } from "@/lib/derived-data-admission";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { DOCUMENT_ID_PATTERN, groupImmutableDocuments, isOcrJsonKey, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
-import { getWorkspaceOcrJson, listImmutableWorkspaceObjects } from "@/lib/r2-objects";
+import { getWorkspaceOcrJson, listImmutableWorkspaceObjects, OCR_JSON_RESPONSE_MAX_BYTES } from "@/lib/r2-objects";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 
 export const dynamic = "force-dynamic";
@@ -48,8 +48,13 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
     headers: { "Cache-Control": "no-store" },
   });
-  const fetched = await getWorkspaceOcrJson(signer, membership.workspaceId, match.ocrJsonKey);
+  // The whole ocr.json is returned in one response, so it is read no larger than one response
+  // can carry: a bigger document is a named 413 here, not a platform 500 after the read.
+  const fetched = await getWorkspaceOcrJson(signer, membership.workspaceId, match.ocrJsonKey, new Date(), OCR_JSON_RESPONSE_MAX_BYTES);
   if (!fetched.ok) {
+    if ("sizeLimit" in fetched) {
+      return NextResponse.json({ code: fetched.code, sizeLimit: fetched.sizeLimit }, { status: 413, headers: { "Cache-Control": "no-store" } });
+    }
     return NextResponse.json({ code: fetched.code }, { status: fetched.code === "NOT_FOUND" ? 404 : 400, headers: { "Cache-Control": "no-store" } });
   }
   const currentAccess = await checkConnectorSourceAccessForViewer(membership.workspaceId, [id], user.id);

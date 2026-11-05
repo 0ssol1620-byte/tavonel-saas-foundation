@@ -1,3 +1,4 @@
+import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -6,7 +7,8 @@ import { expect, test } from "@playwright/test";
 const NODE_STATES = ["current", "changed", "affected", "unresolved", "candidate", "dim"];
 
 test.describe("visual continuity — locked film side", () => {
-  test("the retired WORLD landing stage stays out of One-Path while its approved cut remains byte-locked", async ({ page }) => {
+  test("the retired WORLD landing stage stays out of One-Path while its approved cut remains byte-locked", async ({ page }, testInfo) => {
+    test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     const manifest = JSON.parse(readFileSync(resolve(process.cwd(), "lib/locked-film-assets.json"), "utf8")) as {
       files: Array<{ file: string; bytes: number; sha256: string }>;
     };

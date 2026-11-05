@@ -1,3 +1,4 @@
+import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { expect, test } from "@playwright/test";
 
 async function dismissConsent(page: import("@playwright/test").Page) {
@@ -167,7 +168,8 @@ test("copy controls and navigation remain readable and operable", async ({ page 
 });
 
 
-test("the Home first screen puts actions before its four-stage film and source proof below it", async ({ page }) => {
+test("the Home first screen puts actions before its four-stage film and source proof below it", async ({ page }, testInfo) => {
+  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   const width = page.viewportSize()?.width ?? 0;
   test.skip(width !== 390 && width !== 1440, "Phone and desktop reference widths.");
   await page.emulateMedia({ reducedMotion: "reduce" });

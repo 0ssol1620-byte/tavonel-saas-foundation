@@ -186,3 +186,65 @@
   .paletteBackdrop { padding: 12px; }
   .palette { max-height: calc(100dvh - 24px); }
 }
+
+/*
+  Direction C, warm tactile (2026-11-04; BRIEF outputs/.../design-20261104/impl/BRIEF.md), workspace.
+
+  The workspace leaves the dark instrument ground for the site's warm canvas. Every rule above reads
+  the ground and state tokens, so the change is one token remap (app/chrome-v2.css, shared with the
+  sign-in pages) rather than a rewrite of each sheet:
+  the shell and its rail stand on the canvas, and at 1024px and up the working area is one white
+  sheet floating on it (radius 28, the resting shadow) with the top bar inside. The state values are
+  the light-ground ones the public pages already use; the remap carries their measured ratios.
+*/
+.rail { border-right: 0; background: var(--ground); }
+.brand { border: 0; background: var(--tv-sheet); border-radius: var(--tv-r-small); box-shadow: var(--tv-shadow-1); }
+.nav button { border-radius: var(--tv-r-small); }
+.nav button.current { color: var(--text-hi); background: var(--tv-sheet); box-shadow: var(--tv-shadow-1); }
+.nav button.current svg { color: var(--tv-action); }
+.nav button b { color: #fff; border-color: var(--tv-ink); background: var(--tv-ink); }
+.secondaryStart { border-top-color: transparent; }
+/* The working area: a white sheet. Inside it --ground is the sheet and --g1 the canvas, so a card
+   that paints --g1 reads as a quiet block on the sheet rather than a box drawn round it. */
+.body { --ground: var(--tv-sheet); --g1: var(--tv-canvas); --g2: var(--tv-paper-sunk); background: var(--ground); }
+.topbar { gap: 8px; padding: 8px 12px 8px 20px; border-bottom: 1px solid var(--hairline); background: var(--ground); }
+.workspaceIdentity, .topStatus, .commandButton { border-right: 0; }
+.workspaceIdentity { padding-inline: 8px; }
+/* "N to review" is a tint pill; the published version beside it a quiet one. */
+.topStatus { flex-direction: row; align-items: center; gap: 8px; align-self: center; min-height: 44px; padding: 0 16px; border-radius: var(--tv-r-pill); background: var(--tv-canvas); }
+.topStatus[data-review] { background: var(--tv-tint); }
+.topStatus small { letter-spacing: 0; }
+.topStatus b { color: var(--tv-action); font-weight: 600; }
+.commandButton { align-self: center; min-height: 44px; border-radius: var(--tv-r-pill); background: var(--tv-canvas); }
+.accessStrip, .ownerStrip { background: var(--ground); }
+.accessStrip a { border-radius: var(--tv-r-pill); }
+.stateHero { border-bottom-color: var(--hairline); }
+/* Centred like every other pill: at 560px and below the two actions stretch to the full width, and a stretched label read left-aligned. */
+.stateHero > button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-align: center; min-height: 44px; padding: 0 22px; border-color: var(--tv-action); border-radius: var(--tv-r-pill); background: var(--tv-action); color: #fff; box-shadow: var(--tv-shadow-action); }
+.stateHero > button:disabled { box-shadow: none; }
+.stateHero > button.stateUpload { border-color: transparent; background: var(--tv-sand); box-shadow: none; }
+.palette { border: 0; border-radius: var(--tv-r-card); background: var(--tv-sheet); }
+.paletteBackdrop { background: rgb(40 32 20 / 0.18); }
+.paletteResults button { border-radius: var(--tv-r-small); }
+@media (min-width: 1024px) {
+  .body { margin: 12px 12px 12px 0; border-radius: 28px; box-shadow: var(--tv-shadow-1); overflow: clip; min-height: calc(100vh - 24px); }
+  .topbar { top: 0; }
+}
+@media (max-width: 1023px) {
+  .rail { border-top: 1px solid var(--hairline); background: var(--tv-canvas); }
+  .nav button.current { box-shadow: none; background: var(--tv-sand); }
+  .topbar { padding: 6px 8px 6px 12px; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .nav button:hover:not(.current) { background: rgb(255 255 255 / 0.6); }
+  .topStatus:hover, .commandButton:hover { background: var(--tv-sand); }
+  .stateHero > button:hover:not(:disabled) { background: var(--tv-action-hover); color: #fff; }
+  .stateHero > button.stateUpload:hover { background: var(--tv-sand-2); color: var(--text-hi); }
+}
+/*
+  Round 2 (CRITIQUE-R1 #4): when a candidate waits on the reader and nothing is still running, the state hero is the
+  activation card -- "You decide when this version becomes active" -- so it takes the sand block the attention items
+  use: the one place on the page where a person's decision is asked for.
+*/
+.stateHero[data-decision] { padding: clamp(20px, 2.4vw, 32px); border-bottom: 0; border-radius: var(--tv-r-card); background: var(--tv-sand); }
+.stateHero[data-decision] > button.stateUpload { background: var(--tv-sheet); }

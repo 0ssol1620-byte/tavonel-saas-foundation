@@ -1,7 +1,7 @@
 @layer reset, tokens, base, components, utilities, overrides;
 
 @layer overrides {
-  .process, .product { --text-hi: #19201f; --text-mid: #58615e; --source: var(--tv-action); --hairline: #d9ded9; --hairline-hi: #c7cdc7; background: #faf9f6; color: var(--text-hi); font-family: var(--f-sans); padding-top: clamp(40px, 5vw, 72px); }
+  .process, .product { --text-hi: #19201f; --text-mid: #58615e; --source: var(--tv-action); --hairline: #d9ded9; --hairline-hi: #c7cdc7; background: var(--tv-canvas); color: var(--text-hi); font-family: var(--f-sans); padding-top: clamp(40px, 5vw, 72px); }
   /* H1 column gets the wider share so "A World you can inspect." holds one line beside the lede at desktop widths. */
   .lead { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: clamp(32px, 4vw, 56px); align-items: end; margin-bottom: clamp(40px, 5vw, 64px); }
   /* UX-L3 (UX-PLAN-2026-10-17 §5.3 R2): size, weight, leading and tracking are the T1 H1 role in tavonel.css. */
@@ -14,7 +14,7 @@
   .pipeline li:first-child::before { top: calc(var(--mark) / 2); }
   .pipeline li:last-child { padding-bottom: 0; }
   .pipeline li:last-child::before { display: none; }
-  .stepArt { position: relative; grid-row: span 4; box-sizing: border-box; width: var(--mark); height: var(--mark); padding: calc(var(--mark) / 8); border: 1px solid var(--hairline-hi); border-radius: 4px; fill: none; stroke: var(--source); stroke-width: 1.5; background: #faf9f6; }
+  .stepArt { position: relative; grid-row: span 4; box-sizing: border-box; width: var(--mark); height: var(--mark); padding: calc(var(--mark) / 8); border: 1px solid var(--hairline-hi); border-radius: 4px; fill: none; stroke: var(--source); stroke-width: 1.5; background: var(--tv-canvas); }
   .stepFlow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 24px; font: 13px/1.5 var(--f-sans); color: var(--text-mid); }
   .stepFlow strong { color: var(--source); font-weight: 560; }
   .pipeline h2 { margin: 2px 0 0; font: 560 clamp(20px, 2vw, 24px)/1.25 var(--f-sans); letter-spacing: -0.02em; }
@@ -30,13 +30,16 @@
      clamp set /product's three at 36px. */
   .outcome h2 { margin: 0; font-size: var(--tv-fs-title); line-height: var(--tv-lh-title); letter-spacing: var(--tv-track-title); font-weight: var(--tv-w-title); font-variation-settings: "wght" var(--tv-w-title); }
   .outcome p { max-width: 60ch; margin: 0 0 12px; font: 17px/1.6 var(--f-sans); color: var(--text-mid); }
-  .proof { margin: 20px 0; padding-left: 20px; border-left: 2px solid var(--source); overflow-wrap: anywhere; }
-  .proof blockquote { margin: 0 0 12px; font: 16px/1.6 var(--f-sans); }
+  .proof { margin: 20px 0; overflow-wrap: anywhere; }
+  /* CRITIQUE-R1 #6: reader output at 14px mono on the sunk paper, under its own label. */
+  .proof .proofLabel { margin: 0 0 6px; color: var(--tv-ink-muted); font: 500 12px/1.4 var(--f-sans); }
+  .proof blockquote { margin: 0 0 12px; padding: 14px 16px; border-radius: var(--tv-r-small); background: var(--tv-paper-sunk); font: 400 14px/1.6 var(--f-mono); }
   .proof figcaption { font: 13px/1.6 var(--f-sans); color: var(--text-mid); }
   .proof figcaption span { display: block; }
   .process a, .product a { color: var(--source); }
-  .process :global(.btn), .product :global(.btn) { background: var(--source); border-color: var(--source); color: white; border-radius: 4px; }
-  .process :global(.btn.ghost), .product :global(.btn.ghost) { background: transparent; color: var(--text-hi); border-color: var(--hairline-hi); }
+  /* Direction C (2026-11-04): the filled pill on its shadow; the outlined one is a white sheet on the resting shadow. */
+  .process :global(.btn), .product :global(.btn) { background: var(--source); border-color: var(--source); color: white; border-radius: var(--tv-r-pill); box-shadow: var(--tv-shadow-action); }
+  .process :global(.btn.ghost), .product :global(.btn.ghost) { background: var(--tv-sheet); color: var(--text-hi); border-color: transparent; box-shadow: var(--tv-shadow-1); }
   .boundary { margin: clamp(32px, 4vw, 48px) 0; border-block: 1px solid var(--hairline); padding: 8px 0; }
   /* list-item keeps the disclosure marker that inline-flex removed; padding holds the 44px target. */
   .boundary summary { display: list-item; min-height: 44px; padding-block: 11px; cursor: pointer; font: 15px/1.5 var(--f-sans); }
@@ -51,6 +54,5 @@
     .pipeline p { font-size: 15px; line-height: 1.65; }
     .world { margin-bottom: 40px; }
     .outcome { padding-block: 28px; }
-    .proof { padding-left: 14px; }
   }
 }
