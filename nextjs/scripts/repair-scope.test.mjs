@@ -7489,9 +7489,9 @@ test('affected g1-copy-truth owner: 6 exact paths select 17 direct suites and 2 
 });
 // Library dedup B1 (codex/w1-b1-20261104): one finite owner, restated independently of the exported constants.
 import { LIBRARY_DEDUP_AFFECTED_PATHS, LIBRARY_DEDUP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
-test('affected library-dedup-b1 owner: 2 exact paths select 2 direct suites and no browser suite; neighbours stay unmapped', () => {
-  const paths = ['lib/source-dedup.test.ts', 'lib/source-dedup.ts'];
-  const suites = ['lib/collection-compile-run.test.ts', 'lib/source-dedup.test.ts'];
+test('affected library-dedup-b1 owner: 3 exact paths select 3 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['lib/founder-test-reset-migration.test.ts', 'lib/source-dedup.test.ts', 'lib/source-dedup.ts'];
+  const suites = ['lib/collection-compile-run.test.ts', 'lib/founder-test-reset-migration.test.ts', 'lib/source-dedup.test.ts'];
   assert.deepEqual([[...LIBRARY_DEDUP_AFFECTED_PATHS], [...LIBRARY_DEDUP_AFFECTED_UNIT_FILES]], [paths, suites]);
   for (const path of paths) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['library-dedup-b1'], path);

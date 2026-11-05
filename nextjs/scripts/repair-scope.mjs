@@ -2177,8 +2177,9 @@ export const COMPILER_RELEASE_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/bench
 // Library dedup B1 (codex/w1-b1-20261104): the exact-duplicate intake annotation and its suite. The compile-run hook keeps
 // its compile-source-observations owner; this owner selects both suites because the annotation is asserted from both sides.
 // The migration and pgTAP fixture keep the database-contract owner. No browser suite: nothing renders it yet (B4). Never nativeReuse.
-export const LIBRARY_DEDUP_AFFECTED_PATHS = Object.freeze(['lib/source-dedup.test.ts', 'lib/source-dedup.ts']);
-export const LIBRARY_DEDUP_AFFECTED_UNIT_FILES = Object.freeze(['lib/collection-compile-run.test.ts', 'lib/source-dedup.test.ts']);
+// founder-test-reset-migration.test.ts joins because 20261104091000 extends the founder reset bodies it pins.
+export const LIBRARY_DEDUP_AFFECTED_PATHS = Object.freeze(['lib/founder-test-reset-migration.test.ts', 'lib/source-dedup.test.ts', 'lib/source-dedup.ts']);
+export const LIBRARY_DEDUP_AFFECTED_UNIT_FILES = Object.freeze(['lib/collection-compile-run.test.ts', 'lib/founder-test-reset-migration.test.ts', 'lib/source-dedup.test.ts']);
 export const PACKET_DELIVERY_AFFECTED_PATHS = Object.freeze([
   'app/api/collections/[id]/download/route.ts', 'lib/ai-package-guidance.ts', 'lib/b30-api-mcp-cli-parity.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/export-route-authorization.test.ts', 'lib/package-contents.ts', 'lib/packet-delivery.test.ts', 'public/developer/tavonel-verify-package.mjs', 'scripts/compiled-world/validate.mjs',
 ]);

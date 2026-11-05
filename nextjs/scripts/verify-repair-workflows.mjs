@@ -664,11 +664,11 @@ for (const binding of [
     browsers: ['e2e/docs-reading-layout.spec.ts', 'e2e/pricing-plan-overview.spec.ts'],
     rows: ["['e2e/docs-reading-layout.spec.ts', ['1440', '390', 'reduced-motion']],", "['e2e/pricing-plan-overview.spec.ts', ['1440', '390']],"],
     neighbors: ['nextjs/lib/billing-catalog.test.tsx', 'nextjs/lib/operations-v2.ts', 'nextjs/lib/mcp-tools.tsx', 'nextjs/lib/g1-copy-truth.ts', 'nextjs/public/developer/tavonel-mcp-2.mjs', 'nextjs/public/developer/tavonel-cli.mjs'] },
-  // Library dedup B1 (codex/w1-b1-20261104): two exact paths, two direct suites, no browser suite.
+  // Library dedup B1 (codex/w1-b1-20261104): three exact paths, three direct suites, no browser suite.
   { group: 'library-dedup-b1', prefix: 'nextjs/', exportedPaths: LIBRARY_DEDUP_AFFECTED_PATHS, exportedSuites: LIBRARY_DEDUP_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
-    paths: ['lib/source-dedup.test.ts', 'lib/source-dedup.ts'],
-    suites: ['lib/collection-compile-run.test.ts', 'lib/source-dedup.test.ts'],
+    paths: ['lib/founder-test-reset-migration.test.ts', 'lib/source-dedup.test.ts', 'lib/source-dedup.ts'],
+    suites: ['lib/collection-compile-run.test.ts', 'lib/founder-test-reset-migration.test.ts', 'lib/source-dedup.test.ts'],
     browsers: [],
     rows: [],
     neighbors: ['nextjs/lib/source-dedup.tsx', 'nextjs/lib/source-fingerprint.ts', 'nextjs/lib/library-organize.ts', 'nextjs/lib/source-dedup.test.mjs'] },
