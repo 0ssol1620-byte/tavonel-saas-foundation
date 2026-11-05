@@ -95,10 +95,12 @@ import ReviewQueue from "@/components/review-queue";
 import WorldFreshness from "@/components/world-freshness";
 import FounderTestResetPanel from "@/components/founder-test-reset-panel";
 import {
+  buildReviewQueue,
   currentReviewLedger,
   readReviewLedger,
   reviewLedgerScope,
   reviewQueueDecisionInput,
+  reviewReasonsShown,
   type ReviewQueueInput,
   type ScopedReviewLedger,
 } from "@/lib/review-queue";
@@ -2736,7 +2738,6 @@ export default function WorkspacePage() {
   */
   const compileRunning = Boolean(compileJob && !["ready", "failed", "cancelled", "review_required"].includes(compileJob.state));
   const activityCount = activePipelineCount || (compileRunning ? Math.max(1, compileJob?.documentsTotal ?? 1) : 0) || (busy ? 1 : 0);
-  const reviewCount = collectionResult?.reviewReasons?.length ?? 0;
   const candidateReady = Boolean(collectionResult?.coreExecution);
   const candidateNeedsDecision = Boolean(
     collectionResult?.coreExecution && activeWorld?.manifestDigest !== collectionResult.manifestDigest,
@@ -2750,7 +2751,7 @@ export default function WorkspacePage() {
   const collectionReviewRequired = Boolean(
     collectionResult?.coreExecution?.status === "review_required" ||
     collectionResult?.validation.status === "review_required" ||
-    reviewCount > 0,
+    (collectionResult?.reviewReasons?.length ?? 0) > 0,
   );
   /*
     Everything the per-document breakdown is derived from, gathered in one place.
@@ -2773,6 +2774,8 @@ export default function WorkspacePage() {
     ...reviewQueueDecisionInput(reviewLedger),
     names,
   };
+  /* Review R3 (MAJOR-3): the count the top bar and Home print is the list the Review queue prints, one set. */
+  const reviewCount = reviewReasonsShown(buildReviewQueue(reviewQueueInput)).length;
   /*
     One derivation, in `lib/workspace-onboarding.ts`, for what state this workspace is in.
 

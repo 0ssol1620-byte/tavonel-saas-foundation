@@ -76,12 +76,26 @@ function reviewTimingCopy(row: ReviewQueueRow, decisionsRead: ReviewLedgerStatus
 /*
   Round 3 (CRITIQUE-R2 #3): a reason reads as a chip a person understands, with the string the compile
   recorded printed beside it unchanged. The chip names only the family the string itself announces -- a
-  safety stop or a reading (OCR) check -- and says nothing else; the recorded string stays the fact.
+  security or a reading (OCR) check -- and says nothing else; the recorded string stays the fact.
+  "Safety stop" is said only of the reason that excluded the row (review R3, MAJOR-3): `stopped` is true
+  for a security-blocked row's blocker reason, which lib/review-queue.ts puts first, and the status line
+  counts exclusions from the same flag -- so a chip never calls a source stopped that the line above
+  counts as not excluded. A SECURITY-coded reason on a row that was not excluded is a "Security reason".
 */
-function reasonFamily(value: string): string {
-  if (/^SECURITY/i.test(value)) return "Safety stop";
+export function reasonFamily(value: string, stopped: boolean): string {
+  if (stopped) return "Safety stop";
+  if (/^SECURITY/i.test(value)) return "Security reason";
   if (/^OCR_/.test(value)) return "Reading check";
   return "Review reason";
+}
+
+function ReasonChip({ value, family }: { value: string; family: string }) {
+  return (
+    <small className="workspace-review-reason">
+      <span>{family}</span>
+      {/\s/.test(value) ? value : <code>{value}</code>}
+    </small>
+  );
 }
 
 export default function ReviewQueue({
@@ -216,12 +230,7 @@ export default function ReviewQueue({
                 {REVIEW_QUEUE_STATUS_COPY[row.status]}
                 {row.evidenceCount > 0 ? ` · ${row.evidenceCount} evidence region${row.evidenceCount === 1 ? "" : "s"}` : ""}
               </small>
-              {row.reasons.map((value) => (
-                <small key={value} className="workspace-review-reason">
-                  <span>{reasonFamily(value)}</span>
-                  {/\s/.test(value) ? value : <code>{value}</code>}
-                </small>
-              ))}
+              {row.reasons.map((value, at) => <ReasonChip key={value} value={value} family={reasonFamily(value, row.securityBlocked && at === 0)} />)}
               {queue.decisionsRead === "ready" && !sharedTiming ? <small>{timings[index]}</small> : null}
               {onSelectDocument && row.evidenceCount > 0 ? (
                 <button
@@ -236,6 +245,12 @@ export default function ReviewQueue({
           );
         })}
       </ul>
+      {queue.worldReasons.length > 0 && reason === "" ? (
+        <div className="workspace-review-world">
+          <p className="fine">For the whole World, not one source</p>
+          {queue.worldReasons.map((value) => <ReasonChip key={value} value={value} family={reasonFamily(value, false)} />)}
+        </div>
+      ) : null}
     </div>
   );
 }

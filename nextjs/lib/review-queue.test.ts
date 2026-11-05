@@ -14,6 +14,7 @@ import {
   reviewLedgerScope,
   reviewQueueDecisionInput,
   reviewQueueReasons,
+  reviewReasonsShown,
   type ReviewLedgerFetch,
   type ReviewLedgerReadState,
   type ReviewQueueInput,
@@ -342,10 +343,29 @@ describe("the rendered queue", () => {
     const markup = renderToStaticMarkup(createElement(ReviewQueue, {
       input: { ...base, documentIds: ["doc-x", "doc-y"], blocked: [], documents: [], reviewReasons: ["SECURITY_STOP:doc-x", "OCR_LOW_TEXT_YIELD doc-y"], evidence: [], decisions: [], names: {} },
     }));
-    expect(markup).toContain(`<span>Safety stop</span><code>SECURITY_STOP:doc-x</code>`);
+    // Not excluded (blocked is empty), so not a "Safety stop": the status line would count it as not excluded.
+    expect(markup).toContain(`<span>Security reason</span><code>SECURITY_STOP:doc-x</code>`);
+    expect(markup).not.toContain("Safety stop");
     expect(markup).toContain(`<span>Reading check</span>OCR_LOW_TEXT_YIELD doc-y`);
     expect(markup.split("No review decision recorded yet").length - 1).toBe(1);
     expect(markup).toContain("No review decision recorded yet for any document below.");
+  });
+
+  /*
+    Review R3 (MAJOR-3): one card said "0 excluded by a safety check" above a "Safety stop" chip, and the top bar
+    counted two reasons over one visible chip. The chip's family now follows the same flag the exclusion count does,
+    and the number the top bar prints is reviewReasonsShown's length -- the very list the queue draws as chips.
+  */
+  it("never calls a source stopped that the status line counts as not excluded, and draws exactly the reasons it counts", () => {
+    const queue = buildReviewQueue(base);
+    const markup = renderToStaticMarkup(createElement(ReviewQueue, { input: base }));
+    const chips = [...markup.matchAll(/class="workspace-review-reason"><span>([^<]+)<\/span>/g)].map((match) => match[1]);
+    expect(chips.filter((family) => family === "Safety stop")).toHaveLength(queue.counts.excluded);
+    expect(markup).toContain(`${queue.counts.excluded} excluded by a safety check`);
+    expect(queue.worldReasons).toEqual(["GLOBAL_REASON_WITH_NO_DOCUMENT"]);
+    expect(markup).toContain("For the whole World, not one source");
+    expect(chips).toHaveLength(reviewReasonsShown(queue).length);
+    expect(reviewReasonsShown(queue)).toEqual(expect.arrayContaining(base.reviewReasons));
   });
 
   it("elides a long reason in the filter label but keeps the exact reason as its value", () => {
