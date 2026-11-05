@@ -7920,18 +7920,21 @@ test('affected operational-sli-alert-delivery owner: 4 exact paths select 8 dire
 });
 
 // W1-L7 visuals lane (PR #191): one finite owner, restated independently of the exported constants.
-import { VISUALS_AFFECTED_PATHS, VISUALS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
-test('affected visuals owner: 21 exact paths select 2 direct suites and no browser suite; neighbours stay unmapped', () => {
-  const suites = ['lib/page-metadata.test.ts', 'lib/visuals-diagrams.test.ts'];
+import { VISUALS_AFFECTED_PATHS, VISUALS_AFFECTED_UNIT_FILES, VISUALS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+// Placed in PR #194: the Home record and workspace onboarding suites and the Home, phone-Home and /product specs join.
+test('affected visuals owner: 21 exact paths select 4 direct suites and 3 browser suites; neighbours stay unmapped', () => {
+  const suites = ['lib/landing-v2-page.test.ts', 'lib/page-metadata.test.ts', 'lib/visuals-diagrams.test.ts', 'lib/workspace-onboarding.test.ts'];
+  const browsers = ['e2e/landing-v2.spec.ts', 'e2e/marketing-story.spec.ts', 'e2e/mobile-landing.spec.ts'];
+  assert.deepEqual([...VISUALS_AFFECTED_BROWSER_FILES], browsers);
   assert.deepEqual([[...VISUALS_AFFECTED_PATHS], [...VISUALS_AFFECTED_UNIT_FILES]], [['app/dev/visuals/page.tsx', 'app/dev/visuals/visuals-preview.tsx', 'components/visuals/compile-pipeline-diagram.tsx', 'components/visuals/diagram-frame.tsx', 'components/visuals/fail-closed-gate-diagram.tsx', 'components/visuals/provenance-chain-diagram.tsx', 'components/visuals/temporal-lineage-diagram.tsx', 'components/visuals/visuals.module.css', 'lib/visuals-diagrams.test.ts', 'public/visuals/MANIFEST.json', 'public/visuals/change-center-1440.webp', 'public/visuals/change-center-390.webp', 'public/visuals/compile-timeline-1440.webp', 'public/visuals/compile-timeline-390.webp', 'public/visuals/evidence-inspector-1440.webp', 'public/visuals/evidence-inspector-390.webp', 'public/visuals/sources-board-1440.webp', 'public/visuals/sources-board-390.webp', 'public/visuals/use-with-ai-1440.webp', 'public/visuals/use-with-ai-390.webp', 'scripts/visuals/capture-visuals.mjs'], suites]);
   for (const path of VISUALS_AFFECTED_PATHS) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['visuals'], path);
     const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
-    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['visuals'], [], [...suites].sort(), [], []], path);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['visuals'], [], [...suites].sort(), [...browsers].sort(), []], path);
     assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
   }
   const plan = affectedAskPlan(affectedMap(VISUALS_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
-  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[...suites].sort(), [], false, false]);
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[...suites].sort(), [...browsers].sort(), false, false]);
   for (const adjacent of ['nextjs/app/dev/visuals/layout.tsx', 'nextjs/app/dev/compile-stage/page.tsx', 'nextjs/components/visuals/index.ts', 'nextjs/components/visuals/visuals.test.tsx', 'nextjs/lib/visuals.ts', 'nextjs/public/visuals/MANIFEST.txt', 'nextjs/public/visuals/sources-board-1280.webp', 'nextjs/public/visuals/sources-board-1440.png', 'nextjs/scripts/visuals/capture-visuals.test.mjs', 'components/visuals/diagram-frame.tsx']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     if (unknown.groups.length) { assert.ok(!unknown.groups.includes('visuals'), adjacent); continue; }
