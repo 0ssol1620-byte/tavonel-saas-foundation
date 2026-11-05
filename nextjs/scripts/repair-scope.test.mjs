@@ -7918,3 +7918,30 @@ test('affected operational-sli-alert-delivery owner: 4 exact paths select 8 dire
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
 });
+
+import { ASK_QUALITY_EVAL_AFFECTED_PATHS, ASK_QUALITY_EVAL_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+// E1 ask-quality eval harness (codex/w1-e1-20261104, PR #188): fourteen exact paths, one direct suite, no browser suite.
+test('affected ask-quality-eval owner: 14 exact paths select 1 direct suite and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['eval/README.md', 'eval/ask-quality/.gitattributes', 'eval/ask-quality/.gitignore', 'eval/ask-quality/PREREG.json', 'eval/ask-quality/PREREG.v1.json', 'eval/ask-quality/README.md', 'eval/ask-quality/gen_xbrl_questions.mjs', 'eval/ask-quality/live-adapter.ts', 'eval/ask-quality/metrics.test.ts', 'eval/ask-quality/questions/human-TEMPLATE.json', 'eval/ask-quality/questions/unanswerable.json', 'eval/ask-quality/questions/xbrl-numeric.json', 'eval/ask-quality/run_eval.mjs', 'eval/ask-quality/score.ts'];
+  const suites = ['eval/ask-quality/metrics.test.ts'];
+  assert.deepEqual([[...ASK_QUALITY_EVAL_AFFECTED_PATHS], [...ASK_QUALITY_EVAL_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['ask-quality-eval'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['ask-quality-eval'], [], suites, [], []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  for (const adjacent of ['nextjs/eval/ask-quality/results/receipt.json', 'nextjs/eval/ask-quality/cache/companyfacts-0000021344.json', 'nextjs/eval/ask-quality/questions/human.json', 'nextjs/eval/ask-eval/metrics.ts', 'nextjs/eval/vitest.config.ts', 'eval/ask-quality/score.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});
+test('affected ask-quality-eval runner admits the exact registered eval suite and refuses unregistered siblings', async () => {
+  const { buildUnitArgs, validateSelectedPath } = await import('./run-repair-check.mjs');
+  const file = 'eval/ask-quality/metrics.test.ts';
+  assert.equal(validateSelectedPath(file, 'unit', process.cwd()), file);
+  assert.ok(buildUnitArgs([file], '/tmp/reviewed-ask-quality-unit.json').includes(file));
+  for (const sibling of ['eval/ask-eval/metrics.test.ts', 'eval/ask-eval/run.harness.test.ts', 'eval/ask-quality/metrics.test.tsx', 'eval/ask-quality/other.test.ts']) {
+    assert.throws(() => validateSelectedPath(sibling, 'unit', process.cwd()), /Unsupported unit path/);
+  }
+});

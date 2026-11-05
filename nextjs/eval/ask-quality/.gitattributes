@@ -1,0 +1,2 @@
+# Question sets and the prereg are pinned by sha256 of their bytes; a CRLF checkout would change the digest.
+*.json -text
