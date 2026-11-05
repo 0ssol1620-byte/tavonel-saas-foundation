@@ -61,9 +61,14 @@ export type CompileStage = {
   which is the mislabelling this row was opened about. The cut that *is* a pipeline stage takes
   its name from the constant, so that one cannot drift.
 */
+/*
+  Film re-record on design C (2026-11-05, W2): the four cuts are `hero-c1..4.mp4`, recorded frame by frame from
+  the real product UI on the published sample (the workspace's live OCR view, the World, its change view, its
+  prepared questions). The earlier `compile-cut*.mp4` files stay byte-locked under their own names.
+*/
 export const COMPILE_STAGES: readonly CompileStage[] = [
-  { id: "sources", label: "Files", line: "From the original page to extracted content and connected knowledge.", src: "/film/compile-cut.mp4", poster: "/film/poster-1.webp" },
-  { id: "read", label: PIPELINE_STAGES[2].label, line: "Related information is organized into a connected knowledge structure.", src: "/film/compile-cut-2.mp4", poster: "/film/poster-2.webp" },
-  { id: "structure", label: "Updates", line: "A changed source and its affected knowledge are shown together.", src: "/film/compile-cut-3.mp4", poster: "/film/poster-3.webp" },
-  { id: "world", label: "Use with AI", line: "An assistant, editor and terminal use the same knowledge and its citations.", src: "/film/compile-cut-4.mp4", poster: "/film/poster-4.webp" },
+  { id: "sources", label: "Files", line: "From the original page to extracted content and connected knowledge.", src: "/film/hero-c1.mp4", poster: "/film/poster-c1-t13.60-2x.webp" },
+  { id: "read", label: PIPELINE_STAGES[2].label, line: "Related information is organized into a connected knowledge structure.", src: "/film/hero-c2.mp4", poster: "/film/poster-c2-t4.40-2x.webp" },
+  { id: "structure", label: "Updates", line: "A changed source and its affected knowledge are shown together.", src: "/film/hero-c3.mp4", poster: "/film/poster-c3-t17.96-2x.webp" },
+  { id: "world", label: "Use with AI", line: "A prepared question returns the passage and the page region behind its result.", src: "/film/hero-c4.mp4", poster: "/film/poster-c4-t6.80-2x.webp" },
 ] as const;
