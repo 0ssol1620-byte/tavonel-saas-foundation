@@ -17,7 +17,6 @@ const registeredUnitTestPaths = new Set([
   'components/evaluation-page.test.tsx',
   'components/explore/evidence-workbench.test.tsx',
   'components/compile-stage-player.mobile-view.test.tsx',
-  // E1 ask-quality harness (PR #188): the one eval suite an owner selects; it is in the base include as eval/**/metrics.test.ts.
   'eval/ask-quality/metrics.test.ts',
 ]);
 const asyncRouteUnitTestPath = 'app/api/compile-jobs/route.test.ts';
