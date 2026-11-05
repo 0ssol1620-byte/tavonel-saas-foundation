@@ -117,13 +117,12 @@ export default function ReviewQueue({
         stacked paragraphs stopped reading as a log. An unread ledger is also said once, above the list,
         instead of on every row.
       */}
-      {(queue.missing.includes("compile_job") || queue.missing.includes("compile_settled_at") || historyTruncated || queue.decisionsRead !== "ready") ? (
-      <details className="workspace-review-why">
-        <summary>Why some of this is not known</summary>
       {/*
         The breakdown is only as complete as its inputs, and saying so is the whole point: a
         missing compile-job row means excluded and unread documents cannot be listed, and a
-        zero in those columns would be a lie the reader has no way to check.
+        zero in those columns would be a lie the reader has no way to check. So this one stays
+        on screen, outside the closed "Why?" (REVIEW-R2 M-1): it corrects a number, the others
+        only say something was not measured.
       */}
       {queue.missing.includes("compile_job") ? (
         <p className="fine" role="status">
@@ -131,6 +130,9 @@ export default function ReviewQueue({
           never read cannot be listed here. What is shown is what the compiled artifact carries.
         </p>
       ) : null}
+      {(queue.missing.includes("compile_settled_at") || historyTruncated || queue.decisionsRead !== "ready") ? (
+      <details className="workspace-review-why">
+        <summary>Why some of this is not known</summary>
       {queue.missing.includes("compile_settled_at") ? (
         <p className="fine" role="status">
           This compile has no settled time recorded, so time-to-first-review is not measured.

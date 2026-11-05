@@ -177,8 +177,19 @@ test("a processing-ceiling refusal names the code and the limit", async ({ page 
   // painted #fff behind a --ground label, and --ground is the white sheet in the light workspace.
   const choose = page.getByRole("button", { name: "Choose files", exact: true });
   await choose.hover();
-  const face = await choose.evaluate((element) => { const style = getComputedStyle(element); return { color: style.color, background: style.backgroundColor }; });
-  expect(face.color, "the hovered label is not painted in its own background colour").not.toBe(face.background);
+  const contrast = await choose.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const luminance = (value: string) => {
+      const [r, g, b] = (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number).map((channel) => {
+        const c = channel / 255;
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const [hi, lo] = [luminance(style.color), luminance(style.backgroundColor)].sort((a, b) => b - a);
+    return (hi + 0.05) / (lo + 0.05);
+  });
+  expect(contrast, "the hovered label meets 4.5:1 against its own fill").toBeGreaterThanOrEqual(4.5);
 });
 
 test("a refused whole-set approval ends in a sentence and a usable control, not a spinner", async ({ page }) => {

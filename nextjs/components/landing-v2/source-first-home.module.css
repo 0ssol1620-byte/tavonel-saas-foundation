@@ -451,7 +451,6 @@
     color: var(--tv-ink-muted); font: 13px/1.5 var(--f-sans);
   }
   .heroStillCaption > span:first-child { color: var(--tv-ink); font-family: var(--f-mono); font-size: 12px; }
-  .heroStillCaption > a { margin-left: auto; min-height: 44px; display: inline-flex; align-items: center; color: var(--tv-action); text-decoration: underline; text-underline-offset: 3px; }
 
   /* No rules between sections: the canvas and the blocks carry the rhythm. */
   .home.home :global(#s2 > .lv2-wrap) { padding-top: 32px; border-top: 0; }

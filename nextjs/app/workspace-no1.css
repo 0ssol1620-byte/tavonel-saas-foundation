@@ -599,7 +599,7 @@
   .one-path-workspace .workspace-complete-actions button:hover:not(:disabled) { border-color: var(--text-lo); background: var(--g2); }
   .one-path-workspace .workspace-intake-actions button:hover:not(:disabled) { background: var(--g2); border-color: var(--text-lo); }
   .one-path-workspace .workspace-intake-copy .workspace-intake-actions button:first-child:hover:not(:disabled),
-  /* REVIEW-R1 B-1: the filled ink primary darkens one step on hover. It was #fff over a --ground label, and --ground is the
+  /* REVIEW-R1 B-1: the filled ink primary lightens one step on hover (#15191d to #292f35). It was #fff over a --ground label, and --ground is the
      white sheet in the light workspace, so the label vanished. */
   .one-path-workspace .workspace-preflight .workspace-intake-actions button:first-child:hover:not(:disabled) { background: var(--text-max); border-color: var(--text-max); color: var(--tv-sheet); }
   .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy .workspace-intake-actions button:first-child:hover:not(:disabled) {

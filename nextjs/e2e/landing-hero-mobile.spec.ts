@@ -109,5 +109,8 @@ test("while the still stands in, a phone opens on the readable page and requests
   await expect(page.getByTestId("landing-hero-still")).toBeVisible();
   await expect(page.locator(FILM)).toBeHidden();
   await expect(page.getByTestId("landing-hero-still").locator("img")).toHaveJSProperty("complete", true);
+  // REVIEW-R2 MINOR-3: the still is the regions-on-the-page claim, so its boxes must render, not just the image.
+  expect(await page.locator('[data-testid="landing-hero-still"] span[aria-hidden="true"]').count(), "the still draws its region boxes").toBeGreaterThan(0);
+  await expect(page.locator('[data-testid="landing-hero-still"] span[aria-hidden="true"]').first()).toBeVisible();
   expect(posters, "no poster request on a phone while the still stands in").toEqual([]);
 });
