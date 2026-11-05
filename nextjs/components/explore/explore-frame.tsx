@@ -29,6 +29,12 @@ import { boundVisualWorld, layoutVisualWorld, toVisualWorldModel } from "@/lib/v
 const world = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
 const layout = layoutVisualWorld(world);
 const model = boundVisualWorld(world, layout.placements.map((placement) => placement.id));
+/*
+  Round 3 (CRITIQUE-R2 #8): every drawn relation is filing-to-entity, so lighting that kind at rest lit them all.
+  At rest the frame lights one object's relations instead -- the layout's first hub, which the layout derives
+  from the corpus -- and the rest stay in context at 20%. Selecting any object moves the focus, as before.
+*/
+const restFocusId = layout.placements.find((placement) => placement.role === "hub")?.id ?? null;
 
 const n = (value: number) => value.toLocaleString("en-US");
 
@@ -40,7 +46,7 @@ export default function ExploreFrame({ caption }: { caption: string }) {
         <Link className="link-verify" href={"/explore?act=world" as Route}>Open the full World</Link>
       </p>
       <div className={styles.field}>
-        <ExploreFrameCanvas model={model} layout={layout} label={caption} />
+        <ExploreFrameCanvas model={model} layout={layout} label={caption} restFocusId={restFocusId} />
       </div>
       <p className={styles.counts}>
         <span>
