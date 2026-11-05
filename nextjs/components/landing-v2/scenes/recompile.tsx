@@ -95,13 +95,18 @@ export default function Scene({
               <li key={`${arrival.form}-${arrival.filingDate}`}>
                 <span className={styles.node} aria-hidden="true" />
                 <span className={styles.when} data-derived="1">{arrival.form} · {arrival.filingDate}</span>
-                <span className={styles.what}>{locale === "ko" ? "새 문서" : "Arrived"}</span>
+                {/* Round 3 (CRITIQUE-R2 #2): the page of the filing the change record opens on, read off the record. */}
+                <span className={styles.what}>
+                  {locale === "ko" ? "새 문서" : "Arrived"}
+                  {" · "}
+                  <span data-derived="1">{locale === "ko" ? `${arrival.page}쪽` : `p.${arrival.page}`}</span>
+                </span>
               </li>
             ))}
           </ol>
-        </div>
 
-        {/* Two text links, the contract first: the selective rebuild is specified there, not run here. */}
+        {/* Two text links, the contract first: the selective rebuild is specified there, not run here.
+            Round 3: inside the panel, under the record they open, not below it. */}
         <p className={styles.actions}>
           <Link className="lv2-text-link" href={data.hrefs.contract as Route} prefetch={false} {...english}>
             {actions.contract}<span aria-hidden="true">&nbsp;→</span>
@@ -110,6 +115,7 @@ export default function Scene({
             {actions.change}<span aria-hidden="true">&nbsp;→</span>
           </Link>
         </p>
+        </div>
       </div>
     </section>
   );

@@ -55,7 +55,7 @@ vi.mock("./commercial-state", async importOriginal => {
   };
 });
 
-import LandingPage, { receiveFromCase } from "../components/landing-v2/landing-page";
+import LandingPage, { citationText, receiveFromCase } from "../components/landing-v2/landing-page";
 import HomeReaderGuide from "../components/landing-v2/home-reader-guide";
 import { compactFooterLinks } from "../components/public-site-chrome";
 import { SAMPLE_BOUNDARY } from "../components/landing-v2/scenes/start";
@@ -960,19 +960,31 @@ describe("landing v2 -- difficulty and record", () => {
     region, no links, nothing called verified. Replaces the record-and-rule test: the claim rule picked
     a 10-K fiscal-calendar disclaimer, which the critic found useless as the showcase.
   */
+  /*
+    Round 3 (CRITIQUE-R2 #2): the same record, printed as the citation an answer carries -- four Ask citation
+    fields, each value read from the record (evidence id, page, box, the reader's text unedited) -- instead of a
+    second look at s2's page. No blockquote and no page window: the passage is said once, inside the citation.
+  */
   it.each(LOCALES)("%s prints the s2 passage as the received record, unedited, with its version and region", locale => {
     const receive = sceneOf(mainOf(render(locale)), "s3");
     const korean = locale === "ko";
     const shown = receiveFromCase(selectHomeCase([buildHomeEvidenceCase(buildHeroView(), buildProofTabs())]), korean);
     expect(shown, "the published case has a passage to receive").not.toBeNull();
     const text = readable(receive);
-    const quote = receive.match(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/)?.[1];
-    expect(quote).toBe(escaped(shown!.passage) + (shown!.truncated ? "…" : ""));
+    const pre = receive.match(/<pre[^>]*>([\s\S]*?)<\/pre>/)?.[1];
+    expect(pre).toBe(escaped(citationText(shown!)));
+    expect(JSON.parse(citationText(shown!))).toEqual({
+      evidenceId: shown!.evidenceId,
+      pageNumber1: shown!.page,
+      bbox1000: [...shown!.bbox1000],
+      excerpt: shown!.passage + (shown!.truncated ? "…" : ""),
+    });
+    expect(receive).not.toContain("<blockquote");
+    expect(receive.split(escaped(JSON.stringify(shown!.passage).slice(1, -1))).length - 1, "the passage is said once").toBe(1);
     expect(text).toContain(shown!.kindLabel);
-    expect(text).toContain(shown!.unedited);
+    expect(text).toContain(shown!.citationLabel);
     expect(text).toContain(shown!.digest);
     expect(text).toContain(`bbox ${shown!.bbox1000.join(",")}`);
-    expect(receive).toContain(`data-bbox1000="${shown!.bbox1000.join(",")}"`);
     expect(shown!.passage).toMatch(/^Operating expenses:/);
     expect(elements(receive, "a")).toHaveLength(0);
     expect(text).not.toMatch(/verified answer/i);

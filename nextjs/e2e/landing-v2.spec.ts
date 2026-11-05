@@ -107,7 +107,7 @@ for (const route of ["/", "/ko"]) {
     await page.goto(route);
     const record = page.locator("#s3 article");
     await expect(record).toHaveCount(1);
-    await expect(record.locator("blockquote")).toHaveAttribute("lang", "en");
+    await expect(record.locator("pre")).toHaveAttribute("lang", "en");
     await expect(record.locator("a")).toHaveCount(0);
     await expect(record.locator("code")).toHaveText(/^sha256:[0-9a-f]{64}$/);
     const bench = page.locator(BENCH);
