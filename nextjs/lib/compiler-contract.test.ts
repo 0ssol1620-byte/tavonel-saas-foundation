@@ -377,7 +377,7 @@ describe("contract promises", () => {
     // And the verifier a holder is told to run is now one a holder can actually download.
     const shipped = readdirSync(resolve(import.meta.dirname, "../public/developer"));
     expect(shipped.filter((file) => file.toLowerCase().includes("verify")).sort())
-      .toEqual(["tavonel-verify-export.mjs", "tavonel-verify-package.mjs", "tavonel-verify-roundtrip.py"]);
+      .toEqual(["tavonel-verify-answer.mjs", "tavonel-verify-export.mjs", "tavonel-verify-package.mjs", "tavonel-verify-roundtrip.py"]);
     expect(read("../public/developer/tavonel-cli.mjs")).not.toContain("verify:export");
     expect(read("./collection-download.ts"), "the archive no longer writes the README the clause describes")
       .toContain("Verify manifest/export-manifest.json against signatures/export-manifest.ed25519.json");

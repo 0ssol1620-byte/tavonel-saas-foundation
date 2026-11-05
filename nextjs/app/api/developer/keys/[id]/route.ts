@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireFoundationSession } from "@/lib/developer-auth";
 import { revokeDeveloperApiKey } from "@/lib/developer-store";
+import { recordServerFunnel } from "@/lib/funnel-events";
+import { trialAiAccess } from "@/lib/trial-ai-access";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -11,8 +13,10 @@ const NO_STORE = { "Cache-Control": "no-store" };
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await requireFoundationSession(request, "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
-  if (auth.principal.accessSource === "trial") {
-    return NextResponse.json({ code: "TRIAL_FEATURE_NOT_INCLUDED" }, { status: 402, headers: NO_STORE });
+  const trial = await trialAiAccess(auth.principal, "key_revoke");
+  if (!trial.ok) {
+    if (trial.wouldAllow) recordServerFunnel("trial_ai_access_would_allow", { kind: "key_revoke" });
+    return NextResponse.json({ code: trial.code }, { status: trial.status, headers: NO_STORE });
   }
   const { id } = await context.params;
   if (!UUID.test(id)) return NextResponse.json({ code: "API_KEY_ID_INVALID" }, { status: 400, headers: NO_STORE });

@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
-import { createDeveloperApiKey, listDeveloperApiKeys, revokeDeveloperApiKey } from "@/lib/developer-store";
+import { recordServerFunnel } from "@/lib/funnel-events";
+import { createDeveloperApiKey, listRecentRemoteMcpKeys, revokeDeveloperApiKey } from "@/lib/developer-store";
+import { authorizeFoundationSessionProduct } from "@/lib/self-service-trial";
+import { trialAiAccessEnabled, trialMcpTokenAccess } from "@/lib/trial-ai-access";
 import {
+  REMOTE_MCP_CODE_TTL_SECONDS,
   REMOTE_MCP_TOKEN_TTL_SECONDS,
   checkTokenRequest,
+  clientTag,
   codeIdMarker,
+  cohortRefusalStatus,
   keyNameFor,
+  remoteMcpCohortRefusal,
   remoteMcpEnabled,
   remoteMcpSealingKey,
   requestOrigin,
@@ -29,7 +36,10 @@ const oauthError = (status: number, error: string, error_description: string) =>
 
   No refresh token is issued at this stage of the ladder: a client re-authorizes when the token
   expires. A second redemption of one code revokes the key the first one minted (OAuth 2.1
-  §4.1.3) and is refused.
+  §4.1.3) and is refused. A reconnect revokes the same member's earlier keys for the same client
+  (review R1 M6), so a connector holds one live key, not one per hour.
+
+  The token is a `tvnl_mcp_` key: usable through /api/mcp only (lib/remote-mcp-dispatch.ts).
 */
 export async function POST(request: Request) {
   if (!remoteMcpEnabled()) return new NextResponse(null, { status: 404 });
@@ -43,8 +53,32 @@ export async function POST(request: Request) {
   const checked = checkTokenRequest(new URLSearchParams(text), key, requestOrigin(request));
   if (!checked.ok) return oauthError(checked.status, checked.error, checked.error_description);
   const { grant } = checked;
+  // A1.0: no token outside the processing cohort, checked at minting -- not only at consent, so a
+  // workspace removed from the cohort between consent and exchange gets nothing.
+  const cohort = remoteMcpCohortRefusal(grant.workspaceKey);
+  if (cohort) {
+    return NextResponse.json(
+      { error: cohort === "REMOTE_MCP_COHORT_EXCLUDED" ? "access_denied" : "temporarily_unavailable", error_description: cohort, code: cohort },
+      { status: cohortRefusalStatus(cohort), headers: NO_STORE },
+    );
+  }
 
-  const existing = await listDeveloperApiKeys(grant.workspaceKey);
+  /*
+    Issue time, not only consent: a plan that lapsed in the code's 120 s gets nothing. A free
+    evaluation gets TRIAL_FEATURE_NOT_INCLUDED, as the consent route says, unless trial AI access
+    is on -- then W1-A2's one-live-key cap is checked here, where the key is minted (below).
+  */
+  const refuse = (code: string, status: number) => NextResponse.json(
+    { error: status >= 500 ? "temporarily_unavailable" : "access_denied", error_description: code, code },
+    { status, headers: NO_STORE },
+  );
+  const product = await authorizeFoundationSessionProduct(grant.workspaceKey, grant.userId, "observer");
+  if (!product.ok) return refuse(product.code, product.status);
+  const trial = product.access.source === "trial";
+  if (trial && !trialAiAccessEnabled()) return refuse("TRIAL_FEATURE_NOT_INCLUDED", 402);
+
+  const since = new Date(Date.now() - (REMOTE_MCP_TOKEN_TTL_SECONDS + REMOTE_MCP_CODE_TTL_SECONDS) * 1000).toISOString();
+  const existing = await listRecentRemoteMcpKeys(grant.workspaceKey, grant.userId, since);
   if (!existing.ok) return oauthError(503, "temporarily_unavailable", existing.code);
   // ponytail: list-then-mint, not a unique constraint; two simultaneous redemptions of one code by
   // the PKCE holder can both mint. Add a code ledger with a unique index if that ever matters.
@@ -52,6 +86,19 @@ export async function POST(request: Request) {
   if (replayed) {
     if (!replayed.revokedAt) await revokeDeveloperApiKey(grant.workspaceKey, grant.userId, grant.authorizationRevision, replayed.keyId);
     return oauthError(400, "invalid_grant", "The authorization code was already used.");
+  }
+  // This member's earlier live keys for this client: revoked once the new key exists, so a reconnect
+  // replaces them, and the trial cap does not count them against the key that replaces them.
+  const tag = ` ~${clientTag(grant.clientId)} `;
+  const superseded = existing.keys.filter((entry) => !entry.revokedAt && entry.name.includes(tag)
+    && (entry.expiresAt === null || Date.parse(entry.expiresAt) > Date.now()));
+  if (trial) {
+    const capped = await trialMcpTokenAccess(
+      { workspaceKey: grant.workspaceKey, userId: grant.userId, accessSource: "trial" },
+      grant.scopes,
+      superseded.map((entry) => entry.keyId),
+    );
+    if (!capped.ok) return refuse(capped.code, capped.status);
   }
 
   const minted = await createDeveloperApiKey({
@@ -61,12 +108,21 @@ export async function POST(request: Request) {
     name: keyNameFor(grant),
     scopes: grant.scopes,
     expiresAt: new Date(Date.now() + REMOTE_MCP_TOKEN_TTL_SECONDS * 1000).toISOString(),
+    audience: "mcp",
   });
   if (!minted.ok) {
     return minted.code === "AUTHORIZATION_CHANGED_RETRY"
       ? oauthError(400, "invalid_grant", "The workspace authorization changed since consent.")
       : oauthError(503, "temporarily_unavailable", minted.code);
   }
+  // The new key first, then the old ones: a failed revoke leaves an old key to its expiry (≤ 1 h), said in the log.
+  let unrevoked = 0;
+  for (const entry of superseded) {
+    const revoked = await revokeDeveloperApiKey(grant.workspaceKey, grant.userId, grant.authorizationRevision, entry.keyId);
+    if (!revoked.ok) unrevoked += 1;
+  }
+  if (unrevoked > 0) console.error(JSON.stringify({ event: "mcp_superseded_key_revoke_failed", count: unrevoked }));
+  recordServerFunnel("mcp_token_issued");
   const response: RemoteMcpTokenResponse = {
     access_token: minted.token,
     token_type: "Bearer",

@@ -30,6 +30,10 @@
       "url": "https://tavonel.com/developer/tavonel-verify-package.mjs",
       "sha256": "sha256:ca59882221bc12c65e7e9256fa942bb8a2ee2cee030a26718fddb3d1b9f5a1aa"
     },
+    "verifyAnswer": {
+      "url": "https://tavonel.com/developer/tavonel-verify-answer.mjs",
+      "sha256": "sha256:67ce0da49cee57e5440f6dbefa5a62be9b4217464c2947d9b05a1115e7cf7f8b"
+    },
     "verifyRoundtrip": {
       "url": "https://tavonel.com/developer/tavonel-verify-roundtrip.py",
       "sha256": "sha256:dc3bfbe7fda4526b54e3ef8642dbb9134f8bb1baff8b58bccefceeeb80897756"

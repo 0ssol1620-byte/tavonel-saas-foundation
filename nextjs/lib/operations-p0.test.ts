@@ -7,6 +7,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  ALERT_RECEIVER_UNCONFIGURED_LOG_INTERVAL_MS,
   LARGE_DOCUMENT_POLICY,
   OPERATIONS_ALERT_DEDUPE_WINDOW_MS,
   buildCreditRelease,
@@ -301,6 +302,31 @@ describe("operations alert delivery", () => {
     expect(operationsAlertCounters()).toMatchObject({ unconfigured: 1, delivered: 0 });
     expect(logged.mock.calls[0]?.[0]).toContain("ALERT_RECEIVER_UNCONFIGURED");
     vi.unstubAllGlobals();
+  });
+
+  it("logs a repeating unconfigured alert once per process per hour, and still counts every alert", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    for (let i = 0; i < 5; i += 1) {
+      expect(await deliverOperationsAlert(alert, startedAt + i * 60_000))
+        .toMatchObject({ ok: false, code: "ALERT_RECEIVER_UNCONFIGURED" });
+    }
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(logged.mock.calls[0]?.[0]))).toMatchObject({ code: "ALERT_RECEIVER_UNCONFIGURED", unconfiguredSinceLastLog: 1 });
+    await deliverOperationsAlert(alert, startedAt + ALERT_RECEIVER_UNCONFIGURED_LOG_INTERVAL_MS);
+    expect(logged).toHaveBeenCalledTimes(2);
+    // The hourly line says how many times this alert went nowhere since its last line: the four swallowed plus this one.
+    expect(JSON.parse(String(logged.mock.calls[1]?.[0]))).toMatchObject({ unconfiguredSinceLastLog: 5 });
+    expect(operationsAlertCounters()).toMatchObject({ unconfigured: 6, delivered: 0 });
+  });
+
+  it("never lets one unconfigured alert hide a different one: two critical alerts in the same hour both log", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    await deliverOperationsAlert({ ...alert, severity: "warning", summary: "Compile job settled failed in pilot-a" }, startedAt);
+    await deliverOperationsAlert({ ...alert, severity: "critical", summary: "RunPod spend today is over the daily cap" }, startedAt + 38 * 60_000);
+    await deliverOperationsAlert({ ...alert, severity: "critical", summary: "Remote MCP 5xx spike on this instance" }, startedAt + 39 * 60_000);
+    expect(logged.mock.calls.map((call) => JSON.parse(String(call[0])).summary)).toEqual([
+      "Compile job settled failed in pilot-a", "RunPod spend today is over the daily cap", "Remote MCP 5xx spike on this instance",
+    ]);
   });
 
   it("posts the envelope once and suppresses a repeat inside the dedupe window", async () => {
