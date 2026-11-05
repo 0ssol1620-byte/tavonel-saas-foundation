@@ -1,3 +1,4 @@
+import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { existsSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 
@@ -134,6 +135,7 @@ async function watchAutoAdvance(page: Page, advances: number, before?: () => Pro
 for (const [width, height, views] of [[390, 844, ["fit", "focus"]], [430, 932, ["fit"]]] as const) {
   for (const path of ["/", "/ko"]) for (const view of views) {
     test(`with motion on, three auto-advances leave the phone film where it was (${path} ${width}x${height}, ${view})`, async ({ page }, testInfo) => {
+      test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
       test.skip(testInfo.project.name !== "390", "sets its own viewport");
       test.setTimeout(180_000);
       await page.setViewportSize({ width, height });
@@ -164,6 +166,7 @@ for (const [width, height, views] of [[390, 844, ["fit", "focus"]], [430, 932, [
   the watch can see nothing.
 */
 test("the watch records the shift when the row above the frame changes height by stage (detector)", async ({ page }, testInfo) => {
+  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   test.skip(testInfo.project.name !== "390", "sets its own viewport");
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -216,6 +219,7 @@ function expectOneTop(tops: number[], label: string) {
 }
 
 test("from 768px to the edge of Fit the frame top is the same on every stage", async ({ page }, testInfo) => {
+  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   test.skip(testInfo.project.name !== "390", "sets its own viewports");
   test.setTimeout(120_000);
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -232,6 +236,7 @@ test("from 768px to the edge of Fit the frame top is the same on every stage", a
 });
 
 test("webkit: the frame top is the same on every stage from 360px to the edge of Fit", async ({ playwright, baseURL }, testInfo) => {
+  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   test.skip(testInfo.project.name !== "390", "sets its own viewports");
   test.skip(!existsSync(playwright.webkit.executablePath()), "WebKit is not installed in this runner (playwright install webkit)");
   test.setTimeout(240_000);
@@ -252,4 +257,23 @@ test("webkit: the frame top is the same on every stage from 360px to the edge of
     await testInfo.attach("band-frame-tops-webkit", { body: JSON.stringify(measured, null, 2), contentType: "application/json" });
     await browser.close();
   }
+});
+
+/*
+  Direction C round 2 (lib/hero-phone-mode.ts): while the Inspector still stands in for the film below 900px, the phone
+  hero is a still image, and what this file guards -- the first screen not moving under the reader -- is checked on it:
+  its top edge is where it was after load and three seconds later. Skips itself once the film returns.
+*/
+test("while the still stands in, the phone hero holds its place after load", async ({ page }, testInfo) => {
+  test.skip(!["360", "390"].includes(testInfo.project.name), "phone composition");
+  test.skip(!phoneShowsStill(testInfo.project.name), "the film is the phone hero");
+  await page.goto("/", { waitUntil: "load" });
+  const still = page.getByTestId("landing-hero-still");
+  await expect(still).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  const before = (await still.boundingBox())!;
+  await page.waitForTimeout(3000);
+  const after = (await still.boundingBox())!;
+  expect(Math.abs(after.y - before.y), "the still's top edge moved").toBeLessThanOrEqual(1);
+  expect(Math.abs(after.height - before.height), "the still's height changed").toBeLessThanOrEqual(1);
 });

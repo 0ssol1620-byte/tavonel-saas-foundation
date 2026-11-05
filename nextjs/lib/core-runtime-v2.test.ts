@@ -9,6 +9,7 @@ import {
 import { validateDownloadableCollectionArtifact, validatePromotableCollectionArtifact } from "./collection-download";
 import { CONTRACT_CLAUSES, clause } from "./compiler-contract";
 import {
+  CORE_V2_MAX_REQUEST_BYTES,
   CORE_V2_REVISION_COMPILE_FLAG,
   PRODUCT_CORE_RESPONSE_SCHEMA,
   buildProductCoreV2Request,
@@ -153,6 +154,25 @@ async function candidateFixture() {
 }
 
 describe("Python Product-Core v2 dispatch", () => {
+  it("refuses a request over the platform's body bound by name, without calling the Core", async () => {
+    const fetchCore = vi.fn();
+    vi.stubGlobal("fetch", fetchCore);
+    const [first] = inputs();
+    const region = first!.regions![0]!;
+    // 30,000 regions of 120 characters: about 9 MB of request, twice the bound.
+    const regions = Array.from({ length: 30_000 }, (_, index) => ({ ...region, regionId: `native-${index}`, order: index,
+      text: "x".repeat(120) }));
+    const result = await dispatchProductCoreV2({ url: "https://core-v2.example", hmac: "x".repeat(32) }, "pilot",
+      [{ ...first!, regions }]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("COMPILE_INPUT_TOO_LARGE");
+      expect(result.sizeLimit).toMatchObject({ object: "core-request", bound: CORE_V2_MAX_REQUEST_BYTES });
+      expect(result.sizeLimit!.bytes).toBeGreaterThan(CORE_V2_MAX_REQUEST_BYTES);
+    }
+    expect(fetchCore).not.toHaveBeenCalled();
+  });
+
   it("uses a dedicated v2 HMAC so the v1 fallback can rotate independently", () => {
     vi.stubEnv("FOUNDATION_CORE_V2_URL", "https://core-v2.example");
     vi.stubEnv("FOUNDATION_CORE_HMAC", "v1-secret-that-must-not-be-reused".repeat(2));

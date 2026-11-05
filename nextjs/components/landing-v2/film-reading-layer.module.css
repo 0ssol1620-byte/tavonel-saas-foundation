@@ -64,11 +64,16 @@
   under the label only; 44px is the tap target in both directions. Below 900px nothing changes.
 */
 @media (min-width: 900px) {
+  /* Direction C (2026-11-04): one segmented control, as wide as its four chapters and centred over the
+     frame; the selected chapter is a white pill (source-first-home.module.css), not an underline. */
   .tabs {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-start;
-    gap: 0 36px;
+    justify-self: center;
+    width: max-content;
+    max-width: 100%;
+    gap: 4px;
     border-block: 0;
   }
 
@@ -76,7 +81,7 @@
     flex: none;
     min-width: 44px;
     min-height: 44px;
-    padding-inline: 0;
+    padding-inline: 18px;
     border-left: 0;
   }
 }

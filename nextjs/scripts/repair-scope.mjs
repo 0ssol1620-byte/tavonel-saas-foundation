@@ -1915,6 +1915,22 @@ export const OCR_PAGES_INCOMPLETE_AFFECTED_PATHS = Object.freeze([
 export const OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/documents-route.test.ts', 'lib/operations-p0.test.ts', 'lib/processing-receipts.test.ts',
 ]);
+// OCR JSON read bound (cjob-1e8b7a0e, 2026-11-04): the seven endpoints no owner listed -- the R2 JSON reader and the bounded
+// body reader it uses, their suites, the job store's event writer, and the candidates route with its access suite. Direct
+// suites: every suite that drives one of those modules for real (the R2 reader's consumers, the body reader's other caller,
+// the compile run, worker and Core dispatch that carry its size refusal, the cross-tree pin of the bound, and the three
+// suites that drive the store's job-event insert). Product code, so never nativeReuse.
+export const OCR_JSON_BOUND_AFFECTED_PATHS = Object.freeze([
+  'app/api/documents/[id]/candidates/route.ts', 'lib/bounded-source-body.test.ts', 'lib/bounded-source-body.ts',
+  'lib/compile-job-store.ts', 'lib/document-derived-route-access.test.ts', 'lib/r2-objects.test.ts', 'lib/r2-objects.ts',
+]);
+export const OCR_JSON_BOUND_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/bounded-source-body.test.ts', 'lib/collection-compile-run.test.ts', 'lib/compile-job-migration.test.ts',
+  'lib/compile-job-scheduling.test.ts', 'lib/compile-job-worker.test.ts', 'lib/core-runtime-v2.test.ts',
+  'lib/corpus-batching.test.ts', 'lib/document-derived-route-access.test.ts', 'lib/documents-route.test.ts',
+  'lib/global-collection-compile.test.ts', 'lib/intake-ceiling-cross-tree.test.ts', 'lib/r2-objects.test.ts',
+  'lib/source-import.test.ts', 'lib/tenant-isolation-negative.test.ts', 'lib/world-rollback-source-access.test.ts',
+]);
 // EN-0c benchmarks path mask: /benchmarks masks an absolute scoring-machine path in the Model Arena notes at render time
 // (the artifact and its pinned sha256 are unchanged). The four endpoints no owner listed select their two direct suites plus
 // the five that read the changed files: benchmark-registry, brand-copy, copy-trust-guard and trust-page-answers read the page
@@ -2449,6 +2465,8 @@ const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}(
 // holds since PR #159 stay with that owner). They add their direct suites below and the
 // templates, type-scale, site-alignment, brand-tokens, benchmarks, film-line and solutions browser suites, each with its reviewed
 // project row in run-repair-check.mjs. Still exact paths, no wildcard and no default owner.
+// Direction C (PR #183, 2026-11-04): /login's layout (its light viewport) and the explore frame on /product join as exact
+// paths (135 -> 137), the same direct suites and browser specs; no suite or spec is added.
 export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "docs/gtm/CLAIMS_REGISTRY.yaml",
   "nextjs/app/arena/page.tsx",
@@ -2473,6 +2491,7 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/app/ko/pricing/pricing.module.css",
   "nextjs/app/landing-v2.css",
   "nextjs/app/layout.tsx",
+  "nextjs/app/login/layout.tsx",
   "nextjs/app/not-found.tsx",
   "nextjs/app/paper-product.css",
   "nextjs/app/product/compiled-world/page.tsx",
@@ -2492,9 +2511,11 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/components/evaluation-page.module.css",
   "nextjs/components/evidence/region-highlight.module.css",
   "nextjs/components/explore/evidence-workbench.module.css",
+  "nextjs/components/explore/explore-frame.module.css",
   "nextjs/components/explore/explore-stage.module.css",
   "nextjs/components/font-outline-probe.tsx",
   "nextjs/components/landing-v2/hero-statement.tsx",
+  "nextjs/components/landing-v2/hero-still.tsx",
   "nextjs/components/landing-v2/home-measurement.tsx",
   "nextjs/components/landing-v2/scenes/recompile.module.css",
   "nextjs/components/landing-v2/scenes/recompile.tsx",
@@ -2560,6 +2581,7 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/lib/brand-copy.test.ts",
   "nextjs/lib/brand-tokens.test.ts",
   "nextjs/lib/funnel-events.ts",
+  "nextjs/lib/hero-phone-mode.ts",
   "nextjs/lib/landing-v2-hero-statement.test.ts",
   "nextjs/lib/landing-v2-motion.test.ts",
   "nextjs/lib/landing-v2-recompile.test.ts",
@@ -2763,7 +2785,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('docs', /^(?:README\.md|nextjs\/(?:README\.md|lib\/(?:docs-[a-z-]+|retrieval-docs-parity)(?:\.test)?\.ts|app\/docs\/.+|components\/docs\/.+|e2e\/docs-reading-layout\.spec\.ts))$/,
     { unitFiles: ['lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/retrieval-docs-parity.test.ts'], browserFiles: ['e2e/docs-reading-layout.spec.ts'], nativeReuse: true }),
   // The directory lens reuses the unchanged navigation helper; only this exact source dependency joins lifecycle checks.
-  affectedGroup('workspace-lifecycle', /^nextjs\/(?:app\/workspace\/.+|components\/(?:world-studio-ultimate|world-directory-tree|world-ontology-viewer|world-graph-canvas|workspace-ultimate-shell)(?:\.module\.css|\.tsx)|components\/world-visual\/.+|lib\/(?:visual-world-model|world-graph-layout|workspace-failure-copy|world-directory-and-ontology)(?:\.test)?\.ts|lib\/world-explorer-navigation\.ts|e2e\/world-lifecycle\.spec\.ts)$/,
+  // app/workspace-no1.css is the workspace shell's global sheet (scoped to .one-path-workspace), the twin of the shell module
+  // app/workspace/workspace-ultimate.module.css already owned here; it joins by exact path (direction C, PR #183).
+  affectedGroup('workspace-lifecycle', /^nextjs\/(?:app\/workspace\/.+|app\/workspace-no1\.css|components\/(?:world-studio-ultimate|world-directory-tree|world-ontology-viewer|world-graph-canvas|workspace-ultimate-shell)(?:\.module\.css|\.tsx)|components\/world-visual\/.+|lib\/(?:visual-world-model|world-graph-layout|workspace-failure-copy|world-directory-and-ontology)(?:\.test)?\.ts|lib\/world-explorer-navigation\.ts|e2e\/world-lifecycle\.spec\.ts)$/,
     { unitFiles: ['lib/world-directory-and-ontology.test.ts', 'lib/visual-world-model.test.ts', 'lib/world-graph-layout.test.ts', 'lib/workspace-failure-copy.test.ts'], browserFiles: ['e2e/world-lifecycle.spec.ts'], nativeReuse: true }),
   // Grounded Ask: exactly eight paths. Overlaps acl on ask-route-limits.test.ts and workspace-lifecycle on app/workspace/page.tsx;
   // both keep their own selections. Product Ask behavior, so never nativeReuse: any match requires the fresh native run.
@@ -2865,6 +2889,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // OCR_PAGES_INCOMPLETE: the four exact paths above select three direct suites and no browser suite.
   affectedGroup('ocr-pages-incomplete-code', new RegExp(`^nextjs/(?:${exactPathAlternation(OCR_PAGES_INCOMPLETE_AFFECTED_PATHS)})$`),
     { unitFiles: OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES }),
+  // OCR JSON read bound: the seven exact paths above select fifteen direct suites and no browser suite.
+  affectedGroup('ocr-json-bound', new RegExp(`^nextjs/(?:${exactPathAlternation(OCR_JSON_BOUND_AFFECTED_PATHS)})$`),
+    { unitFiles: OCR_JSON_BOUND_AFFECTED_UNIT_FILES }),
   // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.
   affectedGroup('benchmarks-path-mask', new RegExp(`^nextjs/(?:${exactPathAlternation(BENCHMARKS_PATH_MASK_AFFECTED_PATHS)})$`),
     { unitFiles: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES }),

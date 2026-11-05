@@ -1,3 +1,4 @@
+import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { expect, test } from "@playwright/test";
 
 const FILMS = ["/film/compile-cut.mp4", "/film/compile-cut-2.mp4", "/film/compile-cut-3.mp4", "/film/compile-cut-4.mp4"];
@@ -13,6 +14,7 @@ async function dismissConsent(page: import("@playwright/test").Page) {
 }
 
 test("the title leads directly into four selectable and playing demo recordings", async ({ page }, testInfo) => {
+  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   // Four cold decoders share one case; preserve the per-film progress assertions.
   test.setTimeout(60_000);
   await page.goto("/");
@@ -74,6 +76,7 @@ test("the title leads directly into four selectable and playing demo recordings"
 });
 
 test("reduced motion keeps four stages static until explicitly played", async ({ page }, testInfo) => {
+  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await dismissConsent(page);
@@ -86,4 +89,22 @@ test("reduced motion keeps four stages static until explicitly played", async ({
   await play.click();
   await expect.poll(() => film.locator("video").evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(1);
   await expect(film.getByRole("button", { name: "Pause the compilation film", exact: true })).toBeVisible();
+});
+
+/*
+  Direction C round 2 (lib/hero-phone-mode.ts): while the Inspector still stands in below 900px, the phone's title leads
+  directly into it -- headline, support, actions, then the committed page -- where the two checks above wait for the film.
+*/
+test("while the still stands in, a phone's title leads directly into the readable page", async ({ page }, testInfo) => {
+  test.skip(!["360", "390"].includes(testInfo.project.name), "phone composition");
+  test.skip(!phoneShowsStill(testInfo.project.name), "the film is the phone hero");
+  await page.goto("/");
+  const still = page.locator('#s1 [data-testid="landing-hero-actions"] ~ figure[data-testid="landing-hero-still"]');
+  await expect(still).toBeVisible();
+  const [title, actions, figure] = await Promise.all([
+    page.locator("#s1 h1").boundingBox(), page.getByTestId("landing-hero-actions").boundingBox(), still.boundingBox(),
+  ]);
+  expect(title!.y).toBeLessThan(actions!.y);
+  expect(actions!.y + actions!.height).toBeLessThanOrEqual(figure!.y);
+  expect(figure!.y, "the still starts on the first screen").toBeLessThan(page.viewportSize()!.height);
 });

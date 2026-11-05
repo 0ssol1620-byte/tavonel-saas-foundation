@@ -142,6 +142,7 @@ export function SourceRegionWindow({
   sizes,
   marginPx = CROP_MARGIN_PX,
   className,
+  markClassName,
 }: {
   /** The committed page raster's derivative set (`landingV2PageImage`). */
   image: { src: string; width: number; height: number; srcSet: string; avifSrcSet: string };
@@ -149,6 +150,8 @@ export function SourceRegionWindow({
   sizes: string;
   marginPx?: number;
   className?: string;
+  /** Draws the cited box itself inside a wider window (Home s3, round 2); the window is the page around it. */
+  markClassName?: string;
 }) {
   if (!isSourceRegionBox(bbox1000)) return null;
   const mx = (1000 * marginPx) / image.width;
@@ -180,6 +183,15 @@ export function SourceRegionWindow({
           style={{ left: `${(-100 * x0) / w}%`, top: `${(-100 * y0) / h}%`, width: `${1e5 / w}%`, height: `${1e5 / h}%` }}
         />
       </picture>
+      {markClassName ? (
+        <span
+          className={markClassName}
+          style={{
+            left: `${(100 * (bbox1000[0]! - x0)) / w}%`, top: `${(100 * (bbox1000[1]! - y0)) / h}%`,
+            width: `${(100 * (bbox1000[2]! - bbox1000[0]!)) / w}%`, height: `${(100 * (bbox1000[3]! - bbox1000[1]!)) / h}%`,
+          }}
+        />
+      ) : null}
     </span>
   );
 }

@@ -138,9 +138,13 @@ export const SAMPLE_CTA = { href: EXPLORE_CTA.href, label: "Open the compiled sa
  * Compiler for AI.") as a noun, not an outcome. The category moved to the eyebrow above the H1,
  * and the OG card, Twitter card and Home tab title read this constant. Taken under the founder's
  * 2026-10-03 delegated authority with the founder veto open (RESUME-20261015-LEDGER.md).
+ *
+ * Direction C (2026-11-04): the sentence leads with the outcome. "Turn documents into context ..." read as
+ * the same construction as a competitor's "Turn documents into data." (CRITIQUE-2026-11-04); the claim is
+ * unchanged -- context an AI can cite, compiled from the reader's documents -- and carries no figure.
  */
 export const BRAND_LINE = {
-  headline: "Turn documents into context your AI can cite.",
+  headline: "Context your AI can cite, compiled from your documents.",
   descriptor: "Knowledge compiled with a traceable path back to every source.",
 } as const;
 

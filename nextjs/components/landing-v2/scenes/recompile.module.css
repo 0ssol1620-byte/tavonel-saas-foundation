@@ -8,38 +8,27 @@
   selector, outside .lv2-demo-stage. Reusing those class names in a static scene would import a
   16-second loop into a scene that has no timeline; the markup reuses the primitives instead.
 
-  One panel on the dark surface: what arrived on the left, what the comparison measured on the
-  right. Below 900 the two stack in reading order -- what arrived, then what it did.
+  Direction C (2026-11-04): one sand block on the warm canvas, holding what arrived. The dark
+  instrument panel and its three counts left with the obsidian ground (see recompile.tsx). At 900 and
+  up the filings run as a two-column ledger; below it they stack.
 */
 
 .panel {
   display: grid;
-  gap: 24px;
+  gap: 16px;
   min-width: 0;
   margin-top: 32px;
-  padding: 20px;
-  border: 1px solid var(--tv-rule-inst);
-  border-radius: var(--tv-r-media);
-  background: var(--tv-inst-2);
-  color: var(--tv-on-inst);
+  padding: 24px 20px;
+  border-radius: var(--tv-r-card);
+  background: var(--tv-sand);
+  color: var(--tv-ink);
 }
 
 @media (min-width: 900px) {
   .panel {
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    gap: 24px;
-    margin-top: 64px;
-    padding: 32px;
+    margin-top: 48px;
+    padding: 36px 40px 40px;
   }
-}
-
-/* ------------------------------------------------------------------------------ what arrived */
-
-.arrivals {
-  display: grid;
-  align-content: start;
-  gap: 8px;
-  min-width: 0;
 }
 
 .panelLabel {
@@ -47,102 +36,64 @@
   font-size: var(--home-meta-fs, 13px);
   line-height: 1.5;
   font-weight: 560;
-  color: var(--tv-on-inst-muted);
-}
-
-.arrivalList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.arrivalList li {
-  display: flex;
-  align-items: center;
-  min-height: 40px;
-  border-top: 1px solid var(--tv-rule-inst);
-  font-family: var(--tv-font-mono);
-  font-size: 13px;
-  line-height: 1.45;
-  color: var(--tv-on-inst);
-}
-
-/* ------------------------------------------------------------------------- what it measured */
-
-.counts {
-  display: grid;
-  align-content: start;
-  gap: 24px;
-  min-width: 0;
-}
-
-.countList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 16px;
-}
-
-@media (min-width: 900px) {
-  .countList {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 24px;
-  }
-}
-
-.count {
-  display: grid;
-  gap: 8px;
-  align-content: start;
-}
-
-.count b {
-  font-size: var(--lv2-fs-figure);
-  line-height: 1;
-  font-weight: 510;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-
-.count span {
-  font-size: var(--home-meta-fs, 13px);
-  line-height: 1.5;
-  color: var(--tv-on-inst-muted);
+  color: var(--tv-ink-muted);
 }
 
 /*
-  Amber is the changed partition and the only accent on this panel; the objects the diff added are
-  the neutral ink (every node in this World is `candidate`, so nothing here is verified), and the
-  objects nothing reached are the muted ink.
+  Round 2: a horizontal timeline from 900px (five equal stops on one rule), a vertical one below it (the rule
+  runs down the left, through each node). The origin node is filled ink; an arrival is a ring in the accent.
 */
-.rebuilt b {
-  color: var(--tv-changed-on-dark);
-}
-
-.added b {
-  color: var(--tv-on-inst);
-}
-
-.removed b,
-.untouched b {
-  color: var(--tv-on-inst-muted);
-}
-
-.compared {
+.timeline {
+  list-style: none;
   margin: 0;
-  font-size: 15px;
-  line-height: 1.5;
-  color: var(--tv-on-inst);
-  max-width: 60ch;
+  padding: 0;
+  display: grid;
 }
+.timeline li {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 0 0 20px 28px;
+}
+.timeline li::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 14px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--tv-sand-2);
+}
+.timeline li:last-child { padding-bottom: 0; }
+.timeline li:last-child::before { display: none; }
+.node {
+  position: absolute;
+  left: 0;
+  top: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--tv-sheet);
+  box-shadow: inset 0 0 0 3px var(--tv-action);
+}
+.origin .node { box-shadow: none; background: var(--tv-ink); }
+.when {
+  font-family: var(--tv-font-mono);
+  font-size: 14px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  color: var(--tv-ink);
+  overflow-wrap: anywhere;
+}
+.what { font-size: 13px; line-height: 1.45; color: var(--tv-ink-muted); }
 
-.qualifier {
-  margin: -16px 0 0;
-  font-size: var(--home-meta-fs, 13px);
-  line-height: 1.5;
-  color: var(--tv-on-inst-muted);
-  max-width: 60ch;
+@media (min-width: 900px) {
+  .timeline { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  .timeline li { padding: 30px 16px 0 0; }
+  .timeline li::before { left: 0; right: 0; top: 6px; bottom: auto; width: auto; height: 2px; }
+  .timeline li:last-child::before { display: none; }
+  .node { top: 0; }
 }
 
 /* ------------------------------------------------------------------------------- the actions */

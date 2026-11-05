@@ -1,6 +1,6 @@
 /* Product execution plan: readable paper, genuine source positions, restrained ink. */
 .paper-product {
-  --ground: #f7f5ef; --g2: #fff; --g3: #f0f1ec; --ink-950: #f7f5ef;
+  --ground: var(--tv-canvas); --g2: #fff; --g3: #f0f1ec; --ink-950: var(--tv-canvas);
   --text-hi: #171c20; --text-mid: #46545e; --text-lo: #53606a;
   --hairline: #d8ddd9; --hairline-hi: #88928d;
   --source: var(--tv-action); --verified: var(--tv-verified); --verified-dim: #5e8872;
@@ -74,7 +74,7 @@
 .paper-purchase-boundary p { font-size:15px; line-height:1.65; color:#53606a; margin:8px 0; }
 .paper-purchase-boundary a { color:var(--tv-action); text-decoration:underline; }
 @media(max-width:760px) { .evaluation-shell { padding:32px 20px 48px; } .evaluation-grid { grid-template-columns:1fr; gap:24px; } .evaluation-form { padding:20px 16px; } }
-.paper-product .nav.chrome-v2-header[data-scrolled="1"] { background:#f7f5ef; border-bottom-color:#d8ddd9; }
+.paper-product .nav.chrome-v2-header[data-scrolled="1"] { background:var(--tv-canvas); border-bottom-color:#d8ddd9; }
 /* UX-L2 (UX-PLAN-2026-10-17 §4.5, R1): no measure of its own; the site's one container (app/chrome-v2.css) applies here too. */
 .paper-product { --ink-900:#fff; --ink-850:#f0f1ec; --border-dark:#d8ddd9; --border-dark-hi:#88928d; }
 .paper-product .nav .btn { color:#fff; background:var(--tv-action); border-color:var(--tv-action); }
@@ -114,11 +114,12 @@
 .pricing-page .paper-purchase-boundary p { font-size: 14px; line-height: 1.5; }
 .pricing-page .pricing-utility-links { display: flex; flex-wrap: wrap; gap: 0 16px; margin-top: 4px; font-size: 14px; }
 .pricing-page .pricing-utility-links a { min-height: 44px; text-underline-offset: 4px; }
-.pricing-page .plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(4, auto); gap: 0; margin-top: 0; border-block: 1px solid #88928d; border-radius: 0; background: transparent; overflow: visible; }
-.pricing-page .plan { position: relative; display: grid; grid-template-rows: subgrid; grid-row: span 4; gap: 20px; padding: 24px 20px; border: 0; border-right: 1px solid #d8ddd9; border-radius: 0; background: transparent; box-shadow: none; }
+/* Direction C (2026-11-04): the four plans are one white sheet on the warm shadow, divided by hairlines; the featured plan keeps its accent rule, clipped to the sheet's corner. */
+.pricing-page .plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(4, auto); gap: 0; margin-top: 0; border: 0; border-radius: var(--tv-r-card); background: var(--tv-sheet); box-shadow: var(--tv-shadow-1); overflow: hidden; }
+.pricing-page .plan { position: relative; display: grid; grid-template-rows: subgrid; grid-row: span 4; gap: 20px; padding: 32px 28px 28px; border: 0; border-right: 1px solid var(--tv-rule); border-radius: 0; background: transparent; box-shadow: none; }
 .pricing-page .plan:last-child { border-right: 0; }
-.pricing-page .plan[data-featured="1"] { background: transparent; border-color: #d8ddd9; }
-.pricing-page .plan[data-featured="1"]::before { content: ""; position: absolute; inset: -1px 0 auto; height: 3px; background: var(--tv-action); }
+.pricing-page .plan[data-featured="1"] { background: transparent; border-color: var(--tv-rule); }
+.pricing-page .plan[data-featured="1"]::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px; background: var(--tv-action); }
 .pricing-page .plan-head h2 { margin: 0 0 12px; font-size: 20px; line-height: 1.3; }
 .pricing-page .plan .price { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 8px; margin: 0; color: #171c20; font: 550 clamp(36px, 3vw, 44px)/1.15 var(--f-sans); letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
 .pricing-page .plan .price-currency { font-size: 14px; font-weight: 450; letter-spacing: 0; }
@@ -131,7 +132,7 @@
 @media (max-width: 1023px) {
   .pricing-page .plans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pricing-page .plan:nth-child(2) { border-right: 0; }
-  .pricing-page .plan:nth-child(n + 3) { border-top: 1px solid #d8ddd9; }
+  .pricing-page .plan:nth-child(n + 3) { border-top: 1px solid var(--tv-rule); }
 }
 @media (max-width: 760px) {
   .pricing-page .pricing-context { grid-template-columns: 1fr; gap: 12px; margin-block: 12px 16px; }
@@ -141,6 +142,6 @@
 }
 @media (max-width: 600px) {
   .pricing-page .plans { grid-template-columns: 1fr; grid-template-rows: none; }
-  .pricing-page .plan { grid-template-rows: auto; grid-row: auto; gap: 14px; padding: 20px 0; border-right: 0; }
-  .pricing-page .plan + .plan { border-top: 1px solid #d8ddd9; }
+  .pricing-page .plan { grid-template-rows: auto; grid-row: auto; gap: 14px; padding: 24px 20px; border-right: 0; }
+  .pricing-page .plan + .plan { border-top: 1px solid var(--tv-rule); }
 }

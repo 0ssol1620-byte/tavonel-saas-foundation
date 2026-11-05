@@ -1,3 +1,4 @@
+import { PHONE_HERO, PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
@@ -77,7 +78,8 @@ test("reduced-motion hero actions have no pointer press transform", async ({ pag
 
 test("the restored hero keeps its title, stages and actions at seven widths", async ({ page }, testInfo) => {
   const layouts = [];
-  for (const width of [1920, 1440, 1280, 1024, 768, 390, 360]) {
+  // While lib/hero-phone-mode.ts says "still", the film is not displayed at 900px and below (CRITIQUE-R1 #1 interim).
+  for (const width of [1920, 1440, 1280, 1024, 768, 390, 360].filter(value => PHONE_HERO !== "still" || value > 900)) {
     await page.setViewportSize({ width, height: width < 768 ? 844 : width === 1440 ? 900 : 1000 });
     await page.goto("/");
     const consent = page.getByRole("button", { name: "No thanks", exact: true });
@@ -104,12 +106,13 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
     });
     expect(geometry.overflow).toBe(false);
     if (width >= 900) {
-      // Release 2: a compact left-aligned tab group, labels 32-40px apart.
+      // Release 2: a compact left-aligned tab group. Direction C (2026-11-04) draws it as one segmented track on the sand,
+      // so the labels are padded segments 2-8px apart (4px as built) rather than bare labels 32-40px apart.
       const rects = geometry.tabs.map(tab => tab.rect);
       for (let i = 1; i < rects.length; i++) {
         const gap = rects[i]!.left - rects[i - 1]!.right;
-        expect(gap).toBeGreaterThanOrEqual(32);
-        expect(gap).toBeLessThanOrEqual(40);
+        expect(gap).toBeGreaterThanOrEqual(2);
+        expect(gap).toBeLessThanOrEqual(8);
       }
       for (const rect of rects) expect(rect.width).toBeGreaterThanOrEqual(44);
     }
@@ -147,7 +150,7 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
     }
     await page.emulateMedia({ reducedMotion: "no-preference" });
   }
-  for (const width of [1440, 390]) {
+  for (const width of [1440, 390].filter(value => PHONE_HERO !== "still" || value > 900)) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
     await page.goto("/ko");
     const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
@@ -350,6 +353,8 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
       panel, scanned in phonePaneScan), 9.49px. Phone legibility of the pane is still a person's judgment on the
       founder's device (spec §9 #27); `smallestXHeight` is the stage's desktop crop window's, a proxy for the pane's.
     */
+    // The narrow half (800 and 390) waits for the film's return below 900px; see lib/hero-phone-mode.ts.
+    if (PHONE_HERO === "still") return;
     await page.setViewportSize({ width: 800, height: 1024 });
     await page.goto("/");
     const band = page.locator(FILM);
@@ -654,6 +659,7 @@ const LCP_FLOOR: Record<string, Record<string, Record<number, number>>> = {
 };
 for (const path of ["/", "/ko"]) {
   test(`a phone opens compact on the whole frame, and Focus details opens the stage's source pane with its tabs directly above it, on the first screen (${path})`, async ({ page, browserName }, testInfo) => {
+    test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     test.skip(testInfo.project.name !== "390", "sets its own viewports");
     test.setTimeout(120_000);
     await page.emulateMedia({ reducedMotion: "reduce" });

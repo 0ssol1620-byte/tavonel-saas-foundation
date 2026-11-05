@@ -50,6 +50,8 @@ export default function ProductPage() {
             <div>
               <p>{outcome.body}</p>
               {outcome.href === "/evidence" && region && source ? <figure className={styles.proof}>
+                {/* CRITIQUE-R1 #6: the passage as the reader returned it, in the sample columns' grammar; never re-set as a table. */}
+                <p className={styles.proofLabel}>Reader output, unedited</p>
                 <blockquote>{region.passage}{region.passageTruncated ? " …" : ""}</blockquote>
                 <figcaption>{source.filename} · page {region.page} · <code>{source.digest.slice(0, 12)}</code>
                   <span>Extracted public sample. Context unresolved; no interpreted claim.</span>

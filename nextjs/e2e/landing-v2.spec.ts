@@ -1,3 +1,4 @@
+import { PHONE_HERO, PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 /** Active source-led Home contract. Retired specimen timers are outside this route. */
 import { test, expect, type Page } from "@playwright/test";
 const BENCH = "#s2 article[data-case-status]";
@@ -18,7 +19,8 @@ async function visibleFilm(page: Page) {
   return page.locator(FILM);
 }
 for (const route of ["/", "/ko"]) {
-  test(`${route} offers the next action before the source and difficult context`, async ({ page }) => {
+  test(`${route} offers the next action before the source and difficult context`, async ({ page }, testInfo) => {
+    test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     await page.goto(route);
     const actions = await page.locator("#s1 .lv2-actions").boundingBox();
     const bench = await page.locator(BENCH).boundingBox();
@@ -162,7 +164,7 @@ test("keeps the English brand line as the single H1", async ({ page }) => {
   await expect(page.locator("h1#lv2-hero-title")).toHaveCount(1);
   // Fix round 3 (judge gap 1): the outcome sentence. FINAL-SPEC 2026-10-26 (D, veto): the category leaves the eyebrow
   // above it and names the close instead, as its heading -- printed once, not twice.
-  expect((await page.locator("h1").innerText()).replace(/\s+/g, " ").trim()).toBe("Turn documents into context your AI can cite.");
+  expect((await page.locator("h1").innerText()).replace(/\s+/g, " ").trim()).toBe("Context your AI can cite, compiled from your documents.");
   await expect(page.locator("#s1 .lv2-hero-eyebrow")).toHaveCount(0);
   await expect(page.locator("#s1 h1#lv2-hero-title + .lv2-hero-support")).toHaveCount(1);
   await expect(page.locator("#s6 h2")).toHaveText("The Knowledge Compiler for AI");
@@ -186,7 +188,8 @@ test("the English close keeps its start action on an English destination", async
   expect(href).toMatch(/^\/[a-z]/);
   expect(href, "the English close never sends a reader to the Korean pages").not.toMatch(/^\/ko(\/|$)/);
 });
-test("film follows the headline actions without a separate opening action", async ({ page }) => {
+test("film follows the headline actions without a separate opening action", async ({ page }, testInfo) => {
+  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
@@ -201,7 +204,8 @@ test("film follows the headline actions without a separate opening action", asyn
   expect(actions.y).toBeGreaterThanOrEqual(headline.y + headline.height);
   await expect(film.locator("video")).toHaveCount(0);
 });
-test("four-stage video stays static with reduced motion until explicit play and advances", async ({ page }) => {
+test("four-stage video stays static with reduced motion until explicit play and advances", async ({ page }, testInfo) => {
+  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/"); const film = await visibleFilm(page);
   await expect(film.locator("video")).toHaveCount(0);
@@ -211,6 +215,28 @@ test("four-stage video stays static with reduced motion until explicit play and 
   await expect(video).toBeVisible();
   await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.currentTime)).toBeGreaterThan(1);
   expect(await video.evaluate((node: HTMLVideoElement) => node.error)).toBeNull();
+});
+
+/*
+  Direction C round 2 (CRITIQUE-R1 #1 interim, lib/hero-phone-mode.ts): on a phone the first screen shows the committed
+  10-Q page with its regions instead of the four-panel film; from 1024 up the film plays and the still is not drawn.
+*/
+test("the phone hero shows the Inspector still in place of the film, and only there", async ({ page }, testInfo) => {
+  test.skip(PHONE_HERO !== "still", "the phone hero is the film");
+  test.skip(!["1440", "390", "360"].includes(testInfo.project.name), "measured at 1440, 390 and 360");
+  await page.goto("/");
+  const still = page.getByTestId("landing-hero-still");
+  const film = page.getByTestId("landing-hero-film");
+  if (phoneShowsStill(testInfo.project.name)) {
+    await expect(still).toBeVisible();
+    await expect(film).toBeHidden();
+    await expect(still.locator("img")).toHaveAttribute("src", /apple-2026-q1-10-q-reference-p004/);
+    await expect(still.locator("img")).toHaveAttribute("loading", "eager");
+    expect((await still.boundingBox())!.y, "the still starts on the first screen").toBeLessThan(page.viewportSize()!.height);
+  } else {
+    await expect(still).toBeHidden();
+    await expect(film).toBeVisible();
+  }
 });
 
 test("server-renders the visible film poster as its priority image", async ({ request }) => {
@@ -228,10 +254,20 @@ test("server-renders the visible film poster as its priority image", async ({ re
   expect(posterHint.match(/\/film\/poster-[^>]+/g) ?? []).toEqual([]);
   const head = html.slice(0, html.indexOf("</head>"));
   expect(head).not.toContain("poster-1-t8.16-pane1-684x855");
-  const preloads = [...head.matchAll(/<link[^>]*rel="preload"[^>]*as="image"[^>]*>/g)].map(match => match[0]);
+  const allPreloads = [...head.matchAll(/<link[^>]*rel="preload"[^>]*as="image"[^>]*>/g)].map(match => match[0]);
+  /*
+    Round 2 (lib/hero-phone-mode.ts): while a phone shows the Inspector still, there are two image hints, split by width --
+    the poster's for the widths that draw the film, the still's for the phone (its LCP element) -- so neither screen
+    fetches the image it hides. With the film back on phones this is the one unscoped poster hint again.
+  */
+  const stillHints = allPreloads.filter(tag => tag.includes("apple-2026-q1-10-q-reference-p004"));
+  const preloads = allPreloads.filter(tag => !stillHints.includes(tag));
+  expect(stillHints).toHaveLength(PHONE_HERO === "still" ? 1 : 0);
+  if (PHONE_HERO === "still") expect(stillHints[0]).toMatch(/ media="\(max-width: 900px\)"/i);
   expect(preloads).toHaveLength(1);
   expect(preloads[0]).toMatch(/fetchpriority="high"/i);
-  expect(preloads[0]).not.toMatch(/ media=/i);
+  if (PHONE_HERO === "still") expect(preloads[0]).toMatch(/ media="\(min-width: 901px\)"/i);
+  else expect(preloads[0]).not.toMatch(/ media=/i);
   // POSTER-RECUT (D-11): the one hint is the AVIF srcset, typed so a browser without AVIF skips it.
   expect(preloads[0]).toMatch(/imagesrcset="\/film\/poster-1-t8\.16\.avif 1440w, \/film\/poster-1-t8\.16-2x\.avif 2880w"/i);
   expect(preloads[0]).toMatch(/type="image\/avif"/i);
@@ -240,11 +276,18 @@ test("server-renders the visible film poster as its priority image", async ({ re
   expect(high[0]).toMatch(/srcset="\/film\/poster-1-t8\.16\.webp 1440w, \/film\/poster-1-t8\.16-2x\.webp 2880w"/i);
   expect(high[0]).toMatch(/loading="eager"/i); expect(high[0]).toMatch(/ width="[1-9]\d*"/); expect(high[0]).toMatch(/ height="[1-9]\d*"/);
   const sourceImages = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => tag.includes("apple-2026-q1-10-q-reference-p004"));
-  expect(sourceImages).toHaveLength(1);
-  expect(sourceImages[0]).toContain('loading="lazy"');
-  expect(sourceImages[0]).not.toMatch(/fetchpriority="high"/i);
+  // Direction C round 2: the committed 10-Q page is drawn by s2's window, by s3's received passage (CRITIQUE-R1 #2) and,
+  // while lib/hero-phone-mode.ts says "still", by the phone hero's still (#1) -- every copy lazy, none competing with the
+  // poster for priority.
+  expect(sourceImages).toHaveLength(PHONE_HERO === "still" ? 3 : 2);
+  // s2's and s3's copies are lazy; the phone still is the phone's first-screen image, so it is eager (and hinted above).
+  for (const [index, tag] of sourceImages.entries()) {
+    expect(tag).toContain(PHONE_HERO === "still" && index === 0 ? 'loading="eager"' : 'loading="lazy"');
+    expect(tag).not.toMatch(/fetchpriority="high"/i);
+  }
 });
-test("reduced motion keeps the prepared poster static until explicit play", async ({ page }) => {
+test("reduced motion keeps the prepared poster static until explicit play", async ({ page }, testInfo) => {
+  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   await page.emulateMedia({ reducedMotion: "reduce" }); await page.goto("/");
   const film = await visibleFilm(page);
   await expect(film.locator("img")).toBeVisible();

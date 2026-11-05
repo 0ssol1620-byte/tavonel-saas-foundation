@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import pack from "../content/evidence/public-claims-pack.json";
 import { carried, CLAIMS_PACK_SHA256, formatFigure, HOME_MEASURES } from "./home-measures";
+import { EVIDENCE } from "./evidence-record";
 
 /*
   The claims pack is generated in the evidence repository and copied here byte for byte. A copy that
@@ -49,6 +50,23 @@ describe("Home measurement band data", () => {
     // The two figures inside the accuracy must-say are figures of that claim, not loose digits.
     const figures = HOME_MEASURES[2]!.en.detail.filter(part => typeof part !== "string").map(part => formatFigure(part as { n: number; d: number }));
     expect(figures.slice(-2)).toEqual(["99.0", "36.9"]);
+  });
+
+  /*
+    W0-F1 (2026-11-04): 80.6 is olmOCR-Bench's overall score -- the mean of 8 per-category pass rates --
+    and 7,137/8,413 checks is a different ratio (84.8%). The pack once called 80.6 "the pass rate over
+    8,413 checks"; a copy carrying that wording, or site copy describing 80.6 another way, fails here.
+  */
+  it("carries 80.6 as the mean of per-category pass rates, with the checks as a count", () => {
+    const claims = (pack as { claims: { id: string; must_say?: string; must_say_en?: string; numbers?: Record<string, unknown> }[] }).claims;
+    const accuracy = claims.find(entry => entry.id === "benchmark-accuracy")!;
+    const n = accuracy.numbers as { checks_passed: number; checks_total: number };
+    expect(accuracy.must_say_en).toContain("the mean of the pass rates of its 8 document categories");
+    expect(accuracy.must_say_en).toContain(`${n.checks_passed.toLocaleString("en-US")} of ${n.checks_total.toLocaleString("en-US")} adversarially chosen checks passed`);
+    expect(accuracy.must_say_en).not.toContain("This is the pass rate over");
+    for (const claim of claims) expect(claim.must_say_en ?? "", claim.id).not.toContain("80.6% check pass rate");
+    const byTypeBody = EVIDENCE.find(entry => entry.receipt?.id === "R-03")!.body;
+    expect(byTypeBody).toContain("The overall 80.6 is an average over that spread.");
   });
 
   it("refuses a must-say number the claim does not carry, or carries at another precision", () => {
