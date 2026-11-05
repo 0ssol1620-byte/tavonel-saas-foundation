@@ -1,4 +1,4 @@
--- Migration 20261105090000 (W1-A1 review R2 N1): a key's kind is the stored token_kind, never its name.
+-- Migration 20261105000000 (W1-A1 review R2 N1): a key's kind is the stored token_kind, never its name.
 --
 -- One signed-up member M mints, through the same RPC the application calls with PostgREST's named
 -- arguments: a hand-made key someone named like an MCP connection, with no expiry (the legacy

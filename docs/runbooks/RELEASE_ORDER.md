@@ -310,7 +310,7 @@ migration은 다시 적용할 수 없다. 두 번째 적용은 `column "gate_sur
 - 이 절차를 처음 쓰는 날이 사고 날이 되지 않게 한다. A1.3 canary 전에 preview에서 1–2를 한 번 실행하고,
   걸린 시간을 receipt로 남긴다(로컬 shadow 측정: `REMOTE-MCP-SECURITY-<sha>.json`의 `bulkRevoke`).
 
-### 배포 순서 (R2 N1, migration `20261105090000_api_key_token_kind.sql`)
+### 배포 순서 (R2 N1, migration `20261105000000_api_key_token_kind.sql`)
 
 이 PR의 코드는 key를 인증할 때 `token_kind` 열을 읽는다. **migration을 code보다 먼저 적용한다.** 열이 없는 DB에서
 이 code가 돌면 PostgREST가 select를 거부하고, 모든 API key 인증이 `API_KEY_INVALID`가 된다(fail closed지만 장애다).
@@ -326,4 +326,4 @@ migration은 additive다. 기존 행은 전부 `live`가 되고, create RPC의 �
 - [ ] `/api/mcp*`(OAuth register, authorize, token 경로 포함)에 IP별 rate limit을 둔다(리뷰 R2가 요구한 전제).
 - [ ] production에 `TAVONEL_REMOTE_MCP_COHORT`(1–3개)와 `FOUNDATION_WORKER_SECRET`(32자 이상)이 설정되어 있다.
       값은 출력하지 않고, 설정되어 있다는 사실만 확인한다.
-- [ ] migration `20261105090000`이 production DB에 적용되어 있다(위 배포 순서).
+- [ ] migration `20261105000000`이 production DB에 적용되어 있다(위 배포 순서).

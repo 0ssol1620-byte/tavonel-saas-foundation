@@ -133,7 +133,7 @@ describe("M4: the bulk revoke of remote MCP keys", () => {
 });
 
 describe("R2 N1: the stored token kind, not the name", () => {
-  const sql = readFileSync(new URL("../../supabase/migrations/20261105090000_api_key_token_kind.sql", import.meta.url), "utf8");
+  const sql = readFileSync(new URL("../../supabase/migrations/20261105000000_api_key_token_kind.sql", import.meta.url), "utf8");
   it("adds a constrained kind every existing row reads as live, and only the create RPC writes mcp", () => {
     expect(sql).toMatch(/add column token_kind text not null default 'live'\s+constraint \w+ check \(token_kind in \('live', 'mcp'\)\)/);
     expect(sql).toMatch(/p_token_kind text default 'live'/);

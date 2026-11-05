@@ -6,7 +6,7 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
   is one the remote MCP's OAuth flow minted, usable only through /api/mcp (lib/remote-mcp-dispatch.ts).
   The form is inside the stored sha256, so a token cannot be relabelled from one to the other.
 
-  Which form a row holds is its stored `token_kind` (migration 20261105090000), never its name: a
+  Which form a row holds is its stored `token_kind` (migration 20261105000000), never its name: a
   hand-made key someone named "MCP: ..." is still a manual key in every list and every revoke
   (review R2 N1). Authentication refuses a token whose form differs from its row's kind.
 */
