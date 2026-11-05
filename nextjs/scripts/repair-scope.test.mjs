@@ -7936,3 +7936,12 @@ test('affected ask-quality-eval owner: 14 exact paths select 1 direct suite and 
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
 });
+test('affected ask-quality-eval runner admits the exact registered eval suite and refuses unregistered siblings', async () => {
+  const { buildUnitArgs, validateSelectedPath } = await import('./run-repair-check.mjs');
+  const file = 'eval/ask-quality/metrics.test.ts';
+  assert.equal(validateSelectedPath(file, 'unit', process.cwd()), file);
+  assert.ok(buildUnitArgs([file], '/tmp/reviewed-ask-quality-unit.json').includes(file));
+  for (const sibling of ['eval/ask-eval/metrics.test.ts', 'eval/ask-eval/run.harness.test.ts', 'eval/ask-quality/metrics.test.tsx', 'eval/ask-quality/other.test.ts']) {
+    assert.throws(() => validateSelectedPath(sibling, 'unit', process.cwd()), /Unsupported unit path/);
+  }
+});
