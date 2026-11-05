@@ -142,7 +142,9 @@
   and each region inside it carry fill="url(#specimen-hatch)" (the strip's one <pattern>); CSS sets
   no fill on them, so the attribute holds.
 */
-.regions rect { stroke: var(--tv-ink-muted); stroke-width: 1px; }
+/* Round 3 (CRITIQUE-R2 #7): the other regions at 45% so the printed page reads through them, not a wireframe over it. */
+.regions rect { stroke: var(--tv-ink-muted); stroke-width: 1px; stroke-opacity: 0.45; }
+.regions rect[data-selected] { stroke-opacity: 1; }
 .regions rect:not([fill]) { fill: none; }
 .regions rect[data-selected] { stroke: var(--tv-ink); stroke-width: 2px; }
 .regions rect[data-masked] { stroke: none; }

@@ -36,6 +36,8 @@ type Props = {
   reduced: boolean;
   settled: boolean;
   label: string;
+  /** Round 3 (CRITIQUE-R2 #8): with nothing selected, this object's relations are marked `data-rest-lit` (focus + context). */
+  restFocusId?: string | null;
 };
 
 const KIND_LABEL: Record<string, string> = {
@@ -56,6 +58,7 @@ export default function WorldCanvas({
   reduced,
   settled,
   label,
+  restFocusId = null,
 }: Props) {
   const refs = useRef(new Map<string, HTMLButtonElement>());
   const nodeById = useMemo(() => new Map(model.nodes.map((node) => [node.id, node] as const)), [model.nodes]);
@@ -150,6 +153,7 @@ export default function WorldCanvas({
                 data-edge-to={edge.to}
                 data-edge-state={state}
                 data-lit={lit ? "1" : "0"}
+                data-rest-lit={!selectedId && restFocusId && (edge.from === restFocusId || edge.to === restFocusId) ? "1" : undefined}
                 vectorEffect="non-scaling-stroke"
               />
               {lit && relation?.predicate ? (

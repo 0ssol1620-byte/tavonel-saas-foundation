@@ -11,12 +11,11 @@ import heroStyles from "./landing-hero.module.css";
 import sourceStyles from "./source-first-home.module.css";
 import LandingAnalytics from "./landing-analytics";
 import SpecimenStrip from "./specimen-strip";
-import { SourceRegionWindow } from "./source-region";
+
 import RecompileScene from "./scenes/recompile";
 import StartScene from "./scenes/start";
 import TrustScene from "./scenes/trust";
 import { landingV2Copy } from "@/lib/landing-v2-copy";
-import { landingV2PageImage } from "@/lib/landing-v2-assets";
 import {
   buildHeroView,
   buildProofTabs,
@@ -91,6 +90,10 @@ function homeData(): HomeData {
 export type ReceivePassage = {
   kindLabel: string;
   unedited: string;
+  /** Round 3: the label over the citation view. */
+  citationLabel: string;
+  /** The World's evidence id for the region -- the `evidenceId` an Ask citation carries. */
+  evidenceId: string;
   passage: string;
   truncated: boolean;
   sourceTokens: string[];
@@ -98,7 +101,6 @@ export type ReceivePassage = {
   pageCount: number | null;
   bbox1000: readonly number[];
   digest: string;
-  image: ReturnType<typeof landingV2PageImage>;
 };
 export function receiveFromCase(view: EvidenceCase | null, korean: boolean): ReceivePassage | null {
   if (!view) return null;
@@ -109,6 +111,8 @@ export function receiveFromCase(view: EvidenceCase | null, korean: boolean): Rec
   return {
     kindLabel: korean ? "기존 추출 구절" : "Existing extracted passage",
     unedited: korean ? "판독기 출력, 수정 없음" : "Reader output, unedited",
+    citationLabel: korean ? "Ask 인용 필드" : "As an Ask citation",
+    evidenceId: region.id,
     passage: region.passage,
     truncated: region.passageTruncated,
     sourceTokens: [source.filename, source.form, source.filingDate].filter((token): token is string => Boolean(token)),
@@ -116,8 +120,24 @@ export function receiveFromCase(view: EvidenceCase | null, korean: boolean): Rec
     pageCount: source.pageCount,
     bbox1000: region.bbox1000,
     digest: region.digest,
-    image: landingV2PageImage(region.digest, region.page),
   };
+}
+
+/*
+  Round 3 (CRITIQUE-R2 #2): what a reader receives is a record, not a second look at s2's page. So s3 prints
+  the passage in the shape an answer carries it -- four of the fields every Ask citation has (VerifiedCitation /
+  PacketCitation; the docs' Ask example reads `pageNumber1` and `bbox1000`), each filled from this sample record.
+  Field names only; no value here is computed, and nothing is added that the record does not hold.
+*/
+export function citationText(receive: ReceivePassage): string {
+  return [
+    "{",
+    `  "evidenceId": ${JSON.stringify(receive.evidenceId)},`,
+    `  "pageNumber1": ${receive.page},`,
+    `  "bbox1000": [${receive.bbox1000.join(", ")}],`,
+    `  "excerpt": ${JSON.stringify(receive.passage + (receive.truncated ? "…" : ""))}`,
+    "}",
+  ].join("\n");
 }
 
 /*
@@ -308,10 +328,6 @@ export default function LandingPage({
                 <p className={heroStyles.recordKind} id="lv2-record-kind">
                   <span>{receive.kindLabel}</span>
                 </p>
-                <p className={heroStyles.readerLabel}>{receive.unedited}</p>
-                <blockquote className={heroStyles.recordQuote} lang="en" data-derived="1">
-                  {receive.passage}{receive.truncated ? "…" : ""}
-                </blockquote>
                 <dl className={heroStyles.recordFields}>
                   <div>
                     <dt>{copy.evidence.fields.source}</dt>
@@ -324,34 +340,19 @@ export default function LandingPage({
                       ))}
                     </dd>
                   </div>
-                  <div>
-                    <dt>{copy.evidence.fields.page}</dt>
-                    <dd data-derived="1" className={korean ? heroStyles.recordPageKo : undefined}>
-                      {korean
-                        ? `${receive.pageCount}쪽 중 ${receive.page}쪽`
-                        : `${receive.page} of ${receive.pageCount}`}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>{copy.evidence.fields.region}</dt>
-                    <dd><span data-derived="1" className={heroStyles.recordToken}>bbox {receive.bbox1000.join(",")}</span></dd>
-                  </div>
+                  {/* Round 3: page and region are not repeated here; the citation beside it carries them
+                      as pageNumber1 and bbox1000, and the word budget is not raised to say them twice. */}
                   <div>
                     <dt>{copy.evidence.fields.version}</dt>
                     <dd><code data-derived="1">{receive.digest}</code></dd>
                   </div>
                 </dl>
               </div>
-              {receive.image ? (
-                <SourceRegionWindow
-                  className={`${heroStyles.recordCrop} ${heroStyles.recordAside}`}
-                  image={receive.image}
-                  bbox1000={receive.bbox1000}
-                  marginPx={240}
-                  markClassName={heroStyles.recordMark}
-                  sizes="(min-width: 900px) 420px, calc(100vw - 88px)"
-                />
-              ) : null}
+              {/* Round 3: the reader's output, unedited, inside the citation it travels in. */}
+              <figure className={heroStyles.citation} data-receive="citation">
+                <figcaption className={heroStyles.readerLabel}>{receive.citationLabel}</figcaption>
+                <pre className={heroStyles.citationCode} lang="en" data-derived="1" aria-label={receive.unedited}>{citationText(receive)}</pre>
+              </figure>
             </article>
             ) : null}
           </div>

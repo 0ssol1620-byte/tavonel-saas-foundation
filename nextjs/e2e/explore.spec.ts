@@ -293,6 +293,29 @@ test("an object with many regions is walked with previous and next", async ({ pa
   await expect(group.getByText(/^Region 1 of \d+( shown · \d+ compiled)?$/)).toBeVisible();
 });
 
+/*
+  Round 3 (visuals review R2): a read line can carry one unbroken token -- the proxy filing's regions 8-11 hold a URL --
+  and it pushed the passage panel, and at 390 the whole evidence sheet, past its column. Every region the evidence act
+  steps through keeps its text inside its box (overflow-wrap: anywhere and min-width: 0 on the panel and the line).
+*/
+test("every read line stays inside the evidence panel, region by region", async ({ page }) => {
+  await page.goto("/explore?act=evidence");
+  // The panel the reader's text is printed in: the parent of its label. (The page viewer beside it is a zoom scroller.)
+  const act = page.getByText("What the compiler read from this page", { exact: true }).first().locator("..");
+  await expect(act).toBeVisible();
+  const next = page.getByRole("button", { name: /^Next/ }).first();
+  for (let step = 0; step < 16; step += 1) {
+    const overflowing = await act.evaluate((root) => [root, ...root.querySelectorAll("*")].filter((node) => {
+      const style = getComputedStyle(node);
+      return style.display !== "inline" && style.display !== "none" && style.overflowX !== "hidden" && style.overflowX !== "clip"
+        && node.clientWidth > 0 && node.scrollWidth > node.clientWidth + 1;
+    }).map((node) => `${node.tagName} ${String(node.className)} ${node.scrollWidth}>${node.clientWidth}`));
+    expect(overflowing, `step ${step}`).toEqual([]);
+    if (!(await next.isVisible()) || !(await next.isEnabled())) break;
+    await next.click();
+  }
+});
+
 test("a filing says how much of itself is in the World", async ({ page }) => {
   /*
     §57 and program §24. All five filings are now compiled end to end -- the proxy's declared

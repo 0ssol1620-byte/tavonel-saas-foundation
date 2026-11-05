@@ -1274,7 +1274,7 @@ test("keeps review-required packages downloadable and promotion-closed", async (
   await page.goto(`/workspace?collection=${collectionId}`);
 
   await expect(page.getByText("Review required", { exact: true })).toBeVisible();
-  await expect(page.getByText("1 review item needs a decision.")).toBeVisible();
+  await expect(page.getByText("1 review reason needs a decision.")).toBeVisible();
   await expect(page.locator("body")).not.toContainText("CONTRADICTION_CANDIDATE:claim-a:claim-b");
   await expect(page.getByRole("button", { name: "Download signed knowledge package" })).toBeEnabled();
   // The signed download sits with the collection result on Home; the review record now has a
