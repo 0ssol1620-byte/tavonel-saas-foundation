@@ -4,6 +4,23 @@ import { LANDING_V2_SCENE_ORDER, type LandingV2RecompileCopy } from "@/lib/landi
 import type { RecompileView } from "@/lib/landing-v2-runtime";
 import { RECOMPILE_ACTIONS } from "@/lib/landing-v2-recompile";
 import styles from "./recompile.module.css";
+import ProductCapture from "../product-capture";
+
+/*
+  Round 3, placement series (PR #191's captures): the change record itself, under the timeline -- the
+  /explore change view on the same public sample, as a real capture. It shows filing figures; none is
+  quoted here, and its alt names what is on screen without any of them.
+*/
+const CHANGE_CAPTURE = {
+  en: {
+    alt: "The change view on the public sample: the annual World, then each filing that arrived after it, with its filing date and an excerpt of its source page.",
+    caption: "The change record on the public sample.",
+  },
+  ko: {
+    alt: "공개 샘플의 변경 기록 화면: 연간 World와 그 뒤에 도착한 공시 문서, 각 문서의 제출일과 원문 페이지 일부.",
+    caption: "공개 샘플의 변경 기록.",
+  },
+} as const;
 
 /*
   Scene 05 -- Recompile (blueprint section 15, contract D12 and rule 7).
@@ -104,6 +121,12 @@ export default function Scene({
               </li>
             ))}
           </ol>
+
+        <figure className={styles.capture}>
+          <ProductCapture className="tv-capture" name="change-center" alt={CHANGE_CAPTURE[locale].alt}
+            sizes="(min-width: 1320px) 1176px, (min-width: 768px) calc(100vw - 144px), calc(100vw - 32px)" />
+          <figcaption>{CHANGE_CAPTURE[locale].caption}</figcaption>
+        </figure>
 
         {/* Two text links, the contract first: the selective rebuild is specified there, not run here.
             Round 3: inside the panel, under the record they open, not below it. */}

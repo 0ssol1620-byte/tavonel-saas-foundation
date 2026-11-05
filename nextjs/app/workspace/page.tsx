@@ -62,6 +62,7 @@ import ConnectionsPanel from "@/components/connections-panel";
 import DeveloperPanel from "@/components/developer-panel";
 import WorkspaceUltimateShell, { type SourcePendingReason, type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
 import WorkspaceGettingStarted from "@/components/workspace-getting-started";
+import ProductCapture from "@/components/landing-v2/product-capture";
 import WorkspaceUseWithAi from "@/components/workspace-use-with-ai";
 import ProcessingConsentPanel from "@/components/processing-consent-panel";
 import IntakeTriageReview from "@/components/intake-triage-review";
@@ -3251,6 +3252,21 @@ export default function WorkspacePage() {
                 </div>
               ) : null}
             </section>
+          ) : null}
+
+          {/*
+            Round 3, placement series (PR #191's compile-timeline capture): an empty workspace shows what a run looks
+            like before the first file is chosen -- the compile stage, captured from the dev harness on fixture
+            uploads. Labelled as an example; it is a picture, not this workspace's state, and it leaves with the
+            first source.
+          */}
+          {tab === "overview" && surface === "home" && workspaceState.mode === "new" && intakeOpen ? (
+            <figure className="workspace-example-run">
+              <figcaption>What a run looks like · example files, not yours</figcaption>
+              <ProductCapture className="tv-capture" name="compile-timeline"
+                alt="An example compile stage at its first step: the steps Source, Read, Organize and Review & activate, with example files listed and one marked for review."
+                sizes="(min-width: 1024px) min(1040px, calc(100vw - 340px)), calc(100vw - 32px)" />
+            </figure>
           ) : null}
 
           {/*

@@ -9,6 +9,8 @@ import { buildHeroView, buildProofTabs } from "@/lib/landing-v2-runtime";
 import { buildHomeEvidenceCase, selectHomeCase } from "@/lib/home-evidence-view";
 import tableStyles from "@/components/docs/docs-table.module.css";
 import styles from "@/components/marketing-story.module.css";
+import ProductCapture, { type CaptureName } from "@/components/landing-v2/product-capture";
+import ProvenanceChainDiagram from "@/components/visuals/provenance-chain-diagram";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/product" },
@@ -23,11 +25,20 @@ const LAYERS = [
   ["Ontology and knowledge platforms", "Connects to", "Turtle, JSON-LD and CSV leave in a signed package that a graph database or an ontology tool imports, so modelling and business rules stay in the tool your team already runs."],
   ["Agent and workflow orchestration", "Connects to", `The ${MCP_TOOL_COUNT_WORD} read-only MCP tools and an HTTP API let an agent read a World; the actions it takes stay in the orchestrator that took them.`],
 ] as const;
-const OUTCOMES = [
-  { title: "Inspect the evidence", body: "Follow a passage to its document, source version, page and region. The published sample lets you inspect those links yourself.", href: "/evidence", action: "Inspect a source region" },
-  { title: "Keep versions readable", body: "Compare complete corpus snapshots, see the objects later filings reached, and keep candidate and active versions distinct. The recompilation contract records the current selective-rebuild boundary.", href: "/product/continuous-knowledge", action: "See versions and changes" },
-  { title: "Give your AI the output", body: "Read through HTTP API or MCP. Request a signed portable package when export checks pass, with retrieval material and source references still attached.", href: "/docs", action: "Connect your AI" },
-] as const;
+/*
+  Round 3, placement series (PR #191's captures): each outcome shows the product surface it names, as a real
+  capture. The captures carry public SEC sample figures; none is quoted here, and each alt says what is on
+  screen without one.
+*/
+const OUTCOMES: ReadonlyArray<{ title: string; body: string; href: string; action: string; capture: { name: CaptureName; alt: string } }> = [
+  { title: "Inspect the evidence", body: "Follow a passage to its document, source version, page and region. The published sample lets you inspect those links yourself.", href: "/evidence", action: "Inspect a source region",
+    capture: { name: "evidence-inspector", alt: "The evidence view on the public SEC sample: a source object from a filing beside its source page, with the supporting region highlighted and the text the compiler read from that region." } },
+  { title: "Keep versions readable", body: "Compare complete corpus snapshots, see the objects later filings reached, and keep candidate and active versions distinct. The recompilation contract records the current selective-rebuild boundary.", href: "/product/continuous-knowledge", action: "See versions and changes",
+    capture: { name: "change-center", alt: "The change view on the public SEC sample: the annual World, then each filing that arrived after it, with its filing date and an excerpt of its source page." } },
+  { title: "Give your AI the output", body: "Read through HTTP API or MCP. Request a signed portable package when export checks pass, with retrieval material and source references still attached.", href: "/docs", action: "Connect your AI",
+    capture: { name: "use-with-ai", alt: "The workspace's Use with AI panel: a choice of AI assistant, your application or local files, with the assistant tab pointing to the MCP setup guide." } },
+];
+const CAPTURE_SIZES = "(min-width: 1100px) 640px, (min-width: 641px) 60vw, calc(100vw - 32px)";
 
 export default function ProductPage() {
   const sample = selectHomeCase([buildHomeEvidenceCase(buildHeroView(), buildProofTabs())]);
@@ -49,6 +60,8 @@ export default function ProductPage() {
             <h2>{outcome.title}</h2>
             <div>
               <p>{outcome.body}</p>
+              <ProductCapture className={`tv-capture ${styles.capture}`} name={outcome.capture.name} alt={outcome.capture.alt} sizes={CAPTURE_SIZES} />
+              {outcome.href === "/evidence" ? <ProvenanceChainDiagram className={styles.diagram} /> : null}
               {outcome.href === "/evidence" && region && source ? <figure className={styles.proof}>
                 {/* CRITIQUE-R1 #6: the passage as the reader returned it, in the sample columns' grammar; never re-set as a table. */}
                 <p className={styles.proofLabel}>Reader output, unedited</p>
