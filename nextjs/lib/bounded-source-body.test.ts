@@ -35,6 +35,7 @@ describe("bounded source bytes", () => {
     expect(cancel).toHaveBeenCalledOnce();
   });
   it("rejects an empty source", async () => {
-    expect(await readBoundedSourceBody(new Response(null), 4)).toEqual({ ok: false, code: "SOURCE_SIZE_UNQUALIFIED" });
+    expect(await readBoundedSourceBody(new Response(null), 4)).toEqual({ ok: false, code: "SOURCE_SIZE_UNQUALIFIED", empty: true });
+    expect(await readBoundedSourceBody(new Response(""), 4)).toEqual({ ok: false, code: "SOURCE_SIZE_UNQUALIFIED", empty: true });
   });
 });

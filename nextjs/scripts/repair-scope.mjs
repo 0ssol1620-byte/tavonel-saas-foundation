@@ -1915,6 +1915,22 @@ export const OCR_PAGES_INCOMPLETE_AFFECTED_PATHS = Object.freeze([
 export const OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/documents-route.test.ts', 'lib/operations-p0.test.ts', 'lib/processing-receipts.test.ts',
 ]);
+// OCR JSON read bound (cjob-1e8b7a0e, 2026-11-04): the seven endpoints no owner listed -- the R2 JSON reader and the bounded
+// body reader it uses, their suites, the job store's event writer, and the candidates route with its access suite. Direct
+// suites: every suite that drives one of those modules for real (the R2 reader's consumers, the body reader's other caller,
+// the compile run, worker and Core dispatch that carry its size refusal, the cross-tree pin of the bound, and the three
+// suites that drive the store's job-event insert). Product code, so never nativeReuse.
+export const OCR_JSON_BOUND_AFFECTED_PATHS = Object.freeze([
+  'app/api/documents/[id]/candidates/route.ts', 'lib/bounded-source-body.test.ts', 'lib/bounded-source-body.ts',
+  'lib/compile-job-store.ts', 'lib/document-derived-route-access.test.ts', 'lib/r2-objects.test.ts', 'lib/r2-objects.ts',
+]);
+export const OCR_JSON_BOUND_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/bounded-source-body.test.ts', 'lib/collection-compile-run.test.ts', 'lib/compile-job-migration.test.ts',
+  'lib/compile-job-scheduling.test.ts', 'lib/compile-job-worker.test.ts', 'lib/core-runtime-v2.test.ts',
+  'lib/corpus-batching.test.ts', 'lib/document-derived-route-access.test.ts', 'lib/documents-route.test.ts',
+  'lib/global-collection-compile.test.ts', 'lib/intake-ceiling-cross-tree.test.ts', 'lib/r2-objects.test.ts',
+  'lib/source-import.test.ts', 'lib/tenant-isolation-negative.test.ts', 'lib/world-rollback-source-access.test.ts',
+]);
 // EN-0c benchmarks path mask: /benchmarks masks an absolute scoring-machine path in the Model Arena notes at render time
 // (the artifact and its pinned sha256 are unchanged). The four endpoints no owner listed select their two direct suites plus
 // the five that read the changed files: benchmark-registry, brand-copy, copy-trust-guard and trust-page-answers read the page
@@ -2866,6 +2882,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // OCR_PAGES_INCOMPLETE: the four exact paths above select three direct suites and no browser suite.
   affectedGroup('ocr-pages-incomplete-code', new RegExp(`^nextjs/(?:${exactPathAlternation(OCR_PAGES_INCOMPLETE_AFFECTED_PATHS)})$`),
     { unitFiles: OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES }),
+  // OCR JSON read bound: the seven exact paths above select fifteen direct suites and no browser suite.
+  affectedGroup('ocr-json-bound', new RegExp(`^nextjs/(?:${exactPathAlternation(OCR_JSON_BOUND_AFFECTED_PATHS)})$`),
+    { unitFiles: OCR_JSON_BOUND_AFFECTED_UNIT_FILES }),
   // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.
   affectedGroup('benchmarks-path-mask', new RegExp(`^nextjs/(?:${exactPathAlternation(BENCHMARKS_PATH_MASK_AFFECTED_PATHS)})$`),
     { unitFiles: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES }),
