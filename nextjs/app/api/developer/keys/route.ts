@@ -5,6 +5,7 @@ import { createDeveloperApiKey, listDeveloperApiKeys } from "@/lib/developer-sto
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { trialAiAccess, type TrialAiOperation } from "@/lib/trial-ai-access";
 import type { FoundationPrincipal } from "@/lib/developer-auth";
+import { reservedKeyName } from "@/lib/remote-mcp";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -36,7 +37,8 @@ async function readKeyInput(request: Request): Promise<KeyInput> {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const scopes = parseDeveloperScopes(body.scopes);
   const expiresInDays = body.expiresInDays === null || body.expiresInDays === undefined ? null : Number(body.expiresInDays);
-  if (!name || name.length > 80 || !scopes || (expiresInDays !== null && (!Number.isSafeInteger(expiresInDays) || expiresInDays < 1 || expiresInDays > 365))) {
+  // `MCP: ` labels the remote MCP's own keys; a new hand-made key may not take it. Classification is token_kind, not this.
+  if (!name || name.length > 80 || reservedKeyName(name) || !scopes || (expiresInDays !== null && (!Number.isSafeInteger(expiresInDays) || expiresInDays < 1 || expiresInDays > 365))) {
     return { ok: false, code: "API_KEY_INPUT_INVALID", status: 400 };
   }
   return { ok: true, name, scopes, expiresInDays };
@@ -51,7 +53,7 @@ export async function GET(request: Request) {
   if (!result.ok) return NextResponse.json({ code: result.code }, { status: 503, headers: NO_STORE });
   const current = await revalidateFoundationSession(request, auth.principal, "observer");
   if (!current.ok) return NextResponse.json({ code: current.code }, { status: current.status, headers: NO_STORE });
-  return NextResponse.json({ code: "OK", keys: result.keys }, { headers: NO_STORE });
+  return NextResponse.json({ code: "OK", keys: result.keys, remoteMcpKeys: result.remoteMcpKeys }, { headers: NO_STORE });
 }
 
 export async function POST(request: Request) {

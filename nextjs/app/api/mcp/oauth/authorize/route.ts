@@ -4,8 +4,10 @@ import { recordServerFunnel } from "@/lib/funnel-events";
 import { trialAiAccess } from "@/lib/trial-ai-access";
 import {
   checkAuthorizationRequest,
+  cohortRefusalStatus,
   denialRedirect,
   issueAuthorizationCode,
+  remoteMcpCohortRefusal,
   remoteMcpEnabled,
   remoteMcpSealingKey,
   requestOrigin,
@@ -63,6 +65,9 @@ export async function POST(request: Request) {
     if (trial.wouldAllow) recordServerFunnel("trial_ai_access_would_allow", { kind: "mcp_authorize" });
     return NextResponse.json({ code: trial.code }, { status: trial.status, headers: NO_STORE });
   }
+  // A1.0: the same cohort the token endpoint checks, said here so a person is told before consenting.
+  const cohort = remoteMcpCohortRefusal(auth.principal.workspaceKey);
+  if (cohort) return NextResponse.json({ code: cohort }, { status: cohortRefusalStatus(cohort), headers: NO_STORE });
   return NextResponse.json({
     code: "AUTHORIZATION_GRANTED",
     redirectTo: issueAuthorizationCode(checked.request, auth.principal, key, origin),

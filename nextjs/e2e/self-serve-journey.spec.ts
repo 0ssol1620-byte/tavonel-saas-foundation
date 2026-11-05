@@ -415,8 +415,9 @@ test.describe("simulated switch-on (browser mocks only)", () => {
         items: [{ priceId: SANDBOX_CHECKOUT_READY.offer.priceId, quantity: 1 }],
         customer: SANDBOX_CHECKOUT_READY.customer,
         customData: SANDBOX_CHECKOUT_READY.customData,
-        // Journey A11: the workspace is a dark page in English.
-        settings: { displayMode: "overlay", theme: "dark", locale: "en" },
+        // Journey A11: the overlay follows the page it opens on (English here).
+        // Direction C: the workspace the held offer resumes in is a light page now, and the overlay follows its scheme.
+        settings: { displayMode: "overlay", theme: "light", locale: "en" },
       }],
     });
     const trialStrip = page.getByRole("status").filter({ hasText: "Free evaluation" });

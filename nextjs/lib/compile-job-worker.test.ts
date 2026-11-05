@@ -30,6 +30,10 @@ const recordDeferral = vi.fn(
   async (_input: { attempt: number }): Promise<CompileJobResult<{ recorded: true }>> =>
     ({ ok: true, value: { recorded: true } }),
 );
+const recordSizeLimit = vi.fn(
+  async (_input: { reason: string; sizeLimit: Record<string, unknown> }): Promise<CompileJobResult<{ recorded: true }>> =>
+    ({ ok: true, value: { recorded: true } }),
+);
 
 const openJobs = vi.fn(async (): Promise<CompileJobResult<CompileJob[]>> => ({ ok: true, value: [] }));
 
@@ -41,6 +45,7 @@ vi.mock("./compile-job-store", async (importOriginal) => {
     readOpenCompileJobs: openJobs,
     countCompileJobDeferrals: countDeferrals,
     recordCompileJobDeferral: recordDeferral,
+    recordCompileJobSizeLimit: recordSizeLimit,
   };
 });
 vi.mock("./collection-compile-run", () => ({
@@ -122,6 +127,7 @@ beforeEach(() => {
   listObjects.mockResolvedValue({ ok: true, objects: [] });
   countDeferrals.mockResolvedValue({ ok: true, value: 0 });
   recordDeferral.mockResolvedValue({ ok: true, value: { recorded: true } });
+  recordSizeLimit.mockReset().mockResolvedValue({ ok: true, value: { recorded: true } });
 });
 
 describe("the durable compile worker", () => {
@@ -338,6 +344,26 @@ describe("the durable compile worker", () => {
     expect(turn.state).toBe("ready");
     expect(runCompile).toHaveBeenCalledWith("pilot-alpha", ["doc-a"], undefined, "cjob-00000000000000000000000000000001",
       { userId: "00000000-0000-4000-8000-000000000001", provenance: "durable_job" });
+  });
+
+  it("names the object and its bytes in a job event before failing on JSON_TOO_LARGE", async () => {
+    // cjob-1e8b7a0e (2026-11-04) failed with only the code; nothing said what was too large.
+    group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
+    const sizeLimit = { object: "candidate-world.json", bytes: 32 * 1024 * 1024 + 1, bound: 32 * 1024 * 1024 };
+    runCompile.mockResolvedValue({ ok: false, status: 503, code: "JSON_TOO_LARGE", payload: { sizeLimit } });
+    const turn = await runCompileJobTurn(job());
+    expect(turn.note).toBe("failed");
+    expect(recordSizeLimit).toHaveBeenCalledWith(expect.objectContaining({ reason: "JSON_TOO_LARGE", sizeLimit, state: "structuring" }));
+    expect(advance).toHaveBeenLastCalledWith(expect.objectContaining({ state: "failed", errorCode: "JSON_TOO_LARGE" }));
+    expect(recordSizeLimit.mock.invocationCallOrder[0]).toBeLessThan(advance.mock.invocationCallOrder.at(-1)!);
+  });
+
+  it("writes no size event for a failure that carries no size refusal", async () => {
+    group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
+    runCompile.mockResolvedValue({ ok: false, status: 503, code: "CORE_V2_TIMEOUT", payload: {} });
+    await runCompileJobTurn(job());
+    expect(recordSizeLimit).not.toHaveBeenCalled();
+    expect(advance).toHaveBeenLastCalledWith(expect.objectContaining({ state: "failed", errorCode: "CORE_V2_TIMEOUT" }));
   });
 
   it("records the digest of the artifact it produced, on whichever advance lands", async () => {

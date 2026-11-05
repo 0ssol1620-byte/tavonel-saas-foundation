@@ -814,10 +814,12 @@ assert(JSON.stringify(RECIPE_CONTINUATION_AFFECTED_PATHS)===JSON.stringify(recip
   &&!recipeOwner.nativeReuse&&!recipeOwner.selector&&!recipeOwner.worker&&!recipeOwner.database&&!recipeOwner.databaseTests.length
   &&recipePaths.every(p=>AFFECTED_GROUPS.filter(owner=>owner.match.test('nextjs/'+p)).map(owner=>owner.group).join()==='recipe-continuation')
   &&AFFECTED_GROUPS.filter(owner=>owner.match.test('nextjs/app/cookbooks/page.tsx')).map(owner=>owner.group).join()==='enablement-20261017'
-  &&['app/cookbooks/s/page.tsx','app/cookbooks/[id]/page.tsx','app/cookbooks/[slug]/pageXtsx','app/login/layout.tsx','app/auth/callback/route.ts',
+  &&['app/cookbooks/s/page.tsx','app/cookbooks/[id]/page.tsx','app/cookbooks/[slug]/pageXtsx','app/auth/callback/route.ts',
     'lib/recipe-intent.spec.ts','e2e/recipe-continuation-extra.spec.ts'].every(p=>!AFFECTED_GROUPS.some(owner=>owner.match.test('nextjs/'+p)))
   // B-01: two former neighbours changed in the UX program; each now has exactly one owner, never recipe-continuation.
-  &&[['lib/checkout-intent.ts','ux-billing-checkout'],['e2e/login-capability.spec.ts','ux-billing-checkout']]
+  // Direction C (PR #183): the login layout gained the public chrome, so it is one exact public-marketing-surface path --
+  // still never recipe-continuation, and still owned by exactly one group.
+  &&[['lib/checkout-intent.ts','ux-billing-checkout'],['e2e/login-capability.spec.ts','ux-billing-checkout'],['app/login/layout.tsx','public-marketing-surface']]
     .every(([p,group])=>AFFECTED_GROUPS.filter(owner=>owner.match.test('nextjs/'+p)).map(owner=>owner.group).join()===group)
   &&sharedMap.split("\n  ['e2e/recipe-continuation.spec.ts', ['1440', '390', '360', 'reduced-motion']],").length===2&&sharedMap.split("\n  ['e2e/login-capability.spec.ts', ['1440']],").length===2
   &&recipeBrowsers.every(file=>sharedMap.split(file).length===2)

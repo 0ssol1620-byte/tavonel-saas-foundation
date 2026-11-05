@@ -327,8 +327,15 @@ describe("the change counts claim no state the World does not record", () => {
     throw new Error(`no color declared for ${selector}`);
   }
 
+  /*
+    Direction C (2026-11-04): Scene 05 prints no counts on Home any more (BRIEF item 4, recompile.tsx), so it
+    has no count rule to colour. The guard keeps its point: the sheet still paints nothing --verified, and a
+    count rule that comes back has to clear the same check through colourOf.
+  */
   it("keeps --verified for the state the World actually records, not for a diff partition", () => {
+    expect(stripComments(recompile)).not.toContain("--verified");
     for (const key of ["rebuilt", "added", "removed", "untouched"]) {
+      if (!new RegExp(String.raw`\.${key}\s+b\b`).test(stripComments(recompile))) continue;
       expect(colourOf(recompile, `.${key} b`), `${key} claims the verified colour`)
         .not.toContain("--verified");
     }

@@ -1,3 +1,4 @@
+import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { expect, test } from "@playwright/test";
 const FILM = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]';
 test.describe("phone four-stage film", () => {
@@ -7,7 +8,8 @@ test.describe("phone four-stage film", () => {
     await page.goto("/");
     await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
   });
-  test("opens compact on the locked stage-1 frame, and Focus details opens the pane, with readable stage and play controls", async ({ page }) => {
+  test("opens compact on the locked stage-1 frame, and Focus details opens the pane, with readable stage and play controls", async ({ page }, testInfo) => {
+    test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     const film = page.locator(FILM);
     await expect(film).toBeVisible();
     const still = () => film.locator("img.compile-film-still").evaluate((image: HTMLImageElement) => new URL(image.currentSrc).pathname);
@@ -37,7 +39,8 @@ test.describe("phone four-stage film", () => {
     await expect(film.locator("video")).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   });
-  test("plays the approved recording and supports Fit, Focus and keyboard stage selection", async ({ page }) => {
+  test("plays the approved recording and supports Fit, Focus and keyboard stage selection", async ({ page }, testInfo) => {
+    test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     const film = page.locator(FILM);
     await film.getByRole("button", { name: "Play the compilation film", exact: true }).click();
     const video = film.locator("video");
@@ -76,7 +79,8 @@ test.describe("phone four-stage film", () => {
     await expect(tabs.first()).toBeFocused();
     await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
   });
-  test("reduced motion stays static and failed primary and fallback playback restore the locked poster", async ({ page }) => {
+  test("reduced motion stays static and failed primary and fallback playback restore the locked poster", async ({ page }, testInfo) => {
+    test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     const film = page.locator(FILM);
     await expect(film.locator("video")).toHaveCount(0);
     const failed: string[] = [];
@@ -89,4 +93,24 @@ test.describe("phone four-stage film", () => {
     expect(failed.some(url => url.endsWith("/film/compile-cut-hq-1440.mp4"))).toBe(true);
     await expect(film.getByRole("tab")).toHaveCount(4);
   });
+});
+
+/*
+  Direction C round 2 (lib/hero-phone-mode.ts): while the Inspector still stands in for the film below 900px, the phone's
+  first screen is the committed page and the film's poster is not fetched at all. Runs where the four checks above skip,
+  so this file always executes something on a phone; it skips itself once the film returns.
+*/
+test("while the still stands in, a phone opens on the readable page and requests no film poster", async ({ page }, testInfo) => {
+  test.skip(!["360", "390"].includes(testInfo.project.name), "phone composition");
+  test.skip(!phoneShowsStill(testInfo.project.name), "the film is the phone hero");
+  const posters: string[] = [];
+  page.on("request", request => { if (/\/film\/poster-/.test(request.url())) posters.push(request.url()); });
+  await page.goto("/", { waitUntil: "load" });
+  await expect(page.getByTestId("landing-hero-still")).toBeVisible();
+  await expect(page.locator(FILM)).toBeHidden();
+  await expect(page.getByTestId("landing-hero-still").locator("img")).toHaveJSProperty("complete", true);
+  // REVIEW-R2 MINOR-3: the still is the regions-on-the-page claim, so its boxes must render, not just the image.
+  expect(await page.locator('[data-testid="landing-hero-still"] span[aria-hidden="true"]').count(), "the still draws its region boxes").toBeGreaterThan(0);
+  await expect(page.locator('[data-testid="landing-hero-still"] span[aria-hidden="true"]').first()).toBeVisible();
+  expect(posters, "no poster request on a phone while the still stands in").toEqual([]);
 });

@@ -3060,10 +3060,10 @@ export default function WorkspacePage() {
                   workspace, where it is the first and largest thing on the page.
                 */}
                 {workspaceState.mode === "new" && surface === "home" ? (
-                  <h1 id="workspace-intake-title">Drop files, folders or ZIP here</h1>
+                  <h1 id="workspace-intake-title"><UploadCloud size={22} aria-hidden="true" />Drop files, folders or ZIP here</h1>
                 ) : (
                   /* Founder 2026-10-27: the returning bar names the drop too (the whole section takes one), in the new box's words. */
-                  <h2 id="workspace-intake-title">Drop files, folders or ZIP here</h2>
+                  <h2 id="workspace-intake-title"><UploadCloud size={22} aria-hidden="true" />Drop files, folders or ZIP here</h2>
                 )}
                 <p>
                   {workspaceState.mode === "new"
@@ -3397,7 +3397,7 @@ export default function WorkspacePage() {
                 <p>Compile one or more ready sources into the next candidate. Tick them on the board above; nothing becomes active until you review it.</p>
                 <div className="compile-selection-actions">
                   <small>
-                    {selectedDocumentIds.length} OCR-qualified document{selectedDocumentIds.length === 1 ? "" : "s"} selected
+                    <b>{selectedDocumentIds.length} OCR-qualified document{selectedDocumentIds.length === 1 ? "" : "s"} selected</b>
                     {" · "}{compileLimits}
                   </small>
                   <button type="button" disabled={busy || !judgeCorpusSet(selectedDocumentIds.length).ok} onClick={() => void compileSelectedDocuments()}>

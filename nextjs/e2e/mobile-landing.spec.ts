@@ -267,7 +267,11 @@ test.describe("on a touch screen", () => {
            cut to one source panel (`overflow: clip`) on both axes. Exempt only while it holds no text of its own. */
         const phonePane = innerWidth < 768 && element.matches('.compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-viewport') &&
           style.overflowX === "clip" && !(element.innerText ?? "").trim();
-        if (!pageWindowCrop && !regionWindow && !phonePane && hides(style.overflowY) && element.scrollHeight - element.clientHeight > 2) {
+        /* Direction C round 2 (lib/hero-phone-mode.ts): the phone hero's still is the same declared crop of the committed page
+           as s2's window -- the regions it shows, one image and no text -- so it is exempt vertically; width is still checked. */
+        const heroStill = element.closest('figure[data-testid="landing-hero-still"]') !== null &&
+          element.querySelectorAll("img").length === 1 && !(element.textContent ?? "").trim();
+        if (!pageWindowCrop && !heroStill && !regionWindow && !phonePane && hides(style.overflowY) && element.scrollHeight - element.clientHeight > 2) {
           result.push({ selector, axis: "y", hidden: element.scrollHeight - element.clientHeight });
         }
         if (!regionWindow && !phonePane && hides(style.overflowX) && element.scrollWidth - element.clientWidth > 2) {

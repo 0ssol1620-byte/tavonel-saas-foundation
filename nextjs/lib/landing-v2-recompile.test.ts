@@ -106,7 +106,8 @@ describe("Scene 05 recompile", () => {
     const html = render(locale);
     const copy = LANDING_V2_COPY[locale].recompile;
     expect(html).toContain(copy.arrivalsLabel);
-    expect(html).toContain(copy.compared);
+    // Direction C (2026-11-04): the sentence about the counts left with the counts (next case).
+    expect(html).not.toContain(copy.compared);
     expect(html).not.toContain(exploreChangeStory.before.label);
     /*
       The record's own labels are typed strings and neither may reach the page as a string.
@@ -121,27 +122,25 @@ describe("Scene 05 recompile", () => {
     for (const arrival of view.arrivals) expect(html).toContain(`${arrival.form} · ${arrival.filingDate}`);
   });
 
-  it("prints each count with its noun and the engine that emitted it", () => {
-    const html = render("en");
-    const copy = LANDING_V2_COPY.en.recompile;
-    for (const [key, label] of [
-      [view.counts.rebuilt, copy.countLabels.rebuilt],
-      [view.counts.added, copy.countLabels.added],
-      [view.counts.untouched, copy.countLabels.untouched],
-    ] as const) {
-      expect(html).toContain(`>${key.toLocaleString("en-US")}</b>`);
-      expect(html).toContain(label);
+  /*
+    Direction C (2026-11-04, BRIEF item 4): the three counts (rebuilt, added, untouched), the sentence that
+    said what they compare and the engine qualifier left Home. They are computed from the committed sample
+    World, but no sha256-bound receipt under docs/evidence carries them, and the brief deletes a Home number
+    without one. This case used to pin that each count printed with its noun; it now pins that none does,
+    and that the data -- and /explore's own qualifier, which still travels with the counts there -- is intact.
+  */
+  it("prints no count, no count label and no qualifier on Home; the counts stay on the change record", () => {
+    for (const locale of locales) {
+      const html = render(locale);
+      const copy = LANDING_V2_COPY[locale].recompile;
+      for (const label of Object.values(copy.countLabels)) expect(html).not.toContain(label);
+      expect(html).not.toContain(`aria-label="${copy.compareLabel}"`);
+      expect(html).not.toContain(RECOMPILE_COUNTS_QUALIFIER[locale]);
+      expect(html).not.toContain(`>${view.counts.rebuilt.toLocaleString("en-US")}</b>`);
     }
-    // The list keeps its noun as its accessible name (FINAL-SPEC 2026-10-26 §2.5).
-    expect(html).toContain(`aria-label="${copy.compareLabel}"`);
-    // BA-034: the qualifier travels with the figures, and it is /explore's own sentence.
+    expect(view.hrefs.change).toBe("/explore?act=change");
     expect(RECOMPILE_COUNTS_QUALIFIER.en).toBe(EXPLORE_COPY.countsQualifier);
-    expect(html).toContain(EXPLORE_COPY.countsQualifier);
-  });
-
-  it("omits the removed count while it is zero", () => {
-    expect(exploreChangeStory.counts.removed).toBe(0);
-    expect(render("en")).not.toContain(LANDING_V2_COPY.en.recompile.countLabels.removed);
+    expect(view.counts.rebuilt + view.counts.added + view.counts.untouched).toBeGreaterThan(0);
   });
 
   /*
@@ -183,10 +182,10 @@ describe("Scene 05 recompile", () => {
     const state = view.affectedSample[0]!.state;
     // No state word is printed any more (D-21); the English one may never be (D12).
     expect(html).not.toContain(landingV2StateWord(state, "en"));
-    expect(html).toContain(LANDING_V2_COPY.ko.recompile.compared);
+    // Direction C: the sentence and the qualifier are no longer printed here; their Korean stays drift-free in the deck.
     expect(koTermDrift(LANDING_V2_COPY.ko.recompile.compared)).toEqual([]);
-    expect(html).toContain(RECOMPILE_COUNTS_QUALIFIER.ko);
     expect(koTermDrift(RECOMPILE_COUNTS_QUALIFIER.ko)).toEqual([]);
+    expect(html).toContain(LANDING_V2_COPY.ko.recompile.arrivalsLabel);
     expect(koTermDrift(Object.values(RECOMPILE_ACTIONS.ko).join(" "))).toEqual([]);
   });
 });

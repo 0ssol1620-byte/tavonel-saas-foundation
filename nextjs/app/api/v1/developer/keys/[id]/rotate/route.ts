@@ -4,6 +4,7 @@ import { parseDeveloperScopes, type DeveloperScope } from "@/lib/developer-contr
 import { rotateDeveloperApiKey } from "@/lib/developer-store";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { trialAiAccess } from "@/lib/trial-ai-access";
+import { reservedKeyName } from "@/lib/remote-mcp";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -24,7 +25,7 @@ async function readRotateInput(request: Request): Promise<RotateInput> {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const scopes = parseDeveloperScopes(body.scopes);
   const expiresInDays = body.expiresInDays === null || body.expiresInDays === undefined ? null : Number(body.expiresInDays);
-  if (!name || name.length > 80 || !scopes || (expiresInDays !== null && (!Number.isSafeInteger(expiresInDays) || expiresInDays < 1 || expiresInDays > 365))) {
+  if (!name || name.length > 80 || reservedKeyName(name) || !scopes || (expiresInDays !== null && (!Number.isSafeInteger(expiresInDays) || expiresInDays < 1 || expiresInDays > 365))) {
     return { ok: false, code: "API_KEY_INPUT_INVALID", status: 400 };
   }
   return { ok: true, name, scopes, expiresInDays };

@@ -37,7 +37,7 @@ async function fixture(enabled = true) {
       get: async key => { const bytes = objects.get(key); return bytes ? { size: bytes.length, arrayBuffer: async () => bytes.slice().buffer } : null; },
       put: async (key, value) => { objects.set(key, new Uint8Array(value)); return {}; },
     } };
-  const fetcher = (async (_url, init) => { calls++; if (enabled) assert.equal(init?.redirect, "error");
+  const fetcher = (async (_url, init) => { calls++; if (enabled) assert.equal(init?.redirect, "manual");
     return providerResponse(payload(sanitizedSha256, key)); }) as typeof fetch;
   const run = () => dispatchOcrAfterSanitize(env, key, fetcher);
   const proof = async () => {
@@ -71,7 +71,7 @@ describe("completed read persisted OCR boundary", () => {
         Object.defineProperty(response, "url", { value: endpoint });
       }
       await assert.rejects(() => dispatchOcrAfterSanitize(f.env, f.key, async (_url, init) => {
-        assert.equal(init?.redirect, "error"); return response;
+        assert.equal(init?.redirect, "manual"); return response;
       }), OcrEvidenceRetryableError);
       assert.equal(f.objects.has(f.ocrKey), false);
     }

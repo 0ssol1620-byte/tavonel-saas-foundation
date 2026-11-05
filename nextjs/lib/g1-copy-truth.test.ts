@@ -214,7 +214,7 @@ describe("G1-COPY: Home promise A (D-01 / P2-30)", () => {
     expect(home).not.toContain("TAVONEL reads your PDFs");
     expect(home).toContain('intake: "We arrange intake for your own sources with you."');
     expect(home).toContain('intake: "내 자료의 연결과 컴파일은 상담 후 함께 설정합니다."');
-    expect(read("lib/site-navigation.ts")).toContain('headline: "Turn documents into context your AI can cite."');
+    expect(read("lib/site-navigation.ts")).toContain('headline: "Context your AI can cite, compiled from your documents."');
   });
 });
 

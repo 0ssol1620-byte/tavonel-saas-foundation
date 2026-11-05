@@ -572,6 +572,32 @@ export async function recordCompileJobDeferral(input: {
   reason: string;
   attempt: number;
 }): Promise<CompileJobResult<{ recorded: true }>> {
+  return insertCompileJobEvent(input, { reason: input.reason, attempt: input.attempt });
+}
+
+/**
+ * The size refusal behind a JSON_TOO_LARGE, written as its own event just before the failure.
+ *
+ * The failure itself goes through `advance_foundation_compile_job`, whose detail is fixed at
+ * `{blocked, collectionId, blockedResolution}`; without this row the database said only that
+ * something was too large, never what or by how much. The detail is the object's name, its byte
+ * count and the bound -- no key and no document text.
+ */
+export async function recordCompileJobSizeLimit(input: {
+  job: CompileJob;
+  state: CompileState;
+  documentsReady: number;
+  blocked: CompileBlocker[];
+  reason: string;
+  sizeLimit: Record<string, unknown>;
+}): Promise<CompileJobResult<{ recorded: true }>> {
+  return insertCompileJobEvent(input, { reason: input.reason, sizeLimit: input.sizeLimit });
+}
+
+async function insertCompileJobEvent(
+  input: { job: CompileJob; state: CompileState; documentsReady: number; blocked: CompileBlocker[]; reason: string },
+  observed: Record<string, unknown>,
+): Promise<CompileJobResult<{ recorded: true }>> {
   const { job } = input;
   if (!WORKSPACE_KEY.test(job.workspaceKey) || !COMPILE_JOB_ID.test(job.jobId)) {
     return fail("COMPILE_JOB_SCOPE_INVALID");
@@ -592,8 +618,7 @@ export async function recordCompileJobDeferral(input: {
         collectionId: job.collectionId,
         blocked: input.blocked,
         blockedResolution: job.blockedResolution,
-        reason: input.reason,
-        attempt: input.attempt,
+        ...observed,
       },
     }),
   });

@@ -52,6 +52,26 @@ export const REMOTE_MCP_TOOL_SCOPES: Readonly<Record<string, DeveloperScope>> = 
 /** The only scopes a remote MCP token may hold. A key holding anything else is refused. */
 export const REMOTE_MCP_SCOPES: readonly DeveloperScope[] = [...new Set(Object.values(REMOTE_MCP_TOOL_SCOPES))].sort();
 
+/**
+ * W1-A1 canary cohort: TAVONEL_REMOTE_MCP_COHORT, one to REMOTE_MCP_COHORT_MAX exact workspace keys,
+ * comma-separated. Every consent, every token issued and every authenticated call passes it, and so
+ * does an Ask whose receipt mode is `on` (W1-A5).
+ *
+ * Its own variable, not the processing cohort's (review R1 M5): setting the processing cohort to a
+ * canary of three would also narrow which workspaces may process sources. Unset, empty, malformed
+ * or wider than the cap admits nobody -- the canary fails closed. Widening is a reviewed change.
+ */
+export const REMOTE_MCP_COHORT_MAX = 3;
+const COHORT_WORKSPACE = /^pilot-[A-Za-z0-9]{1,16}$/;
+export type RemoteMcpCohortRefusal = "REMOTE_MCP_COHORT_EXCLUDED" | "REMOTE_MCP_COHORT_CONFIG_INVALID";
+export function remoteMcpCohortRefusal(workspaceKey: string, env: Env = process.env): RemoteMcpCohortRefusal | null {
+  const ids = (env.TAVONEL_REMOTE_MCP_COHORT ?? "").split(",").map((id) => id.trim());
+  if (ids.length > REMOTE_MCP_COHORT_MAX || !ids.every((id) => COHORT_WORKSPACE.test(id))) return "REMOTE_MCP_COHORT_CONFIG_INVALID";
+  return ids.includes(workspaceKey) ? null : "REMOTE_MCP_COHORT_EXCLUDED";
+}
+/** Excluded is the caller's answer (403); a cohort that cannot be read is the server's (503). */
+export const cohortRefusalStatus = (code: RemoteMcpCohortRefusal) => (code === "REMOTE_MCP_COHORT_EXCLUDED" ? 403 : 503);
+
 export const REMOTE_MCP_CODE_TTL_SECONDS = 120;
 export const REMOTE_MCP_TOKEN_TTL_SECONDS = 3600;
 
@@ -386,6 +406,8 @@ export type TokenGrant = {
   authorizationRevision: number;
   scopes: DeveloperScope[];
   clientName: string;
+  /** The registered client id (sealed); its hash tags the key so a reconnect replaces its own key. */
+  clientId: string;
   /** The code's single-use marker, written into the key name. */
   codeId: string;
 };
@@ -417,12 +439,22 @@ export function checkTokenRequest(form: URLSearchParams, key: Buffer, origin: st
   if (scopes.length !== claims.s.length || scopes.length === 0) return bad("invalid_grant", "The authorization code carries a scope this server does not grant.");
   return {
     ok: true,
-    grant: { userId: claims.u, workspaceKey: claims.w, authorizationRevision: Number(claims.a), scopes, clientName: client.n, codeId: claims.j },
+    grant: { userId: claims.u, workspaceKey: claims.w, authorizationRevision: Number(claims.a), scopes, clientName: client.n, clientId, codeId: claims.j },
   };
 }
 
-/** The key name carries the code id, which is how a second redemption of one code is recognised. */
-export const keyNameFor = (grant: TokenGrant) => `MCP: ${grant.clientName} #${grant.codeId}`;
+/**
+ * Every key the remote MCP mints is named `MCP: ...`, so a member recognises it under Developers, and
+ * new hand-made keys may not take the prefix (the create and rotate routes refuse it). The name is a
+ * label only: which rows are MCP keys -- listed apart, revoked in bulk -- is their stored token_kind
+ * (lib/developer-store.ts, review R2 N1), so a legacy hand-made key named "MCP: ..." stays manual.
+ * Among MCP-kind rows the name carries the client's tag and the code id: the tag is how a reconnect
+ * replaces its own earlier key, the code id how a second redemption of one code is recognised.
+ */
+export const REMOTE_MCP_KEY_NAME_PREFIX = "MCP: ";
+export const reservedKeyName = (name: string) => name.trim().toUpperCase().startsWith("MCP:");
+export const clientTag = (clientId: string) => createHash("sha256").update(clientId).digest("hex").slice(0, 12);
+export const keyNameFor = (grant: TokenGrant) => `${REMOTE_MCP_KEY_NAME_PREFIX}${grant.clientName} ~${clientTag(grant.clientId)} #${grant.codeId}`;
 export const codeIdMarker = (codeId: string) => ` #${codeId}`;
 
 /* ------------------------------------------------------------- bearer at /mcp */
@@ -443,7 +475,7 @@ export type BearerCheck =
 export async function checkBearer(authorization: string | null): Promise<BearerCheck> {
   if (authorization === null || authorization === "") return { kind: "anonymous" };
   const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
-  if (!token.startsWith("tvnl_live_")) return { kind: "rejected", description: "The bearer is not a TAVONEL access token." };
+  if (!token.startsWith("tvnl_live_") && !token.startsWith("tvnl_mcp_")) return { kind: "rejected", description: "The bearer is not a TAVONEL access token." };
   const authenticated = await authenticateDeveloperApiKey(token);
   if (!authenticated.ok) {
     return { kind: "rejected", description: authenticated.code === "API_KEY_EXPIRED" ? "The access token has expired." : "The access token is not valid." };
@@ -453,6 +485,63 @@ export async function checkBearer(authorization: string | null): Promise<BearerC
     return { kind: "rejected", description: "The access token carries a write scope; the remote MCP endpoint accepts read-only tokens." };
   }
   return { kind: "principal", token, scopes, workspaceKey: authenticated.principal.workspaceKey };
+}
+
+/* ------------------------------------------------------------------- telemetry */
+
+/** The tool's name when it is one of the nine, else "unknown": a client-chosen string never reaches a log. */
+export const remoteMcpToolLabel = (name: string | null) => (name !== null && Object.hasOwn(REMOTE_MCP_TOOL_SCOPES, name) ? name : "unknown");
+
+const CODE = /^[A-Z][A-Z0-9_]{2,63}/;
+/**
+ * The constant code a refusal or a failed tool result leads with -- for the bridge's
+ * `API_ERROR_404: WORLD_NOT_FOUND`, the API's own code after the status -- else TOOL_FAILED.
+ * Only `[A-Z0-9_]` survives, so no message text, id or question can ride along.
+ */
+export function toolFailureCode(text: unknown): string {
+  if (typeof text !== "string") return "TOOL_FAILED";
+  const api = /^API_ERROR_[0-9]{3}: ([A-Z][A-Z0-9_]{2,63})/.exec(text);
+  return api?.[1] ?? CODE.exec(text)?.[0] ?? "TOOL_FAILED";
+}
+
+export const REMOTE_MCP_SLI_SCHEMA = "tavonel.remote_mcp_sli.v1" as const;
+/**
+ * `status` is the HTTP status of the POST. `upstreamStatus` is the worst status among the /api/v1
+ * routes the call dispatched to in-process (null when it reached none): a tool failure travels
+ * inside a 200 JSON-RPC result, so an SLI that read the HTTP status alone would never see a 5xx
+ * from the routes behind the tools.
+ */
+export type RemoteMcpSliRecord = { sli: typeof REMOTE_MCP_SLI_SCHEMA; method: string; tool: string | null; status: number; upstreamStatus: number | null; durationMs: number };
+
+
+/** One structured line per /api/mcp POST on the server log (the funnel's sink, read by the log drain). */
+export function recordRemoteMcpSli(input: { method: string | null; tool: string | null; status: number; upstreamStatus?: number | null; durationMs: number }) {
+  const method = input.method !== null && /^[a-z/]{1,40}$/.test(input.method) ? input.method : "unknown";
+  const record: RemoteMcpSliRecord = {
+    sli: REMOTE_MCP_SLI_SCHEMA,
+    method,
+    tool: method === "tools/call" ? remoteMcpToolLabel(input.tool) : null,
+    status: input.status,
+    upstreamStatus: input.upstreamStatus ?? null,
+    durationMs: Math.round(input.durationMs * 10) / 10,
+  };
+  try { console.info(JSON.stringify(record)); } catch { /* telemetry never breaks an answer */ }
+}
+
+/**
+ * p50/p95 latency and the 5xx ratio over SLI lines. The denominator is every call recorded --
+ * refusals included -- and is returned beside the ratio, never without it. A call is a 5xx when
+ * the POST was, or when the route its tool reached was (`upstreamStatus`); `http5xx` counts the
+ * first kind alone. Nearest-rank percentiles; null when there are no calls rather than a zero
+ * that reads as a measurement.
+ */
+export function summarizeRemoteMcpSli(records: readonly (Pick<RemoteMcpSliRecord, "status" | "durationMs"> & { upstreamStatus?: number | null })[]) {
+  const calls = records.length;
+  const sorted = records.map((record) => record.durationMs).sort((a, b) => a - b);
+  const rank = (p: number) => (calls === 0 ? null : sorted[Math.max(0, Math.ceil(p * calls) - 1)]!);
+  const http5xx = records.filter((record) => record.status >= 500).length;
+  const server5xx = records.filter((record) => record.status >= 500 || (record.upstreamStatus ?? 0) >= 500).length;
+  return { calls, p50Ms: rank(0.5), p95Ms: rank(0.95), http5xx, server5xx, server5xxRatio: calls === 0 ? null : server5xx / calls };
 }
 
 /** RFC 6750 §3 challenge, with the RFC 9728 pointer MCP clients start discovery from. */

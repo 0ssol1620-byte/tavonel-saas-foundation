@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trackFunnel } from "@/lib/funnel-events";
 
 type HeroActionsProps = {
@@ -27,21 +27,27 @@ export default function HeroActions(props: HeroActionsProps) {
   const [primary, secondary] = ctaOrderVariant === "b" ? [access, explore] : [explore, access];
   const entryRef = useRef<HTMLAnchorElement>(null);
   const drawsEntry = entry && secondary === access;
+  // While files are dragged over the page the entry says it is where they go (CRITIQUE-R1 #5); it says nothing else.
+  const [dragging, setDragging] = useState(false);
   // A file dropped anywhere on Home would open in the tab and leave the site. Home keeps no file: the drop only
   // takes the visitor to the document entry (PR #177 review round 2, nit 1).
   useEffect(() => {
     if (!drawsEntry) return;
     const hasFiles = (event: DragEvent) => event.dataTransfer?.types.includes("Files") ?? false;
-    const onDragOver = (event: DragEvent) => { if (hasFiles(event)) event.preventDefault(); };
+    const onDragOver = (event: DragEvent) => { if (hasFiles(event)) { event.preventDefault(); setDragging(true); } };
+    const onDragLeave = (event: DragEvent) => { if (!event.relatedTarget) setDragging(false); };
     const onDrop = (event: DragEvent) => {
+      setDragging(false);
       if (event.defaultPrevented || !hasFiles(event)) return;
       event.preventDefault();
       entryRef.current?.focus();
       entryRef.current?.scrollIntoView({ block: "center" });
     };
     document.addEventListener("dragover", onDragOver);
+    document.addEventListener("dragleave", onDragLeave);
     document.addEventListener("drop", onDrop);
     return () => {
+      document.removeEventListener("dragleave", onDragLeave);
       document.removeEventListener("dragover", onDragOver);
       document.removeEventListener("drop", onDrop);
     };
@@ -59,7 +65,7 @@ export default function HeroActions(props: HeroActionsProps) {
       </Link>
       {drawsEntry ? (
         <Link ref={entryRef} className="lv2-entry" href={secondary.href as Route} prefetch={false}
-          onClick={onSelect(secondary)} data-analytics="hero-secondary">
+          onClick={onSelect(secondary)} data-analytics="hero-secondary" data-drag={dragging ? "" : undefined}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" focusable="false">
             <path d="M3.5 1.5h6l3 3v10h-9zM9.5 1.5v3h3" />
           </svg>

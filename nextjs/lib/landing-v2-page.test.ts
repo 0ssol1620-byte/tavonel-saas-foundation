@@ -55,18 +55,17 @@ vi.mock("./commercial-state", async importOriginal => {
   };
 });
 
-import LandingPage, { RECORD_EXCERPT } from "../components/landing-v2/landing-page";
+import LandingPage, { receiveFromCase } from "../components/landing-v2/landing-page";
 import HomeReaderGuide from "../components/landing-v2/home-reader-guide";
 import { compactFooterLinks } from "../components/public-site-chrome";
 import { SAMPLE_BOUNDARY } from "../components/landing-v2/scenes/start";
 import EvaluationPage from "../components/evaluation-page";
 import HeroActions from "../components/landing-v2/hero-actions";
 import { primaryCallToAction } from "./commercial-state";
-import { buildHomeEvidenceCase, type EvidenceCase } from "./home-evidence-view";
+import { buildHomeEvidenceCase, selectHomeCase, type EvidenceCase } from "./home-evidence-view";
 import { LANDING_V2_COPY, type LandingV2Locale } from "./landing-v2-copy";
 import { landingV2HeroExtra } from "./landing-v2-hero-copy";
-import { buildHeroView, buildProofTabs, buildReceiveRecord, buildRecompileView, landingV2StateWord } from "./landing-v2-runtime";
-import { excerptPreview } from "./explore-entry-proof";
+import { buildHeroView, buildProofTabs, buildReceiveRecord, buildRecompileView } from "./landing-v2-runtime";
 import { activationPolicy } from "./activation-policy";
 import { TRAINING_DATA_CLAIM } from "./security-claims";
 import {
@@ -332,7 +331,8 @@ const attr = (open: string, name: string): string | undefined =>
  * The first three beats are the source, its difficulty and its record, all read on paper; the
  * change, trust and close beats keep the dark grounds their own components declare.
  */
-const GROUND = ["paper", "paper", "paper", "obsidian", "obsidian", "obsidian"];
+/* Direction C (2026-11-04): one warm canvas for all six scenes; the obsidian flip at s4-s6 is gone (s6 is a navy block inside the canvas). */
+const GROUND = ["paper", "paper", "paper", "paper", "paper", "paper"];
 
 /** One scene's markup: from its own `<section>` to the next one (scenes never nest). */
 function sceneOf(main: string, id: string): string {
@@ -469,7 +469,7 @@ describe("landing v2 -- the composition", () => {
       const expected =
         locale === "ko"
           ? "문서를 AI가 인용할 수 있는 맥락으로 바꿉니다."
-          : "Turn documents into context your AI can cite.";
+          : "Context your AI can cite, compiled from your documents.";
       expect(bare(heading.replace(/<[^>]*>/g, ""))).toBe(bare(expected));
       /*
         R3 (design critique R2-B1): /ko holds "인용할 수 있는" on one line (.lv2-keep, nowrap on Home) so 수 never ends a
@@ -953,23 +953,27 @@ describe("landing v2 -- difficulty and record", () => {
     expect(readable(mainOf(render(locale))).split(rights).length - 1).toBe(1);
   });
 
-  // FINAL-SPEC 2026-10-26 §2.4: same record and rule, four fields, its own region, no links. The quote is the
-  // §2.9 lever-1 length, 120 and then 90 (review 2026-10-26 B-1): the record's own label cut by excerptPreview, never
-  // edited text.
-  it.each(LOCALES)("%s prints the sample record with its own status, version and region", locale => {
+  /*
+    Direction C round 2 (CRITIQUE-R1 #2): s3 shows the passage s2 opened on, from the same evidence case
+    (receiveFromCase), labelled as what the sample records it to be -- an existing extracted passage --
+    and printed exactly as the reader returned it under "Reader output, unedited". Four fields, its own
+    region, no links, nothing called verified. Replaces the record-and-rule test: the claim rule picked
+    a 10-K fiscal-calendar disclaimer, which the critic found useless as the showcase.
+  */
+  it.each(LOCALES)("%s prints the s2 passage as the received record, unedited, with its version and region", locale => {
     const receive = sceneOf(mainOf(render(locale)), "s3");
-    const record = buildReceiveRecord();
+    const korean = locale === "ko";
+    const shown = receiveFromCase(selectHomeCase([buildHomeEvidenceCase(buildHeroView(), buildProofTabs())]), korean);
+    expect(shown, "the published case has a passage to receive").not.toBeNull();
     const text = readable(receive);
-    expect(RECORD_EXCERPT).toBe(90);
-    const preview = excerptPreview(record.claim.label, RECORD_EXCERPT);
     const quote = receive.match(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/)?.[1];
-    expect(quote).toBe(escaped(preview.text) + (preview.truncated ? "…" : ""));
-    expect(record.claim.label.startsWith(preview.text)).toBe(true);
-    expect(text).toContain(landingV2StateWord(record.status.state, locale));
-    expect(text).toContain(record.version.digest);
-    expect(text).toContain(record.source.filename);
-    expect(text).toContain(`bbox ${record.region.bbox1000.join(",")}`);
-    expect(receive).toContain(`data-bbox1000="${record.region.bbox1000.join(",")}"`);
+    expect(quote).toBe(escaped(shown!.passage) + (shown!.truncated ? "…" : ""));
+    expect(text).toContain(shown!.kindLabel);
+    expect(text).toContain(shown!.unedited);
+    expect(text).toContain(shown!.digest);
+    expect(text).toContain(`bbox ${shown!.bbox1000.join(",")}`);
+    expect(receive).toContain(`data-bbox1000="${shown!.bbox1000.join(",")}"`);
+    expect(shown!.passage).toMatch(/^Operating expenses:/);
     expect(elements(receive, "a")).toHaveLength(0);
     expect(text).not.toMatch(/verified answer/i);
     expect(receive).not.toMatch(/>\s*(verified|검증됨)\s*</i);
@@ -1036,13 +1040,15 @@ describe("Home substance renders expanded (redesign brief 2026-10-15, move 3)", 
       reader (no `<details open>` anywhere). s4 keeps its counts in the open with their list name;
       s5 keeps one note open, the training-data sentence (F-2), verbatim.
     */
-    it(`${korean ? "/ko" : "/"} prints the counts and the training sentence unfolded, and opens no disclosure`, () => {
+    it(`${korean ? "/ko" : "/"} prints the arrivals and the training sentence unfolded, and opens no disclosure`, () => {
       const html = renderToStaticMarkup(createElement(LandingPage, { korean }));
       const scene = (id: string, end: string) => html.slice(html.indexOf(`id="${id}"`), html.indexOf(end));
       const s4 = scene("s4", 'id="s5"');
       const s5 = scene("s5", 'id="s6"');
       expect(s4).not.toContain("<details");
-      expect(s4).toContain(`aria-label="${escaped(LANDING_V2_COPY[korean ? "ko" : "en"].recompile.compareLabel)}"`);
+      // Direction C (2026-11-04): s4 prints the filings that arrived, not the three counts (BRIEF item 4).
+      expect(s4).not.toContain(`aria-label="${escaped(LANDING_V2_COPY[korean ? "ko" : "en"].recompile.compareLabel)}"`);
+      expect(s4).toContain(escaped(LANDING_V2_COPY[korean ? "ko" : "en"].recompile.arrivalsLabel));
       expect(s5).not.toContain("<details");
       const notes = [...s5.matchAll(/<p class="lv2-proof-note[^"]*">([\s\S]*?)<\/p>/g)].map(match => readable(match[1]!));
       expect(notes).toEqual([LANDING_V2_COPY[korean ? "ko" : "en"].trust.proofs[0]!.note]);
