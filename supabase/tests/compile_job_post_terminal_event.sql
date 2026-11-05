@@ -1,4 +1,4 @@
--- Migration 20261105120000, and the compare-and-set lease the worker sends as a PATCH.
+-- Migration 20261105080000, and the compare-and-set lease the worker sends as a PATCH.
 --
 -- cjob-157f2f23 (2026-11-05): seq 158 `failed`, then seq 159 `structuring` from a duplicate
 -- runner that had passed a bare stale-lease clock check. Job J walks to failed and the late row is

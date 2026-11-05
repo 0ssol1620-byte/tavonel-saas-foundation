@@ -4,7 +4,7 @@ import { claimCompileJobLease, recordCompileJobSizeLimit, type CompileJob } from
 /*
   cjob-157f2f23 (2026-11-05). Two runners took one stale lease and ran Core twice, and the second
   appended a `structuring` row after `failed`. The lease is now a compare-and-set PATCH on the row
-  as read, and the database refuses a post-terminal row (migration 20261105120000, exercised in
+  as read, and the database refuses a post-terminal row (migration 20261105080000, exercised in
   supabase/tests/compile_job_post_terminal_event.sql). These pin what the application sends and
   what it does with the refusal.
 */

@@ -157,7 +157,7 @@ export type CompileJobFailure =
   | "COMPILE_JOB_RPC_UNDEFINED"
   /*
     The database refused an event row for a job that is already terminal
-    (`compile_job_post_terminal_event`, migration 20261105120000). Nothing was written.
+    (`compile_job_post_terminal_event`, migration 20261105080000). Nothing was written.
   */
   | "COMPILE_JOB_ALREADY_SETTLED";
 
