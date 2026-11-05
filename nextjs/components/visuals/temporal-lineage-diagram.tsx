@@ -5,7 +5,8 @@ import DiagramFrame, { Step, styles } from "./diagram-frame";
  * between them. The state words carry the state colours and nothing else does (DESIGN_MASTER
  * §4.3): changed / added in the changed tone, reached in evidence, unchanged in muted ink.
  */
-const REVISIONS = ["Revision 1", "Revision 2", "Revision 3"] as const;
+const REVISIONS = ["Revision A", "Revision B", "Revision C"] as const;
+const WORLDS = ["earlier World", "next World", "latest World"] as const;
 type Row = readonly [word: string, tone: "changed" | "evidence" | "muted", note: string];
 const PAIRS: ReadonlyArray<readonly Row[]> = [
   [["changed", "changed", "one clause's wording"], ["reached", "evidence", "objects citing it, rebuilt"], ["unchanged", "muted", "same identity, carried"]],
@@ -49,7 +50,7 @@ export default function TemporalLineageDiagram({ className }: { className?: stri
                 <Step key={label} i={i * 2}>
                   <text x={x} y="54" className={styles.label} textAnchor="middle">{label}</text>
                   <circle cx={x} cy="74" r="6" className={i === 2 ? `${styles.boxStrong} ${styles.evidence}` : styles.boxStrong} />
-                  <text x={x} y="100" className={styles.mono} textAnchor="middle">{`World v${i + 1}`}</text>
+                  <text x={x} y="100" className={styles.mono} textAnchor="middle">{WORLDS[i]}</text>
                 </Step>
               );
             })}
@@ -76,7 +77,7 @@ export default function TemporalLineageDiagram({ className }: { className?: stri
                 <Step key={label} i={i * 2}>
                   <circle cx="12" cy={y} r="6" className={i === 2 ? `${styles.boxStrong} ${styles.evidence}` : styles.boxStrong} />
                   <text x="30" y={y + 5} className={styles.label}>{label}</text>
-                  <text x="356" y={y + 5} className={styles.mono} textAnchor="end">{`World v${i + 1}`}</text>
+                  <text x="356" y={y + 5} className={styles.mono} textAnchor="end">{WORLDS[i]}</text>
                 </Step>
               );
             })}

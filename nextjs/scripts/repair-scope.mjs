@@ -2363,6 +2363,35 @@ export const CONSENT_POSTER_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/trust-page-answers.test.ts',
 ]);
 export const CONSENT_POSTER_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/landing-hero-film-loading.spec.ts', 'e2e/templates.spec.ts']);
+// W1-L7 visuals lane (codex/w1-visuals-20261104, PR #191): the dev-only preview route, the four diagram components with their
+// frame and stylesheet, the ten captures with their MANIFEST, the capture script and the suite that hashes them. Exactly these
+// 21 paths select the visuals suite and the route-metadata suite (the preview is a route). No page imports them yet;
+// placement on a public page is a separate owner and a separate review. A new capture name is a new review. Product UI assets,
+// so never nativeReuse.
+export const VISUALS_AFFECTED_PATHS = Object.freeze([
+  'app/dev/visuals/page.tsx',
+  'app/dev/visuals/visuals-preview.tsx',
+  'components/visuals/compile-pipeline-diagram.tsx',
+  'components/visuals/diagram-frame.tsx',
+  'components/visuals/fail-closed-gate-diagram.tsx',
+  'components/visuals/provenance-chain-diagram.tsx',
+  'components/visuals/temporal-lineage-diagram.tsx',
+  'components/visuals/visuals.module.css',
+  'lib/visuals-diagrams.test.ts',
+  'public/visuals/MANIFEST.json',
+  'public/visuals/change-center-1440.webp',
+  'public/visuals/change-center-390.webp',
+  'public/visuals/compile-timeline-1440.webp',
+  'public/visuals/compile-timeline-390.webp',
+  'public/visuals/evidence-inspector-1440.webp',
+  'public/visuals/evidence-inspector-390.webp',
+  'public/visuals/sources-board-1440.webp',
+  'public/visuals/sources-board-390.webp',
+  'public/visuals/use-with-ai-1440.webp',
+  'public/visuals/use-with-ai-390.webp',
+  'scripts/visuals/capture-visuals.mjs',
+]);
+export const VISUALS_AFFECTED_UNIT_FILES = Object.freeze(['lib/page-metadata.test.ts', 'lib/visuals-diagrams.test.ts']);
 // B35 operational SLI alert delivery (codex/ops-alert-delivery-20261102): the route that now posts a breach to the operations
 // webhook, its store module and their two suites. They select those suites, the delivery suite behind deliverOperationsAlert and
 // the suites that read every app/api route source. Product code, so never nativeReuse; no browser, database, worker or build lane.
@@ -2900,6 +2929,9 @@ export const AFFECTED_GROUPS = Object.freeze([
     { unitFiles: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES }),
   affectedGroup('consent-poster', new RegExp(`^nextjs/(?:${exactPathAlternation(CONSENT_POSTER_AFFECTED_PATHS)})$`),
     { unitFiles: CONSENT_POSTER_AFFECTED_UNIT_FILES, browserFiles: CONSENT_POSTER_AFFECTED_BROWSER_FILES }),
+  // visuals: the 21 exact paths above select 2 direct suites and no browser suite.
+  affectedGroup('visuals', new RegExp(`^nextjs/(?:${exactPathAlternation(VISUALS_AFFECTED_PATHS)})$`),
+    { unitFiles: VISUALS_AFFECTED_UNIT_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json|wrangler\.jsonc)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.

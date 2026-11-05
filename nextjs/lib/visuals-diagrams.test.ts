@@ -3,7 +3,7 @@
  * unchanged (lib/home-reader-heading-css-registration.test.ts asserts it is).
  */
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { createElement } from "react";
@@ -57,8 +57,17 @@ describe.each(DIAGRAMS)("%s", (name, file, Diagram) => {
     }
   });
 
-  it("uses currentColor and tokens, never a hard-coded fill or stroke", () => {
-    expect(html).not.toMatch(/(fill|stroke)="#/);
+  it("uses currentColor and tokens, never a hard-coded fill, stroke, style or color literal", () => {
+    const source = readFileSync(here(`../components/visuals/${file}`), "utf8");
+    expect(html).not.toMatch(/(fill|stroke|color)="(?!none")[^"]/);
+    // The only inline style is a step's place in the arrival order.
+    for (const [, style] of html.matchAll(/style="([^"]*)"/g)) expect(style).toMatch(/^--i:\s*\d+;?$/);
+    expect(source).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(|\bcolor\s*:/i);
+  });
+
+  it("prints no digit anywhere a reader sees: text, title or desc", () => {
+    const visible = html.replace(/<[^>]*>/g, " ").replace(/&#x?[0-9a-f]+;/gi, "_");
+    expect(visible, "a number in a diagram is a claim; claims need receipts").not.toMatch(/[0-9]/);
   });
 
   it(`stays within ${BUDGET} bytes gzipped, and matches its MANIFEST row`, () => {
@@ -109,5 +118,11 @@ describe("public/visuals/MANIFEST.json captures", () => {
       expect([1440, 390]).toContain(capture.width);
       expect(capture.alt.length, capture.file).toBeGreaterThan(20);
     }
+  });
+
+  it("lists every file in public/visuals, so nothing ships without a hash", () => {
+    const listed = new Set(["MANIFEST.json", ...manifest.captures.map(capture => capture.file)]);
+    const present = readdirSync(here("../public/visuals"));
+    expect(present.filter(name => !listed.has(name)), "unlisted files in public/visuals").toEqual([]);
   });
 });

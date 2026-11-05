@@ -1,11 +1,19 @@
 /**
  * W1-L7: capture the real product surfaces for nextjs/public/visuals and write MANIFEST.json.
  *
- * Usage (fixture build, never a deployment):
+ * The committed captures were taken from origin/main e595dbca WITH the direction-C CSS of PR #183
+ * (fnd-C head 05eb1d81) applied to the working tree for the capture build only, never committed
+ * here. That is what TOKENS records in MANIFEST. Exact procedure (fixture build, never a deployment):
+ *   git -C <fnd-C> diff origin/main...05eb1d81 -- '*.css' > design-c.patch
+ *   git apply design-c.patch      # tokens, workspace, explore and chrome CSS
  *   PLAYWRIGHT_LOCAL_HTTP=1 NEXT_PUBLIC_SUPABASE_URL=https://test.supabase.co \
  *   NEXT_PUBLIC_SUPABASE_ANON_KEY=foundation-browser-e2e-anon-key pnpm exec next build
  *   pnpm start --hostname 127.0.0.1 --port <port>
  *   VISUALS_BASE_URL=http://127.0.0.1:<port> node scripts/visuals/capture-visuals.mjs
+ *   git apply -R design-c.patch
+ * Once #183 is on main, drop both patch steps and run with VISUALS_TOKENS=main@<sha>. Re-take the
+ * captures from that main build before any public page uses them: a capture of CSS that is not in
+ * production is not a real product capture.
  *
  * Every image is a screenshot of the rendered DOM, cropped to the surface and re-encoded to WebP
  * (lossy, q80). Nothing is drawn on, recoloured or composited. The workspace surfaces read the
@@ -25,7 +33,7 @@ const root = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const OUT = join(root, "public", "visuals");
 // sharp is next's own image dependency; resolved through next so this script adds none.
 const sharp = createRequire(createRequire(import.meta.url).resolve("next/package.json"))("sharp");
-const TOKENS = process.env.VISUALS_TOKENS ?? "main app/tavonel.css";
+const TOKENS = process.env.VISUALS_TOKENS ?? "design-c@05eb1d81";
 
 const sha = (buf) => createHash("sha256").update(buf).digest("hex");
 const READING_PDF = Buffer.from("%PDF-1.4\n% pipeline-board reading fixture\n%%EOF\n", "ascii");
@@ -76,25 +84,53 @@ const SHOTS = [
     before: async (page) => { await page.getByRole("button", { name: /^All \d+/ }).first().click(); },
     alt: "The TAVONEL Sources board with five sources in mixed states: ready to compile, one being read page by page, and one held for review." },
   { name: "evidence-inspector", surface: "Evidence Inspector", route: "/explore?act=evidence", fixture: "public /explore sample World (SEC filings corpus, public/explore-sample)", target: "[data-world-act]",
-    alt: "The TAVONEL evidence view: an answer, its citation, and the highlighted region on the source page with its source version." },
+    // A region whose read text overflows its panel would put a product layout bug in a marketing asset: step to the next region.
+    before: async (page) => {
+      for (let tries = 0; tries < 8 && (await overflowing(page.locator("[data-world-act]").first())) > 0; tries += 1) {
+        await page.getByRole("button", { name: /^Next/ }).first().click();
+        await page.waitForTimeout(600);
+      }
+    },
+    alt: "The TAVONEL evidence view on the public SEC sample: a source object from a filing beside its source page, with the supporting region highlighted and the text the compiler read from that region." },
   { name: "compile-timeline", surface: "Compile timeline", route: "/dev/compile-stage", fixture: "dev harness: rows built by the production buildPipeline from fixture uploads", target: ".workspace-compile-block",
-    alt: "The TAVONEL compile stage: each source's progress through sending, reading, review and compiled." },
+    alt: "The TAVONEL compile stage at its first step: the steps Source, Read, Organize and Review & activate, with five sources listed and one marked for review." },
   { name: "change-center", surface: "World diff / Change Center", route: "/explore?act=change", fixture: "public /explore sample World (SEC filings corpus, public/explore-sample)", target: "[data-world-act]",
-    alt: "The TAVONEL change view: two revisions side by side and the objects the new revision reached." },
+    alt: "The TAVONEL change view on the public SEC sample: the annual 10-K World and the filings that arrived after it, each shown with its filing date and a source page excerpt." },
   { name: "use-with-ai", surface: "MCP: Use with AI", route: "/workspace/ask", fixture: FIXTURE, session: true, target: ".one-path-ai-options",
-    alt: "The TAVONEL Use with AI panel: connecting the compiled knowledge to an assistant over MCP." },
+    alt: "The TAVONEL Use with AI panel: a choice of AI assistant, my application or local files, with the assistant tab pointing to the MCP setup guide." },
 ];
-const WIDTHS = [[1440, 900], [390, 844]];
+// 390x900: tall enough that the phone Sources board fits between the sticky top bar and the fixed bottom nav.
+const WIDTHS = [[1440, 900], [390, 900]];
+
+/**
+ * Elements inside root whose content is wider than their box and not clipped on purpose: text
+ * running out of a button, or a panel that has turned into a sideways scroller. Either one in a
+ * marketing capture shows a layout defect, so the capture steps on or refuses.
+ */
+const overflowing = (root) => root.evaluate((el) => [...el.querySelectorAll("*")].filter((node) => {
+  const cs = getComputedStyle(node);
+  return cs.display !== "inline" && cs.display !== "none" && cs.overflowX !== "hidden" && cs.overflowX !== "clip"
+    && node.clientWidth > 0 && node.scrollWidth > node.clientWidth + 1;
+}).length);
+/** Height of bars pinned to the bottom of the viewport (the phone workspace nav); a crop stops above them. */
+const bottomBars = (page) => page.evaluate(() => Math.max(0, ...[...document.querySelectorAll("body *")].map((node) => {
+  const cs = getComputedStyle(node); const r = node.getBoundingClientRect();
+  return (cs.position === "fixed" || cs.position === "sticky") && r.height > 0 && r.bottom >= innerHeight - 1 && r.top > innerHeight / 2 ? innerHeight - r.top : 0;
+})));
 const MAX_CSS_HEIGHT = { 1440: 1100, 390: 1400 };
 
 mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch();
 const captures = [];
 const failures = [];
-for (const shot of SHOTS) {
+// VISUALS_ONLY=<name> re-shoots one surface for inspection and leaves MANIFEST alone.
+const ONLY = process.env.VISUALS_ONLY;
+for (const shot of SHOTS.filter((candidate) => !ONLY || candidate.name === ONLY)) {
   for (const [width, height] of WIDTHS) {
     const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2, colorScheme: "light", reducedMotion: "reduce" });
     const page = await context.newPage();
+    // A returning visitor who already declined analytics: the consent sheet is not part of the surface, and no analytics loads.
+    await page.addInitScript(() => localStorage.setItem("tavonel.analytics-consent.v1", JSON.stringify({ allowed: false, expires: Date.now() + 86_400_000 })));
     try {
       if (shot.session) await workspace(page);
       await page.goto(BASE + shot.route, { waitUntil: "networkidle" });
@@ -105,9 +141,31 @@ for (const shot of SHOTS) {
       await target.scrollIntoViewIfNeeded();
       await page.evaluate(() => document.fonts.ready);
       await page.waitForTimeout(900);
+      if (await overflowing(target)) throw Error(`target ${shot.target} has text overflowing its box; not captured`);
+      // A fixed bottom bar (the phone workspace nav) is painted where the viewport is, over the surface.
+      // Put the surface's top just under any sticky top bar, and end the crop where the bottom bar starts.
+      const bar = await bottomBars(page);
+      if (bar > 0) {
+        await target.evaluate((el) => {
+          const under = Math.max(0, ...[...document.querySelectorAll("body *")].map((node) => {
+            const cs = getComputedStyle(node); const r = node.getBoundingClientRect();
+            return (cs.position === "fixed" || cs.position === "sticky") && r.height > 0 && r.top <= 1 && r.bottom < innerHeight / 3 ? r.bottom : 0;
+          }));
+          window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - under);
+        });
+        await page.waitForTimeout(400);
+      } else {
+        // Hidden fixed chrome (the skip link sits just above the viewport) lands inside a full-page
+        // crop taken from mid-page. From the top of the document it stays outside every crop.
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.waitForTimeout(400);
+      }
       const box = await target.boundingBox();
       if (!box || box.height < 40) throw Error(`target ${shot.target} has no box`);
-      const clip = { x: Math.max(0, box.x), y: box.y + (await page.evaluate(() => window.scrollY)), width: Math.min(box.width, width), height: Math.min(box.height, MAX_CSS_HEIGHT[width]) };
+      const [scrollY, innerHeight] = await page.evaluate(() => [window.scrollY, window.innerHeight]);
+      const top = box.y + scrollY;
+      const barTop = bar > 0 ? scrollY + innerHeight - bar : Infinity;
+      const clip = { x: Math.max(0, box.x), y: top, width: Math.min(box.width, width), height: Math.min(box.height, MAX_CSS_HEIGHT[width], barTop - top) };
       const png = await page.screenshot({ clip, fullPage: true, animations: "disabled" });
       const webp = await sharp(png).webp({ quality: 80, effort: 6 }).toBuffer();
       const meta = await sharp(webp).metadata();
@@ -125,8 +183,10 @@ for (const shot of SHOTS) {
 }
 await browser.close();
 
+if (ONLY) process.exit(failures.length ? 1 : 0);
 const manifestPath = join(OUT, "MANIFEST.json");
-let diagrams = [];
-try { diagrams = JSON.parse(readFileSync(manifestPath, "utf8")).diagrams ?? []; } catch { /* first run */ }
-writeFileSync(manifestPath, `${JSON.stringify({ schema: "tavonel.visuals.manifest.v1", generatedBy: "nextjs/scripts/visuals/capture-visuals.mjs", captures, diagrams, notCaptured: failures }, null, 2)}\n`);
+// Diagram rows (diagrams, diagramsShared) are measured by lib/visuals-diagrams.test.ts; this run replaces capture rows only.
+let previous = {};
+try { previous = JSON.parse(readFileSync(manifestPath, "utf8")); } catch { /* first run */ }
+writeFileSync(manifestPath, `${JSON.stringify({ ...previous, schema: "tavonel.visuals.manifest.v1", generatedBy: "nextjs/scripts/visuals/capture-visuals.mjs", captures, notCaptured: failures }, null, 2)}\n`);
 console.log(`${captures.length} captures, ${failures.length} failures`);

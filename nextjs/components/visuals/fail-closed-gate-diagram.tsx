@@ -1,9 +1,11 @@
 import DiagramFrame, { arrow, Step, styles } from "./diagram-frame";
 
 /**
- * (d) The fail-closed gate: what is refused, and why. Each row is a rule the product already
- * enforces (project constitution, "Fail closed on integrity violations"; the Ask surface's
- * page-and-bbox abstention; the OCR review hold) -- the drawing adds no rule of its own.
+ * (d) The fail-closed gate: what is refused, and why. Each row cites a rule of the project
+ * constitution ("Fail closed on integrity violations", no partial World as ACTIVE, no auto-resolved
+ * authoritative conflict, hash mismatch stops the line); two also match product copy (the Ask
+ * surface's page-and-bbox abstention, the OCR review hold). The rows cite the constitution, not
+ * Foundation code: a public placement must bind each row to the code or test that enforces it.
  * Refused outcomes stop at the gate; held ones wait for a person; only the last row crosses it.
  */
 type Outcome = "refused" | "held" | "published";

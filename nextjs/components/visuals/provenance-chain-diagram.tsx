@@ -1,7 +1,7 @@
 import DiagramFrame, { arrow, Lines, Step, styles } from "./diagram-frame";
 
 /**
- * (b) Evidence provenance: answer -> citation -> region bbox -> page -> source version -> sha256.
+ * (b) Evidence provenance: answer -> citation -> region bbox -> page -> source version -> hash.
  * The field names are the ones the Explore evidence workbench reads (evidenceId, page,
  * sourceVersionId), so the drawing names what an integrator will actually find in the payload.
  * The Region step carries a small page with its box drawn: the unit of evidence is a box on a
@@ -13,7 +13,7 @@ const CHAIN: ReadonlyArray<readonly [string, string, readonly [string, string]]>
   ["Region", "bbox", ["a box on the page,", "not a text chunk"]],
   ["Page", "page", ["the page the box", "sits on"]],
   ["Source version", "sourceVersionId", ["the exact revision", "that was read"]],
-  ["sha256", "sha256:…", ["the bytes, hashed,", "so an edit shows"]],
+  ["Hash", "hash:…", ["the bytes, hashed,", "so an edit shows"]],
 ];
 const CAPTION = "Followed forward it is a citation. Followed back it is an audit, down to the bytes.";
 
