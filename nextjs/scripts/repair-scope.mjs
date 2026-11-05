@@ -2489,6 +2489,8 @@ const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}(
 // project row in run-repair-check.mjs. Still exact paths, no wildcard and no default owner.
 // Direction C (PR #183, 2026-11-04): /login's layout (its light viewport) and the explore frame on /product join as exact
 // paths (135 -> 137), the same direct suites and browser specs; no suite or spec is added.
+// Direction C round 3 (PR #194, 2026-11-05): the explore frame's two components (its rest focus on /product) and the capture
+// component join as exact paths (139 -> 142); no suite or spec is added. The first-use spec gets its own owner below.
 export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "docs/gtm/CLAIMS_REGISTRY.yaml",
   "nextjs/app/arena/page.tsx",
@@ -2533,7 +2535,9 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/components/evaluation-page.module.css",
   "nextjs/components/evidence/region-highlight.module.css",
   "nextjs/components/explore/evidence-workbench.module.css",
+  "nextjs/components/explore/explore-frame-canvas.tsx",
   "nextjs/components/explore/explore-frame.module.css",
+  "nextjs/components/explore/explore-frame.tsx",
   "nextjs/components/explore/explore-stage.module.css",
   "nextjs/components/font-outline-probe.tsx",
   "nextjs/components/landing-v2/hero-statement.tsx",
@@ -2822,6 +2826,10 @@ export const AFFECTED_GROUPS = Object.freeze([
     { unitFiles: ['lib/explore-entry-proof.test.ts', 'lib/explore-sample.test.ts', 'lib/explore-story.test.ts', 'lib/visual-world-model.test.ts', 'components/explore/evidence-workbench.test.tsx'], browserFiles: ['e2e/explore.spec.ts'] }),
   // File intake (founder ask 2026-10-27): the shared drop reader and the first-screen upload entries' end-to-end spec.
   // Product intake behaviour, so never nativeReuse; the spec runs in 1440 and 390 (run-repair-check).
+  // Workspace first use (design C round 3, PR #194): the empty-workspace and first-review spec owns itself, with the onboarding
+  // copy suite it asserts against. Product UI, so never nativeReuse; the spec runs in 1440 and 390 (run-repair-check).
+  affectedGroup('workspace-first-use', /^nextjs\/e2e\/workspace-first-use\.spec\.ts$/,
+    { unitFiles: ['lib/workspace-onboarding.test.ts'], browserFiles: ['e2e/workspace-first-use.spec.ts'] }),
   affectedGroup('file-intake', /^nextjs\/(?:lib\/workspace-intake(?:\.test)?\.ts|e2e\/upload-entry\.spec\.ts)$/,
     { unitFiles: ['lib/workspace-intake.test.ts'], browserFiles: ['e2e/upload-entry.spec.ts'] }),
   // Ordinary Home landing: the thirty exact paths above select ten direct suites and one browser suite, which runs only in
