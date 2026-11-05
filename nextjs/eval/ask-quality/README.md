@@ -19,7 +19,7 @@ question set and never pooled:
 | correct abstention / unanswerable | unanswerable questions |
 | wrong answer / unanswerable | unanswerable questions |
 | citation precision | all citations returned for that set's answerable questions |
-| citation precision, gold spans >= 4 digits (v2) | citations for answerable questions whose gold spans all have >= 4 digits |
+| citation precision, gold spans non-numeric or >= 4 digits (v2) | all citations for answerable questions whose gold spans are all non-numeric or >= 4 digits |
 | gold-span recall (v2) | answerable questions of that set (numerator: >= 1 citation contains a gold span) |
 | numeric exact match | answerable numeric questions |
 | latency p50 / p95 | all questions asked |

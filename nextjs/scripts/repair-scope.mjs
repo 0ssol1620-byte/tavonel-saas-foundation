@@ -1920,6 +1920,19 @@ export const OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES = Object.freeze([
 // the five that read the changed files: benchmark-registry, brand-copy, copy-trust-guard and trust-page-answers read the page
 // source, and model-arena-artifact-builder imports the pinned digest from the page data. No browser suite of its own.
 // Product code, so never nativeReuse.
+// E1 ask-quality eval harness (codex/w1-e1-20261104, PR #188): the fourteen endpoints no owner listed -- the eval index README,
+// the harness's prereg (v2 and the preserved v1), question sets, generator, scorer, runner, live adapter, README and git
+// attribute files. Its one direct suite is the harness's own metrics.test.ts (in the default Vitest include). Nothing under
+// eval/ is imported by app/, components/ or lib/, but it is kept off nativeReuse like the other lanes' owners: no wildcard,
+// no default owner, and eval/ask-eval and eval/k08-live-engine stay unmapped.
+export const ASK_QUALITY_EVAL_AFFECTED_PATHS = Object.freeze([
+  'eval/README.md', 'eval/ask-quality/.gitattributes', 'eval/ask-quality/.gitignore', 'eval/ask-quality/PREREG.json',
+  'eval/ask-quality/PREREG.v1.json', 'eval/ask-quality/README.md', 'eval/ask-quality/gen_xbrl_questions.mjs',
+  'eval/ask-quality/live-adapter.ts', 'eval/ask-quality/metrics.test.ts', 'eval/ask-quality/questions/human-TEMPLATE.json',
+  'eval/ask-quality/questions/unanswerable.json', 'eval/ask-quality/questions/xbrl-numeric.json', 'eval/ask-quality/run_eval.mjs',
+  'eval/ask-quality/score.ts',
+]);
+export const ASK_QUALITY_EVAL_AFFECTED_UNIT_FILES = Object.freeze(['eval/ask-quality/metrics.test.ts']);
 export const BENCHMARKS_PATH_MASK_AFFECTED_PATHS = Object.freeze([
   'app/benchmarks/page.tsx', 'lib/benchmarks-page.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts',
 ]);
@@ -2858,6 +2871,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // OCR_PAGES_INCOMPLETE: the four exact paths above select three direct suites and no browser suite.
   affectedGroup('ocr-pages-incomplete-code', new RegExp(`^nextjs/(?:${exactPathAlternation(OCR_PAGES_INCOMPLETE_AFFECTED_PATHS)})$`),
     { unitFiles: OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES }),
+  // ask-quality-eval: the fourteen exact paths above select one direct suite and no browser suite.
+  affectedGroup('ask-quality-eval', new RegExp(`^nextjs/(?:${exactPathAlternation(ASK_QUALITY_EVAL_AFFECTED_PATHS)})$`),
+    { unitFiles: ASK_QUALITY_EVAL_AFFECTED_UNIT_FILES }),
   // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.
   affectedGroup('benchmarks-path-mask', new RegExp(`^nextjs/(?:${exactPathAlternation(BENCHMARKS_PATH_MASK_AFFECTED_PATHS)})$`),
     { unitFiles: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES }),

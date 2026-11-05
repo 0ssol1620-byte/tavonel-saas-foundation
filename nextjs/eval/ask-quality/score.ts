@@ -319,7 +319,7 @@ export function summarize(rows: ScoredRow[]): MetricRow[] {
       metric(id, label, "citations containing a gold span", denominator, sum(subset.map((row) => row.citationsWithGoldSpan ?? 0)), sum(subset.map((row) => row.citations)));
     out.push(precision(`citation_precision.${set}`, `Citation precision (${set})`, cited, `citations returned for answerable ${set} questions`));
     // 3-digit spans ("212") recur by accident across a filing's tables; this stratum excludes them.
-    out.push(precision(`citation_precision_4plus_digit_spans.${set}`, `Citation precision, gold spans >= 4 digits (${set})`, cited.filter((row) => row.goldSpanFourDigitsPlus === true), `citations returned for answerable ${set} questions whose gold spans have >= 4 digits`));
+    out.push(precision(`citation_precision_4plus_digit_spans.${set}`, `Citation precision, gold spans non-numeric or >= 4 digits (${set})`, cited.filter((row) => row.goldSpanFourDigitsPlus === true), `all citations returned for answerable ${set} questions whose gold spans are all non-numeric or >= 4 digits`));
     out.push(metric(`gold_span_recall.${set}`, `Gold-span recall (${set})`, "questions with >= 1 citation containing a gold span", `answerable ${set} questions`, count(cited, (row) => (row.citationsWithGoldSpan ?? 0) > 0), cited.length));
   }
   const numeric = rows.filter((row) => row.numericMatch !== null);
