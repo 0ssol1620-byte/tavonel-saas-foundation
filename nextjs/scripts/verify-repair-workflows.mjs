@@ -9,6 +9,7 @@ import { GDP_PDF_RUNS_AFFECTED_PATHS, GDP_PDF_RUNS_AFFECTED_UNIT_FILES, GDP_PDF_
 import { PACKET_DELIVERY_AFFECTED_PATHS, PACKET_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { COMPILER_RELEASE_AFFECTED_PATHS, COMPILER_RELEASE_AFFECTED_UNIT_FILES, COMPILER_RELEASE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { HOME_FILM_RERECORD_AFFECTED_PATHS, HOME_FILM_RERECORD_AFFECTED_UNIT_FILES, HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { CONSENT_POSTER_AFFECTED_PATHS, CONSENT_POSTER_AFFECTED_UNIT_FILES, CONSENT_POSTER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS, OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES, TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_PATHS, SPECIMEN_STRIP_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_BROWSER_FILES, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES, PUBLIC_MARKETING_AFFECTED_BROWSER_FILES, MARKETING_TOOLING_POSTIMAGES, G1_COPY_TRUTH_AFFECTED_PATHS, G1_COPY_TRUTH_AFFECTED_UNIT_FILES, G1_COPY_TRUTH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
@@ -695,6 +696,14 @@ for (const binding of [
     browsers: [],
     rows: [],
     neighbors: ['nextjs/lib/operational-sli.ts', 'nextjs/lib/operational-sli-alert-store.tsx', 'nextjs/app/api/internal/sli-alerts/replay/route.ts', 'nextjs/lib/operational-sli-alert-delivery.ts', 'lib/operational-sli-alert-store.ts'] },
+  // Home film re-record on design C (W2, 2026-11-05).
+  { group: 'film-rerecord-20261105', prefix: 'nextjs/', exportedPaths: HOME_FILM_RERECORD_AFFECTED_PATHS, exportedSuites: HOME_FILM_RERECORD_AFFECTED_UNIT_FILES,
+    exportedBrowsers: HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES,
+    paths: ['public/film/hero-c1-hq-1440.mp4', 'public/film/hero-c1-hq.mp4', 'public/film/hero-c1.mp4', 'public/film/hero-c2.mp4', 'public/film/hero-c3.mp4', 'public/film/hero-c4.mp4', 'public/film/poster-c1-t13.60-2x.avif', 'public/film/poster-c1-t13.60-2x.webp', 'public/film/poster-c1-t13.60-pane1-684x855.avif', 'public/film/poster-c1-t13.60-pane1-684x855.webp', 'public/film/poster-c1-t13.60.avif', 'public/film/poster-c1-t13.60.webp', 'public/film/poster-c2-t4.40-2x.avif', 'public/film/poster-c2-t4.40-2x.webp', 'public/film/poster-c2-t4.40.avif', 'public/film/poster-c2-t4.40.webp', 'public/film/poster-c3-t17.96-2x.avif', 'public/film/poster-c3-t17.96-2x.webp', 'public/film/poster-c3-t17.96.avif', 'public/film/poster-c3-t17.96.webp', 'public/film/poster-c4-t6.80-2x.avif', 'public/film/poster-c4-t6.80-2x.webp', 'public/film/poster-c4-t6.80.avif', 'public/film/poster-c4-t6.80.webp', 'scripts/measure-film-start.mjs'],
+    suites: ['components/compile-stage-player.mobile-view.test.tsx', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts'],
+    browsers: ['e2e/hero-four-stage-restoration.spec.ts', 'e2e/hero-home-responsive.spec.ts'],
+    rows: ["['e2e/hero-four-stage-restoration.spec.ts', ['1440', '390']],", "['e2e/hero-home-responsive.spec.ts', ['1440']],"],
+    neighbors: ['nextjs/public/film/hero-c5.mp4', 'nextjs/public/film/hero-c1-hq-720.mp4', 'nextjs/public/film/poster-c1-t13.60-3x.avif', 'nextjs/public/film/poster-c5-t1.00.avif', 'nextjs/public/film/compile-cut-5.mp4', 'nextjs/scripts/measure-film-end.mjs'] },
   // Phase 4 consent-poster lane (P2-34 analytics notice, D-11 poster re-cut).
   { group: 'consent-poster', prefix: 'nextjs/', exportedPaths: CONSENT_POSTER_AFFECTED_PATHS, exportedSuites: CONSENT_POSTER_AFFECTED_UNIT_FILES,
     exportedBrowsers: CONSENT_POSTER_AFFECTED_BROWSER_FILES,
