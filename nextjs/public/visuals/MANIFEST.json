@@ -181,13 +181,13 @@
   "diagramsShared": [
     {
       "file": "components/visuals/diagram-frame.tsx",
-      "bytes": 2419,
-      "gzipBytes": 1162
+      "bytes": 2420,
+      "gzipBytes": 1163
     },
     {
       "file": "components/visuals/visuals.module.css",
-      "bytes": 3312,
-      "gzipBytes": 1419
+      "bytes": 3658,
+      "gzipBytes": 1569
     }
   ]
 }

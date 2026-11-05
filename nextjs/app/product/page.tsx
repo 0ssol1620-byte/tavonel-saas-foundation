@@ -71,7 +71,7 @@ export default function ProductPage() {
               </figure> : null}
               <Link href={(outcome.href === "/evidence" && region?.href ? region.href : outcome.href) as Route}>{outcome.action}</Link>
             </div>
-            {/* Full width, so the chain draws as one row (its wide drawing starts at 880px). */}
+            {/* Full width, so the chain draws as one row (its wide drawing starts at 1040px). */}
             {outcome.href === "/evidence" ? <ProvenanceChainDiagram className={styles.diagram} /> : null}
           </section>)}
         </div>

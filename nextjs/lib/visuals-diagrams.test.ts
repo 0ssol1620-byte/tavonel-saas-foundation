@@ -126,3 +126,41 @@ describe("public/visuals/MANIFEST.json captures", () => {
     expect(present.filter(name => !listed.has(name)), "unlisted files in public/visuals").toEqual([]);
   });
 });
+
+/*
+  The 12px floor (decision.md 7.3) for SVG text, which a DOM audit does not see: a drawing's text is in viewBox
+  units, so what it renders at is its font size times the drawing's scale. The wide drawing shows from the
+  container breakpoint up, so its smallest scale is breakpoint / viewBox width; the tall one is smallest in the
+  narrowest column it is placed in. 300px is that column: /product's outcome at a 360px phone measured 302px
+  (webkit, PR #194 review R3), and the founder checks 360-430.
+*/
+const MIN_TALL_CONTAINER = 300;
+const FLOOR = 12;
+describe("diagram type never draws under 12px", () => {
+  const css = readFileSync(here("../components/visuals/visuals.module.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const size = (selector: RegExp) => Number(selector.exec(css)?.[1]);
+  const TEXT = ["label", "note", "mono", "eyebrow"] as const;
+  const base = Object.fromEntries(TEXT.map(name => [name, size(new RegExp(String.raw`^\.${name} \{[^}]*font:[^;}]*?([\d.]+)px`, "m"))]));
+  const tall = Object.fromEntries(TEXT.map(name => [name, size(new RegExp(String.raw`^[^{}]*\.tall \.${name}\b[^{]*\{[^}]*font-size: ([\d.]+)px`, "m")) || base[name]]));
+  const breakpoint = size(/@container \(min-width: ([\d.]+)px\)/);
+
+  it.each(DIAGRAMS)("%s, wide and tall", (_name, _file, Diagram) => {
+    const html = renderToStaticMarkup(createElement(Diagram));
+    // CSS module names render hashed (_wide_x, _label_x), so match the readable part.
+    const [wide, narrow] = [...html.matchAll(/<svg class="([^"]+)" viewBox="0 0 ([\d.]+) [\d.]+"/g)].map(match => ({ kind: match[1], width: Number(match[2]) }));
+    expect([wide.kind, narrow.kind].map(kind => /wide/.test(kind) ? "wide" : "tall")).toEqual(["wide", "tall"]);
+    expect(TEXT.filter(name => new RegExp(`class="[^"]*_${name}_`).test(html)).length, "the diagram draws text in these classes").toBeGreaterThan(0);
+    for (const name of TEXT) {
+      expect(base[name] * Math.min(1, breakpoint / wide.width), `wide .${name}`).toBeGreaterThanOrEqual(FLOOR);
+      expect(tall[name] * (MIN_TALL_CONTAINER / narrow.width), `tall .${name}`).toBeGreaterThanOrEqual(FLOOR);
+    }
+  });
+
+  it("reads the sizes it checks (a selector that stops matching fails here, not silently)", () => {
+    expect(breakpoint).toBe(1040);
+    for (const name of TEXT) {
+      expect(base[name], name).toBeGreaterThanOrEqual(FLOOR);
+      expect(tall[name], name).toBeGreaterThan(base[name] - 0.01);
+    }
+  });
+});

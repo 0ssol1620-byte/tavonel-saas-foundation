@@ -5,8 +5,11 @@
   Each diagram ships two drawings of the same data: a wide row and a tall column. The container,
   not the viewport, picks one (a diagram in a 600px column on a laptop is a phone-width diagram),
   and the other is display:none, which also takes it out of the accessibility tree, so it is
-  announced once. The wide drawing only shows from 880px of container, where its 1040-unit viewBox
-  renders at >= 0.85 scale; the tall one is capped at 480px so its type never inflates past ~1.3x.
+  announced once. The wide drawing only shows from 1040px of container, where its viewBox (1040 units
+  or narrower) renders at >= 1x, so its 12px type never draws under 12px. The tall one is capped at
+  480px and carries larger type: a 360-unit column in a 300px phone column draws at 0.83x, and its
+  smallest text is 14.5 units, about 12.1px there (decision.md 7.3; lib/visuals-diagrams.test.ts
+  holds every size to the floor at both ends).
 
   Colour is the page's: currentColor for ink, lines and (at .74 opacity, about 6.9:1 on the canvas)
   the notes, so a dark-theme page variable cannot wash them out; the --tv state tokens only beside
@@ -16,7 +19,7 @@
 .wide, .tall { display: block; height: auto; overflow: visible; }
 .wide { display: none; width: 100%; }
 .tall { width: 100%; max-width: 480px; }
-@container (min-width: 880px) {
+@container (min-width: 1040px) {
   .wide { display: block; }
   .tall { display: none; }
 }
@@ -28,6 +31,8 @@
 .note { fill: currentColor; fill-opacity: .74; font: 12.5px var(--f-sans, system-ui, sans-serif); }
 .mono { fill: currentColor; fill-opacity: .74; font: 12px var(--f-mono, ui-monospace, monospace); letter-spacing: .02em; }
 .eyebrow { fill: currentColor; fill-opacity: .74; font: 12px var(--f-mono, ui-monospace, monospace); letter-spacing: .08em; }
+.tall .label { font-size: 15px; }
+.tall .note, .tall .mono, .tall .eyebrow { font-size: 14.5px; }
 
 /* State tokens, each only ever next to its word (DESIGN_MASTER §4.3). */
 .evidence { stroke: var(--tv-evidence, #0590a2); }

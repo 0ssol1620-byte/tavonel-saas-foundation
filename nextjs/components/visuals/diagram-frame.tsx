@@ -4,7 +4,7 @@ import styles from "./visuals.module.css";
 /**
  * The shell every W1-L7 diagram renders through: one container, two drawings of the same data.
  *
- * The wide row is for a container of 880px and up, the tall column for anything narrower (see
+ * The wide row is for a container of 1040px and up, the tall column for anything narrower (see
  * visuals.module.css). Both carry the same <title> and <desc>, because whichever one is showing
  * is the one a screen reader reaches; the hidden one is display:none and out of the tree.
  * Ids come from useId so two diagrams, or the same one twice, never share a label.
