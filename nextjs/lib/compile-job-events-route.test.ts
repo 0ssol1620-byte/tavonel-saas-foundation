@@ -20,7 +20,7 @@ vi.mock("@/lib/compile-job-store", () => ({
 const turn = vi.fn();
 vi.mock("@/lib/compile-job-worker", () => ({ runCompileJobTurn: turn, runCompileJobBatch: turn }));
 
-import { GET } from "./route";
+import { GET } from "@/app/api/compile-jobs/[jobId]/events/route";
 
 const JOB = "cjob-157f2f236a3efc6984585b399852c60d";
 const event = (sequence: number, state: string) => ({
