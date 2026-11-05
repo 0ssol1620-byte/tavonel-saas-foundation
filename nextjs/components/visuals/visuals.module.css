@@ -1,0 +1,60 @@
+/*
+  W1-L7 explanatory diagrams. One stylesheet for the four of them, so they share one hairline,
+  one type scale and one motion rule.
+
+  Each diagram ships two drawings of the same data: a wide row and a tall column. The container,
+  not the viewport, picks one (a diagram in a 600px column on a laptop is a phone-width diagram),
+  and the other is display:none, which also takes it out of the accessibility tree, so it is
+  announced once. The wide drawing only shows from 880px of container, where its 1040-unit viewBox
+  renders at >= 0.85 scale; the tall one is capped at 480px so its type never inflates past ~1.3x.
+
+  Colour is the page's: currentColor for ink, lines and (at .74 opacity, about 6.9:1 on the canvas)
+  the notes, so a dark-theme page variable cannot wash them out; the --tv state tokens only beside
+  the words that say the state. No fill behind the drawing, so it sits on paper, sand or tint alike.
+*/
+.frame { container-type: inline-size; width: 100%; color: inherit; }
+.wide, .tall { display: block; height: auto; overflow: visible; }
+.wide { display: none; width: 100%; }
+.tall { width: 100%; max-width: 480px; }
+@container (min-width: 880px) {
+  .wide { display: block; }
+  .tall { display: none; }
+}
+
+.box { fill: none; stroke: currentColor; stroke-opacity: .28; }
+.boxStrong { fill: none; stroke: currentColor; stroke-opacity: .6; }
+.line { fill: none; stroke: currentColor; stroke-opacity: .45; stroke-width: 1.25; }
+.label { fill: currentColor; font: 600 14px var(--f-sans, system-ui, sans-serif); }
+.note { fill: currentColor; fill-opacity: .74; font: 12.5px var(--f-sans, system-ui, sans-serif); }
+.mono { fill: currentColor; fill-opacity: .74; font: 12px var(--f-mono, ui-monospace, monospace); letter-spacing: .02em; }
+.eyebrow { fill: currentColor; fill-opacity: .74; font: 12px var(--f-mono, ui-monospace, monospace); letter-spacing: .08em; }
+
+/* State tokens, each only ever next to its word (DESIGN_MASTER §4.3). */
+.evidence { stroke: var(--tv-evidence, #0590a2); }
+.evidenceFill { fill: var(--tv-evidence, #0590a2); fill-opacity: .16; stroke: var(--tv-evidence, #0590a2); }
+.evidenceInk { fill: var(--tv-evidence-ink, #026470); }
+.verified { fill: var(--tv-verified, #1a6d51); }
+.verifiedLine { stroke: var(--tv-verified, #1a6d51); stroke-opacity: 1; }
+.changed { fill: var(--tv-changed, #8c5217); }
+.changedLine { stroke: var(--tv-changed, #8c5217); stroke-opacity: 1; }
+.refused { fill: var(--tv-unresolved, #a72d23); }
+.refusedLine { stroke: var(--tv-unresolved, #a72d23); stroke-opacity: 1; }
+.text { fill: var(--tv-ink-muted, #4c545d); fill-opacity: .35; }
+
+/*
+  Motion encodes order, once. Each step arrives in the sequence the system runs it -- the compile
+  in stage order, the provenance chain from the answer back to the bytes -- and then rests. No
+  loop. With reduced motion (the OS setting, or data-motion="reduce" on any ancestor, which the
+  preview page toggles) the drawing is simply in its final state.
+*/
+@media (prefers-reduced-motion: no-preference) {
+  .step {
+    animation: visArrive 420ms cubic-bezier(.2, .7, .2, 1) both;
+    animation-delay: calc(var(--i, 0) * 110ms);
+  }
+}
+[data-motion="reduce"] .step { animation: none; }
+@keyframes visArrive {
+  from { opacity: .18; transform: translateY(3px); }
+  to { opacity: 1; transform: none; }
+}
