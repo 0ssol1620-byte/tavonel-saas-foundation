@@ -103,7 +103,7 @@ The container suite verifies structured no-store health and disarm failure with 
 
 ## 측정 한도와 쪽 범위 래스터 (D1 1단계, 기본 꺼짐)
 
-production 한도는 `app.py`의 리터럴 `MAX_INPUT_BYTES`(5 MiB), `MAX_PAGES`(80), `MAX_OUTPUT_BYTES`(18 MiB) 그대로다. `service.yaml`은 아래 변수를 하나도 설정하지 않으며 `tests/test_service_definition.py`와 `nextjs/lib/intake-ceiling-cross-tree.test.ts`가 그것을 지킨다. 측정용으로만 띄운 revision(traffic 0, 운영자가 직접 호출)에서만 쓴다.
+production 한도는 `app.py`의 리터럴 `MAX_INPUT_BYTES`(5 MiB), `MAX_PAGES`(80), `MAX_OUTPUT_BYTES`(18 MiB) 그대로다. `service.yaml`은 아래 변수를 하나도 설정하지 않으며 `tests/test_service_definition.py`와 `nextjs/lib/intake-ceiling-cross-tree.test.ts`가 그것을 지킨다. 측정용으로만 띄운 **별도 Cloud Run 서비스**에서만 쓴다. production 서비스에 이 변수를 가진 revision이나 tag를 만들지 않는다: 다음 `gcloud run deploy --image`가 env를 물려받고, `latestRevision: true` traffic이면 그 revision이 production이 된다. 측정 전후로 production `/health`에 `measurementLimits`가 없음을 기록하고, 측정이 끝나면 측정 서비스를 지운다.
 
 | 변수 | 범위 | 뜻 |
 |---|---|---|
@@ -112,7 +112,7 @@ production 한도는 `app.py`의 리터럴 `MAX_INPUT_BYTES`(5 MiB), `MAX_PAGES`
 | `TAVONEL_CDR_MAX_OUTPUT_BYTES` | 1 – 128 MiB | 래스터 PDF 상한 |
 | `TAVONEL_CDR_RASTER_RANGE_PAGES` | 1 – 64 | 쪽 범위 래스터. N쪽씩 그리고 저장한 뒤 이어 붙인다. 문서 전체 픽셀 상한(80 M)이 범위마다 적용된다. 미설정이면 문서 전체가 한 범위(production 경로) |
 
-설정했는데 범위 밖이거나 정수가 아니면 서비스가 부팅하지 않는다. 기본값과 다른 한도로 뜬 revision은 `/health`에 `measurementLimits`를 싣는다(production 응답은 그대로). 측정은 `measure_limits.py`로 한다(문서별 바이트·쪽·OCR range 수·시간, 후보 한도별 허용 건수와 분모). 실제 한도를 올리는 것은 여전히 세 트리(`shared/intakeCeiling.ts`, worker, GPU reader)의 리터럴을 같이 바꾸는 별도 변경이다.
+설정했는데 범위 밖이거나 정수가 아니면 서비스가 부팅하지 않는다. 기본값과 다른 한도로 뜬 revision은 `/health`에 `measurementLimits`를 싣는다(production 응답은 그대로). 측정은 `measure_limits.py`로 한다(문서별 바이트·쪽·OCR range 수·시간, 후보 한도별 허용 건수와 분모). receipt에는 파일 이름 없이 원본 sha256만 남는다. 실제 한도를 올리는 것은 여전히 세 트리(`shared/intakeCeiling.ts`, worker, GPU reader)의 리터럴을 같이 바꾸는 별도 변경이다.
 
 ## Deployment gate for Google Cloud Run
 

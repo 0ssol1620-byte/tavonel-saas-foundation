@@ -1030,6 +1030,17 @@ def test_measurement_limits_default_to_the_production_literals() -> None:
             worker.read_limit("TAVONEL_OCR_MAX_PAGES", 80, 500, {"TAVONEL_OCR_MAX_PAGES": value})
 
 
+def test_a_malformed_or_out_of_range_input_limit_is_refused() -> None:
+    worker = importlib.import_module("app")
+    high = worker.MEASUREMENT_HARD_MAX_INPUT_BYTES
+    assert worker.read_limit("TAVONEL_OCR_MAX_INPUT_BYTES", worker.MAX_INPUT_BYTES, high, {}) == 18 * 1024 * 1024
+    assert worker.read_limit("TAVONEL_OCR_MAX_INPUT_BYTES", worker.MAX_INPUT_BYTES, high,
+                             {"TAVONEL_OCR_MAX_INPUT_BYTES": str(high)}) == high
+    for value in ("0", "-1", str(high + 1), "1e7", "18MiB", " 0x100 "):
+        with pytest.raises(RuntimeError, match=f"TAVONEL_OCR_MAX_INPUT_BYTES must be a whole number from 1 to {high}"):
+            worker.read_limit("TAVONEL_OCR_MAX_INPUT_BYTES", worker.MAX_INPUT_BYTES, high, {"TAVONEL_OCR_MAX_INPUT_BYTES": value})
+
+
 def test_a_configured_page_limit_holds_at_its_boundary_on_both_read_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     worker, calls = ready_fake_ocr(monkeypatch, SCAN)
     monkeypatch.setattr(worker, "PAGES_LIMIT", 81)

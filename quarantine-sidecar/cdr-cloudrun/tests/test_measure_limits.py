@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tempfile
@@ -88,6 +89,16 @@ class MeasureLimitsTest(unittest.TestCase):
         self.assertEqual((record["cdr"]["httpStatus"], record["cdr"]["detail"]), (422, "CDR source page count is not qualified"))
         self.assertIsNone(record["pages"])
         self.assertNotIn("ocr", record)
+
+    def test_the_receipt_and_the_request_carry_no_file_name(self) -> None:
+        bodies: list[bytes] = []
+        post = self.post
+        self.post = lambda url, headers, body: (bodies.append(body), post(url, headers, body))[1]  # type: ignore[method-assign]
+        record = self.measure(self.document("Customer Contract 2026.pdf", 3))
+        self.assertNotIn("file", record)
+        self.assertNotIn("Customer Contract", json.dumps(record))
+        self.assertTrue(bodies and all(b"Customer Contract" not in body for body in bodies))
+        self.assertIn(b'filename="source.pdf"', bodies[0])
 
     def test_ocr_is_never_called_without_its_url(self) -> None:
         self.measure(self.document("short.pdf", 3))

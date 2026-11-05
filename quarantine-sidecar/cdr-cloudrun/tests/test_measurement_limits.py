@@ -147,6 +147,27 @@ class ConfiguredBoundaryTest(unittest.TestCase):
             self.assertEqual(refused.exception.status_code, 422)
 
 
+class HealthTest(unittest.TestCase):
+    """The measurement plan's production receipt is "/health has no measurementLimits"; this is that signal."""
+
+    def health(self, limits: Limits) -> dict:
+        from fastapi.testclient import TestClient
+        with patch.object(app_module, "LIMITS", limits), \
+                patch.object(app_module.shutil, "which", lambda name: f"/usr/bin/{name}"), \
+                patch.object(app_module, "scanner_ready", lambda: True):
+            response = TestClient(app_module.app).get("/health")
+        self.assertEqual(response.status_code, 200)
+        return response.json()
+
+    def test_production_health_carries_no_measurement_limits(self) -> None:
+        self.assertNotIn("measurementLimits", self.health(PRODUCTION_LIMITS))
+
+    def test_a_measurement_revision_says_so_with_its_limits(self) -> None:
+        body = self.health(Limits(25 * 1024 * 1024, 200, 128 * 1024 * 1024, 8))
+        self.assertEqual(body["measurementLimits"], {"maxInputBytes": 25 * 1024 * 1024, "maxPages": 200,
+                                                     "maxOutputBytes": 128 * 1024 * 1024, "rasterRangePages": 8})
+
+
 class PageRangeRasterTest(unittest.TestCase):
     def test_one_range_is_byte_identical_to_the_production_path(self) -> None:
         # PDFium writes a fresh random trailer /ID on every save, production path included, so the

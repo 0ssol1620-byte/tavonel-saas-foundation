@@ -96,8 +96,9 @@ def measure_document(
 ) -> dict[str, object]:
     source = path.read_bytes()
     digest = f"sha256:{hashlib.sha256(source).hexdigest()}"
-    record: dict[str, object] = {"file": path.name, "sourceBytes": len(source), "sourceSha256": digest}
-    content_type, body = multipart(path.name, MIME.get(path.suffix.lower(), "application/octet-stream"), source)
+    # The digest identifies the document; a customer or private file's name never enters the receipt or the request.
+    record: dict[str, object] = {"sourceBytes": len(source), "sourceSha256": digest}
+    content_type, body = multipart(f"source{path.suffix.lower()}", MIME.get(path.suffix.lower(), "application/octet-stream"), source)
     headers = {**signed_headers("cdr", cdr_secret, digest), "content-type": content_type, **(cdr_auth or {})}
     started = clock()
     status, response_headers, output = post(cdr_url, headers, body)
