@@ -170,9 +170,12 @@ class HealthTest(unittest.TestCase):
 
 class PageRangeRasterTest(unittest.TestCase):
     def test_one_range_is_byte_identical_to_the_production_path(self) -> None:
-        # PDFium writes a fresh random trailer /ID on every save, production path included, so the
-        # comparison is of everything else.
-        without_id = lambda body: re.sub(rb"/ID\[<[0-9A-F]+><[0-9A-F]+>\]", b"/ID[]", body)  # noqa: E731
+        # PDFium writes a fresh random trailer /ID on every save, production path included, and the
+        # Info dictionary's dates have one-second resolution, so two saves that straddle a second
+        # differ there too. The comparison is of everything else.
+        def without_id(body: bytes) -> bytes:
+            body = re.sub(rb"/ID\[<[0-9A-F]+><[0-9A-F]+>\]", b"/ID[]", body)
+            return re.sub(rb"/(CreationDate|ModDate)\(D:[^)]*\)", rb"/\1(D:)", body)
         pdf = blank_pdf(5)
         production = without_id(raster(pdf, PRODUCTION_LIMITS)[1])
         self.assertIn(b"/ID[]", production)

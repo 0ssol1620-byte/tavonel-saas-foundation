@@ -7,16 +7,17 @@
 -- closure erases the deleted document's rows while the other copy keeps its own, and neither the
 -- other copy nor another workspace's row with the same document id.
 --
--- Also: a call reports only what it added (newRelations, reusableReadDocumentIds), so a re-compile
--- does not count a known pair again, and it answers for the versions it was given, not for a
--- document's earlier versions.
+-- Also: a call reports only what it added (newRelations as distinct pairs, and the documents whose
+-- earlier read is a source-digest reuse candidate or a sanitized-digest reuse), so a re-compile does
+-- not count a known pair again; two copies in one call are one pair and neither is a reuse; and a
+-- call answers for the versions it was given, not for a document's earlier versions.
 --
 -- Not provable here: the workspace advisory lock against a concurrent session (one transaction).
 --
 -- Two self-service workspaces are bootstrapped by the auth.users insert (20260920121000):
 -- pilot-b1b1b1b1b1b14b1b (owner b1b1...) and pilot-c2c2c2c2c2c24c2c (owner c2c2...).
 begin;
-select plan(44);
+select plan(45);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -100,15 +101,15 @@ select is((select r->'relations' from second_copy), jsonb_build_array(jsonb_buil
   'documentId', '0b000000-0000-4000-8000-00000000000b', 'relatedDocumentId', '0a000000-0000-4000-8000-00000000000a',
   'kind', 'exact_bytes', 'matchedOn', jsonb_build_array('sanitized_sha256', 'source_sha256'))),
   'identical bytes match on both digests');
-select is((select jsonb_build_object('n', r->'newRelations', 'reuse', r->'reusableReadDocumentIds') from second_copy),
-  '{"n":1,"reuse":["0b000000-0000-4000-8000-00000000000b"]}'::jsonb,
-  'the copy is one new relation, and its OCR read could have been the original''s');
+select is((select jsonb_build_object('n', r->'newRelations', 'candidate', r->'sourceDigestReuseCandidateDocumentIds', 'sanitized', r->'sanitizedDigestReuseDocumentIds') from second_copy),
+  '{"n":1,"candidate":["0b000000-0000-4000-8000-00000000000b"],"sanitized":["0b000000-0000-4000-8000-00000000000b"]}'::jsonb,
+  'the copy is one new pair, a reuse candidate by source digest and a sanitized-digest reuse');
 create temp table redelivered as select public.record_source_fingerprints('pilot-b1b1b1b1b1b14b1b',
   jsonb_build_array(public.b1_test_fp('0b000000-0000-4000-8000-00000000000b', 'a'))) as r;
 select is((select r->'relations' from redelivered), (select r->'relations' from second_copy),
   'a redelivered call returns the same relations');
-select is((select jsonb_build_object('n', r->'newRelations', 'reuse', r->'reusableReadDocumentIds') from redelivered),
-  '{"n":0,"reuse":[]}'::jsonb, 'and reports nothing new, so a re-compile does not count the pair again');
+select is((select jsonb_build_object('n', r->'newRelations', 'candidate', r->'sourceDigestReuseCandidateDocumentIds', 'sanitized', r->'sanitizedDigestReuseDocumentIds') from redelivered),
+  '{"n":0,"candidate":[],"sanitized":[]}'::jsonb, 'and reports nothing new, so a re-compile does not count the pair again');
 select is(public.record_source_fingerprints('pilot-b1b1b1b1b1b14b1b',
   jsonb_build_array(public.b1_test_fp('0a000000-0000-4000-8000-00000000000a', 'a')))->'relations'->0->>'relatedDocumentId',
   '0b000000-0000-4000-8000-00000000000b', 'the original names its copy as well');
@@ -122,8 +123,9 @@ select is((select r->'relations' from resanitized),
     jsonb_build_object('documentId', '0d000000-0000-4000-8000-00000000000d', 'relatedDocumentId', '0b000000-0000-4000-8000-00000000000b',
       'kind', 'exact_bytes', 'matchedOn', jsonb_build_array('source_sha256'))),
   'the same source re-sanitized differently is found by its confirm digest alone');
-select is((select jsonb_build_object('n', r->'newRelations', 'reuse', r->'reusableReadDocumentIds') from resanitized),
-  '{"n":2,"reuse":[]}'::jsonb, 'two new relations, and no reusable read: OCR read different bytes');
+select is((select jsonb_build_object('n', r->'newRelations', 'candidate', r->'sourceDigestReuseCandidateDocumentIds', 'sanitized', r->'sanitizedDigestReuseDocumentIds') from resanitized),
+  '{"n":2,"candidate":["0d000000-0000-4000-8000-00000000000d"],"sanitized":[]}'::jsonb,
+  'two new pairs; a source-digest candidate, but no sanitized reuse: OCR read different bytes');
 select is(public.record_source_fingerprints('pilot-b1b1b1b1b1b14b1b',
   jsonb_build_array(public.b1_test_fp('0e000000-0000-4000-8000-00000000000e', 'e')))->'relations', '[]'::jsonb,
   'an unrelated document matches nothing');
@@ -217,6 +219,12 @@ select is((select count(*)::integer from public.source_fingerprints
   where document_id = '0b000000-0000-4000-8000-00000000000b'), 1, 'the surviving copy keeps its own fingerprint');
 select is((select count(*)::integer from public.source_fingerprints where workspace_key = 'pilot-c2c2c2c2c2c24c2c'), 2,
   'the other workspace keeps both its fingerprints, including the one under the same document id');
+
+-- Two copies inside one call: one pair (not two rows), and neither is a reuse of an earlier read.
+select is((select jsonb_build_object('n', r->'newRelations', 'candidate', r->'sourceDigestReuseCandidateDocumentIds', 'sanitized', r->'sanitizedDigestReuseDocumentIds') from (select public.record_source_fingerprints('pilot-c2c2c2c2c2c24c2c', jsonb_build_array(
+    public.b1_test_fp('01000000-0000-4000-8000-000000000001', '8'),
+    public.b1_test_fp('02000000-0000-4000-8000-000000000002', '8'))) as r) q),
+  '{"n":1,"candidate":[],"sanitized":[]}'::jsonb, 'two copies in one call are one new pair and no reuse');
 
 select * from finish();
 rollback;

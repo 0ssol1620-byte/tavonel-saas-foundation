@@ -977,7 +977,8 @@ describe("exact-duplicate annotation at compile intake", () => {
       return new Response(JSON.stringify(ids.includes(HIDDEN)), { status: 200 });
     }
     return new Response(JSON.stringify({
-      schemaVersion: "tavonel.source_fingerprints.v1", fingerprints: 1, newRelations: 2, reusableReadDocumentIds: [DOCUMENT],
+      schemaVersion: "tavonel.source_fingerprints.v1", fingerprints: 1, newRelations: 2,
+      sourceDigestReuseCandidateDocumentIds: [DOCUMENT], sanitizedDigestReuseDocumentIds: [DOCUMENT],
       relations: [{ documentId: DOCUMENT, relatedDocumentId: OTHER, kind: "exact_bytes", matchedOn: ["sanitized_sha256"] },
         { documentId: DOCUMENT, relatedDocumentId: HIDDEN, kind: "exact_bytes", matchedOn: ["sanitized_sha256"] }],
     }), { status: 200 });

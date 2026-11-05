@@ -14,9 +14,17 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
   TAVONEL_SOURCE_DEDUP_MODE, default off:
     off     the RPC is never called and nothing about the compile changes.
     shadow  fingerprints and relations are recorded; the only output is the internal telemetry
-            line `duplicate_detected{kind:exact}`, counting what THIS call added (a re-compile of a
-            known pair adds nothing) and the OCR reads that call could have reused. The compile
-            response is unchanged.
+            line `duplicate_detected{kind:exact}`, counting the document pairs THIS call added (a
+            re-compile of a known pair adds nothing) and the earlier OCR reads it might have reused.
+            The compile response is unchanged.
+
+  Reuse is reported twice, and only one of the two is a fact. The CDR output is not byte-
+  deterministic (random trailer /ID, second-level CreationDate), so the same source re-sanitized
+  gets a different sanitized digest and version key: a sanitized-digest match ("the bytes OCR read
+  were identical") is structurally rare in production. The source-digest match is therefore the
+  count that moves, and it is a CANDIDATE -- whether the earlier read could stand in for this one
+  is not verified, and the field name says so. Making the CDR deterministic is a version-key
+  change and not part of B1.
     on      as shadow, plus a "duplicate of X" note on the compile response, naming only documents
             the requesting viewer may read now (checkConnectorSourceAccessForViewer: connector ACL,
             paused and deleted sources excluded). No authenticated viewer, no names.
@@ -39,7 +47,12 @@ export type ExactDuplicateNote = Readonly<{
 type Env = Readonly<Record<string, string | undefined>>;
 type Input = Readonly<{ documentId: string; versionKey: string; inputSha256: string; pageCount?: number }>;
 type Relation = { documentId: string; relatedDocumentId: string; kind: "exact_bytes"; matchedOn: string[] };
-type Answer = { relations: Relation[]; newRelations: number; reusableReadDocumentIds: string[] };
+type Answer = {
+  relations: Relation[];
+  newRelations: number;
+  sourceDigestReuseCandidateDocumentIds: string[];
+  sanitizedDigestReuseDocumentIds: string[];
+};
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const RUNBOOK = "https://github.com/0ssol1620-byte/tavonel-saas-foundation/blob/main/docs/runbooks/P0_INCIDENT_COST_ALERTS.md";
@@ -61,12 +74,16 @@ function log(level: "info" | "error", line: Record<string, string | number>) {
 
 function readAnswer(body: unknown, inputs: readonly Input[]): Answer | null {
   if (!body || typeof body !== "object") return null;
-  const value = body as { schemaVersion?: unknown; fingerprints?: unknown; relations?: unknown;
-    newRelations?: unknown; reusableReadDocumentIds?: unknown };
+  const value = body as { schemaVersion?: unknown; fingerprints?: unknown; relations?: unknown; newRelations?: unknown;
+    sourceDigestReuseCandidateDocumentIds?: unknown; sanitizedDigestReuseDocumentIds?: unknown };
   if (value.schemaVersion !== "tavonel.source_fingerprints.v1" || value.fingerprints !== inputs.length
-    || !Array.isArray(value.relations) || !Number.isInteger(value.newRelations) || (value.newRelations as number) < 0
-    || !Array.isArray(value.reusableReadDocumentIds)) return null;
+    || !Array.isArray(value.relations) || !Number.isInteger(value.newRelations) || (value.newRelations as number) < 0) return null;
   const asked = new Set(inputs.map((input) => input.documentId.toLowerCase()));
+  const askedIds = (list: unknown): string[] | null =>
+    Array.isArray(list) && list.every((id) => typeof id === "string" && asked.has(id)) ? list as string[] : null;
+  const candidates = askedIds(value.sourceDigestReuseCandidateDocumentIds);
+  const sanitized = askedIds(value.sanitizedDigestReuseDocumentIds);
+  if (!candidates || !sanitized) return null;
   const relations: Relation[] = [];
   for (const item of value.relations as unknown[]) {
     const relation = item as Partial<Relation> | null;
@@ -77,9 +94,8 @@ function readAnswer(body: unknown, inputs: readonly Input[]): Answer | null {
       || !relation.matchedOn.every((digest) => digest === "sanitized_sha256" || digest === "source_sha256")) return null;
     relations.push(relation as Relation);
   }
-  const reusable = value.reusableReadDocumentIds as unknown[];
-  if (!reusable.every((id) => typeof id === "string" && asked.has(id))) return null;
-  return { relations, newRelations: value.newRelations as number, reusableReadDocumentIds: reusable as string[] };
+  return { relations, newRelations: value.newRelations as number,
+    sourceDigestReuseCandidateDocumentIds: candidates, sanitizedDigestReuseDocumentIds: sanitized };
 }
 
 /** A recorded source digest changed under a fingerprint: the stop-the-line class, so it pages. */
@@ -143,11 +159,14 @@ export async function detectExactDuplicatesAtIntake(
 
   // Counts only, and only what this call added: no workspace, document or digest leaves through the log.
   if (answer.newRelations > 0) {
-    const reusable = new Set(answer.reusableReadDocumentIds);
-    const pages = inputs.filter((input) => reusable.has(input.documentId.toLowerCase()))
+    const pages = (ids: readonly string[]) => inputs.filter((input) => ids.includes(input.documentId.toLowerCase()))
       .reduce((sum, input) => sum + (Number.isInteger(input.pageCount) ? input.pageCount! : 0), 0);
-    log("info", { event: "duplicate_detected", kind: "exact", mode, newRelations: answer.newRelations,
-      reusableOcrDocuments: reusable.size, reusableOcrPages: pages });
+    const candidates = answer.sourceDigestReuseCandidateDocumentIds;
+    const sanitized = answer.sanitizedDigestReuseDocumentIds;
+    log("info", { event: "duplicate_detected", kind: "exact", mode, newPairs: answer.newRelations,
+      ocrReuseCandidateDocuments_cdrDeterminismNotVerified: candidates.length,
+      ocrReuseCandidatePages_cdrDeterminismNotVerified: pages(candidates),
+      sanitizedDigestReuseDocuments: sanitized.length, sanitizedDigestReusePages: pages(sanitized) });
   }
   if (mode !== "on") return null;
   if (!viewerUserId) return [];

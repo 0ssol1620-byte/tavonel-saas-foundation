@@ -18,9 +18,10 @@ const STORE = { NEXT_PUBLIC_SUPABASE_URL: "https://store.example", SUPABASE_SERV
 const input = (documentId: string, version = V, pageCount = 3) =>
   ({ documentId, versionKey: version, inputSha256: `sha256:${version}`, pageCount });
 
-function answer(relations: unknown[], fingerprints = 1, newRelations = relations.length, reusableReadDocumentIds: string[] = []) {
+function answer(relations: unknown[], fingerprints = 1, newRelations = relations.length,
+  sourceDigestReuseCandidateDocumentIds: string[] = [], sanitizedDigestReuseDocumentIds: string[] = []) {
   return new Response(JSON.stringify({ schemaVersion: "tavonel.source_fingerprints.v1", fingerprints, relations,
-    newRelations, reusableReadDocumentIds }), { status: 200 });
+    newRelations, sourceDigestReuseCandidateDocumentIds, sanitizedDigestReuseDocumentIds }), { status: 200 });
 }
 const exact = (documentId: string, relatedDocumentId: string, matchedOn = ["sanitized_sha256", "source_sha256"]) =>
   ({ documentId, relatedDocumentId, kind: "exact_bytes", matchedOn });
@@ -81,20 +82,22 @@ describe("exact-duplicate recording", () => {
     });
   });
 
-  it("shadow: a new pair is counted with the OCR pages it could have reused, and not shown to the workspace", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => answer([exact(B, A)], 2, 1, [B])));
+  it("shadow: new pairs are counted, reuse is split into an unverified source-digest candidate and a sanitized-digest fact", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => answer([exact(B, A), exact(D, A, ["source_sha256"])], 2, 2, [B, D], [B])));
     expect(await detectExactDuplicatesAtIntake(WS, [input(B, V, 7), input(D, V, 4)],
       { ...STORE, TAVONEL_SOURCE_DEDUP_MODE: "shadow" }, VIEWER)).toBeNull();
-    expect(parsed(info)).toEqual([
-      { event: "duplicate_detected", kind: "exact", mode: "shadow", newRelations: 1, reusableOcrDocuments: 1, reusableOcrPages: 7 },
-    ]);
+    expect(parsed(info)).toEqual([{
+      event: "duplicate_detected", kind: "exact", mode: "shadow", newPairs: 2,
+      ocrReuseCandidateDocuments_cdrDeterminismNotVerified: 2, ocrReuseCandidatePages_cdrDeterminismNotVerified: 11,
+      sanitizedDigestReuseDocuments: 1, sanitizedDigestReusePages: 7,
+    }]);
     expect(info.join("")).not.toContain(B);
     expect(info.join("")).not.toContain(WS);
     expect(viewerAccess).not.toHaveBeenCalled();
   });
 
   it("shadow: a re-compile of a known pair adds nothing and logs nothing", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => answer([exact(B, A)], 1, 0, [])));
+    vi.stubGlobal("fetch", vi.fn(async () => answer([exact(B, A)], 1, 0)));
     expect(await detectExactDuplicatesAtIntake(WS, [input(B)], { ...STORE, TAVONEL_SOURCE_DEDUP_MODE: "shadow" })).toBeNull();
     expect(info).toEqual([]);
     expect(errors).toEqual([]);
@@ -157,10 +160,16 @@ describe("exact-duplicate recording", () => {
     ["the answer covers a document nobody asked about", async () => answer([exact(B, A)]), "LIBRARY_DEDUP_RESPONSE_INVALID"],
     ["the answer claims a scored kind", async () => answer([{ ...exact(A, B), kind: "near_duplicate" }]), "LIBRARY_DEDUP_RESPONSE_INVALID"],
     ["the answer counts the wrong number of fingerprints", async () => answer([], 2), "LIBRARY_DEDUP_RESPONSE_INVALID"],
-    ["the answer has no new-relation count", async () => new Response(JSON.stringify({
-      schemaVersion: "tavonel.source_fingerprints.v1", fingerprints: 1, relations: [], reusableReadDocumentIds: [] }), { status: 200 }),
+    ["the answer has no new-pair count", async () => new Response(JSON.stringify({
+      schemaVersion: "tavonel.source_fingerprints.v1", fingerprints: 1, relations: [],
+      sourceDigestReuseCandidateDocumentIds: [], sanitizedDigestReuseDocumentIds: [] }), { status: 200 }),
     "LIBRARY_DEDUP_RESPONSE_INVALID"],
-    ["the answer reports a reusable read for a document nobody asked about", async () => answer([], 1, 0, [B]), "LIBRARY_DEDUP_RESPONSE_INVALID"],
+    ["the answer has no sanitized-digest reuse list", async () => new Response(JSON.stringify({
+      schemaVersion: "tavonel.source_fingerprints.v1", fingerprints: 1, relations: [], newRelations: 0,
+      sourceDigestReuseCandidateDocumentIds: [] }), { status: 200 }),
+    "LIBRARY_DEDUP_RESPONSE_INVALID"],
+    ["the answer reports a reuse candidate for a document nobody asked about", async () => answer([], 1, 0, [B]), "LIBRARY_DEDUP_RESPONSE_INVALID"],
+    ["the answer reports a sanitized reuse for a document nobody asked about", async () => answer([], 1, 0, [], [B]), "LIBRARY_DEDUP_RESPONSE_INVALID"],
   ])("fails visibly as an error and changes nothing when %s", async (_name, fetcher, code) => {
     vi.stubGlobal("fetch", vi.fn(fetcher));
     expect(await detectExactDuplicatesAtIntake(WS, [input(A)], { ...STORE, TAVONEL_SOURCE_DEDUP_MODE: "on" }, VIEWER)).toBeNull();

@@ -104,9 +104,15 @@ create policy document_relations_no_client_access on public.document_relations
   versions), live documents only, plus what this call added, so shadow telemetry counts a pair once
   and not once per re-compile:
     {"schemaVersion": "tavonel.source_fingerprints.v1", "fingerprints": n, "relations": [...],
-     "newRelations": rows this call created for its own versions,
-     "reusableReadDocumentIds": documents of this call that gained a sanitized-digest match against
-       a fingerprint recorded by an earlier call -- an OCR read of these exact bytes already existed}.
+     "newRelations": distinct unordered document pairs this call created for its own versions
+       (a copy found here is one, whether one or both of its documents are in the call),
+     "sourceDigestReuseCandidateDocumentIds": documents of this call that gained a SOURCE-digest
+       match against a fingerprint recorded by an earlier call -- a candidate only: the CDR output is
+       not byte-deterministic (random trailer /ID, second-level CreationDate), so the same source
+       re-sanitized gets a different version key, and whether the earlier OCR read could be reused
+       is not verified,
+     "sanitizedDigestReuseDocumentIds": the same for a SANITIZED-digest match -- the bytes OCR read
+       were identical. Structurally rare until the CDR is deterministic (a version-key change)}.
   "Earlier" is the clock after the workspace lock, so a concurrent compile of the same workspace
   is either wholly before or wholly after; two copies inside one call count as neither.
 */
@@ -124,7 +130,8 @@ declare
   v_relations jsonb;
   v_started timestamptz;
   v_new integer;
-  v_reusable jsonb;
+  v_candidates jsonb;
+  v_sanitized_reuse jsonb;
 begin
   if p_workspace_key is null or p_workspace_key !~ '^pilot-[A-Za-z0-9]{1,32}$'
     or p_fingerprints is null or pg_catalog.jsonb_typeof(p_fingerprints) <> 'array'
@@ -211,15 +218,19 @@ begin
            'documentId', x.document_id, 'relatedDocumentId', x.related_document_id,
            'kind', 'exact_bytes', 'matchedOn', x.matched_on)
            order by x.document_id, x.related_document_id, x.related_source_version_id), '[]'::jsonb),
-         count(*) filter (where x.created_at >= v_started),
+         count(distinct (least(x.document_id, x.related_document_id), greatest(x.document_id, x.related_document_id)))
+           filter (where x.created_at >= v_started),
+         coalesce(pg_catalog.jsonb_agg(distinct x.document_id) filter (where x.created_at >= v_started
+           and x.related_recorded_at < v_started and x.matched_on ? 'source_sha256'), '[]'::jsonb),
          coalesce(pg_catalog.jsonb_agg(distinct x.document_id) filter (where x.created_at >= v_started
            and x.related_recorded_at < v_started and x.matched_on ? 'sanitized_sha256'), '[]'::jsonb)
-    into v_relations, v_new, v_reusable
+    into v_relations, v_new, v_candidates, v_sanitized_reuse
     from x;
 
   return pg_catalog.jsonb_build_object('schemaVersion', 'tavonel.source_fingerprints.v1',
     'fingerprints', pg_catalog.cardinality(v_documents), 'relations', v_relations,
-    'newRelations', v_new, 'reusableReadDocumentIds', v_reusable);
+    'newRelations', v_new, 'sourceDigestReuseCandidateDocumentIds', v_candidates,
+    'sanitizedDigestReuseDocumentIds', v_sanitized_reuse);
 end;
 $$;
 
