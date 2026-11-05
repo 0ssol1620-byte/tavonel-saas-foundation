@@ -1449,6 +1449,16 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
       browserFiles.add('e2e/landing-hero-mobile.spec.ts');
       matched = true;
     }
+    // Film re-record (2026-11-05): the design C Home cuts and posters (byte-locked in lib/locked-film-assets.json) and the
+    // film-start probe that names the stage-1 cut. Exact names only: poster-c<stage>-t<seconds>[-2x|-pane1-684x855].
+    if (/^public\/film\/(?:hero-c[1-4](?:-hq(?:-1440)?)?\.mp4|poster-c[1-4]-t\d+\.\d{2}(?:-2x|-pane1-684x855)?\.(?:avif|webp))$/.test(path)
+      || path === 'scripts/measure-film-start.mjs') {
+      groups.add('landing-film-continuity');
+      unitFiles.add('lib/one-path-contract.test.ts');
+      unitFiles.add('components/compile-stage-player.mobile-view.test.tsx');
+      browserFiles.add('e2e/landing-hero-film-loading.spec.ts');
+      matched = true;
+    }
     if (path === 'docs/LANDING_V2_2026-09-19.md') {
       groups.add('landing-film-continuity');
       unitFiles.add('lib/landing-v2-traceability.test.ts');
