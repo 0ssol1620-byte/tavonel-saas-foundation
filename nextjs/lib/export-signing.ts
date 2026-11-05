@@ -7,7 +7,9 @@ const SIGNATURE_SCOPE = "tavonel.signed_export_manifest.v1" as const;
 // The same key signs compile receipts, so the scope sits in the protected header and each verifier
 // names the one it expects: a compile receipt signature never verifies as an export manifest.
 export const COMPILE_RECEIPT_SIGNATURE_SCOPE = "tavonel.signed_compile_receipt.v1" as const;
-export type SignatureScope = typeof SIGNATURE_SCOPE | typeof COMPILE_RECEIPT_SIGNATURE_SCOPE;
+// W1-A5: answers are signed by the same key under a third scope.
+export const ANSWER_RECEIPT_SIGNATURE_SCOPE = "tavonel.signed_answer_receipt.v1" as const;
+export type SignatureScope = typeof SIGNATURE_SCOPE | typeof COMPILE_RECEIPT_SIGNATURE_SCOPE | typeof ANSWER_RECEIPT_SIGNATURE_SCOPE;
 
 export type ExportSignatureV1 = {
   schemaVersion: "tavonel.export_signature.v1";

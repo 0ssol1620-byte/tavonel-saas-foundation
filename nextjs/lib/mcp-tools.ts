@@ -55,6 +55,7 @@ export const DEVELOPER_FILES: ReadonlyArray<{ key: string; file: string; purpose
   { key: "sourceAgent", file: "tavonel-source-agent.py", purpose: "Walks a folder or an S3-compatible bucket and pushes what it finds." },
   { key: "verifyExport", file: "tavonel-verify-export.mjs", purpose: "Checks an archive's signature, its file digests and that nothing was added." },
   { key: "verifyPackage", file: "tavonel-verify-package.mjs", purpose: "Checks what is inside: relations resolve, regions sit inside their page, the three graph formats agree." },
+  { key: "verifyAnswer", file: "tavonel-verify-answer.mjs", purpose: "Checks a signed answer receipt: the signature, the scope, and that the answer beside it is the one signed." },
   { key: "verifyRoundtrip", file: "tavonel-verify-roundtrip.py", purpose: "Loads the export into SQLite and queries the ids back, outside our tools." },
   { key: "recipePublicSample", file: "tavonel-public-sample.py", purpose: "Recipe 2, runnable: reads the public sample World, recomputes its digest and follows every claim to its evidence." },
   { key: "recipeSmoke", file: "tavonel-recipe-smoke.mjs", purpose: "Runs all three recipes against a deployment. Every request it makes is an unauthenticated GET." },

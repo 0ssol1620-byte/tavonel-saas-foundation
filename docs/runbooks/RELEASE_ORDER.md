@@ -270,3 +270,60 @@ migration은 다시 적용할 수 없다. 두 번째 적용은 `column "gate_sur
   계산하므로 그 행을 `SCOPED_RELEASE_INVALID`로 읽고 닫힌다.
 - presentational 목록을 넓혀서 기록을 피하지 않는다. 목록을 넓히는 PR은 규칙 파일을 바꾸므로 그 자체로
   digest가 바뀐다. 리뷰를 거친 뒤 한 번 다시 기록한다.
+
+## 추가 2026-11-05 — W1-A1 원격 MCP: rollback은 무엇이 즉시이고 무엇이 아닌가
+
+리뷰 R1 M4. Vercel에서 env 값은 deployment에 묶인다. `TAVONEL_REMOTE_MCP_ENABLED`나
+`TAVONEL_REMOTE_MCP_COHORT`를 바꿔도, 그 값은 **새 build가 production이 될 때** 반영된다. 새 build는 과금되고
+수 분이 걸린다. 그래서 "env만 바꾸면 즉시 꺼진다"는 말은 틀렸다. 즉시 쓸 수 있는 손잡이는 아래 1과 2다.
+
+`tvnl_mcp_` 토큰(원격 MCP OAuth로 발급된 키)은 `/api/mcp`를 통해서만 인증된다. `/api/v1`에 직접 보내면
+`401 API_KEY_AUDIENCE_INVALID`로 거부된다. 따라서 스위치가 꺼진 deployment가 서빙되는 순간, 남은 토큰은 어디에서도
+쓸 수 없다.
+
+### 순서 (사고 시)
+
+1. **원격 MCP 키 일괄 revoke — 즉시, build 없음.**
+   ```
+   curl -sS -X POST https://<production host>/api/internal/remote-mcp/revoke-all \
+     -H "Authorization: Bearer $FOUNDATION_WORKER_SECRET"
+   ```
+   응답 `{"code":"REVOKED","revoked":N,"byWorkspace":{...},"revokedAt":"..."}`을 캠페인 원장에 그대로 남긴다.
+   인증은 호출마다 키 행을 읽으므로, revoke된 키는 다음 호출부터 401이다. 손으로 만든 키(`tvnl_live_`)는 건드리지
+   않는다. 대상은 저장된 `token_kind = 'mcp'`이고 이름이 아니다(R2 N1). 그래서 예전에 `MCP:`로 이름 붙인 수동 키도
+   남는다.
+
+   **이것만으로는 멈추지 않는다.** 스위치가 켜진 deployment가 서빙되는 동안 client는 다시 OAuth를 거쳐 새 키를
+   받는다. 그러니 2를 이어서 한다.
+
+2. **Vercel Instant Rollback — build 없음, 과금 build 없음.** 원장에 기록해 둔 직전 production deployment ID로 되돌린다.
+   그 deployment가 스위치가 꺼진 env로 build되었으면, 원격 MCP는 그 즉시 404가 된다. 되돌린 뒤 1을 한 번 더 실행해,
+   그 사이에 발급된 키를 정리한다.
+
+3. **영구 조치: env 변경 + redeploy (과금 build 1회).** `TAVONEL_REMOTE_MCP_ENABLED`를 지우거나
+   `TAVONEL_REMOTE_MCP_COHORT`에서 workspace를 뺀다. 이 deployment가 production이 될 때까지는 1과 2가 유효하다.
+
+### 하지 말 것
+
+- `TAVONEL_PROCESSING_WORKSPACE_COHORT`로 원격 MCP를 좁히지 않는다. 원격 MCP의 cohort는
+  `TAVONEL_REMOTE_MCP_COHORT`(1–3개)다. processing cohort를 바꾸면 업로드 처리 허용 범위가 함께 바뀐다(R1 M5).
+- 이 절차를 처음 쓰는 날이 사고 날이 되지 않게 한다. A1.3 canary 전에 preview에서 1–2를 한 번 실행하고,
+  걸린 시간을 receipt로 남긴다(로컬 shadow 측정: `REMOTE-MCP-SECURITY-<sha>.json`의 `bulkRevoke`).
+
+### 배포 순서 (R2 N1, migration `20261105000000_api_key_token_kind.sql`)
+
+이 PR의 코드는 key를 인증할 때 `token_kind` 열을 읽는다. **migration을 code보다 먼저 적용한다.** 열이 없는 DB에서
+이 code가 돌면 PostgREST가 select를 거부하고, 모든 API key 인증이 `API_KEY_INVALID`가 된다(fail closed지만 장애다).
+migration은 additive다. 기존 행은 전부 `live`가 되고, create RPC의 새 마지막 인자 `p_token_kind`의 기본값도 `live`이므로,
+옛 code가 새 DB에서 돌아도 그대로 동작한다. rollback 때 migration을 되돌릴 필요는 없다.
+
+### A1.3 canary 전제 조건 (이 PR 범위 밖, 모두 충족 전에는 cohort를 열지 않는다)
+
+- [ ] preview rollback drill: 위 1(일괄 revoke)과 2(Instant Rollback)를 preview에서 한 번 실행하고 걸린 시간을 receipt로
+      남긴다. preview build는 과금되므로 founder 승인 후에만 한다.
+- [ ] 실제 Claude와 ChatGPT 연결 receipt: 각 vendor client가 public https URL로 OAuth와 MCP handshake를 끝낸 기록.
+      모델 ID나 client 버전은 receipt에 고정한다.
+- [ ] `/api/mcp*`(OAuth register, authorize, token 경로 포함)에 IP별 rate limit을 둔다(리뷰 R2가 요구한 전제).
+- [ ] production에 `TAVONEL_REMOTE_MCP_COHORT`(1–3개)와 `FOUNDATION_WORKER_SECRET`(32자 이상)이 설정되어 있다.
+      값은 출력하지 않고, 설정되어 있다는 사실만 확인한다.
+- [ ] migration `20261105000000`이 production DB에 적용되어 있다(위 배포 순서).

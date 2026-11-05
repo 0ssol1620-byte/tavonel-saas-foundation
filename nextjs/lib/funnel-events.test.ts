@@ -19,7 +19,7 @@ describe("funnel event property allowlist", () => {
     `sourceName`, and the point of the list is that a new key costs somebody a decision.
   */
   it("holds no key that could carry an identifier or a user string", () => {
-    expect([...FUNNEL_DETAIL_KEYS]).toEqual(["act", "cta", "family", "filter", "from", "kind", "lifecycle", "mode", "offer", "plan", "plans", "scene", "sources", "status", "variant"]);
+    expect([...FUNNEL_DETAIL_KEYS]).toEqual(["act", "code", "cta", "family", "filter", "from", "kind", "lifecycle", "mode", "offer", "plan", "plans", "scene", "sources", "status", "tool", "variant"]);
     // D8's experiment arm: three enumerated values, and no fourth. It is on the list for the
     // same reason `scene` and `act` are -- it names a UI state, not a thing a reader typed.
     expect(FUNNEL_DETAIL_KEYS as readonly string[]).toContain("variant");

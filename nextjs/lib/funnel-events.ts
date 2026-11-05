@@ -164,7 +164,11 @@ export type ServerFunnelEvent =
   | "grounded_task_completed"
   | "external_consumer_succeeded"
   | "export_package_signed"
-  | "subscription_started";
+  | "subscription_started"
+  /* W1-A1 remote MCP: a token minted, a tool that ran, a call refused or failed (`tool`, `code`). */
+  | "mcp_token_issued"
+  | "mcp_tool_called"
+  | "mcp_tool_failed";
 
 /*
   The property allowlist -- the enforced half of the sentence at the top of this file.
@@ -186,7 +190,12 @@ export type ServerFunnelEvent =
   key is absent entirely from every event while no experiment is active. It can hold no id and
   no string a reader typed, which is the test every key on this list has to pass.
 */
-export const FUNNEL_DETAIL_KEYS = ["act", "cta", "family", "filter", "from", "kind", "lifecycle", "mode", "offer", "plan", "plans", "scene", "sources", "status", "variant"] as const;
+/*
+  `tool` and `code` (W1-A1) are enumerated the same way: `tool` is one of the remote MCP's nine
+  tool names or "unknown" (remoteMcpToolLabel), and `code` is a refusal constant reduced to
+  `[A-Z0-9_]` by toolFailureCode -- neither can carry an id, a question or message text.
+*/
+export const FUNNEL_DETAIL_KEYS = ["act", "code", "cta", "family", "filter", "from", "kind", "lifecycle", "mode", "offer", "plan", "plans", "scene", "sources", "status", "tool", "variant"] as const;
 export type FunnelDetailKey = (typeof FUNNEL_DETAIL_KEYS)[number];
 export type FunnelDetail = Partial<Record<FunnelDetailKey, string>>;
 
