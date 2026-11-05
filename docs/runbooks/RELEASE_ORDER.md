@@ -284,10 +284,22 @@ migration은 다시 적용할 수 없다. 두 번째 적용은 `column "gate_sur
 - `TAVONEL_TRIAL_AI_ACCESS_ENABLED`는 이 migration이 production에 적용되고, 창업자 F-2(trial 약관 문구·상한)가
   승인된 뒤에만 `true`로 둔다. 상한 값은 `foundation_trial_policy` 한 행을 바꾸면 배포 없이 바뀐다.
 - 되돌리기: env flag를 지운다(즉시, build 없음). 열과 테이블은 남겨 둔다(expand만, down migration 없음).
-- migration 순서: 이 파일은 `20261104090000`이다. W1-B1의 `20261104090500_source_fingerprints_exact_dedup`이
-  그 뒤에 온다. B1이 먼저 production에 적용되면 이 버전이 이미 적용된 버전보다 앞서므로, A2를 먼저 적용하거나
-  B1 쪽이 이 버전 뒤로 정렬되는지 확인한다(2026-11-04 coordinator 합의: A2는 090000 유지, B1은 그 뒤). 적용 순서와
-  버전은 캠페인 ledger에 적는다.
+- migration 순서(2026-11-05 갱신): #186은 #190 다음에 merge한다. 그래서 production에는 #190의 `20261105000000`이
+  이 파일 `20261104090000`보다 먼저 적용된다. 둘은 서로 다른 객체만 만든다(#190은 `foundation_api_keys`와 그 RPC,
+  이 파일은 trial 열과 receipt 테이블). 그래서 적용 순서가 결과를 바꾸지 않는다. 다만 `supabase db push`는 이미 적용된
+  버전보다 이른 버전을 out-of-order로 거부한다. production 이력은 원래 repo와 어긋나 있으므로, 파일을 하나씩 적용하고
+  이력에 기록한다. 빈 DB(CI db-rehearsal)는 파일명 순서대로 적용한다. 적용 순서와 버전은 캠페인 ledger에 적는다.
+- 리셋 범위 `20261105010000_founder_test_reset_operations_receipts`(R2-m2): founder test reset이
+  `foundation_operations_receipts`도 세고, fingerprint에 넣고, 지운다. 이 파일은 `20261104090000`(테이블) **뒤에**
+  적용한다. W1-B1(#187)의 `20261104091000_founder_test_reset_source_fingerprints`도 같은 세 함수 본문을 바꾼다.
+  둘 중 **나중에 merge하는 쪽이 다른 쪽의 줄을 포함**해야 한다. 그러지 않으면 나중에 적용된 본문이 먼저 들어간 테이블을
+  리셋에서 뺀다. 두 pgTAP(`founder_test_reset_operations_receipts.sql`, `founder_test_reset_source_fingerprints.sql`)과
+  `founder-test-reset-migration.test.ts`가 main에서 실패하므로 조용히 지나가지는 않는다.
+- trial 키 규칙(F-2 문구용): **trial 주체 하나당 살아 있는 키 1개. 수동 키든 MCP 키든 같다.** 키를 실제로 만드는 두 곳에서
+  검사한다: `POST /api/developer/keys`와 원격 MCP token 발급(`/api/mcp/oauth/token`). consent(`authorize`)는 키를 만들지
+  않으므로 검사하지 않는다. 같은 client의 재연결은 대체되는 자기 키를 세지 않는다. 그래서 재연결 뒤에도 키는 1개다.
+  수동 키가 살아 있으면 MCP 연결이 402 `TRIAL_LIMIT_REACHED`이고, 반대도 같다. 가진 키를 revoke하거나 만료(MCP 토큰은
+  1시간)되면 풀린다. UI 안내 문구는 A2.2 전에 이 규칙에 맞춘다.
 
 ### 수동 단계 — RunPod billing 1회 확인 (cost cap을 켜기 전)
 

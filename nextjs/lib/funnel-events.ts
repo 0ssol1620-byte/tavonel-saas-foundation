@@ -171,7 +171,7 @@ export type ServerFunnelEvent =
     `kind` is the operation (key_list, key_create, key_revoke, key_rotate, mcp_authorize). It counts
     demand for a behaviour that does not exist yet, so it is a would-allow, not an outcome.
   */
-  | "trial_ai_access_would_allow";
+  | "trial_ai_access_would_allow"
   /* W1-A1 remote MCP: a token minted, a tool that ran, a call refused or failed (`tool`, `code`). */
   | "mcp_token_issued"
   | "mcp_tool_called"

@@ -29,10 +29,16 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
   ai_* columns), the `customerData` launch switch (P2-37), and a founder approval receipt.
   Until then the flag stays unset and every trial gets the 402 it got before W1.
 
+  The key rule, for F-2 wording: one live key per trial principal, hand-made or MCP. It is checked
+  where a key is minted -- key create here, and the remote MCP token at issue
+  (app/api/mcp/oauth/token/route.ts, `trialMcpTokenAccess`), not at consent, which mints nothing.
+  A reconnect does not count the keys it replaces (the same member's earlier keys for the same
+  client), so it stays one key. While a hand-made key lives an MCP connection is refused 402
+  TRIAL_LIMIT_REACHED, and the other way round, until the one held is revoked or expires.
+
   Before the canary (engineering, not founder): confirm a trial principal is accepted end to end by
-  the key-create RPC (create_foundation_api_key_authorized), app/api/mcp/oauth/token/route.ts
-  (which mints the MCP key and counts as the trial's one key while it lives) and the v1 routes
-  behind MCP (ask, search, the customer-data gate). This file only decides entry. The developer
+  the key-create RPC (create_foundation_api_key_authorized) and the v1 routes behind MCP (ask,
+  search, the customer-data gate). This file only decides entry. The developer
   panel's default scopes include connector and intake scopes, so a trial needs a read-only default
   there; and "one query" is one key-authenticated v1 call, which F-2 wording must define.
 */
@@ -49,6 +55,7 @@ export type TrialAiOperation =
   | "key_revoke"
   | "key_rotate"
   | "mcp_authorize"
+  | "mcp_token"
   | "query";
 
 export type TrialAiAccessDecision =
@@ -92,7 +99,7 @@ async function readUsage(principal: Principal, consume: boolean): Promise<Usage 
  * proves nothing, and an MCP token is a key while it lives. One bounded read (limit 1) over the
  * workspace's unrevoked, unexpired keys -- never a newest-N listing another key can push one out of.
  */
-async function holdsLiveKey(workspaceKey: string, now: number): Promise<boolean | null> {
+async function holdsLiveKey(workspaceKey: string, now: number, replacing: readonly string[]): Promise<boolean | null> {
   const config = readSupabaseAdminConfig();
   if (!config) return null;
   const query = new URLSearchParams({
@@ -102,6 +109,7 @@ async function holdsLiveKey(workspaceKey: string, now: number): Promise<boolean 
     or: `(expires_at.is.null,expires_at.gt.${new Date(now).toISOString()})`,
     limit: "1",
   });
+  if (replacing.length > 0) query.set("key_id", `not.in.(${replacing.join(",")})`);
   try {
     const response = await supabaseAdminRequest(config, `/rest/v1/foundation_api_keys?${query}`, { signal: AbortSignal.timeout(5_000) });
     if (!response.ok) {
@@ -120,15 +128,16 @@ type Evaluation = { allowed: true } | { allowed: false; code: "TRIAL_FEATURE_NOT
 /** `scopes` is what a create or rotate asks for; `null` means the request did not parse. */
 type Scopes = readonly DeveloperScope[] | null;
 
-async function evaluate(principal: Principal, operation: TrialAiOperation, consume: boolean, scopes: Scopes): Promise<Evaluation> {
+async function evaluate(principal: Principal, operation: TrialAiOperation, consume: boolean, scopes: Scopes, replacing: readonly string[] = []): Promise<Evaluation> {
   // Listing and revoking a key the trial already holds are never refused for usage: revoking is
   // how a customer gets back under the one-key bound, and refusing it would trap them over it.
   if (operation === "key_list" || operation === "key_revoke") return { allowed: true };
-  if ((operation === "key_create" || operation === "key_rotate") && !trialScopesAllowed(scopes ?? [])) {
+  const mints = operation === "key_create" || operation === "mcp_token";
+  if ((mints || operation === "key_rotate") && !trialScopesAllowed(scopes ?? [])) {
     return { allowed: false, code: "TRIAL_FEATURE_NOT_INCLUDED" };
   }
-  if (operation === "key_create") {
-    const holds = await holdsLiveKey(principal.workspaceKey, Date.now());
+  if (mints) {
+    const holds = await holdsLiveKey(principal.workspaceKey, Date.now(), replacing);
     if (holds === null) return null;
     // ponytail: read-then-create, so two simultaneous creates can both pass; the key is read-only
     // and the counter still bounds its use. A partial unique index on live trial keys closes it.
@@ -164,6 +173,25 @@ export async function trialAiAccess(
   }
   if (keyRequest && scopes === null) return { ok: true };
   const decided = await evaluate(principal, operation, operation === "query", scopes);
+  if (decided === null) return { ok: false, status: 503, code: "TRIAL_AI_ACCESS_CHECK_FAILED", wouldAllow: false };
+  return decided.allowed ? { ok: true } : { ok: false, status: 402, code: decided.code, wouldAllow: false };
+}
+
+/**
+ * Issue time of a remote MCP token, where the MCP key is actually minted: the one-live-key cap
+ * that key create checks, minus `replacing` (the keys this mint supersedes and the route revokes
+ * right after), plus the evaluation bounds. With the flag off it is the 402 consent already gave,
+ * and no shadow -- consent counted that demand once.
+ */
+export async function trialMcpTokenAccess(
+  principal: Principal,
+  scopes: readonly DeveloperScope[],
+  replacing: readonly string[],
+  env: Env = process.env,
+): Promise<TrialAiAccessDecision> {
+  if (principal.accessSource !== "trial") return { ok: true };
+  if (!trialAiAccessEnabled(env)) return { ok: false, status: 402, code: "TRIAL_FEATURE_NOT_INCLUDED", wouldAllow: false };
+  const decided = await evaluate(principal, "mcp_token", false, scopes, replacing);
   if (decided === null) return { ok: false, status: 503, code: "TRIAL_AI_ACCESS_CHECK_FAILED", wouldAllow: false };
   return decided.allowed ? { ok: true } : { ok: false, status: 402, code: decided.code, wouldAllow: false };
 }

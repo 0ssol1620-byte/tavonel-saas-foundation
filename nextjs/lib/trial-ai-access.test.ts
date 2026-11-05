@@ -304,10 +304,10 @@ describe("the four 402 routes", () => {
     const created = await createKeyRoute(post("https://t.test/api/developer/keys", { name: "ci", scopes: ["worlds:read", "ask:read"] }));
     expect(created.status).toBe(201);
 
-    // A key named like an MCP token is still a second key.
+    // A held key is the one key, whatever it is called. (A new key may not take the `MCP:` name at all: #190, 400.)
     keys = [{ key_id: "k1", name: "ci", revoked_at: null, expires_at: null }];
     mocks.createKey.mockClear();
-    const second = await createKeyRoute(post("https://t.test/api/developer/keys", { name: "MCP: a", scopes: ["worlds:read"] }));
+    const second = await createKeyRoute(post("https://t.test/api/developer/keys", { name: "second", scopes: ["worlds:read"] }));
     expect([second.status, await second.json()]).toEqual([402, { code: "TRIAL_LIMIT_REACHED" }]);
     expect(mocks.createKey).not.toHaveBeenCalled();
 

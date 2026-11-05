@@ -867,4 +867,54 @@ describe("review R1: audience, failures, cohort, key churn, trial", () => {
     expect([unknown.status, (await unknown.json()).error]).toEqual([503, "temporarily_unavailable"]);
     expect(mocks.createKey).not.toHaveBeenCalled();
   });
+
+  it("W1-A2 flag on: the one-live-key cap is checked at token issue -- a held key refuses, a reconnect's own keys do not count", async () => {
+    vi.stubEnv("TAVONEL_TRIAL_AI_ACCESS_ENABLED", "true");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://store.test");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "k".repeat(40));
+    const trialProduct = { ok: true, access: { source: "trial", accessPlan: "observer_access", billingExempt: false, expiresAt: null } };
+    let held = true;
+    const keyReads: URL[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const parsed = new URL(url);
+      if (parsed.pathname === "/rest/v1/foundation_api_keys") {
+        keyReads.push(parsed);
+        return new Response(JSON.stringify(held ? [{ key_id: "manual-1" }] : []), { status: 200 });
+      }
+      expect(parsed.pathname).toBe("/rest/v1/rpc/foundation_trial_ai_access");
+      return new Response(JSON.stringify({ status: "allowed", reason: null }), { status: 200 });
+    }));
+    try {
+      const clientId = await registeredClient();
+      // A live key (hand-made or MCP, whatever its name) is the trial's one key: no second one is minted.
+      mocks.sessionProduct.mockResolvedValueOnce(trialProduct);
+      const capped = await exchange({ grant_type: "authorization_code", code: await approvedCode(clientId), client_id: clientId, code_verifier: VERIFIER });
+      expect([capped.status, await capped.json()]).toEqual([402, { error: "access_denied", error_description: "TRIAL_LIMIT_REACHED", code: "TRIAL_LIMIT_REACHED" }]);
+      expect(keyReads[0]!.searchParams.has("token_kind")).toBe(false);
+      expect(keyReads[0]!.searchParams.has("name")).toBe(false);
+      expect(mocks.createKey).not.toHaveBeenCalled();
+
+      // A reconnect: the same client's live key is excluded from the count, then replaced.
+      held = false;
+      const tag = createHash("sha256").update(clientId).digest("hex").slice(0, 12);
+      mocks.listKeys.mockResolvedValueOnce({ ok: true, keys: [
+        { keyId: "same-live", name: `MCP: Example agent ~${tag} #a`, expiresAt: new Date(Date.now() + 600_000).toISOString(), revokedAt: null },
+      ] });
+      mocks.sessionProduct.mockResolvedValueOnce(trialProduct);
+      const reconnect = await exchange({ grant_type: "authorization_code", code: await approvedCode(clientId), client_id: clientId, code_verifier: VERIFIER });
+      expect(reconnect.status).toBe(200);
+      expect(keyReads[1]!.searchParams.get("key_id")).toBe("not.in.(same-live)");
+      expect(mocks.revokeKey.mock.calls.map((args) => args[3])).toEqual(["same-live"]);
+
+      // Unreadable bounds fail closed: 503, nothing minted.
+      vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+      mocks.createKey.mockClear();
+      mocks.sessionProduct.mockResolvedValueOnce(trialProduct);
+      const unreadable = await exchange({ grant_type: "authorization_code", code: await approvedCode(clientId), client_id: clientId, code_verifier: VERIFIER });
+      expect([unreadable.status, (await unreadable.json()).code]).toEqual([503, "TRIAL_AI_ACCESS_CHECK_FAILED"]);
+      expect(mocks.createKey).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
