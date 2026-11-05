@@ -62,7 +62,6 @@ import ConnectionsPanel from "@/components/connections-panel";
 import DeveloperPanel from "@/components/developer-panel";
 import WorkspaceUltimateShell, { type SourcePendingReason, type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
 import WorkspaceGettingStarted from "@/components/workspace-getting-started";
-import ProductCapture from "@/components/landing-v2/product-capture";
 import WorkspaceUseWithAi from "@/components/workspace-use-with-ai";
 import ProcessingConsentPanel from "@/components/processing-consent-panel";
 import IntakeTriageReview from "@/components/intake-triage-review";
@@ -3263,9 +3262,16 @@ export default function WorkspacePage() {
           {tab === "overview" && surface === "home" && workspaceState.mode === "new" && intakeOpen ? (
             <figure className="workspace-example-run">
               <figcaption>What a run looks like · example files, not yours</figcaption>
-              <ProductCapture className="tv-capture" name="compile-timeline"
-                alt="An example compile stage at its first step: the steps Source, Read, Organize and Review & activate, with example files listed and one marked for review."
-                sizes="(min-width: 1024px) min(1040px, calc(100vw - 340px)), calc(100vw - 32px)" />
+              {/* Plain markup, not ProductCapture: this page is a client component, and importing the capture
+                  manifest would ship all of it in the workspace bundle. The two sizes are MANIFEST.json's pixel
+                  size for the pair; lib/workspace-onboarding.test.ts holds them to the manifest. */}
+              <picture className="tv-capture" data-capture="compile-timeline">
+                <source media="(max-width: 640px)" srcSet="/visuals/compile-timeline-390.webp 684w" sizes="calc(100vw - 32px)" width={684} height={1260} />
+                <img src="/visuals/compile-timeline-1440.webp" srcSet="/visuals/compile-timeline-1440.webp 2784w"
+                  sizes="(min-width: 1024px) min(1040px, calc(100vw - 340px)), calc(100vw - 32px)" width={2784} height={1082}
+                  alt="An example compile stage at its first step: the steps Source, Read, Organize and Review & activate, with example files listed and one marked for review."
+                  loading="lazy" decoding="async" />
+              </picture>
             </figure>
           ) : null}
 
