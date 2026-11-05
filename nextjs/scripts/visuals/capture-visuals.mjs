@@ -1,18 +1,15 @@
 /**
  * W1-L7: capture the real product surfaces for nextjs/public/visuals and write MANIFEST.json.
  *
- * The committed captures were taken from origin/main e595dbca WITH the direction-C CSS of PR #183
- * (fnd-C head 05eb1d81) applied to the working tree for the capture build only, never committed
- * here. That is what TOKENS records in MANIFEST. Exact procedure (fixture build, never a deployment):
- *   git -C <fnd-C> diff origin/main...05eb1d81 -- '*.css' > design-c.patch
- *   git apply design-c.patch      # tokens, workspace, explore and chrome CSS
+ * The committed captures are of this branch rebased on main 6c7d3e9d (design C, #183, merged),
+ * built as is: no CSS overlay, no patch. TOKENS records that build in MANIFEST. Procedure (fixture
+ * build on loopback, never a deployment; one build at a time, `rm -rf .next` first):
  *   PLAYWRIGHT_LOCAL_HTTP=1 NEXT_PUBLIC_SUPABASE_URL=https://test.supabase.co \
  *   NEXT_PUBLIC_SUPABASE_ANON_KEY=foundation-browser-e2e-anon-key pnpm exec next build
  *   pnpm start --hostname 127.0.0.1 --port <port>
- *   VISUALS_BASE_URL=http://127.0.0.1:<port> node scripts/visuals/capture-visuals.mjs
- *   git apply -R design-c.patch
- * Once #183 is on main, drop both patch steps and run with VISUALS_TOKENS=main@<sha>. Re-take the
- * captures from that main build before any public page uses them: a capture of CSS that is not in
+ *   VISUALS_TOKENS=main@<sha> VISUALS_BASE_URL=http://127.0.0.1:<port> node scripts/visuals/capture-visuals.mjs
+ *   VISUALS_WRITE_MANIFEST=1 pnpm exec vitest run lib/visuals-diagrams.test.ts   # diagram rows
+ * Re-take them whenever the captured surfaces' CSS changes on main: a capture of CSS that is not in
  * production is not a real product capture.
  *
  * Every image is a screenshot of the rendered DOM, cropped to the surface and re-encoded to WebP
@@ -33,7 +30,7 @@ const root = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const OUT = join(root, "public", "visuals");
 // sharp is next's own image dependency; resolved through next so this script adds none.
 const sharp = createRequire(createRequire(import.meta.url).resolve("next/package.json"))("sharp");
-const TOKENS = process.env.VISUALS_TOKENS ?? "design-c@05eb1d81";
+const TOKENS = process.env.VISUALS_TOKENS ?? "main@6c7d3e9d";
 
 const sha = (buf) => createHash("sha256").update(buf).digest("hex");
 const READING_PDF = Buffer.from("%PDF-1.4\n% pipeline-board reading fixture\n%%EOF\n", "ascii");
