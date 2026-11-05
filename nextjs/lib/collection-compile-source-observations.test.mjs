@@ -71,6 +71,8 @@ function compileFixture(options = {}) {
       putWorkspaceCollectionCandidate: async () => { activity.push("persist"); return { ok: true, status: "written", bytes: 10 }; } },
     "./r2-synthetic-canary": { readR2SignerEnv: () => ({ secretAccessKey: "DO_NOT_RECORD_TOKEN" }) },
     "./world-store": {},
+    // B1 annotation as it behaves with TAVONEL_SOURCE_DEDUP_MODE unset (process.env is {} here): no store call, no note.
+    "./source-dedup": { detectExactDuplicatesAtIntake: async () => null },
   };
   return { ...load("lib/collection-compile-run.ts", mocks), audit, activity };
 }
