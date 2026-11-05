@@ -12,8 +12,8 @@ export const DEFAULT_ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
 export const PRODUCTION_HOSTS = [/^(?:www\.)?tavonel\.com$/, /\.tavonel\.com$/, /^tavonel-saas-foundation(?:-[a-z0-9-]+)?\.vercel\.app$/];
 
 export function checkHost(baseUrl: string, allowHosts: string[] = []): string {
-  // A fully qualified name with its root dot ("tavonel.com.") is the same host; strip it before either check.
-  const host = new URL(baseUrl).hostname.replace(/\.$/, "");
+  // A fully qualified name with its root dot(s) ("tavonel.com.", "tavonel.com..") is the same host; strip them before either check.
+  const host = new URL(baseUrl).hostname.replace(/\.+$/, "");
   if (PRODUCTION_HOSTS.some((pattern) => pattern.test(host))) throw new Error(`refusing production host ${host}`);
   if (![...DEFAULT_ALLOWED_HOSTS, ...allowHosts].includes(host)) throw new Error(`host ${host} is not allowed; name it with --allow-host`);
   return host;

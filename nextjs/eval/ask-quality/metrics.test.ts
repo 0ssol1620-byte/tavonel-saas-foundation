@@ -258,6 +258,7 @@ describe("evidence_excerpts adapter", () => {
     expect(checkHost("https://staging.example.test", ["staging.example.test"])).toBe("staging.example.test");
     expect(() => make(reply(200, {}), "https://tavonel.com")).toThrow(/production/);
     expect(() => checkHost("https://tavonel.com./", ["tavonel.com.", "tavonel.com"])).toThrow(/production/);
+    expect(() => checkHost("https://tavonel.com../", ["tavonel.com..", "tavonel.com"])).toThrow(/production/);
     expect(checkHost("http://localhost.:3000")).toBe("localhost");
     expect(() => checkHost("https://www.tavonel.com", ["www.tavonel.com"])).toThrow(/production/);
     expect(() => checkHost("https://tavonel-saas-foundation-abc123-team.vercel.app", ["tavonel-saas-foundation-abc123-team.vercel.app"])).toThrow(/production/);
