@@ -31,7 +31,7 @@ import { readCustomerSourceAuthorization, type SourceAuthorizationResult } from 
 import { readCustomerSourceScope } from "./customer-source-scope";
 import { appendServiceAuditEvent } from "./enterprise-store";
 import { checkCurrentSourceVersions, collectionCandidateKey, groupImmutableDocuments, selectCurrentDocumentVersions } from "./immutable-keys";
-import { getWorkspaceCollectionCandidate, getWorkspaceOcrJson, listImmutableWorkspaceObjects, MAX_DERIVED_JSON_BYTES, putWorkspaceCollectionCandidate, type JsonSizeLimit } from "./r2-objects";
+import { getWorkspaceCollectionCandidate, getWorkspaceOcrJson, listImmutableWorkspaceObjects, MAX_DERIVED_JSON_BYTES, putSerializedCollectionCandidate, serializeCollectionCandidate, type JsonSizeLimit } from "./r2-objects";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
 import { getFoundationActiveWorld } from "./world-store";
 
@@ -520,6 +520,19 @@ export async function runCollectionCompile(
     compiledAt: compiledAt.toISOString(),
   });
   if (!signed) return { ok: false, status: 502, code: "COMPILE_RECEIPT_INVALID", payload: {} };
+
+  /*
+    Bytes before records. Signing is local; the audit row and the provenance lease below are
+    durable claims about an object, so the one refusal that is certain in advance -- the size
+    bound -- is taken here, before either exists. cjob-157f2f23 registered provenance #8/#9 and two
+    `succeeded` receipt audits for a 134,576,916 B candidate that was never written.
+    The PUT itself still follows provenance (deletion must find any object that can exist); a PUT
+    that fails in transport after this point leaves an expiring lease and no object.
+  */
+  const storedArtifact = { ...artifact, coreExecution, signedReceipt: signed.receipt };
+  const serialized = serializeCollectionCandidate(storedArtifact);
+  if (!serialized.ok) return { ok: false, status: 503, code: serialized.code, payload: sizeLimitPayload(serialized) };
+
   const audited = await appendServiceAuditEvent({
     workspaceKey: workspaceId,
     action: "compile.receipt_signed",
@@ -578,7 +591,6 @@ export async function runCollectionCompile(
     return { ok: false, status: registered.refused ? 409 : 503, code: registered.code, payload: {} };
   }
 
-  const storedArtifact = { ...artifact, coreExecution, signedReceipt: signed.receipt };
   if (!mayPublish(registered)) {
     return { ok: false, status: 503, code: "COLLECTION_ARTIFACT_PUBLICATION_LEASE_EXPIRED", payload: {} };
   }
@@ -588,7 +600,7 @@ export async function runCollectionCompile(
     if (!finalAuthority.ok) return { ok: false, status: finalAuthority.code === "COMPILE_JOB_AUTHORITY_DENIED" ? 403 : 503,
       code: finalAuthority.code, payload: {} };
   }
-  const stored = await putWorkspaceCollectionCandidate(signer, workspaceId, key, storedArtifact);
+  const stored = await putSerializedCollectionCandidate(signer, workspaceId, key, serialized.body);
   if (!stored.ok) return { ok: false, status: 503, code: stored.code, payload: sizeLimitPayload(stored) };
 
   return {

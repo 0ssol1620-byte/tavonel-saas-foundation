@@ -20,6 +20,7 @@ import type { authorizeCompileJobSourceAccess, classifyCompileJobSources } from 
 const listed = vi.fn();
 const fetched = vi.fn();
 const put = vi.fn();
+const serialize = vi.fn();
 const dispatched = vi.fn<(...args: Parameters<typeof dispatchProductCoreV2>) => Promise<unknown>>();
 const jobAuthority = vi.fn<(...args: Parameters<typeof authorizeCompileJobSourceAccess>) => Promise<unknown>>();
 const authorityEnabled = vi.fn(() => true);
@@ -40,7 +41,8 @@ vi.mock("./r2-objects", () => ({
   MAX_DERIVED_JSON_BYTES: 24 * 1024 * 1024,
   listImmutableWorkspaceObjects: (...args: unknown[]) => listed(...args),
   getWorkspaceOcrJson: (...args: unknown[]) => fetched(...args),
-  putWorkspaceCollectionCandidate: (...args: unknown[]) => put(...args),
+  serializeCollectionCandidate: (...args: unknown[]) => serialize(...args),
+  putSerializedCollectionCandidate: (...args: unknown[]) => put(...args),
   getWorkspaceCollectionCandidate: (...args: unknown[]) => priorCandidate(...args),
 }));
 vi.mock("./world-store", () => ({
@@ -150,6 +152,7 @@ beforeEach(() => {
   customerDataGate.mockReset().mockResolvedValue(APPROVED_GATE);
   audited.mockReset().mockResolvedValue({ ok: true, eventId: "00000000-0000-4000-8000-000000000000" });
   registered.mockReset().mockImplementation(async () => ({ ok: true, publishBy: Date.now() + 60_000 }));
+  serialize.mockReset().mockImplementation((value: unknown) => ({ ok: true, body: Buffer.from(JSON.stringify(value), "utf8") }));
   signingEnv = receiptSigningEnv();
   for (const [name, value] of Object.entries(signingEnv)) vi.stubEnv(name, value);
 });
@@ -335,14 +338,26 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
     expect(put).not.toHaveBeenCalled();
   });
 
-  it("carries the candidate's byte count when the candidate write is over its bound", async () => {
+  it("refuses an oversized candidate, with its attribution, before any audit, provenance or PUT", async () => {
     compilableSource();
-    const sizeLimit = { object: "candidate-world.json", bytes: 32 * 1024 * 1024 + 1, bound: 32 * 1024 * 1024 };
-    put.mockResolvedValue({ ok: false, code: "JSON_TOO_LARGE", sizeLimit });
+    const sizeLimit = { object: "candidate-world.json", bytes: 134_576_916, bound: 32 * 1024 * 1024,
+      largestPackageFiles: [{ path: "rag/chunks.jsonl", sizeBytes: 90_000_000 }] };
+    serialize.mockReturnValueOnce({ ok: false, code: "JSON_TOO_LARGE", sizeLimit });
 
     const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run).toEqual({ ok: false, status: 503, code: "JSON_TOO_LARGE", payload: { sizeLimit } });
+    // cjob-157f2f23: provenance #8/#9 and two succeeded receipt audits named an object never written.
+    expect(audited).not.toHaveBeenCalled();
+    expect(registered).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("puts exactly the bytes that passed the size check", async () => {
+    compilableSource();
+    expect((await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).ok).toBe(true);
+    expect(serialize).toHaveBeenCalledOnce();
+    expect(put.mock.calls[0]?.[3]).toBe((serialize.mock.results[0]?.value as { body: Buffer }).body);
   });
 
   it("signs the receipt, audits it, then persists it -- in that order", async () => {
@@ -375,7 +390,7 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
     });
     expect(JSON.stringify(event.details)).not.toMatch(/"(content|text|secret|password|token|credential|private[_-]?key)"\s*:|pump/i);
     expect(audited.mock.invocationCallOrder[0]).toBeLessThan(put.mock.invocationCallOrder[0]!);
-    expect(put.mock.calls[0]?.[3]).toMatchObject({ signedReceipt: receipt });
+    expect(JSON.parse(String(put.mock.calls[0]?.[3]))).toMatchObject({ signedReceipt: receipt });
   });
 
   it("carries a qualification grant from admission through dispatch into the signed, audited receipt", async () => {

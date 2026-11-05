@@ -270,3 +270,11 @@ migration은 다시 적용할 수 없다. 두 번째 적용은 `column "gate_sur
   계산하므로 그 행을 `SCOPED_RELEASE_INVALID`로 읽고 닫힌다.
 - presentational 목록을 넓혀서 기록을 피하지 않는다. 목록을 넓히는 PR은 규칙 파일을 바꾸므로 그 자체로
   digest가 바뀐다. 리뷰를 거친 뒤 한 번 다시 기록한다.
+
+## 추가 2026-11-05 — compile job 이벤트의 종결 guard (migration `20261105120000`)
+
+- `foundation_compile_job_events`에 BEFORE INSERT trigger를 단다. job이 `ready`/`failed`/`cancelled`이면 그와 다른 state의 행을
+  `compile_job_post_terminal_event`로 거절한다. 원인 사례: cjob-157f2f23 seq 159 (`failed` 뒤의 `structuring`).
+- **순서는 자유다.** 앱은 거절을 "기록되지 않은 이벤트"로 다루고(`COMPILE_JOB_ALREADY_SETTLED`, 경고 로그 1줄),
+  migration이 없으면 거절이 일어나지 않을 뿐이다. 같은 PR의 lease CAS는 기존 컬럼(`updated_at`)만 쓰므로 migration이 필요 없다.
+- 적용은 **창업자 작업**이다. 동작은 CI db-rehearsal이 `supabase/tests/compile_job_post_terminal_event.sql`로 검증한다.

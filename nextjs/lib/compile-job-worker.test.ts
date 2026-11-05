@@ -36,12 +36,15 @@ const recordSizeLimit = vi.fn(
 );
 
 const openJobs = vi.fn(async (): Promise<CompileJobResult<CompileJob[]>> => ({ ok: true, value: [] }));
+const claimLease = vi.fn(async (_input: { job: CompileJob }): Promise<CompileJobResult<{ claimed: boolean }>> =>
+  ({ ok: true, value: { claimed: true } }));
 
 vi.mock("./compile-job-store", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./compile-job-store")>();
   return {
     ...actual,
     advanceCompileJob: advance,
+    claimCompileJobLease: claimLease,
     readOpenCompileJobs: openJobs,
     countCompileJobDeferrals: countDeferrals,
     recordCompileJobDeferral: recordDeferral,
@@ -115,6 +118,7 @@ beforeEach(() => {
     value: { state: "reading" as CompileState, changed: true },
   });
   runCompile.mockReset();
+  claimLease.mockReset().mockResolvedValue({ ok: true, value: { claimed: true } });
   listObjects.mockReset();
   jobAuthority.mockReset().mockResolvedValue({ ok: true });
   authorityEnabled.mockReset().mockReturnValue(false);
@@ -329,9 +333,9 @@ describe("the durable compile worker", () => {
     expect(turn.note).toBe("compiled");
 
     const calls = advance.mock.calls as unknown as Array<[{ state: CompileState; candidateManifestDigest?: string }]>;
-    // The lease into `structuring` has no artifact yet and must not claim one.
+    // The lease into `structuring` is the compare-and-set, not an advance; it carries no digest.
+    expect(claimLease).toHaveBeenCalledOnce();
     expect(calls.map(([input]) => [input.state, input.candidateManifestDigest ?? null])).toEqual([
-      ["structuring", null],
       ["building_world", manifestDigest],
       ["ready", manifestDigest],
     ]);
@@ -356,9 +360,8 @@ describe("the durable compile worker", () => {
       payload: { collectionId: "collection-" + "b".repeat(32), manifestDigest, lifecycle: "candidate" },
     });
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
-    // Call 1 is the lease into `structuring`; call 2 is the building_world advance that carries
-    // the digest, and it is the one the old function cannot resolve.
-    advance.mockResolvedValueOnce({ ok: true, value: { state: "structuring", changed: true } });
+    // Call 1 is the building_world advance that carries the digest, and it is the one the old
+    // function cannot resolve. (The lease is the compare-and-set, not an advance.)
     advance.mockResolvedValueOnce({ ok: false, code: "COMPILE_JOB_RPC_UNDEFINED" });
 
     const turn = await runCompileJobTurn(job());
@@ -370,13 +373,12 @@ describe("the durable compile worker", () => {
     );
     const calls = advance.mock.calls as unknown as Array<[{ state: CompileState; candidateManifestDigest?: string }]>;
     expect(calls.map(([input]) => [input.state, input.candidateManifestDigest ?? "omitted"])).toEqual([
-      ["structuring", "omitted"],
       ["building_world", manifestDigest],
       // The retry names no digest at all, which is what makes it the eight-argument call.
       ["building_world", "omitted"],
       ["ready", manifestDigest],
     ]);
-    expect(calls[2][0], "the retry omits the argument rather than nulling it")
+    expect(calls[1][0], "the retry omits the argument rather than nulling it")
       .not.toHaveProperty("candidateManifestDigest", null);
     // Once, not in a loop: a second PGRST202 is a different problem.
     expect(logged).toHaveBeenCalledTimes(1);
@@ -385,10 +387,42 @@ describe("the durable compile worker", () => {
 
   it("does not compile twice when two workers pick up the same job", async () => {
     group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
-    // The lease is the transition into `structuring`: the loser's advance changes nothing.
-    advance.mockResolvedValueOnce({ ok: true, value: { state: "structuring", changed: false } });
+    // The lease is a compare-and-set on the row as read: the loser's PATCH matches nothing.
+    claimLease.mockResolvedValueOnce({ ok: true, value: { claimed: false } });
     const turn = await runCompileJobTurn(job());
     expect(turn.note).toBe("skipped");
+    expect(runCompile).not.toHaveBeenCalled();
+  });
+
+  it("takes over a stale lease only by compare-and-set, and a runner that loses the race never calls Core", async () => {
+    // cjob-157f2f23: after the 5-minute lease went stale, every runner passed a bare clock check
+    // and Core ran twice (two coreRequestIds, one coreOutputSha256).
+    group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
+    const stale = job({ state: "structuring", updatedAt: new Date(Date.now() - 6 * 60_000).toISOString() });
+    runCompile.mockResolvedValue({ ok: false, status: 503, code: "CORE_V2_TIMEOUT", payload: {} });
+    claimLease.mockResolvedValueOnce({ ok: true, value: { claimed: true } })
+      .mockResolvedValueOnce({ ok: true, value: { claimed: false } });
+
+    const [first, second] = await Promise.all([runCompileJobTurn(stale), runCompileJobTurn(stale)]);
+
+    expect([first.note, second.note].sort()).toEqual(["failed", "skipped"]);
+    expect(runCompile).toHaveBeenCalledTimes(1);
+    // Both CAS on the same token: the row as they read it.
+    expect(claimLease.mock.calls.map(([input]) => input.job.updatedAt)).toEqual([stale.updatedAt, stale.updatedAt]);
+  });
+
+  it("does not touch a live lease", async () => {
+    group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
+    const turn = await runCompileJobTurn(job({ state: "structuring", updatedAt: new Date(Date.now() - 60_000).toISOString() }));
+    expect(turn.note).toBe("skipped");
+    expect(claimLease).not.toHaveBeenCalled();
+    expect(runCompile).not.toHaveBeenCalled();
+  });
+
+  it("skips, and compiles nothing, when the lease store cannot answer", async () => {
+    group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
+    claimLease.mockResolvedValueOnce({ ok: false, code: "COMPILE_JOB_STORE_WRITE_FAILED" });
+    expect((await runCompileJobTurn(job())).note).toBe("skipped");
     expect(runCompile).not.toHaveBeenCalled();
   });
 

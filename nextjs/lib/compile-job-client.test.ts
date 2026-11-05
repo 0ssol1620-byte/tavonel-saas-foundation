@@ -93,6 +93,24 @@ describe("observing a durable compile", () => {
     expect(requested[1]).toContain("after=2");
   });
 
+  it("keeps a terminal state when a later frame in the same stream says otherwise", async () => {
+    // cjob-157f2f23: seq 158 `failed`, then seq 159 `structuring` from a duplicate run.
+    const fetchImpl = vi.fn(async () => new Response(
+      stream([eventFrame(157, "structuring"), eventFrame(158, "failed"), eventFrame(159, "structuring")]),
+      { headers: { "content-type": "text/event-stream" } },
+    )) as unknown as typeof fetch;
+    const seen: string[] = [];
+    const settled = await observeCompileJob({
+      jobId: "cjob-00000000000000000000000000000001",
+      authToken: async () => "token",
+      onFrame: (frame) => seen.push(frame.state),
+      fetchImpl,
+      sleep: async () => undefined,
+    });
+    expect(seen).toEqual(["structuring", "failed"]);
+    expect(settled).toBe("failed");
+  });
+
   it("stops rather than looping when the job is not the caller's", async () => {
     const fetchImpl = vi.fn(async () => new Response("{}", { status: 404 })) as unknown as typeof fetch;
     const settled = await observeCompileJob({

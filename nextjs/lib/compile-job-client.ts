@@ -92,6 +92,7 @@ export function frameFromEvent(raw: unknown): CompileJobFrame | null {
  * reconnecting would hold a connection open for hours to watch nothing change.
  */
 const RESTING: readonly string[] = ["ready", "failed", "cancelled", "review_required"];
+const TERMINAL: readonly string[] = ["ready", "failed", "cancelled"];
 
 export type ObserveOptions = {
   jobId: string;
@@ -155,6 +156,9 @@ export async function observeCompileJob(options: ObserveOptions): Promise<Compil
           }
           const frame = frameFromEvent(parsed);
           if (!frame) continue;
+          // Terminal is sticky: a row after it (cjob-157f2f23 seq 159, `structuring` after
+          // `failed`) must not repaint a settled job as still working.
+          if (settled && TERMINAL.includes(settled)) continue;
           options.onFrame(frame);
           if (RESTING.includes(frame.state)) settled = frame.state;
         }

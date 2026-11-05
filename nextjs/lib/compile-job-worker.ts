@@ -2,6 +2,7 @@ import { globalCollectionCompileEnabled, GLOBAL_COLLECTION_KEY_PREFIX } from "./
 import { isCompileWaitingOnReading, runCollectionCompile } from "./collection-compile-run";
 import {
   advanceCompileJob,
+  claimCompileJobLease,
   type CompileBlocker,
   type CompileJob,
   type CompileState,
@@ -306,23 +307,25 @@ export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn
     Take the lease by moving into `structuring`, and compile only if this call is the one that
     moved it. Two schedulers firing together therefore produce one compile, not two.
 
-    An exception for a stale lease: a worker that died mid-compile left the row here, and after
-    COMPILE_LEASE_MS another worker may pick it up. Repeating the compile is safe -- the
+    A stale lease is taken over the same way: a worker that died mid-compile left the row here,
+    and after COMPILE_LEASE_MS another worker may pick it up. Repeating the compile is safe -- the
     collection id is derived from the input binding and the artifact write is idempotent -- so
     the cost of being wrong about a dead worker is one wasted run, not a duplicate World.
+
+    Both are one compare-and-set on the row as this turn read it (`claimCompileJobLease`), so of
+    every runner that read the same row exactly one compiles. Before 2026-11-05 the takeover was
+    a bare clock check and the fresh lease an RPC that answers `changed` to every same-rank
+    caller; cjob-157f2f23 ran Core twice and appended a `structuring` row after `failed`.
   */
-  if (job.state !== "structuring") {
-    const leased = await advanceCompileJob({
-      workspaceKey: job.workspaceKey,
-      jobId: job.jobId,
-      state: "structuring",
-      documentsReady: classified.ready.length,
-      blocked: blockedChanged ? classified.blocked : undefined,
-    });
-    if (!leased.ok || !leased.value.changed) {
-      return rest("skipped", job.state, classified.ready.length, classified.blocked);
-    }
-  } else if (Date.now() - Date.parse(job.updatedAt) < COMPILE_LEASE_MS) {
+  if (job.state === "structuring" && Date.now() - Date.parse(job.updatedAt) < COMPILE_LEASE_MS) {
+    return rest("skipped", job.state, classified.ready.length, classified.blocked);
+  }
+  const leased = await claimCompileJobLease({
+    job,
+    documentsReady: classified.ready.length,
+    blocked: blockedChanged ? classified.blocked : undefined,
+  });
+  if (!leased.ok || !leased.value.claimed) {
     return rest("skipped", job.state, classified.ready.length, classified.blocked);
   }
 
