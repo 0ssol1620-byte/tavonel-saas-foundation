@@ -954,7 +954,7 @@ export async function GET(request: Request) {
               },
             },
           },
-          description: "Grounded answer with exact page and bbox citations, or an explicit abstention. Both retrieval paths return the same fields: `answer`, `reason`, `citations`, `receipt`, `activeWorld`, `freshness`, `answerMode` and `retrievalPath`. `answerMode` is `evidence_excerpts` on both -- the answer is the cited excerpts, concatenated in rank order, and no language model writes any part of it. `retrievalPath` names which runtime answered: `compiled-retrieval-v1` (lexical + dense + structure, RRF-fused, reranked and World Gate filtered; also returns `contextPacket` and `retrieval` diagnostics) or `excerpt-concatenation-fallback` when the active World has no queryable compiled index, which also returns `retrievalIndex` and a human-readable `retrievalNotice`. Per-citation scoring differs by path and is not normalized across them: the fallback carries `relevance` with its lexical/graph/temporal/authority breakdown, the compiled path carries per-source ranks and the reranker score. An abstention is a 200 with `code: ANSWER_ABSTAINED` — a result, not a failure.",
+          description: "Grounded answer with exact page and bbox citations, or an explicit abstention. Both retrieval paths return the same fields: `answer`, `reason`, `citations`, `receipt`, `activeWorld`, `freshness`, `answerMode` and `retrievalPath`. `answerMode` is `evidence_excerpts` on both -- the answer is the cited excerpts, concatenated in rank order, and no language model writes any part of it. `retrievalPath` names which runtime answered: `compiled-retrieval-v1` (lexical + dense + structure, RRF-fused, reranked and World Gate filtered; also returns `contextPacket` and `retrieval` diagnostics) or `excerpt-concatenation-fallback` when the active World has no queryable compiled index, which also returns `retrievalIndex` and a human-readable `retrievalNotice`. Per-citation scoring differs by path and is not normalized across them: the fallback carries `relevance` with its lexical/graph/temporal/authority breakdown, the compiled path carries per-source ranks and the reranker score. An abstention is a 200 with `code: ANSWER_ABSTAINED` — a result, not a failure. Where signed answer receipts are on, the answer also carries `signedReceipt` (`payloadJson` + an Ed25519 `signature` under scope `tavonel.signed_answer_receipt.v1`, verifiable against /api/export/trust with /developer/tavonel-verify-answer.mjs); the receipt holds the question's sha256, never its text. If such an answer cannot be signed it is withheld with 503 ANSWER_SIGNING_UNAVAILABLE, never sent unsigned.",
           responses: {
             "200": ok(
               "{ code, answer, reason, citations, receipt, activeWorld, freshness, answerMode, retrievalPath }. `answerMode` is `evidence_excerpts` on both paths. `retrievalPath` is `compiled-retrieval-v1` (which also returns `contextPacket` and `retrieval`) or `excerpt-concatenation-fallback` (which also returns `retrievalIndex` and `retrievalNotice`). An abstention is a 200 with `code` ANSWER_ABSTAINED and a `reason` — a result, not a failure. Read `retrievalPath` before comparing answers across Worlds: a difference between two answers can be a difference between two runtimes rather than between two corpora.",
@@ -977,7 +977,7 @@ export async function GET(request: Request) {
             "409": err("ACTIVE_WORLD_NOT_FOUND", "ACTIVE_WORLD_CHANGED_RETRY"),
             "413": err("QUESTION_TOO_LARGE"),
             "429": err("API_RATE_LIMITED"),
-            "503": err("ACTIVE_WORLD_STORE_UNAVAILABLE", "WORLD_STORE_READ_FAILED"),
+            "503": err("ACTIVE_WORLD_STORE_UNAVAILABLE", "WORLD_STORE_READ_FAILED", "ANSWER_SIGNING_UNAVAILABLE", "ANSWER_RECEIPT_MODE_INVALID"),
           },
         },
       },
@@ -1460,7 +1460,7 @@ export async function GET(request: Request) {
           tags: ["Workspace administration"],
           "x-tavonel-auth": "browser-session",
           security: [{ TavonelUserSession: [] }],
-          description: "Creates a workspace-scoped key with an explicit scope set. The plaintext `token` is in this response and nowhere else: only its SHA-256 digest is stored. A free evaluation cannot create keys and is answered 402 TRIAL_FEATURE_NOT_INCLUDED.",
+          description: "Creates a workspace-scoped key with an explicit scope set. The plaintext `token` is in this response and nowhere else: only its SHA-256 digest is stored. A free evaluation cannot create keys and is answered 402 TRIAL_FEATURE_NOT_INCLUDED; the same refusal meets a free evaluation approving a remote MCP connection, which mints a key (see `x-tavonel-remote-mcp`). Where trial AI access is enabled, a free evaluation may hold one live read-only key (the remote MCP scopes) -- hand-made or minted by a remote MCP connection -- and a spent evaluation bound is answered 402 TRIAL_LIMIT_REACHED.",
           requestBody: { required: true, content: { "application/json": { schema: DEVELOPER_KEY_INPUT, examples: { default: { value: { name: "ci-ingest", scopes: ["documents:read", "worlds:read"], expiresInDays: 90 } } } } } },
           responses: {
             "201": ok(
@@ -1470,7 +1470,7 @@ export async function GET(request: Request) {
             ),
             "400": err("INVALID_JSON", "API_KEY_INPUT_INVALID"),
             "401": err("AUTH_REQUIRED"),
-            "402": err("TRIAL_FEATURE_NOT_INCLUDED"),
+            "402": err("TRIAL_FEATURE_NOT_INCLUDED", "TRIAL_LIMIT_REACHED"),
             "403": err("PILOT_ACCESS_REQUIRED", "AUTHORIZATION_CHANGED_RETRY"),
             "413": err("REQUEST_TOO_LARGE"),
             "503": err("DEVELOPER_STORE_NOT_CONFIGURED", "API_KEY_CREATE_FAILED", "DEVELOPER_STORE_BINDING_INVALID"),
@@ -1497,7 +1497,7 @@ export async function GET(request: Request) {
             ),
             "400": err("API_KEY_ID_INVALID", "API_KEY_INPUT_INVALID", "INVALID_JSON"),
             "401": err("AUTH_REQUIRED"),
-            "402": err("TRIAL_FEATURE_NOT_INCLUDED"),
+            "402": err("TRIAL_FEATURE_NOT_INCLUDED", "TRIAL_LIMIT_REACHED"),
             "403": err("PILOT_ACCESS_REQUIRED", "AUTHORIZATION_CHANGED_RETRY"),
             "404": err("API_KEY_NOT_FOUND"),
             "413": err("REQUEST_TOO_LARGE"),
@@ -1720,6 +1720,12 @@ export async function GET(request: Request) {
             activeWorld: { $ref: "#/components/schemas/ActiveWorldPointer" },
             freshness: { $ref: "#/components/schemas/Freshness" },
             receipt: { type: "object", ...bestEffort },
+            signedReceipt: {
+              type: "object",
+              description: "Present only where signed answer receipts are on. `payloadJson` is tavonel.answer_receipt.v1 (collectionId, worldStateId, manifestDigest, questionSha256, answerMode, status, citations, answerability, outputSha256, issuedAt); `signature` is a tavonel.export_signature.v2 under scope tavonel.signed_answer_receipt.v1.",
+              required: ["payloadJson", "signature"],
+              properties: { payloadJson: str, signature: { type: "object", ...bestEffort } },
+            },
           },
           ...bestEffort,
         },
@@ -1898,6 +1904,28 @@ export async function GET(request: Request) {
     "x-tavonel-error-catalogue": API_ERROR_CODES,
     "x-tavonel-browser-session-paths": ["/developer/keys", "/oauth-connectors", "/oauth-connectors/authorize", "/oauth-connectors/connections/{id}", "/developer/keys/{id}/rotate", "/developer/audit", "/reviews"],
     "x-tavonel-decision-gates": { promotion: "browser-session-only", rollback: "browser-session-only", mcp: "read-only" },
+    /*
+      W1-A1. The hosted MCP endpoint is not a REST operation (it is JSON-RPC at /api/mcp, outside
+      the /api/v1 server), so it is described here rather than under `paths`. Every status a client
+      meets is named, with the code the body carries.
+    */
+    "x-tavonel-remote-mcp": {
+      endpoint: "https://tavonel.com/api/mcp",
+      transport: "MCP Streamable HTTP, JSON responses only: POST one JSON-RPC message, receive one JSON body. No SSE stream (GET answers 405) and no Mcp-Session-Id.",
+      protocolVersions: ["2025-06-18", "2025-03-26"],
+      authorization: "OAuth 2.1 authorization code with PKCE S256 and RFC 8707 resource; RFC 9728 metadata at /.well-known/oauth-protected-resource/api/mcp, RFC 8414 at /.well-known/oauth-authorization-server, RFC 7591 registration for public clients. Access tokens last 3600 s; no refresh token is issued.",
+      availability: "Every path answers 404 while the deployment's remote MCP switch is off. While on, only workspaces in the pilot cohort can consent, obtain a token or call a tool.",
+      statuses: {
+        "202": "A notification or a response from the client: accepted, no body.",
+        "400": "MCP_PROTOCOL_VERSION_UNSUPPORTED (an MCP-Protocol-Version other than 2025-06-18 or 2025-03-26), Parse error, or Invalid Request (not one JSON-RPC 2.0 message).",
+        "401": "No token on tools/call (AUTH_REQUIRED), or a token that is unknown, expired, revoked or carries a write scope (AUTH_INVALID, WWW-Authenticate error=invalid_token). The token (tvnl_mcp_) is accepted here only; the REST API answers it with 401 API_KEY_AUDIENCE_INVALID.",
+        "402": "TRIAL_FEATURE_NOT_INCLUDED at consent: a free evaluation cannot hold the key a token is.",
+        "403": "REMOTE_MCP_COHORT_EXCLUDED (the workspace is not in the pilot cohort), API_SCOPE_REQUIRED (insufficient_scope, with the scope named), or MCP_ORIGIN_REFUSED (a browser Origin other than this one).",
+        "405": "GET and DELETE: no server-initiated stream and no session.",
+        "413": "REQUEST_TOO_LARGE: a message over 64 KiB.",
+        "503": "REMOTE_MCP_COHORT_CONFIG_INVALID or REMOTE_MCP_NOT_CONFIGURED: the deployment cannot decide who is admitted, so nobody is.",
+      },
+    },
   };
   return NextResponse.json(INTAKE_APPROVAL_ROLLOUT_ENABLED ? contract : withoutApprovalLineage(contract), {
     headers: { "Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex" },

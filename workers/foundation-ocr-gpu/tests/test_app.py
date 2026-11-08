@@ -1016,3 +1016,58 @@ def test_range_body_stamps_conflicts_like_the_whole_document_body(monkeypatch: p
         worker.page_range_body(3, 1, 2, [region], sha)
     assert refused.value.status_code == 422
     assert "recognitionConflictCount" not in worker.page_range_body(3, 0, 1, [], sha)
+
+
+# D1 stage 1 (PROGRAM-2026-11-04 §4.D): a measurement-only reader may move its limits by env.
+def test_measurement_limits_default_to_the_production_literals() -> None:
+    worker = importlib.import_module("app")
+    assert worker.read_limit("TAVONEL_OCR_MAX_PAGES", worker.MAX_PAGES, 500, {}) == 80
+    assert worker.PAGES_LIMIT == worker.MAX_PAGES == 80
+    assert worker.INPUT_BYTES_LIMIT == worker.MAX_INPUT_BYTES == 18 * 1024 * 1024
+    assert worker.read_limit("TAVONEL_OCR_MAX_PAGES", 80, 500, {"TAVONEL_OCR_MAX_PAGES": "200"}) == 200
+    for value in ("0", "-1", "501", "2e2", "two hundred", "080"):
+        with pytest.raises(RuntimeError, match="TAVONEL_OCR_MAX_PAGES must be a whole number from 1 to 500"):
+            worker.read_limit("TAVONEL_OCR_MAX_PAGES", 80, 500, {"TAVONEL_OCR_MAX_PAGES": value})
+
+
+def test_a_malformed_or_out_of_range_input_limit_is_refused() -> None:
+    worker = importlib.import_module("app")
+    high = worker.MEASUREMENT_HARD_MAX_INPUT_BYTES
+    assert worker.read_limit("TAVONEL_OCR_MAX_INPUT_BYTES", worker.MAX_INPUT_BYTES, high, {}) == 18 * 1024 * 1024
+    assert worker.read_limit("TAVONEL_OCR_MAX_INPUT_BYTES", worker.MAX_INPUT_BYTES, high,
+                             {"TAVONEL_OCR_MAX_INPUT_BYTES": str(high)}) == high
+    for value in ("0", "-1", str(high + 1), "1e7", "18MiB", " 0x100 "):
+        with pytest.raises(RuntimeError, match=f"TAVONEL_OCR_MAX_INPUT_BYTES must be a whole number from 1 to {high}"):
+            worker.read_limit("TAVONEL_OCR_MAX_INPUT_BYTES", worker.MAX_INPUT_BYTES, high, {"TAVONEL_OCR_MAX_INPUT_BYTES": value})
+
+
+def test_a_configured_page_limit_holds_at_its_boundary_on_both_read_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    worker, calls = ready_fake_ocr(monkeypatch, SCAN)
+    monkeypatch.setattr(worker, "PAGES_LIMIT", 81)
+    _, page_count, _ = worker.extract_text(pages_pdf(*[None] * 81, size=(306, 396)))
+    assert page_count == 81
+    assert worker.extract_page_range(pages_pdf(*[None] * 81, size=(306, 396)), 80, 88)[:2] == (81, 81)
+    calls.clear()
+    for read in (lambda pdf: worker.extract_text(pdf), lambda pdf: worker.extract_page_range(pdf, 0, 8)):
+        with pytest.raises(HTTPException) as refused:
+            read(pages_pdf(*[None] * 82, size=(306, 396)))
+        assert refused.value.status_code == 422 and "page count" in refused.value.detail
+    assert calls == []
+
+
+def test_a_configured_input_limit_holds_at_its_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
+    worker = importlib.import_module("app")
+    monkeypatch.setattr(worker, "INPUT_BYTES_LIMIT", 2 * 1024 * 1024)
+    upload = lambda size: types.SimpleNamespace(file=io.BytesIO(b"%" * size))  # noqa: E731
+    assert len(worker.copy_and_digest(upload(2 * 1024 * 1024))[0]) == 2 * 1024 * 1024
+    with pytest.raises(HTTPException) as refused:
+        worker.copy_and_digest(upload(2 * 1024 * 1024 + 1))
+    assert refused.value.status_code == 413 and refused.value.detail == "OCR source exceeds the 2 MiB Foundation cap"
+
+
+def test_a_reader_with_a_bad_limit_does_not_boot() -> None:
+    import subprocess
+    env = {**os.environ, "TAVONEL_OCR_MAX_PAGES": "501"}
+    completed = subprocess.run([sys.executable, "-c", "import app"], cwd=ROOT, env=env, capture_output=True, text=True, timeout=120, check=False)
+    assert completed.returncode != 0
+    assert "TAVONEL_OCR_MAX_PAGES must be a whole number from 1 to 500" in completed.stderr

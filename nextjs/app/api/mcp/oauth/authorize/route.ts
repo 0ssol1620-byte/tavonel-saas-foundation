@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { requireFoundationSession } from "@/lib/developer-auth";
+import { recordServerFunnel } from "@/lib/funnel-events";
+import { trialAiAccess } from "@/lib/trial-ai-access";
 import {
   checkAuthorizationRequest,
+  cohortRefusalStatus,
   denialRedirect,
   issueAuthorizationCode,
+  remoteMcpCohortRefusal,
   remoteMcpEnabled,
   remoteMcpSealingKey,
   requestOrigin,
@@ -56,7 +60,14 @@ export async function POST(request: Request) {
 
   const auth = await requireFoundationSession(request, "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
-  if (auth.principal.accessSource === "trial") return NextResponse.json({ code: "TRIAL_FEATURE_NOT_INCLUDED" }, { status: 402, headers: NO_STORE });
+  const trial = await trialAiAccess(auth.principal, "mcp_authorize");
+  if (!trial.ok) {
+    if (trial.wouldAllow) recordServerFunnel("trial_ai_access_would_allow", { kind: "mcp_authorize" });
+    return NextResponse.json({ code: trial.code }, { status: trial.status, headers: NO_STORE });
+  }
+  // A1.0: the same cohort the token endpoint checks, said here so a person is told before consenting.
+  const cohort = remoteMcpCohortRefusal(auth.principal.workspaceKey);
+  if (cohort) return NextResponse.json({ code: cohort }, { status: cohortRefusalStatus(cohort), headers: NO_STORE });
   return NextResponse.json({
     code: "AUTHORIZATION_GRANTED",
     redirectTo: issueAuthorizationCode(checked.request, auth.principal, key, origin),

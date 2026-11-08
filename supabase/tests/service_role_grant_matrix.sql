@@ -15,10 +15,11 @@
 -- The expected sets are the migrations' own statements, not a judgement about what the server
 -- ought to have: 0053's header names the source migration for every row. Fourteen tables expect
 -- `{}` because no migration ever granted service_role anything on them; the four
--- foundation_connection_inventory_* tables (20261002100000) also expect `{}`: RPC-only.
+-- foundation_connection_inventory_* tables (20261002100000) also expect `{}`: RPC-only, as do
+-- source_fingerprints and document_relations (20261104090500).
 
 begin;
-select plan(71);
+select plan(73);
 
 -- ---------------------------------------------------------------------------
 -- 1. Every table in public, in catalog order.
@@ -33,6 +34,7 @@ select table_privs_are('public', 'credit_ledger_entries', 'service_role', array[
 select table_privs_are('public', 'customer_data_gate_receipts', 'service_role', array['SELECT', 'INSERT']::text[]);
 select table_privs_are('public', 'customer_data_release_decisions', 'service_role', array['SELECT', 'INSERT']::text[]);
 select table_privs_are('public', 'customer_data_workspace_decisions', 'service_role', array['SELECT', 'INSERT']::text[]);
+select table_privs_are('public', 'document_relations', 'service_role', array[]::text[]);
 select table_privs_are('public', 'documents', 'service_role', array[]::text[]);
 select table_privs_are('public', 'enterprise_audit_events', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE']::text[]);
 select table_privs_are('public', 'enterprise_daily_metrics', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE']::text[]);
@@ -87,6 +89,7 @@ select table_privs_are('public', 'plans', 'service_role', array[]::text[]);
 select table_privs_are('public', 'profiles', 'service_role', array[]::text[]);
 select table_privs_are('public', 'sanitization_proofs', 'service_role', array[]::text[]);
 select table_privs_are('public', 'source_acl_snapshots', 'service_role', array['SELECT', 'INSERT']::text[]);
+select table_privs_are('public', 'source_fingerprints', 'service_role', array[]::text[]);
 select table_privs_are('public', 'source_representations', 'service_role', array['SELECT', 'INSERT', 'UPDATE']::text[]);
 select table_privs_are('public', 'source_versions', 'service_role', array['SELECT', 'INSERT', 'UPDATE']::text[]);
 select table_privs_are('public', 'sources', 'service_role', array['SELECT', 'INSERT', 'UPDATE']::text[]);
