@@ -466,11 +466,12 @@ describe("the durable compile worker", () => {
       group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
       runCompile.mockResolvedValue({ ok: false, status: 503, code: "CORE_V2_TIMEOUT", payload: {} });
 
-      const refused = await runCompileJobTurn(job(), Date.now() + CORE_CLIENT_TIMEOUT_MS - 1_000);
+      // One millisecond short of a whole Core call is refused; exactly one is claimed.
+      const refused = await runCompileJobTurn(job(), Date.now() + CORE_CLIENT_TIMEOUT_MS - 1);
       expect(refused).toMatchObject({ note: "skipped", outOfTime: true });
       expect(claimLease).not.toHaveBeenCalled();
 
-      const deadline = Date.now() + CORE_CLIENT_TIMEOUT_MS + WORKER_SETTLEMENT_RESERVE_MS;
+      const deadline = Date.now() + CORE_CLIENT_TIMEOUT_MS;
       const allowed = await runCompileJobTurn(job(), deadline);
       expect(allowed).toMatchObject({ note: "failed", claimed: true });
       expect(claimLease).toHaveBeenCalledOnce();
