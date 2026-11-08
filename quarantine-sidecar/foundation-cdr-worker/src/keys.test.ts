@@ -11,6 +11,7 @@ import {
   extractObjectKey,
   hasForbiddenPath,
   immutableObjectKey,
+  intakeCeilingStage,
   isQuarantineSourceKey,
   ocrSiblingKey,
   ocrReviewSiblingKey,
@@ -187,5 +188,17 @@ describe("R2 source filename recovery", () => {
         contentDisposition: "attachment;filename*=UTF-8''research%20notes.pdf",
       },
     }), { filename: "research notes.pdf", contentType: "application/pdf" });
+  });
+});
+
+describe("D1 intake ceiling stage (PROGRAM-2026-11-04 §4.D)", () => {
+  it("reads unset and 0 as stage 0, 1 as stage 1, and nothing else as any stage", () => {
+    assert.equal(intakeCeilingStage({}), "0");
+    assert.equal(intakeCeilingStage({ TAVONEL_INTAKE_CEILING_STAGE: " " }), "0");
+    assert.equal(intakeCeilingStage({ TAVONEL_INTAKE_CEILING_STAGE: "0" }), "0");
+    assert.equal(intakeCeilingStage({ TAVONEL_INTAKE_CEILING_STAGE: "1" }), "1");
+    for (const value of ["2", "01", "true", "one", "-1"]) {
+      assert.equal(intakeCeilingStage({ TAVONEL_INTAKE_CEILING_STAGE: value }), null, value);
+    }
   });
 });

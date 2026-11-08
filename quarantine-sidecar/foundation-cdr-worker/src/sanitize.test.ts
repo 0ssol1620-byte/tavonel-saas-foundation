@@ -1488,3 +1488,46 @@ describe("permanent refusals leave a receipt", () => {
     assert.equal(r2.objects.has(cdrRejectSiblingKey(SOURCE_KEY) as string), false);
   });
 });
+
+describe("source byte cap per intake ceiling stage (D1, PROGRAM-2026-11-04 §4.D)", () => {
+  const sized = (size: number) => {
+    const r2 = new FakeR2();
+    r2.objects.set(SOURCE_KEY, { bytes: SOURCE_BYTES, contentType: "application/pdf" });
+    const originalGet = r2.get.bind(r2);
+    r2.get = async (key: string) => {
+      const object = await originalGet(key);
+      return object ? { ...object, size } : null;
+    };
+    return r2;
+  };
+
+  it("refuses 25 MiB + 1 at stage 1 before calling CDR, and reaches CDR at exactly 25 MiB", async () => {
+    let fetched = 0;
+    const fetcher = async () => { fetched += 1; return new Response("unavailable", { status: 503 }); };
+    await assert.rejects(
+      () => sanitizeObject(envFor(sized(25 * 1024 * 1024 + 1), { TAVONEL_INTAKE_CEILING_STAGE: "1" }), SOURCE_KEY, fetcher),
+      (error: unknown) => error instanceof PermanentReject && /exceeds the 25 MiB Foundation CDR cap/.test(error.message),
+    );
+    assert.equal(fetched, 0);
+    await sanitizeObject(envFor(sized(25 * 1024 * 1024), { TAVONEL_INTAKE_CEILING_STAGE: "1" }), SOURCE_KEY, fetcher).catch(() => undefined);
+    assert.equal(fetched > 0, true, "a source at the stage-1 cap is not refused for size");
+  });
+
+  it("keeps the 5 MiB cap at stage 0 for a source stage 1 would admit", async () => {
+    let fetched = 0;
+    await assert.rejects(
+      () => sanitizeObject(envFor(sized(5 * 1024 * 1024 + 1)), SOURCE_KEY, async () => { fetched += 1; return new Response("no"); }),
+      (error: unknown) => error instanceof PermanentReject && /exceeds the 5 MiB Foundation CDR cap/.test(error.message),
+    );
+    assert.equal(fetched, 0);
+  });
+
+  it("refuses to read with a stage it cannot name, retryably and before CDR", async () => {
+    let fetched = 0;
+    await assert.rejects(
+      () => sanitizeObject(envFor(sized(1024), { TAVONEL_INTAKE_CEILING_STAGE: "2" }), SOURCE_KEY, async () => { fetched += 1; return new Response("no"); }),
+      (error: unknown) => error instanceof RetryableError && !(error instanceof PermanentReject),
+    );
+    assert.equal(fetched, 0);
+  });
+});

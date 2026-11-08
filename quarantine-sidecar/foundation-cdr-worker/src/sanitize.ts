@@ -5,6 +5,8 @@ import { assertFoundationOnlyTarget } from "./guards";
 import { cdrRequestSignature, hmacSecretIsConfigured, sha256DigestHeader, sha256Hex } from "./hmac";
 import {
   MAX_SOURCE_BYTES,
+  STAGE_1_MAX_SOURCE_BYTES,
+  intakeCeilingStage,
   assertProcessableSourceKey,
   cdrReceiptSiblingKey,
   immutableObjectKey,
@@ -66,6 +68,8 @@ export type SanitizeEnv = {
   FOUNDATION_R2_BUCKET: string;
   FOUNDATION_OCR_URL?: string;
   TAVONEL_OCR_HMAC?: string;
+  /** D1 intake ceiling stage (keys.ts intakeCeilingStage): "0" or unset, or "1". */
+  TAVONEL_INTAKE_CEILING_STAGE?: string;
 };
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{16,160}$/;
@@ -505,16 +509,20 @@ export async function sanitizeObject(
     throw new RetryableError("quarantine source object is not yet readable");
   }
   const declaredBytes = declaredBytesOf(object);
-  if (object.size > MAX_SOURCE_BYTES) {
-    throw refuse("PARSER_OOM", "quarantine source exceeds the 5 MiB Foundation CDR cap", {
+  const stage = intakeCeilingStage(env);
+  if (!stage) throw new RetryableError("TAVONEL_INTAKE_CEILING_STAGE must be 0 or 1");
+  const maxSourceBytes = stage === "1" ? STAGE_1_MAX_SOURCE_BYTES : MAX_SOURCE_BYTES;
+  const cap = `quarantine source exceeds the ${maxSourceBytes / (1024 * 1024)} MiB Foundation CDR cap`;
+  if (object.size > maxSourceBytes) {
+    throw refuse("PARSER_OOM", cap, {
       observedBytes: object.size,
       declaredBytes,
     });
   }
 
   const bytes = await object.arrayBuffer();
-  if (bytes.byteLength > MAX_SOURCE_BYTES) {
-    throw refuse("PARSER_OOM", "quarantine source exceeds the 5 MiB Foundation CDR cap", {
+  if (bytes.byteLength > maxSourceBytes) {
+    throw refuse("PARSER_OOM", cap, {
       observedBytes: bytes.byteLength,
       declaredBytes,
     });
