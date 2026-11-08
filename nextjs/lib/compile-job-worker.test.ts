@@ -73,7 +73,7 @@ vi.mock("./immutable-keys", async (importOriginal) => {
 const { runCompileJobBatch, runCompileJobTurn, DIGEST_MIGRATION_NOT_APPLIED } =
   await import("./compile-job-worker");
 const { RESTING_COMPILE_STATES, SCHEDULER_EXCLUDED_STATES } = await import("./compile-job-store");
-const { CORE_CLIENT_TIMEOUT_MS, WORKER_SETTLEMENT_RESERVE_MS } = await import("./execution-budget");
+const { CORE_CLIENT_TIMEOUT_MS } = await import("./execution-budget");
 
 const DOCUMENT = (id: string, state: "ocr_ready" | "sanitized" | "operator_review") => ({
   documentId: id,
