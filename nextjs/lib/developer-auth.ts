@@ -7,6 +7,7 @@ import {
   trialFeatureBlocked,
   type SessionAccessSource,
 } from "./self-service-trial";
+import { trialAiKeyAccess } from "./trial-ai-access";
 import { insideRemoteMcpDispatch } from "./remote-mcp-dispatch";
 import { getWorkspaceMembership, type WorkspaceRole } from "./workspace-membership";
 
@@ -122,6 +123,14 @@ async function resolveFoundationAuthorization(
     };
     const productAccess = await authorizeFoundationProduct(principal.workspaceKey, principal.userId, minimumPlan);
     if (!productAccess.ok) {
+      // W1-A2: with TRIAL_AI_ACCESS on, a trial's read-only key is admitted inside its bounds and
+      // each call spends one of the day's queries. Off, or not a trial: the original refusal.
+      const trial = await trialAiKeyAccess(principal.workspaceKey, principal.userId, scope, minimumPlan, consumeRate);
+      if (trial?.ok) {
+        principal.accessSource = "trial";
+        return { ok: true as const, principal };
+      }
+      if (trial) return { ok: false as const, code: trial.code, status: trial.status };
       return { ok: false as const, code: productAccess.code, status: productAccess.status };
     }
     principal.accessSource = productAccess.source;

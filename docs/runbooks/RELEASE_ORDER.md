@@ -271,6 +271,46 @@ migration은 다시 적용할 수 없다. 두 번째 적용은 `column "gate_sur
 - presentational 목록을 넓혀서 기록을 피하지 않는다. 목록을 넓히는 PR은 규칙 파일을 바꾸므로 그 자체로
   digest가 바뀐다. 리뷰를 거친 뒤 한 번 다시 기록한다.
 
+## 추가 2026-11-04 — W1-A2: trial AI 사용량 열 (`20261104090000_trial_ai_usage`)
+
+- 추가만 한다. `foundation_trial_policy`에 `ai_access_days`(14), `ai_page_limit`(200), `ai_world_limit`(1),
+  `ai_daily_query_limit`(200), `foundation_self_service_trials`에 `ai_query_day`, `ai_query_count`를 더하고,
+  두 테이블에 client 역할 거부 policy와 service_role 전용 함수 `foundation_trial_ai_access`를 만든다.
+  W1-A3의 내부 운영 receipt 테이블 `foundation_operations_receipts`(어떤 역할도 table 권한 없음)와 그 writer
+  `record_foundation_operations_receipt`(service_role 전용)도 같은 파일에서 만든다. 고객이 export하는
+  `enterprise_audit_events`와는 다른 테이블이다.
+- 순서: **migration 먼저, 배포 나중.** 코드가 먼저 도착해도 깨지지 않는다. flag가 꺼져 있으면 shadow 읽기가
+  실패해서 아무것도 세지 않을 뿐이고(402는 그대로), flag가 켜져 있으면 503 `TRIAL_AI_ACCESS_CHECK_FAILED`로 닫힌다.
+- `TAVONEL_TRIAL_AI_ACCESS_ENABLED`는 이 migration이 production에 적용되고, 창업자 F-2(trial 약관 문구·상한)가
+  승인된 뒤에만 `true`로 둔다. 상한 값은 `foundation_trial_policy` 한 행을 바꾸면 배포 없이 바뀐다.
+- 되돌리기: env flag를 지운다(즉시, build 없음). 열과 테이블은 남겨 둔다(expand만, down migration 없음).
+- migration 순서(2026-11-05 갱신): #186은 #190 다음에 merge한다. 그래서 production에는 #190의 `20261105000000`이
+  이 파일 `20261104090000`보다 먼저 적용된다. 둘은 서로 다른 객체만 만든다(#190은 `foundation_api_keys`와 그 RPC,
+  이 파일은 trial 열과 receipt 테이블). 그래서 적용 순서가 결과를 바꾸지 않는다. 다만 `supabase db push`는 이미 적용된
+  버전보다 이른 버전을 out-of-order로 거부한다. production 이력은 원래 repo와 어긋나 있으므로, 파일을 하나씩 적용하고
+  이력에 기록한다. 빈 DB(CI db-rehearsal)는 파일명 순서대로 적용한다. 적용 순서와 버전은 캠페인 ledger에 적는다.
+- 리셋 범위 `20261105010000_founder_test_reset_operations_receipts`(R2-m2): founder test reset이
+  `foundation_operations_receipts`도 세고, fingerprint에 넣고, 지운다. 이 파일은 `20261104090000`(테이블) **뒤에**
+  적용한다. W1-B1(#187)의 `20261104091000_founder_test_reset_source_fingerprints`도 같은 세 함수 본문을 바꾼다.
+  migration은 timestamp 순서로 적용되므로 이 파일이 항상 그 뒤에 온다. 그래서 이 파일의 본문은 #187 본문의 상위집합이다
+  (#187 줄 + receipts 줄). merge 순서는 #190 → #187 → #186이다. 두 pgTAP(`founder_test_reset_operations_receipts.sql`,
+  `founder_test_reset_source_fingerprints.sql`)과 `founder-test-reset-migration.test.ts`가 이 본문에서 함께 통과한다.
+- trial 키 규칙(F-2 문구용): **trial 주체 하나당 살아 있는 키 1개. 수동 키든 MCP 키든 같다.** 키를 실제로 만드는 두 곳에서
+  검사한다: `POST /api/developer/keys`와 원격 MCP token 발급(`/api/mcp/oauth/token`). consent(`authorize`)는 키를 만들지
+  않으므로 검사하지 않는다. 같은 client의 재연결은 대체되는 자기 키를 세지 않는다. 그래서 재연결 뒤에도 키는 1개다.
+  수동 키가 살아 있으면 MCP 연결이 402 `TRIAL_LIMIT_REACHED`이고, 반대도 같다. 가진 키를 revoke하거나 만료(MCP 토큰은
+  1시간)되면 풀린다. UI 안내 문구는 A2.2 전에 이 규칙에 맞춘다.
+
+### 수동 단계 — RunPod billing 1회 확인 (cost cap을 켜기 전)
+
+`TAVONEL_RUNPOD_DAILY_COST_CAP_USD`를 production에 넣기 **전에** 사람이 한 번 한다. 에이전트는 호출하지 않는다.
+
+1. production 값의 `TAVONEL_RUNPOD_API_KEY`로 `GET https://api.runpod.io/v2/billing?bucketSize=day&lastN=2`를 1회 읽는다.
+2. receipt를 남긴다: 요청 시각(UTC), HTTP status, 각 record의 `startTime`·`totalAmount`. key와 응답 원문 전체는
+   남기지 않는다. 캠페인 receipts 디렉터리에 저장하고 ledger에 경로를 적는다.
+3. 확인할 것: status가 200이다(403이면 key scope가 billing을 허용하지 않는다). `records`가 배열이다.
+   오늘 bucket의 `startTime`이 now를 포함하는 하루 구간이다(UTC 자정이 아니어도 된다. 코드는 구간으로 고른다).
+4. 셋 중 하나라도 아니면 cap을 넣지 않는다. 넣어도 점검은 매일 00 UTC에 `RUNPOD_BILLING_UNREADABLE` warning만 보낸다.
 ## 추가 2026-11-05 — W1-A1 원격 MCP: rollback은 무엇이 즉시이고 무엇이 아닌가
 
 리뷰 R1 M4. Vercel에서 env 값은 deployment에 묶인다. `TAVONEL_REMOTE_MCP_ENABLED`나

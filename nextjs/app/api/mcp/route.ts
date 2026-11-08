@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { TOOLS, assertReadOnly, createClient, createServer } from "@/public/developer/tavonel-mcp.mjs";
 import {
@@ -15,6 +15,8 @@ import {
   remoteMcpEnabled,
   requestOrigin,
 } from "@/lib/remote-mcp";
+import { recordMcpToolCall } from "@/lib/operations-alert-triggers";
+import { recordFirstMcpAnswerTiming } from "@/lib/operations-e2e-timing";
 import { withinRemoteMcpDispatch } from "@/lib/remote-mcp-dispatch";
 import { GET as listSources } from "../v1/documents/route";
 import { GET as listWorlds } from "../v1/collections/route";
@@ -174,6 +176,12 @@ async function answer(request: Request, seen: Seen) {
     }
   }
 
+  // W1-A3 telemetry runs after the response, so the alert webhook and the timing reads never sit in
+  // the tool call's latency. Each of them carries its own 5 s timeout and never throws.
+  const later = (task: () => Promise<unknown>) => {
+    // ponytail: outside a request scope (unit tests) after() throws; the task then just starts now.
+    try { after(task); } catch { void task().catch(() => undefined); }
+  };
   const tracked = async (url: string, init: RequestInit) => {
     const response = await dispatch(url, init);
     seen.reached.push({ pathname: new URL(url).pathname, status: response.status });
@@ -182,7 +190,25 @@ async function answer(request: Request, seen: Seen) {
   const handle = createServer({
     call: createClient({ baseUrl: origin, apiKey: bearer.kind === "principal" ? bearer.token : "", fetcher: tracked as typeof fetch }),
   });
-  return NextResponse.json(constantToolErrors(await handle(message)), { headers: NO_STORE });
+  let answered: unknown;
+  try {
+    answered = await handle(message);
+  } catch (error) {
+    if (method === "tools/call") later(() => recordMcpToolCall(true));
+    throw error;
+  }
+  if (method === "tools/call") {
+    // W1-A3 reads the same dispatched-route record as the SLI (`seen.reached`): one definition of a 5xx.
+    const failed = (worstReached(seen) ?? 0) >= 500;
+    later(() => recordMcpToolCall(failed));
+    const firstAnswer = seen.reached.map((entry) => ({ ...entry, world: /^\/api\/v1\/collections\/([^/]+)\/(?:ask|search)$/.exec(entry.pathname)?.[1] }))
+      .find((entry) => entry.world && entry.status >= 200 && entry.status < 300);
+    if (firstAnswer?.world && bearer.kind === "principal") {
+      const { workspaceKey } = bearer, world = firstAnswer.world;
+      later(() => recordFirstMcpAnswerTiming(workspaceKey, world));
+    }
+  }
+  return NextResponse.json(constantToolErrors(answered), { headers: NO_STORE });
 }
 
 /**

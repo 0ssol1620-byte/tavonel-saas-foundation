@@ -34,6 +34,17 @@ const mocks = vi.hoisted(() => ({
   loadCandidate: vi.fn(),
   signerEnv: vi.fn(),
   sessionProduct: vi.fn(),
+  toolCall: vi.fn(async () => null),
+  timing: vi.fn(async () => "not_recorded"),
+}));
+
+vi.mock("@/lib/operations-alert-triggers", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./operations-alert-triggers")>()),
+  recordMcpToolCall: mocks.toolCall,
+}));
+vi.mock("@/lib/operations-e2e-timing", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./operations-e2e-timing")>()),
+  recordFirstMcpAnswerTiming: mocks.timing,
 }));
 
 vi.mock("@/lib/developer-store", async (importOriginal) => ({
@@ -304,6 +315,30 @@ describe("a token for one workspace reads nothing of another", () => {
   });
 });
 
+describe("W1-A3 operations signals from the MCP transport", () => {
+  it("counts each tool call once, as a 5xx only when a route behind it answered 5xx", async () => {
+    mocks.listWorlds.mockResolvedValueOnce({ ok: true, worlds: [], nextCursor: null });
+    await call("list_worlds", { limit: 5 }, "tvnl_live_mine");
+    expect(mocks.toolCall).toHaveBeenLastCalledWith(false);
+
+    mocks.authorize.mockResolvedValueOnce({ ok: false, code: "DEVELOPER_STORE_READ_FAILED", status: 503 });
+    const failed = await call("list_worlds", { limit: 5 }, "tvnl_live_mine");
+    expect(failed.status).toBe(200);
+    expect(mocks.toolCall).toHaveBeenLastCalledWith(true);
+    expect(mocks.toolCall).toHaveBeenCalledTimes(2);
+
+    await rpc({ jsonrpc: "2.0", id: 3, method: "tools/list" });
+    expect(mocks.toolCall).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks for the timing receipt only after an answer tool succeeded, for the caller's workspace", async () => {
+    mocks.listWorlds.mockResolvedValueOnce({ ok: true, worlds: [], nextCursor: null });
+    await call("list_worlds", { limit: 5 }, "tvnl_live_mine");
+    await call("get_world", { collectionId: THEIR_COLLECTION }, "tvnl_live_mine");
+    expect(mocks.timing).not.toHaveBeenCalled();
+  });
+});
+
 describe("the origin metadata is bound to", () => {
   it("is the host the client addressed, with the forwarded scheme, and the URL when no host is sent", () => {
     const at = (headers: Record<string, string>) => requestOrigin(new Request("http://localhost:3000/api/mcp", { headers }));
@@ -478,6 +513,37 @@ describe("consent", () => {
     }
   });
 
+  it("W1-A2 flag on: a trial inside its bounds gets a code, and over a bound gets 402 TRIAL_LIMIT_REACHED and no code", async () => {
+    const clientId = await registeredClient();
+    vi.stubEnv("TAVONEL_TRIAL_AI_ACCESS_ENABLED", "true");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://store.test");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "k".repeat(40));
+    let status = "allowed";
+    const store = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe("https://store.test/rest/v1/rpc/foundation_trial_ai_access");
+      // Consent reads the bounds; it never spends a query.
+      expect(JSON.parse(String(init?.body))).toMatchObject({ p_user_id: USER, p_workspace_key: MINE, p_consume_query: false });
+      return new Response(JSON.stringify({ status, reason: status === "allowed" ? null : "TRIAL_AI_WORLD_LIMIT" }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", store);
+    try {
+      const trialSession = { ok: true, principal: { kind: "session", workspaceKey: MINE, userId: USER, scopes: [], accessSource: "trial", authorizationRevision: 4, workspaceRole: "owner" } };
+      mocks.session.mockResolvedValueOnce(trialSession);
+      const granted = await consent("approve", authorizationRequest(clientId), "supabase-session");
+      const body = await granted.json() as { code: string; redirectTo: string };
+      expect([granted.status, body.code]).toEqual([200, "AUTHORIZATION_GRANTED"]);
+      expect(new URL(body.redirectTo).searchParams.get("code")).toMatch(/^tvmcp_code_/);
+      status = "limit_reached";
+      mocks.session.mockResolvedValueOnce(trialSession);
+      const capped = await consent("approve", authorizationRequest(clientId), "supabase-session");
+      const cappedBody = await capped.json() as Record<string, unknown>;
+      expect([capped.status, cappedBody.code, "redirectTo" in cappedBody]).toEqual([402, "TRIAL_LIMIT_REACHED", false]);
+      expect(store).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("issues a code only to a session that could hold an API key", async () => {
     const clientId = await registeredClient();
     mocks.session.mockResolvedValueOnce({ ok: false, code: "AUTH_REQUIRED", status: 401 });
@@ -485,6 +551,13 @@ describe("consent", () => {
     mocks.session.mockResolvedValueOnce({ ok: true, principal: { workspaceKey: MINE, userId: USER, accessSource: "trial", authorizationRevision: 4 } });
     const trial = await consent("approve", authorizationRequest(clientId), "supabase-session");
     expect([trial.status, (await trial.json()).code]).toEqual([402, "TRIAL_FEATURE_NOT_INCLUDED"]);
+    // W1-A2: with trial AI access on and its bounds unreadable, consent fails closed -- no code.
+    vi.stubEnv("TAVONEL_TRIAL_AI_ACCESS_ENABLED", "true");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+    mocks.session.mockResolvedValueOnce({ ok: true, principal: { workspaceKey: MINE, userId: USER, accessSource: "trial", authorizationRevision: 4 } });
+    const unreadable = await consent("approve", authorizationRequest(clientId), "supabase-session");
+    expect([unreadable.status, (await unreadable.json()).code]).toEqual([503, "TRIAL_AI_ACCESS_CHECK_FAILED"]);
+    vi.stubEnv("TAVONEL_TRIAL_AI_ACCESS_ENABLED", "");
     const denied = await (await consent("deny", authorizationRequest(clientId))).json() as { redirectTo: string };
     expect(new URL(denied.redirectTo).searchParams.get("error")).toBe("access_denied");
     const code = await approvedCode(clientId);
@@ -793,5 +866,55 @@ describe("review R1: audience, failures, cohort, key churn, trial", () => {
     const unknown = await exchange({ grant_type: "authorization_code", code: await approvedCode(clientId), client_id: clientId, code_verifier: VERIFIER });
     expect([unknown.status, (await unknown.json()).error]).toEqual([503, "temporarily_unavailable"]);
     expect(mocks.createKey).not.toHaveBeenCalled();
+  });
+
+  it("W1-A2 flag on: the one-live-key cap is checked at token issue -- a held key refuses, a reconnect's own keys do not count", async () => {
+    vi.stubEnv("TAVONEL_TRIAL_AI_ACCESS_ENABLED", "true");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://store.test");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "k".repeat(40));
+    const trialProduct = { ok: true, access: { source: "trial", accessPlan: "observer_access", billingExempt: false, expiresAt: null } };
+    let held = true;
+    const keyReads: URL[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const parsed = new URL(url);
+      if (parsed.pathname === "/rest/v1/foundation_api_keys") {
+        keyReads.push(parsed);
+        return new Response(JSON.stringify(held ? [{ key_id: "manual-1" }] : []), { status: 200 });
+      }
+      expect(parsed.pathname).toBe("/rest/v1/rpc/foundation_trial_ai_access");
+      return new Response(JSON.stringify({ status: "allowed", reason: null }), { status: 200 });
+    }));
+    try {
+      const clientId = await registeredClient();
+      // A live key (hand-made or MCP, whatever its name) is the trial's one key: no second one is minted.
+      mocks.sessionProduct.mockResolvedValueOnce(trialProduct);
+      const capped = await exchange({ grant_type: "authorization_code", code: await approvedCode(clientId), client_id: clientId, code_verifier: VERIFIER });
+      expect([capped.status, await capped.json()]).toEqual([402, { error: "access_denied", error_description: "TRIAL_LIMIT_REACHED", code: "TRIAL_LIMIT_REACHED" }]);
+      expect(keyReads[0]!.searchParams.has("token_kind")).toBe(false);
+      expect(keyReads[0]!.searchParams.has("name")).toBe(false);
+      expect(mocks.createKey).not.toHaveBeenCalled();
+
+      // A reconnect: the same client's live key is excluded from the count, then replaced.
+      held = false;
+      const tag = createHash("sha256").update(clientId).digest("hex").slice(0, 12);
+      mocks.listKeys.mockResolvedValueOnce({ ok: true, keys: [
+        { keyId: "same-live", name: `MCP: Example agent ~${tag} #a`, expiresAt: new Date(Date.now() + 600_000).toISOString(), revokedAt: null },
+      ] });
+      mocks.sessionProduct.mockResolvedValueOnce(trialProduct);
+      const reconnect = await exchange({ grant_type: "authorization_code", code: await approvedCode(clientId), client_id: clientId, code_verifier: VERIFIER });
+      expect(reconnect.status).toBe(200);
+      expect(keyReads[1]!.searchParams.get("key_id")).toBe("not.in.(same-live)");
+      expect(mocks.revokeKey.mock.calls.map((args) => args[3])).toEqual(["same-live"]);
+
+      // Unreadable bounds fail closed: 503, nothing minted.
+      vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+      mocks.createKey.mockClear();
+      mocks.sessionProduct.mockResolvedValueOnce(trialProduct);
+      const unreadable = await exchange({ grant_type: "authorization_code", code: await approvedCode(clientId), client_id: clientId, code_verifier: VERIFIER });
+      expect([unreadable.status, (await unreadable.json()).code]).toEqual([503, "TRIAL_AI_ACCESS_CHECK_FAILED"]);
+      expect(mocks.createKey).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
