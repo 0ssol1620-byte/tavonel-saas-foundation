@@ -1,0 +1,2963 @@
+{
+ "schema": "tavonel.ask_quality_questions.v1",
+ "set": "unanswerable",
+ "generator": "nextjs/eval/ask-quality/gen_xbrl_questions.mjs",
+ "matchingRule": "masterplan v4 §16.4: concept + non-dimensional context period + unit + scaled value must equal a VISIBLE inline-XBRL fact in the filing",
+ "rules": {
+  "taxonomy": "us-gaap",
+  "units": [
+   "USD",
+   "USD/shares",
+   "shares"
+  ],
+  "durationDays": [
+   350,
+   380
+  ],
+  "perFilingCap": 50,
+  "minSpanDigits": 3,
+  "crossCompanyPerPair": 10,
+  "otherYearPerFiler": 10,
+  "otherYearOffsetBelowEarliestTaggedYear": 5
+ },
+ "filers": [
+  {
+   "cik": "0000021344",
+   "entityName": "COCA COLA CO",
+   "corpusRef": "sec-10k:0000021344",
+   "payloads": {
+    "submissionsSha256": "af45f5a76a925eac64a92f6b8deb44f12086e66736ae860472a47e7014667754",
+    "companyfactsSha256": "87a4173fcd3d662d18d19e0e885095aa5e3812b74c54d1ee55808ff1540a8081"
+   },
+   "filings": [
+    {
+     "accession": "0001628280-26-010047",
+     "form": "10-K",
+     "reportDate": "2025-12-31",
+     "filed": "2026-02-20",
+     "primaryDocument": "ko-20251231.htm",
+     "url": "https://www.sec.gov/Archives/edgar/data/21344/000162828026010047/ko-20251231.htm",
+     "sha256": "675d13c8dff637a9b4230b684ded8f15c679f31de5423096a125678c8fb8c0bc",
+     "bytes": 3758255,
+     "stats": {
+      "candidates": 321,
+      "droppedNoVisibleSpan": 3,
+      "droppedZero": 6,
+      "droppedShortSpan": 74,
+      "droppedAmbiguous": 0,
+      "sampledOut": 188,
+      "kept": 50
+     }
+    },
+    {
+     "accession": "0000021344-25-000011",
+     "form": "10-K",
+     "reportDate": "2024-12-31",
+     "filed": "2025-02-20",
+     "primaryDocument": "ko-20241231.htm",
+     "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134425000011/ko-20241231.htm",
+     "sha256": "515bedd0473f986f3c9ee08f09eb94cf81f424a7e07995ceea3b28454a389a06",
+     "bytes": 3931022,
+     "stats": {
+      "candidates": 317,
+      "droppedNoVisibleSpan": 3,
+      "droppedZero": 14,
+      "droppedShortSpan": 75,
+      "droppedAmbiguous": 0,
+      "sampledOut": 175,
+      "kept": 50
+     }
+    }
+   ]
+  },
+  {
+   "cik": "0000200406",
+   "entityName": "Johnson & Johnson",
+   "corpusRef": "sec-10k:0000200406",
+   "payloads": {
+    "submissionsSha256": "826d25d6bf11a6a11f2a95444fd68456e913555e16a1cd416f714c2b8d32c935",
+    "companyfactsSha256": "9ce98e50414e9a6704eaf485e1868c2298c6ae36acc85a82c0a3737485303be7"
+   },
+   "filings": [
+    {
+     "accession": "0000200406-26-000016",
+     "form": "10-K",
+     "reportDate": "2025-12-28",
+     "filed": "2026-02-11",
+     "primaryDocument": "jnj-20251228.htm",
+     "url": "https://www.sec.gov/Archives/edgar/data/200406/000020040626000016/jnj-20251228.htm",
+     "sha256": "17d1b59e5f0ad0d01942d0a2a89034384ade7d496688e40adc7b74c1c2bbaeb9",
+     "bytes": 3701702,
+     "stats": {
+      "candidates": 241,
+      "droppedNoVisibleSpan": 5,
+      "droppedZero": 13,
+      "droppedShortSpan": 31,
+      "droppedAmbiguous": 0,
+      "sampledOut": 142,
+      "kept": 50
+     }
+    },
+    {
+     "accession": "0000200406-25-000038",
+     "form": "10-K",
+     "reportDate": "2024-12-29",
+     "filed": "2025-02-13",
+     "primaryDocument": "jnj-20241229.htm",
+     "url": "https://www.sec.gov/Archives/edgar/data/200406/000020040625000038/jnj-20241229.htm",
+     "sha256": "2902db7c24f9a7b061c1b304c1a197b08273b0b08f179b83b249a6bd34a45798",
+     "bytes": 3662436,
+     "stats": {
+      "candidates": 239,
+      "droppedNoVisibleSpan": 6,
+      "droppedZero": 11,
+      "droppedShortSpan": 30,
+      "droppedAmbiguous": 0,
+      "sampledOut": 142,
+      "kept": 50
+     }
+    }
+   ]
+  },
+  {
+   "cik": "0000789019",
+   "entityName": "MICROSOFT CORP",
+   "corpusRef": "sec-10k:0000789019",
+   "payloads": {
+    "submissionsSha256": "5c93fe7c62627741a3bd1ff48b9ce38e68be07f03c0b452624316f68ba69b068",
+    "companyfactsSha256": "8c1903c041f5c27e86ed15f37debb1f41882b7904bba129ef9edc76478b1e8ea"
+   },
+   "filings": [
+    {
+     "accession": "0001193125-26-323660",
+     "form": "10-K",
+     "reportDate": "2026-06-30",
+     "filed": "2026-07-29",
+     "primaryDocument": "msft-20260630.htm",
+     "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526323660/msft-20260630.htm",
+     "sha256": "cfb3932da43a491e4876c12be13c2770c1b0108464ab6c1f0741ec194910084d",
+     "bytes": 8585616,
+     "stats": {
+      "candidates": 238,
+      "droppedNoVisibleSpan": 3,
+      "droppedZero": 5,
+      "droppedShortSpan": 20,
+      "droppedAmbiguous": 0,
+      "sampledOut": 160,
+      "kept": 50
+     }
+    },
+    {
+     "accession": "0000950170-25-100235",
+     "form": "10-K",
+     "reportDate": "2025-06-30",
+     "filed": "2025-07-30",
+     "primaryDocument": "msft-20250630.htm",
+     "url": "https://www.sec.gov/Archives/edgar/data/789019/000095017025100235/msft-20250630.htm",
+     "sha256": "e698b490a3fcc0ceb5111ae59435556755b79f804a533880b048fa8b2430d669",
+     "bytes": 8158182,
+     "stats": {
+      "candidates": 230,
+      "droppedNoVisibleSpan": 3,
+      "droppedZero": 7,
+      "droppedShortSpan": 24,
+      "droppedAmbiguous": 0,
+      "sampledOut": 146,
+      "kept": 50
+     }
+    }
+   ]
+  },
+  {
+   "cik": "0000080424",
+   "entityName": "PROCTER & GAMBLE Co",
+   "corpusRef": "sec-10k:0000080424",
+   "payloads": {
+    "submissionsSha256": "dfac53f9f50ab750fde89a247596dd7b45592f8ff1e43585d2d918a79b2330c8",
+    "companyfactsSha256": "c6ae61e012a2b4aadeaa49400847842dd637a4a4a03cbdf4dfff27dffd78f8d1"
+   },
+   "filings": [
+    {
+     "accession": "0000080424-26-000103",
+     "form": "10-K",
+     "reportDate": "2026-06-30",
+     "filed": "2026-08-04",
+     "primaryDocument": "pg-20260630.htm",
+     "url": "https://www.sec.gov/Archives/edgar/data/80424/000008042426000103/pg-20260630.htm",
+     "sha256": "936ce2db25c4d9e326c5faf5fbfd9fde1c1cab46d9df67aa2683c8ac3d5df862",
+     "bytes": 2599600,
+     "stats": {
+      "candidates": 238,
+      "droppedNoVisibleSpan": 6,
+      "droppedZero": 2,
+      "droppedShortSpan": 33,
+      "droppedAmbiguous": 0,
+      "sampledOut": 147,
+      "kept": 50
+     }
+    },
+    {
+     "accession": "0000080424-25-000076",
+     "form": "10-K",
+     "reportDate": "2025-06-30",
+     "filed": "2025-08-04",
+     "primaryDocument": "pg-20250630.htm",
+     "url": "https://www.sec.gov/Archives/edgar/data/80424/000008042425000076/pg-20250630.htm",
+     "sha256": "b7cad01e7da42a179a3ab3b60caf01c6b8b421858ae7ce249c03042c428df1e0",
+     "bytes": 2491402,
+     "stats": {
+      "candidates": 230,
+      "droppedNoVisibleSpan": 4,
+      "droppedZero": 3,
+      "droppedShortSpan": 26,
+      "droppedAmbiguous": 0,
+      "sampledOut": 147,
+      "kept": 50
+     }
+    }
+   ]
+  }
+ ],
+ "unanswerableRules": {
+  "OTHER_COMPANY": "for each corpus A and each other filer B, the first 10 of B's numeric questions (hash order), asked of A",
+  "OTHER_YEAR": "for each corpus A, the first 10 of A's numeric questions asked of fiscal year Y = (earliest year any non-dimensional context in A's corpus touches) - 5, using A's real fiscal-year period from companyfacts (the annual 10-K duration whose end is nearest the source month/day in Y, within 10 days)",
+  "limitation": "Absence is established against tagged XBRL contexts only. Untagged prose or tables could still state an OTHER_YEAR figure; a person spot-checks a sample before the set is treated as frozen (PREREG openItems)."
+ },
+ "questions": [
+  {
+   "id": "unans-co-021344-xbrl-200406-2025-003a0d985d",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was Johnson & Johnson's Inventory, Raw Materials and Supplies, Net of Reserves as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-003a0d985d",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-200406-2025-005b63a0f6",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was Johnson & Johnson's Deferred Tax Assets, Tax Deferred Expense, Reserves and Accruals as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-005b63a0f6",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-200406-2025-0061bf5b17",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was Johnson & Johnson's Share-based Compensation Arrangement by Share-based Payment Award, Options, Outstanding, Intrinsic Value as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-0061bf5b17",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-200406-2025-02b62824e3",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was Johnson & Johnson's Long-term Debt as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-02b62824e3",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-200406-2025-032b0c1c46",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was Johnson & Johnson's Deferred Tax Assets, Valuation Allowance as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-032b0c1c46",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-200406-2025-0347fc032e",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was Johnson & Johnson's Employee-related Liabilities, Current as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-0347fc032e",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-200406-2025-0362f14b1d",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was Johnson & Johnson's Revenue from Contract with Customer, Excluding Assessed Tax for the fiscal year ended December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-0362f14b1d",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-200406-2025-03bf25c106",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was Johnson & Johnson's Net Cash Provided by (Used in) Financing Activities for the fiscal year ended December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-03bf25c106",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-200406-2025-03f6d04aa6",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was Johnson & Johnson's Asset Impairment Charges for the fiscal year ended December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-03f6d04aa6",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-200406-2025-043c10dab4",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was Johnson & Johnson's Accrued Liabilities, Current as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-043c10dab4",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-789019-2026-01cd3e4ddd",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was MICROSOFT CORP's Increase (Decrease) in Other Noncurrent Liabilities for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-01cd3e4ddd",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-789019-2026-01f1c741e0",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was MICROSOFT CORP's Finance Lease, Liability, to be Paid, Year Three as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-01f1c741e0",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-789019-2026-0428f12ec6",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was MICROSOFT CORP's Increase (Decrease) in Accounts Receivable for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0428f12ec6",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-789019-2026-0479a8ff52",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was MICROSOFT CORP's Contract with Customer, Liability as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0479a8ff52",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-789019-2026-0839fe367d",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was MICROSOFT CORP's Finance Lease, Liability, to be Paid, Year Four as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0839fe367d",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-789019-2026-0a8f5349db",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was MICROSOFT CORP's Effective Income Tax Rate Reconciliation, State and Local Income Taxes, Amount for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0a8f5349db",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-789019-2026-0be07edcc5",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was MICROSOFT CORP's Long-Term Debt, Maturity, Year One as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0be07edcc5",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-789019-2026-0c371b4ba4",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was MICROSOFT CORP's Debt Securities, Available-for-sale as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0c371b4ba4",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-789019-2026-0cc84058ae",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was MICROSOFT CORP's Debt Securities, Available-for-sale, Maturity, Allocated and Single Maturity Date, Rolling after One Through Five Years, Fair Value as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0cc84058ae",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-789019-2026-0cff1cf73b",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was MICROSOFT CORP's Debt Securities, Available-for-sale, Unrealized Loss Position, Accumulated Loss as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0cff1cf73b",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-080424-2026-014253983d",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was PROCTER & GAMBLE Co's Income (Loss) from Continuing Operations before Income Taxes, Noncontrolling Interest for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-014253983d",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-080424-2026-0257379216",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was PROCTER & GAMBLE Co's Assets, Current as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-0257379216",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-080424-2026-04bd7a76c5",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was PROCTER & GAMBLE Co's Debt, Current as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-04bd7a76c5",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-080424-2026-056e30e7b8",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was PROCTER & GAMBLE Co's Current State and Local Tax Expense (Benefit) for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-056e30e7b8",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-080424-2026-05ca7db650",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was PROCTER & GAMBLE Co's Payments to Acquire Property, Plant, and Equipment for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-05ca7db650",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-080424-2026-067ab75de0",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was PROCTER & GAMBLE Co's Current Foreign Tax Expense (Benefit) for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-067ab75de0",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-080424-2026-07979ba2e2",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was PROCTER & GAMBLE Co's Weighted Average Number of Shares Outstanding, Diluted for the fiscal year ended June 30, 2026, in shares?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-07979ba2e2",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-080424-2026-07c3361797",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was PROCTER & GAMBLE Co's Derivative Asset as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-07c3361797",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-080424-2026-0a37be7061",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was PROCTER & GAMBLE Co's Lessee, Operating Lease, Liability, Payments, Due in Rolling Year Two as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-0a37be7061",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-021344-xbrl-080424-2026-0a6535ca6b",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was PROCTER & GAMBLE Co's Share-based Compensation Arrangement by Share-based Payment Award, Options, Exercisable, Number as of June 30, 2026, in shares?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-0a6535ca6b",
+    "askedOfCik": "0000021344",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-021344-2025-00b01df3cc",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was COCA COLA CO's Marketable Securities as of December 31, 2015, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-021344-2025-00b01df3cc",
+    "askedOfCik": "0000021344",
+    "period": {
+     "end": "2015-12-31"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2020
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-021344-2025-01320e11d6",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was COCA COLA CO's Self Insurance Reserve as of December 31, 2015, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-021344-2025-01320e11d6",
+    "askedOfCik": "0000021344",
+    "period": {
+     "end": "2015-12-31"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2020
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-021344-2025-05d8b63bea",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was COCA COLA CO's Lessee, Operating Lease, Liability, to be Paid, Year Two as of December 31, 2015, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-021344-2025-05d8b63bea",
+    "askedOfCik": "0000021344",
+    "period": {
+     "end": "2015-12-31"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2020
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-021344-2025-06203fb135",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was COCA COLA CO's Comprehensive Income (Loss), Net of Tax, Attributable to Parent for the fiscal year ended December 31, 2015, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-021344-2025-06203fb135",
+    "askedOfCik": "0000021344",
+    "period": {
+     "start": "2015-01-01",
+     "end": "2015-12-31"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2020
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-021344-2025-065b21b909",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was COCA COLA CO's Defined Benefit Plan, Expected Future Benefit Payment, after Year Five for Next Five Years as of December 31, 2015, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-021344-2025-065b21b909",
+    "askedOfCik": "0000021344",
+    "period": {
+     "end": "2015-12-31"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2020
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-021344-2025-08df8e7a16",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was COCA COLA CO's Increase (Decrease) in Accounts Receivable for the fiscal year ended December 31, 2015, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-021344-2025-08df8e7a16",
+    "askedOfCik": "0000021344",
+    "period": {
+     "start": "2015-01-01",
+     "end": "2015-12-31"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2020
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-021344-2025-09c55dd8ce",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was COCA COLA CO's Debt Securities, Available-for-Sale, Amortized Cost, Maturity, Allocated and Single Maturity Date, after Year 10 as of December 31, 2015, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-021344-2025-09c55dd8ce",
+    "askedOfCik": "0000021344",
+    "period": {
+     "end": "2015-12-31"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2020
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-021344-2025-0adeffb3bd",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was COCA COLA CO's Retained Earnings (Accumulated Deficit) as of December 31, 2015, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-021344-2025-0adeffb3bd",
+    "askedOfCik": "0000021344",
+    "period": {
+     "end": "2015-12-31"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2020
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-021344-2025-0c4e756151",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was COCA COLA CO's Other Comprehensive Income (Loss), Foreign Currency Transaction and Translation Adjustment, before Tax, Portion Attributable to Parent for the fiscal year ended December 31, 2015, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-021344-2025-0c4e756151",
+    "askedOfCik": "0000021344",
+    "period": {
+     "start": "2015-01-01",
+     "end": "2015-12-31"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2020
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-021344-2025-0c5f3c7f55",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000021344",
+   "question": "What was COCA COLA CO's Disposal Group, Not Discontinued Operation, Loss (Gain) on Write-down for the fiscal year ended December 31, 2015, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-021344-2025-0c5f3c7f55",
+    "askedOfCik": "0000021344",
+    "period": {
+     "start": "2015-01-01",
+     "end": "2015-12-31"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2020
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-021344-2025-00b01df3cc",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was COCA COLA CO's Marketable Securities as of December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-00b01df3cc",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-021344-2025-01320e11d6",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was COCA COLA CO's Self Insurance Reserve as of December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-01320e11d6",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-021344-2025-05d8b63bea",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was COCA COLA CO's Lessee, Operating Lease, Liability, to be Paid, Year Two as of December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-05d8b63bea",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-021344-2025-06203fb135",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was COCA COLA CO's Comprehensive Income (Loss), Net of Tax, Attributable to Parent for the fiscal year ended December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-06203fb135",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-021344-2025-065b21b909",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was COCA COLA CO's Defined Benefit Plan, Expected Future Benefit Payment, after Year Five for Next Five Years as of December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-065b21b909",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-021344-2025-08df8e7a16",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was COCA COLA CO's Increase (Decrease) in Accounts Receivable for the fiscal year ended December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-08df8e7a16",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-021344-2025-09c55dd8ce",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was COCA COLA CO's Debt Securities, Available-for-Sale, Amortized Cost, Maturity, Allocated and Single Maturity Date, after Year 10 as of December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-09c55dd8ce",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-021344-2025-0adeffb3bd",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was COCA COLA CO's Retained Earnings (Accumulated Deficit) as of December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-0adeffb3bd",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-021344-2025-0c4e756151",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was COCA COLA CO's Other Comprehensive Income (Loss), Foreign Currency Transaction and Translation Adjustment, before Tax, Portion Attributable to Parent for the fiscal year ended December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-0c4e756151",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-021344-2025-0c5f3c7f55",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was COCA COLA CO's Disposal Group, Not Discontinued Operation, Loss (Gain) on Write-down for the fiscal year ended December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-0c5f3c7f55",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-789019-2026-01cd3e4ddd",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was MICROSOFT CORP's Increase (Decrease) in Other Noncurrent Liabilities for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-01cd3e4ddd",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-789019-2026-01f1c741e0",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was MICROSOFT CORP's Finance Lease, Liability, to be Paid, Year Three as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-01f1c741e0",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-789019-2026-0428f12ec6",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was MICROSOFT CORP's Increase (Decrease) in Accounts Receivable for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0428f12ec6",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-789019-2026-0479a8ff52",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was MICROSOFT CORP's Contract with Customer, Liability as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0479a8ff52",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-789019-2026-0839fe367d",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was MICROSOFT CORP's Finance Lease, Liability, to be Paid, Year Four as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0839fe367d",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-789019-2026-0a8f5349db",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was MICROSOFT CORP's Effective Income Tax Rate Reconciliation, State and Local Income Taxes, Amount for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0a8f5349db",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-789019-2026-0be07edcc5",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was MICROSOFT CORP's Long-Term Debt, Maturity, Year One as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0be07edcc5",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-789019-2026-0c371b4ba4",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was MICROSOFT CORP's Debt Securities, Available-for-sale as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0c371b4ba4",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-789019-2026-0cc84058ae",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was MICROSOFT CORP's Debt Securities, Available-for-sale, Maturity, Allocated and Single Maturity Date, Rolling after One Through Five Years, Fair Value as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0cc84058ae",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-789019-2026-0cff1cf73b",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was MICROSOFT CORP's Debt Securities, Available-for-sale, Unrealized Loss Position, Accumulated Loss as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0cff1cf73b",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-080424-2026-014253983d",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was PROCTER & GAMBLE Co's Income (Loss) from Continuing Operations before Income Taxes, Noncontrolling Interest for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-014253983d",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-080424-2026-0257379216",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was PROCTER & GAMBLE Co's Assets, Current as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-0257379216",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-080424-2026-04bd7a76c5",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was PROCTER & GAMBLE Co's Debt, Current as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-04bd7a76c5",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-080424-2026-056e30e7b8",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was PROCTER & GAMBLE Co's Current State and Local Tax Expense (Benefit) for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-056e30e7b8",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-080424-2026-05ca7db650",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was PROCTER & GAMBLE Co's Payments to Acquire Property, Plant, and Equipment for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-05ca7db650",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-080424-2026-067ab75de0",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was PROCTER & GAMBLE Co's Current Foreign Tax Expense (Benefit) for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-067ab75de0",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-080424-2026-07979ba2e2",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was PROCTER & GAMBLE Co's Weighted Average Number of Shares Outstanding, Diluted for the fiscal year ended June 30, 2026, in shares?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-07979ba2e2",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-080424-2026-07c3361797",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was PROCTER & GAMBLE Co's Derivative Asset as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-07c3361797",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-080424-2026-0a37be7061",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was PROCTER & GAMBLE Co's Lessee, Operating Lease, Liability, Payments, Due in Rolling Year Two as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-0a37be7061",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-200406-xbrl-080424-2026-0a6535ca6b",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was PROCTER & GAMBLE Co's Share-based Compensation Arrangement by Share-based Payment Award, Options, Exercisable, Number as of June 30, 2026, in shares?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-0a6535ca6b",
+    "askedOfCik": "0000200406",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-200406-2025-003a0d985d",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was Johnson & Johnson's Inventory, Raw Materials and Supplies, Net of Reserves as of December 29, 2013, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-200406-2025-003a0d985d",
+    "askedOfCik": "0000200406",
+    "period": {
+     "end": "2013-12-29"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2018
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-200406-2025-005b63a0f6",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was Johnson & Johnson's Deferred Tax Assets, Tax Deferred Expense, Reserves and Accruals as of December 29, 2013, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-200406-2025-005b63a0f6",
+    "askedOfCik": "0000200406",
+    "period": {
+     "end": "2013-12-29"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2018
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-200406-2025-0061bf5b17",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was Johnson & Johnson's Share-based Compensation Arrangement by Share-based Payment Award, Options, Outstanding, Intrinsic Value as of December 29, 2013, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-200406-2025-0061bf5b17",
+    "askedOfCik": "0000200406",
+    "period": {
+     "end": "2013-12-29"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2018
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-200406-2025-02b62824e3",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was Johnson & Johnson's Long-term Debt as of December 29, 2013, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-200406-2025-02b62824e3",
+    "askedOfCik": "0000200406",
+    "period": {
+     "end": "2013-12-29"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2018
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-200406-2025-032b0c1c46",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was Johnson & Johnson's Deferred Tax Assets, Valuation Allowance as of December 29, 2013, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-200406-2025-032b0c1c46",
+    "askedOfCik": "0000200406",
+    "period": {
+     "end": "2013-12-29"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2018
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-200406-2025-0347fc032e",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was Johnson & Johnson's Employee-related Liabilities, Current as of December 29, 2013, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-200406-2025-0347fc032e",
+    "askedOfCik": "0000200406",
+    "period": {
+     "end": "2013-12-29"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2018
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-200406-2025-0362f14b1d",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was Johnson & Johnson's Revenue from Contract with Customer, Excluding Assessed Tax for the fiscal year ended December 29, 2013, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-200406-2025-0362f14b1d",
+    "askedOfCik": "0000200406",
+    "period": {
+     "start": "2012-12-31",
+     "end": "2013-12-29"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2018
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-200406-2025-03bf25c106",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was Johnson & Johnson's Net Cash Provided by (Used in) Financing Activities for the fiscal year ended December 29, 2013, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-200406-2025-03bf25c106",
+    "askedOfCik": "0000200406",
+    "period": {
+     "start": "2012-12-31",
+     "end": "2013-12-29"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2018
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-200406-2025-03f6d04aa6",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was Johnson & Johnson's Asset Impairment Charges for the fiscal year ended December 29, 2013, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-200406-2025-03f6d04aa6",
+    "askedOfCik": "0000200406",
+    "period": {
+     "start": "2012-12-31",
+     "end": "2013-12-29"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2018
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-200406-2025-043c10dab4",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000200406",
+   "question": "What was Johnson & Johnson's Accrued Liabilities, Current as of December 29, 2013, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-200406-2025-043c10dab4",
+    "askedOfCik": "0000200406",
+    "period": {
+     "end": "2013-12-29"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2018
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-021344-2025-00b01df3cc",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was COCA COLA CO's Marketable Securities as of December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-00b01df3cc",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-021344-2025-01320e11d6",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was COCA COLA CO's Self Insurance Reserve as of December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-01320e11d6",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-021344-2025-05d8b63bea",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was COCA COLA CO's Lessee, Operating Lease, Liability, to be Paid, Year Two as of December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-05d8b63bea",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-021344-2025-06203fb135",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was COCA COLA CO's Comprehensive Income (Loss), Net of Tax, Attributable to Parent for the fiscal year ended December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-06203fb135",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-021344-2025-065b21b909",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was COCA COLA CO's Defined Benefit Plan, Expected Future Benefit Payment, after Year Five for Next Five Years as of December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-065b21b909",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-021344-2025-08df8e7a16",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was COCA COLA CO's Increase (Decrease) in Accounts Receivable for the fiscal year ended December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-08df8e7a16",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-021344-2025-09c55dd8ce",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was COCA COLA CO's Debt Securities, Available-for-Sale, Amortized Cost, Maturity, Allocated and Single Maturity Date, after Year 10 as of December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-09c55dd8ce",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-021344-2025-0adeffb3bd",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was COCA COLA CO's Retained Earnings (Accumulated Deficit) as of December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-0adeffb3bd",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-021344-2025-0c4e756151",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was COCA COLA CO's Other Comprehensive Income (Loss), Foreign Currency Transaction and Translation Adjustment, before Tax, Portion Attributable to Parent for the fiscal year ended December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-0c4e756151",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-021344-2025-0c5f3c7f55",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was COCA COLA CO's Disposal Group, Not Discontinued Operation, Loss (Gain) on Write-down for the fiscal year ended December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-0c5f3c7f55",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-200406-2025-003a0d985d",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was Johnson & Johnson's Inventory, Raw Materials and Supplies, Net of Reserves as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-003a0d985d",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-200406-2025-005b63a0f6",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was Johnson & Johnson's Deferred Tax Assets, Tax Deferred Expense, Reserves and Accruals as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-005b63a0f6",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-200406-2025-0061bf5b17",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was Johnson & Johnson's Share-based Compensation Arrangement by Share-based Payment Award, Options, Outstanding, Intrinsic Value as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-0061bf5b17",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-200406-2025-02b62824e3",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was Johnson & Johnson's Long-term Debt as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-02b62824e3",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-200406-2025-032b0c1c46",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was Johnson & Johnson's Deferred Tax Assets, Valuation Allowance as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-032b0c1c46",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-200406-2025-0347fc032e",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was Johnson & Johnson's Employee-related Liabilities, Current as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-0347fc032e",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-200406-2025-0362f14b1d",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was Johnson & Johnson's Revenue from Contract with Customer, Excluding Assessed Tax for the fiscal year ended December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-0362f14b1d",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-200406-2025-03bf25c106",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was Johnson & Johnson's Net Cash Provided by (Used in) Financing Activities for the fiscal year ended December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-03bf25c106",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-200406-2025-03f6d04aa6",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was Johnson & Johnson's Asset Impairment Charges for the fiscal year ended December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-03f6d04aa6",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-200406-2025-043c10dab4",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was Johnson & Johnson's Accrued Liabilities, Current as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-043c10dab4",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-080424-2026-014253983d",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was PROCTER & GAMBLE Co's Income (Loss) from Continuing Operations before Income Taxes, Noncontrolling Interest for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-014253983d",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-080424-2026-0257379216",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was PROCTER & GAMBLE Co's Assets, Current as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-0257379216",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-080424-2026-04bd7a76c5",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was PROCTER & GAMBLE Co's Debt, Current as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-04bd7a76c5",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-080424-2026-056e30e7b8",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was PROCTER & GAMBLE Co's Current State and Local Tax Expense (Benefit) for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-056e30e7b8",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-080424-2026-05ca7db650",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was PROCTER & GAMBLE Co's Payments to Acquire Property, Plant, and Equipment for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-05ca7db650",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-080424-2026-067ab75de0",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was PROCTER & GAMBLE Co's Current Foreign Tax Expense (Benefit) for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-067ab75de0",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-080424-2026-07979ba2e2",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was PROCTER & GAMBLE Co's Weighted Average Number of Shares Outstanding, Diluted for the fiscal year ended June 30, 2026, in shares?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-07979ba2e2",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-080424-2026-07c3361797",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was PROCTER & GAMBLE Co's Derivative Asset as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-07c3361797",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-080424-2026-0a37be7061",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was PROCTER & GAMBLE Co's Lessee, Operating Lease, Liability, Payments, Due in Rolling Year Two as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-0a37be7061",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-co-789019-xbrl-080424-2026-0a6535ca6b",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was PROCTER & GAMBLE Co's Share-based Compensation Arrangement by Share-based Payment Award, Options, Exercisable, Number as of June 30, 2026, in shares?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-080424-2026-0a6535ca6b",
+    "askedOfCik": "0000789019",
+    "factBelongsToCik": "0000080424"
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-789019-2026-01cd3e4ddd",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was MICROSOFT CORP's Increase (Decrease) in Other Noncurrent Liabilities for the fiscal year ended June 30, 2017, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-789019-2026-01cd3e4ddd",
+    "askedOfCik": "0000789019",
+    "period": {
+     "start": "2016-07-01",
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-789019-2026-01f1c741e0",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was MICROSOFT CORP's Finance Lease, Liability, to be Paid, Year Three as of June 30, 2017, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-789019-2026-01f1c741e0",
+    "askedOfCik": "0000789019",
+    "period": {
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-789019-2026-0428f12ec6",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was MICROSOFT CORP's Increase (Decrease) in Accounts Receivable for the fiscal year ended June 30, 2017, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-789019-2026-0428f12ec6",
+    "askedOfCik": "0000789019",
+    "period": {
+     "start": "2016-07-01",
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-789019-2026-0479a8ff52",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was MICROSOFT CORP's Contract with Customer, Liability as of June 30, 2017, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-789019-2026-0479a8ff52",
+    "askedOfCik": "0000789019",
+    "period": {
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-789019-2026-0839fe367d",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was MICROSOFT CORP's Finance Lease, Liability, to be Paid, Year Four as of June 30, 2017, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-789019-2026-0839fe367d",
+    "askedOfCik": "0000789019",
+    "period": {
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-789019-2026-0a8f5349db",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was MICROSOFT CORP's Effective Income Tax Rate Reconciliation, State and Local Income Taxes, Amount for the fiscal year ended June 30, 2017, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-789019-2026-0a8f5349db",
+    "askedOfCik": "0000789019",
+    "period": {
+     "start": "2016-07-01",
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-789019-2026-0be07edcc5",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was MICROSOFT CORP's Long-Term Debt, Maturity, Year One as of June 30, 2017, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-789019-2026-0be07edcc5",
+    "askedOfCik": "0000789019",
+    "period": {
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-789019-2026-0c371b4ba4",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was MICROSOFT CORP's Debt Securities, Available-for-sale as of June 30, 2017, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-789019-2026-0c371b4ba4",
+    "askedOfCik": "0000789019",
+    "period": {
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-789019-2026-0cc84058ae",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was MICROSOFT CORP's Debt Securities, Available-for-sale, Maturity, Allocated and Single Maturity Date, Rolling after One Through Five Years, Fair Value as of June 30, 2017, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-789019-2026-0cc84058ae",
+    "askedOfCik": "0000789019",
+    "period": {
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-789019-2026-0cff1cf73b",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000789019",
+   "question": "What was MICROSOFT CORP's Debt Securities, Available-for-sale, Unrealized Loss Position, Accumulated Loss as of June 30, 2017, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-789019-2026-0cff1cf73b",
+    "askedOfCik": "0000789019",
+    "period": {
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-021344-2025-00b01df3cc",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was COCA COLA CO's Marketable Securities as of December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-00b01df3cc",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-021344-2025-01320e11d6",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was COCA COLA CO's Self Insurance Reserve as of December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-01320e11d6",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-021344-2025-05d8b63bea",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was COCA COLA CO's Lessee, Operating Lease, Liability, to be Paid, Year Two as of December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-05d8b63bea",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-021344-2025-06203fb135",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was COCA COLA CO's Comprehensive Income (Loss), Net of Tax, Attributable to Parent for the fiscal year ended December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-06203fb135",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-021344-2025-065b21b909",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was COCA COLA CO's Defined Benefit Plan, Expected Future Benefit Payment, after Year Five for Next Five Years as of December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-065b21b909",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-021344-2025-08df8e7a16",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was COCA COLA CO's Increase (Decrease) in Accounts Receivable for the fiscal year ended December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-08df8e7a16",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-021344-2025-09c55dd8ce",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was COCA COLA CO's Debt Securities, Available-for-Sale, Amortized Cost, Maturity, Allocated and Single Maturity Date, after Year 10 as of December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-09c55dd8ce",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-021344-2025-0adeffb3bd",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was COCA COLA CO's Retained Earnings (Accumulated Deficit) as of December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-0adeffb3bd",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-021344-2025-0c4e756151",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was COCA COLA CO's Other Comprehensive Income (Loss), Foreign Currency Transaction and Translation Adjustment, before Tax, Portion Attributable to Parent for the fiscal year ended December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-0c4e756151",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-021344-2025-0c5f3c7f55",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was COCA COLA CO's Disposal Group, Not Discontinued Operation, Loss (Gain) on Write-down for the fiscal year ended December 31, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-021344-2025-0c5f3c7f55",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000021344"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-200406-2025-003a0d985d",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was Johnson & Johnson's Inventory, Raw Materials and Supplies, Net of Reserves as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-003a0d985d",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-200406-2025-005b63a0f6",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was Johnson & Johnson's Deferred Tax Assets, Tax Deferred Expense, Reserves and Accruals as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-005b63a0f6",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-200406-2025-0061bf5b17",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was Johnson & Johnson's Share-based Compensation Arrangement by Share-based Payment Award, Options, Outstanding, Intrinsic Value as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-0061bf5b17",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-200406-2025-02b62824e3",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was Johnson & Johnson's Long-term Debt as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-02b62824e3",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-200406-2025-032b0c1c46",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was Johnson & Johnson's Deferred Tax Assets, Valuation Allowance as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-032b0c1c46",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-200406-2025-0347fc032e",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was Johnson & Johnson's Employee-related Liabilities, Current as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-0347fc032e",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-200406-2025-0362f14b1d",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was Johnson & Johnson's Revenue from Contract with Customer, Excluding Assessed Tax for the fiscal year ended December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-0362f14b1d",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-200406-2025-03bf25c106",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was Johnson & Johnson's Net Cash Provided by (Used in) Financing Activities for the fiscal year ended December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-03bf25c106",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-200406-2025-03f6d04aa6",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was Johnson & Johnson's Asset Impairment Charges for the fiscal year ended December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-03f6d04aa6",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-200406-2025-043c10dab4",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was Johnson & Johnson's Accrued Liabilities, Current as of December 28, 2025, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-200406-2025-043c10dab4",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000200406"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-789019-2026-01cd3e4ddd",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was MICROSOFT CORP's Increase (Decrease) in Other Noncurrent Liabilities for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-01cd3e4ddd",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-789019-2026-01f1c741e0",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was MICROSOFT CORP's Finance Lease, Liability, to be Paid, Year Three as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-01f1c741e0",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-789019-2026-0428f12ec6",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was MICROSOFT CORP's Increase (Decrease) in Accounts Receivable for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0428f12ec6",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-789019-2026-0479a8ff52",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was MICROSOFT CORP's Contract with Customer, Liability as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0479a8ff52",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-789019-2026-0839fe367d",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was MICROSOFT CORP's Finance Lease, Liability, to be Paid, Year Four as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0839fe367d",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-789019-2026-0a8f5349db",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was MICROSOFT CORP's Effective Income Tax Rate Reconciliation, State and Local Income Taxes, Amount for the fiscal year ended June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0a8f5349db",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-789019-2026-0be07edcc5",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was MICROSOFT CORP's Long-Term Debt, Maturity, Year One as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0be07edcc5",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-789019-2026-0c371b4ba4",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was MICROSOFT CORP's Debt Securities, Available-for-sale as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0c371b4ba4",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-789019-2026-0cc84058ae",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was MICROSOFT CORP's Debt Securities, Available-for-sale, Maturity, Allocated and Single Maturity Date, Rolling after One Through Five Years, Fair Value as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0cc84058ae",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-co-080424-xbrl-789019-2026-0cff1cf73b",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was MICROSOFT CORP's Debt Securities, Available-for-sale, Unrealized Loss Position, Accumulated Loss as of June 30, 2026, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_COMPANY",
+    "sourceQuestionId": "xbrl-789019-2026-0cff1cf73b",
+    "askedOfCik": "0000080424",
+    "factBelongsToCik": "0000789019"
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-080424-2026-014253983d",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was PROCTER & GAMBLE Co's Income (Loss) from Continuing Operations before Income Taxes, Noncontrolling Interest for the fiscal year ended June 30, 2017, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-080424-2026-014253983d",
+    "askedOfCik": "0000080424",
+    "period": {
+     "start": "2016-07-01",
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-080424-2026-0257379216",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was PROCTER & GAMBLE Co's Assets, Current as of June 30, 2017, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-080424-2026-0257379216",
+    "askedOfCik": "0000080424",
+    "period": {
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-080424-2026-04bd7a76c5",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was PROCTER & GAMBLE Co's Debt, Current as of June 30, 2017, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-080424-2026-04bd7a76c5",
+    "askedOfCik": "0000080424",
+    "period": {
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-080424-2026-056e30e7b8",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was PROCTER & GAMBLE Co's Current State and Local Tax Expense (Benefit) for the fiscal year ended June 30, 2017, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-080424-2026-056e30e7b8",
+    "askedOfCik": "0000080424",
+    "period": {
+     "start": "2016-07-01",
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-080424-2026-05ca7db650",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was PROCTER & GAMBLE Co's Payments to Acquire Property, Plant, and Equipment for the fiscal year ended June 30, 2017, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-080424-2026-05ca7db650",
+    "askedOfCik": "0000080424",
+    "period": {
+     "start": "2016-07-01",
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-080424-2026-067ab75de0",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was PROCTER & GAMBLE Co's Current Foreign Tax Expense (Benefit) for the fiscal year ended June 30, 2017, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-080424-2026-067ab75de0",
+    "askedOfCik": "0000080424",
+    "period": {
+     "start": "2016-07-01",
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-080424-2026-07979ba2e2",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was PROCTER & GAMBLE Co's Weighted Average Number of Shares Outstanding, Diluted for the fiscal year ended June 30, 2017, in shares?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-080424-2026-07979ba2e2",
+    "askedOfCik": "0000080424",
+    "period": {
+     "start": "2016-07-01",
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-080424-2026-07c3361797",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was PROCTER & GAMBLE Co's Derivative Asset as of June 30, 2017, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-080424-2026-07c3361797",
+    "askedOfCik": "0000080424",
+    "period": {
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-080424-2026-0a37be7061",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was PROCTER & GAMBLE Co's Lessee, Operating Lease, Liability, Payments, Due in Rolling Year Two as of June 30, 2017, in US dollars?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-080424-2026-0a37be7061",
+    "askedOfCik": "0000080424",
+    "period": {
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  },
+  {
+   "id": "unans-yr-xbrl-080424-2026-0a6535ca6b",
+   "set": "unanswerable",
+   "kind": "unanswerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "sec-10k:0000080424",
+   "question": "What was PROCTER & GAMBLE Co's Share-based Compensation Arrangement by Share-based Payment Award, Options, Exercisable, Number as of June 30, 2017, in shares?",
+   "gold": null,
+   "generation": {
+    "rule": "OTHER_YEAR",
+    "sourceQuestionId": "xbrl-080424-2026-0a6535ca6b",
+    "askedOfCik": "0000080424",
+    "period": {
+     "end": "2017-06-30"
+    },
+    "periodSource": "companyfacts annual 10-K duration nearest the anchor",
+    "earliestTaggedYear": 2022
+   }
+  }
+ ]
+}
