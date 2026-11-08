@@ -1184,3 +1184,75 @@ describe("exact-duplicate annotation at compile intake", () => {
     expect(put).toHaveBeenCalledOnce();
   });
 });
+
+/*
+  B2 (TAVONEL_LIBRARY_ORGANIZE_MODE). Proposals are recorded at intake, before the paid dispatch, and
+  in no mode do they change what is dispatched, signed, stored or returned: off and shadow are
+  compared on the Core request, the audited sources, the persisted candidate and the response.
+*/
+describe("library organize proposals at compile intake", () => {
+  const store = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({ schemaVersion: "tavonel.library_organize.v1", documents: 1,
+    newPairs: { same_text: 0, near_duplicate: 0, revision_candidate: 0 }, labelsRecorded: 2 }), { status: 200 }));
+  const organizeCalls = () => store.mock.calls.filter(([url]) => String(url).endsWith("/rpc/record_library_organize"));
+  function compilable() {
+    readyWorkspace();
+    fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v2", [{
+      regionId: "native-p0001", pageIndex0: 0, pageNumber1: 1, order: 0, blockType: "paragraph",
+      bbox1000: [0, 0, 1000, 1000], text: "The pump was inspected and the reading stayed inside the policy limits.",
+      confidence: 1, authority: "official",
+    }]) });
+    dispatched.mockResolvedValue({ ok: true, result: {
+      status: "completed", runtime: "tavonel-python-core-v2",
+      candidate: { worldStateId: "world-1", reviewReasons: [] },
+      receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, candidatePromotion: false },
+    } });
+    put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
+  }
+  async function compileWith(mode: string | undefined, fetchImpl: typeof store = store) {
+    vi.clearAllMocks();
+    store.mockClear();
+    vi.stubGlobal("fetch", fetchImpl);
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://store.example");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "k".repeat(40));
+    if (mode !== undefined) vi.stubEnv("TAVONEL_LIBRARY_ORGANIZE_MODE", mode);
+    compilable();
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+    const audit = audited.mock.calls[0]?.[0] as { details: { sourceProcessingObservations: unknown } } | undefined;
+    return {
+      run: JSON.stringify(run.ok ? { ...run, payload: { ...run.payload, signedReceipt: undefined } } : run),
+      ok: run.ok,
+      core: JSON.stringify(dispatched.mock.calls[0]?.slice(0, 3)),
+      stored: JSON.stringify(Object.keys((put.mock.calls[0]?.[3] as Record<string, unknown> | undefined) ?? {})),
+      auditSources: JSON.stringify((audit?.details.sourceProcessingObservations as { sources?: unknown } | undefined)?.sources),
+    };
+  }
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("off (unset): no store call", async () => {
+    const off = await compileWith(undefined);
+    expect(off.ok).toBe(true);
+    expect(store).not.toHaveBeenCalled();
+  });
+
+  it("shadow records once, before the paid dispatch, and the compile is the same compile as with the flag off", async () => {
+    const off = await compileWith("off");
+    expect(store).not.toHaveBeenCalled();
+    const shadow = await compileWith("shadow");
+    expect(organizeCalls()).toHaveLength(1);
+    expect(store.mock.invocationCallOrder[0]).toBeLessThan(dispatched.mock.invocationCallOrder[0]!);
+    expect([shadow.core, shadow.stored, shadow.auditSources, shadow.run]).toEqual([off.core, off.stored, off.auditSources, off.run]);
+  });
+
+  it("a store that is down never stops the compile and changes nothing in it", async () => {
+    const off = await compileWith("off");
+    const down = await compileWith("shadow", vi.fn(async () => { throw new TypeError("network"); }) as unknown as typeof store);
+    expect(down.ok).toBe(true);
+    expect([down.core, down.stored, down.run]).toEqual([off.core, off.stored, off.run]);
+  });
+});
