@@ -20,8 +20,11 @@ import { evaluateAnswerability, type AnswerabilityInput } from "./answerability"
 export const ANSWERABILITY_SHADOW_EVENT = "tavonel.answerability_shadow.v1" as const;
 
 /*
-  Set from the E1 calibration split by the pre-registered rule (eval/ask-quality/e2/PREREG-E2.json,
-  receipts/calibration-*.json). Not calibrated in the CalibrationTable sense: one corpus, one retriever.
+  Set from the E1 calibration split by the pre-registered rule (eval/ask-quality/e2/PREREG-E2.json):
+  receipts/calibration-2026-11-08T082201899Z-99e9448d5587.json chose 0 with constraintMet false -- no
+  threshold kept refused/answerable within 0.05, because the numeric-anchor rule alone refused 25 of 209
+  answerable calibration questions. So the coverage rule is off and only rules 1-3 decide. Not
+  calibrated in the CalibrationTable sense: one corpus, one retriever.
 */
 export const ANSWERABILITY_COVERAGE_THRESHOLD = 0;
 
