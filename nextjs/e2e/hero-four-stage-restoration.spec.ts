@@ -1,7 +1,7 @@
 import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { expect, test } from "@playwright/test";
 
-const FILMS = ["/film/compile-cut.mp4", "/film/compile-cut-2.mp4", "/film/compile-cut-3.mp4", "/film/compile-cut-4.mp4"];
+const FILMS = ["/film/hero-r2-c1.mp4", "/film/hero-r2-c2.mp4", "/film/hero-r2-c3.mp4", "/film/hero-r2-c4.mp4"];
 
 async function dismissConsent(page: import("@playwright/test").Page) {
   // Release 2: the consent card appears after a 200px scroll (or 8 s), not on the first paint.

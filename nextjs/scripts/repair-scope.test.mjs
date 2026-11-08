@@ -7605,6 +7605,24 @@ test('affected gate-release-continuity owner: 9 exact paths select 10 direct sui
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+// Home film re-record on design C (W2, 2026-11-05): one finite owner, restated independently of the exported constants.
+import { HOME_FILM_RERECORD_AFFECTED_PATHS, HOME_FILM_RERECORD_AFFECTED_UNIT_FILES, HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+test('affected film-rerecord-20261105 owner: 32 exact paths select 3 direct suites and 3 browser suites; neighbours stay unmapped', () => {
+  const paths = ['public/film/hero-r2-c1-hq-1440.mp4', 'public/film/hero-r2-c1-hq.mp4', 'public/film/hero-r2-c1.mp4', 'public/film/hero-r2-c2.mp4', 'public/film/hero-r2-c3.mp4', 'public/film/hero-r2-c4.mp4', 'public/film/poster-r2-c1-t13.60-2x.avif', 'public/film/poster-r2-c1-t13.60-2x.webp', 'public/film/poster-r2-c1-t13.60-pane1-684x855.avif', 'public/film/poster-r2-c1-t13.60-pane1-684x855.webp', 'public/film/poster-r2-c1-t13.60.avif', 'public/film/poster-r2-c1-t13.60.webp', 'public/film/poster-r2-c2-t4.40-2x.avif', 'public/film/poster-r2-c2-t4.40-2x.webp', 'public/film/poster-r2-c2-t4.40.avif', 'public/film/poster-r2-c2-t4.40.webp', 'public/film/poster-r2-c3-t17.96-2x.avif', 'public/film/poster-r2-c3-t17.96-2x.webp', 'public/film/poster-r2-c3-t17.96.avif', 'public/film/poster-r2-c3-t17.96.webp', 'public/film/poster-r2-c4-t6.80-2x.avif', 'public/film/poster-r2-c4-t6.80-2x.webp', 'public/film/poster-r2-c4-t6.80.avif', 'public/film/poster-r2-c4-t6.80.webp', 'scripts/film/encode-fallback.sh', 'scripts/film/fixture.mjs', 'scripts/film/frame-strings.mjs', 'scripts/film/posters.mjs', 'scripts/film/record.mjs', 'scripts/film/scan.mjs', 'scripts/film/stages.mjs', 'scripts/measure-film-start.mjs'];
+  const suites = ['components/compile-stage-player.mobile-view.test.tsx', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts'];
+  const browsers = ['e2e/hero-four-stage-restoration.spec.ts', 'e2e/hero-home-responsive.spec.ts', 'e2e/landing-hero-film-loading.spec.ts'];
+  assert.deepEqual([[...HOME_FILM_RERECORD_AFFECTED_PATHS], [...HOME_FILM_RERECORD_AFFECTED_UNIT_FILES], [...HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES]], [paths, suites, browsers]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['film-rerecord-20261105'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['film-rerecord-20261105'], [], [...suites].sort(), [...browsers].sort(), []], path);
+  }
+  for (const adjacent of ['nextjs/public/film/hero-r2-c5.mp4', 'nextjs/public/film/hero-r2-c1-hq-720.mp4', 'nextjs/public/film/poster-r2-c1-t13.60-3x.avif', 'nextjs/public/film/poster-r2-c5-t1.00.avif', 'nextjs/public/film/compile-cut-5.mp4', 'nextjs/scripts/measure-film-end.mjs', 'nextjs/scripts/film/record-2.mjs', 'nextjs/scripts/film/scan.sh']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    if (unknown.groups.length) { assert.ok(!unknown.groups.includes('film-rerecord-20261105'), adjacent); continue; }
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});
 // Phase 4 consent-poster lane (P2-34, D-11): one finite owner, restated independently of the exported constants.
 import { CONSENT_POSTER_AFFECTED_PATHS, CONSENT_POSTER_AFFECTED_UNIT_FILES, CONSENT_POSTER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 test('affected consent-poster owner: 16 exact paths select 5 direct suites and 2 browser suites; neighbours stay unmapped', () => {

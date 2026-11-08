@@ -10,6 +10,7 @@ import { PACKET_DELIVERY_AFFECTED_PATHS, PACKET_DELIVERY_AFFECTED_UNIT_FILES } f
 import { LIBRARY_DEDUP_AFFECTED_PATHS, LIBRARY_DEDUP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { COMPILER_RELEASE_AFFECTED_PATHS, COMPILER_RELEASE_AFFECTED_UNIT_FILES, COMPILER_RELEASE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { HOME_FILM_RERECORD_AFFECTED_PATHS, HOME_FILM_RERECORD_AFFECTED_UNIT_FILES, HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { CONSENT_POSTER_AFFECTED_PATHS, CONSENT_POSTER_AFFECTED_UNIT_FILES, CONSENT_POSTER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { VISUALS_AFFECTED_PATHS, VISUALS_AFFECTED_UNIT_FILES, VISUALS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS, OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
@@ -709,6 +710,14 @@ for (const binding of [
     browsers: [],
     rows: [],
     neighbors: ['nextjs/lib/operational-sli.ts', 'nextjs/lib/operational-sli-alert-store.tsx', 'nextjs/app/api/internal/sli-alerts/replay/route.ts', 'nextjs/lib/operational-sli-alert-delivery.ts', 'lib/operational-sli-alert-store.ts'] },
+  // Home film re-record on design C (W2, 2026-11-05).
+  { group: 'film-rerecord-20261105', prefix: 'nextjs/', exportedPaths: HOME_FILM_RERECORD_AFFECTED_PATHS, exportedSuites: HOME_FILM_RERECORD_AFFECTED_UNIT_FILES,
+    exportedBrowsers: HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES,
+    paths: ['public/film/hero-r2-c1-hq-1440.mp4', 'public/film/hero-r2-c1-hq.mp4', 'public/film/hero-r2-c1.mp4', 'public/film/hero-r2-c2.mp4', 'public/film/hero-r2-c3.mp4', 'public/film/hero-r2-c4.mp4', 'public/film/poster-r2-c1-t13.60-2x.avif', 'public/film/poster-r2-c1-t13.60-2x.webp', 'public/film/poster-r2-c1-t13.60-pane1-684x855.avif', 'public/film/poster-r2-c1-t13.60-pane1-684x855.webp', 'public/film/poster-r2-c1-t13.60.avif', 'public/film/poster-r2-c1-t13.60.webp', 'public/film/poster-r2-c2-t4.40-2x.avif', 'public/film/poster-r2-c2-t4.40-2x.webp', 'public/film/poster-r2-c2-t4.40.avif', 'public/film/poster-r2-c2-t4.40.webp', 'public/film/poster-r2-c3-t17.96-2x.avif', 'public/film/poster-r2-c3-t17.96-2x.webp', 'public/film/poster-r2-c3-t17.96.avif', 'public/film/poster-r2-c3-t17.96.webp', 'public/film/poster-r2-c4-t6.80-2x.avif', 'public/film/poster-r2-c4-t6.80-2x.webp', 'public/film/poster-r2-c4-t6.80.avif', 'public/film/poster-r2-c4-t6.80.webp', 'scripts/film/encode-fallback.sh', 'scripts/film/fixture.mjs', 'scripts/film/frame-strings.mjs', 'scripts/film/posters.mjs', 'scripts/film/record.mjs', 'scripts/film/scan.mjs', 'scripts/film/stages.mjs', 'scripts/measure-film-start.mjs'],
+    suites: ['components/compile-stage-player.mobile-view.test.tsx', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts'],
+    browsers: ['e2e/hero-four-stage-restoration.spec.ts', 'e2e/hero-home-responsive.spec.ts', 'e2e/landing-hero-film-loading.spec.ts'],
+    rows: ["['e2e/hero-four-stage-restoration.spec.ts', ['1440', '390']],", "['e2e/hero-home-responsive.spec.ts', ['1440']],", "['e2e/landing-hero-film-loading.spec.ts', ['390']],"],
+    neighbors: ['nextjs/public/film/hero-r2-c5.mp4', 'nextjs/public/film/hero-r2-c1-hq-720.mp4', 'nextjs/public/film/poster-r2-c1-t13.60-3x.avif', 'nextjs/public/film/poster-r2-c5-t1.00.avif', 'nextjs/public/film/compile-cut-5.mp4', 'nextjs/scripts/measure-film-end.mjs', 'nextjs/scripts/film/record-2.mjs', 'nextjs/scripts/film/scan.sh'] },
   // W1-L7 visuals lane (PR #191), placed in PR #194: exact paths, four direct suites, three browser suites.
   { group: 'visuals', prefix: 'nextjs/', exportedPaths: VISUALS_AFFECTED_PATHS, exportedSuites: VISUALS_AFFECTED_UNIT_FILES,
     exportedBrowsers: VISUALS_AFFECTED_BROWSER_FILES,

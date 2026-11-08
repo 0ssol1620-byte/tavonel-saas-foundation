@@ -47,6 +47,10 @@ export type CompileStage = {
   source, shows which documents that clause reaches, and stops. `CHANGED 1 + TOUCHED 3` is on
   screen. The caption now says the part the viewer is actually watching, which is also the part
   a RAG index cannot do. Nothing else about the film changes; the films are locked.
+
+  That describes compile-cut-3, which COMPILE_STAGES still names. Home overrides the cut and the
+  caption per stage (components/landing-v2/hero-film.tsx, the design-C re-record): its stage 3
+  shows the filings that arrived after the annual World, and its caption says that instead.
 */
 /*
   BQ-056. Sentence case, and the one stage name that is a pipeline stage comes from the constant.
