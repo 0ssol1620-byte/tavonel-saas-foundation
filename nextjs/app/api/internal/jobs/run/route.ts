@@ -59,6 +59,9 @@ async function runOneBatch(request: Request) {
   console.log(JSON.stringify({ event: "compile_batch", turns: compiles.length,
     claimed: compiles.filter((turn) => turn.claimed).length,
     skipped: compiles.filter((turn) => turn.note === "skipped").length,
+    // Starvation SLI (D0): a job is "blocked" for one tick, then leaves the window. blocked == turns
+    // with claimed 0, tick after tick, while compiles sit in preflight/reading, means it is held again.
+    blocked: compiles.filter((turn) => turn.note === "blocked").length,
     durationMs: Date.now() - batchStartedAt }));
 
   /*
