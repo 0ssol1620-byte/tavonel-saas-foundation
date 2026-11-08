@@ -19,7 +19,9 @@ const root = resolve(here, "..");
 const publicDir = join(root, "public", "explore-sample");
 const sourceDir = join(publicDir, "sec-source");
 const manifestPath = join(publicDir, "sec-corpus-manifest.json");
-const SEC_UA = process.env.SEC_USER_AGENT || "TAVONEL public demo source acquisition tavonel.com/contact";
+// SEC fair access names the requester and a contact email; the address is the one /privacy publishes
+// (docs/policy/DECISION_LOG_2026-11-08.md, "SEC User-Agent").
+const SEC_UA = process.env.SEC_USER_AGENT || "TAVONEL privacy@tavonel.com";
 
 const filings = [
   {
