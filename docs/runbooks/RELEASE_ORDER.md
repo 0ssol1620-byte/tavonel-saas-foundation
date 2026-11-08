@@ -375,3 +375,23 @@ migration은 additive다. 기존 행은 전부 `live`가 되고, create RPC의 �
 - **순서는 자유다.** 앱은 거절을 "기록되지 않은 이벤트"로 다루고(`COMPILE_JOB_ALREADY_SETTLED`, 경고 로그 1줄),
   migration이 없으면 거절이 일어나지 않을 뿐이다. 같은 PR의 lease CAS는 기존 컬럼(`updated_at`)만 쓰므로 migration이 필요 없다.
 - 적용은 **창업자 작업**이다. 동작은 CI db-rehearsal이 `supabase/tests/compile_job_post_terminal_event.sql`로 검증한다.
+
+## 추가 2026-11-08 — W2-B2: Library 근사 중복·문서 유형·주제 태그 shadow (`20261107100000`, `20261107100100`)
+
+- `20261107100000_library_organize_shadow`: 추가만 한다. `source_fingerprints`에 `text_sha256`·`minhash`(128×u32)·
+  `text_fingerprint_version` 열(셋이 함께 null이거나 함께 채워짐), `document_relations`에 `inputs_sha256` 열과
+  same_text/near_duplicate/revision_candidate 행의 추적 가능성 제약, 새 테이블 `document_labels`(RLS on, client 거부
+  restrictive policy, 어떤 역할도 table 권한 없음), service_role 전용 RPC `record_library_organize`·`read_library_organize`.
+  B1이 만든 exact_bytes 행과 기존 열은 바꾸지 않는다.
+- `20261107100100_founder_test_reset_library_organize`: founder test reset이 `document_labels`도 세고, fingerprint에 넣고,
+  지운다(label → relation → fingerprint 순서, label이 fingerprint를 FK로 가리키므로). 본문은 `20261105010000`의 상위집합
+  (W1-B1 줄 + W1-A3 줄 + labels 줄)이다. **이 파일은 `20261107100000` 뒤, 그리고 `20261105010000` 뒤에 적용한다.**
+  이 파일보다 먼저 prepare된 reset은 `founder_test_reset_database_drift`로 seal이 실패하므로 다시 prepare한다.
+- 순서: **migration 먼저, 배포 나중.** 코드가 먼저 도착해도 깨지지 않는다. flag가 꺼져 있으면(기본) RPC를 부르지 않는다.
+  flag가 `shadow`인데 migration이 없으면 `LIBRARY_ORGANIZE_MIGRATION_ABSENT` error 로그 1줄이고 compile은 그대로 간다.
+- `TAVONEL_LIBRARY_ORGANIZE_MODE`(off|shadow|on, 기본 off). `shadow`는 제안을 저장만 한다(compile 요청·응답·저장 World
+  불변). `on`은 Library 읽기 DTO를 열지만 `TAVONEL_PROCESSING_WORKSPACE_COHORT`에 명시된 workspace에만 열린다(미설정이면
+  닫힘). 임계값(near 0.85, revision 0.50)과 규칙은 보정되지 않은 shadow 기본값이다. `on`은 §4.B B2a/B2b/B2c benchmark와
+  사람 판정 뒤에만 켠다.
+- 되돌리기: env를 지우거나 `off`(재배포 필요, 과금 build 1회). 테이블·열은 남긴다(expand만, down migration 없음).
+  `off`이면 읽는 경로도 쓰는 경로도 없다.

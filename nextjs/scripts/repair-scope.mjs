@@ -2883,6 +2883,13 @@ export function vitestDiscoveryConfigFailures(source) {
   }
   return failures;
 }
+// Library organize B2 (codex/w2-b2-20261108): the near-duplicate, document-type and topic-tag shadow methods, their intake
+// recorder and Library DTOs, and their suite. The compile-run hook keeps its compile-source-observations owner, which already
+// selects collection-compile-run.test.ts; this owner selects it too because the recorder is asserted from the compile side.
+// The migrations and pgTAP fixtures keep the database-contract owner; founder-test-reset-migration.test.ts keeps library-dedup-b1.
+// No browser suite: nothing renders it yet (B4). Never nativeReuse.
+export const LIBRARY_ORGANIZE_B2_AFFECTED_PATHS = Object.freeze(['lib/library-methods.ts', 'lib/library-shadow.test.ts', 'lib/library-shadow.ts']);
+export const LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES = Object.freeze(['lib/collection-compile-run.test.ts', 'lib/library-shadow.test.ts']);
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
 export const AFFECTED_GROUPS = Object.freeze([
@@ -3112,6 +3119,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('database-contract', /^supabase\/(?:migrations|tests|drafts)\/[A-Za-z0-9_./-]+\.sql$/, { unitFiles: ['lib/pgtap-fixtures.test.ts'], database: true }),
   affectedGroup('native-harness-docs', /^docs\/integration\/NATIVE_WORLD_[A-Z_]+\.md$/),
   affectedGroup('repository-docs', /^(?:docs\/(?!integration\/NATIVE_WORLD_)[A-Za-z0-9_./-]+\.md|[A-Za-z0-9_.-]+\.md)$/, { nativeReuse: true }),
+  // library-organize-b2 (W2-B2): the 3 exact paths above select 2 direct suites and no browser suite.
+  affectedGroup('library-organize-b2', new RegExp(`^nextjs/(?:${exactPathAlternation(LIBRARY_ORGANIZE_B2_AFFECTED_PATHS)})$`),
+    { unitFiles: LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES }),
 ]);const regularModes = ['100644', '100755'];
 
 export function parseAffectedRawDiff(output) {
