@@ -8038,3 +8038,22 @@ test('affected w1-trial-ops owner: 10 exact paths select 17 direct suites and no
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
 });
+// W2-D intake stage 1 + table product-DPI harness (codex/w2-d-20261108): one finite owner, restated independently.
+import { W2_D_INTAKE_STAGE1_AFFECTED_PATHS, W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected w2-d-intake-stage1 owner: 3 exact paths select 2 direct suites and no browser suite; neighbours keep their owners', () => {
+  const paths = ['nextjs/lib/processing-ceiling-stage1.test.ts', 'quarantine-sidecar/cdr-cloudrun/table_dpi_arena.py', 'quarantine-sidecar/cdr-cloudrun/tests/test_table_dpi_arena.py'];
+  const suites = ['lib/intake-ceiling-cross-tree.test.ts', 'lib/processing-ceiling-stage1.test.ts'];
+  assert.deepEqual([[...W2_D_INTAKE_STAGE1_AFFECTED_PATHS], [...W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['w2-d-intake-stage1'], path);
+    const map = affectedMap([affectedRecord('M', [path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['w2-d-intake-stage1'], [], suites, [], []], path);
+  }
+  for (const [neighbour, group] of [['quarantine-sidecar/cdr-cloudrun/app.py', 'cdr-cloudrun-service'], ['shared/intakeCeiling.ts', 'table-read-intake-ceiling']]) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(neighbour)).map(o => o.group), [group], neighbour);
+  }
+  for (const adjacent of ['quarantine-sidecar/cdr-cloudrun/table_dpi_arena_v2.py', 'nextjs/lib/processing-ceiling-stage1.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});

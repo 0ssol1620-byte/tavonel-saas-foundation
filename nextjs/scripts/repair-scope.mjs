@@ -2883,6 +2883,17 @@ export function vitestDiscoveryConfigFailures(source) {
   }
   return failures;
 }
+// W2-D intake (codex/w2-d-20261108, PROGRAM-2026-11-04 §4.D D1/D3): the stage-1 capability-route suite and the table
+// product-DPI Arena harness with its Python suite. Repository-relative, because the harness lives beside the CDR. The shared
+// ceiling, the CDR, reader and worker sources keep their owners (table-read-intake-ceiling, cdr-cloudrun-service,
+// ocr-gpu-worker, ocr-worker). The two direct suites are the stage-1 route suite and the cross-tree pin; the harness's own
+// pytest runs in malware-scan-qualification with the rest of tests/. No browser, database or worker lane. Never nativeReuse.
+export const W2_D_INTAKE_STAGE1_AFFECTED_PATHS = Object.freeze([
+  'nextjs/lib/processing-ceiling-stage1.test.ts',
+  'quarantine-sidecar/cdr-cloudrun/table_dpi_arena.py',
+  'quarantine-sidecar/cdr-cloudrun/tests/test_table_dpi_arena.py',
+]);
+export const W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES = Object.freeze(['lib/intake-ceiling-cross-tree.test.ts', 'lib/processing-ceiling-stage1.test.ts']);
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
 export const AFFECTED_GROUPS = Object.freeze([
@@ -3112,6 +3123,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('database-contract', /^supabase\/(?:migrations|tests|drafts)\/[A-Za-z0-9_./-]+\.sql$/, { unitFiles: ['lib/pgtap-fixtures.test.ts'], database: true }),
   affectedGroup('native-harness-docs', /^docs\/integration\/NATIVE_WORLD_[A-Z_]+\.md$/),
   affectedGroup('repository-docs', /^(?:docs\/(?!integration\/NATIVE_WORLD_)[A-Za-z0-9_./-]+\.md|[A-Za-z0-9_.-]+\.md)$/, { nativeReuse: true }),
+  // w2-d-intake-stage1 (W2-D): the 3 exact repo-relative paths above select 2 direct suites and no browser suite.
+  affectedGroup('w2-d-intake-stage1', new RegExp(`^(?:${exactPathAlternation(W2_D_INTAKE_STAGE1_AFFECTED_PATHS)})$`),
+    { unitFiles: W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES }),
 ]);const regularModes = ['100644', '100755'];
 
 export function parseAffectedRawDiff(output) {

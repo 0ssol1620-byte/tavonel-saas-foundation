@@ -375,3 +375,49 @@ migration은 additive다. 기존 행은 전부 `live`가 되고, create RPC의 �
 - **순서는 자유다.** 앱은 거절을 "기록되지 않은 이벤트"로 다루고(`COMPILE_JOB_ALREADY_SETTLED`, 경고 로그 1줄),
   migration이 없으면 거절이 일어나지 않을 뿐이다. 같은 PR의 lease CAS는 기존 컬럼(`updated_at`)만 쓰므로 migration이 필요 없다.
 - 적용은 **창업자 작업**이다. 동작은 CI db-rehearsal이 `supabase/tests/compile_job_post_terminal_event.sql`로 검증한다.
+
+## 추가 2026-11-08 — W2-D: D1 단계 1 한도(꺼진 채 배포), D2 text-layer shadow, D3 표 DPI harness
+
+근거: PROGRAM-2026-11-04 §4.D. **이 PR을 병합해도 production 동작은 바뀌지 않는다.** 한도는 5 MiB / 80쪽 그대로다.
+migration은 없다.
+
+### D1 단계 1 (25 MiB / 200쪽) — 코드는 모든 트리에 있고, 켜는 것은 아래 순서로만
+
+- intake: `shared/intakeCeiling.ts`의 `INTAKE_CEILING_STAGE`는 코드 상수 `0`이다(§4.D: 한도는 flag가 아니라 코드 상수).
+  `intake-ceiling-cross-tree.test.ts`가 0을 고정한다. 1로 바꾸는 것은 측정을 기록하는 reviewed change에서 그 단언과 함께 바꾼다.
+- 처리기: CDR(Cloud Run), GPU reader(RunPod), worker(Cloudflare)는 `TAVONEL_INTAKE_CEILING_STAGE`(`"0"`/미설정 또는 `"1"`)를 읽는다.
+  그 밖의 값이면 CDR·reader는 부팅을 거부하고 worker는 읽기를 재시도로 거부한다. `service.yaml`은 `"0"`을 배포한다.
+- 단계 1 값: CDR 25 MiB / 200쪽 / 출력 45 MiB / 래스터 범위 8쪽, reader 45 MiB / 200쪽, worker 원본 25 MiB와 OCR 결과 상한
+  ×2.5(200쪽, 1,000만 자, 125,000 region, `ocr.json` 60 MiB). 바이트·쪽은 §4.D 값이고 나머지는 80쪽 상한을 쪽당으로 늘린 **유도값이다(측정 아님).**
+- compile 쪽 `MAX_DERIVED_JSON_BYTES`는 `OCR_JSON_MAX_BYTES`에서 유도된다(단계 0: 24 MiB, 단계 1: 60 MiB). Core 요청 상한
+  4.5 MB와 `COMPILE_INPUT_MAX_OCR_BYTES`(9 MB)는 바꾸지 않았다. 그래서 단계 1에서도 긴 문서는 `COMPILE_INPUT_TOO_LARGE`로 거부될 수 있다.
+
+**켜는 순서 (전제 조건이 모두 참이어야 한다).**
+
+1. §4.D 단계 1 gate 측정: GDP census 재계산(분모 100건 / 4,592쪽), 상한 근처 문서 5건의 Cloud Run 메모리·시간 p95,
+   end-to-end 시간, OCR 비용/쪽(MEASUREMENT-PLAN-D1.md, 별도 측정 서비스).
+2. worker의 한 delivery 15분 벽 해소: 200쪽 / 8 = 25 range × 85 s > 900 s. range마다 queue message 하나(A4.1)가 선행 조건이다.
+3. migration(W2-D 예약 번호 20261107130000 이후): `foundation_intake_admissions` CHECK와 `reserve_foundation_intake_admission`,
+   `foundation_intake_approval_files.byte_length` CHECK와 approval 함수의 5,242,880을 26,214,400으로. 함수 본문 교체라서 pgTAP 필수.
+4. 처리기를 먼저 단계 1로: CDR 새 revision(`TAVONEL_INTAKE_CEILING_STAGE=1`, `/health`에 `intakeCeilingStage: 1`),
+   RunPod endpoint release(같은 env), worker version upload → bindings 확인 → promote(같은 var). 각 rollback ID를 원장에 먼저 적는다.
+5. 마지막으로 intake: `INTAKE_CEILING_STAGE = 1` reviewed change → Foundation build 1회. `/sources`·가격 페이지·refusal 문구가 같이 바뀐다.
+
+**되돌리기.** 역순. intake 상수를 0으로(build 1회) → 처리기 env를 `"0"`(CDR traffic 이전 revision, RunPod 이전 release,
+`wrangler versions deploy <prev>@100%`). intake를 먼저 되돌리면 처리기가 단계 1인 채로 있어도 해가 없다(intake가 바이트를 막고 CDR이 쪽을 막는다).
+
+### D2 text-layer shadow (worker)
+
+- flag `FOUNDATION_CDR_TEXT_LAYER_FIRST`(worker var, ADR-2026-11-02 §5): `"1"`만 켜짐, 미설정/`"0"` 꺼짐, 그 밖의 값은 꺼짐 + 로그 1줄.
+  CDR 쪽 `TAVONEL_CDR_TEXT_LAYER_FIRST="1"`도 있어야 실제 비교가 된다(없으면 receipt가 `unavailable / cdr_text_layer_disabled`).
+- 켜면 OCR이 `ocr.json`을 저장한 뒤에만 같은 원본을 `/v1/text-layer`로 한 번 더 보내고, `text-layer.json`(검증된 CDR 응답)과
+  `text-layer-shadow.json`(쪽별 문자 일치율, 분모, digest만; 본문 없음)을 create-once로 남긴다. **어떤 쪽도 OCR을 건너뛰지 않고,
+  text-layer 출력은 어디에도 serve되지 않는다(`servedPages: 0`).** 실패는 모두 receipt status(`unusable`/`unavailable`)이고 예외가 아니다.
+- 비용: 켜진 문서마다 CDR 호출 1회 추가(ClamAV + LibreOffice + PDFium, timeout 60 s)가 같은 queue delivery 안에 들어간다.
+- 삭제: 두 객체는 문서의 immutable prefix 아래에 있으므로 기존 prefix 삭제가 지운다.
+- 되돌리기: worker var를 지우거나 `"0"`(다음 delivery부터). 남은 객체는 읽는 곳이 없다.
+
+### D3 표 제품 DPI harness
+
+- `quarantine-sidecar/cdr-cloudrun/table_dpi_arena.py`: 운영자 연구 도구. image에 들어가지 않는다. 공개 SEC fixture만 읽고,
+  GPU arm(`paddleocr-vl`)은 `GPU_REQUIRED_ORCHESTRATOR_GO`로 거부하고 아무것도 시작하지 않는다. 배포 대상이 아니다.

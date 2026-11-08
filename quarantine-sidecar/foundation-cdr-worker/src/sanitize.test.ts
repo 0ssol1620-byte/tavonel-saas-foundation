@@ -1531,3 +1531,32 @@ describe("source byte cap per intake ceiling stage (D1, PROGRAM-2026-11-04 §4.D
     assert.equal(fetched, 0);
   });
 });
+
+describe("D2 text-layer shadow beside OCR (PROGRAM-2026-11-04 §4.D, ADR-2026-11-02 §5)", () => {
+  const ocrEnv = (r2: FakeR2, flag?: string) => envFor(r2, {
+    FOUNDATION_OCR_URL: FOUNDATION_OCR, TAVONEL_OCR_HMAC: "foundation-ocr-hmac-fixture-secret-ok",
+    ...(flag === undefined ? {} : { FOUNDATION_CDR_TEXT_LAYER_FIRST: flag }),
+  });
+
+  it("asks nothing more when off", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const urls: string[] = [];
+    await sanitizeObject(ocrEnv(r2), SOURCE_KEY, async (input, init) => { urls.push(String(input)); return cleanCdrFetch(input, init); });
+    assert.equal(urls.some((url) => url.endsWith("/v1/text-layer")), false);
+    assert.equal(r2.puts.some((entry) => entry.key.includes("text-layer")), false);
+  });
+
+  it("records a failed layer read and leaves the OCR result exactly as it was", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const result = await sanitizeObject(ocrEnv(r2, "1"), SOURCE_KEY, async (input, init) => {
+      if (String(input).endsWith("/v1/text-layer")) throw new TypeError("network down");
+      return cleanCdrFetch(input, init);
+    });
+    assert.equal(result.status, "clean");
+    assert.equal(result.ocr.status, "written");
+    const shadowKey = (result.ocr.key as string).replace("ocr.json", "text-layer-shadow.json");
+    const shadow = JSON.parse(new TextDecoder().decode(r2.objects.get(shadowKey)?.bytes));
+    assert.deepEqual([shadow.status, shadow.reason, shadow.servedPages], ["unavailable", "cdr_text_layer_transport", 0]);
+    assert.equal(r2.objects.has((result.ocr.key as string).replace("ocr.json", "text-layer.json")), false);
+  });
+});

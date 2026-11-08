@@ -3,6 +3,7 @@ import { PermanentReject, RetryableError } from "./errors";
 import { cdrAuthorization } from "./identity";
 import { assertFoundationOnlyTarget } from "./guards";
 import { cdrRequestSignature, hmacSecretIsConfigured, sha256DigestHeader, sha256Hex } from "./hmac";
+import { runTextLayerShadow } from "./text-layer-shadow";
 import {
   MAX_SOURCE_BYTES,
   STAGE_1_MAX_SOURCE_BYTES,
@@ -70,6 +71,8 @@ export type SanitizeEnv = {
   TAVONEL_OCR_HMAC?: string;
   /** D1 intake ceiling stage (keys.ts intakeCeilingStage): "0" or unset, or "1". */
   TAVONEL_INTAKE_CEILING_STAGE?: string;
+  /** D2 text-layer shadow (text-layer-shadow.ts): "1" on, unset or "0" off. */
+  FOUNDATION_CDR_TEXT_LAYER_FIRST?: string;
 };
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{16,160}$/;
@@ -682,6 +685,15 @@ export async function sanitizeObject(
         computeCredits: 0,
       };
     }
+  }
+
+  // D2 shadow: beside a stored ocr.json only, after it, and unable to change it (never throws).
+  if (!recorded && (ocr.status === "written" || ocr.status === "exists") && ocr.key) {
+    const { filename, contentType } = sourcePartFromR2Object(object);
+    await runTextLayerShadow({
+      env, immutablePdfKey: immutableKey, ocrKey: ocr.key, inputSha256,
+      source: { bytes, filename, contentType }, fetcher, now, newRequestId,
+    });
   }
 
   /*
