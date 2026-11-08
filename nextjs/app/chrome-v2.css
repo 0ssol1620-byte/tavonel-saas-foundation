@@ -357,3 +357,17 @@ body .skip { min-height: 44px; display: inline-flex; align-items: center; }
 a[hreflang="ko"][lang="ko"] {
   font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
 }
+
+/*
+  Direction C round 3: a real product capture (components/landing-v2/product-capture.tsx) on a neutral
+  sheet. The pixels are the product's own and are never recoloured: no filter, no blend, no overlay. The
+  frame is one hairline and the sheet shadow, so the capture reads as a screen, not as an illustration.
+*/
+.tv-capture { display: block; overflow: hidden; border-radius: var(--tv-r-inner); background: var(--tv-sheet); box-shadow: 0 0 0 1px var(--tv-rule), var(--tv-shadow-1); }
+.tv-capture img { display: block; width: 100%; height: auto; }
+/* The phone captures are tall single columns; the sheet shows their top -- what the surface opens on -- and
+   cuts the rest at 5:4, so the page never grows by several screens. The image box itself is cut (object-fit),
+   not the frame: a frame that hides its own overflow is what e2e/mobile-landing.spec.ts refuses. */
+@media (max-width: 640px) {
+  .tv-capture img { max-height: 125vw; object-fit: cover; object-position: top; }
+}

@@ -271,6 +271,103 @@ migration은 다시 적용할 수 없다. 두 번째 적용은 `column "gate_sur
 - presentational 목록을 넓혀서 기록을 피하지 않는다. 목록을 넓히는 PR은 규칙 파일을 바꾸므로 그 자체로
   digest가 바뀐다. 리뷰를 거친 뒤 한 번 다시 기록한다.
 
+## 추가 2026-11-04 — W1-A2: trial AI 사용량 열 (`20261104090000_trial_ai_usage`)
+
+- 추가만 한다. `foundation_trial_policy`에 `ai_access_days`(14), `ai_page_limit`(200), `ai_world_limit`(1),
+  `ai_daily_query_limit`(200), `foundation_self_service_trials`에 `ai_query_day`, `ai_query_count`를 더하고,
+  두 테이블에 client 역할 거부 policy와 service_role 전용 함수 `foundation_trial_ai_access`를 만든다.
+  W1-A3의 내부 운영 receipt 테이블 `foundation_operations_receipts`(어떤 역할도 table 권한 없음)와 그 writer
+  `record_foundation_operations_receipt`(service_role 전용)도 같은 파일에서 만든다. 고객이 export하는
+  `enterprise_audit_events`와는 다른 테이블이다.
+- 순서: **migration 먼저, 배포 나중.** 코드가 먼저 도착해도 깨지지 않는다. flag가 꺼져 있으면 shadow 읽기가
+  실패해서 아무것도 세지 않을 뿐이고(402는 그대로), flag가 켜져 있으면 503 `TRIAL_AI_ACCESS_CHECK_FAILED`로 닫힌다.
+- `TAVONEL_TRIAL_AI_ACCESS_ENABLED`는 이 migration이 production에 적용되고, 창업자 F-2(trial 약관 문구·상한)가
+  승인된 뒤에만 `true`로 둔다. 상한 값은 `foundation_trial_policy` 한 행을 바꾸면 배포 없이 바뀐다.
+- 되돌리기: env flag를 지운다(즉시, build 없음). 열과 테이블은 남겨 둔다(expand만, down migration 없음).
+- migration 순서(2026-11-05 갱신): #186은 #190 다음에 merge한다. 그래서 production에는 #190의 `20261105000000`이
+  이 파일 `20261104090000`보다 먼저 적용된다. 둘은 서로 다른 객체만 만든다(#190은 `foundation_api_keys`와 그 RPC,
+  이 파일은 trial 열과 receipt 테이블). 그래서 적용 순서가 결과를 바꾸지 않는다. 다만 `supabase db push`는 이미 적용된
+  버전보다 이른 버전을 out-of-order로 거부한다. production 이력은 원래 repo와 어긋나 있으므로, 파일을 하나씩 적용하고
+  이력에 기록한다. 빈 DB(CI db-rehearsal)는 파일명 순서대로 적용한다. 적용 순서와 버전은 캠페인 ledger에 적는다.
+- 리셋 범위 `20261105010000_founder_test_reset_operations_receipts`(R2-m2): founder test reset이
+  `foundation_operations_receipts`도 세고, fingerprint에 넣고, 지운다. 이 파일은 `20261104090000`(테이블) **뒤에**
+  적용한다. W1-B1(#187)의 `20261104091000_founder_test_reset_source_fingerprints`도 같은 세 함수 본문을 바꾼다.
+  migration은 timestamp 순서로 적용되므로 이 파일이 항상 그 뒤에 온다. 그래서 이 파일의 본문은 #187 본문의 상위집합이다
+  (#187 줄 + receipts 줄). merge 순서는 #190 → #187 → #186이다. 두 pgTAP(`founder_test_reset_operations_receipts.sql`,
+  `founder_test_reset_source_fingerprints.sql`)과 `founder-test-reset-migration.test.ts`가 이 본문에서 함께 통과한다.
+- trial 키 규칙(F-2 문구용): **trial 주체 하나당 살아 있는 키 1개. 수동 키든 MCP 키든 같다.** 키를 실제로 만드는 두 곳에서
+  검사한다: `POST /api/developer/keys`와 원격 MCP token 발급(`/api/mcp/oauth/token`). consent(`authorize`)는 키를 만들지
+  않으므로 검사하지 않는다. 같은 client의 재연결은 대체되는 자기 키를 세지 않는다. 그래서 재연결 뒤에도 키는 1개다.
+  수동 키가 살아 있으면 MCP 연결이 402 `TRIAL_LIMIT_REACHED`이고, 반대도 같다. 가진 키를 revoke하거나 만료(MCP 토큰은
+  1시간)되면 풀린다. UI 안내 문구는 A2.2 전에 이 규칙에 맞춘다.
+
+### 수동 단계 — RunPod billing 1회 확인 (cost cap을 켜기 전)
+
+`TAVONEL_RUNPOD_DAILY_COST_CAP_USD`를 production에 넣기 **전에** 사람이 한 번 한다. 에이전트는 호출하지 않는다.
+
+1. production 값의 `TAVONEL_RUNPOD_API_KEY`로 `GET https://api.runpod.io/v2/billing?bucketSize=day&lastN=2`를 1회 읽는다.
+2. receipt를 남긴다: 요청 시각(UTC), HTTP status, 각 record의 `startTime`·`totalAmount`. key와 응답 원문 전체는
+   남기지 않는다. 캠페인 receipts 디렉터리에 저장하고 ledger에 경로를 적는다.
+3. 확인할 것: status가 200이다(403이면 key scope가 billing을 허용하지 않는다). `records`가 배열이다.
+   오늘 bucket의 `startTime`이 now를 포함하는 하루 구간이다(UTC 자정이 아니어도 된다. 코드는 구간으로 고른다).
+4. 셋 중 하나라도 아니면 cap을 넣지 않는다. 넣어도 점검은 매일 00 UTC에 `RUNPOD_BILLING_UNREADABLE` warning만 보낸다.
+## 추가 2026-11-05 — W1-A1 원격 MCP: rollback은 무엇이 즉시이고 무엇이 아닌가
+
+리뷰 R1 M4. Vercel에서 env 값은 deployment에 묶인다. `TAVONEL_REMOTE_MCP_ENABLED`나
+`TAVONEL_REMOTE_MCP_COHORT`를 바꿔도, 그 값은 **새 build가 production이 될 때** 반영된다. 새 build는 과금되고
+수 분이 걸린다. 그래서 "env만 바꾸면 즉시 꺼진다"는 말은 틀렸다. 즉시 쓸 수 있는 손잡이는 아래 1과 2다.
+
+`tvnl_mcp_` 토큰(원격 MCP OAuth로 발급된 키)은 `/api/mcp`를 통해서만 인증된다. `/api/v1`에 직접 보내면
+`401 API_KEY_AUDIENCE_INVALID`로 거부된다. 따라서 스위치가 꺼진 deployment가 서빙되는 순간, 남은 토큰은 어디에서도
+쓸 수 없다.
+
+### 순서 (사고 시)
+
+1. **원격 MCP 키 일괄 revoke — 즉시, build 없음.**
+   ```
+   curl -sS -X POST https://<production host>/api/internal/remote-mcp/revoke-all \
+     -H "Authorization: Bearer $FOUNDATION_WORKER_SECRET"
+   ```
+   응답 `{"code":"REVOKED","revoked":N,"byWorkspace":{...},"revokedAt":"..."}`을 캠페인 원장에 그대로 남긴다.
+   인증은 호출마다 키 행을 읽으므로, revoke된 키는 다음 호출부터 401이다. 손으로 만든 키(`tvnl_live_`)는 건드리지
+   않는다. 대상은 저장된 `token_kind = 'mcp'`이고 이름이 아니다(R2 N1). 그래서 예전에 `MCP:`로 이름 붙인 수동 키도
+   남는다.
+
+   **이것만으로는 멈추지 않는다.** 스위치가 켜진 deployment가 서빙되는 동안 client는 다시 OAuth를 거쳐 새 키를
+   받는다. 그러니 2를 이어서 한다.
+
+2. **Vercel Instant Rollback — build 없음, 과금 build 없음.** 원장에 기록해 둔 직전 production deployment ID로 되돌린다.
+   그 deployment가 스위치가 꺼진 env로 build되었으면, 원격 MCP는 그 즉시 404가 된다. 되돌린 뒤 1을 한 번 더 실행해,
+   그 사이에 발급된 키를 정리한다.
+
+3. **영구 조치: env 변경 + redeploy (과금 build 1회).** `TAVONEL_REMOTE_MCP_ENABLED`를 지우거나
+   `TAVONEL_REMOTE_MCP_COHORT`에서 workspace를 뺀다. 이 deployment가 production이 될 때까지는 1과 2가 유효하다.
+
+### 하지 말 것
+
+- `TAVONEL_PROCESSING_WORKSPACE_COHORT`로 원격 MCP를 좁히지 않는다. 원격 MCP의 cohort는
+  `TAVONEL_REMOTE_MCP_COHORT`(1–3개)다. processing cohort를 바꾸면 업로드 처리 허용 범위가 함께 바뀐다(R1 M5).
+- 이 절차를 처음 쓰는 날이 사고 날이 되지 않게 한다. A1.3 canary 전에 preview에서 1–2를 한 번 실행하고,
+  걸린 시간을 receipt로 남긴다(로컬 shadow 측정: `REMOTE-MCP-SECURITY-<sha>.json`의 `bulkRevoke`).
+
+### 배포 순서 (R2 N1, migration `20261105000000_api_key_token_kind.sql`)
+
+이 PR의 코드는 key를 인증할 때 `token_kind` 열을 읽는다. **migration을 code보다 먼저 적용한다.** 열이 없는 DB에서
+이 code가 돌면 PostgREST가 select를 거부하고, 모든 API key 인증이 `API_KEY_INVALID`가 된다(fail closed지만 장애다).
+migration은 additive다. 기존 행은 전부 `live`가 되고, create RPC의 새 마지막 인자 `p_token_kind`의 기본값도 `live`이므로,
+옛 code가 새 DB에서 돌아도 그대로 동작한다. rollback 때 migration을 되돌릴 필요는 없다.
+
+### A1.3 canary 전제 조건 (이 PR 범위 밖, 모두 충족 전에는 cohort를 열지 않는다)
+
+- [ ] preview rollback drill: 위 1(일괄 revoke)과 2(Instant Rollback)를 preview에서 한 번 실행하고 걸린 시간을 receipt로
+      남긴다. preview build는 과금되므로 founder 승인 후에만 한다.
+- [ ] 실제 Claude와 ChatGPT 연결 receipt: 각 vendor client가 public https URL로 OAuth와 MCP handshake를 끝낸 기록.
+      모델 ID나 client 버전은 receipt에 고정한다.
+- [ ] `/api/mcp*`(OAuth register, authorize, token 경로 포함)에 IP별 rate limit을 둔다(리뷰 R2가 요구한 전제).
+- [ ] production에 `TAVONEL_REMOTE_MCP_COHORT`(1–3개)와 `FOUNDATION_WORKER_SECRET`(32자 이상)이 설정되어 있다.
+      값은 출력하지 않고, 설정되어 있다는 사실만 확인한다.
+- [ ] migration `20261105000000`이 production DB에 적용되어 있다(위 배포 순서).
+
 ## 추가 2026-11-05 — compile job 이벤트의 종결 guard (migration `20261105080000`)
 
 - `foundation_compile_job_events`에 BEFORE INSERT trigger를 단다. job이 `ready`/`failed`/`cancelled`이면 그와 다른 state의 행을

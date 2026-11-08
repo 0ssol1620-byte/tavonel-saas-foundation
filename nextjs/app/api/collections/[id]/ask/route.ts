@@ -12,6 +12,7 @@ import { readBoundedJson } from "@/lib/enterprise-http";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
 import { answerFromContextPacket, answerGroundedQuestion } from "@/lib/grounded-ask";
+import { applyAnswerReceipt } from "@/lib/answer-receipt-signing";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { getWorkspaceCollectionCandidate } from "@/lib/r2-objects";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
@@ -401,7 +402,18 @@ export async function POST(
       recordServerFunnel("external_consumer_succeeded", { from: "ask" });
     }
   }
-  return NextResponse.json(answered.body, { status: answered.status, headers: {
+  /*
+    W1-A5: the signed answer receipt, last, over exactly the body about to be released -- a replay
+    is signed afresh rather than serving a cached signature. In `on` mode an answer that cannot be
+    signed is refused (503 ANSWER_SIGNING_UNAVAILABLE), never released unsigned.
+  */
+  let released = answered.body;
+  if (answered.status === 200) {
+    const signed = applyAnswerReceipt({ workspaceKey, collectionId: id, question, body: answered.body });
+    if (!signed.ok) return NextResponse.json({ code: signed.code }, { status: 503, headers: NO_STORE });
+    released = signed.body;
+  }
+  return NextResponse.json(released, { status: answered.status, headers: {
     ...NO_STORE, ...acknowledgement, ...(lease.replay ? { "X-Tavonel-Idempotent-Replay": "true" } : {}),
   } });
 }

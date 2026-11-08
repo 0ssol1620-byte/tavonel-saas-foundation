@@ -73,6 +73,31 @@ function reviewTimingCopy(row: ReviewQueueRow, decisionsRead: ReviewLedgerStatus
     : `First review decision ${at} · elapsed not measured`;
 }
 
+/*
+  Round 3 (CRITIQUE-R2 #3): a reason reads as a chip a person understands, with the string the compile
+  recorded printed beside it unchanged. The chip names only the family the string itself announces -- a
+  security or a reading (OCR) check -- and says nothing else; the recorded string stays the fact.
+  "Safety stop" is said only of the reason that excluded the row (review R3, MAJOR-3): `stopped` is true
+  for a security-blocked row's blocker reason, which lib/review-queue.ts puts first, and the status line
+  counts exclusions from the same flag -- so a chip never calls a source stopped that the line above
+  counts as not excluded. A SECURITY-coded reason on a row that was not excluded is a "Security reason".
+*/
+export function reasonFamily(value: string, stopped: boolean): string {
+  if (stopped) return "Safety stop";
+  if (/^SECURITY/i.test(value)) return "Security reason";
+  if (/^OCR_/.test(value)) return "Reading check";
+  return "Review reason";
+}
+
+function ReasonChip({ value, family }: { value: string; family: string }) {
+  return (
+    <small className="workspace-review-reason">
+      <span>{family}</span>
+      {/\s/.test(value) ? value : <code>{value}</code>}
+    </small>
+  );
+}
+
 export default function ReviewQueue({
   input,
   compact = false,
@@ -95,6 +120,9 @@ export default function ReviewQueue({
 
   const historyTruncated = queue.missing.includes("review_decisions");
   const settledKnown = !queue.missing.includes("compile_settled_at");
+  /* Round 3: when every row would print the same decision line, it is said once above the list instead. */
+  const timings = rows.map((row) => reviewTimingCopy(row, queue.decisionsRead, historyTruncated, settledKnown));
+  const sharedTiming = queue.decisionsRead === "ready" && timings.length > 1 && timings.every((line) => line === timings[0]) ? timings[0] : null;
 
   if (queue.total === 0) {
     return (
@@ -191,8 +219,9 @@ export default function ReviewQueue({
       {queue.decisionsRead !== "ready" ? (
         <p className="fine workspace-review-ledger">{UNREAD_LEDGER_COPY[queue.decisionsRead].row} for any document below.</p>
       ) : null}
+      {sharedTiming ? <p className="fine workspace-review-ledger">{sharedTiming} for any document below.</p> : null}
       <ul className="document-meta" aria-label="Documents in this compile, most at risk first">
-        {rows.map((row) => {
+        {rows.map((row, index) => {
           return (
             <li key={row.documentId} data-review-status={row.status} data-security={row.securityBlocked || undefined}>
               <strong>{row.name}</strong>
@@ -201,8 +230,8 @@ export default function ReviewQueue({
                 {REVIEW_QUEUE_STATUS_COPY[row.status]}
                 {row.evidenceCount > 0 ? ` · ${row.evidenceCount} evidence region${row.evidenceCount === 1 ? "" : "s"}` : ""}
               </small>
-              {row.reasons.map((value) => <small key={value}>Reason: {value}</small>)}
-              {queue.decisionsRead === "ready" ? <small>{reviewTimingCopy(row, queue.decisionsRead, historyTruncated, settledKnown)}</small> : null}
+              {row.reasons.map((value, at) => <ReasonChip key={value} value={value} family={reasonFamily(value, row.securityBlocked && at === 0)} />)}
+              {queue.decisionsRead === "ready" && !sharedTiming ? <small>{timings[index]}</small> : null}
               {onSelectDocument && row.evidenceCount > 0 ? (
                 <button
                   type="button"
@@ -216,6 +245,12 @@ export default function ReviewQueue({
           );
         })}
       </ul>
+      {queue.worldReasons.length > 0 && reason === "" ? (
+        <div className="workspace-review-world">
+          <p className="fine">For the whole World, not one source</p>
+          {queue.worldReasons.map((value) => <ReasonChip key={value} value={value} family={reasonFamily(value, false)} />)}
+        </div>
+      ) : null}
     </div>
   );
 }

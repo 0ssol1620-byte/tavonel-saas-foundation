@@ -1,0 +1,193 @@
+{
+  "schema": "tavonel.visuals.manifest.v1",
+  "generatedBy": "nextjs/scripts/visuals/capture-visuals.mjs",
+  "captures": [
+    {
+      "file": "sources-board-1440.webp",
+      "surface": "Sources board",
+      "route": "/workspace/sources",
+      "fixture": "e2e pipeline-board corpus (5 sources: 3 ready, 1 reading, 1 held for review), owner access, unsigned local JWT",
+      "tokens": "main@6c7d3e9d",
+      "width": 1440,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 2216,
+      "pixelHeight": 948,
+      "bytes": 57668,
+      "sha256": "48842b31d94387bfe0238323124b650ec9c537bf196c5427e5ec11509c0f00c6",
+      "alt": "The TAVONEL Sources board with five sources in mixed states: ready to compile, one being read page by page, and one held for review."
+    },
+    {
+      "file": "sources-board-390.webp",
+      "surface": "Sources board",
+      "route": "/workspace/sources",
+      "fixture": "e2e pipeline-board corpus (5 sources: 3 ready, 1 reading, 1 held for review), owner access, unsigned local JWT",
+      "tokens": "main@6c7d3e9d",
+      "width": 390,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 716,
+      "pixelHeight": 1538,
+      "bytes": 48390,
+      "sha256": "fc1f72f7ecf7597812a77ce2d8dae91dc9c01c96b034051442e60c2c497d07e0",
+      "alt": "The TAVONEL Sources board with five sources in mixed states: ready to compile, one being read page by page, and one held for review."
+    },
+    {
+      "file": "evidence-inspector-1440.webp",
+      "surface": "Evidence Inspector",
+      "route": "/explore?act=evidence",
+      "fixture": "public /explore sample World (SEC filings corpus, public/explore-sample)",
+      "tokens": "main@6c7d3e9d",
+      "width": 1440,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 2880,
+      "pixelHeight": 1732,
+      "bytes": 126550,
+      "sha256": "1ccc859572c5fe6188111cf3f6def58f1cce0493cedd4cef6f19b41fffa15b36",
+      "alt": "The TAVONEL evidence view on the public SEC sample: a source object from a filing beside its source page, with the supporting region highlighted and the text the compiler read from that region."
+    },
+    {
+      "file": "evidence-inspector-390.webp",
+      "surface": "Evidence Inspector",
+      "route": "/explore?act=evidence",
+      "fixture": "public /explore sample World (SEC filings corpus, public/explore-sample)",
+      "tokens": "main@6c7d3e9d",
+      "width": 390,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 780,
+      "pixelHeight": 2594,
+      "bytes": 76290,
+      "sha256": "a8fc252d106457c6df234817b21d6e7c5692420757d8ed897fb6c0588230b97c",
+      "alt": "The TAVONEL evidence view on the public SEC sample: a source object from a filing beside its source page, with the supporting region highlighted and the text the compiler read from that region."
+    },
+    {
+      "file": "compile-timeline-1440.webp",
+      "surface": "Compile timeline",
+      "route": "/dev/compile-stage",
+      "fixture": "dev harness: rows built by the production buildPipeline from fixture uploads",
+      "tokens": "main@6c7d3e9d",
+      "width": 1440,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 2784,
+      "pixelHeight": 1082,
+      "bytes": 38448,
+      "sha256": "770a19040c36e42eb953c307df0b0ac04c8089bde8b962f0269b3e354079dbb4",
+      "alt": "The TAVONEL compile stage at its first step: the steps Source, Read, Organize and Review & activate, with five sources listed and one marked for review."
+    },
+    {
+      "file": "compile-timeline-390.webp",
+      "surface": "Compile timeline",
+      "route": "/dev/compile-stage",
+      "fixture": "dev harness: rows built by the production buildPipeline from fixture uploads",
+      "tokens": "main@6c7d3e9d",
+      "width": 390,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 684,
+      "pixelHeight": 1260,
+      "bytes": 32916,
+      "sha256": "c7cf60025ebe6501d889a867bee871247b6a7a282cd1f0758dc8b1d5660b4fef",
+      "alt": "The TAVONEL compile stage at its first step: the steps Source, Read, Organize and Review & activate, with five sources listed and one marked for review."
+    },
+    {
+      "file": "change-center-1440.webp",
+      "surface": "World diff / Change Center",
+      "route": "/explore?act=change",
+      "fixture": "public /explore sample World (SEC filings corpus, public/explore-sample)",
+      "tokens": "main@6c7d3e9d",
+      "width": 1440,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 2880,
+      "pixelHeight": 2200,
+      "bytes": 314104,
+      "sha256": "1102c1a4494b92a708c0e53ddbbf777da31c171913edf15f05286bcb2f0a3326",
+      "alt": "The TAVONEL change view on the public SEC sample: the annual 10-K World and the filings that arrived after it, each shown with its filing date and a source page excerpt."
+    },
+    {
+      "file": "change-center-390.webp",
+      "surface": "World diff / Change Center",
+      "route": "/explore?act=change",
+      "fixture": "public /explore sample World (SEC filings corpus, public/explore-sample)",
+      "tokens": "main@6c7d3e9d",
+      "width": 390,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 780,
+      "pixelHeight": 2800,
+      "bytes": 136868,
+      "sha256": "286ee45c6183ad3e7ad0253671f536aafaab4433b365019ed2b51960fe5cdeaf",
+      "alt": "The TAVONEL change view on the public SEC sample: the annual 10-K World and the filings that arrived after it, each shown with its filing date and a source page excerpt."
+    },
+    {
+      "file": "use-with-ai-1440.webp",
+      "surface": "MCP: Use with AI",
+      "route": "/workspace/ask",
+      "fixture": "e2e pipeline-board corpus (5 sources: 3 ready, 1 reading, 1 held for review), owner access, unsigned local JWT",
+      "tokens": "main@6c7d3e9d",
+      "width": 1440,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 2136,
+      "pixelHeight": 786,
+      "bytes": 41368,
+      "sha256": "a23ec78d556755337a558f9f8c03e93f77d0aa02aee7715b13c4859053afe024",
+      "alt": "The TAVONEL Use with AI panel: a choice of AI assistant, my application or local files, with the assistant tab pointing to the MCP setup guide."
+    },
+    {
+      "file": "use-with-ai-390.webp",
+      "surface": "MCP: Use with AI",
+      "route": "/workspace/ask",
+      "fixture": "e2e pipeline-board corpus (5 sources: 3 ready, 1 reading, 1 held for review), owner access, unsigned local JWT",
+      "tokens": "main@6c7d3e9d",
+      "width": 390,
+      "deviceScaleFactor": 2,
+      "pixelWidth": 636,
+      "pixelHeight": 1004,
+      "bytes": 39688,
+      "sha256": "b5cb3212b11117f2f9b4729ab5ec2b3c9363dedf42259c2ee8372682a12820e2",
+      "alt": "The TAVONEL Use with AI panel: a choice of AI assistant, my application or local files, with the assistant tab pointing to the MCP setup guide."
+    }
+  ],
+  "diagrams": [
+    {
+      "component": "CompilePipelineDiagram",
+      "file": "components/visuals/compile-pipeline-diagram.tsx",
+      "sourceBytes": 3322,
+      "sourceGzipBytes": 1225,
+      "markupBytes": 6545,
+      "markupGzipBytes": 1230
+    },
+    {
+      "component": "ProvenanceChainDiagram",
+      "file": "components/visuals/provenance-chain-diagram.tsx",
+      "sourceBytes": 4352,
+      "sourceGzipBytes": 1502,
+      "markupBytes": 7448,
+      "markupGzipBytes": 1388
+    },
+    {
+      "component": "TemporalLineageDiagram",
+      "file": "components/visuals/temporal-lineage-diagram.tsx",
+      "sourceBytes": 4517,
+      "sourceGzipBytes": 1524,
+      "markupBytes": 5987,
+      "markupGzipBytes": 1065
+    },
+    {
+      "component": "FailClosedGateDiagram",
+      "file": "components/visuals/fail-closed-gate-diagram.tsx",
+      "sourceBytes": 4634,
+      "sourceGzipBytes": 1652,
+      "markupBytes": 7631,
+      "markupGzipBytes": 1300
+    }
+  ],
+  "notCaptured": [],
+  "diagramsShared": [
+    {
+      "file": "components/visuals/diagram-frame.tsx",
+      "bytes": 2420,
+      "gzipBytes": 1163
+    },
+    {
+      "file": "components/visuals/visuals.module.css",
+      "bytes": 3658,
+      "gzipBytes": 1569
+    }
+  ]
+}

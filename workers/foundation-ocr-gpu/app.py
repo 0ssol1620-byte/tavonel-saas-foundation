@@ -26,6 +26,27 @@ MAX_INPUT_BYTES: Final = 18 * 1024 * 1024
 MAX_PAGES: Final = 80
 REQUEST_ID: Final = re.compile(r"^[A-Za-z0-9_-]{16,160}$")
 
+# Measurement limits (PROGRAM-2026-11-04 §4.D, D1 stage 1). MAX_INPUT_BYTES and MAX_PAGES above are
+# the production limits that nextjs/lib/intake-ceiling-cross-tree.test.ts pins, and they stay the
+# literals. A reader endpoint released for measurement only -- never the production endpoint --
+# may move them with TAVONEL_OCR_MAX_INPUT_BYTES / TAVONEL_OCR_MAX_PAGES, up to the stage-2 hard
+# maxima. A value that is set and is not a whole number in range refuses the boot.
+MEASUREMENT_HARD_MAX_INPUT_BYTES: Final = 128 * 1024 * 1024
+MEASUREMENT_HARD_MAX_PAGES: Final = 500
+
+
+def read_limit(name: str, default: int, high: int, env: dict[str, str] | None = None) -> int:
+    raw = (os.environ if env is None else env).get(name, "").strip()
+    if raw == "":
+        return default
+    if not re.fullmatch(r"[1-9][0-9]{0,9}", raw) or int(raw) > high:
+        raise RuntimeError(f"{name} must be a whole number from 1 to {high}")
+    return int(raw)
+
+
+INPUT_BYTES_LIMIT: int = read_limit("TAVONEL_OCR_MAX_INPUT_BYTES", MAX_INPUT_BYTES, MEASUREMENT_HARD_MAX_INPUT_BYTES)
+PAGES_LIMIT: int = read_limit("TAVONEL_OCR_MAX_PAGES", MAX_PAGES, MEASUREMENT_HARD_MAX_PAGES)
+
 PDF_MAGIC: Final = b"%PDF"
 RENDER_SCALE: Final = 2.0
 OCR_ENGINE_RELEASE: Final = "rapidocr-3.9.2-ko-pass-nocls-v3-selftest"
@@ -520,8 +541,8 @@ def copy_and_digest(upload: UploadFile) -> tuple[bytes, str]:
     total = 0
     while chunk := upload.file.read(1024 * 1024):
         total += len(chunk)
-        if total > MAX_INPUT_BYTES:
-            raise HTTPException(413, "OCR source exceeds the 18 MiB Foundation cap")
+        if total > INPUT_BYTES_LIMIT:
+            raise HTTPException(413, f"OCR source exceeds the {INPUT_BYTES_LIMIT // (1024 * 1024)} MiB Foundation cap")
         digest.update(chunk)
         chunks.append(chunk)
     if total < 1:
@@ -582,7 +603,7 @@ def extract_text(payload: bytes, on_page=None) -> tuple[str, int, list[OcrRegion
         raise HTTPException(422, "OCR renderer rejected this PDF") from exc
     try:
         page_count = len(document)
-        if page_count < 1 or page_count > MAX_PAGES:
+        if page_count < 1 or page_count > PAGES_LIMIT:
             raise HTTPException(422, "OCR source page count is not qualified")
         regions = read_pages(document, range(page_count), on_page)
         text = "\n".join(region["text"] for region in regions).strip()
@@ -609,7 +630,7 @@ def extract_page_range(payload: bytes, start0: int, end0: int) -> tuple[int, int
         raise HTTPException(422, "OCR renderer rejected this PDF") from exc
     try:
         page_count = len(document)
-        if page_count < 1 or page_count > MAX_PAGES:
+        if page_count < 1 or page_count > PAGES_LIMIT:
             raise HTTPException(422, "OCR source page count is not qualified")
         if start0 >= page_count:
             raise HTTPException(422, "OCR page range starts after the last page")

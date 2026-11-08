@@ -34,6 +34,7 @@ import { checkCurrentSourceVersions, collectionCandidateKey, groupImmutableDocum
 import { getWorkspaceCollectionCandidate, getWorkspaceOcrJson, listImmutableWorkspaceObjects, MAX_DERIVED_JSON_BYTES, putSerializedCollectionCandidate, serializeCollectionCandidate, type JsonSizeLimit } from "./r2-objects";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
 import { getFoundationActiveWorld } from "./world-store";
+import { detectExactDuplicatesAtIntake, type ExactDuplicateNote } from "./source-dedup";
 
 /** A size refusal keeps its detail on the failure, so the job event can name what was too large. */
 const sizeLimitPayload = (result: object) => ("sizeLimit" in result ? { sizeLimit: result.sizeLimit } : {});
@@ -88,6 +89,8 @@ export type CollectionCompileSuccess = {
   signedReceipt: SignedCompileReceipt;
   /** The stage of the grant that admitted the dispatch; `qualification` is not release evidence by itself. */
   customerDataGateStage: ReleaseStage;
+  /** B1: present only when TAVONEL_SOURCE_DEDUP_MODE=on and a document of this compile has an exact copy the viewer may read. */
+  libraryDuplicates?: readonly ExactDuplicateNote[];
 };
 
 export type CollectionCompileRun =
@@ -334,6 +337,11 @@ export async function runCollectionCompile(
   if (globalCollection && !judgeGlobalCollectionInput(verifiedInputs)) {
     return { ok: false, status: 413, code: "GLOBAL_COLLECTION_RESOURCE_LIMIT", payload: {} };
   }
+
+  // B1 intake annotation. Off by default; in no mode does it change what is dispatched or stored.
+  // `on` names only documents this principal may read; with no bound principal it names none.
+  const duplicateNotes = await detectExactDuplicatesAtIntake(workspaceId, verifiedInputs, process.env,
+    principalBound ? observationPrincipal!.userId! : null);
 
   const expectedVersions = selected.map((item) => ({ documentId: item!.documentId, versionKey: item!.versionKey }));
   const revalidate = async (phase: "before_core" | "after_core"): Promise<CollectionCompileRun | null> => {
@@ -632,6 +640,7 @@ export async function runCollectionCompile(
       lifecycle: artifact.lifecycle,
       signedReceipt: signed.receipt,
       customerDataGateStage: authorizationStage(customerDataGate),
+      ...(duplicateNotes && duplicateNotes.length > 0 ? { libraryDuplicates: duplicateNotes } : {}),
     },
   };
 }

@@ -124,6 +124,7 @@ describe("developer credential store", () => {
           expires_at: null,
           revoked_at: null,
           authorization_revision: 7,
+          token_kind: "live",
         }]);
       }
       return Response.json([]);

@@ -112,3 +112,16 @@
     gap: 8px 32px;
   }
 }
+
+/*
+  Round 3, placement series: the change record capture under the timeline. It is cut to its top -- the
+  heading row and the first filings -- at a fixed aspect, so the panel does not grow by a screen and nothing
+  moves when the file arrives. The full record is one link away ("Change record").
+*/
+.capture { margin: 8px 0 0; }
+.capture > :global(.tv-capture) { aspect-ratio: 16 / 9; }
+.capture > :global(.tv-capture) img { height: 100%; object-fit: cover; object-position: top left; }
+.capture figcaption { margin-top: 8px; color: var(--tv-ink-muted); font: 13px/1.5 var(--f-sans); }
+@media (max-width: 640px) {
+  .capture > :global(.tv-capture) { aspect-ratio: auto; }
+}

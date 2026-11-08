@@ -191,6 +191,32 @@ describe("compute settlement endpoint", () => {
     expect(settleProof).not.toHaveBeenCalled();
   });
 
+  it("W1-A3: pages an OCR timeout or out-of-contract answer after the settlement is durable, and nothing else", async () => {
+    const { resetOperationsAlertDelivery } = await import("./operations-p0");
+    resetOperationsAlertDelivery();
+    vi.stubEnv("OPERATIONS_ALERT_WEBHOOK_URL", "https://hooks.example.test/T/B/X");
+    const post = vi.fn(async () => new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", post);
+    try {
+      for (const reasonCode of ["OCR_RESPONSE_INVALID", "OCR_TIMEOUT_OR_NETWORK", "OCR_COMPLETED"]) {
+        const response = await POST(request({ workspaceKey, documentId, outcome: "operator_review", actualCredits: 2, reasonCode }));
+        expect(response.status, reasonCode).toBe(200);
+      }
+      const summaries = post.mock.calls.map((entry) => JSON.parse(String((entry as unknown as [string, RequestInit])[1].body)).summary as string);
+      expect(summaries).toHaveLength(2);
+      expect(summaries[0]).toContain("OCR_RESPONSE_INVALID");
+      expect(summaries[1]).toContain("OCR_TIMEOUT_OR_NETWORK");
+      expect(summaries.every((summary) => summary.includes(documentId))).toBe(true);
+
+      // A settlement the ledger refused is not durable, so it pages nobody.
+      settle.mockResolvedValueOnce({ ok: false, code: "COMPUTE_LEDGER_WRITE_FAILED" });
+      expect((await POST(request({ workspaceKey, documentId, outcome: "operator_review", actualCredits: 2, reasonCode: "OCR_RESPONSE_INVALID" }))).status).toBe(503);
+      expect(post).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("refuses a digest that is not one, rather than passing it on", async () => {
     const response = await POST(request({
       workspaceKey,

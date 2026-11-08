@@ -1311,7 +1311,7 @@ section.receive {
 }
 .recordAside { margin: 0; border: 0; border-radius: var(--tv-r-inner); box-shadow: var(--tv-shadow-1); }
 @media (min-width: 900px) {
-  .recordSheet.recordTwo { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); align-items: center; gap: 40px; padding: 40px; }
+  .recordSheet.recordTwo { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); align-items: start; gap: 40px; padding: 40px; }
   .recordTwo .recordFields { grid-template-columns: minmax(0, 1.6fr) minmax(0, 0.7fr); }
 }
 @media (max-width: 767.98px) {
@@ -1321,5 +1321,14 @@ section.receive {
 /* Round 2 (CRITIQUE-R1 #6): s2's passage pane prints the reader's output the same way. */
 .passagePane .quote { font: 400 14px/1.6 var(--f-mono) !important; letter-spacing: 0 !important; overflow-wrap: anywhere; }
 
-/* Round 2 (CRITIQUE-R1 #2): the received passage's region drawn on the page around it -- the same accent box s2 draws. */
-.recordMark { position: absolute; border: 2px solid var(--tv-action); border-radius: 4px; background: color-mix(in srgb, var(--tv-action) 8%, transparent); pointer-events: none; }
+/* Round 3 (CRITIQUE-R2 #2): the passage inside the citation an answer carries -- mono on the sunk ground, the field
+   names in the ink, nothing highlighted. It wraps; a phone never scrolls it sideways. */
+.citation { min-width: 0; margin: 0; }
+.citation .readerLabel { margin-top: 0; }
+.citationCode {
+  margin: 8px 0 0; padding: 16px 18px; border-radius: var(--tv-r-small); background: var(--tv-paper-sunk);
+  color: var(--tv-ink); font: 400 13px/1.65 var(--f-mono); white-space: pre-wrap; overflow-wrap: anywhere;
+}
+@media (max-width: 899.98px) {
+  .citation { margin-top: 24px; }
+}

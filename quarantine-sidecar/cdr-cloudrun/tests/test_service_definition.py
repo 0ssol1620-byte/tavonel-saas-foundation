@@ -46,6 +46,13 @@ class ServiceDefinitionTest(unittest.TestCase):
         self.assertIn("secretKeyRef", self.source)
         self.assertNotRegex(self.source, r'name: TAVONEL_CDR_HMAC\s*\n\s*value:')
 
+    def test_the_production_revision_runs_the_literal_limits(self) -> None:
+        # The measurement overrides (app.py, D1 stage 1) belong on a zero-traffic revision deployed
+        # for measurement, never in the definition production is applied from.
+        for name in ("TAVONEL_CDR_MAX_INPUT_BYTES", "TAVONEL_CDR_MAX_PAGES",
+                     "TAVONEL_CDR_MAX_OUTPUT_BYTES", "TAVONEL_CDR_RASTER_RANGE_PAGES"):
+            self.assertNotIn(name, self.source)
+
 
 if __name__ == "__main__":
     unittest.main()

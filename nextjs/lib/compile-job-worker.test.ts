@@ -169,6 +169,66 @@ describe("the durable compile worker", () => {
     expect(advance).toHaveBeenCalledWith(expect.objectContaining({ errorCode: "COMPILE_SOURCE_AUTHORITY_DISABLED" }));
   });
 
+  it("W1-A3: pages the operations receiver when a job settles failed, naming the job and its code", async () => {
+    const { resetOperationsAlertDelivery } = await import("./operations-p0");
+    resetOperationsAlertDelivery();
+    vi.stubEnv("OPERATIONS_ALERT_WEBHOOK_URL", "https://hooks.example.test/T/B/X");
+    const post = vi.fn(async () => new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", post);
+    try {
+      classifySources.mockResolvedValueOnce({ ok: true, scope: "connector" });
+      const turn = await runCompileJobTurn(job());
+      expect(turn).toMatchObject({ note: "failed", errorCode: "COMPILE_SOURCE_AUTHORITY_DISABLED" });
+      expect(post).toHaveBeenCalledTimes(1);
+      const body = JSON.parse(String((post.mock.calls[0] as unknown as [string, RequestInit])[1].body));
+      expect(body.summary).toContain("cjob-00000000000000000000000000000001");
+      expect(body.summary).toContain("COMPILE_SOURCE_AUTHORITY_DISABLED");
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("W1-A3: pages nothing when the store refuses the failed write -- the dead letter is paged once it is durable", async () => {
+    const { resetOperationsAlertDelivery } = await import("./operations-p0");
+    resetOperationsAlertDelivery();
+    vi.stubEnv("OPERATIONS_ALERT_WEBHOOK_URL", "https://hooks.example.test/T/B/X");
+    const post = vi.fn(async () => new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", post);
+    try {
+      classifySources.mockResolvedValueOnce({ ok: true, scope: "connector" });
+      advance.mockResolvedValueOnce({ ok: false, code: "COMPILE_JOB_STORE_WRITE_FAILED" } as never);
+      const turn = await runCompileJobTurn(job());
+      expect(turn).toMatchObject({ note: "waiting", retryable: true });
+      expect(post).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("W1-A3: pages a document that never arrived once, on the turn that first blocks it", async () => {
+    const { resetOperationsAlertDelivery } = await import("./operations-p0");
+    resetOperationsAlertDelivery();
+    vi.stubEnv("OPERATIONS_ALERT_WEBHOOK_URL", "https://hooks.example.test/T/B/X");
+    const post = vi.fn(async () => new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", post);
+    try {
+      group.mockReturnValue([]);
+      const stale = job({ createdAt: new Date(Date.now() - 20 * 60_000).toISOString() });
+      const turn = await runCompileJobTurn(stale);
+      expect(turn.blocked.map((entry) => entry.reason)).toEqual(["DOCUMENT_NEVER_ARRIVED", "DOCUMENT_NEVER_ARRIVED"]);
+      expect(post).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(String((post.mock.calls[0] as unknown as [string, RequestInit])[1].body)).summary)
+        .toContain("2 document(s) never arrived");
+      await runCompileJobTurn({ ...stale, blocked: turn.blocked });
+      expect(post).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("fails legacy jobs before listing any workspace objects when the mode is enabled", async () => {
     authorityEnabled.mockReturnValue(true);
     const turn = await runCompileJobTurn(job({ createdByUserId: null, authorizationRevision: null }));
