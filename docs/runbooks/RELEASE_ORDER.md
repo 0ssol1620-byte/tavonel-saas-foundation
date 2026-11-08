@@ -367,3 +367,11 @@ migration은 additive다. 기존 행은 전부 `live`가 되고, create RPC의 �
 - [ ] production에 `TAVONEL_REMOTE_MCP_COHORT`(1–3개)와 `FOUNDATION_WORKER_SECRET`(32자 이상)이 설정되어 있다.
       값은 출력하지 않고, 설정되어 있다는 사실만 확인한다.
 - [ ] migration `20261105000000`이 production DB에 적용되어 있다(위 배포 순서).
+
+## 추가 2026-11-05 — compile job 이벤트의 종결 guard (migration `20261105080000`)
+
+- `foundation_compile_job_events`에 BEFORE INSERT trigger를 단다. job이 `ready`/`failed`/`cancelled`이면 그와 다른 state의 행을
+  `compile_job_post_terminal_event`로 거절한다. 원인 사례: cjob-157f2f23 seq 159 (`failed` 뒤의 `structuring`).
+- **순서는 자유다.** 앱은 거절을 "기록되지 않은 이벤트"로 다루고(`COMPILE_JOB_ALREADY_SETTLED`, 경고 로그 1줄),
+  migration이 없으면 거절이 일어나지 않을 뿐이다. 같은 PR의 lease CAS는 기존 컬럼(`updated_at`)만 쓰므로 migration이 필요 없다.
+- 적용은 **창업자 작업**이다. 동작은 CI db-rehearsal이 `supabase/tests/compile_job_post_terminal_event.sql`로 검증한다.

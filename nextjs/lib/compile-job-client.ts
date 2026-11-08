@@ -23,7 +23,42 @@ export type CompileJobFrame = {
   errorCode: string | null;
   blocked: CompileBlocker[];
   collectionId: string | null;
+  /** The size refusal a JSON_TOO_LARGE / CORE_OUTPUT_TOO_LARGE event carried; numbers and package paths only. */
+  sizeLimit: CompileSizeLimit | null;
 };
+
+export type CompileSizeLimit = {
+  bytes: number | null;
+  bound: number | null;
+  largestPackageFiles: Array<{ path: string; sizeBytes: number }>;
+  /** `validationCounts` from a candidate refusal, or Core's own `counts`. */
+  counts: Record<string, number>;
+};
+
+const count = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
+
+/** Only what the panel may show: numbers, and at most five package paths. Anything else is dropped. */
+export function sizeLimitFromDetail(value: unknown): CompileSizeLimit | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const files = Array.isArray(raw.largestPackageFiles) ? raw.largestPackageFiles : [];
+  const source = raw.validationCounts ?? raw.counts;
+  const counts = source && typeof source === "object"
+    ? Object.fromEntries(Object.entries(source).filter((entry): entry is [string, number] => count(entry[1])).slice(0, 16))
+    : {};
+  const parsed: CompileSizeLimit = {
+    bytes: count(raw.bytes) ? raw.bytes : null,
+    bound: count(raw.bound) ? raw.bound : null,
+    largestPackageFiles: files.flatMap((file) => {
+      const entry = file as { path?: unknown; sizeBytes?: unknown } | null;
+      return typeof entry?.path === "string" && count(entry.sizeBytes) ? [{ path: entry.path.slice(0, 256), sizeBytes: entry.sizeBytes }] : [];
+    }).slice(0, 5),
+    counts,
+  };
+  const empty = parsed.bytes === null && parsed.bound === null && parsed.largestPackageFiles.length === 0
+    && Object.keys(counts).length === 0;
+  return empty ? null : parsed;
+}
 
 export type SseFrame = { id: number | null; event: string; data: string };
 
@@ -81,6 +116,7 @@ export function frameFromEvent(raw: unknown): CompileJobFrame | null {
     errorCode: typeof row.errorCode === "string" ? row.errorCode : null,
     blocked: Array.isArray(detail.blocked) ? (detail.blocked as CompileBlocker[]) : [],
     collectionId: typeof detail.collectionId === "string" ? detail.collectionId : null,
+    sizeLimit: sizeLimitFromDetail(detail.sizeLimit),
   };
 }
 
@@ -92,6 +128,7 @@ export function frameFromEvent(raw: unknown): CompileJobFrame | null {
  * reconnecting would hold a connection open for hours to watch nothing change.
  */
 const RESTING: readonly string[] = ["ready", "failed", "cancelled", "review_required"];
+const TERMINAL: readonly string[] = ["ready", "failed", "cancelled"];
 
 export type ObserveOptions = {
   jobId: string;
@@ -155,6 +192,9 @@ export async function observeCompileJob(options: ObserveOptions): Promise<Compil
           }
           const frame = frameFromEvent(parsed);
           if (!frame) continue;
+          // Terminal is sticky: a row after it (cjob-157f2f23 seq 159, `structuring` after
+          // `failed`) must not repaint a settled job as still working.
+          if (settled && TERMINAL.includes(settled)) continue;
           options.onFrame(frame);
           if (RESTING.includes(frame.state)) settled = frame.state;
         }

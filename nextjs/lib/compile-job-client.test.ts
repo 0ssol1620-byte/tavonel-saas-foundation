@@ -63,6 +63,29 @@ describe("SSE frame parsing", () => {
     expect(frameFromEvent({ nope: true })).toBeNull();
     expect(frameFromEvent(null)).toBeNull();
   });
+
+  it("carries a size refusal's numbers and package paths, and nothing else", () => {
+    // REVIEW-PR192-R1 MAJOR-2: the detail was dropped, so the panel could show nothing measured.
+    const candidate = frameFromEvent({ sequence: 157, state: "structuring", detail: { reason: "JSON_TOO_LARGE", sizeLimit: {
+      object: "candidate-world.json", bytes: 134_576_916, bound: 33_554_432,
+      largestPackageFiles: [{ path: "rag/chunks.jsonl", sizeBytes: 90_000_000, content: "secret" }, { path: 7, sizeBytes: 1 }],
+      validationCounts: { claims: 1_200, contradictions: 719_400, note: "text" },
+    } } });
+    expect(candidate?.sizeLimit).toEqual({ bytes: 134_576_916, bound: 33_554_432,
+      largestPackageFiles: [{ path: "rag/chunks.jsonl", sizeBytes: 90_000_000 }],
+      counts: { claims: 1_200, contradictions: 719_400 } });
+
+    // Core's own 422: `counts`, and no package files.
+    const core = frameFromEvent({ sequence: 9, state: "structuring", detail: { sizeLimit: {
+      object: "core-output", bytes: 52_600_000, bound: 33_554_432, counts: { regions: 3_600, contradictionPairs: 719_400 } } } });
+    expect(core?.sizeLimit).toEqual({ bytes: 52_600_000, bound: 33_554_432, largestPackageFiles: [],
+      counts: { regions: 3_600, contradictionPairs: 719_400 } });
+
+    // A streamed refusal with no length stays unknown rather than guessed; no size row means null.
+    expect(frameFromEvent({ sequence: 3, state: "structuring", detail: { sizeLimit: { bytes: null, bound: 83_886_080 } } })?.sizeLimit)
+      .toEqual({ bytes: null, bound: 83_886_080, largestPackageFiles: [], counts: {} });
+    expect(frameFromEvent({ sequence: 4, state: "failed", detail: {} })?.sizeLimit).toBeNull();
+  });
 });
 
 describe("observing a durable compile", () => {
@@ -91,6 +114,24 @@ describe("observing a durable compile", () => {
     // The whole point: the second connection asks for what came after 2, not from the top.
     expect(requested[0]).toContain("after=0");
     expect(requested[1]).toContain("after=2");
+  });
+
+  it("keeps a terminal state when a later frame in the same stream says otherwise", async () => {
+    // cjob-157f2f23: seq 158 `failed`, then seq 159 `structuring` from a duplicate run.
+    const fetchImpl = vi.fn(async () => new Response(
+      stream([eventFrame(157, "structuring"), eventFrame(158, "failed"), eventFrame(159, "structuring")]),
+      { headers: { "content-type": "text/event-stream" } },
+    )) as unknown as typeof fetch;
+    const seen: string[] = [];
+    const settled = await observeCompileJob({
+      jobId: "cjob-00000000000000000000000000000001",
+      authToken: async () => "token",
+      onFrame: (frame) => seen.push(frame.state),
+      fetchImpl,
+      sleep: async () => undefined,
+    });
+    expect(seen).toEqual(["structuring", "failed"]);
+    expect(settled).toBe("failed");
   });
 
   it("stops rather than looping when the job is not the caller's", async () => {

@@ -6,7 +6,7 @@ import WorldExplorer from "@/components/world-explorer";
 import { FileText, ShieldCheck, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activationPolicy, type ActivationCapability } from "@/lib/activation-policy";
-import { failureSentence } from "@/lib/workspace-failure-copy";
+import { failureSentence, isSizeLimitFailure } from "@/lib/workspace-failure-copy";
 import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion } from "@/lib/workspace-ask-copy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -1433,6 +1433,9 @@ export default function WorkspacePage() {
           blockedResolution: previous?.blockedResolution ?? null,
           errorCode: frame.errorCode,
           collectionId: frame.collectionId ?? previous?.collectionId ?? null,
+          // The size row precedes the `failed` frame, so it is carried forward rather than replaced.
+          sizeLimit: frame.sizeLimit ?? (previous?.jobId === jobId ? previous.sizeLimit : null) ?? null,
+          documentIds: previous?.jobId === jobId ? previous.documentIds : undefined,
         }));
         if (frame.collectionId) compiled = frame.collectionId;
         // The document board is fed by its own effect; this only has to nudge the list so a
@@ -1627,6 +1630,7 @@ export default function WorkspacePage() {
       blockedResolution: null,
       errorCode: null,
       collectionId: null,
+      documentIds,
     });
     const url = new URL(window.location.href);
     url.searchParams.set("job", json.jobId);
@@ -1725,6 +1729,15 @@ export default function WorkspacePage() {
       setBusy(false);
     }
   };
+
+  /*
+    A size refusal is deterministic, so the same selection is not offered again: a second click
+    would recompile -- and pay for -- the same output to fail the same way (REVIEW-PR192-R1
+    MAJOR-2). Changing the selection re-enables it.
+  */
+  const sizeRefusedSameSet = compileJob?.state === "failed" && isSizeLimitFailure(compileJob.errorCode)
+    && compileJob.documentIds !== undefined
+    && [...new Set(selectedDocumentIds)].sort().join(",") === [...compileJob.documentIds].sort().join(",");
 
   const compileSelectedDocuments = async () => {
     const documentIds = [...new Set(selectedDocumentIds)];
@@ -2861,6 +2874,7 @@ export default function WorkspacePage() {
           corpus={corpus}
           names={names}
           busy={busy}
+          languages={navigator.languages}
           onResolve={(resolution) => void resolveCompileBlockers(resolution)}
           onCancel={() => void cancelCompileJob()}
           onOpenPart={(jobId) => {
@@ -3426,7 +3440,7 @@ export default function WorkspacePage() {
                     <b>{selectedDocumentIds.length} OCR-qualified document{selectedDocumentIds.length === 1 ? "" : "s"} selected</b>
                     {" · "}{compileLimits}
                   </small>
-                  <button type="button" disabled={busy || !judgeCorpusSet(selectedDocumentIds.length).ok} onClick={() => void compileSelectedDocuments()}>
+                  <button type="button" disabled={busy || !judgeCorpusSet(selectedDocumentIds.length).ok || sizeRefusedSameSet} onClick={() => void compileSelectedDocuments()}>
                     {busy ? "Compiling selected documents..." : "Compile selected documents"}
                   </button>
                 </div>

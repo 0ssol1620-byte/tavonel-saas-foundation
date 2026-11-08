@@ -24,6 +24,12 @@ const FAILURE_COPY: Record<string, string> = {
   BILLING_HOLD: "A billing hold is active on this workspace, so new processing cannot start.",
   INSUFFICIENT_CREDITS: "There is not enough remaining balance to start this run.",
   COMPILE_JOB_ALREADY_SETTLED: "This compile has already finished, so there is nothing left to change.",
+  /*
+    Size refusals are deterministic: the same files give the same output, so a retry pays for the
+    compile again and fails the same way (REVIEW-PR192-R1 MAJOR-2). Neither line invites one.
+  */
+  JSON_TOO_LARGE: "This is larger than its size limit, so it was not stored. Trying the same thing again gives the same result.",
+  CORE_OUTPUT_TOO_LARGE: "These files compile to more than one World can hold, so nothing was stored. Running the same set again gives the same result. Compile fewer or smaller files at a time.",
   SECURITY_BLOCKER_REQUIRES_EXPLICIT_REMOVAL: "A file stopped by a safety check cannot be passed over in one click. Remove it from this compile explicitly, or cancel.",
   JOB_SYNC_CONFLICT: "An import is already running for this connection. Check its progress before starting another.",
   PATCH_BEFORE_MISMATCH: "The value changed after you opened it, so the correction was not applied. Reload and look again.",
@@ -68,4 +74,37 @@ export function failureSentence(code: string | null | undefined, status: number)
   if (code && FAILURE_COPY[code]) return FAILURE_COPY[code];
   const sentence = byStatus(status);
   return code ? `${sentence} (Reference ${code}.)` : sentence;
+}
+
+/** Codes that mean "this file set is too large to compile": deterministic, so never offered as a retry. */
+export const SIZE_LIMIT_FAILURE_CODES: readonly string[] = ["JSON_TOO_LARGE", "CORE_OUTPUT_TOO_LARGE"];
+
+export function isSizeLimitFailure(code: string | null | undefined): boolean {
+  return Boolean(code && SIZE_LIMIT_FAILURE_CODES.includes(code));
+}
+
+export type SizeLimitFailureCopy = { sentence: string; measured: string; largest: string; counts: string };
+
+const SIZE_LIMIT_COPY: Record<"en" | "ko", SizeLimitFailureCopy> = {
+  en: {
+    sentence: "This set of files compiles to more than one World can hold, so nothing was stored. Running the same set again gives the same result. Compile fewer or smaller files at a time.",
+    measured: "Measured size",
+    largest: "Largest parts of the output",
+    counts: "What the output held",
+  },
+  ko: {
+    sentence: "이 파일 묶음은 World 하나에 담을 수 있는 크기를 넘어, 아무것도 저장하지 않았습니다. 같은 묶음을 다시 실행해도 결과는 같습니다. 파일 수를 줄이거나 더 작은 파일로 나누어 컴파일하세요.",
+    measured: "측정한 크기",
+    largest: "출력에서 가장 큰 부분",
+    counts: "출력에 담긴 항목",
+  },
+};
+
+/**
+ * The compile panel's copy for a size refusal, in the browser's language (English or Korean, the
+ * same rule as `workspace-ask-copy`). The sentence carries no numbers; the measured ones are shown
+ * beside it as detail.
+ */
+export function sizeLimitFailureCopy(languages: readonly string[] = []): SizeLimitFailureCopy {
+  return SIZE_LIMIT_COPY[languages[0]?.toLowerCase().startsWith("ko") ? "ko" : "en"];
 }
