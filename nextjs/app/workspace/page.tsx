@@ -95,10 +95,12 @@ import ReviewQueue from "@/components/review-queue";
 import WorldFreshness from "@/components/world-freshness";
 import FounderTestResetPanel from "@/components/founder-test-reset-panel";
 import {
+  buildReviewQueue,
   currentReviewLedger,
   readReviewLedger,
   reviewLedgerScope,
   reviewQueueDecisionInput,
+  reviewReasonsShown,
   type ReviewQueueInput,
   type ScopedReviewLedger,
 } from "@/lib/review-queue";
@@ -2736,7 +2738,6 @@ export default function WorkspacePage() {
   */
   const compileRunning = Boolean(compileJob && !["ready", "failed", "cancelled", "review_required"].includes(compileJob.state));
   const activityCount = activePipelineCount || (compileRunning ? Math.max(1, compileJob?.documentsTotal ?? 1) : 0) || (busy ? 1 : 0);
-  const reviewCount = collectionResult?.reviewReasons?.length ?? 0;
   const candidateReady = Boolean(collectionResult?.coreExecution);
   const candidateNeedsDecision = Boolean(
     collectionResult?.coreExecution && activeWorld?.manifestDigest !== collectionResult.manifestDigest,
@@ -2750,7 +2751,7 @@ export default function WorkspacePage() {
   const collectionReviewRequired = Boolean(
     collectionResult?.coreExecution?.status === "review_required" ||
     collectionResult?.validation.status === "review_required" ||
-    reviewCount > 0,
+    (collectionResult?.reviewReasons?.length ?? 0) > 0,
   );
   /*
     Everything the per-document breakdown is derived from, gathered in one place.
@@ -2773,6 +2774,8 @@ export default function WorkspacePage() {
     ...reviewQueueDecisionInput(reviewLedger),
     names,
   };
+  /* Review R3 (MAJOR-3): the count the top bar and Home print is the list the Review queue prints, one set. */
+  const reviewCount = reviewReasonsShown(buildReviewQueue(reviewQueueInput)).length;
   /*
     One derivation, in `lib/workspace-onboarding.ts`, for what state this workspace is in.
 
@@ -3254,6 +3257,28 @@ export default function WorkspacePage() {
           ) : null}
 
           {/*
+            Round 3, placement series (PR #191's compile-timeline capture): an empty workspace shows what a run looks
+            like before the first file is chosen -- the compile stage, captured from the dev harness on fixture
+            uploads. Labelled as an example; it is a picture, not this workspace's state, and it leaves with the
+            first source.
+          */}
+          {tab === "overview" && surface === "home" && workspaceState.mode === "new" && intakeOpen ? (
+            <figure className="workspace-example-run">
+              <figcaption>What a run looks like · example files, not yours</figcaption>
+              {/* Plain markup, not ProductCapture: this page is a client component, and importing the capture
+                  manifest would ship all of it in the workspace bundle. The two sizes are MANIFEST.json's pixel
+                  size for the pair; lib/workspace-onboarding.test.ts holds them to the manifest. */}
+              <picture className="tv-capture" data-capture="compile-timeline">
+                <source media="(max-width: 640px)" srcSet="/visuals/compile-timeline-390.webp 684w" sizes="calc(100vw - 32px)" width={684} height={1260} />
+                <img src="/visuals/compile-timeline-1440.webp" srcSet="/visuals/compile-timeline-1440.webp 2784w"
+                  sizes="(min-width: 1024px) min(1040px, calc(100vw - 340px)), calc(100vw - 32px)" width={2784} height={1082}
+                  alt="An example compile stage at its first step: the steps Source, Read, Organize and Review & activate, with example files and a review mark."
+                  loading="lazy" decoding="async" />
+              </picture>
+            </figure>
+          ) : null}
+
+          {/*
             §13.6. Review required, operator action, refused and failed each get their own row
             with its own written label -- the state is legible without reading a colour, and a
             second blocked state can no longer hide behind the first one's heading.
@@ -3312,7 +3337,8 @@ export default function WorkspacePage() {
             <section className="workspace-complete" aria-labelledby="workspace-complete-title">
               <div>
                 <h2 id="workspace-complete-title">
-                  {activeWorld ? "Your Compiled World is ready." : "Your compiled candidate is ready for review."}
+                  {/* Round 3: the state hero above already says "Ready for your review."; this card says what the candidate holds. */}
+                  {activeWorld ? "Your Compiled World is ready." : "What the candidate holds."}
                 </h2>
                 <p>{collectionResult.validation.counts.documents} sources became {collectionResult.validation.counts.entities} entities, {collectionResult.validation.counts.claims} claims, and {collectionResult.validation.counts.relations} evidence-bound relations.</p>
                 {activeWorld ? null : (
@@ -3515,7 +3541,7 @@ export default function WorkspacePage() {
               */}
               <section className="card" aria-labelledby="review-queue-title">
                 <p className="eyebrow">Review queue</p>
-                <h2 id="review-queue-title">Worst first, by the reasons already on the record.</h2>
+                <h2 id="review-queue-title">Sources waiting on you, most at risk first.</h2>
                 <ReviewQueue
                   input={reviewQueueInput}
                   selectedDocumentId={worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)?.sourceId ?? null}

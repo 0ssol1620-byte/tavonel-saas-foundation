@@ -359,6 +359,10 @@
 .passage {
   position: relative;
   min-height: 0;
+  /* Round 3: a read line can hold an unbroken token (a URL in a proxy filing); it wraps inside the panel
+     instead of pushing the panel, and the sheet around it, past its column. */
+  min-width: 0;
+  overflow-wrap: anywhere;
   padding: 14px 16px;
   color: var(--text-mid);
   background: var(--g2);
@@ -381,6 +385,8 @@
   width: 100%;
   /* The measure the proof is read at; longer lines than this stop being a quotation. */
   max-width: 680px;
+  min-width: 0;
+  overflow-wrap: anywhere;
   margin: 0 0 14px;
   padding: 4px 8px;
   color: inherit;

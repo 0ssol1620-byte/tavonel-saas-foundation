@@ -85,6 +85,11 @@ export type ReviewQueueBreakdown = {
   missing: Array<"compile_job" | "compile_settled_at" | "review_decisions" | "review_ledger">;
   /** The state of the decision read this breakdown was built from. */
   decisionsRead: ReviewLedgerStatus;
+  /**
+   * The candidate's review reasons that name no document here: World-level reasons. They are not
+   * pinned to a row, and they are still reasons to review, so the queue lists them on their own.
+   */
+  worldReasons: string[];
 };
 
 export type ReviewQueueInput = {
@@ -322,6 +327,7 @@ export function buildReviewQueue(input: ReviewQueueInput): ReviewQueueBreakdown 
     const document = documentById.get(documentId);
     const evidenceIds = evidenceByDocument.get(documentId) ?? [];
     const reasons: string[] = [];
+    // First, always: components/review-queue.tsx names the first reason of a security-blocked row its "Safety stop".
     if (blocker) reasons.push(blocker.reason);
     if (document?.processingState === "operator_review" && document.ocrReviewReasonCode) {
       reasons.push(document.ocrReviewReasonCode);
@@ -385,7 +391,19 @@ export function buildReviewQueue(input: ReviewQueueInput): ReviewQueueBreakdown 
   const counts: Record<ReviewQueueStatus, number> = { excluded: 0, under_review: 0, unprocessed: 0, read: 0 };
   for (const row of rows) counts[row.status] += 1;
 
-  return { rows, total: rows.length, counts, missing, decisionsRead };
+  const attributed = new Set(rows.flatMap((row) => row.reasons));
+  const worldReasons = [...new Set(input.reviewReasons)].filter((reason) => !attributed.has(reason));
+
+  return { rows, total: rows.length, counts, missing, decisionsRead, worldReasons };
+}
+
+/**
+ * Every distinct reason the Review queue prints -- each row's, then the World-level ones. Round 3
+ * (review R3, MAJOR-3): the top bar's and Home's "N reasons" count is this list's length, so the
+ * number above and the chips below are one set and cannot disagree.
+ */
+export function reviewReasonsShown(queue: ReviewQueueBreakdown): string[] {
+  return [...new Set([...queue.rows.flatMap((row) => row.reasons), ...queue.worldReasons])];
 }
 
 /** Every distinct reason string present in the queue, for a filter control. */

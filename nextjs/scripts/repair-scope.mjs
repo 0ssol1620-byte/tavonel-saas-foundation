@@ -2398,6 +2398,40 @@ export const CONSENT_POSTER_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/trust-page-answers.test.ts',
 ]);
 export const CONSENT_POSTER_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/landing-hero-film-loading.spec.ts', 'e2e/templates.spec.ts']);
+// W1-L7 visuals lane (codex/w1-visuals-20261104, PR #191): the dev-only preview route, the four diagram components with their
+// frame and stylesheet, the ten captures with their MANIFEST, the capture script and the suite that hashes them. Exactly these
+// 21 paths select the visuals suite and the route-metadata suite (the preview is a route). A new capture name is a new review.
+// Product UI assets, so never nativeReuse.
+// Placed (design C round 3, PR #194): ProvenanceChainDiagram and its frame and stylesheet render on /product; the MANIFEST and
+// the change-center, evidence-inspector and use-with-ai pairs render on Home s4 and /product; the compile-timeline pair's pixel
+// sizes are literals in app/workspace/page.tsx, held to the MANIFEST by lib/workspace-onboarding.test.ts. So a re-capture or a
+// diagram change through the repair path also runs the Home record suite, that onboarding suite and the Home, phone-Home and
+// /product browser specs.
+export const VISUALS_AFFECTED_PATHS = Object.freeze([
+  'app/dev/visuals/page.tsx',
+  'app/dev/visuals/visuals-preview.tsx',
+  'components/visuals/compile-pipeline-diagram.tsx',
+  'components/visuals/diagram-frame.tsx',
+  'components/visuals/fail-closed-gate-diagram.tsx',
+  'components/visuals/provenance-chain-diagram.tsx',
+  'components/visuals/temporal-lineage-diagram.tsx',
+  'components/visuals/visuals.module.css',
+  'lib/visuals-diagrams.test.ts',
+  'public/visuals/MANIFEST.json',
+  'public/visuals/change-center-1440.webp',
+  'public/visuals/change-center-390.webp',
+  'public/visuals/compile-timeline-1440.webp',
+  'public/visuals/compile-timeline-390.webp',
+  'public/visuals/evidence-inspector-1440.webp',
+  'public/visuals/evidence-inspector-390.webp',
+  'public/visuals/sources-board-1440.webp',
+  'public/visuals/sources-board-390.webp',
+  'public/visuals/use-with-ai-1440.webp',
+  'public/visuals/use-with-ai-390.webp',
+  'scripts/visuals/capture-visuals.mjs',
+]);
+export const VISUALS_AFFECTED_UNIT_FILES = Object.freeze(['lib/landing-v2-page.test.ts', 'lib/page-metadata.test.ts', 'lib/visuals-diagrams.test.ts', 'lib/workspace-onboarding.test.ts']);
+export const VISUALS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/landing-v2.spec.ts', 'e2e/marketing-story.spec.ts', 'e2e/mobile-landing.spec.ts']);
 // B35 operational SLI alert delivery (codex/ops-alert-delivery-20261102): the route that now posts a breach to the operations
 // webhook, its store module and their two suites. They select those suites, the delivery suite behind deliverOperationsAlert and
 // the suites that read every app/api route source. Product code, so never nativeReuse; no browser, database, worker or build lane.
@@ -2495,6 +2529,8 @@ const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}(
 // project row in run-repair-check.mjs. Still exact paths, no wildcard and no default owner.
 // Direction C (PR #183, 2026-11-04): /login's layout (its light viewport) and the explore frame on /product join as exact
 // paths (135 -> 137), the same direct suites and browser specs; no suite or spec is added.
+// Direction C round 3 (PR #194, 2026-11-05): the explore frame's two components (its rest focus on /product) and the capture
+// component join as exact paths (139 -> 142); no suite or spec is added. The first-use spec gets its own owner below.
 export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "docs/gtm/CLAIMS_REGISTRY.yaml",
   "nextjs/app/arena/page.tsx",
@@ -2539,12 +2575,15 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/components/evaluation-page.module.css",
   "nextjs/components/evidence/region-highlight.module.css",
   "nextjs/components/explore/evidence-workbench.module.css",
+  "nextjs/components/explore/explore-frame-canvas.tsx",
   "nextjs/components/explore/explore-frame.module.css",
+  "nextjs/components/explore/explore-frame.tsx",
   "nextjs/components/explore/explore-stage.module.css",
   "nextjs/components/font-outline-probe.tsx",
   "nextjs/components/landing-v2/hero-statement.tsx",
   "nextjs/components/landing-v2/hero-still.tsx",
   "nextjs/components/landing-v2/home-measurement.tsx",
+  "nextjs/components/landing-v2/product-capture.tsx",
   "nextjs/components/landing-v2/scenes/recompile.module.css",
   "nextjs/components/landing-v2/scenes/recompile.tsx",
   "nextjs/components/landing-v2/scenes/start.module.css",
@@ -2827,6 +2866,10 @@ export const AFFECTED_GROUPS = Object.freeze([
     { unitFiles: ['lib/explore-entry-proof.test.ts', 'lib/explore-sample.test.ts', 'lib/explore-story.test.ts', 'lib/visual-world-model.test.ts', 'components/explore/evidence-workbench.test.tsx'], browserFiles: ['e2e/explore.spec.ts'] }),
   // File intake (founder ask 2026-10-27): the shared drop reader and the first-screen upload entries' end-to-end spec.
   // Product intake behaviour, so never nativeReuse; the spec runs in 1440 and 390 (run-repair-check).
+  // Workspace first use (design C round 3, PR #194): the empty-workspace and first-review spec owns itself, with the onboarding
+  // copy suite it asserts against. Product UI, so never nativeReuse; the spec runs in 1440 and 390 (run-repair-check).
+  affectedGroup('workspace-first-use', /^nextjs\/e2e\/workspace-first-use\.spec\.ts$/,
+    { unitFiles: ['lib/workspace-onboarding.test.ts'], browserFiles: ['e2e/workspace-first-use.spec.ts'] }),
   affectedGroup('file-intake', /^nextjs\/(?:lib\/workspace-intake(?:\.test)?\.ts|e2e\/upload-entry\.spec\.ts)$/,
     { unitFiles: ['lib/workspace-intake.test.ts'], browserFiles: ['e2e/upload-entry.spec.ts'] }),
   // Ordinary Home landing: the thirty exact paths above select ten direct suites and one browser suite, which runs only in
@@ -2974,6 +3017,9 @@ export const AFFECTED_GROUPS = Object.freeze([
     { unitFiles: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES }),
   affectedGroup('consent-poster', new RegExp(`^nextjs/(?:${exactPathAlternation(CONSENT_POSTER_AFFECTED_PATHS)})$`),
     { unitFiles: CONSENT_POSTER_AFFECTED_UNIT_FILES, browserFiles: CONSENT_POSTER_AFFECTED_BROWSER_FILES }),
+  // visuals: the 21 exact paths above select 2 direct suites and no browser suite.
+  affectedGroup('visuals', new RegExp(`^nextjs/(?:${exactPathAlternation(VISUALS_AFFECTED_PATHS)})$`),
+    { unitFiles: VISUALS_AFFECTED_UNIT_FILES, browserFiles: VISUALS_AFFECTED_BROWSER_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json|wrangler\.jsonc)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.

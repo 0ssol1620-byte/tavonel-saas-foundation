@@ -208,7 +208,7 @@ describe("attention items", () => {
     }));
     expect(items.map((item) => item.id)).toEqual(["candidate-review", "operator-review", "refused", "compile-failed"]);
     expect(items.map((item) => item.label)).toEqual(["Review required", "Operator action", "Refused", "Failed"]);
-    expect(items[0].detail).toBe("1 review item needs a decision.");
+    expect(items[0].detail).toBe("1 review reason needs a decision.");
     expect(items[1].detail).toBe("2 sources need review before reading can continue.");
     expect(items[3].detail).toContain("COMPILE_CORE_UNAVAILABLE");
   });
@@ -284,5 +284,25 @@ describe("an incomplete inventory", () => {
 
   it("adds nothing when the listing was complete", () => {
     expect(deriveAttentionItems(input()).map((item) => item.id)).toEqual([]);
+  });
+});
+
+/*
+  Round 3 (direction C), placement series: the empty workspace's example-run capture is plain markup in the client page,
+  so its sizes are literals. They must be the manifest's pixel size for the pair, or the image holds the wrong space.
+*/
+describe("the empty workspace's example run capture", () => {
+  it("states MANIFEST.json's pixel size for both files of the compile-timeline pair", async () => {
+    const { readFileSync } = await import("node:fs");
+    const manifest = JSON.parse(readFileSync(new URL("../public/visuals/MANIFEST.json", import.meta.url), "utf8")) as { captures: { file: string; pixelWidth: number; pixelHeight: number }[] };
+    const page = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
+    for (const file of ["compile-timeline-1440.webp", "compile-timeline-390.webp"]) {
+      const entry = manifest.captures.find((capture) => capture.file === file)!;
+      expect(entry, file).toBeTruthy();
+      expect(page).toContain(`/visuals/${file} ${entry.pixelWidth}w`);
+      const at = page.indexOf(`/visuals/${file} ${entry.pixelWidth}w`);
+      expect(page.indexOf(`width={${entry.pixelWidth}} height={${entry.pixelHeight}}`, at), file).toBeGreaterThan(at);
+    }
+    expect(page).not.toContain("@/components/landing-v2/product-capture");
   });
 });
