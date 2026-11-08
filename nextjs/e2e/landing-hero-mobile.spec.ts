@@ -16,7 +16,7 @@ test.describe("phone four-stage film", () => {
     const column = (await page.locator("#s1 .lv2-wrap").boundingBox())!;
     // Founder ask 2026-10-27: a phone opens compact -- the whole frame of the locked stage-1 poster, inside the viewport.
     await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
-    expect(await still()).toMatch(/^\/film\/poster-c1-t13\.60(-2x)?\.(avif|webp)$/);
+    expect(await still()).toMatch(/^\/film\/poster-r2-c1-t13\.60(-2x)?\.(avif|webp)$/);
     const fit = (await film.locator(".compile-film-viewport").boundingBox())!;
     const drawn = await film.locator("img.compile-film-still").evaluate(image => image.getBoundingClientRect().width);
     expect(Math.abs(drawn - fit.width), "the whole frame at the frame's width, no crop").toBeLessThanOrEqual(2);
@@ -27,7 +27,7 @@ test.describe("phone four-stage film", () => {
     // the WebP fallback where it does not, in a 4:5 frame 16px wider than the column.
     await film.locator(".compile-film-focus-control").click();
     await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
-    await expect.poll(still).toMatch(/^\/film\/poster-c1-t13\.60-pane1-684x855\.(avif|webp)$/);
+    await expect.poll(still).toMatch(/^\/film\/poster-r2-c1-t13\.60-pane1-684x855\.(avif|webp)$/);
     const frame = (await film.locator(".compile-film-viewport").boundingBox())!;
     expect(Math.abs(frame.width / frame.height - 0.8), "a 4:5 pane").toBeLessThan(0.01);
     expect(Math.abs(frame.width - (column.width + 16)), "the column plus 16px").toBeLessThanOrEqual(1);
@@ -45,7 +45,7 @@ test.describe("phone four-stage film", () => {
     await film.getByRole("button", { name: "Play the compilation film", exact: true }).click();
     const video = film.locator("video");
     await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.currentTime)).toBeGreaterThan(1);
-    expect(await video.evaluate((node: HTMLVideoElement) => node.currentSrc)).toContain("/film/hero-c1.mp4");
+    expect(await video.evaluate((node: HTMLVideoElement) => node.currentSrc)).toContain("/film/hero-r2-c1.mp4");
     await expect(film.locator("figcaption")).toHaveText("Illustrative demo · not customer results.");
     const focus = film.getByRole("button", { name: "Focus details", exact: true });
     const toggle = (await focus.boundingBox())!;
@@ -84,13 +84,13 @@ test.describe("phone four-stage film", () => {
     const film = page.locator(FILM);
     await expect(film.locator("video")).toHaveCount(0);
     const failed: string[] = [];
-    await page.route("**/film/hero-c1*.mp4", route => { failed.push(route.request().url()); return route.abort(); });
+    await page.route("**/film/hero-r2-c1*.mp4", route => { failed.push(route.request().url()); return route.abort(); });
     await film.getByRole("button", { name: "Play the compilation film", exact: true }).click();
     // Home prints no caption row (FINAL-SPEC D-7), so the film says it failed in its own status line, never silently.
     await expect(film.locator('.compile-film-inline-error[role="status"]')).toContainText("This browser could not play the film");
     await expect(film.locator("img")).toBeVisible();
-    expect(failed.some(url => url.endsWith("/film/hero-c1.mp4"))).toBe(true);
-    expect(failed.some(url => url.endsWith("/film/hero-c1-hq-1440.mp4"))).toBe(true);
+    expect(failed.some(url => url.endsWith("/film/hero-r2-c1.mp4"))).toBe(true);
+    expect(failed.some(url => url.endsWith("/film/hero-r2-c1-hq-1440.mp4"))).toBe(true);
     await expect(film.getByRole("tab")).toHaveCount(4);
   });
 });

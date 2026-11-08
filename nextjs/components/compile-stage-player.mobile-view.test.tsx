@@ -324,21 +324,21 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
     // Home opens compact (2026-10-27): no phone pane still until Focus details is pressed.
     expect(en).not.toContain("data-pane-poster");
     expect(en).not.toContain("767.98px");
-    const homeStage = { ...COMPILE_STAGES[0]!, poster: "/film/poster-c1-t13.60-2x.webp", poster1x: "/film/poster-c1-t13.60.webp", posterAvif: "/film/poster-c1-t13.60-2x.avif", posterAvif1x: "/film/poster-c1-t13.60.avif", phonePoster: "/film/poster-c1-t13.60-pane1-684x855.webp", phonePosterAvif: "/film/poster-c1-t13.60-pane1-684x855.avif" };
+    const homeStage = { ...COMPILE_STAGES[0]!, poster: "/film/poster-r2-c1-t13.60-2x.webp", poster1x: "/film/poster-r2-c1-t13.60.webp", posterAvif: "/film/poster-r2-c1-t13.60-2x.avif", posterAvif1x: "/film/poster-r2-c1-t13.60.avif", phonePoster: "/film/poster-r2-c1-t13.60-pane1-684x855.webp", phonePosterAvif: "/film/poster-r2-c1-t13.60-pane1-684x855.avif" };
     const focused = renderToStaticMarkup(<CompileStagePlayer stages={[homeStage]} storyLayout initialMobileFilmView="focus" />);
     const still = en.match(/<img[^>]*class="compile-film-still"[^>]*>/)?.[0] ?? "";
     // Re-record (D-11 encoders): the WebP pair of t = 13.60s is the <img>, the fallback inside the <picture>.
-    expect(still).toContain('src="/film/poster-c1-t13.60-2x.webp"');
-    expect(still).toMatch(/srcSet="\/film\/poster-c1-t13\.60\.webp 1440w, \/film\/poster-c1-t13\.60-2x\.webp 2880w"/i);
+    expect(still).toContain('src="/film/poster-r2-c1-t13.60-2x.webp"');
+    expect(still).toMatch(/srcSet="\/film\/poster-r2-c1-t13\.60\.webp 1440w, \/film\/poster-r2-c1-t13\.60-2x\.webp 2880w"/i);
     expect(still).toContain(`sizes="${FILM_POSTER_SIZES}"`);
     // ...and the AVIF pair of the same frame is the <source> ahead of it, with the same sizes.
     const picture = en.match(/<picture[^>]*>([\s\S]*?)<\/picture>/)?.[1] ?? "";
     expect(picture.indexOf("<source")).toBe(0);
-    expect(picture).toMatch(/<source type="image\/avif" srcSet="\/film\/poster-c1-t13\.60\.avif 1440w, \/film\/poster-c1-t13\.60-2x\.avif 2880w" sizes="[^"]+"\/?>/i);
+    expect(picture).toMatch(/<source type="image\/avif" srcSet="\/film\/poster-r2-c1-t13\.60\.avif 1440w, \/film\/poster-r2-c1-t13\.60-2x\.avif 2880w" sizes="[^"]+"\/?>/i);
     expect(picture).toContain(still);
     // FINAL-SPEC 2026-10-26 §2.1, in Focus: ahead of them, the stage-1 pane still for a screen below 768px, AVIF then WebP.
     const focusedPicture = focused.match(/<picture[^>]*>([\s\S]*?)<\/picture>/)?.[1] ?? "";
-    expect(focusedPicture).toMatch(/^<source media="\(max-width: 767\.98px\)" type="image\/avif" srcSet="\/film\/poster-c1-t13\.60-pane1-684x855\.avif"\/><source media="\(max-width: 767\.98px\)" type="image\/webp" srcSet="\/film\/poster-c1-t13\.60-pane1-684x855\.webp"\/><source type="image\/avif"/);
+    expect(focusedPicture).toMatch(/^<source media="\(max-width: 767\.98px\)" type="image\/avif" srcSet="\/film\/poster-r2-c1-t13\.60-pane1-684x855\.avif"\/><source media="\(max-width: 767\.98px\)" type="image\/webp" srcSet="\/film\/poster-r2-c1-t13\.60-pane1-684x855\.webp"\/><source type="image\/avif"/);
     expect(focused).toContain('data-pane-poster="1"');
     expect(en).toContain("--pane-x:1780;--pane-y:420;--pane-w:684");
     // No re-recorded frame carries an overprint, so no stage has a Tier 2 mask.
@@ -369,8 +369,8 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
     // R3: the stage-1 pane still is cut from the same rect the playing cut is drawn at, so still and video match pixel for pixel.
     const posters = (JSON.parse(readFileSync(new URL("../lib/locked-film-assets.json", import.meta.url), "utf8")) as { posters: { file: string; cropRect?: { x: number; y: number; width: number; height: number } }[] }).posters;
     const pane1 = STAGE_FRAMES.sources!.phonePane;
-    const crops = posters.filter(poster => poster.file.startsWith("poster-c1-t13.60-pane1-"));
-    expect(crops.map(poster => poster.file).sort()).toEqual(["poster-c1-t13.60-pane1-684x855.avif", "poster-c1-t13.60-pane1-684x855.webp"]);
+    const crops = posters.filter(poster => poster.file.startsWith("poster-r2-c1-t13.60-pane1-"));
+    expect(crops.map(poster => poster.file).sort()).toEqual(["poster-r2-c1-t13.60-pane1-684x855.avif", "poster-r2-c1-t13.60-pane1-684x855.webp"]);
     for (const poster of crops) expect(poster.cropRect, poster.file).toEqual({ x: pane1.x, y: pane1.y, width: pane1.w, height: (pane1.w * 5) / 4 });
 
     const fit = renderToStaticMarkup(<CompileStagePlayer stages={[{ ...COMPILE_STAGES[0]!, phonePoster: "/film/poster-1-t8.16-pane1-684x855.webp", phonePosterAvif: "/film/poster-1-t8.16-pane1-684x855.avif" }]} storyLayout />);

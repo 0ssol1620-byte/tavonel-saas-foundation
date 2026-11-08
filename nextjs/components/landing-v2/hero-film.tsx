@@ -12,9 +12,11 @@ import HeroFilmDisclosure from "./hero-film-disclosure";
 */
 
 /**
- * Film re-record on design C (2026-11-05, W2): cut 1 is `hero-c1.mp4`, a 2880x1800 H.264 High 4:4:4
- * (yuv444p) master recorded frame by frame from the real workspace UI, like the other three cuts.
- * Its two decoder-error fallbacks are yuv420p encodes of the same frames (2880 and 1440 wide).
+ * Film re-record on design C (2026-11-05, W2; recording R2 2026-11-08 after review R1): cut 1 is `hero-r2-c1.mp4`,
+ * a 2880x1800 H.264 High 4:4:4 (yuv444p) master recorded frame by frame from the real workspace UI, like the other
+ * three cuts. Its two decoder-error fallbacks are yuv420p encodes of the same frames (2880 and 1440 wide). The
+ * recorder, scans and encoders are scripts/film/; R2 removed the edge bands of R1's scroll segments and records the
+ * workspace as a paying customer's, without the internal owner strip.
  *
  * History: cut 1 used the byte-locked 2x master that the other three stages already used.
  *
@@ -25,12 +27,12 @@ import HeroFilmDisclosure from "./hero-film-disclosure";
  * on every viewport and is already recorded in `lib/locked-film-assets.json`.
  */
 /** The four re-recorded cuts, in stage order (stage 1 also has the decoder-error fallbacks in HERO_CUT). */
-export const HOME_FILM_CUTS = ["/film/hero-c1.mp4", "/film/hero-c2.mp4", "/film/hero-c3.mp4", "/film/hero-c4.mp4"] as const;
+export const HOME_FILM_CUTS = ["/film/hero-r2-c1.mp4", "/film/hero-r2-c2.mp4", "/film/hero-r2-c3.mp4", "/film/hero-r2-c4.mp4"] as const;
 
 const HERO_CUT = {
-  src: "/film/hero-c1.mp4",
-  fallbackSrc: "/film/hero-c1-hq.mp4",
-  fallbackPhoneSrc: "/film/hero-c1-hq-1440.mp4",
+  src: "/film/hero-r2-c1.mp4",
+  fallbackSrc: "/film/hero-r2-c1-hq.mp4",
+  fallbackPhoneSrc: "/film/hero-r2-c1-hq-1440.mp4",
 } as const;
 
 /*
@@ -57,7 +59,7 @@ const HERO_CUT = {
   README "Home phone pane"); stages 2-4 are drawn from their 2x posters by the same CSS crop the video uses.
 */
 /*
-  Re-record posters (2026-11-05): one source frame of each new cut -- the lossless PNG the cut was encoded
+  Re-record posters (2026-11-05; R2 2026-11-08, scripts/film/posters.mjs): one source frame of each new cut -- the lossless PNG the cut was encoded
   from -- with the D-11 encoders (AVIF quality 50, 4:4:4, each 2x AVIF at most 140,000 bytes; WebP quality 82
   as the fallback). Stage 1 at t = 13.60s (page 4 of the 10-Q beside its extracted lines, one line's region
   lit), stage 2 at 4.40s (Greater China and the five filings that mention it), stage 3 at 17.96s (the World
@@ -66,10 +68,10 @@ const HERO_CUT = {
   lib/locked-film-assets.json.
 */
 const HOME_POSTERS = [
-  { poster: "/film/poster-c1-t13.60-2x.webp", poster1x: "/film/poster-c1-t13.60.webp", posterAvif: "/film/poster-c1-t13.60-2x.avif", posterAvif1x: "/film/poster-c1-t13.60.avif", phonePoster: "/film/poster-c1-t13.60-pane1-684x855.webp", phonePosterAvif: "/film/poster-c1-t13.60-pane1-684x855.avif" },
-  { poster: "/film/poster-c2-t4.40-2x.webp", poster1x: "/film/poster-c2-t4.40.webp", posterAvif: "/film/poster-c2-t4.40-2x.avif", posterAvif1x: "/film/poster-c2-t4.40.avif" },
-  { poster: "/film/poster-c3-t17.96-2x.webp", poster1x: "/film/poster-c3-t17.96.webp", posterAvif: "/film/poster-c3-t17.96-2x.avif", posterAvif1x: "/film/poster-c3-t17.96.avif" },
-  { poster: "/film/poster-c4-t6.80-2x.webp", poster1x: "/film/poster-c4-t6.80.webp", posterAvif: "/film/poster-c4-t6.80-2x.avif", posterAvif1x: "/film/poster-c4-t6.80.avif" },
+  { poster: "/film/poster-r2-c1-t13.60-2x.webp", poster1x: "/film/poster-r2-c1-t13.60.webp", posterAvif: "/film/poster-r2-c1-t13.60-2x.avif", posterAvif1x: "/film/poster-r2-c1-t13.60.avif", phonePoster: "/film/poster-r2-c1-t13.60-pane1-684x855.webp", phonePosterAvif: "/film/poster-r2-c1-t13.60-pane1-684x855.avif" },
+  { poster: "/film/poster-r2-c2-t4.40-2x.webp", poster1x: "/film/poster-r2-c2-t4.40.webp", posterAvif: "/film/poster-r2-c2-t4.40-2x.avif", posterAvif1x: "/film/poster-r2-c2-t4.40.avif" },
+  { poster: "/film/poster-r2-c3-t17.96-2x.webp", poster1x: "/film/poster-r2-c3-t17.96.webp", posterAvif: "/film/poster-r2-c3-t17.96-2x.avif", posterAvif1x: "/film/poster-r2-c3-t17.96.avif" },
+  { poster: "/film/poster-r2-c4-t6.80-2x.webp", poster1x: "/film/poster-r2-c4-t6.80.webp", posterAvif: "/film/poster-r2-c4-t6.80-2x.avif", posterAvif1x: "/film/poster-r2-c4-t6.80.avif" },
 ] as const;
 
 /** URL of the opening poster (stage 1, 2880px file). */
@@ -77,8 +79,8 @@ export const HERO_FILM_POSTER: string = HOME_POSTERS[0].poster;
 
 function heroStages(korean: boolean): CompileStage[] {
   const lines = korean
-    ? ["원문 페이지와 추출된 자료를 나란히 살펴보세요.", "개체와 그 개체를 언급한 문서를 함께 살펴보세요.", "원문의 변경이 어떤 지식에 닿는지 확인하세요.", "컴파일된 지식에 질문하고, 결과의 근거 구절과 페이지를 확인하세요."]
-    : ["Read original pages beside their extracted content.", "Explore the entities and the documents that mention them.", "Follow a changed source to the knowledge it affects.", "Ask the compiled knowledge and see the passage and page behind the result."];
+    ? ["원문 페이지와 추출된 자료를 나란히 살펴보세요.", "개체와 그 개체를 언급한 문서를 함께 살펴보세요.", "새로 도착한 공시가 지식에 무엇을 더했는지 확인하세요.", "준비된 질문을 골라 답의 근거 구절과 페이지를 확인하세요."]
+    : ["Read original pages beside their extracted content.", "Explore the entities and the documents that mention them.", "See what newly arrived filings add to the knowledge.", "Pick a prepared question and see the passage and page behind the answer."];
   return COMPILE_STAGES.map((stage, index) => ({
     ...stage,
     ...HOME_POSTERS[index],

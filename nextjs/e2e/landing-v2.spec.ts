@@ -253,7 +253,7 @@ test("server-renders the visible film poster as its priority image", async ({ re
   const posterHint = response.headers()["link"] ?? "";
   expect(posterHint.match(/\/film\/poster-[^>]+/g) ?? []).toEqual([]);
   const head = html.slice(0, html.indexOf("</head>"));
-  expect(head).not.toContain("poster-c1-t13.60-pane1-684x855");
+  expect(head).not.toContain("poster-r2-c1-t13.60-pane1-684x855");
   const allPreloads = [...head.matchAll(/<link[^>]*rel="preload"[^>]*as="image"[^>]*>/g)].map(match => match[0]);
   /*
     Round 2 (lib/hero-phone-mode.ts): while a phone shows the Inspector still, there are two image hints, split by width --
@@ -269,11 +269,11 @@ test("server-renders the visible film poster as its priority image", async ({ re
   if (PHONE_HERO === "still") expect(preloads[0]).toMatch(/ media="\(min-width: 901px\)"/i);
   else expect(preloads[0]).not.toMatch(/ media=/i);
   // POSTER-RECUT (D-11): the one hint is the AVIF srcset, typed so a browser without AVIF skips it.
-  expect(preloads[0]).toMatch(/imagesrcset="\/film\/poster-c1-t13\.60\.avif 1440w, \/film\/poster-c1-t13\.60-2x\.avif 2880w"/i);
+  expect(preloads[0]).toMatch(/imagesrcset="\/film\/poster-r2-c1-t13\.60\.avif 1440w, \/film\/poster-r2-c1-t13\.60-2x\.avif 2880w"/i);
   expect(preloads[0]).toMatch(/type="image\/avif"/i);
   const high = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => /fetchpriority="high"/i.test(tag));
-  expect(high).toHaveLength(1); expect(high[0]).toContain('src="/film/poster-c1-t13.60-2x.webp"');
-  expect(high[0]).toMatch(/srcset="\/film\/poster-c1-t13\.60\.webp 1440w, \/film\/poster-c1-t13\.60-2x\.webp 2880w"/i);
+  expect(high).toHaveLength(1); expect(high[0]).toContain('src="/film/poster-r2-c1-t13.60-2x.webp"');
+  expect(high[0]).toMatch(/srcset="\/film\/poster-r2-c1-t13\.60\.webp 1440w, \/film\/poster-r2-c1-t13\.60-2x\.webp 2880w"/i);
   expect(high[0]).toMatch(/loading="eager"/i); expect(high[0]).toMatch(/ width="[1-9]\d*"/); expect(high[0]).toMatch(/ height="[1-9]\d*"/);
   const sourceImages = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => tag.includes("apple-2026-q1-10-q-reference-p004"));
   // Direction C round 2: the committed 10-Q page is drawn by s2's window, by s3's received passage (CRITIQUE-R1 #2) and,

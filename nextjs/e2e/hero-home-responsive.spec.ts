@@ -429,7 +429,7 @@ for (const path of ["/", "/ko"]) {
     await expect(sequence).toHaveAttribute("data-wide-view", "crop");
     // Hold stage 1 so the cut loops in place instead of advancing mid-sample (the crop is unchanged).
     await film.getByRole("tab").first().click();
-    await expect(sequence).toHaveAttribute("data-video-primary-src", "/film/hero-c1.mp4");
+    await expect(sequence).toHaveAttribute("data-video-primary-src", "/film/hero-r2-c1.mp4");
     const video = sequence.locator("video.compile-film-video");
     await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState >= 2 && !v.paused && v.currentTime > 0), { timeout: 20_000 }).toBe(true);
     const run = await video.evaluate(async (v: HTMLVideoElement, wanted: number) => {
@@ -489,7 +489,7 @@ for (const path of ["/", "/ko"]) {
     await testInfo.attach(`film-blank-${path === "/" ? "en" : "ko"}`, { body: JSON.stringify(run, null, 2), contentType: "application/json" });
     expect(run.samples.length).toBeGreaterThanOrEqual(12);
     for (const sample of run.samples) {
-      expect(sample.src).toContain("/film/hero-c1.mp4");
+      expect(sample.src).toContain("/film/hero-r2-c1.mp4");
       // The drawn video is the 16:10 cut at 2x, and the first screen shows a real part of it.
       expect(Math.abs(sample.region.aspect - 1.6)).toBeLessThan(0.01);
       expect(sample.region.visibleCssRows).toBeGreaterThan(200);
@@ -513,7 +513,7 @@ test("every stage that opens cropped keeps ink in both panes of its whole window
   const table = JSON.parse(readFileSync(resolve(process.cwd(), "components/compile-stage-player.frame-strings.json"), "utf8")) as { blankScan: BlankScan };
   const scan = table.blankScan;
   const ids = ["sources", "read", "structure", "world"];
-  const cuts = ["/film/hero-c1.mp4", "/film/hero-c2.mp4", "/film/hero-c3.mp4", "/film/hero-c4.mp4"];
+  const cuts = ["/film/hero-r2-c1.mp4", "/film/hero-r2-c2.mp4", "/film/hero-r2-c3.mp4", "/film/hero-r2-c4.mp4"];
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
@@ -665,8 +665,8 @@ for (const path of ["/", "/ko"]) {
         const last = entries[entries.length - 1]!;
         return { url: last.url ?? "", size: last.size ?? 0, still: Boolean(last.element?.matches("img.compile-film-still")) };
       });
-      expect(new URL(lcp.url).pathname, `LCP at ${width}`).toMatch(/^\/film\/poster-c1-t13\.60\.(avif|webp)$/);
-      if (browserName === "chromium") expect(new URL(lcp.url).pathname, `LCP at ${width}`).toBe("/film/poster-c1-t13.60.avif");
+      expect(new URL(lcp.url).pathname, `LCP at ${width}`).toMatch(/^\/film\/poster-r2-c1-t13\.60\.(avif|webp)$/);
+      if (browserName === "chromium") expect(new URL(lcp.url).pathname, `LCP at ${width}`).toBe("/film/poster-r2-c1-t13.60.avif");
       expect(lcp.still, `LCP element at ${width}`).toBe(true);
       expect(lcp.size, `LCP area at ${width}`).toBeGreaterThanOrEqual(LCP_FLOOR[browserName]![path]![width]! * 0.99);
       const column = (await page.locator("#s1 .lv2-wrap").boundingBox())!;

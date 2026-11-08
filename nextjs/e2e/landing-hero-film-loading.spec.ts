@@ -40,9 +40,9 @@ import { expect, test, type Page } from "@playwright/test";
 */
 const FILM = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]';
 /** The stage-1 frame a phone opens on (Fit): the 1440px file of the srcset, in either format. */
-const POSTER = /^\/film\/poster-c1-t13\.60\.(avif|webp)$/;
+const POSTER = /^\/film\/poster-r2-c1-t13\.60\.(avif|webp)$/;
 /** The stage-1 pane's own still, which a phone asks for only once Focus details is pressed. */
-const PANE_POSTER = /^\/film\/poster-c1-t13\.60-pane1-684x855\.(avif|webp)$/;
+const PANE_POSTER = /^\/film\/poster-r2-c1-t13\.60-pane1-684x855\.(avif|webp)$/;
 const LOCALES = [
   { path: "/", language: "English", play: "Play the compilation film", focus: "Focus details" },
   { path: "/ko", language: "Korean", play: "컴파일 영상 재생", focus: "세부 내용 확대" },
@@ -166,9 +166,9 @@ for (const locale of LOCALES) {
 */
 const RECUT_AVIF = [
   // Film re-record (2026-11-05): the design C posters, same encoders and the same 140,000-byte AVIF budget.
-  "/film/poster-c1-t13.60-pane1-684x855.avif",
-  "/film/poster-c1-t13.60-2x.avif", "/film/poster-c1-t13.60.avif", "/film/poster-c2-t4.40-2x.avif", "/film/poster-c2-t4.40.avif",
-  "/film/poster-c3-t17.96-2x.avif", "/film/poster-c3-t17.96.avif", "/film/poster-c4-t6.80-2x.avif", "/film/poster-c4-t6.80.avif",
+  "/film/poster-r2-c1-t13.60-pane1-684x855.avif",
+  "/film/poster-r2-c1-t13.60-2x.avif", "/film/poster-r2-c1-t13.60.avif", "/film/poster-r2-c2-t4.40-2x.avif", "/film/poster-r2-c2-t4.40.avif",
+  "/film/poster-r2-c3-t17.96-2x.avif", "/film/poster-r2-c3-t17.96.avif", "/film/poster-r2-c4-t6.80-2x.avif", "/film/poster-r2-c4-t6.80.avif",
 ];
 // The re-record supersedes every numbered Home poster too (poster-1..4-*); only poster-c* may be requested.
 const SUPERSEDED = /\/film\/poster-[1-4]-t/;
@@ -205,19 +205,19 @@ async function posterContract(page: Page, engine: string) {
       const beside = rects.map(([x, y, w, h]) => inkIn(x! - 6, y!, 6, h!) + inkIn(x! + w!, y!, 6, h!));
       return { width: bitmap.width, before, above, beside };
     };
-    const webp = "/film/poster-c1-t13.60-2x.webp";
-    const avifDecodes = await decodes("/film/poster-c1-t13.60-2x.avif");
+    const webp = "/film/poster-r2-c1-t13.60-2x.webp";
+    const avifDecodes = await decodes("/film/poster-r2-c1-t13.60-2x.avif");
     return {
       sizes, avifDecodes, currentSrc: new URL(still.currentSrc).pathname, rects, color,
       maskPoster: document.querySelector(".compile-film-mask")?.getAttribute("data-poster-mask") ?? "",
-      labels: { [webp]: await label(webp), ...(avifDecodes ? { "/film/poster-c1-t13.60-2x.avif": await label("/film/poster-c1-t13.60-2x.avif") } : {}) },
+      labels: { [webp]: await label(webp), ...(avifDecodes ? { "/film/poster-r2-c1-t13.60-2x.avif": await label("/film/poster-r2-c1-t13.60-2x.avif") } : {}) },
     };
   }, { avif: RECUT_AVIF });
 
   for (const [url, bytes] of Object.entries(result.sizes)) expect(bytes, `${engine} ${url} within the §22 AVIF budget`).toBeLessThanOrEqual(140_000);
   // The still is one of the two formats of the re-cut frame, AVIF exactly when the engine decodes it: the 1440/2880px
   // frame at every width, as Home opens compact (2026-10-27); the pane's own file waits for Focus details.
-  expect(result.currentSrc, `${engine} still`).toMatch(new RegExp(`^/film/poster-c1-t13\\.60(-2x)?\\.${result.avifDecodes ? "avif" : "webp"}$`));
+  expect(result.currentSrc, `${engine} still`).toMatch(new RegExp(`^/film/poster-r2-c1-t13\\.60(-2x)?\\.${result.avifDecodes ? "avif" : "webp"}$`));
   // The re-recorded frames carry no overprint, so no Tier 2 bars are drawn (and none are checked below).
   expect(result.maskPoster).toBe("");
   expect(result.rects).toHaveLength(0);
@@ -240,7 +240,7 @@ test("serves the re-cut posters as AVIF within 140,000 bytes, with a WebP fallba
   await page.emulateMedia({ reducedMotion: "reduce" });
   const chromium = await posterContract(page, "chromium");
   expect(chromium.avifDecodes, "Chromium decodes AVIF").toBe(true);
-  expect(chromium.currentSrc, "a phone in Fit takes the 1440px stage-1 AVIF").toBe("/film/poster-c1-t13.60.avif");
+  expect(chromium.currentSrc, "a phone in Fit takes the 1440px stage-1 AVIF").toBe("/film/poster-r2-c1-t13.60.avif");
   const measured: Record<string, unknown> = { chromium };
   if (existsSync(playwright.webkit.executablePath())) {
     const browser = await playwright.webkit.launch();

@@ -1,6 +1,6 @@
 {
-  "derivedFrom": "Film re-record on design C, 2026-11-05 (W2). Recorder, DOM probes and scans: outputs/tavonel-research-replan-20261013/design-20261104/impl/FILM-RERECORD-REPORT.md (ai-knowledge-compiler).",
-  "method": "The cuts are recordings of the real product UI, so strings are read from the DOM, not transcribed: a probe run of the same recorder script at deviceScaleFactor 1 (CSS layout identical to the 2x capture) records, at each sampled second, every visible occurrence of each string (Range.getBoundingClientRect, x2 for source px). t=18 is frame 449 (17.96 s). pane = the quarter column of the 2880x1800 frame (the cuts have no drawn panes).",
+  "derivedFrom": "Film re-record on design C, recording R2 (2026-11-08, after review R1). Recorder, DOM probes and scans: scripts/film/ (record.mjs probes, scan.mjs scans); run report: outputs/tavonel-research-replan-20261013/design-20261104/impl/ (ai-knowledge-compiler).",
+  "method": "The cuts are recordings of the real product UI, so strings are read from the DOM, not transcribed: the recorder itself (record.mjs, the 2x capture run) records, at each sampled second, every visible occurrence of each of the stage's probe strings (Range.getBoundingClientRect, x2 for source px). t=18 is frame 449 (17.96 s). pane = the quarter column of the 2880x1800 frame (the cuts have no drawn panes).",
   "times": [
     0,
     2,
@@ -15,8 +15,8 @@
   ],
   "stages": {
     "sources": {
-      "cut": "hero-c1.mp4",
-      "sha256": "64d286184e32b2fae25609bedd527d6996974486b3b76c5923f7a6fb12d0aa2c",
+      "cut": "hero-r2-c1.mp4",
+      "sha256": "19308159fa5fad8fe1471a871296e6b7028a4b89679a4defde8ad2d5adc8c920",
       "strings": {
         "Extracted lines": {
           "pane": "Q3 (x 1440-2159)",
@@ -66,8 +66,8 @@
       }
     },
     "read": {
-      "cut": "hero-c2.mp4",
-      "sha256": "2cf527d63a6e3b66cc3a9cfaa7043fb9a11412849086da179d47201648685ce1",
+      "cut": "hero-r2-c2.mp4",
+      "sha256": "49e8c34d9ae73ad73005360952dd378183c886f158226660446f37c9fa5aa357",
       "strings": {
         "Greater China": {
           "pane": "Q3 (x 1440-2159)",
@@ -117,8 +117,8 @@
       }
     },
     "structure": {
-      "cut": "hero-c3.mp4",
-      "sha256": "cd0ec92d892a443f155f16508e88a8fb2996f40c83a95ea7ddf25fbbcfb60682",
+      "cut": "hero-r2-c3.mp4",
+      "sha256": "5c30a3360a944ae865135c54fd443c8da7603cd29f23088386b7f392c61d40f8",
       "strings": {
         "filed 2026-07-31": {
           "pane": "Q3 (x 1440-2159)",
@@ -130,7 +130,6 @@
             8,
             10,
             12,
-            14,
             16,
             18
           ]
@@ -161,8 +160,8 @@
       }
     },
     "world": {
-      "cut": "hero-c4.mp4",
-      "sha256": "614a4e52d859f1b15db33283739b39b9e8df26049ba5802f5ebcf803474299ca",
+      "cut": "hero-r2-c4.mp4",
+      "sha256": "afcbb47ebf531296da91c9807ebc930290ed766aadfa28a2a3900efe562ea561",
       "strings": {
         "Retrieved source passage": {
           "pane": "Q1 (x 0-719)",
@@ -198,7 +197,7 @@
     }
   },
   "cropCheck": {
-    "method": "Re-record: yAt = the top edge (source px) of each probed occurrence inside the crop window's columns at each sampled second; insideWindow = sampled seconds where one occurrence lies wholly inside rows crop.y*1800 .. +900. A recording scrolls, so the window is held to the same 80% rule as visibleAt: holdsTarget = insideWindow / samples >= 0.8. A stage whose window does not hold its target opens on Fit (structure). smallestXHeight: the recordings carry no text under 12px CSS, i.e. >= 11 source px of x-height at 2x.",
+    "method": "Re-record: yAt = the top edge (source px) of each probed occurrence inside the crop window's columns at each sampled second; insideWindow = sampled seconds where one occurrence lies wholly inside rows crop.y*1800 .. +900. A recording scrolls, so the window is held to the same 80% rule as visibleAt: holdsTarget = insideWindow / samples >= 0.8. A stage whose window does not hold its target opens on Fit. smallestXHeight: product UI type in the recordings is >= 12px CSS, i.e. >= 11 source px of x-height at 2x; embedded page renders (the PDF pages and reference renders shown inside the product) are excluded and carry smaller type. At 1440 the film is drawn 1240/1440 wide, so 12px UI type shows at about 10.3px.",
     "stages": {
       "sources": {
         "text": "Extracted lines",
@@ -209,10 +208,10 @@
         },
         "yAt": {
           "0": [
-            1754
+            1682
           ],
           "2": [
-            1030
+            884
           ],
           "4": [
             452
@@ -243,7 +242,7 @@
         "holdsTarget": true,
         "smallestXHeight": {
           "px": 11,
-          "text": "12px CSS product type (Wanted Sans / Plex Mono), drawn at 24 source px; x-height 0.46-0.52 of the em",
+          "text": "12px CSS product type (Wanted Sans / Plex Mono), drawn at 24 source px; x-height 0.46-0.52 of the em. Embedded page renders (the PDF pages and reference renders on screen) are excluded: their type is the filing's own, at the page's scale",
           "at": "every frame: the recording is the product UI at deviceScaleFactor 2",
           "window": "crop x 0.5, y 0.2"
         }
@@ -266,10 +265,10 @@
             1310
           ],
           "6": [
-            718
+            714
           ],
           "8": [
-            894
+            946
           ],
           "10": [
             1310
@@ -291,7 +290,7 @@
         "holdsTarget": true,
         "smallestXHeight": {
           "px": 11,
-          "text": "12px CSS product type (Wanted Sans / Plex Mono), drawn at 24 source px; x-height 0.46-0.52 of the em",
+          "text": "12px CSS product type (Wanted Sans / Plex Mono), drawn at 24 source px; x-height 0.46-0.52 of the em. Embedded page renders (the PDF pages and reference renders on screen) are excluded: their type is the filing's own, at the page's scale",
           "at": "every frame: the recording is the product UI at deviceScaleFactor 2",
           "window": "crop x 0.5, y 0.25"
         }
@@ -311,7 +310,7 @@
             1581
           ],
           "4": [
-            1539
+            1529
           ],
           "6": [
             1101
@@ -320,14 +319,12 @@
             1101
           ],
           "10": [
-            697
+            675
           ],
           "12": [
             501
           ],
-          "14": [
-            -15
-          ],
+          "14": [],
           "16": [],
           "18": []
         },
@@ -335,7 +332,7 @@
         "holdsTarget": false,
         "smallestXHeight": {
           "px": 11,
-          "text": "12px CSS product type (Wanted Sans / Plex Mono), drawn at 24 source px; x-height 0.46-0.52 of the em",
+          "text": "12px CSS product type (Wanted Sans / Plex Mono), drawn at 24 source px; x-height 0.46-0.52 of the em. Embedded page renders (the PDF pages and reference renders on screen) are excluded: their type is the filing's own, at the page's scale",
           "at": "every frame: the recording is the product UI at deviceScaleFactor 2",
           "window": "crop x 0.5, y 0.4"
         }
@@ -352,7 +349,7 @@
             1196
           ],
           "2": [
-            622
+            540
           ],
           "4": [
             186
@@ -361,13 +358,13 @@
             186
           ],
           "8": [
-            504
+            584
           ],
           "10": [
             1196
           ],
           "12": [
-            196
+            192
           ],
           "14": [
             186
@@ -383,7 +380,7 @@
         "holdsTarget": true,
         "smallestXHeight": {
           "px": 11,
-          "text": "12px CSS product type (Wanted Sans / Plex Mono), drawn at 24 source px; x-height 0.46-0.52 of the em",
+          "text": "12px CSS product type (Wanted Sans / Plex Mono), drawn at 24 source px; x-height 0.46-0.52 of the em. Embedded page renders (the PDF pages and reference renders on screen) are excluded: their type is the filing's own, at the page's scale",
           "at": "every frame: the recording is the product UI at deviceScaleFactor 2",
           "window": "crop x 0, y 0.1"
         }
@@ -392,7 +389,7 @@
   },
   "blankScan": {
     "method": "Re-record: the Release 3 cell rule over the stage's whole 2x crop window (columns crop.x .. crop.x + 0.5 split into its two panes, rows crop.y .. crop.y + 0.5), on all 450 source PNG frames of each cut (2880x1800, the frames the cut was encoded from). 24x24 source-px cells from the window origin; a cell holds ink when its luma range (sampled every 2px) is >= 48; a pane is blank when >= blankAt of its cells hold none. share = frames with neither pane blank / frames. defaultView crop only when share >= threshold and the window holds the reading target (cropCheck.holdsTarget).",
-    "receipt": "outputs/tavonel-research-replan-20261013/design-20261104/impl/FILM-RERECORD-REPORT.md (ai-knowledge-compiler), tool scan.mjs",
+    "receipt": "scripts/film/ (record.mjs probes, scan.mjs scans); run report: outputs/tavonel-research-replan-20261013/design-20261104/impl/ (ai-knowledge-compiler)",
     "blankAt": 0.99,
     "threshold": 0.85,
     "stages": {
@@ -444,7 +441,7 @@
   },
   "phonePaneScan": {
     "method": "Re-record: the blankScan cell rule over one w x w*5/4 source-px rect at the stage's phonePane, on all 450 source frames; a frame is blank when >= blankAt of the rect's cells hold none. share = frames not blank / frames; a phonePane is used only when share >= threshold. All four rects are 684 px wide (the spec ceiling), so 12px CSS product type draws at about 12.5px on a 390 phone.",
-    "receipt": "outputs/tavonel-research-replan-20261013/design-20261104/impl/FILM-RERECORD-REPORT.md (ai-knowledge-compiler), tool scan.mjs",
+    "receipt": "scripts/film/ (record.mjs probes, scan.mjs scans); run report: outputs/tavonel-research-replan-20261013/design-20261104/impl/ (ai-knowledge-compiler)",
     "blankAt": 0.99,
     "threshold": 0.85,
     "rect": "per stage: phonePane.w x phonePane.w * 5 / 4 source px (4:5)",
@@ -488,6 +485,28 @@
         "frames": 450,
         "blankFrames": 0,
         "share": 1
+      }
+    }
+  },
+  "edgeBandScan": {
+    "method": "Review R1 MAJOR-1: a frame has an edge band when any of its top or bottom 16 source-px rows has a full-width mean luma < 60 (scan.mjs edgeBand; record.mjs retakes such a capture). bandFrames = frames of the 450 with a band.",
+    "receipt": "scripts/film/ (record.mjs probes, scan.mjs scans); run report: outputs/tavonel-research-replan-20261013/design-20261104/impl/ (ai-knowledge-compiler)",
+    "stages": {
+      "sources": {
+        "frames": 450,
+        "bandFrames": 0
+      },
+      "read": {
+        "frames": 450,
+        "bandFrames": 0
+      },
+      "structure": {
+        "frames": 450,
+        "bandFrames": 0
+      },
+      "world": {
+        "frames": 450,
+        "bandFrames": 0
       }
     }
   }

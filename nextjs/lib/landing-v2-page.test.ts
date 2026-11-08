@@ -404,7 +404,7 @@ describe("landing v2 -- the composition with the specimen strip rendered", () =>
     expect(poster).toHaveLength(1);
     expect([attr(poster[0]!, "loading"), attr(poster[0]!, "fetchpriority")]).toEqual(["eager", "high"]);
     // The whole render, not <main>: React writes a preload() hint ahead of the content (merge review A2).
-    const posterPreload = /<link[^>]*rel="preload"[^>]*poster-c1/;
+    const posterPreload = /<link[^>]*rel="preload"[^>]*poster-r2-c1/;
     expect(page).toMatch(posterPreload);
     expect(elements(hero, "img").filter(open => attr(open, "fetchpriority") === "high")).toHaveLength(1);
     expect(hero).not.toContain("data-specimen-strip");
@@ -630,7 +630,7 @@ describe("landing v2 -- the composition", () => {
       expect(main).not.toContain("<canvas");
       expect(main).not.toContain("data-compiler-specimen");
       expect(elements(sceneOf(main, "s1"), "div").filter(open => attr(open, "role") === "tablist")).toHaveLength(1);
-      expect(sceneOf(main, "s1")).toContain('data-video-primary-src="/film/hero-c1.mp4"');
+      expect(sceneOf(main, "s1")).toContain('data-video-primary-src="/film/hero-r2-c1.mp4"');
       expect(sceneOf(main, "s1")).not.toContain("data-source-inspection-film");
       const text = readable(main);
       for (const tab of buildProofTabs()) expect(text).not.toContain(tab.question);
@@ -845,13 +845,13 @@ describe("landing v2 -- the lead and the workbench", () => {
     expect(readable(hero)).toContain(
       locale === "ko" ? "각 진술에 원문 페이지와 영역이 남습니다." : "Each statement keeps its source page and region.",
     );
-    expect(hero).toContain("/film/poster-c1-t13.60-2x.webp");
-    expect(hero).toContain("/film/poster-c1-t13.60-2x.avif");
+    expect(hero).toContain("/film/poster-r2-c1-t13.60-2x.webp");
+    expect(hero).toContain("/film/poster-r2-c1-t13.60-2x.avif");
     expect(elements(hero, "button").filter(open => attr(open, "role") === "tab")).toHaveLength(4);
     // Founder ask 2026-10-27: the film opens compact (the whole frame) at every width; the pane still waits for Focus details.
     expect(hero).toContain('data-mobile-view="fit"');
     expect(hero).toContain('data-wide-view="fit"');
-    expect(hero).not.toContain("/film/poster-c1-t13.60-pane1-684x855.avif");
+    expect(hero).not.toContain("/film/poster-r2-c1-t13.60-pane1-684x855.avif");
     expect(hero).not.toContain('data-source-inspection-film');
     // The not-customer-results disclosure stays (FINAL-SPEC D-9 shortens its wording only).
     expect(readable(hero)).toContain(locale === "ko" ? "고객 결과가 아닙니다" : "not customer results");

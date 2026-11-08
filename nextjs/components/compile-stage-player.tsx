@@ -55,7 +55,13 @@ const MOBILE_FOCUS_PANE = [0, 1, 0, 0] as const;
 export type ReadingTarget = { pane: 0 | 1 | 2 | 3; text: string };
 
 /*
-  Home Focus crop (Release 3, brief move 2c). At 1200px the whole 2880x1800 cut draws its 7-9px
+  Home Focus crop (Release 3, brief move 2c). History: the coordinates and scores in this block and the two below
+  (WORKING COPY.md, # Payment terms, CHANGED, nodes lit, the 520px and MCP rects) describe the Release 3 compile-cut*
+  films. The Home cuts are the design-C re-record now; their windows, rects and scans are the re-record block above
+  STAGE_FRAMES and compile-stage-player.frame-strings.json. The rules (2x window, 24px-cell blank scan, 85%
+  threshold, 4:5 phone rect) are unchanged.
+
+  At 1200px the whole 2880x1800 cut draws its 7-9px
   (source) x-height at 3-4px, so on a desktop the Home film opens on a 2x window instead: two
   adjacent panes, half the frame's height, the poster and the playing cut cropped alike. `x`/`y`
   are where the window starts, as fractions of the frame, so the two panes it shows are
@@ -108,9 +114,12 @@ export type PosterMask = { poster: string; color: string; rects: readonly { x: n
   and an auto-advance changes only --pane-x / --pane-y / --pane-w: the panel stays 4:5, no layout moves.
 
   Each rect holds ink in >= 85% of the presented frames of its cut (the blankScan rule above, over the
-  rect alone; phonePaneScan in compile-stage-player.frame-strings.json). Stage 4's first rect, the
-  ASSISTANT pane at y 516, scored 78.1% -- the answer rows are empty until the question is asked -- so
-  stage 4 uses the same pane at y 180, where the MCP session opens (96.2%).
+  rect alone; phonePaneScan in compile-stage-player.frame-strings.json).
+
+  Release 3 history from here to the end of this block (the compile-cut* films; the re-recorded Home cuts'
+  rects are all 684px wide): stage 4's first rect, the ASSISTANT pane at y 516, scored 78.1% -- the answer
+  rows are empty until the question is asked -- so stage 4 used the same pane at y 180, where the MCP
+  session opens (96.2%).
 
   Fix round R3 (review 2026-10-26 B-4): the phone Focus view reads >= 9px equivalent on every stage, as
   main asserted. Stages 2 and 3 hold 7 source-px text, which a 684px rect draws at 7.21px on a 390 phone,
