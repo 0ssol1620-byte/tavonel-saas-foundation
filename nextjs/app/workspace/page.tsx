@@ -94,6 +94,7 @@ import type { BlockerResolution, CompileBlocker } from "@/lib/compile-job-store"
 import ReviewQueue from "@/components/review-queue";
 import WorldFreshness from "@/components/world-freshness";
 import FounderTestResetPanel from "@/components/founder-test-reset-panel";
+import SchemaReview, { useOntologyInductionEnabled } from "@/components/workspace/schema-review";
 import {
   buildReviewQueue,
   currentReviewLedger,
@@ -266,6 +267,7 @@ const SURFACE_TO_TAB: Record<WorkspaceSurface, WorkspaceTab> = {
   review: "knowledge",
   changes: "knowledge",
   world: "knowledge",
+  schema: "knowledge",
   ask: "knowledge",
   connections: "connections",
   developer: "developers",
@@ -282,9 +284,10 @@ const LEGACY_TAB_TO_SURFACE: Record<WorkspaceTab, WorkspaceSurface> = {
   integrity: "settings",
 };
 
-function readWorkspaceLocation(): { surface: WorkspaceSurface; tab: WorkspaceTab } {
+/** `schemaEnabled`: /workspace/schema is a surface only where the C1 flag is set for this build. */
+function readWorkspaceLocation(schemaEnabled: boolean): { surface: WorkspaceSurface; tab: WorkspaceTab } {
   const segment = window.location.pathname.split("/").filter(Boolean)[1];
-  const knownSurface = Object.hasOwn(SURFACE_TO_TAB, segment ?? "") ? segment as WorkspaceSurface : null;
+  const knownSurface = Object.hasOwn(SURFACE_TO_TAB, segment ?? "") && (schemaEnabled || segment !== "schema") ? segment as WorkspaceSurface : null;
   if (knownSurface) {
     const detail = window.location.pathname.split("/").filter(Boolean)[2];
     return { surface: knownSurface, tab: knownSurface === "settings" && detail === "trust" ? "integrity" : SURFACE_TO_TAB[knownSurface] };
@@ -360,16 +363,17 @@ export default function WorkspacePage() {
   // Read from the URL on mount so a linked or reloaded workspace opens on the same view.
   const [tab, setTab] = useState<WorkspaceTab>("overview");
   const [surface, setSurface] = useState<WorkspaceSurface>("home");
+  const schemaEnabled = useOntologyInductionEnabled();
   useEffect(() => {
     const applyLocation = () => {
-      const location = readWorkspaceLocation();
+      const location = readWorkspaceLocation(schemaEnabled);
       setTab(location.tab);
       setSurface(location.surface);
     };
     applyLocation();
     window.addEventListener("popstate", applyLocation);
     return () => window.removeEventListener("popstate", applyLocation);
-  }, []);
+  }, [schemaEnabled]);
   const [busy, setBusy] = useState(false);
   const corpusFollowRef = useRef<AbortController | null>(null);
   const [compileJob, setCompileJob] = useState<CompileJobView | null>(null);
@@ -3523,6 +3527,12 @@ export default function WorkspacePage() {
                   />
                 ) : null}
               </div>
+              ) : null}
+
+              {/* W2-C1: candidate-only schema review; nothing here is used downstream yet. */}
+              {surface === "schema" && schemaEnabled ? (
+                <SchemaReview collection={collectionResult
+                  ? { collectionId: collectionResult.collectionId, manifestDigest: collectionResult.manifestDigest } : null} />
               ) : null}
 
               {surface === "changes" ? (

@@ -8038,3 +8038,19 @@ test('affected w1-trial-ops owner: 10 exact paths select 17 direct suites and no
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
 });
+// W2-C1 ontology (codex/w2-c1-20261108): one finite owner, restated independently of the exported constants.
+import { W2_C1_ONTOLOGY_AFFECTED_PATHS, W2_C1_ONTOLOGY_AFFECTED_UNIT_FILES, W2_C1_ONTOLOGY_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+test('affected w2-c1-ontology owner: 12 exact paths select 10 direct suites and 1 browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/api/ontology/candidates/[candidateId]/route.ts', 'app/api/ontology/candidates/route.ts', 'components/workspace/schema-review.module.css', 'components/workspace/schema-review.tsx', 'e2e/workspace-schema-review.spec.ts', 'lib/ontology-derivation.test.ts', 'lib/ontology-derivation.ts', 'lib/ontology-schema.test.ts', 'lib/ontology-schema.ts', 'lib/schema-review-copy.test.ts', 'lib/schema-review-copy.ts', 'scripts/ontology-derivation-arena.mjs'];
+  const suites = ['lib/api-error-codes.test.ts', 'lib/brand-copy.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/ontology-derivation.test.ts', 'lib/ontology-schema.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/schema-review-copy.test.ts'];
+  const browsers = ['e2e/workspace-schema-review.spec.ts'];
+  assert.deepEqual([[...W2_C1_ONTOLOGY_AFFECTED_PATHS], [...W2_C1_ONTOLOGY_AFFECTED_UNIT_FILES], [...W2_C1_ONTOLOGY_AFFECTED_BROWSER_FILES]], [paths, suites, browsers]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['w2-c1-ontology'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['w2-c1-ontology'], [], suites, browsers, []], path);
+  }
+  for (const adjacent of ['nextjs/lib/ontology-class-rename-preview.ts', 'nextjs/lib/ontology-schema.tsx', 'nextjs/app/api/ontology/route.ts', 'nextjs/app/api/ontology/candidates/[candidateId]/decision/route.ts', 'nextjs/components/workspace/schema-review.test.tsx', 'nextjs/e2e/workspace-schema.spec.ts', 'nextjs/scripts/ontology-derivation-arena.test.mjs']) {
+    assert.ok(!AFFECTED_GROUPS.some(o => o.group === 'w2-c1-ontology' && o.match.test(adjacent)), adjacent);
+  }
+});

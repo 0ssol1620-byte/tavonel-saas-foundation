@@ -1,0 +1,40 @@
+/* C1 Schema screen. Workspace tokens only; no motion; 12 px floor; 44 px targets; wraps at 360 px. */
+.panel { min-width: 0; margin: 0 0 24px; }
+.panel h2 { margin: 0 0 10px; font-size: var(--t-6, 20px); }
+.panel p { max-width: 74ch; line-height: 1.6; margin: 0 0 10px; }
+.note { color: var(--text-mid); font-size: var(--t-3, 14px); }
+.notice { padding: 10px 12px; border: 1px solid var(--hairline-hi); background: var(--g1); }
+.empty { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 16px 0; }
+.empty p { margin: 0; }
+
+.group { margin-top: 24px; min-width: 0; }
+.group h3 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 12px; font-size: var(--t-5, 18px); }
+.count { color: var(--text-mid); font: 14px var(--f-mono); }
+.list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+
+/* One quiet block per candidate; the decided ones recede but stay readable. */
+.card { min-width: 0; padding: 16px; border: 1px solid var(--hairline); background: var(--g1); }
+.card[data-state="rejected"] { color: var(--text-mid); }
+.card[data-state="certified"] { border-color: var(--hairline-hi); }
+.cardHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.cardHead h4 { margin: 0; font-size: var(--t-4, 16px); overflow-wrap: anywhere; }
+.state { color: var(--text-mid); font-size: var(--t-3, 14px); }
+.card[data-state="certified"] .state { color: var(--text-hi); font-weight: 600; }
+.signature { font: 13px var(--f-mono); color: var(--text-mid); overflow-wrap: anywhere; }
+
+.evidenceHeading { margin: 14px 0 6px; font-size: var(--t-3, 14px); color: var(--text-mid); font-weight: 600; }
+.evidence { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.evidence blockquote { margin: 0; padding: 8px 10px; background: var(--ground, #fff); font-size: var(--t-3, 14px); line-height: 1.55; overflow-wrap: anywhere; }
+.where { margin: 4px 0 0 !important; color: var(--text-mid); font-size: 12px; }
+.mono { font-family: var(--f-mono); }
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.actions button, .empty button { min-height: 44px; padding: 0 16px; border: 1px solid var(--hairline-hi); background: var(--ground, #fff); color: var(--text-hi); font: inherit; font-size: var(--t-3, 14px); cursor: pointer; }
+.actions button:disabled, .empty button:disabled { cursor: not-allowed; opacity: 0.55; }
+.actions button:focus-visible, .empty button:focus-visible, .form :is(input, textarea):focus-visible { outline: 2px solid var(--text-hi); outline-offset: 2px; }
+.primary { border-color: var(--text-hi) !important; font-weight: 600; }
+
+.form { display: grid; gap: 6px; margin-top: 14px; min-width: 0; }
+.form label { font-size: var(--t-3, 14px); font-weight: 600; }
+.form input, .form textarea { width: 100%; min-height: 44px; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--hairline-hi); background: var(--ground, #fff); color: var(--text-hi); font: inherit; font-size: 16px; }
+.form p { margin: 0; }

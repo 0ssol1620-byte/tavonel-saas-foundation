@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import {
-  Activity, Braces, CircleHelp, Command, EyeOff, FileStack, GitCompareArrows, Home, Inbox, LogOut, Network, Plug, RefreshCw, Search, Settings, Upload, X,
+  Activity, Braces, CircleHelp, Command, EyeOff, FileStack, GitCompareArrows, Home, Inbox, ListChecks, LogOut, Network, Plug, RefreshCw, Search, Settings, Upload, X,
 } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import Logomark from "@/components/logomark";
 import { useDialogFocus } from "@/components/world-visual/use-dialog-focus";
 import type { ResumeAccess } from "@/lib/checkout-intent";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { useOntologyInductionEnabled } from "@/components/workspace/schema-review";
 import styles from "@/app/workspace/workspace-ultimate.module.css";
 
-export type WorkspaceSurface = "home" | "sources" | "runs" | "review" | "changes" | "world" | "ask" | "connections" | "developer" | "activity" | "settings";
+export type WorkspaceSurface = "home" | "sources" | "runs" | "review" | "changes" | "world" | "schema" | "ask" | "connections" | "developer" | "activity" | "settings";
 
 /*
   `rail` marks the surfaces the condensed mobile rail shows. It used to be decided by counting
@@ -29,6 +30,8 @@ const MORE_ITEMS: NavItem[] = [
   { surface: "review", label: "Review", icon: GitCompareArrows, shortcut: "G R" },
   { surface: "changes", label: "Changes", icon: Inbox },
   { surface: "world", label: "Knowledge graph", icon: Network, shortcut: "G W" },
+  // W2-C1: listed only where TAVONEL_ONTOLOGY_INDUCTION_ENABLED is set (filtered below).
+  { surface: "schema", label: "Schema", icon: ListChecks },
   { surface: "connections", label: "Connections", icon: Plug, secondary: true },
   { surface: "developer", label: "Developer tools", icon: Braces, secondary: true },
   { surface: "activity", label: "Activity", icon: Activity, secondary: true },
@@ -50,6 +53,7 @@ const SURFACE_TITLES: Record<WorkspaceSurface, string> = {
   review: "Review",
   changes: "Changes",
   world: "Knowledge graph",
+  schema: "Schema",
   ask: "Use with AI",
   connections: "Connections",
   developer: "Developer tools",
@@ -139,7 +143,9 @@ export default function WorkspaceUltimateShell({
     return () => document.removeEventListener("pointerdown", close);
   }, []);
   const hasDeveloperAccess = access?.source === "owner" || access?.source === "paid";
-  const moreItems = MORE_ITEMS.filter((item) => hasDeveloperAccess || !["connections", "developer"].includes(item.surface));
+  const ontologyEnabled = useOntologyInductionEnabled();
+  const moreItems = MORE_ITEMS.filter((item) => (hasDeveloperAccess || !["connections", "developer"].includes(item.surface))
+    && (ontologyEnabled || item.surface !== "schema"));
 
   useEffect(() => {
     let current = true;
@@ -229,6 +235,7 @@ export default function WorkspaceUltimateShell({
     { group: "Go to", label: "Review", hint: "G R", surface: "review" as const },
     { group: "Go to", label: "Changes", hint: "", surface: "changes" as const },
     { group: "Go to", label: "Knowledge graph", hint: "G W", surface: "world" as const },
+    ...(ontologyEnabled ? [{ group: "Go to", label: "Schema", hint: "", surface: "schema" as const }] : []),
     { group: "Go to", label: "Use with AI", hint: "G A", surface: "ask" as const },
     { group: "Go to", label: "Activity", hint: "C", surface: "activity" as const },
     { group: "Go to", label: "Settings", hint: "", surface: "settings" as const },

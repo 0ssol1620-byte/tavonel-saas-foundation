@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { RemoteMcpAvailability } from "@/components/workspace/connect-ai-panel";
 import { remoteMcpEnabled } from "@/lib/remote-mcp";
+import { OntologyInductionAvailability } from "@/components/workspace/schema-review";
+import { ontologyInductionEnabled } from "@/lib/ontology-schema";
 
 // Direction C (2026-11-04): the workspace stands on the warm canvas, so the browser chrome does too.
 export const viewport: Viewport = { themeColor: "#F5F3EE", colorScheme: "light" };
@@ -17,5 +19,10 @@ export const metadata: Metadata = {
 
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
   // W1-A1: the Connect AI panel shows the hosted MCP URL only where this deployment serves it.
-  return <RemoteMcpAvailability enabled={remoteMcpEnabled()}>{children}</RemoteMcpAvailability>;
+  // W2-C1: the Schema surface exists only where TAVONEL_ONTOLOGY_INDUCTION_ENABLED is set for this build.
+  return (
+    <RemoteMcpAvailability enabled={remoteMcpEnabled()}>
+      <OntologyInductionAvailability enabled={ontologyInductionEnabled()}>{children}</OntologyInductionAvailability>
+    </RemoteMcpAvailability>
+  );
 }

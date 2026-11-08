@@ -2885,6 +2885,15 @@ export function vitestDiscoveryConfigFailures(source) {
 }
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
+// W2-C1 ontology schema derivation + candidate-only certification (codex/w2-c1-20261108): the deterministic baseline deriver
+// and model slot, the Arena script over the public SEC sample, the server store and public/internal DTO split, the two
+// /api/ontology routes, the Schema screen with its copy, and their suites. They select those suites, the suites that read
+// every app/api route source, the error-code catalogue and the copy sweep, and the Schema screen's browser suite. Product code,
+// so never nativeReuse. The migrations and pgTAP files stay with database-contract; app/workspace/*, the shell, api-error-codes,
+// brand-copy.test, founder-test-reset-migration.test and route-classification.json keep their existing owners.
+export const W2_C1_ONTOLOGY_AFFECTED_PATHS = Object.freeze(['app/api/ontology/candidates/[candidateId]/route.ts', 'app/api/ontology/candidates/route.ts', 'components/workspace/schema-review.module.css', 'components/workspace/schema-review.tsx', 'e2e/workspace-schema-review.spec.ts', 'lib/ontology-derivation.test.ts', 'lib/ontology-derivation.ts', 'lib/ontology-schema.test.ts', 'lib/ontology-schema.ts', 'lib/schema-review-copy.test.ts', 'lib/schema-review-copy.ts', 'scripts/ontology-derivation-arena.mjs']);
+export const W2_C1_ONTOLOGY_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error-codes.test.ts', 'lib/brand-copy.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/ontology-derivation.test.ts', 'lib/ontology-schema.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/schema-review-copy.test.ts']);
+export const W2_C1_ONTOLOGY_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/workspace-schema-review.spec.ts']);
 export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('public-marketing-surface', new RegExp(`^(?:${exactPathAlternation(PUBLIC_MARKETING_AFFECTED_PATHS)})$`),
     { unitFiles: PUBLIC_MARKETING_AFFECTED_UNIT_FILES, browserFiles: PUBLIC_MARKETING_AFFECTED_BROWSER_FILES }),
@@ -3111,7 +3120,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('shared-test-discovery', /^nextjs\/vitest\.config\.ts$/, { selector: true }),
   affectedGroup('database-contract', /^supabase\/(?:migrations|tests|drafts)\/[A-Za-z0-9_./-]+\.sql$/, { unitFiles: ['lib/pgtap-fixtures.test.ts'], database: true }),
   affectedGroup('native-harness-docs', /^docs\/integration\/NATIVE_WORLD_[A-Z_]+\.md$/),
-  affectedGroup('repository-docs', /^(?:docs\/(?!integration\/NATIVE_WORLD_)[A-Za-z0-9_./-]+\.md|[A-Za-z0-9_.-]+\.md)$/, { nativeReuse: true }),
+  affectedGroup('repository-docs', /^(?:docs\/(?!integration\/NATIVE_WORLD_)[A-Za-z0-9_./-]+\.md|[A-Za-z0-9_.-]+\.md)$/, { nativeReuse: true }),  // w2-c1-ontology: the 12 exact paths above select 10 direct suites and 1 browser suite.
+  affectedGroup('w2-c1-ontology', new RegExp(`^nextjs/(?:${exactPathAlternation(W2_C1_ONTOLOGY_AFFECTED_PATHS)})$`),
+    { unitFiles: W2_C1_ONTOLOGY_AFFECTED_UNIT_FILES, browserFiles: W2_C1_ONTOLOGY_AFFECTED_BROWSER_FILES }),
 ]);const regularModes = ['100644', '100755'];
 
 export function parseAffectedRawDiff(output) {

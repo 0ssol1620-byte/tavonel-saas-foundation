@@ -587,6 +587,27 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
       { code: "CONTENT_LENGTH_MISMATCH", status: 400, meaning: "The body length did not match the declared `content-length`.", whatToDo: "Send an accurate `content-length`." },
     ],
   },
+  {
+    title: "Ontology schema (W2-C1)",
+    summary: "`/api/ontology/candidates`: a proposed schema for one World, and a person's certify, reject or edit on each candidate. Off unless the deployment sets `TAVONEL_ONTOLOGY_INDUCTION_ENABLED`; nothing downstream reads a certified candidate yet.",
+    codes: [
+      { code: "ONTOLOGY_INDUCTION_DISABLED", status: 404, meaning: "Schema derivation is not enabled on this deployment. Nothing was read or written.", whatToDo: "Nothing a caller can send; the feature is off here." },
+      { code: "ONTOLOGY_REQUEST_INVALID", status: 400, meaning: "The collection id, manifest digest, candidate id or verdict did not validate, or the body was not JSON or too large.", whatToDo: "Send `collectionId` and `manifestDigest` as the World reported them, and a verdict of `certify`, `reject` or `edit`." },
+      { code: "ONTOLOGY_ROLE_REQUIRED", status: 403, meaning: "Only a workspace owner or admin can propose or decide a schema.", whatToDo: "Ask an owner or admin of this workspace." },
+      { code: "ONTOLOGY_WORLD_CHANGED", status: 409, meaning: "The World revision loaded is not the one named, so nothing was derived from it.", whatToDo: "Reload the World and derive from the revision it reports." },
+      { code: "ONTOLOGY_SOURCE_UNBOUND", status: 422, meaning: "The World's evidence does not name workspace documents, so a derivation could not be erased on source deletion and is not stored.", whatToDo: "Derive from a World compiled from this workspace's own sources." },
+      { code: "ONTOLOGY_NO_EVIDENCE", status: 422, meaning: "The World has no evidence to derive a schema from.", whatToDo: "Compile sources first." },
+      { code: "ONTOLOGY_NO_CANDIDATES", status: 422, meaning: "The evidence supported no candidate. Nothing was stored rather than an empty proposal.", whatToDo: "Nothing to do; add sources and derive again." },
+      { code: "ONTOLOGY_EVIDENCE_INVALID", status: 422, meaning: "A candidate had no evidence, or evidence that is not verbatim in its unit, or the proposal exceeded 25 types or 40 relations. Nothing was stored.", whatToDo: "Nothing a caller can send; this is a deriver fault and is reported." },
+      { code: "ONTOLOGY_CANDIDATE_NOT_FOUND", status: 404, meaning: "The candidate is not in the latest derivation of that collection in this workspace. The same answer for another workspace's candidate.", whatToDo: "Reload the proposed schema and decide a candidate it lists." },
+      { code: "ONTOLOGY_CANDIDATE_ALREADY_DECIDED", status: 409, meaning: "The candidate was already certified or rejected; both are final.", whatToDo: "Reload to see the decision." },
+      { code: "ONTOLOGY_DECISION_REASON_REQUIRED", status: 400, meaning: "Every verdict needs a reason of 8 to 1,000 characters; it is recorded with the decision.", whatToDo: "Send `reason`." },
+      { code: "ONTOLOGY_DECISION_INVALID", status: 400, meaning: "An edit needs a name of 1 to 120 characters and a description of at most 600.", whatToDo: "Send `label` and, optionally, `description`." },
+      { code: "ONTOLOGY_SOURCE_DELETED", status: 409, meaning: "A document the derivation read has a deletion requested, so its candidates can no longer be decided.", whatToDo: "Derive again from the current World." },
+      { code: "ONTOLOGY_STORE_NOT_CONFIGURED", status: 503, meaning: "The deployment has no database configuration for this feature.", whatToDo: "Nothing a caller can send." },
+      { code: "ONTOLOGY_STORE_FAILED", status: 503, meaning: "The schema store could not be read or written. Nothing was recorded.", whatToDo: "Retry." },
+    ],
+  },
 ] as const;
 
 /** The catalogue, flat. The page renders the groups; the spec and the tests want the list. */
@@ -683,4 +704,6 @@ export const API_ERROR_SCAN_ROOTS: readonly string[] = [
   "lib/developer-store.ts",
   "lib/connection-source-inventory.ts",
   "lib/activation-rate-limit.ts",
+  "app/api/ontology",
+  "lib/ontology-schema.ts",
 ];

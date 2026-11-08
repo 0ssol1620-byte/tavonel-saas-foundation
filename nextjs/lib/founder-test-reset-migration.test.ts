@@ -256,6 +256,7 @@ describe("founder test reset keeps its archived-row DELETE allowance in every gu
   const RESET = ["finalize_founder_test_reset", "founder_test_reset_table_counts", "founder_test_reset_rows_fingerprint"];
   const B1 = "20261104091000_founder_test_reset_source_fingerprints.sql";
   const OPS = "20261105010000_founder_test_reset_operations_receipts.sql";
+  const ONTOLOGY = "20261107110100_founder_test_reset_ontology.sql";
   const deletedIn = (finalize: string) => [...finalize.matchAll(/delete\s+from\s+public\.([a-z0-9_]+)/gi)].map((m) => m[1]!);
   const resetBody = (file: string, name: string) => {
     const match = read(file).match(new RegExp(
@@ -264,10 +265,10 @@ describe("founder test reset keeps its archived-row DELETE allowance in every gu
     return match![1]!;
   };
 
-  it("is the live definition of every reset function it replaces, until 20261104091000 and 20261105010000 extend it", () => {
+  it("is the live definition of every reset function it replaces, until 20261104091000, 20261105010000 and 20261107110100 extend it", () => {
     for (const name of RESET) {
       const file = files.filter((candidate) => new RegExp(`function\\s+public\\.${name}\\(`, "i").test(read(candidate))).at(-1);
-      expect([FIX, B1, OPS], name).toContain(file);
+      expect([FIX, B1, OPS, ONTOLOGY], name).toContain(file);
     }
   });
 
@@ -296,11 +297,9 @@ describe("founder test reset keeps its archived-row DELETE allowance in every gu
     expect(read(B1)).not.toMatch(/^\s*(grant|revoke)\b/im);
   });
 
-  it("20261105010000 (W1-A3) is the live definition and adds only foundation_operations_receipts to 20261104091000's bodies", () => {
+  it("20261105010000 (W1-A3) adds only foundation_operations_receipts to 20261104091000's bodies", () => {
     const RECEIPTS = "foundation_operations_receipts";
     for (const name of RESET) {
-      const file = files.filter((candidate) => new RegExp(`function\\s+public\\.${name}\\(`, "i").test(read(candidate))).at(-1);
-      expect(file, name).toBe(OPS);
       const kept = resetBody(OPS, name).split("\n")
         .filter((line) => !line.includes(`public.${RECEIPTS}`) && !/^\s*-- 20261105010000/.test(line));
       expect(kept.join("\n"), name).toBe(resetBody(B1, name));
@@ -318,6 +317,35 @@ describe("founder test reset keeps its archived-row DELETE allowance in every gu
       + "  for each row execute function public.guard_founder_test_reset_workspace_write();");
     expect(read(OPS)).not.toMatch(/function\s+public\.archive_founder_test_reset_evidence/i);
     expect(read(OPS)).not.toMatch(/^\s*(grant|revoke)\b/im);
+  });
+
+  it("20261107110100 (W2-C1) is the live definition and adds only the three ontology tables to 20261105010000's bodies", () => {
+    const ONTOLOGY_TABLES = ["ontology_derivation_runs", "ontology_schema_candidates", "ontology_certification_decisions"];
+    for (const name of RESET) {
+      const file = files.filter((candidate) => new RegExp(`function\\s+public\\.${name}\\(`, "i").test(read(candidate))).at(-1);
+      expect(file, name).toBe(ONTOLOGY);
+      const kept = resetBody(ONTOLOGY, name).split("\n")
+        .filter((line) => !ONTOLOGY_TABLES.some((table) => line.includes(`public.${table}`)) && !/^\s*-- 20261107110100/.test(line));
+      expect(kept.join("\n"), name).toBe(resetBody(OPS, name));
+    }
+    const after = deletedIn(resetBody(ONTOLOGY, "finalize_founder_test_reset"));
+    expect(new Set(after).size).toBe(48);
+    expect([...selectedTables(resetBody(ONTOLOGY, "founder_test_reset_table_counts"), "count\\(\\*\\)")].sort())
+      .toEqual([...new Set(after)].sort());
+    expect([...selectedTables(resetBody(ONTOLOGY, "founder_test_reset_rows_fingerprint"), "to_jsonb\\(x\\)::text")].sort())
+      .toEqual([...new Set(after)].sort());
+    const finalize = resetBody(ONTOLOGY, "finalize_founder_test_reset");
+    const at = (table: string) => finalize.indexOf(`delete from public.${table} where workspace_key=p_workspace_key;`);
+    // A decision names a candidate and a candidate names its run: children first, inside the reset session.
+    expect(at("ontology_certification_decisions")).toBeGreaterThan(finalize.indexOf("set_config('tavonel.founder_reset_id'"));
+    expect(at("ontology_certification_decisions")).toBeLessThan(at("ontology_schema_candidates"));
+    expect(at("ontology_schema_candidates")).toBeLessThan(at("ontology_derivation_runs"));
+    for (const table of ONTOLOGY_TABLES) {
+      expect(read(ONTOLOGY)).toContain(`create trigger founder_reset_fence before insert or update or delete on public.${table}\n`
+        + "  for each row execute function public.guard_founder_test_reset_workspace_write();");
+    }
+    expect(read(ONTOLOGY)).not.toMatch(/function\s+public\.archive_founder_test_reset_evidence/i);
+    expect(read(ONTOLOGY)).not.toMatch(/^\s*(grant|revoke)\b/im);
   });
 
   it("counts, fingerprints and deletes exactly the tie resolutions on top of 20261002120000", () => {

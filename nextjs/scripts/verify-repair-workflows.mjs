@@ -8,6 +8,7 @@ import { REMOTE_MCP_AFFECTED_PATHS, REMOTE_MCP_AFFECTED_UNIT_FILES, REMOTE_MCP_A
 import { GDP_PDF_RUNS_AFFECTED_PATHS, GDP_PDF_RUNS_AFFECTED_UNIT_FILES, GDP_PDF_RUNS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { PACKET_DELIVERY_AFFECTED_PATHS, PACKET_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { LIBRARY_DEDUP_AFFECTED_PATHS, LIBRARY_DEDUP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { W2_C1_ONTOLOGY_AFFECTED_PATHS, W2_C1_ONTOLOGY_AFFECTED_UNIT_FILES, W2_C1_ONTOLOGY_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { COMPILER_RELEASE_AFFECTED_PATHS, COMPILER_RELEASE_AFFECTED_UNIT_FILES, COMPILER_RELEASE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { HOME_FILM_RERECORD_AFFECTED_PATHS, HOME_FILM_RERECORD_AFFECTED_UNIT_FILES, HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
@@ -868,3 +869,21 @@ assert(VITEST_DISCOVERY_CONFIG_PATH==='nextjs/vitest.config.ts'&&discoveryOwners
 console.log(`Workflow static gates pass. Full qualification still pending for exact CI/Launch runs at this head.`);
 
 assert(collectorVerifier.includes("Symbol('native race final-gate generated plan')")&&collectorVerifier.includes("same(untracked,['nextjs/repair-plan.json'])")&&collectorVerifier.includes("resolve(process.argv[1])===resolve(intent.repoRoot,'nextjs/scripts/repair-scope-gate.mjs')")&&collectorVerifier.includes('if(!bytes.equals(expected))')&&collectorVerifier.includes('nativeRacePlan(normal,proof)')&&collectorVerifier.includes('before.isSymbolicLink()')&&collectorVerifier.includes('final-gate owner output refused'), 'c61 final gate alone qualifies the exact regular generated plan against a fresh sealed-selector recomputation before trusting routing flags; initial admission stays strict');
+// W2-C1 ontology (codex/w2-c1-20261108): the exact owner, its suites and its one browser suite with its reviewed
+// 1440 + 390 row, no neighbour admission and no lane flag.
+{
+  const paths = ['app/api/ontology/candidates/[candidateId]/route.ts', 'app/api/ontology/candidates/route.ts', 'components/workspace/schema-review.module.css', 'components/workspace/schema-review.tsx', 'e2e/workspace-schema-review.spec.ts', 'lib/ontology-derivation.test.ts', 'lib/ontology-derivation.ts', 'lib/ontology-schema.test.ts', 'lib/ontology-schema.ts', 'lib/schema-review-copy.test.ts', 'lib/schema-review-copy.ts', 'scripts/ontology-derivation-arena.mjs'];
+  const suites = ['lib/api-error-codes.test.ts', 'lib/brand-copy.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/ontology-derivation.test.ts', 'lib/ontology-schema.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/schema-review-copy.test.ts'];
+  const browsers = ['e2e/workspace-schema-review.spec.ts'];
+  const neighbors = ['nextjs/lib/ontology-class-rename-preview.ts', 'nextjs/lib/ontology-schema.tsx', 'nextjs/app/api/ontology/route.ts', 'nextjs/app/api/ontology/candidates/[candidateId]/decision/route.ts', 'nextjs/components/workspace/schema-review.test.tsx', 'nextjs/e2e/workspace-schema.spec.ts', 'nextjs/scripts/ontology-derivation-arena.test.mjs'];
+  const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'w2-c1-ontology'), [owner] = owners;
+  assert(owners.length === 1 && JSON.stringify([...W2_C1_ONTOLOGY_AFFECTED_PATHS]) === JSON.stringify(paths)
+    && JSON.stringify([...W2_C1_ONTOLOGY_AFFECTED_UNIT_FILES]) === JSON.stringify(suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(suites)
+    && JSON.stringify([...W2_C1_ONTOLOGY_AFFECTED_BROWSER_FILES]) === JSON.stringify(browsers) && JSON.stringify(owner.browserFiles) === JSON.stringify(browsers)
+    && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
+    && paths.every(p => AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + p)).map(o => o.group).join() === 'w2-c1-ontology')
+    && neighbors.every(p => !owner.match.test(p))
+    && sharedMap.split("\n  ['e2e/workspace-schema-review.spec.ts', ['1440', '390']],").length === 2
+    && [...suites, ...browsers].every(file => existsSync(resolve(repo, 'nextjs', file))),
+    'W2-C1 ontology owner must retain exact paths, direct suites, its 1440 + 390 browser row and no broad neighbor admission');
+}

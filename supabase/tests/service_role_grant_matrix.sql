@@ -16,10 +16,11 @@
 -- ought to have: 0053's header names the source migration for every row. Fourteen tables expect
 -- `{}` because no migration ever granted service_role anything on them; the four
 -- foundation_connection_inventory_* tables (20261002100000) also expect `{}`: RPC-only, as do
--- source_fingerprints and document_relations (20261104090500).
+-- source_fingerprints and document_relations (20261104090500), and the three ontology_* tables
+-- (20261107110000).
 
 begin;
-select plan(73);
+select plan(76);
 
 -- ---------------------------------------------------------------------------
 -- 1. Every table in public, in catalog order.
@@ -83,6 +84,9 @@ select table_privs_are('public', 'foundation_world_events', 'service_role', arra
 select table_privs_are('public', 'foundation_world_versions', 'service_role', array['SELECT']::text[]);
 select table_privs_are('public', 'gpu_job_reservations', 'service_role', array[]::text[]);
 select table_privs_are('public', 'knowledge_graph_candidates', 'service_role', array[]::text[]);
+select table_privs_are('public', 'ontology_certification_decisions', 'service_role', array[]::text[]);
+select table_privs_are('public', 'ontology_derivation_runs', 'service_role', array[]::text[]);
+select table_privs_are('public', 'ontology_schema_candidates', 'service_role', array[]::text[]);
 select table_privs_are('public', 'paddle_customers', 'service_role', array[]::text[]);
 select table_privs_are('public', 'paddle_subscriptions', 'service_role', array[]::text[]);
 select table_privs_are('public', 'plans', 'service_role', array[]::text[]);

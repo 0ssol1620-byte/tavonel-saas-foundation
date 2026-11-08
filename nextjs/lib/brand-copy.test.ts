@@ -133,6 +133,9 @@ const COPY_SURFACES = [
   */
   "components/change-inbox.tsx",
   "lib/change-inbox.ts",
+  /* W2-C1: the workspace Schema screen. Every sentence, both languages, is in the copy module. */
+  "components/workspace/schema-review.tsx",
+  "lib/schema-review-copy.ts",
   /*
     The support matrix. `../shared/capabilityManifest.ts` is on the list because most of the
     words on /sources are in it -- the tiers, the preserved lists and every limitation are data,

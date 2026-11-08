@@ -290,6 +290,23 @@
       "credential": "bearer:shared-secret",
       "note": "FOUNDATION_WORKER_SECRET / CRON_SECRET, constant-time compare, closed when unset. W1-A1 rollback lever: revokes every live remote MCP key (token_kind mcp) in one write; returns counts per workspace, no key material."
     },
+    "app/api/ontology/candidates/[candidateId]/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "W2-C1 certify/reject/edit of one schema candidate. requireFoundationSession (Bearer JWT) plus owner/admin role; 404 before any session read when TAVONEL_ONTOLOGY_INDUCTION_ENABLED is unset."
+    },
+    "app/api/ontology/candidates/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "W2-C1 proposed schema of one World: GET lists, POST derives with the deterministic baseline (owner/admin). 404 before any session read when TAVONEL_ONTOLOGY_INDUCTION_ENABLED is unset."
+    },
     "app/api/operations/p0/admission/route.ts": {
       "type": "P-public",
       "methods": [

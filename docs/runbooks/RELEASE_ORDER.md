@@ -375,3 +375,21 @@ migration은 additive다. 기존 행은 전부 `live`가 되고, create RPC의 �
 - **순서는 자유다.** 앱은 거절을 "기록되지 않은 이벤트"로 다루고(`COMPILE_JOB_ALREADY_SETTLED`, 경고 로그 1줄),
   migration이 없으면 거절이 일어나지 않을 뿐이다. 같은 PR의 lease CAS는 기존 컬럼(`updated_at`)만 쓰므로 migration이 필요 없다.
 - 적용은 **창업자 작업**이다. 동작은 CI db-rehearsal이 `supabase/tests/compile_job_post_terminal_event.sql`로 검증한다.
+
+## 추가 2026-11-08 — W2-C1 온톨로지 스키마 유도·인증 (migration `20261107110000`, `20261107110100`)
+
+- **순서: migration 두 개를 code보다 먼저 적용한다.** `20261107110000_ontology_schema_candidates.sql`은 테이블 3개
+  (`ontology_derivation_runs`, `ontology_schema_candidates`, `ontology_certification_decisions`), RPC 3개, 삭제 trigger 1개를
+  더한다. `20261107110100_founder_test_reset_ontology.sql`은 founder test reset 세 함수를 `20261105010000`의 superset으로 바꾸고
+  세 테이블에 reset fence를 단다. 둘 다 additive이며 기존 객체를 바꾸지 않는다(reset 함수는 같은 이름·서명·보안 모드).
+- **flag가 꺼져 있으면 순서는 상관없다.** `TAVONEL_ONTOLOGY_INDUCTION_ENABLED`가 없으면 workspace에 Schema 항목이 없고,
+  `/api/ontology/*`는 session을 읽기 전에 404 `ONTOLOGY_INDUCTION_DISABLED`로 답하며 RPC를 부르지 않는다. migration 없이 flag를
+  켜면 RPC 호출이 실패해 503 `ONTOLOGY_STORE_FAILED`가 된다(fail closed, 기록 없음).
+- **flag는 build에 고정된다**(`app/workspace/layout.tsx`가 서버에서 읽어 client에 전달, W1-A1 원격 MCP와 같은 방식). 켜고 끄는 것은
+  env 변경 + redeploy(과금 build 1회)다. cohort 제한은 이 wave에 없다. 켜기 전 조건: 독립 리뷰, C1 Arena 보고, founder 승인.
+- **이 wave에서 인증된 후보는 저장만 된다.** 어떤 compile·export·MCP도 읽지 않는다(C2 = W3).
+- **rollback:** env를 지우고 redeploy하거나 직전 deployment로 Instant Rollback. 테이블은 남는다(down migration 없음). 데이터는
+  source 삭제의 derived closure(`derived_purged`)와 founder reset이 지운다.
+- 적용은 **창업자 작업**이다(`execute_sql`, 원장에 version 기록). 동작은 CI db-rehearsal이
+  `supabase/tests/ontology_schema_candidates.sql`, `supabase/tests/founder_test_reset_ontology.sql`,
+  `supabase/tests/service_role_grant_matrix.sql`로 검증한다.
