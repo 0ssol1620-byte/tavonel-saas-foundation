@@ -14,6 +14,8 @@ import subprocess
 import tempfile
 import warnings
 import zipfile
+from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
@@ -62,6 +64,61 @@ MAX_RENDER_PIXELS_TOTAL: Final = 80_000_000
 MAX_OFFICE_PACKAGE_MEMBERS: Final = 500
 MAX_OFFICE_PACKAGE_UNCOMPRESSED_BYTES: Final = 64 * 1024 * 1024
 REQUEST_ID: Final = re.compile(r"^[A-Za-z0-9_-]{16,160}$")
+
+# Measurement limits (PROGRAM-2026-11-04 §4.D, D1 stage 1).
+#
+# MAX_INPUT_BYTES, MAX_PAGES and MAX_OUTPUT_BYTES above are the production limits, the values
+# shared/intakeCeiling.ts and nextjs/lib/intake-ceiling-cross-tree.test.ts pin, and they stay
+# literals. A Cloud Run revision deployed for measurement -- zero traffic, called directly by the
+# operator with measure_limits.py -- may move them with the variables below, never past the
+# stage-2 hard maxima, and never silently: a value that is set and is not a whole number in range
+# refuses the boot. service.yaml sets none of them, so the production revision runs the literals.
+# Raising a production limit is still an edit to the literals, in all three trees at once.
+#
+# TAVONEL_CDR_RASTER_RANGE_PAGES turns on page-range rasterisation: the document is rendered N
+# pages at a time, each range saved before the next is drawn, and the total pixel ceiling applies
+# per range rather than per document. Unset, the whole document is one range: the production path.
+MEASUREMENT_HARD_MAX_INPUT_BYTES: Final = 50 * 1024 * 1024
+MEASUREMENT_HARD_MAX_PAGES: Final = 500
+MEASUREMENT_HARD_MAX_OUTPUT_BYTES: Final = 128 * 1024 * 1024
+MEASUREMENT_HARD_MAX_RANGE_PAGES: Final = 64
+
+
+@dataclass(frozen=True)
+class Limits:
+    input_bytes: int
+    pages: int
+    output_bytes: int
+    # 0: the whole document is one range.
+    raster_range_pages: int
+
+    @property
+    def is_production(self) -> bool:
+        return self == PRODUCTION_LIMITS
+
+
+PRODUCTION_LIMITS: Final = Limits(MAX_INPUT_BYTES, MAX_PAGES, MAX_OUTPUT_BYTES, 0)
+
+
+def read_limits(env: Mapping[str, str]) -> Limits:
+    def bounded(name: str, default: int, high: int) -> int:
+        raw = env.get(name, "").strip()
+        if raw == "":
+            return default
+        if not re.fullmatch(r"[1-9][0-9]{0,9}", raw) or int(raw) > high:
+            raise RuntimeError(f"{name} must be a whole number from 1 to {high}")
+        return int(raw)
+
+    return Limits(
+        input_bytes=bounded("TAVONEL_CDR_MAX_INPUT_BYTES", MAX_INPUT_BYTES, MEASUREMENT_HARD_MAX_INPUT_BYTES),
+        pages=bounded("TAVONEL_CDR_MAX_PAGES", MAX_PAGES, MEASUREMENT_HARD_MAX_PAGES),
+        output_bytes=bounded("TAVONEL_CDR_MAX_OUTPUT_BYTES", MAX_OUTPUT_BYTES, MEASUREMENT_HARD_MAX_OUTPUT_BYTES),
+        raster_range_pages=bounded("TAVONEL_CDR_RASTER_RANGE_PAGES", 0, MEASUREMENT_HARD_MAX_RANGE_PAGES),
+    )
+
+
+# Read once, at boot: a revision's limits are a property of the revision, not of a request.
+LIMITS: Limits = read_limits(os.environ)
 
 # Each allowed input is rendered and reconstructed as an image-only PDF. Archive inputs,
 # executable formats, and unqualified proprietary formats are intentionally rejected.
@@ -301,7 +358,7 @@ def copy_and_digest(upload: UploadFile, target: Path) -> tuple[str, int]:
     with target.open("wb") as output:
         while chunk := upload.file.read(1024 * 1024):
             total += len(chunk)
-            if total > MAX_INPUT_BYTES:
+            if total > LIMITS.input_bytes:
                 raise HTTPException(413, "CDR source exceeds the controlled-beta size limit")
             digest.update(chunk)
             output.write(chunk)
@@ -402,7 +459,7 @@ def convert_image_to_pdf(source: Path, work_dir: Path) -> Path:
             warnings.simplefilter("error", Image.DecompressionBombWarning)
             with Image.open(source) as image:
                 frame_count = int(getattr(image, "n_frames", 1))
-                if frame_count < 1 or frame_count > MAX_PAGES:
+                if frame_count < 1 or frame_count > LIMITS.pages:
                     raise HTTPException(422, "CDR source page count is not qualified")
 
                 frame_sizes: list[tuple[int, int]] = []
@@ -606,6 +663,42 @@ def renders_within_budget(page_sizes: list[tuple[float, float]], scale: float) -
     return max(pixels) <= MAX_RENDER_PIXELS_PER_PAGE and sum(pixels) <= MAX_RENDER_PIXELS_TOTAL
 
 
+def raster_ranges(page_count: int) -> list[range]:
+    """The page ranges rendered one after another. Unconfigured, one range: the whole document."""
+    size = LIMITS.raster_range_pages or page_count
+    return [range(start, min(start + size, page_count)) for start in range(0, page_count, size)]
+
+
+def document_render_scale(page_sizes: list[tuple[float, float]]) -> float:
+    """One scale for every page of the document, qualified against every range's pixel ceiling.
+
+    `renders_within_budget` is monotonic in the scale, so the smallest per-range scale fits every
+    range. With one range this is exactly `qualified_render_scale(page_sizes)`.
+    """
+    return min(qualified_render_scale([page_sizes[index] for index in pages]) for pages in raster_ranges(len(page_sizes)))
+
+
+def _join_pdf_ranges(parts: list[Path], target: Path) -> None:
+    """Concatenate the saved range documents. Their page images are already encoded on disk, so
+    the joined document holds compressed streams, never every range's bitmaps at once."""
+    joined = _new_pdf_document()
+    opened: list[pdfium.PdfDocument] = []
+    try:
+        for part in parts:
+            document = pdfium.PdfDocument(part)
+            opened.append(document)
+            joined.import_pages(document)
+        if len(joined) != sum(len(document) for document in opened):
+            raise HTTPException(422, "CDR sanitized PDF could not be created")
+        _save_pdf(joined, target)
+    finally:
+        for document in opened:
+            document.close()
+        joined.close()
+        for part in parts:
+            part.unlink(missing_ok=True)
+
+
 def rasterize_to_pdf(source: Path, target: Path) -> int:
     source_doc: pdfium.PdfDocument | None = None
     output_doc: pdfium.PdfDocument | None = None
@@ -619,7 +712,7 @@ def rasterize_to_pdf(source: Path, target: Path) -> int:
             raise HTTPException(422, "CDR source renderer rejected this document") from exc
 
         page_count = len(source_doc)
-        if page_count < 1 or page_count > MAX_PAGES:
+        if page_count < 1 or page_count > LIMITS.pages:
             raise HTTPException(422, "CDR source page count is not qualified")
         page_sizes: list[tuple[float, float]] = []
         for page_index in range(page_count):
@@ -628,40 +721,55 @@ def rasterize_to_pdf(source: Path, target: Path) -> int:
                 page_sizes.append(tuple(float(value) for value in page.get_size()))
             finally:
                 page.close()
-        render_scale = qualified_render_scale(page_sizes)
-        output_doc = _new_pdf_document()
-        rendered_pixels = 0
-        for page_index, (page_width, page_height) in enumerate(page_sizes):
-            source_page = source_doc[page_index]
-            bitmap: pdfium.PdfBitmap | None = None
-            try:
-                bitmap = source_page.render(
-                    scale=render_scale,
-                    fill_color=(255, 255, 255, 255),
-                )
-                pixel_count = bitmap.width * bitmap.height
-                if (
-                    bitmap.width < 1
-                    or bitmap.height < 1
-                    or pixel_count > MAX_RENDER_PIXELS_PER_PAGE
-                    or rendered_pixels + pixel_count > MAX_RENDER_PIXELS_TOTAL
-                ):
-                    raise HTTPException(422, "CDR source rendering budget is not qualified")
-                rendered_pixels += pixel_count
+        render_scale = document_render_scale(page_sizes)
+        ranges = raster_ranges(page_count)
+        parts: list[Path] = []
+        written = 0
+        for range_index, pages in enumerate(ranges):
+            output_doc = _new_pdf_document()
+            rendered_pixels = 0
+            for page_index in pages:
+                page_width, page_height = page_sizes[page_index]
+                source_page = source_doc[page_index]
+                bitmap: pdfium.PdfBitmap | None = None
+                try:
+                    bitmap = source_page.render(
+                        scale=render_scale,
+                        fill_color=(255, 255, 255, 255),
+                    )
+                    pixel_count = bitmap.width * bitmap.height
+                    if (
+                        bitmap.width < 1
+                        or bitmap.height < 1
+                        or pixel_count > MAX_RENDER_PIXELS_PER_PAGE
+                        or rendered_pixels + pixel_count > MAX_RENDER_PIXELS_TOTAL
+                    ):
+                        raise HTTPException(422, "CDR source rendering budget is not qualified")
+                    rendered_pixels += pixel_count
 
-                output_page = output_doc.new_page(page_width, page_height)
-                page_image = pdfium.PdfImage.new(output_doc)
-                page_image.set_bitmap(bitmap)
-                page_image.set_matrix(pdfium.PdfMatrix().scale(page_width, page_height))
-                output_page.insert_obj(page_image)
-                output_page.gen_content()
-                output_page.close()
-            finally:
-                if bitmap is not None:
-                    bitmap.close()
-                source_page.close()
-        # This is a newly created document containing only rendered page images; source PDF metadata is never copied.
-        _save_pdf(output_doc, target)
+                    output_page = output_doc.new_page(page_width, page_height)
+                    page_image = pdfium.PdfImage.new(output_doc)
+                    page_image.set_bitmap(bitmap)
+                    page_image.set_matrix(pdfium.PdfMatrix().scale(page_width, page_height))
+                    output_page.insert_obj(page_image)
+                    output_page.gen_content()
+                    output_page.close()
+                finally:
+                    if bitmap is not None:
+                        bitmap.close()
+                    source_page.close()
+            # A newly created document containing only rendered page images; source PDF metadata is never copied.
+            part = target if len(ranges) == 1 else target.with_name(f"{target.stem}.range-{range_index:04d}.pdf")
+            parts.append(part)
+            _save_pdf(output_doc, part)
+            output_doc.close()
+            output_doc = None
+            # Refuse as soon as the ranges already written are over the output bound.
+            written += part.stat().st_size
+            if written > LIMITS.output_bytes:
+                raise HTTPException(422, "CDR sanitized output is outside the controlled-beta size limit")
+        if len(ranges) > 1:
+            _join_pdf_ranges(parts, target)
     except HTTPException:
         raise
     except (OSError, pdfium.PdfiumError, ValueError) as exc:
@@ -672,7 +780,7 @@ def rasterize_to_pdf(source: Path, target: Path) -> int:
         if output_doc is not None:
             output_doc.close()
     size = target.stat().st_size if target.is_file() else 0
-    if size < 1 or size > MAX_OUTPUT_BYTES:
+    if size < 1 or size > LIMITS.output_bytes:
         raise HTTPException(422, "CDR sanitized output is outside the controlled-beta size limit")
     return size
 
@@ -687,7 +795,7 @@ def qualified_text_layer_scale(source: Path) -> float:
             raise HTTPException(422, "CDR password-protected PDF is not qualified") from exc
         raise HTTPException(422, "CDR source renderer rejected this document") from exc
     try:
-        if len(document) < 1 or len(document) > MAX_PAGES:
+        if len(document) < 1 or len(document) > LIMITS.pages:
             raise HTTPException(422, "CDR source page count is not qualified")
         sizes: list[tuple[float, float]] = []
         for index in range(len(document)):
@@ -699,7 +807,7 @@ def qualified_text_layer_scale(source: Path) -> float:
                 page.close()
     finally:
         document.close()
-    return qualified_render_scale(sizes)
+    return document_render_scale(sizes)
 
 
 def remove_tree(path: Path) -> None:
@@ -711,7 +819,7 @@ app.add_middleware(
     CdrRequestBoundary,
     authenticate=require_authentication,
     # File content remains capped separately. This only allows bounded multipart framing.
-    max_body_bytes=MAX_INPUT_BYTES + 64 * 1024,
+    max_body_bytes=LIMITS.input_bytes + 64 * 1024,
     receive_timeout_seconds=15.0,
 )
 
@@ -749,10 +857,16 @@ def healthz() -> JSONResponse:
             content={"status": "unavailable", "reason": "CDR malware scanner is unavailable", "scannerReady": False},
             headers={"cache-control": "no-store", "retry-after": "60"},
         )
-    return JSONResponse(
-        content={"status": "ok", "mode": "pdf-raster", "service": APP_NAME, "scannerReady": scanner_is_ready},
-        headers={"cache-control": "no-store"},
-    )
+    content: dict[str, object] = {"status": "ok", "mode": "pdf-raster", "service": APP_NAME, "scannerReady": scanner_is_ready}
+    if not LIMITS.is_production:
+        # Only a measurement revision says so; the production answer is unchanged.
+        content["measurementLimits"] = {
+            "maxInputBytes": LIMITS.input_bytes,
+            "maxPages": LIMITS.pages,
+            "maxOutputBytes": LIMITS.output_bytes,
+            "rasterRangePages": LIMITS.raster_range_pages,
+        }
+    return JSONResponse(content=content, headers={"cache-control": "no-store"})
 
 
 @app.post("/v1/disarm")

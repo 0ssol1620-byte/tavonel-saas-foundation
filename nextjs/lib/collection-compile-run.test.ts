@@ -1024,3 +1024,116 @@ describe("private global compile admission and release binding", () => {
     expect(dispatched).not.toHaveBeenCalled();
   });
 });
+
+/*
+  B1 (TAVONEL_SOURCE_DEDUP_MODE). The annotation is computed at intake, before the paid dispatch, and
+  in no mode does it change what is dispatched, signed or stored: the three modes are compared on
+  the Core request, the audited receipt payload and the persisted candidate. Under `on` the note
+  names only documents the compiling principal may read, through the live source-access check.
+*/
+describe("exact-duplicate annotation at compile intake", () => {
+  const OTHER = "0d0d0d0d-0000-4000-8000-00000000000d";
+  // A connector-bound copy the compiling user may not read (connector_documents_blocked answers true).
+  const HIDDEN = "0e0e0e0e-0000-4000-8000-00000000000e";
+  const VIEWER = { userId: "7a7a7a7a-7a7a-4a7a-8a7a-7a7a7a7a7a7a", provenance: "authenticated_request" } as const;
+  const rpc = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    if (String(url).endsWith("/rpc/connector_documents_blocked")) {
+      const ids = (JSON.parse(String(init?.body)) as { p_document_ids: string[] }).p_document_ids;
+      return new Response(JSON.stringify(ids.includes(HIDDEN)), { status: 200 });
+    }
+    return new Response(JSON.stringify({
+      schemaVersion: "tavonel.source_fingerprints.v1", fingerprints: 1, newRelations: 2,
+      sourceDigestReuseCandidateDocumentIds: [DOCUMENT], sanitizedDigestReuseDocumentIds: [DOCUMENT],
+      relations: [{ documentId: DOCUMENT, relatedDocumentId: OTHER, kind: "exact_bytes", matchedOn: ["sanitized_sha256"] },
+        { documentId: DOCUMENT, relatedDocumentId: HIDDEN, kind: "exact_bytes", matchedOn: ["sanitized_sha256"] }],
+    }), { status: 200 });
+  });
+  const fingerprintCalls = () => rpc.mock.calls.filter(([url]) => String(url).endsWith("/rpc/record_source_fingerprints"));
+  function compilable() {
+    readyWorkspace();
+    fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v2", [{
+      regionId: "native-p0001", pageIndex0: 0, pageNumber1: 1, order: 0, blockType: "paragraph",
+      bbox1000: [0, 0, 1000, 1000], text: "The pump was inspected and the reading stayed inside the policy limits.",
+      confidence: 1, authority: "official",
+    }]) });
+    dispatched.mockResolvedValue({ ok: true, result: {
+      status: "completed", runtime: "tavonel-python-core-v2",
+      candidate: { worldStateId: "world-1", reviewReasons: [] },
+      receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, candidatePromotion: false },
+    } });
+    put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
+  }
+  async function compileWith(mode: string | undefined, principal: typeof VIEWER | null = VIEWER) {
+    vi.clearAllMocks();
+    rpc.mockClear();
+    vi.stubGlobal("fetch", rpc);
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://store.example");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "k".repeat(40));
+    if (mode !== undefined) vi.stubEnv("TAVONEL_SOURCE_DEDUP_MODE", mode);
+    compilable();
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID, principal ?? undefined);
+    const audit = audited.mock.calls[0]?.[0] as { details: { sourceProcessingObservations: unknown } } | undefined;
+    return {
+      run,
+      core: JSON.stringify(dispatched.mock.calls[0]?.slice(0, 3)),
+      stored: put.mock.calls[0]?.[3] as Record<string, unknown> | undefined,
+      auditSources: JSON.stringify((audit?.details.sourceProcessingObservations as { sources?: unknown } | undefined)?.sources),
+    };
+  }
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("off (unset): no store call, and the response has no duplicate field", async () => {
+    const off = await compileWith(undefined);
+    expect(off.run.ok).toBe(true);
+    expect(rpc).not.toHaveBeenCalled();
+    expect(off.run.ok && "libraryDuplicates" in off.run.payload).toBe(false);
+  });
+
+  it("shadow records, and the compile is the same compile as with the flag off", async () => {
+    const off = await compileWith("off");
+    const shadow = await compileWith("shadow");
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(fingerprintCalls()).toHaveLength(1);
+    expect(rpc.mock.invocationCallOrder[0]).toBeLessThan(dispatched.mock.invocationCallOrder[0]!);
+    expect(shadow.run.ok && "libraryDuplicates" in shadow.run.payload).toBe(false);
+    expect(shadow.core).toBe(off.core);
+    expect(shadow.auditSources).toBe(off.auditSources);
+    expect(Object.keys(shadow.stored ?? {})).toEqual(Object.keys(off.stored ?? {}));
+    expect(shadow.stored).not.toHaveProperty("libraryDuplicates");
+  });
+
+  it("on: the response names the copy the viewer may read and not the one it may not; the stored World names neither", async () => {
+    const off = await compileWith("off");
+    const on = await compileWith("on");
+    expect(on.run.ok && on.run.payload.libraryDuplicates).toEqual([
+      { documentId: DOCUMENT, kind: "exact", duplicateOfDocumentIds: [OTHER] },
+    ]);
+    expect(JSON.stringify(on.run.ok && on.run.payload)).not.toContain(HIDDEN);
+    expect(on.core).toBe(off.core);
+    expect(on.stored).not.toHaveProperty("libraryDuplicates");
+  });
+
+  it("on without an authenticated principal names nothing", async () => {
+    const on = await compileWith("on", null);
+    expect(on.run.ok).toBe(true);
+    expect(fingerprintCalls()).toHaveLength(1);
+    expect(on.run.ok && "libraryDuplicates" in on.run.payload).toBe(false);
+  });
+
+  it("a store that is down never stops the compile", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("network"); }));
+    vi.stubEnv("TAVONEL_SOURCE_DEDUP_MODE", "on");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://store.example");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "k".repeat(40));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    compilable();
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID, VIEWER);
+    expect(run.ok).toBe(true);
+    expect(run.ok && "libraryDuplicates" in run.payload).toBe(false);
+    expect(put).toHaveBeenCalledOnce();
+  });
+});

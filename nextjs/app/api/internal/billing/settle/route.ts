@@ -5,6 +5,7 @@ import { parseCompletedReadFacts } from "../../../../../../shared/completedReadR
 import { verifyComputeSettlementRequest } from "@/lib/compute-settlement-auth";
 import { appendServiceAuditEvent } from "@/lib/enterprise-store";
 import { DOCUMENT_ID_PATTERN, WORKSPACE_ID_PATTERN } from "@/lib/immutable-keys";
+import { alertOcrFailure } from "@/lib/operations-alert-triggers";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -143,6 +144,12 @@ export async function POST(request: Request) {
         : null,
     });
     if (!recorded.ok) return NextResponse.json({ code: recorded.code }, { status: 503, headers });
+  }
+
+  // W1-A3: an OCR timeout or out-of-contract answer is paged once the settlement is durable. A
+  // redelivered settlement pages again only outside the same-instance dedupe window.
+  if (WORKSPACE_ID_PATTERN.test(workspaceKey) && DOCUMENT_ID_PATTERN.test(documentId)) {
+    await alertOcrFailure({ workspaceKey, documentId, reasonCode, outcome: input.outcome });
   }
 
   // `sourceSha256` is the digest the worker computed over the bytes it read; the application
