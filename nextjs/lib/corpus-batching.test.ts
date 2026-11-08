@@ -329,7 +329,8 @@ describe("where the corpus path is wired in", () => {
       path could exist on the server and be unreachable from the product -- which is how a
       128-file intake and a 12-file compile coexisted in the first place.
     */
-    expect(workspace).toContain("disabled={busy || !judgeCorpusSet(selectedDocumentIds.length).ok}");
+    // The only other condition is a size refusal of this exact set (REVIEW-PR192-R1 MAJOR-2), never a count.
+    expect(workspace).toContain("disabled={busy || !judgeCorpusSet(selectedDocumentIds.length).ok || sizeRefusedSameSet}");
     expect(workspace).toContain("const stagedVerdict = judgeCorpusSet(");
     // The approved complete set is compiled only after the server returns every approved member.
     expect(workspace).toContain("await uploadDocuments(files, counts, undefined, approvalLineage);");

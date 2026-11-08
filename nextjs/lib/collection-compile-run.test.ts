@@ -20,6 +20,7 @@ import type { authorizeCompileJobSourceAccess, classifyCompileJobSources } from 
 const listed = vi.fn();
 const fetched = vi.fn();
 const put = vi.fn();
+const serialize = vi.fn();
 const dispatched = vi.fn<(...args: Parameters<typeof dispatchProductCoreV2>) => Promise<unknown>>();
 const jobAuthority = vi.fn<(...args: Parameters<typeof authorizeCompileJobSourceAccess>) => Promise<unknown>>();
 const authorityEnabled = vi.fn(() => true);
@@ -40,7 +41,8 @@ vi.mock("./r2-objects", () => ({
   MAX_DERIVED_JSON_BYTES: 24 * 1024 * 1024,
   listImmutableWorkspaceObjects: (...args: unknown[]) => listed(...args),
   getWorkspaceOcrJson: (...args: unknown[]) => fetched(...args),
-  putWorkspaceCollectionCandidate: (...args: unknown[]) => put(...args),
+  serializeCollectionCandidate: (...args: unknown[]) => serialize(...args),
+  putSerializedCollectionCandidate: (...args: unknown[]) => put(...args),
   getWorkspaceCollectionCandidate: (...args: unknown[]) => priorCandidate(...args),
 }));
 vi.mock("./world-store", () => ({
@@ -150,6 +152,7 @@ beforeEach(() => {
   customerDataGate.mockReset().mockResolvedValue(APPROVED_GATE);
   audited.mockReset().mockResolvedValue({ ok: true, eventId: "00000000-0000-4000-8000-000000000000" });
   registered.mockReset().mockImplementation(async () => ({ ok: true, publishBy: Date.now() + 60_000 }));
+  serialize.mockReset().mockImplementation((value: unknown) => ({ ok: true, body: Buffer.from(JSON.stringify(value), "utf8") }));
   signingEnv = receiptSigningEnv();
   for (const [name, value] of Object.entries(signingEnv)) vi.stubEnv(name, value);
 });
@@ -324,6 +327,19 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
     put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
   }
 
+  it("gives Core no more than the tick has left minus the settlement reserve", async () => {
+    // REVIEW-PR192-R1 MINOR-10: a near-timeout Core call must not outlive the scheduler tick.
+    compilableSource();
+    await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID, undefined, Date.now() + 30_000);
+    const budget = dispatched.mock.calls[0]?.[8] as number;
+    expect(budget).toBeLessThanOrEqual(30_000 - 8_000);
+    expect(budget).toBeGreaterThan(30_000 - 8_000 - 2_000);
+
+    dispatched.mockClear();
+    await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+    expect(dispatched.mock.calls[0]?.[8]).toBe(52_000);
+  });
+
   it("refuses a Core request over its bound by name before anything is persisted", async () => {
     compilableSource();
     const sizeLimit = { object: "core-request", bytes: 4_500_001, bound: 4_500_000 };
@@ -335,14 +351,45 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
     expect(put).not.toHaveBeenCalled();
   });
 
-  it("carries the candidate's byte count when the candidate write is over its bound", async () => {
+  it("refuses an oversized candidate, with its attribution, before any audit, provenance or PUT", async () => {
     compilableSource();
-    const sizeLimit = { object: "candidate-world.json", bytes: 32 * 1024 * 1024 + 1, bound: 32 * 1024 * 1024 };
-    put.mockResolvedValue({ ok: false, code: "JSON_TOO_LARGE", sizeLimit });
+    const sizeLimit = { object: "candidate-world.json", bytes: 134_576_916, bound: 32 * 1024 * 1024,
+      largestPackageFiles: [{ path: "rag/chunks.jsonl", sizeBytes: 90_000_000 }] };
+    serialize.mockReturnValueOnce({ ok: false, code: "JSON_TOO_LARGE", sizeLimit });
 
     const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run).toEqual({ ok: false, status: 503, code: "JSON_TOO_LARGE", payload: { sizeLimit } });
+    // cjob-157f2f23: provenance #8/#9 and two succeeded receipt audits named an object never written.
+    expect(audited).not.toHaveBeenCalled();
+    expect(registered).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("fails an oversized Core response by name before any receipt, audit or provenance", async () => {
+    compilableSource();
+    for (const sizeLimit of [
+      { object: "core-response", bytes: 134_576_916, bound: 80 * 1024 * 1024, coreRequestId: "core-test" },
+      // Core's own pre-receipt refusal: its numbers reach the payload the worker writes to the job event.
+      { object: "core-output", bytes: 52_600_000, bound: 33_554_432, counts: { regions: 3_600, contradictionPairs: 719_400 } },
+    ]) {
+      dispatched.mockResolvedValue({ ok: false, code: "CORE_OUTPUT_TOO_LARGE", sizeLimit });
+
+      const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+
+      expect(run).toEqual({ ok: false, status: 422, code: "CORE_OUTPUT_TOO_LARGE", payload: { sizeLimit } });
+    }
+    expect(serialize).not.toHaveBeenCalled();
+    expect(audited).not.toHaveBeenCalled();
+    expect(registered).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("puts exactly the bytes that passed the size check", async () => {
+    compilableSource();
+    expect((await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).ok).toBe(true);
+    expect(serialize).toHaveBeenCalledOnce();
+    expect(put.mock.calls[0]?.[3]).toBe((serialize.mock.results[0]?.value as { body: Buffer }).body);
   });
 
   it("signs the receipt, audits it, then persists it -- in that order", async () => {
@@ -375,7 +422,7 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
     });
     expect(JSON.stringify(event.details)).not.toMatch(/"(content|text|secret|password|token|credential|private[_-]?key)"\s*:|pump/i);
     expect(audited.mock.invocationCallOrder[0]).toBeLessThan(put.mock.invocationCallOrder[0]!);
-    expect(put.mock.calls[0]?.[3]).toMatchObject({ signedReceipt: receipt });
+    expect(JSON.parse(String(put.mock.calls[0]?.[3]))).toMatchObject({ signedReceipt: receipt });
   });
 
   it("carries a qualification grant from admission through dispatch into the signed, audited receipt", async () => {
@@ -1022,5 +1069,118 @@ describe("private global compile admission and release binding", () => {
     fetched.mockResolvedValue({ ok: true, json: { text: "x".repeat(4 * 1024 * 1024 + 1) } });
     expect(await runCollectionCompile(WS, [DOCUMENT], key, JOB_ID)).toMatchObject({ ok: false, code: "GLOBAL_COLLECTION_RESOURCE_LIMIT" });
     expect(dispatched).not.toHaveBeenCalled();
+  });
+});
+
+/*
+  B1 (TAVONEL_SOURCE_DEDUP_MODE). The annotation is computed at intake, before the paid dispatch, and
+  in no mode does it change what is dispatched, signed or stored: the three modes are compared on
+  the Core request, the audited receipt payload and the persisted candidate. Under `on` the note
+  names only documents the compiling principal may read, through the live source-access check.
+*/
+describe("exact-duplicate annotation at compile intake", () => {
+  const OTHER = "0d0d0d0d-0000-4000-8000-00000000000d";
+  // A connector-bound copy the compiling user may not read (connector_documents_blocked answers true).
+  const HIDDEN = "0e0e0e0e-0000-4000-8000-00000000000e";
+  const VIEWER = { userId: "7a7a7a7a-7a7a-4a7a-8a7a-7a7a7a7a7a7a", provenance: "authenticated_request" } as const;
+  const rpc = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    if (String(url).endsWith("/rpc/connector_documents_blocked")) {
+      const ids = (JSON.parse(String(init?.body)) as { p_document_ids: string[] }).p_document_ids;
+      return new Response(JSON.stringify(ids.includes(HIDDEN)), { status: 200 });
+    }
+    return new Response(JSON.stringify({
+      schemaVersion: "tavonel.source_fingerprints.v1", fingerprints: 1, newRelations: 2,
+      sourceDigestReuseCandidateDocumentIds: [DOCUMENT], sanitizedDigestReuseDocumentIds: [DOCUMENT],
+      relations: [{ documentId: DOCUMENT, relatedDocumentId: OTHER, kind: "exact_bytes", matchedOn: ["sanitized_sha256"] },
+        { documentId: DOCUMENT, relatedDocumentId: HIDDEN, kind: "exact_bytes", matchedOn: ["sanitized_sha256"] }],
+    }), { status: 200 });
+  });
+  const fingerprintCalls = () => rpc.mock.calls.filter(([url]) => String(url).endsWith("/rpc/record_source_fingerprints"));
+  function compilable() {
+    readyWorkspace();
+    fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v2", [{
+      regionId: "native-p0001", pageIndex0: 0, pageNumber1: 1, order: 0, blockType: "paragraph",
+      bbox1000: [0, 0, 1000, 1000], text: "The pump was inspected and the reading stayed inside the policy limits.",
+      confidence: 1, authority: "official",
+    }]) });
+    dispatched.mockResolvedValue({ ok: true, result: {
+      status: "completed", runtime: "tavonel-python-core-v2",
+      candidate: { worldStateId: "world-1", reviewReasons: [] },
+      receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, candidatePromotion: false },
+    } });
+    put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
+  }
+  async function compileWith(mode: string | undefined, principal: typeof VIEWER | null = VIEWER) {
+    vi.clearAllMocks();
+    rpc.mockClear();
+    vi.stubGlobal("fetch", rpc);
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://store.example");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "k".repeat(40));
+    if (mode !== undefined) vi.stubEnv("TAVONEL_SOURCE_DEDUP_MODE", mode);
+    compilable();
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID, principal ?? undefined);
+    const audit = audited.mock.calls[0]?.[0] as { details: { sourceProcessingObservations: unknown } } | undefined;
+    return {
+      run,
+      core: JSON.stringify(dispatched.mock.calls[0]?.slice(0, 3)),
+      stored: put.mock.calls[0]?.[3] as Record<string, unknown> | undefined,
+      auditSources: JSON.stringify((audit?.details.sourceProcessingObservations as { sources?: unknown } | undefined)?.sources),
+    };
+  }
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("off (unset): no store call, and the response has no duplicate field", async () => {
+    const off = await compileWith(undefined);
+    expect(off.run.ok).toBe(true);
+    expect(rpc).not.toHaveBeenCalled();
+    expect(off.run.ok && "libraryDuplicates" in off.run.payload).toBe(false);
+  });
+
+  it("shadow records, and the compile is the same compile as with the flag off", async () => {
+    const off = await compileWith("off");
+    const shadow = await compileWith("shadow");
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(fingerprintCalls()).toHaveLength(1);
+    expect(rpc.mock.invocationCallOrder[0]).toBeLessThan(dispatched.mock.invocationCallOrder[0]!);
+    expect(shadow.run.ok && "libraryDuplicates" in shadow.run.payload).toBe(false);
+    expect(shadow.core).toBe(off.core);
+    expect(shadow.auditSources).toBe(off.auditSources);
+    expect(Object.keys(shadow.stored ?? {})).toEqual(Object.keys(off.stored ?? {}));
+    expect(shadow.stored).not.toHaveProperty("libraryDuplicates");
+  });
+
+  it("on: the response names the copy the viewer may read and not the one it may not; the stored World names neither", async () => {
+    const off = await compileWith("off");
+    const on = await compileWith("on");
+    expect(on.run.ok && on.run.payload.libraryDuplicates).toEqual([
+      { documentId: DOCUMENT, kind: "exact", duplicateOfDocumentIds: [OTHER] },
+    ]);
+    expect(JSON.stringify(on.run.ok && on.run.payload)).not.toContain(HIDDEN);
+    expect(on.core).toBe(off.core);
+    expect(on.stored).not.toHaveProperty("libraryDuplicates");
+  });
+
+  it("on without an authenticated principal names nothing", async () => {
+    const on = await compileWith("on", null);
+    expect(on.run.ok).toBe(true);
+    expect(fingerprintCalls()).toHaveLength(1);
+    expect(on.run.ok && "libraryDuplicates" in on.run.payload).toBe(false);
+  });
+
+  it("a store that is down never stops the compile", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("network"); }));
+    vi.stubEnv("TAVONEL_SOURCE_DEDUP_MODE", "on");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://store.example");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "k".repeat(40));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    compilable();
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID, VIEWER);
+    expect(run.ok).toBe(true);
+    expect(run.ok && "libraryDuplicates" in run.payload).toBe(false);
+    expect(put).toHaveBeenCalledOnce();
   });
 });

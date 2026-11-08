@@ -17,6 +17,7 @@ const registeredUnitTestPaths = new Set([
   'components/evaluation-page.test.tsx',
   'components/explore/evidence-workbench.test.tsx',
   'components/compile-stage-player.mobile-view.test.tsx',
+  'eval/ask-quality/metrics.test.ts',
 ]);
 const asyncRouteUnitTestPath = 'app/api/compile-jobs/route.test.ts';
 const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs']);
@@ -226,6 +227,7 @@ const browserProjectsByFile = new Map([
   ['e2e/world-lifecycle.spec.ts', ['1440', '390', 'reduced-motion']],
   ['e2e/explore.spec.ts', ['1440']],
   ['e2e/upload-entry.spec.ts', ['1440', '390']],
+  ['e2e/workspace-first-use.spec.ts', ['1440', '390']],
   ['e2e/landing-v2.spec.ts', ['1440', '390', '360', 'reduced-motion']],
   ['e2e/home-evidence-line.spec.ts', ['1440', '390', '360', 'reduced-motion']],
   ['e2e/sources.spec.ts', ['1440']],

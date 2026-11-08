@@ -154,7 +154,12 @@ export type CompileJobFailure =
     the migration that adds a parameter -- and it is recoverable by sending the call the deployed
     function does have, which is what `lib/compile-job-worker.ts` does once, loudly.
   */
-  | "COMPILE_JOB_RPC_UNDEFINED";
+  | "COMPILE_JOB_RPC_UNDEFINED"
+  /*
+    The database refused an event row for a job that is already terminal
+    (`compile_job_post_terminal_event`, migration 20261105080000). Nothing was written.
+  */
+  | "COMPILE_JOB_ALREADY_SETTLED";
 
 export type CompileJobResult<T> = { ok: true; value: T } | { ok: false; code: CompileJobFailure };
 
@@ -622,7 +627,18 @@ async function insertCompileJobEvent(
       },
     }),
   });
-  if (!response || !response.ok) return fail("COMPILE_JOB_STORE_WRITE_FAILED");
+  if (!response) return fail("COMPILE_JOB_STORE_WRITE_FAILED");
+  if (!response.ok) {
+    // Terminal is the last word (cjob-157f2f23 seq 159: `structuring` after `failed`). The
+    // database refuses the row; this says so once, by the stable name an operator greps for.
+    const body = await response.text().catch(() => "");
+    if (body.includes("compile_job_post_terminal_event")) {
+      console.warn(JSON.stringify({ event: "compile_job_post_terminal_event", jobId: job.jobId, state: input.state,
+        reason: input.reason }));
+      return fail("COMPILE_JOB_ALREADY_SETTLED");
+    }
+    return fail("COMPILE_JOB_STORE_WRITE_FAILED");
+  }
   return { ok: true, value: { recorded: true } };
 }
 
@@ -707,6 +723,48 @@ export async function advanceCompileJob(input: {
   const record = row as { state?: unknown; changed?: unknown } | null;
   if (!record || !isCompileState(record.state)) return fail("COMPILE_JOB_STORE_WRITE_FAILED");
   return { ok: true, value: { state: record.state, changed: record.changed === true } };
+}
+
+/**
+ * Take the compile lease: a compare-and-set against the row exactly as this turn read it.
+ *
+ * `updated_at` is the lease token -- the touch trigger moves it on every write -- so of any
+ * number of runners holding the same read, one PATCH matches and the rest match nothing. The
+ * advance RPC cannot do this: it accepts a same-rank write and answers `changed: true` to every
+ * caller, which is how cjob-157f2f23 ran Core twice after its lease went stale. The state filter
+ * keeps the RPC's no-backwards rule: only a job at or before `structuring` can be leased.
+ */
+export async function claimCompileJobLease(input: {
+  job: CompileJob;
+  documentsReady: number;
+  blocked?: CompileBlocker[];
+}): Promise<CompileJobResult<{ claimed: boolean }>> {
+  const { job } = input;
+  if (!WORKSPACE_KEY.test(job.workspaceKey) || !COMPILE_JOB_ID.test(job.jobId)) {
+    return fail("COMPILE_JOB_SCOPE_INVALID");
+  }
+  if (COMPILE_STATES.indexOf(job.state) > COMPILE_STATES.indexOf("structuring")) return { ok: true, value: { claimed: false } };
+  if (!readSupabaseAdminConfig()) return fail("COMPILE_JOB_STORE_NOT_CONFIGURED");
+  const query = new URLSearchParams({
+    job_id: `eq.${job.jobId}`,
+    workspace_key: `eq.${job.workspaceKey}`,
+    state: `eq.${job.state}`,
+    updated_at: `eq.${job.updatedAt}`,
+    select: "job_id",
+  });
+  const response = await admin(`/rest/v1/foundation_compile_jobs?${query}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      state: "structuring",
+      documents_ready: input.documentsReady,
+      ...(input.blocked ? { blocked: input.blocked } : {}),
+    }),
+  });
+  if (!response || !response.ok) return fail("COMPILE_JOB_STORE_WRITE_FAILED");
+  const rows = await response.json().catch(() => null) as unknown[] | null;
+  if (!Array.isArray(rows)) return fail("COMPILE_JOB_STORE_WRITE_FAILED");
+  return { ok: true, value: { claimed: rows.length === 1 } };
 }
 
 /**

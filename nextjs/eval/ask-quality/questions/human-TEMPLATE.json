@@ -1,0 +1,140 @@
+{
+ "schema": "tavonel.ask_quality_questions.v1",
+ "set": "human",
+ "status": "TEMPLATE_NOT_FROZEN",
+ "instructions": [
+  "This set is written by people, about the documents the A4 proof run actually uploads (PROGRAM-2026-11-04 §4.A.1), before the run. Target n >= 30, at least one unanswerable question per document.",
+  "Write a question only for a document you have opened and read at the cited page. Copy the span verbatim from the page as a reader sees it, not from a text layer or OCR output; if the text layer reads differently, record that in textLayerReading.",
+  "A question enters the scored set only when humanVerified is true and verifiedBy names the person. The runner skips this whole set until PREREG.json pins its sha256.",
+  "The five rows below are worked examples of the schema. An agent wrote them from the pdftotext text layer of two NASA/NACA reports and did not view the page images; they are humanVerified=false and are not scored. Whether these two documents are in the A4 corpus is the A4 lane's decision, not this file's."
+ ],
+ "fieldSchema": {
+  "id": "string, unique: human-<docRef>-<nn>",
+  "set": "\"human\"",
+  "kind": "\"answerable\" | \"unanswerable\"",
+  "answerType": "\"numeric\" | \"text\"",
+  "split": "\"calibration\" | \"holdout\" -- assign before anyone runs anything",
+  "corpusRef": "string naming the corpus the question is asked of (a documents[].docRef, or a proof-run collection ref)",
+  "question": "string, 3..500 characters (the Ask route's limits)",
+  "gold": "null for unanswerable; else { acceptableAnswers: string[] (text) and/or numeric: { value, unit, decimals }, spans: string[] verbatim from the page }",
+  "location": "{ docRef, pdfPage1, printedPage | null } -- unanswerable rows record what was searched instead (searched)",
+  "textLayerReading": "optional: what the document's text layer says where it differs from the page",
+  "authoredBy": "who wrote the row",
+  "humanVerified": "boolean",
+  "verifiedBy": "person's name, or null"
+ },
+ "documents": [
+  {
+   "docRef": "ntrs-19680010155",
+   "title": "Constructing inexpensive automatic picture-transmission ground stations (NASA SP-5079)",
+   "author": "Charles H. Vermillion, NASA Office of Technology Utilization",
+   "year": 1968,
+   "sourceUrl": "https://ntrs.nasa.gov/citations/19680010155",
+   "sha256": "77e6a80db0f9c3e8a6ea23dfafd6a663c4c52f6b39f7b612b55fbd6e28b820f6",
+   "rights": "US-GOV-WORK (17 U.S.C. §105); NTRS copyright determination GOV_PUBLIC_USE_PERMITTED",
+   "localCopy": "D:/CodexData/hard-docs/ntrs-19680010155-apt-ground-station/19680010155.pdf"
+  },
+  {
+   "docRef": "ntrs-19930091059",
+   "title": "Equations, tables, and charts for compressible flow (NACA Report 1135)",
+   "author": "Ames Research Staff, NACA Ames Aeronautical Laboratory",
+   "year": 1953,
+   "sourceUrl": "https://ntrs.nasa.gov/citations/19930091059",
+   "sha256": "1971643025181d1216b0b0a359d2a5a3adf5d254d3e158e19ba880b368b86e53",
+   "rights": "US-GOV-WORK (17 U.S.C. §105); NTRS copyright determination GOV_PUBLIC_USE_PERMITTED",
+   "localCopy": "D:/CodexData/hard-docs/ntrs-19930091059-naca-1135/19930091059.pdf"
+  }
+ ],
+ "questions": [
+  {
+   "id": "human-ntrs-19680010155-01",
+   "set": "human",
+   "kind": "answerable",
+   "answerType": "text",
+   "split": "calibration",
+   "corpusRef": "ntrs-19680010155",
+   "question": "Which satellite was the first to carry the APT system, and when was it launched?",
+   "gold": {
+    "acceptableAnswers": ["TIROS VIII", "December 21, 1963"],
+    "spans": ["The first APT-equipped satellite was TIROS VIII, an experimental version, launched December 21, 1963."]
+   },
+   "location": { "docRef": "ntrs-19680010155", "pdfPage1": 9, "printedPage": null },
+   "authoredBy": "agent (W1-L4), from the pdftotext text layer",
+   "humanVerified": false,
+   "verifiedBy": null
+  },
+  {
+   "id": "human-ntrs-19680010155-02",
+   "set": "human",
+   "kind": "answerable",
+   "answerType": "numeric",
+   "split": "holdout",
+   "corpusRef": "ntrs-19680010155",
+   "question": "About how long does it take for a weather picture from a typical APT-equipped satellite to be complete?",
+   "gold": {
+    "numeric": { "value": 200, "unit": "seconds", "decimals": 0 },
+    "acceptableAnswers": ["200 seconds"],
+    "spans": ["complete within about 200 seconds"]
+   },
+   "location": { "docRef": "ntrs-19680010155", "pdfPage1": 9, "printedPage": null },
+   "textLayerReading": "complete witMn about 200 seconds",
+   "authoredBy": "agent (W1-L4), from the pdftotext text layer",
+   "humanVerified": false,
+   "verifiedBy": null
+  },
+  {
+   "id": "human-ntrs-19680010155-03",
+   "set": "human",
+   "kind": "answerable",
+   "answerType": "numeric",
+   "split": "calibration",
+   "corpusRef": "ntrs-19680010155",
+   "question": "According to the report's summary, for under how many dollars can an APT ground station be built from surplus parts?",
+   "gold": {
+    "numeric": { "value": 500, "unit": "USD", "decimals": 0 },
+    "acceptableAnswers": ["$500", "500 dollars"],
+    "spans": ["They can be built from surplus parts for under $500 or procured for as low as $5000."]
+   },
+   "location": { "docRef": "ntrs-19680010155", "pdfPage1": 7, "printedPage": "vii" },
+   "textLayerReading": "the raw text layer interleaves this sentence with its neighbours ('APT ground built from surplus $5000. With them, ...'); the -layout reading keeps the order",
+   "authoredBy": "agent (W1-L4), from the pdftotext text layer",
+   "humanVerified": false,
+   "verifiedBy": null
+  },
+  {
+   "id": "human-ntrs-19930091059-01",
+   "set": "human",
+   "kind": "answerable",
+   "answerType": "text",
+   "split": "holdout",
+   "corpusRef": "ntrs-19930091059",
+   "question": "Which earlier NACA publication does Report 1135 revise and supersede?",
+   "gold": {
+    "acceptableAnswers": ["NACA TN 1428", "TN 1428"],
+    "spans": ["This report, which is a revision and extension of NACA TN 1428", "Supersedes NACA TN 1428"]
+   },
+   "location": { "docRef": "ntrs-19930091059", "pdfPage1": 2, "printedPage": null },
+   "textLayerReading": "the summary sentence reads 'NACA TN 1_28' in the text layer; the footnote on the same page reads 'Supersedes NACA TN 1428' correctly",
+   "authoredBy": "agent (W1-L4), from the pdftotext text layer",
+   "humanVerified": false,
+   "verifiedBy": null
+  },
+  {
+   "id": "human-ntrs-19680010155-04",
+   "set": "human",
+   "kind": "unanswerable",
+   "answerType": "text",
+   "split": "holdout",
+   "corpusRef": "ntrs-19680010155",
+   "question": "On what date was the Nimbus III satellite launched?",
+   "gold": null,
+   "location": {
+    "docRef": "ntrs-19680010155",
+    "searched": "Full text layer searched for 'Nimbus III', 'Nimbus 3', 'Nimbus B' and '1969': no match. The report (1968) gives launch dates only for TIROS VIII and two experimental Nimbus satellites (August 28, 1964 and May 15, 1966)."
+   },
+   "authoredBy": "agent (W1-L4), from the pdftotext text layer",
+   "humanVerified": false,
+   "verifiedBy": null
+  }
+ ]
+}

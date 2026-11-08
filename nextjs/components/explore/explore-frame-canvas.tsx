@@ -23,10 +23,12 @@ export default function ExploreFrameCanvas({
   model,
   layout,
   label,
+  restFocusId,
 }: {
   model: VisualWorldModel;
   layout: VisualLayout;
   label: string;
+  restFocusId?: string | null;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   return (
@@ -40,6 +42,7 @@ export default function ExploreFrameCanvas({
       reduced
       settled
       label={label}
+      restFocusId={restFocusId}
     />
   );
 }

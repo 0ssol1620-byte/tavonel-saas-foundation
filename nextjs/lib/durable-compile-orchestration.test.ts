@@ -125,10 +125,11 @@ describe("something other than a browser turns the crank", () => {
     expect(vercel.crons?.some((cron) => cron.path === "/api/internal/jobs/run")).toBe(true);
   });
 
-  it("does not require the viewer's nudge to make progress", () => {
+  it("never runs a compile turn inside the viewer's stream", () => {
     const events = read("app/api/compile-jobs/[jobId]/events/route.ts");
-    // The nudge exists for latency only, and the comment saying so is load-bearing: someone
-    // reading this later must not conclude the stream is part of the pipeline.
-    expect(events).toContain("Remove it and the compile still finishes");
+    // cjob-157f2f23: a 60 s stream took the Core lease and died holding it. The scheduled
+    // worker is the only runner; the stream is a reader of durable history.
+    expect(events).not.toContain("compile-job-worker");
+    expect(events).not.toContain("runCompileJobTurn");
   });
 });

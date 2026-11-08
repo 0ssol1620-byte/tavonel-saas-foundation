@@ -53,7 +53,13 @@ async function runOneBatch(request: Request) {
     once a minute, whether or not anyone has the workspace open. The compile turn is bounded
     and takes its own lease, so two invocations overlapping does not compile anything twice.
   */
+  const batchStartedAt = Date.now();
   const compiles = await runCompileJobBatch();
+  // The cron is the only runner now; one line per tick makes "it is turning" observable. Counts only.
+  console.log(JSON.stringify({ event: "compile_batch", turns: compiles.length,
+    claimed: compiles.filter((turn) => turn.claimed).length,
+    skipped: compiles.filter((turn) => turn.note === "skipped").length,
+    durationMs: Date.now() - batchStartedAt }));
 
   /*
     The durable path's `candidate_ready`, fired from the turn that produced the package.

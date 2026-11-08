@@ -62,6 +62,10 @@ export type JsonSizeLimit = {
   object: "ocr.json" | "ocr-review.json" | "candidate-world.json" | "compile-input" | "core-request";
   bytes: number | null;
   bound: number;
+  /** Candidate only: the five largest `package.files[]` by content bytes. Paths, never content. */
+  largestPackageFiles?: Array<{ path: string; sizeBytes: number }>;
+  /** Candidate only: the artifact's own `validation.counts` (numbers only). */
+  validationCounts?: Record<string, number>;
 };
 type TooLarge = { ok: false; code: "JSON_TOO_LARGE"; sizeLimit: JsonSizeLimit };
 const tooLarge = (object: JsonSizeLimit["object"], bytes: number | null, bound: number): TooLarge =>
@@ -319,6 +323,67 @@ export async function getWorkspaceOcrReviewJson(
   }
 }
 
+/**
+ * Core-chosen text for a job-event detail, at most `maxBytes` of UTF-8, cut on a code point.
+ * Control characters and lone surrogates are replaced first: Postgres jsonb refuses `\u0000`
+ * and unpaired surrogates, and escaping (6x for a control character) could push the detail past
+ * its 8 KiB check -- either way the row is refused and the attribution is lost without a trace.
+ */
+function boundedDetailText(text: string, maxBytes: number) {
+  const safe = text.replace(/[\u0000-\u001f\u007f]/g, "?")
+    .replace(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g, "�");
+  let out = "";
+  let bytes = 0;
+  for (const char of safe) {
+    const size = Buffer.byteLength(char, "utf8");
+    if (bytes + size > maxBytes) break;
+    out += char;
+    bytes += size;
+  }
+  return out;
+}
+
+/** The five largest `package.files[]` entries by content bytes. Paths and sizes only. */
+function largestPackageFiles(value: unknown) {
+  const files = (value as { package?: { files?: unknown } } | null)?.package?.files;
+  if (!Array.isArray(files)) return [];
+  return files
+    .flatMap((file) => {
+      const entry = file as { path?: unknown; content?: unknown } | null;
+      if (typeof entry?.path !== "string") return [];
+      const content = typeof entry.content === "string" ? entry.content : JSON.stringify(entry.content ?? null);
+      // Five 256 B paths (escaping at most doubles them) always fit the 8 KiB job-event detail.
+      return [{ path: boundedDetailText(entry.path, 256), sizeBytes: Buffer.byteLength(content, "utf8") }];
+    })
+    .sort((a, b) => b.sizeBytes - a.sizeBytes)
+    .slice(0, 5);
+}
+
+/**
+ * The candidate's stored bytes, or the size refusal -- with no side effect, so a compile learns
+ * the object cannot be stored before it audits a receipt or registers provenance for it. The
+ * refusal names the total and the largest package files, so an oversized World is attributable
+ * from the job event alone (cjob-157f2f23: 134,576,916 B, producer unobserved).
+ */
+export function serializeCollectionCandidate(
+  value: unknown,
+  bound = MAX_COLLECTION_JSON_BYTES,
+): { ok: true; body: Buffer } | TooLarge {
+  const body = Buffer.from(`${JSON.stringify(value)}\n`, "utf8");
+  if (body.length <= bound) return { ok: true, body };
+  const refused = tooLarge("candidate-world.json", body.length, bound);
+  const largest = largestPackageFiles(value);
+  if (largest.length > 0) refused.sizeLimit.largestPackageFiles = largest;
+  // Claims / relations / contradictions vs evidence: tells a pair blow-up from region fan-out.
+  const counts = (value as { validation?: { counts?: unknown } } | null)?.validation?.counts;
+  if (counts && typeof counts === "object") {
+    const numeric = Object.entries(counts).filter((entry): entry is [string, number] => Number.isSafeInteger(entry[1]))
+      .slice(0, 16).map(([key, count]) => [boundedDetailText(key, 64), count] as const);
+    if (numeric.length > 0) refused.sizeLimit.validationCounts = Object.fromEntries(numeric);
+  }
+  return refused;
+}
+
 export async function putWorkspaceCollectionCandidate(
   env: R2SignerEnv,
   workspaceId: string,
@@ -326,9 +391,21 @@ export async function putWorkspaceCollectionCandidate(
   value: unknown,
   now = new Date(),
 ): Promise<{ ok: true; status: "written" | "exists"; bytes: number } | TooLarge | { ok: false; code: string }> {
+  const serialized = serializeCollectionCandidate(value);
+  if (!serialized.ok) return serialized;
+  return putSerializedCollectionCandidate(env, workspaceId, key, serialized.body, now);
+}
+
+/** The PUT half of `putWorkspaceCollectionCandidate`, for bytes `serializeCollectionCandidate` produced. */
+export async function putSerializedCollectionCandidate(
+  env: R2SignerEnv,
+  workspaceId: string,
+  key: string,
+  bytes: Buffer,
+  now = new Date(),
+): Promise<{ ok: true; status: "written" | "exists"; bytes: number } | TooLarge | { ok: false; code: string }> {
   if (env.bucket !== FOUNDATION_R2_BUCKET) return { ok: false, code: "BUCKET_NOT_FOUNDATION" };
   if (!isCollectionCandidateKey(workspaceId, key)) return { ok: false, code: "COLLECTION_JSON_PREFIX_REQUIRED" };
-  const bytes = Buffer.from(`${JSON.stringify(value)}\n`, "utf8");
   if (bytes.length > MAX_COLLECTION_JSON_BYTES) return tooLarge("candidate-world.json", bytes.length, MAX_COLLECTION_JSON_BYTES);
   const response = await signedS3PutJson(env, key, bytes, now);
   if (response.status === 409 || response.status === 412) return { ok: true, status: "exists", bytes: bytes.length };

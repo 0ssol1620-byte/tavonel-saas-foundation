@@ -68,9 +68,12 @@ function compileFixture(options = {}) {
       checkCurrentSourceVersions: () => ({ ok: true }), collectionCandidateKey: () => "candidate-key" },
     "./r2-objects": { listImmutableWorkspaceObjects: async () => ({ ok: true, objects: [] }),
       getWorkspaceOcrJson: async () => { activity.push("ocr-read"); return { ok: true, json: { schemaVersion: "tavonel.ocr_result.v2", text: "DO_NOT_RECORD_BODY", inputSha256: INPUT, regions: [] } }; },
-      putWorkspaceCollectionCandidate: async () => { activity.push("persist"); return { ok: true, status: "written", bytes: 10 }; } },
+      serializeCollectionCandidate: value => ({ ok: true, body: Buffer.from(JSON.stringify(value)) }),
+      putSerializedCollectionCandidate: async () => { activity.push("persist"); return { ok: true, status: "written", bytes: 10 }; } },
     "./r2-synthetic-canary": { readR2SignerEnv: () => ({ secretAccessKey: "DO_NOT_RECORD_TOKEN" }) },
     "./world-store": {},
+    // B1 annotation as it behaves with TAVONEL_SOURCE_DEDUP_MODE unset (process.env is {} here): no store call, no note.
+    "./source-dedup": { detectExactDuplicatesAtIntake: async () => null },
   };
   return { ...load("lib/collection-compile-run.ts", mocks), audit, activity };
 }
@@ -158,13 +161,16 @@ test("SYNTHETIC: real public route forwards authenticated principal instead of r
 test("SYNTHETIC: real durable worker forwards its stored job principal and exact job identity", async () => {
   let args;
   const worker = load("lib/compile-job-worker.ts", {
+    "./execution-budget": { CORE_CLIENT_TIMEOUT_MS: 52_000, WORKER_MAX_DURATION_MS: 60_000 },
     "./global-collection-compile": { globalCollectionCompileEnabled: () => true, GLOBAL_COLLECTION_KEY_PREFIX: "global:" },
     "./collection-compile-run": { isCompileWaitingOnReading: () => false, runCollectionCompile: async (...values) => { args = values;
       return { ok: false, code: "TEST_STOP", status: 422, payload: {} }; } },
-    "./compile-job-store": { isRestingCompileState: () => false, advanceCompileJob: async () => ({ ok: true, value: { changed: true } }) },
+    "./compile-job-store": { isRestingCompileState: () => false, advanceCompileJob: async () => ({ ok: true, value: { changed: true } }),
+      claimCompileJobLease: async () => ({ ok: true, value: { claimed: true } }) },
     "./immutable-keys": { groupImmutableDocuments: () => [SOURCE], selectCurrentDocumentVersions: docs => ({ documents: docs, ambiguousDocumentIds: [] }) },
     "./r2-objects": { listImmutableWorkspaceObjects: async () => ({ ok: true, objects: [] }) },
     "./r2-synthetic-canary": { readR2SignerEnv: () => ({}) },
+    "./operations-alert-triggers": { alertCompileJobTurn: async () => undefined },
     "./compile-job-authority": { compileJobAuthorityEnabled: () => false, classifyCompileJobSources: async () => ({ ok: true, scope: "direct_upload" }) },
   });
   await worker.runCompileJobTurn({ jobId: JOB, workspaceKey: WS, createdByUserId: USER, documentIds: [DOC],

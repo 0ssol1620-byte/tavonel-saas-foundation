@@ -98,6 +98,30 @@ describe("developer request authorization", () => {
     expect(result).toEqual({ ok: false, code: "API_RATE_LIMIT_UNAVAILABLE", status: 503 });
   });
 
+  it("keeps a trial's key refused with trial AI access off, and fails closed with it on and the bounds unreadable", async () => {
+    authenticateDeveloperApiKey.mockResolvedValue({
+      ok: true,
+      principal: { kind: "api-key", keyId: "key", workspaceKey: "pilot-user", userId: "user", scopes: ["ask:read"], authorizationRevision: 7 },
+    });
+    authorizeFoundationProduct.mockResolvedValue({ ok: false, code: "SUBSCRIPTION_REQUIRED", status: 402 });
+    authorizeFoundationSessionProduct.mockResolvedValue({
+      ok: true,
+      access: { source: "trial", accessPlan: "observer_access", billingExempt: true, expiresAt: "2099-01-01T00:00:00Z" },
+    });
+    const call = () => authorizeFoundationRequest(new Request("https://tavonel.com/api/v1/ask", {
+      headers: { authorization: `Bearer tvnl_live_abcdefghijkl_${"a".repeat(43)}` },
+    }), "ask:read");
+    expect(await call()).toEqual({ ok: false, code: "SUBSCRIPTION_REQUIRED", status: 402 });
+    expect(authorizeFoundationSessionProduct).not.toHaveBeenCalled();
+    vi.stubEnv("TAVONEL_TRIAL_AI_ACCESS_ENABLED", "true");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+    try {
+      expect(await call()).toEqual({ ok: false, code: "TRIAL_AI_ACCESS_CHECK_FAILED", status: 503 });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("maps a browser session to its pilot workspace and effective access source", async () => {
     getRequestUser.mockResolvedValue({ id: "59d42924-a3cc-4a09-b92d-9c86b58901a1" });
     foundationPilotAccess.mockReturnValue({ membership: { workspaceId: "pilot-1234567890abcdef" } });

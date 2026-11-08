@@ -10,6 +10,7 @@ import { validateDownloadableCollectionArtifact, validatePromotableCollectionArt
 import { CONTRACT_CLAUSES, clause } from "./compiler-contract";
 import {
   CORE_V2_MAX_REQUEST_BYTES,
+  CORE_V2_MAX_RESPONSE_BYTES,
   CORE_V2_REVISION_COMPILE_FLAG,
   PRODUCT_CORE_RESPONSE_SCHEMA,
   buildProductCoreV2Request,
@@ -171,6 +172,54 @@ describe("Python Product-Core v2 dispatch", () => {
       expect(result.sizeLimit!.bytes).toBeGreaterThan(CORE_V2_MAX_REQUEST_BYTES);
     }
     expect(fetchCore).not.toHaveBeenCalled();
+  });
+
+  it("reads the Core response no further than the largest response a storable candidate implies", async () => {
+    // The bound is derived from a measurement, not from cjob-157f2f23 (whose 134,576,916 B was the
+    // candidate; its response size was never observed): the response is 1.91-2.35x the package while
+    // the candidate is 1.03-1.43x (REVIEW-AKC153-R1.md §1.4), so the read bound sits above 2.35x the
+    // candidate bound -- a 30 MB storable candidate must not be refused here.
+    const { MAX_COLLECTION_JSON_BYTES } = await import("./r2-objects");
+    expect(CORE_V2_MAX_RESPONSE_BYTES).toBe(80 * 1024 * 1024);
+    expect(CORE_V2_MAX_RESPONSE_BYTES).toBeGreaterThanOrEqual(Math.ceil(MAX_COLLECTION_JSON_BYTES * 2.35));
+    expect(MAX_COLLECTION_JSON_BYTES).toBe(32 * 1024 * 1024);
+    const env = { url: "https://core-v2.example", hmac: "x".repeat(32) };
+    const declared = CORE_V2_MAX_RESPONSE_BYTES + 1;
+    vi.stubGlobal("fetch", async () => new Response("{}", { headers: { "content-length": String(declared) } }));
+    const byLength = await dispatchProductCoreV2(env, "pilot", inputs());
+    expect(byLength).toMatchObject({ ok: false, code: "CORE_OUTPUT_TOO_LARGE",
+      sizeLimit: { object: "core-response", bytes: declared, bound: CORE_V2_MAX_RESPONSE_BYTES } });
+    expect(byLength.ok === false && byLength.sizeLimit && "coreRequestId" in byLength.sizeLimit
+      && byLength.sizeLimit.coreRequestId).toMatch(/^core-/);
+
+    // No length, streamed past the bound: cut off there, the size stated as unknown, not guessed.
+    const chunk = new Uint8Array(4 * 1024 * 1024);
+    let sent = 0;
+    vi.stubGlobal("fetch", async () => new Response(new ReadableStream({
+      pull(controller) { sent += chunk.byteLength; controller.enqueue(chunk); },
+    })));
+    const streamed = await dispatchProductCoreV2(env, "pilot", inputs());
+    expect(streamed).toMatchObject({ ok: false, code: "CORE_OUTPUT_TOO_LARGE",
+      sizeLimit: { object: "core-response", bytes: null, bound: CORE_V2_MAX_RESPONSE_BYTES } });
+    expect(sent).toBeLessThanOrEqual(CORE_V2_MAX_RESPONSE_BYTES + 4 * chunk.byteLength);
+  });
+
+  it("carries Core's own CORE_OUTPUT_TOO_LARGE numbers into the refusal, and nothing else", async () => {
+    const env = { url: "https://core-v2.example", hmac: "x".repeat(32) };
+    vi.stubGlobal("fetch", async () => Response.json({ code: "CORE_OUTPUT_TOO_LARGE", bytes: 52_600_000, budget: 33_554_432,
+      counts: { regions: 3_600, claims: 1_200, contradictionPairs: 719_400, files: 31, note: "x" }, message: "region text here" },
+    { status: 422 }));
+    const refused = await dispatchProductCoreV2(env, "pilot", inputs());
+    expect(refused).toEqual({ ok: false, code: "CORE_OUTPUT_TOO_LARGE", sizeLimit: { object: "core-output", bytes: 52_600_000,
+      bound: 33_554_432, counts: { regions: 3_600, claims: 1_200, contradictionPairs: 719_400, files: 31 } } });
+
+    // A malformed body keeps the code and loses the detail rather than inventing numbers.
+    vi.stubGlobal("fetch", async () => Response.json({ code: "CORE_OUTPUT_TOO_LARGE", bytes: "52MB" }, { status: 422 }));
+    expect(await dispatchProductCoreV2(env, "pilot", inputs())).toEqual({ ok: false, code: "CORE_OUTPUT_TOO_LARGE" });
+
+    // An error body over the bound (or with a broken length) is the platform's failure, not an output size.
+    vi.stubGlobal("fetch", async () => new Response("x", { status: 502, headers: { "content-length": "not-a-number" } }));
+    expect(await dispatchProductCoreV2(env, "pilot", inputs())).toEqual({ ok: false, code: "CORE_V2_HTTP_502" });
   });
 
   it("uses a dedicated v2 HMAC so the v1 fallback can rotate independently", () => {

@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 import { globalCollectionCompileEnabled, GLOBAL_COLLECTION_KEY_PREFIX, GLOBAL_COLLECTION_MAX_BYTES, GLOBAL_COLLECTION_MAX_REGIONS, judgeGlobalCollectionInput } from "./global-collection-compile";
-import { CORE_MAX_LATENCY_MS } from "./execution-budget";
+import { CORE_MAX_LATENCY_MS, WORKER_SETTLEMENT_RESERVE_MS } from "./execution-budget";
 import { OCR_REGIONS_REQUIRED, documentsWithoutRegions } from "../../shared/compiledWorldValidation";
 import { authorizationStage, type CustomerDataAuthorization } from "../../shared/customerDataAuthorization";
 import type { ReleaseStage } from "../../shared/scopedCustomerDataGate";
@@ -31,9 +31,10 @@ import { readCustomerSourceAuthorization, type SourceAuthorizationResult } from 
 import { readCustomerSourceScope } from "./customer-source-scope";
 import { appendServiceAuditEvent } from "./enterprise-store";
 import { checkCurrentSourceVersions, collectionCandidateKey, groupImmutableDocuments, selectCurrentDocumentVersions } from "./immutable-keys";
-import { getWorkspaceCollectionCandidate, getWorkspaceOcrJson, listImmutableWorkspaceObjects, MAX_DERIVED_JSON_BYTES, putWorkspaceCollectionCandidate, type JsonSizeLimit } from "./r2-objects";
+import { getWorkspaceCollectionCandidate, getWorkspaceOcrJson, listImmutableWorkspaceObjects, MAX_DERIVED_JSON_BYTES, putSerializedCollectionCandidate, serializeCollectionCandidate, type JsonSizeLimit } from "./r2-objects";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
 import { getFoundationActiveWorld } from "./world-store";
+import { detectExactDuplicatesAtIntake, type ExactDuplicateNote } from "./source-dedup";
 
 /** A size refusal keeps its detail on the failure, so the job event can name what was too large. */
 const sizeLimitPayload = (result: object) => ("sizeLimit" in result ? { sizeLimit: result.sizeLimit } : {});
@@ -88,6 +89,8 @@ export type CollectionCompileSuccess = {
   signedReceipt: SignedCompileReceipt;
   /** The stage of the grant that admitted the dispatch; `qualification` is not release evidence by itself. */
   customerDataGateStage: ReleaseStage;
+  /** B1: present only when TAVONEL_SOURCE_DEDUP_MODE=on and a document of this compile has an exact copy the viewer may read. */
+  libraryDuplicates?: readonly ExactDuplicateNote[];
 };
 
 export type CollectionCompileRun =
@@ -120,6 +123,8 @@ export async function runCollectionCompile(
   logicalCollectionKey?: string,
   compileJobId?: string,
   observationPrincipal?: CompileObservationPrincipal,
+  /** The invocation's wall clock, when a scheduler tick owns it: Core is given what is left of it minus the settlement reserve. */
+  deadlineAt?: number,
 ): Promise<CollectionCompileRun> {
   const startedAt = Date.now();
   // An invocation identity, distinct from a durable job (which can have several attempts).
@@ -333,6 +338,11 @@ export async function runCollectionCompile(
     return { ok: false, status: 413, code: "GLOBAL_COLLECTION_RESOURCE_LIMIT", payload: {} };
   }
 
+  // B1 intake annotation. Off by default; in no mode does it change what is dispatched or stored.
+  // `on` names only documents this principal may read; with no bound principal it names none.
+  const duplicateNotes = await detectExactDuplicatesAtIntake(workspaceId, verifiedInputs, process.env,
+    principalBound ? observationPrincipal!.userId! : null);
+
   const expectedVersions = selected.map((item) => ({ documentId: item!.documentId, versionKey: item!.versionKey }));
   const revalidate = async (phase: "before_core" | "after_core"): Promise<CollectionCompileRun | null> => {
     if (compileJobAuthorityEnabled()) {
@@ -428,7 +438,11 @@ export async function runCollectionCompile(
       return { ok: false, status: 503, code: currentGate.code, payload: {} };
     }
     customerDataGate = currentGate.decision;
-    const remainingMs = globalCollection ? CORE_MAX_LATENCY_MS - (Date.now() - startedAt) : CORE_MAX_LATENCY_MS;
+    // Bounded by the tick as well (REVIEW-PR192-R1 MINOR-10): a Core call that ran to its own 52 s
+    // limit after a late claim would leave no time to settle, and a dead lease retried every 5 min.
+    const tickRemainingMs = deadlineAt === undefined ? CORE_MAX_LATENCY_MS : deadlineAt - Date.now() - WORKER_SETTLEMENT_RESERVE_MS;
+    const remainingMs = Math.min(globalCollection ? CORE_MAX_LATENCY_MS - (Date.now() - startedAt) : CORE_MAX_LATENCY_MS,
+      tickRemainingMs);
     if (remainingMs < 1000) return { ok: false, status: 503, code: "GLOBAL_COLLECTION_TIME_BUDGET_EXHAUSTED", payload: {} };
     const compiled = await dispatchProductCoreV2(
       coreV2,
@@ -442,7 +456,9 @@ export async function runCollectionCompile(
       remainingMs,
     );
     if (!compiled.ok) {
-      return { ok: false, status: compiled.code === "COMPILE_INPUT_TOO_LARGE" ? 413 : 503, code: compiled.code,
+      // CORE_OUTPUT_TOO_LARGE is deterministic -- a retry gets the same answer -- so 422, as Core says, not a retryable 503.
+      const status = compiled.code === "COMPILE_INPUT_TOO_LARGE" ? 413 : compiled.code === "CORE_OUTPUT_TOO_LARGE" ? 422 : 503;
+      return { ok: false, status, code: compiled.code,
         payload: sizeLimitPayload(compiled) };
     }
     if (globalCollection && compiled.result.receipt.coreReleaseDigest !== process.env.TAVONEL_GLOBAL_COLLECTION_CORE_RELEASE_SHA256) {
@@ -520,6 +536,19 @@ export async function runCollectionCompile(
     compiledAt: compiledAt.toISOString(),
   });
   if (!signed) return { ok: false, status: 502, code: "COMPILE_RECEIPT_INVALID", payload: {} };
+
+  /*
+    Bytes before records. Signing is local; the audit row and the provenance lease below are
+    durable claims about an object, so the one refusal that is certain in advance -- the size
+    bound -- is taken here, before either exists. cjob-157f2f23 registered provenance #8/#9 and two
+    `succeeded` receipt audits for a 134,576,916 B candidate that was never written.
+    The PUT itself still follows provenance (deletion must find any object that can exist); a PUT
+    that fails in transport after this point leaves an expiring lease and no object.
+  */
+  const storedArtifact = { ...artifact, coreExecution, signedReceipt: signed.receipt };
+  const serialized = serializeCollectionCandidate(storedArtifact);
+  if (!serialized.ok) return { ok: false, status: 503, code: serialized.code, payload: sizeLimitPayload(serialized) };
+
   const audited = await appendServiceAuditEvent({
     workspaceKey: workspaceId,
     action: "compile.receipt_signed",
@@ -578,7 +607,6 @@ export async function runCollectionCompile(
     return { ok: false, status: registered.refused ? 409 : 503, code: registered.code, payload: {} };
   }
 
-  const storedArtifact = { ...artifact, coreExecution, signedReceipt: signed.receipt };
   if (!mayPublish(registered)) {
     return { ok: false, status: 503, code: "COLLECTION_ARTIFACT_PUBLICATION_LEASE_EXPIRED", payload: {} };
   }
@@ -588,7 +616,7 @@ export async function runCollectionCompile(
     if (!finalAuthority.ok) return { ok: false, status: finalAuthority.code === "COMPILE_JOB_AUTHORITY_DENIED" ? 403 : 503,
       code: finalAuthority.code, payload: {} };
   }
-  const stored = await putWorkspaceCollectionCandidate(signer, workspaceId, key, storedArtifact);
+  const stored = await putSerializedCollectionCandidate(signer, workspaceId, key, serialized.body);
   if (!stored.ok) return { ok: false, status: 503, code: stored.code, payload: sizeLimitPayload(stored) };
 
   return {
@@ -612,6 +640,7 @@ export async function runCollectionCompile(
       lifecycle: artifact.lifecycle,
       signedReceipt: signed.receipt,
       customerDataGateStage: authorizationStage(customerDataGate),
+      ...(duplicateNotes && duplicateNotes.length > 0 ? { libraryDuplicates: duplicateNotes } : {}),
     },
   };
 }
