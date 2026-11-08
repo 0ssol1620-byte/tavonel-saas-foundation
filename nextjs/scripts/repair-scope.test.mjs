@@ -8038,3 +8038,27 @@ test('affected w1-trial-ops owner: 10 exact paths select 17 direct suites and no
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
 });
+import { ASK_ANSWERABILITY_E2_AFFECTED_PATHS, ASK_ANSWERABILITY_E2_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+// W2-E2 answerability gate (codex/w2-e2-20261108): ten exact paths, two direct suites, no browser suite; the Ask route keeps its owner.
+test('affected ask-answerability-e2 owner: 10 exact paths select 2 direct suites and no browser suite; neighbours stay unmapped', async () => {
+  const paths = ['eval/ask-quality/e2/PREREG-E2.json', 'eval/ask-quality/e2/README.md', 'eval/ask-quality/e2/e2.ts', 'eval/ask-quality/e2/metrics.test.ts', 'eval/ask-quality/e2/receipts/calibration-2026-11-08T082201899Z-99e9448d5587.json', 'eval/ask-quality/e2/receipts/holdout-2026-11-08T082317556Z-9dd7cb825748.json', 'eval/ask-quality/e2/run_e2.mjs', 'lib/answerability-shadow.ts', 'lib/answerability.test.ts', 'lib/answerability.ts'];
+  const suites = ['eval/ask-quality/e2/metrics.test.ts', 'lib/answerability.test.ts'];
+  assert.deepEqual([[...ASK_ANSWERABILITY_E2_AFFECTED_PATHS], [...ASK_ANSWERABILITY_E2_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['ask-answerability-e2'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['ask-answerability-e2'], [], suites, [], []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const route = 'nextjs/app/api/collections/[id]/ask/route.ts';
+  assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(route)).map(o => o.group), ['w1-remote-mcp-a1-a5']);
+  assert.ok(affectedMap([affectedRecord('M', [route])]).unitFiles.includes('lib/answerability.test.ts'));
+  for (const adjacent of ['nextjs/eval/ask-quality/e2/receipts/holdout-2026-11-09T000000000Z-000000000000.json', 'nextjs/eval/ask-quality/e2/other.ts',
+    'nextjs/eval/ask-quality/cache/0000021344-0001628280-26-010047-ko-20251231.htm', 'nextjs/lib/answerability-on.ts', 'nextjs/lib/answerability.tsx', 'lib/answerability.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+  const { validateSelectedPath } = await import('./run-repair-check.mjs');
+  assert.equal(validateSelectedPath('eval/ask-quality/e2/metrics.test.ts', 'unit', process.cwd()), 'eval/ask-quality/e2/metrics.test.ts');
+  assert.throws(() => validateSelectedPath('eval/ask-quality/e2/other.test.ts', 'unit', process.cwd()), /Unsupported unit path/);
+});

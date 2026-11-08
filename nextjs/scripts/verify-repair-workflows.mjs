@@ -15,6 +15,7 @@ import { CONSENT_POSTER_AFFECTED_PATHS, CONSENT_POSTER_AFFECTED_UNIT_FILES, CONS
 import { VISUALS_AFFECTED_PATHS, VISUALS_AFFECTED_UNIT_FILES, VISUALS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS, OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { W1_TRIAL_OPS_AFFECTED_PATHS, W1_TRIAL_OPS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { ASK_ANSWERABILITY_E2_AFFECTED_PATHS, ASK_ANSWERABILITY_E2_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES, TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_PATHS, SPECIMEN_STRIP_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_BROWSER_FILES, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES, PUBLIC_MARKETING_AFFECTED_BROWSER_FILES, MARKETING_TOOLING_POSTIMAGES, G1_COPY_TRUTH_AFFECTED_PATHS, G1_COPY_TRUTH_AFFECTED_UNIT_FILES, G1_COPY_TRUTH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { ENABLEMENT_AFFECTED_BROWSER_FILES, P4_FOLLOWUPS_AFFECTED_PATHS, P4_FOLLOWUPS_AFFECTED_UNIT_FILES, P4_FOLLOWUPS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 
@@ -338,7 +339,7 @@ assert(collectorVerifier.includes("const exploreCases=verifyExploreSpecSource(gi
 // explore-answer owner is admitted there only as one literal 1440 row; the historical 424 report keeps its own planner.
 const lfRunner=runner.replace(/\r\n/g,'\n'),sharedMapStart=lfRunner.indexOf('\nconst browserProjectsByFile = new Map([\n'),sharedMapEnd=lfRunner.indexOf('\n]);',sharedMapStart+1),sharedMap=sharedMapStart<0||sharedMapEnd<0?'':lfRunner.slice(sharedMapStart,sharedMapEnd);
 assert(!sharedBrowserProjectsMapExcludesExplore(runner)&&sharedMap&&lfRunner.indexOf('const browserProjectsByFile = new Map([',sharedMapStart+2)<0&&(sharedMap.match(/explore/gi)??[]).length===1&&(sharedMap.match(/\n  \['e2e\/explore\.spec\.ts', \['1440'\]\],/g)??[]).length===1
-  &&lfRunner.includes("const registeredUnitTestPaths = new Set([\n  'app/api/documents/[id]/progress/route.test.ts',\n  'app/api/compile-jobs/route.test.ts',\n  'components/compile-stage.test.tsx',\n  'components/intake-triage-review.interaction.test.ts',\n  'components/intake-triage-review.test.tsx',\n  'components/landing-v2/hero-source-card.test.tsx',\n  'components/evaluation-page.test.tsx',\n  'components/explore/evidence-workbench.test.tsx',\n  'components/compile-stage-player.mobile-view.test.tsx',\n  'eval/ask-quality/metrics.test.ts',\n]);\nconst asyncRouteUnitTestPath")
+  &&lfRunner.includes("const registeredUnitTestPaths = new Set([\n  'app/api/documents/[id]/progress/route.test.ts',\n  'app/api/compile-jobs/route.test.ts',\n  'components/compile-stage.test.tsx',\n  'components/intake-triage-review.interaction.test.ts',\n  'components/intake-triage-review.test.tsx',\n  'components/landing-v2/hero-source-card.test.tsx',\n  'components/evaluation-page.test.tsx',\n  'components/explore/evidence-workbench.test.tsx',\n  'components/compile-stage-player.mobile-view.test.tsx',\n  'eval/ask-quality/metrics.test.ts',\n  // W2-E2 answerability replay: the one E2 eval suite its owner selects; also in the base include as eval/**/metrics.test.ts.\n  'eval/ask-quality/e2/metrics.test.ts',\n]);\nconst asyncRouteUnitTestPath")
   &&planner.includes("affectedGroup('explore-answer', /^nextjs\\/(?:lib\\/explore-(?:(?:sample|story)(?:\\.test)?|entry-proof\\.test)\\.ts|components\\/explore\\/(?:ask-overlay|evidence-workbench(?:\\.test)?)\\.tsx|e2e\\/explore\\.spec\\.ts)$/,")
   &&planner.includes("{ unitFiles: ['lib/explore-entry-proof.test.ts', 'lib/explore-sample.test.ts', 'lib/explore-story.test.ts', 'lib/visual-world-model.test.ts', 'components/explore/evidence-workbench.test.tsx'], browserFiles: ['e2e/explore.spec.ts'] }),")&&(planner.match(/explore-answer/g)??[]).length===1
   &&runner.includes("const units = vitestFiles.length ? readAndValidateVitestReport(resolve(reportDir, 'vitest.json'), vitestFiles) : null;")&&runner.includes('const browsers = planBrowserRuns(plan.browserFiles, plan.runDetailIntegrity).map((planned, index) => ({')
@@ -868,3 +869,21 @@ assert(VITEST_DISCOVERY_CONFIG_PATH==='nextjs/vitest.config.ts'&&discoveryOwners
 console.log(`Workflow static gates pass. Full qualification still pending for exact CI/Launch runs at this head.`);
 
 assert(collectorVerifier.includes("Symbol('native race final-gate generated plan')")&&collectorVerifier.includes("same(untracked,['nextjs/repair-plan.json'])")&&collectorVerifier.includes("resolve(process.argv[1])===resolve(intent.repoRoot,'nextjs/scripts/repair-scope-gate.mjs')")&&collectorVerifier.includes('if(!bytes.equals(expected))')&&collectorVerifier.includes('nativeRacePlan(normal,proof)')&&collectorVerifier.includes('before.isSymbolicLink()')&&collectorVerifier.includes('final-gate owner output refused'), 'c61 final gate alone qualifies the exact regular generated plan against a fresh sealed-selector recomputation before trusting routing flags; initial admission stays strict');
+// W2-E2 answerability gate (codex/w2-e2-20261108), restated independently: one exact ten-path owner with two direct suites and
+// no browser, database, worker or selector lane; the Ask route keeps its W1 owner, which selects the gate's suite; neighbours unmapped.
+{
+  const e2Paths=['eval/ask-quality/e2/PREREG-E2.json', 'eval/ask-quality/e2/README.md', 'eval/ask-quality/e2/e2.ts', 'eval/ask-quality/e2/metrics.test.ts', 'eval/ask-quality/e2/receipts/calibration-2026-11-08T082201899Z-99e9448d5587.json', 'eval/ask-quality/e2/receipts/holdout-2026-11-08T082317556Z-9dd7cb825748.json', 'eval/ask-quality/e2/run_e2.mjs', 'lib/answerability-shadow.ts', 'lib/answerability.test.ts', 'lib/answerability.ts'];
+  const e2Suites=['eval/ask-quality/e2/metrics.test.ts', 'lib/answerability.test.ts'];
+  const e2Owners=AFFECTED_GROUPS.filter(owner=>owner.group==='ask-answerability-e2'),[e2Owner]=e2Owners;
+  const askRoute='nextjs/app/api/collections/[id]/ask/route.ts';
+  assert(e2Owners.length===1&&JSON.stringify([...ASK_ANSWERABILITY_E2_AFFECTED_PATHS])===JSON.stringify(e2Paths)&&JSON.stringify([...ASK_ANSWERABILITY_E2_AFFECTED_UNIT_FILES])===JSON.stringify(e2Suites)
+    &&JSON.stringify(e2Owner.unitFiles)===JSON.stringify(e2Suites)&&!e2Owner.browserFiles.length&&!e2Owner.databaseTests.length
+    &&!e2Owner.nativeReuse&&!e2Owner.selector&&!e2Owner.worker&&!e2Owner.database
+    &&e2Paths.every(p=>AFFECTED_GROUPS.filter(owner=>owner.match.test('nextjs/'+p)).map(owner=>owner.group).join()==='ask-answerability-e2')
+    &&AFFECTED_GROUPS.filter(owner=>owner.match.test(askRoute)).map(owner=>owner.group).join()==='w1-remote-mcp-a1-a5'
+    &&AFFECTED_GROUPS.find(owner=>owner.group==='w1-remote-mcp-a1-a5').unitFiles.includes('lib/answerability.test.ts')
+    &&['nextjs/eval/ask-quality/e2/other.ts','nextjs/eval/ask-quality/e2/receipts/holdout-x.json','nextjs/lib/answerability.tsx','lib/answerability.ts']
+      .every(p=>!AFFECTED_GROUPS.some(owner=>owner.match.test(p)))
+    &&e2Suites.every(file=>existsSync(resolve(repo,'nextjs',file))),
+    'W2-E2 answerability owner must keep its exact ten paths and two suites, leave the Ask route with w1-remote-mcp-a1-a5 and admit no neighbour');
+}
