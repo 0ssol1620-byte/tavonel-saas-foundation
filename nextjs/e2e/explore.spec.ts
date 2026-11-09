@@ -114,6 +114,43 @@ test("Act 1 draws a curated composition of compiled objects", async ({ page }) =
   await expect(page.getByRole("button", { name: "Open source evidence" })).toBeVisible();
 });
 
+/*
+  Review MINOR-4 (film R3): a dimmed object was dimmed with opacity on the whole button, so its box went
+  translucent and the relation lines behind it ran across its label. The box stays opaque now and only its
+  contents dim: no node box is see-through, and at the centre of every label the node is what is on top.
+*/
+test("relation lines never show through an object's label", async ({ page }) => {
+  test.skip(isNarrow(page));
+  await page.goto("/explore?act=world");
+  await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "world");
+  await page.locator(`${STAGE} ${NODE}[data-node-kind="Entity"]`).first().click();
+  await expect(page.locator(`${STAGE} ${NODE}[data-focus-dimmed="1"]`).first()).toBeVisible();
+  await expect(page.locator(`${STAGE} [data-visual-edge]`).first()).toBeAttached();
+  // Let the 260ms entry/selection transitions finish before reading opacities.
+  await page.waitForTimeout(600);
+  const nodes = await page.$$eval(`${STAGE} ${NODE}`, (elements) => elements.map((element) => {
+    const style = getComputedStyle(element);
+    const alpha = /rgba?\(([^)]+)\)/.exec(style.backgroundColor)?.[1].split(",")[3];
+    const label = element.querySelector("span:nth-child(2)")!.getBoundingClientRect();
+    const top = document.elementFromPoint(label.x + label.width / 2, label.y + label.height / 2);
+    return {
+      dimmed: element.getAttribute("data-focus-dimmed") === "1" || element.getAttribute("data-node-state") === "dim",
+      opacity: Number(style.opacity),
+      backgroundAlpha: alpha === undefined ? 1 : Number(alpha),
+      onTop: Boolean(top && element.contains(top)),
+      childOpacity: Number(getComputedStyle(element.firstElementChild!).opacity),
+    };
+  }));
+  expect(nodes.filter(node => node.dimmed).length, "selecting an entity dims the objects outside it").toBeGreaterThan(0);
+  for (const node of nodes) {
+    expect(node.opacity, "a node box is never translucent").toBe(1);
+    expect(node.backgroundAlpha, "a node box is never see-through").toBe(1);
+    expect(node.onTop, "the node, not a line, is on top at its label").toBe(true);
+  }
+  // Still dimmed, not deleted (BQ-132): the contents of a dimmed node carry the dimming.
+  expect(Math.max(...nodes.filter(node => node.dimmed).map(node => node.childOpacity))).toBeLessThan(1);
+});
+
 test("Act 1 offers the same composition as an accessible list", async ({ page }) => {
   // §20: the canvas is not the only reading. Every drawn object, its relations and its evidence
   // link have to be reachable as text, on every width -- 1440 and 390 both run this.

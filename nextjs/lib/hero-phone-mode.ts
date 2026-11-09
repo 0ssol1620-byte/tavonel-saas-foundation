@@ -7,10 +7,14 @@
  * bytes, its player and its desktop behaviour are untouched.
  *
  * One switch, read by the page and by every phone-film browser check: those checks are skipped, not
- * rewritten or deleted, while this is "still", and they run again unchanged the day it is "film" --
- * when the light-canvas re-record lands (impl/FILM-RERECORD-FEASIBILITY.md, founder-gated).
+ * rewritten or deleted, while this is "still", and they run again the day it is "film".
+ *
+ * "film" since the R3 re-record (2026-11-09, LANDING-VIDEO-HISTORY-20261109 option d, D1): the cuts are the
+ * light-canvas product recording, framed on the action so product type is 32 source px, and a phone opens on
+ * one 4:5 pane of each cut (STAGE_FRAMES[].phonePane) where that type draws at >= 12 CSS px. The still and its
+ * component stay, so this line is the rollback.
  */
-export const PHONE_HERO: "still" | "film" = "still";
+export const PHONE_HERO = "film" as "still" | "film";
 
 /** Where each hero draws while the still stands in: the still at 900px and below, the film above. */
 export const PHONE_HERO_STILL_MEDIA = "(max-width: 900px)";

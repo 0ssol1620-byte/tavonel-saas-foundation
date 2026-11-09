@@ -137,10 +137,17 @@
   box-shadow: inset 2px 0 var(--verified);
 }
 .node[data-related="1"] { border-color: var(--verified-dim); color: var(--text-hi); }
-/* BQ-132: 0.2 put an unselected node under 1.6:1 against the ground -- dimmed, not deleted. */
-.node[data-focus-dimmed="1"] { opacity: 0.55; }
+/*
+  BQ-132: 0.2 put an unselected node under 1.6:1 against the ground -- dimmed, not deleted.
+  The box itself stays opaque (film R3, review MINOR-4): opacity on the whole button made its background
+  translucent too, so the relation lines drawn behind it showed through the box and ran across its label.
+  The label, kind and count dim; the box keeps covering the lines.
+*/
+.node[data-focus-dimmed="1"] { border-color: var(--hairline); }
+.node[data-focus-dimmed="1"] > * { opacity: 0.55; }
 
-.node[data-node-state="dim"] { opacity: 0.36; }
+.node[data-node-state="dim"] { border-color: var(--hairline); }
+.node[data-node-state="dim"] > * { opacity: 0.36; }
 
 .node[data-node-state="affected"],
 .node[data-node-state="changed"] {

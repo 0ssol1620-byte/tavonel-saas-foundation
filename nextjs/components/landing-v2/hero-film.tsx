@@ -26,13 +26,21 @@ import HeroFilmDisclosure from "./hero-film-disclosure";
  * the pixels in each dimension. The locked master preserves the verified 2880x1800/yuv444p source
  * on every viewport and is already recorded in `lib/locked-film-assets.json`.
  */
+/*
+  Recording R3 (2026-11-09, LANDING-VIDEO-HISTORY-20261109 option d, D2): the same pipeline with a camera on each step's
+  action and result (scripts/film/record.mjs), so 12px product type is 32 source px -- about 13.8px at 1440 and >= 12px in
+  a phone's 4:5 pane -- instead of the whole 1440px screen at about 10px. No site nav and no second H1 in the frames
+  (review R2-MINOR-1), a compile moment in its own stage (the run reading the five sources and stopping for review), and
+  tab labels that name what each cut shows (review R2-MINOR-2). New names: /film/* is immutable for a year, and the R2
+  files stay byte-identical and locked so this can be rolled back by reverting the references.
+*/
 /** The four re-recorded cuts, in stage order (stage 1 also has the decoder-error fallbacks in HERO_CUT). */
-export const HOME_FILM_CUTS = ["/film/hero-r2-c1.mp4", "/film/hero-r2-c2.mp4", "/film/hero-r2-c3.mp4", "/film/hero-r2-c4.mp4"] as const;
+export const HOME_FILM_CUTS = ["/film/hero-r3-c1.mp4", "/film/hero-r3-c2.mp4", "/film/hero-r3-c3.mp4", "/film/hero-r3-c4.mp4"] as const;
 
 const HERO_CUT = {
-  src: "/film/hero-r2-c1.mp4",
-  fallbackSrc: "/film/hero-r2-c1-hq.mp4",
-  fallbackPhoneSrc: "/film/hero-r2-c1-hq-1440.mp4",
+  src: "/film/hero-r3-c1.mp4",
+  fallbackSrc: "/film/hero-r3-c1-hq.mp4",
+  fallbackPhoneSrc: "/film/hero-r3-c1-hq-1440.mp4",
 } as const;
 
 /*
@@ -67,26 +75,40 @@ const HERO_CUT = {
   None carries an overprint, so no stage has a Tier 2 mask. Rows: public/film/README.md and
   lib/locked-film-assets.json.
 */
+/*
+  R3 posters: each is the frame of a step's result -- stage 1 at 10.40s (the Operating expenses line and its page region
+  lit), stage 2 at 17.96s (the run stopped: a review package ready for a person), stage 3 at 17.96s (Greater China and the
+  filings that mention it, after the 2026 filings arrived), stage 4 at 8.80s (the passage's page region). Stage 1's phone
+  still is its 848x1060 pane (STAGE_FRAMES.sources.phonePane).
+*/
 const HOME_POSTERS = [
-  { poster: "/film/poster-r2-c1-t13.60-2x.webp", poster1x: "/film/poster-r2-c1-t13.60.webp", posterAvif: "/film/poster-r2-c1-t13.60-2x.avif", posterAvif1x: "/film/poster-r2-c1-t13.60.avif", phonePoster: "/film/poster-r2-c1-t13.60-pane1-684x855.webp", phonePosterAvif: "/film/poster-r2-c1-t13.60-pane1-684x855.avif" },
-  { poster: "/film/poster-r2-c2-t4.40-2x.webp", poster1x: "/film/poster-r2-c2-t4.40.webp", posterAvif: "/film/poster-r2-c2-t4.40-2x.avif", posterAvif1x: "/film/poster-r2-c2-t4.40.avif" },
-  { poster: "/film/poster-r2-c3-t17.96-2x.webp", poster1x: "/film/poster-r2-c3-t17.96.webp", posterAvif: "/film/poster-r2-c3-t17.96-2x.avif", posterAvif1x: "/film/poster-r2-c3-t17.96.avif" },
-  { poster: "/film/poster-r2-c4-t6.80-2x.webp", poster1x: "/film/poster-r2-c4-t6.80.webp", posterAvif: "/film/poster-r2-c4-t6.80-2x.avif", posterAvif1x: "/film/poster-r2-c4-t6.80.avif" },
+  { poster: "/film/poster-r3-c1-t10.40-2x.webp", poster1x: "/film/poster-r3-c1-t10.40.webp", posterAvif: "/film/poster-r3-c1-t10.40-2x.avif", posterAvif1x: "/film/poster-r3-c1-t10.40.avif", phonePoster: "/film/poster-r3-c1-t10.40-pane1-848x1060.webp", phonePosterAvif: "/film/poster-r3-c1-t10.40-pane1-848x1060.avif" },
+  { poster: "/film/poster-r3-c2-t17.96-2x.webp", poster1x: "/film/poster-r3-c2-t17.96.webp", posterAvif: "/film/poster-r3-c2-t17.96-2x.avif", posterAvif1x: "/film/poster-r3-c2-t17.96.avif" },
+  { poster: "/film/poster-r3-c3-t17.96-2x.webp", poster1x: "/film/poster-r3-c3-t17.96.webp", posterAvif: "/film/poster-r3-c3-t17.96-2x.avif", posterAvif1x: "/film/poster-r3-c3-t17.96.avif" },
+  { poster: "/film/poster-r3-c4-t8.80-2x.webp", poster1x: "/film/poster-r3-c4-t8.80.webp", posterAvif: "/film/poster-r3-c4-t8.80-2x.avif", posterAvif1x: "/film/poster-r3-c4-t8.80.avif" },
 ] as const;
+
+/*
+  The tab label names the cut's one action (review R2-MINOR-2: "Use with AI" promised an AI session over a cut that shows
+  a prepared question in the public demo). Read: an extracted line lights its page region. Compile: the run. Update: the
+  filings that arrived and what they changed. Trace: a prepared question followed to its page region.
+*/
+const HOME_STAGE_LABELS = { en: ["Read", "Compile", "Update", "Trace"], ko: ["읽기", "컴파일", "업데이트", "근거 추적"] } as const;
 
 /** URL of the opening poster (stage 1, 2880px file). */
 export const HERO_FILM_POSTER: string = HOME_POSTERS[0].poster;
 
 function heroStages(korean: boolean): CompileStage[] {
   const lines = korean
-    ? ["원문 페이지와 추출된 자료를 나란히 살펴보세요.", "개체와 그 개체를 언급한 문서를 함께 살펴보세요.", "새로 도착한 공시가 지식에 무엇을 더했는지 확인하세요.", "준비된 질문을 골라 답의 근거 구절과 페이지를 확인하세요."]
-    : ["Read original pages beside their extracted content.", "Explore the entities and the documents that mention them.", "See what newly arrived filings add to the knowledge.", "Pick a prepared question and see the passage and page behind the answer."];
+    ? ["추출된 줄마다 그 줄을 읽은 페이지 영역이 표시됩니다.", "준비된 원본을 컴파일하면, 실행은 사람의 검토 앞에서 멈춥니다.", "새 공시가 도착하면 지식에서 무엇이 바뀌었는지 보여줍니다.", "준비된 질문을 골라 답을 페이지 영역까지 따라가 보세요."]
+    : ["Pick an extracted line and see the page region it was read from.", "Compile the ready sources; the run stops for a person's review.", "New filings arrive, and the knowledge shows what they changed.", "Pick a prepared question and follow the answer to its page region."];
   return COMPILE_STAGES.map((stage, index) => ({
     ...stage,
     ...HOME_POSTERS[index],
     src: HOME_FILM_CUTS[index]!,
     ...(index === 0 ? HERO_CUT : {}),
     ...(korean ? LANDING_V2_FILM_STAGES_KO[index] : {}),
+    label: HOME_STAGE_LABELS[korean ? "ko" : "en"][index]!,
     line: lines[index],
   }));
 }

@@ -390,10 +390,11 @@ describe("the recordings", () => {
   it("names on its first recording line every video whose takes were not recorded from tavonel.com", () => {
     const manifest = JSON.parse(readFileSync(join(nextjs, "public", "guide", "manifest.json"), "utf8")) as { howRecorded: string[]; files: { file: string; recordedFrom?: string }[] };
     const elsewhere = [...new Set(manifest.files.filter((entry) => entry.recordedFrom).map((entry) => entry.file.replace(/-(?:desktop|phone)\.mp4$/, "")))];
-    expect(elsewhere).toEqual(["guide-2-mcp"]);
+    // 2026-11-09: all six takes were re-recorded on live tavonel.com, so none is an exception today.
+    expect(elsewhere).toEqual([]);
     for (const video of elsewhere) expect(manifest.howRecorded[0], video).toContain(video);
-    // The unqualified "No fixture build, ..." spoke for guide-2 too.
-    expect(manifest.howRecorded[0]).not.toContain("No fixture build,");
+    // An unqualified "No fixture build, ..." would speak for an exception too.
+    if (elsewhere.length) expect(manifest.howRecorded[0]).not.toContain("No fixture build,");
   });
 
   it("fails on a changed byte, an unlisted file and a missing one", () => {

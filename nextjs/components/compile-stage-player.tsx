@@ -137,12 +137,20 @@ export type PhonePane = { x: number; y: number; w: number };
   type size. `readingTarget.pane` is the quarter column of the 2880 x 1800 frame the string sits in;
   the crop, the phone rect and both scans are re-measured on the new frames
   (compile-stage-player.frame-strings.json). No poster carries an overprint, so no stage has a mask.
+
+  Recording R3 (2026-11-09): each cut is framed by a camera on the step's action and result, so product type is
+  32 source px for 12px (about 13.8px at 1440). The phone rects are therefore 848px wide -- 4:5, 848 x 1060 -- which
+  draws that type at 32 x panel/848: >= 12px on any panel >= 318 CSS px, so every phone from 360 up (Windows WebKit's
+  360px panel is 318px, its classic scrollbar included). Stage 2 is now
+  the compile (the workspace run reading five sources and stopping for review), stage 3 the change view, stage 4 the
+  prepared questions. Each reading target is the first string the camera holds (probe[0] in scripts/film/stages.mjs);
+  a stage whose target leaves the 2x window opens on Fit, measured, not chosen.
 */
 export const STAGE_FRAMES: Record<string, { panes?: readonly [string, string, string, string]; readingTarget: ReadingTarget; crop: FilmCrop; wideView: WideView; phonePane: PhonePane; posterMask?: PosterMask }> = {
-  sources: { readingTarget: { pane: 2, text: "Extracted lines" }, crop: { x: 0.5, y: 0.2 }, wideView: "crop", phonePane: { x: 1780, y: 420, w: 684 } },
-  read: { readingTarget: { pane: 2, text: "Greater China" }, crop: { x: 0.5, y: 0.25 }, wideView: "crop", phonePane: { x: 1900, y: 400, w: 684 } },
-  structure: { readingTarget: { pane: 2, text: "filed 2026-07-31" }, crop: { x: 0.5, y: 0.4 }, wideView: "fit", phonePane: { x: 120, y: 300, w: 684 } },
-  world: { readingTarget: { pane: 0, text: "Retrieved source passage" }, crop: { x: 0, y: 0.1 }, wideView: "crop", phonePane: { x: 160, y: 300, w: 684 } },
+  sources: { readingTarget: { pane: 2, text: "Extracted lines" }, crop: { x: 0.25, y: 0.2 }, wideView: "crop", phonePane: { x: 1016, y: 369, w: 848 } },
+  read: { readingTarget: { pane: 0, text: "apple-2026-q3-10-q-reference.pdf" }, crop: { x: 0, y: 0.25 }, wideView: "fit", phonePane: { x: 50, y: 72, w: 848 } },
+  structure: { readingTarget: { pane: 2, text: "filed 2026-01-30" }, crop: { x: 0.5, y: 0.25 }, wideView: "fit", phonePane: { x: 1986, y: 369, w: 848 } },
+  world: { readingTarget: { pane: 2, text: "net sales" }, crop: { x: 0.25, y: 0.25 }, wideView: "fit", phonePane: { x: 1016, y: 369, w: 848 } },
 };
 
 /*
@@ -851,7 +859,7 @@ export default function CompileStagePlayer({
         {!still && !live && paneHold ? (
           <picture className={readingStyles.picture} data-pane-hold="">
             <source type="image/avif" srcSet={paneHold.phonePosterAvif} />
-            <img className="compile-film-still" src={paneHold.phonePoster ?? paneHold.phonePosterAvif} width={684} height={855} alt="" decoding="async" />
+            <img className="compile-film-still" src={paneHold.phonePoster ?? paneHold.phonePosterAvif} width={stageFrame?.phonePane.w ?? 684} height={Math.round((stageFrame?.phonePane.w ?? 684) * 5 / 4)} alt="" decoding="async" />
           </picture>
         ) : null}
         {still && mask ? (

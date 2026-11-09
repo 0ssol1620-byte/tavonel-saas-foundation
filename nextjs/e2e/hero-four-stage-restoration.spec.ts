@@ -1,7 +1,7 @@
 import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { expect, test } from "@playwright/test";
 
-const FILMS = ["/film/hero-r2-c1.mp4", "/film/hero-r2-c2.mp4", "/film/hero-r2-c3.mp4", "/film/hero-r2-c4.mp4"];
+const FILMS = ["/film/hero-r3-c1.mp4", "/film/hero-r3-c2.mp4", "/film/hero-r3-c3.mp4", "/film/hero-r3-c4.mp4"];
 
 async function dismissConsent(page: import("@playwright/test").Page) {
   // Release 2: the consent card appears after a 200px scroll (or 8 s), not on the first paint.
@@ -27,18 +27,19 @@ test("the title leads directly into four selectable and playing demo recordings"
   // FINAL-SPEC 2026-10-26 D-9: the disclosure's wording (S class: the notice stays, its words are a design choice).
   await expect(film.locator("figcaption")).toHaveText("Illustrative demo · not customer results.");
   const sequence = film.locator(".compile-film-sequence");
-  // Founder ask 2026-10-27 ("영상은 축소상태가 디폴트여야"): Home opens compact at every width -- the whole frame --
-  // over FINAL-SPEC 2026-10-26 §2.1's Focus and Release 3's desktop crop (R3-D1). Focus details expands it.
-  await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
+  // Founder ask 2026-10-27 ("영상은 축소상태가 디폴트여야"): the desktop opens compact -- the whole frame. Recording R3
+  // (2026-11-09, D1): below 900px it opens on Focus, where the R3 cut's type reads >= 12px.
+  await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
   await expect(sequence).toHaveAttribute("data-wide-view", "fit");
   // Fix round 3 (M1): one "Focus details" toggle per width, pressed exactly while the focused view
   // shows; it opens not pressed now.
   const viewToggle = film.getByRole("button", { name: "Focus details", exact: true });
   await expect(viewToggle).toHaveCount(1);
-  await expect(viewToggle).toHaveAttribute("aria-pressed", "false");
+  // R3 (D1): the phone's toggle opens pressed (the pane); the desktop's opens not pressed (the whole frame).
+  await expect(viewToggle).toHaveAttribute("aria-pressed", page.viewportSize()!.width < 900 ? "true" : "false");
   await expect(film.getByRole("button", { name: "Fit full frame", exact: true })).toHaveCount(0);
   const tabs = film.getByRole("tab");
-  await expect(tabs).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
+  await expect(tabs).toHaveText(["Read", "Compile", "Update", "Trace"]);
   const playback = [];
   for (let index = 0; index < FILMS.length; index++) {
     await tabs.nth(index).click();
@@ -58,16 +59,16 @@ test("the title leads directly into four selectable and playing demo recordings"
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   if (testInfo.project.name === "390") {
     const focus = film.getByRole("button", { name: "Focus details", exact: true });
-    // Fix round 3 (M1): the name stays; the pressed state follows the view on screen (the whole frame, then the pane).
-    await expect(focus).toHaveAttribute("aria-pressed", "false");
-    expect((await focus.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-    await focus.click();
-    await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
+    // Fix round 3 (M1): the name stays; the pressed state follows the view on screen (the pane, then the whole frame).
     await expect(focus).toHaveAttribute("aria-pressed", "true");
+    expect((await focus.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     await page.screenshot({ path: testInfo.outputPath("phone-focus-details.png") });
     await focus.click();
     await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
     await expect(focus).toHaveAttribute("aria-pressed", "false");
+    await focus.click();
+    await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
+    await expect(focus).toHaveAttribute("aria-pressed", "true");
   }
   await tabs.first().focus();
   await page.keyboard.press("ArrowRight");

@@ -146,3 +146,39 @@ Posters: one source frame of each cut (the lossless PNG the cut was encoded from
 | `poster-r2-c1-t13.60-pane1-684x855.avif` | 684×855 | 20,292 | `c313897b5a924322a02d8ffac21691f9744e9cdfa323576beb5782d1cd3fc282` | `hero-r2-c1.mp4` | 13.60 s | `313175a10f6f453cf65581858c8269edfad5b95e5e8d949c6fa2fb30491b0fe5` |
 
 Reading targets, crop windows, phone rects and both blank scans for these cuts are re-measured in `components/compile-stage-player.frame-strings.json`. The founder restored the earlier film on 2026-08-09; this re-record was taken under the 2026-11-04 delegation and the earlier files are kept so it can be rolled back by reverting the references.
+
+## Home film — recording R3 (2026-11-09)
+
+LANDING-VIDEO-HISTORY-20261109, option (d). Same pipeline as R2 (`scripts/film/`), with a camera: the page renders at a 1920×1200 CSS viewport (1400×900 for the two workspace stages) at deviceScaleFactor 8/3, and each frame is a 1080×675 CSS clip (2880×1800 px) framed on the step's action and its result. So 12px product type is 32 source px — about 13.8px in the 1440 desktop film, and ≥ 12px in a phone's 848×1060 pane on any panel ≥ 318 CSS px (Windows WebKit's 360px panel is 318). The /explore header and its second H1 are hidden inside the recording only (`stage.hide` in `stages.mjs`). One action and one result per step; stage 2 is the compile itself. Edge-band scan: 0 of 1,800 frames. Encoders, crf, profiles and poster settings are R2's. The R2 files stay byte-identical and locked, so this can be rolled back by reverting the references.
+
+| File | Shows | Bytes | sha256 |
+|---|---|---|---|
+| `hero-r3-c1.mp4` | 1 · Read — /workspace/sources (paying-customer fixture session): pages of the 10-Q arrive in the live OCR view, then two extracted lines are picked, each lighting the page region it was read from | 1,150,238 | `2a9318cc9caf8f3c1b5a4349d5d7186c0d8c852b5c6da33acc5ccdcef7400583` |
+| `hero-r3-c2.mp4` | 2 · Compile — /workspace/sources: the five ready sources are compiled; the run checks the selection, reads 0→5 of 5, structures what was read and stops: "A review package is ready for a person to inspect." | 782,407 | `968e8e7cae45930291c8194e648f7cdd66c8695170af7d8fd31749c1df714d15` |
+| `hero-r3-c3.mp4` | 3 · Update — /explore?act=change: the 2025 10-K, the 2026 filings that arrived, then the World after them with Greater China selected (relation lines behind the node boxes, see world-visual.module.css) | 2,991,082 | `3042bf4e70f6212a49335d3b2fe3e19d6c1ce0ff9ee868340633e3597b109a24` |
+| `hero-r3-c4.mp4` | 4 · Trace — /explore: a prepared question, its retrieved passage, the page region it came from, then the next source page of the answer | 2,553,208 | `9b8a7353a96ab0d1778827f0a5ddf67dbf9d3c307c8f4d2e3d289df38de49a0c` |
+| `hero-r3-c1-hq.mp4` | stage 1 decoder-error fallback (yuv420p, 2880x1800) | 1,010,629 | `0e296c6036f19a3fc7c4866e131dfd3f30d90e36077fde9b61cc700603ab20e9` |
+| `hero-r3-c1-hq-1440.mp4` | stage 1 narrow decoder-error fallback (yuv420p, 1440x900) | 418,623 | `9ba7604f0ba3c9d6564602ceaa59bc2c0c517a5a7a4154d2d424a0ec3e8ce627` |
+
+Posters: each is a step's result frame (stage 1 at 10.40 s, stages 2 and 3 at 17.96 s, stage 4 at 8.80 s). The stage-1 phone pane is an 848×1060 extract of the same PNG (`STAGE_FRAMES.sources.phonePane`).
+
+| File | Size | Bytes | sha256 | Cut | Frame *t* | Frame PNG sha256 |
+|---|---|---|---|---|---|---|
+| `poster-r3-c1-t10.40-2x.webp` | 2880×1800 | 191,562 | `55077ee4426f29908668efbb2a9f69c4e303a23f04f8b89e1ff1ab6f56e347c6` | `hero-r3-c1.mp4` | 10.40 s | `74e3363b6b57009d331e9de35e1c672fc2b0552a9b3f04decf48548b52d6ec73` |
+| `poster-r3-c1-t10.40.webp` | 1440×900 | 76,788 | `6ebb76e87d2f18b0eb14715aaf76113c3eb485b846d010413a7efdd3081a3633` | `hero-r3-c1.mp4` | 10.40 s | `74e3363b6b57009d331e9de35e1c672fc2b0552a9b3f04decf48548b52d6ec73` |
+| `poster-r3-c1-t10.40-2x.avif` | 2880×1800 | 109,233 | `8acd642326ff09afdefcf249579cf77a070bdc2372688051a7d96f1b6216a8cb` | `hero-r3-c1.mp4` | 10.40 s | `74e3363b6b57009d331e9de35e1c672fc2b0552a9b3f04decf48548b52d6ec73` |
+| `poster-r3-c1-t10.40.avif` | 1440×900 | 48,101 | `3d569d3dc9eccf38d35fa5bd67040561372543633eaa1753c06ef61ebf3a42b9` | `hero-r3-c1.mp4` | 10.40 s | `74e3363b6b57009d331e9de35e1c672fc2b0552a9b3f04decf48548b52d6ec73` |
+| `poster-r3-c1-t10.40-pane1-848x1060.webp` | 848×1060 | 36,770 | `926c6264b9b16b7976db135ae6dc0dcca17f8d82399454364c13e141a5346c4e` | `hero-r3-c1.mp4` | 10.40 s | `74e3363b6b57009d331e9de35e1c672fc2b0552a9b3f04decf48548b52d6ec73` |
+| `poster-r3-c1-t10.40-pane1-848x1060.avif` | 848×1060 | 21,611 | `372e2255bb3cde0ceac20aa70eab00d9e2fe4e6c790c4e7c18174fb43bcbc12d` | `hero-r3-c1.mp4` | 10.40 s | `74e3363b6b57009d331e9de35e1c672fc2b0552a9b3f04decf48548b52d6ec73` |
+| `poster-r3-c2-t17.96-2x.webp` | 2880×1800 | 106,010 | `3cb0845b1f08018b25243a0c5dcf4ad4f6612ce71c8977aedb4cbdef75f94f70` | `hero-r3-c2.mp4` | 17.96 s | `521a3a1ad5aa827e11bae74879db8bb61f18e3c30caf629e3caff3ae67f46bbe` |
+| `poster-r3-c2-t17.96.webp` | 1440×900 | 42,346 | `a7f81715e908129a6e7848767933f0fc9f05708732f361a68f97e444e573b60b` | `hero-r3-c2.mp4` | 17.96 s | `521a3a1ad5aa827e11bae74879db8bb61f18e3c30caf629e3caff3ae67f46bbe` |
+| `poster-r3-c2-t17.96-2x.avif` | 2880×1800 | 57,182 | `def5ac5952e9e991e8e5f3960998cd27d9993e2870406de00a9f6dcf97128635` | `hero-r3-c2.mp4` | 17.96 s | `521a3a1ad5aa827e11bae74879db8bb61f18e3c30caf629e3caff3ae67f46bbe` |
+| `poster-r3-c2-t17.96.avif` | 1440×900 | 24,319 | `3c8d72ac1dbb5e5ebf57be97c8966eb187ff6f8e7fac1a53a9c5da7785283753` | `hero-r3-c2.mp4` | 17.96 s | `521a3a1ad5aa827e11bae74879db8bb61f18e3c30caf629e3caff3ae67f46bbe` |
+| `poster-r3-c3-t17.96-2x.webp` | 2880×1800 | 173,634 | `2c6072185a752039b663c01baa4a2160af02c53cd3de89c5368bd5dd64322ca8` | `hero-r3-c3.mp4` | 17.96 s | `19d587cb56887c026f348837bed92dafc0790d05d05a9f9b7b80fda337be2ff1` |
+| `poster-r3-c3-t17.96.webp` | 1440×900 | 71,486 | `f7e93558b8b7196331bdf6ca1154a627607bc603fc9a7ef9159b758fdfda232c` | `hero-r3-c3.mp4` | 17.96 s | `19d587cb56887c026f348837bed92dafc0790d05d05a9f9b7b80fda337be2ff1` |
+| `poster-r3-c3-t17.96-2x.avif` | 2880×1800 | 79,951 | `c8afc727a89b10407f2c1d045003c1c0a844cb9f8a3b30fdd66483a214d03ea3` | `hero-r3-c3.mp4` | 17.96 s | `19d587cb56887c026f348837bed92dafc0790d05d05a9f9b7b80fda337be2ff1` |
+| `poster-r3-c3-t17.96.avif` | 1440×900 | 34,436 | `25a4667ed8ac08b4e05f2a20ac4738c884225b5d2853af9b7a4ec05004a874d2` | `hero-r3-c3.mp4` | 17.96 s | `19d587cb56887c026f348837bed92dafc0790d05d05a9f9b7b80fda337be2ff1` |
+| `poster-r3-c4-t8.80-2x.webp` | 2880×1800 | 208,952 | `5628236a463040cbe5b1fa07fee50f4ea9f02ebbfed15f7a8adff3b30a68a7dd` | `hero-r3-c4.mp4` | 8.80 s | `578cca8776ad7a1668497fb828cc337e50929f3f0d26a852180e3a5bd778a7f9` |
+| `poster-r3-c4-t8.80.webp` | 1440×900 | 88,796 | `5842e960628ade5ff8aa6cf6d5bd139a24bcb47f7b5057fbb95f6fdc92cf2fea` | `hero-r3-c4.mp4` | 8.80 s | `578cca8776ad7a1668497fb828cc337e50929f3f0d26a852180e3a5bd778a7f9` |
+| `poster-r3-c4-t8.80-2x.avif` | 2880×1800 | 115,055 | `2b616a4740ca057a8854e739eea943520b9740be1dbbda904c1b9e2a6a0fc425` | `hero-r3-c4.mp4` | 8.80 s | `578cca8776ad7a1668497fb828cc337e50929f3f0d26a852180e3a5bd778a7f9` |
+| `poster-r3-c4-t8.80.avif` | 1440×900 | 55,446 | `a3a80359d7f4f387e370dac55209bedc45ac7f4a694b5cc631ae1345748b9c93` | `hero-r3-c4.mp4` | 8.80 s | `578cca8776ad7a1668497fb828cc337e50929f3f0d26a852180e3a5bd778a7f9` |

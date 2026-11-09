@@ -209,7 +209,9 @@ test("on a Home phone the prompt never opens over the hero film", async ({ page 
     // Waiting, because the clear-of region -- the frame and the reading block under it (homeSheetClear, fix
     // round 4) -- reaches into the sheet's 104px zone at the foot of the screen. In the compact frame (2026-10-27)
     // at 360 the frame ends 2px above the zone and the reading block under it is what reaches in.
-    const line = await page.locator("#s1 [data-film-reading]").boundingBox();
+    // The re-recorded cuts (2026-11-05) draw no pane strip, so there may be no reading block at all.
+    const reading = page.locator("#s1 [data-film-reading]");
+    const line = await reading.count() ? await reading.boundingBox() : null;
     expect(Math.max(film.y + film.height, line ? line.y + line.height : 0)).toBeGreaterThan(height - 104);
     expect(film.y).toBeLessThan(height);
   }
@@ -284,9 +286,7 @@ test("in the 768-899 band in Focus the scrolled sheet never covers the reading b
   await page.goto("/");
   const film = page.locator('#s1 figure[data-testid="landing-hero-film"]');
   await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-narrow", "1");
-  // Home opens compact (founder 2026-10-27); Focus, the taller frame this guards, is one press of Focus details.
-  await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
-  await film.locator(".compile-film-focus-control").click();
+  // Recording R3 (2026-11-09, D1): below 900px Home opens on Focus, the taller frame this guards; no press is needed.
   await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
   const frameBottom = await film.locator(".compile-film-viewport").evaluate(node => node.getBoundingClientRect().bottom + scrollY);
   const scroll = Math.round(frameBottom - (height - 104) + 4);
@@ -294,10 +294,14 @@ test("in the 768-899 band in Focus the scrolled sheet never covers the reading b
   await page.evaluate(y => window.scrollTo(0, y), scroll);
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scroll);
   const frame = (await film.locator(".compile-film-viewport").boundingBox())!;
-  const reading = (await film.locator("[data-film-reading]").boundingBox())!;
-  // The scenario: the frame is out of the zone and only the reading block reaches into it.
+  /*
+    Film re-record (2026-11-05): the cuts are product screens and STAGE_FRAMES has no `panes`, so the player draws no
+    pane strip and there is no reading block under the frame. What is left to guard is the frame: out of the zone, and
+    the sheet never over it. If a strip comes back, this fails and the reading-block check below applies again.
+  */
+  await expect(film.locator("[data-film-reading]")).toHaveCount(0);
+  const reading = frame;
   expect(frame.y + frame.height, "frame above the sheet's zone").toBeLessThanOrEqual(height - 104);
-  expect(reading.y + reading.height, "reading block inside the sheet's zone").toBeGreaterThan(height - 104);
   // Past the 200px trigger the sheet decides within a frame; give it the 180ms entry as well.
   await page.waitForTimeout(800);
   const panel = page.getByRole("region", PANEL);
