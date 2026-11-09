@@ -101,6 +101,14 @@ describe("scheduled operational SLI alert route", () => {
     expect(JSON.stringify(body)).not.toContain("PROBE_STORE_NOT_CONFIGURED");
   });
 
+  it("GA gap 4: hands the evaluator the compile backlog, and an unreadable queue as unavailable rather than empty", async () => {
+    await GET(request());
+    expect(evaluate).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      now: new Date("2026-09-20T12:00:00.000Z"),
+      compileBacklog: { ok: false },
+    }));
+  });
+
   it("returns a durable replay receipt as success", async () => {
     persist.mockResolvedValue({
       ok: true,

@@ -72,8 +72,13 @@ export async function alertCompileJobTurn(job: JobLike, turn: TurnLike, now = Da
 
 /* ------------------------------------------------------------------ OCR settlement */
 
-/** The two OCR failure classes the CDR worker settles with; the rest are not pages. */
-export const ALERTED_OCR_REASON_CODES: readonly string[] = ["OCR_TIMEOUT_OR_NETWORK", "OCR_RESPONSE_INVALID"];
+/**
+ * The OCR failure classes that page; the rest are not pages. OCR_HTTP_UNAVAILABLE (the reader
+ * answering 429/5xx through every retry) is the timeout's twin -- the same transport kind, settled
+ * the same way at zero credits -- and was the one terminal reader outage nothing counted (GA ops
+ * audit gap 4, 2026-11-10).
+ */
+export const ALERTED_OCR_REASON_CODES: readonly string[] = ["OCR_TIMEOUT_OR_NETWORK", "OCR_HTTP_UNAVAILABLE", "OCR_RESPONSE_INVALID"];
 
 /**
  * Called once the settlement for a document is durable. A timeout is the reader being
@@ -156,6 +161,111 @@ async function cannotCheck(check: WatchResult["check"], code: string, now: numbe
   return { check, code, delivery: delivery.code };
 }
 
+type SpendReading =
+  | { ok: true; spent: number; bucketStart: number }
+  | { ok: false; code: "RUNPOD_BILLING_NOT_CONFIGURED" | "RUNPOD_BILLING_UNREADABLE" };
+
+/** RunPod's own measured spend for the billing day that holds `now`, every resource family. */
+async function readRunPodSpendToday(now: number, env: Env, fetcher: typeof fetch): Promise<SpendReading> {
+  const apiKey = env.TAVONEL_RUNPOD_API_KEY?.trim() ?? "";
+  if (!apiKey) return { ok: false, code: "RUNPOD_BILLING_NOT_CONFIGURED" };
+  let records: unknown;
+  try {
+    const response = await fetcher("https://api.runpod.io/v2/billing?bucketSize=day&lastN=2", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) return { ok: false, code: "RUNPOD_BILLING_UNREADABLE" };
+    records = ((await response.json()) as { records?: unknown }).records;
+  } catch {
+    return { ok: false, code: "RUNPOD_BILLING_UNREADABLE" };
+  }
+  if (!Array.isArray(records)) return { ok: false, code: "RUNPOD_BILLING_UNREADABLE" };
+  // The day bucket is the one whose own [startTime, startTime + 1 day) holds now, compared as
+  // instants: RunPod's bucket need not start at UTC midnight, and a string prefix would then miss
+  // today's spend and read it as zero. No bucket holding now means nothing was spent yet today.
+  let spent = 0;
+  let bucketStart = now - (now % DAY_MS);
+  for (const record of records as Array<{ startTime?: unknown; totalAmount?: unknown }>) {
+    const start = typeof record?.startTime === "string" ? Date.parse(record.startTime) : Number.NaN;
+    if (!Number.isFinite(start) || typeof record.totalAmount !== "number" || !Number.isFinite(record.totalAmount)) {
+      return { ok: false, code: "RUNPOD_BILLING_UNREADABLE" };
+    }
+    if (start <= now && now < start + DAY_MS) {
+      spent += record.totalAmount;
+      bucketStart = start;
+    }
+  }
+  return { ok: true, spent, bucketStart };
+}
+
+/* ------------------------------------------------------------------ daily OCR spend stop */
+
+/*
+  GA ops audit gap 2 (2026-11-10). Paid pages are metered and billed, so the exposure is not a
+  customer's usage; it is infrastructure running away -- a retry storm, a stuck loop, abuse --
+  where RunPod bills seconds nobody is billed for. TAVONEL_RUNPOD_DAILY_COST_CAP_USD only pages.
+
+  TAVONEL_RUNPOD_DAILY_HARD_STOP_USD is the stop. Once RunPod's measured spend for the billing day
+  reaches it, every new compute reservation -- the one admission that leads to an OCR dispatch,
+  for paid, trial and owner work alike -- is refused as OCR_DAILY_SPEND_STOP and the operator is
+  paged. What is already reserved, uploaded or queued finishes: the CDR worker never consults
+  this, and its own retries stay bounded (wrangler.jsonc max_retries 10, create-once siblings).
+
+  Fail closed: with a stop set and the spend unreadable, nothing new is admitted
+  (OCR_SPEND_UNVERIFIED), because "we could not measure" is exactly when a runaway goes unseen.
+  Unset, zero or not a number keeps today's alert-only behaviour, so removing the variable is the
+  rollback. The day is RunPod's billing bucket, so the stop lifts when its next bucket opens.
+*/
+export type OcrSpendStopCode = "OCR_DAILY_SPEND_STOP" | "OCR_SPEND_UNVERIFIED";
+
+export const OCR_SPEND_READING_TTL_MS = 60_000;
+
+// ponytail: one cached reading per Vercel instance, so N warm instances read RunPod's billing at
+// most N times a minute and may admit up to a minute past the line. A durable latch row is the
+// upgrade if that overshoot is ever measured to matter.
+let spendCache: { at: number; reading: SpendReading } | null = null;
+
+export function resetOcrSpendStopCache() {
+  spendCache = null;
+}
+
+/** null admits; a code refuses. Never throws: an error here is a refusal, not an admission. */
+export async function ocrSpendStop(
+  now = Date.now(),
+  env: Env = process.env,
+  fetcher: typeof fetch = fetch,
+): Promise<OcrSpendStopCode | null> {
+  const raw = env.TAVONEL_RUNPOD_DAILY_HARD_STOP_USD?.trim() ?? "";
+  const stop = Number(raw);
+  if (!raw || !Number.isFinite(stop) || stop <= 0) return null;
+  let reading: SpendReading;
+  try {
+    if (!spendCache || now - spendCache.at >= OCR_SPEND_READING_TTL_MS || now < spendCache.at) {
+      spendCache = { at: now, reading: await readRunPodSpendToday(now, env, fetcher) };
+    }
+    reading = spendCache.reading;
+  } catch {
+    reading = { ok: false, code: "RUNPOD_BILLING_UNREADABLE" };
+  }
+  if (!reading.ok) {
+    const hour = new Date(now).toISOString().slice(0, 13);
+    await send(`ocr-spend-unverified:${hour}`, {
+      kind: "incident", severity: "critical", service: "runpod", observedAt: new Date(now).toISOString(),
+      summary: `New OCR work is refused (OCR_SPEND_UNVERIFIED): the daily hard stop is set and RunPod spend cannot be read (${reading.code})`,
+    }, now);
+    return "OCR_SPEND_UNVERIFIED";
+  }
+  if (reading.spent < stop) return null;
+  const day = new Date(reading.bucketStart).toISOString().slice(0, 10);
+  await send(`ocr-daily-spend-stop:${day}`, {
+    kind: "cost", severity: "critical", service: "runpod", observedAt: new Date(now).toISOString(),
+    summary: `New OCR work is refused (OCR_DAILY_SPEND_STOP) for the RunPod billing day from ${new Date(reading.bucketStart).toISOString()}; in-flight work finishes`,
+    currentValue: Math.round(reading.spent * 100) / 100, thresholdValue: stop, unit: "usd",
+  }, now);
+  return "OCR_DAILY_SPEND_STOP";
+}
+
 /**
  * RunPod spend for the current UTC day, from RunPod's own billing (REST v2 `GET /v2/billing`,
  * every resource family). The cap is TAVONEL_RUNPOD_DAILY_COST_CAP_USD; unset means unchecked,
@@ -170,35 +280,9 @@ export async function checkRunPodDailyCost(
   const cap = Number(env.TAVONEL_RUNPOD_DAILY_COST_CAP_USD ?? "");
   if (!Number.isFinite(cap) || cap <= 0) return result("RUNPOD_COST_CAP_UNCONFIGURED");
   // A cap was set, so from here on a check that cannot run is a page, not a silent field.
-  const apiKey = env.TAVONEL_RUNPOD_API_KEY?.trim() ?? "";
-  if (!apiKey) return cannotCheck("runpod_daily_cost", "RUNPOD_BILLING_NOT_CONFIGURED", now);
-  let records: unknown;
-  try {
-    const response = await fetcher("https://api.runpod.io/v2/billing?bucketSize=day&lastN=2", {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      signal: AbortSignal.timeout(5_000),
-    });
-    if (!response.ok) return cannotCheck("runpod_daily_cost", "RUNPOD_BILLING_UNREADABLE", now);
-    records = ((await response.json()) as { records?: unknown }).records;
-  } catch {
-    return cannotCheck("runpod_daily_cost", "RUNPOD_BILLING_UNREADABLE", now);
-  }
-  if (!Array.isArray(records)) return cannotCheck("runpod_daily_cost", "RUNPOD_BILLING_UNREADABLE", now);
-  // The day bucket is the one whose own [startTime, startTime + 1 day) holds now, compared as
-  // instants: RunPod's bucket need not start at UTC midnight, and a string prefix would then miss
-  // today's spend and read it as zero. No bucket holding now means nothing was spent yet today.
-  let spent = 0;
-  let bucketStart = now - (now % DAY_MS);
-  for (const record of records as Array<{ startTime?: unknown; totalAmount?: unknown }>) {
-    const start = typeof record?.startTime === "string" ? Date.parse(record.startTime) : Number.NaN;
-    if (!Number.isFinite(start) || typeof record.totalAmount !== "number" || !Number.isFinite(record.totalAmount)) {
-      return cannotCheck("runpod_daily_cost", "RUNPOD_BILLING_UNREADABLE", now);
-    }
-    if (start <= now && now < start + DAY_MS) {
-      spent += record.totalAmount;
-      bucketStart = start;
-    }
-  }
+  const reading = await readRunPodSpendToday(now, env, fetcher);
+  if (!reading.ok) return cannotCheck("runpod_daily_cost", reading.code, now);
+  const { spent, bucketStart } = reading;
   const day = new Date(bucketStart).toISOString().slice(0, 10);
   if (spent <= cap) return result("RUNPOD_COST_WITHIN_CAP");
   const delivery = await send(`runpod-daily-cost:${day}`, {
