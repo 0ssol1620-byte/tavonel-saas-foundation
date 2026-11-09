@@ -16,6 +16,7 @@ import { VISUALS_AFFECTED_PATHS, VISUALS_AFFECTED_UNIT_FILES, VISUALS_AFFECTED_B
 import { OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS, OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { W1_TRIAL_OPS_AFFECTED_PATHS, W1_TRIAL_OPS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES, TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_PATHS, SPECIMEN_STRIP_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_BROWSER_FILES, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES, PUBLIC_MARKETING_AFFECTED_BROWSER_FILES, MARKETING_TOOLING_POSTIMAGES, G1_COPY_TRUTH_AFFECTED_PATHS, G1_COPY_TRUTH_AFFECTED_UNIT_FILES, G1_COPY_TRUTH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+import { GLOBAL_EXPOSURE_AFFECTED_PATHS, GLOBAL_EXPOSURE_AFFECTED_UNIT_FILES, GLOBAL_EXPOSURE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { ENABLEMENT_AFFECTED_BROWSER_FILES, P4_FOLLOWUPS_AFFECTED_PATHS, P4_FOLLOWUPS_AFFECTED_UNIT_FILES, P4_FOLLOWUPS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
@@ -734,6 +735,14 @@ for (const binding of [
     browsers: [],
     rows: [],
     neighbors: ['nextjs/lib/trial-ai-access.tsx', 'nextjs/lib/operations-alert-trigger.ts', 'nextjs/lib/operations-e2e-timing.json', 'nextjs/app/api/developer/keys/[id]/revoke/route.ts', 'lib/trial-ai-access.ts'] },
+  // Global exposure (GX-01..GX-04, 2026-11-09): thirteen exact paths, ten direct suites, evidence-first on its existing row.
+  { group: 'global-exposure', prefix: 'nextjs/', exportedPaths: GLOBAL_EXPOSURE_AFFECTED_PATHS, exportedSuites: GLOBAL_EXPOSURE_AFFECTED_UNIT_FILES,
+    exportedBrowsers: GLOBAL_EXPOSURE_AFFECTED_BROWSER_FILES,
+    paths: ['app/evaluation/page.tsx', 'app/pricing/page.tsx', 'app/robots.ts', 'e2e/evaluation-acceptance.spec.ts', 'e2e/masterplan-workbench.spec.ts', 'e2e/ux06-contact-recovery.spec.ts', 'lib/indexnow.test.ts', 'lib/landing-v2-outcome-ia.test.ts', 'lib/page-metadata.test.ts', 'lib/product-claims-sync.test.ts', 'lib/seo-title-lengths.test.ts', 'public/7a0ff86c91c02b35a358cdf2761b2512.txt', 'scripts/indexnow-ping.mjs'],
+    suites: ['components/evaluation-page.test.tsx', 'lib/indexnow.test.ts', 'lib/landing-v2-outcome-ia.test.ts', 'lib/page-metadata.test.ts', 'lib/page-seo.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts', 'lib/route-canonical-metadata.test.ts', 'lib/seo-surface.test.ts', 'lib/seo-title-lengths.test.ts'],
+    browsers: ['e2e/evidence-first.spec.ts'],
+    rows: ["['e2e/evidence-first.spec.ts', ['1440', '390', 'reduced-motion']],"],
+    neighbors: ['nextjs/app/robots.tsx', 'nextjs/app/pricing/layout.tsx', 'nextjs/app/evaluation/page.ts', 'nextjs/lib/indexnow.ts', 'nextjs/lib/seo-title-lengths.ts', 'nextjs/scripts/indexnow-ping.test.mjs', 'nextjs/public/0000000000000000000000000000000.txt', 'nextjs/e2e/evaluation-acceptance-2.spec.ts', 'scripts/indexnow-ping.mjs'] },
   // Phase 4 consent-poster lane (P2-34 analytics notice, D-11 poster re-cut).
   { group: 'consent-poster', prefix: 'nextjs/', exportedPaths: CONSENT_POSTER_AFFECTED_PATHS, exportedSuites: CONSENT_POSTER_AFFECTED_UNIT_FILES,
     exportedBrowsers: CONSENT_POSTER_AFFECTED_BROWSER_FILES,
