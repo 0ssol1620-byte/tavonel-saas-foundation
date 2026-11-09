@@ -1224,7 +1224,8 @@ describe("library organize proposals at compile intake", () => {
       run: JSON.stringify(run.ok ? { ...run, payload: { ...run.payload, signedReceipt: undefined } } : run),
       ok: run.ok,
       core: JSON.stringify(dispatched.mock.calls[0]?.slice(0, 3)),
-      stored: JSON.stringify(Object.keys((put.mock.calls[0]?.[3] as Record<string, unknown> | undefined) ?? {})),
+      // The whole persisted candidate, decoded, minus only the signed receipt (its time and request id differ per run).
+      stored: JSON.stringify({ ...(JSON.parse(String(put.mock.calls[0]?.[3])) as Record<string, unknown>), signedReceipt: undefined }),
       auditSources: JSON.stringify((audit?.details.sourceProcessingObservations as { sources?: unknown } | undefined)?.sources),
     };
   }

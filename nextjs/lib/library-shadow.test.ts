@@ -3,7 +3,7 @@ import {
   MINHASH_PERMUTATIONS, RULES_DOC_TYPE_V1, minhashSimilarity, proposeTopics, textFingerprint, type DocTypeProposer,
 } from "./library-methods";
 import {
-  docTypeLabel, libraryOrganizeMode, organizeLibraryAtIntake, readLibraryDocuments, readLibraryInternal, toLibraryDocuments,
+  LIBRARY_ORGANIZE_MAX_TEXT_CHARS, docTypeLabel, libraryOrganizeMode, organizeLibraryAtIntake, readLibraryDocuments, readLibraryInternal, toLibraryDocuments,
   type LibraryInternalView,
 } from "./library-shadow";
 
@@ -108,6 +108,12 @@ describe("B2b proposer slot (an Arena arm)", () => {
     expect((await docTypeLabel(arm(async () => ({ label: "report", score: 7, evidenceIds: [] })), doc, null)).abstainReason)
       .toBe("proposer_invalid_score");
   });
+
+  it("a malformed answer abstains for that document instead of failing the batch (review R1-m4)", async () => {
+    expect((await docTypeLabel(arm(async () => null as never), doc, null)).abstainReason).toBe("proposer_invalid_output");
+    expect((await docTypeLabel(arm(async () => ({ label: "report", score: 0.5, evidenceIds: "r-1" as never })), doc, null)).abstainReason)
+      .toBe("proposer_invalid_output");
+  });
 });
 
 describe("B2c topics", () => {
@@ -122,6 +128,18 @@ describe("B2c topics", () => {
     expect(terms[0]).toContain("pump");
     expect(terms[1]).toContain("invoice");
     for (const topic of topics) if ("terms" in topic) expect(topic.terms.reduce((sum, term) => sum + term.score, 0)).toBeCloseTo(1);
+  });
+
+  it("tags a document only with its own words, never a cluster-mate's (review R1-M1)", () => {
+    const a = "pump seal bearing pump seal bearing pump seal bearing lubrication";
+    const h = "pump seal bearing pump seal bearing " + "nightingale ".repeat(5);
+    const other = "invoice freight payment supplier invoice freight payment supplier";
+    const [topicA, topicH] = proposeTopics([a, h, other]);
+    const termsA = "terms" in topicA! ? topicA.terms.map((term) => term.term) : [];
+    expect(termsA.length).toBeGreaterThan(0);
+    expect(termsA.every((term) => a.split(" ").includes(term))).toBe(true);
+    expect(termsA).not.toContain("nightingale");
+    expect("terms" in topicH! && topicH.terms.map((term) => term.term)).toContain("nightingale");
   });
 
   it("abstains with a reason when there is no corpus to contrast against or no text", () => {
@@ -182,6 +200,8 @@ describe("organizeLibraryAtIntake", () => {
       [async () => new Response(JSON.stringify({ code: "PGRST202" }), { status: 404 }), "LIBRARY_ORGANIZE_MIGRATION_ABSENT"],
       [async () => new Response(JSON.stringify({ code: "23514", message: "violates check constraint" }), { status: 400 }), "LIBRARY_ORGANIZE_REQUEST_INVALID"],
       [async () => new Response("{}", { status: 500 }), "LIBRARY_ORGANIZE_STORE_FAILED"],
+      [async () => new Response(JSON.stringify({ code: "P0001", message: "library_organize_time_budget_exceeded" }), { status: 400 }), "LIBRARY_ORGANIZE_STORE_TIME_BUDGET"],
+      [async () => new Response(JSON.stringify({ code: "57014", message: "canceling statement due to statement timeout" }), { status: 500 }), "LIBRARY_ORGANIZE_STORE_TIME_BUDGET"],
       [async () => new Response(JSON.stringify({ schemaVersion: "tavonel.library_organize.v1", documents: 9 }), { status: 200 }), "LIBRARY_ORGANIZE_RESPONSE_INVALID"],
     ];
     for (const [answer, code] of cases) {
@@ -194,6 +214,17 @@ describe("organizeLibraryAtIntake", () => {
     await organizeLibraryAtIntake(WS, [input(A, CONTRACT)], { TAVONEL_LIBRARY_ORGANIZE_MODE: "shadow" });
     expect(parsed(errors).map((line) => line.code)).toEqual(["LIBRARY_ORGANIZE_STORE_NOT_CONFIGURED"]);
     expect(alerted).not.toHaveBeenCalled();
+  });
+
+  it("a compile above the compute budget is skipped with a logged reason, before any computation or call (review R1-M3)", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    const failing: DocTypeProposer = { method: "x", methodVersion: "x", propose: () => { throw new Error("must not run"); } };
+    const big = "word ".repeat(LIBRARY_ORGANIZE_MAX_TEXT_CHARS / 10 + 1);
+    await organizeLibraryAtIntake(WS, [input(A, big, "a"), input(B, big, "b")], SHADOW, failing);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(parsed(errors)).toEqual([{ event: "library_organize_skipped", mode: "shadow", code: "LIBRARY_ORGANIZE_SKIPPED_BUDGET",
+      documents: 2, textChars: big.length * 2 }]);
   });
 
   it("a different text for a recorded version is an integrity fault that pages", async () => {
@@ -229,7 +260,7 @@ const internal: LibraryInternalView = {
     { documentId: A, relatedDocumentId: B, kind: "near_duplicate", state: "proposed", method: "minhash_w5_128", methodVersion: "minhash:v1",
       internalScore: 0.92, internalThreshold: 0.85, inputsSha256: `sha256:${"7".repeat(64)}`, evidence: { matchedOn: ["text_minhash"] } },
     { documentId: A, relatedDocumentId: H, kind: "exact_bytes", state: "proposed", method: "exact_digest", methodVersion: "exact:v1",
-      internalScore: null, internalThreshold: null, inputsSha256: null, evidence: { matchedOn: ["sanitized_sha256", "secret-field"] } },
+      internalScore: null, internalThreshold: null, inputsSha256: null, evidence: { matchedOn: ["sanitized_sha256", "source_sha256", "secret-field"] } },
     { documentId: A, relatedDocumentId: C, kind: "revision_candidate", state: "rejected", method: "minhash_w5_128", methodVersion: "minhash:v1",
       internalScore: 0.6, internalThreshold: 0.5, inputsSha256: `sha256:${"8".repeat(64)}`, evidence: { matchedOn: ["text_minhash"] } },
   ],
@@ -243,8 +274,8 @@ describe("Library DTOs", () => {
       documentType: { label: "contract", state: "proposed" },
       topics: [{ label: "terms", state: "proposed" }],
       duplicates: [
-        { relatedDocumentId: B, badge: "near", kind: "near_duplicate", state: "proposed", evidence: { matchedOn: ["text_minhash"] } },
-        { relatedDocumentId: H, badge: "exact", kind: "exact_bytes", state: "proposed", evidence: { matchedOn: ["sanitized_sha256"] } },
+        { relatedDocumentId: B, badge: "near", kind: "near_duplicate", state: "proposed", evidence: { matchedOn: ["text_similarity"] } },
+        { relatedDocumentId: H, badge: "exact", kind: "exact_bytes", state: "proposed", evidence: { matchedOn: ["file"] } },
       ],
     });
     expect(b!.documentType).toEqual({ label: "report", state: "confirmed" });
@@ -254,7 +285,7 @@ describe("Library DTOs", () => {
 
   it("the public shape carries no score, threshold, method, input digest or abstention reason", () => {
     const text = JSON.stringify(toLibraryDocuments(internal, [A, B]));
-    for (const forbidden of ["internalScore", "internalThreshold", "method", "inputsSha256", "abstainReason", "evidenceIds", "0.92", "0.85", "secret-field"]) {
+    for (const forbidden of ["internalScore", "internalThreshold", "method", "inputsSha256", "abstainReason", "evidenceIds", "0.92", "0.85", "secret-field", "minhash", "sha256", "digest"]) {
       expect(text).not.toContain(forbidden);
     }
   });

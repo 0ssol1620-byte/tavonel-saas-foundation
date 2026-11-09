@@ -1,13 +1,15 @@
 -- The founder test reset covers W2-B2's document_labels
 -- (20261107100000_library_organize_shadow.sql).
 --
--- The table holds the document-type and topic proposals for a workspace's documents. Without this a
--- reset left them behind (they cascade from source_fingerprints only through a source deletion, which
--- a reset does not run), and the fingerprint delete would have failed on their foreign key.
+-- The table holds the document-type and topic proposals for a workspace's documents. Its foreign key
+-- to source_fingerprints is ON DELETE CASCADE, so the existing fingerprint delete would remove the rows
+-- anyway; the table is listed explicitly so that the sealed count and row fingerprint cover it (a label
+-- written after prepare is drift) and the sealed write fence applies to it, like every other table.
 --
 -- Bodies identical to 20261105010000 (which is itself 20261104091000 plus W1-A3's
 -- foundation_operations_receipts) plus one line each: counted, fingerprinted, deleted -- labels ahead
--- of the relations and fingerprints, because a label row references its fingerprint. Derived rows,
+-- of the relations and fingerprints they reference, so the delete is explicit rather than a cascade
+-- side effect. Derived rows,
 -- not archived (the archive function is not replaced). The snapshot now includes the table, so a
 -- reset prepared before this migration fails its seal with founder_test_reset_database_drift and has
 -- to be prepared again. The table gets the same sealed write fence as every other table finalize

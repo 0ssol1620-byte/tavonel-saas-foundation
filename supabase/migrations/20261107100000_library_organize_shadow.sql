@@ -114,13 +114,23 @@ $$;
   would write, the source digest read here and never accepted from the caller. An existing row's
   exact columns are B1's business and are not touched.
 
+  Bounded at 3 s (review R1-M3), shorter than the client's 4 s abort, so a call the client gave up
+  on does not keep holding the workspace lock. It is a function-level SET rather than an in-body
+  `set local`: an in-body change does not re-arm the timer of the statement already running, while
+  PostgREST (v12+) hoists a function's statement_timeout to the transaction before the call; the
+  loop below also checks the elapsed time between documents, so the bound holds without that.
+  The similarity scan is one pass over the workspace's text fingerprints per document, about 20 us a
+  pair on local PG17: a 128-document call fits the bound up to ~700 fingerprints in the workspace,
+  a 32-document call up to ~4,000. ponytail: banded LSH candidates (a GIN-indexed band-key array)
+  before shadow runs in workspaces larger than that; until then the call fails with its own code.
+
   Returns {"schemaVersion": "tavonel.library_organize.v1", "documents": n,
            "newPairs": {"same_text": n, "near_duplicate": n, "revision_candidate": n},
            "labelsRecorded": n}  -- counts of what THIS call added, so shadow telemetry is not
   inflated by re-compiles.
 */
 create function public.record_library_organize(p_workspace_key text, p_items jsonb)
-returns jsonb language plpgsql security definer set search_path = '' as $$
+returns jsonb language plpgsql security definer set search_path = '' set statement_timeout = '3s' as $$
 declare
   v_item jsonb;
   v_label jsonb;
@@ -147,6 +157,11 @@ begin
   v_started := pg_catalog.clock_timestamp();
 
   for v_item in select value from pg_catalog.jsonb_array_elements(p_items) loop
+    -- The same 3 s bound, enforced here whatever the caller's session sets: the whole call rolls back
+    -- and the lock is released, so an over-budget call records nothing rather than part of a compile.
+    if pg_catalog.clock_timestamp() - v_started > interval '3 seconds' then
+      raise exception 'library_organize_time_budget_exceeded';
+    end if;
     if pg_catalog.jsonb_typeof(v_item) <> 'object'
       or (v_item->>'documentId') !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
       or (v_item->>'sourceVersionId') !~ '^[a-f0-9]{64}$'
@@ -207,7 +222,9 @@ begin
                       when s.score >= 0.85 then 'near_duplicate'
                       when s.score >= 0.50 then 'revision_candidate' end as kind
             from public.source_fingerprints o
-            cross join lateral (select public.library_minhash_similarity(v_minhash, o.minhash) as score) s
+            -- offset 0 keeps the subquery from being pulled up, which would copy the call into every
+            -- reference to score (the kind CASE and its filter): one comparison per pair, not five.
+            cross join lateral (select public.library_minhash_similarity(v_minhash, o.minhash) as score offset 0) s
            where o.workspace_key = p_workspace_key
              and o.document_id <> v_document_id
              and o.text_sha256 is not null
@@ -277,7 +294,7 @@ $$;
   server maps it to a separate public type that has none of them (nextjs/lib/library-shadow.ts).
 */
 create function public.read_library_organize(p_workspace_key text, p_document_ids uuid[])
-returns jsonb language plpgsql stable security definer set search_path = '' as $$
+returns jsonb language plpgsql stable security definer set search_path = '' set statement_timeout = '3s' as $$
 begin
   if p_workspace_key is null or p_workspace_key !~ '^pilot-[A-Za-z0-9]{1,32}$'
     or p_document_ids is null or pg_catalog.cardinality(p_document_ids) not between 1 and 128

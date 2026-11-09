@@ -41,6 +41,13 @@ type Input = Readonly<{ documentId: string; versionKey: string; inputSha256: str
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const RUNBOOK = "https://github.com/0ssol1620-byte/tavonel-saas-foundation/blob/main/docs/runbooks/P0_INCIDENT_COST_ALERTS.md";
 const DOC_TYPE_SET = new Set<string>(DOC_TYPES);
+/*
+  Shadow compute budget: total OCR characters of one compile. Measured on the lane PC (2026-11-09,
+  synthetic random-vocabulary text, the worst case for the topic step; fingerprint + rules + topics,
+  median of 5) at 1.93 M chars: 128 docs 0.64 s, 32 docs 0.51 s, 12 docs 0.38 s, 2 docs 0.28 s.
+  Above it the compile is skipped with a logged reason, never organized slowly.
+*/
+export const LIBRARY_ORGANIZE_MAX_TEXT_CHARS = 2_000_000;
 
 /** An unrecognised value is off and says so: a flag that silently read as `on` would be worse. */
 export function libraryOrganizeMode(env: Env = process.env): LibraryOrganizeMode {
@@ -83,13 +90,20 @@ export async function docTypeLabel(proposer: DocTypeProposer, input: Input, text
   } catch {
     return abstained(base, "proposer_unavailable");
   }
-  if ("abstain" in proposal) return abstained(base, /^[a-z_]{1,64}$/.test(proposal.abstain) ? proposal.abstain : "proposer_invalid_reason");
-  // A model reading hostile text may answer anything: only label set v0 is a label.
-  if (!DOC_TYPE_SET.has(proposal.label)) return abstained(base, "label_outside_set");
-  if (!Number.isFinite(proposal.score) || proposal.score < 0 || proposal.score > 1) return abstained(base, "proposer_invalid_score");
-  const regionIds = new Set((input.regions ?? []).map((region) => region.regionId));
-  return { ...base, labelKey: proposal.label, disposition: "proposed", abstainReason: null, internalScore: proposal.score,
-    evidenceIds: proposal.evidenceIds.filter((id) => regionIds.has(id)).slice(0, 16) };
+  // The answer is untrusted in shape too: a malformed one abstains for this document, never fails the batch.
+  try {
+    if ("abstain" in proposal) return abstained(base, /^[a-z_]{1,64}$/.test(proposal.abstain) ? proposal.abstain : "proposer_invalid_reason");
+    // A model reading hostile text may answer anything: only label set v0 is a label.
+    if (!DOC_TYPE_SET.has(proposal.label)) return abstained(base, "label_outside_set");
+    if (typeof proposal.score !== "number" || !Number.isFinite(proposal.score) || proposal.score < 0 || proposal.score > 1) {
+      return abstained(base, "proposer_invalid_score");
+    }
+    const regionIds = new Set((input.regions ?? []).map((region) => region.regionId));
+    return { ...base, labelKey: proposal.label, disposition: "proposed", abstainReason: null, internalScore: proposal.score,
+      evidenceIds: proposal.evidenceIds.filter((id) => typeof id === "string" && regionIds.has(id)).slice(0, 16) };
+  } catch {
+    return abstained(base, "proposer_invalid_output");
+  }
 }
 
 type RecordAnswer = { newPairs: { same_text: number; near_duplicate: number; revision_candidate: number }; labelsRecorded: number };
@@ -104,9 +118,9 @@ function readRecordAnswer(body: unknown, documents: number): RecordAnswer | null
   return value as RecordAnswer;
 }
 
-async function reportIntegrityFault(mode: LibraryOrganizeMode, workspaceKey: string) {
+function reportIntegrityFault(mode: LibraryOrganizeMode, workspaceKey: string) {
   log("error", { event: "library_organize_integrity_fault", mode, code: "LIBRARY_TEXT_FINGERPRINT_CONFLICT" });
-  await deliverOperationsAlert({
+  void deliverOperationsAlert({
     alertId: randomUUID(), kind: "incident", severity: "critical", service: "supabase",
     summary: `Library text fingerprint conflict in ${workspaceKey}: one source version read as two texts (B2a)`,
     observedAt: new Date().toISOString(), runbookUrl: RUNBOOK,
@@ -126,6 +140,12 @@ export async function organizeLibraryAtIntake(
   const mode = libraryOrganizeMode(env);
   if (mode === "off" || inputs.length === 0) return;
   const fail = (code: string) => log("error", { event: "library_organize_failed", mode, code });
+  // The methods run before the Core dispatch, so their cost is bounded by input size (review R1-M3).
+  // ponytail: a compile above the budget is not organized in shadow; move this to a post-compile worker step to cover it.
+  const textChars = inputs.reduce((sum, input) => sum + input.text.length, 0);
+  if (textChars > LIBRARY_ORGANIZE_MAX_TEXT_CHARS) {
+    return log("error", { event: "library_organize_skipped", mode, code: "LIBRARY_ORGANIZE_SKIPPED_BUDGET", documents: inputs.length, textChars });
+  }
   const config = readSupabaseAdminConfig(env);
   if (!config) return fail("LIBRARY_ORGANIZE_STORE_NOT_CONFIGURED");
 
@@ -168,6 +188,7 @@ export async function organizeLibraryAtIntake(
     const message = typeof body?.message === "string" ? body.message : "";
     if (body?.code === "PGRST202" || body?.code === "42883") return fail("LIBRARY_ORGANIZE_MIGRATION_ABSENT");
     if (message.includes("library_text_fingerprint_conflict")) return reportIntegrityFault(mode, workspaceKey);
+    if (message.includes("library_organize_time_budget_exceeded") || body?.code === "57014") return fail("LIBRARY_ORGANIZE_STORE_TIME_BUDGET");
     if (message.includes("library_organize_request_invalid") || body?.code === "23514") return fail("LIBRARY_ORGANIZE_REQUEST_INVALID");
     return fail("LIBRARY_ORGANIZE_STORE_FAILED");
   }
@@ -207,8 +228,8 @@ export type LibraryDuplicate = Readonly<{
   badge: "exact" | "near" | "revision";
   kind: RelationKind;
   state: "proposed" | "confirmed";
-  /** The compare view's data: which representation matched. */
-  evidence: Readonly<{ matchedOn: readonly string[] }>;
+  /** The compare view's data: which representation matched, in public words (no method name). */
+  evidence: Readonly<{ matchedOn: readonly ("file" | "text" | "text_similarity")[] }>;
 }>;
 export type LibraryDocument = Readonly<{
   documentId: string;
@@ -217,7 +238,10 @@ export type LibraryDocument = Readonly<{
   duplicates: readonly LibraryDuplicate[];
 }>;
 
-const MATCHED_ON = new Set(["sanitized_sha256", "source_sha256", "normalized_text", "text_minhash"]);
+// Internal method names never reach the public DTO: each maps to a neutral word (review R1-M2).
+const PUBLIC_MATCHED_ON: Readonly<Record<string, "file" | "text" | "text_similarity">> = {
+  sanitized_sha256: "file", source_sha256: "file", normalized_text: "text", text_minhash: "text_similarity",
+};
 const RELATION_KINDS = new Set<string>(["exact_bytes", "same_text", "near_duplicate", "revision_candidate"]);
 const nullableNumber = (value: unknown) => value === null || (typeof value === "number" && Number.isFinite(value));
 
@@ -300,8 +324,9 @@ export function toLibraryDocuments(view: LibraryInternalView, documentIds: reado
           : relation.kind === "near_duplicate" ? "near" as const : "revision" as const,
         kind: relation.kind,
         state: relation.state as "proposed" | "confirmed",
-        evidence: { matchedOn: (Array.isArray(relation.evidence.matchedOn) ? relation.evidence.matchedOn : [])
-          .filter((item): item is string => typeof item === "string" && MATCHED_ON.has(item)) },
+        evidence: { matchedOn: [...new Set((Array.isArray(relation.evidence.matchedOn) ? relation.evidence.matchedOn : [])
+          .map((item) => (typeof item === "string" ? PUBLIC_MATCHED_ON[item] : undefined))
+          .filter((item): item is "file" | "text" | "text_similarity" => item !== undefined))] },
       }));
     return { documentId, documentType, topics: [...topics.values()], duplicates };
   });

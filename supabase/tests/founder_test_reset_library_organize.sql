@@ -1,7 +1,8 @@
 -- Founder test reset vs. W2-B2's document_labels (migration 20261107100100):
 --   - the table is counted in the sealed manifest and fingerprinted (a label recorded after prepare
---     is drift), fenced while sealed, and deleted by finalize for the reset workspace only, ahead of
---     the fingerprints it references (otherwise the fingerprint delete fails on the foreign key);
+--     is drift), fenced while sealed, and deleted by finalize for the reset workspace only, explicitly
+--     and ahead of the fingerprints it references (the FK cascade would also remove it; the explicit
+--     line is what puts it under the count, the row fingerprint and the fence);
 --   - the bystander's labels are byte-identical after finalize;
 --   - nothing of it is archived: it is derived proposals about rows the reset deletes.
 --

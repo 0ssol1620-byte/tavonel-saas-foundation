@@ -167,6 +167,7 @@ export const TOPIC_METHOD_VERSION = "topic-ctfidf:v1";
 export const TOPIC_LABEL_SET_VERSION = "topic-open:v1";
 const TOPIC_MERGE_SIMILARITY = 0.2;
 const TOPIC_TERMS = 3;
+const TOPIC_VECTOR_TERMS = 256;
 const STOPWORDS = new Set(("a an and are as at be been but by can for from has have he her his i if in into is it its may "
   + "more no not of on or our shall she should such than that the their them then there these they this those to "
   + "was we were which while who will with would you your also any each other per all one two "
@@ -194,17 +195,14 @@ export function proposeTopics(texts: readonly string[]): TopicAssignment[] {
   const documentFrequency = new Map<string, number>();
   for (const map of counts) for (const term of map.keys()) documentFrequency.set(term, (documentFrequency.get(term) ?? 0) + 1);
   const n = live.length;
+  // Each document vector keeps its TOPIC_VECTOR_TERMS heaviest TF-IDF terms: the pairwise cosine is
+  // then bounded per pair instead of by vocabulary (review R1-M3: 128 x 5,000 words took 2.7 s).
   const vectors = counts.map((map, at) => {
-    const vector = new Map<string, number>();
-    let norm = 0;
-    for (const [term, count] of map) {
-      const weight = (count / live[at]!.terms.length) * (Math.log((1 + n) / (1 + documentFrequency.get(term)!)) + 1);
-      vector.set(term, weight);
-      norm += weight * weight;
-    }
-    norm = Math.sqrt(norm);
-    for (const [term, weight] of vector) vector.set(term, weight / norm);
-    return vector;
+    const weighted = [...map].map(([term, count]) =>
+      [term, (count / live[at]!.terms.length) * (Math.log((1 + n) / (1 + documentFrequency.get(term)!)) + 1)] as const)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, TOPIC_VECTOR_TERMS);
+    const norm = Math.sqrt(weighted.reduce((sum, [, weight]) => sum + weight * weight, 0));
+    return new Map(weighted.map(([term, weight]) => [term, weight / norm]));
   });
   const cosine = (a: Map<string, number>, b: Map<string, number>) => {
     const [small, large] = a.size < b.size ? [a, b] : [b, a];
@@ -248,11 +246,15 @@ export function proposeTopics(texts: readonly string[]): TopicAssignment[] {
     const map = groupCounts[at]!;
     const size = [...map.values()].reduce((a, b) => a + b, 0);
     const ranked = [...map].map(([term, count]) => ({ term, weight: (count / size) * Math.log(1 + meanLength / totalFrequency.get(term)!) }))
-      .sort((a, b) => b.weight - a.weight || a.term.localeCompare(b.term)).slice(0, TOPIC_TERMS);
-    const total = ranked.reduce((sum, item) => sum + item.weight, 0);
-    // Code points, not UTF-16 units: a split surrogate pair is not valid jsonb.
-    const terms = ranked.map((item) => ({ term: [...item.term].slice(0, 64).join(""), score: total > 0 ? item.weight / total : 0 }));
-    for (const member of members) result[live[member]!.index] = { terms };
+      .sort((a, b) => b.weight - a.weight || a.term.localeCompare(b.term));
+    for (const member of members) {
+      // A tag is a word of THIS document, ranked by its cluster: a cluster-mate's words would reach
+      // a viewer who may read this document but not that one (review R1-M1).
+      const own = ranked.filter((item) => counts[member]!.has(item.term)).slice(0, TOPIC_TERMS);
+      const total = own.reduce((sum, item) => sum + item.weight, 0);
+      // Code points, not UTF-16 units: a split surrogate pair is not valid jsonb.
+      result[live[member]!.index] = { terms: own.map((item) => ({ term: [...item.term].slice(0, 64).join(""), score: total > 0 ? item.weight / total : 0 })) };
+    }
   });
   return result;
 }

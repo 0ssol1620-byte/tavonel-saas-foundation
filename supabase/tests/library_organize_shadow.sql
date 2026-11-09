@@ -15,7 +15,7 @@
 -- Two self-service workspaces are bootstrapped by the auth.users insert (20260920121000):
 -- pilot-b2b2b2b2b2b24b2b (owner b2b2...) and pilot-c3c3c3c3c3c34c3c (owner c3c3...).
 begin;
-select plan(47);
+select plan(48);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -77,6 +77,8 @@ select ok(not has_function_privilege('authenticated', 'public.record_library_org
 select ok(not has_function_privilege('anon', 'public.read_library_organize(text, uuid[])', 'execute'), 'anon may not read');
 select ok(not has_function_privilege('service_role', 'public.library_minhash_similarity(bigint[], bigint[])', 'execute'),
   'the similarity helper is internal');
+select is((select count(*)::integer from pg_proc where proname in ('record_library_organize', 'read_library_organize')
+  and 'statement_timeout=3s' = any(proconfig)), 2, 'both RPCs are bounded at 3 s, below the client''s 4 s abort');
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"role":"authenticated","sub":"b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2"}', true);
