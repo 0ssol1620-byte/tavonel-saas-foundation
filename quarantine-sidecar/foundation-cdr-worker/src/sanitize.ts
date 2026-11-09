@@ -3,8 +3,11 @@ import { PermanentReject, RetryableError } from "./errors";
 import { cdrAuthorization } from "./identity";
 import { assertFoundationOnlyTarget } from "./guards";
 import { cdrRequestSignature, hmacSecretIsConfigured, sha256DigestHeader, sha256Hex } from "./hmac";
+import { runTextLayerShadow } from "./text-layer-shadow";
 import {
   MAX_SOURCE_BYTES,
+  STAGE_1_MAX_SOURCE_BYTES,
+  intakeCeilingStage,
   assertProcessableSourceKey,
   cdrReceiptSiblingKey,
   immutableObjectKey,
@@ -66,6 +69,10 @@ export type SanitizeEnv = {
   FOUNDATION_R2_BUCKET: string;
   FOUNDATION_OCR_URL?: string;
   TAVONEL_OCR_HMAC?: string;
+  /** D1 intake ceiling stage (keys.ts intakeCeilingStage): "0" or unset, or "1". */
+  TAVONEL_INTAKE_CEILING_STAGE?: string;
+  /** D2 text-layer shadow (text-layer-shadow.ts): "1" on, unset or "0" off. */
+  FOUNDATION_CDR_TEXT_LAYER_FIRST?: string;
 };
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{16,160}$/;
@@ -74,14 +81,19 @@ const SAFE_CDR_REJECT_CODES = new Set(["MALWARE_DETECTED"]);
 const CDR_RECEIPT_SCHEMA = "tavonel.cdr_receipt.v2";
 const DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
 const MAX_RECEIPT_BYTES = 16 * 1024;
-// Matches the qualified Cloud Run output ceiling, not the smaller source ceiling.
+// Matches the qualified Cloud Run output ceiling, not the smaller source ceiling. Stage 1 is the
+// CDR's STAGE_1_MAX_OUTPUT_BYTES (18 MiB / 80 pages x 200 pages); the cross-tree test pins both.
 const MAX_SANITIZED_BYTES = 18 * 1024 * 1024;
+const STAGE_1_MAX_SANITIZED_BYTES = 45 * 1024 * 1024;
+
+/** The response is larger than the bound the caller set. Distinct so a caller can name it. */
+class ResponseBoundExceeded extends RetryableError {}
 
 async function boundedResponseBytes(response: Response, limit: number): Promise<ArrayBuffer> {
   const declared = response.headers.get("content-length");
   if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > limit)) {
     await response.body?.cancel();
-    throw new RetryableError("CDR response exceeds its allowed bound");
+    throw new ResponseBoundExceeded("CDR response exceeds its allowed bound");
   }
   if (!response.body) throw new RetryableError("CDR response body is missing");
   const reader = response.body.getReader();
@@ -92,7 +104,7 @@ async function boundedResponseBytes(response: Response, limit: number): Promise<
       const next = await reader.read();
       if (next.done) break;
       length += next.value.byteLength;
-      if (length > limit) throw new RetryableError("CDR response exceeds its allowed bound");
+      if (length > limit) throw new ResponseBoundExceeded("CDR response exceeds its allowed bound");
       chunks.push(next.value);
     }
     if (declared !== null && Number(declared) !== length) throw new RetryableError("CDR response length did not match");
@@ -100,8 +112,9 @@ async function boundedResponseBytes(response: Response, limit: number): Promise<
     let offset = 0;
     for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
     return bytes.buffer;
-  } catch {
+  } catch (error) {
     await reader.cancel().catch(() => undefined);
+    if (error instanceof ResponseBoundExceeded) throw error;
     throw new RetryableError("CDR response could not be read within its allowed bound");
   } finally {
     reader.releaseLock();
@@ -148,6 +161,8 @@ async function putCreateOnceJson(
 
 type CdrBinding = {
   parts: { workspaceId: string; documentId: string };
+  /** The stage's sanitized-PDF bound; a reused object above it is not reused. */
+  maxSanitizedBytes: number;
   sourceKey: string;
   inputSha256: string;
   provider: string;
@@ -181,7 +196,7 @@ async function verifiedImmutable(
     return null;
   }
   const pdf = await bucket.get(immutableKey);
-  if (!pdf || pdf.size < 1 || pdf.size > MAX_SANITIZED_BYTES) return null;
+  if (!pdf || pdf.size < 1 || pdf.size > binding.maxSanitizedBytes) return null;
   const bytes = await pdf.arrayBuffer();
   if (bytes.byteLength !== pdf.size || await sha256DigestHeader(bytes) !== record.outputSha256) return null;
   return { immutableKey, outputSha256: record.outputSha256 };
@@ -505,16 +520,21 @@ export async function sanitizeObject(
     throw new RetryableError("quarantine source object is not yet readable");
   }
   const declaredBytes = declaredBytesOf(object);
-  if (object.size > MAX_SOURCE_BYTES) {
-    throw refuse("PARSER_OOM", "quarantine source exceeds the 5 MiB Foundation CDR cap", {
+  const stage = intakeCeilingStage(env);
+  if (!stage) throw new RetryableError("TAVONEL_INTAKE_CEILING_STAGE must be 0 or 1");
+  const maxSourceBytes = stage === "1" ? STAGE_1_MAX_SOURCE_BYTES : MAX_SOURCE_BYTES;
+  const maxSanitizedBytes = stage === "1" ? STAGE_1_MAX_SANITIZED_BYTES : MAX_SANITIZED_BYTES;
+  const cap = `quarantine source exceeds the ${maxSourceBytes / (1024 * 1024)} MiB Foundation CDR cap`;
+  if (object.size > maxSourceBytes) {
+    throw refuse("PARSER_OOM", cap, {
       observedBytes: object.size,
       declaredBytes,
     });
   }
 
   const bytes = await object.arrayBuffer();
-  if (bytes.byteLength > MAX_SOURCE_BYTES) {
-    throw refuse("PARSER_OOM", "quarantine source exceeds the 5 MiB Foundation CDR cap", {
+  if (bytes.byteLength > maxSourceBytes) {
+    throw refuse("PARSER_OOM", cap, {
       observedBytes: bytes.byteLength,
       declaredBytes,
     });
@@ -529,7 +549,9 @@ export async function sanitizeObject(
   const targetSha256 = await sha256DigestHeader(new TextEncoder().encode(JSON.stringify([
     env.FOUNDATION_R2_BUCKET, env.TAVONEL_CDR_PROVIDER, env.TAVONEL_CDR_URL,
   ])));
-  const binding: CdrBinding = { parts, sourceKey: objectKey, inputSha256, provider: env.TAVONEL_CDR_PROVIDER, targetSha256 };
+  const binding: CdrBinding = {
+    parts, maxSanitizedBytes, sourceKey: objectKey, inputSha256, provider: env.TAVONEL_CDR_PROVIDER, targetSha256,
+  };
   const reused = await reusableImmutable(env.FOUNDATION_QUARANTINE, binding);
   let immutableKey: string;
   let outputSha256Header: string;
@@ -607,8 +629,17 @@ export async function sanitizeObject(
       throw refuse("RECEIPT_MISMATCH", "synthetic CDR output digest is missing", observed);
     }
 
-    const sanitized = await boundedResponseBytes(response, MAX_SANITIZED_BYTES);
-    if (sanitized.byteLength < 1 || sanitized.byteLength > MAX_SANITIZED_BYTES) {
+    // A clean PDF above the stage bound is a named refusal, not a retry: every retry would pay
+    // for the same CDR run and end in the DLQ. It happens when the CDR runs a higher stage.
+    const outputCap = `sanitized PDF exceeds the ${maxSanitizedBytes / (1024 * 1024)} MiB stage-${stage} bound`;
+    let sanitized: ArrayBuffer;
+    try {
+      sanitized = await boundedResponseBytes(response, maxSanitizedBytes);
+    } catch (error) {
+      if (error instanceof ResponseBoundExceeded) throw refuse("PARSER_OOM", outputCap, observed);
+      throw error;
+    }
+    if (sanitized.byteLength < 1) {
       throw new RetryableError("CDR output is outside the qualified storage bound");
     }
     const computedOutput = `sha256:${await sha256Hex(sanitized)}`;
@@ -674,6 +705,15 @@ export async function sanitizeObject(
         computeCredits: 0,
       };
     }
+  }
+
+  // D2 shadow: beside a stored ocr.json only, after it, and unable to change it (never throws).
+  if (!recorded && (ocr.status === "written" || ocr.status === "exists") && ocr.key) {
+    const { filename, contentType } = sourcePartFromR2Object(object);
+    await runTextLayerShadow({
+      env, immutablePdfKey: immutableKey, ocrKey: ocr.key, inputSha256,
+      source: { bytes, filename, contentType }, fetcher, now, newRequestId,
+    });
   }
 
   /*

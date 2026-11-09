@@ -9,6 +9,7 @@ import { GDP_PDF_RUNS_AFFECTED_PATHS, GDP_PDF_RUNS_AFFECTED_UNIT_FILES, GDP_PDF_
 import { PACKET_DELIVERY_AFFECTED_PATHS, PACKET_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { LIBRARY_DEDUP_AFFECTED_PATHS, LIBRARY_DEDUP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { LIBRARY_ORGANIZE_B2_AFFECTED_PATHS, LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { W2_D_INTAKE_STAGE1_AFFECTED_PATHS, W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { COMPILER_RELEASE_AFFECTED_PATHS, COMPILER_RELEASE_AFFECTED_UNIT_FILES, COMPILER_RELEASE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { SITE_POLISH_AFFECTED_PATHS, SITE_POLISH_AFFECTED_UNIT_FILES, SITE_POLISH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
@@ -906,6 +907,20 @@ assert(VITEST_DISCOVERY_CONFIG_PATH==='nextjs/vitest.config.ts'&&discoveryOwners
     && paths.every(p => AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + p)).length === 1 && owner.match.test('nextjs/' + p))
     && ['nextjs/lib/library-shadow.tsx', 'nextjs/lib/library-organize.ts', 'nextjs/lib/library-methods.test.ts', 'nextjs/lib/source-fingerprint.ts', 'nextjs/lib/topic-cluster.ts'].every(p => !owner.match.test(p)),
     'library-organize-b2 owner must keep its three exact paths, two direct suites and no neighbour admission');
+}
+// W2-D intake stage 1 + table DPI harness (codex/w2-d-20261108), restated independently: three exact repo-relative paths, two
+// direct suites, no browser suite, no lane flag; the CDR's own files and the shared ceiling keep their owners.
+{
+  const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'w2-d-intake-stage1'), [owner] = owners;
+  const paths = ['nextjs/lib/processing-ceiling-stage1.test.ts', 'quarantine-sidecar/cdr-cloudrun/table_dpi_arena.py', 'quarantine-sidecar/cdr-cloudrun/tests/test_table_dpi_arena.py'];
+  const suites = ['lib/intake-ceiling-cross-tree.test.ts', 'lib/processing-ceiling-stage1.test.ts'];
+  assert(owners.length === 1 && JSON.stringify(W2_D_INTAKE_STAGE1_AFFECTED_PATHS) === JSON.stringify(paths)
+    && JSON.stringify(W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES) === JSON.stringify(suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(suites)
+    && !owner.browserFiles.length && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
+    && paths.every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && owner.match.test(p))
+    && ['quarantine-sidecar/cdr-cloudrun/app.py', 'shared/intakeCeiling.ts', 'quarantine-sidecar/cdr-cloudrun/table_dpi_arena.pyc', 'nextjs/lib/processing-ceiling-stage1.ts']
+      .every(p => !owner.match.test(p)),
+    'w2-d-intake-stage1 owner must keep its three exact paths, two direct suites and no neighbour admission');
 }
 console.log(`Workflow static gates pass. Full qualification still pending for exact CI/Launch runs at this head.`);
 

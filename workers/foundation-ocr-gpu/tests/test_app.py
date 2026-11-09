@@ -1071,3 +1071,33 @@ def test_a_reader_with_a_bad_limit_does_not_boot() -> None:
     completed = subprocess.run([sys.executable, "-c", "import app"], cwd=ROOT, env=env, capture_output=True, text=True, timeout=120, check=False)
     assert completed.returncode != 0
     assert "TAVONEL_OCR_MAX_PAGES must be a whole number from 1 to 500" in completed.stderr
+
+
+# D1 stage 1 (PROGRAM-2026-11-04 §4.D): TAVONEL_INTAKE_CEILING_STAGE picks the production pair.
+def test_the_intake_ceiling_stage_picks_the_limits_and_an_unknown_stage_does_not_boot() -> None:
+    import subprocess
+    probe = "import app; print(app.INTAKE_CEILING_STAGE, app.INPUT_BYTES_LIMIT, app.PAGES_LIMIT)"
+    expected = {"": f"0 {18 * 1024 * 1024} 80", "0": f"0 {18 * 1024 * 1024} 80", "1": f"1 {45 * 1024 * 1024} 200"}
+    for stage, answer in expected.items():
+        # PORT_HEALTH == PORT skips the health sidecar, so the probe does not race the parent for :8002.
+        env = {**os.environ, "TAVONEL_INTAKE_CEILING_STAGE": stage, "PORT": "8001", "PORT_HEALTH": "8001"}
+        completed = subprocess.run([sys.executable, "-c", probe], cwd=ROOT, env=env, capture_output=True, text=True, timeout=120, check=False)
+        assert completed.returncode == 0, completed.stderr
+        assert completed.stdout.strip().splitlines()[-1] == answer
+    env = {**os.environ, "TAVONEL_INTAKE_CEILING_STAGE": "2", "PORT": "8001", "PORT_HEALTH": "8001"}
+    completed = subprocess.run([sys.executable, "-c", "import app"], cwd=ROOT, env=env, capture_output=True, text=True, timeout=120, check=False)
+    assert completed.returncode != 0
+    assert "TAVONEL_INTAKE_CEILING_STAGE must be 0 or 1" in completed.stderr
+
+
+def test_stage_one_reads_200_pages_and_refuses_201_before_any_ocr(monkeypatch: pytest.MonkeyPatch) -> None:
+    worker, calls = ready_fake_ocr(monkeypatch, SCAN)
+    assert worker.STAGE_LIMITS["1"] == (45 * 1024 * 1024, 200)
+    monkeypatch.setattr(worker, "PAGES_LIMIT", worker.STAGE_LIMITS["1"][1])
+    _, page_count, _ = worker.extract_text(pages_pdf(*[None] * 200, size=(306, 396)))
+    assert page_count == 200
+    calls.clear()
+    with pytest.raises(HTTPException) as refused:
+        worker.extract_text(pages_pdf(*[None] * 201, size=(306, 396)))
+    assert refused.value.status_code == 422 and "page count" in refused.value.detail
+    assert calls == []

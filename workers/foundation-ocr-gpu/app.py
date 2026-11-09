@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from queue import Queue
 from threading import Lock, Thread
 from time import monotonic
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import asynccontextmanager
 from typing import Final, NotRequired, TypedDict
 
@@ -34,6 +34,22 @@ REQUEST_ID: Final = re.compile(r"^[A-Za-z0-9_-]{16,160}$")
 MEASUREMENT_HARD_MAX_INPUT_BYTES: Final = 128 * 1024 * 1024
 MEASUREMENT_HARD_MAX_PAGES: Final = 500
 
+# D1 stage 1 (PROGRAM-2026-11-04 §4.D, "단계 1: 25 MiB / 200쪽"): a second production pair, chosen by
+# TAVONEL_INTAKE_CEILING_STAGE ("0" or unset = the literals above, "1" = these). The reader reads
+# every page the rasterizer renders, and admits what the rasterizer may emit at that stage
+# (cdr-cloudrun app.py STAGE_1_MAX_OUTPUT_BYTES, 18 MiB / 80 pages x 200: derived, not measured).
+# The measurement overrides still apply on top. A stage it cannot name refuses the boot.
+STAGE_1_MAX_INPUT_BYTES: Final = 45 * 1024 * 1024
+STAGE_1_MAX_PAGES: Final = 200
+STAGE_LIMITS: Final = {"0": (MAX_INPUT_BYTES, MAX_PAGES), "1": (STAGE_1_MAX_INPUT_BYTES, STAGE_1_MAX_PAGES)}
+
+
+def read_stage(env: Mapping[str, str] = os.environ) -> str:
+    raw = env.get("TAVONEL_INTAKE_CEILING_STAGE", "").strip() or "0"
+    if raw not in STAGE_LIMITS:
+        raise RuntimeError("TAVONEL_INTAKE_CEILING_STAGE must be 0 or 1")
+    return raw
+
 
 def read_limit(name: str, default: int, high: int, env: dict[str, str] | None = None) -> int:
     raw = (os.environ if env is None else env).get(name, "").strip()
@@ -44,8 +60,10 @@ def read_limit(name: str, default: int, high: int, env: dict[str, str] | None = 
     return int(raw)
 
 
-INPUT_BYTES_LIMIT: int = read_limit("TAVONEL_OCR_MAX_INPUT_BYTES", MAX_INPUT_BYTES, MEASUREMENT_HARD_MAX_INPUT_BYTES)
-PAGES_LIMIT: int = read_limit("TAVONEL_OCR_MAX_PAGES", MAX_PAGES, MEASUREMENT_HARD_MAX_PAGES)
+INTAKE_CEILING_STAGE: str = read_stage()
+INPUT_BYTES_LIMIT: int = read_limit(
+    "TAVONEL_OCR_MAX_INPUT_BYTES", STAGE_LIMITS[INTAKE_CEILING_STAGE][0], MEASUREMENT_HARD_MAX_INPUT_BYTES)
+PAGES_LIMIT: int = read_limit("TAVONEL_OCR_MAX_PAGES", STAGE_LIMITS[INTAKE_CEILING_STAGE][1], MEASUREMENT_HARD_MAX_PAGES)
 
 PDF_MAGIC: Final = b"%PDF"
 RENDER_SCALE: Final = 2.0

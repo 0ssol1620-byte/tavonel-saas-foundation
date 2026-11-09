@@ -2931,6 +2931,17 @@ export const ASK_ANSWERABILITY_E2_AFFECTED_UNIT_FILES = Object.freeze(['eval/ask
 // No browser suite: nothing renders it yet (B4). Never nativeReuse.
 export const LIBRARY_ORGANIZE_B2_AFFECTED_PATHS = Object.freeze(['lib/library-methods.ts', 'lib/library-shadow.test.ts', 'lib/library-shadow.ts']);
 export const LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES = Object.freeze(['lib/collection-compile-run.test.ts', 'lib/library-shadow.test.ts']);
+// W2-D intake (codex/w2-d-20261108, PROGRAM-2026-11-04 §4.D D1/D3): the stage-1 capability-route suite and the table
+// product-DPI Arena harness with its Python suite. Repository-relative, because the harness lives beside the CDR. The shared
+// ceiling, the CDR, reader and worker sources keep their owners (table-read-intake-ceiling, cdr-cloudrun-service,
+// ocr-gpu-worker, ocr-worker). The two direct suites are the stage-1 route suite and the cross-tree pin; the harness's own
+// pytest runs in malware-scan-qualification with the rest of tests/. No browser, database or worker lane. Never nativeReuse.
+export const W2_D_INTAKE_STAGE1_AFFECTED_PATHS = Object.freeze([
+  'nextjs/lib/processing-ceiling-stage1.test.ts',
+  'quarantine-sidecar/cdr-cloudrun/table_dpi_arena.py',
+  'quarantine-sidecar/cdr-cloudrun/tests/test_table_dpi_arena.py',
+]);
+export const W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES = Object.freeze(['lib/intake-ceiling-cross-tree.test.ts', 'lib/processing-ceiling-stage1.test.ts']);
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
 // legal-semicolons-20261109: the legal, consent, trust and /status copy whose semicolons were removed without a change in meaning.
@@ -3184,6 +3195,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // library-organize-b2 (W2-B2): the 3 exact paths above select 2 direct suites and no browser suite.
   affectedGroup('library-organize-b2', new RegExp(`^nextjs/(?:${exactPathAlternation(LIBRARY_ORGANIZE_B2_AFFECTED_PATHS)})$`),
     { unitFiles: LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES }),
+  // w2-d-intake-stage1 (W2-D): the 3 exact repo-relative paths above select 2 direct suites and no browser suite.
+  affectedGroup('w2-d-intake-stage1', new RegExp(`^(?:${exactPathAlternation(W2_D_INTAKE_STAGE1_AFFECTED_PATHS)})$`),
+    { unitFiles: W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES }),
 ]);const regularModes = ['100644', '100755'];
 
 export function parseAffectedRawDiff(output) {
