@@ -155,6 +155,11 @@ describe("settlement verifiers", () => {
     const pasted = await route(settlementRequest(url, `${KEY}\n`));
     expect(pasted.status).toBe(503);
     await expect(pasted.json()).resolves.toEqual({ code: "BILLING_NOT_CONFIGURED" });
+
+    // An absent key verifies nothing: the unsigned-caller answer is unchanged.
+    vi.stubEnv("FOUNDATION_BILLING_SETTLEMENT_HMAC", "");
+    const absent = await route(settlementRequest(url, KEY));
+    expect(absent.status).toBe(401);
   });
 });
 

@@ -23,8 +23,10 @@ export async function POST(request: Request) {
       { status: 413, headers }
     );
   }
+  // A key that is set but refused (whitespace, too short) is our misconfiguration: 503. An absent key
+  // verifies nothing, and stays the caller's 401 as before.
   const secret = billingSecret("FOUNDATION_BILLING_SETTLEMENT_HMAC");
-  if (!secret) {
+  if (!secret && process.env.FOUNDATION_BILLING_SETTLEMENT_HMAC) {
     return NextResponse.json({ code: "BILLING_NOT_CONFIGURED" }, { status: 503, headers });
   }
   if (!verifyComputeSettlementRequest(rawBody, request.headers, secret)) {

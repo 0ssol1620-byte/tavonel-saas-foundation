@@ -100,9 +100,12 @@ export async function POST(request: Request) {
   if (Buffer.byteLength(rawBody, "utf8") > 2_048) {
     return NextResponse.json({ code: "SETTLEMENT_REQUEST_TOO_LARGE" }, { status: 413, headers });
   }
-  // A refused secret is our misconfiguration, not the caller's bad signature: 503, so the Worker retries.
+  // A key that is set but refused is our misconfiguration, not the caller's bad signature: 503, so the
+  // Worker retries. An absent key verifies nothing, and stays a 401 as before.
   const secret = billingSecret("FOUNDATION_BILLING_SETTLEMENT_HMAC");
-  if (!secret) return NextResponse.json({ code: "BILLING_NOT_CONFIGURED" }, { status: 503, headers });
+  if (!secret && process.env.FOUNDATION_BILLING_SETTLEMENT_HMAC) {
+    return NextResponse.json({ code: "BILLING_NOT_CONFIGURED" }, { status: 503, headers });
+  }
   if (!verifyComputeSettlementRequest(rawBody, request.headers, secret)) {
     return NextResponse.json({ code: "SETTLEMENT_AUTH_INVALID" }, { status: 401, headers });
   }
