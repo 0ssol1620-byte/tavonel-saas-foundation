@@ -112,23 +112,24 @@ test("shows no verified tier while no format carries a qualification receipt", a
 
 /*
   D-33 / P2-33 (DECISION-REGISTER-2026-10-17, KB-F6 and KB-F7). The Korean reader's two answers live
-  here, in Korean markup, and not on /ko: no Korean quality measurement exists, and HWP/HWPX has no
+  here, in English since GX-02 (2026-11-09) made the site English only, and no Korean markup remains: no Korean quality measurement exists, and HWP/HWPX has no
   reader. The PDF tier in the sentence is the one the API serves for application/pdf, read here
   rather than typed, and the API must still list neither HWP nor HWPX for the sentence to stand.
 */
-test("tells a Korean reader, in Korean, what was not measured and that HWP/HWPX is not read", async ({ page }) => {
+test("states, in English, that Korean was not measured and that HWP/HWPX is not read", async ({ page }) => {
   const served = await manifest(page);
   const pdf = served.entries.find((entry) => entry.mime === "application/pdf");
   expect(pdf, "the API serves no PDF row").toBeDefined();
   expect(served.entries.some((entry) => /hwp/i.test(entry.mime)), "the API now lists an HWP format").toBe(false);
 
   await page.goto("/sources");
-  const korean = page.locator('main [lang="ko"]');
-  await expect(korean).toHaveCount(1);
-  await expect(korean).toBeVisible();
-  await expect(korean).toContainText("한국어 문서 품질은 아직 측정하지 않았습니다.");
-  await expect(korean).toContainText(`\u2018${TIER_LABEL[pdf!.status]}\u2019 등급으로 처리됩니다.`);
-  await expect(korean).toContainText("HWP/HWPX: 지원하지 않음 · 측정 안 함.");
+  await expect(page.locator('main [lang="ko"]')).toHaveCount(0);
+  const disclosure = page.locator('main [data-disclosure="korean-hwp"]');
+  await expect(disclosure).toHaveCount(1);
+  await expect(disclosure).toBeVisible();
+  await expect(disclosure).toContainText("Korean document quality has not been measured yet.");
+  await expect(disclosure).toContainText(`same \u2018${TIER_LABEL[pdf!.status]}\u2019 tier as the PDF row above.`);
+  await expect(disclosure).toContainText("HWP/HWPX: not supported, not measured.");
 });
 
 test("states the refusal rule once and claims nothing it cannot support", async ({ page }) => {

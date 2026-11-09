@@ -113,3 +113,10 @@ test("a /ko link lands on the English page it names (GX-02, global-only)", async
   await expect(page.locator("h1#lv2-hero-title")).toContainText("Context your AI can cite");
   await expect(page.locator('a[hreflang="ko"], a[href="/ko"], a[href^="/ko/"]')).toHaveCount(0);
 });
+
+test("the English /guide offers no Korean caption track (GX-02, global-only)", async ({ page }) => {
+  await page.goto("/guide");
+  await expect(page.locator("video").first()).toBeAttached();
+  await expect(page.locator('track[srclang="en"]').first()).toBeAttached();
+  await expect(page.locator('track[srclang="ko"]')).toHaveCount(0);
+});

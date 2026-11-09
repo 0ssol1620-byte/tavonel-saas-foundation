@@ -89,7 +89,8 @@ export function GuideMedia({ block, language, root = GUIDE_PUBLIC }: { block: Gu
           >
             <source src={`/guide/${files.mp4}`} type="video/mp4" />
             <track kind="captions" src={`/guide/${files.en}`} srcLang="en" label="English" default={language === "en"} />
-            <track kind="captions" src={`/guide/${files.ko}`} srcLang="ko" label="한국어" default={language === "ko"} />
+            {/* GX-02: the English guide offers no Korean caption choice. */}
+            {language === "ko" ? <track kind="captions" src={`/guide/${files.ko}`} srcLang="ko" label="한국어" default /> : null}
           </video>
         );
       })}

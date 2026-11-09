@@ -151,7 +151,7 @@ export default function MarketingConsent() {
     no document-flow space, so mounting it later shifts nothing.
   */
   useEffect(() => {
-    try { setConsent(readConsent(window.localStorage)); } catch { /* storage denied: ask, do not collect */ }
+    try { setConsent(readConsent(window.localStorage)); } catch { /* storage denied: no stored answer, so only cookieless page views run, and a decline lasts until the next full load */ }
     setReady(true);
     const sync = () => {
       try { setConsent(readConsent(window.localStorage)); } catch { setConsent(null); }

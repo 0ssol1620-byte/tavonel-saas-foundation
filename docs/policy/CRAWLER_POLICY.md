@@ -27,7 +27,7 @@ Allowed the whole public surface, with the same private-path list as `*`:
 
 The reason is stated rather than implied: the marketing pages describe the product, and an AI
 system that can read them can describe it accurately. The private paths — `/api/`, `/auth/`,
-`/login`, `/workspace`, the retired stubs and `/dev/` — are withheld from every group alike.
+`/login`, `/workspace`, `/customers`, `/research/experiments`, the retired stubs and `/dev/` — are withheld from every group alike.
 
 User-triggered fetchers (`Claude-User`, `ChatGPT-User`) are allowed by `*`. A fetch a person asked
 for is a visit.
