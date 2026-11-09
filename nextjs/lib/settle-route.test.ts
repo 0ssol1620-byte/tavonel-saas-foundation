@@ -15,15 +15,16 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { settle, settleProof, verify, adminConfig, adminRequest } = vi.hoisted(() => ({
+const { settle, metered, settleProof, verify, adminConfig, adminRequest } = vi.hoisted(() => ({
   settle: vi.fn(),
+  metered: vi.fn(),
   settleProof: vi.fn(),
   verify: vi.fn(),
   adminConfig: vi.fn(),
   adminRequest: vi.fn(),
 }));
 
-vi.mock("@/lib/compute-reservation", () => ({ settleFoundationCompute: settle }));
+vi.mock("@/lib/compute-reservation", () => ({ settleFoundationCompute: settle, settleFoundationMeteredCompute: metered }));
 vi.mock("@/lib/completed-read-proof", () => ({ settleCompletedRead: settleProof }));
 vi.mock("@/lib/compute-settlement-auth", () => ({ verifyComputeSettlementRequest: verify }));
 vi.mock("@/lib/supabase-admin", () => ({
@@ -95,6 +96,7 @@ beforeEach(() => {
   vi.stubEnv("FOUNDATION_BILLING_SETTLEMENT_HMAC", "s".repeat(40));
   verify.mockReset().mockReturnValue(true);
   settle.mockReset().mockResolvedValue({ ok: true, result: { status: "processed", reservationId: documentId } });
+  metered.mockReset().mockResolvedValue({ ok: true, result: { status: "processed", reservationId: documentId } });
   settleProof.mockReset();
   adminConfig.mockReset().mockReturnValue({ url: "https://project.supabase.co", serviceRoleKey: "x".repeat(40) });
   healthyStore();
@@ -181,6 +183,7 @@ describe("compute settlement endpoint", () => {
       actualCredits: 2,
       reasonCode: "OCR_COMPLETED",
       sourceSha256: `sha256:${"a".repeat(64)}`,
+      pages: 3,
     }));
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
@@ -188,9 +191,47 @@ describe("compute settlement endpoint", () => {
       sourceSha256: `sha256:${"a".repeat(64)}`,
     });
     expect(calls()).toHaveLength(0);
-    expect(settle).toHaveBeenCalledExactlyOnceWith({ workspaceKey, documentId, outcome: "settled",
-      actualCredits: 2, reasonCode: "OCR_COMPLETED" });
+    // Page meter: charged on the pages the worker counted, keyed on the digest it computed; the
+    // per-document `actualCredits` a pre-meter worker sends is not read.
+    expect(metered).toHaveBeenCalledExactlyOnceWith({ workspaceKey, documentId, outcome: "settled",
+      pages: 3, complexPages: null, sourceSha256: `sha256:${"a".repeat(64)}`, reasonCode: "OCR_COMPLETED" });
+    expect(settle).not.toHaveBeenCalled();
     expect(settleProof).not.toHaveBeenCalled();
+  });
+
+  it("refuses a read from a worker that sends no page count, as retryable, without a ledger call", async () => {
+    for (const outcome of ["settled", "operator_review"]) {
+      const response = await POST(request({ workspaceKey, documentId, outcome, actualCredits: 2,
+        reasonCode: "OCR_COMPLETED", sourceSha256: `sha256:${"a".repeat(64)}` }));
+      expect(response.status, outcome).toBe(503);
+      await expect(response.json()).resolves.toEqual({ code: "COMPUTE_PAGE_COUNT_REQUIRED" });
+    }
+    expect(metered).not.toHaveBeenCalled();
+    expect(settle).not.toHaveBeenCalled();
+  });
+
+  it("passes an unknown count on as unknown and surfaces the ledger's refusal", async () => {
+    metered.mockResolvedValue({ ok: false, code: "COMPUTE_PAGE_COUNT_REQUIRED" });
+    const response = await POST(request({ workspaceKey, documentId, outcome: "settled", actualCredits: 2,
+      reasonCode: "OCR_COMPLETED", pages: null }));
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ code: "COMPUTE_PAGE_COUNT_REQUIRED" });
+    expect(metered).toHaveBeenCalledWith(expect.objectContaining({ pages: null, complexPages: null, sourceSha256: null }));
+  });
+
+  it("hands a malformed page count to the ledger client as not-a-number, never as a count", async () => {
+    await POST(request({ workspaceKey, documentId, outcome: "settled", actualCredits: 2,
+      reasonCode: "OCR_COMPLETED", pages: "3" }));
+    expect(Number.isNaN(metered.mock.calls[0]?.[0]?.pages)).toBe(true);
+  });
+
+  it("keeps a release on the per-document path, which charges nothing", async () => {
+    const response = await POST(request({ workspaceKey, documentId, outcome: "released", actualCredits: 0,
+      reasonCode: "GPU_NOT_DISPATCHED" }));
+    expect(response.status).toBe(200);
+    expect(settle).toHaveBeenCalledExactlyOnceWith({ workspaceKey, documentId, outcome: "released",
+      actualCredits: 0, reasonCode: "GPU_NOT_DISPATCHED" });
+    expect(metered).not.toHaveBeenCalled();
   });
 
   it("W1-A3: pages an OCR timeout or out-of-contract answer after the settlement is durable, and nothing else", async () => {
@@ -201,7 +242,7 @@ describe("compute settlement endpoint", () => {
     vi.stubGlobal("fetch", post);
     try {
       for (const reasonCode of ["OCR_RESPONSE_INVALID", "OCR_TIMEOUT_OR_NETWORK", "OCR_COMPLETED"]) {
-        const response = await POST(request({ workspaceKey, documentId, outcome: "operator_review", actualCredits: 2, reasonCode }));
+        const response = await POST(request({ workspaceKey, documentId, outcome: "operator_review", actualCredits: 2, reasonCode, pages: null }));
         expect(response.status, reasonCode).toBe(200);
       }
       const summaries = post.mock.calls.map((entry) => JSON.parse(String((entry as unknown as [string, RequestInit])[1].body)).summary as string);
@@ -211,8 +252,8 @@ describe("compute settlement endpoint", () => {
       expect(summaries.every((summary) => summary.includes(documentId))).toBe(true);
 
       // A settlement the ledger refused is not durable, so it pages nobody.
-      settle.mockResolvedValueOnce({ ok: false, code: "COMPUTE_LEDGER_WRITE_FAILED" });
-      expect((await POST(request({ workspaceKey, documentId, outcome: "operator_review", actualCredits: 2, reasonCode: "OCR_RESPONSE_INVALID" }))).status).toBe(503);
+      metered.mockResolvedValueOnce({ ok: false, code: "COMPUTE_LEDGER_WRITE_FAILED" });
+      expect((await POST(request({ workspaceKey, documentId, outcome: "operator_review", actualCredits: 2, reasonCode: "OCR_RESPONSE_INVALID", pages: null }))).status).toBe(503);
       expect(post).toHaveBeenCalledTimes(2);
     } finally {
       vi.unstubAllGlobals();
@@ -227,9 +268,12 @@ describe("compute settlement endpoint", () => {
       actualCredits: 2,
       reasonCode: "OCR_COMPLETED",
       sourceSha256: "sha256:not-a-digest",
+      pages: 1,
     }));
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.not.toHaveProperty("sourceSha256");
+    // Not a digest, so not a key the unchanged-source rule can match on.
+    expect(metered).toHaveBeenCalledWith(expect.objectContaining({ sourceSha256: null }));
   });
 
   it("does not touch the ledger's own failures", async () => {

@@ -161,7 +161,8 @@ describe("completed read persisted OCR boundary", () => {
     const env = { FOUNDATION_COMPLETED_READ_ENABLED: "true", FOUNDATION_BILLING_SETTLEMENT_URL:
       "http://localhost/api/internal/billing/settle", FOUNDATION_BILLING_SETTLEMENT_HMAC: "synthetic-secret-".repeat(4) };
     const settle = (fetcher: typeof fetch) => dispatchComputeSettlement(env, proof.originalKey, "settled", 2,
-      "OCR_COMPLETED", fetcher, undefined, undefined, { sourceSha256: proof.originalSha256, completedRead: proof });
+      "OCR_COMPLETED", fetcher, undefined, undefined, { sourceSha256: proof.originalSha256, completedRead: proof,
+        meter: { pages: proof.observedPageCount } });
     const receipt = { status: "processed", reservationId: "02345678-1234-4123-8123-123456789abc", state: "settled",
       settledCredits: 2, billingSource: "paid", completedRead: proof };
     for (const body of [{}, { result: { ...receipt, completedRead: { ...proof, readerRevision: `sha256:${"d".repeat(64)}` } } }]) {
