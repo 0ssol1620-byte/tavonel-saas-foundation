@@ -479,14 +479,20 @@ export async function runCompileJobBatch(
   // query; retryable jobs still perform no R2 listing, OCR read, or Core dispatch.
   const workLimit = Math.min(Math.max(Math.trunc(limit) || 1, 1), 100);
   const open = await readOpenCompileJobs(Math.min(workLimit * 2, 100));
-  if (!open.ok) return [];
+  if (!open.ok) {
+    // An unreadable queue is not an empty one: say so, or a filter PostgREST refuses looks idle.
+    console.error(JSON.stringify({ event: "compile_batch_read_failed", code: open.code }));
+    return [];
+  }
   const turns: CompileJobTurn[] = [];
   let attempted = 0;
   for (const job of open.value) {
     const turn = await runCompileJobTurn(job, deadlineAt);
     turns.push(turn);
     if (turn.outOfTime) break;
-    if (turn.retryable || turn.note === "resting") continue;
+    // A job waiting on the customer's blocker decision is not work (D0, 2026-11-08). The store
+    // no longer hands those out; this covers one that became blocked during this very turn.
+    if (turn.retryable || turn.note === "resting" || turn.note === "blocked") continue;
     attempted += 1;
     if (attempted >= workLimit) break;
   }
