@@ -120,14 +120,14 @@ const genericRule = robots().rules;
 const genericDisallow = (Array.isArray(genericRule) ? genericRule : [genericRule]).filter((rule) => rule.userAgent === "*").flatMap((rule) => (Array.isArray(rule.disallow) ? rule.disallow : rule.disallow ? [rule.disallow] : []));
 
 /*
-  robots.txt now carries two kinds of rule, and they are split here by shape rather than by a
-  second copy of the token lists: a search rule allows the public surface and withholds the private
-  paths, a training rule allows nothing. The tests below assert the membership of each group, so a
-  token that moves between them fails rather than being silently re-classified by this split.
+  robots.txt carries two kinds of rule, split here by shape rather than by a second copy of the
+  token lists: an allow rule opens the public surface and withholds the private paths, a blocked
+  rule allows nothing. The tests below assert the membership of each group, so a token that moves
+  between them fails rather than being silently re-classified by this split.
 */
 const allRules = Array.isArray(genericRule) ? genericRule : [genericRule];
-const TRAINING_RULES = allRules.filter((rule) => rule.allow === undefined);
-const SEARCH_RULES = allRules.filter((rule) => rule.allow !== undefined);
+const BLOCKED_RULES = allRules.filter((rule) => rule.allow === undefined);
+const ALLOW_RULES = allRules.filter((rule) => rule.allow !== undefined);
 const crawlerPolicy = readFileSync(resolve(import.meta.dirname, "../../docs/policy/CRAWLER_POLICY.md"), "utf8");
 const disallowedFor = (path: string) => genericDisallow.filter((token) => path === token || path.startsWith(token));
 
@@ -330,90 +330,48 @@ describe("public surface: robots, sitemap and llms.txt agree", () => {
   });
 
   /*
-    The named search crawlers exist so discovery is explicit, and they inherit the same private
-    list. A rule that allowed one of them past a path `*` is withheld from would be a leak written
-    as an optimisation.
+    GX-01 (founder, 2026-11-09, `docs/policy/DECISION_LOG_2026-11-09.md`): search crawlers and the
+    named AI crawlers read the public marketing pages, and every one of them inherits exactly the
+    private list `*` has. A rule that let one of them past a path `*` is withheld from would be a
+    leak written as an optimisation. Bytespider alone stays refused.
   */
-  it("gives every named search crawler the same private list as *", () => {
-    expect(SEARCH_RULES.map((rule) => rule.userAgent)).toEqual(["OAI-SearchBot", "PerplexityBot", "ClaudeBot", "Googlebot", "*"]);
-    for (const rule of SEARCH_RULES) expect(rule.disallow, `${String(rule.userAgent)} disagrees with *`).toEqual(genericDisallow);
+  const SEARCH_TOKENS = ["OAI-SearchBot", "PerplexityBot", "ClaudeBot", "Googlebot"];
+  const AI_TOKENS = ["GPTBot", "Google-Extended", "anthropic-ai", "Claude-SearchBot", "CCBot", "Applebot-Extended", "Meta-ExternalAgent"];
+
+  it("allows the search and AI crawlers by name, each with the same private list as *", () => {
+    expect(ALLOW_RULES.map((rule) => rule.userAgent)).toEqual([...SEARCH_TOKENS, ...AI_TOKENS, "*"]);
+    for (const rule of ALLOW_RULES) {
+      expect(rule.allow, `${String(rule.userAgent)} must allow the public surface`).toBe("/");
+      expect(rule.disallow, `${String(rule.userAgent)} disagrees with *`).toEqual(genericDisallow);
+    }
+    for (const path of ["/api/", "/auth/", "/login", "/workspace", "/customers", "/research/experiments", "/film-2", "/film-3", "/film-4", "/dev/"]) {
+      expect(genericDisallow, `${path} must stay withheld from every crawler`).toContain(path);
+    }
   });
 
-  /*
-    Training-crawler policy is a delegated decision, 2026-09-11 (orchestrator, under the founder's
-    delegation) -- FD-61 in `docs/policy/DECISION_LOG_2026-09-11.md`, reversible by the founder --
-    and the reasoning is in `docs/policy/CRAWLER_POLICY.md`. The eight tokens below are disallowed
-    everywhere. This test no longer refuses the position -- it pins it, in both directions.
+  it("names every token once, so no parser has to choose between two groups", () => {
+    const agents = allRules.map((rule) => String(rule.userAgent));
+    expect(new Set(agents).size).toBe(agents.length);
+  });
 
-    Both directions, because the two ways this drifts are opposite and each is silent. A training
-    token that loses its Disallow gives away a licence position in a commit about SEO; a search
-    crawler that arrives in the training list by copy-paste removes the site from search, and every
-    other assertion in this file would still pass.
-  */
-  const TRAINING_TOKENS = ["GPTBot", "CCBot", "anthropic-ai", "Google-Extended", "Applebot-Extended", "Bytespider", "Meta-ExternalAgent"];
-
-  /*
-    A fetch a person asked for is a visit, not a corpus crawl, so these five stay allowed. Two are
-    named groups; the other three fall to `*`, which allows them -- and that is the assertion that
-    matters, because "allowed by default" is one careless list edit away from "refused".
-  */
-  const USER_TRIGGERED_TOKENS = ["Claude-User", "Claude-SearchBot", "ChatGPT-User", "OAI-SearchBot", "PerplexityBot", "ClaudeBot"];
-
-  it("disallows every training crawler everywhere", () => {
-    expect(TRAINING_RULES.map((rule) => rule.userAgent)).toEqual(TRAINING_TOKENS);
-    for (const rule of TRAINING_RULES) {
+  it("keeps Bytespider disallowed everywhere, and nothing else", () => {
+    expect(BLOCKED_RULES.map((rule) => rule.userAgent)).toEqual(["Bytespider"]);
+    for (const rule of BLOCKED_RULES) {
       expect(rule.disallow, `${String(rule.userAgent)} must be disallowed at the root`).toBe("/");
       expect(rule.allow, `${String(rule.userAgent)} must not carry an allow rule`).toBeUndefined();
     }
   });
 
-  it("keeps the two groups apart, so neither can become the other", () => {
-    for (const search of ["OAI-SearchBot", "PerplexityBot", "ClaudeBot", "Googlebot", "*"]) {
-      expect(TRAINING_TOKENS, `${search} in the training block would remove this site from search`)
-        .not.toContain(search);
-    }
-    for (const training of TRAINING_TOKENS) {
-      expect(SEARCH_RULES.map((rule) => String(rule.userAgent)), `${training} is not a search crawler`)
-        .not.toContain(training);
-    }
-    // Search discovery is the point of the site: no public page is withheld from a search crawler.
-    for (const rule of SEARCH_RULES) expect(rule.allow).toBe("/");
-  });
-
-  /*
-    One operator sends two tokens, and SD-05 (`docs/policy/DECISION_LOG_2026-09-16.md`) put them
-    in different groups, superseding the ClaudeBot half of FD-61: `ClaudeBot` fetches when a
-    person asks a question, `anthropic-ai` is the older corpus token.
-
-    Both halves are pinned, because each drifts back in its own silent way. `anthropic-ai` sliding
-    into the allow-list gives away a licence position in a commit about SEO; `ClaudeBot` sliding
-    back into the training list removes the site from an answer engine, and every other assertion
-    in this file stays green while it does. FD-61's other tokens are unchanged, and the ones it
-    did not rule on stay open in the crawler policy -- an open decision that stops being written
-    down is an open decision nobody makes.
-  */
-  it("splits the operator's two tokens the way SD-05 decided, in both files", () => {
-    expect(TRAINING_TOKENS, "anthropic-ai is the corpus token and stays refused").toContain("anthropic-ai");
-    expect(TRAINING_TOKENS, "ClaudeBot fetches because a person asked, and is allowed").not.toContain("ClaudeBot");
-    expect(SEARCH_RULES.map((rule) => String(rule.userAgent)), "and it is allowed by name, not by the * default").toContain("ClaudeBot");
-    expect(crawlerPolicy, "the policy must name what it refuses").toContain("anthropic-ai");
-    expect(crawlerPolicy, "and must say which token it now allows, and on whose decision").toContain("SD-05");
+  it("states the same policy in CRAWLER_POLICY.md and llms.txt", () => {
+    const llms = readFileSync(resolve(import.meta.dirname, "../public/llms.txt"), "utf8");
+    expect(crawlerPolicy, "the policy cites the decision it implements").toContain("GX-01");
     expect(crawlerPolicy, "robots.txt is a request, not a technical measure").toContain("not access control");
-  });
-
-  it("keeps user-triggered fetchers allowed, and says so where it can be read", () => {
-    const trainingAgents = TRAINING_RULES.map((rule) => String(rule.userAgent));
-    for (const token of USER_TRIGGERED_TOKENS) {
-      expect(TRAINING_TOKENS, `${token} fetches because a person asked; refusing it is a visit refused`)
-        .not.toContain(token);
-      expect(trainingAgents, `${token} must not reach robots.txt as a disallow-all group`).not.toContain(token);
-      expect(crawlerPolicy, `${token} is allowed on purpose and the policy has to say which ones`).toContain(token);
+    for (const token of [...SEARCH_TOKENS, ...AI_TOKENS, "Bytespider"]) {
+      const tick = String.fromCharCode(96);
+      expect(crawlerPolicy, "a token is classified in the policy").toContain(tick + token + tick);
+      expect(llms, `${token} is named in llms.txt`).toContain(token);
     }
-  });
-
-  it("records the tokens FD-61 did not rule on, rather than letting them look decided", () => {
     for (const token of ["Amazonbot", "Diffbot", "Omgilibot", "Timpibot", "PanguBot"]) {
-      expect(TRAINING_TOKENS, `${token} was not decided and must not arrive by default`).not.toContain(token);
       expect(crawlerPolicy, `${token} has to stay named as open`).toContain(token);
     }
     expect(crawlerPolicy, "the document has to keep an open list at all").toContain("Still open");
@@ -483,7 +441,7 @@ describe("public surface: the sitemap advertises only approved pages", () => {
   it("still knows a noindex page when it reads one", () => {
     expect(isNoindex("/film"), "the standing noindex example no longer reads as noindex").toBe(true);
     expect(sitemapPaths).not.toContain("/film");
-    expect(sitemapPaths).toContain("/ko");
+    expect(sitemapPaths).toContain("/pricing");
   });
 
   /*
@@ -511,62 +469,21 @@ describe("public surface: the sitemap advertises only approved pages", () => {
   from the reader who wanted it. `lib/page-seo.ts` refuses the second at build time; the first
   and the third are facts about files, so they are read here.
 */
-describe("public surface: the Korean subtree", () => {
+describe("public surface: the Korean subtree is retired (GX-02, founder, 2026-11-09)", () => {
   const koreanPages = pages.filter((page) => page.route === "/ko" || page.route.startsWith("/ko/"));
+  const isKorean = (path: string) => path === "/ko" || path.startsWith("/ko/");
 
-  it("includes the Korean entry and its inquiry destination", () => {
+  it("keeps the sources in the tree for a later deletion, and advertises none of them", () => {
     expect(koreanPages.map((page) => page.route).sort()).toEqual(["/ko", "/ko/contact", "/ko/evaluation", "/ko/guide", "/ko/pricing"]);
-    // EN-1: the product guide's Korean edition, indexable like the other four.
-    expect(sitemapPaths).toContain("/ko/guide");
-    expect(isNoindex("/ko/guide")).toBe(false);
-    expect(sitemapPaths).toContain("/ko");
-    expect(sitemapPaths).toContain("/ko/contact");
-    expect(sitemapPaths).toContain("/evaluation");
-    expect(sitemapPaths).toContain("/ko/evaluation");
-    expect(sitemapPaths).toContain("/ko/pricing");
-    expect(isNoindex("/ko")).toBe(false);
-    expect(isNoindex("/ko/contact")).toBe(false);
-    expect(isNoindex("/evaluation")).toBe(false);
-    expect(isNoindex("/ko/evaluation")).toBe(false);
-    expect(isNoindex("/ko/pricing")).toBe(false);
+    expect(sitemapPaths.filter(isKorean), "a /ko URL redirects and must not be in the sitemap").toEqual([]);
+    expect(llmsPaths.filter(isKorean), "a /ko URL redirects and must not be in llms.txt").toEqual([]);
   });
 
-/*
-    B10 / seo-i18n CROSS-LANE 1 and 2, both of which land here because neither file is in a lane's
-    row: the English half of the hreflang pair is declared on the English entry page, and
-    `lib/marketing-analytics.ts` is what decides where a consented page view is even possible.
-
-    The pair is the point. `/ko` naming `/` as its English alternate is a claim a search engine may
-    ignore when only one side annotates it, and a one-way annotation is not wrong -- it is
-    incomplete in a way nothing on either side could see.
-
-    B13 moved the English half off `app/layout.tsx`, where seven pages with no Korean counterpart
-    were inheriting it. The pair is unchanged, so this reads `app/page.tsx` instead.
-  */
-  it("is named as the Korean alternate by the English entry page too", () => {
-    const entry = readFileSync(join(appDirectory, "page.tsx"), "utf8");
-    expect(entry).toMatch(/languages:\s*\{[^}]*ko:\s*"\/ko"/);
-    expect(entry).toMatch(/languages:\s*\{[^}]*en:\s*"\/"/);
-    expect(entry).toMatch(/languages:\s*\{[^}]*"x-default":\s*"\/"/);
-    expect(entry).toMatch(/canonical:\s*"\/"/);
-    // The layout keeps the canonical safety net for every page that declares none of its own.
-    expect(readFileSync(join(appDirectory, "layout.tsx"), "utf8")).toMatch(/canonical:\s*"\/"/);
-  });
-
-  it("pairs Korean pricing with the English pricing page", () => {
-    const korean = readFileSync(join(appDirectory, "ko", "pricing", "page.tsx"), "utf8");
-    const english = readFileSync(join(appDirectory, "pricing", "page.tsx"), "utf8");
-    expect(korean).toMatch(/ko:\s*"\/ko\/pricing"/);
-    expect(korean).toMatch(/en:\s*"\/pricing"/);
-    expect(english).toMatch(/ko:\s*"\/ko\/pricing"/);
-    expect(english).toMatch(/en:\s*"\/pricing"/);
-  });
-
-  it("can be measured at all, which needs its path on the consented set", () => {
-    // Not a consent change: the set gates where a consented page view is possible, and a path
-    // missing from it is a public page measured nowhere -- which is what /ko was.
-    expect(publicPageLocation("/ko")).toBe("https://tavonel.com/ko");
-    expect(publicPageLocation("/workspace"), "the set still refuses a private path").toBeNull();
+  it("answers every /ko URL with a permanent redirect to its English page", async () => {
+    const { default: config } = await import("../next.config.mjs");
+    const redirects = await config.redirects!();
+    expect(redirects).toContainEqual({ source: "/ko", destination: "/", permanent: true });
+    expect(redirects).toContainEqual({ source: "/ko/:path*", destination: "/:path*", permanent: true });
   });
 });
 
@@ -593,30 +510,6 @@ describe("public surface: what is advertised is what is measured", () => {
     for (const path of ["/workspace", "/workspace/sources", "/login", "/auth/callback", "/api/contact", "/dev/tokens"]) {
       expect(publicPageLocation(path), `${path} must not be measured`).toBeNull();
     }
-  });
-
-  /*
-    The root layout says `lang="en"`, so /ko has to say otherwise on the subtree it renders.
-
-    It used to say it through `app/ko/layout.tsx`, a wrapper whose whole body was
-    `<div lang="ko">`. That file was deleted on 2026-09-19: `LandingPage` already puts
-    `lang="ko"` on `.page`, so all the wrapper added was one more element between `body` and the
-    page -- which is why the landmark audit found `body > .page > header` on `/` and nothing on
-    `/ko`. The declaration is asserted where it is actually made.
-  */
-  it("declares Korean on the subtree it renders", () => {
-    expect(
-      readFileSync(join(appDirectory, "..", "components", "landing-v2", "landing-page.tsx"), "utf8"),
-      'the /ko composition must carry lang="ko" -- the root layout says lang="en"',
-    ).toMatch(/lang=\{korean \? "ko"/);
-  });
-
-  it("names itself and the English entry in its own hreflang set", () => {
-    const source = readFileSync(join(appDirectory, "ko", "page.tsx"), "utf8");
-    expect(source).toMatch(/canonical:\s*"\/ko"/);
-    expect(source).toMatch(/ko:\s*"\/ko"/);
-    expect(source).toMatch(/en:\s*"\/"/);
-    expect(source).toMatch(/"x-default":\s*"\/"/);
   });
 
   /*
@@ -715,8 +608,6 @@ describe("public surface: the draft cookbooks", () => {
   which is what makes it true of the six draft cookbooks as well.
 */
 describe("hreflang is declared only where a counterpart exists", () => {
-  const PAIRED = ["app/contact/page.tsx", "app/ko/contact/page.tsx", "app/ko/page.tsx", "app/page.tsx", "app/pricing/page.tsx", "app/ko/pricing/page.tsx", "app/evaluation/page.tsx", "app/ko/evaluation/page.tsx", "app/guide/page.tsx", "app/ko/guide/page.tsx"];
-  const relativeFile = (file: string) => relative(resolve(import.meta.dirname, ".."), file).split(sep).join("/");
 
   it("is not on the root layout, where every page would inherit it", () => {
     const layout = readFileSync(resolve(import.meta.dirname, "../app/layout.tsx"), "utf8");
@@ -725,20 +616,12 @@ describe("hreflang is declared only where a counterpart exists", () => {
       .not.toMatch(/^\s*languages:/m);
   });
 
-  it("is declared only by the complete English/Korean page pairs", () => {
+  it("is declared by no reachable page: each one is its own canonical and names no alternate", () => {
     const declaring = pages
       .filter((page) => /languages:/.test(readFileSync(page.file, "utf8")))
-      .map((page) => relativeFile(page.file))
-      .sort();
-    expect(declaring).toEqual([...PAIRED].sort());
-    for (const file of PAIRED) {
-      const source = readFileSync(resolve(import.meta.dirname, "..", file), "utf8");
-      const korean = file.includes("contact") ? "/ko/contact" : file.includes("pricing") ? "/ko/pricing" : file.includes("evaluation") ? "/ko/evaluation" : file.includes("guide") ? "/ko/guide" : "/ko";
-      const english = file.includes("contact") ? "/contact" : file.includes("pricing") ? "/pricing" : file.includes("evaluation") ? "/evaluation" : file.includes("guide") ? "/guide" : "/";
-      expect(source, `${file} must name its Korean counterpart`).toContain(`ko: "${korean}"`);
-      expect(source, `${file} must name its English counterpart`).toContain(`en: "${english}"`);
-      expect(source, `${file} must name a default`).toContain(`"x-default": "${english}"`);
-    }
+      .map((page) => page.route)
+      .filter((route) => route !== "/ko" && !route.startsWith("/ko/"));
+    expect(declaring, "GX-02 retired /ko, so no English page has a counterpart left to name").toEqual([]);
   });
 
   it("is on no page that asks not to be indexed", () => {

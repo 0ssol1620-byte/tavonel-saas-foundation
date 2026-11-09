@@ -117,13 +117,17 @@ function validateHistory(value: unknown): ProbeHistory | null {
  * written -- that is NOT RUN, and /status renders it as NOT RUN. A read that failed is
  * `{ ok: false, code }` and is rendered as a failed read, never as NOT RUN: "we could not find
  * out" and "it has not run" are different sentences.
+ *
+ * The read is always signed at the real clock. The signed URL lives 60 s, and the SLI alert cron
+ * evaluates at its slot start about 70 s before it runs: signing at that instant made R2 refuse
+ * every read, so production recorded history_unavailable on every slot from 2026-09-20 to
+ * 2026-11-09 while /status, signing at the real clock, read the same object fine.
  */
 export async function readProbeHistory(
   env: R2SignerEnv,
-  now = new Date(),
 ): Promise<{ ok: true; history: ProbeHistory } | { ok: false; code: string }> {
   if (env.bucket !== FOUNDATION_R2_BUCKET) return { ok: false, code: "BUCKET_NOT_FOUNDATION" };
-  const signed = signedSyntheticUrl(env, "GET", PROBE_HISTORY_KEY, now);
+  const signed = signedSyntheticUrl(env, "GET", PROBE_HISTORY_KEY, new Date());
   if (!signed.ok) return signed;
   let response: Response;
   try {

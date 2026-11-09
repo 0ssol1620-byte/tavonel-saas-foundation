@@ -7,9 +7,9 @@ import { EVIDENCE, EVIDENCE_STATE } from "@/lib/evidence-record";
 export const metadata: Metadata = {
   alternates: { canonical: "/research/notes" },
   openGraph: { url: "/research/notes" },
-  title: "Research notes — TAVONEL",
+  title: "Research notes: what we measured, and how — TAVONEL",
   description:
-    "What we measured and how: the figures, their denominators, their receipts, and the hypotheses that did not hold.",
+    "What we measured and how: the figures, their denominators, their receipts, and the hypotheses that did not hold. Each result carries the state of its evidence.",
 };
 
 /**

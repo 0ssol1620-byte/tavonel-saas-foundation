@@ -1,53 +1,53 @@
 WEBVTT
 
 1
-00:00.000 --> 00:12.658
+00:00.000 --> 00:12.863
 The API reference runs unauthenticated reads from the page: no signup, no credential, nothing that spends.
 
 2
-00:12.658 --> 00:21.665
+00:12.863 --> 00:21.863
 What TAVONEL can read: the same list the upload route validates against.
 
 3
-00:21.665 --> 00:30.674
+00:21.863 --> 00:30.863
 The deployment's own state, including that compiling your own files is not open here.
 
 4
-00:30.674 --> 00:37.878
+00:30.863 --> 00:38.075
 A fixed product sample that shows the shape of an answer. Build against the shape; do not judge extraction from it.
 
 5
-00:37.878 --> 00:41.885
+00:38.075 --> 00:42.087
 The response carries a Content-Digest header.
 
 6
-00:41.885 --> 00:49.889
+00:42.087 --> 00:50.089
 Now a terminal. This screen replays a captured session: the commands that ran and the output they printed, unedited.
 
 7
-00:49.889 --> 00:57.896
+00:50.089 --> 00:58.092
 The hash computed from the bytes received equals the Content-Digest the server stated.
 
 8
-00:57.896 --> 01:05.904
+00:58.092 --> 01:06.100
 The published Python recipe is downloaded and matched against its hash in the channel manifest.
 
 9
-01:05.904 --> 01:14.913
+01:06.100 --> 01:15.110
 The recipe recomputes the digest and prints each piece of evidence with the page and region it points at.
 
 10
-01:14.913 --> 01:20.925
+01:15.110 --> 01:21.112
 The sample labels itself a product sample, not customer proof.
 
 11
-01:20.925 --> 01:27.437
+01:21.112 --> 01:27.623
 The CLI file is matched against the channel manifest the same way.
 
 12
-01:27.437 --> 01:37.443
+01:27.623 --> 01:37.627
 The CLI's status command runs without a key. It reports reading the public World as open, and compiling your own documents as closed.
 
 13
-01:37.443 --> 01:44.880
+01:37.627 --> 01:45.040
 A finished Compiled World is open to read in full today. Compiling your own sources is set up with us.

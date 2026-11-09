@@ -6833,7 +6833,7 @@ test('affected pilot worksheet admission: adjacent and lookalike paths, other lo
     'supabase/functions/contact/index.ts','supabase/functions/evaluation-request/index.ts',
     'components/evaluation-page.tsx','public/evaluation/pilot-worksheet.en.md','lib/pilot-evaluation-worksheet.test.ts','components/evaluation-page.test.tsx',
     'evaluation/pilot-worksheet.ko.md','nextjs/nextjs/components/evaluation-page.tsx']) {
-    if (assertNewReviewedMarketingEndpoint(path) || assertLaunchSwitchEndpoint(path)) continue;
+    if (assertNewReviewedMarketingEndpoint(path) || assertLaunchSwitchEndpoint(path) || assertGlobalExposureEndpoint(path)) continue;
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
@@ -7027,6 +7027,16 @@ test('affected pilot worksheet admission: the combined prior workspace, UX08 led
   // Evaluation and contact-form neighbours stay diagnostics only: beside the combined delta they close the whole plan, while the
   // diagnostic selection equals the clean combined selection.
   for (const adjacent of ['nextjs/components/contact-form.tsx','nextjs/app/evaluation/page.tsx',AFFECTED_PILOT_OLD_SUITE]) {
+    // GX-02/GX-04 registered the evaluation page to global-exposure: asserted positively to that one owner, never to the worksheet owner.
+    // It shares only the EvaluationPage render suite, which reads the page directly; the worksheet suite is never selected by it.
+    if (assertGlobalExposureEndpoint(adjacent)) {
+      const map=affectedMap([...prior,...affectedPilotRaw(),affectedRecord('M',[adjacent])]);
+      assert.deepEqual([map.failures,map.unmappedPaths],[[],[]],adjacent);
+      assert.deepEqual(map.groups,[...combined.groups,'global-exposure'].sort(),adjacent);
+      const alone=affectedMap([affectedRecord('M',[adjacent])]);
+      assert.ok(!alone.groups.includes(AFFECTED_PILOT_GROUP)&&!alone.unitFiles.includes('lib/pilot-evaluation-worksheet.test.ts'),adjacent);
+      continue;
+    }
     const map=affectedMap([...prior,...affectedPilotRaw(),affectedRecord('M',[adjacent])]);
     assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${adjacent}`],[adjacent]],adjacent);
     assert.deepEqual([map.groups,map.unitFiles,map.browserFiles],[combined.groups,combined.unitFiles,combined.browserFiles],adjacent);
@@ -7507,6 +7517,25 @@ test('affected g1-copy-truth owner: 6 exact paths select 17 direct suites and 2 
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+// Global exposure (GX-01..GX-04, codex/global-exposure-20261109): one finite owner, restated independently.
+import { GLOBAL_EXPOSURE_AFFECTED_PATHS, GLOBAL_EXPOSURE_AFFECTED_UNIT_FILES, GLOBAL_EXPOSURE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+test('affected global-exposure owner: 12 exact paths select 10 direct suites and 1 browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/evaluation/page.tsx', 'app/pricing/page.tsx', 'app/robots.ts', 'e2e/evaluation-acceptance.spec.ts', 'e2e/masterplan-workbench.spec.ts', 'e2e/ux06-contact-recovery.spec.ts', 'lib/indexnow.test.ts', 'lib/landing-v2-outcome-ia.test.ts', 'lib/page-metadata.test.ts', 'lib/seo-title-lengths.test.ts', 'public/7a0ff86c91c02b35a358cdf2761b2512.txt', 'scripts/indexnow-ping.mjs'];
+  const suites = ['components/evaluation-page.test.tsx', 'lib/indexnow.test.ts', 'lib/landing-v2-outcome-ia.test.ts', 'lib/page-metadata.test.ts', 'lib/page-seo.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts', 'lib/route-canonical-metadata.test.ts', 'lib/seo-surface.test.ts', 'lib/seo-title-lengths.test.ts'];
+  const browsers = ['e2e/evidence-first.spec.ts'];
+  assert.deepEqual([[...GLOBAL_EXPOSURE_AFFECTED_PATHS], [...GLOBAL_EXPOSURE_AFFECTED_UNIT_FILES], [...GLOBAL_EXPOSURE_AFFECTED_BROWSER_FILES]], [paths, suites, browsers]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['global-exposure'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['global-exposure'], [], suites, browsers, []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  for (const adjacent of ['nextjs/app/robots.tsx', 'nextjs/app/pricing/layout.tsx', 'nextjs/app/evaluation/page.ts', 'nextjs/lib/indexnow.ts', 'nextjs/lib/seo-title-lengths.ts', 'nextjs/scripts/indexnow-ping.test.mjs', 'nextjs/public/0000000000000000000000000000000.txt', 'nextjs/e2e/evaluation-acceptance-2.spec.ts', 'scripts/indexnow-ping.mjs']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
 // Library dedup B1 (codex/w1-b1-20261104): one finite owner, restated independently of the exported constants.
 import { LIBRARY_DEDUP_AFFECTED_PATHS, LIBRARY_DEDUP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 test('affected library-dedup-b1 owner: 3 exact paths select 3 direct suites and no browser suite; neighbours stay unmapped', () => {
@@ -7607,6 +7636,27 @@ test('affected site-polish-20261109 owner: 7 exact paths select 5 direct suites 
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+// legal-semicolons-status-20261109: one finite owner, restated independently of the exported constants.
+import { LEGAL_SEMICOLONS_STATUS_AFFECTED_PATHS, LEGAL_SEMICOLONS_STATUS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+test('affected legal-semicolons-status-20261109 owner: 1 exact path selects no direct suite and 1 browser suite; neighbours stay unmapped', () => {
+  const paths = ['e2e/operations.spec.ts'];
+  const browsers = ['e2e/operations.spec.ts'];
+  assert.deepEqual([[...LEGAL_SEMICOLONS_STATUS_AFFECTED_PATHS], [...LEGAL_SEMICOLONS_STATUS_AFFECTED_BROWSER_FILES]], [paths, browsers]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['legal-semicolons-status-20261109'], path);
+  }
+  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['legal-semicolons-status-20261109'], [], [], browsers, []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  const plan = affectedAskPlan(map);
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[], browsers, false, false]);
+  assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440']);
+  for (const adjacent of ['nextjs/e2e/operations-p0.spec.ts', 'nextjs/e2e/operation.spec.ts', 'nextjs/e2e/operations.spec.tsx', 'e2e/operations.spec.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
 // D-05 gate release continuity (docs/adr/0006): one finite owner over repo-relative paths, restated independently.
 import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 test('affected gate-release-continuity owner: 9 exact paths select 10 direct suites and no browser suite; neighbours stay unmapped', () => {
@@ -7631,8 +7681,8 @@ test('affected gate-release-continuity owner: 9 exact paths select 10 direct sui
 });
 // Home film re-record on design C (W2, 2026-11-05): one finite owner, restated independently of the exported constants.
 import { HOME_FILM_RERECORD_AFFECTED_PATHS, HOME_FILM_RERECORD_AFFECTED_UNIT_FILES, HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
-test('affected film-rerecord-20261105 owner: 32 exact paths select 3 direct suites and 3 browser suites; neighbours stay unmapped', () => {
-  const paths = ['public/film/hero-r2-c1-hq-1440.mp4', 'public/film/hero-r2-c1-hq.mp4', 'public/film/hero-r2-c1.mp4', 'public/film/hero-r2-c2.mp4', 'public/film/hero-r2-c3.mp4', 'public/film/hero-r2-c4.mp4', 'public/film/poster-r2-c1-t13.60-2x.avif', 'public/film/poster-r2-c1-t13.60-2x.webp', 'public/film/poster-r2-c1-t13.60-pane1-684x855.avif', 'public/film/poster-r2-c1-t13.60-pane1-684x855.webp', 'public/film/poster-r2-c1-t13.60.avif', 'public/film/poster-r2-c1-t13.60.webp', 'public/film/poster-r2-c2-t4.40-2x.avif', 'public/film/poster-r2-c2-t4.40-2x.webp', 'public/film/poster-r2-c2-t4.40.avif', 'public/film/poster-r2-c2-t4.40.webp', 'public/film/poster-r2-c3-t17.96-2x.avif', 'public/film/poster-r2-c3-t17.96-2x.webp', 'public/film/poster-r2-c3-t17.96.avif', 'public/film/poster-r2-c3-t17.96.webp', 'public/film/poster-r2-c4-t6.80-2x.avif', 'public/film/poster-r2-c4-t6.80-2x.webp', 'public/film/poster-r2-c4-t6.80.avif', 'public/film/poster-r2-c4-t6.80.webp', 'scripts/film/encode-fallback.sh', 'scripts/film/fixture.mjs', 'scripts/film/frame-strings.mjs', 'scripts/film/posters.mjs', 'scripts/film/record.mjs', 'scripts/film/scan.mjs', 'scripts/film/stages.mjs', 'scripts/measure-film-start.mjs'];
+test('affected film-rerecord-20261105 owner: 66 exact paths select 3 direct suites and 3 browser suites; neighbours stay unmapped', () => {
+  const paths = ['public/film/hero-r2-c1-hq-1440.mp4', 'public/film/hero-r2-c1-hq.mp4', 'public/film/hero-r2-c1.mp4', 'public/film/hero-r2-c2.mp4', 'public/film/hero-r2-c3.mp4', 'public/film/hero-r2-c4.mp4', 'public/film/hero-r3-c1-hq-1440.mp4', 'public/film/hero-r3-c1-hq.mp4', 'public/film/hero-r3-c1.mp4', 'public/film/hero-r3-c2-hq.mp4', 'public/film/hero-r3-c2.mp4', 'public/film/hero-r3-c3-hq.mp4', 'public/film/hero-r3-c3.mp4', 'public/film/hero-r3-c4-hq.mp4', 'public/film/hero-r3-c4.mp4', 'public/film/poster-r2-c1-t13.60-2x.avif', 'public/film/poster-r2-c1-t13.60-2x.webp', 'public/film/poster-r2-c1-t13.60-pane1-684x855.avif', 'public/film/poster-r2-c1-t13.60-pane1-684x855.webp', 'public/film/poster-r2-c1-t13.60.avif', 'public/film/poster-r2-c1-t13.60.webp', 'public/film/poster-r2-c2-t4.40-2x.avif', 'public/film/poster-r2-c2-t4.40-2x.webp', 'public/film/poster-r2-c2-t4.40.avif', 'public/film/poster-r2-c2-t4.40.webp', 'public/film/poster-r2-c3-t17.96-2x.avif', 'public/film/poster-r2-c3-t17.96-2x.webp', 'public/film/poster-r2-c3-t17.96.avif', 'public/film/poster-r2-c3-t17.96.webp', 'public/film/poster-r2-c4-t6.80-2x.avif', 'public/film/poster-r2-c4-t6.80-2x.webp', 'public/film/poster-r2-c4-t6.80.avif', 'public/film/poster-r2-c4-t6.80.webp', 'public/film/poster-r3-c1-t10.40-2x.avif', 'public/film/poster-r3-c1-t10.40-2x.webp', 'public/film/poster-r3-c1-t10.40-pane1-848x1060.avif', 'public/film/poster-r3-c1-t10.40-pane1-848x1060.webp', 'public/film/poster-r3-c1-t10.40.avif', 'public/film/poster-r3-c1-t10.40.webp', 'public/film/poster-r3-c2-t17.96-2x.avif', 'public/film/poster-r3-c2-t17.96-2x.webp', 'public/film/poster-r3-c2-t17.96.avif', 'public/film/poster-r3-c2-t17.96.webp', 'public/film/poster-r3-c3-t17.96-2x.avif', 'public/film/poster-r3-c3-t17.96-2x.webp', 'public/film/poster-r3-c3-t17.96.avif', 'public/film/poster-r3-c3-t17.96.webp', 'public/film/poster-r3-c4-t8.80-2x.avif', 'public/film/poster-r3-c4-t8.80-2x.webp', 'public/film/poster-r3-c4-t8.80.avif', 'public/film/poster-r3-c4-t8.80.webp', 'scripts/film/encode-fallback.sh', 'scripts/film/fixture.mjs', 'scripts/film/frame-strings.mjs', 'scripts/film/posters.mjs', 'scripts/film/record.mjs', 'scripts/film/scan.mjs', 'scripts/film/stages.mjs', 'scripts/guide/GUIDE-SCRIPTS.json', 'scripts/guide/capture-terminal.mjs', 'scripts/guide/encode-guides.mjs', 'scripts/guide/record-guide.mjs', 'scripts/guide/terminal-replay.mjs', 'scripts/guide/terminal/api.json', 'scripts/guide/terminal/mcp.json', 'scripts/measure-film-start.mjs'];
   const suites = ['components/compile-stage-player.mobile-view.test.tsx', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts'];
   const browsers = ['e2e/hero-four-stage-restoration.spec.ts', 'e2e/hero-home-responsive.spec.ts', 'e2e/landing-hero-film-loading.spec.ts'];
   assert.deepEqual([[...HOME_FILM_RERECORD_AFFECTED_PATHS], [...HOME_FILM_RERECORD_AFFECTED_UNIT_FILES], [...HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES]], [paths, suites, browsers]);
@@ -7765,6 +7815,15 @@ test('affected published024 marketing admission: discovery duplicate cleanup pre
 
 // Phase 4 LAUNCH (P2-37 / register D-12) gave the launch switch one finite owner. An older owner's negative list keeps it out of its own
 // selection and asserts exactly that owner instead of an unmapped path.
+// Global exposure (GX-02/GX-04, 2026-11-09) registered paths older negative lists name. Each is asserted positively to its one
+// owner with that owner's exact suites; every other listed path keeps its original rejection.
+function assertGlobalExposureEndpoint(path) {
+  if(!GLOBAL_EXPOSURE_AFFECTED_PATHS.some(p=>'nextjs/'+p===path)) return false;
+  const map=affectedMap([affectedRecord('M',[path])]);
+  assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],
+    [[],['global-exposure'],[],[...GLOBAL_EXPOSURE_AFFECTED_UNIT_FILES].sort(),[...GLOBAL_EXPOSURE_AFFECTED_BROWSER_FILES].sort()],path);
+  return true;
+}
 function assertLaunchSwitchEndpoint(path) {
   if(path!=='nextjs/lib/activation-policy.ts') return false;
   const map=affectedMap([affectedRecord('M',[path])]);
@@ -8097,5 +8156,84 @@ test('affected conversion-public owner: seven exact paths and six direct suites,
   // Exact, not a prefix: a neighbour of an owned path stays unmapped and fails closed.
   for (const adjacent of ['nextjs/app/evidence/opengraph-image.tsx', 'nextjs/components/own-files-cta.module.css', 'nextjs/lib/plan-limit-fit.test.ts']) {
     assert.ok(!affectedMap([affectedRecord('M', [adjacent])]).groups.includes('conversion-public'), adjacent);
+  }
+});
+// sli-alert-noise-20261109: one finite owner, restated independently of the exported constants.
+import { SLI_ALERT_NOISE_AFFECTED_PATHS, SLI_ALERT_NOISE_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected sli-alert-noise-20261109 owner: 3 exact paths select 10 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/api/internal/sli/route.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe-store.ts'];
+  const suites = ['lib/api-error-codes.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-read-route.test.ts', 'lib/operational-sli.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe.test.ts'];
+  assert.deepEqual([[...SLI_ALERT_NOISE_AFFECTED_PATHS], [...SLI_ALERT_NOISE_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['sli-alert-noise-20261109'], path);
+  }
+  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['sli-alert-noise-20261109'], [], suites, [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  const plan = affectedAskPlan(map);
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
+  for (const adjacent of ['nextjs/app/api/internal/sli/page.tsx', 'nextjs/lib/synthetic-probe-store.tsx', 'lib/synthetic-probe-store.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
+import { ASK_ANSWERABILITY_E2_AFFECTED_PATHS, ASK_ANSWERABILITY_E2_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+// W2-E2 answerability gate (codex/w2-e2-20261108): ten exact paths, two direct suites, no browser suite; the Ask route keeps its owner.
+test('affected ask-answerability-e2 owner: 10 exact paths select 2 direct suites and no browser suite; neighbours stay unmapped', async () => {
+  const paths = ['eval/ask-quality/e2/PREREG-E2.json', 'eval/ask-quality/e2/README.md', 'eval/ask-quality/e2/e2.ts', 'eval/ask-quality/e2/metrics.test.ts', 'eval/ask-quality/e2/receipts/calibration-2026-11-08T082201899Z-99e9448d5587.json', 'eval/ask-quality/e2/receipts/holdout-2026-11-08T082317556Z-9dd7cb825748.json', 'eval/ask-quality/e2/run_e2.mjs', 'lib/answerability-shadow.ts', 'lib/answerability.test.ts', 'lib/answerability.ts'];
+  const suites = ['eval/ask-quality/e2/metrics.test.ts', 'lib/answerability.test.ts'];
+  assert.deepEqual([[...ASK_ANSWERABILITY_E2_AFFECTED_PATHS], [...ASK_ANSWERABILITY_E2_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['ask-answerability-e2'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['ask-answerability-e2'], [], suites, [], []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  const route = 'nextjs/app/api/collections/[id]/ask/route.ts';
+  assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(route)).map(o => o.group), ['w1-remote-mcp-a1-a5']);
+  assert.ok(affectedMap([affectedRecord('M', [route])]).unitFiles.includes('lib/answerability.test.ts'));
+  for (const adjacent of ['nextjs/eval/ask-quality/e2/receipts/holdout-2026-11-09T000000000Z-000000000000.json', 'nextjs/eval/ask-quality/e2/other.ts',
+    'nextjs/eval/ask-quality/cache/0000021344-0001628280-26-010047-ko-20251231.htm', 'nextjs/lib/answerability-on.ts', 'nextjs/lib/answerability.tsx', 'lib/answerability.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+  const { validateSelectedPath } = await import('./run-repair-check.mjs');
+  assert.equal(validateSelectedPath('eval/ask-quality/e2/metrics.test.ts', 'unit', process.cwd()), 'eval/ask-quality/e2/metrics.test.ts');
+  assert.throws(() => validateSelectedPath('eval/ask-quality/e2/other.test.ts', 'unit', process.cwd()), /Unsupported unit path/);
+});
+// Library organize B2 (codex/w2-b2-20261108): one finite owner, restated independently of the exported constants.
+import { LIBRARY_ORGANIZE_B2_AFFECTED_PATHS, LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected library-organize-b2 owner: 3 exact paths select 2 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['lib/library-methods.ts', 'lib/library-shadow.test.ts', 'lib/library-shadow.ts'];
+  const suites = ['lib/collection-compile-run.test.ts', 'lib/library-shadow.test.ts'];
+  assert.deepEqual([[...LIBRARY_ORGANIZE_B2_AFFECTED_PATHS], [...LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['library-organize-b2'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['library-organize-b2'], [], suites, [], []], path);
+  }
+  for (const adjacent of ['nextjs/lib/library-shadow.tsx', 'nextjs/lib/library-organize.ts', 'nextjs/lib/library-methods.test.ts', 'nextjs/lib/source-fingerprint.ts', 'nextjs/lib/topic-cluster.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});
+// W2-D intake stage 1 + table product-DPI harness (codex/w2-d-20261108): one finite owner, restated independently.
+import { W2_D_INTAKE_STAGE1_AFFECTED_PATHS, W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected w2-d-intake-stage1 owner: 3 exact paths select 2 direct suites and no browser suite; neighbours keep their owners', () => {
+  const paths = ['nextjs/lib/processing-ceiling-stage1.test.ts', 'quarantine-sidecar/cdr-cloudrun/table_dpi_arena.py', 'quarantine-sidecar/cdr-cloudrun/tests/test_table_dpi_arena.py'];
+  const suites = ['lib/intake-ceiling-cross-tree.test.ts', 'lib/processing-ceiling-stage1.test.ts'];
+  assert.deepEqual([[...W2_D_INTAKE_STAGE1_AFFECTED_PATHS], [...W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['w2-d-intake-stage1'], path);
+    const map = affectedMap([affectedRecord('M', [path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['w2-d-intake-stage1'], [], suites, [], []], path);
+  }
+  for (const [neighbour, group] of [['quarantine-sidecar/cdr-cloudrun/app.py', 'cdr-cloudrun-service'], ['shared/intakeCeiling.ts', 'table-read-intake-ceiling']]) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(neighbour)).map(o => o.group), [group], neighbour);
+  }
+  for (const adjacent of ['quarantine-sidecar/cdr-cloudrun/table_dpi_arena_v2.py', 'nextjs/lib/processing-ceiling-stage1.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
 });

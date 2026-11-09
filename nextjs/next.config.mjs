@@ -161,6 +161,18 @@ const nextConfig = {
   outputFileTracingIncludes: {
     "/*": ["./public/policy/*2026-09-30*"],
   },
+  /*
+    Founder decision 2026-11-09: global-only presentation. The service is presented in English and
+    a Korean reader uses the browser's own translation. Every /ko URL answers 308 with the English
+    equivalent, so a link published before this keeps working and a crawler drops the old URL.
+    The app/ko sources stay in the tree, unreachable, until a separate change deletes them.
+  */
+  async redirects() {
+    return [
+      { source: "/ko", destination: "/", permanent: true },
+      { source: "/ko/:path*", destination: "/:path*", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

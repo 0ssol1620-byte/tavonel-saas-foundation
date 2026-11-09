@@ -18,8 +18,8 @@ export const metadata: Metadata = {
   // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
   alternates: { canonical: "/developers" },
   openGraph: { url: "/developers" },
-  title: "Developers — TAVONEL",
-  description: "Compile knowledge once, then reach it live over MCP and the API, or take it away as a signed portable package.",
+  title: "Developers: MCP, API and portable packages — TAVONEL",
+  description: "Compile knowledge once, then reach it live over MCP and the API, or take it away as a signed portable package. The model stays replaceable.",
 };
 
 /*

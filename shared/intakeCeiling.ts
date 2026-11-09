@@ -35,26 +35,70 @@ const CDR_MAX_INPUT_BYTES = 5 * 1024 * 1024;
 /** Pages the Cloud Run rasterizer will render (`app.py` MAX_PAGES). */
 const CDR_MAX_PAGES = 80;
 
-export const PROCESSING_CEILING = {
-  /** No processor in the chain reads more than this, so nothing above it can ever be compiled. */
-  maxSourceBytes: Math.min(WORKER_MAX_SOURCE_BYTES, CDR_MAX_INPUT_BYTES),
-  /** Checked by the rasterizer after decoding; disclosed at intake, never enforced there. */
-  maxSourcePages: CDR_MAX_PAGES,
-} as const;
-
-export const PROCESSING_CEILING_MIB = PROCESSING_CEILING.maxSourceBytes / (1024 * 1024);
+/*
+  D1 stage 1 (PROGRAM-2026-11-04 §4.D, "단계 1: 25 MiB / 200쪽"). The same three copies for a
+  processor deployed with TAVONEL_INTAKE_CEILING_STAGE=1: worker `STAGE_1_MAX_SOURCE_BYTES`,
+  rasterizer `STAGE_1_MAX_INPUT_BYTES` / `STAGE_1_MAX_PAGES`. §4.D calls the numbers measurements,
+  not targets: they stay here, unused by intake, until the stage-1 gates have been measured.
+*/
+const WORKER_STAGE_1_MAX_SOURCE_BYTES = 25 * 1024 * 1024;
+const CDR_STAGE_1_MAX_INPUT_BYTES = 25 * 1024 * 1024;
+const CDR_STAGE_1_MAX_PAGES = 200;
 
 /**
- * The same two ceilings as manifest tokens, so `/sources` and a refusal cannot drift apart.
- *
- * `words()` in the capability table renders a token by replacing underscores with spaces, so
- * these read as sentences in the Known limitations column.
+ * The worker's stored `ocr.json` bound for an 80-page source (`src/ocr.ts` STAGE_0_OCR_BOUNDS
+ * persistedBytes), and the compile's read bound with it (#189). Every other stage's bound is this
+ * one per page times its page ceiling: derived, not measured.
  */
-export const PROCESSING_CEILING_LIMITATIONS = [
-  `at_most_${PROCESSING_CEILING_MIB}_mib_per_source`,
-  `at_most_${PROCESSING_CEILING.maxSourcePages}_pages_per_source`,
-] as const;
+const OCR_JSON_BYTES_FOR_80_PAGES = 24 * 1024 * 1024;
 
-/** One sentence a customer can act on. Used by the refusal copy and the typed 413. */
-export const PROCESSING_CEILING_SENTENCE =
-  `TAVONEL processes sources up to ${PROCESSING_CEILING_MIB} MB and ${PROCESSING_CEILING.maxSourcePages} pages.`;
+export const INTAKE_CEILING_STAGES = {
+  0: { maxSourceBytes: Math.min(WORKER_MAX_SOURCE_BYTES, CDR_MAX_INPUT_BYTES), maxSourcePages: CDR_MAX_PAGES },
+  1: { maxSourceBytes: Math.min(WORKER_STAGE_1_MAX_SOURCE_BYTES, CDR_STAGE_1_MAX_INPUT_BYTES), maxSourcePages: CDR_STAGE_1_MAX_PAGES },
+} as const;
+
+export type IntakeCeilingStage = keyof typeof INTAKE_CEILING_STAGES;
+
+/**
+ * The stage intake admits. A code constant, not an environment flag, so `/sources`, the pricing
+ * page and the refusal a customer reads are one build's numbers on server and client alike
+ * (§4.D: "한도는 flag가 아니라 코드 상수(측정값)다").
+ *
+ * Stays 0 until every stage-1 precondition holds (docs/runbooks/RELEASE_ORDER.md, "W2-D"): the
+ * §4.D gates measured, the rasterizer, reader and worker deployed with
+ * TAVONEL_INTAKE_CEILING_STAGE=1, and the admission CHECKs migrated. Raising it before the
+ * processors is the accepted-then-dropped failure this file exists to prevent.
+ */
+export const INTAKE_CEILING_STAGE: IntakeCeilingStage = 0;
+
+/** Everything a stage decides, under the names this module exports for the active stage. */
+export function intakeCeilingFor(stage: IntakeCeilingStage) {
+  const ceiling = INTAKE_CEILING_STAGES[stage];
+  const mib = ceiling.maxSourceBytes / (1024 * 1024);
+  return {
+    PROCESSING_CEILING: ceiling,
+    PROCESSING_CEILING_MIB: mib,
+    /*
+      The same two ceilings as manifest tokens, so `/sources` and a refusal cannot drift apart.
+      `words()` in the capability table renders a token by replacing underscores with spaces, so
+      these read as sentences in the Known limitations column.
+    */
+    PROCESSING_CEILING_LIMITATIONS: [
+      `at_most_${mib}_mib_per_source`,
+      `at_most_${ceiling.maxSourcePages}_pages_per_source`,
+    ] as const,
+    /** One sentence a customer can act on. Used by the refusal copy and the typed 413. */
+    PROCESSING_CEILING_SENTENCE:
+      `TAVONEL processes sources up to ${mib} MB and ${ceiling.maxSourcePages} pages.`,
+    /** The largest `ocr.json` the worker stores for this stage, and so the compile's read bound. */
+    OCR_JSON_MAX_BYTES: (OCR_JSON_BYTES_FOR_80_PAGES / 80) * ceiling.maxSourcePages,
+  };
+}
+
+const ACTIVE = intakeCeilingFor(INTAKE_CEILING_STAGE);
+
+export const PROCESSING_CEILING = ACTIVE.PROCESSING_CEILING;
+export const PROCESSING_CEILING_MIB = ACTIVE.PROCESSING_CEILING_MIB;
+export const PROCESSING_CEILING_LIMITATIONS = ACTIVE.PROCESSING_CEILING_LIMITATIONS;
+export const PROCESSING_CEILING_SENTENCE = ACTIVE.PROCESSING_CEILING_SENTENCE;
+export const OCR_JSON_MAX_BYTES = ACTIVE.OCR_JSON_MAX_BYTES;

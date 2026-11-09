@@ -387,7 +387,9 @@ describe("landing v2 -- the composition with the specimen strip rendered", () =>
     vi.stubEnv("VERCEL_ENV", "preview");
     const page = render(locale);
     const main = mainOf(page);
-    expect([...main.matchAll(/data-specimen-cell="([^"]+)"/g)].map(match => match[1])).toEqual(["nasa-sp-5079-p039", "nasa-sp-5079-p074", "naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+    // GX-02 (2026-11-09): the Korean document cell is not rendered on Home; its receipt stays committed.
+    expect([...main.matchAll(/data-specimen-cell="([^"]+)"/g)].map(match => match[1])).toEqual(["nasa-sp-5079-p039", "nasa-sp-5079-p074", "naca-rm-l50c03-p001"]);
+    expect(main).not.toContain("kma-2026-09-climate-p001");
     expect(undeclaredText(main)).not.toMatch(/\d/);
     const hero = sceneOf(main, "s1");
     for (const open of elements(main, "img")) {
@@ -399,7 +401,7 @@ describe("landing v2 -- the composition with the specimen strip rendered", () =>
     for (const absent of ["Landsat", "USGS", "NASA", "Cloud = No", "Collection 1"]) expect(readable(withoutSpecimens(main))).not.toContain(absent);
     // F-1: no FAQ on Home, so the strip's own licence line is each cell's full attribution (P2-32, D-06).
     expect(main).not.toContain("data-home-reader-guide");
-    expect(main.match(/data-specimen-licence=""/g)).toHaveLength(4);
+    expect(main.match(/data-specimen-licence=""/g)).toHaveLength(3);
     /*
       hard-proof 2026-10-27 (FINAL-SPEC-HARD-PROOF §2): the strip closes s2, after the workbench, so s1 is the same
       in both postures -- the film poster is the first screen's one priority image and is preloaded -- and nothing
@@ -409,7 +411,7 @@ describe("landing v2 -- the composition with the specimen strip rendered", () =>
     expect(poster).toHaveLength(1);
     expect([attr(poster[0]!, "loading"), attr(poster[0]!, "fetchpriority")]).toEqual(["eager", "high"]);
     // The whole render, not <main>: React writes a preload() hint ahead of the content (merge review A2).
-    const posterPreload = /<link[^>]*rel="preload"[^>]*poster-r2-c1/;
+    const posterPreload = /<link[^>]*rel="preload"[^>]*poster-r3-c1/;
     expect(page).toMatch(posterPreload);
     expect(elements(hero, "img").filter(open => attr(open, "fetchpriority") === "high")).toHaveLength(1);
     expect(hero).not.toContain("data-specimen-strip");
@@ -635,7 +637,7 @@ describe("landing v2 -- the composition", () => {
       expect(main).not.toContain("<canvas");
       expect(main).not.toContain("data-compiler-specimen");
       expect(elements(sceneOf(main, "s1"), "div").filter(open => attr(open, "role") === "tablist")).toHaveLength(1);
-      expect(sceneOf(main, "s1")).toContain('data-video-primary-src="/film/hero-r2-c1.mp4"');
+      expect(sceneOf(main, "s1")).toContain('data-video-primary-src="/film/hero-r3-c1.mp4"');
       expect(sceneOf(main, "s1")).not.toContain("data-source-inspection-film");
       const text = readable(main);
       for (const tab of buildProofTabs()) expect(text).not.toContain(tab.question);
@@ -850,13 +852,13 @@ describe("landing v2 -- the lead and the workbench", () => {
     expect(readable(hero)).toContain(
       locale === "ko" ? "각 진술에 원문 페이지와 영역이 남습니다." : "Each statement keeps its source page and region.",
     );
-    expect(hero).toContain("/film/poster-r2-c1-t13.60-2x.webp");
-    expect(hero).toContain("/film/poster-r2-c1-t13.60-2x.avif");
+    expect(hero).toContain("/film/poster-r3-c1-t10.40-2x.webp");
+    expect(hero).toContain("/film/poster-r3-c1-t10.40-2x.avif");
     expect(elements(hero, "button").filter(open => attr(open, "role") === "tab")).toHaveLength(4);
-    // Founder ask 2026-10-27: the film opens compact (the whole frame) at every width; the pane still waits for Focus details.
+    // Founder ask 2026-10-27, kept for R3 (2026-11-09): the film opens compact (the whole frame) at every width; the pane still waits for Focus details.
     expect(hero).toContain('data-mobile-view="fit"');
     expect(hero).toContain('data-wide-view="fit"');
-    expect(hero).not.toContain("/film/poster-r2-c1-t13.60-pane1-684x855.avif");
+    expect(hero).not.toContain("/film/poster-r3-c1-t10.40-pane1-848x1060.avif");
     expect(hero).not.toContain('data-source-inspection-film');
     // The not-customer-results disclosure stays (FINAL-SPEC D-9 shortens its wording only).
     expect(readable(hero)).toContain(locale === "ko" ? "고객 결과가 아닙니다" : "not customer results");
@@ -1040,7 +1042,9 @@ describe("current-main bounded evaluation entry", () => {
     const requiredControls = (html.match(/<(?:input|select|textarea)\b[^>]*>/g) ?? [])
       .filter(tag => /\srequired(?:=""|(?=\s|>))/.test(tag));
     expect(requiredControls).toHaveLength(3);
-    expect(html).toContain(`href="${locale === "ko" ? "/evaluation" : "/ko/evaluation"}"`);
+    // GX-02 (2026-11-09): no language switch in the footer, in either rendering.
+    expect(html).not.toContain('href="/ko/evaluation"');
+    expect(html).not.toMatch(/hreflang="(ko|en)"[^>]*>(한국어|English)</i);
   });
 
   it("an English inquiry retains the processing and payment boundary", () => {

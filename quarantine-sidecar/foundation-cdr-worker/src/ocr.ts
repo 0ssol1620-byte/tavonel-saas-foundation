@@ -1,5 +1,5 @@
 import { cdrRequestSignature, hmacSecretIsConfigured, sha256DigestHeader } from "./hmac";
-import { ocrPageRangeSiblingKey, ocrProgressSiblingKey, ocrSiblingKey } from "./keys";
+import { intakeCeilingStage, ocrPageRangeSiblingKey, ocrProgressSiblingKey, ocrSiblingKey } from "./keys";
 import { RetryableError } from "./errors";
 import { parseReaderBinding, readerBindingSha256 } from "../../../shared/completedReadReceipt";
 
@@ -115,22 +115,42 @@ export type OcrDispatchEnv = {
    * seconds-per-page figure, and `wrangler.jsonc` says which measurement chose its value.
    */
   FOUNDATION_OCR_PAGE_RANGE_SIZE?: string;
+  /** D1 intake ceiling stage, "0" (unset) or "1": selects the OCR result bounds below. */
+  TAVONEL_INTAKE_CEILING_STAGE?: string;
 };
 
 /** Must stay retryable even after the queue's cold-start retry budget. */
 export class OcrEvidenceRetryableError extends RetryableError {}
-const MAX_PERSISTED_OCR_BYTES = 24 * 1024 * 1024;
+export type OcrBounds = { pages: number; textChars: number; regions: number; persistedBytes: number };
+/*
+  The bounds one OCR result is held to, per intake ceiling stage (shared/intakeCeiling.ts). Stage 0
+  is sized for an 80-page source. Stage 1 (PROGRAM-2026-11-04 §4.D, 200 pages) is the same bounds
+  per page times 200: derived, not measured. The stored ocr.json bound is also the compile's read
+  bound (nextjs/lib/r2-objects.ts MAX_DERIVED_JSON_BYTES, #189); intake-ceiling-cross-tree.test.ts
+  pins both rows against it.
+*/
+const STAGE_0_OCR_BOUNDS: OcrBounds = { pages: 80, textChars: 4_000_000, regions: 50_000, persistedBytes: 24 * 1024 * 1024 };
+const STAGE_1_OCR_BOUNDS: OcrBounds = { pages: 200, textChars: 10_000_000, regions: 125_000, persistedBytes: 60 * 1024 * 1024 };
+const MAX_PERSISTED_OCR_BYTES = STAGE_0_OCR_BOUNDS.persistedBytes;
+
+/** A stage this worker cannot name refuses the read (retryable): a guessed bound is a hidden limit. */
+export function ocrBounds(env: Pick<OcrDispatchEnv, "TAVONEL_INTAKE_CEILING_STAGE">): OcrBounds {
+  const stage = intakeCeilingStage(env);
+  if (!stage) throw new OcrEvidenceRetryableError("TAVONEL_INTAKE_CEILING_STAGE must be 0 or 1");
+  return stage === "1" ? STAGE_1_OCR_BOUNDS : STAGE_0_OCR_BOUNDS;
+}
 
 async function inspectPersistedOcr(
   env: OcrDispatchEnv, immutablePdfKey: string, inputSha256: string, status: "exists" | "written",
 ): Promise<OcrDispatchResult> {
   const key = ocrSiblingKey(immutablePdfKey);
+  const bounds = ocrBounds(env);
   let object: Awaited<ReturnType<OcrR2Bucket["get"]>>;
   let bytes: ArrayBuffer;
   try {
     object = await env.FOUNDATION_QUARANTINE.get(key);
     if (!object) throw new Error("missing");
-    if (object.size !== undefined && (object.size < 1 || object.size > MAX_PERSISTED_OCR_BYTES)) {
+    if (object.size !== undefined && (object.size < 1 || object.size > bounds.persistedBytes)) {
       return { status: "failed", key, inputSha256, reasonCode: "OCR_PERSISTED_RESULT_INVALID", computeCredits: 2 };
     }
     bytes = await object.arrayBuffer();
@@ -138,10 +158,10 @@ async function inspectPersistedOcr(
     throw new OcrEvidenceRetryableError("persisted OCR cannot be read; retry required");
   }
   try {
-    if (bytes.byteLength < 1 || bytes.byteLength > MAX_PERSISTED_OCR_BYTES
+    if (bytes.byteLength < 1 || bytes.byteLength > bounds.persistedBytes
       || (object.size !== undefined && bytes.byteLength !== object.size)) throw new Error("size");
     const payload = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
-    const result = qualifyOcrResult(payload, inputSha256, "persisted");
+    const result = qualifyOcrResult(payload, inputSha256, "persisted", bounds);
     if (!result || payload.sourceImmutableKey !== immutablePdfKey) throw new Error("contract");
     if (env.FOUNDATION_OCR_CONFLICT_V3_REQUIRED === "true" && result.schemaVersion !== OCR_RESULT_SCHEMA_V3) {
       throw new OcrEvidenceRetryableError("persisted v2 OCR lacks required v3 conflict evidence");
@@ -272,6 +292,7 @@ export function qualifyProgressPage(line: unknown): OcrProgressPage | null {
 export async function readOcrStream(
   body: ReadableStream<Uint8Array>,
   onPage: (page: OcrProgressPage) => Promise<void> | void,
+  maxBytes = MAX_PERSISTED_OCR_BYTES,
 ): Promise<unknown> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -302,7 +323,7 @@ export async function readOcrStream(
     const { done, value } = await reader.read();
     if (done) break;
     receivedBytes += value.byteLength;
-    if (receivedBytes > MAX_PERSISTED_OCR_BYTES) {
+    if (receivedBytes > maxBytes) {
       await reader.cancel();
       throw new Error("OCR stream exceeds the result bound");
     }
@@ -319,7 +340,7 @@ export async function readOcrStream(
   return last;
 }
 
-async function readBoundedOcrJson(response: Response): Promise<unknown> {
+async function readBoundedOcrJson(response: Response, maxBytes = MAX_PERSISTED_OCR_BYTES): Promise<unknown> {
   if (!response.body) throw new Error("missing OCR body");
   const reader = response.body.getReader();
   const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -329,7 +350,7 @@ async function readBoundedOcrJson(response: Response): Promise<unknown> {
     const { done, value } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > MAX_PERSISTED_OCR_BYTES) { await reader.cancel(); throw new Error("OCR response exceeds the result bound"); }
+    if (size > maxBytes) { await reader.cancel(); throw new Error("OCR response exceeds the result bound"); }
     text += decoder.decode(value, { stream: true });
   }
   return JSON.parse(text + decoder.decode());
@@ -391,6 +412,7 @@ function polygonBoxIoU(left: number[][], right: number[][]): number {
 
 export function qualifyOcrResult(
   payload: unknown, expectedInputSha256: string, location: "response" | "persisted" = "response",
+  bounds: OcrBounds = STAGE_0_OCR_BOUNDS,
 ): QualifiedOcrResult | null {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
   const result = payload as Partial<QualifiedOcrResult>;
@@ -405,15 +427,15 @@ export function qualifyOcrResult(
     result.status !== "ok" ||
     typeof result.text !== "string" ||
     result.text.length < 1 ||
-    result.text.length > 4_000_000 ||
+    result.text.length > bounds.textChars ||
     !Number.isInteger(result.pageCount) ||
     Number(result.pageCount) < 1 ||
-    Number(result.pageCount) > 80 ||
+    Number(result.pageCount) > bounds.pages ||
     result.inputSha256 !== expectedInputSha256 ||
     !SHA256_PATTERN.test(result.inputSha256) ||
     !Array.isArray(result.regions) ||
     result.regions.length < 1 ||
-    result.regions.length > 50_000
+    result.regions.length > bounds.regions
   ) return null;
   if (v3 && (!Number.isInteger(result.recognitionConflictCount) ||
     Number(result.recognitionConflictCount) < 0 || Number(result.recognitionConflictCount) > 128)) return null;
@@ -562,6 +584,7 @@ export async function dispatchOcrAfterSanitize(
     return { status: "skipped", reason: "OCR URL is not a Foundation target", computeCredits: 0 };
   }
   const rangeSize = ocrPageRangeSize(env);
+  const bounds = ocrBounds(env);
 
   const ocrKey = ocrSiblingKey(immutablePdfKey);
   let existingOcr: Awaited<ReturnType<OcrR2Bucket["get"]>>;
@@ -656,7 +679,7 @@ export async function dispatchOcrAfterSanitize(
         progress.regionsFound += page.regionCount;
         progress.pages = [...progress.pages, page].slice(-PROGRESS_PAGE_WINDOW);
         await writeProgress();
-      });
+      }, bounds.persistedBytes);
     } catch {
       return { status: "failed", key: ocrKey, reasonCode: "OCR_TIMEOUT_OR_NETWORK", reason: "OCR stream ended before a result", requestId, inputSha256, computeCredits: 0 };
     }
@@ -664,19 +687,19 @@ export async function dispatchOcrAfterSanitize(
     await writeProgress();
   } else {
     try {
-      payload = await readBoundedOcrJson(response);
+      payload = await readBoundedOcrJson(response, bounds.persistedBytes);
     } catch {
       return { status: "failed", key: ocrKey, reasonCode: "OCR_RESPONSE_NOT_JSON", reason: "OCR response is not JSON", requestId, inputSha256, computeCredits: 2 };
     }
   }
-  const qualified = qualifyOcrResult(payload, inputSha256);
+  const qualified = qualifyOcrResult(payload, inputSha256, "response", bounds);
   if (!qualified) {
     return { status: "failed", key: ocrKey, reasonCode: "OCR_RESPONSE_INVALID", reason: "OCR response contract is invalid", requestId, inputSha256, computeCredits: 2 };
   }
   await assertReaderAnswer(env, payload, qualified.schemaVersion, binding);
 
   const persistedBytes = await persistedOcrBody(qualified, immutablePdfKey, binding);
-  if (persistedBytes.byteLength > MAX_PERSISTED_OCR_BYTES) {
+  if (persistedBytes.byteLength > bounds.persistedBytes) {
     return { status: "failed", key: ocrKey, reasonCode: "OCR_RESPONSE_INVALID", computeCredits: 2 };
   }
   return putOcrJsonCreateOnce(env, ocrKey, persistedBytes, { requestId, inputSha256 },
@@ -1145,11 +1168,12 @@ async function readAndAssembleRanges(run: RangeRun, ranges: StoredPageRange[]): 
   // checked range by range, so the page count is the only bound range mode does not share.
   const onePage = { ...assembled, pageCount: 1, regions: regions.map((region) => ({ ...region, pageIndex0: 0, pageNumber1: 1,
     ...(region.recognitionConflict ? { recognitionConflict: { ...region.recognitionConflict, pageIndex0: 0 } } : {}) })) };
-  if (!qualifyOcrResult(onePage, run.inputSha256)) {
+  const bounds = ocrBounds(run.env);
+  if (!qualifyOcrResult(onePage, run.inputSha256, "response", bounds)) {
     return rangeFailure(run, "OCR_RESPONSE_INVALID", "assembled OCR exceeds the whole-document bounds", 2);
   }
   const persistedBytes = await persistedOcrBody(assembled, run.immutablePdfKey, run.binding);
-  if (persistedBytes.byteLength > MAX_PERSISTED_OCR_BYTES) {
+  if (persistedBytes.byteLength > bounds.persistedBytes) {
     return rangeFailure(run, "OCR_RESPONSE_INVALID", "assembled OCR exceeds the stored result bound", 2);
   }
   const inspect = (status: "exists" | "written") => inspectAssembledOcr(run, persistedBytes, pageCount, status);

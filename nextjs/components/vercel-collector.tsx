@@ -4,7 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { track } from "@vercel/analytics";
 import { Analytics } from "@vercel/analytics/next";
 import { allowedDetail, type FunnelDetail } from "@/lib/funnel-events";
-import { marketingEventPayload, vercelBeforeSend } from "@/lib/marketing-analytics";
+import { marketingEventPayload, readConsent, vercelBeforeSend } from "@/lib/marketing-analytics";
 
 /*
   P2-07 (ANALYTICS-ACTIVATION-2026-10-17 §4.4 G1-G2, §5 steps 1-2): the Vercel collector, on the
@@ -27,11 +27,24 @@ import { marketingEventPayload, vercelBeforeSend } from "@/lib/marketing-analyti
   Its own file so that it can be loaded lazily (see `MarketingConsent`), and so that the condition
   is the rendered thing a test can count. The condition is repeated here on purpose: this file is
   what renders the SDK's collector component, and it does not rely on its caller for the gate.
+
+  GX-03 (founder, 2026-11-09, `docs/policy/DECISION_LOG_2026-11-09.md`): page views are cookieless
+  and are counted before a choice, so the collector renders on `consent !== false`. A refusal stops
+  it: the component unmounts, and `collectorBeforeSend` reads the stored answer before every send,
+  so a queue that outlives the component sends nothing after a refusal. Interaction events are
+  unchanged and still need a stored yes (`relayToVercel` below). No cookie and no storage are added.
 */
 export default function VercelCollector({ ready, consent, location }: { ready: boolean; consent: boolean | null; location: string | null }): ReactNode {
   useEffect(() => relayToVercel({ ready, consent, location }, window, () => window.location.pathname), [consent, location, ready]);
-  return <>{process.env.NEXT_PUBLIC_TAVONEL_ANALYTICS_ENABLED === "1" && ready && consent === true && location
-    ? <Analytics beforeSend={vercelBeforeSend} /> : null}</>;
+  return <>{process.env.NEXT_PUBLIC_TAVONEL_ANALYTICS_ENABLED === "1" && ready && consent !== false && location
+    ? <Analytics beforeSend={collectorBeforeSend} /> : null}</>;
+}
+
+/** The path gate, after the refusal check. Storage that cannot be read is not a refusal. */
+export function collectorBeforeSend<E extends { url: string }>(event: E, storage?: () => Pick<Storage, "getItem">): E | null {
+  let refused = false;
+  try { refused = readConsent((storage ?? (() => window.localStorage))()) === false; } catch { /* unreadable: the component gate decides */ }
+  return refused ? null : vercelBeforeSend(event);
 }
 
 /*

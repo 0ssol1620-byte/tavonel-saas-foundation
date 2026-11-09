@@ -1,0 +1,98 @@
+{
+  "schema": "tavonel.guide-terminal-capture.v1",
+  "session": "api",
+  "capturedAt": "2026-11-09T06:09:06.025Z",
+  "shell": "C:/Program Files/Git/bin/bash.exe -c <command>",
+  "node": "v22.14.0",
+  "environment": "fresh empty working directory; every TAVONEL_* variable removed; no API key",
+  "steps": [
+    {
+      "command": "curl -sS -D headers.txt -o sample-world.json https://tavonel.com/reproducibility/sample-world",
+      "startedAt": "2026-11-09T06:09:06.025Z",
+      "ms": 394,
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "grep -i '^content-digest' headers.txt",
+      "startedAt": "2026-11-09T06:09:06.421Z",
+      "ms": 44,
+      "exitCode": 0,
+      "stdout": "Content-Digest: sha-256=:xQPgXUPc+3FCjoIPX+P+wo1iFOvzf38tmVSFXiSjfak=:\n",
+      "stderr": ""
+    },
+    {
+      "command": "printf 'sha-256=:%s:\\n' \"$(openssl dgst -sha256 -binary sample-world.json | base64 -w0)\"",
+      "startedAt": "2026-11-09T06:09:06.465Z",
+      "ms": 213,
+      "exitCode": 0,
+      "stdout": "sha-256=:xQPgXUPc+3FCjoIPX+P+wo1iFOvzf38tmVSFXiSjfak=:\n",
+      "stderr": ""
+    },
+    {
+      "command": "test \"$(grep -i '^content-digest' headers.txt | tr -d '\\r' | cut -d' ' -f2)\" = \"sha-256=:$(openssl dgst -sha256 -binary sample-world.json | base64 -w0):\" && echo \"match: Content-Digest = sha-256 of the bytes received\"",
+      "startedAt": "2026-11-09T06:09:06.678Z",
+      "ms": 138,
+      "exitCode": 0,
+      "stdout": "match: Content-Digest = sha-256 of the bytes received\n",
+      "stderr": ""
+    },
+    {
+      "command": "curl -fsS https://tavonel.com/developer/channel.json -o channel.json",
+      "startedAt": "2026-11-09T06:09:06.816Z",
+      "ms": 243,
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "curl -fsSO https://tavonel.com/developer/tavonel-public-sample.py",
+      "startedAt": "2026-11-09T06:09:07.060Z",
+      "ms": 535,
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "test \"sha256:$(sha256sum tavonel-public-sample.py | cut -d' ' -f1)\" = \"$(node -p \"require('./channel.json').assets.recipePublicSample.sha256\")\" && echo \"match: tavonel-public-sample.py = channel.json assets.recipePublicSample.sha256\"",
+      "startedAt": "2026-11-09T06:09:07.595Z",
+      "ms": 145,
+      "exitCode": 0,
+      "stdout": "match: tavonel-public-sample.py = channel.json assets.recipePublicSample.sha256\n",
+      "stderr": ""
+    },
+    {
+      "command": "py -3.13 -I tavonel-public-sample.py",
+      "startedAt": "2026-11-09T06:09:07.740Z",
+      "ms": 441,
+      "exitCode": 0,
+      "stdout": "sample: 3 objects, 2 evidence records, 1584 bytes\r\ndigest: sha-256=:xQPgXUPc+3FCjoIPX+P+wo1iFOvzf38tmVSFXiSjfak=:\r\n  ev-01 -> src_v_01 page 4 bbox [118, 214, 886, 374]\r\n  ev-02 -> src_v_01 page 4 bbox [118, 214, 886, 374]\r\ndisclosure: deterministic_product_sample_not_customer_proof\r\nPUBLIC SAMPLE OK\r\n",
+      "stderr": ""
+    },
+    {
+      "command": "curl -fsSO https://tavonel.com/developer/tavonel-cli.mjs",
+      "startedAt": "2026-11-09T06:09:08.182Z",
+      "ms": 527,
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "test \"sha256:$(sha256sum tavonel-cli.mjs | cut -d' ' -f1)\" = \"$(node -p \"require('./channel.json').assets.cli.sha256\")\" && echo \"match: tavonel-cli.mjs = channel.json assets.cli.sha256\"",
+      "startedAt": "2026-11-09T06:09:08.709Z",
+      "ms": 142,
+      "exitCode": 0,
+      "stdout": "match: tavonel-cli.mjs = channel.json assets.cli.sha256\n",
+      "stderr": ""
+    },
+    {
+      "command": "node tavonel-cli.mjs status",
+      "startedAt": "2026-11-09T06:09:08.852Z",
+      "ms": 280,
+      "exitCode": 0,
+      "stdout": "{\n  \"schemaVersion\": \"tavonel.public_status.v2\",\n  \"service\": {\n    \"name\": \"TAVONEL\",\n    \"state\": \"not_assessed\",\n    \"commercialMode\": \"live\"\n  },\n  \"availableActions\": {\n    \"readPublicWorld\": {\n      \"enabled\": true,\n      \"href\": \"/explore\",\n      \"reason\": \"A completed public Compiled World is open to inspect.\"\n    },\n    \"requestPilot\": {\n      \"enabled\": true,\n      \"href\": \"/contact\",\n      \"reason\": \"Customer document processing is arranged as a scoped pilot.\"\n    },\n    \"signIn\": {\n      \"enabled\": true,\n      \"href\": \"/login\",\n      \"reason\": \"Sign-in is available.\"\n    },\n    \"createAccount\": {\n      \"enabled\": true,\n      \"href\": \"/login\",\n      \"reason\": \"Create an account to inspect the public World. Customer-file processing requires separate approval.\"\n    },\n    \"purchasePlan\": {\n      \"enabled\": false,\n      \"href\": \"/contact\",\n      \"reason\": \"Purchasing does not enable customer document processing today.\"\n    },\n    \"compileCustomerDocuments\": {\n      \"enabled\": false,\n      \"href\": \"/contact\",\n      \"reason\": \"A finished Compiled World is open to read in full today, with its evidence attached. Compiling your own sources is set up with us rather than enabled by a plan purchase.\"\n    }\n  },\n  \"checkedAt\": \"2026-11-09T06:09:09.060Z\",\n  \"evidenceFreshness\": {\n    \"basis\": \"configuration_snapshot\",\n    \"operationalProbe\": \"not_included\"\n  }\n}\n",
+      "stderr": ""
+    }
+  ]
+}
