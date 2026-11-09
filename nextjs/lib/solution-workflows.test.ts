@@ -5,7 +5,9 @@ import ExplorePage from "../app/explore/page";
 import SolutionsPage from "../app/solutions/page";
 import SolutionPage, { SOLUTIONS } from "../app/solutions/[slug]/page";
 import SolutionWorkflowProof, { solutionWorkflowEvidence } from "../app/solutions/solution-workflow-proof";
+import { readFileSync } from "node:fs";
 import { exploreSampleArtifact, exploreSampleAnswers, exploreSampleDocuments, exploreSampleWorld } from "./explore-sample";
+import { SOLUTION_PROOF_PICKS } from "./solution-proof-picks";
 import {
   REGION_BOUND,
   RELATION_BOUND,
@@ -172,6 +174,21 @@ describe("Solutions task choices and workflow evidence", () => {
     expect(html).toContain("single-member workspace");
     expect(html).toContain("shared roles, invitations and organization administration are not available");
     expect(html).not.toContain("we provision the tenant and the roles with you");
+  });
+
+  /*
+    2026-11-09: /explore reads the picks from `lib/solution-proof-picks`, never from a Solutions page
+    module, because importing one ships that page's stylesheets render-blocking on /explore (its
+    Lighthouse LCP crossed 3,000 ms on a tenth stylesheet). The page renders the same pick objects.
+  */
+  it("gives /explore the pages' own picks without importing a Solutions module", () => {
+    expect(Object.keys(SOLUTION_PROOF_PICKS).sort()).toEqual(entries.map(([slug]) => slug).sort());
+    for (const [slug, solution] of entries) expect(solution.proof, slug).toBe(SOLUTION_PROOF_PICKS[slug]);
+    const explore = readFileSync(new URL("../app/explore/page.tsx", import.meta.url), "utf8");
+    expect(explore).not.toContain('from "@/app/solutions/');
+    expect(explore).toContain('from "@/lib/solution-proof-picks"');
+    const picks = readFileSync(new URL("./solution-proof-picks.ts", import.meta.url), "utf8");
+    expect(picks).not.toMatch(/\.css"|from "@\/components\//);
   });
 
   it("fails visibly when a selected source passage is absent", () => {
