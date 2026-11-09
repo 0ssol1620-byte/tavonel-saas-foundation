@@ -37,6 +37,14 @@ import HeroFilmDisclosure from "./hero-film-disclosure";
 /** The four re-recorded cuts, in stage order (stage 1 also has the decoder-error fallbacks in HERO_CUT). */
 export const HOME_FILM_CUTS = ["/film/hero-r3-c1.mp4", "/film/hero-r3-c2.mp4", "/film/hero-r3-c3.mp4", "/film/hero-r3-c4.mp4"] as const;
 
+/*
+  R3 (D1): the masters are H.264 High 4:4:4 (yuv444p), which Chromium decodes and WebKit -- every browser on an iPhone --
+  does not reliably (Windows WebKit hangs on it; Apple's decoders take 4:2:0). Each cut therefore has a 2880px yuv420p
+  twin (`-hq`): a phone (below 900px, `phoneSrc`) plays it first, and any decoder error elsewhere falls back to it, so
+  stages 2-4 no longer stop on an error where stage 1 used to recover. Luma stays 2880px, so the pane's type is as sharp.
+*/
+const HOME_FILM_PHONE_CUTS = ["/film/hero-r3-c1-hq.mp4", "/film/hero-r3-c2-hq.mp4", "/film/hero-r3-c3-hq.mp4", "/film/hero-r3-c4-hq.mp4"] as const;
+
 const HERO_CUT = {
   src: "/film/hero-r3-c1.mp4",
   fallbackSrc: "/film/hero-r3-c1-hq.mp4",
@@ -106,6 +114,8 @@ function heroStages(korean: boolean): CompileStage[] {
     ...stage,
     ...HOME_POSTERS[index],
     src: HOME_FILM_CUTS[index]!,
+    phoneSrc: HOME_FILM_PHONE_CUTS[index]!,
+    fallbackSrc: HOME_FILM_PHONE_CUTS[index]!,
     ...(index === 0 ? HERO_CUT : {}),
     ...(korean ? LANDING_V2_FILM_STAGES_KO[index] : {}),
     label: HOME_STAGE_LABELS[korean ? "ko" : "en"][index]!,

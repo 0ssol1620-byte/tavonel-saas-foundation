@@ -80,6 +80,21 @@
       "file": "hero-r3-c1-hq-1440.mp4",
       "bytes": 418623,
       "sha256": "9ba7604f0ba3c9d6564602ceaa59bc2c0c517a5a7a4154d2d424a0ec3e8ce627"
+    },
+    {
+      "file": "hero-r3-c2-hq.mp4",
+      "bytes": 694303,
+      "sha256": "00fe1e24e7d1c19e3e8914205f589ee7b0a14cc4652cb6bca2d4dfe8e644f7e8"
+    },
+    {
+      "file": "hero-r3-c3-hq.mp4",
+      "bytes": 3148714,
+      "sha256": "2f3e6b0803d918f12f20ffb59be2d20b67b1f1fd56ca5850d144cba706560ced"
+    },
+    {
+      "file": "hero-r3-c4-hq.mp4",
+      "bytes": 3168509,
+      "sha256": "dec454276dd0a1dec66585bd0e485aee816de9eaa6497467e7bf9b1a66bddcf0"
     }
   ],
   "posters": [

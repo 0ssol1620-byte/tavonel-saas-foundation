@@ -45,7 +45,8 @@ test.describe("phone four-stage film", () => {
     await film.getByRole("button", { name: "Play the compilation film", exact: true }).click();
     const video = film.locator("video");
     await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.currentTime)).toBeGreaterThan(1);
-    expect(await video.evaluate((node: HTMLVideoElement) => node.currentSrc)).toContain("/film/hero-r3-c1.mp4");
+    // R3 (D1): a phone plays the yuv420p twin first (phoneSrc), which every engine decodes.
+    expect(await video.evaluate((node: HTMLVideoElement) => node.currentSrc)).toContain("/film/hero-r3-c1-hq.mp4");
     await expect(film.locator("figcaption")).toHaveText("Illustrative demo · not customer results.");
     const focus = film.getByRole("button", { name: "Focus details", exact: true });
     const toggle = (await focus.boundingBox())!;
@@ -89,7 +90,7 @@ test.describe("phone four-stage film", () => {
     // Home prints no caption row (FINAL-SPEC D-7), so the film says it failed in its own status line, never silently.
     await expect(film.locator('.compile-film-inline-error[role="status"]')).toContainText("This browser could not play the film");
     await expect(film.locator("img")).toBeVisible();
-    expect(failed.some(url => url.endsWith("/film/hero-r3-c1.mp4"))).toBe(true);
+    expect(failed.some(url => url.endsWith("/film/hero-r3-c1-hq.mp4"))).toBe(true);
     expect(failed.some(url => url.endsWith("/film/hero-r3-c1-hq-1440.mp4"))).toBe(true);
     await expect(film.getByRole("tab")).toHaveCount(4);
   });

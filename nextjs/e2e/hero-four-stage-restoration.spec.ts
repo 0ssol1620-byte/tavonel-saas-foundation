@@ -44,7 +44,8 @@ test("the title leads directly into four selectable and playing demo recordings"
   for (let index = 0; index < FILMS.length; index++) {
     await tabs.nth(index).click();
     await expect(tabs.nth(index)).toHaveAttribute("aria-selected", "true");
-    await expect(sequence).toHaveAttribute("data-video-primary-src", FILMS[index]);
+    // R3 (D1): below 900px each stage plays its yuv420p twin first (phoneSrc), which every engine decodes.
+    await expect(sequence).toHaveAttribute("data-video-primary-src", page.viewportSize()!.width < 900 ? FILMS[index]!.replace(".mp4", "-hq.mp4") : FILMS[index]!);
     const video = sequence.locator("video");
     await expect(video).toHaveCount(1);
     await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(1);

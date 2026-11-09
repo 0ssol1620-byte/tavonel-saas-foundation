@@ -149,7 +149,7 @@ Reading targets, crop windows, phone rects and both blank scans for these cuts a
 
 ## Home film — recording R3 (2026-11-09)
 
-LANDING-VIDEO-HISTORY-20261109, option (d). Same pipeline as R2 (`scripts/film/`), with a camera: the page renders at a 1920×1200 CSS viewport (1400×900 for the two workspace stages) at deviceScaleFactor 8/3, and each frame is a 1080×675 CSS clip (2880×1800 px) framed on the step's action and its result. So 12px product type is 32 source px — about 13.8px in the 1440 desktop film, and ≥ 12px in a phone's 848×1060 pane on any panel ≥ 318 CSS px (Windows WebKit's 360px panel is 318). The /explore header and its second H1 are hidden inside the recording only (`stage.hide` in `stages.mjs`). One action and one result per step; stage 2 is the compile itself. Edge-band scan: 0 of 1,800 frames. Encoders, crf, profiles and poster settings are R2's. The R2 files stay byte-identical and locked, so this can be rolled back by reverting the references.
+LANDING-VIDEO-HISTORY-20261109, option (d). Same pipeline as R2 (`scripts/film/`), with a camera: the page renders at a 1920×1200 CSS viewport (1400×900 for the two workspace stages) at deviceScaleFactor 8/3, and each frame is a 1080×675 CSS clip (2880×1800 px) framed on the step's action and its result. So 12px product type is 32 source px — about 13.8px in the 1440 desktop film, and ≥ 12px in a phone's 848×1060 pane on any panel ≥ 318 CSS px (Windows WebKit's 360px panel is 318). The /explore header and its second H1 are hidden inside the recording only (`stage.hide` in `stages.mjs`). One action and one result per step; stage 2 is the compile itself. Edge-band scan: 0 of 1,800 frames. Encoders, crf, profiles and poster settings are R2's. Every cut also has a 2880×1800 yuv420p twin (`-hq`, `scripts/film/encode-fallback.sh`, crf 20): a phone plays it first (`phoneSrc`) and any decoder error falls back to it, because WebKit does not reliably decode the High 4:4:4 masters. The R2 files stay byte-identical and locked, so this can be rolled back by reverting the references.
 
 | File | Shows | Bytes | sha256 |
 |---|---|---|---|
@@ -157,8 +157,11 @@ LANDING-VIDEO-HISTORY-20261109, option (d). Same pipeline as R2 (`scripts/film/`
 | `hero-r3-c2.mp4` | 2 · Compile — /workspace/sources: the five ready sources are compiled; the run checks the selection, reads 0→5 of 5, structures what was read and stops: "A review package is ready for a person to inspect." | 782,407 | `968e8e7cae45930291c8194e648f7cdd66c8695170af7d8fd31749c1df714d15` |
 | `hero-r3-c3.mp4` | 3 · Update — /explore?act=change: the 2025 10-K, the 2026 filings that arrived, then the World after them with Greater China selected (relation lines behind the node boxes, see world-visual.module.css) | 2,991,082 | `3042bf4e70f6212a49335d3b2fe3e19d6c1ce0ff9ee868340633e3597b109a24` |
 | `hero-r3-c4.mp4` | 4 · Trace — /explore: a prepared question, its retrieved passage, the page region it came from, then the next source page of the answer | 2,553,208 | `9b8a7353a96ab0d1778827f0a5ddf67dbf9d3c307c8f4d2e3d289df38de49a0c` |
-| `hero-r3-c1-hq.mp4` | stage 1 decoder-error fallback (yuv420p, 2880x1800) | 1,010,629 | `0e296c6036f19a3fc7c4866e131dfd3f30d90e36077fde9b61cc700603ab20e9` |
+| `hero-r3-c1-hq.mp4` | stage 1 phone cut and decoder-error fallback (yuv420p, 2880x1800) | 1,010,629 | `0e296c6036f19a3fc7c4866e131dfd3f30d90e36077fde9b61cc700603ab20e9` |
 | `hero-r3-c1-hq-1440.mp4` | stage 1 narrow decoder-error fallback (yuv420p, 1440x900) | 418,623 | `9ba7604f0ba3c9d6564602ceaa59bc2c0c517a5a7a4154d2d424a0ec3e8ce627` |
+| `hero-r3-c2-hq.mp4` | stage 2 phone cut and decoder-error fallback (yuv420p, 2880x1800) | 694,303 | `00fe1e24e7d1c19e3e8914205f589ee7b0a14cc4652cb6bca2d4dfe8e644f7e8` |
+| `hero-r3-c3-hq.mp4` | stage 3 phone cut and decoder-error fallback (yuv420p, 2880x1800) | 3,148,714 | `2f3e6b0803d918f12f20ffb59be2d20b67b1f1fd56ca5850d144cba706560ced` |
+| `hero-r3-c4-hq.mp4` | stage 4 phone cut and decoder-error fallback (yuv420p, 2880x1800) | 3,168,509 | `dec454276dd0a1dec66585bd0e485aee816de9eaa6497467e7bf9b1a66bddcf0` |
 
 Posters: each is a step's result frame (stage 1 at 10.40 s, stages 2 and 3 at 17.96 s, stage 4 at 8.80 s). The stage-1 phone pane is an 848×1060 extract of the same PNG (`STAGE_FRAMES.sources.phonePane`).
 
