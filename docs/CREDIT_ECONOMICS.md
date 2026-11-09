@@ -38,7 +38,7 @@ The server must reserve the job’s maximum credit cost before it signs or dispa
 |---|---|---|
 | Customer balance | Prepaid only; no post-paid GPU | Compromise cannot create an open-ended invoice |
 | New account allowance | Zero free GPU credits | Stops disposable-account GPU farming |
-| Worker pool | Flex workers, active workers `0`, max workers `1`, GPUs per worker `1` | Removes idle spend and caps concurrency |
+| Worker pool | Flex workers, active workers `0`, max workers `3` (raised from 1 for general availability, 2026-11-10; equal to the CDR queue consumer's `max_concurrency`), GPUs per worker `1` | Removes idle spend and caps concurrency |
 | GPU selection | One price class per operation; no automatic upgrade to a more expensive fallback | Avoids surprise rate escalation |
 | Per-job cap | Default 10 credits; reject above cap | Maximum direct 4090 exposure is about 7.5 minutes at the pilot mapping |
 | Per-workspace daily cap | Default 20 credits in private pilot | Narrows theft and automation blast radius |
