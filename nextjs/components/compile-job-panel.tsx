@@ -3,7 +3,7 @@
 import type { BlockerResolution, CompileBlocker, CompileState } from "@/lib/compile-job-store";
 import type { CorpusProgress } from "@/lib/corpus-batching";
 import type { CompileSizeLimit } from "@/lib/compile-job-client";
-import { failureSentence, isSizeLimitFailure, sizeLimitFailureCopy } from "@/lib/workspace-failure-copy";
+import { blockedPanelCopy, failureSentence, isSizeLimitFailure, REUPLOAD_ONLY_BLOCKER_REASONS, sizeLimitFailureCopy } from "@/lib/workspace-failure-copy";
 
 /*
   What the server is doing with a compile, and what the customer is allowed to do about it.
@@ -115,11 +115,19 @@ export function CompileJobPanel({
   const security = job.blocked.filter((entry) => entry.kind === "security");
   const clean = Math.max(0, job.documentsTotal - job.blocked.length);
   const sizeCopy = sizeLimitFailureCopy(languages);
+  const blockedCopy = blockedPanelCopy(languages);
+  /*
+    F1 (2026-11-09): `retry_eligible` clears the blockers and the worker looks again, which helps a
+    file that was late. A file the reader sent to operator review has an immutable review result,
+    so the same blocker comes straight back. Retry is offered only when some file can change.
+  */
+  const reuploadOnly = job.blocked.filter((entry) => REUPLOAD_ONLY_BLOCKER_REASONS.includes(entry.reason));
+  const retryable = job.blocked.some((entry) => entry.kind !== "security" && !REUPLOAD_ONLY_BLOCKER_REASONS.includes(entry.reason));
 
   return (
     <section className="workspace-compile-job" aria-labelledby="workspace-compile-job-title" data-state={job.state}>
       <p className="eyebrow">{corpus ? `Part ${(job.batchIndex ?? 0) + 1} of ${corpus.batchCount}` : "Compile"}</p>
-      <h2 id="workspace-compile-job-title">{knownState ? STATE_COPY[job.state] : "Run state unavailable."}</h2>
+      <h2 id="workspace-compile-job-title">{!knownState ? "Run state unavailable." : undecided ? blockedCopy.title : STATE_COPY[job.state]}</h2>
       {corpus ? (
         <>
           <p className="fine">
@@ -265,13 +273,15 @@ export function CompileJobPanel({
                 </button>
                 <button
                   type="button"
-                  disabled={busy || job.blocked.every((entry) => entry.kind === "security")}
+                  disabled={busy || !retryable}
                   onClick={() => onResolve("retry_eligible")}
                 >
                   Retry what can be retried
                 </button>
                 <button type="button" disabled={busy} onClick={onCancel}>Cancel</button>
               </div>
+              {reuploadOnly.length > 0 ? <p className="fine" role="note">{blockedCopy.reupload(reuploadOnly.length)}</p> : null}
+              <p className="fine">{blockedCopy.expiry}</p>
               {security.length > 0 ? (
                 <p className="fine workspace-preflight-blocked" role="alert">
                   {security.length === 1 ? "One file was" : `${security.length} files were`} stopped by a safety
