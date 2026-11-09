@@ -28,11 +28,11 @@ import { expect, test, type Page } from "@playwright/test";
   watch records follows an input). The tab-press measurements below run in both views.
 */
 type FilmView = "fit" | "focus";
-/** Opens the view: below 900px Focus is the default (R3, D1); Fit is one press of the toggle, as a visitor would ask for it. */
+/** Opens the view: Fit is the default; Focus is one press of the toggle, as a visitor would ask for it. */
 async function openView(page: Page, view: FilmView) {
   const sequence = page.locator(`${FILM} .compile-film-sequence`);
-  await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
-  if (view === "fit") await page.locator(`${FILM} .compile-film-focus-control`).click();
+  await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
+  if (view === "focus") await page.locator(`${FILM} .compile-film-focus-control`).click();
   await expect(sequence).toHaveAttribute("data-mobile-view", view);
 }
 
@@ -74,7 +74,7 @@ async function recordShifts(page: Page) {
   a shift in the record is one the film made. `before` runs once the film plays, before the
   watch starts (the detector below uses it to take the reservation away).
 */
-async function watchAutoAdvance(page: Page, advances: number, before?: () => Promise<void>, view: FilmView = "focus") {
+async function watchAutoAdvance(page: Page, advances: number, before?: () => Promise<void>, view: FilmView = "fit") {
   const film = page.locator(FILM);
   const sequence = film.locator(".compile-film-sequence");
   await expect(sequence).toHaveAttribute("data-narrow", "1");
@@ -132,7 +132,7 @@ async function watchAutoAdvance(page: Page, advances: number, before?: () => Pro
   (the acceptance asks for two). 430x932 is the width where the consent sheet opens at 8 s, so
   its arrival falls inside the watch as well.
 */
-for (const [width, height, views] of [[390, 844, ["fit", "focus"]], [430, 932, ["focus"]]] as const) {
+for (const [width, height, views] of [[390, 844, ["fit", "focus"]], [430, 932, ["fit"]]] as const) {
   for (const path of ["/", "/ko"]) for (const view of views) {
     test(`with motion on, three auto-advances leave the phone film where it was (${path} ${width}x${height}, ${view})`, async ({ page }, testInfo) => {
       test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);

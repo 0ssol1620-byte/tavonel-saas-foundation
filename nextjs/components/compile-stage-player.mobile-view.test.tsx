@@ -110,20 +110,16 @@ describe("mobile film view", () => {
     landing asks for the compact view explicitly, on the phone and on the desktop, and the same "Focus details"
     toggle, not pressed, is the expand. Focus itself is held below ("opens on focus only when a caller asks for it").
   */
-  /*
-    Recording R3 (2026-11-09, LANDING-VIDEO-HISTORY-20261109 option d, D1): the phone opens on Focus -- the 4:5 pane of
-    the R3 cut, where product type reads >= 12px -- and Fit is one press away. The desktop still opens compact. This
-    reverses the 2026-10-27 compact default on phones only, deliberately: the whole 16:10 frame at 360-390px is ~4px type.
-  */
-  it("the landing disclosure opens the phone on the readable pane and the desktop compact, explicitly", () => {
-    expect(LANDING_MOBILE_FILM_VIEW).toBe("focus");
+  // Recording R3 (2026-11-09): the founder kept the compact opening on phones too; the pane stays one press away.
+  it("the landing disclosure opens compact, explicitly, with Focus details one press away", () => {
+    expect(LANDING_MOBILE_FILM_VIEW).toBe("fit");
     expect(LANDING_WIDE_FILM_VIEW).toBe("fit");
     const source = readFileSync(new URL("./landing-v2/hero-film-disclosure.tsx", import.meta.url), "utf8");
     expect(source).toContain("initialMobileFilmView={LANDING_MOBILE_FILM_VIEW}");
     expect(source).toContain("initialWideView={LANDING_WIDE_FILM_VIEW}");
     const markup = renderToStaticMarkup(<CompileStagePlayer preferVideo initialMobileFilmView={LANDING_MOBILE_FILM_VIEW} />);
-    expect(markup).toContain('data-mobile-view="focus"');
-    expect(focusControl(markup)).toEqual({ attrs: expect.stringContaining('aria-pressed="true"'), label: "Focus details" });
+    expect(markup).toContain('data-mobile-view="fit"');
+    expect(focusControl(markup)).toEqual({ attrs: expect.stringContaining('aria-pressed="false"'), label: "Focus details" });
   });
 
   it("opens on focus only when a caller asks for it", () => {
@@ -221,16 +217,15 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
     "Focus details" as before -- so the expand is the one control that already existed. The crop window and the
     phone rect stay set on the sequence, for the press that shows them.
   */
-  // R3 (D1): the desktop toggle stays not pressed (compact); the phone toggle is pressed (the 4:5 pane).
-  it("opens the Home film compact on the desktop and on the pane on a phone, in English and Korean", () => {
+  it("opens the Home film compact, both Focus details toggles not pressed, in English and Korean", () => {
     for (const korean of [false, true]) {
       const home = renderToStaticMarkup(<HeroFilm korean={korean} />);
       const name = korean ? "세부 내용 확대" : "Focus details";
       expect(home).toContain('data-wide-view="fit"');
-      expect(home).toContain('data-mobile-view="focus"');
+      expect(home).toContain('data-mobile-view="fit"');
       expect(home).toMatch(new RegExp(`<button type="button" class="compile-film-view-control [^"]+" aria-controls="[^"]+" aria-pressed="false" aria-label="${name}"><svg class="compile-film-view-mark"`));
       const phone = home.match(/<button([^>]*class="compile-film-focus-control"[^>]*)>(.*?)<\/button>/);
-      expect(phone?.[1]).toContain('aria-pressed="true"');
+      expect(phone?.[1]).toContain('aria-pressed="false"');
       expect(phone?.[1]).toContain(`aria-label="${name}"`);
       expect(phone?.[2]).toMatch(/^<svg class="compile-film-view-mark"[^>]*aria-hidden="true"/);
       expect(home).toContain("--film-crop-x:25%;--film-crop-y:20%");
@@ -328,9 +323,9 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
 
   it("serves the stage-1 re-record poster at 2x for the crop and 1x for a phone in Fit, with no mask", () => {
     const en = renderToStaticMarkup(<HeroFilm />);
-    // R3 (D1): a phone opens on the pane, so Home serves the stage-1 pane still below 768px from the first paint.
-    expect(en).toContain('data-pane-poster="1"');
-    expect(en).toContain("767.98px");
+    // Home opens compact (2026-10-27, kept for R3 2026-11-09): no phone pane still until Focus details is pressed.
+    expect(en).not.toContain("data-pane-poster");
+    expect(en).not.toContain("767.98px");
     const homeStage = { ...COMPILE_STAGES[0]!, poster: "/film/poster-r3-c1-t10.40-2x.webp", poster1x: "/film/poster-r3-c1-t10.40.webp", posterAvif: "/film/poster-r3-c1-t10.40-2x.avif", posterAvif1x: "/film/poster-r3-c1-t10.40.avif", phonePoster: "/film/poster-r3-c1-t10.40-pane1-848x1060.webp", phonePosterAvif: "/film/poster-r3-c1-t10.40-pane1-848x1060.avif" };
     const focused = renderToStaticMarkup(<CompileStagePlayer stages={[homeStage]} storyLayout initialMobileFilmView="focus" />);
     const still = en.match(/<img[^>]*class="compile-film-still"[^>]*>/)?.[0] ?? "";

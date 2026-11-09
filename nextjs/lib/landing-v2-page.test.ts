@@ -848,11 +848,10 @@ describe("landing v2 -- the lead and the workbench", () => {
     expect(hero).toContain("/film/poster-r3-c1-t10.40-2x.webp");
     expect(hero).toContain("/film/poster-r3-c1-t10.40-2x.avif");
     expect(elements(hero, "button").filter(open => attr(open, "role") === "tab")).toHaveLength(4);
-    // Founder ask 2026-10-27: the desktop film opens compact. R3 (2026-11-09, D1): a phone opens on the readable 4:5 pane,
-    // so its own still is served from the first paint.
-    expect(hero).toContain('data-mobile-view="focus"');
+    // Founder ask 2026-10-27, kept for R3 (2026-11-09): the film opens compact (the whole frame) at every width; the pane still waits for Focus details.
+    expect(hero).toContain('data-mobile-view="fit"');
     expect(hero).toContain('data-wide-view="fit"');
-    expect(hero).toContain("/film/poster-r3-c1-t10.40-pane1-848x1060.avif");
+    expect(hero).not.toContain("/film/poster-r3-c1-t10.40-pane1-848x1060.avif");
     expect(hero).not.toContain('data-source-inspection-film');
     // The not-customer-results disclosure stays (FINAL-SPEC D-9 shortens its wording only).
     expect(readable(hero)).toContain(locale === "ko" ? "고객 결과가 아닙니다" : "not customer results");

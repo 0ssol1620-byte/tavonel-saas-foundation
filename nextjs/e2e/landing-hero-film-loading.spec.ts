@@ -36,18 +36,13 @@ import { expect, test, type Page } from "@playwright/test";
   Founder ask 2026-10-27 ("영상은 축소상태가 디폴트여야"): Home opens compact -- Fit, the whole frame, not pressed --
   so the poster a phone asks for first is the 1440px frame (the 1x file of the one srcset hint), and the pane's
   own still is asked for only after "Focus details" is pressed. Still one first-screen poster: never the pane
-  file before the press.
-
-  Recording R3 (2026-11-09, LANDING-VIDEO-HISTORY-20261109 option d, D1) returns the phone to FINAL-SPEC §2.1: the R3
-  cut's type reads >= 12px in its 4:5 pane, and ~4px in the whole 16:10 frame at 390px. So a phone opens on the pane
-  again, its first-screen poster is the pane's own 848x1060 file, and the 1440/2880px frame is never requested there;
-  a press of "Focus details" shows the whole frame.
+  file before the press. Recording R3 (2026-11-09) keeps this opening on phones, by founder decision the same day.
 */
 const FILM = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]';
-/** The stage-1 pane's own still: the poster a phone opens on (R3, D1). */
-const POSTER = /^\/film\/poster-r3-c1-t10\.40-pane1-848x1060\.(avif|webp)$/;
-/** The 1440/2880px stage-1 frame, in either format, that a phone never asks for on the first screen (acceptance 25). */
-const FRAME_POSTER = /^\/film\/poster-r3-c1-t10\.40(-2x)?\.(avif|webp)$/;
+/** The stage-1 frame a phone opens on (Fit): the 1440px file of the srcset, in either format. */
+const POSTER = /^\/film\/poster-r3-c1-t10\.40\.(avif|webp)$/;
+/** The stage-1 pane's own still, which a phone asks for only once Focus details is pressed. */
+const PANE_POSTER = /^\/film\/poster-r3-c1-t10\.40-pane1-848x1060\.(avif|webp)$/;
 const LOCALES = [
   { path: "/", language: "English", play: "Play the compilation film", focus: "Focus details" },
   { path: "/ko", language: "Korean", play: "컴파일 영상 재생", focus: "세부 내용 확대" },
@@ -84,7 +79,7 @@ for (const locale of LOCALES) {
         await expect(poster).toBeVisible();
         await expect.poll(() => poster.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
         expect(await poster.evaluate((image: HTMLImageElement) => new URL(image.currentSrc).pathname)).toMatch(POSTER);
-        expect(requests.filter(url => FRAME_POSTER.test(new URL(url).pathname)), "a phone asks for one first-screen poster, the pane").toEqual([]);
+        expect(requests.filter(url => PANE_POSTER.test(new URL(url).pathname)), "a phone asks for one first-screen poster, the whole frame").toEqual([]);
         await expect(film.locator("video")).toHaveCount(0);
         expect(requests.filter(isRecording), "no recording loads before the visitor asks").toEqual([]);
 
@@ -97,14 +92,14 @@ for (const locale of LOCALES) {
       await expect.poll(() => requests.some(isRecording), "the recording is requested").toBe(true);
       expect(requests.findIndex(isPoster), "the poster is asked for before the recording").toBeLessThan(requests.findIndex(isRecording));
       /*
-        Review 2026-10-26 B-2: in both motion preferences the playing cut asks for no frame poster. The <video> carries no
-        poster attribute on a phone pane, and the pane's own still stays over the cut until its first frame, then goes.
+        Review 2026-10-26 B-2: in both motion preferences the playing cut asks for no second first-screen poster. In Fit
+        the <video> poster names the file the still already took (the 1440px frame), and no pane still is requested.
       */
       const video = film.locator("video");
       await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState >= 2), "the cut's first frame").toBe(true);
-      expect(await video.getAttribute("poster"), "no frame poster on the phone pane's video").toBeNull();
-      await expect(film.locator("[data-pane-hold]"), "the pane still is released at the first frame").toHaveCount(0);
-      expect(requests.filter(url => FRAME_POSTER.test(new URL(url).pathname)), "a phone asks for one first-screen poster, the pane").toEqual([]);
+      expect(new URL(await video.getAttribute("poster") ?? "", page.url()).pathname, "the Fit video's poster is the still's own file").toMatch(POSTER);
+      await expect(film.locator("[data-pane-hold]"), "no pane still in Fit").toHaveCount(0);
+      expect(requests.filter(url => PANE_POSTER.test(new URL(url).pathname)), "a phone asks for one first-screen poster, the whole frame").toEqual([]);
 
       const sequence = film.locator(".compile-film-sequence");
       const focusControl = film.locator(".compile-film-focus-control");
@@ -112,11 +107,15 @@ for (const locale of LOCALES) {
       const stages = film.getByRole("tab");
       const pane = () => sequence.evaluate(node => ["--pane-x", "--pane-y", "--pane-w"].map(name => (node as HTMLElement).style.getPropertyValue(name)));
 
-      // The phone player opens on the stage's source pane (R3, D1): Focus, pressed, named in the page's language.
+      // The phone player opens compact: Fit, not pressed, named in the page's language; one press opens the pane.
+      await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
+      await expect(focusControl).toHaveAttribute("aria-pressed", "false");
+      await expect(focusControl).toHaveAccessibleName(locale.focus);
+      await expect(hint, "Home prints no hint paragraph").toHaveCount(0);
+      await focusControl.click();
       await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
       await expect(focusControl).toHaveAttribute("aria-pressed", "true");
       await expect(focusControl).toHaveAccessibleName(locale.focus);
-      await expect(hint, "Home prints no hint paragraph").toHaveCount(0);
 
       /*
         The pane follows the stage the visitor chose (STAGE_FRAMES.*.phonePane, 2880px source pixels): R3's Update opens
@@ -216,10 +215,9 @@ async function posterContract(page: Page, engine: string) {
   }, { avif: RECUT_AVIF });
 
   for (const [url, bytes] of Object.entries(result.sizes)) expect(bytes, `${engine} ${url} within the §22 AVIF budget`).toBeLessThanOrEqual(140_000);
-  // The still is one of the two formats of the re-cut frame, AVIF exactly when the engine decodes it; below 768px it is
-  // the stage-1 pane's own file (FINAL-SPEC 2026-10-26 §2.1, back with R3), above it the 1440/2880px frame.
-  const phone = (page.viewportSize()?.width ?? 1440) < 768;
-  expect(result.currentSrc, `${engine} still`).toMatch(new RegExp(`^/film/poster-r3-c1-t10\\.40${phone ? "-pane1-848x1060" : "(-2x)?"}\\.${result.avifDecodes ? "avif" : "webp"}$`));
+  // The still is one of the two formats of the re-cut frame, AVIF exactly when the engine decodes it: the 1440/2880px
+  // frame at every width, as Home opens compact (2026-10-27); the pane's own file waits for Focus details.
+  expect(result.currentSrc, `${engine} still`).toMatch(new RegExp(`^/film/poster-r3-c1-t10\\.40(-2x)?\\.${result.avifDecodes ? "avif" : "webp"}$`));
   // The re-recorded frames carry no overprint, so no Tier 2 bars are drawn (and none are checked below).
   expect(result.maskPoster).toBe("");
   expect(result.rects).toHaveLength(0);
@@ -242,7 +240,7 @@ test("serves the re-cut posters as AVIF within 140,000 bytes, with a WebP fallba
   await page.emulateMedia({ reducedMotion: "reduce" });
   const chromium = await posterContract(page, "chromium");
   expect(chromium.avifDecodes, "Chromium decodes AVIF").toBe(true);
-  expect(chromium.currentSrc, "a phone takes the stage-1 pane AVIF").toBe("/film/poster-r3-c1-t10.40-pane1-848x1060.avif");
+  expect(chromium.currentSrc, "a phone in Fit takes the 1440px stage-1 AVIF").toBe("/film/poster-r3-c1-t10.40.avif");
   const measured: Record<string, unknown> = { chromium };
   if (existsSync(playwright.webkit.executablePath())) {
     const browser = await playwright.webkit.launch();

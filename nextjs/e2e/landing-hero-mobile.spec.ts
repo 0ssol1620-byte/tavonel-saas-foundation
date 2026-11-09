@@ -8,15 +8,24 @@ test.describe("phone four-stage film", () => {
     await page.goto("/");
     await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
   });
-  test("opens on the stage-1 pane, and Focus details shows the whole locked frame, with readable stage and play controls", async ({ page }, testInfo) => {
+  test("opens compact on the locked stage-1 frame, and Focus details opens the pane, with readable stage and play controls", async ({ page }, testInfo) => {
     test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     const film = page.locator(FILM);
     await expect(film).toBeVisible();
     const still = () => film.locator("img.compile-film-still").evaluate((image: HTMLImageElement) => new URL(image.currentSrc).pathname);
     const column = (await page.locator("#s1 .lv2-wrap").boundingBox())!;
-    // FINAL-SPEC 2026-10-26 §2.1 (acceptance 23, 25), back with recording R3 (2026-11-09, D1): one source pane, the stage-1
-    // pane's own 848x1060 file (a crop of the locked 2880px poster, lib/locked-film-assets.json), as AVIF where the browser
-    // decodes it and as the WebP fallback where it does not, in a 4:5 frame 16px wider than the column.
+    // Founder ask 2026-10-27: a phone opens compact -- the whole frame of the locked stage-1 poster, inside the viewport.
+    await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
+    expect(await still()).toMatch(/^\/film\/poster-r3-c1-t10\.40(-2x)?\.(avif|webp)$/);
+    const fit = (await film.locator(".compile-film-viewport").boundingBox())!;
+    const drawn = await film.locator("img.compile-film-still").evaluate(image => image.getBoundingClientRect().width);
+    expect(Math.abs(drawn - fit.width), "the whole frame at the frame's width, no crop").toBeLessThanOrEqual(2);
+    expect(fit.x).toBeGreaterThanOrEqual(0);
+    expect(fit.x + fit.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+    // FINAL-SPEC 2026-10-26 §2.1 (acceptance 23, 25), now after the press: one source pane, the stage-1 pane's own 848x1060
+    // file (a crop of the locked 2880px poster, lib/locked-film-assets.json), as AVIF where the browser decodes it and as
+    // the WebP fallback where it does not, in a 4:5 frame 16px wider than the column.
+    await film.locator(".compile-film-focus-control").click();
     await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
     await expect.poll(still).toMatch(/^\/film\/poster-r3-c1-t10\.40-pane1-848x1060\.(avif|webp)$/);
     const frame = (await film.locator(".compile-film-viewport").boundingBox())!;
@@ -24,15 +33,6 @@ test.describe("phone four-stage film", () => {
     expect(Math.abs(frame.width - (column.width + 16)), "the column plus 16px").toBeLessThanOrEqual(1);
     expect(frame.x).toBeGreaterThanOrEqual(0);
     expect(frame.x + frame.width).toBeLessThanOrEqual(page.viewportSize()!.width);
-    // The press: the whole frame of the locked stage-1 poster, inside the viewport.
-    await film.locator(".compile-film-focus-control").click();
-    await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
-    await expect.poll(still).toMatch(/^\/film\/poster-r3-c1-t10\.40(-2x)?\.(avif|webp)$/);
-    const fit = (await film.locator(".compile-film-viewport").boundingBox())!;
-    const drawn = await film.locator("img.compile-film-still").evaluate(image => image.getBoundingClientRect().width);
-    expect(Math.abs(drawn - fit.width), "the whole frame at the frame's width, no crop").toBeLessThanOrEqual(2);
-    expect(fit.x).toBeGreaterThanOrEqual(0);
-    expect(fit.x + fit.width).toBeLessThanOrEqual(page.viewportSize()!.width);
     await expect(film.getByRole("tab")).toHaveText(["Read", "Compile", "Update", "Trace"]);
     const play = film.getByRole("button", { name: "Play the compilation film", exact: true });
     expect((await play.boundingBox())!.height).toBeGreaterThanOrEqual(44);
@@ -52,8 +52,11 @@ test.describe("phone four-stage film", () => {
     const toggle = (await focus.boundingBox())!;
     expect(toggle.height, "44px touch target (acceptance 28)").toBeGreaterThanOrEqual(44);
     expect(toggle.width, "44px touch target (acceptance 28)").toBeGreaterThanOrEqual(44);
-    // Fix round 3 (M1): one toggle, pressed while the pane shows. R3 (D1): it opens on the pane, pressed; a press
-    // shows the whole frame and a second returns the pane.
+    // Fix round 3 (M1): one toggle, pressed while the pane shows. It opens compact (2026-10-27): a press opens the
+    // pane and a second returns the whole frame.
+    await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
+    await expect(focus).toHaveAttribute("aria-pressed", "false");
+    await focus.click();
     await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
     await expect(focus).toHaveAttribute("aria-pressed", "true");
     // The pane draws the 2880px cut at 2880/w of its width (w = the stage's rect width) and clips it (FINAL-SPEC §2.1), so what a reader sees is the
@@ -65,9 +68,6 @@ test.describe("phone four-stage film", () => {
     await focus.click();
     await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
     await expect(focus).toHaveAttribute("aria-pressed", "false");
-    await focus.click();
-    await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
-    await expect(focus).toHaveAttribute("aria-pressed", "true");
     const tabs = film.getByRole("tab");
     await tabs.first().focus();
     await page.keyboard.press("ArrowRight");

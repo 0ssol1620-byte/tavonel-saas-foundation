@@ -10,7 +10,8 @@
  * rewritten or deleted, while this is "still", and they run again the day it is "film".
  *
  * "film" since the R3 re-record (2026-11-09, LANDING-VIDEO-HISTORY-20261109 option d, D1): the cuts are the
- * light-canvas product recording, framed on the action so product type is 32 source px, and a phone opens on
+ * light-canvas product recording, framed on the action so product type is 32 source px. A phone opens on the whole
+ * frame (founder decision 2026-11-09) and "Focus details" shows
  * one 4:5 pane of each cut (STAGE_FRAMES[].phonePane) where that type draws at >= 12 CSS px. The still and its
  * component stay, so this line is the rollback.
  */

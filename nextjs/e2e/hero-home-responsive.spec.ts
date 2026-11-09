@@ -87,9 +87,9 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
     const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
     await expect(film).toBeVisible();
     await expect(film.getByRole("tab")).toHaveCount(4);
-    // Founder ask 2026-10-27: Home's player opens compact on the desktop. Recording R3 (2026-11-09, D1): below 900px it opens
-    // on Focus -- the 4:5 pane, where the R3 cut's type reads >= 12px -- and Focus details (pressed) returns to the whole frame.
-    await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
+    // Founder ask 2026-10-27 ("영상은 축소상태가 디폴트여야"), over FINAL-SPEC 2026-10-26 §2.1's Focus: Home's player opens
+    // compact -- the whole frame -- at every width; Focus details (not pressed) is the expand.
+    await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
     await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-wide-view", "fit");
     await page.evaluate(() => document.fonts.ready);
     const geometry = await page.locator("#s1").evaluate(section => {
@@ -217,7 +217,7 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
       opens on its scanned default, as before.
     */
     await expect(sequence).toHaveAttribute("data-wide-view", "fit");
-    await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
+    await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
     await expect(film.getByRole("button", { name: "Focus details", exact: true })).toHaveAttribute("aria-pressed", "false");
     expect(await zoom(film)).toBeCloseTo(1, 2);
     await film.getByRole("button", { name: "Focus details", exact: true }).click();
@@ -341,7 +341,9 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
     await page.goto("/");
     const band = page.locator(FILM);
     await expect(band.locator(".compile-film-sequence")).toHaveAttribute("data-narrow", "1");
-    // R3 (D1): 768-899 opens on Focus (the pan surface) with the toggle pressed; no press is needed.
+    await expect(band.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
+    await expect(band.getByRole("button", { name: "Focus details", exact: true })).toHaveAttribute("aria-pressed", "false");
+    await band.getByRole("button", { name: "Focus details", exact: true }).click();
     await expect(band.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
     await expect(band.getByRole("button", { name: "Focus details", exact: true })).toHaveAttribute("aria-pressed", "true");
     for (let stage = 0; stage < 4; stage++) {
@@ -355,10 +357,12 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     const phone = page.locator(FILM);
-    // R3 (D1): the phone opens on the pane, the toggle already pressed.
-    await expect(phone.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
+    await expect(phone.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
     const phoneToggle = phone.getByRole("button", { name: "Focus details", exact: true });
     await expect(phoneToggle).toHaveCount(1);
+    await expect(phoneToggle).toHaveAttribute("aria-pressed", "false");
+    await phoneToggle.click();
+    await expect(phone.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
     await expect(phoneToggle).toHaveAttribute("aria-pressed", "true");
     await expect(phoneToggle).toHaveAccessibleName("Focus details");
     for (let stage = 0; stage < 4; stage++) {
@@ -624,26 +628,19 @@ test("every stage that opens cropped keeps ink in both panes of its whole window
   WebKit, reduced motion, EN and KO 56,250 / 68,062 / 77,440 / 85,562). The pane is one press of "Focus details"
   away and is held below exactly as before, tabs directly above it and its top on the first screen at every width.
   Acceptance 24 at 412 keeps main's numbers (see there).
-
-  Recording R3 (2026-11-09, LANDING-VIDEO-HISTORY-20261109 option d, D1) changes the opening view on purpose again: a
-  phone opens on the 4:5 pane of the R3 cut (its 848x1060 still is the LCP element), so the floors are re-derived from a
-  new measurement by the same rule (the visible area rounded down to the thousand, the 1% margin kept). Measured on that
-  build, reduced motion (landing-film-r3-20261109/qa/lcp-entry-sizes.txt): chromium EN 102,690 / 127,804 / 161,406 /
-  174,902 and KO 105,624 / 131,008 / 164,630 / 194,436; Windows WebKit EN 99,693 / 124,381 / 157,245 / 170,485 and KO
-  102,428 / 127,376 / 160,275 / 186,438, at 360 / 390 / 412 / 430.
 */
 const LCP_FLOOR: Record<string, Record<string, Record<number, number>>> = {
   chromium: {
-    "/": { 360: 102_000, 390: 127_000, 412: 161_000, 430: 174_000 },
-    "/ko": { 360: 105_000, 390: 131_000, 412: 164_000, 430: 194_000 },
+    "/": { 360: 59_000, 390: 72_000, 412: 82_000, 430: 90_000 },
+    "/ko": { 360: 60_000, 390: 72_000, 412: 81_000, 430: 90_000 },
   },
   webkit: {
-    "/": { 360: 99_000, 390: 124_000, 412: 157_000, 430: 170_000 },
-    "/ko": { 360: 102_000, 390: 127_000, 412: 160_000, 430: 186_000 },
+    "/": { 360: 56_000, 390: 68_000, 412: 77_000, 430: 85_000 },
+    "/ko": { 360: 56_000, 390: 68_000, 412: 77_000, 430: 85_000 },
   },
 };
 for (const path of ["/", "/ko"]) {
-  test(`a phone opens on the stage's source pane with its tabs directly above it, on the first screen, and Focus details shows the whole frame (${path})`, async ({ page, browserName }, testInfo) => {
+  test(`a phone opens compact on the whole frame, and Focus details opens the stage's source pane with its tabs directly above it, on the first screen (${path})`, async ({ page, browserName }, testInfo) => {
     test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     test.skip(testInfo.project.name !== "390", "sets its own viewports");
     test.setTimeout(120_000);
@@ -662,21 +659,18 @@ for (const path of ["/", "/ko"]) {
       const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
       const sequence = film.locator(".compile-film-sequence");
       await expect(sequence).toHaveAttribute("data-narrow", "1");
-      await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
+      await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
       await expect.poll(() => page.evaluate(() => (window as unknown as { __lcp: (PerformanceEntry & { url?: string; element?: Element | null })[] }).__lcp.length)).toBeGreaterThan(0);
       const lcp = await page.evaluate(() => {
         const entries = (window as unknown as { __lcp: (PerformanceEntry & { url?: string; size?: number; element?: Element | null })[] }).__lcp;
         const last = entries[entries.length - 1]!;
         return { url: last.url ?? "", size: last.size ?? 0, still: Boolean(last.element?.matches("img.compile-film-still")) };
       });
-      expect(new URL(lcp.url).pathname, `LCP at ${width}`).toMatch(/^\/film\/poster-r3-c1-t10\.40-pane1-848x1060\.(avif|webp)$/);
-      if (browserName === "chromium") expect(new URL(lcp.url).pathname, `LCP at ${width}`).toBe("/film/poster-r3-c1-t10.40-pane1-848x1060.avif");
+      expect(new URL(lcp.url).pathname, `LCP at ${width}`).toMatch(/^\/film\/poster-r3-c1-t10\.40\.(avif|webp)$/);
+      if (browserName === "chromium") expect(new URL(lcp.url).pathname, `LCP at ${width}`).toBe("/film/poster-r3-c1-t10.40.avif");
       expect(lcp.still, `LCP element at ${width}`).toBe(true);
       expect(lcp.size, `LCP area at ${width}`).toBeGreaterThanOrEqual(LCP_FLOOR[browserName]![path]![width]! * 0.99);
       const column = (await page.locator("#s1 .lv2-wrap").boundingBox())!;
-      // R3 (D1): one press of Focus details shows the whole frame; it is measured there and a second press returns to the pane.
-      await film.locator(".compile-film-focus-control").click();
-      await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
       // The compact frame: the whole cut drawn at the frame's width (no crop), wholly on the first screen, unscrolled, inside the viewport.
       const fit = (await film.locator(".compile-film-viewport").boundingBox())!;
       const drawn = await film.locator(".compile-film-viewport :is(img.compile-film-still, video.compile-film-video)").first().evaluate(media => media.getBoundingClientRect().width);
@@ -685,7 +679,7 @@ for (const path of ["/", "/ko"]) {
       expect(fit.x).toBeGreaterThanOrEqual(0);
       expect(fit.x + fit.width).toBeLessThanOrEqual(width);
       measured.push({ width, view: "fit", frameTop: fit.y, frameBottom: fit.y + fit.height, fold: heights[width], lcpSize: lcp.size, lcpUrl: new URL(lcp.url).pathname });
-      // Back to the opening view: the stage's source pane.
+      // The expand: one press of Focus details opens the stage's source pane.
       await film.locator(".compile-film-focus-control").click();
       await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
       for (let stage = 0; stage < 4; stage++) {

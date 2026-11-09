@@ -246,14 +246,14 @@ test("server-renders the visible film poster as its priority image", async ({ re
   // srcset preload in the HTTP Link header, so the hint is the first-party <link rel=preload> in the
   // streamed <head>, ahead of the body; the header must not point at a superseded poster either.
   /*
-    Recording R3 (2026-11-09, D1): a phone opens on the 4:5 pane, so the hints split by width and neither screen fetches
-    the image it hides -- the pane's own AVIF below 768px (a plain href, which React sends in the HTTP Link header) and
-    the frame's srcset from 768px (in the head). (2026-10-27 to R3 every width opened on the whole frame: one unscoped hint.)
+    Founder ask 2026-10-27 (compact by default): every width opens on the whole frame, so the one hint is the frame's
+    srcset with no `media` -- a phone takes its 1440px file, a desktop the 2880px one -- and the phone pane's still,
+    which only Focus details shows, is preloaded nowhere. The header names no poster (React keeps srcset hints in the head).
   */
   const posterHint = response.headers()["link"] ?? "";
-  expect(posterHint.match(/\/film\/poster-[^>]+/g) ?? []).toEqual(["/film/poster-r3-c1-t10.40-pane1-848x1060.avif"]);
-  expect(posterHint).toMatch(/poster-r3-c1-t10\.40-pane1-848x1060\.avif>; rel=preload; as="image"; type="image\/avif"; fetchpriority="high"; media="\(max-width: 767\.98px\)"/);
+  expect(posterHint.match(/\/film\/poster-[^>]+/g) ?? []).toEqual([]);
   const head = html.slice(0, html.indexOf("</head>"));
+  expect(head).not.toContain("poster-r3-c1-t10.40-pane1-848x1060");
   const allPreloads = [...head.matchAll(/<link[^>]*rel="preload"[^>]*as="image"[^>]*>/g)].map(match => match[0]);
   /*
     Round 2 (lib/hero-phone-mode.ts): while a phone shows the Inspector still, there are two image hints, split by width --
@@ -267,7 +267,7 @@ test("server-renders the visible film poster as its priority image", async ({ re
   expect(preloads).toHaveLength(1);
   expect(preloads[0]).toMatch(/fetchpriority="high"/i);
   if (PHONE_HERO === "still") expect(preloads[0]).toMatch(/ media="\(min-width: 901px\)"/i);
-  else expect(preloads[0]).toMatch(/ media="\(min-width: 768px\)"/i);
+  else expect(preloads[0]).not.toMatch(/ media=/i);
   // POSTER-RECUT (D-11): the one hint is the AVIF srcset, typed so a browser without AVIF skips it.
   expect(preloads[0]).toMatch(/imagesrcset="\/film\/poster-r3-c1-t10\.40\.avif 1440w, \/film\/poster-r3-c1-t10\.40-2x\.avif 2880w"/i);
   expect(preloads[0]).toMatch(/type="image\/avif"/i);
