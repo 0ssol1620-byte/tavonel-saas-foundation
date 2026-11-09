@@ -59,6 +59,8 @@
 }
 
 .boundary { margin-top: 24px; }
+/* The agent line's docs link: the Home sheet paints links in canvas ink from a layer, which is 1.13:1 on navy. */
+.boundary a { color: var(--tv-on-navy); text-decoration-line: underline; text-underline-offset: 3px; }
 .gate { margin-top: 8px; }
 
 @media (max-width: 899px) {
