@@ -19,7 +19,7 @@ import { W1_TRIAL_OPS_AFFECTED_PATHS, W1_TRIAL_OPS_AFFECTED_UNIT_FILES } from '.
 import { UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES, TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_PATHS, SPECIMEN_STRIP_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_BROWSER_FILES, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES, PUBLIC_MARKETING_AFFECTED_BROWSER_FILES, MARKETING_TOOLING_POSTIMAGES, G1_COPY_TRUTH_AFFECTED_PATHS, G1_COPY_TRUTH_AFFECTED_UNIT_FILES, G1_COPY_TRUTH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { ENABLEMENT_AFFECTED_BROWSER_FILES, P4_FOLLOWUPS_AFFECTED_PATHS, P4_FOLLOWUPS_AFFECTED_UNIT_FILES, P4_FOLLOWUPS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { LEGAL_SEMICOLONS_AFFECTED_PATHS, LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
-import { TRIAL_TO_PAID_AFFECTED_PATHS, TRIAL_TO_PAID_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { TRIAL_TO_PAID_AFFECTED_PATHS, TRIAL_TO_PAID_AFFECTED_UNIT_FILES, TRIAL_TO_PAID_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
 const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -753,14 +753,14 @@ for (const binding of [
     browsers: ['e2e/landing-hero-film-loading.spec.ts', 'e2e/templates.spec.ts'],
     rows: ["['e2e/landing-hero-film-loading.spec.ts', ['390']],", "['e2e/templates.spec.ts', ['1440']],"],
     neighbors: ['nextjs/app/privacy/opengraph-image.tsx', 'nextjs/app/subprocessors/layout.tsx', 'nextjs/lib/operations.test.ts', 'nextjs/lib/operations-copy.ts', 'nextjs/public/film/poster-1-t8.16-3x.avif', 'nextjs/public/film/poster-5-t1.00.avif', 'nextjs/public/film/compile-cut.mp4'] },
-  // trial-to-paid-20261109: five exact paths, twenty-one direct suites, no browser suite.
+  // trial-to-paid-20261109: six exact paths, twenty-one direct suites, the one browser suite it edits.
   { group: 'trial-to-paid-20261109', prefix: 'nextjs/', exportedPaths: TRIAL_TO_PAID_AFFECTED_PATHS, exportedSuites: TRIAL_TO_PAID_AFFECTED_UNIT_FILES,
-    exportedBrowsers: [],
-    paths: ['app/api/collections/[id]/promote/route.ts', 'components/processing-consent-panel.module.css', 'lib/activation-cohorts.ts', 'lib/cookbook-content.ts', 'lib/keyword-map.ts'],
+    exportedBrowsers: TRIAL_TO_PAID_AFFECTED_BROWSER_FILES,
+    paths: ['app/api/collections/[id]/promote/route.ts', 'components/processing-consent-panel.module.css', 'lib/activation-cohorts.ts', 'lib/cookbook-content.ts', 'lib/keyword-map.ts', 'e2e/billing-lifecycle.spec.ts'],
     suites: ['lib/activation-cohorts.test.ts', 'lib/activation-rate-limit.test.ts', 'lib/brand-copy.test.ts', 'lib/client-route-weight.test.ts', 'lib/cookbook-content.test.ts', 'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/funnel-events.test.ts', 'lib/keyword-map.test.ts', 'lib/marketing-analytics.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/public-copy-purge.test.ts', 'lib/recipe-intent.test.ts', 'lib/resources-hub.test.ts', 'lib/retrieval-compile-wiring.test.ts', 'lib/seo-surface.test.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/trial-ai-access.test.ts', 'lib/world-activation-plan-gate.test.ts', 'lib/world-promotion-current-source.test.ts'],
-    browsers: [],
-    rows: [],
-    neighbors: ['nextjs/app/api/collections/[id]/promote/route.tsx', 'nextjs/components/processing-consent-panel.module.scss', 'nextjs/lib/activation-cohort.ts', 'nextjs/lib/cookbook-contents.ts', 'lib/keyword-map.ts'] },
+    browsers: ['e2e/billing-lifecycle.spec.ts'],
+    rows: ["['e2e/billing-lifecycle.spec.ts', ['audit', 'audit-768', 'audit-1280']],"],
+    neighbors: ['nextjs/app/api/collections/[id]/promote/route.tsx', 'nextjs/components/processing-consent-panel.module.scss', 'nextjs/lib/activation-cohort.ts', 'nextjs/lib/cookbook-contents.ts', 'lib/keyword-map.ts', 'nextjs/e2e/billing-lifecycle.spec.tsx'] },
   // legal-semicolons-20261109: five exact paths, ten direct suites, no browser suite.
   { group: 'legal-semicolons-20261109', prefix: 'nextjs/', exportedPaths: LEGAL_SEMICOLONS_AFFECTED_PATHS, exportedSuites: LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
