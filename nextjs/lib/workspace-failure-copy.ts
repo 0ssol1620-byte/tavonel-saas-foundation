@@ -51,6 +51,14 @@ const FAILURE_COPY: Record<string, string> = {
   /* W1-A1: the processing cohort (uploads, the remote MCP). Excluded is a fact about this workspace; config-invalid is ours to fix. */
   REMOTE_MCP_COHORT_EXCLUDED: "This workspace is not in the current pilot group, so this is not open to it yet. Access is arranged with us through the contact page.",
   REMOTE_MCP_COHORT_CONFIG_INVALID: "This is paused while we correct a configuration on our side. Nothing in your workspace changed.",
+  /*
+    GA gap 2: the daily processing spend stop. Honest about what happened (a safety limit on our
+    side, not the customer's plan or file), what continues (documents already queued) and what was
+    charged (nothing). No reset time: the stop lifts at RunPod's billing-day boundary, which this
+    sentence cannot state accurately for every reader.
+  */
+  OCR_DAILY_SPEND_STOP: "New document processing is paused for today by a safety limit on our side. Documents already queued keep processing, and nothing was charged for this file. Please try again later.",
+  OCR_SPEND_UNVERIFIED: "New document processing is paused by a safety limit on our side while we confirm today's usage. Documents already queued keep processing, and nothing was charged for this file. Please try again later.",
 };
 
 /** What to say when the code is not one we have written a sentence for. */

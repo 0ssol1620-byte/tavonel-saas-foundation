@@ -41,7 +41,8 @@ async function evaluateAndPersist(request: Request) {
     snapshot: await readModelProviderCircuitSnapshot(RETRIEVAL_MODEL_PROVIDER),
   }];
   // GA gap 4: the head of the scheduler's own oldest-first queue. An unreadable queue is reported
-  // as unavailable, never as empty.
+  // as unavailable, never as empty. Read live: a same-slot retry after the head moved persists a
+  // different payload and meets the idempotency conflict below, like a changed circuit read.
   const head = await readOpenCompileJobs(1);
   const compileBacklog = head.ok ? { ok: true as const, oldestWaitingSince: head.value[0]?.updatedAt ?? null } : { ok: false as const };
   const evaluation = evaluateOperationalSli(history, { now: windowStartedAt, modelProviderCircuits, compileBacklog });

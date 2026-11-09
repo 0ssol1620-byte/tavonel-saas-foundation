@@ -98,6 +98,31 @@ describe("operational SLI breach delivery", () => {
     return logged.mock.calls.map((call) => call.join(" ")).join("\n");
   }
 
+  it("pages a backlog-only warning from the hourly slot alone; critical backlog and mixed slots page every slot (GA gap 4)", async () => {
+    const post = vi.fn(async (_url: string, _init: RequestInit) => new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", post);
+    vi.stubEnv("OPERATIONS_ALERT_WEBHOOK_URL", hook);
+    const backlog = (alerts: OperationalSli["alerts"]) => ({ ...evaluation, state: "degraded" as const, alerts });
+    const warning = backlog([{ severity: "warning", reason: "compile_backlog_age_exceeded" }]);
+    const unreadable = backlog([{ severity: "warning", reason: "compile_backlog_unavailable" }]);
+    const at = (minute: number) => new Date(slot.getTime() + minute * 60_000);
+
+    // Eleven quarter-past slots hold it; the :00 slot pages it.
+    for (let minute = 5; minute < 60; minute += 5) {
+      expect(await deliverOperationalSliBreach(warning, at(minute), now), String(minute)).toEqual({ breachId: null, code: "ALERT_HELD_FOR_HOURLY_SLOT" });
+      expect(await deliverOperationalSliBreach(unreadable, at(minute), now), String(minute)).toEqual({ breachId: null, code: "ALERT_HELD_FOR_HOURLY_SLOT" });
+    }
+    expect(post).not.toHaveBeenCalled();
+    expect((await deliverOperationalSliBreach(warning, at(60), now)).code).toBe("ALERT_DELIVERED");
+    expect(post).toHaveBeenCalledTimes(1);
+
+    // Critical backlog, and a backlog warning beside any other reason, keep the per-slot rule.
+    expect((await deliverOperationalSliBreach(backlog([{ severity: "critical", reason: "compile_backlog_age_exceeded" }]), at(5), now)).code).toBe("ALERT_DELIVERED");
+    expect((await deliverOperationalSliBreach(backlog([{ severity: "warning", reason: "compile_backlog_age_exceeded" },
+      { severity: "warning", reason: "model_provider_circuit_open" }]), at(10), now)).code).toBe("ALERT_DELIVERED");
+    expect(post).toHaveBeenCalledTimes(3);
+  });
+
   it("sends nothing when the evaluation has no breach", async () => {
     const post = vi.fn();
     vi.stubGlobal("fetch", post);

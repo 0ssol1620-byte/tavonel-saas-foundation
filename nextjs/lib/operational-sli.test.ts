@@ -254,7 +254,10 @@ describe("B35 operational SLI and freshness gate", () => {
       ]);
     });
 
-    it("is a deterministic function of the slot, so a retry of the same slot persists the same payload", () => {
+    // Deterministic in the reading and the slot only. The route reads the queue head live, so a
+    // same-slot retry after the head moved carries a different payload and meets the store's
+    // idempotency conflict (503, persisted=false, the page still sent), as a changed circuit read does.
+    it("is a deterministic function of the reading and the slot, with no clock of its own", () => {
       const reading = waitingFor(1_234);
       expect(JSON.stringify(evaluateOperationalSli(fresh, { now: NOW, compileBacklog: reading })))
         .toBe(JSON.stringify(evaluateOperationalSli(fresh, { now: NOW, compileBacklog: reading })));

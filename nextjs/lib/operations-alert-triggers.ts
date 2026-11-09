@@ -216,6 +216,11 @@ async function readRunPodSpendToday(now: number, env: Env, fetcher: typeof fetch
   (OCR_SPEND_UNVERIFIED), because "we could not measure" is exactly when a runaway goes unseen.
   Unset, zero or not a number keeps today's alert-only behaviour, so removing the variable is the
   rollback. The day is RunPod's billing bucket, so the stop lifts when its next bucket opens.
+
+  The measured total is every RunPod resource family, so retrieval's RunPod embedder and reranker
+  (embedder-adapter-runpod.ts, reranker-adapter-runpod.ts) count toward it. This gate does not stop
+  them: a retrieval runaway trips the stop and closes new uploads while its own spend continues.
+  Retrieval spend is governed by the model-provider spend ledger and circuit, not here.
 */
 export type OcrSpendStopCode = "OCR_DAILY_SPEND_STOP" | "OCR_SPEND_UNVERIFIED";
 
