@@ -1856,7 +1856,7 @@ export default function WorkspacePage() {
       if (lost > 0) {
         // Deduplicated: twenty files over the same ceiling is one fact, not twenty sentences.
         const why = [...new Set(refusals)].join("; ");
-        setNotice(`${ids.length} of ${files.length} files uploaded. ${lost} did not, and nothing was retried automatically.${why ? ` Why: ${why}.` : ""}`);
+        setNotice(`${ids.length} of ${files.length} files uploaded. ${lost} did not, and nothing was retried automatically.${why ? ` Why: ${why.replace(/\.$/, "")}.` : ""}`);
       }
       /*
         One uploaded file is a compile.
