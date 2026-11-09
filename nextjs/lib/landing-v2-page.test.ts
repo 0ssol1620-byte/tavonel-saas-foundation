@@ -382,7 +382,9 @@ describe("landing v2 -- the composition with the specimen strip rendered", () =>
     vi.stubEnv("VERCEL_ENV", "preview");
     const page = render(locale);
     const main = mainOf(page);
-    expect([...main.matchAll(/data-specimen-cell="([^"]+)"/g)].map(match => match[1])).toEqual(["nasa-sp-5079-p039", "nasa-sp-5079-p074", "naca-rm-l50c03-p001", "kma-2026-09-climate-p001"]);
+    // GX-02 (2026-11-09): the Korean document cell is not rendered on Home; its receipt stays committed.
+    expect([...main.matchAll(/data-specimen-cell="([^"]+)"/g)].map(match => match[1])).toEqual(["nasa-sp-5079-p039", "nasa-sp-5079-p074", "naca-rm-l50c03-p001"]);
+    expect(main).not.toContain("kma-2026-09-climate-p001");
     expect(undeclaredText(main)).not.toMatch(/\d/);
     const hero = sceneOf(main, "s1");
     for (const open of elements(main, "img")) {
@@ -394,7 +396,7 @@ describe("landing v2 -- the composition with the specimen strip rendered", () =>
     for (const absent of ["Landsat", "USGS", "NASA", "Cloud = No", "Collection 1"]) expect(readable(withoutSpecimens(main))).not.toContain(absent);
     // F-1: no FAQ on Home, so the strip's own licence line is each cell's full attribution (P2-32, D-06).
     expect(main).not.toContain("data-home-reader-guide");
-    expect(main.match(/data-specimen-licence=""/g)).toHaveLength(4);
+    expect(main.match(/data-specimen-licence=""/g)).toHaveLength(3);
     /*
       hard-proof 2026-10-27 (FINAL-SPEC-HARD-PROOF §2): the strip closes s2, after the workbench, so s1 is the same
       in both postures -- the film poster is the first screen's one priority image and is preloaded -- and nothing
@@ -1034,7 +1036,9 @@ describe("current-main bounded evaluation entry", () => {
     const requiredControls = (html.match(/<(?:input|select|textarea)\b[^>]*>/g) ?? [])
       .filter(tag => /\srequired(?:=""|(?=\s|>))/.test(tag));
     expect(requiredControls).toHaveLength(3);
-    expect(html).toContain(`href="${locale === "ko" ? "/evaluation" : "/ko/evaluation"}"`);
+    // GX-02 (2026-11-09): no language switch in the footer, in either rendering.
+    expect(html).not.toContain('href="/ko/evaluation"');
+    expect(html).not.toMatch(/hreflang="(ko|en)"[^>]*>(한국어|English)</i);
   });
 
   it("an English inquiry retains the processing and payment boundary", () => {

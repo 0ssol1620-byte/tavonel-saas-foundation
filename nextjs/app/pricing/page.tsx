@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Pricing — TAVONEL",
   description: "Plans and measured compute for the TAVONEL Knowledge Compiler. Hard spend limits.",
-  alternates: { canonical: "/pricing", languages: { en: "/pricing", ko: "/ko/pricing", "x-default": "/pricing" } },
+  alternates: { canonical: "/pricing" },
   openGraph: { url: "/pricing" },
 };
 

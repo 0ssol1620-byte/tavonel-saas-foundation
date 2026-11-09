@@ -101,22 +101,15 @@ test("the hero and every scene below it fit the viewport at the active product-Q
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });
 
-test("Korean visitors get the same story and the same route behind it", async ({ page }, testInfo) => {
-  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
+test("a /ko link lands on the English page it names (GX-02, global-only)", async ({ page }) => {
+  for (const [from, to] of [["/ko", "/"], ["/ko/pricing", "/pricing"], ["/ko/contact", "/contact"], ["/ko/guide", "/guide"], ["/ko/evaluation", "/evaluation"]] as const) {
+    const response = await page.request.get(from, { maxRedirects: 0 });
+    expect(response.status(), from).toBe(308);
+    expect(new URL(response.headers()["location"]!, "http://x").pathname, from).toBe(to);
+  }
   await page.goto("/ko");
-  await expect(page.locator("h1#lv2-hero-title")).toContainText("문서를 AI가 인용할 수 있는 맥락으로 바꿉니다.");
-  await expect(page.locator("[data-proof-variant]")).toHaveCount(0);
-  // The same six scenes, and the same real source page behind the same claim.
-  await expect(page.locator("main > section[data-scene]")).toHaveCount(6);
-  expect(await page.locator(`${BENCH} img`).count()).toBeGreaterThan(0);
-  await expect(page.locator(`${BENCH} [data-hero-evidence]`))
-    .toBeVisible();
-  await expect(page.locator(`${BENCH} button[aria-pressed]`)).toHaveCount(3);
-  await expect(page.locator('section#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]')).toHaveCount(1);
-  await expect(page.locator("section#s1 .compile-film-sequence").getByRole("tab")).toHaveCount(4);
-  await expect(page.locator("section#s2 [data-source-inspection-film]")).toHaveCount(0);
-  await expect(page.locator("section#s2 [data-compiler-specimen]")).toHaveCount(0);
-  await expect(page.getByTestId("landing-hero-film")).toBeVisible();
-  await expect(page.locator('#s1').getByRole("link", { name: "컴파일된 샘플 열기" })).toHaveAttribute("href", "/explore");
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+  expect(new URL(page.url()).pathname).toBe("/");
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.locator("h1#lv2-hero-title")).toContainText("Context your AI can cite");
+  await expect(page.locator('a[hreflang="ko"], a[href="/ko"], a[href^="/ko/"]')).toHaveCount(0);
 });

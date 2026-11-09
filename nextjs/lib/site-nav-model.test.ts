@@ -158,22 +158,13 @@ describe("the global menu's destinations", () => {
       .toContain("korean ? KO_CHROME.footerLinks[link.href] ?? link.label : link.label");
   });
 
-  it("closes the footer with the copyright, the Korean entry and the security inbox", () => {
+  it("closes the footer with the copyright and the security inbox, and no language switch", () => {
     expect(FOOTER_LEGAL_ROW.copyright).toBe("© 2026 TAVONEL");
-    expect(FOOTER_LEGAL_ROW.language).toEqual({ href: "/ko", label: "한국어" });
-    expect(SITEMAP_PATHS.has(FOOTER_LEGAL_ROW.language.href), "the Korean entry is a published route").toBe(true);
-    /*
-      chrome-06. The switch is reciprocal: it was one static entry rendered on every route, so on
-      /ko it read "한국어" and pointed at the page the reader was already on. The guard follows the
-      constant -- both sides, both published -- and holds the footer to picking the side the page
-      is not on.
-    */
-    expect(FOOTER_LEGAL_ROW.languageBack).toEqual({ href: "/", label: "English" });
-    expect(SITEMAP_PATHS.has(FOOTER_LEGAL_ROW.languageBack.href), "the English entry is a published route").toBe(true);
-    expect(read("../components/public-site-chrome.tsx"), "the footer picks the other language")
-      .toContain("korean ? FOOTER_LEGAL_ROW.languageBack : FOOTER_LEGAL_ROW.language");
+    /* Founder decision 2026-11-09: global-only presentation. The switch to /ko is gone, and /ko redirects. */
+    expect(read("../components/public-site-chrome.tsx"), "the footer renders no language switch").not.toContain("한국어");
+    expect(SITEMAP_PATHS.has("/ko"), "the Korean entry is no longer a published route").toBe(false);
     expect(FOOTER_LEGAL_ROW.security).toBe("security@tavonel.com");
-    expect(Object.keys(FOOTER_LEGAL_ROW).sort()).toEqual(["copyright", "language", "languageBack", "security"]);
+    expect(Object.keys(FOOTER_LEGAL_ROW).sort()).toEqual(["copyright", "security"]);
     const chrome = read("../components/public-site-chrome.tsx");
     expect(chrome, "the row is rendered, not just declared").toContain("FOOTER_LEGAL_ROW.copyright");
     for (const invented of ["Co., Ltd", "Inc.", "Republic of Korea", "governed by the laws"]) {

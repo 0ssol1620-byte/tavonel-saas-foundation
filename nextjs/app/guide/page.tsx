@@ -7,7 +7,6 @@ export const metadata: Metadata = pageMetadata({
   title: "Product guide — TAVONEL",
   description: "Use what TAVONEL offers today, step by step: the public Compiled World, its evidence and changes, the signed sample, API reads with no key, the developer files and the MCP bridge.",
   canonical: "/guide",
-  languages: { en: "/guide", ko: "/ko/guide", "x-default": "/guide" },
 });
 
 export default function Page() {

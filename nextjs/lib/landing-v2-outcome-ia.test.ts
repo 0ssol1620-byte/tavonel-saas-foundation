@@ -67,12 +67,11 @@ describe("B33 outcome IA cross-surface integration", () => {
     );
   });
 
-  it("keeps both entry pages indexable and measured", () => {
+  it("keeps the entry page indexable and measured, and no longer advertises /ko (GX-02)", () => {
     expect(sitemapPaths).toContain("/");
-    expect(sitemapPaths).toContain("/ko");
+    expect(sitemapPaths).not.toContain("/ko");
     expect(PUBLIC_MARKETING_PATHS).toContain("/");
-    expect(PUBLIC_MARKETING_PATHS).toContain("/ko");
-    expect(llms).toContain("[Korean entry page](https://tavonel.com/ko)");
+    expect(llms).not.toContain("https://tavonel.com/ko");
   });
 
   it("keeps proof interactions and classified destination clicks in the privacy-minimal listener", () => {

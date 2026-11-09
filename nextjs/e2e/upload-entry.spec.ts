@@ -81,7 +81,7 @@ async function onFirstScreen(page: Page, control: Locator, what: string, minHeig
   expect(box.height, `${what} is a ${minHeight}px target`).toBeGreaterThanOrEqual(minHeight);
 }
 
-for (const [path, label, href] of [["/", "Evaluate your documents", "/evaluation"], ["/ko", "내 문서 평가", "/ko/evaluation"]] as const) {
+for (const [path, label, href] of [["/", "Evaluate your documents", "/evaluation"]] as const) {
   test(`Home's first screen names where your documents go, and the screen it opens keeps that promise (${path})`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440" && testInfo.project.name !== "390", "1440 and 390");
     // A first visit: no session, no fixture user.
@@ -101,7 +101,7 @@ for (const [path, label, href] of [["/", "Evaluate your documents", "/evaluation
   });
 }
 
-for (const path of ["/", "/ko"]) {
+for (const path of ["/"]) {
   test(`a file dropped on Home does not open in the tab, is not kept, and moves focus to the document entry (${path})`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440" && testInfo.project.name !== "390", "1440 and 390");
     await page.goto(path);

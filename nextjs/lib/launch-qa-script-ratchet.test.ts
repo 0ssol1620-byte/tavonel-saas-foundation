@@ -108,38 +108,36 @@ describe("lighthouse-budgets script ratchet", { timeout: 180_000 }, () => {
     expect(run.stderr).toBe("");
     expect(run.code).toBe(0);
     expect(run.stdout).toContain("Lighthouse launch budgets passed.");
-    for (const route of ["/", "/ko", "/pricing", "/explore"]) summaryFor(run, route);
+    for (const route of ["/", "/pricing", "/explore", "/login"]) summaryFor(run, route);
+    // GX-02 (2026-11-09): /ko redirects, so it is not measured.
+    expect(run.summaries.map((summary) => summary.route)).not.toContain("/ko");
     for (const summary of run.summaries) {
       expect(summary.scriptTransferBytes).toBe(1000);
       expect(summary.scriptTransferSamples).toEqual([1000, 1000, 1000]);
     }
     ratchet = Object.fromEntries(run.summaries.flatMap((s) => (s.scriptRatchetBytes === null ? [] : [[s.route, s.scriptRatchetBytes]])));
-    expect(Object.keys(ratchet).sort()).toEqual(["/", "/ko"]);
+    expect(Object.keys(ratchet).sort()).toEqual(["/"]);
     for (const value of Object.values(ratchet)) expect(Number.isInteger(value) && value > 0).toBe(true);
   });
 
   it("passes at exactly the ratchet", async () => {
-    const run = await runGate({ "/": ratchet["/"], "/ko": ratchet["/ko"] });
+    const run = await runGate({ "/": ratchet["/"] });
     expect(run.code).toBe(0);
     expect(summaryFor(run, "/").over).toEqual([]);
-    expect(summaryFor(run, "/ko").over).toEqual([]);
   });
 
-  it("exits 1 when / or /ko is one byte over its ratchet", async () => {
-    const run = await runGate({ "/": ratchet["/"] + 1, "/ko": ratchet["/ko"] + 1 });
+  it("exits 1 when / is one byte over its ratchet", async () => {
+    const run = await runGate({ "/": ratchet["/"] + 1 });
     expect(run.code).toBe(1);
     expect(run.stderr).toContain("LIGHTHOUSE_PRODUCT_FAILURE");
     expect(run.stderr).toContain(`- / script-transfer-bytes ${ratchet["/"] + 1} > ${ratchet["/"]}`);
-    expect(run.stderr).toContain(`- /ko script-transfer-bytes ${ratchet["/ko"] + 1} > ${ratchet["/ko"]}`);
-    // /ko is measure-only for its other budgets; its ratchet miss must not be reported as ignored.
-    expect(summaryFor(run, "/ko").enforced).toBe(false);
     expect(run.stderr).not.toContain("LIGHTHOUSE_MEASURED_NOT_ENFORCED");
   });
 
   it("still reports a measure-only route's ordinary budget miss as not enforced", async () => {
-    const run = await runGate({ "/ko": "slow-lcp" });
+    const run = await runGate({ "/login": "slow-lcp" });
     expect(run.code).toBe(0);
-    expect(run.stderr).toContain("LIGHTHOUSE_MEASURED_NOT_ENFORCED:\n- /ko largest-contentful-paint 5000 > 3000");
+    expect(run.stderr).toContain("LIGHTHOUSE_MEASURED_NOT_ENFORCED:\n- /login largest-contentful-paint 5000 > 3000");
   });
 
   it("does not gate script bytes on routes without a ratchet", async () => {

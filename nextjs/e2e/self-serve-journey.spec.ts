@@ -238,13 +238,6 @@ test.describe("production posture today (S1: account creation open, purchase and
     await expect(page).toHaveURL(/\/contact\?plan=Developer$/);
     await expect(page.locator("form.contact-form")).toBeVisible();
 
-    // The Korean price page sends every plan to the Korean contact page.
-    await page.goto("/ko/pricing");
-    for (const plan of ["Developer", "Team", "Enterprise"]) {
-      await expect(page.getByRole("link", { name: `${plan} 도입 상담` })).toHaveAttribute("href", `/ko/contact?plan=${plan}`);
-    }
-    await expectNoCheckoutDoor(page);
-
     // H3-H5. The one door left: an offer typed into the sign-in URL by hand.
     const authorize = await stubProvider(page);
     await page.goto("/login?next=checkout&offer=observer_access");
