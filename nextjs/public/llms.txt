@@ -6,7 +6,7 @@ This file is a curated map of public TAVONEL pages for language models. It does 
 
 Role of this file: a reading map for tools. It asks no search engine for anything and no claim is made here about how any search engine treats it — every page listed below is reachable from the sitemap and the site navigation, so deleting this file would change what a tool has to crawl to find them, not whether they can be found.
 
-Crawler policy, as robots.txt enforces it: search and answer-engine crawlers are allowed on every public page — Googlebot, OAI-SearchBot, PerplexityBot and ClaudeBot, which is a fetch-time agent rather than a training crawler. Training-corpus crawlers are disallowed everywhere: GPTBot, CCBot, anthropic-ai, Google-Extended, Applebot-Extended, Bytespider and Meta-ExternalAgent. Authenticated, API-internal and workspace surfaces are excluded from every group. robots.txt is a request an operator chooses to honour, not access control; no crawler of any kind reaches a customer document, and that is authorization rather than this policy.
+Crawler policy, as robots.txt states it: search, answer-engine and AI crawlers may read every public marketing page — Googlebot, OAI-SearchBot, PerplexityBot, ClaudeBot, Claude-SearchBot, anthropic-ai, GPTBot, Google-Extended, CCBot, Applebot-Extended and Meta-ExternalAgent. Bytespider is disallowed everywhere. Authenticated, API-internal and workspace surfaces are excluded from every group. robots.txt is a request an operator chooses to honour, not access control. No crawler of any kind reaches a customer document, and that is authorization rather than this policy.
 
 Deployment state: a completed public Compiled World is open to read in full, and intake for your own sources is arranged with us rather than opened by a checkout. Product and research claims should be read from the public pages below; measured evidence and methodology are published separately from product descriptions, and no number is published here without a receipt behind it.
 
@@ -38,7 +38,6 @@ Indexing: public product, documentation, research and trust pages are indexable.
 - [Reproducibility](https://tavonel.com/reproducibility): Frozen public fixtures and digest-bound sample artifacts.
 - [Resources](https://tavonel.com/resources): The hub over the reading, verification and comparison material.
 - [Status](https://tavonel.com/status): Current service status.
-- [Korean entry page](https://tavonel.com/ko): The site's Korean-language entry point — what is compiled, what activating a reviewed World requires today, and which English page is the single source for pricing, documentation and supported formats. Korean pricing, inquiry, and document evaluation pages are also available; technical documentation and the public sample remain in English.
 
 ## Product
 
@@ -86,6 +85,5 @@ Indexing: public product, documentation, research and trust pages are indexable.
 - [Refunds](https://tavonel.com/refunds)
 - [Subprocessors](https://tavonel.com/subprocessors)
 - [Document evaluation](https://tavonel.com/evaluation): Agree on source permissions, scope, retention, costs and evidence checks before processing.
-- [문서 평가](https://tavonel.com/ko/evaluation): Korean-language document evaluation inquiry.
 - [Contact](https://tavonel.com/contact)
 - [Changelog feed (Atom)](https://tavonel.com/changelog/feed.xml)
