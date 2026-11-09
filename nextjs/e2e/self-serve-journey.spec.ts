@@ -283,7 +283,9 @@ test.describe("launch approval withheld (purchase closed; customer processing sw
 
     // H6. The closed workspace points at the public example and offers no file control.
     const strip = page.getByRole("status").filter({ hasText: "Workspace ready" });
-    await expect(strip).toContainText("Source access pending");
+    // FUNNEL-SIGNED-IN #5: before consent the strip names the one step left, not "pending".
+    await expect(strip).toContainText("One step left");
+    await expect(strip).not.toContainText("Source access pending");
     await expect(strip.getByRole("link", { name: "Explore example" })).toHaveAttribute("href", "/explore");
     await expect(page.getByRole("button", { name: "Choose files", exact: true })).toHaveCount(0);
 
