@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readPublicOperations } from "./operations";
+import { activationPolicy } from "./activation-policy";
 
 /*
   /status may not render a row without a state. RESOLVED A-6 (2026-09-06).
@@ -47,8 +48,11 @@ describe("public operations", () => {
     expect(Number.isNaN(Date.parse(status.generatedAt))).toBe(false);
   });
 
-  it("does not describe a closed customer-data path as a working pipeline", () => {
+  // D-12 (delegated decision 2026-11-09): every switch on the path is open, so the row says configured.
+  it("describes the customer-data path as configured only when every switch on it is open", () => {
     const status = readPublicOperations();
-    expect(status.components.documentPipeline.state).toBe("closed");
+    const open = ["customerIntake", "customerData", "cdr", "ocrGpu"] as const;
+    expect(open.every((key) => activationPolicy[key].enabled)).toBe(true);
+    expect(status.components.documentPipeline.state).toBe("configured");
   });
 });

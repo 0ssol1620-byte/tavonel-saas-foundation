@@ -134,7 +134,7 @@ export default function RefundsPage() {
         cancellation. Submit the request through{" "}
         <a href="mailto:support@tavonel.com">support@tavonel.com</a> or Paddle buyer support with
         the transaction email and order reference. Paddle, as merchant of record, processes
-        approved refunds to the original payment method; approved card refunds typically appear
+        approved refunds to the original payment method. Approved card refunds typically appear
         within 3-5 working days, and payment-provider timing can vary. Subject to the terms as
         updated.
       </p>
@@ -161,7 +161,7 @@ export default function RefundsPage() {
         If processing is unavailable for your workspace, renewal of its paid subscription is
         paused rather than charged. It resumes only after you confirm the resumption, because
         Paddle may charge immediately when a subscription resumes. A pause does not by itself
-        refund a completed payment; the refund rule and your statutory rights above still apply.
+        refund a completed payment. The refund rule and your statutory rights above still apply.
       </p>
 
       <h2>Billing errors</h2>

@@ -1,4 +1,4 @@
-import { ACCESS_CTA, SELF_SERVE_CTA } from "../lib/site-navigation";
+import { primaryCallToAction } from "../lib/commercial-state";
 const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/test";
 const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
@@ -91,15 +91,13 @@ test("Explore reaches the actual interactive instrument without a hero-length de
 });
 
 test("product page shows the product path before secondary product surfaces", async ({ page }) => {
-  // The primary CTA is now server-rendered. A browser route mock cannot change that
-  // commercial state: read the actual public snapshot and verify both label and destination.
+  // The primary CTA is server-rendered from primaryCallToAction(). A browser route mock cannot change
+  // that commercial state, and this runner carries the server's environment, so the same call names
+  // the action the page must render, label and destination. (The status snapshot is not that source:
+  // its purchasePlan also needs sign-in readiness, which the CTA does not read.)
   const statusResponse = await page.request.get("/api/status/v2");
   expect(statusResponse.ok()).toBe(true);
-  const status = await statusResponse.json();
-  expect(typeof status.availableActions?.compileCustomerDocuments?.enabled).toBe("boolean");
-  expect(typeof status.availableActions?.purchasePlan?.enabled).toBe("boolean");
-  const expectedCta = status.availableActions.compileCustomerDocuments.enabled &&
-    status.availableActions.purchasePlan.enabled ? SELF_SERVE_CTA : ACCESS_CTA;
+  const expectedCta = primaryCallToAction();
   await page.goto("/product");
   // Output uses follow the actual World; the old duplicate process/card wall stays retired.
   await expect(page.locator(".product-flow, .product-surface-grid")).toHaveCount(0);

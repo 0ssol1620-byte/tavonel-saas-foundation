@@ -192,7 +192,7 @@ describe("Python Product-Core v2 dispatch", () => {
     expect(byLength.ok === false && byLength.sizeLimit && "coreRequestId" in byLength.sizeLimit
       && byLength.sizeLimit.coreRequestId).toMatch(/^core-/);
 
-    // No length, streamed past the bound: cut off there, the size stated as unknown, not guessed.
+    // No length, streamed past the bound: cut off there, bytes null (the panel says "exceeded the bound"), never guessed.
     const chunk = new Uint8Array(4 * 1024 * 1024);
     let sent = 0;
     vi.stubGlobal("fetch", async () => new Response(new ReadableStream({

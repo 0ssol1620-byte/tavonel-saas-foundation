@@ -1,12 +1,95 @@
 import Link from "next/link";
 import type { Route } from "next";
+import type { CSSProperties } from "react";
 import Logomark from "@/components/logomark";
 import MobilePrimaryNav from "@/components/mobile-primary-nav";
-import DesktopPrimaryNav, { HeaderCta } from "@/components/site-nav/desktop-primary-nav";
+import { HeaderCta, NavCurrentLink, NavDisclosure } from "@/components/site-nav/desktop-primary-nav";
 import HeaderScrollState from "@/components/site-nav/header-scroll-state";
 import { MarketingConsentLink } from "@/components/marketing-consent";
-import { BRAND_LINE, FOOTER_GROUPS, FOOTER_LEGAL_ROW, KO_CHROME, SAMPLE_CTA } from "@/lib/site-navigation";
+import {
+  BRAND_LINE,
+  FOOTER_GROUPS,
+  FOOTER_LEGAL_ROW,
+  HEADER_NAV,
+  KO_CHROME,
+  KO_NAV_PANELS,
+  SAMPLE_CTA,
+  navAlsoOwns,
+  navGroupFor,
+  type NavPanelItem,
+} from "@/lib/site-navigation";
 import chrome from "./public-site-chrome.module.css";
+
+/*
+  NAV PANELS, 2026-11-09: the bar's items open the 2026-09-11 panels again, on hover and from a
+  toggle beside each label.
+
+  Server-rendered, both widths. Every bar item is still the link it was -- a click on "Product"
+  goes to /product -- and the items that own a group (`navGroupFor`) are followed by a disclosure
+  button and the panel it controls, in that order, so Tab walks label, toggle, the open panel's
+  links, then the next label. `NavDisclosure` is the only script: it moves `aria-expanded`, and
+  `public-site-chrome.module.css` draws the panel from that attribute. The markup is the same at
+  both widths ("one structure"); the bar lays a panel out as columns under its item, the phone
+  sheet as an accordion row. The class names differ only because the e2e specs and the shared
+  chrome sheets have always told the two chromes apart by them.
+
+  Panel links do not prefetch: they are in the DOM on every page, and T1-014 measured what a footer
+  full of prefetching links cost a cold Home load.
+*/
+export function NavSections({ korean = false, sheet = false }: { korean?: boolean; sheet?: boolean }) {
+  const linkText = (item: NavPanelItem) => (korean ? KO_NAV_PANELS.links[item.href] ?? item.label : item.label);
+  const description = (item: NavPanelItem) => (korean ? KO_NAV_PANELS.descriptions[item.href] ?? item.description : item.description);
+  const panelLink = (item: NavPanelItem) => (
+    <Link key={item.href} className={chrome.navLink} href={item.href as Route} prefetch={false}>
+      <span className={chrome.navLinkLabel}>{linkText(item)}</span>
+      {description(item) ? <span className={chrome.navDescription}>{description(item)}</span> : null}
+    </Link>
+  );
+  return (
+    <>
+      {HEADER_NAV.map((item) => {
+        const label = korean ? KO_CHROME.nav[item.href] ?? item.label : item.label;
+        const group = navGroupFor(item.href);
+        const panelId = `${sheet ? "sheet" : "bar"}-nav-panel-${group?.section}`;
+        return [
+          <NavCurrentLink key={item.href} href={item.href} also={navAlsoOwns(item.href)} native={sheet} section={group?.section}
+            className={sheet ? "mobile-nav-direct" : "site-nav-direct"}>
+            {/* BQ-013: /ko rendered these in English above Korean body copy. */}
+            {label}
+          </NavCurrentLink>,
+          group ? (
+            <button key={`${item.href}-toggle`} type="button" className={chrome.navToggle} aria-expanded="false"
+              aria-controls={panelId} data-section={group.section} data-hub={item.href}
+              aria-label={`${label} ${korean ? KO_NAV_PANELS.menu : "menu"}`} />
+          ) : null,
+          group ? (
+            <div key={`${item.href}-panel`} className={chrome.navPanel} id={panelId} data-section={group.section}>
+              <div className={chrome.navCard} style={{ "--nav-columns": group.columns.length } as CSSProperties}>
+                {group.columns.map((column) => (
+                  <div className={chrome.navColumn} key={column.title}>
+                    <p className={chrome.navColumnTitle}>{korean ? KO_NAV_PANELS.columns[column.title] ?? column.title : column.title}</p>
+                    {column.items.map(panelLink)}
+                  </div>
+                ))}
+                {group.featured ? <p className={chrome.navFeatured}>{panelLink(group.featured)}</p> : null}
+              </div>
+            </div>
+          ) : null,
+        ];
+      })}
+      <NavDisclosure hover={!sheet} />
+    </>
+  );
+}
+
+/** The desktop row: the bar items, their toggles and their panels. Below 1250px the sheet takes over. */
+export function DesktopPrimaryNav({ korean = false }: { korean?: boolean }) {
+  return (
+    <nav aria-label={korean ? "섹션" : "Sections"} className={`site-nav one-path-primary-nav ${chrome.navBar}`}>
+      <NavSections korean={korean} />
+    </nav>
+  );
+}
 
 /**
  * The header, once, for every public surface including the three that used to hand-roll one.
@@ -77,7 +160,10 @@ export function PublicSiteHeader({
         <b>TAVONEL</b>
       </Link>
       <DesktopPrimaryNav korean={korean} />
-      <MobilePrimaryNav korean={korean} signedIn={signedIn} />
+      <MobilePrimaryNav korean={korean} signedIn={signedIn}
+        labels={{ menu: korean ? KO_CHROME.menu : "Menu", pricing: pricingLabel, signIn: korean ? KO_CHROME.signIn : "Sign in" }}>
+        <NavSections korean={korean} sheet />
+      </MobilePrimaryNav>
       <span className="nav-actions">
         <Link className={`small ${chrome.pricingLink}`} href={korean ? "/ko/pricing" : "/pricing"}>{pricingLabel}</Link>
         {/*

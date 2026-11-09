@@ -3,6 +3,7 @@ import { settleFoundationCompute } from "@/lib/compute-reservation";
 import { settleCompletedRead } from "@/lib/completed-read-proof";
 import { parseCompletedReadFacts } from "../../../../../../shared/completedReadReceipt";
 import { verifyComputeSettlementRequest } from "@/lib/compute-settlement-auth";
+import { billingSecret } from "@/lib/billing-secrets";
 import { appendServiceAuditEvent } from "@/lib/enterprise-store";
 import { DOCUMENT_ID_PATTERN, WORKSPACE_ID_PATTERN } from "@/lib/immutable-keys";
 import { alertOcrFailure } from "@/lib/operations-alert-triggers";
@@ -99,7 +100,13 @@ export async function POST(request: Request) {
   if (Buffer.byteLength(rawBody, "utf8") > 2_048) {
     return NextResponse.json({ code: "SETTLEMENT_REQUEST_TOO_LARGE" }, { status: 413, headers });
   }
-  if (!verifyComputeSettlementRequest(rawBody, request.headers, process.env.FOUNDATION_BILLING_SETTLEMENT_HMAC)) {
+  // A key that is set but refused is our misconfiguration, not the caller's bad signature: 503, so the
+  // Worker retries. An absent key verifies nothing, and stays a 401 as before.
+  const secret = billingSecret("FOUNDATION_BILLING_SETTLEMENT_HMAC");
+  if (!secret && process.env.FOUNDATION_BILLING_SETTLEMENT_HMAC) {
+    return NextResponse.json({ code: "BILLING_NOT_CONFIGURED" }, { status: 503, headers });
+  }
+  if (!verifyComputeSettlementRequest(rawBody, request.headers, secret)) {
     return NextResponse.json({ code: "SETTLEMENT_AUTH_INVALID" }, { status: 401, headers });
   }
   let body: unknown;

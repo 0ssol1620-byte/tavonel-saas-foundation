@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
 import sitemap from "@/app/sitemap";
+import { DesktopPrimaryNav, NavSections } from "@/components/public-site-chrome";
+import { navCurrent } from "@/components/site-nav/desktop-primary-nav";
 import { exploreSampleDocuments } from "./explore-sample";
 import {
   CUSTOMER_NAV,
@@ -10,15 +14,22 @@ import {
   EXPLORE_CTA,
   FOOTER_GROUPS,
   FOOTER_LEGAL_ROW,
+  HEADER_NAV,
   NAV_GROUPS,
   NAV_PENDING_HREFS,
   NAV_PRICING,
   PRIMARY_NAV,
   RESOURCE_LINKS,
+  navGroupFor,
   navHrefs,
   navSectionForPath,
   KO_CHROME,
+  KO_NAV_PANELS,
+  navAlsoOwns,
 } from "./site-navigation";
+
+// The bar items read the route; the rendered-panel checks below are made from /docs/mcp.
+vi.mock("next/navigation", () => ({ usePathname: () => "/docs/mcp" }));
 
 /*
   The menu model, checked where it is cheapest to check.
@@ -30,9 +41,10 @@ import {
   that has quietly stopped covering a path just stops saying where you are. None of them fails a
   build, and none of them shows up in a screenshot.
 
-  What it deliberately does not check is presentation. Whether the panel opens on click, returns
-  focus on Escape and closes on an outside press is behaviour in a browser, and it is asserted in
-  `e2e/site-nav.spec.ts` and `e2e/launch-qa-mobile-nav.spec.ts` against a production build.
+  What it deliberately does not check is presentation. Whether the panel opens on hover, returns
+  focus on Escape and closes when the pointer leaves is behaviour in a browser, and it is asserted
+  in `e2e/site-nav.spec.ts` against a production build. What the server renders -- which items
+  carry a panel, and what is in it -- is pinned here, under "the rendered panels".
 */
 
 const read = (path: string) => readFileSync(resolve(import.meta.dirname, path), "utf8");
@@ -43,8 +55,18 @@ const panelItems = NAV_GROUPS.flatMap((group) => [
 ]);
 
 describe("the global menu's destinations", () => {
-  it("is five things in the bar: four groups and Pricing", () => {
-    expect(NAV_GROUPS.map((group) => group.label)).toEqual(["Product", "Solutions", "Developers", "Resources"]);
+  /*
+    NAV PANELS, 2026-11-09. The groups hang from the bar that exists, not from a bar of their own.
+
+    Each group's hub is a bar item's href and its label is that item's label, so the header can find
+    a panel by the item it renders (`navGroupFor`) and never draws a second, different bar. How it
+    works and Pricing carry no group: each is one page that answers its own question.
+  */
+  it("hangs a panel from Product, Resources and Docs, and none from How it works or Pricing", () => {
+    expect(HEADER_NAV.map((item) => navGroupFor(item.href)?.label ?? null)).toEqual(["Product", null, "Resources", "Docs"]);
+    expect(NAV_GROUPS).toHaveLength(3);
+    for (const group of NAV_GROUPS) expect(HEADER_NAV).toContainEqual({ href: group.overviewHref, label: group.label });
+    expect(navGroupFor("/pricing")).toBeUndefined();
     expect(NAV_PRICING).toEqual({ href: "/pricing", label: "Pricing" });
   });
 
@@ -176,9 +198,9 @@ describe("the global menu's destinations", () => {
 /*
   Landing V2, 2026-09-19 (blueprint §8, contract D2). The public destinations a reader actually sees.
 
-  Everything above this describes `NAV_GROUPS`, which is the 2026-09-11 IA model and is rendered
-  by nothing today -- `app/tavonel.css` records where its disclosures used to be. `CUSTOMER_NAV`
-  is the array both chromes map over, and until now it was checked only by
+  Everything above this describes `NAV_GROUPS`, the 2026-09-11 IA model, which hangs from this
+  bar again since NAV PANELS (2026-11-09). `CUSTOMER_NAV` is still the array both chromes map
+  over, and until now it was checked only by
   `lib/one-path-contract.test.ts`'s equality assertion, which cannot catch the two failures that
   are silent in a browser: a bar link to a route the site does not publish, and a /ko header with
   an English label in it because the Korean table was not extended with the bar.
@@ -256,9 +278,17 @@ describe("the Resources panel", () => {
   });
 });
 
-describe("the Solutions panel", () => {
+describe("the Solutions column of the Product panel", () => {
   const page = read("../app/solutions/[slug]/page.tsx");
-  const items = NAV_GROUPS.find((group) => group.section === "solutions")?.columns[0]?.items ?? [];
+  const column = NAV_GROUPS.find((group) => group.section === "product")?.columns.find(
+    (candidate) => candidate.title === "Solutions by workflow",
+  );
+  // The column ends on the hub, which the Solutions panel carried as its featured link.
+  const items = column?.items.filter((item) => item.href !== "/solutions") ?? [];
+
+  it("ends on the Solutions hub", () => {
+    expect(column?.items.at(-1)).toEqual({ href: "/solutions", label: "All solutions" });
+  });
 
   it("lists every solution the page publishes and invents none", () => {
     const published = [...page.matchAll(/^ {2}"([a-z-]+)": \{$/gm)].map((match) => match[1]);
@@ -276,6 +306,112 @@ describe("the Solutions panel", () => {
       expect(page, `no audience matches the menu description for ${item.href}`).toContain(
         `audience: "${item.description}"`,
       );
+    }
+  });
+});
+
+/*
+  NAV PANELS, 2026-11-09. One language per panel, the footer's rule (chrome-14 / D36).
+
+  The /ko header renders the panels too, so every column title, link and audience line they carry
+  has a Korean spelling, and the table names nothing the panels do not carry. The corpus line is a
+  number in two languages: the Korean one is held to the same figures as the English one.
+*/
+describe("the panels in Korean", () => {
+  const items = NAV_GROUPS.flatMap((group) => [
+    ...group.columns.flatMap((column) => column.items),
+    ...(group.featured ? [group.featured] : []),
+  ]);
+
+  it("translates every column, link and description, and nothing else", () => {
+    const titles = NAV_GROUPS.flatMap((group) => group.columns.map((column) => column.title));
+    expect(Object.keys(KO_NAV_PANELS.columns).sort()).toEqual([...new Set(titles)].sort());
+    expect(Object.keys(KO_NAV_PANELS.links).sort()).toEqual([...new Set(items.map((item) => item.href))].sort());
+    const described = items.filter((item) => item.description).map((item) => item.href);
+    expect(Object.keys(KO_NAV_PANELS.descriptions).sort()).toEqual([...new Set(described)].sort());
+  });
+
+  it("states the sample corpus with the figures the English line has", () => {
+    const regions = exploreSampleDocuments.reduce((total, document) => total + document.regionCount, 0);
+    expect(KO_NAV_PANELS.descriptions["/explore"]).toBe(
+      `Apple SEC 코퍼스 · 공시 ${exploreSampleDocuments.length}건 · 영역 ${regions.toLocaleString("en-US")}개`,
+    );
+  });
+});
+
+/*
+  NAV PANELS, 2026-11-09: what the server sends, before any script runs.
+
+  A bar item that owns a group is followed by a closed disclosure button and the panel it names, and
+  the panel carries every link of the group. The labels stay links to their hubs, `aria-current`
+  still comes from `customerNavCurrent`, and nothing in a panel claims the current page. The sheet
+  renders the same rows, so the phone gets the same groups rather than a second list.
+*/
+describe("the rendered panels", () => {
+  const groupHrefs = (section: string) => {
+    const group = NAV_GROUPS.find((candidate) => candidate.section === section)!;
+    return [...group.columns.flatMap((column) => column.items), ...(group.featured ? [group.featured] : [])].map(
+      (item) => item.href,
+    );
+  };
+  const panelOf = (html: string, id: string) => {
+    const start = html.indexOf(`id="${id}"`);
+    expect(start, `${id} is not rendered`).toBeGreaterThan(-1);
+    const next = html.indexOf("-nav-panel-", start + id.length + 4);
+    return html.slice(start, next > -1 ? next : html.length);
+  };
+  // Every anchor with the class, in document order, attribute order aside.
+  const anchors = (html: string, className: string) =>
+    (html.match(/<a [^>]*>/g) ?? []).filter((tag) => tag.includes(`class="${className}"`));
+  const hrefOf = (tag: string) => /href="([^"]+)"/.exec(tag)?.[1];
+
+  it("draws the bar as four links, a closed toggle beside the three that own a group, and their panels", () => {
+    const html = renderToStaticMarkup(createElement(DesktopPrimaryNav));
+    const bar = anchors(html, "site-nav-direct");
+    expect(bar.map(hrefOf)).toEqual(HEADER_NAV.map((item) => item.href));
+    const toggles = [...html.matchAll(/<button[^>]*>/g)].map((match) => match[0]);
+    expect(toggles).toHaveLength(NAV_GROUPS.length);
+    for (const group of NAV_GROUPS) {
+      const toggle = toggles.find((candidate) => candidate.includes(`aria-controls="bar-nav-panel-${group.section}"`));
+      expect(toggle, `${group.label} has no toggle`).toBeDefined();
+      expect(toggle).toContain('aria-expanded="false"');
+      expect(toggle).toContain(`aria-label="${group.label} menu"`);
+      const panel = panelOf(html, `bar-nav-panel-${group.section}`);
+      for (const href of groupHrefs(group.section)) expect(panel, `${group.label} panel lacks ${href}`).toContain(`href="${href}"`);
+    }
+    expect(html, "How it works opens nothing").not.toContain('data-hub="/how-it-works"');
+    expect(bar.find((tag) => hrefOf(tag) === "/docs"), "the bar marks the section it owns").toContain('aria-current="location"');
+    expect(html.match(/aria-current=/g), "and nothing else").toHaveLength(1);
+    expect(html).not.toContain('role="menu"');
+  });
+
+  /*
+    The script ratchet's half of this change. Home and /ko load `lib/site-navigation`'s chunk only if
+    a client module they run imports it, and the two header client files were the only ones. The
+    client copy of the ownership rule is therefore held to the server's on every bar href.
+  */
+  it("keeps the header's client files off lib/site-navigation, with the same ownership rule", () => {
+    for (const file of ["../components/site-nav/desktop-primary-nav.tsx", "../components/mobile-primary-nav.tsx"]) {
+      expect(read(file), `${file} imports the navigation module`).not.toMatch(/from "(?:@\/lib|\.\.?\/lib|\.)\/site-navigation"/);
+    }
+    const paths = ["/", "/product", "/product/", "/product/compiled-world", "/productivity", "/how-it-works", "/research",
+      "/research/notes", "/benchmarks/gdp-pdf", "/changelog", "/guide", "/docs", "/docs/mcp", "/docs-old", "/sources",
+      "/pricing", "/ko/pricing", "/resources", "/explore", ""];
+    for (const { href } of CUSTOMER_NAV) {
+      for (const path of paths) expect(navCurrent(href, navAlsoOwns(href), path), `${href} on ${path}`).toBe(customerNavCurrent(href, path));
+    }
+  });
+
+  it("renders the same groups as the phone sheet's rows, in Korean on /ko", () => {
+    const html = renderToStaticMarkup(createElement(NavSections, { korean: true, sheet: true }));
+    expect(anchors(html, "mobile-nav-direct").map(hrefOf)).toEqual(HEADER_NAV.map((item) => item.href));
+    for (const group of NAV_GROUPS) {
+      const panel = panelOf(html, `sheet-nav-panel-${group.section}`);
+      for (const href of groupHrefs(group.section)) {
+        expect(panel).toContain(`href="${href}"`);
+        expect(panel).toContain(KO_NAV_PANELS.links[href]);
+      }
+      expect(html).toContain(`aria-label="${KO_CHROME.nav[group.overviewHref]} ${KO_NAV_PANELS.menu}"`);
     }
   });
 });

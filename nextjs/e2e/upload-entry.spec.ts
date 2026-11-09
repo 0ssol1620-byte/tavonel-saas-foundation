@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { fixtureDocument, installFixtureSession, installWorkspaceRoutes, sseFrames } from "./fixtures/workspace-fixture";
+import { primaryCallToAction } from "../lib/commercial-state";
 
 /*
   Founder asks 2026-10-27: "pdf 어디에 올리라는거야? ... 파일 드래그앤드랍도 할 수 있게 해야하는거아냐?" (Home), and
@@ -81,7 +82,16 @@ async function onFirstScreen(page: Page, control: Locator, what: string, minHeig
   expect(box.height, `${what} is a ${minHeight}px target`).toBeGreaterThanOrEqual(minHeight);
 }
 
-for (const [path, label, href] of [["/", "Evaluate your documents", "/evaluation"]] as const) {
+/*
+  The entry follows primaryCallToAction(), which this runner reads from the server's own environment.
+  Without launch approval it is the evaluation request. With it, and customer data open (D-12), it is
+  the self-serve action: sign in, then upload -- a door that is open in that posture, not a promise.
+*/
+const ACCESS = primaryCallToAction();
+const SELF_SERVE = ACCESS.href !== "/contact";
+for (const [path, label, href] of SELF_SERVE
+  ? [["/", ACCESS.label, ACCESS.href]] as const
+  : [["/", "Evaluate your documents", "/evaluation"]] as const) {
   test(`Home's first screen names where your documents go, and the screen it opens keeps that promise (${path})`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440" && testInfo.project.name !== "390", "1440 and 390");
     // A first visit: no session, no fixture user.
@@ -91,9 +101,10 @@ for (const [path, label, href] of [["/", "Evaluate your documents", "/evaluation
     await expect(entry).toHaveText(label);
     await expect(entry).toHaveAttribute("href", href);
     await onFirstScreen(page, entry, "the document entry", 44);
-    // Two hero actions, not three (DESIGN_MASTER_V3 §12.2), and none of them promises an upload behind sign-in.
+    // Two hero actions, not three (DESIGN_MASTER_V3 §12.2). Without launch approval none of them promises an
+    // upload behind sign-in; with it, the entry itself is the one sign-in door.
     await expect(page.locator("#s1 [data-testid='landing-hero-actions'] a")).toHaveCount(2);
-    await expect(page.locator("#s1 a[href^='/login']")).toHaveCount(0);
+    await expect(page.locator("#s1 a[href^='/login']")).toHaveCount(SELF_SERVE ? 1 : 0);
     await entry.click();
     await page.waitForURL(`**${href}`);
     await expect(page.locator("main")).toBeVisible();

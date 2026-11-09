@@ -112,8 +112,8 @@ export default function EnterprisePage() {
               <p>
                 A pilot produces an agreed source inventory, reviewable candidate results,
                 evidence-linked findings and a written go/no-go record. We agree the permitted
-                inputs and named-contact support before any material is provided. Processing your
-                own documents is arranged with us and is not enabled by purchasing a plan.
+                inputs and named-contact support before any material is provided. An Enterprise
+                pilot is scoped with us rather than bought online.
               </p>
               {/*
                 Gap #6 + #15, 2026-09-22. The security buyer arrives here, not on /trust, and the
@@ -137,7 +137,7 @@ export default function EnterprisePage() {
 
               <h2>What an engagement costs</h2>
               <p>
-                The published plans and the per-page rate above them are on{" "}
+                The published plans and the pages each one includes are on{" "}
                 <Link href={"/pricing#enterprise-pricing" as Route}>Pricing</Link>, in US dollars and excluding tax.
                 An enterprise number is quoted after the deployment review, against your page
                 volume, your source types and the work that connecting them takes — never before

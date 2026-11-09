@@ -49,7 +49,7 @@ export const metadata: Metadata = { title: "What is a Knowledge Compiler? RAG, g
 const QUESTIONS = [
       {
         question: "Is this just RAG with extra steps?",
-        answer: "RAG is a retrieval strategy; this is an artifact. The chunks a retriever needs are one file in the package, produced from a reviewed World rather than from raw text — so they carry the page and region they came from, and they change only when the World does.",
+        answer: "RAG is a retrieval strategy. A compiled World is an artifact. The chunks a retriever needs are one file in the package, produced from a reviewed World rather than from raw text — so they carry the page and region they came from, and they change only when the World does.",
       },
       {
         question: "Do I have to replace my retrieval stack?",
@@ -120,7 +120,7 @@ export default function KnowledgeCompilerPage() {
       figure: <KnowledgeCompilerDiagram />,
     },
     { title: "Compared with RAG, graphs and search", body: "RAG retrieves chunks at question time, a graph stores entities and relations, and enterprise search helps people find documents. A Knowledge Compiler produces all three — retrieval units, a graph, a document index — and treats each as one projection of a reviewed World rather than as the final asset. Build-time structure, evidence and versions that several retrieval or model layers can consume, in other words.", rows: [
-      { key: "RAG", description: "Question-time retrieval over an index; quality depends on chunking, retrieval and generation. The units a compiler emits come out of a reviewed World, so each one carries the region it was read from and changes only when the World does.", state: "COMPLEMENTARY" },
+      { key: "RAG", description: "Question-time retrieval over an index. Quality depends on chunking, retrieval and generation. The units a compiler emits come out of a reviewed World, so each one carries the region it was read from and changes only when the World does.", state: "COMPLEMENTARY" },
       { key: "KNOWLEDGE GRAPH", description: "A representation of connected objects. A compiler adds the source pipeline, evidence contract, review lifecycle, retrieval projections and portable package around that graph — the process and the receipts that make the representation inspectable and maintainable.", state: "COMPONENT" },
       { key: "ENTERPRISE SEARCH", description: "Find and rank relevant source material. A compiler materializes reusable claims, objects and evidence paths for both people and agents, and preserves the links back to those documents rather than discarding provenance.", state: "DOCUMENT-CENTRIC" },
     ] },
@@ -138,9 +138,9 @@ export default function KnowledgeCompilerPage() {
     ] },
     { title: "Glossary", collapsed: true, body: "The words this product uses in the exact sense it uses them. Where a term has a looser industry meaning, the narrower one here is deliberate.", rows: [
       { key: "COMPILED WORLD", description: "The output of one compile: objects, relations, evidence, retrieval material and a validation report, addressed by a digest.", state: "THE ARTIFACT" },
-      { key: "CANDIDATE", description: "A compiled result that has not been activated. It can be read, downloaded and reviewed; nothing answers from it.", state: "LIFECYCLE" },
+      { key: "CANDIDATE", description: "A compiled result that has not been activated. It can be read, downloaded and reviewed. Nothing answers from it.", state: "LIFECYCLE" },
       { key: "ACTIVE", description: "The one revision a workspace answers from. It changes only when a person activates a candidate or rolls back to a prior revision.", state: "LIFECYCLE" },
-      { key: "EVIDENCE REGION", description: "A source version, an exact location inside it, an excerpt and a digest. What a citation resolves to. The location takes whatever form the source has; in a PDF it is a page and a box measured in thousandths of it.", state: "PROVENANCE" },
+      { key: "EVIDENCE REGION", description: "A source version, an exact location inside it, an excerpt and a digest. What a citation resolves to. The location takes whatever form the source has. In a PDF it is a page and a box measured in thousandths of it.", state: "PROVENANCE" },
       { key: "STABLE ID", description: "An identifier derived from content, so recompiling the same source lands on the same object rather than a new one.", state: "IDENTITY" },
       { key: "MANIFEST DIGEST", description: "The sha256 of the canonical form of a World. Two Worlds with the same digest are the same World.", state: "IDENTITY" },
       { key: "ABSTENTION", description: "The answer given when the sources do not support one. It is a result, not a failure.", state: "BEHAVIOUR" },
