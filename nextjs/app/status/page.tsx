@@ -131,7 +131,7 @@ export default async function StatusPage() {
     <div className={`${styles.section} ${styles.wide}`}>
     <h2>Scheduled dependency checks</h2>
     <div className={styles.guidance}>
-    <p>Request checks here run on a schedule without customer data and report what came back. Billing is a configuration-only check; it sends no request through a payment flow. A row marked &ldquo;not probed&rdquo; is neither a pass nor a failure: nothing was sent, and the reason is given.</p>
+    <p>Request checks here run on a schedule without customer data and report what came back. Billing is a configuration-only check. It sends no request through a payment flow. A row marked &ldquo;not probed&rdquo; is neither a pass nor a failure: nothing was sent, and the reason is given.</p>
     <p>
       Last check that passed: <strong>{stamp(probe.lastSuccessfulAt)}</strong>. Most recent check
       of any outcome: <strong>{stamp(probe.lastRunAt)}</strong>

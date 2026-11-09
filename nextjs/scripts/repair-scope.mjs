@@ -2244,6 +2244,9 @@ export const SITE_POLISH_AFFECTED_PATHS = Object.freeze(['components/benchmarks/
   'components/explore/change-act.tsx', 'components/file-or-route-link.tsx', 'components/trust-disclosures.tsx', 'components/trust-provisions.tsx', 'lib/file-or-route-link.test.ts']);
 export const SITE_POLISH_AFFECTED_UNIT_FILES = Object.freeze(['lib/benchmarks-page.test.ts', 'lib/explore-story.test.ts', 'lib/file-or-route-link.test.ts', 'lib/public-trust-contract.test.ts', 'lib/trust-provisions.test.ts']);
 export const SITE_POLISH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmarks.spec.ts', 'e2e/explore.spec.ts', 'e2e/templates.spec.ts']);
+// legal-semicolons-status-20261109: the /status operating-record spec, which pins the billing sentence.
+export const LEGAL_SEMICOLONS_STATUS_AFFECTED_PATHS = Object.freeze(['e2e/operations.spec.ts']);
+export const LEGAL_SEMICOLONS_STATUS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/operations.spec.ts']);
 // Packet delivery (codex/packet-delivery-textlayer-20261102): the delivery format an AI reads the compiled context in. The
 // download route and the two guidance modules that write the delivery/ files and point AGENTS.md at them, the package verifier
 // and its scripts/ copy that admit the delivery root, the delivery suite and the two parity suites whose MCP surface now reads
@@ -3112,6 +3115,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // site-polish-20261109: 5 exact paths select 4 direct suites and 3 browser suites.
   affectedGroup('site-polish-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(SITE_POLISH_AFFECTED_PATHS)})$`),
     { unitFiles: SITE_POLISH_AFFECTED_UNIT_FILES, browserFiles: SITE_POLISH_AFFECTED_BROWSER_FILES }),
+  // legal-semicolons-status-20261109: 1 exact path selects no direct suite and 1 browser suite.
+  affectedGroup('legal-semicolons-status-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(LEGAL_SEMICOLONS_STATUS_AFFECTED_PATHS)})$`),
+    { unitFiles: [], browserFiles: LEGAL_SEMICOLONS_STATUS_AFFECTED_BROWSER_FILES }),
   // library-dedup-b1: the 2 exact paths above select 2 direct suites and no browser suite.
   affectedGroup('library-dedup-b1', new RegExp(`^nextjs/(?:${exactPathAlternation(LIBRARY_DEDUP_AFFECTED_PATHS)})$`),
     { unitFiles: LIBRARY_DEDUP_AFFECTED_UNIT_FILES }),
