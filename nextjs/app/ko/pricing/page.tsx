@@ -63,7 +63,7 @@ export default function KoreanPricingPage() {
             <div className={styles.intro}>
               <p className="eyebrow">요금</p>
               <h1 className="document-title" id="ko-pricing-title">먼저 확인하고, 맞는 범위로 시작하세요.</h1>
-              <p className="lede">완성된 공개 World는 로그인 없이 살펴볼 수 있습니다. 내 원문 컴파일은 단계적으로 열고 있으며, 로그인하면 대기 목록에 들어갑니다. 요금제와 포함 페이지는 아래에 있습니다.</p>
+              <p className="lede">완성된 공개 World는 로그인 없이 살펴볼 수 있습니다. 내 원문 컴파일은 단계적으로 열고 있으며, 로그인하면 워크스페이스가 만들어지고 열림 상태가 워크스페이스 화면에 표시됩니다. 요금제와 포함 페이지는 아래에 있습니다.</p>
               <div className={styles.actions}>
                 <Link className="btn" href={intro.href as Route}>{intro.label}</Link>
                 <Link className="btn ghost" href="/explore" hrefLang="en">공개 World 확인 (영문)</Link>

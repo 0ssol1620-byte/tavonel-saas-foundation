@@ -244,7 +244,7 @@ export const KO_CHROME = {
     review PR201-R1 B3. Every syllable is inside the KO Home font subset (landing-v2-page.test.ts).
   */
   customerDataGate:
-    "내 원문 컴파일은 단계적으로 열고 있습니다. 로그인하면 워크스페이스가 대기 목록에 들어가고, 하나씩 업로드와 컴파일을 열어 드립니다. 열린 뒤에는 Developer 요금제를 바로 구매할 수 있고, Team과 Enterprise는 저희와 함께 정합니다.",
+    "내 원문 컴파일은 단계적으로 열고 있습니다. 로그인하면 워크스페이스가 만들어지고, 업로드와 컴파일은 단계마다 워크스페이스별로 열립니다. 내 워크스페이스의 열림 상태는 워크스페이스 화면에 표시됩니다. 열린 뒤에는 Developer 요금제를 바로 구매할 수 있고, Team과 Enterprise는 저희와 함께 정합니다.",
 } as const;
 
 /**

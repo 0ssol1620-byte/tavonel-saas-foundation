@@ -259,7 +259,7 @@ const TABLE = {
     home: { ...CLOSED.home, secondary: { href: "/login", label: "Sign up for access" } },
     homeKo: { ...CLOSED.homeKo, secondary: { href: "/login", label: "사용 신청하기" } },
     pricing: [
-      { href: "/login", label: "Start free evaluation" },
+      { href: "/login", label: "Sign up for access" },
       { href: "/login?next=checkout&offer=observer_access", label: "Get Developer access, via sign-in" },
       { href: "/contact?plan=Team", label: "Talk to us about Team" },
       { href: "/contact?plan=Enterprise", label: "Scope an Enterprise pilot" },
@@ -357,7 +357,7 @@ describe.each(STATES)("CTA truth in %s", (state) => {
     // The scan below is only worth its zero if it can see a self-serve label when one is offered.
     it("offers the self-serve labels the scan looks for", () => {
       expect(seen.labels.filter((label) => SELF_SERVE.test(label))).toEqual(
-        expect.arrayContaining(["Sign up for access", "Start free evaluation", "사용 신청하기"]),
+        expect.arrayContaining(["Sign up for access", "사용 신청하기"]),
       );
     });
   } else {
