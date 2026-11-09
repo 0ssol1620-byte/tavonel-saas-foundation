@@ -6,8 +6,8 @@ import { changelogEntries } from "@/lib/changelog";
 import { PublicPageShell } from "@/components/public-page-shell";
 
 export const metadata: Metadata = {
-  title: "Changelog — TAVONEL",
-  description: "What changed in TAVONEL, grouped as added, improved and fixed, with the surface it touched and any breaking change.",
+  title: "Changelog: what changed in TAVONEL and where — TAVONEL",
+  description: "What changed in TAVONEL, grouped as added, improved and fixed, with the surface each change touched and any breaking change called out. Also served as a feed.",
   alternates: { canonical: "/changelog", types: { "application/atom+xml": "/changelog/feed.xml" } },
   openGraph: { url: "/changelog" },
 };

@@ -4,8 +4,8 @@ import { pageMetadata } from "@/lib/page-seo";
 import styles from "@/components/marketing-story.module.css";
 
 export const metadata = pageMetadata({
-  title: "How it works — from source to a Compiled World",
-  description: "Follow the source pipeline: versioned input, document reading, evidence binding, review, AI connections and a new version when sources change.",
+  title: "How it works: from source files to a World — TAVONEL",
+  description: "Follow the source pipeline: versioned input, document reading, evidence binding, review, AI connections and a new version of the World when sources change.",
   canonical: "/how-it-works",
 });
 

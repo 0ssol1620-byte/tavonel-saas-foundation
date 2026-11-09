@@ -225,9 +225,7 @@ export function compactFooterLinks(korean: boolean, groups: typeof FOOTER_GROUPS
   });
 }
 
-export function PublicSiteFooter({ korean = false, onePath = false, languageHref, compact = false }: { korean?: boolean; onePath?: boolean; languageHref?: string; compact?: boolean } = {}) {
-  /* chrome-06: the switch points at the language the reader is not reading. */
-  const language = korean ? FOOTER_LEGAL_ROW.languageBack : FOOTER_LEGAL_ROW.language;
+export function PublicSiteFooter({ korean = false, onePath = false, compact = false }: { korean?: boolean; onePath?: boolean; compact?: boolean } = {}) {
   /* BQ-131: the wordmark at the bottom of a page is where a reader goes home from. It was
      a bare <span> -- the one instance of the lockup on the site that was not a link. */
   const wordmark = <Link href={korean ? "/ko" : "/"} className={`wordmark ${chrome.wordmark}`} aria-label={korean ? "TAVONEL 홈" : "TAVONEL home"}><Logomark /><b>TAVONEL</b></Link>;
@@ -291,9 +289,8 @@ export function PublicSiteFooter({ korean = false, onePath = false, languageHref
           above, which is a design decision rather than a re-add.
         */}
         {/*
-          BA-250: the row a procurement reader looks for. Copyright, the Korean entry and the
-          security inbox -- the last two are pages and an address this site already publishes, so
-          nothing here is a new commitment. The legal entity and the governing jurisdiction are
+          BA-250: the row a procurement reader looks for. Copyright and the security inbox -- an
+          address this site already publishes, so nothing here is a new commitment. The legal entity and the governing jurisdiction are
           deliberately absent; see `FOOTER_LEGAL_ROW`.
         */}
         {/*
@@ -305,12 +302,8 @@ export function PublicSiteFooter({ korean = false, onePath = false, languageHref
         */}
         <p className={`fine site-footer-legal ${chrome.legal}`}>
           <span className="site-footer-legal-pair">{FOOTER_LEGAL_ROW.copyright}</span>
-          <span className="site-footer-legal-sep" aria-hidden="true">·</span>
-          <span className="site-footer-legal-pair">
-            {/* T1-014 again (ROUND3-P2): the one footer link that was missing the flag, so /ko
-                fired an RSC prefetch for `/` that the browser then aborted. */}
-            <Link href={(languageHref ?? language.href) as Route} hrefLang={korean ? "en" : "ko"} lang={korean ? "en" : "ko"} prefetch={false}>{language.label}</Link>
-          </span>
+          {/* Founder decision 2026-11-09 (global-only presentation): no language switch. A Korean
+              reader uses the browser's own translation, and /ko/* redirects to English. */}
           <span className="site-footer-legal-sep" aria-hidden="true">·</span>
           <span className="site-footer-legal-pair">
             <a href={`mailto:${FOOTER_LEGAL_ROW.security}`}>{FOOTER_LEGAL_ROW.security}</a>
@@ -339,7 +332,7 @@ export type PageTemplate = "T0" | "T1" | "T2" | "T3" | "T4" | "T5";
   `template` is required: a new public page has to say which template it is, and a page outside
   §5.4's inventory (the 404, the noindex /arena) says so with `null` rather than by forgetting.
 */
-export function PublicSitePage({ children, template, korean = false, languageHref }: { children: React.ReactNode; template: PageTemplate | null; korean?: boolean; languageHref?: string }) {
+export function PublicSitePage({ children, template, korean = false }: { children: React.ReactNode; template: PageTemplate | null; korean?: boolean }) {
   /*
     The commercial posture, read once per page rather than fetched once per visitor.
 
@@ -353,7 +346,7 @@ export function PublicSitePage({ children, template, korean = false, languageHre
     <div className="page public-page" lang={korean ? "ko" : undefined} data-template={template ?? undefined}>
       <PublicSiteHeader korean={korean} />
       <main id="main" tabIndex={-1}>{children}</main>
-      <PublicSiteFooter korean={korean} languageHref={languageHref} />
+      <PublicSiteFooter korean={korean} />
     </div>
   );
 }

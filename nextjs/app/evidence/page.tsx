@@ -21,9 +21,9 @@ export const metadata: Metadata = {
     The navigation label and the hub tile label live in `lib/site-navigation.ts`, which nav-global
     owns; that half is a cross-lane request.
   */
-  title: "Evidence — TAVONEL",
+  title: "Evidence: follow a result back to its source — TAVONEL",
   description:
-    "How a compiled result stays bound to the source version and the exact location inside it that it came from, and how to verify a signed package.",
+    "How a compiled result stays bound to the source version and the exact location inside it that it came from, and how to verify a signed package yourself.",
 };
 
 /**

@@ -271,3 +271,20 @@ deploy 단계의 요구(깨끗한 `git status`)는 그대로 두고, checkout이
   - 표면 파일: `.gitignore`, `supabase/tests/foundation_approved_connection_batch_binding.sql`, `nextjs/scripts/gate-surface.mjs`,
     `nextjs/scripts/release-gate-check.test.mjs`.
   - presentational 파일: 이 ADR과 runbook(`.md`).
+
+## 추가 2026-11-09 — 병합 전 출시 행 (닫힘 0분)
+
+위 결정은 바꾸지 않았다. 표면 정의, digest, reader, trigger, 만료가 그대로다.
+
+- **문제.** 표면 상속은 최근 main 병합 16개 중 0개에서 일어났다. 16개 모두 실행되는 코드를 바꿨기 때문이다. 그래서 거의
+  모든 배포가 병합 커밋의 행을 기다렸다. 행은 병합 커밋의 main CI를 인용하는데, 그 CI는 Vercel READY보다 늦게 끝난다.
+  `66282505`는 56분, `f2ca88d3`는 6분 닫혔다.
+- **결정.** 행을 병합 전에 PR head에 대해 기록한다. head는 origin/main을 포함해야 하고, 사실은 head의 `pull_request` CI를
+  인용한다. 그런 head의 tree는 병합 커밋의 tree와 같으므로, 배포는 READY 순간 위 5번의 표면 상속으로 그 행을 읽는다.
+  `release-gate-check --merge-into <base>`가 병합 전에 이것을 확인한다. GitHub가 만들 tree(`git merge-tree --write-tree`)의
+  표면을 이름 붙인 행만 센다.
+- **표면을 좁히지 않았다.** #213과 #199가 바꾼 경로는 모두 업로드 route와 같은 서버 프로세스에서, 또는 digest 뒤의 prebuild에서
+  실행된다. 고객 데이터 처리에 닿지 않는다고 증명할 수 있는 경로가 없다(R5 B1).
+- **CI 기록자는 여전히 기각한다.** 위 선택지 (a)(b)의 이유(PUBLIC 저장소의 service-role 비밀, CI가 관찰할 수 없는 사실,
+  창업자 사실의 기계 복사)가 그대로다.
+- 절차와 실패 시 되돌아갈 길은 `docs/runbooks/RELEASE_ORDER.md` "추가 2026-11-09"에 있다.

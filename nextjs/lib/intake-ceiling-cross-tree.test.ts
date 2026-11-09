@@ -16,7 +16,14 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { PROCESSING_CEILING } from "../../shared/intakeCeiling";
+import {
+  INTAKE_CEILING_STAGE,
+  INTAKE_CEILING_STAGES,
+  OCR_JSON_MAX_BYTES,
+  PROCESSING_CEILING,
+  intakeCeilingFor,
+} from "../../shared/intakeCeiling";
+import { MAX_DERIVED_JSON_BYTES } from "./r2-objects";
 
 const ROOT = resolve(import.meta.dirname, "..", "..");
 const WORKER_KEYS = "quarantine-sidecar/foundation-cdr-worker/src/keys.ts";
@@ -26,10 +33,11 @@ const GPU = "workers/foundation-ocr-gpu/app.py";
 const CEILING = "shared/intakeCeiling.ts";
 const READER = "nextjs/lib/r2-objects.ts";
 const WORKER_SANITIZE = "quarantine-sidecar/foundation-cdr-worker/src/sanitize.ts";
+const WORKER_TEXT_LAYER = "quarantine-sidecar/foundation-cdr-worker/src/text-layer-shadow.ts";
 
 // A Windows checkout is CRLF (core.autocrlf) and CI is LF; the line anchors must see the same text.
 const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8").replace(/\r\n/g, "\n");
-const tree = new Map([WORKER_KEYS, WORKER_OCR, CDR, GPU, CEILING, READER, WORKER_SANITIZE].map((path) => [path, read(path)]));
+const tree = new Map([WORKER_KEYS, WORKER_OCR, CDR, GPU, CEILING, READER, WORKER_SANITIZE, WORKER_TEXT_LAYER].map((path) => [path, read(path)]));
 const fromTree = (path: string) => tree.get(path) ?? "";
 
 /** `80`, `4_000_000`, `5 * 1024 * 1024`. A name, a call or anything else is NaN and never matches. */
@@ -46,9 +54,14 @@ const declaredInCeiling = (name: string) =>
 // compared with its own copy: raising one processor and its copy together is not a disagreement.
 const WORKER_SOURCE_BYTES = declaredInCeiling("WORKER_MAX_SOURCE_BYTES");
 const CDR_INPUT_BYTES = declaredInCeiling("CDR_MAX_INPUT_BYTES");
-const PAGES = PROCESSING_CEILING.maxSourcePages;
+const PAGES = INTAKE_CEILING_STAGES[0].maxSourcePages;
+const STAGE_1_PAGES = INTAKE_CEILING_STAGES[1].maxSourcePages;
 const MIB = 1024 * 1024;
 const RASTER_HANDOFF_BYTES = 18 * MIB;
+// D1 stage 1 bounds below the ceiling are the stage-0 bounds per page times the stage-1 pages.
+const perStage1Page = (stage0Bound: number) => (stage0Bound / PAGES) * STAGE_1_PAGES;
+const ocrBounds = (stage: 0 | 1, field: string, tail = ",") =>
+  new RegExp(`^const STAGE_${stage}_OCR_BOUNDS: OcrBounds = \\{.*?\\b${field}: ([^,}]+?)${tail}`, "gm");
 
 type Site = { file: string; name: string; pattern: RegExp; expected: number; source: string };
 
@@ -70,7 +83,7 @@ const SITES: readonly Site[] = [
     expected: PAGES, source: "PROCESSING_CEILING.maxSourcePages: the reader reads every page the rasterizer renders",
   },
   {
-    file: WORKER_OCR, name: "OCR result pageCount bound", pattern: /Number\(result\.pageCount\) > (\S+) \|\|/g,
+    file: WORKER_OCR, name: "STAGE_0_OCR_BOUNDS pages", pattern: ocrBounds(0, "pages"),
     expected: PAGES, source: "PROCESSING_CEILING.maxSourcePages: the worker keeps every page the reader returns",
   },
   {
@@ -82,14 +95,16 @@ const SITES: readonly Site[] = [
     expected: RASTER_HANDOFF_BYTES, source: "pinned: equal to the rasterizer's MAX_OUTPUT_BYTES",
   },
   {
-    file: WORKER_OCR, name: "MAX_PERSISTED_OCR_BYTES", pattern: /^const MAX_PERSISTED_OCR_BYTES = (.+);$/gm,
-    expected: 24 * MIB, source: "pinned: ocr.json for an 80-page source",
+    // The worker carries the sanitized PDF from the rasterizer to the reader; a smaller bound
+    // here retries a paid CDR run into the DLQ (review R1 M1).
+    file: WORKER_SANITIZE, name: "MAX_SANITIZED_BYTES", pattern: /^const MAX_SANITIZED_BYTES = (.+);$/gm,
+    expected: RASTER_HANDOFF_BYTES, source: "pinned: equal to the rasterizer's MAX_OUTPUT_BYTES",
   },
   {
-    // The compile reads what the worker stored. Below the worker's bound, an accepted source
-    // reads, stores, and then fails at structuring on size alone (cjob-1e8b7a0e, 2026-11-04).
-    file: READER, name: "MAX_DERIVED_JSON_BYTES", pattern: /^export const MAX_DERIVED_JSON_BYTES = (.+);$/gm,
-    expected: 24 * MIB, source: "pinned: equal to the worker's MAX_PERSISTED_OCR_BYTES",
+    // The compile reads what the worker stored (#189): below the worker's bound, an accepted
+    // source reads, stores, and then fails at structuring on size alone (cjob-1e8b7a0e).
+    file: WORKER_OCR, name: "STAGE_0_OCR_BOUNDS persistedBytes", pattern: ocrBounds(0, "persistedBytes", " \\};"),
+    expected: intakeCeilingFor(0).OCR_JSON_MAX_BYTES, source: "intakeCeiling.ts OCR_JSON_MAX_BYTES at stage 0: ocr.json for an 80-page source",
   },
   {
     file: WORKER_SANITIZE, name: "MAX_RECEIPT_BYTES", pattern: /^const MAX_RECEIPT_BYTES = (.+);$/gm,
@@ -100,12 +115,71 @@ const SITES: readonly Site[] = [
     expected: 16 * 1024, source: "pinned: equal to the worker's MAX_RECEIPT_BYTES",
   },
   {
-    file: WORKER_OCR, name: "OCR result text length bound", pattern: /result\.text\.length > (\S+) \|\|/g,
+    file: WORKER_OCR, name: "STAGE_0_OCR_BOUNDS textChars", pattern: ocrBounds(0, "textChars"),
     expected: 4_000_000, source: "pinned: OCR text for an 80-page source",
   },
   {
-    file: WORKER_OCR, name: "OCR result region count bound", pattern: /result\.regions\.length > (\S+)$/gm,
+    file: WORKER_OCR, name: "STAGE_0_OCR_BOUNDS regions", pattern: ocrBounds(0, "regions"),
     expected: 50_000, source: "pinned: OCR regions for an 80-page source",
+  },
+  // D1 stage 1 (PROGRAM-2026-11-04 §4.D, 25 MiB / 200 pages): the copies a processor reads when it
+  // runs with TAVONEL_INTAKE_CEILING_STAGE=1. Bytes and pages are §4.D's; the rest is derived.
+  {
+    file: WORKER_KEYS, name: "STAGE_1_MAX_SOURCE_BYTES", pattern: /^export const STAGE_1_MAX_SOURCE_BYTES = (.+);$/gm,
+    expected: declaredInCeiling("WORKER_STAGE_1_MAX_SOURCE_BYTES"), source: "intakeCeiling.ts WORKER_STAGE_1_MAX_SOURCE_BYTES",
+  },
+  {
+    file: CDR, name: "STAGE_1_MAX_INPUT_BYTES", pattern: /^STAGE_1_MAX_INPUT_BYTES: Final = (.+)$/gm,
+    expected: declaredInCeiling("CDR_STAGE_1_MAX_INPUT_BYTES"), source: "intakeCeiling.ts CDR_STAGE_1_MAX_INPUT_BYTES",
+  },
+  {
+    file: CDR, name: "STAGE_1_MAX_PAGES", pattern: /^STAGE_1_MAX_PAGES: Final = (.+)$/gm,
+    expected: STAGE_1_PAGES, source: "INTAKE_CEILING_STAGES[1].maxSourcePages",
+  },
+  {
+    file: CDR, name: "STAGE_1_MAX_OUTPUT_BYTES", pattern: /^STAGE_1_MAX_OUTPUT_BYTES: Final = (.+)$/gm,
+    expected: perStage1Page(RASTER_HANDOFF_BYTES), source: "derived: the stage-0 output bound per page times the stage-1 pages",
+  },
+  {
+    file: CDR, name: "STAGE_1_RASTER_RANGE_PAGES", pattern: /^STAGE_1_RASTER_RANGE_PAGES: Final = (.+)$/gm,
+    expected: 8, source: "pinned: the worker's OCR range size (wrangler.jsonc FOUNDATION_OCR_PAGE_RANGE_SIZE)",
+  },
+  {
+    file: GPU, name: "STAGE_1_MAX_PAGES", pattern: /^STAGE_1_MAX_PAGES: Final = (.+)$/gm,
+    expected: STAGE_1_PAGES, source: "INTAKE_CEILING_STAGES[1].maxSourcePages: the reader reads every page the rasterizer renders",
+  },
+  {
+    file: GPU, name: "STAGE_1_MAX_INPUT_BYTES", pattern: /^STAGE_1_MAX_INPUT_BYTES: Final = (.+)$/gm,
+    expected: perStage1Page(RASTER_HANDOFF_BYTES), source: "derived: equal to the rasterizer's STAGE_1_MAX_OUTPUT_BYTES",
+  },
+  {
+    file: WORKER_SANITIZE, name: "STAGE_1_MAX_SANITIZED_BYTES", pattern: /^const STAGE_1_MAX_SANITIZED_BYTES = (.+);$/gm,
+    expected: perStage1Page(RASTER_HANDOFF_BYTES), source: "derived: equal to the rasterizer's STAGE_1_MAX_OUTPUT_BYTES",
+  },
+  {
+    // The D2 shadow reads the ocr.json the worker wrote at either stage, so it takes the larger.
+    file: WORKER_TEXT_LAYER, name: "MAX_OCR_JSON_BYTES", pattern: /^const MAX_OCR_JSON_BYTES = (.+);$/gm,
+    expected: intakeCeilingFor(1).OCR_JSON_MAX_BYTES, source: "intakeCeiling.ts OCR_JSON_MAX_BYTES at stage 1",
+  },
+  {
+    file: WORKER_TEXT_LAYER, name: "MAX_TEXT_LAYER_BYTES", pattern: /^const MAX_TEXT_LAYER_BYTES = (.+);$/gm,
+    expected: intakeCeilingFor(0).OCR_JSON_MAX_BYTES, source: "intakeCeiling.ts OCR_JSON_MAX_BYTES at stage 0",
+  },
+  {
+    file: WORKER_OCR, name: "STAGE_1_OCR_BOUNDS pages", pattern: ocrBounds(1, "pages"),
+    expected: STAGE_1_PAGES, source: "INTAKE_CEILING_STAGES[1].maxSourcePages",
+  },
+  {
+    file: WORKER_OCR, name: "STAGE_1_OCR_BOUNDS textChars", pattern: ocrBounds(1, "textChars"),
+    expected: perStage1Page(4_000_000), source: "derived: the stage-0 text bound per page times the stage-1 pages",
+  },
+  {
+    file: WORKER_OCR, name: "STAGE_1_OCR_BOUNDS regions", pattern: ocrBounds(1, "regions"),
+    expected: perStage1Page(50_000), source: "derived: the stage-0 region bound per page times the stage-1 pages",
+  },
+  {
+    file: WORKER_OCR, name: "STAGE_1_OCR_BOUNDS persistedBytes", pattern: ocrBounds(1, "persistedBytes", " \\};"),
+    expected: intakeCeilingFor(1).OCR_JSON_MAX_BYTES, source: "intakeCeiling.ts OCR_JSON_MAX_BYTES at stage 1",
   },
 ];
 
@@ -199,6 +273,28 @@ describe("hidden copies of the intake ceiling", () => {
     for (const file of definitions) {
       expect(read(file), file).not.toMatch(/TAVONEL_(CDR|OCR)_(MAX_[A-Z_]+|RASTER_RANGE_PAGES)/);
     }
+  });
+
+  it("read the compile's ocr.json bound from the active stage, never a literal of its own", () => {
+    expect(fromTree(READER)).toMatch(/^export const MAX_DERIVED_JSON_BYTES = OCR_JSON_MAX_BYTES;$/m);
+    expect(MAX_DERIVED_JSON_BYTES).toBe(OCR_JSON_MAX_BYTES);
+    expect(OCR_JSON_MAX_BYTES).toBe(intakeCeilingFor(INTAKE_CEILING_STAGE).OCR_JSON_MAX_BYTES);
+    expect([intakeCeilingFor(0).OCR_JSON_MAX_BYTES, intakeCeilingFor(1).OCR_JSON_MAX_BYTES]).toEqual([24 * MIB, 60 * MIB]);
+  });
+
+  /*
+    The stage intake admits ships as 0. §4.D's stage-1 numbers are measurements to be taken, not
+    targets, and the processors must run stage 1 before intake does (RELEASE_ORDER.md, "W2-D").
+    Flipping it is therefore an edit to this assertion, made in the reviewed change that records
+    the measurement.
+  */
+  it("ship intake at stage 0, with stage 1 at the section 4.D numbers", () => {
+    expect(INTAKE_CEILING_STAGE).toBe(0);
+    expect(PROCESSING_CEILING).toEqual(INTAKE_CEILING_STAGES[0]);
+    expect(INTAKE_CEILING_STAGES).toEqual({
+      0: { maxSourceBytes: 5 * MIB, maxSourcePages: 80 },
+      1: { maxSourceBytes: 25 * MIB, maxSourcePages: 200 },
+    });
   });
 
   it("fail when intakeCeiling.ts stops stating a processor copy as a literal", () => {

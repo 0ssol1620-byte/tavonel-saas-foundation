@@ -550,15 +550,11 @@ export const FOOTER_LEGAL_ROW = {
   /** The brand, which is what this site is published as. No entity, no jurisdiction -- see above. */
   copyright: "© 2026 TAVONEL",
   /*
-    The §12.4 Korean entry, in Korean, because that is who it is for -- and its return trip.
-
-    chrome-06: this was one static entry rendered on every route, so on /ko itself the control
-    read "한국어" and pointed at /ko. A switch whose only job is to change language was a self-link
-    on the one page where it matters. The pair is reciprocal now and the footer picks the side the
-    page is not on.
+    No language switch. Founder decision 2026-11-09 (global-only presentation): the site is
+    presented in English, a Korean reader uses the browser's own translation, and /ko/* answers
+    308 to the English page (next.config.mjs). The /ko sources stay in the tree, unreachable,
+    until a separate change deletes them.
   */
-  language: { href: "/ko", label: "한국어" },
-  languageBack: { href: "/", label: "English" },
   security: "security@tavonel.com",
 } as const;
 

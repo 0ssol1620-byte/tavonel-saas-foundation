@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Stage-1 decoder-error fallbacks, the same two-halves path as scripts/encode-cut-2x.sh, but yuv420p (High profile).
 #   encode-fallback.sh <frames-dir> <out.mp4> <crf> [scale]
-#   hero-r2-c1-hq.mp4:      encode-fallback.sh <root>/hero-r2-c1/frames-2x public/film/hero-r2-c1-hq.mp4 20
-#   hero-r2-c1-hq-1440.mp4: encode-fallback.sh <root>/hero-r2-c1/frames-2x public/film/hero-r2-c1-hq-1440.mp4 20 1440:900
+#   hero-r3-c1-hq.mp4:      encode-fallback.sh <root>/hero-r3-c1/frames-2x public/film/hero-r3-c1-hq.mp4 20
+#   hero-r3-c1-hq-1440.mp4: encode-fallback.sh <root>/hero-r3-c1/frames-2x public/film/hero-r3-c1-hq-1440.mp4 20 1440:900
 set -euo pipefail
 FF="${FILM_FFMPEG:?set FILM_FFMPEG to the ffmpeg 7.1 binary}"; FRAMES="$1"; OUT="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"; CRF="$3"; VF=(); [ -n "${4:-}" ] && VF=(-vf "scale=$4:flags=lanczos")
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT

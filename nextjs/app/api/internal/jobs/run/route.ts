@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
-import { runCompileJobBatch } from "@/lib/compile-job-worker";
+import { expireBlockedCompileJobs, runCompileJobBatch } from "@/lib/compile-job-worker";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { claimJob } from "@/lib/job-store";
 import { runSourceImportBatch } from "@/lib/sync-worker";
@@ -63,6 +63,10 @@ async function runOneBatch(request: Request) {
     // with claimed 0, tick after tick, while compiles sit in preflight/reading, means it is held again.
     blocked: compiles.filter((turn) => turn.note === "blocked").length,
     durationMs: Date.now() - batchStartedAt }));
+
+  // F2: a blocker decision nobody made in seven days settles the job. The batch never sees these
+  // jobs, so this tick is the only thing that ends the wait. Quiet: one count line, no pages.
+  await expireBlockedCompileJobs();
 
   /*
     The durable path's `candidate_ready`, fired from the turn that produced the package.

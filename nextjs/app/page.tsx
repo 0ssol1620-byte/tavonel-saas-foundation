@@ -10,14 +10,8 @@ import { BRAND_LINE } from "@/lib/site-navigation";
 import { SPECIMEN_FIXTURE_COOKIE } from "@/lib/specimen-sources";
 
 /**
- * The English entry point, and one half of the site's only hreflang pair.
- *
- * `/` and `/ko` are each the site's entry point in their own language, so each names the other and
- * `x-default` is the English one, which has the whole site behind it. The pair lives here rather
- * than on the root layout because layout metadata is inherited by every page that declares no
- * `alternates`, which put the annotation on seven retired-URL stubs -- see the comment in
- * `app/layout.tsx`. `canonical` is restated because declaring `alternates` replaces the inherited
- * object rather than merging into it.
+ * The entry point. Self-canonical and nothing else: the founder's 2026-11-09 global-only decision
+ * retired the /ko pair (it now redirects here), so there is no hreflang alternate left to name.
  */
 /*
   D26 / BQ-134. One tab-title pattern, and this page is its one named exception.
@@ -32,11 +26,8 @@ import { SPECIMEN_FIXTURE_COOKIE } from "@/lib/specimen-sources";
 export const metadata: Metadata = {
   title: `TAVONEL — ${BRAND_LINE.headline}`,
   description:
-    "Inspect a finished public Compiled World, follow one result to its exact source region, compare what changed, and review accepted sources and deployment boundaries before discussing your own sources.",
-  alternates: {
-    canonical: "/",
-    languages: { en: "/", ko: "/ko", "x-default": "/" },
-  },
+    "Inspect a finished public Compiled World, follow one result to its exact source region, and compare what changed before you discuss your own sources.",
+  alternates: { canonical: "/" },
   openGraph: {
     title: BRAND_LINE.headline,
     description: BRAND_LINE.descriptor,

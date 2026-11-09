@@ -180,7 +180,7 @@ test("the Home first screen puts actions before its four-stage film and source p
   // action" branch below has nothing to measure until the reader scrolls (marketing-consent.spec).
   await expect(consent).toHaveCount(0);
   const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
-  await expect(film.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
+  await expect(film.getByRole("tab")).toHaveText(["Read", "Compile", "Update", "Trace"]);
   // FINAL-SPEC 2026-10-26 D-9: the disclosure stays; its wording is the redesign's.
   await expect(film.locator("figcaption")).toHaveText("Illustrative demo · not customer results.");
   const measure = async () => page.evaluate(() => {
