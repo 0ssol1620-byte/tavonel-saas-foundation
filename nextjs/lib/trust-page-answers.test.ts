@@ -333,7 +333,7 @@ describe("§77 /status scope", () => {
   */
   it("separates configured rows from successful requests", () => {
     expect(page).toContain("configured and its gate is open");
-    expect(page).toContain("it does not mean a request recently succeeded");
+    expect(page).toContain("It does not mean a request recently succeeded");
     expect(page).toContain("Scheduled checks report request outcomes separately");
   });
 

@@ -128,12 +128,14 @@
   width at which it is still readable, and below that a reader scrolls it rather than reading a
   squashed one. The axis ticks are SVG text, so the box is a fixed user-unit box and is not
   scaled down to the viewport. The frame hugs that box rather than spanning the column, so a wide
-  screen does not get an empty field beside the plot.
+  screen does not get an empty field beside the plot. `justify-self`, not
+  `width: fit-content`: a fixed width is the item's min-content contribution and WebKit grew the
+  grid track to 586px at 390px; a start-aligned scroll container contributes zero.
 */
 .plotScroll {
   overflow-x: auto;
   min-width: 0;
-  width: fit-content;
+  justify-self: start;
   max-width: 100%;
   border: 1px solid var(--hairline);
   border-radius: var(--r-paper-lg, 8px);
