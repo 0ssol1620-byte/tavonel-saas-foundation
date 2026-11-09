@@ -32,6 +32,7 @@
 
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
 import { activationPolicy } from "../lib/activation-policy";
+import { readCommercialState } from "../lib/commercial-state";
 import { ENTITLEMENT_PENDING_SENTENCE, ENTITLEMENT_WAIT_DELAYS_MS, ENTITLEMENT_WAIT_WINDOW_MS, entitlementActiveSentence } from "../lib/entitlement-wait";
 import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "../lib/intake-approval-rollout";
 import { failureSentence } from "../lib/workspace-failure-copy";
@@ -209,6 +210,9 @@ test("the fence records and aborts what would leave the machine, and keeps unmoc
 test.describe("launch approval withheld (purchase closed; customer processing switched on by D-12)", () => {
   test("every purchase entry ends at /contact or a stated sentence -- no checkout door, no Paddle, no raw code", async ({ page, request, baseURL }) => {
     test.setTimeout(90_000);
+    // This posture is the absence of launch approval. A server started with the live-commerce flags (the
+    // repair-scope browser bundle) is the other posture, and the simulated switch-on journey below covers it.
+    test.skip(readCommercialState().liveChargesEnabled, "launch approval is granted on this server");
     // The two switches as this server answers them, not as a fixture says.
     const served = await (await request.get("/api/status/v2")).json() as { availableActions: Record<string, { enabled: boolean }> };
     expect(served.availableActions.purchasePlan.enabled, "purchase is closed without launch approval").toBe(false);
