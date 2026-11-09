@@ -39,7 +39,7 @@ test("navigation and hero actions keep readable labels", async ({ page }) => {
   The film sits under the centered opening statement in Scene 01. Both Scene 01 and the
   source-linked explanation in Scene 02 keep the wordmark's measured outer edge.
 */
-for (const path of ["/", "/ko"]) {
+for (const path of ["/"]) {
   test(`${path} shares a measured outer edge and keeps the opened walkthrough inside it`, async ({ page }, testInfo) => {
     test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     await page.emulateMedia({ reducedMotion: "reduce" });

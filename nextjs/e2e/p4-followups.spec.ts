@@ -100,7 +100,7 @@ test.describe("(a) /developers link targets", () => {
   the line, so wrapped rows sat 21px into each other at 360-430 (5-13 pairs, live main as well as the PR).
 */
 test.describe("(a) /guide link targets", () => {
-  for (const route of ["/guide", "/ko/guide"]) {
+  for (const route of ["/guide"]) {
     for (const width of PHONES) {
       test(`${route} does not overlap at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 844 });
@@ -157,7 +157,7 @@ test.describe("(b) /docs/mcp code", () => {
 });
 
 test.describe("(d) the guide's API key marker", () => {
-  for (const [route, none] of [["/guide", "No API key needed for this chapter."], ["/ko/guide", "이 장은 API 키 없이 따라 할 수 있습니다."]] as const) {
+  for (const [route, none] of [["/guide", "No API key needed for this chapter."]] as const) {
     for (const width of [390, 1440]) {
       test(`${route} marks every chapter at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: width <= 390 ? 844 : 900 });

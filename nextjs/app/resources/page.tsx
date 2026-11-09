@@ -9,9 +9,9 @@ import styles from "./resources.module.css";
 export const metadata: Metadata = {
   alternates: { canonical: "/resources" },
   openGraph: { url: "/resources" },
-  title: "Resources — TAVONEL",
+  title: "Resources: sample World, docs and research — TAVONEL",
   description:
-    "Explore a Compiled World, read the documentation and API, and inspect the research and evidence behind the compiler.",
+    "Explore a Compiled World, read the documentation and API, and inspect the research and evidence behind the compiler. A sample world you can take apart yourself.",
 };
 
 /*
@@ -32,7 +32,7 @@ const NOT_PREFETCHED = new Set(["/guide", "/cookbooks"]);
 
 const DESCRIPTIONS: Record<string, string> = {
   "/explore": "Follow a result from an answer back to the exact source location it came from, without signing in.",
-  "/guide": "How to use what TAVONEL offers today, screen by screen, and where each screen stops. In English and Korean.",
+  "/guide": "How to use what TAVONEL offers today, screen by screen, and where each screen stops.",
   "/knowledge-compiler": "What a Knowledge Compiler is, and how it differs from a parser, a RAG pipeline and a graph database.",
   "/docs": "Quickstart, concepts, supported files, compiling, review, and using a world through Ask, the API and MCP.",
   "/cookbooks": "Task guides that take one piece of work through the product, each published ahead of a recorded run.",

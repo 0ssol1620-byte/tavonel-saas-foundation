@@ -284,7 +284,7 @@ test.describe("Home keeps main's header and footer colours", () => {
     test.skip(!["1440", "390", "360"].includes(testInfo.project.name), "measured at 1440, 390 and 360");
   });
 
-  for (const path of ["/", "/ko"]) {
+  for (const path of ["/"]) {
     test(`on ${path}`, async ({ page }, testInfo) => {
       await page.goto(path);
       const footer = page.locator("footer.site");

@@ -448,7 +448,9 @@ describe("the recordings", () => {
           expect(tag).toMatch(/ poster="[/]guide[/]guide-2-mcp-(desktop|phone)[.]jpg"/);
         }
         expect(html).toContain('<track kind="captions" src="/guide/guide-2-mcp-desktop.en.vtt" srcLang="en" label="English"');
-        expect(html).toContain('src="/guide/guide-2-mcp-phone.ko.vtt" srcLang="ko" label="한국어"');
+        // GX-02: the Korean caption track exists only on the Korean guide.
+        if (language === "ko") expect(html).toContain('src="/guide/guide-2-mcp-phone.ko.vtt" srcLang="ko" label="한국어"');
+        else expect(html).not.toContain('srcLang="ko"');
         expect(html.match(/<track [^>]*default=""/g)).toHaveLength(2);
         expect(html).toMatch(new RegExp(`srcLang="${language}"[^>]*default=""`));
         expect(html).toContain(`<summary>${GUIDE_UI[language].transcript}</summary>`);

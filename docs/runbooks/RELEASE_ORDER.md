@@ -528,3 +528,13 @@ compile이 24 MiB를 넘는 `ocr.json`을 `JSON_TOO_LARGE`로 거부하게 둔�
   ~700개, 32건 호출은 ~4,000개까지 3초 안에 든다. 그보다 큰 workspace에서 `shadow`를 켜기 전에 LSH banding을 넣는다.
 - 되돌리기: env를 지우거나 `off`(재배포 필요, 과금 build 1회). 테이블·열은 남긴다(expand만, down migration 없음).
   `off`이면 읽는 경로도 쓰는 경로도 없다.
+
+## 추가 2026-11-09 — IndexNow 제출 (GX-04)
+
+- 키는 공개용이다. `nextjs/public/7a0ff86c91c02b35a358cdf2761b2512.txt`가 `https://tavonel.com/7a0ff86c91c02b35a358cdf2761b2512.txt`로
+  나가고 본문이 키 자체다. 비밀이 아니며 교체하려면 파일 이름과 본문을 같이 바꾼다(`lib/indexnow.test.ts`가 1개만 허용).
+- **빌드에 연결하지 않는다.** production 배포가 Ready가 된 뒤 사람이 한 번 돌린다:
+  `cd nextjs && node scripts/indexnow-ping.mjs --dry-run`으로 payload를 확인하고, `node scripts/indexnow-ping.mjs`로 보낸다.
+- 스크립트는 라이브 사이트가 키 파일을 같은 본문으로 내보내는지 먼저 확인하고, 아니면 보내지 않는다(exit 1).
+  `https://tavonel.com/sitemap.xml`의 tavonel.com URL 전부를 `https://api.indexnow.org/indexnow`로 POST한다. 200/202만 성공이다.
+- preview 배포에서는 돌리지 않는다. host가 tavonel.com으로 고정되어 있다.

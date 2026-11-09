@@ -9,9 +9,9 @@ import { EXPLORE_CTA } from "@/lib/site-navigation";
 import { signedProductDemo } from "@/lib/signed-product-demo";
 
 export const metadata: Metadata = {
-  title: "Enterprise — TAVONEL",
+  title: "Enterprise: control the knowledge your AI uses — TAVONEL",
   description:
-    "Compile enterprise knowledge into a source-grounded, reviewable, portable world, with activation under human control.",
+    "Turn approved manuals, contracts, policies and reports into a versioned World. Every answer can return to its source, and reviewers control what goes active.",
   alternates: { canonical: "/enterprise" },
   openGraph: { url: "/enterprise" },
 };

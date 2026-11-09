@@ -28,9 +28,9 @@ import { EXPLORE_CTA } from "@/lib/site-navigation";
 */
 
 export const metadata: Metadata = {
-  title: "Cookbooks — TAVONEL",
+  title: "Cookbooks: task guides, one task start to finish — TAVONEL",
   description:
-    "Six task guides: compile a document set into reviewable work, trace a figure to its source, answer from your manuals, connect an external AI, hand over a signed package, apply a source revision.",
+    "Six task guides that each take one piece of work through the product, from compiling a document set to tracing a figure, connecting an AI or signing a package.",
   alternates: { canonical: "/cookbooks" },
   openGraph: { url: "/cookbooks" },
 };

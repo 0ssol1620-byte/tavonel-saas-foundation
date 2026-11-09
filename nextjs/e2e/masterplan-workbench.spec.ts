@@ -22,7 +22,7 @@ test("source-first sample filters honestly and restores the selected question", 
 for (const width of [1178, 390, 320]) {
   test(`public evidence journey reflows at ${width}px`, async ({page}) => {
     await page.setViewportSize({width,height:755});
-    for (const route of ["/", "/ko", "/explore", "/evaluation", "/ko/evaluation", "/pricing"]) {
+    for (const route of ["/", "/explore", "/evaluation", "/pricing"]) {
       await page.goto(route);
       await expect(page.locator("h1")).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

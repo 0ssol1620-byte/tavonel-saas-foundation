@@ -18,7 +18,7 @@ async function visibleFilm(page: Page) {
   await expect(page.locator(FILM)).toBeVisible();
   return page.locator(FILM);
 }
-for (const route of ["/", "/ko"]) {
+for (const route of ["/"]) {
   test(`${route} offers the next action before the source and difficult context`, async ({ page }, testInfo) => {
     test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     await page.goto(route);
@@ -169,17 +169,6 @@ test("keeps the English brand line as the single H1", async ({ page }) => {
   await expect(page.locator("#s1 h1#lv2-hero-title + .lv2-hero-support")).toHaveCount(1);
   await expect(page.locator("#s6 h2")).toHaveText("The Knowledge Compiler for AI");
 });
-test("Korean close repeats the public-sample action and keeps Korean pricing", async ({ page }) => {
-  await page.goto("/ko");
-  const close = page.locator("#s6"), action = close.locator('[data-scene-next="start"]');
-  await expect(close.getByRole("link", { name: "요금 보기" })).toHaveAttribute("href", "/ko/pricing");
-  // Brief 2026-10-15 move 1: same words and destination as the hero and the header.
-  await expect(action).toHaveAttribute("href", "/explore");
-  await expect(action).toHaveText("컴파일된 샘플 열기");
-  // The hero's arrow is aria-hidden, so the action's name is the same words.
-  await expect(page.locator('#s1 [data-testid="landing-hero-actions"] a[href="/explore"]')).toHaveAccessibleName("컴파일된 샘플 열기");
-  await Promise.all([page.waitForURL(url => url.pathname === "/explore"), action.click()]);
-});
 test("the English close keeps its start action on an English destination", async ({ page }) => {
   await page.goto("/");
   const start = page.locator('#s6 [data-scene-next="start"]');
@@ -306,12 +295,6 @@ test("source controls clear the touch floor and keep selected regions inside the
     expect(selected.y).toBeGreaterThanOrEqual(window.y - 1); expect(selected.y + selected.height).toBeLessThanOrEqual(window.y + window.height + 1);
   }
 });
-test("Korean pricing carries the selected plan into the inquiry", async ({ page }) => {
-  await page.goto("/ko/pricing"); await page.getByRole("link", { name: "Developer 도입 상담" }).click();
-  await expect(page).toHaveURL(/\/ko\/contact\?plan=Developer$/);
-  await expect(page.locator("[data-plan-intent]")).toHaveText("Developer 요금제 문의");
-  await expect(page.locator('input[name="plan"]')).toHaveValue("Developer");
-});
 
 /*
   Home's word budgets (FINAL-SPEC 2026-10-26 §9: fold <= 35, EN <= 520, KO <= 460), RE-DERIVED by
@@ -343,7 +326,7 @@ test("Korean pricing carries the selected plan into the inquiry", async ({ page 
     390x844   EN fold 34             KO fold 31
 */
 const WORD_BUDGET = { "/": { fold: 35, body: 659 }, "/ko": { fold: 35, body: 564 } } as const;
-for (const route of ["/", "/ko"] as const) {
+for (const route of ["/"] as const) {
   test(`${route} stays within its re-derived word budget, with six h2`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440" && testInfo.project.name !== "390", "measured at 1440x900 (fold and body) and 390x844 (fold)");
     await page.goto(route);

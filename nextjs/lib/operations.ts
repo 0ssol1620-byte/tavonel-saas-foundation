@@ -24,8 +24,11 @@ export const LEGAL_EFFECTIVE_DATE = "2026-08-30";
   (ANALYTICS-ACTIVATION-2026-10-17 §4.5 items 1-3, 5). Item 6 names the founder's approval day,
   2026-10-17, as the date; this keeps the rule above instead, because a "last updated" date earlier
   than the words it dates would be printed on a page that did not yet say them. Founder veto open.
+
+  2026-11-09 (GX-03, founder): /privacy and /subprocessors say that cookieless Vercel page views run
+  unless a visitor declines, rather than only after a yes.
 */
-export const LEGAL_LAST_UPDATED = "2026-10-19";
+export const LEGAL_LAST_UPDATED = "2026-11-09";
 
 /*
   SD-07. One draft label, on every legal document, until counsel signs it off.

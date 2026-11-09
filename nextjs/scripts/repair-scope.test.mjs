@@ -6833,7 +6833,7 @@ test('affected pilot worksheet admission: adjacent and lookalike paths, other lo
     'supabase/functions/contact/index.ts','supabase/functions/evaluation-request/index.ts',
     'components/evaluation-page.tsx','public/evaluation/pilot-worksheet.en.md','lib/pilot-evaluation-worksheet.test.ts','components/evaluation-page.test.tsx',
     'evaluation/pilot-worksheet.ko.md','nextjs/nextjs/components/evaluation-page.tsx']) {
-    if (assertNewReviewedMarketingEndpoint(path) || assertLaunchSwitchEndpoint(path)) continue;
+    if (assertNewReviewedMarketingEndpoint(path) || assertLaunchSwitchEndpoint(path) || assertGlobalExposureEndpoint(path)) continue;
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
@@ -7027,6 +7027,16 @@ test('affected pilot worksheet admission: the combined prior workspace, UX08 led
   // Evaluation and contact-form neighbours stay diagnostics only: beside the combined delta they close the whole plan, while the
   // diagnostic selection equals the clean combined selection.
   for (const adjacent of ['nextjs/components/contact-form.tsx','nextjs/app/evaluation/page.tsx',AFFECTED_PILOT_OLD_SUITE]) {
+    // GX-02/GX-04 registered the evaluation page to global-exposure: asserted positively to that one owner, never to the worksheet owner.
+    // It shares only the EvaluationPage render suite, which reads the page directly; the worksheet suite is never selected by it.
+    if (assertGlobalExposureEndpoint(adjacent)) {
+      const map=affectedMap([...prior,...affectedPilotRaw(),affectedRecord('M',[adjacent])]);
+      assert.deepEqual([map.failures,map.unmappedPaths],[[],[]],adjacent);
+      assert.deepEqual(map.groups,[...combined.groups,'global-exposure'].sort(),adjacent);
+      const alone=affectedMap([affectedRecord('M',[adjacent])]);
+      assert.ok(!alone.groups.includes(AFFECTED_PILOT_GROUP)&&!alone.unitFiles.includes('lib/pilot-evaluation-worksheet.test.ts'),adjacent);
+      continue;
+    }
     const map=affectedMap([...prior,...affectedPilotRaw(),affectedRecord('M',[adjacent])]);
     assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${adjacent}`],[adjacent]],adjacent);
     assert.deepEqual([map.groups,map.unitFiles,map.browserFiles],[combined.groups,combined.unitFiles,combined.browserFiles],adjacent);
@@ -7507,6 +7517,25 @@ test('affected g1-copy-truth owner: 6 exact paths select 17 direct suites and 2 
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+// Global exposure (GX-01..GX-04, codex/global-exposure-20261109): one finite owner, restated independently.
+import { GLOBAL_EXPOSURE_AFFECTED_PATHS, GLOBAL_EXPOSURE_AFFECTED_UNIT_FILES, GLOBAL_EXPOSURE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+test('affected global-exposure owner: 12 exact paths select 10 direct suites and 1 browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/evaluation/page.tsx', 'app/pricing/page.tsx', 'app/robots.ts', 'e2e/evaluation-acceptance.spec.ts', 'e2e/masterplan-workbench.spec.ts', 'e2e/ux06-contact-recovery.spec.ts', 'lib/indexnow.test.ts', 'lib/landing-v2-outcome-ia.test.ts', 'lib/page-metadata.test.ts', 'lib/seo-title-lengths.test.ts', 'public/7a0ff86c91c02b35a358cdf2761b2512.txt', 'scripts/indexnow-ping.mjs'];
+  const suites = ['components/evaluation-page.test.tsx', 'lib/indexnow.test.ts', 'lib/landing-v2-outcome-ia.test.ts', 'lib/page-metadata.test.ts', 'lib/page-seo.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts', 'lib/route-canonical-metadata.test.ts', 'lib/seo-surface.test.ts', 'lib/seo-title-lengths.test.ts'];
+  const browsers = ['e2e/evidence-first.spec.ts'];
+  assert.deepEqual([[...GLOBAL_EXPOSURE_AFFECTED_PATHS], [...GLOBAL_EXPOSURE_AFFECTED_UNIT_FILES], [...GLOBAL_EXPOSURE_AFFECTED_BROWSER_FILES]], [paths, suites, browsers]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['global-exposure'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['global-exposure'], [], suites, browsers, []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
+  }
+  for (const adjacent of ['nextjs/app/robots.tsx', 'nextjs/app/pricing/layout.tsx', 'nextjs/app/evaluation/page.ts', 'nextjs/lib/indexnow.ts', 'nextjs/lib/seo-title-lengths.ts', 'nextjs/scripts/indexnow-ping.test.mjs', 'nextjs/public/0000000000000000000000000000000.txt', 'nextjs/e2e/evaluation-acceptance-2.spec.ts', 'scripts/indexnow-ping.mjs']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
 // Library dedup B1 (codex/w1-b1-20261104): one finite owner, restated independently of the exported constants.
 import { LIBRARY_DEDUP_AFFECTED_PATHS, LIBRARY_DEDUP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 test('affected library-dedup-b1 owner: 3 exact paths select 3 direct suites and no browser suite; neighbours stay unmapped', () => {
@@ -7786,6 +7815,15 @@ test('affected published024 marketing admission: discovery duplicate cleanup pre
 
 // Phase 4 LAUNCH (P2-37 / register D-12) gave the launch switch one finite owner. An older owner's negative list keeps it out of its own
 // selection and asserts exactly that owner instead of an unmapped path.
+// Global exposure (GX-02/GX-04, 2026-11-09) registered paths older negative lists name. Each is asserted positively to its one
+// owner with that owner's exact suites; every other listed path keeps its original rejection.
+function assertGlobalExposureEndpoint(path) {
+  if(!GLOBAL_EXPOSURE_AFFECTED_PATHS.some(p=>'nextjs/'+p===path)) return false;
+  const map=affectedMap([affectedRecord('M',[path])]);
+  assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],
+    [[],['global-exposure'],[],[...GLOBAL_EXPOSURE_AFFECTED_UNIT_FILES].sort(),[...GLOBAL_EXPOSURE_AFFECTED_BROWSER_FILES].sort()],path);
+  return true;
+}
 function assertLaunchSwitchEndpoint(path) {
   if(path!=='nextjs/lib/activation-policy.ts') return false;
   const map=affectedMap([affectedRecord('M',[path])]);

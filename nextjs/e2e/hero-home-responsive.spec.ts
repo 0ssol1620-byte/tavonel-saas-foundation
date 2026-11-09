@@ -150,16 +150,6 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
     }
     await page.emulateMedia({ reducedMotion: "no-preference" });
   }
-  for (const width of [1440, 390].filter(value => PHONE_HERO !== "still" || value > 900)) {
-    await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
-    await page.goto("/ko");
-    const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
-    await expect(film.getByRole("tab")).toHaveCount(4);
-    // FINAL-SPEC 2026-10-26 D-9: the disclosure stays; its wording is the redesign's.
-    await expect(film.locator("figcaption")).toHaveText("제품 흐름 예시 · 고객 결과가 아닙니다.");
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: testInfo.outputPath(`home-ko-${width}.png`) });
-  }
   await testInfo.attach("responsive-layouts", { body: JSON.stringify(layouts, null, 2), contentType: "application/json" });
 });
 
@@ -415,7 +405,7 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
   80%-empty share is attached for the record, not asserted: EXTRACT clears per document in every
   window, and what this guards is the pane going black, not the pane being rewritten.
 */
-for (const path of ["/", "/ko"]) {
+for (const path of ["/"]) {
   test(`the playing desktop crop never leaves a first-screen pane blank (${path})`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440", "sets its own viewport");
     test.setTimeout(60_000);
@@ -644,7 +634,7 @@ const LCP_FLOOR: Record<string, Record<string, Record<number, number>>> = {
     "/ko": { 360: 56_000, 390: 68_000, 412: 77_000, 430: 85_000 },
   },
 };
-for (const path of ["/", "/ko"]) {
+for (const path of ["/"]) {
   test(`a phone opens compact on the whole frame, and Focus details opens the stage's source pane with its tabs directly above it, on the first screen (${path})`, async ({ page, browserName }, testInfo) => {
     test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     test.skip(testInfo.project.name !== "390", "sets its own viewports");

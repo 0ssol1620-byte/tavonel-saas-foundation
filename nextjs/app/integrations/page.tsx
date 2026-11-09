@@ -7,8 +7,8 @@ import { OAUTH_CONNECTOR_PROVIDERS, OAUTH_CONNECTOR_SCOPES } from "@/lib/connect
 import { PageToc, tocEntries } from "@/components/docs/page-toc";
 
 export const metadata: Metadata = {
-  title: "Integrations — TAVONEL",
-  description: "Connect read-only source systems to TAVONEL and compile their knowledge into a traceable World.",
+  title: "Integrations: connect read-only source systems — TAVONEL",
+  description: "Connect a source system read-only and start each import yourself. TAVONEL records the revision of every imported file, so the compiled World stays traceable.",
   alternates: { canonical: "/integrations" },
   openGraph: { url: "/integrations" },
 };

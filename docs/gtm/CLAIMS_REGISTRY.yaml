@@ -979,12 +979,12 @@ claims:
   # the qualifier was an unsupported claim; the price, the page counts and every other word are
   # unchanged. CLM-050 is the Korean disclosure D-33 publishes on /sources and not on /ko.
   - claimId: CLM-050
-    claim: "한국어 문서 품질은 아직 측정하지 않았습니다. 한국어 PDF도 위 표의 PDF 행과 같은 'Best effort' 등급으로 처리됩니다. / HWP/HWPX: 지원하지 않음 · 측정 안 함. 두 형식 모두 위 표에 없으며, 업로드 단계에서 거부됩니다."
+    claim: "Korean document quality has not been measured yet. A Korean PDF is processed at the same 'Best effort' tier as the PDF row above. / HWP/HWPX: no reader, not measured. Neither format is in the table above, and the upload route turns both away."
     surface: "/sources"
     evidence: "D-33 (KB-F6, KB-F7). No Korean benchmark receipt exists (KOREAN-BENCHMARK-DESIGN-2026-10-17 S0). shared/capabilityManifest.ts carries application/pdf as BEST_EFFORT and has no HWP or HWPX entry; shared/qualifiedDocumentInputs.ts refuses a filename whose extension its MIME does not list."
     artifact: "shared/capabilityManifest.ts; shared/qualifiedDocumentInputs.ts; nextjs/app/sources/page.tsx"
     runtime: "Any deployment built from this tree. The tier is read from the manifest rows, and the page refuses to render the HWP/HWPX sentence beside a manifest that lists either format."
-    scope: "An absence disclosure in Korean: no Korean quality measurement, and no HWP or HWPX reader."
+    scope: "An absence disclosure, stated in English since GX-02 (2026-11-09): no Korean quality measurement, and no HWP or HWPX reader."
     limitations: "Says that nothing was measured, so it says nothing about how well Korean is read in either direction. It is not for /ko, the first-impression surface (conflict C1). A KB1 receipt that clears the publication bar replaces the first sentence."
     status: SUPPORTED
     public_private: PUBLIC

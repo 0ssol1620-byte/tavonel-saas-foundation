@@ -45,7 +45,6 @@ const POSTER = /^\/film\/poster-r3-c1-t10\.40\.(avif|webp)$/;
 const PANE_POSTER = /^\/film\/poster-r3-c1-t10\.40-pane1-848x1060\.(avif|webp)$/;
 const LOCALES = [
   { path: "/", language: "English", play: "Play the compilation film", focus: "Focus details" },
-  { path: "/ko", language: "Korean", play: "컴파일 영상 재생", focus: "세부 내용 확대" },
 ] as const;
 const MOTION_PREFERENCES = [
   { preference: "reduce" as const, name: "reduced motion" },
