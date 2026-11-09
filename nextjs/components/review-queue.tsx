@@ -15,6 +15,7 @@ import {
 } from "@/lib/review-queue";
 import { formatTimestamp } from "@/lib/format";
 import { countNoun } from "@/lib/plural";
+import { reviewReasonCopy } from "@/lib/workspace-failure-copy";
 
 /*
   The queue a reviewer works, and the breakdown a reader needs.
@@ -89,11 +90,20 @@ export function reasonFamily(value: string, stopped: boolean): string {
   return "Review reason";
 }
 
-function ReasonChip({ value, family }: { value: string; family: string }) {
+/*
+  D0 2026-11-09 R2: a reason with a written sentence leads with it, and the recorded string stays on
+  screen as a selectable reference, the way the failure panel prints "Reference CORE_OUTPUT_TOO_LARGE".
+  A reason without one is shown exactly as before.
+*/
+function ReasonChip({ value, family, languages }: { value: string; family: string; languages: readonly string[] }) {
+  const copy = reviewReasonCopy(value, languages);
   return (
     <small className="workspace-review-reason">
       <span>{family}</span>
-      {/\s/.test(value) ? value : <code>{value}</code>}
+      {copy ? <>
+        <em>{copy.sentence}</em>
+        {copy.reference} <code>{value}</code>
+      </> : /\s/.test(value) ? value : <code>{value}</code>}
     </small>
   );
 }
@@ -103,12 +113,15 @@ export default function ReviewQueue({
   compact = false,
   selectedDocumentId,
   onSelectDocument,
+  languages = [],
 }: {
   input: ReviewQueueInput;
   /** Compile-panel form: the breakdown and the denominator, without the filter controls. */
   compact?: boolean;
   selectedDocumentId?: string | null;
   onSelectDocument?: (documentId: string) => void;
+  /** The browser's language list; Korean or English for a review reason's sentence. */
+  languages?: readonly string[];
 }) {
   const [reason, setReason] = useState("");
   const queue = useMemo(() => buildReviewQueue(input), [input]);
@@ -230,7 +243,7 @@ export default function ReviewQueue({
                 {REVIEW_QUEUE_STATUS_COPY[row.status]}
                 {row.evidenceCount > 0 ? ` · ${row.evidenceCount} evidence region${row.evidenceCount === 1 ? "" : "s"}` : ""}
               </small>
-              {row.reasons.map((value, at) => <ReasonChip key={value} value={value} family={reasonFamily(value, row.securityBlocked && at === 0)} />)}
+              {row.reasons.map((value, at) => <ReasonChip key={value} value={value} family={reasonFamily(value, row.securityBlocked && at === 0)} languages={languages} />)}
               {queue.decisionsRead === "ready" && !sharedTiming ? <small>{timings[index]}</small> : null}
               {onSelectDocument && row.evidenceCount > 0 ? (
                 <button
@@ -248,7 +261,7 @@ export default function ReviewQueue({
       {queue.worldReasons.length > 0 && reason === "" ? (
         <div className="workspace-review-world">
           <p className="fine">For the whole World, not one source</p>
-          {queue.worldReasons.map((value) => <ReasonChip key={value} value={value} family={reasonFamily(value, false)} />)}
+          {queue.worldReasons.map((value) => <ReasonChip key={value} value={value} family={reasonFamily(value, false)} languages={languages} />)}
         </div>
       ) : null}
     </div>
