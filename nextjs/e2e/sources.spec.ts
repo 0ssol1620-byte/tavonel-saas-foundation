@@ -252,11 +252,14 @@ test("is reachable from the footer and /integrations, and no bar item claims to 
 
   // The bar has four section links; Pricing is its separate emphasized action.
   const bar = page.locator("header.nav .one-path-primary-nav");
-  await expect(bar.locator("a")).toHaveCount(HEADER_NAV.length);
-  for (const item of HEADER_NAV) await expect(bar.locator(`a[href="${item.href}"]`)).toHaveCount(1);
+  const items = bar.locator("a.site-nav-direct");
+  await expect(items).toHaveCount(HEADER_NAV.length);
+  for (const item of HEADER_NAV) await expect(bar.locator(`a.site-nav-direct[href="${item.href}"]`)).toHaveCount(1);
   await expect(page.locator('header.nav .nav-actions a[href="/pricing"]')).toHaveCount(1);
-  await expect(bar.locator('a[href="/integrations"]')).toHaveCount(0);
-  await expect(bar.locator('a[href="/sources"]')).toHaveCount(0);
+  await expect(items.and(page.locator('[href="/integrations"]'))).toHaveCount(0);
+  await expect(items.and(page.locator('[href="/sources"]'))).toHaveCount(0);
+  // NAV PANELS 2026-11-09: /sources is a row of the Product panel again, not a bar item.
+  await expect(bar.locator('#bar-nav-panel-product a[href="/sources"]')).toHaveCount(1);
   /*
     And none of the five is marked current here. `customerNavOwns` returns false for every bar
     href on this path; a bar that highlighted one anyway would be the false-location defect the
@@ -276,7 +279,7 @@ test("is reachable from the footer and /integrations, and no bar item claims to 
     await expect(sheet.locator(`a.mobile-nav-direct[href="${item.href}"]`)).toHaveCount(1);
   }
   await expect(sheet.locator('a.mobile-nav-direct[aria-current="page"]')).toHaveCount(0);
-  await expect(page.locator("header.nav details.mobile-primary-nav details.mobile-nav-group")).toHaveCount(0);
+  await expect(sheet.locator('#sheet-nav-panel-product a[href="/sources"]')).toHaveCount(1);
 
   const sitemap = await page.request.get("/sitemap.xml");
   expect(await sitemap.text()).toContain("https://tavonel.com/sources");

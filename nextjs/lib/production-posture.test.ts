@@ -17,8 +17,10 @@ import registry from "./benchmark-registry.records.json";
   so this file holds main's value for each of them: which capabilities the deployment has
   enabled, the three launch flags `vercel.json` ships, which plan sells itself, what the
   capability manifest claims per format, that the Vercel collector loads only behind its flag,
-  and that no benchmark row is published. Today that is state S1: account creation open,
-  purchase and customer-file processing closed.
+  and that no benchmark row is published. S1 was account creation open, purchase and
+  customer-file processing closed. D-12 (P2-37, delegated decision 2026-11-09) moved
+  `customerData.enabled` to true and nothing else: account creation, purchase of the self-serve
+  plan and customer-file processing open, still bounded by the processing cohort.
 
   Every expectation is a literal on purpose. A failure here means a posture switch moved. That
   is a founder decision (CLAUDE.md, "What is not an agent's call"), and the pull request that
@@ -37,7 +39,7 @@ describe("production posture @ 4c80bb30", () => {
       cdr: true,
       ocrGpu: true,
       candidatePromotion: false,
-      customerData: false,
+      customerData: true,
     });
   });
 
@@ -222,5 +224,39 @@ describe("production posture: the collector scan refuses what it should", () => 
       'import { Analytics } from "@vercel/analytics/react";',
       'const va = await import("@vercel/analytics");',
     ]) expect(analyticsViolations("x.tsx", source), source).not.toEqual([]);
+  });
+});
+
+/*
+  Review PR201-R1 B2. self-serve-journey's "launch approval withheld" test skips on a server with
+  launch approval, and product-qa and the repair-scope browser run both start theirs with it. So
+  it must run somewhere without: browser-qa (chromium) carries no launch flags and runs the spec.
+  If that step loses the spec, or the job, one of its steps or the whole workflow gains a launch
+  flag, the purchase-door guard runs nowhere.
+*/
+describe("the launch-approval-withheld purchase-door test runs in a CI job without launch approval", () => {
+  const launch = readFileSync(resolve(import.meta.dirname, "../../.github/workflows/launch-qa.yml"), "utf8").replace(/\r\n/g, "\n");
+  const browserQa = launch.slice(launch.indexOf("\n  browser-qa:\n"), launch.indexOf("\n  product-qa:\n"));
+  it("browser-qa runs e2e/self-serve-journey.spec.ts on chromium", () => {
+    expect(browserQa).toMatch(/if: matrix\.browser == 'chromium'\n(?:\s+#.*\n)*\s+run: pnpm exec playwright test [^\n]*e2e\/self-serve-journey\.spec\.ts/);
+  });
+  const LAUNCH_FLAGS = /COMMERCIAL_MODE|TAVONEL_BILLING_LAUNCH_APPROVED|PLAYWRIGHT_EXTERNAL_SERVER/;
+  const settingsOf = (yaml: string) => yaml.split("\n").filter(line => !/^\s*#/.test(line)).join("\n");
+  it("browser-qa sets none of the launch flags its server would read, at job or step level", () => {
+    expect(browserQa, "the browser-qa block was found, steps and all").toContain("\n    steps:\n");
+    expect(settingsOf(browserQa)).not.toMatch(LAUNCH_FLAGS);
+    // The scan covers a step's own env: block, not only the job's.
+    expect(settingsOf(`${browserQa}\n      - name: x\n        env:\n          COMMERCIAL_MODE: live\n`)).toMatch(LAUNCH_FLAGS);
+  });
+  // Review PR201-R2 note 1: a workflow-level env: reaches every job, browser-qa included.
+  it("the workflow's top-level env sets none of them either", () => {
+    const top = launch.slice(0, launch.indexOf("\njobs:\n"));
+    expect(launch.indexOf("\njobs:\n"), "the jobs: key was found").toBeGreaterThan(0);
+    expect(settingsOf(top)).not.toMatch(LAUNCH_FLAGS);
+  });
+  it("the test skips only on launch approval, and the audit project is the one that runs it", () => {
+    const spec = readFileSync(resolve(import.meta.dirname, "../e2e/self-serve-journey.spec.ts"), "utf8");
+    expect(spec).toContain('test.skip(readCommercialState().liveChargesEnabled, "launch approval is granted on this server");');
+    expect(readFileSync(resolve(import.meta.dirname, "../playwright.config.ts"), "utf8")).toMatch(/const auditSpecs = [^\n]*self-serve-journey/);
   });
 });

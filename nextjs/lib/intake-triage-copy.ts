@@ -15,12 +15,12 @@ export function triageUploadNotice(
 ): string {
   switch (phase) {
     case "inventory_staged":
-      return "Source inventory staged. This inventory step does not upload file bytes. Review the separate bounded upload-check approval below; full processing requires a later approval.";
+      return "Source inventory staged. This inventory step does not upload file bytes. Review the separate bounded upload-check approval below. Full processing requires a later approval.";
     case "sealed_review":
-      return "Files uploaded and sealed for checks. Full processing has not started. Choose include or exclude for every row; identical bytes remain separate reviewable sources.";
+      return "Files uploaded and sealed for checks. Full processing has not started. Choose include or exclude for every row. Identical bytes remain separate reviewable sources.";
     case "receipt_ready":
       return "Files uploaded and sealed. The receipt is ready for a separate full-processing quote and approval. Full processing has not started.";
     case "upload_interrupted":
-      return `Upload checks did not complete${errorCode ? ` (${errorCode})` : ""}. Some file bytes may already have been uploaded. No parsing or full-processing approval was requested; processing remains blocked.`;
+      return `Upload checks did not complete${errorCode ? ` (${errorCode})` : ""}. Some file bytes may already have been uploaded. No parsing or full-processing approval was requested. Processing remains blocked.`;
   }
 }

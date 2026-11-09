@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { drainSseFrames, frameFromEvent, observeCompileJob } from "./compile-job-client";
+import { compileJobRestingNotice, drainSseFrames, frameFromEvent, isCompileJobResting, isCompileJobTerminal, observeCompileJob, pickResumableCompileJob } from "./compile-job-client";
+import { COMPILE_STATES } from "./compile-job-store";
 
 /*
   The parser and the resume, tested where they can actually be wrong.
@@ -184,5 +185,55 @@ describe("observing a durable compile", () => {
     });
     expect(settled).toBeNull();
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("pickResumableCompileJob (no ?job= in the URL)", () => {
+  const now = Date.parse("2026-11-09T04:58:06Z");
+  const job = (id: string, state: "ready" | "failed" | "reading" | "cancelled", settledAt: string | null = null) => ({ jobId: id, state, settledAt });
+
+  it("shows a failure that just happened over an older stuck job", () => {
+    // D0: 749b failed seconds before the reload; 130f had been blocked in reading for five days.
+    const jobs = [job("749b", "failed", "2026-11-09T04:57:32Z"), job("130f", "reading")];
+    expect(pickResumableCompileJob(jobs, now)?.jobId).toBe("749b");
+  });
+  it("still shows that failure when the browser clock is behind the server", () => {
+    expect(pickResumableCompileJob([job("749b", "failed", "2026-11-09T04:59:00Z"), job("130f", "reading")], now)?.jobId).toBe("749b");
+  });
+  it("falls back to the first unfinished job when the newest failure is older than 24 h", () => {
+    expect(pickResumableCompileJob([job("old", "failed", "2026-11-06T04:00:00Z"), job("130f", "reading")], now)?.jobId).toBe("130f");
+  });
+  it("takes the newest job when it is still running, and skips ready ones", () => {
+    expect(pickResumableCompileJob([job("run", "reading"), job("130f", "reading")], now)?.jobId).toBe("run");
+    expect(pickResumableCompileJob([job("done", "ready", "2026-11-09T04:00:00Z"), job("130f", "reading")], now)?.jobId).toBe("130f");
+  });
+  it("does not resurrect a recent failure that is not the newest job, nor a cancelled one", () => {
+    expect(pickResumableCompileJob([job("done", "ready", "2026-11-09T04:58:00Z"), job("749b", "failed", "2026-11-09T04:57:32Z")], now)).toBeUndefined();
+    expect(pickResumableCompileJob([job("c", "cancelled", "2026-11-09T04:57:32Z")], now)).toBeUndefined();
+    expect(pickResumableCompileJob([job("f", "failed", null)], now)).toBeUndefined();
+    expect(pickResumableCompileJob([], now)).toBeUndefined();
+  });
+});
+
+/* D0 2026-11-09 R2: a job at rest kept "Compiling 1 source" on the Activity line. */
+describe("a compile job at rest", () => {
+  const resting = ["review_required", "ready", "failed", "cancelled"] as const;
+
+  it("is not running, and replaces the compiling line, in every terminal or waiting state", () => {
+    for (const state of resting) {
+      expect(isCompileJobResting(state)).toBe(true);
+      expect(compileJobRestingNotice(state)).toEqual(expect.any(String));
+      expect(compileJobRestingNotice(state)).not.toMatch(/compiling/i);
+    }
+    expect(compileJobRestingNotice("review_required")).toBe("A review package is ready for a person to inspect. Nothing is active yet.");
+    // Resting is not terminal: a review_required job still waits on a person, and stays resumable.
+    expect(resting.filter((state) => isCompileJobTerminal(state))).toEqual(["ready", "failed", "cancelled"]);
+  });
+
+  it("is running, with no resting line, in every other state", () => {
+    for (const state of COMPILE_STATES.filter((value) => !(resting as readonly string[]).includes(value))) {
+      expect(isCompileJobResting(state)).toBe(false);
+      expect(compileJobRestingNotice(state)).toBeNull();
+    }
   });
 });

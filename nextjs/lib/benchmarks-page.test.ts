@@ -68,6 +68,16 @@ describe("the rendered /benchmarks page", () => {
     expect(html).toContain(`Scatter plot of ${dots.length} models`);
   });
 
+  it("draws a lower Edit lower on the plot, matching the 0 tick at the bottom of the axis", () => {
+    /* SVG y grows downward. Until 2026-11-09 the best reading sat at the top, beside the max tick. */
+    const cys = [...html.matchAll(/<circle[^>]*cy="([\d.]+)"/g)].map((m) => Number(m[1]));
+    const edits = arenaDots().map((dot) => dot.textEdit);
+    expect(cys.length).toBe(edits.length);
+    const best = edits.indexOf(Math.min(...edits));
+    const worst = edits.indexOf(Math.max(...edits));
+    expect(cys[best]).toBeGreaterThan(cys[worst]);
+  });
+
   it("keeps the rows the campaign did not settle on the page, each with its reason", () => {
     for (const model of unsettledModels()) {
       expect(text).toContain(model.display_name);

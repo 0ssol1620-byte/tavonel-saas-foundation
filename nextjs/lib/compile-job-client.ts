@@ -130,6 +130,34 @@ export function frameFromEvent(raw: unknown): CompileJobFrame | null {
 const RESTING: readonly string[] = ["ready", "failed", "cancelled", "review_required"];
 const TERMINAL: readonly string[] = ["ready", "failed", "cancelled"];
 
+/** Reached, and nothing moves it again. `review_required` is resting but not terminal: a person still decides. */
+export function isCompileJobTerminal(state: string): boolean {
+  return TERMINAL.includes(state);
+}
+
+/** Nothing further happens to this job on its own, so nothing on screen may call it compiling. */
+export function isCompileJobResting(state: CompileState): boolean {
+  return RESTING.includes(state);
+}
+
+/*
+  D0 2026-11-09 R2: a job settled review_required and the Activity line still read "Compiling 1
+  source". That line is written once when a compile starts and was replaced only when a World
+  loaded, so a stop with no World, or a slow load, left it claiming work that had ended. Every
+  follow of a job settles through `observeCompileJob`, and the workspace says this when it does.
+*/
+const RESTING_NOTICE: Partial<Record<CompileState, string>> = {
+  ready: "Compilation finished.",
+  review_required: "A review package is ready for a person to inspect. Nothing is active yet.",
+  failed: "This compile stopped. The compile panel says why.",
+  cancelled: "Compile cancelled.",
+};
+
+/** The Activity line for a job that has come to rest, or null while it is still running. */
+export function compileJobRestingNotice(state: CompileState): string | null {
+  return RESTING_NOTICE[state] ?? null;
+}
+
 export type ObserveOptions = {
   jobId: string;
   /** Read afresh each attempt: a stream that lives across a token refresh must not pin one. */
@@ -210,4 +238,22 @@ export async function observeCompileJob(options: ObserveOptions): Promise<Compil
     if (!settled && !options.signal?.aborted) await sleep(300);
   }
   return settled;
+}
+
+const RECENT_FAILURE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The job the workspace opens on load when the URL names none (an explicit `?job=` always wins).
+ * `jobs` is `GET /api/compile-jobs`: newest first. The newest job is shown when it is still running
+ * or failed within the last 24 h, so a compile that just failed shows its failure rather than an
+ * older, stuck one (D0 2026-11-09, cjob-749b behind cjob-130f). Otherwise the first unfinished job.
+ */
+export function pickResumableCompileJob<T extends { state: CompileState; settledAt?: string | null }>(
+  jobs: readonly T[], now: number,
+): T | undefined {
+  const newest = jobs[0];
+  const settled = Date.parse(newest?.settledAt ?? "");
+  // No lower bound: a browser clock behind the server must not hide a failure that just happened.
+  if (newest?.state === "failed" && now - settled <= RECENT_FAILURE_MS) return newest;
+  return jobs.find((job) => !isCompileJobTerminal(job.state));
 }
