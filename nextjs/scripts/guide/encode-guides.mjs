@@ -17,7 +17,7 @@
 //   GUIDE_WORK     scratch directory holding raw/ from record-guide.mjs (default: see terminal-replay.mjs)
 //   GUIDE_OUT      where the media and manifest go (default: nextjs/public/guide)
 //   GUIDE_RECEIPTS local receipt with absolute paths and raw-master digests (default: $GUIDE_WORK/../guide-receipts.json)
-//   FILM_FFMPEG    ffmpeg 7.1 binary with libx264 (default: imageio-ffmpeg in Python 3.13)
+//   FILM_FFMPEG    ffmpeg 7.1 binary with libx264 (required, as in scripts/film/encode-fallback.sh)
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
@@ -29,9 +29,8 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const RAW = join(GUIDE_WORK, "raw");
 const OUT = process.env.GUIDE_OUT ?? join(HERE, "..", "..", "public", "guide");
 const RECEIPTS = process.env.GUIDE_RECEIPTS ?? join(GUIDE_WORK, "..", "guide-receipts.json");
-const FFMPEG = process.env.FILM_FFMPEG
-  ?? "C:/Users/yspow/AppData/Local/Programs/Python/Python313/Lib/site-packages/imageio_ffmpeg/binaries/ffmpeg-win-x86_64-v7.1.exe";
-if (!existsSync(FFMPEG)) throw new Error(`no ffmpeg at ${FFMPEG}; set FILM_FFMPEG`);
+const FFMPEG = process.env.FILM_FFMPEG;
+if (!FFMPEG || !existsSync(FFMPEG)) throw new Error(`no ffmpeg at ${FFMPEG ?? "(unset)"}; set FILM_FFMPEG to the ffmpeg 7.1 binary`);
 const DESKTOP_MAX = 3_000_000; // decimal MB, the stricter reading of "3 MB"
 const POSTER_MAX = 140 * 1024;
 const GUIDES = {

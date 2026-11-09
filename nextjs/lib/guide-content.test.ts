@@ -283,7 +283,8 @@ const NUMBER_ALLOWLIST: Record<string, string> = {
   "10-K": "a form name: EXPLORE_COPY.changeHint, lib/explore-story.ts ('Apple's 2025 Form 10-K')",
   "2025": "EXPLORE_COPY.changeHint, lib/explore-story.ts ('Apple's 2025 Form 10-K')",
   "2026": "EXPLORE_COPY.changeHint and the change act's own label, lib/explore-story.ts / change-act.tsx ('the 2026 filings arrived')",
-  "2026-10-19": "GUIDE_REVIEWED, this guide's review date",
+  "2026-10-19": "GUIDE_FIRST_EDITION, this guide's first edition",
+  "2026-11-09": "GUIDE_REVIEWED, this guide's review date",
   "sha256": "an algorithm name, /developer/channel.json and /docs/concepts",
   "SHA256": "an algorithm name, the certutil argument",
   "256": "an algorithm name, the shasum argument (-a 256)",
@@ -503,8 +504,8 @@ describe("the two pages", () => {
 
   it("end on the feedback address and the review date", () => {
     expect(en).toContain("mailto:support@tavonel.com?subject=Guide%20feedback%3A%20Product%20guide");
-    expect(en).toContain("Reviewed 19 October 2026");
-    expect(ko).toContain("검토일 2026년 10월 19일");
+    expect(en).toContain("Reviewed 9 November 2026");
+    expect(ko).toContain("검토일 2026년 11월 9일");
   });
 });
 

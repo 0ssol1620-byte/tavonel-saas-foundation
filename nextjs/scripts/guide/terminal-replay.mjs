@@ -5,14 +5,14 @@
 // reveals steps when the recorder calls window.__term.show(n); it never types, edits or reorders.
 //
 // usage: node nextjs/scripts/guide/terminal-replay.mjs <mcp|api>   -> $GUIDE_WORK/terminal/<session>.html
-//   GUIDE_WORK  scratch directory, outside the repo, shared by every guide script (default below)
+//   GUIDE_WORK  scratch directory, outside the repo, shared by every guide script (required)
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-export const GUIDE_WORK = process.env.GUIDE_WORK
-  ?? "D:/CodexProjects/ai-knowledge-compiler/outputs/tavonel-research-replan-20261013/market-20261104/landing-film-r3-20261109/guide-work";
+export const GUIDE_WORK = process.env.GUIDE_WORK;
+if (!GUIDE_WORK) throw new Error("set GUIDE_WORK to a scratch directory outside the repo");
 
 const escapeHtml = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const lines = (text, cls) =>

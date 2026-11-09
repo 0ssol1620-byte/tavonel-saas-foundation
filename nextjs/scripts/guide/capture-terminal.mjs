@@ -7,7 +7,8 @@
 // nothing else, so no line of terminal output in the videos is typed by hand.
 //
 // usage: node nextjs/scripts/guide/capture-terminal.mjs <mcp|api>
-//   GUIDE_WORK  scratch directory for the downloads and transcript (default: see terminal-replay.mjs)
+//   GUIDE_WORK  scratch directory for the downloads and transcript (required)
+//   GUIDE_BASH  the Bash that runs each command (default: bash on PATH; on Windows, Git Bash's bash.exe)
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -17,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import { GUIDE_WORK } from "./terminal-replay.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const BASH = "C:/Program Files/Git/bin/bash.exe";
+const BASH = process.env.GUIDE_BASH ?? "bash";
 
 const INIT = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"guide-recording","version":"1"}}}';
 const INITIALIZED = '{"jsonrpc":"2.0","method":"notifications/initialized"}';

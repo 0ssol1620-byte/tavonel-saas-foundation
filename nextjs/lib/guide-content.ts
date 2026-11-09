@@ -94,7 +94,9 @@ export const GUIDE_API_KEY_CHAPTERS: readonly string[] = Object.keys(CHAPTER_API
   The first edition. Moved by a person when the content changes, never derived at render time --
   the same rule as `DOCS_REVIEWED`.
 */
-export const GUIDE_REVIEWED = "2026-10-19";
+export const GUIDE_REVIEWED = "2026-11-09";
+/** The first edition's date, which the appendix's change table keeps when GUIDE_REVIEWED moves. */
+export const GUIDE_FIRST_EDITION = "2026-10-19";
 
 /*
   The variants and caption languages the video lane recorded (VIDEO-MANIFEST.json `files`): a
@@ -537,7 +539,7 @@ const EN: GuideChapter[] = [
       {
         kind: "table",
         head: ["Date", "Change"],
-        rows: [[GUIDE_REVIEWED, "First edition: chapters 0 to 13 and this appendix."]],
+        rows: [[GUIDE_FIRST_EDITION, "First edition: chapters 0 to 13 and this appendix."], [GUIDE_REVIEWED, "The guide videos re-recorded on tavonel.com, desktop and phone, with their captions re-synced."]],
       },
     ],
     links: [{ href: "/docs/concepts", label: "Concepts" }],
@@ -844,7 +846,7 @@ const KO: GuideChapter[] = [
       {
         kind: "table",
         head: ["날짜", "변경"],
-        rows: [[GUIDE_REVIEWED, "초판: 0장부터 13장까지와 이 부록."]],
+        rows: [[GUIDE_FIRST_EDITION, "초판: 0장부터 13장까지와 이 부록."], [GUIDE_REVIEWED, "가이드 영상을 tavonel.com에서 데스크톱과 휴대폰으로 다시 녹화하고 자막을 다시 맞춤."]],
       },
     ],
     links: [{ href: "/docs/concepts", label: "개념" }],
