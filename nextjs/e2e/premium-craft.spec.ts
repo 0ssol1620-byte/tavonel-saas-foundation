@@ -110,7 +110,8 @@ test("phone and tablet use real navigation targets instead of clickable decorati
   await expect(pricingAction).toHaveAttribute("href", "/pricing");
   const menu = page.locator("header.nav details.mobile-primary-nav");
   await menu.locator(":scope > summary").click();
-  const targets = await menu.locator(":scope > nav a").evaluateAll(elements => elements.map(e => {
+  // The sheet's rows; an open group's links are its own targets (NAV PANELS 2026-11-09).
+  const targets = await menu.locator(":scope > nav :is(a.mobile-nav-direct, a.mobile-nav-signin)").evaluateAll(elements => elements.map(e => {
     const r = e.getBoundingClientRect();
     const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
     return {
