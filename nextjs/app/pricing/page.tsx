@@ -13,9 +13,9 @@ import { readPublicStatusV2 } from "@/lib/public-status";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Pricing — TAVONEL",
-  description: "Plans and measured compute for the TAVONEL Knowledge Compiler. Hard spend limits.",
-  alternates: { canonical: "/pricing", languages: { en: "/pricing", ko: "/ko/pricing", "x-default": "/pricing" } },
+  title: "Pricing: plans, pages and hard spend limits — TAVONEL",
+  description: "Plans and measured compute for the TAVONEL Knowledge Compiler, priced in pages and dollars. Each run holds a per-page ceiling you approve before it starts.",
+  alternates: { canonical: "/pricing" },
   openGraph: { url: "/pricing" },
 };
 

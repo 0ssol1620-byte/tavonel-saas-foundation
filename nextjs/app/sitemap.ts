@@ -29,9 +29,9 @@ import { DOCS_SECTIONS } from "@/lib/docs-content";
   declares itself noindex, which is the state a draft `/cookbooks/[slug]` is in: adding a draft
   to this array can no longer half-publish it, it breaks the suite instead.
 
-  `/ko` is here because it is approved, indexable Korean copy with a self-canonical and an
-  hreflang pair (§12.4). It is the only `/ko` URL; the rest of the site keeps its existing
-  English addresses, which is why no other entry carries a locale prefix.
+  No `/ko` URL is here. Founder decision 2026-11-09 (global-only presentation): every /ko URL
+  answers 308 with its English page, and a sitemap entry that redirects asks a crawler to spend
+  the visit twice.
 
   `/api` stays, conditionally, and the condition is named so nobody has to guess it. It is a 308
   to `/docs` today, and a sitemap entry that redirects is a crawl asking to be spent twice -- the
@@ -49,7 +49,7 @@ import { DOCS_SECTIONS } from "@/lib/docs-content";
   keeps it, because a reading map is not a request to index and `lib/seo-surface.test.ts` allows
   an llms-only URL exactly where the page declares itself noindex.
 */
-const ROUTES = ["", "/api", "/benchmarks", "/benchmarks/gdp-pdf", "/changelog", "/contact", "/cookbooks", "/demo", "/developers", "/docs", "/enterprise", "/evaluation", "/evidence", "/explore", "/guide", "/how-it-works", "/integrations", "/knowledge-compiler", "/ko", "/ko/contact", "/ko/evaluation", "/ko/guide", "/ko/pricing", "/pricing", "/privacy", "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding", "/refunds", "/research", "/research/notes", "/resources", "/security", "/solutions", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence", "/solutions/knowledge-graph", "/solutions/source-grounded-assistants", "/solutions/knowledge-operations", "/sources", "/status", "/subprocessors", "/terms", "/trust"];
+const ROUTES = ["", "/api", "/benchmarks", "/benchmarks/gdp-pdf", "/changelog", "/contact", "/cookbooks", "/demo", "/developers", "/docs", "/enterprise", "/evaluation", "/evidence", "/explore", "/guide", "/how-it-works", "/integrations", "/knowledge-compiler", "/pricing", "/privacy", "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding", "/refunds", "/research", "/research/notes", "/resources", "/security", "/solutions", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence", "/solutions/knowledge-graph", "/solutions/source-grounded-assistants", "/solutions/knowledge-operations", "/sources", "/status", "/subprocessors", "/terms", "/trust"];
 /*
   The documentation sections come from the documentation rather than being listed again here.
 

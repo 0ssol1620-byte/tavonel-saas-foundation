@@ -18,6 +18,8 @@ const registeredUnitTestPaths = new Set([
   'components/explore/evidence-workbench.test.tsx',
   'components/compile-stage-player.mobile-view.test.tsx',
   'eval/ask-quality/metrics.test.ts',
+  // W2-E2 answerability replay: the one E2 eval suite its owner selects; also in the base include as eval/**/metrics.test.ts.
+  'eval/ask-quality/e2/metrics.test.ts',
 ]);
 const asyncRouteUnitTestPath = 'app/api/compile-jobs/route.test.ts';
 const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs']);
@@ -248,6 +250,7 @@ const browserProjectsByFile = new Map([
   ['e2e/launch-qa-remote-mcp.spec.ts', ['launch-chromium']],
   ['e2e/keyless-try-it.spec.ts', ['1440', '390']],
   ['e2e/p4-followups.spec.ts', ['1440']],
+  ['e2e/operations.spec.ts', ['1440']],
 ]);
 
 const SOLUTIONS_ROUTES=['ai-ready-knowledge','document-intelligence','knowledge-graph','source-grounded-assistants','knowledge-operations'];

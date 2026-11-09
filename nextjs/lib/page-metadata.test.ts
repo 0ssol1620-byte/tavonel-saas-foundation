@@ -243,7 +243,7 @@ describe("descriptions are the length a search result shows", () => {
     here is a deliberate act with a reason, not a way to make the check pass.
   */
   const COMPUTED = new Map([
-    ["/solutions/[slug]", "the description is the solution's own lede, from the page's data map"],
+    ["/solutions/[slug]", "the description is the solution's own seoDescription, from the page's data map (GX-04)"],
     ["/docs/[section]", "the description is the section's own summary, from lib/docs-content.ts"],
   ]);
 

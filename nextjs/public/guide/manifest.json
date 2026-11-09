@@ -3,195 +3,193 @@
   "truthClass": "T0",
   "generatedWithAI": false,
   "source": "https://tavonel.com",
-  "sourceRelease": "4c80bb3028fb73dc88e929c25baf0bec97bee4e7",
-  "sourceReleaseBasis": "Inferred: the production deployment serving tavonel.com when these were recorded (dpl_7fEfTdmcPi8FfDyrXs17dMiF9gm2) was created 12 s after this main commit and carries the git-main alias. Not read from the deployment's own metadata.",
+  "sourceRelease": "37c44371bda67021c2a9268c2c4a29f77e3ea90f",
+  "sourceReleaseBasis": "Read from the deployment's own metadata on 2026-11-09: tavonel.com was aliased to production deployment dpl_2CtpEqAYLyTEdjuTUrv4yFnU2qjY (vercel inspect tavonel.com), whose git metadata names main at this commit (githubCommitSha). All six takes were recorded the same day, after that deployment went live.",
   "creator": "TAVONEL first-party browser recording (Playwright chromium, scripted clicks on the live site)",
   "rights": "First-party recording of public tavonel.com pages and of the public sample World. The /explore sample keeps its own public-sample rights boundary; nothing here grants rights to arbitrary source uploads.",
   "allowedUse": "TAVONEL enablement guides (/guide, /ko/guide and the documentation). No claim of a customer result, a new compile run, a benchmark, or a capability the public site does not offer today.",
   "howRecorded": [
-    "Browser scenes: Playwright chromium with context.recordVideo; desktop 1280x800 (dpr 1), phone 390x844 (dpr 2, isMobile, hasTouch). guide-1-explore and guide-3-api were recorded on live https://tavonel.com with no fixture build; guide-2-mcp is the exception in the last line. No request interception, no response edit.",
+    "Browser scenes: live https://tavonel.com in Playwright chromium with context.recordVideo; desktop 1280x800 (dpr 1), phone 390x844 (dpr 2, isMobile, hasTouch). No fixture build, no request interception, no response edit.",
     "One declared DOM addition: a synthetic cursor element (#__guide_cursor, pointer-events:none) the recorder moves before each action. Every click is a real pointer click at the cursor position, and the recorder refuses to click when the element under the cursor is not the one named.",
-    "The analytics notice on each first page is declined with its own No thanks button, on camera.",
+    "The analytics notice is declined with its own No thanks button, on camera, on the first page where it appears.",
     "Terminal scenes: a local page generated only from terminal/<session>.json, a capture of real Git Bash commands run in an empty directory with no TAVONEL_* variable set. Each step shows its real exit code, wall-clock duration and start time.",
     "No voice, no burned-in caption text. Captions are WebVTT (ko, en) from GUIDE-SCRIPTS.json; each cue runs from its scene's logged start to the next scene's start.",
-    "guide-2-mcp (both takes) was re-recorded on 2026-10-19 from a local production build of the pull request that fixed /developers and /docs/mcp, not from tavonel.com: its recordedFrom field says so. Its terminal scenes replay the same captured session as before."
+    "Recorder, terminal capture, replay and encoder: nextjs/scripts/guide/ (GUIDE-SCRIPTS.json holds the captions; terminal/<session>.json the captured sessions)."
   ],
   "files": [
     {
       "file": "guide-1-explore-desktop.en.vtt",
-      "bytes": 1981,
-      "sha256": "259be4884a8ca91d9962f4d39b27ec39b7d19ce0ddd3fc50b0c6d8eb6aeab7fb",
+      "bytes": 2035,
+      "sha256": "fc716e9be2acbf5b86451b87968d95cac3a37f35113d745ed7673abc5f6e8ed2",
       "cues": 18
     },
     {
       "file": "guide-1-explore-desktop.jpg",
-      "bytes": 136709,
-      "sha256": "efe4c2b5ed7005a1cec8504876aebb2385b097c3ab496551da0679a75d934ec7"
+      "bytes": 134736,
+      "sha256": "b9030a6067d156d92386a851d6840dd3d3afdaffcc5355608c0be61982e81541"
     },
     {
       "file": "guide-1-explore-desktop.ko.vtt",
-      "bytes": 2210,
-      "sha256": "2328598ca0b73741477a386dcbc0214a177aeca406285bcb4dfc1594fe3b14cd",
+      "bytes": 2261,
+      "sha256": "e4a086c78b5d95ee8ede7001ad2848f62a7a3fb26ef6b036c9d021b463a7660b",
       "cues": 18
     },
     {
       "file": "guide-1-explore-desktop.mp4",
-      "bytes": 2553707,
-      "sha256": "15610083e4303ca9ff5a36337c87ed5c05f7c9b1fc9a01e26c5f76578e13d565",
+      "bytes": 2848425,
+      "sha256": "e2872949e176ca2d9b797fdb4eab15b378a92aac4686bf7b36de0af1d746480c",
       "guide": "guide-1-explore",
       "variant": "desktop",
       "width": 1280,
       "height": 800,
-      "durationSeconds": 115.08,
-      "codec": "H.264 Constrained Baseline (libx264 crf 32), yuv420p, 25 fps, no audio",
-      "recordedAt": "2026-10-19T01:04:05.601Z"
+      "durationSeconds": 113.2,
+      "codec": "H.264 Constrained Baseline (libx264 crf 30), yuv420p, 25 fps, no audio",
+      "recordedAt": "2026-11-09T06:10:02.504Z"
     },
     {
       "file": "guide-1-explore-phone.en.vtt",
-      "bytes": 1981,
-      "sha256": "59f7057527ff10443052114584e47f52a3ff899c01617480fa6a7817d4e39d6f",
+      "bytes": 2035,
+      "sha256": "b601fac7bcab9a764bcbc277faa6e2706201d3967331f2772845ba16644ee089",
       "cues": 18
     },
     {
       "file": "guide-1-explore-phone.jpg",
-      "bytes": 53018,
-      "sha256": "6c77469020741aceb1c07475633ee4ebbd75b3dd704f60dd787cb7f36b279537"
+      "bytes": 49843,
+      "sha256": "9c1ac4d77f338c21b4f0fe5ae66b32cba397d25e2afc3ae5e668f609c553a85d"
     },
     {
       "file": "guide-1-explore-phone.ko.vtt",
-      "bytes": 2210,
-      "sha256": "d467e856469088454bc4f1020984a7fc7fbce9805fcbcec16183a8d57fc2b97a",
+      "bytes": 2261,
+      "sha256": "8a33bb2a52b9b851b5a09f182b68c1ec071df6bab2afee4d93d444ea889ca840",
       "cues": 18
     },
     {
       "file": "guide-1-explore-phone.mp4",
-      "bytes": 1884995,
-      "sha256": "267ce646e12f7a48c77d4531fc0fb275c412ed7fa8cf3e2cda8abeba4727a8a4",
+      "bytes": 1736001,
+      "sha256": "089a2779838e4b6ed09af3ae38f158f822d0609235692459b25db404cfebb6c6",
       "guide": "guide-1-explore",
       "variant": "phone",
       "width": 390,
       "height": 844,
-      "durationSeconds": 114.72,
+      "durationSeconds": 114.28,
       "codec": "H.264 Constrained Baseline (libx264 crf 26), yuv420p, 25 fps, no audio",
-      "recordedAt": "2026-10-19T01:06:02.951Z"
+      "recordedAt": "2026-11-09T06:17:07.837Z"
     },
     {
       "file": "guide-2-mcp-desktop.en.vtt",
       "bytes": 1898,
-      "sha256": "9ee377b98b7f477333f2d5c278a818ea4d99d11f80fff2e52ffa0387b3a48dcf",
+      "sha256": "4cb6e22a22a377f605d9cc852e23e0010cf99dc0446e096e5e97cf47692c748b",
       "cues": 18
     },
     {
       "file": "guide-2-mcp-desktop.jpg",
-      "bytes": 134766,
-      "sha256": "b2330f7c1e2f47b2ad3eacb2951f91d752b36e155f7fa618a518d9089f8d73c9"
+      "bytes": 133599,
+      "sha256": "9086a7648f9dc46b9ba7c60cb18f9ab80b41f30d88cc33ddc5148a85401db0c6"
     },
     {
       "file": "guide-2-mcp-desktop.ko.vtt",
       "bytes": 2280,
-      "sha256": "9db4f10bad104fab9187ad5f67141a2788a810a44831e688f0206a0053eab9a5",
+      "sha256": "fcb0f175db9b8df3643b92eb54a02277d5bf2ebce964a32a40896e323ec36b14",
       "cues": 18
     },
     {
       "file": "guide-2-mcp-desktop.mp4",
-      "bytes": 2631438,
-      "sha256": "1057e084d90ea45357316d67d2ccd393f8850f326b971fbe47dc23f3777a2732",
+      "bytes": 2650277,
+      "sha256": "514637f61713cc45e2f54edaae5acafca413f1cf6583b59bf509ef181e772f74",
       "guide": "guide-2-mcp",
       "variant": "desktop",
       "width": 1280,
       "height": 800,
       "durationSeconds": 127.56,
       "codec": "H.264 Constrained Baseline (libx264 crf 34), yuv420p, 25 fps, no audio",
-      "recordedAt": "2026-10-19T14:25:35.550Z",
-      "recordedFrom": "Re-recorded 2026-10-19 for Phase 4 follow-ups (a) and (b): a local next start of this pull request's head (main ed4a1583 plus the /developers and /docs/mcp fixes), fixture environment, live commercial posture, before tavonel.com served those fixes. Same recorder, captions, terminal capture and encoder as the other takes; the phone tap on the channel link no longer needs an offset."
+      "recordedAt": "2026-11-09T06:23:10.856Z"
     },
     {
       "file": "guide-2-mcp-phone.en.vtt",
       "bytes": 1898,
-      "sha256": "23f2b62cf93f19331c5fbb32906e1fd92a93dd2093f9e94803dda66c17ca77fe",
+      "sha256": "dbdc9e7f2bcdcfe889f8de82207c9698bb40acece408cbcf0585ca134edbdfca",
       "cues": 18
     },
     {
       "file": "guide-2-mcp-phone.jpg",
-      "bytes": 97464,
-      "sha256": "05394610128f61faf8af2651b207d38740e41d2fca65b66653c3dd414f75d53f"
+      "bytes": 98245,
+      "sha256": "f2115d2c6cd3e43d8680652f5977bdad0d4c44f902b4e2857c61233ea61880d1"
     },
     {
       "file": "guide-2-mcp-phone.ko.vtt",
       "bytes": 2280,
-      "sha256": "02cd62d2fc410980b693f2f274a15cf82821df469575238d87e16d914d58d7d3",
+      "sha256": "695adccc6b3c13c3a56043d94fa096e7b184d329710304a213f755bb23b7503f",
       "cues": 18
     },
     {
       "file": "guide-2-mcp-phone.mp4",
-      "bytes": 2298389,
-      "sha256": "a4324b37135db8b95e72d47abf71610314c6e7e84f944de5f5d790eb2cb89f03",
+      "bytes": 2338799,
+      "sha256": "2996141d5bd6cbdb2c4f1a469593ce07fb25b4d67dfbd2c9224aca6fa55e6d9c",
       "guide": "guide-2-mcp",
       "variant": "phone",
       "width": 390,
       "height": 844,
-      "durationSeconds": 127.68,
+      "durationSeconds": 127.24,
       "codec": "H.264 Constrained Baseline (libx264 crf 26), yuv420p, 25 fps, no audio",
-      "recordedAt": "2026-10-19T14:44:41.247Z",
-      "recordedFrom": "Re-recorded 2026-10-19 for Phase 4 follow-ups (a) and (b): a local next start of this pull request's head (main ed4a1583 plus the /developers and /docs/mcp fixes), fixture environment, live commercial posture, before tavonel.com served those fixes. Same recorder, captions, terminal capture and encoder as the other takes; the phone tap on the channel link no longer needs an offset."
+      "recordedAt": "2026-11-09T06:19:04.362Z"
     },
     {
       "file": "guide-3-api-desktop.en.vtt",
       "bytes": 1563,
-      "sha256": "fd7fa8ce8af2a3aa76329fea967d093da913eae7fa238cfada1a8b4512c6ee59",
+      "sha256": "bca26df1659fa25ec0b2778779e80dbd1dae42bc4092b390694a8e141b62af20",
       "cues": 13
     },
     {
       "file": "guide-3-api-desktop.jpg",
-      "bytes": 81554,
-      "sha256": "bf83d08d1c9c3ef4ac0cdd0e63eb00e1c516c7a0b170c670eb3ed2c4df93abad"
+      "bytes": 81966,
+      "sha256": "9f9a4517dc90d673520cceb707187699a7077d735bb881466114ee8115a2dcf9"
     },
     {
       "file": "guide-3-api-desktop.ko.vtt",
       "bytes": 1776,
-      "sha256": "642511e6a74d927413ea2148955923036776a7b319dbfd62af7e6723dd4d2be9",
+      "sha256": "37f4c5876915ebf16c93d18306a52afdee0cae552c7c132429a7f676e3c5de3d",
       "cues": 13
     },
     {
       "file": "guide-3-api-desktop.mp4",
-      "bytes": 2474839,
-      "sha256": "85f845bc3bfe752d19a3ed2ada947dbb0a3230e3df7536539d3c404fcb57c7e1",
+      "bytes": 2951578,
+      "sha256": "49d2920361d20f02378257887783942f6936bee051d74b79f55e32bf6355e397",
       "guide": "guide-3-api",
       "variant": "desktop",
       "width": 1280,
       "height": 800,
-      "durationSeconds": 105.16,
-      "codec": "H.264 Constrained Baseline (libx264 crf 28), yuv420p, 25 fps, no audio",
-      "recordedAt": "2026-10-19T01:12:17.632Z"
+      "durationSeconds": 104.8,
+      "codec": "H.264 Constrained Baseline (libx264 crf 26), yuv420p, 25 fps, no audio",
+      "recordedAt": "2026-11-09T06:25:20.138Z"
     },
     {
       "file": "guide-3-api-phone.en.vtt",
       "bytes": 1563,
-      "sha256": "49910ddc17e7bd3f51880553092d810e88def5b4ea06df90b245b8d98c264010",
+      "sha256": "a559639759293a45d1014b2ea3a1902b30a89399447268d81ca1c098bc9c3a7c",
       "cues": 13
     },
     {
       "file": "guide-3-api-phone.jpg",
-      "bytes": 55367,
-      "sha256": "512d019cd47106aaad29ab8e0eb75b3329063c393738a9fe6793012ce95dfb47"
+      "bytes": 55234,
+      "sha256": "26d6fd2c72f5f6d8881017ec4d3563fff9521502ce68f1cff4d11fb6845c49a7"
     },
     {
       "file": "guide-3-api-phone.ko.vtt",
       "bytes": 1776,
-      "sha256": "28e567161f757f255beec0513bdc0b81c6786d55b7bfe3d349894e3a56816293",
+      "sha256": "ef91ae9ece7499e4a08ac6c99cc0d7a998663eb6b44ce4ff108d7bcb8766098f",
       "cues": 13
     },
     {
       "file": "guide-3-api-phone.mp4",
-      "bytes": 1615170,
-      "sha256": "12ad1332077d772654a62b3bc2b13fd1cb5b68c66b6283ba5456b5b44bdb8a89",
+      "bytes": 1649516,
+      "sha256": "a04891de9d5194de376bbf6a95737a1936d4df91f209ba38c1cec0bd1f4c48bd",
       "guide": "guide-3-api",
       "variant": "phone",
       "width": 390,
       "height": 844,
-      "durationSeconds": 104.88,
+      "durationSeconds": 105.04,
       "codec": "H.264 Constrained Baseline (libx264 crf 26), yuv420p, 25 fps, no audio",
-      "recordedAt": "2026-10-19T01:14:04.161Z"
+      "recordedAt": "2026-11-09T06:21:15.010Z"
     }
   ]
 }

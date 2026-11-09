@@ -10,9 +10,9 @@ export const metadata: Metadata = {
   // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
   alternates: { canonical: "/research" },
   openGraph: { url: "/research" },
-  title: "Research — TAVONEL",
+  title: "Research: turning documents into knowledge — TAVONEL",
   description:
-    "The open problems in compiling documents into evidence-bound, versioned knowledge, and how we work on them.",
+    "The open problems in compiling documents into evidence-bound, versioned knowledge: identity across documents, what supports a statement, what a change breaks.",
 };
 
 /*

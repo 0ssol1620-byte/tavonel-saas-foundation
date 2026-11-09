@@ -104,9 +104,9 @@ function PassFigure({ figure }: { figure: ReturnType<typeof gdpPdfPassFigure> })
 */
 
 export const metadata = pageMetadata({
-  title: "GDP.pdf: compiled context against the PDF alone",
+  title: "GDP.pdf: compiled context against the PDF alone — TAVONEL",
   description:
-    "A two-arm run on the public GDP.pdf task set: the same model reading the raw PDF, and reading it with TAVONEL's compiled context. Not comparable with published GDP.pdf scores.",
+    "A two-arm run on the public GDP.pdf task set: the same model reading the raw PDF, then reading it with compiled context. Not comparable with published scores.",
   canonical: "/benchmarks/gdp-pdf",
 });
 

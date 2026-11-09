@@ -1,0 +1,77 @@
+{
+  "schema": "tavonel.guide-caption-script.v1",
+  "rules": [
+    "Every caption describes only what is on screen during its cue, and is true of the live site at recording time.",
+    "No numbers in captions (no digits, no number words). Hash algorithms are called 'hash' / '해시'.",
+    "No promise beyond SERVICE-DEFINITION-2026-10-17 section 4: customer upload is switched off, the Explore sample World is the only finished World, MCP is a downloaded read-only bridge, there is no SDK.",
+    "The word 'verified' is not used to describe pages; completion is never called accuracy.",
+    "No voice, no burned-in text: captions ship only as WebVTT (ko, en).",
+    "Terminal scenes are replays of a captured real session (terminal/<session>.json); the caption says so the first time a terminal appears."
+  ],
+  "guides": {
+    "guide-1-explore": {
+      "title": { "en": "Follow a result to its source in the public World", "ko": "공개 World에서 결과를 출처까지 따라가기" },
+      "beats": [
+        { "id": "g1-consent", "ko": "먼저 분석 쿠키 안내에서 No thanks를 누릅니다.", "en": "First, the analytics notice: No thanks." },
+        { "id": "g1-open", "ko": "가입 없이 열리는 공개 샘플 World입니다. Apple의 공개 SEC 공시로 만든 읽기 전용 샘플입니다.", "en": "A public sample World that opens without signing up: a read-only sample compiled from Apple's public SEC filings." },
+        { "id": "g1-prepared", "ko": "이 공개 데모에서는 준비된 질문만 실행됩니다. 자유 질의는 돌지 않습니다.", "en": "Prepared retrieval results from this artifact. Free-form AI queries are not running in this public demo." },
+        { "id": "g1-question", "ko": "준비된 질문 하나를 고릅니다.", "en": "Pick one of the prepared questions." },
+        { "id": "g1-passage", "ko": "답은 검색이 고른 원문 발췌입니다. 그 아래에, 독립적으로 확인된 결론이 아니라는 안내가 붙습니다.", "en": "The answer is a source passage chosen by retrieval. Under it, the page says it is a quotation, not an independently checked conclusion." },
+        { "id": "g1-rows", "ko": "발췌마다 출처 파일과 페이지가 붙습니다. 행을 고르면 그 페이지가 열립니다.", "en": "Each excerpt names its source file and page. Choosing a row opens that page." },
+        { "id": "g1-region", "ko": "원문 페이지가 열리고, 발췌가 나온 영역이 표시됩니다.", "en": "The source page opens, with the region the excerpt came from marked on it." },
+        { "id": "g1-version", "ko": "출처 버전은 콘텐츠 해시로 고정됩니다. 근거마다 고정 링크도 있습니다.", "en": "The source version is pinned by its content hash, and each piece of evidence has a permanent link." },
+        { "id": "g1-inspector", "ko": "근거 인스펙터는 객체 하나를, 그것을 받치는 원문 영역과 함께 엽니다.", "en": "The evidence inspector opens one object beside the source region that supports it." },
+        { "id": "g1-step", "ko": "다음을 누르면 이 객체를 받치는 원문 영역을 하나씩 넘겨 봅니다.", "en": "Next steps through the source regions behind this object, one at a time." },
+        { "id": "g1-change", "ko": "변경 탭은 연간 공시로 만든 World와, 이후 공시가 들어온 뒤의 같은 World를 나란히 둡니다.", "en": "Change sets the World built from the annual filing beside the same World after later filings arrived." },
+        { "id": "g1-arrived", "ko": "들어온 공시마다 출처 페이지가 함께 보입니다.", "en": "Each filing that arrived is shown with its source page." },
+        { "id": "g1-counts", "ko": "비교는 객체 단위입니다. 다시 만들어진 객체와 그대로 남은 객체를 따로 셉니다. 이 샘플에 기록된 비교입니다.", "en": "The comparison runs object by object and counts rebuilt and unchanged identities separately. It is a comparison recorded in this sample." },
+        { "id": "g1-noregion", "ko": "영역이 없는 페이지는 그렇다고 표시하고, 그 페이지에 기대는 것은 없습니다.", "en": "A page with no region is marked as such, and nothing in this World stands on it." },
+        { "id": "g1-evidence", "ko": "Evidence 페이지는 World가 한 페이지에서 읽은 영역을 모두 보여 줍니다.", "en": "The Evidence page shows every region a World read from one page." },
+        { "id": "g1-locator", "ko": "영역마다 페이지, 영역 좌표, 출처 해시를 담은 위치 표시가 붙습니다.", "en": "Each region carries a locator: its page, its box coordinates and the source hash." },
+        { "id": "g1-back", "ko": "Open this region in Explore를 누르면 같은 영역이 Explore에서 열립니다.", "en": "Open this region in Explore takes the same region back into Explore." },
+        { "id": "g1-end", "ko": "완성된 Compiled World는 지금 전부 읽을 수 있고, 내 자료의 컴파일은 상담 후 함께 설정합니다.", "en": "A finished Compiled World is open to read in full today. Compiling your own sources is set up with us." }
+      ]
+    },
+    "guide-2-mcp": {
+      "title": { "en": "The read-only MCP bridge, as far as it goes without a key", "ko": "읽기 전용 MCP 브리지 — 키 없이 갈 수 있는 곳까지" },
+      "beats": [
+        { "id": "g2-open", "ko": "개발자 페이지입니다. 에이전트와 코드가 Compiled World를 MCP와 API로 읽는 방법을 설명합니다.", "en": "The Developers page: how agents and code read a Compiled World over MCP and the API." },
+        { "id": "g2-nowrite", "ko": "MCP 서버에는 쓰기 도구가 없고, 쓰기 도구가 추가되면 서버가 시작을 거부합니다.", "en": "No write tool, and the server refuses to start if one is added." },
+        { "id": "g2-download", "ko": "읽기 전용 MCP 서버는 내려받는 파일 하나입니다. 설치할 패키지는 없습니다.", "en": "The read-only MCP server is one downloadable file. There is no package to install." },
+        { "id": "g2-channel", "ko": "채널 매니페스트에는 버전과 파일마다 해시가 적혀 있습니다.", "en": "The channel manifest lists the version and a hash for every file." },
+        { "id": "g2-terminal", "ko": "이제 터미널입니다. 이 화면은 실제로 실행한 명령과 그 출력을 기록한 로그를 고치지 않고 다시 보여 줍니다.", "en": "Now a terminal. This screen replays a captured session: the commands that ran and the output they printed, unedited." },
+        { "id": "g2-hash", "ko": "같은 파일을 받아 해시를 계산하고, 채널 매니페스트의 값과 비교합니다. 두 값이 같습니다.", "en": "The file is downloaded, hashed, and compared with the manifest value. They match." },
+        { "id": "g2-version", "ko": "--version으로 실행할 빌드를 확인합니다.", "en": "--version prints the exact build." },
+        { "id": "g2-nokey", "ko": "이 셸에는 TAVONEL 환경 변수가 없습니다. 아래는 모두 키 없이 실행했습니다.", "en": "No TAVONEL variable is set in this shell, so everything below ran without a key." },
+        { "id": "g2-requests", "ko": "표준 입력으로 보낼 JSON-RPC 요청입니다. 초기화, 도구 목록, 그리고 도구 호출 하나입니다.", "en": "The JSON-RPC requests sent over stdin: initialize, tools/list and one tools/call." },
+        { "id": "g2-raw", "ko": "서버가 돌려준 응답을 그대로 보여 줍니다.", "en": "The server's responses, exactly as printed." },
+        { "id": "g2-tools", "ko": "이름만 추리면 도구 목록입니다. 쓰는 도구는 없습니다.", "en": "Filtered to names: the tool list. None of them writes." },
+        { "id": "g2-missing", "ko": "키가 없으면 도구 호출은 API_KEY_MISSING에서 멈춥니다. 이것이 실제 응답입니다.", "en": "Without a key, the tool call stops at API_KEY_MISSING. This is the real response." },
+        { "id": "g2-doctor", "ko": "--doctor는 빠진 것을 짚고 실패 코드로 끝납니다.", "en": "--doctor names what is missing and exits with a failure code." },
+        { "id": "g2-config", "ko": "MCP 문서의 Claude Desktop 설정 블록입니다. 내려받은 파일의 절대 경로를 넣고, 키 자리는 자리표시입니다.", "en": "The Claude Desktop config block from the MCP docs: the absolute path to the downloaded file, and a placeholder where a key goes." },
+        { "id": "g2-keynote", "ko": "키는 args가 아니라 클라이언트의 env 블록이나 비밀 저장 기능에 둡니다.", "en": "The key lives in the client's env block or its secret facility, never in args." },
+        { "id": "g2-desktop", "ko": "Claude Desktop 앱 화면은 이 녹화에 들어 있지 않습니다.", "en": "The Claude Desktop app itself is not part of this recording." },
+        { "id": "g2-table", "ko": "문서의 도구 표와, 쓰기 도구도 활성화 도구도 없다는 설명입니다.", "en": "The docs' tool table, and the note that there is no write tool and no activation tool." },
+        { "id": "g2-end", "ko": "완성된 Compiled World는 지금 전부 읽을 수 있고, 내 자료의 컴파일은 상담 후 함께 설정합니다.", "en": "A finished Compiled World is open to read in full today. Compiling your own sources is set up with us." }
+      ]
+    },
+    "guide-3-api": {
+      "title": { "en": "First API and CLI calls, without a key", "ko": "키 없이 하는 첫 API·CLI 호출" },
+      "beats": [
+        { "id": "g3-open", "ko": "API 참조 페이지에서 키 없이 읽기 요청을 바로 실행합니다. 가입도, 자격 증명도 필요 없습니다.", "en": "The API reference runs unauthenticated reads from the page: no signup, no credential, nothing that spends." },
+        { "id": "g3-capabilities", "ko": "TAVONEL이 읽는 형식 목록입니다. 업로드 경로가 같은 목록으로 검사합니다.", "en": "What TAVONEL can read: the same list the upload route validates against." },
+        { "id": "g3-status", "ko": "배포 상태입니다. 내 파일 컴파일이 여기서 열려 있지 않다는 것도 응답에 있습니다.", "en": "The deployment's own state, including that compiling your own files is not open here." },
+        { "id": "g3-sample", "ko": "답의 모양을 보여 주는 고정 샘플입니다. 이것으로 추출 품질을 판단하지 않습니다.", "en": "A fixed product sample that shows the shape of an answer. Build against the shape; do not judge extraction from it." },
+        { "id": "g3-digest", "ko": "응답에는 Content-Digest 헤더가 붙어 있습니다.", "en": "The response carries a Content-Digest header." },
+        { "id": "g3-terminal", "ko": "이제 터미널입니다. 이 화면은 실제로 실행한 명령과 그 출력을 기록한 로그를 고치지 않고 다시 보여 줍니다.", "en": "Now a terminal. This screen replays a captured session: the commands that ran and the output they printed, unedited." },
+        { "id": "g3-compare", "ko": "받은 바이트로 계산한 해시가 서버가 밝힌 Content-Digest와 같습니다.", "en": "The hash computed from the bytes received equals the Content-Digest the server stated." },
+        { "id": "g3-recipe", "ko": "공개된 Python 레시피를 받아, 채널 매니페스트의 해시와 같은지 확인합니다.", "en": "The published Python recipe is downloaded and matched against its hash in the channel manifest." },
+        { "id": "g3-run", "ko": "레시피는 다이제스트를 다시 계산하고, 근거가 페이지와 영역을 가리키는지 확인해 출력합니다.", "en": "The recipe recomputes the digest and prints each piece of evidence with the page and region it points at." },
+        { "id": "g3-disclosure", "ko": "샘플은 스스로 고객 증거가 아닌 제품 샘플이라고 밝힙니다.", "en": "The sample labels itself a product sample, not customer proof." },
+        { "id": "g3-cli", "ko": "CLI 파일도 같은 방식으로 채널 매니페스트의 해시와 맞춰 봅니다.", "en": "The CLI file is matched against the channel manifest the same way." },
+        { "id": "g3-cli-status", "ko": "CLI의 status 명령은 키 없이 돌아갑니다. 공개 World 열람은 열려 있고, 내 문서 컴파일은 닫혀 있다고 답합니다.", "en": "The CLI's status command runs without a key. It reports reading the public World as open, and compiling your own documents as closed." },
+        { "id": "g3-end", "ko": "완성된 Compiled World는 지금 전부 읽을 수 있고, 내 자료의 컴파일은 상담 후 함께 설정합니다.", "en": "A finished Compiled World is open to read in full today. Compiling your own sources is set up with us." }
+      ]
+    }
+  }
+}

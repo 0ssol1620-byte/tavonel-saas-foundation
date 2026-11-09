@@ -2,6 +2,19 @@ import { PermanentReject } from "./errors";
 
 export const SOURCE_KEY_PATTERN = /^quarantine\/([^/]+)\/([^/]+)\/source$/;
 export const MAX_SOURCE_BYTES = 5 * 1024 * 1024;
+/**
+ * D1 stage 1 (PROGRAM-2026-11-04 §4.D, "단계 1: 25 MiB / 200쪽"), read only when the worker runs
+ * with TAVONEL_INTAKE_CEILING_STAGE=1. Both copies are pinned by intake-ceiling-cross-tree.test.ts.
+ */
+export const STAGE_1_MAX_SOURCE_BYTES = 25 * 1024 * 1024;
+
+export type IntakeCeilingStage = "0" | "1";
+
+/** Unset is stage 0. Any other value is null: the caller refuses rather than guessing a ceiling. */
+export function intakeCeilingStage(env: { TAVONEL_INTAKE_CEILING_STAGE?: string }): IntakeCeilingStage | null {
+  const raw = (env.TAVONEL_INTAKE_CEILING_STAGE ?? "").trim() || "0";
+  return raw === "0" || raw === "1" ? raw : null;
+}
 
 /**
  * One extension per accepted MIME, for an object that arrived without a filename.

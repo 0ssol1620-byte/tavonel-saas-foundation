@@ -883,6 +883,66 @@ export async function readOpenCompileJobs(limit = 20): Promise<CompileJobResult<
   return { ok: true, value: rows.flatMap((row) => { const job = toJob(row); return job ? [job] : []; }) };
 }
 
+/**
+ * The other half of that filter (F2, 2026-11-09): jobs still waiting on the customer's blocker
+ * decision whose row has not moved since `cutoffIso`. Oldest first, across workspaces, because the
+ * caller is the cron; each settle it makes is scoped to the row's own workspace.
+ *
+ * `updated_at` is the right clock: the worker writes nothing for an unchanged blocker, and every
+ * customer answer (a resolution, or `retry_eligible` clearing the blockers) moves it.
+ */
+export async function readExpiredBlockedCompileJobs(cutoffIso: string, limit = 20): Promise<CompileJobResult<CompileJob[]>> {
+  if (Number.isNaN(Date.parse(cutoffIso))) return fail("COMPILE_JOB_SCOPE_INVALID");
+  const query = new URLSearchParams({
+    state: `not.in.(${SCHEDULER_EXCLUDED_STATES.join(",")})`,
+    blocked: "neq.[]",
+    blocked_resolution: "is.null",
+    updated_at: `lt.${cutoffIso}`,
+    order: "updated_at.asc",
+    limit: String(Math.min(Math.max(1, limit), 100)),
+    select: "*",
+  });
+  const response = await admin(`/rest/v1/foundation_compile_jobs?${query}`);
+  if (!response) return fail("COMPILE_JOB_STORE_NOT_CONFIGURED");
+  if (!response.ok) return fail("COMPILE_JOB_STORE_READ_FAILED");
+  const rows = await response.json().catch(() => null) as CompileJobRow[] | null;
+  if (!Array.isArray(rows)) return fail("COMPILE_JOB_STORE_READ_FAILED");
+  return { ok: true, value: rows.flatMap((row) => { const job = toJob(row); return job ? [job] : []; }) };
+}
+
+/**
+ * Settle one job whose blocker decision expired, as `failed BLOCKED_DECISION_EXPIRED`.
+ *
+ * A compare-and-set like `claimCompileJobLease`, not the advance RPC: the RPC would fail a job the
+ * customer answered a moment after it was read. Here the row must still be in the state, at the
+ * `updated_at`, and without the resolution this read saw, or nothing changes. The event trigger
+ * writes the `failed` row with the code, and `settled_at` satisfies the terminal check.
+ */
+export async function expireBlockedCompileJob(job: CompileJob, now = Date.now()): Promise<CompileJobResult<{ expired: boolean }>> {
+  if (!WORKSPACE_KEY.test(job.workspaceKey) || !COMPILE_JOB_ID.test(job.jobId)) return fail("COMPILE_JOB_SCOPE_INVALID");
+  if (SCHEDULER_EXCLUDED_STATES.includes(job.state) || job.blocked.length === 0 || job.blockedResolution !== null) {
+    return { ok: true, value: { expired: false } };
+  }
+  if (!readSupabaseAdminConfig()) return fail("COMPILE_JOB_STORE_NOT_CONFIGURED");
+  const query = new URLSearchParams({
+    job_id: `eq.${job.jobId}`,
+    workspace_key: `eq.${job.workspaceKey}`,
+    state: `eq.${job.state}`,
+    updated_at: `eq.${job.updatedAt}`,
+    blocked_resolution: "is.null",
+    select: "job_id",
+  });
+  const response = await admin(`/rest/v1/foundation_compile_jobs?${query}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ state: "failed", error_code: "BLOCKED_DECISION_EXPIRED", settled_at: new Date(now).toISOString() }),
+  });
+  if (!response || !response.ok) return fail("COMPILE_JOB_STORE_WRITE_FAILED");
+  const rows = await response.json().catch(() => null) as unknown[] | null;
+  if (!Array.isArray(rows)) return fail("COMPILE_JOB_STORE_WRITE_FAILED");
+  return { ok: true, value: { expired: rows.length === 1 } };
+}
+
 /*
   Enqueue a corpus: one compile job per part, sequentially, into a corpus derived from the set.
 

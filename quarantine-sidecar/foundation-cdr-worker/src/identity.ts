@@ -17,7 +17,9 @@ export class CdrIdentityError extends RetryableError {
 
 export async function cdrAuthorization(target: string, secret: string | undefined,
   fetcher: typeof fetch, now = new Date(), requestId = crypto.randomUUID()): Promise<string | undefined> {
-  const privateTarget = target === `${PRIVATE_CDR_ORIGIN}/v1/disarm` || target === `${PRIVATE_CDR_ORIGIN}/health`;
+  const privateTarget = target === `${PRIVATE_CDR_ORIGIN}/v1/disarm` || target === `${PRIVATE_CDR_ORIGIN}/health`
+    // The D2 shadow's second read of the same source (text-layer-shadow.ts), same origin and gate.
+    || target === `${PRIVATE_CDR_ORIGIN}/v1/text-layer`;
   if (!secret && !target.startsWith(PRIVATE_CDR_ORIGIN)) return undefined; // Existing synthetic lane only.
   if (!privateTarget || !hmacSecretIsConfigured(secret)) throw new RetryableError("CDR identity configuration is invalid");
   let stage: CdrIdentityError["stage"] = "request";

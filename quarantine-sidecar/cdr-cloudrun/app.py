@@ -83,6 +83,21 @@ MEASUREMENT_HARD_MAX_PAGES: Final = 500
 MEASUREMENT_HARD_MAX_OUTPUT_BYTES: Final = 128 * 1024 * 1024
 MEASUREMENT_HARD_MAX_RANGE_PAGES: Final = 64
 
+# D1 stage 1 (PROGRAM-2026-11-04 §4.D: "단계 1: 25 MiB / 200쪽"). A second production limit set,
+# chosen by TAVONEL_INTAKE_CEILING_STAGE ("0" or unset = the literals above, "1" = these), so the
+# rasterizer can be deployed at stage 1 *before* intake admits a stage-1 source -- the other order is
+# the accepted-then-dropped failure shared/intakeCeiling.ts exists to prevent. service.yaml deploys
+# "0". The bytes and pages are §4.D's; the other two are derived, not measured:
+#   output bytes  the stage-0 bound per page (18 MiB / 80) times 200 pages = 45 MiB
+#   range pages   the worker's OCR range size (wrangler.jsonc FOUNDATION_OCR_PAGE_RANGE_SIZE = 8),
+#                 so one range of bitmaps is in memory at a time (§4.D: memory apart from pages)
+# The measurement overrides above still apply on top of either stage, and still say so in /health.
+STAGE_1_MAX_INPUT_BYTES: Final = 25 * 1024 * 1024
+STAGE_1_MAX_PAGES: Final = 200
+STAGE_1_MAX_OUTPUT_BYTES: Final = 45 * 1024 * 1024
+STAGE_1_RASTER_RANGE_PAGES: Final = 8
+INTAKE_CEILING_STAGE_ENV: Final = "TAVONEL_INTAKE_CEILING_STAGE"
+
 
 @dataclass(frozen=True)
 class Limits:
@@ -94,13 +109,27 @@ class Limits:
 
     @property
     def is_production(self) -> bool:
-        return self == PRODUCTION_LIMITS
+        return self in STAGE_LIMITS.values()
 
 
 PRODUCTION_LIMITS: Final = Limits(MAX_INPUT_BYTES, MAX_PAGES, MAX_OUTPUT_BYTES, 0)
+STAGE_LIMITS: Final = {
+    "0": PRODUCTION_LIMITS,
+    "1": Limits(STAGE_1_MAX_INPUT_BYTES, STAGE_1_MAX_PAGES, STAGE_1_MAX_OUTPUT_BYTES, STAGE_1_RASTER_RANGE_PAGES),
+}
+
+
+def read_stage(env: Mapping[str, str]) -> str:
+    """Unset is stage 0. Anything but "0" or "1" refuses the boot rather than guessing a ceiling."""
+    raw = env.get(INTAKE_CEILING_STAGE_ENV, "").strip() or "0"
+    if raw not in STAGE_LIMITS:
+        raise RuntimeError(f"{INTAKE_CEILING_STAGE_ENV} must be 0 or 1")
+    return raw
 
 
 def read_limits(env: Mapping[str, str]) -> Limits:
+    base = STAGE_LIMITS[read_stage(env)]
+
     def bounded(name: str, default: int, high: int) -> int:
         raw = env.get(name, "").strip()
         if raw == "":
@@ -110,10 +139,10 @@ def read_limits(env: Mapping[str, str]) -> Limits:
         return int(raw)
 
     return Limits(
-        input_bytes=bounded("TAVONEL_CDR_MAX_INPUT_BYTES", MAX_INPUT_BYTES, MEASUREMENT_HARD_MAX_INPUT_BYTES),
-        pages=bounded("TAVONEL_CDR_MAX_PAGES", MAX_PAGES, MEASUREMENT_HARD_MAX_PAGES),
-        output_bytes=bounded("TAVONEL_CDR_MAX_OUTPUT_BYTES", MAX_OUTPUT_BYTES, MEASUREMENT_HARD_MAX_OUTPUT_BYTES),
-        raster_range_pages=bounded("TAVONEL_CDR_RASTER_RANGE_PAGES", 0, MEASUREMENT_HARD_MAX_RANGE_PAGES),
+        input_bytes=bounded("TAVONEL_CDR_MAX_INPUT_BYTES", base.input_bytes, MEASUREMENT_HARD_MAX_INPUT_BYTES),
+        pages=bounded("TAVONEL_CDR_MAX_PAGES", base.pages, MEASUREMENT_HARD_MAX_PAGES),
+        output_bytes=bounded("TAVONEL_CDR_MAX_OUTPUT_BYTES", base.output_bytes, MEASUREMENT_HARD_MAX_OUTPUT_BYTES),
+        raster_range_pages=bounded("TAVONEL_CDR_RASTER_RANGE_PAGES", base.raster_range_pages, MEASUREMENT_HARD_MAX_RANGE_PAGES),
     )
 
 
@@ -858,6 +887,9 @@ def healthz() -> JSONResponse:
             headers={"cache-control": "no-store", "retry-after": "60"},
         )
     content: dict[str, object] = {"status": "ok", "mode": "pdf-raster", "service": APP_NAME, "scannerReady": scanner_is_ready}
+    if LIMITS == STAGE_LIMITS["1"]:
+        # Stage 0 answers exactly as before; a stage-1 revision names its stage.
+        content["intakeCeilingStage"] = 1
     if not LIMITS.is_production:
         # Only a measurement revision says so; the production answer is unchanged.
         content["measurementLimits"] = {

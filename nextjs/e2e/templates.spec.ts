@@ -27,17 +27,17 @@ import { measureOverflow } from "./support/overflow";
 */
 
 const TEMPLATES = {
-  T0: ["/", "/ko"],
+  T0: ["/"],
   T1: [
     "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding",
     "/product/knowledge-compiler", "/how-it-works", "/knowledge-compiler", "/solutions", "/solutions/ai-ready-knowledge",
     "/solutions/document-intelligence", "/solutions/knowledge-graph", "/solutions/source-grounded-assistants",
     "/solutions/knowledge-operations", "/integrations", "/demo",
   ],
-  T2: ["/pricing", "/ko/pricing", "/evaluation", "/ko/evaluation", "/contact", "/ko/contact"],
+  T2: ["/pricing", "/evaluation", "/contact"],
   T3: [
     "/docs", "/docs/quickstart", "/developers", "/api", "/cookbooks", "/cookbooks/documents-to-grounded-work", "/sources",
-    "/changelog", "/resources", "/guide", "/ko/guide",
+    "/changelog", "/resources", "/guide",
   ],
   T4: ["/explore"],
   T5: [

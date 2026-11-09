@@ -27,12 +27,12 @@ import { expect, test } from "@playwright/test";
 */
 
 const ROUTES = [
-  "/", "/ko",
+  "/",
   "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding",
   "/product/knowledge-compiler", "/how-it-works", "/knowledge-compiler", "/solutions", "/solutions/ai-ready-knowledge",
   "/solutions/document-intelligence", "/solutions/knowledge-graph", "/solutions/source-grounded-assistants",
   "/solutions/knowledge-operations", "/integrations", "/demo",
-  "/pricing", "/ko/pricing", "/evaluation", "/ko/evaluation", "/contact", "/ko/contact",
+  "/pricing", "/evaluation", "/contact",
   "/docs", "/docs/quickstart", "/developers", "/api", "/cookbooks", "/cookbooks/documents-to-grounded-work", "/sources",
   "/changelog", "/resources",
   "/explore",

@@ -54,9 +54,10 @@ test.describe("visual continuity — locked film side", () => {
     const disclosure = page.getByTestId("landing-hero-film");
     await expect(disclosure).toBeVisible();
     await expect(page.locator("#s1").getByRole("tablist")).toHaveCount(1);
-    await expect(disclosure.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
+    await expect(disclosure.getByRole("tab")).toHaveText(["Read", "Compile", "Update", "Trace"]);
     await expect(disclosure.locator(".compile-film-motion-control")).toHaveCount(1);
-    await expect(disclosure.locator(".compile-film-sequence")).toHaveAttribute("data-video-primary-src", "/film/hero-r2-c1.mp4");
+    // R3 (D1): below 900px the phone plays the cut's yuv420p twin first (phoneSrc).
+    await expect(disclosure.locator(".compile-film-sequence")).toHaveAttribute("data-video-primary-src", page.viewportSize()!.width < 900 ? "/film/hero-r3-c1-hq.mp4" : "/film/hero-r3-c1.mp4");
     await expect(disclosure.locator(".compile-film-stage-disclosure")).toHaveCount(0);
     await expect(page.getByTestId("one-path-works-film")).toHaveCount(0);
     await expect(page.locator(".one-path-io-col")).toHaveCount(0);

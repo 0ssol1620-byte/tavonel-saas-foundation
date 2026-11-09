@@ -1,7 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { fixtureDocument, installFixtureSession, installWorkspaceRoutes, sseFrames } from "./fixtures/workspace-fixture";
 import { primaryCallToAction } from "../lib/commercial-state";
-import { KO_CHROME } from "../lib/site-navigation";
 
 /*
   Founder asks 2026-10-27: "pdf 어디에 올리라는거야? ... 파일 드래그앤드랍도 할 수 있게 해야하는거아냐?" (Home), and
@@ -91,8 +90,8 @@ async function onFirstScreen(page: Page, control: Locator, what: string, minHeig
 const ACCESS = primaryCallToAction();
 const SELF_SERVE = ACCESS.href !== "/contact";
 for (const [path, label, href] of SELF_SERVE
-  ? [["/", ACCESS.label, ACCESS.href], ["/ko", KO_CHROME.cta[ACCESS.href]!, ACCESS.href]] as const
-  : [["/", "Evaluate your documents", "/evaluation"], ["/ko", "내 문서 평가", "/ko/evaluation"]] as const) {
+  ? [["/", ACCESS.label, ACCESS.href]] as const
+  : [["/", "Evaluate your documents", "/evaluation"]] as const) {
   test(`Home's first screen names where your documents go, and the screen it opens keeps that promise (${path})`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440" && testInfo.project.name !== "390", "1440 and 390");
     // A first visit: no session, no fixture user.
@@ -113,7 +112,7 @@ for (const [path, label, href] of SELF_SERVE
   });
 }
 
-for (const path of ["/", "/ko"]) {
+for (const path of ["/"]) {
   test(`a file dropped on Home does not open in the tab, is not kept, and moves focus to the document entry (${path})`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440" && testInfo.project.name !== "390", "1440 and 390");
     await page.goto(path);

@@ -36,9 +36,9 @@ export const metadata: Metadata = {
   // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
   alternates: { canonical: "/product/compiled-world" },
   openGraph: { url: "/product/compiled-world" },
-  title: "Compiled World — TAVONEL",
+  title: "Compiled World: the output of a TAVONEL compile — TAVONEL",
   description:
-    "The output of a TAVONEL compile: objects, relations, evidence and versions, portable as one signed package.",
+    "The output of a TAVONEL compile: objects, relations, evidence and versions, portable as one signed package and used by retrieval, agents, MCP, APIs and apps.",
 };
 
 /*
