@@ -67,7 +67,6 @@ type AnalyticsWindow = Window & {
   dataLayer?: unknown[];
   gtag?: (...args: unknown[]) => void;
   "ga-disable-G-XQ6Z2RJME7"?: boolean;
-  va?: unknown;
 };
 /**
  * Release 2 (orchestrator decision, 2026-10-15): the first-time prompt is not on the first paint.
@@ -261,9 +260,10 @@ export default function MarketingConsent() {
     try { window.localStorage.setItem(CONSENT_KEY, JSON.stringify({ allowed, expires: Date.now() + 180 * 24 * 60 * 60 * 1000 })); } catch { /* this page choice still works */ }
     setConsent(allowed);
     setEditing(false);
-    // On withdrawal unload the vendor runtimes too: no subsequent cookieless pings. `window.va` is
-    // the Vercel collector's queue, which outlives the unmounted component (P2-07).
-    if (!allowed && (document.getElementById("tavonel-google-tag") || (window as AnalyticsWindow).va)) window.location.reload();
+    // On withdrawal unload the Google runtime too. The Vercel collector needs no reload: it unmounts
+    // here, it sends a page view only when its component asks, and its `beforeSend` reads the
+    // stored refusal before every send (GX-03, components/vercel-collector.tsx).
+    if (!allowed && document.getElementById("tavonel-google-tag")) window.location.reload();
   }
 
   function consentPanel() {
@@ -298,8 +298,10 @@ export default function MarketingConsent() {
 
   // One stable tree: the collector is always the first child, so a change of surface (the prompt
   // revealing, the phone menu opening) never remounts it -- every mount sends a page view.
+  // GX-03 (founder, 2026-11-09): cookieless page views run before a choice and stop at a refusal,
+  // so the gate is `consent !== false`. Interaction events still need a yes (relayToVercel).
   return <>
-    {process.env.NEXT_PUBLIC_TAVONEL_ANALYTICS_ENABLED === "1" && ready && consent === true && location
+    {process.env.NEXT_PUBLIC_TAVONEL_ANALYTICS_ENABLED === "1" && ready && consent !== false && location
       ? <Suspense fallback={null}><VercelCollector ready={ready} consent={consent} location={location} /></Suspense> : null}
     {consentPanel()}
   </>;
