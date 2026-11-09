@@ -2234,6 +2234,11 @@ export const GDP_PDF_RUNS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmark
 export const COMPILER_RELEASE_AFFECTED_PATHS = Object.freeze(['lib/compiler-release.ts', 'public/proof-collection/compiler-releases/core-v2-health-2026-10-27T09-28-53Z.json']);
 export const COMPILER_RELEASE_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/changelog.test.ts', 'lib/gdp-pdf-page-data.test.ts']);
 export const COMPILER_RELEASE_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmarks.spec.ts', 'e2e/templates.spec.ts']);
+// site-polish-20261109: the /benchmarks charts, the Explore change act and the two trust-link components.
+export const SITE_POLISH_AFFECTED_PATHS = Object.freeze(['components/benchmarks/arena-charts.module.css', 'components/benchmarks/arena-charts.tsx',
+  'components/explore/change-act.tsx', 'components/file-or-route-link.tsx', 'components/trust-disclosures.tsx', 'components/trust-provisions.tsx', 'lib/file-or-route-link.test.ts']);
+export const SITE_POLISH_AFFECTED_UNIT_FILES = Object.freeze(['lib/benchmarks-page.test.ts', 'lib/explore-story.test.ts', 'lib/file-or-route-link.test.ts', 'lib/public-trust-contract.test.ts', 'lib/trust-provisions.test.ts']);
+export const SITE_POLISH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmarks.spec.ts', 'e2e/explore.spec.ts', 'e2e/templates.spec.ts']);
 // Packet delivery (codex/packet-delivery-textlayer-20261102): the delivery format an AI reads the compiled context in. The
 // download route and the two guidance modules that write the delivery/ files and point AGENTS.md at them, the package verifier
 // and its scripts/ copy that admit the delivery root, the delivery suite and the two parity suites whose MCP surface now reads
@@ -3066,6 +3071,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // compiler-release: 2 exact paths select 3 direct suites and 2 browser suites.
   affectedGroup('compiler-release', new RegExp(`^nextjs/(?:${exactPathAlternation(COMPILER_RELEASE_AFFECTED_PATHS)})$`),
     { unitFiles: COMPILER_RELEASE_AFFECTED_UNIT_FILES, browserFiles: COMPILER_RELEASE_AFFECTED_BROWSER_FILES }),
+  // site-polish-20261109: 5 exact paths select 4 direct suites and 3 browser suites.
+  affectedGroup('site-polish-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(SITE_POLISH_AFFECTED_PATHS)})$`),
+    { unitFiles: SITE_POLISH_AFFECTED_UNIT_FILES, browserFiles: SITE_POLISH_AFFECTED_BROWSER_FILES }),
   // library-dedup-b1: the 2 exact paths above select 2 direct suites and no browser suite.
   affectedGroup('library-dedup-b1', new RegExp(`^nextjs/(?:${exactPathAlternation(LIBRARY_DEDUP_AFFECTED_PATHS)})$`),
     { unitFiles: LIBRARY_DEDUP_AFFECTED_UNIT_FILES }),

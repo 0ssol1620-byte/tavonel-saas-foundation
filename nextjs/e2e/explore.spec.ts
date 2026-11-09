@@ -371,12 +371,16 @@ test("Act 3 reports the arriving filings with derived counts and claims no equiv
   // assertion is about the labelled figure, not about the prose that introduces it.
   await expect(page.getByText("Objects reached", { exact: true })).toBeVisible();
   await expect(page.getByText("Unchanged object identities", { exact: true })).toBeVisible();
-  await expect(page.getByText(/\d+ added · \d+ removed · \d+ rebuilt in place/)).toBeVisible();
+  // 2026-11-09: added / rebuilt / removed are figures in the same row now, not a monospace line.
+  const counts = page.locator("[data-change-counts]");
+  for (const label of ["Added", "Rebuilt in place", "Removed"]) {
+    await expect(counts.getByText(label, { exact: true })).toBeVisible();
+  }
 
   // The world reports the diff honestly, including the identities the arrivals did not disturb.
   await expect(page.locator(`${NODE}[data-node-state="affected"]`).first()).toBeVisible();
-  const unchangedCount = Number(await page.getByText("Unchanged object identities", { exact: true })
-    .locator("xpath=following-sibling::dd").textContent());
+  const unchangedCount = Number((await page.getByText("Unchanged object identities", { exact: true })
+    .locator("xpath=following-sibling::dd").textContent())?.replace(/,/g, ""));
   if (unchangedCount === 0) await expect(page.locator(`${NODE}[data-node-state="dim"]`)).toHaveCount(0);
 
   /*
@@ -390,7 +394,7 @@ test("Act 3 reports the arriving filings with derived counts and claims no equiv
   expect(await steps.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-step"))))
     .toEqual(["w1", "w2", "w3", "w4"]);
   await expect(steps.first()).toContainText(/ACCESSION \d{10}-\d{2}-\d{6}/);
-  await expect(steps.first()).toContainText(/\d+ OF \d+ PAGES · \d+ REGIONS/);
+  await expect(steps.first()).toContainText(/[\d,]+ OF [\d,]+ PAGES · [\d,]+ REGIONS/);
   await expect(steps.first().getByText("Rebuilt in place", { exact: true })).toBeVisible();
   /*
     The pair that stops a five-step temporal view from implying incremental compilation: a
