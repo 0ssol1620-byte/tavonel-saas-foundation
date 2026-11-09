@@ -30,7 +30,7 @@ test("sign-in explains the customer processing gate even when evaluation account
   await page.route("**/api/status/v2", route => route.fulfill({ json: statusV2() }));
   await page.goto("/login");
   await expect(page.getByText("Customer file processing is not open yet.")).toBeVisible();
-  await expect(page.getByText("Start with a free evaluation.")).toHaveCount(0);
+  await expect(page.getByText("Signing in creates your workspace.")).toHaveCount(0);
   // BA-252 left one name for this destination and `EXPLORE_CTA` holds it; /login renders that
   // constant, so "Explore the public World" is one of the four names the vocabulary pass removed.
   // The contract is unchanged: the closed gate still offers the public sample, at a 44px target.
@@ -44,7 +44,11 @@ test("sign-in presents evaluation only when the customer processing gate is enab
     json: statusV2({ createAccount: true, compileCustomerDocuments: true }),
   }));
   await page.goto("/login");
-  await expect(page.getByText("Start with a free evaluation.")).toBeVisible();
+  // Review PR201-R2: the evaluation is offered on the workspace being open, never as an upload behind sign-in.
+  const evaluation = page.locator("p.notice", { hasText: "Signing in creates your workspace." });
+  await expect(evaluation).toBeVisible();
+  await expect(evaluation).toContainText("your workspace shows whether it is open. Once it is open, a free evaluation");
+  await expect(page.getByText("Start with a free evaluation.")).toHaveCount(0);
   await expect(page.getByText("Customer file processing is not open yet.")).toHaveCount(0);
 });
 
@@ -54,7 +58,7 @@ test("a partial v2 contract fails closed instead of enabling sign-in or customer
   await page.route("**/api/status/v2", route => route.fulfill({ json: partial }));
   await page.goto("/login");
   await expect(page.getByRole("button", { name: "Sign-in unavailable" })).toBeDisabled();
-  await expect(page.getByText("Start with a free evaluation.")).toHaveCount(0);
+  await expect(page.getByText("Signing in creates your workspace.")).toHaveCount(0);
 });
 
 test("does not offer a broken sign-in when public auth readiness is false", async ({ page }) => {

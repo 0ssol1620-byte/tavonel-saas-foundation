@@ -19,7 +19,7 @@ import {
 } from "@/lib/billing-catalog";
 import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "@/lib/compile-limits";
 import { trackFunnel } from "@/lib/funnel-events";
-import { EXPLORE_CTA } from "@/lib/site-navigation";
+import { EXPLORE_CTA, SELF_SERVE_CTA } from "@/lib/site-navigation";
 import { MCP_TOOL_COUNT_WORD } from "@/lib/mcp-tools";
 import { jsonLdHtml } from "@/lib/structured-data";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
@@ -171,7 +171,7 @@ function planPath(
 ) {
   if (plan.name === "Evaluation") {
     return state.selfService
-      ? "Sign in → 3 files and 50 pages → your first World"
+      ? "Sign in → your workspace opens → 3 files and 50 pages, your first World"
       : "Explore the public World → inspect its evidence → discuss your sources";
   }
   if (plan.name === "Enterprise") return "Talk to us → we scope it against your material → a written quote";
@@ -242,7 +242,7 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceE
   return [
     [
       "Base subscription",
-      `${BILLING_OFFERS.observer_access.label}: $${BILLING_OFFERS.observer_access.priceUsd}/month. ${BILLING_OFFERS.studio_access.label}: $${BILLING_OFFERS.studio_access.priceUsd}/month. ${selfServiceEvaluation ? "The seven-day evaluation is free and needs no card." : "The public World is free to explore; an evaluation with your own sources is arranged with us."}`,
+      `${BILLING_OFFERS.observer_access.label}: $${BILLING_OFFERS.observer_access.priceUsd}/month. ${BILLING_OFFERS.studio_access.label}: $${BILLING_OFFERS.studio_access.priceUsd}/month. ${selfServiceEvaluation ? "Once your workspace is open, the seven-day evaluation is free and needs no card." : "The public World is free to explore; an evaluation with your own sources is arranged with us."}`,
     ],
     [
       "Included pages",
@@ -286,7 +286,7 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceE
     [
       "How to start",
       selfServiceEvaluation
-        ? "Start with your own files. Nothing is charged until you choose a plan."
+        ? "Sign in to create your workspace. Your own files open once the workspace does, and nothing is charged until you choose a plan."
         : "Explore the public World and its evidence, then contact us to scope your own sources. Nothing is charged for exploring.",
     ],
   ] as const;
@@ -589,9 +589,9 @@ const PURCHASE_FAQ: Array<[string, string, Route, string, string]> = [
 
 /** Keep the visible FAQ and its JSON-LD aligned with the same self-service gate as the cards. */
 const SELF_SERVICE_FAQ_ANSWERS: Record<string, string> = {
-  "What is ready to use?": "A finished public World is open today. Sign in to evaluate your own files with source-linked Evidence, grounded Ask and signed export. The plan comparison above shows which capabilities each plan includes.",
-  "How much setup is required?": "Sign in to start a free seven-day Evaluation with up to 3 files and 50 standard pages. No card is needed; nothing is charged until you choose a plan.",
-  "Can I export?": "Yes. The public sample World is digest-bound, and a signed workspace export is included with a World compiled during your free Evaluation.",
+  "What is ready to use?": "A finished public World is open today. Once your workspace is open, you can evaluate your own files with source-linked Evidence, grounded Ask and signed export. Signing in creates the workspace, and it shows whether it is open. The plan comparison above shows which capabilities each plan includes.",
+  "How much setup is required?": "Sign in to create your workspace. Once it is open, a free seven-day Evaluation covers up to 3 files and 50 standard pages. No card is needed, and nothing is charged until you choose a plan.",
+  "Can I export?": "Yes. The public sample World is digest-bound. Once your workspace is open, a signed workspace export is included with a World compiled during your free Evaluation.",
 };
 
 function purchaseFaqRows(selfService: boolean): typeof PURCHASE_FAQ {
@@ -802,7 +802,7 @@ export default function PricingPageClient({
   const planHref = (plan: (typeof PLANS)[number]) => {
     if (plan.name === "Enterprise") return "/contact?plan=Enterprise";
     if (plan.anchor) return `#${plan.anchor}`;
-    if (plan.name === "Evaluation") return selfService ? "/login" : EXPLORE_CTA.href;
+    if (plan.name === "Evaluation") return selfService ? SELF_SERVE_CTA.href : EXPLORE_CTA.href;
     if (ownerBillingExempt && plan.offerCode) return "/workspace";
     if (!plan.offerCode || !liveCheckout) return `/contact?plan=${encodeURIComponent(plan.name)}`;
     return loginUrlForOffer(plan.offerCode);
@@ -967,7 +967,7 @@ export default function PricingPageClient({
                     {ownerBillingExempt && plan.offerCode
                       ? "Open your workspace"
                       : plan.name === "Evaluation"
-                      ? selfService ? "Start free evaluation" : EXPLORE_CTA.label
+                      ? selfService ? SELF_SERVE_CTA.label : EXPLORE_CTA.label
                       : !plan.offerCode
                         ? plan.name === "Enterprise" ? "Scope an Enterprise pilot" : `Talk to us about ${plan.name}`
                         : !liveCheckout
