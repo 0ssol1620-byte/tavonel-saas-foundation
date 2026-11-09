@@ -8,12 +8,8 @@ import {
   inputsDigest,
   MAX_CLASSES,
   MAX_PROPERTIES,
-  modelArmCandidates,
-  ModelSlotRefused,
-  sha256Of,
   verifiedEvidence,
   type EvidenceUnit,
-  type HarnessRunReceipt,
 } from "./ontology-derivation";
 
 const unit = (evidenceId: string, text: string, documentId = "doc-a", page = 1): EvidenceUnit =>
@@ -97,64 +93,6 @@ describe("verbatim evidence check", () => {
       { ...good, evidenceId: "e9" },
       { ...good, quote: "" },
     ]) expect(verifiedEvidence([bad], index)).toEqual([]);
-  });
-});
-
-describe("model slot (knowledge Arena H, schema_induction)", () => {
-  const excerpts = { D1: UNITS[0]!, D2: UNITS[1]! };
-  const normalized = (value: unknown, status = "SUCCESS") => JSON.stringify({ problem: null, status, value });
-  const output = {
-    entity_types: [
-      { name: "Company", definition: "A registrant.", examples: [{ excerpt_id: "D1", quote: "Apple Inc." }, { excerpt_id: "D2", quote: "Contoso Holdings Inc." }] },
-      { name: "Exchange", definition: "A market.", examples: [{ excerpt_id: "D1", quote: "The Nasdaq Stock Market" }] },
-      { name: "Ghost", definition: "Invented.", examples: [{ excerpt_id: "D1", quote: "a sentence that is not there" }] },
-    ],
-    relation_types: [
-      { name: "listed on", source_type: "Company", target_type: "Exchange", definition: "Listing.", examples: [{ excerpt_id: "D2", quote: "is listed on" }] },
-      { name: "regulated by", source_type: "Company", target_type: "Regulator", definition: "Outside the schema.", examples: [{ excerpt_id: "D1", quote: "reports to" }] },
-    ],
-  };
-  const text = normalized(output);
-  const receipt: HarnessRunReceipt = {
-    schema: "tavonel.karena.run_receipt.v1", task: "schema_induction", status: "SUCCESS",
-    exact_model_id: "Qwen/Qwen3-8B", exact_revision: "b968826d9c46dd6066d109eabc6255188de91218",
-    prompt_sha256: `sha256:${"d".repeat(64)}`, schema_sha256: `sha256:${"f".repeat(64)}`,
-    input_artifact_sha256: `sha256:${"e".repeat(64)}`, normalized_output_sha256: sha256Of(text),
-    cost: { price_snapshot_id: "f2089b15bc59", method: "pod time" },
-  };
-
-  it("pins the receipt's model, revision, prompt, schema and price, and keeps only verbatim evidence", () => {
-    const { receipt: pinned, candidates } = modelArmCandidates({ receipt, normalizedOutputText: text, excerpts });
-    expect(pinned).toMatchObject({
-      deriver: "model", modelId: "Qwen/Qwen3-8B", modelRevision: "b968826d9c46dd6066d109eabc6255188de91218",
-      promptSha256: `sha256:${"d".repeat(64)}`, schemaSha256: `sha256:${"f".repeat(64)}`,
-      priceSnapshot: { priceSnapshotId: "f2089b15bc59", method: "pod time" }, harnessReceiptSha256: sha256Of(receipt),
-    });
-    expect(candidates.map((candidate) => candidate.key)).toEqual(["company", "exchange", "company_listed_on_exchange"]);
-    expect(pinned.droppedCandidates).toBe(2); // Ghost (no verbatim quote left), regulated by (range outside the schema)
-    expect(pinned.droppedEvidence).toBe(1);
-  });
-
-  it("refuses a receipt missing any pin, a different task, a failed run, or an output it did not pin", () => {
-    const refused = (overrides: Partial<HarnessRunReceipt>, body = text) => {
-      try {
-        modelArmCandidates({ receipt: { ...receipt, ...overrides }, normalizedOutputText: body, excerpts });
-      } catch (error) {
-        expect(error).toBeInstanceOf(ModelSlotRefused);
-        return (error as ModelSlotRefused).code;
-      }
-      return "accepted";
-    };
-    expect(refused({ exact_model_id: undefined })).toBe("MODEL_RECEIPT_INCOMPLETE");
-    expect(refused({ exact_revision: "" })).toBe("MODEL_RECEIPT_INCOMPLETE");
-    expect(refused({ prompt_sha256: "dd16" })).toBe("MODEL_RECEIPT_INCOMPLETE");
-    expect(refused({ schema_sha256: undefined })).toBe("MODEL_RECEIPT_INCOMPLETE");
-    expect(refused({ cost: {} })).toBe("MODEL_RECEIPT_INCOMPLETE");
-    expect(refused({ task: "typed_extraction" })).toBe("MODEL_RECEIPT_NOT_SCHEMA_INDUCTION");
-    expect(refused({ status: "INVALID_OUTPUT" })).toBe("MODEL_RUN_NOT_SUCCESSFUL");
-    expect(refused({}, `${text} `)).toBe("MODEL_OUTPUT_DIGEST_MISMATCH");
-    const failed = normalized(null, "TRUNCATED");
-    expect(refused({ normalized_output_sha256: sha256Of(failed) }, failed)).toBe("MODEL_OUTPUT_NOT_SUCCESSFUL");
   });
 });
 

@@ -3,24 +3,15 @@ import { createHash } from "node:crypto";
 /*
   C1 (PROGRAM-2026-11-04 §4.C): schema derivation -- the "derive" of derive -> certify -> use.
 
-  Two derivers produce the same thing, a list of evidence-bound schema candidates plus a receipt:
+  One deriver ships here, the deterministic baseline (`deriveBaselineSchema`): no model, no prompt,
+  no network. It reads capitalised multi-word names in the evidence units, groups them by their last
+  word ("The Nasdaq Stock Market" -> Market), and proposes a class for a head word with enough
+  distinct names; it proposes a property for a short lower-case phrase that joins two such names in
+  one unit ("... Inc. is listed on The Nasdaq Stock Market" -> listed_on, Organization -> Market).
+  It is the floor any model-backed deriver has to beat, measured the same way. A model-backed
+  deriver is not part of this repository; the store accepts one only with a prompt digest pinned.
 
-    * the deterministic baseline (`deriveBaselineSchema`): no model, no prompt, no network. It reads
-      capitalised multi-word names in the evidence units, groups them by their last word ("The
-      Nasdaq Stock Market" -> Market), and proposes a class for a head word with enough distinct
-      names; it proposes a property for a short lower-case phrase that joins two such names in one
-      unit ("... Inc. is listed on The Nasdaq Stock Market" -> listed_on, Organization -> Market).
-      It is the floor any model arm has to beat, measured the same way.
-
-    * the model slot (`modelArmCandidates`): the output of the knowledge Arena harness H's
-      `schema_induction` task (AKC research/knowledge_arena_20261104, karena.schema_induction.output.v1)
-      together with H's own run receipt. This module does not run a model and does not hold a
-      prompt: the prompt, its digest and the output schema digest are H's, frozen in H's
-      FROZEN_v1.json, and the slot refuses a receipt that does not pin model id, revision, prompt
-      digest, schema digest and price snapshot (CLAUDE.md: without a receipt the capability does not
-      exist). Running a model is H's job and needs the orchestrator's go; nothing here calls one.
-
-  Both are checked by the same deterministic rule before anything is stored (§4.C step 2): every
+  Every derivation is checked by one deterministic rule before anything is stored (§4.C step 2): every
   evidence quote must occur verbatim in the unit it names, on that unit's document, page and box.
   A quote that does not is dropped and counted; a candidate left without evidence is dropped. No
   text, page or box is invented to fill a gap.
@@ -77,8 +68,6 @@ export type DerivationReceipt = {
   properties: number;
   droppedEvidence: number;
   droppedCandidates: number;
-  /** For a model arm: the H run receipt this derivation was ingested from, by digest. */
-  harnessReceiptSha256?: string;
 };
 
 export type Derivation = { receipt: DerivationReceipt; receiptSha256: string; candidates: SchemaCandidate[] };
@@ -90,7 +79,7 @@ export const MAX_PROPERTIES = 40;
 const MAX_EVIDENCE = 3;
 const MAX_QUOTE = 300;
 
-/** The output contract both derivers meet; its digest is the run's schema_sha256. */
+/** The output contract a derivation meets; its digest is the run's schema_sha256. */
 export const CANDIDATE_OUTPUT_SCHEMA = Object.freeze({
   $id: "tavonel.ontology_candidates.output.v1",
   type: "array",
@@ -322,7 +311,7 @@ export function deriveBaselineSchema(input: readonly EvidenceUnit[]): Derivation
 
 function finish(
   pins: Pick<DerivationReceipt, "deriver" | "deriverVersion" | "modelId" | "modelRevision" | "promptSha256" | "priceSnapshot">
-    & { schemaSha256?: string; harnessReceiptSha256?: string },
+    & { schemaSha256?: string },
   units: readonly EvidenceUnit[],
   proposed: SchemaCandidate[],
   droppedEvidence: number,
@@ -352,114 +341,4 @@ function finish(
     droppedCandidates: droppedWhole,
   };
   return { receipt, receiptSha256: sha256Of(receipt), candidates };
-}
-
-/* ------------------------------------------------------------------------------ the model slot */
-
-/** H's run receipt (tavonel.karena.run_receipt.v1), the fields this slot requires. */
-export type HarnessRunReceipt = {
-  schema: string;
-  task: string;
-  status: string;
-  exact_model_id?: string;
-  exact_revision?: string;
-  prompt_sha256?: string;
-  schema_sha256?: string;
-  input_artifact_sha256?: string;
-  normalized_output_sha256?: string;
-  cost?: { price_snapshot_id?: string; method?: string };
-};
-
-/** H's karena.schema_induction.output.v1. */
-export type HarnessSchemaInduction = {
-  entity_types?: Array<{ name: string; definition: string; examples: Array<{ excerpt_id: string; quote: string }> }>;
-  relation_types?: Array<{ name: string; source_type: string; target_type: string; definition: string; examples: Array<{ excerpt_id: string; quote: string }> }>;
-};
-
-export class ModelSlotRefused extends Error {
-  readonly code: string;
-  constructor(code: string) { super(code); this.code = code; }
-}
-
-const DIGEST = /^sha256:[a-f0-9]{64}$/;
-
-function slug(name: string) {
-  return name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").replace(/^(?=[0-9])/, "t_").slice(0, 64);
-}
-
-/**
- * Ingest one H `schema_induction` result. `excerpts` maps H's excerpt ids (D1, D2, D3) to the
- * evidence units the case was built from. The receipt must pin model id, revision, prompt digest,
- * schema digest and price snapshot, and the output digest must match the receipt; otherwise the
- * slot refuses and nothing is derived. Quotes that are not verbatim in their excerpt are dropped
- * and counted; a relation whose ends are not proposed classes is dropped.
- */
-export function modelArmCandidates(input: {
-  receipt: HarnessRunReceipt;
-  /** The bytes of H's `normalized/schema_induction/<case>.json`, exactly as written: {status, value, problem}. */
-  normalizedOutputText: string;
-  excerpts: Readonly<Record<string, EvidenceUnit>>;
-}): Derivation {
-  const { receipt, excerpts } = input;
-  if (receipt.schema !== "tavonel.karena.run_receipt.v1" || receipt.task !== "schema_induction") {
-    throw new ModelSlotRefused("MODEL_RECEIPT_NOT_SCHEMA_INDUCTION");
-  }
-  if (receipt.status !== "SUCCESS") throw new ModelSlotRefused("MODEL_RUN_NOT_SUCCESSFUL");
-  const modelId = receipt.exact_model_id;
-  const modelRevision = receipt.exact_revision;
-  const promptSha256 = receipt.prompt_sha256 ?? "";
-  const schemaSha256 = receipt.schema_sha256 ?? "";
-  const priceSnapshotId = receipt.cost?.price_snapshot_id;
-  if (!modelId || !modelRevision || !DIGEST.test(promptSha256) || !DIGEST.test(schemaSha256) || !priceSnapshotId
-    || !DIGEST.test(receipt.input_artifact_sha256 ?? "")) {
-    throw new ModelSlotRefused("MODEL_RECEIPT_INCOMPLETE");
-  }
-  // H writes the digest of the normalized file's bytes; anything else is not the output it pinned.
-  if (receipt.normalized_output_sha256 !== sha256Of(input.normalizedOutputText)) {
-    throw new ModelSlotRefused("MODEL_OUTPUT_DIGEST_MISMATCH");
-  }
-  let normalized: { status?: unknown; value?: unknown };
-  try {
-    normalized = JSON.parse(input.normalizedOutputText) as { status?: unknown; value?: unknown };
-  } catch {
-    throw new ModelSlotRefused("MODEL_OUTPUT_UNREADABLE");
-  }
-  if (normalized.status !== "SUCCESS" || !normalized.value || typeof normalized.value !== "object") {
-    throw new ModelSlotRefused("MODEL_OUTPUT_NOT_SUCCESSFUL");
-  }
-  const output = normalized.value as HarnessSchemaInduction;
-  const units = Object.values(excerpts);
-  let droppedCandidates = 0;
-  let unmappedEvidence = 0;
-  const toEvidence = (examples: Array<{ excerpt_id: string; quote: string }>) => examples.slice(0, MAX_EVIDENCE).flatMap((example) => {
-    const unit = excerpts[example.excerpt_id];
-    if (!unit) unmappedEvidence += 1;
-    return unit ? [evidenceFrom(unit, example.quote)] : [];
-  });
-  const classes: SchemaCandidate[] = (output.entity_types ?? []).slice(0, MAX_CLASSES).flatMap((type) => {
-    const key = slug(type.name);
-    if (!/^[a-z][a-z0-9_]{0,63}$/.test(key)) { droppedCandidates += 1; return []; }
-    return [{ kind: "class" as const, key, label: type.name.slice(0, 120), description: type.definition.slice(0, 600),
-      support: type.examples.length, evidence: toEvidence(type.examples) }];
-  });
-  const classKeys = new Set(classes.map((candidate) => candidate.key));
-  const properties: SchemaCandidate[] = (output.relation_types ?? []).slice(0, MAX_PROPERTIES).flatMap((relation) => {
-    const domainKey = slug(relation.source_type);
-    const rangeKey = slug(relation.target_type);
-    const predicate = slug(relation.name);
-    if (!classKeys.has(domainKey) || !classKeys.has(rangeKey) || !predicate) { droppedCandidates += 1; return []; }
-    return [{ kind: "property" as const, key: `${domainKey}_${predicate}_${rangeKey}`.slice(0, 64), label: relation.name.slice(0, 120),
-      description: relation.definition.slice(0, 600), domainKey, rangeKey, support: relation.examples.length,
-      evidence: toEvidence(relation.examples) }];
-  });
-  return finish({
-    deriver: "model",
-    deriverVersion: `karena-schema-induction:${promptSha256.slice(7, 19)}`,
-    modelId,
-    modelRevision,
-    promptSha256,
-    schemaSha256,
-    priceSnapshot: { priceSnapshotId, method: receipt.cost?.method ?? "unrecorded" },
-    harnessReceiptSha256: sha256Of(receipt),
-  }, units, [...classes, ...properties], unmappedEvidence, droppedCandidates);
 }

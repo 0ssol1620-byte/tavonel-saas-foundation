@@ -2885,8 +2885,8 @@ export function vitestDiscoveryConfigFailures(source) {
 }
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
-// W2-C1 ontology schema derivation + candidate-only certification (codex/w2-c1-20261108): the deterministic baseline deriver
-// and model slot, the Arena script over the public SEC sample, the server store and public/internal DTO split, the two
+// W2-C1 ontology schema derivation + candidate-only certification (codex/w2-c1-20261108): the deterministic baseline deriver,
+// the baseline-only Arena script over the public SEC sample, the server store and public/internal DTO split, the two
 // /api/ontology routes, the Schema screen with its copy, and their suites. They select those suites, the suites that read
 // every app/api route source, the error-code catalogue and the copy sweep, and the Schema screen's browser suite. Product code,
 // so never nativeReuse. The migrations and pgTAP files stay with database-contract; app/workspace/*, the shell, api-error-codes,

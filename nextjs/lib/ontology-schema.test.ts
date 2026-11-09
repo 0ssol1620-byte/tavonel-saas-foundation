@@ -31,9 +31,10 @@ const CANDIDATE = "11111111-2222-4333-8444-555555555555";
 const INTERNAL: InternalCandidates = {
   run: {
     runId: "99999999-2222-4333-8444-555555555555", collectionId: COLLECTION, manifestDigest: MANIFEST, deriver: "model",
-    deriverVersion: "karena-schema-induction:dd161362ecb5", documentIds: [DOC], modelId: "Qwen/Qwen3-8B", modelRevision: "b968826d",
+    // Synthetic pins, none of them a real model, revision, prompt or price snapshot.
+    deriverVersion: "synthetic-deriver:1", documentIds: [DOC], modelId: "synthetic/model-x", modelRevision: "0000000000synthetic",
     promptSha256: `sha256:${"d".repeat(64)}`, schemaSha256: `sha256:${"f".repeat(64)}`, inputsSha256: `sha256:${"1".repeat(64)}`,
-    priceSnapshot: { priceSnapshotId: "f2089b15bc59" }, receiptSha256: `sha256:${"3".repeat(64)}`, createdAt: "2026-11-07T11:00:00Z",
+    priceSnapshot: { priceSnapshotId: "synthetic-price-0000" }, receiptSha256: `sha256:${"3".repeat(64)}`, createdAt: "2026-11-07T11:00:00Z",
   },
   candidates: [{
     candidateId: CANDIDATE, kind: "class", key: "registrant", label: "Organization", description: "Names ending in Inc.",
@@ -92,8 +93,8 @@ describe("public DTO", () => {
   it("is built field by field: no support count, no model id, revision, prompt, schema, price or receipt, no decider id", () => {
     const shown = toPublicCandidates(INTERNAL);
     const text = JSON.stringify(shown);
-    for (const internal of ["support", "318", "Qwen", "b968826d", "modelId", "promptSha256", "schemaSha256", "priceSnapshot",
-      "f2089b15bc59", "receiptSha256", "documentIds", "decidedBy", "44444444-4444"]) {
+    for (const internal of ["support", "318", "synthetic/model-x", "0000000000synthetic", "modelId", "promptSha256", "schemaSha256", "priceSnapshot",
+      "synthetic-price-0000", "receiptSha256", "documentIds", "decidedBy", "44444444-4444"]) {
       expect(text, internal).not.toContain(internal);
     }
     expect(shown.candidates[0]).toMatchObject({ label: "Registrant", proposedLabel: "Organization", state: "proposed",

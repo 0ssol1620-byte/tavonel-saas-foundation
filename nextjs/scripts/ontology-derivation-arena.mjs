@@ -7,7 +7,6 @@
   box) and writes what it measured. No model, no network, no paid call.
 
     node --experimental-strip-types scripts/ontology-derivation-arena.mjs [--out <dir>]
-         [--model-arm <h-receipts.jsonl> <h-normalized.json> <excerpts.json>]
 
   What it measures, all deterministic: candidate counts; evidence validity (every quote verbatim
   in its unit, on its page and box -- §4.C requires 100%); duplicate labels; whether two runs over
@@ -17,11 +16,7 @@
   share of meaningless types need the reference schemas F-10 has not produced. They are reported
   NOT_MEASURED, never estimated.
 
-  --model-arm ingests one result of the knowledge Arena harness H (AKC
-  research/knowledge_arena_20261104, task schema_induction): H's receipt line, H's normalized output
-  file and the excerpt-id -> unit map the case was built from. It runs the same verbatim check and
-  prints the same metrics. It does not run a model. Without it the model arm is NOT_RUN: a GPU run
-  is H's, and waits for the orchestrator's go.
+  A model-backed arm is not part of this repository; it is reported NOT_RUN.
 */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -29,7 +24,6 @@ import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
 import {
   deriveBaselineSchema,
-  modelArmCandidates,
   sha256Of,
   verifiedEvidence,
 } from "../lib/ontology-derivation.ts";
@@ -39,7 +33,6 @@ const FIXTURE = resolve(here, "../lib/explore-sample.w4.inputs.json");
 const args = process.argv.slice(2);
 const outAt = args.indexOf("--out");
 const out = outAt === -1 ? null : resolve(args[outAt + 1] ?? ".");
-const armAt = args.indexOf("--model-arm");
 
 const fixtureText = readFileSync(FIXTURE, "utf8");
 const filings = JSON.parse(fixtureText);
@@ -98,18 +91,8 @@ const summary = {
   fixture: { path: "nextjs/lib/explore-sample.w4.inputs.json", sha256: sha256Of(fixtureText), filings: filings.map((f) => f.documentId) },
   baseline,
   deterministic: first.receiptSha256 === second.receiptSha256,
-  modelArm: "NOT_RUN (no H receipt supplied; a GPU run needs the orchestrator's go)",
+  modelArm: "NOT_RUN (no model-backed deriver in this repository)",
 };
-
-if (armAt !== -1) {
-  const [receiptPath, normalizedPath, excerptsPath] = args.slice(armAt + 1, armAt + 4);
-  const receipt = JSON.parse(readFileSync(receiptPath, "utf8").trim().split("\n")[0]);
-  const normalizedOutputText = readFileSync(normalizedPath, "utf8");
-  const excerpts = JSON.parse(readFileSync(excerptsPath, "utf8"));
-  const a0 = performance.now();
-  const arm = modelArmCandidates({ receipt, normalizedOutputText, excerpts });
-  summary.modelArm = measure("model", arm, Object.values(excerpts), (performance.now() - a0) / 1000);
-}
 
 console.log(JSON.stringify(summary, null, 2));
 if (out) {
