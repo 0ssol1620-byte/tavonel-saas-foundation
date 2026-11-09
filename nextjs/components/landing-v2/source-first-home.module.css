@@ -281,8 +281,13 @@
   @media (max-width: 767px) {
     .home.home > header { height: 56px !important; min-height: 56px; }
     .home.home :global(.lv2-scene) { padding-block: 72px; }
+    /*
+      Bottom 120, not 80 (2026-11-09): with the phone film open on the whole frame again, the next band's heading
+      ("Research figures, with receipts.") rose to y 815 at 390x844 and put the fold at 38 words against the §9 budget of
+      35. The budget stands; the band starts below the first screen instead (heading at about 855).
+    */
     /* §2.1 (412): h1 at y 96, the fixed 56px header plus 40. */
-    .home.home :global(#s1) { padding-block: 96px 80px; }
+    .home.home :global(#s1) { padding-block: 96px 120px; }
     .home.home :global(#s2) { padding-block: 0 48px; }
     .home.home :global(#s2 > .lv2-wrap) { padding-top: 72px; }
     .home.home :global(#s3) { padding-block: 48px 72px; }
