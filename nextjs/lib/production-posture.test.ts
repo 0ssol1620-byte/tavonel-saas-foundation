@@ -226,3 +226,26 @@ describe("production posture: the collector scan refuses what it should", () => 
     ]) expect(analyticsViolations("x.tsx", source), source).not.toEqual([]);
   });
 });
+
+/*
+  Review PR201-R1 B2. self-serve-journey's "launch approval withheld" test skips on a server with
+  launch approval, and product-qa and the repair-scope browser run both start theirs with it. So
+  it must run somewhere without: browser-qa (chromium) carries no launch flags and runs the spec.
+  If that step loses the spec, or the job gains the flags, the purchase-door guard runs nowhere.
+*/
+describe("the launch-approval-withheld purchase-door test runs in a CI job without launch approval", () => {
+  const launch = readFileSync(resolve(import.meta.dirname, "../../.github/workflows/launch-qa.yml"), "utf8").replace(/\r\n/g, "\n");
+  const browserQa = launch.slice(launch.indexOf("\n  browser-qa:\n"), launch.indexOf("\n  product-qa:\n"));
+  it("browser-qa runs e2e/self-serve-journey.spec.ts on chromium", () => {
+    expect(browserQa).toMatch(/if: matrix\.browser == 'chromium'\n(?:\s+#.*\n)*\s+run: pnpm exec playwright test [^\n]*e2e\/self-serve-journey\.spec\.ts/);
+  });
+  it("browser-qa sets none of the launch flags its server would read", () => {
+    const settings = browserQa.split("\n").filter(line => !/^\s*#/.test(line)).join("\n");
+    expect(settings).not.toMatch(/COMMERCIAL_MODE|TAVONEL_BILLING_LAUNCH_APPROVED|PLAYWRIGHT_EXTERNAL_SERVER/);
+  });
+  it("the test skips only on launch approval, and the audit project is the one that runs it", () => {
+    const spec = readFileSync(resolve(import.meta.dirname, "../e2e/self-serve-journey.spec.ts"), "utf8");
+    expect(spec).toContain('test.skip(readCommercialState().liveChargesEnabled, "launch approval is granted on this server");');
+    expect(readFileSync(resolve(import.meta.dirname, "../playwright.config.ts"), "utf8")).toMatch(/const auditSpecs = [^\n]*self-serve-journey/);
+  });
+});
