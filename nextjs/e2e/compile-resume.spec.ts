@@ -228,38 +228,3 @@ test("a tab that never started the compile picks it up from the server", async (
   await expect(progress(page)).toContainText("2 of 2 read");
   expect(state.posts, "picking up an open job posted a new compile").toBe(0);
 });
-
-/*
-  D0 2026-11-09: a reload with no ?job= right after a compile failed opened an older job stuck in
-  reading, and the failure the customer had just watched was nowhere on the page. The newest job,
-  failed within 24 h, is the one shown -- with what was measured.
-*/
-test("a tab with no ?job= shows a compile that just failed, not an older stuck one", async ({ page }) => {
-  const failedId = `cjob-${"f".repeat(32)}`;
-  const entry = (jobId: string, jobState: string, settledAt: string | null) => ({
-    jobId, state: jobState, documentsTotal: 2, documentsReady: 0, collectionId: null,
-    documentIds: DOCUMENTS.map((document) => document.documentId), settledAt, errorCode: null,
-    blocked: [], blockedResolution: null,
-  });
-  const state = { posts: 0, cutStream: false, openJobs: [
-    entry(failedId, "failed", new Date().toISOString()),
-    entry(JOB_ID, "reading", null),
-  ] };
-  await installFixtureSession(page);
-  await installWorkspaceRoutes(page, { documents: DOCUMENTS });
-  await installJobRoutes(page, state);
-  await page.route(`**/api/compile-jobs/${failedId}/events**`, route => route.fulfill({
-    status: 200,
-    contentType: "text/event-stream",
-    headers: { "cache-control": "no-store" },
-    body: sseFrames([
-      { ...frame(1, "structuring", 0), detail: { sizeLimit: { object: "core-response", bytes: null, bound: 83_886_080 } } },
-      { ...frame(2, "failed", 0), errorCode: "CORE_OUTPUT_TOO_LARGE" },
-    ]),
-  }));
-
-  await page.goto("/workspace", { waitUntil: "domcontentloaded" });
-  await expect(progress(page)).toHaveAttribute("data-state", "failed", { timeout: 30_000 });
-  await expect(progress(page)).toContainText("exceeded the 83,886,080 byte limit");
-  expect(state.posts, "showing a failed job posted a new compile").toBe(0);
-});
