@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { NavCurrentLink } from "@/components/site-nav/desktop-primary-nav";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_OPEN_EVENT } from "@/lib/marketing-analytics";
 
@@ -114,7 +115,7 @@ export default function MobilePrimaryNav({ korean = false, signedIn = false, lab
           in both postures and nothing else.
         */}
         {signedIn ? (
-          <a className="mobile-nav-signin" href="/workspace">{korean ? "워크스페이스" : "Your workspace"}</a>
+          <Link className="mobile-nav-signin" href="/workspace">{korean ? "워크스페이스" : "Your workspace"}</Link>
         ) : (
           <a className="mobile-nav-signin" href="/login">{labels.signIn}</a>
         )}

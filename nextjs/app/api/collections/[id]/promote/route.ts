@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { checkActivationRateLimit } from "@/lib/activation-rate-limit";
-import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
 import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
 import { assertEquivalenceGate } from "@/lib/equivalence-gate";
