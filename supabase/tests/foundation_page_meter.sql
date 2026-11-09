@@ -7,24 +7,26 @@
 begin;
 select plan(53);
 
+-- The two users differ in their first 16 hex digits: the auth.users trigger derives a personal
+-- workspace key from them, and one key with two owners violates the one-owner index.
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at
 ) values
-  ('00000000-0000-0000-0000-000000000000', '91000000-0000-4000-8000-00000000000a',
+  ('00000000-0000-0000-0000-000000000000', '9100000a-0000-4000-8000-00000000000a',
    'authenticated', 'authenticated', 'meter-a@example.invalid', '$2a$10$fixture', now(),
    '{"provider":"email","providers":["email"]}', '{}', now(), now()),
-  ('00000000-0000-0000-0000-000000000000', '91000000-0000-4000-8000-00000000000b',
+  ('00000000-0000-0000-0000-000000000000', '9100000b-0000-4000-8000-00000000000b',
    'authenticated', 'authenticated', 'meter-b@example.invalid', '$2a$10$fixture', now(),
    '{"provider":"email","providers":["email"]}', '{}', now(), now());
 
 select public.apply_foundation_billing_event_v4(
   'evt_' || rpad('metera', 26, 'a'), 'transaction.completed', '2026-11-09T07:00:00Z',
-  'sha256:' || repeat('1', 64), 'allowance', 'pilot-metera', '91000000-0000-4000-8000-00000000000a',
+  'sha256:' || repeat('1', 64), 'allowance', 'pilot-metera', '9100000a-0000-4000-8000-00000000000a',
   'observer_access', 'txn_' || rpad('metera', 26, 'a'), 'ctm_' || rpad('metera', 26, 'a'), null, null, 2000, null);
 select public.apply_foundation_billing_event_v4(
   'evt_' || rpad('meterb', 26, 'b'), 'transaction.completed', '2026-11-09T07:00:00Z',
-  'sha256:' || repeat('2', 64), 'allowance', 'pilot-meterb', '91000000-0000-4000-8000-00000000000b',
+  'sha256:' || repeat('2', 64), 'allowance', 'pilot-meterb', '9100000b-0000-4000-8000-00000000000b',
   'observer_access', 'txn_' || rpad('meterb', 26, 'b'), 'ctm_' || rpad('meterb', 26, 'b'), null, null, 2000, null);
 update public.foundation_billing_accounts
    set access_plan = 'observer_access', subscription_status = 'active'
@@ -46,7 +48,7 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 1. Unknown page count: refused, nothing moves.
 -- ---------------------------------------------------------------------------
-select pg_temp.hold('pilot-metera', '91000000-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000001', 12, 18);
+select pg_temp.hold('pilot-metera', '9100000a-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000001', 12, 18);
 select is(pg_temp.balance('pilot-metera'), 1988, 'a three-page hold of 12 leaves the balance');
 select throws_ok(
   $$select pg_temp.settle('pilot-metera', '92000000-0000-4000-8000-000000000001', 'settled', null, null, 'a')$$,
@@ -83,7 +85,7 @@ select throws_ok(
 -- ---------------------------------------------------------------------------
 -- 4. Unchanged source, same workspace: free, and says why.
 -- ---------------------------------------------------------------------------
-select pg_temp.hold('pilot-metera', '91000000-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000002', 12, 18);
+select pg_temp.hold('pilot-metera', '9100000a-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000002', 12, 18);
 select is(pg_temp.settle('pilot-metera', '92000000-0000-4000-8000-000000000002', 'settled', 3, 0, 'a')->>'settledCredits',
   '0', 'the same source digest re-read in the same workspace settles 0');
 select is((select charge_basis from public.foundation_compute_reservations
@@ -97,7 +99,7 @@ select is(pg_temp.balance('pilot-metera'), 1988, 'the free re-read returned its 
 -- ---------------------------------------------------------------------------
 -- 5. The same digest in another workspace is charged in full.
 -- ---------------------------------------------------------------------------
-select pg_temp.hold('pilot-meterb', '91000000-0000-4000-8000-00000000000b', '92000000-0000-4000-8000-0000000000b1', 12, 18);
+select pg_temp.hold('pilot-meterb', '9100000b-0000-4000-8000-00000000000b', '92000000-0000-4000-8000-0000000000b1', 12, 18);
 select is(pg_temp.settle('pilot-meterb', '92000000-0000-4000-8000-0000000000b1', 'settled', 3, 0, 'a')->>'settledCredits',
   '12', 'a digest settled in another workspace is never free here');
 select is((select charge_basis from public.foundation_compute_reservations
@@ -107,7 +109,7 @@ select is(pg_temp.balance('pilot-meterb'), 1988, 'workspace B paid for its own r
 -- ---------------------------------------------------------------------------
 -- 6. Complex against standard: 2 standard + 1 complex = 2 x 4 + 6.
 -- ---------------------------------------------------------------------------
-select pg_temp.hold('pilot-metera', '91000000-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000003', 16, 24);
+select pg_temp.hold('pilot-metera', '9100000a-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000003', 16, 24);
 select is(pg_temp.settle('pilot-metera', '92000000-0000-4000-8000-000000000003', 'settled', 3, 1, 'c')->>'settledCredits',
   '14', 'one complex page of three settles 14, two more than three standard pages');
 select is(pg_temp.balance('pilot-metera'), 1974, 'the unused 2 of the 16 hold came back');
@@ -117,7 +119,7 @@ select is(pg_temp.balance('pilot-metera'), 1974, 'the unused 2 of the 16 hold ca
 -- ---------------------------------------------------------------------------
 -- An allowance grant turns overage on (0036); this section pins the paid account without it.
 update public.foundation_billing_accounts set overage_enabled = false where workspace_key = 'pilot-metera';
-select pg_temp.hold('pilot-metera', '91000000-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000004', 4, 6);
+select pg_temp.hold('pilot-metera', '9100000a-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000004', 4, 6);
 select is(pg_temp.settle('pilot-metera', '92000000-0000-4000-8000-000000000004', 'settled', 3, 0, 'd')->>'settledCredits',
   '4', 'a read longer than its approval settles at the hold when overage is off');
 select is((select charge_basis from public.foundation_compute_reservations
@@ -128,7 +130,7 @@ update public.foundation_billing_accounts set overage_enabled = true where works
 -- ---------------------------------------------------------------------------
 -- 8. A read that failed settles 0, with or without pages.
 -- ---------------------------------------------------------------------------
-select pg_temp.hold('pilot-metera', '91000000-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000005', 12, 18);
+select pg_temp.hold('pilot-metera', '9100000a-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000005', 12, 18);
 select is(pg_temp.settle('pilot-metera', '92000000-0000-4000-8000-000000000005', 'operator_review', null, null, 'e')->>'settledCredits',
   '0', 'operator review charges nothing');
 select is((select charge_basis from public.foundation_compute_reservations
@@ -141,13 +143,13 @@ select is(pg_temp.balance('pilot-metera'), 1970, 'its hold came back');
 insert into public.foundation_compile_jobs (job_id, workspace_key, created_by_user_id, document_ids,
   idempotency_key, state, documents_total, collection_id, settled_at)
 values
-  ('cjob-' || repeat('1', 32), 'pilot-metera', '91000000-0000-4000-8000-00000000000a',
+  ('cjob-' || repeat('1', 32), 'pilot-metera', '9100000a-0000-4000-8000-00000000000a',
    array['92000000-0000-4000-8000-000000000001'], 'page-meter-ready', 'ready', 1,
    'collection-' || repeat('1', 32), now()),
-  ('cjob-' || repeat('2', 32), 'pilot-metera', '91000000-0000-4000-8000-00000000000a',
+  ('cjob-' || repeat('2', 32), 'pilot-metera', '9100000a-0000-4000-8000-00000000000a',
    array['92000000-0000-4000-8000-000000000001', '92000000-0000-4000-8000-000000000003'],
    'page-meter-failed', 'structuring', 2, null, null),
-  ('cjob-' || repeat('3', 32), 'pilot-meterb', '91000000-0000-4000-8000-00000000000b',
+  ('cjob-' || repeat('3', 32), 'pilot-meterb', '9100000b-0000-4000-8000-00000000000b',
    array['92000000-0000-4000-8000-000000000003'], 'page-meter-other', 'structuring', 1, null, null);
 
 update public.foundation_compile_jobs set state = 'failed', settled_at = now(), error_code = 'JSON_TOO_LARGE'
@@ -171,7 +173,7 @@ select is(pg_temp.balance('pilot-meterb'), 1988, 'a failed job in another worksp
 -- ---------------------------------------------------------------------------
 -- 10. A reversed read is not a paid-for source: re-reading it is charged.
 -- ---------------------------------------------------------------------------
-select pg_temp.hold('pilot-metera', '91000000-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000006', 12, 18);
+select pg_temp.hold('pilot-metera', '9100000a-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000006', 12, 18);
 select is(pg_temp.settle('pilot-metera', '92000000-0000-4000-8000-000000000006', 'settled', 3, 0, 'c')->>'chargeBasis',
   'pages', 'a source whose only read was reversed is charged when read again');
 select is(pg_temp.balance('pilot-metera'), 1972, 'and pays for its pages');
@@ -202,10 +204,10 @@ select throws_ok($$select pg_temp.settle('pilot-metera', '92000000-0000-4000-800
 -- 13. Overage on: charged up to the approved maximum, and a failed compile reverses exactly what
 --     settlement booked -- the hold to the balance, the rest off the overage counters.
 -- ---------------------------------------------------------------------------
-select pg_temp.hold('pilot-metera', '91000000-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000007', 4, 12);
+select pg_temp.hold('pilot-metera', '9100000a-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000007', 4, 12);
 select is(pg_temp.settle('pilot-metera', '92000000-0000-4000-8000-000000000007', 'settled', 3, 0, '7')->>'settledCredits',
   '12', 'with overage on, three pages settle 12 against a hold of 4');
-select pg_temp.hold('pilot-metera', '91000000-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000008', 4, 6);
+select pg_temp.hold('pilot-metera', '9100000a-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000008', 4, 6);
 select is(pg_temp.settle('pilot-metera', '92000000-0000-4000-8000-000000000008', 'settled', 3, 0, '8')->>'settledCredits',
   '6', 'and never above the approved maximum');
 select is((select charge_basis from public.foundation_compute_reservations
@@ -217,11 +219,11 @@ select is((select overage_units from public.foundation_billing_accounts where wo
 insert into public.foundation_compile_jobs (job_id, workspace_key, created_by_user_id, document_ids,
   idempotency_key, state, documents_total, collection_id, settled_at)
 values
-  ('cjob-' || repeat('4', 32), 'pilot-metera', '91000000-0000-4000-8000-00000000000a',
+  ('cjob-' || repeat('4', 32), 'pilot-metera', '9100000a-0000-4000-8000-00000000000a',
    array['92000000-0000-4000-8000-000000000007'], 'page-meter-overage', 'structuring', 1, null, null),
-  ('cjob-' || repeat('5', 32), 'pilot-metera', '91000000-0000-4000-8000-00000000000a',
+  ('cjob-' || repeat('5', 32), 'pilot-metera', '9100000a-0000-4000-8000-00000000000a',
    array['92000000-0000-4000-8000-000000000008'], 'page-meter-cancel', 'structuring', 1, null, null),
-  ('cjob-' || repeat('6', 32), 'pilot-metera', '91000000-0000-4000-8000-00000000000a',
+  ('cjob-' || repeat('6', 32), 'pilot-metera', '9100000a-0000-4000-8000-00000000000a',
    array['92000000-0000-4000-8000-000000000009'], 'page-meter-legacy', 'structuring', 1, null, null);
 
 update public.foundation_compile_jobs set state = 'failed', settled_at = now(), error_code = 'JSON_TOO_LARGE'
@@ -246,7 +248,7 @@ select is(pg_temp.balance('pilot-metera'), 1968, 'and moves no balance');
 -- ---------------------------------------------------------------------------
 -- 15. A pre-meter per-document charge is left as it was booked.
 -- ---------------------------------------------------------------------------
-select pg_temp.hold('pilot-metera', '91000000-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000009', 4, 6);
+select pg_temp.hold('pilot-metera', '9100000a-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000009', 4, 6);
 select public.settle_foundation_compute_v3('pilot-metera', '92000000-0000-4000-8000-000000000009'::uuid, 'settled', 4, 'OCR_COMPLETED');
 update public.foundation_compile_jobs set state = 'failed', settled_at = now(), error_code = 'JSON_TOO_LARGE'
  where job_id = 'cjob-' || repeat('6', 32);
