@@ -129,20 +129,32 @@ test.describe("brand tokens as painted (UX-L1)", () => {
 
   test("the audit is not vacuous: it reports a retired paint and a filled action off the accent", async ({ page }) => {
     await page.goto("/pricing", { waitUntil: "load" });
-    await page.evaluate(() => {
-      const main = document.querySelector("main") as HTMLElement;
-      const probe = document.createElement("div");
-      probe.style.background = "#faf9f6";
-      probe.innerHTML = `<p id="probe-blue" style="color:#2447b3">a</p>`
-        + `<p id="probe-mint" style="color:#7be0be">b</p>`
-        + `<a class="btn" id="probe-ink" href="#" style="background:#15191d">c</a>`;
-      main.prepend(probe);
-      const dark = document.createElement("div");
-      dark.style.background = "#0e1013";
-      dark.innerHTML = `<p id="probe-dark-mint" style="color:#7be0be">d</p>`;
-      main.prepend(dark);
-    });
-    const { retired, actions } = await measure(page);
+    /*
+      "load" can fire before React hydrates /pricing. Probes injected before hydration are extra
+      HTML to React (minified error #418), and its client re-render drops them, so the audit then
+      sees nothing. Inject only while the probes are absent and measure until they survive: the
+      assertions below are unchanged, only the hydration race is waited out.
+    */
+    let audited: Awaited<ReturnType<typeof measure>> = { retired: [], actions: [] };
+    await expect(async () => {
+      await page.evaluate(() => {
+        if (document.getElementById("probe-blue")) return;
+        const main = document.querySelector("main") as HTMLElement;
+        const probe = document.createElement("div");
+        probe.style.background = "#faf9f6";
+        probe.innerHTML = `<p id="probe-blue" style="color:#2447b3">a</p>`
+          + `<p id="probe-mint" style="color:#7be0be">b</p>`
+          + `<a class="btn" id="probe-ink" href="#" style="background:#15191d">c</a>`;
+        main.prepend(probe);
+        const dark = document.createElement("div");
+        dark.style.background = "#0e1013";
+        dark.innerHTML = `<p id="probe-dark-mint" style="color:#7be0be">d</p>`;
+        main.prepend(dark);
+      });
+      audited = await measure(page);
+      expect(audited.retired).toContain("p#probe-blue color #2447b3");
+    }).toPass({ timeout: 10_000 });
+    const { retired, actions } = audited;
     expect(retired).toContain("p#probe-blue color #2447b3");
     expect(retired).toContain("p#probe-mint color #7be0be on paper");
     // The same mint on an instrument face is the dark-ground "verified", not a retirement.
