@@ -23,7 +23,13 @@
  * GET only. It never records, renews or refuses a decision, and it echoes neither evidence text,
  * operator nor reason. Recording a decision is a founder act: docs/runbooks/RELEASE_ORDER.md.
  *
- *   pnpm release:gate-check --sha <40 hex> [--scope direct_upload] [--scope connector] [--warn-days 7]
+ *   pnpm release:gate-check --sha <40 hex> [--merge-into <40 hex>] [--scope direct_upload] [--scope connector] [--warn-days 7]
+ *
+ * --merge-into <base>: before a merge, not after. The subject is then the tree that merging --sha into <base> produces
+ * (`git merge-tree --write-tree`, the merge-ort GitHub uses), the tree the production build of the merge commit will
+ * hash. That commit does not exist yet and no row names it, so only a row naming the merge tree's surface can release
+ * it: exit 0 means the deployment is released the moment it is READY. A merge that conflicts, or a commit not fetched
+ * here, cannot be predicted (exit 2). docs/runbooks/RELEASE_ORDER.md, "병합 전 출시 행".
  *
  * Exit 0: every requested scope is released for the SHA and none expires inside the window.
  * Exit 1: a requested scope is missing, refused, invalid, surface-mismatched, expired, qualification-only
@@ -32,6 +38,7 @@
  *         store outage is never reported as a missing release.
  */
 
+import { execFileSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
@@ -153,6 +160,7 @@ export function parseOptions(argv) {
       sha: { type: "string" },
       scope: { type: "string", multiple: true },
       "warn-days": { type: "string" },
+      "merge-into": { type: "string" },
     },
   });
   const sha = values.sha ?? "";
@@ -164,7 +172,26 @@ export function parseOptions(argv) {
   if (!Number.isSafeInteger(warnDays) || warnDays < 0 || warnDays > 30) {
     throw new Error("--warn-days must be an integer from 0 to 30");
   }
-  return { sha, scopes, warnDays };
+  const mergeInto = values["merge-into"];
+  if (mergeInto !== undefined && !REVISION.test(mergeInto)) {
+    throw new Error("--merge-into must be a 40-character lowercase hex Git SHA");
+  }
+  return { sha, scopes, warnDays, ...(mergeInto === undefined ? {} : { mergeInto }) };
+}
+
+/** The tree `git merge` of `head` into `base` produces. Throws on a conflict or a commit not fetched here. */
+export function mergeTreeOf(root, base, head) {
+  let tree = "";
+  try {
+    tree = execFileSync("git", ["--no-replace-objects", "-c", "core.fsmonitor=false", "-C", root, "merge-tree",
+      "--write-tree", base, head], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\n")[0];
+  } catch {
+    // A conflict exits 1 with the tree and the conflict list on stdout; neither predicts what GitHub would build.
+  }
+  if (!REVISION.test(tree)) {
+    throw new Error(`--merge-into: git merge-tree ${base} ${head} did not merge cleanly (conflict, or a commit not fetched here)`);
+  }
+  return tree;
 }
 
 /** One GET per scope, the gate's exact select, filter, order and limit (gate.releaseDecisionQuery). */
@@ -187,14 +214,18 @@ export async function readReleaseRows(config, sha, scopes, request = supabaseAdm
   return rows;
 }
 
-export async function run(argv, env, now = new Date()) {
+export async function run(argv, env, now = new Date(), root = repositoryRoot) {
   const options = parseOptions(argv);
   const config = readSupabaseAdminConfig(env);
   if (!config) throw new Error("needs NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY");
-  const gateSurfaceSha256 = gateSurfaceOfCommit(repositoryRoot, options.sha);
-  const rows = await readReleaseRows(config, options.sha, options.scopes, supabaseAdminRequest, gateSurfaceSha256);
-  return checkReleaseGate({ rows, sha: options.sha, scopes: options.scopes, now, warnDays: options.warnDays,
-    gateSurfaceSha256 });
+  // Before a merge the subject is the merge tree: no row can name it, so only its surface can release it.
+  const subject = options.mergeInto === undefined ? options.sha : mergeTreeOf(root, options.mergeInto, options.sha);
+  const gateSurfaceSha256 = gateSurfaceOfCommit(root, subject);
+  const rows = await readReleaseRows(config, subject, options.scopes, supabaseAdminRequest, gateSurfaceSha256);
+  const report = checkReleaseGate({ rows, sha: subject, scopes: options.scopes, now, warnDays: options.warnDays,
+    gateSurfaceSha256, surfaceOfCommit: (revision) => gateSurfaceOfCommit(root, revision) });
+  return options.mergeInto === undefined ? report
+    : { ...report, mergeOf: { base: options.mergeInto, head: options.sha, tree: subject } };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -18,8 +18,8 @@ import { DOCS_GROUPS, DOCS_REVIEWED, DOCS_SECTIONS, DOCS_VERSION, docsSearchInde
 const FEATURED = ["quickstart", "use-with-ai"] as const;
 
 export const metadata: Metadata = {
-  title: "Documentation — TAVONEL",
-  description: "Quickstart, concepts, the API contract, error codes and limits for compiling sources into a traceable Compiled World.",
+  title: "Documentation: from sources to a Compiled World — TAVONEL",
+  description: "Quickstart, concepts, the API contract, error codes and limits. Upload or connect sources, follow the compile, then read the World and the evidence under it.",
   alternates: { canonical: "/docs" },
   openGraph: { url: "/docs" },
 };
@@ -76,10 +76,10 @@ export default function DocsPage() {
               <h2><Link href={"/cookbooks" as Route} prefetch={false}>Cookbooks</Link></h2>
               <p>Task guides that take one piece of work through the product, each published ahead of a recorded run.</p>
             </article>
-            {/* EN-1. The product guide: the screens a reader can use today, in English and Korean. Not prefetched: this tile is in the first viewport and prefetching the route added 3,065 script bytes to /docs. */}
+            {/* EN-1. The product guide: the screens a reader can use today. Not prefetched: this tile is in the first viewport and prefetching the route added 3,065 script bytes to /docs. */}
             <article className="tile">
               <h2><Link href={"/guide" as Route} prefetch={false}>Product guide</Link></h2>
-              <p>How to use what TAVONEL offers today, screen by screen, and where each screen stops. In English and Korean.</p>
+              <p>How to use what TAVONEL offers today, screen by screen, and where each screen stops.</p>
             </article>
           </div>
         </div>

@@ -180,7 +180,7 @@ describe("G1-COPY: /status and /api/readyz", () => {
     expect(operations.components.billing.state).toBe("disabled");
     expect(operations.components.billing.detail).not.toBe("Paddle live checkout");
     // The launch flag is on here, so the row may not say approval is what it waits for.
-    expect(operations.components.billing.detail).toBe("Paddle live checkout configured; checkout is closed and no plan can be bought");
+    expect(operations.components.billing.detail).toBe("Paddle live checkout configured, but checkout is closed and no plan can be bought");
   });
 });
 
@@ -221,13 +221,13 @@ describe("G1-COPY: Home promise A (D-01 / P2-30)", () => {
 });
 
 describe("G1-COPY: Korean measurement and HWP wording on /sources (D-33 / P2-33)", () => {
-  const sentence = "한국어 문서 품질은 아직 측정하지 않았습니다.";
+  const sentence = "Korean document quality has not been measured yet.";
 
-  it("D-33. publishes the Korean not-measured sentence and the HWP/HWPX wording on /sources, in Korean markup", () => {
+  it("D-33. publishes the Korean not-measured sentence and the HWP/HWPX wording on /sources, in English (GX-02)", () => {
     const sources = copy("app/sources/page.tsx");
-    expect(sources).toContain(`lang="ko"`);
+    expect(sources).not.toContain(`lang="ko"`);
     expect(sources).toContain(sentence);
-    expect(sources).toContain("HWP/HWPX: 지원하지 않음 · 측정 안 함");
+    expect(sources).toContain("HWP/HWPX: no reader, not measured.");
   });
 
   // Review N3: the two sentences are a public claim, so the registry entry that backs them must stay.
@@ -236,7 +236,7 @@ describe("G1-COPY: Korean measurement and HWP wording on /sources (D-33 / P2-33)
     const entry = registry.split("claimId: CLM-050")[1]?.split("claimId:")[0];
     expect(entry, "CLAIMS_REGISTRY carries CLM-050").toBeDefined();
     expect(entry).toContain(sentence);
-    expect(entry).toContain("HWP/HWPX: 지원하지 않음 · 측정 안 함");
+    expect(entry).toContain("HWP/HWPX: no reader, not measured.");
     expect(entry).toContain('surface: "/sources"');
   });
 

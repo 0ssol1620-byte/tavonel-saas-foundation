@@ -15,8 +15,8 @@ import ProvenanceChainDiagram from "@/components/visuals/provenance-chain-diagra
 export const metadata: Metadata = {
   alternates: { canonical: "/product" },
   openGraph: { url: "/product" },
-  title: "Product — TAVONEL",
-  description: "Inspect a Compiled World, follow source-cited knowledge, compare versions and connect the output to your AI stack.",
+  title: "Product: your sources as a World you can inspect — TAVONEL",
+  description: "Inspect a Compiled World, follow source-cited knowledge, compare versions and connect the output to your AI stack, with the evidence still attached.",
 };
 const LAYERS = [
   ["Document parsing and OCR", "Replaced", "Reading is a compile step here: sanitize, read, keep the location and the uncertainty, and carry both into review."],

@@ -8,18 +8,24 @@ import { REMOTE_MCP_AFFECTED_PATHS, REMOTE_MCP_AFFECTED_UNIT_FILES, REMOTE_MCP_A
 import { GDP_PDF_RUNS_AFFECTED_PATHS, GDP_PDF_RUNS_AFFECTED_UNIT_FILES, GDP_PDF_RUNS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { PACKET_DELIVERY_AFFECTED_PATHS, PACKET_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { LIBRARY_DEDUP_AFFECTED_PATHS, LIBRARY_DEDUP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { LIBRARY_ORGANIZE_B2_AFFECTED_PATHS, LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { W2_D_INTAKE_STAGE1_AFFECTED_PATHS, W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { COMPILER_RELEASE_AFFECTED_PATHS, COMPILER_RELEASE_AFFECTED_UNIT_FILES, COMPILER_RELEASE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { SITE_POLISH_AFFECTED_PATHS, SITE_POLISH_AFFECTED_UNIT_FILES, SITE_POLISH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+import { LEGAL_SEMICOLONS_STATUS_AFFECTED_PATHS, LEGAL_SEMICOLONS_STATUS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { HOME_FILM_RERECORD_AFFECTED_PATHS, HOME_FILM_RERECORD_AFFECTED_UNIT_FILES, HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { CONSENT_POSTER_AFFECTED_PATHS, CONSENT_POSTER_AFFECTED_UNIT_FILES, CONSENT_POSTER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { VISUALS_AFFECTED_PATHS, VISUALS_AFFECTED_UNIT_FILES, VISUALS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS, OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { W1_TRIAL_OPS_AFFECTED_PATHS, W1_TRIAL_OPS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { ASK_ANSWERABILITY_E2_AFFECTED_PATHS, ASK_ANSWERABILITY_E2_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES, TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_PATHS, SPECIMEN_STRIP_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_BROWSER_FILES, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES, PUBLIC_MARKETING_AFFECTED_BROWSER_FILES, MARKETING_TOOLING_POSTIMAGES, G1_COPY_TRUTH_AFFECTED_PATHS, G1_COPY_TRUTH_AFFECTED_UNIT_FILES, G1_COPY_TRUTH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+import { GLOBAL_EXPOSURE_AFFECTED_PATHS, GLOBAL_EXPOSURE_AFFECTED_UNIT_FILES, GLOBAL_EXPOSURE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { ENABLEMENT_AFFECTED_BROWSER_FILES, P4_FOLLOWUPS_AFFECTED_PATHS, P4_FOLLOWUPS_AFFECTED_UNIT_FILES, P4_FOLLOWUPS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { LEGAL_SEMICOLONS_AFFECTED_PATHS, LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { OPS_BACKLOG_SLI_AFFECTED_PATHS, OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { SLI_ALERT_NOISE_AFFECTED_PATHS, SLI_ALERT_NOISE_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
 const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -341,7 +347,7 @@ assert(collectorVerifier.includes("const exploreCases=verifyExploreSpecSource(gi
 // explore-answer owner is admitted there only as one literal 1440 row; the historical 424 report keeps its own planner.
 const lfRunner=runner.replace(/\r\n/g,'\n'),sharedMapStart=lfRunner.indexOf('\nconst browserProjectsByFile = new Map([\n'),sharedMapEnd=lfRunner.indexOf('\n]);',sharedMapStart+1),sharedMap=sharedMapStart<0||sharedMapEnd<0?'':lfRunner.slice(sharedMapStart,sharedMapEnd);
 assert(!sharedBrowserProjectsMapExcludesExplore(runner)&&sharedMap&&lfRunner.indexOf('const browserProjectsByFile = new Map([',sharedMapStart+2)<0&&(sharedMap.match(/explore/gi)??[]).length===1&&(sharedMap.match(/\n  \['e2e\/explore\.spec\.ts', \['1440'\]\],/g)??[]).length===1
-  &&lfRunner.includes("const registeredUnitTestPaths = new Set([\n  'app/api/documents/[id]/progress/route.test.ts',\n  'app/api/compile-jobs/route.test.ts',\n  'components/compile-stage.test.tsx',\n  'components/intake-triage-review.interaction.test.ts',\n  'components/intake-triage-review.test.tsx',\n  'components/landing-v2/hero-source-card.test.tsx',\n  'components/evaluation-page.test.tsx',\n  'components/explore/evidence-workbench.test.tsx',\n  'components/compile-stage-player.mobile-view.test.tsx',\n  'eval/ask-quality/metrics.test.ts',\n]);\nconst asyncRouteUnitTestPath")
+  &&lfRunner.includes("const registeredUnitTestPaths = new Set([\n  'app/api/documents/[id]/progress/route.test.ts',\n  'app/api/compile-jobs/route.test.ts',\n  'components/compile-stage.test.tsx',\n  'components/intake-triage-review.interaction.test.ts',\n  'components/intake-triage-review.test.tsx',\n  'components/landing-v2/hero-source-card.test.tsx',\n  'components/evaluation-page.test.tsx',\n  'components/explore/evidence-workbench.test.tsx',\n  'components/compile-stage-player.mobile-view.test.tsx',\n  'eval/ask-quality/metrics.test.ts',\n  // W2-E2 answerability replay: the one E2 eval suite its owner selects; also in the base include as eval/**/metrics.test.ts.\n  'eval/ask-quality/e2/metrics.test.ts',\n]);\nconst asyncRouteUnitTestPath")
   &&planner.includes("affectedGroup('explore-answer', /^nextjs\\/(?:lib\\/explore-(?:(?:sample|story)(?:\\.test)?|entry-proof\\.test)\\.ts|components\\/explore\\/(?:ask-overlay|evidence-workbench(?:\\.test)?)\\.tsx|e2e\\/explore\\.spec\\.ts)$/,")
   &&planner.includes("{ unitFiles: ['lib/explore-entry-proof.test.ts', 'lib/explore-sample.test.ts', 'lib/explore-story.test.ts', 'lib/visual-world-model.test.ts', 'components/explore/evidence-workbench.test.tsx'], browserFiles: ['e2e/explore.spec.ts'] }),")&&(planner.match(/explore-answer/g)??[]).length===1
   &&runner.includes("const units = vitestFiles.length ? readAndValidateVitestReport(resolve(reportDir, 'vitest.json'), vitestFiles) : null;")&&runner.includes('const browsers = planBrowserRuns(plan.browserFiles, plan.runDetailIntegrity).map((planned, index) => ({')
@@ -713,6 +719,14 @@ for (const binding of [
     browsers: ['e2e/benchmarks.spec.ts', 'e2e/explore.spec.ts', 'e2e/templates.spec.ts'],
     rows: ["['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/explore.spec.ts', ['1440']],", "['e2e/templates.spec.ts', ['1440']],"],
     neighbors: ['nextjs/components/benchmarks/arena-chart.tsx', 'nextjs/components/explore/change-act.module.css', 'nextjs/components/trust-disclosure.tsx', 'components/trust-provisions.tsx'] },
+  // legal-semicolons-status-20261109: one exact path, no direct suite, one browser suite with its 1440 row.
+  { group: 'legal-semicolons-status-20261109', prefix: 'nextjs/', exportedPaths: LEGAL_SEMICOLONS_STATUS_AFFECTED_PATHS, exportedSuites: [],
+    exportedBrowsers: LEGAL_SEMICOLONS_STATUS_AFFECTED_BROWSER_FILES,
+    paths: ['e2e/operations.spec.ts'],
+    suites: [],
+    browsers: ['e2e/operations.spec.ts'],
+    rows: ["['e2e/operations.spec.ts', ['1440']],"],
+    neighbors: ['nextjs/e2e/operations-p0.spec.ts', 'nextjs/e2e/operation.spec.ts', 'nextjs/e2e/operations.spec.tsx', 'e2e/operations.spec.ts'] },
   // B35 alert delivery (codex/ops-alert-delivery-20261102): four exact paths, eight direct suites, no browser suite.
   { group: 'operational-sli-alert-delivery', prefix: 'nextjs/', exportedPaths: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS, exportedSuites: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
@@ -724,7 +738,7 @@ for (const binding of [
   // Home film re-record on design C (W2, 2026-11-05).
   { group: 'film-rerecord-20261105', prefix: 'nextjs/', exportedPaths: HOME_FILM_RERECORD_AFFECTED_PATHS, exportedSuites: HOME_FILM_RERECORD_AFFECTED_UNIT_FILES,
     exportedBrowsers: HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES,
-    paths: ['public/film/hero-r2-c1-hq-1440.mp4', 'public/film/hero-r2-c1-hq.mp4', 'public/film/hero-r2-c1.mp4', 'public/film/hero-r2-c2.mp4', 'public/film/hero-r2-c3.mp4', 'public/film/hero-r2-c4.mp4', 'public/film/poster-r2-c1-t13.60-2x.avif', 'public/film/poster-r2-c1-t13.60-2x.webp', 'public/film/poster-r2-c1-t13.60-pane1-684x855.avif', 'public/film/poster-r2-c1-t13.60-pane1-684x855.webp', 'public/film/poster-r2-c1-t13.60.avif', 'public/film/poster-r2-c1-t13.60.webp', 'public/film/poster-r2-c2-t4.40-2x.avif', 'public/film/poster-r2-c2-t4.40-2x.webp', 'public/film/poster-r2-c2-t4.40.avif', 'public/film/poster-r2-c2-t4.40.webp', 'public/film/poster-r2-c3-t17.96-2x.avif', 'public/film/poster-r2-c3-t17.96-2x.webp', 'public/film/poster-r2-c3-t17.96.avif', 'public/film/poster-r2-c3-t17.96.webp', 'public/film/poster-r2-c4-t6.80-2x.avif', 'public/film/poster-r2-c4-t6.80-2x.webp', 'public/film/poster-r2-c4-t6.80.avif', 'public/film/poster-r2-c4-t6.80.webp', 'scripts/film/encode-fallback.sh', 'scripts/film/fixture.mjs', 'scripts/film/frame-strings.mjs', 'scripts/film/posters.mjs', 'scripts/film/record.mjs', 'scripts/film/scan.mjs', 'scripts/film/stages.mjs', 'scripts/measure-film-start.mjs'],
+    paths: ['public/film/hero-r2-c1-hq-1440.mp4', 'public/film/hero-r2-c1-hq.mp4', 'public/film/hero-r2-c1.mp4', 'public/film/hero-r2-c2.mp4', 'public/film/hero-r2-c3.mp4', 'public/film/hero-r2-c4.mp4', 'public/film/hero-r3-c1-hq-1440.mp4', 'public/film/hero-r3-c1-hq.mp4', 'public/film/hero-r3-c1.mp4', 'public/film/hero-r3-c2-hq.mp4', 'public/film/hero-r3-c2.mp4', 'public/film/hero-r3-c3-hq.mp4', 'public/film/hero-r3-c3.mp4', 'public/film/hero-r3-c4-hq.mp4', 'public/film/hero-r3-c4.mp4', 'public/film/poster-r2-c1-t13.60-2x.avif', 'public/film/poster-r2-c1-t13.60-2x.webp', 'public/film/poster-r2-c1-t13.60-pane1-684x855.avif', 'public/film/poster-r2-c1-t13.60-pane1-684x855.webp', 'public/film/poster-r2-c1-t13.60.avif', 'public/film/poster-r2-c1-t13.60.webp', 'public/film/poster-r2-c2-t4.40-2x.avif', 'public/film/poster-r2-c2-t4.40-2x.webp', 'public/film/poster-r2-c2-t4.40.avif', 'public/film/poster-r2-c2-t4.40.webp', 'public/film/poster-r2-c3-t17.96-2x.avif', 'public/film/poster-r2-c3-t17.96-2x.webp', 'public/film/poster-r2-c3-t17.96.avif', 'public/film/poster-r2-c3-t17.96.webp', 'public/film/poster-r2-c4-t6.80-2x.avif', 'public/film/poster-r2-c4-t6.80-2x.webp', 'public/film/poster-r2-c4-t6.80.avif', 'public/film/poster-r2-c4-t6.80.webp', 'public/film/poster-r3-c1-t10.40-2x.avif', 'public/film/poster-r3-c1-t10.40-2x.webp', 'public/film/poster-r3-c1-t10.40-pane1-848x1060.avif', 'public/film/poster-r3-c1-t10.40-pane1-848x1060.webp', 'public/film/poster-r3-c1-t10.40.avif', 'public/film/poster-r3-c1-t10.40.webp', 'public/film/poster-r3-c2-t17.96-2x.avif', 'public/film/poster-r3-c2-t17.96-2x.webp', 'public/film/poster-r3-c2-t17.96.avif', 'public/film/poster-r3-c2-t17.96.webp', 'public/film/poster-r3-c3-t17.96-2x.avif', 'public/film/poster-r3-c3-t17.96-2x.webp', 'public/film/poster-r3-c3-t17.96.avif', 'public/film/poster-r3-c3-t17.96.webp', 'public/film/poster-r3-c4-t8.80-2x.avif', 'public/film/poster-r3-c4-t8.80-2x.webp', 'public/film/poster-r3-c4-t8.80.avif', 'public/film/poster-r3-c4-t8.80.webp', 'scripts/film/encode-fallback.sh', 'scripts/film/fixture.mjs', 'scripts/film/frame-strings.mjs', 'scripts/film/posters.mjs', 'scripts/film/record.mjs', 'scripts/film/scan.mjs', 'scripts/film/stages.mjs', 'scripts/guide/GUIDE-SCRIPTS.json', 'scripts/guide/capture-terminal.mjs', 'scripts/guide/encode-guides.mjs', 'scripts/guide/record-guide.mjs', 'scripts/guide/terminal-replay.mjs', 'scripts/guide/terminal/api.json', 'scripts/guide/terminal/mcp.json', 'scripts/measure-film-start.mjs'],
     suites: ['components/compile-stage-player.mobile-view.test.tsx', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts'],
     browsers: ['e2e/hero-four-stage-restoration.spec.ts', 'e2e/hero-home-responsive.spec.ts', 'e2e/landing-hero-film-loading.spec.ts'],
     rows: ["['e2e/hero-four-stage-restoration.spec.ts', ['1440', '390']],", "['e2e/hero-home-responsive.spec.ts', ['1440']],", "['e2e/landing-hero-film-loading.spec.ts', ['390']],"],
@@ -745,6 +759,14 @@ for (const binding of [
     browsers: [],
     rows: [],
     neighbors: ['nextjs/lib/trial-ai-access.tsx', 'nextjs/lib/operations-alert-trigger.ts', 'nextjs/lib/operations-e2e-timing.json', 'nextjs/app/api/developer/keys/[id]/revoke/route.ts', 'lib/trial-ai-access.ts'] },
+  // Global exposure (GX-01..GX-04, 2026-11-09): twelve exact paths, ten direct suites, evidence-first on its existing row.
+  { group: 'global-exposure', prefix: 'nextjs/', exportedPaths: GLOBAL_EXPOSURE_AFFECTED_PATHS, exportedSuites: GLOBAL_EXPOSURE_AFFECTED_UNIT_FILES,
+    exportedBrowsers: GLOBAL_EXPOSURE_AFFECTED_BROWSER_FILES,
+    paths: ['app/evaluation/page.tsx', 'app/pricing/page.tsx', 'app/robots.ts', 'e2e/evaluation-acceptance.spec.ts', 'e2e/masterplan-workbench.spec.ts', 'e2e/ux06-contact-recovery.spec.ts', 'lib/indexnow.test.ts', 'lib/landing-v2-outcome-ia.test.ts', 'lib/page-metadata.test.ts', 'lib/seo-title-lengths.test.ts', 'public/7a0ff86c91c02b35a358cdf2761b2512.txt', 'scripts/indexnow-ping.mjs'],
+    suites: ['components/evaluation-page.test.tsx', 'lib/indexnow.test.ts', 'lib/landing-v2-outcome-ia.test.ts', 'lib/page-metadata.test.ts', 'lib/page-seo.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts', 'lib/route-canonical-metadata.test.ts', 'lib/seo-surface.test.ts', 'lib/seo-title-lengths.test.ts'],
+    browsers: ['e2e/evidence-first.spec.ts'],
+    rows: ["['e2e/evidence-first.spec.ts', ['1440', '390', 'reduced-motion']],"],
+    neighbors: ['nextjs/app/robots.tsx', 'nextjs/app/pricing/layout.tsx', 'nextjs/app/evaluation/page.ts', 'nextjs/lib/indexnow.ts', 'nextjs/lib/seo-title-lengths.ts', 'nextjs/scripts/indexnow-ping.test.mjs', 'nextjs/public/0000000000000000000000000000000.txt', 'nextjs/e2e/evaluation-acceptance-2.spec.ts', 'scripts/indexnow-ping.mjs'] },
   // Phase 4 consent-poster lane (P2-34 analytics notice, D-11 poster re-cut).
   { group: 'consent-poster', prefix: 'nextjs/', exportedPaths: CONSENT_POSTER_AFFECTED_PATHS, exportedSuites: CONSENT_POSTER_AFFECTED_UNIT_FILES,
     exportedBrowsers: CONSENT_POSTER_AFFECTED_BROWSER_FILES,
@@ -753,6 +775,14 @@ for (const binding of [
     browsers: ['e2e/landing-hero-film-loading.spec.ts', 'e2e/templates.spec.ts'],
     rows: ["['e2e/landing-hero-film-loading.spec.ts', ['390']],", "['e2e/templates.spec.ts', ['1440']],"],
     neighbors: ['nextjs/app/privacy/opengraph-image.tsx', 'nextjs/app/subprocessors/layout.tsx', 'nextjs/lib/operations.test.ts', 'nextjs/lib/operations-copy.ts', 'nextjs/public/film/poster-1-t8.16-3x.avif', 'nextjs/public/film/poster-5-t1.00.avif', 'nextjs/public/film/compile-cut.mp4'] },
+  // sli-alert-noise-20261109: three exact paths, ten direct suites, no browser suite.
+  { group: 'sli-alert-noise-20261109', prefix: 'nextjs/', exportedPaths: SLI_ALERT_NOISE_AFFECTED_PATHS, exportedSuites: SLI_ALERT_NOISE_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['app/api/internal/sli/route.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe-store.ts'],
+    suites: ['lib/api-error-codes.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-read-route.test.ts', 'lib/operational-sli.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/app/api/internal/sli/page.tsx', 'nextjs/lib/synthetic-probe-store.tsx', 'lib/synthetic-probe-store.ts'] },
   // legal-semicolons-20261109: five exact paths, ten direct suites, no browser suite.
   // ops-backlog-sli-20261110: two exact paths, three direct suites, no browser suite.
   { group: 'ops-backlog-sli-20261110', prefix: 'nextjs/', exportedPaths: OPS_BACKLOG_SLI_AFFECTED_PATHS, exportedSuites: OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES,
@@ -892,6 +922,51 @@ assert(VITEST_DISCOVERY_CONFIG_PATH==='nextjs/vitest.config.ts'&&discoveryOwners
   &&['nextjs/vitest.config.mts','nextjs/vitest.config.ts.bak','nextjs/eval/vitest.config.ts','vitest.config.ts'].every(p=>!AFFECTED_GROUPS.some(owner=>owner.match.test(p)))
   &&planner.includes('shared test-discovery config is absent or unreadable at head: ')&&planner.includes('unsupported shared test-discovery config change: ')
   &&JSON.stringify(vitestDiscoveryConfigFailures(globalVitest))==='[]', 'the global Vitest config must pass the finite shared test-discovery contract: '+JSON.stringify(vitestDiscoveryConfigFailures(globalVitest)));
+// Library organize B2 (codex/w2-b2-20261108), restated independently: three exact paths, two direct suites, no browser suite,
+// no lane flag, and the program's sketch names for these modules stay unmapped.
+{
+  const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'library-organize-b2'), [owner] = owners;
+  const paths = ['lib/library-methods.ts', 'lib/library-shadow.test.ts', 'lib/library-shadow.ts'];
+  const suites = ['lib/collection-compile-run.test.ts', 'lib/library-shadow.test.ts'];
+  assert(owners.length === 1 && JSON.stringify(LIBRARY_ORGANIZE_B2_AFFECTED_PATHS) === JSON.stringify(paths)
+    && JSON.stringify(LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES) === JSON.stringify(suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(suites)
+    && !owner.browserFiles.length && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
+    && paths.every(p => AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + p)).length === 1 && owner.match.test('nextjs/' + p))
+    && ['nextjs/lib/library-shadow.tsx', 'nextjs/lib/library-organize.ts', 'nextjs/lib/library-methods.test.ts', 'nextjs/lib/source-fingerprint.ts', 'nextjs/lib/topic-cluster.ts'].every(p => !owner.match.test(p)),
+    'library-organize-b2 owner must keep its three exact paths, two direct suites and no neighbour admission');
+}
+// W2-D intake stage 1 + table DPI harness (codex/w2-d-20261108), restated independently: three exact repo-relative paths, two
+// direct suites, no browser suite, no lane flag; the CDR's own files and the shared ceiling keep their owners.
+{
+  const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'w2-d-intake-stage1'), [owner] = owners;
+  const paths = ['nextjs/lib/processing-ceiling-stage1.test.ts', 'quarantine-sidecar/cdr-cloudrun/table_dpi_arena.py', 'quarantine-sidecar/cdr-cloudrun/tests/test_table_dpi_arena.py'];
+  const suites = ['lib/intake-ceiling-cross-tree.test.ts', 'lib/processing-ceiling-stage1.test.ts'];
+  assert(owners.length === 1 && JSON.stringify(W2_D_INTAKE_STAGE1_AFFECTED_PATHS) === JSON.stringify(paths)
+    && JSON.stringify(W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES) === JSON.stringify(suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(suites)
+    && !owner.browserFiles.length && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
+    && paths.every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && owner.match.test(p))
+    && ['quarantine-sidecar/cdr-cloudrun/app.py', 'shared/intakeCeiling.ts', 'quarantine-sidecar/cdr-cloudrun/table_dpi_arena.pyc', 'nextjs/lib/processing-ceiling-stage1.ts']
+      .every(p => !owner.match.test(p)),
+    'w2-d-intake-stage1 owner must keep its three exact paths, two direct suites and no neighbour admission');
+}
 console.log(`Workflow static gates pass. Full qualification still pending for exact CI/Launch runs at this head.`);
 
 assert(collectorVerifier.includes("Symbol('native race final-gate generated plan')")&&collectorVerifier.includes("same(untracked,['nextjs/repair-plan.json'])")&&collectorVerifier.includes("resolve(process.argv[1])===resolve(intent.repoRoot,'nextjs/scripts/repair-scope-gate.mjs')")&&collectorVerifier.includes('if(!bytes.equals(expected))')&&collectorVerifier.includes('nativeRacePlan(normal,proof)')&&collectorVerifier.includes('before.isSymbolicLink()')&&collectorVerifier.includes('final-gate owner output refused'), 'c61 final gate alone qualifies the exact regular generated plan against a fresh sealed-selector recomputation before trusting routing flags; initial admission stays strict');
+// W2-E2 answerability gate (codex/w2-e2-20261108), restated independently: one exact ten-path owner with two direct suites and
+// no browser, database, worker or selector lane; the Ask route keeps its W1 owner, which selects the gate's suite; neighbours unmapped.
+{
+  const e2Paths=['eval/ask-quality/e2/PREREG-E2.json', 'eval/ask-quality/e2/README.md', 'eval/ask-quality/e2/e2.ts', 'eval/ask-quality/e2/metrics.test.ts', 'eval/ask-quality/e2/receipts/calibration-2026-11-08T082201899Z-99e9448d5587.json', 'eval/ask-quality/e2/receipts/holdout-2026-11-08T082317556Z-9dd7cb825748.json', 'eval/ask-quality/e2/run_e2.mjs', 'lib/answerability-shadow.ts', 'lib/answerability.test.ts', 'lib/answerability.ts'];
+  const e2Suites=['eval/ask-quality/e2/metrics.test.ts', 'lib/answerability.test.ts'];
+  const e2Owners=AFFECTED_GROUPS.filter(owner=>owner.group==='ask-answerability-e2'),[e2Owner]=e2Owners;
+  const askRoute='nextjs/app/api/collections/[id]/ask/route.ts';
+  assert(e2Owners.length===1&&JSON.stringify([...ASK_ANSWERABILITY_E2_AFFECTED_PATHS])===JSON.stringify(e2Paths)&&JSON.stringify([...ASK_ANSWERABILITY_E2_AFFECTED_UNIT_FILES])===JSON.stringify(e2Suites)
+    &&JSON.stringify(e2Owner.unitFiles)===JSON.stringify(e2Suites)&&!e2Owner.browserFiles.length&&!e2Owner.databaseTests.length
+    &&!e2Owner.nativeReuse&&!e2Owner.selector&&!e2Owner.worker&&!e2Owner.database
+    &&e2Paths.every(p=>AFFECTED_GROUPS.filter(owner=>owner.match.test('nextjs/'+p)).map(owner=>owner.group).join()==='ask-answerability-e2')
+    &&AFFECTED_GROUPS.filter(owner=>owner.match.test(askRoute)).map(owner=>owner.group).join()==='w1-remote-mcp-a1-a5'
+    &&AFFECTED_GROUPS.find(owner=>owner.group==='w1-remote-mcp-a1-a5').unitFiles.includes('lib/answerability.test.ts')
+    &&['nextjs/eval/ask-quality/e2/other.ts','nextjs/eval/ask-quality/e2/receipts/holdout-x.json','nextjs/lib/answerability.tsx','lib/answerability.ts']
+      .every(p=>!AFFECTED_GROUPS.some(owner=>owner.match.test(p)))
+    &&e2Suites.every(file=>existsSync(resolve(repo,'nextjs',file))),
+    'W2-E2 answerability owner must keep its exact ten paths and two suites, leave the Ask route with w1-remote-mcp-a1-a5 and admit no neighbour');
+}

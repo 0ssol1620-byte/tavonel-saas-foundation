@@ -1,0 +1,224 @@
+{
+ "schema": "tavonel.ask_answerability_prereg.v1",
+ "title": "E2 answerability gate -- pre-registered calibration and holdout verdict",
+ "status": "IMPLEMENTED_NOT_PROVEN",
+ "registeredOn": "2026-11-08",
+ "revision": 1,
+ "lane": "Market-No.1 program W2-E2, workstream E, item E2 (PROGRAM-2026-11-04.md §4.E)",
+ "claim": "None until the holdout receipt exists. The verdict is SUPPORTED or NOT_SUPPORTED by the rule below and is published either way. Nothing is tuned after the holdout is read; a later change is a new revision and a new holdout, never a substitution.",
+ "question": "Does the deterministic answerability gate, shadowed on the Ask route, refuse questions the World cannot answer often enough to lower the wrong-answer rate on unanswerable questions, without refusing more than a pre-registered share of answerable ones?",
+ "inputs": {
+  "e1Prereg": {
+   "path": "eval/ask-quality/PREREG.json",
+   "revision": 2,
+   "sha256": "32aa98db85bba61036e1d5a6fa0a6d1cf673f73c7b468aa53a174eee3e674f88"
+  },
+  "questionSets": [
+   {
+    "id": "xbrl-numeric",
+    "sha256": "e2bcfcbf5a3bc3cda42af2ee34cc357c30fd64b6f96d234c86ba6e956ab2c4a6",
+    "n": 400,
+    "gold": "answerable"
+   },
+   {
+    "id": "unanswerable",
+    "sha256": "cd4dc590891e0c32d8ba45577b230c5359db151bc3b9f8340c2d0741e9c66d5a",
+    "n": 160,
+    "gold": "unanswerable (OTHER_COMPANY 120, OTHER_YEAR 40)"
+   },
+   {
+    "id": "human",
+    "sha256": null,
+    "n": 0,
+    "gold": "NOT_FROZEN in E1; not used"
+   }
+  ]
+ },
+ "split": {
+  "rule": "E1's own frozen split: every question's `split` field, set by gen_xbrl_questions.mjs splitOf(id) = parity of the first 32 bits of sha256(id). No PRNG and no seed of E2's own: the split is a pure function of the question id, recorded before E2 existed, and E2 does not re-split.",
+  "seed": "none (deterministic sha256(id) parity, E1 PREREG revision 2 `split`)",
+  "calibrationN": 294,
+  "holdoutN": 266,
+  "holdoutComposition": "answerable 191, unanswerable 75 (OTHER_COMPANY 54, OTHER_YEAR 21)",
+  "calibrationComposition": "answerable 209, unanswerable 85 (OTHER_COMPANY 66, OTHER_YEAR 19)",
+  "holdoutIdsSha256": "ac739f39c0f130f5e823c5cc0a07af912a5df99573ccc90f8b699c78739431a6",
+  "holdoutIdsDigestRule": "sha256 of the holdout question ids, sorted, joined by \\n",
+  "use": "The coverage threshold is chosen on calibration only. The calibration phase never replays a holdout question. The holdout is replayed once, after the calibration receipt is committed, with that receipt's threshold."
+ },
+ "corpus": {
+  "description": "One collection per corpusRef: the filer's two pinned 10-K primary documents (E1 questions/xbrl-numeric.json#filers), read from eval/ask-quality/cache (git-ignored) and verified by sha256 before use.",
+  "chunking": "eval/ask-quality/e2/e2.ts chunkDocument: visible text only (ix:header, script, style, comments removed); consecutive text blocks packed into chunks of at most 400 characters on word boundaries; each table packed apart from text, row by row, every chunk prefixed with the table's header (the first of its first five rows that names a year 1900-2199 and is at most 150 characters). 400 keeps three citations inside the fallback's 3 x 420 answer envelope, so a baseline abstention is a retrieval outcome, not an envelope overflow.",
+  "notProduction": "Production compiles OCR regions of a PDF; this is an HTML chunking of the same filings. pageNumber1 = 1 and bbox1000 = [0,0,1000,1000] on every chunk are placeholders the chunk schema requires and nothing reads.",
+  "documents": [
+   {
+    "corpusRef": "sec-10k:0000021344",
+    "filings": [
+     {
+      "accession": "0001628280-26-010047",
+      "sha256": "675d13c8dff637a9b4230b684ded8f15c679f31de5423096a125678c8fb8c0bc",
+      "cacheName": "0000021344-0001628280-26-010047-ko-20251231.htm"
+     },
+     {
+      "accession": "0000021344-25-000011",
+      "sha256": "515bedd0473f986f3c9ee08f09eb94cf81f424a7e07995ceea3b28454a389a06",
+      "cacheName": "0000021344-0000021344-25-000011-ko-20241231.htm"
+     }
+    ]
+   },
+   {
+    "corpusRef": "sec-10k:0000200406",
+    "filings": [
+     {
+      "accession": "0000200406-26-000016",
+      "sha256": "17d1b59e5f0ad0d01942d0a2a89034384ade7d496688e40adc7b74c1c2bbaeb9",
+      "cacheName": "0000200406-0000200406-26-000016-jnj-20251228.htm"
+     },
+     {
+      "accession": "0000200406-25-000038",
+      "sha256": "2902db7c24f9a7b061c1b304c1a197b08273b0b08f179b83b249a6bd34a45798",
+      "cacheName": "0000200406-0000200406-25-000038-jnj-20241229.htm"
+     }
+    ]
+   },
+   {
+    "corpusRef": "sec-10k:0000789019",
+    "filings": [
+     {
+      "accession": "0001193125-26-323660",
+      "sha256": "cfb3932da43a491e4876c12be13c2770c1b0108464ab6c1f0741ec194910084d",
+      "cacheName": "0000789019-0001193125-26-323660-msft-20260630.htm"
+     },
+     {
+      "accession": "0000950170-25-100235",
+      "sha256": "e698b490a3fcc0ceb5111ae59435556755b79f804a533880b048fa8b2430d669",
+      "cacheName": "0000789019-0000950170-25-100235-msft-20250630.htm"
+     }
+    ]
+   },
+   {
+    "corpusRef": "sec-10k:0000080424",
+    "filings": [
+     {
+      "accession": "0000080424-26-000103",
+      "sha256": "936ce2db25c4d9e326c5faf5fbfd9fde1c1cab46d9df67aa2683c8ac3d5df862",
+      "cacheName": "0000080424-0000080424-26-000103-pg-20260630.htm"
+     },
+     {
+      "accession": "0000080424-25-000076",
+      "sha256": "b7cad01e7da42a179a3ab3b60caf01c6b8b421858ae7ce249c03042c428df1e0",
+      "cacheName": "0000080424-0000080424-25-000076-pg-20250630.htm"
+     }
+    ]
+   }
+  ]
+ },
+ "retriever": {
+  "function": "lib/grounded-ask.ts answerGroundedQuestion -- the Ask route's excerpt-concatenation-fallback path, run in process on the built artifact (no network, no database, no model)",
+  "baselineAnswered": "answer.status === 'grounded' (E1 abstention rule for evidence_excerpts)",
+  "goldHit": "answerable only: some citation's 420-character excerpt contains a gold span by E1 score.ts containsSpan (numeric spans as whole numbers)",
+  "notCovered": "The compiled-retrieval-v1 path (RRF, reranker, World Gate, held conflicts) is not replayed; the verdict speaks for the fallback path only."
+ },
+ "gate": {
+  "function": "lib/answerability.ts evaluateAnswerability",
+  "input": "question; evidence = the cited chunks' full text in citation order; heldConflicts = null (the fallback reads none); worldCoverage = {processedSources: 2, unprocessedSources: 0}",
+  "rules": [
+   "1. evidence empty -> NOT_IN_WORLD (NO_EVIDENCE)",
+   "2. heldConflicts > 0 -> CONFLICTED (HELD_CONFLICT) -- cannot fire here (null)",
+   "3. the question asks for an amount (quantity words or a currency/percent unit) and no single evidence item states an amount (digits left after removing month-name dates, ISO/slash dates, Item/Note/Part/Schedule/Exhibit/Page references and years) together with every year 1900-2199 the question names -> NOT_IN_WORLD (NO_NUMERIC_ANCHOR)",
+   "4. termCoverage = |question tokens found in the evidence tokens| / |question tokens| (lib/lexical-tokens.ts tokens, unique) below the threshold -> PARTIAL (TERM_COVERAGE_BELOW_THRESHOLD)",
+   "5. otherwise ANSWERABLE. OUT_OF_SCHEMA is never produced (no certified schema exists)."
+  ],
+  "refuse": "PRIMARY: status in {NOT_IN_WORLD, PARTIAL, OUT_OF_SCHEMA} (lib/answerability.ts REFUSING_STATUSES). SECONDARY, reported and never gating: {NOT_IN_WORLD, OUT_OF_SCHEMA}, the narrower set PROGRAM §4.E names for its canary.",
+  "notAScalar": "No blind quality score: the verdict is a fixed rule order over named features, and termCoverage is one feature with its covered and missing terms reported."
+ },
+ "calibration": {
+  "grid": "0, then 0.500 to 1.000 in steps of 0.025 (22 values; e2.ts THRESHOLD_GRID)",
+  "rule": "On the calibration split: among thresholds whose refused-answerable share (answerable refused / answerable) is <= 0.05, choose the one that refuses the most unanswerable questions; ties go to the smaller threshold. If none is feasible, the threshold is 0 (coverage rule off) and the receipt records constraintMet = false; the holdout still runs and the criteria decide.",
+  "output": "eval/ask-quality/e2/receipts/calibration-<run time>-<receipt sha>.json, committed before the holdout phase runs"
+ },
+ "holdoutMetrics": [
+  {
+   "id": "refuse_precision",
+   "numerator": "refused unanswerable",
+   "denominator": "refused (all holdout questions)"
+  },
+  {
+   "id": "refuse_recall",
+   "numerator": "refused unanswerable",
+   "denominator": "unanswerable holdout questions"
+  },
+  {
+   "id": "baseline_wrong_answer_over_unanswerable",
+   "numerator": "unanswerable the baseline answered",
+   "denominator": "unanswerable holdout questions"
+  },
+  {
+   "id": "gated_wrong_answer_over_unanswerable",
+   "numerator": "unanswerable the baseline answered and the gate did not refuse",
+   "denominator": "unanswerable holdout questions"
+  },
+  {
+   "id": "refused_over_answerable",
+   "numerator": "answerable refused",
+   "denominator": "answerable holdout questions"
+  },
+  {
+   "id": "gold_span_hits_lost",
+   "numerator": "answerable with a baseline gold-span hit that the gate refused",
+   "denominator": "answerable holdout questions with a baseline gold-span hit"
+  },
+  {
+   "id": "baseline_gold_span_recall",
+   "numerator": "answerable with a baseline gold-span hit",
+   "denominator": "answerable holdout questions"
+  },
+  {
+   "id": "baseline_abstained_over_answerable",
+   "numerator": "answerable the baseline abstained on",
+   "denominator": "answerable holdout questions"
+  },
+  {
+   "id": "gated_abstained_over_answerable",
+   "numerator": "answerable abstained on or refused",
+   "denominator": "answerable holdout questions"
+  },
+  {
+   "id": "narrow_refuse_precision / narrow_refuse_recall",
+   "numerator": "as above, secondary refusal set",
+   "denominator": "as above"
+  },
+  {
+   "id": "refuse_recall.<rule>",
+   "numerator": "refused unanswerable of that generation rule",
+   "denominator": "unanswerable holdout questions of that rule"
+  }
+ ],
+ "statistics": {
+  "interval": "Wilson score, 95%, z = 1.959963984540054 (E1 score.ts wilson)",
+  "zeroDenominator": "value null, interval null, criterion NOT_EVALUABLE",
+  "note": "E1's numeric exact match is not used: evidence_excerpts returns passages, not values, so correct_over_answerable is ~0 by construction (E1 PREREG); the gold-span hit stands in for 'a correct answer was served', and E1 statistics.e2Gate asks for exactly these rates to be read together."
+ },
+ "passCriteria": {
+  "C1": "Wilson95 upper(gated_wrong_answer_over_unanswerable) < Wilson95 lower(baseline_wrong_answer_over_unanswerable) -- the wrong-answer rate falls with non-overlapping intervals (PROGRAM §4.E 'lower than baseline (CI)')",
+  "C2": "Wilson95 upper(refused_over_answerable) <= 0.10 -- the pre-registered tolerance for answerable questions lost (PROGRAM §4.E 'loss <= pre-registered tolerance')",
+  "C3": "Wilson95 upper(gold_span_hits_lost) <= 0.10 -- the same tolerance on the answerable questions the baseline actually served the gold evidence for",
+  "verdict": "SUPPORTED iff C1, C2 and C3 all PASS. Any FAIL or NOT_EVALUABLE -> NOT_SUPPORTED, published as NOT_SUPPORTED in the lane report with every rate and its denominator."
+ },
+ "pinnedCode": {
+  "lib/answerability.ts": "140bd1f25353965eb1873d9e474dce44f3e39d57c64afd100584461efd69d779",
+  "lib/grounded-ask.ts": "6ed9f6f7b159239ff05ce84df0b54e96968632e08b056b163ef5cdbe357a37c5",
+  "lib/lexical-tokens.ts": "364ef6b34bec6cace23a6a5e7dd608c6129c6394f1fc3fbd0c89ef28e18a89c3",
+  "eval/ask-quality/score.ts": "3b4ecb3051c6924b9d17e33aeb98a21552ba3cc4fddf35cbaea2ae4bd1e56931",
+  "eval/ask-quality/run_eval.mjs": "d590d7ba548e31a79fb6816e100c1aba8c5c50cf47097ad7e39e66614243a2ec",
+  "eval/ask-quality/e2/e2.ts": "7e43e380ba231785f7c245b931cefac788e55439406182345a252d5d936aa395",
+  "eval/ask-quality/e2/run_e2.mjs": "49afea899020c5ea4fe3339bb96984e0d0ebe91aeb92768c8e970552dd08250d"
+ },
+ "pinnedCodeRule": "sha256 of each file's text with CRLF read as LF, so a Windows checkout and CI agree. run_e2.mjs refuses to run when any differs.",
+ "limitations": [
+  "One retriever (the fallback), one chunking of HTML, four filers, XBRL-template questions: a verdict here says nothing about the compiled path, PDFs, other corpora or human questions.",
+  "Rules 2 and the OUT_OF_SCHEMA status are not exercised: no conflicts, no certified schema.",
+  "Questions cluster by filing; Wilson intervals treat them as independent and understate the uncertainty.",
+  "The threshold is set on one corpus; it is not 'calibrated' in the CalibrationTable sense and is never presented as such."
+ ],
+ "production": "The Ask route shadows the gate behind TAVONEL_ASK_ANSWERABILITY_MODE (off | shadow; default off) and never changes the served answer. `on` is not built; it may only be proposed after a SUPPORTED verdict and a reviewed change."
+}

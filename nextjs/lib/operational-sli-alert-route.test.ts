@@ -81,6 +81,19 @@ describe("scheduled operational SLI alert route", () => {
     expect(persist).not.toHaveBeenCalled();
   });
 
+  it("reads probe history at the real clock and evaluates it at the slot instant", async () => {
+    // Regression: the read used to be signed at the slot start, ~70 s before the cron runs, and
+    // the 60 s signed URL was refused on every production slot (history_unavailable).
+    const signer = { accountId: "a", bucket: "tavonel-saas-foundation-quarantine", accessKeyId: "k", secretAccessKey: "s" };
+    readSigner.mockReturnValue(signer);
+    const stored = { ok: true, history: { schemaVersion: "tavonel.synthetic_probe_history.v1", runs: [] } };
+    readHistory.mockResolvedValue(stored);
+    await GET(request());
+    expect(readHistory).toHaveBeenCalledTimes(1);
+    expect(readHistory.mock.calls[0]).toEqual([signer]);
+    expect(evaluate).toHaveBeenCalledWith(stored, expect.objectContaining({ now: new Date("2026-09-20T12:00:00.000Z") }));
+  });
+
   it("persists an honest blocked evaluation when probe storage is unavailable", async () => {
     const response = await GET(request());
     expect(response.status).toBe(503);

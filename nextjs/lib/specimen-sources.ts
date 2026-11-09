@@ -42,6 +42,13 @@ import committedReceipts from "./specimen-sources.json" with { type: "json" };
 /* The strip's order (FINAL-SPEC-HARD-PROOF §2): drawing, table, degraded scan, Korean. */
 export const SPECIMEN_SLOTS = ["drawing", "table", "degraded_scan", "korean"] as const;
 export type SpecimenSlot = (typeof SPECIMEN_SLOTS)[number];
+/*
+  The slots Home renders. GX-02 (founder, 2026-11-09, global-only presentation) took the Korean
+  document cell off the public marketing pages. Its receipt stays committed and is still verified
+  by `specimen-sources.test.ts` byte for byte, so its figures keep their binding. `homeSpecimens`
+  still returns it, and `components/landing-v2/landing-page.tsx` does not render it.
+*/
+export const HOME_SPECIMEN_SLOTS: readonly SpecimenSlot[] = SPECIMEN_SLOTS.filter((slot) => slot !== "korean");
 export type SpecimenMode = "production" | "fixture";
 
 export type SpecimenReceipt = {

@@ -140,7 +140,7 @@ const REFUSALS = [
 ] as const;
 
 for (const { status, serverError } of REFUSALS) {
-  for (const locale of ["en", "ko"] as const) {
+  for (const locale of ["en"] as const) {
     test(`a mocked ${status} at ${FORMS[locale].path} keeps answers, keeps Send disabled and focuses the fixed-address status`, async ({ page }, testInfo) => {
       test.skip(testInfo.project.name !== "390", "UX06 keyboard and recovery behavior is measured at 390px");
       const form = FORMS[locale];
@@ -174,7 +174,7 @@ for (const { status, serverError } of REFUSALS) {
   }
 }
 
-for (const locale of ["en", "ko"] as const) {
+for (const locale of ["en"] as const) {
   test(`a mocked 413 at ${FORMS[locale].path} names the whole inquiry as too large and sends the trimmed one again`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "390", "UX06 keyboard and recovery behavior is measured at 390px");
     const form = FORMS[locale];
