@@ -60,11 +60,19 @@ export const REMOTE_MCP_SCOPES: readonly DeveloperScope[] = [...new Set(Object.v
  * Its own variable, not the processing cohort's (review R1 M5): setting the processing cohort to a
  * canary of three would also narrow which workspaces may process sources. Unset, empty, malformed
  * or wider than the cap admits nobody -- the canary fails closed. Widening is a reviewed change.
+ *
+ * General availability (2026-11-09) is the one other value: exactly `all`, alone. It drops the
+ * workspace list and nothing else. Consent still needs a signed-in member, the token still needs a
+ * paid plan (or a trial, only with TAVONEL_TRIAL_AI_ACCESS_ENABLED and inside its bounds), and every
+ * call still passes the /api/v1 route's own plan, scope, rate-limit and tenant checks. `all` beside
+ * a workspace key, or any other spelling of it, is still a configuration error.
  */
 export const REMOTE_MCP_COHORT_MAX = 3;
+export const REMOTE_MCP_COHORT_ALL = "all";
 const COHORT_WORKSPACE = /^pilot-[A-Za-z0-9]{1,16}$/;
 export type RemoteMcpCohortRefusal = "REMOTE_MCP_COHORT_EXCLUDED" | "REMOTE_MCP_COHORT_CONFIG_INVALID";
 export function remoteMcpCohortRefusal(workspaceKey: string, env: Env = process.env): RemoteMcpCohortRefusal | null {
+  if (env.TAVONEL_REMOTE_MCP_COHORT === REMOTE_MCP_COHORT_ALL) return COHORT_WORKSPACE.test(workspaceKey) ? null : "REMOTE_MCP_COHORT_EXCLUDED";
   const ids = (env.TAVONEL_REMOTE_MCP_COHORT ?? "").split(",").map((id) => id.trim());
   if (ids.length > REMOTE_MCP_COHORT_MAX || !ids.every((id) => COHORT_WORKSPACE.test(id))) return "REMOTE_MCP_COHORT_CONFIG_INVALID";
   return ids.includes(workspaceKey) ? null : "REMOTE_MCP_COHORT_EXCLUDED";
