@@ -9,6 +9,7 @@ import { GDP_PDF_RUNS_AFFECTED_PATHS, GDP_PDF_RUNS_AFFECTED_UNIT_FILES, GDP_PDF_
 import { PACKET_DELIVERY_AFFECTED_PATHS, PACKET_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { LIBRARY_DEDUP_AFFECTED_PATHS, LIBRARY_DEDUP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { COMPILER_RELEASE_AFFECTED_PATHS, COMPILER_RELEASE_AFFECTED_UNIT_FILES, COMPILER_RELEASE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+import { SITE_POLISH_AFFECTED_PATHS, SITE_POLISH_AFFECTED_UNIT_FILES, SITE_POLISH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { HOME_FILM_RERECORD_AFFECTED_PATHS, HOME_FILM_RERECORD_AFFECTED_UNIT_FILES, HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { CONSENT_POSTER_AFFECTED_PATHS, CONSENT_POSTER_AFFECTED_UNIT_FILES, CONSENT_POSTER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
@@ -17,6 +18,7 @@ import { OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS, OPERATIONAL_SLI_ALERT_DE
 import { W1_TRIAL_OPS_AFFECTED_PATHS, W1_TRIAL_OPS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES, TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_PATHS, SPECIMEN_STRIP_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_BROWSER_FILES, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES, PUBLIC_MARKETING_AFFECTED_BROWSER_FILES, MARKETING_TOOLING_POSTIMAGES, G1_COPY_TRUTH_AFFECTED_PATHS, G1_COPY_TRUTH_AFFECTED_UNIT_FILES, G1_COPY_TRUTH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { ENABLEMENT_AFFECTED_BROWSER_FILES, P4_FOLLOWUPS_AFFECTED_PATHS, P4_FOLLOWUPS_AFFECTED_UNIT_FILES, P4_FOLLOWUPS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+import { LEGAL_SEMICOLONS_AFFECTED_PATHS, LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
 const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -479,7 +481,7 @@ const currentOwnerBindings = [
   // EN-0c benchmarks path mask: four exact paths selecting seven direct suites, no browser suite.
   { group: 'benchmarks-path-mask', paths: ['app/benchmarks/page.tsx', 'lib/benchmarks-page.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts'],
     exportedPaths: BENCHMARKS_PATH_MASK_AFFECTED_PATHS, suites: ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/trust-page-answers.test.ts'], exportedSuites: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES,
-    neighbors: ['app/benchmarks/page.ts', 'app/benchmarks/gdp-pdf/page.tsx', 'lib/model-arena-page-data.tsx', 'components/benchmarks/arena-charts.tsx', 'content/benchmarks/model-arena-20260903.json'] },
+    neighbors: ['app/benchmarks/page.ts', 'app/benchmarks/gdp-pdf/page.tsx', 'lib/model-arena-page-data.tsx', 'components/benchmarks/arena-chart.tsx', 'content/benchmarks/model-arena-20260903.json'] },
   // OCR_PAGES_INCOMPLETE: four exact paths selecting three direct suites, no browser suite.
   { group: 'ocr-pages-incomplete-code', paths: ['lib/operations-p0.test.ts', 'lib/operations-p0.ts', 'lib/processing-receipts.test.ts', 'lib/processing-receipts.ts'],
     exportedPaths: OCR_PAGES_INCOMPLETE_AFFECTED_PATHS, suites: ['lib/documents-route.test.ts', 'lib/operations-p0.test.ts', 'lib/processing-receipts.test.ts'], exportedSuites: OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES,
@@ -513,11 +515,11 @@ const currentOwnerBindings = [
     exportedSuites: INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES,
     neighbors: ['lib/api-error-codes.test.ts', 'lib/intake-approval-rollout-on.test.ts', 'lib/upload-transfer.test.ts', 'lib/usage-pricing.ts'] },
 ];
-// Solutions proof: two exact paths, two direct suites and the one 1440 solutions browser suite.
+// Solutions proof: four exact paths, three direct suites and the one 1440 solutions browser suite.
 {
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'solutions-proof'), [owner] = owners;
-  const paths = ['app/solutions/[slug]/page.tsx', 'app/solutions/solution-workflow-proof.tsx'];
-  const suites = ['lib/copy-trust-guard.test.ts', 'lib/output-escaping.test.ts'], browsers = ['e2e/solutions-workflows.spec.ts'];
+  const paths = ['app/solutions/[slug]/page.tsx', 'app/solutions/solution-workflow-proof.tsx', 'lib/solution-proof-picks.ts', 'lib/solution-workflows.test.ts'];
+  const suites = ['lib/copy-trust-guard.test.ts', 'lib/output-escaping.test.ts', 'lib/solution-workflows.test.ts'], browsers = ['e2e/solutions-workflows.spec.ts'];
   assert(owners.length === 1 && JSON.stringify(SOLUTIONS_PROOF_AFFECTED_PATHS) === JSON.stringify(paths)
     && JSON.stringify(SOLUTIONS_PROOF_AFFECTED_UNIT_FILES) === JSON.stringify(suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(suites)
     && JSON.stringify(SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES) === JSON.stringify(browsers) && JSON.stringify(owner.browserFiles) === JSON.stringify(browsers)
@@ -525,7 +527,7 @@ const currentOwnerBindings = [
     && paths.every(p => owner.match.test('nextjs/' + p))
     && ['app/solutions/[slug]/layout.tsx', 'app/solutions/page.tsx', 'app/solutions/solution-workflow-proof.test.tsx'].every(p => !owner.match.test('nextjs/' + p))
     && runner.includes("['e2e/solutions-workflows.spec.ts', ['1440']]"),
-    'Solutions proof owner must keep its two exact paths, two direct suites and the 1440 solutions browser suite');
+    'Solutions proof owner must keep its four exact paths, three direct suites and the 1440 solutions browser suite');
 }
 // Evidence viewer overlay: one exact stylesheet, its direct suite and the world-lifecycle browser suite.
 {
@@ -702,6 +704,14 @@ for (const binding of [
     browsers: ['e2e/benchmarks.spec.ts', 'e2e/templates.spec.ts'],
     rows: ["['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/templates.spec.ts', ['1440']],"],
     neighbors: ['nextjs/lib/compiler-release.test.ts', 'nextjs/lib/compiler-releases.ts', 'nextjs/lib/compiler-release.tsx', 'lib/compiler-release.ts', 'nextjs/public/proof-collection/compiler-releases/other.json'] },
+  // site-polish-20261109: the /benchmarks charts, the Explore change act and the two trust-link components.
+  { group: 'site-polish-20261109', prefix: 'nextjs/', exportedPaths: SITE_POLISH_AFFECTED_PATHS, exportedSuites: SITE_POLISH_AFFECTED_UNIT_FILES,
+    exportedBrowsers: SITE_POLISH_AFFECTED_BROWSER_FILES,
+    paths: ['components/benchmarks/arena-charts.module.css', 'components/benchmarks/arena-charts.tsx', 'components/explore/change-act.tsx', 'components/file-or-route-link.tsx', 'components/trust-disclosures.tsx', 'components/trust-provisions.tsx', 'lib/file-or-route-link.test.ts'],
+    suites: ['lib/benchmarks-page.test.ts', 'lib/explore-story.test.ts', 'lib/file-or-route-link.test.ts', 'lib/public-trust-contract.test.ts', 'lib/trust-provisions.test.ts'],
+    browsers: ['e2e/benchmarks.spec.ts', 'e2e/explore.spec.ts', 'e2e/templates.spec.ts'],
+    rows: ["['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/explore.spec.ts', ['1440']],", "['e2e/templates.spec.ts', ['1440']],"],
+    neighbors: ['nextjs/components/benchmarks/arena-chart.tsx', 'nextjs/components/explore/change-act.module.css', 'nextjs/components/trust-disclosure.tsx', 'components/trust-provisions.tsx'] },
   // B35 alert delivery (codex/ops-alert-delivery-20261102): four exact paths, eight direct suites, no browser suite.
   { group: 'operational-sli-alert-delivery', prefix: 'nextjs/', exportedPaths: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS, exportedSuites: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
@@ -742,6 +752,14 @@ for (const binding of [
     browsers: ['e2e/landing-hero-film-loading.spec.ts', 'e2e/templates.spec.ts'],
     rows: ["['e2e/landing-hero-film-loading.spec.ts', ['390']],", "['e2e/templates.spec.ts', ['1440']],"],
     neighbors: ['nextjs/app/privacy/opengraph-image.tsx', 'nextjs/app/subprocessors/layout.tsx', 'nextjs/lib/operations.test.ts', 'nextjs/lib/operations-copy.ts', 'nextjs/public/film/poster-1-t8.16-3x.avif', 'nextjs/public/film/poster-5-t1.00.avif', 'nextjs/public/film/compile-cut.mp4'] },
+  // legal-semicolons-20261109: five exact paths, ten direct suites, no browser suite.
+  { group: 'legal-semicolons-20261109', prefix: 'nextjs/', exportedPaths: LEGAL_SEMICOLONS_AFFECTED_PATHS, exportedSuites: LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts'],
+    suites: ['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-provisions.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/app/refunds/page.ts', 'nextjs/components/processing-consent-panel.module.css', 'nextjs/content/trust/provisions.json', 'nextjs/lib/status-probe-store.ts', 'lib/status-probe.ts'] },
 ]) {
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === binding.group), [owner] = owners;
   assert(owners.length === 1 && JSON.stringify(binding.exportedPaths) === JSON.stringify(binding.paths)

@@ -105,7 +105,8 @@ test("the mobile menu exposes four section choices, Pricing and Sign in, and the
   */
   await expect(panel.locator("a.mobile-nav-signin")).toHaveCount(1);
   await expect(page.locator("header .nav-actions .nav-signin")).toBeHidden();
-  await expect(panel.locator("details.mobile-nav-group")).toHaveCount(0);
+  // NAV PANELS 2026-11-09: three of the rows carry a closed group toggle (Home owns no section).
+  await expect(panel.locator('button[aria-controls][aria-expanded="false"]')).toHaveCount(3);
   const geometry = await panel.boundingBox();
   expect(geometry).not.toBeNull();
   expect(geometry!.x).toBeGreaterThanOrEqual(-1);

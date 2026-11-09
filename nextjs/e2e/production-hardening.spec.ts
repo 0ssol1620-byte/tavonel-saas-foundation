@@ -33,7 +33,8 @@ test("mobile public navigation remains reachable", async ({ page }, testInfo) =>
   await expect(direct).toHaveText(["Product", "How it works", "Resources", "Docs", "Pricing"]);
   await expect(page.locator("header.nav .nav-actions")).toBeHidden();
   await expect(menu.locator(":scope > nav a.mobile-nav-cta")).toHaveCount(0);
-  await expect(menu.locator("details.mobile-nav-group")).toHaveCount(0);
+  // NAV PANELS 2026-11-09: Product, Resources and Docs each open their group in place.
+  await expect(menu.locator(":scope > nav button[aria-controls]")).toHaveCount(3);
 });
 
 test("audited public and docs routes keep horizontal overflow local", async ({ page }, testInfo) => {

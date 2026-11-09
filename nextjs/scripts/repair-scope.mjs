@@ -1837,8 +1837,10 @@ export const INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES = Object.freeze([
 ]);
 // Solutions proof (PR #141 fix): the solution page's limitation sentence and its same-origin proof link. Two direct suites and
 // the solutions browser suite, which runs only in project 1440 of the shared map.
-export const SOLUTIONS_PROOF_AFFECTED_PATHS = Object.freeze(['app/solutions/[slug]/page.tsx', 'app/solutions/solution-workflow-proof.tsx']);
-export const SOLUTIONS_PROOF_AFFECTED_UNIT_FILES = Object.freeze(['lib/copy-trust-guard.test.ts', 'lib/output-escaping.test.ts']);
+// 2026-11-09: lib/solution-proof-picks.ts holds the proof picks and resolver both Solutions files render (moved out of them for
+// /explore LCP); lib/solution-workflows.test.ts is their direct suite, so it is owned here and selected for all four paths.
+export const SOLUTIONS_PROOF_AFFECTED_PATHS = Object.freeze(['app/solutions/[slug]/page.tsx', 'app/solutions/solution-workflow-proof.tsx', 'lib/solution-proof-picks.ts', 'lib/solution-workflows.test.ts']);
+export const SOLUTIONS_PROOF_AFFECTED_UNIT_FILES = Object.freeze(['lib/copy-trust-guard.test.ts', 'lib/output-escaping.test.ts', 'lib/solution-workflows.test.ts']);
 export const SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/solutions-workflows.spec.ts']);
 // Evidence viewer overlay (PR #141 fix): the stylesheet that places the bbox overlay over the drawn page. Its direct suite
 // and the world-lifecycle browser suite, whose Ask source-region test measures the overlay against the canvas.
@@ -2234,6 +2236,11 @@ export const GDP_PDF_RUNS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmark
 export const COMPILER_RELEASE_AFFECTED_PATHS = Object.freeze(['lib/compiler-release.ts', 'public/proof-collection/compiler-releases/core-v2-health-2026-10-27T09-28-53Z.json']);
 export const COMPILER_RELEASE_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/changelog.test.ts', 'lib/gdp-pdf-page-data.test.ts']);
 export const COMPILER_RELEASE_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmarks.spec.ts', 'e2e/templates.spec.ts']);
+// site-polish-20261109: the /benchmarks charts, the Explore change act and the two trust-link components.
+export const SITE_POLISH_AFFECTED_PATHS = Object.freeze(['components/benchmarks/arena-charts.module.css', 'components/benchmarks/arena-charts.tsx',
+  'components/explore/change-act.tsx', 'components/file-or-route-link.tsx', 'components/trust-disclosures.tsx', 'components/trust-provisions.tsx', 'lib/file-or-route-link.test.ts']);
+export const SITE_POLISH_AFFECTED_UNIT_FILES = Object.freeze(['lib/benchmarks-page.test.ts', 'lib/explore-story.test.ts', 'lib/file-or-route-link.test.ts', 'lib/public-trust-contract.test.ts', 'lib/trust-provisions.test.ts']);
+export const SITE_POLISH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmarks.spec.ts', 'e2e/explore.spec.ts', 'e2e/templates.spec.ts']);
 // Packet delivery (codex/packet-delivery-textlayer-20261102): the delivery format an AI reads the compiled context in. The
 // download route and the two guidance modules that write the delivery/ files and point AGENTS.md at them, the package verifier
 // and its scripts/ copy that admit the delivery root, the delivery suite and the two parity suites whose MCP surface now reads
@@ -2910,6 +2917,9 @@ export function vitestDiscoveryConfigFailures(source) {
 }
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
+// legal-semicolons-20261109: the legal, consent, trust and /status copy whose semicolons were removed without a change in meaning.
+export const LEGAL_SEMICOLONS_AFFECTED_PATHS = Object.freeze(['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts']);
+export const LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-provisions.test.ts']);
 export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('public-marketing-surface', new RegExp(`^(?:${exactPathAlternation(PUBLIC_MARKETING_AFFECTED_PATHS)})$`),
     { unitFiles: PUBLIC_MARKETING_AFFECTED_UNIT_FILES, browserFiles: PUBLIC_MARKETING_AFFECTED_BROWSER_FILES }),
@@ -3002,7 +3012,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // Intake approval rollout: the ten exact paths above select ten direct suites; no browser, database, worker or build lane.
   affectedGroup('intake-approval-rollout', new RegExp(`^nextjs/(?:${exactPathAlternation(INTAKE_APPROVAL_ROLLOUT_AFFECTED_PATHS)})$`),
     { unitFiles: INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES }),
-  // Solutions proof: the two exact paths above select two direct suites and the 1440 solutions browser suite.
+  // Solutions proof: the four exact paths above select three direct suites and the 1440 solutions browser suite.
   affectedGroup('solutions-proof', new RegExp(`^nextjs/(?:${exactPathAlternation(SOLUTIONS_PROOF_AFFECTED_PATHS)})$`),
     { unitFiles: SOLUTIONS_PROOF_AFFECTED_UNIT_FILES, browserFiles: SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES }),
   // Evidence viewer overlay: the one exact stylesheet above selects its direct suite and the world-lifecycle browser suite.
@@ -3066,6 +3076,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // compiler-release: 2 exact paths select 3 direct suites and 2 browser suites.
   affectedGroup('compiler-release', new RegExp(`^nextjs/(?:${exactPathAlternation(COMPILER_RELEASE_AFFECTED_PATHS)})$`),
     { unitFiles: COMPILER_RELEASE_AFFECTED_UNIT_FILES, browserFiles: COMPILER_RELEASE_AFFECTED_BROWSER_FILES }),
+  // site-polish-20261109: 5 exact paths select 4 direct suites and 3 browser suites.
+  affectedGroup('site-polish-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(SITE_POLISH_AFFECTED_PATHS)})$`),
+    { unitFiles: SITE_POLISH_AFFECTED_UNIT_FILES, browserFiles: SITE_POLISH_AFFECTED_BROWSER_FILES }),
   // library-dedup-b1: the 2 exact paths above select 2 direct suites and no browser suite.
   affectedGroup('library-dedup-b1', new RegExp(`^nextjs/(?:${exactPathAlternation(LIBRARY_DEDUP_AFFECTED_PATHS)})$`),
     { unitFiles: LIBRARY_DEDUP_AFFECTED_UNIT_FILES }),
@@ -3130,6 +3143,9 @@ export const AFFECTED_GROUPS = Object.freeze([
       'lib/connector-page-integrity.test.ts', 'lib/connector-sync-page.test.ts', 'lib/connector-provider-isolation.test.ts', 'lib/connector-source-identity.test.ts',
       'lib/source-version-guard.test.ts', 'lib/connector-replay-world-currency-migration.test.ts'], database: true, databaseTests: ['supabase/tests/dropbox_source_reconciliation.sql'],
       databaseDependencies: DROPBOX_DATABASE_DEPENDENCIES }),
+  // legal-semicolons-20261109: 5 exact paths select 10 direct suites and no browser suite.
+  affectedGroup('legal-semicolons-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(LEGAL_SEMICOLONS_AFFECTED_PATHS)})$`),
+    { unitFiles: LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES }),
   affectedGroup('ci-selector', /^(?:\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml|nextjs\/scripts\/(?:repair-[a-z-]+(?:\.test)?\.mjs|run-repair-check\.mjs|verify-repair-workflows\.mjs|db\/(?:native-world-race(?:-ci)?|dropbox-source-stream-race)(?:\.test)?\.mjs|fixtures\/[A-Za-z0-9_.-]+\.json)|nextjs\/vitest\.repair-scope(?:\.async)?\.config\.ts)$/,
     { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),
   affectedGroup('ci-selector', /^nextjs\/lib\/repair-node-evidence\.test\.mjs$/, { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),

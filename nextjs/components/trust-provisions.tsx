@@ -1,5 +1,4 @@
-import Link from "next/link";
-import type { Route } from "next";
+import FileOrRouteLink from "@/components/file-or-route-link";
 import {
   TRUST_PROVISION_STATE_LABEL,
   TRUST_PROVISION_STATE_TOKEN,
@@ -32,6 +31,7 @@ import {
   decide, `--reused` for an absence. No hue means anything the state's own name does not say.
 */
 
+
 function Row({ row }: { row: TrustProvision }) {
   return (
     <tr data-provision-id={row.id} data-state={row.state}>
@@ -43,7 +43,7 @@ function Row({ row }: { row: TrustProvision }) {
       </td>
       <td data-label="What is true today">
         {row.line}{" "}
-        <Link className="provision-source" href={row.source.href as Route}>{row.source.label}</Link>
+        <FileOrRouteLink className="provision-source" href={row.source.href}>{row.source.label}</FileOrRouteLink>
       </td>
     </tr>
   );

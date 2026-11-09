@@ -117,7 +117,7 @@ describe("intake presentation boundaries", () => {
     const notice = triageUploadNotice("inventory_staged");
     expect(notice).toContain("This inventory step does not upload file bytes");
     expect(notice).toContain("separate bounded upload-check approval");
-    expect(notice).toContain("full processing requires a later approval");
+    expect(notice).toContain("Full processing requires a later approval.");
     expect(notice).not.toContain("No file bytes have been transferred");
   });
 

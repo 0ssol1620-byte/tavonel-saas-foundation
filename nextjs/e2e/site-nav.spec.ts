@@ -12,6 +12,12 @@
  * about the shape of these scenarios. `app/tavonel.css`
  * carries the note where those rules used to be.
  *
+ * NAV PANELS, 2026-11-09, brings the panels back over that same bar. Product, Resources and Docs
+ * open the 2026-09-11 groups on hover or from a toggle beside the label; How it works and Pricing
+ * open nothing; every label is still a link to its hub. On a phone the same rows are an accordion
+ * inside the sheet. The inverse guard that pinned the disclosures at zero is replaced by the
+ * scenario that drives them.
+ *
  * So each find-task is asserted the way it was written -- by clicking to its answer from the home
  * page -- over the trail that exists now: the footer row first, then the section page's own link
  * where the destination is one level down. Nothing here types a URL, because a destination that
@@ -181,7 +187,8 @@ const DESKTOP: Scenario[] = [
         { path: "/research", owner: "/resources", current: "location" },
       ]) {
         await page.goto(entry.path);
-        await expect(page.locator(`${BAR} a[href="${entry.owner}"]`)).toHaveAttribute("aria-current", entry.current);
+        // The bar item, not the panel row with the same href (NAV PANELS 2026-11-09).
+        await expect(page.locator(`${BAR} a.site-nav-direct[href="${entry.owner}"]`)).toHaveAttribute("aria-current", entry.current);
         expect(await page.locator(`${BAR} a[aria-current]`).count(), entry.path).toBe(1);
         expect(await page.locator(`${BAR} a[aria-current="page"]`).count(), entry.path)
           .toBe(entry.current === "page" ? 1 : 0);
@@ -218,21 +225,62 @@ const DESKTOP: Scenario[] = [
   },
   {
     /*
-      The inverse guard for the deleted IA (brand-quality pass, 2026-09-17).
+      NAV PANELS, 2026-11-09: the founder's gesture, hovering a bar item, opens its panel.
 
-      Every scenario in this file used to open one of these; none of them exists now. Asserting
-      zero keeps the coverage pointed at the decision instead of deleting it, and it is the one
-      place that checks both chromes at once -- a re-introduced trigger would otherwise only be
-      caught by the phone specs.
+      The open state is the toggle's `aria-expanded`, so each step asserts what assistive technology
+      is told as well as what is on screen. The pointer path from the label into the panel is the
+      one a reader takes, and leaving both is what closes it; Escape closes it from anywhere. The
+      keyboard path is the toggle beside the label, and focus comes back to it on Escape.
     */
-    name: "no section disclosure survives in either chrome",
+    name: "hovering Product reveals its panel's links, and Escape or leaving it closes it",
     width: 1440,
     run: async (page) => {
       await page.goto("/product");
-      await expect(page.locator("header.nav .site-nav-trigger")).toHaveCount(0);
-      await expect(page.locator('header.nav [id^="site-nav-"]')).toHaveCount(0);
-      await expect(page.locator("header.nav details.mobile-nav-group")).toHaveCount(0);
+      // The panels are driven by a hydrated listener; wait for the header's own one first.
+      await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
+      const label = page.locator(`${BAR} a.site-nav-direct[href="/product"]`);
+      const toggle = page.locator(`${BAR} button[aria-controls="bar-nav-panel-product"]`);
+      const panel = page.locator("#bar-nav-panel-product");
+      await expect(toggle).toHaveAttribute("aria-expanded", "false");
+      await expect(panel).toBeHidden();
+
+      await label.hover();
+      await expect(toggle).toHaveAttribute("aria-expanded", "true");
+      for (const href of ["/product/compiled-world", "/sources", "/solutions/knowledge-graph", "/solutions", "/explore"]) {
+        await expect(panel.locator(`a[href="${href}"]`)).toBeVisible();
+      }
+      await page.keyboard.press("Escape");
+      await expect(toggle).toHaveAttribute("aria-expanded", "false");
+      await expect(panel).toBeHidden();
+
+      // Down from the label into the panel keeps it; leaving both closes it. Escape dismissed the
+      // panel under a resting pointer, so the pointer leaves and comes back first.
+      await page.mouse.move(720, 700);
+      await label.hover();
+      const target = panel.locator('a[href="/product/compiled-world"]');
+      await expect(target).toBeVisible();
+      const box = (await target.boundingBox())!;
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 });
+      await expect(toggle).toHaveAttribute("aria-expanded", "true");
+      await page.mouse.move(box.x + box.width / 2, 700, { steps: 4 });
+      await expect(toggle).toHaveAttribute("aria-expanded", "false");
+      await expect(panel).toBeHidden();
+
+      // Keyboard: the toggle opens it, Escape hands focus back to the toggle.
+      await toggle.focus();
+      await page.keyboard.press("Enter");
+      await expect(toggle).toHaveAttribute("aria-expanded", "true");
+      await expect(target).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(toggle).toHaveAttribute("aria-expanded", "false");
+      await expect(toggle).toBeFocused();
+
+      // How it works and Pricing open nothing; the bar marks no item "true", and its labels are links.
+      await expect(page.locator(`${BAR} button[aria-controls]`)).toHaveCount(3);
+      await expect(page.locator(`${BAR} button[data-hub="/how-it-works"]`)).toHaveCount(0);
       await expect(page.locator('header.nav [aria-current="true"]')).toHaveCount(0);
+      await activateLink(page, page.locator(`${BAR} a.site-nav-direct[href="/resources"]`));
+      await expect(page).toHaveURL(arrivedAt("/resources"));
     },
   },
 ];
@@ -245,7 +293,7 @@ const PHONE: Scenario[] = [
     run: (page: Page) => followTrail(page, ["/docs", "/docs/mcp"]),
   },
   {
-    name: "the phone sheet offers the same four sections as the bar, flat",
+    name: "the phone sheet offers the same four sections as the bar, with their groups as an accordion",
     width: 390,
     touch: true,
     run: async (page) => {
@@ -255,7 +303,18 @@ const PHONE: Scenario[] = [
       // Brief 2026-10-15 move 6: the sections, then Pricing as the last row.
       await expect(rows).toHaveCount(CUSTOMER_HREFS.length + 1);
       expect(await hrefsOf(rows)).toEqual([...CUSTOMER_HREFS, "/pricing"]);
-      await expect(page.locator(`${SHEET} details.mobile-nav-group`)).toHaveCount(0);
+      // NAV PANELS: Product, Resources and Docs each carry a toggle; one group is open at a time.
+      const product = page.locator(`${SHEET} button[aria-controls="sheet-nav-panel-product"]`);
+      const docs = page.locator(`${SHEET} button[aria-controls="sheet-nav-panel-developers"]`);
+      await expect(page.locator(`${SHEET} button[aria-controls]`)).toHaveCount(3);
+      await expect(product).toHaveAttribute("aria-expanded", "false");
+      await product.click();
+      await expect(product).toHaveAttribute("aria-expanded", "true");
+      await expect(page.locator('#sheet-nav-panel-product a[href="/sources"]')).toBeVisible();
+      await docs.click();
+      await expect(product).toHaveAttribute("aria-expanded", "false");
+      await expect(page.locator('#sheet-nav-panel-developers a[href="/docs/mcp"]')).toBeVisible();
+      await expect(page.locator('#sheet-nav-panel-product a[href="/sources"]')).toBeHidden();
       // Sign in is still the sheet's own row; the header row is the wordmark and Menu only.
       await expect(page.locator(`${SHEET} > nav a.mobile-nav-signin`)).toHaveCount(1);
       await expect(page.locator("header.nav .nav-actions")).toBeHidden();
@@ -301,10 +360,12 @@ const PHONE: Scenario[] = [
     run: async (page) => {
       await page.goto("/");
       await openPhoneMenu(page);
+      // An open group's rows are thumb targets too.
+      await page.locator(`${SHEET} button[aria-controls="sheet-nav-panel-product"]`).click();
       const short = await page.evaluate(() => {
         const found: { text: string; height: number; right: number }[] = [];
         const panel = document.querySelector("details.mobile-primary-nav");
-        for (const element of panel?.querySelectorAll("a, summary") ?? []) {
+        for (const element of panel?.querySelectorAll("a, summary, button") ?? []) {
           const rect = element.getBoundingClientRect();
           if (rect.width === 0 || rect.height === 0) continue;
           if (rect.height >= 44 && rect.left >= 0 && rect.right <= window.innerWidth) continue;

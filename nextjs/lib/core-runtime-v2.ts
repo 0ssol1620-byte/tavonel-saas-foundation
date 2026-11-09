@@ -525,6 +525,7 @@ export function projectProductCoreV2Candidate(
     -- an endpoint that is not a node, an evidence id no evidence object carries, a predicate
     outside the allowlist -- refuses the projection rather than shipping a dangling edge.
   */
+  const evidenceIdSet = new Set(evidenceByObject.values());
   for (const item of objects.filter((object) => object.kind === "relation")) {
     const payload = item.payload && typeof item.payload === "object" ? item.payload as Record<string, unknown> : {};
     const links = Array.isArray(item.links) ? (item.links as unknown[]).map(String) : [];
@@ -535,7 +536,7 @@ export function projectProductCoreV2Candidate(
       !nodeKindById.has(links[0]) ||
       !nodeKindById.has(links[1]) ||
       !CORE_RELATION_PREDICATES.has(predicate) ||
-      ![...evidenceByObject.values()].includes(evidenceId)
+      !evidenceIdSet.has(evidenceId)
     ) return null;
     edges.push({
       id: `relation-${sha256(`${links[0]}\n${predicate}\n${links[1]}`).slice(0, 32)}`,
@@ -557,6 +558,7 @@ export function projectProductCoreV2Candidate(
     reached the graph without reaching review would be a conflict drawn on a World a person was
     never asked to look at, and this projection is not the place to decide that is fine.
   */
+  const reviewReasons = new Set(result.candidate.reviewReasons);
   const contradictions = objects.filter((object) => object.kind === "validation_record");
   for (const item of contradictions) {
     const payload = item.payload && typeof item.payload === "object" ? item.payload as Record<string, unknown> : {};
@@ -569,7 +571,7 @@ export function projectProductCoreV2Candidate(
       nodeKindById.get(links[1]) !== "Claim" ||
       !CONTRADICTION_REASONS.has(reason) ||
       evidenceIds.length === 0 ||
-      !result.candidate.reviewReasons.includes(`CONTRADICTION_CANDIDATE:${String(item.stableId)}`)
+      !reviewReasons.has(`CONTRADICTION_CANDIDATE:${String(item.stableId)}`)
     ) return null;
     edges.push({
       id: `relation-${sha256(`${links[0]}\ncontradicts\n${links[1]}`).slice(0, 32)}`,

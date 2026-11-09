@@ -2,7 +2,7 @@
 /**
  * Generate the E1 numeric and unanswerable question sets from SEC 10-K XBRL facts.
  *
- *   TAVONEL_SEC_USER_AGENT="<organisation> <contact email>" \
+ *   TAVONEL_SEC_USER_AGENT="TAVONEL privacy@tavonel.com" \
  *     node eval/ask-quality/gen_xbrl_questions.mjs            # fetch what is not cached, then build
  *   node eval/ask-quality/gen_xbrl_questions.mjs --offline   # build from eval/ask-quality/cache only
  *

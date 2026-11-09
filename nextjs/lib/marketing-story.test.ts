@@ -18,7 +18,7 @@ describe("the public product story", () => {
     const process = renderToStaticMarkup(HowItWorksPage());
     expect(product).toContain("Inspect the evidence");
     expect(product).toContain("Give your AI the output");
-    expect(product).toContain("Context unresolved; no interpreted claim");
+    expect(product).toContain("Context unresolved. No interpreted claim");
     expect(product).not.toContain('aria-label="The compilation process"');
     expect(process).toContain('aria-label="The compilation process"');
     expect(process).toContain("Read the document");
