@@ -195,9 +195,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       "/proof-collection/PROVENANCE.md has a Specimens section on the two pages in /proof-collection/specimens/: the public document each comes from and its licence, when it was read, what each cell holds, what its run receipt does not claim, and the SHA-256 that pins each run receipt and rights snapshot.",
     ],
     improved: [
-      // LANDING-VIDEO-HISTORY-20261109 (D3): this line was true on its date and stays; the sentence after it says what
-      // the guide shows since all three guides were re-recorded on live tavonel.com on 9 November.
-      "The guide's manifest, /guide/manifest.json, says in its first recording line that guide-1-explore and guide-3-api were recorded on live tavonel.com, and that guide-2-mcp is the exception its last line describes. Since 9 November all three guides, guide-2-mcp included, are recorded on live tavonel.com, and the manifest names no exception.",
+      "The guide's manifest, /guide/manifest.json, says in its first recording line that guide-1-explore and guide-3-api were recorded on live tavonel.com, and that guide-2-mcp is the exception its last line describes.",
       "The MCP configuration example in the developer README, /developer/README.md, uses /absolute/path/to/tavonel-mcp.mjs as the placeholder for the server's path, as /docs/mcp does.",
     ],
     fixed: [
@@ -296,9 +294,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       "On a phone, each link on /developers is a full-size tap target clear of its neighbours: the two gate actions sit in a row of their own, and each reference sentence is its own list item.",
       "/docs/mcp prints the Windows configuration path with one backslash between folders and sets file paths as code, drawn in a monospace face on every system, Korean Windows included. Its configuration examples use /absolute/path/to/tavonel-mcp.mjs as the placeholder.",
       "Each chapter of /guide and /ko/guide says under its heading whether its steps need an API key.",
-      // LANDING-VIDEO-HISTORY-20261109 (D3): this line was true on its date and stays; the sentence after it says what
-      // the guide shows since all three guides were re-recorded on live tavonel.com on 9 November.
-      "The MCP bridge walkthrough is re-recorded in its desktop and phone takes, with the same English and Korean captions, so it shows /developers and /docs/mcp as they are now. The takes come from a local production build of that release rather than from tavonel.com, and the guide's manifest says so. It was re-recorded again on 9 November, on live tavonel.com, with its captions re-synced to the new takes.",
+      "The MCP bridge walkthrough is re-recorded in its desktop and phone takes, with the same English and Korean captions, so it shows /developers and /docs/mcp as they are now. The takes come from a local production build of that release rather than from tavonel.com, and the guide's manifest says so.",
       "/changelog lists the releases from 7 to 19 October, each dated by the day it reached tavonel.com.",
     ],
   },
