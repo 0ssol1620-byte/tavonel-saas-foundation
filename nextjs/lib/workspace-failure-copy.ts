@@ -30,6 +30,8 @@ const FAILURE_COPY: Record<string, string> = {
   */
   JSON_TOO_LARGE: "This is larger than its size limit, so it was not stored. Trying the same thing again gives the same result.",
   CORE_OUTPUT_TOO_LARGE: "These files compile to more than one World can hold, so nothing was stored. Running the same set again gives the same result. Compile fewer or smaller files at a time.",
+  /* F2 (2026-11-09): the window is BLOCKED_DECISION_EXPIRY_MS in compile-job-worker.ts; a test holds them together. */
+  BLOCKED_DECISION_EXPIRED: "This compile waited 7 days for a decision about the files that could not be read, so it stopped. Start a new compile to go on.",
   SECURITY_BLOCKER_REQUIRES_EXPLICIT_REMOVAL: "A file stopped by a safety check cannot be passed over in one click. Remove it from this compile explicitly, or cancel.",
   JOB_SYNC_CONFLICT: "An import is already running for this connection. Check its progress before starting another.",
   PATCH_BEFORE_MISMATCH: "The value changed after you opened it, so the correction was not applied. Reload and look again.",
@@ -113,6 +115,40 @@ const SIZE_LIMIT_COPY: Record<"en" | "ko", SizeLimitFailureCopy> = {
  */
 export function sizeLimitFailureCopy(languages: readonly string[] = []): SizeLimitFailureCopy {
   return SIZE_LIMIT_COPY[languages[0]?.toLowerCase().startsWith("ko") ? "ko" : "en"];
+}
+
+/** A blocker no retry can clear: the reader left a review package, and the stored result is immutable (F1). */
+export const REUPLOAD_ONLY_BLOCKER_REASONS: readonly string[] = ["READING_NEEDS_OPERATOR_REVIEW"];
+
+export type BlockedPanelCopy = {
+  /** The panel title while the job waits on the customer. "Reading the sources." was untrue (F4). */
+  title: string;
+  /** Said under the Retry button when it is off because every retryable-looking file is reupload-only. */
+  reupload: (count: number) => string;
+  /** The window BLOCKED_DECISION_EXPIRY_MS sets (F2). */
+  expiry: string;
+};
+
+const BLOCKED_PANEL_COPY: Record<"en" | "ko", BlockedPanelCopy> = {
+  en: {
+    title: "Waiting for your decision.",
+    reupload: (count) => count === 1
+      ? "Retry does not read this file again. Remove it, then upload it again."
+      : `Retry does not read these ${count} files again. Remove them, then upload them again.`,
+    expiry: "If nothing is chosen within 7 days, this compile stops.",
+  },
+  ko: {
+    title: "결정을 기다리고 있습니다.",
+    reupload: (count) => count === 1
+      ? "다시 시도해도 이 파일은 다시 읽지 않습니다. 제거한 뒤 다시 올려 주세요."
+      : `다시 시도해도 이 파일 ${count}개는 다시 읽지 않습니다. 제거한 뒤 다시 올려 주세요.`,
+    expiry: "7일 안에 선택하지 않으면 이 컴파일은 멈춥니다.",
+  },
+};
+
+/** The compile panel's copy for a job waiting on the customer's blocker decision, English or Korean. */
+export function blockedPanelCopy(languages: readonly string[] = []): BlockedPanelCopy {
+  return BLOCKED_PANEL_COPY[languages[0]?.toLowerCase().startsWith("ko") ? "ko" : "en"];
 }
 
 /*

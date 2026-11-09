@@ -1934,15 +1934,18 @@ export const OCR_JSON_BOUND_AFFECTED_UNIT_FILES = Object.freeze([
 // Compile-job stall (cjob-157f2f23, 2026-11-05): the read-only events stream, the sticky-terminal client, and the CAS lease and
 // post-terminal refusal suites. The store, worker and compile-run are owned above; these are the endpoints no owner listed.
 // D0 (2026-11-08) adds the scheduler-window suite, which no affected group listed as an endpoint.
+// Compile reliability (2026-11-09) adds the blocked-decision expiry suite, the same way.
 export const COMPILE_JOB_STALL_AFFECTED_PATHS = Object.freeze([
   'app/api/compile-jobs/[jobId]/events/route.ts', 'app/api/internal/jobs/run/route.ts', 'lib/compile-job-client.test.ts', 'lib/compile-job-client.ts',
   'lib/compile-job-events-route.test.ts', 'lib/compile-job-lease.test.ts', 'lib/durable-compile-orchestration.test.ts',
   'components/compile-job-panel.tsx', 'lib/compile-job-panel.test.ts', 'lib/compile-job-scheduling.test.ts',
+  'lib/compile-job-expiry.test.ts',
 ]);
 export const COMPILE_JOB_STALL_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/compile-job-client.test.ts', 'lib/compile-job-events-route.test.ts', 'lib/compile-job-lease.test.ts',
   'lib/compile-job-worker.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/execution-budget.test.ts',
   'lib/compile-job-panel.test.ts', 'lib/workspace-failure-copy.test.ts', 'lib/compile-job-scheduling.test.ts',
+  'lib/compile-job-expiry.test.ts',
 ]);
 // EN-0c benchmarks path mask: /benchmarks masks an absolute scoring-machine path in the Model Arena notes at render time
 // (the artifact and its pinned sha256 are unchanged). The four endpoints no owner listed select their two direct suites plus
