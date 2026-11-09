@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { drainSseFrames, frameFromEvent, observeCompileJob, pickResumableCompileJob } from "./compile-job-client";
+import { compileJobRestingNotice, drainSseFrames, frameFromEvent, isCompileJobResting, observeCompileJob, pickResumableCompileJob } from "./compile-job-client";
+import { COMPILE_STATES } from "./compile-job-store";
 
 /*
   The parser and the resume, tested where they can actually be wrong.
@@ -211,5 +212,26 @@ describe("pickResumableCompileJob (no ?job= in the URL)", () => {
     expect(pickResumableCompileJob([job("c", "cancelled", "2026-11-09T04:57:32Z")], now)).toBeUndefined();
     expect(pickResumableCompileJob([job("f", "failed", null)], now)).toBeUndefined();
     expect(pickResumableCompileJob([], now)).toBeUndefined();
+  });
+});
+
+/* D0 2026-11-09 R2: a job at rest kept "Compiling 1 source" on the Activity line. */
+describe("a compile job at rest", () => {
+  const resting = ["review_required", "ready", "failed", "cancelled"] as const;
+
+  it("is not running, and replaces the compiling line, in every terminal or waiting state", () => {
+    for (const state of resting) {
+      expect(isCompileJobResting(state)).toBe(true);
+      expect(compileJobRestingNotice(state)).toEqual(expect.any(String));
+      expect(compileJobRestingNotice(state)).not.toMatch(/compiling/i);
+    }
+    expect(compileJobRestingNotice("review_required")).toBe("A review package is ready for a person to inspect. Nothing is active yet.");
+  });
+
+  it("is running, with no resting line, in every other state", () => {
+    for (const state of COMPILE_STATES.filter((value) => !(resting as readonly string[]).includes(value))) {
+      expect(isCompileJobResting(state)).toBe(false);
+      expect(compileJobRestingNotice(state)).toBeNull();
+    }
   });
 });

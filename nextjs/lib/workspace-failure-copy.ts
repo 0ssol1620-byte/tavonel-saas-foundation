@@ -114,3 +114,51 @@ const SIZE_LIMIT_COPY: Record<"en" | "ko", SizeLimitFailureCopy> = {
 export function sizeLimitFailureCopy(languages: readonly string[] = []): SizeLimitFailureCopy {
   return SIZE_LIMIT_COPY[languages[0]?.toLowerCase().startsWith("ko") ? "ko" : "en"];
 }
+
+/*
+  D0 2026-11-09 R2: a 12-page scan settled review_required and the review queue printed
+  `CONTRADICTION_GROUP_TOO_LARGE:contradiction_group_<sha256>:claims=216:pairs=23220` at the customer.
+  Core writes these two codes in one shape (akc_product_core/semantics.py,
+  `ContradictionGroupOverflow.review_reason`): the group is over its own pair bound, or the compile's
+  shared pair budget was spent on other topics first. The only numbers said are the two the string
+  carries. Any other code, or a string not in exactly that shape, gets no sentence and is shown raw.
+*/
+const CONTRADICTION_REASON = /^(CONTRADICTION_GROUP_TOO_LARGE|CONTRADICTION_PAIR_BUDGET_EXCEEDED):[^:\s]+:claims=(\d+):pairs=(\d+)$/;
+
+type ReviewLanguage = "en" | "ko";
+
+const REVIEW_REASON_COPY: Record<ReviewLanguage, {
+  reference: string;
+  CONTRADICTION_GROUP_TOO_LARGE: (claims: string, pairs: string) => string;
+  CONTRADICTION_PAIR_BUDGET_EXCEEDED: (claims: string, pairs: string) => string;
+}> = {
+  en: {
+    reference: "Reference",
+    CONTRADICTION_GROUP_TOO_LARGE: (claims, pairs) =>
+      `${claims} statements on one topic may conflict with each other. Comparing them takes ${pairs} checks, which is more than can be done automatically, so a person needs to review them. Open the review to decide. Splitting the sources into smaller sets may help.`,
+    CONTRADICTION_PAIR_BUDGET_EXCEEDED: (claims, pairs) =>
+      `${claims} statements on one topic may conflict with each other. This compile had already used its automatic checks on other topics, so these ${pairs} checks were left for a person. Open the review to decide. Splitting the sources into smaller sets may help.`,
+  },
+  ko: {
+    reference: "참조",
+    CONTRADICTION_GROUP_TOO_LARGE: (claims, pairs) =>
+      `한 주제에 서로 어긋날 수 있는 진술이 ${claims}개 있습니다. 비교에 ${pairs}번의 확인이 필요해 자동으로 확인할 수 있는 범위를 넘었으므로 사람이 검토해야 합니다. 검토 화면을 열어 결정하세요. 소스를 더 작은 묶음으로 나누면 도움이 될 수 있습니다.`,
+    CONTRADICTION_PAIR_BUDGET_EXCEEDED: (claims, pairs) =>
+      `한 주제에 서로 어긋날 수 있는 진술이 ${claims}개 있습니다. 이번 컴파일은 다른 주제에서 자동 확인 한도를 이미 써서 이 ${pairs}번의 확인을 사람이 검토하도록 남겼습니다. 검토 화면을 열어 결정하세요. 소스를 더 작은 묶음으로 나누면 도움이 될 수 있습니다.`,
+  },
+};
+
+/**
+ * The plain sentence for a recorded review reason, or null when the reason is not one we have
+ * written a sentence for (the caller then shows the raw string, as before). `reference` labels the
+ * raw string, which the caller always keeps on screen beside the sentence.
+ */
+export function reviewReasonCopy(value: string, languages: readonly string[] = []): { sentence: string; reference: string } | null {
+  const match = CONTRADICTION_REASON.exec(value);
+  if (!match) return null;
+  const language: ReviewLanguage = languages[0]?.toLowerCase().startsWith("ko") ? "ko" : "en";
+  const copy = REVIEW_REASON_COPY[language];
+  const format = (digits: string) => Number(digits).toLocaleString(language === "ko" ? "ko-KR" : "en-US");
+  const code = match[1] as "CONTRADICTION_GROUP_TOO_LARGE" | "CONTRADICTION_PAIR_BUDGET_EXCEEDED";
+  return { sentence: copy[code](format(match[2]), format(match[3])), reference: copy.reference };
+}
