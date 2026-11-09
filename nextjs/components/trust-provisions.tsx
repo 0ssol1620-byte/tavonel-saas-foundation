@@ -63,7 +63,7 @@ export default function TrustProvisions({
     <>
       <h2 id={titleId}>{heading}</h2>
       <p className="fine">
-        Every row below is already stated on the page it links to; this is the same record in the
+        Every row below is already stated on the page it links to. This is the same record in the
         order a security review asks for it. {counts.provided} in place · {counts.roadmap} on the
         roadmap · {counts.not_provided} absent.
       </p>

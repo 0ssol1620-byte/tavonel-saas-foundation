@@ -15,7 +15,7 @@ vi.mock("@vercel/analytics", () => ({ track: trackMock }));
 vi.mock("@vercel/analytics/next", () => ({ Analytics: analyticsMock }));
 vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 const { default: MarketingConsent } = await import("../components/marketing-consent");
-const { default: VercelCollector, relayToVercel } = await import("../components/vercel-collector");
+const { default: VercelCollector, collectorBeforeSend, relayToVercel } = await import("../components/vercel-collector");
 
 describe("public marketing analytics boundary", () => {
   it("refuses private, unknown and user-supplied URLs", () => {
@@ -219,20 +219,36 @@ describe("P2-07: the Vercel collector waits for consent on a public page", () =>
     return { stop, navigate: (next: string) => { current = next; } };
   }
 
-  it("renders no <Analytics> before a stored yes, with the flag on", () => {
+  it("renders no <Analytics> before storage is read, after a refusal, or off a listed page, with the flag on", () => {
     expect(renderToStaticMarkup(createElement(MarketingConsent)), "the first paint holds nothing").toBe("");
     for (const state of [
       { ready: false, consent: true, location: HOME }, // storage not read yet
-      { ready: true, consent: null, location: HOME }, // not answered
+      { ready: false, consent: null, location: HOME }, // storage not read yet, no answer
       { ready: true, consent: false, location: HOME }, // refused
-      { ready: true, consent: true, location: null }, // yes, but on an unlisted page (workspace, login)
+      { ready: true, consent: null, location: null }, // unlisted page (workspace, login)
+      { ready: true, consent: true, location: null }, // yes, but on an unlisted page
     ]) expect(renders(state), JSON.stringify(state)).toBe(0);
     expect(analyticsMock).not.toHaveBeenCalled();
   });
 
-  it("renders it once after a yes on a listed page, with the path gate attached", () => {
-    expect(renders({ ready: true, consent: true, location: HOME })).toBe(1);
-    expect(analyticsMock.mock.calls[0][0].beforeSend).toBe(vercelBeforeSend);
+  /*
+    GX-03 (founder, 2026-11-09): cookieless page views are counted before a choice and stop at a
+    refusal. A yes is still what opens the interaction events (the track() cases below).
+  */
+  it("renders it once before a choice and once after a yes on a listed page, with the refusal-aware gate attached", () => {
+    expect(renders({ ready: true, consent: null, location: HOME })).toBe(1);
+    expect(renders({ ready: true, consent: true, location: HOME })).toBe(2);
+    for (const call of analyticsMock.mock.calls) expect(call[0].beforeSend).toBe(collectorBeforeSend);
+  });
+
+  it("drops every send once a refusal is stored, and otherwise applies the path gate", () => {
+    const stored = (value: string | null) => () => ({ getItem: (key: string) => (key === CONSENT_KEY ? value : null) });
+    const event = { type: "pageview", url: "https://tavonel.com/pricing?x=1" };
+    expect(collectorBeforeSend(event, stored(JSON.stringify({ allowed: false, expires: later() })))).toBeNull();
+    expect(collectorBeforeSend(event, stored(null))).toEqual(vercelBeforeSend(event));
+    expect(collectorBeforeSend(event, stored(yes()))).toEqual({ type: "pageview", url: "https://tavonel.com/pricing" });
+    expect(collectorBeforeSend({ type: "pageview", url: "https://tavonel.com/workspace" }, stored(null)), "the path gate still holds").toBeNull();
+    expect(collectorBeforeSend(event, () => { throw new Error("SecurityError"); }), "unreadable storage is not a refusal").toEqual(vercelBeforeSend(event));
   });
 
   it("still needs the flag: a yes without it renders nothing", () => {
@@ -324,11 +340,11 @@ describe("P2-07: the Vercel collector waits for consent on a public page", () =>
     expect(layout).not.toContain("@vercel/analytics");
     expect(layout).not.toContain("vercel-collector");
     const consent = readFileSync(resolve(import.meta.dirname, "../components/marketing-consent.tsx"), "utf8");
-    expect(consent).toContain('if (!allowed && (document.getElementById("tavonel-google-tag") || (window as AnalyticsWindow).va)) window.location.reload();');
+    expect(consent).toContain('if (!allowed && document.getElementById("tavonel-google-tag")) window.location.reload();');
     // Fetched only once it may run, and never statically: a static import of the SDK put it in
     // every page's script and broke the §22 ratchet (P2-07's receipt).
     expect(consent).toContain('const VercelCollector = lazy(() => import("@/components/vercel-collector")');
-    expect(consent).toContain('{process.env.NEXT_PUBLIC_TAVONEL_ANALYTICS_ENABLED === "1" && ready && consent === true && location');
+    expect(consent).toContain('{process.env.NEXT_PUBLIC_TAVONEL_ANALYTICS_ENABLED === "1" && ready && consent !== false && location');
     expect(consent, "the consent component imports none of the Vercel SDK").not.toContain("@vercel/analytics");
     const collector = readFileSync(resolve(import.meta.dirname, "../components/vercel-collector.tsx"), "utf8");
     expect(collector).toContain("useEffect(() => relayToVercel({ ready, consent, location }, window, () => window.location.pathname), [consent, location, ready]);");

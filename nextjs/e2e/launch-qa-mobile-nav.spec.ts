@@ -256,7 +256,7 @@ test("the menu keeps a visible focus ring and does not trap the keyboard", async
   await expect(panel.locator(":scope > a:focus"), "focus must be able to leave the disclosure").toHaveCount(0);
 });
 
-const PUBLIC_HEADER_ROUTES = ["/", "/pricing", "/docs", "/docs/quickstart", "/product", "/ko", "/ko/pricing"] as const;
+const PUBLIC_HEADER_ROUTES = ["/", "/pricing", "/docs", "/docs/quickstart", "/product"] as const;
 /*
   Home (PR #148, main 0969755b) paints its whole page, header disclosure included, in its paper token
   (--paper #faf9f6 in components/landing-v2/source-first-home.module.css). Release 2 (main dbe22b1e) makes
@@ -266,7 +266,7 @@ const PUBLIC_HEADER_ROUTES = ["/", "/pricing", "/docs", "/docs/quickstart", "/pr
   rgb(250, 249, 246); other routes rgba(0, 0, 0, 0) over rgb(251, 250, 247); label and ::before glyph
   rgb(21, 25, 29). The contrast assertions below measure against the surface the control actually sits on.
 */
-const HOME_ROUTES: readonly string[] = ["/", "/ko"];
+const HOME_ROUTES: readonly string[] = ["/"];
 // Direction C (2026-11-04): Home paints the warm canvas #f5f3ee.
 const HOME_PAPER = "rgb(245, 243, 238)";
 

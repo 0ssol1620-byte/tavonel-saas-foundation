@@ -33,7 +33,7 @@ async function evaluateAndPersist(request: Request) {
   const windowStartedAt = operationalSliAlertWindow();
   const signer = readR2SignerEnv();
   const history = signer
-    ? await readProbeHistory(signer, windowStartedAt)
+    ? await readProbeHistory(signer)
     : { ok: false as const, code: "PROBE_STORE_NOT_CONFIGURED" };
   const modelProviderCircuits = [{
     provider: RETRIEVAL_MODEL_PROVIDER,

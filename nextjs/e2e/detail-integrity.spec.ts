@@ -20,7 +20,7 @@ async function sourceBinding(page: Page) {
   expect(b.x).toBeGreaterThanOrEqual(a.x - 1); expect(b.x + b.width).toBeLessThanOrEqual(a.x + a.width + 1);
   expect(b.y).toBeGreaterThanOrEqual(a.y - 1); expect(b.y + b.height).toBeLessThanOrEqual(a.y + a.height + 1);
 }
-for (const route of ["/", "/ko"]) test(`source connections have two real endpoints on ${route}`, async ({ page }) => {
+for (const route of ["/"]) test(`source connections have two real endpoints on ${route}`, async ({ page }) => {
   await page.goto(route);
   const buttons = page.locator('#s2 article[data-case-status] button');
   await expect(buttons).toHaveCount(3);
@@ -78,7 +78,7 @@ for (const state of ['ready', 'review_required', 'failed', 'cancelled']) test(`a
 });
 
 test('every page declares the same versioned brand icon with working fallbacks', async ({ page, request }) => {
-  for (const route of ['/', '/ko', '/workspace', '/pricing', '/docs/quickstart']) {
+  for (const route of ['/', '/workspace', '/pricing', '/docs/quickstart']) {
     await page.goto(route);
     await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/brand/locus-v2.svg');
   }

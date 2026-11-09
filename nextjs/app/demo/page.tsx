@@ -4,9 +4,9 @@ import { PublicSitePage } from "@/components/public-site-chrome";
 import { signedProductDemo } from "@/lib/signed-product-demo";
 
 export const metadata: Metadata = {
-  title: "Signed product path — TAVONEL",
+  title: "Signed product path: a compile end to end — TAVONEL",
   description:
-    "See a compile end to end: a source changes, a person reviews it, and the answer that follows opens at the page it came from.",
+    "See a compile end to end: a source changes, a person reviews it, and the answer that follows opens at the page it came from, with the evidence still attached.",
   alternates: { canonical: "/demo" },
   openGraph: { url: "/demo" },
 };

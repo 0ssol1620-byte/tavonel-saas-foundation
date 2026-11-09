@@ -26,68 +26,35 @@ import type { MetadataRoute } from "next";
 const PRIVATE_PATHS = ["/api/", "/auth/", "/login", "/workspace", "/customers", "/research/experiments", "/film-2", "/film-3", "/film-4", "/dev/"];
 
 /*
-  §88 -- search discovery is named explicitly, and so is model training, in the opposite direction.
-
-  OAI-SearchBot, PerplexityBot, ClaudeBot and Googlebot are the retrieval crawlers whose operators
-  document a user-agent for search appearance, and each gets the same public/private split as `*`.
-  Being findable is the point of this site; nothing here withholds a public page from a search
-  crawler.
-
-  ClaudeBot moved into this group on 2026-09-16, superseding the ClaudeBot half of FD-61. It is the
-  token the operator's fetch-time agent sends when a person asks a question and the answer is
-  retrieved live, which is the same act as the three tokens beside it and a different act from the
-  corpus crawl the block below refuses. Answer-engine citation is this category's discovery path,
-  and refusing it cost a citation without preserving anything: `anthropic-ai` stays disallowed, so
-  the training position is unchanged.
-
-  §12.5 asked for the two policies to be separated rather than decided, and the separation now
-  carries a decision: `docs/policy/CRAWLER_POLICY.md` lists each token, what allowing or refusing
-  it means, and what is already settled by other means (no crawler reaches a customer document --
-  that is authorization, not this file). The training half is the block below; this group is the
-  search half, and `lib/seo-surface.test.ts` fails if a token crosses from one list to the other.
+  §88 -- search discovery is named explicitly. OAI-SearchBot, PerplexityBot, ClaudeBot and Googlebot
+  are the retrieval crawlers whose operators document a user-agent for search appearance, and each
+  gets the same public/private split as `*`. Being findable is the point of this site.
 */
 const SEARCH_CRAWLERS = ["OAI-SearchBot", "PerplexityBot", "ClaudeBot", "Googlebot"];
 
-/* ─── TRAINING-CRAWLER BLOCK — begin (trust-policy lane; self-contained) ──────────────────────
+/*
+  AI crawlers, allowed on the public marketing surface. Founder decision 2026-11-09 (GX-01 in
+  `docs/policy/DECISION_LOG_2026-11-09.md`), which reverses FD-61's training block for these seven
+  tokens: the marketing pages may be read and used by AI systems. They get exactly the private list
+  the search crawlers get -- a path that is private is private to every crawler -- and nothing more.
 
-  These tokens are disallowed everywhere. Delegated decision, 2026-09-11 (orchestrator, under the
-  founder's delegation) -- FD-61 in `docs/policy/DECISION_LOG_2026-09-11.md`, reversible by the
-  founder -- and the reasoning is in `docs/policy/CRAWLER_POLICY.md`: the repository is published
-  for reading under a proprietary licence, the site's copy is the licensed work, and a corpus crawl
-  is a different act from a search crawl even when the same company performs both.
-
-  Search and training are separated by token, not by path, because that is the only distinction
-  robots.txt can express. Two consequences a reader of this file must not lose:
-
-  - **robots.txt is not access control.** Every line here is a request that an operator chooses to
-    honour. It is not a technical measure, and it is not what makes the licence enforceable.
-  - **This is not an SEO change.** Removing a token from this list gives away a licence position;
-    adding one costs nothing in search. `lib/seo-surface.test.ts` pins both groups so neither
-    drifts into the other, and so a search crawler cannot arrive in this list by copy-paste.
-
-  The list is seven of the eight tokens FD-61 named. `ClaudeBot` is the one that left, and it left
-  by a decision rather than by drift: it is the operator's fetch-time token, so it is named in
-  `SEARCH_CRAWLERS` above. `anthropic-ai` stays here. It is the older token and nothing says a
-  corpus crawl stopped sending it, so moving both would have been a different decision than the one
-  that was made -- and that split is exactly what `lib/seo-surface.test.ts` now pins.
-
-  Deliberately absent, and not an oversight: the user-triggered fetchers -- `Claude-User`,
-  `Claude-SearchBot`, `ChatGPT-User`, and the three named in `SEARCH_CRAWLERS` above. A fetch a
-  person asked for is a visit, not a corpus crawl, so the two unnamed ones are allowed by `*` and
-  `lib/seo-surface.test.ts` fails if any of the six arrives in this list. Tokens nobody has ruled
-  on yet (`Amazonbot`, `Diffbot`, `Omgilibot`, `Timpibot`, `PanguBot`) stay open in the crawler
-  policy rather than being defaulted here.
+  `ClaudeBot` is not repeated here. It is already a named group above, and a token named in two
+  groups is read differently by different parsers.
 */
-const TRAINING_CRAWLERS = ["GPTBot", "CCBot", "anthropic-ai", "Google-Extended", "Applebot-Extended", "Bytespider", "Meta-ExternalAgent"];
-/* ─── TRAINING-CRAWLER BLOCK — end ────────────────────────────────────────────────────────────── */
+const AI_CRAWLERS = ["GPTBot", "Google-Extended", "anthropic-ai", "Claude-SearchBot", "CCBot", "Applebot-Extended", "Meta-ExternalAgent"];
+
+/*
+  Refused everywhere. GX-01 kept this one token blocked. robots.txt is a request an operator
+  chooses to honour, not access control, and `lib/seo-surface.test.ts` pins this list.
+*/
+const BLOCKED_CRAWLERS = ["Bytespider"];
 
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
-      ...SEARCH_CRAWLERS.map((userAgent) => ({ userAgent, allow: "/", disallow: [...PRIVATE_PATHS] })),
+      ...[...SEARCH_CRAWLERS, ...AI_CRAWLERS].map((userAgent) => ({ userAgent, allow: "/", disallow: [...PRIVATE_PATHS] })),
       { userAgent: "*", allow: "/", disallow: [...PRIVATE_PATHS] },
-      // TRAINING-CRAWLER BLOCK: disallow-all, one rule per token. Nothing else reads this list.
-      ...TRAINING_CRAWLERS.map((userAgent) => ({ userAgent, disallow: "/" })),
+      ...BLOCKED_CRAWLERS.map((userAgent) => ({ userAgent, disallow: "/" })),
     ],
     sitemap: "https://tavonel.com/sitemap.xml",
     host: "https://tavonel.com",

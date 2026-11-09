@@ -10,9 +10,9 @@ import processingTerms from "@/public/policy/processing-terms-2026-09-30.json";
 export const metadata: Metadata = {
   alternates: { canonical: "/trust" },
   openGraph: { url: "/trust" },
-  title: "Trust Center — TAVONEL",
+  title: "Trust Center: policies, processors and contacts — TAVONEL",
   description:
-    "Public policies, processors, legal terms, and security contacts for evaluating how TAVONEL handles documents.",
+    "Public policies, processors, legal terms and security contacts for evaluating how TAVONEL handles documents. Deeper review material comes on request.",
 };
 
 /*

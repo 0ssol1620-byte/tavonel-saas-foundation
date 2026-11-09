@@ -70,7 +70,7 @@ vi.mock("./immutable-keys", async (importOriginal) => {
   real ones -- the factory spreads the actual module -- so reading them late is what makes them
   readable.
 */
-const { runCompileJobBatch, runCompileJobTurn, DIGEST_MIGRATION_NOT_APPLIED } =
+const { runCompileJobBatch, runCompileJobTurn, DIGEST_MIGRATION_NOT_APPLIED, MAX_RELEASE_GATE_DEFERRALS } =
   await import("./compile-job-worker");
 const { RESTING_COMPILE_STATES, SCHEDULER_EXCLUDED_STATES } = await import("./compile-job-store");
 const { CORE_CLIENT_TIMEOUT_MS } = await import("./execution-budget");
@@ -331,6 +331,17 @@ describe("the durable compile worker", () => {
     expect(turn.note).toBe("blocked");
     expect(turn.blocked).toEqual([{ documentId: "doc-b", kind: "input", reason: "READING_NEEDS_OPERATOR_REVIEW" }]);
     // The one document that read cleanly is NOT compiled. Someone has to say so first.
+    expect(runCompile).not.toHaveBeenCalled();
+  });
+
+  it("F1: puts an operator-review blocker straight back after retry_eligible cleared it, because nothing reads it again", async () => {
+    // retry_eligible (0038:393-410) empties `blocked` and leaves the resolution null. The review
+    // result is immutable, so the next turn classifies the same file the same way. The panel
+    // therefore does not offer Retry for this reason (compile-job-panel.test.ts).
+    group.mockReturnValue([DOCUMENT("doc-a", "operator_review")]);
+    const turn = await runCompileJobTurn(job({ documentIds: ["doc-a"], documentsTotal: 1, blocked: [], blockedResolution: null }));
+    expect(turn.note).toBe("blocked");
+    expect(turn.blocked).toEqual([{ documentId: "doc-a", kind: "input", reason: "READING_NEEDS_OPERATOR_REVIEW" }]);
     expect(runCompile).not.toHaveBeenCalled();
   });
 
@@ -772,6 +783,86 @@ describe("a compiler that keeps saying the reading is not finished", () => {
     expect(turn.note).toBe("waiting");
     expect(advance).not.toHaveBeenCalledWith(expect.objectContaining({ state: "failed" }));
     expect(recordDeferral).toHaveBeenCalledWith(expect.objectContaining({ attempt: 1 }));
+  });
+});
+
+/*
+  F3 (COMPILE-RELIABILITY-20261109 R6). cjob-7de8f7fa took its lease on the first tick after a
+  deploy, before that release's row existed, and the fail-closed gate settled it failed for good.
+  The gate stays closed; the job now waits for it, a bounded number of times.
+*/
+describe("a release gate that is not ready yet", () => {
+  const ready = () => group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "ocr_ready")]);
+  const gate = (code: string) => ({ ok: false, status: 503, code, payload: {} });
+  const ledger = () => {
+    const recorded: Array<{ reason: string; attempt: number }> = [];
+    countDeferrals.mockImplementation(async () => ({ ok: true, value: recorded.length }));
+    recordDeferral.mockImplementation(async (input) => {
+      recorded.push(input as unknown as { reason: string; attempt: number });
+      return { ok: true, value: { recorded: true } };
+    });
+    return recorded;
+  };
+
+  it("waits through the deploy window and compiles once the release row lands", async () => {
+    ready();
+    const recorded = ledger();
+    runCompile
+      .mockResolvedValueOnce(gate("SCOPED_RELEASE_NOT_FOUND"))
+      .mockResolvedValueOnce(gate("SCOPED_RELEASE_NOT_FOUND"))
+      .mockResolvedValueOnce({ ok: true, status: 200, payload: { collectionId: `collection-${"c".repeat(32)}`, lifecycle: "candidate" } });
+
+    const first = await runCompileJobTurn(job());
+    const second = await runCompileJobTurn(job({ state: "structuring", updatedAt: new Date(0).toISOString() }));
+    const third = await runCompileJobTurn(job({ state: "structuring", updatedAt: new Date(0).toISOString() }));
+
+    expect([first.note, second.note, third.note]).toEqual(["waiting", "waiting", "compiled"]);
+    expect(recorded.map(({ reason, attempt }) => [reason, attempt])).toEqual([
+      ["SCOPED_RELEASE_NOT_FOUND", 1], ["SCOPED_RELEASE_NOT_FOUND", 2]]);
+    expect(advance).not.toHaveBeenCalledWith(expect.objectContaining({ state: "failed" }));
+  });
+
+  it("settles with the gate's own code once the deferrals run out", async () => {
+    ready();
+    const recorded = ledger();
+    runCompile.mockResolvedValue(gate("SCOPED_RELEASE_NOT_FOUND"));
+
+    let last = await runCompileJobTurn(job());
+    let turns = 1;
+    while (last.note !== "failed" && turns < 40) {
+      last = await runCompileJobTurn(job({ state: "structuring", updatedAt: new Date(0).toISOString() }));
+      turns += 1;
+    }
+
+    expect(last).toMatchObject({ note: "failed", state: "failed", errorCode: "SCOPED_RELEASE_NOT_FOUND" });
+    expect(recorded.map(({ attempt }) => attempt)).toEqual(Array.from({ length: MAX_RELEASE_GATE_DEFERRALS }, (_, index) => index + 1));
+    expect(turns).toBe(MAX_RELEASE_GATE_DEFERRALS + 1);
+  });
+
+  it("defers a gate store that could not be read the same way", async () => {
+    ready();
+    const recorded = ledger();
+    runCompile.mockResolvedValue(gate("SCOPED_GATE_STORE_FAILED"));
+    const turn = await runCompileJobTurn(job());
+    expect(turn.note).toBe("waiting");
+    expect(recorded).toEqual([expect.objectContaining({ reason: "SCOPED_GATE_STORE_FAILED", attempt: 1 })]);
+  });
+
+  it("does not settle because the deferral ledger could not be read", async () => {
+    ready();
+    runCompile.mockResolvedValue(gate("SCOPED_RELEASE_NOT_FOUND"));
+    countDeferrals.mockResolvedValue({ ok: false, code: "COMPILE_JOB_STORE_READ_FAILED" });
+    const turn = await runCompileJobTurn(job());
+    expect(turn.note).toBe("waiting");
+    expect(advance).not.toHaveBeenCalledWith(expect.objectContaining({ state: "failed" }));
+  });
+
+  it("still settles a refusal that is a verdict, not a window, on the first turn", async () => {
+    ready();
+    runCompile.mockResolvedValue(gate("SCOPED_RELEASE_REFUSED"));
+    const turn = await runCompileJobTurn(job());
+    expect(turn).toMatchObject({ note: "failed", errorCode: "SCOPED_RELEASE_REFUSED" });
+    expect(recordDeferral).not.toHaveBeenCalled();
   });
 });
 

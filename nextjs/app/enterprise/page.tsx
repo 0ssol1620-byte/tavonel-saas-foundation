@@ -9,9 +9,9 @@ import { EXPLORE_CTA } from "@/lib/site-navigation";
 import { signedProductDemo } from "@/lib/signed-product-demo";
 
 export const metadata: Metadata = {
-  title: "Enterprise — TAVONEL",
+  title: "Enterprise: control the knowledge your AI uses — TAVONEL",
   description:
-    "Compile enterprise knowledge into a source-grounded, reviewable, portable world, with activation under human control.",
+    "Turn approved manuals, contracts, policies and reports into a versioned World. Every answer can return to its source, and reviewers control what goes active.",
   alternates: { canonical: "/enterprise" },
   openGraph: { url: "/enterprise" },
 };
@@ -131,8 +131,8 @@ export default function EnterprisePage() {
                 Enterprise engagement can negotiate a separately executed data processing agreement
                 during scoping, starting from the{" "}
                 <a href="/policy/TAVONEL_DPA_v2_2026-09-23.md">archived 2026-09-23 template</a>, which
-                is a draft for review and not a signed agreement; once executed, it prevails within
-                its scope.
+                is a draft for review and not a signed agreement. Once executed, the signed agreement
+                prevails within its scope.
               </p>
 
               <h2>What an engagement costs</h2>
