@@ -71,9 +71,15 @@ async function settleRefusal(
 }
 
 async function settleSanitized(env: Env, objectKey: string, result: SanitizeResult, fetcher: typeof fetch) {
+  const pages = Number.isSafeInteger(result.ocr.observedPageCount) && result.ocr.observedPageCount! >= 1
+    ? result.ocr.observedPageCount!
+    : null;
+  // A read is charged by its pages. One that finished without a count is held for operator
+  // review at no charge instead of being settled on a guessed length.
+  const uncounted = result.ocr.computeCredits !== 0 && result.ocr.status !== "failed" && pages === null;
   const outcome = result.ocr.computeCredits === 0
     ? "released"
-    : result.ocr.status === "failed" ? "operator_review" : "settled";
+    : result.ocr.status === "failed" || uncounted ? "operator_review" : "settled";
   const completedRead = env.FOUNDATION_COMPLETED_READ_ENABLED === "true" && outcome === "settled"
     ? parseCompletedReadFacts({
       schemaVersion: COMPLETED_READ_SCHEMA,
@@ -93,13 +99,19 @@ async function settleSanitized(env: Env, objectKey: string, result: SanitizeResu
     objectKey,
     outcome,
     result.ocr.computeCredits,
-    result.ocr.reasonCode ?? (outcome === "settled" ? "OCR_COMPLETED" : "GPU_NOT_DISPATCHED"),
+    uncounted ? "PAGE_COUNT_UNKNOWN"
+      : result.ocr.reasonCode ?? (outcome === "settled" ? "OCR_COMPLETED" : "GPU_NOT_DISPATCHED"),
     fetcher,
     undefined,
     undefined,
     // The digest over the bytes this worker read. The application server never reads them, so
     // this is the only place a source digest can come from without re-downloading the object.
-    { sourceSha256: result.inputSha256, ...(completedRead ? { completedRead } : {}) },
+    // It is also the key of the unchanged-source rule: an uploader's own digest never is.
+    {
+      sourceSha256: result.inputSha256,
+      ...(outcome === "released" ? {} : { meter: { pages } }),
+      ...(completedRead ? { completedRead } : {}),
+    },
   );
 }
 

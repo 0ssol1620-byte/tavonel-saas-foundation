@@ -854,6 +854,8 @@ describe("Worker HTTP and queue surface", () => {
     assert.equal(run.settlements[0]?.outcome, "operator_review");
     assert.equal(run.settlements[0]?.actualCredits, 2);
     assert.equal(run.settlements[0]?.reasonCode, "OCR_HTTP_REJECTED");
+    // A read that produced nothing carries no page count, and the metered site charges it nothing.
+    assert.equal(run.settlements[0]?.pages, null);
     assert.equal(r2.objects.has(reviewKey), true);
   });
 
@@ -870,6 +872,8 @@ describe("Worker HTTP and queue surface", () => {
     assert.equal(second.settlements.length, 1);
     assert.equal(second.settlements[0]?.outcome, "settled");
     assert.equal(second.settlements[0]?.actualCredits, 2);
+    // The page meter: the reader's own count of the sanitized PDF it read.
+    assert.equal(second.settlements[0]?.pages, 1);
     assert.equal(r2.objects.has(ocrReviewSiblingKey(immutableKey)), false);
     assert.equal(r2.objects.has(ocrSiblingKey(immutableKey)), true);
     assert.equal(r2.puts.filter((entry) => entry.key === immutableKey).length, 1);

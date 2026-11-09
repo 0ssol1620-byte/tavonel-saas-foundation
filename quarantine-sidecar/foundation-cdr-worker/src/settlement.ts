@@ -56,6 +56,13 @@ export type SettlementFacts = {
   failureClass?: FailureClass;
   /** `sha256:<hex>` over the source bytes, computed once while sanitizing. */
   sourceSha256?: string;
+  /**
+   * The page meter (Foundation migration 20261109120000): what a finished or failed read is
+   * charged on. `pages` is the reader's `pageCount` of the sanitized PDF, null only when the read
+   * could not count it, which settles as operator review and never as a guess. No complex-page
+   * count is sent: nothing in this pipeline classifies a page as complex yet.
+   */
+  meter?: { pages: number | null };
 };
 
 /** Long enough for any refusal this worker raises, short enough for the 2 KiB body budget. */
@@ -92,6 +99,14 @@ export async function dispatchComputeSettlement(
       || proof.originalSha256 !== facts.sourceSha256 || outcome !== "settled" || actualCredits !== 2
       || reasonCode !== "OCR_COMPLETED") throw new RetryableError("completed read settlement facts are invalid");
   }
+  // A read is charged by its pages, so every settlement that is not a release carries them, and a
+  // `settled` read carries a real count. Anything else stays on the queue rather than settling.
+  const meter = facts.meter;
+  if (outcome !== "released" && (!meter
+    || (meter.pages !== null && (!Number.isSafeInteger(meter.pages) || meter.pages < 1))
+    || (outcome === "settled" && meter.pages === null))) {
+    throw new RetryableError("compute settlement page meter facts are missing or invalid");
+  }
   const body = JSON.stringify({
     workspaceKey: parts.workspaceId,
     documentId: parts.documentId,
@@ -101,6 +116,9 @@ export async function dispatchComputeSettlement(
     ...(facts.terminalReason ? { terminalReason: facts.terminalReason.slice(0, MAX_TERMINAL_REASON) } : {}),
     ...(facts.failureClass ? { failureClass: facts.failureClass } : {}),
     ...(facts.sourceSha256 ? { sourceSha256: facts.sourceSha256 } : {}),
+    // `actualCredits` above is the per-document figure a pre-meter Foundation still settles on, so
+    // this Worker can deploy before or after the site; the metered site ignores it.
+    ...(outcome !== "released" && meter ? { pages: meter.pages } : {}),
     ...(facts.completedRead ? { completedRead: facts.completedRead } : {}),
   });
   const timestamp = now().toISOString();
