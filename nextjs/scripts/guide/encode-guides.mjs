@@ -14,7 +14,7 @@
 // is carried over as a person wrote it; only `files` is measured and rewritten here.
 //
 // usage: node nextjs/scripts/guide/encode-guides.mjs
-//   GUIDE_WORK     scratch directory holding raw/ from record-guide.mjs (default: see terminal-replay.mjs)
+//   GUIDE_WORK     scratch directory holding raw/ from record-guide.mjs (required; terminal-replay.mjs throws when it is unset)
 //   GUIDE_OUT      where the media and manifest go (default: nextjs/public/guide)
 //   GUIDE_RECEIPTS local receipt with absolute paths and raw-master digests (default: $GUIDE_WORK/../guide-receipts.json)
 //   FILM_FFMPEG    ffmpeg 7.1 binary with libx264 (required, as in scripts/film/encode-fallback.sh)

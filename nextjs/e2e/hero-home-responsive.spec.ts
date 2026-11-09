@@ -599,7 +599,7 @@ test("every stage that opens cropped keeps ink in both panes of its whole window
 
   FINAL-SPEC 2026-10-26 §2.1 (acceptance 23-25) replaces Fit with the source pane on a phone and removes the
   reading line (D-7). What this test holds now, for each stage, in English and Korean, under reduced motion:
-  - the phone opens on the pane (Focus), whose own 848x1060 file is the LCP element (AVIF in Chromium);
+  - the phone opens on the pane (Focus), whose own 684x855 file is the LCP element (AVIF in Chromium);
   - no reading line; the selected tab names the stage, and the tab row sits directly above the frame (only the
     16px gap), both on the first screen, unscrolled, the tab text at 13px or more and 4.5:1 on the paper;
   - the frame is 4:5 and the column plus 16px, inside the viewport, and its top does not move with the stage;
@@ -628,6 +628,11 @@ test("every stage that opens cropped keeps ink in both panes of its whole window
   WebKit, reduced motion, EN and KO 56,250 / 68,062 / 77,440 / 85,562). The pane is one press of "Focus details"
   away and is held below exactly as before, tabs directly above it and its top on the first screen at every width.
   Acceptance 24 at 412 keeps main's numbers (see there).
+
+  Recording R3 (2026-11-09) keeps that opening, by founder decision the same day: a phone opens on Fit and its LCP
+  element is the R3 stage-1 1440px file (poster-r3-c1-t10.40, AVIF in Chromium), and Focus details opens the R3
+  pane (848x1060). The Fit frame's size did not change, so the floors are main's; on CI (Linux chromium, PR #210,
+  889ee863) the 412 entry measured 82,992 (EN) and 82,628 (KO), above them.
 */
 const LCP_FLOOR: Record<string, Record<string, Record<number, number>>> = {
   chromium: {

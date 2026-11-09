@@ -109,7 +109,7 @@ export const HERO_FILM_POSTER: string = HOME_POSTERS[0].poster;
 function heroStages(korean: boolean): CompileStage[] {
   const lines = korean
     ? ["추출된 줄마다 그 줄을 읽은 페이지 영역이 표시됩니다.", "준비된 원본을 컴파일하면, 실행은 사람의 검토 앞에서 멈춥니다.", "새 공시가 도착하면 지식에서 무엇이 바뀌었는지 보여줍니다.", "준비된 질문을 골라 답을 페이지 영역까지 따라가 보세요."]
-    : ["Pick an extracted line and see the page region it was read from.", "Compile the ready sources; the run stops for a person's review.", "New filings arrive, and the knowledge shows what they changed.", "Pick a prepared question and follow the answer to its page region."];
+    : ["Pick an extracted line and see the page region it was read from.", "Compile the ready sources, and the run stops for a person's review.", "New filings arrive, and the knowledge shows what they changed.", "Pick a prepared question and follow the answer to its page region."];
   return COMPILE_STAGES.map((stage, index) => ({
     ...stage,
     ...HOME_POSTERS[index],

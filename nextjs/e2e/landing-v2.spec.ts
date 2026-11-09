@@ -336,6 +336,11 @@ test("Korean pricing carries the selected plan into the inquiry", async ({ page 
   arrow glyph and no third action (PR #177 review round 1). Same method, fixture posture, chromium:
     1440x900  EN fold 29, body 650   KO fold 24, body 554   h2 6
     390x844   EN fold 35             KO fold 31
+  PR #210 (recording R3 with the phone film back on Fit, 2026-11-09) leaves every budget where it was. The hero's
+  spacing moved up 20px for acceptance 24, which brought the next band's heading ("Research figures, with receipts.",
+  4 words) to y 815 at 390x844 (EN fold 38). Below 768px the hero's bottom padding is 120px instead of 80, so that
+  heading starts at about 855, below the first screen. Same method, local production build, chromium:
+    390x844   EN fold 34             KO fold 31
 */
 const WORD_BUDGET = { "/": { fold: 35, body: 659 }, "/ko": { fold: 35, body: 564 } } as const;
 for (const route of ["/", "/ko"] as const) {
