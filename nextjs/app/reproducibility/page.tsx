@@ -32,7 +32,7 @@ import { TrustNext } from "@/components/trust-next";
   public page in llms.txt that search could not see. `app/sitemap.ts` lists it, `lib/seo-surface.test.ts`
   uses /film as its standing noindex control instead, and `public-copy-purge.test.ts` no longer exempts it.
 */
-export const metadata: Metadata = { title: "Reproducibility — TAVONEL", description: "Digest-bound public samples you can download, rerun and verify byte for byte.", alternates: { canonical: "/reproducibility" }, openGraph: { url: "/reproducibility" }, robots: { index: true, follow: true } };
+export const metadata: Metadata = { title: "Reproducibility: rerun the public sample exactly — TAVONEL", description: "Download the manifest that pins three public proof PDFs by SHA-256, rerun the sample and check the bytes. The sample World carries a Content-Digest header.", alternates: { canonical: "/reproducibility" }, openGraph: { url: "/reproducibility" }, robots: { index: true, follow: true } };
 
 /*
   What the audit changed on this page, all of it in props to the shared registry:
