@@ -423,8 +423,10 @@ migration은 additive다. 기존 행은 전부 `live`가 되고, create RPC의 �
 - 병합 전에 main이 다른 표면 변경으로 움직이면 tree의 digest가 바뀐다. 상속은 없고, 배포는 지금처럼 정확한 SHA의 행을
   기다린다. 열린 쪽으로 새지 않는다.
 - 행의 사실은 병합 커밋이 아니라 PR head의 CI를 인용한다. head가 origin/main을 포함하면 head의 `pull_request` run이 시험한
-  병합 tree는 head 자신의 tree다. main은 앞으로만 움직이므로, 지금의 main을 포함하면 run 시점의 main도 포함한다.
-  `make-evidence.mjs`는 이 조건(`git merge-base --is-ancestor origin/main <head>`)을 확인하지 못하면 아무것도 쓰지 않는다.
+  병합 tree는 head 자신의 tree다. `main`은 branch protection이 없으므로 이것을 "main은 앞으로만 움직인다"에서 추론하지 않는다.
+  `make-evidence.mjs`는 인용하는 run마다 GitHub의 run 기록(`pull_requests[]`)을 읽는다. 모든 항목이 같은 저장소의 PR이고, base가
+  `main`이며, 그 `base.sha`가 head의 조상이어야 한다(R1 S1, N3). 로컬 `origin/main`도 head의 조상이어야 한다. 하나라도 아니면
+  아무것도 쓰지 않는다.
 - 만료는 그대로 행의 `evaluated_at`부터 30일이다. 병합 전에 기록하므로 그만큼 일찍 시작한다.
 - 같은 저장소의 브랜치 PR만 대상이다. fork PR의 head로는 기록하지 않는다.
 
@@ -433,8 +435,19 @@ migration은 additive다. 기존 행은 전부 `live`가 되고, create RPC의 �
 1. PR의 필수 체크가 head에서 green이고 독립 리뷰가 blocker 0이다. `fnd-UX`에서
    `git fetch origin main <PR 브랜치>`를 한다.
 2. `git merge-base --is-ancestor origin/main <head>`가 0이 아니면 GitHub의 "Update branch"(merge 방식. rebase 아님)로
-   head를 최신으로 만들고, 새 head의 CI가 green이 될 때까지 기다린다. 묶음 병합이면 마지막 PR만 남기고 먼저 병합하고,
-   그 사이 배포는 지금처럼 취소한 뒤, 마지막 PR을 최신으로 만든다.
+   head를 최신으로 만들고, 새 head의 CI가 green이 될 때까지 기다린다.
+   **묶음은 통합 PR 하나로 낸다(권장, R1).**
+   - origin/main에서 `release/<이름>` 브랜치를 만든다. 구성 PR의 head를 하나씩 merge commit으로 합친다. 합치기 전에 각 head가
+     리뷰를 받은 SHA와 같은지 확인한다.
+   - 구성 PR마다 리뷰받은 내용이 통합 tree에 그대로 있는지 증명한다. 파일별 blob을 비교하고, 여러 PR이 겹치는 등록 파일은
+     각 PR이 더한 줄이 모두 들어 있는지 본다.
+   - 같은 저장소 PR로 main에 연다. CI는 그 head에서 green이어야 한다.
+   - 독립 리뷰는 구성 PR이 아니라 **통합 head**를 승인해야 한다.
+   - 그 사이 구성 PR을 main에 따로 병합하지 않는다. main이 움직이면 digest가 맞지 않는다.
+   - 통합 PR을 병합하면 구성 PR의 head가 main에 들어가므로 GitHub이 병합으로 표시한다. 남은 것은 닫는다.
+   - production build는 한 번이고, 행은 통합 head 하나다.
+   - 다른 방법: 마지막 PR만 남기고 먼저 병합하고, 그 사이 배포를 취소한 뒤, 마지막 PR을 최신으로 만든다. build가 N번 생기고
+     과금된다.
 3. 그 head로 행을 만든다(저장소 밖 도구, AKC `outputs/…/hard-proof-20261027/impl/upload-unblock/`).
    ```sh
    node make-evidence.mjs --rev <head>           # head의 pull_request run을 읽는다. main 포함 여부를 확인한다
@@ -444,13 +457,19 @@ migration은 additive다. 기존 행은 전부 `live`가 되고, create RPC의 �
    생성된 `RELEASE-ROW-<head8>.sql`을 실행한다(위임 운영자, campaign ledger에 sha256 기록).
 4. **병합 직전 확인.** exit 0이 아니면 병합하지 않는다.
    ```sh
+   git fetch origin main <PR 브랜치>      # R1 S2: 예측 base는 방금 받은 main이어야 한다
    cd nextjs
    NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
      pnpm release:gate-check --sha <head> --merge-into $(git rev-parse origin/main)
    ```
    보고서의 `mergeOf`가 base, head, 예측 tree를 적는다. `scopes[0].inheritedFrom`은 head다. exit 2는 conflict이거나 commit을
    fetch하지 않은 것이다.
-5. 곧바로 병합한다. 4와 병합 사이에 main이 움직였으면 4를 다시 한다.
+5. 곧바로 병합한다. 방법과 head를 고정한다(R1 S3).
+   ```sh
+   gh pr merge <n> --merge --match-head-commit <head>
+   ```
+   `--merge`여야 병합 tree가 4의 `merge-tree` 예측과 같다. squash나 rebase는 다른 tree를 만들 수 있다. `--match-head-commit`은
+   4 뒤에 head가 바뀌면 병합을 거부한다. 4와 병합 사이에 main이 움직였으면 4를 다시 한다.
 6. READY 뒤에는 위 D-05 순서 4·6번 그대로다. (a) 빌드 로그 deploy 단계 줄, (b) `next build` 줄, (c)
    `gate-surface.mjs --sha <병합 SHA>`가 같아야 한다. `pnpm release:gate-check --sha <병합 SHA>`가 `released`이고
    `inheritedFrom`이 head여야 한다. 다르면 그 표면을 거절하고(위 "거절") 원인을 찾는다.
