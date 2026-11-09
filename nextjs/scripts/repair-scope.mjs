@@ -1944,6 +1944,30 @@ export const COMPILE_JOB_STALL_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/compile-job-worker.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/execution-budget.test.ts',
   'lib/compile-job-panel.test.ts', 'lib/workspace-failure-copy.test.ts', 'lib/compile-job-scheduling.test.ts',
 ]);
+// Switch-on (D-12 / R1) and billing HMAC integrity (PR #201, 2026-11-09): the nineteen endpoints no owner listed -- the four
+// billing routes that now read the one secret reader, the reader and its suite, the trial digest reader, and the copy and
+// posture suites the switch moved. They select every suite that pins the switched copy or a billing secret call site.
+// Product code, so never nativeReuse. No browser suite of its own: the switch's browser specs are owned above.
+export const SWITCH_ON_BILLING_INTEGRITY_AFFECTED_PATHS = Object.freeze([
+  'app/api/billing/checkout/route.ts', 'app/api/operations/p0/credits/release/route.ts', 'app/api/paddle/webhook/route.ts',
+  'app/api/status/route.ts', 'components/evaluation-page.test.tsx', 'lib/billing-secrets.test.ts', 'lib/billing-secrets.ts',
+  'lib/checkout-customer-data-gate.test.ts', 'lib/customer-data-live-path.test.ts', 'lib/landing-v2-use.test.ts',
+  'lib/operations.test.ts', 'lib/paddle-webhook-route.test.ts', 'lib/page-seo.test.ts', 'lib/pricing-estimator.test.ts',
+  'lib/product-claims-sync.test.ts', 'lib/public-status.test.ts', 'lib/status-route-contract.test.ts',
+  'lib/trial-source-risk.test.ts', 'lib/trial-source-risk.ts',
+]);
+export const SWITCH_ON_BILLING_INTEGRITY_AFFECTED_UNIT_FILES = Object.freeze([
+  'components/evaluation-page.test.tsx', 'lib/billing-binding.test.ts', 'lib/billing-gate-enforce-route.test.ts',
+  'lib/billing-secrets.test.ts', 'lib/brand-copy.test.ts', 'lib/checkout-customer-data-gate.test.ts',
+  'lib/commercial-state.test.ts', 'lib/customer-data-live-path.test.ts', 'lib/g1-copy-truth.test.ts',
+  'lib/guide-content.test.ts', 'lib/keyless-try-it.test.ts', 'lib/landing-v2-page.test.ts', 'lib/landing-v2-start.test.ts',
+  'lib/landing-v2-use.test.ts', 'lib/operations.test.ts', 'lib/paddle-billing-event.test.ts',
+  'lib/paddle-webhook-route.test.ts', 'lib/page-seo.test.ts', 'lib/pilot-evaluation-worksheet.test.ts',
+  'lib/pricing-estimator.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts',
+  'lib/production-posture.test.ts', 'lib/public-status.test.ts', 'lib/self-service-trial-device-rotation.test.ts',
+  'lib/settle-route.test.ts', 'lib/status-route-contract.test.ts', 'lib/trial-source-risk.test.ts',
+  'lib/trust-page-answers.test.ts',
+]);
 // EN-0c benchmarks path mask: /benchmarks masks an absolute scoring-machine path in the Model Arena notes at render time
 // (the artifact and its pinned sha256 are unchanged). The four endpoints no owner listed select their two direct suites plus
 // the five that read the changed files: benchmark-registry, brand-copy, copy-trust-guard and trust-page-answers read the page
@@ -3021,6 +3045,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // Compile-job stall: the ten exact paths above select nine direct suites and no browser suite.
   affectedGroup('compile-job-stall', new RegExp(`^nextjs/(?:${exactPathAlternation(COMPILE_JOB_STALL_AFFECTED_PATHS)})$`),
     { unitFiles: COMPILE_JOB_STALL_AFFECTED_UNIT_FILES }),
+  // Switch-on and billing integrity: the nineteen exact paths above select twenty-nine direct suites and no browser suite.
+  affectedGroup('switch-on-billing-integrity', new RegExp(`^nextjs/(?:${exactPathAlternation(SWITCH_ON_BILLING_INTEGRITY_AFFECTED_PATHS)})$`),
+    { unitFiles: SWITCH_ON_BILLING_INTEGRITY_AFFECTED_UNIT_FILES }),
   // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.
   affectedGroup('benchmarks-path-mask', new RegExp(`^nextjs/(?:${exactPathAlternation(BENCHMARKS_PATH_MASK_AFFECTED_PATHS)})$`),
     { unitFiles: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES }),
