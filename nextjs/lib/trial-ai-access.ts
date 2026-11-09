@@ -1,7 +1,9 @@
+import { authorizeFoundationProduct, type ProductAccessRole } from "./billing-product-access";
 import type { DeveloperScope } from "./developer-contracts";
 import { REMOTE_MCP_SCOPES } from "./remote-mcp";
 import { authorizeFoundationSessionProduct, type SessionAccessSource } from "./self-service-trial";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
+import { listFoundationActiveWorlds } from "./world-store";
 
 /*
   W1-A2.0: the one decision a free evaluation's AI access goes through.
@@ -219,4 +221,64 @@ export async function trialAiKeyAccess(
   const decided = await evaluate({ workspaceKey, userId, accessSource: "trial" }, "query", consume, null);
   if (decided === null) return { ok: false, code: "TRIAL_AI_ACCESS_CHECK_FAILED", status: 503 };
   return decided.allowed ? { ok: true } : { ok: false, code: decided.code, status: 402 };
+}
+
+type Refusal = { ok: false; code: string; status: number };
+
+/*
+  P0 2026-11-09 (FUNNEL-SIGNED-IN §4 #2): /pricing promises a free evaluation "1 Compiled World with
+  Evidence and Ask", and promote answered every trial 402 SUBSCRIPTION_REQUIRED, because it asks
+  `authorizeFoundationProduct`, which knows owner grants and paid plans and predates the trial
+  (6e112242, 2026-08-29; the trial arrived 2026-09-04 through `authorizeFoundationSessionProduct`,
+  which promote never adopted). The 402 was a gap, not a cost or abuse control: FD-02 (2026-09-11)
+  decided who among paid plans activates and left the trial unaddressed, and later copy described the
+  refusal rather than deciding it.
+
+  A trial owner may now activate exactly one World, inside the bounds `foundation_trial_ai_access`
+  (migration 20261104090000, applied in production) already owns: the AI window, the page bound and
+  the World bound. Everything else promote checks -- the human record, equivalence, source
+  freshness, the connector ACL, the re-authorisation pass, the hourly ceiling and the atomic
+  pointer move -- is untouched, because this answers only the plan question.
+*/
+
+/** The activation plan question, with the free evaluation's one World added to the paid answer. */
+export async function authorizeWorldActivation(
+  workspaceKey: string,
+  userId: string,
+  role: ProductAccessRole | undefined,
+  collectionId: string,
+  manifestDigest: string,
+): Promise<{ ok: true } | Refusal> {
+  const paid = await authorizeFoundationProduct(workspaceKey, userId, "activation", role);
+  if (paid.ok || paid.code !== "SUBSCRIPTION_REQUIRED") return paid;
+  const session = await authorizeFoundationSessionProduct(workspaceKey, userId, "observer");
+  if (!session.ok) return session.status === 503 ? { ok: false, code: session.code, status: 503 } : paid;
+  // A trial is one person's workspace, so it reaches activation only as the owner, like Developer.
+  if (session.access.source !== "trial" || role !== "owner") return paid;
+  // One World: any active World other than this exact candidate is the one the trial already used.
+  // ponytail: read-then-move, so two promotes racing on two collections could both pass; the
+  // compile gate already admits one World-bearing job per trial, so a second candidate cannot exist.
+  const worlds = await listFoundationActiveWorlds(workspaceKey, { limit: 2 });
+  if (!worlds.ok) return { ok: false, code: "TRIAL_AI_ACCESS_CHECK_FAILED", status: 503 };
+  if (worlds.worlds.some((world) => world.collectionId !== collectionId || world.manifestDigest !== manifestDigest)) {
+    return { ok: false, code: "TRIAL_WORLD_LIMIT_REACHED", status: 402 };
+  }
+  const usage = await readUsage({ workspaceKey, userId }, false);
+  if (usage === null) return { ok: false, code: "TRIAL_AI_ACCESS_CHECK_FAILED", status: 503 };
+  if (usage.status === "limit_reached") return { ok: false, code: "TRIAL_LIMIT_REACHED", status: 402 };
+  if (usage.status === "not_trial") return paid;
+  return { ok: true };
+}
+
+/**
+ * A trial's browser Ask or search spends one of the day's queries -- the counter a trial key
+ * spends -- before the embedder runs. Not behind TAVONEL_TRIAL_AI_ACCESS_ENABLED: that flag waits on
+ * the key and MCP wording (F-2), and Ask in the workspace is what /pricing already sells.
+ */
+export async function trialSessionQuery(workspaceKey: string, userId: string): Promise<{ ok: true } | Refusal> {
+  const usage = await readUsage({ workspaceKey, userId }, true);
+  if (usage === null) return { ok: false, code: "TRIAL_AI_ACCESS_CHECK_FAILED", status: 503 };
+  if (usage.status === "limit_reached") return { ok: false, code: "TRIAL_LIMIT_REACHED", status: 402 };
+  if (usage.status === "not_trial") return { ok: false, code: "TRIAL_NOT_ACTIVE", status: 402 };
+  return { ok: true };
 }

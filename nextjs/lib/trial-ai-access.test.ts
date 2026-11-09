@@ -30,7 +30,7 @@ vi.mock("./developer-auth", async (importOriginal) => ({
   revalidateFoundationSession: async (_request: Request, principal: unknown) => ({ ok: true, principal }),
 }));
 
-import { trialAiAccess, trialAiKeyAccess, trialScopesAllowed } from "./trial-ai-access";
+import { trialAiAccess, trialAiKeyAccess, trialScopesAllowed, trialSessionQuery } from "./trial-ai-access";
 import { GET as listKeysRoute, POST as createKeyRoute } from "../app/api/developer/keys/route";
 import { DELETE as revokeKeyRoute } from "../app/api/developer/keys/[id]/route";
 import { POST as rotateKeyRoute } from "../app/api/v1/developer/keys/[id]/rotate/route";
@@ -175,6 +175,35 @@ describe("trialAiAccess", () => {
     expect(await trialAiAccess(TRIAL, "key_list")).toEqual({ ok: true });
     expect(await trialAiAccess(TRIAL, "key_revoke")).toEqual({ ok: true });
     expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+});
+
+/*
+  P0 2026-11-09: a trial's browser Ask now reaches an active World, so each one spends a query from
+  the same per-day counter a trial key spends -- with TAVONEL_TRIAL_AI_ACCESS_ENABLED unset, because
+  that flag gates keys and MCP, not the workspace Ask /pricing sells.
+*/
+describe("trialSessionQuery (browser Ask on a free evaluation)", () => {
+  it("spends one query inside the bounds, with the key flag off", async () => {
+    expect(await trialSessionQuery(TRIAL.workspaceKey, TRIAL.userId)).toEqual({ ok: true });
+    expect(rpcBody()).toEqual({ p_user_id: TRIAL.userId, p_workspace_key: TRIAL.workspaceKey, p_consume_query: true });
+  });
+
+  it("stops past the trial cap", async () => {
+    mocks.usage.mockImplementation(async () => usage({ status: "limit_reached", reason: "TRIAL_AI_DAILY_QUERY_LIMIT" }));
+    expect(await trialSessionQuery(TRIAL.workspaceKey, TRIAL.userId)).toEqual({ ok: false, code: "TRIAL_LIMIT_REACHED", status: 402 });
+  });
+
+  it("refuses a trial that ended between session and query", async () => {
+    mocks.usage.mockImplementation(async () => usage({ status: "not_trial" }));
+    expect(await trialSessionQuery(TRIAL.workspaceKey, TRIAL.userId)).toEqual({ ok: false, code: "TRIAL_NOT_ACTIVE", status: 402 });
+  });
+
+  it("fails closed when the counter cannot be read or is not configured", async () => {
+    mocks.usage.mockImplementation(async () => new Response("", { status: 500 }));
+    expect(await trialSessionQuery(TRIAL.workspaceKey, TRIAL.userId)).toEqual({ ok: false, code: "TRIAL_AI_ACCESS_CHECK_FAILED", status: 503 });
+    process.env.TEST_STORE = "off";
+    expect(await trialSessionQuery(TRIAL.workspaceKey, TRIAL.userId)).toEqual({ ok: false, code: "TRIAL_AI_ACCESS_CHECK_FAILED", status: 503 });
   });
 });
 

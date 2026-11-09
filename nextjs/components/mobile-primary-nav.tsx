@@ -8,8 +8,8 @@ import { NAV_OPEN_EVENT } from "@/lib/marketing-analytics";
 /**
  * Native disclosure works without JavaScript. Escape returns focus; Tab never gets trapped.
  *
- * `signedIn` has the same meaning it has in the header: suppress Sign in for a reader who already
- * is, rather than offering them a destination they have no use for.
+ * `signedIn` has the same meaning it has in the header: a reader who already is gets a link to the
+ * workspace in place of Sign in.
  *
  * NAV PANELS, 2026-11-09: `children` is the section rows, and they are the bar's own markup.
  * The header passes `<NavSections sheet />` (`components/public-site-chrome.tsx`), the
@@ -113,7 +113,9 @@ export default function MobilePrimaryNav({ korean = false, signedIn = false, lab
           inline as `undefined` here (BA-232) -- so the sheet carries the one label that is true
           in both postures and nothing else.
         */}
-        {signedIn ? null : (
+        {signedIn ? (
+          <a className="mobile-nav-signin" href="/workspace">{korean ? "워크스페이스" : "Your workspace"}</a>
+        ) : (
           <a className="mobile-nav-signin" href="/login">{labels.signIn}</a>
         )}
       </nav>

@@ -6,6 +6,7 @@ import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-acce
 import { assertEquivalenceGate } from "@/lib/equivalence-gate";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { recordServerFunnel } from "@/lib/funnel-events";
+import { authorizeWorldActivation } from "@/lib/trial-ai-access";
 import {
   checkCurrentSourceVersions,
   collectionCandidateKey,
@@ -113,7 +114,8 @@ export async function POST(
   const access = foundationPilotAccess(user.id);
   if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });
   const { membership } = access;
-  const productAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "activation", membership.role);
+  // A paid plan, or the free evaluation's one World (lib/trial-ai-access.ts).
+  const productAccess = await authorizeWorldActivation(membership.workspaceId, user.id, membership.role, id, manifestDigest);
   if (!productAccess.ok) return NextResponse.json({ code: productAccess.code }, { status: productAccess.status, headers: NO_STORE });
   if (membership.role !== "owner" && membership.role !== "admin") {
     return NextResponse.json(
@@ -273,7 +275,7 @@ export async function POST(
   ) {
     return NextResponse.json({ code: "AUTHORIZATION_CHANGED_RETRY" }, { status: 403, headers: NO_STORE });
   }
-  const currentProductAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "activation", currentPilot.membership.role);
+  const currentProductAccess = await authorizeWorldActivation(membership.workspaceId, user.id, currentPilot.membership.role, id, manifestDigest);
   if (!currentProductAccess.ok) return NextResponse.json({ code: currentProductAccess.code }, {
     status: currentProductAccess.status, headers: NO_STORE,
   });

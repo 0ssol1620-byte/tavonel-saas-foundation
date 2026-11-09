@@ -25,6 +25,11 @@ vi.mock("./foundation-pilot", () => ({ getRequestUser, foundationPilotAccess }))
 vi.mock("./billing-product-access", () => ({ authorizeFoundationProduct }));
 vi.mock("./self-service-trial", () => ({ authorizeFoundationSessionProduct, trialFeatureBlocked }));
 vi.mock("./workspace-membership", () => ({ getWorkspaceMembership }));
+const { trialSessionQuery } = vi.hoisted(() => ({ trialSessionQuery: vi.fn() }));
+vi.mock("./trial-ai-access", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./trial-ai-access")>()),
+  trialSessionQuery,
+}));
 
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "./developer-auth";
 
@@ -252,6 +257,43 @@ describe("developer request authorization", () => {
     expect(await authorizeFoundationRequest(new Request("https://tavonel.test/api/ask"), "ask:read"))
       .toEqual({ ok: false, code: "WORKSPACE_MEMBERSHIP_READ_FAILED", status: 503 });
     expect(authorizeFoundationSessionProduct).not.toHaveBeenCalled();
+  });
+
+  /* P0 2026-11-09: the trial's browser Ask is metered here, once per request, before any retrieval. */
+  describe("a free evaluation's browser Ask", () => {
+    const TRIAL_ACCESS = { source: "trial", accessPlan: "observer_access", billingExempt: true, expiresAt: "2099-01-01T00:00:00Z" };
+    const session = (path: string) => new Request(`https://tavonel.com${path}`, { headers: { authorization: "Bearer supabase-session" } });
+    beforeEach(() => {
+      getRequestUser.mockResolvedValue({ id: "user" });
+      authorizeFoundationSessionProduct.mockResolvedValue({ ok: true, access: TRIAL_ACCESS });
+      trialSessionQuery.mockResolvedValue({ ok: true });
+    });
+
+    it("spends one query on ask:read, and the late re-check spends none", async () => {
+      const request = session("/api/collections/x/ask");
+      const first = await authorizeFoundationRequest(request, "ask:read");
+      expect(first.ok).toBe(true);
+      expect(trialSessionQuery).toHaveBeenCalledTimes(1);
+      expect(trialSessionQuery).toHaveBeenCalledWith("pilot-user", "user");
+      if (!first.ok) return;
+      expect((await revalidateFoundationAuthorization(request, first.principal, "ask:read")).ok).toBe(true);
+      expect(trialSessionQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it("stops the Ask past the trial cap", async () => {
+      trialSessionQuery.mockResolvedValue({ ok: false, code: "TRIAL_LIMIT_REACHED", status: 402 });
+      expect(await authorizeFoundationRequest(session("/api/collections/x/ask"), "ask:read"))
+        .toEqual({ ok: false, code: "TRIAL_LIMIT_REACHED", status: 402 });
+    });
+
+    it("leaves other scopes and paid sessions unmetered", async () => {
+      expect((await authorizeFoundationRequest(session("/api/v1/documents"), "documents:read")).ok).toBe(true);
+      authorizeFoundationSessionProduct.mockResolvedValue({
+        ok: true, access: { source: "paid", accessPlan: "observer_access", billingExempt: false, expiresAt: null },
+      });
+      expect((await authorizeFoundationRequest(session("/api/collections/x/ask"), "ask:read")).ok).toBe(true);
+      expect(trialSessionQuery).not.toHaveBeenCalled();
+    });
   });
 
   it("rejects a session that expires after work starts", async () => {

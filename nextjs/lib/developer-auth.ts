@@ -7,7 +7,7 @@ import {
   trialFeatureBlocked,
   type SessionAccessSource,
 } from "./self-service-trial";
-import { trialAiKeyAccess } from "./trial-ai-access";
+import { trialAiKeyAccess, trialSessionQuery } from "./trial-ai-access";
 import { insideRemoteMcpDispatch } from "./remote-mcp-dispatch";
 import { getWorkspaceMembership, type WorkspaceRole } from "./workspace-membership";
 
@@ -149,6 +149,12 @@ async function resolveFoundationAuthorization(
   }
   if (productAccess.access.source === "trial" && trialFeatureBlocked(scope)) {
     return { ok: false as const, code: "TRIAL_FEATURE_NOT_INCLUDED", status: 402 };
+  }
+  // A trial's Ask or search runs the embedder, so it spends one of the trial's daily queries first.
+  // The late re-check (consumeRate false) does not spend a second one.
+  if (productAccess.access.source === "trial" && consumeRate && scope === "ask:read") {
+    const metered = await trialSessionQuery(access.membership.workspaceId, user.id);
+    if (!metered.ok) return metered;
   }
   const principal: FoundationPrincipal = {
     kind: "session",

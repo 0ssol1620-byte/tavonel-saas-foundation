@@ -434,7 +434,9 @@ test.describe("simulated switch-on (browser mocks only)", () => {
       }],
     });
     const trialStrip = page.getByRole("status").filter({ hasText: "Free evaluation" });
-    await expect(trialStrip.getByRole("link", { name: "Upgrade to Developer" })).toHaveAttribute("href", "/pricing");
+    // FUNNEL-SIGNED-IN #3: the strip keeps a quiet way to the plans; the ask itself waits for a limit.
+    await expect(trialStrip.getByRole("link", { name: "Plans", exact: true })).toHaveAttribute("href", "/pricing");
+    await expect(trialStrip.getByRole("link", { name: "Upgrade to Developer" })).toHaveCount(0);
     await page.evaluate(() => { (window as unknown as { __journeyNoReload: boolean }).__journeyNoReload = true; });
 
     // H16. Paddle reports the payment; the signed webhook lands (billing and bootstrap turn paid).

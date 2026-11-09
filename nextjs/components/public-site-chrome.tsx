@@ -100,9 +100,8 @@ export function DesktopPrimaryNav({ korean = false }: { korean?: boolean }) {
  * times or the site's structure changed as a visitor moved through it. Those three differences are
  * the three props below; everything else is this component.
  *
- * `signedIn` suppresses Sign in rather than the action beside it. A reader who is already
- * authenticated does not need the link, and offering both put the same destination in the row
- * twice on the landing page.
+ * `signedIn` swaps Sign in for a link to the workspace and leaves the action beside it alone. A
+ * reader who is already authenticated needs their account, not a sign-in (FUNNEL-SIGNED-IN #10).
  *
  * BA-232: `cta` is required. It was optional, and the fallback was a client component that
  * painted a placeholder label and then replaced it once `/api/status` answered -- on every page
@@ -174,7 +173,10 @@ export function PublicSiteHeader({
           sheet on a phone; the action beside it is the one thing that may not go behind a
           disclosure.
         */}
-        {signedIn ? null : <Link className="nav-signin chrome-v2-signin" href="/login">{korean ? KO_CHROME.signIn : "Sign in"}</Link>}
+        {/* FUNNEL-SIGNED-IN #10: a signed-in reader is shown where their account is, not asked to sign in. */}
+        {signedIn
+          ? <Link className="nav-signin chrome-v2-signin" href="/workspace">{korean ? "워크스페이스" : "Your workspace"}</Link>
+          : <Link className="nav-signin chrome-v2-signin" href="/login">{korean ? KO_CHROME.signIn : "Sign in"}</Link>}
         {/* Desktop only: below the switch the header is the wordmark and Menu, and the hero carries this.
             Absent on the sample itself (/explore, /ko/explore): an action may not point at its own page. */}
         <HeaderCta className={`btn${ghostCta ? " btn-ghost" : ""} ${chrome.cta}`} href={SAMPLE_CTA.href} label={korean ? SAMPLE_CTA.ko : SAMPLE_CTA.label} />
