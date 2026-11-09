@@ -155,7 +155,7 @@ const developer = BILLING_OFFERS.observer_access.label;
 const team = BILLING_OFFERS.studio_access.label;
 // D-12 (delegated decision 2026-11-09): intake is the workspace's, no longer arranged with us.
 // Both are live sentences: `activationPolicy.customerIntake.reason` and the /ko/pricing Developer card.
-const intakeEn = "Uploading your own sources is switched on for workspaces stage by stage, and your workspace shows whether it is open.";
+const intakeEn = "Uploading your own sources opens for a workspace once its owner accepts the processing terms, and your workspace shows whether it is open.";
 const intakeKo = "내 원문 컴파일은 워크스페이스의 처리 승인 뒤에 시작합니다.";
 
 /* ================================================================================== English */

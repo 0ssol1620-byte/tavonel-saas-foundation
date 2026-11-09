@@ -2919,6 +2919,10 @@ export function vitestDiscoveryConfigFailures(source) {
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
 // legal-semicolons-20261109: the legal, consent, trust and /status copy whose semicolons were removed without a change in meaning.
 export const LEGAL_SEMICOLONS_AFFECTED_PATHS = Object.freeze(['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts']);
+// processing-ga-20261109 (ADR 0008): the processing authorization that reads TAVONEL_PROCESSING_ROLLOUT. The rollout function and
+// its grant caller live in lib/processing-workspace-grant.ts, which keeps its ux-billing-checkout owner.
+export const PROCESSING_GA_AFFECTED_PATHS = Object.freeze(['lib/customer-data-admission.ts']);
+export const PROCESSING_GA_AFFECTED_UNIT_FILES = Object.freeze(['lib/customer-data-admission.test.ts', 'lib/processing-workspace-grant.test.ts']);
 export const LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-provisions.test.ts']);
 export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('public-marketing-surface', new RegExp(`^(?:${exactPathAlternation(PUBLIC_MARKETING_AFFECTED_PATHS)})$`),
@@ -3146,6 +3150,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // legal-semicolons-20261109: 5 exact paths select 10 direct suites and no browser suite.
   affectedGroup('legal-semicolons-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(LEGAL_SEMICOLONS_AFFECTED_PATHS)})$`),
     { unitFiles: LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES }),
+  // processing-ga-20261109: 1 exact path selects 2 direct suites and no browser suite.
+  affectedGroup('processing-ga-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(PROCESSING_GA_AFFECTED_PATHS)})$`),
+    { unitFiles: PROCESSING_GA_AFFECTED_UNIT_FILES }),
   affectedGroup('ci-selector', /^(?:\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml|nextjs\/scripts\/(?:repair-[a-z-]+(?:\.test)?\.mjs|run-repair-check\.mjs|verify-repair-workflows\.mjs|db\/(?:native-world-race(?:-ci)?|dropbox-source-stream-race)(?:\.test)?\.mjs|fixtures\/[A-Za-z0-9_.-]+\.json)|nextjs\/vitest\.repair-scope(?:\.async)?\.config\.ts)$/,
     { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),
   affectedGroup('ci-selector', /^nextjs\/lib\/repair-node-evidence\.test\.mjs$/, { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),

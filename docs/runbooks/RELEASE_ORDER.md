@@ -389,3 +389,56 @@ migration은 additive다. 기존 행은 전부 `live`가 되고, create RPC의 �
   남아 있으면 창이 다시 막힌 것이다. 큐를 읽지 못한 틱은 `{"event":"compile_batch_read_failed","code":…}`(error)로 남는다.
   `turns: 0`만으로는 빈 큐와 구별되지 않으니, 이 줄이 없는지도 함께 본다.
 - 진단과 원인 사례: `outputs/tavonel-research-replan-20261013/market-20261104/w1/D0-DIAGNOSIS-20261108.md`(AKC 저장소).
+
+## 추가 2026-11-09 — 처리 GA: 워크스페이스 수 제한을 푼다 (ADR 0008, `TAVONEL_PROCESSING_ROLLOUT`)
+
+- 결정: `docs/adr/0008-processing-general-availability.md`. D-19 canary(이름 붙은 1–3개 워크스페이스)를 푼다.
+  `TAVONEL_PROCESSING_ROLLOUT=general`(정확히 이 값, 소문자, 공백 없음)이고 `TAVONEL_CUSTOMER_DATA_GATE_VERSION=v2`일 때만
+  모든 워크스페이스가 rollout 검사를 통과한다. 다른 값이나 v2가 아닌 gate는 `PROCESSING_COHORT_CONFIG_INVALID`이고 아무도
+  들이지 않는다. 미설정은 D-19 canary 그대로다.
+- 풀리는 것은 워크스페이스 수뿐이다. 처리 약관 동의와 grant, 배포마다의 release 행, ACL·tenant 격리, trial 파일·페이지 상한,
+  AI 사용량 ledger, malware·CDR, launch switch는 그대로 적용된다.
+- migration은 없다. 코드만 바뀐다.
+
+### 순서 (production)
+
+1. **env를 먼저 넣는다.** Vercel → `tavonel-saas-foundation` → Production에 `TAVONEL_PROCESSING_ROLLOUT` = `general`을 추가한다.
+   같은 화면에서 `TAVONEL_CUSTOMER_DATA_GATE_VERSION` = `v2`인지, `TAVONEL_PROCESSING_WORKSPACE_COHORT`가 **그대로 설정되어
+   있는지** 확인한다. cohort는 지우지 않는다. rollback이 돌아갈 곳이고, cohort로 범위를 정하는 기능(library organize `on`)이
+   읽는 값이다.
+   ```
+   vercel env add TAVONEL_PROCESSING_ROLLOUT production    # 입력: general
+   ```
+2. **배포한다.** env는 새 build가 production이 될 때 반영된다. 이 PR의 merge 배포가 그 build다. env가 이미 들어가 있으므로
+   새 문구와 GA 동작이 같은 배포에서 함께 켜진다.
+3. **release 행을 넣는다.** 배포된 SHA에 대한 production release decision을 기록하고
+   `pnpm release:gate-check --sha <배포된 40자리 SHA>`가 exit 0인지 본다(위 "Every deploy under gate v2"). release 행이 없으면
+   GA여도 아무도 처리되지 않는다.
+4. **읽기 전용으로 확인한다.** cohort 밖의 새 워크스페이스 하나가 로그인하고 처리 약관에 동의한 뒤(창업자 테스트 계정이면 된다),
+   SELECT만으로 grant가 생겼는지 본다. 쓰기·RPC는 하지 않는다.
+   ```sql
+   select a.workspace_key, a.scope, a.accepted_at, d.allowed, d.release_revision, d.granted_at, d.expires_at
+   from public.foundation_processing_terms_acceptances a
+   left join lateral (
+     select allowed, release_revision, granted_at, expires_at
+     from public.customer_data_workspace_decisions d
+     where d.tenant_id = a.workspace_key and d.workspace_id = a.workspace_key and d.scope = a.scope
+     order by d.recorded_at desc, d.allowed asc limit 1
+   ) d on true
+   where a.accepted_at > '<배포 시각 UTC>'
+   order by a.accepted_at desc limit 5;
+   ```
+   기대값: cohort에 없는 `workspace_key`에서 `allowed = true`, `release_revision`은 배포된 SHA(또는 ADR 0006의 같은 gate surface
+   revision), `expires_at`은 미래다. `allowed`가 null이면 워크스페이스 화면이 "awaiting release"를 보이는지 보고, env 철자와
+   release 행부터 의심한다(`PROCESSING_COHORT_CONFIG_INVALID`는 장애가 아니라 대기로 보인다).
+5. **rollback.** `TAVONEL_PROCESSING_ROLLOUT`을 지우고(`vercel env rm TAVONEL_PROCESSING_ROLLOUT production`) 다시 배포한다.
+   cohort가 그대로 있으므로 D-19 canary가 정확히 돌아온다. cohort 밖 워크스페이스는 grant가 남아 있어도 다음 읽기에서
+   `PROCESSING_COHORT_EXCLUDED`가 된다. cohort 검사가 grant 읽기보다 먼저 돈다. 재배포는 과금되는 build다. 즉시 멈춰야 하면
+   Vercel Instant Rollback으로 이전 배포를 production으로 되돌리는 것이 더 빠르다. 다만 그 이전 SHA에도 현재 release 행이 있어야
+   처리가 계속된다.
+
+### 하지 말 것
+
+- `general`이 아닌 철자(`General`, `all`, `*`, `true`, 앞뒤 공백)를 넣지 않는다. 모두 아무도 들이지 않는 설정 오류다.
+- `LAUNCH_CANARY_MAX_WORKSPACES`를 올리거나 cohort에 `*`를 넣어 넓히지 않는다. 넓히는 길은 이 env 하나다.
+- cohort를 지우지 않는다. `general`에서는 처리에 영향이 없지만 rollback이 깨진다(cohort 미설정 + rollout 미설정 = 아무도 처리 안 됨).

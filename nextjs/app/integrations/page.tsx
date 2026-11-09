@@ -214,7 +214,7 @@ export default function IntegrationsPage() {
               have a connector with neither a count nor a "today".
             */}
             <p>
-              Uploading and compiling your own sources are switched on for workspaces stage by stage. The systems with a connector are{" "}
+              Uploading and compiling your own sources open for a workspace once its owner accepts the processing terms. The systems with a connector are{" "}
               {SUPPORT_ROWS.slice(0, -1).map(([name]) => name).join(", ")} and{" "}
               {SUPPORT_ROWS.at(-1)![0]}. Each is described below, with the access it is given and
               what happens when a file moves or disappears.
