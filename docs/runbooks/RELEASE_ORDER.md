@@ -389,3 +389,70 @@ migration은 additive다. 기존 행은 전부 `live`가 되고, create RPC의 �
   남아 있으면 창이 다시 막힌 것이다. 큐를 읽지 못한 틱은 `{"event":"compile_batch_read_failed","code":…}`(error)로 남는다.
   `turns: 0`만으로는 빈 큐와 구별되지 않으니, 이 줄이 없는지도 함께 본다.
 - 진단과 원인 사례: `outputs/tavonel-research-replan-20261013/market-20261104/w1/D0-DIAGNOSIS-20261108.md`(AKC 저장소).
+
+## 추가 2026-11-09 — 병합 전 출시 행: 배포가 READY일 때 이미 열려 있다
+
+위 내용은 바꾸지 않았다. gate 코드, DB trigger, 12개 사실, 30일 만료, receipt 계산은 그대로다. 바뀌는 것은 행을
+**언제, 어느 커밋의 CI로** 만드느냐와 병합 전 확인 한 단계다.
+
+### 왜 닫혔나
+
+- 행의 사실 1·4·5·6은 그 커밋의 CI run을 인용한다. 지금까지는 병합 커밋의 main CI를 기다렸다. Vercel은 그보다 먼저
+  READY가 되므로 그 사이 업로드가 닫혔다. `66282505`는 56분, `f2ca88d3`는 6분이었다(`RELEASE-ROW-README.md`).
+- D-05 상속은 거의 일어나지 않는다. 최근 main 병합 16개(`6c7d3e9d`..`f2ca88d3`)의 표면 digest는 16개 모두 바뀌었다.
+  16개 모두 실행되는 코드(`.ts`, `.tsx`, `.mjs`)를 바꿨다. 테스트, e2e, `.github/`까지 빼더라도 상속은 0개다.
+
+### 검토한 선택지
+
+| 선택지 | 판단 | 이유 |
+|---|---|---|
+| 1. 표면 좁히기 | 기각 | #213은 `app/explore/page.tsx`, `app/solutions/*.tsx`, `lib/solution-proof-picks.ts`, `scripts/repair-scope.mjs`를 바꿨다. #199(`66282505`)는 `lib/trial-ai-access.ts`와 `docs/policy/`(alwaysSurface)를 바꿨다. 모두 업로드 route와 같은 Next.js 서버 프로세스에서, 같은 `SUPABASE_SERVICE_ROLE_KEY`를 가진 채 돌거나, digest 뒤의 prebuild에서 빌드 머신 위에서 돈다. 고객 데이터 처리·허용·저장·삭제에 닿을 수 없다고 증명할 수 있는 경로가 없다. R5 보안 리뷰 B1(실행 코드에 대한 denylist는 안전하지 않다)이 그대로 적용된다. 제외한 경로는 없다. |
+| 2. 병합 전에 행 준비 | **채택** | 표면 digest는 tree만의 함수다. 최신 main을 포함한 PR head의 tree는 병합 커밋의 tree와 같다. 그 head의 `pull_request` CI는 같은 tree를 시험했다. 그래서 행을 head에 대해 head의 CI로 병합 전에 기록하면, 병합 커밋의 배포는 READY 순간 D-05로 그 행을 읽는다. 새 비밀도, gate 변경도 없다. |
+| 3. main CI가 행을 기록 | 기각(권고: 하지 않음) | 저장소가 PUBLIC이다. GitHub secret에 production service-role을 두면 main에서 도는 모든 workflow와 그 action 의존성이 RLS를 우회하는 키를 쥔다. 새어 나가면 테넌트 간 유출이다(Stop the line 1번). 사실 2·7·8·11은 CI job으로 관찰할 수 없고, 사실 12(창업자 승인)를 기계가 복사하게 된다. ADR 0006 선택지 (a)(b)를 기각한 이유와 같다. 2번이 같은 목표를 비밀 없이 이룬다. |
+| Vercel 승격 보류(Deployment Checks) | 지금은 하지 않음 | 승격을 행 존재에 걸려면 GitHub check가 production DB를 읽어야 하고, 읽기 전용 자격 증명이 GitHub에 새로 필요하다. 2번의 병합 전 확인이 같은 보장을 준다. 운영자가 그 확인을 건너뛰는 사고가 생기면 그때 다시 검토한다. |
+
+### 무엇이 보장되나
+
+- `pnpm release:gate-check --sha <PR head> --merge-into <origin/main SHA>`가 exit 0이면, 그 순간 병합하면 생기는 배포는
+  READY일 때 `released`다. check는 `git merge-tree --write-tree`로 GitHub(merge-ort)가 만들 tree를 계산한다. 그 tree의 표면
+  digest를 이름 붙인 행만 찾는다. 그 tree를 이름 붙인 행은 있을 수 없다. 그래서 배포된 gate가 보낼 질의와 같은 결과를 본다.
+  상속 행의 digest는 그 행 revision에서 다시 계산한다. 다르면 `surface_mismatch`이고 exit 1이다.
+  - 2026-11-09에 최근 병합 5개로 확인했다. `merge-tree` tree는 5개 모두 GitHub 병합 커밋의 tree와 같았다. 최신 main을
+    포함했던 #213의 head(`ad4c9e76`)는 병합 커밋 `f2ca88d3`와 표면 digest가 같았다. 나머지 4개 head는 main보다 뒤였고
+    digest가 달랐다. 그 경우가 아래 2번 단계다.
+- 병합 전에 main이 다른 표면 변경으로 움직이면 tree의 digest가 바뀐다. 상속은 없고, 배포는 지금처럼 정확한 SHA의 행을
+  기다린다. 열린 쪽으로 새지 않는다.
+- 행의 사실은 병합 커밋이 아니라 PR head의 CI를 인용한다. head가 origin/main을 포함하면 head의 `pull_request` run이 시험한
+  병합 tree는 head 자신의 tree다. main은 앞으로만 움직이므로, 지금의 main을 포함하면 run 시점의 main도 포함한다.
+  `make-evidence.mjs`는 이 조건(`git merge-base --is-ancestor origin/main <head>`)을 확인하지 못하면 아무것도 쓰지 않는다.
+- 만료는 그대로 행의 `evaluated_at`부터 30일이다. 병합 전에 기록하므로 그만큼 일찍 시작한다.
+- 같은 저장소의 브랜치 PR만 대상이다. fork PR의 head로는 기록하지 않는다.
+
+### 순서 (위임 운영자)
+
+1. PR의 필수 체크가 head에서 green이고 독립 리뷰가 blocker 0이다. `fnd-UX`에서
+   `git fetch origin main <PR 브랜치>`를 한다.
+2. `git merge-base --is-ancestor origin/main <head>`가 0이 아니면 GitHub의 "Update branch"(merge 방식. rebase 아님)로
+   head를 최신으로 만들고, 새 head의 CI가 green이 될 때까지 기다린다. 묶음 병합이면 마지막 PR만 남기고 먼저 병합하고,
+   그 사이 배포는 지금처럼 취소한 뒤, 마지막 PR을 최신으로 만든다.
+3. 그 head로 행을 만든다(저장소 밖 도구, AKC `outputs/…/hard-proof-20261027/impl/upload-unblock/`).
+   ```sh
+   node make-evidence.mjs --rev <head>           # head의 pull_request run을 읽는다. main 포함 여부를 확인한다
+   cd <fnd-UX>/nextjs && node scripts/gate-surface.mjs --sha <head>
+   node build-release-row.mjs --rev <head> --surface <위 digest> --receipt-event <fact 7>
+   ```
+   생성된 `RELEASE-ROW-<head8>.sql`을 실행한다(위임 운영자, campaign ledger에 sha256 기록).
+4. **병합 직전 확인.** exit 0이 아니면 병합하지 않는다.
+   ```sh
+   cd nextjs
+   NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
+     pnpm release:gate-check --sha <head> --merge-into $(git rev-parse origin/main)
+   ```
+   보고서의 `mergeOf`가 base, head, 예측 tree를 적는다. `scopes[0].inheritedFrom`은 head다. exit 2는 conflict이거나 commit을
+   fetch하지 않은 것이다.
+5. 곧바로 병합한다. 4와 병합 사이에 main이 움직였으면 4를 다시 한다.
+6. READY 뒤에는 위 D-05 순서 4·6번 그대로다. (a) 빌드 로그 deploy 단계 줄, (b) `next build` 줄, (c)
+   `gate-surface.mjs --sha <병합 SHA>`가 같아야 한다. `pnpm release:gate-check --sha <병합 SHA>`가 `released`이고
+   `inheritedFrom`이 head여야 한다. 다르면 그 표면을 거절하고(위 "거절") 원인을 찾는다.
+
+어느 단계든 막히면 지금까지의 순서(배포 → main CI → 병합 SHA의 행)로 돌아간다. 그때는 닫히는 시간이 다시 생긴다.
