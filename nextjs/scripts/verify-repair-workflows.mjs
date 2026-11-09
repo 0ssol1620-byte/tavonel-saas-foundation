@@ -706,8 +706,8 @@ for (const binding of [
   // site-polish-20261109: the /benchmarks charts, the Explore change act and the two trust-link components.
   { group: 'site-polish-20261109', prefix: 'nextjs/', exportedPaths: SITE_POLISH_AFFECTED_PATHS, exportedSuites: SITE_POLISH_AFFECTED_UNIT_FILES,
     exportedBrowsers: SITE_POLISH_AFFECTED_BROWSER_FILES,
-    paths: ['components/benchmarks/arena-charts.module.css', 'components/benchmarks/arena-charts.tsx', 'components/explore/change-act.tsx', 'components/trust-disclosures.tsx', 'components/trust-provisions.tsx'],
-    suites: ['lib/benchmarks-page.test.ts', 'lib/explore-story.test.ts', 'lib/public-trust-contract.test.ts', 'lib/trust-provisions.test.ts'],
+    paths: ['components/benchmarks/arena-charts.module.css', 'components/benchmarks/arena-charts.tsx', 'components/explore/change-act.tsx', 'components/file-or-route-link.tsx', 'components/trust-disclosures.tsx', 'components/trust-provisions.tsx', 'lib/file-or-route-link.test.ts'],
+    suites: ['lib/benchmarks-page.test.ts', 'lib/explore-story.test.ts', 'lib/file-or-route-link.test.ts', 'lib/public-trust-contract.test.ts', 'lib/trust-provisions.test.ts'],
     browsers: ['e2e/benchmarks.spec.ts', 'e2e/explore.spec.ts', 'e2e/templates.spec.ts'],
     rows: ["['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/explore.spec.ts', ['1440']],", "['e2e/templates.spec.ts', ['1440']],"],
     neighbors: ['nextjs/components/benchmarks/arena-chart.tsx', 'nextjs/components/explore/change-act.module.css', 'nextjs/components/trust-disclosure.tsx', 'components/trust-provisions.tsx'] },

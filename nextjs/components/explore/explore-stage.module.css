@@ -1235,10 +1235,14 @@
   .askPanel { right: 14px; left: 14px; }
 }
 
-@media (max-width: 480px) {
-  .entry h1 { font-size: 38px; }
+/* Review N2: five tiles need about 120px each, so two columns start where that runs out, not at 480px. */
+@media (max-width: 640px) {
   .changeCounts { grid-template-columns: 1fr 1fr; }
   .changeCounts > div:first-child { grid-column: 1 / -1; }
+}
+
+@media (max-width: 480px) {
+  .entry h1 { font-size: 38px; }
   .drawer { width: 100vw; }
 }
 

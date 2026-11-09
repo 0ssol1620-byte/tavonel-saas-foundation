@@ -2212,8 +2212,8 @@ export const COMPILER_RELEASE_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-co
 export const COMPILER_RELEASE_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmarks.spec.ts', 'e2e/templates.spec.ts']);
 // site-polish-20261109: the /benchmarks charts, the Explore change act and the two trust-link components.
 export const SITE_POLISH_AFFECTED_PATHS = Object.freeze(['components/benchmarks/arena-charts.module.css', 'components/benchmarks/arena-charts.tsx',
-  'components/explore/change-act.tsx', 'components/trust-disclosures.tsx', 'components/trust-provisions.tsx']);
-export const SITE_POLISH_AFFECTED_UNIT_FILES = Object.freeze(['lib/benchmarks-page.test.ts', 'lib/explore-story.test.ts', 'lib/public-trust-contract.test.ts', 'lib/trust-provisions.test.ts']);
+  'components/explore/change-act.tsx', 'components/file-or-route-link.tsx', 'components/trust-disclosures.tsx', 'components/trust-provisions.tsx', 'lib/file-or-route-link.test.ts']);
+export const SITE_POLISH_AFFECTED_UNIT_FILES = Object.freeze(['lib/benchmarks-page.test.ts', 'lib/explore-story.test.ts', 'lib/file-or-route-link.test.ts', 'lib/public-trust-contract.test.ts', 'lib/trust-provisions.test.ts']);
 export const SITE_POLISH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmarks.spec.ts', 'e2e/explore.spec.ts', 'e2e/templates.spec.ts']);
 // Packet delivery (codex/packet-delivery-textlayer-20261102): the delivery format an AI reads the compiled context in. The
 // download route and the two guidance modules that write the delivery/ files and point AGENTS.md at them, the package verifier

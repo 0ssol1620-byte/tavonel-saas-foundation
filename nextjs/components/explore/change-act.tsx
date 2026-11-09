@@ -214,11 +214,6 @@ export default function ChangeAct({
           label="Compiled World after the 2026 filings arrived, with the objects they reached"
         />
         {/*
-          §20. This is the one act where an object's state differs, and the canvas reports that
-          difference in colour. The list prints AFFECTED or UNCHANGED as a word, so the same
-          reading is available to someone who cannot see the palette.
-        */}
-        {/*
           BA-033. The act used to open on two bare figures and close on a paragraph whose first
           clause denied a capability, so the sentence a reader took away was about what is not
           wired rather than about what four filings did. This is the same three measurements the
@@ -289,6 +284,11 @@ export default function ChangeAct({
             Worlds.
           </p>
         </details>
+        {/*
+          §20. This is the one act where an object's state differs, and the canvas reports that
+          difference in colour. The list prints AFFECTED or UNCHANGED as a word, so the same
+          reading is available to someone who cannot see the palette.
+        */}
         <ParallelView
           model={model}
           layout={layout}

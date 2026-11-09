@@ -516,8 +516,36 @@ export default function ExploreStage({ access, model, layout, change, answers, t
       ) : null}
 
       <section className={styles.next}>
-        <p className={styles.nextLabel}>{EXPLORE_COPY.endSourcesLabel}</p>
         <h2>{EXPLORE_COPY.endHeading}</h2>
+        {/*
+          BA-036. Three buttons in one row is the rule 3.4 bars, and the third was the one nobody
+          needed as a button: a reader who has finished the sample either brings their own files or
+          connects a system. The guide stays one click away as a sentence. Only the sign-in exit is
+          the signup step -- counting the other action as a conversion would inflate the last
+          funnel row.
+        */}
+        <div>
+          {endActions.map((action) => (
+            <Link
+              key={action.href}
+              href={action.href as Route}
+              data-primary={action.primary ? "1" : "0"}
+              onClick={action.href === "/login" ? () => trackFunnel("explore_to_signup") : undefined}
+            >
+              {action.label}
+            </Link>
+          ))}
+        </div>
+        <p className={styles.nextNote}>
+          Or read how a compile reaches a World first, in the{" "}
+          <Link href="/knowledge-compiler">Knowledge Compiler guide</Link>.
+        </p>
+        {/*
+          2026-11-09 (review N1). Source order is the phone's reading order -- heading, actions, note,
+          then the filings -- so a keyboard reaches the primary action before the source footnote.
+          The desktop grid areas place the same elements in two columns.
+        */}
+        <p className={styles.nextLabel}>{EXPLORE_COPY.endSourcesLabel}</p>
         {/*
           BA-029. The closing section was a two-column grid with the whole left column empty below
           the heading, which reads as a layout failure rather than as restraint. What belongs there
@@ -550,29 +578,6 @@ export default function ExploreStage({ access, model, layout, change, answers, t
             <Link href={"/explore?act=evidence" as Route}>See what a region is</Link>.
           </p>
         ) : null}
-        {/*
-          BA-036. Three buttons in one row is the rule 3.4 bars, and the third was the one nobody
-          needed as a button: a reader who has finished the sample either brings their own files or
-          connects a system. The guide stays one click away as a sentence. Only the sign-in exit is
-          the signup step -- counting the other action as a conversion would inflate the last
-          funnel row.
-        */}
-        <div>
-          {endActions.map((action) => (
-            <Link
-              key={action.href}
-              href={action.href as Route}
-              data-primary={action.primary ? "1" : "0"}
-              onClick={action.href === "/login" ? () => trackFunnel("explore_to_signup") : undefined}
-            >
-              {action.label}
-            </Link>
-          ))}
-        </div>
-        <p className={styles.nextNote}>
-          Or read how a compile reaches a World first, in the{" "}
-          <Link href="/knowledge-compiler">Knowledge Compiler guide</Link>.
-        </p>
       </section>
     </main>
   );

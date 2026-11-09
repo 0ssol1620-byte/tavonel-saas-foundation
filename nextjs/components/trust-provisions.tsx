@@ -1,5 +1,4 @@
-import Link from "next/link";
-import type { Route } from "next";
+import FileOrRouteLink from "@/components/file-or-route-link";
 import {
   TRUST_PROVISION_STATE_LABEL,
   TRUST_PROVISION_STATE_TOKEN,
@@ -32,12 +31,6 @@ import {
   decide, `--reused` for an absence. No hue means anything the state's own name does not say.
 */
 
-/*
-  A published file (a policy .md, security.txt) is not a route. next/link prefetches its RSC
-  payload, which 404s and puts an error in every visitor's console on /security, /trust and
-  /enterprise. A file gets a plain anchor.
-*/
-const isFile = (href: string) => /.[a-z0-9]+$/i.test(href);
 
 function Row({ row }: { row: TrustProvision }) {
   return (
@@ -50,9 +43,7 @@ function Row({ row }: { row: TrustProvision }) {
       </td>
       <td data-label="What is true today">
         {row.line}{" "}
-        {isFile(row.source.href)
-          ? <a className="provision-source" href={row.source.href}>{row.source.label}</a>
-          : <Link className="provision-source" href={row.source.href as Route}>{row.source.label}</Link>}
+        <FileOrRouteLink className="provision-source" href={row.source.href}>{row.source.label}</FileOrRouteLink>
       </td>
     </tr>
   );

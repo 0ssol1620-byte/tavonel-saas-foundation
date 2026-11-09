@@ -7585,9 +7585,9 @@ test('affected compiler-release owner: 2 exact paths select 3 direct suites and 
 });
 // site-polish-20261109: one finite owner, restated independently of the exported constants.
 import { SITE_POLISH_AFFECTED_PATHS, SITE_POLISH_AFFECTED_UNIT_FILES, SITE_POLISH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
-test('affected site-polish-20261109 owner: 5 exact paths select 4 direct suites and 3 browser suites; neighbours stay unmapped', () => {
-  const paths = ['components/benchmarks/arena-charts.module.css', 'components/benchmarks/arena-charts.tsx', 'components/explore/change-act.tsx', 'components/trust-disclosures.tsx', 'components/trust-provisions.tsx'];
-  const suites = ['lib/benchmarks-page.test.ts', 'lib/explore-story.test.ts', 'lib/public-trust-contract.test.ts', 'lib/trust-provisions.test.ts'];
+test('affected site-polish-20261109 owner: 7 exact paths select 5 direct suites and 3 browser suites; neighbours stay unmapped', () => {
+  const paths = ['components/benchmarks/arena-charts.module.css', 'components/benchmarks/arena-charts.tsx', 'components/explore/change-act.tsx', 'components/file-or-route-link.tsx', 'components/trust-disclosures.tsx', 'components/trust-provisions.tsx', 'lib/file-or-route-link.test.ts'];
+  const suites = ['lib/benchmarks-page.test.ts', 'lib/explore-story.test.ts', 'lib/file-or-route-link.test.ts', 'lib/public-trust-contract.test.ts', 'lib/trust-provisions.test.ts'];
   const browsers = ['e2e/benchmarks.spec.ts', 'e2e/explore.spec.ts', 'e2e/templates.spec.ts'];
   assert.deepEqual([[...SITE_POLISH_AFFECTED_PATHS], [...SITE_POLISH_AFFECTED_UNIT_FILES], [...SITE_POLISH_AFFECTED_BROWSER_FILES]], [paths, suites, browsers]);
   for (const path of paths.map(p => `nextjs/${p}`)) {
@@ -7600,7 +7600,7 @@ test('affected site-polish-20261109 owner: 5 exact paths select 4 direct suites 
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, browsers, false, false]);
   assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440']);
   for (const adjacent of ['nextjs/components/benchmarks/arena-chart.tsx', 'nextjs/components/benchmarks/arena-charts.test.tsx', 'nextjs/components/explore/change-act.module.css',
-    'nextjs/components/trust-disclosure.tsx', 'nextjs/components/trust-provisions.module.css', 'components/trust-provisions.tsx']) {
+    'nextjs/components/trust-disclosure.tsx', 'nextjs/components/trust-provisions.module.css', 'nextjs/components/file-or-route-link.module.css', 'components/trust-provisions.tsx']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
