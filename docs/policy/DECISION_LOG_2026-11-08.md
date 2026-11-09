@@ -13,7 +13,7 @@
 - 특허 출원·공개 시점(F-9)은 이 기록이 정하지 않는다(헌법 "What is not an agent's call").
 - **이 저장소는 공개(public)다**(2026-11-08 `gh api`: `private: false`). 프로그램 §9의 F-8·F-9·F-11 기본값과 설계 182행은
   Foundation이 private이라고 가정했다. 그 가정은 틀렸다. 그래서 receipt 없는 숫자, 증명 실행 원자료, 창업자 문서와 그 동의
-  receipt는 이 저장소에도 AKC에도 push하지 않는다. 저장소 가시성을 바꿀지는 창업자가 정한다. agent는 바꾸지 않는다.
+  receipt는 이 저장소에도 AKC에도 push하지 않는다. 저장소 가시성은 아래 "추가 2026-11-09" V-1이 정한다.
 
 ## 결정
 
@@ -26,7 +26,7 @@
 | F-5 | 제품 안 LLM의 데이터 정책 등급 | **RunPod 자체 호스팅 open-weights만.** 제3자 LLM API는 공개 corpus의 Arena arm으로만. 고객 데이터를 API로 보내는 등급은 별도 결정 | 채택 | `docs/adr/0007-in-product-llm-data-policy.md` |
 | F-6 | Ask 근거 생성 개방과 채널 | MCP/REST는 evidence-first + 답변 가능성 게이트. 근거 생성은 web Ask에만, E3 Arena gate 통과 뒤 cohort로 | 채택 | ADR-0007 §2. `TAVONEL_ASK_GENERATION_ENABLED`는 미설정 유지 |
 | F-7 | 가격 문구, `purchasePlan.enabled`, Paddle live, 환불·세금 문구 | W4까지 닫아 둔다. sandbox 전 구간 receipt만 준비. 전환은 Gate D 뒤 | W4에 **NEEDS-INPUT**: 가격·환불·세금 문구, Paddle live 자격증명, MoR 계약 확인 | 없음 |
-| F-8 | 증명 실행 결과·GDP v4 `NOT_SUPPORTED` 공개, RUN-MANIFEST 서명 방식 | 공개한다. n·분모·한계를 같이 쓴다. RUN-MANIFEST는 **서명 없이 git commit sha에 고정**한다 | 공개·고정 방식 채택. 보관 위치는 **NEEDS-INPUT**(창업자): 프로그램이 정한 "Foundation private"은 이 저장소가 public이라 성립하지 않는다. 저장소를 private으로 돌릴지, 다른 private 위치(예: AKC의 untracked `outputs/`)를 쓸지 창업자가 정한다 | 그 결정 전까지 A4 lane은 증명 실행 원자료를 이 저장소에 push하지 않는다. 공개 숫자는 receipt 규칙 그대로 |
+| F-8 | 증명 실행 결과·GDP v4 `NOT_SUPPORTED` 공개, RUN-MANIFEST 서명 방식 | 공개한다. n·분모·한계를 같이 쓴다. RUN-MANIFEST는 **서명 없이 git commit sha에 고정**한다 | 채택. 보관 위치는 2026-11-09 결정 V-2(아래): 로컬 private 감사 저장소 `D:/CodexProjects/tavonel-private-audit/proof-runs/<yyyy-mm>-<wave>/`. 프로그램이 정한 "Foundation private"은 이 저장소가 public이라 성립하지 않아 대체되었다 | A4 lane은 증명 실행 원자료와 RUN-MANIFEST를 어느 git 저장소에도 push하지 않는다. 원자료에서 나온 숫자를 공개하려면 지금처럼 Evidence 규칙에 따른 receipt가 있어야 한다 |
 | F-9 | 특허 출원·공개 시점, FTO-1 counsel 검토 | **이 기록은 정하지 않는다.** 별도 lane(AKC PR #152 disclosure 처분 포함). 판단 대기 목록에 더할 것: 이 PR 브랜치(public)의 ADR-0007 §2(E3 설계)는 이미 공개되어 있다. 공개에 해당하는지 분류하는 것은 F-9의 몫이다 | 창업자 | 없음 |
 | F-10 | gold 주석·판정 주체 | 창업자 + 지정 검토자 1명(사람 약 4–6일) | **NEEDS-INPUT**: 지정 검토자 이름 | 없음 |
 | F-11 | technology intake register owner, NVIDIA auto-ontology 항목 | owner = 창업자, 초안 = agent | 채택. 항목 초안은 register가 공개 AKC에 있으므로 F-9 판단 전에는 push하지 않는다 | 없음 |
@@ -34,6 +34,16 @@
 | F-13 | Google Drive OAuth 앱 | Drive read-only 최소 scope, 운영자 소유 앱 | **NEEDS-INPUT**: OAuth client 자격증명, 동의 화면 문구. 정확한 scope 문자열은 D5 qualification이 정한다 | 없음 |
 | F-14 | 동일 조건 vendor 비교 | W4에 vendor 2곳, 공개 corpus만, 이기든 지든 공개 | W4에 **NEEDS-INPUT**: vendor 2곳 지정, vendor API 키·결제·약관 확인 | 없음 |
 | F-15 | `channel.json` DISTRIBUTION_VERSION 갱신 | 갱신 + changelog | 채택. W1 배포(`7104a3ef`)는 올리지 않고 나갔다 | 다음 배치의 release 커밋에서 한다(아래) |
+
+### 추가 2026-11-09 — 저장소 가시성과 F-8 보관 위치
+
+근거: 창업자 메시지(2026-11-09, 원문) **"승인할테니까 파운더 결정 필요한것들 너가 다 실행하고 모두 완료할 수 있도록해줘"**.
+이 메시지로 오케스트레이터가 창업자 전용 항목을 프로그램 기본값으로 정했다. 표시 규칙은 위와 같다: "위임 결정, 2026-11-09".
+
+| ID | 결정 | 이유 | 결과 규칙 |
+|---|---|---|---|
+| V-1 | **GitHub 저장소 두 개(Foundation, AKC)는 public으로 둔다.** | 계정이 GitHub Free plan이다. Foundation 저장소의 Actions run은 7,017건이다. private 저장소는 Actions 사용이 월 2,000분으로 제한되어 CI가 멈춘다. | 다음은 어느 저장소에도 push하지 않는다: tenant object key가 든 receipt, 창업자 문서나 동의 receipt, 증명 실행 원자료와 RUN-MANIFEST, Arena prompt와 harness. |
+| V-2 | **F-8 보관 위치는 로컬 private 감사 저장소 `D:/CodexProjects/tavonel-private-audit/`이다.** git 저장소가 아니고 두 저장소 밖에 있다. 실행마다 경로는 `proof-runs/<yyyy-mm>-<wave>/`이다. | public 저장소에는 둘 수 없다(V-1). | 여기서 나온 숫자를 공개하려면 지금처럼 Evidence 규칙에 따른 receipt가 있어야 한다. |
 
 ### SEC User-Agent (handoff 창업자 전용 목록)
 
