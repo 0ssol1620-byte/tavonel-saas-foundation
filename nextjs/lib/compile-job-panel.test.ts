@@ -60,6 +60,19 @@ describe("a size refusal", () => {
     expect(html).not.toContain("<dl");
   });
 
+  it("says the bound was exceeded, not '?', when the read stopped at the bound", () => {
+    // D0 2026-11-09: a Core response streamed past 80 MiB is cut there, so bytes is null; only "more than" is known.
+    const cut = { bytes: null, bound: 83_886_080, largestPackageFiles: [], counts: {} };
+    const failed = { ...job, state: "failed" as const, errorCode: "CORE_OUTPUT_TOO_LARGE", collectionId: null, sizeLimit: cut };
+    const en = render(failed);
+    expect(en).toContain("exceeded the 83,886,080 byte limit");
+    expect(en).not.toContain("?");
+    expect(en).not.toContain("/ 83,886,080");
+    const ko = renderToStaticMarkup(createElement(CompileJobPanel, { job: failed, languages: ["ko-KR"], onResolve() {}, onCancel() {} }));
+    expect(ko).toContain("83,886,080 바이트 상한 초과");
+    expect(ko).not.toContain("?");
+  });
+
   it("keeps the generic line for an unrelated failure", () => {
     expect(render({ state: "failed", errorCode: "CORE_V2_TIMEOUT", collectionId: null })).toContain("Our servers could not complete this");
   });

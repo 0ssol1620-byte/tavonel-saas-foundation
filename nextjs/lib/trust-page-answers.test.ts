@@ -333,7 +333,7 @@ describe("§77 /status scope", () => {
   */
   it("separates configured rows from successful requests", () => {
     expect(page).toContain("configured and its gate is open");
-    expect(page).toContain("it does not mean a request recently succeeded");
+    expect(page).toContain("It does not mean a request recently succeeded");
     expect(page).toContain("Scheduled checks report request outcomes separately");
   });
 
@@ -767,7 +767,8 @@ describe("public trust disclosures and the enterprise procurement summary", () =
   it("routes enterprise buyers to maintained trust records without repeating the review inventory", () => {
     const source = withoutComments(read("app/enterprise/page.tsx"));
     expect(source).not.toContain("<TrustDisclosures");
-    for (const material of ["not enabled by purchasing a plan", 'href={"/trust" as Route}',
+    // D-12 (delegated decision 2026-11-09): the pilot is scoped with us; a plan is bought online.
+    for (const material of ["pilot is scoped with us rather than bought online", 'href={"/trust" as Route}',
       'href={"/security" as Route}', "qualified review", "draft for review"]) {
       expect(source).toContain(material);
     }

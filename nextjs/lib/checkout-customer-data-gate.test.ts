@@ -75,6 +75,19 @@ describe("live checkout requires the buyer's document-processing receipt", () =>
     const response = await POST(request());
     expect(response.status).toBe(200);
     expect(intent).toHaveBeenCalledOnce();
+    // Billing integrity: the signer is handed the stored key exactly, not a trimmed copy.
+    expect(binding).toHaveBeenCalledWith(expect.anything(), "h".repeat(32));
+  });
+
+  it("refuses to sign with a binding key that carries surrounding whitespace (billing integrity)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    gate.mockResolvedValue(approved());
+    vi.stubEnv("FOUNDATION_BILLING_HMAC", `${"h".repeat(32)}\n`);
+    const response = await POST(request());
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ code: "BILLING_NOT_CONFIGURED" });
+    expect(binding).not.toHaveBeenCalled();
+    expect(intent).not.toHaveBeenCalled();
   });
 
   it("keeps the existing sandbox billing qualification independent of customer-data approval", async () => {

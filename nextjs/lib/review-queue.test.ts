@@ -830,3 +830,24 @@ describe("an aborted decision-ledger read", () => {
     expect(currentReviewLedger(stored, oldScope)).toEqual({ status: "loading" });
   });
 });
+
+/* D0 2026-11-09 R2: a known reason leads with its sentence and keeps the recorded string as a reference. */
+describe("review reason chip", () => {
+  const raw = "CONTRADICTION_GROUP_TOO_LARGE:contradiction_group_91a2:claims=216:pairs=23220";
+  const input = { ...base, documentIds: ["doc-x"], blocked: [], documents: [], reviewReasons: [raw], evidence: [], decisions: [], names: {} };
+
+  it("prints the sentence, then Reference and the raw code, in the browser's language", () => {
+    const en = renderToStaticMarkup(createElement(ReviewQueue, { input }));
+    expect(en).toContain("<em>216 statements on one topic may conflict with each other.");
+    expect(en).toContain(`Reference <code>${raw}</code>`);
+    const ko = renderToStaticMarkup(createElement(ReviewQueue, { input, languages: ["ko-KR"] }));
+    expect(ko).toContain("<em>한 주제에 서로 어긋날 수 있는 진술이 216개 있습니다.");
+    expect(ko).toContain(`참조 <code>${raw}</code>`);
+  });
+
+  it("prints an unknown reason exactly as before", () => {
+    const markup = renderToStaticMarkup(createElement(ReviewQueue, { input: { ...input, reviewReasons: ["GLOBAL_REASON_WITH_NO_DOCUMENT"] } }));
+    expect(markup).toContain("<span>Review reason</span><code>GLOBAL_REASON_WITH_NO_DOCUMENT</code>");
+    expect(markup).not.toContain("<em>");
+  });
+});

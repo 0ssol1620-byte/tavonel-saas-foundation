@@ -110,7 +110,8 @@ export function ArenaSpeedQualityPlot({ dots }: { dots: readonly ArenaDot[] }) {
   const plotW = PLOT.width - PLOT.left - PLOT.right;
   const plotH = PLOT.height - PLOT.top - PLOT.bottom;
   const x = (seconds: number) => PLOT.left + (seconds / maxSeconds) * plotW;
-  const y = (edit: number) => PLOT.top + (edit / maxEdit) * plotH;
+  /* SVG y grows downward; the 0 tick sits at the bottom, so a lower Edit is drawn lower. */
+  const y = (edit: number) => PLOT.top + (1 - edit / maxEdit) * plotH;
 
   return (
     <figure className={styles.chart}>

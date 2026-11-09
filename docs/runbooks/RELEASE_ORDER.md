@@ -376,6 +376,20 @@ migration은 additive다. 기존 행은 전부 `live`가 되고, create RPC의 �
   migration이 없으면 거절이 일어나지 않을 뿐이다. 같은 PR의 lease CAS는 기존 컬럼(`updated_at`)만 쓰므로 migration이 필요 없다.
 - 적용은 **창업자 작업**이다. 동작은 CI db-rehearsal이 `supabase/tests/compile_job_post_terminal_event.sql`로 검증한다.
 
+## 추가 2026-11-08 — compile job은 cron 하나가 돌린다 (D0 스케줄러 기아)
+
+- PR #192 이후 compile job을 진행시키는 것은 `/api/internal/jobs/run` cron(1분마다)뿐이다. events 스트림 라우트는 읽기만 한다.
+  이 설계는 유지한다. 라우트에 nudge를 다시 넣지 않는다.
+- cron은 열린 작업을 전역으로 `updated_at` 오름차순, 창 10건으로 읽고 틱당 5건을 시도한다. 고객 응답을 기다리는 작업
+  (`blocked` 비어 있지 않음, `blocked_resolution` null)은 이제 이 창에서 빠진다(`SCHEDULER_AWAITING_CUSTOMER_FILTER`).
+  고객이 blockers 라우트로 답하면 RPC가 행을 쓰고 touch trigger가 `updated_at`을 올려 다음 틱에 다시 들어온다.
+  migration은 필요 없다. 배포 순서도 상관없다.
+- 기아 탐지: 런타임 로그 `{"event":"compile_batch",…}`가 틱마다 `turns`, `claimed`, `skipped`, `blocked`를 남긴다.
+  `blocked`는 작업당 한 틱만 나와야 한다. 여러 틱 연속 `blocked == turns`이고 `claimed: 0`인데 preflight/reading 작업이
+  남아 있으면 창이 다시 막힌 것이다. 큐를 읽지 못한 틱은 `{"event":"compile_batch_read_failed","code":…}`(error)로 남는다.
+  `turns: 0`만으로는 빈 큐와 구별되지 않으니, 이 줄이 없는지도 함께 본다.
+- 진단과 원인 사례: `outputs/tavonel-research-replan-20261013/market-20261104/w1/D0-DIAGNOSIS-20261108.md`(AKC 저장소).
+
 ## 추가 2026-11-08 — W2-E2 Ask 답변 가능성 게이트 shadow (migration 없음)
 
 - 새 flag는 `TAVONEL_ASK_ANSWERABILITY_MODE`(부록 A)다. 기본값은 `off`이고, `off`면 게이트를 계산하지 않는다. `shadow`면 판정을 계산해

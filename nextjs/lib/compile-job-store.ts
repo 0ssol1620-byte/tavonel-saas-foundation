@@ -856,10 +856,21 @@ export async function resolveCompileJobBlockers(input: {
 
   -- and it belongs in the migration that owns this table's chain, not here. Recorded rather than
   written: this lane writes no migration, and the query is correct without it.
+
+  The same reasoning drops a job waiting on the customer's blocker decision (D0, 2026-11-08):
+  `blocked` non-empty and `blocked_resolution` null. The worker keeps every existing blocker
+  (`classify`) and writes nothing for an unchanged one, so such a job never bumps `updated_at`,
+  and five of them held the oldest-first window for every workspace. It comes back on its own:
+  the blockers RPC writes the row (a resolution, or `retry_eligible` clearing the ordinary
+  blockers), the touch trigger moves `updated_at`, and this filter matches again. It is a
+  residual filter over the same partial index; no index is needed at today's row counts.
 */
+export const SCHEDULER_AWAITING_CUSTOMER_FILTER = "(blocked.eq.[],blocked_resolution.not.is.null)";
+
 export async function readOpenCompileJobs(limit = 20): Promise<CompileJobResult<CompileJob[]>> {
   const query = new URLSearchParams({
     state: `not.in.(${SCHEDULER_EXCLUDED_STATES.join(",")})`,
+    or: SCHEDULER_AWAITING_CUSTOMER_FILTER,
     order: "updated_at.asc",
     limit: String(Math.min(Math.max(1, limit), 100)),
     select: "*",

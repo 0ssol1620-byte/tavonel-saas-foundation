@@ -83,7 +83,11 @@ export function isSizeLimitFailure(code: string | null | undefined): boolean {
   return Boolean(code && SIZE_LIMIT_FAILURE_CODES.includes(code));
 }
 
-export type SizeLimitFailureCopy = { sentence: string; measured: string; largest: string; counts: string };
+export type SizeLimitFailureCopy = {
+  sentence: string; measured: string; largest: string; counts: string;
+  /** The read stopped at the bound, so only "more than the bound" was measured, never an exact size. */
+  exceeded: (bound: string) => string;
+};
 
 const SIZE_LIMIT_COPY: Record<"en" | "ko", SizeLimitFailureCopy> = {
   en: {
@@ -91,12 +95,14 @@ const SIZE_LIMIT_COPY: Record<"en" | "ko", SizeLimitFailureCopy> = {
     measured: "Measured size",
     largest: "Largest parts of the output",
     counts: "What the output held",
+    exceeded: (bound) => `exceeded the ${bound} byte limit`,
   },
   ko: {
     sentence: "이 파일 묶음은 World 하나에 담을 수 있는 크기를 넘어, 아무것도 저장하지 않았습니다. 같은 묶음을 다시 실행해도 결과는 같습니다. 파일 수를 줄이거나 더 작은 파일로 나누어 컴파일하세요.",
     measured: "측정한 크기",
     largest: "출력에서 가장 큰 부분",
     counts: "출력에 담긴 항목",
+    exceeded: (bound) => `${bound} 바이트 상한 초과`,
   },
 };
 
@@ -107,4 +113,52 @@ const SIZE_LIMIT_COPY: Record<"en" | "ko", SizeLimitFailureCopy> = {
  */
 export function sizeLimitFailureCopy(languages: readonly string[] = []): SizeLimitFailureCopy {
   return SIZE_LIMIT_COPY[languages[0]?.toLowerCase().startsWith("ko") ? "ko" : "en"];
+}
+
+/*
+  D0 2026-11-09 R2: a 12-page scan settled review_required and the review queue printed
+  `CONTRADICTION_GROUP_TOO_LARGE:contradiction_group_<sha256>:claims=216:pairs=23220` at the customer.
+  Core writes these two codes in one shape (akc_product_core/semantics.py,
+  `ContradictionGroupOverflow.review_reason`): the group is over its own pair bound, or the compile's
+  shared pair budget was spent on other topics first. The only numbers said are the two the string
+  carries. Any other code, or a string not in exactly that shape, gets no sentence and is shown raw.
+*/
+const CONTRADICTION_REASON = /^(CONTRADICTION_GROUP_TOO_LARGE|CONTRADICTION_PAIR_BUDGET_EXCEEDED):[^:\s]+:claims=(\d+):pairs=(\d+)$/;
+
+type ReviewLanguage = "en" | "ko";
+
+const REVIEW_REASON_COPY: Record<ReviewLanguage, {
+  reference: string;
+  CONTRADICTION_GROUP_TOO_LARGE: (claims: string, pairs: string) => string;
+  CONTRADICTION_PAIR_BUDGET_EXCEEDED: (claims: string, pairs: string) => string;
+}> = {
+  en: {
+    reference: "Reference",
+    CONTRADICTION_GROUP_TOO_LARGE: (claims, pairs) =>
+      `${claims} statements on one topic may conflict with each other. Comparing them takes ${pairs} checks, which is more than this compile checks automatically, so a person needs to review them. Open the review to decide.`,
+    CONTRADICTION_PAIR_BUDGET_EXCEEDED: (claims, pairs) =>
+      `${claims} statements on one topic may conflict with each other. This compile had already used its automatic checks on other topics, so these ${pairs} checks were left for a person. Open the review to decide.`,
+  },
+  ko: {
+    reference: "참조",
+    CONTRADICTION_GROUP_TOO_LARGE: (claims, pairs) =>
+      `한 주제에 서로 어긋날 수 있는 진술이 ${claims}개 있습니다. 비교에 ${pairs}번의 확인이 필요해 이번 컴파일이 자동으로 확인하는 한도를 넘었으므로 사람이 검토해야 합니다. 검토 화면을 열어 결정하세요.`,
+    CONTRADICTION_PAIR_BUDGET_EXCEEDED: (claims, pairs) =>
+      `한 주제에 서로 어긋날 수 있는 진술이 ${claims}개 있습니다. 이번 컴파일은 다른 주제에서 자동 확인 한도를 이미 써서 이 ${pairs}번의 확인을 사람이 검토하도록 남겼습니다. 검토 화면을 열어 결정하세요.`,
+  },
+};
+
+/**
+ * The plain sentence for a recorded review reason, or null when the reason is not one we have
+ * written a sentence for (the caller then shows the raw string, as before). `reference` labels the
+ * raw string, which the caller always keeps on screen beside the sentence.
+ */
+export function reviewReasonCopy(value: string, languages: readonly string[] = []): { sentence: string; reference: string } | null {
+  const match = CONTRADICTION_REASON.exec(value);
+  if (!match) return null;
+  const language: ReviewLanguage = languages[0]?.toLowerCase().startsWith("ko") ? "ko" : "en";
+  const copy = REVIEW_REASON_COPY[language];
+  const format = (digits: string) => Number(digits).toLocaleString(language === "ko" ? "ko-KR" : "en-US");
+  const code = match[1] as "CONTRADICTION_GROUP_TOO_LARGE" | "CONTRADICTION_PAIR_BUDGET_EXCEEDED";
+  return { sentence: copy[code](format(match[2]), format(match[3])), reference: copy.reference };
 }

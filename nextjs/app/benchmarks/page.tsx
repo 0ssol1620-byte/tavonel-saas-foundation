@@ -207,7 +207,7 @@ export default function BenchmarksPage() {
                 The reader study compares {settled.length} models on the same{" "}
                 <span data-derived="1">{arena.benchmark.gt_pages.toLocaleString("en-US")}</span>{" "}
                 benchmark pages. The recovery study below tests our own pipeline with and without
-                one lane. Both publish methods and limits; neither is a current-service score.
+                one lane. Both publish methods and limits. Neither is a current-service score.
               </p>
 
               <section className={styles.recovery} aria-labelledby="recovery-title">

@@ -45,7 +45,7 @@ const NEXT_ACTION: Record<TrustStep, string> = {
   "/benchmarks": "Rerun the public sample",
   "/reproducibility": "Read the open questions",
   "/research": "Read what was measured",
-  "/pricing": "Start with your files",
+  "/pricing": "See the plans",
 };
 
 /*

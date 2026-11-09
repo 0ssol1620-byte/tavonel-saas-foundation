@@ -68,7 +68,8 @@ describe("pricing plan overview", () => {
     expect(korean).toContain("<h3>{publicSample.name}</h3>");
     expect(korean).toContain("<h3>{enterprise.name}</h3>");
     expectDisclosureBefore(korean, "현재 단일 사용자 워크스페이스입니다.", 'href="/ko/contact?plan=Team"');
-    expectDisclosureBefore(korean, "자체 자료 컴파일은 승인된 시범 운영 범위에서만 진행합니다.", 'href="/ko/contact?plan=Developer"');
+    // D-12 (delegated decision 2026-11-09): the Developer card's warning is the switch-on sentence.
+    expectDisclosureBefore(korean, "내 원문 컴파일은 워크스페이스의 처리 승인 뒤에 시작합니다.", 'href="/ko/contact?plan=Developer"');
     for (const index of [0, 1, 2, 3]) expect(korean).toContain(`id={pricingPlanId(${index})} tabIndex={-1}`);
   });
 });

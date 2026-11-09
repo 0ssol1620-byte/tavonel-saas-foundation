@@ -101,7 +101,7 @@ export default function ContactPage() {
                 <p className="fine">
                   General inquiries to hello@tavonel.com are read by a person and carry the same
                   one business day (KST) acknowledgement target.
-                  {operator ? " The telephone is answered during Korean business hours; outside them, email reaches us sooner." : null}
+                  {operator ? " The telephone is answered during Korean business hours. Outside them, email reaches us sooner." : null}
                 </p>
                 {/*
                   This read "Personal mailbox addresses are never published", which 13.4 asks to

@@ -1,5 +1,6 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { isBillingOfferCode, type BillingOfferCode } from "./billing-catalog";
+import { billingSecret } from "./billing-secrets";
 
 export type CheckoutBinding = {
   tavonel_binding_version: "v2" | "v3";
@@ -46,8 +47,7 @@ function signedWith(binding: CheckoutBinding, secret: string) {
  * key. Absent, blank or shorter than a qualified key, it is not configured and changes nothing.
  */
 export function previousBillingHmac(env: Readonly<Record<string, string | undefined>> = process.env) {
-  const previous = env.FOUNDATION_BILLING_HMAC_PREVIOUS?.trim() ?? "";
-  return previous.length >= 32 ? previous : undefined;
+  return billingSecret("FOUNDATION_BILLING_HMAC_PREVIOUS", env);
 }
 
 export function createCheckoutBinding(
