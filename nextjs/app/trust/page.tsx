@@ -25,7 +25,7 @@ const ADDENDUM_URL = processingTerms.processing.path;
 const ADDENDUM_LABEL = `Version ${processingTerms.version}, accepted by a workspace owner together with the self-service terms`;
 const ARCHIVED_DPA_URL = "/policy/TAVONEL_DPA_v2_2026-09-23.md";
 const ARCHIVED_DPA_LABEL =
-  "Archived draft v2 (2026-09-23) — replaced by the 2026-09-30 processing addendum for a workspace that accepts it, and kept as the template for negotiating a separately executed Enterprise agreement; not a signed agreement";
+  "Archived draft v2 (2026-09-23) — replaced by the 2026-09-30 processing addendum for a workspace that accepts it, and kept as the template for negotiating a separately executed Enterprise agreement. It is not a signed agreement.";
 
 const DESTINATIONS: Array<[string, string, Route]> = [
   ["Security", "The customer-facing safeguards for document intake, workspace access, evidence, activation, retention, and deletion.", "/security" as Route],
@@ -92,10 +92,10 @@ export default function TrustCenterPage() {
               <p className="fine">
                 <b>This page answers one question:</b> what is published about security and
                 document handling, and where to request a qualified review. How a citation stays bound to its source is
-                on <Link href={"/evidence" as Route}>Evidence</Link>; what a result has to carry
-                before it is published as a number is on <Link href={"/benchmarks" as Route}>Benchmarks</Link>;
-                the frozen fixtures you can rerun are on <Link href={"/reproducibility" as Route}>Reproducibility</Link>;
-                the open problems and the experiments that failed are on <Link href={"/research" as Route}>Research</Link>.
+                on <Link href={"/evidence" as Route}>Evidence</Link>. What a result has to carry
+                before it is published as a number is on <Link href={"/benchmarks" as Route}>Benchmarks</Link>.
+                The frozen fixtures you can rerun are on <Link href={"/reproducibility" as Route}>Reproducibility</Link>.
+                The open problems and the experiments that failed are on <Link href={"/research" as Route}>Research</Link>.
               </p>
 
               {/*

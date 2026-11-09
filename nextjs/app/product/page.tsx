@@ -21,9 +21,9 @@ export const metadata: Metadata = {
 const LAYERS = [
   ["Document parsing and OCR", "Replaced", "Reading is a compile step here: sanitize, read, keep the location and the uncertainty, and carry both into review."],
   ["Ingestion and cleanup scripts", "Replaced", "One compile over a collection, versioned, producing a candidate a person activates, with the revision it replaces still readable."],
-  ["Enterprise search", "Connects to", "The package carries a retrieval-ready index, and the API and MCP are read-only. An existing search product keeps its index; what changes is that a result can name the source version behind it."],
+  ["Enterprise search", "Connects to", "The package carries a retrieval-ready index, and the API and MCP are read-only. An existing search product keeps its index. What changes is that a result can name the source version behind it."],
   ["Ontology and knowledge platforms", "Connects to", "Turtle, JSON-LD and CSV leave in a signed package that a graph database or an ontology tool imports, so modelling and business rules stay in the tool your team already runs."],
-  ["Agent and workflow orchestration", "Connects to", `The ${MCP_TOOL_COUNT_WORD} read-only MCP tools and an HTTP API let an agent read a World; the actions it takes stay in the orchestrator that took them.`],
+  ["Agent and workflow orchestration", "Connects to", `The ${MCP_TOOL_COUNT_WORD} read-only MCP tools and an HTTP API let an agent read a World. The actions it takes stay in the orchestrator that took them.`],
 ] as const;
 /*
   Round 3, placement series (PR #191's captures): each outcome shows the product surface it names, as a real
@@ -66,7 +66,7 @@ export default function ProductPage() {
                 <p className={styles.proofLabel}>Reader output, unedited</p>
                 <blockquote>{region.passage}{region.passageTruncated ? " …" : ""}</blockquote>
                 <figcaption>{source.filename} · page {region.page} · <code>{source.digest.slice(0, 12)}</code>
-                  <span>Extracted public sample. Context unresolved; no interpreted claim.</span>
+                  <span>Extracted public sample. Context unresolved. No interpreted claim.</span>
                 </figcaption>
               </figure> : null}
               <Link href={(outcome.href === "/evidence" && region?.href ? region.href : outcome.href) as Route}>{outcome.action}</Link>

@@ -5,7 +5,6 @@ import { CLAIM_STATE } from "./claim-state";
 import { readCapabilities } from "./capabilities";
 import { CONTRACT_CLAUSES, CONTRACT_STATE, clause } from "./compiler-contract";
 import { monthlyTotalUsd } from "../components/pricing-page-client";
-import { PROCESSING_UNIT_USD, STANDARD_UNITS_PER_PAGE } from "./usage-pricing";
 import { DOCS_SECTIONS } from "./docs-content";
 import { CAPABILITY_MANIFEST } from "../../shared/capabilityManifest";
 import CHANNEL from "../public/developer/channel.json";
@@ -70,6 +69,8 @@ const CLAIM_SURFACES = [
   "app/product/compiled-world/page.tsx",
   "app/product/document-understanding/page.tsx",
   "app/solutions/[slug]/page.tsx",
+  // 2026-11-09: the five proof framings moved here from the detail page; the same rules hold them.
+  "lib/solution-proof-picks.ts",
   "app/explore/page.tsx",
   "components/explore/explore-stage.tsx",
   "lib/docs-content.ts",
@@ -388,20 +389,22 @@ describe("product claims sync", () => {
     `PROCESSING_UNIT_USD` and the catalog's `includedPages` -- the same inputs the reservation
     code charges against -- so a rate change fails the test instead of misquoting a buyer.
   */
-  it("computes the pricing scenarios from the constants the reservation code charges against", () => {
-    const perPage = STANDARD_UNITS_PER_PAGE * PROCESSING_UNIT_USD;
+  /*
+    R1, delegated decision 2026-11-09. Nothing sells or bills a page past the included pages, so
+    the table no longer prices one: a volume inside the plan is the subscription, and a volume past
+    it has no published price (`null`, rendered "Arranged with us").
+  */
+  it("computes the pricing scenarios from the catalog, and prices no page past the plan", () => {
     const developer = BILLING_OFFERS.observer_access;
     const team = BILLING_OFFERS.studio_access;
 
     expect(monthlyTotalUsd(developer, developer.includedPages)).toBe(developer.priceUsd);
-    expect(monthlyTotalUsd(developer, developer.includedPages * 2))
-      .toBeCloseTo(developer.priceUsd + developer.includedPages * perPage, 10);
     expect(monthlyTotalUsd(team, team.includedPages)).toBe(team.priceUsd);
     // A volume under the included pages is the subscription and nothing else.
     expect(monthlyTotalUsd(team, 1)).toBe(team.priceUsd);
-    // Failure path: a volume past the included pages must cost more than the subscription.
-    expect(monthlyTotalUsd(developer, developer.includedPages + 1))
-      .toBeGreaterThan(developer.priceUsd);
+    // Failure path: one page past the included pages is not given a price.
+    expect(monthlyTotalUsd(developer, developer.includedPages + 1)).toBeNull();
+    expect(monthlyTotalUsd(developer, developer.includedPages * 2)).toBeNull();
 
     const pricing = read("components/pricing-page-client.tsx");
     expect(pricing, "the volumes are derived from the catalog, not typed")
@@ -445,8 +448,20 @@ describe("product claims sync", () => {
       .not.toContain("expire at the end of each billing month");
     expect(read("lib/docs-content.ts"), "P06: the billing docs state the same expiry moment as the page")
       .toContain("when the next month's pages are granted, whatever is left of the previous month expires");
-    expect(pricing, "P06: the overage rate is derived, not typed")
-      .toContain("published rate of ${formatUsd(STANDARD_PAGE_USD)} per standard page");
+    // R1 (delegated decision 2026-11-09): no per-page price past the plan, on any public surface that
+    // talks about plans -- neither by name nor as a literal cents figure (review PR201-R1 note 4).
+    const R1_RATE = /per standard page|STANDARD_PAGE_USD|MAXIMUM_PAGE_USD|PROCESSING_UNIT_USD|\$\s?0\.\d/;
+    for (const [surface, source] of [
+      ["pricing", pricing], ["docs", read("lib/docs-content.ts")], ["ko pricing", read("app/ko/pricing/page.tsx")],
+      ["enterprise", read("app/enterprise/page.tsx")], ["guide", read("lib/guide-content.ts")], ["integrations", read("app/integrations/page.tsx")],
+    ] as const) {
+      expect(source, `R1: ${surface} publishes no overage rate`).not.toMatch(R1_RATE);
+    }
+    expect("Additional pages are $0.04 each", "R1: the guard catches the old lede's literal form").toMatch(R1_RATE);
+    expect("Maximum routed cost $0.06 / page", "R1: and the workspace's form").toMatch(R1_RATE);
+    for (const [surface, source] of [["pricing", pricing], ["docs", read("lib/docs-content.ts")], ["ko pricing", read("app/ko/pricing/page.tsx")]] as const) {
+      expect(source, `R1: ${surface} says where additional volume goes`).toMatch(/arranged with us|저희와 상담해 정합니다/);
+    }
     expect(pricing, "P03: whether Ask and search consume pages")
       .toContain("What does not consume pages");
     expect(pricing, "P08: the Enterprise card reaches the trust index")

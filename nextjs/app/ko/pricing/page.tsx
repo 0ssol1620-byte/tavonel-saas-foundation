@@ -10,13 +10,13 @@ import { primaryCallToAction } from "@/lib/commercial-state";
 import { pageMetadata } from "@/lib/page-seo";
 import { readPublicStatusV2 } from "@/lib/public-status";
 import { ACCESS_CTA, KO_CHROME, SELF_SERVE_CTA } from "@/lib/site-navigation";
-import { MAX_UNITS_PER_PAGE, PROCESSING_UNIT_USD, STANDARD_UNITS_PER_PAGE } from "@/lib/usage-pricing";
+import { MAX_UNITS_PER_PAGE, STANDARD_UNITS_PER_PAGE } from "@/lib/usage-pricing";
 import DocumentLangKo from "../document-lang";
 import styles from "./pricing.module.css";
 
 export const metadata: Metadata = pageMetadata({
   title: "요금과 도입 상담 — TAVONEL",
-  description: "TAVONEL의 공개 샘플, Developer·Team 요금, 자료 도입 절차를 확인하세요. 자체 자료 컴파일은 현재 요금제 구매만으로 열리지 않으며 상담 후 설정합니다.",
+  description: "TAVONEL의 공개 샘플, Developer·Team 요금, 내 원문 컴파일을 시작하는 방법을 확인하세요. Developer는 워크스페이스가 열리면 온라인으로 구매하고, Team과 Enterprise는 상담으로 시작합니다.",
   canonical: "/ko/pricing",
   languages: { ko: "/ko/pricing", en: "/pricing", "x-default": "/pricing" },
 });
@@ -33,8 +33,8 @@ const planSummaries = [
   { name: team.label, price: `$${team.priceUsd}`, unit: monthlyUnit },
   enterprise,
 ];
-const standardPageUsd = STANDARD_UNITS_PER_PAGE * PROCESSING_UNIT_USD;
-const maximumPageUsd = MAX_UNITS_PER_PAGE * PROCESSING_UNIT_USD;
+/* R1, delegated decision 2026-11-09: no per-page price past the plan; a complex page is stated in allowance terms. */
+const complexPageMaxStandardPages = MAX_UNITS_PER_PAGE / STANDARD_UNITS_PER_PAGE;
 
 export default function KoreanPricingPage() {
   /*
@@ -63,7 +63,7 @@ export default function KoreanPricingPage() {
             <div className={styles.intro}>
               <p className="eyebrow">요금</p>
               <h1 className="document-title" id="ko-pricing-title">먼저 확인하고, 맞는 범위로 시작하세요.</h1>
-              <p className="lede">완성된 공개 World는 로그인 없이 살펴볼 수 있습니다. 내 자료를 컴파일하는 절차와 요금은 아래에서 확인하고 상담으로 연결할 수 있습니다.</p>
+              <p className="lede">완성된 공개 World는 로그인 없이 살펴볼 수 있습니다. 내 원문 컴파일은 단계적으로 열고 있으며, 로그인하면 워크스페이스가 만들어지고 열림 상태가 워크스페이스 화면에 표시됩니다. 요금제와 포함 페이지는 아래에 있습니다.</p>
               <div className={styles.actions}>
                 <Link className="btn" href={intro.href as Route}>{intro.label}</Link>
                 <Link className="btn ghost" href="/explore" hrefLang="en">공개 World 확인 (영문)</Link>
@@ -86,7 +86,7 @@ export default function KoreanPricingPage() {
                   <h3>{developer.label}</h3>
                   <p className={styles.price}>${developer.priceUsd}<span className={styles.unit}> {monthlyUnit}</span></p>
                   <p>월 {developer.includedPages.toLocaleString("en-US")} 표준 페이지, 증거 연결·Ask·서명된 내보내기, API·MCP 접근.</p>
-                  <p className="fine">자체 자료 컴파일은 승인된 시범 운영 범위에서만 진행합니다.</p>
+                  <p className="fine">내 원문 컴파일은 워크스페이스의 처리 승인 뒤에 시작합니다.</p>
                   {purchaseOpen ? (
                     <Link href={loginUrlForOffer("observer_access") as Route}>{developer.label} · {KO_CHROME.cta[SELF_SERVE_CTA.href]}</Link>
                   ) : (
@@ -107,7 +107,7 @@ export default function KoreanPricingPage() {
                   <Link href="/ko/contact?plan=Enterprise">Enterprise 도입 상담</Link>
                 </article>
               </div>
-              <p className={`${styles.terms} fine`}>포함 페이지 초과 시 표준 페이지는 ${standardPageUsd.toFixed(2)}, 복잡한 페이지는 페이지당 최대 ${maximumPageUsd.toFixed(2)}입니다. 처리 전 상한을 확인합니다. 세금·환불·세부 한도와 공식 계약 조건은 <Link href="/pricing" hrefLang="en">영문 요금 안내</Link>에서 확인하세요.</p>
+              <p className={`${styles.terms} fine`}>포함 페이지를 넘는 분량은 저희와 상담해 정합니다. 복잡한 페이지 한 쪽은 포함 페이지를 최대 {complexPageMaxStandardPages}쪽까지 사용하며, 처리 전 상한을 확인합니다. 세금·환불·세부 한도와 공식 계약 조건은 <Link href="/pricing" hrefLang="en">영문 요금 안내</Link>에서 확인하세요.</p>
             </div>
           </div>
         </div>

@@ -91,7 +91,7 @@ function describe(check: ProbeCheck): ProbeRow {
       name: check.name,
       label,
       state: check.status === "ok" ? "configured" : "not configured",
-      detail: "configuration only; no request is sent through it",
+      detail: "configuration only: no request is sent through it",
     };
   }
   const latency = check.latencyMs === null ? "" : ` in ${check.latencyMs} ms`;

@@ -116,7 +116,8 @@ describe("the keyless try-it mount", () => {
     expect(note, "the intake note is gone").toBeGreaterThan(-1);
     expect(tryIt).toBeLessThan(note);
     expect(text(quickstart)).toContain(
-      "So steps 1 to 5 below are the contract you will call once intake is arranged with us, not a request TAVONEL will accept from you today.",
+      // D-12 (delegated decision 2026-11-09): the note now says the steps run from your workspace.
+      "Steps 1 to 5 below are the calls that do it once your workspace is open.",
     );
   });
 

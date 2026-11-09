@@ -23,11 +23,14 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
   `wouldAllow`; the route turns that into one funnel line. Listing and revoking are not demand
   and never count. A shadow read that fails is simply not counted -- it never changes the 402.
 
-  TODO(founder, F-2): A2.2 is not an agent's call. Before TAVONEL_TRIAL_AI_ACCESS_ENABLED=true:
-  the trial terms wording for AI access (what a free evaluation's key and MCP connection may do,
-  and the four bounds as published), the bound values themselves (foundation_trial_policy
-  ai_* columns), the `customerData` launch switch (P2-37), and a founder approval receipt.
-  Until then the flag stays unset and every trial gets the 402 it got before W1.
+  F-2 (docs/policy/DECISION_LOG_2026-11-08.md): the four bounds are adopted as the migration's
+  defaults -- 14 days, 200 standard pages, 1 World, 200 queries per UTC day -- so
+  foundation_trial_policy needs no change; no connector scope and one live key stay the code rules
+  below. Still open, and not an agent's
+  call: the trial terms wording for AI access (what a free evaluation's key and MCP connection may
+  do, and the four bounds as published), any privacy/processing terms update that wording needs,
+  the `customerData` launch switch (P2-37), and a founder approval receipt. Until all of them
+  exist TAVONEL_TRIAL_AI_ACCESS_ENABLED stays unset and every trial gets the 402 it got before W1.
 
   The key rule, for F-2 wording: one live key per trial principal, hand-made or MCP. It is checked
   where a key is minted -- key create here, and the remote MCP token at issue

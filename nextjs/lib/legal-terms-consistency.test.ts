@@ -163,10 +163,10 @@ describe("/privacy, /trust and /refunds state the same terms", () => {
   */
   it("/privacy and /subprocessors state what Vercel Web Analytics receives, in the approved words", () => {
     const privacy = withoutComments(read("app/privacy/page.tsx"));
-    expect(privacy).toContain("With the same permission, Vercel Web Analytics, run by our hosting provider, counts page views and the same selected interactions on public marketing pages without cookies or storage on your device. It receives the page address without query parameters, the referring address, your browser, operating system and device type, and an approximate location derived from the request; Vercel tells visits apart with a hash of the request that it discards after 24 hours. We do not send document contents, filenames, questions, account identifiers or workspace events to Vercel Web Analytics.");
+    expect(privacy).toContain("With the same permission, Vercel Web Analytics, run by our hosting provider, counts page views and the same selected interactions on public marketing pages without cookies or storage on your device. It receives the page address without query parameters, the referring address, your browser, operating system and device type, and an approximate location derived from the request. Vercel tells visits apart with a hash of the request that it discards after 24 hours. We do not send document contents, filenames, questions, account identifiers or workspace events to Vercel Web Analytics.");
     expect(privacy).not.toContain("Our separate Vercel website analytics uses no analytics cookies.");
     expect(privacy).toContain('"Counts page views and selected clicks on public marketing pages, only after you allow analytics. Sets no cookie and stores nothing on your device",');
-    expect(withoutComments(read("app/subprocessors/page.tsx"))).toContain('["Vercel", "Website and serverless application hosting; consent-based cookieless website analytics", "Requests, operational logs, application metadata and, with analytics consent, public-page views and selected interactions (no workspace events)",');
+    expect(withoutComments(read("app/subprocessors/page.tsx"))).toContain('["Vercel", "Website and serverless application hosting, and consent-based cookieless website analytics", "Requests, operational logs, application metadata and, with analytics consent, public-page views and selected interactions (no workspace events)",');
   });
 
   it("/privacy lists only session-storage keys the code writes and never sends", () => {

@@ -55,11 +55,12 @@ describe.each(LOCALES)("landing V2 scene 07 (%s)", (locale) => {
     scenes below, so a reader who read "one way in" and clicked met the gate on the destination.
     The strings are the site's own -- rule 5 forbids a second spelling of either.
   */
-  it("states the deployment gate in the deployment's own words", () => {
-    expect(activationPolicy.customerData.enabled, "this test describes the gated posture").toBe(false);
+  // D-12 (delegated decision 2026-11-09): the gate is open, so the scene drops the arranged-path note.
+  it("drops the deployment-gate note once the gate is open", () => {
+    expect(activationPolicy.customerData.enabled, "this test describes the open posture").toBe(true);
     const expected = locale === "ko" ? KO_CHROME.customerDataGate : activationPolicy.customerData.reason;
-    expect(html).toContain('data-customer-data="arranged"');
-    expect(visibleText(html)).toContain(expected);
+    expect(html).not.toContain('data-customer-data="arranged"');
+    expect(visibleText(html)).not.toContain(expected);
   });
 
   it("reaches the real page behind every intake and output row", () => {

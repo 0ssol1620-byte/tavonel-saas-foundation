@@ -1,11 +1,11 @@
-import Link from "next/link";
-import type { Route } from "next";
+import FileOrRouteLink from "@/components/file-or-route-link";
 import {
   PUBLIC_DISCLOSURE_STATUS_LABEL,
   PUBLIC_TRUST_DISCLOSURES,
   selectPublicTrustDisclosures,
   type PublicTrustDisclosureId,
 } from "@/lib/public-trust-contract";
+
 
 export function TrustDisclosures({
   heading = "Public trust resources",
@@ -25,7 +25,7 @@ export function TrustDisclosures({
             <span>{PUBLIC_DISCLOSURE_STATUS_LABEL[row.status]}</span>
             <h3>{row.subject}</h3>
             <p>{row.line}</p>
-            <p className="fine"><Link href={row.href as Route}>Open resource</Link></p>
+            <p className="fine"><FileOrRouteLink href={row.href}>Open resource</FileOrRouteLink></p>
           </article>
         ))}
       </div>
