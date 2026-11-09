@@ -2424,7 +2424,8 @@ export const REMOTE_MCP_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/launch-qa-r
 // The cuts themselves stay locked under their own owner; a new poster name is a new review. Product UI, so never nativeReuse.
 // Home film re-record on design C (W2, codex/film-rerecord-20261105): the six new cuts and eighteen posters, byte-locked in
 // lib/locked-film-assets.json, the recorder, scans and encoders that made them (scripts/film/), and the film-start probe
-// that names the stage-1 cut. Exact paths, no glob.
+// that names the stage-1 cut. Recording R3 (codex/landing-film-r3-20261109) adds its cuts, phone twins and posters, and the
+// guide-video recorder (scripts/guide/) under the same owner. Exact paths, no glob.
 export const HOME_FILM_RERECORD_AFFECTED_PATHS = Object.freeze([
   'public/film/hero-r2-c1-hq-1440.mp4',
   'public/film/hero-r2-c1-hq.mp4',
@@ -2432,6 +2433,15 @@ export const HOME_FILM_RERECORD_AFFECTED_PATHS = Object.freeze([
   'public/film/hero-r2-c2.mp4',
   'public/film/hero-r2-c3.mp4',
   'public/film/hero-r2-c4.mp4',
+  'public/film/hero-r3-c1-hq-1440.mp4',
+  'public/film/hero-r3-c1-hq.mp4',
+  'public/film/hero-r3-c1.mp4',
+  'public/film/hero-r3-c2-hq.mp4',
+  'public/film/hero-r3-c2.mp4',
+  'public/film/hero-r3-c3-hq.mp4',
+  'public/film/hero-r3-c3.mp4',
+  'public/film/hero-r3-c4-hq.mp4',
+  'public/film/hero-r3-c4.mp4',
   'public/film/poster-r2-c1-t13.60-2x.avif',
   'public/film/poster-r2-c1-t13.60-2x.webp',
   'public/film/poster-r2-c1-t13.60-pane1-684x855.avif',
@@ -2450,6 +2460,24 @@ export const HOME_FILM_RERECORD_AFFECTED_PATHS = Object.freeze([
   'public/film/poster-r2-c4-t6.80-2x.webp',
   'public/film/poster-r2-c4-t6.80.avif',
   'public/film/poster-r2-c4-t6.80.webp',
+  'public/film/poster-r3-c1-t10.40-2x.avif',
+  'public/film/poster-r3-c1-t10.40-2x.webp',
+  'public/film/poster-r3-c1-t10.40-pane1-848x1060.avif',
+  'public/film/poster-r3-c1-t10.40-pane1-848x1060.webp',
+  'public/film/poster-r3-c1-t10.40.avif',
+  'public/film/poster-r3-c1-t10.40.webp',
+  'public/film/poster-r3-c2-t17.96-2x.avif',
+  'public/film/poster-r3-c2-t17.96-2x.webp',
+  'public/film/poster-r3-c2-t17.96.avif',
+  'public/film/poster-r3-c2-t17.96.webp',
+  'public/film/poster-r3-c3-t17.96-2x.avif',
+  'public/film/poster-r3-c3-t17.96-2x.webp',
+  'public/film/poster-r3-c3-t17.96.avif',
+  'public/film/poster-r3-c3-t17.96.webp',
+  'public/film/poster-r3-c4-t8.80-2x.avif',
+  'public/film/poster-r3-c4-t8.80-2x.webp',
+  'public/film/poster-r3-c4-t8.80.avif',
+  'public/film/poster-r3-c4-t8.80.webp',
   'scripts/film/encode-fallback.sh',
   'scripts/film/fixture.mjs',
   'scripts/film/frame-strings.mjs',
@@ -2457,6 +2485,13 @@ export const HOME_FILM_RERECORD_AFFECTED_PATHS = Object.freeze([
   'scripts/film/record.mjs',
   'scripts/film/scan.mjs',
   'scripts/film/stages.mjs',
+  'scripts/guide/GUIDE-SCRIPTS.json',
+  'scripts/guide/capture-terminal.mjs',
+  'scripts/guide/encode-guides.mjs',
+  'scripts/guide/record-guide.mjs',
+  'scripts/guide/terminal-replay.mjs',
+  'scripts/guide/terminal/api.json',
+  'scripts/guide/terminal/mcp.json',
   'scripts/measure-film-start.mjs',
 ]);
 export const HOME_FILM_RERECORD_AFFECTED_UNIT_FILES = Object.freeze(['components/compile-stage-player.mobile-view.test.tsx', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts']);
@@ -3149,7 +3184,7 @@ export const AFFECTED_GROUPS = Object.freeze([
     { unitFiles: W1_REMOTE_MCP_A1_A5_AFFECTED_UNIT_FILES }),
   affectedGroup('operational-sli-alert-delivery', new RegExp(`^nextjs/(?:${exactPathAlternation(OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS)})$`),
     { unitFiles: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES }),
-  // film-rerecord-20261105: the 32 exact paths above select 3 direct suites and 3 browser suites.
+  // film-rerecord-20261105: the 66 exact paths above select 3 direct suites and 3 browser suites.
   affectedGroup('film-rerecord-20261105', new RegExp(`^nextjs/(?:${exactPathAlternation(HOME_FILM_RERECORD_AFFECTED_PATHS)})$`),
     { unitFiles: HOME_FILM_RERECORD_AFFECTED_UNIT_FILES, browserFiles: HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES }),
   affectedGroup('consent-poster', new RegExp(`^nextjs/(?:${exactPathAlternation(CONSENT_POSTER_AFFECTED_PATHS)})$`),

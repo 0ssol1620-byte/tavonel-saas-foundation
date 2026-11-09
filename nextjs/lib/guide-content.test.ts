@@ -283,7 +283,8 @@ const NUMBER_ALLOWLIST: Record<string, string> = {
   "10-K": "a form name: EXPLORE_COPY.changeHint, lib/explore-story.ts ('Apple's 2025 Form 10-K')",
   "2025": "EXPLORE_COPY.changeHint, lib/explore-story.ts ('Apple's 2025 Form 10-K')",
   "2026": "EXPLORE_COPY.changeHint and the change act's own label, lib/explore-story.ts / change-act.tsx ('the 2026 filings arrived')",
-  "2026-10-19": "GUIDE_REVIEWED, this guide's review date",
+  "2026-10-19": "GUIDE_FIRST_EDITION, this guide's first edition",
+  "2026-11-09": "GUIDE_REVIEWED, this guide's review date",
   "sha256": "an algorithm name, /developer/channel.json and /docs/concepts",
   "SHA256": "an algorithm name, the certutil argument",
   "256": "an algorithm name, the shasum argument (-a 256)",
@@ -390,10 +391,11 @@ describe("the recordings", () => {
   it("names on its first recording line every video whose takes were not recorded from tavonel.com", () => {
     const manifest = JSON.parse(readFileSync(join(nextjs, "public", "guide", "manifest.json"), "utf8")) as { howRecorded: string[]; files: { file: string; recordedFrom?: string }[] };
     const elsewhere = [...new Set(manifest.files.filter((entry) => entry.recordedFrom).map((entry) => entry.file.replace(/-(?:desktop|phone)\.mp4$/, "")))];
-    expect(elsewhere).toEqual(["guide-2-mcp"]);
+    // 2026-11-09: all six takes were re-recorded on live tavonel.com, so none is an exception today.
+    expect(elsewhere).toEqual([]);
     for (const video of elsewhere) expect(manifest.howRecorded[0], video).toContain(video);
-    // The unqualified "No fixture build, ..." spoke for guide-2 too.
-    expect(manifest.howRecorded[0]).not.toContain("No fixture build,");
+    // An unqualified "No fixture build, ..." would speak for an exception too.
+    if (elsewhere.length) expect(manifest.howRecorded[0]).not.toContain("No fixture build,");
   });
 
   it("fails on a changed byte, an unlisted file and a missing one", () => {
@@ -502,8 +504,8 @@ describe("the two pages", () => {
 
   it("end on the feedback address and the review date", () => {
     expect(en).toContain("mailto:support@tavonel.com?subject=Guide%20feedback%3A%20Product%20guide");
-    expect(en).toContain("Reviewed 19 October 2026");
-    expect(ko).toContain("검토일 2026년 10월 19일");
+    expect(en).toContain("Reviewed 9 November 2026");
+    expect(ko).toContain("검토일 2026년 11월 9일");
   });
 });
 

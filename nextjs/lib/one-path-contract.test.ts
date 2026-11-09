@@ -119,11 +119,11 @@ describe("approved one-path experience", () => {
     }
     const film = text("components/landing-v2/hero-film.tsx");
     expect(film).not.toContain('"use client"');
-    expect(film).toContain('src: "/film/hero-r2-c1.mp4"');
-    expect(film).toContain('fallbackSrc: "/film/hero-r2-c1-hq.mp4"');
-    expect(film).toContain('fallbackPhoneSrc: "/film/hero-r2-c1-hq-1440.mp4"');
-    expect(film).toContain('poster: "/film/poster-r2-c1-t13.60-2x.webp"');
-    expect(film).toContain('posterAvif: "/film/poster-r2-c1-t13.60-2x.avif"');
+    expect(film).toContain('src: "/film/hero-r3-c1.mp4"');
+    expect(film).toContain('fallbackSrc: "/film/hero-r3-c1-hq.mp4"');
+    expect(film).toContain('fallbackPhoneSrc: "/film/hero-r3-c1-hq-1440.mp4"');
+    expect(film).toContain('poster: "/film/poster-r3-c1-t10.40-2x.webp"');
+    expect(film).toContain('posterAvif: "/film/poster-r3-c1-t10.40-2x.avif"');
     const disclosure = text("components/landing-v2/hero-film-disclosure.tsx");
     expect(film).toContain("<HeroFilmDisclosure");
     expect(disclosure).toContain('data-testid="landing-hero-film"');
@@ -133,7 +133,7 @@ describe("approved one-path experience", () => {
     expect(disclosure).toContain("priorityPoster");
     // FINAL-SPEC 2026-10-26 D-9: shorter wording, same disclosure (illustrative, not customer results).
     expect(disclosure).toContain("Illustrative demo · not customer results.");
-    // Founder ask 2026-10-27 (over FINAL-SPEC 2026-10-26 §2.1's Focus): Home opens compact at every width; Focus details expands.
+    // Founder ask 2026-10-27 (over FINAL-SPEC 2026-10-26 §2.1's Focus), kept for R3 (2026-11-09): Home opens compact at every width; Focus details expands.
     expect(disclosure).toContain('LANDING_MOBILE_FILM_VIEW: MobileFilmView = "fit"');
     expect(disclosure).toContain('LANDING_WIDE_FILM_VIEW: WideView = "fit"');
     expect(film).toContain("COMPILE_STAGES.map");

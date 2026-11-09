@@ -140,7 +140,7 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
     await expect(film.locator("video")).toHaveCount(0);
     // ... and under reduced motion, where the poster carries the stage's sentence as its alt.
     await expect(reading).toHaveCount(0);
-    await expect(film.locator("img.compile-film-still")).toHaveAttribute("alt", /^Files — \S/);
+    await expect(film.locator("img.compile-film-still")).toHaveAttribute("alt", /^Read — \S/);
     await page.screenshot({ path: testInfo.outputPath(`home-en-${width}-reduced.png`) });
     if (width === 1440 || width === 390) {
       for (let index = 0; index < 4; index++) {
@@ -306,7 +306,8 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
     await expect(sequence).toHaveAttribute("data-wide-view", "crop");
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
     // ... and belongs to stage 4: another stage opens on its own default, and stage 4 on Fit again.
-    await film.getByRole("tab").nth(1).click();
+    // (R3: stage 1 is the one stage whose default is the crop.)
+    await film.getByRole("tab").nth(0).click();
     await expect(sequence).toHaveAttribute("data-wide-view", "crop");
     await film.getByRole("tab").nth(2).click();
     await expect(sequence).toHaveAttribute("data-wide-view", "fit");
@@ -375,8 +376,8 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
       const rectW = paneRects[stage]!.w;
       expect(pane.paneW, `--pane-w, stage ${stage + 1}`).toBe(rectW);
       const scale = pane.frameWidth / rectW;
-      // Stage 1's own file fills the frame (its rect is 684 wide); the cut is drawn at 2880/w of it. Either way one source pixel is frame / w.
-      expect(Math.abs(pane.drawn - (pane.paneFile ? pane.frameWidth * 684 / rectW : pane.frameWidth * 2880 / rectW)), `pane scale, stage ${stage + 1}`).toBeLessThanOrEqual(2);
+      // Stage 1's own file fills the frame (its rect is stage 1's width); the cut is drawn at 2880/w of it. Either way one source pixel is frame / w.
+      expect(Math.abs(pane.drawn - (pane.paneFile ? pane.frameWidth * paneRects[0]!.w / rectW : pane.frameWidth * 2880 / rectW)), `pane scale, stage ${stage + 1}`).toBeLessThanOrEqual(2);
       const xHeight = smallest[stage]! * scale;
       measurements.push({ width: 390, reduced, stage: stage + 1, view: "pane", paneRect: paneRects[stage], drawnPxPerSourcePx: scale, smallestSourceXHeight: smallest[stage], renderedXHeight: xHeight, sansXHeightRatio: ratio, equivalentPx: xHeight / ratio });
       expect(xHeight / ratio, `390 pane stage ${stage + 1}`).toBeGreaterThanOrEqual(9);
@@ -429,7 +430,7 @@ for (const path of ["/", "/ko"]) {
     await expect(sequence).toHaveAttribute("data-wide-view", "crop");
     // Hold stage 1 so the cut loops in place instead of advancing mid-sample (the crop is unchanged).
     await film.getByRole("tab").first().click();
-    await expect(sequence).toHaveAttribute("data-video-primary-src", "/film/hero-r2-c1.mp4");
+    await expect(sequence).toHaveAttribute("data-video-primary-src", "/film/hero-r3-c1.mp4");
     const video = sequence.locator("video.compile-film-video");
     await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState >= 2 && !v.paused && v.currentTime > 0), { timeout: 20_000 }).toBe(true);
     const run = await video.evaluate(async (v: HTMLVideoElement, wanted: number) => {
@@ -489,7 +490,7 @@ for (const path of ["/", "/ko"]) {
     await testInfo.attach(`film-blank-${path === "/" ? "en" : "ko"}`, { body: JSON.stringify(run, null, 2), contentType: "application/json" });
     expect(run.samples.length).toBeGreaterThanOrEqual(12);
     for (const sample of run.samples) {
-      expect(sample.src).toContain("/film/hero-r2-c1.mp4");
+      expect(sample.src).toContain("/film/hero-r3-c1.mp4");
       // The drawn video is the 16:10 cut at 2x, and the first screen shows a real part of it.
       expect(Math.abs(sample.region.aspect - 1.6)).toBeLessThan(0.01);
       expect(sample.region.visibleCssRows).toBeGreaterThan(200);
@@ -513,7 +514,7 @@ test("every stage that opens cropped keeps ink in both panes of its whole window
   const table = JSON.parse(readFileSync(resolve(process.cwd(), "components/compile-stage-player.frame-strings.json"), "utf8")) as { blankScan: BlankScan };
   const scan = table.blankScan;
   const ids = ["sources", "read", "structure", "world"];
-  const cuts = ["/film/hero-r2-c1.mp4", "/film/hero-r2-c2.mp4", "/film/hero-r2-c3.mp4", "/film/hero-r2-c4.mp4"];
+  const cuts = ["/film/hero-r3-c1.mp4", "/film/hero-r3-c2.mp4", "/film/hero-r3-c3.mp4", "/film/hero-r3-c4.mp4"];
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
@@ -627,6 +628,11 @@ test("every stage that opens cropped keeps ink in both panes of its whole window
   WebKit, reduced motion, EN and KO 56,250 / 68,062 / 77,440 / 85,562). The pane is one press of "Focus details"
   away and is held below exactly as before, tabs directly above it and its top on the first screen at every width.
   Acceptance 24 at 412 keeps main's numbers (see there).
+
+  Recording R3 (2026-11-09) keeps that opening, by founder decision the same day: a phone opens on Fit and its LCP
+  element is the R3 stage-1 1440px file (poster-r3-c1-t10.40, AVIF in Chromium), and Focus details opens the R3
+  pane (848x1060). The Fit frame's size did not change, so the floors are main's; on CI (Linux chromium, PR #210,
+  889ee863) the 412 entry measured 82,992 (EN) and 82,628 (KO), above them.
 */
 const LCP_FLOOR: Record<string, Record<string, Record<number, number>>> = {
   chromium: {
@@ -665,8 +671,8 @@ for (const path of ["/", "/ko"]) {
         const last = entries[entries.length - 1]!;
         return { url: last.url ?? "", size: last.size ?? 0, still: Boolean(last.element?.matches("img.compile-film-still")) };
       });
-      expect(new URL(lcp.url).pathname, `LCP at ${width}`).toMatch(/^\/film\/poster-r2-c1-t13\.60\.(avif|webp)$/);
-      if (browserName === "chromium") expect(new URL(lcp.url).pathname, `LCP at ${width}`).toBe("/film/poster-r2-c1-t13.60.avif");
+      expect(new URL(lcp.url).pathname, `LCP at ${width}`).toMatch(/^\/film\/poster-r3-c1-t10\.40\.(avif|webp)$/);
+      if (browserName === "chromium") expect(new URL(lcp.url).pathname, `LCP at ${width}`).toBe("/film/poster-r3-c1-t10.40.avif");
       expect(lcp.still, `LCP element at ${width}`).toBe(true);
       expect(lcp.size, `LCP area at ${width}`).toBeGreaterThanOrEqual(LCP_FLOOR[browserName]![path]![width]! * 0.99);
       const column = (await page.locator("#s1 .lv2-wrap").boundingBox())!;

@@ -27,7 +27,7 @@ import { expect, test, type Page } from "@playwright/test";
   the two formats the engine decodes (the last test below pins which).
 
   FINAL-SPEC 2026-10-26 §2.1 (acceptance 23-25, 28): below 768px Home opens on one source pane --
-  Focus, pressed -- and the poster a phone asks for first is that pane's own 684x855 file, AVIF where
+  Focus, pressed -- and the poster a phone asks for first is that pane's own 848x1060 file, AVIF where
   the engine decodes it, never the 1440px frame. The view toggle is an icon named by its aria-label
   (the same localized "Focus details"), Home prints no hint paragraph (the strings stay for the
   player's other callers), and a press opens the whole frame (Fit). The pane follows the selected
@@ -36,13 +36,13 @@ import { expect, test, type Page } from "@playwright/test";
   Founder ask 2026-10-27 ("영상은 축소상태가 디폴트여야"): Home opens compact -- Fit, the whole frame, not pressed --
   so the poster a phone asks for first is the 1440px frame (the 1x file of the one srcset hint), and the pane's
   own still is asked for only after "Focus details" is pressed. Still one first-screen poster: never the pane
-  file before the press.
+  file before the press. Recording R3 (2026-11-09) keeps this opening on phones, by founder decision the same day.
 */
 const FILM = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]';
 /** The stage-1 frame a phone opens on (Fit): the 1440px file of the srcset, in either format. */
-const POSTER = /^\/film\/poster-r2-c1-t13\.60\.(avif|webp)$/;
+const POSTER = /^\/film\/poster-r3-c1-t10\.40\.(avif|webp)$/;
 /** The stage-1 pane's own still, which a phone asks for only once Focus details is pressed. */
-const PANE_POSTER = /^\/film\/poster-r2-c1-t13\.60-pane1-684x855\.(avif|webp)$/;
+const PANE_POSTER = /^\/film\/poster-r3-c1-t10\.40-pane1-848x1060\.(avif|webp)$/;
 const LOCALES = [
   { path: "/", language: "English", play: "Play the compilation film", focus: "Focus details" },
   { path: "/ko", language: "Korean", play: "컴파일 영상 재생", focus: "세부 내용 확대" },
@@ -118,31 +118,31 @@ for (const locale of LOCALES) {
       await expect(focusControl).toHaveAccessibleName(locale.focus);
 
       /*
-        The pane follows the stage the visitor chose (STAGE_FRAMES.*.phonePane, 2880px source pixels): Updates opens
-        {60, 186} 520 wide, Files {746, 380} 684 wide (fix round R3). A playing film advances by itself, so each check follows a stage the visitor chose.
+        The pane follows the stage the visitor chose (STAGE_FRAMES.*.phonePane, 2880px source pixels): R3's Update opens
+        {1986, 369} and Read {1016, 369}, both 848 wide. A playing film advances by itself, so each check follows a stage the visitor chose.
         The reading target pane (`data-mobile-focus-pane`) is the stage's own, as before.
       */
       await stages.nth(2).click();
       await expect(stages.nth(2)).toHaveAttribute("aria-selected", "true");
-      await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "0");
-      await expect.poll(pane).toEqual(["60", "186", "520"]);
+      await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "2");
+      await expect.poll(pane).toEqual(["1986", "369", "848"]);
       await stages.nth(0).click();
       await expect(stages.nth(0)).toHaveAttribute("aria-selected", "true");
       await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
-      await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "1");
-      await expect.poll(pane).toEqual(["746", "380", "684"]);
+      await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "2");
+      await expect.poll(pane).toEqual(["1016", "369", "848"]);
 
       // A press opens the whole frame (Fit), and changing stages in Fit keeps the visitor's choice.
       // Release 3 fix round 3, M1: one WAI-ARIA toggle whose name never changes; aria-pressed names the state.
       await focusControl.click();
       await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
-      await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "1");
+      await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "2");
       await expect(focusControl).toHaveAttribute("aria-pressed", "false");
       await expect(focusControl).toHaveAccessibleName(locale.focus);
       await stages.nth(2).click();
       await expect(stages.nth(2)).toHaveAttribute("aria-selected", "true");
       await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
-      await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "0");
+      await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "2");
     });
   }
 }
@@ -166,9 +166,9 @@ for (const locale of LOCALES) {
 */
 const RECUT_AVIF = [
   // Film re-record (2026-11-05): the design C posters, same encoders and the same 140,000-byte AVIF budget.
-  "/film/poster-r2-c1-t13.60-pane1-684x855.avif",
-  "/film/poster-r2-c1-t13.60-2x.avif", "/film/poster-r2-c1-t13.60.avif", "/film/poster-r2-c2-t4.40-2x.avif", "/film/poster-r2-c2-t4.40.avif",
-  "/film/poster-r2-c3-t17.96-2x.avif", "/film/poster-r2-c3-t17.96.avif", "/film/poster-r2-c4-t6.80-2x.avif", "/film/poster-r2-c4-t6.80.avif",
+  "/film/poster-r3-c1-t10.40-pane1-848x1060.avif",
+  "/film/poster-r3-c1-t10.40-2x.avif", "/film/poster-r3-c1-t10.40.avif", "/film/poster-r3-c2-t17.96-2x.avif", "/film/poster-r3-c2-t17.96.avif",
+  "/film/poster-r3-c3-t17.96-2x.avif", "/film/poster-r3-c3-t17.96.avif", "/film/poster-r3-c4-t8.80-2x.avif", "/film/poster-r3-c4-t8.80.avif",
 ];
 // The re-record supersedes every numbered Home poster too (poster-1..4-*); only poster-c* may be requested.
 const SUPERSEDED = /\/film\/poster-[1-4]-t/;
@@ -205,19 +205,19 @@ async function posterContract(page: Page, engine: string) {
       const beside = rects.map(([x, y, w, h]) => inkIn(x! - 6, y!, 6, h!) + inkIn(x! + w!, y!, 6, h!));
       return { width: bitmap.width, before, above, beside };
     };
-    const webp = "/film/poster-r2-c1-t13.60-2x.webp";
-    const avifDecodes = await decodes("/film/poster-r2-c1-t13.60-2x.avif");
+    const webp = "/film/poster-r3-c1-t10.40-2x.webp";
+    const avifDecodes = await decodes("/film/poster-r3-c1-t10.40-2x.avif");
     return {
       sizes, avifDecodes, currentSrc: new URL(still.currentSrc).pathname, rects, color,
       maskPoster: document.querySelector(".compile-film-mask")?.getAttribute("data-poster-mask") ?? "",
-      labels: { [webp]: await label(webp), ...(avifDecodes ? { "/film/poster-r2-c1-t13.60-2x.avif": await label("/film/poster-r2-c1-t13.60-2x.avif") } : {}) },
+      labels: { [webp]: await label(webp), ...(avifDecodes ? { "/film/poster-r3-c1-t10.40-2x.avif": await label("/film/poster-r3-c1-t10.40-2x.avif") } : {}) },
     };
   }, { avif: RECUT_AVIF });
 
   for (const [url, bytes] of Object.entries(result.sizes)) expect(bytes, `${engine} ${url} within the §22 AVIF budget`).toBeLessThanOrEqual(140_000);
   // The still is one of the two formats of the re-cut frame, AVIF exactly when the engine decodes it: the 1440/2880px
   // frame at every width, as Home opens compact (2026-10-27); the pane's own file waits for Focus details.
-  expect(result.currentSrc, `${engine} still`).toMatch(new RegExp(`^/film/poster-r2-c1-t13\\.60(-2x)?\\.${result.avifDecodes ? "avif" : "webp"}$`));
+  expect(result.currentSrc, `${engine} still`).toMatch(new RegExp(`^/film/poster-r3-c1-t10\\.40(-2x)?\\.${result.avifDecodes ? "avif" : "webp"}$`));
   // The re-recorded frames carry no overprint, so no Tier 2 bars are drawn (and none are checked below).
   expect(result.maskPoster).toBe("");
   expect(result.rects).toHaveLength(0);
@@ -240,7 +240,7 @@ test("serves the re-cut posters as AVIF within 140,000 bytes, with a WebP fallba
   await page.emulateMedia({ reducedMotion: "reduce" });
   const chromium = await posterContract(page, "chromium");
   expect(chromium.avifDecodes, "Chromium decodes AVIF").toBe(true);
-  expect(chromium.currentSrc, "a phone in Fit takes the 1440px stage-1 AVIF").toBe("/film/poster-r2-c1-t13.60.avif");
+  expect(chromium.currentSrc, "a phone in Fit takes the 1440px stage-1 AVIF").toBe("/film/poster-r3-c1-t10.40.avif");
   const measured: Record<string, unknown> = { chromium };
   if (existsSync(playwright.webkit.executablePath())) {
     const browser = await playwright.webkit.launch();

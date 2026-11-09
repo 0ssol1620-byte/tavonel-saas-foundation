@@ -1,0 +1,98 @@
+{
+  "schema": "tavonel.guide-terminal-capture.v1",
+  "session": "mcp",
+  "capturedAt": "2026-11-09T06:09:03.807Z",
+  "shell": "C:/Program Files/Git/bin/bash.exe -c <command>",
+  "node": "v22.14.0",
+  "environment": "fresh empty working directory; every TAVONEL_* variable removed; no API key",
+  "steps": [
+    {
+      "command": "curl -fsS https://tavonel.com/developer/channel.json -o channel.json",
+      "startedAt": "2026-11-09T06:09:03.807Z",
+      "ms": 402,
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "grep -B1 -A3 '\"mcp\"' channel.json",
+      "startedAt": "2026-11-09T06:09:04.211Z",
+      "ms": 42,
+      "exitCode": 0,
+      "stdout": "    },\n    \"mcp\": {\n      \"url\": \"https://tavonel.com/developer/tavonel-mcp.mjs\",\n      \"sha256\": \"sha256:5b88c69ce3c76c89c2d2de92742688826cd3171c0a18497d780da0da3ee3ece1\"\n    },\n",
+      "stderr": ""
+    },
+    {
+      "command": "curl -fsSO https://tavonel.com/developer/tavonel-mcp.mjs",
+      "startedAt": "2026-11-09T06:09:04.253Z",
+      "ms": 470,
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "sha256sum tavonel-mcp.mjs",
+      "startedAt": "2026-11-09T06:09:04.723Z",
+      "ms": 59,
+      "exitCode": 0,
+      "stdout": "5b88c69ce3c76c89c2d2de92742688826cd3171c0a18497d780da0da3ee3ece1 *tavonel-mcp.mjs\n",
+      "stderr": ""
+    },
+    {
+      "command": "test \"sha256:$(sha256sum tavonel-mcp.mjs | cut -d' ' -f1)\" = \"$(node -p \"require('./channel.json').assets.mcp.sha256\")\" && echo \"match: tavonel-mcp.mjs = channel.json assets.mcp.sha256\"",
+      "startedAt": "2026-11-09T06:09:04.783Z",
+      "ms": 361,
+      "exitCode": 0,
+      "stdout": "match: tavonel-mcp.mjs = channel.json assets.mcp.sha256\n",
+      "stderr": ""
+    },
+    {
+      "command": "node tavonel-mcp.mjs --version",
+      "startedAt": "2026-11-09T06:09:05.144Z",
+      "ms": 94,
+      "exitCode": 0,
+      "stdout": "tavonel-mcp 2026.10.2.1 (api v1, contract 2026-09-02.1)\n",
+      "stderr": ""
+    },
+    {
+      "command": "env | grep '^TAVONEL_' || echo \"no TAVONEL_ variable is set in this shell\"",
+      "startedAt": "2026-11-09T06:09:05.238Z",
+      "ms": 68,
+      "exitCode": 0,
+      "stdout": "no TAVONEL_ variable is set in this shell\n",
+      "stderr": ""
+    },
+    {
+      "command": "printf '%s\\n' '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"guide-recording\",\"version\":\"1\"}}}' '{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}' '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}' '{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"list_worlds\",\"arguments\":{}}}' > requests.jsonl",
+      "startedAt": "2026-11-09T06:09:05.306Z",
+      "ms": 345,
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "node tavonel-mcp.mjs < requests.jsonl",
+      "startedAt": "2026-11-09T06:09:05.651Z",
+      "ms": 101,
+      "exitCode": 0,
+      "stdout": "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"tavonel-readonly\",\"title\":\"TAVONEL Compiled World\",\"version\":\"2026.10.2.1\"},\"instructions\":\"Read-only access to a Compiled World. Every answer is bound to a source version, a page and a region; an ungrounded question is abstained from rather than answered. No tool can upload, compile, promote, roll back, change billing or mutate connectors: promotion is the moment a candidate becomes the World an organisation answers from, and it stays with a person in a browser.\"}}\n{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"tools\":[{\"name\":\"list_sources\",\"description\":\"The documents in the workspace, with their processing state and version key.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false},\"annotations\":{\"readOnlyHint\":true,\"destructiveHint\":false,\"openWorldHint\":true}},{\"name\":\"list_worlds\",\"description\":\"The workspace's active Compiled Worlds, newest promotions included, with each one's manifest digest and revision. Start here when you do not already hold a collection id. Candidates nobody promoted are not listed: they are not what this workspace answers from.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":50},\"cursor\":{\"type\":\"string\",\"description\":\"The last id from the previous page. Requires limit. Keyset, not an offset.\"}},\"additionalProperties\":false},\"annotations\":{\"readOnlyHint\":true,\"destructiveHint\":false,\"openWorldHint\":true}},{\"name\":\"get_world\",\"description\":\"One Compiled World: its status, contract, freshness, objects, relations, evidence and history. Use list_worlds first if you do not have a collection id.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"collectionId\":{\"type\":\"string\",\"pattern\":\"^collection-[a-f0-9]{32}$\",\"description\":\"The Compiled World to read. Collection ids are content-derived and stable.\"}},\"required\":[\"collectionId\"],\"additionalProperties\":false},\"annotations\":{\"readOnlyHint\":true,\"destructiveHint\":false,\"openWorldHint\":true}},{\"name\":\"search_world\",\"description\":\"Retrieved regions with their provenance and ranks, and no generated prose. Use this when the agent will decide for itself; use ask_world when it wants an answer. The text result is the delivery format: a manifest, then every region in page order, one per line, each headed by its page and evidence ids. The full JSON response is the structured content.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"collectionId\":{\"type\":\"string\",\"pattern\":\"^collection-[a-f0-9]{32}$\",\"description\":\"The Compiled World to read. Collection ids are content-derived and stable.\"},\"query\":{\"type\":\"string\",\"minLength\":3,\"maxLength\":500},\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":25}},\"required\":[\"collectionId\",\"query\"],\"additionalProperties\":false},\"annotations\":{\"readOnlyHint\":true,\"destructiveHint\":false,\"openWorldHint\":true}},{\"name\":\"ask_world\",\"description\":\"A grounded answer with its citations, or an abstention. The World abstains rather than answering from outside its sources, and the abstention is the useful reply.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"collectionId\":{\"type\":\"string\",\"pattern\":\"^collection-[a-f0-9]{32}$\",\"description\":\"The Compiled World to read. Collection ids are content-derived and stable.\"},\"question\":{\"type\":\"string\",\"minLength\":3,\"maxLength\":500}},\"required\":[\"collectionId\",\"question\"],\"additionalProperties\":false},\"annotations\":{\"readOnlyHint\":true,\"destructiveHint\":false,\"openWorldHint\":true}},{\"name\":\"get_object\",\"description\":\"The objects lens. Pass objectId to return one object, or limit and cursor to walk a large World a page at a time instead of fetching every object at once.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"collectionId\":{\"type\":\"string\",\"pattern\":\"^collection-[a-f0-9]{32}$\",\"description\":\"The Compiled World to read. Collection ids are content-derived and stable.\"},\"objectId\":{\"type\":\"string\",\"pattern\":\"^[a-z-]+-[a-f0-9]{32}$\"},\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":50},\"cursor\":{\"type\":\"string\",\"description\":\"The last id from the previous page. Requires limit. Keyset, not an offset.\"}},\"required\":[\"collectionId\"],\"additionalProperties\":false},\"annotations\":{\"readOnlyHint\":true,\"destructiveHint\":false,\"openWorldHint\":true}},{\"name\":\"get_relation\",\"description\":\"The relations lens. Pass relationId to return one relation, or limit and cursor to walk the graph a page at a time.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"collectionId\":{\"type\":\"string\",\"pattern\":\"^collection-[a-f0-9]{32}$\",\"description\":\"The Compiled World to read. Collection ids are content-derived and stable.\"},\"relationId\":{\"type\":\"string\",\"pattern\":\"^[a-z-]+-[a-f0-9]{32}$\"},\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":50},\"cursor\":{\"type\":\"string\",\"description\":\"The last id from the previous page. Requires limit. Keyset, not an offset.\"}},\"required\":[\"collectionId\"],\"additionalProperties\":false},\"annotations\":{\"readOnlyHint\":true,\"destructiveHint\":false,\"openWorldHint\":true}},{\"name\":\"get_evidence\",\"description\":\"The evidence lens: every region with its source version, page and bbox in the 0-1000 page frame. Pass evidenceId to return one region, or limit and cursor to page.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"collectionId\":{\"type\":\"string\",\"pattern\":\"^collection-[a-f0-9]{32}$\",\"description\":\"The Compiled World to read. Collection ids are content-derived and stable.\"},\"evidenceId\":{\"type\":\"string\",\"pattern\":\"^[a-z-]+-[a-f0-9]{32}$\"},\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":50},\"cursor\":{\"type\":\"string\",\"description\":\"The last id from the previous page. Requires limit. Keyset, not an offset.\"}},\"required\":[\"collectionId\"],\"additionalProperties\":false},\"annotations\":{\"readOnlyHint\":true,\"destructiveHint\":false,\"openWorldHint\":true}},{\"name\":\"download_package\",\"description\":\"Where the signed Compiled World Package is, how large it is, and what its signed manifest hashes to. The archive itself is fetched over HTTP with the same key and checked with tavonel-verify-export.mjs; the bytes do not travel through this transport.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"collectionId\":{\"type\":\"string\",\"pattern\":\"^collection-[a-f0-9]{32}$\",\"description\":\"The Compiled World to read. Collection ids are content-derived and stable.\"}},\"required\":[\"collectionId\"],\"additionalProperties\":false},\"annotations\":{\"readOnlyHint\":true,\"destructiveHint\":false,\"openWorldHint\":true}}]}}\n{\"jsonrpc\":\"2.0\",\"id\":3,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"API_KEY_MISSING: set TAVONEL_API_KEY to a key from your workspace\"}],\"isError\":true}}\n",
+      "stderr": ""
+    },
+    {
+      "command": "node tavonel-mcp.mjs < requests.jsonl | node -e 'let s=\"\";process.stdin.on(\"data\",d=>s+=d).on(\"end\",()=>{for(const m of s.trim().split(\"\\n\").map(l=>JSON.parse(l))){if(m.result&&m.result.serverInfo)console.log(\"initialize  \"+m.result.serverInfo.name+\" \"+m.result.serverInfo.version);if(m.result&&m.result.tools)for(const t of m.result.tools)console.log(\"tool        \"+t.name);if(m.result&&m.result.content)console.log(\"tools/call  isError=\"+m.result.isError+\"  \"+m.result.content.map(c=>c.text).join(\" \"));if(m.error)console.log(\"error       \"+JSON.stringify(m.error))}})'",
+      "startedAt": "2026-11-09T06:09:05.753Z",
+      "ms": 111,
+      "exitCode": 0,
+      "stdout": "initialize  tavonel-readonly 2026.10.2.1\ntool        list_sources\ntool        list_worlds\ntool        get_world\ntool        search_world\ntool        ask_world\ntool        get_object\ntool        get_relation\ntool        get_evidence\ntool        download_package\ntools/call  isError=true  API_KEY_MISSING: set TAVONEL_API_KEY to a key from your workspace\n",
+      "stderr": ""
+    },
+    {
+      "command": "node tavonel-mcp.mjs --doctor; echo \"exit code $?\"",
+      "startedAt": "2026-11-09T06:09:05.864Z",
+      "ms": 98,
+      "exitCode": 0,
+      "stdout": "tavonel-mcp 2026.10.2.1 doctor  ->  https://tavonel.com\nFAIL  api_key: set TAVONEL_API_KEY to a key from Workspace > Developers\nAt least one check failed. Fix the first FAIL above and run --doctor again.\nexit code 1\n",
+      "stderr": ""
+    }
+  ]
+}
