@@ -231,7 +231,8 @@ describe("production posture: the collector scan refuses what it should", () => 
   Review PR201-R1 B2. self-serve-journey's "launch approval withheld" test skips on a server with
   launch approval, and product-qa and the repair-scope browser run both start theirs with it. So
   it must run somewhere without: browser-qa (chromium) carries no launch flags and runs the spec.
-  If that step loses the spec, or the job gains the flags, the purchase-door guard runs nowhere.
+  If that step loses the spec, or the job, one of its steps or the whole workflow gains a launch
+  flag, the purchase-door guard runs nowhere.
 */
 describe("the launch-approval-withheld purchase-door test runs in a CI job without launch approval", () => {
   const launch = readFileSync(resolve(import.meta.dirname, "../../.github/workflows/launch-qa.yml"), "utf8").replace(/\r\n/g, "\n");
@@ -239,9 +240,19 @@ describe("the launch-approval-withheld purchase-door test runs in a CI job witho
   it("browser-qa runs e2e/self-serve-journey.spec.ts on chromium", () => {
     expect(browserQa).toMatch(/if: matrix\.browser == 'chromium'\n(?:\s+#.*\n)*\s+run: pnpm exec playwright test [^\n]*e2e\/self-serve-journey\.spec\.ts/);
   });
-  it("browser-qa sets none of the launch flags its server would read", () => {
-    const settings = browserQa.split("\n").filter(line => !/^\s*#/.test(line)).join("\n");
-    expect(settings).not.toMatch(/COMMERCIAL_MODE|TAVONEL_BILLING_LAUNCH_APPROVED|PLAYWRIGHT_EXTERNAL_SERVER/);
+  const LAUNCH_FLAGS = /COMMERCIAL_MODE|TAVONEL_BILLING_LAUNCH_APPROVED|PLAYWRIGHT_EXTERNAL_SERVER/;
+  const settingsOf = (yaml: string) => yaml.split("\n").filter(line => !/^\s*#/.test(line)).join("\n");
+  it("browser-qa sets none of the launch flags its server would read, at job or step level", () => {
+    expect(browserQa, "the browser-qa block was found, steps and all").toContain("\n    steps:\n");
+    expect(settingsOf(browserQa)).not.toMatch(LAUNCH_FLAGS);
+    // The scan covers a step's own env: block, not only the job's.
+    expect(settingsOf(`${browserQa}\n      - name: x\n        env:\n          COMMERCIAL_MODE: live\n`)).toMatch(LAUNCH_FLAGS);
+  });
+  // Review PR201-R2 note 1: a workflow-level env: reaches every job, browser-qa included.
+  it("the workflow's top-level env sets none of them either", () => {
+    const top = launch.slice(0, launch.indexOf("\njobs:\n"));
+    expect(launch.indexOf("\njobs:\n"), "the jobs: key was found").toBeGreaterThan(0);
+    expect(settingsOf(top)).not.toMatch(LAUNCH_FLAGS);
   });
   it("the test skips only on launch approval, and the audit project is the one that runs it", () => {
     const spec = readFileSync(resolve(import.meta.dirname, "../e2e/self-serve-journey.spec.ts"), "utf8");
