@@ -11,10 +11,13 @@ vi.mock("@/lib/supabase-browser", () => ({ getSupabaseBrowserClient: () => null 
 import WorkspaceUltimateShell from "@/components/workspace-ultimate-shell";
 import SchemaReview, { OntologyInductionAvailability } from "@/components/workspace/schema-review";
 
-/* Every string of a copy table, functions called with a sample argument. */
+/* Every string of a copy table, functions called with a sample argument (and each deriver, for proposedBy). */
 function strings(value: unknown): string[] {
   if (typeof value === "string") return [value];
-  if (typeof value === "function") return [String((value as (argument: never) => unknown)(3 as never))];
+  if (typeof value === "function") {
+    const call = value as (argument: never, deriver: never) => unknown;
+    return [String(call(3 as never, "baseline" as never)), String(call(3 as never, "model" as never))];
+  }
   if (value && typeof value === "object") return Object.values(value).flatMap(strings);
   return [];
 }
@@ -40,6 +43,13 @@ describe("Schema screen copy (EN/KO)", () => {
     }
     expect(SCHEMA_REVIEW_COPY.en.storedOnly).toMatch(/not used to extract anything yet/);
     expect(SCHEMA_REVIEW_COPY.ko.storedOnly).toMatch(/아직 어떤 추출에도 사용되지 않습니다/);
+  });
+
+  it("says no language model was used only for a baseline run", () => {
+    for (const copy of [SCHEMA_REVIEW_COPY.en, SCHEMA_REVIEW_COPY.ko]) {
+      expect(copy.proposedBy("t", "baseline")).toMatch(/does not use a language model|언어 모델을 사용하지 않습니다/);
+      expect(copy.proposedBy("t", "model")).not.toMatch(/does not use|사용하지 않습니다|deterministic|결정적/);
+    }
   });
 
   it("maps a refusal code to its sentence and anything else to the nothing-recorded sentence", () => {

@@ -114,7 +114,7 @@ export default function SchemaReview({ collection }: { collection: { collectionI
       ) : null}
       {data?.run ? (
         <>
-          <p className={styles.note}>{copy.proposedBy(formatTimestamp(data.run.createdAt) ?? data.run.createdAt)}</p>
+          <p className={styles.note}>{copy.proposedBy(formatTimestamp(data.run.createdAt) ?? data.run.createdAt, data.run.deriver)}</p>
           <CandidateGroup heading={copy.classes} candidates={classes} copy={copy} labels={labels} collectionId={collection.collectionId}
             onDecided={(text) => { setNotice({ text, alert: false }); void read(); }} onFailed={(text) => setNotice({ text, alert: true })} />
           <CandidateGroup heading={copy.properties} candidates={properties} copy={copy} labels={labels} collectionId={collection.collectionId}

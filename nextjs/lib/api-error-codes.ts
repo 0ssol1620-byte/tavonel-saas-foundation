@@ -589,9 +589,9 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
   },
   {
     title: "Ontology schema (W2-C1)",
-    summary: "`/api/ontology/candidates`: a proposed schema for one World, and a person's certify, reject or edit on each candidate. Off unless the deployment sets `TAVONEL_ONTOLOGY_INDUCTION_ENABLED`; nothing downstream reads a certified candidate yet.",
+    summary: "`/api/ontology/candidates`: a proposed schema for one World, and a person's certify, reject or edit on each candidate. Off by default; nothing downstream reads a certified candidate yet.",
     codes: [
-      { code: "ONTOLOGY_INDUCTION_DISABLED", status: 404, meaning: "Schema derivation is not enabled on this deployment. Nothing was read or written.", whatToDo: "Nothing a caller can send; the feature is off here." },
+      { code: "ONTOLOGY_INDUCTION_DISABLED", status: 404, meaning: "Schema derivation is not enabled here. Nothing was read or written.", whatToDo: "Nothing a caller can send; the feature is off here." },
       { code: "ONTOLOGY_REQUEST_INVALID", status: 400, meaning: "The collection id, manifest digest, candidate id or verdict did not validate, or the body was not JSON or too large.", whatToDo: "Send `collectionId` and `manifestDigest` as the World reported them, and a verdict of `certify`, `reject` or `edit`." },
       { code: "ONTOLOGY_ROLE_REQUIRED", status: 403, meaning: "Only a workspace owner or admin can propose or decide a schema.", whatToDo: "Ask an owner or admin of this workspace." },
       { code: "ONTOLOGY_WORLD_CHANGED", status: 409, meaning: "The World revision loaded is not the one named, so nothing was derived from it.", whatToDo: "Reload the World and derive from the revision it reports." },

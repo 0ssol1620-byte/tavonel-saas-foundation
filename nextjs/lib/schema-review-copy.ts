@@ -22,7 +22,8 @@ export type SchemaReviewCopy = {
   derive: string;
   deriving: string;
   derived: string;
-  proposedBy: (when: string) => string;
+  /** Follows the run's deriver: only a baseline run may say it used no language model. */
+  proposedBy: (when: string, deriver: "baseline" | "model") => string;
   classes: string;
   properties: string;
   emptyKind: string;
@@ -56,7 +57,9 @@ const EN: SchemaReviewCopy = {
   derive: "Propose a schema from this World",
   deriving: "Proposing a schema from this World’s evidence…",
   derived: "Schema proposed. Review each candidate below.",
-  proposedBy: (when) => `Proposed ${when} by the deterministic baseline, which reads names in the evidence. It does not use a language model.`,
+  proposedBy: (when, deriver) => deriver === "baseline"
+    ? `Proposed ${when} by the deterministic baseline, which reads names in the evidence. It does not use a language model.`
+    : `Proposed ${when} by a language model. Check each passage before you certify.`,
   classes: "Types",
   properties: "Relations",
   emptyKind: "None proposed.",
@@ -101,7 +104,9 @@ const KO: SchemaReviewCopy = {
   derive: "이 World에서 스키마 제안하기",
   deriving: "이 World의 근거에서 스키마를 제안하는 중…",
   derived: "스키마가 제안되었습니다. 아래에서 각 후보를 검토하세요.",
-  proposedBy: (when) => `${when}에 결정적 기준선이 제안했습니다. 기준선은 근거 속 이름을 읽으며 언어 모델을 사용하지 않습니다.`,
+  proposedBy: (when, deriver) => deriver === "baseline"
+    ? `${when}에 결정적 기준선이 제안했습니다. 기준선은 근거 속 이름을 읽으며 언어 모델을 사용하지 않습니다.`
+    : `${when}에 언어 모델이 제안했습니다. 인증하기 전에 근거를 하나씩 확인하세요.`,
   classes: "유형",
   properties: "관계",
   emptyKind: "제안된 항목이 없습니다.",

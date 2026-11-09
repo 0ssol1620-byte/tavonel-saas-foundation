@@ -74,7 +74,12 @@ async function installWorkspace(page: Page) {
       ] },
     },
   } }));
-  await page.route((url: URL) => url.pathname.startsWith(`/api/collections/${collectionId}/`) || url.pathname.startsWith(`/api/v1/world/${collectionId}`),
+  // A compiled candidate that has not been activated: the workspace's own "no active World yet" answer,
+  // so the screen shows no failure banner.
+  await page.route((url: URL) => url.pathname === `/api/collections/${collectionId}/world`,
+    (route) => route.fulfill({ status: 404, json: { code: "ACTIVE_WORLD_NOT_FOUND" } }));
+  await page.route((url: URL) => (url.pathname.startsWith(`/api/collections/${collectionId}/`) && url.pathname !== `/api/collections/${collectionId}/world`)
+    || url.pathname.startsWith(`/api/v1/world/${collectionId}`),
     (route) => route.fulfill({ json: { code: "WORLD_NOT_ACTIVE", model: null } }));
 }
 
@@ -157,6 +162,8 @@ test.describe("workspace schema review", () => {
       const posts = await installOntology(page);
       await page.goto(`/workspace/schema?collection=${collectionId}&manifest=${encodeURIComponent(manifestDigest)}`);
       await expect(page.getByRole("heading", { name: "Proposed schema" })).toBeVisible();
+      // The shot is of a clean state: no failure banner above the panel (review R1 m5).
+      await expect(page.getByText(/verification failed|WORLD_NOT_ACTIVE/)).toHaveCount(0);
 
       const cards = page.getByTestId("schema-review").locator("li[data-state]");
       await expect(cards).toHaveCount(shown.length);
