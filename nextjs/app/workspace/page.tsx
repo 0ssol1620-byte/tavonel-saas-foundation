@@ -13,6 +13,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { OWNER_ACCESS_ACTIVE_SENTENCE, useCheckout, type NoticeTone } from "@/lib/use-checkout";
 import type { BillingStatusAccount, EntitlementWaitResult } from "@/lib/entitlement-wait";
 import { formatCount, formatTimestamp } from "@/lib/format";
+import { countNoun } from "@/lib/plural";
 import { decideCheckoutResume, heldOfferSentence, readOfferParam, rememberCheckoutIntent, takeCheckoutIntent, type ResumeAccess } from "@/lib/checkout-intent";
 import type { BillingOfferCode } from "@/lib/billing-catalog";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
@@ -80,7 +81,7 @@ import type { WorldReadModel } from "@/lib/world-read-model";
 import { compileLimitsNotice, judgeCompileSet } from "@/lib/compile-limits";
 import { describeCorpusStart, judgeCorpusSet, type CorpusProgress } from "@/lib/corpus-batching";
 import { CompileJobPanel, type CompileJobView } from "@/components/compile-job-panel";
-import { compileJobRestingNotice, isCompileJobResting, observeCompileJob, pickResumableCompileJob } from "@/lib/compile-job-client";
+import { compileJobRestingNotice, isCompileJobResting, isCompileJobTerminal, observeCompileJob, pickResumableCompileJob } from "@/lib/compile-job-client";
 import { measureSelection, type PageCountResult } from "@/lib/page-count";
 import {
   buildPreflightSummary,
@@ -1515,7 +1516,7 @@ export default function WorkspacePage() {
           ...payload,
           parts: payload.parts.map((part) => ({ jobId: part.jobId, batchIndex: part.batchIndex ?? null, state: part.state })),
         });
-        const open = payload.parts.find((part) => !["ready", "failed", "cancelled"].includes(part.state))
+        const open = payload.parts.find((part) => !isCompileJobTerminal(part.state))
           ?? payload.parts[payload.parts.length - 1];
         if (open && open.jobId !== watching) {
           watching = open.jobId;
@@ -1727,7 +1728,7 @@ export default function WorkspacePage() {
       await loadWorldState(json.collectionId, token);
       setNotice(json.coreExecution.status === "review_required"
         // The reasons are read in the review queue, where each has its sentence and reference (D0 R2).
-        ? `Separate Core produced a review package for ${json.collectionId} with ${json.reviewReasons?.length ?? 0} review reason(s). The signed download is available and nothing is active yet.`
+        ? `Separate Core produced a review-required package for ${json.collectionId}${json.reviewReasons?.length ? ` with ${countNoun(json.reviewReasons.length, "review reason")}` : ". Manual review required"}. The signed download is available and nothing is active yet.`
         : `Compiled World ${json.collectionId} is ready for evidence review.`);
     } finally {
       setBusy(false);

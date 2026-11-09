@@ -130,6 +130,11 @@ export function frameFromEvent(raw: unknown): CompileJobFrame | null {
 const RESTING: readonly string[] = ["ready", "failed", "cancelled", "review_required"];
 const TERMINAL: readonly string[] = ["ready", "failed", "cancelled"];
 
+/** Reached, and nothing moves it again. `review_required` is resting but not terminal: a person still decides. */
+export function isCompileJobTerminal(state: string): boolean {
+  return TERMINAL.includes(state);
+}
+
 /** Nothing further happens to this job on its own, so nothing on screen may call it compiling. */
 export function isCompileJobResting(state: CompileState): boolean {
   return RESTING.includes(state);
@@ -250,5 +255,5 @@ export function pickResumableCompileJob<T extends { state: CompileState; settled
   const settled = Date.parse(newest?.settledAt ?? "");
   // No lower bound: a browser clock behind the server must not hide a failure that just happened.
   if (newest?.state === "failed" && now - settled <= RECENT_FAILURE_MS) return newest;
-  return jobs.find((job) => !["ready", "failed", "cancelled"].includes(job.state));
+  return jobs.find((job) => !isCompileJobTerminal(job.state));
 }

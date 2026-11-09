@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { compileJobRestingNotice, drainSseFrames, frameFromEvent, isCompileJobResting, observeCompileJob, pickResumableCompileJob } from "./compile-job-client";
+import { compileJobRestingNotice, drainSseFrames, frameFromEvent, isCompileJobResting, isCompileJobTerminal, observeCompileJob, pickResumableCompileJob } from "./compile-job-client";
 import { COMPILE_STATES } from "./compile-job-store";
 
 /*
@@ -226,6 +226,8 @@ describe("a compile job at rest", () => {
       expect(compileJobRestingNotice(state)).not.toMatch(/compiling/i);
     }
     expect(compileJobRestingNotice("review_required")).toBe("A review package is ready for a person to inspect. Nothing is active yet.");
+    // Resting is not terminal: a review_required job still waits on a person, and stays resumable.
+    expect(resting.filter((state) => isCompileJobTerminal(state))).toEqual(["ready", "failed", "cancelled"]);
   });
 
   it("is running, with no resting line, in every other state", () => {

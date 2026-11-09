@@ -135,16 +135,16 @@ const REVIEW_REASON_COPY: Record<ReviewLanguage, {
   en: {
     reference: "Reference",
     CONTRADICTION_GROUP_TOO_LARGE: (claims, pairs) =>
-      `${claims} statements on one topic may conflict with each other. Comparing them takes ${pairs} checks, which is more than can be done automatically, so a person needs to review them. Open the review to decide. Splitting the sources into smaller sets may help.`,
+      `${claims} statements on one topic may conflict with each other. Comparing them takes ${pairs} checks, which is more than this compile checks automatically, so a person needs to review them. Open the review to decide.`,
     CONTRADICTION_PAIR_BUDGET_EXCEEDED: (claims, pairs) =>
-      `${claims} statements on one topic may conflict with each other. This compile had already used its automatic checks on other topics, so these ${pairs} checks were left for a person. Open the review to decide. Splitting the sources into smaller sets may help.`,
+      `${claims} statements on one topic may conflict with each other. This compile had already used its automatic checks on other topics, so these ${pairs} checks were left for a person. Open the review to decide.`,
   },
   ko: {
     reference: "참조",
     CONTRADICTION_GROUP_TOO_LARGE: (claims, pairs) =>
-      `한 주제에 서로 어긋날 수 있는 진술이 ${claims}개 있습니다. 비교에 ${pairs}번의 확인이 필요해 자동으로 확인할 수 있는 범위를 넘었으므로 사람이 검토해야 합니다. 검토 화면을 열어 결정하세요. 소스를 더 작은 묶음으로 나누면 도움이 될 수 있습니다.`,
+      `한 주제에 서로 어긋날 수 있는 진술이 ${claims}개 있습니다. 비교에 ${pairs}번의 확인이 필요해 이번 컴파일이 자동으로 확인하는 한도를 넘었으므로 사람이 검토해야 합니다. 검토 화면을 열어 결정하세요.`,
     CONTRADICTION_PAIR_BUDGET_EXCEEDED: (claims, pairs) =>
-      `한 주제에 서로 어긋날 수 있는 진술이 ${claims}개 있습니다. 이번 컴파일은 다른 주제에서 자동 확인 한도를 이미 써서 이 ${pairs}번의 확인을 사람이 검토하도록 남겼습니다. 검토 화면을 열어 결정하세요. 소스를 더 작은 묶음으로 나누면 도움이 될 수 있습니다.`,
+      `한 주제에 서로 어긋날 수 있는 진술이 ${claims}개 있습니다. 이번 컴파일은 다른 주제에서 자동 확인 한도를 이미 써서 이 ${pairs}번의 확인을 사람이 검토하도록 남겼습니다. 검토 화면을 열어 결정하세요.`,
   },
 };
 
