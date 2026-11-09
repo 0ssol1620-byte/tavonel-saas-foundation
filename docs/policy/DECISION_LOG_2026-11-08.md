@@ -38,12 +38,14 @@
 ### 추가 2026-11-09 — 저장소 가시성과 F-8 보관 위치
 
 근거: 창업자 메시지(2026-11-09, 원문) **"승인할테니까 파운더 결정 필요한것들 너가 다 실행하고 모두 완료할 수 있도록해줘"**.
-이 메시지로 오케스트레이터가 창업자 전용 항목을 프로그램 기본값으로 정했다. 표시 규칙은 위와 같다: "위임 결정, 2026-11-09".
+이 메시지로 오케스트레이터는 아래 두 건(V-1, V-2)만 정했다. 둘 다 §9에 없던 새 결정이다(§9는 Foundation이 private이라고 가정했다). 이 기록은 이후 창업자 전용 항목에 대한 상시 권한이 아니다. 헌법의 '에이전트가 정하지 않는 것'(특히 F-9)은 그대로다.
 
 | ID | 결정 | 이유 | 결과 규칙 |
 |---|---|---|---|
-| V-1 | **GitHub 저장소 두 개(Foundation, AKC)는 public으로 둔다.** | 계정이 GitHub Free plan이다. Foundation 저장소의 Actions run은 7,017건이다. private 저장소는 Actions 사용이 월 2,000분으로 제한되어 CI가 멈춘다. | 다음은 어느 저장소에도 push하지 않는다: tenant object key가 든 receipt, 창업자 문서나 동의 receipt, 증명 실행 원자료와 RUN-MANIFEST, Arena prompt와 harness. |
+| V-1 | **GitHub 저장소 두 개(Foundation, AKC)는 public으로 둔다.** | 계정이 GitHub Free plan이다. Foundation 저장소의 Actions run은 7,017건이다. private 저장소는 Actions 사용이 월 2,000분으로 제한되어 CI가 멈춘다. | 다음은 어느 저장소에도 push하지 않는다: tenant object key가 든 receipt, 창업자 문서나 동의 receipt, 증명 실행 원자료와 RUN-MANIFEST, Arena prompt와 harness. V-1은 F-9를 정하지 않는다. F-9 후보(예: 스키마 유도, corpus 축약, 답변 가능성 게이트, 표 route)의 설계·코드를 public 저장소에 push하기 전에 오케스트레이터가 창업자의 F-9 판단을 받는다. |
 | V-2 | **F-8 보관 위치는 로컬 private 감사 저장소 `D:/CodexProjects/tavonel-private-audit/`이다.** git 저장소가 아니고 두 저장소 밖에 있다. 실행마다 경로는 `proof-runs/<yyyy-mm>-<wave>/`이다. | public 저장소에는 둘 수 없다(V-1). | 여기서 나온 숫자를 공개하려면 지금처럼 Evidence 규칙에 따른 receipt가 있어야 한다. |
+
+- V-2 보관 규칙: 실행마다 그 디렉터리에 `SHA256SUMS` 파일을 남긴다. 감사 저장소를 이 컴퓨터 밖에 백업하는 일은 창업자 작업이다.
 
 ### SEC User-Agent (handoff 창업자 전용 목록)
 
