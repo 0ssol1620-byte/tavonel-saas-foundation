@@ -13,13 +13,32 @@ const commercial = {
 };
 
 describe("public deployment status v2", () => {
-  it("allows an account while purchase and customer processing stay closed", () => {
+  // D-12 (delegated decision 2026-11-09): the shipped policy now opens the whole customer path.
+  it("opens account, purchase and customer processing on the shipped policy", () => {
     const status = buildPublicStatusV2({
       now: NOW,
       commercial,
       accessMode: "self_service",
       authReady: true,
       policy: activationPolicy,
+    });
+
+    expect(status.schemaVersion).toBe(PUBLIC_STATUS_SCHEMA);
+    expect(status.availableActions.createAccount.enabled).toBe(true);
+    expect(status.availableActions.createAccount.reason).toBe("Self-service account creation is open.");
+    expect(status.availableActions.purchasePlan.enabled).toBe(true);
+    expect(status.availableActions.purchasePlan.href).toBe("/pricing");
+    expect(status.availableActions.compileCustomerDocuments.enabled).toBe(true);
+    expect(status.availableActions.compileCustomerDocuments.href).toBe("/workspace");
+  });
+
+  it("allows an account while purchase and customer processing stay closed", () => {
+    const status = buildPublicStatusV2({
+      now: NOW,
+      commercial,
+      accessMode: "self_service",
+      authReady: true,
+      policy: { ...activationPolicy, customerData: { ...activationPolicy.customerData, enabled: false } },
     });
 
     expect(status.schemaVersion).toBe(PUBLIC_STATUS_SCHEMA);

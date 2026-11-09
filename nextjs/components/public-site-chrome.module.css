@@ -334,3 +334,232 @@
     gap: 0 24px;
   }
 }
+
+/*
+  NAV PANELS, 2026-11-09. The header's panels at both widths, drawn from `aria-expanded`.
+
+  Unlayered, like the rest of this file, so these rules beat the layered `app/tavonel.css` header
+  rules (`.nav > nav a` sets a 0.06em-tracked small face on every link in the bar) without editing
+  a sheet another lane owns. Colours are the
+  paper tokens of DESIGN_MASTER_V3 (`--tv-*`), named directly so a panel reads the same over Home's
+  own header and over every other page's.
+
+  Motion: 160ms opacity and a 4px rise, within the 180ms budget, and none at all under
+  prefers-reduced-motion. A closed panel is `visibility: hidden`, which takes its links out of the
+  tab order and the accessibility tree as well as out of sight.
+*/
+
+/* ---------------------------------------------------------------- the desktop bar */
+
+/* The panels position against the row, so `--nav-panel-x` (the item's offsetLeft) is all they need. */
+.navBar {
+  position: relative;
+}
+
+/* A label that opens a panel sits against its toggle instead of across the row's 10px gap. */
+.navBar > a[data-section] {
+  padding-right: 2px;
+}
+
+.navToggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  min-height: 44px;
+  margin: 0 0 0 -10px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--tv-r-inst, 6px);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.navBar > .navToggle {
+  color: var(--text-mid);
+}
+/* A chevron drawn from two borders: no icon font, no SVG to fetch. */
+.navToggle::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 160ms var(--ease-out, ease-out);
+}
+.navToggle[aria-expanded="true"]::before {
+  transform: translateY(2px) rotate(225deg);
+}
+.navToggle:focus-visible {
+  outline: 2px solid var(--tv-action);
+  outline-offset: -2px;
+}
+
+.navPanel {
+  position: absolute;
+  top: 100%;
+  left: var(--nav-panel-x, 0px);
+  z-index: 2;
+  /* The transparent top band reaches the header's lower edge, so the pointer never leaves the
+     group on its way down from the label: 64px header, 44px row. */
+  padding-top: 18px;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 160ms var(--ease-out, ease-out), transform 160ms var(--ease-out, ease-out), visibility 0s linear 160ms;
+}
+.navToggle[aria-expanded="true"] + .navPanel {
+  visibility: visible;
+  opacity: 1;
+  transform: none;
+  transition-delay: 0s;
+}
+
+.navCard {
+  display: grid;
+  grid-template-columns: repeat(var(--nav-columns, 1), minmax(0, 236px));
+  gap: 4px 28px;
+  width: max-content;
+  padding: 18px 20px 14px;
+  border: 1px solid var(--tv-rule);
+  border-radius: var(--tv-r-small, 10px);
+  background: var(--tv-sheet, #fff);
+  box-shadow: var(--tv-shadow-2);
+  color: var(--tv-ink);
+  text-align: left;
+}
+
+.navColumn {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+}
+
+.navColumnTitle {
+  margin: 0 0 6px;
+  padding-inline: 10px;
+  color: var(--tv-ink-muted);
+  font: 500 13px/1.3 var(--f-sans);
+  letter-spacing: 0;
+}
+
+.navLink {
+  display: grid;
+  gap: 2px;
+  min-height: 44px;
+  align-content: center;
+  padding: 7px 10px;
+  border-radius: var(--tv-r-inst, 6px);
+  color: var(--tv-ink);
+  text-decoration: none;
+  font: 400 15px/1.3 var(--f-sans);
+  letter-spacing: 0;
+}
+.navLink:focus-visible {
+  outline: 2px solid var(--tv-action);
+  outline-offset: -2px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .navLink:hover { background: var(--tv-paper-sunk); color: var(--tv-ink); }
+}
+
+.navLinkLabel {
+  font-weight: 500;
+}
+
+.navDescription {
+  color: var(--tv-ink-muted);
+  font-size: 13px;
+}
+
+.navFeatured {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--tv-rule);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navPanel,
+  .navToggle::before {
+    transition: none;
+  }
+  .navPanel {
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------- the phone sheet
+
+  The same markup as an accordion: a section row is its label (the hub link) and a 48px toggle
+  beside it, and the open group's links stack under that row. One group open at a time
+  (`NavDisclosure`). Pricing and Sign in, which own no group, span the row as before.
+*/
+.header :global(.one-path-mobile-nav) > nav {
+  grid-template-columns: minmax(0, 1fr) 48px;
+}
+.header :global(.one-path-mobile-nav) > nav > * {
+  grid-column: 1 / -1;
+}
+.header :global(.one-path-mobile-nav) > nav > a[data-section] {
+  grid-column: 1;
+}
+.header :global(.one-path-mobile-nav) > nav > .navToggle {
+  grid-column: 2;
+  width: auto;
+  min-height: 48px;
+  margin: 0;
+  border-radius: 0;
+  background: var(--ground);
+  color: var(--text-mid);
+}
+.header :global(.one-path-mobile-nav) > nav > .navPanel {
+  position: static;
+  display: none;
+  padding: 0;
+  visibility: visible;
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
+.header :global(.one-path-mobile-nav) > nav > .navToggle[aria-expanded="true"] + .navPanel {
+  display: block;
+}
+.header :global(.one-path-mobile-nav) > nav .navCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  width: auto;
+  padding: 6px 0 12px;
+  border: 0;
+  border-radius: 0;
+  background: var(--ground);
+  box-shadow: none;
+}
+.header :global(.one-path-mobile-nav) > nav .navColumnTitle {
+  margin: 4px 0 0;
+  padding-inline: clamp(14px, 4vw, 24px);
+}
+.header :global(.one-path-mobile-nav) > nav .navLink {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 clamp(14px, 4vw, 24px) 0 calc(clamp(14px, 4vw, 24px) + 12px);
+  border-radius: 0;
+  background: var(--ground);
+  color: var(--text-hi);
+}
+.header :global(.one-path-mobile-nav) > nav .navLink:focus-visible {
+  background: var(--g1);
+}
+/* The phone row is one line: the audience lines are the desktop panel's room, not the sheet's. */
+.header :global(.one-path-mobile-nav) > nav .navDescription {
+  display: none;
+}
+.header :global(.one-path-mobile-nav) > nav .navFeatured {
+  margin: 0;
+  padding-top: 0;
+  border-top: 0;
+}

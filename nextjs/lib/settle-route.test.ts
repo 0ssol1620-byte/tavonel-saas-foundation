@@ -91,6 +91,8 @@ function healthyStore() {
 
 beforeEach(() => {
   vi.stubEnv("FOUNDATION_COMPLETED_READ_ENABLED", "");
+  // The route reads the settlement key before verifying (billing integrity, lib/billing-secrets.ts).
+  vi.stubEnv("FOUNDATION_BILLING_SETTLEMENT_HMAC", "s".repeat(40));
   verify.mockReset().mockReturnValue(true);
   settle.mockReset().mockResolvedValue({ ok: true, result: { status: "processed", reservationId: documentId } });
   settleProof.mockReset();

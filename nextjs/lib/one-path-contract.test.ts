@@ -26,8 +26,11 @@ describe("approved one-path experience", () => {
       { href: "/pricing", label: "Pricing" },
     ]);
     expect(HEADER_NAV).toEqual(CUSTOMER_NAV.filter((item) => item.href !== "/pricing"));
-    expect(text("components/site-nav/desktop-primary-nav.tsx")).toContain("HEADER_NAV.map");
-    expect(text("components/mobile-primary-nav.tsx")).toContain("HEADER_NAV.map");
+    // NAV PANELS 2026-11-09: the bar and the sheet rows are rendered once, by the header.
+    expect(text("components/public-site-chrome.tsx")).toContain("HEADER_NAV.map");
+    // NAV PANELS 2026-11-09: the sheet renders the bar's own rows, handed to it by the header.
+    expect(text("components/mobile-primary-nav.tsx")).toContain("{children}");
+    expect(text("components/public-site-chrome.tsx")).toContain("<NavSections korean={korean} sheet />");
     expect(text("components/public-site-chrome.tsx")).toContain('href={korean ? "/ko/pricing" : "/pricing"}');
   });
   it("does not confuse a prefix with an unrelated route", () => {

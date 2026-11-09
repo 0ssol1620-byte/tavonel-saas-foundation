@@ -101,10 +101,10 @@ export function TriageCostStatus({ estimate, approvalBlockers }: {
       ) : recompileRequested ? (
         <p>For verified unchanged, already-read sources only, the published policy adds {money(estimate.incremental.minimum)}–{money(estimate.incremental.maximum)} in page charges.</p>
       ) : (
-        <p>This request is a new read; its page charge is shown in the initial estimate. No recompile quote is being made.</p>
+        <p>This request is a new read. Its page charge is shown in the initial estimate. No recompile quote is being made.</p>
       )}
-      <p>Quote scope: {intakeDisplayToken(estimate.customerChargeCoverage.scope)}; pricing policy: published per-page admission, once per document.</p>
-      <p className="fine">Operator infrastructure cost: {estimate.operatorCost.status === "priced" ? "priced separately" : "not priced; separate from this customer charge"}.</p>
+      <p>Quote scope: {intakeDisplayToken(estimate.customerChargeCoverage.scope)}. Pricing policy: published per-page admission, once per document.</p>
+      <p className="fine">Operator infrastructure cost: {estimate.operatorCost.status === "priced" ? "priced separately" : "not priced and separate from this customer charge"}.</p>
       {estimate.operatorCost.unavailableProviders.map((provider) => <p className="fine" key={provider}>Operator cost unavailable: {provider.replaceAll("_", " ")}.</p>)}
       {approvalBlockers.filter((blocker) => blocker !== "READ_PROOF_REQUIRED").map((blocker) => <p className="fine workspace-preflight-blocked" role="alert" key={blocker}>{blocker.replaceAll("_", " ")}</p>)}
       <p className="fine">No parsing, compute reservation, or full-processing approval has been started.</p>
@@ -284,7 +284,7 @@ export default function IntakeTriageReview({ files, getToken, onLegacyFallback, 
       if ("error" in result) {
         if (["INTAKE_PRICE_STALE", "INTAKE_RETRIAGE_REQUIRED", "INTAKE_TRIAGE_RECEIPT_STALE"].includes(result.error.code)) {
           resetForFreshReceiptState();
-          setNotice("The receipt or published price is stale. Review sources again to obtain a fresh receipt and quote; no approval was submitted.");
+          setNotice("The receipt or published price is stale. Review sources again to obtain a fresh receipt and quote. No approval was submitted.");
         } else {
           setNotice(`A complete current quote is unavailable (${result.error.code}). No processing approval was requested.`);
         }
@@ -319,7 +319,7 @@ export default function IntakeTriageReview({ files, getToken, onLegacyFallback, 
     } catch {
       if (operationIsCurrent(operation)) {
         setProcessingConsent(false);
-        setNotice("Approval could not be confirmed. The saved attempt is preserved; check its status before trying again.");
+        setNotice("Approval could not be confirmed. The saved attempt is preserved. Check its status before trying again.");
       }
     } finally {
       endOperation(operation);
@@ -331,7 +331,7 @@ export default function IntakeTriageReview({ files, getToken, onLegacyFallback, 
   return (
     <section className="workspace-preflight" aria-label="Server source triage">
       <h3>Source inventory and cost review</h3>
-      <p className="fine">Before any OCR or parsing, the server checks file identity and keeps every selected path visible. Exact byte matches are review candidates only; they are not silently merged or reused.</p>
+      <p className="fine">Before any OCR or parsing, the server checks file identity and keeps every selected path visible. Exact byte matches are review candidates only. They are not silently merged or reused.</p>
       <p className="fine"><strong>Customer page charge:</strong> new reads use the existing published page-price quote. The published policy permits zero additional page charges for a recompile only when unchanged source versions are verified as already read. Without trusted persisted read proof, the recompile quote and approval are unavailable. This does not promise a free reread or new version.</p>
       <p className="fine"><strong>Operator infrastructure cost:</strong> may be unpriced and is separate from the customer page charge. That uncertainty does not invalidate a complete customer quote. Source safety and qualification requirements still block processing when unresolved.</p>
       {!batch && !legacyFallbackPending ? (
@@ -367,7 +367,7 @@ export default function IntakeTriageReview({ files, getToken, onLegacyFallback, 
       ) : null}
       {receipt ? <TriageCostStatus estimate={receipt.estimate} approvalBlockers={receipt.approvalBlockers ?? []} /> : null}
       {receipt && (receipt.code !== "TRIAGE_RECEIPT_READY" || !receipt.receipt.approvalReady || (receipt.approvalBlockers?.length ?? 0) > 0) ? (
-        <p className="fine workspace-preflight-blocked" role="status">Server qualification is incomplete. Full-processing quote and approval are unavailable. Review the listed unknowns or blockers; no paid work has started.</p>
+        <p className="fine workspace-preflight-blocked" role="status">Server qualification is incomplete. Full-processing quote and approval are unavailable. Review the listed unknowns or blockers. No paid work has started.</p>
       ) : null}
       {receipt?.code === "TRIAGE_RECEIPT_READY" && receipt.receipt.approvalReady && (receipt.approvalBlockers?.length ?? 0) === 0 ? (
         <div aria-label="Full processing approval">

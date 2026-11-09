@@ -516,43 +516,7 @@ export default function ExploreStage({ access, model, layout, change, answers, t
       ) : null}
 
       <section className={styles.next}>
-        <p>{EXPLORE_COPY.endSourcesLabel}</p>
         <h2>{EXPLORE_COPY.endHeading}</h2>
-        {/*
-          BA-029. The closing section was a two-column grid with the whole left column empty below
-          the heading, which reads as a layout failure rather than as restraint. What belongs there
-          is the thing a reader who has just walked the sample wants named: the filings it was
-          compiled from. Every line is read off `technical.documents`, which is the acquisition
-          record -- form, filing date and the bytes the compiler read -- so this cannot drift from
-          the World above it.
-        */}
-        <ul className={styles.nextSources} aria-label="The filings this sample is compiled from">
-          {technical.documents.map((document) => (
-            <li key={document.documentId}>
-              <b>{document.form}</b> filed {document.filingDate} ·{" "}
-              {document.compiledPageCount === document.pageCount
-                ? `${document.pageCount} pages`
-                : `${document.compiledPageCount} of ${document.pageCount} pages`}
-              {/*
-                G1-023. Two of the five read "36 of 37" and "38 of 40" with no reason beside them,
-                which reads as a compile that gave up rather than as what it is. Every page of every
-                filing went to the compiler -- `sliceRationale` says so -- and `compiledPageCount`
-                counts the pages a region was actually read out of, so the shortfall is pages that
-                produced no region. Nothing in the World stands on them, and the sentence is derived
-                from that definition rather than written per document.
-              */}
-              {document.compiledPageCount !== undefined && document.compiledPageCount < document.pageCount ? (
-                <small className={styles.nextSourceNote}>
-                  {document.pageCount - document.compiledPageCount === 1
-                    ? "1 page carries no region, so nothing in this World stands on it."
-                    : `${document.pageCount - document.compiledPageCount} pages carry no region, so nothing in this World stands on them.`}
-                  {" "}
-                  <Link href={"/explore?act=evidence" as Route}>See what a region is</Link>.
-                </small>
-              ) : null}
-            </li>
-          ))}
-        </ul>
         {/*
           BA-036. Three buttons in one row is the rule 3.4 bars, and the third was the one nobody
           needed as a button: a reader who has finished the sample either brings their own files or
@@ -576,6 +540,44 @@ export default function ExploreStage({ access, model, layout, change, answers, t
           Or read how a compile reaches a World first, in the{" "}
           <Link href="/knowledge-compiler">Knowledge Compiler guide</Link>.
         </p>
+        {/*
+          2026-11-09 (review N1). Source order is the phone's reading order -- heading, actions, note,
+          then the filings -- so a keyboard reaches the primary action before the source footnote.
+          The desktop grid areas place the same elements in two columns.
+        */}
+        <p className={styles.nextLabel}>{EXPLORE_COPY.endSourcesLabel}</p>
+        {/*
+          BA-029. The closing section was a two-column grid with the whole left column empty below
+          the heading, which reads as a layout failure rather than as restraint. What belongs there
+          is the thing a reader who has just walked the sample wants named: the filings it was
+          compiled from. Every line is read off `technical.documents`, which is the acquisition
+          record -- form, filing date and the bytes the compiler read -- so this cannot drift from
+          the World above it.
+        */}
+        <ul className={styles.nextSources} aria-label="The filings this sample is compiled from">
+          {technical.documents.map((document) => (
+            <li key={document.documentId}>
+              <b>{document.form}</b> filed {document.filingDate} ·{" "}
+              {document.compiledPageCount === document.pageCount
+                ? `${document.pageCount} pages`
+                : `${document.compiledPageCount} of ${document.pageCount} pages`}
+            </li>
+          ))}
+        </ul>
+        {/*
+          G1-023. "36 of 37" and "38 of 40" need their reason beside them, or they read as a compile
+          that gave up. Every page went to the compiler; `compiledPageCount` counts the pages a
+          region was read out of, so the shortfall is pages with no region. The reason was printed
+          under each short row (2026-11-09: the same sentence twice reads as filler), so it is said
+          once, under the list, and only when a row needs it.
+        */}
+        {technical.documents.some((document) =>
+          document.compiledPageCount !== undefined && document.compiledPageCount < document.pageCount) ? (
+          <p className={styles.nextSourceNote}>
+            A page with no region carries nothing in this World.{" "}
+            <Link href={"/explore?act=evidence" as Route}>See what a region is</Link>.
+          </p>
+        ) : null}
       </section>
     </main>
   );

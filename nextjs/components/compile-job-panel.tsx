@@ -175,8 +175,9 @@ export function CompileJobPanel({
                 <>
                   <dt>{sizeCopy.measured}</dt>
                   <dd>
-                    {job.sizeLimit.bytes !== null ? formatCount(job.sizeLimit.bytes) : "?"}
-                    {job.sizeLimit.bound !== null ? ` / ${formatCount(job.sizeLimit.bound)}` : ""} bytes
+                    {job.sizeLimit.bytes !== null
+                      ? `${formatCount(job.sizeLimit.bytes)}${job.sizeLimit.bound !== null ? ` / ${formatCount(job.sizeLimit.bound)}` : ""} bytes`
+                      : job.sizeLimit.bound !== null ? sizeCopy.exceeded(formatCount(job.sizeLimit.bound)) : null}
                   </dd>
                 </>
               ) : null}

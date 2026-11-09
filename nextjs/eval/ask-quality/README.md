@@ -76,7 +76,7 @@ TAVONEL_EVAL_WORKSPACE_TOKEN=... node --experimental-strip-types eval/ask-qualit
 #   holding that filer's two pinned 10-K documents (url + sha256 in questions/xbrl-numeric.json#filers)
 
 # rebuild the question sets (SEC fair access: identify yourself; responses cache under cache/, git-ignored)
-TAVONEL_SEC_USER_AGENT="<organisation> <contact email>" node eval/ask-quality/gen_xbrl_questions.mjs
+TAVONEL_SEC_USER_AGENT="TAVONEL privacy@tavonel.com" node eval/ask-quality/gen_xbrl_questions.mjs
 node eval/ask-quality/gen_xbrl_questions.mjs --offline   # from cache only
 ```
 

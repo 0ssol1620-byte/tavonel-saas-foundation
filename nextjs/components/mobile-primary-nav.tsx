@@ -1,17 +1,29 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { NavCurrentLink } from "@/components/site-nav/desktop-primary-nav";
 import { usePathname } from "next/navigation";
 import { NAV_OPEN_EVENT } from "@/lib/marketing-analytics";
-import { HEADER_NAV, KO_CHROME, customerNavCurrent } from "@/lib/site-navigation";
 
 /**
  * Native disclosure works without JavaScript. Escape returns focus; Tab never gets trapped.
  *
  * `signedIn` has the same meaning it has in the header: suppress Sign in for a reader who already
  * is, rather than offering them a destination they have no use for.
+ *
+ * NAV PANELS, 2026-11-09: `children` is the section rows, and they are the bar's own markup.
+ * The header passes `<NavSections sheet />` (`components/public-site-chrome.tsx`), the
+ * server-rendered rows the desktop bar draws, so the sheet is an accordion over the same
+ * `NAV_GROUPS` rather than a second list -- and the panels' copy never ships in this file's script.
+ * The words are handed in too (`labels`), from `KO_CHROME`, so this file imports no navigation
+ * module at all: see the note at the top of `components/site-nav/desktop-primary-nav.tsx`.
  */
-export default function MobilePrimaryNav({ korean = false, signedIn = false }: { korean?: boolean; signedIn?: boolean }) {
+export default function MobilePrimaryNav({ korean = false, signedIn = false, labels, children }: {
+  korean?: boolean;
+  signedIn?: boolean;
+  labels: { menu: string; pricing: string; signIn: string };
+  children: ReactNode;
+}) {
   const ref = useRef<HTMLDetailsElement>(null);
   const pathname = usePathname();
   const close = useCallback(() => {
@@ -68,17 +80,15 @@ export default function MobilePrimaryNav({ korean = false, signedIn = false }: {
       */}
       {/* The span is the hook one-path.css uses below 400px to keep the word as the name while the
           toggle is drawn as a 44px icon. */}
-      <summary><span>{korean ? KO_CHROME.menu : "Menu"}</span></summary>
-      <nav aria-label={korean ? "모바일 섹션" : "Mobile sections"}>
-        {HEADER_NAV.map((item) => (
-          <a key={item.href} className="mobile-nav-direct" href={item.href}
-            aria-current={customerNavCurrent(item.href, pathname)}
-            onClick={close}>{korean ? KO_CHROME.nav[item.href] ?? item.label : item.label}</a>
-        ))}
+      <summary><span>{labels.menu}</span></summary>
+      {/* Following any link closes the sheet; a group's toggle is a button and leaves it open. */}
+      <nav aria-label={korean ? "모바일 섹션" : "Mobile sections"}
+        onClick={(event) => { if ((event.target as Element).closest("a")) close(); }}>
+        {children}
         {/* Brief move 6: below the desktop switch the header is wordmark + Menu, so Pricing is a row here. */}
-        <a className="mobile-nav-direct" href={korean ? "/ko/pricing" : "/pricing"}
-          aria-current={customerNavCurrent("/pricing", pathname)}
-          onClick={close}>{korean ? KO_CHROME.nav["/pricing"] : "Pricing"}</a>
+        <NavCurrentLink native className="mobile-nav-direct" href={korean ? "/ko/pricing" : "/pricing"} match="/pricing" also={[]}>
+          {labels.pricing}
+        </NavCurrentLink>
         {/*
           BQ-059. The panel no longer repeats the header's action.
 
@@ -104,7 +114,7 @@ export default function MobilePrimaryNav({ korean = false, signedIn = false }: {
           in both postures and nothing else.
         */}
         {signedIn ? null : (
-          <a className="mobile-nav-signin" href="/login" onClick={close}>{korean ? KO_CHROME.signIn : "Sign in"}</a>
+          <a className="mobile-nav-signin" href="/login">{labels.signIn}</a>
         )}
       </nav>
     </details>

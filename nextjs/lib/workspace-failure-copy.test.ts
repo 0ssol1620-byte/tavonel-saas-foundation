@@ -3,7 +3,7 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import AuthCallbackPage from "../app/auth/callback/page";
-import { failureSentence, isSizeLimitFailure, sizeLimitFailureCopy } from "./workspace-failure-copy";
+import { failureSentence, isSizeLimitFailure, reviewReasonCopy, sizeLimitFailureCopy } from "./workspace-failure-copy";
 
 const workspace = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
 const connections = readFileSync(new URL("../components/connections-panel.tsx", import.meta.url), "utf8");
@@ -139,5 +139,53 @@ describe("sign-in callback access refusal (journey A1, D-13)", () => {
     expect(html).toContain("could not be completed. Please try again");
     expect(html).toMatch(/<button[^>]*>Try again<\/button>/);
     expect(html).not.toContain('href="/contact"');
+  });
+});
+
+/* D0 2026-11-09 R2: the review queue printed Core's contradiction-overflow reason raw, hash and all. */
+describe("review reason copy", () => {
+  const group = "CONTRADICTION_GROUP_TOO_LARGE:contradiction_group_91a27aff07c87960ea4727f31e60dc80728ec587c8cfa466fb2f5a58713f6839:claims=216:pairs=23220";
+  const budget = "CONTRADICTION_PAIR_BUDGET_EXCEEDED:contradiction_group_0abc:claims=40:pairs=780";
+
+  it("says a too-large group in English with only the counts the string carries", () => {
+    const copy = reviewReasonCopy(group, ["en-US"]);
+    expect(copy).toEqual({
+      sentence: "216 statements on one topic may conflict with each other. Comparing them takes 23,220 checks, which is more than this compile checks automatically, so a person needs to review them. Open the review to decide.",
+      reference: "Reference",
+    });
+    expect(copy?.sentence).not.toContain("contradiction_group");
+    expect(copy?.sentence).not.toContain(";");
+    // R2 note 3: separate compiles are never compared with each other, so no line advises splitting the sources.
+    for (const value of [group, budget]) for (const languages of [["en"], ["ko"]]) expect(reviewReasonCopy(value, languages)?.sentence).not.toMatch(/split|나누/i);
+  });
+
+  it("says a spent compile budget in English", () => {
+    expect(reviewReasonCopy(budget)?.sentence).toBe("40 statements on one topic may conflict with each other. This compile had already used its automatic checks on other topics, so these 780 checks were left for a person. Open the review to decide.");
+  });
+
+  it("says both codes in Korean when the browser asks for it first", () => {
+    expect(reviewReasonCopy(group, ["ko-KR", "en"])).toEqual({
+      sentence: "한 주제에 서로 어긋날 수 있는 진술이 216개 있습니다. 비교에 23,220번의 확인이 필요해 이번 컴파일이 자동으로 확인하는 한도를 넘었으므로 사람이 검토해야 합니다. 검토 화면을 열어 결정하세요.",
+      reference: "참조",
+    });
+    expect(reviewReasonCopy(budget, ["ko"])?.sentence).toBe("한 주제에 서로 어긋날 수 있는 진술이 40개 있습니다. 이번 컴파일은 다른 주제에서 자동 확인 한도를 이미 써서 이 780번의 확인을 사람이 검토하도록 남겼습니다. 검토 화면을 열어 결정하세요.");
+  });
+
+  it("invents no meaning for an unknown code, in either language", () => {
+    expect(reviewReasonCopy("AUTHORITY_CONFLICT:doc-1:claims=3:pairs=3")).toBeNull();
+    expect(reviewReasonCopy("SECURITY_STOP:doc-x", ["ko"])).toBeNull();
+  });
+
+  it("gives no sentence for a known code in a malformed string", () => {
+    for (const malformed of [
+      "CONTRADICTION_GROUP_TOO_LARGE",
+      "CONTRADICTION_GROUP_TOO_LARGE:contradiction_group_91a2:claims=216",
+      "CONTRADICTION_GROUP_TOO_LARGE:contradiction_group_91a2:claims=lots:pairs=23220",
+      "CONTRADICTION_PAIR_BUDGET_EXCEEDED:contradiction_group_91a2:pairs=780:claims=40",
+      `${group}:extra`,
+    ]) {
+      expect(reviewReasonCopy(malformed)).toBeNull();
+      expect(reviewReasonCopy(malformed, ["ko"])).toBeNull();
+    }
   });
 });

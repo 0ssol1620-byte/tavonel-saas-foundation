@@ -1944,6 +1944,30 @@ export const COMPILE_JOB_STALL_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/compile-job-worker.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/execution-budget.test.ts',
   'lib/compile-job-panel.test.ts', 'lib/workspace-failure-copy.test.ts', 'lib/compile-job-scheduling.test.ts',
 ]);
+// Switch-on (D-12 / R1) and billing HMAC integrity (PR #201, 2026-11-09): the nineteen endpoints no owner listed -- the four
+// billing routes that now read the one secret reader, the reader and its suite, the trial digest reader, and the copy and
+// posture suites the switch moved. They select every suite that pins the switched copy or a billing secret call site.
+// Product code, so never nativeReuse. No browser suite of its own: the switch's browser specs are owned above.
+export const SWITCH_ON_BILLING_INTEGRITY_AFFECTED_PATHS = Object.freeze([
+  'app/api/billing/checkout/route.ts', 'app/api/operations/p0/credits/release/route.ts', 'app/api/paddle/webhook/route.ts',
+  'app/api/status/route.ts', 'components/trust-next.tsx', 'lib/billing-secrets.test.ts', 'lib/billing-secrets.ts',
+  'lib/checkout-customer-data-gate.test.ts', 'lib/customer-data-live-path.test.ts', 'lib/landing-v2-use.test.ts',
+  'lib/operations.test.ts', 'lib/paddle-webhook-route.test.ts', 'lib/page-seo.test.ts', 'lib/pricing-estimator.test.ts',
+  'lib/product-claims-sync.test.ts', 'lib/public-status.test.ts', 'lib/status-route-contract.test.ts',
+  'lib/trial-source-risk.test.ts', 'lib/trial-source-risk.ts',
+]);
+export const SWITCH_ON_BILLING_INTEGRITY_AFFECTED_UNIT_FILES = Object.freeze([
+  'components/evaluation-page.test.tsx', 'lib/billing-binding.test.ts', 'lib/billing-gate-enforce-route.test.ts',
+  'lib/billing-secrets.test.ts', 'lib/brand-copy.test.ts', 'lib/checkout-customer-data-gate.test.ts',
+  'lib/commercial-state.test.ts', 'lib/customer-data-live-path.test.ts', 'lib/g1-copy-truth.test.ts',
+  'lib/guide-content.test.ts', 'lib/keyless-try-it.test.ts', 'lib/landing-v2-page.test.ts', 'lib/landing-v2-start.test.ts',
+  'lib/landing-v2-use.test.ts', 'lib/operations.test.ts', 'lib/paddle-billing-event.test.ts',
+  'lib/paddle-webhook-route.test.ts', 'lib/page-seo.test.ts', 'lib/pilot-evaluation-worksheet.test.ts',
+  'lib/pricing-estimator.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts',
+  'lib/production-posture.test.ts', 'lib/public-status.test.ts', 'lib/self-service-trial-device-rotation.test.ts',
+  'lib/settle-route.test.ts', 'lib/status-route-contract.test.ts', 'lib/trial-source-risk.test.ts',
+  'lib/trust-page-answers.test.ts',
+]);
 // EN-0c benchmarks path mask: /benchmarks masks an absolute scoring-machine path in the Model Arena notes at render time
 // (the artifact and its pinned sha256 are unchanged). The four endpoints no owner listed select their two direct suites plus
 // the five that read the changed files: benchmark-registry, brand-copy, copy-trust-guard and trust-page-answers read the page
@@ -2210,6 +2234,11 @@ export const GDP_PDF_RUNS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmark
 export const COMPILER_RELEASE_AFFECTED_PATHS = Object.freeze(['lib/compiler-release.ts', 'public/proof-collection/compiler-releases/core-v2-health-2026-10-27T09-28-53Z.json']);
 export const COMPILER_RELEASE_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/changelog.test.ts', 'lib/gdp-pdf-page-data.test.ts']);
 export const COMPILER_RELEASE_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmarks.spec.ts', 'e2e/templates.spec.ts']);
+// site-polish-20261109: the /benchmarks charts, the Explore change act and the two trust-link components.
+export const SITE_POLISH_AFFECTED_PATHS = Object.freeze(['components/benchmarks/arena-charts.module.css', 'components/benchmarks/arena-charts.tsx',
+  'components/explore/change-act.tsx', 'components/file-or-route-link.tsx', 'components/trust-disclosures.tsx', 'components/trust-provisions.tsx', 'lib/file-or-route-link.test.ts']);
+export const SITE_POLISH_AFFECTED_UNIT_FILES = Object.freeze(['lib/benchmarks-page.test.ts', 'lib/explore-story.test.ts', 'lib/file-or-route-link.test.ts', 'lib/public-trust-contract.test.ts', 'lib/trust-provisions.test.ts']);
+export const SITE_POLISH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmarks.spec.ts', 'e2e/explore.spec.ts', 'e2e/templates.spec.ts']);
 // Packet delivery (codex/packet-delivery-textlayer-20261102): the delivery format an AI reads the compiled context in. The
 // download route and the two guidance modules that write the delivery/ files and point AGENTS.md at them, the package verifier
 // and its scripts/ copy that admit the delivery root, the delivery suite and the two parity suites whose MCP surface now reads
@@ -2921,6 +2950,9 @@ export function vitestDiscoveryConfigFailures(source) {
 }
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
+// legal-semicolons-20261109: the legal, consent, trust and /status copy whose semicolons were removed without a change in meaning.
+export const LEGAL_SEMICOLONS_AFFECTED_PATHS = Object.freeze(['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts']);
+export const LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-provisions.test.ts']);
 export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('public-marketing-surface', new RegExp(`^(?:${exactPathAlternation(PUBLIC_MARKETING_AFFECTED_PATHS)})$`),
     { unitFiles: PUBLIC_MARKETING_AFFECTED_UNIT_FILES, browserFiles: PUBLIC_MARKETING_AFFECTED_BROWSER_FILES }),
@@ -3056,6 +3088,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // Compile-job stall: the ten exact paths above select nine direct suites and no browser suite.
   affectedGroup('compile-job-stall', new RegExp(`^nextjs/(?:${exactPathAlternation(COMPILE_JOB_STALL_AFFECTED_PATHS)})$`),
     { unitFiles: COMPILE_JOB_STALL_AFFECTED_UNIT_FILES }),
+  // Switch-on and billing integrity: the nineteen exact paths above select twenty-nine direct suites and no browser suite.
+  affectedGroup('switch-on-billing-integrity', new RegExp(`^nextjs/(?:${exactPathAlternation(SWITCH_ON_BILLING_INTEGRITY_AFFECTED_PATHS)})$`),
+    { unitFiles: SWITCH_ON_BILLING_INTEGRITY_AFFECTED_UNIT_FILES }),
   // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.
   affectedGroup('benchmarks-path-mask', new RegExp(`^nextjs/(?:${exactPathAlternation(BENCHMARKS_PATH_MASK_AFFECTED_PATHS)})$`),
     { unitFiles: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES }),
@@ -3074,6 +3109,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // compiler-release: 2 exact paths select 3 direct suites and 2 browser suites.
   affectedGroup('compiler-release', new RegExp(`^nextjs/(?:${exactPathAlternation(COMPILER_RELEASE_AFFECTED_PATHS)})$`),
     { unitFiles: COMPILER_RELEASE_AFFECTED_UNIT_FILES, browserFiles: COMPILER_RELEASE_AFFECTED_BROWSER_FILES }),
+  // site-polish-20261109: 5 exact paths select 4 direct suites and 3 browser suites.
+  affectedGroup('site-polish-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(SITE_POLISH_AFFECTED_PATHS)})$`),
+    { unitFiles: SITE_POLISH_AFFECTED_UNIT_FILES, browserFiles: SITE_POLISH_AFFECTED_BROWSER_FILES }),
   // library-dedup-b1: the 2 exact paths above select 2 direct suites and no browser suite.
   affectedGroup('library-dedup-b1', new RegExp(`^nextjs/(?:${exactPathAlternation(LIBRARY_DEDUP_AFFECTED_PATHS)})$`),
     { unitFiles: LIBRARY_DEDUP_AFFECTED_UNIT_FILES }),
@@ -3138,6 +3176,9 @@ export const AFFECTED_GROUPS = Object.freeze([
       'lib/connector-page-integrity.test.ts', 'lib/connector-sync-page.test.ts', 'lib/connector-provider-isolation.test.ts', 'lib/connector-source-identity.test.ts',
       'lib/source-version-guard.test.ts', 'lib/connector-replay-world-currency-migration.test.ts'], database: true, databaseTests: ['supabase/tests/dropbox_source_reconciliation.sql'],
       databaseDependencies: DROPBOX_DATABASE_DEPENDENCIES }),
+  // legal-semicolons-20261109: 5 exact paths select 10 direct suites and no browser suite.
+  affectedGroup('legal-semicolons-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(LEGAL_SEMICOLONS_AFFECTED_PATHS)})$`),
+    { unitFiles: LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES }),
   affectedGroup('ci-selector', /^(?:\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml|nextjs\/scripts\/(?:repair-[a-z-]+(?:\.test)?\.mjs|run-repair-check\.mjs|verify-repair-workflows\.mjs|db\/(?:native-world-race(?:-ci)?|dropbox-source-stream-race)(?:\.test)?\.mjs|fixtures\/[A-Za-z0-9_.-]+\.json)|nextjs\/vitest\.repair-scope(?:\.async)?\.config\.ts)$/,
     { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),
   affectedGroup('ci-selector', /^nextjs\/lib\/repair-node-evidence\.test\.mjs$/, { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),

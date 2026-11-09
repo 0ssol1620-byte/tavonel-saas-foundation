@@ -104,7 +104,7 @@ describe("the /status synthetic probe section", () => {
   it("never lets a configuration row read as a request that succeeded", () => {
     const billing = buildProbeSection(stored([run()])).rows.find((row) => row.name === "billing")!;
     expect(billing.state).toBe("configured");
-    expect(billing.detail).toBe("configuration only; no request is sent through it");
+    expect(billing.detail).toBe("configuration only: no request is sent through it");
     const unavailable = buildProbeSection(stored([run({ ok: false }, [
       { name: "billing", status: "failed", errorClass: "not_configured" },
     ])])).rows.find((row) => row.name === "billing")!;

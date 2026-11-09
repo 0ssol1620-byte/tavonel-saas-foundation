@@ -113,7 +113,7 @@ export function termsLoadErrorSentence(failure: Failure) {
 */
 export function termsSubmitErrorSentence(failure: Failure) {
   if (failure.status < 400 || failure.status >= 500) {
-    return "We could not confirm that your agreement was recorded. You can safely try again; accepting the same terms again does not record them twice.";
+    return "We could not confirm that your agreement was recorded. You can safely try again. Accepting the same terms again does not record them twice.";
   }
   switch (failure.code) {
     case "AUTH_REQUIRED": return "Your session has ended. Sign in again, then accept the terms. Nothing was recorded.";

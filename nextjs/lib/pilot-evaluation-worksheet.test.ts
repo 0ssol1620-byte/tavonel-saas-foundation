@@ -240,8 +240,9 @@ describe("pilot evaluation worksheet: rights, scope, cost, retention and exit st
       expect(exit).not.toMatch(/\b(?:has been|have been|was|were) (?:deleted|revoked)\b|\bguarantee/i);
     });
   }
-  it("leaves the customer-data and promotion gates closed in the live activation policy", () => {
-    expect(activationPolicy.customerData.enabled).toBe(false);
+  // D-12 (delegated decision 2026-11-09) opened customer data; the worksheet moves neither gate.
+  it("keeps the activation policy where D-12 put it: customer data open, promotion closed", () => {
+    expect(activationPolicy.customerData.enabled).toBe(true);
     expect(activationPolicy.candidatePromotion.enabled).toBe(false);
   });
 });
@@ -300,7 +301,8 @@ describe("pilot evaluation worksheet: the real EvaluationPage keeps its form, ga
       expect(html).toContain(`lang="${locale}"`);
       expect(html).toContain('href="/explore"');
       expect(html).toContain(locale === "en" ? 'href="/pricing"' : 'href="/ko/pricing"');
-      expect(html).toContain(locale === "en" ? "rather than enabled by a plan purchase" : "요금제 구매가 아니라 저희와 함께 설정합니다");
+      // D-12 (delegated decision 2026-11-09): the switch-on sentence, in each locale.
+      expect(html).toContain(locale === "en" ? "Once it is open, the Developer plan can be bought online. Team and Enterprise are arranged with us rather than enabled by a plan purchase." : "열린 뒤에는 Developer 요금제를 바로 구매할 수 있고, Team과 Enterprise는 저희와 함께 정합니다.");
       expect(html).not.toMatch(/<script\b/);
     });
   }

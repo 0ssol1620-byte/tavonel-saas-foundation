@@ -55,7 +55,7 @@ describe("compile orchestration lives on the server", () => {
     // Two handles: the URL for a reload, and the server's own list for a tab that was closed
     // or a different machine entirely. The second is the one that needed durable state.
     expect(workspace).toContain('params.get("job")');
-    expect(workspace).toContain("json.jobs?.find");
+    expect(workspace).toContain("pickResumableCompileJob(json.jobs");
   });
 });
 

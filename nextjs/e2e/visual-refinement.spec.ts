@@ -149,9 +149,23 @@ test("the first developer request remains keyboard reachable on a narrow screen"
   them in. The server half is read through `page.request`, because the note is a standing fact
   and has to be in what the server sent, not only in what the browser ends up showing.
 */
+/*
+  D-12 (delegated decision 2026-11-09): the gate is open, so /developers sends no gate note, and the
+  narrow-screen contract below only applies the day it closes again (the test then runs as before).
+*/
+test("an open customer-data gate leaves no gate note on /developers", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "390", "the narrow-screen contract is measured at 390");
+  test.skip(!activationPolicy.customerData.enabled, "describes the open gate");
+  const served = await (await page.request.get("/developers")).text();
+  expect(served).not.toContain('data-capability-gate="customerData"');
+  await page.goto("/developers");
+  await expect(page.locator('[data-capability-gate="customerData"]')).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 test("the closed customer-data gate precedes the first developer request on a narrow screen", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "390", "the narrow-screen contract is measured at 390");
-  expect(activationPolicy.customerData.enabled, "this test describes the closed gate").toBe(false);
+  test.skip(activationPolicy.customerData.enabled, "describes the closed gate; D-12 opened it on 2026-11-09");
 
   const served = (await (await page.request.get("/developers")).text())
     .match(/<p [^>]*data-capability-gate="customerData"[^>]*>([\s\S]*?)<\/p>/)?.[1];

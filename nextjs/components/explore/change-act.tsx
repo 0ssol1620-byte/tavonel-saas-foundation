@@ -29,7 +29,10 @@ import type { VisualLayout, VisualState, VisualWorldModel } from "@/lib/visual-w
 
 /** "4 filings", "1 filing" -- a measured count read out loud, never a hand-typed one. */
 const count = (value: number, noun: string) =>
-  `${value.toLocaleString("en-US")} ${noun}${value === 1 ? "" : "s"}`;
+  `${n(value)} ${noun}${value === 1 ? "" : "s"}`;
+
+/** One number format for every figure in the act: 4,510 and 1,800, never 4510 beside 1,800. */
+const n = (value: number) => value.toLocaleString("en-US");
 
 /*
   One arriving filing, opened on a region of itself.
@@ -102,37 +105,37 @@ function Timeline({ steps }: { steps: ExploreChangeView["timeline"] }) {
             </p>
             <p className={styles.timelineArrival}>
               {step.arrival.label.toUpperCase()} · ACCESSION {step.arrival.accession} ·{" "}
-              {step.arrival.compiledPageCount} OF {step.arrival.pageCount} PAGES ·{" "}
-              {step.arrival.regionCount} REGIONS
+              {n(step.arrival.compiledPageCount)} OF {n(step.arrival.pageCount)} PAGES ·{" "}
+              {n(step.arrival.regionCount)} REGIONS
             </p>
             <dl className={styles.timelineCounts}>
               <div>
                 <dt>Added</dt>
-                <dd data-tone="changed">{step.objects.added}</dd>
+                <dd data-tone="changed">{n(step.objects.added)}</dd>
               </div>
               <div>
                 <dt>Rebuilt in place</dt>
-                <dd data-tone="changed">{step.objects.rebuilt}</dd>
+                <dd data-tone="changed">{n(step.objects.rebuilt)}</dd>
               </div>
               <div>
                 <dt>Removed</dt>
-                <dd>{step.objects.removed}</dd>
+                <dd>{n(step.objects.removed)}</dd>
               </div>
               <div>
                 <dt>Unchanged</dt>
-                <dd>{step.objects.untouched}</dd>
+                <dd>{n(step.objects.untouched)}</dd>
               </div>
               <div>
                 <dt>Recompiled</dt>
                 <dd>
-                  {step.recompiledObjects} of {step.objectsAfter}
+                  {n(step.recompiledObjects)} of {n(step.objectsAfter)}
                 </dd>
               </div>
             </dl>
             <p className={styles.changeBreakdown}>
-              {step.relations.added} relations added · {step.relations.removed} removed ·{" "}
-              {step.evidenceRegions.added} source regions added ·{" "}
-              {step.sourceRevisions.added} source version added
+              {n(step.relations.added)} relations added · {n(step.relations.removed)} removed ·{" "}
+              {n(step.evidenceRegions.added)} source regions added ·{" "}
+              {n(step.sourceRevisions.added)} source version added
             </p>
           </li>
         ))}
@@ -211,6 +214,77 @@ export default function ChangeAct({
           label="Compiled World after the 2026 filings arrived, with the objects they reached"
         />
         {/*
+          BA-033. The act used to open on two bare figures and close on a paragraph whose first
+          clause denied a capability, so the sentence a reader took away was about what is not
+          wired rather than about what four filings did. This is the same three measurements the
+          tiles below print, in a sentence, in front of them -- `count()` exists only so that one
+          filing does not read as "1 filings".
+        */}
+        <p className={styles.changeLead}>
+          {count(change.arrivals.length, "filing")} arrived.{" "}
+          {count(change.counts.rebuilt, "object")} the World already carried{" "}
+          {change.counts.rebuilt === 1 ? "was" : "were"} rebuilt because of them.{" "}
+          {change.counts.untouched.toLocaleString("en-US")} kept their identity untouched.
+        </p>
+        <p className={styles.changeCaption}>{EXPLORE_COPY.changeCaption}</p>
+
+        {/*
+          The figures, then the primitives they were derived from.
+
+          "Objects reached" is a count of distinct object ids the diff names -- added, removed or
+          rebuilt -- so the three tiles beside it name its parts without the total double-counting
+          any of them. Relations and evidence regions used to be shown the same way, as
+          added + removed, and that was wrong in the way this whole act is at risk of being
+          wrong: when a content-addressed relation is re-derived it leaves and returns, so
+          summing the two sides reported thirteen replaced relations as twenty-six. They are
+          published as the pair the diff actually produced.
+        */}
+        {/*
+          2026-11-09. The object figures are one row of five, read in the order the diff reads:
+          what it reached, how (added, rebuilt, removed), then what it left alone. They were two
+          tiles hugging the left, with the other three printed as a monospace line under them.
+        */}
+        <dl className={styles.changeCounts} data-change-counts="">
+          <div>
+            <dt>Objects reached</dt>
+            <dd data-tone="changed">{n(change.reached)}</dd>
+          </div>
+          <div>
+            <dt>Added</dt>
+            <dd>{n(change.counts.added)}</dd>
+          </div>
+          <div>
+            <dt>Rebuilt in place</dt>
+            <dd>{n(change.counts.rebuilt)}</dd>
+          </div>
+          <div>
+            <dt>Removed</dt>
+            <dd>{n(change.counts.removed)}</dd>
+          </div>
+          <div>
+            <dt>Unchanged object identities</dt>
+            <dd>{n(change.counts.untouched)}</dd>
+          </div>
+        </dl>
+
+        <p className={styles.changeBreakdown} data-change-breakdown="">
+          {n(change.relations.added)} relations added · {n(change.relations.removed)} removed ·{" "}
+          {n(change.evidenceRegions.added)} source regions added · {n(change.evidenceRegions.removed)} removed ·{" "}
+          {n(change.sourceRevisions.added)} source version
+          {change.sourceRevisions.added === 1 ? "" : "s"} added · {n(change.sourceRevisions.removed)} removed ·{" "}
+          {n(change.sourceRevisions.unchanged)} carried unchanged
+        </p>
+        <details className={styles.changeHow}>
+          <summary>How these counts are measured</summary>
+          <p className={styles.changeNote}>{EXPLORE_COPY.changeCountsNote}</p>
+          <p className={styles.changeNote}>
+            In the composition above, {shownAffected} of the {inFocus.size} objects on screen{" "}
+            {shownAffected === 1 ? "is" : "are"} named by the diff and {shownUntouched}{" "}
+            {shownUntouched === 1 ? "retains" : "retain"} the same compiled identity across both
+            Worlds.
+          </p>
+        </details>
+        {/*
           §20. This is the one act where an object's state differs, and the canvas reports that
           difference in colour. The list prints AFFECTED or UNCHANGED as a word, so the same
           reading is available to someone who cannot see the palette.
@@ -223,61 +297,6 @@ export default function ChangeAct({
           onOpen={onOpen}
           open={reduced}
         />
-        {/*
-          BA-033. The act used to open on two bare figures and close on a paragraph whose first
-          clause denied a capability, so the sentence a reader took away was about what is not
-          wired rather than about what four filings did. This is the same three measurements the
-          tiles below print, in a sentence, in front of them -- `count()` exists only so that one
-          filing does not read as "1 filings".
-        */}
-        <p className={styles.changeLead}>
-          {count(change.arrivals.length, "filing")} arrived.{" "}
-          {count(change.counts.rebuilt, "object")} the World already carried{" "}
-          {change.counts.rebuilt === 1 ? "was" : "were"} rebuilt because of them;{" "}
-          {change.counts.untouched.toLocaleString("en-US")} kept their identity untouched.
-        </p>
-        <p className={styles.changeCaption}>{EXPLORE_COPY.changeCaption}</p>
-
-        {/*
-          Two figures, then the primitives they were derived from.
-
-          "Objects reached" is a count of distinct object ids the diff names -- added, removed or
-          rebuilt -- so the line beneath it can name all three without the tile double-counting
-          any of them. Relations and evidence regions used to be shown the same way, as
-          added + removed, and that was wrong in the way this whole act is at risk of being
-          wrong: when a content-addressed relation is re-derived it leaves and returns, so
-          summing the two sides reported thirteen replaced relations as twenty-six. They are
-          published as the pair the diff actually produced.
-        */}
-        <dl className={styles.changeCounts}>
-          <div>
-            <dt>Objects reached</dt>
-            <dd data-tone="changed">{change.reached}</dd>
-          </div>
-          <div>
-            <dt>Unchanged object identities</dt>
-            <dd>{change.counts.untouched}</dd>
-          </div>
-        </dl>
-
-        <p className={styles.changeBreakdown} data-change-breakdown="">
-          {change.counts.added} added · {change.counts.removed} removed ·{" "}
-          {change.counts.rebuilt} rebuilt in place
-          <br />
-          {change.relations.added} relations added · {change.relations.removed} removed ·{" "}
-          {change.evidenceRegions.added} source regions added · {change.evidenceRegions.removed} removed
-          <br />
-          {change.sourceRevisions.added} source version
-          {change.sourceRevisions.added === 1 ? "" : "s"} added · {change.sourceRevisions.removed} removed ·{" "}
-          {change.sourceRevisions.unchanged} carried unchanged
-        </p>
-        <p className={styles.changeNote}>{EXPLORE_COPY.changeCountsNote}</p>
-        <p className={styles.changeNote}>
-          In the composition above, {shownAffected} of the {inFocus.size} objects on screen{" "}
-          {shownAffected === 1 ? "is" : "are"} named by the diff and {shownUntouched}{" "}
-          {shownUntouched === 1 ? "retains" : "retain"} the same compiled identity across both
-          Worlds.
-        </p>
 
         <Timeline steps={change.timeline} />
       </div>

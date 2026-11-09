@@ -75,9 +75,13 @@ jobs:
         run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
       - name: Run launch QA
         run: pnpm exec playwright test --project=launch-${{ matrix.browser }}
-      - name: Verify analytics consent at all seven widths and reduced motion
+      - name: Verify analytics consent at all seven widths and reduced motion, and every purchase door without launch approval
         if: matrix.browser == 'chromium'
-        run: pnpm exec playwright test e2e/marketing-consent.spec.ts
+        # This job's server has no launch flags (pilot posture), so it is where self-serve-journey's
+        # "launch approval withheld" test runs: product-qa and the repair-scope browser run set
+        # COMMERCIAL_MODE=live and TAVONEL_BILLING_LAUNCH_APPROVED=true and skip it (review PR201-R1 B2).
+        # The spec runs in the `audit` project only; the consent spec in its width projects, as before.
+        run: pnpm exec playwright test e2e/marketing-consent.spec.ts e2e/self-serve-journey.spec.ts
       - name: Preserve browser failure evidence
         if: always()
         uses: actions/upload-artifact@v4

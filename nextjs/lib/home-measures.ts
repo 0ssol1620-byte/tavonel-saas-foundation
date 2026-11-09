@@ -107,7 +107,7 @@ export const HOME_MEASURES: readonly HomeMeasure[] = [
     receipt: recovery.receipt,
     en: {
       figure: [fig(recovery.numbers.with_recovery, 1)],
-      label: ["olmOCR-Bench score with recovery; ", fig(recovery.numbers.without_recovery, 1), " with only recovery switched off"],
+      label: ["olmOCR-Bench score with recovery. ", fig(recovery.numbers.without_recovery, 1), " with only recovery switched off"],
       detail: [
         fig(r01.held_constant.input_count), " documents, ", fig(r01.held_constant.test_count), " checks. ", ...recovery.mustSay.en,
       ],
@@ -149,7 +149,7 @@ export const HOME_MEASURES: readonly HomeMeasure[] = [
       figure: [fig(weakest.accuracy_percent, 1), "%"],
       label: ["of checks passed on low-quality scans"],
       detail: [
-        fig(weakest.checks_passed), " of ", fig(weakest.checks_total), " checks on low-quality scans; ",
+        fig(weakest.checks_passed), " of ", fig(weakest.checks_total), " checks on low-quality scans. ",
         fig(standard.checks_passed), " of ", fig(standard.checks_total), " on standard digital documents. ", ...byType.mustSay.en,
       ],
     },
