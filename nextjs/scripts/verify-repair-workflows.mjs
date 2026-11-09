@@ -515,11 +515,11 @@ const currentOwnerBindings = [
     exportedSuites: INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES,
     neighbors: ['lib/api-error-codes.test.ts', 'lib/intake-approval-rollout-on.test.ts', 'lib/upload-transfer.test.ts', 'lib/usage-pricing.ts'] },
 ];
-// Solutions proof: two exact paths, two direct suites and the one 1440 solutions browser suite.
+// Solutions proof: four exact paths, three direct suites and the one 1440 solutions browser suite.
 {
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'solutions-proof'), [owner] = owners;
-  const paths = ['app/solutions/[slug]/page.tsx', 'app/solutions/solution-workflow-proof.tsx'];
-  const suites = ['lib/copy-trust-guard.test.ts', 'lib/output-escaping.test.ts'], browsers = ['e2e/solutions-workflows.spec.ts'];
+  const paths = ['app/solutions/[slug]/page.tsx', 'app/solutions/solution-workflow-proof.tsx', 'lib/solution-proof-picks.ts', 'lib/solution-workflows.test.ts'];
+  const suites = ['lib/copy-trust-guard.test.ts', 'lib/output-escaping.test.ts', 'lib/solution-workflows.test.ts'], browsers = ['e2e/solutions-workflows.spec.ts'];
   assert(owners.length === 1 && JSON.stringify(SOLUTIONS_PROOF_AFFECTED_PATHS) === JSON.stringify(paths)
     && JSON.stringify(SOLUTIONS_PROOF_AFFECTED_UNIT_FILES) === JSON.stringify(suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(suites)
     && JSON.stringify(SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES) === JSON.stringify(browsers) && JSON.stringify(owner.browserFiles) === JSON.stringify(browsers)
@@ -527,7 +527,7 @@ const currentOwnerBindings = [
     && paths.every(p => owner.match.test('nextjs/' + p))
     && ['app/solutions/[slug]/layout.tsx', 'app/solutions/page.tsx', 'app/solutions/solution-workflow-proof.test.tsx'].every(p => !owner.match.test('nextjs/' + p))
     && runner.includes("['e2e/solutions-workflows.spec.ts', ['1440']]"),
-    'Solutions proof owner must keep its two exact paths, two direct suites and the 1440 solutions browser suite');
+    'Solutions proof owner must keep its four exact paths, three direct suites and the 1440 solutions browser suite');
 }
 // Evidence viewer overlay: one exact stylesheet, its direct suite and the world-lifecycle browser suite.
 {
