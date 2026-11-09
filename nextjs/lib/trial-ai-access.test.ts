@@ -30,7 +30,8 @@ vi.mock("./developer-auth", async (importOriginal) => ({
   revalidateFoundationSession: async (_request: Request, principal: unknown) => ({ ok: true, principal }),
 }));
 
-import { trialAiAccess, trialAiKeyAccess, trialScopesAllowed, trialSessionQuery } from "./trial-ai-access";
+import { readFileSync } from "node:fs";
+import { spendTrialSessionQuery, trialAiAccess, trialAiKeyAccess, trialScopesAllowed, trialSessionQuery } from "./trial-ai-access";
 import { GET as listKeysRoute, POST as createKeyRoute } from "../app/api/developer/keys/route";
 import { DELETE as revokeKeyRoute } from "../app/api/developer/keys/[id]/route";
 import { POST as rotateKeyRoute } from "../app/api/v1/developer/keys/[id]/rotate/route";
@@ -204,6 +205,34 @@ describe("trialSessionQuery (browser Ask on a free evaluation)", () => {
     expect(await trialSessionQuery(TRIAL.workspaceKey, TRIAL.userId)).toEqual({ ok: false, code: "TRIAL_AI_ACCESS_CHECK_FAILED", status: 503 });
     process.env.TEST_STORE = "off";
     expect(await trialSessionQuery(TRIAL.workspaceKey, TRIAL.userId)).toEqual({ ok: false, code: "TRIAL_AI_ACCESS_CHECK_FAILED", status: 503 });
+  });
+});
+
+/* Review N2: the route spends the trial's query after validating the body, before any retrieval. */
+describe("spendTrialSessionQuery (the Ask routes' one spend)", () => {
+  const session = (accessSource: string) => ({ kind: "session" as const, accessSource, workspaceKey: TRIAL.workspaceKey, userId: TRIAL.userId });
+
+  it("spends one counted query for a trial session, and stops it past the cap", async () => {
+    expect(await spendTrialSessionQuery(session("trial"))).toEqual({ ok: true });
+    expect(rpcBody()).toEqual({ p_user_id: TRIAL.userId, p_workspace_key: TRIAL.workspaceKey, p_consume_query: true });
+    mocks.usage.mockImplementation(async () => usage({ status: "limit_reached", reason: "TRIAL_AI_DAILY_QUERY_LIMIT" }));
+    expect(await spendTrialSessionQuery(session("trial"))).toEqual({ ok: false, code: "TRIAL_LIMIT_REACHED", status: 402 });
+  });
+
+  it("leaves paid and owner sessions, and API keys, to their own metering", async () => {
+    expect(await spendTrialSessionQuery(session("paid"))).toEqual({ ok: true });
+    expect(await spendTrialSessionQuery(session("owner"))).toEqual({ ok: true });
+    expect(await spendTrialSessionQuery({ ...session("trial"), kind: "api-key" })).toEqual({ ok: true });
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it("is called by both Ask routes after the body is validated and before the active World is read", () => {
+    for (const [route, lastCheck] of [["ask", '"QUESTION_INVALID"'], ["search", '"LIMIT_INVALID"']] as const) {
+      const source = readFileSync(new URL(`../app/api/collections/[id]/${route}/route.ts`, import.meta.url), "utf8");
+      const spend = source.indexOf("await spendTrialSessionQuery(auth.principal)");
+      expect(spend, route).toBeGreaterThan(source.indexOf(lastCheck));
+      expect(spend, route).toBeLessThan(source.indexOf("getFoundationActiveWorld("));
+    }
   });
 });
 

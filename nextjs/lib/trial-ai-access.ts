@@ -75,7 +75,8 @@ export function trialScopesAllowed(scopes: readonly DeveloperScope[]): boolean {
   return scopes.length > 0 && scopes.every((scope) => REMOTE_MCP_SCOPES.includes(scope));
 }
 
-type Usage = { status: "allowed" } | { status: "limit_reached"; reason: string } | { status: "not_trial" };
+/** `worldLimit` is the policy's ai_world_limit, as the same RPC reports it, when it reports a valid one. */
+type Usage = { status: "allowed"; worldLimit?: number } | { status: "limit_reached"; reason: string } | { status: "not_trial" };
 
 async function readUsage(principal: Principal, consume: boolean): Promise<Usage | null> {
   const config = readSupabaseAdminConfig();
@@ -91,7 +92,13 @@ async function readUsage(principal: Principal, consume: boolean): Promise<Usage 
       return null;
     }
     const body = await response.json().catch(() => null) as Record<string, unknown> | null;
-    if (body?.status === "allowed" || body?.status === "not_trial") return { status: body.status };
+    if (body?.status === "not_trial") return { status: body.status };
+    if (body?.status === "allowed") {
+      const worlds = (body.limits as Record<string, unknown> | undefined)?.worlds;
+      return Number.isInteger(worlds) && (worlds as number) >= 1 && (worlds as number) <= 10
+        ? { status: "allowed", worldLimit: worlds as number }
+        : { status: "allowed" };
+    }
     if (body?.status === "limit_reached" && typeof body.reason === "string") return { status: "limit_reached", reason: body.reason };
     return null;
   } catch {
@@ -255,18 +262,22 @@ export async function authorizeWorldActivation(
   if (!session.ok) return session.status === 503 ? { ok: false, code: session.code, status: 503 } : paid;
   // A trial is one person's workspace, so it reaches activation only as the owner, like Developer.
   if (session.access.source !== "trial" || role !== "owner") return paid;
-  // One World: any active World other than this exact candidate is the one the trial already used.
-  // ponytail: read-then-move, so two promotes racing on two collections could both pass; the
-  // compile gate already admits one World-bearing job per trial, so a second candidate cannot exist.
-  const worlds = await listFoundationActiveWorlds(workspaceKey, { limit: 2 });
-  if (!worlds.ok) return { ok: false, code: "TRIAL_AI_ACCESS_CHECK_FAILED", status: 503 };
-  if (worlds.worlds.some((world) => world.collectionId !== collectionId || world.manifestDigest !== manifestDigest)) {
-    return { ok: false, code: "TRIAL_WORLD_LIMIT_REACHED", status: 402 };
-  }
+  // The bounds first, peeked without spending a query. The World bound is the policy's
+  // ai_world_limit (default 1, migration 20261104090000), not a number in this file (review N3).
   const usage = await readUsage({ workspaceKey, userId }, false);
   if (usage === null) return { ok: false, code: "TRIAL_AI_ACCESS_CHECK_FAILED", status: 503 };
   if (usage.status === "limit_reached") return { ok: false, code: "TRIAL_LIMIT_REACHED", status: 402 };
   if (usage.status === "not_trial") return paid;
+  if (usage.worldLimit === undefined) return { ok: false, code: "TRIAL_AI_ACCESS_CHECK_FAILED", status: 503 };
+  // Every active World other than this exact candidate counts against the bound. At the default of
+  // 1 that also refuses a new revision of the World already activated.
+  // ponytail: read-then-move. Two promotes racing on two collections could both pass when a cancel
+  // or failure frees a compile slot inside the window (review N1). The atomic bound belongs in the
+  // promote RPC, a migration, so it is a follow-up.
+  const worlds = await listFoundationActiveWorlds(workspaceKey, { limit: usage.worldLimit + 1 });
+  if (!worlds.ok) return { ok: false, code: "TRIAL_AI_ACCESS_CHECK_FAILED", status: 503 };
+  const others = worlds.worlds.filter((world) => world.collectionId !== collectionId || world.manifestDigest !== manifestDigest);
+  if (others.length >= usage.worldLimit) return { ok: false, code: "TRIAL_WORLD_LIMIT_REACHED", status: 402 };
   return { ok: true };
 }
 
@@ -281,4 +292,17 @@ export async function trialSessionQuery(workspaceKey: string, userId: string): P
   if (usage.status === "limit_reached") return { ok: false, code: "TRIAL_LIMIT_REACHED", status: 402 };
   if (usage.status === "not_trial") return { ok: false, code: "TRIAL_NOT_ACTIVE", status: 402 };
   return { ok: true };
+}
+
+/*
+  A trial's browser Ask or search runs the embedder, so it spends one of the trial's daily queries.
+  The route calls this once, after the body is validated and before any retrieval, so a malformed
+  request spends nothing (review N2). Every other principal passes through unmetered here: a trial
+  API key is metered by trialAiKeyAccess at authorization.
+*/
+export async function spendTrialSessionQuery(principal: {
+  kind: "session" | "api-key"; accessSource?: string; workspaceKey: string; userId: string;
+}): Promise<{ ok: true } | Refusal> {
+  if (principal.kind !== "session" || principal.accessSource !== "trial") return { ok: true };
+  return trialSessionQuery(principal.workspaceKey, principal.userId);
 }

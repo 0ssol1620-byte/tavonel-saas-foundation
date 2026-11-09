@@ -259,7 +259,10 @@ describe("developer request authorization", () => {
     expect(authorizeFoundationSessionProduct).not.toHaveBeenCalled();
   });
 
-  /* P0 2026-11-09: the trial's browser Ask is metered here, once per request, before any retrieval. */
+  /*
+    P0 2026-11-09: the trial's browser Ask is metered once per request, by the route, after its body is
+    validated and before any retrieval (review N2). Authorization itself spends nothing.
+  */
   describe("a free evaluation's browser Ask", () => {
     const TRIAL_ACCESS = { source: "trial", accessPlan: "observer_access", billingExempt: true, expiresAt: "2099-01-01T00:00:00Z" };
     const session = (path: string) => new Request(`https://tavonel.com${path}`, { headers: { authorization: "Bearer supabase-session" } });
@@ -269,29 +272,12 @@ describe("developer request authorization", () => {
       trialSessionQuery.mockResolvedValue({ ok: true });
     });
 
-    it("spends one query on ask:read, and the late re-check spends none", async () => {
+    it("authorizes a trial's Ask and its late re-check without spending, and names the principal a trial", async () => {
       const request = session("/api/collections/x/ask");
       const first = await authorizeFoundationRequest(request, "ask:read");
-      expect(first.ok).toBe(true);
-      expect(trialSessionQuery).toHaveBeenCalledTimes(1);
-      expect(trialSessionQuery).toHaveBeenCalledWith("pilot-user", "user");
-      if (!first.ok) return;
+      if (!first.ok) throw new Error("trial authorization failed");
+      expect(first.principal).toMatchObject({ kind: "session", accessSource: "trial", workspaceKey: "pilot-user", userId: "user" });
       expect((await revalidateFoundationAuthorization(request, first.principal, "ask:read")).ok).toBe(true);
-      expect(trialSessionQuery).toHaveBeenCalledTimes(1);
-    });
-
-    it("stops the Ask past the trial cap", async () => {
-      trialSessionQuery.mockResolvedValue({ ok: false, code: "TRIAL_LIMIT_REACHED", status: 402 });
-      expect(await authorizeFoundationRequest(session("/api/collections/x/ask"), "ask:read"))
-        .toEqual({ ok: false, code: "TRIAL_LIMIT_REACHED", status: 402 });
-    });
-
-    it("leaves other scopes and paid sessions unmetered", async () => {
-      expect((await authorizeFoundationRequest(session("/api/v1/documents"), "documents:read")).ok).toBe(true);
-      authorizeFoundationSessionProduct.mockResolvedValue({
-        ok: true, access: { source: "paid", accessPlan: "observer_access", billingExempt: false, expiresAt: null },
-      });
-      expect((await authorizeFoundationRequest(session("/api/collections/x/ask"), "ask:read")).ok).toBe(true);
       expect(trialSessionQuery).not.toHaveBeenCalled();
     });
   });

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EMPTY_BILLING_ACCOUNT, type FoundationBillingAccount } from "./billing-store";
 
@@ -112,7 +113,7 @@ function signedIn(plan: Plan | null, role: Role) {
 }
 
 /** A free evaluation: no plan bought, a live trial row, the bounds RPC answering `usage`. */
-function onTrial(role: Role, usage: Record<string, unknown> | null = { status: "allowed" }) {
+function onTrial(role: Role, usage: Record<string, unknown> | null = { status: "allowed", limits: { worlds: 1 } }) {
   signedIn(null, role);
   trialRow.mockResolvedValue({ ok: true, trial: { status: "trialing", expiresAt: new Date(Date.now() + 86_400_000).toISOString() } });
   trialUsage.mockResolvedValue(usage ? new Response(JSON.stringify(usage)) : new Response("", { status: 500 }));
@@ -264,6 +265,37 @@ describe("promote on a free evaluation", () => {
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ code: "TRIAL_AI_ACCESS_CHECK_FAILED" });
     expect(candidate).not.toHaveBeenCalled();
+  });
+
+  it("reads the World bound from the trial policy, not from the code (review N3)", async () => {
+    const two = { collectionId: `collection-${"d".repeat(32)}`, manifestDigest: target, revision: 1, updatedAt: "2026-11-09T00:00:00Z" };
+    const three = { ...two, collectionId: `collection-${"e".repeat(32)}` };
+    onTrial("owner", { status: "allowed", limits: { worlds: 2 } });
+    activeWorlds.mockResolvedValue({ ok: true, nextCursor: null, worlds: [two] });
+    expect((await promoteRequest()).status).toBe(404);
+    expect(activeWorlds).toHaveBeenLastCalledWith(workspaceId, { limit: 3 });
+    onTrial("owner", { status: "allowed", limits: { worlds: 2 } }); // a fresh RPC answer: a Response body reads once
+    activeWorlds.mockResolvedValue({ ok: true, nextCursor: null, worlds: [two, three] });
+    const third = await promoteRequest();
+    expect(third.status).toBe(402);
+    expect(await third.json()).toEqual({ code: "TRIAL_WORLD_LIMIT_REACHED" });
+  });
+
+  it.each([undefined, 0, 11, 1.5, "1"])("fails closed with 503 when the policy's World bound is %s", async (worlds) => {
+    onTrial("owner", { status: "allowed", limits: worlds === undefined ? {} : { worlds } });
+    const response = await promoteRequest();
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ code: "TRIAL_AI_ACCESS_CHECK_FAILED" });
+    expect(candidate).not.toHaveBeenCalled();
+  });
+
+  it("keeps the shipped World bound at 1, the number the trial copy states", () => {
+    // /pricing, the cookbook and the preflight say "one World". Raising the policy means rewording them.
+    const migrations = new URL("../../supabase/migrations/", import.meta.url);
+    expect(readFileSync(new URL("20261104090000_trial_ai_usage.sql", migrations), "utf8"))
+      .toMatch(/add column ai_world_limit integer not null default 1 /);
+    expect(readFileSync(new URL("0045_self_service_trial_and_owner_access.sql", migrations), "utf8"))
+      .toContain(") values ('default', true, 7, 3, 50, 1, ");
   });
 
   it("fails closed with 503 when the active Worlds cannot be listed", async () => {
