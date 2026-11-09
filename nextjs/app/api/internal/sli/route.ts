@@ -36,7 +36,7 @@ export async function GET(request: Request) {
   const signer = readR2SignerEnv();
   const admin = readSupabaseAdminConfig();
   const [history, snapshot, observation] = await Promise.all([
-    signer ? readProbeHistory(signer, now) : { ok: false as const, code: "PROBE_STORE_NOT_CONFIGURED" },
+    signer ? readProbeHistory(signer) : { ok: false as const, code: "PROBE_STORE_NOT_CONFIGURED" },
     readModelProviderCircuitSnapshot(RETRIEVAL_MODEL_PROVIDER),
     readOperationalJobObservation({ supabaseUrl: admin?.url, serviceRoleKey: admin?.serviceRoleKey }),
   ]);

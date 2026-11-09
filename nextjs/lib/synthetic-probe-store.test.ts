@@ -101,6 +101,41 @@ describe("probe history storage", () => {
     expect(next.runs.at(-1)!.startedAt).toBe(older.at(-2)!.startedAt);
   });
 
+  describe("signing clock", () => {
+    // R2 refuses a query-signed URL once X-Amz-Date + X-Amz-Expires is in the past; this stub
+    // applies the same rule against the (fake) clock at the moment the request arrives.
+    function r2WithExpiry(advanceBeforeArrivalMs = 0) {
+      return vi.fn(async (input: RequestInfo | URL) => {
+        vi.advanceTimersByTime(advanceBeforeArrivalMs);
+        const url = new URL(String(input));
+        const stamp = url.searchParams.get("X-Amz-Date")!;
+        const signedAt = Date.parse(`${stamp.slice(0, 4)}-${stamp.slice(4, 6)}-${stamp.slice(6, 11)}:${stamp.slice(11, 13)}:${stamp.slice(13)}`);
+        const expiresMs = Number(url.searchParams.get("X-Amz-Expires")) * 1_000;
+        if (Date.now() > signedAt + expiresMs) return new Response("<Error>expired</Error>", { status: 403 });
+        return new Response(JSON.stringify(history([run("2026-11-09T10:20:00.600Z")])), { status: 200 });
+      });
+    }
+    afterEach(() => { vi.useRealTimers(); });
+
+    it("signs at the real clock, so the alert cron 70 s after its slot still reads the history", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-11-09T10:21:10.000Z"));
+      const fetch = r2WithExpiry();
+      vi.stubGlobal("fetch", fetch);
+      await expect(readProbeHistory(signer)).resolves.toEqual({
+        ok: true, history: history([run("2026-11-09T10:20:00.600Z")]),
+      });
+      expect(new URL(String(fetch.mock.calls[0][0])).searchParams.get("X-Amz-Date")).toBe("20261109T102110Z");
+    });
+
+    it("still names a refused read when the signed URL has really expired", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-11-09T10:21:10.000Z"));
+      vi.stubGlobal("fetch", r2WithExpiry(61_000));
+      await expect(readProbeHistory(signer)).resolves.toEqual({ ok: false, code: "PROBE_HISTORY_READ_FAILED" });
+    });
+  });
+
   it("refuses a bucket that is not the Foundation bucket, in both directions", async () => {
     const wrong = { ...signer, bucket: "someone-elses-bucket" };
     await expect(readProbeHistory(wrong)).resolves.toEqual({ ok: false, code: "BUCKET_NOT_FOUNDATION" });

@@ -19,6 +19,7 @@ import { W1_TRIAL_OPS_AFFECTED_PATHS, W1_TRIAL_OPS_AFFECTED_UNIT_FILES } from '.
 import { UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES, TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_PATHS, SPECIMEN_STRIP_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_BROWSER_FILES, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES, PUBLIC_MARKETING_AFFECTED_BROWSER_FILES, MARKETING_TOOLING_POSTIMAGES, G1_COPY_TRUTH_AFFECTED_PATHS, G1_COPY_TRUTH_AFFECTED_UNIT_FILES, G1_COPY_TRUTH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { ENABLEMENT_AFFECTED_BROWSER_FILES, P4_FOLLOWUPS_AFFECTED_PATHS, P4_FOLLOWUPS_AFFECTED_UNIT_FILES, P4_FOLLOWUPS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { LEGAL_SEMICOLONS_AFFECTED_PATHS, LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { SLI_ALERT_NOISE_AFFECTED_PATHS, SLI_ALERT_NOISE_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
 const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -752,6 +753,14 @@ for (const binding of [
     browsers: ['e2e/landing-hero-film-loading.spec.ts', 'e2e/templates.spec.ts'],
     rows: ["['e2e/landing-hero-film-loading.spec.ts', ['390']],", "['e2e/templates.spec.ts', ['1440']],"],
     neighbors: ['nextjs/app/privacy/opengraph-image.tsx', 'nextjs/app/subprocessors/layout.tsx', 'nextjs/lib/operations.test.ts', 'nextjs/lib/operations-copy.ts', 'nextjs/public/film/poster-1-t8.16-3x.avif', 'nextjs/public/film/poster-5-t1.00.avif', 'nextjs/public/film/compile-cut.mp4'] },
+  // sli-alert-noise-20261109: three exact paths, ten direct suites, no browser suite.
+  { group: 'sli-alert-noise-20261109', prefix: 'nextjs/', exportedPaths: SLI_ALERT_NOISE_AFFECTED_PATHS, exportedSuites: SLI_ALERT_NOISE_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['app/api/internal/sli/route.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe-store.ts'],
+    suites: ['lib/api-error-codes.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-read-route.test.ts', 'lib/operational-sli.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/app/api/internal/sli/page.tsx', 'nextjs/lib/synthetic-probe-store.tsx', 'lib/synthetic-probe-store.ts'] },
   // legal-semicolons-20261109: five exact paths, ten direct suites, no browser suite.
   { group: 'legal-semicolons-20261109', prefix: 'nextjs/', exportedPaths: LEGAL_SEMICOLONS_AFFECTED_PATHS, exportedSuites: LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],

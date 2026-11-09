@@ -8082,3 +8082,23 @@ test('affected legal-semicolons-20261109 owner: 5 exact paths select 10 direct s
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+// sli-alert-noise-20261109: one finite owner, restated independently of the exported constants.
+import { SLI_ALERT_NOISE_AFFECTED_PATHS, SLI_ALERT_NOISE_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected sli-alert-noise-20261109 owner: 3 exact paths select 10 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/api/internal/sli/route.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe-store.ts'];
+  const suites = ['lib/api-error-codes.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-read-route.test.ts', 'lib/operational-sli.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe.test.ts'];
+  assert.deepEqual([[...SLI_ALERT_NOISE_AFFECTED_PATHS], [...SLI_ALERT_NOISE_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['sli-alert-noise-20261109'], path);
+  }
+  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['sli-alert-noise-20261109'], [], suites, [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  const plan = affectedAskPlan(map);
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
+  for (const adjacent of ['nextjs/app/api/internal/sli/page.tsx', 'nextjs/lib/synthetic-probe-store.tsx', 'lib/synthetic-probe-store.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});

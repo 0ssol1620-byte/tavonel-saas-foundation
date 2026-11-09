@@ -2918,6 +2918,9 @@ export function vitestDiscoveryConfigFailures(source) {
 // legal-semicolons-20261109: the legal, consent, trust and /status copy whose semicolons were removed without a change in meaning.
 export const LEGAL_SEMICOLONS_AFFECTED_PATHS = Object.freeze(['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts']);
 export const LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-provisions.test.ts']);
+// sli-alert-noise-20261109: the probe-history reader signs at the real clock; the two SLI routes stop passing an evaluation instant to it.
+export const SLI_ALERT_NOISE_AFFECTED_PATHS = Object.freeze(['app/api/internal/sli/route.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe-store.ts']);
+export const SLI_ALERT_NOISE_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error-codes.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-read-route.test.ts', 'lib/operational-sli.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe.test.ts']);
 export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('public-marketing-surface', new RegExp(`^(?:${exactPathAlternation(PUBLIC_MARKETING_AFFECTED_PATHS)})$`),
     { unitFiles: PUBLIC_MARKETING_AFFECTED_UNIT_FILES, browserFiles: PUBLIC_MARKETING_AFFECTED_BROWSER_FILES }),
@@ -3144,6 +3147,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // legal-semicolons-20261109: 5 exact paths select 10 direct suites and no browser suite.
   affectedGroup('legal-semicolons-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(LEGAL_SEMICOLONS_AFFECTED_PATHS)})$`),
     { unitFiles: LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES }),
+  // sli-alert-noise-20261109: 3 exact paths select 10 direct suites and no browser suite.
+  affectedGroup('sli-alert-noise-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(SLI_ALERT_NOISE_AFFECTED_PATHS)})$`),
+    { unitFiles: SLI_ALERT_NOISE_AFFECTED_UNIT_FILES }),
   affectedGroup('ci-selector', /^(?:\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml|nextjs\/scripts\/(?:repair-[a-z-]+(?:\.test)?\.mjs|run-repair-check\.mjs|verify-repair-workflows\.mjs|db\/(?:native-world-race(?:-ci)?|dropbox-source-stream-race)(?:\.test)?\.mjs|fixtures\/[A-Za-z0-9_.-]+\.json)|nextjs\/vitest\.repair-scope(?:\.async)?\.config\.ts)$/,
     { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),
   affectedGroup('ci-selector', /^nextjs\/lib\/repair-node-evidence\.test\.mjs$/, { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),
