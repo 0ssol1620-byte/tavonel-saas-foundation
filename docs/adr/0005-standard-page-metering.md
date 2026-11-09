@@ -4,6 +4,18 @@
   constant, no plan quantity, no ledger function, no migration, no public sentence and no
   commercial, intake or consent switch. The register row also asks for shadow meter code. That
   code is not written here; it is the first row of [Work this unblocks](#work-this-unblocks).
+- **Amended 2026-11-09 (pricing v2, package B, phase 1):** the founder chose package B, whose
+  first step binds settlement to pages. Migration `20261109120000_page_meter_settlement.sql` and
+  `settle_foundation_compute_v4` implement S2 on this ADR's definition (C1, the reader's
+  `pageCount` of the sanitized PDF), skipping S0/S1 shadow by that decision. What it binds: N-1 is
+  the existing `STANDARD_UNITS_PER_PAGE`; a no-text page counts as a page (N-2); nothing is
+  metered complex because nothing classifies a complex page (N-3 stays open, and an unclassified
+  page is charged standard); no per-document minimum (N-4); the trial quota now counts metered
+  credits (N-6). Added beyond this ADR: a re-read of a source the same workspace already paid to
+  read settles 0, keyed on the worker-observed digest; a read that produced nothing usable
+  (`operator_review`, or a compile that failed with no world) is not charged. Prices, plan
+  quantities and public copy are unchanged and remain phase 2. The completed-read proof path still
+  carries the per-document `2` and must be re-bound before its flag is enabled.
 - **Date:** 2026-10-19. Drafted 2026-10-17, the date of the register and of the adoption it records.
 - **Branch this was written on:** `codex/records-20261017`, on top of `main` `4c80bb30`.
 - **Register row:** D-28 (aliases T-F6), "페이지 단위 과금". Adopted default: "페이지 계량 설계를
