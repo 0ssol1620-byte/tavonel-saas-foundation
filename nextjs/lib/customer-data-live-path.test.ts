@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { evaluateCustomerDataGate } from "../../shared/customerDataGate";
 import { customerDataPreconditions } from "../../shared/uskcEnums";
 import { activationPolicy } from "./activation-policy";
+import { BILLING_OFFERS } from "./billing-catalog";
 import type { CollectionOcrInput } from "./collection-compiler";
 import { buildProductCoreV2Request } from "./core-runtime-v2";
 import { readCapabilities } from "./capabilities";
@@ -82,30 +83,46 @@ describe("customer data on the live compile path", () => {
     two rules below are the ones that matter: it names the arranged path, and it never says a plan
     purchase opens the compile.
   */
-  it("states the arranged intake path without offering a self-serve compile", () => {
-    expect(activationPolicy.customerData.enabled).toBe(false);
+  /*
+    D-12, delegated decision 2026-11-09. The switch is on, so the sentence has to say what this
+    deployment now does, in the reader's terms, and nothing it does not: the compile is the
+    reader's own, only the self-serve plan is offered online (`saleChannel`), and none of our
+    internal vocabulary rides along. The closed-gate phrasing is held out so it cannot survive the
+    switch on the most-rendered sentence on the site.
+  */
+  it("states the open path in the reader's terms, and only the plan that sells itself as bought online", () => {
+    expect(activationPolicy.customerData.enabled).toBe(true);
     const { reason } = activationPolicy.customerData;
-    expect(reason).toMatch(/set up with us|arranged with us/i);
-    expect(reason).toMatch(/rather than enabled by a plan purchase/i);
+    expect(reason).toMatch(/upload your own sources and compile them/i);
+    expect(reason).toContain("The Developer plan can be bought online; Team and Enterprise are arranged with us.");
+    expect(BILLING_OFFERS.observer_access.saleChannel).toBe("self_serve");
+    expect(BILLING_OFFERS.studio_access.saleChannel).toBe("contact");
+    expect(reason).not.toMatch(/rather than enabled by a plan purchase|set up with us/i);
+    expect(reason).not.toMatch(/\b(gate|receipt|cohort|founder|qualif\w*)\b/i);
+    expect(reason).not.toMatch(/\d/);
   });
 
   /*
     G3-003 keeps storage admission and compile permission as separate facts. Activation does not
     weaken the quarantine statement or turn it into a generic "upload is open" claim.
   */
-  it("keeps the intake description precise while compilation is closed", () => {
-    expect(activationPolicy.customerData.enabled).toBe(false);
+  it("keeps the intake description precise now that compilation is open", () => {
+    expect(activationPolicy.customerData.enabled).toBe(true);
     const { reason } = activationPolicy.customerIntake;
     expect(reason).toMatch(/tenant-scoped quarantine/i);
+    expect(reason).not.toMatch(/arranged with us|opened by a checkout/i);
   });
 
   it("says so on the public capability grid", () => {
     const grid = readCapabilities({ activationPolicy: { ...activationPolicy } }, false);
     expect(grid.find((capability) => capability.name === "Customer-data compilation")).toEqual({
       name: "Customer-data compilation",
-      state: "Closed",
-      tone: "closed",
+      state: "Open",
+      tone: "open",
       note: activationPolicy.customerData.reason,
     });
+    // Failure path: the grid still reads the flag, not the sentence.
+    const closed = readCapabilities({ activationPolicy: { ...activationPolicy, customerData: { ...activationPolicy.customerData, enabled: false } } }, false);
+    expect(closed.find((capability) => capability.name === "Customer-data compilation")?.state).toBe("Closed");
   });
 });

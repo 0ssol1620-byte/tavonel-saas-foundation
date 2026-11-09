@@ -25,7 +25,6 @@ import { jsonLdHtml } from "@/lib/structured-data";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
 import {
   MAX_UNITS_PER_PAGE,
-  PROCESSING_UNIT_USD,
   STANDARD_UNITS_PER_PAGE,
   formatUsd,
 } from "@/lib/usage-pricing";
@@ -187,10 +186,9 @@ function planPath(
 
   The page already carried every one of these facts, spread between a lede, four cards, an
   estimator and a fold, so answering "what do I pay and what happens when I use more" took a
-  scroll and some arithmetic. Nothing here is a new number: the rate is
-  `STANDARD_UNITS_PER_PAGE * PROCESSING_UNIT_USD` and the ceiling is `MAX_UNITS_PER_PAGE *
-  PROCESSING_UNIT_USD`, the same two constants the estimator quotes and the reservation code
-  charges against, and the included pages are the catalog's `includedPages`.
+  scroll and some arithmetic. Nothing here is a new number: the complex-page ceiling is
+  `MAX_UNITS_PER_PAGE / STANDARD_UNITS_PER_PAGE`, the two constants the reservation code charges
+  against, and the included pages are the catalog's `includedPages`.
 
   The "Unused pages" tile is the one to read carefully, and it is the one thing this merge had to
   decide. The entitlements lane held FD-03's term back -- "unused pages expire at the end of each
@@ -213,12 +211,21 @@ function planPath(
   requires that attribution, and the founder's direct ratification is a merge condition the lane
   reports carry.
 
-  The numbers stay derived -- the rate from the two constants the reservation code charges
-  against, the refund figures from the catalog -- so a moved rate moves this copy instead of
-  leaving it stale.
+  The numbers stay derived -- the refund figures from the catalog -- so a moved value moves this
+  copy instead of leaving it stale.
+
+  R1, delegated decision 2026-11-09. The page used to publish a per-page dollar rate past the
+  included pages, and a higher dollar cap for a complex page. Nothing sells or
+  bills that: there is no overage product in the catalog, a compile past the balance is refused
+  (`foundation_credits_required`, migration 0045), and `overage_units` is recorded but never sent
+  to Paddle. So the page states what does happen -- the plan's included pages each month, and
+  additional volume arranged with us -- and a complex page is described in allowance terms, from
+  the two unit constants the reservation code charges against.
 */
-const STANDARD_PAGE_USD = STANDARD_UNITS_PER_PAGE * PROCESSING_UNIT_USD;
-const MAXIMUM_PAGE_USD = MAX_UNITS_PER_PAGE * PROCESSING_UNIT_USD;
+/** How many standard pages of the allowance one complex page can use, at most. Derived, never typed. */
+const COMPLEX_PAGE_MAX_STANDARD_PAGES = MAX_UNITS_PER_PAGE / STANDARD_UNITS_PER_PAGE;
+/** Said wherever volume past a plan would otherwise carry a price. */
+const ADDITIONAL_VOLUME = "Arranged with us";
 const REFUND_MAX_CONSUMED_PERCENT = Math.round(REFUND_MAX_CONSUMED_FRACTION * 100);
 
 /*
@@ -243,14 +250,14 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceE
     ],
     [
       "Past the included pages",
-      `${formatUsd(STANDARD_PAGE_USD)} per standard page. Complex-page processing is capped at ${formatUsd(MAXIMUM_PAGE_USD)}, shown before the run starts.`,
+      "Additional volume is arranged with us; talk to us before you need it. Once a month's included pages are used, new sources wait for the next month's pages, and Ask, search and the Worlds you already compiled keep working.",
     ],
     // FD-03 (`docs/policy/DECISION_LOG_2026-09-11.md`): grant-time expiry, no roll-over, no refund
     // of unused pages. Delegated decision, 2026-09-11; the wording here is the customer's, per the
     // log's "Public wording of delegated values" section.
     [
       "Unused pages",
-      `Included pages belong to the billing month they are granted in: when the next month's pages are granted, whatever is left of the previous month expires. Unused pages do not roll over and are not refunded if you cancel. Pages past the included allowance are billed at the published rate of ${formatUsd(STANDARD_PAGE_USD)} per standard page.`,
+      `Included pages belong to the billing month they are granted in: when the next month's pages are granted, whatever is left of the previous month expires. Unused pages do not roll over and are not refunded if you cancel.`,
     ],
     // FD-02 (`docs/policy/DECISION_LOG_2026-09-11.md`): Developer reaches activation when the
     // caller owns the workspace. Delegated decision, 2026-09-11; the row is read off the
@@ -299,10 +306,12 @@ const SCENARIO_PAGES = [
   BILLING_OFFERS.studio_access.includedPages,
 ] as const;
 
-export function monthlyTotalUsd(offer: { priceUsd: number; includedPages: number }, pages: number) {
-  const extra = Math.max(0, pages - offer.includedPages);
-  return offer.priceUsd + extra * STANDARD_PAGE_USD;
+/** The subscription covers a volume up to the plan's included pages; past them there is no published price (R1). */
+export function monthlyTotalUsd(offer: { priceUsd: number; includedPages: number }, pages: number): number | null {
+  return pages <= offer.includedPages ? offer.priceUsd : null;
 }
+
+const totalOrArranged = (usd: number | null) => (usd === null ? ADDITIONAL_VOLUME : formatUsd(usd));
 
 /*
   BA-121. What the estimator shows, computed by the function the volume table above is built
@@ -315,9 +324,9 @@ export function monthlyTotalUsd(offer: { priceUsd: number; includedPages: number
   same volume costs, because it had left out the subscription entirely. The number a buyer reads
   last was the one understating the bill.
 
-  So the estimator states the two plan totals and, beside them, the ceiling if every page
-  escalated. `extraPages` is the row the old "Standard estimate" was trying to be: the pages
-  past the plan, at the published rate, labelled as what it is.
+  So the estimator states the two plan totals. `extraPages` is the row the old "Standard
+  estimate" was trying to be: the pages past the plan, which are arranged with us (R1) rather
+  than priced.
 
   `pricing-estimator.test.ts` holds these rows against `monthlyTotalUsd` and against the
   volume table's own figures at 50, 250, 300 and 348 pages.
@@ -331,9 +340,6 @@ export function estimatorRows(pages: number) {
     developerTotalUsd: monthlyTotalUsd(developer, pages),
     teamTotalUsd: monthlyTotalUsd(team, pages),
     extraPages,
-    extraPagesUsd: extraPages * STANDARD_PAGE_USD,
-    /** Every page past the plan escalating to the complex ceiling: the most this run can cost. */
-    developerMaximumUsd: developer.priceUsd + extraPages * MAXIMUM_PAGE_USD,
   };
 }
 
@@ -561,7 +567,7 @@ const PURCHASE_FAQ: Array<[string, string, Route, string, string]> = [
   ["What does it do when it is uncertain?", "It abstains and says which sources it looked at. A composed answer with no region behind it would be indistinguishable from a correct one, which is the failure the whole contract exists to prevent.", "/knowledge-compiler" as Route, "Questions people ask", "What it is"],
   ["Is my data safe?", "Your sources go to a tenant-scoped quarantine, are sanitized before anything reads them, and are not used to train shared models. No third-party model API receives your documents today.", "/security" as Route, "Where your documents go", "What happens to my data"],
   ["What is ready to use?", "A finished public World is available to read today, with source-linked Evidence, Ask, a public HTTP API and a digest-bound sample download. MCP access to your own workspace requires an API key and an arranged evaluation. Current service status stays visible on the linked page.", "/status" as Route, "Current service status", "What it costs"],
-  ["How much does it cost?", "A monthly subscription with included pages, then a per-page rate past them. Both numbers are above, and the maximum for any page is shown before a run starts.", "/refunds" as Route, "Cancellation and refunds", "What it costs"],
+  ["How much does it cost?", "A monthly subscription with included pages, both shown above. Volume past the included pages is arranged with us, and the most any run can use is shown before it starts.", "/refunds" as Route, "Cancellation and refunds", "What it costs"],
   ["How much setup is required?", "Explore the public World and its evidence without a card. To evaluate your own sources, contact us to agree the scope and intake path before any processing or payment.", "/docs" as Route, "Documentation", "What it costs"],
   ["Will I be locked in?", "The package is open formats — canonical JSON, Turtle, JSON-LD, CSV and JSONL — and the two verifiers are readable scripts rather than a service, so a package can be checked and loaded without us.", "/docs/exports" as Route, "The package format", "What happens to my data"],
   ["Can I export?", "You can download the digest-bound public sample World today. Workspace exports are signed; compiling and exporting your own sources requires an arranged evaluation.", "/reproducibility" as Route, "Public sample and checksums", "What happens to my data"],
@@ -840,8 +846,7 @@ export default function PricingPageClient({
               <p className="lede">
                 Developer includes {BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")} standard
                 pages each month; Team includes {BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")}.
-                Additional pages are {formatUsd(STANDARD_PAGE_USD)} each, with complex processing
-                capped at {formatUsd(MAXIMUM_PAGE_USD)} per page and confirmed before a run.
+                Need more in a month? Talk to us and we will arrange the additional volume.
               </p>
               {/*
                 BA-119. Audit M04's disclosure stays -- both gates are still read from
@@ -1047,8 +1052,8 @@ export default function PricingPageClient({
             <p className="fine">
               Those are the plan differences. Once your source-processing access is approved,
               both plans include compiling, evidence, Ask, signed export, API and MCP access,
-              reviewing a candidate, activating a World and rolling one back, at the same
-              per-page rate past the included pages and under the same limits below. The
+              reviewing a candidate, activating a World and rolling one back, under the same
+              limits below. The
               capability table compares those plan entitlements; it does not open a closed
               customer-data gate.
             </p>
@@ -1090,8 +1095,8 @@ export default function PricingPageClient({
                 <h4>Standard page</h4>
                 <p>
                   A page the reader gets through in the standard time: a digital PDF page, a
-                  converted document or slide, a clean single-column scan of ordinary type. It is
-                  billed at {formatUsd(STANDARD_PAGE_USD)}, and most pages are this.
+                  converted document or slide, a clean single-column scan of ordinary type. It uses
+                  one standard page of your allowance, and most pages are this.
                 </p>
               </article>
               <article className="tile">
@@ -1099,17 +1104,17 @@ export default function PricingPageClient({
                 <p>
                   A page that takes the same reader longer: a skewed, noisy or low-contrast scan, a
                   tightly packed multi-column layout, a page that is mostly drawing or photograph.
-                  It costs more than a standard page and never more than{" "}
-                  {formatUsd(MAXIMUM_PAGE_USD)}.
+                  It uses more of your allowance than a standard page and never more than{" "}
+                  {COMPLEX_PAGE_MAX_STANDARD_PAGES} standard pages.
                 </p>
               </article>
               <article className="tile">
                 <h4>Who decides, and when</h4>
                 <p>
                   Nobody decides in advance. Every run holds the ceiling — every page at{" "}
-                  {formatUsd(MAXIMUM_PAGE_USD)} — before it starts, so the figure you authorise is
-                  the most it can cost, and the bill is settled on the work the pages actually
-                  took. The invoice can come in under the number you approved; it cannot come in
+                  {COMPLEX_PAGE_MAX_STANDARD_PAGES} standard pages — before it starts, so the maximum
+                  you approve is the most it can use, and the run is settled on the work the pages
+                  actually took. It can come in under the maximum you approved; it cannot come in
                   over it.
                 </p>
               </article>
@@ -1206,19 +1211,18 @@ export default function PricingPageClient({
                 {SCENARIOS.map((scenario) => (
                   <tr key={scenario.pages}>
                     <th scope="row">{scenario.pages.toLocaleString("en-US")}</th>
-                    <td data-label={BILLING_OFFERS.observer_access.label}>{formatUsd(scenario.developer)}</td>
-                    <td data-label={BILLING_OFFERS.studio_access.label}>{formatUsd(scenario.team)}</td>
+                    <td data-label={BILLING_OFFERS.observer_access.label}>{totalOrArranged(scenario.developer)}</td>
+                    <td data-label={BILLING_OFFERS.studio_access.label}>{totalOrArranged(scenario.team)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             </div>
             <p className="fine">
-              Subscription plus {formatUsd(STANDARD_PAGE_USD)} for every standard page past the
-              plan&apos;s included pages. A page is counted when a source is admitted for reading,
-              so re-asking, searching and recompiling sources already read do not appear in this
-              table. Complex-page processing is capped at {formatUsd(MAXIMUM_PAGE_USD)} per page
-              and is shown before the run starts. Every figure is in US dollars, excluding tax.
+              The subscription covers every page up to the plan&apos;s included pages; a volume
+              past them is arranged with us. A page is counted when a source is admitted for
+              reading, so re-asking, searching and recompiling sources already read do not appear
+              in this table. Every figure is in US dollars, excluding tax.
             </p>
             </section>
             </details>
@@ -1276,13 +1280,12 @@ export default function PricingPageClient({
                 ))}
               </dl>
               <dl>
-                <div><dt>{BILLING_OFFERS.observer_access.label} total, USD</dt><dd>{formatUsd(estimate.developerTotalUsd)}</dd></div>
-                <div><dt>{BILLING_OFFERS.studio_access.label} total, USD</dt><dd>{formatUsd(estimate.teamTotalUsd)}</dd></div>
+                <div><dt>{BILLING_OFFERS.observer_access.label} total, USD</dt><dd>{totalOrArranged(estimate.developerTotalUsd)}</dd></div>
+                <div><dt>{BILLING_OFFERS.studio_access.label} total, USD</dt><dd>{totalOrArranged(estimate.teamTotalUsd)}</dd></div>
                 <div>
                   <dt>Pages beyond {BILLING_OFFERS.observer_access.label}</dt>
-                  <dd>{estimate.extraPages.toLocaleString("en-US")} at {formatUsd(STANDARD_PAGE_USD)} = {formatUsd(estimate.extraPagesUsd)}</dd>
+                  <dd>{estimate.extraPages.toLocaleString("en-US")}{estimate.extraPages > 0 ? `, ${ADDITIONAL_VOLUME.toLowerCase()}` : ""}</dd>
                 </div>
-                <div><dt>Maximum if every extra page escalates</dt><dd>{formatUsd(estimate.developerMaximumUsd)}</dd></div>
               </dl>
             </section>
             <details className="status-fold">
@@ -1316,9 +1319,8 @@ export default function PricingPageClient({
               <details className="status-fold pricing-depth">
                 <summary>How the quote is built</summary>
                 <p>
-                  Processing starts from {formatUsd(STANDARD_PAGE_USD)} per standard page and is
-                  capped at {formatUsd(MAXIMUM_PAGE_USD)} for a complex page. The final scope is
-                  agreed in writing before processing.
+                  The quote is built from your page volume and source mix, starting from the
+                  published plans above. The final scope is agreed in writing before processing.
                 </p>
                 <h3 id="enterprise-variables-title">What moves the quote</h3>
                 <ul aria-labelledby="enterprise-variables-title">

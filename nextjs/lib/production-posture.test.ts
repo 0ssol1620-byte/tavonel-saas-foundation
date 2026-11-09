@@ -17,8 +17,10 @@ import registry from "./benchmark-registry.records.json";
   so this file holds main's value for each of them: which capabilities the deployment has
   enabled, the three launch flags `vercel.json` ships, which plan sells itself, what the
   capability manifest claims per format, that the Vercel collector loads only behind its flag,
-  and that no benchmark row is published. Today that is state S1: account creation open,
-  purchase and customer-file processing closed.
+  and that no benchmark row is published. S1 was account creation open, purchase and
+  customer-file processing closed. D-12 (P2-37, delegated decision 2026-11-09) moved
+  `customerData.enabled` to true and nothing else: account creation, purchase of the self-serve
+  plan and customer-file processing open, still bounded by the processing cohort.
 
   Every expectation is a literal on purpose. A failure here means a posture switch moved. That
   is a founder decision (CLAUDE.md, "What is not an agent's call"), and the pull request that
@@ -37,7 +39,7 @@ describe("production posture @ 4c80bb30", () => {
       cdr: true,
       ocrGpu: true,
       candidatePromotion: false,
-      customerData: false,
+      customerData: true,
     });
   });
 

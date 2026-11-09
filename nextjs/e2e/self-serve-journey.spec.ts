@@ -199,13 +199,21 @@ test("the fence records and aborts what would leave the machine, and keeps unmoc
   await context.close();
 });
 
-test.describe("production posture today (S1: account creation open, purchase and processing closed)", () => {
+/*
+  D-12 (delegated decision 2026-11-09) moved `activationPolicy.customerData` to true. This server
+  carries no launch flags (a CI runner sets none of COMMERCIAL_MODE, TAVONEL_BILLING_LAUNCH_APPROVED
+  or VERCEL_ENV=production), so purchase stays closed here while customer processing is switched on:
+  the posture every deployment without launch approval now serves. Every purchase door has to stay
+  shut in it, which is what this test still holds.
+*/
+test.describe("launch approval withheld (purchase closed; customer processing switched on by D-12)", () => {
   test("every purchase entry ends at /contact or a stated sentence -- no checkout door, no Paddle, no raw code", async ({ page, request, baseURL }) => {
     test.setTimeout(90_000);
-    // The two closed switches as this server answers them, not as a fixture says.
+    // The two switches as this server answers them, not as a fixture says.
     const served = await (await request.get("/api/status/v2")).json() as { availableActions: Record<string, { enabled: boolean }> };
-    expect(served.availableActions.purchasePlan.enabled, "purchase is closed on main").toBe(false);
-    expect(served.availableActions.compileCustomerDocuments.enabled, "customer processing is closed on main").toBe(false);
+    expect(served.availableActions.purchasePlan.enabled, "purchase is closed without launch approval").toBe(false);
+    expect(served.availableActions.compileCustomerDocuments.enabled, "customer processing is switched on (D-12)").toBe(true);
+    expect(activationPolicy.customerData.enabled, "the server constant this posture follows").toBe(true);
 
     await declineAnalytics(page);
     await servePosture(page, "today");
@@ -232,7 +240,8 @@ test.describe("production posture today (S1: account creation open, purchase and
     for (const enterprise of await page.getByRole("link", { name: "Scope an Enterprise pilot" }).all()) {
       await expect(enterprise).toHaveAttribute("href", "/contact?plan=Enterprise");
     }
-    await expect(page.locator('[data-purchase-gate="customerData"]')).toContainText(activationPolicy.customerData.reason);
+    // The customer-data gate is open (D-12), so /pricing no longer states it.
+    await expect(page.locator('[data-purchase-gate="customerData"]')).toHaveCount(0);
     await expectNoCheckoutDoor(page);
     await developer.click();
     await expect(page).toHaveURL(/\/contact\?plan=Developer$/);

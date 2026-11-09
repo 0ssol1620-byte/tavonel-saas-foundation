@@ -66,12 +66,16 @@ describe("readCommercialState", () => {
     `activationPolicy.customerData`: while that is closed, "Start with your files" describes a
     compile this deployment refuses, and a prerendered page and a dynamic one disagreed about it.
   */
+  // D-12 (delegated decision 2026-11-09) opened the gate: the card now decides, and only in production.
   it("derives one call to action from the same state, and from the customer-data gate", () => {
-    expect(activationPolicy.customerData.enabled, "this suite's expectations assume the closed gate").toBe(false);
+    expect(activationPolicy.customerData.enabled, "this suite's expectations assume the open gate").toBe(true);
     expect(readCommercialState({ ...LIVE, VERCEL_ENV: "production" }).liveChargesEnabled).toBe(true);
-    expect(isLiveCommerce({ ...LIVE, VERCEL_ENV: "production" })).toBe(false);
+    expect(isLiveCommerce({ ...LIVE, VERCEL_ENV: "production" })).toBe(true);
+    expect(isLiveCommerce({ ...LIVE, VERCEL_ENV: "preview" })).toBe(false);
+    expect(isLiveCommerce({ ...LIVE, TAVONEL_BILLING_LAUNCH_APPROVED: "false", VERCEL_ENV: "production" })).toBe(false);
     expect(primaryCallToAction({}).label).toBe("Request access");
-    expect(primaryCallToAction({ ...LIVE, VERCEL_ENV: "production" }).label).toBe("Request access");
+    expect(primaryCallToAction({ ...LIVE, VERCEL_ENV: "preview" }).label).toBe("Request access");
+    expect(primaryCallToAction({ ...LIVE, VERCEL_ENV: "production" }).label).toBe("Start with your files");
   });
 
   /*

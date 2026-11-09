@@ -46,9 +46,11 @@ const agent = read("public/developer/tavonel-source-agent.py");
 afterEach(() => vi.unstubAllEnvs());
 
 describe("G1-COPY: /integrations", () => {
-  it("1. states that compiling your own sources is set up with us, not that five systems connect today", () => {
+  // D-12 (delegated decision 2026-11-09): the arranged-intake sentence is now the workspace's.
+  it("1. states where your own sources are compiled, not that five systems connect today", () => {
     const page = integrations();
-    expect(page).toContain("Compiling your own sources is set up with us.");
+    expect(page).toContain("You upload and compile your own sources from your workspace.");
+    expect(page).not.toContain("Compiling your own sources is set up with us.");
     expect(page).not.toMatch(/connects? today/i);
   });
 

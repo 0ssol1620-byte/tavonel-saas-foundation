@@ -1489,19 +1489,26 @@ describe("the site's own vocabulary", () => {
       promised the compile this deployment does not run.
 
       The fact being pinned is the same one, with the condition it was missing: the self-serve
-      action requires the customer-data gate as well as the card. The gate is closed, so the
-      billing flags no longer change the answer -- and when it opens, this case is the one that
-      says so out loud rather than a CTA changing under nobody's decision.
+      action requires the customer-data gate as well as the card. D-12 (delegated decision
+      2026-11-09) opened the gate, so the billing flags now do change the answer -- this is the
+      case that says so out loud -- and a preview, which cannot charge a card, still offers access.
     */
     expect(
       activationPolicy.customerData.enabled,
       "the gate below is what this case turns on"
-    ).toBe(false);
+    ).toBe(true);
     expect(
       primaryCallToAction({
         COMMERCIAL_MODE: "live",
         TAVONEL_BILLING_LAUNCH_APPROVED: "true",
         VERCEL_ENV: "production",
+      })
+    ).toEqual(SELF_SERVE_CTA);
+    expect(
+      primaryCallToAction({
+        COMMERCIAL_MODE: "live",
+        TAVONEL_BILLING_LAUNCH_APPROVED: "true",
+        VERCEL_ENV: "preview",
       })
     ).toEqual(ACCESS_CTA);
   });
@@ -1538,17 +1545,19 @@ describe("the site's own vocabulary", () => {
     G1-001: /explore's closing action is the site's access action, not a fourth spelling of it.
 
     `lib/explore-story.ts` is reachable from the client bundle, where the commercial flags inline
-    as `undefined`, so it names `ACCESS_CTA` directly instead of resolving the posture. That is
-    only honest while the gate is closed, which is exactly what this asserts.
+    as `undefined`, so it names `ACCESS_CTA` as a placeholder. P2-10 resolved the posture on the
+    server: `app/explore/page.tsx` passes `primaryCallToAction()` and the stage replaces the
+    primary action with it. With the gate open (D-12) that wiring is what keeps /explore on the
+    header's action, so it is what this asserts.
   */
   it("closes the public sample on the same access action the header offers", () => {
-    expect(activationPolicy.customerData.enabled).toBe(false);
-    const primary = EXPLORE_COPY.endActions.find(action => action.primary);
-    expect(primary).toEqual({
-      label: ACCESS_CTA.label,
-      href: ACCESS_CTA.href,
-      primary: true,
-    });
+    expect(activationPolicy.customerData.enabled).toBe(true);
+    const primary = EXPLORE_COPY.endActions.filter(action => action.primary);
+    expect(primary).toEqual([{ label: ACCESS_CTA.label, href: ACCESS_CTA.href, primary: true }]);
+    expect(read("app/explore/page.tsx")).toContain("access={primaryCallToAction()}");
+    expect(read("components/explore/explore-stage.tsx")).toContain(
+      "action.primary ? { ...action, label: access.label, href: access.href } : action"
+    );
   });
 
   it.each(CHROME_SURFACES)("publishes no retired name in %s", surface => {

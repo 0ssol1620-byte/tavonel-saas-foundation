@@ -165,7 +165,7 @@ describe("the Korean entry page stands on a fact, not a translation", () => {
       `activationPolicy.customerData.reason`, translated literally beside it so the two cannot be
       edited apart. The assertion turns on the closed gate, as it always did.
     */
-    expect(activationPolicy.customerData.enabled, "the assertion below turns on the closed gate").toBe(false);
+    expect(activationPolicy.customerData.enabled, "the assertion below turns on the open gate (D-12, 2026-11-09)").toBe(true);
     /*
       Asserted on the value rather than on the copy module's source text, because the Korean
       sentence moved out of that file in fix round 3. The chrome states the same gate on every
@@ -180,7 +180,7 @@ describe("the Korean entry page stands on a fact, not a translation", () => {
       literally. The gate is still stated, still in Korean, still once.
     */
     expect(LANDING_V2_COPY.ko.start.microtext, "the Korean close states the gate in the reader's language")
-      .toContain("직접 가진 원문의 컴파일은 요금제 구매가 아니라 저희와 함께 설정합니다");
+      .toContain("Developer 요금제는 바로 구매할 수 있고, Team과 Enterprise는 저희와 함께 정합니다");
     expect(copyDeck, "and the English close is the policy's own sentence, not a paraphrase")
       .toContain("microtext: activationPolicy.customerData.reason");
     expect(copyDeck, "the Korean close reads the site's one spelling of the gate, not a second one")

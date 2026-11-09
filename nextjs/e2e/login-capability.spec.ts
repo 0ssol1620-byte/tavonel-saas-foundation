@@ -127,15 +127,19 @@ test("a Team intent is not promised a checkout even where a plan can be bought",
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in to TAVONEL.");
 });
 
-test("/pricing names the customer-data gate, server-side, with its own reason", async ({ page }) => {
-  // No mock: both gates render on the server from activationPolicy, so this asserts the shipped
-  // default rather than a fixture. The reason string is read off lib/activation-policy.ts, so a
-  // reworded policy fails here instead of quietly showing a stale sentence.
+/*
+  D-12 (delegated decision 2026-11-09). No mock: the gate renders on the server from
+  activationPolicy, so this asserts the shipped default rather than a fixture. With the switch on,
+  /pricing states no closed customer-data gate at all -- neither the gate row nor the reason in the
+  purchase aside -- and the old closed-gate sentence is nowhere on the page.
+*/
+test("/pricing states no closed customer-data gate once the switch is on, server-side", async ({ page }) => {
+  expect(activationPolicy.customerData.enabled).toBe(true);
   const html = await (await page.goto("/pricing"))!.text();
-  expect(html).toContain('data-purchase-gate="customerData"');
-  const gate = page.locator('[data-purchase-gate="customerData"]');
-  await expect(gate).toBeVisible();
-  await expect(gate).toContainText(activationPolicy.customerData.reason);
+  expect(html).not.toContain('data-purchase-gate="customerData"');
+  await expect(page.locator('[data-purchase-gate="customerData"]')).toHaveCount(0);
+  expect(html).not.toContain("rather than enabled by a plan purchase");
+  await expect(page.locator(".paper-purchase-boundary")).not.toContainText(activationPolicy.customerData.reason);
 });
 
 test("closed intake offers a working public evaluation and an Enterprise conversation", async ({ page }) => {

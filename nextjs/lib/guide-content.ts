@@ -153,8 +153,10 @@ export const GUIDE_UI: Record<GuideLanguage, {
 
 const developer = BILLING_OFFERS.observer_access.label;
 const team = BILLING_OFFERS.studio_access.label;
-const intakeEn = "We arrange intake for your own sources with you.";
-const intakeKo = "내 자료의 연결과 컴파일은 상담 후 함께 설정합니다.";
+// D-12 (delegated decision 2026-11-09): intake is the workspace's, no longer arranged with us.
+// Both are live sentences: `activationPolicy.customerIntake.reason` and the /ko/pricing Developer card.
+const intakeEn = "Upload your own sources from your workspace.";
+const intakeKo = "내 원문 컴파일은 워크스페이스의 처리 승인 뒤에 시작합니다.";
 
 /* ================================================================================== English */
 
@@ -410,7 +412,7 @@ const EN: GuideChapter[] = [
         ],
       },
       { kind: "prose", text: "The server refuses to start if a tool that writes is ever added to it. There is no activation tool: activation stays with a person in a browser." },
-      { kind: "note", text: "Without a key the tool list still answers, and every tool call returns “API_KEY_MISSING: set TAVONEL_API_KEY to a key from your workspace”. Keys and your own World are set up with us." },
+      { kind: "note", text: "Without a key the tool list still answers, and every tool call returns “API_KEY_MISSING: set TAVONEL_API_KEY to a key from your workspace”. Keys are issued in your workspace." },
       { kind: "media", video: "guide-2-mcp", title: "The read-only MCP bridge, as far as it goes without a key" },
     ],
     links: [
@@ -433,11 +435,11 @@ const EN: GuideChapter[] = [
         kind: "steps",
         items: [
           "It first shows how that run meets the compile ceilings, row by row.",
-          `Then it shows the ${developer} and ${team} totals, the pages beyond ${developer}, and the maximum if every extra page escalates.`,
+          `Then it shows the ${developer} and ${team} totals and the pages beyond ${developer}, which are arranged with us.`,
         ],
       },
       { kind: "prose", text: "“All figures in US dollars, excluding tax.”" },
-      { kind: "note", text: "Buying a plan starts with a conversation: the plan actions on /pricing go to /contact." },
+      { kind: "note", text: `${developer} can be bought on /pricing; ${team} and Enterprise start with a conversation on /contact.` },
     ],
     links: [
       { href: "/pricing#usage-estimator-title", label: "What will this run cost?" },
@@ -742,7 +744,7 @@ const KO: GuideChapter[] = [
         ],
       },
       { kind: "prose", text: "쓰기 도구가 추가되면 서버는 시작을 거부합니다. 활성화 도구는 없습니다. 활성화는 브라우저에서 사람이 합니다." },
-      { kind: "note", text: "키가 없어도 도구 목록은 응답하고, 모든 도구 호출은 “API_KEY_MISSING: set TAVONEL_API_KEY to a key from your workspace”를 돌려줍니다. 워크스페이스에서 발급한 키를 TAVONEL_API_KEY에 넣으라는 뜻입니다. 키와 내 World는 저희와 함께 설정합니다." },
+      { kind: "note", text: "키가 없어도 도구 목록은 응답하고, 모든 도구 호출은 “API_KEY_MISSING: set TAVONEL_API_KEY to a key from your workspace”를 돌려줍니다. 워크스페이스에서 발급한 키를 TAVONEL_API_KEY에 넣으라는 뜻입니다. 키는 워크스페이스에서 발급합니다." },
       { kind: "media", video: "guide-2-mcp", title: "읽기 전용 MCP 브리지 — 키 없이 갈 수 있는 곳까지" },
     ],
     links: [
@@ -759,11 +761,11 @@ const KO: GuideChapter[] = [
         kind: "steps",
         items: [
           "먼저 그 실행이 컴파일 한도를 어떻게 만나는지 행별로 보여 줍니다.",
-          `이어서 ${developer}와 ${team}의 합계, ${developer}를 넘는 페이지, 추가 페이지가 모두 상향될 때의 최대 금액을 보여 줍니다.`,
+          `이어서 ${developer}와 ${team}의 합계와 ${developer}를 넘는 페이지를 보여 줍니다. 넘는 분량은 저희와 상담해 정합니다.`,
         ],
       },
       { kind: "prose", text: "“All figures in US dollars, excluding tax.” 모든 금액은 미국 달러이며 세금은 포함하지 않습니다." },
-      { kind: "note", text: "요금제 구매는 상담으로 시작합니다. /pricing의 요금제 버튼은 /contact로 연결됩니다." },
+      { kind: "note", text: `${developer}는 /pricing에서 구매할 수 있고, ${team}과 Enterprise는 /contact에서 상담으로 시작합니다.` },
     ],
     links: [
       { href: "/pricing#usage-estimator-title", label: "What will this run cost?" },

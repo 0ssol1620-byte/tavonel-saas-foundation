@@ -8,7 +8,8 @@ describe("bounded evaluation funnel", () => {
     expect((html.match(/ required=""/g) ?? []).length).toBe(3);
     expect(html).toContain("An inquiry does not start processing");
     expect(html).toContain("Do not attach or paste customer documents here");
-    expect(html).toContain("rather than enabled by a plan purchase");
+    // D-12 (delegated decision 2026-11-09): the page states the switch-on sentence verbatim.
+    expect(html).toContain("The Developer plan can be bought online; Team and Enterprise are arranged with us.");
   });
   it("localizes the complete evaluation path for Korean readers", () => {
     const html = renderToStaticMarkup(<EvaluationPage korean />);

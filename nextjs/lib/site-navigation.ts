@@ -238,9 +238,11 @@ export const KO_CHROME = {
     entry page, was what the deployment does not do. It states the same two facts in the same order
     the English does now: the World a reader can open today, then the arranged path. The gate is
     unchanged and still stated once, in Korean, in the site's one spelling of it.
+
+    D-12, delegated decision 2026-11-09: the literal Korean of the switch-on sentence.
   */
   customerDataGate:
-    "완성된 Compiled World는 오늘 근거까지 전부 읽을 수 있습니다. 직접 가진 원문의 컴파일은 요금제 구매가 아니라 저희와 함께 설정합니다.",
+    "로그인하면 내 원문을 업로드해 근거가 붙은 World로 컴파일할 수 있습니다. Developer 요금제는 바로 구매할 수 있고, Team과 Enterprise는 저희와 함께 정합니다.",
 } as const;
 
 /**

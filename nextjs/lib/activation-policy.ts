@@ -36,11 +36,15 @@ export const activationPolicy = {
     two it is about, in the words the `customerData` row and the header state line already use:
     intake is arranged, not switched on by a checkout.
 
+    D-12, delegated decision 2026-11-09. With `customerData` open the sentence says what intake
+    does for the reader -- upload from the workspace, into quarantine -- and no longer that it is
+    arranged with us, which stopped being true when the switch moved.
+
     The flag stays `true` because the path is built and the routes guarding on it
     (`/api/uploads/capability`, the connector sync route) must keep refusing on the day it is set
     `false`. This row states what the path does; `customerData` states who may use it.
   */
-  customerIntake: { enabled: true, reason: "Intake for your own sources is arranged with us rather than opened by a checkout, and compiling them is gated separately. The path itself is built: files go to tenant-scoped quarantine storage before processing, and no other part of the deployment reads them there." },
+  customerIntake: { enabled: true, reason: "Upload your own sources from your workspace. Files go to tenant-scoped quarantine storage before processing, and no other part of the deployment reads them there." },
   /*
     C-13 names the path that is actually carrying production Worker traffic.
 
@@ -81,8 +85,14 @@ export const activationPolicy = {
     does not allow -- `enabled` is still false, every route guarding on it still refuses, and the
     capability grid still prints "Closed" in the state column beside this note. The limit is
     disclosed where the customer meets it; it is not the first thing the sentence says.
+
+    D-12, delegated decision 2026-11-09 (P2-37). The switch is on, so the sentence says what this
+    deployment now does, in the reader's terms: sign in, upload your own sources, compile them;
+    Developer is bought online, Team and Enterprise are arranged with us (`saleChannel` in the
+    billing catalog). It is still rendered verbatim wherever the gate was stated, and
+    `KO_CHROME.customerDataGate` is its literal Korean.
   */
-  customerData: { enabled: false, reason: "A finished Compiled World is open to read in full today, with its evidence attached. Compiling your own sources is set up with us rather than enabled by a plan purchase." },
+  customerData: { enabled: true, reason: "Sign in to upload your own sources and compile them into a World with its evidence attached. The Developer plan can be bought online; Team and Enterprise are arranged with us." },
 } as const;
 
 export type ActivationCapability = keyof typeof activationPolicy;
