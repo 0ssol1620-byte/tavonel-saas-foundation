@@ -2919,6 +2919,10 @@ export function vitestDiscoveryConfigFailures(source) {
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
 // legal-semicolons-20261109: the legal, consent, trust and /status copy whose semicolons were removed without a change in meaning.
 export const LEGAL_SEMICOLONS_AFFECTED_PATHS = Object.freeze(['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts']);
+// trial-to-paid-20261109: the promote route that admits the free evaluation's one World, the consent summary's
+// stylesheet, and the three copy modules that described the old trial refusal.
+export const TRIAL_TO_PAID_AFFECTED_PATHS = Object.freeze(['app/api/collections/[id]/promote/route.ts', 'components/processing-consent-panel.module.css', 'lib/activation-cohorts.ts', 'lib/cookbook-content.ts', 'lib/keyword-map.ts']);
+export const TRIAL_TO_PAID_AFFECTED_UNIT_FILES = Object.freeze(['lib/activation-cohorts.test.ts', 'lib/activation-rate-limit.test.ts', 'lib/brand-copy.test.ts', 'lib/client-route-weight.test.ts', 'lib/cookbook-content.test.ts', 'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/funnel-events.test.ts', 'lib/keyword-map.test.ts', 'lib/marketing-analytics.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/public-copy-purge.test.ts', 'lib/recipe-intent.test.ts', 'lib/resources-hub.test.ts', 'lib/retrieval-compile-wiring.test.ts', 'lib/seo-surface.test.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/trial-ai-access.test.ts', 'lib/world-activation-plan-gate.test.ts', 'lib/world-promotion-current-source.test.ts']);
 export const LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-provisions.test.ts']);
 export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('public-marketing-surface', new RegExp(`^(?:${exactPathAlternation(PUBLIC_MARKETING_AFFECTED_PATHS)})$`),
@@ -3146,6 +3150,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // legal-semicolons-20261109: 5 exact paths select 10 direct suites and no browser suite.
   affectedGroup('legal-semicolons-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(LEGAL_SEMICOLONS_AFFECTED_PATHS)})$`),
     { unitFiles: LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES }),
+  // trial-to-paid-20261109: 5 exact paths select 21 direct suites and no browser suite.
+  affectedGroup('trial-to-paid-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(TRIAL_TO_PAID_AFFECTED_PATHS)})$`),
+    { unitFiles: TRIAL_TO_PAID_AFFECTED_UNIT_FILES }),
   affectedGroup('ci-selector', /^(?:\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml|nextjs\/scripts\/(?:repair-[a-z-]+(?:\.test)?\.mjs|run-repair-check\.mjs|verify-repair-workflows\.mjs|db\/(?:native-world-race(?:-ci)?|dropbox-source-stream-race)(?:\.test)?\.mjs|fixtures\/[A-Za-z0-9_.-]+\.json)|nextjs\/vitest\.repair-scope(?:\.async)?\.config\.ts)$/,
     { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),
   affectedGroup('ci-selector', /^nextjs\/lib\/repair-node-evidence\.test\.mjs$/, { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),
