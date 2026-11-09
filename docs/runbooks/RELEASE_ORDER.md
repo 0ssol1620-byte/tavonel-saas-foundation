@@ -392,19 +392,68 @@ migration은 없다.
 - compile 쪽 `MAX_DERIVED_JSON_BYTES`는 `OCR_JSON_MAX_BYTES`에서 유도된다(단계 0: 24 MiB, 단계 1: 60 MiB). Core 요청 상한
   4.5 MB와 `COMPILE_INPUT_MAX_OCR_BYTES`(9 MB)는 바꾸지 않았다. 그래서 단계 1에서도 긴 문서는 `COMPILE_INPUT_TOO_LARGE`로 거부될 수 있다.
 
+- worker가 CDR에서 받는 sanitized PDF 상한(`MAX_SANITIZED_BYTES`)도 단계를 따른다(단계 0: 18 MiB, 단계 1: 45 MiB = CDR 출력 상한).
+  상한을 넘으면 재시도하지 않고 `PARSER_OOM` 이름 있는 거부("sanitized PDF exceeds the N MiB stage-S bound")로 끝난다.
+  두 값은 cross-tree 테스트가 고정한다.
+
+**섞인 기간에 무엇이 깨지는가 (review R1 M2).** 단계는 스위치 네 개(intake 상수, CDR·worker·reader env)로 나뉘어 있다.
+
+- 쪽 상한을 실제로 막는 것은 CDR이다. intake는 쪽을 세지 않는다. 그래서 **CDR이 단계 1이고 intake가 단계 0인 동안에는
+  5 MiB 이하의 81–200쪽 소스가 처리되고 과금된다.** 그동안 `/sources`·가격·거부 문구는 "80 pages"를 말한다.
+- compile 읽기 상한 `MAX_DERIVED_JSON_BYTES`는 **intake 상수**를 따르고(24 MiB), worker의 `ocr.json` 쓰기 상한은 **worker env**를
+  따른다(60 MiB). worker가 단계 1이고 intake가 단계 0인 동안 24 MiB를 넘는 `ocr.json`은 저장된 뒤 compile에서 `JSON_TOO_LARGE`로
+  거부된다. #189(cjob-1e8b7a0e)가 막은 "받고, 저장하고, 크기만으로 실패"가 다시 생긴다.
+- 반대 방향(intake가 단계 1이고 처리기가 단계 0)은 닫혀 있다. 5–25 MiB 원본과 81–200쪽은 worker·CDR에서 이름 있는 거부
+  (`PARSER_OOM`)로 끝나고, compile 상한(60 MiB)이 worker 상한(24 MiB)보다 크므로 #189 규칙도 깨지지 않는다.
+- 그래서 **처리기와 intake는 같은 release window에서 연달아 바꾼다.** 처리기만 단계 1인 채로 window를 닫지 않는다.
+  compile 읽기 상한을 배포된 worker 단계에 묶는 코드 변경(env에서 유도)은 하지 않았다. 단계 0에서 상한을 느슨하게 하지 않는
+  방법은 오케스트레이터가 정한다.
+
 **켜는 순서 (전제 조건이 모두 참이어야 한다).**
 
 1. §4.D 단계 1 gate 측정: GDP census 재계산(분모 100건 / 4,592쪽), 상한 근처 문서 5건의 Cloud Run 메모리·시간 p95,
-   end-to-end 시간, OCR 비용/쪽(MEASUREMENT-PLAN-D1.md, 별도 측정 서비스).
+   end-to-end 시간, OCR 비용/쪽(MEASUREMENT-PLAN-D1.md, 별도 측정 서비스). 여기에 다음을 더한다(review R1 M1, m9, 이 PR에서 검증 안 함).
+   - Cloudflare Worker isolate 메모리(128 MB)에서 60 MiB `ocr.json`을 `TextDecoder().decode` + `JSON.parse`로 올리는 경로
+     (`inspectPersistedOcr`, range 조립, D2 shadow 비교)의 실측. G2는 Cloud Run 메모리만 잰다.
+   - Cloud Run 응답 크기 상한과 45 MiB CDR 출력(non-streaming 응답 상한 확인).
+   - RunPod load-balancer 요청 본문 상한과 45 MiB multipart.
+   - 삭제 inventory 배치 `MAX_TOTAL_BYTES = 1 GiB`(`source-deletion-inventory-r2.ts`)에 문서당 객체 합(원본 25 + sanitized 45 +
+     range + `ocr.json` 60 + text-layer 24 MiB)이 더 일찍 닿는다. 결과는 `SOURCE_INVENTORY_TOTAL_TOO_LARGE`이고 데이터 손실은 없다.
+   - worker의 `FOUNDATION_OCR_URL`이 `workers/foundation-ocr-gpu` 이미지를 가리키는지 확인한다. `workers/foundation-ocr-cpu-raster`와
+     `workers/foundation-ocr`는 18 MiB / 80쪽에서 단계를 나누지 않으므로 **단계 1 대상이 아니다.** 그쪽을 가리키면 단계 1을 켜지 않는다.
 2. worker의 한 delivery 15분 벽 해소: 200쪽 / 8 = 25 range × 85 s > 900 s. range마다 queue message 하나(A4.1)가 선행 조건이다.
-3. migration(W2-D 예약 번호 20261107130000 이후): `foundation_intake_admissions` CHECK와 `reserve_foundation_intake_admission`,
-   `foundation_intake_approval_files.byte_length` CHECK와 approval 함수의 5,242,880을 26,214,400으로. 함수 본문 교체라서 pgTAP 필수.
-4. 처리기를 먼저 단계 1로: CDR 새 revision(`TAVONEL_INTAKE_CEILING_STAGE=1`, `/health`에 `intakeCeilingStage: 1`),
-   RunPod endpoint release(같은 env), worker version upload → bindings 확인 → promote(같은 var). 각 rollback ID를 원장에 먼저 적는다.
-5. 마지막으로 intake: `INTAKE_CEILING_STAGE = 1` reviewed change → Foundation build 1회. `/sources`·가격 페이지·refusal 문구가 같이 바뀐다.
+3. migration(W2-D 예약 번호 20261107130000 이후). 아래 정정 메모(review R1 M3)를 따른다.
+   - **함수 이름.** `20260927102000_customer_source_deletion.sql`이 0051의 `reserve_foundation_intake_admission`을
+     `reserve_foundation_intake_admission_unchecked`로 rename했다. 지금의 `reserve_foundation_intake_admission`은 삭제된 source의
+     재입고를 막는 tombstone 가드(`foundation_intake_source_deleted`) wrapper다. 5 MiB 리터럴은 `_unchecked` 본문에 있다.
+     **wrapper를 create-or-replace하면 삭제 가드가 사라진다.** 바꾸는 것은 `_unchecked`다.
+   - **바꿀 리터럴 전부.** 5,242,880만 바꾸면 단계 1 approval 경로가 `foundation_intake_approval_invalid`로 전부 거부된다.
+     - `0051:47` `foundation_intake_admissions.requested_bytes` CHECK, `_unchecked` 본문의 5,242,880(0051 `:87`, `:131` 계보)
+     - `20261003120000:72` `foundation_intake_approval_files.byte_length between 1 and 5242880` CHECK
+     - `20261003120000:75` `approved_max_pages between 1 and 80` CHECK
+     - `20261003120000:95` `page_basis <> 'unknown' or approved_max_pages = 80`
+     - `20261003120000:431` `byteLength` 정규식 `^[0-9]{1,7}$`(26,214,400은 8자리라 정규식에서 먼저 걸린다)
+     - `20261003120000:437-438` approval 함수 안의 `5242880`과 `approvedMaxPages … between 1 and 80`
+     - `20261003130000:14` `aggregate_maximum_pages between 1 and 10240`(= 128 × 80)
+   - **현재 본문을 기준으로 한다.** 20261003120000과 20261003130000은 production에 적용돼 있다. 새 migration은
+     `create_foundation_intake_approval`, `reserve_foundation_intake_admission_unchecked`, guard 함수들의 **현재 production 본문
+     (`pg_get_functiondef`로 받은 것)에서 리터럴만 바꾼 create-or-replace superset**이어야 한다. 0051 시점 본문으로 덮으면
+     20261003120000이 추가한 예산 불변식이 지워진다. pgTAP으로 tombstone 가드, 예산 불변식, 단계 1 경계(26,214,400 통과 /
+     26,214,401 거부, 200쪽 통과 / 201쪽 거부)를 단언한다.
+4. 처리기를 단계 1로, **받는 쪽부터**: RunPod reader release(`TAVONEL_INTAKE_CEILING_STAGE=1`) → worker version upload →
+   bindings 확인 → promote(같은 var) → CDR 새 revision(같은 env, `/health`에 `intakeCeilingStage: 1`). 받는 쪽이 먼저 45 MiB를
+   받을 수 있어야 CDR이 그만큼을 내보낼 때 거부가 생기지 않는다. 각 rollback ID를 원장에 먼저 적는다. reader와 worker는
+   단계를 health에 싣지 않으므로(review R1 m5) 단계 1 경계 문서 1건으로 동작을 확인한다.
+5. **같은 release window 안에서 바로** intake: `INTAKE_CEILING_STAGE = 1` reviewed change → Foundation build 1회.
+   `/sources`·가격 페이지·refusal 문구와 compile 읽기 상한(60 MiB)이 같이 바뀐다. 4의 CDR 전환부터 5의 배포까지가 위의
+   "섞인 기간"이다. 이 기간을 window 밖으로 넘기지 않는다.
 
-**되돌리기.** 역순. intake 상수를 0으로(build 1회) → 처리기 env를 `"0"`(CDR traffic 이전 revision, RunPod 이전 release,
-`wrangler versions deploy <prev>@100%`). intake를 먼저 되돌리면 처리기가 단계 1인 채로 있어도 해가 없다(intake가 바이트를 막고 CDR이 쪽을 막는다).
+**되돌리기.** **처리기를 먼저, 문의 역할을 하는 CDR부터** 단계 0으로 되돌린다: CDR traffic을 이전 revision으로 →
+`wrangler versions deploy <prev>@100%` → RunPod 이전 release. 그다음 intake 상수를 0으로(build 1회).
+이 순서를 고른 이유: 섞인 기간이 "intake 단계 1, 처리기 단계 0" 방향이 되어, 5–25 MiB 업로드와 81–200쪽 문서가
+CDR·worker에서 이름 있는 거부로 끝난다(fail closed). 감수하는 것은 그 기간에 intake가 받아 준 업로드가 처리 단계에서
+거부된다는 점이다. 반대 순서(intake 먼저)는 처리기가 단계 1인 동안 81–200쪽을 "80 pages" 문구 아래에서 처리하고 과금하며,
+compile이 24 MiB를 넘는 `ocr.json`을 `JSON_TOO_LARGE`로 거부하게 둔다. 그래서 쓰지 않는다.
 
 ### D2 text-layer shadow (worker)
 

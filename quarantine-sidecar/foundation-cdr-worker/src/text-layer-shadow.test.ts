@@ -168,6 +168,8 @@ describe("D2 text-layer shadow (PROGRAM-2026-11-04 §4.D, ADR-2026-11-02 §5)", 
     ["the CDR flag off (503)", async () => new Response("disabled", { status: 503 }), "cdr_text_layer_disabled"],
     ["a transport failure", async () => { throw new TypeError("network"); }, "cdr_text_layer_transport"],
     ["an auth refusal", async () => new Response("no", { status: 401 }), "cdr_text_layer_http_401"],
+    // Our bound, not the document: a layer above it must not inflate the unusable count (R1 m4).
+    ["a layer above our 24 MiB bound", async () => new Response("{}", { status: 200, headers: { "content-length": String(24 * 1024 * 1024 + 1) } }), "text_layer_too_large"],
   ];
   for (const [name, fetcher, reason] of unavailable) {
     it(`records ${name} as unavailable without throwing`, async () => {

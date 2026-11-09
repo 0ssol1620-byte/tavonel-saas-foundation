@@ -33,10 +33,11 @@ const GPU = "workers/foundation-ocr-gpu/app.py";
 const CEILING = "shared/intakeCeiling.ts";
 const READER = "nextjs/lib/r2-objects.ts";
 const WORKER_SANITIZE = "quarantine-sidecar/foundation-cdr-worker/src/sanitize.ts";
+const WORKER_TEXT_LAYER = "quarantine-sidecar/foundation-cdr-worker/src/text-layer-shadow.ts";
 
 // A Windows checkout is CRLF (core.autocrlf) and CI is LF; the line anchors must see the same text.
 const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8").replace(/\r\n/g, "\n");
-const tree = new Map([WORKER_KEYS, WORKER_OCR, CDR, GPU, CEILING, READER, WORKER_SANITIZE].map((path) => [path, read(path)]));
+const tree = new Map([WORKER_KEYS, WORKER_OCR, CDR, GPU, CEILING, READER, WORKER_SANITIZE, WORKER_TEXT_LAYER].map((path) => [path, read(path)]));
 const fromTree = (path: string) => tree.get(path) ?? "";
 
 /** `80`, `4_000_000`, `5 * 1024 * 1024`. A name, a call or anything else is NaN and never matches. */
@@ -94,6 +95,12 @@ const SITES: readonly Site[] = [
     expected: RASTER_HANDOFF_BYTES, source: "pinned: equal to the rasterizer's MAX_OUTPUT_BYTES",
   },
   {
+    // The worker carries the sanitized PDF from the rasterizer to the reader; a smaller bound
+    // here retries a paid CDR run into the DLQ (review R1 M1).
+    file: WORKER_SANITIZE, name: "MAX_SANITIZED_BYTES", pattern: /^const MAX_SANITIZED_BYTES = (.+);$/gm,
+    expected: RASTER_HANDOFF_BYTES, source: "pinned: equal to the rasterizer's MAX_OUTPUT_BYTES",
+  },
+  {
     // The compile reads what the worker stored (#189): below the worker's bound, an accepted
     // source reads, stores, and then fails at structuring on size alone (cjob-1e8b7a0e).
     file: WORKER_OCR, name: "STAGE_0_OCR_BOUNDS persistedBytes", pattern: ocrBounds(0, "persistedBytes", " \\};"),
@@ -144,6 +151,19 @@ const SITES: readonly Site[] = [
   {
     file: GPU, name: "STAGE_1_MAX_INPUT_BYTES", pattern: /^STAGE_1_MAX_INPUT_BYTES: Final = (.+)$/gm,
     expected: perStage1Page(RASTER_HANDOFF_BYTES), source: "derived: equal to the rasterizer's STAGE_1_MAX_OUTPUT_BYTES",
+  },
+  {
+    file: WORKER_SANITIZE, name: "STAGE_1_MAX_SANITIZED_BYTES", pattern: /^const STAGE_1_MAX_SANITIZED_BYTES = (.+);$/gm,
+    expected: perStage1Page(RASTER_HANDOFF_BYTES), source: "derived: equal to the rasterizer's STAGE_1_MAX_OUTPUT_BYTES",
+  },
+  {
+    // The D2 shadow reads the ocr.json the worker wrote at either stage, so it takes the larger.
+    file: WORKER_TEXT_LAYER, name: "MAX_OCR_JSON_BYTES", pattern: /^const MAX_OCR_JSON_BYTES = (.+);$/gm,
+    expected: intakeCeilingFor(1).OCR_JSON_MAX_BYTES, source: "intakeCeiling.ts OCR_JSON_MAX_BYTES at stage 1",
+  },
+  {
+    file: WORKER_TEXT_LAYER, name: "MAX_TEXT_LAYER_BYTES", pattern: /^const MAX_TEXT_LAYER_BYTES = (.+);$/gm,
+    expected: intakeCeilingFor(0).OCR_JSON_MAX_BYTES, source: "intakeCeiling.ts OCR_JSON_MAX_BYTES at stage 0",
   },
   {
     file: WORKER_OCR, name: "STAGE_1_OCR_BOUNDS pages", pattern: ocrBounds(1, "pages"),

@@ -22,7 +22,9 @@ export const TEXT_LAYER_SHADOW_SCHEMA = "tavonel.text_layer_shadow.v1";
 export const TEXT_LAYER_SHADOW_FLAG = "FOUNDATION_CDR_TEXT_LAYER_FIRST";
 const CDR_TEXT_LAYER_SCHEMA = "tavonel.cdr_text_layer.v1";
 const ADR = "docs/adr/ADR-2026-11-02-text-layer-first-cdr.md";
-/** The stored ocr.json bound at stage 0; a layer receipt for the same pages is far smaller. */
+/** The stored ocr.json bound at stage 0; a layer receipt for the same pages is far smaller. Over it
+ * the cause is our bound, not the document, so the shadow records it as unavailable. Both copies
+ * are pinned by nextjs/lib/intake-ceiling-cross-tree.test.ts. */
 const MAX_TEXT_LAYER_BYTES = 24 * 1024 * 1024;
 const MAX_OCR_JSON_BYTES = 60 * 1024 * 1024;
 const PATHS = new Set([
@@ -246,11 +248,11 @@ async function compare(input: TextLayerShadowInput): Promise<TextLayerShadowRece
   const declared = Number(response.headers.get("content-length") ?? "0");
   if (declared > MAX_TEXT_LAYER_BYTES) {
     await response.body?.cancel().catch(() => undefined);
-    return base("unusable", "text_layer_too_large", { ocrJsonSha256 });
+    return base("unavailable", "text_layer_too_large", { ocrJsonSha256 });
   }
   const body = await response.arrayBuffer().catch(() => null);
   if (!body) return base("unavailable", "cdr_text_layer_transport", { ocrJsonSha256 });
-  if (body.byteLength > MAX_TEXT_LAYER_BYTES) return base("unusable", "text_layer_too_large", { ocrJsonSha256 });
+  if (body.byteLength > MAX_TEXT_LAYER_BYTES) return base("unavailable", "text_layer_too_large", { ocrJsonSha256 });
   const textLayerSha256 = await sha256DigestHeader(body);
   if (response.headers.get("x-tavonel-input-sha256") !== input.inputSha256
     || response.headers.get("x-tavonel-text-layer-sha256") !== textLayerSha256) {
