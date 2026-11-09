@@ -837,7 +837,7 @@ console.log("compile job:", accepted.jobId);` },
     slug: "collections-and-compile",
     title: "Collections and compile",
     group: "Input and compile",
-    summary: `A compile carries up to ${COMPILE_MAX_DOCUMENTS} documents; a run carries up to ${CORPUS_MAX_DOCUMENTS}.`,
+    summary: `A compile carries up to ${COMPILE_MAX_DOCUMENTS} documents. A run carries up to ${CORPUS_MAX_DOCUMENTS}.`,
     blocks: [
       { kind: "prose", text: `A compile takes between ${COMPILE_MIN_DOCUMENTS} and ${COMPILE_MAX_DOCUMENTS} documents. That is one Core request and one artifact, and it is not the limit on how much you can compile: a selection larger than that is partitioned server-side into parts of that size and answered as a corpus, up to ${CORPUS_MAX_DOCUMENTS} documents in one run.` },
       { kind: "heading", text: "Corpora and their parts" },

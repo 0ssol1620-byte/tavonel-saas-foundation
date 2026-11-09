@@ -619,11 +619,10 @@
   line-height: 1.55;
 }
 
-/* Two figures, sized to be read rather than stretched across the whole stage. */
+/* Five figures in one balanced row that fills the stage; two per row on a phone. */
 .changeCounts {
   display: grid;
-  grid-template-columns: repeat(2, minmax(150px, 230px));
-  justify-content: start;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin: 0;
   border-top: 1px solid var(--hairline);
   border-left: 1px solid var(--hairline);
@@ -637,26 +636,32 @@
 
 .changeCounts dt {
   color: var(--text-lo);
-  font: 12px var(--f-mono);
-  letter-spacing: 0.12em;
+  font: 12px/1.35 var(--f-sans);
+  letter-spacing: 0;
 }
 
 .changeCounts dd {
   margin: 6px 0 0;
   color: var(--text-hi);
   font-size: 26px;
+  font-variant-numeric: tabular-nums;
   font-weight: 500;
   letter-spacing: -0.03em;
 }
 
 .changeCounts dd[data-tone="changed"] { color: var(--changed); }
 
+/* The secondary counts are a sentence in the text face; monospace is for ids and code. */
 .changeBreakdown {
   margin: 0;
   color: var(--text-lo);
-  font: 12px/2 var(--f-mono);
-  letter-spacing: 0.08em;
+  font: 13px/1.6 var(--f-sans);
+  font-variant-numeric: tabular-nums;
 }
+
+/* The explanation of the counts, folded: the figures are the reading, this is the footnote. */
+.changeHow { display: grid; gap: 8px; }
+.changeHow summary { cursor: pointer; color: var(--text-mid); font-size: 13px; }
 
 .changeNote {
   margin: 0;
@@ -1061,10 +1066,22 @@
 
 /* ------------------------------------------------------------------ end */
 
+/*
+  2026-11-09. The two columns share one top: the sources label sits level with the heading, the
+  list runs down the left, and the actions and the guide line follow the heading directly. Before
+  this the list set the second row's height, so the guide line hung ~200px under the buttons.
+  The actions row takes the slack, and the two closing notes share the last row's top.
+*/
 .next {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-  gap: 22px;
+  grid-template-areas:
+    "label heading"
+    "sources heading"
+    "sources actions"
+    "srcnote note";
+  grid-template-rows: auto auto 1fr auto;
+  gap: 14px 22px;
   align-items: start;
   width: 100%;
   margin: 0 auto;
@@ -1081,13 +1098,14 @@
 
 /*
   G1-047. The eyebrow sat at the top of a row whose height is a 74px headline, so it floated about
-  160px above the list it labels. Bottom-aligning it in its own cell puts the label back on the
-  thing it names without moving either column.
+  160px above the list it labels. Its own row now sits level with the heading and the list starts
+  directly under it (2026-11-09), so the label stays on the thing it names.
 */
-.next > p:first-of-type { align-self: end; }
+.next .nextLabel { grid-area: label; align-self: start; padding-top: 0.6em; }
+.next h2 { grid-area: heading; }
 
-/* The reason a filing shows two page numbers, under the row it belongs to (G1-023). */
-.nextSourceNote { display: block; margin-top: 3px; color: var(--text-lo); font-size: 12px; line-height: 1.5; }
+/* The reason a filing shows two page numbers, said once under the list (G1-023). */
+.next .nextSourceNote { grid-area: srcnote; color: var(--text-lo); font: 12px/1.5 var(--f-sans); letter-spacing: 0; }
 .nextSourceNote a { color: var(--text-lo); text-decoration: underline; text-underline-offset: 2px; }
 
 /*
@@ -1097,7 +1115,7 @@
   the acquisition record rather than written here.
 */
 .nextSources {
-  grid-column: 1;
+  grid-area: sources;
   display: grid;
   gap: 9px;
   align-content: start;
@@ -1111,7 +1129,7 @@
 
 /* BA-036: the third action, as the sentence it always was. */
 .next .nextNote {
-  grid-column: 2;
+  grid-area: note;
   max-width: 54ch;
   color: var(--text-lo);
   font: 13px/1.6 var(--f-sans);
@@ -1132,7 +1150,7 @@
 }
 
 .next > div {
-  grid-column: 2;
+  grid-area: actions;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -1203,10 +1221,12 @@
   .revision > header { flex-wrap: wrap; min-height: 0; padding: 10px 14px; }
   .revision > header span { flex-basis: 100%; }
 
-  .next { grid-template-columns: 1fr; }
-  .next > div,
-  .next .nextNote,
-  .nextSources { grid-column: 1; }
+  .next {
+    grid-template-columns: 1fr;
+    grid-template-areas: "heading" "actions" "note" "label" "sources" "srcnote";
+    grid-template-rows: none;
+  }
+  .next .nextLabel { padding-top: 12px; }
 
   /* Five figures do not fit a phone column; they wrap rather than shrink to unreadable. */
   .timelineCounts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1218,6 +1238,7 @@
 @media (max-width: 480px) {
   .entry h1 { font-size: 38px; }
   .changeCounts { grid-template-columns: 1fr 1fr; }
+  .changeCounts > div:first-child { grid-column: 1 / -1; }
   .drawer { width: 100vw; }
 }
 

@@ -7,6 +7,13 @@ import {
   type PublicTrustDisclosureId,
 } from "@/lib/public-trust-contract";
 
+/*
+  A published file (a policy .md, security.txt) is not a route. next/link prefetches its RSC
+  payload, which 404s and puts an error in every visitor's console on /security, /trust and
+  /enterprise. A file gets a plain anchor.
+*/
+const isFile = (href: string) => /.[a-z0-9]+$/i.test(href);
+
 export function TrustDisclosures({
   heading = "Public trust resources",
   ids,
@@ -25,7 +32,9 @@ export function TrustDisclosures({
             <span>{PUBLIC_DISCLOSURE_STATUS_LABEL[row.status]}</span>
             <h3>{row.subject}</h3>
             <p>{row.line}</p>
-            <p className="fine"><Link href={row.href as Route}>Open resource</Link></p>
+            <p className="fine">{isFile(row.href)
+              ? <a href={row.href}>Open resource</a>
+              : <Link href={row.href as Route}>Open resource</Link>}</p>
           </article>
         ))}
       </div>
