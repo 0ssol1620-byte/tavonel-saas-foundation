@@ -2343,11 +2343,12 @@ export const G1_COPY_TRUTH_AFFECTED_UNIT_FILES = Object.freeze([
 export const G1_COPY_TRUTH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/docs-reading-layout.spec.ts', 'e2e/pricing-plan-overview.spec.ts']);
 // Global exposure (GX-01..GX-04, founder 2026-11-09, codex/global-exposure-20261109): robots for AI crawlers, the /ko retirement's
 // two page heads and three browser specs no owner listed, the IndexNow key file, its manual ping script and its suite, and the
-// title-length and head suites. Exactly these thirteen paths select the ten suites that read them directly (the SEO, head,
+// title-length and head suites. lib/product-claims-sync.test.ts is not here: switch-on-billing-integrity owns it and already
+// selects it. Exactly these twelve paths select the ten suites that read them directly (the SEO, head,
 // canonical, title-length, claims-sync, outcome-IA, IndexNow, pricing and evaluation suites) and evidence-first, which proves the
 // /ko 308s, through its existing reviewed project row. Product copy and a published file, so never nativeReuse.
 export const GLOBAL_EXPOSURE_AFFECTED_PATHS = Object.freeze([
-  'app/evaluation/page.tsx', 'app/pricing/page.tsx', 'app/robots.ts', 'e2e/evaluation-acceptance.spec.ts', 'e2e/masterplan-workbench.spec.ts', 'e2e/ux06-contact-recovery.spec.ts', 'lib/indexnow.test.ts', 'lib/landing-v2-outcome-ia.test.ts', 'lib/page-metadata.test.ts', 'lib/product-claims-sync.test.ts', 'lib/seo-title-lengths.test.ts', 'public/7a0ff86c91c02b35a358cdf2761b2512.txt', 'scripts/indexnow-ping.mjs',
+  'app/evaluation/page.tsx', 'app/pricing/page.tsx', 'app/robots.ts', 'e2e/evaluation-acceptance.spec.ts', 'e2e/masterplan-workbench.spec.ts', 'e2e/ux06-contact-recovery.spec.ts', 'lib/indexnow.test.ts', 'lib/landing-v2-outcome-ia.test.ts', 'lib/page-metadata.test.ts', 'lib/seo-title-lengths.test.ts', 'public/7a0ff86c91c02b35a358cdf2761b2512.txt', 'scripts/indexnow-ping.mjs',
 ]);
 export const GLOBAL_EXPOSURE_AFFECTED_UNIT_FILES = Object.freeze([
   'components/evaluation-page.test.tsx', 'lib/indexnow.test.ts', 'lib/landing-v2-outcome-ia.test.ts', 'lib/page-metadata.test.ts', 'lib/page-seo.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts', 'lib/route-canonical-metadata.test.ts', 'lib/seo-surface.test.ts', 'lib/seo-title-lengths.test.ts',
@@ -3101,7 +3102,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // gate-release-continuity (D-05): the 9 exact repo-relative paths above select 10 direct suites and no browser suite.
   affectedGroup('gate-release-continuity', new RegExp(`^(?:${exactPathAlternation(GATE_RELEASE_CONTINUITY_AFFECTED_PATHS)})$`),
     { unitFiles: GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES }),
-  // global-exposure: the 13 exact paths above select 10 direct suites and 1 browser suite.
+  // global-exposure: the 12 exact paths above select 10 direct suites and 1 browser suite.
   affectedGroup('global-exposure', new RegExp(`^nextjs/(?:${exactPathAlternation(GLOBAL_EXPOSURE_AFFECTED_PATHS)})$`),
     { unitFiles: GLOBAL_EXPOSURE_AFFECTED_UNIT_FILES, browserFiles: GLOBAL_EXPOSURE_AFFECTED_BROWSER_FILES }),
   // g1-copy-truth: the 6 exact paths above select 17 direct suites and 2 browser suites.

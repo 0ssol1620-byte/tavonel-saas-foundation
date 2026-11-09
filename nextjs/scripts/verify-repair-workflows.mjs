@@ -745,10 +745,10 @@ for (const binding of [
     browsers: [],
     rows: [],
     neighbors: ['nextjs/lib/trial-ai-access.tsx', 'nextjs/lib/operations-alert-trigger.ts', 'nextjs/lib/operations-e2e-timing.json', 'nextjs/app/api/developer/keys/[id]/revoke/route.ts', 'lib/trial-ai-access.ts'] },
-  // Global exposure (GX-01..GX-04, 2026-11-09): thirteen exact paths, ten direct suites, evidence-first on its existing row.
+  // Global exposure (GX-01..GX-04, 2026-11-09): twelve exact paths, ten direct suites, evidence-first on its existing row.
   { group: 'global-exposure', prefix: 'nextjs/', exportedPaths: GLOBAL_EXPOSURE_AFFECTED_PATHS, exportedSuites: GLOBAL_EXPOSURE_AFFECTED_UNIT_FILES,
     exportedBrowsers: GLOBAL_EXPOSURE_AFFECTED_BROWSER_FILES,
-    paths: ['app/evaluation/page.tsx', 'app/pricing/page.tsx', 'app/robots.ts', 'e2e/evaluation-acceptance.spec.ts', 'e2e/masterplan-workbench.spec.ts', 'e2e/ux06-contact-recovery.spec.ts', 'lib/indexnow.test.ts', 'lib/landing-v2-outcome-ia.test.ts', 'lib/page-metadata.test.ts', 'lib/product-claims-sync.test.ts', 'lib/seo-title-lengths.test.ts', 'public/7a0ff86c91c02b35a358cdf2761b2512.txt', 'scripts/indexnow-ping.mjs'],
+    paths: ['app/evaluation/page.tsx', 'app/pricing/page.tsx', 'app/robots.ts', 'e2e/evaluation-acceptance.spec.ts', 'e2e/masterplan-workbench.spec.ts', 'e2e/ux06-contact-recovery.spec.ts', 'lib/indexnow.test.ts', 'lib/landing-v2-outcome-ia.test.ts', 'lib/page-metadata.test.ts', 'lib/seo-title-lengths.test.ts', 'public/7a0ff86c91c02b35a358cdf2761b2512.txt', 'scripts/indexnow-ping.mjs'],
     suites: ['components/evaluation-page.test.tsx', 'lib/indexnow.test.ts', 'lib/landing-v2-outcome-ia.test.ts', 'lib/page-metadata.test.ts', 'lib/page-seo.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts', 'lib/route-canonical-metadata.test.ts', 'lib/seo-surface.test.ts', 'lib/seo-title-lengths.test.ts'],
     browsers: ['e2e/evidence-first.spec.ts'],
     rows: ["['e2e/evidence-first.spec.ts', ['1440', '390', 'reduced-motion']],"],
