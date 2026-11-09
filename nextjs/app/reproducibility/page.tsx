@@ -26,7 +26,13 @@ import { TrustNext } from "@/components/trust-next";
   summary no longer says a digest "does not prove semantic quality". The scope limit stays in
   "What it establishes", where it is a statement rather than a denial.
 */
-export const metadata: Metadata = { title: "Reproducibility — TAVONEL", description: "Digest-bound public samples you can download, rerun and verify byte for byte.", alternates: { canonical: "/reproducibility" }, openGraph: { url: "/reproducibility" }, robots: { index: false, follow: true } };
+/*
+  Indexed, conversion pass 2026-11-09 (funnel audit SEO item). BA-100's patch, applied: the page is three
+  digest-bound public samples and two verifiable downloads, /explore links to it, and it was the one
+  public page in llms.txt that search could not see. `app/sitemap.ts` lists it, `lib/seo-surface.test.ts`
+  uses /film as its standing noindex control instead, and `public-copy-purge.test.ts` no longer exempts it.
+*/
+export const metadata: Metadata = { title: "Reproducibility — TAVONEL", description: "Digest-bound public samples you can download, rerun and verify byte for byte.", alternates: { canonical: "/reproducibility" }, openGraph: { url: "/reproducibility" }, robots: { index: true, follow: true } };
 
 /*
   What the audit changed on this page, all of it in props to the shared registry:

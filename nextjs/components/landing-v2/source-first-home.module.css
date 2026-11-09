@@ -393,10 +393,10 @@
     min-height: 48px; padding: 10px 22px; border: 0; border-radius: var(--tv-r-pill);
     box-shadow: inset 0 0 0 1.5px var(--tv-rule-strong); background: transparent; color: var(--tv-ink);
   }
-  /* CRITIQUE-R1 #5: the entry reads as where a document goes -- a dashed inset edge, and while files are dragged over
-     the page it takes the accent (data-drag, set by HeroActions; a drop moves focus to it, Home keeps no file). */
-  .heroAside :global(.lv2-entry) { box-shadow: none; outline: 1.5px dashed var(--tv-rule-strong); outline-offset: -1.5px; }
-  .heroAside :global(.lv2-entry[data-drag]) { outline: 2px dashed var(--tv-action); outline-offset: -2px; background: var(--tv-tint); color: var(--tv-action); }
+  /* CRITIQUE-R1 #5: while files are dragged over the page the entry takes the accent (data-drag, set by HeroActions;
+     a drop moves focus to it, Home keeps no file). Conversion pass 2026-11-09 (funnel audit fix 2): the resting edge is
+     the solid 1.5px inset above, not a dashed one -- the dashed edge read as a disabled control on the start action. */
+  .heroAside :global(.lv2-entry[data-drag]) { box-shadow: inset 0 0 0 2px var(--tv-action); background: var(--tv-tint); color: var(--tv-action); }
   @media (hover: hover) and (pointer: fine) {
     .home.home :global(.lv2-cta:hover) { background: var(--tv-action-hover); border-color: var(--tv-action-hover); }
     .heroAside :global(.lv2-entry:hover) { background: var(--tv-sand); box-shadow: inset 0 0 0 1.5px var(--tv-sand-2); color: var(--tv-ink); }

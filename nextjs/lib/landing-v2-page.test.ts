@@ -76,7 +76,7 @@ import {
 } from "./landing-v2-copy.test";
 import { koTermDrift } from "./ko-terms";
 import { consentCopy } from "./marketing-analytics";
-import { ACCESS_CTA, EXPLORE_CTA, FOOTER_GROUPS, KO_CHROME, SELF_SERVE_CTA } from "./site-navigation";
+import { ACCESS_CTA, EXPLORE_CTA, FOOTER_GROUPS, KO_CHROME, SELF_SERVE_CTA, START_FREE_LABEL } from "./site-navigation";
 import { EVIDENCE } from "./evidence-record";
 import claimsPack from "../content/evidence/public-claims-pack.json";
 
@@ -905,7 +905,8 @@ describe("landing v2 -- hero actions by commercial state", () => {
       expect(label(secondary![1]!)).toBe(locale === "ko" ? "내 문서 평가" : "Evaluate your documents");
       // Brief 2026-10-15 move 1: the close fills the hero's public-sample action beside the price link, in both languages.
       const close = elements(sceneOf(main, "s6"), "a").map(open => attr(open, "href"));
-      expect(close).toEqual([EXPLORE_CTA.href, locale === "ko" ? "/ko/pricing" : "/pricing"]);
+      // Conversion pass 2026-11-09: the English close also links the MCP setup page.
+      expect(close).toEqual(locale === "ko" ? [EXPLORE_CTA.href, "/ko/pricing"] : [EXPLORE_CTA.href, "/pricing", "/docs/mcp"]);
     }
   );
 
@@ -920,12 +921,13 @@ describe("landing v2 -- hero actions by commercial state", () => {
       expect(secondary).not.toBeNull();
       expect(attr(secondary![0], "href")).toBe(escaped(SELF_SERVE_CTA.href));
       expect(label(secondary![1]!)).toBe(
-        locale === "ko" ? KO_CHROME.cta[SELF_SERVE_CTA.href] : SELF_SERVE_CTA.label
+        // Conversion pass 2026-11-09: the hero prints the allowance the start action opens.
+        locale === "ko" ? KO_CHROME.cta[SELF_SERVE_CTA.href] : START_FREE_LABEL
       );
       expect(main).not.toMatch(/href="(?:\/ko)?\/evaluation"/);
       // The close does not change with commercial posture (brief move 1).
       expect(elements(sceneOf(main, "s6"), "a").map(open => attr(open, "href")))
-        .toEqual([EXPLORE_CTA.href, locale === "ko" ? "/ko/pricing" : "/pricing"]);
+        .toEqual(locale === "ko" ? [EXPLORE_CTA.href, "/ko/pricing"] : [EXPLORE_CTA.href, "/pricing", "/docs/mcp"]);
     }
   );
 });

@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { TrustNext } from "@/components/trust-next";
+import { OwnFilesCta } from "@/components/own-files-cta";
 import RegionHighlight from "@/components/evidence/region-highlight";
 import { sampleEvidencePage } from "@/lib/evidence-regions";
 import styles from "./evidence.module.css";
@@ -300,6 +301,7 @@ export default function EvidencePage() {
               two "main next actions". The step stays, quietly.
             */}
             <TrustNext from="/evidence" emphasis="quiet" />
+            <OwnFilesCta />
           </div>
         </div>
       </section>

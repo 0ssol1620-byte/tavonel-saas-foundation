@@ -217,6 +217,19 @@
   border-top: 1px solid var(--border-dark, var(--hairline));
   color: var(--text-mid);
 }
+/* Conversion pass 2026-11-09: the sheet's start action, the filled button at its foot (mobile-primary-nav.tsx). */
+.one-path-mobile-nav .mobile-nav-start {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 48px;
+  margin: 8px 0 4px;
+  color: #fff;
+  background: var(--tv-action);
+  border-color: var(--tv-action);
+  text-align: center;
+  white-space: normal;
+}
 @media (hover: hover) and (pointer: fine) {
   .one-path-mobile-nav .mobile-nav-signin:hover { color: var(--text-hi); }
 }

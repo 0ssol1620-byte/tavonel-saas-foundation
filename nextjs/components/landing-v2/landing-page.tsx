@@ -16,6 +16,7 @@ import RecompileScene from "./scenes/recompile";
 import StartScene from "./scenes/start";
 import TrustScene from "./scenes/trust";
 import { landingV2Copy } from "@/lib/landing-v2-copy";
+import { SELF_SERVE_CTA, START_FREE_LABEL } from "@/lib/site-navigation";
 import {
   buildHeroView,
   buildProofTabs,
@@ -221,7 +222,8 @@ export default function LandingPage({
   };
   const access = primaryCallToAction();
   const heroStart = {
-    label: access.href === "/contact" ? page.bringOwn : korean ? KO_CHROME.cta[access.href] : access.label,
+    // Conversion pass 2026-11-09: the hero has room for the allowance the start action opens.
+    label: access.href === "/contact" ? page.bringOwn : korean ? KO_CHROME.cta[access.href] : access === SELF_SERVE_CTA ? START_FREE_LABEL : access.label,
     href: access.href === "/contact" ? (korean ? "/ko/evaluation" : "/evaluation") : access.href,
   };
 
@@ -236,7 +238,7 @@ export default function LandingPage({
         <link rel="preload" as="font" type="font/woff2" href="/fonts/wanted-sans-ko-home-400.woff2" crossOrigin="" />
         <link rel="preload" as="font" type="font/woff2" href="/fonts/wanted-sans-ko-home-510.woff2" crossOrigin="" />
       </> : null}
-      <PublicSiteHeader korean={korean} ghostCta />
+      <PublicSiteHeader korean={korean} ghostCta start={heroStart} />
       <main id="main" tabIndex={-1} data-home-ia="outcome-v1.1">
         {children}
         {/*

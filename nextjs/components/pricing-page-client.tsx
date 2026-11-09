@@ -818,7 +818,8 @@ export default function PricingPageClient({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdHtml(pricingJsonLd(initialLiveCheckout, faqRows)) }}
       />
-      <PublicSiteHeader />
+      {/* Conversion pass 2026-11-09: the phone sheet's start action, the same one the Evaluation card offers. */}
+      <PublicSiteHeader start={selfService ? SELF_SERVE_CTA : undefined} />
       <main id="main">
         <section className="scene doc">
           <div className="shell">
@@ -974,7 +975,9 @@ export default function PricingPageClient({
                           ? `Request ${plan.name} access`
                           : billingBusy === plan.offerCode
                             ? "Opening checkout…"
-                            : signedIn ? `Get ${plan.name} access` : `Get ${plan.name} access, via sign-in`}
+                            // Conversion pass 2026-11-09 (funnel audit fix 2): the label names the purchase and its
+                            // catalog price. The path under the button still says sign-in comes first.
+                            : `Buy ${plan.name} — $${BILLING_OFFERS[plan.offerCode].priceUsd}/month`}
                   </a>
                   {plan.name === "Evaluation" && !selfService ? (
                     <Link className="fine pricing-secondary-link" href="/contact">Discuss your sources</Link>

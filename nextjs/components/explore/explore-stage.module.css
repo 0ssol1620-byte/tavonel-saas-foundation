@@ -81,7 +81,15 @@
   white-space: nowrap;
 }
 
-@media (max-width: 860px) { .siteLinks { display: none; } }
+/*
+  Conversion pass 2026-11-09 (funnel audit fix 3). This used to hide all three links below 860px, which
+  left a phone reader at the end of the strongest proof page with no way to Pricing or to start. Product
+  folds, Pricing and the access action stay, and the row wraps rather than overflowing at 360px.
+*/
+@media (max-width: 860px) {
+  .siteLinks a:not([data-phone]) { display: none; }
+  .headerActions { flex-wrap: wrap; row-gap: 0; column-gap: 12px; }
+}
 
 /*
   BA-029. Both header actions used to be bordered boxes of the same weight, which is not a
