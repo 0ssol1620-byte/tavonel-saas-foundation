@@ -18,6 +18,8 @@ const registeredUnitTestPaths = new Set([
   'components/explore/evidence-workbench.test.tsx',
   'components/compile-stage-player.mobile-view.test.tsx',
   'eval/ask-quality/metrics.test.ts',
+  // W2-E2 answerability replay: the one E2 eval suite its owner selects; also in the base include as eval/**/metrics.test.ts.
+  'eval/ask-quality/e2/metrics.test.ts',
 ]);
 const asyncRouteUnitTestPath = 'app/api/compile-jobs/route.test.ts';
 const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs']);

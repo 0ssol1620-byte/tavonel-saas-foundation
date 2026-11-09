@@ -2524,7 +2524,7 @@ export const VISUALS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/landing-v2.spe
 // scripts/remote-mcp (test plumbing, never shipped). They select those suites and the suites that read every app/api route
 // source. Product code, so never nativeReuse; no browser, database, worker or build lane.
 export const W1_REMOTE_MCP_A1_A5_AFFECTED_PATHS = Object.freeze(['app/api/collections/[id]/ask/route.ts', 'app/api/developer/keys/route.ts', 'app/api/internal/remote-mcp/revoke-all/route.ts', 'app/api/v1/developer/keys/[id]/rotate/route.ts', 'app/one-path.css', 'components/workspace-use-with-ai.tsx', 'components/workspace/connect-ai-panel.module.css', 'components/workspace/connect-ai-panel.tsx', 'lib/answer-receipt-signing.test.ts', 'lib/answer-receipt-signing.ts', 'lib/connect-ai-panel.test.ts', 'lib/developer-auth.ts', 'lib/developer-distribution.test.ts', 'lib/developer-store.test.ts', 'lib/developer-store.ts', 'lib/export-signing.ts', 'lib/funnel-events.test.ts', 'lib/remote-mcp-dispatch.ts', 'lib/remote-mcp-r1.test.ts', 'public/developer/tavonel-verify-answer.mjs', 'scripts/remote-mcp/conformance.mjs', 'scripts/remote-mcp/connect-ai-qa.mjs', 'scripts/remote-mcp/loopback-fetch.mjs', 'scripts/remote-mcp/security.mjs', 'scripts/remote-mcp/shadow-common.mjs']);
-export const W1_REMOTE_MCP_A1_A5_AFFECTED_UNIT_FILES = Object.freeze(['lib/answer-receipt-signing.test.ts', 'lib/api-error-codes.test.ts', 'lib/ask-route-limits.test.ts', 'lib/compile-receipt-signing.test.ts', 'lib/compiler-contract.test.ts', 'lib/connect-ai-panel.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/developer-distribution.test.ts', 'lib/developer-store.test.ts', 'lib/export-signing.test.ts', 'lib/funnel-events.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/remote-mcp-r1.test.ts', 'lib/remote-mcp.test.ts', 'lib/route-classification.test.ts', 'lib/trial-ai-access.test.ts']);
+export const W1_REMOTE_MCP_A1_A5_AFFECTED_UNIT_FILES = Object.freeze(['lib/answer-receipt-signing.test.ts', 'lib/answerability.test.ts', 'lib/api-error-codes.test.ts', 'lib/ask-route-limits.test.ts', 'lib/compile-receipt-signing.test.ts', 'lib/compiler-contract.test.ts', 'lib/connect-ai-panel.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/developer-distribution.test.ts', 'lib/developer-store.test.ts', 'lib/export-signing.test.ts', 'lib/funnel-events.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/remote-mcp-r1.test.ts', 'lib/remote-mcp.test.ts', 'lib/route-classification.test.ts', 'lib/trial-ai-access.test.ts']);
 export const OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS = Object.freeze(['app/api/internal/sli-alerts/route.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-alert-store.test.ts', 'lib/operational-sli-alert-store.ts']);
 // W1 trial AI access + operations alert producers (codex/w1-a2-20261104): the four 402 routes' key-route trio, the settle route
 // (OCR alerts), the session/key authorizer, the trial decision, the alert producers and the E2E timing receipt, with their suites.
@@ -2915,6 +2915,15 @@ export function vitestDiscoveryConfigFailures(source) {
   }
   return failures;
 }
+// W2-E2 answerability gate (codex/w2-e2-20261108): the pure gate, its shadow wiring and suite, and the pre-registered
+// replay under eval/ask-quality/e2 (prereg, replay module, runner, README, its synthetic suite and the two committed receipts).
+// They select the gate's suite and the replay's suite. The Ask route the shadow is wired into stays with
+// w1-remote-mcp-a1-a5 (one owner per path), which now selects lib/answerability.test.ts for it. Product code, so never
+// nativeReuse; exact paths, no wildcard, no default owner; eval/ask-quality/cache and any later receipt stay unmapped.
+export const ASK_ANSWERABILITY_E2_AFFECTED_PATHS = Object.freeze([
+  'eval/ask-quality/e2/PREREG-E2.json', 'eval/ask-quality/e2/README.md', 'eval/ask-quality/e2/e2.ts', 'eval/ask-quality/e2/metrics.test.ts', 'eval/ask-quality/e2/receipts/calibration-2026-11-08T082201899Z-99e9448d5587.json', 'eval/ask-quality/e2/receipts/holdout-2026-11-08T082317556Z-9dd7cb825748.json', 'eval/ask-quality/e2/run_e2.mjs', 'lib/answerability-shadow.ts', 'lib/answerability.test.ts', 'lib/answerability.ts',
+]);
+export const ASK_ANSWERABILITY_E2_AFFECTED_UNIT_FILES = Object.freeze(['eval/ask-quality/e2/metrics.test.ts', 'lib/answerability.test.ts']);
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
 // legal-semicolons-20261109: the legal, consent, trust and /status copy whose semicolons were removed without a change in meaning.
@@ -3108,7 +3117,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // w1-trial-ops: the 10 exact paths above select 17 direct suites and no browser suite.
   affectedGroup('w1-trial-ops', new RegExp(`^nextjs/(?:${exactPathAlternation(W1_TRIAL_OPS_AFFECTED_PATHS)})$`),
     { unitFiles: W1_TRIAL_OPS_AFFECTED_UNIT_FILES }),
-  // w1-remote-mcp-a1-a5: the 25 exact paths above select 20 direct suites and no browser suite.
+  // w1-remote-mcp-a1-a5: the 25 exact paths above select 21 direct suites and no browser suite (W2-E2 added the shadow's suite).
   affectedGroup('w1-remote-mcp-a1-a5', new RegExp(`^nextjs/(?:${exactPathAlternation(W1_REMOTE_MCP_A1_A5_AFFECTED_PATHS)})$`),
     { unitFiles: W1_REMOTE_MCP_A1_A5_AFFECTED_UNIT_FILES }),
   affectedGroup('operational-sli-alert-delivery', new RegExp(`^nextjs/(?:${exactPathAlternation(OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS)})$`),
@@ -3162,6 +3171,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('database-contract', /^supabase\/(?:migrations|tests|drafts)\/[A-Za-z0-9_./-]+\.sql$/, { unitFiles: ['lib/pgtap-fixtures.test.ts'], database: true }),
   affectedGroup('native-harness-docs', /^docs\/integration\/NATIVE_WORLD_[A-Z_]+\.md$/),
   affectedGroup('repository-docs', /^(?:docs\/(?!integration\/NATIVE_WORLD_)[A-Za-z0-9_./-]+\.md|[A-Za-z0-9_.-]+\.md)$/, { nativeReuse: true }),
+  // ask-answerability-e2: the 10 exact paths above select 2 direct suites and no browser suite.
+  affectedGroup('ask-answerability-e2', new RegExp(`^nextjs/(?:${exactPathAlternation(ASK_ANSWERABILITY_E2_AFFECTED_PATHS)})$`),
+    { unitFiles: ASK_ANSWERABILITY_E2_AFFECTED_UNIT_FILES }),
 ]);const regularModes = ['100644', '100755'];
 
 export function parseAffectedRawDiff(output) {

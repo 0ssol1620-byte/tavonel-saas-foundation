@@ -389,3 +389,16 @@ migration은 additive다. 기존 행은 전부 `live`가 되고, create RPC의 �
   남아 있으면 창이 다시 막힌 것이다. 큐를 읽지 못한 틱은 `{"event":"compile_batch_read_failed","code":…}`(error)로 남는다.
   `turns: 0`만으로는 빈 큐와 구별되지 않으니, 이 줄이 없는지도 함께 본다.
 - 진단과 원인 사례: `outputs/tavonel-research-replan-20261013/market-20261104/w1/D0-DIAGNOSIS-20261108.md`(AKC 저장소).
+
+## 추가 2026-11-08 — W2-E2 Ask 답변 가능성 게이트 shadow (migration 없음)
+
+- 새 flag는 `TAVONEL_ASK_ANSWERABILITY_MODE`(부록 A)다. 기본값은 `off`이고, `off`면 게이트를 계산하지 않는다. `shadow`면 판정을 계산해
+  `tavonel.answerability_shadow.v1` 로그 한 줄로 남긴다. 그 줄은 답 receipt의 `outputSha256`, `questionSha256`에 묶이고, 개수만 담으며
+  질문의 단어는 담지 않는다. 응답 본문, receipt, signed receipt(`answerability: null`)는 바뀌지 않는다. `on`을 포함한 다른 값은
+  `off`로 처리하고 `TAVONEL_ASK_ANSWERABILITY_MODE_INVALID` 오류를 로그에 남긴다.
+- **순서는 자유다.** migration도, 새 API 오류 코드도, DB 쓰기도 없다. production에서 `shadow`로 켜는 것은 env 변경이고,
+  재배포가 필요하므로 과금 build 1회다. 별도 batch로 하지 말고 다음 wave batch에 묶는다.
+- **holdout 판정은 `NOT_SUPPORTED`다**(`nextjs/eval/ask-quality/e2/receipts/holdout-*.json`, C2 실패: 답할 수 있는 질문 21/191을
+  거절했고, Wilson 상한은 0.162로 허용치 0.10을 넘었다). 그래서 `on`(cohort 안에서 abstain)은 만들지 않았다. 새 사전 등록과 새 holdout에서
+  `SUPPORTED`가 나오고 리뷰를 거친 변경이 있기 전에는 제안하지 않는다.
+- rollback: flag를 지우거나 `off`로 둔다. 코드를 되돌릴 필요는 없다(off 경로는 계산을 하지 않는다).
