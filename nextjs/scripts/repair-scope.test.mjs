@@ -7301,7 +7301,7 @@ test('affected PR #141 fix owners: intake approval rollout, solutions proof and 
     for (const file of INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES) assert.ok(map.unitFiles.includes(file), `${path}: ${file}`);
     if (!intake) assert.deepEqual([map.unitFiles, map.browserFiles], [[...INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES].sort(), []], path);
   }
-  assert.deepEqual(SOLUTIONS_PROOF_AFFECTED_PATHS, ['app/solutions/[slug]/page.tsx', 'app/solutions/solution-workflow-proof.tsx']);
+  assert.deepEqual(SOLUTIONS_PROOF_AFFECTED_PATHS, ['app/solutions/[slug]/page.tsx', 'app/solutions/solution-workflow-proof.tsx', 'lib/solution-proof-picks.ts', 'lib/solution-workflows.test.ts']);
   for (const path of SOLUTIONS_PROOF_AFFECTED_PATHS) {
     const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
     assert.deepEqual([map.failures, map.groups, map.unmappedPaths], [[], ['solutions-proof'], []], path);
