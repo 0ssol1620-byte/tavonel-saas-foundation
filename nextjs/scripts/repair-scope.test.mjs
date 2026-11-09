@@ -7606,6 +7606,27 @@ test('affected site-polish-20261109 owner: 7 exact paths select 5 direct suites 
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+// legal-semicolons-status-20261109: one finite owner, restated independently of the exported constants.
+import { LEGAL_SEMICOLONS_STATUS_AFFECTED_PATHS, LEGAL_SEMICOLONS_STATUS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+test('affected legal-semicolons-status-20261109 owner: 1 exact path selects no direct suite and 1 browser suite; neighbours stay unmapped', () => {
+  const paths = ['e2e/operations.spec.ts'];
+  const browsers = ['e2e/operations.spec.ts'];
+  assert.deepEqual([[...LEGAL_SEMICOLONS_STATUS_AFFECTED_PATHS], [...LEGAL_SEMICOLONS_STATUS_AFFECTED_BROWSER_FILES]], [paths, browsers]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['legal-semicolons-status-20261109'], path);
+  }
+  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['legal-semicolons-status-20261109'], [], [], browsers, []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  const plan = affectedAskPlan(map);
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[], browsers, false, false]);
+  assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440']);
+  for (const adjacent of ['nextjs/e2e/operations-p0.spec.ts', 'nextjs/e2e/operation.spec.ts', 'nextjs/e2e/operations.spec.tsx', 'e2e/operations.spec.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
 // D-05 gate release continuity (docs/adr/0006): one finite owner over repo-relative paths, restated independently.
 import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 test('affected gate-release-continuity owner: 9 exact paths select 10 direct suites and no browser suite; neighbours stay unmapped', () => {

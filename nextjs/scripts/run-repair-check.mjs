@@ -247,6 +247,7 @@ const browserProjectsByFile = new Map([
   ['e2e/launch-qa-remote-mcp.spec.ts', ['launch-chromium']],
   ['e2e/keyless-try-it.spec.ts', ['1440', '390']],
   ['e2e/p4-followups.spec.ts', ['1440']],
+  ['e2e/operations.spec.ts', ['1440']],
 ]);
 
 const SOLUTIONS_ROUTES=['ai-ready-knowledge','document-intelligence','knowledge-graph','source-grounded-assistants','knowledge-operations'];

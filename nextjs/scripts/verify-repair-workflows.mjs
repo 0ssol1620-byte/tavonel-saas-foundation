@@ -10,6 +10,7 @@ import { PACKET_DELIVERY_AFFECTED_PATHS, PACKET_DELIVERY_AFFECTED_UNIT_FILES } f
 import { LIBRARY_DEDUP_AFFECTED_PATHS, LIBRARY_DEDUP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { COMPILER_RELEASE_AFFECTED_PATHS, COMPILER_RELEASE_AFFECTED_UNIT_FILES, COMPILER_RELEASE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { SITE_POLISH_AFFECTED_PATHS, SITE_POLISH_AFFECTED_UNIT_FILES, SITE_POLISH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+import { LEGAL_SEMICOLONS_STATUS_AFFECTED_PATHS, LEGAL_SEMICOLONS_STATUS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { HOME_FILM_RERECORD_AFFECTED_PATHS, HOME_FILM_RERECORD_AFFECTED_UNIT_FILES, HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { CONSENT_POSTER_AFFECTED_PATHS, CONSENT_POSTER_AFFECTED_UNIT_FILES, CONSENT_POSTER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
@@ -711,6 +712,14 @@ for (const binding of [
     browsers: ['e2e/benchmarks.spec.ts', 'e2e/explore.spec.ts', 'e2e/templates.spec.ts'],
     rows: ["['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/explore.spec.ts', ['1440']],", "['e2e/templates.spec.ts', ['1440']],"],
     neighbors: ['nextjs/components/benchmarks/arena-chart.tsx', 'nextjs/components/explore/change-act.module.css', 'nextjs/components/trust-disclosure.tsx', 'components/trust-provisions.tsx'] },
+  // legal-semicolons-status-20261109: one exact path, no direct suite, one browser suite with its 1440 row.
+  { group: 'legal-semicolons-status-20261109', prefix: 'nextjs/', exportedPaths: LEGAL_SEMICOLONS_STATUS_AFFECTED_PATHS, exportedSuites: [],
+    exportedBrowsers: LEGAL_SEMICOLONS_STATUS_AFFECTED_BROWSER_FILES,
+    paths: ['e2e/operations.spec.ts'],
+    suites: [],
+    browsers: ['e2e/operations.spec.ts'],
+    rows: ["['e2e/operations.spec.ts', ['1440']],"],
+    neighbors: ['nextjs/e2e/operations-p0.spec.ts', 'nextjs/e2e/operation.spec.ts', 'nextjs/e2e/operations.spec.tsx', 'e2e/operations.spec.ts'] },
   // B35 alert delivery (codex/ops-alert-delivery-20261102): four exact paths, eight direct suites, no browser suite.
   { group: 'operational-sli-alert-delivery', prefix: 'nextjs/', exportedPaths: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS, exportedSuites: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
