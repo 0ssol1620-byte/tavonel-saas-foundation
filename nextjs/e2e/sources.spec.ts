@@ -129,7 +129,7 @@ test("states, in English, that Korean was not measured and that HWP/HWPX is not 
   await expect(disclosure).toBeVisible();
   await expect(disclosure).toContainText("Korean document quality has not been measured yet.");
   await expect(disclosure).toContainText(`same \u2018${TIER_LABEL[pdf!.status]}\u2019 tier as the PDF row above.`);
-  await expect(disclosure).toContainText("HWP/HWPX: not supported, not measured.");
+  await expect(disclosure).toContainText("HWP/HWPX: no reader, not measured.");
 });
 
 test("states the refusal rule once and claims nothing it cannot support", async ({ page }) => {

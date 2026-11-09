@@ -979,7 +979,7 @@ claims:
   # the qualifier was an unsupported claim; the price, the page counts and every other word are
   # unchanged. CLM-050 is the Korean disclosure D-33 publishes on /sources and not on /ko.
   - claimId: CLM-050
-    claim: "Korean document quality has not been measured yet. A Korean PDF is processed at the same 'Best effort' tier as the PDF row above. / HWP/HWPX: not supported, not measured. Neither format is in the table above, and both are refused at upload."
+    claim: "Korean document quality has not been measured yet. A Korean PDF is processed at the same 'Best effort' tier as the PDF row above. / HWP/HWPX: no reader, not measured. Neither format is in the table above, and the upload route turns both away."
     surface: "/sources"
     evidence: "D-33 (KB-F6, KB-F7). No Korean benchmark receipt exists (KOREAN-BENCHMARK-DESIGN-2026-10-17 S0). shared/capabilityManifest.ts carries application/pdf as BEST_EFFORT and has no HWP or HWPX entry; shared/qualifiedDocumentInputs.ts refuses a filename whose extension its MIME does not list."
     artifact: "shared/capabilityManifest.ts; shared/qualifiedDocumentInputs.ts; nextjs/app/sources/page.tsx"

@@ -227,7 +227,7 @@ describe("G1-COPY: Korean measurement and HWP wording on /sources (D-33 / P2-33)
     const sources = copy("app/sources/page.tsx");
     expect(sources).not.toContain(`lang="ko"`);
     expect(sources).toContain(sentence);
-    expect(sources).toContain("HWP/HWPX: not supported, not measured.");
+    expect(sources).toContain("HWP/HWPX: no reader, not measured.");
   });
 
   // Review N3: the two sentences are a public claim, so the registry entry that backs them must stay.
@@ -236,7 +236,7 @@ describe("G1-COPY: Korean measurement and HWP wording on /sources (D-33 / P2-33)
     const entry = registry.split("claimId: CLM-050")[1]?.split("claimId:")[0];
     expect(entry, "CLAIMS_REGISTRY carries CLM-050").toBeDefined();
     expect(entry).toContain(sentence);
-    expect(entry).toContain("HWP/HWPX: not supported, not measured.");
+    expect(entry).toContain("HWP/HWPX: no reader, not measured.");
     expect(entry).toContain('surface: "/sources"');
   });
 

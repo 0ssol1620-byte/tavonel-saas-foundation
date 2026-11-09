@@ -85,7 +85,7 @@ export default function SourcesPage() {
   const pdfTier = rows.find((row) => row.mime === "application/pdf")?.tier;
   if (!pdfTier) throw new Error("/sources: the manifest has no PDF row to state the Korean PDF tier from");
   if (rows.some((row) => row.extensions.some((extension) => /^hwpx?$/i.test(extension)))) {
-    throw new Error("/sources: the manifest lists HWP or HWPX, so 'HWP/HWPX: not supported, not measured.' is no longer true");
+    throw new Error("/sources: the manifest lists HWP or HWPX, so 'HWP/HWPX: no reader, not measured.' is no longer true");
   }
 
   return (
@@ -148,8 +148,8 @@ export default function SourcesPage() {
                   same &lsquo;{pdfTier}&rsquo; tier as the PDF row above.
                 </p>
                 <p className="src-para">
-                  <b>HWP/HWPX: not supported, not measured.</b> Neither format is in the table above, and both are refused at
-                  upload.
+                  <b>HWP/HWPX: no reader, not measured.</b> Neither format is in the table above, and the upload
+                  route turns both away.
                 </p>
               </div>
 
