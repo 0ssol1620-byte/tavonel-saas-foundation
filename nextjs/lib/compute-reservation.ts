@@ -11,7 +11,7 @@ import {
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 import { INTAKE_TRIAGE_ROLLOUT_ENABLED } from "./intake-triage-rollout";
 import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "./intake-approval-rollout";
-import { intakePricingFingerprint, quoteCompilePages, type IntakePageBasis } from "./usage-pricing";
+import { creditsForMeteredPages, intakePricingFingerprint, quoteCompilePages, type IntakePageBasis } from "./usage-pricing";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const OUTCOMES = new Set(["settled", "operator_review", "released"]);
@@ -57,6 +57,8 @@ function errorCode(message: string) {
     ["foundation_compute_settlement_invalid", "COMPUTE_SETTLEMENT_INVALID"],
     ["foundation_compute_overage_not_enabled", "COMPUTE_OVERAGE_NOT_ENABLED"],
     ["foundation_compute_maximum_charge_exceeded", "COMPUTE_MAXIMUM_CHARGE_EXCEEDED"],
+    // A read settled without its page count (20261109120000). Never charged on a guess.
+    ["foundation_compute_page_count_required", "COMPUTE_PAGE_COUNT_REQUIRED"],
   ] as const;
   return mappings.find(([needle]) => message.includes(needle))?.[1] ?? "COMPUTE_LEDGER_FAILED";
 }
@@ -762,4 +764,94 @@ export async function settleFoundationCompute(value: {
     return { ok: false as const, code: "COMPUTE_SETTLEMENT_RECEIPT_INVALID" };
   }
   return { ok: true as const, result };
+}
+
+const SOURCE_SHA256 = /^sha256:[a-f0-9]{64}$/;
+const MAX_METERED_PAGES = 10_000;
+
+export type MeteredSettlement = {
+  workspaceKey: string;
+  documentId: string;
+  /** A finished read (`settled`) or one that produced nothing usable (`operator_review`). Releases stay on v3. */
+  outcome: "settled" | "operator_review";
+  /** Pages of the sanitized PDF the reader observed. Null only for a read that could not count them. */
+  pages: number | null;
+  /** Null while nothing classifies a complex page; such pages are charged as standard. */
+  complexPages: number | null;
+  /** The digest the CDR worker computed over the bytes it read -- never the uploader's claim. */
+  sourceSha256: string | null;
+  reasonCode: string;
+};
+
+const CHARGE_BASES = new Set(["pages", "pages_capped", "unchanged_source", "no_usable_output"]);
+
+/**
+ * Settles a read by its pages (20261109120000, `settle_foundation_compute_v4`).
+ *
+ * The ledger decides the charge -- pages at the quote's rates, capped at what was approved; 0 for
+ * a source this workspace already paid to read; 0 for a read that produced nothing usable -- and
+ * this checks the answer is one of those, for exactly the pages sent. A receipt that disagrees is
+ * refused rather than passed on as a charge nobody can explain.
+ */
+export async function settleFoundationMeteredCompute(value: MeteredSettlement) {
+  const pagesValid = value.pages === null
+    || (Number.isSafeInteger(value.pages) && value.pages >= 1 && value.pages <= MAX_METERED_PAGES);
+  const complexValid = value.complexPages === null
+    || (value.pages !== null && Number.isSafeInteger(value.complexPages)
+      && value.complexPages >= 0 && value.complexPages <= value.pages);
+  if (!WORKSPACE_ID_PATTERN.test(value.workspaceKey) || !UUID.test(value.documentId)
+    || (value.outcome !== "settled" && value.outcome !== "operator_review")
+    || !pagesValid || !complexValid
+    || (value.sourceSha256 !== null && !SOURCE_SHA256.test(value.sourceSha256))
+    || !/^[A-Z0-9_]{3,80}$/.test(value.reasonCode)) {
+    return { ok: false as const, code: "COMPUTE_SETTLEMENT_INVALID" };
+  }
+  if (value.outcome === "settled" && value.pages === null) {
+    return { ok: false as const, code: "COMPUTE_PAGE_COUNT_REQUIRED" };
+  }
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false as const, code: "COMPUTE_LEDGER_NOT_CONFIGURED" };
+  let response: Response;
+  try {
+    response = await supabaseAdminRequest(config, "/rest/v1/rpc/settle_foundation_compute_v4", {
+      method: "POST",
+      body: JSON.stringify({
+        p_workspace_key: value.workspaceKey,
+        p_document_id: value.documentId,
+        p_outcome: value.outcome,
+        p_pages: value.pages,
+        p_complex_pages: value.complexPages,
+        p_source_sha256: value.sourceSha256,
+        p_reason_code: value.reasonCode,
+      }),
+    });
+  } catch {
+    return { ok: false as const, code: "COMPUTE_LEDGER_FAILED" };
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { message?: unknown } | null;
+    return { ok: false as const, code: errorCode(typeof body?.message === "string" ? body.message : "") };
+  }
+  const result = await response.json().catch(() => null) as Record<string, unknown> | null;
+  if (!result || !meteredReceiptMatches(result, value)) {
+    return { ok: false as const, code: "COMPUTE_SETTLEMENT_RECEIPT_INVALID" };
+  }
+  return { ok: true as const, result };
+}
+
+function meteredReceiptMatches(result: Record<string, unknown>, sent: MeteredSettlement) {
+  const basis = String(result.chargeBasis ?? "");
+  const credits = result.settledCredits;
+  if ((result.status !== "processed" && result.status !== "duplicate")
+    || !UUID.test(String(result.reservationId ?? "")) || !BILLING_SOURCES.has(String(result.billingSource ?? ""))
+    || result.state !== sent.outcome || result.meteredPages !== sent.pages
+    || result.meteredComplexPages !== sent.complexPages
+    || !CHARGE_BASES.has(basis) || typeof credits !== "number" || !Number.isSafeInteger(credits)) {
+    return false;
+  }
+  if (sent.outcome === "operator_review") return basis === "no_usable_output" && credits === 0;
+  if (basis === "unchanged_source") return credits === 0 && UUID.test(String(result.chargeBasisReservationId ?? ""));
+  const metered = creditsForMeteredPages(sent.pages!, sent.complexPages);
+  if (basis === "pages") return credits === metered;
+  return basis === "pages_capped" && credits >= 0 && credits < metered;
 }

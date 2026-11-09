@@ -123,6 +123,19 @@ export function quoteCompilePages(pages: number): CompileQuote | null {
   };
 }
 
+/**
+ * What a read settles for the pages its reader observed, at the quote's own two rates.
+ *
+ * `settle_foundation_compute_v4` (20261109120000) computes the same sum in SQL, and
+ * `settleFoundationMeteredCompute` checks the ledger's answer against this one. `complexPages` is
+ * null while nothing in the pipeline classifies a page as complex: such a page is charged as
+ * standard, the lower rate, rather than on an inferred complexity.
+ */
+export function creditsForMeteredPages(pages: number, complexPages: number | null) {
+  const complex = complexPages ?? 0;
+  return (pages - complex) * STANDARD_UNITS_PER_PAGE + complex * MAX_UNITS_PER_PAGE;
+}
+
 export function formatUsd(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
