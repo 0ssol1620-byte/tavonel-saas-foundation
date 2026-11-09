@@ -92,7 +92,7 @@ export const activationPolicy = {
     billing catalog). It is still rendered verbatim wherever the gate was stated, and
     `KO_CHROME.customerDataGate` is its literal Korean.
   */
-  customerData: { enabled: true, reason: "Sign in to upload your own sources and compile them into a World with its evidence attached. The Developer plan can be bought online; Team and Enterprise are arranged with us." },
+  customerData: { enabled: true, reason: "Sign in to upload your own sources and compile them into a World with its evidence attached. The Developer plan can be bought online; Team and Enterprise are arranged with us rather than enabled by a plan purchase." },
 } as const;
 
 export type ActivationCapability = keyof typeof activationPolicy;

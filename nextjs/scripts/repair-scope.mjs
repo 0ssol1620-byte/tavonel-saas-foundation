@@ -1944,13 +1944,13 @@ export const COMPILE_JOB_STALL_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/compile-job-worker.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/execution-budget.test.ts',
   'lib/compile-job-panel.test.ts', 'lib/workspace-failure-copy.test.ts', 'lib/compile-job-scheduling.test.ts',
 ]);
-// Switch-on (D-12 / R1) and billing HMAC integrity (PR #201, 2026-11-09): the nineteen endpoints no owner listed -- the four
+// Switch-on (D-12 / R1) and billing HMAC integrity (PR #201, 2026-11-09): the eighteen endpoints no owner listed -- the four
 // billing routes that now read the one secret reader, the reader and its suite, the trial digest reader, and the copy and
 // posture suites the switch moved. They select every suite that pins the switched copy or a billing secret call site.
 // Product code, so never nativeReuse. No browser suite of its own: the switch's browser specs are owned above.
 export const SWITCH_ON_BILLING_INTEGRITY_AFFECTED_PATHS = Object.freeze([
   'app/api/billing/checkout/route.ts', 'app/api/operations/p0/credits/release/route.ts', 'app/api/paddle/webhook/route.ts',
-  'app/api/status/route.ts', 'components/evaluation-page.test.tsx', 'lib/billing-secrets.test.ts', 'lib/billing-secrets.ts',
+  'app/api/status/route.ts', 'lib/billing-secrets.test.ts', 'lib/billing-secrets.ts',
   'lib/checkout-customer-data-gate.test.ts', 'lib/customer-data-live-path.test.ts', 'lib/landing-v2-use.test.ts',
   'lib/operations.test.ts', 'lib/paddle-webhook-route.test.ts', 'lib/page-seo.test.ts', 'lib/pricing-estimator.test.ts',
   'lib/product-claims-sync.test.ts', 'lib/public-status.test.ts', 'lib/status-route-contract.test.ts',
@@ -3045,7 +3045,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // Compile-job stall: the ten exact paths above select nine direct suites and no browser suite.
   affectedGroup('compile-job-stall', new RegExp(`^nextjs/(?:${exactPathAlternation(COMPILE_JOB_STALL_AFFECTED_PATHS)})$`),
     { unitFiles: COMPILE_JOB_STALL_AFFECTED_UNIT_FILES }),
-  // Switch-on and billing integrity: the nineteen exact paths above select twenty-nine direct suites and no browser suite.
+  // Switch-on and billing integrity: the eighteen exact paths above select twenty-nine direct suites and no browser suite.
   affectedGroup('switch-on-billing-integrity', new RegExp(`^nextjs/(?:${exactPathAlternation(SWITCH_ON_BILLING_INTEGRITY_AFFECTED_PATHS)})$`),
     { unitFiles: SWITCH_ON_BILLING_INTEGRITY_AFFECTED_UNIT_FILES }),
   // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.

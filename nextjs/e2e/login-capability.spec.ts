@@ -138,7 +138,7 @@ test("/pricing states no closed customer-data gate once the switch is on, server
   const html = await (await page.goto("/pricing"))!.text();
   expect(html).not.toContain('data-purchase-gate="customerData"');
   await expect(page.locator('[data-purchase-gate="customerData"]')).toHaveCount(0);
-  expect(html).not.toContain("rather than enabled by a plan purchase");
+  expect(html).not.toContain("Compiling your own sources is set up with us");
   await expect(page.locator(".paper-purchase-boundary")).not.toContainText(activationPolicy.customerData.reason);
 });
 

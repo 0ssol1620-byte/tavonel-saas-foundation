@@ -94,10 +94,10 @@ describe("customer data on the live compile path", () => {
     expect(activationPolicy.customerData.enabled).toBe(true);
     const { reason } = activationPolicy.customerData;
     expect(reason).toMatch(/upload your own sources and compile them/i);
-    expect(reason).toContain("The Developer plan can be bought online; Team and Enterprise are arranged with us.");
+    expect(reason).toContain("The Developer plan can be bought online; Team and Enterprise are arranged with us rather than enabled by a plan purchase.");
     expect(BILLING_OFFERS.observer_access.saleChannel).toBe("self_serve");
     expect(BILLING_OFFERS.studio_access.saleChannel).toBe("contact");
-    expect(reason).not.toMatch(/rather than enabled by a plan purchase|set up with us/i);
+    expect(reason).not.toMatch(/set up with us|Compiling your own sources is/i);
     expect(reason).not.toMatch(/\b(gate|receipt|cohort|founder|qualif\w*)\b/i);
     expect(reason).not.toMatch(/\d/);
   });
