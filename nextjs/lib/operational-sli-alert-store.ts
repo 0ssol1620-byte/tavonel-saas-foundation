@@ -94,7 +94,7 @@ export type OperationalSliAlertDelivery = {
 
 function isBacklogWarning(entry: OperationalSli["alerts"][number]) {
   return entry.severity === "warning"
-    && (entry.reason === "compile_backlog_age_exceeded" || entry.reason === "compile_backlog_unavailable");
+    && entry.reason === "compile_backlog_age_exceeded";
 }
 
 /** One breach per schedule slot: the same slot always yields the same UUID, so a retry is the same breach. */
@@ -121,10 +121,10 @@ export async function deliverOperationalSliBreach(
   // on another instance after a 2xx pages twice with the same alertId; add a delivered_at column on
   // foundation_operational_sli_evaluations if duplicate pages become a measured problem.
   if (evaluation.alerts.length === 0) return { breachId: null, code: "NO_BREACH" };
-  // A compile backlog warning is a latency condition that lasts while the queue is busy, so it
+  // A compile backlog age warning is a latency condition that lasts while the queue is busy, so it
   // alone pages from the hourly slot only (the cadence of the RunPod cost check), not every five
-  // minutes. It is still persisted in every slot. Critical backlog, and any slot that also carries
-  // another reason, page per slot as before.
+  // minutes. It is still persisted in every slot. An unreadable queue is an outage and, like critical
+  // backlog and any slot that also carries another reason, pages per slot as before.
   if (windowStartedAt.getUTCMinutes() >= 5 && evaluation.alerts.every(isBacklogWarning)) {
     return { breachId: null, code: "ALERT_HELD_FOR_HOURLY_SLOT" };
   }

@@ -104,13 +104,11 @@ describe("operational SLI breach delivery", () => {
     vi.stubEnv("OPERATIONS_ALERT_WEBHOOK_URL", hook);
     const backlog = (alerts: OperationalSli["alerts"]) => ({ ...evaluation, state: "degraded" as const, alerts });
     const warning = backlog([{ severity: "warning", reason: "compile_backlog_age_exceeded" }]);
-    const unreadable = backlog([{ severity: "warning", reason: "compile_backlog_unavailable" }]);
     const at = (minute: number) => new Date(slot.getTime() + minute * 60_000);
 
     // Eleven quarter-past slots hold it; the :00 slot pages it.
     for (let minute = 5; minute < 60; minute += 5) {
       expect(await deliverOperationalSliBreach(warning, at(minute), now), String(minute)).toEqual({ breachId: null, code: "ALERT_HELD_FOR_HOURLY_SLOT" });
-      expect(await deliverOperationalSliBreach(unreadable, at(minute), now), String(minute)).toEqual({ breachId: null, code: "ALERT_HELD_FOR_HOURLY_SLOT" });
     }
     expect(post).not.toHaveBeenCalled();
     expect((await deliverOperationalSliBreach(warning, at(60), now)).code).toBe("ALERT_DELIVERED");
@@ -121,6 +119,9 @@ describe("operational SLI breach delivery", () => {
     expect((await deliverOperationalSliBreach(backlog([{ severity: "warning", reason: "compile_backlog_age_exceeded" },
       { severity: "warning", reason: "model_provider_circuit_open" }]), at(10), now)).code).toBe("ALERT_DELIVERED");
     expect(post).toHaveBeenCalledTimes(3);
+    // An unreadable queue is an outage, not a busy one: it pages every slot like any other unreadable store.
+    expect((await deliverOperationalSliBreach(backlog([{ severity: "warning", reason: "compile_backlog_unavailable" }]), at(15), now)).code).toBe("ALERT_DELIVERED");
+    expect(post).toHaveBeenCalledTimes(4);
   });
 
   it("sends nothing when the evaluation has no breach", async () => {
