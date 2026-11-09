@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
-import { SOLUTIONS, type SolutionSlug } from "@/app/solutions/[slug]/page";
-import { solutionWorkflowEvidence } from "@/app/solutions/solution-workflow-proof";
+/*
+  Not `@/app/solutions/...`: importing a page module imports its stylesheets, and /explore drew none
+  of them yet shipped them render-blocking (2026-11-09, LCP over budget). The picks and the
+  resolver live in `lib/solution-proof-picks`; `lib/solution-workflows.test.ts` pins both halves.
+*/
+import { SOLUTION_PROOF_PICKS, solutionWorkflowEvidence, type WorkflowKind } from "@/lib/solution-proof-picks";
 import ExploreStage from "@/components/explore/explore-stage";
 import stageStyles from "@/components/explore/explore-stage.module.css";
 import { PublicSiteFooter } from "@/components/public-site-chrome";
@@ -83,13 +87,13 @@ const answers = buildExploreAnswerViews(exploreSampleAnswers, world.evidence);
 const entryProof = chooseExploreEntryProof(world.evidence, answers);
 /*
   Each Solutions page links one passage here as `/explore?evidence=<id>`, and that passage is what
-  `solutionWorkflowEvidence` resolves from the page's own proof pick -- the call the page renders
+  `solutionWorkflowEvidence` resolves from the page's own proof pick (`SOLUTION_PROOF_PICKS`) -- the call the page renders
   from. Naming those regions keeps them, an owner and their page-mates in the bounded model through
   the same `keepRegionIds` the Ask citations use. Nothing is typed: a pick that stops resolving
   throws here at build time rather than shipping a link that opens some other passage.
 */
-const solutionTargets = (Object.keys(SOLUTIONS) as SolutionSlug[]).map(
-  (slug) => solutionWorkflowEvidence(slug, SOLUTIONS[slug].proof).region.id,
+const solutionTargets = (Object.keys(SOLUTION_PROOF_PICKS) as WorkflowKind[]).map(
+  (slug) => solutionWorkflowEvidence(slug, SOLUTION_PROOF_PICKS[slug]).region.id,
 );
 const model = boundVisualWorld(
   world,
