@@ -211,3 +211,21 @@ export async function observeCompileJob(options: ObserveOptions): Promise<Compil
   }
   return settled;
 }
+
+const RECENT_FAILURE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The job the workspace opens on load when the URL names none (an explicit `?job=` always wins).
+ * `jobs` is `GET /api/compile-jobs`: newest first. The newest job is shown when it is still running
+ * or failed within the last 24 h, so a compile that just failed shows its failure rather than an
+ * older, stuck one (D0 2026-11-09, cjob-749b behind cjob-130f). Otherwise the first unfinished job.
+ */
+export function pickResumableCompileJob<T extends { state: CompileState; settledAt?: string | null }>(
+  jobs: readonly T[], now: number,
+): T | undefined {
+  const newest = jobs[0];
+  const settled = Date.parse(newest?.settledAt ?? "");
+  // No lower bound: a browser clock behind the server must not hide a failure that just happened.
+  if (newest?.state === "failed" && now - settled <= RECENT_FAILURE_MS) return newest;
+  return jobs.find((job) => !["ready", "failed", "cancelled"].includes(job.state));
+}

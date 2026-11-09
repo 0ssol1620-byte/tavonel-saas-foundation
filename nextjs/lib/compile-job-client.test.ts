@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { drainSseFrames, frameFromEvent, observeCompileJob } from "./compile-job-client";
+import { drainSseFrames, frameFromEvent, observeCompileJob, pickResumableCompileJob } from "./compile-job-client";
 
 /*
   The parser and the resume, tested where they can actually be wrong.
@@ -184,5 +184,32 @@ describe("observing a durable compile", () => {
     });
     expect(settled).toBeNull();
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("pickResumableCompileJob (no ?job= in the URL)", () => {
+  const now = Date.parse("2026-11-09T04:58:06Z");
+  const job = (id: string, state: "ready" | "failed" | "reading" | "cancelled", settledAt: string | null = null) => ({ jobId: id, state, settledAt });
+
+  it("shows a failure that just happened over an older stuck job", () => {
+    // D0: 749b failed seconds before the reload; 130f had been blocked in reading for five days.
+    const jobs = [job("749b", "failed", "2026-11-09T04:57:32Z"), job("130f", "reading")];
+    expect(pickResumableCompileJob(jobs, now)?.jobId).toBe("749b");
+  });
+  it("still shows that failure when the browser clock is behind the server", () => {
+    expect(pickResumableCompileJob([job("749b", "failed", "2026-11-09T04:59:00Z"), job("130f", "reading")], now)?.jobId).toBe("749b");
+  });
+  it("falls back to the first unfinished job when the newest failure is older than 24 h", () => {
+    expect(pickResumableCompileJob([job("old", "failed", "2026-11-06T04:00:00Z"), job("130f", "reading")], now)?.jobId).toBe("130f");
+  });
+  it("takes the newest job when it is still running, and skips ready ones", () => {
+    expect(pickResumableCompileJob([job("run", "reading"), job("130f", "reading")], now)?.jobId).toBe("run");
+    expect(pickResumableCompileJob([job("done", "ready", "2026-11-09T04:00:00Z"), job("130f", "reading")], now)?.jobId).toBe("130f");
+  });
+  it("does not resurrect a recent failure that is not the newest job, nor a cancelled one", () => {
+    expect(pickResumableCompileJob([job("done", "ready", "2026-11-09T04:58:00Z"), job("749b", "failed", "2026-11-09T04:57:32Z")], now)).toBeUndefined();
+    expect(pickResumableCompileJob([job("c", "cancelled", "2026-11-09T04:57:32Z")], now)).toBeUndefined();
+    expect(pickResumableCompileJob([job("f", "failed", null)], now)).toBeUndefined();
+    expect(pickResumableCompileJob([], now)).toBeUndefined();
   });
 });

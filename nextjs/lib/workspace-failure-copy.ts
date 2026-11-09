@@ -83,7 +83,11 @@ export function isSizeLimitFailure(code: string | null | undefined): boolean {
   return Boolean(code && SIZE_LIMIT_FAILURE_CODES.includes(code));
 }
 
-export type SizeLimitFailureCopy = { sentence: string; measured: string; largest: string; counts: string };
+export type SizeLimitFailureCopy = {
+  sentence: string; measured: string; largest: string; counts: string;
+  /** The read stopped at the bound, so only "more than the bound" was measured, never an exact size. */
+  exceeded: (bound: string) => string;
+};
 
 const SIZE_LIMIT_COPY: Record<"en" | "ko", SizeLimitFailureCopy> = {
   en: {
@@ -91,12 +95,14 @@ const SIZE_LIMIT_COPY: Record<"en" | "ko", SizeLimitFailureCopy> = {
     measured: "Measured size",
     largest: "Largest parts of the output",
     counts: "What the output held",
+    exceeded: (bound) => `exceeded the ${bound} byte limit`,
   },
   ko: {
     sentence: "이 파일 묶음은 World 하나에 담을 수 있는 크기를 넘어, 아무것도 저장하지 않았습니다. 같은 묶음을 다시 실행해도 결과는 같습니다. 파일 수를 줄이거나 더 작은 파일로 나누어 컴파일하세요.",
     measured: "측정한 크기",
     largest: "출력에서 가장 큰 부분",
     counts: "출력에 담긴 항목",
+    exceeded: (bound) => `${bound} 바이트 상한 초과`,
   },
 };
 

@@ -80,7 +80,7 @@ import type { WorldReadModel } from "@/lib/world-read-model";
 import { compileLimitsNotice, judgeCompileSet } from "@/lib/compile-limits";
 import { describeCorpusStart, judgeCorpusSet, type CorpusProgress } from "@/lib/corpus-batching";
 import { CompileJobPanel, type CompileJobView } from "@/components/compile-job-panel";
-import { observeCompileJob } from "@/lib/compile-job-client";
+import { observeCompileJob, pickResumableCompileJob } from "@/lib/compile-job-client";
 import { measureSelection, type PageCountResult } from "@/lib/page-count";
 import {
   buildPreflightSummary,
@@ -994,8 +994,8 @@ export default function WorkspacePage() {
         if (!token) return;
         const response = await fetch("/api/compile-jobs", { headers: { authorization: `Bearer ${token}` } });
         if (!response.ok) return;
-        const json = await response.json() as { jobs?: CompileJobView[] };
-        const open = json.jobs?.find((entry) => !["ready", "failed", "cancelled"].includes(entry.state));
+        const json = await response.json() as { jobs?: Array<CompileJobView & { settledAt?: string | null }> };
+        const open = pickResumableCompileJob(json.jobs ?? [], Date.now());
         if (!open) return;
         // A part found on its own is still part of a run, and showing it alone would say
         // "12 sources" about a compile the customer started with 128.
