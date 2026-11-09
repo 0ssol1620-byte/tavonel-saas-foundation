@@ -17,8 +17,8 @@ export const metadata: Metadata = {
   // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
   alternates: { canonical: "/contact" },
   openGraph: { url: "/contact" },
-  title: "Contact — TAVONEL",
-  description: "Tell us what your documents need to become, without sending the documents themselves.",
+  title: "Contact us about what your documents need — TAVONEL",
+  description: "Tell us what your documents need to become, without sending the documents themselves. A few optional questions let the first reply come back with specifics.",
 };
 
 /*

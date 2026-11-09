@@ -6,7 +6,7 @@ import { primaryCallToAction } from "@/lib/commercial-state";
 import { jsonLdHtml } from "@/lib/structured-data";
 import { EXPLORE_CTA } from "@/lib/site-navigation";
 
-export const metadata: Metadata = { title: "What Is a Knowledge Compiler? — TAVONEL", description: "A practical guide to Knowledge Compilers, RAG, knowledge graphs and enterprise search.", alternates: { canonical: "/knowledge-compiler" }, openGraph: { url: "/knowledge-compiler" } };
+export const metadata: Metadata = { title: "What is a Knowledge Compiler? RAG, graphs, search — TAVONEL", description: "A practical guide to Knowledge Compilers and how they compare with RAG, knowledge graphs and enterprise search, and when a compiler is the right tool.", alternates: { canonical: "/knowledge-compiler" }, openGraph: { url: "/knowledge-compiler" } };
 
 /*
   The category guide.

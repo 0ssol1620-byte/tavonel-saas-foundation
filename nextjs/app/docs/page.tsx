@@ -18,8 +18,8 @@ import { DOCS_GROUPS, DOCS_REVIEWED, DOCS_SECTIONS, DOCS_VERSION, docsSearchInde
 const FEATURED = ["quickstart", "use-with-ai"] as const;
 
 export const metadata: Metadata = {
-  title: "Documentation — TAVONEL",
-  description: "Quickstart, concepts, the API contract, error codes and limits for compiling sources into a traceable Compiled World.",
+  title: "Documentation: from sources to a Compiled World — TAVONEL",
+  description: "Quickstart, concepts, the API contract, error codes and limits. Upload or connect sources, follow the compile, then read the World and the evidence under it.",
   alternates: { canonical: "/docs" },
   openGraph: { url: "/docs" },
 };

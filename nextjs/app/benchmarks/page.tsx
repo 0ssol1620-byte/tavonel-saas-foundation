@@ -57,9 +57,9 @@ import styles from "./benchmarks.module.css";
 */
 
 export const metadata: Metadata = {
-  title: "Knowledge Compilation Benchmark — TAVONEL",
+  title: "Knowledge compilation benchmark and receipts — TAVONEL",
   description:
-    "A completed document-reading run with its receipts — model revisions, page counts, GPU and price snapshot — and the protocol a knowledge compilation result has to satisfy before it is published.",
+    "A completed document-reading run with its receipts, model revisions, page counts and price snapshot, and the protocol a result meets before it is published.",
   alternates: { canonical: "/benchmarks" },
   openGraph: { url: "/benchmarks" },
   robots: { index: true, follow: true },

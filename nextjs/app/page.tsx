@@ -26,7 +26,7 @@ import { SPECIMEN_FIXTURE_COOKIE } from "@/lib/specimen-sources";
 export const metadata: Metadata = {
   title: `TAVONEL — ${BRAND_LINE.headline}`,
   description:
-    "Inspect a finished public Compiled World, follow one result to its exact source region, compare what changed, and review accepted sources and deployment boundaries before discussing your own sources.",
+    "Inspect a finished public Compiled World, follow one result to its exact source region, and compare what changed before you discuss your own sources.",
   alternates: { canonical: "/" },
   openGraph: {
     title: BRAND_LINE.headline,

@@ -9,9 +9,9 @@ import styles from "./resources.module.css";
 export const metadata: Metadata = {
   alternates: { canonical: "/resources" },
   openGraph: { url: "/resources" },
-  title: "Resources — TAVONEL",
+  title: "Resources: sample World, docs and research — TAVONEL",
   description:
-    "Explore a Compiled World, read the documentation and API, and inspect the research and evidence behind the compiler.",
+    "Explore a Compiled World, read the documentation and API, and inspect the research and evidence behind the compiler. A sample world you can take apart yourself.",
 };
 
 /*

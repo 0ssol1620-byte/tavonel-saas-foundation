@@ -14,7 +14,7 @@ Indexing: public product, documentation, research and trust pages are indexable.
 
 ## Pages
 
-- [Home](https://tavonel.com/): Inspect a finished public Compiled World, follow one result to its exact source region, compare what changed, and review accepted sources and deployment boundaries before discussing your own sources.
+- [Home](https://tavonel.com/): Inspect a finished public Compiled World, follow one result to its exact source region, and compare what changed before you discuss your own sources.
 - [Product](https://tavonel.com/product): Inspect the resulting World, its source-linked knowledge, version history and AI connections.
 - [How it works](https://tavonel.com/how-it-works): Follow six steps from a source to a reviewed, versioned World.
 - [Solutions](https://tavonel.com/solutions): The five documented uses, each linking to its own page: who it is for, the path from source to World, what the workflow leaves behind, and where it stops. A described use, not a completed customer case.

@@ -41,9 +41,9 @@ import {
 */
 
 export const metadata: Metadata = {
-  title: "Supported sources — TAVONEL",
+  title: "Supported sources, file formats and limits — TAVONEL",
   description:
-    "Every source format TAVONEL reads, its support tier, what survives into the Compiled World, and the limits that come with it.",
+    "Every source format TAVONEL reads, its support tier, what survives into the Compiled World and its limits. One list decides what the upload route accepts.",
   alternates: { canonical: "/sources" },
   openGraph: { url: "/sources" },
   robots: { index: true, follow: true },

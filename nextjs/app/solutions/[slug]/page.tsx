@@ -23,6 +23,8 @@ export const SOLUTIONS = {
     audience: "AI and platform engineers",
     eyebrow: "AI-ready knowledge",
     name: "AI-ready knowledge",
+    seoTitle: "AI-ready knowledge: reuse one collection across AI — TAVONEL",
+    seoDescription: "Compile document collections into a versioned World before retrieval, assistants or agent workflows consume them, so every project inherits one governed source.",
     title: "Reuse one collection across AI projects.",
     task: {
       input: "A document collection",
@@ -58,6 +60,8 @@ export const SOLUTIONS = {
     audience: "Document and operations teams",
     eyebrow: "Document intelligence",
     name: "Document intelligence",
+    seoTitle: "Document intelligence: review what a PDF says — TAVONEL",
+    seoDescription: "Move from difficult PDFs and scans to reviewable structure, without losing the exact source location each result came from or the uncertainty a reviewer needs.",
     title: "Review what a PDF actually says.",
     task: {
       input: "PDFs and scans",
@@ -106,6 +110,8 @@ export const SOLUTIONS = {
     audience: "Data and knowledge architects",
     eyebrow: "Knowledge graph",
     name: "Knowledge graph",
+    seoTitle: "Knowledge graph exports with source evidence — TAVONEL",
+    seoDescription: "Turn document facts into stable semantic objects and evidence-bound relations inside a versioned World, then export them as Turtle, JSON-LD and CSV.",
     title: "Export a graph with its source evidence.",
     task: {
       input: "Facts in your documents",
@@ -152,6 +158,8 @@ export const SOLUTIONS = {
     audience: "Application and agent developers",
     eyebrow: "Grounded assistants",
     name: "Source-grounded assistants",
+    seoTitle: "Source-grounded assistants that open their source — TAVONEL",
+    seoDescription: "Ask, API and MCP consume the same current World and return evidence from the same version, so each answer opens at its source. It declines when nothing matched.",
     title: "Answer a question. Open its source.",
     task: {
       input: "A question and the current World",
@@ -190,6 +198,8 @@ export const SOLUTIONS = {
     audience: "Knowledge owners and security reviewers",
     eyebrow: "Knowledge operations",
     name: "Knowledge operations",
+    seoTitle: "Knowledge operations: review before it goes live — TAVONEL",
+    seoDescription: "Separate candidate compilation from the active World, preserve change history and keep human decisions explicit. Review a revision before it is current.",
     title: "Review a revision before it becomes current.",
     task: {
       input: "A new or updated collection",
@@ -251,8 +261,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       eyebrow, because lower-casing turns "AI-READY" into "Ai-ready" and there is no rule that
       knows which words are acronyms. Five strings, written once.
     */
-    title: `${solution.name} — TAVONEL`,
-    description: solution.lede,
+    title: solution.seoTitle,
+    // GX-04: the search-result sentence, from the same page's own claims. The lede stays the page's.
+    description: solution.seoDescription,
     alternates: { canonical: `/solutions/${slug}` },
     openGraph: { url: `/solutions/${slug}` },
   };

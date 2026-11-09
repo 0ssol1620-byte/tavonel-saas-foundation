@@ -9,8 +9,8 @@ import styles from "./solutions.module.css";
 import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 export const metadata: Metadata = {
-  title: "Solutions — TAVONEL",
-  description: "Choose a document workflow by its input, the action you need and the result you can inspect. Five uses, with sample evidence and published limits.",
+  title: "Solutions: start with the work you need to do — TAVONEL",
+  description: "Choose a document workflow by its input, the action you need and the result you can inspect. Five uses, each with sample evidence and its published limits.",
   alternates: { canonical: "/solutions" },
   openGraph: { url: "/solutions" },
 };

@@ -16,8 +16,8 @@ export const metadata: Metadata = {
   // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
   alternates: { canonical: "/status" },
   openGraph: { url: "/status" },
-  title: "Service status — TAVONEL",
-  description: "Component-by-component state of the active TAVONEL deployment, the last synthetic probe result, and the addresses to report service impact and security issues to.",
+  title: "Service status, probes and incident history — TAVONEL",
+  description: "Component-by-component state of the active TAVONEL deployment, the last synthetic probe result, incident history and where to report an issue.",
 };
 /*
   A named month, because 08/09/2026 is two different dates.
