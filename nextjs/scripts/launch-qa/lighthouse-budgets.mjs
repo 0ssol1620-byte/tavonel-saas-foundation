@@ -84,7 +84,15 @@ const budgets = {
   beside BASELINE-L0.json, and the commit says which of the two acts it is. It is never raised to
   make a run go green. A ratcheted route fails the run whatever its `enforced` flag says.
 */
-const scriptRatchetBytes = { "/": 160_768 };
+/*
+  2026-11-09, GX-03: RE-DERIVED, not raised. The founder's analytics decision makes / load the lazy
+  Vercel collector chunk (4,115 B) and /_vercel/insights/script.js (2,677 B as Vercel serves it)
+  before a choice. Largest sample with both: 166,252 B, so 166,912 by the rule above. Receipt with
+  every sample and the method (CDP, because Lighthouse could not trace on the measuring host):
+  RATCHET-GX03-20261109.json beside BASELINE-L0.json. This job builds without
+  NEXT_PUBLIC_TAVONEL_ANALYTICS_ENABLED, so it measures about 159.5 kB until the flag is set.
+*/
+const scriptRatchetBytes = { "/": 166_912 };
 
 try {
   const health = await fetch(`${baseUrl}/api/healthz`);
