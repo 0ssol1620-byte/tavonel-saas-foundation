@@ -1247,47 +1247,47 @@ console.log("compile job:", accepted.jobId);` },
       { kind: "heading", text: "Claude Code and Cursor" },
       { kind: "prose", text: "Claude Code and Cursor take the URL directly. Use OAuth, or skip it and send an API key in the Authorization header. A key for this endpoint must hold only the five read scopes: documents:read, collections:read, worlds:read, ask:read and collections:download. Create it under Workspace › Developers with those boxes and no others, because a key with any other scope is refused at /api/mcp with 401. Keep the key in the environment variable TAVONEL_API_KEY and let the client expand it, so it never sits in a file you commit. Claude Desktop connects to a URL only through Settings › Connectors, with OAuth, as in the steps above." },
       {
-        kind: "snippets",
-        label: "Remote MCP config",
-        items: [
-          {
-            label: "Claude Code (.mcp.json)",
-            language: "json",
-            body: [
-              "{",
-              "  \"mcpServers\": {",
-              "    \"tavonel\": {",
-              "      \"type\": \"http\",",
-              "      \"url\": \"https://tavonel.com/api/mcp\",",
-              "      \"headers\": { \"Authorization\": \"Bearer ${TAVONEL_API_KEY}\" }",
-              "    }",
-              "  }",
-              "}",
-            ].join("\n"),
-          },
-          {
-            label: "Claude Code (OAuth)",
-            language: "bash",
-            body: [
-              "claude mcp add --transport http tavonel https://tavonel.com/api/mcp",
-              "# then run /mcp inside Claude Code and choose tavonel to sign in",
-            ].join("\n"),
-          },
-          {
-            label: "Cursor (.cursor/mcp.json)",
-            language: "json",
-            body: [
-              "{",
-              "  \"mcpServers\": {",
-              "    \"tavonel\": {",
-              "      \"url\": \"https://tavonel.com/api/mcp\",",
-              "      \"headers\": { \"Authorization\": \"Bearer ${env:TAVONEL_API_KEY}\" }",
-              "    }",
-              "  }",
-              "}",
-            ].join("\n"),
-          },
-        ],
+        kind: "code",
+        label: "Claude Code, .mcp.json with an API key",
+        language: "json",
+        body: [
+          "{",
+          "  \"mcpServers\": {",
+          "    \"tavonel\": {",
+          "      \"type\": \"http\",",
+          "      \"url\": \"https://tavonel.com/api/mcp\",",
+          "      \"headers\": { \"Authorization\": \"Bearer ${TAVONEL_API_KEY}\" }",
+          "    }",
+          "  }",
+          "}",
+        ].join("
+"),
+      },
+      {
+        kind: "code",
+        label: "Claude Code, OAuth",
+        language: "bash",
+        body: [
+          "claude mcp add --transport http tavonel https://tavonel.com/api/mcp",
+          "# then run /mcp inside Claude Code and choose tavonel to sign in",
+        ].join("
+"),
+      },
+      {
+        kind: "code",
+        label: "Cursor, .cursor/mcp.json with an API key",
+        language: "json",
+        body: [
+          "{",
+          "  \"mcpServers\": {",
+          "    \"tavonel\": {",
+          "      \"url\": \"https://tavonel.com/api/mcp\",",
+          "      \"headers\": { \"Authorization\": \"Bearer ${env:TAVONEL_API_KEY}\" }",
+          "    }",
+          "  }",
+          "}",
+        ].join("
+"),
       },
       { kind: "heading", text: "The OAuth flow" },
       {
