@@ -110,12 +110,14 @@ describe("billing binding key rotation", () => {
     expect(checkoutRoute).not.toMatch(/PREVIOUS|previousBillingHmac/);
   });
 
-  it("reads the previous key trimmed, and treats absent, blank or short values as not configured", () => {
+  // Billing integrity (2026-11-09): a pasted previous key is refused, not trimmed (lib/billing-secrets.ts).
+  it("reads the previous key exactly, and treats absent, blank, short or whitespace-padded values as not configured", () => {
     expect(previousBillingHmac({})).toBeUndefined();
     expect(previousBillingHmac({ FOUNDATION_BILLING_HMAC_PREVIOUS: "" })).toBeUndefined();
     expect(previousBillingHmac({ FOUNDATION_BILLING_HMAC_PREVIOUS: "   " })).toBeUndefined();
     expect(previousBillingHmac({ FOUNDATION_BILLING_HMAC_PREVIOUS: "p".repeat(31) })).toBeUndefined();
-    expect(previousBillingHmac({ FOUNDATION_BILLING_HMAC_PREVIOUS: ` ${OLD}\n` })).toBe(OLD);
+    expect(previousBillingHmac({ FOUNDATION_BILLING_HMAC_PREVIOUS: OLD })).toBe(OLD);
+    expect(previousBillingHmac({ FOUNDATION_BILLING_HMAC_PREVIOUS: ` ${OLD}\n` })).toBeUndefined();
     // The current key is never read as the previous one.
     expect(previousBillingHmac({ FOUNDATION_BILLING_HMAC: CURRENT })).toBeUndefined();
   });
