@@ -70,7 +70,7 @@ vi.mock("./immutable-keys", async (importOriginal) => {
   real ones -- the factory spreads the actual module -- so reading them late is what makes them
   readable.
 */
-const { runCompileJobBatch, runCompileJobTurn, DIGEST_MIGRATION_NOT_APPLIED } =
+const { runCompileJobBatch, runCompileJobTurn, DIGEST_MIGRATION_NOT_APPLIED, COMPILE_BATCH_SCAN_WINDOW, interleaveByWorkspace } =
   await import("./compile-job-worker");
 const { RESTING_COMPILE_STATES, SCHEDULER_EXCLUDED_STATES } = await import("./compile-job-store");
 const { CORE_CLIENT_TIMEOUT_MS } = await import("./execution-budget");
@@ -512,7 +512,7 @@ describe("the durable compile worker", () => {
 
     const turns = await runCompileJobBatch(5);
 
-    expect(openJobs).toHaveBeenCalledWith(10);
+    expect(openJobs).toHaveBeenCalledWith(COMPILE_BATCH_SCAN_WINDOW);
     expect(turns.map((turn) => turn.note)).toEqual(["resting", "resting", "resting", "resting", "resting", "waiting"]);
     expect(advance).toHaveBeenCalledWith(expect.objectContaining({ jobId: fresh }));
     expect(listObjects).toHaveBeenCalledTimes(1);
@@ -591,7 +591,7 @@ describe("the durable compile worker", () => {
 
     const turns = await runCompileJobBatch(5);
 
-    expect(openJobs).toHaveBeenCalledWith(10);
+    expect(openJobs).toHaveBeenCalledWith(COMPILE_BATCH_SCAN_WINDOW);
     expect(turns).toHaveLength(6);
     expect(turns.slice(0, 5).every((turn) => turn.retryable)).toBe(true);
     expect(turns[5]).toMatchObject({ jobId: healthyId });
@@ -632,6 +632,39 @@ describe("the durable compile worker", () => {
     const turns = await runCompileJobBatch(5);
 
     expect(turns.map((turn) => turn.note)).toEqual(Array(5).fill("waiting"));
+  });
+
+  it("takes one job per workspace per round, so 22 jobs from one workspace cannot hold the batch (GA gap 3)", async () => {
+    group.mockReturnValue([DOCUMENT("doc-a", "sanitized"), DOCUMENT("doc-b", "sanitized")]);
+    const id = (n: number) => `cjob-${String(n).padStart(32, "0")}`;
+    // Oldest first, as the store returns them: the busy workspace's 22, then two others' one each.
+    const busy = Array.from({ length: 22 }, (_, index) => job({ jobId: id(index + 1), workspaceKey: "pilot-busy" }));
+    const quiet = job({ jobId: id(30), workspaceKey: "pilot-quiet" });
+    const late = job({ jobId: id(31), workspaceKey: "pilot-late" });
+    openJobs.mockResolvedValue({ ok: true, value: [...busy, quiet, late] });
+
+    const turns = await runCompileJobBatch(5);
+
+    expect(openJobs).toHaveBeenCalledWith(COMPILE_BATCH_SCAN_WINDOW);
+    expect(turns.map((turn) => turn.jobId)).toEqual([id(1), id(30), id(31), id(2), id(3)]);
+    expect(turns.map((turn) => turn.note)).toEqual(Array(5).fill("waiting"));
+  });
+
+  it("keeps the turn bound at twice the work limit however wide the window is", async () => {
+    openJobs.mockResolvedValue({ ok: true, value: Array.from({ length: 40 }, (_, index) =>
+      job({ jobId: `cjob-${String(index + 1).padStart(32, "0")}`, workspaceKey: `pilot-w${index}`, state: "review_required" })) });
+
+    const turns = await runCompileJobBatch(5);
+
+    // Every turn rests, so none counts as work; the bound stops the batch, not the window.
+    expect(turns.map((turn) => turn.note)).toEqual(Array(10).fill("resting"));
+  });
+
+  it("orders by each workspace's oldest job and keeps each workspace's own order", () => {
+    const [a1, b1, a2, a3, c1] = [["a1", "a"], ["b1", "b"], ["a2", "a"], ["a3", "a"], ["c1", "c"]]
+      .map(([jobId, workspaceKey]) => job({ jobId, workspaceKey }));
+    expect(interleaveByWorkspace([a1!, b1!, a2!, a3!, c1!]).map((entry) => entry.jobId)).toEqual(["a1", "b1", "c1", "a2", "a3"]);
+    expect(interleaveByWorkspace([])).toEqual([]);
   });
 
   it("reports an unreadable queue instead of looking idle", async () => {

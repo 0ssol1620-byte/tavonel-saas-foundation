@@ -21,7 +21,13 @@ spec:
     metadata:
       annotations:
         autoscaling.knative.dev/minScale: "0"
-        autoscaling.knative.dev/maxScale: "1"
+        # Equal to the Cloudflare consumer's max_concurrency (foundation-cdr-worker/wrangler.jsonc).
+        # Each instance still takes one hostile document at a time (the containerConcurrency of one below),
+        # so a second tenant's file never shares a sandbox, a LibreOffice profile or the 4 GiB
+        # render budget. What a second instance does change: the replay guard is per instance, so
+        # a captured authenticated request could be accepted once per instance inside its
+        # 300-second window (README "Security contract"). Raised from 1 on 2026-11-10.
+        autoscaling.knative.dev/maxScale: "3"
         run.googleapis.com/execution-environment: gen1
         # The CDR container is not started until clamd passes its startup probe, so a
         # request can never arrive at an instance whose scanner is still loading.
