@@ -182,6 +182,8 @@ const COPY_SURFACES = [
     Neither had a row here, so nothing would have caught the drift on the way in either.
   */
   "app/solutions/[slug]/page.tsx",
+  // 2026-11-09: the five proof framings moved here from the detail page; the same rules hold them.
+  "lib/solution-proof-picks.ts",
   "app/api/page.tsx",
   // The /solutions hub, added with the route. Its cards are read from the record on the detail
   // page above, so the only copy of its own it carries is the title, the intro and the closing
@@ -964,6 +966,7 @@ describe("public copy", () => {
     "components/landing-v2/landing-page.tsx",
     "app/product/compiled-world/page.tsx",
     "app/solutions/[slug]/page.tsx",
+    "lib/solution-proof-picks.ts",
     "app/api/page.tsx",
     "app/evidence/page.tsx",
     "app/enterprise/page.tsx",

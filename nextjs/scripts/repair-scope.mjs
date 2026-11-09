@@ -1837,7 +1837,8 @@ export const INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES = Object.freeze([
 ]);
 // Solutions proof (PR #141 fix): the solution page's limitation sentence and its same-origin proof link. Two direct suites and
 // the solutions browser suite, which runs only in project 1440 of the shared map.
-export const SOLUTIONS_PROOF_AFFECTED_PATHS = Object.freeze(['app/solutions/[slug]/page.tsx', 'app/solutions/solution-workflow-proof.tsx']);
+// 2026-11-09: lib/solution-proof-picks.ts holds the proof picks and resolver both Solutions files render (moved out of them for /explore LCP).
+export const SOLUTIONS_PROOF_AFFECTED_PATHS = Object.freeze(['app/solutions/[slug]/page.tsx', 'app/solutions/solution-workflow-proof.tsx', 'lib/solution-proof-picks.ts']);
 export const SOLUTIONS_PROOF_AFFECTED_UNIT_FILES = Object.freeze(['lib/copy-trust-guard.test.ts', 'lib/output-escaping.test.ts']);
 export const SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/solutions-workflows.spec.ts']);
 // Evidence viewer overlay (PR #141 fix): the stylesheet that places the bbox overlay over the drawn page. Its direct suite
@@ -3010,7 +3011,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // Intake approval rollout: the ten exact paths above select ten direct suites; no browser, database, worker or build lane.
   affectedGroup('intake-approval-rollout', new RegExp(`^nextjs/(?:${exactPathAlternation(INTAKE_APPROVAL_ROLLOUT_AFFECTED_PATHS)})$`),
     { unitFiles: INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES }),
-  // Solutions proof: the two exact paths above select two direct suites and the 1440 solutions browser suite.
+  // Solutions proof: the three exact paths above select two direct suites and the 1440 solutions browser suite.
   affectedGroup('solutions-proof', new RegExp(`^nextjs/(?:${exactPathAlternation(SOLUTIONS_PROOF_AFFECTED_PATHS)})$`),
     { unitFiles: SOLUTIONS_PROOF_AFFECTED_UNIT_FILES, browserFiles: SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES }),
   // Evidence viewer overlay: the one exact stylesheet above selects its direct suite and the world-lifecycle browser suite.
