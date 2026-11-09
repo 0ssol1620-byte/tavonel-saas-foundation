@@ -18,7 +18,7 @@ async function visibleFilm(page: Page) {
   await expect(page.locator(FILM)).toBeVisible();
   return page.locator(FILM);
 }
-for (const route of ["/", "/ko"]) {
+for (const route of ["/"]) {
   test(`${route} offers the next action before the source and difficult context`, async ({ page }, testInfo) => {
     test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     await page.goto(route);
@@ -169,17 +169,6 @@ test("keeps the English brand line as the single H1", async ({ page }) => {
   await expect(page.locator("#s1 h1#lv2-hero-title + .lv2-hero-support")).toHaveCount(1);
   await expect(page.locator("#s6 h2")).toHaveText("The Knowledge Compiler for AI");
 });
-test("Korean close repeats the public-sample action and keeps Korean pricing", async ({ page }) => {
-  await page.goto("/ko");
-  const close = page.locator("#s6"), action = close.locator('[data-scene-next="start"]');
-  await expect(close.getByRole("link", { name: "요금 보기" })).toHaveAttribute("href", "/ko/pricing");
-  // Brief 2026-10-15 move 1: same words and destination as the hero and the header.
-  await expect(action).toHaveAttribute("href", "/explore");
-  await expect(action).toHaveText("컴파일된 샘플 열기");
-  // The hero's arrow is aria-hidden, so the action's name is the same words.
-  await expect(page.locator('#s1 [data-testid="landing-hero-actions"] a[href="/explore"]')).toHaveAccessibleName("컴파일된 샘플 열기");
-  await Promise.all([page.waitForURL(url => url.pathname === "/explore"), action.click()]);
-});
 test("the English close keeps its start action on an English destination", async ({ page }) => {
   await page.goto("/");
   const start = page.locator('#s6 [data-scene-next="start"]');
@@ -195,7 +184,7 @@ test("film follows the headline actions without a separate opening action", asyn
   const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
   await expect(film).toBeVisible();
   await expect(film.locator("img")).toHaveCount(1);
-  await expect(film.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
+  await expect(film.getByRole("tab")).toHaveText(["Read", "Compile", "Update", "Trace"]);
   const headline = (await page.locator('h1').boundingBox())!;
   const media = (await film.boundingBox())!;
   expect(media.y).toBeGreaterThanOrEqual(headline.y + headline.height);
@@ -253,7 +242,7 @@ test("server-renders the visible film poster as its priority image", async ({ re
   const posterHint = response.headers()["link"] ?? "";
   expect(posterHint.match(/\/film\/poster-[^>]+/g) ?? []).toEqual([]);
   const head = html.slice(0, html.indexOf("</head>"));
-  expect(head).not.toContain("poster-r2-c1-t13.60-pane1-684x855");
+  expect(head).not.toContain("poster-r3-c1-t10.40-pane1-848x1060");
   const allPreloads = [...head.matchAll(/<link[^>]*rel="preload"[^>]*as="image"[^>]*>/g)].map(match => match[0]);
   /*
     Round 2 (lib/hero-phone-mode.ts): while a phone shows the Inspector still, there are two image hints, split by width --
@@ -269,11 +258,11 @@ test("server-renders the visible film poster as its priority image", async ({ re
   if (PHONE_HERO === "still") expect(preloads[0]).toMatch(/ media="\(min-width: 901px\)"/i);
   else expect(preloads[0]).not.toMatch(/ media=/i);
   // POSTER-RECUT (D-11): the one hint is the AVIF srcset, typed so a browser without AVIF skips it.
-  expect(preloads[0]).toMatch(/imagesrcset="\/film\/poster-r2-c1-t13\.60\.avif 1440w, \/film\/poster-r2-c1-t13\.60-2x\.avif 2880w"/i);
+  expect(preloads[0]).toMatch(/imagesrcset="\/film\/poster-r3-c1-t10\.40\.avif 1440w, \/film\/poster-r3-c1-t10\.40-2x\.avif 2880w"/i);
   expect(preloads[0]).toMatch(/type="image\/avif"/i);
   const high = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => /fetchpriority="high"/i.test(tag));
-  expect(high).toHaveLength(1); expect(high[0]).toContain('src="/film/poster-r2-c1-t13.60-2x.webp"');
-  expect(high[0]).toMatch(/srcset="\/film\/poster-r2-c1-t13\.60\.webp 1440w, \/film\/poster-r2-c1-t13\.60-2x\.webp 2880w"/i);
+  expect(high).toHaveLength(1); expect(high[0]).toContain('src="/film/poster-r3-c1-t10.40-2x.webp"');
+  expect(high[0]).toMatch(/srcset="\/film\/poster-r3-c1-t10\.40\.webp 1440w, \/film\/poster-r3-c1-t10\.40-2x\.webp 2880w"/i);
   expect(high[0]).toMatch(/loading="eager"/i); expect(high[0]).toMatch(/ width="[1-9]\d*"/); expect(high[0]).toMatch(/ height="[1-9]\d*"/);
   const sourceImages = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => tag.includes("apple-2026-q1-10-q-reference-p004"));
   // Direction C round 2: the committed 10-Q page is drawn by s2's window and, while lib/hero-phone-mode.ts says "still",
@@ -306,12 +295,6 @@ test("source controls clear the touch floor and keep selected regions inside the
     expect(selected.y).toBeGreaterThanOrEqual(window.y - 1); expect(selected.y + selected.height).toBeLessThanOrEqual(window.y + window.height + 1);
   }
 });
-test("Korean pricing carries the selected plan into the inquiry", async ({ page }) => {
-  await page.goto("/ko/pricing"); await page.getByRole("link", { name: "Developer 도입 상담" }).click();
-  await expect(page).toHaveURL(/\/ko\/contact\?plan=Developer$/);
-  await expect(page.locator("[data-plan-intent]")).toHaveText("Developer 요금제 문의");
-  await expect(page.locator('input[name="plan"]')).toHaveValue("Developer");
-});
 
 /*
   Home's word budgets (FINAL-SPEC 2026-10-26 §9: fold <= 35, EN <= 520, KO <= 460), RE-DERIVED by
@@ -336,9 +319,14 @@ test("Korean pricing carries the selected plan into the inquiry", async ({ page 
   arrow glyph and no third action (PR #177 review round 1). Same method, fixture posture, chromium:
     1440x900  EN fold 29, body 650   KO fold 24, body 554   h2 6
     390x844   EN fold 35             KO fold 31
+  PR #210 (recording R3 with the phone film back on Fit, 2026-11-09) leaves every budget where it was. The hero's
+  spacing moved up 20px for acceptance 24, which brought the next band's heading ("Research figures, with receipts.",
+  4 words) to y 815 at 390x844 (EN fold 38). Below 768px the hero's bottom padding is 120px instead of 80, so that
+  heading starts at about 855, below the first screen. Same method, local production build, chromium:
+    390x844   EN fold 34             KO fold 31
 */
 const WORD_BUDGET = { "/": { fold: 35, body: 659 }, "/ko": { fold: 35, body: 564 } } as const;
-for (const route of ["/", "/ko"] as const) {
+for (const route of ["/"] as const) {
   test(`${route} stays within its re-derived word budget, with six h2`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440" && testInfo.project.name !== "390", "measured at 1440x900 (fold and body) and 390x844 (fold)");
     await page.goto(route);

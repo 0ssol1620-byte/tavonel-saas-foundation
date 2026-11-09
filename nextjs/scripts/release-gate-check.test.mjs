@@ -16,6 +16,7 @@ import {
   RELEASE_GATE_REPORT_SCHEMA,
   RELEASE_MAX_AGE_MS,
   checkReleaseGate,
+  mergeTreeOf,
   parseOptions,
   readReleaseRows,
   run,
@@ -474,7 +475,7 @@ const blobId = (content) => createHash("sha1").update(`blob ${Buffer.byteLength(
  * One commit whose tree is exactly `files` ([path (string or Buffer), content, mode = "100644"]); no working
  * tree needed. A gitlink (160000) takes the commit id it names as its content.
  */
-function commitTree(dir, files) {
+function commitTree(dir, files, parents = []) {
   const index = join(dir, ".git", `index-${Math.random().toString(16).slice(2)}`);
   const records = files.map(([path, content, mode = "100644"]) => Buffer.concat([
     Buffer.from(`${mode} ${mode === "160000" ? content : scratchGit(dir, ["hash-object", "-w", "--stdin"], content)}\t`),
@@ -484,7 +485,7 @@ function commitTree(dir, files) {
     { input: Buffer.concat(records), env: { ...process.env, GIT_INDEX_FILE: index }, stdio: ["pipe", "ignore", "ignore"] });
   const tree = execFileSync("git", ["-C", dir, "write-tree"], { env: { ...process.env, GIT_INDEX_FILE: index } })
     .toString().trim();
-  return scratchGit(dir, ["commit-tree", tree, "-m", "gate surface fixture"], "");
+  return scratchGit(dir, ["commit-tree", tree, ...parents.flatMap((parent) => ["-p", parent]), "-m", "gate surface fixture"], "");
 }
 function withScratchRepo(body) {
   const dir = mkdtempSync(join(tmpdir(), "gate-surface-"));
@@ -1045,3 +1046,133 @@ test("gate surface: the digest is the first thing the production build runs (R4)
   assert.doesNotMatch(config, /\b(deploymentGateSurface|gateSurfaceOfCommit|recordDeploymentGateSurface|resolveDeployTools)\b/);
   assert.match(config, /readDeploymentGateSurface\(\)/);
 });
+
+// Pre-merge release (RELEASE_ORDER.md, "병합 전 출시 행"). The row is recorded for an up-to-date PR head, from that
+// head's own CI, before the merge; --merge-into proves the merge commit's deployment reads it the moment it is READY.
+// The gate itself is unchanged: these tests drive checkReleaseGate with the merge tree as the subject.
+function premergeCommits(dir) {
+  const files = [[GATE_SURFACE_RULES_PATH, rulesSource], ["shared/scopedCustomerDataGate.ts", "// gate"],
+    ["nextjs/app/explore/page.tsx", "export default function Page() { return null; }"]];
+  const base = commitTree(dir, files);
+  const head = commitTree(dir, [files[0], files[1], [files[2][0], "export default function Page() { return 1; }"]], [base]);
+  return { files, base, head };
+}
+const premergeCheck = (dir, tree, rows) => checkReleaseGate({ rows, sha: tree, scopes: ["direct_upload"], now: NOW,
+  gateSurfaceSha256: gateSurfaceOfCommit(dir, tree), surfaceOfCommit: (revision) => gateSurfaceOfCommit(dir, revision) });
+
+test("pre-merge: a row recorded for an up-to-date PR head releases its merge before the merge commit exists",
+  { skip: !gitBinary }, () => {
+    withScratchRepo((dir) => {
+      const { base, head } = premergeCommits(dir);
+      const tree = mergeTreeOf(dir, base, head);
+      assert.equal(tree, scratchGit(dir, ["rev-parse", `${head}^{tree}`]));
+      const surface = gateSurfaceOfCommit(dir, head);
+      assert.match(surface, SURFACE_DIGEST);
+      assert.equal(gateSurfaceOfCommit(dir, tree), surface);
+      const report = premergeCheck(dir, tree, [surfacedRow({ sha: head, evaluatedMs: NOW.getTime() - DAY, surface })]);
+      assert.equal(report.ready, true);
+      assert.equal(report.scopes[0].status, "released");
+      assert.equal(report.scopes[0].inheritedFrom, head);
+    });
+  });
+
+test("pre-merge: no row for the merge's surface, or a decision missing a fact, is not ready (missing evidence)",
+  { skip: !gitBinary }, () => {
+    withScratchRepo((dir) => {
+      const { base, head } = premergeCommits(dir);
+      const tree = mergeTreeOf(dir, base, head);
+      const surface = gateSurfaceOfCommit(dir, head);
+      const none = premergeCheck(dir, tree, []);
+      assert.equal(none.ready, false);
+      assert.equal(none.scopes[0].status, "missing");
+      assert.deepEqual(none.scopes[0].requiredFacts, [...gate.requiredReleaseEvidence("direct_upload")]);
+      // Evidence without the CI fact: the gate's own evaluator refuses, and so does a stored refusal for that surface.
+      const evaluatedMs = NOW.getTime() - DAY;
+      const partial = evidenceFor(gate.requiredReleaseEvidence("direct_upload")
+        .filter((fact) => fact !== "tenant_isolation_suite_passed"), at(evaluatedMs - DAY));
+      const decision = gate.evaluateScopedRelease({ scope: "direct_upload", releaseRevision: head, evidence: partial,
+        now: at(evaluatedMs), gateSurfaceSha256: surface });
+      assert.equal(decision.allowed, false);
+      assert.ok(decision.missing.includes("tenant_isolation_suite_passed"));
+      const refusal = { ...surfacedRow({ sha: head, evaluatedMs, surface }), allowed: false, receipt_sha256: null,
+        evidence: [], missing: ["tenant_isolation_suite_passed"], recorded_at: at(evaluatedMs + 60_000) };
+      const refused = premergeCheck(dir, tree, [surfacedRow({ sha: head, evaluatedMs, surface }), refusal]);
+      assert.equal(refused.ready, false);
+      assert.equal(refused.scopes[0].status, "refused");
+      assert.deepEqual(refused.scopes[0].missingFacts, ["tenant_isolation_suite_passed"]);
+    });
+  });
+
+test("pre-merge: main moved on a surface path, or the row names a digest not its own: not released (surface mismatch)",
+  { skip: !gitBinary }, () => {
+    withScratchRepo((dir) => {
+      const { files, base, head } = premergeCommits(dir);
+      const moved = commitTree(dir, [files[0], [files[1][0], "// gate, changed on main"], files[2]], [base]);
+      const tree = mergeTreeOf(dir, moved, head);
+      const headSurface = gateSurfaceOfCommit(dir, head);
+      assert.notEqual(gateSurfaceOfCommit(dir, tree), headSurface);
+      const evaluatedMs = NOW.getTime() - DAY;
+      const stale = premergeCheck(dir, tree, [surfacedRow({ sha: head, evaluatedMs, surface: headSurface })]);
+      assert.equal(stale.ready, false);
+      assert.equal(stale.scopes[0].status, "missing");
+      // A row for the head carrying the merge tree's digest is caught when the head's own digest is recomputed.
+      const pasted = premergeCheck(dir, tree, [surfacedRow({ sha: head, evaluatedMs, surface: gateSurfaceOfCommit(dir, tree) })]);
+      assert.equal(pasted.ready, false);
+      assert.equal(pasted.scopes[0].status, "surface_mismatch");
+      assert.equal(pasted.scopes[0].recomputedGateSurfaceSha256, headSurface);
+    });
+  });
+
+test("pre-merge: an expired row, or one expiring inside the warning window, does not clear the merge",
+  { skip: !gitBinary }, () => {
+    withScratchRepo((dir) => {
+      const { base, head } = premergeCommits(dir);
+      const tree = mergeTreeOf(dir, base, head);
+      const surface = gateSurfaceOfCommit(dir, head);
+      const expired = premergeCheck(dir, tree, [surfacedRow({ sha: head, evaluatedMs: NOW.getTime() - 31 * DAY, surface })]);
+      assert.equal(expired.ready, false);
+      assert.equal(expired.scopes[0].status, "expired");
+      const expiring = premergeCheck(dir, tree, [surfacedRow({ sha: head, evaluatedMs: NOW.getTime() - 25 * DAY, surface })]);
+      assert.equal(expiring.ready, false);
+      assert.equal(expiring.scopes[0].status, "expiring");
+    });
+  });
+
+test("pre-merge: a merge that conflicts, or a commit not fetched here, cannot be predicted", { skip: !gitBinary }, () => {
+  withScratchRepo((dir) => {
+    const { files, base, head } = premergeCommits(dir);
+    const other = commitTree(dir, [files[0], files[1], [files[2][0], "export default function Page() { return 2; }"]], [base]);
+    assert.throws(() => mergeTreeOf(dir, other, head), /did not merge cleanly/);
+    assert.throws(() => mergeTreeOf(dir, base, "c".repeat(40)), /did not merge cleanly/);
+  });
+});
+
+test("pre-merge: --merge-into is a 40-hex SHA, and the CLI checks the merge tree's surface with one GET", { skip: !gitBinary },
+  async () => {
+    assert.deepEqual(parseOptions(["--sha", SHA, "--merge-into", OTHER_SHA]),
+      { sha: SHA, scopes: ["direct_upload"], warnDays: 7, mergeInto: OTHER_SHA });
+    assert.throws(() => parseOptions(["--sha", SHA, "--merge-into", "main"]), /--merge-into/);
+    const dir = mkdtempSync(join(tmpdir(), "gate-surface-"));
+    try {
+      scratchGit(dir, ["init", "-q"]);
+      const { base, head } = premergeCommits(dir);
+      const tree = mergeTreeOf(dir, base, head);
+      const surface = gateSurfaceOfCommit(dir, head);
+      const fake = recordFetch(() => json([surfacedRow({ sha: head, evaluatedMs: NOW.getTime() - DAY, surface })]));
+      let report;
+      try {
+        report = await run(["--sha", head, "--merge-into", base], ENV, NOW, dir);
+      } finally {
+        fake.restore();
+      }
+      assert.equal(report.ready, true);
+      assert.deepEqual(report.mergeOf, { base, head, tree });
+      assert.equal(report.scopes[0].inheritedFrom, head);
+      assert.equal(fake.calls.length, 1);
+      assert.equal(fake.calls[0].method, "GET");
+      const url = new URL(fake.calls[0].url);
+      assert.equal(url.searchParams.get("or"), `(release_revision.eq.${tree},gate_surface_sha256.eq."${surface}")`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });

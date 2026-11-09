@@ -1,14 +1,13 @@
 import { test, expect } from "@playwright/test";
 
-for (const route of ["/evaluation", "/ko/evaluation"]) {
+for (const route of ["/evaluation"]) {
   test(`${route} preserves locale metadata and accessible inquiry boundaries`, async ({ page }) => {
     await page.goto(route);
-    await expect(page.locator("html")).toHaveAttribute("lang", route.startsWith("/ko") ? "ko" : "en");
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", `https://tavonel.com${route}`);
     await expect(page.locator('meta[property="og:url"]')).toHaveAttribute("content", `https://tavonel.com${route}`);
-    for (const [locale, target] of [["en", "/evaluation"], ["ko", "/ko/evaluation"], ["x-default", "/evaluation"]]) {
-      await expect(page.locator(`link[rel="alternate"][hreflang="${locale}"]`)).toHaveAttribute("href", `https://tavonel.com${target}`);
-    }
+    // GX-02 (2026-11-09): global-only. A self-canonical and no hreflang alternate.
+    await expect(page.locator('link[rel="alternate"][hreflang]')).toHaveCount(0);
     const title = page.locator("#evaluation-request-title");
     await expect(title).toBeVisible();
     await expect(page.getByRole("region", { name: (await title.innerText()).trim(), exact: true })).toBeVisible();

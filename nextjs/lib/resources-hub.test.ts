@@ -160,7 +160,6 @@ describe("nothing links a draft cookbook", () => {
   const destinations = [
     ...CUSTOMER_NAV, ...HEADER_NAV, ...PRIMARY_NAV, ...RESOURCE_LINKS,
     ...FOOTER_GROUPS.flatMap((group) => group.links),
-    FOOTER_LEGAL_ROW.language, FOOTER_LEGAL_ROW.languageBack,
     ACCESS_CTA, SELF_SERVE_CTA, EXPLORE_CTA, NAV_PRICING,
   ].map((link) => link.href).concat([...navHrefs()], NAV_GROUPS.map((group) => group.overviewHref));
 
@@ -183,11 +182,9 @@ describe("nothing links a draft cookbook", () => {
     }
   });
 
-  it("guards both footer language switch destinations", () => {
-    for (const link of [FOOTER_LEGAL_ROW.language, FOOTER_LEGAL_ROW.languageBack]) {
-      expect(destinations, "footer language switch is missing from the destination inventory").toContain(link.href);
-      expect(link.href, "footer language switch links a draft cookbook").not.toContain("/cookbooks/");
-    }
+  it("carries no footer language switch (global-only presentation, 2026-11-09)", () => {
+    expect(Object.keys(FOOTER_LEGAL_ROW)).not.toContain("language");
+    expect(destinations.filter((href) => href === "/ko" || href.startsWith("/ko/"))).toEqual([]);
   });
 
   it("guards every navigation panel overview destination", () => {

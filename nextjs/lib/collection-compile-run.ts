@@ -35,6 +35,7 @@ import { getWorkspaceCollectionCandidate, getWorkspaceOcrJson, listImmutableWork
 import { readR2SignerEnv } from "./r2-synthetic-canary";
 import { getFoundationActiveWorld } from "./world-store";
 import { detectExactDuplicatesAtIntake, type ExactDuplicateNote } from "./source-dedup";
+import { organizeLibraryAtIntake } from "./library-shadow";
 
 /** A size refusal keeps its detail on the failure, so the job event can name what was too large. */
 const sizeLimitPayload = (result: object) => ("sizeLimit" in result ? { sizeLimit: result.sizeLimit } : {});
@@ -342,6 +343,9 @@ export async function runCollectionCompile(
   // `on` names only documents this principal may read; with no bound principal it names none.
   const duplicateNotes = await detectExactDuplicatesAtIntake(workspaceId, verifiedInputs, process.env,
     principalBound ? observationPrincipal!.userId! : null);
+  // B2 shadow proposals (near duplicate, document type, topics). Off by default; in no mode does it
+  // change what is dispatched, stored or returned, and it never throws.
+  await organizeLibraryAtIntake(workspaceId, verifiedInputs, process.env);
 
   const expectedVersions = selected.map((item) => ({ documentId: item!.documentId, versionKey: item!.versionKey }));
   const revalidate = async (phase: "before_core" | "after_core"): Promise<CollectionCompileRun | null> => {

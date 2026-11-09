@@ -209,7 +209,9 @@ test("on a Home phone the prompt never opens over the hero film", async ({ page 
     // Waiting, because the clear-of region -- the frame and the reading block under it (homeSheetClear, fix
     // round 4) -- reaches into the sheet's 104px zone at the foot of the screen. In the compact frame (2026-10-27)
     // at 360 the frame ends 2px above the zone and the reading block under it is what reaches in.
-    const line = await page.locator("#s1 [data-film-reading]").boundingBox();
+    // The re-recorded cuts (2026-11-05) draw no pane strip, so there may be no reading block at all.
+    const reading = page.locator("#s1 [data-film-reading]");
+    const line = await reading.count() ? await reading.boundingBox() : null;
     expect(Math.max(film.y + film.height, line ? line.y + line.height : 0)).toBeGreaterThan(height - 104);
     expect(film.y).toBeLessThan(height);
   }
@@ -294,10 +296,14 @@ test("in the 768-899 band in Focus the scrolled sheet never covers the reading b
   await page.evaluate(y => window.scrollTo(0, y), scroll);
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scroll);
   const frame = (await film.locator(".compile-film-viewport").boundingBox())!;
-  const reading = (await film.locator("[data-film-reading]").boundingBox())!;
-  // The scenario: the frame is out of the zone and only the reading block reaches into it.
+  /*
+    Film re-record (2026-11-05): the cuts are product screens and STAGE_FRAMES has no `panes`, so the player draws no
+    pane strip and there is no reading block under the frame. What is left to guard is the frame: out of the zone, and
+    the sheet never over it. If a strip comes back, this fails and the reading-block check below applies again.
+  */
+  await expect(film.locator("[data-film-reading]")).toHaveCount(0);
+  const reading = frame;
   expect(frame.y + frame.height, "frame above the sheet's zone").toBeLessThanOrEqual(height - 104);
-  expect(reading.y + reading.height, "reading block inside the sheet's zone").toBeGreaterThan(height - 104);
   // Past the 200px trigger the sheet decides within a frame; give it the 180ms entry as well.
   await page.waitForTimeout(800);
   const panel = page.getByRole("region", PANEL);
@@ -425,28 +431,3 @@ test("only successful commercial inquiries produce a lead event", async ({ page 
   expect(JSON.stringify(await records())).not.toMatch(/test@example|Test Visitor|production delivery/);
 });
 
-/*
-  Stage-A open risk 5, proven where it actually renders.
-
-  `/ko` became a measured public page, and the banner it then showed was the English one. The
-  unit test beside `consentCopy` holds the selection; this holds the render, because the failure
-  was visible in a screenshot and invisible to every assertion in the repository.
-*/
-test("the Korean entry page asks for consent in Korean, and other pages do not", async ({ page }) => {
-  await page.goto("/ko");
-  await revealConsent(page);
-  const korean = page.getByRole("region", { name: "선택 분석" });
-  await expect(korean).toBeVisible();
-  await expect(page.getByRole("button", { name: "분석 허용", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "허용하지 않음", exact: true })).toBeVisible();
-  // The same two choices, and the same behaviour behind them.
-  await expect(page.getByRole("button", { name: "Allow analytics" })).toHaveCount(0);
-  await page.getByRole("button", { name: "허용하지 않음", exact: true }).click();
-  await expect(korean).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "분석 설정" })).toBeVisible();
-
-  // And the refusal is one choice for the whole site, not one per language.
-  await page.goto("/");
-  await expect(page.getByRole("region", { name: "Optional analytics" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Analytics preferences" })).toBeVisible();
-});

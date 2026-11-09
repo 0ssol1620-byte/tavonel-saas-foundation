@@ -33,7 +33,7 @@ import {
 } from "@/lib/home-evidence-view";
 import { KO_CHROME, SAMPLE_CTA } from "@/lib/site-navigation";
 import { primaryCallToAction } from "@/lib/commercial-state";
-import { homeSpecimens } from "@/lib/specimen-sources";
+import { HOME_SPECIMEN_SLOTS, homeSpecimens } from "@/lib/specimen-sources";
 import {
   landingVariantState,
   type LandingVariantState,
@@ -207,7 +207,9 @@ export default function LandingPage({
   const page = HOME_COPY[locale];
   const { home } = data;
   const receive = receiveFromCase(home, korean);
-  const specimens = homeSpecimens({ fixtures: specimenRequest === "1", committed: specimenRequest === "committed" });
+  // GX-02 (2026-11-09): the Korean document cell is not on the public pages. See HOME_SPECIMEN_SLOTS.
+  const specimens = homeSpecimens({ fixtures: specimenRequest === "1", committed: specimenRequest === "committed" })
+    .filter((cell) => HOME_SPECIMEN_SLOTS.includes(cell.slot));
 
   /*
     A reader can inspect the sample before choosing a plan. The access action is resolved from

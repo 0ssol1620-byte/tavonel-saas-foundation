@@ -281,8 +281,13 @@
   @media (max-width: 767px) {
     .home.home > header { height: 56px !important; min-height: 56px; }
     .home.home :global(.lv2-scene) { padding-block: 72px; }
+    /*
+      Bottom 120, not 80 (2026-11-09): with the phone film open on the whole frame again, the next band's heading
+      ("Research figures, with receipts.") rose to y 815 at 390x844 and put the fold at 38 words against the §9 budget of
+      35. The budget stands; the band starts below the first screen instead (heading at about 855).
+    */
     /* §2.1 (412): h1 at y 96, the fixed 56px header plus 40. */
-    .home.home :global(#s1) { padding-block: 96px 80px; }
+    .home.home :global(#s1) { padding-block: 96px 120px; }
     .home.home :global(#s2) { padding-block: 0 48px; }
     .home.home :global(#s2 > .lv2-wrap) { padding-top: 72px; }
     .home.home :global(#s3) { padding-block: 48px 72px; }
@@ -315,8 +320,12 @@
       zone at 828) and every other one sits higher (EN 360 450 -> 426, KO 360 404 -> 381; Windows
       Chromium, phase4/G1-COPY/hero-geometry).
     */
-    /* FINAL-SPEC 2026-10-26 §2.1 at 412: tabs at their content width, 16px apart, one line each; 12px to the panel. */
-    .home.home :global(#s1 .compile-film-sequence) { gap: 12px 8px; }
+    /*
+      FINAL-SPEC 2026-10-26 §2.1 at 412: tabs at their content width, 16px apart, one line each. Acceptance 24 (frame top
+      <= 480 EN / 430 KO at 412x915) failed once the phone film returned (R3, 2026-11-09: CI Linux EN 486.7, KO 437.8), so
+      the tabs sit 4px above the panel instead of 12, and the figure drops its 12px top padding below 768px (further down).
+    */
+    .home.home :global(#s1 .compile-film-sequence) { gap: 4px 8px; }
     .home.home :global(#s1 .compile-film-stages) { grid-template-columns: repeat(4, auto); justify-content: start; column-gap: 16px; }
     .home.home :global(.lv2-hero-support) { margin-top: 16px; font-size: 17px; line-height: 1.5; }
     .home.home :global(#s1 .compile-film-stages button) { font-size: 13px; padding-block: 10px; padding-inline: 2px; min-height: 44px; white-space: nowrap; }
@@ -412,6 +421,10 @@
     box-shadow: 0 3px 6px rgb(40 32 20 / 0.08), 0 30px 60px -20px rgb(40 32 20 / 0.45);
   }
   .home.home :global(#s1 .lv2-film-story > figcaption) { color: var(--tv-ink-muted); padding-inline: 4px; }
+  /* Below 768px the link -> tabs distance is the heroAside margin alone (§2.1: 24px), so acceptance 24 holds with margin. */
+  @media (max-width: 767px) {
+    .home.home :global(#s1 .lv2-film-story) { padding-top: 0; }
+  }
   @media (min-width: 768px) {
     .home.home :global(#s1 .lv2-film-story) { padding: 20px 0 24px; }
     .home.home :global(#s1 .compile-film-stages) {

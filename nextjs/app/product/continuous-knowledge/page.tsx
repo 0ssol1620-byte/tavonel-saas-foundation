@@ -21,9 +21,9 @@ export const metadata: Metadata = {
   // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
   alternates: { canonical: "/product/continuous-knowledge" },
   openGraph: { url: "/product/continuous-knowledge" },
-  title: "Continuous recompilation — TAVONEL",
+  title: "Continuous recompilation when sources change — TAVONEL",
   description:
-    "Compare World versions after a source changes, then inspect the Compiler Contract and the current state of each clause.",
+    "Compare World versions after a source changes, see what changed before you activate it, then inspect the Compiler Contract and the current state of each clause.",
   /*
     No `robots` field here, and one line elsewhere is still wrong.
 

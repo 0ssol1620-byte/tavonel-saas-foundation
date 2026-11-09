@@ -11,7 +11,8 @@ import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
-import { answerFromContextPacket, answerGroundedQuestion } from "@/lib/grounded-ask";
+import { answerFromContextPacket, answerGroundedQuestion, parseChunks } from "@/lib/grounded-ask";
+import { recordAnswerabilityShadow } from "@/lib/answerability-shadow";
 import { applyAnswerReceipt } from "@/lib/answer-receipt-signing";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { getWorkspaceCollectionCandidate } from "@/lib/r2-objects";
@@ -90,7 +91,7 @@ type Answered = { status: number; body: Record<string, unknown> };
  * carries the same idempotency key. Neither is possible while every branch returns from the
  * handler directly. The branches, their codes and their statuses are unchanged.
  */
-async function answerQuestion(workspaceKey: string, id: string, question: string, active: { world: ActiveWorld }): Promise<Answered> {
+async function answerQuestion(workspaceKey: string, id: string, question: string, active: { world: ActiveWorld }, processedSources: number): Promise<Answered> {
 
   const activeWorld = {
     manifestDigest: active.world.manifestDigest,
@@ -150,6 +151,17 @@ async function answerQuestion(workspaceKey: string, id: string, question: string
       collectionId: id,
       manifestDigest: active.world.manifestDigest,
     });
+    // E2 shadow: off computes nothing; shadow logs the verdict against this receipt and changes nothing served.
+    recordAnswerabilityShadow({
+      collectionId: id, question, retrievalPath: "compiled-retrieval-v1", answer,
+      build: () => ({
+        evidence: pipeline.packet.items
+          .filter(item => item.evidenceIds.length > 0 && item.text.trim().length > 0)
+          .map(item => ({ evidenceId: item.evidenceIds[0]!, text: item.text })),
+        heldConflicts: pipeline.packet.heldConflicts.length,
+        worldCoverage: { processedSources, unprocessedSources: null },
+      }),
+    });
     return {
       status: 200,
       body: {
@@ -207,6 +219,22 @@ async function answerQuestion(workspaceKey: string, id: string, question: string
   if (!answer || answer.receipt.manifestDigest !== active.world.manifestDigest) {
     return { status: 422, body: { code: "ACTIVE_WORLD_RETRIEVAL_INVALID" } };
   }
+  recordAnswerabilityShadow({
+    collectionId: id, question, retrievalPath: "excerpt-concatenation-fallback", answer,
+    build: () => {
+      const cited = new Set(answer.citations.map(citation => citation.evidenceId));
+      // ponytail: shadow re-parses the artifact (<= 8 MB) for the cited chunks' full text; hand the ranked
+      // chunks out of answerGroundedQuestion if E2 ever goes on.
+      return {
+        evidence: parseChunks(loaded.json as Parameters<typeof parseChunks>[0])
+          .filter(chunk => cited.has(chunk.evidenceId))
+          .map(chunk => ({ evidenceId: chunk.evidenceId, text: chunk.text })),
+        // The fallback reads no conflicts; null says so rather than claiming none.
+        heldConflicts: null,
+        worldCoverage: { processedSources, unprocessedSources: null },
+      };
+    },
+  });
   return {
     status: 200,
     body: {
@@ -313,7 +341,7 @@ export async function POST(
     if (!await admitsDerivedCustomerData(workspaceKey, documentIds)) {
       return NextResponse.json({ code: DERIVED_DATA_REFUSED }, { status: 403, headers: NO_STORE });
     }
-    answered = lease.replay ? lease.value : await answerQuestion(workspaceKey, id, question, active);
+    answered = lease.replay ? lease.value : await answerQuestion(workspaceKey, id, question, active, documentIds.length);
     if (answered.status === 200) {
       const authorizedNow = await revalidateFoundationAuthorization(request, auth.principal, "ask:read", "observer");
       if (!authorizedNow.ok) return NextResponse.json({ code: authorizedNow.code }, {

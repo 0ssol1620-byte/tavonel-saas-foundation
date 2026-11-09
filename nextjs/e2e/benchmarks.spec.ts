@@ -175,29 +175,36 @@ test("is a real page, in the sitemap, and offered to crawlers", async ({ page })
   */
   expect(robotsText).toContain("User-Agent: OAI-SearchBot");
   expect(robotsText).toContain("User-Agent: PerplexityBot");
+  /*
+    GX-01 (2026-11-09, docs/policy/DECISION_LOG_2026-11-09.md) reversed FD-61 for these seven tokens:
+    each is now allowed on the public surface with exactly the private list the search crawlers get.
+    Bytespider alone is still refused at the root.
+  */
   for (const token of [
-    "GPTBot", "CCBot", "anthropic-ai",
-    "Google-Extended", "Applebot-Extended", "Bytespider", "Meta-ExternalAgent",
+    "GPTBot", "Google-Extended", "anthropic-ai", "Claude-SearchBot",
+    "CCBot", "Applebot-Extended", "Meta-ExternalAgent",
   ]) {
-    expect(robotsText, `${token} must be refused at the root`).toContain(
-      `User-Agent: ${token}\nDisallow: /\n`,
+    expect(robotsText, `${token} is allowed like the search crawlers`).toContain(
+      `User-Agent: ${token}\nAllow: /\nDisallow: /api/\n`,
     );
+    expect(robotsText, `${token} is not refused at the root`).not.toContain(`User-Agent: ${token}\nDisallow: /\n`);
   }
+  expect(robotsText, "Bytespider must be refused at the root").toContain("User-Agent: Bytespider\nDisallow: /\n");
   // A fetch a person asked for is a visit, not a corpus crawl: those tokens are not in the block
   // at all, so they fall to `*`, which allows them. A copy-paste into the list would remove a
   // reader's own assistant from the site, and this is what notices.
   /*
     SD-05 (2026-09-16, docs/policy/DECISION_LOG_2026-09-16.md): ClaudeBot is a fetch-time agent,
     not a training crawler, so it moved from the refusal block to the same allow-list as
-    OAI-SearchBot and PerplexityBot. The training tokens above are still refused.
+    OAI-SearchBot and PerplexityBot. GX-01 later allowed the AI tokens above as well.
   */
   expect(robotsText, "ClaudeBot is allowed like the other answer-engine fetchers").toContain("User-Agent: ClaudeBot\nAllow: /\n");
-  for (const token of ["Claude-User", "Claude-SearchBot", "ChatGPT-User"]) {
+  for (const token of ["Claude-User", "ChatGPT-User"]) {
     expect(robotsText, `${token} is a person's own fetch, not a training crawl`).not.toContain(`User-Agent: ${token}\n`);
   }
   // Private surfaces are still withheld from every named search crawler and from `*`:
-  // `*`, OAI-SearchBot, PerplexityBot, ClaudeBot (SD-05) and the Google block.
-  expect(robotsText.match(/Disallow: \/workspace/g)?.length).toBe(5);
+  // `*`, OAI-SearchBot, PerplexityBot, ClaudeBot (SD-05), the Google block and, since GX-01, the seven AI crawlers.
+  expect(robotsText.match(/Disallow: \/workspace/g)?.length).toBe(12);
 
   await page.goto("/benchmarks");
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://tavonel.com/benchmarks");

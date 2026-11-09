@@ -41,6 +41,6 @@ export default function EvaluationPage({ korean = false }: { korean?: boolean })
         </section>
       </div>
     </main>
-    <PublicSiteFooter korean={korean} languageHref={korean ? "/evaluation" : "/ko/evaluation"} />
+    <PublicSiteFooter korean={korean} />
   </div>;
 }

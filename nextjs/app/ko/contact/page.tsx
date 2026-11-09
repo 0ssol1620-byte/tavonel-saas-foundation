@@ -18,7 +18,7 @@ export const metadata: Metadata = pageMetadata({
 export default function KoreanContactPage() {
   const operator = readLegalOperator();
   return (
-    <PublicSitePage template="T2" korean languageHref="/contact">
+    <PublicSitePage template="T2" korean>
       <DocumentLangKo />
       <BreadcrumbJsonLd trail={[{ name: "한국어 안내", path: "/ko" }, { name: "이용 문의", path: "/ko/contact" }]} />
       <section className="scene doc contact-page">

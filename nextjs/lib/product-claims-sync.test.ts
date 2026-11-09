@@ -608,8 +608,9 @@ describe("llms.txt maps what the site actually publishes", () => {
   */
   it("states the crawler policy robots.txt enforces", () => {
     expect(llms).not.toContain("unresolved");
-    expect(llms).toContain("Training-corpus crawlers are disallowed everywhere");
-    expect(llms).toContain("ClaudeBot, which is a fetch-time agent rather than a training crawler");
+    // GX-01 (founder, 2026-11-09): AI crawlers allowed, Bytespider alone refused.
+    expect(llms).toContain("search, answer-engine and AI crawlers may read every public marketing page");
+    expect(llms).toContain("Bytespider is disallowed everywhere.");
   });
 });
 

@@ -10,6 +10,7 @@ import {
   OCR_FAILURE_CATEGORY,
   OCR_REQUEST_TIMEOUT_MS,
   ocrFailureKind,
+  ocrBounds,
   ocrPageRangeSize,
   qualifyOcrResult,
   shouldDispatchOcr,
@@ -1323,5 +1324,32 @@ describe("the reader is fetched unbound", () => {
         `range size ${size ?? "unset"}: fetch was called as a method`);
       assert.equal(result.status, "written");
     }
+  });
+});
+
+describe("OCR result bounds per intake ceiling stage (D1, PROGRAM-2026-11-04 §4.D)", () => {
+  const digest = `sha256:${"a".repeat(64)}`;
+  const withPages = (pageCount: number) => ({ ...ocrPayload(digest), pageCount });
+
+  it("keeps the 80-page bounds unless the worker runs at stage 1", () => {
+    assert.deepEqual(ocrBounds({}), { pages: 80, textChars: 4_000_000, regions: 50_000, persistedBytes: 24 * 1024 * 1024 });
+    assert.deepEqual(ocrBounds({ TAVONEL_INTAKE_CEILING_STAGE: "1" }),
+      { pages: 200, textChars: 10_000_000, regions: 125_000, persistedBytes: 60 * 1024 * 1024 });
+  });
+
+  it("refuses a stage it cannot name, retryably, instead of guessing a bound", () => {
+    for (const value of ["2", "yes", "1.0"]) {
+      assert.throws(() => ocrBounds({ TAVONEL_INTAKE_CEILING_STAGE: value }), OcrEvidenceRetryableError, value);
+    }
+  });
+
+  it("admits a 200-page result at stage 1 and refuses 201, while stage 0 still refuses 81", () => {
+    const stage0 = ocrBounds({});
+    const stage1 = ocrBounds({ TAVONEL_INTAKE_CEILING_STAGE: "1" });
+    assert.ok(qualifyOcrResult(withPages(80), digest, "response", stage0));
+    assert.equal(qualifyOcrResult(withPages(81), digest, "response", stage0), null);
+    assert.equal(qualifyOcrResult(withPages(200), digest), null, "the default is stage 0");
+    assert.ok(qualifyOcrResult(withPages(200), digest, "response", stage1));
+    assert.equal(qualifyOcrResult(withPages(201), digest, "response", stage1), null);
   });
 });

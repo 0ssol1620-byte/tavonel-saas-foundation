@@ -28,9 +28,9 @@ export const metadata: Metadata = {
   // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
   alternates: { canonical: "/product/document-understanding" },
   openGraph: { url: "/product/document-understanding" },
-  title: "Document understanding — TAVONEL",
+  title: "Document understanding: reading scans and layouts — TAVONEL",
   description:
-    "Reading scans and complex layouts while keeping the location of every region and the uncertainty around it for review.",
+    "Reading scans and complex layouts while keeping the location of every region and the uncertainty around it for review. Reading is the first compile step.",
 };
 
 /*

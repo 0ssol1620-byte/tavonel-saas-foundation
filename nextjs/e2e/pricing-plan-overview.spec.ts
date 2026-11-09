@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-const ROUTES = ["/pricing", "/ko/pricing"] as const;
+const ROUTES = ["/pricing"] as const;
 
 function overview(page: import("@playwright/test").Page, route: typeof ROUTES[number]) {
   return page.getByRole("navigation", { name: route === "/ko/pricing" ? "요금제 비교 및 상세 보기" : "Compare plans and jump to details", exact: true });

@@ -35,7 +35,8 @@ const serverMode = process.env.QA_SERVER_MODE ?? "production";
   measured on every run, its summary line is printed like any other, and it starts failing the
   build the day the shift is fixed and it is moved into `routes`.
 */
-const routes = ["/", "/privacy", "/security", "/pricing", "/ko/pricing", "/ko/contact", "/explore"];
+/* GX-02 (founder, 2026-11-09): /ko/* answers 308 with the English page, so no /ko route is measured. */
+const routes = ["/", "/privacy", "/security", "/pricing", "/explore"];
 /*
   `/login` and `/auth/callback` are here because of a regression that nothing caught.
 
@@ -54,13 +55,8 @@ const routes = ["/", "/privacy", "/security", "/pricing", "/ko/pricing", "/ko/co
   move into `routes` above with the first run that shows they clear the budgets -- which is the
   same discipline `/explore` is held to below, and not a ceiling bent to fit.
 
-  `/ko` joined this list with the script ratchet below (UX-L0), and it joined here, not `routes`,
-  because its first run did not clear: largest-contentful-paint median 3,093.6 ms against the
-  3,000 ceiling (2026-10-17, BASELINE-L0.json; every other budget passed). That is an existing
-  defect this list had never measured, not one the ratchet introduced. The script ratchet gates
-  `/ko` already; the other budgets start gating it with the first run that shows the LCP cleared.
 */
-const measureOnlyRoutes = ["/ko", "/login", "/auth/callback"];
+const measureOnlyRoutes = ["/login", "/auth/callback"];
 const runsPerRoute = 3;
 const maxAttemptsPerRoute = 6;
 const budgets = {
@@ -88,7 +84,15 @@ const budgets = {
   beside BASELINE-L0.json, and the commit says which of the two acts it is. It is never raised to
   make a run go green. A ratcheted route fails the run whatever its `enforced` flag says.
 */
-const scriptRatchetBytes = { "/": 160_768, "/ko": 160_768 };
+/*
+  2026-11-09, GX-03: RE-DERIVED, not raised. The founder's analytics decision makes / load the lazy
+  Vercel collector chunk (4,115 B) and /_vercel/insights/script.js (2,677 B as Vercel serves it)
+  before a choice. Largest sample with both: 166,252 B, so 166,912 by the rule above. Receipt with
+  every sample and the method (CDP, because Lighthouse could not trace on the measuring host):
+  RATCHET-GX03-20261109.json beside BASELINE-L0.json. This job builds without
+  NEXT_PUBLIC_TAVONEL_ANALYTICS_ENABLED, so it measures about 159.5 kB until the flag is set.
+*/
+const scriptRatchetBytes = { "/": 166_912 };
 
 try {
   const health = await fetch(`${baseUrl}/api/healthz`);

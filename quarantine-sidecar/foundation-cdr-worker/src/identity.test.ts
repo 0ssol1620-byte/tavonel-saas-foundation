@@ -40,3 +40,11 @@ it("cancels oversized broker output", async () => {
   }))), RetryableError);
   assert.equal(canceled, true);
 });
+it("mints for the private text-layer route (D2 shadow) and still refuses any other private path", async () => {
+  const broker: typeof fetch = async () => Response.json({ audience: PRIVATE_CDR_ORIGIN, token: "fixture.identity.signature" });
+  assert.equal(await cdrAuthorization(`${PRIVATE_CDR_ORIGIN}/v1/text-layer`, secret, broker), "Bearer fixture.identity.signature");
+  const never: typeof fetch = async () => { throw new Error("must not fetch"); };
+  for (const path of ["/v1/text-layer/", "/v1/other", "/v1/text-layer?x=1"]) {
+    await assert.rejects(cdrAuthorization(`${PRIVATE_CDR_ORIGIN}${path}`, secret, never), /configuration/, path);
+  }
+});

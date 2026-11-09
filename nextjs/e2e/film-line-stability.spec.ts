@@ -133,7 +133,7 @@ async function watchAutoAdvance(page: Page, advances: number, before?: () => Pro
   its arrival falls inside the watch as well.
 */
 for (const [width, height, views] of [[390, 844, ["fit", "focus"]], [430, 932, ["fit"]]] as const) {
-  for (const path of ["/", "/ko"]) for (const view of views) {
+  for (const path of ["/"]) for (const view of views) {
     test(`with motion on, three auto-advances leave the phone film where it was (${path} ${width}x${height}, ${view})`, async ({ page }, testInfo) => {
       test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
       test.skip(testInfo.project.name !== "390", "sets its own viewport");
@@ -226,7 +226,7 @@ test("from 768px to the edge of Fit the frame top is the same on every stage", a
   const measured: Record<string, number[]> = {};
   for (const [width, height] of BAND) {
     await page.setViewportSize({ width, height });
-    for (const path of ["/", "/ko"]) for (const view of ["fit", "focus"] as const) {
+    for (const path of ["/"]) for (const view of ["fit", "focus"] as const) {
       const tops = await frameTopByStage(page, path, view);
       measured[`${path} ${width} ${view}`] = tops;
       expectOneTop(tops, `${path} ${width} ${view}`);
@@ -246,7 +246,7 @@ test("webkit: the frame top is the same on every stage from 360px to the edge of
     for (const [width, height] of [...PHONES, ...BAND]) {
       const context = await browser.newContext({ baseURL, viewport: { width, height }, reducedMotion: "reduce" });
       const page = await context.newPage();
-      for (const path of ["/", "/ko"]) for (const view of ["fit", "focus"] as const) {
+      for (const path of ["/"]) for (const view of ["fit", "focus"] as const) {
         const tops = await frameTopByStage(page, path, view);
         measured[`${path} ${width} ${view}`] = tops;
         expectOneTop(tops, `webkit ${path} ${width} ${view}`);
