@@ -319,31 +319,47 @@ describe("founder test reset keeps its archived-row DELETE allowance in every gu
     expect(read(OPS)).not.toMatch(/^\s*(grant|revoke)\b/im);
   });
 
-  it("20261107110100 (W2-C1) is the live definition and adds only the three ontology tables to 20261105010000's bodies", () => {
+  /*
+    W2-C1 sits on W2-B2 (#196): its bodies are 20261107100100's (20261105010000 plus document_labels)
+    plus the three ontology tables. Until #196 is in this tree the B2 file is absent, so the check
+    strips B2's label lines too and compares with 20261105010000; once it is in, it compares with B2.
+  */
+  it("20261107110100 (W2-C1) is the live definition and adds only the three ontology tables to W2-B2's bodies", () => {
     const ONTOLOGY_TABLES = ["ontology_derivation_runs", "ontology_schema_candidates", "ontology_certification_decisions"];
+    const B2_RESET = "20261107100100_founder_test_reset_library_organize.sql";
+    const onB2 = files.includes(B2_RESET);
+    const strip = (line: string) => ONTOLOGY_TABLES.some((table) => line.includes(`public.${table}`)) || /^\s*-- 20261107110100/.test(line)
+      || (!onB2 && (line.includes("public.document_labels") || /^\s*-- 20261107100100/.test(line)));
     for (const name of RESET) {
       const file = files.filter((candidate) => new RegExp(`function\\s+public\\.${name}\\(`, "i").test(read(candidate))).at(-1);
       expect(file, name).toBe(ONTOLOGY);
-      const kept = resetBody(ONTOLOGY, name).split("\n")
-        .filter((line) => !ONTOLOGY_TABLES.some((table) => line.includes(`public.${table}`)) && !/^\s*-- 20261107110100/.test(line));
-      expect(kept.join("\n"), name).toBe(resetBody(OPS, name));
+      const kept = resetBody(ONTOLOGY, name).split("\n").filter((line) => !strip(line));
+      expect(kept.join("\n"), name).toBe(resetBody(onB2 ? B2_RESET : OPS, name));
     }
     const after = deletedIn(resetBody(ONTOLOGY, "finalize_founder_test_reset"));
-    expect(new Set(after).size).toBe(48);
+    // 45 tables in 20261105010000, document_labels from W2-B2, the three ontology tables from W2-C1.
+    expect(new Set(after).size).toBe(49);
+    expect(after).toContain("document_labels");
     expect([...selectedTables(resetBody(ONTOLOGY, "founder_test_reset_table_counts"), "count\\(\\*\\)")].sort())
       .toEqual([...new Set(after)].sort());
     expect([...selectedTables(resetBody(ONTOLOGY, "founder_test_reset_rows_fingerprint"), "to_jsonb\\(x\\)::text")].sort())
       .toEqual([...new Set(after)].sort());
     const finalize = resetBody(ONTOLOGY, "finalize_founder_test_reset");
     const at = (table: string) => finalize.indexOf(`delete from public.${table} where workspace_key=p_workspace_key;`);
-    // A decision names a candidate and a candidate names its run: children first, inside the reset session.
-    expect(at("ontology_certification_decisions")).toBeGreaterThan(finalize.indexOf("set_config('tavonel.founder_reset_id'"));
+    // B2's order stays (a label names its fingerprint, a relation names two), then the ontology rows:
+    // a decision names a candidate and a candidate names its run, so children first.
+    expect(at("document_labels")).toBeGreaterThan(finalize.indexOf("set_config('tavonel.founder_reset_id'"));
+    expect(at("document_labels")).toBeLessThan(at("document_relations"));
+    expect(at("document_relations")).toBeLessThan(at("source_fingerprints"));
+    expect(at("source_fingerprints")).toBeLessThan(at("ontology_certification_decisions"));
     expect(at("ontology_certification_decisions")).toBeLessThan(at("ontology_schema_candidates"));
     expect(at("ontology_schema_candidates")).toBeLessThan(at("ontology_derivation_runs"));
     for (const table of ONTOLOGY_TABLES) {
       expect(read(ONTOLOGY)).toContain(`create trigger founder_reset_fence before insert or update or delete on public.${table}\n`
         + "  for each row execute function public.guard_founder_test_reset_workspace_write();");
     }
+    // document_labels' fence is B2's; creating it again here would fail on the duplicate trigger.
+    expect(read(ONTOLOGY)).not.toMatch(/create trigger founder_reset_fence[^\n]*public\.document_labels/);
     expect(read(ONTOLOGY)).not.toMatch(/function\s+public\.archive_founder_test_reset_evidence/i);
     expect(read(ONTOLOGY)).not.toMatch(/^\s*(grant|revoke)\b/im);
   });

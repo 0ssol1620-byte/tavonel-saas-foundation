@@ -6,23 +6,20 @@
 -- workspace's proposed schema and its decisions behind, naming Worlds and documents that no longer
 -- exist.
 --
--- Bodies identical to 20261105010000 (W1-A3: 20261104091000 plus foundation_operations_receipts) plus
--- one line per table in each of the three functions: counted, fingerprinted, deleted. Deleted
--- decisions -> candidates -> runs, inside the reset session, ahead of the fingerprints' neighbours. Not
+-- Bodies identical to 20261107100100 (W2-B2: 20261105010000 plus document_labels) plus one line per
+-- table in each of the three functions: counted, fingerprinted, deleted. Deleted decisions ->
+-- candidates -> runs, after B2's document_labels -> document_relations -> source_fingerprints. Not
 -- archived (the archive function is not replaced): a proposed schema is derived data the reset deletes
 -- with its sources. The snapshot now includes the three tables, so a reset prepared before this
 -- migration fails its seal with founder_test_reset_database_drift and has to be prepared again. Each
--- table gets the same sealed write fence as every other table finalize deletes from.
+-- of the three tables gets the same sealed write fence as every other table finalize deletes from;
+-- document_labels already has its fence from 20261107100100 and is not touched here.
 --
--- Migrations apply in timestamp order, so this file runs after 20261105010000 and must be the superset
--- of it: it keeps B1's dedup lines and W1-A3's receipt lines. All three pgTAP files
--- (founder_test_reset_source_fingerprints.sql, founder_test_reset_operations_receipts.sql,
--- founder_test_reset_ontology.sql) run against these bodies.
---
--- Every function keeps its name, signature, language, security mode and `set search_path = ''`;
--- create or replace keeps the owner and the existing ACL, and no grant changes.
---
--- Not part of the replay step in db-rehearsal.yml (create trigger is create-once).
+-- Migrations apply in timestamp order, so this file runs after 20261107100100 and must be the superset
+-- of it: it keeps B1's dedup lines, W1-A3's receipt lines and B2's label lines. The earlier pgTAP files
+-- (founder_test_reset.sql, founder_test_reset_source_fingerprints.sql,
+-- founder_test_reset_operations_receipts.sql, founder_test_reset_library_organize.sql) and
+-- founder_test_reset_ontology.sql run against these bodies.
 begin;
 
 create or replace function public.founder_test_reset_rows_fingerprint(p_workspace_key text, p_legacy_workspace_id uuid)
@@ -60,6 +57,7 @@ returns text language sql stable security definer set search_path = '' as $$
     union all select 'connector_binding_tie_resolutions',to_jsonb(x)::text from public.connector_binding_tie_resolutions x where workspace_key=p_workspace_key
     union all select 'source_fingerprints',to_jsonb(x)::text from public.source_fingerprints x where workspace_key=p_workspace_key
     union all select 'document_relations',to_jsonb(x)::text from public.document_relations x where workspace_key=p_workspace_key
+    union all select 'document_labels',to_jsonb(x)::text from public.document_labels x where workspace_key=p_workspace_key
     union all select 'connector_source_suspensions',to_jsonb(x)::text from public.connector_source_suspensions x where workspace_key=p_workspace_key
     union all select 'sources',to_jsonb(x)::text from public.sources x where workspace_id=p_workspace_key
     union all select 'source_versions',to_jsonb(x)::text from public.source_versions x where source_id in (select source_id from public.sources where workspace_id=p_workspace_key)
@@ -121,6 +119,7 @@ returns jsonb language sql stable security definer set search_path = '' as $$
     union all select 'connector_binding_tie_resolutions',count(*) from public.connector_binding_tie_resolutions where workspace_key=p_workspace_key
     union all select 'source_fingerprints',count(*) from public.source_fingerprints where workspace_key=p_workspace_key
     union all select 'document_relations',count(*) from public.document_relations where workspace_key=p_workspace_key
+    union all select 'document_labels',count(*) from public.document_labels where workspace_key=p_workspace_key
     union all select 'connector_source_suspensions',count(*) from public.connector_source_suspensions where workspace_key=p_workspace_key
     union all select 'sources',count(*) from public.sources where workspace_id=p_workspace_key
     union all select 'source_versions',count(*) from public.source_versions where source_version_id in (select source_version_id from target_versions)
@@ -174,6 +173,8 @@ begin
   ) s where id is not null;
   perform pg_catalog.set_config('tavonel.founder_reset_id',p_reset_id::text,true);
   -- 20261104091000: a relation names two fingerprints; it goes first.
+  -- 20261107100100: a label names a fingerprint; it goes ahead of it.
+  delete from public.document_labels where workspace_key=p_workspace_key;
   delete from public.document_relations where workspace_key=p_workspace_key;
   delete from public.source_fingerprints where workspace_key=p_workspace_key;
   -- 20261107110100: a decision names a candidate, a candidate names its run; they go in that order.

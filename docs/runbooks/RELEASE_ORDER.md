@@ -380,8 +380,12 @@ migration은 additive다. 기존 행은 전부 `live`가 되고, create RPC의 �
 
 - **순서: migration 두 개를 code보다 먼저 적용한다.** `20261107110000_ontology_schema_candidates.sql`은 테이블 3개
   (`ontology_derivation_runs`, `ontology_schema_candidates`, `ontology_certification_decisions`), RPC 3개, 삭제 trigger 1개를
-  더한다. `20261107110100_founder_test_reset_ontology.sql`은 founder test reset 세 함수를 `20261105010000`의 superset으로 바꾸고
-  세 테이블에 reset fence를 단다. 둘 다 additive이며 기존 객체를 바꾸지 않는다(reset 함수는 같은 이름·서명·보안 모드).
+  더한다. `20261107110100_founder_test_reset_ontology.sql`은 founder test reset 세 함수를 W2-B2
+  `20261107100100`(`document_labels` 포함)의 superset으로 바꾸고 세 테이블에 reset fence를 단다. 둘 다 additive이며
+  기존 객체를 바꾸지 않는다(reset 함수는 같은 이름·서명·보안 모드).
+- **W2-B2(#196)가 먼저다.** `20261107110100`의 reset 본문은 `document_labels`를 세고 지우므로, B2의
+  `20261107100000`·`20261107100100`이 적용된 뒤에만 적용한다. 원장에도 timestamp 순서(100000 → 100100 → 110000 →
+  110100)로 남긴다.
 - **flag가 꺼져 있으면 순서는 상관없다.** `TAVONEL_ONTOLOGY_INDUCTION_ENABLED`가 없으면 workspace에 Schema 항목이 없고,
   `/api/ontology/*`는 session을 읽기 전에 404 `ONTOLOGY_INDUCTION_DISABLED`로 답하며 RPC를 부르지 않는다. migration 없이 flag를
   켜면 RPC 호출이 실패해 503 `ONTOLOGY_STORE_FAILED`가 된다(fail closed, 기록 없음).
