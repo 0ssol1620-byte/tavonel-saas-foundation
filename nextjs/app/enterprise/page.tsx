@@ -131,8 +131,8 @@ export default function EnterprisePage() {
                 Enterprise engagement can negotiate a separately executed data processing agreement
                 during scoping, starting from the{" "}
                 <a href="/policy/TAVONEL_DPA_v2_2026-09-23.md">archived 2026-09-23 template</a>, which
-                is a draft for review and not a signed agreement; once executed, it prevails within
-                its scope.
+                is a draft for review and not a signed agreement. Once executed, the signed agreement
+                prevails within its scope.
               </p>
 
               <h2>What an engagement costs</h2>
