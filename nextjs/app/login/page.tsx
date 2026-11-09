@@ -247,8 +247,11 @@ export default function LoginPage() {
             </>
           ) : selfService && customerProcessingEnabled ? (
             <p className="notice static" role="status">
-              <strong>Start with a free evaluation.</strong> Use up to 3 files and 50 standard
-              pages to compile 1 World for 7 days. No card is required.
+              {/* Review PR201-R2: uploads open per workspace in stages, so the evaluation is conditioned on it. */}
+              <strong>Signing in creates your workspace.</strong> Uploading your own sources is switched
+              on for workspaces stage by stage, and your workspace shows whether it is open. Once it is
+              open, a free evaluation uses up to 3 files and 50 standard pages to compile 1 World for 7
+              days. No card is required.
             </p>
           ) : null}
 

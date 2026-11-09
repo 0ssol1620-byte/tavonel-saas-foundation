@@ -182,6 +182,8 @@ const COPY_SURFACES = [
     Neither had a row here, so nothing would have caught the drift on the way in either.
   */
   "app/solutions/[slug]/page.tsx",
+  // 2026-11-09: the five proof framings moved here from the detail page; the same rules hold them.
+  "lib/solution-proof-picks.ts",
   "app/api/page.tsx",
   // The /solutions hub, added with the route. Its cards are read from the record on the detail
   // page above, so the only copy of its own it carries is the title, the intro and the closing
@@ -964,6 +966,7 @@ describe("public copy", () => {
     "components/landing-v2/landing-page.tsx",
     "app/product/compiled-world/page.tsx",
     "app/solutions/[slug]/page.tsx",
+    "lib/solution-proof-picks.ts",
     "app/api/page.tsx",
     "app/evidence/page.tsx",
     "app/enterprise/page.tsx",
@@ -1460,9 +1463,10 @@ const prose = (surface: string) =>
 describe("the site's own vocabulary", () => {
   it("declares two access actions and one Explore action, and no more", () => {
     expect(ACCESS_CTA).toEqual({ href: "/contact", label: "Request access" });
+    // Review PR201-R1 B3: self-serve opens in stages, so the live-posture action signs a visitor up.
     expect(SELF_SERVE_CTA).toEqual({
       href: "/login",
-      label: "Start with your files",
+      label: "Sign up for access",
     });
     expect(EXPLORE_CTA).toEqual({
       href: "/explore",
@@ -1489,19 +1493,26 @@ describe("the site's own vocabulary", () => {
       promised the compile this deployment does not run.
 
       The fact being pinned is the same one, with the condition it was missing: the self-serve
-      action requires the customer-data gate as well as the card. The gate is closed, so the
-      billing flags no longer change the answer -- and when it opens, this case is the one that
-      says so out loud rather than a CTA changing under nobody's decision.
+      action requires the customer-data gate as well as the card. D-12 (delegated decision
+      2026-11-09) opened the gate, so the billing flags now do change the answer -- this is the
+      case that says so out loud -- and a preview, which cannot charge a card, still offers access.
     */
     expect(
       activationPolicy.customerData.enabled,
       "the gate below is what this case turns on"
-    ).toBe(false);
+    ).toBe(true);
     expect(
       primaryCallToAction({
         COMMERCIAL_MODE: "live",
         TAVONEL_BILLING_LAUNCH_APPROVED: "true",
         VERCEL_ENV: "production",
+      })
+    ).toEqual(SELF_SERVE_CTA);
+    expect(
+      primaryCallToAction({
+        COMMERCIAL_MODE: "live",
+        TAVONEL_BILLING_LAUNCH_APPROVED: "true",
+        VERCEL_ENV: "preview",
       })
     ).toEqual(ACCESS_CTA);
   });
@@ -1538,17 +1549,19 @@ describe("the site's own vocabulary", () => {
     G1-001: /explore's closing action is the site's access action, not a fourth spelling of it.
 
     `lib/explore-story.ts` is reachable from the client bundle, where the commercial flags inline
-    as `undefined`, so it names `ACCESS_CTA` directly instead of resolving the posture. That is
-    only honest while the gate is closed, which is exactly what this asserts.
+    as `undefined`, so it names `ACCESS_CTA` as a placeholder. P2-10 resolved the posture on the
+    server: `app/explore/page.tsx` passes `primaryCallToAction()` and the stage replaces the
+    primary action with it. With the gate open (D-12) that wiring is what keeps /explore on the
+    header's action, so it is what this asserts.
   */
   it("closes the public sample on the same access action the header offers", () => {
-    expect(activationPolicy.customerData.enabled).toBe(false);
-    const primary = EXPLORE_COPY.endActions.find(action => action.primary);
-    expect(primary).toEqual({
-      label: ACCESS_CTA.label,
-      href: ACCESS_CTA.href,
-      primary: true,
-    });
+    expect(activationPolicy.customerData.enabled).toBe(true);
+    const primary = EXPLORE_COPY.endActions.filter(action => action.primary);
+    expect(primary).toEqual([{ label: ACCESS_CTA.label, href: ACCESS_CTA.href, primary: true }]);
+    expect(read("app/explore/page.tsx")).toContain("access={primaryCallToAction()}");
+    expect(read("components/explore/explore-stage.tsx")).toContain(
+      "action.primary ? { ...action, label: access.label, href: access.href } : action"
+    );
   });
 
   it.each(CHROME_SURFACES)("publishes no retired name in %s", surface => {
@@ -1631,7 +1644,7 @@ describe("the site's own vocabulary", () => {
       'const pricingLabel = korean ? KO_CHROME.nav["/pricing"] : "Pricing";'
     );
     expect(chrome, "and renders that").toContain("{pricingLabel}");
-    for (const literal of ["Request access", "Start with your files"]) {
+    for (const literal of ["Request access", "Sign up for access"]) {
       expect(
         chrome,
         `the header writes "${literal}" instead of reading it`
@@ -1654,7 +1667,7 @@ describe("the site's own vocabulary", () => {
     for (const literal of [
       "Contact<",
       "Request access",
-      "Start with your files",
+      "Sign up for access",
     ]) {
       expect(
         sheet,

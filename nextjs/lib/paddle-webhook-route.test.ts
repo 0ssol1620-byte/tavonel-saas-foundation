@@ -25,6 +25,8 @@ const request = () => new Request("https://tavonel.com/api/paddle/webhook", {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv("PADDLE_WEBHOOK_SECRET", "test-secret");
+  // The route checks the binding key before parsing (billing integrity, lib/billing-secrets.ts).
+  vi.stubEnv("FOUNDATION_BILLING_HMAC", "b".repeat(40));
   mocks.verify.mockReturnValue(true);
 });
 afterEach(() => vi.unstubAllEnvs());

@@ -115,10 +115,15 @@ describe("Home reading guide integration", () => {
     const text = readable(main);
     const gate = locale === "ko" ? KO_CHROME.customerDataGate : activationPolicy.customerData.reason;
     expect(gate).toBe(LANDING_V2_COPY[locale].start.microtext);
-    for (const sentence of [gate, SAMPLE_BOUNDARY[locale]]) {
-      expect(text.split(sentence).length - 1, `once on Home: ${sentence}`).toBe(1);
-      expect(readable(sceneOf(main, "s6"))).toContain(sentence);
-    }
+    /*
+      D-12 (delegated decision 2026-11-09) opened the gate, and s6 states the boundary sentence
+      only while it is closed (`components/landing-v2/scenes/start.tsx`). So: the sample boundary
+      once, in s6; the gate sentence nowhere on Home.
+    */
+    expect(activationPolicy.customerData.enabled).toBe(true);
+    expect(text.split(SAMPLE_BOUNDARY[locale]).length - 1, `once on Home: ${SAMPLE_BOUNDARY[locale]}`).toBe(1);
+    expect(readable(sceneOf(main, "s6"))).toContain(SAMPLE_BOUNDARY[locale]);
+    expect(text.split(gate).length - 1, `the open gate is not restated on Home: ${gate}`).toBe(0);
     expect(text).not.toContain(locale === "ko" ? "별도 협의" : "by arrangement");
   });
 

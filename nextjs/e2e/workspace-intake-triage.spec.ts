@@ -571,7 +571,7 @@ test("exclude-all 409 leaves choices editable so the customer can retry", async 
       "409 TRIAGE_CHOICES_REQUIRED",
     ],
     putResponseStatuses: [200],
-    status: "Files uploaded and sealed for checks. Full processing has not started. Choose include or exclude for every row; identical bytes remain separate reviewable sources.",
+    status: "Files uploaded and sealed for checks. Full processing has not started. Choose include or exclude for every row. Identical bytes remain separate reviewable sources.",
   });
   const options = flow.events.filter(event => event.startsWith("upload OPTIONS "));
   expect(options.length).toBeLessThanOrEqual(1);
@@ -605,7 +605,7 @@ test("exclude-all 409 leaves choices editable so the customer can retry", async 
   const costStatus = page.locator('[aria-label="Cost status"]');
   await expect(costStatus).toBeVisible();
   await expect(costStatus).toContainText("Initial customer page charge for this complete source/version set");
-  await expect(costStatus).toContainText("This request is a new read; its page charge is shown in the initial estimate. No recompile quote is being made.");
+  await expect(costStatus).toContainText("This request is a new read. Its page charge is shown in the initial estimate. No recompile quote is being made.");
   await expect(costStatus).not.toContainText("$0.00");
   await expectNoGlobalUploadDenial(page);
   expect(finalCalls).toBe(2);
@@ -638,7 +638,7 @@ for (const failure of ["seal", "receipt"] as const) {
     await page.getByRole("button", { name: "Review sources before processing" }).click();
     await page.getByRole("button", { name: "Approve bounded source preflight" }).click();
     const triage = page.getByRole("region", { name: "Server source triage", exact: true });
-    await expect(triage.getByRole("status").last()).toHaveText("Upload checks did not complete (INTAKE_TRIAGE_NETWORK_ERROR). Some file bytes may already have been uploaded. No parsing or full-processing approval was requested; processing remains blocked.");
+    await expect(triage.getByRole("status").last()).toHaveText("Upload checks did not complete (INTAKE_TRIAGE_NETWORK_ERROR). Some file bytes may already have been uploaded. No parsing or full-processing approval was requested. Processing remains blocked.");
     await expectNoGlobalUploadDenial(page);
     await expect(page.locator(".notice.static")).toContainText("selected for source review");
     expect(flow.putResponseStatuses).toEqual([200]);

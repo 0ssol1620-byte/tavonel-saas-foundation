@@ -1,3 +1,4 @@
+import { primaryCallToAction } from "../lib/commercial-state";
 const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/test";
 const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
@@ -640,10 +641,11 @@ test("a deep link lands on the exact region it names, not only on the act", asyn
 test("the closing action offers the reader their own sources", async ({ page }) => {
   await page.goto("/explore");
   await expect(page.getByRole("heading", { name: "Try the same path with your own knowledge." })).toBeVisible();
-  // G1-001 / SD-01: the primary action is ACCESS_CTA until checkout *and* customer data are open.
-  const status = await (await page.request.get("/api/status/v2")).json();
-  const selfServe = status.availableActions?.createAccount?.enabled === true;
-  await expect(page.getByRole("link", { name: selfServe ? "Start with your files" : "Request access" }).first()).toBeVisible();
+  // G1-001 / SD-01: the primary action is ACCESS_CTA until checkout *and* customer data are open. The page
+  // renders primaryCallToAction(); this runner carries the server's environment, so the same call names it.
+  const access = primaryCallToAction();
+  await expect(page.getByRole("link", { name: access.label }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: access.label }).first()).toHaveAttribute("href", access.href);
   await expect(page.getByRole("link", { name: "Connect a source" })).toBeVisible();
   /*
     BA-036. Three sibling buttons in one row is the arrangement 3.4 bars, so the reading action

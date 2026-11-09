@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { previousBillingHmac } from "@/lib/billing-binding";
+import { billingSecret } from "@/lib/billing-secrets";
 import { createSupabaseGateEnforcementStore, runBillingGateEnforcement } from "@/lib/billing-gate-enforcement";
 import { readCommercialState } from "@/lib/commercial-state";
 import { authorizationStage, readCustomerSourceAuthorization } from "@/lib/customer-data-admission";
@@ -28,7 +29,7 @@ async function enforce(request: Request) {
   }
   const commercial = readCommercialState();
   const paddle = readPaddleApiConfig();
-  const bindingSecret = process.env.FOUNDATION_BILLING_HMAC?.trim() ?? "";
+  const bindingSecret = billingSecret("FOUNDATION_BILLING_HMAC") ?? "";
   // A preview holding the live key must never pause a live customer's subscription.
   const vercelEnv = process.env.VERCEL_ENV;
   const deploymentMayAct = commercial.provider === "sandbox" || vercelEnv === undefined || vercelEnv === "production";

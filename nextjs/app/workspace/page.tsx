@@ -13,6 +13,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { OWNER_ACCESS_ACTIVE_SENTENCE, useCheckout, type NoticeTone } from "@/lib/use-checkout";
 import type { BillingStatusAccount, EntitlementWaitResult } from "@/lib/entitlement-wait";
 import { formatCount, formatTimestamp } from "@/lib/format";
+import { countNoun } from "@/lib/plural";
 import { decideCheckoutResume, heldOfferSentence, readOfferParam, rememberCheckoutIntent, takeCheckoutIntent, type ResumeAccess } from "@/lib/checkout-intent";
 import type { BillingOfferCode } from "@/lib/billing-catalog";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
@@ -80,7 +81,7 @@ import type { WorldReadModel } from "@/lib/world-read-model";
 import { compileLimitsNotice, judgeCompileSet } from "@/lib/compile-limits";
 import { describeCorpusStart, judgeCorpusSet, type CorpusProgress } from "@/lib/corpus-batching";
 import { CompileJobPanel, type CompileJobView } from "@/components/compile-job-panel";
-import { observeCompileJob } from "@/lib/compile-job-client";
+import { compileJobRestingNotice, isCompileJobResting, isCompileJobTerminal, observeCompileJob, pickResumableCompileJob } from "@/lib/compile-job-client";
 import { measureSelection, type PageCountResult } from "@/lib/page-count";
 import {
   buildPreflightSummary,
@@ -994,8 +995,8 @@ export default function WorkspacePage() {
         if (!token) return;
         const response = await fetch("/api/compile-jobs", { headers: { authorization: `Bearer ${token}` } });
         if (!response.ok) return;
-        const json = await response.json() as { jobs?: CompileJobView[] };
-        const open = json.jobs?.find((entry) => !["ready", "failed", "cancelled"].includes(entry.state));
+        const json = await response.json() as { jobs?: Array<CompileJobView & { settledAt?: string | null }> };
+        const open = pickResumableCompileJob(json.jobs ?? [], Date.now());
         if (!open) return;
         // A part found on its own is still part of a run, and showing it alone would say
         // "12 sources" about a compile the customer started with 128.
@@ -1419,7 +1420,7 @@ export default function WorkspacePage() {
     followRef.current = controller;
     let compiled: string | null = null;
 
-    await observeCompileJob({
+    const rested = await observeCompileJob({
       jobId,
       authToken: sessionToken,
       signal: controller.signal,
@@ -1445,6 +1446,9 @@ export default function WorkspacePage() {
     });
 
     if (controller.signal.aborted) return;
+    /* The "Compiling N sources" line is retired here, for every caller; a World that loads below says more. */
+    const restingNotice = rested ? compileJobRestingNotice(rested) : null;
+    if (restingNotice) setNotice(restingNotice);
     /*
       The compile ran to a stop and produced no World. `workspace_compile_started` already
       counted the attempt, so without this the funnel reports the drop as a gap between two
@@ -1512,7 +1516,7 @@ export default function WorkspacePage() {
           ...payload,
           parts: payload.parts.map((part) => ({ jobId: part.jobId, batchIndex: part.batchIndex ?? null, state: part.state })),
         });
-        const open = payload.parts.find((part) => !["ready", "failed", "cancelled"].includes(part.state))
+        const open = payload.parts.find((part) => !isCompileJobTerminal(part.state))
           ?? payload.parts[payload.parts.length - 1];
         if (open && open.jobId !== watching) {
           watching = open.jobId;
@@ -1723,7 +1727,8 @@ export default function WorkspacePage() {
       setCollectionResult(json);
       await loadWorldState(json.collectionId, token);
       setNotice(json.coreExecution.status === "review_required"
-        ? `Separate Core produced a review-required package for ${json.collectionId}; ${json.reviewReasons?.join(", ") || "manual review required"}. The signed download is available and nothing is active yet.`
+        // The reasons are read in the review queue, where each has its sentence and reference (D0 R2).
+        ? `Separate Core produced a review-required package for ${json.collectionId}${json.reviewReasons?.length ? ` with ${countNoun(json.reviewReasons.length, "review reason")}` : ". Manual review required"}. The signed download is available and nothing is active yet.`
         : `Compiled World ${json.collectionId} is ready for evidence review.`);
     } finally {
       setBusy(false);
@@ -2749,7 +2754,7 @@ export default function WorkspacePage() {
     `structuring`; without this the hero said "2 sources are ready to compile" above a panel
     that said the compile was running.
   */
-  const compileRunning = Boolean(compileJob && !["ready", "failed", "cancelled", "review_required"].includes(compileJob.state));
+  const compileRunning = Boolean(compileJob && !isCompileJobResting(compileJob.state));
   const activityCount = activePipelineCount || (compileRunning ? Math.max(1, compileJob?.documentsTotal ?? 1) : 0) || (busy ? 1 : 0);
   const candidateReady = Boolean(collectionResult?.coreExecution);
   const candidateNeedsDecision = Boolean(
@@ -3558,6 +3563,7 @@ export default function WorkspacePage() {
                 <h2 id="review-queue-title">Sources waiting on you, most at risk first.</h2>
                 <ReviewQueue
                   input={reviewQueueInput}
+                  languages={navigator.languages}
                   selectedDocumentId={worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)?.sourceId ?? null}
                   onSelectDocument={(documentId) => selectReviewEvidence(worldReadModel?.evidence.find((item) => item.sourceId === documentId)?.id ?? null)}
                 />

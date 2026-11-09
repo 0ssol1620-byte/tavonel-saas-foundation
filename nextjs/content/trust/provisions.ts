@@ -129,7 +129,7 @@ export const TRUST_PROVISIONS: readonly TrustProvision[] = [
     id: "deletion",
     subject: "Deletion on a verified request",
     state: "provided",
-    line: "On a verified deletion request, or on termination, the scope and outcome are confirmed in writing, and compiled worlds can be exported as signed packages first. Affected material becomes eligible for physical purge 30 days after the verified request, and immutable artifacts carry a 28-day recovery protection from creation; these are configured periods, not a guaranteed completion deadline. A request may be limited or delayed by a legal hold or retention duty.",
+    line: "On a verified deletion request, or on termination, the scope and outcome are confirmed in writing, and compiled worlds can be exported as signed packages first. Affected material becomes eligible for physical purge 30 days after the verified request, and immutable artifacts carry a 28-day recovery protection from creation. These are configured periods, not a guaranteed completion deadline. A request may be limited or delayed by a legal hold or retention duty.",
     source: PRIVACY,
   },
   {
@@ -164,21 +164,21 @@ export const TRUST_PROVISIONS: readonly TrustProvision[] = [
     id: "processing_addendum",
     subject: "Data processing terms",
     state: "provided",
-    line: "The 2026-09-30 processing addendum becomes part of the self-service agreement when a workspace owner explicitly accepts it, and the acceptance records the version and the hash of each document. It does not execute standard contractual clauses; a transfer that needs them is agreed before the affected data is submitted.",
+    line: "The 2026-09-30 processing addendum becomes part of the self-service agreement when a workspace owner explicitly accepts it, and the acceptance records the version and the hash of each document. It does not execute standard contractual clauses. A transfer that needs them is agreed before the affected data is submitted.",
     source: ADDENDUM,
   },
   {
     id: "dpa",
     subject: "Separately signed data processing agreement",
     state: "roadmap",
-    line: "Negotiated for an Enterprise engagement during scoping, starting from the archived 2026-09-23 draft, which is a template and not a signed agreement. No signed bilateral agreement exists until both parties execute one; once executed, it prevails within its scope.",
+    line: "Negotiated for an Enterprise engagement during scoping, starting from the archived 2026-09-23 draft, which is a template and not a signed agreement. No signed bilateral agreement exists until both parties execute one. Once executed, the signed agreement prevails within its scope.",
     source: ENTERPRISE_TEMPLATE,
   },
   {
     id: "third_party_assurance",
     subject: "Third-party assurance report",
     state: "not_provided",
-    line: "No SOC 2 report, ISO 27001 certificate or independent penetration-test report exists yet. An external penetration test is planned after the first paying customer; SOC 2 timing is not set. The processing addendum's audit right is a real right to inspect controls, not a report that already exists.",
+    line: "No SOC 2 report, ISO 27001 certificate or independent penetration-test report exists yet. An external penetration test is planned after the first paying customer. SOC 2 timing is not set. The processing addendum's audit right is a real right to inspect controls, not a report that already exists.",
     source: ADDENDUM,
   },
   {

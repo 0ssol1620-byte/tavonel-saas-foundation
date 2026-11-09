@@ -64,12 +64,17 @@ describe("internal billing gate enforcement route", () => {
     vi.stubEnv("FOUNDATION_BILLING_HMAC_PREVIOUS", "");
     await call();
     expect(run.mock.calls[0][0]).toMatchObject({ bindingSecret: "h".repeat(40), previousBindingSecret: undefined });
-    vi.stubEnv("FOUNDATION_BILLING_HMAC_PREVIOUS", ` ${"p".repeat(40)} `);
+    vi.stubEnv("FOUNDATION_BILLING_HMAC_PREVIOUS", "p".repeat(40));
     await call();
     expect(run.mock.calls[1][0]).toMatchObject({ bindingSecret: "h".repeat(40), previousBindingSecret: "p".repeat(40) });
+    // Billing integrity (2026-11-09): a whitespace-padded previous key is refused, not trimmed.
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubEnv("FOUNDATION_BILLING_HMAC_PREVIOUS", ` ${"p".repeat(40)} `);
+    await call();
+    expect(run.mock.calls[2][0]).toMatchObject({ bindingSecret: "h".repeat(40), previousBindingSecret: undefined });
     vi.stubEnv("FOUNDATION_BILLING_HMAC", "");
     expect((await call()).status).toBe(503);
-    expect(run).toHaveBeenCalledTimes(2);
+    expect(run).toHaveBeenCalledTimes(3);
   });
 
   it("answers 503 when the durable store cannot list candidates", async () => {

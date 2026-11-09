@@ -35,6 +35,28 @@ describe("compute settlement callback", () => {
     assert.match(String(new Headers(call.init.headers).get("x-tavonel-billing-signature")), /^[A-Za-z0-9_-]{43}$/u);
   });
 
+  it("refuses a settlement secret with surrounding whitespace instead of trimming it", async () => {
+    let calls = 0;
+    const fetcher = async () => { calls += 1; return new Response("{}", { status: 200 }); };
+    for (const secret of [`${"s".repeat(40)}\n`, ` ${"s".repeat(40)}`, `${"s".repeat(40)}\r\n`]) {
+      await assert.rejects(
+        dispatchComputeSettlement(
+          {
+            FOUNDATION_BILLING_SETTLEMENT_URL: "https://tavonel-saas-foundation.vercel.app/api/internal/billing/settle",
+            FOUNDATION_BILLING_SETTLEMENT_HMAC: secret,
+          },
+          "quarantine/pilot-test/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/source",
+          "settled",
+          2,
+          "OCR_COMPLETED",
+          fetcher as typeof fetch,
+        ),
+        /^RetryableError: compute settlement secret has leading or trailing whitespace$/,
+      );
+    }
+    assert.equal(calls, 0);
+  });
+
   it("surfaces only a bounded settlement status code", async () => {
     const env = {
       FOUNDATION_BILLING_SETTLEMENT_URL: "https://tavonel-saas-foundation.vercel.app/api/internal/billing/settle",

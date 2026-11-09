@@ -26,7 +26,6 @@ import {
   REFUND_WINDOW_DAYS,
   refundablePageAllowance,
 } from "./billing-catalog";
-import { PROCESSING_UNIT_USD, STANDARD_UNITS_PER_PAGE, formatUsd } from "./usage-pricing";
 import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "./intake-approval-rollout";
 
 /*
@@ -159,7 +158,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Getting started",
     summary: "From an API key to an evidence-bound answer, with the one step no key can take.",
     blocks: [
-      { kind: "note", text: `**Before you start.** ${activationPolicy.customerData.reason} So steps 1 to 5 below are the contract you will call once intake is arranged with us, not a request TAVONEL will accept from you today. Steps 6 and 7 read a World that already exists, and the completed public Compiled World is readable in full right now — including from the unauthenticated reads the API reference at /api will run for you.` },
+      { kind: "note", text: `**Before you start.** ${activationPolicy.customerData.reason} Steps 1 to 5 below are the calls that do it once your workspace is open. Steps 6 and 7 read a World that already exists, and the completed public Compiled World is readable in full right now — including from the unauthenticated reads the API reference at /api will run for you.` },
       { kind: "prose", text: "Every request is tenant-scoped by the key it carries. There is no account switch and no impersonation header: a key belongs to one workspace and reaches nothing else." },
       /*
         Review 3 (CI-TI-1): the whole-set approval lineage is documented only while it is on
@@ -766,7 +765,7 @@ console.log("compile job:", accepted.jobId);` },
     group: "Input and compile",
     summary: "Direct-to-storage upload, and why bytes never reach the application server.",
     blocks: [
-      { kind: "note", text: `**Before you start.** ${activationPolicy.customerData.reason} Everything on this page is the contract the capability endpoint serves once intake is arranged; it is not a request TAVONEL will accept from you today.` },
+      { kind: "note", text: `**Before you start.** ${activationPolicy.customerData.reason} Everything on this page is the contract the capability endpoint serves to a signed-in workspace.` },
       { kind: "heading", text: "Why bytes never reach our server" },
       { kind: "prose", text: "Uploads are direct. The capability endpoint returns a short-lived URL to object storage; you PUT the bytes there. The application server sees the request for permission and the receipt afterwards, and never the document." },
       { kind: "heading", text: "Requesting a capability and listing documents" },
@@ -1487,8 +1486,8 @@ console.log("compile job:", accepted.jobId);` },
         `lib/product-claims-sync.test.ts` P06 pins both surfaces so they cannot drift apart.
 
         P07 / FD-04's refund numbers stay: `REFUND_WINDOW_DAYS`,
-        `REFUND_MAX_CONSUMED_FRACTION` and the catalog's own `includedPages`, with the rate from
-        the two constants the reservation code charges against. Nothing here is typed as a figure.
+        `REFUND_MAX_CONSUMED_FRACTION` and the catalog's own `includedPages`. R1 (delegated decision
+        2026-11-09) removed the per-page rate: volume past the allowance is arranged with us.
         No route enforces the refund rule because a person issues refunds through Paddle, and
         `liveChargesEnabled` is false.
 
@@ -1498,7 +1497,7 @@ console.log("compile job:", accepted.jobId);` },
         ratification a merge condition.
       */
       { kind: "heading", text: "Included pages, and what expires" },
-      { kind: "prose", text: `Included pages belong to the billing month they are granted in: when the next month's pages are granted, whatever is left of the previous month expires. Unused pages do not roll over and are not refunded if you cancel. A balance can only be spent while a plan is active. Pages past the included allowance are billed at the published rate of ${formatUsd(STANDARD_UNITS_PER_PAGE * PROCESSING_UNIT_USD)} per standard page.` },
+      { kind: "prose", text: `Included pages belong to the billing month they are granted in: when the next month's pages are granted, whatever is left of the previous month expires. Unused pages do not roll over and are not refunded if you cancel. A balance can only be spent while a plan is active. Volume past the included allowance is arranged with us.` },
       { kind: "heading", text: "Refunds" },
       { kind: "prose", text: `Refunds: ask within ${REFUND_WINDOW_DAYS} days of payment and the payment is refunded in full, provided fewer than ${Math.round(REFUND_MAX_CONSUMED_FRACTION * 100)}% of the plan's included pages have been consumed — ${refundablePageAllowance(BILLING_OFFERS.observer_access)} pages on ${BILLING_OFFERS.observer_access.label}, ${refundablePageAllowance(BILLING_OFFERS.studio_access)} on ${BILLING_OFFERS.studio_access.label}. Past that, the payment is not refunded. Unused pages are not refunded on cancellation. Subject to the terms as updated.` },
       { kind: "heading", text: "The ceilings" },

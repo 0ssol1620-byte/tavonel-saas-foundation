@@ -19,6 +19,7 @@ import { OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS, OPERATIONAL_SLI_ALERT_DE
 import { W1_TRIAL_OPS_AFFECTED_PATHS, W1_TRIAL_OPS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES, TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_PATHS, SPECIMEN_STRIP_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_BROWSER_FILES, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES, PUBLIC_MARKETING_AFFECTED_BROWSER_FILES, MARKETING_TOOLING_POSTIMAGES, G1_COPY_TRUTH_AFFECTED_PATHS, G1_COPY_TRUTH_AFFECTED_UNIT_FILES, G1_COPY_TRUTH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { ENABLEMENT_AFFECTED_BROWSER_FILES, P4_FOLLOWUPS_AFFECTED_PATHS, P4_FOLLOWUPS_AFFECTED_UNIT_FILES, P4_FOLLOWUPS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+import { LEGAL_SEMICOLONS_AFFECTED_PATHS, LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
 const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -515,11 +516,11 @@ const currentOwnerBindings = [
     exportedSuites: INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES,
     neighbors: ['lib/api-error-codes.test.ts', 'lib/intake-approval-rollout-on.test.ts', 'lib/upload-transfer.test.ts', 'lib/usage-pricing.ts'] },
 ];
-// Solutions proof: two exact paths, two direct suites and the one 1440 solutions browser suite.
+// Solutions proof: four exact paths, three direct suites and the one 1440 solutions browser suite.
 {
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'solutions-proof'), [owner] = owners;
-  const paths = ['app/solutions/[slug]/page.tsx', 'app/solutions/solution-workflow-proof.tsx'];
-  const suites = ['lib/copy-trust-guard.test.ts', 'lib/output-escaping.test.ts'], browsers = ['e2e/solutions-workflows.spec.ts'];
+  const paths = ['app/solutions/[slug]/page.tsx', 'app/solutions/solution-workflow-proof.tsx', 'lib/solution-proof-picks.ts', 'lib/solution-workflows.test.ts'];
+  const suites = ['lib/copy-trust-guard.test.ts', 'lib/output-escaping.test.ts', 'lib/solution-workflows.test.ts'], browsers = ['e2e/solutions-workflows.spec.ts'];
   assert(owners.length === 1 && JSON.stringify(SOLUTIONS_PROOF_AFFECTED_PATHS) === JSON.stringify(paths)
     && JSON.stringify(SOLUTIONS_PROOF_AFFECTED_UNIT_FILES) === JSON.stringify(suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(suites)
     && JSON.stringify(SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES) === JSON.stringify(browsers) && JSON.stringify(owner.browserFiles) === JSON.stringify(browsers)
@@ -527,7 +528,7 @@ const currentOwnerBindings = [
     && paths.every(p => owner.match.test('nextjs/' + p))
     && ['app/solutions/[slug]/layout.tsx', 'app/solutions/page.tsx', 'app/solutions/solution-workflow-proof.test.tsx'].every(p => !owner.match.test('nextjs/' + p))
     && runner.includes("['e2e/solutions-workflows.spec.ts', ['1440']]"),
-    'Solutions proof owner must keep its two exact paths, two direct suites and the 1440 solutions browser suite');
+    'Solutions proof owner must keep its four exact paths, three direct suites and the 1440 solutions browser suite');
 }
 // Evidence viewer overlay: one exact stylesheet, its direct suite and the world-lifecycle browser suite.
 {
@@ -760,6 +761,14 @@ for (const binding of [
     browsers: ['e2e/landing-hero-film-loading.spec.ts', 'e2e/templates.spec.ts'],
     rows: ["['e2e/landing-hero-film-loading.spec.ts', ['390']],", "['e2e/templates.spec.ts', ['1440']],"],
     neighbors: ['nextjs/app/privacy/opengraph-image.tsx', 'nextjs/app/subprocessors/layout.tsx', 'nextjs/lib/operations.test.ts', 'nextjs/lib/operations-copy.ts', 'nextjs/public/film/poster-1-t8.16-3x.avif', 'nextjs/public/film/poster-5-t1.00.avif', 'nextjs/public/film/compile-cut.mp4'] },
+  // legal-semicolons-20261109: five exact paths, ten direct suites, no browser suite.
+  { group: 'legal-semicolons-20261109', prefix: 'nextjs/', exportedPaths: LEGAL_SEMICOLONS_AFFECTED_PATHS, exportedSuites: LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts'],
+    suites: ['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-provisions.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/app/refunds/page.ts', 'nextjs/components/processing-consent-panel.module.css', 'nextjs/content/trust/provisions.json', 'nextjs/lib/status-probe-store.ts', 'lib/status-probe.ts'] },
 ]) {
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === binding.group), [owner] = owners;
   assert(owners.length === 1 && JSON.stringify(binding.exportedPaths) === JSON.stringify(binding.paths)
