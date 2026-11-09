@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { activationPolicy } from "@/lib/activation-policy";
 import { readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
+import { readBillingSecret } from "@/lib/billing-secrets";
 import { readCommercialState } from "@/lib/commercial-state";
 import { readExportSignerEnv } from "@/lib/export-signing";
 import { readPaddleApiConfig } from "@/lib/paddle-api";
@@ -25,8 +26,9 @@ export function GET() {
     checkout: Boolean(readPaddleBrowserConfig()),
     api: Boolean(readPaddleApiConfig()),
     store: Boolean(readSupabaseAdminConfig()),
-    binding: (process.env.FOUNDATION_BILLING_HMAC?.trim().length ?? 0) >= 32,
-    settlement: (process.env.FOUNDATION_BILLING_SETTLEMENT_HMAC?.trim().length ?? 0) >= 32,
+    // Same reader as the signers and verifiers: a value with surrounding whitespace reports as not configured.
+    binding: readBillingSecret("FOUNDATION_BILLING_HMAC").ok,
+    settlement: readBillingSecret("FOUNDATION_BILLING_SETTLEMENT_HMAC").ok,
     catalog: readConfiguredBillingOffers().size === 2,
   };
   const billingConfigured = Object.values(billingChecks).every(Boolean);

@@ -7351,7 +7351,8 @@ test('affected OCR_PAGES_INCOMPLETE owner: four exact paths select three direct 
   const plan = affectedAskPlan(affectedMap(OCR_PAGES_INCOMPLETE_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
   for (const adjacent of ['nextjs/lib/operations-p0.tsx', 'nextjs/lib/operations-p0-v2.ts', 'nextjs/lib/processing-receipts.test.tsx',
-    'nextjs/lib/processing-receipts-v2.ts', 'nextjs/app/api/operations/p0/credits/release/route.ts', 'nextjs/e2e/operations-p0.spec.ts', 'lib/operations-p0.ts']) {
+    // The credit-release route is owned by switch-on-billing-integrity since PR #201; its lookalike stays the neighbour.
+    'nextjs/lib/processing-receipts-v2.ts', 'nextjs/app/api/operations/p0/credits/release/route.tsx', 'nextjs/e2e/operations-p0.spec.ts', 'lib/operations-p0.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);

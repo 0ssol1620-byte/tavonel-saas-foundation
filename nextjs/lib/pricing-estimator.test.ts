@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { estimatorRows, monthlyTotalUsd } from "@/components/pricing-page-client";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
-import { MAX_UNITS_PER_PAGE, PROCESSING_UNIT_USD, STANDARD_UNITS_PER_PAGE } from "@/lib/usage-pricing";
+import { PROCESSING_UNIT_USD, STANDARD_UNITS_PER_PAGE } from "@/lib/usage-pricing";
 
 /*
   BA-121. The /pricing estimator and the /pricing volume table, held to the same arithmetic.
@@ -16,9 +16,12 @@ import { MAX_UNITS_PER_PAGE, PROCESSING_UNIT_USD, STANDARD_UNITS_PER_PAGE } from
   Four volumes, the ones the audit named: 50 and 250 are inside the Developer plan, 300 and 348
   are also inside it (the plan includes 500), and the failure path below is the one that matters
   -- a volume past the included pages has to cost more than the subscription, in both surfaces.
+
+  R1, delegated decision 2026-11-09: nothing sells or bills a page past the plan, so a volume past
+  the included pages has no published price in either surface (`null`, "Arranged with us"), and
+  the per-page ceiling row is gone. The agreement between the two surfaces is what stays pinned.
 */
 const STANDARD_PAGE_USD = STANDARD_UNITS_PER_PAGE * PROCESSING_UNIT_USD;
-const MAXIMUM_PAGE_USD = MAX_UNITS_PER_PAGE * PROCESSING_UNIT_USD;
 const developer = BILLING_OFFERS.observer_access;
 const team = BILLING_OFFERS.studio_access;
 
@@ -36,24 +39,18 @@ describe("the /pricing estimator agrees with the volume table", () => {
     expect(rows.developerTotalUsd).not.toBe(pages * STANDARD_PAGE_USD);
     // Inside the included pages nothing is added, and the extra row says so with a zero.
     expect(rows.extraPages).toBe(0);
-    expect(rows.extraPagesUsd).toBe(0);
   });
 
-  it("charges the published rate for the pages past the plan", () => {
+  it("prices no page past the plan, and counts them instead", () => {
     const pages = developer.includedPages + 100;
     const rows = estimatorRows(pages);
     expect(rows.extraPages).toBe(100);
-    expect(rows.extraPagesUsd).toBeCloseTo(100 * STANDARD_PAGE_USD, 10);
-    expect(rows.developerTotalUsd).toBeCloseTo(developer.priceUsd + 100 * STANDARD_PAGE_USD, 10);
-    expect(rows.developerTotalUsd).toBeGreaterThan(developer.priceUsd);
-  });
-
-  it("caps the maximum at the complex-page ceiling and never below the standard total", () => {
-    const rows = estimatorRows(developer.includedPages + 100);
-    expect(rows.developerMaximumUsd).toBeCloseTo(developer.priceUsd + 100 * MAXIMUM_PAGE_USD, 10);
-    expect(rows.developerMaximumUsd).toBeGreaterThan(rows.developerTotalUsd);
-    // Failure path: inside the plan there is nothing to escalate, so the ceiling is the plan.
-    expect(estimatorRows(1).developerMaximumUsd).toBe(developer.priceUsd);
+    expect(rows.developerTotalUsd).toBeNull();
+    expect(rows.developerTotalUsd).toBe(monthlyTotalUsd(developer, pages));
+    // Team still covers the volume, so it still has a price.
+    expect(rows.teamTotalUsd).toBe(team.priceUsd);
+    expect(rows).not.toHaveProperty("extraPagesUsd");
+    expect(rows).not.toHaveProperty("developerMaximumUsd");
   });
 
   it("refuses to read a page count as a bare unit-rate quote", () => {

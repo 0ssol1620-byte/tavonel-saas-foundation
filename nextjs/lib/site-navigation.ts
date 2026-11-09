@@ -100,7 +100,8 @@ export function customerNavOwns(href: string, pathname: string): boolean {
 export const ACCESS_CTA: SiteLink = { href: "/contact", label: "Request access" };
 
 /** The access action once a real card can be charged. The same action, live posture. */
-export const SELF_SERVE_CTA: SiteLink = { href: "/login", label: "Start with your files" };
+// Review PR201-R1 B3: self-serve opens in stages, so the action signs a visitor up rather than promising an upload.
+export const SELF_SERVE_CTA: SiteLink = { href: "/login", label: "Sign up for access" };
 
 /** The one name for the public sample, everywhere it is linked. */
 export const EXPLORE_CTA: SiteLink = { href: "/explore", label: "Explore a Compiled World" };
@@ -168,7 +169,7 @@ export const BRAND_LINE = {
   still stated verbatim where it is stated; the inventory is in `lib/commercial-state.ts`.
 */
 export const KO_CHROME = {
-  cta: { [ACCESS_CTA.href]: "이용 문의", [SELF_SERVE_CTA.href]: "내 자료로 시작하기" } as Record<string, string>,
+  cta: { [ACCESS_CTA.href]: "이용 문의", [SELF_SERVE_CTA.href]: "사용 신청하기" } as Record<string, string>,
   signIn: "로그인",
   /* Labels follow the same hrefs as the English primary navigation. */
   nav: {
@@ -238,9 +239,12 @@ export const KO_CHROME = {
     entry page, was what the deployment does not do. It states the same two facts in the same order
     the English does now: the World a reader can open today, then the arranged path. The gate is
     unchanged and still stated once, in Korean, in the site's one spelling of it.
+
+    D-12, delegated decision 2026-11-09: the literal Korean of the switch-on sentence, staged per
+    review PR201-R1 B3. Every syllable is inside the KO Home font subset (landing-v2-page.test.ts).
   */
   customerDataGate:
-    "완성된 Compiled World는 오늘 근거까지 전부 읽을 수 있습니다. 직접 가진 원문의 컴파일은 요금제 구매가 아니라 저희와 함께 설정합니다.",
+    "내 원문 컴파일은 단계적으로 열고 있습니다. 로그인하면 워크스페이스가 만들어지고, 업로드와 컴파일은 단계마다 워크스페이스별로 열립니다. 내 워크스페이스의 열림 상태는 워크스페이스 화면에 표시됩니다. 열린 뒤에는 Developer 요금제를 바로 구매할 수 있고, Team과 Enterprise는 저희와 함께 정합니다.",
 } as const;
 
 /**

@@ -94,8 +94,10 @@ describe("landing scene 09 -- start", () => {
   it.each(LOCALES)("%s prints the customer-data gate and the sample boundary verbatim, once each", (locale) => {
     const plain = text(render(locale)).replace(/\s+/g, " ");
     const gate = locale === "ko" ? KO_CHROME.customerDataGate : activationPolicy.customerData.reason;
-    expect(activationPolicy.customerData.enabled).toBe(false);
-    for (const sentence of [gate, SAMPLE_BOUNDARY[locale]]) expect(plain.split(sentence).length - 1, sentence).toBe(1);
+    // D-12 (delegated decision 2026-11-09): the gate is open, so only the sample boundary is printed.
+    expect(activationPolicy.customerData.enabled).toBe(true);
+    expect(plain.split(SAMPLE_BOUNDARY[locale]).length - 1, SAMPLE_BOUNDARY[locale]).toBe(1);
+    expect(plain.split(gate).length - 1, gate).toBe(0);
     const faq = readFileSync(new URL("../components/landing-v2/home-reader-guide.tsx", import.meta.url), "utf8");
     expect(faq).toContain(` ${SAMPLE_BOUNDARY[locale]}"]`);
   });

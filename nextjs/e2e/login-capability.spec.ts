@@ -30,7 +30,7 @@ test("sign-in explains the customer processing gate even when evaluation account
   await page.route("**/api/status/v2", route => route.fulfill({ json: statusV2() }));
   await page.goto("/login");
   await expect(page.getByText("Customer file processing is not open yet.")).toBeVisible();
-  await expect(page.getByText("Start with a free evaluation.")).toHaveCount(0);
+  await expect(page.getByText("Signing in creates your workspace.")).toHaveCount(0);
   // BA-252 left one name for this destination and `EXPLORE_CTA` holds it; /login renders that
   // constant, so "Explore the public World" is one of the four names the vocabulary pass removed.
   // The contract is unchanged: the closed gate still offers the public sample, at a 44px target.
@@ -44,7 +44,11 @@ test("sign-in presents evaluation only when the customer processing gate is enab
     json: statusV2({ createAccount: true, compileCustomerDocuments: true }),
   }));
   await page.goto("/login");
-  await expect(page.getByText("Start with a free evaluation.")).toBeVisible();
+  // Review PR201-R2: the evaluation is offered on the workspace being open, never as an upload behind sign-in.
+  const evaluation = page.locator("p.notice", { hasText: "Signing in creates your workspace." });
+  await expect(evaluation).toBeVisible();
+  await expect(evaluation).toContainText("your workspace shows whether it is open. Once it is open, a free evaluation");
+  await expect(page.getByText("Start with a free evaluation.")).toHaveCount(0);
   await expect(page.getByText("Customer file processing is not open yet.")).toHaveCount(0);
 });
 
@@ -54,7 +58,7 @@ test("a partial v2 contract fails closed instead of enabling sign-in or customer
   await page.route("**/api/status/v2", route => route.fulfill({ json: partial }));
   await page.goto("/login");
   await expect(page.getByRole("button", { name: "Sign-in unavailable" })).toBeDisabled();
-  await expect(page.getByText("Start with a free evaluation.")).toHaveCount(0);
+  await expect(page.getByText("Signing in creates your workspace.")).toHaveCount(0);
 });
 
 test("does not offer a broken sign-in when public auth readiness is false", async ({ page }) => {
@@ -127,15 +131,21 @@ test("a Team intent is not promised a checkout even where a plan can be bought",
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in to TAVONEL.");
 });
 
-test("/pricing names the customer-data gate, server-side, with its own reason", async ({ page }) => {
-  // No mock: both gates render on the server from activationPolicy, so this asserts the shipped
-  // default rather than a fixture. The reason string is read off lib/activation-policy.ts, so a
-  // reworded policy fails here instead of quietly showing a stale sentence.
+/*
+  D-12 (delegated decision 2026-11-09). No mock: the gate renders on the server from
+  activationPolicy, so this asserts the shipped default rather than a fixture. With the switch on,
+  /pricing states no closed customer-data gate row, and the old closed-gate sentence is nowhere on
+  the page. Review PR201-R1 B3: the purchase aside states the staged-opening sentence, open or closed,
+  so a reader learns how a workspace gets in before choosing a plan.
+*/
+test("/pricing states no closed customer-data gate once the switch is on, server-side", async ({ page }) => {
+  expect(activationPolicy.customerData.enabled).toBe(true);
   const html = await (await page.goto("/pricing"))!.text();
-  expect(html).toContain('data-purchase-gate="customerData"');
-  const gate = page.locator('[data-purchase-gate="customerData"]');
-  await expect(gate).toBeVisible();
-  await expect(gate).toContainText(activationPolicy.customerData.reason);
+  expect(html).not.toContain('data-purchase-gate="customerData"');
+  await expect(page.locator('[data-purchase-gate="customerData"]')).toHaveCount(0);
+  expect(html).not.toContain("Compiling your own sources is set up with us");
+  await expect(page.locator(".paper-purchase-boundary")).toContainText(activationPolicy.customerData.reason);
+  await expect(page.locator(".paper-purchase-boundary")).toContainText("Self-serve access is opening in stages.");
 });
 
 test("closed intake offers a working public evaluation and an Enterprise conversation", async ({ page }) => {
