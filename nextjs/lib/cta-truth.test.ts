@@ -259,7 +259,7 @@ const TABLE = {
   S1: CLOSED,
   S2: {
     ...CLOSED,
-    home: { ...CLOSED.home, secondary: { href: "/login", label: "Start free — 3 files, no card" } },
+    home: { ...CLOSED.home, secondary: { href: "/login", label: "Start free" } },
     homeKo: { ...CLOSED.homeKo, secondary: { href: "/login", label: "사용 신청하기" } },
     pricing: [
       { href: "/login", label: "Start free" },

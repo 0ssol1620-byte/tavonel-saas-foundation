@@ -76,7 +76,7 @@ import {
 } from "./landing-v2-copy.test";
 import { koTermDrift } from "./ko-terms";
 import { consentCopy } from "./marketing-analytics";
-import { ACCESS_CTA, EXPLORE_CTA, FOOTER_GROUPS, KO_CHROME, SELF_SERVE_CTA, START_FREE_LABEL } from "./site-navigation";
+import { ACCESS_CTA, EXPLORE_CTA, FOOTER_GROUPS, KO_CHROME, SELF_SERVE_CTA } from "./site-navigation";
 import { EVIDENCE } from "./evidence-record";
 import claimsPack from "../content/evidence/public-claims-pack.json";
 
@@ -921,8 +921,7 @@ describe("landing v2 -- hero actions by commercial state", () => {
       expect(secondary).not.toBeNull();
       expect(attr(secondary![0], "href")).toBe(escaped(SELF_SERVE_CTA.href));
       expect(label(secondary![1]!)).toBe(
-        // Conversion pass 2026-11-09: the hero prints the allowance the start action opens.
-        locale === "ko" ? KO_CHROME.cta[SELF_SERVE_CTA.href] : START_FREE_LABEL
+        locale === "ko" ? KO_CHROME.cta[SELF_SERVE_CTA.href] : SELF_SERVE_CTA.label
       );
       expect(main).not.toMatch(/href="(?:\/ko)?\/evaluation"/);
       // The close does not change with commercial posture (brief move 1).

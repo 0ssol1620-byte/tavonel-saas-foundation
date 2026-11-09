@@ -16,7 +16,6 @@ import RecompileScene from "./scenes/recompile";
 import StartScene from "./scenes/start";
 import TrustScene from "./scenes/trust";
 import { landingV2Copy } from "@/lib/landing-v2-copy";
-import { SELF_SERVE_CTA, START_FREE_LABEL } from "@/lib/site-navigation";
 import {
   buildHeroView,
   buildProofTabs,
@@ -222,8 +221,12 @@ export default function LandingPage({
   };
   const access = primaryCallToAction();
   const heroStart = {
-    // Conversion pass 2026-11-09: the hero has room for the allowance the start action opens.
-    label: access.href === "/contact" ? page.bringOwn : korean ? KO_CHROME.cta[access.href] : access === SELF_SERVE_CTA ? START_FREE_LABEL : access.label,
+    /*
+      Conversion pass 2026-11-09: the live label is SELF_SERVE_CTA's "Start free". The allowance is printed where there
+      is room (the proof-page block, the Explore close). The hero's first screen is held to its re-derived word budget
+      (e2e/landing-v2.spec.ts), which "Start free — 3 files, no card" would exceed by three words.
+    */
+    label: access.href === "/contact" ? page.bringOwn : korean ? KO_CHROME.cta[access.href] : access.label,
     href: access.href === "/contact" ? (korean ? "/ko/evaluation" : "/evaluation") : access.href,
   };
 

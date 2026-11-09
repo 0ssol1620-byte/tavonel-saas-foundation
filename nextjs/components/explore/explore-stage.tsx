@@ -383,7 +383,7 @@ export default function ExploreStage({ access, model, layout, change, answers, t
           <nav className={styles.siteLinks} aria-label="TAVONEL">
             {/* Conversion pass 2026-11-09 (funnel audit fix 3): Pricing and the access action stay on a phone, Product folds. */}
             {exitLinks.map((link) => (
-              <Link key={link.href} href={link.href as Route} data-phone={link.href === "/product" ? undefined : "1"}>{link.label}</Link>
+              <Link key={link.href} href={link.href as Route} data-phone={link.href === "/product" ? undefined : link.href === "/pricing" ? "pricing" : "start"}>{link.label}</Link>
             ))}
           </nav>
           <button

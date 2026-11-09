@@ -84,11 +84,14 @@
 /*
   Conversion pass 2026-11-09 (funnel audit fix 3). This used to hide all three links below 860px, which
   left a phone reader at the end of the strongest proof page with no way to Pricing or to start. Product
-  folds, Pricing and the access action stay, and the row wraps rather than overflowing at 360px.
+  folds, Pricing and the access action stay. B-09 allows two header rows below 821px and no more, so at
+  the narrowest phones the access action folds too (the closing scene still carries it) and Pricing stays.
 */
 @media (max-width: 860px) {
   .siteLinks a:not([data-phone]) { display: none; }
-  .headerActions { flex-wrap: wrap; row-gap: 0; column-gap: 12px; }
+}
+@media (max-width: 380px) {
+  .siteLinks a[data-phone="start"] { display: none; }
 }
 
 /*
