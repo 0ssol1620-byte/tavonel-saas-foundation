@@ -8144,19 +8144,6 @@ test('affected legal-semicolons-20261109 owner: 5 exact paths select 10 direct s
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
-// processing-ga-20261109 (ADR 0008): one finite owner, restated independently of the exported constants.
-import { PROCESSING_GA_AFFECTED_PATHS, PROCESSING_GA_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
-test('affected processing-ga-20261109 owner: 1 exact path selects 2 direct suites and no browser suite; neighbours stay unmapped', () => {
-  const paths = ['lib/customer-data-admission.ts'];
-  const suites = ['lib/customer-data-admission.test.ts', 'lib/processing-workspace-grant.test.ts'];
-  assert.deepEqual([[...PROCESSING_GA_AFFECTED_PATHS], [...PROCESSING_GA_AFFECTED_UNIT_FILES]], [paths, suites]);
-  for (const path of paths.map(p => `nextjs/${p}`)) {
-    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['processing-ga-20261109'], path);
-  }
-  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
-  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['processing-ga-20261109'], [], suites, [], []]);
-  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
-  for (const adjacent of ['nextjs/lib/customer-data-admission.tsx', 'nextjs/lib/customer-data-admission-routes.ts', 'nextjs/lib/library-shadow.ts', 'lib/customer-data-admission.ts']) {
 // sli-alert-noise-20261109: one finite owner, restated independently of the exported constants.
 import { SLI_ALERT_NOISE_AFFECTED_PATHS, SLI_ALERT_NOISE_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 test('affected sli-alert-noise-20261109 owner: 3 exact paths select 10 direct suites and no browser suite; neighbours stay unmapped', () => {
@@ -8232,6 +8219,23 @@ test('affected w2-d-intake-stage1 owner: 3 exact paths select 2 direct suites an
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(neighbour)).map(o => o.group), [group], neighbour);
   }
   for (const adjacent of ['quarantine-sidecar/cdr-cloudrun/table_dpi_arena_v2.py', 'nextjs/lib/processing-ceiling-stage1.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});
+// processing-ga-20261109 (ADR 0008): one finite owner, restated independently of the exported constants.
+import { PROCESSING_GA_AFFECTED_PATHS, PROCESSING_GA_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected processing-ga-20261109 owner: 1 exact path selects 2 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['lib/customer-data-admission.ts'];
+  const suites = ['lib/customer-data-admission.test.ts', 'lib/processing-workspace-grant.test.ts'];
+  assert.deepEqual([[...PROCESSING_GA_AFFECTED_PATHS], [...PROCESSING_GA_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['processing-ga-20261109'], path);
+  }
+  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['processing-ga-20261109'], [], suites, [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  for (const adjacent of ['nextjs/lib/customer-data-admission.tsx', 'nextjs/lib/customer-data-admission-routes.ts', 'nextjs/lib/library-shadow.ts', 'lib/customer-data-admission.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }

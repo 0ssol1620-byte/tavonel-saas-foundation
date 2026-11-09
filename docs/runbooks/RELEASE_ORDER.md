@@ -485,6 +485,60 @@ compile이 24 MiB를 넘는 `ocr.json`을 `JSON_TOO_LARGE`로 거부하게 둔�
   `turns: 0`만으로는 빈 큐와 구별되지 않으니, 이 줄이 없는지도 함께 본다.
 - 진단과 원인 사례: `outputs/tavonel-research-replan-20261013/market-20261104/w1/D0-DIAGNOSIS-20261108.md`(AKC 저장소).
 
+## 추가 2026-11-08 — W2-E2 Ask 답변 가능성 게이트 shadow (migration 없음)
+
+- 새 flag는 `TAVONEL_ASK_ANSWERABILITY_MODE`(부록 A)다. 기본값은 `off`이고, `off`면 게이트를 계산하지 않는다. `shadow`면 판정을 계산해
+  `tavonel.answerability_shadow.v1` 로그 한 줄로 남긴다. 그 줄은 답 receipt의 `outputSha256`, `questionSha256`에 묶이고, 개수만 담으며
+  질문의 단어는 담지 않는다. 응답 본문, receipt, signed receipt(`answerability: null`)는 바뀌지 않는다. `on`을 포함한 다른 값은
+  `off`로 처리하고 `TAVONEL_ASK_ANSWERABILITY_MODE_INVALID` 오류를 로그에 남긴다.
+- **순서는 자유다.** migration도, 새 API 오류 코드도, DB 쓰기도 없다. production에서 `shadow`로 켜는 것은 env 변경이고,
+  재배포가 필요하므로 과금 build 1회다. 별도 batch로 하지 말고 다음 wave batch에 묶는다.
+- **holdout 판정은 `NOT_SUPPORTED`다**(`nextjs/eval/ask-quality/e2/receipts/holdout-*.json`, C2 실패: 답할 수 있는 질문 21/191을
+  거절했고, Wilson 상한은 0.162로 허용치 0.10을 넘었다). 그래서 `on`(cohort 안에서 abstain)은 만들지 않았다. 새 사전 등록과 새 holdout에서
+  `SUPPORTED`가 나오고 리뷰를 거친 변경이 있기 전에는 제안하지 않는다.
+- rollback: flag를 지우거나 `off`로 둔다. 코드를 되돌릴 필요는 없다(off 경로는 계산을 하지 않는다).
+
+## 추가 2026-11-08 — W2-B2: Library 근사 중복·문서 유형·주제 태그 shadow (`20261107100000`, `20261107100100`)
+
+- `20261107100000_library_organize_shadow`: 추가만 한다. `source_fingerprints`에 `text_sha256`·`minhash`(128×u32)·
+  `text_fingerprint_version` 열(셋이 함께 null이거나 함께 채워짐), `document_relations`에 `inputs_sha256` 열과
+  same_text/near_duplicate/revision_candidate 행의 추적 가능성 제약, 새 테이블 `document_labels`(RLS on, client 거부
+  restrictive policy, 어떤 역할도 table 권한 없음), service_role 전용 RPC `record_library_organize`·`read_library_organize`.
+  B1이 만든 exact_bytes 행과 기존 열은 바꾸지 않는다.
+- `20261107100100_founder_test_reset_library_organize`: founder test reset이 `document_labels`도 세고, fingerprint에 넣고,
+  지운다(label → relation → fingerprint 순서). FK가 `on delete cascade`라 fingerprint 삭제만으로도 label은 지워지지만,
+  명시적으로 지워야 seal의 count·fingerprint와 write fence가 이 테이블을 덮는다. 본문은 `20261105010000`의 상위집합
+  (W1-B1 줄 + W1-A3 줄 + labels 줄)이다. **이 파일은 `20261107100000` 뒤, 그리고 `20261105010000` 뒤에 적용한다.**
+  이 파일보다 먼저 prepare된 reset은 `founder_test_reset_database_drift`로 seal이 실패하므로 다시 prepare한다.
+- 적용 주체: production 적용은 위임 운영자가 Supabase MCP `apply_migration`으로 파일 하나씩
+  (`20261107100000` → `20261107100100`) 한다. `supabase db push`는 쓰지 않는다(production 이력이 repo와 어긋나 있어
+  out-of-order로 거부한다). 적용 뒤 `supabase_migrations.schema_migrations`에 두 버전이 있는지 확인하고, 적용 시각·
+  버전·적용자를 캠페인 ledger에 적는다. `20261107100000`은 `document_relations`에 CHECK를 NOT VALID 없이 추가하므로
+  적용 시 기존 행 전체 검사와 짧은 잠금이 있다(테이블이 작아 무시할 수준, 2026-11 기준).
+- 순서: **migration 먼저, 배포 나중.** 코드가 먼저 도착해도 깨지지 않는다. flag가 꺼져 있으면(기본) RPC를 부르지 않는다.
+  flag가 `shadow`인데 migration이 없으면 `LIBRARY_ORGANIZE_MIGRATION_ABSENT` error 로그 1줄이고 compile은 그대로 간다.
+- `TAVONEL_LIBRARY_ORGANIZE_MODE`(off|shadow|on, 기본 off). `shadow`는 제안을 저장만 한다(compile 요청·응답·저장 World
+  불변). `on`은 Library 읽기 DTO를 열지만 `TAVONEL_PROCESSING_WORKSPACE_COHORT`에 명시된 workspace에만 열린다(미설정이면
+  닫힘). 임계값(near 0.85, revision 0.50)과 규칙은 보정되지 않은 shadow 기본값이다. `on`은 §4.B B2a/B2b/B2c benchmark와
+  사람 판정 뒤에만 켠다.
+- 시간 상한(R1-M3): hook은 Core dispatch 앞에서 돈다. 한 compile의 OCR 텍스트가 2,000,000자를 넘으면 계산 없이
+  `LIBRARY_ORGANIZE_SKIPPED_BUDGET` 1줄로 건너뛴다(상한 근처 계산 0.28~0.64초, lane PC 측정). RPC는 DB 3초
+  (`statement_timeout` + 문서 사이 경과 검사, 넘으면 전체 rollback·`LIBRARY_ORGANIZE_STORE_TIME_BUDGET`), client 4초.
+  그래서 compile 하나에 더해지는 최악 지연은 약 4.7초다. 로컬 PG17 측정으로 128건 호출은 workspace fingerprint
+  ~700개, 32건 호출은 ~4,000개까지 3초 안에 든다. 그보다 큰 workspace에서 `shadow`를 켜기 전에 LSH banding을 넣는다.
+- 되돌리기: env를 지우거나 `off`(재배포 필요, 과금 build 1회). 테이블·열은 남긴다(expand만, down migration 없음).
+  `off`이면 읽는 경로도 쓰는 경로도 없다.
+
+## 추가 2026-11-09 — IndexNow 제출 (GX-04)
+
+- 키는 공개용이다. `nextjs/public/7a0ff86c91c02b35a358cdf2761b2512.txt`가 `https://tavonel.com/7a0ff86c91c02b35a358cdf2761b2512.txt`로
+  나가고 본문이 키 자체다. 비밀이 아니며 교체하려면 파일 이름과 본문을 같이 바꾼다(`lib/indexnow.test.ts`가 1개만 허용).
+- **빌드에 연결하지 않는다.** production 배포가 Ready가 된 뒤 사람이 한 번 돌린다:
+  `cd nextjs && node scripts/indexnow-ping.mjs --dry-run`으로 payload를 확인하고, `node scripts/indexnow-ping.mjs`로 보낸다.
+- 스크립트는 라이브 사이트가 키 파일을 같은 본문으로 내보내는지 먼저 확인하고, 아니면 보내지 않는다(exit 1).
+  `https://tavonel.com/sitemap.xml`의 tavonel.com URL 전부를 `https://api.indexnow.org/indexnow`로 POST한다. 200/202만 성공이다.
+- preview 배포에서는 돌리지 않는다. host가 tavonel.com으로 고정되어 있다.
+
 ## 추가 2026-11-09 — 처리 GA: 워크스페이스 수 제한을 푼다 (ADR 0008, `TAVONEL_PROCESSING_ROLLOUT`)
 
 - 결정: `docs/adr/0008-processing-general-availability.md`. D-19 canary(이름 붙은 1–3개 워크스페이스)를 푼다.
@@ -561,16 +615,6 @@ compile이 24 MiB를 넘는 `ocr.json`을 `JSON_TOO_LARGE`로 거부하게 둔�
 - cohort를 지우지 않는다. `general`에서는 처리에 영향이 없다. 하지만 지우면 rollback이 깨진다. cohort와 rollout이 둘 다
   미설정이면 아무도 처리되지 않는다.
 - 1이 끝나기 전에 2를 하지 않는다.
-
-## 추가 2026-11-09 — IndexNow 제출 (GX-04)
-
-- 키는 공개용이다. `nextjs/public/7a0ff86c91c02b35a358cdf2761b2512.txt`가 `https://tavonel.com/7a0ff86c91c02b35a358cdf2761b2512.txt`로
-  나가고 본문이 키 자체다. 비밀이 아니며 교체하려면 파일 이름과 본문을 같이 바꾼다(`lib/indexnow.test.ts`가 1개만 허용).
-- **빌드에 연결하지 않는다.** production 배포가 Ready가 된 뒤 사람이 한 번 돌린다:
-  `cd nextjs && node scripts/indexnow-ping.mjs --dry-run`으로 payload를 확인하고, `node scripts/indexnow-ping.mjs`로 보낸다.
-- 스크립트는 라이브 사이트가 키 파일을 같은 본문으로 내보내는지 먼저 확인하고, 아니면 보내지 않는다(exit 1).
-  `https://tavonel.com/sitemap.xml`의 tavonel.com URL 전부를 `https://api.indexnow.org/indexnow`로 POST한다. 200/202만 성공이다.
-- preview 배포에서는 돌리지 않는다. host가 tavonel.com으로 고정되어 있다.
 
 ## 추가 2026-11-09 — 병합 전 출시 행: 배포가 READY일 때 이미 열려 있다
 
