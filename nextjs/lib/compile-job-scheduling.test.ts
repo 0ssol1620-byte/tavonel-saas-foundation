@@ -73,8 +73,36 @@ function install(rows: Row[]) {
     if (order !== "updated_at.asc") throw new Error(`unsupported order: ${order}`);
     const limit = Number(parsed.searchParams.get("limit") ?? "20");
 
+    /*
+      `or=(a,b)` as PostgREST evaluates it, for the two operators the scheduler uses: `eq` on a
+      jsonb column compares values (so `[]` matches an empty array however it is spelled), and
+      `not.is.null`. Anything else is answered the way PostgREST answers a filter it cannot
+      parse -- a 400 -- so a misspelled filter fails here as it would in production.
+    */
+    const orFilter = parsed.searchParams.get("or");
+    const terms = orFilter === null ? null : /^\((.*)\)$/.exec(orFilter)?.[1]?.split(",") ?? [];
+    const evaluators = terms?.map((term) => {
+      const eq = /^(\w+)\.eq\.(.+)$/.exec(term);
+      if (eq) {
+        try {
+          const expected = JSON.stringify(JSON.parse(eq[2]!));
+          return (entry: Row) => JSON.stringify(entry[eq[1]!]) === expected;
+        } catch {
+          return null;
+        }
+      }
+      const notNull = /^(\w+)\.not\.is\.null$/.exec(term);
+      if (notNull) return (entry: Row) => entry[notNull[1]!] !== null && entry[notNull[1]!] !== undefined;
+      return null;
+    });
+    if (evaluators && (evaluators.length === 0 || evaluators.some((check) => check === null))) {
+      return new Response(JSON.stringify({ code: "PGRST100", message: `failed to parse logic tree (${orFilter})` }),
+        { status: 400, headers: { "content-type": "application/json" } });
+    }
+
     const matched = rows
       .filter((entry) => !denied.includes(entry.state))
+      .filter((entry) => !evaluators || evaluators.some((check) => check!(entry)))
       .sort((a, b) => a.updated_at.localeCompare(b.updated_at))
       .slice(0, limit);
     return new Response(JSON.stringify(matched), {
@@ -125,6 +153,53 @@ describe("the scheduler's open-job window", () => {
     const open = await readOpenCompileJobs(10);
     expect(open.ok && open.value.map((job) => job.state))
       .toEqual(["preflight", "uploading", "reading", "structuring", "building_world"]);
+  });
+});
+
+/*
+  D0, 2026-11-08: the same starvation, one level down. A job whose blockers wait on the
+  customer's answer writes nothing on its turn, so its `updated_at` never moves; six of them
+  are the oldest rows and a fresh compile behind them was never reached.
+*/
+describe("the scheduler and a job waiting on the customer's blocker decision", () => {
+  const BLOCKER = [{ documentId: "doc-a", kind: "input", reason: "READING_NEEDS_OPERATOR_REVIEW" }];
+  const waiting = (index: number, resolution: string | null = null): Row => ({
+    ...row("reading", `2026-09-30T06:3${index}:00Z`, `cjob-${String(index).repeat(32)}`),
+    blocked: BLOCKER,
+    blocked_resolution: resolution,
+  });
+  const fresh = row("preflight", "2026-11-08T08:10:55Z", "cjob-" + "f".repeat(32));
+
+  it("reaches a fresh compile behind six jobs waiting on a customer answer, in the first window", async () => {
+    install([...Array.from({ length: 6 }, (_, index) => waiting(index)), fresh]);
+    // 5 is the cron's batch width; the window it reads is twice that.
+    for (const limit of [5, 10]) {
+      const open = await readOpenCompileJobs(limit);
+      expect(open.ok && open.value.map((job) => job.jobId)).toEqual([fresh.job_id]);
+    }
+  });
+
+  it("schedules a blocked job again once the customer has answered", async () => {
+    const answered = waiting(1, "continue");
+    const removed = waiting(2, "remove_blocked");
+    install([waiting(0), answered, removed, fresh]);
+    const open = await readOpenCompileJobs(10);
+    expect(open.ok && open.value.map((job) => job.jobId)).toEqual([answered.job_id, removed.job_id, fresh.job_id]);
+    expect(open.ok && open.value[0]?.blockedResolution).toBe("continue");
+  });
+
+  it("leaves a job with no blockers exactly where it was", async () => {
+    const plain = row("reading", "2026-09-01T00:00:00Z", "cjob-" + "1".repeat(32));
+    install([plain, fresh]);
+    const open = await readOpenCompileJobs(10);
+    expect(open.ok && open.value.map((job) => job.jobId)).toEqual([plain.job_id, fresh.job_id]);
+  });
+
+  it("surfaces a filter the store refuses as an error, not as an empty queue", async () => {
+    vi.stubGlobal("fetch", async () => new Response(
+      JSON.stringify({ code: "PGRST100", message: "failed to parse logic tree" }),
+      { status: 400, headers: { "content-type": "application/json" } }));
+    expect(await readOpenCompileJobs(10)).toEqual({ ok: false, code: "COMPILE_JOB_STORE_READ_FAILED" });
   });
 });
 

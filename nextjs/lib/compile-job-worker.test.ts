@@ -599,6 +599,56 @@ describe("the durable compile worker", () => {
     expect(runCompile).not.toHaveBeenCalled();
   });
 
+  it("spends none of the batch on jobs waiting for the customer's blocker decision (D0)", async () => {
+    /*
+      D0, 2026-11-08: five jobs waiting on a customer answer each took a "blocked" turn that
+      wrote nothing, used the five-wide budget, and the sixth job never got a turn. The store
+      no longer hands those out; this is the batch-side guard, so six are handed over anyway.
+    */
+    const waiting = (index: number) => job({
+      jobId: `cjob-${String(index + 1).padStart(32, "0")}`,
+      documentIds: [`wait-${index}`],
+      blocked: [{ documentId: `wait-${index}`, kind: "input", reason: "READING_NEEDS_OPERATOR_REVIEW" }],
+    });
+    const fresh = "cjob-" + "e".repeat(32);
+    group.mockReturnValue([DOCUMENT("doc-a", "sanitized"), DOCUMENT("doc-b", "sanitized")]);
+    openJobs.mockResolvedValue({ ok: true, value: [...Array.from({ length: 6 }, (_, index) => waiting(index)),
+      job({ jobId: fresh })] });
+
+    const turns = await runCompileJobBatch(5);
+
+    expect(turns.map((turn) => turn.note)).toEqual([...Array(6).fill("blocked"), "waiting"]);
+    expect(turns[6]).toMatchObject({ jobId: fresh });
+    // Unchanged blockers are not rewritten; only the fresh job advanced.
+    expect(advance).toHaveBeenCalledTimes(1);
+    expect(advance).toHaveBeenCalledWith(expect.objectContaining({ jobId: fresh }));
+  });
+
+  it("still counts real work against the budget after skipping blocked turns", async () => {
+    group.mockReturnValue([DOCUMENT("doc-a", "sanitized"), DOCUMENT("doc-b", "sanitized")]);
+    openJobs.mockResolvedValue({ ok: true, value: Array.from({ length: 8 }, (_, index) =>
+      job({ jobId: `cjob-${String(index + 1).padStart(32, "0")}` })) });
+
+    const turns = await runCompileJobBatch(5);
+
+    expect(turns.map((turn) => turn.note)).toEqual(Array(5).fill("waiting"));
+  });
+
+  it("reports an unreadable queue instead of looking idle", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      openJobs.mockResolvedValue({ ok: false, code: "COMPILE_JOB_STORE_READ_FAILED" });
+
+      const turns = await runCompileJobBatch(5);
+
+      expect(turns).toEqual([]);
+      expect(error).toHaveBeenCalledWith(JSON.stringify({ event: "compile_batch_read_failed",
+        code: "COMPILE_JOB_STORE_READ_FAILED" }));
+    } finally {
+      error.mockRestore();
+    }
+  });
+
   it("rests on every state the scheduler refuses to hand out", async () => {
     /*
       The two halves of the starvation fix are one list. A state this worker cannot move must be
