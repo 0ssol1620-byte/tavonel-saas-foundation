@@ -7990,7 +7990,8 @@ test('affected operational-sli-alert-delivery owner: 4 exact paths select 8 dire
     assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['operational-sli-alert-delivery'], [], [...suites].sort(), [], []], path);
     assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
   }
-  for (const adjacent of ['nextjs/lib/operational-sli.ts', 'nextjs/lib/operational-sli-alert-store.tsx', 'nextjs/app/api/internal/sli-alerts/replay/route.ts', 'nextjs/lib/operational-sli-alert-delivery.ts', 'lib/operational-sli-alert-store.ts']) {
+  // lib/operational-sli.ts left this neighbour list when ops-backlog-sli-20261110 took it; that owner's test pins it there alone.
+  for (const adjacent of ['nextjs/lib/operational-sli-alert.ts', 'nextjs/lib/operational-sli-alert-store.tsx', 'nextjs/app/api/internal/sli-alerts/replay/route.ts', 'nextjs/lib/operational-sli-alert-delivery.ts', 'lib/operational-sli-alert-store.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
@@ -8062,6 +8063,24 @@ test('affected w1-trial-ops owner: 10 exact paths select 17 direct suites and no
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
 });
+// ops-backlog-sli-20261110: one finite owner, restated independently of the exported constants.
+import { OPS_BACKLOG_SLI_AFFECTED_PATHS, OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected ops-backlog-sli-20261110 owner: 2 exact paths select 3 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['lib/operational-sli.test.ts', 'lib/operational-sli.ts'];
+  const suites = ['lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-read-route.test.ts', 'lib/operational-sli.test.ts'];
+  assert.deepEqual([[...OPS_BACKLOG_SLI_AFFECTED_PATHS], [...OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['ops-backlog-sli-20261110'], path);
+  }
+  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['ops-backlog-sli-20261110'], [], suites, [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  for (const adjacent of ['nextjs/lib/operational-sli-store.ts', 'nextjs/lib/operational-sli.tsx', 'nextjs/lib/operational-job-liveness.ts', 'lib/operational-sli.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});
+
 // legal-semicolons-20261109: one finite owner, restated independently of the exported constants.
 import { LEGAL_SEMICOLONS_AFFECTED_PATHS, LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 test('affected legal-semicolons-20261109 owner: 5 exact paths select 10 direct suites and no browser suite; neighbours stay unmapped', () => {
