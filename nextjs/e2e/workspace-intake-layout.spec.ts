@@ -40,7 +40,7 @@ test("nested triage keeps the inventory edge, natural Clear height and usable so
           ${introduction}
           <ul class="workspace-preflight-files" aria-label="Server classified source inventory">${reviewRow("scan.pdf")}${reviewRow(longPath)}</ul>
           <button type="button" disabled>Save choices and show estimate</button>
-          <p class="fine" role="status">Server verified the sealed sources. Choose include or exclude for every row; identical bytes remain separate reviewable sources.</p>
+          <p class="fine" role="status">Server verified the sealed sources. Choose include or exclude for every row. Identical bytes remain separate reviewable sources.</p>
         </section>
         <button type="button">Clear</button>
       </div>
