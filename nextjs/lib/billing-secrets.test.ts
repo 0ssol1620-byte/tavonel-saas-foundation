@@ -111,6 +111,28 @@ describe("webhook binding verification", () => {
     await expect(response.json()).resolves.toEqual({ code: "BILLING_NOT_CONFIGURED", reason: "BILLING_SECRET_WHITESPACE" });
   });
 
+  it("answers 503 for a set but refused previous key too, before anything is parsed or quarantined (review B1)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubEnv("PADDLE_WEBHOOK_SECRET", WEBHOOK_SECRET);
+    vi.stubEnv("FOUNDATION_BILLING_HMAC", KEY);
+    for (const [previous, reason] of [...PASTED.map(value => [value, "BILLING_SECRET_WHITESPACE"] as const), ["p".repeat(31), "BILLING_SECRET_TOO_SHORT"] as const]) {
+      vi.stubEnv("FOUNDATION_BILLING_HMAC_PREVIOUS", previous);
+      const response = await webhook(signed(transactionBody()));
+      expect(response.status, JSON.stringify(previous)).toBe(503);
+      await expect(response.json()).resolves.toEqual({ code: "BILLING_NOT_CONFIGURED", reason });
+    }
+  });
+
+  it("parses with a clean previous key, and with none at all", async () => {
+    vi.stubEnv("PADDLE_WEBHOOK_SECRET", WEBHOOK_SECRET);
+    vi.stubEnv("FOUNDATION_BILLING_HMAC", KEY);
+    for (const previous of [`${"p".repeat(40)}`, ""]) {
+      vi.stubEnv("FOUNDATION_BILLING_HMAC_PREVIOUS", previous);
+      const response = await webhook(signed("{}"));
+      expect(response.status, JSON.stringify(previous)).toBe(422);
+    }
+  });
+
   it("passes a clean binding key through to event parsing", async () => {
     vi.stubEnv("PADDLE_WEBHOOK_SECRET", WEBHOOK_SECRET);
     vi.stubEnv("FOUNDATION_BILLING_HMAC", KEY);

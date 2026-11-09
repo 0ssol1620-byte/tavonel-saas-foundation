@@ -32,6 +32,19 @@ export async function POST(request: Request) {
     console.error("foundation_billing_binding_key_refused", { code: bindingKey.code });
     return NextResponse.json({ code: "BILLING_NOT_CONFIGURED", reason: bindingKey.code }, { status: 503, headers });
   }
+  /*
+    The same holds for the previous key of a rotation (review PR201-R1 B1). It is optional, so an
+    absent one is fine. But one that is set and refused would drop every binding signed before the
+    rotation -- renewals, in-flight checkouts -- into binding_invalid with a 200: charged, and no
+    allowance. Refuse with 503 instead, so Paddle redelivers once the value is fixed.
+  */
+  if (process.env.FOUNDATION_BILLING_HMAC_PREVIOUS) {
+    const previousKey = readBillingSecret("FOUNDATION_BILLING_HMAC_PREVIOUS");
+    if (!previousKey.ok) {
+      console.error("foundation_billing_previous_binding_key_refused", { code: previousKey.code });
+      return NextResponse.json({ code: "BILLING_NOT_CONFIGURED", reason: previousKey.code }, { status: 503, headers });
+    }
+  }
   const action = parsePaddleBillingAction(rawBody);
   if (!action) return NextResponse.json({ code: "EVENT_ENVELOPE_INVALID" }, { status: 422, headers });
   if (action.action === "ignored") {
