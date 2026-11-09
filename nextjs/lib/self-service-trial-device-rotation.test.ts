@@ -78,4 +78,14 @@ describe("trial device token across a billing key rotation", () => {
     const refused = await bootstrap(token(OLD));
     expect(refused).toEqual({ ok: false, code: "TRIAL_RISK_GATE_NOT_CONFIGURED", status: 503 });
   });
+
+  // Billing integrity: a pasted key is refused, not trimmed, as the current key and as the previous one.
+  it("refuses a current key with surrounding whitespace, and ignores a previous key with it", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubEnv("FOUNDATION_BILLING_HMAC_PREVIOUS", `${OLD}\n`);
+    expect(issued(await bootstrap(token(OLD)))?.split(".")[1]).not.toBe(DEVICE);
+
+    vi.stubEnv("FOUNDATION_BILLING_HMAC", `${CURRENT}\n`);
+    expect(await bootstrap(token(CURRENT))).toEqual({ ok: false, code: "TRIAL_RISK_GATE_NOT_CONFIGURED", status: 503 });
+  });
 });

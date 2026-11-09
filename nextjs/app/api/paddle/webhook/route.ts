@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { applyFoundationBillingAction, quarantineFoundationBillingEnvelope } from "@/lib/billing-store";
 import { recordServerFunnel } from "@/lib/funnel-events";
+import { readBillingSecret } from "@/lib/billing-secrets";
 import { parsePaddleBillingAction } from "@/lib/paddle-billing-event";
 import { verifyPaddleSignature } from "@/lib/paddle-webhook";
 
@@ -20,6 +21,16 @@ export async function POST(request: Request) {
   }
   if (!verifyPaddleSignature(rawBody, request.headers.get("paddle-signature"), secret)) {
     return NextResponse.json({ code: "INVALID_SIGNATURE" }, { status: 401, headers });
+  }
+  /*
+    A binding key we cannot use is our misconfiguration, not the customer's bad binding. Without
+    this every paid event would be quarantined as binding_invalid with a 200, which Paddle never
+    retries: charged, and no allowance. A 503 makes Paddle redeliver once the value is fixed.
+  */
+  const bindingKey = readBillingSecret("FOUNDATION_BILLING_HMAC");
+  if (!bindingKey.ok) {
+    console.error("foundation_billing_binding_key_refused", { code: bindingKey.code });
+    return NextResponse.json({ code: "BILLING_NOT_CONFIGURED", reason: bindingKey.code }, { status: 503, headers });
   }
   const action = parsePaddleBillingAction(rawBody);
   if (!action) return NextResponse.json({ code: "EVENT_ENVELOPE_INVALID" }, { status: 422, headers });

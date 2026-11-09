@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { billingSecret } from "./billing-secrets";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -45,9 +46,9 @@ export async function assessTrialSourceReuse(value: {
     || !digest) {
     return { ok: false, code: "TRIAL_SOURCE_RISK_FAILED" };
   }
-  const secret = process.env.FOUNDATION_BILLING_HMAC?.trim() ?? "";
+  const secret = billingSecret("FOUNDATION_BILLING_HMAC");
   const config = readSupabaseAdminConfig();
-  if (secret.length < 32 || !config) return { ok: false, code: "TRIAL_SOURCE_RISK_NOT_CONFIGURED" };
+  if (!secret || !config) return { ok: false, code: "TRIAL_SOURCE_RISK_NOT_CONFIGURED" };
 
   let response: Response;
   try {

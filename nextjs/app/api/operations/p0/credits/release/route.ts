@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { billingSecret } from "@/lib/billing-secrets";
 import { verifyComputeSettlementRequest } from "@/lib/compute-settlement-auth";
 import { settleFoundationCompute } from "@/lib/compute-reservation";
 import { buildCreditRelease } from "@/lib/operations-p0";
@@ -22,13 +23,11 @@ export async function POST(request: Request) {
       { status: 413, headers }
     );
   }
-  if (
-    !verifyComputeSettlementRequest(
-      rawBody,
-      request.headers,
-      process.env.FOUNDATION_BILLING_SETTLEMENT_HMAC
-    )
-  ) {
+  const secret = billingSecret("FOUNDATION_BILLING_SETTLEMENT_HMAC");
+  if (!secret) {
+    return NextResponse.json({ code: "BILLING_NOT_CONFIGURED" }, { status: 503, headers });
+  }
+  if (!verifyComputeSettlementRequest(rawBody, request.headers, secret)) {
     return NextResponse.json(
       { code: "CREDIT_RELEASE_AUTH_INVALID" },
       { status: 401, headers }

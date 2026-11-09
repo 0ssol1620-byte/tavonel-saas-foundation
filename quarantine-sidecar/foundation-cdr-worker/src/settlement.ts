@@ -73,7 +73,15 @@ export async function dispatchComputeSettlement(
   facts: SettlementFacts = {},
 ) {
   const url = env.FOUNDATION_BILLING_SETTLEMENT_URL?.trim() ?? "";
-  const secret = env.FOUNDATION_BILLING_SETTLEMENT_HMAC?.trim() ?? "";
+  /*
+    Read raw, never trimmed. Foundation verifies with the exact value, so a trimmed signer and a
+    raw verifier disagree on a pasted newline and every settlement is refused. A value with
+    surrounding whitespace is refused here too (nextjs/lib/billing-secrets.ts is the other half).
+  */
+  const secret = env.FOUNDATION_BILLING_SETTLEMENT_HMAC ?? "";
+  if (secret !== secret.trim()) {
+    throw new RetryableError("compute settlement secret has leading or trailing whitespace");
+  }
   const parts = parseQuarantineSourceKey(sourceKey);
   if (!parts || !isFoundationSettlementUrl(url) || !hmacSecretIsConfigured(secret)) {
     throw new RetryableError("compute settlement is not configured");
