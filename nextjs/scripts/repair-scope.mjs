@@ -1968,6 +1968,22 @@ export const SWITCH_ON_BILLING_INTEGRITY_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/settle-route.test.ts', 'lib/status-route-contract.test.ts', 'lib/trial-source-risk.test.ts',
   'lib/trust-page-answers.test.ts',
 ]);
+// Page meter (pricing v2 phase 1, 2026-11-09): settlement by observed pages. The two endpoints no owner listed -- the
+// shared rate helper and its new suite -- select every suite that quotes, holds or settles with those rates. The route, the
+// ledger client, the worker and the SQL are owned above (w1-trial-ops, intake-triage, ocr-worker, database-contract).
+// Product code, so never nativeReuse. No browser suite of its own.
+export const PAGE_METER_AFFECTED_PATHS = Object.freeze(['lib/page-meter.test.ts', 'lib/usage-pricing.ts']);
+export const PAGE_METER_AFFECTED_UNIT_FILES = Object.freeze([
+  'app/api/compile-jobs/route.test.ts', 'lib/api-error-codes.test.ts', 'lib/billing-reconciliation.test.ts',
+  'lib/compute-reservation.test.ts', 'lib/customer-data-admission-routes.test.ts', 'lib/intake-approval-rollout-off.test.ts',
+  'lib/intake-approval-route.test.ts', 'lib/intake-capability-sealed-version.test.ts', 'lib/intake-rollout-compatibility.test.ts',
+  'lib/intake-rollout-compile-compatibility.test.ts', 'lib/intake-rollout-server-db-mismatch.test.ts',
+  'lib/intake-triage-client.test.ts', 'lib/intake-triage-processing-quote.test.ts', 'lib/intake-triage-routes.test.ts',
+  'lib/intake-triage-server.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/openapi-response-shape.switch-off.test.ts',
+  'lib/openapi-response-shape.test.ts', 'lib/openapi-routes.test.ts', 'lib/page-meter.test.ts', 'lib/plan-limit-fit.test.ts',
+  'lib/pricing-estimator.test.ts', 'lib/settle-route.test.ts', 'lib/source-import.test.ts', 'lib/upload-confirm-route.test.ts',
+  'lib/upload-release-route.switch-off.test.ts', 'lib/upload-release-route.test.ts', 'lib/usage-pricing.test.ts',
+]);
 // EN-0c benchmarks path mask: /benchmarks masks an absolute scoring-machine path in the Model Arena notes at render time
 // (the artifact and its pinned sha256 are unchanged). The four endpoints no owner listed select their two direct suites plus
 // the five that read the changed files: benchmark-registry, brand-copy, copy-trust-guard and trust-page-answers read the page
@@ -3048,6 +3064,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // Switch-on and billing integrity: the nineteen exact paths above select twenty-nine direct suites and no browser suite.
   affectedGroup('switch-on-billing-integrity', new RegExp(`^nextjs/(?:${exactPathAlternation(SWITCH_ON_BILLING_INTEGRITY_AFFECTED_PATHS)})$`),
     { unitFiles: SWITCH_ON_BILLING_INTEGRITY_AFFECTED_UNIT_FILES }),
+  // Page meter: the two exact paths above select twenty-eight direct suites and no browser suite.
+  affectedGroup('page-meter', new RegExp(`^nextjs/(?:${exactPathAlternation(PAGE_METER_AFFECTED_PATHS)})$`),
+    { unitFiles: PAGE_METER_AFFECTED_UNIT_FILES }),
   // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.
   affectedGroup('benchmarks-path-mask', new RegExp(`^nextjs/(?:${exactPathAlternation(BENCHMARKS_PATH_MASK_AFFECTED_PATHS)})$`),
     { unitFiles: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES }),
