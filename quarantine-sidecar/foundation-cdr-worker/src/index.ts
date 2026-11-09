@@ -23,6 +23,8 @@ export interface Env {
   FOUNDATION_BILLING_SETTLEMENT_URL?: string;
   FOUNDATION_BILLING_SETTLEMENT_HMAC?: string;
   FOUNDATION_MANUAL_TRIGGER_TOKEN?: string;
+  TAVONEL_INTAKE_CEILING_STAGE?: string;
+  FOUNDATION_CDR_TEXT_LAYER_FIRST?: string;
 }
 
 function authorizeManualTrigger(request: Request, token: string | undefined): "ok" | "disabled" | "denied" {

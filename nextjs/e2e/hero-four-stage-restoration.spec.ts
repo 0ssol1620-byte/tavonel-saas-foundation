@@ -1,7 +1,7 @@
 import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { expect, test } from "@playwright/test";
 
-const FILMS = ["/film/hero-r2-c1.mp4", "/film/hero-r2-c2.mp4", "/film/hero-r2-c3.mp4", "/film/hero-r2-c4.mp4"];
+const FILMS = ["/film/hero-r3-c1.mp4", "/film/hero-r3-c2.mp4", "/film/hero-r3-c3.mp4", "/film/hero-r3-c4.mp4"];
 
 async function dismissConsent(page: import("@playwright/test").Page) {
   // Release 2: the consent card appears after a 200px scroll (or 8 s), not on the first paint.
@@ -38,12 +38,13 @@ test("the title leads directly into four selectable and playing demo recordings"
   await expect(viewToggle).toHaveAttribute("aria-pressed", "false");
   await expect(film.getByRole("button", { name: "Fit full frame", exact: true })).toHaveCount(0);
   const tabs = film.getByRole("tab");
-  await expect(tabs).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
+  await expect(tabs).toHaveText(["Read", "Compile", "Update", "Trace"]);
   const playback = [];
   for (let index = 0; index < FILMS.length; index++) {
     await tabs.nth(index).click();
     await expect(tabs.nth(index)).toHaveAttribute("aria-selected", "true");
-    await expect(sequence).toHaveAttribute("data-video-primary-src", FILMS[index]);
+    // R3 (D1): below 900px each stage plays its yuv420p twin first (phoneSrc), which every engine decodes.
+    await expect(sequence).toHaveAttribute("data-video-primary-src", page.viewportSize()!.width < 900 ? FILMS[index]!.replace(".mp4", "-hq.mp4") : FILMS[index]!);
     const video = sequence.locator("video");
     await expect(video).toHaveCount(1);
     await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(1);

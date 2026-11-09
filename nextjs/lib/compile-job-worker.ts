@@ -7,7 +7,9 @@ import {
   type CompileJob,
   type CompileState,
   countCompileJobDeferrals,
+  expireBlockedCompileJob,
   isRestingCompileState,
+  readExpiredBlockedCompileJobs,
   readOpenCompileJobs,
   recordCompileJobDeferral,
   recordCompileJobSizeLimit,
@@ -102,6 +104,32 @@ const READING_LISTING_DISAGREEMENT = "READING_LISTING_DISAGREEMENT";
 const MAX_READING_DEFERRALS = 10;
 /** Temporary policy-store outages retry with the same bounded, durable deferral ledger. */
 const MAX_AUTHORITY_DEFERRALS = 10;
+
+/*
+  The release gate answered "no release row" or "could not read the gate" (F3, 2026-11-09).
+
+  Right after a Foundation deploy the scoped release row for the new surface does not exist yet,
+  and until it does every compile is refused. cjob-7de8f7fa met that window on its first tick and
+  settled failed for good. The window is not a verdict, so it is deferred like the listing
+  disagreement above -- recorded, bounded, nothing compiled -- and the gate is asked again.
+
+  Still fail-closed: a deferral runs nothing, and the gate is read again before any compile.
+  A deferred job sits in `structuring`, so the lease (COMPILE_LEASE_MS, 5 minutes) spaces the
+  attempts, and 12 of them cover about an hour. Measured windows were about 9 and 37 minutes
+  (COMPILE-RELIABILITY-20261109 R6). A release that never arrives settles with the gate's own code.
+*/
+const RELEASE_GATE_NOT_READY: readonly string[] = ["SCOPED_RELEASE_NOT_FOUND", "SCOPED_GATE_STORE_FAILED"];
+export const MAX_RELEASE_GATE_DEFERRALS = 12;
+
+/*
+  How long a job may wait on the customer's blocker decision before it settles (F2, 2026-11-09).
+
+  Before this nothing ended that wait: the scheduler no longer hands such a job out, the stall
+  timer only turns missing documents into blockers, and five owner-test jobs sat in `reading`
+  from September and November on. Seven days is a judgement, not a measurement.
+*/
+export const BLOCKED_DECISION_EXPIRY_MS = 7 * 24 * 60 * 60 * 1_000;
+export const BLOCKED_DECISION_EXPIRED = "BLOCKED_DECISION_EXPIRED";
 
 export type CompileJobTurn = {
   jobId: string;
@@ -375,6 +403,41 @@ async function advanceCompileJobTurn(job: CompileJob, deadlineAt: number): Promi
       { userId: job.createdByUserId, provenance: "durable_job" }, tickDeadline)
     : await runCollectionCompile(job.workspaceKey, classified.ready, undefined, job.jobId,
       { userId: job.createdByUserId, provenance: "durable_job" }, tickDeadline);
+  /*
+    A run that was refused for a reason that may pass: write the deferral down, move the job to the
+    back of the queue, and settle with `reason` once `max` deferrals have been spent. A count that
+    cannot be read settles nothing -- the ledger keeps the evidence and the bound applies again as
+    soon as the store answers.
+  */
+  const deferRun = async (reason: string, max: number): Promise<CompileJobTurn> => {
+    const seen = await countCompileJobDeferrals(job.workspaceKey, job.jobId, reason, max + 1);
+    const attempt = (seen.ok ? seen.value : 0) + 1;
+    if (attempt > max) {
+      return settleFailed({
+        workspaceKey: job.workspaceKey,
+        jobId: job.jobId,
+        state: "failed",
+        documentsReady: classified.ready.length,
+        errorCode: reason,
+        blocked: classified.blocked,
+      }, classified.ready.length, classified.blocked);
+    }
+    await recordCompileJobDeferral({
+      job,
+      state: "structuring",
+      documentsReady: classified.ready.length,
+      blocked: classified.blocked,
+      reason,
+      attempt,
+    });
+    await advanceCompileJob({
+      workspaceKey: job.workspaceKey,
+      jobId: job.jobId,
+      state: "structuring",
+      documentsReady: classified.ready.length,
+    });
+    return rest("waiting", "structuring", classified.ready.length, classified.blocked);
+  };
   if (!run.ok) {
     if (isCompileWaitingOnReading(run.code)) {
       /*
@@ -389,42 +452,10 @@ async function advanceCompileJobTurn(job: CompileJob, deadlineAt: number): Promi
         Every deferral is therefore recorded and moves the job to the back of the queue, and a
         disagreement that survives `MAX_READING_DEFERRALS` turns is settled rather than retried:
         at that point it is not a listing catching up, and a job that cannot finish should say so.
-        A count that cannot be read does not settle anything -- the ledger keeps the evidence and
-        the bound applies again as soon as the store answers.
       */
-      const seen = await countCompileJobDeferrals(
-        job.workspaceKey,
-        job.jobId,
-        READING_LISTING_DISAGREEMENT,
-        MAX_READING_DEFERRALS + 1,
-      );
-      const attempt = (seen.ok ? seen.value : 0) + 1;
-      if (attempt > MAX_READING_DEFERRALS) {
-        return settleFailed({
-          workspaceKey: job.workspaceKey,
-          jobId: job.jobId,
-          state: "failed",
-          documentsReady: classified.ready.length,
-          errorCode: READING_LISTING_DISAGREEMENT,
-          blocked: classified.blocked,
-        }, classified.ready.length, classified.blocked);
-      }
-      await recordCompileJobDeferral({
-        job,
-        state: "structuring",
-        documentsReady: classified.ready.length,
-        blocked: classified.blocked,
-        reason: READING_LISTING_DISAGREEMENT,
-        attempt,
-      });
-      await advanceCompileJob({
-        workspaceKey: job.workspaceKey,
-        jobId: job.jobId,
-        state: "structuring",
-        documentsReady: classified.ready.length,
-      });
-      return rest("waiting", "structuring", classified.ready.length, classified.blocked);
+      return deferRun(READING_LISTING_DISAGREEMENT, MAX_READING_DEFERRALS);
     }
+    if (RELEASE_GATE_NOT_READY.includes(run.code)) return deferRun(run.code, MAX_RELEASE_GATE_DEFERRALS);
     const sizeLimit = run.payload.sizeLimit;
     if (sizeLimit && typeof sizeLimit === "object") {
       // Best effort: the failure below is recorded whether or not this row lands. Not deduplicated:
@@ -528,4 +559,35 @@ export async function runCompileJobBatch(
     if (attempted >= workLimit) break;
   }
   return turns;
+}
+
+/*
+  Settle every job whose blocker decision has waited longer than BLOCKED_DECISION_EXPIRY_MS (F2).
+
+  Run from the same cron tick as the batch, because the batch never sees these jobs
+  (`SCHEDULER_AWAITING_CUSTOMER_FILTER`). Each settle is a compare-and-set on the row as it was
+  read, in that row's own workspace, so a customer who answers at the same moment wins and a rerun
+  over an already settled job changes nothing.
+
+  Quiet on purpose: no dead-letter page per job. The five owner-test jobs from September and
+  November all expire on the first tick after this ships, and a page for each would be a burst
+  about a decision nobody was asked to make in time. The job's own `failed` event carries the code,
+  and the tick logs one count line. No reservation is touched: a compile job holds none (the
+  per-document OCR reservation settled or released when its reading ended).
+*/
+export async function expireBlockedCompileJobs(now = Date.now(), limit = 20): Promise<{ expired: number; failed: number }> {
+  const due = await readExpiredBlockedCompileJobs(new Date(now - BLOCKED_DECISION_EXPIRY_MS).toISOString(), limit);
+  if (!due.ok) {
+    console.error(JSON.stringify({ event: "compile_blocked_expiry_read_failed", code: due.code }));
+    return { expired: 0, failed: 0 };
+  }
+  let expired = 0;
+  let failed = 0;
+  for (const job of due.value) {
+    const settled = await expireBlockedCompileJob(job, now);
+    if (!settled.ok) failed += 1;
+    else if (settled.value.expired) expired += 1;
+  }
+  if (due.value.length > 0) console.log(JSON.stringify({ event: "compile_blocked_expired", due: due.value.length, expired, failed }));
+  return { expired, failed };
 }

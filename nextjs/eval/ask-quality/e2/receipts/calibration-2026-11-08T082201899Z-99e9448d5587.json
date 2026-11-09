@@ -1,0 +1,5666 @@
+{
+ "schema": "tavonel.ask_answerability_e2_receipt.v1",
+ "status": "IMPLEMENTED_NOT_PROVEN",
+ "phase": "calibration",
+ "preregSha256": "f07b1ef445157cf8264cfeae85a7e843ce5181a7c5b9624947f835b09a05582f",
+ "e1PreregSha256": "32aa98db85bba61036e1d5a6fa0a6d1cf673f73c7b468aa53a174eee3e674f88",
+ "retriever": "lib/grounded-ask.ts answerGroundedQuestion (excerpt-concatenation-fallback), offline replay over chunked 10-K HTML",
+ "corpora": [
+  {
+   "corpusRef": "sec-10k:0000021344",
+   "chunks": 3946,
+   "manifestDigest": "sha256:b986ce2d59ea7eabee9399a6c9487fcc57f354679616b94aded69aa0da896d58"
+  },
+  {
+   "corpusRef": "sec-10k:0000200406",
+   "chunks": 3076,
+   "manifestDigest": "sha256:4d5d95dbc89c645a4c527f4895bfae2b0ccd4069881354c1d9b4ce378b02a8e1"
+  },
+  {
+   "corpusRef": "sec-10k:0000789019",
+   "chunks": 2157,
+   "manifestDigest": "sha256:dab15f0e7d0a2c4d9a6231b3eeddc8bea165493826f1cbd25d939f3ded74ff9c"
+  },
+  {
+   "corpusRef": "sec-10k:0000080424",
+   "chunks": 2031,
+   "manifestDigest": "sha256:35ae4ebde127e6878e9ce002cf66634c5f2569323cdfc9fc787c9ca7cf8b337b"
+  }
+ ],
+ "questionsReplayed": 294,
+ "gitSha": "27142990d43b9e9ce4edb9169127e2c25faced6f",
+ "gitDirty": true,
+ "runStartedAt": "2026-11-08T08:22:01.899Z",
+ "calibration": {
+  "threshold": 0,
+  "constraintMet": false,
+  "table": [
+   {
+    "threshold": 0,
+    "refusedUnanswerable": 46,
+    "unanswerable": 85,
+    "refusedAnswerable": 25,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.5,
+    "refusedUnanswerable": 54,
+    "unanswerable": 85,
+    "refusedAnswerable": 35,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.525,
+    "refusedUnanswerable": 56,
+    "unanswerable": 85,
+    "refusedAnswerable": 44,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.55,
+    "refusedUnanswerable": 61,
+    "unanswerable": 85,
+    "refusedAnswerable": 56,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.575,
+    "refusedUnanswerable": 64,
+    "unanswerable": 85,
+    "refusedAnswerable": 69,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.6,
+    "refusedUnanswerable": 64,
+    "unanswerable": 85,
+    "refusedAnswerable": 80,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.625,
+    "refusedUnanswerable": 70,
+    "unanswerable": 85,
+    "refusedAnswerable": 93,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.65,
+    "refusedUnanswerable": 74,
+    "unanswerable": 85,
+    "refusedAnswerable": 106,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.675,
+    "refusedUnanswerable": 77,
+    "unanswerable": 85,
+    "refusedAnswerable": 124,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.7,
+    "refusedUnanswerable": 80,
+    "unanswerable": 85,
+    "refusedAnswerable": 134,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.725,
+    "refusedUnanswerable": 80,
+    "unanswerable": 85,
+    "refusedAnswerable": 146,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.75,
+    "refusedUnanswerable": 82,
+    "unanswerable": 85,
+    "refusedAnswerable": 156,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.775,
+    "refusedUnanswerable": 85,
+    "unanswerable": 85,
+    "refusedAnswerable": 164,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.8,
+    "refusedUnanswerable": 85,
+    "unanswerable": 85,
+    "refusedAnswerable": 170,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.825,
+    "refusedUnanswerable": 85,
+    "unanswerable": 85,
+    "refusedAnswerable": 192,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.85,
+    "refusedUnanswerable": 85,
+    "unanswerable": 85,
+    "refusedAnswerable": 199,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.875,
+    "refusedUnanswerable": 85,
+    "unanswerable": 85,
+    "refusedAnswerable": 203,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.9,
+    "refusedUnanswerable": 85,
+    "unanswerable": 85,
+    "refusedAnswerable": 205,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.925,
+    "refusedUnanswerable": 85,
+    "unanswerable": 85,
+    "refusedAnswerable": 209,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.95,
+    "refusedUnanswerable": 85,
+    "unanswerable": 85,
+    "refusedAnswerable": 209,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 0.975,
+    "refusedUnanswerable": 85,
+    "unanswerable": 85,
+    "refusedAnswerable": 209,
+    "answerable": 209,
+    "feasible": false
+   },
+   {
+    "threshold": 1,
+    "refusedUnanswerable": 85,
+    "unanswerable": 85,
+    "refusedAnswerable": 209,
+    "answerable": 209,
+    "feasible": false
+   }
+  ]
+ },
+ "calibrationSplitMetrics": [
+  {
+   "id": "refuse_precision",
+   "numerator": 46,
+   "denominator": 71,
+   "value": 0.647887323943662,
+   "wilson95": {
+    "low": 0.5318206221160442,
+    "high": 0.7487725187834671
+   },
+   "role": "reported"
+  },
+  {
+   "id": "refuse_recall",
+   "numerator": 46,
+   "denominator": 85,
+   "value": 0.5411764705882353,
+   "wilson95": {
+    "low": 0.4357633606996252,
+    "high": 0.6430286818098059
+   },
+   "role": "reported"
+  },
+  {
+   "id": "baseline_wrong_answer_over_unanswerable",
+   "numerator": 85,
+   "denominator": 85,
+   "value": 1,
+   "wilson95": {
+    "low": 0.9567605161859486,
+    "high": 1
+   },
+   "role": "criterion"
+  },
+  {
+   "id": "gated_wrong_answer_over_unanswerable",
+   "numerator": 39,
+   "denominator": 85,
+   "value": 0.4588235294117647,
+   "wilson95": {
+    "low": 0.3569713181901941,
+    "high": 0.5642366393003748
+   },
+   "role": "criterion"
+  },
+  {
+   "id": "refused_over_answerable",
+   "numerator": 25,
+   "denominator": 209,
+   "value": 0.11961722488038277,
+   "wilson95": {
+    "low": 0.08234870281163167,
+    "high": 0.17061638734992493
+   },
+   "role": "criterion"
+  },
+  {
+   "id": "gold_span_hits_lost",
+   "numerator": 0,
+   "denominator": 68,
+   "value": 0,
+   "wilson95": {
+    "low": 0,
+    "high": 0.053471336520070537
+   },
+   "role": "criterion"
+  },
+  {
+   "id": "baseline_gold_span_recall",
+   "numerator": 68,
+   "denominator": 209,
+   "value": 0.3253588516746411,
+   "wilson95": {
+    "low": 0.2654903909275722,
+    "high": 0.3915313171340229
+   },
+   "role": "reported"
+  },
+  {
+   "id": "baseline_abstained_over_answerable",
+   "numerator": 0,
+   "denominator": 209,
+   "value": 0,
+   "wilson95": {
+    "low": 0,
+    "high": 0.018048451847580686
+   },
+   "role": "reported"
+  },
+  {
+   "id": "gated_abstained_over_answerable",
+   "numerator": 25,
+   "denominator": 209,
+   "value": 0.11961722488038277,
+   "wilson95": {
+    "low": 0.08234870281163167,
+    "high": 0.17061638734992493
+   },
+   "role": "reported"
+  },
+  {
+   "id": "narrow_refuse_precision",
+   "numerator": 46,
+   "denominator": 71,
+   "value": 0.647887323943662,
+   "wilson95": {
+    "low": 0.5318206221160442,
+    "high": 0.7487725187834671
+   },
+   "role": "reported"
+  },
+  {
+   "id": "narrow_refuse_recall",
+   "numerator": 46,
+   "denominator": 85,
+   "value": 0.5411764705882353,
+   "wilson95": {
+    "low": 0.4357633606996252,
+    "high": 0.6430286818098059
+   },
+   "role": "reported"
+  },
+  {
+   "id": "refuse_recall.OTHER_COMPANY",
+   "numerator": 29,
+   "denominator": 66,
+   "value": 0.4393939393939394,
+   "wilson95": {
+    "low": 0.3262812091954944,
+    "high": 0.5591736462000862
+   },
+   "role": "reported"
+  },
+  {
+   "id": "refuse_recall.OTHER_YEAR",
+   "numerator": 17,
+   "denominator": 19,
+   "value": 0.8947368421052632,
+   "wilson95": {
+    "low": 0.6860591728889099,
+    "high": 0.9706414397011299
+   },
+   "role": "reported"
+  }
+ ],
+ "statusCounts": {
+  "answerable": {
+   "ANSWERABLE": 184,
+   "NOT_IN_WORLD": 25
+  },
+  "unanswerable": {
+   "ANSWERABLE": 39,
+   "NOT_IN_WORLD": 46
+  }
+ },
+ "rows": [
+  {
+   "id": "xbrl-021344-2025-00b01df3cc",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8461538461538461,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01180",
+    "ev-0000021344-25-000011-00004",
+    "ev-0001628280-26-010047-00004"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-01320e11d6",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7857142857142857,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-00934",
+    "ev-0001628280-26-010047-01365",
+    "ev-0000021344-25-000011-00004"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-06203fb135",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7142857142857143,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-00979",
+    "ev-0000021344-25-000011-00985",
+    "ev-0001628280-26-010047-01275"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-065b21b909",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5454545454545454,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01522",
+    "ev-0001628280-26-010047-01476",
+    "ev-0000021344-25-000011-01517"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-08df8e7a16",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6875,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01685",
+    "ev-0000021344-25-000011-01696",
+    "ev-0001628280-26-010047-00002"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-09c55dd8ce",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5416666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01049",
+    "ev-0001628280-26-010047-01044",
+    "ev-0001628280-26-010047-01181"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-0c4e756151",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6296296296296297,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01536",
+    "ev-0000021344-25-000011-01532",
+    "ev-0001628280-26-010047-00979"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-0c5f3c7f55",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.36363636363636365,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-00002",
+    "ev-0000021344-25-000011-00002",
+    "ev-0001628280-26-010047-01450"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-0fe86ea7fc",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5714285714285714,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01039",
+    "ev-0001628280-26-010047-00994",
+    "ev-0001628280-26-010047-00993"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-104e1c8345",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.631578947368421,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01106",
+    "ev-0001628280-26-010047-01101",
+    "ev-0000021344-25-000011-01490"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-119fc6cb1d",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8235294117647058,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-00976",
+    "ev-0000021344-25-000011-01039",
+    "ev-0001628280-26-010047-01034"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-16bd3bfba1",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5263157894736842,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01467",
+    "ev-0001628280-26-010047-01476",
+    "ev-0001628280-26-010047-01474"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-18a04e8eda",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5882352941176471,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01067",
+    "ev-0000021344-25-000011-00004",
+    "ev-0001628280-26-010047-00004"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-1b17f057e4",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7333333333333333,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-00002",
+    "ev-0000021344-25-000011-00002",
+    "ev-0001628280-26-010047-00876"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-1d965134d3",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6875,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-00002",
+    "ev-0000021344-25-000011-00002",
+    "ev-0001628280-26-010047-00979"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-200540475a",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8666666666666667,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01520",
+    "ev-0000021344-25-000011-00004",
+    "ev-0001628280-26-010047-00004"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-21f57d78df",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.7037037037037037,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01375",
+    "ev-0001628280-26-010047-01366",
+    "ev-0000021344-25-000011-01374"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-234d0a7afd",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.45454545454545453,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01395",
+    "ev-0001628280-26-010047-01397",
+    "ev-0001628280-26-010047-01400"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-255b082cbf",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.5714285714285714,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01629",
+    "ev-0000021344-25-000011-01621",
+    "ev-0000021344-25-000011-00989"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-26f4aa34cb",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-00979",
+    "ev-0000021344-25-000011-00985",
+    "ev-0001628280-26-010047-01544"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-2724243fa2",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7333333333333333,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-00002",
+    "ev-0000021344-25-000011-00002",
+    "ev-0001628280-26-010047-00876"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-2a777a2125",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7368421052631579,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-00002",
+    "ev-0001628280-26-010047-00910",
+    "ev-0001628280-26-010047-00976"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-2c38a18e61",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.6923076923076923,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00004",
+    "ev-0001628280-26-010047-00004",
+    "ev-0001628280-26-010047-01705"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-2d811ae436",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.5384615384615384,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-00002",
+    "ev-0000021344-25-000011-00002",
+    "ev-0000021344-25-000011-01672"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-2ebe3f07bf",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6470588235294118,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01686",
+    "ev-0000021344-25-000011-01697",
+    "ev-0001628280-26-010047-01685"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-31e1c40d55",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5652173913043478,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01181",
+    "ev-0000021344-25-000011-01049",
+    "ev-0001628280-26-010047-01044"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-3372d8c588",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.75,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-00984",
+    "ev-0001628280-26-010047-00997",
+    "ev-0000021344-25-000011-00004"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2025-33fab3568d",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5833333333333334,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01544",
+    "ev-0001628280-26-010047-00979",
+    "ev-0001628280-26-010047-00002"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-0036e54d9e",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5238095238095238,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01530",
+    "ev-0001628280-26-010047-01534",
+    "ev-0000021344-25-000011-01179"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-00902ead6d",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.47368421052631576,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00002",
+    "ev-0000021344-25-000011-00894",
+    "ev-0001628280-26-010047-00887"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-026c8d994c",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5555555555555556,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00002",
+    "ev-0000021344-25-000011-01593",
+    "ev-0001628280-26-010047-01596"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-0322dc2d0f",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8461538461538461,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00004",
+    "ev-0001628280-26-010047-00004",
+    "ev-0000021344-25-000011-01031"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-03615095f5",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5882352941176471,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00898",
+    "ev-0001628280-26-010047-00903",
+    "ev-0000021344-25-000011-01317"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-040f82fce1",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6470588235294118,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00002",
+    "ev-0001628280-26-010047-00002",
+    "ev-0000021344-25-000011-00985"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-04a28d39c4",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01382",
+    "ev-0000021344-25-000011-01382",
+    "ev-0001628280-26-010047-01366"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-0585872c5b",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01696",
+    "ev-0001628280-26-010047-01685",
+    "ev-0000021344-25-000011-01697"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-06bd5f5fb1",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8666666666666667,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01515",
+    "ev-0001628280-26-010047-01520",
+    "ev-0000021344-25-000011-00004"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-078b6f6e28",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.42857142857142855,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01303",
+    "ev-0000021344-25-000011-01303",
+    "ev-0000021344-25-000011-01302"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-07ab9a0e8f",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.75,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00004",
+    "ev-0001628280-26-010047-00004",
+    "ev-0000021344-25-000011-01716"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-0afe7a1f9c",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.47058823529411764,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00002",
+    "ev-0001628280-26-010047-00002",
+    "ev-0000021344-25-000011-01766"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-0bf60c705b",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8235294117647058,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00982",
+    "ev-0001628280-26-010047-00976",
+    "ev-0000021344-25-000011-01039"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-0cfba61cea",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.4117647058823529,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01163",
+    "ev-0001628280-26-010047-01162",
+    "ev-0000021344-25-000011-01047"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-0d2c5fd8cd",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8125,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00002",
+    "ev-0001628280-26-010047-00876",
+    "ev-0000021344-25-000011-01697"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-0ebe6bc200",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.631578947368421,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01893",
+    "ev-0001628280-26-010047-01879",
+    "ev-0000021344-25-000011-01465"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-1225d44f73",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5789473684210527,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00991",
+    "ev-0001628280-26-010047-00985",
+    "ev-0000021344-25-000011-01529"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-12c0bf60da",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7857142857142857,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01278",
+    "ev-0001628280-26-010047-01278",
+    "ev-0000021344-25-000011-01272"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-183e8f76b0",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5294117647058824,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01519",
+    "ev-0000021344-25-000011-01514",
+    "ev-0000021344-25-000011-01513"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-1872a60d87",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01593",
+    "ev-0001628280-26-010047-01596",
+    "ev-0000021344-25-000011-00002"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-1b442f8422",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.6428571428571429,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00004",
+    "ev-0001628280-26-010047-00004",
+    "ev-0000021344-25-000011-01907"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-1e524dd182",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6875,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01621",
+    "ev-0000021344-25-000011-00862",
+    "ev-0001628280-26-010047-01629"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-209fbb65fe",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00989",
+    "ev-0000021344-25-000011-00004",
+    "ev-0001628280-26-010047-00004"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-2242e61500",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7894736842105263,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-00876",
+    "ev-0000021344-25-000011-00998",
+    "ev-0001628280-26-010047-00992"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-2377e22c74",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8333333333333334,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00004",
+    "ev-0001628280-26-010047-00004",
+    "ev-0000021344-25-000011-01285"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-2379194908",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5416666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01539",
+    "ev-0000021344-25-000011-00985",
+    "ev-0001628280-26-010047-00979"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-2a2f0661e7",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00985",
+    "ev-0001628280-26-010047-00979",
+    "ev-0001628280-26-010047-01275"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-2ce74f2f9d",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6875,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00982",
+    "ev-0001628280-26-010047-00976",
+    "ev-0000021344-25-000011-00002"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-2d7870b033",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.625,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01140",
+    "ev-0000021344-25-000011-00709",
+    "ev-0001628280-26-010047-00712"
+   ]
+  },
+  {
+   "id": "xbrl-021344-2024-30d3ffdd7e",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.75,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00991",
+    "ev-0001628280-26-010047-00985",
+    "ev-0000021344-25-000011-00004"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-0061bf5b17",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-01030",
+    "ev-0000200406-26-000016-01046",
+    "ev-0000200406-26-000016-01049"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-032b0c1c46",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7857142857142857,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00919",
+    "ev-0000200406-26-000016-00626",
+    "ev-0000200406-25-000038-00560"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-03f6d04aa6",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.46153846153846156,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00002",
+    "ev-0000200406-26-000016-00857",
+    "ev-0000200406-26-000016-00838"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-043c10dab4",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.9166666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00865",
+    "ev-0000200406-26-000016-00626",
+    "ev-0000200406-26-000016-00611"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-0679e0dc10",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7647058823529411,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-01011",
+    "ev-0000200406-25-000038-00991",
+    "ev-0000200406-26-000016-00653"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-07a44e2824",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.9166666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00929",
+    "ev-0000200406-26-000016-00626",
+    "ev-0000200406-25-000038-00904"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-08227904a0",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.8461538461538461,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00626",
+    "ev-0000200406-25-000038-00560",
+    "ev-0000200406-26-000016-00857"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-0997f2ee47",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7333333333333333,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-01426",
+    "ev-0000200406-26-000016-01119",
+    "ev-0000200406-25-000038-01424"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-0a545f251d",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.9166666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00767",
+    "ev-0000200406-26-000016-00626",
+    "ev-0000200406-26-000016-00517"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-0c02a6b7b6",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00002",
+    "ev-0000200406-26-000016-00839",
+    "ev-0000200406-26-000016-00826"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-10d4b74d6c",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.8666666666666667,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00002",
+    "ev-0000200406-25-000038-00753",
+    "ev-0000200406-26-000016-00760"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-1d0c21bda2",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7142857142857143,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00002",
+    "ev-0000200406-26-000016-01426",
+    "ev-0000200406-26-000016-00400"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-22e3347498",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7142857142857143,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00878",
+    "ev-0000200406-26-000016-00626",
+    "ev-0000200406-26-000016-00835"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-22ebeec95a",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6842105263157895,
+   "numericAnchor": null,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-01030",
+    "ev-0000200406-26-000016-00002",
+    "ev-0000200406-25-000038-01505"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-2643fb7f15",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00885",
+    "ev-0000200406-25-000038-00872",
+    "ev-0000200406-26-000016-00523"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-26c979b710",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5625,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00002",
+    "ev-0000200406-26-000016-00789",
+    "ev-0000200406-25-000038-00776"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-272f2b9c0d",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.7142857142857143,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00872",
+    "ev-0000200406-26-000016-00785",
+    "ev-0000200406-26-000016-00886"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-2923667646",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.7692307692307693,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00785",
+    "ev-0000200406-26-000016-00626",
+    "ev-0000200406-26-000016-01375"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-411b501f0c",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6923076923076923,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00790",
+    "ev-0000200406-25-000038-00777",
+    "ev-0000200406-26-000016-00789"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-420a3b7991",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6818181818181818,
+   "numericAnchor": null,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-01030",
+    "ev-0000200406-26-000016-01032",
+    "ev-0000200406-26-000016-00002"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2025-468205d004",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.42857142857142855,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00002",
+    "ev-0000200406-26-000016-00857",
+    "ev-0000200406-26-000016-00838"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-03715ebdbf",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00563",
+    "ev-0000200406-25-000038-00750",
+    "ev-0000200406-25-000038-00496"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-05ad6558cf",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-01012",
+    "ev-0000200406-25-000038-01028",
+    "ev-0000200406-26-000016-01046"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-0a878f577a",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7333333333333333,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00497",
+    "ev-0000200406-25-000038-00822",
+    "ev-0000200406-26-000016-00835"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-103dc78eab",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8181818181818182,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00824",
+    "ev-0000200406-26-000016-00837",
+    "ev-0000200406-25-000038-00616"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-192ef7ac71",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.5384615384615384,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00002",
+    "ev-0000200406-25-000038-00825",
+    "ev-0000200406-26-000016-00838"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-1ca36665f8",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.48,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-01028",
+    "ev-0000200406-26-000016-01046",
+    "ev-0000200406-25-000038-01473"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-1dbe5960ba",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5294117647058824,
+   "numericAnchor": null,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-01032",
+    "ev-0000200406-25-000038-01028",
+    "ev-0000200406-26-000016-01046"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-1f15b6b1f0",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00897",
+    "ev-0000200406-26-000016-00917",
+    "ev-0000200406-25-000038-00776"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-21c279ef8c",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5555555555555556,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-01023",
+    "ev-0000200406-26-000016-01041",
+    "ev-0000200406-25-000038-01025"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-224e904c01",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00822",
+    "ev-0000200406-26-000016-00835",
+    "ev-0000200406-26-000016-00860"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-2478527b22",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.6428571428571429,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00936",
+    "ev-0000200406-26-000016-00959",
+    "ev-0000200406-25-000038-01027"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-25bdec66f8",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7333333333333333,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00002",
+    "ev-0000200406-25-000038-01344",
+    "ev-0000200406-26-000016-01529"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-25d78072eb",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5333333333333333,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00002",
+    "ev-0000200406-26-000016-01529",
+    "ev-0000200406-25-000038-00815"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-268752b7d5",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8461538461538461,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-01472",
+    "ev-0000200406-25-000038-00984",
+    "ev-0000200406-26-000016-01004"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-27bd6690d6",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6153846153846154,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-01119",
+    "ev-0000200406-25-000038-00827",
+    "ev-0000200406-26-000016-00840"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-28e7e6508e",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7647058823529411,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00446",
+    "ev-0000200406-25-000038-01424",
+    "ev-0000200406-25-000038-00002"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-296d4c835d",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5294117647058824,
+   "numericAnchor": null,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-01032",
+    "ev-0000200406-26-000016-01050",
+    "ev-0000200406-25-000038-01031"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-2a4bfc199e",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7692307692307693,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00853",
+    "ev-0000200406-26-000016-00865",
+    "ev-0000200406-25-000038-00616"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-3412a152d2",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7857142857142857,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00822",
+    "ev-0000200406-26-000016-00835",
+    "ev-0000200406-25-000038-00824"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-349aee7736",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.7894736842105263,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00002",
+    "ev-0000200406-25-000038-00486",
+    "ev-0000200406-26-000016-00516"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-38ec7bb1a4",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.6842105263157895,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00772",
+    "ev-0000200406-25-000038-00769",
+    "ev-0000200406-26-000016-00782"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-3cbcb13126",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.4666666666666667,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00002",
+    "ev-0000200406-25-000038-00845",
+    "ev-0000200406-26-000016-00857"
+   ]
+  },
+  {
+   "id": "xbrl-200406-2024-3efc3a618d",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.55,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00002",
+    "ev-0000200406-25-000038-00815",
+    "ev-0000200406-26-000016-01529"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-01cd3e4ddd",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.625,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00552",
+    "ev-0001193125-26-323660-00860",
+    "ev-0001193125-26-323660-00017"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-01f1c741e0",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00889",
+    "ev-0000950170-25-100235-00864",
+    "ev-0001193125-26-323660-00887"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-0428f12ec6",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00717",
+    "ev-0001193125-26-323660-00552",
+    "ev-0001193125-26-323660-00683"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-0a8f5349db",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00725",
+    "ev-0001193125-26-323660-00869",
+    "ev-0001193125-26-323660-00847"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-0c371b4ba4",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7857142857142857,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00756",
+    "ev-0001193125-26-323660-00585",
+    "ev-0001193125-26-323660-00777"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-0cc84058ae",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6538461538461539,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00778",
+    "ev-0000950170-25-100235-00759",
+    "ev-0001193125-26-323660-00585"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-0e5fac5c56",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6363636363636364,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00822",
+    "ev-0000950170-25-100235-00805",
+    "ev-0001193125-26-323660-00894"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-0ef5f15b55",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5652173913043478,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00753",
+    "ev-0001193125-26-323660-00772",
+    "ev-0001193125-26-323660-00773"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-0fbedbb8e4",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00552",
+    "ev-0001193125-26-323660-00860",
+    "ev-0000950170-25-100235-00543"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-10eff91426",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.4666666666666667,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00002",
+    "ev-0001193125-26-323660-00641",
+    "ev-0001193125-26-323660-00918"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-11d4f0171f",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7142857142857143,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00552",
+    "ev-0001193125-26-323660-00860",
+    "ev-0001193125-26-323660-00017"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-12d1459e7e",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5833333333333334,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00796",
+    "ev-0001193125-26-323660-00792",
+    "ev-0001193125-26-323660-00788"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-143d4694a9",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6428571428571429,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00873",
+    "ev-0000950170-25-100235-00846",
+    "ev-0001193125-26-323660-00631"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-14ff483660",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00552",
+    "ev-0001193125-26-323660-00860",
+    "ev-0000950170-25-100235-00543"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-190506010a",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5263157894736842,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00921",
+    "ev-0000950170-25-100235-00894",
+    "ev-0001193125-26-323660-00920"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-19cdd77b18",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00796",
+    "ev-0001193125-26-323660-00792",
+    "ev-0001193125-26-323660-00770"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-1ba21dae7f",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7272727272727273,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00795",
+    "ev-0000950170-25-100235-00776",
+    "ev-0001193125-26-323660-00770"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-1d288dabac",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5714285714285714,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00894",
+    "ev-0001193125-26-323660-00887",
+    "ev-0001193125-26-323660-00889"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-2097ebd137",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00844",
+    "ev-0001193125-26-323660-00842",
+    "ev-0000950170-25-100235-00828"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-20cf2de434",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5625,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00838",
+    "ev-0001193125-26-323660-00637",
+    "ev-0000950170-25-100235-00822"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-2320b82c2e",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6875,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00552",
+    "ev-0001193125-26-323660-00826",
+    "ev-0001193125-26-323660-00860"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-272be25d3c",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6875,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00565",
+    "ev-0001193125-26-323660-00561",
+    "ev-0001193125-26-323660-00002"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-275bfd8c6a",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.625,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00552",
+    "ev-0001193125-26-323660-00860",
+    "ev-0001193125-26-323660-00017"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-27ef3ac3c4",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.65,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00916",
+    "ev-0001193125-26-323660-00627",
+    "ev-0001193125-26-323660-00918"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-2dfd7ef719",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.6363636363636364,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00894",
+    "ev-0001193125-26-323660-00967",
+    "ev-0001193125-26-323660-01006"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-332e29ff3b",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00472",
+    "ev-0001193125-26-323660-00473",
+    "ev-0001193125-26-323660-00884"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-36db51d2f4",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.65,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00846",
+    "ev-0000950170-25-100235-00829",
+    "ev-0001193125-26-323660-00847"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2026-3741097d18",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5625,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00838",
+    "ev-0001193125-26-323660-00637",
+    "ev-0000950170-25-100235-00822"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-023385e863",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7333333333333333,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00622",
+    "ev-0001193125-26-323660-00860",
+    "ev-0001193125-26-323660-00552"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-0401fca981",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6153846153846154,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00795",
+    "ev-0000950170-25-100235-00784",
+    "ev-0000950170-25-100235-00774"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-046ed4303f",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6153846153846154,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00759",
+    "ev-0001193125-26-323660-00778",
+    "ev-0001193125-26-323660-00585"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-054eb5c149",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5714285714285714,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00839",
+    "ev-0001193125-26-323660-00861",
+    "ev-0001193125-26-323660-00864"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-056b52795c",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00542",
+    "ev-0001193125-26-323660-00638",
+    "ev-0000950170-25-100235-00624"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-05b18690a7",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5263157894736842,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00889",
+    "ev-0000950170-25-100235-00864",
+    "ev-0000950170-25-100235-00869"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-07fab55bad",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7222222222222222,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00805",
+    "ev-0001193125-26-323660-00822",
+    "ev-0000950170-25-100235-00728"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-0a153955b6",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5625,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00822",
+    "ev-0000950170-25-100235-00812",
+    "ev-0000950170-25-100235-00623"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-0cc6872589",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5833333333333334,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00669",
+    "ev-0001193125-26-323660-00683",
+    "ev-0001193125-26-323660-00855"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-0d9ee74a5e",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00543",
+    "ev-0000950170-25-100235-00017",
+    "ev-0000950170-25-100235-00626"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-1460f95a0c",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6842105263157895,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00844",
+    "ev-0001193125-26-323660-00871",
+    "ev-0000950170-25-100235-00848"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-181d9a9856",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5294117647058824,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00867",
+    "ev-0001193125-26-323660-00892",
+    "ev-0001193125-26-323660-00630"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-1984388d5b",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6153846153846154,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00822",
+    "ev-0000950170-25-100235-00812",
+    "ev-0001193125-26-323660-00794"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-1daf50e7e8",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7333333333333333,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00869",
+    "ev-0001193125-26-323660-00870",
+    "ev-0000950170-25-100235-00826"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-206ecd50a1",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7142857142857143,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00830",
+    "ev-0000950170-25-100235-00017",
+    "ev-0000950170-25-100235-00002"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-21b1fcdc01",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7222222222222222,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00805",
+    "ev-0001193125-26-323660-00822",
+    "ev-0000950170-25-100235-00728"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-23b8dcabab",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5625,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00017",
+    "ev-0000950170-25-100235-00002",
+    "ev-0000950170-25-100235-00519"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-241977e316",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.47368421052631576,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00623",
+    "ev-0001193125-26-323660-00637",
+    "ev-0001193125-26-323660-00638"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-2b5ab8c60b",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6111111111111112,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00844",
+    "ev-0000950170-25-100235-00828",
+    "ev-0000950170-25-100235-00521"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-2dc0ce260b",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.6363636363636364,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00753",
+    "ev-0001193125-26-323660-00772",
+    "ev-0000950170-25-100235-00758"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-32c6586b15",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00822",
+    "ev-0001193125-26-323660-00838",
+    "ev-0000950170-25-100235-00623"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-32c9811a3f",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00889",
+    "ev-0000950170-25-100235-00864",
+    "ev-0000950170-25-100235-00862"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-3591c46707",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5333333333333333,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00717",
+    "ev-0000950170-25-100235-00669",
+    "ev-0001193125-26-323660-00683"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-3658fe8b99",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6153846153846154,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00869",
+    "ev-0000950170-25-100235-00862",
+    "ev-0001193125-26-323660-00887"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-3ad6d03a06",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6111111111111112,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00854",
+    "ev-0001193125-26-323660-00869",
+    "ev-0001193125-26-323660-00847"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-41b619f05f",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5789473684210527,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00889",
+    "ev-0000950170-25-100235-00864",
+    "ev-0000950170-25-100235-00759"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-4347d27198",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6470588235294118,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00854",
+    "ev-0000950170-25-100235-00830",
+    "ev-0000950170-25-100235-00888"
+   ]
+  },
+  {
+   "id": "xbrl-789019-2025-43cb71055c",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00628",
+    "ev-0001193125-26-323660-00643",
+    "ev-0000950170-25-100235-00618"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-014253983d",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.75,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00595",
+    "ev-0000080424-26-000103-00590",
+    "ev-0000080424-26-000103-00681"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-056e30e7b8",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6111111111111112,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00739",
+    "ev-0000080424-25-000076-00734",
+    "ev-0000080424-26-000103-00741"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-067ab75de0",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7647058823529411,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00593",
+    "ev-0000080424-26-000103-00706",
+    "ev-0000080424-26-000103-00594"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-07979ba2e2",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8235294117647058,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00755",
+    "ev-0000080424-26-000103-00761",
+    "ev-0000080424-26-000103-00764"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-0a37be7061",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.45,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00926",
+    "ev-0000080424-25-000076-00914",
+    "ev-0000080424-26-000103-00927"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-0d4feebabb",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6190476190476191,
+   "numericAnchor": null,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00765",
+    "ev-0000080424-26-000103-00356",
+    "ev-0000080424-25-000076-00759"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-108874eff2",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00593",
+    "ev-0000080424-26-000103-00712",
+    "ev-0000080424-25-000076-00595"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-1163b43554",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5789473684210527,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00429",
+    "ev-0000080424-26-000103-00420",
+    "ev-0000080424-25-000076-00421"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-16b65a05a1",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5909090909090909,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00616",
+    "ev-0000080424-25-000076-00618",
+    "ev-0000080424-26-000103-00617"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-1a9a692e5c",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8125,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00534",
+    "ev-0000080424-26-000103-00591",
+    "ev-0000080424-25-000076-00537"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-1acf7b2c48",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.5882352941176471,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00852",
+    "ev-0000080424-26-000103-00860",
+    "ev-0000080424-26-000103-00865"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-1b6a97ffbc",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6190476190476191,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00928",
+    "ev-0000080424-25-000076-00916",
+    "ev-0000080424-26-000103-00924"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-1c78e21ae6",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.47368421052631576,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00420",
+    "ev-0000080424-25-000076-00421",
+    "ev-0000080424-26-000103-00428"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-2197d3ac56",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8125,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00537",
+    "ev-0000080424-26-000103-00706",
+    "ev-0000080424-26-000103-00537"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-22129260ee",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.6,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00894",
+    "ev-0000080424-25-000076-00657",
+    "ev-0000080424-26-000103-00655"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-2235058578",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5925925925925926,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00784",
+    "ev-0000080424-26-000103-00765",
+    "ev-0000080424-25-000076-00777"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-24f7a23f5e",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7368421052631579,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00731",
+    "ev-0000080424-25-000076-00533",
+    "ev-0000080424-26-000103-00480"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-2517970cec",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6470588235294118,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00534",
+    "ev-0000080424-26-000103-00706",
+    "ev-0000080424-26-000103-00946"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-2562adfe43",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.5294117647058824,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00894",
+    "ev-0000080424-25-000076-00657",
+    "ev-0000080424-26-000103-00655"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-28a3afe1fe",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8235294117647058,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00758",
+    "ev-0000080424-26-000103-00706",
+    "ev-0000080424-25-000076-00752"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-2a4cd7d17f",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7058823529411765,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00534",
+    "ev-0000080424-26-000103-00591",
+    "ev-0000080424-26-000103-00706"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-2ffe43967a",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.75,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00315",
+    "ev-0000080424-26-000103-00534",
+    "ev-0000080424-26-000103-00783"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-3112a3f3c1",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8125,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00532",
+    "ev-0000080424-26-000103-00536",
+    "ev-0000080424-26-000103-00348"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-32ae5c7dad",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7142857142857143,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00656",
+    "ev-0000080424-25-000076-00660",
+    "ev-0000080424-26-000103-00745"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-332c040b5d",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00784",
+    "ev-0000080424-25-000076-00894",
+    "ev-0000080424-25-000076-00788"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-34e2061269",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7058823529411765,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00315",
+    "ev-0000080424-26-000103-00534",
+    "ev-0000080424-26-000103-00706"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-359a0d6dce",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00601",
+    "ev-0000080424-25-000076-00606",
+    "ev-0000080424-26-000103-00706"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-3609687d50",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8235294117647058,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00894",
+    "ev-0000080424-26-000103-00895",
+    "ev-0000080424-25-000076-00885"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-363a4aeff4",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8666666666666667,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00706",
+    "ev-0000080424-26-000103-00757",
+    "ev-0000080424-26-000103-00758"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2026-389b846624",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6,
+   "numericAnchor": null,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00770",
+    "ev-0000080424-25-000076-00755",
+    "ev-0000080424-26-000103-00761"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-061d89a8d8",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.65,
+   "numericAnchor": null,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00770",
+    "ev-0000080424-25-000076-00755",
+    "ev-0000080424-26-000103-00761"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-08e673d299",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.631578947368421,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00537",
+    "ev-0000080424-25-000076-00682",
+    "ev-0000080424-26-000103-00685"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-0a0a6f48f3",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7222222222222222,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00788",
+    "ev-0000080424-26-000103-00795",
+    "ev-0000080424-25-000076-00596"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-0fc7b0a084",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8235294117647058,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00894",
+    "ev-0000080424-25-000076-00891",
+    "ev-0000080424-25-000076-00892"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-10b5f37203",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8333333333333334,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00498",
+    "ev-0000080424-26-000103-00706",
+    "ev-0000080424-25-000076-00710"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-127f19a862",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5789473684210527,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00726",
+    "ev-0000080424-26-000103-00731",
+    "ev-0000080424-25-000076-00485"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-150fcbb3d5",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00606",
+    "ev-0000080424-26-000103-00601",
+    "ev-0000080424-25-000076-00603"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-1575ecb812",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8461538461538461,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00695",
+    "ev-0000080424-26-000103-00706",
+    "ev-0000080424-26-000103-00106"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-175869ba34",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00695",
+    "ev-0000080424-26-000103-00706",
+    "ev-0000080424-25-000076-00745"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-19d544260c",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.9230769230769231,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00695",
+    "ev-0000080424-26-000103-00706",
+    "ev-0000080424-26-000103-00106"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-1b80a86055",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00695",
+    "ev-0000080424-25-000076-00777",
+    "ev-0000080424-26-000103-00784"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-22a4ee6eb7",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8235294117647058,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00755",
+    "ev-0000080424-26-000103-00761",
+    "ev-0000080424-25-000076-00758"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-2303474e14",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.625,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00912",
+    "ev-0000080424-26-000103-00924",
+    "ev-0000080424-25-000076-00916"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-29dd67c194",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.875,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00706",
+    "ev-0000080424-25-000076-00599",
+    "ev-0000080424-26-000103-00597"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-2bcad473f6",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8125,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00706",
+    "ev-0000080424-26-000103-00537",
+    "ev-0000080424-25-000076-00702"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-2f2bf8a756",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": true,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.875,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00751",
+    "ev-0000080424-26-000103-00757",
+    "ev-0000080424-26-000103-00706"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-307bcf5a4b",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00695",
+    "ev-0000080424-26-000103-00706",
+    "ev-0000080424-25-000076-00745"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-31ee984924",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.5294117647058824,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00894",
+    "ev-0000080424-25-000076-00657",
+    "ev-0000080424-26-000103-00655"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-35e5988540",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8333333333333334,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00695",
+    "ev-0000080424-26-000103-00706",
+    "ev-0000080424-25-000076-00777"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-368db3a3ed",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8125,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00706",
+    "ev-0000080424-25-000076-00768",
+    "ev-0000080424-26-000103-00775"
+   ]
+  },
+  {
+   "id": "xbrl-080424-2025-3ac3a1e2f4",
+   "kind": "answerable",
+   "rule": null,
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": false,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.8571428571428571,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00695",
+    "ev-0000080424-25-000076-00912",
+    "ev-0000080424-26-000103-00924"
+   ]
+  },
+  {
+   "id": "unans-co-021344-xbrl-200406-2025-005b63a0f6",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7333333333333333,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01521",
+    "ev-0001628280-26-010047-01526",
+    "ev-0001628280-26-010047-00379"
+   ]
+  },
+  {
+   "id": "unans-co-021344-xbrl-200406-2025-0347fc032e",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6153846153846154,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-00379",
+    "ev-0000021344-25-000011-00375",
+    "ev-0001628280-26-010047-01227"
+   ]
+  },
+  {
+   "id": "unans-co-021344-xbrl-200406-2025-0362f14b1d",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.5,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-00002",
+    "ev-0000021344-25-000011-00002",
+    "ev-0000021344-25-000011-00691"
+   ]
+  },
+  {
+   "id": "unans-co-021344-xbrl-200406-2025-03f6d04aa6",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6923076923076923,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-00002",
+    "ev-0001628280-26-010047-01605",
+    "ev-0000021344-25-000011-00002"
+   ]
+  },
+  {
+   "id": "unans-co-021344-xbrl-200406-2025-043c10dab4",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.75,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-00379",
+    "ev-0001628280-26-010047-01207",
+    "ev-0000021344-25-000011-00375"
+   ]
+  },
+  {
+   "id": "unans-co-021344-xbrl-789019-2026-0479a8ff52",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.38461538461538464,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01157",
+    "ev-0001628280-26-010047-01156",
+    "ev-0000021344-25-000011-00691"
+   ]
+  },
+  {
+   "id": "unans-co-021344-xbrl-789019-2026-0839fe367d",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.6111111111111112,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01883",
+    "ev-0001628280-26-010047-01868",
+    "ev-0001628280-26-010047-00551"
+   ]
+  },
+  {
+   "id": "unans-co-021344-xbrl-789019-2026-0a8f5349db",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.6,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01497",
+    "ev-0000021344-25-000011-00842",
+    "ev-0000021344-25-000011-01490"
+   ]
+  },
+  {
+   "id": "unans-co-021344-xbrl-789019-2026-0be07edcc5",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.4375,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00906",
+    "ev-0001628280-26-010047-00903",
+    "ev-0000021344-25-000011-01318"
+   ]
+  },
+  {
+   "id": "unans-co-021344-xbrl-789019-2026-0c371b4ba4",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.5714285714285714,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01182",
+    "ev-0001628280-26-010047-01181",
+    "ev-0000021344-25-000011-01179"
+   ]
+  },
+  {
+   "id": "unans-co-021344-xbrl-789019-2026-0cc84058ae",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.38461538461538464,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01049",
+    "ev-0001628280-26-010047-01044",
+    "ev-0000021344-25-000011-01179"
+   ]
+  },
+  {
+   "id": "unans-co-021344-xbrl-789019-2026-0cff1cf73b",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.5555555555555556,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01530",
+    "ev-0001628280-26-010047-01534",
+    "ev-0000021344-25-000011-00833"
+   ]
+  },
+  {
+   "id": "unans-co-021344-xbrl-080424-2026-04bd7a76c5",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.38461538461538464,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01948",
+    "ev-0000021344-25-000011-01826",
+    "ev-0001628280-26-010047-01810"
+   ]
+  },
+  {
+   "id": "unans-co-021344-xbrl-080424-2026-056e30e7b8",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.4444444444444444,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01497",
+    "ev-0000021344-25-000011-01490",
+    "ev-0001628280-26-010047-01501"
+   ]
+  },
+  {
+   "id": "unans-co-021344-xbrl-080424-2026-05ca7db650",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.3888888888888889,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01068",
+    "ev-0000021344-25-000011-01593",
+    "ev-0000021344-25-000011-01666"
+   ]
+  },
+  {
+   "id": "unans-co-021344-xbrl-080424-2026-07c3361797",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.46153846153846156,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01342",
+    "ev-0000021344-25-000011-01938",
+    "ev-0001628280-26-010047-01925"
+   ]
+  },
+  {
+   "id": "unans-co-021344-xbrl-080424-2026-0a37be7061",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.35,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01306",
+    "ev-0001628280-26-010047-01307",
+    "ev-0000021344-25-000011-01065"
+   ]
+  },
+  {
+   "id": "unans-co-021344-xbrl-080424-2026-0a6535ca6b",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.45,
+   "numericAnchor": null,
+   "evidenceIds": [
+    "ev-0001628280-26-010047-01399",
+    "ev-0001628280-26-010047-01382",
+    "ev-0000021344-25-000011-01382"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-021344-2025-00b01df3cc",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.7692307692307693,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00004",
+    "ev-0001628280-26-010047-00004",
+    "ev-0000021344-25-000011-01181"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-021344-2025-06203fb135",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00985",
+    "ev-0001628280-26-010047-00979",
+    "ev-0000021344-25-000011-01543"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-021344-2025-065b21b909",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6363636363636364,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01517",
+    "ev-0001628280-26-010047-01522",
+    "ev-0000021344-25-000011-01922"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-021344-2025-08df8e7a16",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.625,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01696",
+    "ev-0001628280-26-010047-01685",
+    "ev-0000021344-25-000011-00002"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-021344-2025-09c55dd8ce",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01049",
+    "ev-0001628280-26-010047-01044",
+    "ev-0000021344-25-000011-01532"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-021344-2025-0adeffb3bd",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-00004",
+    "ev-0001628280-26-010047-00004",
+    "ev-0001628280-26-010047-00984"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-021344-2025-0c4e756151",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000021344",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.5925925925925926,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000021344-25-000011-01532",
+    "ev-0001628280-26-010047-01536",
+    "ev-0000021344-25-000011-00985"
+   ]
+  },
+  {
+   "id": "unans-co-200406-xbrl-021344-2025-01320e11d6",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.42857142857142855,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00558",
+    "ev-0000200406-25-000038-00553",
+    "ev-0000200406-26-000016-00573"
+   ]
+  },
+  {
+   "id": "unans-co-200406-xbrl-021344-2025-05d8b63bea",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.4,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00722",
+    "ev-0000200406-26-000016-00726",
+    "ev-0000200406-25-000038-00721"
+   ]
+  },
+  {
+   "id": "unans-co-200406-xbrl-021344-2025-065b21b909",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.5454545454545454,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00786",
+    "ev-0000200406-26-000016-00942",
+    "ev-0000200406-25-000038-00773"
+   ]
+  },
+  {
+   "id": "unans-co-200406-xbrl-021344-2025-09c55dd8ce",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.4166666666666667,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00769",
+    "ev-0000200406-26-000016-00782",
+    "ev-0000200406-25-000038-00686"
+   ]
+  },
+  {
+   "id": "unans-co-200406-xbrl-021344-2025-0adeffb3bd",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5333333333333333,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00826",
+    "ev-0000200406-26-000016-00839",
+    "ev-0000200406-26-000016-01348"
+   ]
+  },
+  {
+   "id": "unans-co-200406-xbrl-021344-2025-0c4e756151",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5185185185185185,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00646",
+    "ev-0000200406-26-000016-01023",
+    "ev-0000200406-25-000038-00808"
+   ]
+  },
+  {
+   "id": "unans-co-200406-xbrl-789019-2026-01cd3e4ddd",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.4375,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00517",
+    "ev-0000200406-25-000038-00402",
+    "ev-0000200406-26-000016-00400"
+   ]
+  },
+  {
+   "id": "unans-co-200406-xbrl-789019-2026-01f1c741e0",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.6111111111111112,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-01120",
+    "ev-0000200406-25-000038-00712",
+    "ev-0000200406-26-000016-00717"
+   ]
+  },
+  {
+   "id": "unans-co-200406-xbrl-789019-2026-0428f12ec6",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.4666666666666667,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00517",
+    "ev-0000200406-25-000038-00487",
+    "ev-0000200406-26-000016-00400"
+   ]
+  },
+  {
+   "id": "unans-co-200406-xbrl-789019-2026-0479a8ff52",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.6153846153846154,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-01264",
+    "ev-0000200406-25-000038-01394",
+    "ev-0000200406-26-000016-01397"
+   ]
+  },
+  {
+   "id": "unans-co-200406-xbrl-789019-2026-0a8f5349db",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.5,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00888",
+    "ev-0000200406-25-000038-00894",
+    "ev-0000200406-26-000016-00678"
+   ]
+  },
+  {
+   "id": "unans-co-200406-xbrl-789019-2026-0be07edcc5",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.4375,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00886",
+    "ev-0000200406-25-000038-00856",
+    "ev-0000200406-26-000016-00870"
+   ]
+  },
+  {
+   "id": "unans-co-200406-xbrl-789019-2026-0c371b4ba4",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.5714285714285714,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00772",
+    "ev-0000200406-26-000016-00785",
+    "ev-0000200406-26-000016-00779"
+   ]
+  },
+  {
+   "id": "unans-co-200406-xbrl-789019-2026-0cc84058ae",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.5769230769230769,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00786",
+    "ev-0000200406-25-000038-00773",
+    "ev-0000200406-25-000038-00769"
+   ]
+  },
+  {
+   "id": "unans-co-200406-xbrl-080424-2026-014253983d",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.35,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00480",
+    "ev-0000200406-26-000016-00507",
+    "ev-0000200406-25-000038-00874"
+   ]
+  },
+  {
+   "id": "unans-co-200406-xbrl-080424-2026-056e30e7b8",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.4444444444444444,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-26-000016-00965",
+    "ev-0000200406-25-000038-00594",
+    "ev-0000200406-26-000016-00603"
+   ]
+  },
+  {
+   "id": "unans-co-200406-xbrl-080424-2026-05ca7db650",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.3888888888888889,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00776",
+    "ev-0000200406-26-000016-00789",
+    "ev-0000200406-25-000038-00717"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-200406-2025-032b0c1c46",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.5714285714285714,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-01119",
+    "ev-0000200406-25-000038-00560",
+    "ev-0000200406-26-000016-00921"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-200406-2025-0347fc032e",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.6923076923076923,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00853",
+    "ev-0000200406-26-000016-00865",
+    "ev-0000200406-25-000038-00616"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-200406-2025-03bf25c106",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.8235294117647058,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00484",
+    "ev-0000200406-26-000016-01529",
+    "ev-0000200406-26-000016-00512"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-200406-2025-03f6d04aa6",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000200406",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.46153846153846156,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000200406-25-000038-00002",
+    "ev-0000200406-26-000016-01529",
+    "ev-0000200406-26-000016-00002"
+   ]
+  },
+  {
+   "id": "unans-co-789019-xbrl-021344-2025-01320e11d6",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.42857142857142855,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00549",
+    "ev-0000950170-25-100235-00016",
+    "ev-0001193125-26-323660-00016"
+   ]
+  },
+  {
+   "id": "unans-co-789019-xbrl-021344-2025-05d8b63bea",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.55,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00725",
+    "ev-0001193125-26-323660-00889",
+    "ev-0000950170-25-100235-00864"
+   ]
+  },
+  {
+   "id": "unans-co-789019-xbrl-021344-2025-065b21b909",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.4090909090909091,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00759",
+    "ev-0001193125-26-323660-00778",
+    "ev-0000950170-25-100235-00896"
+   ]
+  },
+  {
+   "id": "unans-co-789019-xbrl-021344-2025-09c55dd8ce",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.4583333333333333,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00737",
+    "ev-0001193125-26-323660-00585",
+    "ev-0001193125-26-323660-00756"
+   ]
+  },
+  {
+   "id": "unans-co-789019-xbrl-021344-2025-0adeffb3bd",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5333333333333333,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00619",
+    "ev-0000950170-25-100235-00629",
+    "ev-0000950170-25-100235-00549"
+   ]
+  },
+  {
+   "id": "unans-co-789019-xbrl-200406-2025-005b63a0f6",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00837",
+    "ev-0001193125-26-323660-00862",
+    "ev-0001193125-26-323660-00861"
+   ]
+  },
+  {
+   "id": "unans-co-789019-xbrl-200406-2025-0061bf5b17",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.55,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00016",
+    "ev-0001193125-26-323660-00016",
+    "ev-0000950170-25-100235-00885"
+   ]
+  },
+  {
+   "id": "unans-co-789019-xbrl-200406-2025-0347fc032e",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6923076923076923,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00886",
+    "ev-0000950170-25-100235-00887",
+    "ev-0000950170-25-100235-00670"
+   ]
+  },
+  {
+   "id": "unans-co-789019-xbrl-200406-2025-03bf25c106",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6470588235294118,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00542",
+    "ev-0000950170-25-100235-00624",
+    "ev-0001193125-26-323660-00552"
+   ]
+  },
+  {
+   "id": "unans-co-789019-xbrl-200406-2025-03f6d04aa6",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5384615384615384,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00886",
+    "ev-0000950170-25-100235-00017",
+    "ev-0001193125-26-323660-00017"
+   ]
+  },
+  {
+   "id": "unans-co-789019-xbrl-200406-2025-043c10dab4",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.75,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00631",
+    "ev-0000950170-25-100235-00886",
+    "ev-0000950170-25-100235-00887"
+   ]
+  },
+  {
+   "id": "unans-co-789019-xbrl-080424-2026-0257379216",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6153846153846154,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00838",
+    "ev-0001193125-26-323660-00684",
+    "ev-0001193125-26-323660-00794"
+   ]
+  },
+  {
+   "id": "unans-co-789019-xbrl-080424-2026-04bd7a76c5",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5384615384615384,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00838",
+    "ev-0000950170-25-100235-00822",
+    "ev-0001193125-26-323660-00836"
+   ]
+  },
+  {
+   "id": "unans-co-789019-xbrl-080424-2026-056e30e7b8",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5555555555555556,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00869",
+    "ev-0001193125-26-323660-00847",
+    "ev-0001193125-26-323660-00850"
+   ]
+  },
+  {
+   "id": "unans-co-789019-xbrl-080424-2026-05ca7db650",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6111111111111112,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00561",
+    "ev-0001193125-26-323660-00002",
+    "ev-0001193125-26-323660-00553"
+   ]
+  },
+  {
+   "id": "unans-co-789019-xbrl-080424-2026-067ab75de0",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6470588235294118,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00914",
+    "ev-0000950170-25-100235-00519",
+    "ev-0001193125-26-323660-00916"
+   ]
+  },
+  {
+   "id": "unans-co-789019-xbrl-080424-2026-07c3361797",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6153846153846154,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00796",
+    "ev-0001193125-26-323660-00792",
+    "ev-0001193125-26-323660-00770"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-789019-2026-0839fe367d",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.4444444444444444,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0001193125-26-323660-00889",
+    "ev-0000950170-25-100235-00864",
+    "ev-0000950170-25-100235-00862"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-789019-2026-0a8f5349db",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.75,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00725",
+    "ev-0001193125-26-323660-00869",
+    "ev-0001193125-26-323660-00847"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-789019-2026-0be07edcc5",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000789019",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.4375,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000950170-25-100235-00822",
+    "ev-0001193125-26-323660-00838",
+    "ev-0000950170-25-100235-00812"
+   ]
+  },
+  {
+   "id": "unans-co-080424-xbrl-021344-2025-00b01df3cc",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.5384615384615384,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00722",
+    "ev-0000080424-26-000103-00727",
+    "ev-0000080424-25-000076-00003"
+   ]
+  },
+  {
+   "id": "unans-co-080424-xbrl-021344-2025-01320e11d6",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.5714285714285714,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00722",
+    "ev-0000080424-26-000103-00727",
+    "ev-0000080424-25-000076-00862"
+   ]
+  },
+  {
+   "id": "unans-co-080424-xbrl-021344-2025-06203fb135",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00595",
+    "ev-0000080424-25-000076-00597",
+    "ev-0000080424-25-000076-00700"
+   ]
+  },
+  {
+   "id": "unans-co-080424-xbrl-021344-2025-0c5f3c7f55",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.36363636363636365,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00705",
+    "ev-0000080424-26-000103-00709",
+    "ev-0000080424-25-000076-00183"
+   ]
+  },
+  {
+   "id": "unans-co-080424-xbrl-200406-2025-003a0d985d",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.3333333333333333,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00933",
+    "ev-0000080424-25-000076-00633",
+    "ev-0000080424-26-000103-00631"
+   ]
+  },
+  {
+   "id": "unans-co-080424-xbrl-200406-2025-005b63a0f6",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.4666666666666667,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00626",
+    "ev-0000080424-26-000103-00624",
+    "ev-0000080424-25-000076-00750"
+   ]
+  },
+  {
+   "id": "unans-co-080424-xbrl-200406-2025-0347fc032e",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6153846153846154,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00695",
+    "ev-0000080424-26-000103-00878",
+    "ev-0000080424-25-000076-00695"
+   ]
+  },
+  {
+   "id": "unans-co-080424-xbrl-200406-2025-043c10dab4",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6666666666666666,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00912",
+    "ev-0000080424-26-000103-00924",
+    "ev-0000080424-26-000103-00695"
+   ]
+  },
+  {
+   "id": "unans-co-080424-xbrl-789019-2026-0428f12ec6",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.7333333333333333,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00356",
+    "ev-0000080424-26-000103-00613",
+    "ev-0000080424-26-000103-00830"
+   ]
+  },
+  {
+   "id": "unans-co-080424-xbrl-789019-2026-0479a8ff52",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5384615384615384,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00883",
+    "ev-0000080424-26-000103-00861",
+    "ev-0000080424-26-000103-00881"
+   ]
+  },
+  {
+   "id": "unans-co-080424-xbrl-789019-2026-0a8f5349db",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.75,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00656",
+    "ev-0000080424-25-000076-00660",
+    "ev-0000080424-26-000103-00745"
+   ]
+  },
+  {
+   "id": "unans-co-080424-xbrl-789019-2026-0be07edcc5",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6875,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00895",
+    "ev-0000080424-25-000076-00885",
+    "ev-0000080424-26-000103-00599"
+   ]
+  },
+  {
+   "id": "unans-co-080424-xbrl-789019-2026-0c371b4ba4",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6428571428571429,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00877",
+    "ev-0000080424-25-000076-00869",
+    "ev-0000080424-26-000103-00430"
+   ]
+  },
+  {
+   "id": "unans-co-080424-xbrl-789019-2026-0cc84058ae",
+   "kind": "unanswerable",
+   "rule": "OTHER_COMPANY",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.5,
+   "numericAnchor": true,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00877",
+    "ev-0000080424-26-000103-00430",
+    "ev-0000080424-25-000076-00869"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-080424-2026-014253983d",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.65,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00595",
+    "ev-0000080424-25-000076-00592",
+    "ev-0000080424-25-000076-00597"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-080424-2026-0257379216",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.6923076923076923,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00695",
+    "ev-0000080424-26-000103-00106",
+    "ev-0000080424-25-000076-00788"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-080424-2026-067ab75de0",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.7058823529411765,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00595",
+    "ev-0000080424-26-000103-00593",
+    "ev-0000080424-26-000103-00706"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-080424-2026-0a37be7061",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "NOT_IN_WORLD",
+   "reason": "NO_NUMERIC_ANCHOR",
+   "termCoverage": 0.55,
+   "numericAnchor": false,
+   "evidenceIds": [
+    "ev-0000080424-25-000076-00914",
+    "ev-0000080424-26-000103-00926",
+    "ev-0000080424-26-000103-00919"
+   ]
+  },
+  {
+   "id": "unans-yr-xbrl-080424-2026-0a6535ca6b",
+   "kind": "unanswerable",
+   "rule": "OTHER_YEAR",
+   "corpusRef": "sec-10k:0000080424",
+   "baselineAnswered": true,
+   "baselineReason": null,
+   "goldHit": null,
+   "status": "ANSWERABLE",
+   "reason": null,
+   "termCoverage": 0.6,
+   "numericAnchor": null,
+   "evidenceIds": [
+    "ev-0000080424-26-000103-00770",
+    "ev-0000080424-25-000076-00759",
+    "ev-0000080424-26-000103-00765"
+   ]
+  }
+ ],
+ "receiptSha256": "99e9448d5587af347a7ec7a8ad073c6ab7bc2d2ba40f4c7c5e9b43531d8cd4d8"
+}

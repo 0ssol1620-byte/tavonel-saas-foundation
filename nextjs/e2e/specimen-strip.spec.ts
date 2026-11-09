@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { expect, test, type Page, type PlaywrightWorkerArgs } from "@playwright/test";
-import { SPECIMEN_FIXTURE_COOKIE, SPECIMEN_SLOTS, type SpecimenReceipt } from "../lib/specimen-sources";
+import { HOME_SPECIMEN_SLOTS, SPECIMEN_FIXTURE_COOKIE, SPECIMEN_SLOTS, type SpecimenReceipt } from "../lib/specimen-sources";
 
 /*
   P2-08 / UX-L4 (UX-PLAN-2026-10-17 §3.3, §3.4, §3.7; PHASE1-CRITIC-2026-10-17 §5.4): the specimen
@@ -34,10 +34,14 @@ const FIXTURE_DIR = new URL("./fixtures/specimens/", import.meta.url);
 const FIXTURES = readdirSync(FIXTURE_DIR)
   .filter(name => name.endsWith(".json"))
   .map(name => JSON.parse(readFileSync(new URL(name, FIXTURE_DIR), "utf8")) as SpecimenReceipt)
-  .sort((a, b) => SPECIMEN_SLOTS.indexOf(a.slot) - SPECIMEN_SLOTS.indexOf(b.slot));
+  .sort((a, b) => SPECIMEN_SLOTS.indexOf(a.slot) - SPECIMEN_SLOTS.indexOf(b.slot))
+  // GX-02 (2026-11-09): Home renders no Korean document cell, fixture or committed.
+  .filter(receipt => HOME_SPECIMEN_SLOTS.includes(receipt.slot));
 // In the strip's order: slot order, receipt order within a slot (readSpecimens), whatever order the JSON lists them in.
-const COMMITTED = (JSON.parse(readFileSync(new URL("../lib/specimen-sources.json", import.meta.url), "utf8")) as SpecimenReceipt[])
+const ALL_COMMITTED = (JSON.parse(readFileSync(new URL("../lib/specimen-sources.json", import.meta.url), "utf8")) as SpecimenReceipt[])
   .sort((a, b) => SPECIMEN_SLOTS.indexOf(a.slot) - SPECIMEN_SLOTS.indexOf(b.slot));
+// What Home renders. Every committed receipt, the Korean one included, is still served byte for byte (below).
+const COMMITTED = ALL_COMMITTED.filter(receipt => HOME_SPECIMEN_SLOTS.includes(receipt.slot));
 const VIEWPORTS = [[360, 780], [390, 844], [412, 915], [430, 932], [1440, 900]] as const;
 const BROWSERS = ["chromium", "webkit"] as const;
 type BrowserName = (typeof BROWSERS)[number];
@@ -177,7 +181,7 @@ async function loadVisibleImages(page: Page) {
 
 for (const browserName of BROWSERS) {
   for (const [width, height] of VIEWPORTS) {
-    for (const path of ["/", "/ko"]) {
+    for (const path of ["/"]) {
       test(`${browserName} ${width}x${height} ${path}: the strip closes s2 after the workbench, with the fixture's own text`, async ({ playwright, baseURL }, testInfo) => {
         fixturesOnly();
         test.skip(testInfo.project.name !== "390", "sets its own browser and viewport");
@@ -240,7 +244,7 @@ for (const browserName of BROWSERS) {
           }
         });
         const tabs = page.locator("[data-specimen-tab]");
-        await expect(tabs).toHaveCount(3);
+        await expect(tabs).toHaveCount(FIXTURES.length);
         await tabs.first().focus();
         await page.keyboard.press("ArrowRight");
         await expect(tabs.nth(1)).toBeChecked();
@@ -248,9 +252,9 @@ for (const browserName of BROWSERS) {
         const visibleIds = () => page.evaluate(() =>
           [...document.querySelectorAll("[data-specimen-cell]")].filter(cell => getComputedStyle(cell).visibility === "visible").map(cell => cell.getAttribute("data-specimen-cell")));
         expect(await visibleIds()).toEqual([FIXTURES[1]!.specimenId]);
-        await page.locator("[data-specimen-strip] label").nth(2).click();
-        await expect(tabs.nth(2)).toBeChecked();
-        expect(await visibleIds()).toEqual([FIXTURES[2]!.specimenId]);
+        await page.locator("[data-specimen-strip] label").nth(0).click();
+        await expect(tabs.nth(0)).toBeChecked();
+        expect(await visibleIds()).toEqual([FIXTURES[0]!.specimenId]);
         const after = await below();
         expect(Math.abs(after.film - before.film), "the scene below does not move").toBeLessThanOrEqual(0.5);
         expect(Math.abs(after.strip - before.strip), "the strip keeps its height").toBeLessThanOrEqual(0.5);
@@ -311,7 +315,7 @@ for (const browserName of BROWSERS) {
 
 for (const browserName of BROWSERS) {
   for (const [width, height] of VIEWPORTS) {
-    for (const path of ["/", "/ko"]) {
+    for (const path of ["/"]) {
       test(`${browserName} ${width}x${height} ${path}: the committed pages, crops and reader's text, every region drawn`, async ({ playwright, baseURL }, testInfo) => {
         fixturesOnly();
         test.skip(testInfo.project.name !== "390", "sets its own browser and viewport");
@@ -397,7 +401,7 @@ for (const browserName of BROWSERS) {
   test(`${browserName} 390: the committed cells' "Show full text" opens the approved full source line`, async ({ playwright, baseURL }, testInfo) => {
     fixturesOnly();
     test.skip(testInfo.project.name !== "390", "sets its own browser and viewport");
-    for (const [path, lang] of [["/", "en"], ["/ko", "ko"]] as const) {
+    for (const [path, lang] of [["/", "en"]] as const) {
       await withPage({ playwright, baseURL }, browserName, { width: 390, height: 844 }, path, async page => {
         await page.locator("[data-specimen-strip] label").nth(1).click();
         const cell = page.locator(`[data-specimen-cell="${COMMITTED[1]!.specimenId}"]`);
@@ -415,7 +419,7 @@ for (const browserName of BROWSERS) {
 test("the committed cells' run receipts, extracts, crops and pages are served byte for byte", async ({ request }, testInfo) => {
   test.skip(testInfo.project.name !== "390", "one request is enough");
   const digest = (bytes: Buffer) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
-  for (const receipt of COMMITTED) {
+  for (const receipt of ALL_COMMITTED) {
     const run = await request.get(receipt.runReceiptUrl);
     expect(run.status(), receipt.runReceiptUrl).toBe(200);
     const runBytes = await run.body();
@@ -431,7 +435,7 @@ test("the committed cells' run receipts, extracts, crops and pages are served by
 test("the test server renders the committed cells for a request that asks, with no script needed to read them", async ({ request }, testInfo) => {
   fixturesOnly();
   test.skip(testInfo.project.name !== "390", "one request is enough");
-  for (const path of ["/", "/ko"]) {
+  for (const path of ["/"]) {
     const html = await (await request.get(path, { headers: { cookie: `${SPECIMEN_FIXTURE_COOKIE}=committed` } })).text();
     expect([...html.matchAll(/data-specimen-cell="([^"]+)"/g)].map(match => match[1]), path).toEqual(COMMITTED.map(r => r.specimenId));
     expect(html).not.toContain(path === "/" ? "synthetic fixture" : "합성 픽스처");
@@ -445,7 +449,7 @@ test("the test server renders the committed cells for a request that asks, with 
 test("the server renders the fixture cells for a request that asks, with no script needed to read them", async ({ request }, testInfo) => {
   fixturesOnly();
   test.skip(testInfo.project.name !== "390", "one request is enough");
-  for (const path of ["/", "/ko"]) {
+  for (const path of ["/"]) {
     const html = await (await request.get(path, { headers: { cookie: `${SPECIMEN_FIXTURE_COOKIE}=1` } })).text();
     expect(html.match(/data-specimen-cell="/g), path).toHaveLength(FIXTURES.length);
     expect(html).toContain(path === "/" ? "Reader output, unedited" : "판독기 출력, 수정 없음");
@@ -459,7 +463,7 @@ test("the server renders the fixture cells for a request that asks, with no scri
 */
 test("with the rollout switch on, Home renders the committed cells to a request that does not ask", async ({ request }, testInfo) => {
   test.skip(testInfo.project.name !== "390", "one request is enough");
-  for (const path of ["/", "/ko"]) {
+  for (const path of ["/"]) {
     const response = await request.get(path);
     expect(response.status()).toBe(200);
     const html = await response.text();
@@ -471,7 +475,7 @@ test("with the rollout switch on, Home renders the committed cells to a request 
 test("a production server ignores the fixture cookie and renders the committed cells, never a fixture", async ({ request }, testInfo) => {
   test.skip(!PRODUCTION_SERVER, "needs a server started without PLAYWRIGHT_LOCAL_HTTP; run with SPECIMEN_SERVER=production");
   test.skip(testInfo.project.name !== "390", "one request is enough");
-  for (const path of ["/", "/ko"]) {
+  for (const path of ["/"]) {
     for (const value of ["1", "committed"]) {
       const response = await request.get(path, { headers: { cookie: `${SPECIMEN_FIXTURE_COOKIE}=${value}` } });
       expect(response.status()).toBe(200);

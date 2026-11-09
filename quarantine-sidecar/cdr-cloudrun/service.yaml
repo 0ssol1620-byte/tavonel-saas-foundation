@@ -66,6 +66,11 @@ spec:
             # /v1/text-layer answers 503 and nothing changes. Turning it on is a founder decision.
             - name: TAVONEL_CDR_TEXT_LAYER_FIRST
               value: "0"
+            # D1 intake ceiling stage (app.py STAGE_LIMITS). "0" = 5 MiB / 80 pages. "1" = 25 MiB /
+            # 200 pages, deployed only after the §4.D stage-1 gates pass and before intake flips
+            # (docs/runbooks/RELEASE_ORDER.md, "W2-D").
+            - name: TAVONEL_INTAKE_CEILING_STAGE
+              value: "0"
             - name: TAVONEL_CDR_HMAC
               valueFrom:
                 secretKeyRef:

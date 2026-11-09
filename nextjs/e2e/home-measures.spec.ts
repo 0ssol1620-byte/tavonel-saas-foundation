@@ -17,7 +17,7 @@ async function seedRefusal(page: Page) {
   await page.addInitScript(() => localStorage.setItem("tavonel.analytics-consent.v1", JSON.stringify({ allowed: false, expires: Date.now() + 86_400_000 })));
 }
 
-for (const route of ["/", "/ko"]) {
+for (const route of ["/"]) {
   test(`${route} prints three receipted measures between the hero and the workbench`, async ({ page }, testInfo) => {
     test.skip(!["1440", "390"].includes(testInfo.project.name), "one desktop and one phone width");
     await seedRefusal(page);
@@ -54,7 +54,7 @@ test("phones read the band as one column, with no overflow and nothing clipped",
   await seedRefusal(page);
   for (const width of [360, 390, 412, 430]) {
     await page.setViewportSize({ width, height: 844 });
-    for (const route of ["/", "/ko"]) {
+    for (const route of ["/"]) {
       await page.goto(route);
       const layout = await page.locator("main > section[data-home-measures]").evaluate(node => {
         const facts = [...node.querySelectorAll("li[data-claim-id]")].map(fact => fact.getBoundingClientRect().toJSON());

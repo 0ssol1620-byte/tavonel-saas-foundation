@@ -74,6 +74,8 @@ function compileFixture(options = {}) {
     "./world-store": {},
     // B1 annotation as it behaves with TAVONEL_SOURCE_DEDUP_MODE unset (process.env is {} here): no store call, no note.
     "./source-dedup": { detectExactDuplicatesAtIntake: async () => null },
+    // B2 proposals as they behave with TAVONEL_LIBRARY_ORGANIZE_MODE unset: no computation, no store call.
+    "./library-shadow": { organizeLibraryAtIntake: async () => undefined },
   };
   return { ...load("lib/collection-compile-run.ts", mocks), audit, activity };
 }

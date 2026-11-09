@@ -233,5 +233,76 @@ class PageRangeRasterTest(unittest.TestCase):
             self.assertGreater(raster(pdf, limits(2))[0], 0)
 
 
+
+class IntakeCeilingStageTest(unittest.TestCase):
+    """D1 stage 1 (PROGRAM-2026-11-04 §4.D): a production limit set chosen by TAVONEL_INTAKE_CEILING_STAGE."""
+
+    STAGE_1 = Limits(25 * 1024 * 1024, 200, 45 * 1024 * 1024, 8)
+
+    def test_unset_and_zero_are_stage_zero_and_one_is_the_section_4d_numbers(self) -> None:
+        self.assertEqual(read_limits({"TAVONEL_INTAKE_CEILING_STAGE": "0"}), PRODUCTION_LIMITS)
+        self.assertEqual(read_limits({"TAVONEL_INTAKE_CEILING_STAGE": " "}), PRODUCTION_LIMITS)
+        stage_1 = read_limits({"TAVONEL_INTAKE_CEILING_STAGE": "1"})
+        self.assertEqual(stage_1, self.STAGE_1)
+        self.assertTrue(stage_1.is_production, "stage 1 is a production limit set, not a measurement")
+        # Derived, not measured: the stage-0 output bound per page times the stage-1 page ceiling.
+        self.assertEqual(app_module.STAGE_1_MAX_OUTPUT_BYTES, MAX_OUTPUT_BYTES * 200 // 80)
+
+    def test_an_unknown_stage_refuses_rather_than_guessing(self) -> None:
+        for value in ["2", "01", "one", "true", "-1", "1.0"]:
+            with self.subTest(value=value), self.assertRaises(RuntimeError):
+                read_limits({"TAVONEL_INTAKE_CEILING_STAGE": value})
+        env = {**os.environ, "TAVONEL_INTAKE_CEILING_STAGE": "2"}
+        completed = subprocess.run(
+            [sys.executable, "-c", "import app"], cwd=APP_DIR, env=env, capture_output=True, text=True, timeout=120, check=False,
+        )
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("TAVONEL_INTAKE_CEILING_STAGE must be 0 or 1", completed.stderr)
+
+    def test_measurement_overrides_still_apply_on_top_and_still_say_so(self) -> None:
+        limits = read_limits({"TAVONEL_INTAKE_CEILING_STAGE": "1", "TAVONEL_CDR_MAX_PAGES": "300"})
+        self.assertEqual(limits, Limits(25 * 1024 * 1024, 300, 45 * 1024 * 1024, 8))
+        self.assertFalse(limits.is_production)
+
+    def test_a_source_at_the_stage_one_byte_ceiling_passes_and_one_byte_more_is_refused(self) -> None:
+        ceiling = self.STAGE_1.input_bytes
+        with tempfile.TemporaryDirectory() as work, patch.object(app_module, "LIMITS", self.STAGE_1):
+            target = Path(work) / "source.bin"
+            self.assertEqual(copy_and_digest(Upload(b"x" * ceiling), target)[1], ceiling)  # type: ignore[arg-type]
+            with self.assertRaises(HTTPException) as refused:
+                copy_and_digest(Upload(b"x" * (ceiling + 1)), target)  # type: ignore[arg-type]
+            self.assertEqual((refused.exception.status_code, refused.exception.detail),
+                             (413, "CDR source exceeds the controlled-beta size limit"))
+
+    def test_a_source_at_the_stage_one_page_ceiling_renders_and_one_page_more_is_refused(self) -> None:
+        _, joined = raster(blank_pdf(200), self.STAGE_1)
+        output = pdfium.PdfDocument(joined)
+        try:
+            self.assertEqual(len(output), 200)
+        finally:
+            output.close()
+        with self.assertRaises(HTTPException) as refused:
+            raster(blank_pdf(201), self.STAGE_1)
+        self.assertEqual((refused.exception.status_code, refused.exception.detail),
+                         (422, "CDR source page count is not qualified"))
+        # Stage 0 still refuses the page count stage 1 admits.
+        with self.assertRaises(HTTPException):
+            raster(blank_pdf(81, (300.0, 300.0)), PRODUCTION_LIMITS)
+
+    def test_health_names_stage_one_and_stage_zero_answers_as_before(self) -> None:
+        health = HealthTest()
+        stage_1 = health.health(self.STAGE_1)
+        self.assertEqual(stage_1.get("intakeCeilingStage"), 1)
+        self.assertNotIn("measurementLimits", stage_1)
+        stage_0 = health.health(PRODUCTION_LIMITS)
+        self.assertNotIn("intakeCeilingStage", stage_0)
+        self.assertNotIn("measurementLimits", stage_0)
+
+    def test_service_definition_deploys_stage_zero(self) -> None:
+        service = (APP_DIR / "service.yaml").read_text(encoding="utf-8")
+        self.assertRegex(service, r'name: TAVONEL_INTAKE_CEILING_STAGE\s*\n\s*value: "0"')
+        self.assertEqual(len(re.findall(r"TAVONEL_INTAKE_CEILING_STAGE", service)), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

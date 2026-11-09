@@ -11,6 +11,10 @@ import styles from "./landing-hero.module.css";
  * Founder ask 2026-10-27 ("랜딩페이지에 영상은 축소상태가 디폴트여야"), over FINAL-SPEC 2026-10-26 §2.1: Home opens the
  * film compact -- the whole frame -- at every width. "Focus details" (the same toggle, pressed) is the expand: one
  * readable 4:5 pane below 768px (STAGE_FRAMES[].phonePane), the pan surface to 899px, the 2x crop from 900px.
+ *
+ * Recording R3 (2026-11-09) kept this on phones by founder decision: the phone film opens on the whole frame, and the
+ * readable pane is one press away. Product type in the whole frame draws under 12px at phone width (measured per width
+ * in the R3 QA receipts); the frame is not cropped to reach 12px.
  */
 export const LANDING_MOBILE_FILM_VIEW: MobileFilmView = "fit";
 export const LANDING_WIDE_FILM_VIEW: WideView = "fit";

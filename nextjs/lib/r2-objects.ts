@@ -10,6 +10,7 @@ import {
   isOcrJsonKey,
   type ImmutableObjectMeta,
 } from "./immutable-keys";
+import { OCR_JSON_MAX_BYTES } from "../../shared/intakeCeiling";
 
 /*
   The read bound for one ocr.json, equal to the worker's write bound for it.
@@ -32,8 +33,11 @@ import {
   Readable is not compilable. What one compile can carry is decided downstream by the Core
   request bound (`CORE_V2_MAX_REQUEST_BYTES`), and what a route can return by the response
   bound (`OCR_JSON_RESPONSE_MAX_BYTES`); both refuse with a named code before the platform would.
+
+  Derived from the intake ceiling stage (shared/intakeCeiling.ts OCR_JSON_MAX_BYTES): 24 MiB at
+  stage 0 (80 pages), the same per page at any other stage. The worker's stage table matches it.
 */
-export const MAX_DERIVED_JSON_BYTES = 24 * 1024 * 1024;
+export const MAX_DERIVED_JSON_BYTES = OCR_JSON_MAX_BYTES;
 export const MAX_COLLECTION_JSON_BYTES = 32 * 1024 * 1024;
 /**
  * The ocr-review.json read bound, equal to the worker's `MAX_RECEIPT_BYTES` (src/sanitize.ts).

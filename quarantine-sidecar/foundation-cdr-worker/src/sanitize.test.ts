@@ -12,6 +12,7 @@ import { OcrEvidenceRetryableError } from "./ocr";
 import {
   CDR_DETAIL_FAILURE_CLASS,
   cdrRefusalFailureClass,
+  asSourceRefusal,
   cdrRejectSiblingKey,
   sanitizeObject,
   type R2BucketLike,
@@ -140,7 +141,9 @@ describe("CDR response transport bounds", () => {
           cancel() { canceled = true; },
         }), { headers });
       };
-      await assert.rejects(sanitizeObject(envFor(r2), SOURCE_KEY, fetcher), RetryableError);
+      // Review R1 M1: a bound breach is a named refusal, not a retry that pays for CDR again.
+      await assert.rejects(sanitizeObject(envFor(r2), SOURCE_KEY, fetcher),
+        (error: unknown) => asSourceRefusal(error)?.failureClass === "PARSER_OOM" && /18 MiB stage-0 bound/.test((error as Error).message));
       assert.equal(canceled, true);
       assert.equal(calls, 1);
       assert.equal(r2.puts.length, 0);
@@ -1486,5 +1489,119 @@ describe("permanent refusals leave a receipt", () => {
       RetryableError,
     );
     assert.equal(r2.objects.has(cdrRejectSiblingKey(SOURCE_KEY) as string), false);
+  });
+});
+
+describe("source byte cap per intake ceiling stage (D1, PROGRAM-2026-11-04 §4.D)", () => {
+  const sized = (size: number) => {
+    const r2 = new FakeR2();
+    r2.objects.set(SOURCE_KEY, { bytes: SOURCE_BYTES, contentType: "application/pdf" });
+    const originalGet = r2.get.bind(r2);
+    r2.get = async (key: string) => {
+      const object = await originalGet(key);
+      return object ? { ...object, size } : null;
+    };
+    return r2;
+  };
+
+  it("refuses 25 MiB + 1 at stage 1 before calling CDR, and reaches CDR at exactly 25 MiB", async () => {
+    let fetched = 0;
+    const fetcher = async () => { fetched += 1; return new Response("unavailable", { status: 503 }); };
+    await assert.rejects(
+      () => sanitizeObject(envFor(sized(25 * 1024 * 1024 + 1), { TAVONEL_INTAKE_CEILING_STAGE: "1" }), SOURCE_KEY, fetcher),
+      (error: unknown) => error instanceof PermanentReject && /exceeds the 25 MiB Foundation CDR cap/.test(error.message),
+    );
+    assert.equal(fetched, 0);
+    await sanitizeObject(envFor(sized(25 * 1024 * 1024), { TAVONEL_INTAKE_CEILING_STAGE: "1" }), SOURCE_KEY, fetcher).catch(() => undefined);
+    assert.equal(fetched > 0, true, "a source at the stage-1 cap is not refused for size");
+  });
+
+  it("keeps the 5 MiB cap at stage 0 for a source stage 1 would admit", async () => {
+    let fetched = 0;
+    await assert.rejects(
+      () => sanitizeObject(envFor(sized(5 * 1024 * 1024 + 1)), SOURCE_KEY, async () => { fetched += 1; return new Response("no"); }),
+      (error: unknown) => error instanceof PermanentReject && /exceeds the 5 MiB Foundation CDR cap/.test(error.message),
+    );
+    assert.equal(fetched, 0);
+  });
+
+  it("refuses to read with a stage it cannot name, retryably and before CDR", async () => {
+    let fetched = 0;
+    await assert.rejects(
+      () => sanitizeObject(envFor(sized(1024), { TAVONEL_INTAKE_CEILING_STAGE: "2" }), SOURCE_KEY, async () => { fetched += 1; return new Response("no"); }),
+      (error: unknown) => error instanceof RetryableError && !(error instanceof PermanentReject),
+    );
+    assert.equal(fetched, 0);
+  });
+
+  // Review R1 M1: the worker's sanitized bound moves with the stage, or a 200-page stage-1 PDF
+  // above 18 MiB would retry the paid CDR run into the DLQ instead of failing by name.
+  const cdrReturning = (sanitized: Uint8Array<ArrayBuffer>) => async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (!String(input).includes("/v1/disarm")) return cleanCdrFetch(input, init);
+    return new Response(sanitized, {
+      status: 200,
+      headers: {
+        "content-type": "application/pdf",
+        "x-tavonel-cdr-status": "clean",
+        "x-tavonel-input-sha256": new Headers(init?.headers).get("x-tavonel-input-sha256") || "",
+        "x-tavonel-cdr-output-sha256": `sha256:${createHash("sha256").update(sanitized).digest("hex")}`,
+      },
+    });
+  };
+  const pdfOf = (size: number): Uint8Array<ArrayBuffer> => { const bytes = new Uint8Array(size); bytes.set(SANITIZED_BYTES); return bytes; };
+
+  it("stores an 18 MiB + 1 sanitized PDF at stage 1 and refuses it by name at stage 0", async () => {
+    const between = pdfOf(18 * 1024 * 1024 + 1);
+    const stageOne = new FakeR2();
+    stageOne.objects.set(SOURCE_KEY, { bytes: SOURCE_BYTES, contentType: "application/pdf" });
+    const stored = await sanitizeObject(envFor(stageOne, { TAVONEL_INTAKE_CEILING_STAGE: "1" }), SOURCE_KEY, cdrReturning(between));
+    assert.equal(stageOne.objects.get(stored.immutableKey)!.bytes.byteLength, between.byteLength);
+
+    const stageZero = new FakeR2();
+    stageZero.objects.set(SOURCE_KEY, { bytes: SOURCE_BYTES, contentType: "application/pdf" });
+    await assert.rejects(
+      () => sanitizeObject(envFor(stageZero), SOURCE_KEY, cdrReturning(between)),
+      (error: unknown) => asSourceRefusal(error)?.failureClass === "PARSER_OOM"
+        && /sanitized PDF exceeds the 18 MiB stage-0 bound/.test((error as Error).message),
+    );
+  });
+
+  it("refuses a sanitized PDF above 45 MiB at stage 1 by name, not by retry", async () => {
+    const r2 = new FakeR2();
+    r2.objects.set(SOURCE_KEY, { bytes: SOURCE_BYTES, contentType: "application/pdf" });
+    await assert.rejects(
+      () => sanitizeObject(envFor(r2, { TAVONEL_INTAKE_CEILING_STAGE: "1" }), SOURCE_KEY, cdrReturning(pdfOf(45 * 1024 * 1024 + 1))),
+      (error: unknown) => asSourceRefusal(error)?.failureClass === "PARSER_OOM"
+        && /sanitized PDF exceeds the 45 MiB stage-1 bound/.test((error as Error).message),
+    );
+  });
+});
+
+describe("D2 text-layer shadow beside OCR (PROGRAM-2026-11-04 §4.D, ADR-2026-11-02 §5)", () => {
+  const ocrEnv = (r2: FakeR2, flag?: string) => envFor(r2, {
+    FOUNDATION_OCR_URL: FOUNDATION_OCR, TAVONEL_OCR_HMAC: "foundation-ocr-hmac-fixture-secret-ok",
+    ...(flag === undefined ? {} : { FOUNDATION_CDR_TEXT_LAYER_FIRST: flag }),
+  });
+
+  it("asks nothing more when off", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const urls: string[] = [];
+    await sanitizeObject(ocrEnv(r2), SOURCE_KEY, async (input, init) => { urls.push(String(input)); return cleanCdrFetch(input, init); });
+    assert.equal(urls.some((url) => url.endsWith("/v1/text-layer")), false);
+    assert.equal(r2.puts.some((entry) => entry.key.includes("text-layer")), false);
+  });
+
+  it("records a failed layer read and leaves the OCR result exactly as it was", async () => {
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+    const result = await sanitizeObject(ocrEnv(r2, "1"), SOURCE_KEY, async (input, init) => {
+      if (String(input).endsWith("/v1/text-layer")) throw new TypeError("network down");
+      return cleanCdrFetch(input, init);
+    });
+    assert.equal(result.status, "clean");
+    assert.equal(result.ocr.status, "written");
+    const shadowKey = (result.ocr.key as string).replace("ocr.json", "text-layer-shadow.json");
+    const shadow = JSON.parse(new TextDecoder().decode(r2.objects.get(shadowKey)?.bytes));
+    assert.deepEqual([shadow.status, shadow.reason, shadow.servedPages], ["unavailable", "cdr_text_layer_transport", 0]);
+    assert.equal(r2.objects.has((result.ocr.key as string).replace("ocr.json", "text-layer.json")), false);
   });
 });

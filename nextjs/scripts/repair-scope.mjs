@@ -1936,15 +1936,18 @@ export const OCR_JSON_BOUND_AFFECTED_UNIT_FILES = Object.freeze([
 // Compile-job stall (cjob-157f2f23, 2026-11-05): the read-only events stream, the sticky-terminal client, and the CAS lease and
 // post-terminal refusal suites. The store, worker and compile-run are owned above; these are the endpoints no owner listed.
 // D0 (2026-11-08) adds the scheduler-window suite, which no affected group listed as an endpoint.
+// Compile reliability (2026-11-09) adds the blocked-decision expiry suite, the same way.
 export const COMPILE_JOB_STALL_AFFECTED_PATHS = Object.freeze([
   'app/api/compile-jobs/[jobId]/events/route.ts', 'app/api/internal/jobs/run/route.ts', 'lib/compile-job-client.test.ts', 'lib/compile-job-client.ts',
   'lib/compile-job-events-route.test.ts', 'lib/compile-job-lease.test.ts', 'lib/durable-compile-orchestration.test.ts',
   'components/compile-job-panel.tsx', 'lib/compile-job-panel.test.ts', 'lib/compile-job-scheduling.test.ts',
+  'lib/compile-job-expiry.test.ts',
 ]);
 export const COMPILE_JOB_STALL_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/compile-job-client.test.ts', 'lib/compile-job-events-route.test.ts', 'lib/compile-job-lease.test.ts',
   'lib/compile-job-worker.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/execution-budget.test.ts',
   'lib/compile-job-panel.test.ts', 'lib/workspace-failure-copy.test.ts', 'lib/compile-job-scheduling.test.ts',
+  'lib/compile-job-expiry.test.ts',
 ]);
 // Switch-on (D-12 / R1) and billing HMAC integrity (PR #201, 2026-11-09): the nineteen endpoints no owner listed -- the four
 // billing routes that now read the one secret reader, the reader and its suite, the trial digest reader, and the copy and
@@ -2241,6 +2244,9 @@ export const SITE_POLISH_AFFECTED_PATHS = Object.freeze(['components/benchmarks/
   'components/explore/change-act.tsx', 'components/file-or-route-link.tsx', 'components/trust-disclosures.tsx', 'components/trust-provisions.tsx', 'lib/file-or-route-link.test.ts']);
 export const SITE_POLISH_AFFECTED_UNIT_FILES = Object.freeze(['lib/benchmarks-page.test.ts', 'lib/explore-story.test.ts', 'lib/file-or-route-link.test.ts', 'lib/public-trust-contract.test.ts', 'lib/trust-provisions.test.ts']);
 export const SITE_POLISH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmarks.spec.ts', 'e2e/explore.spec.ts', 'e2e/templates.spec.ts']);
+// legal-semicolons-status-20261109: the /status operating-record spec, which pins the billing sentence.
+export const LEGAL_SEMICOLONS_STATUS_AFFECTED_PATHS = Object.freeze(['e2e/operations.spec.ts']);
+export const LEGAL_SEMICOLONS_STATUS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/operations.spec.ts']);
 // Packet delivery (codex/packet-delivery-textlayer-20261102): the delivery format an AI reads the compiled context in. The
 // download route and the two guidance modules that write the delivery/ files and point AGENTS.md at them, the package verifier
 // and its scripts/ copy that admit the delivery root, the delivery suite and the two parity suites whose MCP surface now reads
@@ -2343,6 +2349,19 @@ export const G1_COPY_TRUTH_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/tenant-isolation-negative.test.ts',
 ]);
 export const G1_COPY_TRUTH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/docs-reading-layout.spec.ts', 'e2e/pricing-plan-overview.spec.ts']);
+// Global exposure (GX-01..GX-04, founder 2026-11-09, codex/global-exposure-20261109): robots for AI crawlers, the /ko retirement's
+// two page heads and three browser specs no owner listed, the IndexNow key file, its manual ping script and its suite, and the
+// title-length and head suites. lib/product-claims-sync.test.ts is not here: switch-on-billing-integrity owns it and already
+// selects it. Exactly these twelve paths select the ten suites that read them directly (the SEO, head,
+// canonical, title-length, claims-sync, outcome-IA, IndexNow, pricing and evaluation suites) and evidence-first, which proves the
+// /ko 308s, through its existing reviewed project row. Product copy and a published file, so never nativeReuse.
+export const GLOBAL_EXPOSURE_AFFECTED_PATHS = Object.freeze([
+  'app/evaluation/page.tsx', 'app/pricing/page.tsx', 'app/robots.ts', 'e2e/evaluation-acceptance.spec.ts', 'e2e/masterplan-workbench.spec.ts', 'e2e/ux06-contact-recovery.spec.ts', 'lib/indexnow.test.ts', 'lib/landing-v2-outcome-ia.test.ts', 'lib/page-metadata.test.ts', 'lib/seo-title-lengths.test.ts', 'public/7a0ff86c91c02b35a358cdf2761b2512.txt', 'scripts/indexnow-ping.mjs',
+]);
+export const GLOBAL_EXPOSURE_AFFECTED_UNIT_FILES = Object.freeze([
+  'components/evaluation-page.test.tsx', 'lib/indexnow.test.ts', 'lib/landing-v2-outcome-ia.test.ts', 'lib/page-metadata.test.ts', 'lib/page-seo.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts', 'lib/route-canonical-metadata.test.ts', 'lib/seo-surface.test.ts', 'lib/seo-title-lengths.test.ts',
+]);
+export const GLOBAL_EXPOSURE_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/evidence-first.spec.ts']);
 // G8 CHANGE-NOTIFY (phase 4, DECISION-REGISTER S6-15): the switched-off notifier, its cron route, the route's classification row,
 // the cron entry in vercel.json and the receiver-contract browser spec. Exactly these six paths select the notifier's own suite, the
 // classification and route-surface suites for the new route, and every suite that reads vercel.json (production-posture among
@@ -2418,7 +2437,8 @@ export const REMOTE_MCP_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/launch-qa-r
 // The cuts themselves stay locked under their own owner; a new poster name is a new review. Product UI, so never nativeReuse.
 // Home film re-record on design C (W2, codex/film-rerecord-20261105): the six new cuts and eighteen posters, byte-locked in
 // lib/locked-film-assets.json, the recorder, scans and encoders that made them (scripts/film/), and the film-start probe
-// that names the stage-1 cut. Exact paths, no glob.
+// that names the stage-1 cut. Recording R3 (codex/landing-film-r3-20261109) adds its cuts, phone twins and posters, and the
+// guide-video recorder (scripts/guide/) under the same owner. Exact paths, no glob.
 export const HOME_FILM_RERECORD_AFFECTED_PATHS = Object.freeze([
   'public/film/hero-r2-c1-hq-1440.mp4',
   'public/film/hero-r2-c1-hq.mp4',
@@ -2426,6 +2446,15 @@ export const HOME_FILM_RERECORD_AFFECTED_PATHS = Object.freeze([
   'public/film/hero-r2-c2.mp4',
   'public/film/hero-r2-c3.mp4',
   'public/film/hero-r2-c4.mp4',
+  'public/film/hero-r3-c1-hq-1440.mp4',
+  'public/film/hero-r3-c1-hq.mp4',
+  'public/film/hero-r3-c1.mp4',
+  'public/film/hero-r3-c2-hq.mp4',
+  'public/film/hero-r3-c2.mp4',
+  'public/film/hero-r3-c3-hq.mp4',
+  'public/film/hero-r3-c3.mp4',
+  'public/film/hero-r3-c4-hq.mp4',
+  'public/film/hero-r3-c4.mp4',
   'public/film/poster-r2-c1-t13.60-2x.avif',
   'public/film/poster-r2-c1-t13.60-2x.webp',
   'public/film/poster-r2-c1-t13.60-pane1-684x855.avif',
@@ -2444,6 +2473,24 @@ export const HOME_FILM_RERECORD_AFFECTED_PATHS = Object.freeze([
   'public/film/poster-r2-c4-t6.80-2x.webp',
   'public/film/poster-r2-c4-t6.80.avif',
   'public/film/poster-r2-c4-t6.80.webp',
+  'public/film/poster-r3-c1-t10.40-2x.avif',
+  'public/film/poster-r3-c1-t10.40-2x.webp',
+  'public/film/poster-r3-c1-t10.40-pane1-848x1060.avif',
+  'public/film/poster-r3-c1-t10.40-pane1-848x1060.webp',
+  'public/film/poster-r3-c1-t10.40.avif',
+  'public/film/poster-r3-c1-t10.40.webp',
+  'public/film/poster-r3-c2-t17.96-2x.avif',
+  'public/film/poster-r3-c2-t17.96-2x.webp',
+  'public/film/poster-r3-c2-t17.96.avif',
+  'public/film/poster-r3-c2-t17.96.webp',
+  'public/film/poster-r3-c3-t17.96-2x.avif',
+  'public/film/poster-r3-c3-t17.96-2x.webp',
+  'public/film/poster-r3-c3-t17.96.avif',
+  'public/film/poster-r3-c3-t17.96.webp',
+  'public/film/poster-r3-c4-t8.80-2x.avif',
+  'public/film/poster-r3-c4-t8.80-2x.webp',
+  'public/film/poster-r3-c4-t8.80.avif',
+  'public/film/poster-r3-c4-t8.80.webp',
   'scripts/film/encode-fallback.sh',
   'scripts/film/fixture.mjs',
   'scripts/film/frame-strings.mjs',
@@ -2451,6 +2498,13 @@ export const HOME_FILM_RERECORD_AFFECTED_PATHS = Object.freeze([
   'scripts/film/record.mjs',
   'scripts/film/scan.mjs',
   'scripts/film/stages.mjs',
+  'scripts/guide/GUIDE-SCRIPTS.json',
+  'scripts/guide/capture-terminal.mjs',
+  'scripts/guide/encode-guides.mjs',
+  'scripts/guide/record-guide.mjs',
+  'scripts/guide/terminal-replay.mjs',
+  'scripts/guide/terminal/api.json',
+  'scripts/guide/terminal/mcp.json',
   'scripts/measure-film-start.mjs',
 ]);
 export const HOME_FILM_RERECORD_AFFECTED_UNIT_FILES = Object.freeze(['components/compile-stage-player.mobile-view.test.tsx', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts']);
@@ -2524,7 +2578,7 @@ export const VISUALS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/landing-v2.spe
 // scripts/remote-mcp (test plumbing, never shipped). They select those suites and the suites that read every app/api route
 // source. Product code, so never nativeReuse; no browser, database, worker or build lane.
 export const W1_REMOTE_MCP_A1_A5_AFFECTED_PATHS = Object.freeze(['app/api/collections/[id]/ask/route.ts', 'app/api/developer/keys/route.ts', 'app/api/internal/remote-mcp/revoke-all/route.ts', 'app/api/v1/developer/keys/[id]/rotate/route.ts', 'app/one-path.css', 'components/workspace-use-with-ai.tsx', 'components/workspace/connect-ai-panel.module.css', 'components/workspace/connect-ai-panel.tsx', 'lib/answer-receipt-signing.test.ts', 'lib/answer-receipt-signing.ts', 'lib/connect-ai-panel.test.ts', 'lib/developer-auth.ts', 'lib/developer-distribution.test.ts', 'lib/developer-store.test.ts', 'lib/developer-store.ts', 'lib/export-signing.ts', 'lib/funnel-events.test.ts', 'lib/remote-mcp-dispatch.ts', 'lib/remote-mcp-r1.test.ts', 'public/developer/tavonel-verify-answer.mjs', 'scripts/remote-mcp/conformance.mjs', 'scripts/remote-mcp/connect-ai-qa.mjs', 'scripts/remote-mcp/loopback-fetch.mjs', 'scripts/remote-mcp/security.mjs', 'scripts/remote-mcp/shadow-common.mjs']);
-export const W1_REMOTE_MCP_A1_A5_AFFECTED_UNIT_FILES = Object.freeze(['lib/answer-receipt-signing.test.ts', 'lib/api-error-codes.test.ts', 'lib/ask-route-limits.test.ts', 'lib/compile-receipt-signing.test.ts', 'lib/compiler-contract.test.ts', 'lib/connect-ai-panel.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/developer-distribution.test.ts', 'lib/developer-store.test.ts', 'lib/export-signing.test.ts', 'lib/funnel-events.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/remote-mcp-r1.test.ts', 'lib/remote-mcp.test.ts', 'lib/route-classification.test.ts', 'lib/trial-ai-access.test.ts']);
+export const W1_REMOTE_MCP_A1_A5_AFFECTED_UNIT_FILES = Object.freeze(['lib/answer-receipt-signing.test.ts', 'lib/answerability.test.ts', 'lib/api-error-codes.test.ts', 'lib/ask-route-limits.test.ts', 'lib/compile-receipt-signing.test.ts', 'lib/compiler-contract.test.ts', 'lib/connect-ai-panel.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/developer-distribution.test.ts', 'lib/developer-store.test.ts', 'lib/export-signing.test.ts', 'lib/funnel-events.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/remote-mcp-r1.test.ts', 'lib/remote-mcp.test.ts', 'lib/route-classification.test.ts', 'lib/trial-ai-access.test.ts']);
 export const OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS = Object.freeze(['app/api/internal/sli-alerts/route.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-alert-store.test.ts', 'lib/operational-sli-alert-store.ts']);
 // W1 trial AI access + operations alert producers (codex/w1-a2-20261104): the four 402 routes' key-route trio, the settle route
 // (OCR alerts), the session/key authorizer, the trial decision, the alert producers and the E2E timing receipt, with their suites.
@@ -2915,11 +2969,41 @@ export function vitestDiscoveryConfigFailures(source) {
   }
   return failures;
 }
+// W2-E2 answerability gate (codex/w2-e2-20261108): the pure gate, its shadow wiring and suite, and the pre-registered
+// replay under eval/ask-quality/e2 (prereg, replay module, runner, README, its synthetic suite and the two committed receipts).
+// They select the gate's suite and the replay's suite. The Ask route the shadow is wired into stays with
+// w1-remote-mcp-a1-a5 (one owner per path), which now selects lib/answerability.test.ts for it. Product code, so never
+// nativeReuse; exact paths, no wildcard, no default owner; eval/ask-quality/cache and any later receipt stay unmapped.
+export const ASK_ANSWERABILITY_E2_AFFECTED_PATHS = Object.freeze([
+  'eval/ask-quality/e2/PREREG-E2.json', 'eval/ask-quality/e2/README.md', 'eval/ask-quality/e2/e2.ts', 'eval/ask-quality/e2/metrics.test.ts', 'eval/ask-quality/e2/receipts/calibration-2026-11-08T082201899Z-99e9448d5587.json', 'eval/ask-quality/e2/receipts/holdout-2026-11-08T082317556Z-9dd7cb825748.json', 'eval/ask-quality/e2/run_e2.mjs', 'lib/answerability-shadow.ts', 'lib/answerability.test.ts', 'lib/answerability.ts',
+]);
+export const ASK_ANSWERABILITY_E2_AFFECTED_UNIT_FILES = Object.freeze(['eval/ask-quality/e2/metrics.test.ts', 'lib/answerability.test.ts']);
+// Library organize B2 (codex/w2-b2-20261108): the near-duplicate, document-type and topic-tag shadow methods, their intake
+// recorder and Library DTOs, and their suite. The compile-run hook keeps its compile-source-observations owner, which already
+// selects collection-compile-run.test.ts; this owner selects it too because the recorder is asserted from the compile side.
+// The migrations and pgTAP fixtures keep the database-contract owner; founder-test-reset-migration.test.ts keeps library-dedup-b1.
+// No browser suite: nothing renders it yet (B4). Never nativeReuse.
+export const LIBRARY_ORGANIZE_B2_AFFECTED_PATHS = Object.freeze(['lib/library-methods.ts', 'lib/library-shadow.test.ts', 'lib/library-shadow.ts']);
+export const LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES = Object.freeze(['lib/collection-compile-run.test.ts', 'lib/library-shadow.test.ts']);
+// W2-D intake (codex/w2-d-20261108, PROGRAM-2026-11-04 §4.D D1/D3): the stage-1 capability-route suite and the table
+// product-DPI Arena harness with its Python suite. Repository-relative, because the harness lives beside the CDR. The shared
+// ceiling, the CDR, reader and worker sources keep their owners (table-read-intake-ceiling, cdr-cloudrun-service,
+// ocr-gpu-worker, ocr-worker). The two direct suites are the stage-1 route suite and the cross-tree pin; the harness's own
+// pytest runs in malware-scan-qualification with the rest of tests/. No browser, database or worker lane. Never nativeReuse.
+export const W2_D_INTAKE_STAGE1_AFFECTED_PATHS = Object.freeze([
+  'nextjs/lib/processing-ceiling-stage1.test.ts',
+  'quarantine-sidecar/cdr-cloudrun/table_dpi_arena.py',
+  'quarantine-sidecar/cdr-cloudrun/tests/test_table_dpi_arena.py',
+]);
+export const W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES = Object.freeze(['lib/intake-ceiling-cross-tree.test.ts', 'lib/processing-ceiling-stage1.test.ts']);
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
 // legal-semicolons-20261109: the legal, consent, trust and /status copy whose semicolons were removed without a change in meaning.
 export const LEGAL_SEMICOLONS_AFFECTED_PATHS = Object.freeze(['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts']);
 export const LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-provisions.test.ts']);
+// sli-alert-noise-20261109: the probe-history reader signs at the real clock; the two SLI routes stop passing an evaluation instant to it.
+export const SLI_ALERT_NOISE_AFFECTED_PATHS = Object.freeze(['app/api/internal/sli/route.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe-store.ts']);
+export const SLI_ALERT_NOISE_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error-codes.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-read-route.test.ts', 'lib/operational-sli.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe.test.ts']);
 export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('public-marketing-surface', new RegExp(`^(?:${exactPathAlternation(PUBLIC_MARKETING_AFFECTED_PATHS)})$`),
     { unitFiles: PUBLIC_MARKETING_AFFECTED_UNIT_FILES, browserFiles: PUBLIC_MARKETING_AFFECTED_BROWSER_FILES }),
@@ -3079,6 +3163,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // site-polish-20261109: 5 exact paths select 4 direct suites and 3 browser suites.
   affectedGroup('site-polish-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(SITE_POLISH_AFFECTED_PATHS)})$`),
     { unitFiles: SITE_POLISH_AFFECTED_UNIT_FILES, browserFiles: SITE_POLISH_AFFECTED_BROWSER_FILES }),
+  // legal-semicolons-status-20261109: 1 exact path selects no direct suite and 1 browser suite.
+  affectedGroup('legal-semicolons-status-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(LEGAL_SEMICOLONS_STATUS_AFFECTED_PATHS)})$`),
+    { unitFiles: [], browserFiles: LEGAL_SEMICOLONS_STATUS_AFFECTED_BROWSER_FILES }),
   // library-dedup-b1: the 2 exact paths above select 2 direct suites and no browser suite.
   affectedGroup('library-dedup-b1', new RegExp(`^nextjs/(?:${exactPathAlternation(LIBRARY_DEDUP_AFFECTED_PATHS)})$`),
     { unitFiles: LIBRARY_DEDUP_AFFECTED_UNIT_FILES }),
@@ -3091,6 +3178,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // gate-release-continuity (D-05): the 9 exact repo-relative paths above select 10 direct suites and no browser suite.
   affectedGroup('gate-release-continuity', new RegExp(`^(?:${exactPathAlternation(GATE_RELEASE_CONTINUITY_AFFECTED_PATHS)})$`),
     { unitFiles: GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES }),
+  // global-exposure: the 12 exact paths above select 10 direct suites and 1 browser suite.
+  affectedGroup('global-exposure', new RegExp(`^nextjs/(?:${exactPathAlternation(GLOBAL_EXPOSURE_AFFECTED_PATHS)})$`),
+    { unitFiles: GLOBAL_EXPOSURE_AFFECTED_UNIT_FILES, browserFiles: GLOBAL_EXPOSURE_AFFECTED_BROWSER_FILES }),
   // g1-copy-truth: the 6 exact paths above select 17 direct suites and 2 browser suites.
   affectedGroup('g1-copy-truth', new RegExp(`^nextjs/(?:${exactPathAlternation(G1_COPY_TRUTH_AFFECTED_PATHS)})$`),
     { unitFiles: G1_COPY_TRUTH_AFFECTED_UNIT_FILES, browserFiles: G1_COPY_TRUTH_AFFECTED_BROWSER_FILES }),
@@ -3105,12 +3195,12 @@ export const AFFECTED_GROUPS = Object.freeze([
   // w1-trial-ops: the 10 exact paths above select 17 direct suites and no browser suite.
   affectedGroup('w1-trial-ops', new RegExp(`^nextjs/(?:${exactPathAlternation(W1_TRIAL_OPS_AFFECTED_PATHS)})$`),
     { unitFiles: W1_TRIAL_OPS_AFFECTED_UNIT_FILES }),
-  // w1-remote-mcp-a1-a5: the 25 exact paths above select 20 direct suites and no browser suite.
+  // w1-remote-mcp-a1-a5: the 25 exact paths above select 21 direct suites and no browser suite (W2-E2 added the shadow's suite).
   affectedGroup('w1-remote-mcp-a1-a5', new RegExp(`^nextjs/(?:${exactPathAlternation(W1_REMOTE_MCP_A1_A5_AFFECTED_PATHS)})$`),
     { unitFiles: W1_REMOTE_MCP_A1_A5_AFFECTED_UNIT_FILES }),
   affectedGroup('operational-sli-alert-delivery', new RegExp(`^nextjs/(?:${exactPathAlternation(OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS)})$`),
     { unitFiles: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES }),
-  // film-rerecord-20261105: the 32 exact paths above select 3 direct suites and 3 browser suites.
+  // film-rerecord-20261105: the 66 exact paths above select 3 direct suites and 3 browser suites.
   affectedGroup('film-rerecord-20261105', new RegExp(`^nextjs/(?:${exactPathAlternation(HOME_FILM_RERECORD_AFFECTED_PATHS)})$`),
     { unitFiles: HOME_FILM_RERECORD_AFFECTED_UNIT_FILES, browserFiles: HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES }),
   affectedGroup('consent-poster', new RegExp(`^nextjs/(?:${exactPathAlternation(CONSENT_POSTER_AFFECTED_PATHS)})$`),
@@ -3147,6 +3237,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // legal-semicolons-20261109: 5 exact paths select 10 direct suites and no browser suite.
   affectedGroup('legal-semicolons-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(LEGAL_SEMICOLONS_AFFECTED_PATHS)})$`),
     { unitFiles: LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES }),
+  // sli-alert-noise-20261109: 3 exact paths select 10 direct suites and no browser suite.
+  affectedGroup('sli-alert-noise-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(SLI_ALERT_NOISE_AFFECTED_PATHS)})$`),
+    { unitFiles: SLI_ALERT_NOISE_AFFECTED_UNIT_FILES }),
   affectedGroup('ci-selector', /^(?:\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml|nextjs\/scripts\/(?:repair-[a-z-]+(?:\.test)?\.mjs|run-repair-check\.mjs|verify-repair-workflows\.mjs|db\/(?:native-world-race(?:-ci)?|dropbox-source-stream-race)(?:\.test)?\.mjs|fixtures\/[A-Za-z0-9_.-]+\.json)|nextjs\/vitest\.repair-scope(?:\.async)?\.config\.ts)$/,
     { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),
   affectedGroup('ci-selector', /^nextjs\/lib\/repair-node-evidence\.test\.mjs$/, { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),
@@ -3157,6 +3250,15 @@ export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('database-contract', /^supabase\/(?:migrations|tests|drafts)\/[A-Za-z0-9_./-]+\.sql$/, { unitFiles: ['lib/pgtap-fixtures.test.ts'], database: true }),
   affectedGroup('native-harness-docs', /^docs\/integration\/NATIVE_WORLD_[A-Z_]+\.md$/),
   affectedGroup('repository-docs', /^(?:docs\/(?!integration\/NATIVE_WORLD_)[A-Za-z0-9_./-]+\.md|[A-Za-z0-9_.-]+\.md)$/, { nativeReuse: true }),
+  // ask-answerability-e2: the 10 exact paths above select 2 direct suites and no browser suite.
+  affectedGroup('ask-answerability-e2', new RegExp(`^nextjs/(?:${exactPathAlternation(ASK_ANSWERABILITY_E2_AFFECTED_PATHS)})$`),
+    { unitFiles: ASK_ANSWERABILITY_E2_AFFECTED_UNIT_FILES }),
+  // library-organize-b2 (W2-B2): the 3 exact paths above select 2 direct suites and no browser suite.
+  affectedGroup('library-organize-b2', new RegExp(`^nextjs/(?:${exactPathAlternation(LIBRARY_ORGANIZE_B2_AFFECTED_PATHS)})$`),
+    { unitFiles: LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES }),
+  // w2-d-intake-stage1 (W2-D): the 3 exact repo-relative paths above select 2 direct suites and no browser suite.
+  affectedGroup('w2-d-intake-stage1', new RegExp(`^(?:${exactPathAlternation(W2_D_INTAKE_STAGE1_AFFECTED_PATHS)})$`),
+    { unitFiles: W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES }),
 ]);const regularModes = ['100644', '100755'];
 
 export function parseAffectedRawDiff(output) {

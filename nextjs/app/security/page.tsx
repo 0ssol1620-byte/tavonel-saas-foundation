@@ -8,9 +8,9 @@ import { TRAINING_DATA_CLAIM } from "@/lib/security-claims";
 export const metadata: Metadata = {
   alternates: { canonical: "/security" },
   openGraph: { url: "/security" },
-  title: "Security — TAVONEL",
+  title: "Security: how document processing is controlled — TAVONEL",
   description:
-    "How TAVONEL protects source material, separates workspaces, preserves evidence, and keeps activation under human control.",
+    "How TAVONEL protects source material, separates workspaces, preserves evidence and keeps activation under human control. An incomplete check blocks the action.",
 };
 
 const PROCESSING_PATH = [

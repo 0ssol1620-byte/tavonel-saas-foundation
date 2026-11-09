@@ -1,6 +1,6 @@
 /*
   Frame scans over the 450 source PNGs of each Home cut. Run after record.mjs, before encoding:
-    node scripts/film/scan.mjs <frames-root>      (reads <frames-root>/hero-r2-c<n>/frames-2x/f0000.png ...; writes <frames-root>/scan.json)
+    node scripts/film/scan.mjs <frames-root>      (reads <frames-root>/hero-r3-c<n>/frames-2x/f0000.png ...; writes <frames-root>/scan.json)
   Exits 1 when any frame carries an edge band.
 
   blank (the cell rule of compile-stage-player.frame-strings.json): 24x24 source-px cells from the window origin; a cell
@@ -43,12 +43,19 @@ function blank(luma, W, x0, y0, w, h) {
   return empty / cells >= BLANK_AT;
 }
 
-// Crop windows and phone rects: STAGE_FRAMES in components/compile-stage-player.tsx.
-const PLAN = {
-  sources: { n: 1, crop: { x: 0.5, y: 0.2 }, phonePane: { x: 1780, y: 420, w: 684 } },
-  read: { n: 2, crop: { x: 0.5, y: 0.25 }, phonePane: { x: 1900, y: 400, w: 684 } },
-  structure: { n: 3, crop: { x: 0.5, y: 0.4 }, phonePane: { x: 120, y: 300, w: 684 } },
-  world: { n: 4, crop: { x: 0, y: 0.1 }, phonePane: { x: 160, y: 300, w: 684 } },
+/** The recording's file prefix: <frames-root>/<CUT>-c<n>/, public/film/<CUT>-c<n>.mp4, poster-<round>-c<n>-*. */
+export const CUT = "hero-r3";
+/*
+  Crop windows and phone rects: STAGE_FRAMES in components/compile-stage-player.tsx (the unit test holds the two equal).
+  R3 phone rects are 848 source px wide (4:5, 848x1060): the camera frames 1080 CSS px at 8/3, so 12px product type is 32
+  source px and draws at >= 12 CSS px in a phone pane at least 318px wide (Windows WebKit at 360). Each sits where the stage's camera keeps the
+  action: the centre (Read, Trace), the run panel and its sources at the left (Compile), the entity column (Update).
+*/
+export const PLAN = {
+  sources: { n: 1, crop: { x: 0.25, y: 0.2 }, phonePane: { x: 1016, y: 369, w: 848 } },
+  read: { n: 2, crop: { x: 0, y: 0.25 }, phonePane: { x: 50, y: 72, w: 848 } },
+  structure: { n: 3, crop: { x: 0.5, y: 0.25 }, phonePane: { x: 1986, y: 369, w: 848 } },
+  world: { n: 4, crop: { x: 0.25, y: 0.25 }, phonePane: { x: 1016, y: 369, w: 848 } },
 };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -60,7 +67,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     let inkBoth = 0, phoneBlank = 0, lastBlankT = null;
     const bandFrames = [];
     for (let i = 0; i < 450; i += 1) {
-      const { luma, W, H } = await greyscale(`${root}/hero-r2-c${p.n}/frames-2x/f${String(i).padStart(4, "0")}.png`);
+      const { luma, W, H } = await greyscale(`${root}/${CUT}-c${p.n}/frames-2x/f${String(i).padStart(4, "0")}.png`);
       const x0 = Math.round(p.crop.x * 2880), y0 = Math.round(p.crop.y * 1800);
       const a = blank(luma, W, x0, y0, 720, 900), b = blank(luma, W, x0 + 720, y0, 720, 900);
       if (!a && !b) inkBoth += 1; else lastBlankT = i / 25;

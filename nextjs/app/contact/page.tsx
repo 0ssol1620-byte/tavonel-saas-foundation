@@ -15,13 +15,10 @@ import faq from "./contact-faq.module.css";
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
   // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
-  alternates: {
-    canonical: "/contact",
-    languages: { en: "/contact", ko: "/ko/contact", "x-default": "/contact" },
-  },
+  alternates: { canonical: "/contact" },
   openGraph: { url: "/contact" },
-  title: "Contact — TAVONEL",
-  description: "Tell us what your documents need to become, without sending the documents themselves.",
+  title: "Contact us about what your documents need — TAVONEL",
+  description: "Tell us what your documents need to become, without sending the documents themselves. A few optional questions let the first reply come back with specifics.",
 };
 
 /*
@@ -52,7 +49,7 @@ export default function ContactPage() {
   const formats = describeAcceptedFormats(CAPABILITY_MANIFEST);
   const access = primaryCallToAction();
   return (
-    <PublicSitePage template="T2" languageHref="/ko/contact">
+    <PublicSitePage template="T2">
       <section className="scene doc contact-page">
           <div className="shell">
             <div className="body">

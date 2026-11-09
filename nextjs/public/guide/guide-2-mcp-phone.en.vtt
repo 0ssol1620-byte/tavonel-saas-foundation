@@ -1,73 +1,73 @@
 WEBVTT
 
 1
-00:00.000 --> 00:13.945
+00:00.000 --> 00:13.624
 The Developers page: how agents and code read a Compiled World over MCP and the API.
 
 2
-00:13.945 --> 00:17.967
+00:13.624 --> 00:17.624
 No write tool, and the server refuses to start if one is added.
 
 3
-00:17.967 --> 00:23.053
+00:17.624 --> 00:22.720
 The read-only MCP server is one downloadable file. There is no package to install.
 
 4
-00:23.053 --> 00:28.083
+00:22.720 --> 00:27.821
 The channel manifest lists the version and a hash for every file.
 
 5
-00:28.083 --> 00:36.095
+00:27.821 --> 00:35.832
 Now a terminal. This screen replays a captured session: the commands that ran and the output they printed, unedited.
 
 6
-00:36.095 --> 00:44.604
+00:35.832 --> 00:44.338
 The file is downloaded, hashed, and compared with the manifest value. They match.
 
 7
-00:44.604 --> 00:51.105
+00:44.338 --> 00:50.847
 --version prints the exact build.
 
 8
-00:51.105 --> 00:57.616
+00:50.847 --> 00:57.359
 No TAVONEL variable is set in this shell, so everything below ran without a key.
 
 9
-00:57.616 --> 01:05.163
+00:57.359 --> 01:04.874
 The JSON-RPC requests sent over stdin: initialize, tools/list and one tools/call.
 
 10
-01:05.163 --> 01:15.172
+01:04.874 --> 01:14.875
 The server's responses, exactly as printed.
 
 11
-01:15.172 --> 01:23.174
+01:14.875 --> 01:22.885
 Filtered to names: the tool list. None of them writes.
 
 12
-01:23.174 --> 01:30.179
+01:22.885 --> 01:29.897
 Without a key, the tool call stops at API_KEY_MISSING. This is the real response.
 
 13
-01:30.179 --> 01:38.181
+01:29.897 --> 01:37.906
 --doctor names what is missing and exits with a failure code.
 
 14
-01:38.181 --> 01:46.126
+01:37.906 --> 01:45.846
 The Claude Desktop config block from the MCP docs: the absolute path to the downloaded file, and a placeholder where a key goes.
 
 15
-01:46.126 --> 01:50.962
+01:45.846 --> 01:50.683
 The key lives in the client's env block or its secret facility, never in args.
 
 16
-01:50.962 --> 01:54.970
+01:50.683 --> 01:54.698
 The Claude Desktop app itself is not part of this recording.
 
 17
-01:54.970 --> 02:00.312
+01:54.698 --> 02:00.040
 The docs' tool table, and the note that there is no write tool and no activation tool.
 
 18
-02:00.312 --> 02:07.680
+02:00.040 --> 02:07.240
 A finished Compiled World is open to read in full today. Compiling your own sources is set up with us.
