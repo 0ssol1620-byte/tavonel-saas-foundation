@@ -256,8 +256,8 @@ const TABLE = {
   S1: CLOSED,
   S2: {
     ...CLOSED,
-    home: { ...CLOSED.home, secondary: { href: "/login", label: "Start with your files" } },
-    homeKo: { ...CLOSED.homeKo, secondary: { href: "/login", label: "내 자료로 시작하기" } },
+    home: { ...CLOSED.home, secondary: { href: "/login", label: "Sign up for access" } },
+    homeKo: { ...CLOSED.homeKo, secondary: { href: "/login", label: "사용 신청하기" } },
     pricing: [
       { href: "/login", label: "Start free evaluation" },
       { href: "/login?next=checkout&offer=observer_access", label: "Get Developer access, via sign-in" },
@@ -270,24 +270,24 @@ const TABLE = {
       wording with D-07, in P2-37, before the switch moves.
     */
     koPricing: {
-      intro: { href: "/login", label: "내 자료로 시작하기" },
+      intro: { href: "/login", label: "사용 신청하기" },
       cards: [
         CLOSED.koPricing.cards[0],
-        { href: "/login?next=checkout&offer=observer_access", label: "Developer · 내 자료로 시작하기" },
+        { href: "/login?next=checkout&offer=observer_access", label: "Developer · 사용 신청하기" },
         CLOSED.koPricing.cards[2],
         CLOSED.koPricing.cards[3],
       ],
     },
     explore: {
-      exits: [CLOSED.explore.exits[0], CLOSED.explore.exits[1], { href: "/login", label: "Start with your files" }],
-      close: { href: "/login", label: "Start with your files" },
+      exits: [CLOSED.explore.exits[0], CLOSED.explore.exits[1], { href: "/login", label: "Sign up for access" }],
+      close: { href: "/login", label: "Sign up for access" },
     },
     login: { text: OPEN_INTENT, links: [] },
   },
 } as const;
 
 /* UX-PLAN §6.3 rule 1: none of these may be offered before live commerce and founder-approved copy. */
-const SELF_SERVE = /free|start with your files|sign up|trial|내 자료로 시작/i;
+const SELF_SERVE = /free|start with your files|sign up|trial|내 자료로 시작|사용 신청/i;
 
 const STATES: State[] = ["S0", "S1", "S2"];
 
@@ -357,7 +357,7 @@ describe.each(STATES)("CTA truth in %s", (state) => {
     // The scan below is only worth its zero if it can see a self-serve label when one is offered.
     it("offers the self-serve labels the scan looks for", () => {
       expect(seen.labels.filter((label) => SELF_SERVE.test(label))).toEqual(
-        expect.arrayContaining(["Start with your files", "Start free evaluation", "내 자료로 시작하기"]),
+        expect.arrayContaining(["Sign up for access", "Start free evaluation", "사용 신청하기"]),
       );
     });
   } else {

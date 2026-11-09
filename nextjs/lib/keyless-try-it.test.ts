@@ -117,7 +117,7 @@ describe("the keyless try-it mount", () => {
     expect(tryIt).toBeLessThan(note);
     expect(text(quickstart)).toContain(
       // D-12 (delegated decision 2026-11-09): the note now says the steps run from your workspace.
-      "Steps 1 to 5 below are the calls that do it from your workspace.",
+      "Steps 1 to 5 below are the calls that do it once your workspace is open.",
     );
   });
 

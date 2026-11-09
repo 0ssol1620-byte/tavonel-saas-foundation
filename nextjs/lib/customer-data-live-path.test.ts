@@ -93,8 +93,11 @@ describe("customer data on the live compile path", () => {
   it("states the open path in the reader's terms, and only the plan that sells itself as bought online", () => {
     expect(activationPolicy.customerData.enabled).toBe(true);
     const { reason } = activationPolicy.customerData;
-    expect(reason).toMatch(/upload your own sources and compile them/i);
-    expect(reason).toContain("The Developer plan can be bought online; Team and Enterprise are arranged with us rather than enabled by a plan purchase.");
+    // Review PR201-R1 B3: the opening is staged, so the sentence promises a place in line, not open self-serve.
+    expect(reason).toContain("Self-serve access is opening in stages. Sign in and your workspace joins the waiting list");
+    expect(reason).toContain("Once yours is open, the Developer plan can be bought online. Team and Enterprise are arranged with us rather than enabled by a plan purchase.");
+    expect(reason).not.toMatch(/^Sign in to upload|can be bought online;/);
+    expect(reason, "plain sentences").not.toContain(";");
     expect(BILLING_OFFERS.observer_access.saleChannel).toBe("self_serve");
     expect(BILLING_OFFERS.studio_access.saleChannel).toBe("contact");
     expect(reason).not.toMatch(/set up with us|Compiling your own sources is/i);

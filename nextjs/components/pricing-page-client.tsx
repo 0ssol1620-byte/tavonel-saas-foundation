@@ -177,7 +177,7 @@ function planPath(
   if (plan.name === "Enterprise") return "Talk to us → we scope it against your material → a written quote";
   if (!plan.offerCode) return "Talk to us → scope volume and onboarding → agree a pilot";
   return state.liveCheckout
-    ? "Sign in → checkout → first compile"
+    ? "Sign in → your workspace opens → checkout and first compile"
     : "Request access → scope your sources → agree a pilot";
 }
 
@@ -860,7 +860,8 @@ export default function PricingPageClient({
               */}
               <aside className="paper-purchase-boundary" aria-label="Before choosing a plan">
                 <h2>{selfService ? "Check the scope before choosing a plan" : "Start with the sample. Agree on your evaluation."}</h2>
-                {!ownFilesOpen ? <p>{gates.find(gate => gate.id === "customerData")?.reason}</p> : null}
+                {/* Review PR201-R1 B3: open or closed, the policy sentence says how a workspace gets in. */}
+                <p>{gates.find(gate => gate.id === "customerData")?.reason}</p>
                 {/*
                   No plan-scope sentence here: what a plan includes is pricing wording, which is the
                   founder's (CLAUDE.md). The proposed sentence waits in PR #141's "Founder wording

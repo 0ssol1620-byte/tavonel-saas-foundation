@@ -38,13 +38,14 @@ export const activationPolicy = {
 
     D-12, delegated decision 2026-11-09. With `customerData` open the sentence says what intake
     does for the reader -- upload from the workspace, into quarantine -- and no longer that it is
-    arranged with us, which stopped being true when the switch moved.
+    arranged with us. Review PR201-R1 B3: the opening is staged (a canary of workspaces, see
+    `processing-workspace-grant.ts`), so it says intake opens for each workspace in turn.
 
     The flag stays `true` because the path is built and the routes guarding on it
     (`/api/uploads/capability`, the connector sync route) must keep refusing on the day it is set
     `false`. This row states what the path does; `customerData` states who may use it.
   */
-  customerIntake: { enabled: true, reason: "Upload your own sources from your workspace. Files go to tenant-scoped quarantine storage before processing, and no other part of the deployment reads them there." },
+  customerIntake: { enabled: true, reason: "Uploading your own sources opens for each workspace in turn. Once yours is open, files go to tenant-scoped quarantine storage before processing, and no other part of the deployment reads them there." },
   /*
     C-13 names the path that is actually carrying production Worker traffic.
 
@@ -87,12 +88,14 @@ export const activationPolicy = {
     disclosed where the customer meets it; it is not the first thing the sentence says.
 
     D-12, delegated decision 2026-11-09 (P2-37). The switch is on, so the sentence says what this
-    deployment now does, in the reader's terms: sign in, upload your own sources, compile them;
-    Developer is bought online, Team and Enterprise are arranged with us (`saleChannel` in the
+    deployment now does, in the reader's terms. Review PR201-R1 B3 (coordinator decision, recorded
+    in the campaign ledger): the launch is staged and the workspace canary stays until after it, so
+    the sentence promises a place on the waiting list, not open self-serve. Developer is bought
+    online once a workspace is open, Team and Enterprise are arranged with us (`saleChannel` in the
     billing catalog). It is still rendered verbatim wherever the gate was stated, and
     `KO_CHROME.customerDataGate` is its literal Korean.
   */
-  customerData: { enabled: true, reason: "Sign in to upload your own sources and compile them into a World with its evidence attached. The Developer plan can be bought online; Team and Enterprise are arranged with us rather than enabled by a plan purchase." },
+  customerData: { enabled: true, reason: "Self-serve access is opening in stages. Sign in and your workspace joins the waiting list, and we open uploading and compiling your own sources for each workspace in turn. Once yours is open, the Developer plan can be bought online. Team and Enterprise are arranged with us rather than enabled by a plan purchase." },
 } as const;
 
 export type ActivationCapability = keyof typeof activationPolicy;

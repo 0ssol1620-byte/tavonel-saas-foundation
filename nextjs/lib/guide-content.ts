@@ -155,7 +155,7 @@ const developer = BILLING_OFFERS.observer_access.label;
 const team = BILLING_OFFERS.studio_access.label;
 // D-12 (delegated decision 2026-11-09): intake is the workspace's, no longer arranged with us.
 // Both are live sentences: `activationPolicy.customerIntake.reason` and the /ko/pricing Developer card.
-const intakeEn = "Upload your own sources from your workspace.";
+const intakeEn = "Uploading your own sources opens for each workspace in turn.";
 const intakeKo = "내 원문 컴파일은 워크스페이스의 처리 승인 뒤에 시작합니다.";
 
 /* ================================================================================== English */
@@ -439,7 +439,7 @@ const EN: GuideChapter[] = [
         ],
       },
       { kind: "prose", text: "“All figures in US dollars, excluding tax.”" },
-      { kind: "note", text: `${developer} can be bought on /pricing; ${team} and Enterprise start with a conversation on /contact.` },
+      { kind: "note", text: `${developer} can be bought on /pricing once your workspace is open. ${team} and Enterprise start with a conversation on /contact.` },
     ],
     links: [
       { href: "/pricing#usage-estimator-title", label: "What will this run cost?" },
@@ -765,7 +765,7 @@ const KO: GuideChapter[] = [
         ],
       },
       { kind: "prose", text: "“All figures in US dollars, excluding tax.” 모든 금액은 미국 달러이며 세금은 포함하지 않습니다." },
-      { kind: "note", text: `${developer}는 /pricing에서 구매할 수 있고, ${team}과 Enterprise는 /contact에서 상담으로 시작합니다.` },
+      { kind: "note", text: `${developer}는 워크스페이스가 열리면 /pricing에서 구매할 수 있고, ${team}과 Enterprise는 /contact에서 상담으로 시작합니다.` },
     ],
     links: [
       { href: "/pricing#usage-estimator-title", label: "What will this run cost?" },

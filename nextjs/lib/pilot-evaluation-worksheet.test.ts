@@ -302,7 +302,7 @@ describe("pilot evaluation worksheet: the real EvaluationPage keeps its form, ga
       expect(html).toContain('href="/explore"');
       expect(html).toContain(locale === "en" ? 'href="/pricing"' : 'href="/ko/pricing"');
       // D-12 (delegated decision 2026-11-09): the switch-on sentence, in each locale.
-      expect(html).toContain(locale === "en" ? "The Developer plan can be bought online; Team and Enterprise are arranged with us rather than enabled by a plan purchase." : "Developer 요금제는 바로 구매할 수 있고, Team과 Enterprise는 저희와 함께 정합니다.");
+      expect(html).toContain(locale === "en" ? "Once yours is open, the Developer plan can be bought online. Team and Enterprise are arranged with us rather than enabled by a plan purchase." : "열린 뒤에는 Developer 요금제를 바로 구매할 수 있고, Team과 Enterprise는 저희와 함께 정합니다.");
       expect(html).not.toMatch(/<script\b/);
     });
   }

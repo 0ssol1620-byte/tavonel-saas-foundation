@@ -158,7 +158,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Getting started",
     summary: "From an API key to an evidence-bound answer, with the one step no key can take.",
     blocks: [
-      { kind: "note", text: `**Before you start.** ${activationPolicy.customerData.reason} Steps 1 to 5 below are the calls that do it from your workspace. Steps 6 and 7 read a World that already exists, and the completed public Compiled World is readable in full right now — including from the unauthenticated reads the API reference at /api will run for you.` },
+      { kind: "note", text: `**Before you start.** ${activationPolicy.customerData.reason} Steps 1 to 5 below are the calls that do it once your workspace is open. Steps 6 and 7 read a World that already exists, and the completed public Compiled World is readable in full right now — including from the unauthenticated reads the API reference at /api will run for you.` },
       { kind: "prose", text: "Every request is tenant-scoped by the key it carries. There is no account switch and no impersonation header: a key belongs to one workspace and reaches nothing else." },
       /*
         Review 3 (CI-TI-1): the whole-set approval lineage is documented only while it is on

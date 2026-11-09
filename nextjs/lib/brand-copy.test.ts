@@ -1460,9 +1460,10 @@ const prose = (surface: string) =>
 describe("the site's own vocabulary", () => {
   it("declares two access actions and one Explore action, and no more", () => {
     expect(ACCESS_CTA).toEqual({ href: "/contact", label: "Request access" });
+    // Review PR201-R1 B3: self-serve opens in stages, so the live-posture action signs a visitor up.
     expect(SELF_SERVE_CTA).toEqual({
       href: "/login",
-      label: "Start with your files",
+      label: "Sign up for access",
     });
     expect(EXPLORE_CTA).toEqual({
       href: "/explore",
@@ -1640,7 +1641,7 @@ describe("the site's own vocabulary", () => {
       'const pricingLabel = korean ? KO_CHROME.nav["/pricing"] : "Pricing";'
     );
     expect(chrome, "and renders that").toContain("{pricingLabel}");
-    for (const literal of ["Request access", "Start with your files"]) {
+    for (const literal of ["Request access", "Sign up for access"]) {
       expect(
         chrome,
         `the header writes "${literal}" instead of reading it`
@@ -1663,7 +1664,7 @@ describe("the site's own vocabulary", () => {
     for (const literal of [
       "Contact<",
       "Request access",
-      "Start with your files",
+      "Sign up for access",
     ]) {
       expect(
         sheet,

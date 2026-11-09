@@ -100,7 +100,8 @@ export function customerNavOwns(href: string, pathname: string): boolean {
 export const ACCESS_CTA: SiteLink = { href: "/contact", label: "Request access" };
 
 /** The access action once a real card can be charged. The same action, live posture. */
-export const SELF_SERVE_CTA: SiteLink = { href: "/login", label: "Start with your files" };
+// Review PR201-R1 B3: self-serve opens in stages, so the action signs a visitor up rather than promising an upload.
+export const SELF_SERVE_CTA: SiteLink = { href: "/login", label: "Sign up for access" };
 
 /** The one name for the public sample, everywhere it is linked. */
 export const EXPLORE_CTA: SiteLink = { href: "/explore", label: "Explore a Compiled World" };
@@ -168,7 +169,7 @@ export const BRAND_LINE = {
   still stated verbatim where it is stated; the inventory is in `lib/commercial-state.ts`.
 */
 export const KO_CHROME = {
-  cta: { [ACCESS_CTA.href]: "이용 문의", [SELF_SERVE_CTA.href]: "내 자료로 시작하기" } as Record<string, string>,
+  cta: { [ACCESS_CTA.href]: "이용 문의", [SELF_SERVE_CTA.href]: "사용 신청하기" } as Record<string, string>,
   signIn: "로그인",
   /* Labels follow the same hrefs as the English primary navigation. */
   nav: {
@@ -239,10 +240,11 @@ export const KO_CHROME = {
     the English does now: the World a reader can open today, then the arranged path. The gate is
     unchanged and still stated once, in Korean, in the site's one spelling of it.
 
-    D-12, delegated decision 2026-11-09: the literal Korean of the switch-on sentence.
+    D-12, delegated decision 2026-11-09: the literal Korean of the switch-on sentence, staged per
+    review PR201-R1 B3. Every syllable is inside the KO Home font subset (landing-v2-page.test.ts).
   */
   customerDataGate:
-    "로그인하면 내 원문을 업로드해 근거가 붙은 World로 컴파일할 수 있습니다. Developer 요금제는 바로 구매할 수 있고, Team과 Enterprise는 저희와 함께 정합니다.",
+    "내 원문 컴파일은 단계적으로 열고 있습니다. 로그인하면 워크스페이스가 대기 목록에 들어가고, 하나씩 업로드와 컴파일을 열어 드립니다. 열린 뒤에는 Developer 요금제를 바로 구매할 수 있고, Team과 Enterprise는 저희와 함께 정합니다.",
 } as const;
 
 /**

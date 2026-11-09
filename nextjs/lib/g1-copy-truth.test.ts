@@ -49,7 +49,7 @@ describe("G1-COPY: /integrations", () => {
   // D-12 (delegated decision 2026-11-09): the arranged-intake sentence is now the workspace's.
   it("1. states where your own sources are compiled, not that five systems connect today", () => {
     const page = integrations();
-    expect(page).toContain("You upload and compile your own sources from your workspace.");
+    expect(page).toContain("Uploading and compiling your own sources opens for each workspace in turn.");
     expect(page).not.toContain("Compiling your own sources is set up with us.");
     expect(page).not.toMatch(/connects? today/i);
   });
