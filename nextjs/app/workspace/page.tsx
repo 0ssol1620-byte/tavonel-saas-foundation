@@ -486,19 +486,24 @@ export default function WorkspacePage() {
   }, [documents]);
   const [proofMode, setProofMode] = useState(false);
   const [collectionResult, setCollectionResult] = useState<CollectionResult | null>(null);
-  /*
-    FUNNEL-SIGNED-IN #4: "Review and activate" on a finished compile lands here with #activate. The
-    form renders only once the candidate has loaded, after the browser's own hash scroll has run, so
-    the scroll is made when it exists.
-  */
-  const activateTarget = surface === "review" && Boolean(collectionResult);
-  useEffect(() => {
-    if (!activateTarget || window.location.hash !== "#activate") return;
-    document.getElementById("workspace-review")?.scrollIntoView({ block: "start" });
-    document.getElementById("review-reason")?.focus({ preventScroll: true });
-  }, [activateTarget]);
   const candidateLoadSequence = useRef(0);
   const [worldReadModel, setWorldReadModel] = useState<WorldReadModel | null>(null);
+  /*
+    FUNNEL-SIGNED-IN #4: "Review and activate" on a finished compile lands here with #activate. The
+    form renders once the candidate has loaded, and the evidence view above it grows once the read
+    model has, both after the browser's own hash scroll. So the scroll waits for both, and is made
+    once per visit so a later reload never moves the page under the reader.
+  */
+  const activateScrolled = useRef(false);
+  const activateTarget = surface === "review" && Boolean(collectionResult) && Boolean(worldReadModel);
+  useEffect(() => {
+    if (!activateTarget || activateScrolled.current || window.location.hash !== "#activate") return;
+    const field = document.getElementById("review-reason");
+    if (!field) return;
+    activateScrolled.current = true;
+    field.scrollIntoView({ block: "center" });
+    field.focus({ preventScroll: true });
+  }, [activateTarget]);
   useEffect(() => {
     const collectionId = collectionResult?.collectionId;
     const manifest = collectionResult?.manifestDigest;
