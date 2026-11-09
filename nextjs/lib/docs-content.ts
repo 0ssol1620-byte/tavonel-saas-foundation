@@ -203,12 +203,14 @@ export const DOCS_SECTIONS: DocsSection[] = [
           "Download the signed package and verify it offline with the published verifiers.",
         ],
       },
+      // ADR 0008 (2026-11-09): processing is open to every workspace whose owner accepts the processing
+      // terms, so the last sentence below no longer says files are not compiled here.
       // FD-02 (`docs/policy/DECISION_LOG_2026-09-11.md`): the activation plan gate stated below is
       // a delegated decision, 2026-09-11, read off `planReachesLevel` rather than typed here.
       { kind: "heading", text: "Why step 5 stops a script" },
       {
         kind: "note",
-        text: "Step 5 is the one that stops a script, and it stops for two separate reasons. Activation is human-only by design — a candidate is not organizational truth until a person says so, and no API key of any plan has a `promote` or `rollback` path to call. Separately, the activation surface is plan-gated: it runs on the **Developer** plan held by the workspace **owner**, or on the **Team** plan under its usual workspace roles, so steps 1-4 and 6-7 are what a Developer key is scoped for, and step 5 is open to you as well when you own the workspace. Any other caller is refused with `STUDIO_SUBSCRIPTION_REQUIRED`, and an evaluation trial with `SUBSCRIPTION_REQUIRED`; branch on those two codes. Team is arranged with us rather than bought at a checkout. That is the plan gate, and it is not the only one: the deployment-wide intake gate at the top of this page stops steps 1 to 4 on every plan until intake is arranged, so a Developer key passing the plan check still will not compile your files here today.",
+        text: "Step 5 is the one that stops a script, and it stops for two separate reasons. Activation is human-only by design — a candidate is not organizational truth until a person says so, and no API key of any plan has a `promote` or `rollback` path to call. Separately, the activation surface is plan-gated: it runs on the **Developer** plan held by the workspace **owner**, or on the **Team** plan under its usual workspace roles, so steps 1-4 and 6-7 are what a Developer key is scoped for, and step 5 is open to you as well when you own the workspace. Any other caller is refused with `STUDIO_SUBSCRIPTION_REQUIRED`, and an evaluation trial with `SUBSCRIPTION_REQUIRED`; branch on those two codes. Team is arranged with us rather than bought at a checkout. That is the plan gate, and it is not the only one. Steps 1 to 4 also need your workspace to be open for processing, which it is once its owner accepts the processing terms, and the workspace shows whether it is. From then on a Developer key that passes the plan check compiles your files.",
       },
       { kind: "heading", text: "Compile a document set" },
       {

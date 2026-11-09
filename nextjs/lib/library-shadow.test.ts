@@ -300,6 +300,19 @@ describe("Library DTOs", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  // ADR 0008: TAVONEL_PROCESSING_ROLLOUT=general opens processing to every workspace, not this unbenchmarked
+  // feature. Organize `on` still answers only inside the named cohort, and only while the cohort is set.
+  it("readLibraryDocuments stays cohort-only under TAVONEL_PROCESSING_ROLLOUT=general", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    const ga = { ...ON, TAVONEL_PROCESSING_ROLLOUT: "general" };
+    for (const env of [{ ...ga, TAVONEL_PROCESSING_WORKSPACE_COHORT: "pilot-someoneelse" },
+      { ...ga, TAVONEL_PROCESSING_WORKSPACE_COHORT: undefined }]) {
+      expect(await readLibraryDocuments(WS, [A], VIEWER, env)).toEqual({ ok: false, code: "LIBRARY_ORGANIZE_NOT_ENABLED" });
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("under `on` it names only documents the viewer may read", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ schemaVersion: "tavonel.library_organize_read.v1", ...internal }), { status: 200 })));
     const read = await readLibraryDocuments(WS, [A, H], VIEWER, ON);

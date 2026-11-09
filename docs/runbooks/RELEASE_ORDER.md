@@ -488,29 +488,43 @@ compile이 24 MiB를 넘는 `ocr.json`을 `JSON_TOO_LARGE`로 거부하게 둔�
 ## 추가 2026-11-09 — 처리 GA: 워크스페이스 수 제한을 푼다 (ADR 0008, `TAVONEL_PROCESSING_ROLLOUT`)
 
 - 결정: `docs/adr/0008-processing-general-availability.md`. D-19 canary(이름 붙은 1–3개 워크스페이스)를 푼다.
-  `TAVONEL_PROCESSING_ROLLOUT=general`(정확히 이 값, 소문자, 공백 없음)이고 `TAVONEL_CUSTOMER_DATA_GATE_VERSION=v2`일 때만
+  `TAVONEL_PROCESSING_ROLLOUT=general`(정확히 이 값, 소문자, 공백·줄바꿈 없음)이고 `TAVONEL_CUSTOMER_DATA_GATE_VERSION=v2`일 때만
   모든 워크스페이스가 rollout 검사를 통과한다. 다른 값이나 v2가 아닌 gate는 `PROCESSING_COHORT_CONFIG_INVALID`이고 아무도
-  들이지 않는다. 미설정은 D-19 canary 그대로다.
+  들이지 않는다. 창업자 cohort도 막힌다. 미설정은 D-19 canary 그대로다.
 - 풀리는 것은 워크스페이스 수뿐이다. 처리 약관 동의와 grant, 배포마다의 release 행, ACL·tenant 격리, trial 파일·페이지 상한,
   AI 사용량 ledger, malware·CDR, launch switch는 그대로 적용된다.
 - migration은 없다. 코드만 바뀐다.
+- **env 값은 `printf %s`로 넣는다. `echo`는 쓰지 않는다.** `echo`가 붙이는 줄바꿈이 값에 들어가면 `general\n`은 `general`이
+  아니므로 설정 오류이고, 그 순간 모든 워크스페이스의 처리가 닫힌다.
 
 ### 순서 (production)
 
-1. **env를 먼저 넣는다.** Vercel → `tavonel-saas-foundation` → Production에 `TAVONEL_PROCESSING_ROLLOUT` = `general`을 추가한다.
+1. **선행: 지출 상한부터.** #221(fail-closed 일일 OCR 지출 차단, `OCR_HTTP_UNAVAILABLE` 알림, compile 적체 SLI)이 main에
+   병합되어 배포되어 있어야 한다. 그다음 `TAVONEL_RUNPOD_DAILY_COST_CAP_USD`를 production에 넣는다. 값(USD)은 campaign
+   ledger에 기록한 결정을 따른다.
+   ```sh
+   printf %s '<USD>' | vercel env add TAVONEL_RUNPOD_DAILY_COST_CAP_USD production
+   ```
+   이 둘이 끝나기 전에는 2로 가지 않는다(Stop the line: runaway GPU/API spend). 처리 용량은 #220이 늘린다. GA 전에
+   병합하기를 권장한다. 순서와 근거는 ledger에 남긴다.
+2. **GA env를 넣는다.** Vercel → `tavonel-saas-foundation` → Production.
+   ```sh
+   printf %s general | vercel env add TAVONEL_PROCESSING_ROLLOUT production
+   ```
    같은 화면에서 `TAVONEL_CUSTOMER_DATA_GATE_VERSION` = `v2`인지, `TAVONEL_PROCESSING_WORKSPACE_COHORT`가 **그대로 설정되어
-   있는지** 확인한다. cohort는 지우지 않는다. rollback이 돌아갈 곳이고, cohort로 범위를 정하는 기능(library organize `on`)이
-   읽는 값이다.
-   ```
-   vercel env add TAVONEL_PROCESSING_ROLLOUT production    # 입력: general
-   ```
-2. **배포한다.** env는 새 build가 production이 될 때 반영된다. 이 PR의 merge 배포가 그 build다. env가 이미 들어가 있으므로
-   새 문구와 GA 동작이 같은 배포에서 함께 켜진다.
-3. **release 행을 넣는다.** 배포된 SHA에 대한 production release decision을 기록하고
-   `pnpm release:gate-check --sha <배포된 40자리 SHA>`가 exit 0인지 본다(위 "Every deploy under gate v2"). release 행이 없으면
-   GA여도 아무도 처리되지 않는다.
-4. **읽기 전용으로 확인한다.** cohort 밖의 새 워크스페이스 하나가 로그인하고 처리 약관에 동의한 뒤(창업자 테스트 계정이면 된다),
-   SELECT만으로 grant가 생겼는지 본다. 쓰기·RPC는 하지 않는다.
+   있는지** 확인한다. cohort는 지우지 않는다. rollback이 돌아갈 곳이고, cohort로 범위를 정하는 기능(library organize `on`,
+   `nextjs/lib/library-shadow.ts`)이 읽는 값이다. 이 PR 이전 코드는 이 env를 읽지 않는다. 그래서 병합 전에 다른 배포가 생겨도
+   아무것도 바뀌지 않는다.
+3. **release 행은 병합 전에 넣고, 병합한다.** 아래 "추가 2026-11-09 — 병합 전 출시 행"의 순서 1–5를 그대로 따른다.
+   - 이 PR head(최신 main 포함)로 행을 만든다.
+   - `pnpm release:gate-check --sha <head> --merge-into $(git rev-parse origin/main)`가 exit 0인지 확인한다.
+   - `gh pr merge <n> --merge --match-head-commit <head>`로 병합한다.
+   그러면 env가 이미 들어가 있으므로 배포가 READY가 되는 순간 새 문구, GA 동작, release 행이 함께 열린다. 그 절차가 막히면 그
+   절의 마지막 줄대로 배포 → main CI → 병합 SHA의 행 순서로 돌아간다. 그 사이에는 업로드가 닫혀 있다.
+4. **READY 뒤 확인.** 같은 절의 순서 6대로 `pnpm release:gate-check --sha <병합 SHA>`가 `released`여야 한다.
+5. **읽기 전용으로 GA를 확인한다. GA를 알리기 전의 필수 확인이다.** cohort 밖의 새 워크스페이스 하나로 확인한다. 창업자
+   테스트 계정이면 된다. 그 워크스페이스가 로그인하고 처리 약관에 동의한 뒤, SELECT만으로 grant가 생겼는지 본다. 쓰기와
+   RPC는 하지 않는다.
    ```sql
    select a.workspace_key, a.scope, a.accepted_at, d.allowed, d.release_revision, d.granted_at, d.expires_at
    from public.foundation_processing_terms_acceptances a
@@ -523,64 +537,30 @@ compile이 24 MiB를 넘는 `ocr.json`을 `JSON_TOO_LARGE`로 거부하게 둔�
    where a.accepted_at > '<배포 시각 UTC>'
    order by a.accepted_at desc limit 5;
    ```
-   기대값: cohort에 없는 `workspace_key`에서 `allowed = true`, `release_revision`은 배포된 SHA(또는 ADR 0006의 같은 gate surface
-   revision), `expires_at`은 미래다. `allowed`가 null이면 워크스페이스 화면이 "awaiting release"를 보이는지 보고, env 철자와
-   release 행부터 의심한다(`PROCESSING_COHORT_CONFIG_INVALID`는 장애가 아니라 대기로 보인다).
-5. **rollback.** `TAVONEL_PROCESSING_ROLLOUT`을 지우고(`vercel env rm TAVONEL_PROCESSING_ROLLOUT production`) 다시 배포한다.
-   cohort가 그대로 있으므로 D-19 canary가 정확히 돌아온다. cohort 밖 워크스페이스는 grant가 남아 있어도 다음 읽기에서
-   `PROCESSING_COHORT_EXCLUDED`가 된다. cohort 검사가 grant 읽기보다 먼저 돈다. 재배포는 과금되는 build다. 즉시 멈춰야 하면
-   Vercel Instant Rollback으로 이전 배포를 production으로 되돌리는 것이 더 빠르다. 다만 그 이전 SHA에도 현재 release 행이 있어야
-   처리가 계속된다.
+   - 기대값은 세 가지다.
+     - cohort에 없는 `workspace_key`에서 `allowed = true`다.
+     - `release_revision`은 행을 기록한 PR head다(D-05 상속).
+     - `expires_at`은 미래다.
+   - `allowed`가 null이고 워크스페이스가 "awaiting release"를 보이면 GA를 알리지 않는다. 먼저 env 철자를 의심하고(줄바꿈
+     포함), 그다음 release 행을 의심한다. `PROCESSING_COHORT_CONFIG_INVALID`는 장애가 아니라 대기로 보인다.
+6. **rollback.**
+   - 먼저 쓰는 것은 Vercel Instant Rollback이다. 이전 배포로 되돌리면 동작과 공개 문구가 함께 이전 상태로 돌아간다. 이전 코드는
+     이 env를 읽지 않는다. 그 이전 SHA에도 현재 release 행이 있어야 처리가 계속된다.
+   - env만 되돌릴 수도 있다. `vercel env rm TAVONEL_PROCESSING_ROLLOUT production`을 하고 다시 배포한다(과금 build).
+     - cohort가 그대로 있으므로 D-19 canary가 정확히 돌아온다.
+     - cohort 밖 워크스페이스는 grant가 남아 있어도 다음 읽기에서 `PROCESSING_COHORT_EXCLUDED`가 된다. cohort 검사가 grant 읽기보다
+       먼저 돈다.
+     - 이때 공개 문구는 GA 문구로 남는다. cohort 밖 소유자는 약관에 동의해도 열리지 않는다. "워크스페이스가 열림 여부를 보여 준다"는
+       문장만 참으로 남는다. 그래서 env만 되돌리는 것은 잠깐 쓰는 방법이다. 길어지면 Instant Rollback으로 바꾼다.
 
 ### 하지 말 것
 
-- `general`이 아닌 철자(`General`, `all`, `*`, `true`, 앞뒤 공백)를 넣지 않는다. 모두 아무도 들이지 않는 설정 오류다.
+- `general`이 아닌 철자(`General`, `all`, `*`, `true`, 앞뒤 공백, 끝 줄바꿈)를 넣지 않는다. 모두 아무도 들이지 않는 설정
+  오류다. 값은 `printf %s`로만 넣는다.
 - `LAUNCH_CANARY_MAX_WORKSPACES`를 올리거나 cohort에 `*`를 넣어 넓히지 않는다. 넓히는 길은 이 env 하나다.
-- cohort를 지우지 않는다. `general`에서는 처리에 영향이 없지만 rollback이 깨진다(cohort 미설정 + rollout 미설정 = 아무도 처리 안 됨).
-
-## 추가 2026-11-08 — W2-E2 Ask 답변 가능성 게이트 shadow (migration 없음)
-
-- 새 flag는 `TAVONEL_ASK_ANSWERABILITY_MODE`(부록 A)다. 기본값은 `off`이고, `off`면 게이트를 계산하지 않는다. `shadow`면 판정을 계산해
-  `tavonel.answerability_shadow.v1` 로그 한 줄로 남긴다. 그 줄은 답 receipt의 `outputSha256`, `questionSha256`에 묶이고, 개수만 담으며
-  질문의 단어는 담지 않는다. 응답 본문, receipt, signed receipt(`answerability: null`)는 바뀌지 않는다. `on`을 포함한 다른 값은
-  `off`로 처리하고 `TAVONEL_ASK_ANSWERABILITY_MODE_INVALID` 오류를 로그에 남긴다.
-- **순서는 자유다.** migration도, 새 API 오류 코드도, DB 쓰기도 없다. production에서 `shadow`로 켜는 것은 env 변경이고,
-  재배포가 필요하므로 과금 build 1회다. 별도 batch로 하지 말고 다음 wave batch에 묶는다.
-- **holdout 판정은 `NOT_SUPPORTED`다**(`nextjs/eval/ask-quality/e2/receipts/holdout-*.json`, C2 실패: 답할 수 있는 질문 21/191을
-  거절했고, Wilson 상한은 0.162로 허용치 0.10을 넘었다). 그래서 `on`(cohort 안에서 abstain)은 만들지 않았다. 새 사전 등록과 새 holdout에서
-  `SUPPORTED`가 나오고 리뷰를 거친 변경이 있기 전에는 제안하지 않는다.
-- rollback: flag를 지우거나 `off`로 둔다. 코드를 되돌릴 필요는 없다(off 경로는 계산을 하지 않는다).
-
-## 추가 2026-11-08 — W2-B2: Library 근사 중복·문서 유형·주제 태그 shadow (`20261107100000`, `20261107100100`)
-
-- `20261107100000_library_organize_shadow`: 추가만 한다. `source_fingerprints`에 `text_sha256`·`minhash`(128×u32)·
-  `text_fingerprint_version` 열(셋이 함께 null이거나 함께 채워짐), `document_relations`에 `inputs_sha256` 열과
-  same_text/near_duplicate/revision_candidate 행의 추적 가능성 제약, 새 테이블 `document_labels`(RLS on, client 거부
-  restrictive policy, 어떤 역할도 table 권한 없음), service_role 전용 RPC `record_library_organize`·`read_library_organize`.
-  B1이 만든 exact_bytes 행과 기존 열은 바꾸지 않는다.
-- `20261107100100_founder_test_reset_library_organize`: founder test reset이 `document_labels`도 세고, fingerprint에 넣고,
-  지운다(label → relation → fingerprint 순서). FK가 `on delete cascade`라 fingerprint 삭제만으로도 label은 지워지지만,
-  명시적으로 지워야 seal의 count·fingerprint와 write fence가 이 테이블을 덮는다. 본문은 `20261105010000`의 상위집합
-  (W1-B1 줄 + W1-A3 줄 + labels 줄)이다. **이 파일은 `20261107100000` 뒤, 그리고 `20261105010000` 뒤에 적용한다.**
-  이 파일보다 먼저 prepare된 reset은 `founder_test_reset_database_drift`로 seal이 실패하므로 다시 prepare한다.
-- 적용 주체: production 적용은 위임 운영자가 Supabase MCP `apply_migration`으로 파일 하나씩
-  (`20261107100000` → `20261107100100`) 한다. `supabase db push`는 쓰지 않는다(production 이력이 repo와 어긋나 있어
-  out-of-order로 거부한다). 적용 뒤 `supabase_migrations.schema_migrations`에 두 버전이 있는지 확인하고, 적용 시각·
-  버전·적용자를 캠페인 ledger에 적는다. `20261107100000`은 `document_relations`에 CHECK를 NOT VALID 없이 추가하므로
-  적용 시 기존 행 전체 검사와 짧은 잠금이 있다(테이블이 작아 무시할 수준, 2026-11 기준).
-- 순서: **migration 먼저, 배포 나중.** 코드가 먼저 도착해도 깨지지 않는다. flag가 꺼져 있으면(기본) RPC를 부르지 않는다.
-  flag가 `shadow`인데 migration이 없으면 `LIBRARY_ORGANIZE_MIGRATION_ABSENT` error 로그 1줄이고 compile은 그대로 간다.
-- `TAVONEL_LIBRARY_ORGANIZE_MODE`(off|shadow|on, 기본 off). `shadow`는 제안을 저장만 한다(compile 요청·응답·저장 World
-  불변). `on`은 Library 읽기 DTO를 열지만 `TAVONEL_PROCESSING_WORKSPACE_COHORT`에 명시된 workspace에만 열린다(미설정이면
-  닫힘). 임계값(near 0.85, revision 0.50)과 규칙은 보정되지 않은 shadow 기본값이다. `on`은 §4.B B2a/B2b/B2c benchmark와
-  사람 판정 뒤에만 켠다.
-- 시간 상한(R1-M3): hook은 Core dispatch 앞에서 돈다. 한 compile의 OCR 텍스트가 2,000,000자를 넘으면 계산 없이
-  `LIBRARY_ORGANIZE_SKIPPED_BUDGET` 1줄로 건너뛴다(상한 근처 계산 0.28~0.64초, lane PC 측정). RPC는 DB 3초
-  (`statement_timeout` + 문서 사이 경과 검사, 넘으면 전체 rollback·`LIBRARY_ORGANIZE_STORE_TIME_BUDGET`), client 4초.
-  그래서 compile 하나에 더해지는 최악 지연은 약 4.7초다. 로컬 PG17 측정으로 128건 호출은 workspace fingerprint
-  ~700개, 32건 호출은 ~4,000개까지 3초 안에 든다. 그보다 큰 workspace에서 `shadow`를 켜기 전에 LSH banding을 넣는다.
-- 되돌리기: env를 지우거나 `off`(재배포 필요, 과금 build 1회). 테이블·열은 남긴다(expand만, down migration 없음).
-  `off`이면 읽는 경로도 쓰는 경로도 없다.
+- cohort를 지우지 않는다. `general`에서는 처리에 영향이 없다. 하지만 지우면 rollback이 깨진다. cohort와 rollout이 둘 다
+  미설정이면 아무도 처리되지 않는다.
+- 1이 끝나기 전에 2를 하지 않는다.
 
 ## 추가 2026-11-09 — IndexNow 제출 (GX-04)
 

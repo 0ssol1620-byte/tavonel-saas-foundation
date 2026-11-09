@@ -18,7 +18,7 @@ written (2026-10-19, `vercel env ls production` on `tavonel-saas-foundation`).
   `TAVONEL_PROCESSING_WORKSPACE_COHORT` (`processingCohortRefusal`,
   `nextjs/lib/processing-workspace-grant.ts`). Any other configuration admits nobody. While the
   switch is off this rule adds nothing. ADR 0008 (2026-11-09) lifts the count with
-  `TAVONEL_PROCESSING_ROLLOUT=general` (`processingRolloutRefusal`); unset, this rule holds as written. On gate v1 the workspace no longer shows the processing
+  `TAVONEL_PROCESSING_ROLLOUT=general` (`processingRolloutRefusal`). With it unset, this rule holds as written. On gate v1 the workspace no longer shows the processing
   terms panel, because v1 never reads an acceptance.
 - **D-13.** The runtime reads launch approval from the deployment environment only
   (`readCommercialState`). `nextjs/vercel.json` still carries `TAVONEL_BILLING_LAUNCH_APPROVED`.

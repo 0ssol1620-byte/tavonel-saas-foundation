@@ -61,15 +61,23 @@ what cohort-scoped features read.
 
 Every step is in `docs/runbooks/RELEASE_ORDER.md` ("추가 2026-11-09 — 처리 GA"), in this order:
 
-1. Set `TAVONEL_PROCESSING_ROLLOUT=general` (Production). Confirm `TAVONEL_CUSTOMER_DATA_GATE_VERSION=v2`
-   and that the cohort is still set.
-2. Deploy. The value takes effect only when a new build becomes production.
-3. Insert the production release row for the deployed SHA. `pnpm release:gate-check --sha <sha>`
-   must exit 0.
-4. Run a read-only check that a fresh workspace receives a grant after consent.
-5. Rollback: unset `TAVONEL_PROCESSING_ROLLOUT` and redeploy. The cohort is still set, so the
-   canary is back exactly. Workspaces outside it read `PROCESSING_COHORT_EXCLUDED` on their next
-   read, whether or not they hold a grant. The cohort check runs before the grant reader.
+1. Spend first. Merge and deploy #221, the fail-closed daily OCR spend stop. Then set
+   `TAVONEL_RUNPOD_DAILY_COST_CAP_USD`. #220 adds capacity and is recommended before GA.
+2. Set `TAVONEL_PROCESSING_ROLLOUT=general` in Production with `printf %s general | vercel env add …`,
+   never `echo`. A trailing newline makes the value invalid, and that closes processing for every
+   workspace, the cohort included. Confirm gate v2, and confirm the cohort is still set.
+3. Record the release row before the merge, against the PR head. Follow RELEASE_ORDER "추가
+   2026-11-09 — 병합 전 출시 행": `release:gate-check --sha <head> --merge-into <main>` exits 0, then
+   `gh pr merge --merge --match-head-commit <head>`. The deploy is then open when it reaches READY.
+4. After READY, `pnpm release:gate-check --sha <merge SHA>` reads `released`.
+5. Run a read-only check that a fresh workspace outside the cohort receives a grant after consent.
+   This is a hard check before GA is announced.
+6. Rollback.
+   - First choice: Vercel Instant Rollback to the previous deployment. It reverts the behaviour
+     and the public copy together. The older code never reads this variable.
+   - Env-only rollback: unset `TAVONEL_PROCESSING_ROLLOUT` and redeploy. The cohort is still set,
+     so the canary is back exactly. Workspaces outside it read `PROCESSING_COHORT_EXCLUDED` on
+     their next read, grant or not.
 
 ## Consequences
 
@@ -77,8 +85,11 @@ Every step is in `docs/runbooks/RELEASE_ORDER.md` ("추가 2026-11-09 — 처리
 - Public copy that said processing opened "in stages" / "stage by stage" now names what opens a
   workspace: its owner accepting the processing terms (`activationPolicy.customerData.reason`,
   `customerIntake.reason`, `/integrations`, `/login`, the guide, `KO_CHROME.customerDataGate`,
-  `/ko/pricing`). It still says the workspace shows whether it is open. Under rollback that
-  sentence stays true and the grant reader still decides.
+  `/ko/pricing`). It still says the workspace shows whether it is open. After an env-only
+  rollback this build's copy is no longer fully true: a non-cohort owner reads that processing
+  opens once the terms are accepted, accepts, and stays closed. Only the hedge sentence, that the
+  workspace shows whether it is open, still holds. That is why Instant Rollback, which reverts the
+  copy too, is the first rollback, and an env-only rollback is a short-term measure.
 - Load is no longer bounded by the canary width. The PR that adopts this ADR lists the
   concurrency and spend gaps ("Ops readiness"). Close them under their own reviews.
 - Nothing here is calibrated or benchmarked. It changes who may pass a gate, not what the
