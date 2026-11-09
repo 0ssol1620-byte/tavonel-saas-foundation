@@ -242,15 +242,15 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceE
   return [
     [
       "Base subscription",
-      `${BILLING_OFFERS.observer_access.label}: $${BILLING_OFFERS.observer_access.priceUsd}/month. ${BILLING_OFFERS.studio_access.label}: $${BILLING_OFFERS.studio_access.priceUsd}/month. ${selfServiceEvaluation ? "The seven-day evaluation is free and needs no card." : "The public World is free to explore; an evaluation with your own sources is arranged with us."}`,
+      `${BILLING_OFFERS.observer_access.label}: $${BILLING_OFFERS.observer_access.priceUsd}/month. ${BILLING_OFFERS.studio_access.label}: $${BILLING_OFFERS.studio_access.priceUsd}/month. ${selfServiceEvaluation ? "The seven-day evaluation is free and needs no card." : "The public World is free to explore. An evaluation with your own sources is arranged with us."}`,
     ],
     [
       "Included pages",
-      `${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")} standard pages on ${BILLING_OFFERS.observer_access.label}; ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} on ${BILLING_OFFERS.studio_access.label}.`,
+      `${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")} standard pages on ${BILLING_OFFERS.observer_access.label} and ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} on ${BILLING_OFFERS.studio_access.label}.`,
     ],
     [
       "Past the included pages",
-      "Additional volume is arranged with us; talk to us before you need it. Once a month's included pages are used, new sources wait for the next month's pages, and Ask, search and the Worlds you already compiled keep working.",
+      "Additional volume is arranged with us. Talk to us before you need it. Once a month's included pages are used, new sources wait for the next month's pages, and Ask, search and the Worlds you already compiled keep working.",
     ],
     // FD-03 (`docs/policy/DECISION_LOG_2026-09-11.md`): grant-time expiry, no roll-over, no refund
     // of unused pages. Delegated decision, 2026-09-11; the wording here is the customer's, per the
@@ -411,7 +411,7 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "Sources in one run",
-    `${CORPUS_MAX_DOCUMENTS}, compiled in parts of ${COMPILE_MAX_DOCUMENTS}. Each part compiles to its own World and is reviewed on its own; the parts are not merged.`,
+    `${CORPUS_MAX_DOCUMENTS}, compiled in parts of ${COMPILE_MAX_DOCUMENTS}. Each part compiles to its own World and is reviewed on its own. The parts are not merged.`,
   ],
   [
     "Members in a workspace",
@@ -570,7 +570,7 @@ const PURCHASE_FAQ: Array<[string, string, Route, string, string]> = [
   ["How much does it cost?", "A monthly subscription with included pages, both shown above. Volume past the included pages is arranged with us, and the most any run can use is shown before it starts.", "/refunds" as Route, "Cancellation and refunds", "What it costs"],
   ["How much setup is required?", "Explore the public World and its evidence without a card. To evaluate your own sources, contact us to agree the scope and intake path before any processing or payment.", "/docs" as Route, "Documentation", "What it costs"],
   ["Will I be locked in?", "The package is open formats — canonical JSON, Turtle, JSON-LD, CSV and JSONL — and the two verifiers are readable scripts rather than a service, so a package can be checked and loaded without us.", "/docs/exports" as Route, "The package format", "What happens to my data"],
-  ["Can I export?", "You can download the digest-bound public sample World today. Workspace exports are signed; compiling and exporting your own sources requires an arranged evaluation.", "/reproducibility" as Route, "Public sample and checksums", "What happens to my data"],
+  ["Can I export?", "You can download the digest-bound public sample World today. Workspace exports are signed. Compiling and exporting your own sources requires an arranged evaluation.", "/reproducibility" as Route, "Public sample and checksums", "What happens to my data"],
   ["Can I delete my data?", "Source material, derived artifacts and compiled packages are deleted on a verified request to privacy@tavonel.com. The categories and purposes are set out in the privacy notice.", "/privacy" as Route, "Storage and lifecycle", "What happens to my data"],
   /*
     BA-126 and BA-164. This row counted our own gaps on the page where a purchase is decided, and
@@ -584,13 +584,13 @@ const PURCHASE_FAQ: Array<[string, string, Route, string, string]> = [
     absences -- the rows a reader can count on that page -- rather than to a shared number, and
     fails if either page reaches for the thirteen again.
   */
-  ["Can an enterprise security review approve it?", "The Trust Center provides the public policies, processor record, legal terms, and reporting contacts. Deployment-specific architecture, control evidence, assurance scope, and questionnaire responses are provided through a qualified review; the reviewer makes the approval decision.", "/trust" as Route, "Trust Center", "What a review will find"],
+  ["Can an enterprise security review approve it?", "The Trust Center provides the public policies, processor record, legal terms, and reporting contacts. Deployment-specific architecture, control evidence, assurance scope, and questionnaire responses are provided through a qualified review. The reviewer makes the approval decision.", "/trust" as Route, "Trust Center", "What a review will find"],
 ];
 
 /** Keep the visible FAQ and its JSON-LD aligned with the same self-service gate as the cards. */
 const SELF_SERVICE_FAQ_ANSWERS: Record<string, string> = {
   "What is ready to use?": "A finished public World is open today. Sign in to evaluate your own files with source-linked Evidence, grounded Ask and signed export. The plan comparison above shows which capabilities each plan includes.",
-  "How much setup is required?": "Sign in to start a free seven-day Evaluation with up to 3 files and 50 standard pages. No card is needed; nothing is charged until you choose a plan.",
+  "How much setup is required?": "Sign in to start a free seven-day Evaluation with up to 3 files and 50 standard pages. No card is needed. Nothing is charged until you choose a plan.",
   "Can I export?": "Yes. The public sample World is digest-bound, and a signed workspace export is included with a World compiled during your free Evaluation.",
 };
 
@@ -845,7 +845,7 @@ export default function PricingPageClient({
             <div className="pricing-context">
               <p className="lede">
                 Developer includes {BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")} standard
-                pages each month; Team includes {BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")}.
+                pages each month. Team includes {BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")}.
                 Need more in a month? Talk to us and we will arrange the additional volume.
               </p>
               {/*
@@ -1055,7 +1055,7 @@ export default function PricingPageClient({
               both plans include compiling, evidence, Ask, signed export, API and MCP access,
               reviewing a candidate, activating a World and rolling one back, under the same
               limits below. The
-              capability table compares those plan entitlements; it does not open a closed
+              capability table compares those plan entitlements. It does not open a closed
               customer-data gate.
             </p>
             {/*
@@ -1115,7 +1115,7 @@ export default function PricingPageClient({
                   Nobody decides in advance. Every run holds the ceiling — every page at{" "}
                   {COMPLEX_PAGE_MAX_STANDARD_PAGES} standard pages — before it starts, so the maximum
                   you approve is the most it can use, and the run is settled on the work the pages
-                  actually took. It can come in under the maximum you approved; it cannot come in
+                  actually took. It can come in under the maximum you approved, but it cannot come in
                   over it.
                 </p>
               </article>
@@ -1180,13 +1180,13 @@ export default function PricingPageClient({
             */}
             <p className="fine">
               This table compares plan entitlements, not what a new visitor can start today.
-              {!ownFilesOpen ? " While source processing is closed, a tick does not open uploads or compilation; request an approved pilot first." : null}
+              {!ownFilesOpen ? " While source processing is closed, a tick does not open uploads or compilation. Request an approved pilot first." : null}
               {" "}A row marked Planned is a capability the plan names in its own catalog entry as not
-              sold yet; it is not billed, not enabled by buying the plan, and not a date. A row
+              sold yet. It is not billed, not enabled by buying the plan, and not a date. A row
               marked Not sold is not part of that plan at all. Only a capability the plan&apos;s
               authorization check admits carries a tick. Every row is answered for the workspace owner, the role a
               buyer of either plan holds in their own workspace. {selfService
-                ? `The free evaluation reaches ${BILLING_OFFERS.observer_access.label} capabilities that do not activate a World, inside its file and page limits; activating one needs a paid plan, which is why it has no column here.`
+                ? `The free evaluation reaches ${BILLING_OFFERS.observer_access.label} capabilities that do not activate a World, inside its file and page limits. Activating one needs a paid plan, which is why it has no column here.`
                 : "An evaluation of your own sources is arranged with us while self-service intake is closed."}
               {" "}An Enterprise scope is agreed in the conversation rather than compared against
               these two. Nothing an Ask answer returns is invented for it: every answer names the
@@ -1220,7 +1220,7 @@ export default function PricingPageClient({
             </table>
             </div>
             <p className="fine">
-              The subscription covers every page up to the plan&apos;s included pages; a volume
+              The subscription covers every page up to the plan&apos;s included pages. A volume
               past them is arranged with us. A page is counted when a source is admitted for
               reading, so re-asking, searching and recompiling sources already read do not appear
               in this table. Every figure is in US dollars, excluding tax.
@@ -1292,7 +1292,7 @@ export default function PricingPageClient({
             <details className="status-fold">
               <summary>How usage is measured</summary>
               <p>
-                Usage is measured in pages. A PDF page is a page; one image is one page; a slide
+                Usage is measured in pages. A PDF page is a page, one image is one page, and a slide
                 is a page-equivalent.
               </p>
               <p>
