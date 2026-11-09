@@ -1,83 +1,13 @@
 import type { Route } from "next";
 import Link from "next/link";
 import SolutionProofSample from "@/components/solution-proof-sample";
-import {
-  EXPLORE_SAMPLE_QUESTIONS,
-  exploreSampleAnswers,
-  exploreSampleArtifact,
-  exploreSampleDocuments,
-  exploreSampleSources,
-  exploreSampleWorld,
-} from "@/lib/explore-sample";
+import { exploreSampleArtifact } from "@/lib/explore-sample";
+import { solutionWorkflowEvidence, solutionWorkflowPick, type ProofPick, type WorkflowKind } from "@/lib/solution-proof-picks";
 import styles from "./solutions.module.css";
 
-type WorkflowKind = "ai-ready-knowledge" | "document-intelligence" | "knowledge-graph"
-  | "source-grounded-assistants" | "knowledge-operations";
-type ProofPick = { form: string; match: RegExp; framing: string };
-
-// The hub retains its existing committed crops. PDF and assistants details open readable
-// figures and a supported question's returned passage; the old segment question is not revived.
-export function solutionWorkflowPick(kind: WorkflowKind, pick: ProofPick): ProofPick {
-  if (kind === "document-intelligence") return {
-    form: "10-Q",
-    match: /Three Months Ended December 27, December 28, 2025 2024 Net sales:/,
-    framing: pick.framing,
-  };
-  return kind === "source-grounded-assistants" ? {
-    form: "10-Q",
-    match: /Operating expenses: Research and development/,
-    framing: "A passage returned for the curated research-and-development question. Open the source and judge whether it answers the question.",
-  } : pick;
-}
-
-// Resolve the published passage and its mechanics from the existing artifact. No authored
-// outputs, customer results or extra fixture files sit beside the shared sample.
-export function solutionWorkflowEvidence(kind: WorkflowKind, pick: ProofPick) {
-  const selectedPick = solutionWorkflowPick(kind, pick);
-  const region = exploreSampleWorld.evidence.find((item) => {
-    const source = exploreSampleSources.find((entry) => entry.documentId === item.sourceId);
-    return source?.form === selectedPick.form && item.page > 2 && selectedPick.match.test(item.excerpt);
-  });
-  if (!region) throw new Error(`solution_workflow_region_missing: ${kind}`);
-  const document = exploreSampleDocuments.find((item) => item.documentId === region.sourceId);
-  if (!document) throw new Error(`solution_workflow_source_missing: ${kind}`);
-  const file = (name: string) => {
-    const found = exploreSampleArtifact.package.files.find((item) => item.path === name);
-    if (!found) throw new Error(`solution_workflow_file_missing: ${name}`);
-    return found;
-  };
-  const question = EXPLORE_SAMPLE_QUESTIONS[0];
-  const answer = exploreSampleAnswers.find((item) => item.question === question);
-  const isReturnedPassage = answer?.citations.some((citation) =>
-    citation.sourceId === region.sourceId && citation.pageNumber1 === region.page
-      && citation.bbox1000.every((value, index) => value === region.bbox[index]));
-  if (kind === "source-grounded-assistants" && !isReturnedPassage) {
-    throw new Error("solution_workflow_passage_not_returned_for_question");
-  }
-  let preview: { path: string; label: string; content: string } | null = null;
-  if (kind === "ai-ready-knowledge") {
-    const chunkFile = file("rag/chunks.jsonl");
-    const chunk = chunkFile.content.trim().split("\n").map((line) => JSON.parse(line)).find((item) =>
-      item.sourceId === region.sourceId && item.pageNumber1 === region.page
-        && item.bbox1000.every((value: number, index: number) => value === region.bbox[index]));
-    if (!chunk) throw new Error("solution_workflow_chunk_missing");
-    preview = {
-      path: chunkFile.path,
-      label: "Locator fields from this passage’s emitted chunk",
-      content: JSON.stringify({ chunkId: chunk.chunkId, sourceId: chunk.sourceId,
-        pageNumber1: chunk.pageNumber1, bbox1000: chunk.bbox1000, evidenceId: chunk.evidenceId }, null, 2),
-    };
-  } else if (kind === "knowledge-graph") {
-    const relations = file("graph/relationships.csv");
-    const lines = relations.content.trim().split("\n");
-    const row = lines.slice(1).find((line) => line.includes(`"${region.id.split(":")[0]}"`));
-    if (!row) throw new Error("solution_workflow_relation_missing");
-    preview = { path: relations.path, label: "CSV header and one emitted relation with its evidence IDs",
-      content: `${lines[0]}\n${row}` };
-  }
-  const validation = JSON.parse(file("validation/report.json").content);
-  return { region, document, preview, question, answer, validation };
-}
+// Moved to `lib/solution-proof-picks` so /explore can resolve the same passages without importing this
+// file and its stylesheets; re-exported so every existing caller keeps its import.
+export { solutionWorkflowEvidence, solutionWorkflowPick } from "@/lib/solution-proof-picks";
 
 const TITLES: Record<WorkflowKind, string> = {
   "ai-ready-knowledge": "A passage inside the retrieval projection.",

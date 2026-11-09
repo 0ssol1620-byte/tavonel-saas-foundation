@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { PublicPageShell } from "@/components/public-page-shell";
 import PublicPrimaryCta from "@/components/public-primary-cta";
 import SolutionWorkflowProof from "../solution-workflow-proof";
+import { SOLUTION_PROOF_PICKS } from "@/lib/solution-proof-picks";
 import { EXPLORE_CTA, RESOURCE_TAG_LABELS, resourceFilterHref, type ResourceTag } from "@/lib/site-navigation";
 import styles from "../solutions.module.css";
 
@@ -41,11 +42,7 @@ export const SOLUTIONS = {
       flow: "From five filings to one portable World.",
       outcomes: "What every project downstream inherits.",
     },
-    proof: {
-      form: "10-K",
-      match: /PART I Item 1\. Business Company Background/,
-      framing: "One region out of the annual filing, in the shape every project downstream receives it: the passage, the page it was printed on and the box it sat in.",
-    },
+    proof: SOLUTION_PROOF_PICKS["ai-ready-knowledge"],
     outcomes: ["One governed source of knowledge", "Retrieval as a World projection", "Citations back to the exact source location", "Signed portable artifacts"],
     limitations: [
       "A compile costs a reading pass and a review. One project over one small corpus is cheaper to do by hand.",
@@ -87,11 +84,7 @@ export const SOLUTIONS = {
       flow: "From a difficult scan to a reviewable read.",
       outcomes: "What a reviewer gets to check.",
     },
-    proof: {
-      form: "10-Q",
-      match: /CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS/,
-      framing: "A printed financial statement, read the way TAVONEL reads one: every figure stays readable and locatable as the paragraphs it was printed as, while the grid that arranged them is not recovered.",
-    },
+    proof: SOLUTION_PROOF_PICKS["document-intelligence"],
     outcomes: ["Provenance to the exact source location", "Visible confidence and review reasons", "Immutable OCR output", "Regions ready for compilation"],
     limitations: [
       "Where a format does not state a page count, the quote is an estimate and is labelled one. Spreadsheets have no decided billable unit at all.",
@@ -125,11 +118,7 @@ export const SOLUTIONS = {
       flow: "From filing text to objects and edges.",
       outcomes: "What loads into the store you already run.",
     },
-    proof: {
-      form: "DEF 14A",
-      match: /Nominees to Apple’s Board of Directors Apple is overseen/,
-      framing: "A proxy passage naming people and roles — the kind of region an object and its relations are compiled from, with the evidence that supports each one still attached.",
-    },
+    proof: SOLUTION_PROOF_PICKS["knowledge-graph"],
     outcomes: ["Stable object and relation IDs", "Ontology and graph exports", "Version history and rollback", "Evidence for every qualified edge"],
     limitations: [
       "The graph is compiled from documents, so an object exists only where a source region supports it.",
@@ -165,11 +154,7 @@ export const SOLUTIONS = {
       flow: "From a question to a citation you can open.",
       outcomes: "What an answer carries with it.",
     },
-    proof: {
-      form: "10-Q",
-      match: /Segment Operating Performance The following table shows net sales by reportable segment/,
-      framing: "A source region from the quarterly filing. The workflow proof uses the curated question’s actual returned passage.",
-    },
+    proof: SOLUTION_PROOF_PICKS["source-grounded-assistants"],
     /*
       BA-042. The outcome read "Explicit abstention" and the limitation forty lines below said
       the World does not abstain in the case that matters -- so a reader who opened the fold
@@ -203,11 +188,7 @@ export const SOLUTIONS = {
       flow: "From a new filing to an approved revision.",
       outcomes: "What a reviewer signs, and what stays on record.",
     },
-    proof: {
-      form: "DEF 14A",
-      match: /Audit Committee Ron Sugar/,
-      framing: "A governance passage from the proxy — the kind of region a reviewer opens beside the compiled result before activating a candidate.",
-    },
+    proof: SOLUTION_PROOF_PICKS["knowledge-operations"],
     outcomes: ["Candidate-to-active lifecycle", "Human activation gate", "Activity and audit records", "Budget and retention controls"],
     limitations: [
       "Activation is a human decision by design.",

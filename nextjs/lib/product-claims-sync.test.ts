@@ -69,6 +69,8 @@ const CLAIM_SURFACES = [
   "app/product/compiled-world/page.tsx",
   "app/product/document-understanding/page.tsx",
   "app/solutions/[slug]/page.tsx",
+  // 2026-11-09: the five proof framings moved here from the detail page; the same rules hold them.
+  "lib/solution-proof-picks.ts",
   "app/explore/page.tsx",
   "components/explore/explore-stage.tsx",
   "lib/docs-content.ts",
