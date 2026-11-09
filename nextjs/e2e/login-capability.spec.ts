@@ -130,8 +130,9 @@ test("a Team intent is not promised a checkout even where a plan can be bought",
 /*
   D-12 (delegated decision 2026-11-09). No mock: the gate renders on the server from
   activationPolicy, so this asserts the shipped default rather than a fixture. With the switch on,
-  /pricing states no closed customer-data gate at all -- neither the gate row nor the reason in the
-  purchase aside -- and the old closed-gate sentence is nowhere on the page.
+  /pricing states no closed customer-data gate row, and the old closed-gate sentence is nowhere on
+  the page. Review PR201-R1 B3: the purchase aside states the staged-opening sentence, open or closed,
+  so a reader learns how a workspace gets in before choosing a plan.
 */
 test("/pricing states no closed customer-data gate once the switch is on, server-side", async ({ page }) => {
   expect(activationPolicy.customerData.enabled).toBe(true);
@@ -139,7 +140,8 @@ test("/pricing states no closed customer-data gate once the switch is on, server
   expect(html).not.toContain('data-purchase-gate="customerData"');
   await expect(page.locator('[data-purchase-gate="customerData"]')).toHaveCount(0);
   expect(html).not.toContain("Compiling your own sources is set up with us");
-  await expect(page.locator(".paper-purchase-boundary")).not.toContainText(activationPolicy.customerData.reason);
+  await expect(page.locator(".paper-purchase-boundary")).toContainText(activationPolicy.customerData.reason);
+  await expect(page.locator(".paper-purchase-boundary")).toContainText("Self-serve access is opening in stages.");
 });
 
 test("closed intake offers a working public evaluation and an Enterprise conversation", async ({ page }) => {
