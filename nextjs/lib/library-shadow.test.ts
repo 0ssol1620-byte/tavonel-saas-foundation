@@ -19,7 +19,7 @@ const H = "0e000000-0000-4000-8000-00000000000e";
 const VIEWER = "7a7a7a7a-7a7a-4a7a-8a7a-7a7a7a7a7a7a";
 const STORE = { NEXT_PUBLIC_SUPABASE_URL: "https://store.example", SUPABASE_SERVICE_ROLE_KEY: "k".repeat(40) };
 const SHADOW = { ...STORE, TAVONEL_LIBRARY_ORGANIZE_MODE: "shadow" };
-const ON = { ...STORE, TAVONEL_LIBRARY_ORGANIZE_MODE: "on", TAVONEL_PROCESSING_WORKSPACE_COHORT: WS };
+const ON = { ...STORE, TAVONEL_LIBRARY_ORGANIZE_MODE: "on", TAVONEL_PROCESSING_WORKSPACE_COHORT: WS, TAVONEL_CUSTOMER_DATA_GATE_VERSION: "v2" };
 
 const CONTRACT = "This Services Agreement (hereinafter the Agreement) is made between the parties. Governing law: Delaware.";
 const region = (regionId: string, text: string, pageIndex0 = 0, order = 0) => ({ regionId, text, pageIndex0, order });
