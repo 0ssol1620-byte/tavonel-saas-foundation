@@ -490,7 +490,7 @@ export async function checkBearer(authorization: string | null): Promise<BearerC
   }
   const scopes = authenticated.principal.scopes;
   if (scopes.some((scope) => !(REMOTE_MCP_SCOPES as readonly string[]).includes(scope))) {
-    return { kind: "rejected", description: "The access token carries a write scope; the remote MCP endpoint accepts read-only tokens." };
+    return { kind: "rejected", description: "The access token holds a scope outside the read-only MCP scopes, and the remote MCP endpoint accepts only those." };
   }
   return { kind: "principal", token, scopes, workspaceKey: authenticated.principal.workspaceKey };
 }

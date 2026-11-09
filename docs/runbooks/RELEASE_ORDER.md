@@ -653,12 +653,16 @@ compile이 24 MiB를 넘는 `ocr.json`을 `JSON_TOO_LARGE`로 거부하게 둔�
 | `TAVONEL_REMOTE_MCP_ENABLED` | `true` | kill switch. 정확히 `true`일 때만 켜진다 |
 | `TAVONEL_REMOTE_MCP_COHORT` | canary: 창업자 workspace key 1개 (`pilot-…`). GA: `all` | 두 단계로 연다(아래 순서) |
 | `TAVONEL_REMOTE_MCP_SIGNING_SECRET` | 비밀값, 32자 이상 | client id와 authorization code를 봉인한다. 바꾸면 등록된 client는 다시 등록한다 |
-| `FOUNDATION_WORKER_SECRET` | 비밀값, 32자 이상 | `/api/internal/remote-mcp/revoke-all` 인증. 이미 있으면 그대로 |
+| `FOUNDATION_WORKER_SECRET` | 비밀값, 32자 이상 | `/api/internal/remote-mcp/revoke-all` 인증. production에 이미 있다(2026-11-09 이름 확인) |
 | `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | 기존 | 키 인증, 키 발급 audit 행, trial 계량 |
 | `TAVONEL_TRIAL_AI_ACCESS_ENABLED` | `true` 또는 미설정 | 선택. F-2 조건을 채운 뒤에만 |
 
-주의: `TAVONEL_ASK_RECEIPT_SIGNED=on`은 이 cohort 안에서만 효력이 있다. cohort를 `all`로 넓히면 서명 receipt도 모든
-workspace로 넓어진다.
+2026-11-09 production 이름 확인(값은 읽지 않음): `FOUNDATION_WORKER_SECRET`은 있다. `TAVONEL_REMOTE_MCP_SIGNING_SECRET`,
+`TAVONEL_REMOTE_MCP_ENABLED`, `TAVONEL_REMOTE_MCP_COHORT`, `TAVONEL_ASK_RECEIPT_SIGNED`는 미설정이다.
+
+주의: `TAVONEL_ASK_RECEIPT_SIGNED=on`은 이 cohort를 그대로 읽는다(`lib/answer-receipt-signing.ts`). cohort를 `all`로 넓히면
+서명 receipt도 모든 workspace로 넓어지고, MCP만이 아니라 REST와 web Ask까지 포함된다. signer가 없거나 틀리면 모든 Ask가
+`503 ANSWER_SIGNING_UNAVAILABLE`이다. 그래서 10단계에 전제를 둔다(결정 기록 2026-11-08 "추가 2026-11-09 — 원격 MCP GA").
 
 이미 있는 장치(코드 변경 없음): 인증은 `tvnl_mcp_` 1시간 토큰 또는 읽기 scope만 가진 `tvnl_live_` 키(쓰기 scope가 하나라도
 있으면 401). tenant는 키의 workspace로만 읽는다. tool마다 scope가 고정이다(`REMOTE_MCP_TOOL_SCOPES`). rate limit은 키별·scope별
@@ -688,7 +692,7 @@ Firewall rate limit은 plan에 따라 과금될 수 있다. 새 반복 지출이
 
 1. migration `20261105000000_api_key_token_kind`가 production에 적용되어 있는지 확인한다(위 "배포 순서"). 읽기만 한다.
 2. Firewall 규칙 두 개를 넣는다(위).
-3. 창업자가 `TAVONEL_REMOTE_MCP_SIGNING_SECRET`(없으면 `FOUNDATION_WORKER_SECRET`도)를 Vercel production env에 입력한다.
+3. 창업자가 `TAVONEL_REMOTE_MCP_SIGNING_SECRET`을 Vercel production env에 입력한다. `FOUNDATION_WORKER_SECRET`은 이미 있다.
 4. `TAVONEL_REMOTE_MCP_ENABLED=true`, `TAVONEL_REMOTE_MCP_COHORT=<창업자 workspace key>`를 넣는다.
 5. 직전 production deployment ID를 캠페인 원장에 rollback 대상으로 적는다.
 6. production redeploy 1회(과금 build 1회).
@@ -697,7 +701,10 @@ Firewall rate limit은 plan에 따라 과금될 수 있다. 새 반복 지출이
 8. smoke(아래). 실패하면 rollback.
 9. canary receipt: 창업자 workspace로 Claude(claude.ai 또는 Claude Desktop Connectors)와 Claude Code에서 OAuth 연결을 끝내고,
    client 이름·버전과 `list_worlds` 결과 status를 receipt로 남긴다. ChatGPT도 같은 방식으로 남긴다.
-10. GA: `TAVONEL_REMOTE_MCP_COHORT=all`로 바꾸고 redeploy 1회, 7과 8을 다시 한다.
+10. GA 전제: production의 `TAVONEL_ASK_RECEIPT_SIGNED`가 `on`이 아님을 확인한다(미설정, `off`, `shadow`는 된다). `on`이면
+    `all`로 넓히지 않는다. 서명 receipt를 전체로 넓히는 것은 부록 A에 따라 별도 reviewed change이고, 그 change가 signer 설정
+    (v2 export key, trust store, 만료)을 확인한 receipt를 남긴 뒤에만 한다. 확인 결과를 캠페인 원장에 적는다.
+11. GA: `TAVONEL_REMOTE_MCP_COHORT=all`로 바꾸고 redeploy 1회, 7과 8을 다시 한다.
 
 ### smoke
 

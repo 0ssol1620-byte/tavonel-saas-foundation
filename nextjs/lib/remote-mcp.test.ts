@@ -268,7 +268,7 @@ describe("credential failures stop before any route runs", () => {
     const challenges = outcomes.map((response) => response.headers.get("www-authenticate") ?? "");
     for (const challenge of challenges) expect(challenge).toContain('error="invalid_token"');
     expect(challenges[1]).toContain("expired");
-    expect(challenges[3]).toContain("write scope");
+    expect(challenges[3]).toContain("holds a scope outside the read-only MCP scopes");
     // A present-but-bad token is refused even for discovery.
     mocks.authenticateKey.mockResolvedValueOnce({ ok: false, code: "API_KEY_INVALID" });
     expect((await rpc({ jsonrpc: "2.0", id: 2, method: "tools/list" }, { authorization: "Bearer tvnl_live_unknown" })).status).toBe(401);
@@ -988,5 +988,22 @@ describe("GA: the cohort value all admits every workspace and keeps every other 
     const response = await exchange({ grant_type: "authorization_code", code, client_id: clientId, code_verifier: VERIFIER });
     expect([response.status, (await response.json()).code]).toEqual([402, "TRIAL_FEATURE_NOT_INCLUDED"]);
     expect(mocks.createKey).not.toHaveBeenCalled();
+  });
+});
+
+describe("a hand-made key can be made to work at /api/mcp", () => {
+  it("the Developers panel offers the exact scopes checkBearer accepts, and a key holding them is admitted", async () => {
+    const { CONNECT_AI_SCOPES } = await import("../components/workspace/connect-ai-panel");
+    expect([...CONNECT_AI_SCOPES].sort()).toEqual([...REMOTE_MCP_SCOPES]);
+    const panel = readFileSync(resolve(import.meta.dirname, "../components/developer-panel.tsx"), "utf8");
+    expect(panel).toContain("onClick={() => setScopes([...CONNECT_AI_SCOPES])}");
+    mocks.authenticateKey.mockResolvedValueOnce(keyPrincipal([...CONNECT_AI_SCOPES]));
+    mocks.listWorlds.mockResolvedValueOnce({ ok: true, worlds: [], nextCursor: null });
+    expect((await call("list_worlds", {}, "tvnl_live_preset")).status).toBe(200);
+    // One scope more, a connector read, and the same key is refused before any route runs.
+    mocks.authenticateKey.mockResolvedValueOnce(keyPrincipal([...CONNECT_AI_SCOPES, "connections:read"]));
+    const refused = await call("list_worlds", {}, "tvnl_live_wider");
+    expect(refused.status).toBe(401);
+    expect(refused.headers.get("www-authenticate")).toContain("holds a scope outside the read-only MCP scopes");
   });
 });
