@@ -2915,6 +2915,9 @@ export function vitestDiscoveryConfigFailures(source) {
 }
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
+// legal-semicolons-20261109: the legal, consent, trust and /status copy whose semicolons were removed without a change in meaning.
+export const LEGAL_SEMICOLONS_AFFECTED_PATHS = Object.freeze(['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts']);
+export const LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-provisions.test.ts']);
 export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('public-marketing-surface', new RegExp(`^(?:${exactPathAlternation(PUBLIC_MARKETING_AFFECTED_PATHS)})$`),
     { unitFiles: PUBLIC_MARKETING_AFFECTED_UNIT_FILES, browserFiles: PUBLIC_MARKETING_AFFECTED_BROWSER_FILES }),
@@ -3138,6 +3141,9 @@ export const AFFECTED_GROUPS = Object.freeze([
       'lib/connector-page-integrity.test.ts', 'lib/connector-sync-page.test.ts', 'lib/connector-provider-isolation.test.ts', 'lib/connector-source-identity.test.ts',
       'lib/source-version-guard.test.ts', 'lib/connector-replay-world-currency-migration.test.ts'], database: true, databaseTests: ['supabase/tests/dropbox_source_reconciliation.sql'],
       databaseDependencies: DROPBOX_DATABASE_DEPENDENCIES }),
+  // legal-semicolons-20261109: 5 exact paths select 10 direct suites and no browser suite.
+  affectedGroup('legal-semicolons-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(LEGAL_SEMICOLONS_AFFECTED_PATHS)})$`),
+    { unitFiles: LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES }),
   affectedGroup('ci-selector', /^(?:\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml|nextjs\/scripts\/(?:repair-[a-z-]+(?:\.test)?\.mjs|run-repair-check\.mjs|verify-repair-workflows\.mjs|db\/(?:native-world-race(?:-ci)?|dropbox-source-stream-race)(?:\.test)?\.mjs|fixtures\/[A-Za-z0-9_.-]+\.json)|nextjs\/vitest\.repair-scope(?:\.async)?\.config\.ts)$/,
     { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),
   affectedGroup('ci-selector', /^nextjs\/lib\/repair-node-evidence\.test\.mjs$/, { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),

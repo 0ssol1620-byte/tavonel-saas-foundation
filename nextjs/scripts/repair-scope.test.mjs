@@ -8062,3 +8062,23 @@ test('affected w1-trial-ops owner: 10 exact paths select 17 direct suites and no
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
 });
+// legal-semicolons-20261109: one finite owner, restated independently of the exported constants.
+import { LEGAL_SEMICOLONS_AFFECTED_PATHS, LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected legal-semicolons-20261109 owner: 5 exact paths select 10 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts'];
+  const suites = ['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-provisions.test.ts'];
+  assert.deepEqual([[...LEGAL_SEMICOLONS_AFFECTED_PATHS], [...LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['legal-semicolons-20261109'], path);
+  }
+  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['legal-semicolons-20261109'], [], suites, [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  const plan = affectedAskPlan(map);
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
+  for (const adjacent of ['nextjs/app/refunds/page.ts', 'nextjs/components/processing-consent-panel.module.css', 'nextjs/content/trust/provisions.json', 'nextjs/lib/status-probe-store.ts', 'lib/status-probe.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
