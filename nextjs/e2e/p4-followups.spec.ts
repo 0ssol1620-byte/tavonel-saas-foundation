@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { measureOverflow } from "./support/overflow";
+import { activationPolicy } from "../lib/activation-policy";
 
 /*
   Phase 4 follow-ups (2026-10-19), read off the browser.
@@ -64,8 +65,11 @@ test.describe("(a) /developers link targets", () => {
       expect(boxes.length).toBeGreaterThan(8);
       expect(overlaps(boxes)).toEqual([]);
 
-      // The two gate actions and the reference sentences are the rows that overlapped.
-      for (const selector of [".dev-actions a", ".dev-refs a"]) {
+      // The two gate actions and the reference sentences are the rows that overlapped. The gate
+      // note (and its actions) renders only while customer data is closed; D-12 opened it 2026-11-09.
+      const rows = activationPolicy.customerData.enabled ? [".dev-refs a"] : [".dev-actions a", ".dev-refs a"];
+      if (activationPolicy.customerData.enabled) await expect(page.locator(".dev-actions")).toHaveCount(0);
+      for (const selector of rows) {
         const heights = await page.locator(selector).evaluateAll((links) => links.map((link) => link.getBoundingClientRect().height));
         expect(heights.length, selector).toBeGreaterThan(1);
         for (const height of heights) expect(height, selector).toBeGreaterThanOrEqual(44);

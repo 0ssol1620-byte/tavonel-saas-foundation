@@ -2,6 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { isIP } from "node:net";
 import { getFoundationAccountGrant, getFoundationSelfServiceTrial } from "./account-grants";
 import { previousBillingHmac } from "./billing-binding";
+import { billingSecret } from "./billing-secrets";
 import { billingProductDecision, type ProductAccessLevel } from "./billing-product-access";
 import { getFoundationBillingAccount } from "./billing-store";
 import { readAccessMode } from "./foundation-pilot";
@@ -36,8 +37,7 @@ function readTrialSecret(env: Readonly<Record<string, string | undefined>> = pro
   // Reuse the already-operated billing HMAC, but domain-separate every trial use. This avoids a
   // second secret-management surface while ensuring a device token can never be replayed as a
   // checkout binding or vice versa.
-  const secret = env.FOUNDATION_BILLING_HMAC?.trim() ?? "";
-  return secret.length >= 32 ? secret : null;
+  return billingSecret("FOUNDATION_BILLING_HMAC", env) ?? null;
 }
 
 function readCookie(request: Request, name: string) {

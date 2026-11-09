@@ -71,6 +71,9 @@ export function customerNavCurrent(href: string, pathname: string): "page" | "lo
   return (NAV_ALSO_OWNS[href] ?? []).some(under) || under(href) ? "location" : undefined;
 }
 
+/** The routes an item speaks for beyond its own URL. The client header components take it as a prop. */
+export const navAlsoOwns = (href: string): readonly string[] => NAV_ALSO_OWNS[href] ?? [];
+
 export function customerNavOwns(href: string, pathname: string): boolean {
   return customerNavCurrent(href, pathname) !== undefined;
 }
@@ -100,7 +103,8 @@ export function customerNavOwns(href: string, pathname: string): boolean {
 export const ACCESS_CTA: SiteLink = { href: "/contact", label: "Request access" };
 
 /** The access action once a real card can be charged. The same action, live posture. */
-export const SELF_SERVE_CTA: SiteLink = { href: "/login", label: "Start with your files" };
+// Review PR201-R1 B3: self-serve opens in stages, so the action signs a visitor up rather than promising an upload.
+export const SELF_SERVE_CTA: SiteLink = { href: "/login", label: "Sign up for access" };
 
 /** The one name for the public sample, everywhere it is linked. */
 export const EXPLORE_CTA: SiteLink = { href: "/explore", label: "Explore a Compiled World" };
@@ -168,7 +172,7 @@ export const BRAND_LINE = {
   still stated verbatim where it is stated; the inventory is in `lib/commercial-state.ts`.
 */
 export const KO_CHROME = {
-  cta: { [ACCESS_CTA.href]: "이용 문의", [SELF_SERVE_CTA.href]: "내 자료로 시작하기" } as Record<string, string>,
+  cta: { [ACCESS_CTA.href]: "이용 문의", [SELF_SERVE_CTA.href]: "사용 신청하기" } as Record<string, string>,
   signIn: "로그인",
   /* Labels follow the same hrefs as the English primary navigation. */
   nav: {
@@ -238,9 +242,12 @@ export const KO_CHROME = {
     entry page, was what the deployment does not do. It states the same two facts in the same order
     the English does now: the World a reader can open today, then the arranged path. The gate is
     unchanged and still stated once, in Korean, in the site's one spelling of it.
+
+    D-12, delegated decision 2026-11-09: the literal Korean of the switch-on sentence, staged per
+    review PR201-R1 B3. Every syllable is inside the KO Home font subset (landing-v2-page.test.ts).
   */
   customerDataGate:
-    "완성된 Compiled World는 오늘 근거까지 전부 읽을 수 있습니다. 직접 가진 원문의 컴파일은 요금제 구매가 아니라 저희와 함께 설정합니다.",
+    "내 원문 컴파일은 단계적으로 열고 있습니다. 로그인하면 워크스페이스가 만들어지고, 업로드와 컴파일은 단계마다 워크스페이스별로 열립니다. 내 워크스페이스의 열림 상태는 워크스페이스 화면에 표시됩니다. 열린 뒤에는 Developer 요금제를 바로 구매할 수 있고, Team과 Enterprise는 저희와 함께 정합니다.",
 } as const;
 
 /**
@@ -556,6 +563,23 @@ export const FOOTER_LEGAL_ROW = {
 
 /* ==================================================== the global menu (IA redesign, 2026-09-11)
 
+  NAV PANELS, 2026-11-09. The panels are rendered again, over the bar `HEADER_NAV` already draws.
+
+  The founder asked for the competitor behaviour: hovering a bar item opens its menu. The bar
+  keeps its four items and their URLs (Product, How it works, Resources, Docs) and Pricing stays a
+  plain link, so `customerNavCurrent` and every page's `aria-current` are unchanged. A group hangs
+  from the bar item whose href is its `overviewHref`, which is why each hub below is a bar href:
+
+    Product    the 2026-09-11 Product panel, with the Solutions panel folded in as one column
+    Resources  the 2026-09-11 Resources panel, unchanged
+    Docs       the 2026-09-11 Developers panel under the bar's own word for it
+
+  How it works opens nothing, like Pricing. It is one page telling one process, and the only
+  links it could list are pages the Product and Docs panels already carry -- which the
+  one-URL-one-panel rule below forbids. `lib/site-nav-model.test.ts` pins all of this.
+
+  What follows is the 2026-09-11 note, kept for the reasoning that still holds.
+
   Five things in the bar, four of which open a panel.
 
   The bar was eight flat links at one level -- Product, Solutions, Integrations, Developers,
@@ -630,6 +654,8 @@ const SOLUTION_ITEMS: readonly NavPanelItem[] = [
     label: "Document intelligence",
     description: "Document and operations teams",
   },
+  // The Solutions panel's hub, which ended that panel as its featured link.
+  { href: "/solutions", label: "All solutions" },
 ] as const;
 
 export const NAV_GROUPS: readonly NavGroup[] = [
@@ -672,6 +698,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
           { href: "/trust", label: "Trust Center" },
         ],
       },
+      // NAV PANELS 2026-11-09: the Solutions panel, folded in. The bar has no Solutions item.
+      { title: "Solutions by workflow", items: SOLUTION_ITEMS },
     ],
     /*
       BA-232 / BA-244: one name for `/explore`, and the panel's last row says what is behind it.
@@ -687,15 +715,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     },
   },
   {
-    section: "solutions",
-    label: "Solutions",
-    overviewHref: "/solutions",
-    columns: [{ title: "By workflow", items: SOLUTION_ITEMS }],
-    featured: { href: "/solutions", label: "All solutions" },
-  },
-  {
+    // NAV PANELS 2026-11-09: the Developers panel hangs from the bar's Docs item and takes its word.
     section: "developers",
-    label: "Developers",
+    label: "Docs",
     overviewHref: "/docs",
     columns: [
       {
@@ -725,10 +747,11 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       // An approved execution guide belongs in this column. `/cookbooks` is a draft route in
       // another lane and a draft is not advertised, so nothing links to it from here yet.
       /*
-        PURE: no component renders NAV_GROUPS, so the minifier drops it from the client bundle, but
-        it kept these two calls as possible side effects, and with them all of RESOURCE_LINKS
-        (purposes, workflows) on every page: about 280 gzipped script bytes. EN-1 measured it
-        when the guide's nav entries took /docs/quickstart past the 200,000-byte script ratchet.
+        PURE: only server components render NAV_GROUPS, so the minifier drops it from the client
+        bundle of every page whose header is server-rendered, but it kept these two calls as
+        possible side effects, and with them all of RESOURCE_LINKS (purposes, workflows) on every
+        page: about 280 gzipped script bytes. EN-1 measured it when the guide's nav entries took
+        /docs/quickstart past the 200,000-byte script ratchet.
       */
       { title: "Learn and do", items: /*#__PURE__*/ resourceColumn("learn") },
       { title: "Verify and compare", items: /*#__PURE__*/ resourceColumn("verify") },
@@ -739,6 +762,76 @@ export const NAV_GROUPS: readonly NavGroup[] = [
 
 /** Pricing answers its question on the page itself, so it opens nothing. */
 export const NAV_PRICING: SiteLink = { href: "/pricing", label: "Pricing" };
+
+/** The group that hangs from a bar item, if any. How it works and Pricing have none. */
+export const navGroupFor = (href: string): NavGroup | undefined =>
+  NAV_GROUPS.find((group) => group.overviewHref === href);
+
+/**
+ * The panels in Korean, for the /ko header.
+ *
+ * Kept apart from `KO_CHROME` on purpose: the two client components import `KO_CHROME`, so a
+ * table added to it ships in every page's script. Only the server-rendered panels read this one.
+ * Keyed the way the footer's table is -- links and descriptions by href, columns by their English
+ * title -- so it cannot name a destination the panels do not carry. Product names (TAVONEL,
+ * Compiled World, MCP, API, CLI) are not translated.
+ *
+ * Every syllable here has to be in /ko's subset font (`app/wanted-sans-korean.css`, pinned by
+ * `lib/landing-v2-page.test.ts`), so a few labels take the word the subset already carries:
+ * the footer's own "지원 파일", "연동" and "방법론", and "관계도" or "분석" where the usual loanword
+ * is outside it. Widening the subset is a font rebuild, not a copy edit. The corpus line repeats the figures of the
+ * English one, and `lib/site-nav-model.test.ts` recomputes both from the sample.
+ */
+export const KO_NAV_PANELS = {
+  menu: "메뉴",
+  columns: {
+    "Understand the product": "제품 이해하기",
+    "Sources, connections and trust": "지원 파일, 연동, 신뢰",
+    "Solutions by workflow": "워크플로별 솔루션",
+    "Get connected": "연결하기",
+    "Interfaces and tools": "인터페이스와 도구",
+    "Learn and do": "학습하고 실행하기",
+    "Verify and compare": "검증하고 비교하기",
+  } as Record<string, string>,
+  links: {
+    "/product": "제품 개요",
+    "/product/document-understanding": "문서 이해",
+    "/product/compiled-world": "Compiled World",
+    "/sources": "지원 파일",
+    "/integrations": "연동",
+    "/trust": "신뢰 센터",
+    "/solutions/ai-ready-knowledge": "AI 준비가 된 지식",
+    "/solutions/source-grounded-assistants": "근거 기반 AI 비서",
+    "/solutions/knowledge-graph": "지식 관계도",
+    "/solutions/knowledge-operations": "지식 운영",
+    "/solutions/document-intelligence": "문서 분석",
+    "/solutions": "모든 솔루션",
+    "/explore": "Compiled World 살펴보기",
+    "/developers": "개발자 가이드",
+    "/docs/quickstart": "시작하기",
+    "/docs/use-with-ai": "AI에서 결과 사용하기",
+    "/api": "API 레퍼런스",
+    "/docs/mcp": "MCP",
+    "/docs/cli": "CLI와 패키지 검증",
+    "/docs": "모든 문서",
+    "/demo": "검증할 수 있는 제품 경로",
+    "/knowledge-compiler": "지식 컴파일러 가이드",
+    "/guide": "제품 가이드",
+    "/changelog": "변경 이력",
+    "/research": "리서치",
+    "/benchmarks": "방법론",
+    "/resources": "모든 자료",
+  } as Record<string, string>,
+  descriptions: {
+    "/sources": "TAVONEL이 읽는 것과 읽은 뒤 남는 것",
+    "/solutions/ai-ready-knowledge": "AI·인프라 엔지니어",
+    "/solutions/source-grounded-assistants": "서비스·에이전트 개발자",
+    "/solutions/knowledge-graph": "데이터·지식 아키텍트",
+    "/solutions/knowledge-operations": "지식 관리자와 보안 검토자",
+    "/solutions/document-intelligence": "문서·운영 조직",
+    "/explore": "Apple SEC 코퍼스 · 공시 5건 · 영역 1,281개",
+  } as Record<string, string>,
+} as const;
 
 /**
  * Declared in the menu before the route exists. Empty, and meant to stay empty.

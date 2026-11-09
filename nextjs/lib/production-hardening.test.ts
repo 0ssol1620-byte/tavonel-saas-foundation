@@ -151,7 +151,10 @@ describe("2026-09-05 production hardening", () => {
     const css = read("app/tavonel.css");
     const nav = read("components/mobile-primary-nav.tsx");
     expect(css).toContain(".mobile-primary-nav { display: block; }");
-    expect(nav).toContain("HEADER_NAV.map");
+    // NAV PANELS 2026-11-09: the rows are the bar's own, rendered by the header into the sheet.
+    expect(nav).toContain("{children}");
+    expect(read("components/public-site-chrome.tsx")).toContain("<NavSections korean={korean} sheet />");
+    expect(read("components/public-site-chrome.tsx")).toContain("HEADER_NAV.map");
     /*
       BQ-013. The landmark still has a name; the name is now in the language of the page.
 
@@ -166,15 +169,21 @@ describe("2026-09-05 production hardening", () => {
     expect(nav).not.toContain("from \"@/components/world-visual/use-dialog-focus\"");
   });
 
-  it("keeps the simplified desktop section row as direct links, not false menu controls", () => {
-    const nav = read("components/site-nav/desktop-primary-nav.tsx");
+  it("keeps the desktop section row as links, with disclosure buttons and no false menu controls", () => {
+    // NAV PANELS 2026-11-09: the header renders the row (server); the client file only moves state.
+    const nav = read("components/public-site-chrome.tsx");
+    const client = read("components/site-nav/desktop-primary-nav.tsx");
     expect(nav).toContain("HEADER_NAV.map");
     // BQ-013: the landmark keeps its name, in the language of the page it is on.
     expect(nav).toContain('aria-label={korean ? "섹션" : "Sections"}');
-    // `aria-expanded`/`aria-controls` on a `<button>`, and no `role="menu"` promising arrow keys
-    // this navigation does not implement.
-    expect(nav).toContain("href={item.href as Route}");
-    expect(nav).toContain("aria-current=");
+    // NAV PANELS 2026-11-09: `aria-expanded`/`aria-controls` on a `<button>`, and no `role="menu"`
+    // promising arrow keys this navigation does not implement. The labels stay links.
+    expect(nav).toContain('aria-expanded="false"');
+    expect(nav).toContain("aria-controls={panelId}");
+    expect(client).toContain("href={href as Route}");
+    expect(client).toContain('"aria-current": navCurrent(match, also, pathname)');
+    expect(client).not.toContain("role=\"menu\"");
+    expect(client).not.toContain("from \"@/components/world-visual/use-dialog-focus\"");
     expect(nav).not.toContain("role=\"menu\"");
     expect(nav).not.toContain("from \"@/components/world-visual/use-dialog-focus\"");
   });

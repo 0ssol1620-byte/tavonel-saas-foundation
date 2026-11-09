@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getFoundationAccountGrant } from "@/lib/account-grants";
 import { createCheckoutBinding } from "@/lib/billing-binding";
+import { billingSecret } from "@/lib/billing-secrets";
 import { isBillingOfferCode, readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
 import { issueFoundationCheckoutIntent } from "@/lib/billing-store";
 import { readCommercialState } from "@/lib/commercial-state";
@@ -42,8 +43,9 @@ export async function POST(request: Request) {
   }
   const paddle = readPaddleBrowserConfig();
   const offer = readConfiguredBillingOffers().get(body.offerCode);
-  const secret = process.env.FOUNDATION_BILLING_HMAC?.trim() ?? "";
-  if (!paddle || !offer || secret.length < 32) {
+  // The one reader: a value with surrounding whitespace is refused, never trimmed (lib/billing-secrets.ts).
+  const secret = billingSecret("FOUNDATION_BILLING_HMAC");
+  if (!paddle || !offer || !secret) {
     return NextResponse.json({ code: "BILLING_NOT_CONFIGURED" }, { status: 503, headers: NO_STORE });
   }
   const offerPolicy = decideOfferCheckoutPolicy(offer);
