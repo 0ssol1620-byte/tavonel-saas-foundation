@@ -5,7 +5,7 @@
   commercial, intake or consent switch. The register row also asks for shadow meter code. That
   code is not written here; it is the first row of [Work this unblocks](#work-this-unblocks).
 - **Amended 2026-11-09 (pricing v2, package B, phase 1):** the founder chose package B, whose
-  first step binds settlement to pages. Migration `20261109120000_page_meter_settlement.sql` and
+  first step binds settlement to pages. Migration `20261109080000_page_meter_settlement.sql` and
   `settle_foundation_compute_v4` implement S2 on this ADR's definition (C1, the reader's
   `pageCount` of the sanitized PDF), skipping S0/S1 shadow by that decision. What it binds: N-1 is
   the existing `STANDARD_UNITS_PER_PAGE`; a no-text page counts as a page (N-2); nothing is

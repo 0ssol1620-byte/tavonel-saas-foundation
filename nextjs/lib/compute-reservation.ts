@@ -57,7 +57,7 @@ function errorCode(message: string) {
     ["foundation_compute_settlement_invalid", "COMPUTE_SETTLEMENT_INVALID"],
     ["foundation_compute_overage_not_enabled", "COMPUTE_OVERAGE_NOT_ENABLED"],
     ["foundation_compute_maximum_charge_exceeded", "COMPUTE_MAXIMUM_CHARGE_EXCEEDED"],
-    // A read settled without its page count (20261109120000). Never charged on a guess.
+    // A read settled without its page count (20261109080000). Never charged on a guess.
     ["foundation_compute_page_count_required", "COMPUTE_PAGE_COUNT_REQUIRED"],
   ] as const;
   return mappings.find(([needle]) => message.includes(needle))?.[1] ?? "COMPUTE_LEDGER_FAILED";
@@ -786,7 +786,7 @@ export type MeteredSettlement = {
 const CHARGE_BASES = new Set(["pages", "pages_capped", "unchanged_source", "no_usable_output"]);
 
 /**
- * Settles a read by its pages (20261109120000, `settle_foundation_compute_v4`).
+ * Settles a read by its pages (20261109080000, `settle_foundation_compute_v4`).
  *
  * The ledger decides the charge -- pages at the quote's rates, capped at what was approved; 0 for
  * a source this workspace already paid to read; 0 for a read that produced nothing usable -- and

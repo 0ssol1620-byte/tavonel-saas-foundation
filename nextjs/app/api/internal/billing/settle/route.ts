@@ -142,7 +142,7 @@ export async function POST(request: Request) {
   const sourceSha256 = typeof input.sourceSha256 === "string" && SOURCE_SHA256.test(input.sourceSha256)
     ? input.sourceSha256
     : null;
-  // Page meter (20261109120000). A read that finished or failed is settled by its pages; only a
+  // Page meter (20261109080000). A read that finished or failed is settled by its pages; only a
   // release, which charges nothing, stays on the per-document v3 path. A body without `pages` is
   // a worker from before the meter: refused as retryable, never settled at a guessed length.
   const metered = !completedRead && (input.outcome === "settled" || input.outcome === "operator_review");

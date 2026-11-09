@@ -57,7 +57,7 @@ export type SettlementFacts = {
   /** `sha256:<hex>` over the source bytes, computed once while sanitizing. */
   sourceSha256?: string;
   /**
-   * The page meter (Foundation migration 20261109120000): what a finished or failed read is
+   * The page meter (Foundation migration 20261109080000): what a finished or failed read is
    * charged on. `pages` is the reader's `pageCount` of the sanitized PDF, null only when the read
    * could not count it, which settles as operator review and never as a guess. No complex-page
    * count is sent: nothing in this pipeline classifies a page as complex yet.

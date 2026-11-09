@@ -1,5 +1,5 @@
 /**
- * Page meter, application half (Foundation migration 20261109120000).
+ * Page meter, application half (Foundation migration 20261109080000).
  *
  * The ledger decides each charge; this file pins what the application sends and which answers it
  * will accept. `supabase/tests/foundation_page_meter.sql` is the half that cannot be mocked:
@@ -49,7 +49,7 @@ describe("credits for metered pages", () => {
   });
 
   it("is the same sum the ledger computes", () => {
-    const sql = readFileSync(resolve(import.meta.dirname, "../../supabase/migrations/20261109120000_page_meter_settlement.sql"), "utf8");
+    const sql = readFileSync(resolve(import.meta.dirname, "../../supabase/migrations/20261109080000_page_meter_settlement.sql"), "utf8");
     expect(sql).toContain(
       `v_metered := (p_pages - v_complex) * ${STANDARD_UNITS_PER_PAGE} + v_complex * ${MAX_UNITS_PER_PAGE};`);
   });

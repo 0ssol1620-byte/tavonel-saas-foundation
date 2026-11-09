@@ -24,6 +24,10 @@
 --   3. No usable output. `operator_review` (the reader failed) settles 0 (`no_usable_output`), and
 --      a compile job that settles `failed` reverses the page charge of every document in it that
 --      no `ready` or `review_required` compile ever used (`COMPILE_FAILED_NO_OUTPUT`), once.
+--      Only reads this function settled are reversed: a pre-meter per-document charge
+--      (`charge_basis` null) is left as it was booked. A reversal undoes exactly what settlement
+--      booked: the held part goes back to the balance and the part above the hold comes off the
+--      overage counters, never both for the same credit.
 --
 -- Idempotent: a redelivered settlement with the same outcome, pages and digest answers
 -- `duplicate` with the stored receipt; any other second settlement conflicts. The free-source
@@ -81,7 +85,7 @@ create or replace function public.foundation_compute_settlement_receipt(
 )
 returns jsonb
 language sql
-immutable
+stable
 set search_path = public, pg_temp
 as $$
   select jsonb_build_object(
@@ -250,6 +254,8 @@ set search_path = public, pg_temp
 as $$
 declare
   r public.foundation_compute_reservations%rowtype;
+  v_outstanding integer;
+  v_overage_back integer;
 begin
   perform pg_advisory_xact_lock(hashtextextended('foundation-compute:' || new.workspace_key, 0));
   for r in
@@ -257,6 +263,7 @@ begin
      where c.workspace_key = new.workspace_key
        and c.document_id::text = any (new.document_ids)
        and c.state = 'settled' and c.settled_credits > 0 and c.reversed_at is null
+       and c.charge_basis is not null
        and not exists (
          select 1 from public.foundation_compile_jobs j
           where j.workspace_key = new.workspace_key
@@ -264,13 +271,26 @@ begin
             and c.document_id::text = any (j.document_ids))
      for update of c
   loop
+    v_overage_back := 0;
     if r.billing_source = 'paid' then
+      -- Settlement took min(charge, hold) from the balance and booked the rest as overage units.
+      -- ponytail: nothing drains overage_units today. If a billing report ever has, only the
+      -- overage still outstanding is reversed, and reversed_credits records the smaller amount.
+      select overage_units into v_outstanding from public.foundation_billing_accounts
+       where workspace_key = new.workspace_key for update;
+      v_overage_back := least(greatest(0, r.settled_credits - r.reserved_credits), coalesce(v_outstanding, 0));
       update public.foundation_billing_accounts
-         set credit_balance = credit_balance + r.settled_credits, updated_at = now()
+         set credit_balance = credit_balance + least(r.settled_credits, r.reserved_credits),
+             overage_units = overage_units - v_overage_back,
+             lifetime_overage_units = lifetime_overage_units - v_overage_back,
+             updated_at = now()
        where workspace_key = new.workspace_key;
     end if;
     update public.foundation_compute_reservations
-       set reversed_credits = r.settled_credits, reversal_reason = 'COMPILE_FAILED_NO_OUTPUT',
+       set reversed_credits = case when r.billing_source = 'paid'
+             then least(r.settled_credits, r.reserved_credits) + v_overage_back
+             else r.settled_credits end,
+           reversal_reason = 'COMPILE_FAILED_NO_OUTPUT',
            reversal_compile_job_id = new.job_id, reversed_at = now(), updated_at = now()
      where reservation_id = r.reservation_id;
   end loop;
