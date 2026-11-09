@@ -2924,6 +2924,13 @@ export const ASK_ANSWERABILITY_E2_AFFECTED_PATHS = Object.freeze([
   'eval/ask-quality/e2/PREREG-E2.json', 'eval/ask-quality/e2/README.md', 'eval/ask-quality/e2/e2.ts', 'eval/ask-quality/e2/metrics.test.ts', 'eval/ask-quality/e2/receipts/calibration-2026-11-08T082201899Z-99e9448d5587.json', 'eval/ask-quality/e2/receipts/holdout-2026-11-08T082317556Z-9dd7cb825748.json', 'eval/ask-quality/e2/run_e2.mjs', 'lib/answerability-shadow.ts', 'lib/answerability.test.ts', 'lib/answerability.ts',
 ]);
 export const ASK_ANSWERABILITY_E2_AFFECTED_UNIT_FILES = Object.freeze(['eval/ask-quality/e2/metrics.test.ts', 'lib/answerability.test.ts']);
+// Library organize B2 (codex/w2-b2-20261108): the near-duplicate, document-type and topic-tag shadow methods, their intake
+// recorder and Library DTOs, and their suite. The compile-run hook keeps its compile-source-observations owner, which already
+// selects collection-compile-run.test.ts; this owner selects it too because the recorder is asserted from the compile side.
+// The migrations and pgTAP fixtures keep the database-contract owner; founder-test-reset-migration.test.ts keeps library-dedup-b1.
+// No browser suite: nothing renders it yet (B4). Never nativeReuse.
+export const LIBRARY_ORGANIZE_B2_AFFECTED_PATHS = Object.freeze(['lib/library-methods.ts', 'lib/library-shadow.test.ts', 'lib/library-shadow.ts']);
+export const LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES = Object.freeze(['lib/collection-compile-run.test.ts', 'lib/library-shadow.test.ts']);
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
 // legal-semicolons-20261109: the legal, consent, trust and /status copy whose semicolons were removed without a change in meaning.
@@ -3174,6 +3181,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // ask-answerability-e2: the 10 exact paths above select 2 direct suites and no browser suite.
   affectedGroup('ask-answerability-e2', new RegExp(`^nextjs/(?:${exactPathAlternation(ASK_ANSWERABILITY_E2_AFFECTED_PATHS)})$`),
     { unitFiles: ASK_ANSWERABILITY_E2_AFFECTED_UNIT_FILES }),
+  // library-organize-b2 (W2-B2): the 3 exact paths above select 2 direct suites and no browser suite.
+  affectedGroup('library-organize-b2', new RegExp(`^nextjs/(?:${exactPathAlternation(LIBRARY_ORGANIZE_B2_AFFECTED_PATHS)})$`),
+    { unitFiles: LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES }),
 ]);const regularModes = ['100644', '100755'];
 
 export function parseAffectedRawDiff(output) {

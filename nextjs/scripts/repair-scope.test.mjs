@@ -8126,3 +8126,19 @@ test('affected ask-answerability-e2 owner: 10 exact paths select 2 direct suites
   assert.equal(validateSelectedPath('eval/ask-quality/e2/metrics.test.ts', 'unit', process.cwd()), 'eval/ask-quality/e2/metrics.test.ts');
   assert.throws(() => validateSelectedPath('eval/ask-quality/e2/other.test.ts', 'unit', process.cwd()), /Unsupported unit path/);
 });
+// Library organize B2 (codex/w2-b2-20261108): one finite owner, restated independently of the exported constants.
+import { LIBRARY_ORGANIZE_B2_AFFECTED_PATHS, LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected library-organize-b2 owner: 3 exact paths select 2 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['lib/library-methods.ts', 'lib/library-shadow.test.ts', 'lib/library-shadow.ts'];
+  const suites = ['lib/collection-compile-run.test.ts', 'lib/library-shadow.test.ts'];
+  assert.deepEqual([[...LIBRARY_ORGANIZE_B2_AFFECTED_PATHS], [...LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['library-organize-b2'], path);
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['library-organize-b2'], [], suites, [], []], path);
+  }
+  for (const adjacent of ['nextjs/lib/library-shadow.tsx', 'nextjs/lib/library-organize.ts', 'nextjs/lib/library-methods.test.ts', 'nextjs/lib/source-fingerprint.ts', 'nextjs/lib/topic-cluster.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});

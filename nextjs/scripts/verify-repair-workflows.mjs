@@ -8,6 +8,7 @@ import { REMOTE_MCP_AFFECTED_PATHS, REMOTE_MCP_AFFECTED_UNIT_FILES, REMOTE_MCP_A
 import { GDP_PDF_RUNS_AFFECTED_PATHS, GDP_PDF_RUNS_AFFECTED_UNIT_FILES, GDP_PDF_RUNS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { PACKET_DELIVERY_AFFECTED_PATHS, PACKET_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { LIBRARY_DEDUP_AFFECTED_PATHS, LIBRARY_DEDUP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { LIBRARY_ORGANIZE_B2_AFFECTED_PATHS, LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { COMPILER_RELEASE_AFFECTED_PATHS, COMPILER_RELEASE_AFFECTED_UNIT_FILES, COMPILER_RELEASE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { SITE_POLISH_AFFECTED_PATHS, SITE_POLISH_AFFECTED_UNIT_FILES, SITE_POLISH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
@@ -893,6 +894,19 @@ assert(VITEST_DISCOVERY_CONFIG_PATH==='nextjs/vitest.config.ts'&&discoveryOwners
   &&['nextjs/vitest.config.mts','nextjs/vitest.config.ts.bak','nextjs/eval/vitest.config.ts','vitest.config.ts'].every(p=>!AFFECTED_GROUPS.some(owner=>owner.match.test(p)))
   &&planner.includes('shared test-discovery config is absent or unreadable at head: ')&&planner.includes('unsupported shared test-discovery config change: ')
   &&JSON.stringify(vitestDiscoveryConfigFailures(globalVitest))==='[]', 'the global Vitest config must pass the finite shared test-discovery contract: '+JSON.stringify(vitestDiscoveryConfigFailures(globalVitest)));
+// Library organize B2 (codex/w2-b2-20261108), restated independently: three exact paths, two direct suites, no browser suite,
+// no lane flag, and the program's sketch names for these modules stay unmapped.
+{
+  const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'library-organize-b2'), [owner] = owners;
+  const paths = ['lib/library-methods.ts', 'lib/library-shadow.test.ts', 'lib/library-shadow.ts'];
+  const suites = ['lib/collection-compile-run.test.ts', 'lib/library-shadow.test.ts'];
+  assert(owners.length === 1 && JSON.stringify(LIBRARY_ORGANIZE_B2_AFFECTED_PATHS) === JSON.stringify(paths)
+    && JSON.stringify(LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES) === JSON.stringify(suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(suites)
+    && !owner.browserFiles.length && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
+    && paths.every(p => AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + p)).length === 1 && owner.match.test('nextjs/' + p))
+    && ['nextjs/lib/library-shadow.tsx', 'nextjs/lib/library-organize.ts', 'nextjs/lib/library-methods.test.ts', 'nextjs/lib/source-fingerprint.ts', 'nextjs/lib/topic-cluster.ts'].every(p => !owner.match.test(p)),
+    'library-organize-b2 owner must keep its three exact paths, two direct suites and no neighbour admission');
+}
 console.log(`Workflow static gates pass. Full qualification still pending for exact CI/Launch runs at this head.`);
 
 assert(collectorVerifier.includes("Symbol('native race final-gate generated plan')")&&collectorVerifier.includes("same(untracked,['nextjs/repair-plan.json'])")&&collectorVerifier.includes("resolve(process.argv[1])===resolve(intent.repoRoot,'nextjs/scripts/repair-scope-gate.mjs')")&&collectorVerifier.includes('if(!bytes.equals(expected))')&&collectorVerifier.includes('nativeRacePlan(normal,proof)')&&collectorVerifier.includes('before.isSymbolicLink()')&&collectorVerifier.includes('final-gate owner output refused'), 'c61 final gate alone qualifies the exact regular generated plan against a fresh sealed-selector recomputation before trusting routing flags; initial admission stays strict');
