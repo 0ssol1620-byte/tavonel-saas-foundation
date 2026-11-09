@@ -1260,8 +1260,7 @@ console.log("compile job:", accepted.jobId);` },
           "    }",
           "  }",
           "}",
-        ].join("
-"),
+        ].join("\n"),
       },
       {
         kind: "code",
@@ -1270,8 +1269,7 @@ console.log("compile job:", accepted.jobId);` },
         body: [
           "claude mcp add --transport http tavonel https://tavonel.com/api/mcp",
           "# then run /mcp inside Claude Code and choose tavonel to sign in",
-        ].join("
-"),
+        ].join("\n"),
       },
       {
         kind: "code",
@@ -1286,8 +1284,7 @@ console.log("compile job:", accepted.jobId);` },
           "    }",
           "  }",
           "}",
-        ].join("
-"),
+        ].join("\n"),
       },
       { kind: "heading", text: "The OAuth flow" },
       {

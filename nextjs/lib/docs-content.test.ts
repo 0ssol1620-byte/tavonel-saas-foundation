@@ -599,9 +599,14 @@ describe("backslashes in the documentation", () => {
 
   it("shows an MCP args placeholder that is not a machine path", () => {
     const configs = DOCS_SECTIONS.flatMap((section) => section.blocks.flatMap((block) => (block.kind === "code" && block.body.includes("mcpServers") ? [block.body] : [])));
-    expect(configs.length).toBeGreaterThan(1);
+    // A stdio config launches the downloaded file. A remote config (2026-11-09) names the hosted URL instead.
+    const stdio = configs.filter((body) => body.includes('"command"'));
+    const remote = configs.filter((body) => !body.includes('"command"'));
+    expect(stdio.length).toBeGreaterThan(1);
+    expect(remote.length).toBeGreaterThan(0);
+    for (const body of stdio) expect(body).toContain('"args": ["/absolute/path/to/tavonel-mcp.mjs"]');
+    for (const body of remote) expect(body).toContain('"url": "https://tavonel.com/api/mcp"');
     for (const body of configs) {
-      expect(body).toContain('"args": ["/absolute/path/to/tavonel-mcp.mjs"]');
       expect(body).not.toMatch(/\b[A-Za-z]:[\\/]|\/Users\/|\/home\//);
     }
   });
