@@ -8082,3 +8082,20 @@ test('affected legal-semicolons-20261109 owner: 5 exact paths select 10 direct s
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+
+test('affected conversion-public owner: seven exact paths and six direct suites, nothing adjacent', async () => {
+  const { CONVERSION_PUBLIC_AFFECTED_PATHS, CONVERSION_PUBLIC_AFFECTED_UNIT_FILES } = await import('./repair-scope.mjs');
+  assert.deepEqual(CONVERSION_PUBLIC_AFFECTED_PATHS, ['app/pricing/opengraph-image.tsx', 'app/reproducibility/opengraph-image.tsx',
+    'components/own-files-cta.tsx', 'lib/own-files-cta.test.ts', 'lib/plan-limit-fit.ts', 'lib/public-copy-purge.test.ts', 'lib/trial-allowance.test.ts']);
+  assert.deepEqual(CONVERSION_PUBLIC_AFFECTED_UNIT_FILES, ['lib/og-card-frame.test.ts', 'lib/own-files-cta.test.ts', 'lib/plan-limit-fit.test.ts',
+    'lib/public-copy-purge.test.ts', 'lib/seo-surface.test.ts', 'lib/trial-allowance.test.ts']);
+  for (const path of CONVERSION_PUBLIC_AFFECTED_PATHS) {
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths], [[], ['conversion-public'], []], path);
+    assert.deepEqual([map.unitFiles, map.browserFiles], [[...CONVERSION_PUBLIC_AFFECTED_UNIT_FILES], []], path);
+  }
+  // Exact, not a prefix: a neighbour of an owned path stays unmapped and fails closed.
+  for (const adjacent of ['nextjs/app/evidence/opengraph-image.tsx', 'nextjs/components/own-files-cta.module.css', 'nextjs/lib/plan-limit-fit.test.ts']) {
+    assert.ok(!affectedMap([affectedRecord('M', [adjacent])]).groups.includes('conversion-public'), adjacent);
+  }
+});

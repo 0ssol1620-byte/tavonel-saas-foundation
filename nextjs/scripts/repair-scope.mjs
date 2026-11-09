@@ -1842,6 +1842,13 @@ export const INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES = Object.freeze([
 export const SOLUTIONS_PROOF_AFFECTED_PATHS = Object.freeze(['app/solutions/[slug]/page.tsx', 'app/solutions/solution-workflow-proof.tsx', 'lib/solution-proof-picks.ts', 'lib/solution-workflows.test.ts']);
 export const SOLUTIONS_PROOF_AFFECTED_UNIT_FILES = Object.freeze(['lib/copy-trust-guard.test.ts', 'lib/output-escaping.test.ts', 'lib/solution-workflows.test.ts']);
 export const SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/solutions-workflows.spec.ts']);
+// Conversion pass 2026-11-09 (codex/conversion-public-20261109): the proof-page start block, the two share cards, the trial
+// allowance pin, the calculator's ceiling line and the copy-purge exemption the indexed /reproducibility left. Its own owner:
+// none of these paths had one, and every suite they move is named here.
+export const CONVERSION_PUBLIC_AFFECTED_PATHS = Object.freeze(['app/pricing/opengraph-image.tsx', 'app/reproducibility/opengraph-image.tsx',
+  'components/own-files-cta.tsx', 'lib/own-files-cta.test.ts', 'lib/plan-limit-fit.ts', 'lib/public-copy-purge.test.ts', 'lib/trial-allowance.test.ts']);
+export const CONVERSION_PUBLIC_AFFECTED_UNIT_FILES = Object.freeze(['lib/og-card-frame.test.ts', 'lib/own-files-cta.test.ts', 'lib/plan-limit-fit.test.ts',
+  'lib/public-copy-purge.test.ts', 'lib/seo-surface.test.ts', 'lib/trial-allowance.test.ts']);
 // Evidence viewer overlay (PR #141 fix): the stylesheet that places the bbox overlay over the drawn page. Its direct suite
 // and the world-lifecycle browser suite, whose Ask source-region test measures the overlay against the canvas.
 export const EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS = Object.freeze(['components/pdf-evidence-viewer.module.css']);
@@ -3015,6 +3022,8 @@ export const AFFECTED_GROUPS = Object.freeze([
   // Solutions proof: the four exact paths above select three direct suites and the 1440 solutions browser suite.
   affectedGroup('solutions-proof', new RegExp(`^nextjs/(?:${exactPathAlternation(SOLUTIONS_PROOF_AFFECTED_PATHS)})$`),
     { unitFiles: SOLUTIONS_PROOF_AFFECTED_UNIT_FILES, browserFiles: SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES }),
+  affectedGroup('conversion-public', new RegExp(`^nextjs/(?:${exactPathAlternation(CONVERSION_PUBLIC_AFFECTED_PATHS)})$`),
+    { unitFiles: CONVERSION_PUBLIC_AFFECTED_UNIT_FILES }),
   // Evidence viewer overlay: the one exact stylesheet above selects its direct suite and the world-lifecycle browser suite.
   affectedGroup('evidence-viewer-overlay', new RegExp(`^nextjs/(?:${exactPathAlternation(EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS)})$`),
     { unitFiles: EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES, browserFiles: EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES }),
