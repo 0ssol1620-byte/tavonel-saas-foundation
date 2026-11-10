@@ -11,7 +11,8 @@ const PLAIN_TOKENS: Readonly<Record<string, string>> = {
   no_native_structure_reader_yet: "headings and sections are not read as structure yet",
   no_visual_native_reconciliation: "text is not yet cross-checked between the page image and the file",
   [`at_most_${PROCESSING_CEILING_MIB}_mib_per_source`]: `up to ${PROCESSING_CEILING_MIB} MB per file`,
-  [`at_most_${PROCESSING_CEILING.maxSourcePages}_pages_per_source`]: `up to ${PROCESSING_CEILING.maxSourcePages} pages per file`,
+  [`at_most_${PROCESSING_CEILING.maxSourcePages}_pages_per_pdf_or_docx_source`]: `up to ${PROCESSING_CEILING.maxSourcePages} pages per PDF or Word file`,
+  [`at_most_${PROCESSING_CEILING.maxUnsegmentedSourcePages}_pages_per_other_source`]: `up to ${PROCESSING_CEILING.maxUnsegmentedSourcePages} pages per file in any other format`,
   [`over_the_${PROCESSING_CEILING_MIB}_mib_processing_ceiling`]: `over the ${PROCESSING_CEILING_MIB} MB per-file limit`,
 };
 

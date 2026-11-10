@@ -62,14 +62,15 @@ describe("production posture @ 4c80bb30", () => {
   });
 
   it("keeps every shipped manifest row's status and known limitations", () => {
-    // `LIVE_LIMITS` in shared/capabilityManifest.ts, spelled out. The last two are the processing
+    // `LIVE_LIMITS` in shared/capabilityManifest.ts, spelled out. The last three are the processing
     // ceiling (shared/intakeCeiling.ts), so moving the ceiling is a posture change too.
     const live = [
       "no_native_structure_reader_yet",
       "no_table_or_formula_extraction",
       "no_visual_native_reconciliation",
       "at_most_5_mib_per_source",
-      "at_most_80_pages_per_source",
+      "at_most_500_pages_per_pdf_or_docx_source",
+      "at_most_80_pages_per_other_source",
     ];
     const converted = { status: "BEST_EFFORT", knownLimitations: ["converted_to_pdf_before_reading", ...live] };
     const spreadsheet = {

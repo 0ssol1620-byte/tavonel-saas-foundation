@@ -407,7 +407,7 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "Most pages in one source",
-    `${PROCESSING_CEILING.maxSourcePages}. A PDF or Word file you choose directly is counted in your browser, and a longer one is refused before it uploads. A file inside a ZIP, or in a format that does not state its page count, is counted when it is read, and a longer one is refused then, with the reason on the source. Nothing is cut short.`,
+    `${PROCESSING_CEILING.maxSourcePages} for a PDF or Word file, ${PROCESSING_CEILING.maxUnsegmentedSourcePages} for any other format. A PDF or Word file you choose directly is counted in your browser, and a longer one is refused before it uploads. A file inside a ZIP, or in a format that does not state its page count, is counted when it is read, and a longer one is refused then, with the reason on the source. Nothing is cut short.`,
   ],
   [
     "Sources in one run",
@@ -1268,7 +1268,7 @@ export default function PricingPageClient({
 
                 Every row states the ceiling it is measured against and says on which plans that
                 ceiling holds, which on this deployment is all of them. A reader who came looking
-                for the plan that lifts the 80-page ceiling reads here that there is not one,
+                for the plan that lifts the page ceiling reads here that there is not one,
                 instead of buying and finding out.
               */}
               <dl className="usage-estimator-fit" aria-label="How this corpus meets the compile ceilings">

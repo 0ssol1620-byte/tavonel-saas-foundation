@@ -170,7 +170,8 @@ describe("the limits are read from the product, and sit above the calls to actio
       "no_table_or_formula_extraction",
       "no_visual_native_reconciliation",
       "at_most_5_mib_per_source",
-      "at_most_80_pages_per_source",
+      "at_most_500_pages_per_pdf_or_docx_source",
+      "at_most_80_pages_per_other_source",
     ]);
   });
 

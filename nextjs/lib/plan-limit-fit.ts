@@ -74,7 +74,7 @@ export function corpusFit(sources: number, pagesPerSource: number): CorpusFit {
       label: "Pages in one source",
       state: safePages > PROCESSING_CEILING.maxSourcePages ? "refused" : "within",
       value: n(safePages),
-      ceiling: `${n(PROCESSING_CEILING.maxSourcePages)} per source, on every plan`,
+      ceiling: `${n(PROCESSING_CEILING.maxSourcePages)} per PDF or Word source and ${n(PROCESSING_CEILING.maxUnsegmentedSourcePages)} per source in any other format, on every plan`,
     },
     {
       id: "sources-per-run",
