@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { failureSentence } from "./workspace-failure-copy";
 import { ENTITLEMENT_PENDING_SENTENCE, type BillingStatusAccount, type EntitlementWaitResult } from "./entitlement-wait";
 import { readOfferParam } from "./checkout-intent";
+import type { CheckoutHandlers } from "./use-checkout";
 
 /* ---------------------------------------------------------------- module doubles */
 
@@ -47,7 +48,7 @@ vi.mock("./paddle-browser", () => ({
  * Drives the hook without a DOM. `useCallback`/`useState` are the only React features it uses,
  * so a two-hook dispatcher is enough and keeps the test free of a renderer dependency.
  */
-async function runCheckout(offer: string, onEntitlement?: (wait: EntitlementWaitResult) => void) {
+async function runCheckout(offer: string, onEntitlement?: (wait: EntitlementWaitResult) => void, handlers?: CheckoutHandlers) {
   const notices: string[] = [];
   const React = await import("react");
   const states: unknown[] = [];
@@ -76,7 +77,7 @@ async function runCheckout(offer: string, onEntitlement?: (wait: EntitlementWait
 
   let start: (code: string) => Promise<void>;
   try {
-    const hook = useCheckout((m, tone, link) => { notices.push(m); tones.push(tone); links.push(link); }, onEntitlement) as { start: (code: string) => Promise<void> };
+    const hook = useCheckout((m, tone, link) => { notices.push(m); tones.push(tone); links.push(link); }, onEntitlement, handlers as never) as { start: (code: string) => Promise<void> };
     start = hook.start;
   } finally {
     if (internals && "H" in internals) internals.H = previous;
@@ -271,6 +272,30 @@ describe("checkout refusals", () => {
     expect(readOfferParam(new URL(href, "https://tavonel.com").search)).toBe("observer_access");
   });
 
+  /*
+    One-step buy (2026-11-10). A page that can collect the terms itself (/pricing) takes the terms
+    refusal: no sentence, no link, no Paddle -- the offer goes to its handler, which opens the
+    terms dialog. Any other refusal stays a sentence even with a handler present.
+  */
+  it("hands a pre-terms refusal to a page that collects the terms itself, with no sentence", async () => {
+    respondWith({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, false, 403);
+    const owed: string[] = [];
+    const notices = await runCheckout("observer_access", undefined, { onTermsRequired: (offer) => owed.push(offer) });
+
+    expect(owed).toEqual(["observer_access"]);
+    expect(notices).toEqual([]);
+    expect(paddle.opened).toHaveLength(0);
+  });
+
+  it("keeps any other refusal a sentence when a terms handler is present", async () => {
+    respondWith({ code: "BILLING_HOLD" }, false, 403);
+    const owed: string[] = [];
+    const notices = await runCheckout("observer_access", undefined, { onTermsRequired: (offer) => owed.push(offer) });
+
+    expect(owed).toEqual([]);
+    expect(notices).toEqual([`Checkout is unavailable. ${failureSentence("BILLING_HOLD", 403)}`]);
+  });
+
   it("links nothing on a refusal the terms cannot change", async () => {
     respondWith({ code: "PROCESSING_QUALIFICATION_NOT_BILLABLE" }, false, 403);
     await runCheckout("observer_access");
@@ -375,6 +400,33 @@ describe("waiting for the entitlement after checkout", () => {
     await vi.advanceTimersByTimeAsync(120_000);
     return { notices, settled };
   }
+
+  it("closes the overlay and tells a page that states the outcome itself, once Paddle reports the payment", async () => {
+    serve([{ ok: true, status: 200, body: { account: active } }]);
+    const completed: string[] = [];
+    const closed: number[] = [];
+    vi.stubGlobal("window", { Paddle: { Checkout: { close: () => closed.push(1) } }, dispatchEvent: () => true });
+    await runCheckout("observer_access", undefined, { onCompleted: (offer) => completed.push(offer) });
+    expect(completed).toEqual([]);
+    vi.useFakeTimers();
+    paddle.eventCallback?.({ name: "checkout.completed" });
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(completed).toEqual(["observer_access"]);
+    expect(closed).toHaveLength(1);
+  });
+
+  it("leaves the overlay to the buyer on a page with no outcome handler (the workspace)", async () => {
+    serve([{ ok: true, status: 200, body: { account: active } }]);
+    const closed: number[] = [];
+    vi.stubGlobal("window", { Paddle: { Checkout: { close: () => closed.push(1) } }, dispatchEvent: () => true });
+    await runCheckout("observer_access");
+    vi.useFakeTimers();
+    paddle.eventCallback?.({ name: "checkout.completed" });
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(closed).toHaveLength(0);
+  });
 
   it("reads nothing before Paddle reports the payment, and nothing on other Paddle events", async () => {
     serve([{ ok: true, status: 200, body: { account: active } }]);

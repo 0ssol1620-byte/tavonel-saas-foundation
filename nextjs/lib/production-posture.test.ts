@@ -58,7 +58,8 @@ describe("production posture @ 4c80bb30", () => {
     const channels = Object.fromEntries(
       Object.entries(BILLING_OFFERS).map(([code, offer]) => [code, offer.saleChannel]),
     );
-    expect(channels).toEqual({ observer_access: "self_serve", studio_access: "contact" });
+    // Team self-serve (2026-11-10, intended): 
+    expect(channels).toEqual({ observer_access: "self_serve", studio_access: "self_serve" });
   });
 
   it("keeps every shipped manifest row's status and known limitations", () => {

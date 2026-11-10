@@ -50,7 +50,7 @@ test("an active subscription shows its state, its remaining pages and a working 
   await expect(card.locator("dl")).toContainText("active");
   // 4 credits to a standard page, so 4,000 credits is 1,000 pages. Derived, never invented.
   await expect(card.locator("dl")).toContainText("1,000");
-  await expect(card.getByRole("button", { name: "Manage billing" })).toBeEnabled();
+  await expect(card.getByRole("button", { name: "Manage or cancel subscription" })).toBeEnabled();
   await expect(card.locator(".billing-hold")).toHaveCount(0);
   await expect(card).not.toContainText("not read yet");
 });
@@ -69,7 +69,7 @@ test("a past-due account keeps the hold visible as an alert, not a colour", asyn
   await expect(hold).toContainText("Billing hold active");
   await expect(hold).toContainText("cannot be processed");
   // The way out stays reachable while the hold is on.
-  await expect(card.getByRole("button", { name: "Manage billing" })).toBeEnabled();
+  await expect(card.getByRole("button", { name: "Manage or cancel subscription" })).toBeEnabled();
 });
 
 test("a scheduled cancellation says access continues, and until when", async ({ page }) => {
@@ -96,7 +96,7 @@ test("a billing read that failed prints no number at all", async ({ page }) => {
 
   await expect(card.locator("dl")).toContainText("not read yet");
   await expect(card).toContainText("These are not zeroes");
-  await expect(card.getByRole("button", { name: "Manage billing" })).toBeDisabled();
+  await expect(card.getByRole("button", { name: "Manage or cancel subscription" })).toBeDisabled();
   // Fail closed: no zero balance, no invented plan name. The card is still headed, and the heading
   // is the neutral one -- not a plan, and not a repeat of the tab above it (workspace-18).
   await expect(card.getByRole("heading", { level: 2 })).toHaveText("Access and balance");

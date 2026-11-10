@@ -21,7 +21,10 @@ vi.mock("@/lib/billing-catalog", async (original) => ({
     ? { environment: "sandbox", clientToken: `test_${"a".repeat(30)}` }
     : { environment: "production", clientToken: `live_${"a".repeat(30)}` },
 }));
-vi.mock("@/lib/billing-store", () => ({ issueFoundationCheckoutIntent: intent }));
+vi.mock("@/lib/billing-store", () => ({
+  issueFoundationCheckoutIntent: intent,
+  getFoundationBillingAccount: async () => ({ ok: true, account: { accessPlan: null, subscriptionStatus: "inactive", subscriptionCancelAt: null, paddleSubscriptionId: null } }),
+}));
 vi.mock("@/lib/commercial-state", () => ({ readCommercialState: commercial }));
 vi.mock("@/lib/customer-data-admission", async () => ({
   readCustomerSourceAuthorization: gate,

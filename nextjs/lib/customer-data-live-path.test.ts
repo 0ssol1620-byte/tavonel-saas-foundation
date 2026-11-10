@@ -99,12 +99,13 @@ describe("customer data on the live compile path", () => {
     expect(reason).toContain("Signing in creates your workspace, and uploading and compiling your own sources open for it once its owner accepts the processing terms.");
     expect(reason).not.toMatch(/in stages|stage by stage/);
     expect(reason).toContain("Your workspace shows whether it is open.");
-    expect(reason).toContain("Once it is open, the Developer plan can be bought online. Team and Enterprise are arranged with us rather than enabled by a plan purchase.");
+    // Team self-serve (2026-11-10, intended): 
+    expect(reason).toContain("Once it is open, the Developer and Team plans can be bought online. Enterprise is arranged with us rather than enabled by a plan purchase.");
     expect(reason).not.toMatch(/waiting list|in turn|notify|notification|we will (?:email|tell)/i);
     expect(reason).not.toMatch(/^Sign in to upload|can be bought online;/);
     expect(reason, "plain sentences").not.toContain(";");
     expect(BILLING_OFFERS.observer_access.saleChannel).toBe("self_serve");
-    expect(BILLING_OFFERS.studio_access.saleChannel).toBe("contact");
+    expect(BILLING_OFFERS.studio_access.saleChannel).toBe("self_serve");
     expect(reason).not.toMatch(/set up with us|Compiling your own sources is/i);
     expect(reason).not.toMatch(/\b(gate|receipt|cohort|founder|qualif\w*)\b/i);
     expect(reason).not.toMatch(/\d/);

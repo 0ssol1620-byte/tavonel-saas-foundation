@@ -216,7 +216,8 @@ const CLOSED = {
   pricing: [
     { href: "/explore", label: "Explore a Compiled World" },
     { href: "/contact?plan=Developer", label: "Request Developer access" },
-    { href: "/contact?plan=Team", label: "Talk to us about Team" },
+    // Team self-serve (2026-11-10, intended): Team's card reads as Developer's does while purchase is closed.
+    { href: "/contact?plan=Team", label: "Request Team access" },
     { href: "/contact?plan=Enterprise", label: "Scope an Enterprise pilot" },
   ],
   koPricing: {
@@ -264,7 +265,7 @@ const TABLE = {
     pricing: [
       { href: "/login", label: "Start free" },
       { href: "/login?next=checkout&offer=observer_access", label: "Buy Developer — $29/month" },
-      { href: "/contact?plan=Team", label: "Talk to us about Team" },
+      { href: "/login?next=checkout&offer=studio_access", label: "Buy Team — $99/month" },
       { href: "/contact?plan=Enterprise", label: "Scope an Enterprise pilot" },
     ],
     /*
@@ -277,7 +278,7 @@ const TABLE = {
       cards: [
         CLOSED.koPricing.cards[0],
         { href: "/login?next=checkout&offer=observer_access", label: "Developer · 사용 신청하기" },
-        CLOSED.koPricing.cards[2],
+        { href: "/login?next=checkout&offer=studio_access", label: "Team · 사용 신청하기" },
         CLOSED.koPricing.cards[3],
       ],
     },
@@ -383,11 +384,10 @@ describe("the checkout-intent notice", () => {
     const { default: CheckoutIntentNotice } = await import("../components/checkout-intent-notice");
     const closed = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "studio_access", purchaseOpen: false })));
     expect(closed).toBe("Team is not sold online today. Nothing is charged by signing in. Request Team access");
-    // B-07 / CLM-023: Team's saleChannel is "contact", so an open deployment still does not sell it
-    // online, and the checkout it would promise answers 403 BILLING_OFFER_CONTACT_REQUIRED.
+    // Team self-serve (2026-11-10, intended): an open deployment sells Team online, so the notice holds it
+    // with its own catalog numbers, as it does Developer.
     const open = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "studio_access", purchaseOpen: true })));
-    expect(open).toBe("Team is not sold online today. Nothing is charged by signing in. Request Team access");
-    expect(open).not.toContain("Checkout opens by itself");
+    expect(open).toBe("Team is held for you. $99/month for 2,500 standard pages, with a full refund within 14 days if you have used fewer than 250 of them. Paddle is the merchant of record. Sign in and accept the processing terms, and checkout opens by itself. Nothing is charged by signing in.");
     const developer = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "observer_access", purchaseOpen: true })));
     expect(developer).toBe(OPEN_INTENT);
   }, RENDER_TIMEOUT);

@@ -65,6 +65,7 @@ import WorkspaceUltimateShell, { type SourcePendingReason, type WorkspaceSurface
 import WorkspaceGettingStarted from "@/components/workspace-getting-started";
 import WorkspaceUseWithAi from "@/components/workspace-use-with-ai";
 import ProcessingConsentPanel from "@/components/processing-consent-panel";
+import BillingRefund from "@/components/billing-refund";
 import IntakeTriageReview from "@/components/intake-triage-review";
 import workspaceStateStyles from "./workspace-states.module.css";
 import {
@@ -4002,10 +4003,12 @@ export default function WorkspacePage() {
             </p>
             <div className="billing-actions">
               <button disabled={billingBusy} onClick={() => void loadBilling()}>Refresh billing</button>
+              {/* One-step buy (2026-11-10): the portal is where a subscription is changed or cancelled, so the label says both. */}
               <button disabled={billingBusy || !billingAccount?.paddleCustomerId} onClick={() => void openBillingPortal()}>
-                {billingBusy ? "Opening..." : "Manage billing"}
+                {billingBusy ? "Opening..." : "Manage or cancel subscription"}
               </button>
             </div>
+            {billingAccount?.paddleCustomerId ? <BillingRefund getToken={getAuthToken} /> : null}
             {billingAccount?.billingHold ? <p className="billing-hold" role="alert">Billing hold active. Refunded or disputed usage cannot be processed.</p> : null}
             {billingAccount?.subscriptionCancelAt ? (
               <p className="billing-hold" role="status">

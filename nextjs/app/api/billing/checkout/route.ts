@@ -3,9 +3,9 @@ import { getFoundationAccountGrant } from "@/lib/account-grants";
 import { createCheckoutBinding } from "@/lib/billing-binding";
 import { billingSecret } from "@/lib/billing-secrets";
 import { isBillingOfferCode, readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
-import { issueFoundationCheckoutIntent } from "@/lib/billing-store";
+import { getFoundationBillingAccount, issueFoundationCheckoutIntent } from "@/lib/billing-store";
 import { readCommercialState } from "@/lib/commercial-state";
-import { decideCheckoutPolicy, decideOfferCheckoutPolicy } from "@/lib/checkout-policy";
+import { decideCheckoutPolicy, decideOfferCheckoutPolicy, decideSubscriptionChange } from "@/lib/checkout-policy";
 import { authorizationStage, readCustomerSourceAuthorization } from "@/lib/customer-data-admission";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { readPublicStatusV2 } from "@/lib/public-status";
@@ -63,6 +63,11 @@ export async function POST(request: Request) {
   const access = foundationPilotAccess(user.id);
   if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });
   const { membership } = access;
+  // One subscription per workspace: a live one refuses a second checkout (see `decideSubscriptionChange`).
+  const billing = await getFoundationBillingAccount(membership.workspaceId, user.id);
+  if (!billing.ok) return NextResponse.json({ code: billing.code }, { status: 503, headers: NO_STORE });
+  const change = decideSubscriptionChange(billing.account, body.offerCode);
+  if (!change.allowed) return NextResponse.json({ code: change.code }, { status: 409, headers: NO_STORE });
   // A deployment-wide launch switch is not permission for this customer's sources. In live mode
   // refuse payment before creating a durable checkout intent unless the same workspace receipt
   // that intake and compilation require is current and valid. Sandbox qualification remains

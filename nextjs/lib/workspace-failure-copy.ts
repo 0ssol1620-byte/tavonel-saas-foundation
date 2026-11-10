@@ -47,6 +47,8 @@ const FAILURE_COPY: Record<string, string> = {
   */
   BILLING_LAUNCH_PENDING: "Plan purchase is not open, so nothing was charged. Access is arranged with us through the contact page.",
   BILLING_NOT_CONFIGURED: "Online payment is not configured, so nothing was charged. Access is arranged with us through the contact page.",
+  BILLING_PLAN_ALREADY_ACTIVE: "This workspace already has this plan, so nothing was opened or charged. Manage it from Usage & billing in your workspace.",
+  BILLING_PLAN_CHANGE_REQUIRED: "This workspace already has a plan, so nothing was opened or charged. To move from Developer to Team, cancel Developer in the subscription portal first, then buy Team here, and Team replaces Developer once its payment is confirmed. Any other change waits until the current plan ends.",
   BILLING_OFFER_CONTACT_REQUIRED: "This plan is arranged with us rather than bought online, so nothing was charged. Use the contact page to set it up.",
   PROCESSING_QUALIFICATION_NOT_BILLABLE: "This workspace's source access covers a processing check, not paid use, so nothing was charged. Request source access for paid use before retrying.",
   PILOT_ACCESS_REQUIRED: "This account is not admitted to a TAVONEL workspace. Access is arranged with us through the contact page.",

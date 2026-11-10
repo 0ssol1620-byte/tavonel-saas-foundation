@@ -45,16 +45,15 @@ export const BILLING_OFFERS = {
     includedPages: 2_500,
     priceEnv: "PADDLE_PRICE_STUDIO_ACCESS",
     /*
-      Contact sales, and not only because billing is in pilot.
+      Self-serve since 2026-11-10 (orchestrator, delegated pricing and plan decision).
 
-      Routing Team to /contact today is a side effect of checkout being closed for everyone.
-      The moment live checkout opens, that side effect disappears and this plan would start
-      selling itself -- while invitations, roles, seat accounting and access revocation still
-      do not exist in any migration or route. `saleChannel` makes the gate independent of
-      commercial mode, so opening billing cannot arm a plan whose product is unfinished.
-      It flips to "self_serve" when the membership flow ships end to end, not before.
+      This was "contact" while Team was sold on collaboration that did not exist. Since SD-02
+      (below) the plan is described as what it is -- the higher-volume single-member plan, with
+      shared members and roles named in `notYetSold` on the same card -- so it is bought online
+      exactly as Developer is. `saleChannel` stays the per-offer gate: the checkout route still
+      refuses any offer whose channel is "contact" (`decideOfferCheckoutPolicy`).
     */
-    saleChannel: "contact",
+    saleChannel: "self_serve" as "self_serve" | "contact",
     /*
       SD-02, 2026-09-16. Collaboration was what this plan sold, and collaboration is the part
       that is not finished. "Up to 5 seats" came off the card in an earlier pass, but the copy

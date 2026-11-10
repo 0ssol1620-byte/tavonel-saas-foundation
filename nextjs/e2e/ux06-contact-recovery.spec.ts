@@ -10,7 +10,8 @@ test("closed pricing CTAs stay on the evaluation/contact path when status is una
   await page.goto("/pricing");
 
   const developer = page.getByRole("link", { name: "Request Developer access", exact: true });
-  const team = page.getByRole("link", { name: "Talk to us about Team", exact: true });
+  // Team self-serve (2026-11-10, intended): Team's closed action reads as Developer's does.
+  const team = page.getByRole("link", { name: "Request Team access", exact: true });
   const enterprise = page.getByRole("link", { name: "Scope an Enterprise pilot", exact: true }).first();
   const evaluation = page.getByRole("link", { name: "Explore a Compiled World", exact: true });
 

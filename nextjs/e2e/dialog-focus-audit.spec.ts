@@ -188,7 +188,7 @@ test.describe("notice live regions (journey A9)", () => {
     });
     await page.route("**/api/billing/portal", route => route.fulfill({ status: 404, json: { code: "BILLING_CUSTOMER_NOT_FOUND" } }));
     await page.goto("/workspace/settings/usage", { waitUntil: "domcontentloaded" });
-    const manage = page.locator("section.billing-card").getByRole("button", { name: "Manage billing" });
+    const manage = page.locator("section.billing-card").getByRole("button", { name: "Manage or cancel subscription" });
     await expect(manage).toBeEnabled();
     expect(await markEmptyAlertRegions(page)).toBeGreaterThan(0);
 
@@ -265,7 +265,7 @@ test.describe("notice live regions (journey A9)", () => {
     const refusal = page.getByRole("alert").filter({ hasText: "Checkout is unavailable." });
     await expect(refusal).toHaveCount(1);
     await expect(refusal).toHaveAttribute("data-a9-before-reply", "");
-    await expect(refusal.locator(".notice"), "the fixed toast inside the region is what is shown").toBeVisible();
+    await expect(refusal.locator(".notice"), "the sentence inside the region is what is shown").toBeVisible();
     await expect(refusal).not.toContainText("PILOT_ACCESS_REQUIRED");
     await expect(page.getByRole("status").filter({ hasText: "Checkout is unavailable." })).toHaveCount(0);
     // Nothing navigated: the refusal is read where the buyer is.

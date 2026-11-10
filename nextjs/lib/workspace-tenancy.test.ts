@@ -55,10 +55,11 @@ describe("the workspace key is a function of the user", () => {
 });
 
 describe("nothing claims a membership feature that the tenancy model cannot carry", () => {
-  it("keeps Team on contact sales", () => {
-    // The plan whose product this is. `plan-entitlement.test.ts` checks the gate; this checks
-    // the reason, so the two do not drift apart if the gate is ever revisited.
-    expect(BILLING_OFFERS.studio_access.saleChannel).toBe("contact");
+  it("sells Team only as the single-member plan it is", () => {
+    // Team self-serve (2026-11-10, intended): the gate was revisited (orchestrator, delegated plan decision). Team is
+    // self-serve, and the membership it cannot carry stays named as not sold on its card.
+    expect(BILLING_OFFERS.studio_access.saleChannel).toBe("self_serve");
+    expect(BILLING_OFFERS.studio_access.notYetSold).toContain("Shared members and roles");
   });
 
   it("ships no invitation or seat surface while the key is derived", () => {

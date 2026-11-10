@@ -322,13 +322,13 @@ describe("recipe preflight", () => {
   */
   it("states both activation plans as the catalog has them, with no self-serve path for Team", () => {
     const html = render({ intent: intentFor() });
-    expect(BILLING_OFFERS.studio_access.saleChannel).toBe("contact");
+    // Team self-serve (2026-11-10, intended): Team's half now points at /pricing, as Developer's does.
+    expect(BILLING_OFFERS.studio_access.saleChannel).toBe("self_serve");
     expect(BILLING_OFFERS.observer_access.saleChannel).toBe("self_serve");
     expect(html).toContain(BILLING_OFFERS.studio_access.label);
     expect(html).toContain(BILLING_OFFERS.observer_access.label);
-    // Team's half: a conversation, and the destination is /contact, not a checkout.
-    expect(html).toContain("set up with you directly");
-    expect(html).toContain("/contact");
+    expect(html).toContain("also shown on");
+    expect(html).not.toContain("set up with you directly");
     // Developer's half: self-serve, and only for the owner.
     expect(html).toContain("if you own the workspace");
     expect(html).toContain("/pricing");
@@ -389,8 +389,9 @@ describe("continuing a recipe after sign-in", () => {
 
   it("keeps checkout's precedence, and the owner's exemption from it", () => {
     const recipe = intentFor();
-    expect(resumeDestination({ checkout: "observer_access", recipe })).toBe("/workspace?checkout=observer_access");
-    expect(resumeDestination({ checkout: "observer_access", recipe: null })).toBe("/workspace?checkout=observer_access");
+    // One-step buy (2026-11-10, intended): the held offer returns to /pricing, not the workspace.
+    expect(resumeDestination({ checkout: "observer_access", recipe })).toBe("/pricing?checkout=observer_access");
+    expect(resumeDestination({ checkout: "observer_access", recipe: null })).toBe("/pricing?checkout=observer_access");
     // An owner never reaches checkout: the recipe continues, or the workspace opens.
     expect(resumeDestination({ checkout: "observer_access", ownerBillingExempt: true, recipe }))
       .toBe(loginUrlForRecipe(recipe.recipeId, recipe.returnTo));

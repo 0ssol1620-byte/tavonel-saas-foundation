@@ -122,16 +122,17 @@ test("a plan intent fails closed when the deployment cannot be asked", async ({ 
   await expect(page.getByText("not sold online today", { exact: false })).toHaveCount(0);
 });
 
-test("a Team intent is not promised a checkout even where a plan can be bought", async ({ page }) => {
-  // B-07 / CLM-023: Team's saleChannel is "contact"; checkout answers 403 BILLING_OFFER_CONTACT_REQUIRED.
+test("a Team intent is held for checkout where a plan can be bought", async ({ page }) => {
+  // Team self-serve (2026-11-10, intended): Team's saleChannel is "self_serve", so an open deployment
+  // holds it exactly as it holds Developer, with Team's own catalog numbers.
   await page.route("**/api/status/v2", route => route.fulfill({
     json: statusV2({ createAccount: true, compileCustomerDocuments: true, purchasePlan: true }),
   }));
   await page.goto("/login?next=checkout&offer=studio_access");
-  await expect(page.getByText("Team is not sold online today.")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Request Team access" })).toHaveAttribute("href", "/contact?plan=Team");
-  await expect(page.getByText("Checkout opens by itself", { exact: false })).toHaveCount(0);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in to TAVONEL.");
+  await expect(page.getByText("Team is held for you.")).toBeVisible();
+  await expect(page.getByText("$99/month for 2,500 standard pages", { exact: false })).toBeVisible();
+  await expect(page.getByText("not sold online today", { exact: false })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("One step before checkout.");
 });
 
 /*

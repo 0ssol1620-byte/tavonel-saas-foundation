@@ -98,9 +98,9 @@ export const activationPolicy = {
     in the campaign ledger): the launch is staged and the workspace canary stays until after it, so
     the sentence promises no open self-serve. Review R2: there is no list, order or notification,
     so it says what happens -- signing in creates the workspace, and the workspace states whether
-    it is open ("awaiting release" outside the canary, app/workspace/page.tsx). Developer is bought
-    online once a workspace is open, Team and Enterprise are arranged with us (`saleChannel` in the
-    billing catalog). It is still rendered verbatim wherever the gate was stated, and
+    it is open ("awaiting release" outside the canary, app/workspace/page.tsx). Developer and Team are
+    bought online once a workspace is open, Enterprise is arranged with us (`saleChannel` in the
+    billing catalog, Team self-serve since 2026-11-10). It is still rendered verbatim wherever the gate was stated, and
     `KO_CHROME.customerDataGate` is its literal Korean.
 
     ADR 0008, 2026-11-09: the workspace canary is lifted (TAVONEL_PROCESSING_ROLLOUT=general), so the
@@ -108,7 +108,7 @@ export const activationPolicy = {
     processing terms; the release row and the grant still decide, so it still says the workspace
     shows whether it is open.
   */
-  customerData: { enabled: true, reason: "Signing in creates your workspace, and uploading and compiling your own sources open for it once its owner accepts the processing terms. Your workspace shows whether it is open. Once it is open, the Developer plan can be bought online. Team and Enterprise are arranged with us rather than enabled by a plan purchase." },
+  customerData: { enabled: true, reason: "Signing in creates your workspace, and uploading and compiling your own sources open for it once its owner accepts the processing terms. Your workspace shows whether it is open. Once it is open, the Developer and Team plans can be bought online. Enterprise is arranged with us rather than enabled by a plan purchase." },
 } as const;
 
 export type ActivationCapability = keyof typeof activationPolicy;

@@ -265,7 +265,7 @@ export const KO_CHROME = {
     ADR 0008, 2026-11-09: no longer staged; it names what opens a workspace, as the English does.
   */
   customerDataGate:
-    "로그인하면 워크스페이스가 만들어지고, 처리 약관에 동의하면 내 원문 업로드와 컴파일이 열립니다. 내 워크스페이스의 열림 상태는 워크스페이스 화면에 표시됩니다. 열린 뒤에는 Developer 요금제를 바로 구매할 수 있고, Team과 Enterprise는 저희와 함께 정합니다.",
+    "로그인하면 워크스페이스가 만들어지고, 처리 약관에 동의하면 내 원문 업로드와 컴파일이 열립니다. 내 워크스페이스의 열림 상태는 워크스페이스 화면에 표시됩니다. 열린 뒤에는 Developer와 Team 요금제를 바로 구매할 수 있고, Enterprise는 저희와 함께 정합니다.",
 } as const;
 
 /**

@@ -206,11 +206,11 @@ export const SOLUTIONS = {
         BA-049. "Membership is not available yet for shared workspaces; Team remains contact-only
         until tenancy is complete" put an internal engineering milestone in front of knowledge
         owners and security reviewers. The commercial fact is unchanged and is the one a buyer has
-        to plan for: Team is `saleChannel: "contact"` in `lib/billing-catalog.ts`, so it is set up
-        with us rather than bought at a checkout. The roadmap half belongs in the pricing footnote
+        to plan for: Team is `saleChannel: "self_serve"` in `lib/billing-catalog.ts` since 2026-11-10, so it is
+        bought online as Developer is. The roadmap half belongs in the pricing footnote
         where a reader is comparing plans, and goes to `copy-commerce-legal` as a cross-lane item.
       */
-      "Team setup is arranged with us rather than bought at a checkout. Each workspace is a single-member workspace; shared roles, invitations and organization administration are not available.",
+      "Team is bought online, as Developer is. Each workspace is a single-member workspace; shared roles, invitations and organization administration are not available.",
       "Rollback restores a prior revision. It does not undo downstream use of an older answer.",
     ],
   },

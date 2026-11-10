@@ -48,7 +48,8 @@ describe("checkoutSellable: the one predicate /login's notice and H1 both read (
     for (const code of OFFER_CODES) {
       expect(checkoutSellable(code, true), code).toBe(BILLING_OFFERS[code].saleChannel === "self_serve");
     }
-    expect(checkoutSellable("studio_access", true)).toBe(false);
+    // Team self-serve (2026-11-10, intended): both plans sell online on an open deployment.
+    expect(checkoutSellable("studio_access", true)).toBe(true);
     expect(checkoutSellable("observer_access", true)).toBe(true);
   });
 });
@@ -137,8 +138,8 @@ describe("decideCheckoutResume: terms -> launch -> checkout (D-14)", () => {
         expect(decideCheckoutResume("observer_access", purchaseOpen, access), String(purchaseOpen)).toBe("open");
       }
     }
-    // Team is a conversation; its checkout is refused with the contact sentence, never held.
-    expect(decideCheckoutResume("studio_access", true, newAccount)).toBe("open");
+    // Team self-serve (2026-11-10, intended): Team is held for the terms exactly as Developer is.
+    expect(decideCheckoutResume("studio_access", true, newAccount)).toBe("hold_terms");
   });
 
   it("opens only for production processing in this workspace", () => {
