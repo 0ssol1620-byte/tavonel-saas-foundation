@@ -882,6 +882,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
       await accept.click({ trial: true });
       await accept.click();
       await expect(dialog).toHaveCount(0);
+      await expect(region(page, "status", "Developer sandbox checkout opened.")).toBeVisible();
       expect(await emitPaddleEvent(page, "checkout.completed")).toBe(true);
       const outcome = page.locator("section.pricing-purchase");
       await expect(outcome.getByRole("heading", { name: "Developer is active." })).toBeVisible({ timeout: 10_000 });

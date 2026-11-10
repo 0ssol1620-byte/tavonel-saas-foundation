@@ -47,9 +47,9 @@ test("an active subscription shows its state, its remaining pages and a working 
   }));
 
   await expect(card.getByRole("heading", { name: "studio access" })).toBeVisible();
-  await expect(card.locator("dl")).toContainText("active");
+  await expect(card.locator(":scope > dl")).toContainText("active");
   // 4 credits to a standard page, so 4,000 credits is 1,000 pages. Derived, never invented.
-  await expect(card.locator("dl")).toContainText("1,000");
+  await expect(card.locator(":scope > dl")).toContainText("1,000");
   await expect(card.getByRole("button", { name: "Manage or cancel subscription" })).toBeEnabled();
   await expect(card.locator(".billing-hold")).toHaveCount(0);
   await expect(card).not.toContainText("not read yet");
@@ -64,7 +64,7 @@ test("a past-due account keeps the hold visible as an alert, not a colour", asyn
     paddleCustomerId: "ctm_fixture_pastdue",
   }));
 
-  await expect(card.locator("dl")).toContainText("past_due");
+  await expect(card.locator(":scope > dl")).toContainText("past_due");
   const hold = card.getByRole("alert");
   await expect(hold).toContainText("Billing hold active");
   await expect(hold).toContainText("cannot be processed");
@@ -83,10 +83,10 @@ test("a scheduled cancellation says access continues, and until when", async ({ 
 
   // Not "canceled": the state is active-until, and saying "canceled" would understate what the
   // customer still has.
-  await expect(card.locator("dl")).toContainText("active until");
+  await expect(card.locator(":scope > dl")).toContainText("active until");
   await expect(card.getByRole("status")).toContainText("Cancellation is scheduled");
   await expect(card.getByRole("status")).toContainText("through the current paid period");
-  await expect(card.locator("dl")).toContainText("200");
+  await expect(card.locator(":scope > dl")).toContainText("200");
 });
 
 test("a billing read that failed prints no number at all", async ({ page }) => {
@@ -94,13 +94,13 @@ test("a billing read that failed prints no number at all", async ({ page }) => {
   // panel has nothing to state -- which is the only honest thing to show about a balance.
   const card = await openBilling(page, null);
 
-  await expect(card.locator("dl")).toContainText("not read yet");
+  await expect(card.locator(":scope > dl")).toContainText("not read yet");
   await expect(card).toContainText("These are not zeroes");
   await expect(card.getByRole("button", { name: "Manage or cancel subscription" })).toBeDisabled();
   // Fail closed: no zero balance, no invented plan name. The card is still headed, and the heading
   // is the neutral one -- not a plan, and not a repeat of the tab above it (workspace-18).
   await expect(card.getByRole("heading", { level: 2 })).toHaveText("Access and balance");
-  await expect(card.locator("dl")).not.toContainText("active");
+  await expect(card.locator(":scope > dl")).not.toContainText("active");
   // And the read is retryable rather than terminal.
   await expect(card.getByRole("button", { name: "Refresh billing" })).toBeEnabled();
 });

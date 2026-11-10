@@ -60,10 +60,12 @@ export default function BillingRefund({ getToken }: { getToken: () => Promise<st
 
   return (
     <section className="billing-refund" aria-labelledby="billing-refund-title">
-      <dl>
-        <div><dt>Renews</dt><dd>{facts ? formatTimestamp(facts.renewsAt) ?? "no renewal scheduled" : NOT_READ}</dd></div>
-        <div><dt>Latest payment</dt><dd>{facts ? formatTimestamp(facts.paidAt) ?? NOT_READ : NOT_READ}</dd></div>
-      </dl>
+      {facts ? (
+        <dl>
+          <div><dt>Renews</dt><dd>{formatTimestamp(facts.renewsAt) ?? "no renewal scheduled"}</dd></div>
+          <div><dt>Latest payment</dt><dd>{formatTimestamp(facts.paidAt) ?? NOT_READ}</dd></div>
+        </dl>
+      ) : null}
       <h3 id="billing-refund-title">Refund</h3>
       <p className="fine">
         {facts ? eligibilitySentence(facts) : readFailed
