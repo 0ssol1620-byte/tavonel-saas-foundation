@@ -6,12 +6,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
   revoke route says the feature is off -- never a store failure -- and the page does not exist.
 */
 
-vi.mock("@/lib/developer-auth", () => ({
-  requireFoundationSession: vi.fn(async () => ({
+vi.mock("@/lib/developer-auth", () => {
+  const session = vi.fn(async () => ({
     ok: true,
     principal: { kind: "session", workspaceKey: "pilot-1234567890abcdef", userId: "59d42924-a3cc-4a09-b92d-9c86b58901a1", scopes: [], authorizationRevision: 4 },
-  })),
-}));
+  }));
+  // Revoke is not plan-gated, so the route asks the revoke helper rather than the plan-gated one.
+  return { requireFoundationSession: session, requireFoundationRevokeSession: session };
+});
 
 import { POST as revokeViewerLinks } from "../app/api/v1/oauth-connectors/viewer-links/revoke/route";
 import GoogleDriveAccessLayout from "../app/workspace/google-drive-access/layout";

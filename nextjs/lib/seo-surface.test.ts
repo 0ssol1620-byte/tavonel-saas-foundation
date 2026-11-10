@@ -206,10 +206,6 @@ const READER_CONTROLS = [
   "/film",
   "/benchmarks",
   "/reproducibility",
-  // D11 delisted `/arena` from all three files while the route kept answering, so it is read
-  // here for the same reason the drafts are: a page nothing advertises is the case this reader
-  // exists for.
-  "/arena",
   // The index (BA-210) for the same reason as its entries: advertised nowhere, so read here.
   "/cookbooks",
   ...COOKBOOK_SLUGS.map((slug) => `/cookbooks/${slug}`),
@@ -300,14 +296,18 @@ describe("public surface: robots, sitemap and llms.txt agree", () => {
     The route still answers so an existing link does not 404. `/cookbooks` is held to the same
     rule in `lib/cookbook-content.test.ts`: out of the sitemap and out of llms.txt, both.
   */
-  it("delists /arena everywhere it would be advertised, and keeps it answering", () => {
-    expect(isRealRoute("/arena"), "an existing link must not 404").toBe(true);
-    expect(isNoindex("/arena")).toBe(true);
+  /*
+    2026-11-10 (founder direction): intended re-pin. /arena is retired. It has no page, it is
+    advertised nowhere, and an existing link lands on /benchmarks through a permanent redirect.
+  */
+  it("retires /arena: no page, advertised nowhere, and a permanent redirect to /benchmarks", async () => {
+    expect(pages.some((page) => page.route === "/arena"), "the /arena page is deleted").toBe(false);
     expect(sitemapPaths).not.toContain("/arena");
     expect(llmsPaths).not.toContain("/arena");
+    const { default: config } = await import("../next.config.mjs");
+    expect(await config.redirects!()).toContainEqual({ source: "/arena", destination: "/benchmarks", permanent: true });
   });
   it("reads noindex from the page rather than assuming it", () => {
-    expect(isNoindex("/arena"), "a delisted noindex page no longer reads as noindex").toBe(true);
     // Conversion pass 2026-11-09: /reproducibility left the llms-only exemption for the sitemap.
     expect(isNoindex("/reproducibility"), "the indexed proof page reads as noindex").toBe(false);
     expect(sitemapPaths).toContain("/reproducibility");

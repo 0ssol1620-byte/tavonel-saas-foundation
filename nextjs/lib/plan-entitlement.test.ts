@@ -36,6 +36,13 @@ const PROMISED_ROUTES = [
   ["app/api/developer/keys/route.ts", "mint an API key"],
   ["app/api/developer/keys/[id]/route.ts", "revoke an API key"],
   ["app/api/v1/developer/keys/[id]/rotate/route.ts", "rotate an API key"],
+  ["app/api/connections/route.ts", "create a file-server connection"],
+  ["app/api/connections/[id]/route.ts", "revoke a file-server connection"],
+  ["app/api/v1/connections/[id]/sync/route.ts", "sync a file-server connection"],
+  ["app/api/v1/oauth-connectors/authorize/route.ts", "connect Google Drive"],
+  ["app/api/v1/oauth-connectors/connections/[id]/route.ts", "revoke a provider connection"],
+  ["app/api/v1/oauth-connectors/connections/[id]/sync/route.ts", "import a provider connection"],
+  ["app/api/v1/oauth-connectors/viewer-links/revoke/route.ts", "revoke a viewer link"],
 ] as const;
 
 describe("plan entitlement", () => {

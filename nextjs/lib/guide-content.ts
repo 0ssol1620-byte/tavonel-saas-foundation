@@ -465,7 +465,6 @@ const EN: GuideChapter[] = [
           "**/status** shows the configuration and activation state, the scheduled dependency checks and the incident history.",
           "**/trust** lists what is in place, what is coming and what is absent, each row linked to the page that states it.",
           "**/security** describes how document processing is controlled: the enforced processing boundary and the controls customers can rely on.",
-          "**/benchmarks/gdp-pdf** publishes a two-arm run on the public GDP.pdf task set, with its result as the page's headline.",
         ],
       },
       { kind: "note", text: "“No SOC 2 report, ISO 27001 certificate or independent penetration-test report exists yet.”" },
@@ -474,7 +473,6 @@ const EN: GuideChapter[] = [
       { href: "/status", label: "Status" },
       { href: "/trust", label: "Trust Center" },
       { href: "/security", label: "Security" },
-      { href: "/benchmarks/gdp-pdf", label: "GDP.pdf run" },
     ],
   },
   /*
@@ -785,7 +783,6 @@ const KO: GuideChapter[] = [
           "**/status**는 설정과 활성화 상태, 예약된 의존성 점검, 장애 이력을 보여 줍니다.",
           "**/trust**는 갖춘 것, 앞으로 갖출 것, 없는 것을 나열하고, 각 행을 그것을 밝힌 페이지에 연결합니다.",
           "**/security**는 문서 처리를 어떻게 통제하는지 설명합니다. 강제되는 처리 경계와, 믿고 기댈 수 있는 통제입니다.",
-          "**/benchmarks/gdp-pdf**는 공개 GDP.pdf 과제 세트로 돌린 두 갈래 실행을 게시하며, 그 결과를 페이지 제목으로 보여 줍니다.",
         ],
       },
       { kind: "note", text: "“No SOC 2 report, ISO 27001 certificate or independent penetration-test report exists yet.” SOC 2 보고서, ISO 27001 인증서, 독립 침투 테스트 보고서는 없습니다." },
@@ -794,7 +791,6 @@ const KO: GuideChapter[] = [
       { href: "/status", label: "상태" },
       { href: "/trust", label: "신뢰 센터" },
       { href: "/security", label: "보안" },
-      { href: "/benchmarks/gdp-pdf", label: "GDP.pdf 실행" },
     ],
   },
   {

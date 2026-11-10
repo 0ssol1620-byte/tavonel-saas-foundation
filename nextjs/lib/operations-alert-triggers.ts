@@ -347,10 +347,40 @@ export async function checkReleaseRowExpiry(now = Date.now(), env: Env = process
  * running either every slot would page every five minutes for a condition that lasts days.
  */
 // ponytail: a missed 00:00 slot skips that day's expiry check; the seven-day lead absorbs it.
-export async function runScheduledOperationsChecks(windowStartedAt: Date, env: Env = process.env, fetcher: typeof fetch = fetch) {
+export async function runScheduledOperationsChecks(
+  windowStartedAt: Date,
+  env: Env = process.env,
+  fetcher: typeof fetch = fetch,
+  deadlineMs = SCHEDULED_CHECKS_DEADLINE_MS,
+) {
+  const now = windowStartedAt.getTime();
   const minute = windowStartedAt.getUTCMinutes();
+  const due: [WatchResult["check"], (bounded: typeof fetch) => Promise<WatchResult>][] = [];
+  if (minute < 5) due.push(["runpod_daily_cost", (bounded) => checkRunPodDailyCost(now, env, bounded)]);
+  if (minute < 5 && windowStartedAt.getUTCHours() === 0) due.push(["release_row_expiry", () => checkReleaseRowExpiry(now, env)]);
   const results: WatchResult[] = [];
-  if (minute < 5) results.push(await checkRunPodDailyCost(windowStartedAt.getTime(), env, fetcher));
-  if (minute < 5 && windowStartedAt.getUTCHours() === 0) results.push(await checkReleaseRowExpiry(windowStartedAt.getTime(), env));
+  if (due.length === 0) return results;
+
+  // One overall deadline: the SLI record and its page run after these checks inside the route's
+  // maxDuration. The billing read is aborted at the deadline; the release read (Supabase admin
+  // request) cannot be, so it is only abandoned. A page already in flight is not aborted.
+  const controller = new AbortController();
+  const bounded: typeof fetch = (input, init) =>
+    fetcher(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<"expired">((resolve) => {
+    timer = setTimeout(() => { controller.abort(); resolve("expired"); }, deadlineMs);
+  });
+  try {
+    for (const [check, run] of due) {
+      const outcome = controller.signal.aborted ? "expired" : await Promise.race([run(bounded), expired]);
+      results.push(outcome === "expired" ? { check, code: "CHECK_DEADLINE_EXCEEDED" } : outcome);
+    }
+  } finally {
+    clearTimeout(timer);
+  }
   return results;
 }
+
+/** Leaves the SLI record and its page most of the sli-alerts route's 15 s maxDuration. */
+export const SCHEDULED_CHECKS_DEADLINE_MS = 4_000;

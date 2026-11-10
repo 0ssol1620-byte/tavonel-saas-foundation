@@ -4080,19 +4080,19 @@ export default function WorkspacePage() {
             <section className="card workspace-access-gate" role="status">
               <h2>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "Workspace access could not be verified." : "Checking workspace access."
-                : customerDataAccess === "closed" ? "Source connections are not available for this workspace yet." : "Source connections are part of Developer access."}</h2>
+                : customerDataAccess === "closed" ? "Source connections are not available for this workspace yet." : "Available on Developer and Team."}</h2>
               <p>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
                 : customerDataAccess === "closed"
                 ? `Your account is ready, but source processing is closed. ${closedGate.sentence}`
                 : accessSource === "trial"
-                ? "Free evaluation works with files you upload directly. Connect Google Drive, Dropbox, OneDrive or your own storage once the workspace is on Developer access."
-                : "This account has no active compute access. Source connections require Developer access."}</p>
+                ? "Google Drive and file-server connections are included on Developer and Team. The free evaluation works with files you upload directly."
+                : "Google Drive and file-server connections are included on Developer and Team. This workspace has no active plan."}</p>
               <div className="billing-actions">{accessSource === null
                 ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
                 : customerDataAccess === "closed"
                 ? closedGate.action
-                : <Link className="btn" href="/pricing">See Developer access</Link>}</div>
+                : <Link className="btn" href="/pricing">See plans</Link>}</div>
             </section>
           ) : <ConnectionsPanel />) : null}
 

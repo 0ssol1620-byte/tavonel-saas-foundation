@@ -1,4 +1,4 @@
-import { authorizeFoundationProduct, type ProductAccessRole } from "./billing-product-access";
+import { authorizeFoundationProduct, type MinimumPlanLevel, type ProductAccessRole } from "./billing-product-access";
 import type { DeveloperScope } from "./developer-contracts";
 import { REMOTE_MCP_SCOPES } from "./remote-mcp";
 import { authorizeFoundationSessionProduct, type SessionAccessSource } from "./self-service-trial";
@@ -217,7 +217,7 @@ export async function trialAiKeyAccess(
   workspaceKey: string,
   userId: string,
   scope: DeveloperScope,
-  minimumPlan: "observer" | "studio",
+  minimumPlan: MinimumPlanLevel,
   consume: boolean,
   env: Env = process.env,
 ): Promise<{ ok: true } | { ok: false; code: string; status: number } | null> {

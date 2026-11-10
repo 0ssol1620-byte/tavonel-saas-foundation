@@ -95,7 +95,7 @@ export default function TrustCenterPage() {
                 on <Link href={"/evidence" as Route}>Evidence</Link>. What a result has to carry
                 before it is published as a number is on <Link href={"/benchmarks" as Route}>Benchmarks</Link>.
                 The frozen fixtures you can rerun are on <Link href={"/reproducibility" as Route}>Reproducibility</Link>.
-                The open problems and the experiments that failed are on <Link href={"/research" as Route}>Research</Link>.
+                Our research and its measured results are on <Link href={"/research" as Route}>Research</Link>.
               </p>
 
               {/*
