@@ -171,6 +171,47 @@ test("the hero film is one tabbed slot: four tabs, one panel, keys move the sele
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
+/*
+  WCAG 2.2.2 (PR #235 review R1, B1). The hero starts moving by itself for longer than five seconds, so it carries a
+  Pause / Play control; pausing is the reduced-motion path (poster, nothing playing, no advance across a whole cut).
+  Keyboard focus entering the tablist stops the rotation, and a held cut plays once and stops: nothing loops for ever.
+*/
+test("the hero film can be paused, holds its cut while paused, and a focused cut plays once and stops", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/");
+  const hero = page.locator(HERO);
+  const control = hero.locator("[data-motion-control]");
+  const selected = () => hero.getByRole("tab").evaluateAll(tabs => tabs.findIndex(tab => tab.getAttribute("aria-selected") === "true"));
+  await expect(hero).toHaveAttribute("data-playing", "1");
+  await expect(control).toHaveAttribute("data-motion-control", "pause");
+  await expect(control).toHaveAccessibleName("Pause the compile film");
+  const box = (await control.boundingBox())!;
+  expect(box.width).toBeGreaterThanOrEqual(44);
+  expect(box.height).toBeGreaterThanOrEqual(44);
+
+  await control.click();
+  await expect(control).toHaveAttribute("data-motion-control", "play");
+  await expect(control).toHaveAccessibleName("Play the compile film");
+  await expect(hero).toHaveAttribute("data-playing", "0");
+  await expect(hero).toHaveAttribute("data-mode", "poster");
+  await expect(hero.locator("video, canvas")).toHaveCount(0);
+  const held = await selected();
+  // One whole cut (FILM_DURATION, 18 s) and then some: a paused slot does not advance.
+  await page.waitForTimeout(21_000);
+  expect(await selected(), "no advance while paused").toBe(held);
+  await expect(hero).toHaveAttribute("data-playing", "0");
+
+  await control.click();
+  await expect(hero).toHaveAttribute("data-playing", "1");
+  await expect(control).toHaveAttribute("data-motion-control", "pause");
+  // Focus inside the tablist stops the rotation: this cut plays to its end once and holds there.
+  await hero.getByRole("tab").nth(held).focus();
+  await expect(control, "the focused cut stops at its end").toHaveAttribute("data-motion-control", "play", { timeout: 30_000 });
+  expect(await selected(), "the focused tab keeps the selection").toBe(held);
+  await expect(hero).toHaveAttribute("data-playing", "0");
+});
+
 test("the restored hero keeps its title, stages and actions at seven widths", async ({ page }, testInfo) => {
   // Seven widths, each now also scrolled down to the walkthrough and back.
   test.setTimeout(90_000);

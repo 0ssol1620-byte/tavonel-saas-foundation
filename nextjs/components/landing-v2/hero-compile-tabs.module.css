@@ -103,6 +103,37 @@
   height: 100%;
 }
 
+/* The motion control (WCAG 2.2.2): a 44px target in the stage's corner, drawn as a small mark on the paper. */
+.motion {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tv-ink, #15191d);
+  cursor: pointer;
+}
+
+.motion svg {
+  box-sizing: content-box;
+  padding: 7px;
+  border: 1px solid var(--tv-rule, rgb(21 25 29 / 0.12));
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.88);
+}
+
+.motion:focus-visible {
+  outline: 2px solid var(--tv-action, #005bb3);
+  outline-offset: -2px;
+  border-radius: 50%;
+}
+
 .caption {
   margin-top: 12px;
   color: var(--tv-ink-muted, #4c545d);

@@ -195,3 +195,19 @@ test("the header CTA is the start action, not the public sample", async ({ page 
   await expect(cta).toHaveText(HEADER_START.label);
   await expect(page.locator('header.nav .nav-actions a[href="/explore"]')).toHaveCount(0);
 });
+
+/*
+  An action may not point at its own page (PR #235 review R1, S2: the self-link guard kept, its test restored). On the
+  start's own page the header offers no start, and Sign in stays. /ko/contact is a 308 to /contact since GX-02.
+*/
+test("the header hides its start on the start's own page", async ({ page }, testInfo) => {
+  test.skip(!["1440", "1920"].includes(testInfo.project.name), "the header actions show from 1250px");
+  test.skip(HEADER_START.href !== "/contact", "live posture: the start is /login, which has no public header");
+  for (const path of ["/contact", "/ko/contact"]) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/contact$/);
+    await expect(page.locator("header.nav .nav-actions a.nav-signin")).toBeVisible();
+    await expect(page.locator('header.nav .nav-actions a[data-analytics="header-start"]'), `${path}: no self-link`).toHaveCount(0);
+    await expect(page.locator(`header.nav .nav-actions a[href="${HEADER_START.href}"]`)).toHaveCount(0);
+  }
+});

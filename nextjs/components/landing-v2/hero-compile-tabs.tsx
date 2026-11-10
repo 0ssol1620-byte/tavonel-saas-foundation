@@ -16,10 +16,15 @@ import styles from "./hero-compile-tabs.module.css";
   - >= 900px, motion allowed: the cut's live canvas, mounted once the slot is in view, the next cut's chunk prefetched.
   - < 900px, motion allowed: the same desktop cut as a pre-rendered video at full width (founder 2026-11-10: the 4:5
     phone composition read as missing content). No live canvas below ~900px (the founder's phone rule).
-  - reduced motion: the cut's poster, no autoplay; the tabs still switch.
-  The tabs autoplay the four cuts in order, one FILM_DURATION each, with a progress bar in the active tab. A click (or
-  arrow key) on a tab jumps to that cut and stops the advance; that cut then loops. Playback pauses while the slot is
-  offscreen or the document is hidden.
+  - reduced motion, Save-Data or prefers-reduced-data: the cut's poster, no autoplay, until the visitor presses Play
+    (the phone's cut is 0.2-1.4 MB of video); the tabs still switch.
+  The tabs autoplay the four cuts in order, one FILM_DURATION each, with a progress bar in the active tab. A click, an
+  arrow key, or keyboard focus entering the tablist stops the rotation (the APG carousel rule): the chosen cut plays to
+  its end once and holds there. Playback also pauses while the slot is offscreen or the document is hidden.
+
+  WCAG 2.2.2 (PR #235 review R1, B1; the precedent is compile-stage-player.tsx's motion control): Pause / Play beside
+  the tabs. Pausing takes the reduced-motion path -- the poster, no advance, playing=false -- rather than a second
+  mechanism per renderer, because the wide renderer is a canvas rAF loop with no pause() to call.
 
   Posters and videos are frames of these same components, captured from their own clock (scripts/film/hero-tabs.mjs).
 */
@@ -53,12 +58,18 @@ type Mode = "poster" | "canvas" | "video";
 const WIDE = "(min-width: 900px)";
 const POSTER_SIZES = "(min-width: 1280px) 1200px, 100vw";
 const REDUCED = "(prefers-reduced-motion: reduce)";
+const REDUCED_DATA = "(prefers-reduced-data: reduce)";
 
 export default function HeroCompileTabs({ korean = false }: { korean?: boolean }) {
   const base = useId();
   const [active, setActive] = useState(0);
   const [auto, setAuto] = useState(true);
-  const [mode, setMode] = useState<Mode>("poster");
+  const [wide, setWide] = useState(false);
+  // Until the effect below has read the preferences the slot is the poster: server render and first paint agree.
+  const [hold, setHold] = useState(true);
+  const [paused, setPaused] = useState(false);
+  // Only the control lifts a reduced-motion or Save-Data hold; nothing else overrides the visitor's preference.
+  const [playRequested, setPlayRequested] = useState(false);
   const [inView, setInView] = useState(false);
   const [visible, setVisible] = useState(true);
   const [seen, setSeen] = useState(false);
@@ -69,11 +80,13 @@ export default function HeroCompileTabs({ korean = false }: { korean?: boolean }
   const tabsRef = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
-    const wide = window.matchMedia(WIDE);
+    const wideQuery = window.matchMedia(WIDE);
     const reduced = window.matchMedia(REDUCED);
-    const pick = () => setMode(reduced.matches ? "poster" : wide.matches ? "canvas" : "video");
+    const reducedData = window.matchMedia(REDUCED_DATA);
+    const saveData = Boolean((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData);
+    const pick = () => { setWide(wideQuery.matches); setHold(reduced.matches || reducedData.matches || saveData); };
     pick();
-    wide.addEventListener("change", pick);
+    wideQuery.addEventListener("change", pick);
     reduced.addEventListener("change", pick);
     const onVisibility = () => setVisible(document.visibilityState === "visible");
     onVisibility();
@@ -82,7 +95,7 @@ export default function HeroCompileTabs({ korean = false }: { korean?: boolean }
     const observer = root ? new IntersectionObserver(([entry]) => setInView(Boolean(entry?.isIntersecting)), { threshold: 0.2 }) : null;
     if (root) observer?.observe(root);
     return () => {
-      wide.removeEventListener("change", pick);
+      wideQuery.removeEventListener("change", pick);
       reduced.removeEventListener("change", pick);
       document.removeEventListener("visibilitychange", onVisibility);
       observer?.disconnect();
@@ -91,11 +104,13 @@ export default function HeroCompileTabs({ korean = false }: { korean?: boolean }
 
   useEffect(() => { if (inView) setSeen(true); }, [inView]);
 
+  const still = paused || (hold && !playRequested);
+  const mode: Mode = still ? "poster" : wide ? "canvas" : "video";
   const playing = mode !== "poster" && inView && visible;
   // The canvas mounts lazily: not before the slot has been in view once.
   const live = mode === "canvas" && seen;
 
-  // While a cut plays, fetch the next one: its chunk on a wide screen, its video's first bytes on a phone.
+  // While a cut plays, fetch the next one: its chunk on a wide screen, its poster on a phone.
   useEffect(() => {
     if (!playing) return;
     const next = (active + 1) % FILMS.length;
@@ -110,17 +125,28 @@ export default function HeroCompileTabs({ korean = false }: { korean?: boolean }
     else video.pause();
   }, [playing, active, round, mode]);
 
+  // A held cut (chosen, or the tablist has focus) plays once and stops on its last frame, which the poster is.
   const advance = useCallback(() => {
-    if (!auto) { setRound((r) => r + 1); return; }
+    if (!auto) { setPaused(true); return; }
     setActive((a) => (a + 1) % FILMS.length);
     setRound((r) => r + 1);
   }, [auto]);
 
+  // Choosing a tab asks for that cut, so it plays (unless a reduced-motion or Save-Data hold stands); it does not rotate on.
   const choose = (index: number) => {
     setAuto(false);
+    setPaused(false);
     setActive(index);
     setRound((r) => r + 1);
   };
+
+  const toggleMotion = () => {
+    if (still) { setPaused(false); setPlayRequested(true); setRound((r) => r + 1); }
+    else setPaused(true);
+  };
+  const motionLabel = still
+    ? korean ? "컴파일 영상 재생" : "Play the compile film"
+    : korean ? "컴파일 영상 일시정지" : "Pause the compile film";
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const last = HERO_TABS.length - 1;
@@ -143,7 +169,8 @@ export default function HeroCompileTabs({ korean = false }: { korean?: boolean }
   const panelId = `${base}-panel`;
   return (
     <figure ref={rootRef} className={styles.tabs} data-testid="hero-compile-tabs" data-mode={mode} data-playing={playing ? "1" : "0"}>
-      <div role="tablist" aria-label={korean ? "컴파일 과정" : "How a compile runs"} className={styles.list} onKeyDown={onKeyDown}>
+      <div role="tablist" aria-label={korean ? "컴파일 과정" : "How a compile runs"} className={styles.list} onKeyDown={onKeyDown}
+        onFocus={() => setAuto(false)}>
         {HERO_TABS.map((tab, index) => {
           const on = index === active;
           return (
@@ -192,6 +219,12 @@ export default function HeroCompileTabs({ korean = false }: { korean?: boolean }
           />
         </picture>
         {live ? <div className={styles.live}><Film key={`${active}-${round}`} {...FILM_PROPS} playing={playing} /></div> : null}
+        <button type="button" className={styles.motion} onClick={toggleMotion} aria-label={motionLabel}
+          data-motion-control={still ? "play" : "pause"}>
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+            {still ? <path d="M2.5 1.5v9l7.5-4.5z" fill="currentColor" /> : <path d="M2.5 1.5h2.5v9H2.5zM7 1.5h2.5v9H7z" fill="currentColor" />}
+          </svg>
+        </button>
         {mode === "video" ? (
           <video
             key={`${active}-${round}`}

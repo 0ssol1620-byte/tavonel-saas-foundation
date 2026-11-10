@@ -1055,6 +1055,19 @@ describe("current-main bounded evaluation entry", () => {
     expect(access).not.toContain('href="/pricing"');
   });
 
+  // PR #235 review R1, S3: the CTA-order arms stay distinct on Home -- the control draws the entry first, arm B the sample.
+  it("keeps the CTA-order arms distinct on Home", () => {
+    const arm = (ctaOrderVariant: "a" | "b") => renderToStaticMarkup(createElement(HeroActions, {
+      exploreLabel: "Explore", exploreHref: "/explore", startLabel: "Evaluate documents", startHref: "/evaluation", scene: "1", entry: true, ctaOrderVariant,
+    }));
+    const [a, b] = [arm("a"), arm("b")];
+    expect(a).not.toBe(b);
+    expect(a).toContain("lv2-entry");
+    expect(a.indexOf('href="/evaluation"')).toBeLessThan(a.indexOf('href="/explore"'));
+    expect(b).not.toContain("lv2-entry");
+    expect(b.indexOf('href="/explore"')).toBeLessThan(b.indexOf('href="/evaluation"'));
+  });
+
   it.each(["en", "ko"] as const)("%s offers the blank localized worksheet without uploading documents", locale => {
     const html = renderToStaticMarkup(createElement(EvaluationPage, { korean: locale === "ko" }));
     expect(html).toContain(`lang="${locale}"`);

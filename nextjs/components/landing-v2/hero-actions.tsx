@@ -26,10 +26,14 @@ export default function HeroActions(props: HeroActionsProps) {
     : { label: props.pricingLabel, href: props.pricingHref ?? "/pricing", cta: "pricing" as const };
   /*
     Founder 2026-11-10: on Home the document entry (the drop zone) is the hero's primary action and the public sample is
-    the secondary link under it ("Open the compiled sample" in the header read as "enter the dashboard"). Elsewhere, and
-    in the CTA-order experiment arms, the order is the variant's.
+    the secondary link under it ("Open the compiled sample" in the header read as "enter the dashboard").
+    The CTA-order experiment (lib/landing-experiments.ts, off on every deployment) keeps two distinct arms: on Home its
+    control is now this entry-first order and arm B is the order Home had before 2026-11-10, sample first. Elsewhere arm B
+    puts the access action first, as before. A series keyed on data-analytics="hero-primary" changes meaning on Home from
+    2026-11-10: it was the sample and is now the document entry (PR #235 review R1, S3).
   */
-  const [primary, secondary] = entry || ctaOrderVariant === "b" ? [access, explore] : [explore, access];
+  const accessFirst = entry ? ctaOrderVariant !== "b" : ctaOrderVariant === "b";
+  const [primary, secondary] = accessFirst ? [access, explore] : [explore, access];
   const entryRef = useRef<HTMLAnchorElement>(null);
   const drawsEntry = entry && primary === access;
   // While files are dragged over the page the entry says it is where they go (CRITIQUE-R1 #5); it says nothing else.
