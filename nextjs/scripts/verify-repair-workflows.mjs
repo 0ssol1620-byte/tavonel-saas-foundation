@@ -1013,6 +1013,14 @@ assert(VITEST_DISCOVERY_CONFIG_PATH==='nextjs/vitest.config.ts'&&discoveryOwners
     && ['nextjs/lib/compile-limits.ts', 'nextjs/lib/compile-limits.test.ts'].every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && copyOwners[0].match.test(p))
     && ['nextjs/lib/compile-limits-v2.ts', 'nextjs/lib/corpus-batching.ts'].every(p => !copyOwners[0].match.test(p)),
     'large-source-intake-copy owner must keep its two exact paths, two direct suites and no neighbour admission');
+  // The intake quote and the capability manifest that state the segmented page ceiling: one exact owner, nothing adjacent.
+  const ceilingOwners = AFFECTED_GROUPS.filter(o => o.group === 'large-source-intake-ceiling');
+  assert(ceilingOwners.length === 1
+    && JSON.stringify(ceilingOwners[0].unitFiles) === JSON.stringify(['lib/capability-manifest-route.test.ts', 'lib/production-posture.test.ts', 'lib/usage-pricing.test.ts'])
+    && !ceilingOwners[0].browserFiles.length && !ceilingOwners[0].databaseTests.length && !ceilingOwners[0].nativeReuse
+    && ['nextjs/lib/usage-pricing.ts', 'shared/capabilityManifest.ts'].every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && ceilingOwners[0].match.test(p))
+    && ['nextjs/lib/usage-pricing-v2.ts', 'shared/capabilityManifest.test.ts'].every(p => !ceilingOwners[0].match.test(p)),
+    'large-source-intake-ceiling owner must keep its two exact paths, three direct suites and no neighbour admission');
 }
 console.log(`Workflow static gates pass. Full qualification still pending for exact CI/Launch runs at this head.`);
 

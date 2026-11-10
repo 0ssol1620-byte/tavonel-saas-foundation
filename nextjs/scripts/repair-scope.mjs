@@ -3008,6 +3008,11 @@ export const W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES = Object.freeze(['lib/intake
 // never nativeReuse. No browser, database or worker lane.
 export const LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS = Object.freeze(['nextjs/lib/compile-limits.test.ts', 'nextjs/lib/compile-limits.ts']);
 export const LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES = Object.freeze(['lib/compile-limits.test.ts', 'lib/workspace-existing-compile.test.ts']);
+// Large-source intake ceiling (ADR-0006, site half): the intake quote that approves a counted PDF or DOCX up to 500 pages and an
+// uncounted file at 80, and the capability manifest whose page tokens and labels state both. Product code, so never nativeReuse.
+// No browser, database or worker lane: the approval CHECKs are their own migration owner.
+export const LARGE_SOURCE_INTAKE_CEILING_AFFECTED_PATHS = Object.freeze(['nextjs/lib/usage-pricing.ts', 'shared/capabilityManifest.ts']);
+export const LARGE_SOURCE_INTAKE_CEILING_AFFECTED_UNIT_FILES = Object.freeze(['lib/capability-manifest-route.test.ts', 'lib/production-posture.test.ts', 'lib/usage-pricing.test.ts']);
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
 // ops-backlog-sli-20261110 (GA ops gap 4): the B35 evaluator gains a compile backlog age. Its own suite and both routes that call it.
@@ -3297,6 +3302,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // large-source-intake-copy (ADR-0006): the 2 exact paths above select 2 direct suites and no browser suite.
   affectedGroup('large-source-intake-copy', new RegExp(`^(?:${exactPathAlternation(LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS)})$`),
     { unitFiles: LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES }),
+  // large-source-intake-ceiling (ADR-0006): the 2 exact repo-relative paths above select 3 direct suites and no browser suite.
+  affectedGroup('large-source-intake-ceiling', new RegExp(`^(?:${exactPathAlternation(LARGE_SOURCE_INTAKE_CEILING_AFFECTED_PATHS)})$`),
+    { unitFiles: LARGE_SOURCE_INTAKE_CEILING_AFFECTED_UNIT_FILES }),
 ]);const regularModes = ['100644', '100755'];
 
 export function parseAffectedRawDiff(output) {
