@@ -7,6 +7,13 @@ export const MAX_SOURCE_BYTES = 5 * 1024 * 1024;
  * with TAVONEL_INTAKE_CEILING_STAGE=1. Both copies are pinned by intake-ceiling-cross-tree.test.ts.
  */
 export const STAGE_1_MAX_SOURCE_BYTES = 25 * 1024 * 1024;
+/**
+ * Large-source bytes (docs/adr/0006-segmented-large-sources.md), read only with
+ * FOUNDATION_SOURCE_TRANSPORT=presigned, where the worker never holds the source and the CDR reads
+ * it from R2. A target to be measured on the deployed services, not a measurement; pinned with the
+ * CDR's LARGE_SOURCE_MAX_INPUT_BYTES by intake-ceiling-cross-tree.test.ts.
+ */
+export const LARGE_SOURCE_MAX_BYTES = 50 * 1024 * 1024;
 
 export type IntakeCeilingStage = "0" | "1";
 

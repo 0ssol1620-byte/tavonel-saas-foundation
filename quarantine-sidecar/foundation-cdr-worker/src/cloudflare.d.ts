@@ -8,6 +8,7 @@ interface R2ObjectBody {
   readonly size: number;
   readonly httpMetadata?: { contentType?: string; contentDisposition?: string };
   readonly customMetadata?: Record<string, string>;
+  readonly body: ReadableStream<Uint8Array>;
   arrayBuffer(): Promise<ArrayBuffer>;
 }
 
