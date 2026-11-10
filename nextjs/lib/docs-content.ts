@@ -27,6 +27,7 @@ import {
   refundablePageAllowance,
 } from "./billing-catalog";
 import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "./intake-approval-rollout";
+import { remoteMcpEnabled } from "./remote-mcp";
 
 /*
   The documentation, as data.
@@ -1214,13 +1215,16 @@ console.log("compile job:", accepted.jobId);` },
       { kind: "note", text: "list_worlds lists only active Worlds, over `GET /v1/collections`. Candidates are excluded: a discovery list mixing accepted and unaccepted output would present both as organizational truth." },
       { kind: "note", text: "download_package returns a descriptor rather than the archive: the URL, the size, the signed manifest digest and the signing key id. The bytes are fetched over HTTP with the same key and checked with the verifier on the CLI page." },
       /*
-        G11 REMOTE-MCP (DECISION-REGISTER S6-09, S6-10). The endpoint is built behind
-        TAVONEL_REMOTE_MCP_ENABLED, which production leaves unset, so this subsection leads with
-        that fact: a reader must not take the URL below for something tavonel.com answers.
+        G11 REMOTE-MCP (DECISION-REGISTER S6-09, S6-10). Whether this site serves the endpoint is
+        TAVONEL_REMOTE_MCP_ENABLED, read here the way the workspace's Connect AI panel reads it. The
+        docs pages are built with the deployment's env, and that env only changes with a new build
+        (RELEASE_ORDER.md, W1-A1), so the sentence below is the endpoint's own state, never a guess.
       */
-      { kind: "heading", text: "Remote MCP endpoint (not enabled in production)" },
-      { kind: "note", text: "**Not enabled in production.** The remote endpoint is built and tested behind a rollout switch that is off on tavonel.com, so every URL in this subsection answers 404 there. Until the switch is on, connect through the stdio server above." },
-      { kind: "note", text: "**Pilot workspaces only, once it is on.** The remote endpoint opens to a named pilot cohort of at most three workspaces: consent, the token exchange and every tool call are refused with 403 REMOTE_MCP_COHORT_EXCLUDED for a workspace outside it, and with 503 REMOTE_MCP_COHORT_CONFIG_INVALID — admitting nobody — if the deployment's cohort is unset or malformed." },
+      { kind: "heading", text: "Remote MCP endpoint" },
+      ...(remoteMcpEnabled() ? [] : [
+        { kind: "note" as const, text: "**Not switched on for this site.** The remote endpoint is built and tested behind a rollout switch that is off here, so every URL in this subsection answers 404. Until the switch is on, connect through the stdio server above." },
+      ]),
+      { kind: "note", text: "**Who can connect.** A member of a workspace on a paid plan. A free evaluation connects only where trial AI access is on, with one live key or connection at a time and the trial's daily query bound, and is otherwise refused with 402 TRIAL_FEATURE_NOT_INCLUDED. During a canary the endpoint admits named workspaces only and refuses the rest with 403 REMOTE_MCP_COHORT_EXCLUDED. A deployment whose cohort setting is unset or malformed admits nobody and answers 503 REMOTE_MCP_COHORT_CONFIG_INVALID." },
       { kind: "prose", text: `With the switch on, the same ${MCP_TOOL_COUNT_WORD} read-only tools are served over MCP Streamable HTTP, protocol revision 2025-06-18, at /api/mcp — for clients that connect by URL instead of launching a local process, such as ChatGPT connectors and other web agents. The tool table is the stdio server's own file, so the two cannot list different tools, and neither has a write tool. initialize and tools/list answer without a token; every tools/call needs one.` },
       { kind: "note", text: "Only the JSON response form of Streamable HTTP is served: each POST carries one JSON-RPC message and gets one JSON body back. There is no SSE stream (GET /api/mcp answers 405) and no Mcp-Session-Id, both of which the transport allows a server to omit. A client that insists on either will not connect." },
       { kind: "heading", text: "Connecting Claude, ChatGPT or a web agent" },
@@ -1236,6 +1240,54 @@ console.log("compile job:", accepted.jobId);` },
           "The client receives an access token and lists the tools. Ask it to run list_worlds first, then search_world or ask_world with a collection id from that list.",
         ],
       },
+      /*
+        Funnel 2026-11-09: a coding agent that takes a URL and a header does not need the OAuth
+        round trip. checkBearer (lib/remote-mcp.ts) accepts a hand-made tvnl_live_ key at /api/mcp
+        when it holds only the read scopes, so these blocks are that path. Each client's config
+        shape is from its own documentation, and none has been run against tavonel.com yet.
+      */
+      { kind: "heading", text: "Claude Code and Cursor" },
+      { kind: "prose", text: "Claude Code and Cursor take the URL directly. Use OAuth, or skip it and send an API key in the Authorization header. A key for this endpoint must hold only the five read scopes: documents:read, collections:read, worlds:read, ask:read and collections:download. Under Workspace › Developers, choose Use MCP read-only scopes before you create it, because a key with any other scope is refused at /api/mcp with 401. Keep the key in the environment variable TAVONEL_API_KEY and let the client expand it, so it never sits in a file you commit. Claude Desktop connects to a URL only through Settings › Connectors, with OAuth, as in the steps above." },
+      {
+        kind: "code",
+        label: "Claude Code, .mcp.json with an API key",
+        language: "json",
+        body: [
+          "{",
+          "  \"mcpServers\": {",
+          "    \"tavonel\": {",
+          "      \"type\": \"http\",",
+          "      \"url\": \"https://tavonel.com/api/mcp\",",
+          "      \"headers\": { \"Authorization\": \"Bearer ${TAVONEL_API_KEY}\" }",
+          "    }",
+          "  }",
+          "}",
+        ].join("\n"),
+      },
+      {
+        kind: "code",
+        label: "Claude Code, OAuth",
+        language: "bash",
+        body: [
+          "claude mcp add --transport http tavonel https://tavonel.com/api/mcp",
+          "# then run /mcp inside Claude Code and choose tavonel to sign in",
+        ].join("\n"),
+      },
+      {
+        kind: "code",
+        label: "Cursor, .cursor/mcp.json with an API key",
+        language: "json",
+        body: [
+          "{",
+          "  \"mcpServers\": {",
+          "    \"tavonel\": {",
+          "      \"url\": \"https://tavonel.com/api/mcp\",",
+          "      \"headers\": { \"Authorization\": \"Bearer ${env:TAVONEL_API_KEY}\" }",
+          "    }",
+          "  }",
+          "}",
+        ].join("\n"),
+      },
       { kind: "heading", text: "The OAuth flow" },
       {
         kind: "table",
@@ -1243,12 +1295,12 @@ console.log("compile job:", accepted.jobId);` },
         rows: [
           ["Discovery", "GET /.well-known/oauth-protected-resource/api/mcp, GET /.well-known/oauth-authorization-server", "RFC 9728 resource metadata and RFC 8414 authorization server metadata."],
           ["Registration", "POST /api/mcp/oauth/register", "RFC 7591 dynamic registration. Public clients only, with no client secret; redirect URIs are https or a loopback http address."],
-          ["Consent", "/oauth/authorize", "Authorization code with PKCE S256, required. A signed-in workspace member allows or denies. A free evaluation cannot connect, the same rule as for API keys."],
+          ["Consent", "/oauth/authorize", "Authorization code with PKCE S256, required. A signed-in workspace member allows or denies. A free evaluation connects only where trial AI access is on, the same rule as for API keys."],
           ["Token", "POST /api/mcp/oauth/token", "The code and its verifier become an access token scoped to documents:read, collections:read, worlds:read, ask:read and collections:download. It expires after an hour and no refresh token is issued, so the client asks again."],
-          ["Tool calls", "POST /api/mcp", "Bearer token on every tools/call: 401 without one, or with one that is expired, revoked or able to write; 403 REMOTE_MCP_COHORT_EXCLUDED outside the pilot cohort and API_SCOPE_REQUIRED for a scope the token does not hold; 503 when the cohort configuration cannot be read."],
+          ["Tool calls", "POST /api/mcp", "Bearer token on every tools/call. 401 without one, or with one that is expired, revoked or holds any scope outside the five read scopes. 403 REMOTE_MCP_COHORT_EXCLUDED outside a canary cohort, and API_SCOPE_REQUIRED for a scope the token does not hold. 503 when the cohort configuration cannot be read."],
         ],
       },
-      { kind: "note", text: "The access token is a developer API key minted for the connection, in its own form (tvnl_mcp_…): it works through /api/mcp only, and the REST API refuses it with 401 API_KEY_AUDIENCE_INVALID. It is listed under Workspace › Developers with the client's name, apart from the keys you make by hand, and can be revoked there. Reconnecting the same client replaces its earlier key. The remote endpoint refuses any key that carries a write scope. Rate limits and tenant scoping are the API's own, per key and per scope." },
+      { kind: "note", text: "The access token is a developer API key minted for the connection, in its own form (tvnl_mcp_…): it works through /api/mcp only, and the REST API refuses it with 401 API_KEY_AUDIENCE_INVALID. It is listed under Workspace › Developers with the client's name, apart from the keys you make by hand, and can be revoked there. Reconnecting the same client replaces its earlier key. The remote endpoint refuses any key that holds a scope outside the five read scopes. Rate limits and tenant scoping are the API's own, per key and per scope." },
       { kind: "heading", text: "Verifying an answer" },
       { kind: "prose", text: "Where signed answer receipts are on, an ask_world or POST /collections/{id}/ask answer carries signedReceipt: an Ed25519 signature, under its own scope tavonel.signed_answer_receipt.v1, over the collection, the World state, the manifest digest, the sha256 of the question (never its text), the status, the cited evidence ids and the answer's output digest. Save the whole answer as JSON, fetch the trust store from /api/export/trust, and run `node tavonel-verify-answer.mjs --receipt answer.json --trust-store trust.json`, adding `--question-file question.txt` to check the question too. It recomputes the output digest from the answer text and citations, so an answer edited after signing fails. The trust store is required, since it is where a revoked key is named; `--trusted-fingerprint sha256:…` may be added as a pin. A receipt stays valid if its key was valid when it signed: a key that later expired or was retired still verifies its earlier receipts, a revoked key verifies none, and a signing time in the future or a payload time that is not the signing time is refused. An answer that cannot be signed while receipts are on is withheld with 503 ANSWER_SIGNING_UNAVAILABLE, never sent unsigned." },
     ],

@@ -89,7 +89,7 @@ import { GET as protectedResource } from "../app/.well-known/oauth-protected-res
 import { GET as authorizationServer } from "../app/.well-known/oauth-authorization-server/route";
 import OAuthAuthorizeLayout from "../app/oauth/authorize/layout";
 import { TOOLS } from "../public/developer/tavonel-mcp.mjs";
-import { REMOTE_MCP_SCOPES, REMOTE_MCP_TOOL_SCOPES, requestOrigin, summarizeRemoteMcpSli, toolFailureCode } from "./remote-mcp";
+import { REMOTE_MCP_SCOPES, REMOTE_MCP_TOOL_SCOPES, remoteMcpCohortRefusal, requestOrigin, summarizeRemoteMcpSli, toolFailureCode } from "./remote-mcp";
 import { POST as createKeyRoute } from "../app/api/developer/keys/route";
 import { insideRemoteMcpDispatch } from "./remote-mcp-dispatch";
 
@@ -268,7 +268,7 @@ describe("credential failures stop before any route runs", () => {
     const challenges = outcomes.map((response) => response.headers.get("www-authenticate") ?? "");
     for (const challenge of challenges) expect(challenge).toContain('error="invalid_token"');
     expect(challenges[1]).toContain("expired");
-    expect(challenges[3]).toContain("write scope");
+    expect(challenges[3]).toContain("holds a scope outside the read-only MCP scopes");
     // A present-but-bad token is refused even for discovery.
     mocks.authenticateKey.mockResolvedValueOnce({ ok: false, code: "API_KEY_INVALID" });
     expect((await rpc({ jsonrpc: "2.0", id: 2, method: "tools/list" }, { authorization: "Bearer tvnl_live_unknown" })).status).toBe(401);
@@ -916,5 +916,94 @@ describe("review R1: audience, failures, cohort, key churn, trial", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+/*
+  General availability (2026-11-09): TAVONEL_REMOTE_MCP_COHORT=all drops the workspace list and
+  nothing else. Each failure path below is the one that still has to hold once the list is gone.
+*/
+describe("GA: the cohort value all admits every workspace and keeps every other check", () => {
+  const args = { collectionId: THEIR_COLLECTION };
+  beforeEach(() => vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", "all"));
+
+  it("admits a workspace no list names: consent, token and a tool call", async () => {
+    expect(remoteMcpCohortRefusal("pilot-zz9", { TAVONEL_REMOTE_MCP_COHORT: "all" })).toBeNull();
+    const clientId = await registeredClient();
+    const minted = await exchange({ grant_type: "authorization_code", code: await approvedCode(clientId), client_id: clientId, code_verifier: VERIFIER });
+    expect(minted.status).toBe(200);
+    expect(mocks.createKey).toHaveBeenCalledTimes(1);
+    mocks.listWorlds.mockResolvedValueOnce({ ok: true, worlds: [], nextCursor: null });
+    expect((await call("list_worlds", {}, "tvnl_live_mine")).status).toBe(200);
+  });
+
+  it("is exact: any other spelling, or all beside a workspace, admits nobody", async () => {
+    for (const value of ["ALL", " all", "all ", "*", "all,pilot-alpha", "pilot-alpha,all"]) {
+      vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", value);
+      const called = await call("get_world", args, "tvnl_live_mine");
+      expect([called.status, (await called.json()).error.message], value).toEqual([503, "REMOTE_MCP_COHORT_CONFIG_INVALID"]);
+    }
+    // A principal whose workspace key is not a workspace key is never admitted by all.
+    expect(remoteMcpCohortRefusal("not-a-workspace", { TAVONEL_REMOTE_MCP_COHORT: "all" })).toBe("REMOTE_MCP_COHORT_EXCLUDED");
+    expect(mocks.authorize).not.toHaveBeenCalled();
+  });
+
+  it("a disabled switch is still a 404 everywhere", async () => {
+    vi.stubEnv("TAVONEL_REMOTE_MCP_ENABLED", "");
+    expect((await rpc({ jsonrpc: "2.0", id: 1, method: "tools/list" })).status).toBe(404);
+    expect((await call("list_worlds", {}, "tvnl_live_mine")).status).toBe(404);
+    expect((await exchange({ grant_type: "authorization_code" })).status).toBe(404);
+    expect(mocks.authenticateKey).not.toHaveBeenCalled();
+  });
+
+  it("a revoked key is a 401 before any route runs", async () => {
+    mocks.authenticateKey.mockResolvedValueOnce({ ok: false, code: "API_KEY_INVALID" });
+    const revoked = await call("list_worlds", {}, "tvnl_live_mine");
+    expect(revoked.status).toBe(401);
+    expect(revoked.headers.get("www-authenticate")).toContain('error="invalid_token"');
+    expect(mocks.authorize).not.toHaveBeenCalled();
+  });
+
+  it("a key for one workspace still reads nothing of another", async () => {
+    const response = await call("get_world", args, "tvnl_live_mine");
+    const { result } = await response.json() as { result: { isError: boolean; content: Array<{ text: string }> } };
+    expect([response.status, result.isError]).toEqual([200, true]);
+    expect(result.content[0]!.text).toMatch(/^API_ERROR_404/);
+    for (const called of mocks.readModel.mock.calls) expect(called).toContain(MINE);
+  });
+
+  it("an over-limit key gets the route's 429 as the tool result, and the route is not run past it", async () => {
+    mocks.authorize.mockResolvedValueOnce({ ok: false, code: "API_RATE_LIMITED", status: 429 });
+    const response = await call("list_worlds", {}, "tvnl_live_mine");
+    const { result } = await response.json() as { result: { isError: boolean; content: Array<{ text: string }> } };
+    expect([response.status, result.isError]).toEqual([200, true]);
+    expect(result.content[0]!.text).toMatch(/^API_ERROR_429: API_RATE_LIMITED/);
+    expect(mocks.listWorlds).not.toHaveBeenCalled();
+  });
+
+  it("a free evaluation still gets no token while trial AI access is off", async () => {
+    const clientId = await registeredClient();
+    const code = await approvedCode(clientId);
+    mocks.sessionProduct.mockResolvedValueOnce({ ok: true, access: { source: "trial", accessPlan: "observer_access", billingExempt: false, expiresAt: null } });
+    const response = await exchange({ grant_type: "authorization_code", code, client_id: clientId, code_verifier: VERIFIER });
+    expect([response.status, (await response.json()).code]).toEqual([402, "TRIAL_FEATURE_NOT_INCLUDED"]);
+    expect(mocks.createKey).not.toHaveBeenCalled();
+  });
+});
+
+describe("a hand-made key can be made to work at /api/mcp", () => {
+  it("the Developers panel offers the exact scopes checkBearer accepts, and a key holding them is admitted", async () => {
+    const { CONNECT_AI_SCOPES } = await import("../components/workspace/connect-ai-panel");
+    expect([...CONNECT_AI_SCOPES].sort()).toEqual([...REMOTE_MCP_SCOPES]);
+    const panel = readFileSync(resolve(import.meta.dirname, "../components/developer-panel.tsx"), "utf8");
+    expect(panel).toContain("onClick={() => setScopes([...CONNECT_AI_SCOPES])}");
+    mocks.authenticateKey.mockResolvedValueOnce(keyPrincipal([...CONNECT_AI_SCOPES]));
+    mocks.listWorlds.mockResolvedValueOnce({ ok: true, worlds: [], nextCursor: null });
+    expect((await call("list_worlds", {}, "tvnl_live_preset")).status).toBe(200);
+    // One scope more, a connector read, and the same key is refused before any route runs.
+    mocks.authenticateKey.mockResolvedValueOnce(keyPrincipal([...CONNECT_AI_SCOPES, "connections:read"]));
+    const refused = await call("list_worlds", {}, "tvnl_live_wider");
+    expect(refused.status).toBe(401);
+    expect(refused.headers.get("www-authenticate")).toContain("holds a scope outside the read-only MCP scopes");
   });
 });

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { API_VERSION } from "./api-version";
 import { COMPILE_MAX_DOCUMENTS, COMPILE_MIN_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 import { DEVELOPER_SCOPES } from "./developer-contracts";
@@ -599,10 +599,33 @@ describe("backslashes in the documentation", () => {
 
   it("shows an MCP args placeholder that is not a machine path", () => {
     const configs = DOCS_SECTIONS.flatMap((section) => section.blocks.flatMap((block) => (block.kind === "code" && block.body.includes("mcpServers") ? [block.body] : [])));
-    expect(configs.length).toBeGreaterThan(1);
+    // A stdio config launches the downloaded file. A remote config (2026-11-09) names the hosted URL instead.
+    const stdio = configs.filter((body) => body.includes('"command"'));
+    const remote = configs.filter((body) => !body.includes('"command"'));
+    expect(stdio.length).toBeGreaterThan(1);
+    expect(remote.length).toBeGreaterThan(0);
+    for (const body of stdio) expect(body).toContain('"args": ["/absolute/path/to/tavonel-mcp.mjs"]');
+    for (const body of remote) expect(body).toContain('"url": "https://tavonel.com/api/mcp"');
     for (const body of configs) {
-      expect(body).toContain('"args": ["/absolute/path/to/tavonel-mcp.mjs"]');
       expect(body).not.toMatch(/\b[A-Za-z]:[\\/]|\/Users\/|\/home\//);
     }
   });
+});
+
+describe("/docs/mcp says what this deployment serves", () => {
+  afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
+  // The docs are built with the deployment's env, the same TAVONEL_REMOTE_MCP_ENABLED the endpoint reads.
+  for (const [value, off] of [["", true], ["false", true], ["true", false]] as const) {
+    it(`TAVONEL_REMOTE_MCP_ENABLED=${JSON.stringify(value)} ${off ? "keeps" : "drops"} the not-switched-on note`, async () => {
+      vi.stubEnv("TAVONEL_REMOTE_MCP_ENABLED", value);
+      vi.resetModules();
+      const { findDocsSection } = await import("./docs-content");
+      const text = JSON.stringify(findDocsSection("mcp")!.blocks);
+      expect(text.includes("Not switched on for this site."), value).toBe(off);
+      // Either way the page never promises a package that does not exist, and names the real endpoint.
+      expect(text).toContain("There is no npm or PyPI package yet.");
+      expect(text).toContain("https://tavonel.com/api/mcp");
+      expect(text).toContain("Bearer ${TAVONEL_API_KEY}");
+    });
+  }
 });

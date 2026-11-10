@@ -363,7 +363,7 @@ migration은 additive다. 기존 행은 전부 `live`가 되고, create RPC의 �
       남긴다. preview build는 과금되므로 founder 승인 후에만 한다.
 - [ ] 실제 Claude와 ChatGPT 연결 receipt: 각 vendor client가 public https URL로 OAuth와 MCP handshake를 끝낸 기록.
       모델 ID나 client 버전은 receipt에 고정한다.
-- [ ] `/api/mcp*`(OAuth register, authorize, token 경로 포함)에 IP별 rate limit을 둔다(리뷰 R2가 요구한 전제).
+- [ ] `/api/mcp*`(OAuth register, authorize, token 경로 포함)에 IP별 rate limit을 둔다(리뷰 R2가 요구한 전제). 2026-11-09: Vercel Firewall 규칙 두 개로 둔다(아래 "원격 MCP production 활성화" 절).
 - [ ] production에 `TAVONEL_REMOTE_MCP_COHORT`(1–3개)와 `FOUNDATION_WORKER_SECRET`(32자 이상)이 설정되어 있다.
       값은 출력하지 않고, 설정되어 있다는 사실만 확인한다.
 - [ ] migration `20261105000000`이 production DB에 적용되어 있다(위 배포 순서).
@@ -701,3 +701,113 @@ compile이 24 MiB를 넘는 `ocr.json`을 `JSON_TOO_LARGE`로 거부하게 둔�
    `inheritedFrom`이 head여야 한다. 다르면 그 표면을 거절하고(위 "거절") 원인을 찾는다.
 
 어느 단계든 막히면 지금까지의 순서(배포 → main CI → 병합 SHA의 행)로 돌아간다. 그때는 닫히는 시간이 다시 생긴다.
+
+## 추가 2026-11-09 — 원격 MCP production 활성화 (유료·trial 고객)
+
+### 왜 꺼져 있었나
+
+보안 결함 때문이 아니다. 부록 A(`docs/policy/DECISION_LOG_2026-11-08.md`)가 `TAVONEL_REMOTE_MCP_ENABLED`를 "A1.3 canary
+전제(F-1 값 포함) 충족 뒤"로 정했고, 위 "A1.3 canary 전제 조건" 체크리스트가 비어 있었다. 열린 항목은 rollout 사다리의
+절차(preview rollback drill, 실제 client 연결 receipt, env와 migration 확인)와 IP별 rate limit 하나다. 리뷰 R1·R2의
+결함 항목(M1–M7, N1)은 #190에서 닫혔다. 그래서 stop-the-line 대상이 아니다.
+
+### 이 PR이 바꾼 것
+
+- `TAVONEL_REMOTE_MCP_COHORT=all`(정확히 이 세 글자, 단독)이 모든 workspace를 받는다. 목록만 없앤다. consent의 로그인,
+  token 발급의 유료 plan 또는 trial 검사, `/api/v1` 라우트의 plan·scope·키별 rate limit·tenant 검사는 그대로다.
+  `ALL`, ` all`, `all,pilot-…`, `*`는 지금처럼 `503 REMOTE_MCP_COHORT_CONFIG_INVALID`다(`lib/remote-mcp.test.ts` GA 절).
+- `/docs/mcp`의 "켜지지 않음" 문구는 이 deployment의 `TAVONEL_REMOTE_MCP_ENABLED`를 build 때 읽는다. env는 build와 함께
+  바뀌므로 문구가 endpoint 상태와 어긋나지 않는다. Claude Code와 Cursor 연결 예시(URL과 `Authorization: Bearer` 헤더)를
+  더했다. npm 패키지는 여전히 없다고 쓴다.
+- trial: 코드는 이미 있다. `TAVONEL_TRIAL_AI_ACCESS_ENABLED=true`이면 trial은 읽기 전용 키 1개(수동 키든 MCP 연결이든)를
+  가지며, 키로 들어오는 `/api/v1` 호출마다 `foundation_trial_ai_access`가 질의 1회를 센다(MCP tool call 포함). 상한은
+  migration `20261104090000` 기본값이다. 켜는 조건은 F-2(위 결정 기록)이고 이 PR은 바꾸지 않는다.
+
+### 필요한 것 (이름만. 비밀값은 창업자가 직접 입력한다)
+
+| 이름 | 값 | 비고 |
+|---|---|---|
+| `TAVONEL_REMOTE_MCP_ENABLED` | `true` | kill switch. 정확히 `true`일 때만 켜진다 |
+| `TAVONEL_REMOTE_MCP_COHORT` | canary: 창업자 workspace key 1개 (`pilot-…`). GA: `all` | 두 단계로 연다(아래 순서) |
+| `TAVONEL_REMOTE_MCP_SIGNING_SECRET` | 비밀값, 32자 이상 | client id와 authorization code를 봉인한다. 바꾸면 등록된 client는 다시 등록한다 |
+| `FOUNDATION_WORKER_SECRET` | 비밀값, 32자 이상 | `/api/internal/remote-mcp/revoke-all` 인증. production에 이미 있다(2026-11-09 이름 확인) |
+| `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | 기존 | 키 인증, 키 발급 audit 행, trial 계량 |
+| `TAVONEL_TRIAL_AI_ACCESS_ENABLED` | `true` 또는 미설정 | 선택. F-2 조건을 채운 뒤에만 |
+
+2026-11-09 production 이름 확인(값은 읽지 않음): `FOUNDATION_WORKER_SECRET`은 있다. `TAVONEL_REMOTE_MCP_SIGNING_SECRET`,
+`TAVONEL_REMOTE_MCP_ENABLED`, `TAVONEL_REMOTE_MCP_COHORT`, `TAVONEL_ASK_RECEIPT_SIGNED`는 미설정이다.
+
+주의: `TAVONEL_ASK_RECEIPT_SIGNED=on`은 이 cohort를 그대로 읽는다(`lib/answer-receipt-signing.ts`). cohort를 `all`로 넓히면
+서명 receipt도 모든 workspace로 넓어지고, MCP만이 아니라 REST와 web Ask까지 포함된다. signer가 없거나 틀리면 모든 Ask가
+`503 ANSWER_SIGNING_UNAVAILABLE`이다. 그래서 10단계에 전제를 둔다(결정 기록 2026-11-08 "추가 2026-11-09 — 원격 MCP GA").
+
+이미 있는 장치(코드 변경 없음): 인증은 `tvnl_mcp_` 1시간 토큰 또는 읽기 scope만 가진 `tvnl_live_` 키(쓰기 scope가 하나라도
+있으면 401). tenant는 키의 workspace로만 읽는다. tool마다 scope가 고정이다(`REMOTE_MCP_TOOL_SCOPES`). rate limit은 키별·scope별
+(`consume_foundation_api_rate_limit`)과 Ask 동시 실행 상한이다. 공개 응답은 `buildPublicRetrievalRoute`를 거치고 tool 오류는
+상수 코드만 나간다. audit은 키 발급 RPC의 행, 요청마다 SLI 한 줄(`tavonel.remote_mcp_sli.v1`), funnel 이벤트다. MCP/REST Ask는
+근거 생성이 꺼져 있다(F-6).
+
+### IP별 rate limit — Vercel Firewall 규칙 (A1.3 전제)
+
+함수가 돌기 전에 막아야 함수 호출 비용과 DB 조회가 늘지 않는다. 그래서 코드가 아니라 Firewall 규칙으로 둔다. 두 규칙:
+토큰 없는 요청은 IP당 분당 120, `/api/mcp` 전체는 IP당 분당 600. 두 번째 값이 큰 이유는 Claude와 ChatGPT가 vendor cloud의
+공용 IP에서 여러 고객의 호출을 보내기 때문이다. 인증된 호출의 실제 상한은 키별 rate limit이다.
+
+```sh
+vercel firewall rules add "remote-mcp anonymous per IP" \
+  --condition '{"type":"path","op":"pre","value":"/api/mcp"}' \
+  --condition '{"type":"header","op":"ex","key":"authorization","neg":true}' \
+  --action rate_limit --rate-limit-window 60 --rate-limit-requests 120 --rate-limit-keys ip --yes
+vercel firewall rules add "remote-mcp per IP" \
+  --condition '{"type":"path","op":"pre","value":"/api/mcp"}' \
+  --action rate_limit --rate-limit-window 60 --rate-limit-requests 600 --rate-limit-keys ip --yes
+```
+
+Firewall rate limit은 plan에 따라 과금될 수 있다. 새 반복 지출이면 넣기 전에 창업자에게 chat으로 확인한다.
+
+### 순서
+
+1. migration `20261105000000_api_key_token_kind`가 production에 적용되어 있는지 확인한다(위 "배포 순서"). 읽기만 한다.
+2. Firewall 규칙 두 개를 넣는다(위).
+3. 창업자가 `TAVONEL_REMOTE_MCP_SIGNING_SECRET`을 Vercel production env에 입력한다. `FOUNDATION_WORKER_SECRET`은 이미 있다.
+4. `TAVONEL_REMOTE_MCP_ENABLED=true`, `TAVONEL_REMOTE_MCP_COHORT=<창업자 workspace key>`를 넣는다.
+5. 직전 production deployment ID를 캠페인 원장에 rollback 대상으로 적는다.
+6. production redeploy 1회(과금 build 1회).
+7. release 행: env만 바꾼 redeploy는 커밋이 같으므로 그 SHA의 행이 그대로 유효하다. `pnpm release:gate-check --sha <배포 SHA>`가
+   exit 0인지 본다. 코드가 함께 나가면 위 "병합 전 출시 행" 절대로 PR head에 행을 만든다. 캠페인 원장에 SHA, deployment ID, 넣은 env 이름을 적는다.
+8. smoke(아래). 실패하면 rollback.
+9. canary receipt: 창업자 workspace로 Claude(claude.ai 또는 Claude Desktop Connectors)와 Claude Code에서 OAuth 연결을 끝내고,
+   client 이름·버전과 `list_worlds` 결과 status를 receipt로 남긴다. ChatGPT도 같은 방식으로 남긴다.
+10. GA 전제: production의 `TAVONEL_ASK_RECEIPT_SIGNED`가 `on`이 아님을 확인한다(미설정, `off`, `shadow`는 된다). `on`이면
+    `all`로 넓히지 않는다. 서명 receipt를 전체로 넓히는 것은 부록 A에 따라 별도 reviewed change이고, 그 change가 signer 설정
+    (v2 export key, trust store, 만료)을 확인한 receipt를 남긴 뒤에만 한다. 확인 결과를 캠페인 원장에 적는다.
+11. GA: `TAVONEL_REMOTE_MCP_COHORT=all`로 바꾸고 redeploy 1회, 7과 8을 다시 한다.
+
+### smoke
+
+```sh
+BASE=https://tavonel.com
+# 1. discovery가 켜졌다
+curl -s -o /dev/null -w '%{http_code}\n' "$BASE/.well-known/oauth-authorization-server"   # 200
+# 2. 토큰 없이 tool 목록: 9개, 쓰기 tool 없음
+curl -s "$BASE/api/mcp" -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | jq '.result.tools | length'            # 9
+# 3. 토큰 없는 tool call은 OAuth를 시작하는 401
+curl -s -i "$BASE/api/mcp" -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_worlds","arguments":{}}}' \
+  | grep -i '^www-authenticate: Bearer resource_metadata='
+# 4. 읽기 scope만 가진 키(창업자가 TAVONEL_API_KEY에 넣는다)로 실제 읽기
+curl -s "$BASE/api/mcp" -H 'content-type: application/json' -H "Authorization: Bearer $TAVONEL_API_KEY" \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_worlds","arguments":{}}}' | jq '.result.isError'   # false
+```
+
+5. 쓰기 scope가 있는 키로 4를 하면 401이다. cohort 밖 workspace의 키(canary 단계)는 403 `REMOTE_MCP_COHORT_EXCLUDED`다.
+6. 런타임 로그에 `tavonel.remote_mcp_sli.v1` 줄이 요청마다 하나씩 있다.
+
+출력에는 키를 남기지 않는다. 결과 status와 숫자만 receipt에 적는다.
+
+### rollback
+
+위 "W1-A1 원격 MCP: rollback" 절 그대로다. 즉시: `revoke-all`로 MCP 키 일괄 revoke, 그다음 원장에 적은 deployment로
+Instant Rollback. 영구: `TAVONEL_REMOTE_MCP_ENABLED`를 지우고 redeploy. GA만 되돌릴 때는 `TAVONEL_REMOTE_MCP_COHORT`를
+canary 값으로 되돌리고 redeploy한다. Firewall 규칙은 남겨 둔다(꺼진 endpoint에는 해가 없다).
