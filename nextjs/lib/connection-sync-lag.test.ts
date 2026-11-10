@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { describeBacklog, describeImportScope, readSyncBacklog } from "@/components/connection-sync-status";
-import { connectionsPlanLocked, describeSyncLag, oauthConnectionAttention } from "@/components/connections-panel";
+import { describeSyncLag, oauthConnectionAttention } from "@/components/connections-panel";
 
 vi.mock("@/lib/developer-auth", () => ({
   requireFoundationSession: vi.fn(async () => ({
@@ -237,17 +237,5 @@ describe("a withdrawn grant", () => {
 
   it.each(["active", "paused", "error", "revoked"] as const)("leaves %s to the per-job recovery advice", (status) => {
     expect(oauthConnectionAttention(status)).toBeNull();
-  });
-});
-
-describe("connections plan availability before the click", () => {
-  it("locks the panel for a plan refusal and for nothing else", () => {
-    for (const code of ["TRIAL_FEATURE_NOT_INCLUDED", "SUBSCRIPTION_REQUIRED", "STUDIO_SUBSCRIPTION_REQUIRED", "TRIAL_NOT_ACTIVE"]) {
-      expect(connectionsPlanLocked(402, code), code).toBe(true);
-    }
-    expect(connectionsPlanLocked(402, "BILLING_HOLD")).toBe(false);
-    expect(connectionsPlanLocked(402, undefined)).toBe(false);
-    expect(connectionsPlanLocked(503, "SUBSCRIPTION_REQUIRED")).toBe(false);
-    expect(connectionsPlanLocked(200, undefined)).toBe(false);
   });
 });

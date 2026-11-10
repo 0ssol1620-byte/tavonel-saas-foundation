@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { installFixtureSession, installWorkspaceRoutes } from "./fixtures/workspace-fixture";
 
 // Labeled UI fixtures only. No provider account, document or production auth is used.
 test("connector progress follows real response states and retains uncertainty on read failure", async ({ page }, testInfo) => {
@@ -72,40 +73,30 @@ test("connector progress follows real response states and retains uncertainty on
 });
 
 // 2026-11-10: plan availability is shown before the click. Labeled UI fixtures only.
-async function signIn(page: import("@playwright/test").Page, access: { source: string; accessPlan: string | null }) {
-  const userId = "44444444-4444-4444-8444-444444444444";
-  const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
-  const accessToken = `${encode({ alg: "none" })}.${encode({ sub: userId, role: "authenticated", exp: Math.floor(Date.now()/1000)+3600 })}.fixture`;
-  await page.addInitScript(({ accessToken, userId }) => {
-    localStorage.setItem("sb-test-auth-token", JSON.stringify({ access_token: accessToken, refresh_token: "fixture-refresh",
-      expires_at: Math.floor(Date.now()/1000)+3600, token_type: "bearer", expires_in: 3600,
-      user: { id: userId, aud: "authenticated", role: "authenticated", email: "fixture@example.invalid", app_metadata: {}, user_metadata: {} } }));
-  }, { accessToken, userId });
-  await page.route("**/api/access/bootstrap", route => route.fulfill({ json: { code: "ACCESS_READY", access: { ...access, billingExempt: false, expiresAt: null, limits: null, customerDataEnabled: true } } }));
-  await page.route("**/api/documents", route => route.fulfill({ json: { documents: [] } }));
-  await page.route("**/api/compile-jobs", route => route.fulfill({ json: { code: "OK", jobs: [] } }));
-  await page.route("**/api/billing/status", route => route.fulfill({ json: { account: { accessPlan: access.accessPlan, subscriptionStatus: access.accessPlan ? "active" : "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null } } }));
-}
-
-for (const refusal of ["TRIAL_FEATURE_NOT_INCLUDED", "SUBSCRIPTION_REQUIRED"]) {
-  test(`a workspace refused with ${refusal} sees where connections are sold, and no connect button`, async ({ page }) => {
-    await signIn(page, { source: "trial", accessPlan: "observer_access" });
+for (const [source, sentence] of [
+  ["trial", "The free evaluation works with files you upload directly."],
+  ["unentitled", "This workspace has no active plan."],
+] as const) {
+  test(`a ${source} workspace sees where connections are sold, and no connect button`, async ({ page }) => {
+    await installFixtureSession(page);
+    await installWorkspaceRoutes(page, { accessSource: source, customerDataEnabled: true });
     let authorizeCalls = 0;
-    await page.route("**/api/connections", route => route.fulfill({ status: 402, json: { code: refusal } }));
-    await page.route("**/api/v1/oauth-connectors", route => route.fulfill({ json: { providers: [{ provider: "google_drive", configured: true }], connections: [] } }));
-    await page.route("**/api/v1/oauth-connectors/authorize", route => { authorizeCalls += 1; return route.fulfill({ status: 402, json: { code: refusal } }); });
+    await page.route("**/api/v1/oauth-connectors/authorize", route => { authorizeCalls += 1; return route.fulfill({ status: 402, json: { code: "TRIAL_FEATURE_NOT_INCLUDED" } }); });
     await page.goto("/workspace/connections");
-    const offer = page.locator('[data-state="plan-locked"]');
-    await expect(offer).toContainText("Available on Developer and Team");
-    await expect(offer.getByRole("link", { name: "See plans" })).toHaveAttribute("href", "/pricing");
+    const gate = page.locator(".workspace-access-gate");
+    await expect(gate.getByRole("heading", { name: "Available on Developer and Team." })).toBeVisible();
+    await expect(gate).toContainText("Google Drive and file-server connections are included on Developer and Team.");
+    await expect(gate).toContainText(sentence);
+    await expect(gate).not.toContainText(/Dropbox|OneDrive/);
+    await expect(gate.getByRole("link", { name: "See plans" })).toHaveAttribute("href", "/pricing");
     await expect(page.getByRole("button", { name: /^Connect / })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Create connection" })).toHaveCount(0);
     expect(authorizeCalls).toBe(0);
   });
 }
 
 test("a paid Developer workspace sees only the providers this deployment configured", async ({ page }) => {
-  await signIn(page, { source: "paid", accessPlan: "observer_access" });
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page, { accessSource: "paid", customerDataEnabled: true });
   await page.route("**/api/connections", route => route.fulfill({ json: { code: "OK", connections: [] } }));
   await page.route("**/api/v1/oauth-connectors", route => route.fulfill({ json: { providers: [
     { provider: "google_drive", configured: true },
@@ -116,6 +107,6 @@ test("a paid Developer workspace sees only the providers this deployment configu
   await expect(page.getByRole("button", { name: "Connect Google Drive", exact: true })).toBeEnabled();
   await expect(page.getByText(/not configured/)).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Dropbox|OneDrive/ })).toHaveCount(0);
-  await expect(page.locator('[data-state="plan-locked"]')).toHaveCount(0);
+  await expect(page.locator(".workspace-access-gate")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Create connection" })).toBeVisible();
 });

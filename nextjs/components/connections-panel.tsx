@@ -1,7 +1,6 @@
 "use client";
 
 import { Cloud, Link2, Server, Trash2 } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { failureSentence } from "@/lib/workspace-failure-copy";
@@ -86,21 +85,6 @@ type OAuthConnection = {
 
 type OAuthProviderState = { provider: OAuthProvider; configured: boolean };
 
-/*
-  Plan availability, before the click (2026-11-10).
-
-  Storage connections are on Developer and Team. A paying Developer workspace used to press
-  "Connect Google Drive" and only then read that its plan did not include it. The tenant read
-  below is refused by the same plan gate the connect call uses, so its refusal is the answer:
-  a free evaluation or a workspace with no plan sees where connections are sold, and no button
-  that can only fail. A billing hold is not a plan question and keeps its own failure sentence.
-*/
-const PLAN_REFUSALS = new Set(["TRIAL_FEATURE_NOT_INCLUDED", "SUBSCRIPTION_REQUIRED", "STUDIO_SUBSCRIPTION_REQUIRED", "TRIAL_NOT_ACTIVE"]);
-
-export function connectionsPlanLocked(status: number, code: string | undefined) {
-  return status === 402 && PLAN_REFUSALS.has(code ?? "");
-}
-
 function connectionRequest(input: string, init: RequestInit) {
   return fetch(input, { ...init, signal: AbortSignal.timeout(15_000) });
 }
@@ -133,7 +117,6 @@ export default function ConnectionsPanel() {
   const [progressRevision, setProgressRevision] = useState(0);
   const [notice, setNotice] = useState("Reading tenant-scoped connections.");
   const [readFailed, setReadFailed] = useState(false);
-  const [planLocked, setPlanLocked] = useState(false);
 
   const load = async (successNotice?: string) => {
     setReadFailed(false);
@@ -146,14 +129,6 @@ export default function ConnectionsPanel() {
       }
       const response = await connectionRequest("/api/connections", { headers: { authorization: `Bearer ${token}` } });
       const json = await response.json() as { code?: string; connections?: Connection[] };
-      if (connectionsPlanLocked(response.status, json.code)) {
-        setPlanLocked(true);
-        setConnections([]);
-        setOAuthConnections([]);
-        setNotice("Connections are not included in this workspace's current plan.");
-        return;
-      }
-      setPlanLocked(false);
       if (!response.ok || !Array.isArray(json.connections)) {
         setReadFailed(true);
         setNotice(`Connections could not be read. ${failureSentence(json.code, response.status)} No connection state is being inferred.`);
@@ -359,13 +334,6 @@ export default function ConnectionsPanel() {
         <button type="button" disabled={busy} onClick={() => void load()}>Refresh state</button>
       </header>
       <p className="connection-notice" role="status">{notice}</p>
-      {planLocked ? (
-        <div className="connection-form" data-state="plan-locked">
-          <h3>Available on Developer and Team</h3>
-          <p className="field-help">Google Drive and file-server connections are included on both paid plans. Synced pages count against the plan&apos;s included pages, the same as uploads.</p>
-          <Link href="/pricing">See plans</Link>
-        </div>
-      ) : (
       <div className="connection-form">
         {/* workspace-16: this panel had no title, so a paragraph and a field floated on their own. */}
         <h3>Connect a provider account</h3>
@@ -386,9 +354,8 @@ export default function ConnectionsPanel() {
         {oauthProviders.length === 0 ? <p className="field-help">{readFailed ? "Provider availability could not be confirmed. Refresh state to retry." : "Reading OAuth provider availability."}</p> : null}
         {oauthProviders.length > 0 && readyProviders.length === 0 ? <p className="field-help">No provider account can be connected from this workspace. The local source agent below reads a mounted share without one.</p> : null}
       </div>
-      )}
       <div className="connection-layout">
-        {planLocked ? null : <form className="connection-form" onSubmit={create}>
+        <form className="connection-form" onSubmit={create}>
           <label htmlFor="connection-provider">Source type</label>
           <select id="connection-provider" value={provider} onChange={(event) => {
             const next = event.target.value as Connection["provider"];
@@ -417,10 +384,10 @@ export default function ConnectionsPanel() {
           <button type="submit" disabled={busy || (provider !== "file_server" && !bucket.trim())}>
             {busy ? "Writing durable record..." : "Create connection"}
           </button>
-        </form>}
+        </form>
         <div className="connection-list" aria-live="polite">
           {connections === null || oauthConnections === null ? <p className="world-empty">Connection state has not been read yet.</p> : null}
-          {!planLocked && connections?.length === 0 && oauthConnections?.length === 0 ? <p className="world-empty">Create a connection, then use OAuth or a scoped sync key with the local source agent.</p> : null}
+          {connections?.length === 0 && oauthConnections?.length === 0 ? <p className="world-empty">Create a connection, then use OAuth or a scoped sync key with the local source agent.</p> : null}
           {oauthConnections?.map((connection) => {
             const attention = oauthConnectionAttention(connection.status);
             return (

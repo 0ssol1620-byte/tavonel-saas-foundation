@@ -4904,11 +4904,12 @@ test('affected connector progress admission: the literal [id] route is accepted 
     'nextjs/app/api/v1/oauth-connectors/connections/d/sync/route.ts','nextjs/app/api/v1/oauth-connectors/connections/[ID]/sync/route.ts',
     'nextjs/app/api/v1/oauth-connectors/connections/[connectionId]/sync/route.ts','nextjs/app/api/v1/oauth-connectors/connections/[id/sync/route.ts',
     'nextjs/app/api/v1/oauth-connectors/connections/id]/sync/route.ts','nextjs/app/api/v1/oauth-connectors/connections/[[id]]/sync/route.ts',
-    'nextjs/app/api/v1/oauth-connectors/connections/[id]/route.ts','nextjs/app/api/v1/oauth-connectors/connections/route.ts',
+    // connections/[id]/route.ts, authorize/route.ts and connections-panel.tsx are owned by connectors-developer-20261110.
+    'nextjs/app/api/v1/oauth-connectors/connections/route.ts',
     'nextjs/app/api/v1/oauth-connectors/connections/[id]/sync/route.test.ts','nextjs/app/api/v1/oauth-connectors/connections/[id]/sync/routeXts',
-    'nextjs/app/api/v1/oauth-connectors/connections/[id]/sync/status/route.ts','nextjs/app/api/v1/oauth-connectors/authorize/route.ts',
+    'nextjs/app/api/v1/oauth-connectors/connections/[id]/sync/status/route.ts',
     'nextjs/app/api/oauth-connectors/connections/[id]/sync/route.ts','app/api/v1/oauth-connectors/connections/[id]/sync/route.ts',
-    'nextjs/components/connections-panel.tsx','nextjs/components/connection-sync-status.test.tsx','nextjs/components/connection-sync-status.module.css',
+    'nextjs/components/connection-sync-status.test.tsx','nextjs/components/connection-sync-status.module.css',
     'nextjs/components/connection-sync-statusXtsx','nextjs/components/connection-sync-status.tsx.bak','components/connection-sync-status.tsx',
     'nextjs/lib/connection-sync-lag.ts','nextjs/lib/connection-sync-polling.ts','nextjs/lib/connection-sync-retry.test.ts','nextjs/lib/connection-sync-lag.test.tsx',
     'nextjs/lib/connection-sync-polling.spec.ts','nextjs/lib/connection-sync/polling.test.ts','lib/connection-sync-polling.test.ts']) {
@@ -4929,7 +4930,7 @@ test('affected connector progress admission: a known batch with an unknown sibli
   const mixed=affectedMap([...affectedConnectorRaw(),affectedRecord('A',['nextjs/lib/connection-sync-retry.test.ts'],'000000')]);
   assert.deepEqual([mixed.failures,mixed.unmappedPaths],[['unmapped changed endpoint: nextjs/lib/connection-sync-retry.test.ts'],['nextjs/lib/connection-sync-retry.test.ts']]);
   assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/);
-  for (const paths of [[AFFECTED_CONNECTOR_ROUTE,'nextjs/app/api/v1/oauth-connectors/connections/[connectionId]/sync/route.ts'],['nextjs/components/connections-panel.tsx',AFFECTED_CONNECTOR_STATUS]]) {
+  for (const paths of [[AFFECTED_CONNECTOR_ROUTE,'nextjs/app/api/v1/oauth-connectors/connections/[connectionId]/sync/route.ts'],['nextjs/components/connections-panel-v2.tsx',AFFECTED_CONNECTOR_STATUS]]) {
     const unknown=paths.find(path=>!AFFECTED_CONNECTOR_PATHS.includes(path)),map=affectedMap([affectedRecord('R090',paths)]);
     assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],paths.join(' -> '));
     assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,paths.join(' -> '));
