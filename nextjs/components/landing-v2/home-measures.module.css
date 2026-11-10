@@ -2,10 +2,9 @@
   The receipted measurement band (Release 3 move 7), as a ledger (FINAL-SPEC 2026-10-26 §2.2).
 
   Direction C (2026-11-04): one white sheet on the warm canvas, resting on the two-layer shadow, and
-  the three receipts inside it as three columns divided by a hairline at 900 and up (rows below).
+  the receipts inside it as columns divided by a hairline at 900 and up (rows below).
   One surface, no per-card fill: the critic's three-colour bento (white / sand / navy) is exactly what
-  this is not, and no row is accented over the others -- the 36.9% low-quality-scan row reads at the
-  same weight as the two that flatter us. Each column is the figure, then its label, its detail and
+  this is not, and no row is accented over the others. Each column is the figure, then its label, its detail and
   must-say verbatim, then the receipt chip (`R-0x · date · sha256 xxxxxxxx`) on the foot. The receipt
   chip is muted mono with no underline until it is hovered or focused. The figures are tabular. The
   head is Home's section head (`lv2-h2`, styled in source-first-home.module.css).
@@ -83,7 +82,7 @@
 
 @media (min-width: 900px) {
   .facts {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     margin-top: 48px;
     padding: 0;
   }
