@@ -86,6 +86,36 @@ export function immutableObjectKey(workspaceId: string, documentId: string, outp
   return `immutable/${workspaceId}/${workspaceId}/${documentId}/${versionKey}/sanitized.pdf`;
 }
 
+/*
+  A segmented source's objects (sanitize.ts, "Segmented sources"). All of them sit under the
+  source's own `immutable/<ws>/<ws>/<doc>/` prefix, so a deletion of the document removes them, and
+  none of them has the `<doc>/<version>/<file>` shape the site lists as a document.
+*/
+function segmentsPrefix(workspaceId: string, documentId: string): string {
+  return `immutable/${workspaceId}/${workspaceId}/${documentId}/segments/`;
+}
+
+export function segmentPlanKey(workspaceId: string, documentId: string): string {
+  return `${segmentsPrefix(workspaceId, documentId)}plan.json`;
+}
+
+export function segmentManifestKey(workspaceId: string, documentId: string): string {
+  return `${segmentsPrefix(workspaceId, documentId)}manifest.json`;
+}
+
+export function segmentRangePrefix(workspaceId: string, documentId: string, start0: number, end0: number): string {
+  if (!Number.isSafeInteger(start0) || !Number.isSafeInteger(end0) || start0 < 0 || end0 <= start0) {
+    throw new PermanentReject("segment page range is invalid");
+  }
+  return `${segmentsPrefix(workspaceId, documentId)}${start0}-${end0}/`;
+}
+
+export function segmentImmutableKey(
+  workspaceId: string, documentId: string, start0: number, end0: number, outputSha256: string,
+): string {
+  return `${segmentRangePrefix(workspaceId, documentId, start0, end0)}${versionKeyFromOutputSha256(outputSha256)}/sanitized.pdf`;
+}
+
 export function ocrSiblingKey(immutablePdfKey: string): string {
   if (!immutablePdfKey.endsWith("/sanitized.pdf")) {
     throw new PermanentReject("immutable PDF key is not a sanitized.pdf object");

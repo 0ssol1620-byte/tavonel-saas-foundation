@@ -25,6 +25,8 @@ export interface Env {
   FOUNDATION_MANUAL_TRIGGER_TOKEN?: string;
   TAVONEL_INTAKE_CEILING_STAGE?: string;
   FOUNDATION_CDR_TEXT_LAYER_FIRST?: string;
+  /** Segmented sources (sanitize.ts sourceSegmentPages). Unset: off. */
+  FOUNDATION_SOURCE_SEGMENT_PAGES?: string;
 }
 
 function authorizeManualTrigger(request: Request, token: string | undefined): "ok" | "disabled" | "denied" {
