@@ -19,6 +19,7 @@ import { describe, expect, it } from "vitest";
 import {
   INTAKE_CEILING_STAGE,
   INTAKE_CEILING_STAGES,
+  LARGE_SOURCE_TARGET_BYTES,
   OCR_JSON_MAX_BYTES,
   PROCESSING_CEILING,
   intakeCeilingFor,
@@ -181,6 +182,16 @@ const SITES: readonly Site[] = [
     file: WORKER_OCR, name: "STAGE_1_OCR_BOUNDS persistedBytes", pattern: ocrBounds(1, "persistedBytes", " \\};"),
     expected: intakeCeilingFor(1).OCR_JSON_MAX_BYTES, source: "intakeCeiling.ts OCR_JSON_MAX_BYTES at stage 1",
   },
+  // Large-source bytes (docs/adr/0006-segmented-large-sources.md): the two copies read only with
+  // FOUNDATION_SOURCE_TRANSPORT=presigned, where the CDR reads the source from R2 itself.
+  {
+    file: WORKER_KEYS, name: "LARGE_SOURCE_MAX_BYTES", pattern: /^export const LARGE_SOURCE_MAX_BYTES = (.+);$/gm,
+    expected: declaredInCeiling("WORKER_LARGE_SOURCE_MAX_BYTES"), source: "intakeCeiling.ts WORKER_LARGE_SOURCE_MAX_BYTES",
+  },
+  {
+    file: CDR, name: "LARGE_SOURCE_MAX_INPUT_BYTES", pattern: /^LARGE_SOURCE_MAX_INPUT_BYTES: Final = (.+)$/gm,
+    expected: declaredInCeiling("CDR_LARGE_SOURCE_MAX_INPUT_BYTES"), source: "intakeCeiling.ts CDR_LARGE_SOURCE_MAX_INPUT_BYTES",
+  },
 ];
 
 /** Every site must be declared exactly once: a second copy is one more hidden limit, not a refactor. */
@@ -272,6 +283,8 @@ describe("hidden copies of the intake ceiling", () => {
     ];
     for (const file of definitions) {
       expect(read(file), file).not.toMatch(/TAVONEL_(CDR|OCR)_(MAX_[A-Z_]+|RASTER_RANGE_PAGES)/);
+      // The large-source transport ships off in both processors; turning it on edits this line.
+      expect(read(file), file).not.toMatch(/TAVONEL_CDR_REMOTE_SOURCE_PREFIX|FOUNDATION_SOURCE_TRANSPORT/);
     }
   });
 
@@ -295,6 +308,9 @@ describe("hidden copies of the intake ceiling", () => {
       0: { maxSourceBytes: 5 * MIB, maxSourcePages: 80 },
       1: { maxSourceBytes: 25 * MIB, maxSourcePages: 200 },
     });
+    // The 50 MiB the processors read on the presigned transport is a target: no stage admits it.
+    expect(LARGE_SOURCE_TARGET_BYTES).toBe(50 * MIB);
+    expect(Object.values(INTAKE_CEILING_STAGES).every((stage) => stage.maxSourceBytes < LARGE_SOURCE_TARGET_BYTES)).toBe(true);
   });
 
   it("fail when intakeCeiling.ts stops stating a processor copy as a literal", () => {
