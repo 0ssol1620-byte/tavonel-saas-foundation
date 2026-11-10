@@ -31,6 +31,22 @@ export type UnmeasuredPages = {
 
 export type PageCountResult = MeasuredPages | UnmeasuredPages;
 
+/**
+ * The part of a measured count the capability route may refuse a file on, before upload.
+ *
+ * Only a PDF's page tree is counted. A DOCX `<Pages>` is what the last editor wrote, and the CDR
+ * re-paginates with its own fonts; a PPTX count includes hidden slides, which the CDR's PDF export
+ * leaves out. Either can be over the ceiling for a file that renders under it, so neither is sent.
+ * pdf.js and pdfium can still disagree on a malformed page tree; that is accepted as counted.
+ */
+export function refusablePageCount(
+  measured: PageCountResult | null | undefined,
+): { declaredPages: number; declaredBasis: "pdf_page_tree" } | Record<string, never> {
+  return measured && measured.pages !== null && measured.basis === "pdf_page_tree"
+    ? { declaredPages: measured.pages, declaredBasis: "pdf_page_tree" }
+    : {};
+}
+
 /** Guards a hostile archive: an OOXML file is a ZIP, and a ZIP can be a bomb. */
 const MAX_OOXML_BYTES = 64 * 1024 * 1024;
 

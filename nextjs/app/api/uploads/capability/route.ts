@@ -263,6 +263,21 @@ async function legacyCapability(request: Request, input: {
   const clientEstimate = typeof input.estimatedPages === "number" && Number.isSafeInteger(input.estimatedPages)
     && input.estimatedPages >= 1 ? input.estimatedPages : serverEstimate;
   const reservationPages = Math.max(serverEstimate, clientEstimate);
+  /*
+    A counted file over the page ceiling is refused here, before a URL or a reservation exists.
+    The approval path already refuses it at the quote (`quoteIntakeFile`); this path accepted it and
+    the rasterizer refused it after the upload, which is how a folder of long manuals was uploaded
+    and then failed one by one. The count is the client's, so it can only refuse earlier, never
+    admit more: the rasterizer still enforces the ceiling on the decoded document.
+  */
+  if (clientEstimate > PROCESSING_CEILING.maxSourcePages) {
+    return NextResponse.json({
+      code: "SOURCE_EXCEEDS_PROCESSING_CEILING",
+      maxBytes: FOUNDATION_INTAKE_MAX_BYTES,
+      maxPages: PROCESSING_CEILING.maxSourcePages,
+      limit: PROCESSING_CEILING_SENTENCE,
+    }, { status: 413, headers: NO_STORE });
+  }
 
   const signer = readR2SignerEnv();
   if (!signer) {

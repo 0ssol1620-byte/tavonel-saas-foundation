@@ -7140,7 +7140,7 @@ test('affected CPU OCR synthetic binding owns exactly four paths and defers its 
 });
 test('affected CDR Cloud Run service owns exactly its app and wiring suite and defers its exact-head malware-scan qualification', () => {
   // Sorted as the map reports changed paths (code-point order).
-  const paths = ['Dockerfile', 'README.md', 'app.py', 'measure_limits.py', 'request_boundary.py', 'service.yaml', 'tests/test_app.py', 'tests/test_measure_limits.py', 'tests/test_measurement_limits.py', 'tests/test_service_definition.py', 'tests/test_text_layer.py', 'text_layer.py']
+  const paths = ['Dockerfile', 'README.md', 'app.py', 'measure_limits.py', 'request_boundary.py', 'service.yaml', 'tests/test_app.py', 'tests/test_measure_limits.py', 'tests/test_measurement_limits.py', 'tests/test_page_ranges.py', 'tests/test_service_definition.py', 'tests/test_text_layer.py', 'text_layer.py']
     .map(path => `quarantine-sidecar/cdr-cloudrun/${path}`);
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'cdr-cloudrun-service');
   assert.equal(owners.length, 1);
@@ -8306,6 +8306,22 @@ test('affected w2-d-intake-stage1 owner: 3 exact paths select 2 direct suites an
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(neighbour)).map(o => o.group), [group], neighbour);
   }
   for (const adjacent of ['quarantine-sidecar/cdr-cloudrun/table_dpi_arena_v2.py', 'nextjs/lib/processing-ceiling-stage1.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});
+// large-source-intake-copy (ADR-0006): one finite owner, restated independently.
+import { LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS, LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected large-source-intake-copy owner: 4 exact paths select 4 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['nextjs/lib/compile-limits.test.ts', 'nextjs/lib/compile-limits.ts', 'nextjs/lib/page-count.test.ts', 'nextjs/lib/page-count.ts'];
+  const suites = ['lib/compile-limits.test.ts', 'lib/intake-approval-rollout-off.test.ts', 'lib/page-count.test.ts', 'lib/workspace-existing-compile.test.ts'];
+  assert.deepEqual([[...LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS], [...LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['large-source-intake-copy'], path);
+    const map = affectedMap([affectedRecord('M', [path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['large-source-intake-copy'], [], suites, [], []], path);
+  }
+  for (const adjacent of ['nextjs/lib/compile-limits-v2.ts', 'nextjs/lib/compile-limits.spec.ts', 'nextjs/lib/page-count-v2.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }

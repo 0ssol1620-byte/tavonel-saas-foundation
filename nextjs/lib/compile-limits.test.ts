@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { PROCESSING_CEILING, PROCESSING_CEILING_MIB } from "../../shared/intakeCeiling";
 import {
   COMPILE_LIMITS_NOTICE,
   COMPILE_MAX_DOCUMENTS,
@@ -38,5 +39,10 @@ describe("judgeCompileSet", () => {
 
   it("states the ceiling in the notice customers read before choosing files", () => {
     expect(COMPILE_LIMITS_NOTICE).toContain(String(COMPILE_MAX_DOCUMENTS));
+  });
+
+  it("states the per-source byte and page ceiling before a file is chosen, from the enforced constants", () => {
+    expect(COMPILE_LIMITS_NOTICE).toContain(`Each file up to ${PROCESSING_CEILING_MIB} MB and ${PROCESSING_CEILING.maxSourcePages} pages`);
+    expect(COMPILE_LIMITS_NOTICE).toContain("never cut short");
   });
 });

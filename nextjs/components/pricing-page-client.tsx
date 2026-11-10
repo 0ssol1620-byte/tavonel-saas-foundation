@@ -407,7 +407,7 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "Most pages in one source",
-    `${PROCESSING_CEILING.maxSourcePages}. The page ceiling is checked after the document is decoded, so a longer file is refused during processing rather than at upload.`,
+    `${PROCESSING_CEILING.maxSourcePages}. A PDF is counted in your browser, also when it is inside a ZIP, and a longer one is refused before it uploads. Other formats, and a PDF the browser cannot open, are counted when they are read, and a longer one is refused then, with the reason on the source. Nothing is cut short.`,
   ],
   [
     "Sources in one run",

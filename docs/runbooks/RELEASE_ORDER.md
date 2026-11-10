@@ -828,3 +828,22 @@ canary 값으로 되돌리고 redeploy한다. Firewall 규칙은 남겨 둔다(�
   COMMENT를 지운다. 커밋 뒤 같은 세션에서
   `delete from supabase_migrations.schema_migrations where version = '20261110040000';`를 실행하고, 버전·시각·md5 쌍·
   실행자를 캠페인 ledger에 적는다.
+
+## 추가 2026-11-10 — 대용량 소스 분할 처리(processor 절반, flag off)
+
+근거: `docs/adr/0006-segmented-large-sources.md`. **이 PR을 병합해도 production 동작은 바뀌지 않는다.** 한도 문구는 5 MiB / 80쪽 그대로이고
+migration은 없다. 바뀌는 것은 업로드 전 안내(드롭 박스·`/pricing`)와, 승인 lineage off 경로에서 브라우저가 센 쪽수가 80을 넘으면
+URL·예약 전에 413으로 거절하는 것뿐이다.
+
+- CDR: 서명된 request id 끝의 `_p<start0>_<end0>`가 있으면 그 범위만 렌더한다(문서 ≤ 500쪽, 요청당 ≤ `MAX_PAGES`). 없으면 지금과 같다.
+  새 revision을 먼저 배포해도 기존 worker 요청에는 영향이 없다. 되돌리기: traffic을 `tavonel-cdr-validation-0909-00004-qsb`로.
+- worker: `FOUNDATION_SOURCE_SEGMENT_PAGES` 미설정이면 꺼짐. **site 절반(ADR-0006 "Site half": manifest 읽기, 범위별 compile,
+  원래 쪽 번호, intake 500쪽 + approval CHECK migration)이 배포되기 전에는 켜지 않는다.** 켜면 81쪽 이상 소스는 처리·정산되지만
+  site가 `segments/manifest.json`을 읽지 못해 화면에 나타나지 않는다.
+- 값은 `80`만 허용한다. `FOUNDATION_COMPLETED_READ_ENABLED=true`와 함께 켜면 worker가 CDR 요청 전에 설정 오류로 멈춘다(completed-read는 꺼 둔다).
+  `wrangler.jsonc`의 producer `FOUNDATION_SEGMENT_CONTINUATION`(같은 queue)이 없으면 역시 설정 오류다.
+- CDR이 먼저다. 범위를 모르는 옛 CDR은 81쪽 이상을 거절하는데, worker는 `x-tavonel-cdr-ranges` 헤더가 없는 거절을 재시도로 다룬다.
+- 켜기 전에 삭제 inventory 한도(512 객체 / 1 GiB, 여러 장문 소스를 한 번에 지울 때 초과)를 site 절반 PR에서 해소한다(ADR-0006 "Deletion").
+- 순서: (1) CDR revision → (2) site 절반 병합 + migration 적용 → (3) worker version upload에 `FOUNDATION_SOURCE_SEGMENT_PAGES=80`,
+  81쪽·300쪽 문서 1건씩 end-to-end 확인 → (4) 문구·`PROCESSING_CEILING_SENTENCE` 변경 build.
+- 되돌리기: worker 변수 삭제(`wrangler versions deploy <prev>@100%`). 저장된 범위는 manifest가 없으면 보이지 않고 소스 삭제 때 함께 지워진다.

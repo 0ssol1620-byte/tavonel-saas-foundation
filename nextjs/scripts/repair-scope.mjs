@@ -3014,6 +3014,11 @@ export const W2_D_INTAKE_STAGE1_AFFECTED_PATHS = Object.freeze([
   'quarantine-sidecar/cdr-cloudrun/tests/test_table_dpi_arena.py',
 ]);
 export const W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES = Object.freeze(['lib/intake-ceiling-cross-tree.test.ts', 'lib/processing-ceiling-stage1.test.ts']);
+// Large-source intake copy (codex/large-source-segmentation-20261110, ADR-0006): the drop box's limits notice, which now states
+// the per-source ceiling, and its suite. The notice is rendered by the workspace, whose suite pins the call. Product copy, so
+// never nativeReuse. No browser, database or worker lane.
+export const LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS = Object.freeze(['nextjs/lib/compile-limits.test.ts', 'nextjs/lib/compile-limits.ts', 'nextjs/lib/page-count.test.ts', 'nextjs/lib/page-count.ts']);
+export const LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES = Object.freeze(['lib/compile-limits.test.ts', 'lib/intake-approval-rollout-off.test.ts', 'lib/page-count.test.ts', 'lib/workspace-existing-compile.test.ts']);
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
 // ops-backlog-sli-20261110 (GA ops gap 4): the B35 evaluator gains a compile backlog age. Its own suite and both routes that call it.
@@ -3266,7 +3271,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // suite against the digest-pinned clamd and inside the service image built from the checkout, and which affectedPlan defers as pending debt.
   // ADR-2026-11-02 (text-layer-first CDR) adds the text-layer module and its suite, the request boundary that now also gates
   // /v1/text-layer, and the Dockerfile, service.yaml and README that ship and describe them; malware-scan-qualification runs them all.
-  affectedGroup('cdr-cloudrun-service', /^quarantine-sidecar\/cdr-cloudrun\/(?:app\.py|request_boundary\.py|text_layer\.py|measure_limits\.py|Dockerfile|service\.yaml|README\.md|tests\/test_(?:app|text_layer|measurement_limits|measure_limits|service_definition)\.py)$/),
+  affectedGroup('cdr-cloudrun-service', /^quarantine-sidecar\/cdr-cloudrun\/(?:app\.py|request_boundary\.py|text_layer\.py|measure_limits\.py|Dockerfile|service\.yaml|README\.md|tests\/test_(?:app|text_layer|measurement_limits|measure_limits|page_ranges|service_definition)\.py)$/),
   affectedGroup('dropbox-connector', /^nextjs\/lib\/(?:dropbox-[a-z-]+|connector-(?:oauth-adapters|page-integrity|provider-isolation|source-identity|sync-page|replay-world-currency-migration)|sync-worker|source-import|source-version-guard)(?:\.test)?\.ts$/,
     { unitFiles: ['lib/dropbox-source-reconciliation.test.ts', 'lib/connector-oauth-adapters.test.ts', 'lib/sync-worker.test.ts', 'lib/source-import.test.ts',
       'lib/connector-page-integrity.test.ts', 'lib/connector-sync-page.test.ts', 'lib/connector-provider-isolation.test.ts', 'lib/connector-source-identity.test.ts',
@@ -3316,6 +3321,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // w2-d-intake-stage1 (W2-D): the 3 exact repo-relative paths above select 2 direct suites and no browser suite.
   affectedGroup('w2-d-intake-stage1', new RegExp(`^(?:${exactPathAlternation(W2_D_INTAKE_STAGE1_AFFECTED_PATHS)})$`),
     { unitFiles: W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES }),
+  // large-source-intake-copy (ADR-0006): the 4 exact paths above select 4 direct suites and no browser suite.
+  affectedGroup('large-source-intake-copy', new RegExp(`^(?:${exactPathAlternation(LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS)})$`),
+    { unitFiles: LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES }),
 ]);const regularModes = ['100644', '100755'];
 
 export function parseAffectedRawDiff(output) {

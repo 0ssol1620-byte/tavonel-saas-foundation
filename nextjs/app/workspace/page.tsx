@@ -82,7 +82,7 @@ import { compileLimitsNotice, judgeCompileSet } from "@/lib/compile-limits";
 import { describeCorpusStart, judgeCorpusSet, type CorpusProgress } from "@/lib/corpus-batching";
 import { CompileJobPanel, type CompileJobView } from "@/components/compile-job-panel";
 import { compileJobRestingNotice, isCompileJobResting, isCompileJobTerminal, observeCompileJob, pickResumableCompileJob } from "@/lib/compile-job-client";
-import { measureSelection, type PageCountResult } from "@/lib/page-count";
+import { measureSelection, refusablePageCount, type PageCountResult } from "@/lib/page-count";
 import {
   buildPreflightSummary,
   describePreflightFile,
@@ -1283,7 +1283,9 @@ export default function WorkspacePage() {
     capability, confirm and release exactly as main does: each file reserves its own compute, and
     no approval exists to reference.
   */
-  const uploadLegacyDocument = async (file: File, manageBusy = true, onRefusal?: (reason: string) => void): Promise<string | null> => {
+  const uploadLegacyDocument = async (
+    file: File, manageBusy = true, onRefusal?: (reason: string) => void, measured?: PageCountResult | null,
+  ): Promise<string | null> => {
     if (!intakeOpen) { setNotice(intakeClosedCopy); onRefusal?.(intakeClosedCopy); return null; }
     const sourceLabel = (file as WorkspaceUploadFile).tavonelRelativePath || file.name;
     if (manageBusy) setBusy(true);
@@ -1327,9 +1329,15 @@ export default function WorkspacePage() {
           originalFilename: file.name,
           declaredMimeType: file.type || "application/pdf",
           requestedBytes: file.size,
+          /*
+            A PDF's counted page tree, so the route can refuse a file over the page ceiling before
+            any byte is sent rather than the rasterizer refusing it after. A declared DOCX count or
+            a PPTX slide count is not sent: either can exceed what the file renders to.
+          */
           estimatedPages: estimateBillablePages({
             bytes: file.size,
             mimeType: file.type || "application/pdf",
+            ...refusablePageCount(measured),
           })?.pages,
         }),
       });
@@ -1860,7 +1868,7 @@ export default function WorkspacePage() {
    * still being read, so the report now names the failure and keeps going.
    */
   // main's batch over the per-file upload above, for when the approval lineage is off.
-  const uploadLegacyDocuments = async (files: File[]) => {
+  const uploadLegacyDocuments = async (files: File[], measured?: PageCountResult[] | null) => {
     if (files.length === 0) return;
     if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
     setBusy(true);
@@ -1869,8 +1877,10 @@ export default function WorkspacePage() {
     try {
       setNotice(`Uploading ${files.length} file(s) securely, ${UPLOAD_CEILING} at a time.`);
       const refusals: string[] = [];
+      // The counts were measured on this same selection, in order; a stale set is not used.
+      const counts = measured?.length === files.length ? measured : null;
       const settled = await runBounded(files, UPLOAD_CEILING, (file) =>
-        uploadLegacyDocument(file, false, (reason) => { refusals.push(reason); }));
+        uploadLegacyDocument(file, false, (reason) => { refusals.push(reason); }, counts?.[files.indexOf(file)] ?? null));
       const ids = settled.flatMap((result) => (result.ok && result.value ? [result.value] : []));
       const lost = files.length - ids.length;
       if (lost > 0) {
@@ -1902,7 +1912,7 @@ export default function WorkspacePage() {
     if (files.length === 0) return;
     if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
     // No whole-set approval to create: upload file by file, exactly as main does.
-    if (!approvalLineage && !triageApproval) { await uploadLegacyDocuments(files); return; }
+    if (!approvalLineage && !triageApproval) { await uploadLegacyDocuments(files, measured); return; }
     setBusy(true);
     setCollectionResult(null);
     clearWorldState();
