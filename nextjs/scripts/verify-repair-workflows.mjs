@@ -34,6 +34,7 @@ import { TRUST_COPY_AFFECTED_PATHS, TRUST_COPY_AFFECTED_UNIT_FILES } from './rep
 import { HERO_COMPILE_TABS_AFFECTED_PATHS, HERO_COMPILE_TABS_AFFECTED_UNIT_FILES, HERO_COMPILE_TABS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { CONNECTORS_DEVELOPER_AFFECTED_PATHS, CONNECTORS_DEVELOPER_AFFECTED_UNIT_FILES, CONNECTORS_DEVELOPER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS, REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { SOURCE_ORIGIN_UNPROVEN_AFFECTED_PATHS, SOURCE_ORIGIN_UNPROVEN_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { WORLD_READ_CAP_AFFECTED_PATHS, WORLD_READ_CAP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
@@ -839,6 +840,14 @@ for (const binding of [
     browsers: [],
     rows: [],
     neighbors: ['nextjs/app/api/collections/[id]/page.tsx', 'nextjs/app/api/v1/world/[id]/[lens]/page.tsx', 'nextjs/lib/collection-storage.test.ts', 'nextjs/public/developer/tavonel-verify-export.test.mjs', 'nextjs/scripts/verify-signed-export.test.mjs', 'lib/world-read-model.ts'] },
+  // source-origin-unproven-20261111: 8 exact paths, 12 direct suites, no browser suite.
+  { group: 'source-origin-unproven-20261111', prefix: 'nextjs/', exportedPaths: SOURCE_ORIGIN_UNPROVEN_AFFECTED_PATHS, exportedSuites: SOURCE_ORIGIN_UNPROVEN_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['app/api/compile-jobs/route.ts', 'lib/consumer-context-api.ts', 'lib/customer-source-scope.test.ts', 'lib/customer-source-scope.ts', 'lib/derived-data-admission.test.ts', 'lib/derived-data-admission.ts', 'lib/retrieval-pipeline.ts', 'lib/scoped-admission-boundaries.test.ts'],
+    suites: ['lib/api-error-codes.test.ts', 'lib/collection-compile-run.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/corpus-batching.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/customer-source-scope.test.ts', 'lib/derived-data-admission.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/production-route-surface.test.ts', 'lib/retrieval-pipeline.test.ts', 'lib/route-classification.test.ts', 'lib/scoped-admission-boundaries.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/app/api/compile-jobs/[jobId]/route.tsx', 'nextjs/lib/customer-source-scope.tsx', 'nextjs/lib/derived-data-admission-v2.ts', 'nextjs/lib/retrieval-pipeline.tsx', 'nextjs/lib/consumer-context-api.test.tsx', 'lib/customer-source-scope.ts'] },
   // revoke-not-plan-gated-20261110: three exact paths, six direct suites, no browser suite.
   { group: 'revoke-not-plan-gated-20261110', prefix: 'nextjs/', exportedPaths: REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS, exportedSuites: REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],

@@ -61,6 +61,8 @@ vi.mock("@/lib/active-world-source-access", () => ({ loadActiveWorldSourceIds: f
 vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: fx.sourceAccess, checkConnectorSourceAccessForViewer: fx.sourceAccess }));
 vi.mock("@/lib/derived-data-admission", () => ({
   admitsDerivedCustomerData: fx.admits,
+  derivedCustomerDataRefusal: async (...args: unknown[]) => (await (fx.admits as (...a: unknown[]) => Promise<boolean>)(...args))
+    ? null : { code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE", status: 403 },
   // lib/derived-data-admission.ts: DERIVED_DATA_REFUSED.
   DERIVED_DATA_REFUSED: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE",
 }));

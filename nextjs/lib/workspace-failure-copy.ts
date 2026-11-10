@@ -30,6 +30,7 @@ const FAILURE_COPY: Record<string, string> = {
     compile again and fails the same way (REVIEW-PR192-R1 MAJOR-2). Neither line invites one.
   */
   JSON_TOO_LARGE: "This is larger than its size limit, so it was not stored. Trying the same thing again gives the same result.",
+  CUSTOMER_SOURCE_ORIGIN_UNPROVEN: "Some selected files have no upload record we can verify, so nothing was processed. Upload those files again, then select the new uploads.",
   COLLECTION_PACKAGE_TOO_LARGE: "This World was saved, but it is too large to open, download or ask here. Nothing in it was changed, and trying again gives the same result. Compile the same files in smaller groups.",
   CORE_OUTPUT_TOO_LARGE: "The result of compiling these files is larger than one World can hold, so nothing was saved. Running the same files again gives the same result. Select fewer files and compile them in smaller groups. If one file on its own does this, send us the reference below.",
   /* F2 (2026-11-09): the window is BLOCKED_DECISION_EXPIRY_MS in compile-job-worker.ts; a test holds them together. */
@@ -182,6 +183,16 @@ const SIZE_LIMIT_COPY: Record<PageLocale, SizeLimitFailureCopy> = {
  */
 export function sizeLimitFailureCopy(locale: PageLocale = "en"): SizeLimitFailureCopy {
   return SIZE_LIMIT_COPY[locale];
+}
+
+const ORIGIN_UNPROVEN_COPY: Record<PageLocale, (names: string) => string> = {
+  en: (names) => `These files have no upload record we can verify, so nothing was processed: ${names}. Retrying gives the same result. Upload them again, then select the new uploads.`,
+  ko: (names) => `다음 파일은 확인할 수 있는 업로드 기록이 없어 처리하지 않았습니다: ${names}. 다시 시도해도 결과는 같습니다. 이 파일을 다시 업로드한 뒤 새로 올린 파일을 선택하세요.`,
+};
+
+/** CUSTOMER_SOURCE_ORIGIN_UNPROVEN, naming the files the server listed, in the page's language. */
+export function originUnprovenCopy(names: readonly string[], locale: PageLocale = "en"): string {
+  return ORIGIN_UNPROVEN_COPY[locale](names.join(", "));
 }
 
 /** A blocker no retry can clear: the reader left a review package, and the stored result is immutable (F1). */

@@ -170,7 +170,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
           : {}),
       },
       { status: conflict ? 409 : result.code === "RETRIEVAL_QUESTION_INVALID" ? 400
-        : result.code === DERIVED_DATA_REFUSED ? 403 : 503, headers: NO_STORE },
+        : result.code === DERIVED_DATA_REFUSED ? 403 : result.code === "CUSTOMER_SOURCE_ORIGIN_UNPROVEN" ? 409 : 503, headers: NO_STORE },
     );
   }
 

@@ -6,7 +6,7 @@ import WorldExplorer from "@/components/world-explorer";
 import { FileText, ShieldCheck, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activationPolicy, type ActivationCapability } from "@/lib/activation-policy";
-import { failureSentence, isSizeLimitFailure, offersUpgrade, pageLocale } from "@/lib/workspace-failure-copy";
+import { failureSentence, isSizeLimitFailure, offersUpgrade, originUnprovenCopy, pageLocale } from "@/lib/workspace-failure-copy";
 import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion } from "@/lib/workspace-ask-copy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -57,7 +57,7 @@ import { clearSourceVersionUnavailable, filterPollableSourceVersions, isCurrentS
 import PipelineBoard from "@/components/pipeline-board";
 import CompileStage from "@/components/compile-stage";
 import { hasActiveSourceWork } from "@/lib/compile-stage-view";
-import { recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
+import { displayName, recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 import ConnectionsPanel from "@/components/connections-panel";
 import DeveloperPanel from "@/components/developer-panel";
@@ -1624,6 +1624,8 @@ export default function WorkspacePage() {
         state?: string;
         code?: string;
         message?: string;
+        /* CUSTOMER_SOURCE_ORIGIN_UNPROVEN: the selected files with no provable origin. */
+        documentIds?: string[];
         corpusId?: string;
         batchCount?: number;
         partsEnqueued?: number;
@@ -1671,6 +1673,10 @@ export default function WorkspacePage() {
     }
     if (!response.ok || !json.jobId) {
       if (json.code === "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE") setCustomerDataAccess("closed");
+      if (json.code === "CUSTOMER_SOURCE_ORIGIN_UNPROVEN" && json.documentIds?.length) {
+        setNotice(originUnprovenCopy(json.documentIds.map((id) => displayName(id, names)), pageLocale()));
+        return;
+      }
       setNotice(json.message ?? `Compile could not be started. ${failureSentence(json.code, response.status)}`);
       return;
     }

@@ -12,7 +12,14 @@ const BATCH_SIZE = 100;
 export type CustomerSourceScope = "direct_upload" | "connector";
 export type CustomerSourceScopeResult =
   | { ok: true; scope: CustomerSourceScope }
-  | { ok: false; code: "CUSTOMER_SOURCE_SCOPE_INVALID" | "CUSTOMER_SOURCE_SCOPE_UNAVAILABLE" };
+  | { ok: false; code: "CUSTOMER_SOURCE_SCOPE_INVALID" | "CUSTOMER_SOURCE_SCOPE_UNAVAILABLE" }
+  /*
+    The store answered, completely, and some documents have no origin in it: no connector binding
+    and no confirmed intake admission. That is a fact about those documents, not an outage, so it
+    is not 503 -- retrying cannot change it; uploading the file again (which writes an admission)
+    can. `documentIds` names them so the caller can say which files.
+  */
+  | { ok: false; code: "CUSTOMER_SOURCE_ORIGIN_UNPROVEN"; documentIds: string[] };
 
 type Config = NonNullable<ReturnType<typeof readSupabaseAdminConfig>>;
 
@@ -42,7 +49,8 @@ export async function readCustomerSourceScope(
   if (unbound.length > 0) {
     const admitted = await readPresentDocuments(config, "foundation_intake_admissions", workspaceKey, unbound);
     if (!admitted) return { ok: false, code: "CUSTOMER_SOURCE_SCOPE_UNAVAILABLE" };
-    if (unbound.some((id) => !admitted.has(id))) return { ok: false, code: "CUSTOMER_SOURCE_SCOPE_UNAVAILABLE" };
+    const unproven = unbound.filter((id) => !admitted.has(id));
+    if (unproven.length > 0) return { ok: false, code: "CUSTOMER_SOURCE_ORIGIN_UNPROVEN", documentIds: unproven };
   }
   return { ok: true, scope: bound.size > 0 ? "connector" : "direct_upload" };
 }

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import AuthCallbackPage from "../app/auth/callback/page";
 import { CompileJobPanel } from "../components/compile-job-panel";
 import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT } from "./workspace-ask-copy";
-import { blockedPanelCopy, FAILURE_COPY_CODES, failureSentence, isSizeLimitFailure, offersUpgrade, pageLocale, reviewReasonCopy, SIZE_LIMIT_FAILURE_CODES, sizeLimitFailureCopy } from "./workspace-failure-copy";
+import { blockedPanelCopy, FAILURE_COPY_CODES, originUnprovenCopy, failureSentence, isSizeLimitFailure, offersUpgrade, pageLocale, reviewReasonCopy, SIZE_LIMIT_FAILURE_CODES, sizeLimitFailureCopy } from "./workspace-failure-copy";
 
 const workspace = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
 const connections = readFileSync(new URL("../components/connections-panel.tsx", import.meta.url), "utf8");
@@ -286,5 +286,21 @@ describe("failure copy follows the page, not the browser", () => {
       expect(html).toContain("Measured size");
       expect(html).not.toMatch(HANGUL);
     }
+  });
+});
+
+describe("an unproven source origin names the files and asks for a re-upload, in the page's language", () => {
+  const HANGUL = /[ᄀ-ᇿ㄰-㆏가-힯]/;
+  it("lists every file it was given, says retrying will not help, and keeps each locale's script", () => {
+    const names = ["pump-manual.pdf", "valve-guide.pdf"];
+    const en = originUnprovenCopy(names, "en");
+    const ko = originUnprovenCopy(names, "ko");
+    for (const text of [en, ko]) for (const name of names) expect(text).toContain(name);
+    expect(en).toMatch(/Upload them again/);
+    expect(en).toMatch(/Retrying gives the same result/);
+    expect(en).not.toMatch(HANGUL);
+    expect(ko).toMatch(HANGUL);
+    expect(ko).toContain("다시 업로드");
+    expect(failureSentence("CUSTOMER_SOURCE_ORIGIN_UNPROVEN", 409)).not.toMatch(/servers could not/i);
   });
 });

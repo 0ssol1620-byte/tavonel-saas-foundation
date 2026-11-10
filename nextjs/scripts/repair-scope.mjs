@@ -3056,6 +3056,10 @@ export const CONNECTORS_DEVELOPER_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/c
 // read route, sequential candidate loading, the offline export verifier's bounds) and the end-to-end suite that walks it.
 export const WORLD_READ_CAP_AFFECTED_PATHS = Object.freeze(['app/api/collections/[id]/route.ts', 'app/api/v1/world/[id]/[lens]/route.ts', 'app/api/v1/world/[id]/route.ts', 'lib/active-world-source-access.ts', 'lib/collection-storage.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/world-read-model.ts', 'lib/world-rollback-source-access.ts', 'public/developer/tavonel-verify-export.mjs', 'scripts/verify-signed-export.mjs']);
 export const WORLD_READ_CAP_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error-codes.test.ts', 'lib/ask-route-limits.test.ts', 'lib/collection-download.test.ts', 'lib/collection-storage.test.ts', 'lib/compiler-contract.test.ts', 'lib/developer-distribution.test.ts', 'lib/export-route-authorization.test.ts', 'lib/grounded-ask.test.ts', 'lib/openapi-completeness.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/world-read-model.test.ts', 'lib/world-rollback-source-access.test.ts']);
+// source-origin-unproven-20261111: a document with no binding and no confirmed admission is a 409 naming it, not a 503
+// outage, on compile start and on every derived-data read (customer-source-scope, derived-data-admission and their callers).
+export const SOURCE_ORIGIN_UNPROVEN_AFFECTED_PATHS = Object.freeze(['app/api/compile-jobs/route.ts', 'lib/consumer-context-api.ts', 'lib/customer-source-scope.test.ts', 'lib/customer-source-scope.ts', 'lib/derived-data-admission.test.ts', 'lib/derived-data-admission.ts', 'lib/retrieval-pipeline.ts', 'lib/scoped-admission-boundaries.test.ts']);
+export const SOURCE_ORIGIN_UNPROVEN_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error-codes.test.ts', 'lib/collection-compile-run.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/corpus-batching.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/customer-source-scope.test.ts', 'lib/derived-data-admission.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/production-route-surface.test.ts', 'lib/retrieval-pipeline.test.ts', 'lib/route-classification.test.ts', 'lib/scoped-admission-boundaries.test.ts']);
 // revoke-not-plan-gated-20261110: the three revocation routes ask for membership and scope, never the plan ("Never let an ACL revoke wait").
 export const REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS = Object.freeze(['app/api/connections/[id]/route.ts', 'app/api/v1/oauth-connectors/connections/[id]/route.ts', 'lib/connection-revoke-not-plan-gated.test.ts']);
 export const REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES = Object.freeze(['lib/connection-revoke-not-plan-gated.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/google-drive-viewer-link-off.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts']);
@@ -3312,6 +3316,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // world-read-cap-20261110: 10 exact paths select 14 direct suites and no browser suite.
   affectedGroup('world-read-cap-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(WORLD_READ_CAP_AFFECTED_PATHS)})$`),
     { unitFiles: WORLD_READ_CAP_AFFECTED_UNIT_FILES }),
+  // source-origin-unproven-20261111: 8 exact paths select 12 direct suites and no browser suite.
+  affectedGroup('source-origin-unproven-20261111', new RegExp(`^nextjs/(?:${exactPathAlternation(SOURCE_ORIGIN_UNPROVEN_AFFECTED_PATHS)})$`),
+    { unitFiles: SOURCE_ORIGIN_UNPROVEN_AFFECTED_UNIT_FILES }),
   // revoke-not-plan-gated-20261110: 3 exact paths select 6 direct suites and no browser suite.
   affectedGroup('revoke-not-plan-gated-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS)})$`),
     { unitFiles: REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES }),

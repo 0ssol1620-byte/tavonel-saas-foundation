@@ -1,6 +1,6 @@
 import { loadActiveWorldSourceIds } from "./active-world-source-access";
 import { checkConnectorSourceAccess } from "./connector-source-access";
-import { admitsDerivedCustomerData, DERIVED_DATA_REFUSED } from "./derived-data-admission";
+import { derivedCustomerDataRefusal } from "./derived-data-admission";
 import { revalidateFoundationAuthorization, type FoundationPrincipal } from "./developer-auth";
 import type { DeveloperScope } from "./developer-contracts";
 import { getFoundationActiveWorld, getFoundationWorldVersion, type ActiveWorld } from "./world-store";
@@ -430,7 +430,8 @@ export async function releaseConsumerContext(input: {
   if (!sources.ok) return failure(sources.code, 503);
   const access = await checkConnectorSourceAccess(workspaceKey, sources.documentIds);
   if (!access.ok) return failure(access.code, access.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503);
-  if (!await admitsDerivedCustomerData(workspaceKey, sources.documentIds)) return failure(DERIVED_DATA_REFUSED, 403);
+  const derivedRefusal = await derivedCustomerDataRefusal(workspaceKey, sources.documentIds);
+  if (derivedRefusal) return failure(derivedRefusal.code, derivedRefusal.status);
 
   const current = await getFoundationActiveWorld(workspaceKey, collectionId);
   // No active World any more is the resolved one gone, not an outage.

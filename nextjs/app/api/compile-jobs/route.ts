@@ -76,7 +76,11 @@ export async function POST(request: Request) {
   let sourceScope: "direct_upload" | "connector" = "direct_upload";
   if (process.env.TAVONEL_CUSTOMER_DATA_GATE_VERSION === "v2") {
     const source = await readCustomerSourceScope(auth.principal.workspaceKey, documentIds);
-    if (!source.ok) return NextResponse.json({ code: source.code }, { status: 503, headers: HEADERS });
+    if (!source.ok) {
+      return source.code === "CUSTOMER_SOURCE_ORIGIN_UNPROVEN"
+        ? NextResponse.json({ code: source.code, documentIds: source.documentIds }, { status: 409, headers: HEADERS })
+        : NextResponse.json({ code: source.code }, { status: 503, headers: HEADERS });
+    }
     sourceScope = source.scope;
   }
   if (!await canAdmitCustomerSource(auth.principal.workspaceKey, sourceScope)) {
