@@ -401,6 +401,13 @@ describe("a World at the package size a 96 MiB Core produces", () => {
       expect(response.status).toBe(422);
       expect(await response.json()).toEqual(refusal);
     }
+    // Over the bound and damaged: integrity wins, so the alarm on INVALID still fires.
+    const damaged = { ...over, package: { ...over.package, files: over.package.files.map((file, index) =>
+      index === 0 ? { ...file, content: `${file.content} ` } : file) } };
+    artifacts = new Map([[keyFor(big), damaged as Fixture]]);
+    const damagedOpen = await openCollection(read(""), context);
+    expect([damagedOpen.status, await damagedOpen.json()]).toEqual([422, { code: "COLLECTION_PACKAGE_INVALID" }]);
+    artifacts = new Map([[keyFor(big), over as Fixture]]);
     const asked = await fetch(`${base}/api/v1/collections/${collection}/ask`, { method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ question }) });
     expect(asked.status).toBe(422);
