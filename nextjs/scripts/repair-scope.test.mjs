@@ -8336,3 +8336,20 @@ test('affected processing-ga-20261109 owner: 1 exact path selects 2 direct suite
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
 });
+
+// large-source-site-half (ADR-0006): one finite owner, restated independently.
+import { LARGE_SOURCE_SITE_HALF_AFFECTED_PATHS, LARGE_SOURCE_SITE_HALF_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected large-source-site-half owner: 8 exact paths select 8 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['nextjs/app/api/documents/[id]/source/route.ts', 'nextjs/lib/collection-source-access.test.ts', 'nextjs/lib/collection-source-access.ts', 'nextjs/lib/compile-artifact-provenance.ts', 'nextjs/lib/document-source-route.test.ts', 'nextjs/lib/immutable-keys.test.ts', 'nextjs/lib/immutable-keys.ts', 'nextjs/lib/pdf-evidence-viewer.test.ts'];
+  const suites = ['lib/collection-compile-run.test.ts', 'lib/collection-source-access.test.ts', 'lib/compile-artifact-provenance.test.ts', 'lib/compile-job-worker.test.ts', 'lib/document-source-route.test.ts', 'lib/documents-route.test.ts', 'lib/immutable-keys.test.ts', 'lib/pdf-evidence-viewer.test.ts'];
+  assert.deepEqual([[...LARGE_SOURCE_SITE_HALF_AFFECTED_PATHS], [...LARGE_SOURCE_SITE_HALF_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['large-source-site-half'], path);
+    const map = affectedMap([affectedRecord('M', [path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['large-source-site-half'], [], suites, [], []], path);
+  }
+  for (const adjacent of ['nextjs/lib/immutable-keys-v2.ts', 'nextjs/app/api/documents/[id]/source/route.test.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});

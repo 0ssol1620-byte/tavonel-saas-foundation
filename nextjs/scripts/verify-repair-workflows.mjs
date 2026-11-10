@@ -1021,6 +1021,14 @@ assert(VITEST_DISCOVERY_CONFIG_PATH==='nextjs/vitest.config.ts'&&discoveryOwners
     && ['nextjs/lib/usage-pricing.ts', 'shared/capabilityManifest.ts'].every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && ceilingOwners[0].match.test(p))
     && ['nextjs/lib/usage-pricing-v2.ts', 'shared/capabilityManifest.test.ts'].every(p => !ceilingOwners[0].match.test(p)),
     'large-source-intake-ceiling owner must keep its two exact paths, three direct suites and no neighbour admission');
+  // The segmented-source listing, compile and source route: one exact owner with eight direct suites, nothing adjacent.
+  const siteHalfOwners = AFFECTED_GROUPS.filter(o => o.group === 'large-source-site-half');
+  assert(siteHalfOwners.length === 1
+    && JSON.stringify(siteHalfOwners[0].unitFiles) === JSON.stringify(['lib/collection-compile-run.test.ts', 'lib/collection-source-access.test.ts', 'lib/compile-artifact-provenance.test.ts', 'lib/compile-job-worker.test.ts', 'lib/document-source-route.test.ts', 'lib/documents-route.test.ts', 'lib/immutable-keys.test.ts', 'lib/pdf-evidence-viewer.test.ts'])
+    && !siteHalfOwners[0].browserFiles.length && !siteHalfOwners[0].databaseTests.length && !siteHalfOwners[0].nativeReuse
+    && ['nextjs/app/api/documents/[id]/source/route.ts', 'nextjs/lib/collection-source-access.test.ts', 'nextjs/lib/collection-source-access.ts', 'nextjs/lib/compile-artifact-provenance.ts', 'nextjs/lib/document-source-route.test.ts', 'nextjs/lib/immutable-keys.test.ts', 'nextjs/lib/immutable-keys.ts', 'nextjs/lib/pdf-evidence-viewer.test.ts'].every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && siteHalfOwners[0].match.test(p))
+    && ['nextjs/lib/immutable-keys-v2.ts', 'nextjs/lib/collection-source-access-v2.ts'].every(p => !siteHalfOwners[0].match.test(p)),
+    'large-source-site-half owner must keep its eight exact paths, eight direct suites and no neighbour admission');
 }
 console.log(`Workflow static gates pass. Full qualification still pending for exact CI/Launch runs at this head.`);
 
