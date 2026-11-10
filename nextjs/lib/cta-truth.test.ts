@@ -205,7 +205,7 @@ const SAMPLE_KO = { href: "/explore", label: "컴파일된 샘플 열기" };
 */
 const CLOSED = {
   header: { href: "/contact", label: "Request access" },
-  headerKo: { href: "/contact", label: "이용 문의" },
+  headerKo: { href: "/ko/contact", label: "이용 문의" },
   home: {
     primary: { href: "/evaluation", label: "Evaluate your documents" },
     secondary: SAMPLE,

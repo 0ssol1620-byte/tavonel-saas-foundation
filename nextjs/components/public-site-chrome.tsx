@@ -164,7 +164,10 @@ export function PublicSiteHeader({
     (BA-232) and passes nothing gets the closed posture, which is the truthful default.
   */
   const resolved = primaryCallToAction();
-  const action = start ?? { href: resolved.href, label: korean ? KO_CHROME.cta[resolved.href] ?? resolved.label : resolved.label };
+  // Korean pages send /contact to its Korean page, the one KO_FOOTER_PAGES names (lib/guide-content.test.ts).
+  const action = start ?? (korean
+    ? { href: resolved.href === "/contact" ? "/ko/contact" : resolved.href, label: KO_CHROME.cta[resolved.href] ?? resolved.label }
+    : resolved);
   return (
     <header className={`nav chrome-v2-header ${chrome.header}`}>
       <HeaderScrollState />
