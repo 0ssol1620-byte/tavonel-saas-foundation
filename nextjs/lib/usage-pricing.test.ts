@@ -5,6 +5,7 @@ import {
   canAuthorizeCharge,
   canReserveAgainst,
   estimateBillablePages,
+  intakePageBasisLabel,
   pageCountLabel,
   pageEstimateConfidence,
   quoteCompilePages,
@@ -36,6 +37,41 @@ describe("page-based compile pricing", () => {
     ]);
     expect(mixed.ok && mixed.quote.maximumPages).toBe(84);
     expect(mixed.ok && mixed.quote.maximumCredits).toBe(504);
+  });
+
+  /*
+    ADR-0006: a PDF or DOCX is read as page ranges, so a counted one is approved up to 500 pages.
+    Nothing else is segmented, and nothing uncounted is approved past one request's 80 pages --
+    the database refuses either (20261110041500).
+  */
+  it("approves a counted PDF or DOCX up to the segmented ceiling, and nothing else past one request", () => {
+    const pdf = "application/pdf";
+    const docx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const pptx = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    expect([PROCESSING_CEILING.maxSourcePages, PROCESSING_CEILING.maxUnsegmentedSourcePages]).toEqual([500, 80]);
+    const quote = (mimeType: string, claimedPages: number | null, claimedBasis: "pdf_page_tree" | "docx_declared" | "pptx_slides" | null) =>
+      quoteIntakeManifest([{ bytes: 80_000, mimeType, claimedPages, claimedBasis }]);
+
+    const longPdf = quote(pdf, 500, "pdf_page_tree");
+    expect(longPdf.ok && longPdf.quote.files[0]).toMatchObject({ pageBasis: "measured", approvedMaxPages: 500 });
+    const longDocx = quote(docx, 500, "docx_declared");
+    expect(longDocx.ok && longDocx.quote.files[0]).toMatchObject({ pageBasis: "declared", approvedMaxPages: 500 });
+
+    expect(quote(pdf, 501, "pdf_page_tree")).toEqual({ ok: false, code: "SOURCE_EXCEEDS_PROCESSING_CEILING", index: 0 });
+    expect(quote(docx, 501, "docx_declared")).toEqual({ ok: false, code: "SOURCE_EXCEEDS_PROCESSING_CEILING", index: 0 });
+    // Counted, but not segmented: a deck stays at one request's pages.
+    expect(quote(pptx, 80, "pptx_slides").ok).toBe(true);
+    expect(quote(pptx, 81, "pptx_slides")).toEqual({ ok: false, code: "SOURCE_EXCEEDS_PROCESSING_CEILING", index: 0 });
+
+    // No count: approved at 80 even for a segmented format, never at 500.
+    for (const mimeType of [pdf, docx, pptx]) {
+      const unknown = quote(mimeType, null, null);
+      expect(unknown.ok && unknown.quote.files[0], mimeType).toMatchObject({ pageBasis: "unknown", approvedMaxPages: 80 });
+    }
+    // A claim borrowed from another format is no count at all.
+    const borrowed = quote(pptx, 400, "pdf_page_tree");
+    expect(borrowed.ok && borrowed.quote.files[0]).toMatchObject({ pageBasis: "unknown", approvedMaxPages: 80 });
+    expect(intakePageBasisLabel("unknown")).toBe("Not counted yet — approved at the 80-page processing ceiling");
   });
 
   it("quotes standard and hard maximum usage in pages and dollars", () => {
@@ -176,7 +212,7 @@ describe("what an uncounted source reserves", () => {
   it("reserves the deployment's page ceiling when the format states no count", () => {
     expect(estimateBillablePages({ bytes: 2_000_000, mimeType: SPREADSHEET })).toBeNull();
     expect(reservationPageCeiling({ bytes: 2_000_000, mimeType: SPREADSHEET }))
-      .toBe(PROCESSING_CEILING.maxSourcePages);
+      .toBe(PROCESSING_CEILING.maxUnsegmentedSourcePages);
     // Not one page, which is what both call sites held before this.
     expect(reservationPageCeiling({ bytes: 2_000_000, mimeType: SPREADSHEET })).toBeGreaterThan(1);
   });
@@ -191,7 +227,7 @@ describe("what an uncounted source reserves", () => {
   it("reserves nothing above the ceiling for a source that cannot be read at all", () => {
     // An unreadable request (zero bytes) still gets a bounded hold rather than an unbounded one.
     expect(reservationPageCeiling({ bytes: 0, mimeType: SPREADSHEET }))
-      .toBe(PROCESSING_CEILING.maxSourcePages);
+      .toBe(PROCESSING_CEILING.maxUnsegmentedSourcePages);
   });
 
   /*

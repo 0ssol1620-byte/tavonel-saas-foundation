@@ -21,7 +21,9 @@ import {
   INTAKE_CEILING_STAGES,
   OCR_JSON_MAX_BYTES,
   PROCESSING_CEILING,
+  SEGMENTED_SOURCE_MIMES,
   intakeCeilingFor,
+  maxSourcePagesFor,
 } from "../../shared/intakeCeiling";
 import { MAX_DERIVED_JSON_BYTES } from "./r2-objects";
 
@@ -54,7 +56,9 @@ const declaredInCeiling = (name: string) =>
 // compared with its own copy: raising one processor and its copy together is not a disagreement.
 const WORKER_SOURCE_BYTES = declaredInCeiling("WORKER_MAX_SOURCE_BYTES");
 const CDR_INPUT_BYTES = declaredInCeiling("CDR_MAX_INPUT_BYTES");
+// Pages per CDR request. A segmented source (ADR-0006) is read as ranges of at most this many.
 const PAGES = INTAKE_CEILING_STAGES[0].maxSourcePages;
+const SEGMENTED_PAGES = declaredInCeiling("CDR_SEGMENTED_MAX_DOCUMENT_PAGES");
 const STAGE_1_PAGES = INTAKE_CEILING_STAGES[1].maxSourcePages;
 const MIB = 1024 * 1024;
 const RASTER_HANDOFF_BYTES = 18 * MIB;
@@ -76,15 +80,31 @@ const SITES: readonly Site[] = [
   },
   {
     file: CDR, name: "MAX_PAGES", pattern: /^MAX_PAGES: Final = (.+)$/gm,
-    expected: PAGES, source: "PROCESSING_CEILING.maxSourcePages",
+    expected: PAGES, source: "INTAKE_CEILING_STAGES[0].maxSourcePages: pages per CDR request",
+  },
+  {
+    file: CDR, name: "SEGMENTED_MAX_DOCUMENT_PAGES", pattern: /^SEGMENTED_MAX_DOCUMENT_PAGES: Final = (.+)$/gm,
+    expected: SEGMENTED_PAGES, source: "intakeCeiling.ts CDR_SEGMENTED_MAX_DOCUMENT_PAGES: PROCESSING_CEILING.maxSourcePages for a PDF or DOCX",
+  },
+  {
+    file: WORKER_SANITIZE, name: "MAX_SEGMENTED_SOURCE_PAGES", pattern: /^export const MAX_SEGMENTED_SOURCE_PAGES = (.+);$/gm,
+    expected: SEGMENTED_PAGES, source: "intakeCeiling.ts CDR_SEGMENTED_MAX_DOCUMENT_PAGES: the worker segments what the CDR renders",
+  },
+  {
+    file: WORKER_OCR, name: "MAX_RANGE_DOCUMENT_PAGES", pattern: /^const MAX_RANGE_DOCUMENT_PAGES = (.+);$/gm,
+    expected: SEGMENTED_PAGES, source: "intakeCeiling.ts CDR_SEGMENTED_MAX_DOCUMENT_PAGES: the range reader's loop bound",
+  },
+  {
+    file: WORKER_SANITIZE, name: "MAX_SEGMENT_PAGES", pattern: /^const MAX_SEGMENT_PAGES = (.+);$/gm,
+    expected: PAGES, source: "INTAKE_CEILING_STAGES[0].maxSourcePages: one range is one CDR request",
   },
   {
     file: GPU, name: "MAX_PAGES", pattern: /^MAX_PAGES: Final = (.+)$/gm,
-    expected: PAGES, source: "PROCESSING_CEILING.maxSourcePages: the reader reads every page the rasterizer renders",
+    expected: PAGES, source: "INTAKE_CEILING_STAGES[0].maxSourcePages: the reader reads every page the rasterizer renders",
   },
   {
     file: WORKER_OCR, name: "STAGE_0_OCR_BOUNDS pages", pattern: ocrBounds(0, "pages"),
-    expected: PAGES, source: "PROCESSING_CEILING.maxSourcePages: the worker keeps every page the reader returns",
+    expected: PAGES, source: "INTAKE_CEILING_STAGES[0].maxSourcePages: the worker keeps every page the reader returns",
   },
   {
     file: CDR, name: "MAX_OUTPUT_BYTES", pattern: /^MAX_OUTPUT_BYTES: Final = (.+)$/gm,
@@ -213,7 +233,22 @@ describe("hidden copies of the intake ceiling", () => {
   it("parses the same copies intakeCeiling.ts computes its ceiling from", () => {
     expect(Number.isInteger(WORKER_SOURCE_BYTES) && Number.isInteger(CDR_INPUT_BYTES)).toBe(true);
     expect(PROCESSING_CEILING.maxSourceBytes).toBe(Math.min(WORKER_SOURCE_BYTES, CDR_INPUT_BYTES));
-    expect(PROCESSING_CEILING.maxSourcePages).toBe(declaredInCeiling("CDR_MAX_PAGES"));
+    expect(PROCESSING_CEILING.maxUnsegmentedSourcePages).toBe(declaredInCeiling("CDR_MAX_PAGES"));
+    expect(PROCESSING_CEILING.maxSourcePages).toBe(SEGMENTED_PAGES);
+  });
+
+  it("segment exactly the formats the worker segments, and hold every other one to one request", () => {
+    const sanitize = fromTree(WORKER_SANITIZE);
+    const opened = sanitize.indexOf("const SEGMENTABLE_MIMES: ReadonlySet<string> = new Set([");
+    expect(opened, "SEGMENTABLE_MIMES is declared in the worker").toBeGreaterThan(-1);
+    const declared = sanitize.slice(opened, sanitize.indexOf("]);", opened));
+    const workerMimes = [...declared.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+    expect(workerMimes.length).toBeGreaterThan(0);
+    expect(new Set(workerMimes)).toEqual(SEGMENTED_SOURCE_MIMES);
+    for (const mime of SEGMENTED_SOURCE_MIMES) expect(maxSourcePagesFor(mime), mime).toBe(SEGMENTED_PAGES);
+    for (const mime of ["application/vnd.openxmlformats-officedocument.presentationml.presentation", "image/png", "text/csv", ""]) {
+      expect(maxSourcePagesFor(mime), mime).toBe(PAGES);
+    }
   });
 
   it("agree with intakeCeiling.ts and the pinned downstream bounds in every tree", () => {
@@ -290,7 +325,13 @@ describe("hidden copies of the intake ceiling", () => {
   */
   it("ship intake at stage 0, with stage 1 at the section 4.D numbers", () => {
     expect(INTAKE_CEILING_STAGE).toBe(0);
-    expect(PROCESSING_CEILING).toEqual(INTAKE_CEILING_STAGES[0]);
+    expect(PROCESSING_CEILING).toEqual({
+      maxSourceBytes: INTAKE_CEILING_STAGES[0].maxSourceBytes,
+      maxSourcePages: 500,
+      maxUnsegmentedSourcePages: INTAKE_CEILING_STAGES[0].maxSourcePages,
+    });
+    // Stage 1 raises the pages per request, not the pages in a segmented source.
+    expect(intakeCeilingFor(1).PROCESSING_CEILING).toEqual({ maxSourceBytes: 25 * MIB, maxSourcePages: 500, maxUnsegmentedSourcePages: 200 });
     expect(INTAKE_CEILING_STAGES).toEqual({
       0: { maxSourceBytes: 5 * MIB, maxSourcePages: 80 },
       1: { maxSourceBytes: 25 * MIB, maxSourcePages: 200 },

@@ -103,14 +103,16 @@ describe("intake at the D1 stage-1 ceiling", () => {
     await expect(response.json()).resolves.toEqual({
       code: "SOURCE_EXCEEDS_PROCESSING_CEILING",
       maxBytes: STAGE_1_BYTES,
-      maxPages: 200,
-      limit: "TAVONEL processes sources up to 25 MB and 200 pages.",
+      // A byte refusal names the largest page count any source may have: a segmented PDF's, which
+      // stage 1 does not move (it raises the pages per request, 200 here).
+      maxPages: 500,
+      limit: "TAVONEL processes sources up to 25 MB, and up to 500 pages for a PDF or Word file or 200 pages for any other format.",
     });
     expect(mocks.calls).toEqual([]);
   });
 
-  // Pages are not checked here at any stage: intake never decodes the document (intakeCeiling.ts
-  // rule 2). The stage-1 page boundary (200 renders, 201 is refused 422) is proven where it is
+  // Intake never decodes the document (intakeCeiling.ts rule 2): it checks only a page count the
+  // browser read, against the format's ceiling. The stage-1 page boundary (200 renders, 201 is refused 422) is proven where it is
   // enforced: cdr-cloudrun tests/test_measurement_limits.py IntakeCeilingStageTest, and the
   // reader and worker bounds in their own suites.
 });

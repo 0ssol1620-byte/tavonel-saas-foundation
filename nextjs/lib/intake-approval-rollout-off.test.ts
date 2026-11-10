@@ -187,6 +187,31 @@ describe("intake approval lineage off (the production default)", () => {
     expect(at.status).toBe(200);
   });
 
+  it("holds a Word file to the segmented ceiling and every other format to one request's pages", async () => {
+    // ADR-0006: only PDF and DOCX are read as page ranges, so only they pass 80 pages.
+    const ask = (originalFilename: string, declaredMimeType: string, estimatedPages: number) =>
+      capabilityPost(json("https://tavonel.com/api/uploads/capability", {
+        originalFilename, declaredMimeType, requestedBytes: 2048, estimatedPages,
+      }));
+    const docx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const pptx = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    expect(PROCESSING_CEILING.maxSourcePages).toBe(500);
+
+    expect((await ask("manual.docx", docx, 500)).status).toBe(200);
+
+    mocks.calls.length = 0;
+    const longDocx = await ask("manual.docx", docx, 501);
+    expect(longDocx.status).toBe(413);
+    await expect(longDocx.json()).resolves.toMatchObject({ code: "SOURCE_EXCEEDS_PROCESSING_CEILING", maxPages: 500 });
+
+    const longDeck = await ask("deck.pptx", pptx, PROCESSING_CEILING.maxUnsegmentedSourcePages + 1);
+    expect(longDeck.status).toBe(413);
+    await expect(longDeck.json()).resolves.toMatchObject({
+      code: "SOURCE_EXCEEDS_PROCESSING_CEILING", maxPages: PROCESSING_CEILING.maxUnsegmentedSourcePages, limit: PROCESSING_CEILING_SENTENCE,
+    });
+    expect(mocks.calls).toEqual([]);
+  });
+
   it("sends the count the browser measured, so the refusal above happens before upload", () => {
     // The workspace measured every staged file and then dropped the counts on this path.
     const page = readFileSync(join(process.cwd(), "app/workspace/page.tsx"), "utf8");

@@ -28,6 +28,7 @@ import {
   PROCESSING_CEILING_SENTENCE,
 } from "@/lib/r2-presign";
 import { intakePricingFingerprint, quoteIntakeManifest } from "@/lib/usage-pricing";
+import { maxSourcePagesFor } from "../../../../../shared/intakeCeiling";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -158,7 +159,7 @@ export async function POST(request: Request) {
       ? refuse(quoted.code, 413, {
         index: quoted.index,
         maxBytes: FOUNDATION_INTAKE_MAX_BYTES,
-        maxPages: PROCESSING_CEILING.maxSourcePages,
+        maxPages: maxSourcePagesFor(entries[quoted.index]?.mimeType ?? ""),
         limit: PROCESSING_CEILING_SENTENCE,
       })
       : refuse(quoted.code, 400, { index: quoted.index });
