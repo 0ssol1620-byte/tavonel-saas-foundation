@@ -134,8 +134,9 @@ describe("approved one-path experience", () => {
     expect(disclosure).toContain("<CompileStagePlayer");
     expect(disclosure).toContain("preferVideo");
     expect(disclosure).toContain("priorityPoster");
-    // FINAL-SPEC 2026-10-26 D-9: shorter wording, same disclosure (illustrative, not customer results).
-    expect(disclosure).toContain("Illustrative demo · not customer results.");
+    // Founder 2026-11-10: the caption names what the film is (a walkthrough on sample files) instead of what it is not.
+    expect(disclosure).toContain("Product walkthrough on sample files");
+    expect(disclosure).not.toContain("not customer results");
     // Founder ask 2026-10-27 (over FINAL-SPEC 2026-10-26 §2.1's Focus), kept for R3 (2026-11-09): Home opens compact at every width; Focus details expands.
     expect(disclosure).toContain('LANDING_MOBILE_FILM_VIEW: MobileFilmView = "fit"');
     expect(disclosure).toContain('LANDING_WIDE_FILM_VIEW: WideView = "fit"');

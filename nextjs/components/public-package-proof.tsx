@@ -96,7 +96,7 @@ export default function PublicPackageProof({ artifact, sources, runtime }: {
     </div>
     <details className={styles.integrity}>
       <summary>Sample sources and integrity</summary>
-      <p>This is a public sample compiled by the TypeScript sample engine, not a customer compile or an activated customer World.</p>
+      <p>A public sample compiled by the TypeScript sample engine.</p>
       <dl className={styles.record}>
         <div><dt>Engine</dt><dd><code>{runtime}</code></dd></div>
         <div><dt>Manifest digest</dt><dd><code>{artifact.manifestDigest}</code></dd></div>
