@@ -8,14 +8,17 @@
 --
 -- Now:
 --   1. source_deletion_inventory_digests keeps the worker's per-object digests between runs, keyed
---      by (deletion_id, object_key) with the listed size. It is a work table, not evidence: the
---      worker discards it whenever the listing no longer matches it, and nothing is sealed from it
---      except through 4.
+--      by (deletion_id, object_key) with the listed size and the listed R2 ETag. The ETag is what
+--      makes a rewrite of a key at the same size visible between runs. It is a work table, not
+--      evidence: the worker discards it whenever the listing no longer matches it (key, size or
+--      ETag), and nothing is sealed from it except through 4.
 --   2. record_source_deletion_inventory_digest upserts one hashed object, under the deletion's
 --      advisory lock. It refuses the 16,385th object and a set past 64 GiB (68,719,476,736 bytes):
 --      128 documents (the candidate's own bound) x 128 objects, and x 512 MiB.
 --   3. read_source_deletion_inventory_digests returns the rows ordered by key, and
---      digestSetSha256 over exactly that array. discard_source_deletion_inventory_digests empties
+--      digestSetSha256 over exactly that array, ETags included -- so the seal in 4 refuses a set
+--      whose ETags changed as it refuses one whose digests did. attest_source_deletion_inventory
+--      reads only key, sha256 and sizeBytes from each object, so its manifest is unchanged. discard_source_deletion_inventory_digests empties
 --      the rows of one deletion.
 --   4. seal_source_deletion_inventory takes the digestSetSha256 the worker read after it checked
 --      the rows against two identical listings. Under the same lock it recomputes the set; any row
@@ -38,6 +41,7 @@ create table public.source_deletion_inventory_digests (
   object_key text not null check (length(object_key) between 1 and 1024),
   size_bytes bigint not null check (size_bytes between 0 and 67108864),
   object_sha256 text not null check (object_sha256 ~ '^sha256:[a-f0-9]{64}$'),
+  etag text not null check (etag ~ '^[A-Za-z0-9_-]{1,128}$'),
   recorded_at timestamptz not null default clock_timestamp(),
   primary key (deletion_id, object_key)
 );
@@ -46,7 +50,7 @@ alter table public.source_deletion_inventory_digests enable row level security;
 revoke all on public.source_deletion_inventory_digests from public, anon, authenticated, service_role;
 
 create or replace function public.record_source_deletion_inventory_digest(
-  p_deletion_id text, p_object_key text, p_size_bytes bigint, p_sha256 text
+  p_deletion_id text, p_object_key text, p_size_bytes bigint, p_sha256 text, p_etag text
 ) returns void
 language plpgsql
 security definer
@@ -59,7 +63,8 @@ begin
   if p_deletion_id is null or p_deletion_id !~ '^sha256:[a-f0-9]{64}$'
      or p_object_key is null or length(p_object_key) not between 1 and 1024
      or p_size_bytes is null or p_size_bytes not between 0 and 67108864
-     or p_sha256 is null or p_sha256 !~ '^sha256:[a-f0-9]{64}$' then
+     or p_sha256 is null or p_sha256 !~ '^sha256:[a-f0-9]{64}$'
+     or p_etag is null or p_etag !~ '^[A-Za-z0-9_-]{1,128}$' then
     raise exception 'SOURCE_DELETION_INVENTORY_OBJECT_INVALID';
   end if;
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_deletion_id, 0));
@@ -74,11 +79,12 @@ begin
   if v_count >= 16384 then raise exception 'SOURCE_DELETION_INVENTORY_OBJECT_LIMIT'; end if;
   if v_bytes + p_size_bytes > 68719476736 then raise exception 'SOURCE_DELETION_INVENTORY_TOTAL_TOO_LARGE'; end if;
 
-  insert into public.source_deletion_inventory_digests (deletion_id, object_key, size_bytes, object_sha256)
-  values (p_deletion_id, p_object_key, p_size_bytes, p_sha256)
+  insert into public.source_deletion_inventory_digests (deletion_id, object_key, size_bytes, object_sha256, etag)
+  values (p_deletion_id, p_object_key, p_size_bytes, p_sha256, p_etag)
   on conflict (deletion_id, object_key) do update
     set size_bytes = excluded.size_bytes,
         object_sha256 = excluded.object_sha256,
+        etag = excluded.etag,
         recorded_at = pg_catalog.clock_timestamp();
 end;
 $$;
@@ -97,7 +103,7 @@ begin
     raise exception 'SOURCE_DELETION_INVENTORY_INVALID';
   end if;
   select coalesce(pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
-           'key', d.object_key, 'sha256', d.object_sha256, 'sizeBytes', d.size_bytes)
+           'key', d.object_key, 'sha256', d.object_sha256, 'sizeBytes', d.size_bytes, 'etag', d.etag)
            order by d.object_key collate "C"), '[]'::jsonb)
     into v_objects
     from public.source_deletion_inventory_digests d
@@ -175,12 +181,12 @@ begin
 end;
 $$;
 
-revoke all on function public.record_source_deletion_inventory_digest(text, text, bigint, text),
+revoke all on function public.record_source_deletion_inventory_digest(text, text, bigint, text, text),
   public.read_source_deletion_inventory_digests(text),
   public.discard_source_deletion_inventory_digests(text),
   public.seal_source_deletion_inventory(text, text, jsonb)
   from public, anon, authenticated;
-grant execute on function public.record_source_deletion_inventory_digest(text, text, bigint, text),
+grant execute on function public.record_source_deletion_inventory_digest(text, text, bigint, text, text),
   public.read_source_deletion_inventory_digests(text),
   public.discard_source_deletion_inventory_digests(text),
   public.seal_source_deletion_inventory(text, text, jsonb)

@@ -14,7 +14,15 @@ import {
 export type SourceInventoryObject = {
   key: string;
   sizeBytes: number;
+  /**
+   * The listed R2 ETag, unquoted. Key and size alone miss a key rewritten at the same size between
+   * two runs; the ETag changes with the bytes, so a digest persisted against another ETag is stale.
+   */
+  etag: string;
 };
+
+/** What the database accepts (20261110043000): R2 MD5 hex, or `<hex>-<parts>` for a multipart upload. */
+export const INVENTORY_ETAG_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 
 export type SourceInventoryHashedObject = SourceInventoryObject & {
   sha256: string;
@@ -130,7 +138,7 @@ export async function listFoundationSourceInventory(
     return { ok: false, code: "SOURCE_INVENTORY_SCOPE_INVALID" };
   }
 
-  const byKey = new Map<string, number>();
+  const byKey = new Map<string, { sizeBytes: number; etag: string }>();
   let totalBytes = 0;
   const scans = [
     ...[...documentIds].sort().flatMap((documentId) =>
@@ -153,7 +161,10 @@ export async function listFoundationSourceInventory(
         const block = match[1] ?? "";
         const key = decodeXml(/<Key>([\s\S]*?)<\/Key>/i.exec(block)?.[1] ?? "");
         const rawSize = /<Size>(\d+)<\/Size>/i.exec(block)?.[1] ?? "";
-        if (!key || !/^\d+$/.test(rawSize)) return { ok: false, code: "SOURCE_INVENTORY_LIST_INVALID" };
+        const etag = decodeXml(/<ETag>([\s\S]*?)<\/ETag>/i.exec(block)?.[1] ?? "").replaceAll('"', "");
+        if (!key || !/^\d+$/.test(rawSize) || !INVENTORY_ETAG_PATTERN.test(etag)) {
+          return { ok: false, code: "SOURCE_INVENTORY_LIST_INVALID" };
+        }
         // A longer key that merely starts with the World key belongs to no one named here.
         if (exact && key !== prefix) continue;
         const sizeBytes = Number(rawSize);
@@ -164,11 +175,11 @@ export async function listFoundationSourceInventory(
           return { ok: false, code: "SOURCE_INVENTORY_OBJECT_OUT_OF_SCOPE" };
         }
         const prior = byKey.get(key);
-        if (prior !== undefined && prior !== sizeBytes) {
+        if (prior !== undefined && (prior.sizeBytes !== sizeBytes || prior.etag !== etag)) {
           return { ok: false, code: "SOURCE_INVENTORY_LIST_CHANGED" };
         }
         if (prior === undefined) {
-          byKey.set(key, sizeBytes);
+          byKey.set(key, { sizeBytes, etag });
           totalBytes += sizeBytes;
           if (byKey.size > MAX_INVENTORY_OBJECTS) return { ok: false, code: "SOURCE_INVENTORY_OBJECT_LIMIT" };
           if (totalBytes > MAX_TOTAL_BYTES) return { ok: false, code: "SOURCE_INVENTORY_TOTAL_TOO_LARGE" };
@@ -185,7 +196,7 @@ export async function listFoundationSourceInventory(
   return {
     ok: true,
     objects: [...byKey.entries()].sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, sizeBytes]) => ({ key, sizeBytes })),
+      .map(([key, { sizeBytes, etag }]) => ({ key, sizeBytes, etag })),
   };
 }
 
@@ -208,7 +219,10 @@ export async function hashFoundationSourceInventoryObject(
     return { ok: false, code: "SOURCE_INVENTORY_READ_FAILED" };
   }
   const declared = response.headers.get("content-length");
-  if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) !== object.sizeBytes)) {
+  const servedEtag = response.headers.get("etag");
+  // Rewritten between the listing and this read: the bytes below would not be the listed object.
+  if ((servedEtag !== null && servedEtag.replaceAll('"', "") !== object.etag)
+    || (declared !== null && (!/^\d+$/.test(declared) || Number(declared) !== object.sizeBytes))) {
     await response.body.cancel().catch(() => undefined);
     return { ok: false, code: "SOURCE_INVENTORY_LIST_CHANGED" };
   }

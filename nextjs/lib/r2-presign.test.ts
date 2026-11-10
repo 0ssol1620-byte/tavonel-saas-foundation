@@ -29,6 +29,15 @@ describe("foundation quarantine presign guards", () => {
     expect(FOUNDATION_TRIAL_INTAKE_MAX_BYTES).toBeGreaterThan(0);
   });
 
+  it("mints a PUT url only for a source key, never for a sibling the worker trusts (#242 R1)", () => {
+    const signer = { accountId: "acct", bucket: FOUNDATION_R2_BUCKET, accessKeyId: "AKIAEXAMPLE", secretAccessKey: "secret" };
+    for (const key of ["quarantine/pilot/doc/approval.json", "quarantine/pilot/doc/cdr-reject.json", "quarantine/pilot/doc/source.bin",
+      "quarantine/pilot/doc/source/x", "quarantine/pilot/source", "quarantine/pi.lot/doc/source"]) {
+      expect(presignFoundationQuarantinePut(signer, { key, contentType: "application/pdf", contentLength: 12, expiresInSeconds: 300 }), key)
+        .toMatchObject({ ok: false });
+    }
+  });
+
   it("mints a PUT url only for the Foundation quarantine prefix", () => {
     const result = presignFoundationQuarantinePut(
       { accountId: "acct", bucket: FOUNDATION_R2_BUCKET, accessKeyId: "AKIAEXAMPLE", secretAccessKey: "secret" },

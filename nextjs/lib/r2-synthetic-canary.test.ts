@@ -253,4 +253,12 @@ describe("CDR refusal receipt", () => {
     expect(validateCdrRejectReceipt({ ...receipt, observedBytes: -1 }, workspaceKey, documentId)).toBeNull();
     expect(validateCdrRejectReceipt({ ...receipt, observedBytes: "6291456" }, workspaceKey, documentId)).toBeNull();
   });
+
+  it("carries the page counts of a source refused for more pages than its approval, both or neither (F1)", () => {
+    expect(validateCdrRejectReceipt({ ...receipt, observedPages: 240, approvedMaxPages: 80 }, workspaceKey, documentId))
+      .toMatchObject({ reasonCode: "PARSER_OOM", observedPages: 240, approvedMaxPages: 80 });
+    expect(validateCdrRejectReceipt({ ...receipt, observedPages: 240 }, workspaceKey, documentId)).toBeNull();
+    expect(validateCdrRejectReceipt({ ...receipt, observedPages: 0, approvedMaxPages: 80 }, workspaceKey, documentId)).toBeNull();
+    expect(validateCdrRejectReceipt({ ...receipt, observedPages: "240", approvedMaxPages: 80 }, workspaceKey, documentId)).toBeNull();
+  });
 });

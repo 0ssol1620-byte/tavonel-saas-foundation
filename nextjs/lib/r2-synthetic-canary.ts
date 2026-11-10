@@ -1,5 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { failureClasses } from "../../shared/uskcEnums";
+import { parseSourceApproval, sourceApprovalKey, type SourceApproval } from "../../shared/sourceApproval";
 import { isKeyInsideWorkspacePrefix, PROBE_WORKSPACE_PATTERN, WORKSPACE_ID_PATTERN } from "./immutable-keys";
 
 export const FOUNDATION_R2_BUCKET = "tavonel-saas-foundation-quarantine";
@@ -380,6 +381,40 @@ export async function sealFoundationTriageSource(
   return { ok: true as const, key, sha256: verified.sha256, byteLength: verified.byteLength, etag: verified.etag, replay: false };
 }
 
+/**
+ * Write the approval beside the source, create-once, before its upload URL exists (ADR-0006 F1).
+ *
+ * The worker reads only within the pages written here. The key is the source's sibling and no
+ * presigner issues a URL for it, so only this server can write it. A replay of the same capability
+ * finds the same bytes and succeeds; different bytes for one document are a conflict, never an
+ * overwrite.
+ */
+export async function putFoundationSourceApproval(
+  env: R2SignerEnv,
+  workspaceKey: string,
+  approval: SourceApproval,
+  now = new Date(),
+): Promise<{ ok: true } | { ok: false; code: string }> {
+  const sourceKey = `quarantine/${workspaceKey}/${approval.documentId}/source`;
+  if (assertFoundationQuarantineKey(env.bucket, workspaceKey, approval.documentId, sourceKey)
+    || !WORKSPACE_ID_PATTERN.test(workspaceKey) || !DOCUMENT_SEGMENT.test(approval.documentId)
+    || parseSourceApproval(approval, approval.documentId) === null) {
+    return { ok: false, code: "SOURCE_APPROVAL_INVALID" };
+  }
+  const key = sourceApprovalKey(workspaceKey, approval.documentId);
+  const body = Buffer.from(`${JSON.stringify(approval)}\n`, "utf8");
+  const put = await signedS3Response(env, "PUT", key, body, now, { "if-none-match": "*" }, "application/json");
+  await put?.body?.cancel().catch(() => {});
+  if (put && (put.status === 200 || put.status === 204)) return { ok: true };
+  if (put?.status !== 412) return { ok: false, code: "SOURCE_APPROVAL_WRITE_FAILED" };
+  const existing = await signedS3Response(env, "GET", key, undefined, now);
+  if (!existing?.ok) {
+    await existing?.body?.cancel().catch(() => {});
+    return { ok: false, code: "SOURCE_APPROVAL_WRITE_FAILED" };
+  }
+  return Buffer.from(await existing.arrayBuffer()).equals(body) ? { ok: true } : { ok: false, code: "SOURCE_APPROVAL_CONFLICT" };
+}
+
 async function signedS3(
   env: R2SignerEnv,
   method: "PUT" | "HEAD" | "DELETE",
@@ -646,6 +681,9 @@ export type CdrRejectReceipt = {
   reasonCode: string;
   provider: string;
   occurredAt: string;
+  /** Both present, or both absent: a source refused for more pages than its approval (ADR-0006 F1). */
+  observedPages?: number;
+  approvedMaxPages?: number;
 };
 
 const FAILURE_CLASSES: ReadonlySet<string> = new Set(failureClasses);
@@ -673,6 +711,9 @@ export function validateCdrRejectReceipt(
   const receipt = value as Partial<CdrRejectReceipt>;
   const observedBytes = optionalByteCount(receipt.observedBytes);
   const declaredBytes = optionalByteCount(receipt.declaredBytes);
+  const pages = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value >= 1;
+  const pagesAbsent = receipt.observedPages === undefined && receipt.approvedMaxPages === undefined;
+  if (!pagesAbsent && (!pages(receipt.observedPages) || !pages(receipt.approvedMaxPages))) return null;
   if (
     receipt.schemaVersion !== "tavonel.cdr_reject_receipt.v1" ||
     receipt.sourceKey !== `quarantine/${workspaceKey}/${documentId}/source` ||

@@ -63,7 +63,7 @@ async function expectNotStored(uri: string) {
 }
 
 function sign(body: Buffer, contentType: string) {
-  const signed = presignFoundationQuarantinePut(env, { key: `quarantine/browser-transport/${randomUUID()}/source.bin`,
+  const signed = presignFoundationQuarantinePut(env, { key: `quarantine/browser-transport/${randomUUID()}/source`,
     contentType, contentLength: body.length, expiresInSeconds: 300 });
   if (!signed.ok) throw new Error(`Production signer refused fixture: ${signed.code}`);
   return { uploadUrl: signed.uploadUrl, target: new URL(signed.uploadUrl), contentType };

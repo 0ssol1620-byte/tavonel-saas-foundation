@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import { PROCESSING_CEILING_SENTENCE } from "../../shared/intakeCeiling";
-import { buildPipeline, storedPipelineDocument, summarize, type LocalUpload, type PipelineDocument } from "./pipeline";
+import { buildPipeline, reapprovalPages, storedPipelineDocument, summarize, type LocalUpload, type PipelineDocument } from "./pipeline";
 
 function doc(overrides: Partial<PipelineDocument> = {}): PipelineDocument {
   return {
@@ -227,6 +227,22 @@ describe("a refused source", () => {
   it("leaves a document with no refusal exactly as it was", () => {
     const rows = buildPipeline([], [doc({ sanitizedKey: "k/sanitized.pdf" })]);
     expect(states(rows)).toEqual(["done", "done", "active", "waiting"]);
+    expect(rows[0].reapprovePages).toBeUndefined();
+  });
+
+  it("offers no re-approval above the live PDF ceiling, and says to split instead (ADR-0006 F1, #242 R1 P2)", () => {
+    // Segmented intake is off in this build, so the PDF ceiling is 80 and a 240-page re-upload would be refused 413.
+    const rows = buildPipeline([], [doc({ processingState: "refused", refusal: { ...refusal, observedPages: 240, approvedMaxPages: 80 } })]);
+    expect(rows[0].stages[1].state).toBe("failed");
+    expect(rows[0].stages[1].detail).toBe(
+      "This PDF has 240 pages, more than the 80 pages approved for it, so it was stored but not compiled or charged. "
+      + "TAVONEL reads at most 80 pages from one PDF, so split it into PDFs of at most 80 pages and upload those.",
+    );
+    expect(rows[0].reapprovePages).toBeUndefined();
+    expect(reapprovalPages({ ...refusal, observedPages: 240, approvedMaxPages: 80 }, 500)).toBe(240);
+    expect(reapprovalPages({ ...refusal, observedPages: 501, approvedMaxPages: 80 }, 500)).toBeNull();
+    // A ceiling refusal carries no page counts and offers no re-approval.
+    expect(buildPipeline([], [doc({ processingState: "refused", refusal })])[0].reapprovePages).toBeUndefined();
   });
 });
 

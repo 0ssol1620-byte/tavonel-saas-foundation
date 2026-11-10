@@ -8395,6 +8395,22 @@ test('affected large-source-deletion-inventory owner: 4 exact paths select 3 dir
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
 });
+// large-source-approval-bound (ADR-0006, F1): one finite owner, restated independently.
+import { LARGE_SOURCE_APPROVAL_BOUND_AFFECTED_PATHS, LARGE_SOURCE_APPROVAL_BOUND_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected large-source-approval-bound owner: 6 exact paths select 5 direct suites and the worker checks, no browser suite; neighbours stay unmapped', () => {
+  const paths = ['nextjs/components/pipeline-board.tsx', 'nextjs/lib/pipeline-reapproval.test.ts', 'nextjs/lib/r2-presign.test.ts', 'nextjs/lib/r2-presign.ts', 'nextjs/scripts/journey/local-browser-storage-transport.integration.test.ts', 'shared/sourceApproval.ts'];
+  const suites = ['lib/intake-approval-rollout-off.test.ts', 'lib/pipeline-reapproval.test.ts', 'lib/pipeline.test.ts', 'lib/r2-presign.test.ts', 'lib/r2-triage-seal.test.ts'];
+  assert.deepEqual([[...LARGE_SOURCE_APPROVAL_BOUND_AFFECTED_PATHS], [...LARGE_SOURCE_APPROVAL_BOUND_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['large-source-approval-bound'], path);
+    const map = affectedMap([affectedRecord('M', [path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['large-source-approval-bound'], [], suites, [], []], path);
+  }
+  for (const adjacent of ['shared/sourceApproval.test.ts', 'nextjs/components/pipeline-board-v2.tsx']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});
 // connectors-developer-20261110: one finite owner, restated independently of the exported constants.
 import { CONNECTORS_DEVELOPER_AFFECTED_PATHS, CONNECTORS_DEVELOPER_AFFECTED_UNIT_FILES, CONNECTORS_DEVELOPER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 test('affected connectors-developer-20261110 owner: 4 exact paths select 9 direct suites and one browser suite; neighbours stay unmapped', () => {

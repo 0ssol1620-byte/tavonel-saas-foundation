@@ -53,6 +53,7 @@ vi.mock("@/lib/r2-presign", async (importOriginal) => ({
 }));
 vi.mock("@/lib/r2-synthetic-canary", () => ({
   readR2SignerEnv: () => ({ accountId: "account", bucket: "bucket", accessKeyId: "key", secretAccessKey: "secret" }),
+  putFoundationSourceApproval: async () => ({ ok: true }),
 }));
 vi.mock("@/lib/self-service-trial", () => ({
   authorizeFoundationSessionProduct: async () => ({ ok: true, access: { source: "paid" } }),

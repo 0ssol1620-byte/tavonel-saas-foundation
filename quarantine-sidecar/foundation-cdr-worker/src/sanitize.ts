@@ -1,4 +1,5 @@
 import type { FailureClass } from "../../../shared/uskcEnums";
+import { parseSourceApproval, sourceApprovalKey } from "../../../shared/sourceApproval";
 import { PermanentReject, RetryableError } from "./errors";
 import { cdrAuthorization } from "./identity";
 import { assertFoundationOnlyTarget } from "./guards";
@@ -262,17 +263,25 @@ export type SourceRefusal = PermanentReject & {
   readonly observedBytes: number | null;
   /** What intake said it would be, when the object carries it. Null, never inferred. */
   readonly declaredBytes: number | null;
+  /** Set only on a source refused for having more pages than its approval (F1): the CDR's count. */
+  readonly observedPages: number | null;
+  /** Set with `observedPages`: the pages the source was approved and reserved at. */
+  readonly approvedMaxPages: number | null;
 };
 
 export function refuse(
   failureClass: FailureClass,
   message: string,
-  observed: { observedBytes?: number | null; declaredBytes?: number | null } = {},
+  observed: {
+    observedBytes?: number | null; declaredBytes?: number | null; observedPages?: number | null; approvedMaxPages?: number | null;
+  } = {},
 ): SourceRefusal {
   return Object.assign(new PermanentReject(message), {
     failureClass,
     observedBytes: observed.observedBytes ?? null,
     declaredBytes: observed.declaredBytes ?? null,
+    observedPages: observed.observedPages ?? null,
+    approvedMaxPages: observed.approvedMaxPages ?? null,
   });
 }
 
@@ -361,6 +370,9 @@ export type CdrRejectReceipt = {
   reasonCode: FailureClass;
   provider: string;
   occurredAt: string;
+  /** Present only on a refusal for exceeding the approval (F1); the site offers re-approval at it. */
+  observedPages?: number;
+  approvedMaxPages?: number;
 };
 
 /** Sibling of the quarantine source, because a refused source never gets an immutable version. */
@@ -398,6 +410,8 @@ export async function writeCdrRejectReceipt(
     reasonCode: refusal.failureClass,
     provider: env.TAVONEL_CDR_PROVIDER,
     occurredAt: now().toISOString(),
+    ...(refusal.observedPages !== null && refusal.approvedMaxPages !== null
+      ? { observedPages: refusal.observedPages, approvedMaxPages: refusal.approvedMaxPages } : {}),
   };
   const status = await putCreateOnceJson(env.FOUNDATION_QUARANTINE, key, receipt);
   return status === "failed" ? null : { key, status, receipt };
@@ -1069,6 +1083,39 @@ function manifestResult(
 
 type SegmentedOutcome = { kind: "whole"; stored: StoredImmutable } | { kind: "result"; result: SanitizeResult };
 
+/**
+ * The pages intake approved and reserved this source at (`approval.json`, shared/sourceApproval.ts).
+ *
+ * Absent or invalid is one request's pages: a PDF the browser could not count is approved at 80,
+ * and a source with no approval written is never read further than that. A read that fails is
+ * thrown and retried rather than taken as absent, so a storage blip cannot refuse an approved source.
+ */
+async function approvedSourcePages(bucket: R2BucketLike, whole: CdrBinding): Promise<number> {
+  const stored = await readJsonRecord(bucket, sourceApprovalKey(whole.parts.workspaceId, whole.parts.documentId));
+  return parseSourceApproval(stored?.record ?? null, whole.parts.documentId)?.approvedMaxPages ?? SEGMENT_PAGES;
+}
+
+/**
+ * F1: segmentation reads only the pages that were approved and reserved.
+ *
+ * The CDR's count arrives with the first range, before anything is stored or read. A source longer
+ * than its approval is refused there, at zero credits, with both numbers on the receipt so the site
+ * can offer re-approval at the real count. One range is always allowed -- it is what the
+ * whole-document path reads with no approval at all -- so a PDF approved under 80 pages and longer
+ * than its count but still within one request behaves exactly as it does with segmentation off.
+ *
+ * The class is `PARSER_OOM`, the frozen vocabulary's "more than this run may process" (the same
+ * class as the page ceiling); `observedPages` and `approvedMaxPages` are what distinguish it.
+ */
+function assertWithinApproval(ctx: DisarmContext, sourcePages: number, approvedMaxPages: number, segmentPages: number) {
+  if (sourcePages <= Math.max(approvedMaxPages, segmentPages)) return;
+  throw refuse(
+    "PARSER_OOM",
+    `source has ${sourcePages} pages, more than the ${approvedMaxPages} pages approved for it`,
+    { ...ctx.observed, observedPages: sourcePages, approvedMaxPages },
+  );
+}
+
 async function sanitizeSegmented(
   ctx: DisarmContext,
   whole: CdrBinding,
@@ -1086,6 +1133,7 @@ async function sanitizeSegmented(
     return manifestResult(ctx, whole, manifestKey, planKey, finished, "exists", `sha256:${await sha256Hex(finished.bytes)}`);
   }
 
+  const approvedMaxPages = await approvedSourcePages(bucket, whole);
   let plan = await readSegmentPlan(bucket, planKey, whole);
   let first: Disarmed | null = null;
   if (!plan) {
@@ -1095,6 +1143,8 @@ async function sanitizeSegmented(
       // The first range is the whole document: store it exactly where an unranged answer goes.
       return { kind: "whole", stored: await storeDisarmed(env, whole, first, {}) };
     }
+    // Before the plan, so a source longer than its approval leaves nothing under segments/.
+    assertWithinApproval(ctx, sourcePages, approvedMaxPages, segmentPages);
     const status = await putCreateOnceJson(bucket, planKey, {
       schemaVersion: SEGMENT_PLAN_SCHEMA, sourceKey: whole.sourceKey, inputSha256: whole.inputSha256,
       totalPages: sourcePages, segmentPages,
@@ -1106,6 +1156,8 @@ async function sanitizeSegmented(
     // The same source must be cut the same way on every delivery, or two cuts would both be stored.
     throw new RetryableError("segment size changed while a segmented source was being read");
   }
+  // A plan stored before this check existed is held to the same approval before any further range.
+  assertWithinApproval(ctx, plan.totalPages, approvedMaxPages, segmentPages);
 
   const read: Array<Record<string, unknown>> = [];
   // The first ranged request of a new plan is this delivery's one new range.

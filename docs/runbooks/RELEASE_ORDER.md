@@ -859,6 +859,29 @@ URL·예약 전에 413으로 거절하는 것뿐이다.
   `"FOUNDATION_SOURCE_SEGMENT_PAGES": "80"`을 함께 바꾼다. 둘이 다르면 `intake-ceiling-cross-tree.test.ts`가 실패한다.
   순서: 그 커밋의 worker를 먼저 `wrangler deploy`하고 81쪽·300쪽 PDF를 end-to-end 확인한 뒤 site를 main에 병합한다.
   site가 먼저 나가면 81–500쪽 PDF가 승인된 뒤 worker(off)에서 `PARSER_OOM`으로 거절되므로 이 순서를 바꾸지 않는다.
+- **되돌리기도 짝으로, 배포의 역순으로.** worker 변수(`FOUNDATION_SOURCE_SEGMENT_PAGES`)를 되돌릴 때는 언제나 site flip build
+  (`SEGMENTED_INTAKE_ENABLED = true`)도 함께 되돌린다. 순서는 site 먼저(flip 이전 build로 Vercel rollback), 그 다음 worker
+  (`wrangler versions deploy <prev>@100%`). 이유: site 500쪽 + worker off이면 81–500쪽 PDF가 승인·예약된 뒤 worker가 통째로
+  보내 rasterizer가 `PARSER_OOM`으로 거절한다. 0 credits라 청구는 없지만 그 사이 올라온 업로드는 모두 버려진다.
+- **F1: worker는 승인된 쪽수 안에서만 분할한다**(ADR-0006 "Reads only what was approved"). capability route가 업로드 URL을 주기 전에
+  `quarantine/<ws>/<doc>/approval.json`을 create-once로 쓰고, 쓰기에 실패하면 URL을 주지 않는다(503 `SOURCE_APPROVAL_WRITE_FAILED`
+  / `SOURCE_APPROVAL_CONFLICT`, 예약은 다른 실패처럼 만료로 돌아간다). worker는 이 파일이 없거나 유효하지 않으면 80쪽으로 보고,
+  첫 범위 응답의 실제 쪽수가 승인보다 많으면 plan·범위·OCR 전에 `PARSER_OOM`(+ `observedPages`/`approvedMaxPages`)으로 거절하고
+  0 credits로 정산한다. 화면은 "N쪽, 승인 M쪽 초과, 저장만 되고 compile·청구는 없음 — N쪽으로 다시 승인해 업로드"를 안내하고 그 행에서 재업로드를
+  제공한다(N이 지금 PDF 한도 80/500을 넘으면 재업로드 대신 나눠 올리라고 안내한다). 그러므로 approval.json을 쓰는 site(#242)가 worker 변수보다 먼저 production에 있어야 하고, worker 배포 후 81쪽·300쪽
+  end-to-end 확인은 그 site로 실제 쪽수에 승인된 소스로 해야 한다(승인 없는 소스는 80쪽에서 거절되는 것이 정상).
+- **flip 전 staging receipt: R2가 create-once를 지키는지**(#242 R1 P3). approval.json의 create-once는 S3 PUT의 `If-None-Match: *`에
+  기대므로, flip 전에 같은 bucket의 `synthetic/` 네임스페이스에서 한 번 확인하고 receipt를 남긴다. 첫 PUT은 200, 같은 key의 두 번째는
+  **412**여야 하고, 두 번째 뒤의 GET이 첫 번째 내용이어야 한다. 412가 아니면(덮어쓰면) flip하지 않는다.
+  ```
+  K=synthetic/if-none-match-probe-$(date -u +%Y%m%dT%H%M%SZ).json; E=https://<account>.r2.cloudflarestorage.com
+  echo '{"n":1}' > /tmp/a.json; echo '{"n":2}' > /tmp/b.json
+  aws s3api put-object --endpoint-url $E --bucket tavonel-saas-foundation-quarantine --key $K --body /tmp/a.json --if-none-match '*'   # 200
+  aws s3api put-object --endpoint-url $E --bucket tavonel-saas-foundation-quarantine --key $K --body /tmp/b.json --if-none-match '*'   # PreconditionFailed (412)
+  aws s3api get-object --endpoint-url $E --bucket tavonel-saas-foundation-quarantine --key $K /dev/stdout                             # {"n":1}
+  aws s3api delete-object --endpoint-url $E --bucket tavonel-saas-foundation-quarantine --key $K
+  ```
+  자격 증명은 founder가 입력한다(write 권한 key). 세 결과와 시각을 `outputs/.../r2-if-none-match-receipt.json`에 남긴다.
 - 켜는 release는 fingerprint를 바꾼다. 그 전에 받은 승인은 `INTAKE_PRICE_STALE`로 거절되고, 화면은 "페이지를 새로 고친 뒤 파일을
   다시 골라 새 최대 금액을 승인"하라고 안내한다(승인 lineage는 production에서 꺼져 있어 직접 업로드 경로에는 영향이 없다).
 - 삭제 inventory(E5): migration `20261110043000`을 적용하고 그 site(`source-deletion-inventory.ts`가

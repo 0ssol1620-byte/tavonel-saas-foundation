@@ -22,6 +22,19 @@ const SETTLEMENT_URL = "https://tavonel-saas-foundation.vercel.app/api/internal/
 const SOURCE_KEY = "quarantine/ws_pilot/doc_1/source";
 const SOURCE = new TextEncoder().encode("%PDF-1.4 long manual");
 
+const APPROVAL_KEY = "quarantine/ws_pilot/doc_1/approval.json";
+
+/** The source, and the approval intake writes beside it (shared/sourceApproval.ts). `null` writes none. */
+function approved(pages: number | null = 500, raw?: string): Record<string, Uint8Array> {
+  const objects: Record<string, Uint8Array> = { [SOURCE_KEY]: SOURCE };
+  const body = raw ?? (pages === null ? null : JSON.stringify({
+    schemaVersion: "tavonel.source_approval.v1", documentId: "doc_1", approvedMaxPages: pages,
+    pageBasis: "declared", reservedCredits: pages * 4, maximumCredits: pages * 6,
+  }));
+  if (body !== null) objects[APPROVAL_KEY] = new TextEncoder().encode(body);
+  return objects;
+}
+
 class FakeR2 implements R2BucketLike {
   readonly objects = new Map<string, Uint8Array>();
   constructor(initial: Record<string, Uint8Array> = {}, private readonly contentType = "application/pdf") {
@@ -197,7 +210,7 @@ describe("segmented sources", () => {
 
   it("refuses segmentation with completed-read on before any CDR request is paid for", async () => {
     // REVIEW-PR231-R1 E3: the check used to run after the first ranged request.
-    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE });
+    const r2 = new FakeR2(approved());
     const chain = fakeChain(240);
     await assert.rejects(sanitizeObject(envFor(r2, { FOUNDATION_COMPLETED_READ_ENABLED: "true" }), SOURCE_KEY, chain.fetch),
       /FOUNDATION_COMPLETED_READ_ENABLED/);
@@ -206,7 +219,7 @@ describe("segmented sources", () => {
   });
 
   it("sends an unranged request exactly as before when it is off", async () => {
-    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE });
+    const r2 = new FakeR2(approved());
     const chain = fakeChain(1);
     await sanitizeObject(envFor(r2, { FOUNDATION_SOURCE_SEGMENT_PAGES: undefined }), SOURCE_KEY, chain.fetch);
     assert.equal(chain.calls.length, 1);
@@ -215,7 +228,7 @@ describe("segmented sources", () => {
   });
 
   it("stores a source that fits one range where a whole document goes, and nothing under segments/", async () => {
-    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE });
+    const r2 = new FakeR2(approved());
     const chain = fakeChain(80);
     const result = await sanitizeObject(envFor(r2), SOURCE_KEY, chain.fetch);
     assert.equal(chain.calls.length, 1);
@@ -226,7 +239,7 @@ describe("segmented sources", () => {
   });
 
   it("reads one new range per delivery and writes the manifest only once every range is read", async () => {
-    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE });
+    const r2 = new FakeR2(approved());
     const chain = fakeChain(200);
     const { result, deliveries } = await readToEnd(envFor(r2), chain.fetch);
     assert.equal(deliveries, 3, "one range per delivery");
@@ -252,7 +265,7 @@ describe("segmented sources", () => {
   });
 
   it("reads a source at the 500-page ceiling to its last page", async () => {
-    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE });
+    const r2 = new FakeR2(approved());
     const chain = fakeChain(500);
     const { result, deliveries } = await readToEnd(envFor(r2), chain.fetch);
     assert.equal(deliveries, 7);
@@ -267,7 +280,7 @@ describe("segmented sources", () => {
   it("continues a source as a new queue message, so a later range keeps the cold-start grace", async () => {
     // REVIEW-PR231-R1 E2: continuing by message.retry() spent attempts, and a cold GPU on attempt 3
     // parked the whole source. A continuation is a new message, which Cloudflare starts at attempt 1.
-    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE });
+    const r2 = new FakeR2(approved());
     const queue = new FakeQueue();
     const env = envFor(r2, { FOUNDATION_SEGMENT_CONTINUATION: queue });
     const chain = fakeChain(240, { ocrColdRange: "80-160" });
@@ -290,7 +303,7 @@ describe("segmented sources", () => {
   });
 
   it("refuses the whole source, naming the pages, when one range has a page that cannot be rendered", async () => {
-    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE });
+    const r2 = new FakeR2(approved());
     const chain = fakeChain(240, { refuseRange: "80-160" });
     let caught: unknown;
     await readToEnd(envFor(r2), chain.fetch).catch((error) => { caught = error; });
@@ -303,7 +316,7 @@ describe("segmented sources", () => {
   });
 
   it("parks the whole source, with no manifest, when the reader refuses one range", async () => {
-    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE });
+    const r2 = new FakeR2(approved());
     const chain = fakeChain(240, { ocrRefuseRange: "80-160" });
     const { result } = await readToEnd(envFor(r2), chain.fetch);
     assert.equal(result.ocr.status, "failed");
@@ -318,7 +331,7 @@ describe("segmented sources", () => {
   });
 
   it("refuses a source over the segmented page ceiling as too large, before anything is stored", async () => {
-    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE });
+    const r2 = new FakeR2(approved());
     const chain = fakeChain(501);
     const tooLong: typeof fetch = async (input, init) => String(input) === CDR_URL
       ? (chain.calls.push("refused"), Response.json({ detail: "CDR source page count is not qualified" },
@@ -352,7 +365,7 @@ describe("segmented sources", () => {
     // REVIEW-PR231-R1 E4: an old CDR renders the whole source and refuses past 80 pages. That is the
     // deploy order, not the document, so it must not become a permanent refusal.
     for (const pages of [6, 240]) {
-      const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE });
+      const r2 = new FakeR2(approved());
       const chain = fakeChain(pages, { noRangeHeaders: true });
       let caught: unknown;
       await sanitizeObject(envFor(r2), SOURCE_KEY, chain.fetch).catch((error) => { caught = error; });
@@ -363,7 +376,7 @@ describe("segmented sources", () => {
   });
 
   it("refuses a source whose page count changes between ranges", async () => {
-    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE });
+    const r2 = new FakeR2(approved());
     const chain = fakeChain(240, { pagesFor: (range) => (range === "0-80" ? 240 : 280) });
     let caught: unknown;
     await readToEnd(envFor(r2), chain.fetch).catch((error) => { caught = error; });
@@ -372,7 +385,7 @@ describe("segmented sources", () => {
   });
 
   it("does not trust a stored plan that belongs to other bytes", async () => {
-    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE });
+    const r2 = new FakeR2(approved());
     r2.objects.set(segmentPlanKey("ws_pilot", "doc_1"), new TextEncoder().encode(JSON.stringify({
       schemaVersion: "tavonel.source_segment_plan.v1", sourceKey: SOURCE_KEY, inputSha256: `sha256:${"0".repeat(64)}`,
       totalPages: 240, segmentPages: 80,
@@ -385,7 +398,7 @@ describe("segmented sources", () => {
   it("answers a redelivery from the manifest without touching a range, even when a range has two versions", async () => {
     // REVIEW-PR231-R1 E6: re-verifying every range picked whichever version was listed first, which
     // could disagree with the manifest and loop to the dead-letter queue.
-    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE });
+    const r2 = new FakeR2(approved());
     const chain = fakeChain(240);
     const first = await readToEnd(envFor(r2), chain.fetch);
     r2.objects.set(`${SEGMENTS}80-160/${"f".repeat(64)}/sanitized.pdf`, new TextEncoder().encode("%PDF-1.4 a second version"));
@@ -400,7 +413,7 @@ describe("segmented sources", () => {
   });
 
   it("settles a long source once, after its last range, and retries without settling until then", async () => {
-    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE });
+    const r2 = new FakeR2(approved());
     const env = envFor(r2);
     const chain = fakeChain(240);
     let cdrDown = true;
@@ -421,5 +434,84 @@ describe("segmented sources", () => {
     assert.equal(chain.settlements[0].actualCredits, 2);
     // The refused CDR call never reached the chain, so the last range is rendered once.
     assert.deepEqual(ranges(chain.calls), ["p0_80", "p80_160", "p160_240"]);
+  });
+  describe("the approval bounds what is read (F1)", () => {
+    async function refusedAt(objects: Record<string, Uint8Array>, pages: number) {
+      const r2 = new FakeR2(objects);
+      const chain = fakeChain(pages);
+      let caught: unknown;
+      await readToEnd(envFor(r2), chain.fetch).catch((error) => { caught = error; });
+      return { r2, chain, refusal: asSourceRefusal(caught) };
+    }
+
+    it("refuses a 240-page PDF approved at 80 after the first range, storing and reading nothing", async () => {
+      const { r2, chain, refusal } = await refusedAt(approved(80), 240);
+      assert.ok(refusal, "a refusal, not a retry");
+      assert.equal(refusal.failureClass, "PARSER_OOM");
+      assert.equal(refusal.observedPages, 240);
+      assert.equal(refusal.approvedMaxPages, 80);
+      assert.match(refusal.message, /240 pages, more than the 80 pages approved/);
+      assert.deepEqual(ranges(chain.calls), ["p0_80"], "no second range is requested");
+      assert.equal(chain.ocrCalls, 0);
+      assert.deepEqual(r2.keys("immutable/"), [], "no plan, no range, no manifest");
+    });
+
+    it("records both page counts on the receipt and releases the reservation at zero credits", async () => {
+      const r2 = new FakeR2(approved(80));
+      const chain = fakeChain(240);
+      assert.deepEqual(await deliver(envFor(r2), chain.fetch, 1), { acks: 1, retries: 0, delays: [] });
+      const receipt = JSON.parse(new TextDecoder().decode(r2.objects.get("quarantine/ws_pilot/doc_1/cdr-reject.json")));
+      assert.equal(receipt.reasonCode, "PARSER_OOM");
+      assert.equal(receipt.observedPages, 240);
+      assert.equal(receipt.approvedMaxPages, 80);
+      assert.equal(chain.settlements.length, 1);
+      assert.equal(chain.settlements[0].outcome, "released");
+      assert.equal(chain.settlements[0].actualCredits, 0);
+      assert.equal(chain.ocrCalls, 0);
+    });
+
+    it("treats a source with no approval, or an approval that does not parse, as approved at 80", async () => {
+      const otherDocument = JSON.stringify({
+        schemaVersion: "tavonel.source_approval.v1", documentId: "doc_2", approvedMaxPages: 500,
+        pageBasis: "declared", reservedCredits: 2000, maximumCredits: 3000,
+      });
+      for (const objects of [approved(null), approved(500, "{not json"), approved(500, otherDocument), approved(0)]) {
+        const { r2, chain, refusal } = await refusedAt(objects, 240);
+        assert.equal(refusal?.approvedMaxPages, 80);
+        assert.deepEqual(ranges(chain.calls), ["p0_80"]);
+        assert.deepEqual(r2.keys("immutable/"), []);
+      }
+    });
+
+    it("reads every range of a 240-page PDF approved at 240 or more", async () => {
+      for (const pages of [240, 300]) {
+        const r2 = new FakeR2(approved(pages));
+        const chain = fakeChain(240);
+        const { result, deliveries } = await readToEnd(envFor(r2), chain.fetch);
+        assert.equal(deliveries, 3, `${pages}`);
+        assert.equal(result.ocr.observedPageCount, 240);
+        assert.deepEqual(ranges(chain.calls), ["p0_80", "p80_160", "p160_240"]);
+      }
+    });
+
+    it("still reads a PDF within one request whole, whatever it was approved at", async () => {
+      const r2 = new FakeR2(approved(10));
+      const chain = fakeChain(80);
+      const result = await sanitizeObject(envFor(r2), SOURCE_KEY, chain.fetch);
+      assert.equal(result.ocr.status, "written");
+      assert.deepEqual(r2.keys(SEGMENTS), []);
+    });
+
+    it("holds a plan stored before the check to the approval, before any further range", async () => {
+      const r2 = new FakeR2(approved(80));
+      r2.objects.set(segmentPlanKey("ws_pilot", "doc_1"), new TextEncoder().encode(JSON.stringify({
+        schemaVersion: "tavonel.source_segment_plan.v1", sourceKey: SOURCE_KEY, inputSha256: sha(SOURCE),
+        totalPages: 240, segmentPages: 80,
+      })));
+      const { chain, refusal } = await refusedAt(Object.fromEntries(r2.objects), 240);
+      assert.equal(refusal?.observedPages, 240);
+      assert.equal(chain.calls.length, 0);
+      assert.equal(chain.ocrCalls, 0);
+    });
   });
 });

@@ -5,7 +5,7 @@
 -- One workspace, grace 0, hold off: pilot-e5del. Its one connector source binds one document; the
 -- "listing" is 600 objects under that document's quarantine prefix.
 begin;
-select plan(19);
+select plan(21);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -70,12 +70,12 @@ select throws_ok(
 -- ---------------------------------------------------------------------------
 
 select lives_ok(
-  $$ select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(n), 1, 'sha256:' || repeat('7', 64))
+  $$ select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(n), 1, 'sha256:' || repeat('7', 64), 'etag-1')
        from generate_series(1, 300) as n $$,
   'run 1 records the first 300 digests'
 );
 select lives_ok(
-  $$ select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(n), 1, 'sha256:' || repeat('7', 64))
+  $$ select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(n), 1, 'sha256:' || repeat('7', 64), 'etag-1')
        from generate_series(301, 600) as n $$,
   'run 2 records the next 300 digests'
 );
@@ -86,8 +86,8 @@ select is(
 );
 select is(
   public.read_source_deletion_inventory_digests(pg_temp.del())->'objects'->0,
-  jsonb_build_object('key', pg_temp.part(1), 'sha256', 'sha256:' || repeat('7', 64), 'sizeBytes', 1),
-  'the set is ordered by key and carries key, digest and listed size'
+  jsonb_build_object('key', pg_temp.part(1), 'sha256', 'sha256:' || repeat('7', 64), 'sizeBytes', 1, 'etag', 'etag-1'),
+  'the set is ordered by key and carries key, digest, listed size and listed ETag'
 );
 
 -- ---------------------------------------------------------------------------
@@ -96,18 +96,26 @@ select is(
 
 create temporary table e5_read as select pg_temp.set_sha() as sha;
 -- An overlapping run saw a different size for one key and hashed it again.
-select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(1), 2, 'sha256:' || repeat('8', 64));
+select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(1), 2, 'sha256:' || repeat('8', 64), 'etag-2');
 select throws_ok(
   $$ select public.seal_source_deletion_inventory(pg_temp.del(), (select sha from e5_read)) $$,
   'SOURCE_DELETION_INVENTORY_DIGESTS_CHANGED',
   'a row rewritten after the worker read the set refuses the seal'
 );
 update e5_read set sha = pg_temp.set_sha();
-select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(601), 1, 'sha256:' || repeat('7', 64));
+select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(601), 1, 'sha256:' || repeat('7', 64), 'etag-1');
 select throws_ok(
   $$ select public.seal_source_deletion_inventory(pg_temp.del(), (select sha from e5_read)) $$,
   'SOURCE_DELETION_INVENTORY_DIGESTS_CHANGED',
   'a row added after the worker read the set refuses the seal'
+);
+-- The same key rewritten at the same size: only its ETag changed, and that alone refuses the seal.
+update e5_read set sha = pg_temp.set_sha();
+select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(601), 1, 'sha256:' || repeat('7', 64), 'etag-2');
+select throws_ok(
+  $$ select public.seal_source_deletion_inventory(pg_temp.del(), (select sha from e5_read)) $$,
+  'SOURCE_DELETION_INVENTORY_DIGESTS_CHANGED',
+  'a row whose ETag changed at the same size and digest after the worker read the set refuses the seal'
 );
 select is(
   (select count(*)::integer from public.source_deletion_inventory_attestations where deletion_id = pg_temp.del()),
@@ -123,30 +131,35 @@ select is(public.discard_source_deletion_inventory_digests(pg_temp.del()), 601,
 -- The bounds: 16,384 objects and 64 GiB per deletion.
 -- ---------------------------------------------------------------------------
 
-insert into public.source_deletion_inventory_digests (deletion_id, object_key, size_bytes, object_sha256)
-select pg_temp.del(), pg_temp.part(n), 1, 'sha256:' || repeat('7', 64) from generate_series(1, 16384) as n;
+insert into public.source_deletion_inventory_digests (deletion_id, object_key, size_bytes, object_sha256, etag)
+select pg_temp.del(), pg_temp.part(n), 1, 'sha256:' || repeat('7', 64), 'etag-1' from generate_series(1, 16384) as n;
 select throws_ok(
-  $$ select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(20000), 1, 'sha256:' || repeat('7', 64)) $$,
+  $$ select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(20000), 1, 'sha256:' || repeat('7', 64), 'etag-1') $$,
   'SOURCE_DELETION_INVENTORY_OBJECT_LIMIT',
   'the 16,385th object of one deletion is refused'
 );
 select lives_ok(
-  $$ select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(1), 1, 'sha256:' || repeat('9', 64)) $$,
+  $$ select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(1), 1, 'sha256:' || repeat('9', 64), 'etag-1') $$,
   'at the bound, an object already in the set may still be hashed again'
 );
 select public.discard_source_deletion_inventory_digests(pg_temp.del());
 
-insert into public.source_deletion_inventory_digests (deletion_id, object_key, size_bytes, object_sha256)
-select pg_temp.del(), pg_temp.part(n), 67108864, 'sha256:' || repeat('7', 64) from generate_series(1, 1024) as n;
+insert into public.source_deletion_inventory_digests (deletion_id, object_key, size_bytes, object_sha256, etag)
+select pg_temp.del(), pg_temp.part(n), 67108864, 'sha256:' || repeat('7', 64), 'etag-1' from generate_series(1, 1024) as n;
 select throws_ok(
-  $$ select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(2000), 1, 'sha256:' || repeat('7', 64)) $$,
+  $$ select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(2000), 1, 'sha256:' || repeat('7', 64), 'etag-1') $$,
   'SOURCE_DELETION_INVENTORY_TOTAL_TOO_LARGE',
   'one byte past 64 GiB in one deletion is refused'
 );
 select throws_ok(
-  $$ select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(1), 67108865, 'sha256:' || repeat('7', 64)) $$,
+  $$ select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(1), 67108865, 'sha256:' || repeat('7', 64), 'etag-1') $$,
   'SOURCE_DELETION_INVENTORY_OBJECT_INVALID',
   'an object past 64 MiB is refused, as the attestation refuses it'
+);
+select throws_ok(
+  $$ select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(1), 1, 'sha256:' || repeat('7', 64), '"quoted"') $$,
+  'SOURCE_DELETION_INVENTORY_OBJECT_INVALID',
+  'an ETag outside its pattern (the worker strips the quotes R2 lists it with) is refused'
 );
 select public.discard_source_deletion_inventory_digests(pg_temp.del());
 
@@ -154,7 +167,7 @@ select public.discard_source_deletion_inventory_digests(pg_temp.del());
 -- The seal: 600 objects from two runs, then an idempotent replay.
 -- ---------------------------------------------------------------------------
 
-select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(n), 1, 'sha256:' || repeat('7', 64))
+select public.record_source_deletion_inventory_digest(pg_temp.del(), pg_temp.part(n), 1, 'sha256:' || repeat('7', 64), 'etag-1')
   from generate_series(1, 600) as n;
 update e5_read set sha = pg_temp.set_sha();
 
@@ -188,7 +201,7 @@ select is(
 select table_privs_are('public', 'source_deletion_inventory_digests', 'service_role', array[]::text[]);
 select ok(
   not has_function_privilege('authenticated', 'public.seal_source_deletion_inventory(text,text,jsonb)', 'execute')
-  and not has_function_privilege('anon', 'public.record_source_deletion_inventory_digest(text,text,bigint,text)', 'execute')
+  and not has_function_privilege('anon', 'public.record_source_deletion_inventory_digest(text,text,bigint,text,text)', 'execute')
   and has_function_privilege('service_role', 'public.seal_source_deletion_inventory(text,text,jsonb)', 'execute')
   and has_function_privilege('service_role', 'public.read_source_deletion_inventory_digests(text)', 'execute'),
   'the digest functions are service-only'

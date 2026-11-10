@@ -61,7 +61,7 @@ function failureCopy(detail: string) {
   name. The board does not decide which rows are eligible -- the page passes the ids it read
   from the document list, so eligibility and the compile call cannot drift apart.
 */
-export default function PipelineBoard({ rows, reading = {}, names = {}, onDismiss, selectableIds, selectedIds, onToggleSelected, customerDataAccess, noComputeAccess = false }: {
+export default function PipelineBoard({ rows, reading = {}, names = {}, onDismiss, selectableIds, selectedIds, onToggleSelected, onReapprove, customerDataAccess, noComputeAccess = false }: {
   rows: PipelineRow[];
   reading?: Record<string, OcrProgress>;
   names?: DocumentNames;
@@ -69,6 +69,8 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
   selectableIds?: readonly string[];
   selectedIds?: readonly string[];
   onToggleSelected?: (documentId: string) => void;
+  /** ADR-0006 F1: a source refused for more pages than its approval is uploaded again approving `pages`. */
+  onReapprove?: (pages: number) => void;
   customerDataAccess: CustomerDataAccess;
   noComputeAccess?: boolean;
 }) {
@@ -103,7 +105,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
       {/* The counts live in the filter chips below; four big-number tiles said the same thing with zeroes. */}
       <div className="board-toolbar"><div className="board-filters" role="group" aria-label="Filter sources"><button type="button" data-active={effectiveFilter === "all"} onClick={() => selectFilter("all")}>All {counts.all}</button><button type="button" data-active={effectiveFilter === "attention"} onClick={() => selectFilter("attention")}>Review {counts.attention}</button><button type="button" data-active={effectiveFilter === "processing"} onClick={() => selectFilter("processing")}>Processing {counts.processing}</button><button type="button" data-active={effectiveFilter === "ready"} onClick={() => selectFilter("ready")}>Ready {counts.ready}</button>{counts.failed > 0 ? <button type="button" data-active={effectiveFilter === "failed"} onClick={() => selectFilter("failed")}>Failed {counts.failed}</button> : null}</div><label className="board-search"><span className="sr-only">Search sources</span><input value={query} onChange={(event) => { setQuery(event.target.value); setVisibleCount(12); }} placeholder="Search sources…" /></label></div>
       <div className="board-list-wrap"><ol className="board-list board-rows" aria-label={countNoun(filtered.length, "matching source")}>
-        {visible.map((row) => { const rowStatus = statusOf(row); const expanded = expandedId === row.id; const progress = reading[row.id]; return (
+        {visible.map((row) => { const rowStatus = statusOf(row); const expanded = expandedId === row.id; const progress = reading[row.id]; const reapprove = row.reapprovePages; return (
           <li key={row.id} data-status={rowStatus} data-document-id={row.id} data-held={row.needsPerson ? "1" : "0"}>
             <div className="board-row-head">
               {onToggleSelected && selectable.has(row.id) ? (
@@ -122,6 +124,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
                   nothing. */}
               {row.observedAt ? <p className="fine board-row-observed">Source ready <time dateTime={row.observedAt}>{formatTimestamp(row.observedAt)}</time></p> : null}
               {progress && row.stages[2].state === "active" ? <ReadingView progress={progress} /> : null}
+              {reapprove && onReapprove ? <button type="button" className="board-reapprove" onClick={() => onReapprove(reapprove)}>Upload again and approve {reapprove} pages</button> : null}
               <div className="board-stages board-stages-detail">{row.stages.map((stageItem) => <div className="board-stage" key={stageItem.key} data-s={stageItem.state}><span className="board-stage-k"><i aria-hidden="true" />{stageItem.label}</span><span className="board-stage-d">{stageItem.key === "compile" && stageItem.state === "active" && customerDataAccess !== "open" ? customerDataAccess === "closed" ? noComputeAccess ? "Reading complete · no active compute access" : "Reading complete · compilation requires a scoped pilot" : customerDataAccess === "checking" ? "Reading complete · checking access" : "Reading complete · source access unavailable" : stageItem.state === "failed" ? failureCopy(stageItem.detail) : stageItem.detail || "Not started"}</span></div>)}</div>
             </div>
           </li>

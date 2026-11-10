@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { FOUNDATION_R2_BUCKET, readFoundationTriageStagingObject, sealFoundationTriageSource } from "./r2-synthetic-canary";
+import { FOUNDATION_R2_BUCKET, putFoundationSourceApproval, readFoundationTriageStagingObject, sealFoundationTriageSource } from "./r2-synthetic-canary";
 
 const env = {
   accountId: "0123456789abcdef0123456789abcdef",
@@ -75,5 +75,47 @@ describe("sealFoundationTriageSource", () => {
     expect(result).toMatchObject({ ok: true, replay: false, sha256 });
     expect(staging).toEqual(lateBytes);
     expect(sealed).toEqual(bytes);
+  });
+});
+
+describe("putFoundationSourceApproval (ADR-0006 F1)", () => {
+  beforeEach(() => vi.unstubAllGlobals());
+  const approval = {
+    schemaVersion: "tavonel.source_approval.v1" as const, documentId, approvedMaxPages: 240,
+    pageBasis: "declared" as const, reservedCredits: 960, maximumCredits: 1440,
+  };
+  const written = Buffer.from(`${JSON.stringify(approval)}\n`);
+
+  it("writes create-once beside the source, never at the source key", async () => {
+    const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    expect(await putFoundationSourceApproval(env, workspaceKey, approval)).toEqual({ ok: true });
+    const [url, init] = fetch.mock.calls[0]!;
+    expect(new URL(String(url)).pathname).toBe(`/${FOUNDATION_R2_BUCKET}/quarantine/${workspaceKey}/${documentId}/approval.json`);
+    expect(init?.method).toBe("PUT");
+    expect((init?.headers as Record<string, string>)["if-none-match"]).toBe("*");
+    expect(Buffer.from(init?.body as Uint8Array)).toEqual(written);
+  });
+
+  it("accepts a replay that finds the same approval, and refuses a different one", async () => {
+    for (const [existing, expected] of [
+      [written, { ok: true }],
+      [Buffer.from(JSON.stringify({ ...approval, approvedMaxPages: 80 })), { ok: false, code: "SOURCE_APPROVAL_CONFLICT" }],
+    ] as const) {
+      vi.stubGlobal("fetch", vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => init?.method === "PUT"
+        ? new Response(null, { status: 412 }) : new Response(existing, { status: 200 })));
+      expect(await putFoundationSourceApproval(env, workspaceKey, approval)).toEqual(expected);
+    }
+  });
+
+  it("fails closed on a failed write and on an approval it would not let the worker read", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 500 })));
+    expect(await putFoundationSourceApproval(env, workspaceKey, approval)).toEqual({ ok: false, code: "SOURCE_APPROVAL_WRITE_FAILED" });
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    for (const bad of [{ ...approval, approvedMaxPages: 0 }, { ...approval, documentId: "../other" }]) {
+      expect(await putFoundationSourceApproval(env, workspaceKey, bad)).toEqual({ ok: false, code: "SOURCE_APPROVAL_INVALID" });
+    }
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

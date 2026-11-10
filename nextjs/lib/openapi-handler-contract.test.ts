@@ -49,6 +49,7 @@ vi.mock("@/lib/r2-synthetic-canary", async (importOriginal) => ({
   readR2SignerEnv: m.signer,
   headFoundationQuarantineObject: m.head,
   headFoundationQuarantineSignature: m.headSignature,
+  putFoundationSourceApproval: async () => ({ ok: true }),
 }));
 vi.mock("@/lib/r2-presign", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./r2-presign")>()),

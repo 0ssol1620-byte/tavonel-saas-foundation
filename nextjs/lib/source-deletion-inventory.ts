@@ -94,14 +94,19 @@ export async function runSourceDeletionInventoryAttestation(
   return { ...result, deletionId: candidate.deletionId, failureRecorded: recorded.ok };
 }
 
-/** The persisted digests cover exactly this listing: the same keys at the same listed sizes. */
+/** The same object as listed: the same key at the same size and the same ETag. */
+function sameListedObject(listed: SourceInventoryObject | undefined, object: SourceInventoryObject) {
+  return listed !== undefined && listed.sizeBytes === object.sizeBytes && listed.etag === object.etag;
+}
+
+/** The persisted digests cover exactly this listing: the same keys at the same listed size and ETag. */
 function digestsMatchListing(
   digests: readonly SourceInventoryObject[],
   listing: readonly SourceInventoryObject[],
 ) {
-  const sizes = new Map(listing.map((object) => [object.key, object.sizeBytes]));
+  const listed = new Map(listing.map((object) => [object.key, object]));
   return digests.length === listing.length
-    && digests.every((object) => sizes.get(object.key) === object.sizeBytes);
+    && digests.every((object) => sameListedObject(listed.get(object.key), object));
 }
 
 /**
@@ -131,11 +136,12 @@ async function attestCandidate(
 
   let stored = await steps.readDigests(candidate.deletionId);
   if (!stored.ok) return failed(stored.code);
-  // A digest whose key is no longer listed, or is listed at another size, was taken from bytes
-  // that are not the ones there now. None of the set is trusted then: discard it and hash again.
-  const listedSizes = new Map(before.objects.map((object) => [object.key, object.sizeBytes]));
+  // A digest whose key is no longer listed, or is listed at another size or ETag, was taken from
+  // bytes that are not the ones there now -- the ETag catches a rewrite at the same size. None of
+  // the set is trusted then: discard it and hash again.
+  const listed = new Map(before.objects.map((object) => [object.key, object]));
   let hashedKeys = new Set(stored.digests.objects.map((object) => object.key));
-  if (stored.digests.objects.some((object) => listedSizes.get(object.key) !== object.sizeBytes)) {
+  if (stored.digests.objects.some((object) => !sameListedObject(listed.get(object.key), object))) {
     const discarded = await steps.discardDigests(candidate.deletionId);
     if (!discarded.ok) return failed(discarded.code);
     hashedKeys = new Set();
