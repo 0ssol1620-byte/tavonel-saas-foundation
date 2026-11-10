@@ -13,7 +13,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const NO_STORE = { "Cache-Control": "no-store" };
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await authorizeFoundationRequest(request, "connections:sync", "studio");
+  const auth = await authorizeFoundationRequest(request, "connections:sync", "connections");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
   const { id } = await context.params;
   if (!UUID.test(id)) return NextResponse.json({ code: "CONNECTION_ID_INVALID" }, { status: 400, headers: NO_STORE });

@@ -323,6 +323,8 @@ export default function ConnectionsPanel() {
     }
   };
 
+  const readyProviders = oauthProviders.filter((item) => item.configured);
+
   return (
     <section className="connection-studio" aria-labelledby="connections-title">
       <header className="studio-heading">
@@ -343,12 +345,14 @@ export default function ConnectionsPanel() {
         */}
         <label htmlFor="oauth-connection-name">Name this connection <small>optional</small></label>
         <input id="oauth-connection-name" maxLength={100} value={oauthDisplayName} onChange={(event) => setOAuthDisplayName(event.target.value)} placeholder="Defaults to the provider name" />
-        {oauthProviders.map((item) => (
-          <button key={item.provider} type="button" disabled={busy || !item.configured} onClick={() => void connectOAuth(item.provider)}>
-            {item.configured ? `Connect ${oauthProviderLabel(item.provider)}` : `${oauthProviderLabel(item.provider)} not configured`}
+        {/* A provider this deployment has no OAuth app for is left out, not shown as a dead button. */}
+        {readyProviders.map((item) => (
+          <button key={item.provider} type="button" disabled={busy} onClick={() => void connectOAuth(item.provider)}>
+            {`Connect ${oauthProviderLabel(item.provider)}`}
           </button>
         ))}
         {oauthProviders.length === 0 ? <p className="field-help">{readFailed ? "Provider availability could not be confirmed. Refresh state to retry." : "Reading OAuth provider availability."}</p> : null}
+        {oauthProviders.length > 0 && readyProviders.length === 0 ? <p className="field-help">No provider account can be connected from this workspace. The local source agent below reads a mounted share without one.</p> : null}
       </div>
       <div className="connection-layout">
         <form className="connection-form" onSubmit={create}>
