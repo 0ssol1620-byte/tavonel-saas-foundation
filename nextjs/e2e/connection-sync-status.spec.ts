@@ -1,6 +1,4 @@
 import { test, expect } from "@playwright/test";
-import { mkdirSync } from "node:fs";
-import { resolve } from "node:path";
 import { installFixtureSession, installWorkspaceRoutes } from "./fixtures/workspace-fixture";
 
 // Labeled UI fixtures only. No provider account, document or production auth is used.
@@ -42,9 +40,9 @@ test("connector progress follows real response states and retains uncertainty on
   await expect(panel).toContainText("Source access changed");
   await panel.getByText("Import details", { exact: true }).click();
   await expect(panel).toContainText("SOURCE_LIFECYCLE_REVIEW_REQUIRED");
-  const directory = resolve(process.cwd(), "../.chatgpt2codex/connection-sync-captures-0910");
-  mkdirSync(directory, { recursive: true });
-  await page.screenshot({ path: resolve(directory, `${testInfo.project.name}-fixture.png`), fullPage: true });
+  // Inside the ignored test output, not a tracked tree: a capture outside it left the CI checkout
+  // with untracked paths, which the repair-scope gate refuses.
+  await page.screenshot({ path: testInfo.outputPath(`${testInfo.project.name}-fixture.png`), fullPage: true });
   unavailable = true;
   await panel.getByRole("button", { name: "Refresh import progress" }).click();
   await expect(panel).toContainText("last known state");
