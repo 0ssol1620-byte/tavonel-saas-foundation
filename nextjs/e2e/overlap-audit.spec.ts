@@ -49,9 +49,14 @@ for (const width of WIDTHS) {
       for (const route of routes) {
         const response = await page.goto(route, { waitUntil: "domcontentloaded", timeout: 60_000 });
         expect(response?.status(), `${route} did not render`).toBeLessThan(400);
-        // Widths are font widths: measured in the fallback face, a label can fit that does not.
-        await page.evaluate(() => document.fonts.ready);
-        await page.waitForTimeout(500);
+        /* Widths are font widths: measured in the fallback face, a label can fit that does not.
+           Then two frames, so the layout the fonts trigger has been drawn. No fixed settle: this is
+           layout, not motion, and the spec walks every sitemap route seven times inside Product
+           QA's 45-minute job (a 500ms settle cost 33s of each width's ~55s in CI). */
+        await page.evaluate(async () => {
+          await document.fonts.ready;
+          await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+        });
         for (const finding of await page.evaluate(measureOverlap)) {
           if (allowed(route, finding)) continue;
           failures.push(`${route} ${finding.kind}: ${finding.a} | ${finding.b} ${finding.text} [${finding.box}]`);
