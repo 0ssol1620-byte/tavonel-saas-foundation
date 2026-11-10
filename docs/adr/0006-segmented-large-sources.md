@@ -113,7 +113,8 @@ processor keeps the per-request bound it has today. Nothing is raised to meet a 
 
 Bytes are a separate track. Above 5 MiB the worker's memory and, above about 32 MiB, Cloud Run's
 HTTP/1 request bind; 50 MB needs either HTTP/2 end to end to the CDR or a read from object storage
-inside the CDR's VPC. That is an infrastructure decision and is not taken here. D1 stage 1
+inside the CDR's VPC. The processor half of that is "Large-source bytes" below, flag off; the
+infrastructure decision is not taken here. D1 stage 1
 (25 MiB, `RELEASE_ORDER.md` W2-D) remains the next byte step and composes with this.
 
 ## Copy, now
@@ -158,3 +159,229 @@ is set; the worker refuses the pair before any request (E3).
 CDR render time and memory for an 80-page range of a long source; DOCX conversion time for a
 300-page document (45 s limit, repeated per range); compile time for a corpus of ranges; worker
 memory with a 5 MiB source held across several range requests.
+
+## Large-source bytes (processor half, flag off)
+
+- **Status:** Implemented, inert by default, **not measured**. Branch `codex/large-source-bytes-20261110`,
+  stacked on PR #231. Intake, `r2-presign.ts` and the DB admission check stay at 5 MiB until the
+  measurement below exists. Nothing here is proven by the tests: they show the code does what it
+  says, not that a 50 MiB source fits the deployed services.
+
+### The three ways to get 50 MiB to the CDR
+
+Today `sanitizeObject` reads the whole R2 object (`arrayBuffer()`), hashes it, and `requestDisarm`
+builds a multipart `FormData` copy for every request, including every ranged request of a segmented
+source. The isolate (128 MB) also holds the sanitized answer: up to 18 MiB, twice while it is
+assembled, and once more when `verifiedImmutable` reads it back.
+
+| | (a) HTTP/2 end to end, streamed body | (b) CDR reads a presigned GET **(chosen)** | (c) Stage through GCS read in the VPC |
+| --- | --- | --- | --- |
+| Worker memory at 50 MiB | O(chunk) only if the worker hashes in one streamed R2 pass and streams a hand-built multipart body from a second; today's code would hold 50 MiB + its copy + the answer, over 128 MB | O(chunk): one streamed pass through `crypto.DigestStream`; the request body is ~1 KiB. Peak is the sanitized answer, as today | O(chunk), plus a streamed upload to GCS |
+| Cloud Run 32 MiB HTTP/1 limit | Lifted only with `--use-http2`, which needs an h2c server: uvicorn has none, so the server becomes hypercorn for every request, small ones included | Not reached: the request is ~1 KiB | Not reached |
+| Egress / credentials | No CDR egress; no new credential | CDR makes one HTTPS GET to `<account>.r2.cloudflarestorage.com` before parsing, URL-allowlisted to the quarantine prefix, no redirect, no proxy. CDR holds no credential; the URL reads one object for 300 s. The worker gains an R2 token with **Object Read only on this bucket** | Worker needs a GCS write credential; the CDR's runtime service account needs read on a bucket holding every tenant's staged source: the broad credential this must avoid |
+| Code | New server dependency (licence intake row), Dockerfile `CMD` swap with no off switch, streamed multipart builder in the worker | CDR +1 route (~110 lines, stdlib `urllib`); worker +1 module (~130 lines) | New bucket, lifecycle, IAM, two clients |
+| Config | `gcloud run services update --use-http2` + port `h2c` + image | One CDR env var; two worker vars, two worker secrets, one R2 token | Bucket, IAM, worker secret |
+
+**Choice: (b).** It is the only option whose off path is the current code byte for byte (a separate
+route and a separate flag; (a) swaps the server under every request), it never puts more than one
+chunk of the source in the isolate, it never approaches the 32 MiB request limit, and every line of
+it is testable here without an HTTP/2 stack. Its cost is egress: the CDR process that parses hostile
+documents gets a route to R2. The live revision's egress is read before anything else (operator step
+1); `service.yaml`'s Direct VPC with no Cloud NAT is not assumed applied (README "Egress"). **If that
+hardening is live, or is required before 50 MiB ships, (b) is the wrong choice and (a) is the
+fallback**, because a NAT plus an egress allow-list for R2 is new recurring spend and a wider network
+path than (a) needs.
+
+### What is built
+
+- **Worker** (`src/remote-source.ts`, `sanitize.ts`). `FOUNDATION_SOURCE_TRANSPORT` unset is today's
+  path. `presigned` raises the worker's byte cap to `LARGE_SOURCE_MAX_BYTES` (50 MiB, `keys.ts`), hashes
+  the object as a stream (`crypto.DigestStream`; its absence is a configuration error, never a fall
+  back to `arrayBuffer()`), and posts the same four signed headers to `/v1/disarm-remote` with three
+  form fields: `source_url` (a SigV4 presigned GET for exactly that key, 300 s, minted per request),
+  `filename`, `content_type`. A ranged request does the same, so segmentation works unchanged.
+  Configuration errors, raised before the source is read or a CDR request is paid for: any other
+  value; a missing or malformed `FOUNDATION_R2_ACCOUNT_ID`; a missing
+  `FOUNDATION_R2_READ_ACCESS_KEY_ID` / `FOUNDATION_R2_READ_SECRET_ACCESS_KEY`;
+  `FOUNDATION_CDR_TEXT_LAYER_FIRST` on (the D2 shadow posts the source bytes).
+- **CDR** (`app.py`). `/v1/disarm-remote` is `/v1/disarm` with the bytes read from the URL instead of
+  the body: same signature check, replay guard, digest comparison, scan, conversion, range and render
+  bounds, same response. Off unless `TAVONEL_CDR_REMOTE_SOURCE_PREFIX` is
+  `https://<host>/<bucket>/quarantine/` (anything else refuses the boot). A URL outside that prefix,
+  with another key shape, other query parameters, or `X-Amz-Expires` over 900 is refused before a
+  connection opens. The read is bounded by `LARGE_SOURCE_MAX_INPUT_BYTES` (50 MiB) and hashed while it
+  is written to disk, exactly as an upload is. The upload route keeps the stage bound (5 MiB).
+- **Fail closed.**
+
+  | Event | CDR answer | Worker |
+  | --- | --- | --- |
+  | Source over 50 MiB | (worker refuses first) / 413 `CDR source exceeds the controlled-beta size limit` | `PARSER_OOM`, named, no CDR call when R2's size says so |
+  | Bytes read ≠ signed digest | 422 `CDR source digest does not match the uploaded body` | `RECEIPT_MISMATCH` |
+  | URL expired or refused by R2, redirect, store unreachable, cut short | 502 | retry |
+  | Route off, URL not qualified | 503 | retry |
+  | CDR revision without the route (404, no `x-tavonel-cdr-remote-source` marker) | — | retry (deploy order) |
+  | Stream shorter or longer than R2's size, stream error | — | retry |
+
+  The URL is not covered by the HMAC. What it can name is bounded anyway: an object under the
+  configured quarantine prefix that the worker presigned, whose bytes must hash to the signed digest.
+- **Pinned.** `shared/intakeCeiling.ts` states both 50 MiB copies (`LARGE_SOURCE_TARGET_BYTES`, read by
+  no stage) and `nextjs/lib/intake-ceiling-cross-tree.test.ts` pins them; the same test fails if
+  `service.yaml`, the Dockerfiles or `wrangler.jsonc` set either flag, so turning it on edits that line
+  in a reviewed change.
+- **Tests.** Worker `src/remote-source.test.ts` (11): config refusals; SigV4 equal to AWS's published
+  example; the URL shape the CDR accepts; streamed hash, length mismatch and missing `DigestStream`; a
+  50 MiB source admitted with `arrayBuffer()` throwing and no blob in the request; 50 MiB + 1 refused
+  with no read and no call; digest refusal; 502, 503, unmarked 404 and network failure retried; the
+  shadow conflict; a 200-page source in three deliveries, a URL per range; the off path still posting
+  the source to `/v1/disarm`. CDR `tests/test_remote_source.py` (13): off by default; boot validation;
+  read once and disarmed; 50 MiB admitted while the upload route still answers 413; declared and
+  undeclared oversize; digest mismatch; eleven unqualified URLs never opened; store failures are 502
+  and never echo the URL; unsigned requests never reach the store; a ranged request; the real opener
+  reads and refuses to follow a redirect.
+
+### Operator steps (not run by an agent; the coordinator applies infrastructure)
+
+Names used below: project `tavonel-saas-foundation`, region `asia-northeast3`, service
+`tavonel-cdr-validation-0909`, bucket `tavonel-saas-foundation-quarantine`, `<ACCOUNT_ID>` the
+Cloudflare account id (32 hex), `<HEAD>` the merged commit.
+
+1. **Read the live CDR first; stop if it is egress-locked.**
+
+   ```bash
+   gcloud run services describe tavonel-cdr-validation-0909 --project tavonel-saas-foundation \
+     --region asia-northeast3 --format=yaml > cdr-0909-before.yaml
+   grep -nE 'vpc-access-egress|network-interfaces|image:|revisionName|memory|cpu|timeoutSeconds' cdr-0909-before.yaml
+   ```
+
+   Record the serving revision as `<PREV_REVISION>` in the campaign ledger (rollback target). If
+   `vpc-access-egress: all-traffic` is present, the CDR cannot reach R2: do not continue; take (a).
+
+2. **R2 read token (founder types the values).** Cloudflare dashboard → R2 → Manage API tokens →
+   Create: permission **Object Read only**, bucket **tavonel-saas-foundation-quarantine** only. Then,
+   from `quarantine-sidecar/foundation-cdr-worker` (each prompts for the value; never put it in vars,
+   files or chat):
+
+   ```bash
+   npx wrangler versions secret put FOUNDATION_R2_READ_ACCESS_KEY_ID
+   npx wrangler versions secret put FOUNDATION_R2_READ_SECRET_ACCESS_KEY
+   ```
+
+   These create versions without deploying them, and are inert while `FOUNDATION_SOURCE_TRANSPORT` is
+   unset. Rollback: revoke the token in the dashboard.
+
+3. **CDR revision with the route on.** The route only answers a worker that asks for it, so this
+   revision serves today's traffic unchanged. `<IMAGE_REPO>` is the repository of the image in
+   `cdr-0909-before.yaml`. CPU, memory, timeout, concurrency and scale are restated at their current
+   values, not changed: the measurement decides whether they move.
+
+   ```bash
+   cd quarantine-sidecar/cdr-cloudrun
+   gcloud builds submit --project tavonel-saas-foundation --region asia-northeast3 \
+     --tag <IMAGE_REPO>:large-bytes-<HEAD> .
+   gcloud run deploy tavonel-cdr-validation-0909 --project tavonel-saas-foundation --region asia-northeast3 \
+     --timeout 120 --concurrency 1 --max-instances 3 \
+     --container cdr --image <IMAGE_REPO>@sha256:<BUILT_DIGEST> --cpu 2 --memory 4Gi \
+     --update-env-vars TAVONEL_CDR_REMOTE_SOURCE_PREFIX=https://<ACCOUNT_ID>.r2.cloudflarestorage.com/tavonel-saas-foundation-quarantine/quarantine/ \
+     --container clamd --cpu 2 --memory 4Gi
+   ```
+
+   No `--use-http2`, no new secret (the CDR holds no R2 credential). Check: `/health` answers
+   `"remoteSourceMaxBytes": 52428800`; one ordinary small source still processes. Rollback:
+
+   ```bash
+   gcloud run services update-traffic tavonel-cdr-validation-0909 --project tavonel-saas-foundation \
+     --region asia-northeast3 --to-revisions <PREV_REVISION>=100
+   ```
+
+4. **Worker version with the transport on, not deployed.** No `wrangler.jsonc` edit is needed for
+   the measurement:
+
+   ```bash
+   cd quarantine-sidecar/foundation-cdr-worker
+   npx wrangler versions upload --preview-alias large-bytes \
+     --var FOUNDATION_SOURCE_TRANSPORT:presigned --var FOUNDATION_R2_ACCOUNT_ID:<ACCOUNT_ID>
+   ```
+
+   A version that is uploaded and not deployed consumes no queue message. If the worker has no
+   preview URL, this step and step 5 need a quiet window with the version deployed at 100% and
+   step 7's rollback ready.
+
+5. **The measurement (before the 5 MiB admission check may move).** One synthetic, non-customer 50 MiB
+   PDF of more than 80 pages (so the segmented path runs; it re-reads 50 MiB per range), placed by the
+   operator because intake still refuses it:
+
+   ```bash
+   npx wrangler r2 object put tavonel-saas-foundation-quarantine/quarantine/<MEASURE_WS>/<MEASURE_DOC>/source \
+     --file manual-50mib.pdf --content-type application/pdf --remote
+   curl -sS -X POST https://large-bytes-tavonel-foundation-cdr.<SUBDOMAIN>.workers.dev/v1/sanitize \
+     -H "authorization: Bearer $FOUNDATION_MANUAL_TRIGGER_TOKEN" -H 'content-type: application/json' \
+     -d '{"objectKey":"quarantine/<MEASURE_WS>/<MEASURE_DOC>/source"}'   # repeat until the manifest exists
+   npx wrangler tail tavonel-foundation-cdr --format json > worker-tail.jsonl   # in parallel; or that version's Workers Logs
+   gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="tavonel-cdr-validation-0909" AND httpRequest.requestUrl:"/v1/disarm-remote"' \
+     --project tavonel-saas-foundation --freshness 1h --format json > cdr-requests.json
+   ```
+
+   The receipt, under `docs/evidence/artifacts/` with sha256s: the source's sha256 and size; each
+   range's `cdr-receipt.json` and `ocr.json` keys and digests, and `segments/manifest.json`; per CDR
+   request the latency from `cdr-requests.json` against the worker's 60 s CDR timeout and Cloud Run's
+   120 s; CDR memory and CPU per container (`run.googleapis.com/container/memory/utilizations`,
+   container `cdr` and `clamd`) against 4 GiB; the clamd scan time (`x-tavonel-malware-scan`
+   `durationMs`) against `CLAMD_READ_TIMEOUT_SECONDS` 20; and `worker-tail.jsonl` showing no
+   `exceededMemory` / `exceededCpu` outcome. Cloudflare reports no per-invocation memory, so the worker
+   bound is the code's (`arrayBuffer()` never called, test above) plus that outcome; that is stated in
+   the receipt, not rounded up to a number. The manual route settles the source, and a source with no
+   intake reservation may be refused by settlement; its answer is recorded, not part of the proof.
+   Then delete the measurement objects (`immutable/<MEASURE_WS>/…`, `quarantine/<MEASURE_WS>/…`).
+
+6. **Turn it on for traffic** (only after step 5's receipt and the preconditions below). `wrangler.jsonc`:
+
+   ```diff
+   -    "FOUNDATION_OCR_PAGE_RANGE_SIZE": "8"
+   +    "FOUNDATION_OCR_PAGE_RANGE_SIZE": "8",
+   +    // Large-source bytes (ADR-0006): the CDR reads each source from R2 through a presigned GET.
+   +    // Needs the dashboard secrets FOUNDATION_R2_READ_ACCESS_KEY_ID / FOUNDATION_R2_READ_SECRET_ACCESS_KEY
+   +    // (Object Read only, this bucket) and a CDR revision with TAVONEL_CDR_REMOTE_SOURCE_PREFIX.
+   +    "FOUNDATION_SOURCE_TRANSPORT": "presigned",
+   +    "FOUNDATION_R2_ACCOUNT_ID": "<ACCOUNT_ID>"
+      },
+   ```
+
+   with the matching edit to the `FOUNDATION_SOURCE_TRANSPORT` line in
+   `intake-ceiling-cross-tree.test.ts`, then:
+
+   ```bash
+   npx wrangler versions upload
+   npx wrangler versions deploy <NEW_VERSION_ID>@100% --yes
+   ```
+
+7. **Rollback** (worker): `npx wrangler versions deploy <PREV_VERSION_ID>@100% --yes`. Sources between
+   5 and 50 MiB admitted meanwhile (none, while intake stays at 5 MiB) would then be refused
+   `PARSER_OOM` by the 5 MiB cap, with a receipt. CDR rollback is step 3's. R2 token: revoke.
+
+### Preconditions for moving the 5 MiB admission check
+
+1. Step 1 shows the live CDR can reach R2, and the network posture is accepted as is (or (a) is built
+   instead).
+2. Step 5's receipt exists and every number in it is inside its bound: CDR request time under the
+   worker's 60 s per request (or the timeout and the 15-minute wall arithmetic move together, in the
+   same change); CDR memory under 4 GiB per container; scan time under 20 s; no worker memory or CPU
+   exceeded outcome.
+3. clamd accepts a 50 MiB `INSTREAM` (its `StreamMaxLength` is the image's default; a refusal there
+   is a 503 that retries forever, so it is checked by the measurement, not assumed).
+4. A 50 MiB DOCX is measured too, or DOCX stays at the old bound: conversion runs once per range, and
+   `MAX_OFFICE_PACKAGE_UNCOMPRESSED_BYTES` (64 MiB) may refuse a large package by name.
+5. Per-range output stays within `MAX_OUTPUT_BYTES` (18 MiB) for the measured source, so the GPU
+   reader's 18 MiB input is unchanged; a dense 50 MiB scan that exceeds it is refused `PARSER_OOM`
+   by range, which is the per-request bound working, not a byte-intake failure.
+6. The site half: the browser PUT timeout (`nextjs/lib/upload-transfer.ts`, 120 s sized to 5 MiB at
+   43 KiB/s) is re-derived for 50 MiB; a new intake stage in `shared/intakeCeiling.ts` carries the
+   50 MiB (with `r2-presign.ts`, the capability route and `/pricing` following it); one migration
+   moves the DB admission checks (`0051`, `20261003120000`, PR #228's `_unchecked`) with pgTAP at both
+   boundaries; the deletion inventory bound (1 GiB) is re-checked for 50 MiB sources.
+7. An independent reviewer approves the processor change and the receipt with zero blockers.
+
+### Not measured
+
+Everything in step 5. In particular: R2 → Cloud Run read time for 50 MiB; whether the live revision
+has egress to R2; clamd's stream limit and scan time at 50 MiB; DOCX conversion of a 50 MiB package;
+the worker's real peak memory (only its code path is shown).
