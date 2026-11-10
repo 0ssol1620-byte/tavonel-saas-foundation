@@ -407,7 +407,7 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "Most pages in one source",
-    `${PROCESSING_CEILING.maxSourcePages} for a PDF or Word file, ${PROCESSING_CEILING.maxUnsegmentedSourcePages} for any other format. A PDF or Word file you choose directly is counted in your browser, and a longer one is refused before it uploads. A file inside a ZIP, or in a format that does not state its page count, is counted when it is read, and a longer one is refused then, with the reason on the source. Nothing is cut short.`,
+    `${PROCESSING_CEILING.maxSourcePages} for a PDF or Word file, ${PROCESSING_CEILING.maxUnsegmentedSourcePages} for any other format. A PDF is counted in your browser, also when it is inside a ZIP, and a longer one is refused before it uploads. Other formats, and a PDF the browser cannot open, are counted when they are read, and a longer one is refused then, with the reason on the source. Nothing is cut short.`,
   ],
   [
     "Sources in one run",

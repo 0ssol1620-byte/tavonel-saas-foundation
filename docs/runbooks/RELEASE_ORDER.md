@@ -823,6 +823,10 @@ URL·예약 전에 413으로 거절하는 것뿐이다.
 - worker: `FOUNDATION_SOURCE_SEGMENT_PAGES` 미설정이면 꺼짐. **site 절반(ADR-0006 "Site half": manifest 읽기, 범위별 compile,
   원래 쪽 번호, intake 500쪽 + approval CHECK migration)이 배포되기 전에는 켜지 않는다.** 켜면 81쪽 이상 소스는 처리·정산되지만
   site가 `segments/manifest.json`을 읽지 못해 화면에 나타나지 않는다.
+- 값은 `80`만 허용한다. `FOUNDATION_COMPLETED_READ_ENABLED=true`와 함께 켜면 worker가 CDR 요청 전에 설정 오류로 멈춘다(completed-read는 꺼 둔다).
+  `wrangler.jsonc`의 producer `FOUNDATION_SEGMENT_CONTINUATION`(같은 queue)이 없으면 역시 설정 오류다.
+- CDR이 먼저다. 범위를 모르는 옛 CDR은 81쪽 이상을 거절하는데, worker는 `x-tavonel-cdr-ranges` 헤더가 없는 거절을 재시도로 다룬다.
+- 켜기 전에 삭제 inventory 한도(512 객체 / 1 GiB, 여러 장문 소스를 한 번에 지울 때 초과)를 site 절반 PR에서 해소한다(ADR-0006 "Deletion").
 - 순서: (1) CDR revision → (2) site 절반 병합 + migration 적용 → (3) worker version upload에 `FOUNDATION_SOURCE_SEGMENT_PAGES=80`,
   81쪽·300쪽 문서 1건씩 end-to-end 확인 → (4) 문구·`PROCESSING_CEILING_SENTENCE` 변경 build.
 - 되돌리기: worker 변수 삭제(`wrangler versions deploy <prev>@100%`). 저장된 범위는 manifest가 없으면 보이지 않고 소스 삭제 때 함께 지워진다.

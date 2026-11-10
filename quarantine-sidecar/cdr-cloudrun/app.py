@@ -107,6 +107,7 @@ INTAKE_CEILING_STAGE_ENV: Final = "TAVONEL_INTAKE_CEILING_STAGE"
 # `LIMITS.pages` pages. The 500 is the loop bound the worker's range reader already uses
 # (`foundation-cdr-worker/src/ocr.ts` MAX_RANGE_DOCUMENT_PAGES), not a measurement.
 SEGMENTED_MAX_DOCUMENT_PAGES: Final = 500
+CDR_RANGES_HEADER: Final = "x-tavonel-cdr-ranges"
 PAGE_RANGE_REQUEST_ID: Final = re.compile(r"^[A-Za-z0-9-]{16,140}_p([0-9]{1,4})_([0-9]{1,4})$")
 
 
@@ -895,7 +896,9 @@ app.add_middleware(
 
 @app.exception_handler(HTTPException)
 async def http_exception_no_store(_: Request, exc: HTTPException) -> JSONResponse:
-    headers = {"cache-control": "no-store"}
+    # CDR_RANGES_HEADER on every refusal tells the worker this revision answers page ranges, so a
+    # refusal of a ranged request is a verdict. Without it the worker retries (ADR-0006, E4).
+    headers = {"cache-control": "no-store", CDR_RANGES_HEADER: "1"}
     if exc.headers:
         headers.update(exc.headers)
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=headers)

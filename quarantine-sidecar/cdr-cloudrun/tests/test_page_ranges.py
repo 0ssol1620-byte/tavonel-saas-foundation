@@ -110,6 +110,15 @@ class PageRangeDisarmTest(unittest.TestCase):
         response = post(blank_pdf(SEGMENTED_MAX_DOCUMENT_PAGES + 1), ranged(0, 80))
         self.assertEqual(response.status_code, 422, response.text)
         self.assertEqual(response.json()["detail"], "CDR source page count is not qualified")
+        # The refusal says this revision answers ranges, so the worker treats it as a verdict.
+        self.assertEqual(response.headers["x-tavonel-cdr-ranges"], "1")
+
+    def test_the_last_range_of_a_document_at_the_segmented_ceiling_is_answered(self) -> None:
+        response = post(blank_pdf(SEGMENTED_MAX_DOCUMENT_PAGES), ranged(420, 500))
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.headers["x-tavonel-cdr-source-pages"], str(SEGMENTED_MAX_DOCUMENT_PAGES))
+        self.assertEqual(response.headers["x-tavonel-cdr-page-range"], "420-500")
+        self.assertEqual(page_widths(response.content), [round(LETTER[0] + index % 7, 2) for index in range(420, 500)])
 
     def test_an_unranged_request_keeps_the_production_page_ceiling(self) -> None:
         response = post(blank_pdf(MAX_PAGES + 1), secrets.token_hex(12))

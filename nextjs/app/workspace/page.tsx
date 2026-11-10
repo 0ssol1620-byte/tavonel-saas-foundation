@@ -82,7 +82,7 @@ import { compileLimitsNotice, judgeCompileSet } from "@/lib/compile-limits";
 import { describeCorpusStart, judgeCorpusSet, type CorpusProgress } from "@/lib/corpus-batching";
 import { CompileJobPanel, type CompileJobView } from "@/components/compile-job-panel";
 import { compileJobRestingNotice, isCompileJobResting, isCompileJobTerminal, observeCompileJob, pickResumableCompileJob } from "@/lib/compile-job-client";
-import { measureSelection, type PageCountResult } from "@/lib/page-count";
+import { measureSelection, refusablePageCount, type PageCountResult } from "@/lib/page-count";
 import {
   buildPreflightSummary,
   describePreflightFile,
@@ -1330,14 +1330,14 @@ export default function WorkspacePage() {
           declaredMimeType: file.type || "application/pdf",
           requestedBytes: file.size,
           /*
-            The count read out of the file before upload, when the format states one, so the route
-            can refuse a file over the page ceiling before any byte is sent rather than the
-            rasterizer refusing it after.
+            A PDF's counted page tree, so the route can refuse a file over the page ceiling before
+            any byte is sent rather than the rasterizer refusing it after. A declared DOCX count or
+            a PPTX slide count is not sent: either can exceed what the file renders to.
           */
           estimatedPages: estimateBillablePages({
             bytes: file.size,
             mimeType: file.type || "application/pdf",
-            ...(measured && measured.pages !== null ? { declaredPages: measured.pages, declaredBasis: measured.basis } : {}),
+            ...refusablePageCount(measured),
           })?.pages,
         }),
       });
