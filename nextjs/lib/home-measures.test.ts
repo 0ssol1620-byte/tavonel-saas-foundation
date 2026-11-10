@@ -22,13 +22,12 @@ describe("Home measurement band data", () => {
       return [...copy.figure, ...copy.label, ...copy.detail].map(part => (typeof part === "string" ? part : formatFigure(part))).join("");
     };
     // FINAL-SPEC 2026-10-26 D-12: R-01 first, then R-02 -- the same facts, word for word, in receipt order.
-    expect(HOME_MEASURES.map(measure => measure.receipt.id)).toEqual(["R-01", "R-02", "R-03"]);
+    // 2026-11-10 public-copy cleanup (founder direction): intended re-pin. R-03 (by document type) left the band. Home does not lead with a weakness.
+    expect(HOME_MEASURES.map(measure => measure.receipt.id)).toEqual(["R-01", "R-02"]);
+    expect(HOME_MEASURES.map(measure => measure.claim)).not.toContain("accuracy-by-document-type");
     expect(text(1, "en")).toBe("0broken links in compiled outputOf 1,000 documents offered, 596 compiled and 404 were refused for a link that could not be resolved. These guarantees describe the structure of the compiled output. They are a separate measure from whether the extracted text is correct.");
     expect(text(0, "en")).toContain("80.6olmOCR-Bench score with recovery. 53.7 with only recovery switched off");
     expect(text(0, "en")).toContain("1,403 documents, 8,413 checks.");
-    expect(text(2, "en")).toContain("36.9%of checks passed on low-quality scans194 of 526 checks on low-quality scans. 1,380 of 1,394 on standard digital documents.");
-    expect(text(2, "en")).toContain("The spread runs from 99.0% to 36.9%.");
-    expect(text(2, "ko")).toContain("저품질 스캔본 검사 526개 중 194개");
   });
 
   /*
@@ -47,9 +46,6 @@ describe("Home measurement band data", () => {
       expect(detail(index, "en").endsWith(claim.must_say_en!), measure.claim).toBe(true);
       expect(detail(index, "ko").endsWith(claim.must_say!), measure.claim).toBe(true);
     });
-    // The two figures inside the accuracy must-say are figures of that claim, not loose digits.
-    const figures = HOME_MEASURES[2]!.en.detail.filter(part => typeof part !== "string").map(part => formatFigure(part as { n: number; d: number }));
-    expect(figures.slice(-2)).toEqual(["99.0", "36.9"]);
   });
 
   /*
@@ -66,7 +62,9 @@ describe("Home measurement band data", () => {
     expect(accuracy.must_say_en).not.toContain("This is the pass rate over");
     for (const claim of claims) expect(claim.must_say_en ?? "", claim.id).not.toContain("80.6% check pass rate");
     const byTypeBody = EVIDENCE.find(entry => entry.receipt?.id === "R-03")!.body;
-    expect(byTypeBody).toContain("The overall 80.6 is an average over that spread.");
+    // 2026-11-10 public-copy cleanup (founder direction): intended re-pin. The R-03 body names 80.6 as the overall score over every document type.
+    expect(byTypeBody).toContain("the overall score was 80.6");
+    expect(byTypeBody).toContain("1,403 documents and 8,413 checks");
   });
 
   it("refuses a must-say number the claim does not carry, or carries at another precision", () => {

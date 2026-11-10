@@ -267,7 +267,7 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceE
     // Identity and team-access requirements stay in Enterprise scoping rather than plan copy.
     [
       "What differs by plan",
-      `${BILLING_OFFERS.studio_access.label} carries ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} included pages against ${BILLING_OFFERS.observer_access.label}'s ${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")}, adds the review queue, version history and a guided onboarding session, and is sold through a conversation rather than a checkout. ${activationPlans.join(" and ")} reach World activation — activating a candidate and rolling one back — as the workspace owner. Source connections are verified separately in Workspace.`,
+      `${BILLING_OFFERS.studio_access.label} carries ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} included pages against ${BILLING_OFFERS.observer_access.label}'s ${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")}, adds the review queue, version history and a guided onboarding session, and is sold through a conversation rather than a checkout. ${activationPlans.join(" and ")} reach World activation — activating a candidate and rolling one back — as the workspace owner. Both include Google Drive and file-server connections.`,
     ],
     [
       "What does not consume pages",
@@ -407,7 +407,7 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "Most pages in one source",
-    `${PROCESSING_CEILING.maxSourcePages}. The page ceiling is checked after the document is decoded, so a longer file is refused during processing rather than at upload.`,
+    `${PROCESSING_CEILING.maxSourcePages}. A PDF is counted in your browser, also when it is inside a ZIP, and a longer one is refused before it uploads. Other formats, and a PDF the browser cannot open, are counted when they are read, and a longer one is refused then, with the reason on the source. Nothing is cut short.`,
   ],
   [
     "Sources in one run",
@@ -517,7 +517,7 @@ export type PlanCapabilityRow = {
   capability: string;
   /** The route file whose access check this row's level is taken from; absent on an unsold row. */
   route?: string;
-  level?: "observer" | "studio" | "activation";
+  level?: "observer" | "connections" | "studio" | "activation";
   plans: ReadonlyArray<{ label: string; saleChannel: string; state: PlanFeatureState }>;
 };
 

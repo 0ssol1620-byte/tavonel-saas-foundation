@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 const HEADERS = { "Cache-Control": "no-store", "X-TAVONEL-API-Version": "1" };
 
 export async function POST(request: Request) {
-  const auth = await requireFoundationSession(request, "studio");
+  const auth = await requireFoundationSession(request, "connections");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: HEADERS });
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(declaredLength) && declaredLength > 4_096) return NextResponse.json({ code: "REQUEST_TOO_LARGE" }, { status: 413, headers: HEADERS });

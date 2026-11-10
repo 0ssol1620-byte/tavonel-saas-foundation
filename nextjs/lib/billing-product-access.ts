@@ -18,7 +18,20 @@ import type { WorkspaceMembership } from "./pilot-tenant";
   role, reach this level -- and the /pricing capability table is rendered from the same answer, so
   the page cannot promise a different one.
 */
-export type ProductAccessLevel = "observer" | "studio" | "activation";
+export type ProductAccessLevel = "observer" | "connections" | "studio" | "activation";
+
+/*
+  `connections` (2026-11-10): storage connectors -- Google Drive, Dropbox and OneDrive OAuth, and
+  the local source agent -- are included on both paid plans. They were `studio` until a paying
+  Developer workspace pressed "Connect Google Drive" and was told its plan did not include it.
+  Plan-wise this level is answered like `observer`; the free evaluation is what it keeps out,
+  which `authorizeFoundationSessionProduct` decides, because only that function knows a trial.
+  Synced pages are metered by the same compute reservation as an upload, so nothing about the
+  allowance changes here.
+*/
+
+/** The levels a route may name as its minimum plan. Activation needs a role and has its own call. */
+export type MinimumPlanLevel = Exclude<ProductAccessLevel, "activation">;
 
 /**
  * The caller's workspace role, as the membership row spells it rather than a second list of
@@ -37,7 +50,7 @@ export function planReachesLevel(
   required: ProductAccessLevel,
   role?: ProductAccessRole,
 ) {
-  if (required === "observer") return true;
+  if (required === "observer" || required === "connections") return true;
   if (accessPlan === "studio_access") return true;
   return required === "activation" && role === "owner";
 }

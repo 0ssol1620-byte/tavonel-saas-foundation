@@ -85,7 +85,7 @@ export default function KoreanPricingPage() {
                 <article className={`${styles.card} ${pricingPlanDestinationClass}`} id={pricingPlanId(1)} tabIndex={-1}>
                   <h3>{developer.label}</h3>
                   <p className={styles.price}>${developer.priceUsd}<span className={styles.unit}> {monthlyUnit}</span></p>
-                  <p>월 {developer.includedPages.toLocaleString("en-US")} 표준 페이지, 증거 연결·Ask·서명된 내보내기, API·MCP 접근.</p>
+                  <p>월 {developer.includedPages.toLocaleString("en-US")} 표준 페이지, 증거 연결·Ask·서명된 내보내기, API·MCP 접근, Google Drive·파일 서버 연결.</p>
                   <p className="fine">내 원문 컴파일은 워크스페이스의 처리 승인 뒤에 시작합니다.</p>
                   {purchaseOpen ? (
                     <Link href={loginUrlForOffer("observer_access") as Route}>{developer.label} · {KO_CHROME.cta[SELF_SERVE_CTA.href]}</Link>
@@ -96,7 +96,7 @@ export default function KoreanPricingPage() {
                 <article className={`${styles.card} ${pricingPlanDestinationClass}`} id={pricingPlanId(2)} tabIndex={-1}>
                   <h3>{team.label}</h3>
                   <p className={styles.price}>${team.priceUsd}<span className={styles.unit}> {monthlyUnit}</span></p>
-                  <p>월 {team.includedPages.toLocaleString("en-US")} 표준 페이지, 검토 대기열·버전 기록·자료 도입 안내.</p>
+                  <p>월 {team.includedPages.toLocaleString("en-US")} 표준 페이지, 검토 대기열·버전 기록·자료 도입 안내, Google Drive·파일 서버 연결.</p>
                   <p className="fine">현재 단일 사용자 워크스페이스입니다. 여러 사용자·역할·사용자별 원문 권한은 제공하지 않습니다.</p>
                   <Link href="/ko/contact?plan=Team">Team 도입 상담</Link>
                 </article>

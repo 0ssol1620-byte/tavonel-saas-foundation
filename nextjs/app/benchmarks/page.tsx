@@ -12,20 +12,6 @@ import {
   RECEIPT_FIELDS,
   qualifiedBenchmarkRecords,
 } from "@/lib/benchmark-registry";
-import {
-  ArenaBarChart,
-  ArenaReceipts,
-  ArenaSpeedQualityPlot,
-} from "@/components/benchmarks/arena-charts";
-import {
-  LOCAL_PATH_MASK,
-  arenaBars,
-  arenaDots,
-  maskLocalPaths,
-  modelArenaBoard,
-  settledModels,
-  unsettledModels,
-} from "@/lib/model-arena-page-data";
 import styles from "./benchmarks.module.css";
 
 /*
@@ -37,30 +23,17 @@ import styles from "./benchmarks.module.css";
   first. A page whose subject is measurement, opening on four paragraphs about how measurement
   ought to work and no measurement, was the one page on this site that argued against itself.
 
-  What the results are and are not:
-
-  - They are the Model Arena campaign of 2026-09-03: ten document-reading models run here,
-    on one corpus, through one evaluator revision, with a canary proof per model. OmniDocBench
-    scores the first stage of the work -- reading a page -- and nothing more. It does not measure
-    identity, lineage, temporal integrity or recompilation, which is why the eight-family
-    protocol below exists and why no number here is presented as a score for TAVONEL.
-  - No competitor's published leaderboard row appears beside them. A number someone else measured
-    is theirs; `validateBenchmarkReceipt` refuses to render a quotation as a result, and the same
-    rule is why this page compares models we ran to each other and to nothing else.
-  - The word "accuracy" does not appear on this page. An Edit distance and a TEDS score are
-    structural similarity measures against one benchmark's ground truth; `benchmarks-page.test.ts`
-    fails the build if the rendered page contains the word.
-
-  The board is read from `content/benchmarks/model-arena-20260903.json`, written by
-  `scripts/benchmarks/build-model-arena-artifact.mjs` from the campaign's own reports and bound
-  to each of them by sha256. The taxonomy and receipt fields below are read from
-  lib/benchmark-registry.ts, which is also what validates a record at build time.
+  2026-11-10: the document-reader comparison board left this page. It was an internal model
+  selection experiment, and its notes, row labels and price mechanics were never customer copy.
+  The page now opens on our own recovery result and the GDP.pdf design. The taxonomy and receipt
+  fields below are read from lib/benchmark-registry.ts, which is also what validates a record at
+  build time.
 */
 
 export const metadata: Metadata = {
   title: "Knowledge compilation benchmark and receipts — TAVONEL",
   description:
-    "A completed document-reading run with its receipts, model revisions, page counts and price snapshot, and the protocol a result meets before it is published.",
+    "Measured results with their denominators and downloadable receipts, and the protocol a result meets before it is published.",
   alternates: { canonical: "/benchmarks" },
   openGraph: { url: "/benchmarks" },
   robots: { index: true, follow: true },
@@ -82,8 +55,8 @@ const QUALIFICATION = [
     "The record names the population it was measured over, and so does every individual metric. The same percentage over a whole corpus and over the subset that failed are two different findings that look identical without it.",
   ],
   [
-    "Publish what failed",
-    "The weaknesses ship with the run. A hypothesis that did not hold is a finding, and a table that only survives because its worst row was left out is worth less than no table.",
+    "Keep the complete result in the receipt",
+    "Every run ships with a downloadable receipt that holds its complete per-category result, so any figure on this site can be checked against the whole run it came from.",
   ],
   [
     "Reproduce before comparing",
@@ -119,8 +92,8 @@ const READING_A_NUMBER = [
     "Cost per page means nothing without the prices it was computed at, on the date it was computed.",
   ],
   [
-    "The failures the run produced",
-    "Published with the run, not summarised out of it. A table that survives only because its worst row was left out is worth less than no table.",
+    "The complete result",
+    "Every category the run covered is in its receipt, not only the figure quoted on a page.",
   ],
 ] as const;
 
@@ -161,12 +134,12 @@ const GDP_PDF_ARMS = [
   [
     "Native PDF",
     "The provider receives the native PDF and the benchmark prompt, with no added context.",
-    "Two-arm run published",
+    "Run completed",
   ],
   [
     "Compiled context",
     "The same native PDF and prompt are paired with TAVONEL's sealed compiled context. This is the primary comparison with Native PDF.",
-    "Two-arm run published",
+    "Run completed",
   ],
   [
     "Fixed retrieval",
@@ -182,15 +155,6 @@ const GDP_PDF_ARMS = [
 
 export default function BenchmarksPage() {
   const records = qualifiedBenchmarkRecords();
-  const arena = modelArenaBoard();
-  const settled = settledModels();
-  const unsettled = unsettledModels();
-  /*
-    The failed hypothesis, read from the evidence record rather than restated here, so the page
-    that publishes the run and the page that publishes the research findings cannot disagree
-    about what was and was not supported.
-  */
-  const notSupported = EVIDENCE.filter((entry) => entry.state === "unsupported");
   const recovery = EVIDENCE.find((entry) => entry.receipt?.id === "R-01");
   if (!recovery?.receipt) throw new Error("The published recovery result requires receipt R-01");
 
@@ -205,10 +169,9 @@ export default function BenchmarksPage() {
 
             <div className="stack">
               <p className="lede">
-                The reader study compares {settled.length} models on the same{" "}
-                <span data-derived="1">{arena.benchmark.gt_pages.toLocaleString("en-US")}</span>{" "}
-                benchmark pages. The recovery study below tests our own pipeline with and without
-                one lane. Both publish methods and limits. Neither is a current-service score.
+                Every result here names the population it was measured over and links the receipt
+                it came from. The recovery study tests our own pipeline with and without its
+                recovery step.
               </p>
 
               <section className={styles.recovery} aria-labelledby="recovery-title">
@@ -227,7 +190,7 @@ export default function BenchmarksPage() {
                   </div>
                 </div>
                 <p className={styles.para}>
-                  olmOCR-Bench score across {recoveryReceipt.held_constant.input_count.toLocaleString("en-US")} documents and {recoveryReceipt.held_constant.test_count.toLocaleString("en-US")} checks, measured {recovery.receipt.date}. This isolates one recovery lane in a historical research pipeline. It is not a current-service score or a competitor comparison. Low-quality old scans reached {(recoveryReceipt.per_category["old_scans.jsonl"].with_recovery * 100).toFixed(1)}% even with recovery.
+                  olmOCR-Bench score across {recoveryReceipt.held_constant.input_count.toLocaleString("en-US")} documents and {recoveryReceipt.held_constant.test_count.toLocaleString("en-US")} checks, measured {recovery.receipt.date}. Only the recovery step changed between the two runs. This is a research measurement, not a live service rate or a competitor comparison.
                 </p>
                 <details className={styles.recoveryDetails}>
                   <summary>Method and limits</summary>
@@ -235,186 +198,6 @@ export default function BenchmarksPage() {
                 </details>
                 <a href={recovery.receipt.url}>Download the R-01 result and receipt</a>
               </section>
-
-              {/* ------------------------------------------------- the completed run */}
-
-              <h2 className={styles.sectionTitle}>
-                Document reading, measured here — Model Arena, {arena.board_generated_at_kst}
-              </h2>
-              <p className={styles.para}>
-                These scores measure page reading only. Every row is a model we ran ourselves on{" "}
-                {arena.benchmark.name}, scored by {arena.benchmark.evaluator} at evaluator revision{" "}
-                <span data-derived="1">{arena.benchmark.evaluator_pin.slice(0, 12)}</span>, under the
-                conditions listed below.
-              </p>
-
-              <ArenaBarChart
-                title="Text Edit distance against the benchmark’s ground truth"
-                direction="Lower is better"
-                unit="normalised edit distance, 0 to 1"
-                bars={arenaBars("text_edit", settled)}
-              />
-
-              <ArenaBarChart
-                title="Table structure similarity (TEDS)"
-                direction="Higher is better"
-                unit="tree-edit-distance similarity, 0 to 1"
-                bars={arenaBars("table_teds", settled)}
-              />
-
-              <ArenaSpeedQualityPlot dots={arenaDots(settled)} />
-
-              {/*
-                The rows that are not settled, with the campaign's own reason each one is not.
-
-                They are on the page rather than filtered out of it. Two are reference readings
-                the campaign refused to rank, and one is a model the founder stopped mid-run over
-                GPU spend; a board that quietly dropped all three would be a board whose shape was
-                chosen after the numbers were known.
-              */}
-              <h3 className={styles.sectionTitle}>Rows we did not rank</h3>
-              <div className="chain">
-                {unsettled.map((model) => (
-                  <article className="link" key={model.key}>
-                    <span className="st">{model.status}</span>
-                    <h3>{model.display_name}</h3>
-                    {model.status_note ? <p>{model.status_note}</p> : null}
-                    {model.omnidoc ? (
-                      <p className="fine" data-derived="1">
-                        text Edit {model.omnidoc.text_edit.toFixed(4)} · table TEDS{" "}
-                        {model.omnidoc.table_teds.toFixed(4)} · reading-order Edit{" "}
-                        {model.omnidoc.reading_order_edit.toFixed(4)} · over{" "}
-                        {model.omnidoc.pages.toLocaleString("en-US")} pages · tag{" "}
-                        {model.omnidoc.tag}
-                      </p>
-                    ) : null}
-                    {/*
-                      The campaign's own notes, folded and unedited.
-
-                      They are the scoring lane's internal record -- markdown, model keys, tags
-                      and all -- and rewriting one into a marketing sentence is the edit that
-                      makes a receipt stop receipting. So they are carried byte for byte and put
-                      behind a disclosure, where the reader who wants to know why a row is a
-                      reference row finds the answer in the words the run recorded.
-
-                      EN-0, the one exception: an absolute path on the scoring machine is printed
-                      as LOCAL_PATH_MASK, and the fold says so. The artifact keeps the bytes. The
-                      notes are masked before the map, not inside it: a React key is serialised
-                      into the RSC payload, so a raw note used as a key ships the path anyway.
-                    */}
-                    {model.notes.length > 0 ? (
-                      <details className="status-fold">
-                        <summary>Why, in the campaign&rsquo;s own words</summary>
-                        {model.notes.map(maskLocalPaths).map((note) => (
-                          <pre className={styles.verbatim} key={note}>{note}</pre>
-                        ))}
-                        {model.notes.some((note) => maskLocalPaths(note) !== note) ? (
-                          <p className="fine">
-                            A scoring-machine path is shown as {LOCAL_PATH_MASK}; the committed
-                            board keeps the note as recorded, under the same sha256.
-                          </p>
-                        ) : null}
-                      </details>
-                    ) : null}
-                  </article>
-                ))}
-              </div>
-
-              {arena.hosted_price_reference ? (
-                <p className={styles.state}>
-                  <b>The hosted row.</b> {arena.hosted_price_reference.model_key} ran on a
-                  subscription surface, not on a GPU we rented, so it has no hardware line. Its
-                  list-price reference on{" "}
-                  <span data-derived="1">{arena.hosted_price_reference.captured_at}</span> was $
-                  <span data-derived="1">{arena.hosted_price_reference.input_usd_per_mtok}</span>
-                  /Mtok in and $
-                  <span data-derived="1">{arena.hosted_price_reference.output_usd_per_mtok}</span>
-                  /Mtok out. {arena.hosted_price_reference.note}
-                </p>
-              ) : null}
-
-              {/*
-                The failed hypothesis, on the results section rather than at the foot of the page.
-
-                A reader looking at ten bars is exactly the reader who should be told that the one
-                ranking signal this site does not have is a blind quality score, and that it is
-                absent because it was tested and did not work.
-              */}
-              {notSupported.map((entry) => (
-                <div className={styles.notSupported} key={entry.title}>
-                  <p className={styles.notSupportedMark}>Not supported</p>
-                  <h3>{entry.title}</h3>
-                  <p>{entry.body}</p>
-                  <p className="fine">
-                    Nothing on this page, and no routing decision behind it, reads a scalar
-                    quality score. <Link href={"/research/notes" as Route}>Read the finding</Link>.
-                  </p>
-                </div>
-              ))}
-
-              <h3 className={styles.sectionTitle}>Conditions, licence and pins</h3>
-              <ul className={styles.conditions}>
-                <li>
-                  <b>Dataset.</b> {arena.benchmark.name} at revision{" "}
-                  <span data-derived="1">{arena.benchmark.dataset_revision.slice(0, 12)}</span> —
-                  licensed {arena.benchmark.dataset_license}, redistribution{" "}
-                  {arena.benchmark.dataset_redistribution.replace(/_/g, " ")}. Its pages are not
-                  republished here and no page image from it appears on this site.
-                </li>
-                <li>
-                  <b>Evaluator.</b> {arena.benchmark.evaluator} from{" "}
-                  {arena.benchmark.evaluator_repository} at pin{" "}
-                  <span data-derived="1">{arena.benchmark.evaluator_pin}</span>, licence{" "}
-                  {arena.benchmark.evaluator_license}, entrypoint{" "}
-                  <code>{arena.benchmark.evaluator_entrypoint}</code>. Scoring driver:{" "}
-                  <code>{arena.benchmark.driver}</code>.
-                </li>
-                <li>
-                  <b>Speed.</b> {arena.speed_method.definition} {arena.speed_method.not_measured}
-                </li>
-                <li>
-                  <b>Registry snapshot.</b> Model revisions and the GPU catalogue were resolved at{" "}
-                  <span data-derived="1">{arena.registry_snapshot_at}</span>. A listed GPU rate is
-                  the provider&rsquo;s rate when that pod was provisioned; it is raw hardware cost
-                  and never a price for a page.
-                </li>
-              </ul>
-
-              <h3 className={styles.sectionTitle}>Limits of this run</h3>
-              <ul className={styles.conditions}>
-                {arena.caveats.map((caveat) => (
-                  <li className={styles.verbatim} key={caveat}>{caveat}</li>
-                ))}
-              </ul>
-
-              <ArenaReceipts models={arena.models} sources={arena.sources} />
-
-              {/* ------------------------------------------------- the sibling run */}
-
-              <h2 className={styles.sectionTitle}>The other run on this site</h2>
-              <div className="chain">
-                <article className="link">
-                  <span className="st">GDP.pdf</span>
-                  <h3>Does compiled context change what a model gets right?</h3>
-                  <p>
-                    A held-out task set answered twice by the same model — once from the PDF alone,
-                    once with TAVONEL&rsquo;s compiled context beside it. The measured delta, the
-                    conditions it was measured under and the deviations from the sealed protocol
-                    are on its own page.
-                  </p>
-                  <p className="fine">
-                    <Link href={"/benchmarks/gdp-pdf" as Route}>Read the GDP.pdf run</Link>
-                  </p>
-                </article>
-                <article className="link">
-                  <span className="st">Model Arena</span>
-                  <h3>Which reader should the router send a page to?</h3>
-                  <p>
-                    The board above. It answers what a page costs to read and how closely each
-                    reader reproduced it, which is the evidence a routing policy is learned from.
-                  </p>
-                </article>
-              </div>
 
               {/* ------------------------------------------------- the protocol */}
 
@@ -433,7 +216,7 @@ export default function BenchmarksPage() {
               <p className={styles.state}>
                 The qualification contract defines what a knowledge-compilation result has to
                 carry: a frozen configuration, corpus and output digests, a named denominator,
-                published failures, and reproducible scoring material.
+                the complete per-category result, and reproducible scoring material.
               </p>
               {/*
                 B07's label is right that an absence with nothing said about it reads as an
@@ -466,20 +249,6 @@ export default function BenchmarksPage() {
                 Review the{" "}
                 <a href="https://huggingface.co/datasets/surgeai/GDP.pdf">public dataset</a>{" "}
                 and <a href="https://github.com/surge-ai/gdp-pdf">reference harness</a>.
-              </p>
-              {/*
-                Two of the four arms have now been run. The result page says what it found --
-                which was that the compiled arm did not beat the PDF alone -- and lists every
-                condition that makes it incomparable with a published GDP.pdf score. It is linked
-                rather than summarised here: a one-line summary of a negative result on the
-                protocol page is where a negative result goes to be forgotten.
-              */}
-              <p className={styles.para}>
-                <Link href={"/benchmarks/gdp-pdf" as Route}>
-                  Read the two-arm run: compiled context against the PDF alone
-                </Link>{" "}
-                &mdash; a first result on this design, with its deviations, denominators and
-                receipts. It is not comparable with any published GDP.pdf score.
               </p>
               <div className="chain">
                 {GDP_PDF_ARMS.map(([title, body, state]) => (

@@ -171,6 +171,8 @@ const nextConfig = {
     return [
       { source: "/ko", destination: "/", permanent: true },
       { source: "/ko/:path*", destination: "/:path*", permanent: true },
+      // 2026-11-10 (founder direction): /arena is retired. Measured results live on /benchmarks.
+      { source: "/arena", destination: "/benchmarks", permanent: true },
     ];
   },
   async headers() {

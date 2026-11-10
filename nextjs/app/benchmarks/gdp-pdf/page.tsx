@@ -108,6 +108,8 @@ export const metadata = pageMetadata({
   description:
     "A two-arm run on the public GDP.pdf task set: the same model reading the raw PDF, then reading it with compiled context. Not comparable with published scores.",
   canonical: "/benchmarks/gdp-pdf",
+  // 2026-11-10 (founder direction): the evidence record stays reachable at its URL and is not featured or indexed.
+  index: false,
 });
 
 export default function GdpPdfBenchmarkPage() {
@@ -169,8 +171,8 @@ export default function GdpPdfBenchmarkPage() {
 
               <h2 className={styles.sectionTitle}>The conditions this was run under</h2>
               <p className={styles.para}>
-                Each row is a difference between the run manifest and the sealed protocol in{" "}
-                <code>eval/gdp-pdf/protocol.json</code>.
+                Each row is a difference between this run and the sealed official protocol. The
+                protocol file is named with the receipts at the foot of this page.
               </p>
               <div className={styles.tableScroll}>
                 <table className={styles.table}>
@@ -321,9 +323,8 @@ export default function GdpPdfBenchmarkPage() {
               <h2 className={styles.sectionTitle}>Tokens, latency and cost</h2>
               <p className={styles.para}>
                 The money column is a <b>list-price equivalent</b>, never an invoice amount. The
-                run executed on a subscription surface where the marginal cost of a call is $0; the
-                figure is what the same tokens would have cost at the API list price in the run&rsquo;s
-                price snapshot. That snapshot carries no cache-token price, so where cost is marked
+                run was not billed per call. The figure is what the same tokens would have cost at the
+                API list price in the run&rsquo;s price snapshot. That snapshot carries no cache-token price, so where cost is marked
                 incomplete the figure covers uncached input and output only and{" "}
                 <b>understates the run</b>. Latency is wall-clock per task, including the model
                 paging through the PDF.
@@ -434,7 +435,7 @@ export default function GdpPdfBenchmarkPage() {
               <h2 className={styles.sectionTitle}>What this does and does not show</h2>
               <ul className={styles.plainList}>
                 <li>
-                  <b>It shows</b> that on {pairedN} tasks of this set, under this surface and this
+                  <b>It shows</b> that on {pairedN} tasks of this set, with this model and this
                   grader, the compiled-context arm did not beat the model reading the PDF directly.
                   That is a finding about our compiled context.
                 </li>
@@ -450,7 +451,7 @@ export default function GdpPdfBenchmarkPage() {
                 </li>
                 <li>
                   <b>It does not show</b> anything about the other two sealed arms. Fixed-control
-                  retrieval and the adaptive router were not run in this lane. They are not run,
+                  retrieval and adaptive routing were not run in this evaluation. They are not run,
                   which is different from zero.
                 </li>
                 {truncated !== undefined && report.packet_size !== undefined && truncated > 0 ? (

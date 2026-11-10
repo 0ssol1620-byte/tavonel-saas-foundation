@@ -17,7 +17,6 @@ vi.mock("next/navigation", () => ({
 }));
 
 const { default: BenchmarksPage } = await import("../app/benchmarks/page");
-import { LOCAL_PATH_MASK, arenaBars, arenaDots, modelArenaBoard, settledModels, unsettledModels } from "./model-arena-page-data";
 
 /*
   The guard over the rendered /benchmarks page.
@@ -46,84 +45,37 @@ describe("the rendered /benchmarks page", () => {
     expect(html.toLowerCase()).not.toContain("accuracy");
   });
 
-  it("prints the settled board, with each model's figure and the pages it was scored over", () => {
-    for (const bar of arenaBars("text_edit")) {
-      expect(text).toContain(bar.label);
-      expect(text).toContain(bar.value.toFixed(4));
-      expect(text).toContain(`${bar.pages.toLocaleString("en-US")} pages`);
+  /*
+    2026-11-10 public-copy cleanup (founder direction): intended re-pin. The document-reader board
+    was an internal model-selection experiment. Its row labels, notes, hosted-row price mechanics
+    and the not-supported box left the page, so the board assertions became absence assertions.
+    The recovery result stays, with its denominator and receipt.
+  */
+  it("publishes no internal model-selection material or process vocabulary", () => {
+    for (const internal of [
+      "opus5_subscription", "ARENA_CONTRACT", "api_equivalent", "masterplan", "Model Arena",
+      "FOUNDER_EXCLUDED", "founder", "subscription surface", "scalar", "Not supported",
+      "Blind quality", "campaign", " lane", "router", "low-quality",
+    ]) {
+      expect(text, internal).not.toContain(internal);
     }
   });
 
-  it("states the direction of each metric rather than implying it with a bar", () => {
-    expect(text).toMatch(/Lower is better/);
-    expect(text).toMatch(/Higher is better/);
+  it("prints the recovery result with its denominator and its receipt", () => {
+    expect(text).toContain("80.6");
+    expect(text).toContain("53.7");
+    expect(text).toContain("1,403 documents and 8,413 checks");
+    expect(html).toContain("R-01-recovery-counterfactual-olmocr-2026-08-08.json");
   });
 
-  it("plots only the rows with both readings, and lists every plotted value as text", () => {
-    const dots = arenaDots();
-    for (const dot of dots) {
-      expect(text).toContain(`${dot.secondsPerPage} s/page`);
-      expect(text).toContain(`${dot.timedPages.toLocaleString("en-US")} timed pages`);
-    }
-    expect(html).toContain(`Scatter plot of ${dots.length} models`);
-  });
-
-  it("draws a lower Edit lower on the plot, matching the 0 tick at the bottom of the axis", () => {
-    /* SVG y grows downward. Until 2026-11-09 the best reading sat at the top, beside the max tick. */
-    const cys = [...html.matchAll(/<circle[^>]*cy="([\d.]+)"/g)].map((m) => Number(m[1]));
-    const edits = arenaDots().map((dot) => dot.textEdit);
-    expect(cys.length).toBe(edits.length);
-    const best = edits.indexOf(Math.min(...edits));
-    const worst = edits.indexOf(Math.max(...edits));
-    expect(cys[best]).toBeGreaterThan(cys[worst]);
-  });
-
-  it("keeps the rows the campaign did not settle on the page, each with its reason", () => {
-    for (const model of unsettledModels()) {
-      expect(text).toContain(model.display_name);
-    }
-    expect(text).toMatch(/FOUNDER_EXCLUDED/);
-  });
-
-  it("publishes the failed hypothesis rather than only the board", () => {
-    expect(text).toMatch(/Not supported/);
-    expect(text).toMatch(/Blind quality detection failed/);
-  });
-
-  it("carries the dataset licence, the evaluator pin and the price snapshot date", () => {
-    const board = modelArenaBoard();
-    expect(text).toContain(board.benchmark.dataset_license);
-    expect(text).toContain(board.benchmark.dataset_redistribution.replace(/_/g, " "));
-    expect(text).toContain(board.benchmark.evaluator_pin);
-    expect(text).toContain(board.registry_snapshot_at);
-  });
-
-  it("binds every source by sha256 in the receipts drawer", () => {
-    for (const source of modelArenaBoard().sources) {
-      expect(text).toContain(source.sha256);
-      expect(text).toContain(source.path);
-    }
-  });
-
-  it("names the GPU and the listed rate for every row that has one, and never a price per page", () => {
-    for (const model of modelArenaBoard().models) {
-      if (model.gpu.gpu_type) expect(text).toContain(model.gpu.gpu_type);
-      if (model.gpu.listed_usd_per_hour !== null) {
-        expect(text).toContain(`$${model.gpu.listed_usd_per_hour.toFixed(2)}/h listed`);
-      }
-    }
+  it("never prints a price per page", () => {
     expect(text.toLowerCase()).not.toMatch(/per 1,?000 pages\s*\$/);
-    /*
-      The one dollar-per-page string on the page is the campaign's own rule that the hosted lane
-      is never reported as one. No figure here is divided into a price for a page: a listed GPU
-      rate is raw hardware cost, and the constitution keeps it away from anything that reads as
-      what a page costs to buy.
-    */
-    expect(text.toLowerCase().match(/\$[\d.]+\s*\/\s*page/g) ?? []).toEqual(["$0/page"]);
+    expect(text.toLowerCase().match(/\$[\d.]+\s*\/\s*page/g) ?? []).toEqual([]);
   });
 
-  it("links the sibling run without importing it", () => {
-    expect(html).toContain("/benchmarks/gdp-pdf");
+  /* 2026-11-10 (founder direction): intended re-pin. The GDP.pdf run page stays reachable at its URL, noindex, and unlinked. */
+  it("neither links nor imports the GDP.pdf run page", () => {
+    expect(html).not.toContain("/benchmarks/gdp-pdf");
     expect(read("app/benchmarks/page.tsx")).not.toMatch(/from\s+["'].*benchmarks\/gdp-pdf/);
   });
 
@@ -133,86 +85,22 @@ describe("the rendered /benchmarks page", () => {
     }
   });
 
-  /*
-    EN-0. A campaign note named a directory on the machine that scored it, user name included, and
-    the page printed it. The note is carried as the run recorded it except for that path, which is
-    masked at render time only: the artifact and the sha256 it is pinned by do not change.
-  */
-  it("prints no local filesystem path, and says where one was masked", () => {
+  it("prints no local filesystem path", () => {
     expect(html).not.toContain("C:/");
     expect(html).not.toContain("Users/");
-    expect(text).toContain(LOCAL_PATH_MASK);
-    expect(JSON.stringify(modelArenaBoard().models.flatMap((model) => model.notes)), "the artifact itself is unchanged")
-      .toContain("C:/Users/");
-    /*
-      The markup above is not all a server page ships: React keys travel in the RSC payload, which
-      renderToStaticMarkup does not produce. The built page leaked the path through `key={note}`
-      while this HTML was clean, so the notes are masked before anything -- key included -- reads
-      them. The browser check over the built page is in the EN-0 receipts.
-    */
-    expect(read("app/benchmarks/page.tsx")).toContain("model.notes.map(maskLocalPaths).map(");
-    expect(read("app/benchmarks/page.tsx")).not.toContain("key={note}>{maskLocalPaths");
-  });
-
-  it("carries the campaign's own caveats verbatim", () => {
-    for (const caveat of modelArenaBoard().caveats) {
-      expect(text.replace(/\s+/g, " ")).toContain(caveat.replace(/\s+/g, " "));
-    }
   });
 });
 
 /*
-  THE 360px GUARD, as far as a node test can carry it.
-
-  The e2e overflow sweep is the real check and this route is in its list. It cannot run here:
-  there is no layout engine. What is still checkable is the source invariant that makes the page
-  safe at 360px -- every element wider than a phone is inside a frame that scrolls on its own
-  axis and may shrink below its content.
+  2026-11-10: the document-reader board, its chart component and its stylesheet were deleted with
+  the rest of the internal model-selection material, so their 360px and scroll-frame invariants
+  went with them. The reduced-motion check on the evidence highlight stays.
 */
-describe("the 360px invariant", () => {
-  const sheet = read("components/benchmarks/arena-charts.module.css");
-  const component = read("components/benchmarks/arena-charts.tsx");
-
-  it("puts every table inside a scroll frame", () => {
-    const tables = component.match(/<table/g) ?? [];
-    const frames = component.match(/<div className=\{styles\.tableScroll\}/g) ?? [];
-    expect(tables.length).toBeGreaterThan(0);
-    expect(frames.length).toBe(tables.length);
-  });
-
-  it("gives that frame its own overflow and a min-width of zero", () => {
-    expect(sheet).toMatch(/\.tableScroll\s*\{[^}]*overflow-x:\s*auto/);
-    expect(sheet).toMatch(/\.tableScroll\s*\{[^}]*min-width:\s*0/);
-  });
-
-  it("puts the scatter plot in a scroll frame too, because its ticks are text", () => {
-    expect(component).toContain("styles.plotScroll");
-    expect(sheet).toMatch(/\.plotScroll\s*\{[^}]*overflow-x:\s*auto/);
-  });
-
-  it("lets a digest and a bar row break rather than widen the page", () => {
-    expect(sheet).toMatch(/\.digest\s*\{[^}]*overflow-wrap:\s*anywhere/);
-    expect(sheet).toMatch(/\.barLabel\s*\{[^}]*overflow-wrap:\s*anywhere/);
-    expect(sheet).toMatch(/\.bars\s*\{[^}]*min-width:\s*0/);
-  });
-
-  it("stacks the bar row before it reaches a phone, rather than keeping four columns", () => {
-    /* The four-column grid is behind a min-width query; the default is the stacked areas. */
-    expect(sheet).toMatch(/@media \(min-width: 720px\)/);
-    expect(sheet).toMatch(/"label label"/);
-  });
-
-  it("animates nothing, so there is nothing for reduced motion to turn off", () => {
-    for (const file of [sheet, read("components/evidence/region-highlight.module.css")]) {
-      expect(file).not.toMatch(/\btransition\s*:/);
-      expect(file).not.toMatch(/\banimation\s*:/);
-      expect(file).not.toMatch(/@keyframes/);
-    }
-  });
-});
-
-describe("the settled board itself", () => {
-  it("is what the page renders and not a subset of it", () => {
-    expect(arenaBars("text_edit").length).toBe(settledModels().length);
+describe("reduced motion", () => {
+  it("animates nothing in the evidence highlight, so there is nothing for reduced motion to turn off", () => {
+    const file = read("components/evidence/region-highlight.module.css");
+    expect(file).not.toMatch(/\btransition\s*:/);
+    expect(file).not.toMatch(/\banimation\s*:/);
+    expect(file).not.toMatch(/@keyframes/);
   });
 });

@@ -621,7 +621,7 @@ describe("/docs/mcp says what this deployment serves", () => {
       vi.resetModules();
       const { findDocsSection } = await import("./docs-content");
       const text = JSON.stringify(findDocsSection("mcp")!.blocks);
-      expect(text.includes("Not switched on for this site."), value).toBe(off);
+      expect(text.includes("Not available on this site yet."), value).toBe(off); // 2026-11-10 public-copy cleanup: intended re-pin.
       // Either way the page never promises a package that does not exist, and names the real endpoint.
       expect(text).toContain("There is no npm or PyPI package yet.");
       expect(text).toContain("https://tavonel.com/api/mcp");

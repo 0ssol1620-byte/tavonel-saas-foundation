@@ -47,7 +47,7 @@ function parseBody(value: unknown) {
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   if (!activationPolicy.customerIntake.enabled) return NextResponse.json({ code: "INTAKE_DISABLED" }, { status: 503, headers: HEADERS });
-  const auth = await requireFoundationSession(request, "studio");
+  const auth = await requireFoundationSession(request, "connections");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: HEADERS });
 
   const { id } = await context.params;
@@ -93,7 +93,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 // Recent jobs for this connection, so the workspace can show real sync state -- running,
 // last result, how many objects seen and imported -- instead of a spinner that means nothing.
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireFoundationSession(request, "studio");
+  const auth = await requireFoundationSession(request, "connections");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: HEADERS });
 
   const { id } = await context.params;

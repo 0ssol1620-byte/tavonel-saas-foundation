@@ -230,7 +230,6 @@ function mainOf(html: string): string {
 const HOME_CLAIM_ALLOWLIST: Readonly<Record<string, string>> = {
   "compilation-guarantees": "936b859c484fb54a8bdff3175d89d2fd47d695d48ec93b99fcfd93ac53ee2e25",
   "recovery-contribution-olmocr": "1f5b6220c1fa569e8e33530d933a16eb7ad6b856c56e22f1744f8fa96efe33e0",
-  "accuracy-by-document-type": "4d75ae96e70c7c1c425b991df0f1c356ec6393e73914aaed27f5f54b0048a559",
 };
 
 type PackClaim = { id: string; status: string; evidence_sha256?: unknown; numbers?: unknown };
@@ -547,22 +546,21 @@ describe("landing v2 -- the composition", () => {
   /*
     Release 3 move 7. The band sits between the hero and the workbench, every figure in it is
     claim-bound (the walk above checks each one), and every fact links to the receipt that holds it.
-    The weakest row is asserted by name: a band that kept only its flattering figures would pass
-    the digit walk and still be the thing the evidence rules forbid.
+    2026-11-10 public-copy cleanup (founder direction): intended re-pin. The by-document-type row (R-03) left Home, so the band carries R-01 and R-02.
+    Every figure on it is still claim-bound and dated, and 99.98 is still never on it.
   */
-  it.each(LOCALES)("%s shows three receipted measures under the hero, weakest row included", locale => {
+  it.each(LOCALES)("%s shows two receipted measures under the hero", locale => {
     const main = mainOf(render(locale));
     const band = main.slice(main.lastIndexOf("<section", main.indexOf("data-home-measures")), main.indexOf('<section id="s2"'));
     expect(main.indexOf("data-home-measures")).toBeGreaterThan(main.indexOf('<section id="s1"'));
     expect(main.indexOf("data-home-measures")).toBeLessThan(main.indexOf('<section id="s2"'));
     // FINAL-SPEC 2026-10-26 D-12: the same three allowlisted claims, in receipt order R-01, R-02, R-03.
     const ids = [...band.matchAll(/data-claim-id="([^"]+)"/g)].map(match => match[1]);
-    expect(ids).toEqual(["recovery-contribution-olmocr", "compilation-guarantees", "accuracy-by-document-type"]);
+    expect(ids).toEqual(["recovery-contribution-olmocr", "compilation-guarantees"]);
     expect([...ids].sort()).toEqual(Object.keys(HOME_CLAIM_ALLOWLIST).sort());
     const receipts = elements(band, "a").filter(open => attr(open, "data-receipt")).map(open => [attr(open, "href"), attr(open, "data-receipt")]);
-    expect(receipts).toEqual([["/research/notes#R-01", "R-01"], ["/research/notes#R-02", "R-02"], ["/research/notes#R-03", "R-03"]]);
-    expect(readable(band)).toContain(locale === "ko" ? "저품질 스캔본" : "low-quality scans");
-    expect(band).toContain('data-claim-sha="4d75ae96e70c7c1c425b991df0f1c356ec6393e73914aaed27f5f54b0048a559">36.9</span>');
+    expect(receipts).toEqual([["/research/notes#R-01", "R-01"], ["/research/notes#R-02", "R-02"]]);
+    expect(readable(band)).not.toContain(locale === "ko" ? "저품질 스캔본" : "low-quality scans");
     // The completion share is never called accuracy, and is not on the band without a served receipt.
     expect(readable(band).toLowerCase()).not.toContain("accuracy");
     expect(readable(band)).not.toContain("99.98");

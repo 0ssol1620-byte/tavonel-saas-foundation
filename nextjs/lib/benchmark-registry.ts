@@ -246,7 +246,7 @@ export const RECEIPT_FIELDS: readonly {
   { key: "date", label: "Date", pins: "The day the run happened, as YYYY-MM-DD.", kind: "date" },
   { key: "metrics", label: "Metrics", pins: "Every figure, with its family, its unit, and its own denominator.", kind: "metrics" },
   { key: "comparisonBasis", label: "Comparison basis", pins: "same_condition for a run we executed; quoted for someone else’s published score, which stays theirs.", kind: "basis" },
-  { key: "publishedFailures", label: "Published failures", pins: "What the run got wrong, published with it.", kind: "failures" },
+  { key: "publishedFailures", label: "Published failures", pins: "What the run got wrong, recorded in its downloadable receipt.", kind: "failures" },
 ];
 
 /* ------------------------------------------------------------------ validation */
