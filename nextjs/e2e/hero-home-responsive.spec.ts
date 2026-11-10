@@ -6,6 +6,14 @@ import { expect, test } from "@playwright/test";
 /* The blank-scan record in components/compile-stage-player.frame-strings.json (fix round 3, B1). */
 type BlankScan = { threshold: number; blankAt: number; stages: Record<string, { crop: { x: number; y: number }; frames: number; inkBoth: number; share: number; defaultView: "crop" | "fit" }> };
 
+/*
+  Founder 2026-11-10: the hero film is the four compile cuts (Extract / Link / Update / Use) in one tabbed slot,
+  right after the actions (components/landing-v2/hero-compile-tabs.tsx). The recorded walkthrough -- the player these
+  checks were written for -- is unchanged but moves below the fold, into #walkthrough, so its checks follow it there.
+*/
+const HERO = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="hero-compile-tabs"]';
+const WALKTHROUGH = '#walkthrough figure[data-testid="landing-hero-film"]';
+
 test("first-visit desktop actions leave room below the consent-visible hero", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
@@ -76,7 +84,96 @@ test("reduced-motion hero actions have no pointer press transform", async ({ pag
   }
 });
 
+/*
+  The hero slot is a WAI-ARIA tablist: four named tabs, one panel they all control, a roving tabindex, and the arrow,
+  Home and End keys moving the selection (and the panel's poster) with the focus. What plays follows the screen: a live
+  canvas from 900px, the same cut as a video below it, the poster alone under reduced motion.
+*/
+test("the hero film is one tabbed slot: four tabs, one panel, keys move the selection", async ({ page }) => {
+  await page.goto("/");
+  const hero = page.locator(HERO);
+  await expect(hero).toBeVisible();
+  await expect(hero.getByRole("tablist")).toHaveCount(1);
+  const tabs = hero.getByRole("tab");
+  await expect(tabs).toHaveText(["Extract", "Link", "Update", "Use"]);
+  const panel = hero.getByRole("tabpanel");
+  await expect(panel).toHaveCount(1);
+  const panelId = (await panel.getAttribute("id"))!;
+  expect(panelId).toBeTruthy();
+  const ids: string[] = [];
+  for (let index = 0; index < 4; index++) {
+    await expect(tabs.nth(index)).toHaveAttribute("aria-controls", panelId);
+    ids.push((await tabs.nth(index).getAttribute("id"))!);
+  }
+  await expect(hero.locator("figcaption")).toHaveText("Illustrative demo · not customer results.");
+  const poster = panel.locator("img");
+  await expect(poster).toHaveCount(1);
+  // The first cut's poster is the first screen's priority image.
+  await expect(poster).toHaveAttribute("loading", "eager");
+  await expect(poster).toHaveAttribute("fetchpriority", "high");
+  await expect(poster).toHaveAttribute("src", "/film/hero-tab-1.webp");
+  // A click selects a cut and stops the advance, so the keys below start from a known tab.
+  await tabs.nth(0).click();
+  const expectSelected = async (index: number) => {
+    await expect(tabs.nth(index)).toHaveAttribute("aria-selected", "true");
+    await expect(hero.locator('[role="tab"][aria-selected="true"]')).toHaveCount(1);
+    await expect(tabs.nth(index)).toHaveAttribute("tabindex", "0");
+    await expect(hero.locator('[role="tab"][tabindex="0"]')).toHaveCount(1);
+    await expect(panel).toHaveAttribute("aria-labelledby", ids[index]!);
+    await expect(poster).toHaveAttribute("src", `/film/hero-tab-${index + 1}.webp`);
+  };
+  await expectSelected(0);
+  await page.keyboard.press("ArrowRight");
+  await expect(tabs.nth(1)).toBeFocused();
+  await expectSelected(1);
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  await expect(tabs.nth(3)).toBeFocused();
+  await expectSelected(3);
+  await page.keyboard.press("ArrowRight");
+  await expect(tabs.nth(0)).toBeFocused();
+  await expectSelected(0);
+  await page.keyboard.press("End");
+  await expectSelected(3);
+  await page.keyboard.press("Home");
+  await expect(tabs.nth(0)).toBeFocused();
+  await expectSelected(0);
+  await tabs.nth(2).click();
+  await expectSelected(2);
+  // What plays where, read from the page's own media state (the reduced-motion project sets its media per test).
+  const width = page.viewportSize()!.width;
+  const reduced = await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches);
+  if (!reduced) {
+    const mode = width >= 900 ? "canvas" : "video";
+    await expect(hero).toHaveAttribute("data-mode", mode);
+    await expect(hero).toHaveAttribute("data-playing", "1");
+    if (mode === "canvas") {
+      await expect(panel.locator("canvas")).toHaveCount(1);
+      await expect(panel.locator("video")).toHaveCount(0);
+    } else {
+      await expect(panel.locator("canvas"), "no live canvas below 900px").toHaveCount(0);
+      await expect(panel.locator("video")).toHaveAttribute("src", "/film/hero-tab-3.mp4");
+    }
+  }
+  // Reduced motion: the selected cut's poster alone, nothing playing; the tabs still switch.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(hero).toHaveAttribute("data-mode", "poster");
+  await expect(hero).toHaveAttribute("data-playing", "0");
+  await expect(hero.locator("video, canvas")).toHaveCount(0);
+  await tabs.nth(1).click();
+  await expectSelected(1);
+  // Touch floor and no horizontal overflow, the 360 phone included.
+  for (const box of await tabs.evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON() as DOMRect))) {
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    expect(box.left).toBeGreaterThanOrEqual(0);
+    expect(box.right).toBeLessThanOrEqual(width);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 test("the restored hero keeps its title, stages and actions at seven widths", async ({ page }, testInfo) => {
+  // Seven widths, each now also scrolled down to the walkthrough and back.
+  test.setTimeout(90_000);
   const layouts = [];
   // While lib/hero-phone-mode.ts says "still", the film is not displayed at 900px and below (CRITIQUE-R1 #1 interim).
   for (const width of [1920, 1440, 1280, 1024, 768, 390, 360].filter(value => PHONE_HERO !== "still" || value > 900)) {
@@ -84,8 +181,16 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
     await page.goto("/");
     const consent = page.getByRole("button", { name: "No thanks", exact: true });
     if (await consent.isVisible()) await consent.click();
-    const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
-    await expect(film).toBeVisible();
+    /*
+      Founder 2026-11-10: the hero film is the four compile cuts in one tabbed slot (hero-compile-tabs.tsx), right after
+      the actions; the recorded walkthrough (four recorded cuts, Read / Compile / Update / Trace) moves below the fold
+      into #walkthrough, unchanged. The hero holds its title, actions and its own four tabs; the walkthrough holds its own.
+    */
+    const hero = page.locator(HERO);
+    await expect(hero).toBeVisible();
+    await expect(hero.getByRole("tab")).toHaveCount(4);
+    await expect(page.locator(`#s1 ${WALKTHROUGH}`)).toHaveCount(0);
+    const film = page.locator(WALKTHROUGH);
     await expect(film.getByRole("tab")).toHaveCount(4);
     // Founder ask 2026-10-27 ("영상은 축소상태가 디폴트여야"), over FINAL-SPEC 2026-10-26 §2.1's Focus: Home's player opens
     // compact -- the whole frame -- at every width; Focus details (not pressed) is the expand.
@@ -94,36 +199,26 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
     await page.evaluate(() => document.fonts.ready);
     const geometry = await page.locator("#s1").evaluate(section => {
       const title = section.querySelector("h1")!;
-      const tabs = [...section.querySelectorAll('[role="tab"]')];
+      const figure = section.querySelector('figure[data-testid="hero-compile-tabs"]')!;
+      const tabs = [...figure.querySelectorAll('[role="tab"]')];
       const actions = [...section.querySelectorAll('.lv2-actions a')];
       return {
         width: innerWidth, height: innerHeight, overflow: document.documentElement.scrollWidth > innerWidth,
         title: title.getBoundingClientRect().toJSON(),
-        media: section.querySelector('.compile-film-viewport')!.getBoundingClientRect().toJSON(),
+        media: figure.querySelector('[role="tabpanel"]')!.getBoundingClientRect().toJSON(),
         tabs: tabs.map(tab => ({ text: tab.textContent, rect: tab.getBoundingClientRect().toJSON(), fontSize: getComputedStyle(tab).fontSize })),
         actions: actions.map(action => ({ text: action.textContent, rect: action.getBoundingClientRect().toJSON() })),
       };
     });
     expect(geometry.overflow).toBe(false);
-    if (width >= 900) {
-      // Release 2: a compact left-aligned tab group. Direction C (2026-11-04) draws it as one segmented track on the sand,
-      // so the labels are padded segments 2-8px apart (4px as built) rather than bare labels 32-40px apart.
-      const rects = geometry.tabs.map(tab => tab.rect);
-      for (let i = 1; i < rects.length; i++) {
-        const gap = rects[i]!.left - rects[i - 1]!.right;
-        expect(gap).toBeGreaterThanOrEqual(2);
-        expect(gap).toBeLessThanOrEqual(8);
-      }
-      for (const rect of rects) expect(rect.width).toBeGreaterThanOrEqual(44);
-    }
-    /*
-      Release 2 put a reading line under the film, at least 15px. FINAL-SPEC 2026-10-26 (D-7) removes it: the stage's
-      sentence is the poster's alt (hero-film.tsx, `${label} — ${line}`), read where it is needed and printed nowhere
-      else. What stays visible is held to its own floors: the tabs and actions below (44px), the disclosure (13px).
-    */
-    const reading = film.locator("[data-film-reading] p");
-    await expect(reading).toHaveCount(0);
-    expect(parseFloat(await film.locator("figcaption").evaluate(node => getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(13);
+    // The hero's slot: its four tabs sit in one row directly above the 16:10 stage, which starts on the first screen.
+    for (const rect of geometry.tabs.map(tab => tab.rect)) expect(Math.abs(rect.top - geometry.tabs[0]!.rect.top)).toBeLessThanOrEqual(0.5);
+    expect(geometry.media.top).toBeGreaterThanOrEqual(geometry.tabs[0]!.rect.bottom);
+    expect(geometry.media.top - geometry.tabs[0]!.rect.bottom).toBeLessThanOrEqual(16);
+    expect(Math.abs(geometry.media.width / geometry.media.height - 1.6)).toBeLessThan(0.01);
+    expect(geometry.media.top).toBeLessThan(geometry.height);
+    expect(geometry.media.top).toBeGreaterThanOrEqual(geometry.title.bottom);
+    expect(parseFloat(await hero.locator("figcaption").evaluate(node => getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(13);
     for (const target of [...geometry.tabs, ...geometry.actions]) {
       expect(target.rect.height).toBeGreaterThanOrEqual(44);
       expect(target.rect.left).toBeGreaterThanOrEqual(0);
@@ -132,10 +227,42 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
     if (width === 1440) {
       for (const action of geometry.actions) expect(action.rect.bottom).toBeLessThanOrEqual(900);
     }
-    layouts.push(geometry);
+    // The walkthrough, scrolled to: its own tab row, held to the floors it kept in the hero.
+    await film.scrollIntoViewIfNeeded();
+    const walkTabs = await film.getByRole("tab").evaluateAll(tabs => tabs.map(tab => tab.getBoundingClientRect().toJSON() as DOMRect));
+    if (width >= 900) {
+      // Release 2: a compact left-aligned tab group. Direction C (2026-11-04) draws it as one segmented track on the sand,
+      // so the labels are padded segments 2-8px apart (4px as built) rather than bare labels 32-40px apart.
+      for (let i = 1; i < walkTabs.length; i++) {
+        const gap = walkTabs[i]!.left - walkTabs[i - 1]!.right;
+        expect(gap).toBeGreaterThanOrEqual(2);
+        expect(gap).toBeLessThanOrEqual(8);
+      }
+      for (const rect of walkTabs) expect(rect.width).toBeGreaterThanOrEqual(44);
+    }
+    for (const rect of walkTabs) {
+      expect(rect.height).toBeGreaterThanOrEqual(44);
+      expect(rect.left).toBeGreaterThanOrEqual(0);
+      expect(rect.right).toBeLessThanOrEqual(width);
+    }
+    /*
+      Release 2 put a reading line under the film, at least 15px. FINAL-SPEC 2026-10-26 (D-7) removes it: the stage's
+      sentence is the poster's alt (hero-film.tsx, `${label} — ${line}`), read where it is needed and printed nowhere
+      else. What stays visible is held to its own floors: the tabs and actions above (44px), the disclosure (13px).
+    */
+    const reading = film.locator("[data-film-reading] p");
+    await expect(reading).toHaveCount(0);
+    expect(parseFloat(await film.locator("figcaption").evaluate(node => getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(13);
+    layouts.push({ ...geometry, walkthroughTabs: walkTabs });
+    await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: testInfo.outputPath(`home-en-${width}.png`) });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.reload();
+    // Reduced motion: the hero shows its poster and plays nothing; the walkthrough waits for an explicit play.
+    await expect(hero).toHaveAttribute("data-mode", "poster");
+    await expect(hero).toHaveAttribute("data-playing", "0");
+    await expect(hero.locator("video, canvas")).toHaveCount(0);
+    await film.scrollIntoViewIfNeeded();
     await expect(film.getByRole("button", { name: "Play the compilation film", exact: true })).toBeVisible();
     await expect(film.locator("video")).toHaveCount(0);
     // ... and under reduced motion, where the poster carries the stage's sentence as its alt.
@@ -167,6 +294,8 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
 */
 test("the film opens each stage on its scanned default view and Focus reads at 9px or more on every stage, the 390 phone pane included", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "1440", "sets its own viewports");
+  // Two motion settings, each now scrolled down to the walkthrough, plus a playing page to close.
+  test.setTimeout(90_000);
   const table = JSON.parse(readFileSync(resolve(process.cwd(), "components/compile-stage-player.frame-strings.json"), "utf8")) as {
     cropCheck: { stages: Record<string, { smallestXHeight: { px: number }; holdsTarget: boolean }> };
     blankScan: BlankScan;
@@ -178,7 +307,7 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
   const paneRects = ids.map(id => table.phonePaneScan.stages[id]!.phonePane);
   const scan = table.blankScan;
   const measurements: Record<string, unknown>[] = [];
-  const FILM = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]';
+  const FILM = WALKTHROUGH;
   const drawnScale = (film: import("@playwright/test").Locator) =>
     film.locator(".compile-film-viewport :is(img.compile-film-still, video.compile-film-video)").first().evaluate(media => media.getBoundingClientRect().width / 2880);
   // Drawn width over laid-out width: 2 on the crop, 1 on the whole frame (the transform leaves layout alone).
@@ -199,6 +328,7 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
     const film = page.locator(FILM);
+    await film.scrollIntoViewIfNeeded();
     const sequence = film.locator(".compile-film-sequence");
     /*
       Founder ask 2026-10-27: the film opens compact (Fit, not pressed). One press of "Focus details" is the expand, and
@@ -330,6 +460,7 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
     await page.setViewportSize({ width: 800, height: 1024 });
     await page.goto("/");
     const band = page.locator(FILM);
+    await band.scrollIntoViewIfNeeded();
     await expect(band.locator(".compile-film-sequence")).toHaveAttribute("data-narrow", "1");
     await expect(band.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
     await expect(band.getByRole("button", { name: "Focus details", exact: true })).toHaveAttribute("aria-pressed", "false");
@@ -347,6 +478,7 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     const phone = page.locator(FILM);
+    await phone.scrollIntoViewIfNeeded();
     await expect(phone.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
     const phoneToggle = phone.getByRole("button", { name: "Focus details", exact: true });
     await expect(phoneToggle).toHaveCount(1);
@@ -406,14 +538,16 @@ test("the film opens each stage on its scanned default view and Focus reads at 9
   window, and what this guards is the pane going black, not the pane being rewritten.
 */
 for (const path of ["/"]) {
-  test(`the playing desktop crop never leaves a first-screen pane blank (${path})`, async ({ page }, testInfo) => {
+  test(`the playing desktop crop never leaves an on-screen pane blank (${path})`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440", "sets its own viewport");
     test.setTimeout(60_000);
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(path);
-    const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
+    // 2026-11-10: the player is the below-the-fold walkthrough; what it guards is the part of the crop on screen once scrolled to.
+    const film = page.locator(WALKTHROUGH);
     const sequence = film.locator(".compile-film-sequence");
+    await film.scrollIntoViewIfNeeded();
     // Home opens compact (2026-10-27); the crop this guards is one press of Focus details.
     await expect(sequence).toHaveAttribute("data-wide-view", "fit");
     await film.locator(".compile-film-view-control").click();
@@ -421,6 +555,7 @@ for (const path of ["/"]) {
     // Hold stage 1 so the cut loops in place instead of advancing mid-sample (the crop is unchanged).
     await film.getByRole("tab").first().click();
     await expect(sequence).toHaveAttribute("data-video-primary-src", "/film/hero-r3-c1.mp4");
+    await sequence.locator(".compile-film-viewport").scrollIntoViewIfNeeded();
     const video = sequence.locator("video.compile-film-video");
     await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState >= 2 && !v.paused && v.currentTime > 0), { timeout: 20_000 }).toBe(true);
     const run = await video.evaluate(async (v: HTMLVideoElement, wanted: number) => {
@@ -508,8 +643,9 @@ test("every stage that opens cropped keeps ink in both panes of its whole window
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
-  const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
+  const film = page.locator(WALKTHROUGH);
   const sequence = film.locator(".compile-film-sequence");
+  await film.scrollIntoViewIfNeeded();
   // Home opens compact (2026-10-27): the press that expands lands on stage 1's default, so each stage opens on its own.
   await expect(sequence).toHaveAttribute("data-wide-view", "fit");
   await film.locator(".compile-film-view-control").click();
@@ -520,6 +656,8 @@ test("every stage that opens cropped keeps ink in both panes of its whole window
     await expect(sequence).toHaveAttribute("data-wide-view", row.defaultView);
     if (row.defaultView !== "crop") continue;
     await expect(sequence).toHaveAttribute("data-video-primary-src", cuts[stage]!);
+    // The player plays while it is in view.
+    await sequence.locator(".compile-film-viewport").scrollIntoViewIfNeeded();
     const video = sequence.locator("video.compile-film-video");
     await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState >= 2 && !v.paused && v.currentTime > 0), { timeout: 20_000 }).toBe(true);
     const run = await video.evaluate(async (v: HTMLVideoElement, args: { crop: { x: number; y: number }; blankAt: number; wanted: number }) => {
@@ -623,19 +761,24 @@ test("every stage that opens cropped keeps ink in both panes of its whole window
   element is the R3 stage-1 1440px file (poster-r3-c1-t10.40, AVIF in Chromium), and Focus details opens the R3
   pane (848x1060). The Fit frame's size did not change, so the floors are main's; on CI (Linux chromium, PR #210,
   889ee863) the 412 entry measured 82,992 (EN) and 82,628 (KO), above them.
+
+  Founder 2026-11-10 moves the recorded player below the fold (#walkthrough) and puts the four compile cuts in the hero
+  (hero-compile-tabs.tsx), so the first screen's LCP element is a different element again: the hero's first poster,
+  /film/hero-tab-1 (1440w, AVIF in Chromium), drawn in a 16:10 stage the column's width. The floors are re-derived from
+  a new measurement by the same rule (the area rounded down to the thousand, the 1% margin kept), not raised or lowered
+  to pass. Measured on the codex/hero-tabs-20261110 production build (008f08ef), reduced motion, the last LCP entry's
+  size, twice each: chromium EN 59,439 / 71,571 / 81,180 / 89,426 and Windows WebKit EN 55,800 / 67,567 / 76,912 /
+  85,007 at 360 / 390 / 412 / 430. The hero stage is held wholly on the first screen at every width with its tabs
+  directly above it. Acceptance 24's 480px top was written for the player's pane on the first screen; that pane is
+  now the walkthrough's, below the fold, and its checks (Fit opening, Focus details, tabs directly above a 4:5 pane
+  the column plus 16px wide, a top that does not move by stage) are held there, scrolled to.
 */
 const LCP_FLOOR: Record<string, Record<string, Record<number, number>>> = {
-  chromium: {
-    "/": { 360: 59_000, 390: 72_000, 412: 82_000, 430: 90_000 },
-    "/ko": { 360: 60_000, 390: 72_000, 412: 81_000, 430: 90_000 },
-  },
-  webkit: {
-    "/": { 360: 56_000, 390: 68_000, 412: 77_000, 430: 85_000 },
-    "/ko": { 360: 56_000, 390: 68_000, 412: 77_000, 430: 85_000 },
-  },
+  chromium: { "/": { 360: 59_000, 390: 71_000, 412: 81_000, 430: 89_000 } },
+  webkit: { "/": { 360: 55_000, 390: 67_000, 412: 76_000, 430: 85_000 } },
 };
 for (const path of ["/"]) {
-  test(`a phone opens compact on the whole frame, and Focus details opens the stage's source pane with its tabs directly above it, on the first screen (${path})`, async ({ page, browserName }, testInfo) => {
+  test(`a phone's first screen holds the hero film with its poster as the LCP, and the walkthrough opens compact, Focus details opening the stage's source pane under its tabs (${path})`, async ({ page, browserName }, testInfo) => {
     test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     test.skip(testInfo.project.name !== "390", "sets its own viewports");
     test.setTimeout(120_000);
@@ -651,29 +794,47 @@ for (const path of ["/"]) {
       const frameTops: number[] = [];
       await page.setViewportSize({ width, height: heights[width]! });
       await page.goto(path);
-      const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
-      const sequence = film.locator(".compile-film-sequence");
-      await expect(sequence).toHaveAttribute("data-narrow", "1");
-      await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
+      const hero = page.locator(HERO);
+      await expect(hero).toHaveAttribute("data-mode", "poster");
       await expect.poll(() => page.evaluate(() => (window as unknown as { __lcp: (PerformanceEntry & { url?: string; element?: Element | null })[] }).__lcp.length)).toBeGreaterThan(0);
       const lcp = await page.evaluate(() => {
         const entries = (window as unknown as { __lcp: (PerformanceEntry & { url?: string; size?: number; element?: Element | null })[] }).__lcp;
         const last = entries[entries.length - 1]!;
-        return { url: last.url ?? "", size: last.size ?? 0, still: Boolean(last.element?.matches("img.compile-film-still")) };
+        return { url: last.url ?? "", size: last.size ?? 0, poster: Boolean(last.element?.matches('figure[data-testid="hero-compile-tabs"] [role="tabpanel"] img')) };
       });
-      expect(new URL(lcp.url).pathname, `LCP at ${width}`).toMatch(/^\/film\/poster-r3-c1-t10\.40\.(avif|webp)$/);
-      if (browserName === "chromium") expect(new URL(lcp.url).pathname, `LCP at ${width}`).toBe("/film/poster-r3-c1-t10.40.avif");
-      expect(lcp.still, `LCP element at ${width}`).toBe(true);
+      expect(new URL(lcp.url).pathname, `LCP at ${width}`).toMatch(/^\/film\/hero-tab-1\.(avif|webp)$/);
+      if (browserName === "chromium") expect(new URL(lcp.url).pathname, `LCP at ${width}`).toBe("/film/hero-tab-1.avif");
+      expect(lcp.poster, `LCP element at ${width}`).toBe(true);
       expect(lcp.size, `LCP area at ${width}`).toBeGreaterThanOrEqual(LCP_FLOOR[browserName]![path]![width]! * 0.99);
-      const column = (await page.locator("#s1 .lv2-wrap").boundingBox())!;
-      // The compact frame: the whole cut drawn at the frame's width (no crop), wholly on the first screen, unscrolled, inside the viewport.
+      // The hero's stage: the cut drawn at the stage's width, wholly on the first screen, unscrolled, its tabs directly above.
+      const stage = (await hero.getByRole("tabpanel").boundingBox())!;
+      const heroTabs = (await hero.getByRole("tablist").boundingBox())!;
+      const drawn = (await hero.getByRole("tabpanel").locator("img").boundingBox())!;
+      expect(Math.abs(drawn.width - stage.width), `${width}: the poster at the stage's width`).toBeLessThanOrEqual(2);
+      expect(Math.abs(stage.width / stage.height - 1.6), `${width}: a 16:10 stage`).toBeLessThan(0.02);
+      expect(stage.y - (heroTabs.y + heroTabs.height), `${width}: gap above the hero stage`).toBeGreaterThanOrEqual(0);
+      expect(stage.y - (heroTabs.y + heroTabs.height), `${width}: gap above the hero stage`).toBeLessThanOrEqual(16);
+      expect(await page.evaluate(() => scrollY), `${width}: no scroll`).toBe(0);
+      expect(stage.y + stage.height, `${width}: the hero stage wholly on the first screen`).toBeLessThanOrEqual(heights[width]!);
+      expect(stage.x).toBeGreaterThanOrEqual(0);
+      expect(stage.x + stage.width).toBeLessThanOrEqual(width);
+      measured.push({ width, view: "hero", stageTop: stage.y, stageBottom: stage.y + stage.height, fold: heights[width], lcpSize: lcp.size, lcpUrl: new URL(lcp.url).pathname });
+
+      // The walkthrough, below the fold: it opens compact, the whole cut at the frame's width, inside the viewport.
+      const film = page.locator(WALKTHROUGH);
+      const sequence = film.locator(".compile-film-sequence");
+      await expect(sequence).toHaveAttribute("data-narrow", "1");
+      await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
+      await film.scrollIntoViewIfNeeded();
+      const column = (await page.locator("#walkthrough .lv2-wrap").boundingBox())!;
       const fit = (await film.locator(".compile-film-viewport").boundingBox())!;
-      const drawn = await film.locator(".compile-film-viewport :is(img.compile-film-still, video.compile-film-video)").first().evaluate(media => media.getBoundingClientRect().width);
-      expect(Math.abs(drawn - fit.width), `${width}: the whole cut at the frame's width`).toBeLessThanOrEqual(2);
-      expect(fit.y + fit.height, `${width}: the compact frame wholly on the first screen`).toBeLessThanOrEqual(heights[width]!);
+      const fitDrawn = await film.locator(".compile-film-viewport :is(img.compile-film-still, video.compile-film-video)").first().evaluate(media => media.getBoundingClientRect().width);
+      expect(Math.abs(fitDrawn - fit.width), `${width}: the whole cut at the frame's width`).toBeLessThanOrEqual(2);
+      expect(fit.y, `${width}: the compact frame in view once scrolled to`).toBeGreaterThanOrEqual(0);
+      expect(fit.y + fit.height, `${width}: the compact frame wholly in view once scrolled to`).toBeLessThanOrEqual(heights[width]!);
       expect(fit.x).toBeGreaterThanOrEqual(0);
       expect(fit.x + fit.width).toBeLessThanOrEqual(width);
-      measured.push({ width, view: "fit", frameTop: fit.y, frameBottom: fit.y + fit.height, fold: heights[width], lcpSize: lcp.size, lcpUrl: new URL(lcp.url).pathname });
+      measured.push({ width, view: "fit", frameTop: fit.y, frameBottom: fit.y + fit.height });
       // The expand: one press of Focus details opens the stage's source pane.
       await film.locator(".compile-film-focus-control").click();
       await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
@@ -687,7 +848,7 @@ for (const path of ["/"]) {
         const contrast = await tab.evaluate(node => {
           const rgb = (value: string) => (value.match(/[\d.]+/g) ?? []).map(Number);
           const lum = (c: number[]) => { const f = (v: number) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]!) + 0.7152 * f(c[1]!) + 0.0722 * f(c[2]!); };
-          const [x, y] = [lum(rgb(getComputedStyle(node).color)), lum(rgb(getComputedStyle(document.querySelector("#s1")!).backgroundColor))].sort((m, n) => n - m);
+          const [x, y] = [lum(rgb(getComputedStyle(node).color)), lum(rgb(getComputedStyle(document.querySelector("#walkthrough")!).backgroundColor))].sort((m, n) => n - m);
           return (x! + 0.05) / (y! + 0.05);
         });
         expect(contrast, `${width} stage ${stage + 1}: tab contrast`).toBeGreaterThanOrEqual(4.5);
@@ -695,28 +856,19 @@ for (const path of ["/"]) {
         const tabs = (await film.locator(".compile-film-stages").boundingBox())!;
         expect(frame.y - (tabs.y + tabs.height), `${width} stage ${stage + 1}: gap above the frame`).toBeGreaterThanOrEqual(0);
         expect(frame.y - (tabs.y + tabs.height), `${width} stage ${stage + 1}: gap above the frame`).toBeLessThanOrEqual(16);
-        expect(await page.evaluate(() => scrollY), `${width} stage ${stage + 1}: no scroll`).toBe(0);
-        expect(tabs.y + tabs.height, `${width} stage ${stage + 1}: tabs on the first screen`).toBeLessThanOrEqual(heights[width]!);
-        expect(frame.y, `${width} stage ${stage + 1}: film top on the first screen`).toBeLessThan(heights[width]!);
+        expect(tabs.y, `${width} stage ${stage + 1}: tabs in view`).toBeGreaterThanOrEqual(0);
+        expect(tabs.y + tabs.height, `${width} stage ${stage + 1}: tabs in view`).toBeLessThanOrEqual(heights[width]!);
+        expect(frame.y, `${width} stage ${stage + 1}: film top in view`).toBeLessThan(heights[width]!);
         expect(Math.abs(frame.width / frame.height - 0.8), `${width}: a 4:5 pane`).toBeLessThan(0.01);
         expect(Math.abs(frame.width - (column.width + 16)), `${width}: the column plus 16px`).toBeLessThanOrEqual(1);
         expect(frame.x).toBeGreaterThanOrEqual(0);
         expect(frame.x + frame.width).toBeLessThanOrEqual(width);
-        measured.push({ width, stage: stage + 1, tabsBottom: tabs.y + tabs.height, frameTop: frame.y, frameBottom: frame.y + frame.height, fold: heights[width], contrast, lcpSize: lcp.size });
+        measured.push({ width, stage: stage + 1, tabsBottom: tabs.y + tabs.height, frameTop: frame.y, frameBottom: frame.y + frame.height, contrast });
         frameTops.push(frame.y);
       }
+      // A top that does not move by stage (nor scroll: a tab press that scrolled would move it too), the same in Fit and Focus.
       for (const [stage, top] of frameTops.entries()) expect(Math.abs(top - frameTops[0]!), `${width} stage ${stage + 1}: frame top as on stage 1`).toBeLessThanOrEqual(0.5);
-      if (width === 412) {
-        // Acceptance 24: the pane's top at most 480 (EN) / 430 (KO), and the whole KO pane on the first screen (main's
-        // numbers; measured 2026-10-28 at 412x915, reduced motion: chromium EN top 439.0, KO top 424.4, KO bottom 899.4;
-        // Windows WebKit 475.0 / 424.4 / 886.9). Added with the compact default: the top is the same in Fit and in Focus,
-        // and the whole Fit frame is on the first screen.
-        const frame = (await film.locator(".compile-film-viewport").boundingBox())!;
-        expect(frame.y, "412 frame top").toBeLessThanOrEqual(path === "/" ? 480 : 430);
-        if (path === "/ko") expect(frame.y + frame.height, "412 KO frame bottom").toBeLessThanOrEqual(915);
-        expect(Math.abs(frame.y - fit.y), "412 frame top, Fit and Focus").toBeLessThanOrEqual(0.5);
-        expect(fit.y + fit.height, "412 compact frame bottom").toBeLessThanOrEqual(915);
-      }
+      expect(Math.abs(frameTops[0]! - fit.y), `${width} frame top, Fit and Focus`).toBeLessThanOrEqual(0.5);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await page.screenshot({ path: testInfo.outputPath(`phone-${path === "/" ? "en" : "ko"}-${width}-pane.png`) });
     }

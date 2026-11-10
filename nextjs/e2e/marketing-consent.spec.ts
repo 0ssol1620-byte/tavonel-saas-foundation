@@ -30,6 +30,11 @@ async function revealConsent(page: import("@playwright/test").Page) {
   lower half of the first screen. Phones and every other page keep the bottom card.
 */
 type Box = { x: number; y: number; width: number; height: number };
+/*
+  Founder 2026-11-10: the hero film is the tabbed compile slot (hero-compile-tabs.tsx); its stage -- the tab panel -- is
+  the film the prompt must clear. The recorded walkthrough moved below the fold (#walkthrough).
+*/
+const HERO_STAGE = '#s1 [data-testid="hero-compile-tabs"] [role="tabpanel"]';
 const overlaps = (a: Box, b: Box) =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 /*
@@ -42,7 +47,7 @@ async function expectHomeRowUnderHeader(page: import("@playwright/test").Page, b
   expect(Math.abs(box.y - (header!.y + header!.height)), "the row starts at the header's foot").toBeLessThanOrEqual(1);
   expect(box.height, "one row, not a card").toBeLessThanOrEqual(56);
   if (!atReveal) return;
-  const stage = await page.locator("#s1 .compile-film-viewport").boundingBox();
+  const stage = await page.locator(HERO_STAGE).boundingBox();
   expect(stage, "the film stage is measured").not.toBeNull();
   expect(overlaps(box, stage!), "the row does not open over the film stage").toBe(false);
 }
@@ -65,10 +70,10 @@ test("decision A counts prepared source UI engagement once without source or act
   await expect(regions.nth(1)).toHaveAttribute("aria-pressed", "true");
   await regions.nth(2).click();
   await expect(regions.nth(2)).toHaveAttribute("aria-pressed", "true");
-  const filmTab = page.locator('#s1 [data-testid="landing-hero-film"]').getByRole("tab").nth(1);
+  const filmTab = page.locator('#walkthrough [data-testid="landing-hero-film"]').getByRole("tab").nth(1);
   await filmTab.click();
   await expect(filmTab).toHaveAttribute("aria-selected", "true");
-  await expect(page.locator('#s1 [data-testid="landing-hero-film"] video')).toHaveCount(1);
+  await expect(page.locator('#walkthrough [data-testid="landing-hero-film"] video')).toHaveCount(1);
   const events = await page.evaluate(() =>
     (window as Window & { __preparedEngagement: Record<string, unknown>[] }).__preparedEngagement,
   );
@@ -162,7 +167,7 @@ test("on Home from 900px the 8 s prompt covers no title, support, action or film
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
   const box = (await panel.boundingBox())!;
   await expectHomeRowUnderHeader(page, box);
-  for (const target of ["#s1 h1", "#s1 .lv2-hero-support", "#s1 .lv2-actions", "#s1 .compile-film-viewport"]) {
+  for (const target of ["#s1 h1", "#s1 .lv2-hero-support", "#s1 .lv2-actions", HERO_STAGE]) {
     const rect = await page.locator(target).first().boundingBox();
     expect(rect, target).not.toBeNull();
     expect(overlaps(box, rect!), `the 8 s row covers ${target}`).toBe(false);
@@ -195,12 +200,12 @@ test("on a Home phone the prompt never opens over the hero film", async ({ page 
   await page.goto("/");
   const panel = page.getByRole("region", PANEL);
   // Hydrated (the player has read its media query) before the clock moves.
-  await expect(page.locator("#s1 .compile-film-sequence")).toHaveAttribute("data-narrow", "1");
+  await expect(page.locator('#s1 [data-testid="hero-compile-tabs"]')).toHaveAttribute("data-mode", "video");
   await expect(panel).toHaveCount(0);
   await page.clock.fastForward(8_000);
   await page.clock.runFor(500);
   await expect(page.locator("#s1 [data-film-reading] p"), "no reading line on Home (D-7)").toHaveCount(0);
-  const film = (await page.locator("#s1 .compile-film-viewport").boundingBox())!;
+  const film = (await page.locator(HERO_STAGE).boundingBox())!;
   const height = page.viewportSize()!.height;
   if (await panel.count()) {
     const box = (await panel.boundingBox())!;
@@ -219,7 +224,7 @@ test("on a Home phone the prompt never opens over the hero film", async ({ page 
   await expect(panel).toBeVisible();
   await settle(panel);
   const box = (await panel.boundingBox())!;
-  const moved = (await page.locator("#s1 .compile-film-viewport").boundingBox())!;
+  const moved = (await page.locator(HERO_STAGE).boundingBox())!;
   expect(overlaps(box, moved), "the scrolled sheet covers the film").toBe(false);
   expect(box.y + box.height).toBeGreaterThan(height - 40);
   await testInfo.attach("home-phone-sheet", { body: await page.screenshot(), contentType: "image/png" });
@@ -245,14 +250,14 @@ for (const [width, height] of [[430, 932], [412, 915]] as const) {
     await page.clock.install();
     await page.goto("/");
     const panel = page.getByRole("region", PANEL);
-    await expect(page.locator("#s1 .compile-film-sequence")).toHaveAttribute("data-narrow", "1");
+    await expect(page.locator('#s1 [data-testid="hero-compile-tabs"]')).toHaveAttribute("data-mode", "video");
     await expect(panel).toHaveCount(0);
     await page.clock.fastForward(8_000);
     await page.clock.runFor(500);
     expect(await page.evaluate(() => window.scrollY), `${width}: unscrolled`).toBe(0);
     // FINAL-SPEC 2026-10-26: no reading line under or over the phone pane, so the film's box is the reach. The 4:5 pane
     // is taller than the old 16:10 frame, so whether the sheet opens at 8 s is read from the boxes, both ways, at both widths.
-    const film = (await page.locator("#s1 .compile-film-viewport").boundingBox())!;
+    const film = (await page.locator(HERO_STAGE).boundingBox())!;
     const reach = film.y + film.height;
     if (reach <= height - 104) {
       await expect(panel, `${width}: the 8 s sheet opens`).toBeVisible();
@@ -284,7 +289,7 @@ test("in the 768-899 band in Focus the scrolled sheet never covers the reading b
   const [width, height] = [800, 800];
   await page.setViewportSize({ width, height });
   await page.goto("/");
-  const film = page.locator('#s1 figure[data-testid="landing-hero-film"]');
+  const film = page.locator('#walkthrough figure[data-testid="landing-hero-film"]');
   await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-narrow", "1");
   // Home opens compact (founder 2026-10-27); Focus, the taller frame this guards, is one press of Focus details.
   await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");

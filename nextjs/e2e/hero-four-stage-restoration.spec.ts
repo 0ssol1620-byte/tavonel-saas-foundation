@@ -13,14 +13,26 @@ async function dismissConsent(page: import("@playwright/test").Page) {
   await page.evaluate(() => window.scrollTo(0, 0));
 }
 
-test("the title leads directly into four selectable and playing demo recordings", async ({ page }, testInfo) => {
+/*
+  Founder 2026-11-10: the title leads into the hero film -- the four compile cuts in one tabbed slot, right after the
+  actions (hero-compile-tabs.tsx) -- and the four recorded demo cuts follow below the fold, in #walkthrough, unchanged.
+*/
+const HERO = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="hero-compile-tabs"]';
+const WALKTHROUGH = '#walkthrough figure[data-testid="landing-hero-film"]';
+
+test("the title leads directly into the hero film, and four selectable and playing demo recordings follow below it", async ({ page }, testInfo) => {
   test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   // Four cold decoders share one case; preserve the per-film progress assertions.
   test.setTimeout(60_000);
   await page.goto("/");
   await dismissConsent(page);
-  const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
+  const hero = page.locator(HERO);
+  await expect(hero).toBeVisible();
+  await expect(hero.getByRole("tab")).toHaveText(["Extract", "Link", "Update", "Use"]);
+  const film = page.locator(WALKTHROUGH);
   await expect(film).toHaveCount(1);
+  await expect(page.locator('#s1 [data-testid="landing-hero-film"]')).toHaveCount(0);
+  await film.scrollIntoViewIfNeeded();
   await expect(film).toBeVisible();
   await expect(page.locator('#s1 [data-source-inspection-film]')).toHaveCount(0);
   await expect(page.locator('#s2 [data-testid="landing-hero-film"]')).toHaveCount(0);
@@ -43,6 +55,8 @@ test("the title leads directly into four selectable and playing demo recordings"
   for (let index = 0; index < FILMS.length; index++) {
     await tabs.nth(index).click();
     await expect(tabs.nth(index)).toHaveAttribute("aria-selected", "true");
+    // The player plays while it is in view.
+    await sequence.locator(".compile-film-viewport").scrollIntoViewIfNeeded();
     // R3 (D1): below 900px each stage plays its yuv420p twin first (phoneSrc), which every engine decodes.
     await expect(sequence).toHaveAttribute("data-video-primary-src", page.viewportSize()!.width < 900 ? FILMS[index]!.replace(".mp4", "-hq.mp4") : FILMS[index]!);
     const video = sequence.locator("video");
@@ -81,7 +95,12 @@ test("reduced motion keeps four stages static until explicitly played", async ({
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await dismissConsent(page);
-  const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
+  // The hero film plays nothing under reduced motion either: its poster, no cut, no canvas.
+  const hero = page.locator(HERO);
+  await expect(hero).toHaveAttribute("data-mode", "poster");
+  await expect(hero.locator("video, canvas")).toHaveCount(0);
+  const film = page.locator(WALKTHROUGH);
+  await film.scrollIntoViewIfNeeded();
   await expect(film.getByRole("tab")).toHaveCount(4);
   const play = film.getByRole("button", { name: "Play the compilation film", exact: true });
   await expect(play).toBeVisible();
