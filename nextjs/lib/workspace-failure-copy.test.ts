@@ -3,7 +3,7 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import AuthCallbackPage from "../app/auth/callback/page";
-import { failureSentence, isSizeLimitFailure, reviewReasonCopy, sizeLimitFailureCopy } from "./workspace-failure-copy";
+import { failureSentence, isSizeLimitFailure, offersUpgrade, reviewReasonCopy, sizeLimitFailureCopy } from "./workspace-failure-copy";
 
 const workspace = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
 const connections = readFileSync(new URL("../components/connections-panel.tsx", import.meta.url), "utf8");
@@ -20,6 +20,40 @@ describe("workspace failure copy", () => {
     const sentence = failureSentence("SOME_NEW_CODE", 500);
     expect(sentence.startsWith("Our servers could not complete this.")).toBe(true);
     expect(sentence).toContain("Reference SOME_NEW_CODE.");
+  });
+
+  it("says the daily spend stop is a safety pause for today, that queued work continues and nothing was charged, with no reset time", () => {
+    for (const code of ["OCR_DAILY_SPEND_STOP", "OCR_SPEND_UNVERIFIED"]) {
+      const sentence = failureSentence(code, 503);
+      expect(sentence, code).toContain("paused");
+      expect(sentence, code).toContain("safety limit");
+      expect(sentence, code).toContain("already queued keep processing");
+      expect(sentence, code).toContain("nothing was charged");
+      expect(sentence, code).not.toContain(code);
+      // The stop lifts at the provider's billing-day boundary, which no single clock time states truly.
+      expect(sentence, code).not.toMatch(/UTC|midnight|\d{1,2}:\d{2}|minutes?|hours?/i);
+    }
+    expect(failureSentence("OCR_DAILY_SPEND_STOP", 503)).toContain("for today");
+  });
+
+  it("gives every plan and free-evaluation refusal its own sentence, and offers the plans for each", () => {
+    const codes = ["SUBSCRIPTION_REQUIRED", "STUDIO_SUBSCRIPTION_REQUIRED", "TRIAL_FILE_LIMIT_EXCEEDED", "TRIAL_PAGE_LIMIT_EXCEEDED",
+      "TRIAL_FILE_TOO_LARGE", "TRIAL_ARCHIVE_NOT_INCLUDED", "TRIAL_FEATURE_NOT_INCLUDED", "TRIAL_WORLD_LIMIT_REACHED",
+      "TRIAL_LIMIT_REACHED", "TRIAL_NOT_ACTIVE"];
+    const sentences = codes.map((code) => failureSentence(code, 402));
+    expect(new Set(sentences).size).toBe(codes.length);
+    for (const [index, sentence] of sentences.entries()) {
+      expect(sentence).not.toContain("Reference");
+      expect(sentence).not.toContain(codes[index]);
+      expect(sentence).not.toContain(";");
+      expect(offersUpgrade(`Activation failed. ${sentence} The active World is unchanged.`)).toBe(true);
+    }
+  });
+
+  it("does not offer a plan for a refusal a plan cannot lift", () => {
+    expect(offersUpgrade(failureSentence("TRIAL_AI_ACCESS_CHECK_FAILED", 503))).toBe(false);
+    expect(offersUpgrade(failureSentence("AUTH_REQUIRED", 401))).toBe(false);
+    expect(offersUpgrade(failureSentence("SOME_NEW_CODE", 402))).toBe(false);
   });
 
   it("says something useful when there is no code at all", () => {

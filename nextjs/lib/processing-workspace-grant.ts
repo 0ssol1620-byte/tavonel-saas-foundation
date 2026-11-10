@@ -17,7 +17,7 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
   Issues or renews the v2 workspace grant the scoped customer-data gate reads. The only inputs
   are durable ones: the latest release decision for the exact deployed SHA and scope, or for the
   deployment's gate surface (D-05, docs/adr/0006; recomputed like the gate reader does), the published terms manifest (re-hashed from disk) and the current
-  owner's persisted acceptance of it, narrowed by the optional operator rollout cohort. A
+  owner's persisted acceptance of it, narrowed by the operator rollout (a cohort, or general: ADR 0008). A
   qualification release yields an hour-bounded qualification grant for its one recorded workspace,
   and only when the caller opts in (the owner's own bootstrap); billing renewal never does. It never
   records release evidence or an acceptance, flips TAVONEL_CUSTOMER_DATA_GATE_VERSION, starts a
@@ -84,7 +84,8 @@ export function processingTermsReceiptSha256(kind: "terms" | "processing", accep
  * (`activationPolicy.customerData.enabled`, flipped only by P2-37), processing runs under gate v2
  * inside a canary of one to LAUNCH_CANARY_MAX_WORKSPACES named workspaces. An unset cohort, a wider
  * list or any gate other than v2 is then a configuration error and admits nobody. While the switch
- * is off -- production today -- this adds nothing. Widening past the canary is a reviewed change here.
+ * is off this adds nothing. Widening past the canary is a reviewed change: ADR 0008 (2026-11-09) made it
+ * as TAVONEL_PROCESSING_ROLLOUT=general (processingRolloutRefusal below), not by raising this cap.
  */
 export const LAUNCH_CANARY_MAX_WORKSPACES = 3;
 export function processingCohortRefusal(workspaceKey: string, env: Env = process.env):
@@ -98,6 +99,30 @@ export function processingCohortRefusal(workspaceKey: string, env: Env = process
     return "PROCESSING_COHORT_CONFIG_INVALID";
   }
   return ids.includes(workspaceKey) ? null : "PROCESSING_COHORT_EXCLUDED";
+}
+
+/**
+ * ADR 0008 (2026-11-09, docs/adr/0008-processing-general-availability.md): the processing rollout mode,
+ * read by every grant and every processing authorization in place of the bare cohort check.
+ *
+ *   unset      the D-19 canary exactly as before (processingCohortRefusal). This is the rollback.
+ *   "general"  every workspace passes the rollout check, and only under gate v2. Consent and the
+ *              grant, the per-deploy release row, ACL and tenant checks, trial caps, the spend
+ *              ledger, CDR and the launch switch all still apply: it lifts the workspace count and
+ *              nothing else.
+ *   any other  value -- empty, padded, other case, "all", "*" -- is PROCESSING_COHORT_CONFIG_INVALID
+ *              and admits nobody. Admitting everyone takes this one exact word.
+ *
+ * processingCohortRefusal is unchanged and stays the named-cohort check, so a feature scoped to the
+ * cohort (library organize `on`, W2-B2) keeps reading it and does not open under "general".
+ */
+export const PROCESSING_ROLLOUT_GENERAL = "general";
+export function processingRolloutRefusal(workspaceKey: string, env: Env = process.env):
+  "PROCESSING_COHORT_EXCLUDED" | "PROCESSING_COHORT_CONFIG_INVALID" | null {
+  const rollout = env.TAVONEL_PROCESSING_ROLLOUT;
+  if (rollout === undefined) return processingCohortRefusal(workspaceKey, env);
+  return rollout === PROCESSING_ROLLOUT_GENERAL && env.TAVONEL_CUSTOMER_DATA_GATE_VERSION === "v2"
+    ? null : "PROCESSING_COHORT_CONFIG_INVALID";
 }
 
 async function call(config: Config, path: string, init?: RequestInit) {
@@ -200,7 +225,7 @@ export async function issueProcessingWorkspaceGrant(input: {
   if (!current.ok) return current;
   const { manifest } = current;
 
-  const cohort = processingCohortRefusal(workspaceKey, env);
+  const cohort = processingRolloutRefusal(workspaceKey, env);
   if (cohort) return fail(cohort);
 
   const gateSurfaceSha256 = deployedGateSurface(env);

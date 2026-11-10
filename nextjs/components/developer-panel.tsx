@@ -6,6 +6,7 @@ import { DEVELOPER_SCOPES, type DeveloperScope } from "@/lib/developer-contracts
 import { failureSentence } from "@/lib/workspace-failure-copy";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import ConsumerVerificationPanel from "@/components/consumer-verification-panel";
+import { CONNECT_AI_SCOPES } from "@/components/workspace/connect-ai-panel";
 
 type ApiKey = {
   keyId: string;
@@ -138,6 +139,8 @@ export default function DeveloperPanel() {
             <option value="180">180 days</option>
             <option value="365">365 days</option>
           </select>
+          {/* /api/mcp refuses a key holding any scope outside these five (checkBearer in lib/remote-mcp.ts), so this preset is the one that works there. */}
+          <button type="button" className="btn btn-ghost" onClick={() => setScopes([...CONNECT_AI_SCOPES])}>Use MCP read-only scopes</button>
           <fieldset>
             <legend>Scopes</legend>
             {DEVELOPER_SCOPES.map((scope) => (

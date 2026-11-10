@@ -92,10 +92,11 @@ export function corpusFit(sources: number, pagesPerSource: number): CorpusFit {
     {
       id: "pages-in-the-month",
       label: "Pages in the month",
-      /* Volume past a plan's included pages is billed, never refused: the row is always within. */
+      /* Volume past a plan's included pages is arranged, never refused before processing: the row is always within. */
       state: "within",
       value: n(pages),
-      ceiling: "Billed past the plan's included pages, at the published rate",
+      /* Conversion pass 2026-11-09: no per-page overage rate is published or billed, so the row says what /pricing's FAQ says. */
+      ceiling: "Volume past the plan's included pages is arranged with us",
     },
   ];
 

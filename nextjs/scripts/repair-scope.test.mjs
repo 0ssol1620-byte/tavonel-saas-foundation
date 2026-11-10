@@ -3228,6 +3228,10 @@ test('affected owner groups select the initial task checks for every product own
   // The worker's deployed vars (FOUNDATION_OCR_PAGE_RANGE_SIZE) change what ocr.ts does, so they run the same suite.
   const wrangler=select('quarantine-sidecar/foundation-cdr-worker/wrangler.jsonc');
   assert.deepEqual([wrangler.groups,wrangler.unitFiles,wrangler.browserFiles,wrangler.runCdrWorkerChecks],[['ocr-worker'],[],[],true]);
+  // Its README states the consumer concurrency contract beside wrangler.jsonc; a README elsewhere is not admitted.
+  const workerReadme=select('quarantine-sidecar/foundation-cdr-worker/README.md');
+  assert.deepEqual([workerReadme.groups,workerReadme.unitFiles,workerReadme.browserFiles,workerReadme.runCdrWorkerChecks],[['ocr-worker'],[],[],true]);
+  assert.ok(!AFFECTED_GROUPS.some(owner=>owner.group==='ocr-worker'&&(owner.match.test('quarantine-sidecar/foundation-cdr-worker/docs/README.md')||owner.match.test('quarantine-sidecar/foundation-cdr-worker/src/README.md'))));
   const dropbox=select('nextjs/lib/dropbox-source-reconciliation.ts');
   assert.deepEqual(dropbox.groups,['dropbox-connector']);assert.equal(dropbox.unitFiles.length,10);
   for (const consumer of ['lib/connector-page-integrity.test.ts','lib/connector-provider-isolation.test.ts','lib/connector-source-identity.test.ts','lib/sync-worker.test.ts','lib/connector-replay-world-currency-migration.test.ts']) assert.ok(dropbox.unitFiles.includes(consumer),consumer);
@@ -7409,6 +7413,9 @@ test('affected ux-billing-checkout owner: 26 exact paths select 25 direct suites
   assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440', 'audit']);
   for (const adjacent of ['nextjs/app/api/internal/billing/other/route.ts', 'nextjs/components/checkout-intent-notice.test.tsx', 'nextjs/e2e/fixtures/paddle-fixture-2.ts', 'nextjs/lib/billing-catalog.ts', 'nextjs/lib/checkout-policy.ts', 'nextjs/lib/use-checkout.tsx', 'nextjs/lib/self-service-trial.test.ts', 'app/api/internal/billing/gate-enforce/route.ts.bak', 'nextjs/lib/customer-data-admission.ts', 'nextjs/lib/commercial-state.ts', 'nextjs/lib/processing-workspace-grant.tsx']) {
     // G1-COPY registered the plan catalog to g1-copy-truth: still not this owner's, now asserted positively to its one owner.
+    // ADR 0008 registered lib/customer-data-admission.ts to processing-ga-20261109 (intentionally new): still not this
+    // owner's, now asserted positively to its one owner, as G1-COPY did for the plan catalog.
+    if (adjacent === 'nextjs/lib/customer-data-admission.ts') { assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(adjacent)).map(o => o.group), ['processing-ga-20261109'], adjacent); continue; }
     if (assertUxProgramEndpoint(adjacent)) { assert.equal(UX_BILLING_CHECKOUT_AFFECTED_PATHS.some(path => 'nextjs/' + path === adjacent), false, adjacent); continue; }
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
@@ -8049,7 +8056,8 @@ test('affected operational-sli-alert-delivery owner: 4 exact paths select 8 dire
     assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['operational-sli-alert-delivery'], [], [...suites].sort(), [], []], path);
     assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged, map.nativeEvidence.disposition], [false, false, false, 'fresh-seven-case-native-run-required'], path);
   }
-  for (const adjacent of ['nextjs/lib/operational-sli.ts', 'nextjs/lib/operational-sli-alert-store.tsx', 'nextjs/app/api/internal/sli-alerts/replay/route.ts', 'nextjs/lib/operational-sli-alert-delivery.ts', 'lib/operational-sli-alert-store.ts']) {
+  // lib/operational-sli.ts left this neighbour list when ops-backlog-sli-20261110 took it; that owner's test pins it there alone.
+  for (const adjacent of ['nextjs/lib/operational-sli-alert.ts', 'nextjs/lib/operational-sli-alert-store.tsx', 'nextjs/app/api/internal/sli-alerts/replay/route.ts', 'nextjs/lib/operational-sli-alert-delivery.ts', 'lib/operational-sli-alert-store.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
@@ -8121,6 +8129,46 @@ test('affected w1-trial-ops owner: 10 exact paths select 17 direct suites and no
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
 });
+// ops-backlog-sli-20261110: one finite owner, restated independently of the exported constants.
+import { OPS_BACKLOG_SLI_AFFECTED_PATHS, OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected ops-backlog-sli-20261110 owner: 2 exact paths select 3 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['lib/operational-sli.test.ts', 'lib/operational-sli.ts'];
+  const suites = ['lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-read-route.test.ts', 'lib/operational-sli.test.ts'];
+  assert.deepEqual([[...OPS_BACKLOG_SLI_AFFECTED_PATHS], [...OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['ops-backlog-sli-20261110'], path);
+  }
+  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['ops-backlog-sli-20261110'], [], suites, [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  for (const adjacent of ['nextjs/lib/operational-sli-store.ts', 'nextjs/lib/operational-sli.tsx', 'nextjs/lib/operational-job-liveness.ts', 'lib/operational-sli.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});
+
+// trial-to-paid-20261109: one finite owner, restated independently of the exported constants.
+import { TRIAL_TO_PAID_AFFECTED_PATHS, TRIAL_TO_PAID_AFFECTED_UNIT_FILES, TRIAL_TO_PAID_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+test('affected trial-to-paid-20261109 owner: 7 exact paths select 27 direct suites and one browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/api/collections/[id]/promote/route.ts', 'components/processing-consent-panel.module.css', 'lib/activation-cohorts.ts', 'lib/cookbook-content.ts', 'lib/keyword-map.ts', 'e2e/billing-lifecycle.spec.ts', 'app/api/collections/[id]/search/route.ts'];
+  const browsers = ['e2e/billing-lifecycle.spec.ts'];
+  assert.deepEqual([...TRIAL_TO_PAID_AFFECTED_BROWSER_FILES], browsers);
+  const suites = ['lib/activation-cohorts.test.ts', 'lib/activation-rate-limit.test.ts', 'lib/brand-copy.test.ts', 'lib/client-route-weight.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/cookbook-content.test.ts', 'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/funnel-events.test.ts', 'lib/keyword-map.test.ts', 'lib/marketing-analytics.test.ts', 'lib/model-attempt-receipt.test.ts', 'lib/openapi-response-shape.switch-off.test.ts', 'lib/openapi-response-shape.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/public-copy-purge.test.ts', 'lib/recipe-intent.test.ts', 'lib/remote-mcp.test.ts', 'lib/resources-hub.test.ts', 'lib/retrieval-compile-wiring.test.ts', 'lib/retrieval-search-authorization.test.ts', 'lib/seo-surface.test.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/trial-ai-access.test.ts', 'lib/world-activation-plan-gate.test.ts', 'lib/world-promotion-current-source.test.ts'];
+  assert.deepEqual([[...TRIAL_TO_PAID_AFFECTED_PATHS], [...TRIAL_TO_PAID_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['trial-to-paid-20261109'], path);
+  }
+  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['trial-to-paid-20261109'], [], suites, browsers, []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  const plan = affectedAskPlan(map);
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, browsers, false, false]);
+  for (const adjacent of ['nextjs/app/api/collections/[id]/promote/route.tsx', 'nextjs/components/processing-consent-panel.module.scss', 'nextjs/lib/activation-cohort.ts', 'nextjs/lib/cookbook-contents.ts', 'lib/keyword-map.ts', 'nextjs/e2e/billing-lifecycle.spec.tsx', 'nextjs/app/api/collections/[id]/search/route.tsx']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
 // legal-semicolons-20261109: one finite owner, restated independently of the exported constants.
 import { LEGAL_SEMICOLONS_AFFECTED_PATHS, LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 test('affected legal-semicolons-20261109 owner: 5 exact paths select 10 direct suites and no browser suite; neighbours stay unmapped', () => {
@@ -8135,10 +8183,27 @@ test('affected legal-semicolons-20261109 owner: 5 exact paths select 10 direct s
   assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
   const plan = affectedAskPlan(map);
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
-  for (const adjacent of ['nextjs/app/refunds/page.ts', 'nextjs/components/processing-consent-panel.module.css', 'nextjs/content/trust/provisions.json', 'nextjs/lib/status-probe-store.ts', 'lib/status-probe.ts']) {
+  for (const adjacent of ['nextjs/app/refunds/page.ts', 'nextjs/components/processing-consent-panel.css', 'nextjs/content/trust/provisions.json', 'nextjs/lib/status-probe-store.ts', 'lib/status-probe.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
+
+test('affected conversion-public owner: seven exact paths and six direct suites, nothing adjacent', async () => {
+  const { CONVERSION_PUBLIC_AFFECTED_PATHS, CONVERSION_PUBLIC_AFFECTED_UNIT_FILES } = await import('./repair-scope.mjs');
+  assert.deepEqual(CONVERSION_PUBLIC_AFFECTED_PATHS, ['app/pricing/opengraph-image.tsx', 'app/reproducibility/opengraph-image.tsx',
+    'components/own-files-cta.tsx', 'lib/own-files-cta.test.ts', 'lib/plan-limit-fit.ts', 'lib/public-copy-purge.test.ts', 'lib/trial-allowance.test.ts']);
+  assert.deepEqual(CONVERSION_PUBLIC_AFFECTED_UNIT_FILES, ['lib/og-card-frame.test.ts', 'lib/own-files-cta.test.ts', 'lib/plan-limit-fit.test.ts',
+    'lib/public-copy-purge.test.ts', 'lib/seo-surface.test.ts', 'lib/trial-allowance.test.ts']);
+  for (const path of CONVERSION_PUBLIC_AFFECTED_PATHS) {
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths], [[], ['conversion-public'], []], path);
+    assert.deepEqual([map.unitFiles, map.browserFiles], [[...CONVERSION_PUBLIC_AFFECTED_UNIT_FILES], []], path);
+  }
+  // Exact, not a prefix: a neighbour of an owned path stays unmapped and fails closed.
+  for (const adjacent of ['nextjs/app/evidence/opengraph-image.tsx', 'nextjs/components/own-files-cta.module.css', 'nextjs/lib/plan-limit-fit.test.ts']) {
+    assert.ok(!affectedMap([affectedRecord('M', [adjacent])]).groups.includes('conversion-public'), adjacent);
   }
 });
 // sli-alert-noise-20261109: one finite owner, restated independently of the exported constants.
@@ -8216,6 +8281,25 @@ test('affected w2-d-intake-stage1 owner: 3 exact paths select 2 direct suites an
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(neighbour)).map(o => o.group), [group], neighbour);
   }
   for (const adjacent of ['quarantine-sidecar/cdr-cloudrun/table_dpi_arena_v2.py', 'nextjs/lib/processing-ceiling-stage1.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});
+// processing-ga-20261109 (ADR 0008): one finite owner, restated independently of the exported constants.
+import { PROCESSING_GA_AFFECTED_PATHS, PROCESSING_GA_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected processing-ga-20261109 owner: 1 exact path selects 2 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['lib/customer-data-admission.ts'];
+  const suites = ['lib/customer-data-admission.test.ts', 'lib/processing-workspace-grant.test.ts'];
+  assert.deepEqual([[...PROCESSING_GA_AFFECTED_PATHS], [...PROCESSING_GA_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['processing-ga-20261109'], path);
+  }
+  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['processing-ga-20261109'], [], suites, [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  // library-shadow.ts reads the named cohort and keeps its own owner (main, W2-B2). It is not this owner's.
+  assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/lib/library-shadow.ts')).map(o => o.group), ['library-organize-b2']);
+  for (const adjacent of ['nextjs/lib/customer-data-admission.tsx', 'nextjs/lib/customer-data-admission-routes.ts', 'nextjs/lib/customer-data-admission.mjs', 'lib/customer-data-admission.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }

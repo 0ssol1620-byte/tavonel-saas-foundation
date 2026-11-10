@@ -6,6 +6,7 @@ import MobilePrimaryNav from "@/components/mobile-primary-nav";
 import { HeaderCta, NavCurrentLink, NavDisclosure } from "@/components/site-nav/desktop-primary-nav";
 import HeaderScrollState from "@/components/site-nav/header-scroll-state";
 import { MarketingConsentLink } from "@/components/marketing-consent";
+import { primaryCallToAction } from "@/lib/commercial-state";
 import {
   BRAND_LINE,
   FOOTER_GROUPS,
@@ -100,9 +101,8 @@ export function DesktopPrimaryNav({ korean = false }: { korean?: boolean }) {
  * times or the site's structure changed as a visitor moved through it. Those three differences are
  * the three props below; everything else is this component.
  *
- * `signedIn` suppresses Sign in rather than the action beside it. A reader who is already
- * authenticated does not need the link, and offering both put the same destination in the row
- * twice on the landing page.
+ * `signedIn` swaps Sign in for a link to the workspace and leaves the action beside it alone. A
+ * reader who is already authenticated needs their account, not a sign-in (FUNNEL-SIGNED-IN #10).
  *
  * BA-232: `cta` is required. It was optional, and the fallback was a client component that
  * painted a placeholder label and then replaced it once `/api/status` answered -- on every page
@@ -141,8 +141,14 @@ export function PublicSiteHeader({
   signedIn,
   korean = false,
   ghostCta = false,
+  start,
 }: {
   signedIn?: boolean;
+  /**
+   * The start action for the phone sheet, resolved on the server (`primaryCallToAction()`). A
+   * client caller passes the one it already resolved, or nothing.
+   */
+  start?: { href: string; label: string };
   /** Korean entry, pricing, and contact share the localized chrome. */
   korean?: boolean;
   /**
@@ -160,7 +166,7 @@ export function PublicSiteHeader({
         <b>TAVONEL</b>
       </Link>
       <DesktopPrimaryNav korean={korean} />
-      <MobilePrimaryNav korean={korean} signedIn={signedIn}
+      <MobilePrimaryNav korean={korean} signedIn={signedIn} start={start}
         labels={{ menu: korean ? KO_CHROME.menu : "Menu", pricing: pricingLabel, signIn: korean ? KO_CHROME.signIn : "Sign in" }}>
         <NavSections korean={korean} sheet />
       </MobilePrimaryNav>
@@ -174,7 +180,10 @@ export function PublicSiteHeader({
           sheet on a phone; the action beside it is the one thing that may not go behind a
           disclosure.
         */}
-        {signedIn ? null : <Link className="nav-signin chrome-v2-signin" href="/login">{korean ? KO_CHROME.signIn : "Sign in"}</Link>}
+        {/* FUNNEL-SIGNED-IN #10: a signed-in reader is shown where their account is, not asked to sign in. */}
+        {signedIn
+          ? <Link className="nav-signin chrome-v2-signin" href="/workspace">{korean ? "워크스페이스" : "Your workspace"}</Link>
+          : <Link className="nav-signin chrome-v2-signin" href="/login">{korean ? KO_CHROME.signIn : "Sign in"}</Link>}
         {/* Desktop only: below the switch the header is the wordmark and Menu, and the hero carries this.
             Absent on the sample itself (/explore, /ko/explore): an action may not point at its own page. */}
         <HeaderCta className={`btn${ghostCta ? " btn-ghost" : ""} ${chrome.cta}`} href={SAMPLE_CTA.href} label={korean ? SAMPLE_CTA.ko : SAMPLE_CTA.label} />
@@ -344,7 +353,7 @@ export function PublicSitePage({ children, template, korean = false }: { childre
   */
   return (
     <div className="page public-page" lang={korean ? "ko" : undefined} data-template={template ?? undefined}>
-      <PublicSiteHeader korean={korean} />
+      <PublicSiteHeader korean={korean} start={korean ? undefined : primaryCallToAction()} />
       <main id="main" tabIndex={-1}>{children}</main>
       <PublicSiteFooter korean={korean} />
     </div>

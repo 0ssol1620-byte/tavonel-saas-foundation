@@ -81,6 +81,25 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   /*
+    PR #210, Home film recording R3 and the guide videos (codex/landing-film-r3-20261109, head 4163ec77), released in
+    integration PR #219: production deployment dpl_3PNhr1TxfJ9sSWpa4C39MAoExPTN (main 008016029f94), READY
+    2026-11-09T16:18:06Z (01:18:06 on 10 November in Seoul). Worded from the two lines drafted in #210's description.
+    By docs/CHANGELOG_ENTRY_RULE.md these have no bullet: the byte locks, the re-derived CSS pin and pane-width cap, the
+    e2e and unit re-specs, the repair-scope registrations and the recorder scripts (internal), and the phone hero spacing
+    (no change a reader acts on). No version or apiVersion: channel.json and /api/openapi did not move.
+  */
+  {
+    date: "2026-11-10",
+    releasedAt: "2026-11-09T16:18:06Z",
+    id: "2026-11-10-home-film-and-guide-videos",
+    title: "A new recording of the Home film, back on phones, and re-recorded guide videos",
+    surfaces: ["Website"],
+    improved: [
+      "/ and /ko play a new recording of the compilation film, framed on each step, and phones play it again, opening on the full frame. The four stages are Read, Compile, Update and Trace (읽기, 컴파일, 업데이트, 근거 추적 on /ko).",
+      "The three /guide videos, Explore, the MCP bridge and the API, are re-recorded on tavonel.com in their desktop and phone takes, with their English and Korean captions re-timed. The guide's manifest, /guide/manifest.json, records all three as recorded on live tavonel.com and names no exception.",
+    ],
+  },
+  /*
     PR #177, Home and /workspace entry (codex/home-ux-20261027, head 072806fb): production deployment
     dpl_KzzW2z9UAfN5Sjbj7bpEb8ci7WB3 (main b2874b5842664c8f7d17f7ad9adfd2fc22842e96), READY 2026-11-03T21:25:26.405Z
     (06:25:26 on 4 November in Seoul); `releasedAt` keeps the house format to the second. The day's last production deployment,

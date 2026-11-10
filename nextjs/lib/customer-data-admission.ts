@@ -1,6 +1,6 @@
 import { readVerifiedCustomerDataGateDecision } from "./customer-data-gate-store";
 import { readVerifiedScopedCustomerDataGate } from "./scoped-customer-data-gate-store";
-import { processingCohortRefusal } from "./processing-workspace-grant";
+import { processingRolloutRefusal } from "./processing-workspace-grant";
 import type { CustomerDataScope } from "../../shared/scopedCustomerDataGate";
 import type { CustomerDataAuthorization } from "../../shared/customerDataAuthorization";
 
@@ -20,8 +20,9 @@ export async function readCustomerSourceAuthorization(
   scope: CustomerDataScope,
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): Promise<SourceAuthorizationResult> {
-  // A rollout cohort only narrows: it refuses existing grants too, and never stands in for one.
-  const cohort = processingCohortRefusal(workspaceKey, env);
+  // The rollout only narrows: it refuses existing grants too, and never stands in for one. Under
+  // TAVONEL_PROCESSING_ROLLOUT=general (ADR 0008) it narrows nothing, and the v2 grant still decides.
+  const cohort = processingRolloutRefusal(workspaceKey, env);
   if (cohort) return { ok: false, code: cohort };
   const version = env.TAVONEL_CUSTOMER_DATA_GATE_VERSION;
   if (version === "v2") {

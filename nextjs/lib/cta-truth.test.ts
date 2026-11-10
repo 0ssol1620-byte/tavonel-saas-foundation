@@ -247,20 +247,23 @@ const CLOSED = {
   },
 } as const;
 
-/* Main's notice at 4c80bb30, word for word, now rendered only where a plan can be bought. */
+/*
+  The notice rendered only where a plan can be bought. Conversion pass 2026-11-09 (funnel audit fix 8): it
+  carries the deal from the billing catalog and the step before checkout, in place of main's "signed webhook".
+*/
 const OPEN_INTENT =
-  "Developer is held for you. Checkout opens by itself once you are in. Nothing is charged by signing in, and access changes only after a signed webhook is persisted.";
+  "Developer is held for you. $29/month for 500 standard pages, with a full refund within 14 days if you have used fewer than 50 of them. Paddle is the merchant of record. Sign in and accept the processing terms, and checkout opens by itself. Nothing is charged by signing in.";
 
 const TABLE = {
   S0: CLOSED,
   S1: CLOSED,
   S2: {
     ...CLOSED,
-    home: { ...CLOSED.home, secondary: { href: "/login", label: "Sign up for access" } },
+    home: { ...CLOSED.home, secondary: { href: "/login", label: "Start free" } },
     homeKo: { ...CLOSED.homeKo, secondary: { href: "/login", label: "사용 신청하기" } },
     pricing: [
-      { href: "/login", label: "Sign up for access" },
-      { href: "/login?next=checkout&offer=observer_access", label: "Get Developer access, via sign-in" },
+      { href: "/login", label: "Start free" },
+      { href: "/login?next=checkout&offer=observer_access", label: "Buy Developer — $29/month" },
       { href: "/contact?plan=Team", label: "Talk to us about Team" },
       { href: "/contact?plan=Enterprise", label: "Scope an Enterprise pilot" },
     ],
@@ -279,8 +282,8 @@ const TABLE = {
       ],
     },
     explore: {
-      exits: [CLOSED.explore.exits[0], CLOSED.explore.exits[1], { href: "/login", label: "Sign up for access" }],
-      close: { href: "/login", label: "Sign up for access" },
+      exits: [CLOSED.explore.exits[0], CLOSED.explore.exits[1], { href: "/login", label: "Start free" }],
+      close: { href: "/login", label: "Start free — 3 files, no card" },
     },
     login: { text: OPEN_INTENT, links: [] },
   },
@@ -357,7 +360,7 @@ describe.each(STATES)("CTA truth in %s", (state) => {
     // The scan below is only worth its zero if it can see a self-serve label when one is offered.
     it("offers the self-serve labels the scan looks for", () => {
       expect(seen.labels.filter((label) => SELF_SERVE.test(label))).toEqual(
-        expect.arrayContaining(["Sign up for access", "사용 신청하기"]),
+        expect.arrayContaining(["Start free", "사용 신청하기"]),
       );
     });
   } else {

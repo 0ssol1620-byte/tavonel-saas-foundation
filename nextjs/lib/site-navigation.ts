@@ -103,8 +103,25 @@ export function customerNavOwns(href: string, pathname: string): boolean {
 export const ACCESS_CTA: SiteLink = { href: "/contact", label: "Request access" };
 
 /** The access action once a real card can be charged. The same action, live posture. */
-// Review PR201-R1 B3: self-serve opens in stages, so the action signs a visitor up rather than promising an upload.
-export const SELF_SERVE_CTA: SiteLink = { href: "/login", label: "Sign up for access" };
+/*
+  Conversion pass, 2026-11-09 (funnel audit fix 2). "Sign up for access" read as a waitlist.
+  Customer file processing opens to every workspace that accepts the processing terms
+  (orchestrator decision 2026-11-09), so the live-posture action is an active start. `START_FREE_LABEL` prints the allowance beside it where
+  there is room.
+*/
+export const SELF_SERVE_CTA: SiteLink = { href: "/login", label: "Start free" };
+
+/**
+ * The free evaluation's allowance, for copy only.
+ *
+ * Enforced by the database, not here: the `default` row of `foundation_trial_policy` in
+ * `supabase/migrations/0045_self_service_trial_and_owner_access.sql` (7 days, 3 files, 50 standard
+ * pages, 1 World). `lib/trial-allowance.test.ts` reads that insert and fails if these drift from it.
+ */
+export const TRIAL_ALLOWANCE = { days: 7, files: 3, pages: 50 } as const;
+
+/** The start action and the allowance it opens, in one line, for a hero-sized control. */
+export const START_FREE_LABEL = `${SELF_SERVE_CTA.label} — ${TRIAL_ALLOWANCE.files} files, no card`;
 
 /** The one name for the public sample, everywhere it is linked. */
 export const EXPLORE_CTA: SiteLink = { href: "/explore", label: "Explore a Compiled World" };
@@ -245,9 +262,10 @@ export const KO_CHROME = {
 
     D-12, delegated decision 2026-11-09: the literal Korean of the switch-on sentence, staged per
     review PR201-R1 B3. Every syllable is inside the KO Home font subset (landing-v2-page.test.ts).
+    ADR 0008, 2026-11-09: no longer staged; it names what opens a workspace, as the English does.
   */
   customerDataGate:
-    "내 원문 컴파일은 단계적으로 열고 있습니다. 로그인하면 워크스페이스가 만들어지고, 업로드와 컴파일은 단계마다 워크스페이스별로 열립니다. 내 워크스페이스의 열림 상태는 워크스페이스 화면에 표시됩니다. 열린 뒤에는 Developer 요금제를 바로 구매할 수 있고, Team과 Enterprise는 저희와 함께 정합니다.",
+    "로그인하면 워크스페이스가 만들어지고, 처리 약관에 동의하면 내 원문 업로드와 컴파일이 열립니다. 내 워크스페이스의 열림 상태는 워크스페이스 화면에 표시됩니다. 열린 뒤에는 Developer 요금제를 바로 구매할 수 있고, Team과 Enterprise는 저희와 함께 정합니다.",
 } as const;
 
 /**

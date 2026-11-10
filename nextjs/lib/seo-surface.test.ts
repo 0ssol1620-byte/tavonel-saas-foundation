@@ -307,7 +307,10 @@ describe("public surface: robots, sitemap and llms.txt agree", () => {
     expect(llmsPaths).not.toContain("/arena");
   });
   it("reads noindex from the page rather than assuming it", () => {
-    expect(isNoindex("/reproducibility"), "the one deliberate llms-only URL no longer reads as noindex").toBe(true);
+    expect(isNoindex("/arena"), "a delisted noindex page no longer reads as noindex").toBe(true);
+    // Conversion pass 2026-11-09: /reproducibility left the llms-only exemption for the sitemap.
+    expect(isNoindex("/reproducibility"), "the indexed proof page reads as noindex").toBe(false);
+    expect(sitemapPaths).toContain("/reproducibility");
     expect(isNoindex("/benchmarks"), "an indexable page reads as noindex, so the exemption admits anything").toBe(false);
     expect(isNoindex("/film"), "a noindex page nothing advertises reads as indexable, so heads are not being read").toBe(true);
   });
@@ -436,8 +439,8 @@ describe("public surface: the sitemap advertises only approved pages", () => {
 
   /* The reader, both ways. A noindex test that stopped recognising noindex would pass everything. */
   it("still knows a noindex page when it reads one", () => {
-    expect(isNoindex("/reproducibility"), "the standing noindex example no longer reads as noindex").toBe(true);
-    expect(sitemapPaths).not.toContain("/reproducibility");
+    expect(isNoindex("/film"), "the standing noindex example no longer reads as noindex").toBe(true);
+    expect(sitemapPaths).not.toContain("/film");
     expect(sitemapPaths).toContain("/pricing");
   });
 

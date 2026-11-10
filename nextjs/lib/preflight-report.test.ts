@@ -155,7 +155,7 @@ describe("the preflight denominators", () => {
       CAPABILITY_MANIFEST.entries.filter((entry) => isAcceptedAtUpload(entry.status)).length,
     );
     expect(describePreflightSummary(summary))
-      .toContain(`0 of ${summary.acceptedFormatCount} supported formats carry a qualification receipt`);
+      .toContain(`0 of ${summary.acceptedFormatCount} supported formats have a recorded reading-quality test so far`);
     expect(describePreflightSummary(summary)).toContain("2 of 3 selected files supported by format checks");
   });
 
@@ -218,7 +218,7 @@ describe("the workspace preflight section", () => {
     expect(html).toContain("Not extracted: sheet names, cell addresses, formulas");
     expect(html).toContain("drawing.dwg");
     expect(html).toContain("refused");
-    expect(html).toContain("supported formats carry a qualification receipt");
+    expect(html).toContain("supported formats have a recorded reading-quality test so far");
   });
 
   it("counts a source whose filename this device does not hold instead of calling it refused", () => {
@@ -464,7 +464,7 @@ describe("preflight known size admission: mixed sizes are counted honestly and c
   it("gives each refusal one plain reason a customer can read", () => {
     expect(summary.files[0].reasons.map(words)).toEqual(["empty or invalid file size"]);
     expect(summary.files[4].reasons.map(words)).toEqual(["empty or invalid file size"]);
-    expect(summary.files[3].reasons.map(words)).toEqual(["over the 5 mib processing ceiling"]);
+    expect(summary.files[3].reasons.map(words)).toEqual(["over the 5 MB per-file limit"]);
     for (const file of summary.files.filter((each) => each.status === "refused")) {
       for (const reason of file.reasons.map(words)) {
         expect(reason).not.toMatch(/_|intake|admission|requested|integer|rpc/i);
@@ -475,7 +475,7 @@ describe("preflight known size admission: mixed sizes are counted honestly and c
   it("keeps the safety and qualification caveats beside the counts", () => {
     const line = describePreflightSummary(summary);
     expect(line).toContain("Source safety checks are separate");
-    expect(line).toContain(`0 of ${summary.acceptedFormatCount} supported formats carry a qualification receipt`);
+    expect(line).toContain(`0 of ${summary.acceptedFormatCount} supported formats have a recorded reading-quality test so far`);
     expect(line).toContain("Format lookup only; this report does not inspect file bytes or assess safety");
     for (const file of summary.files) {
       const fileLine = describePreflightFile(file);

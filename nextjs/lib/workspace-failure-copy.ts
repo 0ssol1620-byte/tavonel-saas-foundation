@@ -53,7 +53,47 @@ const FAILURE_COPY: Record<string, string> = {
   /* W1-A1: the processing cohort (uploads, the remote MCP). Excluded is a fact about this workspace; config-invalid is ours to fix. */
   REMOTE_MCP_COHORT_EXCLUDED: "This workspace is not in the current pilot group, so this is not open to it yet. Access is arranged with us through the contact page.",
   REMOTE_MCP_COHORT_CONFIG_INVALID: "This is paused while we correct a configuration on our side. Nothing in your workspace changed.",
+  /*
+    GA gap 2: the daily processing spend stop. Honest about what happened (a safety limit on our
+    side, not the customer's plan or file), what continues (documents already queued) and what was
+    charged (nothing). No reset time: the stop lifts at RunPod's billing-day boundary, which this
+    sentence cannot state accurately for every reader.
+  */
+  OCR_DAILY_SPEND_STOP: "New document processing is paused for today by a safety limit on our side. Documents already queued keep processing, and nothing was charged for this file. Please try again later.",
+  OCR_SPEND_UNVERIFIED: "New document processing is paused by a safety limit on our side while we confirm today's usage. Documents already queued keep processing, and nothing was charged for this file. Please try again later.",
+  /*
+    FUNNEL-SIGNED-IN #1 (2026-11-09). The plan and free-evaluation refusals fell through to "This
+    request was refused. (Reference ...)" at the exact moment a person reaches a limit. Each one now
+    says which limit it was. The notice adds a link to the plans for every code in UPGRADE_CODES.
+  */
+  SUBSCRIPTION_REQUIRED: "This needs a paid plan. Nothing was changed.",
+  STUDIO_SUBSCRIPTION_REQUIRED: "Your current plan does not include this. Nothing was changed.",
+  TRIAL_FILE_LIMIT_EXCEEDED: "Your free evaluation has used all of its files. Nothing was uploaded.",
+  TRIAL_PAGE_LIMIT_EXCEEDED: "These files go past the pages left in your free evaluation. Nothing was uploaded.",
+  TRIAL_FILE_TOO_LARGE: "This file is larger than the free evaluation accepts. Nothing was uploaded.",
+  TRIAL_ARCHIVE_NOT_INCLUDED: "ZIP archives are not part of the free evaluation. Choose the files inside it instead.",
+  TRIAL_FEATURE_NOT_INCLUDED: "This is not part of the free evaluation.",
+  TRIAL_WORLD_LIMIT_REACHED: "Your free evaluation has already used its one World.",
+  TRIAL_LIMIT_REACHED: "Your free evaluation has reached one of its limits.",
+  TRIAL_NOT_ACTIVE: "Your free evaluation has ended.",
+  TRIAL_AI_ACCESS_CHECK_FAILED: "We could not check your free evaluation limits, so nothing ran. Try again in a minute.",
 };
+
+/** Refusals a plan can lift. Their sentence is shown with a link to /pricing. */
+const UPGRADE_CODES: readonly string[] = [
+  "SUBSCRIPTION_REQUIRED", "STUDIO_SUBSCRIPTION_REQUIRED", "TRIAL_FILE_LIMIT_EXCEEDED",
+  "TRIAL_PAGE_LIMIT_EXCEEDED", "TRIAL_FILE_TOO_LARGE", "TRIAL_ARCHIVE_NOT_INCLUDED",
+  "TRIAL_FEATURE_NOT_INCLUDED", "TRIAL_WORLD_LIMIT_REACHED", "TRIAL_LIMIT_REACHED", "TRIAL_NOT_ACTIVE",
+];
+
+/**
+ * Whether a notice carries a refusal a plan can lift. Read off the sentence rather than the code
+ * because the workspace composes its notices as text ("Activation failed. <sentence> ..."), and the
+ * sentences are this module's own constants, so the match cannot drift from the copy.
+ */
+export function offersUpgrade(notice: string): boolean {
+  return UPGRADE_CODES.some((code) => notice.includes(FAILURE_COPY[code]!));
+}
 
 /** What to say when the code is not one we have written a sentence for. */
 function byStatus(status: number): string {

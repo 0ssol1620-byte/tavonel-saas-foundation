@@ -345,8 +345,11 @@ test.describe("a compile that cannot start", () => {
 
     await selectAndCompile(page);
     const notice = page.locator("p.notice");
-    await expect(notice).toContainText("TRIAL_WORLD_LIMIT_REACHED");
+    // FUNNEL-SIGNED-IN #1: the code became a sentence, and the way out is a link to the plans beside it.
+    await expect(notice).toContainText("Your free evaluation has already used its one World.");
+    await expect(notice).not.toContainText("TRIAL_WORLD_LIMIT_REACHED");
     await expect(notice).toContainText("could not be started");
+    await expect(notice.getByRole("link", { name: "See plans" })).toHaveAttribute("href", "/pricing");
     await expect(page.getByRole("button", { name: "Compile selected documents" })).toBeEnabled();
   });
 

@@ -42,11 +42,16 @@ export const activationPolicy = {
     `processing-workspace-grant.ts`), so it says intake is switched on stage by stage and that the
     workspace shows whether it is open (review R2: there is no ordered list and no notification).
 
+    ADR 0008, 2026-11-09: processing is open to every workspace (TAVONEL_PROCESSING_ROLLOUT=general),
+    so the sentence says what opens it -- the owner's acceptance of the processing terms -- and no
+    longer that it opens stage by stage. The workspace still shows whether it is open: the release
+    row and the grant are still checked, and an unset rollout is the canary again.
+
     The flag stays `true` because the path is built and the routes guarding on it
     (`/api/uploads/capability`, the connector sync route) must keep refusing on the day it is set
     `false`. This row states what the path does; `customerData` states who may use it.
   */
-  customerIntake: { enabled: true, reason: "Uploading your own sources is switched on for workspaces stage by stage, and your workspace shows whether it is open. Once it is, files go to tenant-scoped quarantine storage before processing, and no other part of the deployment reads them there." },
+  customerIntake: { enabled: true, reason: "Uploading your own sources opens for a workspace once its owner accepts the processing terms, and your workspace shows whether it is open. Once it is, files go to tenant-scoped quarantine storage before processing, and no other part of the deployment reads them there." },
   /*
     C-13 names the path that is actually carrying production Worker traffic.
 
@@ -97,8 +102,13 @@ export const activationPolicy = {
     online once a workspace is open, Team and Enterprise are arranged with us (`saleChannel` in the
     billing catalog). It is still rendered verbatim wherever the gate was stated, and
     `KO_CHROME.customerDataGate` is its literal Korean.
+
+    ADR 0008, 2026-11-09: the workspace canary is lifted (TAVONEL_PROCESSING_ROLLOUT=general), so the
+    "opening in stages" sentence is gone. What opens a workspace is its owner accepting the
+    processing terms; the release row and the grant still decide, so it still says the workspace
+    shows whether it is open.
   */
-  customerData: { enabled: true, reason: "Self-serve access is opening in stages. Signing in creates your workspace, and uploading and compiling your own sources are switched on for workspaces stage by stage. Your workspace shows whether it is open. Once it is open, the Developer plan can be bought online. Team and Enterprise are arranged with us rather than enabled by a plan purchase." },
+  customerData: { enabled: true, reason: "Signing in creates your workspace, and uploading and compiling your own sources open for it once its owner accepts the processing terms. Your workspace shows whether it is open. Once it is open, the Developer plan can be bought online. Team and Enterprise are arranged with us rather than enabled by a plan purchase." },
 } as const;
 
 export type ActivationCapability = keyof typeof activationPolicy;

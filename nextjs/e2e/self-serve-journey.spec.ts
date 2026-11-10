@@ -276,7 +276,9 @@ test.describe("launch approval withheld (purchase closed; customer processing sw
 
     // H6. The closed workspace points at the public example and offers no file control.
     const strip = page.getByRole("status").filter({ hasText: "Workspace ready" });
-    await expect(strip).toContainText("Source access pending");
+    // FUNNEL-SIGNED-IN #5: before consent the strip names the one step left, not "pending".
+    await expect(strip).toContainText("One step left");
+    await expect(strip).not.toContainText("Source access pending");
     await expect(strip.getByRole("link", { name: "Explore example" })).toHaveAttribute("href", "/explore");
     await expect(page.getByRole("button", { name: "Choose files", exact: true })).toHaveCount(0);
 
@@ -376,7 +378,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
 
     // H2. Developer goes through sign-in carrying the offer; Team stays a conversation.
     await page.goto("/pricing");
-    const developer = page.getByRole("link", { name: "Get Developer access, via sign-in" });
+    const developer = page.getByRole("link", { name: "Buy Developer — $29/month" });
     await expect(developer).toHaveAttribute("href", "/login?next=checkout&offer=observer_access");
     await expect(page.getByRole("link", { name: "Talk to us about Team" })).toHaveAttribute("href", "/contact?plan=Team");
     await tabTo(page, developer);
@@ -427,7 +429,9 @@ test.describe("simulated switch-on (browser mocks only)", () => {
       }],
     });
     const trialStrip = page.getByRole("status").filter({ hasText: "Free evaluation" });
-    await expect(trialStrip.getByRole("link", { name: "Upgrade to Developer" })).toHaveAttribute("href", "/pricing");
+    // FUNNEL-SIGNED-IN #3: the strip keeps a quiet way to the plans; the ask itself waits for a limit.
+    await expect(trialStrip.getByRole("link", { name: "Plans", exact: true })).toHaveAttribute("href", "/pricing");
+    await expect(trialStrip.getByRole("link", { name: "Upgrade to Developer" })).toHaveCount(0);
     await page.evaluate(() => { (window as unknown as { __journeyNoReload: boolean }).__journeyNoReload = true; });
 
     // H16. Paddle reports the payment; the signed webhook lands (billing and bootstrap turn paid).
@@ -568,7 +572,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     const posts = await answerCheckout(page, () => ({ status: 200, json: SANDBOX_CHECKOUT_READY }));
 
     await page.goto("/pricing");
-    await page.getByRole("link", { name: "Get Developer access", exact: true }).click();
+    await page.getByRole("link", { name: "Buy Developer — $29/month", exact: true }).click();
     await expect(region(page, "status", "Developer sandbox checkout opened.")).toHaveCount(1);
     await expect(page).toHaveURL(/\/pricing$/);
     expect(posts).toEqual([{ offerCode: "observer_access" }]);
@@ -678,7 +682,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
       let page = await open("today", "/pricing", false);
       await reachable(page, page.getByRole("link", { name: "Request Developer access" }), "today's Developer action");
       page = await open("switch-on", "/pricing", false);
-      await reachable(page, page.getByRole("link", { name: "Get Developer access, via sign-in" }), "switch-on Developer action");
+      await reachable(page, page.getByRole("link", { name: "Buy Developer — $29/month" }), "switch-on Developer action");
       page = await open("switch-on", "/login?next=checkout&offer=observer_access", false);
       await reachable(page, page.getByRole("button", { name: "Continue with Google" }), "sign-in");
       page = await open("today", "/workspace?checkout=observer_access", true);

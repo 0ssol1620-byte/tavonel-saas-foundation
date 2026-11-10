@@ -181,7 +181,7 @@ try {
     toolsListed: listed,
     writeToolsListed: listed.filter((name) => /upload|compile|promote|activate|rollback|delete|write|create|update|sync|revoke/.test(name)),
     startupRefusalUnitTest: { command: "vitest run lib/remote-mcp.test.ts -t 'write tool'", exit: unit.status, summary: unitSummary },
-    pass: writerCall.status === 401 && /write scope/.test(writerCall.headers["www-authenticate"] ?? "") && narrowCall.status === 403
+    pass: writerCall.status === 401 && /outside the read-only MCP scopes/.test(writerCall.headers["www-authenticate"] ?? "") && narrowCall.status === 403
       && unknownTool.startsWith("TOOL_NOT_FOUND") && listed.length === 9 && unit.status === 0,
   };
 

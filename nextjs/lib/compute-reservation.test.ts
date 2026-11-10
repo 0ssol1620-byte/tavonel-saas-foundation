@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { readFoundationIntakeApproval, reserveFoundationCompute, settleFoundationCompute } from "./compute-reservation";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFoundationIntakeApproval, reserveFoundationCompute, reserveFoundationIntakeApprovedFile, settleFoundationCompute } from "./compute-reservation";
+import { resetOcrSpendStopCache } from "./operations-alert-triggers";
 
 // Both switches are code constants; these getters let one file pin each combination.
 const rollout = vi.hoisted(() => ({ approval: true, triage: true }));
@@ -65,6 +66,52 @@ describe("Foundation compute ledger", () => {
     conflict refused rather than silently re-reserved, and a settlement that arrives twice
     because delivery is at-least-once.
   */
+  describe("daily RunPod hard stop (GA gap 2)", () => {
+    beforeEach(() => resetOcrSpendStopCache());
+    afterEach(() => vi.restoreAllMocks());
+    const runpodDay = (totalAmount: number) => new Response(JSON.stringify({
+      records: [{ startTime: new Date(Date.now() - (Date.now() % 86_400_000)).toISOString(), totalAmount }],
+    }), { status: 200 });
+
+    it("refuses a new reservation past the stop and never reaches the ledger", async () => {
+      configure();
+      vi.stubEnv("TAVONEL_RUNPOD_DAILY_HARD_STOP_USD", "40");
+      vi.stubEnv("TAVONEL_RUNPOD_API_KEY", "rp-test");
+      vi.stubEnv("OPERATIONS_ALERT_WEBHOOK_URL", "");
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const calls = vi.fn(async (url: string) => url.startsWith("https://api.runpod.io/") ? runpodDay(41) : new Response("{}", { status: 500 }));
+      vi.stubGlobal("fetch", calls);
+      await expect(reserveFoundationCompute(base)).resolves.toEqual({ ok: false, code: "OCR_DAILY_SPEND_STOP" });
+      await expect(reserveFoundationIntakeApprovedFile({
+        workspaceKey: base.workspaceKey, userId: base.userId, attemptKey: "a".repeat(32), scopeDigest: `sha256:${"1".repeat(64)}`,
+        pricingFingerprint: `sha256:${"2".repeat(64)}`, fileKey: "f".repeat(32), documentId: base.documentId,
+      })).resolves.toEqual({ ok: false, code: "OCR_DAILY_SPEND_STOP", status: 503 });
+      expect(calls.mock.calls.every(([url]) => String(url).startsWith("https://api.runpod.io/"))).toBe(true);
+    });
+
+    it("fails closed when the stop is set and spend cannot be read", async () => {
+      configure();
+      vi.stubEnv("TAVONEL_RUNPOD_DAILY_HARD_STOP_USD", "40");
+      vi.stubEnv("OPERATIONS_ALERT_WEBHOOK_URL", "");
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const calls = vi.fn();
+      vi.stubGlobal("fetch", calls);
+      await expect(reserveFoundationCompute(base)).resolves.toEqual({ ok: false, code: "OCR_SPEND_UNVERIFIED" });
+      expect(calls).not.toHaveBeenCalled();
+    });
+
+    it("reserves as before below the stop", async () => {
+      configure();
+      vi.stubEnv("TAVONEL_RUNPOD_DAILY_HARD_STOP_USD", "40");
+      vi.stubEnv("TAVONEL_RUNPOD_API_KEY", "rp-test");
+      vi.stubGlobal("fetch", vi.fn(async (url: string) => url.startsWith("https://api.runpod.io/") ? runpodDay(39) : new Response(JSON.stringify({
+        reservationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", documentId: base.documentId, state: "reserved",
+        expiresAt: futureExpiry(), reservedCredits: 12, maximumCredits: 18, billingSource: "paid", idempotentReplay: false,
+      }), { status: 200 })));
+      await expect(reserveFoundationCompute(base)).resolves.toMatchObject({ ok: true });
+    });
+  });
+
   it("passes an idempotent replay through as a replay rather than a second reservation", async () => {
     configure();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({

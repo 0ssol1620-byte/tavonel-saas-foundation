@@ -85,7 +85,7 @@ export function RecipePreflight({
         ) : (
           <>, also shown on <Link href="/pricing">pricing</Link></>
         )}
-        . A free evaluation compiles, reviews and exports; its activation request is refused.
+        . A free evaluation activates one World, as its owner. A second World needs one of these plans.
       </li>
       {omitLanding ? null : <li>
         {/*

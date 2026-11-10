@@ -6,7 +6,7 @@ import WorldExplorer from "@/components/world-explorer";
 import { FileText, ShieldCheck, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activationPolicy, type ActivationCapability } from "@/lib/activation-policy";
-import { failureSentence, isSizeLimitFailure } from "@/lib/workspace-failure-copy";
+import { failureSentence, isSizeLimitFailure, offersUpgrade } from "@/lib/workspace-failure-copy";
 import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion } from "@/lib/workspace-ask-copy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -433,6 +433,16 @@ export default function WorkspacePage() {
     return () => { expanderRef.current?.close(); expanderRef.current = null; };
   }, []);
   const compileLimits = compileLimitsNotice(archiveCeilingMb);
+  /*
+    FUNNEL-SIGNED-IN #1: a refusal a plan can lift used to land in the Activity line far above the
+    control that was pressed, off-screen on a phone, so the click looked like it did nothing. The
+    line carries a link to the plans, and is brought into view when it arrives (no smooth scroll).
+  */
+  const noticeText = notice === null ? null : typeof notice === "string" ? notice : notice.alert;
+  const noticeUpgrade = noticeText !== null && offersUpgrade(noticeText);
+  useEffect(() => {
+    if (noticeUpgrade) document.getElementById("workspace-upgrade-notice")?.scrollIntoView({ block: "center" });
+  }, [noticeText, noticeUpgrade]);
   const [dropActive, setDropActive] = useState(false);
   // A file dropped outside the intake section would open in the tab and leave the workspace. The section handles its
   // own drop (and prevents the default first); any other drop is cancelled and the section is brought into view.
@@ -478,6 +488,22 @@ export default function WorkspacePage() {
   const [collectionResult, setCollectionResult] = useState<CollectionResult | null>(null);
   const candidateLoadSequence = useRef(0);
   const [worldReadModel, setWorldReadModel] = useState<WorldReadModel | null>(null);
+  /*
+    FUNNEL-SIGNED-IN #4: "Review and activate" on a finished compile lands here with #activate. The
+    form renders once the candidate has loaded, and the evidence view above it grows once the read
+    model has, both after the browser's own hash scroll. So the scroll waits for both, and is made
+    once per visit so a later reload never moves the page under the reader.
+  */
+  const activateScrolled = useRef(false);
+  const activateTarget = surface === "review" && Boolean(collectionResult) && Boolean(worldReadModel);
+  useEffect(() => {
+    if (!activateTarget || activateScrolled.current || window.location.hash !== "#activate") return;
+    const field = document.getElementById("review-reason");
+    if (!field) return;
+    activateScrolled.current = true;
+    field.scrollIntoView({ block: "center" });
+    field.focus({ preventScroll: true });
+  }, [activateTarget]);
   useEffect(() => {
     const collectionId = collectionResult?.collectionId;
     const manifest = collectionResult?.manifestDigest;
@@ -1835,7 +1861,7 @@ export default function WorkspacePage() {
       if (lost > 0) {
         // Deduplicated: twenty files over the same ceiling is one fact, not twenty sentences.
         const why = [...new Set(refusals)].join("; ");
-        setNotice(`${ids.length} of ${files.length} files uploaded. ${lost} did not, and nothing was retried automatically.${why ? ` Why: ${why}.` : ""}`);
+        setNotice(`${ids.length} of ${files.length} files uploaded. ${lost} did not, and nothing was retried automatically.${why ? ` Why: ${why.replace(/\.$/, "")}.` : ""}`);
       }
       /*
         One uploaded file is a compile.
@@ -2951,9 +2977,11 @@ export default function WorkspacePage() {
           */}
           {(["status", "alert"] as const).map((region) => (
             <div key={region} className={workspaceStateStyles.noticeRegion} role={region}>
-              {notice !== null && (typeof notice === "string") === (region === "status") ? (
-                <p className="notice static">
-                  <strong>Activity.</strong> {typeof notice === "string" ? notice : notice.alert}
+              {/* A refusal a plan can lift is a refusal, so it is read as an alert whichever way it was set. */}
+              {notice !== null && (typeof notice === "string" && !noticeUpgrade) === (region === "status") ? (
+                <p className="notice static" id={noticeUpgrade ? "workspace-upgrade-notice" : undefined}>
+                  <strong>Activity.</strong> {noticeText}
+                  {noticeUpgrade ? <> <Link href="/pricing">See plans</Link></> : null}
                   {/*
                     The compensating action for a partly enqueued corpus, beside the sentence that
                     reports it. It re-submits the identical document set: enqueue is idempotent and
@@ -3168,14 +3196,22 @@ export default function WorkspacePage() {
                     </div>
                     <div><dt>Archives</dt><dd>{stagedSelection.archiveCount}</dd></div>
                     <div><dt>Unsupported files</dt><dd>{stagedSelection.unsupported.length}</dd></div>
-                    <div><dt>Estimated</dt><dd>{stagedQuote ? formatUsd(stagedQuote.estimatedUsd) : "—"}</dd></div>
-                    <div><dt>Maximum</dt><dd>{stagedQuote ? formatUsd(stagedQuote.maximumUsd) : "—"}</dd></div>
+                    {/* FUNNEL-SIGNED-IN #7: a free evaluation pays nothing inside its limits, so it is
+                        shown what it pays rather than what the run would cost on a plan. */}
+                    {accessSource === "trial" ? (
+                      <div><dt>You pay</dt><dd>Nothing</dd></div>
+                    ) : <>
+                      <div><dt>Estimated</dt><dd>{stagedQuote ? formatUsd(stagedQuote.estimatedUsd) : "—"}</dd></div>
+                      <div><dt>Maximum</dt><dd>{stagedQuote ? formatUsd(stagedQuote.maximumUsd) : "—"}</dd></div>
+                    </>}
                   </dl>
                   <p className="fine" aria-live="polite">
                     {!stagedPageCounts
                       ? INTAKE_APPROVAL_ROLLOUT_ENABLED ? "Counting pages in this browser. This page-count step does not upload file bytes." : "Counting the pages in these files. Nothing has been uploaded."
                       : stagedCounted.length === 0
                         ? "None of these files states a page count before it is read. Pages are counted while the documents are processed, and the estimate appears once there is a number to show."
+                        : accessSource === "trial"
+                          ? "Your free evaluation covers this within its file and page limits. No card is needed."
                         : stagedConfidence === "verified"
                           ? "Page counts were counted from the documents themselves. You will never be charged above the maximum shown."
                           : "Some files state their own page count rather than being counted — Word records the number it last saved, which can be out of date. The billed page count is confirmed once the documents are processed, and never exceeds the maximum shown."}
@@ -3687,8 +3723,8 @@ export default function WorkspacePage() {
               <section id="workspace-review" className="card world-studio" aria-labelledby="world-studio-title">
                 <div className="world-heading">
                   <div>
-                    <p className="eyebrow">Advanced review · World lifecycle</p>
-                    <h2 id="world-studio-title">Candidate bytes stay immutable. Humans move the active pointer.</h2>
+                    <p className="eyebrow">Activate</p>
+                    <h2 id="world-studio-title">Make this the version your AI reads.</h2>
                   </div>
                   <output className={activeWorld ? "world-status active" : "world-status"}>
                     {activeWorld ? `ACTIVE · REVISION ${activeWorld.revision}` : "NO ACTIVE WORLD"}
@@ -3861,6 +3897,13 @@ export default function WorkspacePage() {
                       </div>
                     ) : null}
                   </div>
+                ) : null}
+                {/* FUNNEL-SIGNED-IN #3: the plans are offered after the first trusted answer, not before it. */}
+                {askResult?.status === "grounded" && accessSource === "trial" ? (
+                  <p className="fine">
+                    This answer came from your free evaluation World, with its sources. To keep using it after the
+                    evaluation ends, and to add API keys, choose a plan. <Link href="/pricing">See plans</Link>
+                  </p>
                 ) : null}
                 {askWorldModel && askEvidenceId !== undefined ? (
                   <WorldStudioUltimate model={askWorldModel} initialLens="evidence" selectedEvidenceId={askEvidenceId} onEvidenceSelect={(selection) => setAskEvidenceId(selection?.id ?? null)} />

@@ -19,6 +19,8 @@
 
   .form { display: grid; gap: 4px; }
 
+  .summary { margin: 0 0 12px; padding-left: 20px; color: var(--text-hi); }
+
   .agree {
     display: flex;
     align-items: flex-start;

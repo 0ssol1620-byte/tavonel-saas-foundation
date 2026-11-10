@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { NavCurrentLink } from "@/components/site-nav/desktop-primary-nav";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_OPEN_EVENT } from "@/lib/marketing-analytics";
 
 /**
  * Native disclosure works without JavaScript. Escape returns focus; Tab never gets trapped.
  *
- * `signedIn` has the same meaning it has in the header: suppress Sign in for a reader who already
- * is, rather than offering them a destination they have no use for.
+ * `signedIn` has the same meaning it has in the header: a reader who already is gets a link to the
+ * workspace in place of Sign in.
  *
  * NAV PANELS, 2026-11-09: `children` is the section rows, and they are the bar's own markup.
  * The header passes `<NavSections sheet />` (`components/public-site-chrome.tsx`), the
@@ -18,10 +19,15 @@ import { NAV_OPEN_EVENT } from "@/lib/marketing-analytics";
  * The words are handed in too (`labels`), from `KO_CHROME`, so this file imports no navigation
  * module at all: see the note at the top of `components/site-nav/desktop-primary-nav.tsx`.
  */
-export default function MobilePrimaryNav({ korean = false, signedIn = false, labels, children }: {
+export default function MobilePrimaryNav({ korean = false, signedIn = false, labels, start, children }: {
   korean?: boolean;
   signedIn?: boolean;
   labels: { menu: string; pricing: string; signIn: string };
+  /**
+   * The start action, resolved on the server by the page (`primaryCallToAction()`) and handed in,
+   * because this client file cannot read the commercial flags (BA-232). Absent: no start row.
+   */
+  start?: { href: string; label: string };
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDetailsElement>(null);
@@ -113,9 +119,20 @@ export default function MobilePrimaryNav({ korean = false, signedIn = false, lab
           inline as `undefined` here (BA-232) -- so the sheet carries the one label that is true
           in both postures and nothing else.
         */}
-        {signedIn ? null : (
+        {signedIn ? (
+          <Link className="mobile-nav-signin" href="/workspace">{korean ? "워크스페이스" : "Your workspace"}</Link>
+        ) : (
           <a className="mobile-nav-signin" href="/login">{labels.signIn}</a>
         )}
+        {/*
+          Conversion pass 2026-11-09 (funnel audit fix 3). Below the desktop switch the header is the
+          wordmark and Menu, and its one action (the public sample) is desktop-only, so a phone reader
+          had Pricing in reach and no way to start. The start action is the sheet's foot, filled. It
+          does not repeat the header: the header's action is the sample, this one is the start.
+        */}
+        {start && !signedIn ? (
+          <a className="btn mobile-nav-start" href={start.href}>{start.label}</a>
+        ) : null}
       </nav>
     </details>
   );

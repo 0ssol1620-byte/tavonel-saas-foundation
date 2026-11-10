@@ -223,6 +223,11 @@ export default function LandingPage({
   };
   const access = primaryCallToAction();
   const heroStart = {
+    /*
+      Conversion pass 2026-11-09: the live label is SELF_SERVE_CTA's "Start free". The allowance is printed where there
+      is room (the proof-page block, the Explore close). The hero's first screen is held to its re-derived word budget
+      (e2e/landing-v2.spec.ts), which "Start free — 3 files, no card" would exceed by three words.
+    */
     label: access.href === "/contact" ? page.bringOwn : korean ? KO_CHROME.cta[access.href] : access.label,
     href: access.href === "/contact" ? (korean ? "/ko/evaluation" : "/evaluation") : access.href,
   };
@@ -238,7 +243,7 @@ export default function LandingPage({
         <link rel="preload" as="font" type="font/woff2" href="/fonts/wanted-sans-ko-home-400.woff2" crossOrigin="" />
         <link rel="preload" as="font" type="font/woff2" href="/fonts/wanted-sans-ko-home-510.woff2" crossOrigin="" />
       </> : null}
-      <PublicSiteHeader korean={korean} ghostCta />
+      <PublicSiteHeader korean={korean} ghostCta start={heroStart} />
       <main id="main" tabIndex={-1} data-home-ia="outcome-v1.1">
         {children}
         {/*

@@ -51,6 +51,8 @@
 .ownerStrip span { font: 500 12px var(--f-mono); letter-spacing: .06em; }
 .accessStrip p, .ownerStrip p { margin: 0; color: var(--text-lo); font-size: 13px; }
 .accessStrip a { min-height: 32px; display: inline-flex; align-items: center; padding: 0 12px; border: 1px solid var(--hairline-hi); border-radius: var(--r-inst, 6px); color: var(--text-hi); font: 500 13px var(--f-sans); white-space: nowrap; }
+/* A way to the plans, not an ask: no outline, the strip's quiet text colour, a full touch target. */
+.accessStrip a.quietLink { min-height: 44px; padding: 0 4px; border: 0; color: var(--text-mid); text-decoration: underline; text-underline-offset: 3px; }
 
 .ownerStrip { grid-template-columns: auto minmax(0, 1fr); min-height: 36px; padding-block: 6px; }
 .ownerStrip span { color: var(--text-lo); }
