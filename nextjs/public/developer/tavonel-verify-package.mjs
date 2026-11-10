@@ -86,7 +86,9 @@ const ID_PREFIX = {
 const STABLE_ID = /^[a-z-]+-[a-f0-9]{32}$/;
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const VERSION_KEY = /^[a-f0-9]{64}$/;
-const MAX_ARCHIVE_BYTES = 64 * 1024 * 1024;
+// Sized 2026-11-10 with scripts/verify-signed-export.mjs, for a 56 MiB package (lib/collection-download.ts).
+const MAX_ARCHIVE_BYTES = 128 * 1024 * 1024;
+const MAX_UNCOMPRESSED_BYTES = 256 * 1024 * 1024;
 const MAX_FILES = 4096;
 
 /* ------------------------------------------------------------------ reading */
@@ -144,7 +146,7 @@ function inflateBounded(raw, declared, path) {
 }
 
 function readZipEntries(archive) {
-  if (archive.byteLength > MAX_ARCHIVE_BYTES) throw new Error("archive exceeds the 64 MiB validation limit");
+  if (archive.byteLength > MAX_ARCHIVE_BYTES) throw new Error("archive exceeds the 128 MiB validation limit");
   const minimumEocd = 22;
   let eocd = -1;
   for (let offset = archive.byteLength - minimumEocd;
@@ -180,7 +182,7 @@ function readZipEntries(archive) {
     if (offset > centralEnd) throw new Error("ZIP entry bounds are invalid");
     if (method !== 0 && method !== 8) throw new Error("ZIP compression method is unsupported");
     totalUncompressed += uncompressedSize;
-    if (totalUncompressed > MAX_ARCHIVE_BYTES) throw new Error("archive expands beyond the 64 MiB validation limit");
+    if (totalUncompressed > MAX_UNCOMPRESSED_BYTES) throw new Error("archive expands beyond the 256 MiB validation limit");
     if (path.endsWith("/")) continue;
     if (files.has(path)) throw new Error("ZIP entry path is duplicated");
     if (localOffset + 30 > archive.byteLength || archive.readUInt32LE(localOffset) !== 0x04034b50) {

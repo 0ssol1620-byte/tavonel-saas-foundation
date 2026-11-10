@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
-import { validateReviewableCollectionArtifact } from "@/lib/collection-download";
+import { collectionPackageSizeRefusal, validateReviewableCollectionArtifact } from "@/lib/collection-download";
 import { loadPreferredCollectionCandidate } from "@/lib/collection-storage";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
@@ -39,7 +39,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   }
   const artifact = validateReviewableCollectionArtifact(loaded.value.artifact, id);
   if (!artifact) {
-    return NextResponse.json({ code: "COLLECTION_PACKAGE_INVALID" }, { status: 422, headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(collectionPackageSizeRefusal(loaded.value.artifact) ?? { code: "COLLECTION_PACKAGE_INVALID" },
+      { status: 422, headers: { "Cache-Control": "no-store" } });
   }
   const documentIds = collectionSourceDocumentIds(artifact);
   if (!documentIds) return NextResponse.json({ code: "COLLECTION_SOURCE_BINDING_INVALID" }, { status: 422, headers: { "Cache-Control": "no-store" } });

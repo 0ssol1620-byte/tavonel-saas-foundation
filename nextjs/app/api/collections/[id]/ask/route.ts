@@ -11,7 +11,7 @@ import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@
 import { spendTrialSessionQuery } from "@/lib/trial-ai-access";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { recordServerFunnel } from "@/lib/funnel-events";
-import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
+import { COLLECTION_PACKAGE_TOO_LARGE, collectionPackageSizeRefusal, validatePromotableCollectionArtifact } from "@/lib/collection-download";
 import { answerFromContextPacket, answerGroundedQuestion, parseChunks } from "@/lib/grounded-ask";
 import { recordAnswerabilityShadow } from "@/lib/answerability-shadow";
 import { applyAnswerReceipt } from "@/lib/answer-receipt-signing";
@@ -214,7 +214,7 @@ async function answerQuestion(workspaceKey: string, id: string, question: string
   if (!loaded.ok) return { status: 503, body: { code: loaded.code } };
   const artifact = validatePromotableCollectionArtifact(loaded.json, id);
   if (!artifact || artifact.manifestDigest !== active.world.manifestDigest) {
-    return { status: 422, body: { code: "ACTIVE_WORLD_ARTIFACT_INVALID" } };
+    return { status: 422, body: collectionPackageSizeRefusal(loaded.json) ?? { code: "ACTIVE_WORLD_ARTIFACT_INVALID" } };
   }
   const answer = answerGroundedQuestion(loaded.json, question);
   if (!answer || answer.receipt.manifestDigest !== active.world.manifestDigest) {
@@ -335,7 +335,9 @@ export async function POST(
   let documentIds: string[];
   try {
     const sources = await loadActiveWorldSourceIds(workspaceKey, id, active.world);
-    if (!sources.ok) return NextResponse.json({ code: sources.code }, { status: 503, headers: NO_STORE });
+    if (!sources.ok) return NextResponse.json({ code: sources.code }, {
+      status: sources.code === COLLECTION_PACKAGE_TOO_LARGE ? 422 : 503, headers: NO_STORE,
+    });
     documentIds = sources.documentIds;
     const sourceAccess = await checkConnectorSourceAccessForViewer(workspaceKey, documentIds, auth.principal.userId);
     if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {

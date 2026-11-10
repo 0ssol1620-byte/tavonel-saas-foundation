@@ -46,8 +46,8 @@ export const MAX_DERIVED_JSON_BYTES = OCR_JSON_MAX_BYTES;
   answer is streamed (one ran past 80 MiB into this side on 2026-11-09, cjob-749b). Six manuals --
   6,072 regions, cjob-fac5555a, 2026-11-10 -- already crossed it, and a corpus part is twelve
   documents (`COMPILE_MAX_DOCUMENTS`). Re-derived from a measurement (manual-shaped synthetic
-  corpus, ~1,012 regions a document, live Core 733f4453; receipts in
-  market-20261104/w2/OUT-20261110/):
+  corpus, ~1,012 regions a document, live Core 733f4453; receipts kept with the rollout evidence,
+  measurements.txt and scale.py's output):
 
     documents  Core response   Core peak RSS   this side: stored   this side: peak RSS
         6         87.5 MB          578 MiB

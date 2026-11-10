@@ -30,6 +30,7 @@ const FAILURE_COPY: Record<string, string> = {
     compile again and fails the same way (REVIEW-PR192-R1 MAJOR-2). Neither line invites one.
   */
   JSON_TOO_LARGE: "This is larger than its size limit, so it was not stored. Trying the same thing again gives the same result.",
+  COLLECTION_PACKAGE_TOO_LARGE: "This World was saved, but it is too large to open, download or ask here. Nothing in it was changed, and trying again gives the same result. Compile the same files in smaller groups.",
   CORE_OUTPUT_TOO_LARGE: "The result of compiling these files is larger than one World can hold, so nothing was saved. Running the same files again gives the same result. Select fewer files and compile them in smaller groups. If one file on its own does this, send us the reference below.",
   /* F2 (2026-11-09): the window is BLOCKED_DECISION_EXPIRY_MS in compile-job-worker.ts; a test holds them together. */
   BLOCKED_DECISION_EXPIRED: "This compile waited 7 days for a decision about the files that could not be read, so it stopped. Start a new compile to go on.",
