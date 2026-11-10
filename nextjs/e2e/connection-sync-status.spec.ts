@@ -108,3 +108,34 @@ test("a paid Developer workspace sees only the providers this deployment configu
   await expect(page.locator(".workspace-access-gate")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Create connection" })).toBeVisible();
 });
+
+// Live QA 2026-11-10: the home drop zone's chips read the same provider list as the connections page.
+test("the home connector chips name only configured providers and how the agent sources work", async ({ page }) => {
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page, { accessSource: "paid", customerDataEnabled: true });
+  await page.route("**/api/v1/oauth-connectors", route => route.fulfill({ json: { providers: [
+    { provider: "google_drive", configured: true },
+    { provider: "dropbox", configured: false },
+    { provider: "microsoft_graph", configured: false },
+  ], connections: [] } }));
+  await page.goto("/workspace");
+  const chips = page.locator(".workspace-source-choices");
+  await expect(chips.getByRole("button", { name: /Google Drive/ })).toBeVisible();
+  await expect(chips).not.toContainText(/Dropbox|OneDrive/);
+  await expect(chips.getByRole("button", { name: /File server/ })).toContainText("Local source agent");
+  await expect(chips).not.toContainText("Assisted setup");
+  await expect(page.locator(".workspace-source-plan")).toHaveCount(0);
+});
+
+test("a free evaluation's home says where connections are sold instead of offering chips", async ({ page }) => {
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page, { accessSource: "trial", customerDataEnabled: true });
+  let providerReads = 0;
+  await page.route("**/api/v1/oauth-connectors", route => { providerReads += 1; return route.fulfill({ status: 402, json: { code: "TRIAL_FEATURE_NOT_INCLUDED" } }); });
+  await page.goto("/workspace");
+  const plan = page.locator(".workspace-source-plan");
+  await expect(plan).toContainText("available on Developer and Team");
+  await expect(plan.getByRole("link", { name: "See plans" })).toHaveAttribute("href", "/pricing");
+  await expect(page.locator(".workspace-source-choices")).toHaveCount(0);
+  expect(providerReads).toBe(0);
+});

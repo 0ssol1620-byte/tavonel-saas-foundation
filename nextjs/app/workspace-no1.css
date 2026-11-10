@@ -177,7 +177,9 @@
 .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy .workspace-intake-actions button:first-child {
   background: transparent; border-color: var(--hairline-hi); color: var(--text-hi);
 }
-/* The connectors live inside the box. Availability text is WORKSPACE_SOURCE_CHOICES verbatim. */
+/* The connectors live inside the box. Names and availability come from lib/workspace-source-choices.ts. */
+/* Without a plan that includes connections, one line says where they are sold instead of the chips. */
+.one-path-workspace .workspace-source-plan { margin: 16px 0 0; padding-top: 16px; border-top: 1px solid var(--hairline); color: var(--text-lo); font: 14px/1.5 var(--f-sans); text-align: left; }
 .one-path-workspace .workspace-source-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--hairline); text-align: left; }
 /* D6/BQ-023: the connectors are in the box at every width and in every mode. A returning
    workspace is the visitor most likely to be connecting a system rather than dragging a file,

@@ -8387,3 +8387,23 @@ test('affected revoke-not-plan-gated-20261110 owner: 3 exact paths select 6 dire
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+// workspace-connector-chips-20261110: one finite owner, restated independently of the exported constants.
+import { HOME_CONNECTOR_CHIPS_AFFECTED_PATHS, HOME_CONNECTOR_CHIPS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected workspace-connector-chips-20261110 owner: 2 exact paths select 1 direct suite and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['lib/workspace-source-choices.test.ts', 'lib/workspace-source-choices.ts'];
+  const suites = ['lib/workspace-source-choices.test.ts'];
+  assert.deepEqual([[...HOME_CONNECTOR_CHIPS_AFFECTED_PATHS], [...HOME_CONNECTOR_CHIPS_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['workspace-connector-chips-20261110'], path);
+  }
+  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['workspace-connector-chips-20261110'], [], suites, [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  const plan = affectedAskPlan(map);
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
+  for (const adjacent of ['nextjs/lib/workspace-source-choices.tsx', 'nextjs/lib/workspace-source-choice.ts', 'nextjs/lib/workspace-source-choices.spec.ts', 'nextjs/components/workspace-source-choices.tsx', 'lib/workspace-source-choices.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});

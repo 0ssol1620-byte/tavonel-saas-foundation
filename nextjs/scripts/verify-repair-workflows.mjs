@@ -30,6 +30,7 @@ import { OPS_BACKLOG_SLI_AFFECTED_PATHS, OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES } f
 import { PROCESSING_GA_AFFECTED_PATHS, PROCESSING_GA_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { TRIAL_TO_PAID_AFFECTED_PATHS, TRIAL_TO_PAID_AFFECTED_UNIT_FILES, TRIAL_TO_PAID_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { SLI_ALERT_NOISE_AFFECTED_PATHS, SLI_ALERT_NOISE_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { HOME_CONNECTOR_CHIPS_AFFECTED_PATHS, HOME_CONNECTOR_CHIPS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { CONNECTORS_DEVELOPER_AFFECTED_PATHS, CONNECTORS_DEVELOPER_AFFECTED_UNIT_FILES, CONNECTORS_DEVELOPER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS, REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 
@@ -828,6 +829,14 @@ for (const binding of [
     browsers: [],
     rows: [],
     neighbors: ['nextjs/app/api/connections/[id]/revoke/route.ts', 'nextjs/app/api/v1/oauth-connectors/connections/[id]/page.tsx', 'nextjs/lib/connection-revoke-not-plan-gated.ts', 'nextjs/lib/connection-revoke.test.ts', 'app/api/connections/[id]/route.ts'] },
+  // workspace-connector-chips-20261110: two exact paths, one direct suite, no browser suite.
+  { group: 'workspace-connector-chips-20261110', prefix: 'nextjs/', exportedPaths: HOME_CONNECTOR_CHIPS_AFFECTED_PATHS, exportedSuites: HOME_CONNECTOR_CHIPS_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['lib/workspace-source-choices.test.ts', 'lib/workspace-source-choices.ts'],
+    suites: ['lib/workspace-source-choices.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/lib/workspace-source-choices.tsx', 'nextjs/lib/workspace-source-choice.ts', 'nextjs/lib/workspace-source-choices.spec.ts', 'nextjs/components/workspace-source-choices.tsx', 'lib/workspace-source-choices.ts'] },
   // sli-alert-noise-20261109: three exact paths, ten direct suites, no browser suite.
   { group: 'sli-alert-noise-20261109', prefix: 'nextjs/', exportedPaths: SLI_ALERT_NOISE_AFFECTED_PATHS, exportedSuites: SLI_ALERT_NOISE_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],

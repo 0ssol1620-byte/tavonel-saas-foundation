@@ -59,6 +59,7 @@ import CompileStage from "@/components/compile-stage";
 import { hasActiveSourceWork } from "@/lib/compile-stage-view";
 import { recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
+import { workspaceSourceChoices, type OAuthProviderAvailability } from "@/lib/workspace-source-choices";
 import ConnectionsPanel from "@/components/connections-panel";
 import DeveloperPanel from "@/components/developer-panel";
 import WorkspaceUltimateShell, { type SourcePendingReason, type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
@@ -189,19 +190,6 @@ type GroundedAnswer = {
   receipt: { collectionId: string; manifestDigest: string; retrieval: string; outputSha256: string };
 };
 
-/*
-  These are action labels, not qualification claims. Workspace tells a user how access works;
-  /integrations owns the evidence-backed support level and provider-specific limitations.
-*/
-const WORKSPACE_SOURCE_CHOICES = [
-  { name: "Google Drive", availability: "Read-only" },
-  { name: "Dropbox", availability: "Read-only" },
-  { name: "OneDrive", availability: "Read-only" },
-  { name: "File Server", availability: "Assisted setup" },
-  { name: "Amazon S3", availability: "Assisted setup" },
-  { name: "Cloudflare R2", availability: "Assisted setup" },
-  { name: "MinIO", availability: "Assisted setup" },
-] as const;
 
 /** One shape for the billing card and the post-checkout wait (journey A4) that refreshes it. */
 type BillingAccount = BillingStatusAccount;
@@ -774,6 +762,28 @@ export default function WorkspacePage() {
     const { data } = client ? await client.auth.getSession() : { data: { session: null } };
     return data.session?.access_token ?? null;
   };
+
+  /* The drop zone's connector chips read the provider list the connections page reads, so the two
+     cannot disagree. Only a workspace whose plan includes connections asks; a failed read leaves
+     no OAuth chip rather than a guessed one. */
+  const [oauthProviders, setOAuthProviders] = useState<OAuthProviderAvailability[]>([]);
+  useEffect(() => {
+    if (accessSource !== "owner" && accessSource !== "paid") return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const token = await getAuthToken();
+        if (!token) return;
+        const response = await fetch("/api/v1/oauth-connectors", { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15_000) });
+        const json = await response.json() as { providers?: OAuthProviderAvailability[] };
+        if (!cancelled && response.ok && Array.isArray(json.providers)) setOAuthProviders(json.providers);
+      } catch {
+        // No provider list, no OAuth chip. The connections page states the read failure.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [accessSource]);
+  const sourceChoices = workspaceSourceChoices(accessSource, oauthProviders);
 
   /*
     The shell's /api/access/bootstrap read, including the v2 reason a closed workspace is closed:
@@ -3198,18 +3208,23 @@ export default function WorkspacePage() {
                 */}
                 <small className="workspace-intake-limits">{compileLimits}</small>
                 {/*
-                  The availability line under each name is WORKSPACE_SOURCE_CHOICES verbatim.
-                  Nothing here states a support level the capability manifest does not; the
+                  The chips come from workspaceSourceChoices: configured OAuth providers and the
+                  local source agent's sources for a plan that includes connections, and the
+                  connections page's plan answer for a free evaluation or no plan. The
                   provider-specific limits stay on /integrations.
                 */}
-                <div className="workspace-source-choices" aria-label="Available source connections">
-                  {WORKSPACE_SOURCE_CHOICES.map((source) => (
-                    <button type="button" key={source.name} onClick={() => navigateSurface("connections")}>
-                      <span>{source.name}</span>
-                      <small>{source.availability}</small>
-                    </button>
-                  ))}
-                </div>
+                {sourceChoices.kind === "choices" ? (
+                  <div className="workspace-source-choices" aria-label="Available source connections">
+                    {sourceChoices.choices.map((source) => (
+                      <button type="button" key={source.name} onClick={() => navigateSurface("connections")}>
+                        <span>{source.name}</span>
+                        <small>{source.availability}</small>
+                      </button>
+                    ))}
+                  </div>
+                ) : sourceChoices.kind === "plan_required" ? (
+                  <p className="workspace-source-plan">Google Drive and file-server connections are available on Developer and Team. <Link href="/pricing">See plans</Link></p>
+                ) : null}
               </div>
               )}
               {staging ? (

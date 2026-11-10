@@ -3046,6 +3046,9 @@ export const CONNECTORS_DEVELOPER_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/c
 // revoke-not-plan-gated-20261110: the three revocation routes ask for membership and scope, never the plan ("Never let an ACL revoke wait").
 export const REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS = Object.freeze(['app/api/connections/[id]/route.ts', 'app/api/v1/oauth-connectors/connections/[id]/route.ts', 'lib/connection-revoke-not-plan-gated.test.ts']);
 export const REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES = Object.freeze(['lib/connection-revoke-not-plan-gated.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/google-drive-viewer-link-off.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts']);
+// workspace-connector-chips-20261110: the drop zone's connector chips read the connections page's provider list and plan answer.
+export const HOME_CONNECTOR_CHIPS_AFFECTED_PATHS = Object.freeze(['lib/workspace-source-choices.test.ts', 'lib/workspace-source-choices.ts']);
+export const HOME_CONNECTOR_CHIPS_AFFECTED_UNIT_FILES = Object.freeze(['lib/workspace-source-choices.test.ts']);
 export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('public-marketing-surface', new RegExp(`^(?:${exactPathAlternation(PUBLIC_MARKETING_AFFECTED_PATHS)})$`),
     { unitFiles: PUBLIC_MARKETING_AFFECTED_UNIT_FILES, browserFiles: PUBLIC_MARKETING_AFFECTED_BROWSER_FILES }),
@@ -3299,6 +3302,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // revoke-not-plan-gated-20261110: 3 exact paths select 6 direct suites and no browser suite.
   affectedGroup('revoke-not-plan-gated-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS)})$`),
     { unitFiles: REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES }),
+  // workspace-connector-chips-20261110: 2 exact paths select 1 direct suite and no browser suite.
+  affectedGroup('workspace-connector-chips-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(HOME_CONNECTOR_CHIPS_AFFECTED_PATHS)})$`),
+    { unitFiles: HOME_CONNECTOR_CHIPS_AFFECTED_UNIT_FILES }),
   // sli-alert-noise-20261109: 3 exact paths select 10 direct suites and no browser suite.
   affectedGroup('sli-alert-noise-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(SLI_ALERT_NOISE_AFFECTED_PATHS)})$`),
     { unitFiles: SLI_ALERT_NOISE_AFFECTED_UNIT_FILES }),
