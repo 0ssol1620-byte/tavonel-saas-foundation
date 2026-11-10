@@ -7372,13 +7372,13 @@ test('affected OCR_PAGES_INCOMPLETE owner: four exact paths select three direct 
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
-test('affected benchmarks path mask owner: six exact paths select ten direct suites and no browser suite; neighbours stay unmapped', () => {
+test('affected benchmarks path mask owner: five exact paths select ten direct suites and no browser suite; neighbours stay unmapped', () => {
   const suites = ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts',
     'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/og-card-frame.test.ts',
     'lib/public-copy-purge.test.ts', 'lib/seo-surface.test.ts', 'lib/trust-page-answers.test.ts'];
   assert.deepEqual([[...BENCHMARKS_PATH_MASK_AFFECTED_PATHS], [...BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES]], [['app/benchmarks/page.tsx',
-    'app/research/notes/opengraph-image.tsx', 'lib/benchmarks-page.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts',
-    'lib/public-copy-purge.test.ts'], suites]);
+    'app/research/notes/opengraph-image.tsx', 'lib/benchmarks-page.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts'],
+    suites]);
   for (const path of BENCHMARKS_PATH_MASK_AFFECTED_PATHS) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['benchmarks-path-mask'], path);
     const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);

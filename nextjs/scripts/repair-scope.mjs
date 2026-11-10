@@ -1985,8 +1985,8 @@ export const SWITCH_ON_BILLING_INTEGRITY_AFFECTED_UNIT_FILES = Object.freeze([
 // the five that read the changed files: benchmark-registry, brand-copy, copy-trust-guard and trust-page-answers read the page
 // source, and model-arena-artifact-builder imports the pinned digest from the page data. No browser suite of its own.
 // Product code, so never nativeReuse.
-// 2026-11-10 public-copy cleanup (PR #224): the /research/notes share card and the public-copy purge suite join this owner.
-// Their direct suites (og-card-frame, public-copy-purge, seo-surface) are selected with the seven above.
+// 2026-11-10 public-copy cleanup (PR #224): the /research/notes share card joins this owner. The public-copy purge suite is
+// owned by conversion-public (GA) and is selected here as a direct suite, with og-card-frame and seo-surface.
 // E1 ask-quality eval harness (codex/w1-e1-20261104, PR #188): the fourteen endpoints no owner listed -- the eval index README,
 // the harness's prereg (v2 and the preserved v1), question sets, generator, scorer, runner, live adapter, README and git
 // attribute files. Its one direct suite is the harness's own metrics.test.ts (in the default Vitest include). Nothing under
@@ -2002,7 +2002,7 @@ export const ASK_QUALITY_EVAL_AFFECTED_PATHS = Object.freeze([
 export const ASK_QUALITY_EVAL_AFFECTED_UNIT_FILES = Object.freeze(['eval/ask-quality/metrics.test.ts']);
 export const BENCHMARKS_PATH_MASK_AFFECTED_PATHS = Object.freeze([
   'app/benchmarks/page.tsx', 'app/research/notes/opengraph-image.tsx', 'lib/benchmarks-page.test.ts', 'lib/model-arena-page-data.test.ts',
-  'lib/model-arena-page-data.ts', 'lib/public-copy-purge.test.ts',
+  'lib/model-arena-page-data.ts',
 ]);
 export const BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts',
