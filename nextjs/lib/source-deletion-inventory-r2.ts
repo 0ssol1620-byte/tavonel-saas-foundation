@@ -21,10 +21,13 @@ export type SourceInventoryHashedObject = SourceInventoryObject & {
 };
 
 const MAX_DOCUMENTS = 128;
-const MAX_OBJECTS = 512;
+// One tombstone is attested across runs (20261110043000), so these bound a whole deletion, not one
+// request: MAX_DOCUMENTS x 128 objects, and x 512 MiB -- what 128 segmented 500-page sources need
+// (about 100 objects and 460 MiB each). The database refuses past the same two numbers.
+export const MAX_INVENTORY_OBJECTS = 16_384;
 export const MAX_WORLD_OBJECTS = 64;
 const MAX_OBJECT_BYTES = 64 * 1024 * 1024;
-const MAX_TOTAL_BYTES = 1024 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 64 * 1024 * 1024 * 1024;
 
 function hmac(key: Buffer | string, data: string) {
   return createHmac("sha256", key).update(data, "utf8").digest();
@@ -167,7 +170,7 @@ export async function listFoundationSourceInventory(
         if (prior === undefined) {
           byKey.set(key, sizeBytes);
           totalBytes += sizeBytes;
-          if (byKey.size > MAX_OBJECTS) return { ok: false, code: "SOURCE_INVENTORY_OBJECT_LIMIT" };
+          if (byKey.size > MAX_INVENTORY_OBJECTS) return { ok: false, code: "SOURCE_INVENTORY_OBJECT_LIMIT" };
           if (totalBytes > MAX_TOTAL_BYTES) return { ok: false, code: "SOURCE_INVENTORY_TOTAL_TOO_LARGE" };
         }
       }

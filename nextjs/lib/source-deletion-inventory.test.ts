@@ -1,8 +1,15 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { runSourceDeletionInventoryAttestation } from "./source-deletion-inventory";
+import {
+  HASH_BUDGET_BYTES,
+  HASH_BUDGET_MS,
+  runSourceDeletionInventoryAttestation,
+} from "./source-deletion-inventory";
 import {
   hashFoundationSourceInventoryObject,
   listFoundationSourceInventory,
+  type SourceInventoryHashedObject,
+  type SourceInventoryObject,
 } from "./source-deletion-inventory-r2";
 
 const signer = {
@@ -19,6 +26,50 @@ const workspaceKey = "pilot-acme01";
 const worldKey = (digestSeed: string, workspace = workspaceKey) =>
   `immutable/${workspace}/${workspace}/collections/collection-${"e".repeat(32)}/${digestSeed.repeat(64 / digestSeed.length)}/candidate-world.json`;
 
+const candidateFor = (overrides: Partial<{ deletionId: string; documentIds: string[]; worldObjectKeys: string[] }> = {}) => ({
+  ok: true as const,
+  candidate: { deletionId, workspaceKey, sourceId, documentIds: [documentId], worldObjectKeys: [] as string[], ...overrides },
+});
+const part = (n: number, sizeBytes = 5): SourceInventoryObject =>
+  ({ key: `quarantine/${workspaceKey}/${documentId}/segments/part-${String(n).padStart(5, "0")}`, sizeBytes });
+const hashOf = (object: SourceInventoryObject) => `sha256:${createHash("sha256").update(`${object.key}:${object.sizeBytes}`).digest("hex")}`;
+const hasher = () => vi.fn(async (_s: unknown, _w: string, object: SourceInventoryObject) => ({
+  ok: true as const, object: { ...object, sha256: hashOf(object) },
+}));
+
+/**
+ * The database half, in memory: rows keyed by object, a digest over the ordered set, and a seal
+ * that refuses any set but the one it was named with -- what 20261110043000 does under its lock.
+ */
+function digestStore() {
+  const rows = new Map<string, SourceInventoryHashedObject>();
+  const ordered = () => [...rows.values()].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  const setSha = () => `sha256:${createHash("sha256").update(JSON.stringify(ordered())).digest("hex")}`;
+  const sealed: SourceInventoryHashedObject[][] = [];
+  return {
+    rows,
+    sealed,
+    readDigests: vi.fn(async () => ({ ok: true as const, digests: { objects: ordered(), digestSetSha256: setSha() } })),
+    recordDigest: vi.fn(async (_id: string, object: SourceInventoryHashedObject) => {
+      rows.set(object.key, object);
+      return { ok: true as const };
+    }),
+    discardDigests: vi.fn(async () => {
+      rows.clear();
+      return { ok: true as const };
+    }),
+    seal: vi.fn(async (_id: string, digestSetSha256: string, _world: readonly string[]) => {
+      if (digestSetSha256 !== setSha()) return { ok: false as const, code: "SOURCE_INVENTORY_STORE_FAILED" };
+      sealed.push(ordered());
+      return { ok: true as const, attestation: {
+        status: sealed.length === 1 ? "recorded" as const : "replayed" as const,
+        manifestSha256: `sha256:${"d".repeat(64)}`,
+        artifactCount: rows.size,
+      } };
+    }),
+  };
+}
+
 describe("source deletion inventory attestation", () => {
   it("stays idle when no eligible source needs an inventory", async () => {
     const readCandidate = vi.fn(async () => ({ ok: true as const, candidate: null }));
@@ -26,44 +77,25 @@ describe("source deletion inventory attestation", () => {
       .resolves.toEqual({ ok: true, code: "IDLE", processed: 0 });
   });
 
-  it("hashes a stable complete listing before recording one attestation", async () => {
-    const objects = [{
-      key: `quarantine/${workspaceKey}/${documentId}/source`,
-      sizeBytes: 5,
-    }];
+  it("hashes a stable complete listing, persists each digest and seals that exact set", async () => {
+    const objects = [{ key: `quarantine/${workspaceKey}/${documentId}/source`, sizeBytes: 5 }];
     const list = vi.fn(async () => ({ ok: true as const, objects }));
-    const hash = vi.fn(async (_signer: typeof signer, _workspace: string, object: typeof objects[number]) => ({
-      ok: true as const,
-      object: { ...object, sha256: `sha256:${"c".repeat(64)}` },
-    }));
-    const readCandidate = vi.fn(async () => ({
-      ok: true as const,
-      candidate: { deletionId, workspaceKey, sourceId, documentIds: [documentId], worldObjectKeys: [] },
-    }));
-    const attest = vi.fn(async () => ({
-      ok: true as const,
-      attestation: {
-        status: "recorded" as const,
-        manifestSha256: `sha256:${"d".repeat(64)}`,
-        artifactCount: 1,
-      },
-    }));
+    const hash = hasher();
+    const store = digestStore();
 
     await expect(runSourceDeletionInventoryAttestation({
-      signer, list, hash, readCandidate, attest,
+      signer, list, hash, readCandidate: vi.fn(async () => candidateFor()), ...store,
     })).resolves.toEqual({
       ok: true, code: "ATTESTED", processed: 1, artifactCount: 1, status: "recorded",
     });
     expect(list).toHaveBeenCalledTimes(2);
     expect(hash).toHaveBeenCalledOnce();
-    expect(attest).toHaveBeenCalledWith(
-      deletionId,
-      [{ ...objects[0], sha256: `sha256:${"c".repeat(64)}` }],
-      [],
-    );
+    expect(store.recordDigest).toHaveBeenCalledWith(deletionId, { ...objects[0], sha256: hashOf(objects[0]!) });
+    expect(store.seal).toHaveBeenCalledWith(deletionId, expect.stringMatching(/^sha256:[a-f0-9]{64}$/), []);
+    expect(store.sealed).toEqual([[{ ...objects[0], sha256: hashOf(objects[0]!) }]]);
   });
 
-  it("inventories the exact World keys twice and hands the full set to the attestation", async () => {
+  it("inventories the exact World keys twice and hands the full set to the seal", async () => {
     const present = worldKey("1");
     const absent = worldKey("2");
     const objects = [
@@ -71,40 +103,31 @@ describe("source deletion inventory attestation", () => {
       { key: `quarantine/${workspaceKey}/${documentId}/source`, sizeBytes: 5 },
     ];
     const list = vi.fn(async () => ({ ok: true as const, objects }));
-    const hash = vi.fn(async (_s: unknown, _w: string, object: { key: string; sizeBytes: number }) => ({
-      ok: true as const, object: { ...object, sha256: `sha256:${"c".repeat(64)}` },
-    }));
-    const readCandidate = vi.fn(async () => ({
-      ok: true as const,
-      candidate: { deletionId, workspaceKey, sourceId, documentIds: [documentId], worldObjectKeys: [present, absent] },
-    }));
-    const attest = vi.fn(async () => ({ ok: true as const,
-      attestation: { status: "recorded" as const, manifestSha256: `sha256:${"d".repeat(64)}`, artifactCount: 2 } }));
+    const store = digestStore();
 
-    await expect(runSourceDeletionInventoryAttestation({ signer, list, hash, readCandidate, attest }))
-      .resolves.toMatchObject({ ok: true, code: "ATTESTED", artifactCount: 2 });
+    await expect(runSourceDeletionInventoryAttestation({
+      signer, list, hash: hasher(), ...store,
+      readCandidate: vi.fn(async () => candidateFor({ worldObjectKeys: [present, absent] })),
+    })).resolves.toMatchObject({ ok: true, code: "ATTESTED", artifactCount: 2 });
     expect(list.mock.calls).toEqual([
       [signer, workspaceKey, [documentId], [present, absent]],
       [signer, workspaceKey, [documentId], [present, absent]],
     ]);
     // The absent key is still named: the database records it as absent, never as purged.
-    expect(attest).toHaveBeenCalledWith(deletionId, expect.any(Array), [present, absent]);
+    expect(store.seal).toHaveBeenCalledWith(deletionId, expect.any(String), [present, absent]);
   });
 
   it("refuses an oversized World set and records it against the tombstone", async () => {
     const worldObjectKeys = Array.from({ length: 65 }, (_, i) => worldKey(i.toString(16).padStart(2, "0")));
-    const readCandidate = vi.fn(async () => ({
-      ok: true as const,
-      candidate: { deletionId, workspaceKey, sourceId, documentIds: [documentId], worldObjectKeys },
-    }));
     const list = vi.fn();
-    const attest = vi.fn();
+    const store = digestStore();
     const recordFailure = vi.fn(async () => ({ ok: true as const }));
 
-    await expect(runSourceDeletionInventoryAttestation({ signer, list, readCandidate, attest, recordFailure }))
-      .resolves.toEqual({ ok: false, code: "SOURCE_INVENTORY_WORLD_LIMIT", processed: 0, deletionId, failureRecorded: true });
+    await expect(runSourceDeletionInventoryAttestation({
+      signer, list, ...store, recordFailure, readCandidate: vi.fn(async () => candidateFor({ worldObjectKeys })),
+    })).resolves.toEqual({ ok: false, code: "SOURCE_INVENTORY_WORLD_LIMIT", processed: 0, deletionId, failureRecorded: true });
     expect(list).not.toHaveBeenCalled();
-    expect(attest).not.toHaveBeenCalled();
+    expect(store.seal).not.toHaveBeenCalled();
   });
 
   it("refuses to attest an empty listing while the source still has bound documents", async () => {
@@ -112,24 +135,21 @@ describe("source deletion inventory attestation", () => {
     // complete inventory, enqueue nothing, and make every later attestation of the real objects
     // a permanent ATTESTATION_CONFLICT. The database refuses this; so does the worker.
     const list = vi.fn(async () => ({ ok: true as const, objects: [] }));
-    const readCandidate = vi.fn(async () => ({
-      ok: true as const,
-      candidate: { deletionId, workspaceKey, sourceId, documentIds: [documentId], worldObjectKeys: [] },
-    }));
-    const attest = vi.fn();
+    const store = digestStore();
     const recordFailure = vi.fn(async () => ({ ok: true as const }));
 
     await expect(runSourceDeletionInventoryAttestation({
-      signer, list, readCandidate, attest, recordFailure,
+      signer, list, ...store, recordFailure, readCandidate: vi.fn(async () => candidateFor()),
     })).resolves.toEqual({ ok: false, code: "SOURCE_INVENTORY_EMPTY_LISTING", processed: 0,
       deletionId, failureRecorded: true });
-    expect(attest).not.toHaveBeenCalled();
+    expect(store.readDigests).not.toHaveBeenCalled();
+    expect(store.seal).not.toHaveBeenCalled();
     expect(recordFailure).toHaveBeenCalledWith(deletionId, "SOURCE_INVENTORY_EMPTY_LISTING");
   });
 
   it("isolates a stuck tombstone: its failure is recorded so the next run takes the next one", async () => {
     // Stand-in for source_deletion_inventory_candidate's order: least recently failed first.
-    const stuck = { deletionId, workspaceKey, sourceId, documentIds: [documentId], worldObjectKeys: [] };
+    const stuck = candidateFor().candidate;
     const other = { ...stuck, deletionId: `sha256:${"e".repeat(64)}`, documentIds: ["22222222-2222-4222-8222-222222222222"] };
     const failures = new Map<string, number>();
     const readCandidate = vi.fn(async () => ({
@@ -144,16 +164,12 @@ describe("source deletion inventory attestation", () => {
       ok: true as const,
       objects: ids[0] === documentId ? [] : [{ key: `quarantine/${workspaceKey}/${ids[0]}/source`, sizeBytes: 5 }],
     }));
-    const hash = vi.fn(async (_s: unknown, _w: string, object: { key: string; sizeBytes: number }) => ({
-      ok: true as const, object: { ...object, sha256: `sha256:${"c".repeat(64)}` },
-    }));
-    const attest = vi.fn(async () => ({ ok: true as const,
-      attestation: { status: "recorded" as const, manifestSha256: `sha256:${"d".repeat(64)}`, artifactCount: 1 } }));
-    const deps = { signer, list, hash, readCandidate, attest, recordFailure };
+    const store = digestStore();
+    const deps = { signer, list, hash: hasher(), readCandidate, ...store, recordFailure };
 
     expect(await runSourceDeletionInventoryAttestation(deps)).toMatchObject({ ok: false, deletionId });
     expect(await runSourceDeletionInventoryAttestation(deps)).toMatchObject({ ok: true, code: "ATTESTED" });
-    expect(attest).toHaveBeenCalledWith(other.deletionId, expect.any(Array), []);
+    expect(store.seal).toHaveBeenCalledWith(other.deletionId, expect.any(String), []);
     // The stuck one is still handed out again later: retried, never skipped or marked done.
     failures.set(other.deletionId, 2);
     expect(await runSourceDeletionInventoryAttestation(deps)).toMatchObject({ ok: false, deletionId });
@@ -161,34 +177,134 @@ describe("source deletion inventory attestation", () => {
   });
 
   it("refuses a prefix that changes while bytes are being hashed", async () => {
-    const first = [{
-      key: `quarantine/${workspaceKey}/${documentId}/source`,
-      sizeBytes: 5,
-    }];
-    const second = [...first, {
-      key: `quarantine/${workspaceKey}/${documentId}/cdr-reject.json`,
-      sizeBytes: 9,
-    }];
+    const first = [{ key: `quarantine/${workspaceKey}/${documentId}/source`, sizeBytes: 5 }];
+    const second = [...first, { key: `quarantine/${workspaceKey}/${documentId}/cdr-reject.json`, sizeBytes: 9 }];
     const list = vi.fn()
       .mockResolvedValueOnce({ ok: true as const, objects: first })
       .mockResolvedValueOnce({ ok: true as const, objects: second });
-    const hash = vi.fn(async (_signer: typeof signer, _workspace: string, object: typeof first[number]) => ({
-      ok: true as const,
-      object: { ...object, sha256: `sha256:${"c".repeat(64)}` },
-    }));
-    const readCandidate = vi.fn(async () => ({
-      ok: true as const,
-      candidate: { deletionId, workspaceKey, sourceId, documentIds: [documentId], worldObjectKeys: [] },
-    }));
-    const attest = vi.fn();
+    const store = digestStore();
     const recordFailure = vi.fn(async () => ({ ok: false as const, code: "SOURCE_INVENTORY_STORE_FAILED" }));
 
     await expect(runSourceDeletionInventoryAttestation({
-      signer, list, hash, readCandidate, attest, recordFailure,
+      signer, list, hash: hasher(), ...store, recordFailure, readCandidate: vi.fn(async () => candidateFor()),
     })).resolves.toEqual({
       ok: false, code: "SOURCE_INVENTORY_CHANGED_DURING_SCAN", processed: 0, deletionId, failureRecorded: false,
     });
-    expect(attest).not.toHaveBeenCalled();
+    expect(store.seal).not.toHaveBeenCalled();
+  });
+
+  it("attests 600 objects across several runs, hashing each object exactly once", async () => {
+    // Past the 512 the single-call attestation held. The clock advances 100 ms per reading, so
+    // each run stops starting objects at the 15 s budget and the next run continues.
+    const objects = Array.from({ length: 600 }, (_, i) => part(i + 1, 1));
+    const list = vi.fn(async () => ({ ok: true as const, objects }));
+    const hash = hasher();
+    const store = digestStore();
+    let clock = 0;
+    const deps = { signer, list, hash, ...store, now: () => (clock += 100), readCandidate: vi.fn(async () => candidateFor()) };
+
+    const runs = [];
+    for (let run = 0; run < 10; run += 1) {
+      const result = await runSourceDeletionInventoryAttestation(deps);
+      runs.push(result);
+      if (result.code !== "IN_PROGRESS") break;
+    }
+    expect(runs.length).toBeGreaterThan(2);
+    expect(runs.slice(0, -1).every((result) => result.ok && result.code === "IN_PROGRESS")).toBe(true);
+    const perRun = HASH_BUDGET_MS / 100;
+    expect(runs[0]).toEqual({ ok: true, code: "IN_PROGRESS", processed: 0, deletionId, hashedCount: perRun, remainingCount: 600 - perRun });
+    expect(runs.at(-1)).toEqual({ ok: true, code: "ATTESTED", processed: 1, artifactCount: 600, status: "recorded" });
+    expect(hash).toHaveBeenCalledTimes(600);
+    expect(new Set(hash.mock.calls.map(([, , object]) => object.key)).size).toBe(600);
+    expect(store.sealed).toHaveLength(1);
+    expect(store.sealed[0]).toHaveLength(600);
+    expect(store.discardDigests).not.toHaveBeenCalled();
+  });
+
+  it("stops at the byte budget but always hashes one object, so a run never stalls", async () => {
+    const big = Math.floor(HASH_BUDGET_BYTES * 0.6);
+    const objects = [part(1, big), part(2, big), part(3, big)];
+    const list = vi.fn(async () => ({ ok: true as const, objects }));
+    const hash = hasher();
+    const store = digestStore();
+    const deps = { signer, list, hash, ...store, now: () => 0, readCandidate: vi.fn(async () => candidateFor()) };
+
+    await expect(runSourceDeletionInventoryAttestation(deps)).resolves.toMatchObject({ code: "IN_PROGRESS", hashedCount: 1, remainingCount: 2 });
+    await expect(runSourceDeletionInventoryAttestation(deps)).resolves.toMatchObject({ code: "IN_PROGRESS", hashedCount: 1, remainingCount: 1 });
+    // The last object is hashed and sealed in the same run.
+    await expect(runSourceDeletionInventoryAttestation(deps)).resolves.toMatchObject({ code: "ATTESTED", artifactCount: 3 });
+    expect(hash).toHaveBeenCalledTimes(3);
+    // A progress run lists once; the sealing run lists before and after.
+    expect(list).toHaveBeenCalledTimes(4);
+  });
+
+  it("resumes after a run dies between objects without hashing a persisted object again", async () => {
+    const objects = [part(1), part(2), part(3), part(4)];
+    const list = vi.fn(async () => ({ ok: true as const, objects }));
+    const hash = hasher();
+    hash.mockImplementationOnce(async (_s, _w, object) => ({ ok: true as const, object: { ...object, sha256: hashOf(object) } }))
+      .mockImplementationOnce(async (_s, _w, object) => ({ ok: true as const, object: { ...object, sha256: hashOf(object) } }))
+      .mockImplementationOnce(async () => { throw new Error("function instance killed"); });
+    const store = digestStore();
+    const recordFailure = vi.fn(async () => ({ ok: true as const }));
+    const deps = { signer, list, hash, ...store, recordFailure, now: () => 0, readCandidate: vi.fn(async () => candidateFor()) };
+
+    await expect(runSourceDeletionInventoryAttestation(deps)).rejects.toThrow("function instance killed");
+    expect([...store.rows.keys()]).toEqual([part(1).key, part(2).key]);
+
+    await expect(runSourceDeletionInventoryAttestation(deps)).resolves.toMatchObject({ code: "ATTESTED", artifactCount: 4 });
+    expect(hash.mock.calls.slice(3).map(([, , object]) => object.key)).toEqual([part(3).key, part(4).key]);
+    expect(store.sealed[0]).toEqual(objects.map((object) => ({ ...object, sha256: hashOf(object) })));
+  });
+
+  it("discards every persisted digest when the listing changed between runs, then hashes again", async () => {
+    const list = vi.fn()
+      .mockResolvedValueOnce({ ok: true as const, objects: [part(1, 5), part(2, 5)] })
+      .mockResolvedValue({ ok: true as const, objects: [part(1, 6), part(2, 5)] });
+    const hash = hasher();
+    const store = digestStore();
+    let clock = 0;
+    const deps = { signer, list, hash, ...store, now: () => (clock += HASH_BUDGET_MS), readCandidate: vi.fn(async () => candidateFor()) };
+
+    await expect(runSourceDeletionInventoryAttestation(deps)).resolves.toMatchObject({ code: "IN_PROGRESS", hashedCount: 1 });
+    expect(store.rows.get(part(1).key)?.sizeBytes).toBe(5);
+    // part-00001 is now listed at 6 bytes: its digest is of bytes that are gone.
+    await expect(runSourceDeletionInventoryAttestation(deps)).resolves.toMatchObject({ code: "IN_PROGRESS", hashedCount: 1 });
+    expect(store.discardDigests).toHaveBeenCalledOnce();
+    await expect(runSourceDeletionInventoryAttestation(deps)).resolves.toMatchObject({ code: "ATTESTED", artifactCount: 2 });
+    expect(store.sealed[0]).toEqual([part(1, 6), part(2, 5)].map((object) => ({ ...object, sha256: hashOf(object) })));
+  });
+
+  it("seals nothing when an overlapping run changed the digest set after this run's listing", async () => {
+    const objects = [part(1), part(2)];
+    const list = vi.fn(async () => ({ ok: true as const, objects }));
+    const store = digestStore();
+    const read = store.readDigests.getMockImplementation()!;
+    // The second read (just before sealing) sees an overlapping run's discard.
+    store.readDigests.mockImplementationOnce(read).mockImplementationOnce(async () => {
+      store.rows.clear();
+      return read();
+    });
+    const recordFailure = vi.fn(async () => ({ ok: true as const }));
+
+    await expect(runSourceDeletionInventoryAttestation({
+      signer, list, hash: hasher(), ...store, recordFailure, now: () => 0, readCandidate: vi.fn(async () => candidateFor()),
+    })).resolves.toEqual({ ok: false, code: "SOURCE_INVENTORY_DIGESTS_CHANGED", processed: 0, deletionId, failureRecorded: true });
+    expect(store.seal).not.toHaveBeenCalled();
+  });
+
+  it("passes a seal refusal through: the database's own check of the digest set fails closed", async () => {
+    const objects = [part(1)];
+    const store = digestStore();
+    store.seal.mockResolvedValueOnce({ ok: false as const, code: "SOURCE_INVENTORY_STORE_FAILED" });
+    const recordFailure = vi.fn(async () => ({ ok: true as const }));
+
+    await expect(runSourceDeletionInventoryAttestation({
+      signer, list: vi.fn(async () => ({ ok: true as const, objects })), hash: hasher(), ...store, recordFailure,
+      now: () => 0, readCandidate: vi.fn(async () => candidateFor()),
+    })).resolves.toEqual({ ok: false, code: "SOURCE_INVENTORY_STORE_FAILED", processed: 0, deletionId, failureRecorded: true });
+    // The digests stay: the next run seals them without reading a byte again.
+    expect(store.rows.size).toBe(1);
   });
 });
 
