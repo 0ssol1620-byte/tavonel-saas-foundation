@@ -35,7 +35,7 @@ jobs:
           await browser.close();const failures=rows.filter(r=>r.error||r.overflow>1||r.summaryTop<r.titleBottom||r.alignment>=2||(r.width>=1280&&r.articleWidth<=580)||(r.paragraphFont!==null&&r.paragraphFont<(r.width<=600?16:17)));
           fs.writeFileSync(path.join(out,'checks.json'),JSON.stringify({sha:'2ee99feb2f865405197d925641b92438980e90c8',deployment:base,scope:'public documentation layout only; not whole release qualification',rows,failures,pass:failures.length===0},null,2));console.log(JSON.stringify({rows:rows.length,failures}));if(failures.length)process.exitCode=1;
           JS
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: docs-reading-review-${{ github.sha }}
