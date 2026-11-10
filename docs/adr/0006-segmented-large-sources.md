@@ -84,6 +84,21 @@ processor keeps the per-request bound it has today. Nothing is raised to meet a 
   the manifest exists reads the manifest and returns it, without listing or hashing a single range,
   so a range stored twice by a racing duplicate cannot turn a finished source into a retry loop
   (E6). The source settles once, after its last range.
+- **Reads only what was approved (F1, #238 review).** Intake approves and reserves a PDF the
+  browser could not count at 80 pages, and the worker used to segment every PDF over 80 regardless,
+  so such a PDF was read to 500 pages on an 80-page reservation. The capability route now writes
+  `quarantine/<ws>/<doc>/approval.json` (`shared/sourceApproval.ts`, `tavonel.source_approval.v1`:
+  approved pages, page basis, reserved and maximum credits) create-once, server-side, before any
+  upload URL exists; a failed or conflicting write issues no URL (503 `SOURCE_APPROVAL_WRITE_FAILED`
+  / `SOURCE_APPROVAL_CONFLICT`). No presigner signs that key. The worker reads it before
+  segmenting; absent or invalid is 80. When the first range reports more pages than
+  `max(approved, 80)`, the source is refused there -- before a plan, a range or any OCR exists --
+  as `PARSER_OOM` (the frozen class set is unchanged) with `observedPages` and `approvedMaxPages`
+  on `cdr-reject.json`, released at 0 credits through the ordinary refusal path. A stored plan is
+  held to the same check. The workspace says "This PDF has N pages, more than the M pages approved
+  for it, so nothing was read or charged. Upload it again and approve N pages." and offers that
+  upload on the row, sending `estimatedPages = N`. A customer-stated count is safe to approve on
+  because of this rule: too high only reserves more, too low is refused at zero.
 - **Metering unchanged.** The source settles the per-document charge a whole document settles
   today (`computeCredits: 2`); intake still reserves and approves pages exactly as before. The
   trial bound (50 pages) is untouched.
@@ -100,11 +115,12 @@ processor keeps the per-request bound it has today. Nothing is raised to meet a 
   again, requires the two listings and the persisted set to agree on every key and size, and seals
   the set by its database digest (`seal_source_deletion_inventory`), which refuses a set an
   overlapping run changed and then runs the unchanged attestation checks. A digest whose key is no
-  longer listed, or is listed at another size, discards the whole set. The bound is now per
+  longer listed, or is listed at another size or another ETag, discards the whole set. The bound is now per
   deletion: 16,384 objects and 64 GiB (128 documents × 128 objects, × 512 MiB; the listing, the
-  digest table and the attestation all refuse past it), and 64 MiB per object as before. Same-size
-  rewrites of a key between runs are not detected, as they were not inside one run: listing
-  identity is key and size.
+  digest table and the attestation all refuse past it), and 64 MiB per object as before. Listing
+  identity is key, size and the listed R2 ETag (#238 review item 4), so a key rewritten at the same
+  size between runs is hashed again, and the hash read refuses a served ETag other than the listed
+  one.
 
 ### Site half (next change; the flag stays off until it lands)
 
@@ -168,6 +184,14 @@ is set; the worker refuses the pair before any request (E3).
    `FOUNDATION_SEGMENT_CONTINUATION` producer); check one 81-page and one 300-page source end to end.
    Rollback: unset the variable (`wrangler versions deploy <prev>`). Ranges already stored stay
    invisible without a manifest and are deleted with their source.
+
+The two halves roll back as a pair, in the reverse of the deploy order: revert the site build that
+set `SEGMENTED_INTAKE_ENABLED = true` first, then the worker variable. Rolling back only the worker
+leaves a site that admits 81–500-page PDFs in front of a worker that sends them whole, so every one
+is approved, reserved and then refused as `PARSER_OOM` -- nothing charged, but every upload lost.
+The site that writes `approval.json` must be live before the worker variable is set: with no
+approval the worker holds every PDF to 80 pages, so an end-to-end check of an 81- or 300-page source
+needs one uploaded through that site at its real count.
 
 ## Not measured
 
