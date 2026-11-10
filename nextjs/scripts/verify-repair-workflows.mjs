@@ -717,7 +717,7 @@ for (const binding of [
     suites: ['lib/ai-package-guidance.test.ts', 'lib/b30-api-mcp-cli-parity.test.ts', 'lib/brand-copy.test.ts', 'lib/collection-download.test.ts', 'lib/compiler-contract.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/developer-distribution.test.ts', 'lib/export-route-authorization.test.ts', 'lib/journey-acceptance.test.ts', 'lib/mcp-server.test.ts', 'lib/packet-delivery.test.ts', 'lib/remote-mcp.test.ts'],
     browsers: [],
     rows: [],
-    neighbors: ['nextjs/app/api/collections/[id]/route.ts', 'nextjs/lib/ai-package-guidance.tsx', 'nextjs/lib/packet-delivery.ts', 'nextjs/lib/consumer-context/consumer-context.ts', 'nextjs/public/developer/tavonel-verify-export.mjs', 'nextjs/scripts/compiled-world/verify-external-roundtrip.py'] },
+    neighbors: ['nextjs/app/api/collections/[id]/route.tsx', 'nextjs/lib/ai-package-guidance.tsx', 'nextjs/lib/packet-delivery.ts', 'nextjs/lib/consumer-context/consumer-context.ts', 'nextjs/public/developer/tavonel-verify-export.cjs', 'nextjs/scripts/compiled-world/verify-external-roundtrip.py'] },
   // hard-proof 2026-10-27 C1: the GDP.pdf runs list, its reserved v3 path and the two browser suites that read the page.
   { group: 'gdp-pdf-runs', prefix: 'nextjs/', exportedPaths: GDP_PDF_RUNS_AFFECTED_PATHS, exportedSuites: GDP_PDF_RUNS_AFFECTED_UNIT_FILES,
     exportedBrowsers: GDP_PDF_RUNS_AFFECTED_BROWSER_FILES,
