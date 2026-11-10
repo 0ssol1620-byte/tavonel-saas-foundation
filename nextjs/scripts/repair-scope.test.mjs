@@ -5998,7 +5998,7 @@ test('affected preflight report admission: lookalikes, operations, pipeline, API
     'nextjs/lib/__snapshots__/preflight-report.test.ts.snap','nextjs/lib/pipeline.tsx','nextjs/lib/pipeline-v2.test.ts',
     'nextjs/components/operations-ultimate.tsx','nextjs/components/preflight-report.tsx','nextjs/e2e/preflight-report.spec.ts',
     'nextjs/app/api/v1/preflight-report/route.ts','nextjs/app/api/preflight-report/route.ts',
-    'shared/capabilityManifest.ts','shared/intakeCeiling.ts','shared/qualifiedDocumentInputs.ts',
+    'shared/intakeCeiling.ts','shared/qualifiedDocumentInputs.ts',
     'nextjs/nextjs/lib/preflight-report.ts','lib/preflight-report.ts','lib/preflight-report.test.ts','preflight-report.ts']) {
     if (assertUxProgramEndpoint(path)) continue;
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
@@ -8303,8 +8303,8 @@ test('affected large-source-intake-copy owner: 4 exact paths select 4 direct sui
 });
 // large-source-intake-ceiling (ADR-0006): one finite owner, restated independently.
 import { LARGE_SOURCE_INTAKE_CEILING_AFFECTED_PATHS, LARGE_SOURCE_INTAKE_CEILING_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
-test('affected large-source-intake-ceiling owner: 2 exact paths select 3 direct suites and no browser suite; neighbours stay unmapped', () => {
-  const paths = ['nextjs/lib/usage-pricing.ts', 'shared/capabilityManifest.ts'];
+test('affected large-source-intake-ceiling owner: 3 exact paths select 3 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['nextjs/lib/usage-pricing.ts', 'server/foundation/intakeCeilingMigration.test.ts', 'shared/capabilityManifest.ts'];
   const suites = ['lib/capability-manifest-route.test.ts', 'lib/production-posture.test.ts', 'lib/usage-pricing.test.ts'];
   assert.deepEqual([[...LARGE_SOURCE_INTAKE_CEILING_AFFECTED_PATHS], [...LARGE_SOURCE_INTAKE_CEILING_AFFECTED_UNIT_FILES]], [paths, suites]);
   for (const path of paths) {

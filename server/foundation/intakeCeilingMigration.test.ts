@@ -33,7 +33,8 @@ describe("intake ceiling", () => {
 
     const workerMax = /MAX_SOURCE_BYTES = (\d+) \* 1024 \* 1024/.exec(worker)?.[1];
     const cdrMax = /MAX_INPUT_BYTES: Final = (\d+) \* 1024 \* 1024/.exec(rasterizer)?.[1];
-    const cdrPages = /MAX_PAGES: Final = (\d+)/.exec(rasterizer)?.[1];
+    const cdrPages = /^MAX_PAGES: Final = (\d+)/m.exec(rasterizer)?.[1];
+    const cdrSegmentedPages = /^SEGMENTED_MAX_DOCUMENT_PAGES: Final = (\d+)/m.exec(rasterizer)?.[1];
     expect(workerMax, "the worker no longer states a source ceiling").toBeDefined();
     expect(cdrMax, "the rasterizer no longer states an input ceiling").toBeDefined();
     expect(cdrPages, "the rasterizer no longer states a page ceiling").toBeDefined();
@@ -41,7 +42,9 @@ describe("intake ceiling", () => {
     expect(PROCESSING_CEILING.maxSourceBytes).toBe(
       Math.min(Number(workerMax) * 1024 * 1024, Number(cdrMax) * 1024 * 1024),
     );
-    expect(PROCESSING_CEILING.maxSourcePages).toBe(Number(cdrPages));
+    // ADR-0006: one request renders at most MAX_PAGES; a PDF or DOCX is read as ranges up to the segmented ceiling.
+    expect(PROCESSING_CEILING.maxUnsegmentedSourcePages).toBe(Number(cdrPages));
+    expect(PROCESSING_CEILING.maxSourcePages).toBe(Number(cdrSegmentedPages));
   });
 
   it("is the same number the admission table and its function enforce", () => {
@@ -57,7 +60,8 @@ describe("intake ceiling", () => {
   it("is stated on the capability surface a customer reads before uploading", () => {
     expect(PROCESSING_CEILING_LIMITATIONS).toEqual([
       "at_most_5_mib_per_source",
-      "at_most_80_pages_per_source",
+      "at_most_500_pages_per_pdf_or_docx_source",
+      "at_most_80_pages_per_other_source",
     ]);
     const pdf = CAPABILITY_MANIFEST.entries.find((entry) => entry.mime === "application/pdf");
     for (const limitation of PROCESSING_CEILING_LIMITATIONS) {

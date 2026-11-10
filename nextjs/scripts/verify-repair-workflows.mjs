@@ -1018,9 +1018,9 @@ assert(VITEST_DISCOVERY_CONFIG_PATH==='nextjs/vitest.config.ts'&&discoveryOwners
   assert(ceilingOwners.length === 1
     && JSON.stringify(ceilingOwners[0].unitFiles) === JSON.stringify(['lib/capability-manifest-route.test.ts', 'lib/production-posture.test.ts', 'lib/usage-pricing.test.ts'])
     && !ceilingOwners[0].browserFiles.length && !ceilingOwners[0].databaseTests.length && !ceilingOwners[0].nativeReuse
-    && ['nextjs/lib/usage-pricing.ts', 'shared/capabilityManifest.ts'].every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && ceilingOwners[0].match.test(p))
+    && ['nextjs/lib/usage-pricing.ts', 'server/foundation/intakeCeilingMigration.test.ts', 'shared/capabilityManifest.ts'].every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && ceilingOwners[0].match.test(p))
     && ['nextjs/lib/usage-pricing-v2.ts', 'shared/capabilityManifest.test.ts'].every(p => !ceilingOwners[0].match.test(p)),
-    'large-source-intake-ceiling owner must keep its two exact paths, three direct suites and no neighbour admission');
+    'large-source-intake-ceiling owner must keep its three exact paths, three direct suites and no neighbour admission');
   // The segmented-source listing, compile and source route: one exact owner with eight direct suites, nothing adjacent.
   const siteHalfOwners = AFFECTED_GROUPS.filter(o => o.group === 'large-source-site-half');
   assert(siteHalfOwners.length === 1

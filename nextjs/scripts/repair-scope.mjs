@@ -3011,7 +3011,7 @@ export const LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES = Object.freeze(['lib/
 // Large-source intake ceiling (ADR-0006, site half): the intake quote that approves a counted PDF or DOCX up to 500 pages and an
 // uncounted file at 80, and the capability manifest whose page tokens and labels state both. Product code, so never nativeReuse.
 // No browser, database or worker lane: the approval CHECKs are their own migration owner.
-export const LARGE_SOURCE_INTAKE_CEILING_AFFECTED_PATHS = Object.freeze(['nextjs/lib/usage-pricing.ts', 'shared/capabilityManifest.ts']);
+export const LARGE_SOURCE_INTAKE_CEILING_AFFECTED_PATHS = Object.freeze(['nextjs/lib/usage-pricing.ts', 'server/foundation/intakeCeilingMigration.test.ts', 'shared/capabilityManifest.ts']);
 // Large-source site half (ADR-0006): a segmented source listed once its manifest exists, read as ranges by the compile, and opened
 // at an original page by the source route. Product code, so never nativeReuse. No browser, database or worker lane.
 export const LARGE_SOURCE_SITE_HALF_AFFECTED_PATHS = Object.freeze(['nextjs/app/api/documents/[id]/source/route.ts', 'nextjs/lib/collection-source-access.test.ts', 'nextjs/lib/collection-source-access.ts', 'nextjs/lib/compile-artifact-provenance.ts', 'nextjs/lib/document-source-route.test.ts', 'nextjs/lib/immutable-keys.test.ts', 'nextjs/lib/immutable-keys.ts', 'nextjs/lib/pdf-evidence-viewer.test.ts']);
@@ -3306,7 +3306,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // large-source-intake-copy (ADR-0006): the 4 exact paths above select 4 direct suites and no browser suite.
   affectedGroup('large-source-intake-copy', new RegExp(`^(?:${exactPathAlternation(LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS)})$`),
     { unitFiles: LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES }),
-  // large-source-intake-ceiling (ADR-0006): the 2 exact repo-relative paths above select 3 direct suites and no browser suite.
+  // large-source-intake-ceiling (ADR-0006): the 3 exact repo-relative paths above select 3 direct suites and no browser suite.
   affectedGroup('large-source-intake-ceiling', new RegExp(`^(?:${exactPathAlternation(LARGE_SOURCE_INTAKE_CEILING_AFFECTED_PATHS)})$`),
     { unitFiles: LARGE_SOURCE_INTAKE_CEILING_AFFECTED_UNIT_FILES }),
   // large-source-site-half (ADR-0006): the 8 exact repo-relative paths above select 8 direct suites and no browser suite.
