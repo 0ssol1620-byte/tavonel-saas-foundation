@@ -216,6 +216,7 @@ const browserProjectsByFile = new Map([
   ['e2e/workspace-source-observation.spec.ts', ['1440']],
   ['e2e/failure-states-audit.spec.ts', ['audit', 'audit-768', 'audit-1280']],
   ['e2e/billing-lifecycle.spec.ts', ['audit', 'audit-768', 'audit-1280']],
+  ['e2e/connection-sync-status.spec.ts', ['1440', '390']],
   ['e2e/dialog-focus-audit.spec.ts', ['audit']],
   ['e2e/site-nav.spec.ts', ['1440']],
   ['e2e/site-chrome-v2.spec.ts', ['1440', '390']],

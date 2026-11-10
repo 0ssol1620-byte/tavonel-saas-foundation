@@ -29,6 +29,7 @@ import { OPS_BACKLOG_SLI_AFFECTED_PATHS, OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES } f
 import { PROCESSING_GA_AFFECTED_PATHS, PROCESSING_GA_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { TRIAL_TO_PAID_AFFECTED_PATHS, TRIAL_TO_PAID_AFFECTED_UNIT_FILES, TRIAL_TO_PAID_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { SLI_ALERT_NOISE_AFFECTED_PATHS, SLI_ALERT_NOISE_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { CONNECTORS_DEVELOPER_AFFECTED_PATHS, CONNECTORS_DEVELOPER_AFFECTED_UNIT_FILES, CONNECTORS_DEVELOPER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
 const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -801,6 +802,14 @@ for (const binding of [
     browsers: ['e2e/billing-lifecycle.spec.ts'],
     rows: ["['e2e/billing-lifecycle.spec.ts', ['audit', 'audit-768', 'audit-1280']],"],
     neighbors: ['nextjs/app/api/collections/[id]/promote/route.tsx', 'nextjs/components/processing-consent-panel.module.scss', 'nextjs/lib/activation-cohort.ts', 'nextjs/lib/cookbook-contents.ts', 'lib/keyword-map.ts', 'nextjs/e2e/billing-lifecycle.spec.tsx', 'nextjs/app/api/collections/[id]/search/route.tsx'] },
+  // connectors-developer-20261110: six exact paths, nine direct suites, the one browser suite it edits.
+  { group: 'connectors-developer-20261110', prefix: 'nextjs/', exportedPaths: CONNECTORS_DEVELOPER_AFFECTED_PATHS, exportedSuites: CONNECTORS_DEVELOPER_AFFECTED_UNIT_FILES,
+    exportedBrowsers: CONNECTORS_DEVELOPER_AFFECTED_BROWSER_FILES,
+    paths: ['app/api/connections/[id]/route.ts', 'app/api/connections/route.ts', 'app/api/v1/oauth-connectors/authorize/route.ts', 'app/api/v1/oauth-connectors/connections/[id]/route.ts', 'components/connections-panel.tsx', 'e2e/connection-sync-status.spec.ts'],
+    suites: ['lib/billing-product-access.test.ts', 'lib/connection-sync-lag.test.ts', 'lib/connector-contract.test.ts', 'lib/connector-oauth-route.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/plan-entitlement.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts'],
+    browsers: ['e2e/connection-sync-status.spec.ts'],
+    rows: ["['e2e/connection-sync-status.spec.ts', ['1440', '390']],"],
+    neighbors: ['nextjs/app/api/connections/[id]/page.tsx', 'nextjs/app/api/connections/route.tsx', 'nextjs/app/api/v1/oauth-connectors/authorize/page.tsx', 'nextjs/components/connections-panel.module.css', 'nextjs/e2e/connection-sync-status-2.spec.ts', 'components/connections-panel.tsx'] },
   // sli-alert-noise-20261109: three exact paths, ten direct suites, no browser suite.
   { group: 'sli-alert-noise-20261109', prefix: 'nextjs/', exportedPaths: SLI_ALERT_NOISE_AFFECTED_PATHS, exportedSuites: SLI_ALERT_NOISE_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
