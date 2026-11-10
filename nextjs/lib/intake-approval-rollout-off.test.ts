@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { PROCESSING_CEILING, PROCESSING_CEILING_SENTENCE } from "../../shared/intakeCeiling";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
@@ -161,6 +164,34 @@ describe("intake approval lineage off (the production default)", () => {
     expect(response.status).toBe(413);
     await expect(response.json()).resolves.toMatchObject({ code: "SOURCE_EXCEEDS_PROCESSING_CEILING", limit: expect.any(String) });
     expect(mocks.calls).toEqual([]);
+  });
+
+  it("refuses a file counted over the page ceiling before any URL or database call, and admits one at it", async () => {
+    // Founder, 2026-11-10: device manuals of 100-400 pages were admitted here and refused by the
+    // rasterizer after upload. The browser had already counted them.
+    const over = await capabilityPost(json("https://tavonel.com/api/uploads/capability", {
+      originalFilename: "manual.pdf", declaredMimeType: "application/pdf", requestedBytes: 2048,
+      estimatedPages: PROCESSING_CEILING.maxSourcePages + 1,
+    }));
+    expect(over.status).toBe(413);
+    await expect(over.json()).resolves.toMatchObject({
+      code: "SOURCE_EXCEEDS_PROCESSING_CEILING", maxPages: PROCESSING_CEILING.maxSourcePages, limit: PROCESSING_CEILING_SENTENCE,
+    });
+    expect(mocks.calls).toEqual([]);
+    expect(mocks.presign).not.toHaveBeenCalled();
+
+    const at = await capabilityPost(json("https://tavonel.com/api/uploads/capability", {
+      originalFilename: "manual.pdf", declaredMimeType: "application/pdf", requestedBytes: 2048,
+      estimatedPages: PROCESSING_CEILING.maxSourcePages,
+    }));
+    expect(at.status).toBe(200);
+  });
+
+  it("sends the count the browser measured, so the refusal above happens before upload", () => {
+    // The workspace measured every staged file and then dropped the counts on this path.
+    const page = readFileSync(join(process.cwd(), "app/workspace/page.tsx"), "utf8");
+    expect(page).toContain("await uploadLegacyDocuments(files, measured)");
+    expect(page).toContain("declaredPages: measured.pages, declaredBasis: measured.basis");
   });
 
   it("confirms through confirm_foundation_intake_admission without an approval identity", async () => {

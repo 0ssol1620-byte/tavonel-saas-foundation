@@ -992,6 +992,20 @@ assert(VITEST_DISCOVERY_CONFIG_PATH==='nextjs/vitest.config.ts'&&discoveryOwners
       .every(p => !owner.match.test(p)),
     'w2-d-intake-stage1 owner must keep its three exact paths, two direct suites and no neighbour admission');
 }
+// Segmented large sources (codex/large-source-segmentation-20261110, docs/adr/0006-segmented-large-sources.md), restated
+// independently: the CDR's page-range suite joins the Cloud Run service owner, and the worker's segment suite stays with the
+// worker owner, each owned exactly once; neither admits a neighbour.
+{
+  const owned = { 'quarantine-sidecar/cdr-cloudrun/tests/test_page_ranges.py': 'cdr-cloudrun-service',
+    'quarantine-sidecar/foundation-cdr-worker/src/segments.test.ts': 'ocr-worker' };
+  for (const [p, group] of Object.entries(owned)) {
+    const groups = AFFECTED_GROUPS.filter(o => o.match.test(p)).map(o => o.group);
+    assert(groups.length === 1 && groups[0] === group, `${p} must be owned by ${group} alone, not ${groups.join(',') || 'nobody'}`);
+  }
+  assert(['quarantine-sidecar/cdr-cloudrun/tests/test_page_ranges_v2.py', 'quarantine-sidecar/cdr-cloudrun/page_ranges.py']
+    .every(p => !AFFECTED_GROUPS.some(o => o.group === 'cdr-cloudrun-service' && o.match.test(p))),
+    'cdr-cloudrun-service must not admit a neighbour of the page-range suite');
+}
 console.log(`Workflow static gates pass. Full qualification still pending for exact CI/Launch runs at this head.`);
 
 assert(collectorVerifier.includes("Symbol('native race final-gate generated plan')")&&collectorVerifier.includes("same(untracked,['nextjs/repair-plan.json'])")&&collectorVerifier.includes("resolve(process.argv[1])===resolve(intent.repoRoot,'nextjs/scripts/repair-scope-gate.mjs')")&&collectorVerifier.includes('if(!bytes.equals(expected))')&&collectorVerifier.includes('nativeRacePlan(normal,proof)')&&collectorVerifier.includes('before.isSymbolicLink()')&&collectorVerifier.includes('final-gate owner output refused'), 'c61 final gate alone qualifies the exact regular generated plan against a fresh sealed-selector recomputation before trusting routing flags; initial admission stays strict');

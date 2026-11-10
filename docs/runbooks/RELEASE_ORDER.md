@@ -811,3 +811,18 @@ curl -s "$BASE/api/mcp" -H 'content-type: application/json' -H "Authorization: B
 위 "W1-A1 원격 MCP: rollback" 절 그대로다. 즉시: `revoke-all`로 MCP 키 일괄 revoke, 그다음 원장에 적은 deployment로
 Instant Rollback. 영구: `TAVONEL_REMOTE_MCP_ENABLED`를 지우고 redeploy. GA만 되돌릴 때는 `TAVONEL_REMOTE_MCP_COHORT`를
 canary 값으로 되돌리고 redeploy한다. Firewall 규칙은 남겨 둔다(꺼진 endpoint에는 해가 없다).
+
+## 추가 2026-11-10 — 대용량 소스 분할 처리(processor 절반, flag off)
+
+근거: `docs/adr/0006-segmented-large-sources.md`. **이 PR을 병합해도 production 동작은 바뀌지 않는다.** 한도 문구는 5 MiB / 80쪽 그대로이고
+migration은 없다. 바뀌는 것은 업로드 전 안내(드롭 박스·`/pricing`)와, 승인 lineage off 경로에서 브라우저가 센 쪽수가 80을 넘으면
+URL·예약 전에 413으로 거절하는 것뿐이다.
+
+- CDR: 서명된 request id 끝의 `_p<start0>_<end0>`가 있으면 그 범위만 렌더한다(문서 ≤ 500쪽, 요청당 ≤ `MAX_PAGES`). 없으면 지금과 같다.
+  새 revision을 먼저 배포해도 기존 worker 요청에는 영향이 없다. 되돌리기: traffic을 `tavonel-cdr-validation-0909-00004-qsb`로.
+- worker: `FOUNDATION_SOURCE_SEGMENT_PAGES` 미설정이면 꺼짐. **site 절반(ADR-0006 "Site half": manifest 읽기, 범위별 compile,
+  원래 쪽 번호, intake 500쪽 + approval CHECK migration)이 배포되기 전에는 켜지 않는다.** 켜면 81쪽 이상 소스는 처리·정산되지만
+  site가 `segments/manifest.json`을 읽지 못해 화면에 나타나지 않는다.
+- 순서: (1) CDR revision → (2) site 절반 병합 + migration 적용 → (3) worker version upload에 `FOUNDATION_SOURCE_SEGMENT_PAGES=80`,
+  81쪽·300쪽 문서 1건씩 end-to-end 확인 → (4) 문구·`PROCESSING_CEILING_SENTENCE` 변경 build.
+- 되돌리기: worker 변수 삭제(`wrangler versions deploy <prev>@100%`). 저장된 범위는 manifest가 없으면 보이지 않고 소스 삭제 때 함께 지워진다.

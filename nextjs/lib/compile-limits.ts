@@ -1,3 +1,5 @@
+import { PROCESSING_CEILING, PROCESSING_CEILING_MIB } from "../../shared/intakeCeiling";
+
 /**
  * The corpus size contract, declared once.
  *
@@ -74,8 +76,15 @@ export function judgeCompileSet(count: number): CompileSetVerdict {
  * sizes. Printing the larger number to a browser that will refuse at the smaller one would be
  * a promise the page cannot keep, so the workspace passes what its own environment can do.
  */
+/*
+  The per-source ceiling leads, because it is the one a long manual meets. It used to be stated only
+  on /pricing and in the refusal, so a folder of device manuals was chosen, uploaded and refused
+  file by file (founder, 2026-11-10: 12 of 18 manuals over 80 pages, after upload).
+*/
 export function compileLimitsNotice(archiveMb: number) {
-  return `Up to ${CORPUS_MAX_DOCUMENTS} sources per run, compiled in parts of ${COMPILE_MAX_DOCUMENTS}. ` +
+  return `Each file up to ${PROCESSING_CEILING_MIB} MB and ${PROCESSING_CEILING.maxSourcePages} pages; ` +
+    "a longer file is refused, never cut short. " +
+    `Up to ${CORPUS_MAX_DOCUMENTS} sources per run, compiled in parts of ${COMPILE_MAX_DOCUMENTS}. ` +
     `ZIP archives up to ${archiveMb} MB. Larger corpus? Connect a source or talk to us.`;
 }
 
