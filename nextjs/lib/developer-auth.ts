@@ -66,12 +66,31 @@ export async function authorizeFoundationRequest(
   return resolveFoundationAuthorization(request, scope, minimumPlan, true);
 }
 
+/*
+  Revocation is never plan-gated (constitution: "Never let an ACL revoke wait").
+
+  A workspace whose plan lapsed, is on billing hold, or is a free evaluation can still withdraw a
+  connection, a provider credential or a viewer link it holds. The plan answers what a workspace
+  may start. It never decides whether a workspace may stop sharing. Everything else stays: the
+  caller is authenticated and an active member of the workspace, an API key still needs its exact
+  scope, and the route acts only on rows of the caller's own workspace.
+*/
+export async function authorizeFoundationRevoke(request: Request, scope: DeveloperScope) {
+  return resolveFoundationAuthorization(request, scope, null, true);
+}
+
+/** The browser-session half of the same rule, for routes that only accept a session. */
+export async function requireFoundationRevokeSession(request: Request) {
+  return resolveFoundationSession(request, null);
+}
+
 // A late authorization check is not a second billable/rate-limited request.
 // This switch is private to the module, never caller-controlled over HTTP.
+// `null` is the revocation path: membership and scope only, no plan and no trial feature gate.
 async function resolveFoundationAuthorization(
   request: Request,
   scope: DeveloperScope,
-  minimumPlan: MinimumPlanLevel,
+  minimumPlan: MinimumPlanLevel | null,
   consumeRate: boolean,
 ) {
   const authorization = request.headers.get("authorization") ?? "";
@@ -121,6 +140,7 @@ async function resolveFoundationAuthorization(
       code: rate.code,
       status: rate.code === "API_RATE_LIMITED" ? 429 : 503,
     };
+    if (minimumPlan === null) return { ok: true as const, principal };
     const productAccess = await authorizeFoundationProduct(principal.workspaceKey, principal.userId, minimumPlan);
     if (!productAccess.ok) {
       // W1-A2: with TRIAL_AI_ACCESS on, a trial's read-only key is admitted inside its bounds and
@@ -143,6 +163,18 @@ async function resolveFoundationAuthorization(
   if (!access) return { ok: false as const, code: "PILOT_ACCESS_REQUIRED", status: 403 };
   const authority = await resolveWorkspaceAuthority(access.membership.workspaceId, user.id);
   if (!authority.ok) return authority;
+  if (minimumPlan === null) {
+    const principal: FoundationPrincipal = {
+      kind: "session",
+      workspaceKey: access.membership.workspaceId,
+      userId: user.id,
+      scopes: [scope],
+      authorizationRevision: authority.authorizationRevision,
+      workspaceRole: authority.workspaceRole,
+      email: typeof user.email === "string" ? user.email : undefined,
+    };
+    return { ok: true as const, principal };
+  }
   const productAccess = await authorizeFoundationSessionProduct(access.membership.workspaceId, user.id, minimumPlan);
   if (!productAccess.ok) {
     return { ok: false as const, code: productAccess.code, status: productAccess.status };
@@ -185,14 +217,19 @@ export async function revalidateFoundationAuthorization(
 }
 
 export async function requireFoundationSession(request: Request, minimumPlan: MinimumPlanLevel = "observer") {
+  return resolveFoundationSession(request, minimumPlan);
+}
+
+async function resolveFoundationSession(request: Request, minimumPlan: MinimumPlanLevel | null) {
   const user = await getRequestUser(request);
   if (!user) return { ok: false as const, code: "AUTH_REQUIRED", status: 401 };
   const access = foundationPilotAccess(user.id);
   if (!access) return { ok: false as const, code: "PILOT_ACCESS_REQUIRED", status: 403 };
   const authority = await resolveWorkspaceAuthority(access.membership.workspaceId, user.id);
   if (!authority.ok) return authority;
-  const productAccess = await authorizeFoundationSessionProduct(access.membership.workspaceId, user.id, minimumPlan);
-  if (!productAccess.ok) {
+  const productAccess = minimumPlan === null ? null
+    : await authorizeFoundationSessionProduct(access.membership.workspaceId, user.id, minimumPlan);
+  if (productAccess && !productAccess.ok) {
     return { ok: false as const, code: productAccess.code, status: productAccess.status };
   }
   return {
@@ -202,7 +239,7 @@ export async function requireFoundationSession(request: Request, minimumPlan: Mi
       workspaceKey: access.membership.workspaceId,
       userId: user.id,
       scopes: [] as DeveloperScope[],
-      accessSource: productAccess.access.source,
+      accessSource: productAccess?.access.source,
       authorizationRevision: authority.authorizationRevision,
       workspaceRole: authority.workspaceRole,
       email: typeof user.email === "string" ? user.email : undefined,
