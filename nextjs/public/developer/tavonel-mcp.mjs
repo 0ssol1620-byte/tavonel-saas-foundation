@@ -237,7 +237,8 @@ function deliveryOrder(units) {
  * `units` are ContextPacket items or package chunks: `{ unitId, text, sourceVersionId,
  * evidenceIds, pageNumber1, bbox1000 }`. `heading` lines open the manifest (world, question);
  * `notices` are lines it must carry rather than drop (held conflicts, abstention reasons).
- * Returns `{ format, itemCount, manifest, parts }`; every file is `{ name, text, sha256, estTokens }`.
+ * Returns `{ format, itemCount, manifest, parts }`, plus `indexes` when the part list does not fit
+ * the manifest; every file is `{ name, text, sha256, estTokens }`.
  *
  * @param {unknown[]} units
  * @param {{ heading?: string[], notices?: string[], machineFormat?: string, budget?: number }} [options]
@@ -301,7 +302,7 @@ export function renderDelivery(units, {
     throw new DeliveryError("DELIVERY_ITEM_COUNT_MISMATCH", `${delivered} of ${units.length} items reached a part`);
   }
 
-  const manifestLines = [
+  const head = [
     `TAVONEL compiled context, delivery format ${DELIVERY_FORMAT}.`,
     ...heading.map((line) => deliveryOneLine(String(line))),
     `${units.length} item(s) in ${parts.length} part(s), in page order. Read every part; each one fits in a single read.`,
@@ -309,11 +310,41 @@ export function renderDelivery(units, {
     "Cite the evidence ids in the header: each resolves to a source version, page and region. A '## sN source <id>' line names the source of the lines under it.",
     `The machine-readable form of the same items is ${machineFormat}.`,
     ...notices.map((line) => deliveryOneLine(String(line))),
-    ...parts.map((part) =>
-      `${part.name}  items u${part.first.k}-u${part.last.k}  pages ${part.first.page}-${part.last.page}  ` +
-      `${part.items} item(s)  est_tokens ${part.estTokens}  ${part.sha256}`),
   ];
-  const manifestText = `${manifestLines.join("\n")}\n`;
+  const partLines = parts.map((part) =>
+    `${part.name}  items u${part.first.k}-u${part.last.k}  pages ${part.first.page}-${part.last.page}  ` +
+    `${part.items} item(s)  est_tokens ${part.estTokens}  ${part.sha256}`);
+  let manifestText = `${[...head, ...partLines].join("\n")}\n`;
+  /*
+    A manifest that names every part stops fitting one read at roughly 270 parts (about 6 M
+    estimated tokens of text: an 18 MB English World, or a 6 MB Korean one). Past that the part
+    list moves into numbered index files, each within the part budget and each named here with
+    its sha256, so every part is still reachable from the manifest by digest. Below it the output
+    is byte-identical to what it always was.
+  */
+  const indexes = [];
+  if (estimateTokens(manifestText) > budget) {
+    let lines = [];
+    let used = 0;
+    let first = 1;
+    const flush = (last) => {
+      const text = `${lines.join("\n")}\n`;
+      indexes.push({ name: "", text, sha256: deliverySha256(text), estTokens: estimateTokens(text), first, last });
+      lines = []; used = 0; first = last + 1;
+    };
+    partLines.forEach((line, i) => {
+      const cost = estimateTokens(`${line}\n`);
+      if (lines.length && used + cost > budget) flush(i);
+      lines.push(line); used += cost;
+    });
+    flush(partLines.length);
+    const indexWidth = Math.max(3, String(indexes.length).length);
+    indexes.forEach((index, i) => { index.name = `index-${String(i + 1).padStart(indexWidth, "0")}.txt`; });
+    manifestText = `${[...head,
+      `The ${parts.length} parts are listed in ${indexes.length} index file(s), with each part's sha256. Read every index, then every part it names.`,
+      ...indexes.map((index) => `${index.name}  parts ${index.first}-${index.last}  est_tokens ${index.estTokens}  ${index.sha256}`),
+    ].join("\n")}\n`;
+  }
   const manifestTokens = estimateTokens(manifestText);
   if (manifestTokens > budget) {
     throw new DeliveryError("DELIVERY_MANIFEST_OVER_BUDGET", `the manifest is ${manifestTokens} estimated tokens`);
@@ -323,6 +354,7 @@ export function renderDelivery(units, {
     itemCount: units.length,
     manifest: { name: "manifest.txt", text: manifestText, sha256: deliverySha256(manifestText), estTokens: manifestTokens },
     parts: parts.map(({ name, text, sha256, estTokens, items }) => ({ name, text, sha256, estTokens, items })),
+    ...(indexes.length ? { indexes: indexes.map(({ name, text, sha256, estTokens }) => ({ name, text, sha256, estTokens })) } : {}),
   };
 }
 
@@ -719,7 +751,7 @@ export function createServer({ call }) {
   function toolContent(tool, result) {
     if (!tool.deliver) return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     const delivery = tool.deliver(result);
-    const files = [delivery.manifest, ...delivery.parts];
+    const files = [delivery.manifest, ...(delivery.indexes ?? []), ...delivery.parts];
     const total = files.reduce((sum, file) => sum + file.estTokens, 0);
     if (total > DELIVERY_PART_BUDGET_TOKENS) {
       throw new DeliveryError(

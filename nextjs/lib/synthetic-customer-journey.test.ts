@@ -1,6 +1,8 @@
 import { execFile } from "node:child_process";
 import { createServer, type Server } from "node:http";
-import { resolve } from "node:path";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { createHash, generateKeyPairSync } from "node:crypto";
 import { unzipSync } from "fflate";
@@ -47,7 +49,10 @@ import { POST as restore } from "../app/api/collections/[id]/world/rollback/rout
 import { POST as review } from "../app/api/v1/reviews/route";
 import { POST as ask } from "../app/api/collections/[id]/ask/route";
 import { buildWorldReadModel } from "./world-read-model";
-import { buildSignedCollectionZip, validateReviewableCollectionArtifact } from "./collection-download";
+import { GET as openCollection } from "../app/api/collections/[id]/route";
+import { GET as downloadCollection } from "../app/api/collections/[id]/download/route";
+import { buildSignedCollectionZip, COLLECTION_PACKAGE_TOO_LARGE, MAX_UNCOMPRESSED_BYTES,
+  validateReviewableCollectionArtifact } from "./collection-download";
 import { createExportSigner, verifyExportSignature } from "./export-signing";
 
 const exec = promisify(execFile);
@@ -56,15 +61,25 @@ const actor = "969dc192-daa2-4119-a5d9-9a7621f171a1";
 const source = "synthetic-payment-policy";
 const token = "tvnl_live_synthetic_local_fixture";
 const question = "What are the payment terms?";
-function compile(version: string, days: number) {
+// `filler` adds manual-shaped regions after the payment clause, on later pages, so a World can be
+// built at the package size a 96 MiB Core budget produces without changing what is asked of it.
+function compile(version: string, days: number, filler = 0) {
   const text = `The synthetic customer's payment terms require payment within ${days} days.`;
   const key = `immutable/${workspace}/${workspace}/${source}/${version}/sanitized.pdf`;
+  const regions: CollectionOcrInput["regions"] = [{ regionId: "payment-p1-b1", pageIndex0: 0, pageNumber1: 1,
+    order: 0, blockType: "paragraph", text, bbox1000: [80, 120, 920, 320],
+    confidence: 0.99, authority: "contractual" }];
+  for (let index = 0; index < filler; index += 1) {
+    const page = 2 + Math.floor(index / 20);
+    regions.push({ regionId: `manual-p${page}-b${index % 20}`, pageIndex0: page - 1, pageNumber1: page,
+      order: index % 20, blockType: "paragraph", bbox1000: [80, 40 + (index % 20) * 45, 920, 80 + (index % 20) * 45],
+      text: `Maintenance step ${index} inspects valve ${index % 97} and records torque ${index % 13} newton metres. `
+        .repeat(64).trim(), confidence: 0.99, authority: "official" });
+  }
   const inputs: CollectionOcrInput[] = [{
     documentId: source, versionKey: version, sanitizedKey: key, sourceImmutableKey: key,
     ocrJsonKey: key.replace("sanitized.pdf", "ocr.json"), inputSha256: `sha256:${version}`,
-    pageCount: 1, text, regions: [{ regionId: "payment-p1-b1", pageIndex0: 0, pageNumber1: 1,
-      order: 0, blockType: "paragraph", text, bbox1000: [80, 120, 920, 320],
-      confidence: 0.99, authority: "contractual" }],
+    pageCount: regions[regions.length - 1]!.pageNumber1, text: regions.map(region => region.text).join("\n"), regions,
   }];
   const candidate = compileCollectionCandidate(inputs);
   // The model boundary is a fixture, not a claim that the fallback is Core. Materialize
@@ -305,4 +320,90 @@ describe("same synthetic customer across revisions and consumers", () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
   });
+});
+
+/*
+  The read path at the size the 96 MiB Core rollout produces (2026-11-10).
+
+  cjob-7b3bd740 compiled 12 sources, Core answered 200 and the World was stored -- and then every
+  read refused it as COLLECTION_PACKAGE_INVALID, because the package verifier still stopped at
+  24 MiB. Nothing tested a stored World above that size on the read side, so this walks one
+  through every consumer: stored (the real serializer's admission), verified, opened, downloaded
+  and checked by the published verifier, then activated and asked. And one byte past the bound
+  is refused by name, with its size, on every route that reads it.
+*/
+describe("a World at the package size a 96 MiB Core produces", () => {
+  it("is stored, verified, opened, downloaded, verified offline and asked; past the bound it is refused by name", async () => {
+    const big = compile("c".repeat(64), 60, 3_400);
+    const packageBytes = big.package.files.reduce((total, file) => total + file.sizeBytes, 0);
+    expect(big.lifecycle).toBe("candidate");
+    // Above the 24 MiB that refused cjob-7b3bd740, inside the bound that replaced it.
+    expect(packageBytes).toBeGreaterThan(38_000_000);
+    expect(packageBytes).toBeLessThanOrEqual(MAX_UNCOMPRESSED_BYTES);
+    const chunks = big.package.files.find(file => file.path === "rag/chunks.jsonl")!;
+    expect(chunks.sizeBytes).toBeGreaterThan(8 * 1024 * 1024); // the ask bound this replaced
+
+    const { serializeCollectionCandidate } = await vi.importActual<typeof import("./r2-objects")>("./r2-objects");
+    const stored = serializeCollectionCandidate(big);
+    expect(stored.ok).toBe(true);
+    artifacts = new Map([[keyFor(big), big]]);
+    expect(validateReviewableCollectionArtifact(big, collection)).not.toBeNull();
+
+    const read = (path: string) => new Request(`https://tavonel.test/api/collections/${collection}${path}`,
+      { headers: { authorization: `Bearer ${token}` } });
+    const opened = await openCollection(read(""), context);
+    expect(opened.status).toBe(200);
+    const openedBody = await opened.json();
+    expect(openedBody.artifact.manifestDigest).toBe(big.manifestDigest);
+
+    const keys = generateKeyPairSync("ed25519");
+    const signer = createExportSigner({ keyId: "synthetic-export-fixture",
+      privateKeyPkcs8DerBase64: keys.privateKey.export({ format: "der", type: "pkcs8" }).toString("base64") })!;
+    vi.stubEnv("TAVONEL_EXPORT_SIGNING_KEY_ID", "synthetic-export-fixture");
+    vi.stubEnv("TAVONEL_EXPORT_SIGNING_PRIVATE_KEY_PKCS8_DER_B64",
+      keys.privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"));
+    const directory = await mkdtemp(join(tmpdir(), "tavonel-large-export-"));
+    try {
+      const download = await downloadCollection(read("/download"), context);
+      expect(download.status).toBe(200);
+      const archive = Buffer.from(await download.arrayBuffer());
+      const entries = unzipSync(archive);
+      expect(entries["rag/chunks.jsonl"]!.byteLength).toBe(chunks.sizeBytes);
+      // More delivery parts than one manifest can list in a single read: the part list is in index files.
+      expect(Object.keys(entries).some(path => path.startsWith("delivery/index-"))).toBe(true);
+      console.log(JSON.stringify({ packageBytes, archiveBytes: archive.byteLength, entries: Object.keys(entries).length,
+        uncompressedBytes: Object.values(entries).reduce((total, entry) => total + entry.byteLength, 0) }));
+      await writeFile(join(directory, "package.zip"), archive);
+      for (const script of ["../public/developer/tavonel-verify-export.mjs", "../scripts/verify-signed-export.mjs"]) {
+        const verified = await exec(process.execPath, [resolve(import.meta.dirname, script),
+          "--archive", join(directory, "package.zip"), "--trusted-fingerprint", signer.publicKeySpkiSha256], { timeout: 60_000 });
+        expect(JSON.parse(verified.stdout)).toMatchObject({ ok: true, collectionId: collection });
+      }
+      await exec(process.execPath, [resolve(import.meta.dirname, "../public/developer/tavonel-verify-package.mjs"),
+        "--package", join(directory, "package.zip"), "--json"], { timeout: 60_000, maxBuffer: 64 * 1024 * 1024 });
+    } finally {
+      vi.unstubAllEnvs();
+      await rm(directory, { recursive: true, force: true });
+    }
+
+    await approve(big);
+    expect((await publish(mutationRequest(publishBody(big, "44444444-4444-4444-8444-444444444444")), context)).status).toBe(200);
+    const answer = await consume();
+    expect(answer.answer).toContain("60 days");
+
+    const content = "x".repeat(MAX_UNCOMPRESSED_BYTES - packageBytes + 1);
+    const over = { ...big, package: { ...big.package, files: [...big.package.files, {
+      path: "canonical/padding.txt", mediaType: "text/plain; charset=utf-8", sizeBytes: content.length,
+      sha256: `sha256:${createHash("sha256").update(content).digest("hex")}`, content }] } };
+    artifacts = new Map([[keyFor(big), over as Fixture]]);
+    const refusal = { code: COLLECTION_PACKAGE_TOO_LARGE, bytes: MAX_UNCOMPRESSED_BYTES + 1, bound: MAX_UNCOMPRESSED_BYTES };
+    for (const response of [await openCollection(read(""), context), await downloadCollection(read("/download"), context)]) {
+      expect(response.status).toBe(422);
+      expect(await response.json()).toEqual(refusal);
+    }
+    const asked = await fetch(`${base}/api/v1/collections/${collection}/ask`, { method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ question }) });
+    expect(asked.status).toBe(422);
+    expect((await asked.json()).code).toBe(COLLECTION_PACKAGE_TOO_LARGE);
+  }, 180_000);
 });

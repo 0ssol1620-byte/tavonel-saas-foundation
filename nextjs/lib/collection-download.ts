@@ -53,7 +53,39 @@ const MAX_PACKAGE_FILES = 200;
  * Exported so `collection-compiler.ts` can name the number its budget is derived from instead of
  * restating it, and so a test can assert the derivation still holds.
  */
-export const MAX_UNCOMPRESSED_BYTES = 24 * 1024 * 1024;
+/*
+ * Re-derived 2026-11-10 from 24 MiB, from the Core output budget it now has to serve (PR #237 /
+ * AKC #163). Core refuses a candidate over `TAVONEL_CORE_OUTPUT_BUDGET_BYTES` (96 MiB in the
+ * rollout plan), and the package is 0.535 of the candidate it travels in (6 synthetic manuals,
+ * 6,072 regions: package 46,830,331 B of candidate 87,530,520 B; receipt w2/OUT-20261110/m6.json),
+ * so the largest package Core can hand over is 0.535 x 100,663,296 = 53.9 MB = 51.4 MiB. 56 MiB is
+ * the next round size above it. At 24 MiB the 96 MiB Core compiled and stored a 12-source World
+ * (cjob-7b3bd740, 2026-11-10) that every read route then refused as COLLECTION_PACKAGE_INVALID.
+ *
+ * Past it the refusal is `COLLECTION_PACKAGE_TOO_LARGE` with the bytes and this bound
+ * (`collectionPackageSizeRefusal`), never the generic invalid-package code.
+ */
+export const MAX_UNCOMPRESSED_BYTES = 56 * 1024 * 1024;
+
+export const COLLECTION_PACKAGE_TOO_LARGE = "COLLECTION_PACKAGE_TOO_LARGE" as const;
+
+/**
+ * Why a stored package that failed validation failed, when the reason is its size. Called only on
+ * the refusal branch, so a valid package pays nothing for it. Counts the content actually stored,
+ * not the declared `sizeBytes`, because a declared size is the thing validation does not trust.
+ */
+export function collectionPackageSizeRefusal(
+  value: unknown,
+): { code: typeof COLLECTION_PACKAGE_TOO_LARGE; bytes: number; bound: number } | null {
+  const files = (value as { package?: { files?: unknown } } | null)?.package?.files;
+  if (!Array.isArray(files)) return null;
+  let bytes = 0;
+  for (const file of files) {
+    const content = (file as { content?: unknown } | null)?.content;
+    if (typeof content === "string") bytes += Buffer.byteLength(content, "utf8");
+  }
+  return bytes > MAX_UNCOMPRESSED_BYTES ? { code: COLLECTION_PACKAGE_TOO_LARGE, bytes, bound: MAX_UNCOMPRESSED_BYTES } : null;
+}
 /**
  * Exported so /developers can list what a package contains from the code that writes it.
  *
@@ -414,7 +446,8 @@ export function buildPackageDelivery(artifact: ReviewableCollectionArtifact): Ar
     ],
     machineFormat: "rag/chunks.jsonl in this package",
   });
-  return [delivery.manifest, ...delivery.parts].map((file) => ({ path: `delivery/${file.name}`, text: file.text }));
+  return [delivery.manifest, ...(delivery.indexes ?? []), ...delivery.parts]
+    .map((file) => ({ path: `delivery/${file.name}`, text: file.text }));
 }
 
 export function buildSignedCollectionZip(artifact: ReviewableCollectionArtifact, signer: ExportSigner) {

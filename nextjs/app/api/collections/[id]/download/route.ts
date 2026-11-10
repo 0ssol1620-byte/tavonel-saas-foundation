@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
-import { buildSignedCollectionZip, validateReviewableCollectionArtifact } from "@/lib/collection-download";
+import { buildSignedCollectionZip, collectionPackageSizeRefusal, validateReviewableCollectionArtifact } from "@/lib/collection-download";
 import { DeliveryError } from "@/public/developer/tavonel-mcp.mjs";
 import { readExportSignerEnv } from "@/lib/export-signing";
 import { recordServerFunnel } from "@/lib/funnel-events";
@@ -65,7 +65,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     }
     const artifact = validateReviewableCollectionArtifact(loaded.value.artifact, id);
     if (!artifact) {
-      return NextResponse.json({ code: "COLLECTION_PACKAGE_INVALID" }, { status: 422, headers: NO_STORE });
+      return NextResponse.json(collectionPackageSizeRefusal(loaded.value.artifact) ?? { code: "COLLECTION_PACKAGE_INVALID" },
+        { status: 422, headers: NO_STORE });
     }
     const sourceIds = collectionSourceDocumentIds(artifact);
     if (!sourceIds) return NextResponse.json({ code: "COLLECTION_SOURCE_BINDING_INVALID" }, { status: 422, headers: NO_STORE });

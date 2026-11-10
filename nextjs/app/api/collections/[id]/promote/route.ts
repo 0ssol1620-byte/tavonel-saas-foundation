@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { checkActivationRateLimit } from "@/lib/activation-rate-limit";
-import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
+import { collectionPackageSizeRefusal, validatePromotableCollectionArtifact } from "@/lib/collection-download";
 import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
 import { assertEquivalenceGate } from "@/lib/equivalence-gate";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
@@ -188,7 +188,7 @@ export async function POST(
     stored.coreExecution.receipt.candidatePromotion !== false
   ) {
     return NextResponse.json(
-      { code: "WORLD_CANDIDATE_NOT_PROMOTABLE" },
+      collectionPackageSizeRefusal(loaded.json) ?? { code: "WORLD_CANDIDATE_NOT_PROMOTABLE" },
       { status: 422, headers: NO_STORE }
     );
   }

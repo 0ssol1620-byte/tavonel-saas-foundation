@@ -90,7 +90,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     }
   }
   const loaded = await loadWorldReadModel(auth.principal.workspaceKey, id, selected);
-  if (!loaded.ok) return NextResponse.json({ code: loaded.code }, { status: loaded.status, headers: NO_STORE });
+  if (!loaded.ok) return NextResponse.json({ code: loaded.code, bytes: loaded.bytes, bound: loaded.bound }, { status: loaded.status, headers: NO_STORE });
   const shared = {
     code: "OK",
     world: loaded.model.world,
