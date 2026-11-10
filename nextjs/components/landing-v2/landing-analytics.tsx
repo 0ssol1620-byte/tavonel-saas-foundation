@@ -157,10 +157,12 @@ export default function LandingAnalytics({ variant }: { variant?: LandingVariant
       that counted only the mouse would report the keyboard path as unused. `trackFunnelOnce` is
       what keeps a reader who sweeps a pointer across the strip from producing a hundred rows.
     */
+    // Founder 2026-11-10: the hero's film is the tabbed compile slot and the recorded walkthrough sits below the fold;
+    // both count, so hero_demo_interact rows from this date on also include the hero tabs.
     const onDemo = (event: Event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
-      if (target.closest("#s1 [data-source-inspection-film] button, #s1 .compile-film-sequence button, #s2 .compile-film-sequence button, #s2 [data-compiler-specimen] button, #s2 [data-source-digest] button[aria-pressed][aria-controls], #s2 [data-specimen-strip] label, #s2 [data-specimen-strip] summary")) {
+      if (target.closest("#s1 [data-source-inspection-film] button, #s1 [data-testid=hero-compile-tabs] [role=tab], #walkthrough .compile-film-sequence button, #s2 .compile-film-sequence button, #s2 [data-compiler-specimen] button, #s2 [data-source-digest] button[aria-pressed][aria-controls], #s2 [data-specimen-strip] label, #s2 [data-specimen-strip] summary")) {
         trackFunnelOnce("hero_demo_interact", arm);
       }
     };

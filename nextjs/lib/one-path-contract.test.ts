@@ -159,7 +159,9 @@ describe("approved one-path experience", () => {
     expect(onDemo).toContain('trackFunnelOnce("hero_demo_interact", arm)');
     const selector = onDemo.match(/target\.closest\("([^"]+)"\)/)?.[1] ?? "";
     const parts = selector.split(",").map(part => part.trim());
-    expect(parts, "the film's controls, where the film now is").toContain("#s1 .compile-film-sequence button");
+    // Founder 2026-11-10: the hero film is the tabbed slot in s1; the recorded walkthrough moved below the fold.
+    expect(parts, "the hero film's tabs").toContain("#s1 [data-testid=hero-compile-tabs] [role=tab]");
+    expect(parts, "the film's controls, where the film now is").toContain("#walkthrough .compile-film-sequence button");
     expect(parts, "decision A preserves prepared source UI engagement")
       .toContain("#s2 [data-source-digest] button[aria-pressed][aria-controls]");
     expect(onDemo, "the engagement hook adds no action or document payload")
