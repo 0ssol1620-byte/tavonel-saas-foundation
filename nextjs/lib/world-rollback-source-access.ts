@@ -1,4 +1,4 @@
-import { validatePromotableCollectionArtifact } from "./collection-download";
+import { collectionPackageSizeRefusal, validatePromotableCollectionArtifact } from "./collection-download";
 import { collectionSourceDocumentIds } from "./collection-source-access";
 import { checkConnectorSourceAccess } from "./connector-source-access";
 import { collectionCandidateKey } from "./immutable-keys";
@@ -23,7 +23,7 @@ export async function checkRollbackSourceAccess(
   const artifact = validatePromotableCollectionArtifact(loaded.json, collectionId);
   if (!artifact || artifact.manifestDigest !== manifestDigest ||
       artifact.coreExecution.runtime !== "tavonel-python-core-v2") {
-    return { ok: false, code: "ROLLBACK_TARGET_ARTIFACT_INVALID", status: 422 };
+    return { ok: false, code: collectionPackageSizeRefusal(loaded.json)?.code ?? "ROLLBACK_TARGET_ARTIFACT_INVALID", status: 422 };
   }
   const model = buildWorldReadModel(loaded.json, collectionId);
   if (!model || model.evidence.length === 0) {

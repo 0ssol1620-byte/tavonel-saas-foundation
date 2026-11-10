@@ -1,4 +1,4 @@
-import { validateReviewableCollectionArtifact } from "./collection-download";
+import { collectionPackageSizeRefusal, validateReviewableCollectionArtifact } from "./collection-download";
 import { loadPreferredCollectionCandidate } from "./collection-storage";
 import { COLLECTION_ID_PATTERN } from "./immutable-keys";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
@@ -742,7 +742,7 @@ export function buildWorldReadModel(value: unknown, collectionId: string, contex
 
 export type LoadWorldReadModelResult =
   | { ok: true; model: WorldReadModel }
-  | { ok: false; code: string; status: number };
+  | { ok: false; code: string; status: number; bytes?: number; bound?: number };
 
 /**
  * Read one World, optionally a specific version of it.
@@ -766,7 +766,11 @@ export async function loadWorldReadModel(
   const versions = active.ok ? await listFoundationWorldVersions(workspaceKey, collectionId) : { ok: true as const, versions: [] };
   if (!versions.ok) return { ok: false, code: versions.code, status: 503 };
   const artifact = validateReviewableCollectionArtifact(loaded.value.artifact, collectionId);
-  const documentIds = artifact ? collectionSourceDocumentIds(artifact) : null;
+  if (!artifact) {
+    const tooLarge = collectionPackageSizeRefusal(loaded.value.artifact);
+    return tooLarge ? { ok: false, ...tooLarge, status: 422 } : { ok: false, code: "COLLECTION_PACKAGE_INVALID", status: 422 };
+  }
+  const documentIds = collectionSourceDocumentIds(artifact);
   if (!documentIds) return { ok: false, code: "COLLECTION_SOURCE_BINDING_INVALID", status: 422 };
   const sourceAccess = await checkConnectorSourceAccess(workspaceKey, documentIds);
   if (!sourceAccess.ok) return { ok: false, code: sourceAccess.code,

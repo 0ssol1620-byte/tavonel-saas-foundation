@@ -6501,7 +6501,7 @@ test('affected ontology name preview admission: lookalikes, spellings, modes, st
     'nextjs/lib/world-ontology-rename-preview.tsx','nextjs/lib/ontology-class-rename-preview.md','nextjs/lib/ontology-class-rename-preview.spec.ts',
     'nextjs/lib/ontology-class-rename-preview.test.tsx','nextjs/lib/ontology-class-rename-previewXtest.ts','nextjs/lib/ontology-class-rename-preview-copy.test.ts',
     'nextjs/lib/__snapshots__/ontology-class-rename-preview.test.ts.snap',
-    'nextjs/lib/world-read-model.ts','nextjs/lib/world-read-model.test.ts','nextjs/lib/world-ontology.ts','nextjs/lib/ontology-mutation.ts','nextjs/lib/world-ontology-store.ts',
+    'nextjs/lib/world-read-model.tsx','nextjs/lib/world-read-model.test.ts','nextjs/lib/world-ontology.ts','nextjs/lib/ontology-mutation.ts','nextjs/lib/world-ontology-store.ts',
     'nextjs/app/api/v1/worlds/[id]/ontology/route.ts','nextjs/app/api/v1/worlds/[id]/ontology/classes/[classId]/rename/route.ts','nextjs/app/api/v1/ontology-class-rename-preview/route.ts',
     'nextjs/app/api/ontology/rename/route.ts','nextjs/app/worlds/[id]/ontology/page.tsx','nextjs/e2e/world-ontology-rename-preview.spec.ts','nextjs/e2e/ontology-class-rename-preview.spec.ts',
     'supabase/functions/ontology-class-rename/index.ts',
@@ -6560,7 +6560,7 @@ test('affected ontology name preview admission: mixed unknown, an unknown rename
   assert.deepEqual([mixed.groups,mixed.unitFiles,mixed.browserFiles],[AFFECTED_ONTOLOGY_OLD_GROUPS,AFFECTED_ONTOLOGY_OLD_UNITS,[AFFECTED_ONTOLOGY_SPEC]],'diagnostic selection is retained beside the failure');
   assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/);
   // A rename with one unowned endpoint refuses in either direction, for the sole-owned paths and for the viewer pair.
-  for (const paths of [[AFFECTED_ONTOLOGY_PREVIEW,'nextjs/components/world-ontology-rename-preview-v2.tsx'],['nextjs/lib/world-read-model.ts',AFFECTED_ONTOLOGY_MODEL],
+  for (const paths of [[AFFECTED_ONTOLOGY_PREVIEW,'nextjs/components/world-ontology-rename-preview-v2.tsx'],['nextjs/lib/world-read-model-v2.ts',AFFECTED_ONTOLOGY_MODEL],
     [AFFECTED_ONTOLOGY_TEST,'nextjs/lib/ontology-class-rename-preview.spec.ts'],[AFFECTED_ONTOLOGY_VIEWER,'nextjs/components/world-ontology-editor.tsx'],
     ['nextjs/components/world-ontology-viewer.module.scss',AFFECTED_ONTOLOGY_VIEWER_CSS]]) {
     const known=paths.find(path=>AFFECTED_ONTOLOGY_PATHS.includes(path)),unknown=paths.find(path=>path!==known),old=affectedOntologyOld(known);
@@ -7575,7 +7575,7 @@ test('affected packet-delivery-20261102 owner: 9 exact paths select 12 direct su
     assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['packet-delivery-20261102'], [], [...suites].sort(), [], []], path);
     assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false], path);
   }
-  for (const adjacent of ['nextjs/app/api/collections/[id]/route.ts', 'nextjs/lib/ai-package-guidance.tsx', 'nextjs/lib/packet-delivery.ts', 'nextjs/lib/consumer-context/consumer-context.ts', 'nextjs/public/developer/tavonel-verify-export.mjs', 'nextjs/scripts/compiled-world/verify-external-roundtrip.py', 'lib/packet-delivery.test.ts']) {
+  for (const adjacent of ['nextjs/app/api/collections/[id]/route.tsx', 'nextjs/lib/ai-package-guidance.tsx', 'nextjs/lib/packet-delivery.ts', 'nextjs/lib/consumer-context/consumer-context.ts', 'nextjs/public/developer/tavonel-verify-export.cjs', 'nextjs/scripts/compiled-world/verify-external-roundtrip.py', 'lib/packet-delivery.test.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
@@ -8444,6 +8444,26 @@ test('affected workspace-connector-chips-20261110 owner: 2 exact paths select 1 
   const plan = affectedAskPlan(map);
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
   for (const adjacent of ['nextjs/lib/workspace-source-choices.tsx', 'nextjs/lib/workspace-source-choice.ts', 'nextjs/lib/workspace-source-choices.spec.ts', 'nextjs/components/workspace-source-choices.tsx', 'lib/workspace-source-choices.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
+// world-read-cap-20261110: one finite owner, restated independently of the exported constants.
+import { WORLD_READ_CAP_AFFECTED_PATHS, WORLD_READ_CAP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected world-read-cap-20261110 owner: 10 exact paths select 14 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/api/collections/[id]/route.ts', 'app/api/v1/world/[id]/[lens]/route.ts', 'app/api/v1/world/[id]/route.ts', 'lib/active-world-source-access.ts', 'lib/collection-storage.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/world-read-model.ts', 'lib/world-rollback-source-access.ts', 'public/developer/tavonel-verify-export.mjs', 'scripts/verify-signed-export.mjs'];
+  const suites = ['lib/api-error-codes.test.ts', 'lib/ask-route-limits.test.ts', 'lib/collection-download.test.ts', 'lib/collection-storage.test.ts', 'lib/compiler-contract.test.ts', 'lib/developer-distribution.test.ts', 'lib/export-route-authorization.test.ts', 'lib/grounded-ask.test.ts', 'lib/openapi-completeness.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/world-read-model.test.ts', 'lib/world-rollback-source-access.test.ts'];
+  assert.deepEqual([[...WORLD_READ_CAP_AFFECTED_PATHS], [...WORLD_READ_CAP_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['world-read-cap-20261110'], path);
+  }
+  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['world-read-cap-20261110'], [], suites, [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  const plan = affectedAskPlan(map);
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
+  for (const adjacent of ['nextjs/app/api/collections/[id]/page.tsx', 'nextjs/app/api/v1/world/[id]/[lens]/page.tsx', 'nextjs/lib/collection-storage.test.ts', 'nextjs/public/developer/tavonel-verify-export.test.mjs', 'nextjs/scripts/verify-signed-export.test.mjs', 'lib/world-read-model.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);

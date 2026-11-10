@@ -277,7 +277,7 @@ describe("Foundation collection package download", () => {
     // The derivation `collection-compiler.ts` documents: the worst case of ~2.5 KiB of package
     // per object across the whole budget, plus the 2,826,476 B the Apple corpus's region text,
     // source binding, provenance and validation files were measured to cost beside them.
-    expect(MAX_UNCOMPRESSED_BYTES).toBe(24 * 1024 * 1024);
+    expect(MAX_UNCOMPRESSED_BYTES).toBe(56 * 1024 * 1024);
     expect(EXTRACTION_CANDIDATE_BUDGET * 2_560 + 2_826_476).toBeLessThanOrEqual(MAX_UNCOMPRESSED_BYTES);
     // And the budget still has to reach the corpus §24 directs: 290 pages, 6,300 objects.
     expect(EXTRACTION_CANDIDATE_BUDGET).toBeGreaterThanOrEqual(6_300);

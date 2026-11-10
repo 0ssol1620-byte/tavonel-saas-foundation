@@ -941,7 +941,9 @@ export default function WorkspacePage() {
       !paths.includes("graph/nodes.csv") ||
       !paths.includes("graph/relationships.csv")
     ) {
-      setNotice(`Immutable collection verification failed. ${failureSentence(json.code, response.status)}`);
+      setNotice(json.code === "COLLECTION_PACKAGE_TOO_LARGE"
+        ? failureSentence(json.code, response.status)
+        : `Immutable collection verification failed. ${failureSentence(json.code, response.status)}`);
       return;
     }
     setCollectionResult({ ...artifact, artifactKey: json.artifactKey ?? "" });

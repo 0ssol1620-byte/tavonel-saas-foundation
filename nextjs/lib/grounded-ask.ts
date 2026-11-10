@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { MAX_UNCOMPRESSED_BYTES } from "./collection-download";
 import {
   verifyGroundedCitations,
   type ContextPacket,
@@ -169,7 +170,9 @@ export function parseChunks(artifact: AskArtifact) {
   );
   if (
     typeof file?.content !== "string" ||
-    file.content.length > 8 * 1024 * 1024
+    // The package bound, not a smaller one of its own. This was 8 MiB and returned no chunks
+    // past it, so a validated World with more text than that answered as if it held nothing.
+    file.content.length > MAX_UNCOMPRESSED_BYTES
   )
     return [];
   const rows = file.content.split("\n").filter(Boolean);

@@ -29,7 +29,9 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
   the access action while closed, Start free in S2.
 */
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
+/* The route the header is rendered on. "/" everywhere except the self-link check below. */
+const nav = vi.hoisted(() => ({ path: "/" }));
+vi.mock("next/navigation", () => ({ usePathname: () => nav.path }));
 
 const policy = vi.hoisted(() => ({ customerDataOpen: false }));
 vi.mock("./activation-policy", async (importOriginal) => {
@@ -339,6 +341,28 @@ describe.each(STATES)("CTA truth in %s", (state) => {
     expect(seen.header).toEqual(expected.header);
     expect(seen.headerKo).toEqual(expected.headerKo);
   });
+
+  /*
+    An action may not point at its own page (PR #235 review R1/R2, S2). The browser test of this ran only where the start
+    is /contact, and CI's width projects serve live commerce, where the start is /login and /login has no public header,
+    so it was skipped in every run. Here it runs in every state: on the start's own route the header keeps Sign in and
+    offers no start. The header test above, on "/", is its failure path -- the same render there does carry the start.
+  */
+  it("the header offers no start on the start's own page", async () => {
+    const { PublicSiteHeader } = await import("../components/public-site-chrome");
+    for (const [korean, start] of [[false, expected.header], [true, expected.headerKo]] as const) {
+      nav.path = start.href;
+      try {
+        const html = renderToStaticMarkup(createElement(PublicSiteHeader, { korean }));
+        const actions = anchors(block(html, 'class="nav-actions"', "span"));
+        expect(html, `${start.href}: no header start`).not.toContain('data-analytics="header-start"');
+        expect(actions.map((action) => action.label), `${start.href}: the start goes`).not.toContain(start.label);
+        expect(actions.at(-1), `${start.href}: Sign in stays, last`).toEqual({ href: "/login", label: korean ? "로그인" : "Sign in" });
+      } finally {
+        nav.path = "/";
+      }
+    }
+  }, RENDER_TIMEOUT);
 
   it("Home hero primary, hero secondary and close", () => {
     expect(seen.home).toEqual(expected.home);
