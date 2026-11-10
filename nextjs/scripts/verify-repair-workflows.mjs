@@ -484,10 +484,10 @@ assert(REPAIR_NODE_EVIDENCE_CONTRACT_FILE===ciNodeSuites[0]&&REPAIR_NODE_GATE_RE
   'CI selector keeps exactly the registered Node evidence and Vitest gate receipt contracts, with finite endpoints and no product neighbor admission');
 // Current compile, navigation and version comparison ownership is finite and restated independently.
 const currentOwnerBindings = [
-  // EN-0c benchmarks path mask: four exact paths selecting seven direct suites, no browser suite.
-  { group: 'benchmarks-path-mask', paths: ['app/benchmarks/page.tsx', 'lib/benchmarks-page.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts'],
-    exportedPaths: BENCHMARKS_PATH_MASK_AFFECTED_PATHS, suites: ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/trust-page-answers.test.ts'], exportedSuites: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES,
-    neighbors: ['app/benchmarks/page.ts', 'app/benchmarks/gdp-pdf/page.tsx', 'lib/model-arena-page-data.tsx', 'components/benchmarks/arena-chart.tsx', 'content/benchmarks/model-arena-20260903.json'] },
+  // EN-0c benchmarks path mask, plus the 2026-11-10 public-copy cleanup: six exact paths selecting ten direct suites, no browser suite.
+  { group: 'benchmarks-path-mask', paths: ['app/benchmarks/page.tsx', 'app/research/notes/opengraph-image.tsx', 'lib/benchmarks-page.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts', 'lib/public-copy-purge.test.ts'],
+    exportedPaths: BENCHMARKS_PATH_MASK_AFFECTED_PATHS, suites: ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/og-card-frame.test.ts', 'lib/public-copy-purge.test.ts', 'lib/seo-surface.test.ts', 'lib/trust-page-answers.test.ts'], exportedSuites: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES,
+    neighbors: ['app/benchmarks/page.ts', 'app/benchmarks/gdp-pdf/page.tsx', 'lib/model-arena-page-data.tsx', 'components/benchmarks/arena-chart.tsx', 'content/benchmarks/model-arena-20260903.json', 'app/research/opengraph-image.tsx', 'lib/public-copy-purge.ts'] },
   // OCR_PAGES_INCOMPLETE: four exact paths selecting three direct suites, no browser suite.
   { group: 'ocr-pages-incomplete-code', paths: ['lib/operations-p0.test.ts', 'lib/operations-p0.ts', 'lib/processing-receipts.test.ts', 'lib/processing-receipts.ts'],
     exportedPaths: OCR_PAGES_INCOMPLETE_AFFECTED_PATHS, suites: ['lib/documents-route.test.ts', 'lib/operations-p0.test.ts', 'lib/processing-receipts.test.ts'], exportedSuites: OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES,

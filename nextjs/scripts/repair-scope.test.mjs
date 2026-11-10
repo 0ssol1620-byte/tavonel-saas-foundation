@@ -7368,11 +7368,13 @@ test('affected OCR_PAGES_INCOMPLETE owner: four exact paths select three direct 
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
-test('affected benchmarks path mask owner: four exact paths select seven direct suites and no browser suite; neighbours stay unmapped', () => {
+test('affected benchmarks path mask owner: six exact paths select ten direct suites and no browser suite; neighbours stay unmapped', () => {
   const suites = ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts',
-    'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/trust-page-answers.test.ts'];
+    'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/og-card-frame.test.ts',
+    'lib/public-copy-purge.test.ts', 'lib/seo-surface.test.ts', 'lib/trust-page-answers.test.ts'];
   assert.deepEqual([[...BENCHMARKS_PATH_MASK_AFFECTED_PATHS], [...BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES]], [['app/benchmarks/page.tsx',
-    'lib/benchmarks-page.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts'], suites]);
+    'app/research/notes/opengraph-image.tsx', 'lib/benchmarks-page.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts',
+    'lib/public-copy-purge.test.ts'], suites]);
   for (const path of BENCHMARKS_PATH_MASK_AFFECTED_PATHS) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['benchmarks-path-mask'], path);
     const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
@@ -7383,7 +7385,8 @@ test('affected benchmarks path mask owner: four exact paths select seven direct 
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
   for (const adjacent of ['nextjs/app/benchmarks/page.ts', 'nextjs/app/benchmarks/gdp-pdf/page.tsx', 'nextjs/lib/model-arena-page-data.tsx',
     'nextjs/lib/model-arena-page-data-v2.ts', 'nextjs/lib/benchmarks-page.test.tsx', 'nextjs/components/benchmarks/arena-chart.tsx',
-    'nextjs/content/benchmarks/model-arena-20260903.json', 'lib/model-arena-page-data.ts']) {
+    'nextjs/content/benchmarks/model-arena-20260903.json', 'lib/model-arena-page-data.ts', 'nextjs/app/research/opengraph-image.tsx',
+    'nextjs/lib/public-copy-purge.ts']) {
     if (assertUxProgramEndpoint(adjacent)) continue;
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
