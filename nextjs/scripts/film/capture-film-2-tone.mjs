@@ -2,7 +2,7 @@
   Capture opening-film-2 in a tone/variant, frame by frame from its own clock (window.__filmSeek),
   reading the canvas backing store (no page chrome, no dev overlay).
 
-    node scripts/film/capture-film-2-tone.mjs <base-url+path?query> <out-dir> <width> <height> [fps] [seconds]
+    node scripts/film/capture-film-2-tone.mjs <base-url+path?query> <out-dir> <width> <height> [fps] [seconds] [deviceScaleFactor=2]
 
   e.g. http://127.0.0.1:3057/film-lab?tone=light  work/a-wide 1440 900
   The canvas draws at devicePixelRatio 2, so a 1440x900 stage gives 2880x1800 frames.
@@ -13,14 +13,14 @@ import { join, resolve } from "node:path";
 
 const require = createRequire(resolve("package.json"));
 const { chromium } = require("@playwright/test");
-const [url, outDir, w, h, fpsArg, secArg] = process.argv.slice(2);
+const [url, outDir, w, h, fpsArg, secArg, dsfArg] = process.argv.slice(2);
 const FPS = Number(fpsArg ?? 25);
 const RUN = Number(secArg ?? 18);
 rmSync(outDir, { recursive: true, force: true });
 mkdirSync(outDir, { recursive: true });
 
 const browser = await chromium.launch();
-const context = await browser.newContext({ viewport: { width: Number(w), height: Number(h) }, deviceScaleFactor: 2, reducedMotion: "no-preference" });
+const context = await browser.newContext({ viewport: { width: Number(w), height: Number(h) }, deviceScaleFactor: Number(dsfArg ?? 2), reducedMotion: "no-preference" });
 const page = await context.newPage();
 page.on("pageerror", (e) => console.log("PAGEERROR", e.message));
 await page.goto(url, { waitUntil: "networkidle", timeout: 180_000 });
