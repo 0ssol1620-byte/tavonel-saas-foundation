@@ -10,13 +10,14 @@
 import { useEffect, useRef } from "react";
 import { FILM_ACT as ACT } from "@/lib/film-script";
 import { buildWorldGraph, nodeBudget, type WorldGraph } from "@/lib/world-graph";
+import { compileGraph, dimAlpha, LIGHT_AREAS, tint, type FilmTone } from "@/lib/film-tone";
 
 const ONTO_SPLIT = 0.50;
 const SOURCE_SPLIT = 0.50;
 const PERIOD = 4.4;
 const WORLD_UNTIL = 17.2;
 
-const AREA_RGB: [number, number, number][] = [
+const AREA_DARK: [number, number, number][] = [
   [242, 166, 90],
   [80, 210, 170],
   [90, 170, 230],
@@ -347,14 +348,18 @@ function deltaAt(t: number): { d: Delta; local: number } {
   return { d: DELTAS[i], local: Math.min(1, (t - i * PERIOD) / PERIOD) };
 }
 
-export default function OpeningFilm3(_props: { onEnded?: () => void }) {
+export default function OpeningFilm3({ tone = "dark", compiled = false, playing = true }: { onEnded?: () => void; tone?: FilmTone; compiled?: boolean; playing?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const playingRef = useRef(true);
   const startRef = useRef(0);
   const elapsedRef = useRef(0);
   const reducedRef = useRef(false);
 
+  useEffect(() => { playingRef.current = playing; }, [playing]);
+
   useEffect(() => {
+    const C = (dark: string) => tint(tone, dark);
+    const AREA_RGB = tone === "light" ? LIGHT_AREAS : AREA_DARK;
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d");
     if (!canvas || !context) return;
@@ -364,7 +369,7 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
     let height = 0;
     let frame = 0;
     let plaster: HTMLImageElement | null = null;
-    let graph: WorldGraph | null = null;
+    let graph: (WorldGraph & { doc?: number[]; coreStart?: number }) | null = null;
     let cancelled = false;
 
     const layout = () => {
@@ -374,11 +379,11 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
       canvas.width = Math.round(width * ratio);
       canvas.height = Math.round(height * ratio);
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
-      graph = buildWorldGraph(Math.min(420, nodeBudget(width, height)));
+      graph = compiled ? compileGraph(buildWorldGraph(Math.min(420, nodeBudget(width, height)))) : buildWorldGraph(Math.min(420, nodeBudget(width, height)));
     };
 
     const studio = () => {
-      context.fillStyle = "#070809";
+      context.fillStyle = C("#070809");
       context.fillRect(0, 0, width, height);
       if (plaster) {
         context.globalAlpha = 0.07;
@@ -389,16 +394,16 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
 
     const pane = (x: number, y: number, w: number, h: number, title: string, live: string) => {
       roundRect(context, x, y, w, h, 8);
-      context.fillStyle = "#101214";
+      context.fillStyle = C("#101214");
       context.fill();
-      context.strokeStyle = "#2e353b";
+      context.strokeStyle = C("#2e353b");
       context.stroke();
-      context.fillStyle = "#16191c";
+      context.fillStyle = C("#16191c");
       context.fillRect(x, y, w, 26);
-      context.fillStyle = "#edeae4";
+      context.fillStyle = C("#edeae4");
       context.font = "500 10px ui-monospace, Menlo, monospace";
       context.fillText(title, x + 10, y + 17);
-      context.fillStyle = "rgba(40,140,110,0.95)";
+      context.fillStyle = C("rgba(40,140,110,0.95)");
       context.textAlign = "right";
       context.fillText(live, x + w - 8, y + 17);
       context.textAlign = "left";
@@ -409,7 +414,7 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
       d: Delta, local: number,
     ) => {
       const listH = Math.round(h * SOURCE_SPLIT);
-      context.fillStyle = "#0b0d0e";
+      context.fillStyle = C("#0b0d0e");
       context.fillRect(x, y, w, h);
       const rowH = 17;
       const slots = Math.max(8, Math.floor((listH - 8) / rowH));
@@ -421,17 +426,17 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
         const on = name === d.file;
         const touched = d.touch.includes(name);
         if (on) {
-          context.fillStyle = "#1a2220";
+          context.fillStyle = C("#1a2220");
           context.fillRect(x + 4, yy - 2, w - 8, rowH);
         } else if (touched) {
-          context.fillStyle = "#1a1814";
+          context.fillStyle = C("#1a1814");
           context.fillRect(x + 4, yy - 2, w - 8, rowH);
         }
-        context.fillStyle = on ? "#7be0be" : touched ? "#e0c07a" : "#8a9399";
+        context.fillStyle = on ? C("#7be0be") : touched ? C("#e0c07a") : C("#8a9399");
         context.font = `${on || touched ? "600" : "400"} 10px ui-monospace, Menlo, monospace`;
         context.fillText(name, x + 10, yy + 11);
         if (on || touched) {
-          context.fillStyle = on ? "#7be0be" : "#e0c07a";
+          context.fillStyle = on ? C("#7be0be") : C("#e0c07a");
           context.font = "600 8px ui-monospace, Menlo, monospace";
           context.textAlign = "right";
           context.fillText(on ? "CHANGED" : "TOUCHED", x + w - 10, yy + 11);
@@ -441,26 +446,26 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
       const dx = x;
       const dy = y + listH + 4;
       const dh = h - listH - 4;
-      context.fillStyle = "#0e1114";
+      context.fillStyle = C("#0e1114");
       context.fillRect(dx, dy, w, dh);
       const dRow = 11;
       const maxDiff = Math.max(8, Math.floor((dh - 6) / dRow));
       const plusN = Math.max(1, Math.floor(d.plus.length * clamp01(0.2 + local * 1.5)));
       const diffRows: { color: string; text: string }[] = [
-        { color: "rgba(123,224,190,0.85)", text: `diff  ${d.file}  ${d.clause}` },
-        { color: "#7d878d", text: `--- a/${d.file}` },
-        { color: "#7d878d", text: `+++ b/${d.file}` },
-        { color: "#8fb4c9", text: `@@ ${d.clause} @@` },
+        { color: C("rgba(123,224,190,0.85)"), text: `diff  ${d.file}  ${d.clause}` },
+        { color: C("#7d878d"), text: `--- a/${d.file}` },
+        { color: C("#7d878d"), text: `+++ b/${d.file}` },
+        { color: C("#8fb4c9"), text: `@@ ${d.clause} @@` },
       ];
-      d.mdKeep.slice(0, 4).forEach((line) => diffRows.push({ color: "#9aa3a8", text: `  ${line}` }));
-      diffRows.push({ color: "#e07a5f", text: `- ${d.minus}` });
-      diffRows.push({ color: "#7be0be", text: `+ ${d.plus.slice(0, plusN)}` });
-      d.mdKeep.slice(4).forEach((line) => diffRows.push({ color: "#9aa3a8", text: `  ${line}` }));
+      d.mdKeep.slice(0, 4).forEach((line) => diffRows.push({ color: C("#9aa3a8"), text: `  ${line}` }));
+      diffRows.push({ color: C("#e07a5f"), text: `- ${d.minus}` });
+      diffRows.push({ color: C("#7be0be"), text: `+ ${d.plus.slice(0, plusN)}` });
+      d.mdKeep.slice(4).forEach((line) => diffRows.push({ color: C("#9aa3a8"), text: `  ${line}` }));
       if (local > 0.35) {
         d.sat.forEach((s) => {
-          diffRows.push({ color: "#8fb4c9", text: `@@ ${s.name} @@` });
-          diffRows.push({ color: "#e07a5f", text: `- ${s.minus}` });
-          diffRows.push({ color: "#7be0be", text: `+ ${s.plus}` });
+          diffRows.push({ color: C("#8fb4c9"), text: `@@ ${s.name} @@` });
+          diffRows.push({ color: C("#e07a5f"), text: `- ${s.minus}` });
+          diffRows.push({ color: C("#7be0be"), text: `+ ${s.plus}` });
         });
       }
       diffRows.slice(0, maxDiff).forEach((row, i) => {
@@ -474,14 +479,14 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
       x: number, y: number, w: number, h: number,
       d: Delta, local: number,
     ) => {
-      context.fillStyle = "#0b0d0e";
+      context.fillStyle = C("#0b0d0e");
       context.fillRect(x, y, w, h);
-      context.fillStyle = "rgba(123,224,190,0.85)";
+      context.fillStyle = C("rgba(123,224,190,0.85)");
       context.font = "500 8px ui-monospace, Menlo, monospace";
       context.fillText("NODE.md", x + 8, y + 12);
       const rowH = 10;
       const gutter = 22;
-      context.fillStyle = "#121416";
+      context.fillStyle = C("#121416");
       context.fillRect(x, y + 16, gutter, h - 16);
       const lines: { text: string; kind: "keep" | "del" | "add" }[] = [];
       d.mdKeep.slice(0, 3).forEach((row) => lines.push({ text: row, kind: "keep" }));
@@ -503,20 +508,20 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
         });
       });
       packed.slice(0, maxRows).forEach((row, i) => {
-        context.fillStyle = "#1a1e22";
+        context.fillStyle = C("#1a1e22");
         context.fillRect(x + gutter, y + 16 + i * rowH, w - gutter, 1);
-        context.fillStyle = "#3a4248";
+        context.fillStyle = C("#3a4248");
         context.font = "400 8px ui-monospace, Menlo, monospace";
         context.fillText(String(i + 1), x + 4, y + 26 + i * rowH);
         if (row.kind === "del") {
-          context.fillStyle = local < 0.45 ? "#e07a5f" : "#3a4248";
+          context.fillStyle = local < 0.45 ? C("#e07a5f") : C("#3a4248");
           context.fillText(`- ${row.text}`, x + gutter + 6, y + 26 + i * rowH);
         } else if (row.kind === "add") {
           const n = Math.floor(row.text.length * clamp01((local - 0.2) / 0.55));
-          context.fillStyle = "#7be0be";
+          context.fillStyle = C("#7be0be");
           context.fillText(`+ ${row.text.slice(0, Math.max(0, n))}`, x + gutter + 6, y + 26 + i * rowH);
         } else {
-          context.fillStyle = "#c8ced2";
+          context.fillStyle = C("#c8ced2");
           context.fillText(row.text, x + gutter + 6, y + 26 + i * rowH);
         }
       });
@@ -526,14 +531,14 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
       x: number, y: number, w: number, h: number,
       d: Delta, local: number, accent: string,
     ) => {
-      context.fillStyle = "#0b0d0e";
+      context.fillStyle = C("#0b0d0e");
       context.fillRect(x, y, w, h);
-      context.fillStyle = "rgba(123,224,190,0.85)";
+      context.fillStyle = C("rgba(123,224,190,0.85)");
       context.font = "500 8px ui-monospace, Menlo, monospace";
       context.fillText("ontology.ttl", x + 8, y + 12);
       const rowH = 10;
       const gutter = 22;
-      context.fillStyle = "#121416";
+      context.fillStyle = C("#121416");
       context.fillRect(x, y + 16, gutter, h - 16);
       const editLines: string[] = [];
       d.ttlEdits.forEach((edit) => {
@@ -547,24 +552,24 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
       });
       const maxRows = Math.max(6, Math.floor((h - 18) / rowH));
       packed.slice(0, maxRows).forEach((row, i) => {
-        context.fillStyle = "#1a1e22";
+        context.fillStyle = C("#1a1e22");
         context.fillRect(x + gutter, y + 16 + i * rowH, w - gutter, 1);
-        context.fillStyle = "#3a4248";
+        context.fillStyle = C("#3a4248");
         context.font = "400 8px ui-monospace, Menlo, monospace";
         context.fillText(String(i + 1), x + 4, y + 24 + i * rowH);
         const isOld = d.ttlEdits.some((e) => row.includes(e.old.trim().slice(0, 22)));
         const isNew = d.ttlEdits.some((e) => row.includes(e.new.trim().slice(0, 22)));
         context.font = "400 8px ui-monospace, Menlo, monospace";
         if (isOld) {
-          context.fillStyle = local < 0.45 ? "#e07a5f" : "#3a4248";
+          context.fillStyle = local < 0.45 ? C("#e07a5f") : C("#3a4248");
         } else if (isNew) {
           context.fillStyle = accent;
         } else if (row.startsWith("@prefix") || row.startsWith(":")) {
-          context.fillStyle = "#edeae4";
+          context.fillStyle = C("#edeae4");
         } else if (row.includes("owl:") || row.includes("rdfs:")) {
           context.fillStyle = accent;
         } else {
-          context.fillStyle = "#c8ced2";
+          context.fillStyle = C("#c8ced2");
         }
         context.fillText(row, x + gutter + 6, y + 24 + i * rowH);
       });
@@ -574,9 +579,9 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
       x: number, y: number, w: number, h: number,
       d: Delta,
     ) => {
-      context.fillStyle = "#0b0d0e";
+      context.fillStyle = C("#0b0d0e");
       context.fillRect(x, y, w, h);
-      context.fillStyle = "rgba(123,224,190,0.85)";
+      context.fillStyle = C("rgba(123,224,190,0.85)");
       context.font = "500 8px ui-monospace, Menlo, monospace";
       context.fillText("TBox  ·  affected only", x + 8, y + 12);
       const cols = 2;
@@ -601,22 +606,22 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
         const by = innerY + r * (cardH + gap);
         const on = id === d.label;
         const attrs = CLASS_ATTRS[id] ?? [["iri", "xsd:anyURI 1"]];
-        context.fillStyle = on ? "#1a2220" : "#16191c";
+        context.fillStyle = on ? C("#1a2220") : C("#16191c");
         roundRect(context, bx, by, cardW, cardH, 2);
         context.fill();
-        context.strokeStyle = on ? "rgba(123,224,190,0.8)" : "#2e353b";
+        context.strokeStyle = on ? C("rgba(123,224,190,0.8)") : C("#2e353b");
         context.lineWidth = on ? 1.2 : 1;
         roundRect(context, bx, by, cardW, cardH, 2);
         context.stroke();
-        context.fillStyle = on ? "#7be0be" : "#3d4a46";
+        context.fillStyle = on ? C("#7be0be") : C("#3d4a46");
         context.fillRect(bx, by, 3, cardH);
-        context.fillStyle = "#edeae4";
+        context.fillStyle = C("#edeae4");
         context.font = "600 8px Wanted Sans Variable, system-ui, sans-serif";
         context.fillText(id.length > 16 ? `${id.slice(0, 14)}…` : id, bx + 8, by + 12);
-        context.fillStyle = "#7d878d";
+        context.fillStyle = C("#7d878d");
         context.font = "500 7px ui-monospace, Menlo, monospace";
         context.fillText("owl:Class", bx + 8, by + 22);
-        context.fillStyle = "#8fb4c9";
+        context.fillStyle = C("#8fb4c9");
         attrs.slice(0, 2).forEach((attr, k) => {
           context.fillText(`${attr[0]}  ${attr[1]}`, bx + 8, by + 34 + k * 10);
         });
@@ -637,7 +642,7 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
         const na = g.nodes[ia];
         const nb = g.nodes[ib];
         if (!na || !nb) return;
-        context.strokeStyle = "rgba(80,88,94,0.16)";
+        context.strokeStyle = C("rgba(80,88,94,0.16)");
         context.lineWidth = 0.7;
         context.beginPath();
         context.moveTo(ox + na.x * gw, oy + na.y * gh);
@@ -663,7 +668,7 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
           const na = g.nodes[origin];
           const nb = g.nodes[ib];
           if (!na || !nb) return;
-          const rgb = AREA_RGB[na.area % AREA_RGB.length];
+          const rgb = AREA_RGB[(g.doc?.[origin] ?? na.area) % AREA_RGB.length];
           context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.92)`;
           context.lineWidth = 1.45;
           context.beginPath();
@@ -673,7 +678,7 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
         });
       }
       g.nodes.forEach((node, i) => {
-        const rgb = AREA_RGB[node.area % AREA_RGB.length];
+        const rgb = AREA_RGB[(g.doc?.[i] ?? node.area) % AREA_RGB.length];
         const isSel = i === selected;
         const isA = live.has(i);
         const r = (isSel ? 4.2 : isA ? 2.6 : 1.5) * node.radius;
@@ -681,12 +686,12 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
           ? `rgb(${Math.min(255, rgb[0] + 50)},${rgb[1]},${rgb[2]})`
           : isA
             ? `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.95)`
-            : `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.28)`;
+            : `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${dimAlpha(tone, 0.28)})`;
         context.beginPath();
         context.arc(ox + node.x * gw, oy + node.y * gh, r, 0, Math.PI * 2);
         context.fill();
       });
-      context.fillStyle = "#7d878d";
+      context.fillStyle = C("#7d878d");
       context.font = "500 8px ui-monospace, Menlo, monospace";
       const trace = Math.floor(clamp01(t / WORLD_UNTIL) * 4);
       const steps = ["WORLD edge", d.label, d.file, d.clause];
@@ -706,13 +711,13 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
       const colW = (bw - gap * 3) / 4;
       const xs = [0, 1, 2, 3].map((i) => bx + i * (colW + gap));
 
-      context.fillStyle = "#14171a";
+      context.fillStyle = C("#14171a");
       context.fillRect(bx, by, bw, 32);
-      context.fillStyle = "rgba(123,224,190,0.9)";
+      context.fillStyle = C("rgba(123,224,190,0.9)");
       context.beginPath();
       context.arc(bx + 14, by + 16, 4, 0, Math.PI * 2);
       context.fill();
-      context.fillStyle = "#edeae4";
+      context.fillStyle = C("#edeae4");
       context.font = "500 12px Wanted Sans Variable, system-ui, sans-serif";
       context.fillText("TAVONEL  ·  Recompile the slice", bx + 26, by + 20);
 
@@ -775,7 +780,13 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
           frame = window.requestAnimationFrame(tick);
           return;
         }
-        if (playingRef.current) elapsedRef.current += (now - startRef.current) / 1000;
+        if (!playingRef.current) {
+          // Paused by the host (offscreen, hidden tab): hold the frame and draw nothing.
+          startRef.current = now;
+          frame = window.requestAnimationFrame(tick);
+          return;
+        }
+        elapsedRef.current += (now - startRef.current) / 1000;
         startRef.current = now;
         if (elapsedRef.current >= ACT.stop) elapsedRef.current = 0;
         const current = elapsedRef.current;
@@ -796,7 +807,7 @@ export default function OpeningFilm3(_props: { onEnded?: () => void }) {
       .then((pl) => { if (cancelled) return; plaster = pl; stop = startLoop(); })
       .catch(() => { if (!cancelled) stop = startLoop(); });
     return () => { cancelled = true; stop?.(); };
-  }, []);
+  }, [tone, compiled]);
 
   return (
     <div className="film">

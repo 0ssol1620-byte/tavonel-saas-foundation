@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { primaryCallToAction } from "../lib/commercial-state";
 
 /*
   Release 2 (2026-10-15), brief move 5: the workbench Evidence Line, and the header CTA guard.
@@ -179,8 +180,34 @@ test("the region crop keeps the record bbox and shows a padded window around it"
   expect(w3!).toBeGreaterThan(b3!);
 });
 
-test("the header CTA points at the public sample and is not a self-link", async ({ page }, testInfo) => {
+/*
+  Founder 2026-11-10: the header's action is the visitor's start, never the public sample ("Open the compiled sample" read
+  as "enter the dashboard"). This runner's posture decides which start: the access action while checkout is closed, Start
+  free once it is live (lib/commercial-state.ts).
+*/
+const HEADER_START = primaryCallToAction();
+test("the header CTA is the start action, not the public sample", async ({ page }, testInfo) => {
   test.skip(!["1440", "1920"].includes(testInfo.project.name), "the header actions show from 1250px");
   await page.goto("/pricing");
-  await expect(page.locator("header.nav .nav-actions a.btn")).toHaveAttribute("href", "/explore");
+  const cta = page.locator("header.nav .nav-actions a.btn");
+  await expect(cta).toHaveCount(1);
+  await expect(cta).toHaveAttribute("href", HEADER_START.href);
+  await expect(cta).toHaveText(HEADER_START.label);
+  await expect(page.locator('header.nav .nav-actions a[href="/explore"]')).toHaveCount(0);
+});
+
+/*
+  An action may not point at its own page (PR #235 review R1, S2: the self-link guard kept, its test restored). On the
+  start's own page the header offers no start, and Sign in stays. /ko/contact is a 308 to /contact since GX-02.
+*/
+test("the header hides its start on the start's own page", async ({ page }, testInfo) => {
+  test.skip(!["1440", "1920"].includes(testInfo.project.name), "the header actions show from 1250px");
+  test.skip(HEADER_START.href !== "/contact", "live posture: the start is /login, which has no public header");
+  for (const path of ["/contact", "/ko/contact"]) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/contact$/);
+    await expect(page.locator("header.nav .nav-actions a.nav-signin")).toBeVisible();
+    await expect(page.locator('header.nav .nav-actions a[data-analytics="header-start"]'), `${path}: no self-link`).toHaveCount(0);
+    await expect(page.locator(`header.nav .nav-actions a[href="${HEADER_START.href}"]`)).toHaveCount(0);
+  }
 });

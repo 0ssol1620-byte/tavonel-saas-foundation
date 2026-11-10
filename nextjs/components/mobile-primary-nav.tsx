@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, type ReactNode } from "react";
-import { NavCurrentLink } from "@/components/site-nav/desktop-primary-nav";
+import { NavCurrentLink, useSignedIn } from "@/components/site-nav/desktop-primary-nav";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_OPEN_EVENT } from "@/lib/marketing-analytics";
@@ -19,7 +19,7 @@ import { NAV_OPEN_EVENT } from "@/lib/marketing-analytics";
  * The words are handed in too (`labels`), from `KO_CHROME`, so this file imports no navigation
  * module at all: see the note at the top of `components/site-nav/desktop-primary-nav.tsx`.
  */
-export default function MobilePrimaryNav({ korean = false, signedIn = false, labels, start, children }: {
+export default function MobilePrimaryNav({ korean = false, signedIn: signedInProp, labels, start, children }: {
   korean?: boolean;
   signedIn?: boolean;
   labels: { menu: string; pricing: string; signIn: string };
@@ -31,6 +31,8 @@ export default function MobilePrimaryNav({ korean = false, signedIn = false, lab
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDetailsElement>(null);
+  // The header's rule (founder 2026-11-10): signed in, the sheet's foot is Open workspace; signed out, Sign in and the start.
+  const signedIn = useSignedIn(signedInProp);
   const pathname = usePathname();
   const close = useCallback(() => {
     const details = ref.current;
@@ -119,18 +121,16 @@ export default function MobilePrimaryNav({ korean = false, signedIn = false, lab
           inline as `undefined` here (BA-232) -- so the sheet carries the one label that is true
           in both postures and nothing else.
         */}
-        {signedIn ? (
-          <Link className="mobile-nav-signin" href="/workspace">{korean ? "워크스페이스" : "Your workspace"}</Link>
-        ) : (
-          <a className="mobile-nav-signin" href="/login">{labels.signIn}</a>
-        )}
+        {signedIn ? null : <a className="mobile-nav-signin" href="/login">{labels.signIn}</a>}
         {/*
           Conversion pass 2026-11-09 (funnel audit fix 3). Below the desktop switch the header is the
           wordmark and Menu, and its one action (the public sample) is desktop-only, so a phone reader
           had Pricing in reach and no way to start. The start action is the sheet's foot, filled. It
           does not repeat the header: the header's action is the sample, this one is the start.
         */}
-        {start && !signedIn ? (
+        {signedIn ? (
+          <Link className="btn mobile-nav-start" href="/workspace">{korean ? "워크스페이스 열기" : "Open workspace"}</Link>
+        ) : start ? (
           <a className="btn mobile-nav-start" href={start.href}>{start.label}</a>
         ) : null}
       </nav>

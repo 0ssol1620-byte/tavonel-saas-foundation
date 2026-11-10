@@ -31,6 +31,7 @@ import { PROCESSING_GA_AFFECTED_PATHS, PROCESSING_GA_AFFECTED_UNIT_FILES } from 
 import { TRIAL_TO_PAID_AFFECTED_PATHS, TRIAL_TO_PAID_AFFECTED_UNIT_FILES, TRIAL_TO_PAID_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { SLI_ALERT_NOISE_AFFECTED_PATHS, SLI_ALERT_NOISE_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { HOME_CONNECTOR_CHIPS_AFFECTED_PATHS, HOME_CONNECTOR_CHIPS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { HERO_COMPILE_TABS_AFFECTED_PATHS, HERO_COMPILE_TABS_AFFECTED_UNIT_FILES, HERO_COMPILE_TABS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { CONNECTORS_DEVELOPER_AFFECTED_PATHS, CONNECTORS_DEVELOPER_AFFECTED_UNIT_FILES, CONNECTORS_DEVELOPER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS, REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 
@@ -813,6 +814,14 @@ for (const binding of [
     browsers: ['e2e/billing-lifecycle.spec.ts'],
     rows: ["['e2e/billing-lifecycle.spec.ts', ['audit', 'audit-768', 'audit-1280']],"],
     neighbors: ['nextjs/app/api/collections/[id]/promote/route.tsx', 'nextjs/components/processing-consent-panel.module.scss', 'nextjs/lib/activation-cohort.ts', 'nextjs/lib/cookbook-contents.ts', 'lib/keyword-map.ts', 'nextjs/e2e/billing-lifecycle.spec.tsx', 'nextjs/app/api/collections/[id]/search/route.tsx'] },
+  // hero-compile-tabs-20261110: twenty-nine exact paths, five direct suites, four browser suites with their reviewed rows.
+  { group: 'hero-compile-tabs-20261110', prefix: 'nextjs/', exportedPaths: HERO_COMPILE_TABS_AFFECTED_PATHS, exportedSuites: HERO_COMPILE_TABS_AFFECTED_UNIT_FILES,
+    exportedBrowsers: HERO_COMPILE_TABS_AFFECTED_BROWSER_FILES,
+    paths: ['components/landing-v2/hero-compile-tabs.module.css', 'components/landing-v2/hero-compile-tabs.tsx', 'components/opening-film-2.tsx', 'components/opening-film-3.tsx', 'components/opening-film-4.tsx', 'components/opening-film.tsx', 'lib/film-tone.ts', 'public/film/hero-tab-1-2x.avif', 'public/film/hero-tab-1-2x.webp', 'public/film/hero-tab-1.avif', 'public/film/hero-tab-1.mp4', 'public/film/hero-tab-1.webp', 'public/film/hero-tab-2-2x.avif', 'public/film/hero-tab-2-2x.webp', 'public/film/hero-tab-2.avif', 'public/film/hero-tab-2.mp4', 'public/film/hero-tab-2.webp', 'public/film/hero-tab-3-2x.avif', 'public/film/hero-tab-3-2x.webp', 'public/film/hero-tab-3.avif', 'public/film/hero-tab-3.mp4', 'public/film/hero-tab-3.webp', 'public/film/hero-tab-4-2x.avif', 'public/film/hero-tab-4-2x.webp', 'public/film/hero-tab-4.avif', 'public/film/hero-tab-4.mp4', 'public/film/hero-tab-4.webp', 'scripts/film/capture-film-2-tone.mjs', 'scripts/film/hero-tabs.mjs'],
+    suites: ['components/compile-stage-player.mobile-view.test.tsx', 'lib/brand-copy.test.ts', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts', 'lib/opening-film.test.ts'],
+    browsers: ['e2e/hero-four-stage-restoration.spec.ts', 'e2e/hero-home-responsive.spec.ts', 'e2e/landing-hero-film-loading.spec.ts', 'e2e/landing-v2.spec.ts'],
+    rows: ["['e2e/hero-four-stage-restoration.spec.ts', ['1440', '390']],", "['e2e/hero-home-responsive.spec.ts', ['1440']],", "['e2e/landing-hero-film-loading.spec.ts', ['390']],", "['e2e/landing-v2.spec.ts', ['1440', '390', '360', 'reduced-motion']],"],
+    neighbors: ['nextjs/components/landing-v2/hero-compile-tabs.module.scss', 'nextjs/components/landing-v2/hero-compile-tabs.test.tsx', 'nextjs/components/opening-film-5.tsx', 'nextjs/lib/film-tone.test.ts', 'nextjs/public/film/hero-tab-5.mp4', 'nextjs/public/film/hero-tab-1-3x.webp', 'nextjs/scripts/film/hero-tabs-2.mjs', 'lib/film-tone.ts'] },
   // connectors-developer-20261110: four exact paths, nine direct suites, the one browser suite it edits.
   { group: 'connectors-developer-20261110', prefix: 'nextjs/', exportedPaths: CONNECTORS_DEVELOPER_AFFECTED_PATHS, exportedSuites: CONNECTORS_DEVELOPER_AFFECTED_UNIT_FILES,
     exportedBrowsers: CONNECTORS_DEVELOPER_AFFECTED_BROWSER_FILES,

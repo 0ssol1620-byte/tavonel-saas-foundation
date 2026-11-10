@@ -11,6 +11,7 @@ import { useEffect, useRef } from "react";
 import { CHANGE } from "@/lib/demo-world";
 import { FILM_ACT as ACT } from "@/lib/film-script";
 import { buildWorldGraph, nodeBudget, type WorldGraph } from "@/lib/world-graph";
+import { compileGraph, LIGHT_AREAS, tint, type FilmTone } from "@/lib/film-tone";
 
 export { FILM_CAPTIONS, FILM_DURATION } from "@/lib/film-script";
 
@@ -44,7 +45,7 @@ const FILLER = [
 ];
 
 const INK = ["#1a1612", "#163050", "#173028", "#2a1736", "#1a2c18"];
-const AREA_RGB: [number, number, number][] = [
+const AREA_DARK: [number, number, number][] = [
   [242, 166, 90],
   [80, 210, 170],
   [90, 170, 230],
@@ -285,14 +286,18 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number): string
   return out;
 }
 
-export default function OpeningFilm(_props: { onEnded?: () => void }) {
+export default function OpeningFilm({ tone = "dark", compiled = false, playing = true }: { onEnded?: () => void; tone?: FilmTone; compiled?: boolean; playing?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const playingRef = useRef(true);
   const startRef = useRef(0);
   const elapsedRef = useRef(0);
   const reducedRef = useRef(false);
 
+  useEffect(() => { playingRef.current = playing; }, [playing]);
+
   useEffect(() => {
+    const C = (dark: string) => tint(tone, dark);
+    const AREA_RGB = tone === "light" ? LIGHT_AREAS : AREA_DARK;
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d");
     if (!canvas || !context) return;
@@ -303,7 +308,7 @@ export default function OpeningFilm(_props: { onEnded?: () => void }) {
     let frame = 0;
     let paper: HTMLImageElement | null = null;
     let plaster: HTMLImageElement | null = null;
-    let graph: WorldGraph | null = null;
+    let graph: (WorldGraph & { doc?: number[]; coreStart?: number }) | null = null;
     let cancelled = false;
 
     const layout = () => {
@@ -313,11 +318,11 @@ export default function OpeningFilm(_props: { onEnded?: () => void }) {
       canvas.width = Math.round(width * ratio);
       canvas.height = Math.round(height * ratio);
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
-      graph = buildWorldGraph(Math.min(420, nodeBudget(width, height)));
+      graph = compiled ? compileGraph(buildWorldGraph(Math.min(420, nodeBudget(width, height)))) : buildWorldGraph(Math.min(420, nodeBudget(width, height)));
     };
 
     const studio = () => {
-      context.fillStyle = "#070809";
+      context.fillStyle = C("#070809");
       context.fillRect(0, 0, width, height);
       if (plaster) {
         context.globalAlpha = 0.07;
@@ -328,16 +333,16 @@ export default function OpeningFilm(_props: { onEnded?: () => void }) {
 
     const pane = (x: number, y: number, w: number, h: number, title: string, live: string, light?: boolean) => {
       roundRect(context, x, y, w, h, 8);
-      context.fillStyle = light ? "#e8e4dc" : "#101214";
+      context.fillStyle = light ? "#e8e4dc" : C("#101214");
       context.fill();
-      context.strokeStyle = light ? "#c8c2b6" : "#2e353b";
+      context.strokeStyle = light ? "#c8c2b6" : C("#2e353b");
       context.stroke();
-      context.fillStyle = light ? "#f4f1ea" : "#16191c";
+      context.fillStyle = light ? "#f4f1ea" : C("#16191c");
       context.fillRect(x, y, w, 26);
-      context.fillStyle = light ? "#2a2622" : "#edeae4";
+      context.fillStyle = light ? "#2a2622" : C("#edeae4");
       context.font = "500 10px ui-monospace, Menlo, monospace";
       context.fillText(title, x + 10, y + 17);
-      context.fillStyle = "rgba(40,140,110,0.95)";
+      context.fillStyle = C("rgba(40,140,110,0.95)");
       context.textAlign = "right";
       context.fillText(live, x + w - 8, y + 17);
       context.textAlign = "left";
@@ -350,10 +355,10 @@ export default function OpeningFilm(_props: { onEnded?: () => void }) {
       const live = Math.min(DRIVE_FILES.length, 6 + Math.floor(t / 0.14));
       pane(x, y, w, h, "SOURCES", `${live} files`);
       const rail = 64;
-      context.fillStyle = "#121416";
+      context.fillStyle = C("#121416");
       context.fillRect(x, y + 26, rail, h - 26);
       ["Work", "Scan", "Notes"].forEach((label, i) => {
-        context.fillStyle = i === 0 ? "#edeae4" : "#7d878d";
+        context.fillStyle = i === 0 ? C("#edeae4") : C("#7d878d");
         context.font = "500 10px Wanted Sans Variable, system-ui, sans-serif";
         context.fillText(label, x + 8, y + 46 + i * 18);
       });
@@ -363,13 +368,13 @@ export default function OpeningFilm(_props: { onEnded?: () => void }) {
         const name = DRIVE_FILES[i % DRIVE_FILES.length];
         const iy = listTop + vis * rowH;
         if (name === active) {
-          context.fillStyle = "rgba(123,224,190,0.12)";
+          context.fillStyle = C("rgba(123,224,190,0.12)");
           context.fillRect(x + rail, iy - 12, w - rail, 18);
         }
-        context.fillStyle = name === active ? "#7be0be" : "#8a9399";
+        context.fillStyle = name === active ? C("#7be0be") : C("#8a9399");
         roundRect(context, x + rail + 8, iy - 8, 7, 9, 1.5);
         context.fill();
-        context.fillStyle = name === active ? "#edeae4" : "#c8ced2";
+        context.fillStyle = name === active ? C("#edeae4") : C("#c8ced2");
         context.font = "500 11px Wanted Sans Variable, system-ui, sans-serif";
         context.fillText(name.length > 22 ? `${name.slice(0, 20)}…` : name, x + rail + 20, iy);
       }
@@ -536,7 +541,7 @@ export default function OpeningFilm(_props: { onEnded?: () => void }) {
     ) => {
       context.save();
       roundRect(context, x, y, w, h, 2);
-      context.fillStyle = lockAll ? "#f7f2e8" : "#1a1614";
+      context.fillStyle = lockAll ? "#f7f2e8" : C("#1a1614");
       context.fill();
       context.beginPath();
       roundRect(context, x, y, w, h, 2);
@@ -605,20 +610,20 @@ export default function OpeningFilm(_props: { onEnded?: () => void }) {
     };
 
     const drawMd = (x: number, y: number, w: number, h: number, md: string, local: number) => {
-      context.fillStyle = "#0b0d0e";
+      context.fillStyle = C("#0b0d0e");
       context.fillRect(x, y, w, h);
-      context.fillStyle = "rgba(123,224,190,0.85)";
+      context.fillStyle = C("rgba(123,224,190,0.85)");
       context.font = "500 8px ui-monospace, Menlo, monospace";
       context.fillText("WORKING COPY.md", x + 8, y + 12);
       const rowH = 11;
       const maxRows = Math.max(4, Math.floor((h - 20) / rowH));
       const gutter = 22;
-      context.fillStyle = "#121416";
+      context.fillStyle = C("#121416");
       context.fillRect(x, y + 16, gutter, h - 16);
       for (let i = 0; i < maxRows; i += 1) {
-        context.fillStyle = "#1a1e22";
+        context.fillStyle = C("#1a1e22");
         context.fillRect(x + gutter, y + 16 + i * rowH, w - gutter, 1);
-        context.fillStyle = "#3a4248";
+        context.fillStyle = C("#3a4248");
         context.font = "400 8px ui-monospace, Menlo, monospace";
         context.fillText(String(i + 1), x + 4, y + 24 + i * rowH);
       }
@@ -634,18 +639,18 @@ export default function OpeningFilm(_props: { onEnded?: () => void }) {
       });
       lines.slice(0, maxRows).forEach((row, i) => {
         context.fillStyle = row.startsWith("#")
-          ? "#edeae4"
+          ? C("#edeae4")
           : row.startsWith("|") || row.startsWith("!")
-            ? "#7be0be"
+            ? C("#7be0be")
             : row.startsWith(">") || row.startsWith("source") || row.startsWith("path")
-              ? "#7d878d"
-              : "#c8ced2";
+              ? C("#7d878d")
+              : C("#c8ced2");
         context.fillText(row, x + gutter + 6, y + 24 + i * rowH);
       });
     };
 
     const drawWorld = (x: number, y: number, w: number, h: number, t: number) => {
-      context.fillStyle = "#edeae4";
+      context.fillStyle = C("#edeae4");
       context.font = "500 9px ui-monospace, Menlo, monospace";
       context.fillText("COMPANY KNOWLEDGE", x + 8, y + 12);
       if (!graph) return;
@@ -661,7 +666,7 @@ export default function OpeningFilm(_props: { onEnded?: () => void }) {
       g.nodes.forEach((node, i) => {
         const pop = through(t, born(i), born(i) + 0.32);
         if (pop < 0.02) return;
-        const rgb = AREA_RGB[node.area % AREA_RGB.length];
+        const rgb = AREA_RGB[(g.doc?.[i] ?? node.area) % AREA_RGB.length];
         const lit = front > 0 && node.depth >= 0 && front > node.depth;
         const r = (lit ? 3.1 : 2.0) * node.radius * (pop < 1 ? pop * 1.25 : 1);
         /* No "held" state any more: the published sample this field is built from records no
@@ -693,13 +698,13 @@ export default function OpeningFilm(_props: { onEnded?: () => void }) {
       context.scale(cam.s, cam.s);
       context.translate(-width / 2 + cam.x, -height / 2 + cam.y);
 
-      context.fillStyle = "#14171a";
+      context.fillStyle = C("#14171a");
       context.fillRect(bx, by, bw, 32);
-      context.fillStyle = "rgba(123,224,190,0.9)";
+      context.fillStyle = C("rgba(123,224,190,0.9)");
       context.beginPath();
       context.arc(bx + 14, by + 16, 4, 0, Math.PI * 2);
       context.fill();
-      context.fillStyle = "#edeae4";
+      context.fillStyle = C("#edeae4");
       context.font = "500 12px Wanted Sans Variable, system-ui, sans-serif";
       context.fillText("TAVONEL  ·  Compile", bx + 26, by + 20);
 
@@ -770,7 +775,13 @@ export default function OpeningFilm(_props: { onEnded?: () => void }) {
           frame = window.requestAnimationFrame(tick);
           return;
         }
-        if (playingRef.current) elapsedRef.current += (now - startRef.current) / 1000;
+        if (!playingRef.current) {
+          // Paused by the host (offscreen, hidden tab): hold the frame and draw nothing.
+          startRef.current = now;
+          frame = window.requestAnimationFrame(tick);
+          return;
+        }
+        elapsedRef.current += (now - startRef.current) / 1000;
         startRef.current = now;
         if (elapsedRef.current >= ACT.stop) elapsedRef.current = 0;
         const current = elapsedRef.current;
@@ -791,7 +802,7 @@ export default function OpeningFilm(_props: { onEnded?: () => void }) {
       .then(([p, pl]) => { if (cancelled) return; paper = p; plaster = pl; stop = startLoop(); })
       .catch(() => { if (!cancelled) stop = startLoop(); });
     return () => { cancelled = true; stop?.(); };
-  }, []);
+  }, [tone, compiled]);
 
   return (
     <div className="film">

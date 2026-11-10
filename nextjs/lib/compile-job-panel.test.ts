@@ -44,19 +44,19 @@ describe("a size refusal", () => {
     // REVIEW-PR192-R1 MAJOR-2: it read "Our servers could not complete this", and customers retried.
     const html = render({ state: "failed", errorCode: "JSON_TOO_LARGE", collectionId: null, sizeLimit });
     expect(html).not.toContain("Our servers");
-    expect(html).toContain("Running the same set again gives the same result");
+    expect(html).toContain("Running the same files again gives the same result");
     expect(html).toContain("134,576,916 / 33,554,432 bytes");
     expect(html).toContain("<code>rag/chunks.jsonl</code> 90,000,000 bytes");
-    expect(html).toContain("contradictions 719,400");
+    expect(html).toContain("possible conflicts 719,400");
     expect(html).toContain("Reference JSON_TOO_LARGE");
   });
 
-  it("speaks Korean when the browser does, and still says it without detail when none arrived", () => {
+  it("speaks Korean when the page does, and still says it without detail when none arrived", () => {
     const html = renderToStaticMarkup(createElement(CompileJobPanel, {
       job: { ...job, state: "failed", errorCode: "CORE_OUTPUT_TOO_LARGE", collectionId: null },
-      languages: ["ko-KR"], onResolve() {}, onCancel() {},
+      locale: "ko", onResolve() {}, onCancel() {},
     }));
-    expect(html).toContain("같은 묶음을 다시 실행해도 결과는 같습니다");
+    expect(html).toContain("같은 파일로 다시 실행해도 결과는 같습니다");
     expect(html).not.toContain("<dl");
   });
 
@@ -68,7 +68,7 @@ describe("a size refusal", () => {
     expect(en).toContain("exceeded the 83,886,080 byte limit");
     expect(en).not.toContain("?");
     expect(en).not.toContain("/ 83,886,080");
-    const ko = renderToStaticMarkup(createElement(CompileJobPanel, { job: failed, languages: ["ko-KR"], onResolve() {}, onCancel() {} }));
+    const ko = renderToStaticMarkup(createElement(CompileJobPanel, { job: failed, locale: "ko", onResolve() {}, onCancel() {} }));
     expect(ko).toContain("83,886,080 바이트 상한 초과");
     expect(ko).not.toContain("?");
   });
@@ -85,9 +85,9 @@ describe("a size refusal", () => {
 */
 describe("a job waiting on the customer's decision", () => {
   const review = { documentId: "doc-a", kind: "input" as const, reason: "READING_NEEDS_OPERATOR_REVIEW" };
-  const waiting = (blocked: CompileJobView["blocked"], languages: string[] = []) => renderToStaticMarkup(createElement(CompileJobPanel, {
+  const waiting = (blocked: CompileJobView["blocked"], locale: "en" | "ko" = "en") => renderToStaticMarkup(createElement(CompileJobPanel, {
     job: { ...job, state: "reading", documentsTotal: blocked.length, documentsReady: 0, blocked, collectionId: null },
-    languages, onResolve() {}, onCancel() {},
+    locale, onResolve() {}, onCancel() {},
   }));
   const retryButton = (html: string) => /<button[^>]*>Retry what can be retried<\/button>/.exec(html)?.[0] ?? "";
 
@@ -121,8 +121,8 @@ describe("a job waiting on the customer's decision", () => {
     expect(html).not.toContain("upload it again");
   });
 
-  it("speaks Korean when the browser does, without semicolons", () => {
-    const html = waiting([review, { ...review, documentId: "doc-b" }], ["ko-KR"]);
+  it("speaks Korean when the page does, without semicolons", () => {
+    const html = waiting([review, { ...review, documentId: "doc-b" }], "ko");
     expect(html).toContain("결정을 기다리고 있습니다.");
     expect(html).toContain("다시 시도해도 이 파일 2개는 다시 읽지 않습니다. 제거한 뒤 다시 올려 주세요.");
     expect(html).toContain("7일 안에 선택하지 않으면 이 컴파일은 멈춥니다.");

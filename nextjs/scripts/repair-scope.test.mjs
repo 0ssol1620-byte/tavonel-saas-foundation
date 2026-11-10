@@ -8251,6 +8251,28 @@ test('affected sli-alert-noise-20261109 owner: 3 exact paths select 10 direct su
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+// hero-compile-tabs-20261110: one finite owner, restated independently of the exported constants.
+import { HERO_COMPILE_TABS_AFFECTED_PATHS, HERO_COMPILE_TABS_AFFECTED_UNIT_FILES, HERO_COMPILE_TABS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+test('affected hero-compile-tabs-20261110 owner: 29 exact paths select 5 direct suites and 4 browser suites; neighbours stay unmapped', () => {
+  const paths = ['components/landing-v2/hero-compile-tabs.module.css', 'components/landing-v2/hero-compile-tabs.tsx', 'components/opening-film-2.tsx', 'components/opening-film-3.tsx', 'components/opening-film-4.tsx', 'components/opening-film.tsx', 'lib/film-tone.ts', 'public/film/hero-tab-1-2x.avif', 'public/film/hero-tab-1-2x.webp', 'public/film/hero-tab-1.avif', 'public/film/hero-tab-1.mp4', 'public/film/hero-tab-1.webp', 'public/film/hero-tab-2-2x.avif', 'public/film/hero-tab-2-2x.webp', 'public/film/hero-tab-2.avif', 'public/film/hero-tab-2.mp4', 'public/film/hero-tab-2.webp', 'public/film/hero-tab-3-2x.avif', 'public/film/hero-tab-3-2x.webp', 'public/film/hero-tab-3.avif', 'public/film/hero-tab-3.mp4', 'public/film/hero-tab-3.webp', 'public/film/hero-tab-4-2x.avif', 'public/film/hero-tab-4-2x.webp', 'public/film/hero-tab-4.avif', 'public/film/hero-tab-4.mp4', 'public/film/hero-tab-4.webp', 'scripts/film/capture-film-2-tone.mjs', 'scripts/film/hero-tabs.mjs'];
+  const suites = ['components/compile-stage-player.mobile-view.test.tsx', 'lib/brand-copy.test.ts', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts', 'lib/opening-film.test.ts'];
+  const browsers = ['e2e/hero-four-stage-restoration.spec.ts', 'e2e/hero-home-responsive.spec.ts', 'e2e/landing-hero-film-loading.spec.ts', 'e2e/landing-v2.spec.ts'];
+  assert.deepEqual([[...HERO_COMPILE_TABS_AFFECTED_PATHS], [...HERO_COMPILE_TABS_AFFECTED_UNIT_FILES], [...HERO_COMPILE_TABS_AFFECTED_BROWSER_FILES]], [paths, suites, browsers]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['hero-compile-tabs-20261110'], path);
+  }
+  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['hero-compile-tabs-20261110'], [], suites, browsers, []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  const plan = affectedAskPlan(map);
+  for (const suite of suites) assert.ok(plan.unitFiles.includes(suite), suite);
+  assert.deepEqual([plan.browserFiles, plan.runCdrWorkerChecks], [browsers, false]);
+  for (const adjacent of ['nextjs/components/landing-v2/hero-compile-tabs.module.scss', 'nextjs/components/landing-v2/hero-compile-tabs.test.tsx', 'nextjs/components/opening-film-5.tsx', 'nextjs/lib/film-tone.test.ts', 'nextjs/public/film/hero-tab-5.mp4', 'nextjs/public/film/hero-tab-1-3x.webp', 'nextjs/scripts/film/hero-tabs-2.mjs', 'lib/film-tone.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
 import { ASK_ANSWERABILITY_E2_AFFECTED_PATHS, ASK_ANSWERABILITY_E2_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 // W2-E2 answerability gate (codex/w2-e2-20261108): ten exact paths, two direct suites, no browser suite; the Ask route keeps its owner.
 test('affected ask-answerability-e2 owner: 10 exact paths select 2 direct suites and no browser suite; neighbours stay unmapped', async () => {

@@ -3,7 +3,9 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import AuthCallbackPage from "../app/auth/callback/page";
-import { failureSentence, isSizeLimitFailure, offersUpgrade, reviewReasonCopy, sizeLimitFailureCopy } from "./workspace-failure-copy";
+import { CompileJobPanel } from "../components/compile-job-panel";
+import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT } from "./workspace-ask-copy";
+import { blockedPanelCopy, FAILURE_COPY_CODES, failureSentence, isSizeLimitFailure, offersUpgrade, pageLocale, reviewReasonCopy, SIZE_LIMIT_FAILURE_CODES, sizeLimitFailureCopy } from "./workspace-failure-copy";
 
 const workspace = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
 const connections = readFileSync(new URL("../components/connections-panel.tsx", import.meta.url), "utf8");
@@ -72,13 +74,13 @@ describe("workspace failure copy", () => {
     }
     expect(isSizeLimitFailure("CORE_V2_TIMEOUT")).toBe(false);
     expect(isSizeLimitFailure(null)).toBe(false);
-    const en = sizeLimitFailureCopy(["en-US"]);
-    const ko = sizeLimitFailureCopy(["ko-KR", "en"]);
+    const en = sizeLimitFailureCopy("en");
+    const ko = sizeLimitFailureCopy("ko");
     expect(en.sentence).toMatch(/same result/);
     expect(en.sentence).not.toMatch(/try again|retry/i);
-    expect(ko.sentence).toContain("다시 실행해도 결과는 같습니다");
+    expect(ko.sentence).toContain("같은 파일로 다시 실행해도 결과는 같습니다");
     for (const copy of [en, ko]) expect(copy.sentence).not.toMatch(/\d/);
-    expect(sizeLimitFailureCopy([])).toEqual(en);
+    expect(sizeLimitFailureCopy()).toEqual(en);
     // The same selection is not offered again after a size refusal.
     expect(workspace).toContain("disabled={busy || !judgeCorpusSet(selectedDocumentIds.length).ok || sizeRefusedSameSet}");
     expect(workspace).toContain("isSizeLimitFailure(compileJob.errorCode)");
@@ -184,7 +186,7 @@ describe("review reason copy", () => {
   const budget = "CONTRADICTION_PAIR_BUDGET_EXCEEDED:contradiction_group_0abc:claims=40:pairs=780";
 
   it("says a too-large group in English with only the counts the string carries", () => {
-    const copy = reviewReasonCopy(group, ["en-US"]);
+    const copy = reviewReasonCopy(group, "en");
     expect(copy).toEqual({
       sentence: "216 statements on one topic may conflict with each other. Comparing them takes 23,220 checks, which is more than this compile checks automatically, so a person needs to review them. Open the review to decide.",
       reference: "Reference",
@@ -192,24 +194,24 @@ describe("review reason copy", () => {
     expect(copy?.sentence).not.toContain("contradiction_group");
     expect(copy?.sentence).not.toContain(";");
     // R2 note 3: separate compiles are never compared with each other, so no line advises splitting the sources.
-    for (const value of [group, budget]) for (const languages of [["en"], ["ko"]]) expect(reviewReasonCopy(value, languages)?.sentence).not.toMatch(/split|나누/i);
+    for (const value of [group, budget]) for (const locale of ["en", "ko"] as const) expect(reviewReasonCopy(value, locale)?.sentence).not.toMatch(/split|나누/i);
   });
 
   it("says a spent compile budget in English", () => {
     expect(reviewReasonCopy(budget)?.sentence).toBe("40 statements on one topic may conflict with each other. This compile had already used its automatic checks on other topics, so these 780 checks were left for a person. Open the review to decide.");
   });
 
-  it("says both codes in Korean when the browser asks for it first", () => {
-    expect(reviewReasonCopy(group, ["ko-KR", "en"])).toEqual({
+  it("says both codes in Korean on a Korean page", () => {
+    expect(reviewReasonCopy(group, "ko")).toEqual({
       sentence: "한 주제에 서로 어긋날 수 있는 진술이 216개 있습니다. 비교에 23,220번의 확인이 필요해 이번 컴파일이 자동으로 확인하는 한도를 넘었으므로 사람이 검토해야 합니다. 검토 화면을 열어 결정하세요.",
       reference: "참조",
     });
-    expect(reviewReasonCopy(budget, ["ko"])?.sentence).toBe("한 주제에 서로 어긋날 수 있는 진술이 40개 있습니다. 이번 컴파일은 다른 주제에서 자동 확인 한도를 이미 써서 이 780번의 확인을 사람이 검토하도록 남겼습니다. 검토 화면을 열어 결정하세요.");
+    expect(reviewReasonCopy(budget, "ko")?.sentence).toBe("한 주제에 서로 어긋날 수 있는 진술이 40개 있습니다. 이번 컴파일은 다른 주제에서 자동 확인 한도를 이미 써서 이 780번의 확인을 사람이 검토하도록 남겼습니다. 검토 화면을 열어 결정하세요.");
   });
 
   it("invents no meaning for an unknown code, in either language", () => {
     expect(reviewReasonCopy("AUTHORITY_CONFLICT:doc-1:claims=3:pairs=3")).toBeNull();
-    expect(reviewReasonCopy("SECURITY_STOP:doc-x", ["ko"])).toBeNull();
+    expect(reviewReasonCopy("SECURITY_STOP:doc-x", "ko")).toBeNull();
   });
 
   it("gives no sentence for a known code in a malformed string", () => {
@@ -221,7 +223,68 @@ describe("review reason copy", () => {
       `${group}:extra`,
     ]) {
       expect(reviewReasonCopy(malformed)).toBeNull();
-      expect(reviewReasonCopy(malformed, ["ko"])).toBeNull();
+      expect(reviewReasonCopy(malformed, "ko")).toBeNull();
+    }
+  });
+});
+
+/*
+  Founder, 2026-11-10 (cjob-fac5555a): an English workspace printed the size refusal in Korean
+  because the copy followed `navigator.languages`. The page decides; the browser does not. Every
+  code this module has a sentence for is held to that, in both directions.
+*/
+describe("failure copy follows the page, not the browser", () => {
+  const HANGUL = /[ᄀ-ᇿ㄰-㆏가-힯]/;
+  // Korean copy may name the product's own nouns and print numbers; any other Latin word is English leaking in.
+  const englishWords = (text: string) => (text.match(/[A-Za-z]+/g) ?? []).filter((word) => word !== "World");
+  const group = "CONTRADICTION_GROUP_TOO_LARGE:contradiction_group_0abc:claims=3:pairs=3";
+  const budget = "CONTRADICTION_PAIR_BUDGET_EXCEEDED:contradiction_group_0abc:claims=3:pairs=3";
+  const englishLines = () => [
+    ...FAILURE_COPY_CODES.map((code) => failureSentence(code, 500)),
+    ...[400, 401, 403, 404, 409, 429, 500].map((status) => failureSentence("SOME_UNMAPPED_CODE", status)),
+    ...Object.values(sizeLimitFailureCopy("en")).flatMap((value) => typeof value === "function" ? [value("1,000")]
+      : typeof value === "string" ? [value] : Object.values(value)),
+    ...Object.values(blockedPanelCopy("en")).map((value) => typeof value === "function" ? `${value(1)} ${value(3)}` : value),
+    reviewReasonCopy(group, "en")!.sentence, reviewReasonCopy(budget, "en")!.sentence, reviewReasonCopy(group, "en")!.reference,
+    ...Object.values(askAbstentionCopy(EVIDENCE_EXCEEDS_ANSWER_LIMIT, "en")).filter((value): value is string => typeof value === "string"),
+    ...Object.values(askSourceCopy("en")),
+  ];
+
+  it("has no Hangul in any English line, for every failure code", () => {
+    expect(FAILURE_COPY_CODES.length).toBeGreaterThan(30);
+    for (const line of englishLines()) expect(line, line).not.toMatch(HANGUL);
+  });
+
+  it("has no English in any Korean line it carries", () => {
+    const koreanLines = [
+      ...Object.values(sizeLimitFailureCopy("ko")).flatMap((value) => typeof value === "function" ? [value("1,000")]
+      : typeof value === "string" ? [value] : Object.values(value)),
+      ...Object.values(blockedPanelCopy("ko")).map((value) => typeof value === "function" ? `${value(1)} ${value(3)}` : value),
+      reviewReasonCopy(group, "ko")!.sentence, reviewReasonCopy(budget, "ko")!.sentence, reviewReasonCopy(group, "ko")!.reference,
+      ...Object.values(askAbstentionCopy(EVIDENCE_EXCEEDS_ANSWER_LIMIT, "ko")).filter((value): value is string => typeof value === "string"),
+      ...Object.values(askSourceCopy("ko")),
+    ];
+    for (const line of koreanLines) {
+      expect(line, line).toMatch(HANGUL);
+      expect(englishWords(line), line).toEqual([]);
+    }
+  });
+
+  it("defaults to English and reads the page's <html lang>, never navigator.languages", () => {
+    expect(pageLocale()).toBe("en"); // no document in this suite
+    const sources = [workspace, panel, readFileSync(new URL("../components/review-queue.tsx", import.meta.url), "utf8"),
+      readFileSync(new URL("./workspace-ask-copy.ts", import.meta.url), "utf8")];
+    for (const source of sources) expect(source).not.toMatch(/navigator\.languages/);
+  });
+
+  it("renders every size refusal in English on the English workspace, whatever the browser prefers", () => {
+    const job = { jobId: "job-x", state: "failed" as const, documentsTotal: 6, documentsReady: 6, blocked: [],
+      blockedResolution: null, collectionId: null,
+      sizeLimit: { bytes: 38_980_103, bound: 33_554_432, largestPackageFiles: [], counts: { regions: 6_072, claims: 536 } } };
+    for (const errorCode of SIZE_LIMIT_FAILURE_CODES) {
+      const html = renderToStaticMarkup(React.createElement(CompileJobPanel, { job: { ...job, errorCode }, onResolve() {}, onCancel() {} }));
+      expect(html).toContain("Measured size");
+      expect(html).not.toMatch(HANGUL);
     }
   });
 });
