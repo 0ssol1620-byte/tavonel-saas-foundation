@@ -56,7 +56,9 @@ Operator checks:
    The stored evaluation also carries `watch`: the `{check, code}` of each scheduled operations
    check that ran in the slot (the hourly RunPod daily-cost read, the 00 UTC release-row expiry),
    and an empty list in slots that run none. It holds codes only, never spend, cap or delivery
-   detail. An hourly slot whose `watch` lacks `runpod_daily_cost` did not read billing.
+   detail. An hourly slot whose `watch` lacks `runpod_daily_cost` did not read billing. The
+   checks share one 4 s deadline so the record and its page keep the route's 15 s budget; a check
+   that ran out of time is stored as `CHECK_DEADLINE_EXCEEDED`, which means billing went unread.
 4. With `OPERATIONS_ALERT_WEBHOOK_URL` set, confirm a breaching slot returns `ALERT_DELIVERED` and
    the message arrives in the chosen channel. `ALERT_DELIVERY_UNCONFIGURED` in production means
    alerts are still record-only.

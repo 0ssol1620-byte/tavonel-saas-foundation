@@ -218,6 +218,25 @@ describe("scheduled operational SLI alert route", () => {
     expect((await response.json()).watch).toEqual([{ check: "runpod_daily_cost", code: "RUNPOD_BILLING_UNREADABLE" }]);
   });
 
+  it("B3: a hanging billing read cannot hold the SLI record past the scheduled-check deadline", async () => {
+    vi.stubEnv("TAVONEL_RUNPOD_DAILY_COST_CAP_USD", "40");
+    vi.stubEnv("TAVONEL_RUNPOD_API_KEY", "rp-test");
+    const hanging = vi.fn((_input: unknown, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+    }));
+    vi.stubGlobal("fetch", hanging);
+    persist.mockResolvedValue({ ok: true, receipt: RECEIPT });
+    const pending = GET(request());
+    await vi.advanceTimersByTimeAsync(3_999);
+    expect(persist).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    const response = await pending;
+    expect(response.status).toBe(200);
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(persist.mock.calls[0][0].watch).toEqual([{ check: "runpod_daily_cost", code: "CHECK_DEADLINE_EXCEEDED" }]);
+    expect((hanging.mock.calls[0][1] as RequestInit).signal?.aborted).toBe(true);
+  });
+
   it("W1-A3: pages a RunPod day over its cap from the hourly slot", async () => {
     vi.stubEnv("OPERATIONS_ALERT_WEBHOOK_URL", HOOK);
     vi.stubEnv("TAVONEL_RUNPOD_DAILY_COST_CAP_USD", "10");
