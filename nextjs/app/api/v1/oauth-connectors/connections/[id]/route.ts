@@ -10,7 +10,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const HEADERS = { "Cache-Control": "no-store", "X-TAVONEL-API-Version": "1" };
 
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireFoundationSession(request, "studio");
+  const auth = await requireFoundationSession(request, "connections");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: HEADERS });
   const { id } = await context.params;
   if (!UUID.test(id)) return NextResponse.json({ code: "OAUTH_CONNECTION_ID_INVALID" }, { status: 400, headers: HEADERS });

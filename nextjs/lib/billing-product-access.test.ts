@@ -1,6 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { EMPTY_BILLING_ACCOUNT, type FoundationBillingAccount } from "./billing-store";
 import { billingProductDecision } from "./billing-product-access";
+import { authorizeFoundationSessionProduct } from "./self-service-trial";
+
+const store = vi.hoisted(() => ({
+  grant: null as null | { accessPlan: "observer_access" | "studio_access"; billingExempt: boolean },
+  billing: {} as Record<string, unknown>,
+  trial: null as null | { status: string; expiresAt: string },
+}));
+vi.mock("./account-grants", () => ({
+  getFoundationAccountGrant: async () => ({ ok: true, grant: store.grant }),
+  getFoundationSelfServiceTrial: async () => ({ ok: true, trial: store.trial }),
+}));
+vi.mock("./billing-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./billing-store")>()),
+  getFoundationBillingAccount: async (workspaceKey: string, userId: string) => ({
+    ok: true, account: { workspaceKey, userId, ...EMPTY_BILLING_ACCOUNT, ...store.billing },
+  }),
+}));
 
 const account = (overrides: Partial<FoundationBillingAccount> = {}): FoundationBillingAccount => ({
   workspaceKey: "pilot-test",
@@ -24,6 +41,49 @@ describe("paid product access matrix", () => {
   it("allows Observer reads and Studio governed writes while active or trialing", () => {
     expect(billingProductDecision(developer, "observer")).toEqual({ ok: true });
     expect(billingProductDecision(account({ accessPlan: "studio_access", subscriptionStatus: "trialing" }), "studio")).toEqual({ ok: true });
+  });
+});
+
+/*
+  2026-11-10: storage connections moved from Team to both paid plans. The free evaluation keeps
+  no connector scope, a workspace with no plan and one on billing hold stay refused.
+*/
+describe("storage connections", () => {
+  const ask = () => authorizeFoundationSessionProduct("pilot-test", "44444444-4444-4444-8444-444444444444", "connections");
+  const reset = (billing: Record<string, unknown>, trial: typeof store.trial = null) => {
+    store.grant = null; store.billing = billing; store.trial = trial;
+  };
+  const liveTrial = () => ({ status: "trialing", expiresAt: new Date(Date.now() + 86_400_000).toISOString() });
+
+  it("admits a paid Developer workspace, and Team as before", async () => {
+    expect(billingProductDecision(developer, "connections")).toEqual({ ok: true });
+    expect(billingProductDecision(team, "connections")).toEqual({ ok: true });
+    reset({ accessPlan: "observer_access", subscriptionStatus: "active" });
+    expect(await ask()).toMatchObject({ ok: true, access: { source: "paid", accessPlan: "observer_access" } });
+  });
+
+  it("admits a Developer owner grant", async () => {
+    reset({});
+    store.grant = { accessPlan: "observer_access", billingExempt: true };
+    expect(await ask()).toMatchObject({ ok: true, access: { source: "owner" } });
+  });
+
+  it("refuses the free evaluation, which still reaches the entry level", async () => {
+    reset({}, liveTrial());
+    expect(await ask()).toEqual({ ok: false, code: "TRIAL_FEATURE_NOT_INCLUDED", status: 402 });
+    expect(await authorizeFoundationSessionProduct("pilot-test", "44444444-4444-4444-8444-444444444444", "observer"))
+      .toMatchObject({ ok: true, access: { source: "trial" } });
+  });
+
+  it("refuses a workspace with no plan", async () => {
+    reset({});
+    expect(await ask()).toEqual({ ok: false, code: "SUBSCRIPTION_REQUIRED", status: 402 });
+    expect(billingProductDecision(account(), "connections")).toMatchObject({ ok: false, code: "SUBSCRIPTION_REQUIRED" });
+  });
+
+  it("refuses a Developer workspace on billing hold", async () => {
+    reset({ accessPlan: "observer_access", subscriptionStatus: "active", billingHold: true });
+    expect(await ask()).toEqual({ ok: false, code: "BILLING_HOLD", status: 402 });
   });
 });
 

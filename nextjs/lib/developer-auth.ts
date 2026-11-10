@@ -1,4 +1,4 @@
-import { authorizeFoundationProduct } from "./billing-product-access";
+import { authorizeFoundationProduct, type MinimumPlanLevel } from "./billing-product-access";
 import type { DeveloperScope } from "./developer-contracts";
 import { authenticateDeveloperApiKey, consumeDeveloperApiRateLimit } from "./developer-store";
 import { foundationPilotAccess, getRequestUser } from "./foundation-pilot";
@@ -61,7 +61,7 @@ export const SCOPE_RATE_LIMITS: Record<DeveloperScope, number> = {
 export async function authorizeFoundationRequest(
   request: Request,
   scope: DeveloperScope,
-  minimumPlan: "observer" | "studio" = "observer",
+  minimumPlan: MinimumPlanLevel = "observer",
 ) {
   return resolveFoundationAuthorization(request, scope, minimumPlan, true);
 }
@@ -71,7 +71,7 @@ export async function authorizeFoundationRequest(
 async function resolveFoundationAuthorization(
   request: Request,
   scope: DeveloperScope,
-  minimumPlan: "observer" | "studio",
+  minimumPlan: MinimumPlanLevel,
   consumeRate: boolean,
 ) {
   const authorization = request.headers.get("authorization") ?? "";
@@ -168,7 +168,7 @@ export async function revalidateFoundationAuthorization(
   request: Request,
   expected: FoundationPrincipal,
   scope: DeveloperScope,
-  minimumPlan: "observer" | "studio" = "observer",
+  minimumPlan: MinimumPlanLevel = "observer",
 ) {
   const current = await resolveFoundationAuthorization(request, scope, minimumPlan, false);
   if (!current.ok) return current;
@@ -184,7 +184,7 @@ export async function revalidateFoundationAuthorization(
   return current;
 }
 
-export async function requireFoundationSession(request: Request, minimumPlan: "observer" | "studio" = "observer") {
+export async function requireFoundationSession(request: Request, minimumPlan: MinimumPlanLevel = "observer") {
   const user = await getRequestUser(request);
   if (!user) return { ok: false as const, code: "AUTH_REQUIRED", status: 401 };
   const access = foundationPilotAccess(user.id);
@@ -214,7 +214,7 @@ export async function requireFoundationSession(request: Request, minimumPlan: "o
 export async function revalidateFoundationSession(
   request: Request,
   expected: FoundationPrincipal,
-  minimumPlan: "observer" | "studio" = "observer",
+  minimumPlan: MinimumPlanLevel = "observer",
 ) {
   const current = await requireFoundationSession(request, minimumPlan);
   if (!current.ok) return current;
