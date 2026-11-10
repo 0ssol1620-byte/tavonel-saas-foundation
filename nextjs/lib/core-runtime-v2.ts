@@ -739,6 +739,12 @@ export function readRevisionCompileSnapshot(
   };
 }
 
+/** The digest of the candidate's exact wire bytes; the slice itself lives only inside this call. */
+function candidateWireSha256(responseText: string): string | null {
+  const canonical = canonicalJsonWireField(responseText, "candidate");
+  return canonical === null ? null : sha256(canonical);
+}
+
 export async function dispatchProductCoreV2(
   env: ProductCoreV2Env,
   workspaceId: string,
@@ -817,7 +823,15 @@ export async function dispatchProductCoreV2(
     size was never observed (by the ratio, roughly 176-307 MB -- an estimate, not a measurement).
     Counts are not reported on this refusal: they would need the parse this bound prevents.
   */
-  const read = await readBoundedSourceBody(response, CORE_V2_MAX_RESPONSE_BYTES);
+  /*
+    `let`, and dropped as soon as each is no longer needed (2026-11-10, site worker at 84% of its
+    2,048 MB on a ~95 MB Core response, cjob-ef0df5af). The bytes, their decoded text and the
+    candidate's canonical slice are each about the response's size, and they all stayed reachable
+    until this function returned -- and the parsed result's unprojected half stayed reachable
+    until the job turn ended. Each is now released once read: the bytes after decoding, the
+    canonical slice inside the digest it feeds, the text after the digest.
+  */
+  let read: Awaited<ReturnType<typeof readBoundedSourceBody>> | null = await readBoundedSourceBody(response, CORE_V2_MAX_RESPONSE_BYTES);
   // An oversized or malformed-length error body is the platform's failure, not an output size.
   if (!read.ok && read.code === "SOURCE_SIZE_UNQUALIFIED" && !read.empty && !response.ok) {
     return { ok: false, code: `CORE_V2_HTTP_${response.status}` };
@@ -828,7 +842,8 @@ export async function dispatchProductCoreV2(
       bytes: Number.isSafeInteger(declared) && declared > CORE_V2_MAX_RESPONSE_BYTES ? declared : null,
       bound: CORE_V2_MAX_RESPONSE_BYTES, coreRequestId: envelope.requestId } };
   }
-  const responseText = read.ok ? Buffer.from(read.bytes.buffer, read.bytes.byteOffset, read.bytes.byteLength).toString("utf8") : "";
+  let responseText: string | null = read.ok ? Buffer.from(read.bytes.buffer, read.bytes.byteOffset, read.bytes.byteLength).toString("utf8") : "";
+  read = null;
   let json: ProductCoreV2CompileResponse | { code?: unknown } | null;
   try { json = JSON.parse(responseText); } catch { json = null; }
   if (!response.ok || !json) {
@@ -840,7 +855,8 @@ export async function dispatchProductCoreV2(
     return { ok: false, code: typeof errorCode === "string" ? errorCode : `CORE_V2_HTTP_${response.status}` };
   }
   const result = json as ProductCoreV2CompileResponse;
-  const canonicalCandidate = canonicalJsonWireField(responseText, "candidate");
+  const candidateSha256 = candidateWireSha256(responseText);
+  responseText = null;
   const lifecycleStatus = {
     completed: "candidate",
     review_required: "review_required",
@@ -863,8 +879,8 @@ export async function dispatchProductCoreV2(
     (result.status === "completed" && envelope.previousActiveWorld !== undefined && result.receipt.equivalence !== "passed") ||
     result.receipt.requestId !== envelope.requestId ||
     result.receipt.inputSha256 !== inputSha256 ||
-    canonicalCandidate === null ||
-    result.receipt.outputSha256 !== `sha256:${sha256(canonicalCandidate)}` ||
+    candidateSha256 === null ||
+    result.receipt.outputSha256 !== `sha256:${candidateSha256}` ||
     !SHA256.test(result.receipt.coreReleaseDigest) ||
     result.receipt.matchingPolicy !== "legacy" ||
     result.receipt.candidatePromotion !== false ||
