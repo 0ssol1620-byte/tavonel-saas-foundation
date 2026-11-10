@@ -2247,6 +2247,11 @@ export const SITE_POLISH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmarks
 // legal-semicolons-status-20261109: the /status operating-record spec, which pins the billing sentence.
 export const LEGAL_SEMICOLONS_STATUS_AFFECTED_PATHS = Object.freeze(['e2e/operations.spec.ts']);
 export const LEGAL_SEMICOLONS_STATUS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/operations.spec.ts']);
+// overlap-audit-20261110: the text/edge/fixed-bar collision audit over every sitemap route (founder report 2026-11-10) and its
+// in-page measurement. Browser-only: the measurement has no unit twin, and the spec runs once in the audit project, walking
+// its seven widths from the inside like overflow-audit.
+export const OVERLAP_AUDIT_AFFECTED_PATHS = Object.freeze(['e2e/overlap-audit.spec.ts', 'e2e/support/overlap.ts']);
+export const OVERLAP_AUDIT_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/overlap-audit.spec.ts']);
 // Packet delivery (codex/packet-delivery-textlayer-20261102): the delivery format an AI reads the compiled context in. The
 // download route and the two guidance modules that write the delivery/ files and point AGENTS.md at them, the package verifier
 // and its scripts/ copy that admit the delivery root, the delivery suite and the two parity suites whose MCP surface now reads
@@ -3166,6 +3171,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // legal-semicolons-status-20261109: 1 exact path selects no direct suite and 1 browser suite.
   affectedGroup('legal-semicolons-status-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(LEGAL_SEMICOLONS_STATUS_AFFECTED_PATHS)})$`),
     { unitFiles: [], browserFiles: LEGAL_SEMICOLONS_STATUS_AFFECTED_BROWSER_FILES }),
+  // overlap-audit-20261110: 2 exact paths select no direct suite and 1 browser suite.
+  affectedGroup('overlap-audit-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(OVERLAP_AUDIT_AFFECTED_PATHS)})$`),
+    { unitFiles: [], browserFiles: OVERLAP_AUDIT_AFFECTED_BROWSER_FILES }),
   // library-dedup-b1: the 2 exact paths above select 2 direct suites and no browser suite.
   affectedGroup('library-dedup-b1', new RegExp(`^nextjs/(?:${exactPathAlternation(LIBRARY_DEDUP_AFFECTED_PATHS)})$`),
     { unitFiles: LIBRARY_DEDUP_AFFECTED_UNIT_FILES }),
