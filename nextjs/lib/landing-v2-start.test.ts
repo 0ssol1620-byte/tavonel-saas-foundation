@@ -76,7 +76,15 @@ describe("landing scene 09 -- start", () => {
   it.each(LOCALES)("%s carries the price line and links only to routes this site publishes", (locale) => {
     const html = render(locale);
     const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1]);
-    expect(hrefs).toEqual([EXPLORE_CTA.href, locale === "ko" ? "/ko/pricing" : "/pricing"]);
+    // Conversion pass 2026-11-09: the English close names how agents read a World, and links its setup page.
+    expect(hrefs).toEqual(locale === "ko" ? [EXPLORE_CTA.href, "/ko/pricing"] : [EXPLORE_CTA.href, "/pricing", "/docs/mcp"]);
+  });
+
+  it("states only the MCP path that works today, not the hosted endpoint", () => {
+    const html = text(render("en"));
+    expect(html).toContain("local MCP server");
+    expect(html).not.toMatch(/hosted MCP|remote MCP|MCP endpoint/i);
+    expect(text(render("ko"))).not.toContain("MCP");
   });
 
   it.each(LOCALES)("%s keeps deployment detail on Pricing rather than in the closing scene", (locale) => {

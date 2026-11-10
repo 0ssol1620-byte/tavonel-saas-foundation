@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
+import { BILLING_OFFERS, REFUND_WINDOW_DAYS, refundablePageAllowance, type BillingOfferCode } from "@/lib/billing-catalog";
 import { checkoutSellable } from "@/lib/checkout-intent";
 
 /**
@@ -29,14 +29,21 @@ export default function CheckoutIntentNotice({
   purchaseOpen: boolean | null;
 }) {
   const plan = BILLING_OFFERS[offer].label;
+  const terms = BILLING_OFFERS[offer];
   const sellable = checkoutSellable(offer, purchaseOpen);
   if (sellable === null) return null;
   if (sellable) {
     return (
       <p className="notice static" role="status">
-        <strong>{plan} is held for you.</strong> Checkout opens by
-        itself once you are in. Nothing is charged by signing in, and access changes only
-        after a signed webhook is persisted.
+        {/*
+          Conversion pass 2026-11-09 (funnel audit fix 8): the last page before money carries the deal,
+          read from the billing catalog, and the step between here and checkout. "Signed webhook" was
+          our mechanism, not the reader's.
+        */}
+        <strong>{plan} is held for you.</strong> ${terms.priceUsd}/month for{" "}
+        {terms.includedPages.toLocaleString("en-US")} standard pages, with a full refund within {REFUND_WINDOW_DAYS} days
+        if you have used fewer than {refundablePageAllowance(terms)} of them. Paddle is the merchant of record.
+        Sign in and accept the processing terms, and checkout opens by itself. Nothing is charged by signing in.
       </p>
     );
   }

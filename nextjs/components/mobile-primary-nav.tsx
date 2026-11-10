@@ -19,10 +19,15 @@ import { NAV_OPEN_EVENT } from "@/lib/marketing-analytics";
  * The words are handed in too (`labels`), from `KO_CHROME`, so this file imports no navigation
  * module at all: see the note at the top of `components/site-nav/desktop-primary-nav.tsx`.
  */
-export default function MobilePrimaryNav({ korean = false, signedIn = false, labels, children }: {
+export default function MobilePrimaryNav({ korean = false, signedIn = false, labels, start, children }: {
   korean?: boolean;
   signedIn?: boolean;
   labels: { menu: string; pricing: string; signIn: string };
+  /**
+   * The start action, resolved on the server by the page (`primaryCallToAction()`) and handed in,
+   * because this client file cannot read the commercial flags (BA-232). Absent: no start row.
+   */
+  start?: { href: string; label: string };
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDetailsElement>(null);
@@ -119,6 +124,15 @@ export default function MobilePrimaryNav({ korean = false, signedIn = false, lab
         ) : (
           <a className="mobile-nav-signin" href="/login">{labels.signIn}</a>
         )}
+        {/*
+          Conversion pass 2026-11-09 (funnel audit fix 3). Below the desktop switch the header is the
+          wordmark and Menu, and its one action (the public sample) is desktop-only, so a phone reader
+          had Pricing in reach and no way to start. The start action is the sheet's foot, filled. It
+          does not repeat the header: the header's action is the sample, this one is the start.
+        */}
+        {start && !signedIn ? (
+          <a className="btn mobile-nav-start" href={start.href}>{start.label}</a>
+        ) : null}
       </nav>
     </details>
   );

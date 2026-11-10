@@ -43,6 +43,8 @@ export const PUBLIC_MARKETING_PATHS = new Set([
   */
   "/solutions",
   "/trust",
+  // Conversion pass 2026-11-09: /reproducibility is indexable and in the sitemap now.
+  "/reproducibility",
   // EN-0: the cookbooks index is in the sitemap and on /resources, so it is measured; its six
   // draft records are not, for the reason below.
   "/cookbooks",

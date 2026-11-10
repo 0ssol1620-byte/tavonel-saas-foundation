@@ -121,6 +121,9 @@ test("the mobile menu ships only the customer choices and one commercial action"
   expect(html.match(/nav-actions/g)?.length ?? 0, "and the header still carries it").toBeGreaterThan(0);
   // Landing V2: Sign in moved the other way -- out of the narrow header row and into the sheet.
   expect(html.match(/mobile-nav-signin/g)?.length ?? 0, "the sheet carries Sign in").toBe(1);
+  // Conversion pass 2026-11-09: below the desktop switch the header's action is hidden, so the sheet ends on the
+  // start action -- once, and not the header's sample action (that would be `mobile-nav-cta`, still zero above).
+  expect(html.match(/mobile-nav-start/g)?.length ?? 0, "the sheet ends on the start action").toBe(1);
 });
 
 /*

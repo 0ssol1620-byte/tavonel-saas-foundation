@@ -6,6 +6,7 @@ import MobilePrimaryNav from "@/components/mobile-primary-nav";
 import { HeaderCta, NavCurrentLink, NavDisclosure } from "@/components/site-nav/desktop-primary-nav";
 import HeaderScrollState from "@/components/site-nav/header-scroll-state";
 import { MarketingConsentLink } from "@/components/marketing-consent";
+import { primaryCallToAction } from "@/lib/commercial-state";
 import {
   BRAND_LINE,
   FOOTER_GROUPS,
@@ -140,8 +141,14 @@ export function PublicSiteHeader({
   signedIn,
   korean = false,
   ghostCta = false,
+  start,
 }: {
   signedIn?: boolean;
+  /**
+   * The start action for the phone sheet, resolved on the server (`primaryCallToAction()`). A
+   * client caller passes the one it already resolved, or nothing.
+   */
+  start?: { href: string; label: string };
   /** Korean entry, pricing, and contact share the localized chrome. */
   korean?: boolean;
   /**
@@ -159,7 +166,7 @@ export function PublicSiteHeader({
         <b>TAVONEL</b>
       </Link>
       <DesktopPrimaryNav korean={korean} />
-      <MobilePrimaryNav korean={korean} signedIn={signedIn}
+      <MobilePrimaryNav korean={korean} signedIn={signedIn} start={start}
         labels={{ menu: korean ? KO_CHROME.menu : "Menu", pricing: pricingLabel, signIn: korean ? KO_CHROME.signIn : "Sign in" }}>
         <NavSections korean={korean} sheet />
       </MobilePrimaryNav>
@@ -346,7 +353,7 @@ export function PublicSitePage({ children, template, korean = false }: { childre
   */
   return (
     <div className="page public-page" lang={korean ? "ko" : undefined} data-template={template ?? undefined}>
-      <PublicSiteHeader korean={korean} />
+      <PublicSiteHeader korean={korean} start={korean ? undefined : primaryCallToAction()} />
       <main id="main" tabIndex={-1}>{children}</main>
       <PublicSiteFooter korean={korean} />
     </div>

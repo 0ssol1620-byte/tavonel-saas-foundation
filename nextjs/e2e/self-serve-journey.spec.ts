@@ -378,7 +378,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
 
     // H2. Developer goes through sign-in carrying the offer; Team stays a conversation.
     await page.goto("/pricing");
-    const developer = page.getByRole("link", { name: "Get Developer access, via sign-in" });
+    const developer = page.getByRole("link", { name: "Buy Developer — $29/month" });
     await expect(developer).toHaveAttribute("href", "/login?next=checkout&offer=observer_access");
     await expect(page.getByRole("link", { name: "Talk to us about Team" })).toHaveAttribute("href", "/contact?plan=Team");
     await tabTo(page, developer);
@@ -572,7 +572,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     const posts = await answerCheckout(page, () => ({ status: 200, json: SANDBOX_CHECKOUT_READY }));
 
     await page.goto("/pricing");
-    await page.getByRole("link", { name: "Get Developer access", exact: true }).click();
+    await page.getByRole("link", { name: "Buy Developer — $29/month", exact: true }).click();
     await expect(region(page, "status", "Developer sandbox checkout opened.")).toHaveCount(1);
     await expect(page).toHaveURL(/\/pricing$/);
     expect(posts).toEqual([{ offerCode: "observer_access" }]);
@@ -682,7 +682,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
       let page = await open("today", "/pricing", false);
       await reachable(page, page.getByRole("link", { name: "Request Developer access" }), "today's Developer action");
       page = await open("switch-on", "/pricing", false);
-      await reachable(page, page.getByRole("link", { name: "Get Developer access, via sign-in" }), "switch-on Developer action");
+      await reachable(page, page.getByRole("link", { name: "Buy Developer — $29/month" }), "switch-on Developer action");
       page = await open("switch-on", "/login?next=checkout&offer=observer_access", false);
       await reachable(page, page.getByRole("button", { name: "Continue with Google" }), "sign-in");
       page = await open("today", "/workspace?checkout=observer_access", true);

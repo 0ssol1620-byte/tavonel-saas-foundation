@@ -105,7 +105,10 @@ test("a plan intent keeps main's checkout promise where a plan can be bought", a
   }));
   await page.goto(INTENT_URL);
   await expect(page.getByText("Developer is held for you.")).toBeVisible();
-  await expect(page.getByText("Checkout opens by itself once you are in.", { exact: false })).toBeVisible();
+  // Conversion pass 2026-11-09: the notice carries the deal, and names the step between sign-in and checkout.
+  await expect(page.getByText("$29/month for 500 standard pages", { exact: false })).toBeVisible();
+  await expect(page.getByText("Sign in and accept the processing terms, and checkout opens by itself.", { exact: false })).toBeVisible();
+  await expect(page.getByText("signed webhook", { exact: false })).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("One step before checkout.");
 });
 

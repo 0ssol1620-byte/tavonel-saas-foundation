@@ -64,6 +64,15 @@ export const SAMPLE_BOUNDARY: Record<LandingV2Locale, string> = {
  * keyed by destination. Nothing in this scene resolves either -- a client render of the
  * commercial flags inlines them as `undefined` and quietly returns the closed posture (BA-232).
  */
+/*
+  Conversion pass 2026-11-09 (funnel audit fix 6). "MCP" appeared nowhere on Home, and the engineer
+  persona arrives from an MCP search. One factual sentence, for what works today: the REST API and the
+  local stdio MCP server (/docs/mcp), both with an API key. The hosted MCP endpoint is off in production
+  (`lib/remote-mcp.ts`), so it is not named here.
+*/
+// English only: /ko is leaving the public site (PR #211), and its Home font subset is pinned to the syllables it renders.
+export const AGENT_LINE = { text: "Agents read a compiled World over the REST API or a local MCP server, with an API key.", link: "MCP setup" } as const;
+
 export type StartActions = {
   exploreLabel: string;
   exploreHref: string;
@@ -111,6 +120,12 @@ export default function Scene({
             </Link>
           </div>
           <p className={styles.boundary}>{SAMPLE_BOUNDARY[locale]}</p>
+          {locale === "en" ? (
+            <p className={styles.boundary} data-agent-line="">
+              {AGENT_LINE.text}{" "}
+              <Link href={"/docs/mcp" as Route} prefetch={false}>{AGENT_LINE.link}</Link>
+            </p>
+          ) : null}
           {/* G12: the customer-data gate, `activationPolicy.customerData.reason` / `KO_CHROME.customerDataGate`, verbatim. */}
           {activationPolicy.customerData.enabled ? null : <p className={styles.gate}>{copy.microtext}</p>}
         </div>

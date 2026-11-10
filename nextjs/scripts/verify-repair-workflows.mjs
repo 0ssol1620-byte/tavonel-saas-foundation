@@ -8,6 +8,7 @@ import { REMOTE_MCP_AFFECTED_PATHS, REMOTE_MCP_AFFECTED_UNIT_FILES, REMOTE_MCP_A
 import { GDP_PDF_RUNS_AFFECTED_PATHS, GDP_PDF_RUNS_AFFECTED_UNIT_FILES, GDP_PDF_RUNS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { PACKET_DELIVERY_AFFECTED_PATHS, PACKET_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { LIBRARY_DEDUP_AFFECTED_PATHS, LIBRARY_DEDUP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { CONVERSION_PUBLIC_AFFECTED_PATHS, CONVERSION_PUBLIC_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { LIBRARY_ORGANIZE_B2_AFFECTED_PATHS, LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { W2_D_INTAKE_STAGE1_AFFECTED_PATHS, W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { COMPILER_RELEASE_AFFECTED_PATHS, COMPILER_RELEASE_AFFECTED_UNIT_FILES, COMPILER_RELEASE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
@@ -537,6 +538,21 @@ const currentOwnerBindings = [
     && ['app/solutions/[slug]/layout.tsx', 'app/solutions/page.tsx', 'app/solutions/solution-workflow-proof.test.tsx'].every(p => !owner.match.test('nextjs/' + p))
     && runner.includes("['e2e/solutions-workflows.spec.ts', ['1440']]"),
     'Solutions proof owner must keep its four exact paths, three direct suites and the 1440 solutions browser suite');
+}
+// Conversion public (2026-11-09): seven exact paths, six direct suites, no browser suite of its own.
+{
+  const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'conversion-public'), [owner] = owners;
+  const paths = ['app/pricing/opengraph-image.tsx', 'app/reproducibility/opengraph-image.tsx', 'components/own-files-cta.tsx',
+    'lib/own-files-cta.test.ts', 'lib/plan-limit-fit.ts', 'lib/public-copy-purge.test.ts', 'lib/trial-allowance.test.ts'];
+  const suites = ['lib/og-card-frame.test.ts', 'lib/own-files-cta.test.ts', 'lib/plan-limit-fit.test.ts', 'lib/public-copy-purge.test.ts',
+    'lib/seo-surface.test.ts', 'lib/trial-allowance.test.ts'];
+  assert(owners.length === 1 && JSON.stringify(CONVERSION_PUBLIC_AFFECTED_PATHS) === JSON.stringify(paths)
+    && JSON.stringify(CONVERSION_PUBLIC_AFFECTED_UNIT_FILES) === JSON.stringify(suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(suites)
+    && !owner.browserFiles.length && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
+    && paths.every(p => owner.match.test('nextjs/' + p) && existsSync(resolve(repo, 'nextjs', p)))
+    && suites.every(s => existsSync(resolve(repo, 'nextjs', s)))
+    && ['app/evidence/opengraph-image.tsx', 'lib/plan-limit-fit.test.ts', 'components/own-files-cta.module.css'].every(p => !owner.match.test('nextjs/' + p)),
+    'Conversion public owner must keep its seven exact paths and six direct suites');
 }
 // Evidence viewer overlay: one exact stylesheet, its direct suite and the world-lifecycle browser suite.
 {

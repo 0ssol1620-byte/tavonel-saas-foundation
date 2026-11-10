@@ -75,7 +75,7 @@ describe("readCommercialState", () => {
     expect(isLiveCommerce({ ...LIVE, TAVONEL_BILLING_LAUNCH_APPROVED: "false", VERCEL_ENV: "production" })).toBe(false);
     expect(primaryCallToAction({}).label).toBe("Request access");
     expect(primaryCallToAction({ ...LIVE, VERCEL_ENV: "preview" }).label).toBe("Request access");
-    expect(primaryCallToAction({ ...LIVE, VERCEL_ENV: "production" }).label).toBe("Sign up for access");
+    expect(primaryCallToAction({ ...LIVE, VERCEL_ENV: "production" }).label).toBe("Start free");
   });
 
   /*
