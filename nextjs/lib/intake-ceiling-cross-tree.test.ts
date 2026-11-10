@@ -95,7 +95,7 @@ const SITES: readonly Site[] = [
     expected: SEGMENTED_PAGES, source: "intakeCeiling.ts CDR_SEGMENTED_MAX_DOCUMENT_PAGES: the range reader's loop bound",
   },
   {
-    file: WORKER_SANITIZE, name: "MAX_SEGMENT_PAGES", pattern: /^const MAX_SEGMENT_PAGES = (.+);$/gm,
+    file: WORKER_SANITIZE, name: "SEGMENT_PAGES", pattern: /^const SEGMENT_PAGES = (.+);$/gm,
     expected: PAGES, source: "INTAKE_CEILING_STAGES[0].maxSourcePages: one range is one CDR request",
   },
   {
