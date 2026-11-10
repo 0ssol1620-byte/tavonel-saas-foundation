@@ -55,7 +55,8 @@ describe("pricing plan overview", () => {
     // SEC-2 / FE-B2 (review 2): plan-scope wording is pricing wording and is founder-only. main's
     // card line stays; the proposed sentence is listed for founder approval, not shipped.
     expect(english).not.toContain("single-member workspaces. The Team name does not include");
-    expect(english).toContain("<b>Single-member workspace</b>");
+    // Starter/Pro rename (2026-11-10, founder, intended): the Pro card names what it delivers and no membership line.
+    expect(english).not.toContain("<b>Single-member workspace</b>");
     expectDisclosureBefore(english, 'gates.find(gate => gate.id === "customerData")?.reason', "<PricingPlanOverview");
     expect(english).toContain("plans={PLANS.map(plan => ({");
     expect(english).toContain('id={pricingPlanId(index)} tabIndex={-1}');
@@ -67,9 +68,10 @@ describe("pricing plan overview", () => {
     expect(korean).toContain("{ name: team.label, price: `$${team.priceUsd}`, unit: monthlyUnit }");
     expect(korean).toContain("<h3>{publicSample.name}</h3>");
     expect(korean).toContain("<h3>{enterprise.name}</h3>");
-    expectDisclosureBefore(korean, "현재 단일 사용자 워크스페이스입니다.", 'href="/ko/contact?plan=Team"');
-    // D-12 (delegated decision 2026-11-09): the Developer card's warning is the switch-on sentence.
-    expectDisclosureBefore(korean, "내 원문 컴파일은 워크스페이스의 처리 승인 뒤에 시작합니다.", 'href="/ko/contact?plan=Developer"');
+    // Starter/Pro rename (2026-11-10, founder, intended): the Pro card carries no membership disclosure to put first.
+    expect(korean).not.toContain("현재 단일 사용자 워크스페이스입니다.");
+    // D-12 (delegated decision 2026-11-09): the Starter card's warning is the switch-on sentence.
+    expectDisclosureBefore(korean, "내 원문 컴파일은 워크스페이스의 처리 승인 뒤에 시작합니다.", 'href="/ko/contact?plan=Starter"');
     for (const index of [0, 1, 2, 3]) expect(korean).toContain(`id={pricingPlanId(${index})} tabIndex={-1}`);
   });
 });

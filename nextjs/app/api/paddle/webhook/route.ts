@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { applyFoundationBillingAction, quarantineFoundationBillingEnvelope } from "@/lib/billing-store";
 import { recordServerFunnel } from "@/lib/funnel-events";
-import { OPERATIONS_ALERTS_RUNBOOK_URL, stableAlertId } from "@/lib/operations-alert-triggers";
-import { deliverOperationsAlert } from "@/lib/operations-p0";
 import { readBillingSecret } from "@/lib/billing-secrets";
 import { parsePaddleBillingAction } from "@/lib/paddle-billing-event";
 import { verifyPaddleSignature } from "@/lib/paddle-webhook";
@@ -95,24 +93,6 @@ export async function POST(request: Request) {
     && action.eventType === "subscription.activated"
     && (applied.result.status === "processed" || applied.result.status === "processed_subscription_upgrade")) {
     recordServerFunnel("subscription_started", { offer: action.offerCode });
-    /*
-      Team includes guided corpus onboarding, and Team is bought online since 2026-11-10 (R1 review).
-      A started Team subscription pages operations to schedule it, and the buyer is told we contact
-      them within one working day. The payment is already projected, so an undelivered alert never
-      un-acknowledges the event. It is logged as an error for the operator instead.
-    */
-    if (action.offerCode === "studio_access") {
-      const onboarding = await deliverOperationsAlert({
-        alertId: stableAlertId(`team_onboarding:${action.subscriptionId}`),
-        kind: "incident",
-        severity: "warning",
-        service: "billing",
-        summary: `Team onboarding ${action.workspaceId} ${action.subscriptionId}: contact the buyer within 1 working day to schedule guided corpus onboarding.`,
-        observedAt: new Date().toISOString(),
-        runbookUrl: OPERATIONS_ALERTS_RUNBOOK_URL,
-      }).catch(() => ({ ok: false as const, code: "ALERT_PAYLOAD_INVALID" as const }));
-      if (!onboarding.ok) console.error("foundation_team_onboarding_alert_undelivered", { code: onboarding.code });
-    }
   }
   console.info("foundation_billing_event_applied", {
     eventType: action.eventType,

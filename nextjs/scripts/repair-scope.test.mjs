@@ -6803,7 +6803,7 @@ test('affected pilot worksheet admission: the actual regular affectedPlan defers
   assert.deepEqual(affectedAskPlan(withDocs).deferredGroups,['native-world-race-fresh-run']);
   // An unmapped endpoint never enters invalidatingPaths, so its disposition still reads historical-input-reuse while the map fails closed
   // and no plan exists: that row is a classification, never current-head qualification.
-  for (const path of [AFFECTED_PILOT_OLD_SUITE,'nextjs/public/evaluation/pilot-worksheet.ja.md','nextjs/components/contact-form.tsx']) {
+  for (const path of [AFFECTED_PILOT_OLD_SUITE,'nextjs/public/evaluation/pilot-worksheet.ja.md','nextjs/components/contact-form.jsx']) {
     const unmapped=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([unmapped.failures,unmapped.groups,unmapped.nativeEvidence.disposition,unmapped.nativeEvidence.invalidatingPaths],[[`unmapped changed endpoint: ${path}`],[],'historical-input-reuse',[]],path);
     assert.throws(()=>affectedAskPlan(unmapped),/clean fail-closed map/,path);
@@ -6820,8 +6820,8 @@ test('affected pilot worksheet admission: adjacent and lookalike paths, other lo
     'nextjs/components/evaluation-page.ts','nextjs/components/evaluation-page.jsx','nextjs/components/evaluation-page.tsx.bak','nextjs/components/evaluation-pageXtsx',
     'nextjs/components/evaluation-page-v2.tsx','nextjs/components/evaluation-pages.tsx','nextjs/components/evaluation_page.tsx','nextjs/components/Evaluation-Page.tsx',
     'nextjs/components/evaluation-page/index.tsx','nextjs/components/evaluation-page.module.css','nextjs/components/evaluation-page.test.ts','nextjs/components/evaluation-page.spec.tsx',
-    'nextjs/components/contact-form.tsx','nextjs/components/contact-form.test.tsx','nextjs/components/contact-form.module.css','nextjs/components/public-site-chrome.tsx',
-    'nextjs/app/evaluation/page.tsx','nextjs/app/ko/evaluation/page.tsx','nextjs/app/evaluation/pilot-worksheet/route.ts','nextjs/app/api/contact/route.ts',
+    'nextjs/components/contact-form.jsx','nextjs/components/contact-form.test.tsx','nextjs/components/contact-form.module.css','nextjs/components/public-site-chrome.tsx',
+    'nextjs/app/evaluation/page.tsx','nextjs/app/ko/evaluation/page.tsx','nextjs/app/evaluation/pilot-worksheet/route.ts','nextjs/app/api/contact/route.tsx',
     'nextjs/app/api/v1/evaluation/requests/route.ts','nextjs/app/api/evaluation/worksheet/route.ts',
     'nextjs/public/evaluation/pilot-worksheet.md','nextjs/public/evaluation/pilot-worksheet.ja.md','nextjs/public/evaluation/pilot-worksheet.en-US.md',
     'nextjs/public/evaluation/pilot-worksheet.EN.md','nextjs/public/evaluation/pilot-worksheet.ko.MD','nextjs/public/evaluation/pilot-worksheet.en.markdown',
@@ -6882,14 +6882,14 @@ test('affected pilot worksheet admission: adjacent and lookalike paths, other lo
 });
 test('affected pilot worksheet admission: mixed unknown, an unknown rename endpoint or the old suite endpoint refuse the whole plan while the diagnostic selection remains; a deleted owned path still requires both direct suites at head', () => {
   // buildAffectedMap keeps the known owner's selection for diagnosis beside the failure; only the plan refuses, never a shrunken selection.
-  for (const unknown of ['nextjs/components/evaluation-page-v2.tsx','nextjs/public/evaluation/pilot-worksheet.ja.md',AFFECTED_PILOT_OLD_SUITE,'nextjs/components/contact-form.tsx']) {
+  for (const unknown of ['nextjs/components/evaluation-page-v2.tsx','nextjs/public/evaluation/pilot-worksheet.ja.md',AFFECTED_PILOT_OLD_SUITE,'nextjs/components/contact-form.jsx']) {
     const mixed=affectedMap([...affectedPilotRaw(),affectedRecord(unknown===AFFECTED_PILOT_OLD_SUITE?'M':'A',[unknown],unknown===AFFECTED_PILOT_OLD_SUITE?'100644':'000000')]);
     assert.deepEqual([mixed.failures,mixed.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],unknown);
     assert.deepEqual([mixed.groups,mixed.unitFiles,mixed.browserFiles],[[AFFECTED_PILOT_GROUP],AFFECTED_PILOT_SUITES,[]],'diagnostic selection is retained beside the failure: '+unknown);
     assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/,unknown);
   }
   // A rename with one unowned endpoint refuses in either direction, including a rename to or from the old suite path.
-  for (const paths of [[AFFECTED_PILOT_PAGE,'nextjs/components/evaluation-page-v2.tsx'],['nextjs/components/contact-form.tsx',AFFECTED_PILOT_PAGE],
+  for (const paths of [[AFFECTED_PILOT_PAGE,'nextjs/components/evaluation-page-v2.tsx'],['nextjs/components/contact-form.jsx',AFFECTED_PILOT_PAGE],
     [AFFECTED_PILOT_EN,'nextjs/public/evaluation/pilot-worksheet.ja.md'],['nextjs/public/evaluation/pilot-worksheet.md',AFFECTED_PILOT_KO],
     [AFFECTED_PILOT_TEST,'nextjs/lib/pilot-evaluation-worksheet.spec.ts'],[AFFECTED_PILOT_OLD_SUITE,AFFECTED_PILOT_TEST],[AFFECTED_PILOT_PAGE,AFFECTED_PILOT_OLD_SUITE]]) {
     const known=paths.find(path=>AFFECTED_PILOT_PATHS.includes(path)),unknown=paths.find(path=>path!==known);
@@ -7030,7 +7030,7 @@ test('affected pilot worksheet admission: the combined prior workspace, UX08 led
     [[],combined.groups,combined.unitFiles,combined.changedPaths,combined.browserFiles,combined.entries.length+4]);
   // Evaluation and contact-form neighbours stay diagnostics only: beside the combined delta they close the whole plan, while the
   // diagnostic selection equals the clean combined selection.
-  for (const adjacent of ['nextjs/components/contact-form.tsx','nextjs/app/evaluation/page.tsx',AFFECTED_PILOT_OLD_SUITE]) {
+  for (const adjacent of ['nextjs/components/contact-form.jsx','nextjs/app/evaluation/page.tsx',AFFECTED_PILOT_OLD_SUITE]) {
     // GX-02/GX-04 registered the evaluation page to global-exposure: asserted positively to that one owner, never to the worksheet owner.
     // It shares only the EvaluationPage render suite, which reads the page directly; the worksheet suite is never selected by it.
     if (assertGlobalExposureEndpoint(adjacent)) {
@@ -8228,9 +8228,9 @@ test('affected sli-alert-noise-20261109 owner: 3 exact paths select 10 direct su
 });
 // pricing-one-step-buy-20261110: one finite owner, restated independently of the exported constants.
 import { ONE_STEP_BUY_AFFECTED_PATHS, ONE_STEP_BUY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
-test('affected pricing-one-step-buy-20261110 owner: 11 exact paths select 13 direct suites and no browser suite; neighbours stay unmapped', () => {
-  const paths = ['app/api/billing/refund-request/route.ts', 'components/billing-refund.tsx', 'lib/billing-refund-request.test.ts', 'lib/billing-store.ts', 'lib/category-guide.test.ts', 'lib/checkout-policy.test.ts', 'lib/checkout-policy.ts', 'lib/paddle-browser.ts', 'lib/refund-eligibility.test.ts', 'lib/refund-eligibility.ts', 'lib/workspace-tenancy.test.ts'];
-  const suites = ['lib/api-error-codes.test.ts', 'lib/billing-reconciliation.test.ts', 'lib/billing-refund-request.test.ts', 'lib/category-guide.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-policy.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/refund-eligibility.test.ts', 'lib/route-classification.test.ts', 'lib/use-checkout.test.ts', 'lib/workspace-tenancy.test.ts'];
+test('affected pricing-one-step-buy-20261110 owner: 16 exact paths select 15 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/api/billing/refund-request/route.ts', 'app/api/contact/route.ts', 'components/billing-refund.tsx', 'components/contact-form.tsx', 'components/pipeline-board.tsx', 'lib/billing-refund-request.test.ts', 'lib/billing-store.ts', 'lib/category-guide.test.ts', 'lib/checkout-policy.test.ts', 'lib/checkout-policy.ts', 'lib/contact-route.test.ts', 'lib/paddle-browser.ts', 'lib/plan-feature-matrix.test.ts', 'lib/refund-eligibility.test.ts', 'lib/refund-eligibility.ts', 'lib/workspace-tenancy.test.ts'];
+  const suites = ['lib/api-error-codes.test.ts', 'lib/billing-reconciliation.test.ts', 'lib/billing-refund-request.test.ts', 'lib/category-guide.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-policy.test.ts', 'lib/contact-route.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/output-escaping.test.ts', 'lib/plan-feature-matrix.test.ts', 'lib/production-route-surface.test.ts', 'lib/refund-eligibility.test.ts', 'lib/route-classification.test.ts', 'lib/use-checkout.test.ts', 'lib/workspace-tenancy.test.ts'];
   assert.deepEqual([[...ONE_STEP_BUY_AFFECTED_PATHS], [...ONE_STEP_BUY_AFFECTED_UNIT_FILES]], [paths, suites]);
   for (const path of paths.map(p => `nextjs/${p}`)) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['pricing-one-step-buy-20261110'], path);

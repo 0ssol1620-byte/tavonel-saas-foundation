@@ -171,7 +171,7 @@ describe("every solution page says where it stops too", () => {
       "declines when nothing matched at all",
       "is the reader’s call",
       // Team self-serve (2026-11-10, intended): the sentinel follows the catalog's self_serve channel.
-      "Team is bought online, as Developer is",
+      "Starter and Pro are both bought online",
       "held for review with the regions that support each side",
       "is an estimate",
       "human decision",

@@ -100,7 +100,7 @@ describe("customer data on the live compile path", () => {
     expect(reason).not.toMatch(/in stages|stage by stage/);
     expect(reason).toContain("Your workspace shows whether it is open.");
     // Team self-serve (2026-11-10, intended): 
-    expect(reason).toContain("Once it is open, the Developer and Team plans can be bought online. Enterprise is arranged with us rather than enabled by a plan purchase.");
+    expect(reason).toContain("Once it is open, the Starter and Pro plans can be bought online. Enterprise is arranged with us rather than enabled by a plan purchase.");
     expect(reason).not.toMatch(/waiting list|in turn|notify|notification|we will (?:email|tell)/i);
     expect(reason).not.toMatch(/^Sign in to upload|can be bought online;/);
     expect(reason, "plain sentences").not.toContain(";");

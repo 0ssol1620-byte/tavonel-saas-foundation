@@ -810,11 +810,11 @@ for (const binding of [
     browsers: [],
     rows: [],
     neighbors: ['nextjs/app/api/internal/sli/page.tsx', 'nextjs/lib/synthetic-probe-store.tsx', 'lib/synthetic-probe-store.ts'] },
-  // pricing-one-step-buy-20261110: eleven exact paths, thirteen direct suites, no browser suite.
+  // pricing-one-step-buy-20261110: sixteen exact paths, fifteen direct suites, no browser suite.
   { group: 'pricing-one-step-buy-20261110', prefix: 'nextjs/', exportedPaths: ONE_STEP_BUY_AFFECTED_PATHS, exportedSuites: ONE_STEP_BUY_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
-    paths: ['app/api/billing/refund-request/route.ts', 'components/billing-refund.tsx', 'lib/billing-refund-request.test.ts', 'lib/billing-store.ts', 'lib/category-guide.test.ts', 'lib/checkout-policy.test.ts', 'lib/checkout-policy.ts', 'lib/paddle-browser.ts', 'lib/refund-eligibility.test.ts', 'lib/refund-eligibility.ts', 'lib/workspace-tenancy.test.ts'],
-    suites: ['lib/api-error-codes.test.ts', 'lib/billing-reconciliation.test.ts', 'lib/billing-refund-request.test.ts', 'lib/category-guide.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-policy.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/refund-eligibility.test.ts', 'lib/route-classification.test.ts', 'lib/use-checkout.test.ts', 'lib/workspace-tenancy.test.ts'],
+    paths: ['app/api/billing/refund-request/route.ts', 'app/api/contact/route.ts', 'components/billing-refund.tsx', 'components/contact-form.tsx', 'components/pipeline-board.tsx', 'lib/billing-refund-request.test.ts', 'lib/billing-store.ts', 'lib/category-guide.test.ts', 'lib/checkout-policy.test.ts', 'lib/checkout-policy.ts', 'lib/contact-route.test.ts', 'lib/paddle-browser.ts', 'lib/plan-feature-matrix.test.ts', 'lib/refund-eligibility.test.ts', 'lib/refund-eligibility.ts', 'lib/workspace-tenancy.test.ts'],
+    suites: ['lib/api-error-codes.test.ts', 'lib/billing-reconciliation.test.ts', 'lib/billing-refund-request.test.ts', 'lib/category-guide.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-policy.test.ts', 'lib/contact-route.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/output-escaping.test.ts', 'lib/plan-feature-matrix.test.ts', 'lib/production-route-surface.test.ts', 'lib/refund-eligibility.test.ts', 'lib/route-classification.test.ts', 'lib/use-checkout.test.ts', 'lib/workspace-tenancy.test.ts'],
     browsers: [],
     rows: [],
     neighbors: ['nextjs/app/api/billing/refund-request/route.tsx', 'nextjs/components/billing-refund.ts', 'nextjs/lib/checkout-policies.ts', 'nextjs/lib/paddle-browser.tsx', 'nextjs/lib/refund-eligibility.tsx', 'lib/refund-eligibility.ts'] },

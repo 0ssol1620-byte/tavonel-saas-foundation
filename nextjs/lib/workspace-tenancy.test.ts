@@ -55,11 +55,13 @@ describe("the workspace key is a function of the user", () => {
 });
 
 describe("nothing claims a membership feature that the tenancy model cannot carry", () => {
-  it("sells Team only as the single-member plan it is", () => {
-    // Team self-serve (2026-11-10, intended): the gate was revisited (orchestrator, delegated plan decision). Team is
-    // self-serve, and the membership it cannot carry stays named as not sold on its card.
+  it("sells the $99 plan as Pro, a volume plan, never as a membership plan", () => {
+    // Starter/Pro rename (2026-11-10, founder, intended): "Team" read as seats the tenancy model cannot carry, so the plan is
+    // Pro and its card names what it delivers. No seat, member or role is sold or promised.
     expect(BILLING_OFFERS.studio_access.saleChannel).toBe("self_serve");
-    expect(BILLING_OFFERS.studio_access.notYetSold).toContain("Shared members and roles");
+    expect(BILLING_OFFERS.studio_access.label).toBe("Pro");
+    const card = [BILLING_OFFERS.studio_access.description, ...BILLING_OFFERS.studio_access.features].join(" ");
+    expect(card).not.toMatch(/\b(seats?|members?|roles?|team|onboarding)\b/i);
   });
 
   it("ships no invitation or seat surface while the key is derived", () => {

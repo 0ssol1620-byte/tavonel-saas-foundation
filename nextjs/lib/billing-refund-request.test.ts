@@ -48,7 +48,7 @@ describe("refund request route", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.facts).toEqual({
-      plan: "Developer", paidAt: PAID_AT, renewsAt: "2026-12-08T00:00:00.000Z",
+      plan: "Starter", paidAt: PAID_AT, renewsAt: "2026-12-08T00:00:00.000Z",
       windowEndsAt: "2026-11-22T09:00:00.000Z", allowancePages: 50,
     });
     expect(payment).toHaveBeenCalledWith("pilot-11111111", "11111111-1111-4111-8111-111111111111");

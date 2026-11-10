@@ -9,7 +9,7 @@ const base = { accessPlan: "observer_access", paidAt, renewsAt: "2026-12-01T00:0
 describe("refund facts, recorded data only (R1 review, 2026-11-10)", () => {
   it("states the recorded payment, its window and the plan's page line", () => {
     expect(refundFacts(base)).toEqual({
-      plan: "Developer",
+      plan: "Starter",
       paidAt,
       renewsAt: base.renewsAt,
       windowEndsAt: new Date(Date.parse(paidAt) + REFUND_WINDOW_DAYS * DAY).toISOString(),

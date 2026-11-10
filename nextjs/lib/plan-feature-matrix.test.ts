@@ -96,7 +96,9 @@ describe("the /pricing comparison matrix has three states, not a column of ticks
 
   it("renders every unsold capability the catalog names, in one of the two unsold states", () => {
     const unsold = [...new Set(PLAN_CODES.flatMap((code) => BILLING_OFFERS[code].notYetSold as readonly string[]))];
-    expect(unsold.length, "the catalog names no unsold capability, so the rule is untested").toBeGreaterThan(0);
+    // Starter/Pro rename (2026-11-10, founder, intended): Pro is sold on what it delivers, so the catalog names no unsold capability
+    // today. The rule below still holds for any capability a plan names later.
+    expect(unsold).toEqual([]);
 
     for (const row of expectedRows().filter((candidate) => unsold.includes(candidate.capability))) {
       for (const plan of row.plans) {

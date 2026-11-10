@@ -269,7 +269,7 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceE
     // Identity and team-access requirements stay in Enterprise scoping rather than plan copy.
     [
       "What differs by plan",
-      `${BILLING_OFFERS.studio_access.label} carries ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} included pages against ${BILLING_OFFERS.observer_access.label}'s ${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")}, adds the review queue, version history and a guided onboarding session, and is bought online as ${BILLING_OFFERS.observer_access.label} is. ${activationPlans.join(" and ")} reach World activation — activating a candidate and rolling one back — as the workspace owner. Source connections are verified separately in Workspace.`,
+      `${BILLING_OFFERS.studio_access.label} carries ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} included pages against ${BILLING_OFFERS.observer_access.label}'s ${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")}, adds the review queue and version history, and is bought online as ${BILLING_OFFERS.observer_access.label} is. ${activationPlans.join(" and ")} reach World activation — activating a candidate and rolling one back — as the workspace owner. Source connections are verified separately in Workspace.`,
     ],
     [
       "What does not consume pages",
@@ -417,7 +417,7 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "Members in a workspace",
-    "Published plans cover the workspace owner. Team access and identity requirements are confirmed during Enterprise scoping.",
+    "Published plans cover the workspace owner. Access for more people and identity requirements are confirmed during Enterprise scoping.",
   ],
   [
     "API requests",
@@ -925,8 +925,8 @@ export default function PricingPageClient({
             */}
             <div className="pricing-context">
               <p className="lede">
-                Developer includes {BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")} standard
-                pages each month. Team includes {BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")}.
+                {BILLING_OFFERS.observer_access.label} includes {BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")} standard
+                pages each month. {BILLING_OFFERS.studio_access.label} includes {BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")}.
                 Need more in a month? Talk to us and we will arrange the additional volume.
               </p>
               {/*
@@ -976,12 +976,6 @@ export default function PricingPageClient({
                       ? `${BILLING_OFFERS[purchase.offer].label} turns on when Paddle's signed confirmation reaches us. This page is checking for it now.`
                       : ENTITLEMENT_PENDING_SENTENCE}
                 </p>
-                {purchase.offer === "studio_access" ? (
-                  <p>
-                    We will contact you within 1 working day to schedule your guided onboarding. You can also write to{" "}
-                    <a href="mailto:support@tavonel.com">support@tavonel.com</a>.
-                  </p>
-                ) : null}
                 <p className="pricing-purchase-actions">
                   <Link className="btn" href={"/workspace" as Route}>Open your workspace</Link>
                   {purchase.outcome === "unconfirmed" ? <Link href={"/workspace/settings/usage" as Route}>Usage &amp; billing</Link> : null}
@@ -1003,7 +997,7 @@ export default function PricingPageClient({
             ) : null}
             <div className="plans" ref={plansRef} data-visual>
               {PLANS.map((plan, index) => (
-                <article className={`plan ${pricingPlanDestinationClass}`} id={pricingPlanId(index)} tabIndex={-1} key={plan.name} data-featured={plan.name === "Developer" ? 1 : 0}>
+                <article className={`plan ${pricingPlanDestinationClass}`} id={pricingPlanId(index)} tabIndex={-1} key={plan.name} data-featured={plan.offerCode === "observer_access" ? 1 : 0}>
                   {/*
                     BQ-027. Four cards, four shared baselines.
 
@@ -1041,8 +1035,7 @@ export default function PricingPageClient({
                     {plan.name === EVALUATION.name && !selfService ? EVALUATION_GATED_DESCRIPTION : plan.description}
                   </p>
                   <div className="plan-features">
-                    {plan.name === "Team" ? <p className="fine"><b>Single-member workspace</b></p> : null}
-                    {!ownFilesOpen && (plan.name === "Developer" || plan.name === "Team") ? (
+                    {!ownFilesOpen && plan.offerCode ? (
                       <p className="fine">Ask us about an approved source-processing pilot before your first compile.</p>
                     ) : null}
                     <ul>{(plan.name === EVALUATION.name && !selfService ? EVALUATION_GATED_FEATURES : plan.features).map((feature) => (
@@ -1072,7 +1065,7 @@ export default function PricingPageClient({
                     discovered one redirect at a time.
                   */}
                   <a
-                    className={plan.name === "Developer" ? "btn" : "btn ghost"}
+                    className={plan.offerCode === "observer_access" ? "btn" : "btn ghost"}
                     href={planHref(plan)}
                     aria-disabled={billingBusy !== null && billingBusy === plan.offerCode ? true : undefined}
                     onClick={(event) => {

@@ -244,9 +244,9 @@ describe("2026-09-05 production hardening", () => {
   it("does not sell collaboration that has not shipped", () => {
     const catalog = read("lib/billing-catalog.ts");
     expect(catalog).not.toContain("Shared workspace onboarding");
-    expect(catalog).toContain("Guided corpus onboarding");
-    // Team self-serve (2026-11-10, intended): Team sells as the single-member plan it is. Membership stays named as not sold.
-    expect(catalog).toContain('notYetSold: ["Shared members and roles", "Per-member source permissions"]');
+    // Starter/Pro rename (2026-11-10, founder, intended): guided onboarding is Enterprise only, and Pro names no membership.
+    expect(catalog).not.toContain('"Guided corpus onboarding"');
+    expect(catalog).not.toContain("Shared members and roles");
   });
 
   it("has one definitive Knowledge Compiler URL and production-gates capture routes", () => {

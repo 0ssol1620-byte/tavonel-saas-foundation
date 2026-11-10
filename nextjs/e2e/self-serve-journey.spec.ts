@@ -262,10 +262,10 @@ test.describe("launch approval withheld (purchase closed; customer processing sw
 
     // H2. Every plan action is a conversation, and the gate is stated in the policy's own words.
     await page.goto("/pricing");
-    const developer = page.getByRole("link", { name: "Request Developer access" });
-    await expect(developer).toHaveAttribute("href", "/contact?plan=Developer");
+    const developer = page.getByRole("link", { name: "Request Starter access" });
+    await expect(developer).toHaveAttribute("href", "/contact?plan=Starter");
     // Team self-serve (2026-11-10, intended): Team reads as Developer does while purchase is closed.
-    await expect(page.getByRole("link", { name: "Request Team access" })).toHaveAttribute("href", "/contact?plan=Team");
+    await expect(page.getByRole("link", { name: "Request Pro access" })).toHaveAttribute("href", "/contact?plan=Pro");
     for (const enterprise of await page.getByRole("link", { name: "Scope an Enterprise pilot" }).all()) {
       await expect(enterprise).toHaveAttribute("href", "/contact?plan=Enterprise");
     }
@@ -273,7 +273,7 @@ test.describe("launch approval withheld (purchase closed; customer processing sw
     await expect(page.locator('[data-purchase-gate="customerData"]')).toHaveCount(0);
     await expectNoCheckoutDoor(page);
     await developer.click();
-    await expect(page).toHaveURL(/\/contact\?plan=Developer$/);
+    await expect(page).toHaveURL(/\/contact\?plan=Starter$/);
     await expect(page.locator("form.contact-form")).toBeVisible();
 
     // H3-H5. The one door left: an offer typed into the sign-in URL by hand.
@@ -405,9 +405,9 @@ test.describe("simulated switch-on (browser mocks only)", () => {
 
     // H2. Developer and Team go through sign-in carrying the offer (Team self-serve, 2026-11-10); Enterprise stays a conversation.
     await page.goto("/pricing");
-    const developer = page.getByRole("link", { name: "Buy Developer — $29/month" });
+    const developer = page.getByRole("link", { name: "Buy Starter — $29/month" });
     await expect(developer).toHaveAttribute("href", "/login?next=checkout&offer=observer_access");
-    await expect(page.getByRole("link", { name: "Buy Team — $99/month" })).toHaveAttribute("href", "/login?next=checkout&offer=studio_access");
+    await expect(page.getByRole("link", { name: "Buy Pro — $99/month" })).toHaveAttribute("href", "/login?next=checkout&offer=studio_access");
     await expect(page.getByRole("link", { name: "Scope an Enterprise pilot" }).first()).toHaveAttribute("href", "/contact?plan=Enterprise");
     await tabTo(page, developer);
     await page.keyboard.press("Enter");
@@ -441,7 +441,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
 
     // H6 + H15. One-step buy (2026-11-10, intended): sign-in returns to /pricing, which strips the
     // offer from the address and resumes it once, as an offer code and nothing else.
-    await expect(region(page, "status", "Developer sandbox checkout opened. Only a verified webhook can change entitlements.")).toBeVisible();
+    await expect(region(page, "status", "Starter sandbox checkout opened. Only a verified webhook can change entitlements.")).toBeVisible();
     await expect(page).toHaveURL(/\/pricing$/);
     expect(posts).toEqual([{ offerCode: "observer_access" }]);
     expect(paddle.loads()).toBe(1);
@@ -469,7 +469,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     expect(await paddleClosed(page), "the buyer is not left on Paddle's own success screen").toBe(1);
 
     // H17 (journey A4). The bounded wait reads the arrival: the plan and its catalog pages, no reload.
-    await expect(outcome.getByRole("heading", { name: "Developer is active." })).toBeVisible({ timeout: 10_000 });
+    await expect(outcome.getByRole("heading", { name: "Starter is active." })).toBeVisible({ timeout: 10_000 });
     await expect(outcome).toContainText("500 pages this month.");
     expect(await page.evaluate(() => (window as unknown as { __journeyNoReload?: boolean }).__journeyNoReload), "the page was not reloaded").toBe(true);
     await expect(outcome.getByRole("link", { name: "Open your workspace" })).toHaveAttribute("href", "/workspace");
@@ -484,7 +484,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     // H18. The workspace billing card shows the plan, and its portal action leaves for the portal.
     await page.goto("/workspace/settings/usage", { waitUntil: "domcontentloaded" });
     const card = page.locator("section.billing-card");
-    await expect(card.getByRole("heading", { name: "observer access" })).toBeVisible();
+    await expect(card.getByRole("heading", { name: "Starter plan" })).toBeVisible();
     await expect(card.locator("dl").first()).toContainText("active");
     await card.getByRole("button", { name: "Manage or cancel subscription" }).click();
     await expect(page).toHaveURL(FIXTURE_PORTAL_URL);
@@ -507,7 +507,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     const state: { bootstrap: unknown; reads: number } = { bootstrap: TODAY_NEW_ACCOUNT, reads: 0 };
     await page.route("**/api/access/bootstrap", (route) => (state.reads += 1, route.fulfill({ json: state.bootstrap })));
     const posts = await answerCheckout(page, () => ({ status: 200, json: SANDBOX_CHECKOUT_READY }));
-    const held = region(page, "status", "Developer is held for you.");
+    const held = region(page, "status", "Starter is held for you.");
     const reload = async (bootstrap: unknown) => {
       state.bootstrap = bootstrap;
       await page.reload({ waitUntil: "domcontentloaded" });
@@ -534,7 +534,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
 
     // Released for production: the held offer resumes once, as an offer code and nothing else.
     await reload(open);
-    await expect(region(page, "status", "Developer sandbox checkout opened. Only a verified webhook can change entitlements.")).toBeVisible();
+    await expect(region(page, "status", "Starter sandbox checkout opened. Only a verified webhook can change entitlements.")).toBeVisible();
     expect(posts).toEqual([{ offerCode: "observer_access" }]);
     expect(paddle.loads()).toBe(1);
 
@@ -565,7 +565,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     const state = { bootstrap: noEntitlement("qualification"), reads: 0 };
     await page.route("**/api/access/bootstrap", (route) => (state.reads += 1, route.fulfill({ json: state.bootstrap })));
     const posts = await answerCheckout(page, () => ({ status: 200, json: SANDBOX_CHECKOUT_READY }));
-    const held = region(page, "status", "Developer is held for you.");
+    const held = region(page, "status", "Starter is held for you.");
 
     // Qualified, not released: held, nothing sent.
     await page.goto("/workspace?checkout=observer_access", { waitUntil: "domcontentloaded" });
@@ -575,7 +575,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     // Released for production with the trial over: one checkout, as an offer code and nothing else.
     state.bootstrap = noEntitlement("production");
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(region(page, "status", "Developer sandbox checkout opened. Only a verified webhook can change entitlements.")).toBeVisible();
+    await expect(region(page, "status", "Starter sandbox checkout opened. Only a verified webhook can change entitlements.")).toBeVisible();
     await expect(held).toHaveCount(0);
     expect(posts).toEqual([{ offerCode: "observer_access" }]);
     expect(paddle.loads()).toBe(1);
@@ -597,8 +597,8 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     const posts = await answerCheckout(page, () => ({ status: 200, json: SANDBOX_CHECKOUT_READY }));
 
     await page.goto("/pricing");
-    await page.getByRole("link", { name: "Buy Developer — $29/month", exact: true }).click();
-    await expect(region(page, "status", "Developer sandbox checkout opened.")).toHaveCount(1);
+    await page.getByRole("link", { name: "Buy Starter — $29/month", exact: true }).click();
+    await expect(region(page, "status", "Starter sandbox checkout opened.")).toHaveCount(1);
     await expect(page).toHaveURL(/\/pricing$/);
     expect(posts).toEqual([{ offerCode: "observer_access" }]);
     expect(paddle.loads()).toBe(1);
@@ -624,13 +624,13 @@ test.describe("simulated switch-on (browser mocks only)", () => {
       : { status: 403, json: { code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" } });
 
     await page.goto("/pricing");
-    const buy = page.getByRole("link", { name: "Buy Developer — $29/month", exact: true });
+    const buy = page.getByRole("link", { name: "Buy Starter — $29/month", exact: true });
     await buy.click();
     const dialog = page.getByRole("dialog", { name: "Accept the processing terms" });
     await expect(dialog).toBeVisible();
     // No toast, no workspace detour: nothing is announced as a refusal.
     await expect(page.getByRole("alert").filter({ hasText: "Checkout is unavailable." })).toHaveCount(0);
-    await expect(dialog).toContainText("Developer checkout opens as soon as you accept.");
+    await expect(dialog).toContainText("Starter checkout opens as soon as you accept.");
     await expect(dialog.getByRole("list", { name: "The terms in brief" }).getByRole("listitem")).toHaveCount(3);
     await expect(dialog.getByRole("link", { name: "Self-Service Terms" })).toHaveAttribute("href", TERMS_OFFER.terms.path);
     await expect(dialog.getByRole("link", { name: "Processing Addendum" })).toHaveAttribute("href", TERMS_OFFER.processing.path);
@@ -654,7 +654,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     await dialog.getByRole("checkbox", { name: /I have read and agree/ }).check();
     await accept.click();
     await expect(dialog).toHaveCount(0);
-    await expect(region(page, "status", "Developer sandbox checkout opened.")).toBeVisible();
+    await expect(region(page, "status", "Starter sandbox checkout opened.")).toBeVisible();
     await expect(page).toHaveURL(/\/pricing$/);
     expect(terms.posts).toBe(1);
     expect(posts).toEqual([{ offerCode: "observer_access" }, { offerCode: "observer_access" }, { offerCode: "observer_access" }]);
@@ -678,51 +678,43 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     const posts = await answerCheckout(page, () => reply);
 
     await page.goto("/pricing?checkout=enterprise_access");
-    await expect(page.getByRole("link", { name: "Buy Developer — $29/month", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Buy Starter — $29/month", exact: true })).toBeVisible();
     expect(posts, "an offer off the list resumes nothing").toEqual([]);
 
-    await page.getByRole("link", { name: "Buy Developer — $29/month", exact: true }).click();
+    await page.getByRole("link", { name: "Buy Starter — $29/month", exact: true }).click();
     const hold = region(page, "alert", failureSentence("BILLING_HOLD", 403));
     await expect(hold).toBeVisible();
     await expect(hold.locator("p")).toHaveCSS("position", "static");
-    expect(await hold.evaluate((node) => node.closest("article")?.querySelector("h2")?.textContent)).toBe("Developer");
-    await expect(hold.getByRole("link", { name: "Contact us about Developer" })).toHaveAttribute("href", "/contact?plan=Developer");
+    expect(await hold.evaluate((node) => node.closest("article")?.querySelector("h2")?.textContent)).toBe("Starter");
+    await expect(hold.getByRole("link", { name: "Contact us about Starter" })).toHaveAttribute("href", "/contact?plan=Starter");
 
     reply = { status: 409, json: { code: "BILLING_PLAN_CHANGE_REQUIRED" } };
-    await page.getByRole("link", { name: "Buy Team — $99/month", exact: true }).click();
+    await page.getByRole("link", { name: "Buy Pro — $99/month", exact: true }).click();
     const change = region(page, "alert", failureSentence("BILLING_PLAN_CHANGE_REQUIRED", 409));
     await expect(change).toBeVisible();
-    expect(await change.evaluate((node) => node.closest("article")?.querySelector("h2")?.textContent)).toBe("Team");
+    expect(await change.evaluate((node) => node.closest("article")?.querySelector("h2")?.textContent)).toBe("Pro");
     await expect(change.getByRole("link", { name: "Manage or cancel subscription" })).toHaveAttribute("href", "/workspace/settings/usage");
     await expect(page.getByRole("link", { name: "Scope an Enterprise pilot" }).first()).toHaveAttribute("href", "/contact?plan=Enterprise");
     expect(posts).toEqual([{ offerCode: "observer_access" }, { offerCode: "studio_access" }]);
     expect(paddle.loads()).toBe(0);
   });
 
-  test("Team is bought online: signed out it carries its offer into sign-in, signed in it opens the checkout", async ({ page }) => {
-    // The paid outcome runs the bounded billing wait, as the other paid journeys here do.
-    test.setTimeout(90_000);
+  test("Pro is bought online: signed out it carries its offer into sign-in, signed in it opens the checkout", async ({ page }) => {
     await declineAnalytics(page);
     await servePosture(page, "switch-on");
     await page.goto("/pricing");
-    await expect(page.getByRole("link", { name: "Buy Team — $99/month", exact: true })).toHaveAttribute("href", "/login?next=checkout&offer=studio_access");
+    await expect(page.getByRole("link", { name: "Buy Pro — $99/month", exact: true })).toHaveAttribute("href", "/login?next=checkout&offer=studio_access");
 
     await installFixtureSession(page);
     const paddle = await installFakePaddle(page);
     await page.route("**/api/billing/status", (route) => route.fulfill({ json: { code: "OK", account: INACTIVE_BILLING } }));
-    const team = { ...SANDBOX_CHECKOUT_READY, offer: { ...SANDBOX_CHECKOUT_READY.offer, code: "studio_access", label: "Team", credits: 10_000 } };
+    const team = { ...SANDBOX_CHECKOUT_READY, offer: { ...SANDBOX_CHECKOUT_READY.offer, code: "studio_access", label: "Pro", credits: 10_000 } };
     const posts = await answerCheckout(page, () => ({ status: 200, json: team }));
     await page.goto("/pricing");
-    await page.getByRole("link", { name: "Buy Team — $99/month", exact: true }).click();
-    await expect(region(page, "status", "Team sandbox checkout opened.")).toBeVisible();
+    await page.getByRole("link", { name: "Buy Pro — $99/month", exact: true }).click();
+    await expect(region(page, "status", "Pro sandbox checkout opened.")).toBeVisible();
     expect(posts).toEqual([{ offerCode: "studio_access" }]);
     expect(paddle.loads()).toBe(1);
-
-    // R1 review (2026-11-10): Team includes guided onboarding, so the paid outcome says how it is arranged.
-    expect(await emitPaddleEvent(page, "checkout.completed")).toBe(true);
-    const outcome = page.locator("section.pricing-purchase");
-    await expect(outcome).toContainText("We will contact you within 1 working day to schedule your guided onboarding.");
-    await expect(outcome.getByRole("link", { name: "support@tavonel.com" })).toHaveAttribute("href", "mailto:support@tavonel.com");
   });
 
   /*
@@ -803,7 +795,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     await answerCheckout(page, () => ({ status: 200, json: SANDBOX_CHECKOUT_READY }));
 
     await page.goto("/workspace?checkout=observer_access", { waitUntil: "domcontentloaded" });
-    await expect(region(page, "status", "Developer sandbox checkout opened.")).toBeVisible();
+    await expect(region(page, "status", "Starter sandbox checkout opened.")).toBeVisible();
     const readsBefore = reads;
     expect(await emitPaddleEvent(page, "checkout.completed")).toBe(true);
 
@@ -813,7 +805,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     }
     await expect(pending).toBeVisible();
     expect(reads - readsBefore, "one read per scheduled delay, and no more").toBe(ENTITLEMENT_WAIT_DELAYS_MS.length);
-    await expect(page.getByText(entitlementActiveSentence("Developer"))).toHaveCount(0);
+    await expect(page.getByText(entitlementActiveSentence("Starter"))).toHaveCount(0);
 
     // Bounded: once it has said pending, time passing reads nothing more.
     await page.clock.runFor(ENTITLEMENT_WAIT_WINDOW_MS);
@@ -876,7 +868,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
         ? { status: 200, json: SANDBOX_CHECKOUT_READY }
         : { status: 403, json: { code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" } });
       await page.goto("/pricing", { waitUntil: "domcontentloaded" });
-      const buy = page.getByRole("link", { name: "Buy Developer — $29/month", exact: true });
+      const buy = page.getByRole("link", { name: "Buy Starter — $29/month", exact: true });
       await buy.scrollIntoViewIfNeeded();
       await buy.click();
       const dialog = page.getByRole("dialog", { name: "Accept the processing terms" });
@@ -890,10 +882,10 @@ test.describe("simulated switch-on (browser mocks only)", () => {
       await accept.click({ trial: true });
       await accept.click();
       await expect(dialog).toHaveCount(0);
-      await expect(region(page, "status", "Developer sandbox checkout opened.")).toBeVisible();
+      await expect(region(page, "status", "Starter sandbox checkout opened.")).toBeVisible();
       expect(await emitPaddleEvent(page, "checkout.completed")).toBe(true);
       const outcome = page.locator("section.pricing-purchase");
-      await expect(outcome.getByRole("heading", { name: "Developer is active." })).toBeVisible({ timeout: 10_000 });
+      await expect(outcome.getByRole("heading", { name: "Starter is active." })).toBeVisible({ timeout: 10_000 });
       await expect(outcome).toBeInViewport();
       expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), `no sideways scroll at ${width}px`).toBeLessThanOrEqual(1);
       await context.close();
@@ -929,9 +921,9 @@ test.describe("simulated switch-on (browser mocks only)", () => {
       };
 
       let page = await open("today", "/pricing", false);
-      await reachable(page, page.getByRole("link", { name: "Request Developer access" }), "today's Developer action");
+      await reachable(page, page.getByRole("link", { name: "Request Starter access" }), "today's Starter action");
       page = await open("switch-on", "/pricing", false);
-      await reachable(page, page.getByRole("link", { name: "Buy Developer — $29/month" }), "switch-on Developer action");
+      await reachable(page, page.getByRole("link", { name: "Buy Starter — $29/month" }), "switch-on Starter action");
       page = await open("switch-on", "/login?next=checkout&offer=observer_access", false);
       await reachable(page, page.getByRole("button", { name: "Continue with Google" }), "sign-in");
       page = await open("today", "/workspace?checkout=observer_access", true);

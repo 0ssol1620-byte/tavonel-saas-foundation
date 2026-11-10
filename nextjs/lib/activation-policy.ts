@@ -108,7 +108,7 @@ export const activationPolicy = {
     processing terms; the release row and the grant still decide, so it still says the workspace
     shows whether it is open.
   */
-  customerData: { enabled: true, reason: "Signing in creates your workspace, and uploading and compiling your own sources open for it once its owner accepts the processing terms. Your workspace shows whether it is open. Once it is open, the Developer and Team plans can be bought online. Enterprise is arranged with us rather than enabled by a plan purchase." },
+  customerData: { enabled: true, reason: "Signing in creates your workspace, and uploading and compiling your own sources open for it once its owner accepts the processing terms. Your workspace shows whether it is open. Once it is open, the Starter and Pro plans can be bought online. Enterprise is arranged with us rather than enabled by a plan purchase." },
 } as const;
 
 export type ActivationCapability = keyof typeof activationPolicy;

@@ -16,7 +16,7 @@ import styles from "./pricing.module.css";
 
 export const metadata: Metadata = pageMetadata({
   title: "요금과 도입 상담 — TAVONEL",
-  description: "TAVONEL의 공개 샘플, Developer·Team 요금, 내 원문 컴파일을 시작하는 방법을 확인하세요. Developer와 Team은 워크스페이스가 열리면 온라인으로 구매하고, Enterprise는 상담으로 시작합니다.",
+  description: "TAVONEL의 공개 샘플, Starter·Pro 요금, 내 원문 컴파일을 시작하는 방법을 확인하세요. Starter와 Pro는 워크스페이스가 열리면 온라인으로 구매하고, Enterprise는 상담으로 시작합니다.",
   canonical: "/ko/pricing",
   languages: { ko: "/ko/pricing", en: "/pricing", "x-default": "/pricing" },
 });
@@ -90,18 +90,17 @@ export default function KoreanPricingPage() {
                   {purchaseOpen ? (
                     <Link href={loginUrlForOffer("observer_access") as Route}>{developer.label} · {KO_CHROME.cta[SELF_SERVE_CTA.href]}</Link>
                   ) : (
-                    <Link href="/ko/contact?plan=Developer">Developer 도입 상담</Link>
+                    <Link href="/ko/contact?plan=Starter">{developer.label} 도입 상담</Link>
                   )}
                 </article>
                 <article className={`${styles.card} ${pricingPlanDestinationClass}`} id={pricingPlanId(2)} tabIndex={-1}>
                   <h3>{team.label}</h3>
                   <p className={styles.price}>${team.priceUsd}<span className={styles.unit}> {monthlyUnit}</span></p>
-                  <p>월 {team.includedPages.toLocaleString("en-US")} 표준 페이지, 검토 대기열·버전 기록·자료 도입 안내.</p>
-                  <p className="fine">현재 단일 사용자 워크스페이스입니다. 여러 사용자·역할·사용자별 원문 권한은 제공하지 않습니다.</p>
+                  <p>월 {team.includedPages.toLocaleString("en-US")} 표준 페이지, 검토 대기열·버전 기록.</p>
                   {purchaseOpen ? (
                     <Link href={loginUrlForOffer("studio_access") as Route}>{team.label} · {KO_CHROME.cta[SELF_SERVE_CTA.href]}</Link>
                   ) : (
-                    <Link href="/ko/contact?plan=Team">Team 도입 상담</Link>
+                    <Link href="/ko/contact?plan=Pro">{team.label} 도입 상담</Link>
                   )}
                 </article>
                 <article className={`${styles.card} ${pricingPlanDestinationClass}`} id={pricingPlanId(3)} tabIndex={-1}>

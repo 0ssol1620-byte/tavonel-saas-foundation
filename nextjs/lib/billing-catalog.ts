@@ -22,7 +22,7 @@
 export const BILLING_OFFERS = {
   observer_access: {
     kind: "subscription",
-    label: "Developer",
+    label: "Starter",
     priceUsd: 29,
     credits: 2_000,
     includedPages: 500,
@@ -39,7 +39,7 @@ export const BILLING_OFFERS = {
   },
   studio_access: {
     kind: "subscription",
-    label: "Team",
+    label: "Pro",
     priceUsd: 99,
     credits: 10_000,
     includedPages: 2_500,
@@ -66,14 +66,20 @@ export const BILLING_OFFERS = {
       all enforced. Membership is named below as something that is not sold yet, in the same
       card, rather than left for a buyer to discover on the security page after they have paid.
     */
-    description: "The higher-volume plan for a single-member workspace, with guided review and onboarding.",
+    /*
+      2026-11-10, founder: the customer-facing names are Starter ($29) and Pro ($99). "Team" read as
+      seats this plan does not have, and "Developer" read as for developers only. The offer codes,
+      price env names, webhooks and stored rows are unchanged, and receipts keep the names they had.
+      Pro is told apart by what it delivers: the volume, the review queue and the version history.
+      Guided onboarding is an Enterprise item and is not part of a self-serve plan.
+    */
+    description: "The higher-volume plan, with the review queue and version history.",
     features: [
       "2,500 standard pages",
-      "Everything in Developer",
+      "Everything in Starter",
       "Review queue and version history",
-      "Guided corpus onboarding",
     ],
-    notYetSold: ["Shared members and roles", "Per-member source permissions"],
+    notYetSold: [],
   },
 } as const;
 

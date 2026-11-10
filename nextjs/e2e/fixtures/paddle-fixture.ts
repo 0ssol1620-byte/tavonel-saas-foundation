@@ -131,7 +131,7 @@ export const SANDBOX_CHECKOUT_READY = {
   code: "CHECKOUT_READY",
   environment: "sandbox",
   clientToken: "test_fixture_journey_client_token",
-  offer: { code: "observer_access", kind: "subscription", label: "Developer", priceId: "pri_01journeyfixture0000000000", credits: 2_000 },
+  offer: { code: "observer_access", kind: "subscription", label: "Starter", priceId: "pri_01journeyfixture0000000000", credits: 2_000 },
   customer: { email: "audit-e2e@example.invalid" },
   customData: { tavonel_binding: "fixture-binding-not-signed", tavonel_offer: "observer_access" },
 } as const;

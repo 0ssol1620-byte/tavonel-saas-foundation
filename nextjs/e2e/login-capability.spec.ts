@@ -93,8 +93,8 @@ const INTENT_URL = "/login?next=checkout&offer=observer_access";
 test("a plan intent is not promised a checkout while no plan can be bought", async ({ page }) => {
   await page.route("**/api/status/v2", route => route.fulfill({ json: statusV2({ createAccount: true }) }));
   await page.goto(INTENT_URL);
-  await expect(page.getByText("Developer is not sold online today.")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Request Developer access" })).toHaveAttribute("href", "/contact?plan=Developer");
+  await expect(page.getByText("Starter is not sold online today.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Request Starter access" })).toHaveAttribute("href", "/contact?plan=Starter");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in to TAVONEL.");
   await expect(page.getByText("Checkout opens by itself", { exact: false })).toHaveCount(0);
 });
@@ -104,7 +104,7 @@ test("a plan intent keeps main's checkout promise where a plan can be bought", a
     json: statusV2({ createAccount: true, compileCustomerDocuments: true, purchasePlan: true }),
   }));
   await page.goto(INTENT_URL);
-  await expect(page.getByText("Developer is held for you.")).toBeVisible();
+  await expect(page.getByText("Starter is held for you.")).toBeVisible();
   // Conversion pass 2026-11-09: the notice carries the deal, and names the step between sign-in and checkout.
   await expect(page.getByText("$29/month for 500 standard pages", { exact: false })).toBeVisible();
   await expect(page.getByText("Sign in and accept the processing terms, and checkout opens by itself.", { exact: false })).toBeVisible();
@@ -122,14 +122,14 @@ test("a plan intent fails closed when the deployment cannot be asked", async ({ 
   await expect(page.getByText("not sold online today", { exact: false })).toHaveCount(0);
 });
 
-test("a Team intent is held for checkout where a plan can be bought", async ({ page }) => {
+test("a Pro intent is held for checkout where a plan can be bought", async ({ page }) => {
   // Team self-serve (2026-11-10, intended): Team's saleChannel is "self_serve", so an open deployment
   // holds it exactly as it holds Developer, with Team's own catalog numbers.
   await page.route("**/api/status/v2", route => route.fulfill({
     json: statusV2({ createAccount: true, compileCustomerDocuments: true, purchasePlan: true }),
   }));
   await page.goto("/login?next=checkout&offer=studio_access");
-  await expect(page.getByText("Team is held for you.")).toBeVisible();
+  await expect(page.getByText("Pro is held for you.")).toBeVisible();
   await expect(page.getByText("$99/month for 2,500 standard pages", { exact: false })).toBeVisible();
   await expect(page.getByText("not sold online today", { exact: false })).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("One step before checkout.");
@@ -176,11 +176,11 @@ test("closed intake offers a working public evaluation and an Enterprise convers
 
   const enterprise = page.locator("article.plan").filter({ has: page.getByRole("heading", { name: "Enterprise" }) });
   await expect(enterprise.getByRole("link", { name: "Scope an Enterprise pilot" })).toHaveAttribute("href", "/contact?plan=Enterprise");
-  const team = page.locator("article.plan").filter({ has: page.getByRole("heading", { name: "Team" }) });
-  await expect(team.getByText("Single-member workspace", { exact: true })).toBeVisible();
-  await expect(team.getByText("Shared members and roles")).not.toBeVisible();
-  await team.getByText("Plan limits").click();
-  await expect(team.getByText("Shared members and roles")).toBeVisible();
+  // Starter/Pro rename (2026-11-10, founder, intended): Pro is told apart by what it delivers, with no membership line or limits list.
+  const pro = page.locator("article.plan").filter({ has: page.getByRole("heading", { name: "Pro" }) });
+  await expect(pro.getByText("Review queue and version history", { exact: true })).toBeVisible();
+  await expect(pro).not.toContainText(/single-member|members|roles|seats|onboarding/i);
+  await expect(pro.getByText("Plan limits")).toHaveCount(0);
   const quote = page.locator("#enterprise-pricing");
   await expect(quote.getByRole("link", { name: "Scope an Enterprise pilot" })).toBeVisible();
   await expect(quote.getByRole("heading", { name: "What moves the quote" })).not.toBeVisible();

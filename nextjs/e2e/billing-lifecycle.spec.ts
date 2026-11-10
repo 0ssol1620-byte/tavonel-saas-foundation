@@ -46,7 +46,7 @@ test("an active subscription shows its state, its remaining pages and a working 
     updatedAt: "2026-09-01T00:00:00Z",
   }));
 
-  await expect(card.getByRole("heading", { name: "studio access" })).toBeVisible();
+  await expect(card.getByRole("heading", { name: "Pro plan" })).toBeVisible();
   await expect(card.locator(":scope > dl")).toContainText("active");
   // 4 credits to a standard page, so 4,000 credits is 1,000 pages. Derived, never invented.
   await expect(card.locator(":scope > dl")).toContainText("1,000");
