@@ -8231,6 +8231,26 @@ test('affected conversion-public owner: seven exact paths and six direct suites,
     assert.ok(!affectedMap([affectedRecord('M', [adjacent])]).groups.includes('conversion-public'), adjacent);
   }
 });
+// trust-copy-20261110: one finite owner, restated independently of the exported constants.
+import { TRUST_COPY_AFFECTED_PATHS, TRUST_COPY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected trust-copy-20261110 owner: 2 exact paths select 2 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['lib/explore-frame.test.ts', 'lib/public-package-proof.test.ts'];
+  const suites = paths;
+  assert.deepEqual([[...TRUST_COPY_AFFECTED_PATHS], [...TRUST_COPY_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['trust-copy-20261110'], path);
+  }
+  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['trust-copy-20261110'], [], suites, [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  const plan = affectedAskPlan(map);
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
+  for (const adjacent of ['nextjs/lib/explore-frame.test.tsx', 'nextjs/lib/public-package-proof.ts', 'lib/explore-frame.test.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
 // sli-alert-noise-20261109: one finite owner, restated independently of the exported constants.
 import { SLI_ALERT_NOISE_AFFECTED_PATHS, SLI_ALERT_NOISE_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 test('affected sli-alert-noise-20261109 owner: 3 exact paths select 10 direct suites and no browser suite; neighbours stay unmapped', () => {

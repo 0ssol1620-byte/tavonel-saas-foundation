@@ -127,6 +127,13 @@ const DEFENSIVE_PHRASES = [
   "coming soon",
   "policy-gated",
   "deterministic product sample",
+  // Founder 2026-11-10: the sample/demo disclaimers that said what a thing is not.
+  "not customer results",
+  "not customer engagements",
+  "not a customer compile",
+  "not a customer run receipt",
+  "not a production activation receipt",
+  "not a claim about",
 ] as const;
 
 /*

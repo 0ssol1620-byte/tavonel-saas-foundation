@@ -25,7 +25,8 @@ describe("the public product story", () => {
     expect(process).toContain("Bind the evidence");
     expect(process).not.toContain("A Compiled World, drawn from the published sample");
     expect(process).toContain("full-corpus compiles");
-    expect(process).toContain("not a customer run receipt");
+    expect(process).toContain("This process diagram describes the product path.");
+    expect(process).not.toContain("not a customer run receipt");
   });
   it.each([false, true])("keeps the GDP result, denominator and comparison boundary together (Korean=%s)", korean => {
     const html = renderToStaticMarkup(HomeMeasurement({ korean }));

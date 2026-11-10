@@ -66,11 +66,11 @@ describe("film reading layer (brief 2026-10-15 move 2b/2c)", () => {
     expect(STAGE_FRAMES.sources!.readingTarget).toEqual({ pane: 2, text: "Extracted lines" });
   });
 
-  it("keeps the hero's illustrative label in both locales, with no reading line or hint paragraph", () => {
+  it("keeps the hero's walkthrough label in both locales, with no reading line or hint paragraph", () => {
     const en = renderToStaticMarkup(<HeroFilm />);
-    expect(en).toContain("Illustrative demo · not customer results.");
+    expect(en).toContain("Product walkthrough on sample files");
     const ko = renderToStaticMarkup(<HeroFilm korean />);
-    expect(ko).toContain("제품 흐름 예시 · 고객 결과가 아닙니다.");
+    expect(ko).toContain("샘플 파일로 보는 제품 흐름");
     for (const markup of [en, ko]) {
       expect(markup).not.toContain("compile-film-caption");
       expect(markup).not.toMatch(/<p aria-live="polite">/);

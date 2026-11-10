@@ -59,7 +59,7 @@ export default function HeroFilmDisclosure({
         <div className={`lv2-film ${styles.filmBody}`}>
           <CompileStagePlayer stages={stages} preferVideo priorityPoster={priority} lazyPoster={!priority} posterSkipMedia={PHONE_HERO === "still" ? PHONE_HERO_STILL_MEDIA : undefined} korean={korean} initialMobileFilmView={LANDING_MOBILE_FILM_VIEW} initialWideView={LANDING_WIDE_FILM_VIEW} storyLayout />
         </div>
-      <figcaption className="fine">{korean ? "제품 흐름 예시 · 고객 결과가 아닙니다." : "Illustrative demo · not customer results."}</figcaption>
+      <figcaption className="fine">{korean ? "샘플 파일로 보는 제품 흐름" : "Product walkthrough on sample files"}</figcaption>
     </figure>
   );
 }

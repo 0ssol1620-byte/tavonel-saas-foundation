@@ -1157,7 +1157,7 @@ console.log("compile job:", accepted.jobId);` },
         head: ["Artifact", "Signature state", "What happens"],
         rows: [
           ["Customer download", "Signed, or refused", "`GET /v1/collections/{id}/download` signs the manifest with Ed25519 or refuses with `EXPORT_SIGNER_NOT_CONFIGURED` (503). There is no third outcome: you never receive an archive still in the candidate state."],
-          ["Public sample World", "Deliberately unsigned", "The sample on the Reproducibility page is a fixture, labelled unsigned, and is not an activated customer World. Do not use it to test the signature path."],
+          ["Public sample World", "Deliberately unsigned", "The sample on the Reproducibility page is a public fixture, labelled unsigned. Test the signature path against a World you activated."],
         ],
       },
       { kind: "heading", text: "Downloading it, and fetching the key to check it with" },

@@ -1400,8 +1400,8 @@ describe("public copy", () => {
     ).not.toContain("Apple&apos;s own public SEC filings");
     expect(
       stage,
-      "the limit still names what the corpus does not represent"
-    ).toContain("not a claim about a mixed internal corpus");
+      "the note still names what the corpus is"
+    ).toContain("one issuer’s clean, English-language filings");
     expect(
       stage,
       "and the reproducible asset is reachable from the sample"

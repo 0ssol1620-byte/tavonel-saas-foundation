@@ -3386,7 +3386,7 @@ export default function WorkspacePage() {
           */}
           {tab === "overview" && surface === "home" && workspaceState.mode === "new" && intakeOpen ? (
             <figure className="workspace-example-run">
-              <figcaption>What a run looks like · example files, not yours</figcaption>
+              <figcaption>What a run looks like · example files</figcaption>
               {/* Plain markup, not ProductCapture: this page is a client component, and importing the capture
                   manifest would ship all of it in the workspace bundle. The two sizes are MANIFEST.json's pixel
                   size for the pair; lib/workspace-onboarding.test.ts holds them to the manifest. */}

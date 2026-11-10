@@ -240,7 +240,7 @@ export default function HeroCompileTabs({ korean = false }: { korean?: boolean }
           />
         ) : null}
       </div>
-      <figcaption className={styles.caption}>{korean ? "제품 흐름 예시 · 고객 결과가 아닙니다." : "Illustrative demo · not customer results."}</figcaption>
+      <figcaption className={styles.caption}>{korean ? "샘플 파일로 보는 제품 흐름" : "Product walkthrough on sample files"}</figcaption>
     </figure>
   );
 }
