@@ -811,3 +811,16 @@ curl -s "$BASE/api/mcp" -H 'content-type: application/json' -H "Authorization: B
 위 "W1-A1 원격 MCP: rollback" 절 그대로다. 즉시: `revoke-all`로 MCP 키 일괄 revoke, 그다음 원장에 적은 deployment로
 Instant Rollback. 영구: `TAVONEL_REMOTE_MCP_ENABLED`를 지우고 redeploy. GA만 되돌릴 때는 `TAVONEL_REMOTE_MCP_COHORT`를
 canary 값으로 되돌리고 redeploy한다. Firewall 규칙은 남겨 둔다(꺼진 endpoint에는 해가 없다).
+
+## 추가 2026-11-10 — 핫픽스: intake admission에서 유료 플랜이 trial 행보다 우선 (`20261110120000`)
+
+- `20261110120000_intake_admission_paid_over_trial`: `reserve_foundation_intake_admission_unchecked`만 `create or replace`
+  한다. 0051 본문에 v_paid 검사 하나를 trial 분기 앞에 넣었다(활성 `observer_access`/`studio_access`, `active`/`trialing`,
+  billing hold 없음, 취소 시각이 지나지 않음 — `billingProductDecision`·`reserve_foundation_compute_v3`와 같은 조건).
+  테이블·행·grant 변화는 없다. 이 파일은 `20260927102000` 뒤면 어디서든 적용된다.
+- 적용 전 확인(읽기 전용): `select pg_get_functiondef('public.reserve_foundation_intake_admission_unchecked(text,uuid,uuid,text,integer,text)'::regprocedure);`
+  결과가 0051 본문(trial 행이 있으면 바로 `foundation_trial_not_active`)인지 본다.
+- 검증: `supabase/tests/intake_admission_paid_over_trial.sql`(paid+expired/converted trial → paid, trial만 만료 → 거절,
+  hold·취소 지난 plan → 거절, trialing → trial 그대로).
+- rollback: 0051의 같은 함수 본문을 `create or replace function public.reserve_foundation_intake_admission_unchecked(...)`로
+  다시 적용한다(이름만 `_unchecked`로 바꾼 0051 본문).
