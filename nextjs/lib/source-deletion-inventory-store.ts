@@ -1,6 +1,6 @@
 import { isCollectionCandidateKey } from "./immutable-keys";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
-import type { SourceInventoryHashedObject } from "./source-deletion-inventory-r2";
+import { MAX_INVENTORY_OBJECTS, type SourceInventoryHashedObject } from "./source-deletion-inventory-r2";
 
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 // Connector sources are `src-<sha256 hex>`; upload tombstones (20260927102000) use the document uuid.
@@ -56,7 +56,7 @@ function attestation(value: unknown): SourceDeletionInventoryAttestation | null 
     (row.status !== "recorded" && row.status !== "replayed") ||
     typeof row.manifestSha256 !== "string" || !SHA256.test(row.manifestSha256) ||
     typeof row.artifactCount !== "number" || !Number.isSafeInteger(row.artifactCount) ||
-    row.artifactCount < 0 || row.artifactCount > 512
+    row.artifactCount < 0 || row.artifactCount > MAX_INVENTORY_OBJECTS
   ) return null;
   return {
     status: row.status,
@@ -109,24 +109,88 @@ export async function recordSourceDeletionInventoryFailure(deletionId: string, c
   return result.ok ? { ok: true } : result;
 }
 
-export async function recordSourceDeletionInventoryAttestation(
+export type SourceDeletionInventoryDigests = {
+  objects: SourceInventoryHashedObject[];
+  /** The database's digest over exactly these rows; the seal refuses any other set. */
+  digestSetSha256: string;
+};
+
+function digests(value: unknown): SourceDeletionInventoryDigests | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  if (
+    typeof row.digestSetSha256 !== "string" || !SHA256.test(row.digestSetSha256) ||
+    !Array.isArray(row.objects) || row.objects.length > MAX_INVENTORY_OBJECTS
+  ) return null;
+  const objects: SourceInventoryHashedObject[] = [];
+  for (const item of row.objects as unknown[]) {
+    if (!item || typeof item !== "object") return null;
+    const object = item as Record<string, unknown>;
+    if (
+      typeof object.key !== "string" || object.key.length < 1 || object.key.length > 1024 ||
+      typeof object.sha256 !== "string" || !SHA256.test(object.sha256) ||
+      typeof object.sizeBytes !== "number" || !Number.isSafeInteger(object.sizeBytes) || object.sizeBytes < 0
+    ) return null;
+    objects.push({ key: object.key, sizeBytes: object.sizeBytes, sha256: object.sha256 });
+  }
+  return { objects, digestSetSha256: row.digestSetSha256 };
+}
+
+/** Every digest earlier runs persisted for this deletion, and the database's digest of that set. */
+export async function readSourceDeletionInventoryDigests(deletionId: string): Promise<
+  { ok: true; digests: SourceDeletionInventoryDigests } | { ok: false; code: string }
+> {
+  if (!SHA256.test(deletionId)) return { ok: false, code: "SOURCE_INVENTORY_DIGESTS_INVALID" };
+  const result = await rpc("read_source_deletion_inventory_digests", { p_deletion_id: deletionId });
+  if (!result.ok) return result;
+  const parsed = digests(result.value);
+  return parsed ? { ok: true, digests: parsed } : { ok: false, code: "SOURCE_INVENTORY_DIGESTS_INVALID" };
+}
+
+/** Persists one hashed object, so a later run does not hash it again. */
+export async function recordSourceDeletionInventoryDigest(
   deletionId: string,
-  objects: readonly SourceInventoryHashedObject[],
+  object: SourceInventoryHashedObject,
+): Promise<{ ok: true } | { ok: false; code: string }> {
+  if (!SHA256.test(deletionId) || !SHA256.test(object.sha256)) {
+    return { ok: false, code: "SOURCE_INVENTORY_DIGESTS_INVALID" };
+  }
+  const result = await rpc("record_source_deletion_inventory_digest", {
+    p_deletion_id: deletionId,
+    p_object_key: object.key,
+    p_size_bytes: object.sizeBytes,
+    p_sha256: object.sha256,
+  });
+  return result.ok ? { ok: true } : result;
+}
+
+/** Drops every persisted digest of this deletion, because the listing no longer matches them. */
+export async function discardSourceDeletionInventoryDigests(deletionId: string): Promise<
+  { ok: true } | { ok: false; code: string }
+> {
+  if (!SHA256.test(deletionId)) return { ok: false, code: "SOURCE_INVENTORY_DIGESTS_INVALID" };
+  const result = await rpc("discard_source_deletion_inventory_digests", { p_deletion_id: deletionId });
+  return result.ok ? { ok: true } : result;
+}
+
+/**
+ * Attests the persisted digest set. The database recomputes it under the deletion's lock and
+ * refuses unless it is still exactly the set `digestSetSha256` names.
+ */
+export async function sealSourceDeletionInventory(
+  deletionId: string,
+  digestSetSha256: string,
   worldObjectKeys: readonly string[],
 ): Promise<
   { ok: true; attestation: SourceDeletionInventoryAttestation } | { ok: false; code: string }
 > {
-  if (!SHA256.test(deletionId) || objects.length > 512 || worldObjectKeys.length > 64) {
+  if (!SHA256.test(deletionId) || !SHA256.test(digestSetSha256) || worldObjectKeys.length > 64) {
     return { ok: false, code: "SOURCE_INVENTORY_ATTESTATION_INVALID" };
   }
-  const result = await rpc("attest_source_deletion_inventory", {
+  const result = await rpc("seal_source_deletion_inventory", {
     p_deletion_id: deletionId,
-    p_objects: objects.map((object) => ({
-      key: object.key,
-      sha256: object.sha256,
-      sizeBytes: object.sizeBytes,
-    })),
-    // The database re-derives this set and refuses any other; present keys are in `objects`.
+    p_digest_set_sha256: digestSetSha256,
+    // The database re-derives this set and refuses any other; present keys are in the digests.
     p_world_object_keys: [...worldObjectKeys],
   });
   if (!result.ok) return result;

@@ -90,12 +90,21 @@ processor keeps the per-request bound it has today. Nothing is raised to meet a 
 - **Deletion.** Everything sits under the source's own prefix, so the existing deletion sweep
   removes a segmented source exactly as a whole one. Nothing under `segments/` has the
   `<doc>/<version>/<file>` shape `nextjs/lib/immutable-keys.ts` lists, so the site cannot show a
-  range by accident. **Bound (E5):** one deletion inventory is capped at 512 objects and 1 GiB
-  (`nextjs/lib/source-deletion-inventory-r2.ts` `MAX_OBJECTS`, `MAX_TOTAL_BYTES`) and fails closed.
-  At 80-page ranges a 500-page source is about 100 objects and at most about 460 MiB (7 × the 18 MiB
-  sanitized, 24 MiB `ocr.json` and its page-range sidecars), so one source fits, but a deletion that
-  names several long sources does not. The site-half PR makes deletion independent of that bound
-  before the flag is set; until then the flag stays off.
+  range by accident. **Bound (E5):** at 80-page ranges a 500-page source is about 100 objects and
+  at most about 460 MiB (7 × the 18 MiB sanitized, 24 MiB `ocr.json` and its page-range sidecars).
+  The inventory used to be hashed in one 60 s request and attested in one call capped at 512
+  objects and 1 GiB, so a deletion naming several long sources was refused on every run. Since
+  migration `20261110043000` it is attested across runs: each run hashes at most 1 GiB or 15 s of
+  objects no earlier run hashed and persists each digest as it goes
+  (`source_deletion_inventory_digests`); once every listed object has a digest, the run lists
+  again, requires the two listings and the persisted set to agree on every key and size, and seals
+  the set by its database digest (`seal_source_deletion_inventory`), which refuses a set an
+  overlapping run changed and then runs the unchanged attestation checks. A digest whose key is no
+  longer listed, or is listed at another size, discards the whole set. The bound is now per
+  deletion: 16,384 objects and 64 GiB (128 documents × 128 objects, × 512 MiB; the listing, the
+  digest table and the attestation all refuse past it), and 64 MiB per object as before. Same-size
+  rewrites of a key between runs are not detected, as they were not inside one run: listing
+  identity is key and size.
 
 ### Site half (next change; the flag stays off until it lands)
 
