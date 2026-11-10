@@ -3003,6 +3003,10 @@ export const OPS_BACKLOG_SLI_AFFECTED_PATHS = Object.freeze(['lib/operational-sl
 export const OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES = Object.freeze(['lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-read-route.test.ts', 'lib/operational-sli.test.ts']);
 // legal-semicolons-20261109: the legal, consent, trust and /status copy whose semicolons were removed without a change in meaning.
 export const LEGAL_SEMICOLONS_AFFECTED_PATHS = Object.freeze(['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts']);
+// processing-ga-20261109 (ADR 0008): the processing authorization that reads TAVONEL_PROCESSING_ROLLOUT. The rollout function and
+// its grant caller live in lib/processing-workspace-grant.ts, which keeps its ux-billing-checkout owner.
+export const PROCESSING_GA_AFFECTED_PATHS = Object.freeze(['lib/customer-data-admission.ts']);
+export const PROCESSING_GA_AFFECTED_UNIT_FILES = Object.freeze(['lib/customer-data-admission.test.ts', 'lib/processing-workspace-grant.test.ts']);
 export const LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-provisions.test.ts']);
 // sli-alert-noise-20261109: the probe-history reader signs at the real clock; the two SLI routes stop passing an evaluation instant to it.
 export const SLI_ALERT_NOISE_AFFECTED_PATHS = Object.freeze(['app/api/internal/sli/route.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe-store.ts']);
@@ -3243,6 +3247,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // legal-semicolons-20261109: 5 exact paths select 10 direct suites and no browser suite.
   affectedGroup('legal-semicolons-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(LEGAL_SEMICOLONS_AFFECTED_PATHS)})$`),
     { unitFiles: LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES }),
+  // processing-ga-20261109: 1 exact path selects 2 direct suites and no browser suite.
+  affectedGroup('processing-ga-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(PROCESSING_GA_AFFECTED_PATHS)})$`),
+    { unitFiles: PROCESSING_GA_AFFECTED_UNIT_FILES }),
   // sli-alert-noise-20261109: 3 exact paths select 10 direct suites and no browser suite.
   affectedGroup('sli-alert-noise-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(SLI_ALERT_NOISE_AFFECTED_PATHS)})$`),
     { unitFiles: SLI_ALERT_NOISE_AFFECTED_UNIT_FILES }),

@@ -539,6 +539,83 @@ compile이 24 MiB를 넘는 `ocr.json`을 `JSON_TOO_LARGE`로 거부하게 둔�
   `https://tavonel.com/sitemap.xml`의 tavonel.com URL 전부를 `https://api.indexnow.org/indexnow`로 POST한다. 200/202만 성공이다.
 - preview 배포에서는 돌리지 않는다. host가 tavonel.com으로 고정되어 있다.
 
+## 추가 2026-11-09 — 처리 GA: 워크스페이스 수 제한을 푼다 (ADR 0008, `TAVONEL_PROCESSING_ROLLOUT`)
+
+- 결정: `docs/adr/0008-processing-general-availability.md`. D-19 canary(이름 붙은 1–3개 워크스페이스)를 푼다.
+  `TAVONEL_PROCESSING_ROLLOUT=general`(정확히 이 값, 소문자, 공백·줄바꿈 없음)이고 `TAVONEL_CUSTOMER_DATA_GATE_VERSION=v2`일 때만
+  모든 워크스페이스가 rollout 검사를 통과한다. 다른 값이나 v2가 아닌 gate는 `PROCESSING_COHORT_CONFIG_INVALID`이고 아무도
+  들이지 않는다. 창업자 cohort도 막힌다. 미설정은 D-19 canary 그대로다.
+- 풀리는 것은 워크스페이스 수뿐이다. 처리 약관 동의와 grant, 배포마다의 release 행, ACL·tenant 격리, trial 파일·페이지 상한,
+  AI 사용량 ledger, malware·CDR, launch switch는 그대로 적용된다.
+- migration은 없다. 코드만 바뀐다.
+- **env 값은 `printf %s`로 넣는다. `echo`는 쓰지 않는다.** `echo`가 붙이는 줄바꿈이 값에 들어가면 `general\n`은 `general`이
+  아니므로 설정 오류이고, 그 순간 모든 워크스페이스의 처리가 닫힌다.
+
+### 순서 (production)
+
+1. **선행: 지출 상한부터.** #221(fail-closed 일일 OCR 지출 차단, `OCR_HTTP_UNAVAILABLE` 알림, compile 적체 SLI)이 main에
+   병합되어 배포되어 있어야 한다. 그다음 `TAVONEL_RUNPOD_DAILY_COST_CAP_USD`를 production에 넣는다. 값(USD)은 campaign
+   ledger에 기록한 결정을 따른다.
+   ```sh
+   printf %s '<USD>' | vercel env add TAVONEL_RUNPOD_DAILY_COST_CAP_USD production
+   ```
+   이 둘이 끝나기 전에는 2로 가지 않는다(Stop the line: runaway GPU/API spend). 처리 용량은 #220이 늘린다. GA 전에
+   병합하기를 권장한다. 순서와 근거는 ledger에 남긴다.
+2. **GA env를 넣는다.** Vercel → `tavonel-saas-foundation` → Production.
+   ```sh
+   printf %s general | vercel env add TAVONEL_PROCESSING_ROLLOUT production
+   ```
+   같은 화면에서 `TAVONEL_CUSTOMER_DATA_GATE_VERSION` = `v2`인지, `TAVONEL_PROCESSING_WORKSPACE_COHORT`가 **그대로 설정되어
+   있는지** 확인한다. cohort는 지우지 않는다. rollback이 돌아갈 곳이고, cohort로 범위를 정하는 기능(library organize `on`,
+   `nextjs/lib/library-shadow.ts`)이 읽는 값이다. 이 PR 이전 코드는 이 env를 읽지 않는다. 그래서 병합 전에 다른 배포가 생겨도
+   아무것도 바뀌지 않는다.
+3. **release 행은 병합 전에 넣고, 병합한다.** 아래 "추가 2026-11-09 — 병합 전 출시 행"의 순서 1–5를 그대로 따른다.
+   - 이 PR head(최신 main 포함)로 행을 만든다.
+   - `pnpm release:gate-check --sha <head> --merge-into $(git rev-parse origin/main)`가 exit 0인지 확인한다.
+   - `gh pr merge <n> --merge --match-head-commit <head>`로 병합한다.
+   그러면 env가 이미 들어가 있으므로 배포가 READY가 되는 순간 새 문구, GA 동작, release 행이 함께 열린다. 그 절차가 막히면 그
+   절의 마지막 줄대로 배포 → main CI → 병합 SHA의 행 순서로 돌아간다. 그 사이에는 업로드가 닫혀 있다.
+4. **READY 뒤 확인.** 같은 절의 순서 6대로 `pnpm release:gate-check --sha <병합 SHA>`가 `released`여야 한다.
+5. **읽기 전용으로 GA를 확인한다. GA를 알리기 전의 필수 확인이다.** cohort 밖의 새 워크스페이스 하나로 확인한다. 창업자
+   테스트 계정이면 된다. 그 워크스페이스가 로그인하고 처리 약관에 동의한 뒤, SELECT만으로 grant가 생겼는지 본다. 쓰기와
+   RPC는 하지 않는다.
+   ```sql
+   select a.workspace_key, a.scope, a.accepted_at, d.allowed, d.release_revision, d.granted_at, d.expires_at
+   from public.foundation_processing_terms_acceptances a
+   left join lateral (
+     select allowed, release_revision, granted_at, expires_at
+     from public.customer_data_workspace_decisions d
+     where d.tenant_id = a.workspace_key and d.workspace_id = a.workspace_key and d.scope = a.scope
+     order by d.recorded_at desc, d.allowed asc limit 1
+   ) d on true
+   where a.accepted_at > '<배포 시각 UTC>'
+   order by a.accepted_at desc limit 5;
+   ```
+   - 기대값은 세 가지다.
+     - cohort에 없는 `workspace_key`에서 `allowed = true`다.
+     - `release_revision`은 행을 기록한 PR head다(D-05 상속).
+     - `expires_at`은 미래다.
+   - `allowed`가 null이고 워크스페이스가 "awaiting release"를 보이면 GA를 알리지 않는다. 먼저 env 철자를 의심하고(줄바꿈
+     포함), 그다음 release 행을 의심한다. `PROCESSING_COHORT_CONFIG_INVALID`는 장애가 아니라 대기로 보인다.
+6. **rollback.**
+   - 먼저 쓰는 것은 Vercel Instant Rollback이다. 이전 배포로 되돌리면 동작과 공개 문구가 함께 이전 상태로 돌아간다. 이전 코드는
+     이 env를 읽지 않는다. 그 이전 SHA에도 현재 release 행이 있어야 처리가 계속된다.
+   - env만 되돌릴 수도 있다. `vercel env rm TAVONEL_PROCESSING_ROLLOUT production`을 하고 다시 배포한다(과금 build).
+     - cohort가 그대로 있으므로 D-19 canary가 정확히 돌아온다.
+     - cohort 밖 워크스페이스는 grant가 남아 있어도 다음 읽기에서 `PROCESSING_COHORT_EXCLUDED`가 된다. cohort 검사가 grant 읽기보다
+       먼저 돈다.
+     - 이때 공개 문구는 GA 문구로 남는다. cohort 밖 소유자는 약관에 동의해도 열리지 않는다. "워크스페이스가 열림 여부를 보여 준다"는
+       문장만 참으로 남는다. 그래서 env만 되돌리는 것은 잠깐 쓰는 방법이다. 길어지면 Instant Rollback으로 바꾼다.
+
+### 하지 말 것
+
+- `general`이 아닌 철자(`General`, `all`, `*`, `true`, 앞뒤 공백, 끝 줄바꿈)를 넣지 않는다. 모두 아무도 들이지 않는 설정
+  오류다. 값은 `printf %s`로만 넣는다.
+- `LAUNCH_CANARY_MAX_WORKSPACES`를 올리거나 cohort에 `*`를 넣어 넓히지 않는다. 넓히는 길은 이 env 하나다.
+- cohort를 지우지 않는다. `general`에서는 처리에 영향이 없다. 하지만 지우면 rollback이 깨진다. cohort와 rollout이 둘 다
+  미설정이면 아무도 처리되지 않는다.
+- 1이 끝나기 전에 2를 하지 않는다.
+
 ## 추가 2026-11-09 — 병합 전 출시 행: 배포가 READY일 때 이미 열려 있다
 
 위 내용은 바꾸지 않았다. gate 코드, DB trigger, 12개 사실, 30일 만료, receipt 계산은 그대로다. 바뀌는 것은 행을

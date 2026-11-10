@@ -25,6 +25,7 @@ import { GLOBAL_EXPOSURE_AFFECTED_PATHS, GLOBAL_EXPOSURE_AFFECTED_UNIT_FILES, GL
 import { ENABLEMENT_AFFECTED_BROWSER_FILES, P4_FOLLOWUPS_AFFECTED_PATHS, P4_FOLLOWUPS_AFFECTED_UNIT_FILES, P4_FOLLOWUPS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { LEGAL_SEMICOLONS_AFFECTED_PATHS, LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { OPS_BACKLOG_SLI_AFFECTED_PATHS, OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { PROCESSING_GA_AFFECTED_PATHS, PROCESSING_GA_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { SLI_ALERT_NOISE_AFFECTED_PATHS, SLI_ALERT_NOISE_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
@@ -799,6 +800,14 @@ for (const binding of [
     browsers: [],
     rows: [],
     neighbors: ['nextjs/app/refunds/page.ts', 'nextjs/components/processing-consent-panel.module.css', 'nextjs/content/trust/provisions.json', 'nextjs/lib/status-probe-store.ts', 'lib/status-probe.ts'] },
+  // processing-ga-20261109 (ADR 0008): one exact path, two direct suites, no browser suite.
+  { group: 'processing-ga-20261109', prefix: 'nextjs/', exportedPaths: PROCESSING_GA_AFFECTED_PATHS, exportedSuites: PROCESSING_GA_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['lib/customer-data-admission.ts'],
+    suites: ['lib/customer-data-admission.test.ts', 'lib/processing-workspace-grant.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/lib/customer-data-admission.tsx', 'nextjs/lib/customer-data-admission-routes.ts', 'nextjs/lib/customer-data-gate-store.ts', 'nextjs/lib/library-shadow.ts', 'lib/customer-data-admission.ts'] },
 ]) {
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === binding.group), [owner] = owners;
   assert(owners.length === 1 && JSON.stringify(binding.exportedPaths) === JSON.stringify(binding.paths)

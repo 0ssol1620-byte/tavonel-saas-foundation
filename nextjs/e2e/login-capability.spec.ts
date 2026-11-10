@@ -145,7 +145,8 @@ test("/pricing states no closed customer-data gate once the switch is on, server
   await expect(page.locator('[data-purchase-gate="customerData"]')).toHaveCount(0);
   expect(html).not.toContain("Compiling your own sources is set up with us");
   await expect(page.locator(".paper-purchase-boundary")).toContainText(activationPolicy.customerData.reason);
-  await expect(page.locator(".paper-purchase-boundary")).toContainText("Self-serve access is opening in stages.");
+  // ADR 0008 (intentionally new): the staged-opening sentence is gone with the canary.
+  await expect(page.locator(".paper-purchase-boundary")).toContainText("Signing in creates your workspace, and uploading and compiling your own sources open for it once its owner accepts the processing terms.");
 });
 
 test("closed intake offers a working public evaluation and an Enterprise conversation", async ({ page }) => {

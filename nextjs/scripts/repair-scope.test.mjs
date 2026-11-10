@@ -7413,6 +7413,9 @@ test('affected ux-billing-checkout owner: 26 exact paths select 25 direct suites
   assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440', 'audit']);
   for (const adjacent of ['nextjs/app/api/internal/billing/other/route.ts', 'nextjs/components/checkout-intent-notice.test.tsx', 'nextjs/e2e/fixtures/paddle-fixture-2.ts', 'nextjs/lib/billing-catalog.ts', 'nextjs/lib/checkout-policy.ts', 'nextjs/lib/use-checkout.tsx', 'nextjs/lib/self-service-trial.test.ts', 'app/api/internal/billing/gate-enforce/route.ts.bak', 'nextjs/lib/customer-data-admission.ts', 'nextjs/lib/commercial-state.ts', 'nextjs/lib/processing-workspace-grant.tsx']) {
     // G1-COPY registered the plan catalog to g1-copy-truth: still not this owner's, now asserted positively to its one owner.
+    // ADR 0008 registered lib/customer-data-admission.ts to processing-ga-20261109 (intentionally new): still not this
+    // owner's, now asserted positively to its one owner, as G1-COPY did for the plan catalog.
+    if (adjacent === 'nextjs/lib/customer-data-admission.ts') { assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(adjacent)).map(o => o.group), ['processing-ga-20261109'], adjacent); continue; }
     if (assertUxProgramEndpoint(adjacent)) { assert.equal(UX_BILLING_CHECKOUT_AFFECTED_PATHS.some(path => 'nextjs/' + path === adjacent), false, adjacent); continue; }
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
@@ -8239,6 +8242,25 @@ test('affected w2-d-intake-stage1 owner: 3 exact paths select 2 direct suites an
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(neighbour)).map(o => o.group), [group], neighbour);
   }
   for (const adjacent of ['quarantine-sidecar/cdr-cloudrun/table_dpi_arena_v2.py', 'nextjs/lib/processing-ceiling-stage1.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});
+// processing-ga-20261109 (ADR 0008): one finite owner, restated independently of the exported constants.
+import { PROCESSING_GA_AFFECTED_PATHS, PROCESSING_GA_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected processing-ga-20261109 owner: 1 exact path selects 2 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['lib/customer-data-admission.ts'];
+  const suites = ['lib/customer-data-admission.test.ts', 'lib/processing-workspace-grant.test.ts'];
+  assert.deepEqual([[...PROCESSING_GA_AFFECTED_PATHS], [...PROCESSING_GA_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['processing-ga-20261109'], path);
+  }
+  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['processing-ga-20261109'], [], suites, [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  // library-shadow.ts reads the named cohort and keeps its own owner (main, W2-B2). It is not this owner's.
+  assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/lib/library-shadow.ts')).map(o => o.group), ['library-organize-b2']);
+  for (const adjacent of ['nextjs/lib/customer-data-admission.tsx', 'nextjs/lib/customer-data-admission-routes.ts', 'nextjs/lib/customer-data-admission.mjs', 'lib/customer-data-admission.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }

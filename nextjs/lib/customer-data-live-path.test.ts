@@ -93,9 +93,11 @@ describe("customer data on the live compile path", () => {
   it("states the open path in the reader's terms, and only the plan that sells itself as bought online", () => {
     expect(activationPolicy.customerData.enabled).toBe(true);
     const { reason } = activationPolicy.customerData;
-    // Review PR201-R1 B3 and R2: the opening is staged, and the sentence says what happens -- the
-    // workspace is created, it shows whether it is open -- with no list, order or notification it cannot keep.
-    expect(reason).toContain("Self-serve access is opening in stages. Signing in creates your workspace");
+    // Review PR201-R1 B3 and R2: the sentence says what happens -- the workspace is created, it shows
+    // whether it is open -- with no list, order or notification it cannot keep. ADR 0008 (intentionally
+    // new): processing is generally available, so it names what opens it and no longer says "in stages".
+    expect(reason).toContain("Signing in creates your workspace, and uploading and compiling your own sources open for it once its owner accepts the processing terms.");
+    expect(reason).not.toMatch(/in stages|stage by stage/);
     expect(reason).toContain("Your workspace shows whether it is open.");
     expect(reason).toContain("Once it is open, the Developer plan can be bought online. Team and Enterprise are arranged with us rather than enabled by a plan purchase.");
     expect(reason).not.toMatch(/waiting list|in turn|notify|notification|we will (?:email|tell)/i);

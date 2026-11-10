@@ -17,7 +17,8 @@ written (2026-10-19, `vercel env ls production` on `tavonel-saas-foundation`).
   `TAVONEL_CUSTOMER_DATA_GATE_VERSION=v2` and only for the one to three workspaces named in
   `TAVONEL_PROCESSING_WORKSPACE_COHORT` (`processingCohortRefusal`,
   `nextjs/lib/processing-workspace-grant.ts`). Any other configuration admits nobody. While the
-  switch is off this rule adds nothing. On gate v1 the workspace no longer shows the processing
+  switch is off this rule adds nothing. ADR 0008 (2026-11-09) lifts the count with
+  `TAVONEL_PROCESSING_ROLLOUT=general` (`processingRolloutRefusal`). With it unset, this rule holds as written. On gate v1 the workspace no longer shows the processing
   terms panel, because v1 never reads an acceptance.
 - **D-13.** The runtime reads launch approval from the deployment environment only
   (`readCommercialState`). `nextjs/vercel.json` still carries `TAVONEL_BILLING_LAUNCH_APPROVED`.
@@ -62,7 +63,11 @@ also require `VERCEL_ENV=production`.
 3. Record the production release decision for the deployed SHA, then
    `pnpm release:gate-check --sha <deployed sha>` exits 0 (`docs/runbooks/RELEASE_ORDER.md`).
 4. Widening past three workspaces, or removing the cohort, is a reviewed code change to
-   `LAUNCH_CANARY_MAX_WORKSPACES`, not an environment edit.
+   `LAUNCH_CANARY_MAX_WORKSPACES`, not an environment edit. **Superseded 2026-11-09 by ADR 0008
+   (`docs/adr/0008-processing-general-availability.md`):** the reviewed change added one exact
+   rollout mode, `TAVONEL_PROCESSING_ROLLOUT=general` under gate v2, and left the cap alone. Its
+   production steps and rollback are in `docs/runbooks/RELEASE_ORDER.md` ("추가 2026-11-09 — 처리 GA").
+   With the rollout unset, this section still describes production exactly.
 5. Check the two values by eye. `release:gate-check` does not read the canary variables, and a
    cohort misconfiguration (`PROCESSING_COHORT_CONFIG_INVALID`) shows in the workspace as awaiting
    release, not as an outage.
