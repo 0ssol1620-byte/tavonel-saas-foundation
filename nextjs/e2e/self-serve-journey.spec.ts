@@ -595,13 +595,78 @@ test.describe("simulated switch-on (browser mocks only)", () => {
 
     await page.goto("/pricing");
     await page.getByRole("link", { name: "Buy Developer — $29/month", exact: true }).click();
+    // The region is a zero-height wrapper around the fixed toast, so the toast is what is visible.
     const refusal = region(page, "alert", "Accept the processing terms in your workspace first.");
-    await expect(refusal).toBeVisible();
+    await expect(refusal.locator("p.notice")).toBeVisible();
     await expect(refusal).not.toContainText(/request/i);
     await expect(refusal).not.toContainText("CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE");
     await expect(refusal.getByRole("link", { name: "Accept the processing terms" })).toHaveAttribute("href", "/workspace?checkout=observer_access");
     expect(posts).toEqual([{ offerCode: "observer_access" }]);
     expect(paddle.loads()).toBe(0);
+  });
+
+  /*
+    Hotfix 2026-11-10. In production a first sign-in has no trial before the terms are accepted, so
+    /api/documents is refused 402 SUBSCRIPTION_REQUIRED by the product gate. The terms step must
+    render, not the load error, and accepting opens the drop zone with the inventory read again.
+    A genuine read failure still says so.
+  */
+  async function installPreTermsWorkspace(page: Page, inventory: (accepted: boolean) => { status: number; json: unknown }) {
+    await installFixtureSession(page);
+    await installWorkspaceRoutes(page, { accessSource: "unentitled", customerDataEnabled: false });
+    const state = { accepted: false, inventoryReads: 0 };
+    const offer = {
+      version: "2026-09-30",
+      terms: { path: "/policy/TAVONEL_SELF_SERVICE_TERMS_2026-09-30.md", sha256: `sha256:${"a".repeat(64)}` },
+      processing: { path: "/policy/TAVONEL_PROCESSING_ADDENDUM_2026-09-30.md", sha256: `sha256:${"b".repeat(64)}` },
+      scopes: ["direct_upload", "connector"],
+    };
+    await page.route("**/api/access/bootstrap", (route) => route.fulfill({
+      json: state.accepted
+        ? { code: "ACCESS_READY", access: { ...TODAY_NEW_ACCOUNT.access, customerDataEnabled: true } }
+        : TODAY_NEW_ACCOUNT,
+    }));
+    await page.route("**/api/access/processing-terms", async (route) => {
+      if (route.request().method() === "GET") return route.fulfill({ json: offer });
+      state.accepted = true;
+      return route.fulfill({ status: 201, json: { code: "PROCESSING_TERMS_ACCEPTED", receipt: {
+        acceptanceId: "5f2b8a4e-2c1d-4b7a-9e3f-0a1b2c3d4e5f", scope: "direct_upload", termsVersion: offer.version,
+        terms: offer.terms, processing: offer.processing, acceptedAt: "2026-11-10T10:00:00.000Z", idempotentReplay: false,
+      } } });
+    });
+    await page.route("**/api/documents", (route) => {
+      state.inventoryReads += 1;
+      const answer = inventory(state.accepted);
+      return route.fulfill({ status: answer.status, json: answer.json });
+    });
+    return state;
+  }
+
+  test("a pre-terms inventory refusal shows the terms step, and acceptance opens the drop zone", async ({ page }) => {
+    const state = await installPreTermsWorkspace(page, (accepted) => accepted
+      ? { status: 200, json: { documents: [] } }
+      : { status: 402, json: { code: "SUBSCRIPTION_REQUIRED" } });
+    await page.goto("/workspace", { waitUntil: "domcontentloaded" });
+
+    await expect(page.getByText("To process your own files, review and accept the processing terms.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Start with your documents" })).toBeVisible();
+    await expect(page.getByText("could not be loaded")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Retry loading sources" })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Review processing terms" }).click();
+    await page.getByRole("checkbox", { name: /I have read and agree/ }).check();
+    await page.getByRole("button", { name: "Accept terms" }).click();
+    await expect(page.getByRole("heading", { name: "Drop files, folders or ZIP here" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Choose files" })).toBeEnabled();
+    expect(state.inventoryReads).toBeGreaterThanOrEqual(2);
+  });
+
+  test("a failed inventory read still says so while the terms are pending", async ({ page }) => {
+    await installPreTermsWorkspace(page, () => ({ status: 503, json: { code: "SIGNER_NOT_CONFIGURED" } }));
+    await page.goto("/workspace", { waitUntil: "domcontentloaded" });
+
+    await expect(page.getByRole("heading", { name: "Your sources could not be loaded" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Retry loading sources" }).first()).toBeVisible();
   });
 
   test("webhook never arrives: the bounded wait ends in a stated pending sentence, not a spinner (D-04)", async ({ page }) => {
