@@ -8285,6 +8285,22 @@ test('affected w2-d-intake-stage1 owner: 3 exact paths select 2 direct suites an
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
 });
+// large-source-intake-copy (ADR-0006): one finite owner, restated independently.
+import { LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS, LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected large-source-intake-copy owner: 2 exact paths select 2 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['nextjs/lib/compile-limits.test.ts', 'nextjs/lib/compile-limits.ts'];
+  const suites = ['lib/compile-limits.test.ts', 'lib/workspace-existing-compile.test.ts'];
+  assert.deepEqual([[...LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS], [...LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['large-source-intake-copy'], path);
+    const map = affectedMap([affectedRecord('M', [path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['large-source-intake-copy'], [], suites, [], []], path);
+  }
+  for (const adjacent of ['nextjs/lib/compile-limits-v2.ts', 'nextjs/lib/compile-limits.spec.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});
 // processing-ga-20261109 (ADR 0008): one finite owner, restated independently of the exported constants.
 import { PROCESSING_GA_AFFECTED_PATHS, PROCESSING_GA_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 test('affected processing-ga-20261109 owner: 1 exact path selects 2 direct suites and no browser suite; neighbours stay unmapped', () => {

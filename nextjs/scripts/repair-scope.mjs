@@ -3003,6 +3003,11 @@ export const W2_D_INTAKE_STAGE1_AFFECTED_PATHS = Object.freeze([
   'quarantine-sidecar/cdr-cloudrun/tests/test_table_dpi_arena.py',
 ]);
 export const W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES = Object.freeze(['lib/intake-ceiling-cross-tree.test.ts', 'lib/processing-ceiling-stage1.test.ts']);
+// Large-source intake copy (codex/large-source-segmentation-20261110, ADR-0006): the drop box's limits notice, which now states
+// the per-source ceiling, and its suite. The notice is rendered by the workspace, whose suite pins the call. Product copy, so
+// never nativeReuse. No browser, database or worker lane.
+export const LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS = Object.freeze(['nextjs/lib/compile-limits.test.ts', 'nextjs/lib/compile-limits.ts']);
+export const LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES = Object.freeze(['lib/compile-limits.test.ts', 'lib/workspace-existing-compile.test.ts']);
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
 // ops-backlog-sli-20261110 (GA ops gap 4): the B35 evaluator gains a compile backlog age. Its own suite and both routes that call it.
@@ -3289,6 +3294,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // w2-d-intake-stage1 (W2-D): the 3 exact repo-relative paths above select 2 direct suites and no browser suite.
   affectedGroup('w2-d-intake-stage1', new RegExp(`^(?:${exactPathAlternation(W2_D_INTAKE_STAGE1_AFFECTED_PATHS)})$`),
     { unitFiles: W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES }),
+  // large-source-intake-copy (ADR-0006): the 2 exact paths above select 2 direct suites and no browser suite.
+  affectedGroup('large-source-intake-copy', new RegExp(`^(?:${exactPathAlternation(LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS)})$`),
+    { unitFiles: LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES }),
 ]);const regularModes = ['100644', '100755'];
 
 export function parseAffectedRawDiff(output) {
