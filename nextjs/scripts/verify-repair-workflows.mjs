@@ -29,6 +29,7 @@ import { OPS_BACKLOG_SLI_AFFECTED_PATHS, OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES } f
 import { PROCESSING_GA_AFFECTED_PATHS, PROCESSING_GA_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { TRIAL_TO_PAID_AFFECTED_PATHS, TRIAL_TO_PAID_AFFECTED_UNIT_FILES, TRIAL_TO_PAID_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { SLI_ALERT_NOISE_AFFECTED_PATHS, SLI_ALERT_NOISE_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { ONE_STEP_BUY_AFFECTED_PATHS, ONE_STEP_BUY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
 const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -809,6 +810,14 @@ for (const binding of [
     browsers: [],
     rows: [],
     neighbors: ['nextjs/app/api/internal/sli/page.tsx', 'nextjs/lib/synthetic-probe-store.tsx', 'lib/synthetic-probe-store.ts'] },
+  // pricing-one-step-buy-20261110: ten exact paths, twelve direct suites, no browser suite.
+  { group: 'pricing-one-step-buy-20261110', prefix: 'nextjs/', exportedPaths: ONE_STEP_BUY_AFFECTED_PATHS, exportedSuites: ONE_STEP_BUY_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['app/api/billing/refund-request/route.ts', 'components/billing-refund.tsx', 'lib/billing-refund-request.test.ts', 'lib/category-guide.test.ts', 'lib/checkout-policy.test.ts', 'lib/checkout-policy.ts', 'lib/paddle-browser.ts', 'lib/refund-eligibility.test.ts', 'lib/refund-eligibility.ts', 'lib/workspace-tenancy.test.ts'],
+    suites: ['lib/api-error-codes.test.ts', 'lib/billing-refund-request.test.ts', 'lib/category-guide.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-policy.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/refund-eligibility.test.ts', 'lib/route-classification.test.ts', 'lib/use-checkout.test.ts', 'lib/workspace-tenancy.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/app/api/billing/refund-request/route.tsx', 'nextjs/components/billing-refund.ts', 'nextjs/lib/checkout-policies.ts', 'nextjs/lib/paddle-browser.tsx', 'nextjs/lib/refund-eligibility.tsx', 'lib/refund-eligibility.ts'] },
   // legal-semicolons-20261109: five exact paths, ten direct suites, no browser suite.
   // ops-backlog-sli-20261110: two exact paths, three direct suites, no browser suite.
   { group: 'ops-backlog-sli-20261110', prefix: 'nextjs/', exportedPaths: OPS_BACKLOG_SLI_AFFECTED_PATHS, exportedSuites: OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES,
