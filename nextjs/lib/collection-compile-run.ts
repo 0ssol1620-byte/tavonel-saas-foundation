@@ -448,7 +448,9 @@ export async function runCollectionCompile(
     const remainingMs = Math.min(globalCollection ? CORE_MAX_LATENCY_MS - (Date.now() - startedAt) : CORE_MAX_LATENCY_MS,
       tickRemainingMs);
     if (remainingMs < 1000) return { ok: false, status: 503, code: "GLOBAL_COLLECTION_TIME_BUDGET_EXHAUSTED", payload: {} };
-    const compiled = await dispatchProductCoreV2(
+    // `let` so the parsed Core result -- about half of it never projected -- is released before the
+    // stored artifact is serialized (see core-runtime-v2.ts, the same 2026-11-10 measurement).
+    let compiled: Awaited<ReturnType<typeof dispatchProductCoreV2>> | null = await dispatchProductCoreV2(
       coreV2,
       workspaceId,
       verifiedInputs,
@@ -489,6 +491,7 @@ export async function runCollectionCompile(
       worldStateId: compiled.result.candidate.worldStateId,
       receipt: compiled.result.receipt,
     };
+    compiled = null;
   } else {
     const compiled = await dispatchCoreCompile(coreV1!, workspaceId, verifiedInputs);
     if (!compiled.ok) return { ok: false, status: 503, code: compiled.code, payload: {} };
