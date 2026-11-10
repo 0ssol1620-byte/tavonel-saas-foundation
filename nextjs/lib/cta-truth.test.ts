@@ -24,10 +24,9 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
   opens by itself once you are in" whatever `purchasePlan` said, and that sentence is now rendered
   only where a plan can actually be bought.
 
-  S2 is reached by opening `activationPolicy.customerData` inside this file only. The header and
-  the Home close keep the sample action in S2 too: the S2 hierarchy (UX F-5) is founder decision
-  D-07 and waits for P2-37, so these rows pin today's code rather than the proposal. P2-37 updates
-  the S2 rows when it sets that copy, citing D-07.
+  S2 is reached by opening `activationPolicy.customerData` inside this file only. The Home close keeps
+  the sample action in S2 too. The header's action is the start in every state (founder 2026-11-10):
+  the access action while closed, Start free in S2.
 */
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
@@ -199,18 +198,22 @@ async function status() {
 const SAMPLE = { href: "/explore", label: "Open the compiled sample" };
 const SAMPLE_KO = { href: "/explore", label: "컴파일된 샘플 열기" };
 
-/* Main at 4c80bb30. S0 is the same table: the account gate opens no action a buyer can take. */
+/*
+  Main at 4c80bb30. S0 is the same table: the account gate opens no action a buyer can take.
+  Founder 2026-11-10: the header's action is the visitor's start, not the public sample, and on Home the document
+  entry is the hero's primary with the sample as its secondary link. Closed, the start is the access action.
+*/
 const CLOSED = {
-  header: SAMPLE,
-  headerKo: SAMPLE_KO,
+  header: { href: "/contact", label: "Request access" },
+  headerKo: { href: "/ko/contact", label: "이용 문의" },
   home: {
-    primary: SAMPLE,
-    secondary: { href: "/evaluation", label: "Evaluate your documents" },
+    primary: { href: "/evaluation", label: "Evaluate your documents" },
+    secondary: SAMPLE,
     close: SAMPLE,
   },
   homeKo: {
-    primary: SAMPLE_KO,
-    secondary: { href: "/ko/evaluation", label: "내 문서 평가" },
+    primary: { href: "/ko/evaluation", label: "내 문서 평가" },
+    secondary: SAMPLE_KO,
     close: SAMPLE_KO,
   },
   pricing: [
@@ -259,8 +262,10 @@ const TABLE = {
   S1: CLOSED,
   S2: {
     ...CLOSED,
-    home: { ...CLOSED.home, secondary: { href: "/login", label: "Start free" } },
-    homeKo: { ...CLOSED.homeKo, secondary: { href: "/login", label: "사용 신청하기" } },
+    header: { href: "/login", label: "Start free" },
+    headerKo: { href: "/login", label: "사용 신청하기" },
+    home: { ...CLOSED.home, primary: { href: "/login", label: "Start free" } },
+    homeKo: { ...CLOSED.homeKo, primary: { href: "/login", label: "사용 신청하기" } },
     pricing: [
       { href: "/login", label: "Start free" },
       { href: "/login?next=checkout&offer=observer_access", label: "Buy Developer — $29/month" },

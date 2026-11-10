@@ -38,7 +38,14 @@ import { expect, test, type Page } from "@playwright/test";
   own still is asked for only after "Focus details" is pressed. Still one first-screen poster: never the pane
   file before the press. Recording R3 (2026-11-09) keeps this opening on phones, by founder decision the same day.
 */
-const FILM = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]';
+/*
+  Founder 2026-11-10: the hero film is the tabbed compile slot (hero-compile-tabs.tsx), and the recorded player this
+  contract was written for is unchanged but sits below the fold in #walkthrough, its poster lazy. Its loading contract
+  is asked of it there, once scrolled to; the hero's own (first poster first, at priority; its phone video only with
+  motion) is the last test in this file.
+*/
+const HERO = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="hero-compile-tabs"]';
+const FILM = '#walkthrough figure[data-testid="landing-hero-film"]';
 /** The stage-1 frame a phone opens on (Fit): the 1440px file of the srcset, in either format. */
 const POSTER = /^\/film\/poster-r3-c1-t10\.40\.(avif|webp)$/;
 /** The stage-1 pane's own still, which a phone asks for only once Focus details is pressed. */
@@ -53,7 +60,7 @@ const MOTION_PREFERENCES = [
 
 const isRecording = (url: string) => {
   const { pathname } = new URL(url);
-  return pathname.startsWith("/film/") && (pathname.endsWith(".mp4") || pathname.endsWith(".webm"));
+  return pathname.startsWith("/film/hero-r3-") && (pathname.endsWith(".mp4") || pathname.endsWith(".webm"));
 };
 const isPoster = (url: string) => POSTER.test(new URL(url).pathname);
 
@@ -71,6 +78,7 @@ for (const locale of LOCALES) {
 
       const film = page.locator(FILM);
       await expect(film).toBeVisible();
+      await film.scrollIntoViewIfNeeded();
       await expect.poll(() => requests.some(isPoster), "the locked poster is requested").toBe(true);
 
       if (motion.preference === "reduce") {
@@ -164,6 +172,9 @@ for (const locale of LOCALES) {
   that is true and does not claim the rest.
 */
 const RECUT_AVIF = [
+  // 2026-11-10: the hero film's posters (hero-compile-tabs.tsx) are the hero posters §22 budgets now.
+  "/film/hero-tab-1.avif", "/film/hero-tab-1-2x.avif", "/film/hero-tab-2.avif", "/film/hero-tab-2-2x.avif",
+  "/film/hero-tab-3.avif", "/film/hero-tab-3-2x.avif", "/film/hero-tab-4.avif", "/film/hero-tab-4-2x.avif",
   // Film re-record (2026-11-05): the design C posters, same encoders and the same 140,000-byte AVIF budget.
   "/film/poster-r3-c1-t10.40-pane1-848x1060.avif",
   "/film/poster-r3-c1-t10.40-2x.avif", "/film/poster-r3-c1-t10.40.avif", "/film/poster-r3-c2-t17.96-2x.avif", "/film/poster-r3-c2-t17.96.avif",
@@ -177,6 +188,8 @@ async function posterContract(page: Page, engine: string) {
   page.on("request", request => requests.push(new URL(request.url()).pathname));
   await page.goto("/");
   const still = page.locator(`${FILM} img.compile-film-still`);
+  // The walkthrough's poster is lazy (2026-11-10): scrolled to, as a visitor reaches it.
+  await still.scrollIntoViewIfNeeded();
   await expect.poll(() => still.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
   const result = await page.evaluate(async ({ avif }) => {
     const sizes: Record<string, number> = {};
@@ -269,3 +282,41 @@ test("while the still stands in, a phone loads the still and no film bytes", asy
   expect(await image.evaluate(element => (element as HTMLImageElement).currentSrc)).toMatch(/\/landing\/v2\/apple-2026-q1-10-q-reference-p004-\d+\.(avif|webp)$/);
   expect(film, "no film request on a phone while the still stands in").toEqual([]);
 });
+
+/*
+  The hero film's own loading contract (founder 2026-11-10, hero-compile-tabs.tsx), at the phone width: its first
+  cut's poster is the page's priority image and decodes on the first screen; under reduced motion that poster is all
+  it loads -- no cut, no canvas; with motion the phone plays the same cut as a video, asked for after the poster.
+  The walkthrough's recordings wait for the walkthrough either way.
+*/
+for (const motion of MOTION_PREFERENCES) {
+  test(`the hero film loads its first poster first, at priority, and its phone cut only with motion (${motion.name})`, async ({ page, browserName }, testInfo) => {
+    test.skip(testInfo.project.name !== "390", "run the hero's media contract once at the phone viewport");
+    await page.emulateMedia({ reducedMotion: motion.preference });
+    const requests: string[] = [];
+    page.on("request", request => requests.push(new URL(request.url()).pathname));
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    const hero = page.locator(HERO);
+    const poster = hero.getByRole("tabpanel").locator("img");
+    await expect(poster).toHaveAttribute("loading", "eager");
+    await expect(poster).toHaveAttribute("fetchpriority", "high");
+    await expect.poll(() => poster.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+    const currentSrc = await poster.evaluate((image: HTMLImageElement) => new URL(image.currentSrc).pathname);
+    expect(currentSrc).toMatch(/^\/film\/hero-tab-1\.(avif|webp)$/);
+    if (browserName === "chromium") expect(currentSrc, "a phone takes the 1440px AVIF").toBe("/film/hero-tab-1.avif");
+    const isHeroCut = (path: string) => /^\/film\/hero-tab-\d\.mp4$/.test(path);
+    if (motion.preference === "reduce") {
+      await expect(hero).toHaveAttribute("data-mode", "poster");
+      await page.waitForTimeout(1_000);
+      await expect(hero.locator("video, canvas")).toHaveCount(0);
+      expect(requests.filter(isHeroCut), "no hero cut under reduced motion").toEqual([]);
+    } else {
+      await expect(hero).toHaveAttribute("data-mode", "video");
+      await expect(hero.locator("video")).toHaveAttribute("src", "/film/hero-tab-1.mp4");
+      await expect.poll(() => requests.some(isHeroCut), "the phone cut is requested").toBe(true);
+      expect(requests.findIndex(path => /^\/film\/hero-tab-1\.(avif|webp)$/.test(path)), "the poster before the cut").toBeLessThan(requests.findIndex(isHeroCut));
+      await expect(hero.locator("canvas"), "no live canvas below 900px").toHaveCount(0);
+    }
+    expect(requests.filter(path => isRecording(`http://x${path}`)), "no walkthrough recording before the walkthrough is reached").toEqual([]);
+  });
+}

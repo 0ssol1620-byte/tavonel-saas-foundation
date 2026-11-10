@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /*
   NAV PANELS, 2026-11-09: this file does not import `lib/site-navigation`, and neither does
@@ -26,15 +26,42 @@ export function navCurrent(href: string, also: readonly string[], pathname: stri
   return also.some(under) || under(href) ? "location" : undefined;
 }
 
-/**
- * The header's filled action, which never points at the page it is on (Release 2 critic: on
- * /explore it linked to itself). Route-aware, so it lives in this client file; the header passes
- * the words and the class.
- */
-export function HeaderCta({ href, label, className }: { href: string; label: string; className: string }) {
+/*
+  Founder, 2026-11-10: the header's action is the visitor's own next step, not the public sample ("Open the compiled
+  sample" read as "enter the dashboard"). Signed out it is the start action and Sign in stays a plain link beside it;
+  signed in it is "Open workspace". The session is read from the Supabase browser client's own storage key
+  (lib/supabase-browser.ts: persistSession, default localStorage key `sb-<ref>-auth-token`) rather than by loading
+  supabase-js on every public page: it is a hint, and /workspace still checks the session itself. Server-rendered
+  signed out, so the first paint is the anonymous header and a returning reader's swaps after hydration.
+*/
+const SESSION_KEY = /^sb-.+-auth-token$/;
+
+/** `explicit` (a caller that already asked Supabase, e.g. /pricing) wins over the storage hint. */
+export function useSignedIn(explicit?: boolean): boolean {
+  const [hint, setHint] = useState(false);
+  useEffect(() => {
+    if (explicit !== undefined) return;
+    try { setHint(Object.keys(window.localStorage).some((key) => SESSION_KEY.test(key))); } catch { /* storage blocked: anonymous */ }
+  }, [explicit]);
+  return explicit ?? hint;
+}
+
+/** Sign in and the start action signed out; Open workspace signed in. */
+export function HeaderAccountActions({ signedIn, start, labels, className, signInClassName }: {
+  signedIn?: boolean;
+  start: { href: string; label: string };
+  labels: { signIn: string; workspace: string };
+  className: string;
+  signInClassName: string;
+}) {
   const pathname = usePathname();
-  if (pathname === href || pathname === `/ko${href}`) return null;
-  return <Link className={className} href={href as Route} prefetch={false}>{label}</Link>;
+  if (useSignedIn(signedIn)) return <Link className={className} href="/workspace" prefetch={false} data-analytics="header-workspace">{labels.workspace}</Link>;
+  return (
+    <>
+      <Link className={signInClassName} href="/login">{labels.signIn}</Link>
+      {pathname === start.href ? null : <Link className={className} href={start.href as Route} prefetch={false} data-analytics="header-start">{start.label}</Link>}
+    </>
+  );
 }
 
 /**

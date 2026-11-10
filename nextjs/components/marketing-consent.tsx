@@ -179,7 +179,10 @@ export default function MarketingConsent() {
   }, [revealed]);
 
   useEffect(() => {
-    const film = document.querySelector("[data-home-ia] #s1 .compile-film-viewport");
+    /* Founder 2026-11-10: the hero film is the tabbed compile slot's stage. The recorded walkthrough left s1 for
+       #walkthrough below the fold and is not watched: homeSheetClear reads one block's envelope, and two blocks a
+       screen apart would hold the sheet back for the whole page. */
+    const film = document.querySelector("[data-home-ia] #s1 [data-testid=\"hero-compile-tabs\"] [role=\"tabpanel\"]");
     const strip = document.querySelector("[data-home-ia] #s1 [data-specimen-strip]");
     if (!film && !strip) { setFilmClear(true); return; }
     const line = document.querySelector("[data-home-ia] #s1 [data-film-reading]");
@@ -198,7 +201,7 @@ export default function MarketingConsent() {
     // A stage change or a Focus press moves the frame and the line without a scroll.
     // So does "Show full text", which lengthens the strip and moves the film under it.
     const resize = new ResizeObserver(check);
-    if (film) resize.observe(film.closest(".compile-film-sequence") ?? film);
+    if (film) resize.observe(film);
     if (strip) resize.observe(strip);
     return () => { window.removeEventListener("scroll", check); window.removeEventListener("resize", check); resize.disconnect(); };
   }, [pathname]);

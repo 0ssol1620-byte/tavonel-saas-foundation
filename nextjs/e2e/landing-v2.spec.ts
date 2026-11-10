@@ -2,7 +2,12 @@ import { PHONE_HERO, PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/her
 /** Active source-led Home contract. Retired specimen timers are outside this route. */
 import { test, expect, type Page } from "@playwright/test";
 const BENCH = "#s2 article[data-case-status]";
-const FILM = '#s1 figure[data-testid="landing-hero-film"]';
+/*
+  Founder 2026-11-10: the hero film is the four compile cuts in one tabbed slot right after the actions
+  (hero-compile-tabs.tsx); the recorded walkthrough (FILM) is unchanged but sits below the fold in #walkthrough.
+*/
+const HERO = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="hero-compile-tabs"]';
+const FILM = '#walkthrough figure[data-testid="landing-hero-film"]';
 const SECTIONS = ["s1", "s2", "s3", "s4", "s5", "s6"];
 /* While the server resolves access to /contact, the hero offers the document evaluation instead,
    named as the start path it is (fix round 3, judge gap 4). FINAL-SPEC 2026-10-26 §2.1 (D, veto): the
@@ -29,7 +34,7 @@ for (const route of ["/"]) {
     const source = await page.locator(`${BENCH} [data-page-window]`).first().boundingBox();
     const context = await page.locator("#s2 h2").first().boundingBox();
     expect(actions).not.toBeNull(); expect(bench).not.toBeNull(); expect(source).not.toBeNull(); expect(context).not.toBeNull();
-    expect((await page.getByTestId("landing-hero-film").boundingBox())!.y).toBeLessThan(page.viewportSize()!.height);
+    expect((await page.locator(HERO).boundingBox())!.y).toBeLessThan(page.viewportSize()!.height);
     expect(actions!.y + actions!.height).toBeLessThan(bench!.y);
     expect(context!.y).toBeLessThan(source!.y);
     await expect(page.locator("[data-compiler-specimen]")).toHaveCount(0);
@@ -181,17 +186,28 @@ test("film follows the headline actions without a separate opening action", asyn
   test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
+  const film = page.locator(HERO);
   await expect(film).toBeVisible();
   await expect(film.locator("img")).toHaveCount(1);
-  await expect(film.getByRole("tab")).toHaveText(["Read", "Compile", "Update", "Trace"]);
+  await expect(film.getByRole("tab")).toHaveText(["Extract", "Link", "Update", "Use"]);
   const headline = (await page.locator('h1').boundingBox())!;
   const media = (await film.boundingBox())!;
   expect(media.y).toBeGreaterThanOrEqual(headline.y + headline.height);
   expect(media.y).toBeLessThan(page.viewportSize()!.height);
   const actions = (await page.locator('#s1 .lv2-actions').boundingBox())!;
   expect(actions.y).toBeGreaterThanOrEqual(headline.y + headline.height);
-  await expect(film.locator("video")).toHaveCount(0);
+  expect(media.y).toBeGreaterThanOrEqual(actions.y + actions.height);
+  await expect(film.locator("video, canvas")).toHaveCount(0);
+  // The recorded walkthrough follows the hero, below the fold and before s2, with its own four stages.
+  const walkthrough = page.locator(FILM);
+  await expect(page.locator(`#s1 [data-testid="landing-hero-film"]`)).toHaveCount(0);
+  await expect(walkthrough.getByRole("tab")).toHaveText(["Read", "Compile", "Update", "Trace"]);
+  const hero = (await page.locator("#s1").boundingBox())!;
+  const walk = (await walkthrough.boundingBox())!;
+  expect(walk.y).toBeGreaterThanOrEqual(hero.y + hero.height);
+  expect(walk.y).toBeGreaterThanOrEqual(page.viewportSize()!.height);
+  expect(walk.y + walk.height).toBeLessThanOrEqual((await page.locator("#s2").boundingBox())!.y);
+  await expect(walkthrough.locator("video")).toHaveCount(0);
 });
 test("four-stage video stays static with reduced motion until explicit play and advances", async ({ page }, testInfo) => {
   test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
@@ -228,7 +244,7 @@ test("the phone hero shows the Inspector still in place of the film, and only th
   }
 });
 
-test("server-renders the visible film poster as its priority image", async ({ request }) => {
+test("server-renders the hero film's first poster as its priority image, and the walkthrough's poster lazily", async ({ request }) => {
   const response = await request.get("/"); expect(response.status()).toBe(200);
   const html = await response.text();
   // Release 3: the poster is a 1x/2x srcset (a phone in Fit takes the 1440px file). React does not put a
@@ -239,10 +255,15 @@ test("server-renders the visible film poster as its priority image", async ({ re
     srcset with no `media` -- a phone takes its 1440px file, a desktop the 2880px one -- and the phone pane's still,
     which only Focus details shows, is preloaded nowhere. The header names no poster (React keeps srcset hints in the head).
   */
+  /*
+    Founder 2026-11-10: the hero film is the tabbed compile slot, so the one priority image is its first cut's poster
+    (/film/hero-tab-1, AVIF hint, WebP <img>); the recorded walkthrough moved below the fold and its poster is lazy,
+    hinted nowhere.
+  */
   const posterHint = response.headers()["link"] ?? "";
-  expect(posterHint.match(/\/film\/poster-[^>]+/g) ?? []).toEqual([]);
+  expect(posterHint.match(/\/film\/(poster|hero-tab)-[^>]+/g) ?? []).toEqual([]);
   const head = html.slice(0, html.indexOf("</head>"));
-  expect(head).not.toContain("poster-r3-c1-t10.40-pane1-848x1060");
+  expect(head).not.toContain("poster-r3-c1-t10.40");
   const allPreloads = [...head.matchAll(/<link[^>]*rel="preload"[^>]*as="image"[^>]*>/g)].map(match => match[0]);
   /*
     Round 2 (lib/hero-phone-mode.ts): while a phone shows the Inspector still, there are two image hints, split by width --
@@ -258,12 +279,17 @@ test("server-renders the visible film poster as its priority image", async ({ re
   if (PHONE_HERO === "still") expect(preloads[0]).toMatch(/ media="\(min-width: 901px\)"/i);
   else expect(preloads[0]).not.toMatch(/ media=/i);
   // POSTER-RECUT (D-11): the one hint is the AVIF srcset, typed so a browser without AVIF skips it.
-  expect(preloads[0]).toMatch(/imagesrcset="\/film\/poster-r3-c1-t10\.40\.avif 1440w, \/film\/poster-r3-c1-t10\.40-2x\.avif 2880w"/i);
+  expect(preloads[0]).toMatch(/imagesrcset="\/film\/hero-tab-1\.avif 1440w, \/film\/hero-tab-1-2x\.avif 2880w"/i);
   expect(preloads[0]).toMatch(/type="image\/avif"/i);
   const high = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => /fetchpriority="high"/i.test(tag));
-  expect(high).toHaveLength(1); expect(high[0]).toContain('src="/film/poster-r3-c1-t10.40-2x.webp"');
-  expect(high[0]).toMatch(/srcset="\/film\/poster-r3-c1-t10\.40\.webp 1440w, \/film\/poster-r3-c1-t10\.40-2x\.webp 2880w"/i);
+  expect(high).toHaveLength(1); expect(high[0]).toContain('src="/film/hero-tab-1.webp"');
+  expect(high[0]).toMatch(/srcset="\/film\/hero-tab-1\.webp 1440w, \/film\/hero-tab-1-2x\.webp 2880w"/i);
   expect(high[0]).toMatch(/loading="eager"/i); expect(high[0]).toMatch(/ width="[1-9]\d*"/); expect(high[0]).toMatch(/ height="[1-9]\d*"/);
+  // The walkthrough's poster: in the HTML, lazy, never a priority image.
+  const walkthroughPosters = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => tag.includes("/film/poster-r3-c1-t10.40"));
+  expect(walkthroughPosters).toHaveLength(1);
+  expect(walkthroughPosters[0]).toMatch(/loading="lazy"/i);
+  expect(walkthroughPosters[0]).not.toMatch(/fetchpriority/i);
   const sourceImages = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => tag.includes("apple-2026-q1-10-q-reference-p004"));
   // Direction C round 2: the committed 10-Q page is drawn by s2's window and, while lib/hero-phone-mode.ts says "still",
   // by the phone hero's still (#1) -- every copy lazy, none competing with the poster for priority. Round 3: s3 no
