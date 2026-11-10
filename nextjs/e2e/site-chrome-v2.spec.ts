@@ -233,7 +233,9 @@ test.describe("at 390", () => {
     const start = panel.locator("a.mobile-nav-start");
     await expect(start).toHaveText(primaryCallToAction().label);
     await expect(start).toHaveAttribute("href", primaryCallToAction().href);
-    await expect(panel.locator('a[href="/explore"]')).toHaveCount(0);
+    // The sections may link the sample; the sheet's one filled action is the start, not the sample.
+    await expect(panel.locator("a.btn")).toHaveCount(1);
+    await expect(panel.locator('a.btn[href="/explore"]')).toHaveCount(0);
     expect((await start.boundingBox())!.height, "the sheet's start is a 44px target").toBeGreaterThanOrEqual(44);
   });
 
