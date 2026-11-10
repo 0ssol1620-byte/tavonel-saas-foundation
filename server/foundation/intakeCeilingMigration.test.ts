@@ -18,7 +18,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { PROCESSING_CEILING, PROCESSING_CEILING_LIMITATIONS } from "../../shared/intakeCeiling";
+import {
+  INTAKE_CEILING_STAGE,
+  PROCESSING_CEILING,
+  PROCESSING_CEILING_LIMITATIONS,
+  SEGMENTED_INTAKE_ENABLED,
+  intakeCeilingFor,
+} from "../../shared/intakeCeiling";
 import { CAPABILITY_MANIFEST } from "../../shared/capabilityManifest";
 
 const root = join(import.meta.dirname, "..", "..");
@@ -42,9 +48,11 @@ describe("intake ceiling", () => {
     expect(PROCESSING_CEILING.maxSourceBytes).toBe(
       Math.min(Number(workerMax) * 1024 * 1024, Number(cdrMax) * 1024 * 1024),
     );
-    // ADR-0006: one request renders at most MAX_PAGES; a PDF or DOCX is read as ranges up to the segmented ceiling.
+    // ADR-0006: one request renders at most MAX_PAGES; once segmented intake is on, a PDF is read
+    // as ranges up to the segmented ceiling.
     expect(PROCESSING_CEILING.maxUnsegmentedSourcePages).toBe(Number(cdrPages));
-    expect(PROCESSING_CEILING.maxSourcePages).toBe(Number(cdrSegmentedPages));
+    expect(PROCESSING_CEILING.maxSourcePages).toBe(Number(SEGMENTED_INTAKE_ENABLED ? cdrSegmentedPages : cdrPages));
+    expect(intakeCeilingFor(INTAKE_CEILING_STAGE, true).PROCESSING_CEILING.maxSourcePages).toBe(Number(cdrSegmentedPages));
   });
 
   it("is the same number the admission table and its function enforce", () => {
@@ -58,11 +66,9 @@ describe("intake ceiling", () => {
   });
 
   it("is stated on the capability surface a customer reads before uploading", () => {
-    expect(PROCESSING_CEILING_LIMITATIONS).toEqual([
-      "at_most_5_mib_per_source",
-      "at_most_500_pages_per_pdf_or_docx_source",
-      "at_most_80_pages_per_other_source",
-    ]);
+    expect(PROCESSING_CEILING_LIMITATIONS).toEqual(SEGMENTED_INTAKE_ENABLED
+      ? ["at_most_5_mib_per_source", "at_most_500_pages_per_pdf_source", "at_most_80_pages_per_other_source"]
+      : ["at_most_5_mib_per_source", "at_most_80_pages_per_source"]);
     const pdf = CAPABILITY_MANIFEST.entries.find((entry) => entry.mime === "application/pdf");
     for (const limitation of PROCESSING_CEILING_LIMITATIONS) {
       expect(pdf?.knownLimitations, "/sources does not disclose the live ceiling").toContain(limitation);

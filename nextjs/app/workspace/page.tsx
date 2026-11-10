@@ -2070,7 +2070,7 @@ export default function WorkspacePage() {
           const nothingUploaded = triageApproval ? "" : " Nothing was uploaded.";
           const why = ` Why: ${failureSentence(submitted.code, submitted.status)}${submitted.limit ? ` ${submitted.limit}` : ""}`;
           setNotice(submitted.code === "INTAKE_PRICE_STALE"
-            ? `Pricing changed since this estimate. This approval request was rejected.${nothingUploaded} Review the refreshed maximum and approve again.`
+            ? `Pricing changed since this estimate. This approval request was rejected.${nothingUploaded} Reload the page so it prices with the current terms, then review the refreshed maximum and approve again.`
             : submitted.code === "INTAKE_APPROVAL_AGGREGATE_MISMATCH"
               ? `The server recalculated this set's maximum as ${formatUsd(typeof submitted.quote?.maximumUsd === "number" ? submitted.quote.maximumUsd : Number.NaN)}. This approval request was rejected.${nothingUploaded} Review and approve the refreshed quote again.`
               : `This approval request for the complete set was rejected. Review the reason and retry the complete set.${nothingUploaded}${why}`);

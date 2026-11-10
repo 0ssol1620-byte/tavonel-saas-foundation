@@ -62,11 +62,12 @@ select is(
     where a.attempt_key = 'attempt-segceil-pdf500'),
   500, 'and stored at 500 pages'
 );
-select is(
-  pg_temp.approve('attempt-segceil-docx500',
-    jsonb_build_array(pg_temp.file('file-docx-500',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'measured', 500)))->>'aggregateMaximumPages',
-  '500', 'a 500-page DOCX is approved'
+select throws_ok(
+  $$select pg_temp.approve('attempt-segceil-docx81',
+    jsonb_build_array(pg_temp.file('file-docx-81',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'declared', 81)))$$,
+  'foundation_intake_approval_invalid',
+  'a DOCX is not segmented, so its declared count keeps the 80-page ceiling'
 );
 select throws_ok(
   $$select pg_temp.approve('attempt-segceil-pdf501',
@@ -119,7 +120,7 @@ select throws_ok(
 );
 select is(
   (select count(*)::integer from public.foundation_intake_approvals where attempt_key like 'attempt-segceil-%'),
-  4, 'only the four approved sets were written'
+  3, 'only the three approved sets were written'
 );
 
 select * from finish();

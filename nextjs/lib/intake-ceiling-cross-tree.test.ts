@@ -21,6 +21,7 @@ import {
   INTAKE_CEILING_STAGES,
   OCR_JSON_MAX_BYTES,
   PROCESSING_CEILING,
+  SEGMENTED_INTAKE_ENABLED,
   SEGMENTED_SOURCE_MIMES,
   intakeCeilingFor,
   maxSourcePagesFor,
@@ -234,7 +235,23 @@ describe("hidden copies of the intake ceiling", () => {
     expect(Number.isInteger(WORKER_SOURCE_BYTES) && Number.isInteger(CDR_INPUT_BYTES)).toBe(true);
     expect(PROCESSING_CEILING.maxSourceBytes).toBe(Math.min(WORKER_SOURCE_BYTES, CDR_INPUT_BYTES));
     expect(PROCESSING_CEILING.maxUnsegmentedSourcePages).toBe(declaredInCeiling("CDR_MAX_PAGES"));
-    expect(PROCESSING_CEILING.maxSourcePages).toBe(SEGMENTED_PAGES);
+    expect(PROCESSING_CEILING.maxSourcePages).toBe(SEGMENTED_INTAKE_ENABLED ? SEGMENTED_PAGES : PAGES);
+    expect(intakeCeilingFor(INTAKE_CEILING_STAGE, true).PROCESSING_CEILING.maxSourcePages).toBe(SEGMENTED_PAGES);
+  });
+
+  /*
+    #234 R1 item 2. Intake may admit a PDF past one request only while the worker it hands the bytes
+    to reads ranges, so the two switches live in one commit: the intake constant and the worker's
+    committed FOUNDATION_SOURCE_SEGMENT_PAGES var. A tree that flips one without the other fails here,
+    and RELEASE_ORDER.md deploys the worker from that commit before the site.
+  */
+  it("admits a segmented page count only in a tree whose worker is configured to segment", () => {
+    const wrangler = read("quarantine-sidecar/foundation-cdr-worker/wrangler.jsonc");
+    expect(wrangler).toContain("\"FOUNDATION_OCR_PAGE_RANGE_SIZE\"");
+    const workerSegments = /^\s*"FOUNDATION_SOURCE_SEGMENT_PAGES":\s*"80",?\s*$/m.test(wrangler);
+    expect(workerSegments, "wrangler.jsonc FOUNDATION_SOURCE_SEGMENT_PAGES agrees with SEGMENTED_INTAKE_ENABLED")
+      .toBe(SEGMENTED_INTAKE_ENABLED);
+    expect(intakeCeilingFor(INTAKE_CEILING_STAGE, false).PROCESSING_CEILING_SENTENCE).toBe(`TAVONEL processes sources up to ${PROCESSING_CEILING.maxSourceBytes / 1_048_576} MB and ${PAGES} pages.`);
   });
 
   it("segment exactly the formats the worker segments, and hold every other one to one request", () => {
@@ -245,8 +262,15 @@ describe("hidden copies of the intake ceiling", () => {
     const workerMimes = [...declared.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
     expect(workerMimes.length).toBeGreaterThan(0);
     expect(new Set(workerMimes)).toEqual(SEGMENTED_SOURCE_MIMES);
-    for (const mime of SEGMENTED_SOURCE_MIMES) expect(maxSourcePagesFor(mime), mime).toBe(SEGMENTED_PAGES);
-    for (const mime of ["application/vnd.openxmlformats-officedocument.presentationml.presentation", "image/png", "text/csv", ""]) {
+    const segmentedOn = intakeCeilingFor(INTAKE_CEILING_STAGE, true).PROCESSING_CEILING;
+    for (const mime of SEGMENTED_SOURCE_MIMES) {
+      expect(maxSourcePagesFor(mime, segmentedOn), mime).toBe(SEGMENTED_PAGES);
+      expect(maxSourcePagesFor(mime), mime).toBe(SEGMENTED_INTAKE_ENABLED ? SEGMENTED_PAGES : PAGES);
+    }
+    // A Word file is not segmented: its page count is Word's saved number, never verified (#234 R1 item 1).
+    for (const mime of ["application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation", "image/png", "text/csv", ""]) {
+      expect(maxSourcePagesFor(mime, segmentedOn), mime).toBe(PAGES);
       expect(maxSourcePagesFor(mime), mime).toBe(PAGES);
     }
   });
@@ -327,11 +351,12 @@ describe("hidden copies of the intake ceiling", () => {
     expect(INTAKE_CEILING_STAGE).toBe(0);
     expect(PROCESSING_CEILING).toEqual({
       maxSourceBytes: INTAKE_CEILING_STAGES[0].maxSourceBytes,
-      maxSourcePages: 500,
+      maxSourcePages: SEGMENTED_INTAKE_ENABLED ? 500 : INTAKE_CEILING_STAGES[0].maxSourcePages,
       maxUnsegmentedSourcePages: INTAKE_CEILING_STAGES[0].maxSourcePages,
     });
     // Stage 1 raises the pages per request, not the pages in a segmented source.
-    expect(intakeCeilingFor(1).PROCESSING_CEILING).toEqual({ maxSourceBytes: 25 * MIB, maxSourcePages: 500, maxUnsegmentedSourcePages: 200 });
+    expect(intakeCeilingFor(1, false).PROCESSING_CEILING).toEqual({ maxSourceBytes: 25 * MIB, maxSourcePages: 200, maxUnsegmentedSourcePages: 200 });
+    expect(intakeCeilingFor(1, true).PROCESSING_CEILING).toEqual({ maxSourceBytes: 25 * MIB, maxSourcePages: 500, maxUnsegmentedSourcePages: 200 });
     expect(INTAKE_CEILING_STAGES).toEqual({
       0: { maxSourceBytes: 5 * MIB, maxSourcePages: 80 },
       1: { maxSourceBytes: 25 * MIB, maxSourcePages: 200 },

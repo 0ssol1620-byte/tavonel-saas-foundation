@@ -1,4 +1,4 @@
-import { PROCESSING_CEILING, PROCESSING_CEILING_MIB } from "../../shared/intakeCeiling";
+import { PROCESSING_CEILING_MIB, PROCESSING_CEILING_PAGES } from "../../shared/intakeCeiling";
 
 /**
  * The corpus size contract, declared once.
@@ -82,8 +82,7 @@ export function judgeCompileSet(count: number): CompileSetVerdict {
   file by file (founder, 2026-11-10: 12 of 18 manuals over 80 pages, after upload).
 */
 export function compileLimitsNotice(archiveMb: number) {
-  return `Each file up to ${PROCESSING_CEILING_MIB} MB, and up to ${PROCESSING_CEILING.maxSourcePages} pages for a PDF or Word file ` +
-    `or ${PROCESSING_CEILING.maxUnsegmentedSourcePages} pages for any other format; ` +
+  return `Each file up to ${PROCESSING_CEILING_MIB} MB and ${PROCESSING_CEILING_PAGES}; ` +
     "a longer file is refused, never cut short. " +
     `Up to ${CORPUS_MAX_DOCUMENTS} sources per run, compiled in parts of ${COMPILE_MAX_DOCUMENTS}. ` +
     `ZIP archives up to ${archiveMb} MB. Larger corpus? Connect a source or talk to us.`;

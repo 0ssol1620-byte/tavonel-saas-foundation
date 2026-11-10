@@ -82,7 +82,7 @@ describe("the home hero's stat strip", () => {
 
   /*
     §7.1 of the gap document. Reducto publishes "5,000,000,000 pages" and Mistral "2,000 pages per
-    minute"; this deployment caps a source at 5 MB and 80 pages, so a headline number here may
+    minute"; this deployment caps every source (PROCESSING_CEILING_SENTENCE), so a headline number here may
     only ever say what one published World contains. A throughput or capacity word in the strip's
     copy is the claim the manifest contradicts, and it is barred rather than reviewed.
   */

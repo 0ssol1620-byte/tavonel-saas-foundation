@@ -1,6 +1,6 @@
 import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 import { MAX_QUOTED_PAGES } from "./usage-pricing";
-import { PROCESSING_CEILING } from "../../shared/intakeCeiling";
+import { PROCESSING_CEILING, SEGMENTED_INTAKE_ENABLED } from "../../shared/intakeCeiling";
 
 /*
   Gap #5 (V-5). The plan-times-limit half of the pricing calculator.
@@ -74,7 +74,9 @@ export function corpusFit(sources: number, pagesPerSource: number): CorpusFit {
       label: "Pages in one source",
       state: safePages > PROCESSING_CEILING.maxSourcePages ? "refused" : "within",
       value: n(safePages),
-      ceiling: `${n(PROCESSING_CEILING.maxSourcePages)} per PDF or Word source and ${n(PROCESSING_CEILING.maxUnsegmentedSourcePages)} per source in any other format, on every plan`,
+      ceiling: SEGMENTED_INTAKE_ENABLED
+        ? `${n(PROCESSING_CEILING.maxSourcePages)} per PDF source and ${n(PROCESSING_CEILING.maxUnsegmentedSourcePages)} per source in any other format, on every plan`
+        : `${n(PROCESSING_CEILING.maxSourcePages)} per source, on every plan`,
     },
     {
       id: "sources-per-run",

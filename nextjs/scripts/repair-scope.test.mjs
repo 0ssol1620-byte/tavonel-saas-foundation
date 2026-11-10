@@ -8287,9 +8287,9 @@ test('affected w2-d-intake-stage1 owner: 3 exact paths select 2 direct suites an
 });
 // large-source-intake-copy (ADR-0006): one finite owner, restated independently.
 import { LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS, LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
-test('affected large-source-intake-copy owner: 4 exact paths select 4 direct suites and no browser suite; neighbours stay unmapped', () => {
-  const paths = ['nextjs/lib/compile-limits.test.ts', 'nextjs/lib/compile-limits.ts', 'nextjs/lib/page-count.test.ts', 'nextjs/lib/page-count.ts'];
-  const suites = ['lib/compile-limits.test.ts', 'lib/intake-approval-rollout-off.test.ts', 'lib/page-count.test.ts', 'lib/workspace-existing-compile.test.ts'];
+test('affected large-source-intake-copy owner: 6 exact paths select 5 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['nextjs/lib/compile-limits.test.ts', 'nextjs/lib/compile-limits.ts', 'nextjs/lib/hero-stats.test.ts', 'nextjs/lib/hero-stats.ts', 'nextjs/lib/page-count.test.ts', 'nextjs/lib/page-count.ts'];
+  const suites = ['lib/compile-limits.test.ts', 'lib/hero-stats.test.ts', 'lib/intake-approval-rollout-off.test.ts', 'lib/page-count.test.ts', 'lib/workspace-existing-compile.test.ts'];
   assert.deepEqual([[...LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS], [...LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES]], [paths, suites]);
   for (const path of paths) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['large-source-intake-copy'], path);

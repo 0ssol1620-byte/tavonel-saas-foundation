@@ -1,7 +1,8 @@
 import {
-  PROCESSING_CEILING,
   PROCESSING_CEILING_LIMITATIONS,
   PROCESSING_CEILING_MIB,
+  PROCESSING_CEILING_PAGE_LIMITS,
+  pageLimitPhrase,
 } from "./intakeCeiling";
 import {
   capabilityStatusesAcceptedAtUpload,
@@ -690,8 +691,10 @@ export const CAPABILITY_TOKEN_LABEL: Record<string, string> = {
   the_archive_itself_is_never_compiled: "The archive itself is never compiled",
   not_included_in_free_evaluation: "Not included in a free evaluation",
   [PROCESSING_CEILING_LIMITATIONS[0]]: `Up to ${PROCESSING_CEILING_MIB} MB per source`,
-  [PROCESSING_CEILING_LIMITATIONS[1]]: `Up to ${PROCESSING_CEILING.maxSourcePages} pages per PDF or Word source`,
-  [PROCESSING_CEILING_LIMITATIONS[2]]: `Up to ${PROCESSING_CEILING.maxUnsegmentedSourcePages} pages per source in any other format`,
+  ...Object.fromEntries(PROCESSING_CEILING_PAGE_LIMITS.map((limit) => {
+    const phrase = pageLimitPhrase(limit, "source");
+    return [limit.token, phrase.charAt(0).toUpperCase() + phrase.slice(1)];
+  })),
 };
 
 /** A token with no written label is a bug, not a reason to print the identifier. */

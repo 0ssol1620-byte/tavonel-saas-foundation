@@ -259,7 +259,7 @@ export async function GET(request: Request) {
                   extensions: ["pdf"],
                   status: "BEST_EFFORT",
                   preserved: ["page", "paragraph_text", "bbox1000"],
-                  knownLimitations: ["read_through_cdr_sanitized_pdf_and_ocr", "no_table_or_formula_extraction", "at_most_5_mib_per_source", "at_most_500_pages_per_pdf_or_docx_source", "at_most_80_pages_per_other_source"],
+                  knownLimitations: ["read_through_cdr_sanitized_pdf_and_ocr", "no_table_or_formula_extraction", "at_most_5_mib_per_source", "at_most_80_pages_per_source"],
                   qualifiedAt: null,
                   qualificationReceipt: null,
                 }],

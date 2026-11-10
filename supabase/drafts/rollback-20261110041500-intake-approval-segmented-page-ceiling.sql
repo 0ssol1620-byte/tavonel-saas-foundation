@@ -43,8 +43,7 @@ declare
   v_definition text;
   v_new_bound text := $q$(v_entry->>'approvedMaxPages')::integer not between 1 and 500$q$;
   v_old_bound text := $q$(v_entry->>'approvedMaxPages')::integer not between 1 and 80$q$;
-  v_new_unknown text := $q$    if (v_entry->>'approvedMaxPages')::integer > 80 and v_entry->>'mimeType' not in (
-         'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') then
+  v_new_unknown text := $q$    if (v_entry->>'approvedMaxPages')::integer > 80 and v_entry->>'mimeType' <> 'application/pdf' then
       raise exception 'foundation_intake_approval_invalid';
     end if;
     if v_entry->>'pageBasis' = 'unknown' and (v_entry->>'approvedMaxPages')::integer <> 80 then$q$;

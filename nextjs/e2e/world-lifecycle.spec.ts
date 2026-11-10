@@ -22,6 +22,11 @@ type Page = {
 
 const collectionId = "collection-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const candidateManifest = `sha256:${"b".repeat(64)}`;
+/*
+  What `/api/documents/[id]/source` sends with every PDF: where its first page sits in the original
+  source. 0 for a source read whole; a segmented source (ADR-0006) serves one range and names its start.
+*/
+const SOURCE_PAGE_START = { "x-tavonel-source-page-start0": "0" };
 const activeManifest = `sha256:${"a".repeat(64)}`;
 const outputSha = `sha256:${"d".repeat(64)}`;
 
@@ -73,7 +78,7 @@ async function mockWorkspace(page: Page, reviewRequired = false, artifactManifes
   );
   await page.route("**/api/documents/*/source?**", route => {
     expect(route.request().headers().authorization).toMatch(/^Bearer /);
-    return route.fulfill({ contentType: "application/pdf", body: sourcePreviewPdfFixture() });
+    return route.fulfill({ contentType: "application/pdf", headers: SOURCE_PAGE_START, body: sourcePreviewPdfFixture() });
   });
   await page.route("**/api/documents", route =>
     route.fulfill({ json: { documents: [] } })
@@ -488,7 +493,7 @@ async function routeOverflowAsk(page: Page, reads: string[], served: string[]) {
   await page.route("**/api/documents/*/source?**", route => {
     reads.push(route.request().url());
     expect(route.request().headers().authorization).toMatch(/^Bearer /);
-    return route.fulfill({ contentType: "application/pdf", body: sourcePreviewPdfFixture() });
+    return route.fulfill({ contentType: "application/pdf", headers: SOURCE_PAGE_START, body: sourcePreviewPdfFixture() });
   });
 }
 
@@ -533,7 +538,7 @@ for (const locale of ["en-US", "ko-KR"] as const) {
       await page.route("**/api/documents/*/source?**", route => {
         reads.push(route.request().url());
         expect(route.request().headers().authorization).toMatch(/^Bearer /);
-        return route.fulfill({ contentType: "application/pdf", body: sourcePreviewPdfFixture() });
+        return route.fulfill({ contentType: "application/pdf", headers: SOURCE_PAGE_START, body: sourcePreviewPdfFixture() });
       });
 
       await page.goto(`/workspace/ask?collection=${collectionId}`);
@@ -815,7 +820,7 @@ test("source preview reuses bytes across pages and clears the previous document 
     reads += 1;
     expect(route.request().headers().authorization).toMatch(/^Bearer /);
     if (route.request().url().includes("/doc-b/")) await otherReady;
-    await route.fulfill({ contentType: "application/pdf", body: sourcePreviewPdfFixture() });
+    await route.fulfill({ contentType: "application/pdf", headers: SOURCE_PAGE_START, body: sourcePreviewPdfFixture() });
   });
   try {
     await page.goto(`/workspace/world?collection=${collectionId}`);
@@ -909,7 +914,7 @@ test("every evidence ref bound to an object opens that exact record from the key
   await page.route("**/api/documents/*/source?**", route => {
     reads.push(route.request().url());
     expect(route.request().headers().authorization).toMatch(/^Bearer /);
-    return route.fulfill({ contentType: "application/pdf", body: sourcePreviewPdfFixture() });
+    return route.fulfill({ contentType: "application/pdf", headers: SOURCE_PAGE_START, body: sourcePreviewPdfFixture() });
   });
   await page.goto(`/workspace/world?collection=${collectionId}`);
   const inspector = page.getByRole("complementary", { name: "World selection inspector" });
@@ -949,7 +954,7 @@ test("a failed source preview retries the identical source and version", async (
     expect(route.request().headers().authorization).toMatch(/^Bearer /);
     if (reads.length === 1) return route.fulfill({ status: 503, json: { code: "SOURCE_STORE_UNAVAILABLE" } });
     await retryHeld;
-    return route.fulfill({ contentType: "application/pdf", body: sourcePreviewPdfFixture() });
+    return route.fulfill({ contentType: "application/pdf", headers: SOURCE_PAGE_START, body: sourcePreviewPdfFixture() });
   });
   try {
     await page.goto(`/workspace/world?collection=${collectionId}`);
@@ -999,7 +1004,7 @@ test("a late source read cannot overwrite the object selected after it", async (
     entered = true;
     await gate;
     // The page aborts this read when the selection moves; a refused fulfil is that abort.
-    await route.fulfill({ contentType: "application/pdf", body: sourcePreviewPdfFixture() }).catch(() => undefined);
+    await route.fulfill({ contentType: "application/pdf", headers: SOURCE_PAGE_START, body: sourcePreviewPdfFixture() }).catch(() => undefined);
     settled = true;
   });
   try {

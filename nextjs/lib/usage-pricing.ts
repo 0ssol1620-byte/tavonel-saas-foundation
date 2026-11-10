@@ -311,7 +311,15 @@ export function intakePricingCanonical() {
     `max_units_per_page=${MAX_UNITS_PER_PAGE}`,
     `max_quoted_pages=${MAX_QUOTED_PAGES}`,
     `max_source_pages=${PROCESSING_CEILING.maxSourcePages}`,
-    `max_unsegmented_source_pages=${PROCESSING_CEILING.maxUnsegmentedSourcePages}`,
+    /*
+      Only once segmented intake is on (shared/intakeCeiling.ts SEGMENTED_INTAKE_ENABLED). While it
+      is off the canonical text is production's byte for byte, so this release leaves every
+      approval given before it valid; the release that flips the switch moves the fingerprint, and
+      an approval from before it is refused INTAKE_PRICE_STALE with a re-approve instruction.
+    */
+    ...(PROCESSING_CEILING.maxSourcePages !== PROCESSING_CEILING.maxUnsegmentedSourcePages
+      ? [`max_unsegmented_source_pages=${PROCESSING_CEILING.maxUnsegmentedSourcePages}`]
+      : []),
   ].join("\n");
 }
 

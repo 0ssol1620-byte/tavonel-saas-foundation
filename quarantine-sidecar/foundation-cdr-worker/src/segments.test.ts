@@ -24,7 +24,7 @@ const SOURCE = new TextEncoder().encode("%PDF-1.4 long manual");
 
 class FakeR2 implements R2BucketLike {
   readonly objects = new Map<string, Uint8Array>();
-  constructor(initial: Record<string, Uint8Array> = {}) {
+  constructor(initial: Record<string, Uint8Array> = {}, private readonly contentType = "application/pdf") {
     for (const [key, bytes] of Object.entries(initial)) this.objects.set(key, bytes);
   }
   async list({ prefix }: { prefix: string }) {
@@ -35,7 +35,7 @@ class FakeR2 implements R2BucketLike {
     if (!bytes) return null;
     return {
       size: bytes.byteLength,
-      httpMetadata: { contentType: "application/pdf" },
+      httpMetadata: { contentType: this.contentType },
       arrayBuffer: async () => bytes.slice().buffer as ArrayBuffer,
     };
   }
@@ -328,6 +328,24 @@ describe("segmented sources", () => {
     await sanitizeObject(envFor(r2), SOURCE_KEY, tooLong).catch((error) => { caught = error; });
     assert.equal(asSourceRefusal(caught)?.failureClass, "PARSER_OOM");
     assert.deepEqual(r2.keys("immutable/"), []);
+  });
+
+  it("sends a Word file whole, so one longer than a request is refused rather than read past its approval", async () => {
+    // A DOCX is approved on Word's own saved count, or at 80 when it has none: never read in ranges.
+    const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE }, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    const chain = fakeChain(240);
+    const whole: typeof fetch = async (input, init) => {
+      if (String(input) !== CDR_URL) return chain.fetch(input, init);
+      chain.calls.push(new Headers(init?.headers).get("x-tavonel-cdr-request-id") ?? "");
+      return Response.json({ detail: "CDR source page count is not qualified" }, { status: 422 });
+    };
+    let caught: unknown;
+    await sanitizeObject(envFor(r2), SOURCE_KEY, whole).catch((error) => { caught = error; });
+    assert.equal(chain.calls.length, 1);
+    assert.doesNotMatch(chain.calls[0], /_p\d+_\d+$/);
+    assert.equal(asSourceRefusal(caught)?.failureClass, "PARSER_OOM");
+    assert.deepEqual(r2.keys("immutable/"), []);
+    assert.equal(chain.ocrCalls, 0);
   });
 
   it("retries rather than refusing when a CDR revision that predates ranges answers a long source", async () => {

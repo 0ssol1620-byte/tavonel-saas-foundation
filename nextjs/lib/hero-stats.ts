@@ -16,7 +16,7 @@
  *   2. **Every rate carries its denominator.** Pages is two numbers -- what this World compiled
  *      and what the filings contain -- because §57 already refused a UI that prints only one.
  *   3. **A World-scale count, never a throughput claim.** §7.1 of the gap document: the manifest
- *      caps a source at 5 MB and 80 pages, so no figure here may read as a capacity, a rate or a
+ *      caps a source (shared/intakeCeiling.ts PROCESSING_CEILING_SENTENCE), so no figure here may read as a capacity, a rate or a
  *      "large documents are fine" implication. These are what one published World contains.
  *   4. **A digest is not a score.** The fourth entry is the manifest digest of the artifact the
  *      other three were counted from, so the strip names the thing it counted rather than

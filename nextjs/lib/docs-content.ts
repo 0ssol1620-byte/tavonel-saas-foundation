@@ -17,8 +17,22 @@ import {
   PROCESSING_CEILING,
   PROCESSING_CEILING_LIMITATIONS,
   PROCESSING_CEILING_MIB,
+  PROCESSING_CEILING_PAGE_LIMITS,
   PROCESSING_CEILING_SENTENCE,
+  type PageLimit,
 } from "../../shared/intakeCeiling";
+
+/** The page rows of the limits tables: one while segmented intake is off, two once it is on. */
+const PAGE_LIMIT_ROW: Record<PageLimit["appliesTo"], string> = {
+  any: "**Pages per source**",
+  pdf: "**Pages per PDF source**",
+  other: "**Pages per source, other formats**",
+};
+const PAGE_LIMIT_WHY: Record<PageLimit["appliesTo"], string> = {
+  any: "The most the rasterizer renders in one request. A count the browser read from a PDF is checked at the capability call and refused there with 413 and SOURCE_EXCEEDS_PROCESSING_CEILING; any other file is refused after the bytes are read, because intake never decodes the document.",
+  pdf: `Read as page ranges of at most ${PROCESSING_CEILING.maxUnsegmentedSourcePages} pages each, up to this many in all. A count the browser read from the file is checked at the capability call and refused there with 413 and SOURCE_EXCEEDS_PROCESSING_CEILING; a PDF the browser cannot count is approved at the per-request number and refused after the bytes are read if it is longer.`,
+  other: "The most the rasterizer renders in one request. These formats, Word included, are not read in ranges, and a file whose pages are not counted before upload is approved at this number and refused after the bytes are read if it is longer.",
+};
 import { CAPABILITY_MANIFEST, describeAcceptedFormats } from "../../shared/capabilityManifest";
 import {
   BILLING_OFFERS,
@@ -740,8 +754,7 @@ console.log("compile job:", accepted.jobId);` },
         head: ["Limit", "Value", "Why it is that number"],
         rows: [
           ["**Bytes per source**", `${PROCESSING_CEILING_MIB} MB`, "No processor in the chain reads more, so nothing above it can ever be compiled. Refused at the capability call with 413 and SOURCE_EXCEEDS_PROCESSING_CEILING, before any byte is stored."],
-          ["**Pages per PDF or Word source**", String(PROCESSING_CEILING.maxSourcePages), `Read as page ranges of at most ${PROCESSING_CEILING.maxUnsegmentedSourcePages} pages each, up to this many in all. A count the browser read from the file is checked at the capability call and refused there with 413 and SOURCE_EXCEEDS_PROCESSING_CEILING; a file that states no count is refused after the bytes are read, because intake never decodes the document.`],
-          ["**Pages per source, other formats**", String(PROCESSING_CEILING.maxUnsegmentedSourcePages), "The most the rasterizer renders in one request. These formats are not read in ranges, and a file whose pages are not counted before upload is approved at this number."],
+          ...PROCESSING_CEILING_PAGE_LIMITS.map((limit) => [PAGE_LIMIT_ROW[limit.appliesTo], String(limit.pages), PAGE_LIMIT_WHY[limit.appliesTo]]),
           ["Files in one archive", String(MAX_FILES), "The largest expansion a browser tab performs without becoming unresponsive."],
           ["Archive size, no worker", `${MAX_SYNC_ARCHIVE_BYTES / 1_048_576} MB`, "Expansion on the main thread; larger would block the tab."],
           ["Archive size, with a worker", `${MAX_WORKER_ARCHIVE_BYTES / 1_048_576} MB`, "Expansion off-thread, where the ceiling is memory rather than responsiveness. The manifest's at_most_128_files_and_500_mb_expanded is the expanded total, not the size of the archive you select."],
@@ -1563,8 +1576,7 @@ console.log("compile job:", accepted.jobId);` },
           // G3-002: the two the deployment actually refuses on, first, because they are the two
           // that stop a first integration. shared/intakeCeiling.ts is the module that enforces them.
           ["**Bytes per source**", `${PROCESSING_CEILING_MIB} MB`],
-          ["**Pages per PDF or Word source**", String(PROCESSING_CEILING.maxSourcePages)],
-          ["**Pages per source, other formats**", String(PROCESSING_CEILING.maxUnsegmentedSourcePages)],
+          ...PROCESSING_CEILING_PAGE_LIMITS.map((limit) => [PAGE_LIMIT_ROW[limit.appliesTo], String(limit.pages)]),
           ["Documents per compile", `${COMPILE_MIN_DOCUMENTS}–${COMPILE_MAX_DOCUMENTS}`],
           ["Documents per run", String(CORPUS_MAX_DOCUMENTS)],
           ["Files per archive", String(MAX_FILES)],

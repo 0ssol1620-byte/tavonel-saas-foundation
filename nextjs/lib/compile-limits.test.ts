@@ -42,9 +42,7 @@ describe("judgeCompileSet", () => {
   });
 
   it("states the per-source byte and page ceiling before a file is chosen, from the enforced constants", () => {
-    expect(COMPILE_LIMITS_NOTICE).toContain(`Each file up to ${PROCESSING_CEILING_MIB} MB, and up to ${PROCESSING_CEILING.maxSourcePages} pages for a PDF or Word file `
-      + `or ${PROCESSING_CEILING.maxUnsegmentedSourcePages} pages for any other format;`);
-    expect(COMPILE_LIMITS_NOTICE).toContain("Each file up to 5 MB, and up to 500 pages for a PDF or Word file or 80 pages for any other format;");
+    expect(COMPILE_LIMITS_NOTICE).toContain(`Each file up to ${PROCESSING_CEILING_MIB} MB and ${PROCESSING_CEILING.maxSourcePages} pages`);
     expect(COMPILE_LIMITS_NOTICE).toContain("never cut short");
   });
 });

@@ -38,7 +38,7 @@ import {
   COMPILE_MAX_DOCUMENTS is the size of the parts it is compiled in. Both were published on
   `/sources` and in the changelog and nowhere near the page where the money decision is made.
 */
-import { PROCESSING_CEILING, PROCESSING_CEILING_MIB } from "../../shared/intakeCeiling";
+import { PROCESSING_CEILING, PROCESSING_CEILING_MIB, SEGMENTED_INTAKE_ENABLED } from "../../shared/intakeCeiling";
 import { corpusFit, LIMIT_STATE_GLYPH, LIMIT_STATE_LABEL } from "@/lib/plan-limit-fit";
 
 /*
@@ -407,7 +407,7 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "Most pages in one source",
-    `${PROCESSING_CEILING.maxSourcePages} for a PDF or Word file, ${PROCESSING_CEILING.maxUnsegmentedSourcePages} for any other format. A PDF is counted in your browser, also when it is inside a ZIP, and a longer one is refused before it uploads. Other formats, and a PDF the browser cannot open, are counted when they are read, and a longer one is refused then, with the reason on the source. Nothing is cut short.`,
+    `${SEGMENTED_INTAKE_ENABLED ? `${PROCESSING_CEILING.maxSourcePages} for a PDF, ${PROCESSING_CEILING.maxUnsegmentedSourcePages} for any other format` : PROCESSING_CEILING.maxSourcePages}. A PDF is counted in your browser, also when it is inside a ZIP, and a longer one is refused before it uploads. Other formats, and a PDF the browser cannot open, are counted when they are read, and a longer one is refused then, with the reason on the source. Nothing is cut short.`,
   ],
   [
     "Sources in one run",

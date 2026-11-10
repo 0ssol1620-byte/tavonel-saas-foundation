@@ -830,3 +830,17 @@ URL·예약 전에 413으로 거절하는 것뿐이다.
 - 순서: (1) CDR revision → (2) site 절반 병합 + migration 적용 → (3) worker version upload에 `FOUNDATION_SOURCE_SEGMENT_PAGES=80`,
   81쪽·300쪽 문서 1건씩 end-to-end 확인 → (4) 문구·`PROCESSING_CEILING_SENTENCE` 변경 build.
 - 되돌리기: worker 변수 삭제(`wrangler versions deploy <prev>@100%`). 저장된 범위는 manifest가 없으면 보이지 않고 소스 삭제 때 함께 지워진다.
+
+### site 절반(#234) 이후의 순서 — intake 500쪽은 코드 스위치 하나
+
+- #234는 `SEGMENTED_INTAKE_ENABLED = false`로 나간다. intake·문구·가격 fingerprint는 production과 같다(배포로 승인이 stale되지 않는다).
+  migration `20261110041500`은 CHECK을 넓힐 뿐 아무것도 승인하지 않는다.
+- DOCX는 분할하지 않는다. Word가 저장한 쪽수는 검증되지 않으므로 DOCX는 언제나 80쪽까지이고, 넘으면 rasterizer가 `PARSER_OOM`으로
+  거절한다(정산 released, 0 credits, 소스에 한도 문장 표시).
+- 켜는 release는 한 커밋에서 `shared/intakeCeiling.ts`의 `SEGMENTED_INTAKE_ENABLED = true`와 `wrangler.jsonc` vars의
+  `"FOUNDATION_SOURCE_SEGMENT_PAGES": "80"`을 함께 바꾼다. 둘이 다르면 `intake-ceiling-cross-tree.test.ts`가 실패한다.
+  순서: 그 커밋의 worker를 먼저 `wrangler deploy`하고 81쪽·300쪽 PDF를 end-to-end 확인한 뒤 site를 main에 병합한다.
+  site가 먼저 나가면 81–500쪽 PDF가 승인된 뒤 worker(off)에서 `PARSER_OOM`으로 거절되므로 이 순서를 바꾸지 않는다.
+- 켜는 release는 fingerprint를 바꾼다. 그 전에 받은 승인은 `INTAKE_PRICE_STALE`로 거절되고, 화면은 "페이지를 새로 고친 뒤 파일을
+  다시 골라 새 최대 금액을 승인"하라고 안내한다(승인 lineage는 production에서 꺼져 있어 직접 업로드 경로에는 영향이 없다).
+- 삭제 inventory 한도(E5)가 해소되기 전에는 켜지 않는다.

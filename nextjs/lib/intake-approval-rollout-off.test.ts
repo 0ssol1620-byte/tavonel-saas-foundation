@@ -189,29 +189,26 @@ describe("intake approval lineage off (the production default)", () => {
     expect(at.status).toBe(200);
   });
 
-  it("holds a Word file to the segmented ceiling and every other format to one request's pages", async () => {
-    // ADR-0006: only PDF and DOCX are read as page ranges, so only they pass 80 pages.
+  it("holds a Word file and every other format but PDF to one request's pages", async () => {
+    // ADR-0006 and #234 R1 item 1: only a PDF is ever read as page ranges. A Word file's count is
+    // the number Word saved, never verified, so it is held to what one request renders.
     const ask = (originalFilename: string, declaredMimeType: string, estimatedPages: number) =>
       capabilityPost(json("https://tavonel.com/api/uploads/capability", {
         originalFilename, declaredMimeType, requestedBytes: 2048, estimatedPages,
       }));
     const docx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     const pptx = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-    expect(PROCESSING_CEILING.maxSourcePages).toBe(500);
+    const perRequest = PROCESSING_CEILING.maxUnsegmentedSourcePages;
 
-    expect((await ask("manual.docx", docx, 500)).status).toBe(200);
-
-    mocks.calls.length = 0;
-    const longDocx = await ask("manual.docx", docx, 501);
-    expect(longDocx.status).toBe(413);
-    await expect(longDocx.json()).resolves.toMatchObject({ code: "SOURCE_EXCEEDS_PROCESSING_CEILING", maxPages: 500 });
-
-    const longDeck = await ask("deck.pptx", pptx, PROCESSING_CEILING.maxUnsegmentedSourcePages + 1);
-    expect(longDeck.status).toBe(413);
-    await expect(longDeck.json()).resolves.toMatchObject({
-      code: "SOURCE_EXCEEDS_PROCESSING_CEILING", maxPages: PROCESSING_CEILING.maxUnsegmentedSourcePages, limit: PROCESSING_CEILING_SENTENCE,
-    });
+    for (const [name, mime] of [["manual.docx", docx], ["deck.pptx", pptx]] as const) {
+      const long = await ask(name, mime, perRequest + 1);
+      expect(long.status, name).toBe(413);
+      await expect(long.json()).resolves.toMatchObject({
+        code: "SOURCE_EXCEEDS_PROCESSING_CEILING", maxPages: perRequest, limit: PROCESSING_CEILING_SENTENCE,
+      });
+    }
     expect(mocks.calls).toEqual([]);
+    expect((await ask("manual.docx", docx, perRequest)).status).toBe(200);
   });
 
   it("sends the count the browser measured, so the refusal above happens before upload", () => {
