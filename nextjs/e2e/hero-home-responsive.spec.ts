@@ -105,7 +105,7 @@ test("the hero film is one tabbed slot: four tabs, one panel, keys move the sele
     await expect(tabs.nth(index)).toHaveAttribute("aria-controls", panelId);
     ids.push((await tabs.nth(index).getAttribute("id"))!);
   }
-  await expect(hero.locator("figcaption")).toHaveText("Illustrative demo · not customer results.");
+  await expect(hero.locator("figcaption")).toHaveText("Product walkthrough on sample files");
   const poster = panel.locator("img");
   await expect(poster).toHaveCount(1);
   // The first cut's poster is the first screen's priority image.

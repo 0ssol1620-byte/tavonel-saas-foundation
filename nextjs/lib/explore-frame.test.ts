@@ -46,7 +46,7 @@ describe("the embedded Explore frame", () => {
     const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
     expect(text).toContain("One issuer");
     expect(text).toContain("single permission level show the mechanism");
-    expect(text).toContain("not a claim about a mixed internal corpus");
+    expect(text).not.toContain("not a claim about");
     expect(html).toContain('href="/sources"');
     expect(html).toContain('href="/explore?act=world"');
   });

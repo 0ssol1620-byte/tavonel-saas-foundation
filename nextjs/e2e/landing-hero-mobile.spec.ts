@@ -54,7 +54,7 @@ test.describe("phone four-stage film", () => {
     await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.currentTime)).toBeGreaterThan(1);
     // R3 (D1): a phone plays the yuv420p twin first (phoneSrc), which every engine decodes.
     expect(await video.evaluate((node: HTMLVideoElement) => node.currentSrc)).toContain("/film/hero-r3-c1-hq.mp4");
-    await expect(film.locator("figcaption")).toHaveText("Illustrative demo · not customer results.");
+    await expect(film.locator("figcaption")).toHaveText("Product walkthrough on sample files");
     const focus = film.getByRole("button", { name: "Focus details", exact: true });
     const toggle = (await focus.boundingBox())!;
     expect(toggle.height, "44px touch target (acceptance 28)").toBeGreaterThanOrEqual(44);

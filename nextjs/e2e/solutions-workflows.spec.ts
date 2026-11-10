@@ -81,7 +81,7 @@ for (const width of [390, 1440, 1920]) {
       await expect(page.locator(".solution-notes")).toHaveAttribute("open", "");
       const proof = page.locator(`[data-workflow-proof="${slug}"]`);
       await expect(proof).toHaveCount(1);
-      await expect(proof).toContainText("mechanics demonstrations, not customer engagements or domain-accuracy results");
+      await expect(proof).toContainText("Five public Apple filings, compiled with the TypeScript sample compiler.");
       await expect(proof.locator('[data-proof-variant="excerpt"]')).toHaveCount(1);
       expect((await proof.locator('[data-proof-variant="excerpt"]').boundingBox())!.width).toBeGreaterThan(300);
       expect(await proof.locator("[data-evidence-id]").evaluate((element) => getComputedStyle(element).webkitLineClamp)).toBe("none");
