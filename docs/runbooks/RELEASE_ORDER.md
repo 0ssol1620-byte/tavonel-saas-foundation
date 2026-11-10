@@ -812,15 +812,19 @@ curl -s "$BASE/api/mcp" -H 'content-type: application/json' -H "Authorization: B
 Instant Rollback. 영구: `TAVONEL_REMOTE_MCP_ENABLED`를 지우고 redeploy. GA만 되돌릴 때는 `TAVONEL_REMOTE_MCP_COHORT`를
 canary 값으로 되돌리고 redeploy한다. Firewall 규칙은 남겨 둔다(꺼진 endpoint에는 해가 없다).
 
-## 추가 2026-11-10 — 핫픽스: intake admission에서 유료 플랜이 trial 행보다 우선 (`20261110120000`)
+## 추가 2026-11-10 — 핫픽스: intake admission에서 유료 플랜이 trial 행보다 우선 (`20261110040000`)
 
-- `20261110120000_intake_admission_paid_over_trial`: `reserve_foundation_intake_admission_unchecked`만 `create or replace`
+- `20261110040000_intake_admission_paid_over_trial`: `reserve_foundation_intake_admission_unchecked`만 `create or replace`
   한다. 0051 본문에 v_paid 검사 하나를 trial 분기 앞에 넣었다(활성 `observer_access`/`studio_access`, `active`/`trialing`,
   billing hold 없음, 취소 시각이 지나지 않음 — `billingProductDecision`·`reserve_foundation_compute_v3`와 같은 조건).
-  테이블·행·grant 변화는 없다. 이 파일은 `20260927102000` 뒤면 어디서든 적용된다.
-- 적용 전 확인(읽기 전용): `select pg_get_functiondef('public.reserve_foundation_intake_admission_unchecked(text,uuid,uuid,text,integer,text)'::regprocedure);`
-  결과가 0051 본문(trial 행이 있으면 바로 `foundation_trial_not_active`)인지 본다.
+  테이블·행·grant 변화는 없다. 버전은 main의 마지막 마이그레이션 `20261107100100` 뒤이고 지난 시각이라, rehearsal이
+  그 뒤에 붙이는 staged draft보다 앞에 정렬된다.
+- 적용 전 확인(읽기 전용): `select md5(pg_get_functiondef('public.reserve_foundation_intake_admission_unchecked(text,uuid,uuid,text,integer,text)'::regprocedure));`
+  가 `b3c3d529a701f88e6d3f1928ee8b4888`(0051 본문)이어야 한다. 적용 뒤에는 `c6ad2d27d175e27f3f43439b608a8e05`다.
 - 검증: `supabase/tests/intake_admission_paid_over_trial.sql`(paid+expired/converted trial → paid, trial만 만료 → 거절,
-  hold·취소 지난 plan → 거절, trialing → trial 그대로).
-- rollback: 0051의 같은 함수 본문을 `create or replace function public.reserve_foundation_intake_admission_unchecked(...)`로
-  다시 적용한다(이름만 `_unchecked`로 바꾼 0051 본문).
+  hold·past_due·paused·취소 지난 plan → 거절, owner → owner, trialing → trial 그대로, 설치된 본문 md5).
+- rollback: `psql -f supabase/drafts/rollback-20261110040000-intake-admission-paid-over-trial.sql`. live md5가
+  `c6ad2d27…`가 아니면 아무것도 바꾸지 않고 멈추고, 0051 본문을 그대로 되돌린 뒤 md5가 `b3c3d529…`인지 확인하고
+  COMMENT를 지운다. 커밋 뒤 같은 세션에서
+  `delete from supabase_migrations.schema_migrations where version = '20261110040000';`를 실행하고, 버전·시각·md5 쌍·
+  실행자를 캠페인 ledger에 적는다.
