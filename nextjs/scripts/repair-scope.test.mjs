@@ -7435,7 +7435,7 @@ test('affected table-read-intake-ceiling owner: 6 exact paths select 8 direct su
   const plan = affectedAskPlan(affectedMap(TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS.map(path => affectedRecord('M', ['' + path]))));
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[...suites].sort(), [...browsers].sort(), false, false]);
   assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), []);
-  for (const adjacent of ['shared/capabilityManifest.ts', 'shared/intakeCeiling.test.ts', 'shared/tableReadContract.js', 'nextjs/shared/intakeCeiling.ts', 'nextjs/lib/fixtures/table-read/other.json', 'nextjs/lib/table-read-contract.ts', 'nextjs/lib/fixtures/table-read/synthetic-no-table.json.bak']) {
+  for (const adjacent of ['shared/intakeCeiling.test.ts', 'shared/tableReadContract.js', 'nextjs/shared/intakeCeiling.ts', 'nextjs/lib/fixtures/table-read/other.json', 'nextjs/lib/table-read-contract.ts', 'nextjs/lib/fixtures/table-read/synthetic-no-table.json.bak']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
