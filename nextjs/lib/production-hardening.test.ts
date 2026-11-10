@@ -67,10 +67,11 @@ describe("2026-09-05 production hardening", () => {
   it("gives the workspace page exactly one h1", () => {
     const workspace = read("app/workspace/page.tsx");
     expect(workspace).toContain('workspaceState.mode === "new" && surface === "home" ? (');
-    // Three mutually exclusive render branches: signed out, intake held on a new Home,
-    // and intake open on a new Home. Only one appears on a page.
+    // Four mutually exclusive render branches: signed out, the plan state on Home (hotfix PR #227,
+    // state hero off there), intake held on a new Home, and intake open on a new Home. Only one appears on a page.
     expect(workspace).toContain(') : !intakeOpen ? (');
-    expect(workspace.match(/<h1[ >]/g) ?? []).toHaveLength(3);
+    expect(workspace).toContain('stateHero={workspaceState.mode !== "new" && workspaceState.mode !== "source_pending" && workspaceState.mode !== "plan_required"}');
+    expect(workspace.match(/<h1[ >]/g) ?? []).toHaveLength(4);
     expect(read("components/workspace-ultimate-shell.tsx").match(/<h1[ >]/g) ?? []).toHaveLength(2);
   });
 

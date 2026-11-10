@@ -39,8 +39,9 @@ test("an authenticated account without compute access sees one consistent next s
 
   await expect(page.getByText("Source access pending")).toBeVisible();
   await expect(page.getByText("Your account is ready, but source processing is closed.", { exact: false })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Request source access" })).toHaveAttribute("href", "/contact");
-  await expect(page.getByRole("link", { name: "See Developer access" })).toHaveCount(0);
+  // Re-pinned 2026-11-10 (intended, hotfix PR #227): GA has no access request. Closed with no gate reason is a plan state.
+  await expect(page.getByRole("link", { name: "Request source access" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "See Developer access" })).toHaveAttribute("href", "/pricing");
 });
 
 test("closed workspace does not sell AI connection access as an available plan", async ({ page }) => {
@@ -49,8 +50,27 @@ test("closed workspace does not sell AI connection access as an available plan",
   await page.goto("/workspace/developer", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByRole("heading", { name: "AI connections are not available for this workspace yet." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Request source access" })).toHaveAttribute("href", "/contact");
-  await expect(page.getByRole("link", { name: "See Developer access" })).toHaveCount(0);
+  // Re-pinned 2026-11-10 (intended, hotfix PR #227): GA has no access request. Closed with no gate reason is a plan state.
+  await expect(page.getByRole("link", { name: "Request source access" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "See Developer access" })).toHaveAttribute("href", "/pricing");
+});
+
+/*
+  REVIEW-PR227-R1 B1. Terms accepted but no plan or trial (lapsed, expired, exhausted, device reused):
+  bootstrap closes the workspace with no gate reason and /api/documents answers 402. The workspace
+  routes to plans, and neither shows the load error nor the first-run terms step.
+*/
+test("a closed workspace with no gate reason and a 402 inventory routes to plans, not a dead end", async ({ page }) => {
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page, { accessSource: "unentitled", customerDataEnabled: false });
+  await page.route("**/api/documents", route => route.fulfill({ status: 402, json: { code: "SUBSCRIPTION_REQUIRED" } }));
+  await page.goto("/workspace", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("heading", { name: "This workspace has no active plan." })).toBeVisible();
+  await expect(page.getByRole("link", { name: "See plans" })).toHaveAttribute("href", "/pricing");
+  await expect(page.getByText("could not be loaded")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Review processing terms" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Choose files" })).toHaveCount(0);
 });
 
 test("an unentitled workspace home points to the public example; gate v1 offers no processing terms (D-19)", async ({ page }) => {
