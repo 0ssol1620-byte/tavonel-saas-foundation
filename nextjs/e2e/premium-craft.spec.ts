@@ -169,7 +169,7 @@ test("copy controls and navigation remain readable and operable", async ({ page 
 });
 
 
-test("the Home first screen puts actions before its four-stage film and source proof below it", async ({ page }, testInfo) => {
+test("the Home first screen puts actions before its four-cut hero film and source proof below it", async ({ page }, testInfo) => {
   test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   const width = page.viewportSize()?.width ?? 0;
   test.skip(width !== 390 && width !== 1440, "Phone and desktop reference widths.");
@@ -179,15 +179,16 @@ test("the Home first screen puts actions before its four-stage film and source p
   // Release 2: the first screen has no consent card at scroll 0, so the "card clears title and
   // action" branch below has nothing to measure until the reader scrolls (marketing-consent.spec).
   await expect(consent).toHaveCount(0);
-  const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
-  await expect(film.getByRole("tab")).toHaveText(["Read", "Compile", "Update", "Trace"]);
+  // Founder 2026-11-10: the hero film is the tabbed compile slot (hero-compile-tabs.tsx); the recorded walkthrough is below the fold.
+  const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="hero-compile-tabs"]');
+  await expect(film.getByRole("tab")).toHaveText(["Extract", "Link", "Update", "Use"]);
   // FINAL-SPEC 2026-10-26 D-9: the disclosure stays; its wording is the redesign's.
   await expect(film.locator("figcaption")).toHaveText("Illustrative demo · not customer results.");
   const measure = async () => page.evaluate(() => {
     const rect = (selector: string) => { const element = document.querySelector(selector); if (!element) throw Error("Missing Home element: " + selector); return element.getBoundingClientRect().toJSON(); };
     const banner = document.querySelector('[data-marketing-consent-panel]');
     return { width: innerWidth, height: innerHeight, overflow: document.documentElement.scrollWidth - innerWidth,
-      header: rect("header.nav"), title: rect("#lv2-hero-title"), film: rect('#s1 figure[data-testid="landing-hero-film"]'),
+      header: rect("header.nav"), title: rect("#lv2-hero-title"), film: rect('#s1 figure[data-testid="hero-compile-tabs"]'),
       action: rect("#s1 .lv2-actions a"), source: rect("#s2 article[data-case-status]"), banner: banner?.getBoundingClientRect().toJSON() ?? null };
   });
   for (const consentVisible of [true, false]) {

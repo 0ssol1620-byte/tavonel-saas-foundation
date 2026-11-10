@@ -19,6 +19,7 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
+import { primaryCallToAction } from "../lib/commercial-state";
 
 /** The four section links; Pricing is the separate emphasized header control. */
 const CUSTOMER_NAV = [
@@ -97,14 +98,29 @@ test.describe("at 1440", () => {
         })
         .map((element) => (element.textContent ?? "").trim().slice(0, 24)),
     );
-    // Brief 2026-10-15 move 1: the bar carries exactly one filled control, the public-sample action
-    // the Home hero and close repeat. Pricing stays a plain link at link weight.
-    expect(filled, `filled controls in the bar: ${JSON.stringify(filled)}`).toEqual(["Open the compiled sample".slice(0, 24)]);
+    // Brief 2026-10-15 move 1: the bar carries exactly one filled control. Founder 2026-11-10: it is the visitor's
+    // start (this runner's posture: the access action, or Start free once live), not the public sample.
+    // Pricing stays a plain link at link weight.
+    expect(filled, `filled controls in the bar: ${JSON.stringify(filled)}`).toEqual([primaryCallToAction().label.slice(0, 24)]);
     await expect(action).toHaveCSS("font-weight", "400");
 
     const signIn = page.locator(`${HEADER} .nav-signin`);
     await expect(signIn).toHaveAttribute("href", "/login");
     await expect(signIn).toBeVisible();
+  });
+
+  /*
+    Founder 2026-11-10: a reader with a session is shown their workspace, not a sign-in and a start. The header reads
+    the Supabase browser client's own storage key (components/site-nav/desktop-primary-nav.tsx, useSignedIn); the
+    failure path is the test above, which loads with no key and must keep Sign in and the start.
+  */
+  test("swaps Sign in and the start for Open workspace when a session is stored", async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem("sb-test-auth-token", "{}"));
+    await page.goto("/product");
+    const action = page.locator(`${HEADER} .nav-actions a.btn`);
+    await expect(action).toHaveText("Open workspace");
+    await expect(action).toHaveAttribute("href", "/workspace");
+    await expect(page.locator(`${HEADER} .nav-signin`)).toHaveCount(0);
   });
 
   /*
@@ -213,6 +229,24 @@ test.describe("at 390", () => {
     expect(await hrefsOf(rows)).toEqual([...CUSTOMER_NAV.map((item) => item.href), "/pricing"]);
     await expect(panel.locator("a.mobile-nav-signin")).toHaveAttribute("href", "/login");
     await expect(panel.locator("a.mobile-nav-cta"), "the sheet does not repeat the header action").toHaveCount(0);
+    // Founder 2026-11-10: the sheet's foot is the same start the desktop header offers, never the public sample.
+    const start = panel.locator("a.mobile-nav-start");
+    await expect(start).toHaveText(primaryCallToAction().label);
+    await expect(start).toHaveAttribute("href", primaryCallToAction().href);
+    // The sections may link the sample; the sheet's one filled action is the start, not the sample.
+    await expect(panel.locator("a.btn")).toHaveCount(1);
+    await expect(panel.locator('a.btn[href="/explore"]')).toHaveCount(0);
+    expect((await start.boundingBox())!.height, "the sheet's start is a 44px target").toBeGreaterThanOrEqual(44);
+  });
+
+  test("the sheet's foot is Open workspace when a session is stored", async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem("sb-test-auth-token", "{}"));
+    await page.goto("/product");
+    await page.locator(`${SHEET} > summary`).click();
+    const panel = page.locator(`${SHEET} > nav`);
+    await expect(panel.locator("a.mobile-nav-start")).toHaveText("Open workspace");
+    await expect(panel.locator("a.mobile-nav-start")).toHaveAttribute("href", "/workspace");
+    await expect(panel.locator("a.mobile-nav-signin")).toHaveCount(0);
   });
 
   test("closes on Escape and returns focus to the control that opened it", async ({ page }) => {

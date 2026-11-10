@@ -185,3 +185,30 @@ Posters: each is a step's result frame (stage 1 at 10.40 s, stages 2 and 3 at 17
 | `poster-r3-c4-t8.80.webp` | 1440×900 | 88,796 | `5842e960628ade5ff8aa6cf6d5bd139a24bcb47f7b5057fbb95f6fdc92cf2fea` | `hero-r3-c4.mp4` | 8.80 s | `578cca8776ad7a1668497fb828cc337e50929f3f0d26a852180e3a5bd778a7f9` |
 | `poster-r3-c4-t8.80-2x.avif` | 2880×1800 | 115,055 | `2b616a4740ca057a8854e739eea943520b9740be1dbbda904c1b9e2a6a0fc425` | `hero-r3-c4.mp4` | 8.80 s | `578cca8776ad7a1668497fb828cc337e50929f3f0d26a852180e3a5bd778a7f9` |
 | `poster-r3-c4-t8.80.avif` | 1440×900 | 55,446 | `a3a80359d7f4f387e370dac55209bedc45ac7f4a694b5cc631ae1345748b9c93` | `hero-r3-c4.mp4` | 8.80 s | `578cca8776ad7a1668497fb828cc337e50929f3f0d26a852180e3a5bd778a7f9` |
+
+## Hero tabs (2026-11-10, founder variant A)
+
+The four locked cuts in the light tone, nodes coloured by source document and the ring's centre filled (`components/opening-film*.tsx` with `tone="light" compiled`, `lib/film-tone.ts`), as `components/landing-v2/hero-compile-tabs.tsx` shows them. Drawn from each component's own clock and its 2880x1800 canvas by `scripts/film/hero-tabs.mjs`: posters at *t* = 17.50 s (each 2x AVIF at most 140,000 bytes, quality stepped down from 50 until it fits), and the whole cut as a 1440x900 H.264 yuv420p CRF 30 video for widths below 900 px, where no live canvas runs.
+
+| File | Bytes | sha256 |
+|---|---|---|
+| `hero-tab-1-2x.avif` | 136,464 | `dfb209e717c68354f4afb5c43d2eee3dc9f7ec0e90ae6dbb78a1cbb6bfb7cb05` |
+| `hero-tab-1-2x.webp` | 272,554 | `edb6fcbf496de13e918b2040e6a71cec331708324a41229e08eb3676e1c91d75` |
+| `hero-tab-1.avif` | 60,883 | `32e024069b4497783f18336073859dbb93f628c8f1ab3f5401bbfdeadd65ba01` |
+| `hero-tab-1.mp4` | 1,387,810 | `2f87834c71216f5319699802f805d72f611ed510ea8c9c3ed92f6a84502da5f0` |
+| `hero-tab-1.webp` | 110,496 | `3b27aedd85050a4e0e9ec9fea8b3e9522ccc67169a283da594778347a78d140a` |
+| `hero-tab-2-2x.avif` | 136,087 | `9942155e5ad084deb16fb5f3da0aa36153ccbf8be917790552c6222697b46408` |
+| `hero-tab-2-2x.webp` | 358,050 | `2ae4f01b7740c2a78bdf572f6b7017efef00091d84bdd5b8e2c3ead6da913f0c` |
+| `hero-tab-2.avif` | 72,536 | `c3bb0832a5c84b9e457995142537db219142ea7a95100343e543d537bc009cc6` |
+| `hero-tab-2.mp4` | 1,267,928 | `783d9579772eec316e7c35b40e9c3cade90a2c7e21bb81ab83eae27795a52a4d` |
+| `hero-tab-2.webp` | 133,710 | `3196063ee87e96ce8d48fcae1bc16a1485d2504221dbf937a4cea22e73759fdd` |
+| `hero-tab-3-2x.avif` | 105,217 | `7123b99cfe9657f2693fee9abe4294bbc582297754358aedffe4920ddd54bd9c` |
+| `hero-tab-3-2x.webp` | 245,668 | `354fa46f8c460c376f11bdfb044a158da071728f3aa71398d2e4b8e92cda3b5b` |
+| `hero-tab-3.avif` | 46,390 | `f0d840c57c767a3d8fded0c1d77b691da85740f8d93bf3496cb5d9736ce5d0e6` |
+| `hero-tab-3.mp4` | 326,622 | `7b2f151651c18e0d37e8eea3b42221ef7ab7cac941f530f94f3ef0ff3aaaabc5` |
+| `hero-tab-3.webp` | 86,882 | `8481a5e697c6f38f6fe1aa009c9a7a12fb1d22191a80fb0c0059fc1e7d6084c6` |
+| `hero-tab-4-2x.avif` | 119,794 | `367b85ff2379bc6ae004327b4326e587a6217d00074ce071709a376ab2acc320` |
+| `hero-tab-4-2x.webp` | 246,266 | `f02e61925fc4fae429c97a85fcfa2486695dcfe8a4412e247ed784ab8668a606` |
+| `hero-tab-4.avif` | 52,566 | `7a94a20a5a0343f4274bc0bcf44c7ffba15c86ee714cb39df385f79ba7f3da84` |
+| `hero-tab-4.mp4` | 205,155 | `a4ab3431425b00685d6da0b7b5bb32325cf7a31a3397a37f19c6e5460e7852aa` |
+| `hero-tab-4.webp` | 98,642 | `8623a4dab5afaa21f6687c2f71f9c65e0f3e70c0c8cdf39e1e083a9929908e27` |

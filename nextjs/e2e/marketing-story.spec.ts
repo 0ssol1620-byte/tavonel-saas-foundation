@@ -38,10 +38,11 @@ test("four-stage film controls and captions retain readable contrast", async ({ 
   await page.goto("/");
   // FINAL-SPEC 2026-10-26 (D-7): Home prints no film caption row (the stage sentence is the poster's alt), so the
   // film's text on the page is its controls and the disclosure; both are still held to 4.5:1 below.
-  await expect(page.locator("#s1 .compile-film-caption")).toHaveCount(0);
+  // Founder 2026-11-10: the recorded player is the walkthrough below the fold; the hero film is the tabbed compile slot.
+  await expect(page.locator("#walkthrough .compile-film-caption")).toHaveCount(0);
   // FINAL-SPEC 2026-10-26 §2.5: the change scene's note is gone; its one sentence and the fixed qualifier are its
   // paragraphs now, on the instrument ground, and each is held to the same 4.5:1.
-  for (const selector of ['#s1 .compile-film-sequence button', '#s1 figure[data-testid="landing-hero-film"] figcaption', '#s4 p', 'footer .wordmark b', 'footer .site-footer-legal-pair', 'footer [data-consent-anchor]']) {
+  for (const selector of ['#walkthrough .compile-film-sequence button', '#walkthrough figure[data-testid="landing-hero-film"] figcaption', '#s1 figure[data-testid="hero-compile-tabs"] [role="tab"]', '#s1 figure[data-testid="hero-compile-tabs"] figcaption', '#s4 p', 'footer .wordmark b', 'footer .site-footer-legal-pair', 'footer [data-consent-anchor]']) {
     const contrasts = await page.locator(selector).evaluateAll(elements => elements.map(element => {
       const luminance = (value: string) => {
         const channels = (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number).map(channel => {

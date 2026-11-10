@@ -30,7 +30,7 @@ const FAILURE_COPY: Record<string, string> = {
     compile again and fails the same way (REVIEW-PR192-R1 MAJOR-2). Neither line invites one.
   */
   JSON_TOO_LARGE: "This is larger than its size limit, so it was not stored. Trying the same thing again gives the same result.",
-  CORE_OUTPUT_TOO_LARGE: "These files compile to more than one World can hold, so nothing was stored. Running the same set again gives the same result. Compile fewer or smaller files at a time.",
+  CORE_OUTPUT_TOO_LARGE: "The result of compiling these files is larger than one World can hold, so nothing was saved. Running the same files again gives the same result. Select fewer files and compile them in smaller groups. If one file on its own does this, send us the reference below.",
   /* F2 (2026-11-09): the window is BLOCKED_DECISION_EXPIRY_MS in compile-job-worker.ts; a test holds them together. */
   BLOCKED_DECISION_EXPIRED: "This compile waited 7 days for a decision about the files that could not be read, so it stopped. Start a new compile to go on.",
   SECURITY_BLOCKER_REQUIRES_EXPLICIT_REMOVAL: "A file stopped by a safety check cannot be passed over in one click. Remove it from this compile explicitly, or cancel.",
@@ -130,32 +130,57 @@ export type SizeLimitFailureCopy = {
   sentence: string; measured: string; largest: string; counts: string;
   /** The read stopped at the bound, so only "more than the bound" was measured, never an exact size. */
   exceeded: (bound: string) => string;
+  /** Words for the counts an event may carry. A count with no word here is not shown: its key is internal. */
+  countLabels: Readonly<Record<string, string>>;
 };
 
-const SIZE_LIMIT_COPY: Record<"en" | "ko", SizeLimitFailureCopy> = {
+/*
+  Which language a workspace sentence is written in is the page's, never the browser's.
+
+  These helpers used to take `navigator.languages`, so an English workspace opened in a Korean
+  browser printed Korean refusal copy beside English headings (founder, 2026-11-10,
+  cjob-fac5555a). The page says what language it is in on `<html lang>`: `en` from the root
+  layout, `ko` from `app/ko/document-lang.tsx`. There is no Korean workspace today, so every
+  workspace caller gets `en`; the Korean rows stay for the page that will be.
+*/
+export type PageLocale = "en" | "ko";
+
+/** The language of the page being shown, read from `<html lang>`. English when there is no document. */
+export function pageLocale(): PageLocale {
+  return typeof document !== "undefined" && document.documentElement.lang.toLowerCase().startsWith("ko") ? "ko" : "en";
+}
+
+/** Every code this module has a sentence for, so a test can hold each one to the page's language. */
+export const FAILURE_COPY_CODES: readonly string[] = Object.keys(FAILURE_COPY);
+
+const SIZE_LIMIT_COPY: Record<PageLocale, SizeLimitFailureCopy> = {
   en: {
-    sentence: "This set of files compiles to more than one World can hold, so nothing was stored. Running the same set again gives the same result. Compile fewer or smaller files at a time.",
+    sentence: FAILURE_COPY.CORE_OUTPUT_TOO_LARGE!,
     measured: "Measured size",
     largest: "Largest parts of the output",
     counts: "What the output held",
     exceeded: (bound) => `exceeded the ${bound} byte limit`,
+    countLabels: { documents: "documents", regions: "source regions", evidence: "evidence regions", claims: "statements",
+      entities: "entities", relations: "relations", contradictions: "possible conflicts", contradictionPairs: "possible conflicts",
+      files: "output files", packageFiles: "output files" },
   },
   ko: {
-    sentence: "이 파일 묶음은 World 하나에 담을 수 있는 크기를 넘어, 아무것도 저장하지 않았습니다. 같은 묶음을 다시 실행해도 결과는 같습니다. 파일 수를 줄이거나 더 작은 파일로 나누어 컴파일하세요.",
+    sentence: "이 파일들을 컴파일한 결과가 World 하나에 담을 수 있는 크기보다 커서 아무것도 저장하지 않았습니다. 같은 파일로 다시 실행해도 결과는 같습니다. 파일을 더 적게 골라 작은 묶음으로 나누어 컴파일하세요. 파일 하나만으로 이렇게 된다면 아래 참조 번호를 보내 주세요.",
     measured: "측정한 크기",
     largest: "출력에서 가장 큰 부분",
     counts: "출력에 담긴 항목",
     exceeded: (bound) => `${bound} 바이트 상한 초과`,
+    countLabels: { documents: "문서", regions: "원문 영역", evidence: "근거 영역", claims: "진술", entities: "개체", relations: "관계",
+      contradictions: "충돌 후보", contradictionPairs: "충돌 후보", files: "출력 파일", packageFiles: "출력 파일" },
   },
 };
 
 /**
- * The compile panel's copy for a size refusal, in the browser's language (English or Korean, the
- * same rule as `workspace-ask-copy`). The sentence carries no numbers; the measured ones are shown
- * beside it as detail.
+ * The compile panel's copy for a size refusal, in the page's language. The sentence carries no
+ * numbers; the measured ones are shown beside it as detail.
  */
-export function sizeLimitFailureCopy(languages: readonly string[] = []): SizeLimitFailureCopy {
-  return SIZE_LIMIT_COPY[languages[0]?.toLowerCase().startsWith("ko") ? "ko" : "en"];
+export function sizeLimitFailureCopy(locale: PageLocale = "en"): SizeLimitFailureCopy {
+  return SIZE_LIMIT_COPY[locale];
 }
 
 /** A blocker no retry can clear: the reader left a review package, and the stored result is immutable (F1). */
@@ -170,7 +195,7 @@ export type BlockedPanelCopy = {
   expiry: string;
 };
 
-const BLOCKED_PANEL_COPY: Record<"en" | "ko", BlockedPanelCopy> = {
+const BLOCKED_PANEL_COPY: Record<PageLocale, BlockedPanelCopy> = {
   en: {
     title: "Waiting for your decision.",
     reupload: (count) => count === 1
@@ -187,9 +212,9 @@ const BLOCKED_PANEL_COPY: Record<"en" | "ko", BlockedPanelCopy> = {
   },
 };
 
-/** The compile panel's copy for a job waiting on the customer's blocker decision, English or Korean. */
-export function blockedPanelCopy(languages: readonly string[] = []): BlockedPanelCopy {
-  return BLOCKED_PANEL_COPY[languages[0]?.toLowerCase().startsWith("ko") ? "ko" : "en"];
+/** The compile panel's copy for a job waiting on the customer's blocker decision, in the page's language. */
+export function blockedPanelCopy(locale: PageLocale = "en"): BlockedPanelCopy {
+  return BLOCKED_PANEL_COPY[locale];
 }
 
 /*
@@ -202,9 +227,7 @@ export function blockedPanelCopy(languages: readonly string[] = []): BlockedPane
 */
 const CONTRADICTION_REASON = /^(CONTRADICTION_GROUP_TOO_LARGE|CONTRADICTION_PAIR_BUDGET_EXCEEDED):[^:\s]+:claims=(\d+):pairs=(\d+)$/;
 
-type ReviewLanguage = "en" | "ko";
-
-const REVIEW_REASON_COPY: Record<ReviewLanguage, {
+const REVIEW_REASON_COPY: Record<PageLocale, {
   reference: string;
   CONTRADICTION_GROUP_TOO_LARGE: (claims: string, pairs: string) => string;
   CONTRADICTION_PAIR_BUDGET_EXCEEDED: (claims: string, pairs: string) => string;
@@ -230,12 +253,11 @@ const REVIEW_REASON_COPY: Record<ReviewLanguage, {
  * written a sentence for (the caller then shows the raw string, as before). `reference` labels the
  * raw string, which the caller always keeps on screen beside the sentence.
  */
-export function reviewReasonCopy(value: string, languages: readonly string[] = []): { sentence: string; reference: string } | null {
+export function reviewReasonCopy(value: string, locale: PageLocale = "en"): { sentence: string; reference: string } | null {
   const match = CONTRADICTION_REASON.exec(value);
   if (!match) return null;
-  const language: ReviewLanguage = languages[0]?.toLowerCase().startsWith("ko") ? "ko" : "en";
-  const copy = REVIEW_REASON_COPY[language];
-  const format = (digits: string) => Number(digits).toLocaleString(language === "ko" ? "ko-KR" : "en-US");
+  const copy = REVIEW_REASON_COPY[locale];
+  const format = (digits: string) => Number(digits).toLocaleString(locale === "ko" ? "ko-KR" : "en-US");
   const code = match[1] as "CONTRADICTION_GROUP_TOO_LARGE" | "CONTRADICTION_PAIR_BUDGET_EXCEEDED";
   return { sentence: copy[code](format(match[2]), format(match[3])), reference: copy.reference };
 }

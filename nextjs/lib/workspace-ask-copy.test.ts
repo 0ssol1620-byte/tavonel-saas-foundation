@@ -39,7 +39,7 @@ describe("workspace Ask abstention copy", () => {
   });
 
   it("says in English that evidence exists but is too long, shows no partial answer, and points at sources or a narrower question", () => {
-    for (const languages of [[], ["en-US"], ["fr-FR", "ko-KR"]]) {
+    for (const languages of [undefined, "en"] as const) {
       const copy = askAbstentionCopy(EVIDENCE_EXCEEDS_ANSWER_LIMIT, languages);
       for (const text of [copy.notice, copy.result]) {
         expect(text).toContain("too long");
@@ -57,8 +57,8 @@ describe("workspace Ask abstention copy", () => {
     }
   });
 
-  it("says the same in Korean when the browser prefers Korean", () => {
-    for (const languages of [["ko"], ["ko-KR", "en-US"], ["KO-kr"]]) {
+  it("says the same in Korean on a Korean page", () => {
+    for (const languages of ["ko"] as const) {
       const copy = askAbstentionCopy(EVIDENCE_EXCEEDS_ANSWER_LIMIT, languages);
       for (const text of [copy.notice, copy.result]) {
         expect(text).toContain("너무 길어");
@@ -74,9 +74,9 @@ describe("workspace Ask abstention copy", () => {
     }
   });
 
-  it("leaves every other abstention on its existing English copy, in any browser language", () => {
+  it("leaves every other abstention on its existing English copy, in either page language", () => {
     for (const reason of [null, "NO_REGION_BOUND_EVIDENCE_MATCH", "CITED_EVIDENCE_NOT_IN_PACKET", "every candidate was rejected by the World Gate"])
-      for (const languages of [[], ["ko-KR"]])
+      for (const languages of [undefined, "ko"] as const)
         expect(askAbstentionCopy(reason, languages)).toEqual({ notice: NO_EVIDENCE_NOTICE, result: NO_EVIDENCE_RESULT, action: null });
   });
 
@@ -85,7 +85,7 @@ describe("workspace Ask abstention copy", () => {
     expect(result).toMatchObject({ status: "abstained", answer: "", reason: EVIDENCE_EXCEEDS_ANSWER_LIMIT });
     expect(result?.citations).toHaveLength(1);
     expect(result?.citations[0]).toMatchObject({ evidenceId: "evidence-a", sourceId: "source-a", pageNumber1: 4 });
-    expect(askAbstentionCopy(result!.reason, ["ko-KR"]).action).toBe("더 좁은 질문하기");
+    expect(askAbstentionCopy(result!.reason, "ko").action).toBe("더 좁은 질문하기");
   });
 
   /*
@@ -97,8 +97,8 @@ describe("workspace Ask abstention copy", () => {
   it("wires the copy into the workspace without moving the source buttons under a status check", () => {
     expect(workspace).toContain('from "@/lib/workspace-ask-copy"');
     expect(workspace).not.toContain('from "@/lib/grounded-ask"');
-    expect(workspace).toContain("askAbstentionCopy(json.reason, navigator.languages).notice");
-    expect(workspace).toContain("askAbstentionCopy(askResult.reason, navigator.languages).result");
+    expect(workspace).toContain("askAbstentionCopy(json.reason, pageLocale()).notice");
+    expect(workspace).toContain("askAbstentionCopy(askResult.reason, pageLocale()).result");
     expect(workspace).toContain('askResult.reason === EVIDENCE_EXCEEDS_ANSWER_LIMIT');
     expect(workspace).toContain("Add the source that would answer this");
     expect(workspace).toContain("Check what is waiting for review");
@@ -130,12 +130,12 @@ describe("workspace Ask abstention copy", () => {
     expect(sourceList).toContain("citation.bbox1000 ? `[${citation.bbox1000.join(\", \")}]` : sourceCopy.missing");
     expect(workspace).not.toContain("[{citation.bbox1000.join(");
     expect(sourceList).toContain("citation.relevanceBreakdown && citation.relevance !== undefined");
-    // An unresolved citation says so, in the browser language, right under its disabled button.
+    // An unresolved citation says so, in the page language, right under its disabled button.
     // Same-World refusal keeps its region copy; an unqualified World says identity, not absence.
     const unavailable = workspace.indexOf("{regionId === null ? <small>{askWorldModel ? sourceCopy.unavailable : sourceCopy.unverified}</small> : null}", button);
     expect(unavailable).toBeGreaterThan(button);
     expect(actions).toBeGreaterThan(unavailable);
-    expect(sourceList).toContain("const sourceCopy = askSourceCopy(navigator.languages);");
+    expect(sourceList).toContain("const sourceCopy = askSourceCopy(pageLocale());");
   });
 });
 
@@ -371,24 +371,24 @@ describe("resolving a cited source region against the active read model", () => 
   });
 
   it("marks an unopenable source in English or Korean without promising a location", () => {
-    for (const languages of [[], ["en-US"], ["fr-FR", "ko-KR"]]) {
+    for (const languages of [undefined, "en"] as const) {
       const copy = askSourceCopy(languages);
       expect(copy.unavailable).toContain("cannot be opened");
       expect(copy.unavailable).toContain("no location is guessed");
       expect(copy.missing).toBe("unavailable");
     }
-    for (const languages of [["ko"], ["ko-KR", "en-US"], ["KO-kr"]]) {
+    for (const languages of ["ko"] as const) {
       const copy = askSourceCopy(languages);
       expect(copy.unavailable).toContain("열 수 없습니다");
       expect(copy.unavailable).toContain("위치를 추측하지 않습니다");
       expect(copy.missing).toBe("정보 없음");
     }
-    for (const copy of [askSourceCopy(["en"]), askSourceCopy(["ko"])])
+    for (const copy of [askSourceCopy("en"), askSourceCopy("ko")])
       expect(copy.unavailable).not.toMatch(/correct answer|benchmark|정답|벤치마크/i);
   });
 
   it("says an unverified World is unverified, not that the region is absent, in English or Korean", () => {
-    for (const languages of [[], ["en-US"], ["fr-FR", "ko-KR"]]) {
+    for (const languages of [undefined, "en"] as const) {
       const { unverified, unavailable } = askSourceCopy(languages);
       expect(unverified).toContain("cannot be opened here");
       expect(unverified).toContain("not confirmed as the same collection and revision that answered");
@@ -397,7 +397,7 @@ describe("resolving a cited source region against the active read model", () => 
       expect(unverified).not.toMatch(/no single region|has no region|not found|absent/i);
       expect(unverified).not.toBe(unavailable);
     }
-    for (const languages of [["ko"], ["ko-KR", "en-US"], ["KO-kr"]]) {
+    for (const languages of ["ko"] as const) {
       const { unverified, unavailable } = askSourceCopy(languages);
       expect(unverified).toContain("여기서 열 수 없습니다");
       expect(unverified).toContain("같은 컬렉션·리비전으로 확인되지 않았거나");
@@ -407,7 +407,7 @@ describe("resolving a cited source region against the active read model", () => 
       expect(unverified).not.toBe(unavailable);
     }
     // Equality of identity fields is not authenticity: the copy claims neither a signature nor a forgery.
-    for (const copy of [askSourceCopy(["en"]), askSourceCopy(["ko"])])
+    for (const copy of [askSourceCopy("en"), askSourceCopy("ko")])
       expect(copy.unverified).not.toMatch(/signature|tamper|forg|authentic|서명|위조|변조/i);
   });
 });

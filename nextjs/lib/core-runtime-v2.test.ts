@@ -175,14 +175,12 @@ describe("Python Product-Core v2 dispatch", () => {
   });
 
   it("reads the Core response no further than the largest response a storable candidate implies", async () => {
-    // The bound is derived from a measurement, not from cjob-157f2f23 (whose 134,576,916 B was the
-    // candidate; its response size was never observed): the response is 1.91-2.35x the package while
-    // the candidate is 1.03-1.43x (REVIEW-AKC153-R1.md §1.4), so the read bound sits above 2.35x the
-    // candidate bound -- a 30 MB storable candidate must not be refused here.
+    // Core gates the serialised candidate at its budget (= the stored bound), so the response is that
+    // plus the envelope: a 12-document part (176.2 MB measured, 2026-11-10) is read whole.
     const { MAX_COLLECTION_JSON_BYTES } = await import("./r2-objects");
-    expect(CORE_V2_MAX_RESPONSE_BYTES).toBe(80 * 1024 * 1024);
-    expect(CORE_V2_MAX_RESPONSE_BYTES).toBeGreaterThanOrEqual(Math.ceil(MAX_COLLECTION_JSON_BYTES * 2.35));
-    expect(MAX_COLLECTION_JSON_BYTES).toBe(32 * 1024 * 1024);
+    expect(MAX_COLLECTION_JSON_BYTES).toBe(192 * 1024 * 1024);
+    expect(CORE_V2_MAX_RESPONSE_BYTES).toBe(MAX_COLLECTION_JSON_BYTES + 1024 * 1024);
+    expect(CORE_V2_MAX_RESPONSE_BYTES).toBeGreaterThan(176_212_746);
     const env = { url: "https://core-v2.example", hmac: "x".repeat(32) };
     const declared = CORE_V2_MAX_RESPONSE_BYTES + 1;
     vi.stubGlobal("fetch", async () => new Response("{}", { headers: { "content-length": String(declared) } }));
