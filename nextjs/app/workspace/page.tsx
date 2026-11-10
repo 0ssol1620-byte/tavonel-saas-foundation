@@ -6,7 +6,7 @@ import WorldExplorer from "@/components/world-explorer";
 import { FileText, ShieldCheck, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activationPolicy, type ActivationCapability } from "@/lib/activation-policy";
-import { failureSentence, isSizeLimitFailure, offersUpgrade } from "@/lib/workspace-failure-copy";
+import { failureSentence, isSizeLimitFailure, offersUpgrade, pageLocale } from "@/lib/workspace-failure-copy";
 import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion } from "@/lib/workspace-ask-copy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -2743,7 +2743,7 @@ export default function WorkspacePage() {
       trackFunnelOnce("workspace_first_ask", { status: json.status });
       setNotice(json.status === "grounded"
         ? `Answer returned from ${json.citations.length} exact source region(s) in active revision ${activeWorld.revision}.`
-        : askAbstentionCopy(json.reason, navigator.languages).notice);
+        : askAbstentionCopy(json.reason, pageLocale()).notice);
     } catch {
       setNotice("The answer response could not be read. Your question is kept. No answer is shown; retry when the connection is available.");
     } finally {
@@ -2922,7 +2922,7 @@ export default function WorkspacePage() {
           corpus={corpus}
           names={names}
           busy={busy}
-          languages={navigator.languages}
+          locale={pageLocale()}
           onResolve={(resolution) => void resolveCompileBlockers(resolution)}
           onCancel={() => void cancelCompileJob()}
           onOpenPart={(jobId) => {
@@ -3641,7 +3641,7 @@ export default function WorkspacePage() {
                 <h2 id="review-queue-title">Sources waiting on you, most at risk first.</h2>
                 <ReviewQueue
                   input={reviewQueueInput}
-                  languages={navigator.languages}
+                  locale={pageLocale()}
                   selectedDocumentId={worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)?.sourceId ?? null}
                   onSelectDocument={(documentId) => selectReviewEvidence(worldReadModel?.evidence.find((item) => item.sourceId === documentId)?.id ?? null)}
                 />
@@ -3894,13 +3894,13 @@ export default function WorkspacePage() {
                 {askResult ? (
                   <div className={`ask-result ${askResult.status}`} role="status">
                     <strong>{askResult.status === "grounded" ? "Grounded answer" : "Abstained"}</strong>
-                    <p data-sensitive="content">{askResult.status === "grounded" ? askResult.answer : askAbstentionCopy(askResult.reason, navigator.languages).result}</p>
+                    <p data-sensitive="content">{askResult.status === "grounded" ? askResult.answer : askAbstentionCopy(askResult.reason, pageLocale()).result}</p>
                     {askResult.citations.length > 0 ? (
                       <ol data-sensitive="content">
                         {askResult.citations.map((citation, index) => {
                           // One strict resolver for both availability and the click; null keeps the button disabled.
                           const regionId = resolveCitationRegion(citation, askWorldModel?.evidence);
-                          const sourceCopy = askSourceCopy(navigator.languages);
+                          const sourceCopy = askSourceCopy(pageLocale());
                           return (
                           <li key={`${index}-${citation.evidenceId}`}>
                             <b>{citation.evidenceId}</b>
@@ -3929,7 +3929,7 @@ export default function WorkspacePage() {
                     {askResult.status === "abstained" && askResult.reason === EVIDENCE_EXCEEDS_ANSWER_LIMIT ? (
                       <div className="workspace-intake-actions">
                         <button type="button" onClick={() => document.getElementById("ask-question")?.focus()}>
-                          {askAbstentionCopy(askResult.reason, navigator.languages).action}
+                          {askAbstentionCopy(askResult.reason, pageLocale()).action}
                         </button>
                       </div>
                     ) : askResult.status === "abstained" ? (

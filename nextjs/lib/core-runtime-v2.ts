@@ -27,13 +27,16 @@ export const PRODUCT_CORE_RESPONSE_SCHEMA = "tavonel.product_core.compile_respon
  */
 export const CORE_V2_MAX_REQUEST_BYTES = 4_500_000;
 /**
- * The largest Core response read. Not the candidate bound: the response carries the package
- * roughly twice (measured 1.91-2.35x the raw package bytes, against 1.03-1.43x for the stored
- * candidate -- go-live/REVIEW-AKC153-R1.md §1.4, 2026-11-05), so a 32 MiB read would refuse a
- * storable 30 MB candidate. 32 MiB x 2.35 = 75.2 MiB, plus margin. The precise gate stays the
- * candidate write bound (`MAX_COLLECTION_JSON_BYTES`, 32 MiB), taken before any receipt.
+ * The largest Core response read: Core's own candidate budget (`OUTPUT_BUDGET_BYTES`, equal to
+ * `MAX_COLLECTION_JSON_BYTES`, 192 MiB) plus 1 MiB for the envelope around it.
+ *
+ * Core gates the serialised candidate itself (`core-candidate`) against that budget before any
+ * digest, and the response is that candidate plus `artifacts` and `receipt` (about 1.7 KB at six
+ * documents). So this read is the backstop for a Core that does not hold its budget, not a second
+ * estimate. It was 80 MiB, 2.35x an older 32 MiB package bound; a Core still on that bound refuses
+ * first, and a Core on the new one is read whole.
  */
-export const CORE_V2_MAX_RESPONSE_BYTES = 80 * 1024 * 1024;
+export const CORE_V2_MAX_RESPONSE_BYTES = 193 * 1024 * 1024;
 
 const CORE_OUTPUT_COUNT_KEYS = ["regions", "claims", "contradictionPairs", "files"] as const;
 const safeCount = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
