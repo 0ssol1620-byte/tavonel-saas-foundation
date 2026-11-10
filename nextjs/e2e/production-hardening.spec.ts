@@ -68,7 +68,7 @@ test("odd grids compose the final item instead of painting an empty cell", async
 test("landing scenes flow continuously without artificial viewport oceans", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "1440");
   await page.goto("/");
-  const geometry = await page.locator('main > section[data-scene], main > [data-home-measurement], main > [data-home-measures], main > [data-home-reader-guide]').evaluateAll(sections => sections.map(section => {
+  const geometry = await page.locator('main > section[data-scene], main > [data-home-measurement], main > [data-home-measures], main > #walkthrough, main > [data-home-reader-guide]').evaluateAll(sections => sections.map(section => {
     const rect = section.getBoundingClientRect();
     return { id: section.id || (section.hasAttribute("data-home-measurement") ? "measurement" : section.hasAttribute("data-home-measures") ? "measures" : "reader-guide"), top: rect.top, bottom: rect.bottom, height: rect.height, minHeight: getComputedStyle(section).minHeight };
   }));
@@ -91,7 +91,8 @@ test("landing scenes flow continuously without artificial viewport oceans", asyn
     collapsed, and it is not an ocean.
   */
   // FINAL-SPEC 2026-10-26 §11 F-1: the reader guide (FAQ) leaves Home, so s5 butts against s6.
-  expect(geometry.map(item => item.id)).toEqual(["s1", "measures", "s2", "s3", "s4", "s5", "s6"]);
+  // Founder 2026-11-10: the recorded walkthrough left s1 for its own band after the measures, under the same three rules.
+  expect(geometry.map(item => item.id)).toEqual(["s1", "measures", "walkthrough", "s2", "s3", "s4", "s5", "s6"]);
   for (let index = 1; index < geometry.length; index += 1) {
     expect(Math.abs(geometry[index].top - geometry[index - 1].bottom), `${geometry[index - 1].id} → ${geometry[index].id}`).toBeLessThanOrEqual(2);
   }

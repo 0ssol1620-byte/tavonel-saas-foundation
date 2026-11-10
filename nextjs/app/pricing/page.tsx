@@ -9,6 +9,7 @@ import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
 import { billingProductDecision, type ProductAccessLevel, type ProductAccessRole } from "@/lib/billing-product-access";
 import type { FoundationBillingAccount } from "@/lib/billing-store";
 import { readPublicStatusV2 } from "@/lib/public-status";
+import { primaryCallToAction } from "@/lib/commercial-state";
 
 export const dynamic = "force-dynamic";
 
@@ -154,6 +155,7 @@ export default function PricingPage() {
     <PricingPageClient
       initialLiveCheckout={status.availableActions.purchasePlan.enabled}
       initialSelfService={status.availableActions.createAccount.enabled}
+      headerStart={primaryCallToAction()}
       gates={PURCHASE_GATES}
       planCapabilities={PLAN_CAPABILITIES}
     />

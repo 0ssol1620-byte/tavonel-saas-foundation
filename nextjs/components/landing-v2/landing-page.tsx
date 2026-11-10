@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
 import HeroFilm from "./hero-film";
+import HeroCompileTabs from "./hero-compile-tabs";
 import HeroStill from "./hero-still";
 import { PHONE_HERO } from "@/lib/hero-phone-mode";
 import HeroActions from "./hero-actions";
@@ -274,8 +275,11 @@ export default function LandingPage({
                     <HeroActions {...heroActions} startLabel={heroStart.label} startHref={heroStart.href}
                       scene="1" ctaOrderVariant={experiment.ctaOrderVariant} entry />
                 </div>
-                {/* The film's poster is the first screen's priority image: the specimen strip closes s2. */}
-                <HeroFilm korean={korean} />
+                {/*
+                  Founder 2026-11-10: the hero film is the four compile cuts in one tabbed slot, around the drop zone
+                  (hero-compile-tabs.tsx). Its first poster is the first screen's priority image.
+                */}
+                <HeroCompileTabs korean={korean} />
                 {/* Direction C round 2: below 900px the page s2 opens on, in place of the film (hero-still.tsx). */}
                 {PHONE_HERO === "still" ? <HeroStill view={home} korean={korean} /> : null}
               </HeroStatement>
@@ -285,6 +289,17 @@ export default function LandingPage({
 
         {/* Release 3 move 7: measured figures with their denominators and receipts, under the hero. */}
         <HomeMeasures korean={korean} />
+
+        {/*
+          Founder 2026-11-10: the product walkthrough (the four recorded workspace cuts, Read / Compile / Update /
+          Trace) moves below the fold. Same player, same recordings; its poster loads lazily here. Not a scene: no heading
+          of its own (the page keeps six h2) and no landmark; its figure carries the caption.
+        */}
+        <div id="walkthrough" className="lv2-scene lv2-paper">
+          <div className="lv2-wrap">
+            <HeroFilm korean={korean} priority={false} />
+          </div>
+        </div>
 
         {/*
           s2: one passage followed to its source. The workbench's own title is the section's h2, and

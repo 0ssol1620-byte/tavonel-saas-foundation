@@ -24,13 +24,14 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
   opens by itself once you are in" whatever `purchasePlan` said, and that sentence is now rendered
   only where a plan can actually be bought.
 
-  S2 is reached by opening `activationPolicy.customerData` inside this file only. The header and
-  the Home close keep the sample action in S2 too: the S2 hierarchy (UX F-5) is founder decision
-  D-07 and waits for P2-37, so these rows pin today's code rather than the proposal. P2-37 updates
-  the S2 rows when it sets that copy, citing D-07.
+  S2 is reached by opening `activationPolicy.customerData` inside this file only. The Home close keeps
+  the sample action in S2 too. The header's action is the start in every state (founder 2026-11-10):
+  the access action while closed, Start free in S2.
 */
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
+/* The route the header is rendered on. "/" everywhere except the self-link check below. */
+const nav = vi.hoisted(() => ({ path: "/" }));
+vi.mock("next/navigation", () => ({ usePathname: () => nav.path }));
 
 const policy = vi.hoisted(() => ({ customerDataOpen: false }));
 vi.mock("./activation-policy", async (importOriginal) => {
@@ -199,18 +200,22 @@ async function status() {
 const SAMPLE = { href: "/explore", label: "Open the compiled sample" };
 const SAMPLE_KO = { href: "/explore", label: "컴파일된 샘플 열기" };
 
-/* Main at 4c80bb30. S0 is the same table: the account gate opens no action a buyer can take. */
+/*
+  Main at 4c80bb30. S0 is the same table: the account gate opens no action a buyer can take.
+  Founder 2026-11-10: the header's action is the visitor's start, not the public sample, and on Home the document
+  entry is the hero's primary with the sample as its secondary link. Closed, the start is the access action.
+*/
 const CLOSED = {
-  header: SAMPLE,
-  headerKo: SAMPLE_KO,
+  header: { href: "/contact", label: "Request access" },
+  headerKo: { href: "/ko/contact", label: "이용 문의" },
   home: {
-    primary: SAMPLE,
-    secondary: { href: "/evaluation", label: "Evaluate your documents" },
+    primary: { href: "/evaluation", label: "Evaluate your documents" },
+    secondary: SAMPLE,
     close: SAMPLE,
   },
   homeKo: {
-    primary: SAMPLE_KO,
-    secondary: { href: "/ko/evaluation", label: "내 문서 평가" },
+    primary: { href: "/ko/evaluation", label: "내 문서 평가" },
+    secondary: SAMPLE_KO,
     close: SAMPLE_KO,
   },
   pricing: [
@@ -259,8 +264,10 @@ const TABLE = {
   S1: CLOSED,
   S2: {
     ...CLOSED,
-    home: { ...CLOSED.home, secondary: { href: "/login", label: "Start free" } },
-    homeKo: { ...CLOSED.homeKo, secondary: { href: "/login", label: "사용 신청하기" } },
+    header: { href: "/login", label: "Start free" },
+    headerKo: { href: "/login", label: "사용 신청하기" },
+    home: { ...CLOSED.home, primary: { href: "/login", label: "Start free" } },
+    homeKo: { ...CLOSED.homeKo, primary: { href: "/login", label: "사용 신청하기" } },
     pricing: [
       { href: "/login", label: "Start free" },
       { href: "/login?next=checkout&offer=observer_access", label: "Buy Developer — $29/month" },
@@ -334,6 +341,28 @@ describe.each(STATES)("CTA truth in %s", (state) => {
     expect(seen.header).toEqual(expected.header);
     expect(seen.headerKo).toEqual(expected.headerKo);
   });
+
+  /*
+    An action may not point at its own page (PR #235 review R1/R2, S2). The browser test of this ran only where the start
+    is /contact, and CI's width projects serve live commerce, where the start is /login and /login has no public header,
+    so it was skipped in every run. Here it runs in every state: on the start's own route the header keeps Sign in and
+    offers no start. The header test above, on "/", is its failure path -- the same render there does carry the start.
+  */
+  it("the header offers no start on the start's own page", async () => {
+    const { PublicSiteHeader } = await import("../components/public-site-chrome");
+    for (const [korean, start] of [[false, expected.header], [true, expected.headerKo]] as const) {
+      nav.path = start.href;
+      try {
+        const html = renderToStaticMarkup(createElement(PublicSiteHeader, { korean }));
+        const actions = anchors(block(html, 'class="nav-actions"', "span"));
+        expect(html, `${start.href}: no header start`).not.toContain('data-analytics="header-start"');
+        expect(actions.map((action) => action.label), `${start.href}: the start goes`).not.toContain(start.label);
+        expect(actions.at(-1), `${start.href}: Sign in stays, last`).toEqual({ href: "/login", label: korean ? "로그인" : "Sign in" });
+      } finally {
+        nav.path = "/";
+      }
+    }
+  }, RENDER_TIMEOUT);
 
   it("Home hero primary, hero secondary and close", () => {
     expect(seen.home).toEqual(expected.home);

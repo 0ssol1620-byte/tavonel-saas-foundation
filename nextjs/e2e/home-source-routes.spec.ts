@@ -41,9 +41,11 @@ test("the entry page keeps its public product routes actionable, with no console
   await expect(close.locator('a[href="/explore"]')).toHaveCount(1);
   await expect(close.locator('a[href="/pricing"]')).toHaveCount(1);
 
-  // The hero offers arranged evaluation or live access; the close retains Pricing.
-  const access = page.locator('#s1 [data-analytics="hero-secondary"]');
+  // The hero's primary is the document entry: arranged evaluation or live access; the public sample is its
+  // secondary link (founder 2026-11-10); the close retains Pricing.
+  const access = page.locator('#s1 [data-analytics="hero-primary"]');
   await expect(access).toHaveAttribute("href", /^\/(login|evaluation)$/);
+  await expect(page.locator('#s1 [data-analytics="hero-secondary"]')).toHaveAttribute("href", "/explore");
 
   // Every one of those next actions clears the touch floor.
   for (const link of [access, proofLinks.first(), close.locator("a.lv2-text-link").first()]) {

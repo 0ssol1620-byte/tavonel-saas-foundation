@@ -19,6 +19,7 @@
 
 import { useEffect, useRef } from "react";
 import { buildWorldGraph, nodeBudget, type WorldGraph } from "@/lib/world-graph";
+import { compileGraph, dimAlpha, LIGHT_AREAS, tint, type FilmTone } from "@/lib/film-tone";
 
 const RUN = 18;
 
@@ -31,7 +32,7 @@ const ACT = {
   keep: RUN,
 } as const;
 
-const AREA_RGB: [number, number, number][] = [
+const AREA_DARK: [number, number, number][] = [
   [242, 166, 90],
   [80, 210, 170],
   [90, 170, 230],
@@ -40,7 +41,7 @@ const AREA_RGB: [number, number, number][] = [
   [120, 220, 110],
 ];
 
-const INK = {
+const INK_DARK = {
   panel: "#101214",
   head: "#16191c",
   line: "#2e353b",
@@ -107,10 +108,10 @@ type Line = { at: number; text: string; ink?: string; mono?: boolean; indent?: n
 
 /** Column 3 — the assistant panel: handshake, tools, the ask, the grounded answer. */
 const MCP_LINES: Line[] = [
-  { at: 0.15, text: "→ initialize", ink: INK.dim },
-  { at: 0.7, text: "← tavonel-readonly", ink: INK.text },
-  { at: 1.1, text: "  protocolVersion 2025-06-18", ink: INK.faint },
-  { at: 1.5, text: "→ tools/list · 4 of 9 shown", ink: INK.dim },
+  { at: 0.15, text: "→ initialize", ink: INK_DARK.dim },
+  { at: 0.7, text: "← tavonel-readonly", ink: INK_DARK.text },
+  { at: 1.1, text: "  protocolVersion 2025-06-18", ink: INK_DARK.faint },
+  { at: 1.5, text: "→ tools/list · 4 of 9 shown", ink: INK_DARK.dim },
 ];
 
 /*
@@ -122,27 +123,32 @@ const MCP_LINES: Line[] = [
   the one that fills the column.
 */
 const TERM_LINES: Line[] = [
-  { at: 0.15, text: "$ export TAVONEL_API_KEY=tvnl_live_••••", ink: INK.text },
-  { at: 0.6, text: "$ tavonel worlds", ink: INK.hi },
-  { at: 1.0, text: "  active World · 4 sources", ink: INK.text },
-  { at: 1.2, text: "  choose its collection id", ink: INK.dim },
-  { at: 1.4, text: "$ export COLLECTION_ID=<world-id>", ink: INK.text },
-  { at: 1.6, text: "  human-activated revision", ink: INK.dim },
-  { at: 1.9, text: "$ tavonel documents", ink: INK.hi },
-  { at: 2.3, text: "  handbook-2026.pdf        v1  official", ink: INK.text },
-  { at: 2.5, text: "  MSA_v4.pdf               v2  contractual", ink: INK.text },
-  { at: 2.7, text: "  ops-manual-r9.pdf        v1  reviewed", ink: INK.text },
-  { at: 2.9, text: "  scan_0140.jpg            v1  informal", ink: INK.text },
-  { at: 3.15, text: "  4 immutable versions", ink: INK.dim },
+  { at: 0.15, text: "$ export TAVONEL_API_KEY=tvnl_live_••••", ink: INK_DARK.text },
+  { at: 0.6, text: "$ tavonel worlds", ink: INK_DARK.hi },
+  { at: 1.0, text: "  active World · 4 sources", ink: INK_DARK.text },
+  { at: 1.2, text: "  choose its collection id", ink: INK_DARK.dim },
+  { at: 1.4, text: "$ export COLLECTION_ID=<world-id>", ink: INK_DARK.text },
+  { at: 1.6, text: "  human-activated revision", ink: INK_DARK.dim },
+  { at: 1.9, text: "$ tavonel documents", ink: INK_DARK.hi },
+  { at: 2.3, text: "  handbook-2026.pdf        v1  official", ink: INK_DARK.text },
+  { at: 2.5, text: "  MSA_v4.pdf               v2  contractual", ink: INK_DARK.text },
+  { at: 2.7, text: "  ops-manual-r9.pdf        v1  reviewed", ink: INK_DARK.text },
+  { at: 2.9, text: "  scan_0140.jpg            v1  informal", ink: INK_DARK.text },
+  { at: 3.15, text: "  4 immutable versions", ink: INK_DARK.dim },
 ];
 
-export default function OpeningFilm4() {
+export default function OpeningFilm4({ tone = "dark", compiled = false, playing = true }: { onEnded?: () => void; tone?: FilmTone; compiled?: boolean; playing?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const playingRef = useRef(true);
   const startRef = useRef(0);
   const elapsedRef = useRef(0);
 
+  useEffect(() => { playingRef.current = playing; }, [playing]);
+
   useEffect(() => {
+    const C = (dark: string) => tint(tone, dark);
+    const AREA_RGB = tone === "light" ? LIGHT_AREAS : AREA_DARK;
+    const INK = Object.fromEntries(Object.entries(INK_DARK).map(([k, v]) => [k, C(v)])) as Record<keyof typeof INK_DARK, string>;
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d");
     if (!canvas || !context) return;
@@ -152,7 +158,7 @@ export default function OpeningFilm4() {
     let height = 0;
     let frame = 0;
     let cancelled = false;
-    let graph: WorldGraph | null = null;
+    let graph: (WorldGraph & { doc?: number[]; coreStart?: number }) | null = null;
 
     const layout = () => {
       const ratio = Math.min(3, Math.max(2, window.devicePixelRatio || 1));
@@ -161,7 +167,7 @@ export default function OpeningFilm4() {
       canvas.width = Math.round(width * ratio);
       canvas.height = Math.round(height * ratio);
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
-      graph = buildWorldGraph(nodeBudget(width, height));
+      graph = compiled ? compileGraph(buildWorldGraph(nodeBudget(width, height))) : buildWorldGraph(nodeBudget(width, height));
     };
 
     const pane = (x: number, y: number, w: number, h: number, title: string, right: string) => {
@@ -190,7 +196,7 @@ export default function OpeningFilm4() {
       for (const item of items) {
         const shown = typed(item.text, t, item.at);
         if (!shown) continue;
-        context.fillStyle = item.ink ?? INK.text;
+        context.fillStyle = C(item.ink ?? INK_DARK.text);
         context.font = `400 ${BODY}px ui-monospace, Menlo, monospace`;
         context.fillText(shown, x + (item.indent ?? 0), y + row * rowH);
         row += 1;
@@ -212,7 +218,7 @@ export default function OpeningFilm4() {
       left: string, right: string, ink: string = INK.dim,
     ) => {
       const fy = y + h - 14;
-      context.strokeStyle = "rgba(46,53,59,0.9)";
+      context.strokeStyle = C("rgba(46,53,59,0.9)");
       context.lineWidth = 1;
       context.beginPath();
       context.moveTo(x + 12, fy - 16);
@@ -458,7 +464,7 @@ export default function OpeningFilm4() {
         const na = g.nodes[ia];
         const nb = g.nodes[ib];
         if (!na || !nb) return;
-        context.strokeStyle = "rgba(80,88,94,0.16)";
+        context.strokeStyle = C("rgba(80,88,94,0.16)");
         context.lineWidth = 0.7;
         context.beginPath();
         context.moveTo(ox + na.x * gw, oy + na.y * gh);
@@ -491,7 +497,7 @@ export default function OpeningFilm4() {
           const na = g.nodes[origin];
           const nb = g.nodes[ib];
           if (!na || !nb) return;
-          const rgb = AREA_RGB[na.area % AREA_RGB.length];
+          const rgb = AREA_RGB[(g.doc?.[origin] ?? na.area) % AREA_RGB.length];
           context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.9)`;
           context.lineWidth = 1.4;
           context.beginPath();
@@ -503,7 +509,7 @@ export default function OpeningFilm4() {
 
       const live = new Set<number>(grounded ? [origin, ...cited] : []);
       g.nodes.forEach((node, i) => {
-        const rgb = AREA_RGB[node.area % AREA_RGB.length];
+        const rgb = AREA_RGB[(g.doc?.[i] ?? node.area) % AREA_RGB.length];
         const isOrigin = grounded && i === origin;
         const isLit = live.has(i);
         const r = (isOrigin ? 4.4 : isLit ? 2.8 : 1.5) * node.radius;
@@ -511,7 +517,7 @@ export default function OpeningFilm4() {
           ? `rgb(${Math.min(255, rgb[0] + 50)},${rgb[1]},${rgb[2]})`
           : isLit
             ? `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.95)`
-            : `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.26)`;
+            : `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${dimAlpha(tone, 0.26)})`;
         context.beginPath();
         context.arc(ox + node.x * gw, oy + node.y * gh, r, 0, Math.PI * 2);
         context.fill();
@@ -540,7 +546,7 @@ export default function OpeningFilm4() {
 
     const draw = (t: number) => {
       try {
-        context.fillStyle = "#08090a";
+        context.fillStyle = C("#08090a");
         context.fillRect(0, 0, width, height);
 
         const bw = width * 0.97;
@@ -596,7 +602,13 @@ export default function OpeningFilm4() {
           frame = window.requestAnimationFrame(tick);
           return;
         }
-        if (playingRef.current) elapsedRef.current += (now - startRef.current) / 1000;
+        if (!playingRef.current) {
+          // Paused by the host (offscreen, hidden tab): hold the frame and draw nothing.
+          startRef.current = now;
+          frame = window.requestAnimationFrame(tick);
+          return;
+        }
+        elapsedRef.current += (now - startRef.current) / 1000;
         startRef.current = now;
         if (elapsedRef.current >= RUN) elapsedRef.current = 0;
         /*
@@ -622,7 +634,7 @@ export default function OpeningFilm4() {
 
     const stop = startLoop();
     return () => { cancelled = true; stop?.(); };
-  }, []);
+  }, [tone, compiled]);
 
   return (
     <div className="film">
