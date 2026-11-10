@@ -108,6 +108,8 @@ export const metadata = pageMetadata({
   description:
     "A two-arm run on the public GDP.pdf task set: the same model reading the raw PDF, then reading it with compiled context. Not comparable with published scores.",
   canonical: "/benchmarks/gdp-pdf",
+  // 2026-11-10 (founder direction): the evidence record stays reachable at its URL and is not featured or indexed.
+  index: false,
 });
 
 export default function GdpPdfBenchmarkPage() {

@@ -74,8 +74,9 @@ describe("the rendered /benchmarks page", () => {
     expect(text.toLowerCase().match(/\$[\d.]+\s*\/\s*page/g) ?? []).toEqual([]);
   });
 
-  it("links the sibling run without importing it", () => {
-    expect(html).toContain("/benchmarks/gdp-pdf");
+  /* 2026-11-10 (founder direction): intended re-pin. The GDP.pdf run page stays reachable at its URL, noindex, and unlinked. */
+  it("neither links nor imports the GDP.pdf run page", () => {
+    expect(html).not.toContain("/benchmarks/gdp-pdf");
     expect(read("app/benchmarks/page.tsx")).not.toMatch(/from\s+["'].*benchmarks\/gdp-pdf/);
   });
 
