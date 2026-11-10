@@ -87,20 +87,15 @@ function bound<T>(id: string, receiptId: string): { numbers: T; receipt: Evidenc
 /** How every figure on the band is printed: one formatter, so a receipt value cannot be restyled into another number. */
 export const formatFigure = ({ n, d }: Figure) => (d > 0 ? n.toFixed(d) : n.toLocaleString("en-US"));
 
-type TypeRow = { label_en: string; accuracy_percent: number; checks_passed: number; checks_total: number };
 const structure = bound<{ broken_links_in_output: number; documents_exercised: number }>("compilation-guarantees", "R-02");
 const recovery = bound<{ with_recovery: number; without_recovery: number }>("recovery-contribution-olmocr", "R-01");
-const byType = bound<TypeRow[]>("accuracy-by-document-type", "R-03");
-const row = (label: string) => {
-  const found = byType.numbers.find(entry => entry.label_en === label);
-  if (!found) throw new Error(`Home measure: claims pack has no "${label}" row`);
-  return found;
-};
-const weakest = row("Low-quality scans");
-const standard = row("Standard digital documents");
 const vault = r02.vault_compilation;
 
-/* FINAL-SPEC 2026-10-26 §0.3-10: receipts in their own order, R-01 -> R-02 -> R-03, so a phone does not open on "0". */
+/*
+  FINAL-SPEC 2026-10-26 §0.3-10: receipts in their own order, R-01 -> R-02, so a phone does not open on "0".
+  2026-11-10 (founder direction): the by-document-type row (R-03) left Home. Home is product copy and
+  does not lead with a weakness. The full per-type result stays in the R-03 receipt.
+*/
 export const HOME_MEASURES: readonly HomeMeasure[] = [
   {
     claim: "recovery-contribution-olmocr",
@@ -139,26 +134,6 @@ export const HOME_MEASURES: readonly HomeMeasure[] = [
         "제공된 문서 ", fig(structure.numbers.documents_exercised), "건 중 ", fig(vault.documents_compiled),
         "건을 컴파일했고, 확인할 수 없는 링크가 있는 ", fig(vault.documents_refused_for_broken_links),
         "건은 내보내지 않고 거부했습니다. ", ...structure.mustSay.ko,
-      ],
-    },
-  },
-  {
-    claim: "accuracy-by-document-type",
-    receipt: byType.receipt,
-    en: {
-      figure: [fig(weakest.accuracy_percent, 1), "%"],
-      label: ["of checks passed on low-quality scans"],
-      detail: [
-        fig(weakest.checks_passed), " of ", fig(weakest.checks_total), " checks on low-quality scans. ",
-        fig(standard.checks_passed), " of ", fig(standard.checks_total), " on standard digital documents. ", ...byType.mustSay.en,
-      ],
-    },
-    ko: {
-      figure: [fig(weakest.accuracy_percent, 1), "%"],
-      label: ["저품질 스캔본에서 통과한 검사 비율"],
-      detail: [
-        "저품질 스캔본 검사 ", fig(weakest.checks_total), "개 중 ", fig(weakest.checks_passed), "개, 표준 디지털 문서 ",
-        fig(standard.checks_total), "개 중 ", fig(standard.checks_passed), "개. ", ...byType.mustSay.ko,
       ],
     },
   },

@@ -324,6 +324,23 @@ describe("scheduled cadence", () => {
     expect((await at("2026-11-04T03:00:00Z")).map((entry) => entry.check)).toEqual(["runpod_daily_cost"]);
     expect(await at("2026-11-04T03:05:00Z")).toEqual([]);
   });
+
+  it("stops at one overall deadline: the hanging billing read is aborted and the expiry check is not started", async () => {
+    let signal: AbortSignal | undefined;
+    const hanging = vi.fn((_input: unknown, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      signal = init?.signal ?? undefined;
+      signal?.addEventListener("abort", () => reject(signal?.reason));
+    }));
+    const env = { TAVONEL_RUNPOD_DAILY_COST_CAP_USD: "40", TAVONEL_RUNPOD_API_KEY: "rp-test" };
+    const started = Date.now();
+    const results = await runScheduledOperationsChecks(new Date("2026-11-04T00:00:00Z"), env, hanging as unknown as typeof fetch, 30);
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(results).toEqual([
+      { check: "runpod_daily_cost", code: "CHECK_DEADLINE_EXCEEDED" },
+      { check: "release_row_expiry", code: "CHECK_DEADLINE_EXCEEDED" },
+    ]);
+    expect(signal?.aborted).toBe(true);
+  });
 });
 
 describe("with no receiver configured", () => {

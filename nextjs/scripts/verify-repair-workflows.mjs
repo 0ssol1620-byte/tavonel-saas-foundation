@@ -14,6 +14,7 @@ import { W2_D_INTAKE_STAGE1_AFFECTED_PATHS, W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FIL
 import { COMPILER_RELEASE_AFFECTED_PATHS, COMPILER_RELEASE_AFFECTED_UNIT_FILES, COMPILER_RELEASE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { SITE_POLISH_AFFECTED_PATHS, SITE_POLISH_AFFECTED_UNIT_FILES, SITE_POLISH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { LEGAL_SEMICOLONS_STATUS_AFFECTED_PATHS, LEGAL_SEMICOLONS_STATUS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+import { OVERLAP_AUDIT_AFFECTED_PATHS, OVERLAP_AUDIT_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { HOME_FILM_RERECORD_AFFECTED_PATHS, HOME_FILM_RERECORD_AFFECTED_UNIT_FILES, HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { CONSENT_POSTER_AFFECTED_PATHS, CONSENT_POSTER_AFFECTED_UNIT_FILES, CONSENT_POSTER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
@@ -29,6 +30,8 @@ import { OPS_BACKLOG_SLI_AFFECTED_PATHS, OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES } f
 import { PROCESSING_GA_AFFECTED_PATHS, PROCESSING_GA_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { TRIAL_TO_PAID_AFFECTED_PATHS, TRIAL_TO_PAID_AFFECTED_UNIT_FILES, TRIAL_TO_PAID_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { SLI_ALERT_NOISE_AFFECTED_PATHS, SLI_ALERT_NOISE_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { CONNECTORS_DEVELOPER_AFFECTED_PATHS, CONNECTORS_DEVELOPER_AFFECTED_UNIT_FILES, CONNECTORS_DEVELOPER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+import { REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS, REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
 const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -488,10 +491,10 @@ assert(REPAIR_NODE_EVIDENCE_CONTRACT_FILE===ciNodeSuites[0]&&REPAIR_NODE_GATE_RE
   'CI selector keeps exactly the registered Node evidence and Vitest gate receipt contracts, with finite endpoints and no product neighbor admission');
 // Current compile, navigation and version comparison ownership is finite and restated independently.
 const currentOwnerBindings = [
-  // EN-0c benchmarks path mask: four exact paths selecting seven direct suites, no browser suite.
-  { group: 'benchmarks-path-mask', paths: ['app/benchmarks/page.tsx', 'lib/benchmarks-page.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts'],
-    exportedPaths: BENCHMARKS_PATH_MASK_AFFECTED_PATHS, suites: ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/trust-page-answers.test.ts'], exportedSuites: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES,
-    neighbors: ['app/benchmarks/page.ts', 'app/benchmarks/gdp-pdf/page.tsx', 'lib/model-arena-page-data.tsx', 'components/benchmarks/arena-chart.tsx', 'content/benchmarks/model-arena-20260903.json'] },
+  // EN-0c benchmarks path mask, plus the 2026-11-10 public-copy cleanup: nine exact paths selecting eight direct suites, no browser suite.
+  { group: 'benchmarks-path-mask', paths: ['app/arena/opengraph-image.tsx', 'app/benchmarks/page.tsx', 'app/research/notes/opengraph-image.tsx', 'content/benchmarks/model-arena-20260903.json', 'lib/benchmarks-page.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts', 'scripts/benchmarks/build-model-arena-artifact.mjs'],
+    exportedPaths: BENCHMARKS_PATH_MASK_AFFECTED_PATHS, suites: ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/og-card-frame.test.ts', 'lib/public-copy-purge.test.ts', 'lib/seo-surface.test.ts', 'lib/trust-page-answers.test.ts'], exportedSuites: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES,
+    neighbors: ['app/benchmarks/page.ts', 'app/benchmarks/gdp-pdf/page.tsx', 'lib/model-arena-page-data.tsx', 'components/benchmarks/arena-chart.tsx', 'content/benchmarks/model-arena-20260904.json', 'app/research/opengraph-image.tsx', 'lib/public-copy-purge.ts'] },
   // OCR_PAGES_INCOMPLETE: four exact paths selecting three direct suites, no browser suite.
   { group: 'ocr-pages-incomplete-code', paths: ['lib/operations-p0.test.ts', 'lib/operations-p0.ts', 'lib/processing-receipts.test.ts', 'lib/processing-receipts.ts'],
     exportedPaths: OCR_PAGES_INCOMPLETE_AFFECTED_PATHS, suites: ['lib/documents-route.test.ts', 'lib/operations-p0.test.ts', 'lib/processing-receipts.test.ts'], exportedSuites: OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES,
@@ -657,12 +660,12 @@ for (const binding of [
     browsers: ['e2e/launch-qa-remote-mcp.spec.ts'],
     rows: ["['e2e/launch-qa-remote-mcp.spec.ts', ['launch-chromium']],"],
     neighbors: ['nextjs/app/api/mcp/other/route.ts', 'nextjs/app/api/mcp/oauth/revoke/route.ts', 'nextjs/app/.well-known/security.txt/route.ts', 'nextjs/app/oauth/callback/page.tsx', 'nextjs/lib/remote-mcp-tools.ts', 'nextjs/lib/security/route-classification.md', 'nextjs/e2e/launch-qa-remote-mcp-2.spec.ts'] },
-  // Enablement batch (codex/enablement-20261017): fifty-three exact paths selecting twenty-one direct suites and, since the
+  // Enablement batch (codex/enablement-20261017): fifty-three exact paths selecting nineteen direct suites and, since the
   // Phase 4 follow-ups (DELTA-REVIEW-2026-10-19 N-3), the four browser suites that read its pages, each with one reviewed row.
   { group: 'enablement-20261017', prefix: 'nextjs/', exportedPaths: ENABLEMENT_AFFECTED_PATHS, exportedSuites: ENABLEMENT_AFFECTED_UNIT_FILES,
     exportedBrowsers: ENABLEMENT_AFFECTED_BROWSER_FILES,
     paths: ['app/api/page.tsx', 'app/changelog/feed.xml/route.ts', 'app/cookbooks/opengraph-image.tsx', 'app/cookbooks/page.tsx', 'app/developers/page.tsx', 'app/guide/opengraph-image.tsx', 'app/guide/page.tsx', 'app/ko/guide/opengraph-image.tsx', 'app/ko/guide/page.tsx', 'app/product-polish.css', 'app/resources/page.tsx', 'components/api-try-it.tsx', 'components/changelog-list.tsx', 'components/guide/guide-media.module.css', 'components/guide/guide-media.tsx', 'components/guide/guide-page.tsx', 'components/guide/guide.module.css', 'e2e/keyless-try-it.spec.ts', 'lib/changelog.test.ts', 'lib/changelog.ts', 'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/guide-content.ts', 'lib/keyless-read.test.ts', 'lib/keyless-read.ts', 'lib/keyless-try-it.test.ts', 'lib/resources-hub.test.ts', 'public/guide/guide-1-explore-desktop.en.vtt', 'public/guide/guide-1-explore-desktop.jpg', 'public/guide/guide-1-explore-desktop.ko.vtt', 'public/guide/guide-1-explore-desktop.mp4', 'public/guide/guide-1-explore-phone.en.vtt', 'public/guide/guide-1-explore-phone.jpg', 'public/guide/guide-1-explore-phone.ko.vtt', 'public/guide/guide-1-explore-phone.mp4', 'public/guide/guide-2-mcp-desktop.en.vtt', 'public/guide/guide-2-mcp-desktop.jpg', 'public/guide/guide-2-mcp-desktop.ko.vtt', 'public/guide/guide-2-mcp-desktop.mp4', 'public/guide/guide-2-mcp-phone.en.vtt', 'public/guide/guide-2-mcp-phone.jpg', 'public/guide/guide-2-mcp-phone.ko.vtt', 'public/guide/guide-2-mcp-phone.mp4', 'public/guide/guide-3-api-desktop.en.vtt', 'public/guide/guide-3-api-desktop.jpg', 'public/guide/guide-3-api-desktop.ko.vtt', 'public/guide/guide-3-api-desktop.mp4', 'public/guide/guide-3-api-phone.en.vtt', 'public/guide/guide-3-api-phone.jpg', 'public/guide/guide-3-api-phone.ko.vtt', 'public/guide/guide-3-api-phone.mp4', 'public/guide/manifest.json'],
-    suites: ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/brand-tokens.test.ts', 'lib/changelog.test.ts', 'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/design-tokens.test.ts', 'lib/developer-snippets.test.ts', 'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/guide-content.test.ts', 'lib/keyless-read.test.ts', 'lib/keyless-try-it.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/product-claims-sync.test.ts', 'lib/resources-hub.test.ts', 'lib/seo-surface.test.ts', 'lib/site-nav-model.test.ts', 'lib/trust-page-answers.test.ts'],
+    suites: ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/brand-tokens.test.ts', 'lib/changelog.test.ts', 'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/design-tokens.test.ts', 'lib/developer-snippets.test.ts', 'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/guide-content.test.ts', 'lib/keyless-read.test.ts', 'lib/keyless-try-it.test.ts', 'lib/product-claims-sync.test.ts', 'lib/resources-hub.test.ts', 'lib/seo-surface.test.ts', 'lib/site-nav-model.test.ts', 'lib/trust-page-answers.test.ts'],
     browsers: ['e2e/brand-tokens.spec.ts', 'e2e/keyless-try-it.spec.ts', 'e2e/p4-followups.spec.ts', 'e2e/templates.spec.ts'],
     rows: ["['e2e/brand-tokens.spec.ts', ['1440']],", "['e2e/keyless-try-it.spec.ts', ['1440', '390']],", "['e2e/p4-followups.spec.ts', ['1440']],", "['e2e/templates.spec.ts', ['1440']],"],
     neighbors: ['nextjs/app/guide/layout.tsx', 'nextjs/components/guide/guide-media.test.tsx', 'nextjs/lib/changelog.tsx', 'nextjs/lib/keyless-read-v2.ts', 'nextjs/public/guide/guide-4-new-desktop.mp4', 'nextjs/public/guide/README.md', 'nextjs/app/benchmarks/[slug]/page.tsx'] },
@@ -745,6 +748,14 @@ for (const binding of [
     browsers: ['e2e/operations.spec.ts'],
     rows: ["['e2e/operations.spec.ts', ['1440']],"],
     neighbors: ['nextjs/e2e/operations-p0.spec.ts', 'nextjs/e2e/operation.spec.ts', 'nextjs/e2e/operations.spec.tsx', 'e2e/operations.spec.ts'] },
+  // overlap-audit-20261110: two exact paths, no direct suite, one browser suite with its audit row.
+  { group: 'overlap-audit-20261110', prefix: 'nextjs/', exportedPaths: OVERLAP_AUDIT_AFFECTED_PATHS, exportedSuites: [],
+    exportedBrowsers: OVERLAP_AUDIT_AFFECTED_BROWSER_FILES,
+    paths: ['e2e/overlap-audit.spec.ts', 'e2e/support/overlap.ts'],
+    suites: [],
+    browsers: ['e2e/overlap-audit.spec.ts'],
+    rows: ["['e2e/overlap-audit.spec.ts', ['audit']],"],
+    neighbors: ['nextjs/e2e/overlap-audit-2.spec.ts', 'nextjs/e2e/support/overlap.tsx', 'nextjs/e2e/support/overlaps.ts', 'e2e/overlap-audit.spec.ts'] },
   // B35 alert delivery (codex/ops-alert-delivery-20261102): four exact paths, eight direct suites, no browser suite.
   { group: 'operational-sli-alert-delivery', prefix: 'nextjs/', exportedPaths: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS, exportedSuites: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
@@ -801,6 +812,22 @@ for (const binding of [
     browsers: ['e2e/billing-lifecycle.spec.ts'],
     rows: ["['e2e/billing-lifecycle.spec.ts', ['audit', 'audit-768', 'audit-1280']],"],
     neighbors: ['nextjs/app/api/collections/[id]/promote/route.tsx', 'nextjs/components/processing-consent-panel.module.scss', 'nextjs/lib/activation-cohort.ts', 'nextjs/lib/cookbook-contents.ts', 'lib/keyword-map.ts', 'nextjs/e2e/billing-lifecycle.spec.tsx', 'nextjs/app/api/collections/[id]/search/route.tsx'] },
+  // connectors-developer-20261110: four exact paths, nine direct suites, the one browser suite it edits.
+  { group: 'connectors-developer-20261110', prefix: 'nextjs/', exportedPaths: CONNECTORS_DEVELOPER_AFFECTED_PATHS, exportedSuites: CONNECTORS_DEVELOPER_AFFECTED_UNIT_FILES,
+    exportedBrowsers: CONNECTORS_DEVELOPER_AFFECTED_BROWSER_FILES,
+    paths: ['app/api/connections/route.ts', 'app/api/v1/oauth-connectors/authorize/route.ts', 'components/connections-panel.tsx', 'e2e/connection-sync-status.spec.ts'],
+    suites: ['lib/billing-product-access.test.ts', 'lib/connection-sync-lag.test.ts', 'lib/connector-contract.test.ts', 'lib/connector-oauth-route.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/plan-entitlement.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts'],
+    browsers: ['e2e/connection-sync-status.spec.ts'],
+    rows: ["['e2e/connection-sync-status.spec.ts', ['1440', '390']],"],
+    neighbors: ['nextjs/app/api/connections/[id]/page.tsx', 'nextjs/app/api/connections/route.tsx', 'nextjs/app/api/v1/oauth-connectors/authorize/page.tsx', 'nextjs/components/connections-panel.module.css', 'nextjs/e2e/connection-sync-status-2.spec.ts', 'components/connections-panel.tsx'] },
+  // revoke-not-plan-gated-20261110: three exact paths, six direct suites, no browser suite.
+  { group: 'revoke-not-plan-gated-20261110', prefix: 'nextjs/', exportedPaths: REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS, exportedSuites: REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['app/api/connections/[id]/route.ts', 'app/api/v1/oauth-connectors/connections/[id]/route.ts', 'lib/connection-revoke-not-plan-gated.test.ts'],
+    suites: ['lib/connection-revoke-not-plan-gated.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/google-drive-viewer-link-off.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/app/api/connections/[id]/revoke/route.ts', 'nextjs/app/api/v1/oauth-connectors/connections/[id]/page.tsx', 'nextjs/lib/connection-revoke-not-plan-gated.ts', 'nextjs/lib/connection-revoke.test.ts', 'app/api/connections/[id]/route.ts'] },
   // sli-alert-noise-20261109: three exact paths, ten direct suites, no browser suite.
   { group: 'sli-alert-noise-20261109', prefix: 'nextjs/', exportedPaths: SLI_ALERT_NOISE_AFFECTED_PATHS, exportedSuites: SLI_ALERT_NOISE_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
