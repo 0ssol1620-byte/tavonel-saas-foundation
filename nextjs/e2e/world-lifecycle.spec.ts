@@ -71,6 +71,10 @@ async function mockWorkspace(page: Page, reviewRequired = false, artifactManifes
   await page.route("**/api/compile-jobs", route =>
     route.fulfill({ json: { code: "OK", jobs: [] } })
   );
+  // The drop zone's connector chips read the provider list (2026-11-10). No provider is configured here.
+  await page.route("**/api/v1/oauth-connectors", route =>
+    route.fulfill({ json: { code: "OK", apiVersion: 1, providers: [], connections: [] } })
+  );
   await page.route("**/api/documents/*/source?**", route => {
     expect(route.request().headers().authorization).toMatch(/^Bearer /);
     return route.fulfill({ contentType: "application/pdf", body: sourcePreviewPdfFixture() });

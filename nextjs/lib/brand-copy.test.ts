@@ -880,12 +880,13 @@ describe("public copy", () => {
     expect(workspace).not.toContain(
       '{ name: "Google Drive", availability: "Beta" }'
     );
-    expect(workspace).toContain(
-      '{ name: "Google Drive", availability: "Read-only" }'
-    );
-    expect(workspace).toContain(
-      '{ name: "File Server", availability: "Assisted setup" }'
-    );
+    // Live QA 2026-11-10: the chips moved to lib/workspace-source-choices.ts, which names only
+    // configured OAuth providers and labels the agent sources by how they work.
+    const chips = read("lib/workspace-source-choices.ts");
+    expect(chips).toContain('availability: "Read-only"');
+    expect(chips).toContain('availability: "Local source agent"');
+    expect(chips).not.toContain("Assisted setup");
+    expect(chips).not.toContain('"Beta"');
   });
 
   it("keeps internal qualification vocabulary out of the integration buying path", () => {
