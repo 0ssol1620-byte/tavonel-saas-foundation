@@ -52,7 +52,8 @@ export async function registerCollectionArtifact(
         p_workspace_key: input.workspaceKey,
         p_collection_id: input.collectionId,
         p_manifest_digest: input.manifestDigest,
-        p_document_ids: [...input.documentIds],
+        // A segmented source names its parent once per range; the registry names a document once.
+        p_document_ids: [...new Set(input.documentIds)],
       }),
     });
     const body = await response.json().catch(() => null) as { message?: unknown; leaseSeconds?: unknown } | null;

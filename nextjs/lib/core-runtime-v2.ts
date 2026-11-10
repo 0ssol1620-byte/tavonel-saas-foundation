@@ -272,6 +272,18 @@ export function productCoreV2RevisionId(
   }))}`;
 }
 
+/**
+ * The Core's source identity for one compiled document (`native_id`, unique per request).
+ *
+ * A page range of a segmented source (ADR-0006) is its own Core document, so it is its own source:
+ * the parent's identity and the original pages it holds. The collection identity above stays the
+ * parent's, so how a source was cut never changes which collection it belongs to.
+ */
+export function coreNativeId(document: CollectionOcrInput) {
+  const source = document.logicalSourceId ?? document.documentId;
+  return document.pageStart0 === undefined ? source : `${source}:p${document.pageStart0 + 1}-${document.pageCount}`;
+}
+
 export function buildProductCoreV2Request(
   workspaceId: string,
   documents: CollectionOcrInput[],
@@ -282,7 +294,7 @@ export function buildProductCoreV2Request(
   expectedSourceScope?: CustomerDataScope,
   logicalCollectionKey?: string,
 ): ProductCoreV2CompileRequest {
-  const nativeIds = documents.map(document => document.logicalSourceId ?? document.documentId);
+  const nativeIds = documents.map(coreNativeId);
   if (nativeIds.some(id => !IDENTIFIER.test(id)) || new Set(nativeIds).size !== nativeIds.length) {
     throw new Error("COLLECTION_SOURCE_IDENTITY_INVALID");
   }
@@ -327,12 +339,12 @@ export function buildProductCoreV2Request(
     documents: [...documents]
       .sort((left, right) => left.documentId.localeCompare(right.documentId))
       .map((document) => ({
-        nativeId: document.logicalSourceId ?? document.documentId,
+        nativeId: coreNativeId(document),
         connectorType: "foundation-r2" as const,
         immutableObjectKey: document.sourceImmutableKey,
         ocrObjectKey: document.ocrJsonKey,
         contentSha256: document.inputSha256,
-        title: `Document ${document.documentId.slice(0, 8)}`,
+        title: `Document ${document.documentId.slice(0, 8)}${document.pageStart0 === undefined ? "" : ` pages ${document.pageStart0 + 1}-${document.pageCount}`}`,
         sourceFilename: `${document.documentId}.pdf`,
         pageCount: document.pageCount,
         ...(document.ocrSchemaVersion === "tavonel.ocr_result.v3"
@@ -625,7 +637,7 @@ export function projectProductCoreV2Candidate(
           // akc_cir.identity.source_id v1: length-delimited ASCII identifiers.
           // This names the exact Core review reason/source-manifest row.
           coreSourceId: `src_${sha256(`akc.identity.v1\x1esrc\x1e${[
-            workspaceId!.trim(), "foundation-r2", (document.logicalSourceId ?? document.documentId).trim(),
+            workspaceId!.trim(), "foundation-r2", coreNativeId(document).trim(),
           ].map((part) => `${part.length}:${part}`).join("\x1f")}`)}`,
           readerRevision: document.readerRevision,
           readerBindingSha256: document.readerBindingSha256,
