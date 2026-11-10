@@ -8235,7 +8235,9 @@ test('affected processing-ga-20261109 owner: 1 exact path selects 2 direct suite
   const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
   assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['processing-ga-20261109'], [], suites, [], []]);
   assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
-  for (const adjacent of ['nextjs/lib/customer-data-admission.tsx', 'nextjs/lib/customer-data-admission-routes.ts', 'nextjs/lib/library-shadow.ts', 'lib/customer-data-admission.ts']) {
+  // library-shadow.ts reads the named cohort and keeps its own owner (main, W2-B2). It is not this owner's.
+  assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/lib/library-shadow.ts')).map(o => o.group), ['library-organize-b2']);
+  for (const adjacent of ['nextjs/lib/customer-data-admission.tsx', 'nextjs/lib/customer-data-admission-routes.ts', 'nextjs/lib/customer-data-admission.mjs', 'lib/customer-data-admission.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
