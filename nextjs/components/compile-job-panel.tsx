@@ -3,7 +3,7 @@
 import type { BlockerResolution, CompileBlocker, CompileState } from "@/lib/compile-job-store";
 import type { CorpusProgress } from "@/lib/corpus-batching";
 import type { CompileSizeLimit } from "@/lib/compile-job-client";
-import { blockedPanelCopy, failureSentence, isSizeLimitFailure, REUPLOAD_ONLY_BLOCKER_REASONS, sizeLimitFailureCopy } from "@/lib/workspace-failure-copy";
+import { blockedPanelCopy, failureSentence, isSizeLimitFailure, REUPLOAD_ONLY_BLOCKER_REASONS, sizeLimitFailureCopy, type PageLocale } from "@/lib/workspace-failure-copy";
 
 /*
   What the server is doing with a compile, and what the customer is allowed to do about it.
@@ -96,11 +96,11 @@ export function CompileJobPanel({
   onResolve,
   onCancel,
   onOpenPart,
-  languages = [],
+  locale = "en",
 }: {
   job: CompileJobView;
-  /** The browser's language list; Korean or English for the size-refusal copy. */
-  languages?: readonly string[];
+  /** The page's language (`pageLocale()`), never the browser's: the size and blocked copy follow it. */
+  locale?: PageLocale;
   corpus?: (CorpusProgress & { parts: Array<{ jobId: string; batchIndex: number | null; state: CompileState }> }) | null;
   names?: Record<string, string>;
   busy?: boolean;
@@ -114,8 +114,8 @@ export function CompileJobPanel({
   const undecided = job.blocked.length > 0 && !job.blockedResolution && !settled;
   const security = job.blocked.filter((entry) => entry.kind === "security");
   const clean = Math.max(0, job.documentsTotal - job.blocked.length);
-  const sizeCopy = sizeLimitFailureCopy(languages);
-  const blockedCopy = blockedPanelCopy(languages);
+  const sizeCopy = sizeLimitFailureCopy(locale);
+  const blockedCopy = blockedPanelCopy(locale);
   /*
     F1 (2026-11-09): `retry_eligible` clears the blockers and the worker looks again, which helps a
     file that was late. A file the reader sent to operator review has an immutable review result,
@@ -197,10 +197,12 @@ export function CompileJobPanel({
                   ))}
                 </>
               ) : null}
-              {Object.keys(job.sizeLimit.counts).length > 0 ? (
+              {/* Counts are said in words; a key with no word is internal and is not printed (founder 2026-11-10). */}
+              {Object.keys(job.sizeLimit.counts).some((name) => Object.hasOwn(sizeCopy.countLabels, name)) ? (
                 <>
                   <dt>{sizeCopy.counts}</dt>
-                  <dd>{Object.entries(job.sizeLimit.counts).map(([name, value]) => `${name} ${formatCount(value)}`).join(" · ")}</dd>
+                  <dd>{Object.entries(job.sizeLimit.counts).filter(([name]) => Object.hasOwn(sizeCopy.countLabels, name))
+                    .map(([name, value]) => `${sizeCopy.countLabels[name]} ${formatCount(value)}`).join(" · ")}</dd>
                 </>
               ) : null}
             </dl>

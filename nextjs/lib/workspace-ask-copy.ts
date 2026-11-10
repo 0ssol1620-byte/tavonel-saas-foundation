@@ -59,18 +59,14 @@ const SOURCE: Record<"en" | "ko", AskSourceCopy> = {
   },
 };
 
-/** `languages` is the browser's preference list (navigator.languages); only its first entry counts. */
-function language(languages: readonly string[]): "en" | "ko" {
-  return languages[0]?.toLowerCase().startsWith("ko") ? "ko" : "en";
-}
-
-export function askAbstentionCopy(reason: string | null, languages: readonly string[] = []): AskAbstentionCopy {
+/** `locale` is the page's language (`pageLocale()`), never the browser's preference list. */
+export function askAbstentionCopy(reason: string | null, locale: "en" | "ko" = "en"): AskAbstentionCopy {
   if (reason !== EVIDENCE_EXCEEDS_ANSWER_LIMIT) return NO_EVIDENCE;
-  return OVERFLOW[language(languages)];
+  return OVERFLOW[locale];
 }
 
-export function askSourceCopy(languages: readonly string[] = []): AskSourceCopy {
-  return SOURCE[language(languages)];
+export function askSourceCopy(locale: "en" | "ko" = "en"): AskSourceCopy {
+  return SOURCE[locale];
 }
 
 /*

@@ -439,6 +439,10 @@ function compiledCitation(evidenceId: string, unitId: string, bbox1000: [number,
   };
 }
 
+/*
+  The page decides the language, not the browser (founder, 2026-11-10): the workspace is English, so a
+  ko-KR browser reads the same English copy. Both browser locales run below to hold that.
+*/
 const ASK_OVERFLOW_COPY = {
   "en-US": {
     result: "The selected evidence is too long for a complete answer, so no partial answer is shown. Open a cited source region below where one is available, or ask a narrower question.",
@@ -446,13 +450,6 @@ const ASK_OVERFLOW_COPY = {
     unavailable: "This cited source region cannot be opened: the active World has no single region matching its evidence, version, page and box. The citation stays listed; no location is guessed.",
     unverified: "This cited source region cannot be opened here: the loaded World is not confirmed as the same collection and revision that answered this question, or is still loading. The citation stays listed; no location is guessed.",
     missing: "unavailable",
-  },
-  "ko-KR": {
-    result: "선택된 근거가 너무 길어 완전한 답변을 표시할 수 없으며, 일부만 잘라낸 답변은 표시하지 않습니다. 열 수 있는 인용 원문 영역이 있으면 아래에서 열어 보거나 더 좁은 질문을 해 주세요.",
-    action: "더 좁은 질문하기",
-    unavailable: "이 인용 원문 영역은 열 수 없습니다. 활성 World에 근거, 버전, 페이지, 영역이 모두 일치하는 영역이 하나로 확인되지 않습니다. 인용은 그대로 표시되며 위치를 추측하지 않습니다.",
-    unverified: "이 인용 원문 영역은 여기서 열 수 없습니다. 불러온 World가 이 질문에 답한 것과 같은 컬렉션·리비전으로 확인되지 않았거나 아직 불러오는 중입니다. 인용은 그대로 표시되며 위치를 추측하지 않습니다.",
-    missing: "정보 없음",
   },
 } as const;
 
@@ -493,11 +490,11 @@ async function routeOverflowAsk(page: Page, reads: string[], served: string[]) {
 }
 
 for (const locale of ["en-US", "ko-KR"] as const) {
-  test.describe(`overflowing compiled Ask in ${locale}`, () => {
+  test.describe(`overflowing compiled Ask in a ${locale} browser, on the English workspace`, () => {
     test.use({ locale });
 
     test("opens only the exactly bound source region and marks the rest unavailable", async ({ page }) => {
-      const copy = ASK_OVERFLOW_COPY[locale];
+      const copy = ASK_OVERFLOW_COPY["en-US"];
       const pageErrors: string[] = [];
       page.on("pageerror", error => pageErrors.push(error.message));
       await installSession(page);
@@ -591,7 +588,7 @@ for (const locale of ["en-US", "ko-KR"] as const) {
     });
 
     test("opens nothing from a selected candidate beside the active World that answered, though its regions are identical", async ({ page }) => {
-      const copy = ASK_OVERFLOW_COPY[locale];
+      const copy = ASK_OVERFLOW_COPY["en-US"];
       const pageErrors: string[] = [];
       page.on("pageerror", error => pageErrors.push(error.message));
       await installSession(page);
@@ -623,7 +620,7 @@ for (const locale of ["en-US", "ko-KR"] as const) {
     });
 
     test("closes an opened source region when a new question clears the answer, and does not reopen it", async ({ page }) => {
-      const copy = ASK_OVERFLOW_COPY[locale];
+      const copy = ASK_OVERFLOW_COPY["en-US"];
       const pageErrors: string[] = [];
       page.on("pageerror", error => pageErrors.push(error.message));
       await installSession(page);
@@ -667,7 +664,7 @@ for (const locale of ["en-US", "ko-KR"] as const) {
     });
 
     test("closes an opened source region as soon as the selection moves to another revision", async ({ page }) => {
-      const copy = ASK_OVERFLOW_COPY[locale];
+      const copy = ASK_OVERFLOW_COPY["en-US"];
       const pageErrors: string[] = [];
       page.on("pageerror", error => pageErrors.push(error.message));
       await installSession(page);

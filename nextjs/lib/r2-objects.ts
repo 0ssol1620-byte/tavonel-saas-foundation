@@ -38,7 +38,28 @@ import { OCR_JSON_MAX_BYTES } from "../../shared/intakeCeiling";
   stage 0 (80 pages), the same per page at any other stage. The worker's stage table matches it.
 */
 export const MAX_DERIVED_JSON_BYTES = OCR_JSON_MAX_BYTES;
-export const MAX_COLLECTION_JSON_BYTES = 32 * 1024 * 1024;
+/*
+  The largest stored candidate World, and the same number as Core's output budget
+  (`akc_product_core.compiler.OUTPUT_BUDGET_BYTES`), so the two sides refuse at one size.
+
+  It was 32 MiB, a constant with no platform behind it: R2 takes a 5 GiB single PUT, and the Core
+  answer is streamed (one ran past 80 MiB into this side on 2026-11-09, cjob-749b). Six manuals --
+  6,072 regions, cjob-fac5555a, 2026-11-10 -- already crossed it, and a corpus part is twelve
+  documents (`COMPILE_MAX_DOCUMENTS`). Re-derived from a measurement (manual-shaped synthetic
+  corpus, ~1,012 regions a document, live Core 733f4453; receipts in
+  market-20261104/w2/OUT-20261110/):
+
+    documents  Core response   Core peak RSS   this side: stored   this side: peak RSS
+        6         87.5 MB          578 MiB
+       12        176.2 MB        1,102 MiB         101.1 MB              902 MiB
+
+  192 MiB holds a twelve-document part at that density with ~10% to spare, inside the 2 GB both
+  functions run with. It is a size bound, not an integrity check: every digest, receipt and
+  validation check is unchanged, and an output over it is still refused by name with its numbers.
+  What it does not settle: Core time (12 documents took 28 s locally against a 52 s Core budget)
+  and R2 transfer time inside the 8 s object timeouts are unmeasured on the deployed functions.
+*/
+export const MAX_COLLECTION_JSON_BYTES = 192 * 1024 * 1024;
 /**
  * The ocr-review.json read bound, equal to the worker's `MAX_RECEIPT_BYTES` (src/sanitize.ts).
  *

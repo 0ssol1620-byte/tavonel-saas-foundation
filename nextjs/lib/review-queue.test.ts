@@ -836,11 +836,11 @@ describe("review reason chip", () => {
   const raw = "CONTRADICTION_GROUP_TOO_LARGE:contradiction_group_91a2:claims=216:pairs=23220";
   const input = { ...base, documentIds: ["doc-x"], blocked: [], documents: [], reviewReasons: [raw], evidence: [], decisions: [], names: {} };
 
-  it("prints the sentence, then Reference and the raw code, in the browser's language", () => {
+  it("prints the sentence, then Reference and the raw code, in the page's language", () => {
     const en = renderToStaticMarkup(createElement(ReviewQueue, { input }));
     expect(en).toContain("<em>216 statements on one topic may conflict with each other.");
     expect(en).toContain(`Reference <code>${raw}</code>`);
-    const ko = renderToStaticMarkup(createElement(ReviewQueue, { input, languages: ["ko-KR"] }));
+    const ko = renderToStaticMarkup(createElement(ReviewQueue, { input, locale: "ko" }));
     expect(ko).toContain("<em>한 주제에 서로 어긋날 수 있는 진술이 216개 있습니다.");
     expect(ko).toContain(`참조 <code>${raw}</code>`);
   });
