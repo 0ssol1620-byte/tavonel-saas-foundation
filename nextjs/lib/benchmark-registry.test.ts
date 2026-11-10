@@ -524,7 +524,7 @@ describe("the /benchmarks page", () => {
     // The repository is public, so the board, its data and its builder do not ship at all.
     for (const file of [
       "content/benchmarks/model-arena-20260903.json", "lib/model-arena-page-data.ts", "components/benchmarks/arena-charts.tsx",
-      "components/benchmarks/arena-charts.module.css", "scripts/benchmarks/build-model-arena-artifact.mjs", "app/arena/page.tsx",
+      "components/benchmarks/arena-charts.module.css", "scripts/benchmarks/build-model-arena-artifact.mjs", "app/arena/page.tsx", "app/arena/opengraph-image.tsx",
     ]) {
       expect(existsSync(new URL(`../${file}`, import.meta.url)), `${file} does not exist`).toBe(false);
     }

@@ -2003,7 +2003,7 @@ export const ASK_QUALITY_EVAL_AFFECTED_PATHS = Object.freeze([
 ]);
 export const ASK_QUALITY_EVAL_AFFECTED_UNIT_FILES = Object.freeze(['eval/ask-quality/metrics.test.ts']);
 export const BENCHMARKS_PATH_MASK_AFFECTED_PATHS = Object.freeze([
-  'app/benchmarks/page.tsx', 'app/research/notes/opengraph-image.tsx', 'content/benchmarks/model-arena-20260903.json',
+  'app/arena/opengraph-image.tsx', 'app/benchmarks/page.tsx', 'app/research/notes/opengraph-image.tsx', 'content/benchmarks/model-arena-20260903.json',
   'lib/benchmarks-page.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts',
   'scripts/benchmarks/build-model-arena-artifact.mjs',
 ]);
