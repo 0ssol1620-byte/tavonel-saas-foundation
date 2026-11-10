@@ -139,8 +139,41 @@ jobs:
       # questions from inside the 1440 project (see that file's header for why it launches its own
       # browser). Until 2026-09-17 that test was gated on a project no job runs and never launched;
       # once it did, this job failed at `browserType.launch: Executable doesn't exist`.
+      #
+      # Cached, because the install is apt-bound. On 2026-11-10 (PR #234, run 42804611180) WebKit's
+      # system packages -- 185 debs, 139 MB, mostly GStreamer -- took 38m01s (60.8 kB/s) on attempt 2
+      # and 19m23s (119 kB/s) on attempt 3 of a 45-minute job, against about 15 s for every browser
+      # download together. So both the browser binaries and the .deb archives are cached. The key carries the installed @playwright/test
+      # (it pins the browser builds and the package list) and the runner image (it pins the distro
+      # and the deb versions). On a hit the install below downloads no browser and apt finds every
+      # archive locally, so it only unpacks; a new image restores the previous archives and apt
+      # fetches just the debs that changed. Debs are cached by glob: apt's root-owned lock and
+      # partial/ are unreadable to the save step.
+      #
+      # `--only-shell`: every project in this job is headless Chromium, which Playwright runs on
+      # chromium-headless-shell, so the full Chrome for Testing build was downloaded and never run.
+      - name: Read the Playwright version and runner image
+        id: playwright
+        run: |
+          echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "image=${ImageOS}-${ImageVersion}" >> "$GITHUB_OUTPUT"
+      - name: Restore Playwright browsers and their apt archives
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/.cache/apt-archives/*.deb
+          key: product-qa-pw-${{ steps.playwright.outputs.version }}-${{ steps.playwright.outputs.image }}
+          restore-keys: product-qa-pw-${{ steps.playwright.outputs.version }}-
+      - name: Keep apt's downloaded archives in the cached directory
+        run: |
+          mkdir -p ~/.cache/apt-archives/partial
+          printf 'Dir::Cache::Archives "%s";\nAPT::Keep-Downloaded-Packages "true";\n' "$HOME/.cache/apt-archives" | sudo tee /etc/apt/apt.conf.d/99-product-qa-archives
       - name: Install Chromium and WebKit runtimes
-        run: pnpm exec playwright install --with-deps chromium webkit
+        run: |
+          pnpm exec playwright install --with-deps --only-shell chromium webkit
+          # Drop archives the mirror no longer serves, so a restored cache does not grow every image.
+          sudo apt-get autoclean -qq
       # One command, seven projects, one build.
       #
       # The webServer in playwright.config.ts runs `pnpm exec next build && pnpm start` with
