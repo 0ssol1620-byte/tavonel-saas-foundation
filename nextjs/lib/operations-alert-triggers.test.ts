@@ -12,6 +12,8 @@ import {
   alertOcrFailure,
   checkReleaseRowExpiry,
   checkRunPodDailyCost,
+  ocrSpendStop,
+  resetOcrSpendStopCache,
   MCP_SPIKE_MIN_CALLS,
   OPERATIONS_ALERTS_RUNBOOK_URL,
   recordMcpToolCall,
@@ -90,18 +92,21 @@ describe("compile job worker pages", () => {
 });
 
 describe("OCR settlement pages", () => {
-  it("pages OCR_TIMEOUT_OR_NETWORK and OCR_RESPONSE_INVALID, and nothing else", async () => {
+  it("pages OCR_TIMEOUT_OR_NETWORK, OCR_HTTP_UNAVAILABLE and OCR_RESPONSE_INVALID, and nothing else", async () => {
     expect(await alertOcrFailure({ workspaceKey: "pilot-ops01", documentId: DOC, reasonCode: "OCR_TIMEOUT_OR_NETWORK", outcome: "released" }, NOW)).toMatchObject({ code: "ALERT_DELIVERED" });
+    // GA gap 4: the reader answering 429/5xx through every retry settles released, like a timeout, and pages like one.
+    expect(await alertOcrFailure({ workspaceKey: "pilot-ops01", documentId: DOC, reasonCode: "OCR_HTTP_UNAVAILABLE", outcome: "released" }, NOW)).toMatchObject({ code: "ALERT_DELIVERED" });
     expect(await alertOcrFailure({ workspaceKey: "pilot-ops01", documentId: DOC, reasonCode: "OCR_RESPONSE_INVALID", outcome: "operator_review" }, NOW)).toMatchObject({ code: "ALERT_DELIVERED" });
     // The page says what the settlement did, never a state it did not report.
     expect(posts.map((post) => String(post.summary).split("; ")[1])).toEqual([
-      "the reservation was released at no charge", "the reservation is held for operator review",
+      "the reservation was released at no charge", "the reservation was released at no charge", "the reservation is held for operator review",
     ]);
-    for (const reasonCode of ["OCR_COMPLETED", "CDR_PERMANENT_REJECT", "GPU_NOT_DISPATCHED"]) {
+    for (const reasonCode of ["OCR_COMPLETED", "CDR_PERMANENT_REJECT", "GPU_NOT_DISPATCHED", "OCR_HTTP_REJECTED"]) {
       expect(await alertOcrFailure({ workspaceKey: "pilot-ops01", documentId: DOC, reasonCode }, NOW)).toBeNull();
     }
-    expect(posts.map((post) => post.service)).toEqual(["runpod", "runpod"]);
-    expect(String(posts[1]!.summary)).toContain("OCR_RESPONSE_INVALID");
+    expect(posts.map((post) => post.service)).toEqual(["runpod", "runpod", "runpod"]);
+    expect(String(posts[1]!.summary)).toContain("OCR_HTTP_UNAVAILABLE");
+    expect(String(posts[2]!.summary)).toContain("OCR_RESPONSE_INVALID");
   });
 });
 
@@ -199,6 +204,69 @@ describe("RunPod daily cost", () => {
       expect(await checkRunPodDailyCost(NOW, env, fetcher as unknown as typeof fetch)).toMatchObject({ code: "RUNPOD_BILLING_UNREADABLE" });
     }
     expect(posts).toEqual([]);
+  });
+});
+
+describe("daily OCR spend stop (GA gap 2)", () => {
+  const billing = (totalAmount: unknown) => vi.fn(async () =>
+    new Response(JSON.stringify({ records: [{ startTime: "2026-11-04T00:00:00Z", totalAmount }] }), { status: 200 }));
+  const env = { TAVONEL_RUNPOD_DAILY_HARD_STOP_USD: "40", TAVONEL_RUNPOD_API_KEY: "rp-test" };
+  beforeEach(() => resetOcrSpendStopCache());
+
+  it("admits and reads nothing when no stop is set, keeping today's alert-only behaviour", async () => {
+    const fetcher = vi.fn();
+    for (const value of [undefined, "", "0", "-5", "forty"]) {
+      expect(await ocrSpendStop(NOW, { TAVONEL_RUNPOD_DAILY_HARD_STOP_USD: value, TAVONEL_RUNPOD_API_KEY: "rp-test" }, fetcher), String(value)).toBeNull();
+    }
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(posts).toEqual([]);
+  });
+
+  it("admits below the stop without paging", async () => {
+    expect(await ocrSpendStop(NOW, env, billing(39.99))).toBeNull();
+    expect(posts).toEqual([]);
+  });
+
+  it("refuses at the stop with a named code and one critical cost page per billing day", async () => {
+    expect(await ocrSpendStop(NOW, env, billing(40))).toBe("OCR_DAILY_SPEND_STOP");
+    expect(posts).toHaveLength(1);
+    expect(posts[0]).toMatchObject({ kind: "cost", severity: "critical", service: "runpod", unit: "usd", currentValue: 40, thresholdValue: 40 });
+    expect(String(posts[0]!.summary)).toContain("OCR_DAILY_SPEND_STOP");
+    expect(JSON.stringify(posts[0])).not.toContain("rp-test");
+    // The next refusal on this instance inside the dedupe window does not page again.
+    expect(await ocrSpendStop(NOW + 1_000, env, billing(41))).toBe("OCR_DAILY_SPEND_STOP");
+    expect(posts).toHaveLength(1);
+  });
+
+  it("fails closed when the stop is set and spend cannot be measured", async () => {
+    for (const [label, fetcher, environment] of [
+      ["no key", vi.fn(), { TAVONEL_RUNPOD_DAILY_HARD_STOP_USD: "40" }],
+      ["401", vi.fn(async () => new Response("no", { status: 401 })), env],
+      ["throws", vi.fn(async () => { throw new Error("down"); }), env],
+      ["not a number", billing("40"), env],
+    ] as const) {
+      resetOcrSpendStopCache();
+      resetOperationsAlertDelivery();
+      posts = [];
+      expect(await ocrSpendStop(NOW, environment, fetcher as unknown as typeof fetch), label).toBe("OCR_SPEND_UNVERIFIED");
+      expect(posts, label).toHaveLength(1);
+      expect(posts[0], label).toMatchObject({ kind: "incident", severity: "critical", service: "runpod" });
+    }
+  });
+
+  it("reads RunPod's billing at most once a minute per instance, then reads again", async () => {
+    const fetcher = billing(10);
+    expect(await ocrSpendStop(NOW, env, fetcher)).toBeNull();
+    expect(await ocrSpendStop(NOW + 59_999, env, billing(99))).toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(await ocrSpendStop(NOW + 60_000, env, billing(99))).toBe("OCR_DAILY_SPEND_STOP");
+  });
+
+  it("lifts when RunPod's next billing day opens", async () => {
+    expect(await ocrSpendStop(NOW, env, billing(50))).toBe("OCR_DAILY_SPEND_STOP");
+    resetOcrSpendStopCache();
+    // Only yesterday's bucket: nothing is spent yet in the day that holds now.
+    expect(await ocrSpendStop(NOW + 86_400_000, env, billing(50))).toBeNull();
   });
 });
 

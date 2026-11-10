@@ -74,6 +74,12 @@ const DOCS_ROUTES = DOCS_SECTIONS.map((section) => `/docs/${section.slug}`);
 const FEED_ROUTES = ["/changelog/feed.xml"];
 
 /*
+  Conversion pass 2026-11-09 (funnel audit SEO item): /reproducibility is indexable now and /explore links
+  to it. Its own list rather than an edit to `ROUTES`, whose one line PR #211 rewrites.
+*/
+const PROOF_ROUTES = ["/reproducibility"];
+
+/*
   G2-046 -- `lastmod`, from the commit that last changed the page rather than from the clock.
 
   Every entry carried `changefreq` and `priority` and no `lastmod`. Google ignores the first two
@@ -155,7 +161,7 @@ const lastCommitDate = (() => {
 })();
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const paths = [...ROUTES, ...DOCS_ROUTES, ...FEED_ROUTES];
+  const paths = [...ROUTES, ...PROOF_ROUTES, ...DOCS_ROUTES, ...FEED_ROUTES];
   const dates = paths.map((path) => lastCommitDate(ROUTE_SOURCE(path)));
   // A newly added or untracked route has no Git date yet. Publishing dates for only the older
   // subset makes the sitemap look authoritative while silently omitting the newest pages, so the

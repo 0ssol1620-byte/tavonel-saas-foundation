@@ -88,10 +88,11 @@ const TOOL_ENGINE: Record<KeywordSourceTool, "google" | "naver"> = {
  * is named after the narrower rule it used to describe. What the entitlement now is: promoting a
  * candidate to an active World needs a paid plan, either Developer held by the workspace owner
  * or Team (`saleChannel: "contact"`), and every other caller -- a Developer member, an Evaluation
- * trial -- is refused with `402 STUDIO_SUBSCRIPTION_REQUIRED` or `402 SUBSCRIPTION_REQUIRED`
- * (`planReachesLevel` in `lib/billing-product-access.ts`,
- * `app/api/collections/[id]/promote/route.ts`). Every one of the six work packages ends at an
- * approved World, which no free reader can reach, so none of them may be marked `live` --
+ * trial past its one World -- is refused with `402 STUDIO_SUBSCRIPTION_REQUIRED` or
+ * `402 TRIAL_WORLD_LIMIT_REACHED` (`planReachesLevel` in `lib/billing-product-access.ts`,
+ * `authorizeWorldActivation` in `lib/trial-ai-access.ts`). Since 2026-11-09 a free evaluation
+ * activates one World, once -- not the recurring work these six packages
+ * describe, each of which ends at an approved World kept current, so none of them may be marked `live` --
  * `validateKeywordRecord` enforces it, and that rule is unchanged by FD-02.
  *
  * The value's *name* is the legacy half and is deliberately not renamed here: it is carried by 36

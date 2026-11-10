@@ -328,19 +328,25 @@ export default function WorkspaceUltimateShell({
 
         {access?.source === "unentitled" ? (
           <div className={styles.accessStrip} role="status">
-            <div><strong>Workspace ready</strong><span>{access.customerDataEnabled ? "No active plan" : sourcePending === "workspace_refused" ? "Source processing unavailable" : "Source access pending"}</span></div>
+            {/* FUNNEL-SIGNED-IN #5: before consent the one missing step is the terms, which the card
+                below offers, so the strip says that instead of "cannot be processed". */}
+            <div><strong>Workspace ready</strong><span>{access.customerDataEnabled ? "No active plan" : sourcePending === "workspace_refused" ? "Source processing unavailable" : sourcePending === "terms_acceptance_required" ? "One step left" : "Source access pending"}</span></div>
             <p>{access.customerDataEnabled
               ? "No evaluation or paid compute access is active."
               : sourcePending === "workspace_refused"
                 ? "Files cannot be processed in this workspace. Explore a complete public example below."
-                : "Your files cannot be processed here yet. Explore a complete public example below."}</p>
+                : sourcePending === "terms_acceptance_required"
+                  ? "Accept the processing terms below to work with your own files."
+                  : "Your files cannot be processed here yet. Explore a complete public example below."}</p>
             <Link href={access.customerDataEnabled ? "/pricing" : "/explore"}>{access.customerDataEnabled ? "View access options" : "Explore example"}</Link>
           </div>
         ) : access?.source === "trial" ? (
           <div className={styles.accessStrip} role="status">
             <div><strong>Free evaluation</strong><span>{trialDays} day{trialDays === 1 ? "" : "s"} remaining</span></div>
             <p>{access.limits ? `${access.limits.files} files · ${access.limits.pages} pages · ${access.limits.worlds} World` : "Bounded evaluation access"}</p>
-            <Link href="/pricing">Upgrade to Developer</Link>
+            {/* FUNNEL-SIGNED-IN #3: the upgrade ask belongs at a limit or after the first answer, not in
+                the first second of the trial, so the strip keeps only a quiet way to the plans. */}
+            <Link className={styles.quietLink} href="/pricing">Plans</Link>
           </div>
         ) : access?.source === "owner" ? (
           /* BQ-133: the strip used to print "billing exempt" for every owner. The exemption is a

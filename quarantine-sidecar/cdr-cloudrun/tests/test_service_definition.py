@@ -6,6 +6,9 @@ from pathlib import Path
 
 SERVICE_PATH = Path(__file__).resolve().parents[1] / "service.yaml"
 README_PATH = Path(__file__).resolve().parents[1] / "README.md"
+WRANGLER_PATH = Path(__file__).resolve().parents[2] / "foundation-cdr-worker" / "wrangler.jsonc"
+# Raised from 1 for general availability (2026-11-10). One hostile document per instance stays exact.
+MAX_SCALE = 3
 PINNED_SIDECAR = "clamav/clamav:1.5.4@sha256:f0954d679017eb6d48221e2b2be3ac5457bf278a844f39b672376f55a085f591"
 
 
@@ -38,9 +41,23 @@ class ServiceDefinitionTest(unittest.TestCase):
 
     def test_ingress_scaling_and_concurrency_stay_closed(self) -> None:
         self.assertIn("run.googleapis.com/ingress: internal", self.source)
-        self.assertIn('autoscaling.knative.dev/maxScale: "1"', self.source)
-        self.assertIn("containerConcurrency: 1", self.source)
+        self.assertIn(f'autoscaling.knative.dev/maxScale: "{MAX_SCALE}"', self.source)
+        self.assertEqual(re.findall(r"containerConcurrency: ([0-9]+)", self.source), ["1"])
+        self.assertIn('autoscaling.knative.dev/minScale: "0"', self.source)
         self.assertIn("run.googleapis.com/vpc-access-egress: all-traffic", self.source)
+
+    def test_cdr_instances_match_the_queue_consumers_that_call_them(self) -> None:
+        # Each consumer invocation holds one CDR request at a time and each instance takes one, so
+        # more consumers than instances queue requests inside Cloud Run past the 120 s timeout, and
+        # more instances than consumers is capacity nothing can reach.
+        wrangler = WRANGLER_PATH.read_text(encoding="utf-8")
+        self.assertEqual(re.findall(r'"max_concurrency": ([0-9]+)', wrangler), [str(MAX_SCALE)])
+        self.assertEqual(re.findall(r'"max_batch_size": ([0-9]+)', wrangler), ["1"])
+
+    def test_more_than_one_instance_states_its_replay_residual(self) -> None:
+        readme = README_PATH.read_text(encoding="utf-8")
+        self.assertIn("not shared between instances", readme)
+        self.assertIn(f"max instances `{MAX_SCALE}`", readme)
 
     def test_no_secret_value_is_committed(self) -> None:
         self.assertIn("secretKeyRef", self.source)

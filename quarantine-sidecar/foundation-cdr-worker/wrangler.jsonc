@@ -46,7 +46,13 @@
       {
         "queue": "foundation-quarantine-created",
         "max_batch_size": 1,
-        "max_concurrency": 1,
+        // One consumer invocation holds at most one CDR request and then one OCR request at a
+        // time (ocr.ts reads page ranges one after another), so this number is the ceiling on
+        // concurrent calls to both. It must equal the CDR Cloud Run maxScale (each instance takes
+        // one request, containerConcurrency 1) and must not exceed the RunPod endpoint's max
+        // workers, or the load balancer queues a request past its 85 s budget.
+        // cdr-cloudrun/tests/test_service_definition.py holds the first equality.
+        "max_concurrency": 3,
         "max_retries": 10,
         "dead_letter_queue": "foundation-quarantine-dead-letter"
       }

@@ -97,7 +97,7 @@ export default function ConnectAiPanel({ headingLevel: Heading = "h3" }: { headi
               <li>Permissions: {CONNECT_AI_SCOPES.map((scope, index) => <span key={scope}>{index > 0 ? ", " : ""}<code>{scope}</code></span>)}. Nothing that writes.</li>
               <li>One workspace. The access lasts one hour and is not renewed in the background, so your assistant asks you to reconnect after that.</li>
               <li>Each connection appears as an API key named <code>MCP: …</code> under Workspace › Developers; revoking it ends access on the next request.</li>
-              <li>Open to the current pilot workspaces. If yours is not one yet, the sign-in page says so and nothing is granted.</li>
+              <li>A paid workspace can connect, and so can a free evaluation where trial AI access is on. During a canary only named workspaces can, and if yours is not one the sign-in page says so and nothing is granted.</li>
             </ul>
           </details>
           <p className={styles.note}>

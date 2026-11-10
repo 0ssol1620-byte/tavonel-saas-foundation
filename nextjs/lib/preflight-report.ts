@@ -250,7 +250,7 @@ export function describePreflightSummary(summary: PreflightSummary): string {
     `${summary.acceptedCount} of ${summary.stagedCount} selected ${summary.stagedCount === 1 ? "file" : "files"} supported by format checks`,
     `${summary.convertedCount} would be converted to PDF before reading`,
     summary.reviewRequiredCount > 0 ? `${summary.reviewRequiredCount} sources marked for review` : "Source safety checks are separate",
-    `${summary.qualifiedFormatCount} of ${summary.acceptedFormatCount} supported formats carry a qualification receipt`,
+    `${summary.qualifiedFormatCount} of ${summary.acceptedFormatCount} supported formats have a recorded reading-quality test so far`,
     "Format lookup only; this report does not inspect file bytes or assess safety",
   ];
   if (summary.unreportedCount > 0) {

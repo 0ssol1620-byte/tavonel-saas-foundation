@@ -818,7 +818,8 @@ export default function PricingPageClient({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdHtml(pricingJsonLd(initialLiveCheckout, faqRows)) }}
       />
-      <PublicSiteHeader />
+      {/* Conversion pass 2026-11-09: the phone sheet's start action, the same one the Evaluation card offers. */}
+      <PublicSiteHeader signedIn={signedIn} start={selfService ? SELF_SERVE_CTA : undefined} />
       <main id="main">
         <section className="scene doc">
           <div className="shell">
@@ -974,7 +975,9 @@ export default function PricingPageClient({
                           ? `Request ${plan.name} access`
                           : billingBusy === plan.offerCode
                             ? "Opening checkout…"
-                            : signedIn ? `Get ${plan.name} access` : `Get ${plan.name} access, via sign-in`}
+                            // Conversion pass 2026-11-09 (funnel audit fix 2): the label names the purchase and its
+                            // catalog price. The path under the button still says sign-in comes first.
+                            : `Buy ${plan.name} — $${BILLING_OFFERS[plan.offerCode].priceUsd}/month`}
                   </a>
                   {plan.name === "Evaluation" && !selfService ? (
                     <Link className="fine pricing-secondary-link" href="/contact">Discuss your sources</Link>
@@ -1186,7 +1189,7 @@ export default function PricingPageClient({
               marked Not sold is not part of that plan at all. Only a capability the plan&apos;s
               authorization check admits carries a tick. Every row is answered for the workspace owner, the role a
               buyer of either plan holds in their own workspace. {selfService
-                ? `The free evaluation reaches ${BILLING_OFFERS.observer_access.label} capabilities that do not activate a World, inside its file and page limits. Activating one needs a paid plan, which is why it has no column here.`
+                ? `The free evaluation reaches ${BILLING_OFFERS.observer_access.label} capabilities inside its file and page limits, including activating its one World and asking it questions. A second World, rollback, API keys and MCP need a paid plan, which is why it has no column here.`
                 : "An evaluation of your own sources is arranged with us while self-service intake is closed."}
               {" "}An Enterprise scope is agreed in the conversation rather than compared against
               these two. Nothing an Ask answer returns is invented for it: every answer names the

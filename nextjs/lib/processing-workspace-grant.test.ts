@@ -467,3 +467,61 @@ describe("D-05: issuance under a release recorded for this deployment's gate sur
     expect(wroteGrant()).toBe(false);
   });
 });
+
+/*
+  ADR 0008 (2026-11-09): TAVONEL_PROCESSING_ROLLOUT=general admits every workspace through the rollout
+  check, under gate v2 only. WORKSPACE is left out of the cohort here, so every admission below is
+  the general mode's and every refusal is one of the gates it leaves in place.
+*/
+describe("ADR 0008: general availability (TAVONEL_PROCESSING_ROLLOUT)", () => {
+  const ga = (overrides: Record<string, string | undefined> = {}) => ({
+    VERCEL_GIT_COMMIT_SHA: revision, TAVONEL_CUSTOMER_DATA_GATE_VERSION: "v2",
+    TAVONEL_PROCESSING_WORKSPACE_COHORT: OTHER, TAVONEL_PROCESSING_ROLLOUT: "general", ...overrides,
+  });
+
+  it("issues to a workspace outside the cohort only with the exact value and gate v2", async () => {
+    await expect(issue(now, ga())).resolves.toMatchObject({ ok: true, grant: { workspaceId: WORKSPACE } });
+    // The cohort no longer matters to processing under general, set or not.
+    await expect(issue(now, ga({ TAVONEL_PROCESSING_WORKSPACE_COHORT: undefined }))).resolves.toMatchObject({ ok: true });
+    // Rollback: unset the rollout and the same workspace is back outside the canary.
+    request.mockClear();
+    await expect(issue(now, ga({ TAVONEL_PROCESSING_ROLLOUT: undefined })))
+      .resolves.toEqual({ ok: false, code: "PROCESSING_COHORT_EXCLUDED" });
+    expect(wroteGrant()).toBe(false);
+  });
+
+  it.each(["", " ", "general ", " general", "General", "GENERAL", "all", "*", "on", "true", "general,canary"])(
+    "a rollout value other than the exact word (%j) is CONFIG_INVALID and writes nothing", async (value) => {
+      request.mockClear();
+      await expect(issue(now, ga({ TAVONEL_PROCESSING_ROLLOUT: value })))
+        .resolves.toEqual({ ok: false, code: "PROCESSING_COHORT_CONFIG_INVALID" });
+      expect(wroteGrant()).toBe(false);
+      expect(readRelease()).toBe(false);
+    },
+  );
+
+  it.each([undefined, "", "v1", "v3"])("general under gate %j is CONFIG_INVALID", async (version) => {
+    request.mockClear();
+    await expect(issue(now, ga({ TAVONEL_CUSTOMER_DATA_GATE_VERSION: version })))
+      .resolves.toEqual({ ok: false, code: "PROCESSING_COHORT_CONFIG_INVALID" });
+    expect(wroteGrant()).toBe(false);
+  });
+
+  it("still refuses without consent, without a release row, over a refusal, and when the RPC refuses", async () => {
+    store.acceptance = null;
+    await expect(issue(now, ga())).resolves.toEqual({ ok: false, code: "PROCESSING_TERMS_ACCEPTANCE_REQUIRED" });
+    store.acceptance = acceptance();
+    store.release = [];
+    await expect(issue(now, ga())).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_NOT_FOUND" });
+    store.release = [releaseRow({ allowed: false, missing: ["x"] })];
+    await expect(issue(now, ga())).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_REFUSED" });
+    store.release = [releaseRow()];
+    store.rpc = () => rpcError("workspace_grant_acceptance_required");
+    await expect(issue(now, ga())).resolves.toEqual({ ok: false, code: "PROCESSING_TERMS_ACCEPTANCE_REQUIRED" });
+    store.rpc = grantRpc();
+    store.latest = [{ allowed: false }];
+    request.mockClear();
+    await expect(issue(now, ga())).resolves.toEqual({ ok: false, code: "SCOPED_WORKSPACE_REFUSED" });
+    expect(wroteGrant()).toBe(false);
+  });
+});

@@ -140,6 +140,15 @@ export function ProcessingTermsForm({ offer, agreed, submitting, error, onAgreed
       aria-busy={submitting}
       onSubmit={(event: FormEvent) => { event.preventDefault(); if (agreed && !submitting) onSubmit(); }}
     >
+      {/*
+        FUNNEL-SIGNED-IN #6: three plain lines over the documents, each said in the addendum this links
+        to. They summarise and do not replace it, so the checkbox below still names both documents.
+      */}
+      <ul className={styles.summary} aria-label="The terms in brief">
+        <li>We process the files you upload to read them and build your World.</li>
+        <li>Your files are not used to train shared models.</li>
+        <li>You can export your results and ask us to delete your files.</li>
+      </ul>
       <p>
         Read the <a href={offer.terms.path} target="_blank" rel="noopener noreferrer">Self-Service Terms</a> and
         the <a href={offer.processing.path} target="_blank" rel="noopener noreferrer">Processing Addendum</a> (version {offer.version}).

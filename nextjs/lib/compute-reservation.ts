@@ -9,6 +9,7 @@ import {
   type ApprovalPayload,
 } from "./intake-approval";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
+import { ocrSpendStop } from "./operations-alert-triggers";
 import { INTAKE_TRIAGE_ROLLOUT_ENABLED } from "./intake-triage-rollout";
 import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "./intake-approval-rollout";
 import { intakePricingFingerprint, quoteCompilePages, type IntakePageBasis } from "./usage-pricing";
@@ -531,6 +532,9 @@ export async function reserveFoundationIntakeApprovedFile(value: MemberCall & {
     || !SHA256_DIGEST_PATTERN.test(value.pricingFingerprint) || !UUID.test(value.documentId)) {
     return { ok: false, code: "INTAKE_APPROVAL_INVALID", status: 400 };
   }
+  // GA gap 2: past the day's RunPod hard stop, no new reservation means no new OCR dispatch.
+  const spendStop = await ocrSpendStop();
+  if (spendStop) return { ok: false, code: spendStop, status: 503 };
   const approvalState = await readFoundationIntakeApproval({
     workspaceKey: value.workspaceKey, userId: value.userId, attemptKey: value.attemptKey,
   });
@@ -672,6 +676,9 @@ export async function reserveFoundationCompute(value: {
     || !UUID.test(value.documentId) || !UUID.test(value.userId) || !quote) {
     return { ok: false as const, code: "COMPUTE_RESERVATION_INVALID" };
   }
+  // GA gap 2: the same daily RunPod hard stop as the approved-file path; in-flight work is untouched.
+  const spendStop = await ocrSpendStop();
+  if (spendStop) return { ok: false as const, code: spendStop };
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "COMPUTE_LEDGER_NOT_CONFIGURED" };
   let response: Response;

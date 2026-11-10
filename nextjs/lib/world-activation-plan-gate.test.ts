@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EMPTY_BILLING_ACCOUNT, type FoundationBillingAccount } from "./billing-store";
 
@@ -13,7 +14,10 @@ import { EMPTY_BILLING_ACCOUNT, type FoundationBillingAccount } from "./billing-
   The two routes are asserted separately rather than through a shared helper, because "rollback
   mirrors promote" is the claim under test and a helper that drove both would assume it.
 */
-const { getUser, pilotAccess, grant, billing, candidate, rollback, apiRequest, activeWorld, ceiling } = vi.hoisted(() => ({
+const { getUser, pilotAccess, grant, billing, candidate, rollback, apiRequest, activeWorld, ceiling, trialRow, activeWorlds, trialUsage } = vi.hoisted(() => ({
+  trialRow: vi.fn(),
+  activeWorlds: vi.fn(),
+  trialUsage: vi.fn(),
   ceiling: vi.fn(),
   getUser: vi.fn(),
   pilotAccess: vi.fn(),
@@ -43,7 +47,18 @@ vi.mock("@/lib/developer-auth", () => ({ authorizeFoundationRequest: apiRequest 
 */
 vi.mock("@/lib/activation-rate-limit", () => ({ checkActivationRateLimit: ceiling }));
 vi.mock("@/lib/world-rollback-source-access", () => ({ checkRollbackSourceAccess: async () => ({ ok: true }) }));
-vi.mock("@/lib/account-grants", () => ({ getFoundationAccountGrant: grant }));
+vi.mock("@/lib/account-grants", () => ({ getFoundationAccountGrant: grant, getFoundationSelfServiceTrial: trialRow }));
+/*
+  The trial's bounds live in `foundation_trial_ai_access` (migration 20261104090000). Only that RPC
+  is answered here; any other store path reaching this mock is a test failure, not a quiet 200.
+*/
+vi.mock("@/lib/supabase-admin", () => ({
+  readSupabaseAdminConfig: () => ({ url: "https://store.test", serviceRoleKey: "k".repeat(40) }),
+  supabaseAdminRequest: async (_config: unknown, path: string, init?: RequestInit) => {
+    if (path !== "/rest/v1/rpc/foundation_trial_ai_access") throw new Error(`unexpected store path ${path}`);
+    return trialUsage(JSON.parse(String(init?.body ?? "{}")));
+  },
+}));
 vi.mock("@/lib/billing-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./billing-store")>()),
   getFoundationBillingAccount: billing,
@@ -59,6 +74,7 @@ vi.mock("@/lib/world-store", () => ({
   promoteFoundationCandidate: vi.fn(),
   rollbackFoundationWorld: rollback,
   getFoundationActiveWorld: activeWorld,
+  listFoundationActiveWorlds: activeWorlds,
 }));
 
 import { POST as promoteRoute } from "../app/api/collections/[id]/promote/route";
@@ -94,6 +110,13 @@ function signedIn(plan: Plan | null, role: Role) {
     ok: true,
     principal: { kind: "session", workspaceKey: workspaceId, userId, scopes: ["collections:compile"] },
   });
+}
+
+/** A free evaluation: no plan bought, a live trial row, the bounds RPC answering `usage`. */
+function onTrial(role: Role, usage: Record<string, unknown> | null = { status: "allowed", limits: { worlds: 1 } }) {
+  signedIn(null, role);
+  trialRow.mockResolvedValue({ ok: true, trial: { status: "trialing", expiresAt: new Date(Date.now() + 86_400_000).toISOString() } });
+  trialUsage.mockResolvedValue(usage ? new Response(JSON.stringify(usage)) : new Response("", { status: 500 }));
 }
 
 function promoteRequest() {
@@ -148,6 +171,8 @@ beforeEach(() => {
   candidate.mockResolvedValue({ ok: false, code: "NOT_FOUND" });
   rollback.mockResolvedValue({ ok: true, result: { collectionId, manifestDigest: target } });
   activeWorld.mockResolvedValue({ ok: false, code: "ACTIVE_WORLD_NOT_FOUND" });
+  activeWorlds.mockResolvedValue({ ok: true, worlds: [], nextCursor: null });
+  trialRow.mockResolvedValue({ ok: true, trial: null });
 });
 
 describe("promote", () => {
@@ -167,17 +192,134 @@ describe("promote", () => {
     expect(candidate).not.toHaveBeenCalled();
   });
 
-  it("refuses an evaluation trial holding the owner role", async () => {
-    signedIn(null, "owner");
-    const response = await promoteRequest();
-    expect(response.status).toBe(402);
-    expect(await response.json()).toEqual({ code: "SUBSCRIPTION_REQUIRED" });
-  });
-
   it.each(["owner", "admin"] as const)("leaves the Team plan admitted for a %s", async (role) => {
     signedIn("studio_access", role);
     const response = await promoteRequest();
     expect(response.status).toBe(404);
+  });
+
+  it("asks a paid plan nothing about a trial", async () => {
+    signedIn("observer_access", "owner");
+    await promoteRequest();
+    expect(trialRow).not.toHaveBeenCalled();
+    expect(trialUsage).not.toHaveBeenCalled();
+    expect(activeWorlds).not.toHaveBeenCalled();
+  });
+
+  it("still refuses a workspace with neither a plan nor a live trial", async () => {
+    signedIn(null, "owner");
+    const response = await promoteRequest();
+    expect(response.status).toBe(402);
+    expect(await response.json()).toEqual({ code: "SUBSCRIPTION_REQUIRED" });
+    expect(candidate).not.toHaveBeenCalled();
+  });
+});
+
+/*
+  P0 2026-11-09: the free evaluation's one World. /pricing sells "1 Compiled World with Evidence and
+  Ask", so a trial owner reaches activation once, inside the bounds the database owns, and every
+  other promote gate still runs after this one.
+*/
+describe("promote on a free evaluation", () => {
+  it("admits the trial owner's first World, and peeks at the bounds without spending a query", async () => {
+    onTrial("owner");
+    const response = await promoteRequest();
+    // 404 is the candidate lookup: past the plan gate, every later gate still runs.
+    expect(response.status).toBe(404);
+    expect(candidate).toHaveBeenCalled();
+    expect(trialUsage).toHaveBeenCalledWith(expect.objectContaining({ p_consume_query: false, p_workspace_key: workspaceId }));
+  });
+
+  it("refuses a second World", async () => {
+    onTrial("owner");
+    activeWorlds.mockResolvedValue({ ok: true, nextCursor: null, worlds: [
+      { collectionId: `collection-${"d".repeat(32)}`, manifestDigest: target, revision: 1, updatedAt: "2026-11-09T00:00:00Z" },
+    ] });
+    const response = await promoteRequest();
+    expect(response.status).toBe(402);
+    expect(await response.json()).toEqual({ code: "TRIAL_WORLD_LIMIT_REACHED" });
+    expect(candidate).not.toHaveBeenCalled();
+  });
+
+  it("refuses a new revision of the World it already activated", async () => {
+    onTrial("owner");
+    activeWorlds.mockResolvedValue({ ok: true, nextCursor: null, worlds: [
+      { collectionId, manifestDigest: target, revision: 1, updatedAt: "2026-11-09T00:00:00Z" },
+    ] });
+    const response = await promoteRequest();
+    expect(response.status).toBe(402);
+    expect(await response.json()).toEqual({ code: "TRIAL_WORLD_LIMIT_REACHED" });
+  });
+
+  it("refuses once the database says a trial bound is spent", async () => {
+    onTrial("owner", { status: "limit_reached", reason: "TRIAL_AI_WINDOW_ENDED" });
+    const response = await promoteRequest();
+    expect(response.status).toBe(402);
+    expect(await response.json()).toEqual({ code: "TRIAL_LIMIT_REACHED" });
+    expect(candidate).not.toHaveBeenCalled();
+  });
+
+  it("fails closed with 503 when the bounds cannot be read", async () => {
+    onTrial("owner", null);
+    const response = await promoteRequest();
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ code: "TRIAL_AI_ACCESS_CHECK_FAILED" });
+    expect(candidate).not.toHaveBeenCalled();
+  });
+
+  it("reads the World bound from the trial policy, not from the code (review N3)", async () => {
+    const two = { collectionId: `collection-${"d".repeat(32)}`, manifestDigest: target, revision: 1, updatedAt: "2026-11-09T00:00:00Z" };
+    const three = { ...two, collectionId: `collection-${"e".repeat(32)}` };
+    onTrial("owner", { status: "allowed", limits: { worlds: 2 } });
+    activeWorlds.mockResolvedValue({ ok: true, nextCursor: null, worlds: [two] });
+    expect((await promoteRequest()).status).toBe(404);
+    expect(activeWorlds).toHaveBeenLastCalledWith(workspaceId, { limit: 3 });
+    onTrial("owner", { status: "allowed", limits: { worlds: 2 } }); // a fresh RPC answer: a Response body reads once
+    activeWorlds.mockResolvedValue({ ok: true, nextCursor: null, worlds: [two, three] });
+    const third = await promoteRequest();
+    expect(third.status).toBe(402);
+    expect(await third.json()).toEqual({ code: "TRIAL_WORLD_LIMIT_REACHED" });
+  });
+
+  it.each([undefined, 0, 11, 1.5, "1"])("fails closed with 503 when the policy's World bound is %s", async (worlds) => {
+    onTrial("owner", { status: "allowed", limits: worlds === undefined ? {} : { worlds } });
+    const response = await promoteRequest();
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ code: "TRIAL_AI_ACCESS_CHECK_FAILED" });
+    expect(candidate).not.toHaveBeenCalled();
+  });
+
+  it("keeps the shipped World bound at 1, the number the trial copy states", () => {
+    // /pricing, the cookbook and the preflight say "one World". Raising the policy means rewording them.
+    const migrations = new URL("../../supabase/migrations/", import.meta.url);
+    expect(readFileSync(new URL("20261104090000_trial_ai_usage.sql", migrations), "utf8"))
+      .toMatch(/add column ai_world_limit integer not null default 1 /);
+    expect(readFileSync(new URL("0045_self_service_trial_and_owner_access.sql", migrations), "utf8"))
+      .toContain(") values ('default', true, 7, 3, 50, 1, ");
+  });
+
+  it("fails closed with 503 when the active Worlds cannot be listed", async () => {
+    onTrial("owner");
+    activeWorlds.mockResolvedValue({ ok: false, code: "WORLD_STORE_READ_FAILED" });
+    const response = await promoteRequest();
+    expect(response.status).toBe(503);
+    expect(candidate).not.toHaveBeenCalled();
+  });
+
+  it.each(["admin", "member", "viewer"] as const)("refuses a trial %s", async (role) => {
+    onTrial(role);
+    const response = await promoteRequest();
+    expect(response.status).toBe(402);
+    expect(await response.json()).toEqual({ code: "SUBSCRIPTION_REQUIRED" });
+    expect(candidate).not.toHaveBeenCalled();
+  });
+
+  it("does not stretch to rollback, which stays with a paid plan", async () => {
+    onTrial("owner");
+    const response = await rollbackRequest();
+    expect(response.status).toBe(402);
+    expect(await response.json()).toEqual({ code: "SUBSCRIPTION_REQUIRED" });
+    expect(rollback).not.toHaveBeenCalled();
   });
 
   it("still refuses a Team-plan member on the role gate, not the plan gate", async () => {

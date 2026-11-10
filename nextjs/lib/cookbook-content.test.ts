@@ -219,8 +219,8 @@ describe("the limits are read from the product, and sit above the calls to actio
       expect(prerequisites.body).toContain("rather than self-serve checkout");
       expect(prerequisites.body, `${record.slug}: Developer activation is the owner's, not any member's`)
         .toContain("if you are the workspace owner");
-      expect(prerequisites.body, `${record.slug}: the free evaluation still cannot activate`)
-        .toContain("its activation request is refused");
+      expect(prerequisites.body, `${record.slug}: the free evaluation activates one World and no more`)
+        .toContain("A free evaluation activates one World, as its owner.");
     }
   });
 

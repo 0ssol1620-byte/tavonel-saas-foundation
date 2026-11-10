@@ -1440,7 +1440,12 @@ const RETIRED_NAMES = [
   "ENTER WORLD",
   "Get started",
   "Start with the data path",
-  "Start free",
+  /*
+    "Start free" was retired while it promised an upload this deployment refused (BA-232). Conversion
+    pass 2026-11-09: it is `SELF_SERVE_CTA`'s label now, gated by the same commercial state, and the
+    label it replaced is the retired one.
+  */
+  "Sign up for access",
 ] as const;
 
 /** The chrome: rendered on every public page, and the only surfaces this lane owns. */
@@ -1463,10 +1468,10 @@ const prose = (surface: string) =>
 describe("the site's own vocabulary", () => {
   it("declares two access actions and one Explore action, and no more", () => {
     expect(ACCESS_CTA).toEqual({ href: "/contact", label: "Request access" });
-    // Review PR201-R1 B3: self-serve opens in stages, so the live-posture action signs a visitor up.
+    // Conversion pass 2026-11-09: processing is generally available, so the live-posture action is an active start.
     expect(SELF_SERVE_CTA).toEqual({
       href: "/login",
-      label: "Sign up for access",
+      label: "Start free",
     });
     expect(EXPLORE_CTA).toEqual({
       href: "/explore",
@@ -1559,8 +1564,9 @@ describe("the site's own vocabulary", () => {
     const primary = EXPLORE_COPY.endActions.filter(action => action.primary);
     expect(primary).toEqual([{ label: ACCESS_CTA.label, href: ACCESS_CTA.href, primary: true }]);
     expect(read("app/explore/page.tsx")).toContain("access={primaryCallToAction()}");
+    // Conversion pass 2026-11-09: the same action, with its allowance printed when it is the start.
     expect(read("components/explore/explore-stage.tsx")).toContain(
-      "action.primary ? { ...action, label: access.label, href: access.href } : action"
+      "label: access.href === SELF_SERVE_CTA.href ? START_FREE_LABEL : access.label, href: access.href"
     );
   });
 

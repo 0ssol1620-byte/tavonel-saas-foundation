@@ -8,6 +8,7 @@ import { REMOTE_MCP_AFFECTED_PATHS, REMOTE_MCP_AFFECTED_UNIT_FILES, REMOTE_MCP_A
 import { GDP_PDF_RUNS_AFFECTED_PATHS, GDP_PDF_RUNS_AFFECTED_UNIT_FILES, GDP_PDF_RUNS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { PACKET_DELIVERY_AFFECTED_PATHS, PACKET_DELIVERY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { LIBRARY_DEDUP_AFFECTED_PATHS, LIBRARY_DEDUP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { CONVERSION_PUBLIC_AFFECTED_PATHS, CONVERSION_PUBLIC_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { LIBRARY_ORGANIZE_B2_AFFECTED_PATHS, LIBRARY_ORGANIZE_B2_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { W2_D_INTAKE_STAGE1_AFFECTED_PATHS, W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { COMPILER_RELEASE_AFFECTED_PATHS, COMPILER_RELEASE_AFFECTED_UNIT_FILES, COMPILER_RELEASE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
@@ -25,6 +26,9 @@ import { UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_F
 import { GLOBAL_EXPOSURE_AFFECTED_PATHS, GLOBAL_EXPOSURE_AFFECTED_UNIT_FILES, GLOBAL_EXPOSURE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { ENABLEMENT_AFFECTED_BROWSER_FILES, P4_FOLLOWUPS_AFFECTED_PATHS, P4_FOLLOWUPS_AFFECTED_UNIT_FILES, P4_FOLLOWUPS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { LEGAL_SEMICOLONS_AFFECTED_PATHS, LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { OPS_BACKLOG_SLI_AFFECTED_PATHS, OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { PROCESSING_GA_AFFECTED_PATHS, PROCESSING_GA_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { TRIAL_TO_PAID_AFFECTED_PATHS, TRIAL_TO_PAID_AFFECTED_UNIT_FILES, TRIAL_TO_PAID_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { SLI_ALERT_NOISE_AFFECTED_PATHS, SLI_ALERT_NOISE_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
@@ -536,6 +540,21 @@ const currentOwnerBindings = [
     && runner.includes("['e2e/solutions-workflows.spec.ts', ['1440']]"),
     'Solutions proof owner must keep its four exact paths, three direct suites and the 1440 solutions browser suite');
 }
+// Conversion public (2026-11-09): seven exact paths, six direct suites, no browser suite of its own.
+{
+  const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'conversion-public'), [owner] = owners;
+  const paths = ['app/pricing/opengraph-image.tsx', 'app/reproducibility/opengraph-image.tsx', 'components/own-files-cta.tsx',
+    'lib/own-files-cta.test.ts', 'lib/plan-limit-fit.ts', 'lib/public-copy-purge.test.ts', 'lib/trial-allowance.test.ts'];
+  const suites = ['lib/og-card-frame.test.ts', 'lib/own-files-cta.test.ts', 'lib/plan-limit-fit.test.ts', 'lib/public-copy-purge.test.ts',
+    'lib/seo-surface.test.ts', 'lib/trial-allowance.test.ts'];
+  assert(owners.length === 1 && JSON.stringify(CONVERSION_PUBLIC_AFFECTED_PATHS) === JSON.stringify(paths)
+    && JSON.stringify(CONVERSION_PUBLIC_AFFECTED_UNIT_FILES) === JSON.stringify(suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(suites)
+    && !owner.browserFiles.length && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
+    && paths.every(p => owner.match.test('nextjs/' + p) && existsSync(resolve(repo, 'nextjs', p)))
+    && suites.every(s => existsSync(resolve(repo, 'nextjs', s)))
+    && ['app/evidence/opengraph-image.tsx', 'lib/plan-limit-fit.test.ts', 'components/own-files-cta.module.css'].every(p => !owner.match.test('nextjs/' + p)),
+    'Conversion public owner must keep its seven exact paths and six direct suites');
+}
 // Evidence viewer overlay: one exact stylesheet, its direct suite and the world-lifecycle browser suite.
 {
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'evidence-viewer-overlay'), [owner] = owners;
@@ -783,6 +802,14 @@ for (const binding of [
     browsers: ['e2e/landing-hero-film-loading.spec.ts', 'e2e/templates.spec.ts'],
     rows: ["['e2e/landing-hero-film-loading.spec.ts', ['390']],", "['e2e/templates.spec.ts', ['1440']],"],
     neighbors: ['nextjs/app/privacy/opengraph-image.tsx', 'nextjs/app/subprocessors/layout.tsx', 'nextjs/lib/operations.test.ts', 'nextjs/lib/operations-copy.ts', 'nextjs/public/film/poster-1-t8.16-3x.avif', 'nextjs/public/film/poster-5-t1.00.avif', 'nextjs/public/film/compile-cut.mp4'] },
+  // trial-to-paid-20261109: seven exact paths, twenty-seven direct suites, the one browser suite it edits.
+  { group: 'trial-to-paid-20261109', prefix: 'nextjs/', exportedPaths: TRIAL_TO_PAID_AFFECTED_PATHS, exportedSuites: TRIAL_TO_PAID_AFFECTED_UNIT_FILES,
+    exportedBrowsers: TRIAL_TO_PAID_AFFECTED_BROWSER_FILES,
+    paths: ['app/api/collections/[id]/promote/route.ts', 'components/processing-consent-panel.module.css', 'lib/activation-cohorts.ts', 'lib/cookbook-content.ts', 'lib/keyword-map.ts', 'e2e/billing-lifecycle.spec.ts', 'app/api/collections/[id]/search/route.ts'],
+    suites: ['lib/activation-cohorts.test.ts', 'lib/activation-rate-limit.test.ts', 'lib/brand-copy.test.ts', 'lib/client-route-weight.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/cookbook-content.test.ts', 'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/funnel-events.test.ts', 'lib/keyword-map.test.ts', 'lib/marketing-analytics.test.ts', 'lib/model-attempt-receipt.test.ts', 'lib/openapi-response-shape.switch-off.test.ts', 'lib/openapi-response-shape.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/public-copy-purge.test.ts', 'lib/recipe-intent.test.ts', 'lib/remote-mcp.test.ts', 'lib/resources-hub.test.ts', 'lib/retrieval-compile-wiring.test.ts', 'lib/retrieval-search-authorization.test.ts', 'lib/seo-surface.test.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/trial-ai-access.test.ts', 'lib/world-activation-plan-gate.test.ts', 'lib/world-promotion-current-source.test.ts'],
+    browsers: ['e2e/billing-lifecycle.spec.ts'],
+    rows: ["['e2e/billing-lifecycle.spec.ts', ['audit', 'audit-768', 'audit-1280']],"],
+    neighbors: ['nextjs/app/api/collections/[id]/promote/route.tsx', 'nextjs/components/processing-consent-panel.module.scss', 'nextjs/lib/activation-cohort.ts', 'nextjs/lib/cookbook-contents.ts', 'lib/keyword-map.ts', 'nextjs/e2e/billing-lifecycle.spec.tsx', 'nextjs/app/api/collections/[id]/search/route.tsx'] },
   // sli-alert-noise-20261109: three exact paths, ten direct suites, no browser suite.
   { group: 'sli-alert-noise-20261109', prefix: 'nextjs/', exportedPaths: SLI_ALERT_NOISE_AFFECTED_PATHS, exportedSuites: SLI_ALERT_NOISE_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
@@ -792,13 +819,29 @@ for (const binding of [
     rows: [],
     neighbors: ['nextjs/app/api/internal/sli/page.tsx', 'nextjs/lib/synthetic-probe-store.tsx', 'lib/synthetic-probe-store.ts'] },
   // legal-semicolons-20261109: five exact paths, ten direct suites, no browser suite.
+  // ops-backlog-sli-20261110: two exact paths, three direct suites, no browser suite.
+  { group: 'ops-backlog-sli-20261110', prefix: 'nextjs/', exportedPaths: OPS_BACKLOG_SLI_AFFECTED_PATHS, exportedSuites: OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['lib/operational-sli.test.ts', 'lib/operational-sli.ts'],
+    suites: ['lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-read-route.test.ts', 'lib/operational-sli.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/lib/operational-sli-store.ts', 'nextjs/lib/operational-sli.tsx', 'nextjs/lib/operational-job-liveness.ts', 'lib/operational-sli.ts'] },
   { group: 'legal-semicolons-20261109', prefix: 'nextjs/', exportedPaths: LEGAL_SEMICOLONS_AFFECTED_PATHS, exportedSuites: LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
     paths: ['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts'],
     suites: ['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-provisions.test.ts'],
     browsers: [],
     rows: [],
-    neighbors: ['nextjs/app/refunds/page.ts', 'nextjs/components/processing-consent-panel.module.css', 'nextjs/content/trust/provisions.json', 'nextjs/lib/status-probe-store.ts', 'lib/status-probe.ts'] },
+    neighbors: ['nextjs/app/refunds/page.ts', 'nextjs/components/processing-consent-panel.css', 'nextjs/content/trust/provisions.json', 'nextjs/lib/status-probe-store.ts', 'lib/status-probe.ts'] },
+  // processing-ga-20261109 (ADR 0008): one exact path, two direct suites, no browser suite.
+  { group: 'processing-ga-20261109', prefix: 'nextjs/', exportedPaths: PROCESSING_GA_AFFECTED_PATHS, exportedSuites: PROCESSING_GA_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['lib/customer-data-admission.ts'],
+    suites: ['lib/customer-data-admission.test.ts', 'lib/processing-workspace-grant.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/lib/customer-data-admission.tsx', 'nextjs/lib/customer-data-admission-routes.ts', 'nextjs/lib/customer-data-gate-store.ts', 'nextjs/lib/library-shadow.ts', 'lib/customer-data-admission.ts'] },
 ]) {
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === binding.group), [owner] = owners;
   assert(owners.length === 1 && JSON.stringify(binding.exportedPaths) === JSON.stringify(binding.paths)
@@ -813,6 +856,15 @@ assert(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'] === '5c11e634df5c2ce7
   && ['e2e/benchmarks.spec.ts', 'e2e/brand-tokens.spec.ts', 'e2e/film-line-stability.spec.ts', 'e2e/site-alignment.spec.ts', 'e2e/solutions-workflows.spec.ts', 'e2e/templates.spec.ts', 'e2e/type-scale.spec.ts'].every(file => PUBLIC_MARKETING_AFFECTED_BROWSER_FILES.includes(file))
   && ["['e2e/templates.spec.ts', ['1440']],", "['e2e/type-scale.spec.ts', ['1440']],", "['e2e/site-alignment.spec.ts', ['1440']],", "['e2e/brand-tokens.spec.ts', ['1440']],", "['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/film-line-stability.spec.ts', ['390']],"].every(row => sharedMap.includes('\n  ' + row)),
   'Public marketing owner must keep the reviewed package.json postimage and a reviewed project row for each UX program browser suite');
+// Ops capacity (2026-11-10), restated independently: the CDR worker README states the queue consumer's concurrency
+// contract with wrangler.jsonc, so it selects only the worker owner and its worker checks; no other README is admitted.
+{
+  const owners = AFFECTED_GROUPS.filter(owner => owner.match.test('quarantine-sidecar/foundation-cdr-worker/README.md'));
+  assert(owners.length === 1 && owners[0].group === 'ocr-worker' && owners[0].worker === true && !owners[0].unitFiles.length
+    && ['quarantine-sidecar/foundation-cdr-worker/src/README.md', 'quarantine-sidecar/foundation-cdr-worker/docs/README.md', 'quarantine-sidecar/README.md']
+      .every(p => !owners[0].match.test(p)),
+    'CDR worker README must select exactly the ocr-worker owner and its worker checks (ops capacity 2026-11-10)');
+}
 // COPY re-review R2-N2, restated independently: public/llms.txt selects g1-copy-truth through public-marketing-surface, and
 // landing-page.tsx selects copy-trust-guard through home-landing. Each path keeps exactly its one owner.
 for (const [path, group, suite] of [['nextjs/public/llms.txt', 'public-marketing-surface', 'lib/g1-copy-truth.test.ts'],

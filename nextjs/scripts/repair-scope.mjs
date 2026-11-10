@@ -1842,6 +1842,13 @@ export const INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES = Object.freeze([
 export const SOLUTIONS_PROOF_AFFECTED_PATHS = Object.freeze(['app/solutions/[slug]/page.tsx', 'app/solutions/solution-workflow-proof.tsx', 'lib/solution-proof-picks.ts', 'lib/solution-workflows.test.ts']);
 export const SOLUTIONS_PROOF_AFFECTED_UNIT_FILES = Object.freeze(['lib/copy-trust-guard.test.ts', 'lib/output-escaping.test.ts', 'lib/solution-workflows.test.ts']);
 export const SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/solutions-workflows.spec.ts']);
+// Conversion pass 2026-11-09 (codex/conversion-public-20261109): the proof-page start block, the two share cards, the trial
+// allowance pin, the calculator's ceiling line and the copy-purge exemption the indexed /reproducibility left. Its own owner:
+// none of these paths had one, and every suite they move is named here.
+export const CONVERSION_PUBLIC_AFFECTED_PATHS = Object.freeze(['app/pricing/opengraph-image.tsx', 'app/reproducibility/opengraph-image.tsx',
+  'components/own-files-cta.tsx', 'lib/own-files-cta.test.ts', 'lib/plan-limit-fit.ts', 'lib/public-copy-purge.test.ts', 'lib/trial-allowance.test.ts']);
+export const CONVERSION_PUBLIC_AFFECTED_UNIT_FILES = Object.freeze(['lib/og-card-frame.test.ts', 'lib/own-files-cta.test.ts', 'lib/plan-limit-fit.test.ts',
+  'lib/public-copy-purge.test.ts', 'lib/seo-surface.test.ts', 'lib/trial-allowance.test.ts']);
 // Evidence viewer overlay (PR #141 fix): the stylesheet that places the bbox overlay over the drawn page. Its direct suite
 // and the world-lifecycle browser suite, whose Ask source-region test measures the overlay against the canvas.
 export const EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS = Object.freeze(['components/pdf-evidence-viewer.module.css']);
@@ -3003,8 +3010,20 @@ export const W2_D_INTAKE_STAGE1_AFFECTED_PATHS = Object.freeze([
 export const W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES = Object.freeze(['lib/intake-ceiling-cross-tree.test.ts', 'lib/processing-ceiling-stage1.test.ts']);
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
+// ops-backlog-sli-20261110 (GA ops gap 4): the B35 evaluator gains a compile backlog age. Its own suite and both routes that call it.
+export const OPS_BACKLOG_SLI_AFFECTED_PATHS = Object.freeze(['lib/operational-sli.test.ts', 'lib/operational-sli.ts']);
+export const OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES = Object.freeze(['lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-read-route.test.ts', 'lib/operational-sli.test.ts']);
 // legal-semicolons-20261109: the legal, consent, trust and /status copy whose semicolons were removed without a change in meaning.
 export const LEGAL_SEMICOLONS_AFFECTED_PATHS = Object.freeze(['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts']);
+// processing-ga-20261109 (ADR 0008): the processing authorization that reads TAVONEL_PROCESSING_ROLLOUT. The rollout function and
+// its grant caller live in lib/processing-workspace-grant.ts, which keeps its ux-billing-checkout owner.
+export const PROCESSING_GA_AFFECTED_PATHS = Object.freeze(['lib/customer-data-admission.ts']);
+export const PROCESSING_GA_AFFECTED_UNIT_FILES = Object.freeze(['lib/customer-data-admission.test.ts', 'lib/processing-workspace-grant.test.ts']);
+// trial-to-paid-20261109: the promote route that admits the free evaluation's one World, the consent summary's
+// stylesheet, and the three copy modules that described the old trial refusal.
+export const TRIAL_TO_PAID_AFFECTED_PATHS = Object.freeze(['app/api/collections/[id]/promote/route.ts', 'components/processing-consent-panel.module.css', 'lib/activation-cohorts.ts', 'lib/cookbook-content.ts', 'lib/keyword-map.ts', 'e2e/billing-lifecycle.spec.ts', 'app/api/collections/[id]/search/route.ts']);
+export const TRIAL_TO_PAID_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/billing-lifecycle.spec.ts']);
+export const TRIAL_TO_PAID_AFFECTED_UNIT_FILES = Object.freeze(['lib/activation-cohorts.test.ts', 'lib/activation-rate-limit.test.ts', 'lib/brand-copy.test.ts', 'lib/client-route-weight.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/cookbook-content.test.ts', 'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/funnel-events.test.ts', 'lib/keyword-map.test.ts', 'lib/marketing-analytics.test.ts', 'lib/model-attempt-receipt.test.ts', 'lib/openapi-response-shape.switch-off.test.ts', 'lib/openapi-response-shape.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/public-copy-purge.test.ts', 'lib/recipe-intent.test.ts', 'lib/remote-mcp.test.ts', 'lib/resources-hub.test.ts', 'lib/retrieval-compile-wiring.test.ts', 'lib/retrieval-search-authorization.test.ts', 'lib/seo-surface.test.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/trial-ai-access.test.ts', 'lib/world-activation-plan-gate.test.ts', 'lib/world-promotion-current-source.test.ts']);
 export const LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-provisions.test.ts']);
 // sli-alert-noise-20261109: the probe-history reader signs at the real clock; the two SLI routes stop passing an evaluation instant to it.
 export const SLI_ALERT_NOISE_AFFECTED_PATHS = Object.freeze(['app/api/internal/sli/route.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe-store.ts']);
@@ -3104,6 +3123,8 @@ export const AFFECTED_GROUPS = Object.freeze([
   // Solutions proof: the four exact paths above select three direct suites and the 1440 solutions browser suite.
   affectedGroup('solutions-proof', new RegExp(`^nextjs/(?:${exactPathAlternation(SOLUTIONS_PROOF_AFFECTED_PATHS)})$`),
     { unitFiles: SOLUTIONS_PROOF_AFFECTED_UNIT_FILES, browserFiles: SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES }),
+  affectedGroup('conversion-public', new RegExp(`^nextjs/(?:${exactPathAlternation(CONVERSION_PUBLIC_AFFECTED_PATHS)})$`),
+    { unitFiles: CONVERSION_PUBLIC_AFFECTED_UNIT_FILES }),
   // Evidence viewer overlay: the one exact stylesheet above selects its direct suite and the world-lifecycle browser suite.
   affectedGroup('evidence-viewer-overlay', new RegExp(`^nextjs/(?:${exactPathAlternation(EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS)})$`),
     { unitFiles: EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES, browserFiles: EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES }),
@@ -3216,7 +3237,8 @@ export const AFFECTED_GROUPS = Object.freeze([
   // visuals: the 21 exact paths above select 2 direct suites and no browser suite.
   affectedGroup('visuals', new RegExp(`^nextjs/(?:${exactPathAlternation(VISUALS_AFFECTED_PATHS)})$`),
     { unitFiles: VISUALS_AFFECTED_UNIT_FILES, browserFiles: VISUALS_AFFECTED_BROWSER_FILES }),
-  affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json|wrangler\.jsonc)$/, { worker: true }),
+  // README.md states the consumer's concurrency contract with wrangler.jsonc (ops capacity 2026-11-10), so it runs the same suite.
+  affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json|wrangler\.jsonc|README\.md)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.
   affectedGroup('ocr-cpu-worker', /^workers\/foundation-ocr-cpu-raster\/(?:app\.py|SYNTHETIC_TABLE_BINDING\.md|tests\/fixtures\/synthetic-grid-profile\.json|tests\/(?:test_synthetic_table_caller|test_cpu_ocr_v3_contract)\.py)$/),
@@ -3241,9 +3263,18 @@ export const AFFECTED_GROUPS = Object.freeze([
       'lib/connector-page-integrity.test.ts', 'lib/connector-sync-page.test.ts', 'lib/connector-provider-isolation.test.ts', 'lib/connector-source-identity.test.ts',
       'lib/source-version-guard.test.ts', 'lib/connector-replay-world-currency-migration.test.ts'], database: true, databaseTests: ['supabase/tests/dropbox_source_reconciliation.sql'],
       databaseDependencies: DROPBOX_DATABASE_DEPENDENCIES }),
+  // ops-backlog-sli-20261110: 2 exact paths select 3 direct suites and no browser suite.
+  affectedGroup('ops-backlog-sli-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(OPS_BACKLOG_SLI_AFFECTED_PATHS)})$`),
+    { unitFiles: OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES }),
   // legal-semicolons-20261109: 5 exact paths select 10 direct suites and no browser suite.
   affectedGroup('legal-semicolons-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(LEGAL_SEMICOLONS_AFFECTED_PATHS)})$`),
     { unitFiles: LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES }),
+  // processing-ga-20261109: 1 exact path selects 2 direct suites and no browser suite.
+  affectedGroup('processing-ga-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(PROCESSING_GA_AFFECTED_PATHS)})$`),
+    { unitFiles: PROCESSING_GA_AFFECTED_UNIT_FILES }),
+  // trial-to-paid-20261109: 7 exact paths select 27 direct suites and the one browser suite it edits.
+  affectedGroup('trial-to-paid-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(TRIAL_TO_PAID_AFFECTED_PATHS)})$`),
+    { unitFiles: TRIAL_TO_PAID_AFFECTED_UNIT_FILES, browserFiles: TRIAL_TO_PAID_AFFECTED_BROWSER_FILES }),
   // sli-alert-noise-20261109: 3 exact paths select 10 direct suites and no browser suite.
   affectedGroup('sli-alert-noise-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(SLI_ALERT_NOISE_AFFECTED_PATHS)})$`),
     { unitFiles: SLI_ALERT_NOISE_AFFECTED_UNIT_FILES }),
