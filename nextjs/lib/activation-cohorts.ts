@@ -268,7 +268,7 @@ export const DECISION_TABLE: readonly DecisionRow[] = [
     priorityAction: "Check whether the repeat need is real, and whether the plan's value, limits and cost explanation are fair and legible.",
     inputs: ["cohort.A2", "funnel.subscription_started"],
     availability: "computable",
-    availabilityNote: "A2 is a server cohort and the subscription is a provider receipt. Activation needs a paid plan -- Developer held by the workspace owner, or Team, which is sold through a conversation -- so this row's denominator is small by construction and no free-evaluation workspace can enter it.",
+    availabilityNote: "A2 is a server cohort and the subscription is a provider receipt. Since 2026-11-09 a free evaluation activates its one World, so A2 now holds free-evaluation workspaces as well as paid ones, and this row is the share of them that went on to subscribe.",
   },
   {
     id: "payment_without_next_month_use",

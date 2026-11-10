@@ -368,7 +368,9 @@ describe("product claims sync", () => {
       const source = read(route!);
       if (level === "activation") {
         expect(source, `${route} is advertised as World activation and does not require it`)
-          .toMatch(/authorizeFoundationProduct\([^)]*"activation",\s*\w+(?:\.\w+)*\.role\s*\)/s);
+          // Promote asks through authorizeWorldActivation (lib/trial-ai-access.ts), which hands the same
+          // role to authorizeFoundationProduct(.., "activation", role) and adds the trial's one World.
+          .toMatch(/authorizeFoundationProduct\([^)]*"activation",\s*\w+(?:\.\w+)*\.role\s*\)|authorizeWorldActivation\([^)]*\w+(?:\.\w+)*\.role,/s);
       } else if (level === "studio") {
         expect(source, `${route} is advertised as Team-only and does not require it`)
           .toMatch(/(?:authorizeFoundationProduct|authorizeFoundationRequest|requireFoundationSession)\([^)]*"studio"/s);

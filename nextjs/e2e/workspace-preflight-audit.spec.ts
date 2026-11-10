@@ -75,7 +75,7 @@ test("the preflight rows say what each staged file loses, before anything is upl
   await expect(spreadsheet).toContainText("Expected output: page, paragraph text, Locations on the source page");
 
   // The qualification claim, which is the one number on this panel a buyer would quote.
-  await expect(preflight).toContainText("supported formats carry a qualification receipt");
+  await expect(preflight).toContainText("supported formats have a recorded reading-quality test so far");
 
   // Nothing has left the browser. If this ever fails, the panel is no longer a preflight.
   // main's notice with the approval lineage off (production); the lineage's words only with it on.

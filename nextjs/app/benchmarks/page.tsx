@@ -5,6 +5,7 @@ import { PublicSitePage } from "@/components/public-site-chrome";
 import { EVIDENCE } from "@/lib/evidence-record";
 import recoveryReceipt from "@/public/research/receipts/R-01-recovery-counterfactual-olmocr-2026-08-08.json";
 import { TrustNext } from "@/components/trust-next";
+import { OwnFilesCta } from "@/components/own-files-cta";
 import {
   BENCHMARK_FAMILIES,
   NORTH_STAR,
@@ -482,7 +483,9 @@ export default function BenchmarksPage() {
                 <Link href={"/trust" as Route}>Trust</Link>
               </p>
             </div>
-            <TrustNext from="/benchmarks" />
+            {/* Conversion pass 2026-11-09: the page's one filled action is the start below, so the next trust step is quiet (BA-097). */}
+            <TrustNext from="/benchmarks" emphasis="quiet" />
+            <OwnFilesCta />
           </div>
         </div>
       </section>

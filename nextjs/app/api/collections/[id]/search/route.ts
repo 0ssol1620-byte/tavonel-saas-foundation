@@ -6,6 +6,7 @@ import {
   snapshotOf,
 } from "@/lib/consumer-context-api";
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
+import { spendTrialSessionQuery } from "@/lib/trial-ai-access";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { runRetrievalPipeline } from "@/lib/retrieval-pipeline";
 import { DERIVED_DATA_REFUSED } from "@/lib/derived-data-admission";
@@ -75,6 +76,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 25) {
     return NextResponse.json({ code: "LIMIT_INVALID" }, { status: 400, headers: NO_STORE });
   }
+  const metered = await spendTrialSessionQuery(auth.principal);
+  if (!metered.ok) return NextResponse.json({ code: metered.code }, { status: metered.status, headers: NO_STORE });
 
   // A bound context resolves its exact World here, before retrieval; legacy reads the active World
   // as before. Either way retrieval runs against this one row.

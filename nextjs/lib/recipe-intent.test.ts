@@ -332,8 +332,8 @@ describe("recipe preflight", () => {
     // Developer's half: self-serve, and only for the owner.
     expect(html).toContain("if you own the workspace");
     expect(html).toContain("/pricing");
-    // The refusal is as plain as the permission.
-    expect(html).toContain("its activation request is refused");
+    // The free evaluation's one World is as plain as the paid permission (P0 2026-11-09).
+    expect(html).toContain("A free evaluation activates one World, as its owner.");
     expect(html, "Team must not read as a checkout while it is sold through a conversation")
       .not.toMatch(/Team plan, which you can start on/);
   });

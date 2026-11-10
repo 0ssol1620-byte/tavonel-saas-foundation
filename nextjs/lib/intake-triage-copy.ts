@@ -1,10 +1,27 @@
+import { PROCESSING_CEILING, PROCESSING_CEILING_MIB } from "../../shared/intakeCeiling";
+
+/*
+  FUNNEL-SIGNED-IN #7: the preflight printed manifest tokens with the underscores taken out --
+  "read through cdr sanitized pdf and ocr", "at most 5 mib per source". The ones a customer meets
+  on a PDF are said in plain words, with the size in MB as everywhere else on the site. The numbers
+  come from shared/intakeCeiling.ts, the same constants that build the tokens.
+*/
+const PLAIN_TOKENS: Readonly<Record<string, string>> = {
+  read_through_cdr_sanitized_pdf_and_ocr: "read from a cleaned copy of the file with text recognition",
+  no_native_structure_reader_yet: "headings and sections are not read as structure yet",
+  no_visual_native_reconciliation: "text is not yet cross-checked between the page image and the file",
+  [`at_most_${PROCESSING_CEILING_MIB}_mib_per_source`]: `up to ${PROCESSING_CEILING_MIB} MB per file`,
+  [`at_most_${PROCESSING_CEILING.maxSourcePages}_pages_per_source`]: `up to ${PROCESSING_CEILING.maxSourcePages} pages per file`,
+  [`over_the_${PROCESSING_CEILING_MIB}_mib_processing_ceiling`]: `over the ${PROCESSING_CEILING_MIB} MB per-file limit`,
+};
+
 /** Display translations only. API values and qualification decisions stay unchanged. */
 export function intakeDisplayToken(token: string): string {
   switch (token) {
     case "BEST_EFFORT": return "Supported with limitations";
     case "bbox1000": return "Locations on the source page";
     case "entire_affected_source_version_set": return "All affected files and versions";
-    default: return token.replaceAll("_", " ");
+    default: return PLAIN_TOKENS[token] ?? token.replaceAll("_", " ");
   }
 }
 

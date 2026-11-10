@@ -97,13 +97,9 @@ const EXEMPT = {
   research: "research index",
   "research/notes": "noindex-adjacent research: 13.20 puts failure records here, with context",
   /*
-    Still exempt because it is noindex, no longer exempt in practice: the 2026-09-22 copy
-    cleanup took "does not prove semantic quality" out of the summary, which was the one
-    phrase this entry was covering. The route keeps the entry -- it is a noindex Resources
-    page and 13.19 still files it there -- and the test below pins the copy so the phrase
-    cannot come back under cover of the exemption.
+    `reproducibility` left this list on 2026-11-09 when the page became indexable (conversion
+    pass). Its copy was already clean, and the test below still pins it.
   */
-  reproducibility: "noindex: 13.19 files it under Resources",
   // `benchmarks` left this list for SALES_SURFACES when it stopped being a noindex 404.
   customers: "noindex",
   "research/experiments": "noindex",

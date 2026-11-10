@@ -255,7 +255,7 @@ test.describe("notice live regions (journey A9)", () => {
     const checkout = await holdCheckoutRefusal(page, "PILOT_ACCESS_REQUIRED", 403);
 
     await page.goto("/pricing", { waitUntil: "domcontentloaded" });
-    const developer = page.getByRole("link", { name: "Get Developer access", exact: true });
+    const developer = page.getByRole("link", { name: "Buy Developer — $29/month", exact: true });
     await expect(developer).toBeVisible();
     expect(await markEmptyAlertRegions(page), "no empty alert region was waiting for the reply").toBeGreaterThan(0);
     await developer.click();

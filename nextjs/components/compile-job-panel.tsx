@@ -229,6 +229,8 @@ export function CompileJobPanel({
       {job.state === "ready" && job.collectionId && /^collection-[a-f0-9]{32}$/.test(job.collectionId) ? (
         <div className="workspace-intake-actions">
           <a className="btn" href={`/workspace?collection=${encodeURIComponent(job.collectionId)}`}>Inspect compiled result</a>
+          {/* FUNNEL-SIGNED-IN #4: the activation form sat behind Home, Review and a scroll. */}
+          <a href={`/workspace/review?collection=${encodeURIComponent(job.collectionId)}#activate`}>Review and activate</a>
         </div>
       ) : null}
       <progress

@@ -10,6 +10,7 @@ vi.mock("./activation-policy", async (importOriginal) => {
   return { activationPolicy: { ...activationPolicy, customerData: { ...activationPolicy.customerData, get enabled() { return launch.open; } } } };
 });
 import { canAdmitCustomerSource, readCustomerSourceAuthorization } from "./customer-data-admission";
+import { processingCohortRefusal, processingRolloutRefusal } from "./processing-workspace-grant";
 
 const revision = "a".repeat(40);
 const env = { TAVONEL_CUSTOMER_DATA_GATE_VERSION: "v2", VERCEL_GIT_COMMIT_SHA: revision };
@@ -152,5 +153,79 @@ describe("D-19 launch canary: gate v2 and a cohort of one to three workspaces", 
     expect(await canAdmitCustomerSource(PILOT, "direct_upload", {})).toBe(true);
     expect(await canAdmitCustomerSource(PILOT, "direct_upload", canary(undefined))).toBe(true);
     expect(await canAdmitCustomerSource("pilot-a4", "direct_upload", canary(wide.join(",")))).toBe(true);
+  });
+});
+
+/*
+  ADR 0008 (2026-11-09): general availability. TAVONEL_PROCESSING_ROLLOUT=general under gate v2 lets
+  every workspace through the rollout check, and the v2 grant reader still decides. Unset is D-19
+  exactly. processingCohortRefusal stays the named-cohort check that cohort-scoped features read
+  (library organize `on`, W2-B2), so general does not open them.
+*/
+describe("ADR 0008: general availability (TAVONEL_PROCESSING_ROLLOUT)", () => {
+  const PILOT = "pilot-969dc192daa24119";
+  const OTHER = "pilot-1111111111114111";
+  const ga = (overrides: Record<string, string | undefined> = {}) => ({
+    VERCEL_GIT_COMMIT_SHA: revision, TAVONEL_CUSTOMER_DATA_GATE_VERSION: "v2",
+    TAVONEL_PROCESSING_WORKSPACE_COHORT: PILOT, TAVONEL_PROCESSING_ROLLOUT: "general", ...overrides,
+  });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    launch.open = true;
+    legacy.mockResolvedValue({ ok: true });
+    scoped.mockResolvedValue({ ok: true, authorization: { allowed: true } });
+  });
+
+  it("admits a workspace outside the cohort through its v2 grant, cohort set or not", async () => {
+    expect(await canAdmitCustomerSource(OTHER, "direct_upload", ga())).toBe(true);
+    expect(await canAdmitCustomerSource(OTHER, "connector", ga({ TAVONEL_PROCESSING_WORKSPACE_COHORT: undefined }))).toBe(true);
+    expect(scoped).toHaveBeenLastCalledWith(OTHER, OTHER, "connector", revision, expect.any(Date), expect.anything());
+    expect(legacy).not.toHaveBeenCalled();
+  });
+
+  it("lifts the count and nothing else: the grant reader's refusal still closes the workspace", async () => {
+    for (const code of ["SCOPED_WORKSPACE_NOT_FOUND", "SCOPED_RELEASE_NOT_FOUND", "SCOPED_WORKSPACE_REFUSED", "SCOPED_GATE_STORE_FAILED"]) {
+      scoped.mockResolvedValue({ ok: false, code });
+      expect(await readCustomerSourceAuthorization(OTHER, "direct_upload", ga()), code).toEqual({ ok: false, code });
+    }
+    expect(legacy).not.toHaveBeenCalled();
+    expect(await canAdmitCustomerSource(OTHER, "direct_upload", ga({ VERCEL_GIT_COMMIT_SHA: undefined }))).toBe(false);
+  });
+
+  it.each(["", " ", "general ", "General", "all", "*", "on", "true"])("a wrong rollout value (%j) admits nobody", async (value) => {
+    for (const workspace of [PILOT, OTHER]) {
+      expect(await readCustomerSourceAuthorization(workspace, "direct_upload", ga({ TAVONEL_PROCESSING_ROLLOUT: value })))
+        .toEqual({ ok: false, code: "PROCESSING_COHORT_CONFIG_INVALID" });
+    }
+    expect(scoped).not.toHaveBeenCalled();
+  });
+
+  it("general under any gate but v2 admits nobody, the launch switch on or off", async () => {
+    for (const open of [true, false]) {
+      launch.open = open;
+      for (const version of [undefined, "", "v1"]) {
+        expect(await readCustomerSourceAuthorization(PILOT, "direct_upload", ga({ TAVONEL_CUSTOMER_DATA_GATE_VERSION: version })))
+          .toEqual({ ok: false, code: "PROCESSING_COHORT_CONFIG_INVALID" });
+      }
+    }
+    expect(scoped).not.toHaveBeenCalled();
+    expect(legacy).not.toHaveBeenCalled();
+  });
+
+  it("rollout unset is the D-19 canary exactly: cohort required, three at most, outsiders excluded", async () => {
+    const canary = ga({ TAVONEL_PROCESSING_ROLLOUT: undefined });
+    expect(await canAdmitCustomerSource(PILOT, "direct_upload", canary)).toBe(true);
+    expect(await readCustomerSourceAuthorization(OTHER, "direct_upload", canary)).toEqual({ ok: false, code: "PROCESSING_COHORT_EXCLUDED" });
+    for (const cohort of [undefined, "", "pilot-a1,pilot-a2,pilot-a3,pilot-a4"]) {
+      expect(await readCustomerSourceAuthorization("pilot-a1", "direct_upload", { ...canary, TAVONEL_PROCESSING_WORKSPACE_COHORT: cohort }))
+        .toEqual({ ok: false, code: "PROCESSING_COHORT_CONFIG_INVALID" });
+    }
+  });
+
+  it("cohort-scoped features keep reading the named cohort: general does not open them", () => {
+    expect(processingRolloutRefusal(OTHER, ga())).toBeNull();
+    expect(processingCohortRefusal(OTHER, ga())).toBe("PROCESSING_COHORT_EXCLUDED");
+    expect(processingCohortRefusal(PILOT, ga())).toBeNull();
+    expect(processingCohortRefusal(PILOT, ga({ TAVONEL_PROCESSING_WORKSPACE_COHORT: undefined }))).toBe("PROCESSING_COHORT_CONFIG_INVALID");
   });
 });

@@ -46,7 +46,30 @@ export type OperationalReason =
   | "synthetic_transaction_refused"
   | "window_failure_budget_exceeded"
   | "model_provider_circuit_open"
-  | "model_provider_circuit_state_unavailable";
+  | "model_provider_circuit_state_unavailable"
+  | "compile_backlog_age_exceeded"
+  | "compile_backlog_unavailable";
+
+/*
+  Compile backlog age (GA ops audit gap 4, 2026-11-10): how long the oldest runnable compile job
+  has waited since anything last moved it -- `updated_at` of the head of the scheduler's own
+  oldest-first queue (compile-job-store readOpenCompileJobs). A queue that is moving keeps this
+  near the one-minute cron; a stuck or starved queue grows it without bound.
+
+  Thresholds are a judgement, not a measurement: 15 minutes is the same bar as
+  DOCUMENT_NEVER_ARRIVED and the queue-liveness stall, 60 minutes is four of them. An unreadable
+  queue is never an empty one: it is its own warning, like an unreadable provider circuit.
+*/
+export const COMPILE_BACKLOG_WARNING_SECONDS = 15 * 60;
+export const COMPILE_BACKLOG_CRITICAL_SECONDS = 60 * 60;
+
+export type CompileBacklogReading = { ok: true; oldestWaitingSince: string | null } | { ok: false };
+
+export type CompileBacklogHealth = {
+  status: "ok" | "unavailable";
+  /** Null when the queue holds no runnable job, or could not be read. */
+  oldestWaitSeconds: number | null;
+};
 
 /*
   Paid-provider health, as the durable circuit already records it. An open breaker is a warning,
@@ -96,6 +119,7 @@ export type OperationalSli = {
     latencySamples: number;
   };
   modelProviders: ModelProviderHealth[];
+  compileBacklog?: CompileBacklogHealth;
   alerts: OperationalAlert[];
 };
 
@@ -110,6 +134,8 @@ export type OperationalSliOptions = {
   minimumWindowSamples?: number;
   /** Already-read circuit state. This module stays pure; the caller performs the provider I/O. */
   modelProviderCircuits?: readonly ModelProviderCircuitReading[];
+  /** Already-read oldest runnable compile job. Omitted, the evaluation carries no backlog field. */
+  compileBacklog?: CompileBacklogReading;
 };
 
 type StoredHistory = { ok: true; history: ProbeHistory } | { ok: false; code: string };
@@ -152,7 +178,24 @@ function alert(severity: OperationalAlert["severity"], reason: OperationalReason
 
 const PROVIDER_NAME = /^[a-z0-9][a-z0-9._-]{1,63}$/;
 
-type ProviderReading = { health: ModelProviderHealth[]; alerts: OperationalAlert[] };
+type ProviderReading = { health: ModelProviderHealth[]; alerts: OperationalAlert[]; compileBacklog?: CompileBacklogHealth };
+
+/** Bounded projection of the already-read backlog head. Unreadable or untrusted is never healthy. */
+function withCompileBacklog(providers: ProviderReading, reading: CompileBacklogReading | undefined, nowMs: number): ProviderReading {
+  if (!reading) return providers;
+  const since = reading.ok && reading.oldestWaitingSince !== null ? Date.parse(reading.oldestWaitingSince) : null;
+  if (!reading.ok || (since !== null && !Number.isFinite(since))) {
+    return { ...providers, compileBacklog: { status: "unavailable", oldestWaitSeconds: null },
+      alerts: [...providers.alerts, alert("warning", "compile_backlog_unavailable")] };
+  }
+  // A job touched after the slot began has waited no time at all; the slot is the evaluation's now.
+  const oldestWaitSeconds = since === null ? null : Math.max(0, Math.floor((nowMs - since) / 1_000));
+  const alerts = [...providers.alerts];
+  if (oldestWaitSeconds !== null && oldestWaitSeconds > COMPILE_BACKLOG_WARNING_SECONDS) {
+    alerts.push(alert(oldestWaitSeconds > COMPILE_BACKLOG_CRITICAL_SECONDS ? "critical" : "warning", "compile_backlog_age_exceeded"));
+  }
+  return { ...providers, compileBacklog: { status: "ok", oldestWaitSeconds }, alerts };
+}
 
 /** Bounded projection of already-read circuit state. An unreadable circuit is never "closed". */
 function modelProviderHealth(readings: readonly ModelProviderCircuitReading[] | undefined): ProviderReading {
@@ -193,6 +236,7 @@ function emptyResult(
     availability: { required, passing: 0, total: required.length, ratio: 0, failed: [], unobserved: [...required] },
     window: { passingRuns: 0, totalRuns: 0, ratio: null, successfulRequestLatencyP95Ms: null, latencySamples: 0 },
     modelProviders: providers.health,
+    ...(providers.compileBacklog ? { compileBacklog: providers.compileBacklog } : {}),
     alerts: [alert("critical", reason), ...providers.alerts],
   };
 }
@@ -212,7 +256,9 @@ export function evaluateOperationalSli(stored: StoredHistory, options: Operation
   const required = uniqueRequired(options.requiredRequestChecks);
   const evaluatedAt = now.toISOString();
 
-  const providers = modelProviderHealth(options.modelProviderCircuits);
+  // The compile backlog rides with provider health: independent of probe freshness, appended on
+  // every branch, able to degrade an available state and never to clear a blocked or stale one.
+  const providers = withCompileBacklog(modelProviderHealth(options.modelProviderCircuits), options.compileBacklog, nowMs);
 
   if (!stored.ok) return emptyResult(evaluatedAt, ttlMs, required, "history_unavailable", providers);
   if (stored.history.runs.length === 0) {
@@ -287,6 +333,7 @@ export function evaluateOperationalSli(stored: StoredHistory, options: Operation
       latencySamples: latencySamples.length,
     },
     modelProviders: providers.health,
+    ...(providers.compileBacklog ? { compileBacklog: providers.compileBacklog } : {}),
     alerts,
   };
 }

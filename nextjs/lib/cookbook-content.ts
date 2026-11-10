@@ -177,8 +177,8 @@ const DEVELOPER_CLAUSE = DEVELOPER.saleChannel === "self_serve"
 // delegated decision, 2026-09-11. Both halves below are read off the catalog.
 const ACTIVATION_SENTENCE =
   `A compile produces a candidate, and a candidate becomes an active World only when a person activates it in the workspace. `
-  + `That step needs a paid plan: ${DEVELOPER_CLAUSE}, or the ${TEAM.label} plan, which is ${ACTIVATION_CLAUSE}. `
-  + `A free evaluation can upload, compile, review and export; its activation request is refused, so decide the plan before you plan the run.`;
+  + `A free evaluation activates one World, as its owner. More than that needs a paid plan: ${DEVELOPER_CLAUSE}, or the ${TEAM.label} plan, which is ${ACTIVATION_CLAUSE}. `
+  + `Decide the plan before you plan a run that needs a second World.`;
 
 const READING = CAPABILITY_MANIFEST.entries.find((entry) => entry.mime === "application/pdf");
 if (!READING) {

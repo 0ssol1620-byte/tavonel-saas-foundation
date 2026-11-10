@@ -40,7 +40,7 @@ import AskOverlay from "./ask-overlay";
 import type { TechnicalSelection } from "./technical-details";
 import styles from "./explore-stage.module.css";
 import { useNarrowStage, useReducedMotion } from "@/components/world-visual/use-stage-media";
-import { PRIMARY_NAV, type SiteLink } from "@/lib/site-navigation";
+import { PRIMARY_NAV, SELF_SERVE_CTA, START_FREE_LABEL, type SiteLink } from "@/lib/site-navigation";
 import {
   EXPLORE_ACTS,
   EXPLORE_COPY,
@@ -89,8 +89,11 @@ type Props = {
 export default function ExploreStage({ access, model, layout, change, answers, technical, capturedOn }: Props) {
   const exitLinks = [...NAV_EXITS, access];
   // The closing scene's primary action is the same access action, not a second copy of it.
+  // Conversion pass 2026-11-09: at the end of the proof, the start action carries its allowance.
   const endActions = EXPLORE_COPY.endActions.map((action) =>
-    action.primary ? { ...action, label: access.label, href: access.href } : action,
+    action.primary
+      ? { ...action, label: access.href === SELF_SERVE_CTA.href ? START_FREE_LABEL : access.label, href: access.href }
+      : action,
   );
   const reduced = useReducedMotion();
   const narrow = useNarrowStage();
@@ -378,8 +381,9 @@ export default function ExploreStage({ access, model, layout, change, answers, t
         */}
         <div className={styles.headerActions}>
           <nav className={styles.siteLinks} aria-label="TAVONEL">
+            {/* Conversion pass 2026-11-09 (funnel audit fix 3): Pricing and the access action stay on a phone, Product folds. */}
             {exitLinks.map((link) => (
-              <Link key={link.href} href={link.href as Route}>{link.label}</Link>
+              <Link key={link.href} href={link.href as Route} data-phone={link.href === "/product" ? undefined : link.href === "/pricing" ? "pricing" : "start"}>{link.label}</Link>
             ))}
           </nav>
           <button

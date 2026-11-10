@@ -159,6 +159,12 @@
 .one-path-workspace .workspace-intake-copy > small { display: block; margin-top: 16px; color: var(--text-lo); font: 12px var(--f-sans); letter-spacing: 0; }
 .one-path-workspace .workspace-intake-gated-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 16px auto 0; }
 .one-path-workspace .workspace-intake-gated-actions .btn { min-height: 44px; }
+/* FUNNEL-SIGNED-IN #5: `.workspace-body button` clears every button's ground, so the one action this card asks for
+   ("Review processing terms") read as a second outline beside the example link. The filled `.btn` is filled here. */
+.one-path-workspace .workspace-intake-gated-actions .btn:not(.ghost, :disabled) { background: var(--text-hi); border-color: var(--text-hi); color: var(--ground); }
+@media (hover: hover) and (pointer: fine) {
+  .one-path-workspace .workspace-intake-gated-actions .btn:not(.ghost, :disabled):hover { background: var(--text-max); border-color: var(--text-max); }
+}
 .one-path-workspace .workspace-intake-limits { margin-top: 6px !important; }
 .one-path-workspace .workspace-intake-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
 .one-path-workspace .workspace-intake-actions button { min-height: 44px; padding: 0 16px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: transparent; color: var(--text-hi); font-size: 14px; }

@@ -8,6 +8,7 @@ import {
   snapshotOf,
 } from "@/lib/consumer-context-api";
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
+import { spendTrialSessionQuery } from "@/lib/trial-ai-access";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
@@ -294,6 +295,8 @@ export async function POST(
       { status: 400, headers: NO_STORE }
     );
   }
+  const metered = await spendTrialSessionQuery(auth.principal);
+  if (!metered.ok) return NextResponse.json({ code: metered.code }, { status: metered.status, headers: NO_STORE });
 
   // Resolve the current World before consulting a cache. A previous user's answer or a
   // superseded World must never be returned merely because the HTTP key was reused.

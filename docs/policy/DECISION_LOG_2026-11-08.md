@@ -89,3 +89,13 @@ SEC fair-access 정책은 요청자 이름과 연락 이메일을 요구한다. 
 | `TAVONEL_ASK_GENERATION_ENABLED` | 미설정 | F-6: E3 Arena gate 뒤 web Ask cohort만 |
 
 mode 값 `on`은 cohort 안에서만 효력이 있다. cohort 밖으로 넓히는 것은 별도 reviewed change다.
+
+### 추가 2026-11-09 — 원격 MCP GA (`TAVONEL_REMOTE_MCP_COHORT=all`)와 서명 receipt
+
+- PR #215가 원격 MCP cohort에 `all`(정확히 이 값 단독)을 더했다. 이것이 F-1 canary 뒤 원격 MCP를 모든 workspace로 넓히는
+  reviewed change다. 넓히는 것은 workspace 목록뿐이다. plan, trial, scope, 키별 rate limit, tenant 검사는 그대로다.
+- `TAVONEL_ASK_RECEIPT_SIGNED=on`은 같은 cohort를 읽는다. 그래서 `all`은 서명 receipt도 MCP, REST, web Ask의 모든 workspace로
+  넓힌다. 이 기록은 그 확장을 승인하지 않는다(위 부록 A 마지막 줄). PR #215 리뷰 R1 B1.
+- 규칙: `all`을 넣기 전에 production의 `TAVONEL_ASK_RECEIPT_SIGNED`가 `on`이 아님을 확인한다. 2026-11-09 확인 시 미설정이다.
+  `on`을 `all`과 함께 쓰는 것은 별도 reviewed change이고, signer 설정을 확인한 receipt가 먼저 있어야 한다. signer가 틀리면
+  모든 Ask가 `503 ANSWER_SIGNING_UNAVAILABLE`이다. 절차는 `docs/runbooks/RELEASE_ORDER.md` "원격 MCP production 활성화" 10단계다.
