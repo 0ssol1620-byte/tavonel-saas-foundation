@@ -37,7 +37,7 @@ $restore$;
 drop function public.seal_source_deletion_inventory(text, text, jsonb);
 drop function public.discard_source_deletion_inventory_digests(text);
 drop function public.read_source_deletion_inventory_digests(text);
-drop function public.record_source_deletion_inventory_digest(text, text, bigint, text);
+drop function public.record_source_deletion_inventory_digest(text, text, bigint, text, text);
 drop table public.source_deletion_inventory_digests;
 
 commit;

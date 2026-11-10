@@ -10,7 +10,8 @@ export type CustomerSourceInventory = {
   schemaVersion: "tavonel.customer_source_inventory.v1";
   workspaceKey: string;
   documentId: string;
-  objects: SourceInventoryObject[];
+  /** Key and size only: the ETag is the deletion worker's listing identity, not part of the receipt. */
+  objects: Array<Pick<SourceInventoryObject, "key" | "sizeBytes">>;
   totalBytes: number;
   manifestSha256: string;
   legalHoldState: LegalHoldState;
@@ -62,7 +63,7 @@ export async function inventoryCustomerSource(input: {
       schemaVersion: "tavonel.customer_source_inventory.v1",
       workspaceKey: input.workspaceKey,
       documentId: input.documentId,
-      objects: before.objects,
+      objects: before.objects.map(({ key, sizeBytes }) => ({ key, sizeBytes })),
       totalBytes: before.objects.reduce((sum, object) => sum + object.sizeBytes, 0),
       manifestSha256: manifestSha256(input.workspaceKey, input.documentId, before.objects),
       legalHoldState,

@@ -15,10 +15,10 @@ vi.mock("./supabase-admin", () => ({
 
 const OBJECTS = {
   "pilot-acme01": [
-    { key: "immutable/pilot-acme01/doc-1/v1/sanitized.pdf", sizeBytes: 20 },
-    { key: "quarantine/pilot-acme01/doc-1/source", sizeBytes: 10 },
+    { key: "immutable/pilot-acme01/doc-1/v1/sanitized.pdf", sizeBytes: 20, etag: "e1" },
+    { key: "quarantine/pilot-acme01/doc-1/source", sizeBytes: 10, etag: "e2" },
   ],
-} as Record<string, { key: string; sizeBytes: number }[]>;
+} as Record<string, { key: string; sizeBytes: number; etag: string }[]>;
 
 const list = vi.fn(async (workspaceKey: string) =>
   ({ ok: true as const, objects: OBJECTS[workspaceKey] ?? [] }));

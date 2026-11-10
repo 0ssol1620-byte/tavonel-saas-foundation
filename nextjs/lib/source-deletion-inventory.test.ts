@@ -30,8 +30,8 @@ const candidateFor = (overrides: Partial<{ deletionId: string; documentIds: stri
   ok: true as const,
   candidate: { deletionId, workspaceKey, sourceId, documentIds: [documentId], worldObjectKeys: [] as string[], ...overrides },
 });
-const part = (n: number, sizeBytes = 5): SourceInventoryObject =>
-  ({ key: `quarantine/${workspaceKey}/${documentId}/segments/part-${String(n).padStart(5, "0")}`, sizeBytes });
+const part = (n: number, sizeBytes = 5, etag = "e1"): SourceInventoryObject =>
+  ({ key: `quarantine/${workspaceKey}/${documentId}/segments/part-${String(n).padStart(5, "0")}`, sizeBytes, etag });
 const hashOf = (object: SourceInventoryObject) => `sha256:${createHash("sha256").update(`${object.key}:${object.sizeBytes}`).digest("hex")}`;
 const hasher = () => vi.fn(async (_s: unknown, _w: string, object: SourceInventoryObject) => ({
   ok: true as const, object: { ...object, sha256: hashOf(object) },
@@ -78,7 +78,7 @@ describe("source deletion inventory attestation", () => {
   });
 
   it("hashes a stable complete listing, persists each digest and seals that exact set", async () => {
-    const objects = [{ key: `quarantine/${workspaceKey}/${documentId}/source`, sizeBytes: 5 }];
+    const objects = [{ key: `quarantine/${workspaceKey}/${documentId}/source`, sizeBytes: 5, etag: "e1" }];
     const list = vi.fn(async () => ({ ok: true as const, objects }));
     const hash = hasher();
     const store = digestStore();
@@ -99,8 +99,8 @@ describe("source deletion inventory attestation", () => {
     const present = worldKey("1");
     const absent = worldKey("2");
     const objects = [
-      { key: present, sizeBytes: 7 },
-      { key: `quarantine/${workspaceKey}/${documentId}/source`, sizeBytes: 5 },
+      { key: present, sizeBytes: 7, etag: "e1" },
+      { key: `quarantine/${workspaceKey}/${documentId}/source`, sizeBytes: 5, etag: "e1" },
     ];
     const list = vi.fn(async () => ({ ok: true as const, objects }));
     const store = digestStore();
@@ -162,7 +162,7 @@ describe("source deletion inventory attestation", () => {
     });
     const list = vi.fn(async (_s: unknown, _w: string, ids: readonly string[]) => ({
       ok: true as const,
-      objects: ids[0] === documentId ? [] : [{ key: `quarantine/${workspaceKey}/${ids[0]}/source`, sizeBytes: 5 }],
+      objects: ids[0] === documentId ? [] : [{ key: `quarantine/${workspaceKey}/${ids[0]}/source`, sizeBytes: 5, etag: "e1" }],
     }));
     const store = digestStore();
     const deps = { signer, list, hash: hasher(), readCandidate, ...store, recordFailure };
@@ -177,8 +177,8 @@ describe("source deletion inventory attestation", () => {
   });
 
   it("refuses a prefix that changes while bytes are being hashed", async () => {
-    const first = [{ key: `quarantine/${workspaceKey}/${documentId}/source`, sizeBytes: 5 }];
-    const second = [...first, { key: `quarantine/${workspaceKey}/${documentId}/cdr-reject.json`, sizeBytes: 9 }];
+    const first = [{ key: `quarantine/${workspaceKey}/${documentId}/source`, sizeBytes: 5, etag: "e1" }];
+    const second = [...first, { key: `quarantine/${workspaceKey}/${documentId}/cdr-reject.json`, sizeBytes: 9, etag: "e1" }];
     const list = vi.fn()
       .mockResolvedValueOnce({ ok: true as const, objects: first })
       .mockResolvedValueOnce({ ok: true as const, objects: second });
@@ -275,6 +275,23 @@ describe("source deletion inventory attestation", () => {
     expect(store.sealed[0]).toEqual([part(1, 6), part(2, 5)].map((object) => ({ ...object, sha256: hashOf(object) })));
   });
 
+  it("discards and hashes again when a key was rewritten at the same size between runs (its ETag moved)", async () => {
+    const list = vi.fn()
+      .mockResolvedValueOnce({ ok: true as const, objects: [part(1, 5), part(2, 5)] })
+      .mockResolvedValue({ ok: true as const, objects: [part(1, 5, "e2"), part(2, 5)] });
+    const hash = hasher();
+    const store = digestStore();
+    let clock = 0;
+    const deps = { signer, list, hash, ...store, now: () => (clock += HASH_BUDGET_MS), readCandidate: vi.fn(async () => candidateFor()) };
+
+    await expect(runSourceDeletionInventoryAttestation(deps)).resolves.toMatchObject({ code: "IN_PROGRESS", hashedCount: 1 });
+    expect(store.rows.get(part(1).key)?.etag).toBe("e1");
+    await expect(runSourceDeletionInventoryAttestation(deps)).resolves.toMatchObject({ code: "IN_PROGRESS", hashedCount: 1 });
+    expect(store.discardDigests).toHaveBeenCalledOnce();
+    await expect(runSourceDeletionInventoryAttestation(deps)).resolves.toMatchObject({ code: "ATTESTED", artifactCount: 2 });
+    expect(store.sealed[0]?.map((object) => object.etag)).toEqual(["e2", "e1"]);
+  });
+
   it("seals nothing when an overlapping run changed the digest set after this run's listing", async () => {
     const objects = [part(1), part(2)];
     const list = vi.fn(async () => ({ ok: true as const, objects }));
@@ -316,7 +333,7 @@ describe("source deletion R2 inventory", () => {
       const key = prefix.endsWith("/")
         ? `${prefix}${prefix.startsWith("quarantine/") ? "source" : "sanitized.pdf"}`
         : "";
-      const xml = `<?xml version="1.0"?><ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>${key}</Key><Size>5</Size></Contents></ListBucketResult>`;
+      const xml = `<?xml version="1.0"?><ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>${key}</Key><Size>5</Size><ETag>&quot;e1&quot;</ETag></Contents></ListBucketResult>`;
       return new Response(xml, { status: 200 });
     });
     const result = await listFoundationSourceInventory(
@@ -325,8 +342,8 @@ describe("source deletion R2 inventory", () => {
     expect(result).toEqual({
       ok: true,
       objects: [
-        { key: `immutable/${workspaceKey}/${workspaceKey}/${documentId}/sanitized.pdf`, sizeBytes: 5 },
-        { key: `quarantine/${workspaceKey}/${documentId}/source`, sizeBytes: 5 },
+        { key: `immutable/${workspaceKey}/${workspaceKey}/${documentId}/sanitized.pdf`, sizeBytes: 5, etag: "e1" },
+        { key: `quarantine/${workspaceKey}/${documentId}/source`, sizeBytes: 5, etag: "e1" },
       ],
     });
     expect(fetcher).toHaveBeenCalledTimes(2);
@@ -343,11 +360,11 @@ describe("source deletion R2 inventory", () => {
         : prefix === absent ? [`${absent}.bak`] : [];
       // One page with more to come: an exact World key must not follow the cursor.
       const truncated = prefix === present ? "<IsTruncated>true</IsTruncated><NextContinuationToken>next</NextContinuationToken>" : "<IsTruncated>false</IsTruncated>";
-      const xml = `<?xml version="1.0"?><ListBucketResult>${truncated}${keys.map((key) => `<Contents><Key>${key}</Key><Size>7</Size></Contents>`).join("")}</ListBucketResult>`;
+      const xml = `<?xml version="1.0"?><ListBucketResult>${truncated}${keys.map((key) => `<Contents><Key>${key}</Key><Size>7</Size><ETag>"e1"</ETag></Contents>`).join("")}</ListBucketResult>`;
       return new Response(xml, { status: 200 });
     });
     const result = await listFoundationSourceInventory(signer, workspaceKey, [], [absent, present], fetcher);
-    expect(result).toEqual({ ok: true, objects: [{ key: present, sizeBytes: 7 }] });
+    expect(result).toEqual({ ok: true, objects: [{ key: present, sizeBytes: 7, etag: "e1" }] });
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(fetcher.mock.calls.every(([input]) => new URL(String(input)).searchParams.get("max-keys") === "1")).toBe(true);
   });
@@ -373,6 +390,7 @@ describe("source deletion R2 inventory", () => {
     const object = {
       key: `quarantine/${workspaceKey}/${documentId}/source`,
       sizeBytes: 5,
+      etag: "e1",
     };
     const fetcher = vi.fn(async () => new Response("hello", {
       status: 200, headers: { "content-length": "5" },
@@ -395,5 +413,23 @@ describe("source deletion R2 inventory", () => {
       })),
     );
     expect(changed).toEqual({ ok: false, code: "SOURCE_INVENTORY_LIST_CHANGED" });
+
+    // Rewritten at the same size between the listing and the read: the served ETag says so.
+    const rewritten = await hashFoundationSourceInventoryObject(
+      signer, workspaceKey, object,
+      vi.fn(async () => new Response("hullo", {
+        status: 200, headers: { "content-length": "5", etag: '"e2"' },
+      })),
+    );
+    expect(rewritten).toEqual({ ok: false, code: "SOURCE_INVENTORY_LIST_CHANGED" });
+  });
+
+  it("refuses a listing entry with no ETag, because a same-size rewrite could not be seen", async () => {
+    const fetcher = vi.fn(async () => new Response(
+      `<?xml version="1.0"?><ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>quarantine/${workspaceKey}/${documentId}/source</Key><Size>5</Size></Contents></ListBucketResult>`,
+      { status: 200 },
+    ));
+    await expect(listFoundationSourceInventory(signer, workspaceKey, [documentId], [], fetcher))
+      .resolves.toEqual({ ok: false, code: "SOURCE_INVENTORY_LIST_INVALID" });
   });
 });

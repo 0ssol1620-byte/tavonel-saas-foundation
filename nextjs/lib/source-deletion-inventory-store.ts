@@ -1,6 +1,6 @@
 import { isCollectionCandidateKey } from "./immutable-keys";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
-import { MAX_INVENTORY_OBJECTS, type SourceInventoryHashedObject } from "./source-deletion-inventory-r2";
+import { INVENTORY_ETAG_PATTERN, MAX_INVENTORY_OBJECTS, type SourceInventoryHashedObject } from "./source-deletion-inventory-r2";
 
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 // Connector sources are `src-<sha256 hex>`; upload tombstones (20260927102000) use the document uuid.
@@ -129,9 +129,10 @@ function digests(value: unknown): SourceDeletionInventoryDigests | null {
     if (
       typeof object.key !== "string" || object.key.length < 1 || object.key.length > 1024 ||
       typeof object.sha256 !== "string" || !SHA256.test(object.sha256) ||
-      typeof object.sizeBytes !== "number" || !Number.isSafeInteger(object.sizeBytes) || object.sizeBytes < 0
+      typeof object.sizeBytes !== "number" || !Number.isSafeInteger(object.sizeBytes) || object.sizeBytes < 0 ||
+      typeof object.etag !== "string" || !INVENTORY_ETAG_PATTERN.test(object.etag)
     ) return null;
-    objects.push({ key: object.key, sizeBytes: object.sizeBytes, sha256: object.sha256 });
+    objects.push({ key: object.key, sizeBytes: object.sizeBytes, etag: object.etag, sha256: object.sha256 });
   }
   return { objects, digestSetSha256: row.digestSetSha256 };
 }
@@ -152,7 +153,7 @@ export async function recordSourceDeletionInventoryDigest(
   deletionId: string,
   object: SourceInventoryHashedObject,
 ): Promise<{ ok: true } | { ok: false; code: string }> {
-  if (!SHA256.test(deletionId) || !SHA256.test(object.sha256)) {
+  if (!SHA256.test(deletionId) || !SHA256.test(object.sha256) || !INVENTORY_ETAG_PATTERN.test(object.etag)) {
     return { ok: false, code: "SOURCE_INVENTORY_DIGESTS_INVALID" };
   }
   const result = await rpc("record_source_deletion_inventory_digest", {
@@ -160,6 +161,7 @@ export async function recordSourceDeletionInventoryDigest(
     p_object_key: object.key,
     p_size_bytes: object.sizeBytes,
     p_sha256: object.sha256,
+    p_etag: object.etag,
   });
   return result.ok ? { ok: true } : result;
 }
