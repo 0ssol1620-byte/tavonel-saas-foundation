@@ -22,6 +22,20 @@ describe("workspace failure copy", () => {
     expect(sentence).toContain("Reference SOME_NEW_CODE.");
   });
 
+  it("says the daily spend stop is a safety pause for today, that queued work continues and nothing was charged, with no reset time", () => {
+    for (const code of ["OCR_DAILY_SPEND_STOP", "OCR_SPEND_UNVERIFIED"]) {
+      const sentence = failureSentence(code, 503);
+      expect(sentence, code).toContain("paused");
+      expect(sentence, code).toContain("safety limit");
+      expect(sentence, code).toContain("already queued keep processing");
+      expect(sentence, code).toContain("nothing was charged");
+      expect(sentence, code).not.toContain(code);
+      // The stop lifts at the provider's billing-day boundary, which no single clock time states truly.
+      expect(sentence, code).not.toMatch(/UTC|midnight|\d{1,2}:\d{2}|minutes?|hours?/i);
+    }
+    expect(failureSentence("OCR_DAILY_SPEND_STOP", 503)).toContain("for today");
+  });
+
   it("says something useful when there is no code at all", () => {
     expect(failureSentence(null, 429)).toBe("Too many requests at once. Wait a minute and try again.");
     expect(failureSentence(undefined, 404)).not.toContain("Reference");

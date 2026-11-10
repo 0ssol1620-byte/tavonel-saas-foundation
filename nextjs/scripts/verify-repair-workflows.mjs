@@ -24,6 +24,7 @@ import { UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_F
 import { GLOBAL_EXPOSURE_AFFECTED_PATHS, GLOBAL_EXPOSURE_AFFECTED_UNIT_FILES, GLOBAL_EXPOSURE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { ENABLEMENT_AFFECTED_BROWSER_FILES, P4_FOLLOWUPS_AFFECTED_PATHS, P4_FOLLOWUPS_AFFECTED_UNIT_FILES, P4_FOLLOWUPS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { LEGAL_SEMICOLONS_AFFECTED_PATHS, LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { OPS_BACKLOG_SLI_AFFECTED_PATHS, OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { SLI_ALERT_NOISE_AFFECTED_PATHS, SLI_ALERT_NOISE_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
@@ -783,6 +784,14 @@ for (const binding of [
     rows: [],
     neighbors: ['nextjs/app/api/internal/sli/page.tsx', 'nextjs/lib/synthetic-probe-store.tsx', 'lib/synthetic-probe-store.ts'] },
   // legal-semicolons-20261109: five exact paths, ten direct suites, no browser suite.
+  // ops-backlog-sli-20261110: two exact paths, three direct suites, no browser suite.
+  { group: 'ops-backlog-sli-20261110', prefix: 'nextjs/', exportedPaths: OPS_BACKLOG_SLI_AFFECTED_PATHS, exportedSuites: OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['lib/operational-sli.test.ts', 'lib/operational-sli.ts'],
+    suites: ['lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-read-route.test.ts', 'lib/operational-sli.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/lib/operational-sli-store.ts', 'nextjs/lib/operational-sli.tsx', 'nextjs/lib/operational-job-liveness.ts', 'lib/operational-sli.ts'] },
   { group: 'legal-semicolons-20261109', prefix: 'nextjs/', exportedPaths: LEGAL_SEMICOLONS_AFFECTED_PATHS, exportedSuites: LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
     paths: ['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts'],

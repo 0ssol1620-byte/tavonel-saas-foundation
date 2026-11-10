@@ -7,6 +7,8 @@ import { PROBE_RUN_SCHEMA, type ProbeCheck, type ProbeRun } from "./synthetic-pr
 import type { ProbeHistory } from "./synthetic-probe-store";
 import type { OperationalJobObservation, OperationalJobRow } from "./operational-job-liveness";
 import {
+  COMPILE_BACKLOG_CRITICAL_SECONDS,
+  COMPILE_BACKLOG_WARNING_SECONDS,
   DEFAULT_FRESHNESS_TTL_MS,
   MAX_WINDOW_RUNS,
   OPERATIONAL_SLI_SCHEMA,
@@ -203,6 +205,63 @@ describe("B35 operational SLI and freshness gate", () => {
       { severity: "critical", reason: "observation_missing" },
       { severity: "warning", reason: "model_provider_circuit_state_unavailable" },
     ]);
+  });
+
+  describe("compile backlog age (GA gap 4)", () => {
+    const fresh = stored([run("2026-09-20T11:59:00.000Z")]);
+    const waitingFor = (seconds: number) => ({ ok: true as const, oldestWaitingSince: new Date(NOW.getTime() - seconds * 1_000).toISOString() });
+
+    it("carries no backlog field when the caller read none, so other readers are unchanged", () => {
+      expect(evaluateOperationalSli(fresh, { now: NOW })).not.toHaveProperty("compileBacklog");
+    });
+
+    it("reports a moving or empty queue without an alert", () => {
+      for (const [reading, seconds] of [[waitingFor(60), 60], [waitingFor(COMPILE_BACKLOG_WARNING_SECONDS), COMPILE_BACKLOG_WARNING_SECONDS],
+        [{ ok: true as const, oldestWaitingSince: null }, null]] as const) {
+        const result = evaluateOperationalSli(fresh, { now: NOW, compileBacklog: reading });
+        expect(result.state).toBe("available");
+        expect(result.compileBacklog).toEqual({ status: "ok", oldestWaitSeconds: seconds });
+        expect(result.alerts).toEqual([]);
+      }
+      // A job touched after the slot began has waited no time, never a negative age.
+      expect(evaluateOperationalSli(fresh, { now: NOW, compileBacklog: waitingFor(-90) }).compileBacklog)
+        .toEqual({ status: "ok", oldestWaitSeconds: 0 });
+    });
+
+    it("warns past 15 minutes and goes critical past an hour, degrading but never blocking", () => {
+      const warning = evaluateOperationalSli(fresh, { now: NOW, compileBacklog: waitingFor(COMPILE_BACKLOG_WARNING_SECONDS + 1) });
+      expect(warning.state).toBe("degraded");
+      expect(warning.alerts).toEqual([{ severity: "warning", reason: "compile_backlog_age_exceeded" }]);
+      const critical = evaluateOperationalSli(fresh, { now: NOW, compileBacklog: waitingFor(COMPILE_BACKLOG_CRITICAL_SECONDS + 1) });
+      expect(critical.state).toBe("degraded");
+      expect(critical.compileBacklog).toEqual({ status: "ok", oldestWaitSeconds: COMPILE_BACKLOG_CRITICAL_SECONDS + 1 });
+      expect(critical.alerts).toEqual([{ severity: "critical", reason: "compile_backlog_age_exceeded" }]);
+    });
+
+    it("never reads an unreadable or untrusted queue as empty, including on an empty history", () => {
+      for (const reading of [{ ok: false as const }, { ok: true as const, oldestWaitingSince: "not-a-time" }]) {
+        const result = evaluateOperationalSli(fresh, { now: NOW, compileBacklog: reading });
+        expect(result.state).toBe("degraded");
+        expect(result.compileBacklog).toEqual({ status: "unavailable", oldestWaitSeconds: null });
+        expect(result.alerts).toEqual([{ severity: "warning", reason: "compile_backlog_unavailable" }]);
+      }
+      const blocked = evaluateOperationalSli(stored([]), { now: NOW, compileBacklog: { ok: false } });
+      expect(blocked.state).toBe("blocked");
+      expect(blocked.compileBacklog).toEqual({ status: "unavailable", oldestWaitSeconds: null });
+      expect(blocked.alerts).toEqual([
+        { severity: "critical", reason: "observation_missing" },
+        { severity: "warning", reason: "compile_backlog_unavailable" },
+      ]);
+    });
+
+    // Deterministic in the reading and the slot only. The route reads the queue head live, so a
+    // same-slot retry after the head moved carries a different payload and meets the store's
+    // idempotency conflict (503, persisted=false, the page still sent), as a changed circuit read does.
+    it("is a deterministic function of the reading and the slot, with no clock of its own", () => {
+      const reading = waitingFor(1_234);
+      expect(JSON.stringify(evaluateOperationalSli(fresh, { now: NOW, compileBacklog: reading })))
+        .toBe(JSON.stringify(evaluateOperationalSli(fresh, { now: NOW, compileBacklog: reading })));
+    });
   });
 
   it("refuses an unbounded provider identifier", () => {
