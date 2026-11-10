@@ -53,6 +53,10 @@ Operator checks:
    `SLI_ALERT_EVALUATION_REPLAYED` when the probe snapshot is unchanged.
 3. Query `foundation_operational_sli_evaluations` with the service role and confirm the stored
    state and alert reasons match the route receipt. Never treat a `503` response as persisted.
+   The stored evaluation also carries `watch`: the `{check, code}` of each scheduled operations
+   check that ran in the slot (the hourly RunPod daily-cost read, the 00 UTC release-row expiry),
+   and an empty list in slots that run none. It holds codes only, never spend, cap or delivery
+   detail. An hourly slot whose `watch` lacks `runpod_daily_cost` did not read billing.
 4. With `OPERATIONS_ALERT_WEBHOOK_URL` set, confirm a breaching slot returns `ALERT_DELIVERED` and
    the message arrives in the chosen channel. `ALERT_DELIVERY_UNCONFIGURED` in production means
    alerts are still record-only.
