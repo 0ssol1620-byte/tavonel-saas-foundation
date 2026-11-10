@@ -99,8 +99,10 @@ test("each receipt link lands on the research note that prints the whole digest 
   test.skip(testInfo.project.name !== "1440", "one width");
   await seedRefusal(page);
   await page.goto("/");
-  await page.locator('a[data-receipt="R-03"]').click();
-  await expect(page).toHaveURL(/\/research\/notes#R-03$/);
+  // The last receipt on the band (R-02 since the 2026-11-10 public-copy cleanup) is the deepest anchor on the note.
+  const last = RECEIPTS[RECEIPTS.length - 1];
+  await page.locator(`a[data-receipt="${last}"]`).click();
+  await expect(page).toHaveURL(new RegExp(`/research/notes#${last}$`));
   for (const id of RECEIPTS) {
     const note = page.locator(`article[id="${id}"]`);
     await expect(note).toHaveCount(1);
@@ -112,5 +114,5 @@ test("each receipt link lands on the research note that prints the whole digest 
     const { createHash } = await import("node:crypto");
     expect(createHash("sha256").update(await response.body()).digest("hex"), `${id} bytes hash to the printed digest`).toBe(digest);
   }
-  await expect(page.locator('article[id="R-03"]')).toBeInViewport();
+  await expect(page.locator(`article[id="${last}"]`)).toBeInViewport();
 });
