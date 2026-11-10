@@ -61,18 +61,39 @@ processor keeps the per-request bound it has today. Nothing is raised to meet a 
 - **Fail closed.** A refused range refuses the source and names the pages. A reader failure parks
   the source for review. A page count that changes between ranges is `RECEIPT_MISMATCH`. None of
   these writes a manifest, so no range is ever shown. A CDR revision that does not answer ranges
-  is a retry, not a refusal (it is our misconfiguration).
+  is a retry, not a refusal, for a source of any length: the new CDR sends `x-tavonel-cdr-ranges: 1`
+  on every refusal, and a refusal of a ranged request without it is our deploy order (an old CDR
+  refuses past 80 pages), never the document (REVIEW-PR231-R1 E4).
+- **Pinned to 80.** `FOUNDATION_SOURCE_SEGMENT_PAGES` is `80` or unset; any other value, the
+  value without the `FOUNDATION_SEGMENT_CONTINUATION` producer, or the value together with
+  `FOUNDATION_COMPLETED_READ_ENABLED=true` is a configuration error raised before any CDR request
+  (E2, E3). The completed-read proof binds one sanitized PDF and one `ocr.json`; it does not cover a
+  segmented source, so completed-read stays off while segmentation is on.
+- **One new range per delivery, then a new message.** A delivery reads at most one range that has
+  no `ocr.json` yet (one CDR request and that range's OCR: the work of today's whole 80-page
+  document, up to 60 s + 10 × 85 s in the worst case, the same bound a whole document already has
+  against the 15-minute wall). It then sends the source on as a new message on its own queue
+  (producer `FOUNDATION_SEGMENT_CONTINUATION` in `wrangler.jsonc`) and acknowledges the old one. A
+  new message starts at attempt 1, so the cold-start grace (`OCR_COLD_START_RETRY_DELAYS_S`) and
+  `max_retries: 10` apply to each range, not to the whole source. A 500-page source is 7 messages
+  (E1, E2).
 - **Idempotent, at-least-once.** Every output is create-once and is found again by listing, so a
-  redelivery continues from the first unread range and pays for no range twice. A delivery starts
-  no new range after five minutes and leaves the rest to a redelivery (`message.retry`); the
-  source settles once, after its last range.
+  redelivery continues from the first unread range and pays for no range twice. A redelivery after
+  the manifest exists reads the manifest and returns it, without listing or hashing a single range,
+  so a range stored twice by a racing duplicate cannot turn a finished source into a retry loop
+  (E6). The source settles once, after its last range.
 - **Metering unchanged.** The source settles the per-document charge a whole document settles
   today (`computeCredits: 2`); intake still reserves and approves pages exactly as before. The
   trial bound (50 pages) is untouched.
 - **Deletion.** Everything sits under the source's own prefix, so the existing deletion sweep
   removes a segmented source exactly as a whole one. Nothing under `segments/` has the
   `<doc>/<version>/<file>` shape `nextjs/lib/immutable-keys.ts` lists, so the site cannot show a
-  range by accident.
+  range by accident. **Bound (E5):** one deletion inventory is capped at 512 objects and 1 GiB
+  (`nextjs/lib/source-deletion-inventory-r2.ts` `MAX_OBJECTS`, `MAX_TOTAL_BYTES`) and fails closed.
+  At 80-page ranges a 500-page source is about 100 objects and at most about 460 MiB (7 × the 18 MiB
+  sanitized, 24 MiB `ocr.json` and its page-range sidecars), so one source fits, but a deletion that
+  names several long sources does not. The site-half PR makes deletion independent of that bound
+  before the flag is set; until then the flag stays off.
 
 ### Site half (next change; the flag stays off until it lands)
 
@@ -101,10 +122,14 @@ Shipped in this branch, with no processor change:
 
 - The drop box states the per-source ceiling before a file is chosen (`compileLimitsNotice`).
 - `/pricing` says which files are counted before upload and which are counted when read.
-- The production upload path (approval lineage off) sends the page count the browser already
-  measured, and the capability route refuses a counted file over the ceiling before a URL or a
-  reservation exists. Files inside a server-expanded ZIP are not counted before upload; for them
-  the refusal still comes from the rasterizer, with the reason on the source.
+- The production upload path (approval lineage off) sends a PDF's page count, counted from its page
+  tree in the browser, and the capability route refuses a PDF over the ceiling before a URL or a
+  reservation exists. A ZIP is expanded in the browser (`nextjs/lib/workspace-intake.ts`), so a PDF
+  inside one is counted and refused the same way. A DOCX `<Pages>` and a PPTX slide count are not
+  sent (REVIEW-PR231-R1 B1): the first is what the last editor wrote and the CDR re-paginates, the
+  second counts hidden slides the CDR's export leaves out, so either can be over 80 for a file that
+  renders under it. Those formats, and a PDF the browser cannot open, are counted when read, and
+  the refusal comes from the rasterizer with the reason on the source.
 
 ## Cost of a 300-page manual at current settings [calc, not a receipt]
 
@@ -116,12 +141,17 @@ Shipped in this branch, with no processor change:
 
 ## Rollout and rollback
 
+The CDR goes first. A worker with the flag set against an old CDR is retried, not refused (E4), but
+it does no useful work. `FOUNDATION_COMPLETED_READ_ENABLED` must be unset or `false` whenever the flag
+is set; the worker refuses the pair before any request (E3).
+
 1. Deploy a CDR revision from this branch (ranges answered; unranged behaviour unchanged).
    Rollback: route traffic to `tavonel-cdr-validation-0909-00004-qsb`.
 2. Merge the site half; apply its migration.
-3. Upload the worker with `FOUNDATION_SOURCE_SEGMENT_PAGES=80`; check one 81-page and one
-   300-page source end to end. Rollback: unset the variable (`wrangler versions deploy <prev>`).
-   Ranges already stored stay invisible without a manifest and are deleted with their source.
+3. Upload the worker with `FOUNDATION_SOURCE_SEGMENT_PAGES=80` (its `wrangler.jsonc` already binds the
+   `FOUNDATION_SEGMENT_CONTINUATION` producer); check one 81-page and one 300-page source end to end.
+   Rollback: unset the variable (`wrangler versions deploy <prev>`). Ranges already stored stay
+   invisible without a manifest and are deleted with their source.
 
 ## Not measured
 

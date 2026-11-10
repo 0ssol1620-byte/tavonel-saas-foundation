@@ -115,6 +115,8 @@ import { POST as collectionsCompilePost } from "../app/api/collections/compile/r
 import { POST as connectionSyncPost } from "../app/api/v1/connections/[id]/sync/route";
 import { canonicalJson, sha256Prefixed } from "./developer-contracts";
 import { deterministicSourceDocumentId } from "./source-intake";
+import { refusablePageCount } from "./page-count";
+import { estimateBillablePages } from "./usage-pricing";
 
 const documentId = "f07fe147-f52e-4fd0-8afc-79cd848b928d";
 const otherId = "11111111-1111-4111-8111-111111111111";
@@ -191,7 +193,30 @@ describe("intake approval lineage off (the production default)", () => {
     // The workspace measured every staged file and then dropped the counts on this path.
     const page = readFileSync(join(process.cwd(), "app/workspace/page.tsx"), "utf8");
     expect(page).toContain("await uploadLegacyDocuments(files, measured)");
-    expect(page).toContain("declaredPages: measured.pages, declaredBasis: measured.basis");
+    expect(page).toContain("...refusablePageCount(measured),");
+  });
+
+  it("does not refuse a DOCX or PPTX on a declared count over the ceiling: only a PDF page tree is counted", async () => {
+    // REVIEW-PR231-R1 B1: <Pages> is what the last editor wrote and the CDR re-paginates; a PPTX
+    // slide count includes hidden slides the export leaves out. Both rendered under 80 before.
+    const over = PROCESSING_CEILING.maxSourcePages + 40;
+    const cases = [
+      { name: "manual.docx", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", basis: "docx_declared" as const },
+      { name: "deck.pptx", mime: "application/vnd.openxmlformats-officedocument.presentationml.presentation", basis: "pptx_slides" as const },
+    ];
+    for (const { name, mime, basis } of cases) {
+      const estimatedPages = estimateBillablePages({
+        bytes: 2048, mimeType: mime, ...refusablePageCount({ pages: over, basis }),
+      })?.pages;
+      expect(estimatedPages ?? 0).toBeLessThanOrEqual(PROCESSING_CEILING.maxSourcePages);
+      const response = await capabilityPost(json("https://tavonel.com/api/uploads/capability", {
+        originalFilename: name, declaredMimeType: mime, requestedBytes: 2048, estimatedPages,
+      }));
+      expect(response.status).toBe(200);
+    }
+    // A PDF's page tree over the ceiling is still refused before upload.
+    expect(refusablePageCount({ pages: over, basis: "pdf_page_tree" })).toEqual({ declaredPages: over, declaredBasis: "pdf_page_tree" });
+    expect(refusablePageCount({ pages: null, reason: "FILE_UNREADABLE" })).toEqual({});
   });
 
   it("confirms through confirm_foundation_intake_admission without an approval identity", async () => {

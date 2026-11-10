@@ -77,8 +77,10 @@ export type SanitizeEnv = {
   TAVONEL_INTAKE_CEILING_STAGE?: string;
   /** D2 text-layer shadow (text-layer-shadow.ts): "1" on, unset or "0" off. */
   FOUNDATION_CDR_TEXT_LAYER_FIRST?: string;
-  /** Segmented sources (`sourceSegmentPages`): unset off, else pages per CDR request, 1 to 80. */
+  /** Segmented sources (`sourceSegmentPages`): unset off, else "80" (pages per CDR request). */
   FOUNDATION_SOURCE_SEGMENT_PAGES?: string;
+  /** Producer on the consumer's own queue: a segmented source continues as a new message. */
+  FOUNDATION_SEGMENT_CONTINUATION?: { send(body: unknown, options?: { contentType?: "json" }): Promise<unknown> };
 };
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{16,160}$/;
@@ -672,6 +674,13 @@ async function requestDisarm(ctx: DisarmContext, pageRange: [number, number] | n
     throw new RetryableError("synthetic CDR did not accept this worker's credentials");
   }
   if (response.status !== 200) {
+    // A CDR that answers ranges says so on every refusal (cdr-cloudrun/app.py CDR_RANGES_HEADER).
+    // One that predates ranges reads the whole source and refuses past 80 pages: that is our
+    // deploy order, not the customer's document, so it is retried, never refused (E4).
+    if (pageRange && response.headers.get("x-tavonel-cdr-ranges") !== "1") {
+      await response.body?.cancel();
+      throw new RetryableError("CDR revision predates ranged requests; deploy the CDR before the worker");
+    }
     const detail = await safeCdrRejectDetail(response);
     const suffix = detail ? `: ${detail}` : "";
     // A refused range refuses the source, and says which pages it was refused on.
@@ -929,9 +938,16 @@ async function finishWholeDocument(
 
   Every range output is create-once and found again by listing, so a redelivery continues from the
   first range that is not yet read and pays for no range twice.
+
+  One delivery reads at most one range that is not yet read (one CDR request and that range's OCR,
+  the same work as today's whole 80-page document) and then continues the source as a NEW queue
+  message (`SegmentContinuation`, sent by index.ts through FOUNDATION_SEGMENT_CONTINUATION). A new
+  message starts at attempt 1, so the cold-start grace and max_retries apply to each range rather
+  than to the whole source (REVIEW-PR231-R1 E1, E2).
 */
 
-const MAX_SEGMENT_PAGES = 80;
+/** Pages per range. Pinned: the CDR's MAX_PAGES, and the object count ADR-0006 bounds deletion on. */
+const SEGMENT_PAGES = 80;
 /** The CDR's SEGMENTED_MAX_DOCUMENT_PAGES. */
 export const MAX_SEGMENTED_SOURCE_PAGES = 500;
 /** The formats intake counts pages for before upload (`nextjs/lib/page-count.ts`). */
@@ -941,24 +957,38 @@ const SEGMENTABLE_MIMES: ReadonlySet<string> = new Set([
 ]);
 const SEGMENT_PLAN_SCHEMA = "tavonel.source_segment_plan.v1";
 export const SEGMENT_MANIFEST_SCHEMA = "tavonel.source_segments.v1";
-/*
-  ponytail: a delivery starts no new range after this long and leaves the rest to a redelivery.
-  One range reads like today's 80-page document, whose worst case already fills most of the
-  15-minute consumer wall, so this keeps one range of headroom. Each redelivery is a queue attempt,
-  so max_retries (10) bounds how many deliveries a long source may take; one queue message per
-  range lifts both bounds when that is needed.
-*/
-const SEGMENT_START_BUDGET_MS = 5 * 60 * 1000;
+/** A delivery read its one new range and more remain: index.ts sends the source on as a new message. */
+export class SegmentContinuation extends RetryableError {
+  constructor(readonly nextPage1: number) {
+    super(`segmented source continues from page ${nextPage1} on the next delivery`);
+  }
+}
 
-/** Off unless set. One CDR request renders at most the CDR's MAX_PAGES (80), so neither may this. */
-export function sourceSegmentPages(env: Pick<SanitizeEnv, "FOUNDATION_SOURCE_SEGMENT_PAGES">): number | null {
+/**
+ * Off unless set; when set it must be exactly 80, and the rest of the configuration must allow it.
+ * Every refusal is a configuration error raised before any CDR request is paid for (E3).
+ */
+export function sourceSegmentPages(
+  env: Pick<SanitizeEnv, "FOUNDATION_SOURCE_SEGMENT_PAGES" | "FOUNDATION_COMPLETED_READ_ENABLED" | "FOUNDATION_SEGMENT_CONTINUATION">,
+): number | null {
   const raw = (env.FOUNDATION_SOURCE_SEGMENT_PAGES ?? "").trim();
   if (raw === "") return null;
-  const pages = /^[1-9][0-9]?$/.test(raw) ? Number(raw) : Number.NaN;
-  if (!(pages <= MAX_SEGMENT_PAGES)) {
-    throw new RetryableError(`FOUNDATION_SOURCE_SEGMENT_PAGES must be a whole number from 1 to ${MAX_SEGMENT_PAGES}`);
+  if (raw !== String(SEGMENT_PAGES)) {
+    throw new RetryableError(`FOUNDATION_SOURCE_SEGMENT_PAGES must be ${SEGMENT_PAGES} or unset`);
   }
-  return pages;
+  if (env.FOUNDATION_COMPLETED_READ_ENABLED === "true") {
+    // The completed-read proof binds one sanitized PDF and one ocr.json; a segmented source has several.
+    throw new RetryableError("FOUNDATION_SOURCE_SEGMENT_PAGES cannot be set while FOUNDATION_COMPLETED_READ_ENABLED is true");
+  }
+  if (!env.FOUNDATION_SEGMENT_CONTINUATION) {
+    throw new RetryableError("FOUNDATION_SOURCE_SEGMENT_PAGES needs the FOUNDATION_SEGMENT_CONTINUATION queue producer");
+  }
+  return SEGMENT_PAGES;
+}
+
+async function hasObject(bucket: R2BucketLike, key: string): Promise<boolean> {
+  const listed = await bucket.list({ prefix: key });
+  return listed.objects.some((object) => object.key === key);
 }
 
 type SegmentPlan = { totalPages: number; segmentPages: number };
@@ -988,10 +1018,49 @@ async function readSegmentPlan(bucket: R2BucketLike, key: string, binding: CdrBi
   if (!record || record.schemaVersion !== SEGMENT_PLAN_SCHEMA || record.sourceKey !== binding.sourceKey
     || record.inputSha256 !== binding.inputSha256 || typeof totalPages !== "number" || typeof segmentPages !== "number"
     || !Number.isSafeInteger(totalPages) || !Number.isSafeInteger(segmentPages) || segmentPages < 1
-    || segmentPages > MAX_SEGMENT_PAGES || totalPages <= segmentPages || totalPages > MAX_SEGMENTED_SOURCE_PAGES) {
+    || segmentPages > SEGMENT_PAGES || totalPages <= segmentPages || totalPages > MAX_SEGMENTED_SOURCE_PAGES) {
     throw new RetryableError("stored segment plan does not match this source; operator review required");
   }
   return { totalPages, segmentPages };
+}
+
+/**
+ * A manifest that already exists for these bytes is the finished reading: a redelivery returns it
+ * without listing, hashing or re-verifying a single range (E6). Two stored versions of one range
+ * (a duplicate delivery racing, a CDR whose output is not byte-deterministic) can no longer turn a
+ * finished source into a retry loop, because the manifest already names the one that was read.
+ */
+async function finishedManifest(bucket: R2BucketLike, key: string, binding: CdrBinding) {
+  const stored = await readJsonRecord(bucket, key);
+  if (!stored) return null;
+  const record = stored.record;
+  const totalPages = record?.totalPages;
+  const segments = record?.segments;
+  if (!record || record.schemaVersion !== SEGMENT_MANIFEST_SCHEMA || record.sourceKey !== binding.sourceKey
+    || record.inputSha256 !== binding.inputSha256 || record.segmentPages !== SEGMENT_PAGES
+    || typeof totalPages !== "number" || !Number.isSafeInteger(totalPages)
+    || totalPages <= SEGMENT_PAGES || totalPages > MAX_SEGMENTED_SOURCE_PAGES
+    || !Array.isArray(segments) || segments.length !== Math.ceil(totalPages / SEGMENT_PAGES)) {
+    throw new RetryableError("stored segment manifest does not match this source; operator review required");
+  }
+  return { totalPages, bytes: stored.bytes };
+}
+
+function manifestResult(
+  ctx: DisarmContext, whole: CdrBinding, manifestKey: string, planKey: string,
+  manifest: { totalPages: number; bytes: ArrayBuffer }, status: "written" | "exists", outputSha256: string,
+): SegmentedOutcome {
+  return { kind: "result", result: {
+    sourceKey: whole.sourceKey,
+    immutableKey: manifestKey,
+    inputSha256: ctx.inputSha256,
+    outputSha256,
+    status: "clean",
+    // One settlement for the source, at the per-document charge a whole document settles today
+    // (`ocr.ts` computeCredits): segmentation changes how a source is read, not what it costs.
+    ocr: { status, key: manifestKey, observedPageCount: manifest.totalPages, computeCredits: 2 },
+    cdrReceipt: { key: planKey, status: "exists" },
+  } };
 }
 
 type SegmentedOutcome = { kind: "whole"; stored: StoredImmutable } | { kind: "result"; result: SanitizeResult };
@@ -1004,9 +1073,14 @@ async function sanitizeSegmented(
 ): Promise<SegmentedOutcome> {
   const { env } = ctx;
   const bucket = env.FOUNDATION_QUARANTINE;
-  const started = ctx.now().getTime();
   const { workspaceId, documentId } = whole.parts;
   const planKey = segmentPlanKey(workspaceId, documentId);
+  const manifestKey = segmentManifestKey(workspaceId, documentId);
+
+  const finished = await finishedManifest(bucket, manifestKey, whole);
+  if (finished) {
+    return manifestResult(ctx, whole, manifestKey, planKey, finished, "exists", `sha256:${await sha256Hex(finished.bytes)}`);
+  }
 
   let plan = await readSegmentPlan(bucket, planKey, whole);
   let first: Disarmed | null = null;
@@ -1016,11 +1090,6 @@ async function sanitizeSegmented(
     if (sourcePages <= segmentPages) {
       // The first range is the whole document: store it exactly where an unranged answer goes.
       return { kind: "whole", stored: await storeDisarmed(env, whole, first, {}) };
-    }
-    if (env.FOUNDATION_COMPLETED_READ_ENABLED === "true") {
-      // The completed-read proof binds one sanitized PDF and one ocr.json; a segmented source has
-      // several. Not settling beats settling a proof that describes a different document.
-      throw new RetryableError("completed-read receipts do not cover segmented sources yet");
     }
     const status = await putCreateOnceJson(bucket, planKey, {
       schemaVersion: SEGMENT_PLAN_SCHEMA, sourceKey: whole.sourceKey, inputSha256: whole.inputSha256,
@@ -1035,6 +1104,8 @@ async function sanitizeSegmented(
   }
 
   const read: Array<Record<string, unknown>> = [];
+  // The first ranged request of a new plan is this delivery's one new range.
+  let worked = first !== null;
   for (let start0 = 0; start0 < plan.totalPages; start0 += segmentPages) {
     const end0 = Math.min(start0 + segmentPages, plan.totalPages);
     const binding: CdrBinding = {
@@ -1044,13 +1115,15 @@ async function sanitizeSegmented(
       pageRange: { start0, end0, sourcePages: plan.totalPages },
     };
     const reused = await reusableImmutable(bucket, binding);
+    const isFirst = start0 === 0 && first !== null;
+    // A range is work when it has no ocr.json yet: a CDR request, an OCR read, or both.
+    const needsWork = !reused || !(await hasObject(bucket, ocrSiblingKey(reused.immutableKey)));
+    if (needsWork && worked && !isFirst) throw new SegmentContinuation(start0 + 1);
+    if (needsWork) worked = true;
     let stored: StoredImmutable;
     if (reused) {
       stored = { ...reused, cdrReceiptStatus: "exists" };
     } else {
-      if (start0 > 0 && ctx.now().getTime() - started > SEGMENT_START_BUDGET_MS) {
-        throw new RetryableError(`segmented source continues from page ${start0 + 1} on the next delivery`);
-      }
       const disarmed = start0 === 0 && first ? first : await requestDisarm(ctx, [start0, start0 + segmentPages]);
       if (disarmed.range!.sourcePages !== plan.totalPages || disarmed.range!.end0 !== end0) {
         throw refuse("RECEIPT_MISMATCH", `CDR page count changed between ranges (pages ${start0 + 1}-${end0})`, ctx.observed);
@@ -1070,7 +1143,6 @@ async function sanitizeSegmented(
     });
   }
 
-  const manifestKey = segmentManifestKey(workspaceId, documentId);
   const manifest = {
     schemaVersion: SEGMENT_MANIFEST_SCHEMA, sourceKey: whole.sourceKey, inputSha256: whole.inputSha256,
     totalPages: plan.totalPages, segmentPages, segments: read,
@@ -1082,16 +1154,6 @@ async function sanitizeSegmented(
   if (!durable?.record || JSON.stringify(durable.record) !== JSON.stringify(manifest)) {
     throw new RetryableError("segment manifest is not durable or conflicts; operator review required");
   }
-  return { kind: "result", result: {
-    sourceKey: whole.sourceKey,
-    immutableKey: manifestKey,
-    inputSha256: ctx.inputSha256,
-    outputSha256: `sha256:${await sha256Hex(durable.bytes)}`,
-    status: "clean",
-    // One settlement for the source, at the per-document charge a whole document settles today
-    // (`ocr.ts` computeCredits): segmentation changes how a source is read, not what it costs.
-    ocr: { status: manifestStatus === "written" ? "written" : "exists", key: manifestKey,
-      observedPageCount: plan.totalPages, computeCredits: 2 },
-    cdrReceipt: { key: planKey, status: "exists" },
-  } };
+  return manifestResult(ctx, whole, manifestKey, planKey, { totalPages: plan.totalPages, bytes: durable.bytes },
+    manifestStatus === "written" ? "written" : "exists", `sha256:${await sha256Hex(durable.bytes)}`);
 }

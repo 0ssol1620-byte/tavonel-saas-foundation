@@ -2,7 +2,7 @@ import { PermanentReject, isRetryable } from "./errors";
 import { evaluateHealth } from "./guards";
 import { extractObjectKey, isQuarantineSourceKey } from "./keys";
 import { ocrFailureKind } from "./ocr";
-import { asSourceRefusal, sanitizeObject, writeCdrRejectReceipt, type SanitizeResult } from "./sanitize";
+import { SegmentContinuation, asSourceRefusal, sanitizeObject, writeCdrRejectReceipt, type SanitizeResult } from "./sanitize";
 import { dispatchComputeSettlement } from "./settlement";
 import { COMPLETED_READ_SCHEMA, parseCompletedReadFacts } from "../../../shared/completedReadReceipt";
 import { RetryableError } from "./errors";
@@ -27,6 +27,8 @@ export interface Env {
   FOUNDATION_CDR_TEXT_LAYER_FIRST?: string;
   /** Segmented sources (sanitize.ts sourceSegmentPages). Unset: off. */
   FOUNDATION_SOURCE_SEGMENT_PAGES?: string;
+  /** Producer bound to this consumer's own queue (wrangler.jsonc); a segmented source continues on it. */
+  FOUNDATION_SEGMENT_CONTINUATION?: { send(body: unknown, options?: { contentType?: "json" }): Promise<unknown> };
 }
 
 function authorizeManualTrigger(request: Request, token: string | undefined): "ok" | "disabled" | "denied" {
@@ -217,6 +219,21 @@ export async function handleQueue(batch: MessageBatch<unknown>, env: Env, fetche
       await settleSanitized(env, objectKey, result, fetcher);
       message.ack();
     } catch (error) {
+      if (error instanceof SegmentContinuation && env.FOUNDATION_SEGMENT_CONTINUATION) {
+        /*
+          One range was read and more remain. The source continues as a new message, which starts
+          at attempt 1: the cold-start grace and max_retries then count the deliveries of one
+          range, not of the whole source (ADR-0006; REVIEW-PR231-R1 E2). The range is durable
+          before this send and every range is create-once, so a duplicate continuation only lists.
+        */
+        try {
+          await env.FOUNDATION_SEGMENT_CONTINUATION.send(message.body, { contentType: "json" });
+          message.ack();
+        } catch {
+          message.retry();
+        }
+        continue;
+      }
       if (error instanceof PermanentReject) {
         const objectKey = extractObjectKey(message.body);
         if (!objectKey || !isQuarantineSourceKey(objectKey)) {
