@@ -26,6 +26,12 @@ describe("actual PDF evidence viewer", () => {
     expect(studio).toContain("<PdfEvidenceViewer");
     expect(studio).not.toContain("<iframe");
   });
+
+  it("opens a segmented source's range at the local page of an original-page citation (ADR-0006)", () => {
+    expect(studio).toContain('response.headers.get("x-tavonel-source-page-start0")');
+    expect(studio).toContain("page={selection.page - currentPreview.pageStart0}");
+    expect(studio).toContain("selection.page > currentPreview.pageStart0");
+  });
 });
 
 /*

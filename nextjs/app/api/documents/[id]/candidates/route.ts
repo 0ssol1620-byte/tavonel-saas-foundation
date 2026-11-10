@@ -40,6 +40,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const match = selected.documents.find(
     (item) => item.documentId === id && item.ocrJsonKey,
   );
+  // A segmented source has one ocr.json per page range (ADR-0006); returning the first as the
+  // document's reading would be a partial answer that looks whole.
+  if (match?.segments) {
+    return NextResponse.json({ code: "SEGMENTED_SOURCE_READ_BY_RANGE" }, { status: 409, headers: { "Cache-Control": "no-store" } });
+  }
   if (!match?.ocrJsonKey || !isOcrJsonKey(membership.workspaceId, match.ocrJsonKey)) {
     return NextResponse.json({ code: "NOT_FOUND" }, { status: 404, headers: { "Cache-Control": "no-store" } });
   }
