@@ -25,6 +25,11 @@ vi.mock("./foundation-pilot", () => ({ getRequestUser, foundationPilotAccess }))
 vi.mock("./billing-product-access", () => ({ authorizeFoundationProduct }));
 vi.mock("./self-service-trial", () => ({ authorizeFoundationSessionProduct, trialFeatureBlocked }));
 vi.mock("./workspace-membership", () => ({ getWorkspaceMembership }));
+const { trialSessionQuery } = vi.hoisted(() => ({ trialSessionQuery: vi.fn() }));
+vi.mock("./trial-ai-access", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./trial-ai-access")>()),
+  trialSessionQuery,
+}));
 
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "./developer-auth";
 
@@ -252,6 +257,29 @@ describe("developer request authorization", () => {
     expect(await authorizeFoundationRequest(new Request("https://tavonel.test/api/ask"), "ask:read"))
       .toEqual({ ok: false, code: "WORKSPACE_MEMBERSHIP_READ_FAILED", status: 503 });
     expect(authorizeFoundationSessionProduct).not.toHaveBeenCalled();
+  });
+
+  /*
+    P0 2026-11-09: the trial's browser Ask is metered once per request, by the route, after its body is
+    validated and before any retrieval (review N2). Authorization itself spends nothing.
+  */
+  describe("a free evaluation's browser Ask", () => {
+    const TRIAL_ACCESS = { source: "trial", accessPlan: "observer_access", billingExempt: true, expiresAt: "2099-01-01T00:00:00Z" };
+    const session = (path: string) => new Request(`https://tavonel.com${path}`, { headers: { authorization: "Bearer supabase-session" } });
+    beforeEach(() => {
+      getRequestUser.mockResolvedValue({ id: "user" });
+      authorizeFoundationSessionProduct.mockResolvedValue({ ok: true, access: TRIAL_ACCESS });
+      trialSessionQuery.mockResolvedValue({ ok: true });
+    });
+
+    it("authorizes a trial's Ask and its late re-check without spending, and names the principal a trial", async () => {
+      const request = session("/api/collections/x/ask");
+      const first = await authorizeFoundationRequest(request, "ask:read");
+      if (!first.ok) throw new Error("trial authorization failed");
+      expect(first.principal).toMatchObject({ kind: "session", accessSource: "trial", workspaceKey: "pilot-user", userId: "user" });
+      expect((await revalidateFoundationAuthorization(request, first.principal, "ask:read")).ok).toBe(true);
+      expect(trialSessionQuery).not.toHaveBeenCalled();
+    });
   });
 
   it("rejects a session that expires after work starts", async () => {

@@ -111,9 +111,11 @@ test("an evaluation account is told its limits and where the paid path is", asyn
   await page.goto(BILLING_URL, { waitUntil: "domcontentloaded" });
 
   // Entitlement-driven, from /api/access/bootstrap rather than from the billing row: the trial
-  // strip states the bounded limits and offers the upgrade.
+  // strip states the bounded limits and keeps the paid path as a quiet Plans link (FUNNEL-SIGNED-IN
+  // #2: the invitation moved to the limits, the activation refusal and the first answer).
   const strip = page.getByRole("status").filter({ hasText: "Free evaluation" });
   await expect(strip).toBeVisible();
   await expect(strip).toContainText("3 files · 80 pages · 1 World");
-  await expect(strip.getByRole("link", { name: /Upgrade/ })).toHaveAttribute("href", "/pricing");
+  await expect(strip.getByRole("link", { name: "Plans", exact: true })).toHaveAttribute("href", "/pricing");
+  await expect(strip.getByRole("link", { name: /Upgrade/ })).toHaveCount(0);
 });

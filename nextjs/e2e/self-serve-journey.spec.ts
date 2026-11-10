@@ -276,7 +276,9 @@ test.describe("launch approval withheld (purchase closed; customer processing sw
 
     // H6. The closed workspace points at the public example and offers no file control.
     const strip = page.getByRole("status").filter({ hasText: "Workspace ready" });
-    await expect(strip).toContainText("Source access pending");
+    // FUNNEL-SIGNED-IN #5: before consent the strip names the one step left, not "pending".
+    await expect(strip).toContainText("One step left");
+    await expect(strip).not.toContainText("Source access pending");
     await expect(strip.getByRole("link", { name: "Explore example" })).toHaveAttribute("href", "/explore");
     await expect(page.getByRole("button", { name: "Choose files", exact: true })).toHaveCount(0);
 
@@ -427,7 +429,9 @@ test.describe("simulated switch-on (browser mocks only)", () => {
       }],
     });
     const trialStrip = page.getByRole("status").filter({ hasText: "Free evaluation" });
-    await expect(trialStrip.getByRole("link", { name: "Upgrade to Developer" })).toHaveAttribute("href", "/pricing");
+    // FUNNEL-SIGNED-IN #3: the strip keeps a quiet way to the plans; the ask itself waits for a limit.
+    await expect(trialStrip.getByRole("link", { name: "Plans", exact: true })).toHaveAttribute("href", "/pricing");
+    await expect(trialStrip.getByRole("link", { name: "Upgrade to Developer" })).toHaveCount(0);
     await page.evaluate(() => { (window as unknown as { __journeyNoReload: boolean }).__journeyNoReload = true; });
 
     // H16. Paddle reports the payment; the signed webhook lands (billing and bootstrap turn paid).
