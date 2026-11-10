@@ -8397,9 +8397,9 @@ test('affected large-source-deletion-inventory owner: 4 exact paths select 3 dir
 });
 // large-source-approval-bound (ADR-0006, F1): one finite owner, restated independently.
 import { LARGE_SOURCE_APPROVAL_BOUND_AFFECTED_PATHS, LARGE_SOURCE_APPROVAL_BOUND_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
-test('affected large-source-approval-bound owner: 3 exact paths select 4 direct suites and the worker checks, no browser suite; neighbours stay unmapped', () => {
-  const paths = ['nextjs/components/pipeline-board.tsx', 'nextjs/lib/pipeline-reapproval.test.ts', 'shared/sourceApproval.ts'];
-  const suites = ['lib/intake-approval-rollout-off.test.ts', 'lib/pipeline-reapproval.test.ts', 'lib/pipeline.test.ts', 'lib/r2-triage-seal.test.ts'];
+test('affected large-source-approval-bound owner: 6 exact paths select 5 direct suites and the worker checks, no browser suite; neighbours stay unmapped', () => {
+  const paths = ['nextjs/components/pipeline-board.tsx', 'nextjs/lib/pipeline-reapproval.test.ts', 'nextjs/lib/r2-presign.test.ts', 'nextjs/lib/r2-presign.ts', 'nextjs/scripts/journey/local-browser-storage-transport.integration.test.ts', 'shared/sourceApproval.ts'];
+  const suites = ['lib/intake-approval-rollout-off.test.ts', 'lib/pipeline-reapproval.test.ts', 'lib/pipeline.test.ts', 'lib/r2-presign.test.ts', 'lib/r2-triage-seal.test.ts'];
   assert.deepEqual([[...LARGE_SOURCE_APPROVAL_BOUND_AFFECTED_PATHS], [...LARGE_SOURCE_APPROVAL_BOUND_AFFECTED_UNIT_FILES]], [paths, suites]);
   for (const path of paths) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['large-source-approval-bound'], path);

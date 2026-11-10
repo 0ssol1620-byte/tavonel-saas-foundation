@@ -96,8 +96,11 @@ processor keeps the per-request bound it has today. Nothing is raised to meet a 
   as `PARSER_OOM` (the frozen class set is unchanged) with `observedPages` and `approvedMaxPages`
   on `cdr-reject.json`, released at 0 credits through the ordinary refusal path. A stored plan is
   held to the same check. The workspace says "This PDF has N pages, more than the M pages approved
-  for it, so nothing was read or charged. Upload it again and approve N pages." and offers that
-  upload on the row, sending `estimatedPages = N`. A customer-stated count is safe to approve on
+  for it, so it was stored but not compiled or charged." (the CDR did render the first range to
+  learn N). When N is within the live PDF ceiling (80 with segmented intake off, 500 with it on) it
+  adds "Upload it again and approve N pages." and offers that upload on the row, sending
+  `estimatedPages = N`; above the ceiling it offers no upload and says to split the PDF, since that
+  upload would only be refused 413 (#242 R1 P1, P2). A customer-stated count is safe to approve on
   because of this rule: too high only reserves more, too low is refused at zero.
 - **Metering unchanged.** The source settles the per-document charge a whole document settles
   today (`computeCredits: 2`); intake still reserves and approves pages exactly as before. The

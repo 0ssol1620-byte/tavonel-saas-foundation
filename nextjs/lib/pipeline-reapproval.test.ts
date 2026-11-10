@@ -2,7 +2,16 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// The board as it renders once segmented intake is on (PDF ceiling 500). The switch-off side, where
+// the ceiling is 80 and no re-approval is offered, is lib/pipeline.test.ts.
+vi.mock("../../shared/intakeCeiling", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../../shared/intakeCeiling")>();
+  const on = real.intakeCeilingFor(real.INTAKE_CEILING_STAGE, true);
+  return { ...real, ...on, SEGMENTED_INTAKE_ENABLED: true,
+    maxSourcePagesFor: (mimeType: string) => real.maxSourcePagesFor(mimeType, on.PROCESSING_CEILING) };
+});
 import PipelineBoard from "@/components/pipeline-board";
 import { buildPipeline, type PipelineDocument } from "@/lib/pipeline";
 
@@ -25,6 +34,18 @@ describe("re-approval of a source longer than its approval", () => {
   it("offers an upload approving the real count, only where the page can send one", () => {
     expect(render(() => undefined)).toContain("Upload again and approve 240 pages");
     expect(render()).not.toContain("Upload again and approve");
+  });
+
+  it("offers no upload above the live ceiling, and says to split instead (#242 R1 P2)", () => {
+    const tooLong = { ...refused, refusal: { ...refused.refusal!, observedPages: 501 } };
+    const html = renderToStaticMarkup(createElement(PipelineBoard, {
+      rows: buildPipeline([], [tooLong]), customerDataAccess: "open", onReapprove: () => undefined,
+    }));
+    expect(html).not.toContain("Upload again and approve");
+    expect(buildPipeline([], [tooLong])[0].stages[1].detail).toContain("split it into PDFs of at most 500 pages");
+    expect(buildPipeline([], [refused])[0].stages[1].detail).toBe(
+      "This PDF has 240 pages, more than the 80 pages approved for it, so it was stored but not compiled or charged. Upload it again and approve 240 pages.",
+    );
   });
 
   it("sends that count as the upload's estimatedPages, on the per-file path the board offers it on", () => {

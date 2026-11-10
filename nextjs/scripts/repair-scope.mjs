@@ -3036,8 +3036,8 @@ export const LARGE_SOURCE_INTAKE_CEILING_AFFECTED_UNIT_FILES = Object.freeze(['l
 // Large-source approval bound (ADR-0006, F1): the approval record the capability route writes beside a source and the worker
 // reads before segmenting (shared, so the CDR worker checks run too), and the board's re-approval action with its suite.
 // Product code, so never nativeReuse. No browser or database lane.
-export const LARGE_SOURCE_APPROVAL_BOUND_AFFECTED_PATHS = Object.freeze(['nextjs/components/pipeline-board.tsx', 'nextjs/lib/pipeline-reapproval.test.ts', 'shared/sourceApproval.ts']);
-export const LARGE_SOURCE_APPROVAL_BOUND_AFFECTED_UNIT_FILES = Object.freeze(['lib/intake-approval-rollout-off.test.ts', 'lib/pipeline-reapproval.test.ts', 'lib/pipeline.test.ts', 'lib/r2-triage-seal.test.ts']);
+export const LARGE_SOURCE_APPROVAL_BOUND_AFFECTED_PATHS = Object.freeze(['nextjs/components/pipeline-board.tsx', 'nextjs/lib/pipeline-reapproval.test.ts', 'nextjs/lib/r2-presign.test.ts', 'nextjs/lib/r2-presign.ts', 'nextjs/scripts/journey/local-browser-storage-transport.integration.test.ts', 'shared/sourceApproval.ts']);
+export const LARGE_SOURCE_APPROVAL_BOUND_AFFECTED_UNIT_FILES = Object.freeze(['lib/intake-approval-rollout-off.test.ts', 'lib/pipeline-reapproval.test.ts', 'lib/pipeline.test.ts', 'lib/r2-presign.test.ts', 'lib/r2-triage-seal.test.ts']);
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
 // ops-backlog-sli-20261110 (GA ops gap 4): the B35 evaluator gains a compile backlog age. Its own suite and both routes that call it.
@@ -3352,7 +3352,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // large-source-deletion-inventory (ADR-0006, E5): the 4 exact repo-relative paths above select 3 direct suites and no browser suite.
   affectedGroup('large-source-deletion-inventory', new RegExp(`^(?:${exactPathAlternation(LARGE_SOURCE_DELETION_INVENTORY_AFFECTED_PATHS)})$`),
     { unitFiles: LARGE_SOURCE_DELETION_INVENTORY_AFFECTED_UNIT_FILES }),
-  // large-source-approval-bound (ADR-0006, F1): the 3 exact repo-relative paths above select 4 direct suites, the CDR worker
+  // large-source-approval-bound (ADR-0006, F1): the 6 exact repo-relative paths above select 5 direct suites, the CDR worker
   // checks and no browser suite.
   affectedGroup('large-source-approval-bound', new RegExp(`^(?:${exactPathAlternation(LARGE_SOURCE_APPROVAL_BOUND_AFFECTED_PATHS)})$`),
     { unitFiles: LARGE_SOURCE_APPROVAL_BOUND_AFFECTED_UNIT_FILES, worker: true }),

@@ -198,11 +198,23 @@ function presignFoundationPutValidated(
   return { ok: true as const, uploadUrl, contentLength };
 }
 
+/*
+  A browser-writable quarantine key is exactly `quarantine/<workspace>/<document>/source`. Every
+  sibling under that prefix -- `approval.json`, which the worker trusts for the approved page count
+  (ADR-0006 F1), receipts, refusals -- is written by the server or the worker, never through a
+  URL handed to a client (#242 R1).
+*/
+const QUARANTINE_SOURCE_KEY = /^quarantine\/[A-Za-z0-9_-]{1,64}\/[A-Za-z0-9_-]{1,64}\/source$/;
+
+export function assertFoundationQuarantineSourceKey(bucket: string, key: string) {
+  return assertFoundationQuarantineKey(bucket, key) ?? (QUARANTINE_SOURCE_KEY.test(key) ? null : "QUARANTINE_SOURCE_KEY_REQUIRED");
+}
+
 export function presignFoundationQuarantinePut(
   env: R2SignerEnv,
   input: { key: string; contentType: string; contentLength: number; expiresInSeconds: number; now?: Date },
 ) {
-  return presignFoundationPutValidated(env, input, assertFoundationQuarantineKey);
+  return presignFoundationPutValidated(env, input, assertFoundationQuarantineSourceKey);
 }
 
 /** The only browser-writable triage object; sealed source keys never use this signer. */

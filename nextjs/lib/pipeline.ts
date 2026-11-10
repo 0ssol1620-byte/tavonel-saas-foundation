@@ -20,7 +20,7 @@
  *     reload. It now arrives as a refusal receipt and stops the row where it stopped.
  */
 
-import { PROCESSING_CEILING_SENTENCE } from "../../shared/intakeCeiling";
+import { PROCESSING_CEILING_SENTENCE, maxSourcePagesFor } from "../../shared/intakeCeiling";
 import { selectCurrentDocumentVersions, type DocumentListItem } from "./immutable-keys";
 
 export type StageKey = "quarantine" | "sanitize" | "read" | "compile";
@@ -49,16 +49,30 @@ export type DocumentRefusal = {
   occurredAt: string;
   /**
    * Both set only when the worker refused the source for having more pages than it was approved and
-   * reserved at (ADR-0006 F1): the count the CDR read, and the approval. Nothing was read or charged.
+   * reserved at (ADR-0006 F1): the count the CDR read, and the approval. The source is stored; the
+   * CDR rendered its first range to learn the count, and nothing was compiled or charged.
    */
   observedPages?: number;
   approvedMaxPages?: number;
 };
 
-/** The page count to approve on a second upload of a source refused for exceeding its approval. */
-export function reapprovalPages(refusal: DocumentRefusal | undefined): number | null {
+/** The real page count of a source refused for having more pages than it was approved at. */
+function pagesOverApproval(refusal: DocumentRefusal | undefined): number | null {
   return refusal?.observedPages !== undefined && refusal.approvedMaxPages !== undefined
     && refusal.observedPages > refusal.approvedMaxPages ? refusal.observedPages : null;
+}
+
+/**
+ * The page count to approve on a second upload of such a source -- only when intake would accept
+ * it. Above the live PDF ceiling (80 while segmented intake is off, 500 once it is on) the upload
+ * would only be refused 413, so no re-approval is offered (#242 R1 P2).
+ */
+export function reapprovalPages(
+  refusal: DocumentRefusal | undefined,
+  ceiling = maxSourcePagesFor("application/pdf"),
+): number | null {
+  const pages = pagesOverApproval(refusal);
+  return pages !== null && pages <= ceiling ? pages : null;
 }
 
 /**
@@ -130,9 +144,13 @@ export function refusalDetail(refusal: DocumentRefusal): string {
   const size = refusal.observedBytes && refusal.observedBytes > 0
     ? `This source is ${bytes(refusal.observedBytes)}. `
     : "";
-  const reapprove = reapprovalPages(refusal);
-  if (reapprove !== null) {
-    return `This PDF has ${reapprove} pages, more than the ${refusal.approvedMaxPages} pages approved for it, so nothing was read or charged. Upload it again and approve ${reapprove} pages.`;
+  const over = pagesOverApproval(refusal);
+  if (over !== null) {
+    const ceiling = maxSourcePagesFor("application/pdf");
+    const approved = `This PDF has ${over} pages, more than the ${refusal.approvedMaxPages} pages approved for it, so it was stored but not compiled or charged.`;
+    return reapprovalPages(refusal, ceiling) !== null
+      ? `${approved} Upload it again and approve ${over} pages.`
+      : `${approved} TAVONEL reads at most ${ceiling} pages from one PDF, so split it into PDFs of at most ${ceiling} pages and upload those.`;
   }
   switch (refusal.reasonCode) {
     case "PARSER_OOM":

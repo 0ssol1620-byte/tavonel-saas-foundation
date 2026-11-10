@@ -1064,15 +1064,15 @@ assert(VITEST_DISCOVERY_CONFIG_PATH==='nextjs/vitest.config.ts'&&discoveryOwners
     && ['nextjs/lib/source-deletion-inventory-r2.ts', 'nextjs/lib/source-deletion-inventory-store.ts', 'nextjs/lib/source-deletion-inventory.test.ts', 'nextjs/lib/source-deletion-inventory.ts'].every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && deletionInventoryOwners[0].match.test(p))
     && ['nextjs/lib/source-deletion-inventory-v2.ts', 'nextjs/lib/source-deletion-inventory-store.test.ts'].every(p => !deletionInventoryOwners[0].match.test(p)),
     'large-source-deletion-inventory owner must keep its four exact paths, three direct suites and no neighbour admission');
-  // The approval record beside a source and the board's re-approval: one exact owner, four direct suites and the worker checks.
+  // The approval record beside a source and the board's re-approval: one exact owner, five direct suites and the worker checks.
   const approvalBoundOwners = AFFECTED_GROUPS.filter(o => o.group === 'large-source-approval-bound');
   assert(approvalBoundOwners.length === 1
-    && JSON.stringify(approvalBoundOwners[0].unitFiles) === JSON.stringify(['lib/intake-approval-rollout-off.test.ts', 'lib/pipeline-reapproval.test.ts', 'lib/pipeline.test.ts', 'lib/r2-triage-seal.test.ts'])
+    && JSON.stringify(approvalBoundOwners[0].unitFiles) === JSON.stringify(['lib/intake-approval-rollout-off.test.ts', 'lib/pipeline-reapproval.test.ts', 'lib/pipeline.test.ts', 'lib/r2-presign.test.ts', 'lib/r2-triage-seal.test.ts'])
     && approvalBoundOwners[0].worker === true
     && !approvalBoundOwners[0].browserFiles.length && !approvalBoundOwners[0].databaseTests.length && !approvalBoundOwners[0].nativeReuse
-    && ['nextjs/components/pipeline-board.tsx', 'nextjs/lib/pipeline-reapproval.test.ts', 'shared/sourceApproval.ts'].every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && approvalBoundOwners[0].match.test(p))
+    && ['nextjs/components/pipeline-board.tsx', 'nextjs/lib/pipeline-reapproval.test.ts', 'nextjs/lib/r2-presign.test.ts', 'nextjs/lib/r2-presign.ts', 'nextjs/scripts/journey/local-browser-storage-transport.integration.test.ts', 'shared/sourceApproval.ts'].every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && approvalBoundOwners[0].match.test(p))
     && ['shared/sourceApproval.test.ts', 'nextjs/components/pipeline-board-v2.tsx'].every(p => !approvalBoundOwners[0].match.test(p)),
-    'large-source-approval-bound owner must keep its three exact paths, four direct suites, the worker checks and no neighbour admission');
+    'large-source-approval-bound owner must keep its six exact paths, five direct suites, the worker checks and no neighbour admission');
 }
 console.log(`Workflow static gates pass. Full qualification still pending for exact CI/Launch runs at this head.`);
 
