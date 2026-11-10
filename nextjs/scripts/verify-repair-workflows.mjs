@@ -29,6 +29,7 @@ import { OPS_BACKLOG_SLI_AFFECTED_PATHS, OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES } f
 import { PROCESSING_GA_AFFECTED_PATHS, PROCESSING_GA_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { TRIAL_TO_PAID_AFFECTED_PATHS, TRIAL_TO_PAID_AFFECTED_UNIT_FILES, TRIAL_TO_PAID_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { SLI_ALERT_NOISE_AFFECTED_PATHS, SLI_ALERT_NOISE_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS, REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
 const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -801,6 +802,14 @@ for (const binding of [
     browsers: ['e2e/billing-lifecycle.spec.ts'],
     rows: ["['e2e/billing-lifecycle.spec.ts', ['audit', 'audit-768', 'audit-1280']],"],
     neighbors: ['nextjs/app/api/collections/[id]/promote/route.tsx', 'nextjs/components/processing-consent-panel.module.scss', 'nextjs/lib/activation-cohort.ts', 'nextjs/lib/cookbook-contents.ts', 'lib/keyword-map.ts', 'nextjs/e2e/billing-lifecycle.spec.tsx', 'nextjs/app/api/collections/[id]/search/route.tsx'] },
+  // revoke-not-plan-gated-20261110: three exact paths, six direct suites, no browser suite.
+  { group: 'revoke-not-plan-gated-20261110', prefix: 'nextjs/', exportedPaths: REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS, exportedSuites: REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['app/api/connections/[id]/route.ts', 'app/api/v1/oauth-connectors/connections/[id]/route.ts', 'lib/connection-revoke-not-plan-gated.test.ts'],
+    suites: ['lib/connection-revoke-not-plan-gated.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/google-drive-viewer-link-off.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/app/api/connections/[id]/revoke/route.ts', 'nextjs/app/api/v1/oauth-connectors/connections/[id]/page.tsx', 'nextjs/lib/connection-revoke-not-plan-gated.ts', 'nextjs/lib/connection-revoke.test.ts', 'app/api/connections/[id]/route.ts'] },
   // sli-alert-noise-20261109: three exact paths, ten direct suites, no browser suite.
   { group: 'sli-alert-noise-20261109', prefix: 'nextjs/', exportedPaths: SLI_ALERT_NOISE_AFFECTED_PATHS, exportedSuites: SLI_ALERT_NOISE_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],

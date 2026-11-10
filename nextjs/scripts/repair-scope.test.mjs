@@ -4904,7 +4904,8 @@ test('affected connector progress admission: the literal [id] route is accepted 
     'nextjs/app/api/v1/oauth-connectors/connections/d/sync/route.ts','nextjs/app/api/v1/oauth-connectors/connections/[ID]/sync/route.ts',
     'nextjs/app/api/v1/oauth-connectors/connections/[connectionId]/sync/route.ts','nextjs/app/api/v1/oauth-connectors/connections/[id/sync/route.ts',
     'nextjs/app/api/v1/oauth-connectors/connections/id]/sync/route.ts','nextjs/app/api/v1/oauth-connectors/connections/[[id]]/sync/route.ts',
-    'nextjs/app/api/v1/oauth-connectors/connections/[id]/route.ts','nextjs/app/api/v1/oauth-connectors/connections/route.ts',
+    // connections/[id]/route.ts is owned by revoke-not-plan-gated-20261110.
+    'nextjs/app/api/v1/oauth-connectors/connections/route.ts',
     'nextjs/app/api/v1/oauth-connectors/connections/[id]/sync/route.test.ts','nextjs/app/api/v1/oauth-connectors/connections/[id]/sync/routeXts',
     'nextjs/app/api/v1/oauth-connectors/connections/[id]/sync/status/route.ts','nextjs/app/api/v1/oauth-connectors/authorize/route.ts',
     'nextjs/app/api/oauth-connectors/connections/[id]/sync/route.ts','app/api/v1/oauth-connectors/connections/[id]/sync/route.ts',
@@ -8302,5 +8303,25 @@ test('affected processing-ga-20261109 owner: 1 exact path selects 2 direct suite
   for (const adjacent of ['nextjs/lib/customer-data-admission.tsx', 'nextjs/lib/customer-data-admission-routes.ts', 'nextjs/lib/customer-data-admission.mjs', 'lib/customer-data-admission.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});
+// revoke-not-plan-gated-20261110: one finite owner, restated independently of the exported constants.
+import { REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS, REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected revoke-not-plan-gated-20261110 owner: 3 exact paths select 6 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/api/connections/[id]/route.ts', 'app/api/v1/oauth-connectors/connections/[id]/route.ts', 'lib/connection-revoke-not-plan-gated.test.ts'];
+  const suites = ['lib/connection-revoke-not-plan-gated.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/google-drive-viewer-link-off.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts'];
+  assert.deepEqual([[...REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS], [...REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['revoke-not-plan-gated-20261110'], path);
+  }
+  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['revoke-not-plan-gated-20261110'], [], suites, [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  const plan = affectedAskPlan(map);
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
+  for (const adjacent of ['nextjs/app/api/connections/[id]/revoke/route.ts', 'nextjs/app/api/v1/oauth-connectors/connections/[id]/page.tsx', 'nextjs/lib/connection-revoke-not-plan-gated.ts', 'nextjs/lib/connection-revoke.test.ts', 'app/api/connections/[id]/route.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });

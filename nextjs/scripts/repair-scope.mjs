@@ -3023,6 +3023,9 @@ export const LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-co
 // sli-alert-noise-20261109: the probe-history reader signs at the real clock; the two SLI routes stop passing an evaluation instant to it.
 export const SLI_ALERT_NOISE_AFFECTED_PATHS = Object.freeze(['app/api/internal/sli/route.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe-store.ts']);
 export const SLI_ALERT_NOISE_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error-codes.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-read-route.test.ts', 'lib/operational-sli.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe.test.ts']);
+// revoke-not-plan-gated-20261110: the three revocation routes ask for membership and scope, never the plan ("Never let an ACL revoke wait").
+export const REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS = Object.freeze(['app/api/connections/[id]/route.ts', 'app/api/v1/oauth-connectors/connections/[id]/route.ts', 'lib/connection-revoke-not-plan-gated.test.ts']);
+export const REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES = Object.freeze(['lib/connection-revoke-not-plan-gated.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/google-drive-viewer-link-off.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts']);
 export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('public-marketing-surface', new RegExp(`^(?:${exactPathAlternation(PUBLIC_MARKETING_AFFECTED_PATHS)})$`),
     { unitFiles: PUBLIC_MARKETING_AFFECTED_UNIT_FILES, browserFiles: PUBLIC_MARKETING_AFFECTED_BROWSER_FILES }),
@@ -3267,6 +3270,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // trial-to-paid-20261109: 7 exact paths select 27 direct suites and the one browser suite it edits.
   affectedGroup('trial-to-paid-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(TRIAL_TO_PAID_AFFECTED_PATHS)})$`),
     { unitFiles: TRIAL_TO_PAID_AFFECTED_UNIT_FILES, browserFiles: TRIAL_TO_PAID_AFFECTED_BROWSER_FILES }),
+  // revoke-not-plan-gated-20261110: 3 exact paths select 6 direct suites and no browser suite.
+  affectedGroup('revoke-not-plan-gated-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS)})$`),
+    { unitFiles: REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES }),
   // sli-alert-noise-20261109: 3 exact paths select 10 direct suites and no browser suite.
   affectedGroup('sli-alert-noise-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(SLI_ALERT_NOISE_AFFECTED_PATHS)})$`),
     { unitFiles: SLI_ALERT_NOISE_AFFECTED_UNIT_FILES }),
