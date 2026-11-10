@@ -1,0 +1,118 @@
+/* The hero film slot (hero-compile-tabs.tsx). Paper ground, the site's ink and action blue; no glow, no decoration. */
+.tabs {
+  margin: clamp(32px, 4vw, 56px) 0 0;
+  width: 100%;
+  text-align: start;
+}
+
+.list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 clamp(8px, 2vw, 24px);
+  margin-bottom: 12px;
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 0 0;
+  border: 0;
+  background: none;
+  color: var(--tv-ink-muted, #4c545d);
+  font: 500 15px/1.2 var(--f-sans, system-ui, sans-serif);
+  text-align: start;
+  cursor: pointer;
+}
+
+.tab > span:first-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tab[aria-selected="true"] {
+  color: var(--tv-ink, #15191d);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--tv-action, #005bb3);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* The track is the cut's clock: it fills over the cut's own eighteen seconds. */
+.track {
+  position: relative;
+  display: block;
+  height: 2px;
+  background: var(--tv-rule, rgb(21 25 29 / 0.12));
+  overflow: hidden;
+}
+
+.fill,
+.fillStatic {
+  position: absolute;
+  inset: 0;
+  background: var(--tv-action, #005bb3);
+  transform-origin: left center;
+}
+
+.fill {
+  transform: scaleX(0);
+  animation-name: heroTabClock;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes heroTabClock {
+  to { transform: scaleX(1); }
+}
+
+.stage {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 10;
+  border: 1px solid var(--tv-rule, rgb(21 25 29 / 0.12));
+  border-radius: var(--tv-r-media, 8px);
+  background: #f5f3ee;
+}
+
+.poster,
+.video,
+.live {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.poster,
+.video {
+  display: block;
+  object-fit: contain;
+}
+
+/* The films size themselves to a 100vh stage; here the stage is the slot. */
+.live :global(.film) {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+}
+
+.caption {
+  margin-top: 12px;
+  color: var(--tv-ink-muted, #4c545d);
+  font: 13px/1.5 var(--f-sans, system-ui, sans-serif);
+}
+
+@media (max-width: 480px) {
+  .tab { font-size: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill { animation: none; transform: scaleX(1); }
+}

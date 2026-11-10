@@ -9,7 +9,8 @@
 
 import { useEffect, useRef } from "react";
 import { FILM_ACT as ACT } from "@/lib/film-script";
-import { buildWorldGraph, nodeBudget, SHARED_ENTITIES, type WorldGraph } from "@/lib/world-graph";
+import { buildWorldGraph, nodeBudget, type WorldGraph } from "@/lib/world-graph";
+import { compileGraph } from "@/lib/film-tone";
 
 const ONTO_SPLIT = 0.56;
 const WORLD_UNTIL = 17.2;
@@ -281,84 +282,8 @@ function uniqueIds(): string[] {
 
 const CLASS_IDS = uniqueIds();
 
-/*
-  "Compiled" graph (founder, 2026-11-10): the clusters stay where buildWorldGraph puts them and read as
-  topics; a node's colour is the source document its entity came from. Each topic is mostly fed by one
-  document and partly by the documents it shares identity with (SHARED_ENTITIES), and a borrowed colour
-  sits on the side of the cluster that faces that document's own topic -- a realistic mix, not noise.
-  The empty centre of the ring becomes a core of identity-resolved entities that several documents point
-  to: larger, linked into every topic, and grown last, so the core lights up as the cross-topic links form.
-  Deterministic: one LCG, a fixed seed.
-*/
-type CompiledGraph = WorldGraph & { doc: number[]; coreStart: number };
-function compileGraph(g: WorldGraph): CompiledGraph {
-  let state = 20261110;
-  const random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296; };
-  const areas = g.byArea.length;
-  const centre = g.byArea.map((m) => ({
-    x: m.reduce((sum, i) => sum + g.nodes[i].x, 0) / Math.max(1, m.length),
-    y: m.reduce((sum, i) => sum + g.nodes[i].y, 0) / Math.max(1, m.length),
-  }));
-  const shared = (a: number, b: number) => SHARED_ENTITIES.find(([x, y]) => (x === a && y === b) || (x === b && y === a))?.[2] ?? 0;
-  const nodes = g.nodes.map((n) => ({ ...n }));
-  const doc = nodes.map((n) => {
-    if (random() < 0.52) return n.area;
-    const c = centre[n.area];
-    const dx = n.x - c.x, dy = n.y - c.y;
-    const weights = Array.from({ length: areas }, (_, b) => {
-      if (b === n.area) return 0;
-      const tx = centre[b].x - c.x, ty = centre[b].y - c.y;
-      const facing = (dx * tx + dy * ty) / (Math.hypot(tx, ty) * Math.max(0.02, Math.hypot(dx, dy)));
-      return shared(n.area, b) * Math.max(0.12, 1 + 1.6 * facing);
-    });
-    let pick = random() * weights.reduce((a, b) => a + b, 0);
-    for (let b = 0; b < areas; b += 1) { pick -= weights[b]; if (pick <= 0) return b; }
-    return n.area;
-  });
-  const intra = g.edges.filter(([a, b]) => g.nodes[a].area === g.nodes[b].area);
-  const cross = g.edges.filter(([a, b]) => g.nodes[a].area !== g.nodes[b].area);
-  // the core: about 7% of the budget, inside the ring
-  const coreStart = nodes.length;
-  const coreCount = Math.max(14, Math.round(nodes.length * 0.07));
-  const core: number[] = [];
-  for (let i = 0; i < coreCount; i += 1) {
-    const a = random() * Math.PI * 2, d = Math.sqrt(random()) * 0.16;
-    const home = Math.floor(random() * areas);
-    nodes.push({ x: 0.5 + Math.cos(a) * d, y: 0.5 + Math.sin(a) * d * 0.8, area: home, depth: -1, state: "kept", radius: 1.6 + random() * 0.8 });
-    doc.push(home);
-    core.push(nodes.length - 1);
-  }
-  const coreEdges: [number, number][] = [];
-  core.forEach((c, i) => {
-    // every core entity reaches three or four topics; together they reach all of them
-    // to the inner edge of each topic it reaches (nearest of a few candidates), so the spokes stay short
-    for (let k = 0; k < 3; k += 1) {
-      const m = g.byArea[(i + k * 2) % areas];
-      let best = m[0], bestD = Infinity;
-      for (let q = 0; q < 8; q += 1) {
-        const cand = m[Math.floor(random() * m.length)];
-        const d = Math.hypot(nodes[cand].x - nodes[c].x, nodes[cand].y - nodes[c].y);
-        if (d < bestD) { bestD = d; best = cand; }
-      }
-      coreEdges.push([c, best]);
-    }
-    if (i > 0) coreEdges.push([c, core[Math.floor(random() * i)]]);
-  });
-  // cross-topic bridges and core links interleave at the end of the clock
-  const tail: [number, number][] = [];
-  const total = cross.length + coreEdges.length;
-  for (let i = 0, a = 0, b = 0; i < total; i += 1) {
-    if (b >= coreEdges.length || (a < cross.length && a / cross.length <= b / coreEdges.length)) tail.push(cross[a++]);
-    else tail.push(coreEdges[b++]);
-  }
-  return { ...g, nodes, edges: [...intra, ...tail], doc, coreStart };
-}
-
-/**
- * `variant` "four-up" is the locked cut. "phone" is the same film for a 4:5 phone frame: WORLD large on top, the MARKDOWN
- * strip under it. `compiled` colours nodes by source document and fills the ring's centre (compileGraph).
- */
-export default function OpeningFilm2({ tone = "dark", variant = "four-up", compiled = false }: { onEnded?: () => void; tone?: FilmTone; variant?: "four-up" | "phone"; compiled?: boolean }) {
+/** `compiled` colours nodes by source document and fills the ring's centre (lib/film-tone.ts compileGraph). */
+export default function OpeningFilm2({ tone = "dark", compiled = false, playing = true }: { onEnded?: () => void; tone?: FilmTone; compiled?: boolean; playing?: boolean }) {
   const P = TONES[tone];
   const AREA_RGB = P.areas;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -366,6 +291,8 @@ export default function OpeningFilm2({ tone = "dark", variant = "four-up", compi
   const startRef = useRef(0);
   const elapsedRef = useRef(0);
   const reducedRef = useRef(false);
+
+  useEffect(() => { playingRef.current = playing; }, [playing]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -522,7 +449,6 @@ export default function OpeningFilm2({ tone = "dark", variant = "four-up", compi
       });
     };
 
-    let nodeScale = 1; // the phone frame draws marks smaller than the four-up's CSS-pixel sizes
     const drawNodes = (
       x: number, y: number, w: number, h: number,
       t: number, selected: number, withEdges: boolean,
@@ -549,7 +475,7 @@ export default function OpeningFilm2({ tone = "dark", variant = "four-up", compi
           // compiled: links across topics and into the core are identity, drawn in ink; a topic's own links keep the document's colour
           const identity = g.coreStart !== undefined && (na.area !== nb.area || ia >= g.coreStart || ib >= g.coreStart);
           context.strokeStyle = identity ? `rgba(21,25,29,${0.14 + grow * 0.22})` : `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${P.edgeBase + grow * P.edgeGrow})`;
-          context.lineWidth = (last ? 1.6 : 1.05) * nodeScale;
+          context.lineWidth = (last ? 1.6 : 1.05);
           context.beginPath();
           context.moveTo(ox + na.x * gw, oy + na.y * gh);
           context.lineTo(ox + lerp(na.x, nb.x, grow) * gw, oy + lerp(na.y, nb.y, grow) * gh);
@@ -560,7 +486,7 @@ export default function OpeningFilm2({ tone = "dark", variant = "four-up", compi
         const rgb = AREA_RGB[(g.doc?.[i] ?? node.area) % AREA_RGB.length];
         const isSel = i === selected;
         const isN = linked.has(i);
-        const r = (isSel ? 4.2 : isN && withEdges ? 2.4 : 1.7) * node.radius * nodeScale;
+        const r = (isSel ? 4.2 : isN && withEdges ? 2.4 : 1.7) * node.radius;
         context.fillStyle = isSel
           ? `rgb(${Math.max(0, Math.min(255, rgb[0] + P.selLift))},${rgb[1]},${rgb[2]})`
           : isN && withEdges
@@ -570,28 +496,6 @@ export default function OpeningFilm2({ tone = "dark", variant = "four-up", compi
         context.arc(ox + node.x * gw, oy + node.y * gh, r, 0, Math.PI * 2);
         context.fill();
       });
-    };
-
-    /* Phone, 4:5: WORLD large on top, the MARKDOWN strip under it. Same graph, clock and selection. */
-    const drawPhone = (t: number) => {
-      const cap = graph ? graph.edges.length : 1;
-      const edgeI = Math.min(cap - 1, Math.max(0, Math.floor(clamp01(t / WORLD_UNTIL) * cap)));
-      const selected = graph ? graph.edges[edgeI][0] : 0;
-      const area = graph ? graph.nodes[selected].area : 0;
-      const byArea = FOCI.findIndex((f) => f.area === area);
-      const f0 = FOCI[byArea >= 0 ? byArea : 0];
-      const x = width * 0.04, w = width * 0.92;
-      const worldH = height * 0.68;
-      pane(x, height * 0.03, w, worldH, "WORLD", "linking");
-      // the WORLD pane's own proportion (a tall ring), centred in the wider phone pane
-      const gh = worldH - 40, gw = w - 12;
-      nodeScale = 0.6;
-      // the ring leaves its outer sixth empty; stretch the box past the pane so the cloud fills it
-      drawNodes(x + (w - gw) / 2, height * 0.03 + 32 - gh * 0.17, gw, gh * 1.35, t, selected, true);
-      nodeScale = 1;
-      const mdY = height * 0.03 + worldH + 10;
-      pane(x, mdY, w, height * 0.97 - mdY, "MARKDOWN", f0.label);
-      typeLines(x + 8, mdY + 30, w - 16, height * 0.97 - mdY - 38, "NODE.md", ALL_MD, t, P.accent);
     };
 
     const draw = (t: number) => {
@@ -606,7 +510,6 @@ export default function OpeningFilm2({ tone = "dark", variant = "four-up", compi
       const colW = (bw - gap * 3) / 4;
       const xs = [0, 1, 2, 3].map((i) => bx + i * (colW + gap));
 
-      if (variant === "phone") { drawPhone(t); return; }
       context.fillStyle = P.titleBar;
       context.fillRect(bx, by, bw, 32);
       context.fillStyle = P.dot;
@@ -674,7 +577,13 @@ export default function OpeningFilm2({ tone = "dark", variant = "four-up", compi
           frame = window.requestAnimationFrame(tick);
           return;
         }
-        if (playingRef.current) elapsedRef.current += (now - startRef.current) / 1000;
+        if (!playingRef.current) {
+          // Paused by the host (offscreen, hidden tab): hold the frame and draw nothing.
+          startRef.current = now;
+          frame = window.requestAnimationFrame(tick);
+          return;
+        }
+        elapsedRef.current += (now - startRef.current) / 1000;
         startRef.current = now;
         if (elapsedRef.current >= ACT.stop) elapsedRef.current = 0;
         draw(elapsedRef.current);
@@ -694,7 +603,7 @@ export default function OpeningFilm2({ tone = "dark", variant = "four-up", compi
       .then((pl) => { if (cancelled) return; plaster = pl; stop = startLoop(); })
       .catch(() => { if (!cancelled) stop = startLoop(); });
     return () => { cancelled = true; stop?.(); };
-  }, [P, variant, compiled]);
+  }, [P, AREA_RGB, compiled]);
 
   return (
     <div className="film">
