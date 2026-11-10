@@ -7667,6 +7667,27 @@ test('affected legal-semicolons-status-20261109 owner: 1 exact path selects no d
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+// overlap-audit-20261110: one finite owner, restated independently of the exported constants.
+import { OVERLAP_AUDIT_AFFECTED_PATHS, OVERLAP_AUDIT_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+test('affected overlap-audit-20261110 owner: 2 exact paths select no direct suite and 1 browser suite in audit; neighbours stay unmapped', () => {
+  const paths = ['e2e/overlap-audit.spec.ts', 'e2e/support/overlap.ts'];
+  const browsers = ['e2e/overlap-audit.spec.ts'];
+  assert.deepEqual([[...OVERLAP_AUDIT_AFFECTED_PATHS], [...OVERLAP_AUDIT_AFFECTED_BROWSER_FILES]], [paths, browsers]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['overlap-audit-20261110'], path);
+    const map = affectedMap([affectedRecord('M', [path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['overlap-audit-20261110'], [], [], browsers, []], path);
+    assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false], path);
+  }
+  const plan = affectedAskPlan(affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]));
+  assert.deepEqual([plan.unitFiles, plan.browserFiles], [[], browsers]);
+  assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['audit']);
+  for (const adjacent of ['nextjs/e2e/overlap-audit-2.spec.ts', 'nextjs/e2e/support/overlap.tsx', 'nextjs/e2e/support/overlaps.ts', 'e2e/overlap-audit.spec.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
 // D-05 gate release continuity (docs/adr/0006): one finite owner over repo-relative paths, restated independently.
 import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 test('affected gate-release-continuity owner: 9 exact paths select 10 direct suites and no browser suite; neighbours stay unmapped', () => {

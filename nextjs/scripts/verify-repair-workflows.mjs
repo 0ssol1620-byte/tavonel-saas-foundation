@@ -14,6 +14,7 @@ import { W2_D_INTAKE_STAGE1_AFFECTED_PATHS, W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FIL
 import { COMPILER_RELEASE_AFFECTED_PATHS, COMPILER_RELEASE_AFFECTED_UNIT_FILES, COMPILER_RELEASE_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { SITE_POLISH_AFFECTED_PATHS, SITE_POLISH_AFFECTED_UNIT_FILES, SITE_POLISH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { LEGAL_SEMICOLONS_STATUS_AFFECTED_PATHS, LEGAL_SEMICOLONS_STATUS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+import { OVERLAP_AUDIT_AFFECTED_PATHS, OVERLAP_AUDIT_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { GATE_RELEASE_CONTINUITY_AFFECTED_PATHS, GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { HOME_FILM_RERECORD_AFFECTED_PATHS, HOME_FILM_RERECORD_AFFECTED_UNIT_FILES, HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { CONSENT_POSTER_AFFECTED_PATHS, CONSENT_POSTER_AFFECTED_UNIT_FILES, CONSENT_POSTER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
@@ -745,6 +746,14 @@ for (const binding of [
     browsers: ['e2e/operations.spec.ts'],
     rows: ["['e2e/operations.spec.ts', ['1440']],"],
     neighbors: ['nextjs/e2e/operations-p0.spec.ts', 'nextjs/e2e/operation.spec.ts', 'nextjs/e2e/operations.spec.tsx', 'e2e/operations.spec.ts'] },
+  // overlap-audit-20261110: two exact paths, no direct suite, one browser suite with its audit row.
+  { group: 'overlap-audit-20261110', prefix: 'nextjs/', exportedPaths: OVERLAP_AUDIT_AFFECTED_PATHS, exportedSuites: [],
+    exportedBrowsers: OVERLAP_AUDIT_AFFECTED_BROWSER_FILES,
+    paths: ['e2e/overlap-audit.spec.ts', 'e2e/support/overlap.ts'],
+    suites: [],
+    browsers: ['e2e/overlap-audit.spec.ts'],
+    rows: ["['e2e/overlap-audit.spec.ts', ['audit']],"],
+    neighbors: ['nextjs/e2e/overlap-audit-2.spec.ts', 'nextjs/e2e/support/overlap.tsx', 'nextjs/e2e/support/overlaps.ts', 'e2e/overlap-audit.spec.ts'] },
   // B35 alert delivery (codex/ops-alert-delivery-20261102): four exact paths, eight direct suites, no browser suite.
   { group: 'operational-sli-alert-delivery', prefix: 'nextjs/', exportedPaths: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS, exportedSuites: OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],

@@ -238,6 +238,7 @@ const browserProjectsByFile = new Map([
   ['e2e/login-capability.spec.ts', ['1440']],
   ['e2e/home-measures.spec.ts', ['1440', '390', 'reduced-motion']],
   ['e2e/overflow-audit.spec.ts', ['audit']],
+  ['e2e/overlap-audit.spec.ts', ['audit']],
   ['e2e/templates.spec.ts', ['1440']],
   ['e2e/type-scale.spec.ts', ['1440']],
   ['e2e/site-alignment.spec.ts', ['1440']],
