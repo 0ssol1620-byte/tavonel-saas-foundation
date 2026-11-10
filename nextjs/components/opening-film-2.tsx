@@ -14,16 +14,36 @@ import { buildWorldGraph, nodeBudget, type WorldGraph } from "@/lib/world-graph"
 const ONTO_SPLIT = 0.56;
 const WORLD_UNTIL = 17.2;
 
-const AREA_RGB: [number, number, number][] = [
-  [242, 166, 90],
-  [80, 210, 170],
-  [90, 170, 230],
-  [180, 130, 255],
-  [255, 120, 170],
-  [120, 220, 110],
-  [255, 170, 90],
-  [90, 210, 230],
-];
+type RGB = [number, number, number];
+
+/*
+  Tone (2026-11-10, founder: the same film on the site's own ground). "dark" is the locked cut,
+  value for value; "light" re-tones every surface and type colour to the site tokens (app/tavonel.css)
+  and swaps the cluster hues for ones that hold >= 3:1 as marks on the paper (code text in a cluster
+  hue >= 4.5:1 on the code ground). Layout, timing, density and motion are the same code path.
+*/
+const TONES = {
+  dark: {
+    studio: "#070809", plaster: 0.07, pane: "#101214", paneRule: "#2e353b", paneHead: "#16191c",
+    text: "#edeae4", live: "rgba(40,140,110,0.95)", code: "#0b0d0e", codeTitle: "rgba(123,224,190,0.85)",
+    gutter: "#121416", rowRule: "#1a1e22", lineNo: "#3a4248", body: "#c8ced2", accent: "#7be0be",
+    cardOn: "#1a2220", card: "#16191c", cardRuleOn: "rgba(123,224,190,0.8)", cardRule: "#2e353b",
+    cardBarOn: "#7be0be", cardBar: "#3d4a46", cardMeta: "#7d878d", cardAttr: "#8fb4c9", cardRel: "#7be0be",
+    titleBar: "#14171a", dot: "rgba(123,224,190,0.9)", selLift: 50, nodeDim: 0.45, nodeOn: 0.9, edgeBase: 0.28, edgeGrow: 0.45,
+    areas: [[242, 166, 90], [80, 210, 170], [90, 170, 230], [180, 130, 255], [255, 120, 170], [120, 220, 110], [255, 170, 90], [90, 210, 230]] as RGB[],
+  },
+  light: {
+    studio: "#f5f3ee", plaster: 0, pane: "#ffffff", paneRule: "#dedad2", paneHead: "#f2f0eb",
+    text: "#15191d", live: "#1a6d51", code: "#fbfaf7", codeTitle: "#026470",
+    gutter: "#f2f0eb", rowRule: "#efece6", lineNo: "#6b7178", body: "#3b4249", accent: "#026470",
+    cardOn: "#e5edf9", card: "#ffffff", cardRuleOn: "#005bb3", cardRule: "#dedad2",
+    cardBarOn: "#005bb3", cardBar: "#d2d6dc", cardMeta: "#5c636b", cardAttr: "#1f4f86", cardRel: "#026470",
+    titleBar: "#ffffff", dot: "#0590a2", selLift: -40, nodeDim: 0.5, nodeOn: 0.95, edgeBase: 0.3, edgeGrow: 0.45,
+    // orange, teal, blue, raspberry (no violet on paper, UX-L1), green
+    areas: [[184, 82, 0], [0, 125, 99], [31, 111, 209], [194, 51, 107], [67, 125, 23], [184, 82, 0], [0, 125, 99], [31, 111, 209]] as RGB[],
+  },
+} as const;
+export type FilmTone = keyof typeof TONES;
 
 type Focus = {
   label: string;
@@ -258,7 +278,13 @@ function uniqueIds(): string[] {
 
 const CLASS_IDS = uniqueIds();
 
-export default function OpeningFilm2(_props: { onEnded?: () => void }) {
+/**
+ * `variant` "four-up" is the locked cut. "graph" draws only its WORLD pane at the full stage, with an
+ * optional MARKDOWN strip on the left as the source cue: the same graph, the same edge growth and clock.
+ */
+export default function OpeningFilm2({ tone = "dark", variant = "four-up", strip = true }: { onEnded?: () => void; tone?: FilmTone; variant?: "four-up" | "graph"; strip?: boolean }) {
+  const P = TONES[tone];
+  const AREA_RGB = P.areas;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const playingRef = useRef(true);
   const startRef = useRef(0);
@@ -289,10 +315,10 @@ export default function OpeningFilm2(_props: { onEnded?: () => void }) {
     };
 
     const studio = () => {
-      context.fillStyle = "#070809";
+      context.fillStyle = P.studio;
       context.fillRect(0, 0, width, height);
-      if (plaster) {
-        context.globalAlpha = 0.07;
+      if (plaster && P.plaster) {
+        context.globalAlpha = P.plaster;
         context.drawImage(plaster, 0, 0, width, height);
         context.globalAlpha = 1;
       }
@@ -300,16 +326,16 @@ export default function OpeningFilm2(_props: { onEnded?: () => void }) {
 
     const pane = (x: number, y: number, w: number, h: number, title: string, live: string) => {
       roundRect(context, x, y, w, h, 8);
-      context.fillStyle = "#101214";
+      context.fillStyle = P.pane;
       context.fill();
-      context.strokeStyle = "#2e353b";
+      context.strokeStyle = P.paneRule;
       context.stroke();
-      context.fillStyle = "#16191c";
+      context.fillStyle = P.paneHead;
       context.fillRect(x, y, w, 26);
-      context.fillStyle = "#edeae4";
+      context.fillStyle = P.text;
       context.font = "500 10px ui-monospace, Menlo, monospace";
       context.fillText(title, x + 10, y + 17);
-      context.fillStyle = "rgba(40,140,110,0.95)";
+      context.fillStyle = P.live;
       context.textAlign = "right";
       context.fillText(live, x + w - 8, y + 17);
       context.textAlign = "left";
@@ -319,15 +345,15 @@ export default function OpeningFilm2(_props: { onEnded?: () => void }) {
       x: number, y: number, w: number, h: number,
       title: string, body: string, t: number, accent: string,
     ) => {
-      context.fillStyle = "#0b0d0e";
+      context.fillStyle = P.code;
       context.fillRect(x, y, w, h);
-      context.fillStyle = "rgba(123,224,190,0.85)";
+      context.fillStyle = P.codeTitle;
       context.font = "500 8px ui-monospace, Menlo, monospace";
       context.fillText(title, x + 8, y + 12);
       const rowH = 10;
       const gutter = 22;
       const maxRows = Math.max(6, Math.floor((h - 18) / rowH));
-      context.fillStyle = "#121416";
+      context.fillStyle = P.gutter;
       context.fillRect(x, y + 16, gutter, h - 16);
       context.font = "400 8px ui-monospace, Menlo, monospace";
       const maxW = w - gutter - 10;
@@ -338,30 +364,30 @@ export default function OpeningFilm2(_props: { onEnded?: () => void }) {
       const start = Math.floor(t * 9) % Math.max(1, packed.length);
       for (let i = 0; i < maxRows; i += 1) {
         const row = packed[(start + i) % packed.length];
-        context.fillStyle = "#1a1e22";
+        context.fillStyle = P.rowRule;
         context.fillRect(x + gutter, y + 16 + i * rowH, w - gutter, 1);
-        context.fillStyle = "#3a4248";
+        context.fillStyle = P.lineNo;
         context.font = "400 8px ui-monospace, Menlo, monospace";
         context.fillText(String((start + i) % 99 + 1), x + 4, y + 24 + i * rowH);
         if (!row) continue;
         context.fillStyle = row.startsWith("@prefix") || row.startsWith(":")
-          ? "#edeae4"
+          ? P.text
           : row.includes("owl:") || row.includes("rdfs:")
             ? accent
             : row.startsWith("#") || row.startsWith("entity")
-              ? "#edeae4"
+              ? P.text
               : row.startsWith("|") || row.startsWith("!")
                 ? accent
-                : "#c8ced2";
+                : P.body;
         context.font = "400 8px ui-monospace, Menlo, monospace";
         context.fillText(row, x + gutter + 6, y + 24 + i * rowH);
       }
     };
 
     const drawCorr = (x: number, y: number, w: number, h: number, t: number, current: string) => {
-      context.fillStyle = "#0b0d0e";
+      context.fillStyle = P.code;
       context.fillRect(x, y, w, h);
-      context.fillStyle = "rgba(123,224,190,0.85)";
+      context.fillStyle = P.codeTitle;
       context.font = "500 8px ui-monospace, Menlo, monospace";
       context.fillText("TBox  ·  owl:Class", x + 8, y + 12);
 
@@ -391,26 +417,26 @@ export default function OpeningFilm2(_props: { onEnded?: () => void }) {
         const on = id === hot;
         const attrs = CLASS_ATTRS[id] ?? [["iri", "xsd:anyURI 1"]];
         const rels = ALL_CORR.filter((e) => e.from === id).slice(0, 2);
-        context.fillStyle = on ? "#1a2220" : "#16191c";
+        context.fillStyle = on ? P.cardOn : P.card;
         roundRect(context, bx, by, cardW, cardH, 2);
         context.fill();
-        context.strokeStyle = on ? "rgba(123,224,190,0.8)" : "#2e353b";
+        context.strokeStyle = on ? P.cardRuleOn : P.cardRule;
         context.lineWidth = on ? 1.2 : 1;
         roundRect(context, bx, by, cardW, cardH, 2);
         context.stroke();
-        context.fillStyle = on ? "#7be0be" : "#3d4a46";
+        context.fillStyle = on ? P.cardBarOn : P.cardBar;
         context.fillRect(bx, by, 3, cardH);
-        context.fillStyle = "#edeae4";
+        context.fillStyle = P.text;
         context.font = "600 8px Wanted Sans Variable, system-ui, sans-serif";
         context.fillText(id.length > 16 ? `${id.slice(0, 14)}…` : id, bx + 8, by + 12);
-        context.fillStyle = "#7d878d";
+        context.fillStyle = P.cardMeta;
         context.font = "500 7px ui-monospace, Menlo, monospace";
         context.fillText("owl:Class", bx + 8, by + 22);
-        context.fillStyle = "#8fb4c9";
+        context.fillStyle = P.cardAttr;
         attrs.slice(0, 2).forEach((attr, k) => {
           context.fillText(`${attr[0]}  ${attr[1]}`, bx + 8, by + 34 + k * 10);
         });
-        context.fillStyle = "#7be0be";
+        context.fillStyle = P.cardRel;
         rels.forEach((edge, k) => {
           const ty = by + 34 + 20 + k * 10;
           if (ty > by + cardH - 6) return;
@@ -442,7 +468,7 @@ export default function OpeningFilm2(_props: { onEnded?: () => void }) {
           const grow = last ? Math.max(0.15, frac) : 1;
           linked.add(ia);
           linked.add(ib);
-          context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${0.28 + grow * 0.45})`;
+          context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${P.edgeBase + grow * P.edgeGrow})`;
           context.lineWidth = last ? 1.6 : 1.05;
           context.beginPath();
           context.moveTo(ox + na.x * gw, oy + na.y * gh);
@@ -456,14 +482,29 @@ export default function OpeningFilm2(_props: { onEnded?: () => void }) {
         const isN = linked.has(i);
         const r = (isSel ? 4.2 : isN && withEdges ? 2.4 : 1.7) * node.radius;
         context.fillStyle = isSel
-          ? `rgb(${Math.min(255, rgb[0] + 50)},${rgb[1]},${rgb[2]})`
+          ? `rgb(${Math.max(0, Math.min(255, rgb[0] + P.selLift))},${rgb[1]},${rgb[2]})`
           : isN && withEdges
-            ? `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.9)`
-            : `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.45)`;
+            ? `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${P.nodeOn})`
+            : `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${P.nodeDim})`;
         context.beginPath();
         context.arc(ox + node.x * gw, oy + node.y * gh, r, 0, Math.PI * 2);
         context.fill();
       });
+    };
+
+    /* The WORLD pane alone, at the stage size: the same graph, edges and selection clock as the four-up. */
+    const drawGraphOnly = (t: number) => {
+      const cap = graph ? graph.edges.length : 1;
+      const edgeI = Math.min(cap - 1, Math.max(0, Math.floor(clamp01(t / WORLD_UNTIL) * cap)));
+      const selected = graph ? graph.edges[edgeI][0] : 0;
+      const narrow = width < 700;
+      const stripW = strip && !narrow ? Math.min(300, width * 0.24) : 0;
+      if (stripW) typeLines(width * 0.03, height * 0.08, stripW, height * 0.84, "NODE.md", ALL_MD, t, P.accent);
+      const gx = stripW ? width * 0.03 + stripW + width * 0.04 : width * 0.04;
+      const gw = width - gx - width * 0.04;
+      const boxH = height * 0.88;
+      const boxW = Math.min(gw, boxH * 0.85); // the WORLD pane's own proportion: a tall cloud, not a stretched one
+      drawNodes(gx + (gw - boxW) / 2, (height - boxH) / 2, boxW, boxH, t, selected, true);
     };
 
     const draw = (t: number) => {
@@ -478,13 +519,14 @@ export default function OpeningFilm2(_props: { onEnded?: () => void }) {
       const colW = (bw - gap * 3) / 4;
       const xs = [0, 1, 2, 3].map((i) => bx + i * (colW + gap));
 
-      context.fillStyle = "#14171a";
+      if (variant === "graph") { drawGraphOnly(t); return; }
+      context.fillStyle = P.titleBar;
       context.fillRect(bx, by, bw, 32);
-      context.fillStyle = "rgba(123,224,190,0.9)";
+      context.fillStyle = P.dot;
       context.beginPath();
       context.arc(bx + 14, by + 16, 4, 0, Math.PI * 2);
       context.fill();
-      context.fillStyle = "#edeae4";
+      context.fillStyle = P.text;
       context.font = "500 12px Wanted Sans Variable, system-ui, sans-serif";
       context.fillText("TAVONEL  ·  Compile links", bx + 26, by + 20);
 
@@ -501,7 +543,7 @@ export default function OpeningFilm2(_props: { onEnded?: () => void }) {
       drawNodes(xs[0] + 6, colY + 30, colW - 12, colH - 38, t, selected, false);
 
       pane(xs[1], colY, colW, colH, "MARKDOWN", f0.label);
-      typeLines(xs[1] + 8, colY + 30, colW - 16, colH - 38, "NODE.md", ALL_MD, t, "#7be0be");
+      typeLines(xs[1] + 8, colY + 30, colW - 16, colH - 38, "NODE.md", ALL_MD, t, P.accent);
 
       pane(xs[2], colY, colW, colH, "ONTOLOGY", f0.label);
       const bodyX = xs[2] + 8;
@@ -565,7 +607,7 @@ export default function OpeningFilm2(_props: { onEnded?: () => void }) {
       .then((pl) => { if (cancelled) return; plaster = pl; stop = startLoop(); })
       .catch(() => { if (!cancelled) stop = startLoop(); });
     return () => { cancelled = true; stop?.(); };
-  }, []);
+  }, [P, variant, strip]);
 
   return (
     <div className="film">
