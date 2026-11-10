@@ -135,10 +135,10 @@ function fakeChain(pages: number, refusal?: { status: number; detail: string; ma
     const form = init?.body as FormData;
     const fields: Record<string, string> = {};
     let blobs = 0;
-    for (const [name, value] of form.entries()) {
+    form.forEach((value, name) => {
       if (typeof value === "string") fields[name] = value;
       else blobs += 1;
-    }
+    });
     const requestId = headers.get("x-tavonel-cdr-request-id") ?? "";
     calls.push({ url, requestId, inputSha256: headers.get("x-tavonel-input-sha256") ?? "", fields, blobs });
     if (refusal) {
@@ -311,7 +311,9 @@ describe("large-source bytes: off", () => {
     };
     const fetcher: typeof fetch = async (input, init) => {
       const form = init?.body as FormData;
-      calls.push({ url: String(input), blobs: [...form.entries()].filter(([, value]) => typeof value !== "string").length });
+      let blobs = 0;
+      form.forEach((value) => { if (typeof value !== "string") blobs += 1; });
+      calls.push({ url: String(input), blobs });
       return new Response("unavailable", { status: 503 });
     };
     const env: SanitizeEnv = { ...envFor(new FakeR2(1)), FOUNDATION_QUARANTINE: r2, FOUNDATION_SOURCE_TRANSPORT: undefined };

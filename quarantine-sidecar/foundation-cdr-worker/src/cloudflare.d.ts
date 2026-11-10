@@ -8,7 +8,8 @@ interface R2ObjectBody {
   readonly size: number;
   readonly httpMetadata?: { contentType?: string; contentDisposition?: string };
   readonly customMetadata?: Record<string, string>;
-  readonly body: ReadableStream<Uint8Array>;
+  /** Absent only in test doubles; the presigned path refuses to run without it (sanitize.ts). */
+  readonly body?: ReadableStream<Uint8Array>;
   arrayBuffer(): Promise<ArrayBuffer>;
 }
 
