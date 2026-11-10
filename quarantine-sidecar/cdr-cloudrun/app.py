@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import http.client
 import io
 import json
 import logging
@@ -12,19 +13,21 @@ import re
 import shutil
 import subprocess
 import tempfile
+import urllib.request
 import warnings
 import zipfile
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
 from time import monotonic
 from typing import Final
+from urllib.parse import parse_qs
 
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from PIL import Image, UnidentifiedImageError
 from request_boundary import CdrRequestBoundary
@@ -160,6 +163,41 @@ def read_limits(env: Mapping[str, str]) -> Limits:
 
 # Read once, at boot: a revision's limits are a property of the revision, not of a request.
 LIMITS: Limits = read_limits(os.environ)
+
+# Large-source bytes (docs/adr/0006-segmented-large-sources.md, "Large-source bytes"). Above Cloud
+# Run's 32 MiB HTTP/1 request a source cannot be posted here, so /v1/disarm-remote reads it instead:
+# the worker signs the same four headers (the source digest included) and sends a presigned GET URL
+# for the one quarantine object, valid for minutes. This service reads that object once, bounded and
+# hashed exactly as an upload is, before anything parses it, and holds no object-store credential.
+# Off unless TAVONEL_CDR_REMOTE_SOURCE_PREFIX names the quarantine prefix of the one bucket it may
+# read; a URL outside it is refused before a connection is opened. The URL itself is not signed, but
+# it can only name a quarantine object the worker presigned, and the bytes read must still hash to
+# the signed digest. The 50 MiB is the worker's LARGE_SOURCE_MAX_BYTES (pinned by
+# nextjs/lib/intake-ceiling-cross-tree.test.ts): a target to be measured, not a measurement.
+LARGE_SOURCE_MAX_INPUT_BYTES: Final = 50 * 1024 * 1024
+REMOTE_SOURCE_PREFIX_ENV: Final = "TAVONEL_CDR_REMOTE_SOURCE_PREFIX"
+# On every refusal of /v1/disarm-remote, so the worker can tell this route's verdict from an older
+# revision's 404 (which it retries, like CDR_RANGES_HEADER for ranges).
+REMOTE_SOURCE_HEADER: Final = "x-tavonel-cdr-remote-source"
+REMOTE_SOURCE_KEY: Final = re.compile(r"[A-Za-z0-9_-]{1,128}/[A-Za-z0-9_-]{1,128}/source")
+REMOTE_SOURCE_QUERY: Final = frozenset({
+    "X-Amz-Algorithm", "X-Amz-Credential", "X-Amz-Date", "X-Amz-Expires", "X-Amz-SignedHeaders", "X-Amz-Signature",
+})
+REMOTE_SOURCE_MAX_EXPIRES_SECONDS: Final = 900
+REMOTE_SOURCE_SOCKET_SECONDS: Final = 15.0
+
+
+def read_remote_source_prefix(env: Mapping[str, str]) -> str | None:
+    """Unset is off. A value that is not https://<host>/<bucket>/quarantine/ refuses the boot."""
+    raw = env.get(REMOTE_SOURCE_PREFIX_ENV, "").strip()
+    if raw == "":
+        return None
+    if not re.fullmatch(r"https://[a-z0-9][a-z0-9.-]{0,252}/[a-z0-9][a-z0-9-]{1,62}/quarantine/", raw):
+        raise RuntimeError(f"{REMOTE_SOURCE_PREFIX_ENV} must be https://<host>/<bucket>/quarantine/")
+    return raw
+
+
+REMOTE_SOURCE_PREFIX: str | None = read_remote_source_prefix(os.environ)
 
 # Each allowed input is rendered and reconstructed as an image-only PDF. Archive inputs,
 # executable formats, and unqualified proprietary formats are intentionally rejected.
@@ -394,18 +432,72 @@ def reject_active_html(source: Path, source_mime: str) -> None:
 
 
 def copy_and_digest(upload: UploadFile, target: Path) -> tuple[str, int]:
+    return stream_and_digest(upload.file.read, target, LIMITS.input_bytes)
+
+
+def stream_and_digest(read: Callable[[int], bytes], target: Path, limit: int) -> tuple[str, int]:
     digest = hashlib.sha256()
     total = 0
     with target.open("wb") as output:
-        while chunk := upload.file.read(1024 * 1024):
+        while chunk := read(1024 * 1024):
             total += len(chunk)
-            if total > LIMITS.input_bytes:
+            if total > limit:
                 raise HTTPException(413, "CDR source exceeds the controlled-beta size limit")
             digest.update(chunk)
             output.write(chunk)
     if total < 1:
         raise HTTPException(422, "CDR source is empty")
     return f"sha256:{digest.hexdigest()}", total
+
+
+def qualified_remote_source_url(url: str) -> str:
+    """The presigned GET of one quarantine source object under the configured prefix, or a 503.
+
+    A 503, never a 4xx: a URL this service will not read is the worker's request or this
+    revision's configuration, not a statement about the document, so the worker retries it.
+    """
+    if REMOTE_SOURCE_PREFIX is None:
+        raise HTTPException(503, "CDR remote source is disabled")
+    head, _, query = url.partition("?")
+    fields = parse_qs(query, keep_blank_values=True)
+    expires = fields.get("X-Amz-Expires", [""])[0]
+    if (not head.startswith(REMOTE_SOURCE_PREFIX) or "#" in url
+            or not REMOTE_SOURCE_KEY.fullmatch(head[len(REMOTE_SOURCE_PREFIX):])
+            or set(fields) != REMOTE_SOURCE_QUERY or any(len(values) != 1 for values in fields.values())
+            or not re.fullmatch(r"[1-9][0-9]{0,3}", expires) or int(expires) > REMOTE_SOURCE_MAX_EXPIRES_SECONDS):
+        raise HTTPException(503, "CDR remote source is not qualified")
+    return url
+
+
+class _RefuseRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *_: object, **__: object) -> None:
+        return None
+
+
+# No proxy from the environment and no redirect: the one URL that was checked is the one read.
+REMOTE_SOURCE_OPENER: Final = urllib.request.build_opener(urllib.request.ProxyHandler({}), _RefuseRedirect())
+
+
+def read_remote_source(url: str, target: Path) -> tuple[str, int]:
+    """Read a qualified URL once into `target`, bounded and hashed exactly as an upload is.
+
+    The store refusing the URL (expired, signature, missing object), a redirect, an unreachable
+    store or a cut connection is infrastructure: 502, retried by the worker, never a verdict. The
+    URL carries a signature, so it is never logged or echoed.
+    """
+    try:
+        with REMOTE_SOURCE_OPENER.open(url, timeout=REMOTE_SOURCE_SOCKET_SECONDS) as response:
+            declared = response.headers.get("content-length")
+            if declared is not None and declared.isdigit() and int(declared) > LARGE_SOURCE_MAX_INPUT_BYTES:
+                raise HTTPException(413, "CDR source exceeds the controlled-beta size limit")
+            digest, total = stream_and_digest(response.read, target, LARGE_SOURCE_MAX_INPUT_BYTES)
+    except HTTPException:
+        raise
+    except (OSError, ValueError, http.client.HTTPException) as exc:
+        raise HTTPException(502, "CDR remote source could not be read") from exc
+    if declared is not None and declared != str(total):
+        raise HTTPException(502, "CDR remote source length did not match")
+    return digest, total
 
 
 # Every adapter refusal is a 503 with no output and no promotion. antivirus_required is a
@@ -895,10 +987,12 @@ app.add_middleware(
 
 
 @app.exception_handler(HTTPException)
-async def http_exception_no_store(_: Request, exc: HTTPException) -> JSONResponse:
+async def http_exception_no_store(request: Request, exc: HTTPException) -> JSONResponse:
     # CDR_RANGES_HEADER on every refusal tells the worker this revision answers page ranges, so a
     # refusal of a ranged request is a verdict. Without it the worker retries (ADR-0006, E4).
     headers = {"cache-control": "no-store", CDR_RANGES_HEADER: "1"}
+    if request.url.path.rstrip("/") == "/v1/disarm-remote":
+        headers[REMOTE_SOURCE_HEADER] = "1"
     if exc.headers:
         headers.update(exc.headers)
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=headers)
@@ -941,6 +1035,9 @@ def healthz() -> JSONResponse:
             "maxOutputBytes": LIMITS.output_bytes,
             "rasterRangePages": LIMITS.raster_range_pages,
         }
+    if REMOTE_SOURCE_PREFIX is not None:
+        # Only a revision that reads remote sources says so; the default answer is unchanged.
+        content["remoteSourceMaxBytes"] = LARGE_SOURCE_MAX_INPUT_BYTES
     return JSONResponse(content=content, headers={"cache-control": "no-store"})
 
 
@@ -950,16 +1047,44 @@ def disarm(
     request: Request,
     source: UploadFile = File(...),
 ) -> FileResponse:
+    try:
+        return disarm_source(background_tasks, request, source.filename, source.content_type,
+                             lambda target: copy_and_digest(source, target))
+    finally:
+        source.file.close()
+
+
+@app.post("/v1/disarm-remote")
+def disarm_remote(
+    background_tasks: BackgroundTasks,
+    request: Request,
+    source_url: str = Form(..., max_length=4096),
+    filename: str = Form(..., max_length=512),
+    content_type: str = Form(..., max_length=256),
+) -> FileResponse:
+    """/v1/disarm for a source this service reads itself (see LARGE_SOURCE_MAX_INPUT_BYTES)."""
+    url = qualified_remote_source_url(source_url)
+    return disarm_source(background_tasks, request, filename, content_type,
+                         lambda target: read_remote_source(url, target))
+
+
+def disarm_source(
+    background_tasks: BackgroundTasks,
+    request: Request,
+    name: str | None,
+    mime: str | None,
+    receive: Callable[[Path], tuple[str, int]],
+) -> FileResponse:
     expected_digest = getattr(request.state, "cdr_authenticated_input_sha256", None)
     if not isinstance(expected_digest, str):
         raise HTTPException(401, "CDR request boundary authentication is required")
-    file_name, mime_type = validate_input(source.filename, source.content_type)
+    file_name, mime_type = validate_input(name, mime)
     # Read from the authenticated id, so the range is the one the signature covers.
     page_range = requested_page_range(request.headers.get("x-tavonel-cdr-request-id"))
     work_dir = Path(tempfile.mkdtemp(prefix="tavonel-cdr-"))
     try:
         input_path = work_dir / file_name
-        actual_digest, _ = copy_and_digest(source, input_path)
+        actual_digest, _ = receive(input_path)
         if not hmac.compare_digest(expected_digest, actual_digest):
             raise HTTPException(422, "CDR source digest does not match the uploaded body")
         # Scanned before this process parses the bytes as anything: the package guard,
@@ -975,8 +1100,6 @@ def disarm(
     except Exception:
         remove_tree(work_dir)
         raise
-    finally:
-        source.file.close()
     background_tasks.add_task(remove_tree, work_dir)
     return FileResponse(
         output_path,
