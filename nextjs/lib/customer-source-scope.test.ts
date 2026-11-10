@@ -45,14 +45,14 @@ it("treats a mixed set as connector scope when every document is accounted for",
   expect(calls[1]!.searchParams.get("document_id")).toBe(`in.(${doc(2)})`);
 });
 
-it("fails closed on an unknown origin", async () => {
+it("names the documents with no origin, as a fact about them and not an outage", async () => {
   stubStore({ connector_document_bindings: [row(doc(1))], foundation_intake_admissions: [] });
-  expect(await readCustomerSourceScope(WS, [doc(1), doc(2)], ENV)).toEqual({ ok: false, code: "CUSTOMER_SOURCE_SCOPE_UNAVAILABLE" });
+  expect(await readCustomerSourceScope(WS, [doc(1), doc(2)], ENV)).toEqual({ ok: false, code: "CUSTOMER_SOURCE_ORIGIN_UNPROVEN", documentIds: [doc(2)] });
 });
 
 it("does not count evidence from another workspace", async () => {
   stubStore({ connector_document_bindings: [row(doc(1), "pilot-other")], foundation_intake_admissions: [row(doc(1), "pilot-other")] });
-  expect(await readCustomerSourceScope(WS, [doc(1)], ENV)).toEqual({ ok: false, code: "CUSTOMER_SOURCE_SCOPE_UNAVAILABLE" });
+  expect(await readCustomerSourceScope(WS, [doc(1)], ENV)).toEqual({ ok: false, code: "CUSTOMER_SOURCE_ORIGIN_UNPROVEN", documentIds: [doc(1)] });
 });
 
 it("reads in bounded batches and succeeds at the 2000 document ceiling", async () => {
@@ -129,6 +129,6 @@ it("fails closed when a later batch fails after earlier ones succeed", async () 
 
 it("does not treat reserved but unconfirmed uploads as admitted", async () => {
   const calls = stubStore({ connector_document_bindings: [], foundation_intake_admissions: [{ ...row(doc(1)), confirmed_at: null }] });
-  expect(await readCustomerSourceScope(WS, [doc(1)], ENV)).toEqual({ ok: false, code: "CUSTOMER_SOURCE_SCOPE_UNAVAILABLE" });
+  expect(await readCustomerSourceScope(WS, [doc(1)], ENV)).toEqual({ ok: false, code: "CUSTOMER_SOURCE_ORIGIN_UNPROVEN", documentIds: [doc(1)] });
   expect(calls[1]!.searchParams.get("confirmed_at")).toBe("not.is.null");
 });

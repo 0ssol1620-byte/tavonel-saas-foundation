@@ -35,7 +35,7 @@ vi.mock("./retrieval-store", async (importOriginal) => ({
 }));
 vi.mock("./retrieval-compile", () => ({ compileRetrievalArtifacts: h.compile }));
 
-import { admitsDerivedCustomerData, DERIVED_DATA_REFUSED } from "./derived-data-admission";
+import { admitsDerivedCustomerData, derivedCustomerDataRefusal, DERIVED_DATA_REFUSED } from "./derived-data-admission";
 import { ensureRetrievalIndexForActiveWorld } from "./retrieval-index-status";
 import { resetWorkspaceCostGuard } from "./workspace-cost-guard";
 import { POST as ask } from "../app/api/collections/[id]/ask/route";
@@ -82,6 +82,21 @@ describe("admitsDerivedCustomerData", () => {
       expect(await admitsDerivedCustomerData(WS, ["not-a-uuid"], V2)).toBe(false);
       expect(h.authorization).not.toHaveBeenCalled();
     });
+
+  it("names the reason: unproven origin 409 with its files, an unreadable store 503, anything else 403", async () => {
+    h.scope.mockResolvedValue({ ok: false, code: "CUSTOMER_SOURCE_ORIGIN_UNPROVEN", documentIds: [DOC] });
+    expect(await derivedCustomerDataRefusal(WS, [DOC], V2))
+      .toEqual({ code: "CUSTOMER_SOURCE_ORIGIN_UNPROVEN", status: 409, documentIds: [DOC] });
+    expect(await admitsDerivedCustomerData(WS, [DOC], V2)).toBe(false);
+    h.scope.mockResolvedValue({ ok: false, code: "CUSTOMER_SOURCE_SCOPE_UNAVAILABLE" });
+    expect(await derivedCustomerDataRefusal(WS, [DOC], V2)).toEqual({ code: "CUSTOMER_SOURCE_SCOPE_UNAVAILABLE", status: 503 });
+    h.scope.mockResolvedValue({ ok: false, code: "CUSTOMER_SOURCE_SCOPE_INVALID" });
+    expect(await derivedCustomerDataRefusal(WS, [DOC], V2)).toEqual({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE", status: 403 });
+    h.scope.mockResolvedValue({ ok: true, scope: "direct_upload" });
+    h.authorization.mockResolvedValue({ ok: false, code: "SCOPED_RELEASE_REFUSED" });
+    expect(await derivedCustomerDataRefusal(WS, [DOC], V2)).toEqual({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE", status: 403 });
+    expect(h.authorization).toHaveBeenCalledTimes(1);
+  });
 
   it("refuses a revoked release or workspace grant", async () => {
     h.authorization.mockResolvedValue({ ok: false, code: "SCOPED_RELEASE_REFUSED" });

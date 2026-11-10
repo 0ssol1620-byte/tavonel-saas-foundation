@@ -18,7 +18,7 @@ import {
 import { rankByStructuralOverlap } from "./structure-search";
 import { applyWorldGate, type WorldGateRejection } from "./world-gate";
 import { checkConnectorSourceAccess } from "./connector-source-access";
-import { admitsDerivedCustomerData, DERIVED_DATA_REFUSED } from "./derived-data-admission";
+import { derivedCustomerDataRefusal, type DerivedDataRefusal } from "./derived-data-admission";
 import type { AdaptiveRouterDecision } from "./adaptive-router";
 import {
   contentAddressedRetrievalProfileIdentity,
@@ -60,7 +60,7 @@ export type RetrievalPipelineFailure =
   | "RETRIEVAL_EMBEDDER_UNAVAILABLE"
   | "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE"
   | "CONNECTOR_SOURCE_ACCESS_DENIED"
-  | typeof DERIVED_DATA_REFUSED;
+  | DerivedDataRefusal["code"];
 
 export type RetrievalPipelineResult =
   | {
@@ -342,7 +342,10 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
   const sourceAccess = await checkConnectorSourceAccess(input.workspaceKey, documentIds);
   if (!sourceAccess.ok) return sourceAccess;
   // Before any unit text reaches the reranker provider or the caller.
-  if (!await admitsDerivedCustomerData(input.workspaceKey, documentIds)) return { ok: false, code: DERIVED_DATA_REFUSED };
+  {
+    const refused = await derivedCustomerDataRefusal(input.workspaceKey, documentIds);
+    if (refused) return { ok: false, code: refused.code };
+  }
   const unitById = new Map(hydrated.value.map((unit) => [unit.unitId, unit]));
 
   // --- Rerank --------------------------------------------------------------------------
@@ -371,7 +374,10 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
   // A provider call can take time. Recheck before releasing context after reranking.
   const sourceAccessNow = await checkConnectorSourceAccess(input.workspaceKey, documentIds);
   if (!sourceAccessNow.ok) return sourceAccessNow;
-  if (!await admitsDerivedCustomerData(input.workspaceKey, documentIds)) return { ok: false, code: DERIVED_DATA_REFUSED };
+  {
+    const refused = await derivedCustomerDataRefusal(input.workspaceKey, documentIds);
+    if (refused) return { ok: false, code: refused.code };
+  }
 
   // --- World Gate ----------------------------------------------------------------------
   // The active world for this request is already resolved by the caller (world-store), so

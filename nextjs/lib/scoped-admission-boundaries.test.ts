@@ -91,9 +91,10 @@ describe("compile-jobs v2 origin classification", () => {
   const DOC_B = "00000000-0000-4000-8000-00000000000b";
   type Row = { workspace_key: string; document_id: string };
 
-  function stubStore(bindings: Row[], admissions: Row[]) {
+  function stubStore(bindings: Row[], admissions: Row[], outage = false) {
     vi.stubGlobal("fetch", vi.fn(async (input: string) => {
       const url = new URL(input);
+      if (outage && url.pathname.endsWith("foundation_intake_admissions")) return new Response("unavailable", { status: 503 });
       if (url.pathname.endsWith("/rpc/connector_documents_blocked")) return new Response("false");
       if (url.pathname.endsWith("/rpc/assert_foundation_intake_compile_set")) {
         return new Response(JSON.stringify({ allowed: true, approvalRequired: false }), { headers: { "content-type": "application/json" } });
@@ -125,15 +126,25 @@ describe("compile-jobs v2 origin classification", () => {
     expect(m.enqueue).not.toHaveBeenCalled();
   });
 
-  it("never enqueues or consults the gate for a document with unknown origin", async () => {
+  it("never enqueues or consults the gate for a document with unknown origin, and names it with a 409", async () => {
     stubStore([], [{ workspace_key: WS, document_id: DOC_A }]);
+    m.gate.mockResolvedValue(true);
+    const response = await post([DOC_A, DOC_B]);
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ code: "CUSTOMER_SOURCE_ORIGIN_UNPROVEN", documentIds: [DOC_B] });
+    expect(m.gate).not.toHaveBeenCalled();
+    expect(m.enqueue).not.toHaveBeenCalled();
+    expect(m.enqueueCorpus).not.toHaveBeenCalled();
+  });
+
+  it("keeps an unreadable origin store a 503, distinct from an unproven origin", async () => {
+    stubStore([], [], true);
     m.gate.mockResolvedValue(true);
     const response = await post([DOC_A, DOC_B]);
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({ code: "CUSTOMER_SOURCE_SCOPE_UNAVAILABLE" });
     expect(m.gate).not.toHaveBeenCalled();
     expect(m.enqueue).not.toHaveBeenCalled();
-    expect(m.enqueueCorpus).not.toHaveBeenCalled();
   });
 
   it("enqueues a connector-bound set only after the connector gate admits it", async () => {

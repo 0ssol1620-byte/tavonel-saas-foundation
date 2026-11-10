@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
-import { admitsDerivedCustomerData, DERIVED_DATA_REFUSED } from "@/lib/derived-data-admission";
+import { derivedCustomerDataRefusal } from "@/lib/derived-data-admission";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { DOCUMENT_ID_PATTERN, groupImmutableDocuments, isOcrJsonKey, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
 import { getWorkspaceOcrJson, listImmutableWorkspaceObjects, OCR_JSON_RESPONSE_MAX_BYTES } from "@/lib/r2-objects";
@@ -63,8 +63,10 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     headers: { "Cache-Control": "no-store" },
   });
   // OCR output is derived content; the original source route stays open on refusal.
-  if (!await admitsDerivedCustomerData(membership.workspaceId, [id])) {
-    return NextResponse.json({ code: DERIVED_DATA_REFUSED }, { status: 403, headers: { "Cache-Control": "no-store" } });
+  const derivedRefusal = await derivedCustomerDataRefusal(membership.workspaceId, [id]);
+  if (derivedRefusal) {
+    const { status, ...body } = derivedRefusal;
+    return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
   }
   const currentUser = await getRequestUser(request);
   if (!currentUser || currentUser.id !== user.id) {

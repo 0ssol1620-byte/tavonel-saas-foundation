@@ -8449,3 +8449,23 @@ test('affected world-read-cap-20261110 owner: 10 exact paths select 14 direct su
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+// source-origin-unproven-20261111: one finite owner, restated independently of the exported constants.
+import { SOURCE_ORIGIN_UNPROVEN_AFFECTED_PATHS, SOURCE_ORIGIN_UNPROVEN_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected source-origin-unproven-20261111 owner: 8 exact paths select 12 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/api/compile-jobs/route.ts', 'lib/consumer-context-api.ts', 'lib/customer-source-scope.test.ts', 'lib/customer-source-scope.ts', 'lib/derived-data-admission.test.ts', 'lib/derived-data-admission.ts', 'lib/retrieval-pipeline.ts', 'lib/scoped-admission-boundaries.test.ts'];
+  const suites = ['lib/api-error-codes.test.ts', 'lib/collection-compile-run.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/corpus-batching.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/customer-source-scope.test.ts', 'lib/derived-data-admission.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/production-route-surface.test.ts', 'lib/retrieval-pipeline.test.ts', 'lib/route-classification.test.ts', 'lib/scoped-admission-boundaries.test.ts'];
+  assert.deepEqual([[...SOURCE_ORIGIN_UNPROVEN_AFFECTED_PATHS], [...SOURCE_ORIGIN_UNPROVEN_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['source-origin-unproven-20261111'], path);
+  }
+  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['source-origin-unproven-20261111'], [], suites, [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  const plan = affectedAskPlan(map);
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
+  for (const adjacent of ['nextjs/app/api/compile-jobs/[jobId]/route.tsx', 'nextjs/lib/customer-source-scope.tsx', 'nextjs/lib/derived-data-admission-v2.ts', 'nextjs/lib/retrieval-pipeline.tsx', 'nextjs/lib/consumer-context-api.test.tsx', 'lib/customer-source-scope.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
