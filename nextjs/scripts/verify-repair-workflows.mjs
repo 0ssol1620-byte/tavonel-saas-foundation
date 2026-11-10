@@ -1009,14 +1009,14 @@ assert(VITEST_DISCOVERY_CONFIG_PATH==='nextjs/vitest.config.ts'&&discoveryOwners
     'quarantine-sidecar/cdr-cloudrun/tests/test_remote_source_v2.py', 'quarantine-sidecar/cdr-cloudrun/remote_source.py']
     .every(p => !AFFECTED_GROUPS.some(o => o.group === 'cdr-cloudrun-service' && o.match.test(p))),
     'cdr-cloudrun-service must not admit a neighbour of the page-range suite');
-  // The drop box's limits notice and its suite: one exact owner with two direct suites, nothing adjacent.
+  // The drop box's limits notice and its suite: one exact owner with four direct suites, nothing adjacent.
   const copyOwners = AFFECTED_GROUPS.filter(o => o.group === 'large-source-intake-copy');
   assert(copyOwners.length === 1
-    && JSON.stringify(copyOwners[0].unitFiles) === JSON.stringify(['lib/compile-limits.test.ts', 'lib/workspace-existing-compile.test.ts'])
+    && JSON.stringify(copyOwners[0].unitFiles) === JSON.stringify(['lib/compile-limits.test.ts', 'lib/intake-approval-rollout-off.test.ts', 'lib/page-count.test.ts', 'lib/workspace-existing-compile.test.ts'])
     && !copyOwners[0].browserFiles.length && !copyOwners[0].databaseTests.length && !copyOwners[0].nativeReuse
-    && ['nextjs/lib/compile-limits.ts', 'nextjs/lib/compile-limits.test.ts'].every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && copyOwners[0].match.test(p))
+    && ['nextjs/lib/compile-limits.ts', 'nextjs/lib/compile-limits.test.ts', 'nextjs/lib/page-count.ts', 'nextjs/lib/page-count.test.ts'].every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && copyOwners[0].match.test(p))
     && ['nextjs/lib/compile-limits-v2.ts', 'nextjs/lib/corpus-batching.ts'].every(p => !copyOwners[0].match.test(p)),
-    'large-source-intake-copy owner must keep its two exact paths, two direct suites and no neighbour admission');
+    'large-source-intake-copy owner must keep its four exact paths, four direct suites and no neighbour admission');
 }
 console.log(`Workflow static gates pass. Full qualification still pending for exact CI/Launch runs at this head.`);
 

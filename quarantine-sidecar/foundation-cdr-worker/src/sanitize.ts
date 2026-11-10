@@ -1024,6 +1024,8 @@ export function sourceSegmentPages(
 }
 
 async function hasObject(bucket: R2BucketLike, key: string): Promise<boolean> {
+  // Without listing a stored range cannot be found again, so it is treated as not yet read.
+  if (!bucket.list) return false;
   const listed = await bucket.list({ prefix: key });
   return listed.objects.some((object) => object.key === key);
 }
