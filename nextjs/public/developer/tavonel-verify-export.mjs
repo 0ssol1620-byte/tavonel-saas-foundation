@@ -18,9 +18,13 @@ import { readFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { inflateRawSync } from "node:zlib";
 
-const MAX_ARCHIVE_BYTES = 64 * 1024 * 1024;
-const MAX_UNCOMPRESSED_BYTES = 64 * 1024 * 1024;
-const MAX_ENTRIES = 256;
+// Sized 2026-11-10 for a 56 MiB package (lib/collection-download.ts MAX_UNCOMPRESSED_BYTES): the archive
+// carries the package, manifest/candidate-world.json (the whole artifact again) and the delivery
+// parts: 2.5x the package uncompressed (99,938,612 B for a 39,899,326 B package, 361 entries) in
+// lib/synthetic-customer-journey.test.ts, past the 64 MiB and 256 entries this stopped at.
+const MAX_ARCHIVE_BYTES = 128 * 1024 * 1024;
+const MAX_UNCOMPRESSED_BYTES = 256 * 1024 * 1024;
+const MAX_ENTRIES = 2048;
 const MANIFEST_PATH = "manifest/export-manifest.json";
 const SIGNATURE_PATH = "signatures/export-manifest.ed25519.json";
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
@@ -99,7 +103,7 @@ function inspectCentralDirectory(archive) {
     if (!isSafePath(path) || paths.has(path)) throw new Error("ZIP entry path is unsafe or duplicated");
     paths.add(path);
     totalUncompressed += uncompressedSize;
-    if (totalUncompressed > MAX_UNCOMPRESSED_BYTES) throw new Error("archive expands beyond 64 MiB verification limit");
+    if (totalUncompressed > MAX_UNCOMPRESSED_BYTES) throw new Error("archive expands beyond 256 MiB verification limit");
     if (localOffset >= centralOffset) throw new Error("ZIP entry data lies outside the archive");
     found.push({ path, flags, method, compressedSize, uncompressedSize, localOffset });
     offset += recordLength;
@@ -197,7 +201,7 @@ if (!options) {
   try {
     const archivePath = resolve(options.archive);
     const archive = await readFile(archivePath);
-    if (archive.byteLength > MAX_ARCHIVE_BYTES) throw new Error("archive exceeds 64 MiB verification limit");
+    if (archive.byteLength > MAX_ARCHIVE_BYTES) throw new Error("archive exceeds 128 MiB verification limit");
     const entries = extractEntries(archive, inspectCentralDirectory(archive));
     const paths = Object.keys(entries);
     if (paths.length > MAX_ENTRIES) throw new Error("archive contains too many entries");

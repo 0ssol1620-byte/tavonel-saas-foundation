@@ -12,7 +12,7 @@
     },
     "mcp": {
       "url": "https://tavonel.com/developer/tavonel-mcp.mjs",
-      "sha256": "sha256:5b88c69ce3c76c89c2d2de92742688826cd3171c0a18497d780da0da3ee3ece1"
+      "sha256": "sha256:0cfbe57bcbac892f8816cab6de0e48c586dceb6178fffa1adfffb707b9b0fc77"
     },
     "consumerContext": {
       "url": "https://tavonel.com/developer/consumer-context.mjs",
@@ -24,11 +24,11 @@
     },
     "verifyExport": {
       "url": "https://tavonel.com/developer/tavonel-verify-export.mjs",
-      "sha256": "sha256:59ad613670a6b4d8c1186539192d10222187eac38d4bacff5875c209476526c3"
+      "sha256": "sha256:1e3369d33c5a2af52339a29aab3d72a9283dc0014d0e262a4b31f41dd7d68d5a"
     },
     "verifyPackage": {
       "url": "https://tavonel.com/developer/tavonel-verify-package.mjs",
-      "sha256": "sha256:ca59882221bc12c65e7e9256fa942bb8a2ee2cee030a26718fddb3d1b9f5a1aa"
+      "sha256": "sha256:ab3a3121dc3561672bc35a36e9def24665e1fd10e3df9a460598778f5b7d20cc"
     },
     "verifyAnswer": {
       "url": "https://tavonel.com/developer/tavonel-verify-answer.mjs",

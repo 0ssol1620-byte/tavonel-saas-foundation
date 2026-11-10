@@ -34,6 +34,7 @@ import { TRUST_COPY_AFFECTED_PATHS, TRUST_COPY_AFFECTED_UNIT_FILES } from './rep
 import { HERO_COMPILE_TABS_AFFECTED_PATHS, HERO_COMPILE_TABS_AFFECTED_UNIT_FILES, HERO_COMPILE_TABS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { CONNECTORS_DEVELOPER_AFFECTED_PATHS, CONNECTORS_DEVELOPER_AFFECTED_UNIT_FILES, CONNECTORS_DEVELOPER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS, REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { WORLD_READ_CAP_AFFECTED_PATHS, WORLD_READ_CAP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
 const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -717,7 +718,7 @@ for (const binding of [
     suites: ['lib/ai-package-guidance.test.ts', 'lib/b30-api-mcp-cli-parity.test.ts', 'lib/brand-copy.test.ts', 'lib/collection-download.test.ts', 'lib/compiler-contract.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/developer-distribution.test.ts', 'lib/export-route-authorization.test.ts', 'lib/journey-acceptance.test.ts', 'lib/mcp-server.test.ts', 'lib/packet-delivery.test.ts', 'lib/remote-mcp.test.ts'],
     browsers: [],
     rows: [],
-    neighbors: ['nextjs/app/api/collections/[id]/route.ts', 'nextjs/lib/ai-package-guidance.tsx', 'nextjs/lib/packet-delivery.ts', 'nextjs/lib/consumer-context/consumer-context.ts', 'nextjs/public/developer/tavonel-verify-export.mjs', 'nextjs/scripts/compiled-world/verify-external-roundtrip.py'] },
+    neighbors: ['nextjs/app/api/collections/[id]/route.tsx', 'nextjs/lib/ai-package-guidance.tsx', 'nextjs/lib/packet-delivery.ts', 'nextjs/lib/consumer-context/consumer-context.ts', 'nextjs/public/developer/tavonel-verify-export.cjs', 'nextjs/scripts/compiled-world/verify-external-roundtrip.py'] },
   // hard-proof 2026-10-27 C1: the GDP.pdf runs list, its reserved v3 path and the two browser suites that read the page.
   { group: 'gdp-pdf-runs', prefix: 'nextjs/', exportedPaths: GDP_PDF_RUNS_AFFECTED_PATHS, exportedSuites: GDP_PDF_RUNS_AFFECTED_UNIT_FILES,
     exportedBrowsers: GDP_PDF_RUNS_AFFECTED_BROWSER_FILES,
@@ -830,6 +831,14 @@ for (const binding of [
     browsers: ['e2e/connection-sync-status.spec.ts'],
     rows: ["['e2e/connection-sync-status.spec.ts', ['1440', '390']],"],
     neighbors: ['nextjs/app/api/connections/[id]/page.tsx', 'nextjs/app/api/connections/route.tsx', 'nextjs/app/api/v1/oauth-connectors/authorize/page.tsx', 'nextjs/components/connections-panel.module.css', 'nextjs/e2e/connection-sync-status-2.spec.ts', 'components/connections-panel.tsx'] },
+  // world-read-cap-20261110: 10 exact paths, 14 direct suites, no browser suite.
+  { group: 'world-read-cap-20261110', prefix: 'nextjs/', exportedPaths: WORLD_READ_CAP_AFFECTED_PATHS, exportedSuites: WORLD_READ_CAP_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['app/api/collections/[id]/route.ts', 'app/api/v1/world/[id]/[lens]/route.ts', 'app/api/v1/world/[id]/route.ts', 'lib/active-world-source-access.ts', 'lib/collection-storage.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/world-read-model.ts', 'lib/world-rollback-source-access.ts', 'public/developer/tavonel-verify-export.mjs', 'scripts/verify-signed-export.mjs'],
+    suites: ['lib/api-error-codes.test.ts', 'lib/ask-route-limits.test.ts', 'lib/collection-download.test.ts', 'lib/collection-storage.test.ts', 'lib/compiler-contract.test.ts', 'lib/developer-distribution.test.ts', 'lib/export-route-authorization.test.ts', 'lib/grounded-ask.test.ts', 'lib/openapi-completeness.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/world-read-model.test.ts', 'lib/world-rollback-source-access.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/app/api/collections/[id]/page.tsx', 'nextjs/app/api/v1/world/[id]/[lens]/page.tsx', 'nextjs/lib/collection-storage.test.ts', 'nextjs/public/developer/tavonel-verify-export.test.mjs', 'nextjs/scripts/verify-signed-export.test.mjs', 'lib/world-read-model.ts'] },
   // revoke-not-plan-gated-20261110: three exact paths, six direct suites, no browser suite.
   { group: 'revoke-not-plan-gated-20261110', prefix: 'nextjs/', exportedPaths: REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS, exportedSuites: REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
