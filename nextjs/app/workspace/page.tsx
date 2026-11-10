@@ -464,6 +464,8 @@ export default function WorkspacePage() {
   const [documents, setDocuments] = useState<DocumentListItem[] | null>(null);
   const [documentInventoryState, setDocumentInventoryState] = useState<"loading" | "ready" | "unavailable">("loading");
   const [documentInventoryPartial, setDocumentInventoryPartial] = useState<DocumentListPartial | null>(null);
+  /* The code the last inventory read was refused with. A workspace without file access is refused, not broken (hotfix 2026-11-10). */
+  const [documentInventoryRefusal, setDocumentInventoryRefusal] = useState<string | null>(null);
   const [workspaceStartupReady, setWorkspaceStartupReady] = useState(false);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   useEffect(() => {
@@ -832,6 +834,7 @@ export default function WorkspacePage() {
       that has resolved once stays resolved; a failure below still says so.
     */
     setDocumentInventoryState((current) => (current === "ready" ? "ready" : "loading"));
+    setDocumentInventoryRefusal(null);
     try {
       const client = getSupabaseBrowserClient();
       if (!client) {
@@ -846,6 +849,8 @@ export default function WorkspacePage() {
       }
       const response = await fetch("/api/documents", { headers: { authorization: `Bearer ${token}` } });
       if (!response.ok) {
+        const refused = (await response.json().catch(() => null)) as { code?: unknown } | null;
+        setDocumentInventoryRefusal(typeof refused?.code === "string" ? refused.code : null);
         setDocumentInventoryState("unavailable");
         return [];
       }
@@ -863,6 +868,16 @@ export default function WorkspacePage() {
       return [];
     }
   };
+
+  /*
+    Hotfix 2026-11-10. A workspace refused its inventory because it had no file access reads it
+    again the moment access opens (terms accepted, release recorded), so the drop zone does not
+    open over a stale refusal. Only the flip to "open" triggers it, so a refusal cannot loop.
+  */
+  useEffect(() => {
+    if (customerDataAccess === "open" && documentInventoryRefusal) void loadDocuments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerDataAccess]);
 
   const loadBilling = async () => {
     const client = getSupabaseBrowserClient();
@@ -2831,6 +2846,8 @@ export default function WorkspacePage() {
   const workspaceStateInput: WorkspaceStateInput = {
     customerDataAccess,
     inventoryState: documentInventoryState,
+    inventoryRefusalCode: documentInventoryState === "unavailable" ? documentInventoryRefusal : null,
+    sourcePending,
     // A marker from an earlier load says nothing once the inventory is unavailable again.
     inventoryPartial: documentInventoryState === "ready" ? documentInventoryPartial : null,
     documentCount,
@@ -2940,6 +2957,19 @@ export default function WorkspacePage() {
     />
   ) : null;
 
+  /*
+    Hotfix 2026-11-10. GA has no access request. A closed workspace's Sources and AI-connection tabs
+    name the step bootstrap gave as the reason: the terms on Home, the release wait, support for a
+    refused workspace, and with no reason (terms accepted, no plan or trial) the plans page.
+  */
+  const closedGate = sourcePending === "terms_acceptance_required"
+    ? { sentence: "Accept the processing terms on Home to open it.", action: <button className="btn" type="button" onClick={() => navigateSurface("home")}>Accept the processing terms</button> }
+    : sourcePending === "release_pending"
+      ? { sentence: "Your processing terms are accepted and file access is awaiting release.", action: null }
+      : sourcePending === "workspace_refused"
+        ? { sentence: "File processing is not available for this workspace.", action: <Link className="btn" href="/contact">Contact support</Link> }
+        : { sentence: "This workspace has no active plan. Choose a plan to open it.", action: <Link className="btn" href="/pricing">See Developer access</Link> };
+
   return (
     <WorkspaceUltimateShell
       surface={surface}
@@ -2950,7 +2980,7 @@ export default function WorkspacePage() {
       stateTitle={stateTitle}
       stateDescription={stateDescription}
       stateFacts={workspaceFacts}
-      stateHero={workspaceState.mode !== "new"}
+      stateHero={workspaceState.mode !== "new" && workspaceState.mode !== "source_pending" && workspaceState.mode !== "plan_required"}
       onAccess={applyAccess}
       accessEpoch={accessEpoch}
       nextAction={nextAction}
@@ -3042,6 +3072,18 @@ export default function WorkspacePage() {
                     <button type="button" onClick={() => void loadDocuments()}>Retry loading sources</button>
                   </div>
                 </div>
+              ) : workspaceState.mode === "plan_required" ? (
+                /* REVIEW-PR227-R1 B1: terms accepted, no plan or trial. The way forward is a plan, never a dead end. */
+                <div className="workspace-intake-copy workspace-intake-closed">
+                  {surface === "home"
+                    ? <h1 id="workspace-intake-title">{workspaceState.stateTitle}</h1>
+                    : <h2 id="workspace-intake-title">{workspaceState.stateTitle}</h2>}
+                  <p role="status">{workspaceState.stateDescription}</p>
+                  <div className="workspace-intake-gated-actions">
+                    <Link className="btn" href="/pricing">See plans</Link>
+                    <Link className="btn ghost" href="/explore">Explore a compiled World</Link>
+                  </div>
+                </div>
               ) : !intakeOpen ? (
                 /*
                   Journey A9 (D-08). This block used to be one polite live region around its h1,
@@ -3051,7 +3093,7 @@ export default function WorkspacePage() {
                 */
                 <div className="workspace-intake-copy workspace-intake-closed">
                   <p className="eyebrow">{sourcePending === "terms_acceptance_required" ? "Your workspace" : "A complete example is ready"}</p>
-                  {workspaceState.mode === "new" && surface === "home"
+                  {(workspaceState.mode === "new" || workspaceState.mode === "source_pending") && surface === "home"
                     ? <h1 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : sourcePending === "terms_acceptance_required" ? "Start with your documents" : "See how a source becomes usable knowledge"}</h1>
                     : <h2 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : "See a compiled World"}</h2>}
                   <p role="status">{customerDataAccess === "checking"
@@ -3503,9 +3545,9 @@ export default function WorkspacePage() {
               <section className="card">
                 <h2>This candidate has not been run through Core.</h2>
                 <p>{collectionResult.validation.counts.documents} documents · {collectionResult.validation.counts.entities} entities · {collectionResult.validation.counts.claims} claims · {collectionResult.validation.counts.relations} relations</p>
-                {!intakeOpen ? <p>{customerDataAccess === "checking" ? "Checking source access before this candidate can run through Core." : customerDataAccess === "closed" ? "Source processing is not active for this workspace. Request source access before running Core." : "Source access could not be verified. Refresh before running Core."}</p> : null}
+                {!intakeOpen ? <p>{customerDataAccess === "checking" ? "Checking source access before this candidate can run through Core." : customerDataAccess === "closed" ? "Source processing is not active for this workspace, so Core cannot run yet. Home shows the step that opens it." : "Source access could not be verified. Refresh before running Core."}</p> : null}
                 <div className="billing-actions">
-                  {intakeOpen ? <button disabled={busy} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button> : customerDataAccess === "closed" ? <Link href="/contact">Request source access</Link> : null}
+                  {intakeOpen ? <button disabled={busy} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button> : customerDataAccess === "closed" ? <button type="button" onClick={() => navigateSurface("home")}>Open Home</button> : null}
                 </div>
               </section>
             ) : null}
@@ -4032,14 +4074,14 @@ export default function WorkspacePage() {
               <p>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
                 : customerDataAccess === "closed"
-                ? "Your account is ready, but source processing is closed. Request source access before connecting a provider."
+                ? `Your account is ready, but source processing is closed. ${closedGate.sentence}`
                 : accessSource === "trial"
                 ? "Free evaluation works with files you upload directly. Connect Google Drive, Dropbox, OneDrive or your own storage once the workspace is on Developer access."
                 : "This account has no active compute access. Source connections require Developer access."}</p>
               <div className="billing-actions">{accessSource === null
                 ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
                 : customerDataAccess === "closed"
-                ? <Link className="btn" href="/contact">Request source access</Link>
+                ? closedGate.action
                 : <Link className="btn" href="/pricing">See Developer access</Link>}</div>
             </section>
           ) : <ConnectionsPanel />) : null}
@@ -4052,14 +4094,14 @@ export default function WorkspacePage() {
               <p>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
                 : customerDataAccess === "closed"
-                ? "Your account is ready, but source processing is closed. Request source access before setting up API keys or MCP."
+                ? `Your account is ready, but source processing is closed. ${closedGate.sentence}`
                 : accessSource === "trial"
                 ? "Free evaluation reads the World inside this workspace. Keys, the OpenAPI document and MCP setup open with Developer access."
                 : "This account has no active compute access. API keys and MCP setup require Developer access."}</p>
               <div className="billing-actions">{accessSource === null
                 ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
                 : customerDataAccess === "closed"
-                ? <Link className="btn" href="/contact">Request source access</Link>
+                ? closedGate.action
                 : <Link className="btn" href="/pricing">See Developer access</Link>}</div>
             </section>
           ) : <DeveloperPanel />) : null}

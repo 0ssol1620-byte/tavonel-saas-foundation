@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
 import PricingPlanOverview, { pricingPlanDestinationClass, pricingPlanId } from "./pricing-plan-overview";
 import tableStyles from "@/components/docs/docs-table.module.css";
-import { useCheckout, type NoticeTone } from "@/lib/use-checkout";
+import { useCheckout, type NoticeLink, type NoticeTone } from "@/lib/use-checkout";
 import { loginUrlForOffer } from "@/lib/checkout-intent";
 import {
   BILLING_OFFERS,
@@ -673,8 +673,8 @@ export default function PricingPageClient({
   planCapabilities: readonly PlanCapabilityRow[];
 }) {
   /* Journey A9 (D-08): the checkout hook says whether a sentence is progress or a refusal. */
-  const [notice, setNotice] = useState<{ text: string; tone: NoticeTone } | null>(null);
-  const notify = useCallback((text: string, tone: NoticeTone) => setNotice({ text, tone }), []);
+  const [notice, setNotice] = useState<{ text: string; tone: NoticeTone; link?: NoticeLink } | null>(null);
+  const notify = useCallback((text: string, tone: NoticeTone, link?: NoticeLink) => setNotice({ text, tone, link }), []);
   const [signedIn, setSignedIn] = useState(false);
   const [ownerBillingExempt, setOwnerBillingExempt] = useState(false);
   // SD-01: the same `activationPolicy` row the fine print under the grid prints.
@@ -1389,7 +1389,12 @@ export default function PricingPageClient({
             */}
             {(["status", "alert"] as const).map((region) => (
               <div key={region} role={region}>
-                {notice?.tone === region ? <p className="notice">{notice.text}</p> : null}
+                {notice?.tone === region ? (
+                  <p className="notice">
+                    {notice.text}
+                    {notice.link ? <> <Link href={notice.link.href as Route}>{notice.link.label}</Link></> : null}
+                  </p>
+                ) : null}
               </div>
             ))}
           </div>

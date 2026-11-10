@@ -18,6 +18,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { failureSentence } from "./workspace-failure-copy";
 import { ENTITLEMENT_PENDING_SENTENCE, type BillingStatusAccount, type EntitlementWaitResult } from "./entitlement-wait";
+import { readOfferParam } from "./checkout-intent";
 
 /* ---------------------------------------------------------------- module doubles */
 
@@ -75,7 +76,7 @@ async function runCheckout(offer: string, onEntitlement?: (wait: EntitlementWait
 
   let start: (code: string) => Promise<void>;
   try {
-    const hook = useCheckout((m, tone) => { notices.push(m); tones.push(tone); }, onEntitlement) as { start: (code: string) => Promise<void> };
+    const hook = useCheckout((m, tone, link) => { notices.push(m); tones.push(tone); links.push(link); }, onEntitlement) as { start: (code: string) => Promise<void> };
     start = hook.start;
   } finally {
     if (internals && "H" in internals) internals.H = previous;
@@ -91,6 +92,8 @@ async function runCheckout(offer: string, onEntitlement?: (wait: EntitlementWait
 const fetchCalls: Array<{ url: string; init: RequestInit }> = [];
 /** The tone of every notice, in order, beside the sentence `runCheckout` returns (journey A9). */
 const tones: string[] = [];
+/** The link each notice carried, in order (hotfix 2026-11-10). */
+const links: unknown[] = [];
 
 function respondWith(body: unknown, ok = true, status = ok ? 200 : 402) {
   globalThis.fetch = (async (url: string, init: RequestInit) => {
@@ -108,6 +111,7 @@ const page = { lang: "en", scheme: "dark" };
 beforeEach(() => {
   fetchCalls.length = 0;
   tones.length = 0;
+  links.length = 0;
   paddle.opened.length = 0;
   paddle.eventCallback = null;
   paddle.init = { Checkout: { open: (args: unknown) => paddle.opened.push(args) } };
@@ -247,6 +251,31 @@ describe("checkout refusals", () => {
       expect(notices[0], "no parenthetical code or status").not.toMatch(/\([A-Z0-9_]+\)|\(\d{3}\)/);
     });
   }
+
+  /*
+    Hotfix 2026-11-10. A workspace that has not accepted the processing terms is refused checkout
+    (the server gate stays). The refusal says to accept the terms, never to request access, and
+    links to the workspace terms step carrying the offer, which the workspace holds and resumes.
+  */
+  it("sends a pre-terms refusal to the workspace terms step, carrying the offer", async () => {
+    respondWith({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, false, 403);
+    const notices = await runCheckout("observer_access");
+
+    expect(paddle.opened).toHaveLength(0);
+    expect(tones).toEqual(["alert"]);
+    expect(notices[0]).toContain("Accept the processing terms in your workspace first.");
+    expect(notices[0]).toContain("nothing was processed or charged");
+    expect(notices[0]).not.toMatch(/request/i);
+    expect(links).toEqual([{ href: "/workspace?checkout=observer_access", label: "Accept the processing terms" }]);
+    const href = (links[0] as { href: string }).href;
+    expect(readOfferParam(new URL(href, "https://tavonel.com").search)).toBe("observer_access");
+  });
+
+  it("links nothing on a refusal the terms cannot change", async () => {
+    respondWith({ code: "PROCESSING_QUALIFICATION_NOT_BILLABLE" }, false, 403);
+    await runCheckout("observer_access");
+    expect(links).toEqual([undefined]);
+  });
 
   it("still names a code it has no sentence for, as a reference rather than dropping it", async () => {
     respondWith({ code: "BILLING_OFFER_INVALID" }, false, 400);

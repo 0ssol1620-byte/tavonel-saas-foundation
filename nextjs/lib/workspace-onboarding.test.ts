@@ -38,6 +38,58 @@ describe("workspace mode", () => {
     expect(deriveWorkspaceMode(input({ inventoryState: "unavailable" }))).toBe("unavailable");
   });
 
+  /*
+    Hotfix 2026-11-10. A first sign-in that has not accepted the processing terms has no trial, so
+    /api/documents refuses it 402 SUBSCRIPTION_REQUIRED. That is an access state, and the terms
+    step must render, not the load error. Everything else that fails stays `unavailable`.
+  */
+  it("renders the access step, not the load error, for a pre-terms inventory refusal", () => {
+    for (const code of ["SUBSCRIPTION_REQUIRED", "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE"]) {
+      for (const sourcePending of ["terms_acceptance_required", "release_pending", "workspace_refused"]) {
+        expect(deriveWorkspaceMode(input({ inventoryState: "unavailable", inventoryRefusalCode: code, customerDataAccess: "closed", sourcePending }))).toBe("source_pending");
+      }
+      const view = deriveWorkspaceState(input({ inventoryState: "unavailable", inventoryRefusalCode: code, customerDataAccess: "closed", sourcePending: "terms_acceptance_required" }));
+      expect(view.mode).toBe("source_pending");
+      expect(view.stateTitle).not.toMatch(/could not be loaded/);
+      expect(view.nextAction.intent).toBeUndefined();
+      // Until access is read, wait rather than flash the error.
+      expect(deriveWorkspaceMode(input({ inventoryState: "unavailable", inventoryRefusalCode: code, customerDataAccess: "checking" }))).toBe("loading");
+    }
+  });
+
+  /*
+    REVIEW-PR227-R1 B1. Terms accepted, no plan or trial (lapsed, expired, exhausted, device reused):
+    bootstrap answers ACCESS_READY_NO_ENTITLEMENT, closed with no reason, and the inventory is 402.
+    That is a plan state with a route to pay, never the first-run access step.
+  */
+  it("sends a closed workspace with no gate reason and a 402 inventory to the plan state, not the terms step", () => {
+    for (const sourcePending of [undefined, null, "legacy"]) {
+      const view = deriveWorkspaceState(input({ inventoryState: "unavailable", inventoryRefusalCode: "SUBSCRIPTION_REQUIRED", customerDataAccess: "closed", sourcePending }));
+      expect(view.mode).toBe("plan_required");
+      expect(view.stateTitle).toBe("This workspace has no active plan.");
+      expect(view.stateDescription).toContain("Choose a plan");
+    }
+    // Without a reason, a gate refusal is not a plan state either: nothing to buy names it.
+    expect(deriveWorkspaceMode(input({ inventoryState: "unavailable", inventoryRefusalCode: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE", customerDataAccess: "closed" }))).toBe("unavailable");
+  });
+
+  it("keeps a genuine load failure unavailable", () => {
+    const closed = { inventoryState: "unavailable", customerDataAccess: "closed", sourcePending: "terms_acceptance_required" } as const;
+    // 5xx store and signer failures, an expired session, a network failure (no code).
+    for (const code of ["SIGNER_NOT_CONFIGURED", "BILLING_STORE_READ_FAILED", "AUTH_REQUIRED", "AUTHORIZATION_CHANGED_RETRY", null]) {
+      expect(deriveWorkspaceMode(input({ ...closed, inventoryRefusalCode: code }))).toBe("unavailable");
+    }
+    // A refusal code while access is open, or unverifiable, is not an access step either.
+    expect(deriveWorkspaceMode(input({ inventoryState: "unavailable", inventoryRefusalCode: "SUBSCRIPTION_REQUIRED", customerDataAccess: "open" }))).toBe("unavailable");
+    expect(deriveWorkspaceMode(input({ inventoryState: "unavailable", inventoryRefusalCode: "SUBSCRIPTION_REQUIRED", customerDataAccess: "unavailable" }))).toBe("unavailable");
+    expect(deriveWorkspaceState(input({ ...closed, inventoryRefusalCode: "SIGNER_NOT_CONFIGURED" })).stateTitle).toBe("Your knowledge could not be loaded.");
+  });
+
+  it("is unchanged once access is accepted and the inventory loads", () => {
+    expect(deriveWorkspaceMode(input({ inventoryRefusalCode: null }))).toBe("new");
+    expect(deriveWorkspaceMode(input({ documentCount: 2, inventoryRefusalCode: null }))).toBe("returning");
+  });
+
   it("reaches the first-run hero only from a resolved, genuinely untouched workspace", () => {
     expect(deriveWorkspaceMode(input())).toBe("new");
     expect(deriveWorkspaceMode(input({ documentCount: 1 }))).toBe("returning");
