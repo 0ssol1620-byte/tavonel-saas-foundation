@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   BENCHMARK_FAMILIES,
@@ -521,6 +521,13 @@ describe("the /benchmarks page", () => {
     // 2026-11-10 public-copy cleanup (founder direction): intended re-pin. The document-reader board was an internal experiment and left the page.
     expect(page).not.toContain('from "@/lib/model-arena-page-data"');
     expect(page).not.toContain('from "@/components/benchmarks/arena-charts"');
+    // The repository is public, so the board, its data and its builder do not ship at all.
+    for (const file of [
+      "content/benchmarks/model-arena-20260903.json", "lib/model-arena-page-data.ts", "components/benchmarks/arena-charts.tsx",
+      "components/benchmarks/arena-charts.module.css", "scripts/benchmarks/build-model-arena-artifact.mjs", "app/arena/page.tsx",
+    ]) {
+      expect(existsSync(new URL(`../${file}`, import.meta.url)), `${file} does not exist`).toBe(false);
+    }
     /*
       No decimal literal in this file. Every Edit distance, TEDS score and median on the page is
       a field of the artifact, formatted where it is rendered; a float typed here would be a

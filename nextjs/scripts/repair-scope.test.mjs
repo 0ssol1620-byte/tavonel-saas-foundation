@@ -7372,13 +7372,13 @@ test('affected OCR_PAGES_INCOMPLETE owner: four exact paths select three direct 
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
-test('affected benchmarks path mask owner: five exact paths select ten direct suites and no browser suite; neighbours stay unmapped', () => {
+test('affected benchmarks path mask owner: eight exact paths select eight direct suites and no browser suite; neighbours stay unmapped', () => {
   const suites = ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts',
-    'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/og-card-frame.test.ts',
-    'lib/public-copy-purge.test.ts', 'lib/seo-surface.test.ts', 'lib/trust-page-answers.test.ts'];
+    'lib/og-card-frame.test.ts', 'lib/public-copy-purge.test.ts', 'lib/seo-surface.test.ts', 'lib/trust-page-answers.test.ts'];
   assert.deepEqual([[...BENCHMARKS_PATH_MASK_AFFECTED_PATHS], [...BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES]], [['app/benchmarks/page.tsx',
-    'app/research/notes/opengraph-image.tsx', 'lib/benchmarks-page.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts'],
-    suites]);
+    'app/research/notes/opengraph-image.tsx', 'content/benchmarks/model-arena-20260903.json', 'lib/benchmarks-page.test.ts',
+    'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts',
+    'scripts/benchmarks/build-model-arena-artifact.mjs'], suites]);
   for (const path of BENCHMARKS_PATH_MASK_AFFECTED_PATHS) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['benchmarks-path-mask'], path);
     const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
@@ -7389,7 +7389,7 @@ test('affected benchmarks path mask owner: five exact paths select ten direct su
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
   for (const adjacent of ['nextjs/app/benchmarks/page.ts', 'nextjs/app/benchmarks/gdp-pdf/page.tsx', 'nextjs/lib/model-arena-page-data.tsx',
     'nextjs/lib/model-arena-page-data-v2.ts', 'nextjs/lib/benchmarks-page.test.tsx', 'nextjs/components/benchmarks/arena-chart.tsx',
-    'nextjs/content/benchmarks/model-arena-20260903.json', 'lib/model-arena-page-data.ts', 'nextjs/app/research/opengraph-image.tsx',
+    'nextjs/content/benchmarks/model-arena-20260904.json', 'lib/model-arena-page-data.ts', 'nextjs/app/research/opengraph-image.tsx',
     'nextjs/lib/public-copy-purge.ts']) {
     if (assertUxProgramEndpoint(adjacent)) continue;
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
@@ -7922,9 +7922,9 @@ test('OCR v3 admission owns exactly the seven newly encountered endpoints and se
   assert.deepEqual(oldOwner.map(owner => owner.group), ['compile-source-observations']);
 });
 
-test('affected enablement owner: fifty-three exact paths select twenty-one direct suites and four browser suites; neighbours stay unmapped', async () => {
+test('affected enablement owner: fifty-three exact paths select nineteen direct suites and four browser suites; neighbours stay unmapped', async () => {
   const { ENABLEMENT_AFFECTED_PATHS: paths, ENABLEMENT_AFFECTED_UNIT_FILES: units, ENABLEMENT_AFFECTED_BROWSER_FILES: exportedBrowsers } = await import('./repair-scope.mjs');
-  const suites = ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/brand-tokens.test.ts', 'lib/changelog.test.ts', 'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/design-tokens.test.ts', 'lib/developer-snippets.test.ts', 'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/guide-content.test.ts', 'lib/keyless-read.test.ts', 'lib/keyless-try-it.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/product-claims-sync.test.ts', 'lib/resources-hub.test.ts', 'lib/seo-surface.test.ts', 'lib/site-nav-model.test.ts', 'lib/trust-page-answers.test.ts'];
+  const suites = ['lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/brand-tokens.test.ts', 'lib/changelog.test.ts', 'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/design-tokens.test.ts', 'lib/developer-snippets.test.ts', 'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/guide-content.test.ts', 'lib/keyless-read.test.ts', 'lib/keyless-try-it.test.ts', 'lib/product-claims-sync.test.ts', 'lib/resources-hub.test.ts', 'lib/seo-surface.test.ts', 'lib/site-nav-model.test.ts', 'lib/trust-page-answers.test.ts'];
   // Phase 4 follow-ups (DELTA-REVIEW-2026-10-19 N-3): a change to only components/guide/* or app/product-polish.css selects
   // the /guide template rule, the token sweep and its unit twin, the keyless try-it and the p4 spec.
   const browsers = ['e2e/brand-tokens.spec.ts', 'e2e/keyless-try-it.spec.ts', 'e2e/p4-followups.spec.ts', 'e2e/templates.spec.ts'];

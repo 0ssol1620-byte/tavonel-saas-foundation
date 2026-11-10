@@ -218,7 +218,8 @@ export default function EvidencePage() {
               */}
               <p className={styles.locatorState}>
                 The evidence contract defines these seven locator shapes ahead of the readers
-                that use them. When a format gains a reader, its locator is already specified.
+                that use them, and none of them is read today. When a format gains a reader, its
+                locator is already specified.
               </p>
               <div className="tiles" aria-describedby="contracted-locators">
                 {CONTRACTED_LOCATORS.map(([family, locator]) => (

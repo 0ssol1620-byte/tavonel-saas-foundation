@@ -17,7 +17,6 @@ vi.mock("next/navigation", () => ({
 }));
 
 const { default: BenchmarksPage } = await import("../app/benchmarks/page");
-import { arenaBars, settledModels } from "./model-arena-page-data";
 
 /*
   The guard over the rendered /benchmarks page.
@@ -93,57 +92,15 @@ describe("the rendered /benchmarks page", () => {
 });
 
 /*
-  THE 360px GUARD, as far as a node test can carry it.
-
-  The e2e overflow sweep is the real check and this route is in its list. It cannot run here:
-  there is no layout engine. What is still checkable is the source invariant that makes the page
-  safe at 360px -- every element wider than a phone is inside a frame that scrolls on its own
-  axis and may shrink below its content.
+  2026-11-10: the document-reader board, its chart component and its stylesheet were deleted with
+  the rest of the internal model-selection material, so their 360px and scroll-frame invariants
+  went with them. The reduced-motion check on the evidence highlight stays.
 */
-describe("the 360px invariant", () => {
-  const sheet = read("components/benchmarks/arena-charts.module.css");
-  const component = read("components/benchmarks/arena-charts.tsx");
-
-  it("puts every table inside a scroll frame", () => {
-    const tables = component.match(/<table/g) ?? [];
-    const frames = component.match(/<div className=\{styles\.tableScroll\}/g) ?? [];
-    expect(tables.length).toBeGreaterThan(0);
-    expect(frames.length).toBe(tables.length);
-  });
-
-  it("gives that frame its own overflow and a min-width of zero", () => {
-    expect(sheet).toMatch(/\.tableScroll\s*\{[^}]*overflow-x:\s*auto/);
-    expect(sheet).toMatch(/\.tableScroll\s*\{[^}]*min-width:\s*0/);
-  });
-
-  it("puts the scatter plot in a scroll frame too, because its ticks are text", () => {
-    expect(component).toContain("styles.plotScroll");
-    expect(sheet).toMatch(/\.plotScroll\s*\{[^}]*overflow-x:\s*auto/);
-  });
-
-  it("lets a digest and a bar row break rather than widen the page", () => {
-    expect(sheet).toMatch(/\.digest\s*\{[^}]*overflow-wrap:\s*anywhere/);
-    expect(sheet).toMatch(/\.barLabel\s*\{[^}]*overflow-wrap:\s*anywhere/);
-    expect(sheet).toMatch(/\.bars\s*\{[^}]*min-width:\s*0/);
-  });
-
-  it("stacks the bar row before it reaches a phone, rather than keeping four columns", () => {
-    /* The four-column grid is behind a min-width query; the default is the stacked areas. */
-    expect(sheet).toMatch(/@media \(min-width: 720px\)/);
-    expect(sheet).toMatch(/"label label"/);
-  });
-
-  it("animates nothing, so there is nothing for reduced motion to turn off", () => {
-    for (const file of [sheet, read("components/evidence/region-highlight.module.css")]) {
-      expect(file).not.toMatch(/\btransition\s*:/);
-      expect(file).not.toMatch(/\banimation\s*:/);
-      expect(file).not.toMatch(/@keyframes/);
-    }
-  });
-});
-
-describe("the settled board itself", () => {
-  it("is what the page renders and not a subset of it", () => {
-    expect(arenaBars("text_edit").length).toBe(settledModels().length);
+describe("reduced motion", () => {
+  it("animates nothing in the evidence highlight, so there is nothing for reduced motion to turn off", () => {
+    const file = read("components/evidence/region-highlight.module.css");
+    expect(file).not.toMatch(/\btransition\s*:/);
+    expect(file).not.toMatch(/\banimation\s*:/);
+    expect(file).not.toMatch(/@keyframes/);
   });
 });

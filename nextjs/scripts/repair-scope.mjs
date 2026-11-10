@@ -1987,6 +1987,8 @@ export const SWITCH_ON_BILLING_INTEGRITY_AFFECTED_UNIT_FILES = Object.freeze([
 // Product code, so never nativeReuse.
 // 2026-11-10 public-copy cleanup (PR #224): the /research/notes share card joins this owner. The public-copy purge suite is
 // owned by conversion-public (GA) and is selected here as a direct suite, with og-card-frame and seo-surface.
+// Later on 2026-11-10 the Model Arena board, its artifact, builder, chart component and suites were deleted (the repository
+// is public). The deleted paths stay owned here so the deletion is a mapped change, and their two suites leave every list.
 // E1 ask-quality eval harness (codex/w1-e1-20261104, PR #188): the fourteen endpoints no owner listed -- the eval index README,
 // the harness's prereg (v2 and the preserved v1), question sets, generator, scorer, runner, live adapter, README and git
 // attribute files. Its one direct suite is the harness's own metrics.test.ts (in the default Vitest include). Nothing under
@@ -2001,13 +2003,13 @@ export const ASK_QUALITY_EVAL_AFFECTED_PATHS = Object.freeze([
 ]);
 export const ASK_QUALITY_EVAL_AFFECTED_UNIT_FILES = Object.freeze(['eval/ask-quality/metrics.test.ts']);
 export const BENCHMARKS_PATH_MASK_AFFECTED_PATHS = Object.freeze([
-  'app/benchmarks/page.tsx', 'app/research/notes/opengraph-image.tsx', 'lib/benchmarks-page.test.ts', 'lib/model-arena-page-data.test.ts',
-  'lib/model-arena-page-data.ts',
+  'app/benchmarks/page.tsx', 'app/research/notes/opengraph-image.tsx', 'content/benchmarks/model-arena-20260903.json',
+  'lib/benchmarks-page.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts',
+  'scripts/benchmarks/build-model-arena-artifact.mjs',
 ]);
 export const BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts',
-  'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/og-card-frame.test.ts',
-  'lib/public-copy-purge.test.ts', 'lib/seo-surface.test.ts', 'lib/trust-page-answers.test.ts',
+  'lib/og-card-frame.test.ts', 'lib/public-copy-purge.test.ts', 'lib/seo-surface.test.ts', 'lib/trust-page-answers.test.ts',
 ]);
 // PR #141's merge of main bcba7173 (Home Release 3, PR #150): the thirty changed endpoints no owner listed -- the Home and
 // Korean entry pages, the receipted measurement band (component, styles, data, its claims pack and suite, its receipt and research
@@ -2633,7 +2635,7 @@ export const ENABLEMENT_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/brand-tokens.test.ts', 'lib/changelog.test.ts',
   'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/design-tokens.test.ts', 'lib/developer-snippets.test.ts',
   'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/guide-content.test.ts', 'lib/keyless-read.test.ts',
-  'lib/keyless-try-it.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts',
+  'lib/keyless-try-it.test.ts',
   'lib/product-claims-sync.test.ts', 'lib/resources-hub.test.ts', 'lib/seo-surface.test.ts', 'lib/site-nav-model.test.ts', 'lib/trust-page-answers.test.ts',
 ]);
 // Phase 4 follow-ups (DELTA-REVIEW-2026-10-19 N-3): the browser suites that read this owner's pages. A change to only
@@ -3133,7 +3135,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // paper-product.css route ownership: the two exact components above select three direct suites and the Explore and Pricing suites.
   affectedGroup('paper-product-route-css', new RegExp(`^nextjs/(?:${exactPathAlternation(PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS)})$`),
     { unitFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, browserFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES }),
-  // Enablement batch: the fifty-three exact paths above select twenty-one direct suites and four browser suites (Phase 4, N-3).
+  // Enablement batch: the fifty-three exact paths above select nineteen direct suites and four browser suites (Phase 4, N-3).
   // The /benchmarks path mask left this owner when PR #157 brought the same change to main under benchmarks-path-mask.
   affectedGroup('enablement-20261017', new RegExp(`^nextjs/(?:${exactPathAlternation(ENABLEMENT_AFFECTED_PATHS)})$`),
     { unitFiles: ENABLEMENT_AFFECTED_UNIT_FILES, browserFiles: ENABLEMENT_AFFECTED_BROWSER_FILES }),

@@ -134,12 +134,12 @@ const GDP_PDF_ARMS = [
   [
     "Native PDF",
     "The provider receives the native PDF and the benchmark prompt, with no added context.",
-    "Two-arm run published",
+    "Run completed",
   ],
   [
     "Compiled context",
     "The same native PDF and prompt are paired with TAVONEL's sealed compiled context. This is the primary comparison with Native PDF.",
-    "Two-arm run published",
+    "Run completed",
   ],
   [
     "Fixed retrieval",
