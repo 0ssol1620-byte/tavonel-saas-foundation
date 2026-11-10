@@ -3049,6 +3049,10 @@ export const HERO_COMPILE_TABS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/hero
 export const CONNECTORS_DEVELOPER_AFFECTED_PATHS = Object.freeze(['app/api/connections/route.ts', 'app/api/v1/oauth-connectors/authorize/route.ts', 'components/connections-panel.tsx', 'e2e/connection-sync-status.spec.ts']);
 export const CONNECTORS_DEVELOPER_AFFECTED_UNIT_FILES = Object.freeze(['lib/billing-product-access.test.ts', 'lib/connection-sync-lag.test.ts', 'lib/connector-contract.test.ts', 'lib/connector-oauth-route.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/plan-entitlement.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts']);
 export const CONNECTORS_DEVELOPER_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/connection-sync-status.spec.ts']);
+// world-read-cap-20261110: the read side of a World at the package size a 96 MiB Core stores (named size refusal on every
+// read route, sequential candidate loading, the offline export verifier's bounds) and the end-to-end suite that walks it.
+export const WORLD_READ_CAP_AFFECTED_PATHS = Object.freeze(['app/api/collections/[id]/route.ts', 'app/api/v1/world/[id]/[lens]/route.ts', 'app/api/v1/world/[id]/route.ts', 'lib/active-world-source-access.ts', 'lib/collection-storage.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/world-read-model.ts', 'lib/world-rollback-source-access.ts', 'public/developer/tavonel-verify-export.mjs', 'scripts/verify-signed-export.mjs']);
+export const WORLD_READ_CAP_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error-codes.test.ts', 'lib/ask-route-limits.test.ts', 'lib/collection-download.test.ts', 'lib/collection-storage.test.ts', 'lib/compiler-contract.test.ts', 'lib/developer-distribution.test.ts', 'lib/export-route-authorization.test.ts', 'lib/grounded-ask.test.ts', 'lib/openapi-completeness.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/world-read-model.test.ts', 'lib/world-rollback-source-access.test.ts']);
 // revoke-not-plan-gated-20261110: the three revocation routes ask for membership and scope, never the plan ("Never let an ACL revoke wait").
 export const REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS = Object.freeze(['app/api/connections/[id]/route.ts', 'app/api/v1/oauth-connectors/connections/[id]/route.ts', 'lib/connection-revoke-not-plan-gated.test.ts']);
 export const REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES = Object.freeze(['lib/connection-revoke-not-plan-gated.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/google-drive-viewer-link-off.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts']);
@@ -3302,6 +3306,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // connectors-developer-20261110: 4 exact paths select 9 direct suites and one browser suite.
   affectedGroup('connectors-developer-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(CONNECTORS_DEVELOPER_AFFECTED_PATHS)})$`),
     { unitFiles: CONNECTORS_DEVELOPER_AFFECTED_UNIT_FILES, browserFiles: CONNECTORS_DEVELOPER_AFFECTED_BROWSER_FILES }),
+  // world-read-cap-20261110: 10 exact paths select 14 direct suites and no browser suite.
+  affectedGroup('world-read-cap-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(WORLD_READ_CAP_AFFECTED_PATHS)})$`),
+    { unitFiles: WORLD_READ_CAP_AFFECTED_UNIT_FILES }),
   // revoke-not-plan-gated-20261110: 3 exact paths select 6 direct suites and no browser suite.
   affectedGroup('revoke-not-plan-gated-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS)})$`),
     { unitFiles: REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES }),

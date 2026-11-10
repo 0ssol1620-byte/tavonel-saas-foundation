@@ -8409,3 +8409,23 @@ test('affected revoke-not-plan-gated-20261110 owner: 3 exact paths select 6 dire
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+// world-read-cap-20261110: one finite owner, restated independently of the exported constants.
+import { WORLD_READ_CAP_AFFECTED_PATHS, WORLD_READ_CAP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected world-read-cap-20261110 owner: 10 exact paths select 14 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/api/collections/[id]/route.ts', 'app/api/v1/world/[id]/[lens]/route.ts', 'app/api/v1/world/[id]/route.ts', 'lib/active-world-source-access.ts', 'lib/collection-storage.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/world-read-model.ts', 'lib/world-rollback-source-access.ts', 'public/developer/tavonel-verify-export.mjs', 'scripts/verify-signed-export.mjs'];
+  const suites = ['lib/api-error-codes.test.ts', 'lib/ask-route-limits.test.ts', 'lib/collection-download.test.ts', 'lib/collection-storage.test.ts', 'lib/compiler-contract.test.ts', 'lib/developer-distribution.test.ts', 'lib/export-route-authorization.test.ts', 'lib/grounded-ask.test.ts', 'lib/openapi-completeness.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/world-read-model.test.ts', 'lib/world-rollback-source-access.test.ts'];
+  assert.deepEqual([[...WORLD_READ_CAP_AFFECTED_PATHS], [...WORLD_READ_CAP_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths.map(p => `nextjs/${p}`)) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['world-read-cap-20261110'], path);
+  }
+  const map = affectedMap([affectedRecord('M', paths.map(p => `nextjs/${p}`))]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['world-read-cap-20261110'], [], suites, [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  const plan = affectedAskPlan(map);
+  assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [suites, [], false, false]);
+  for (const adjacent of ['nextjs/app/api/collections/[id]/page.tsx', 'nextjs/app/api/v1/world/[id]/[lens]/page.tsx', 'nextjs/lib/collection-storage.test.ts', 'nextjs/public/developer/tavonel-verify-export.test.mjs', 'nextjs/scripts/verify-signed-export.test.mjs', 'lib/world-read-model.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
