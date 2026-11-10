@@ -38,6 +38,39 @@ describe("workspace mode", () => {
     expect(deriveWorkspaceMode(input({ inventoryState: "unavailable" }))).toBe("unavailable");
   });
 
+  /*
+    Hotfix 2026-11-10. A first sign-in that has not accepted the processing terms has no trial, so
+    /api/documents refuses it 402 SUBSCRIPTION_REQUIRED. That is an access state, and the terms
+    step must render, not the load error. Everything else that fails stays `unavailable`.
+  */
+  it("renders the access step, not the load error, for a pre-terms inventory refusal", () => {
+    for (const code of ["SUBSCRIPTION_REQUIRED", "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE"]) {
+      const view = deriveWorkspaceState(input({ inventoryState: "unavailable", inventoryRefusalCode: code, customerDataAccess: "closed" }));
+      expect(view.mode).toBe("source_pending");
+      expect(view.stateTitle).not.toMatch(/could not be loaded/);
+      expect(view.nextAction.intent).toBeUndefined();
+      // Until access is read, wait rather than flash the error.
+      expect(deriveWorkspaceMode(input({ inventoryState: "unavailable", inventoryRefusalCode: code, customerDataAccess: "checking" }))).toBe("loading");
+    }
+  });
+
+  it("keeps a genuine load failure unavailable", () => {
+    const closed = { inventoryState: "unavailable", customerDataAccess: "closed" } as const;
+    // 5xx store and signer failures, an expired session, a network failure (no code).
+    for (const code of ["SIGNER_NOT_CONFIGURED", "BILLING_STORE_READ_FAILED", "AUTH_REQUIRED", "AUTHORIZATION_CHANGED_RETRY", null]) {
+      expect(deriveWorkspaceMode(input({ ...closed, inventoryRefusalCode: code }))).toBe("unavailable");
+    }
+    // A refusal code while access is open, or unverifiable, is not an access step either.
+    expect(deriveWorkspaceMode(input({ inventoryState: "unavailable", inventoryRefusalCode: "SUBSCRIPTION_REQUIRED", customerDataAccess: "open" }))).toBe("unavailable");
+    expect(deriveWorkspaceMode(input({ inventoryState: "unavailable", inventoryRefusalCode: "SUBSCRIPTION_REQUIRED", customerDataAccess: "unavailable" }))).toBe("unavailable");
+    expect(deriveWorkspaceState(input({ ...closed, inventoryRefusalCode: "SIGNER_NOT_CONFIGURED" })).stateTitle).toBe("Your knowledge could not be loaded.");
+  });
+
+  it("is unchanged once access is accepted and the inventory loads", () => {
+    expect(deriveWorkspaceMode(input({ inventoryRefusalCode: null }))).toBe("new");
+    expect(deriveWorkspaceMode(input({ documentCount: 2, inventoryRefusalCode: null }))).toBe("returning");
+  });
+
   it("reaches the first-run hero only from a resolved, genuinely untouched workspace", () => {
     expect(deriveWorkspaceMode(input())).toBe("new");
     expect(deriveWorkspaceMode(input({ documentCount: 1 }))).toBe("returning");

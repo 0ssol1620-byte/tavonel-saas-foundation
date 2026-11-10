@@ -580,6 +580,30 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     expect((await paddleCalls(page))?.opened.map((open) => open.settings)).toEqual([{ displayMode: "overlay", theme: "light", locale: "en" }]);
   });
 
+  /*
+    Hotfix 2026-11-10. GA, signed in, terms not accepted: the server gate still refuses the checkout,
+    and the refusal now names the terms and links to the workspace terms step with the offer, which
+    the workspace holds until access opens. No "request access", no Paddle.
+  */
+  test("a pre-terms checkout refusal on /pricing links to the workspace terms step, carrying the offer", async ({ page }) => {
+    await declineAnalytics(page);
+    await servePosture(page, "switch-on");
+    await installFixtureSession(page);
+    const paddle = await installFakePaddle(page);
+    await page.route("**/api/billing/status", (route) => route.fulfill({ json: { code: "OK", account: INACTIVE_BILLING } }));
+    const posts = await answerCheckout(page, () => ({ status: 403, json: { code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" } }));
+
+    await page.goto("/pricing");
+    await page.getByRole("link", { name: "Buy Developer — $29/month", exact: true }).click();
+    const refusal = region(page, "alert", "Accept the processing terms in your workspace first.");
+    await expect(refusal).toBeVisible();
+    await expect(refusal).not.toContainText(/request/i);
+    await expect(refusal).not.toContainText("CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE");
+    await expect(refusal.getByRole("link", { name: "Accept the processing terms" })).toHaveAttribute("href", "/workspace?checkout=observer_access");
+    expect(posts).toEqual([{ offerCode: "observer_access" }]);
+    expect(paddle.loads()).toBe(0);
+  });
+
   test("webhook never arrives: the bounded wait ends in a stated pending sentence, not a spinner (D-04)", async ({ page }) => {
     // The page's clock, so the 60 s window is walked rather than waited out.
     await page.clock.install();

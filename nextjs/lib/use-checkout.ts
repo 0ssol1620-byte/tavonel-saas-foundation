@@ -47,6 +47,18 @@ function overlayLook(): { theme: "light" | "dark"; locale: "ko" | "en" } {
   The hook knows which sentence is which; the page only decides where each region sits.
 */
 export type NoticeTone = "status" | "alert";
+/** The one next step a refusal can name, shown as a link beside its sentence. */
+export type NoticeLink = { href: string; label: string };
+
+/*
+  Hotfix 2026-11-10. A workspace that has not accepted the processing terms is refused a checkout
+  (no charge for a workspace that cannot process). The link takes the buyer to the workspace terms
+  step carrying the offer, and the workspace holds it until access opens and then resumes it
+  (`decideCheckoutResume`'s hold_terms in checkout-intent.ts).
+*/
+export function termsFirstLink(offerCode: BillingOfferCode): NoticeLink {
+  return { href: `/workspace?checkout=${encodeURIComponent(offerCode)}`, label: "Accept the processing terms" };
+}
 
 /** What a billing-exempt owner is told instead of a checkout; the workspace says it too when it drops a held offer (P2-29). */
 export const OWNER_ACCESS_ACTIVE_SENTENCE = "Owner access is already active. No checkout or payment is required for this account.";
@@ -55,7 +67,7 @@ export const OWNER_ACCESS_ACTIVE_SENTENCE = "Owner access is already active. No 
  * `onEntitlement` hears how the bounded wait after `checkout.completed` ended (journey A4), so a
  * page that shows billing can show the account the wait read without a reload.
  */
-export function useCheckout(notify: (message: string, tone: NoticeTone) => void, onEntitlement?: (wait: EntitlementWaitResult) => void) {
+export function useCheckout(notify: (message: string, tone: NoticeTone, link?: NoticeLink) => void, onEntitlement?: (wait: EntitlementWaitResult) => void) {
   const [busy, setBusy] = useState<BillingOfferCode | null>(null);
 
   const start = useCallback(
@@ -88,7 +100,11 @@ export function useCheckout(notify: (message: string, tone: NoticeTone) => void,
         // Journey A1 (D-03): a refusal is a sentence from the one failure-copy table, never a raw
         // code in parentheses. A code with no sentence still reaches the screen as a reference.
         if (!response.ok) {
-          notify(`Checkout is unavailable. ${failureSentence(checkout.code, response.status)}`, "alert");
+          notify(
+            `Checkout is unavailable. ${failureSentence(checkout.code, response.status)}`,
+            "alert",
+            checkout.code === "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" ? termsFirstLink(offerCode) : undefined,
+          );
           return;
         }
         if (!checkout.clientToken || !checkout.environment || !checkout.offer?.priceId || !checkout.customData) {

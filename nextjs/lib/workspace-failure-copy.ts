@@ -18,7 +18,8 @@ const FAILURE_COPY: Record<string, string> = {
   TENANT_MISMATCH: "That record belongs to another workspace.",
   NOT_FOUND: "That record is no longer in this workspace.",
   INTAKE_DISABLED: "Source intake is paused right now. Work already compiled stays available.",
-  CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE: "Source processing is not active for this workspace. Request source access before retrying.",
+  /* Hotfix 2026-11-10: GA has no access request. What opens processing is the owner accepting the terms. */
+  CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE: "File processing is not open for this workspace yet, so nothing was processed or charged. Accept the processing terms in your workspace first.",
   INTAKE_RATE_LIMITED: "Too many source bytes arrived at once. Wait a minute and try again; what was accepted is safe.",
   INTAKE_DAILY_QUOTA_EXCEEDED: "This workspace has reached its 24-hour direct-upload bound. Connect a source system, or retry after the window resets.",
   BILLING_HOLD: "A billing hold is active on this workspace, so new processing cannot start.",

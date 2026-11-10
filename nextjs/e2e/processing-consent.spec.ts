@@ -112,6 +112,41 @@ test("the owner reviews and accepts the terms by keyboard, once, and the file dr
   });
 });
 
+/*
+  Hotfix 2026-11-10. In production a first sign-in has no trial before the terms are accepted, so
+  /api/documents is refused 402 SUBSCRIPTION_REQUIRED by the product gate. The terms step must
+  render, not the load error, and accepting opens the drop zone with the inventory read again.
+*/
+test("a pre-terms inventory refusal shows the terms step, and acceptance opens the drop zone", async ({ page }) => {
+  const state = await installConsentRoutes(page, "terms_acceptance_required");
+  let inventoryReads = 0;
+  await page.route("**/api/documents", route => (inventoryReads += 1, state.accepted
+    ? route.fulfill({ json: { documents: [] } })
+    : route.fulfill({ status: 402, json: { code: "SUBSCRIPTION_REQUIRED" } })));
+  await page.goto("/workspace", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByText("To process your own files, review and accept the processing terms.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Start with your documents" })).toBeVisible();
+  await expect(page.getByText("could not be loaded")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Retry loading sources" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Review processing terms" }).click();
+  await page.getByRole("checkbox", { name: /I have read and agree/ }).check();
+  await page.getByRole("button", { name: "Accept terms" }).click();
+  await expect(page.getByRole("heading", { name: "Drop files, folders or ZIP here" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Choose files" })).toBeEnabled();
+  expect(inventoryReads).toBeGreaterThanOrEqual(2);
+});
+
+test("a failed inventory read still says so while the terms are pending", async ({ page }) => {
+  await installConsentRoutes(page, "terms_acceptance_required");
+  await page.route("**/api/documents", route => route.fulfill({ status: 503, json: { code: "SIGNER_NOT_CONFIGURED" } }));
+  await page.goto("/workspace", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("heading", { name: "Your sources could not be loaded" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry loading sources" }).first()).toBeVisible();
+});
+
 test("an unconfirmed submit says so, keeps the agreement, and a retry records it", async ({ page }) => {
   const state = await installConsentRoutes(page, "terms_acceptance_required", { failFirstPost: true });
   await page.goto("/workspace", { waitUntil: "domcontentloaded" });

@@ -21,6 +21,8 @@ export type WorkspaceStateInput = {
   customerDataAccess: "checking" | "open" | "closed" | "unavailable";
   /** Whether the source inventory is known. Never assume "loading" means "empty". */
   inventoryState: WorkspaceInventoryState;
+  /** The code `/api/documents` refused with, when it answered with one. Null for a network failure or a success. */
+  inventoryRefusalCode?: string | null;
   /** `/api/documents`'s `partial` marker: the inventory loaded but is known to be incomplete. */
   inventoryPartial?: DocumentListPartial | null;
   documentCount: number;
@@ -64,7 +66,21 @@ export type WorkspaceNextAction = {
  * `loading` and `unavailable` are not "empty". Only `new` may show the first-run intake hero,
  * and it is reachable exclusively from a resolved, genuinely empty inventory.
  */
-export type WorkspaceMode = "loading" | "unavailable" | "new" | "returning";
+export type WorkspaceMode = "loading" | "unavailable" | "source_pending" | "new" | "returning";
+
+/*
+  Hotfix 2026-11-10. The refusals the inventory gives a workspace that has no file access yet.
+
+  A first sign-in has accepted no processing terms, so bootstrap mints no trial (the trial waits for
+  the customer-data gate) and `/api/documents` answers 402 SUBSCRIPTION_REQUIRED from the product
+  gate. That is the workspace's access state, not a failed read, and it was rendering the
+  "could not be loaded" error over the terms step that opens access. Only these two codes and only
+  with access read as closed: a 5xx, a network failure or an expired session stays `unavailable`.
+*/
+export const SOURCE_PENDING_INVENTORY_REFUSALS: ReadonlySet<string> = new Set([
+  "SUBSCRIPTION_REQUIRED",
+  "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE",
+]);
 
 export type WorkspaceStateView = {
   mode: WorkspaceMode;
@@ -75,7 +91,14 @@ export type WorkspaceStateView = {
 
 export function deriveWorkspaceMode(input: WorkspaceStateInput): WorkspaceMode {
   if (input.inventoryState === "loading") return "loading";
-  if (input.inventoryState === "unavailable") return "unavailable";
+  if (input.inventoryState === "unavailable") {
+    if (input.inventoryRefusalCode && SOURCE_PENDING_INVENTORY_REFUSALS.has(input.inventoryRefusalCode)) {
+      // Wait for the access read rather than flash the error before the terms step.
+      if (input.customerDataAccess === "checking") return "loading";
+      if (input.customerDataAccess === "closed") return "source_pending";
+    }
+    return "unavailable";
+  }
   // An incomplete inventory with nothing listed is not an empty workspace; it is a failed read.
   const untouched =
     !input.inventoryPartial &&
@@ -97,6 +120,16 @@ export function deriveWorkspaceState(input: WorkspaceStateInput): WorkspaceState
       stateDescription:
         "Checking your files and the latest processing state.",
       nextAction: { label: "Loading" },
+    };
+  }
+
+  if (mode === "source_pending") {
+    return {
+      mode,
+      stateTitle: "Your workspace is ready.",
+      stateDescription:
+        "Your sources load here once this workspace can process files. The step that opens it is below.",
+      nextAction: { label: "See the step below" },
     };
   }
 
