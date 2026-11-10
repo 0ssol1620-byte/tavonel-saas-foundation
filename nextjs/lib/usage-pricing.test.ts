@@ -62,6 +62,7 @@ describe("page-based compile pricing", () => {
       expect(quote(mimeType, 80, basis).ok, mimeType).toBe(true);
       expect(quote(mimeType, 81, basis), mimeType).toEqual({ ok: false, code: "SOURCE_EXCEEDS_PROCESSING_CEILING", index: 0 });
     }
+    expect(intakePageBasisLabel("unknown")).toBe("Not counted yet — approved at the 80-page processing ceiling");
     // The canonical text production signs approvals with, unchanged: no approval goes stale on deploy.
     expect(intakePricingCanonical().split("\n").slice(-2)).toEqual(["max_quoted_pages=10000", "max_source_pages=80"]);
   });
