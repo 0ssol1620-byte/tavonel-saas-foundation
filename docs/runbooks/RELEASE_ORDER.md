@@ -826,7 +826,8 @@ URL·예약 전에 413으로 거절하는 것뿐이다.
 - 값은 `80`만 허용한다. `FOUNDATION_COMPLETED_READ_ENABLED=true`와 함께 켜면 worker가 CDR 요청 전에 설정 오류로 멈춘다(completed-read는 꺼 둔다).
   `wrangler.jsonc`의 producer `FOUNDATION_SEGMENT_CONTINUATION`(같은 queue)이 없으면 역시 설정 오류다.
 - CDR이 먼저다. 범위를 모르는 옛 CDR은 81쪽 이상을 거절하는데, worker는 `x-tavonel-cdr-ranges` 헤더가 없는 거절을 재시도로 다룬다.
-- 켜기 전에 삭제 inventory 한도(512 객체 / 1 GiB, 여러 장문 소스를 한 번에 지울 때 초과)를 site 절반 PR에서 해소한다(ADR-0006 "Deletion").
+- 삭제 inventory 한도(512 객체 / 1 GiB)는 migration `20261110043000`과 그 worker로 해소된다(ADR-0006 "Deletion", E5): 여러 실행에 걸쳐
+  해시하고 삭제 1건당 16,384 객체 / 64 GiB까지 attest한다.
 - 순서: (1) CDR revision → (2) site 절반 병합 + migration 적용 → (3) worker version upload에 `FOUNDATION_SOURCE_SEGMENT_PAGES=80`,
   81쪽·300쪽 문서 1건씩 end-to-end 확인 → (4) 문구·`PROCESSING_CEILING_SENTENCE` 변경 build.
 - 되돌리기: worker 변수 삭제(`wrangler versions deploy <prev>@100%`). 저장된 범위는 manifest가 없으면 보이지 않고 소스 삭제 때 함께 지워진다.
@@ -843,4 +844,8 @@ URL·예약 전에 413으로 거절하는 것뿐이다.
   site가 먼저 나가면 81–500쪽 PDF가 승인된 뒤 worker(off)에서 `PARSER_OOM`으로 거절되므로 이 순서를 바꾸지 않는다.
 - 켜는 release는 fingerprint를 바꾼다. 그 전에 받은 승인은 `INTAKE_PRICE_STALE`로 거절되고, 화면은 "페이지를 새로 고친 뒤 파일을
   다시 골라 새 최대 금액을 승인"하라고 안내한다(승인 lineage는 production에서 꺼져 있어 직접 업로드 경로에는 영향이 없다).
-- 삭제 inventory 한도(E5)가 해소되기 전에는 켜지 않는다.
+- 삭제 inventory(E5): migration `20261110043000`을 적용하고 그 site(`source-deletion-inventory.ts`가
+  `seal_source_deletion_inventory`를 부르는 버전)를 배포한 뒤에 켠다. 삭제 1건은 16,384 객체 / 64 GiB까지 여러 attest 실행
+  (15분 cron, 실행당 최대 1 GiB 또는 15초)에 걸쳐 봉인되고, 진행 중인 실행은 `IN_PROGRESS`(200)로 답한다. migration은 site보다 먼저:
+  옛 site는 바뀐 512→16,384 한도 외에 영향이 없고, 새 site는 migration 없이 `read_source_deletion_inventory_digests` 호출에서 실패한다
+  (fail closed, 삭제는 다음 실행까지 대기).

@@ -1029,6 +1029,14 @@ assert(VITEST_DISCOVERY_CONFIG_PATH==='nextjs/vitest.config.ts'&&discoveryOwners
     && ['nextjs/app/api/documents/[id]/source/route.ts', 'nextjs/lib/collection-source-access.test.ts', 'nextjs/lib/collection-source-access.ts', 'nextjs/lib/compile-artifact-provenance.ts', 'nextjs/lib/document-source-route.test.ts', 'nextjs/lib/immutable-keys.test.ts', 'nextjs/lib/immutable-keys.ts', 'nextjs/lib/pdf-evidence-viewer.test.ts'].every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && siteHalfOwners[0].match.test(p))
     && ['nextjs/lib/immutable-keys-v2.ts', 'nextjs/lib/collection-source-access-v2.ts'].every(p => !siteHalfOwners[0].match.test(p)),
     'large-source-site-half owner must keep its eight exact paths, eight direct suites and no neighbour admission');
+  // The deletion inventory worker, its R2 listing and its store: one exact owner with three direct suites, nothing adjacent.
+  const deletionInventoryOwners = AFFECTED_GROUPS.filter(o => o.group === 'large-source-deletion-inventory');
+  assert(deletionInventoryOwners.length === 1
+    && JSON.stringify(deletionInventoryOwners[0].unitFiles) === JSON.stringify(['lib/customer-source-lifecycle-route.test.ts', 'lib/customer-source-lifecycle.test.ts', 'lib/source-deletion-inventory.test.ts'])
+    && !deletionInventoryOwners[0].browserFiles.length && !deletionInventoryOwners[0].databaseTests.length && !deletionInventoryOwners[0].nativeReuse
+    && ['nextjs/lib/source-deletion-inventory-r2.ts', 'nextjs/lib/source-deletion-inventory-store.ts', 'nextjs/lib/source-deletion-inventory.test.ts', 'nextjs/lib/source-deletion-inventory.ts'].every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && deletionInventoryOwners[0].match.test(p))
+    && ['nextjs/lib/source-deletion-inventory-v2.ts', 'nextjs/lib/source-deletion-inventory-store.test.ts'].every(p => !deletionInventoryOwners[0].match.test(p)),
+    'large-source-deletion-inventory owner must keep its four exact paths, three direct suites and no neighbour admission');
 }
 console.log(`Workflow static gates pass. Full qualification still pending for exact CI/Launch runs at this head.`);
 

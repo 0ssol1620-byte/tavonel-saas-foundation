@@ -3016,6 +3016,11 @@ export const LARGE_SOURCE_INTAKE_CEILING_AFFECTED_PATHS = Object.freeze(['nextjs
 // at an original page by the source route. Product code, so never nativeReuse. No browser, database or worker lane.
 export const LARGE_SOURCE_SITE_HALF_AFFECTED_PATHS = Object.freeze(['nextjs/app/api/documents/[id]/source/route.ts', 'nextjs/lib/collection-source-access.test.ts', 'nextjs/lib/collection-source-access.ts', 'nextjs/lib/compile-artifact-provenance.ts', 'nextjs/lib/document-source-route.test.ts', 'nextjs/lib/immutable-keys.test.ts', 'nextjs/lib/immutable-keys.ts', 'nextjs/lib/pdf-evidence-viewer.test.ts']);
 export const LARGE_SOURCE_SITE_HALF_AFFECTED_UNIT_FILES = Object.freeze(['lib/collection-compile-run.test.ts', 'lib/collection-source-access.test.ts', 'lib/compile-artifact-provenance.test.ts', 'lib/compile-job-worker.test.ts', 'lib/document-source-route.test.ts', 'lib/documents-route.test.ts', 'lib/immutable-keys.test.ts', 'lib/pdf-evidence-viewer.test.ts']);
+// Large-source deletion inventory (ADR-0006, Bound E5): the attestation worker that hashes a tombstone's objects across runs,
+// its R2 listing (shared with the customer lifecycle inventory, whose two suites it selects) and its RPC store. Product code,
+// so never nativeReuse. No browser, worker or build lane; its migration and pgTAP file are database-contract's.
+export const LARGE_SOURCE_DELETION_INVENTORY_AFFECTED_PATHS = Object.freeze(['nextjs/lib/source-deletion-inventory-r2.ts', 'nextjs/lib/source-deletion-inventory-store.ts', 'nextjs/lib/source-deletion-inventory.test.ts', 'nextjs/lib/source-deletion-inventory.ts']);
+export const LARGE_SOURCE_DELETION_INVENTORY_AFFECTED_UNIT_FILES = Object.freeze(['lib/customer-source-lifecycle-route.test.ts', 'lib/customer-source-lifecycle.test.ts', 'lib/source-deletion-inventory.test.ts']);
 export const LARGE_SOURCE_INTAKE_CEILING_AFFECTED_UNIT_FILES = Object.freeze(['lib/capability-manifest-route.test.ts', 'lib/production-posture.test.ts', 'lib/usage-pricing.test.ts']);
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
@@ -3312,6 +3317,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // large-source-site-half (ADR-0006): the 8 exact repo-relative paths above select 8 direct suites and no browser suite.
   affectedGroup('large-source-site-half', new RegExp(`^(?:${exactPathAlternation(LARGE_SOURCE_SITE_HALF_AFFECTED_PATHS)})$`),
     { unitFiles: LARGE_SOURCE_SITE_HALF_AFFECTED_UNIT_FILES }),
+  // large-source-deletion-inventory (ADR-0006, E5): the 4 exact repo-relative paths above select 3 direct suites and no browser suite.
+  affectedGroup('large-source-deletion-inventory', new RegExp(`^(?:${exactPathAlternation(LARGE_SOURCE_DELETION_INVENTORY_AFFECTED_PATHS)})$`),
+    { unitFiles: LARGE_SOURCE_DELETION_INVENTORY_AFFECTED_UNIT_FILES }),
 ]);const regularModes = ['100644', '100755'];
 
 export function parseAffectedRawDiff(output) {

@@ -166,8 +166,9 @@ begin
   if position(v_new_bound in v_definition) > 0 and position(v_old_bound in v_definition) = 0 then
     return;
   end if;
-  if position(v_old_bound in v_definition) = 0 or position(v_new_bound in v_definition) > 0
-     or position(v_old_bound in replace(v_definition, v_old_bound, '')) > 0 then
+  -- Exactly one occurrence of the old bound, and none of the new one.
+  if length(v_definition) - length(replace(v_definition, v_old_bound, '')) <> length(v_old_bound)
+     or position(v_new_bound in v_definition) > 0 then
     raise exception 'source_deletion_inventory_resumable_definition_unexpected';
   end if;
   execute replace(v_definition, v_old_bound, v_new_bound);
