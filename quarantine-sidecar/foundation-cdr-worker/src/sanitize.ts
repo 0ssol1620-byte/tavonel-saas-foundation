@@ -5,6 +5,10 @@ import { assertFoundationOnlyTarget } from "./guards";
 import { cdrRequestSignature, hmacSecretIsConfigured, sha256DigestHeader, sha256Hex } from "./hmac";
 import { runTextLayerShadow } from "./text-layer-shadow";
 import {
+  presignedSourceUrl, remoteDisarmUrl, remoteSourceTransport, streamedSha256, type RemoteSource, type RemoteSourceEnv,
+} from "./remote-source";
+import {
+  LARGE_SOURCE_MAX_BYTES,
   MAX_SOURCE_BYTES,
   STAGE_1_MAX_SOURCE_BYTES,
   intakeCeilingStage,
@@ -45,6 +49,8 @@ export type R2ObjectLike = {
   httpMetadata?: { contentType?: string; contentDisposition?: string };
   customMetadata?: Record<string, string>;
   arrayBuffer(): Promise<ArrayBuffer>;
+  /** The object's bytes as a stream; read instead of `arrayBuffer()` by the presigned transport. */
+  body?: ReadableStream<Uint8Array>;
 };
 
 export type R2BucketLike = {
@@ -62,7 +68,7 @@ export type R2BucketLike = {
   ): Promise<unknown>;
 };
 
-export type SanitizeEnv = {
+export type SanitizeEnv = RemoteSourceEnv & {
   FOUNDATION_COMPLETED_READ_ENABLED?: string;
   FOUNDATION_COMPLETED_READ_BINDING?: string;
   FOUNDATION_QUARANTINE: R2BucketLike;
@@ -540,6 +546,8 @@ export async function sanitizeObject(
   assertFoundationOnlyTarget(env.TAVONEL_CDR_URL, env.FOUNDATION_R2_BUCKET);
 
   const parts = assertProcessableSourceKey(objectKey);
+  // Large-source bytes: null is today's multipart transport, byte for byte.
+  const remote = remoteSourceTransport(env);
   const object = await env.FOUNDATION_QUARANTINE.get(objectKey);
   if (!object) {
     throw new RetryableError("quarantine source object is not yet readable");
@@ -547,7 +555,7 @@ export async function sanitizeObject(
   const declaredBytes = declaredBytesOf(object);
   const stage = intakeCeilingStage(env);
   if (!stage) throw new RetryableError("TAVONEL_INTAKE_CEILING_STAGE must be 0 or 1");
-  const maxSourceBytes = stage === "1" ? STAGE_1_MAX_SOURCE_BYTES : MAX_SOURCE_BYTES;
+  const maxSourceBytes = remote ? LARGE_SOURCE_MAX_BYTES : stage === "1" ? STAGE_1_MAX_SOURCE_BYTES : MAX_SOURCE_BYTES;
   const maxSanitizedBytes = stage === "1" ? STAGE_1_MAX_SANITIZED_BYTES : MAX_SANITIZED_BYTES;
   const cap = `quarantine source exceeds the ${maxSourceBytes / (1024 * 1024)} MiB Foundation CDR cap`;
   if (object.size > maxSourceBytes) {
@@ -557,18 +565,26 @@ export async function sanitizeObject(
     });
   }
 
-  const bytes = await object.arrayBuffer();
-  if (bytes.byteLength > maxSourceBytes) {
-    throw refuse("PARSER_OOM", cap, {
-      observedBytes: bytes.byteLength,
-      declaredBytes,
-    });
+  let bytes: ArrayBuffer | null = null;
+  let inputSha256: string;
+  if (remote) {
+    // The CDR reads the object itself; the worker only hashes it, one chunk at a time.
+    if (object.size < 1) throw refuse("CORRUPT_SOURCE", "quarantine source is empty", { observedBytes: 0, declaredBytes });
+    if (!object.body) throw new RetryableError("quarantine source cannot be read as a stream");
+    inputSha256 = await streamedSha256(object.body, object.size);
+  } else {
+    bytes = await object.arrayBuffer();
+    if (bytes.byteLength > maxSourceBytes) {
+      throw refuse("PARSER_OOM", cap, {
+        observedBytes: bytes.byteLength,
+        declaredBytes,
+      });
+    }
+    if (bytes.byteLength < 1) {
+      throw refuse("CORRUPT_SOURCE", "quarantine source is empty", { observedBytes: 0, declaredBytes });
+    }
+    inputSha256 = await sha256DigestHeader(bytes);
   }
-  if (bytes.byteLength < 1) {
-    throw refuse("CORRUPT_SOURCE", "quarantine source is empty", { observedBytes: 0, declaredBytes });
-  }
-
-  const inputSha256 = await sha256DigestHeader(bytes);
   // This binds configured routing, not scanner/image qualification. A runtime-policy change
   // at the same URL must also change the provider identity before rollout.
   const targetSha256 = await sha256DigestHeader(new TextEncoder().encode(JSON.stringify([
@@ -580,7 +596,8 @@ export async function sanitizeObject(
     listPrefix: `immutable/${parts.workspaceId}/${parts.workspaceId}/${parts.documentId}/`,
   };
   const ctx: DisarmContext = {
-    env, object, bytes, inputSha256, observed: { observedBytes: bytes.byteLength, declaredBytes },
+    env, object, sourceKey: objectKey, bytes, remote, inputSha256,
+    observed: { observedBytes: bytes?.byteLength ?? object.size, declaredBytes },
     stage, maxSanitizedBytes, fetcher, now, newRequestId,
   };
   const reused = await reusableImmutable(env.FOUNDATION_QUARANTINE, binding);
@@ -602,7 +619,10 @@ export async function sanitizeObject(
 type DisarmContext = {
   env: SanitizeEnv;
   object: R2ObjectLike;
-  bytes: ArrayBuffer;
+  sourceKey: string;
+  /** The source, held once, on the multipart transport; null on the presigned one. */
+  bytes: ArrayBuffer | null;
+  remote: RemoteSource | null;
   inputSha256: string;
   observed: { observedBytes: number; declaredBytes: number | null };
   stage: string;
@@ -642,12 +662,22 @@ async function requestDisarm(ctx: DisarmContext, pageRange: [number, number] | n
 
   const signature = await cdrRequestSignature(env.TAVONEL_CDR_HMAC as string, timestamp, requestId, inputSha256);
   const form = new FormData();
-  form.append("source", new Blob([bytes], { type: contentType }), filename);
+  let cdrUrl = env.TAVONEL_CDR_URL;
+  if (ctx.remote) {
+    // The same signed headers; the body names the object instead of carrying it. A fresh URL per
+    // request, so a range read after a long OCR never finds its URL expired.
+    cdrUrl = remoteDisarmUrl(env.TAVONEL_CDR_URL);
+    form.append("source_url", await presignedSourceUrl(ctx.remote, env.FOUNDATION_R2_BUCKET, ctx.sourceKey, ctx.now()));
+    form.append("filename", filename);
+    form.append("content_type", contentType);
+  } else {
+    form.append("source", new Blob([bytes as ArrayBuffer], { type: contentType }), filename);
+  }
 
   let response: Response;
   try {
-    const authorization = await cdrAuthorization(env.TAVONEL_CDR_URL, env.FOUNDATION_CDR_IDENTITY_HMAC, fetcher);
-    response = await fetcher(env.TAVONEL_CDR_URL, {
+    const authorization = await cdrAuthorization(cdrUrl, env.FOUNDATION_CDR_IDENTITY_HMAC, fetcher);
+    response = await fetcher(cdrUrl, {
       method: "POST",
       headers: {
         ...(authorization ? { authorization } : {}),
@@ -674,6 +704,12 @@ async function requestDisarm(ctx: DisarmContext, pageRange: [number, number] | n
     throw new RetryableError("synthetic CDR did not accept this worker's credentials");
   }
   if (response.status !== 200) {
+    // The same rule for the remote route: a revision without it answers 404 with no marker, which
+    // is our deploy order and is retried, never recorded against the document.
+    if (ctx.remote && response.headers.get("x-tavonel-cdr-remote-source") !== "1") {
+      await response.body?.cancel();
+      throw new RetryableError("CDR revision does not read remote sources; deploy the CDR before the worker");
+    }
     // A CDR that answers ranges says so on every refusal (cdr-cloudrun/app.py CDR_RANGES_HEADER).
     // One that predates ranges reads the whole source and refuses past 80 pages: that is our
     // deploy order, not the customer's document, so it is retried, never refused (E4).
@@ -910,7 +946,8 @@ async function finishWholeDocument(
   const read = await readSanitized(ctx, binding.sourceKey, stored, options);
 
   // D2 shadow: beside a stored ocr.json only, after it, and unable to change it (never throws).
-  if (!read.recorded && (read.ocr.status === "written" || read.ocr.status === "exists") && read.ocr.key) {
+  // It posts the source, so it needs the held bytes; the presigned transport refuses the flag before any request.
+  if (ctx.bytes && !read.recorded && (read.ocr.status === "written" || read.ocr.status === "exists") && read.ocr.key) {
     const { filename, contentType } = sourcePartFromR2Object(ctx.object);
     await runTextLayerShadow({
       env: ctx.env, immutablePdfKey: stored.immutableKey, ocrKey: read.ocr.key, inputSha256: ctx.inputSha256,

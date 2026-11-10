@@ -3250,7 +3250,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // suite against the digest-pinned clamd and inside the service image built from the checkout, and which affectedPlan defers as pending debt.
   // ADR-2026-11-02 (text-layer-first CDR) adds the text-layer module and its suite, the request boundary that now also gates
   // /v1/text-layer, and the Dockerfile, service.yaml and README that ship and describe them; malware-scan-qualification runs them all.
-  affectedGroup('cdr-cloudrun-service', /^quarantine-sidecar\/cdr-cloudrun\/(?:app\.py|request_boundary\.py|text_layer\.py|measure_limits\.py|Dockerfile|service\.yaml|README\.md|tests\/test_(?:app|text_layer|measurement_limits|measure_limits|page_ranges|service_definition)\.py)$/),
+  affectedGroup('cdr-cloudrun-service', /^quarantine-sidecar\/cdr-cloudrun\/(?:app\.py|request_boundary\.py|text_layer\.py|measure_limits\.py|Dockerfile|service\.yaml|README\.md|tests\/test_(?:app|text_layer|measurement_limits|measure_limits|page_ranges|remote_source|service_definition)\.py)$/),
   affectedGroup('dropbox-connector', /^nextjs\/lib\/(?:dropbox-[a-z-]+|connector-(?:oauth-adapters|page-integrity|provider-isolation|source-identity|sync-page|replay-world-currency-migration)|sync-worker|source-import|source-version-guard)(?:\.test)?\.ts$/,
     { unitFiles: ['lib/dropbox-source-reconciliation.test.ts', 'lib/connector-oauth-adapters.test.ts', 'lib/sync-worker.test.ts', 'lib/source-import.test.ts',
       'lib/connector-page-integrity.test.ts', 'lib/connector-sync-page.test.ts', 'lib/connector-provider-isolation.test.ts', 'lib/connector-source-identity.test.ts',

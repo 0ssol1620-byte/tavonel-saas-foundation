@@ -155,7 +155,8 @@ export async function handleRequest(request: Request, env: Env, fetcher: typeof 
     } catch (error) {
       const message = error instanceof Error ? error.message : "sanitize failed";
       if (error instanceof PermanentReject) {
-        const status = message.includes("5 MiB") ? 413 : 400;
+        // Any stage's byte cap (sanitize.ts `cap`), not only the 5 MiB one.
+        const status = message.includes("MiB Foundation CDR cap") ? 413 : 400;
         if (!isQuarantineSourceKey(objectKey)) return jsonResponse(status, { error: message });
         return await settleRefusal(env, objectKey, error, fetcher) === "recorded"
           ? jsonResponse(status, { error: message })

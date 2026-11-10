@@ -997,12 +997,16 @@ assert(VITEST_DISCOVERY_CONFIG_PATH==='nextjs/vitest.config.ts'&&discoveryOwners
 // worker owner, each owned exactly once; neither admits a neighbour.
 {
   const owned = { 'quarantine-sidecar/cdr-cloudrun/tests/test_page_ranges.py': 'cdr-cloudrun-service',
-    'quarantine-sidecar/foundation-cdr-worker/src/segments.test.ts': 'ocr-worker' };
+    'quarantine-sidecar/foundation-cdr-worker/src/segments.test.ts': 'ocr-worker',
+    // Large-source bytes (the presigned transport): the CDR's remote-read suite and the worker's, same owners.
+    'quarantine-sidecar/cdr-cloudrun/tests/test_remote_source.py': 'cdr-cloudrun-service',
+    'quarantine-sidecar/foundation-cdr-worker/src/remote-source.test.ts': 'ocr-worker' };
   for (const [p, group] of Object.entries(owned)) {
     const groups = AFFECTED_GROUPS.filter(o => o.match.test(p)).map(o => o.group);
     assert(groups.length === 1 && groups[0] === group, `${p} must be owned by ${group} alone, not ${groups.join(',') || 'nobody'}`);
   }
-  assert(['quarantine-sidecar/cdr-cloudrun/tests/test_page_ranges_v2.py', 'quarantine-sidecar/cdr-cloudrun/page_ranges.py']
+  assert(['quarantine-sidecar/cdr-cloudrun/tests/test_page_ranges_v2.py', 'quarantine-sidecar/cdr-cloudrun/page_ranges.py',
+    'quarantine-sidecar/cdr-cloudrun/tests/test_remote_source_v2.py', 'quarantine-sidecar/cdr-cloudrun/remote_source.py']
     .every(p => !AFFECTED_GROUPS.some(o => o.group === 'cdr-cloudrun-service' && o.match.test(p))),
     'cdr-cloudrun-service must not admit a neighbour of the page-range suite');
   // The drop box's limits notice and its suite: one exact owner with four direct suites, nothing adjacent.

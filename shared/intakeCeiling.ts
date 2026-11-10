@@ -45,6 +45,16 @@ const WORKER_STAGE_1_MAX_SOURCE_BYTES = 25 * 1024 * 1024;
 const CDR_STAGE_1_MAX_INPUT_BYTES = 25 * 1024 * 1024;
 const CDR_STAGE_1_MAX_PAGES = 200;
 
+/*
+  Large-source bytes (docs/adr/0006-segmented-large-sources.md): the bytes the worker
+  (`LARGE_SOURCE_MAX_BYTES`) and the rasterizer (`LARGE_SOURCE_MAX_INPUT_BYTES`) read when the CDR
+  reads the source from R2 itself (FOUNDATION_SOURCE_TRANSPORT=presigned). A target, not a stage:
+  no stage admits it, and intake does not read it, until a 50 MiB source has been measured end to end.
+*/
+const WORKER_LARGE_SOURCE_MAX_BYTES = 50 * 1024 * 1024;
+const CDR_LARGE_SOURCE_MAX_INPUT_BYTES = 50 * 1024 * 1024;
+export const LARGE_SOURCE_TARGET_BYTES = Math.min(WORKER_LARGE_SOURCE_MAX_BYTES, CDR_LARGE_SOURCE_MAX_INPUT_BYTES);
+
 /**
  * The worker's stored `ocr.json` bound for an 80-page source (`src/ocr.ts` STAGE_0_OCR_BOUNDS
  * persistedBytes), and the compile's read bound with it (#189). Every other stage's bound is this
