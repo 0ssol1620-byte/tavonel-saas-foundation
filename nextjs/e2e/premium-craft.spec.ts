@@ -183,7 +183,7 @@ test("the Home first screen puts actions before its four-cut hero film and sourc
   const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="hero-compile-tabs"]');
   await expect(film.getByRole("tab")).toHaveText(["Extract", "Link", "Update", "Use"]);
   // FINAL-SPEC 2026-10-26 D-9: the disclosure stays; its wording is the redesign's.
-  await expect(film.locator("figcaption")).toHaveText("Illustrative demo · not customer results.");
+  await expect(film.locator("figcaption")).toHaveText("Product walkthrough on sample files");
   const measure = async () => page.evaluate(() => {
     const rect = (selector: string) => { const element = document.querySelector(selector); if (!element) throw Error("Missing Home element: " + selector); return element.getBoundingClientRect().toJSON(); };
     const banner = document.querySelector('[data-marketing-consent-panel]');

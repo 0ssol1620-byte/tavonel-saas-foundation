@@ -870,15 +870,17 @@ describe("landing v2 -- the lead and the workbench", () => {
     for (const tab of tabs) expect(attr(tab, "aria-controls")).toBe(attr(panel, "id"));
     expect(hero).not.toContain('data-testid="landing-hero-film"');
     expect(hero).not.toContain('data-source-inspection-film');
-    // The not-customer-results disclosure stays (FINAL-SPEC D-9 shortens its wording only), on both films.
-    expect(readable(hero)).toContain(locale === "ko" ? "고객 결과가 아닙니다" : "not customer results");
+    // Founder 2026-11-10: each film is labelled by what it is, a walkthrough on sample files; the old negation is gone.
+    expect(readable(hero)).toContain(locale === "ko" ? "샘플 파일로 보는 제품 흐름" : "Product walkthrough on sample files");
+    expect(readable(hero)).not.toContain(locale === "ko" ? "고객 결과가 아닙니다" : "not customer results");
     // The recorded walkthrough moved below the fold, unchanged: compact at every width, the pane waits for Focus details.
     const walkthrough = walkthroughOf(main);
     expect(walkthrough).toContain('data-testid="landing-hero-film"');
     expect(walkthrough).toContain('data-mobile-view="fit"');
     expect(walkthrough).toContain('data-wide-view="fit"');
     expect(walkthrough).not.toContain("/film/poster-r3-c1-t10.40-pane1-848x1060.avif");
-    expect(readable(walkthrough)).toContain(locale === "ko" ? "고객 결과가 아닙니다" : "not customer results");
+    expect(readable(walkthrough)).toContain(locale === "ko" ? "샘플 파일로 보는 제품 흐름" : "Product walkthrough on sample files");
+    expect(readable(walkthrough)).not.toContain(locale === "ko" ? "고객 결과가 아닙니다" : "not customer results");
     expect(main.indexOf('id="walkthrough"')).toBeGreaterThan(main.indexOf("data-home-measures"));
     expect(main.indexOf('id="walkthrough"')).toBeLessThan(main.indexOf('<section id="s2"'));
     expect(sceneOf(main, "s2")).not.toContain('data-testid="landing-hero-film"');

@@ -131,7 +131,7 @@ test("the actual sample package remains readable and keyboard usable at narrow w
       await proofPage.keyboard.press("Enter");
       await expect(integrity).toHaveAttribute("open", "");
       await expect(integrity).toContainText("they do not verify a signature");
-      await expect(integrity).toContainText("not a customer compile or an activated customer World");
+      await expect(integrity).toContainText("A public sample compiled by the TypeScript sample engine.");
       await expect(integrity).toContainText("Reference render");
       await expect(integrity).toContainText("rather than an original SEC PDF");
       await expect(integrity).toContainText("tavonel-collection-compiler-ts-v1/explore-sample");

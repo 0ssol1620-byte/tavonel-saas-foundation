@@ -113,7 +113,8 @@ describe("public emitted-package proof", () => {
     expect(markup).toContain(runtime);
     expect(markup).toContain("external_signer_required");
     expect(markup).toContain("they do not verify a signature");
-    expect(markup).toContain("not a customer compile or an activated customer World");
+    expect(markup).toContain("A public sample compiled by the TypeScript sample engine.");
+    expect(markup).not.toContain("not a customer compile");
     expect(markup).not.toContain("/reproducibility/sample-world");
     expect(markup).not.toContain("signature verified");
     const page = readFileSync(new URL("../app/product/compiled-world/page.tsx", import.meta.url), "utf8");

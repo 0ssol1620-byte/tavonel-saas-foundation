@@ -60,7 +60,7 @@ export default function ExploreFrame({ caption }: { caption: string }) {
       <p className={styles.note}>
         Compiled from Apple&apos;s public SEC filings, so every result can be re-derived. One
         issuer&apos;s clean, English-language filings at a single permission level show the
-        mechanism; they are not a claim about a mixed internal corpus or a degraded scan. What
+        mechanism. What
         this read recovers, and what it does not, is in the{" "}
         <Link href="/sources">capability manifest</Link>.
       </p>

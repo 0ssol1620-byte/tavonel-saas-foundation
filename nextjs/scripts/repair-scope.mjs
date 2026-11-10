@@ -3036,6 +3036,9 @@ export const TRIAL_TO_PAID_AFFECTED_PATHS = Object.freeze(['app/api/collections/
 export const TRIAL_TO_PAID_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/billing-lifecycle.spec.ts']);
 export const TRIAL_TO_PAID_AFFECTED_UNIT_FILES = Object.freeze(['lib/activation-cohorts.test.ts', 'lib/activation-rate-limit.test.ts', 'lib/brand-copy.test.ts', 'lib/client-route-weight.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/cookbook-content.test.ts', 'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/funnel-events.test.ts', 'lib/keyword-map.test.ts', 'lib/marketing-analytics.test.ts', 'lib/model-attempt-receipt.test.ts', 'lib/openapi-response-shape.switch-off.test.ts', 'lib/openapi-response-shape.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/public-copy-purge.test.ts', 'lib/recipe-intent.test.ts', 'lib/remote-mcp.test.ts', 'lib/resources-hub.test.ts', 'lib/retrieval-compile-wiring.test.ts', 'lib/retrieval-search-authorization.test.ts', 'lib/seo-surface.test.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/trial-ai-access.test.ts', 'lib/world-activation-plan-gate.test.ts', 'lib/world-promotion-current-source.test.ts']);
 export const LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-provisions.test.ts']);
+// trust-copy-20261110: the two direct suites whose sample-disclaimer assertions moved to the positive label; each selects itself.
+export const TRUST_COPY_AFFECTED_PATHS = Object.freeze(['lib/explore-frame.test.ts', 'lib/public-package-proof.test.ts']);
+export const TRUST_COPY_AFFECTED_UNIT_FILES = Object.freeze(['lib/explore-frame.test.ts', 'lib/public-package-proof.test.ts']);
 // sli-alert-noise-20261109: the probe-history reader signs at the real clock; the two SLI routes stop passing an evaluation instant to it.
 export const SLI_ALERT_NOISE_AFFECTED_PATHS = Object.freeze(['app/api/internal/sli/route.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe-store.ts']);
 export const SLI_ALERT_NOISE_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error-codes.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-read-route.test.ts', 'lib/operational-sli.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe.test.ts']);
@@ -3305,6 +3308,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // revoke-not-plan-gated-20261110: 3 exact paths select 6 direct suites and no browser suite.
   affectedGroup('revoke-not-plan-gated-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS)})$`),
     { unitFiles: REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES }),
+  // trust-copy-20261110: 2 exact paths select 2 direct suites and no browser suite.
+  affectedGroup('trust-copy-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(TRUST_COPY_AFFECTED_PATHS)})$`),
+    { unitFiles: TRUST_COPY_AFFECTED_UNIT_FILES }),
   // sli-alert-noise-20261109: 3 exact paths select 10 direct suites and no browser suite.
   affectedGroup('sli-alert-noise-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(SLI_ALERT_NOISE_AFFECTED_PATHS)})$`),
     { unitFiles: SLI_ALERT_NOISE_AFFECTED_UNIT_FILES }),

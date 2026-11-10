@@ -36,7 +36,7 @@ export default function SolutionWorkflowProof({ kind, pick }: { kind: WorkflowKi
           <pre tabIndex={0} aria-labelledby="solution-preview-label" data-workflow-preview={preview.path}>
             <code>{preview.content}</code>
           </pre>
-          {kind === "knowledge-graph" && <p>This row binds evidence at document level. It shows the export’s shape, without establishing that this passage supports the relation’s meaning or qualifying identity resolution.</p>}
+          {kind === "knowledge-graph" && <p>This row binds evidence at document level and shows the export’s shape.</p>}
           <Link href="/product/compiled-world#public-package-proof">Inspect the full sample package</Link>
         </div>
       )}
@@ -48,11 +48,10 @@ export default function SolutionWorkflowProof({ kind, pick }: { kind: WorkflowKi
             <div><dt>Read representation</dt><dd>{document.representationKind === "original" ? "Original PDF" : "Reference-render PDF"}</dd></div>
           </dl>
           <Link href={`/${document.href.replace(/^\/+/, "")}#page=${region.page}` as Route}>Open the read PDF at this page</Link>
-          <p>This printed-region sample does not establish degraded-scan accuracy or recovered table grids.</p>
         </div>
       )}
       {kind === "source-grounded-assistants" && (
-        <p className={styles.proofContext}>The passage above is one of the retriever’s actual matches for this curated question. Open its locator and judge the answer relevance; a returned citation alone does not establish open-ended retrieval accuracy.</p>
+        <p className={styles.proofContext}>The passage above is one of the retriever’s actual matches for this curated question. Open its locator to judge the answer’s relevance yourself.</p>
       )}
       {kind === "knowledge-operations" && (
         <div className={styles.locator}>
@@ -61,13 +60,12 @@ export default function SolutionWorkflowProof({ kind, pick }: { kind: WorkflowKi
             <div><dt>Candidate promotion</dt><dd>{String(exploreSampleArtifact.candidatePromotion)}</dd></div>
             <div><dt>validation/report.json</dt><dd>{validation.status}</dd></div>
           </dl>
-          <p>“Passed” reports artifact validation. This public candidate has not been activated and is not a production activation receipt.</p>
+          <p>“Passed” reports artifact validation of this public candidate.</p>
           <Link href="/product/continuous-knowledge">Inspect the review and activation contract</Link>
         </div>
       )}
       <p className={styles.sampleQualifier}>
-        Five Apple filings, compiled by this repository’s TypeScript sample compiler. These are
-        mechanics demonstrations, not customer engagements or domain-accuracy results.
+        Five public Apple filings, compiled with the TypeScript sample compiler.
       </p>
     </section>
   );

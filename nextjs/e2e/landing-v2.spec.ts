@@ -214,7 +214,7 @@ test("four-stage video stays static with reduced motion until explicit play and 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/"); const film = await visibleFilm(page);
   await expect(film.locator("video")).toHaveCount(0);
-  await expect(film).toContainText("Illustrative demo · not customer results.");
+  await expect(film).toContainText("Product walkthrough on sample files");
   await film.getByRole("button", { name: "Play the compilation film", exact: true }).click();
   const video = film.locator("video");
   await expect(video).toBeVisible();

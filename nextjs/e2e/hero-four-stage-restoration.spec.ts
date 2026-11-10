@@ -37,7 +37,7 @@ test("the title leads directly into the hero film, and four selectable and playi
   await expect(page.locator('#s1 [data-source-inspection-film]')).toHaveCount(0);
   await expect(page.locator('#s2 [data-testid="landing-hero-film"]')).toHaveCount(0);
   // FINAL-SPEC 2026-10-26 D-9: the disclosure's wording (S class: the notice stays, its words are a design choice).
-  await expect(film.locator("figcaption")).toHaveText("Illustrative demo · not customer results.");
+  await expect(film.locator("figcaption")).toHaveText("Product walkthrough on sample files");
   const sequence = film.locator(".compile-film-sequence");
   // Founder ask 2026-10-27 ("영상은 축소상태가 디폴트여야"): Home opens compact at every width -- the whole frame --
   // over FINAL-SPEC 2026-10-26 §2.1's Focus and Release 3's desktop crop (R3-D1). Focus details expands it.
