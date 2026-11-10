@@ -1985,6 +1985,10 @@ export const SWITCH_ON_BILLING_INTEGRITY_AFFECTED_UNIT_FILES = Object.freeze([
 // the five that read the changed files: benchmark-registry, brand-copy, copy-trust-guard and trust-page-answers read the page
 // source, and model-arena-artifact-builder imports the pinned digest from the page data. No browser suite of its own.
 // Product code, so never nativeReuse.
+// 2026-11-10 public-copy cleanup (PR #224): the /research/notes share card joins this owner. The public-copy purge suite is
+// owned by conversion-public (GA) and is selected here as a direct suite, with og-card-frame and seo-surface.
+// Later on 2026-11-10 the Model Arena board, its artifact, builder, chart component and suites were deleted (the repository
+// is public). The deleted paths stay owned here so the deletion is a mapped change, and their two suites leave every list.
 // E1 ask-quality eval harness (codex/w1-e1-20261104, PR #188): the fourteen endpoints no owner listed -- the eval index README,
 // the harness's prereg (v2 and the preserved v1), question sets, generator, scorer, runner, live adapter, README and git
 // attribute files. Its one direct suite is the harness's own metrics.test.ts (in the default Vitest include). Nothing under
@@ -1999,11 +2003,13 @@ export const ASK_QUALITY_EVAL_AFFECTED_PATHS = Object.freeze([
 ]);
 export const ASK_QUALITY_EVAL_AFFECTED_UNIT_FILES = Object.freeze(['eval/ask-quality/metrics.test.ts']);
 export const BENCHMARKS_PATH_MASK_AFFECTED_PATHS = Object.freeze([
-  'app/benchmarks/page.tsx', 'lib/benchmarks-page.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts',
+  'app/arena/opengraph-image.tsx', 'app/benchmarks/page.tsx', 'app/research/notes/opengraph-image.tsx', 'content/benchmarks/model-arena-20260903.json',
+  'lib/benchmarks-page.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/model-arena-page-data.ts',
+  'scripts/benchmarks/build-model-arena-artifact.mjs',
 ]);
 export const BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts',
-  'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts', 'lib/trust-page-answers.test.ts',
+  'lib/og-card-frame.test.ts', 'lib/public-copy-purge.test.ts', 'lib/seo-surface.test.ts', 'lib/trust-page-answers.test.ts',
 ]);
 // PR #141's merge of main bcba7173 (Home Release 3, PR #150): the thirty changed endpoints no owner listed -- the Home and
 // Korean entry pages, the receipted measurement band (component, styles, data, its claims pack and suite, its receipt and research
@@ -2254,6 +2260,11 @@ export const SITE_POLISH_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/benchmarks
 // legal-semicolons-status-20261109: the /status operating-record spec, which pins the billing sentence.
 export const LEGAL_SEMICOLONS_STATUS_AFFECTED_PATHS = Object.freeze(['e2e/operations.spec.ts']);
 export const LEGAL_SEMICOLONS_STATUS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/operations.spec.ts']);
+// overlap-audit-20261110: the text/edge/fixed-bar collision audit over every sitemap route (founder report 2026-11-10) and its
+// in-page measurement. Browser-only: the measurement has no unit twin, and the spec runs once in the audit project, walking
+// its seven widths from the inside like overflow-audit.
+export const OVERLAP_AUDIT_AFFECTED_PATHS = Object.freeze(['e2e/overlap-audit.spec.ts', 'e2e/support/overlap.ts']);
+export const OVERLAP_AUDIT_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/overlap-audit.spec.ts']);
 // Packet delivery (codex/packet-delivery-textlayer-20261102): the delivery format an AI reads the compiled context in. The
 // download route and the two guidance modules that write the delivery/ files and point AGENTS.md at them, the package verifier
 // and its scripts/ copy that admit the delivery root, the delivery suite and the two parity suites whose MCP surface now reads
@@ -2629,7 +2640,7 @@ export const ENABLEMENT_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/benchmark-registry.test.ts', 'lib/benchmarks-page.test.ts', 'lib/brand-copy.test.ts', 'lib/brand-tokens.test.ts', 'lib/changelog.test.ts',
   'lib/cookbook-content.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/design-tokens.test.ts', 'lib/developer-snippets.test.ts',
   'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/guide-content.test.ts', 'lib/keyless-read.test.ts',
-  'lib/keyless-try-it.test.ts', 'lib/model-arena-artifact-builder.test.ts', 'lib/model-arena-page-data.test.ts',
+  'lib/keyless-try-it.test.ts',
   'lib/product-claims-sync.test.ts', 'lib/resources-hub.test.ts', 'lib/seo-surface.test.ts', 'lib/site-nav-model.test.ts', 'lib/trust-page-answers.test.ts',
 ]);
 // Phase 4 follow-ups (DELTA-REVIEW-2026-10-19 N-3): the browser suites that read this owner's pages. A change to only
@@ -3003,6 +3014,11 @@ export const W2_D_INTAKE_STAGE1_AFFECTED_PATHS = Object.freeze([
   'quarantine-sidecar/cdr-cloudrun/tests/test_table_dpi_arena.py',
 ]);
 export const W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES = Object.freeze(['lib/intake-ceiling-cross-tree.test.ts', 'lib/processing-ceiling-stage1.test.ts']);
+// Large-source intake copy (codex/large-source-segmentation-20261110, ADR-0006): the drop box's limits notice, which now states
+// the per-source ceiling, and its suite. The notice is rendered by the workspace, whose suite pins the call. Product copy, so
+// never nativeReuse. No browser, database or worker lane.
+export const LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS = Object.freeze(['nextjs/lib/compile-limits.test.ts', 'nextjs/lib/compile-limits.ts', 'nextjs/lib/page-count.test.ts', 'nextjs/lib/page-count.ts']);
+export const LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES = Object.freeze(['lib/compile-limits.test.ts', 'lib/intake-approval-rollout-off.test.ts', 'lib/page-count.test.ts', 'lib/workspace-existing-compile.test.ts']);
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
 // ops-backlog-sli-20261110 (GA ops gap 4): the B35 evaluator gains a compile backlog age. Its own suite and both routes that call it.
@@ -3029,6 +3045,13 @@ export const SLI_ALERT_NOISE_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error
 export const HERO_COMPILE_TABS_AFFECTED_PATHS = Object.freeze(['components/landing-v2/hero-compile-tabs.module.css', 'components/landing-v2/hero-compile-tabs.tsx', 'components/opening-film-2.tsx', 'components/opening-film-3.tsx', 'components/opening-film-4.tsx', 'components/opening-film.tsx', 'lib/film-tone.ts', 'public/film/hero-tab-1-2x.avif', 'public/film/hero-tab-1-2x.webp', 'public/film/hero-tab-1.avif', 'public/film/hero-tab-1.mp4', 'public/film/hero-tab-1.webp', 'public/film/hero-tab-2-2x.avif', 'public/film/hero-tab-2-2x.webp', 'public/film/hero-tab-2.avif', 'public/film/hero-tab-2.mp4', 'public/film/hero-tab-2.webp', 'public/film/hero-tab-3-2x.avif', 'public/film/hero-tab-3-2x.webp', 'public/film/hero-tab-3.avif', 'public/film/hero-tab-3.mp4', 'public/film/hero-tab-3.webp', 'public/film/hero-tab-4-2x.avif', 'public/film/hero-tab-4-2x.webp', 'public/film/hero-tab-4.avif', 'public/film/hero-tab-4.mp4', 'public/film/hero-tab-4.webp', 'scripts/film/capture-film-2-tone.mjs', 'scripts/film/hero-tabs.mjs']);
 export const HERO_COMPILE_TABS_AFFECTED_UNIT_FILES = Object.freeze(['components/compile-stage-player.mobile-view.test.tsx', 'lib/brand-copy.test.ts', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts', 'lib/opening-film.test.ts']);
 export const HERO_COMPILE_TABS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/hero-four-stage-restoration.spec.ts', 'e2e/hero-home-responsive.spec.ts', 'e2e/landing-hero-film-loading.spec.ts', 'e2e/landing-v2.spec.ts']);
+// connectors-developer-20261110: storage connections move from Team to both paid plans; the panel shows plan availability before the click.
+export const CONNECTORS_DEVELOPER_AFFECTED_PATHS = Object.freeze(['app/api/connections/route.ts', 'app/api/v1/oauth-connectors/authorize/route.ts', 'components/connections-panel.tsx', 'e2e/connection-sync-status.spec.ts']);
+export const CONNECTORS_DEVELOPER_AFFECTED_UNIT_FILES = Object.freeze(['lib/billing-product-access.test.ts', 'lib/connection-sync-lag.test.ts', 'lib/connector-contract.test.ts', 'lib/connector-oauth-route.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/plan-entitlement.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts']);
+export const CONNECTORS_DEVELOPER_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/connection-sync-status.spec.ts']);
+// revoke-not-plan-gated-20261110: the three revocation routes ask for membership and scope, never the plan ("Never let an ACL revoke wait").
+export const REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS = Object.freeze(['app/api/connections/[id]/route.ts', 'app/api/v1/oauth-connectors/connections/[id]/route.ts', 'lib/connection-revoke-not-plan-gated.test.ts']);
+export const REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES = Object.freeze(['lib/connection-revoke-not-plan-gated.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/google-drive-viewer-link-off.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts']);
 export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('public-marketing-surface', new RegExp(`^(?:${exactPathAlternation(PUBLIC_MARKETING_AFFECTED_PATHS)})$`),
     { unitFiles: PUBLIC_MARKETING_AFFECTED_UNIT_FILES, browserFiles: PUBLIC_MARKETING_AFFECTED_BROWSER_FILES }),
@@ -3135,7 +3158,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // paper-product.css route ownership: the two exact components above select three direct suites and the Explore and Pricing suites.
   affectedGroup('paper-product-route-css', new RegExp(`^nextjs/(?:${exactPathAlternation(PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS)})$`),
     { unitFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, browserFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES }),
-  // Enablement batch: the fifty-three exact paths above select twenty-one direct suites and four browser suites (Phase 4, N-3).
+  // Enablement batch: the fifty-three exact paths above select nineteen direct suites and four browser suites (Phase 4, N-3).
   // The /benchmarks path mask left this owner when PR #157 brought the same change to main under benchmarks-path-mask.
   affectedGroup('enablement-20261017', new RegExp(`^nextjs/(?:${exactPathAlternation(ENABLEMENT_AFFECTED_PATHS)})$`),
     { unitFiles: ENABLEMENT_AFFECTED_UNIT_FILES, browserFiles: ENABLEMENT_AFFECTED_BROWSER_FILES }),
@@ -3193,6 +3216,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // legal-semicolons-status-20261109: 1 exact path selects no direct suite and 1 browser suite.
   affectedGroup('legal-semicolons-status-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(LEGAL_SEMICOLONS_STATUS_AFFECTED_PATHS)})$`),
     { unitFiles: [], browserFiles: LEGAL_SEMICOLONS_STATUS_AFFECTED_BROWSER_FILES }),
+  // overlap-audit-20261110: 2 exact paths select no direct suite and 1 browser suite.
+  affectedGroup('overlap-audit-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(OVERLAP_AUDIT_AFFECTED_PATHS)})$`),
+    { unitFiles: [], browserFiles: OVERLAP_AUDIT_AFFECTED_BROWSER_FILES }),
   // library-dedup-b1: the 2 exact paths above select 2 direct suites and no browser suite.
   affectedGroup('library-dedup-b1', new RegExp(`^nextjs/(?:${exactPathAlternation(LIBRARY_DEDUP_AFFECTED_PATHS)})$`),
     { unitFiles: LIBRARY_DEDUP_AFFECTED_UNIT_FILES }),
@@ -3251,7 +3277,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // suite against the digest-pinned clamd and inside the service image built from the checkout, and which affectedPlan defers as pending debt.
   // ADR-2026-11-02 (text-layer-first CDR) adds the text-layer module and its suite, the request boundary that now also gates
   // /v1/text-layer, and the Dockerfile, service.yaml and README that ship and describe them; malware-scan-qualification runs them all.
-  affectedGroup('cdr-cloudrun-service', /^quarantine-sidecar\/cdr-cloudrun\/(?:app\.py|request_boundary\.py|text_layer\.py|measure_limits\.py|Dockerfile|service\.yaml|README\.md|tests\/test_(?:app|text_layer|measurement_limits|measure_limits|service_definition)\.py)$/),
+  affectedGroup('cdr-cloudrun-service', /^quarantine-sidecar\/cdr-cloudrun\/(?:app\.py|request_boundary\.py|text_layer\.py|measure_limits\.py|Dockerfile|service\.yaml|README\.md|tests\/test_(?:app|text_layer|measurement_limits|measure_limits|page_ranges|service_definition)\.py)$/),
   affectedGroup('dropbox-connector', /^nextjs\/lib\/(?:dropbox-[a-z-]+|connector-(?:oauth-adapters|page-integrity|provider-isolation|source-identity|sync-page|replay-world-currency-migration)|sync-worker|source-import|source-version-guard)(?:\.test)?\.ts$/,
     { unitFiles: ['lib/dropbox-source-reconciliation.test.ts', 'lib/connector-oauth-adapters.test.ts', 'lib/sync-worker.test.ts', 'lib/source-import.test.ts',
       'lib/connector-page-integrity.test.ts', 'lib/connector-sync-page.test.ts', 'lib/connector-provider-isolation.test.ts', 'lib/connector-source-identity.test.ts',
@@ -3273,6 +3299,12 @@ export const AFFECTED_GROUPS = Object.freeze([
   // trial-to-paid-20261109: 7 exact paths select 27 direct suites and the one browser suite it edits.
   affectedGroup('trial-to-paid-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(TRIAL_TO_PAID_AFFECTED_PATHS)})$`),
     { unitFiles: TRIAL_TO_PAID_AFFECTED_UNIT_FILES, browserFiles: TRIAL_TO_PAID_AFFECTED_BROWSER_FILES }),
+  // connectors-developer-20261110: 4 exact paths select 9 direct suites and one browser suite.
+  affectedGroup('connectors-developer-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(CONNECTORS_DEVELOPER_AFFECTED_PATHS)})$`),
+    { unitFiles: CONNECTORS_DEVELOPER_AFFECTED_UNIT_FILES, browserFiles: CONNECTORS_DEVELOPER_AFFECTED_BROWSER_FILES }),
+  // revoke-not-plan-gated-20261110: 3 exact paths select 6 direct suites and no browser suite.
+  affectedGroup('revoke-not-plan-gated-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS)})$`),
+    { unitFiles: REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES }),
   // sli-alert-noise-20261109: 3 exact paths select 10 direct suites and no browser suite.
   affectedGroup('sli-alert-noise-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(SLI_ALERT_NOISE_AFFECTED_PATHS)})$`),
     { unitFiles: SLI_ALERT_NOISE_AFFECTED_UNIT_FILES }),
@@ -3298,6 +3330,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // w2-d-intake-stage1 (W2-D): the 3 exact repo-relative paths above select 2 direct suites and no browser suite.
   affectedGroup('w2-d-intake-stage1', new RegExp(`^(?:${exactPathAlternation(W2_D_INTAKE_STAGE1_AFFECTED_PATHS)})$`),
     { unitFiles: W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES }),
+  // large-source-intake-copy (ADR-0006): the 4 exact paths above select 4 direct suites and no browser suite.
+  affectedGroup('large-source-intake-copy', new RegExp(`^(?:${exactPathAlternation(LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS)})$`),
+    { unitFiles: LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES }),
 ]);const regularModes = ['100644', '100755'];
 
 export function parseAffectedRawDiff(output) {

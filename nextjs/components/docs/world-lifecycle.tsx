@@ -37,61 +37,124 @@ const STEPS: ReadonlyArray<readonly [string, string, string]> = [
 */
 const TRANSITIONS = ["compile", "activate", "read back"];
 
-export function WorldLifecycle() {
+/*
+  The gap between two boxes is derived from the longest edge label, not the other way round.
+
+  With a fixed 64-unit gap the verbs still did not fit: "read back" draws about 70 units and
+  "activate" 62, centred over that gap, so their ends sat on the borders of the boxes on either
+  side (founder report 2026-11-10; e2e/overlap-audit.spec.ts measures it). A label's width is its
+  character count times the mono advance plus the `.edge` letter-spacing, both set in
+  world-lifecycle.module.css; LABEL_CLEARANCE is the space kept between a label's end and a box.
+  The boxes take what is left: 108 units, where the longest name, "Candidate", draws about 70.
+*/
+const EDGE_FONT_SIZE = 12;
+const EDGE_ADVANCE = EDGE_FONT_SIZE * (0.6 + 0.06);
+const LABEL_CLEARANCE = 12;
+
+const DESCRIPTION = "Four states in sequence: Source, then Candidate after a compile, then Active after a person activates it, then Evidence read back from the active version. The list below gives the same sequence in words.";
+
+/*
+  Two drawings of the same sequence, one shown at a time (world-lifecycle.module.css).
+
+  The row needs about 520px to stay legible, so below 620px it used to scroll sideways inside the
+  figure -- and the figure was the scroll container, so the definitions list under it was laid out
+  at the row's 520px too and every line ran off the right edge of a phone. On a phone the states
+  are stacked instead: each verb sits beside the arrow it labels, in a lane to the right of the
+  arrow rather than across it, and nothing scrolls.
+*/
+function Row() {
   const width = 720;
-  const boxWidth = 132;
-  const gap = (width - boxWidth * 4) / 3;
+  const gap = Math.ceil(Math.max(...TRANSITIONS.map(label => label.length)) * EDGE_ADVANCE) + LABEL_CLEARANCE * 2;
+  const boxWidth = (width - gap * 3) / 4;
+  return (
+    <svg
+      viewBox={`0 0 ${width} 132`}
+      className={`${styles.svg} ${styles.row}`}
+      role="img"
+      aria-labelledby="world-lifecycle-title world-lifecycle-desc"
+      preserveAspectRatio="xMidYMid meet"
+    >
+      <title id="world-lifecycle-title">The life of a Compiled World</title>
+      <desc id="world-lifecycle-desc">{DESCRIPTION}</desc>
+      {STEPS.map(([name], index) => {
+        const x = index * (boxWidth + gap);
+        return (
+          <g key={name}>
+            <rect x={x} y={28} width={boxWidth} height={54} rx={3} className={styles.box} />
+            {/*
+              One word per box.
+
+              The gloss was printed under the name at 9.5px -- under the type floor, and about
+              190 user units of text inside a 132-unit box, so it ran out of both sides of the
+              rectangle it was describing. It is in the list below, in full and at a size a
+              reader can read, which is the only place it was ever legible.
+            */}
+            <text x={x + boxWidth / 2} y={60} textAnchor="middle" className={styles.name}>{name}</text>
+            {index < STEPS.length - 1 ? (
+              <>
+                <line x1={x + boxWidth + 6} y1={55} x2={x + boxWidth + gap - 10} y2={55} className={styles.arrow} />
+                <polygon
+                  points={`${x + boxWidth + gap - 10},55 ${x + boxWidth + gap - 17},51 ${x + boxWidth + gap - 17},59`}
+                  className={styles.head}
+                />
+                <text x={x + boxWidth + gap / 2} y={44} textAnchor="middle" className={styles.edge}>
+                  {TRANSITIONS[index]}
+                </text>
+              </>
+            ) : null}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function Column() {
+  const width = 300;
+  const boxWidth = 150;
+  const boxHeight = 44;
+  const gap = 40;
+  const x = 16;
+  const arrowX = x + boxWidth / 2;
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${STEPS.length * boxHeight + (STEPS.length - 1) * gap + 2}`}
+      className={`${styles.svg} ${styles.column}`}
+      role="img"
+      aria-labelledby="world-lifecycle-column-title world-lifecycle-column-desc"
+      preserveAspectRatio="xMinYMin meet"
+    >
+      <title id="world-lifecycle-column-title">The life of a Compiled World</title>
+      <desc id="world-lifecycle-column-desc">{DESCRIPTION}</desc>
+      {STEPS.map(([name], index) => {
+        const y = 1 + index * (boxHeight + gap);
+        const arrowTop = y + boxHeight + 5;
+        const arrowBottom = y + boxHeight + gap - 6;
+        return (
+          <g key={name}>
+            <rect x={x} y={y} width={boxWidth} height={boxHeight} rx={3} className={styles.box} />
+            <text x={arrowX} y={y + boxHeight / 2 + 4.5} textAnchor="middle" className={styles.name}>{name}</text>
+            {index < STEPS.length - 1 ? (
+              <>
+                <line x1={arrowX} y1={arrowTop} x2={arrowX} y2={arrowBottom} className={styles.arrow} />
+                <polygon points={`${arrowX},${arrowBottom} ${arrowX - 4},${arrowBottom - 7} ${arrowX + 4},${arrowBottom - 7}`} className={styles.head} />
+                <text x={arrowX + LABEL_CLEARANCE} y={(arrowTop + arrowBottom) / 2 + 4} className={styles.edge}>
+                  {TRANSITIONS[index]}
+                </text>
+              </>
+            ) : null}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+export function WorldLifecycle() {
   return (
     <figure className={styles.figure} tabIndex={0} role="group" aria-label="Compiled World lifecycle diagram and definitions">
-      <svg
-        viewBox={`0 0 ${width} 132`}
-        className={styles.svg}
-        role="img"
-        aria-labelledby="world-lifecycle-title world-lifecycle-desc"
-        preserveAspectRatio="xMidYMid meet"
-      >
-        <title id="world-lifecycle-title">The life of a Compiled World</title>
-        <desc id="world-lifecycle-desc">
-          Four states in sequence: Source, then Candidate after a compile, then Active after a
-          person activates it, then Evidence read back from the active version. The list below
-          gives the same sequence in words.
-        </desc>
-        {STEPS.map(([name], index) => {
-          const x = index * (boxWidth + gap);
-          return (
-            <g key={name}>
-              <rect x={x} y={28} width={boxWidth} height={54} rx={3} className={styles.box} />
-              {/*
-                One word per box.
-
-                The gloss was printed under the name at 9.5px -- under the type floor, and about
-                190 user units of text inside a 132-unit box, so it ran out of both sides of the
-                rectangle it was describing. It is in the list below, in full and at a size a
-                reader can read, which is the only place it was ever legible.
-              */}
-              <text x={x + boxWidth / 2} y={60} textAnchor="middle" className={styles.name}>{name}</text>
-              {index < STEPS.length - 1 ? (
-                <>
-                  <line
-                    x1={x + boxWidth + 6}
-                    y1={55}
-                    x2={x + boxWidth + gap - 10}
-                    y2={55}
-                    className={styles.arrow}
-                  />
-                  <polygon
-                    points={`${x + boxWidth + gap - 10},55 ${x + boxWidth + gap - 17},51 ${x + boxWidth + gap - 17},59`}
-                    className={styles.head}
-                  />
-                  <text x={x + boxWidth + gap / 2} y={44} textAnchor="middle" className={styles.edge}>
-                    {TRANSITIONS[index]}
-                  </text>
-                </>
-              ) : null}
-            </g>
-          );
-        })}
-      </svg>
+      <Row />
+      <Column />
       <figcaption>
         <ol className={styles.list}>
           {STEPS.map(([name, gloss, detail]) => (

@@ -42,6 +42,11 @@
     "FOUNDATION_OCR_PAGE_RANGE_SIZE": "8"
   },
   "queues": {
+    // A segmented source (ADR-0006) continues as a new message on its own queue, so each range
+    // starts at attempt 1. Unused while FOUNDATION_SOURCE_SEGMENT_PAGES is unset.
+    "producers": [
+      { "binding": "FOUNDATION_SEGMENT_CONTINUATION", "queue": "foundation-quarantine-created" }
+    ],
     "consumers": [
       {
         "queue": "foundation-quarantine-created",

@@ -3,7 +3,7 @@ import { isIP } from "node:net";
 import { getFoundationAccountGrant, getFoundationSelfServiceTrial } from "./account-grants";
 import { previousBillingHmac } from "./billing-binding";
 import { billingSecret } from "./billing-secrets";
-import { billingProductDecision, type ProductAccessLevel } from "./billing-product-access";
+import { billingProductDecision, planReachesLevel, type ProductAccessLevel } from "./billing-product-access";
 import { getFoundationBillingAccount } from "./billing-store";
 import { readAccessMode } from "./foundation-pilot";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
@@ -84,10 +84,6 @@ function normalizeIpPrefix(request: Request, fallback: string) {
   return `${chunks.slice(0, 4).join(":")}::/56`;
 }
 
-function planAllows(accessPlan: "observer_access" | "studio_access", required: ProductAccessLevel) {
-  return required === "observer" || accessPlan === "studio_access";
-}
-
 export async function authorizeFoundationSessionProduct(
   workspaceKey: string,
   userId: string,
@@ -96,7 +92,7 @@ export async function authorizeFoundationSessionProduct(
   const grantResult = await getFoundationAccountGrant(userId);
   if (!grantResult.ok) return { ok: false as const, code: grantResult.code, status: 503 };
   if (grantResult.grant) {
-    if (!planAllows(grantResult.grant.accessPlan, required)) {
+    if (!planReachesLevel(grantResult.grant.accessPlan, required)) {
       return { ok: false as const, code: "STUDIO_SUBSCRIPTION_REQUIRED", status: 402 };
     }
     return {
@@ -130,6 +126,9 @@ export async function authorizeFoundationSessionProduct(
   const trial = trialResult.trial;
   if (trial?.status === "trialing" && Date.parse(trial.expiresAt) > Date.now()) {
     if (required === "studio") return { ok: false as const, code: "STUDIO_SUBSCRIPTION_REQUIRED", status: 402 };
+    // The free evaluation has no connector scope (trial-ai-access.ts). Same code the session
+    // path already answers a trial's `connections:*` scope with.
+    if (required === "connections") return { ok: false as const, code: "TRIAL_FEATURE_NOT_INCLUDED", status: 402 };
     return {
       ok: true as const,
       access: {

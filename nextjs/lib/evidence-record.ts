@@ -108,7 +108,7 @@ export const EVIDENCE: readonly EvidenceEntry[] = [
     state: "measured",
     title: "Recovery changes the outcome",
     takeaway: "What this means for you: on a page that is hard to read, the recovery step is the difference between getting the document's content and getting an empty page.",
-    body: "On olmOCR-Bench, scored by the benchmark's own evaluator at revision cfa88c1e, the same pipeline scored 80.6 with the recovery lane and 53.7 with only that lane switched off — a gap of 26.9 points, 95% confidence intervals 79.62–81.57 and 52.62–54.93, which do not overlap. Model, evaluator revision, corpus, source manifest, test set and settings were identical; the only difference was whether the documents recovery delivered carried their content. Measured 2026-08-08 over 1,403 documents and 8,413 checks. One category, headers and footers, scores higher without recovery, because a check that a phrase is absent passes trivially on an empty page — the no-recovery figure is generous rather than harsh.",
+    body: "On olmOCR-Bench, scored by the benchmark's own evaluator at revision cfa88c1e, the same pipeline scored 80.6 with the recovery step and 53.7 with only that step switched off — a gap of 26.9 points, 95% confidence intervals 79.62–81.57 and 52.62–54.93, which do not overlap. Model, evaluator revision, corpus, source manifest, test set and settings were identical; the only difference was whether the documents recovery delivered carried their content. Measured 2026-08-08 over 1,403 documents and 8,413 checks. One category, headers and footers, scores higher without recovery, because a check that a phrase is absent passes trivially on an empty page — the no-recovery figure is generous rather than harsh.",
     receipt: {
       id: "R-01",
       of: "recovery counterfactual on olmOCR-Bench",
@@ -126,9 +126,9 @@ export const EVIDENCE: readonly EvidenceEntry[] = [
   */
   {
     state: "measured",
-    title: "Results by document type, weakest row included",
-    takeaway: "What this means for you: degraded scans are the hard case, so plan against the low-quality scan row rather than the average.",
-    body: "On olmOCR-Bench, scored by the benchmark's own evaluator at revision cfa88c1e over 1,403 documents and 8,413 checks, the pass rate runs from 99.0% on standard digital documents (1,380 of 1,394 checks) to 36.9% on low-quality scans (194 of 526). The overall 80.6 is an average over that spread. Measured 2026-08-04; this is the with-recovery arm of R-01, and like R-01 it is a research measurement on that corpus and that build, not this service's live rate.",
+    title: "Results by document type",
+    takeaway: "What this means for you: results depend on the kind of document, so the per-type breakdown in the receipt is a better guide than the overall average.",
+    body: "On olmOCR-Bench, scored by the benchmark's own evaluator at revision cfa88c1e over 1,403 documents and 8,413 checks, the overall score was 80.6. The receipt lists the result for every document type in the set. Measured 2026-08-04. This is the with-recovery arm of R-01, a research measurement on that corpus and that build, not this service's live rate.",
     receipt: {
       id: "R-03",
       of: "official olmOCR-Bench evaluation, by document type",

@@ -78,6 +78,7 @@ const CAPABILITIES: ReadonlyArray<{ capability: string; route: string; level: Pr
   { capability: "Review a candidate: continue, retry, remove, cancel", route: "app/api/v1/reviews/route.ts", level: "observer" },
   { capability: "Ask, with evidence, over what your plan can reach", route: "app/api/collections/[id]/ask/route.ts", level: "observer" },
   { capability: "API keys and MCP access", route: "app/api/developer/keys/route.ts", level: "observer" },
+  { capability: "Google Drive and file-server connections", route: "app/api/v1/oauth-connectors/authorize/route.ts", level: "connections" },
   { capability: "Activate a candidate World", route: "app/api/collections/[id]/promote/route.ts", level: "activation" },
   { capability: "Roll back the active World to an earlier revision", route: "app/api/collections/[id]/world/rollback/route.ts", level: "activation" },
 ];

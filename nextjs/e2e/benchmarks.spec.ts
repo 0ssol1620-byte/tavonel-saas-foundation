@@ -55,7 +55,8 @@ test("publishes the compilation protocol and source-bound recovery without an un
   await expect(stated).toContainText("The qualification contract defines what a knowledge-compilation result has to carry");
   await expect(page.getByRole("heading", { name: "GDP.pdf evaluation design" })).toBeVisible();
   await expect(stated).toContainText("Fixed retrieval and adaptive routing remain unrun");
-  await expect(stated.getByRole("link", { name: /Read the two-arm run/ })).toHaveAttribute("href", "/benchmarks/gdp-pdf");
+  // 2026-11-10 (founder direction): intended re-pin. The GDP.pdf run page stays at its URL, noindex, and is no longer linked from here.
+  await expect(page.locator('main a[href="/benchmarks/gdp-pdf"]')).toHaveCount(0);
   for (const arm of ["Native PDF", "Compiled context", "Fixed retrieval", "Adaptive routing"]) {
     await expect(page.getByRole("heading", { name: arm, exact: true })).toBeVisible();
   }
@@ -63,42 +64,24 @@ test("publishes the compilation protocol and source-bound recovery without an un
   await expect(stated).not.toContainText("NO VALUE PUBLISHED");
   await expect(stated, "our operations vocabulary on a buyer's page").not.toContainText("this deployment");
   /*
-    Gap #2 (2026-09-22). The page now carries the Model Arena run we made ourselves and its two
-    receipt tables: the per-model receipts (revision, hardware, listed price snapshot) and the
-    campaign files with the sha256 of the bytes every figure was read from. Those are the only
-    tables allowed here. A results table for the compile protocol still waits on a qualified
-    record, and a table carrying a figure with no receipt is the thing this test exists against.
+    2026-11-10 public-copy cleanup (founder direction): intended re-pin. The internal
+    document-reader board and its receipt tables left the page, so no table renders until a
+    qualified record exists, and a table carrying a figure with no receipt is still the thing
+    this test exists against.
   */
-  const receiptTables = page.locator('table[class*="receipts"]');
-  expect(
-    await page.locator("table").count(),
-    "every table on /benchmarks is a receipt table",
-  ).toBe(await receiptTables.count());
-  await expect(receiptTables.last()).toContainText("sha256");
+  expect(await page.locator("table").count(), "no table renders without a qualified record").toBe(0);
 
   const body = (await page.locator("main").innerText()).replace(/\s+/g, " ");
   const recovery = page.locator('section[aria-labelledby="recovery-title"]');
   await expect(recovery).toContainText("80.6");
   await expect(recovery).toContainText("53.7");
   await expect(recovery).toContainText("1,403 documents and 8,413 checks");
-  await expect(recovery).toContainText("36.9% even with recovery");
+  await expect(recovery).not.toContainText("low-quality");
   await expect(recovery.getByRole("link", { name: /R-01 result and receipt/ })).toHaveAttribute("href", /R-01/);
-  expect(body.match(/\d+(?:\.\d+)?\s*%/g), "every public percentage needs a receipt and limitation").toEqual(["36.9%"]);
-  /*
-    OmniDocBench is the benchmark our own run was scored on, named beside its evaluator pin, so
-    it is no longer barred here. A vendor's published leaderboard row still is: a figure someone
-    else measured stays theirs.
-
-    The 2026-09-22 copy cleanup dropped the paragraph's closing narration -- the sentence that
-    announced no competitor row was placed beside these, on a page that carries none. What it
-    protected is pinned positively instead: the board states the scope of the scores, states that
-    every row is a run we made ourselves, and still names the evaluator revision the run was
-    scored at. The vendor-name sweep below is unchanged and is what actually keeps someone
-    else's figure off this page.
-  */
-  await expect(page.locator("main")).toContainText("evaluator revision");
-  await expect(page.locator("main")).toContainText("These scores measure page reading only");
-  await expect(page.locator("main")).toContainText("a model we ran ourselves");
+  expect(body.match(/\d+(?:\.\d+)?\s*%/g) ?? [], "no loose percentage outside a receipted record").toEqual([]);
+  for (const internal of ["Model Arena", "opus5_subscription", "ARENA_CONTRACT", "subscription surface", "Not supported", "scalar"]) {
+    expect(body, `${internal} is internal material`).not.toContain(internal);
+  }
   for (const vendor of ["Mistral", "Gemini", "GPT-", "Qwen"]) {
     expect(body, `${vendor} has no place on a page that publishes only our own run`).not.toContain(vendor);
   }

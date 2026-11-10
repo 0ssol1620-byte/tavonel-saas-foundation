@@ -46,12 +46,16 @@ async function evaluateAndPersist(request: Request) {
   const head = await readOpenCompileJobs(1);
   const compileBacklog = head.ok ? { ok: true as const, oldestWaitingSince: head.value[0]?.updatedAt ?? null } : { ok: false as const };
   const evaluation = evaluateOperationalSli(history, { now: windowStartedAt, modelProviderCircuits, compileBacklog });
-  const persisted = await persistOperationalSliAlert(evaluation, windowStartedAt);
+  // W1-A3: hourly RunPod daily-cost and daily release-row expiry checks ride the same slot. Their
+  // outcome is reported beside the SLI result and never changes its status code. They run before
+  // the record so their codes are stored with it: the hourly billing read leaves a durable receipt,
+  // not only this response. Codes only -- no spend, cap or delivery detail. Every check returns a
+  // code rather than throwing, so the record and the page below are never skipped.
+  const watch = await runScheduledOperationsChecks(windowStartedAt);
+  const recorded = { ...evaluation, watch: watch.map(({ check, code }) => ({ check, code })) };
+  const persisted = await persistOperationalSliAlert(recorded, windowStartedAt);
   // Sent even when the record failed: a database outage is exactly the breach that must page.
   const delivery = await deliverOperationalSliBreach(evaluation, windowStartedAt);
-  // W1-A3: hourly RunPod daily-cost and daily release-row expiry checks ride the same slot. Their
-  // outcome is reported beside the SLI result and never changes its status code.
-  const watch = await runScheduledOperationsChecks(windowStartedAt);
   if (!persisted.ok) {
     return NextResponse.json(
       { code: persisted.code, persisted: false, evaluation, delivery, watch },
