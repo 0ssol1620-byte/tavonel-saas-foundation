@@ -700,6 +700,8 @@ test.describe("simulated switch-on (browser mocks only)", () => {
   });
 
   test("Team is bought online: signed out it carries its offer into sign-in, signed in it opens the checkout", async ({ page }) => {
+    // The paid outcome runs the bounded billing wait, as the other paid journeys here do.
+    test.setTimeout(90_000);
     await declineAnalytics(page);
     await servePosture(page, "switch-on");
     await page.goto("/pricing");
