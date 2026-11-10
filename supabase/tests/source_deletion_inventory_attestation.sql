@@ -193,9 +193,9 @@ select throws_ok(
           'key', 'quarantine/pilot-del1/0d000000-0000-4000-8000-000000000001/part-' || n,
           'sha256', 'sha256:' || repeat('7', 64),
           'sizeBytes', 1))
-          from generate_series(1, 513) as n)) $$,
+          from generate_series(1, 16385) as n)) $$,
   'SOURCE_DELETION_INVENTORY_INVALID',
-  '513 objects is refused rather than truncated to the 512 the attestation can hold'
+  '16,385 objects is refused rather than truncated to the 16,384 the attestation can hold (20261110043000)'
 );
 
 -- An empty listing for a source that still has bound documents is a listing that did not happen,
