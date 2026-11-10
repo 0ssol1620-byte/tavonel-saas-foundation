@@ -165,8 +165,8 @@ test("a refused intake says why", async ({ page }) => {
 });
 
 test("a processing-ceiling refusal names the code and the limit", async ({ page }) => {
-  const limit = "TAVONEL processes sources up to 50 MB and 80 pages.";
-  const calls = await refuseIntake(page, "SOURCE_EXCEEDS_PROCESSING_CEILING", 413, { maxBytes: 52_428_800, maxPages: 80, limit });
+  const limit = "TAVONEL processes sources up to 5 MB and 80 pages.";
+  const calls = await refuseIntake(page, "SOURCE_EXCEEDS_PROCESSING_CEILING", 413, { maxBytes: 5_242_880, maxPages: 80, limit });
   const notice = page.locator("p.notice");
   await expect(notice).toContainText("0 of 1 files uploaded", { timeout: 10_000 });
   await expect(notice).toContainText("SOURCE_EXCEEDS_PROCESSING_CEILING");
@@ -209,8 +209,8 @@ test("a processing-ceiling refusal keeps the complete set out and leaves a retry
     The approval endpoint uses SOURCE_EXCEEDS_PROCESSING_CEILING (413) when a selected file is
     above the processor's supported byte/page ceiling. Keep this distinct from stale pricing.
   */
-  const limit = "TAVONEL processes sources up to 50 MB and 80 pages.";
-  const calls = await refuseApproval(page, "SOURCE_EXCEEDS_PROCESSING_CEILING", 413, { index: 0, maxBytes: 52_428_800, maxPages: 80, limit });
+  const limit = "TAVONEL processes sources up to 5 MB and 80 pages.";
+  const calls = await refuseApproval(page, "SOURCE_EXCEEDS_PROCESSING_CEILING", 413, { index: 0, maxBytes: 5_242_880, maxPages: 80, limit });
   const notice = page.locator("p.notice");
   await expect(notice).toContainText("This approval request for the complete set was rejected.", { timeout: 10_000 });
   await expect(notice).toContainText("Nothing was uploaded.");

@@ -321,6 +321,8 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
       { code: "INVALID_FILENAME", status: 400, meaning: "Same refusal from the intake validator.", whatToDo: "Send a plain filename." },
       { code: "SIGNER_NOT_CONFIGURED", status: 503, meaning: "The upload URL signer is not configured, so no capability can be issued.", whatToDo: "Nothing a caller can send. /api/status reports the deployment's state." },
       { code: "SOURCE_VERSION_AMBIGUOUS", status: 409, meaning: "Two source versions carry the same identity and the request did not say which.", whatToDo: "Name the version explicitly." },
+      { code: "PAGE_INVALID", status: 400, meaning: "The `page` parameter is not a whole page number from 1.", whatToDo: "Send the original page number a citation carries, or leave it out." },
+      { code: "SEGMENTED_SOURCE_READ_BY_RANGE", status: 409, meaning: "A source read in page ranges has one OCR reading per range, so there is no single reading to return for the whole source.", whatToDo: "Compile the source, or open its pages through `/source`; a range's reading is not returned as the whole document's." },
       { code: "SOURCE_NOT_QUALIFIED", meaning: "A connected source did not qualify for compilation.", whatToDo: "Check the source's format against `GET /capabilities`." },
       { code: "SOURCE_REVOKED", meaning: "The source's connection was revoked; its bytes are no longer reachable.", whatToDo: "Reconnect the source, or drop it from the set." },
       { code: "SOURCE_TOMBSTONED", meaning: "The source was deleted at origin and is recorded as gone rather than silently omitted.", whatToDo: "Remove it from the compile set." },

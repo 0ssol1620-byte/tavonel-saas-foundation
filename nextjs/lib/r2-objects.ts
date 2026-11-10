@@ -8,6 +8,7 @@ import {
   isKeyInsideWorkspacePrefix,
   isOcrReviewKey,
   isOcrJsonKey,
+  SEGMENT_MANIFEST_MAX_BYTES,
   type ImmutableObjectMeta,
 } from "./immutable-keys";
 import { OCR_JSON_MAX_BYTES } from "../../shared/intakeCeiling";
@@ -300,6 +301,33 @@ export async function getWorkspaceOcrJson(
   if (bytes.subarray(0, 4).toString("utf8") === "%PDF") return { ok: false, code: "PDF_BYTES_FORBIDDEN" };
   try {
     return { ok: true, json: JSON.parse(bytes.toString("utf8")), byteLength: bytes.length };
+  } catch {
+    return { ok: false, code: "NOT_JSON" };
+  }
+}
+
+/**
+ * A segmented source's `segments/manifest.json` (ADR-0006), read no larger than the worker writes
+ * it. What it says is checked by `verifySegmentManifest`; this only fetches and parses it.
+ */
+export async function getWorkspaceSegmentManifest(
+  env: R2SignerEnv,
+  workspaceId: string,
+  key: string,
+  now = new Date(),
+): Promise<{ ok: true; json: unknown } | { ok: false; code: string }> {
+  if (env.bucket !== FOUNDATION_R2_BUCKET) return { ok: false, code: "BUCKET_NOT_FOUNDATION" };
+  if (!isKeyInsideWorkspacePrefix(workspaceId, key) || !key.endsWith("/segments/manifest.json")) {
+    return { ok: false, code: "SEGMENT_MANIFEST_PREFIX_REQUIRED" };
+  }
+  const canonicalUri = `/${env.bucket}/${key.split("/").map(encodeURIComponent).join("/")}`;
+  const response = await signedS3Get(env, canonicalUri, "", now);
+  if (response.status === 404) return { ok: false, code: "NOT_FOUND" };
+  if (!response.ok) return { ok: false, code: "GET_FAILED" };
+  const body = await readBoundedSourceBody(response, SEGMENT_MANIFEST_MAX_BYTES);
+  if (!body.ok) return { ok: false, code: body.code !== "SOURCE_SIZE_UNQUALIFIED" ? "GET_FAILED" : body.empty ? "NOT_JSON" : "JSON_TOO_LARGE" };
+  try {
+    return { ok: true, json: JSON.parse(Buffer.from(body.bytes).toString("utf8")) };
   } catch {
     return { ok: false, code: "NOT_JSON" };
   }

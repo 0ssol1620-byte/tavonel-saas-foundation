@@ -13,7 +13,8 @@ import styles from "./world-studio-ultimate.module.css";
 export type WorldStudioLens = "overview" | "graph" | "directory" | "ontology" | "evidence" | "versions" | "files";
 
 type SourcePreview = { sourceId: string; versionId: string } & (
-  | { state: "ready"; bytes: Uint8Array }
+  /* `pageStart0`: where the served PDF's first page sits in the original source (a segmented source's range, ADR-0006). */
+  | { state: "ready"; bytes: Uint8Array; pageStart0: number }
   | { state: "loading"; retry?: boolean }
   | { state: "unavailable" }
 );
@@ -105,9 +106,11 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
       if (!token) { setSourcePreview({ ...identity, state: "unavailable" }); return; }
       const response = await fetch(`/api/documents/${encodeURIComponent(selectedSourceId)}/source?version=${encodeURIComponent(selectedSourceVersionId)}&format=pdf`, { headers: { authorization: `Bearer ${token}` }, cache: "no-store", signal: controller.signal });
       if (!response.ok || !response.headers.get("content-type")?.startsWith("application/pdf")) throw new Error("SOURCE_PREVIEW_UNAVAILABLE");
+      const offset = response.headers.get("x-tavonel-source-page-start0");
+      if (offset === null || !/^(0|[1-9][0-9]{0,5})$/.test(offset)) throw new Error("SOURCE_PREVIEW_UNAVAILABLE");
       const bytes = new Uint8Array(await response.arrayBuffer());
       if (cancelled) return;
-      setSourcePreview({ ...identity, bytes, state: "ready" });
+      setSourcePreview({ ...identity, bytes, pageStart0: Number(offset), state: "ready" });
     })().catch(() => { if (!cancelled) setSourcePreview({ ...identity, state: "unavailable" }); });
     return () => { cancelled = true; controller.abort(); };
   }, [selectedSourceId, selectedSourceVersionId, previewAttempt]);
@@ -183,7 +186,7 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
 
         <aside className={styles.inspector} aria-label="World selection inspector">
           {selection ? (
-            <><div className={styles.inspectorTitle}><span ref={evidenceHeadingRef} role="heading" aria-level={3} tabIndex={-1}>Selected evidence</span><button type="button" onClick={clearEvidence}>Clear</button></div><strong>{selection.sourceId}</strong><dl><div><dt>Version</dt><dd>{selection.sourceVersionId}</dd></div><div><dt>Page</dt><dd>{selection.page}</dd></div><div><dt>Region</dt><dd>[{selection.bbox.join(", ")}]</dd></div></dl><blockquote className={styles.excerpt} data-sensitive="content">{selection.excerpt}</blockquote><div className={styles.pagePreview} aria-label={`Actual source page ${selection.page} with evidence bounding box`}>{currentPreview?.state === "ready" ? <PdfEvidenceViewer key={JSON.stringify([selection.sourceId, selection.sourceVersionId, selection.page])} data={currentPreview.bytes} page={selection.page} bbox={selection.bbox} label={`Source ${selection.sourceId}, page ${selection.page}, exact evidence region`} /> : <span><span role="status" aria-busy={previewBusy}>{previewBusy ? "Opening source page…" : `Preview unavailable · page ${selection.page}`}</span>{previewRetryable && <button type="button" aria-disabled={previewBusy} onClick={retryPreview}>Retry</button>}</span>}</div></>
+            <><div className={styles.inspectorTitle}><span ref={evidenceHeadingRef} role="heading" aria-level={3} tabIndex={-1}>Selected evidence</span><button type="button" onClick={clearEvidence}>Clear</button></div><strong>{selection.sourceId}</strong><dl><div><dt>Version</dt><dd>{selection.sourceVersionId}</dd></div><div><dt>Page</dt><dd>{selection.page}</dd></div><div><dt>Region</dt><dd>[{selection.bbox.join(", ")}]</dd></div></dl><blockquote className={styles.excerpt} data-sensitive="content">{selection.excerpt}</blockquote><div className={styles.pagePreview} aria-label={`Actual source page ${selection.page} with evidence bounding box`}>{currentPreview?.state === "ready" && selection.page > currentPreview.pageStart0 ? <PdfEvidenceViewer key={JSON.stringify([selection.sourceId, selection.sourceVersionId, selection.page])} data={currentPreview.bytes} page={selection.page - currentPreview.pageStart0} bbox={selection.bbox} label={`Source ${selection.sourceId}, page ${selection.page}, exact evidence region`} /> : <span><span role="status" aria-busy={previewBusy}>{previewBusy ? "Opening source page…" : `Preview unavailable · page ${selection.page}`}</span>{previewRetryable && <button type="button" aria-disabled={previewBusy} onClick={retryPreview}>Retry</button>}</span>}</div></>
           ) : activeEvidenceId && model ? (
             <><div className={styles.inspectorTitle}><span>Selected evidence</span><button type="button" onClick={clearEvidence}>Clear</button></div><EmptyState title="Evidence not in this revision">{`${activeEvidenceId} is not part of this compiled World, so no source page is shown.`}</EmptyState></>
           ) : selectedObject ? (

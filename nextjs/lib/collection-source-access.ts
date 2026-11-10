@@ -148,10 +148,11 @@ export function coreCollectionSourceBinding(artifact: unknown): CollectionSource
       typeof document.versionKey !== "string" || !VERSION_KEY.test(document.versionKey) ||
       typeof document.inputSha256 !== "string" || !SHA256.test(document.inputSha256) ||
       document.inputSha256 !== `sha256:${document.versionKey}` ||
-      // One document listed twice is a malformed input, unlike two documents sharing bytes.
-      productIds.has(document.documentId)
+      // One reading listed twice is a malformed input, unlike two documents sharing bytes. A segmented
+      // source (ADR-0006) lists its parent once per range, each range its own version.
+      productIds.has(`${document.documentId}/${document.versionKey}`)
     ) return null;
-    productIds.add(document.documentId);
+    productIds.add(`${document.documentId}/${document.versionKey}`);
     const group = productByDigest.get(document.inputSha256) ?? [];
     group.push({ documentId: document.documentId, versionKey: document.versionKey });
     productByDigest.set(document.inputSha256, group);

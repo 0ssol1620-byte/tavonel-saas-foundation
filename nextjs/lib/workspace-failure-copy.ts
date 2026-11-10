@@ -22,6 +22,9 @@ const FAILURE_COPY: Record<string, string> = {
   CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE: "File processing is not open for this workspace yet, so nothing was processed or charged. Accept the processing terms in your workspace first.",
   INTAKE_RATE_LIMITED: "Too many source bytes arrived at once. Wait a minute and try again; what was accepted is safe.",
   INTAKE_DAILY_QUOTA_EXCEEDED: "This workspace has reached its 24-hour direct-upload bound. Connect a source system, or retry after the window resets.",
+  // Raised at capability or confirm when an approval predates a pricing or ceiling change (the
+  // pricing fingerprint moved). The way on is a fresh approval, never a retry of the old one.
+  INTAKE_PRICE_STALE: "Pricing or processing limits changed after this was approved, so that approval no longer covers it. Reload the page, choose the files again, and approve the refreshed maximum.",
   BILLING_HOLD: "A billing hold is active on this workspace, so new processing cannot start.",
   INSUFFICIENT_CREDITS: "There is not enough remaining balance to start this run.",
   COMPILE_JOB_ALREADY_SETTLED: "This compile has already finished, so there is nothing left to change.",

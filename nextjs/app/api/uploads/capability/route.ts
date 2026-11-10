@@ -19,6 +19,7 @@ import { INTAKE_TRIAGE_ROLLOUT_ENABLED } from "@/lib/intake-triage-rollout";
 import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "@/lib/intake-approval-rollout";
 import { deterministicSourceDocumentId, validSourceIdempotencyKey } from "@/lib/source-intake";
 import { intakePricingFingerprint, reservationPageCeiling } from "@/lib/usage-pricing";
+import { maxSourcePagesFor } from "../../../../../shared/intakeCeiling";
 import { approvedSourceIdempotencyKey, ATTEMPT_KEY_PATTERN, FILE_KEY_PATTERN, SHA256_DIGEST_PATTERN } from "@/lib/intake-approval";
 
 export const dynamic = "force-dynamic";
@@ -270,11 +271,12 @@ async function legacyCapability(request: Request, input: {
     and then failed one by one. The count is the client's, so it can only refuse earlier, never
     admit more: the rasterizer still enforces the ceiling on the decoded document.
   */
-  if (clientEstimate > PROCESSING_CEILING.maxSourcePages) {
+  const maxPages = maxSourcePagesFor(input.normalizedMimeType);
+  if (clientEstimate > maxPages) {
     return NextResponse.json({
       code: "SOURCE_EXCEEDS_PROCESSING_CEILING",
       maxBytes: FOUNDATION_INTAKE_MAX_BYTES,
-      maxPages: PROCESSING_CEILING.maxSourcePages,
+      maxPages,
       limit: PROCESSING_CEILING_SENTENCE,
     }, { status: 413, headers: NO_STORE });
   }

@@ -5999,7 +5999,7 @@ test('affected preflight report admission: lookalikes, operations, pipeline, API
     'nextjs/lib/__snapshots__/preflight-report.test.ts.snap','nextjs/lib/pipeline.tsx','nextjs/lib/pipeline-v2.test.ts',
     'nextjs/components/operations-ultimate.tsx','nextjs/components/preflight-report.tsx','nextjs/e2e/preflight-report.spec.ts',
     'nextjs/app/api/v1/preflight-report/route.ts','nextjs/app/api/preflight-report/route.ts',
-    'shared/capabilityManifest.ts','shared/intakeCeiling.ts','shared/qualifiedDocumentInputs.ts',
+    'shared/intakeCeiling.ts','shared/qualifiedDocumentInputs.ts',
     'nextjs/nextjs/lib/preflight-report.ts','lib/preflight-report.ts','lib/preflight-report.test.ts','preflight-report.ts']) {
     if (assertUxProgramEndpoint(path)) continue;
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
@@ -7439,7 +7439,7 @@ test('affected table-read-intake-ceiling owner: 6 exact paths select 8 direct su
   const plan = affectedAskPlan(affectedMap(TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS.map(path => affectedRecord('M', ['' + path]))));
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [[...suites].sort(), [...browsers].sort(), false, false]);
   assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), []);
-  for (const adjacent of ['shared/capabilityManifest.ts', 'shared/intakeCeiling.test.ts', 'shared/tableReadContract.js', 'nextjs/shared/intakeCeiling.ts', 'nextjs/lib/fixtures/table-read/other.json', 'nextjs/lib/table-read-contract.ts', 'nextjs/lib/fixtures/table-read/synthetic-no-table.json.bak']) {
+  for (const adjacent of ['shared/intakeCeiling.test.ts', 'shared/tableReadContract.js', 'nextjs/shared/intakeCeiling.ts', 'nextjs/lib/fixtures/table-read/other.json', 'nextjs/lib/table-read-contract.ts', 'nextjs/lib/fixtures/table-read/synthetic-no-table.json.bak']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
@@ -8312,9 +8312,9 @@ test('affected w2-d-intake-stage1 owner: 3 exact paths select 2 direct suites an
 });
 // large-source-intake-copy (ADR-0006): one finite owner, restated independently.
 import { LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS, LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
-test('affected large-source-intake-copy owner: 4 exact paths select 4 direct suites and no browser suite; neighbours stay unmapped', () => {
-  const paths = ['nextjs/lib/compile-limits.test.ts', 'nextjs/lib/compile-limits.ts', 'nextjs/lib/page-count.test.ts', 'nextjs/lib/page-count.ts'];
-  const suites = ['lib/compile-limits.test.ts', 'lib/intake-approval-rollout-off.test.ts', 'lib/page-count.test.ts', 'lib/workspace-existing-compile.test.ts'];
+test('affected large-source-intake-copy owner: 6 exact paths select 5 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['nextjs/lib/compile-limits.test.ts', 'nextjs/lib/compile-limits.ts', 'nextjs/lib/hero-stats.test.ts', 'nextjs/lib/hero-stats.ts', 'nextjs/lib/page-count.test.ts', 'nextjs/lib/page-count.ts'];
+  const suites = ['lib/compile-limits.test.ts', 'lib/hero-stats.test.ts', 'lib/intake-approval-rollout-off.test.ts', 'lib/page-count.test.ts', 'lib/workspace-existing-compile.test.ts'];
   assert.deepEqual([[...LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS], [...LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES]], [paths, suites]);
   for (const path of paths) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['large-source-intake-copy'], path);
@@ -8322,6 +8322,22 @@ test('affected large-source-intake-copy owner: 4 exact paths select 4 direct sui
     assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['large-source-intake-copy'], [], suites, [], []], path);
   }
   for (const adjacent of ['nextjs/lib/compile-limits-v2.ts', 'nextjs/lib/compile-limits.spec.ts', 'nextjs/lib/page-count-v2.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});
+// large-source-intake-ceiling (ADR-0006): one finite owner, restated independently.
+import { LARGE_SOURCE_INTAKE_CEILING_AFFECTED_PATHS, LARGE_SOURCE_INTAKE_CEILING_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected large-source-intake-ceiling owner: 3 exact paths select 3 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['nextjs/lib/usage-pricing.ts', 'server/foundation/intakeCeilingMigration.test.ts', 'shared/capabilityManifest.ts'];
+  const suites = ['lib/capability-manifest-route.test.ts', 'lib/production-posture.test.ts', 'lib/usage-pricing.test.ts'];
+  assert.deepEqual([[...LARGE_SOURCE_INTAKE_CEILING_AFFECTED_PATHS], [...LARGE_SOURCE_INTAKE_CEILING_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['large-source-intake-ceiling'], path);
+    const map = affectedMap([affectedRecord('M', [path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['large-source-intake-ceiling'], [], suites, [], []], path);
+  }
+  for (const adjacent of ['nextjs/lib/usage-pricing-v2.ts', 'shared/capabilityManifest.test.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
@@ -8341,6 +8357,23 @@ test('affected processing-ga-20261109 owner: 1 exact path selects 2 direct suite
   // library-shadow.ts reads the named cohort and keeps its own owner (main, W2-B2). It is not this owner's.
   assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/lib/library-shadow.ts')).map(o => o.group), ['library-organize-b2']);
   for (const adjacent of ['nextjs/lib/customer-data-admission.tsx', 'nextjs/lib/customer-data-admission-routes.ts', 'nextjs/lib/customer-data-admission.mjs', 'lib/customer-data-admission.ts']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});
+
+// large-source-site-half (ADR-0006): one finite owner, restated independently.
+import { LARGE_SOURCE_SITE_HALF_AFFECTED_PATHS, LARGE_SOURCE_SITE_HALF_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+test('affected large-source-site-half owner: 8 exact paths select 8 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['nextjs/app/api/documents/[id]/source/route.ts', 'nextjs/lib/collection-source-access.test.ts', 'nextjs/lib/collection-source-access.ts', 'nextjs/lib/compile-artifact-provenance.ts', 'nextjs/lib/document-source-route.test.ts', 'nextjs/lib/immutable-keys.test.ts', 'nextjs/lib/immutable-keys.ts', 'nextjs/lib/pdf-evidence-viewer.test.ts'];
+  const suites = ['lib/collection-compile-run.test.ts', 'lib/collection-source-access.test.ts', 'lib/compile-artifact-provenance.test.ts', 'lib/compile-job-worker.test.ts', 'lib/document-source-route.test.ts', 'lib/documents-route.test.ts', 'lib/immutable-keys.test.ts', 'lib/pdf-evidence-viewer.test.ts'];
+  assert.deepEqual([[...LARGE_SOURCE_SITE_HALF_AFFECTED_PATHS], [...LARGE_SOURCE_SITE_HALF_AFFECTED_UNIT_FILES]], [paths, suites]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['large-source-site-half'], path);
+    const map = affectedMap([affectedRecord('M', [path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles, map.databaseTests], [[], ['large-source-site-half'], [], suites, [], []], path);
+  }
+  for (const adjacent of ['nextjs/lib/immutable-keys-v2.ts', 'nextjs/app/api/documents/[id]/source/route.test.ts']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }

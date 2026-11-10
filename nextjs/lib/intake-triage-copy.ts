@@ -1,4 +1,4 @@
-import { PROCESSING_CEILING, PROCESSING_CEILING_MIB } from "../../shared/intakeCeiling";
+import { PROCESSING_CEILING_MIB, PROCESSING_CEILING_PAGE_LIMITS, pageLimitPhrase } from "../../shared/intakeCeiling";
 
 /*
   FUNNEL-SIGNED-IN #7: the preflight printed manifest tokens with the underscores taken out --
@@ -11,7 +11,7 @@ const PLAIN_TOKENS: Readonly<Record<string, string>> = {
   no_native_structure_reader_yet: "headings and sections are not read as structure yet",
   no_visual_native_reconciliation: "text is not yet cross-checked between the page image and the file",
   [`at_most_${PROCESSING_CEILING_MIB}_mib_per_source`]: `up to ${PROCESSING_CEILING_MIB} MB per file`,
-  [`at_most_${PROCESSING_CEILING.maxSourcePages}_pages_per_source`]: `up to ${PROCESSING_CEILING.maxSourcePages} pages per file`,
+  ...Object.fromEntries(PROCESSING_CEILING_PAGE_LIMITS.map((limit) => [limit.token, pageLimitPhrase(limit, "file")])),
   [`over_the_${PROCESSING_CEILING_MIB}_mib_processing_ceiling`]: `over the ${PROCESSING_CEILING_MIB} MB per-file limit`,
 };
 

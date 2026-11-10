@@ -18,7 +18,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { PROCESSING_CEILING, PROCESSING_CEILING_LIMITATIONS } from "../../shared/intakeCeiling";
+import {
+  INTAKE_CEILING_STAGE,
+  PROCESSING_CEILING,
+  PROCESSING_CEILING_LIMITATIONS,
+  SEGMENTED_INTAKE_ENABLED,
+  intakeCeilingFor,
+} from "../../shared/intakeCeiling";
 import { CAPABILITY_MANIFEST } from "../../shared/capabilityManifest";
 
 const root = join(import.meta.dirname, "..", "..");
@@ -33,7 +39,8 @@ describe("intake ceiling", () => {
 
     const workerMax = /MAX_SOURCE_BYTES = (\d+) \* 1024 \* 1024/.exec(worker)?.[1];
     const cdrMax = /MAX_INPUT_BYTES: Final = (\d+) \* 1024 \* 1024/.exec(rasterizer)?.[1];
-    const cdrPages = /MAX_PAGES: Final = (\d+)/.exec(rasterizer)?.[1];
+    const cdrPages = /^MAX_PAGES: Final = (\d+)/m.exec(rasterizer)?.[1];
+    const cdrSegmentedPages = /^SEGMENTED_MAX_DOCUMENT_PAGES: Final = (\d+)/m.exec(rasterizer)?.[1];
     expect(workerMax, "the worker no longer states a source ceiling").toBeDefined();
     expect(cdrMax, "the rasterizer no longer states an input ceiling").toBeDefined();
     expect(cdrPages, "the rasterizer no longer states a page ceiling").toBeDefined();
@@ -41,7 +48,11 @@ describe("intake ceiling", () => {
     expect(PROCESSING_CEILING.maxSourceBytes).toBe(
       Math.min(Number(workerMax) * 1024 * 1024, Number(cdrMax) * 1024 * 1024),
     );
-    expect(PROCESSING_CEILING.maxSourcePages).toBe(Number(cdrPages));
+    // ADR-0006: one request renders at most MAX_PAGES; once segmented intake is on, a PDF is read
+    // as ranges up to the segmented ceiling.
+    expect(PROCESSING_CEILING.maxUnsegmentedSourcePages).toBe(Number(cdrPages));
+    expect(PROCESSING_CEILING.maxSourcePages).toBe(Number(SEGMENTED_INTAKE_ENABLED ? cdrSegmentedPages : cdrPages));
+    expect(intakeCeilingFor(INTAKE_CEILING_STAGE, true).PROCESSING_CEILING.maxSourcePages).toBe(Number(cdrSegmentedPages));
   });
 
   it("is the same number the admission table and its function enforce", () => {
@@ -55,10 +66,9 @@ describe("intake ceiling", () => {
   });
 
   it("is stated on the capability surface a customer reads before uploading", () => {
-    expect(PROCESSING_CEILING_LIMITATIONS).toEqual([
-      "at_most_5_mib_per_source",
-      "at_most_80_pages_per_source",
-    ]);
+    expect(PROCESSING_CEILING_LIMITATIONS).toEqual(SEGMENTED_INTAKE_ENABLED
+      ? ["at_most_5_mib_per_source", "at_most_500_pages_per_pdf_source", "at_most_80_pages_per_other_source"]
+      : ["at_most_5_mib_per_source", "at_most_80_pages_per_source"]);
     const pdf = CAPABILITY_MANIFEST.entries.find((entry) => entry.mime === "application/pdf");
     for (const limitation of PROCESSING_CEILING_LIMITATIONS) {
       expect(pdf?.knownLimitations, "/sources does not disclose the live ceiling").toContain(limitation);

@@ -1032,14 +1032,30 @@ assert(VITEST_DISCOVERY_CONFIG_PATH==='nextjs/vitest.config.ts'&&discoveryOwners
   assert(['quarantine-sidecar/cdr-cloudrun/tests/test_page_ranges_v2.py', 'quarantine-sidecar/cdr-cloudrun/page_ranges.py']
     .every(p => !AFFECTED_GROUPS.some(o => o.group === 'cdr-cloudrun-service' && o.match.test(p))),
     'cdr-cloudrun-service must not admit a neighbour of the page-range suite');
-  // The drop box's limits notice and its suite: one exact owner with four direct suites, nothing adjacent.
+  // The drop box's limits notice, the ceiling comments in hero-stats and their suites: one exact owner with five direct suites, nothing adjacent.
   const copyOwners = AFFECTED_GROUPS.filter(o => o.group === 'large-source-intake-copy');
   assert(copyOwners.length === 1
-    && JSON.stringify(copyOwners[0].unitFiles) === JSON.stringify(['lib/compile-limits.test.ts', 'lib/intake-approval-rollout-off.test.ts', 'lib/page-count.test.ts', 'lib/workspace-existing-compile.test.ts'])
+    && JSON.stringify(copyOwners[0].unitFiles) === JSON.stringify(['lib/compile-limits.test.ts', 'lib/hero-stats.test.ts', 'lib/intake-approval-rollout-off.test.ts', 'lib/page-count.test.ts', 'lib/workspace-existing-compile.test.ts'])
     && !copyOwners[0].browserFiles.length && !copyOwners[0].databaseTests.length && !copyOwners[0].nativeReuse
-    && ['nextjs/lib/compile-limits.ts', 'nextjs/lib/compile-limits.test.ts', 'nextjs/lib/page-count.ts', 'nextjs/lib/page-count.test.ts'].every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && copyOwners[0].match.test(p))
+    && ['nextjs/lib/compile-limits.ts', 'nextjs/lib/compile-limits.test.ts', 'nextjs/lib/hero-stats.ts', 'nextjs/lib/hero-stats.test.ts', 'nextjs/lib/page-count.ts', 'nextjs/lib/page-count.test.ts'].every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && copyOwners[0].match.test(p))
     && ['nextjs/lib/compile-limits-v2.ts', 'nextjs/lib/corpus-batching.ts'].every(p => !copyOwners[0].match.test(p)),
-    'large-source-intake-copy owner must keep its four exact paths, four direct suites and no neighbour admission');
+    'large-source-intake-copy owner must keep its six exact paths, five direct suites and no neighbour admission');
+  // The intake quote and the capability manifest that state the segmented page ceiling: one exact owner, nothing adjacent.
+  const ceilingOwners = AFFECTED_GROUPS.filter(o => o.group === 'large-source-intake-ceiling');
+  assert(ceilingOwners.length === 1
+    && JSON.stringify(ceilingOwners[0].unitFiles) === JSON.stringify(['lib/capability-manifest-route.test.ts', 'lib/production-posture.test.ts', 'lib/usage-pricing.test.ts'])
+    && !ceilingOwners[0].browserFiles.length && !ceilingOwners[0].databaseTests.length && !ceilingOwners[0].nativeReuse
+    && ['nextjs/lib/usage-pricing.ts', 'server/foundation/intakeCeilingMigration.test.ts', 'shared/capabilityManifest.ts'].every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && ceilingOwners[0].match.test(p))
+    && ['nextjs/lib/usage-pricing-v2.ts', 'shared/capabilityManifest.test.ts'].every(p => !ceilingOwners[0].match.test(p)),
+    'large-source-intake-ceiling owner must keep its three exact paths, three direct suites and no neighbour admission');
+  // The segmented-source listing, compile and source route: one exact owner with eight direct suites, nothing adjacent.
+  const siteHalfOwners = AFFECTED_GROUPS.filter(o => o.group === 'large-source-site-half');
+  assert(siteHalfOwners.length === 1
+    && JSON.stringify(siteHalfOwners[0].unitFiles) === JSON.stringify(['lib/collection-compile-run.test.ts', 'lib/collection-source-access.test.ts', 'lib/compile-artifact-provenance.test.ts', 'lib/compile-job-worker.test.ts', 'lib/document-source-route.test.ts', 'lib/documents-route.test.ts', 'lib/immutable-keys.test.ts', 'lib/pdf-evidence-viewer.test.ts'])
+    && !siteHalfOwners[0].browserFiles.length && !siteHalfOwners[0].databaseTests.length && !siteHalfOwners[0].nativeReuse
+    && ['nextjs/app/api/documents/[id]/source/route.ts', 'nextjs/lib/collection-source-access.test.ts', 'nextjs/lib/collection-source-access.ts', 'nextjs/lib/compile-artifact-provenance.ts', 'nextjs/lib/document-source-route.test.ts', 'nextjs/lib/immutable-keys.test.ts', 'nextjs/lib/immutable-keys.ts', 'nextjs/lib/pdf-evidence-viewer.test.ts'].every(p => AFFECTED_GROUPS.filter(o => o.match.test(p)).length === 1 && siteHalfOwners[0].match.test(p))
+    && ['nextjs/lib/immutable-keys-v2.ts', 'nextjs/lib/collection-source-access-v2.ts'].every(p => !siteHalfOwners[0].match.test(p)),
+    'large-source-site-half owner must keep its eight exact paths, eight direct suites and no neighbour admission');
 }
 console.log(`Workflow static gates pass. Full qualification still pending for exact CI/Launch runs at this head.`);
 

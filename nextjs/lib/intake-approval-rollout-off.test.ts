@@ -189,6 +189,28 @@ describe("intake approval lineage off (the production default)", () => {
     expect(at.status).toBe(200);
   });
 
+  it("holds a Word file and every other format but PDF to one request's pages", async () => {
+    // ADR-0006 and #234 R1 item 1: only a PDF is ever read as page ranges. A Word file's count is
+    // the number Word saved, never verified, so it is held to what one request renders.
+    const ask = (originalFilename: string, declaredMimeType: string, estimatedPages: number) =>
+      capabilityPost(json("https://tavonel.com/api/uploads/capability", {
+        originalFilename, declaredMimeType, requestedBytes: 2048, estimatedPages,
+      }));
+    const docx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const pptx = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    const perRequest = PROCESSING_CEILING.maxUnsegmentedSourcePages;
+
+    for (const [name, mime] of [["manual.docx", docx], ["deck.pptx", pptx]] as const) {
+      const long = await ask(name, mime, perRequest + 1);
+      expect(long.status, name).toBe(413);
+      await expect(long.json()).resolves.toMatchObject({
+        code: "SOURCE_EXCEEDS_PROCESSING_CEILING", maxPages: perRequest, limit: PROCESSING_CEILING_SENTENCE,
+      });
+    }
+    expect(mocks.calls).toEqual([]);
+    expect((await ask("manual.docx", docx, perRequest)).status).toBe(200);
+  });
+
   it("sends the count the browser measured, so the refusal above happens before upload", () => {
     // The workspace measured every staged file and then dropped the counts on this path.
     const page = readFileSync(join(process.cwd(), "app/workspace/page.tsx"), "utf8");

@@ -1,4 +1,4 @@
-import { PROCESSING_CEILING } from "../../shared/intakeCeiling";
+import { PROCESSING_CEILING, maxSourcePagesFor } from "../../shared/intakeCeiling";
 
 export const PROCESSING_UNIT_USD = 0.01;
 export const STANDARD_UNITS_PER_PAGE = 4;
@@ -163,19 +163,20 @@ export function estimateBillablePages(value: {
  * the correct answer to "how many pages is this" and a dangerous one to reserve against. Both
  * server call sites used to write `?? 1`: before the byte-derived fallback was removed they
  * reserved a byte-derived ceiling, and afterwards they reserved **one page** for a spreadsheet
- * that can settle at up to `PROCESSING_CEILING.maxSourcePages`. Bounded, because nothing in the
+ * that can settle at up to `PROCESSING_CEILING.maxUnsegmentedSourcePages`. Bounded, because nothing in the
  * chain reads more than that ceiling and settlement bills the pages actually produced -- but the
  * gap between the hold and the settlement is credit an untruthful client can spend twice.
  *
- * So the fallback is the deployment's own documented page ceiling: the most a rasterizer will
- * ever render for one source, which is the most a settlement for one source can ever charge.
+ * So the fallback is the deployment's own documented page ceiling for a source nobody counted:
+ * the most one rasterizer request renders, which is the most a settlement for an unsegmented
+ * source can ever charge. An uncounted file is never reserved at the segmented ceiling.
  * It over-reserves, deliberately and in the customer's favour on refusal, and it is never
  * rendered: `pageCountLabel("provisional")` is what a reader sees for an uncounted file, and it
  * says the pages are not counted yet. A number chosen to hold credit is not a fact about a
  * document, and this function returns the first and never the second.
  */
 export function reservationPageCeiling(value: Parameters<typeof estimateBillablePages>[0]): number {
-  return estimateBillablePages(value)?.pages ?? PROCESSING_CEILING.maxSourcePages;
+  return estimateBillablePages(value)?.pages ?? PROCESSING_CEILING.maxUnsegmentedSourcePages;
 }
 
 /*
@@ -240,7 +241,8 @@ export function quoteIntakeFile(claim: IntakeFileClaim):
     declaredPages: basis ? claim.claimedPages : null,
     declaredBasis: basis,
   });
-  if (estimate && estimate.pages > PROCESSING_CEILING.maxSourcePages) {
+  // Only a segmented format (PDF, DOCX) may pass one request's pages; a 200-slide deck may not.
+  if (estimate && estimate.pages > maxSourcePagesFor(mimeType)) {
     return { ok: false, code: "SOURCE_EXCEEDS_PROCESSING_CEILING" };
   }
   // No count is approved at the whole processing ceiling: the customer never approves less than
@@ -291,7 +293,7 @@ export function quoteIntakeManifest(claims: readonly IntakeFileClaim[]):
 export function intakePageBasisLabel(basis: IntakePageBasis) {
   if (basis === "measured") return "Measured pages (estimate)";
   if (basis === "declared") return "Declared pages (the file's own claim)";
-  return `Not counted yet — approved at the ${PROCESSING_CEILING.maxSourcePages}-page processing ceiling`;
+  return `Not counted yet — approved at the ${PROCESSING_CEILING.maxUnsegmentedSourcePages}-page processing ceiling`;
 }
 
 /*
@@ -309,6 +311,15 @@ export function intakePricingCanonical() {
     `max_units_per_page=${MAX_UNITS_PER_PAGE}`,
     `max_quoted_pages=${MAX_QUOTED_PAGES}`,
     `max_source_pages=${PROCESSING_CEILING.maxSourcePages}`,
+    /*
+      Only once segmented intake is on (shared/intakeCeiling.ts SEGMENTED_INTAKE_ENABLED). While it
+      is off the canonical text is production's byte for byte, so this release leaves every
+      approval given before it valid; the release that flips the switch moves the fingerprint, and
+      an approval from before it is refused INTAKE_PRICE_STALE with a re-approve instruction.
+    */
+    ...(PROCESSING_CEILING.maxSourcePages !== PROCESSING_CEILING.maxUnsegmentedSourcePages
+      ? [`max_unsegmented_source_pages=${PROCESSING_CEILING.maxUnsegmentedSourcePages}`]
+      : []),
   ].join("\n");
 }
 

@@ -1,7 +1,8 @@
 import {
-  PROCESSING_CEILING,
   PROCESSING_CEILING_LIMITATIONS,
   PROCESSING_CEILING_MIB,
+  PROCESSING_CEILING_PAGE_LIMITS,
+  pageLimitPhrase,
 } from "./intakeCeiling";
 import {
   capabilityStatusesAcceptedAtUpload,
@@ -83,7 +84,7 @@ const LIVE_PRESERVED = ["page", "paragraph_text", "bbox1000"] as const;
 /*
   True of every row, and the reason none of them is qualified.
 
-  The last two come from `shared/intakeCeiling.ts` rather than being typed out here: they are
+  The last three come from `shared/intakeCeiling.ts` rather than being typed out here: they are
   the ceilings the deployed processors actually enforce, and they were this deployment's
   largest undisclosed limit. Intake admitted 250 MB, the CDR refused above 5 MB and 80 pages,
   and an ordinary 200-page manual was accepted and then dropped with nothing said. A limit that
@@ -561,7 +562,7 @@ export function serializeCanonicalInputs(): string {
   label is written. Both are here so the manifest stays the one list and neither the table nor
   the API has a second opinion.
 
-  The two ceiling labels are derived from `PROCESSING_CEILING`, not typed out, because the tokens
+  The ceiling labels are derived from `PROCESSING_CEILING`, not typed out, because the tokens
   they label are generated from the same constant -- a hand-typed "5 MB" would drift the day the
   deployed processors change.
 */
@@ -690,7 +691,10 @@ export const CAPABILITY_TOKEN_LABEL: Record<string, string> = {
   the_archive_itself_is_never_compiled: "The archive itself is never compiled",
   not_included_in_free_evaluation: "Not included in a free evaluation",
   [PROCESSING_CEILING_LIMITATIONS[0]]: `Up to ${PROCESSING_CEILING_MIB} MB per source`,
-  [PROCESSING_CEILING_LIMITATIONS[1]]: `Up to ${PROCESSING_CEILING.maxSourcePages} pages per source`,
+  ...Object.fromEntries(PROCESSING_CEILING_PAGE_LIMITS.map((limit) => {
+    const phrase = pageLimitPhrase(limit, "source");
+    return [limit.token, phrase.charAt(0).toUpperCase() + phrase.slice(1)];
+  })),
 };
 
 /** A token with no written label is a bug, not a reason to print the identifier. */

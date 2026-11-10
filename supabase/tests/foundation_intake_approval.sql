@@ -195,11 +195,11 @@ select throws_ok(
 );
 select throws_ok(
   $$select public.create_foundation_intake_approval(
-    'pilot-apprpaid01', '88880001-8888-4888-8888-888888888801', 'attempt-invalid-known081',
+    'pilot-apprpaid01', '88880001-8888-4888-8888-888888888801', 'attempt-invalid-known501',
     pg_temp.digest('6'), pg_temp.digest('f'), 18,
-    jsonb_build_array(pg_temp.file('file-known-pdf', 'a', 120000, 'application/pdf', 'measured', 81, 12, 18)))$$,
+    jsonb_build_array(pg_temp.file('file-known-pdf', 'a', 120000, 'application/pdf', 'measured', 501, 12, 18)))$$,
   'foundation_intake_approval_invalid',
-  'no member may be approved past the 80-page processing ceiling'
+  'no member may be approved past the 500-page segmented ceiling (20261110041500)'
 );
 select throws_ok(
   $$select public.create_foundation_intake_approval(
