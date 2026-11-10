@@ -59,7 +59,7 @@ import CompileStage from "@/components/compile-stage";
 import { hasActiveSourceWork } from "@/lib/compile-stage-view";
 import { recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
-import { workspaceSourceChoices, type OAuthProviderAvailability } from "@/lib/workspace-source-choices";
+import { CONNECTION_PLANS, workspaceSourceChoices, type OAuthProviderAvailability } from "@/lib/workspace-source-choices";
 import ConnectionsPanel from "@/components/connections-panel";
 import DeveloperPanel from "@/components/developer-panel";
 import WorkspaceUltimateShell, { type SourcePendingReason, type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
@@ -3223,7 +3223,7 @@ export default function WorkspacePage() {
                     ))}
                   </div>
                 ) : sourceChoices.kind === "plan_required" ? (
-                  <p className="workspace-source-plan">Google Drive and file-server connections are available on Developer and Team. <Link href="/pricing">See plans</Link></p>
+                  <p className="workspace-source-plan">Google Drive and file-server connections come with {CONNECTION_PLANS}. <Link href="/pricing">See plans</Link></p>
                 ) : null}
               </div>
               )}
@@ -4095,14 +4095,14 @@ export default function WorkspacePage() {
             <section className="card workspace-access-gate" role="status">
               <h2>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "Workspace access could not be verified." : "Checking workspace access."
-                : customerDataAccess === "closed" ? "Source connections are not available for this workspace yet." : "Available on Developer and Team."}</h2>
+                : customerDataAccess === "closed" ? "Source connections are not available for this workspace yet." : `Available on ${CONNECTION_PLANS}.`}</h2>
               <p>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
                 : customerDataAccess === "closed"
                 ? `Your account is ready, but source processing is closed. ${closedGate.sentence}`
                 : accessSource === "trial"
-                ? "Google Drive and file-server connections are included on Developer and Team. The free evaluation works with files you upload directly."
-                : "Google Drive and file-server connections are included on Developer and Team. This workspace has no active plan."}</p>
+                ? `Google Drive and file-server connections are included on ${CONNECTION_PLANS}. The free evaluation works with files you upload directly.`
+                : `Google Drive and file-server connections are included on ${CONNECTION_PLANS}. This workspace has no active plan.`}</p>
               <div className="billing-actions">{accessSource === null
                 ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
                 : customerDataAccess === "closed"

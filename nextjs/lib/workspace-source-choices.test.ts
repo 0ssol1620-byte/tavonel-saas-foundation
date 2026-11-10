@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { workspaceSourceChoices } from "./workspace-source-choices";
+import { BILLING_OFFERS } from "./billing-catalog";
+import { CONNECTION_PLANS, workspaceSourceChoices } from "./workspace-source-choices";
 
 const PRODUCTION = [
   { provider: "google_drive", configured: true },
@@ -38,6 +39,10 @@ describe("workspace home connector chips", () => {
   it("answers a free evaluation and a workspace with no plan before the click", () => {
     expect(workspaceSourceChoices("trial", PRODUCTION)).toEqual({ kind: "plan_required" });
     expect(workspaceSourceChoices("unentitled", PRODUCTION)).toEqual({ kind: "plan_required" });
+  });
+
+  it("names the connection plans from the catalog the pricing page renders", () => {
+    expect(CONNECTION_PLANS).toBe(`${BILLING_OFFERS.observer_access.label} and ${BILLING_OFFERS.studio_access.label}`);
   });
 
   it("shows nothing while access is still being checked", () => {

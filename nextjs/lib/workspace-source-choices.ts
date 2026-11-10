@@ -8,9 +8,15 @@
   S3-compatible bucket (S3, R2, MinIO) with the customer's own credentials, so they are labelled
   by how they work, not by an availability claim.
 
-  Connections are on Developer and Team. A free evaluation or a workspace with no plan gets the
+  Connections are on the two subscription plans, named from lib/billing-catalog.ts so a plan
+  rename reaches this copy. A free evaluation or a workspace with no plan gets the
   same answer the connections page gives, before anything is clicked.
 */
+import { BILLING_OFFERS } from "./billing-catalog";
+
+/** "Developer and Team" today; follows the catalog labels the pricing page renders. */
+export const CONNECTION_PLANS = `${BILLING_OFFERS.observer_access.label} and ${BILLING_OFFERS.studio_access.label}`;
+
 export type WorkspaceAccessSource = "owner" | "paid" | "trial" | "unentitled" | null;
 export type OAuthProviderAvailability = { provider: string; configured: boolean };
 
