@@ -715,6 +715,12 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     await expect(region(page, "status", "Team sandbox checkout opened.")).toBeVisible();
     expect(posts).toEqual([{ offerCode: "studio_access" }]);
     expect(paddle.loads()).toBe(1);
+
+    // R1 review (2026-11-10): Team includes guided onboarding, so the paid outcome says how it is arranged.
+    expect(await emitPaddleEvent(page, "checkout.completed")).toBe(true);
+    const outcome = page.locator("section.pricing-purchase");
+    await expect(outcome).toContainText("We will contact you within 1 working day to schedule your guided onboarding.");
+    await expect(outcome.getByRole("link", { name: "support@tavonel.com" })).toHaveAttribute("href", "mailto:support@tavonel.com");
   });
 
   /*

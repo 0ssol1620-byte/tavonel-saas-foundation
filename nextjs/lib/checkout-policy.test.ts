@@ -48,10 +48,28 @@ describe("checkout deployment policy", () => {
 describe("one subscription per workspace (Team self-serve, 2026-11-10)", () => {
   const none = { accessPlan: null, subscriptionStatus: "inactive", subscriptionCancelAt: null, paddleSubscriptionId: null };
   const developer = { accessPlan: "observer_access", subscriptionStatus: "active", subscriptionCancelAt: null, paddleSubscriptionId: "sub_1" };
-  it("lets a workspace with no live subscription buy either plan", () => {
+  it("lets a workspace that never held a subscription buy either plan", () => {
     expect(decideSubscriptionChange(none, "observer_access")).toEqual({ allowed: true });
     expect(decideSubscriptionChange(none, "studio_access")).toEqual({ allowed: true });
-    expect(decideSubscriptionChange({ ...developer, subscriptionStatus: "canceled" }, "studio_access")).toEqual({ allowed: true });
+  });
+  /*
+    R1 review (2026-11-10, intended): the projection (0005) never replaces a held subscription id
+    except by the 0010 upgrade, so these are refused before Paddle charges. The earlier pin let an
+    ended Developer buy again, which Paddle would charge and the projection would refuse.
+  */
+  it("sends past due and paused to the portal, and an ended subscription to us, for either plan", () => {
+    for (const offer of ["observer_access", "studio_access"]) {
+      for (const status of ["past_due", "paused"]) {
+        expect(decideSubscriptionChange({ ...developer, subscriptionStatus: status }, offer))
+          .toEqual({ allowed: false, code: "BILLING_SUBSCRIPTION_NEEDS_PORTAL" });
+        expect(decideSubscriptionChange({ ...developer, accessPlan: "studio_access", subscriptionStatus: status }, offer))
+          .toEqual({ allowed: false, code: "BILLING_SUBSCRIPTION_NEEDS_PORTAL" });
+      }
+      for (const status of ["canceled", "inactive"]) {
+        expect(decideSubscriptionChange({ ...developer, subscriptionStatus: status, subscriptionCancelAt: "2026-12-01T00:00:00Z" }, offer))
+          .toEqual({ allowed: false, code: "BILLING_RESUBSCRIBE_CONTACT" });
+      }
+    }
   });
   it("refuses a second subscription, and admits only the Developer-to-Team replacement after Developer is set to cancel", () => {
     expect(decideSubscriptionChange(developer, "observer_access")).toEqual({ allowed: false, code: "BILLING_PLAN_ALREADY_ACTIVE" });

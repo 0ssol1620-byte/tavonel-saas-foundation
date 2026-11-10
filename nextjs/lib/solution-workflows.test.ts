@@ -173,7 +173,7 @@ describe("Solutions task choices and workflow evidence", () => {
     // Team self-serve (2026-11-10, intended): 
     expect(html).toContain("Team is bought online, as Developer is");
     expect(html).toContain("single-member workspace");
-    expect(html).toContain("shared roles, invitations and organization administration are not available");
+    expect(html).toContain("Shared roles, invitations and organization administration are not available");
     expect(html).not.toContain("we provision the tenant and the roles with you");
   });
 

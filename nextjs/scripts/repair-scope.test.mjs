@@ -8228,9 +8228,9 @@ test('affected sli-alert-noise-20261109 owner: 3 exact paths select 10 direct su
 });
 // pricing-one-step-buy-20261110: one finite owner, restated independently of the exported constants.
 import { ONE_STEP_BUY_AFFECTED_PATHS, ONE_STEP_BUY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
-test('affected pricing-one-step-buy-20261110 owner: 10 exact paths select 12 direct suites and no browser suite; neighbours stay unmapped', () => {
-  const paths = ['app/api/billing/refund-request/route.ts', 'components/billing-refund.tsx', 'lib/billing-refund-request.test.ts', 'lib/category-guide.test.ts', 'lib/checkout-policy.test.ts', 'lib/checkout-policy.ts', 'lib/paddle-browser.ts', 'lib/refund-eligibility.test.ts', 'lib/refund-eligibility.ts', 'lib/workspace-tenancy.test.ts'];
-  const suites = ['lib/api-error-codes.test.ts', 'lib/billing-refund-request.test.ts', 'lib/category-guide.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-policy.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/refund-eligibility.test.ts', 'lib/route-classification.test.ts', 'lib/use-checkout.test.ts', 'lib/workspace-tenancy.test.ts'];
+test('affected pricing-one-step-buy-20261110 owner: 11 exact paths select 13 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/api/billing/refund-request/route.ts', 'components/billing-refund.tsx', 'lib/billing-refund-request.test.ts', 'lib/billing-store.ts', 'lib/category-guide.test.ts', 'lib/checkout-policy.test.ts', 'lib/checkout-policy.ts', 'lib/paddle-browser.ts', 'lib/refund-eligibility.test.ts', 'lib/refund-eligibility.ts', 'lib/workspace-tenancy.test.ts'];
+  const suites = ['lib/api-error-codes.test.ts', 'lib/billing-reconciliation.test.ts', 'lib/billing-refund-request.test.ts', 'lib/category-guide.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-policy.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/refund-eligibility.test.ts', 'lib/route-classification.test.ts', 'lib/use-checkout.test.ts', 'lib/workspace-tenancy.test.ts'];
   assert.deepEqual([[...ONE_STEP_BUY_AFFECTED_PATHS], [...ONE_STEP_BUY_AFFECTED_UNIT_FILES]], [paths, suites]);
   for (const path of paths.map(p => `nextjs/${p}`)) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['pricing-one-step-buy-20261110'], path);

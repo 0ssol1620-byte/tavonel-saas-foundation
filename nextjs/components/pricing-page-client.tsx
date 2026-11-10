@@ -976,6 +976,12 @@ export default function PricingPageClient({
                       ? `${BILLING_OFFERS[purchase.offer].label} turns on when Paddle's signed confirmation reaches us. This page is checking for it now.`
                       : ENTITLEMENT_PENDING_SENTENCE}
                 </p>
+                {purchase.offer === "studio_access" ? (
+                  <p>
+                    We will contact you within 1 working day to schedule your guided onboarding. You can also write to{" "}
+                    <a href="mailto:support@tavonel.com">support@tavonel.com</a>.
+                  </p>
+                ) : null}
                 <p className="pricing-purchase-actions">
                   <Link className="btn" href={"/workspace" as Route}>Open your workspace</Link>
                   {purchase.outcome === "unconfirmed" ? <Link href={"/workspace/settings/usage" as Route}>Usage &amp; billing</Link> : null}

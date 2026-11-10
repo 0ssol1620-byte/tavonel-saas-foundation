@@ -210,7 +210,7 @@ export const SOLUTIONS = {
         bought online as Developer is. The roadmap half belongs in the pricing footnote
         where a reader is comparing plans, and goes to `copy-commerce-legal` as a cross-lane item.
       */
-      "Team is bought online, as Developer is. Each workspace is a single-member workspace; shared roles, invitations and organization administration are not available.",
+      "Team is bought online, as Developer is. Each workspace is a single-member workspace. Shared roles, invitations and organization administration are not available.",
       "Rollback restores a prior revision. It does not undo downstream use of an older answer.",
     ],
   },

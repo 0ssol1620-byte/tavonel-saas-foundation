@@ -20,22 +20,36 @@ export function decideOfferCheckoutPolicy(
 
 export type SubscriptionChangeDecision =
   | { allowed: true }
-  | { allowed: false; code: "BILLING_PLAN_ALREADY_ACTIVE" | "BILLING_PLAN_CHANGE_REQUIRED" };
+  | {
+      allowed: false;
+      code: "BILLING_PLAN_ALREADY_ACTIVE" | "BILLING_PLAN_CHANGE_REQUIRED" | "BILLING_SUBSCRIPTION_NEEDS_PORTAL" | "BILLING_RESUBSCRIBE_CONTACT";
+    };
 
 /*
-  2026-11-10, with Team self-serve. A workspace holds one subscription. A second checkout while one
-  is live would be a second charge that the billing projection then refuses to apply, because the
-  projection admits exactly one replacement: Developer to Team, once the Developer subscription is
-  scheduled to cancel (`supabase/migrations/0010_foundation_subscription_upgrade.sql`). So a live
-  subscription refuses every other checkout before a Paddle intent exists. The change goes through
-  the customer portal (cancel Developer at period end), then Team is bought and replaces it.
+  2026-11-10, with Team self-serve. This mirrors what the billing projection accepts, so a checkout
+  is refused before Paddle can take a payment the projection would then refuse to apply.
+
+  - 0005 (the v2 subscription branch, still the base of v3 to v6) writes a subscription event only
+    when the account has no `paddle_subscription_id` yet or the event carries the same one.
+  - Nothing ever clears that id. Cancellation, past due and pause only change the status.
+  - 0010/0011 admit exactly one replacement: a Team subscription over a Developer one that is
+    `active` or `trialing` with its cancellation scheduled, for the same Paddle customer.
+
+  So once a workspace has held any subscription, the only checkout the projection can apply is that
+  replacement. Past due and paused are fixed or cancelled in the customer portal. An ended
+  subscription cannot be replaced by a new one, so re-subscribing is arranged with us.
 */
 export function decideSubscriptionChange(
   account: { accessPlan: string | null; subscriptionStatus: string; subscriptionCancelAt: string | null; paddleSubscriptionId: string | null },
   offerCode: string,
 ): SubscriptionChangeDecision {
-  const live = Boolean(account.paddleSubscriptionId) && ["active", "trialing"].includes(account.subscriptionStatus);
-  if (!live) return { allowed: true };
+  if (!account.paddleSubscriptionId) return { allowed: true };
+  if (account.subscriptionStatus === "past_due" || account.subscriptionStatus === "paused") {
+    return { allowed: false, code: "BILLING_SUBSCRIPTION_NEEDS_PORTAL" };
+  }
+  if (account.subscriptionStatus !== "active" && account.subscriptionStatus !== "trialing") {
+    return { allowed: false, code: "BILLING_RESUBSCRIBE_CONTACT" };
+  }
   if (account.accessPlan === offerCode) return { allowed: false, code: "BILLING_PLAN_ALREADY_ACTIVE" };
   if (offerCode === "studio_access" && account.accessPlan === "observer_access" && account.subscriptionCancelAt) return { allowed: true };
   return { allowed: false, code: "BILLING_PLAN_CHANGE_REQUIRED" };

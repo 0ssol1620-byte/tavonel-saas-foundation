@@ -3024,8 +3024,8 @@ export const LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-co
 export const SLI_ALERT_NOISE_AFFECTED_PATHS = Object.freeze(['app/api/internal/sli/route.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe-store.ts']);
 // pricing-one-step-buy-20261110: the refund request route and its rule, the billing card's refund section, the
 // one-subscription checkout policy, the Paddle overlay type, and two suites re-pinned for Team self-serve.
-export const ONE_STEP_BUY_AFFECTED_PATHS = Object.freeze(['app/api/billing/refund-request/route.ts', 'components/billing-refund.tsx', 'lib/billing-refund-request.test.ts', 'lib/category-guide.test.ts', 'lib/checkout-policy.test.ts', 'lib/checkout-policy.ts', 'lib/paddle-browser.ts', 'lib/refund-eligibility.test.ts', 'lib/refund-eligibility.ts', 'lib/workspace-tenancy.test.ts']);
-export const ONE_STEP_BUY_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error-codes.test.ts', 'lib/billing-refund-request.test.ts', 'lib/category-guide.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-policy.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/refund-eligibility.test.ts', 'lib/route-classification.test.ts', 'lib/use-checkout.test.ts', 'lib/workspace-tenancy.test.ts']);
+export const ONE_STEP_BUY_AFFECTED_PATHS = Object.freeze(['app/api/billing/refund-request/route.ts', 'components/billing-refund.tsx', 'lib/billing-refund-request.test.ts', 'lib/billing-store.ts', 'lib/category-guide.test.ts', 'lib/checkout-policy.test.ts', 'lib/checkout-policy.ts', 'lib/paddle-browser.ts', 'lib/refund-eligibility.test.ts', 'lib/refund-eligibility.ts', 'lib/workspace-tenancy.test.ts']);
+export const ONE_STEP_BUY_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error-codes.test.ts', 'lib/billing-reconciliation.test.ts', 'lib/billing-refund-request.test.ts', 'lib/category-guide.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-policy.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/refund-eligibility.test.ts', 'lib/route-classification.test.ts', 'lib/use-checkout.test.ts', 'lib/workspace-tenancy.test.ts']);
 export const SLI_ALERT_NOISE_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error-codes.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-read-route.test.ts', 'lib/operational-sli.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe.test.ts']);
 export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('public-marketing-surface', new RegExp(`^(?:${exactPathAlternation(PUBLIC_MARKETING_AFFECTED_PATHS)})$`),
@@ -3274,7 +3274,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // sli-alert-noise-20261109: 3 exact paths select 10 direct suites and no browser suite.
   affectedGroup('sli-alert-noise-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(SLI_ALERT_NOISE_AFFECTED_PATHS)})$`),
     { unitFiles: SLI_ALERT_NOISE_AFFECTED_UNIT_FILES }),
-  // pricing-one-step-buy-20261110: 10 exact paths select 12 direct suites and no browser suite.
+  // pricing-one-step-buy-20261110: 11 exact paths select 13 direct suites and no browser suite.
   affectedGroup('pricing-one-step-buy-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(ONE_STEP_BUY_AFFECTED_PATHS)})$`),
     { unitFiles: ONE_STEP_BUY_AFFECTED_UNIT_FILES }),
   affectedGroup('ci-selector', /^(?:\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml|nextjs\/scripts\/(?:repair-[a-z-]+(?:\.test)?\.mjs|run-repair-check\.mjs|verify-repair-workflows\.mjs|db\/(?:native-world-race(?:-ci)?|dropbox-source-stream-race)(?:\.test)?\.mjs|fixtures\/[A-Za-z0-9_.-]+\.json)|nextjs\/vitest\.repair-scope(?:\.async)?\.config\.ts)$/,

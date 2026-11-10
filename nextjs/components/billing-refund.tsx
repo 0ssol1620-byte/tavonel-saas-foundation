@@ -18,13 +18,10 @@ const NOT_READ = "not read yet";
 
 type Request = "idle" | "sending" | "sent" | "failed";
 
-function eligibilitySentence(facts: RefundFacts) {
-  const used = `${facts.consumedPages.toLocaleString("en-US")} of ${facts.allowancePages.toLocaleString("en-US")} pages used`;
-  if (facts.eligible === null) return "The payment date could not be read right now, so eligibility is not shown. You can still send a request.";
-  if (facts.eligible) {
-    return `This payment is inside the refund rule. ${used}, and the ${REFUND_WINDOW_DAYS}-day window closes ${formatTimestamp(facts.windowEndsAt) ?? NOT_READ}.`;
-  }
-  return `This payment is outside the refund rule of ${REFUND_WINDOW_DAYS} days and fewer than ${facts.allowancePages.toLocaleString("en-US")} pages (${used}, paid ${formatTimestamp(facts.paidAt) ?? NOT_READ}). You can still send a request. Mandatory consumer rights are assessed on their own facts.`;
+// R1 review (2026-11-10): the rule and the recorded dates only. No verdict, no page count.
+function ruleSentence(facts: RefundFacts) {
+  const window = facts.windowEndsAt ? ` For your latest payment that window closes ${formatTimestamp(facts.windowEndsAt) ?? NOT_READ}.` : "";
+  return `A payment can be refunded within ${REFUND_WINDOW_DAYS} days while fewer than ${facts.allowancePages.toLocaleString("en-US")} pages have been processed.${window} Eligibility is confirmed when you request.`;
 }
 
 export default function BillingRefund({ getToken }: { getToken: () => Promise<string | null> }) {
@@ -68,8 +65,8 @@ export default function BillingRefund({ getToken }: { getToken: () => Promise<st
       ) : null}
       <h3 id="billing-refund-title">Refund</h3>
       <p className="fine">
-        {facts ? eligibilitySentence(facts) : readFailed
-          ? "Eligibility could not be read right now. You can still send a request."
+        {facts ? ruleSentence(facts) : readFailed
+          ? "The refund rule could not be read right now. Eligibility is confirmed when you request."
           : "Reading the refund rule for your latest payment."}{" "}
         <Link href={"/refunds" as Route}>Refund rules</Link>
       </p>

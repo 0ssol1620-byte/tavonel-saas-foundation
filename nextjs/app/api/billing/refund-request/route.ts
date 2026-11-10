@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { getFoundationBillingAccount } from "@/lib/billing-store";
+import { getFoundationBillingAccount, getLatestSubscriptionPayment } from "@/lib/billing-store";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { OPERATIONS_ALERTS_RUNBOOK_URL, stableAlertId } from "@/lib/operations-alert-triggers";
 import { deliverOperationsAlert } from "@/lib/operations-p0";
 import { getPaddleSubscription } from "@/lib/paddle-api";
 import { refundFacts, type RefundFacts } from "@/lib/refund-eligibility";
+import { REFUND_WINDOW_DAYS } from "@/lib/billing-catalog";
 import { getWorkspaceMembership } from "@/lib/workspace-membership";
 
 export const dynamic = "force-dynamic";
@@ -13,9 +14,10 @@ export const runtime = "nodejs";
 /*
   One-step buy (2026-11-10). A paying customer's refund request, the smallest path that works.
 
-  GET states the subscription's renewal date and where the refund rule stands for the latest
-  payment (`lib/refund-eligibility.ts`). POST sends that same reading to the operations alert
-  channel, where an operator decides it and refunds in Paddle by hand. Nothing here calls Paddle's
+  GET states the renewal date, the latest recorded payment and the refund rule
+  (`lib/refund-eligibility.ts`). It states no verdict: pages processed since a payment are not read
+  by anything yet, so eligibility is confirmed by an operator. POST sends that same reading to the
+  operations alert channel, where an operator decides it and refunds in Paddle by hand. Nothing here calls Paddle's
   refund or adjustment API, and the request is never refused for being outside the rule: mandatory
   consumer rights are assessed on their own facts (/refunds).
 
@@ -44,12 +46,14 @@ async function readRefund(request: Request): Promise<Reading> {
   const { account } = billing;
   const subscriptionId = account.paddleSubscriptionId;
   if (!subscriptionId) return { ok: false, response: reply({ code: "REFUND_NO_PAID_PLAN" }, 409) };
-  // Unread provider facts leave the dates null. They never become a guess.
-  const subscription = await getPaddleSubscription(subscriptionId);
+  // Unread facts leave the dates null. They never become a guess.
+  const [subscription, payment] = await Promise.all([
+    getPaddleSubscription(subscriptionId),
+    getLatestSubscriptionPayment(workspaceId, user.id),
+  ]);
   const facts = refundFacts({
     accessPlan: account.accessPlan,
-    creditBalance: account.creditBalance,
-    paidAt: subscription.ok ? subscription.subscription.currentPeriodStartsAt : null,
+    paidAt: payment.ok ? payment.paidAt : null,
     renewsAt: subscription.ok ? subscription.subscription.nextBilledAt : null,
   });
   if (!facts) return { ok: false, response: reply({ code: "REFUND_NO_PAID_PLAN" }, 409) };
@@ -69,9 +73,8 @@ export async function POST(request: Request) {
   const reading = await readRefund(request);
   if (!reading.ok) return reading.response;
   const { facts, workspaceKey, subscriptionId } = reading;
-  const rule = facts.eligible === null ? "unread" : facts.eligible ? "met" : "not met";
-  const summary = `Refund request ${workspaceKey} ${subscriptionId}: ${facts.plan}, paid ${facts.paidAt?.slice(0, 10) ?? "unread"}, `
-    + `${facts.consumedPages}/${facts.allowancePages} pages, rule ${rule}. Decide and refund in Paddle by hand.`;
+  const summary = `Refund request ${workspaceKey} ${subscriptionId}: ${facts.plan}, latest payment ${facts.paidAt?.slice(0, 10) ?? "unread"}, `
+    + `rule ${REFUND_WINDOW_DAYS} days and under ${facts.allowancePages} pages. Check usage, decide and refund in Paddle by hand.`;
   const delivery = await deliverOperationsAlert({
     alertId: stableAlertId(`refund_request:${subscriptionId}:${facts.paidAt ?? "unread"}`),
     kind: "incident",
