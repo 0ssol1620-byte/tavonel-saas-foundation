@@ -499,6 +499,36 @@ async function advanceCompileJobTurn(job: CompileJob, deadlineAt: number): Promi
   return rest("compiled", settled, classified.ready.length, classified.blocked);
 }
 
+/*
+  GA fairness (ops audit gap 3, 2026-11-10). The store hands jobs out oldest-first across every
+  workspace, so a workspace with 22 runnable jobs (WORKSPACE_RUNNABLE_COMPILE_LIMIT) held 22 places
+  ahead of a workspace with one: each of its jobs moves to the back after a turn, but the front of
+  the queue is still mostly that workspace.
+
+  The batch now reads the widest window the store allows and takes one job per workspace per
+  round -- every workspace's oldest, then every workspace's second-oldest -- in the order of each
+  workspace's oldest job. Nothing about a turn changes: the lease (claimCompileJobLease) still
+  admits the work, so a reordered or redelivered turn is the same idempotent at-least-once step.
+*/
+export const COMPILE_BATCH_SCAN_WINDOW = 100;
+
+// ponytail: fair within the 100 oldest runnable jobs. A workspace whose every job is newer than
+// those 100 waits until turns move them to the back; a DISTINCT ON (workspace_key) RPC is the
+// upgrade once more than four workspaces sit at the 22-job limit at the same time.
+export function interleaveByWorkspace(jobs: readonly CompileJob[]): CompileJob[] {
+  const queues = new Map<string, CompileJob[]>();
+  for (const job of jobs) {
+    const queue = queues.get(job.workspaceKey);
+    if (queue) queue.push(job);
+    else queues.set(job.workspaceKey, [job]);
+  }
+  const fair: CompileJob[] = [];
+  for (let round = 0; fair.length < jobs.length; round += 1) {
+    for (const queue of queues.values()) if (round < queue.length) fair.push(queue[round]!);
+  }
+  return fair;
+}
+
 /** One turn across the queue: pick up whatever is due and advance each by one step. */
 export async function runCompileJobBatch(
   limit = 5,
@@ -509,7 +539,7 @@ export async function runCompileJobBatch(
   // oldest-first runnable window when their event or timestamp write fails. This is one metadata
   // query; retryable jobs still perform no R2 listing, OCR read, or Core dispatch.
   const workLimit = Math.min(Math.max(Math.trunc(limit) || 1, 1), 100);
-  const open = await readOpenCompileJobs(Math.min(workLimit * 2, 100));
+  const open = await readOpenCompileJobs(COMPILE_BATCH_SCAN_WINDOW);
   if (!open.ok) {
     // An unreadable queue is not an empty one: say so, or a filter PostgREST refuses looks idle.
     console.error(JSON.stringify({ event: "compile_batch_read_failed", code: open.code }));
@@ -517,7 +547,8 @@ export async function runCompileJobBatch(
   }
   const turns: CompileJobTurn[] = [];
   let attempted = 0;
-  for (const job of open.value) {
+  // The turn bound is what it was before the window widened: at most two per unit of work.
+  for (const job of interleaveByWorkspace(open.value).slice(0, workLimit * 2)) {
     const turn = await runCompileJobTurn(job, deadlineAt);
     turns.push(turn);
     if (turn.outOfTime) break;

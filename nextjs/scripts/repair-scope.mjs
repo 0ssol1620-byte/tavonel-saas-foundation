@@ -3211,7 +3211,8 @@ export const AFFECTED_GROUPS = Object.freeze([
   // visuals: the 21 exact paths above select 2 direct suites and no browser suite.
   affectedGroup('visuals', new RegExp(`^nextjs/(?:${exactPathAlternation(VISUALS_AFFECTED_PATHS)})$`),
     { unitFiles: VISUALS_AFFECTED_UNIT_FILES, browserFiles: VISUALS_AFFECTED_BROWSER_FILES }),
-  affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json|wrangler\.jsonc)$/, { worker: true }),
+  // README.md states the consumer's concurrency contract with wrangler.jsonc (ops capacity 2026-11-10), so it runs the same suite.
+  affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json|wrangler\.jsonc|README\.md)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.
   affectedGroup('ocr-cpu-worker', /^workers\/foundation-ocr-cpu-raster\/(?:app\.py|SYNTHETIC_TABLE_BINDING\.md|tests\/fixtures\/synthetic-grid-profile\.json|tests\/(?:test_synthetic_table_caller|test_cpu_ocr_v3_contract)\.py)$/),

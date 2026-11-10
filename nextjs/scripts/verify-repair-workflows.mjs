@@ -813,6 +813,15 @@ assert(MARKETING_TOOLING_POSTIMAGES['nextjs/package.json'] === '5c11e634df5c2ce7
   && ['e2e/benchmarks.spec.ts', 'e2e/brand-tokens.spec.ts', 'e2e/film-line-stability.spec.ts', 'e2e/site-alignment.spec.ts', 'e2e/solutions-workflows.spec.ts', 'e2e/templates.spec.ts', 'e2e/type-scale.spec.ts'].every(file => PUBLIC_MARKETING_AFFECTED_BROWSER_FILES.includes(file))
   && ["['e2e/templates.spec.ts', ['1440']],", "['e2e/type-scale.spec.ts', ['1440']],", "['e2e/site-alignment.spec.ts', ['1440']],", "['e2e/brand-tokens.spec.ts', ['1440']],", "['e2e/benchmarks.spec.ts', ['1440']],", "['e2e/film-line-stability.spec.ts', ['390']],"].every(row => sharedMap.includes('\n  ' + row)),
   'Public marketing owner must keep the reviewed package.json postimage and a reviewed project row for each UX program browser suite');
+// Ops capacity (2026-11-10), restated independently: the CDR worker README states the queue consumer's concurrency
+// contract with wrangler.jsonc, so it selects only the worker owner and its worker checks; no other README is admitted.
+{
+  const owners = AFFECTED_GROUPS.filter(owner => owner.match.test('quarantine-sidecar/foundation-cdr-worker/README.md'));
+  assert(owners.length === 1 && owners[0].group === 'ocr-worker' && owners[0].worker === true && !owners[0].unitFiles.length
+    && ['quarantine-sidecar/foundation-cdr-worker/src/README.md', 'quarantine-sidecar/foundation-cdr-worker/docs/README.md', 'quarantine-sidecar/README.md']
+      .every(p => !owners[0].match.test(p)),
+    'CDR worker README must select exactly the ocr-worker owner and its worker checks (ops capacity 2026-11-10)');
+}
 // COPY re-review R2-N2, restated independently: public/llms.txt selects g1-copy-truth through public-marketing-surface, and
 // landing-page.tsx selects copy-trust-guard through home-landing. Each path keeps exactly its one owner.
 for (const [path, group, suite] of [['nextjs/public/llms.txt', 'public-marketing-surface', 'lib/g1-copy-truth.test.ts'],
