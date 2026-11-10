@@ -31,6 +31,7 @@ vi.mock("@/lib/r2-presign", () => ({
 vi.mock("@/lib/r2-synthetic-canary", () => ({
   readR2SignerEnv: () => ({ bucket: "foundation" }),
   headFoundationQuarantineObject: mocks.head,
+  putFoundationSourceApproval: async () => ({ ok: true }),
 }));
 vi.mock("@/lib/intake-triage-server", () => ({ readReadyUploadTriage: mocks.readTriage }));
 vi.mock("@/lib/intake-triage-rollout", () => ({ INTAKE_TRIAGE_ROLLOUT_ENABLED: true }));

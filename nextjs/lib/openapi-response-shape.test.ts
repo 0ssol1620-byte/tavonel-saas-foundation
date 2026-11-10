@@ -102,6 +102,7 @@ vi.mock("@/lib/compute-reservation", async (importOriginal) => ({
 vi.mock("@/lib/r2-synthetic-canary", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./r2-synthetic-canary")>()),
   readR2SignerEnv: signerEnv,
+  putFoundationSourceApproval: async () => ({ ok: true }),
 }));
 vi.mock("@/lib/r2-presign", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./r2-presign")>()),

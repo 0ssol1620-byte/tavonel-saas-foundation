@@ -52,6 +52,7 @@ vi.mock("@/lib/r2-presign", () => ({
 vi.mock("@/lib/r2-synthetic-canary", () => ({
   readR2SignerEnv: mocks.signer, headFoundationQuarantineObject: mocks.headObject,
   headFoundationQuarantineSignature: mocks.headSignature,
+  putFoundationSourceApproval: async () => ({ ok: true }),
 }));
 vi.mock("@/lib/supabase-admin", () => ({
   readSupabaseAdminConfig: mocks.supabaseConfig, supabaseAdminRequest: mocks.supabaseRequest,

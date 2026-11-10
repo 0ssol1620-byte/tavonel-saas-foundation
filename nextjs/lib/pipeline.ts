@@ -47,7 +47,19 @@ export type DocumentRefusal = {
   /** What R2 reported for the source, when the worker got that far. Never estimated. */
   observedBytes: number | null;
   occurredAt: string;
+  /**
+   * Both set only when the worker refused the source for having more pages than it was approved and
+   * reserved at (ADR-0006 F1): the count the CDR read, and the approval. Nothing was read or charged.
+   */
+  observedPages?: number;
+  approvedMaxPages?: number;
 };
+
+/** The page count to approve on a second upload of a source refused for exceeding its approval. */
+export function reapprovalPages(refusal: DocumentRefusal | undefined): number | null {
+  return refusal?.observedPages !== undefined && refusal.approvedMaxPages !== undefined
+    && refusal.observedPages > refusal.approvedMaxPages ? refusal.observedPages : null;
+}
 
 /**
  * `stored`: the source is in quarantine and nothing after it is recorded -- no immutable object
@@ -118,6 +130,10 @@ export function refusalDetail(refusal: DocumentRefusal): string {
   const size = refusal.observedBytes && refusal.observedBytes > 0
     ? `This source is ${bytes(refusal.observedBytes)}. `
     : "";
+  const reapprove = reapprovalPages(refusal);
+  if (reapprove !== null) {
+    return `This PDF has ${reapprove} pages, more than the ${refusal.approvedMaxPages} pages approved for it, so nothing was read or charged. Upload it again and approve ${reapprove} pages.`;
+  }
   switch (refusal.reasonCode) {
     case "PARSER_OOM":
       return `${size}${PROCESSING_CEILING_SENTENCE} Split it or connect the source system instead.`;
@@ -163,6 +179,8 @@ export type PipelineRow = {
    * time for says nothing, which is the rule every stage above it already follows.
    */
   observedAt: string | null;
+  /** Set when the source was refused for more pages than its approval: re-upload approving this many. */
+  reapprovePages?: number;
 };
 
 /** A file this browser is sending or has sent. The server list cannot see it until CDR runs. */
@@ -260,6 +278,7 @@ function rowFor(
     stages: [quarantine, sanitize, read, compile],
     needsPerson: [quarantine, sanitize, read, compile].some((item) => item.state === "held"),
     observedAt: server?.sanitizedObservedAt ?? null,
+    reapprovePages: reapprovalPages(server?.refusal) ?? undefined,
   };
 }
 

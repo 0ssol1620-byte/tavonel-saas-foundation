@@ -227,6 +227,18 @@ describe("a refused source", () => {
   it("leaves a document with no refusal exactly as it was", () => {
     const rows = buildPipeline([], [doc({ sanitizedKey: "k/sanitized.pdf" })]);
     expect(states(rows)).toEqual(["done", "done", "active", "waiting"]);
+    expect(rows[0].reapprovePages).toBeUndefined();
+  });
+
+  it("asks for re-approval at the real count when the PDF had more pages than it was approved at (ADR-0006 F1)", () => {
+    const rows = buildPipeline([], [doc({ processingState: "refused", refusal: { ...refusal, observedPages: 240, approvedMaxPages: 80 } })]);
+    expect(rows[0].stages[1].state).toBe("failed");
+    expect(rows[0].stages[1].detail).toBe(
+      "This PDF has 240 pages, more than the 80 pages approved for it, so nothing was read or charged. Upload it again and approve 240 pages.",
+    );
+    expect(rows[0].reapprovePages).toBe(240);
+    // A ceiling refusal carries no page counts and offers no re-approval.
+    expect(buildPipeline([], [doc({ processingState: "refused", refusal })])[0].reapprovePages).toBeUndefined();
   });
 });
 

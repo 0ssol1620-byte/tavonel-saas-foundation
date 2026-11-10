@@ -73,6 +73,8 @@ async function listQuarantineDocuments(
         reasonCode: result.receipt.reasonCode,
         observedBytes: result.receipt.observedBytes,
         occurredAt: result.receipt.occurredAt,
+        ...(result.receipt.observedPages !== undefined && result.receipt.approvedMaxPages !== undefined
+          ? { observedPages: result.receipt.observedPages, approvedMaxPages: result.receipt.approvedMaxPages } : {}),
       },
     } satisfies PipelineDocument]
     : []);

@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   calls: [] as string[],
   head: vi.fn(),
   presign: vi.fn(),
+  approval: vi.fn(),
   enqueueSingle: vi.fn(),
   runCompile: vi.fn(),
 }));
@@ -80,6 +81,7 @@ vi.mock("@/lib/r2-presign", async (importOriginal) => ({
 vi.mock("@/lib/r2-synthetic-canary", () => ({
   readR2SignerEnv: () => ({ accountId: "account", bucket: "bucket", accessKeyId: "key", secretAccessKey: "secret" }),
   headFoundationQuarantineObject: mocks.head,
+  putFoundationSourceApproval: mocks.approval,
   headFoundationQuarantineSignature: async () => ({ ok: true, exists: true, bytes: new TextEncoder().encode("%PDF-1.4\n%fixture\n") }),
 }));
 vi.mock("@/lib/self-service-trial", () => ({
@@ -134,6 +136,7 @@ beforeEach(() => {
   vi.stubEnv("TAVONEL_CUSTOMER_DATA_GATE_VERSION", "");
   mocks.calls.length = 0;
   mocks.head.mockReset().mockResolvedValue({ ok: true, exists: true, sizeBytes: 2048, contentType: "application/pdf", etag: "etag" });
+  mocks.approval.mockReset().mockResolvedValue({ ok: true });
   mocks.presign.mockReset().mockReturnValue({ ok: true, uploadUrl: "https://upload.invalid/signed", expiresAt: new Date(Date.now() + 300_000).toISOString() });
   mocks.enqueueSingle.mockReset().mockResolvedValue({
     ok: true, value: { jobId: "cjob-00000000000000000000000000000001", state: "queued", created: true },
@@ -156,6 +159,43 @@ describe("intake approval lineage off (the production default)", () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toMatchObject({ code: "QUALIFIED", uploadUrl: "https://upload.invalid/signed" });
       expect(mocks.calls).toEqual(["reserve_foundation_intake_admission", "reserve_foundation_compute_v3"]);
+    }
+  });
+
+  it("writes the approval beside the source, at the pages it reserved, before any upload URL (ADR-0006 F1)", async () => {
+    const ask = (estimatedPages?: number) => capabilityPost(json("https://tavonel.com/api/uploads/capability", {
+      originalFilename: "manual.pdf", declaredMimeType: "application/pdf", requestedBytes: 2048,
+      ...(estimatedPages === undefined ? {} : { estimatedPages }),
+    }));
+    // A PDF is never reserved under one request's pages; a counted one above that, at its count.
+    const counted = PROCESSING_CEILING.maxSourcePages;
+    expect((await ask(counted)).status).toBe(200);
+    const [signer, workspaceKey, approval] = mocks.approval.mock.calls[0];
+    expect(signer).toMatchObject({ bucket: "bucket" });
+    expect(typeof workspaceKey).toBe("string");
+    expect(approval).toMatchObject({
+      schemaVersion: "tavonel.source_approval.v1", approvedMaxPages: counted, pageBasis: "declared",
+      reservedCredits: counted * 4, maximumCredits: counted * 6,
+    });
+    expect(mocks.approval.mock.invocationCallOrder[0]).toBeLessThan(mocks.presign.mock.invocationCallOrder[0]);
+
+    // A PDF the browser could not count is approved, reserved and bounded at one request's pages.
+    expect((await ask()).status).toBe(200);
+    expect(mocks.approval.mock.calls[1][2]).toMatchObject({
+      approvedMaxPages: PROCESSING_CEILING.maxUnsegmentedSourcePages, pageBasis: "unknown",
+    });
+  });
+
+  it("issues no upload URL when the approval cannot be written", async () => {
+    for (const code of ["SOURCE_APPROVAL_WRITE_FAILED", "SOURCE_APPROVAL_CONFLICT"]) {
+      mocks.presign.mockClear();
+      mocks.approval.mockResolvedValueOnce({ ok: false, code });
+      const response = await capabilityPost(json("https://tavonel.com/api/uploads/capability", {
+        originalFilename: "manual.pdf", declaredMimeType: "application/pdf", requestedBytes: 2048, estimatedPages: 40,
+      }));
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toEqual({ code });
+      expect(mocks.presign).not.toHaveBeenCalled();
     }
   });
 

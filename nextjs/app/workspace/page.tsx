@@ -1285,6 +1285,8 @@ export default function WorkspacePage() {
   */
   const uploadLegacyDocument = async (
     file: File, manageBusy = true, onRefusal?: (reason: string) => void, measured?: PageCountResult | null,
+    /** ADR-0006 F1: the count a refused source was read at, approved on its second upload. */
+    approvePages?: number,
   ): Promise<string | null> => {
     if (!intakeOpen) { setNotice(intakeClosedCopy); onRefusal?.(intakeClosedCopy); return null; }
     const sourceLabel = (file as WorkspaceUploadFile).tavonelRelativePath || file.name;
@@ -1334,11 +1336,11 @@ export default function WorkspacePage() {
             any byte is sent rather than the rasterizer refusing it after. A declared DOCX count or
             a PPTX slide count is not sent: either can exceed what the file renders to.
           */
-          estimatedPages: estimateBillablePages({
+          estimatedPages: Math.max(approvePages ?? 0, estimateBillablePages({
             bytes: file.size,
             mimeType: file.type || "application/pdf",
             ...refusablePageCount(measured),
-          })?.pages,
+          })?.pages ?? 0) || undefined,
         }),
       });
       const json = await capability.json() as { code?: string; documentId?: string; uploadUrl?: string; declaredMimeType?: string; limit?: unknown };
@@ -1867,6 +1869,23 @@ export default function WorkspacePage() {
    * failure and silently abandoned the rest; the ones already in the bucket are still there and
    * still being read, so the report now names the failure and keeps going.
    */
+  /*
+    ADR-0006 F1: a PDF the browser could not count is approved at one request's pages, and the
+    worker refuses it at zero credits when it turns out longer, with the count it read. Re-approval
+    is a second upload of the same file at that count -- safe to approve on the customer's word,
+    because the worker reads no further than the approval and refuses a count that is too low.
+  */
+  const reapproveSource = (pages: number) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/pdf,.pdf";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (file) void uploadLegacyDocument(file, true, undefined, null, pages);
+    };
+    input.click();
+  };
+
   // main's batch over the per-file upload above, for when the approval lineage is off.
   const uploadLegacyDocuments = async (files: File[], measured?: PageCountResult[] | null) => {
     if (files.length === 0) return;
@@ -3515,6 +3534,7 @@ export default function WorkspacePage() {
               noComputeAccess={accessSource === "unentitled"}
               selectableIds={intakeOpen ? compilableDocumentIds : []}
               selectedIds={selectedDocumentIds}
+              onReapprove={intakeOpen && !INTAKE_APPROVAL_ROLLOUT_ENABLED ? reapproveSource : undefined}
               onToggleSelected={(documentId) => setSelectedDocumentIds((current) => current.includes(documentId)
                 ? current.filter((id) => id !== documentId)
                 : [...current, documentId])}

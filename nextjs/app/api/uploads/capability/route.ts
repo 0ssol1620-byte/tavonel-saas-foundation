@@ -13,13 +13,14 @@ import {
   PROCESSING_CEILING_SENTENCE,
   presignFoundationQuarantinePut,
 } from "@/lib/r2-presign";
-import { headFoundationQuarantineObject, readR2SignerEnv } from "@/lib/r2-synthetic-canary";
+import { headFoundationQuarantineObject, putFoundationSourceApproval, readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { readReadyUploadTriage } from "@/lib/intake-triage-server";
 import { INTAKE_TRIAGE_ROLLOUT_ENABLED } from "@/lib/intake-triage-rollout";
 import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "@/lib/intake-approval-rollout";
 import { deterministicSourceDocumentId, validSourceIdempotencyKey } from "@/lib/source-intake";
 import { intakePricingFingerprint, reservationPageCeiling } from "@/lib/usage-pricing";
 import { maxSourcePagesFor } from "../../../../../shared/intakeCeiling";
+import { SOURCE_APPROVAL_SCHEMA } from "../../../../../shared/sourceApproval";
 import { approvedSourceIdempotencyKey, ATTEMPT_KEY_PATTERN, FILE_KEY_PATTERN, SHA256_DIGEST_PATTERN } from "@/lib/intake-approval";
 
 export const dynamic = "force-dynamic";
@@ -187,6 +188,11 @@ export async function POST(request: Request) {
     workspaceKey: workspaceId, userId: auth.principal.userId, attemptKey, scopeDigest, pricingFingerprint, fileKey, documentId,
   });
   if (!compute.ok) return NextResponse.json({ code: compute.code }, { status: compute.status, headers: NO_STORE });
+  const approvalWritten = await writeSourceApproval(signer, workspaceId, {
+    documentId, approvedMaxPages: compute.result.approvedMaxPages, pageBasis: compute.result.pageBasis,
+    reservedCredits: compute.result.approvedReservedCredits, maximumCredits: compute.result.approvedMaximumCredits,
+  });
+  if (approvalWritten) return approvalWritten;
   if (!INTAKE_TRIAGE_ROLLOUT_ENABLED) {
     const signed = presignFoundationQuarantinePut(signer, {
       key: objectKey, contentType: qualified.normalizedMimeType, contentLength: requestedBytes, expiresInSeconds: 300,
@@ -242,6 +248,26 @@ export async function POST(request: Request) {
 }
 
 /*
+  ADR-0006 F1: the worker reads a source only within the pages approved and reserved for it, and it
+  learns that number from here. So the approval is written beside the source before any upload URL
+  exists, and no URL is issued without it. The reservation already made is left to lapse with the
+  admission, as it is for every other failure after reserving in this route; a retry of the same
+  capability replays both and finds the same approval.
+
+  A page count the customer states (`estimatedPages`) is safe to approve at because of this: a count
+  too high only reserves more, and a count too low is refused by the worker at zero credits.
+*/
+async function writeSourceApproval(
+  signer: NonNullable<ReturnType<typeof readR2SignerEnv>>,
+  workspaceId: string,
+  approval: { documentId: string; approvedMaxPages: number; pageBasis: "measured" | "declared" | "unknown";
+    reservedCredits: number; maximumCredits: number },
+): Promise<NextResponse | null> {
+  const written = await putFoundationSourceApproval(signer, workspaceId, { schemaVersion: SOURCE_APPROVAL_SCHEMA, ...approval });
+  return written.ok ? null : NextResponse.json({ code: written.code }, { status: 503, headers: NO_STORE });
+}
+
+/*
   The approval lineage is off (lib/intake-approval-rollout.ts): main dbe22b1e's per-file path,
   unchanged. One file reserves its own compute through reserve_foundation_compute_v3, as it does in
   production today, and no approval RPC is called.
@@ -261,8 +287,9 @@ async function legacyCapability(request: Request, input: {
     bytes: requestedBytes,
     mimeType: input.normalizedMimeType,
   });
-  const clientEstimate = typeof input.estimatedPages === "number" && Number.isSafeInteger(input.estimatedPages)
-    && input.estimatedPages >= 1 ? input.estimatedPages : serverEstimate;
+  const clientCounted = typeof input.estimatedPages === "number" && Number.isSafeInteger(input.estimatedPages)
+    && input.estimatedPages >= 1;
+  const clientEstimate = clientCounted ? input.estimatedPages as number : serverEstimate;
   const reservationPages = Math.max(serverEstimate, clientEstimate);
   /*
     A counted file over the page ceiling is refused here, before a URL or a reservation exists.
@@ -351,6 +378,11 @@ async function legacyCapability(request: Request, input: {
       },
     );
   }
+  const approvalWritten = await writeSourceApproval(signer, workspaceId, {
+    documentId, approvedMaxPages: reservationPages, pageBasis: clientCounted && clientEstimate >= serverEstimate ? "declared" : "unknown",
+    reservedCredits: compute.result.reservedCredits, maximumCredits: compute.result.maximumCredits,
+  });
+  if (approvalWritten) return approvalWritten;
   const signed = presignFoundationQuarantinePut(signer, {
     key: objectKey,
     contentType: input.normalizedMimeType,
