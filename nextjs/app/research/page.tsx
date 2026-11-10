@@ -80,7 +80,7 @@ const AREAS = [
 const METHOD = [
   ["Freeze the configuration", "Model, revision, prompt, schema and price snapshot are pinned before a run, or the result is not comparable to anything."],
   ["Publish the denominator", "A rate without the population it was measured over is not a result. Every number carries what it was measured on."],
-  ["Publish what failed", "A hypothesis that did not hold is a finding. It is recorded with the same weight as one that did."],
+  ["Link every number to its receipt", "Every figure links to the receipt it came from, and the receipt holds the complete result the figure was read from."],
   ["Reproduce before comparing", "A competitor's published score is quoted as theirs, never restated as something we reproduced. Comparative claims wait for a same-condition run."],
 ] as const;
 

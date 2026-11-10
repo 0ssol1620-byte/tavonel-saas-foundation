@@ -16,7 +16,7 @@ import { PublicSitePage } from "@/components/public-site-chrome";
   back, with the leaderboard, when there is one.
 */
 export const metadata: Metadata = {
-  title: "Arena — TAVONEL",
+  title: "Measured results — TAVONEL",
   description: "Measured results and their receipts are published on Benchmarks.",
   alternates: { canonical: "/arena" },
   // Still its own address when someone shares the link. `noindex` governs the crawl; it does not

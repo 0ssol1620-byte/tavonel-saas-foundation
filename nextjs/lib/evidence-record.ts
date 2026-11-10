@@ -128,7 +128,7 @@ export const EVIDENCE: readonly EvidenceEntry[] = [
     state: "measured",
     title: "Results by document type",
     takeaway: "What this means for you: results depend on the kind of document, so the per-type breakdown in the receipt is a better guide than the overall average.",
-    body: "On olmOCR-Bench, scored by the benchmark's own evaluator at revision cfa88c1e over 1,403 documents and 8,413 checks, the overall score was 80.6. Standard digital documents passed 99.0% of their checks (1,380 of 1,394). The receipt lists the result for every document type in the set. Measured 2026-08-04. This is the with-recovery arm of R-01, a research measurement on that corpus and that build, not this service's live rate.",
+    body: "On olmOCR-Bench, scored by the benchmark's own evaluator at revision cfa88c1e over 1,403 documents and 8,413 checks, the overall score was 80.6. The receipt lists the result for every document type in the set. Measured 2026-08-04. This is the with-recovery arm of R-01, a research measurement on that corpus and that build, not this service's live rate.",
     receipt: {
       id: "R-03",
       of: "official olmOCR-Bench evaluation, by document type",

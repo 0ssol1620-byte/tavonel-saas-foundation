@@ -55,8 +55,8 @@ const QUALIFICATION = [
     "The record names the population it was measured over, and so does every individual metric. The same percentage over a whole corpus and over the subset that failed are two different findings that look identical without it.",
   ],
   [
-    "Publish what failed",
-    "The weaknesses ship with the run. A hypothesis that did not hold is a finding, and a table that only survives because its worst row was left out is worth less than no table.",
+    "Keep the complete result in the receipt",
+    "Every run ships with a downloadable receipt that holds its complete per-category result, so any figure on this site can be checked against the whole run it came from.",
   ],
   [
     "Reproduce before comparing",
@@ -92,8 +92,8 @@ const READING_A_NUMBER = [
     "Cost per page means nothing without the prices it was computed at, on the date it was computed.",
   ],
   [
-    "The failures the run produced",
-    "Published with the run, not summarised out of it. A table that survives only because its worst row was left out is worth less than no table.",
+    "The complete result",
+    "Every category the run covered is in its receipt, not only the figure quoted on a page.",
   ],
 ] as const;
 
@@ -216,7 +216,7 @@ export default function BenchmarksPage() {
               <p className={styles.state}>
                 The qualification contract defines what a knowledge-compilation result has to
                 carry: a frozen configuration, corpus and output digests, a named denominator,
-                published failures, and reproducible scoring material.
+                the complete per-category result, and reproducible scoring material.
               </p>
               {/*
                 B07's label is right that an absence with nothing said about it reads as an
