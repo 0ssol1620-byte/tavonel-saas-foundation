@@ -216,10 +216,8 @@ export default function EvidencePage() {
                 first tile rather than again after each one.
               */}
               <p className={styles.locatorState}>
-                Reader not shipped: none of these seven is read today. They are
-                the locator shapes the evidence contract is defined for, so a format that gains a
-                reader gains a locator that was already specified rather than one invented at the
-                time.
+                The evidence contract defines these seven locator shapes ahead of the readers
+                that use them. When a format gains a reader, its locator is already specified.
               </p>
               <div className="tiles" aria-describedby="contracted-locators">
                 {CONTRACTED_LOCATORS.map(([family, locator]) => (
@@ -280,8 +278,7 @@ export default function EvidencePage() {
               */}
               <p className="fine">
                 Every measurement behind these claims, with its denominator and its receipt, is in
-                the <Link href={"/research/notes" as Route}>research notes</Link> — including the
-                hypotheses that did not hold.
+                the <Link href={"/research/notes" as Route}>research notes</Link>.
               </p>
 
               {/* BA-088. The cross-links the deleted template sentence carried. */}

@@ -1042,12 +1042,12 @@ describe("public copy", () => {
       "the locator that reads today is marked as the one that does"
     ).toContain("Reading today");
     expect(
-      [...page.matchAll(/Reader not shipped/g)],
+      [...page.matchAll(/ahead of the readers/g)],
       "one statement, not one per tile"
     ).toHaveLength(1);
     expect(
       page
-        .slice(page.indexOf("Reader not shipped"))
+        .slice(page.indexOf("ahead of the readers"))
         .indexOf("CONTRACTED_LOCATORS.map"),
       "the state is read before the grid, not after it"
     ).toBeGreaterThan(0);
@@ -1055,7 +1055,7 @@ describe("public copy", () => {
       "See current locator coverage"
     );
     // And may not be put inside one: nothing above the statement opens a disclosure at all.
-    expect(page.slice(0, page.indexOf("Reader not shipped"))).not.toContain(
+    expect(page.slice(0, page.indexOf("ahead of the readers"))).not.toContain(
       "<details"
     );
 

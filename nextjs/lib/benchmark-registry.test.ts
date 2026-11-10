@@ -517,9 +517,10 @@ describe("the /benchmarks page", () => {
     }
   });
 
-  it("reads the arena board from the validated artifact rather than retyping a row", () => {
-    expect(page).toContain('from "@/lib/model-arena-page-data"');
-    expect(page).toContain("modelArenaBoard()");
+  it("does not render the internal model-selection board, and types no figure of its own", () => {
+    // 2026-11-10 public-copy cleanup (founder direction): intended re-pin. The document-reader board was an internal experiment and left the page.
+    expect(page).not.toContain('from "@/lib/model-arena-page-data"');
+    expect(page).not.toContain('from "@/components/benchmarks/arena-charts"');
     /*
       No decimal literal in this file. Every Edit distance, TEDS score and median on the page is
       a field of the artifact, formatted where it is rendered; a float typed here would be a

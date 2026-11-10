@@ -9,8 +9,8 @@ import { expect, test, type Page } from "@playwright/test";
   moving under reduced motion, and receipt links that land on a note that prints the whole digest.
 */
 
-// FINAL-SPEC 2026-10-26 §2.2: R-01 (80.6) -> R-02 (0) -> R-03 (36.9%); the 36.9% row is still printed.
-const RECEIPTS = ["R-01", "R-02", "R-03"] as const;
+// FINAL-SPEC 2026-10-26 §2.2: R-01 (80.6) -> R-02 (0). 2026-11-10 public-copy cleanup (founder direction): intended re-pin. R-03 left the Home band.
+const RECEIPTS = ["R-01", "R-02"] as const;
 
 async function seedRefusal(page: Page) {
   // Not a consent spec: a stored refusal keeps the delayed card from covering a measurement.
@@ -18,7 +18,7 @@ async function seedRefusal(page: Page) {
 }
 
 for (const route of ["/"]) {
-  test(`${route} prints three receipted measures between the hero and the workbench`, async ({ page }, testInfo) => {
+  test(`${route} prints two receipted measures between the hero and the workbench`, async ({ page }, testInfo) => {
     test.skip(!["1440", "390"].includes(testInfo.project.name), "one desktop and one phone width");
     await seedRefusal(page);
     await page.goto(route);
@@ -28,11 +28,11 @@ for (const route of ["/"]) {
     expect(order).toEqual(["s1", "band", "s2"]);
     const band = page.locator("main > section[data-home-measures]");
     await expect(band.getByRole("heading", { level: 2 })).toHaveCount(1);
-    await expect(band.locator("li[data-claim-id]")).toHaveCount(3);
+    await expect(band.locator("li[data-claim-id]")).toHaveCount(RECEIPTS.length);
     expect(await band.locator("a[data-receipt]").evaluateAll(links => links.map(link => link.getAttribute("href")))).toEqual(
       RECEIPTS.map(id => `/research/notes#${id}`),
     );
-    await expect(band).toContainText(route === "/ko" ? "저품질 스캔본" : "low-quality scans");
+    await expect(band).not.toContainText(route === "/ko" ? "저품질 스캔본" : "low-quality scans");
     const text = await band.evaluate(node => {
       const sizes = [...node.querySelectorAll<HTMLElement>("*")]
         .filter(element => [...element.childNodes].some(child => child.nodeType === Node.TEXT_NODE && child.textContent!.trim()))
