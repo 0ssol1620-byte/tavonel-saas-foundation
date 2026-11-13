@@ -8,7 +8,7 @@ type PaddleCheckoutOptions = {
 type PaddleBrowser = {
   Environment: { set(environment: "sandbox"): void };
   Initialize(options: { token: string; eventCallback?: (event: PaddleEvent) => void }): void;
-  Checkout: { open(options: PaddleCheckoutOptions): void };
+  Checkout: { open(options: PaddleCheckoutOptions): void; close?(): void };
 };
 
 declare global {

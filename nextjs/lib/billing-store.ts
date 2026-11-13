@@ -100,6 +100,35 @@ export async function getFoundationBillingAccount(workspaceKey: string, userId: 
 }
 
 /**
+ * The latest subscription payment the billing projection granted to this workspace: the newest
+ * `transaction.completed` it recorded as `allowance_granted`. Its allowance rows carry no
+ * subscription id (20260911130000), and a workspace holds one subscription at a time, so the
+ * workspace and payer identify it. `paidAt` is null when none is recorded. A failed read says so.
+ */
+export async function getLatestSubscriptionPayment(workspaceKey: string, userId: string) {
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false as const, code: "BILLING_STORE_NOT_CONFIGURED" };
+  const query = new URLSearchParams({
+    select: "occurred_at",
+    workspace_key: `eq.${workspaceKey}`,
+    user_id: `eq.${userId}`,
+    event_type: "eq.transaction.completed",
+    processing_result: "eq.allowance_granted",
+    order: "occurred_at.desc",
+    limit: "1",
+  });
+  try {
+    const response = await supabaseAdminRequest(config, `/rest/v1/foundation_billing_events?${query}`);
+    if (!response.ok) return { ok: false as const, code: "BILLING_STORE_READ_FAILED" };
+    const rows = await response.json() as Array<Record<string, unknown>>;
+    const occurredAt = rows[0]?.occurred_at;
+    return { ok: true as const, paidAt: typeof occurredAt === "string" ? occurredAt : null };
+  } catch {
+    return { ok: false as const, code: "BILLING_STORE_READ_FAILED" };
+  }
+}
+
+/**
  * Records what the checkout route authorized, while it is authorized: the binding's nonce and
  * the price and credits offered. The webhook settles a new binding from this row, so a gate that
  * closes or a price id that rotates after the buyer reached Paddle cannot drop their payment.

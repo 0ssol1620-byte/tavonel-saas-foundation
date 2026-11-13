@@ -3041,6 +3041,10 @@ export const TRUST_COPY_AFFECTED_PATHS = Object.freeze(['lib/explore-frame.test.
 export const TRUST_COPY_AFFECTED_UNIT_FILES = Object.freeze(['lib/explore-frame.test.ts', 'lib/public-package-proof.test.ts']);
 // sli-alert-noise-20261109: the probe-history reader signs at the real clock; the two SLI routes stop passing an evaluation instant to it.
 export const SLI_ALERT_NOISE_AFFECTED_PATHS = Object.freeze(['app/api/internal/sli/route.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe-store.ts']);
+// pricing-one-step-buy-20261110: the refund request route and its rule, the billing card's refund section, the
+// one-subscription checkout policy, the Paddle overlay type, and two suites re-pinned for Team self-serve.
+export const ONE_STEP_BUY_AFFECTED_PATHS = Object.freeze(['app/api/billing/refund-request/route.ts', 'app/api/contact/route.ts', 'components/billing-refund.tsx', 'components/contact-form.tsx', 'components/pipeline-board.tsx', 'lib/billing-refund-request.test.ts', 'lib/billing-store.ts', 'lib/category-guide.test.ts', 'lib/checkout-policy.test.ts', 'lib/checkout-policy.ts', 'lib/contact-route.test.ts', 'lib/paddle-browser.ts', 'lib/plan-feature-matrix.test.ts', 'lib/refund-eligibility.test.ts', 'lib/refund-eligibility.ts', 'lib/workspace-tenancy.test.ts']);
+export const ONE_STEP_BUY_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error-codes.test.ts', 'lib/billing-reconciliation.test.ts', 'lib/billing-refund-request.test.ts', 'lib/category-guide.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-policy.test.ts', 'lib/contact-route.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/output-escaping.test.ts', 'lib/plan-feature-matrix.test.ts', 'lib/production-route-surface.test.ts', 'lib/refund-eligibility.test.ts', 'lib/route-classification.test.ts', 'lib/use-checkout.test.ts', 'lib/workspace-tenancy.test.ts']);
 export const SLI_ALERT_NOISE_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error-codes.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-read-route.test.ts', 'lib/operational-sli.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts', 'lib/synthetic-probe-store.test.ts', 'lib/synthetic-probe.test.ts']);
 // hero-compile-tabs-20261110: the tabbed hero film (Extract/Link/Update/Use) in the light tone: the tab component and its stylesheet, the four
 // opening-film stages it plays, the tone module, the twenty tab cuts and posters, and the two scripts that made them. Exact
@@ -3321,6 +3325,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // sli-alert-noise-20261109: 3 exact paths select 10 direct suites and no browser suite.
   affectedGroup('sli-alert-noise-20261109', new RegExp(`^nextjs/(?:${exactPathAlternation(SLI_ALERT_NOISE_AFFECTED_PATHS)})$`),
     { unitFiles: SLI_ALERT_NOISE_AFFECTED_UNIT_FILES }),
+  // pricing-one-step-buy-20261110: 16 exact paths select 15 direct suites and no browser suite.
+  affectedGroup('pricing-one-step-buy-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(ONE_STEP_BUY_AFFECTED_PATHS)})$`),
+    { unitFiles: ONE_STEP_BUY_AFFECTED_UNIT_FILES }),
   // hero-compile-tabs-20261110: 29 exact paths select 5 direct suites and 4 browser suites.
   affectedGroup('hero-compile-tabs-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(HERO_COMPILE_TABS_AFFECTED_PATHS)})$`),
     { unitFiles: HERO_COMPILE_TABS_AFFECTED_UNIT_FILES, browserFiles: HERO_COMPILE_TABS_AFFECTED_BROWSER_FILES }),

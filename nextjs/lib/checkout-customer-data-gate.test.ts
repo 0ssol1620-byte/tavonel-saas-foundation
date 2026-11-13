@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { gate, intent, commercial, binding } = vi.hoisted(() => ({
+const { gate, intent, commercial, binding, billingAccount } = vi.hoisted(() => ({
+  billingAccount: vi.fn(),
   gate: vi.fn(),
   intent: vi.fn(),
   commercial: vi.fn(),
@@ -21,7 +22,10 @@ vi.mock("@/lib/billing-catalog", async (original) => ({
     ? { environment: "sandbox", clientToken: `test_${"a".repeat(30)}` }
     : { environment: "production", clientToken: `live_${"a".repeat(30)}` },
 }));
-vi.mock("@/lib/billing-store", () => ({ issueFoundationCheckoutIntent: intent }));
+vi.mock("@/lib/billing-store", () => ({
+  issueFoundationCheckoutIntent: intent,
+  getFoundationBillingAccount: billingAccount,
+}));
 vi.mock("@/lib/commercial-state", () => ({ readCommercialState: commercial }));
 vi.mock("@/lib/customer-data-admission", async () => ({
   readCustomerSourceAuthorization: gate,
@@ -58,7 +62,28 @@ describe("live checkout requires the buyer's document-processing receipt", () =>
     commercial.mockReturnValue({ provider: "production", checkoutEnabled: true, liveChargesEnabled: true });
     binding.mockReturnValue({ tavonel_nonce: "nonce" });
     intent.mockResolvedValue({ ok: true });
+    billingAccount.mockResolvedValue({ ok: true, account: { accessPlan: null, subscriptionStatus: "inactive", subscriptionCancelAt: null, paddleSubscriptionId: null } });
   });
+
+  // R1 review (2026-11-10): a held subscription the projection would not replace refuses before any intent.
+  for (const [subscriptionStatus, code] of [
+    ["past_due", "BILLING_SUBSCRIPTION_NEEDS_PORTAL"],
+    ["paused", "BILLING_SUBSCRIPTION_NEEDS_PORTAL"],
+    ["canceled", "BILLING_RESUBSCRIBE_CONTACT"],
+    ["active", "BILLING_PLAN_ALREADY_ACTIVE"],
+  ] as const) {
+    it(`refuses a second subscription over a ${subscriptionStatus} one before any payment intent exists`, async () => {
+      gate.mockResolvedValue(approved());
+      billingAccount.mockResolvedValue({ ok: true, account: {
+        accessPlan: "observer_access", subscriptionStatus, subscriptionCancelAt: null, paddleSubscriptionId: `sub_${"a".repeat(26)}`,
+      } });
+      const response = await POST(request());
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toEqual({ code });
+      expect(binding).not.toHaveBeenCalled();
+      expect(intent).not.toHaveBeenCalled();
+    });
+  }
 
   it("refuses to create a live payment intent when this workspace cannot compile", async () => {
     gate.mockResolvedValue(refused);

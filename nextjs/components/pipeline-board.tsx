@@ -48,7 +48,7 @@ function failureCopy(detail: string) {
   if (detail.includes("FILE_TOO_LARGE") || detail.includes("INTAKE_FILE_TOO_LARGE")) return "This file exceeds the 250 MB direct-upload limit. Connect the source system instead of uploading it directly.";
   if (detail.includes("UNQUALIFIED_MIME")) return `This file type is not supported yet. Use ${acceptedFormatSentence}.`;
   if (detail.includes("FILENAME_MIME_MISMATCH")) return "The file extension and detected browser type disagree. Export the source again with its correct format and retry.";
-  if (detail.includes("TRIAL_ARCHIVE_NOT_INCLUDED")) return "ZIP archives are not included in Free Evaluation. Upload the files directly or use Developer access.";
+  if (detail.includes("TRIAL_ARCHIVE_NOT_INCLUDED")) return "ZIP archives are not included in Free Evaluation. Upload the files directly or use Starter or Pro.";
   if (detail.includes("UNQUALIFIED_INPUT")) return "This source was rejected by the previous intake contract. Re-add it now; the direct-upload ceiling has been raised.";
   if (detail.includes("INTAKE_RATE_LIMITED")) return "Too many source bytes arrived at once. Wait a minute and retry; already accepted sources are safe.";
   if (detail.includes("INTAKE_DAILY_QUOTA_EXCEEDED")) return "This workspace reached its 24-hour direct-upload safety bound. Connect a source system or retry after the window resets.";

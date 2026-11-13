@@ -244,8 +244,9 @@ describe("2026-09-05 production hardening", () => {
   it("does not sell collaboration that has not shipped", () => {
     const catalog = read("lib/billing-catalog.ts");
     expect(catalog).not.toContain("Shared workspace onboarding");
-    expect(catalog).toContain("Guided corpus onboarding");
-    expect(catalog).toContain('saleChannel: "contact"');
+    // Starter/Pro rename (2026-11-10, founder, intended): guided onboarding is Enterprise only, and Pro names no membership.
+    expect(catalog).not.toContain('"Guided corpus onboarding"');
+    expect(catalog).not.toContain("Shared members and roles");
   });
 
   it("has one definitive Knowledge Compiler URL and production-gates capture routes", () => {

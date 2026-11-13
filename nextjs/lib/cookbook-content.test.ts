@@ -210,13 +210,14 @@ describe("the limits are read from the product, and sit above the calls to actio
   it("names the plans that activation needs, how each is sold, and who is refused", () => {
     const team = BILLING_OFFERS.studio_access;
     const developer = BILLING_OFFERS.observer_access;
-    expect(team.saleChannel, "if Team becomes self-serve the activation sentence must be re-read").toBe("contact");
+    // Team self-serve (2026-11-10, intended): the sentence was re-read and now says checkout.
+    expect(team.saleChannel, "if Team stops being self-serve the activation sentence must be re-read").toBe("self_serve");
     expect(developer.saleChannel, "if Developer stops being self-serve the same sentence must be re-read").toBe("self_serve");
     for (const record of COOKBOOKS) {
       const prerequisites = record.sections.find((section) => section.key === "prerequisites")!;
       expect(prerequisites.body, `${record.slug}: the activation plan is not named`).toContain(team.label);
       expect(prerequisites.body, `${record.slug}: the self-serve activation plan is not named`).toContain(developer.label);
-      expect(prerequisites.body).toContain("rather than self-serve checkout");
+      expect(prerequisites.body).toContain("available on self-serve checkout");
       expect(prerequisites.body, `${record.slug}: Developer activation is the owner's, not any member's`)
         .toContain("if you are the workspace owner");
       expect(prerequisites.body, `${record.slug}: the free evaluation activates one World and no more`)

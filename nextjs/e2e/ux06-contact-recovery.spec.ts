@@ -9,20 +9,21 @@ test("closed pricing CTAs stay on the evaluation/contact path when status is una
   await page.route("**/api/status/v2", route => route.abort());
   await page.goto("/pricing");
 
-  const developer = page.getByRole("link", { name: "Request Developer access", exact: true });
-  const team = page.getByRole("link", { name: "Talk to us about Team", exact: true });
+  const developer = page.getByRole("link", { name: "Request Starter access", exact: true });
+  // Team self-serve (2026-11-10, intended): Team's closed action reads as Developer's does.
+  const team = page.getByRole("link", { name: "Request Pro access", exact: true });
   const enterprise = page.getByRole("link", { name: "Scope an Enterprise pilot", exact: true }).first();
   const evaluation = page.getByRole("link", { name: "Explore a Compiled World", exact: true });
 
-  await expect(developer).toHaveAttribute("href", "/contact?plan=Developer");
-  await expect(team).toHaveAttribute("href", "/contact?plan=Team");
+  await expect(developer).toHaveAttribute("href", "/contact?plan=Starter");
+  await expect(team).toHaveAttribute("href", "/contact?plan=Pro");
   await expect(enterprise).toHaveAttribute("href", "/contact?plan=Enterprise");
   await expect(evaluation).toHaveAttribute("href", "/explore");
 
   await developer.click();
-  await expect(page).toHaveURL(/\/contact\?plan=Developer$/);
-  await expect(page.locator("[data-plan-intent]")).toHaveText("Inquiry about the Developer plan");
-  await expect(page.locator('input[name="plan"]')).toHaveValue("Developer");
+  await expect(page).toHaveURL(/\/contact\?plan=Starter$/);
+  await expect(page.locator("[data-plan-intent]")).toHaveText("Inquiry about the Starter plan");
+  await expect(page.locator('input[name="plan"]')).toHaveValue("Starter");
 });
 
 test("native contact validation focuses Name and sends no request", async ({ page }, testInfo) => {
@@ -50,7 +51,7 @@ test("a mocked 503 keeps answers and returns keyboard focus to the retry button"
       body: JSON.stringify({ error: "private stack trace SECRET-DB-DETAILS" }),
     });
   });
-  await page.goto("/contact?plan=Developer");
+  await page.goto("/contact?plan=Starter");
   await page.locator('input[name="name"]').fill("Avery Chen");
   await page.locator('input[name="email"]').fill("avery@example.com");
   await page.locator('textarea[name="message"]').fill("We need a source-linked knowledge review for a small team.");

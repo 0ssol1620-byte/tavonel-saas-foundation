@@ -67,7 +67,7 @@ export async function installNetworkFence(context: BrowserContext, baseURL: stri
   arrives unless a spec sends it.
 */
 const FAKE_PADDLE_SCRIPT = `(() => {
-  const state = { environments: [], initialized: [], opened: [], callback: null };
+  const state = { environments: [], initialized: [], opened: [], closed: 0, callback: null };
   Object.defineProperty(window, "__fakePaddle", { value: state });
   window.Paddle = {
     Environment: { set(environment) { state.environments.push(environment); } },
@@ -75,7 +75,10 @@ const FAKE_PADDLE_SCRIPT = `(() => {
       state.initialized.push({ token: options.token });
       state.callback = typeof options.eventCallback === "function" ? options.eventCallback : null;
     },
-    Checkout: { open(options) { state.opened.push(JSON.parse(JSON.stringify(options))); } },
+    Checkout: {
+      open(options) { state.opened.push(JSON.parse(JSON.stringify(options))); },
+      close() { state.closed += 1; },
+    },
   };
 })();`;
 
@@ -108,6 +111,11 @@ export function paddleCalls(page: Page): Promise<FakePaddleCalls | null> {
   });
 }
 
+/** How often the page closed the overlay itself (one-step buy, 2026-11-10: after checkout.completed on /pricing). */
+export function paddleClosed(page: Page): Promise<number> {
+  return page.evaluate(() => (window as unknown as { __fakePaddle?: { closed: number } }).__fakePaddle?.closed ?? 0);
+}
+
 /** Plays Paddle's side of the overlay: delivers one event to the callback the page registered. */
 export function emitPaddleEvent(page: Page, name: string): Promise<boolean> {
   return page.evaluate((eventName) => {
@@ -123,7 +131,7 @@ export const SANDBOX_CHECKOUT_READY = {
   code: "CHECKOUT_READY",
   environment: "sandbox",
   clientToken: "test_fixture_journey_client_token",
-  offer: { code: "observer_access", kind: "subscription", label: "Developer", priceId: "pri_01journeyfixture0000000000", credits: 2_000 },
+  offer: { code: "observer_access", kind: "subscription", label: "Starter", priceId: "pri_01journeyfixture0000000000", credits: 2_000 },
   customer: { email: "audit-e2e@example.invalid" },
   customData: { tavonel_binding: "fixture-binding-not-signed", tavonel_offer: "observer_access" },
 } as const;

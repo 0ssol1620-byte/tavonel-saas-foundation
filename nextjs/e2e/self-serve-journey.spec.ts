@@ -45,6 +45,7 @@ import {
   installNetworkFence,
   installPortalStub,
   paddleCalls,
+  paddleClosed,
 } from "./fixtures/paddle-fixture";
 import {
   INACTIVE_BILLING,
@@ -114,6 +115,29 @@ async function answerCheckout(page: Page, reply: () => CheckoutReply) {
     return answer === "abort" ? route.abort("failed") : route.fulfill({ status: answer.status, json: answer.json });
   });
   return posts;
+}
+
+/** The published processing-terms offer, as `GET /api/access/processing-terms` serves it. */
+const TERMS_OFFER = {
+  version: "2026-09-30",
+  terms: { path: "/policy/TAVONEL_SELF_SERVICE_TERMS_2026-09-30.md", sha256: `sha256:${"a".repeat(64)}` },
+  processing: { path: "/policy/TAVONEL_PROCESSING_ADDENDUM_2026-09-30.md", sha256: `sha256:${"b".repeat(64)}` },
+  scopes: ["direct_upload", "connector"],
+};
+
+/** Serves the terms offer and records each acceptance POST; `accepted` flips on the first one. */
+async function installTermsRoutes(page: Page) {
+  const state = { accepted: false, posts: 0 };
+  await page.route("**/api/access/processing-terms", (route) => {
+    if (route.request().method() === "GET") return route.fulfill({ json: TERMS_OFFER });
+    state.posts += 1;
+    state.accepted = true;
+    return route.fulfill({ status: 201, json: { code: "PROCESSING_TERMS_ACCEPTED", receipt: {
+      acceptanceId: "5f2b8a4e-2c1d-4b7a-9e3f-0a1b2c3d4e5f", scope: "direct_upload", termsVersion: TERMS_OFFER.version,
+      terms: TERMS_OFFER.terms, processing: TERMS_OFFER.processing, acceptedAt: "2026-11-10T10:00:00.000Z", idempotentReplay: false,
+    } } });
+  });
+  return state;
 }
 
 /** A new account today: signed in, terms not yet accepted, no processing (journey H5-H6). */
@@ -240,9 +264,10 @@ test.describe("launch approval withheld (purchase closed; customer processing sw
 
     // H2. Every plan action is a conversation, and the gate is stated in the policy's own words.
     await page.goto("/pricing");
-    const developer = page.getByRole("link", { name: "Request Developer access" });
-    await expect(developer).toHaveAttribute("href", "/contact?plan=Developer");
-    await expect(page.getByRole("link", { name: "Talk to us about Team" })).toHaveAttribute("href", "/contact?plan=Team");
+    const developer = page.getByRole("link", { name: "Request Starter access" });
+    await expect(developer).toHaveAttribute("href", "/contact?plan=Starter");
+    // Team self-serve (2026-11-10, intended): Team reads as Developer does while purchase is closed.
+    await expect(page.getByRole("link", { name: "Request Pro access" })).toHaveAttribute("href", "/contact?plan=Pro");
     for (const enterprise of await page.getByRole("link", { name: "Scope an Enterprise pilot" }).all()) {
       await expect(enterprise).toHaveAttribute("href", "/contact?plan=Enterprise");
     }
@@ -250,7 +275,7 @@ test.describe("launch approval withheld (purchase closed; customer processing sw
     await expect(page.locator('[data-purchase-gate="customerData"]')).toHaveCount(0);
     await expectNoCheckoutDoor(page);
     await developer.click();
-    await expect(page).toHaveURL(/\/contact\?plan=Developer$/);
+    await expect(page).toHaveURL(/\/contact\?plan=Starter$/);
     await expect(page.locator("form.contact-form")).toBeVisible();
 
     // H3-H5. The one door left: an offer typed into the sign-in URL by hand.
@@ -268,15 +293,17 @@ test.describe("launch approval withheld (purchase closed; customer processing sw
     const posts = await answerCheckout(page, () => ({ status: 503, json: { code: "BILLING_LAUNCH_PENDING" } }));
     await page.goto("/auth/callback");
 
-    // H15. The resumed checkout ends in a sentence, read as an alert, with nothing opened.
+    // H15. One-step buy (2026-11-10, intended): the held offer returns to /pricing, and the resumed
+    // checkout ends there in a sentence in the Developer card, read as an alert, with nothing opened.
     const refusal = region(page, "alert", `Checkout is unavailable. ${failureSentence("BILLING_LAUNCH_PENDING", 503)}`);
     await expect(refusal).toBeVisible();
     await expect(refusal).not.toContainText("BILLING_LAUNCH_PENDING");
-    await expect(page).toHaveURL(/\/workspace$/);
+    await expect(page).toHaveURL(/\/pricing$/);
     expect(posts).toEqual([{ offerCode: "observer_access" }]);
     expect(paddle.loads(), "no Paddle script is fetched while purchase is closed").toBe(0);
 
     // H6. The closed workspace points at the public example and offers no file control.
+    await page.goto("/workspace", { waitUntil: "domcontentloaded" });
     const strip = page.getByRole("status").filter({ hasText: "Workspace ready" });
     // FUNNEL-SIGNED-IN #5: before consent the strip names the one step left, not "pending".
     await expect(strip).toContainText("One step left");
@@ -370,7 +397,7 @@ test.describe("launch approval withheld (purchase closed; customer processing sw
 });
 
 test.describe("simulated switch-on (browser mocks only)", () => {
-  test("pricing → sign-in → callback → checkout → overlay → checkout.completed → entitlement without reload → portal", async ({ page, baseURL }) => {
+  test("pricing → sign-in → back on pricing → checkout → overlay → checkout.completed → success on pricing → portal", async ({ page, baseURL }) => {
     test.setTimeout(90_000);
     await declineAnalytics(page);
     await servePosture(page, "switch-on");
@@ -378,11 +405,12 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     const authorize = await stubProvider(page);
     const portal = await installPortalStub(page);
 
-    // H2. Developer goes through sign-in carrying the offer; Team stays a conversation.
+    // H2. Developer and Team go through sign-in carrying the offer (Team self-serve, 2026-11-10); Enterprise stays a conversation.
     await page.goto("/pricing");
-    const developer = page.getByRole("link", { name: "Buy Developer — $29/month" });
+    const developer = page.getByRole("link", { name: "Buy Starter — $29/month" });
     await expect(developer).toHaveAttribute("href", "/login?next=checkout&offer=observer_access");
-    await expect(page.getByRole("link", { name: "Talk to us about Team" })).toHaveAttribute("href", "/contact?plan=Team");
+    await expect(page.getByRole("link", { name: "Buy Pro — $99/month" })).toHaveAttribute("href", "/login?next=checkout&offer=studio_access");
+    await expect(page.getByRole("link", { name: "Scope an Enterprise pilot" }).first()).toHaveAttribute("href", "/contact?plan=Enterprise");
     await tabTo(page, developer);
     await page.keyboard.press("Enter");
 
@@ -413,9 +441,10 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     const posts = await answerCheckout(page, () => ({ status: 200, json: SANDBOX_CHECKOUT_READY }));
     await page.goto("/auth/callback");
 
-    // H6 + H15. The held offer resumes once, as an offer code and nothing else.
-    await expect(region(page, "status", "Developer sandbox checkout opened. Only a verified webhook can change entitlements.")).toBeVisible();
-    await expect(page).toHaveURL(/\/workspace$/);
+    // H6 + H15. One-step buy (2026-11-10, intended): sign-in returns to /pricing, which strips the
+    // offer from the address and resumes it once, as an offer code and nothing else.
+    await expect(region(page, "status", "Starter sandbox checkout opened. Only a verified webhook can change entitlements.")).toBeVisible();
+    await expect(page).toHaveURL(/\/pricing$/);
     expect(posts).toEqual([{ offerCode: "observer_access" }]);
     expect(paddle.loads()).toBe(1);
     expect(await paddleCalls(page)).toEqual({
@@ -425,31 +454,27 @@ test.describe("simulated switch-on (browser mocks only)", () => {
         items: [{ priceId: SANDBOX_CHECKOUT_READY.offer.priceId, quantity: 1 }],
         customer: SANDBOX_CHECKOUT_READY.customer,
         customData: SANDBOX_CHECKOUT_READY.customData,
-        // Journey A11: the overlay follows the page it opens on (English here).
-        // Direction C: the workspace the held offer resumes in is a light page now, and the overlay follows its scheme.
+        // Journey A11: the overlay follows the page it opens on (English, and /pricing is a light page).
         settings: { displayMode: "overlay", theme: "light", locale: "en" },
       }],
     });
-    const trialStrip = page.getByRole("status").filter({ hasText: "Free evaluation" });
-    // FUNNEL-SIGNED-IN #3: the strip keeps a quiet way to the plans; the ask itself waits for a limit.
-    await expect(trialStrip.getByRole("link", { name: "Plans", exact: true })).toHaveAttribute("href", "/pricing");
-    await expect(trialStrip.getByRole("link", { name: "Upgrade to Developer" })).toHaveCount(0);
     await page.evaluate(() => { (window as unknown as { __journeyNoReload: boolean }).__journeyNoReload = true; });
 
-    // H16. Paddle reports the payment; the signed webhook lands (billing and bootstrap turn paid).
-    const bootstrapsBefore = state.bootstraps;
+    // H16. Paddle reports the payment; the signed webhook lands (billing turns paid). The page closes
+    // the overlay and states the outcome itself, pending first.
     state.account = ACTIVE_DEVELOPER;
     state.paid = true;
     expect(await emitPaddleEvent(page, "checkout.completed")).toBe(true);
-    await expect(region(page, "status", "Paddle accepted the sandbox payment.")).toBeVisible();
+    const outcome = page.locator("section.pricing-purchase");
+    await expect(outcome.getByRole("heading", { name: "Payment accepted." })).toBeVisible();
+    await expect(outcome).toBeFocused();
+    expect(await paddleClosed(page), "the buyer is not left on Paddle's own success screen").toBe(1);
 
-    // H17 (journey A4). The bounded wait reads the arrival and the shell re-reads access, no reload.
-    await expect(region(page, "status", entitlementActiveSentence("Developer"))).toBeVisible({ timeout: 10_000 });
-    await expect.poll(() => state.bootstraps).toBeGreaterThan(bootstrapsBefore);
-    await expect(trialStrip).toHaveCount(0);
+    // H17 (journey A4). The bounded wait reads the arrival: the plan and its catalog pages, no reload.
+    await expect(outcome.getByRole("heading", { name: "Starter is active." })).toBeVisible({ timeout: 10_000 });
+    await expect(outcome).toContainText("500 pages this month.");
     expect(await page.evaluate(() => (window as unknown as { __journeyNoReload?: boolean }).__journeyNoReload), "the page was not reloaded").toBe(true);
-    await page.getByLabel("More workspace tools").first().click();
-    await expect(page.getByRole("button", { name: "Developer tools" })).toBeVisible();
+    await expect(outcome.getByRole("link", { name: "Open your workspace" })).toHaveAttribute("href", "/workspace");
 
     expect(await journeyFunnel(page)).toEqual([
       { event: "login_reached_with_intent", offer: "observer_access" },
@@ -458,12 +483,12 @@ test.describe("simulated switch-on (browser mocks only)", () => {
       { event: "checkout_completed", offer: "observer_access", mode: "sandbox" },
     ]);
 
-    // H18. The billing card shows what the wait read, and Manage billing leaves for the portal.
-    await page.getByRole("button", { name: "Settings" }).click();
+    // H18. The workspace billing card shows the plan, and its portal action leaves for the portal.
+    await page.goto("/workspace/settings/usage", { waitUntil: "domcontentloaded" });
     const card = page.locator("section.billing-card");
-    await expect(card.getByRole("heading", { name: "observer access" })).toBeVisible();
-    await expect(card.locator("dl")).toContainText("active");
-    await card.getByRole("button", { name: "Manage billing" }).click();
+    await expect(card.getByRole("heading", { name: "Starter plan" })).toBeVisible();
+    await expect(card.locator("dl").first()).toContainText("active");
+    await card.getByRole("button", { name: "Manage or cancel subscription" }).click();
     await expect(page).toHaveURL(FIXTURE_PORTAL_URL);
     expect(portal).toEqual([FIXTURE_PORTAL_URL]);
     expect(posts, "one checkout for one offer").toHaveLength(1);
@@ -484,7 +509,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     const state: { bootstrap: unknown; reads: number } = { bootstrap: TODAY_NEW_ACCOUNT, reads: 0 };
     await page.route("**/api/access/bootstrap", (route) => (state.reads += 1, route.fulfill({ json: state.bootstrap })));
     const posts = await answerCheckout(page, () => ({ status: 200, json: SANDBOX_CHECKOUT_READY }));
-    const held = region(page, "status", "Developer is held for you.");
+    const held = region(page, "status", "Starter is held for you.");
     const reload = async (bootstrap: unknown) => {
       state.bootstrap = bootstrap;
       await page.reload({ waitUntil: "domcontentloaded" });
@@ -511,7 +536,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
 
     // Released for production: the held offer resumes once, as an offer code and nothing else.
     await reload(open);
-    await expect(region(page, "status", "Developer sandbox checkout opened. Only a verified webhook can change entitlements.")).toBeVisible();
+    await expect(region(page, "status", "Starter sandbox checkout opened. Only a verified webhook can change entitlements.")).toBeVisible();
     expect(posts).toEqual([{ offerCode: "observer_access" }]);
     expect(paddle.loads()).toBe(1);
 
@@ -542,7 +567,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     const state = { bootstrap: noEntitlement("qualification"), reads: 0 };
     await page.route("**/api/access/bootstrap", (route) => (state.reads += 1, route.fulfill({ json: state.bootstrap })));
     const posts = await answerCheckout(page, () => ({ status: 200, json: SANDBOX_CHECKOUT_READY }));
-    const held = region(page, "status", "Developer is held for you.");
+    const held = region(page, "status", "Starter is held for you.");
 
     // Qualified, not released: held, nothing sent.
     await page.goto("/workspace?checkout=observer_access", { waitUntil: "domcontentloaded" });
@@ -552,7 +577,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     // Released for production with the trial over: one checkout, as an offer code and nothing else.
     state.bootstrap = noEntitlement("production");
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(region(page, "status", "Developer sandbox checkout opened. Only a verified webhook can change entitlements.")).toBeVisible();
+    await expect(region(page, "status", "Starter sandbox checkout opened. Only a verified webhook can change entitlements.")).toBeVisible();
     await expect(held).toHaveCount(0);
     expect(posts).toEqual([{ offerCode: "observer_access" }]);
     expect(paddle.loads()).toBe(1);
@@ -574,8 +599,8 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     const posts = await answerCheckout(page, () => ({ status: 200, json: SANDBOX_CHECKOUT_READY }));
 
     await page.goto("/pricing");
-    await page.getByRole("link", { name: "Buy Developer — $29/month", exact: true }).click();
-    await expect(region(page, "status", "Developer sandbox checkout opened.")).toHaveCount(1);
+    await page.getByRole("link", { name: "Buy Starter — $29/month", exact: true }).click();
+    await expect(region(page, "status", "Starter sandbox checkout opened.")).toHaveCount(1);
     await expect(page).toHaveURL(/\/pricing$/);
     expect(posts).toEqual([{ offerCode: "observer_access" }]);
     expect(paddle.loads()).toBe(1);
@@ -583,28 +608,115 @@ test.describe("simulated switch-on (browser mocks only)", () => {
   });
 
   /*
-    Hotfix 2026-11-10. GA, signed in, terms not accepted: the server gate still refuses the checkout,
-    and the refusal now names the terms and links to the workspace terms step with the offer, which
-    the workspace holds until access opens. No "request access", no Paddle.
+    One-step buy (2026-11-10, replaces the hotfix toast). Signed in, terms not accepted: the server
+    gate still refuses the checkout (403), and /pricing answers with the workspace's own terms step
+    in a modal dialog -- same summary, documents, version, checkbox and POST. Escape closes it and
+    hands focus back. Accepting records the agreement and opens the checkout on /pricing.
   */
-  test("a pre-terms checkout refusal on /pricing links to the workspace terms step, carrying the offer", async ({ page }) => {
+  test("terms owed: the terms open in a dialog on /pricing, and accepting opens the checkout there", async ({ page }) => {
+    test.setTimeout(90_000);
     await declineAnalytics(page);
     await servePosture(page, "switch-on");
     await installFixtureSession(page);
     const paddle = await installFakePaddle(page);
     await page.route("**/api/billing/status", (route) => route.fulfill({ json: { code: "OK", account: INACTIVE_BILLING } }));
-    const posts = await answerCheckout(page, () => ({ status: 403, json: { code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" } }));
+    const terms = await installTermsRoutes(page);
+    const posts = await answerCheckout(page, () => terms.accepted
+      ? { status: 200, json: SANDBOX_CHECKOUT_READY }
+      : { status: 403, json: { code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" } });
 
     await page.goto("/pricing");
-    await page.getByRole("link", { name: "Buy Developer — $29/month", exact: true }).click();
-    // The region is a zero-height wrapper around the fixed toast, so the toast is what is visible.
-    const refusal = region(page, "alert", "Accept the processing terms in your workspace first.");
-    await expect(refusal.locator("p.notice")).toBeVisible();
-    await expect(refusal).not.toContainText(/request/i);
-    await expect(refusal).not.toContainText("CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE");
-    await expect(refusal.getByRole("link", { name: "Accept the processing terms" })).toHaveAttribute("href", "/workspace?checkout=observer_access");
-    expect(posts).toEqual([{ offerCode: "observer_access" }]);
+    const buy = page.getByRole("link", { name: "Buy Starter — $29/month", exact: true });
+    await buy.click();
+    const dialog = page.getByRole("dialog", { name: "Accept the processing terms" });
+    await expect(dialog).toBeVisible();
+    // No toast, no workspace detour: nothing is announced as a refusal.
+    await expect(page.getByRole("alert").filter({ hasText: "Checkout is unavailable." })).toHaveCount(0);
+    await expect(dialog).toContainText("Starter checkout opens as soon as you accept.");
+    await expect(dialog.getByRole("list", { name: "The terms in brief" }).getByRole("listitem")).toHaveCount(3);
+    await expect(dialog.getByRole("link", { name: "Self-Service Terms" })).toHaveAttribute("href", TERMS_OFFER.terms.path);
+    await expect(dialog.getByRole("link", { name: "Processing Addendum" })).toHaveAttribute("href", TERMS_OFFER.processing.path);
+    await expect(dialog).toContainText(`(version ${TERMS_OFFER.version})`);
+    const accept = dialog.getByRole("button", { name: "Accept terms" });
+    await expect(accept).toBeDisabled();
+
+    // Keyboard: Tab stays inside, Escape closes, focus returns to the Buy control.
+    for (let press = 0; press < 8; press += 1) {
+      await page.keyboard.press("Tab");
+      expect(await dialog.evaluate((node) => node.contains(document.activeElement)), `Tab left the dialog after ${press + 1}`).toBe(true);
+    }
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(buy).toBeFocused();
+    expect(terms.posts, "closing records nothing").toBe(0);
+
+    // Again, and accept: the agreement is recorded once and the checkout opens on /pricing.
+    await buy.click();
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("checkbox", { name: /I have read and agree/ }).check();
+    await accept.click();
+    await expect(dialog).toHaveCount(0);
+    await expect(region(page, "status", "Starter sandbox checkout opened.")).toBeVisible();
+    await expect(page).toHaveURL(/\/pricing$/);
+    expect(terms.posts).toBe(1);
+    expect(posts).toEqual([{ offerCode: "observer_access" }, { offerCode: "observer_access" }, { offerCode: "observer_access" }]);
+    expect(paddle.loads()).toBe(1);
+    expect((await paddleCalls(page))?.opened).toHaveLength(1);
+  });
+
+  /*
+    One-step buy (2026-11-10). Any other refusal is a sentence in the card of the plan it is about,
+    in the page rather than a toast fixed to the foot of it, with a next step. Team (self-serve the
+    same day) is refused for a workspace that already holds Developer, and the next step is the
+    subscription portal. An offer code off the list in the address resumes nothing.
+  */
+  test("a refusal is an inline sentence in its plan card with a next step, and a bad offer in the address does nothing", async ({ page }) => {
+    await declineAnalytics(page);
+    await servePosture(page, "switch-on");
+    await installFixtureSession(page);
+    const paddle = await installFakePaddle(page);
+    await page.route("**/api/billing/status", (route) => route.fulfill({ json: { code: "OK", account: INACTIVE_BILLING } }));
+    let reply = { status: 403, json: { code: "BILLING_HOLD" } as unknown };
+    const posts = await answerCheckout(page, () => reply);
+
+    await page.goto("/pricing?checkout=enterprise_access");
+    await expect(page.getByRole("link", { name: "Buy Starter — $29/month", exact: true })).toBeVisible();
+    expect(posts, "an offer off the list resumes nothing").toEqual([]);
+
+    await page.getByRole("link", { name: "Buy Starter — $29/month", exact: true }).click();
+    const hold = region(page, "alert", failureSentence("BILLING_HOLD", 403));
+    await expect(hold).toBeVisible();
+    await expect(hold.locator("p")).toHaveCSS("position", "static");
+    expect(await hold.evaluate((node) => node.closest("article")?.querySelector("h2")?.textContent)).toBe("Starter");
+    await expect(hold.getByRole("link", { name: "Contact us about Starter" })).toHaveAttribute("href", "/contact?plan=Starter");
+
+    reply = { status: 409, json: { code: "BILLING_PLAN_CHANGE_REQUIRED" } };
+    await page.getByRole("link", { name: "Buy Pro — $99/month", exact: true }).click();
+    const change = region(page, "alert", failureSentence("BILLING_PLAN_CHANGE_REQUIRED", 409));
+    await expect(change).toBeVisible();
+    expect(await change.evaluate((node) => node.closest("article")?.querySelector("h2")?.textContent)).toBe("Pro");
+    await expect(change.getByRole("link", { name: "Manage or cancel subscription" })).toHaveAttribute("href", "/workspace/settings/usage");
+    await expect(page.getByRole("link", { name: "Scope an Enterprise pilot" }).first()).toHaveAttribute("href", "/contact?plan=Enterprise");
+    expect(posts).toEqual([{ offerCode: "observer_access" }, { offerCode: "studio_access" }]);
     expect(paddle.loads()).toBe(0);
+  });
+
+  test("Pro is bought online: signed out it carries its offer into sign-in, signed in it opens the checkout", async ({ page }) => {
+    await declineAnalytics(page);
+    await servePosture(page, "switch-on");
+    await page.goto("/pricing");
+    await expect(page.getByRole("link", { name: "Buy Pro — $99/month", exact: true })).toHaveAttribute("href", "/login?next=checkout&offer=studio_access");
+
+    await installFixtureSession(page);
+    const paddle = await installFakePaddle(page);
+    await page.route("**/api/billing/status", (route) => route.fulfill({ json: { code: "OK", account: INACTIVE_BILLING } }));
+    const team = { ...SANDBOX_CHECKOUT_READY, offer: { ...SANDBOX_CHECKOUT_READY.offer, code: "studio_access", label: "Pro", credits: 10_000 } };
+    const posts = await answerCheckout(page, () => ({ status: 200, json: team }));
+    await page.goto("/pricing");
+    await page.getByRole("link", { name: "Buy Pro — $99/month", exact: true }).click();
+    await expect(region(page, "status", "Pro sandbox checkout opened.")).toBeVisible();
+    expect(posts).toEqual([{ offerCode: "studio_access" }]);
+    expect(paddle.loads()).toBe(1);
   });
 
   /*
@@ -685,7 +797,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     await answerCheckout(page, () => ({ status: 200, json: SANDBOX_CHECKOUT_READY }));
 
     await page.goto("/workspace?checkout=observer_access", { waitUntil: "domcontentloaded" });
-    await expect(region(page, "status", "Developer sandbox checkout opened.")).toBeVisible();
+    await expect(region(page, "status", "Starter sandbox checkout opened.")).toBeVisible();
     const readsBefore = reads;
     expect(await emitPaddleEvent(page, "checkout.completed")).toBe(true);
 
@@ -695,7 +807,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     }
     await expect(pending).toBeVisible();
     expect(reads - readsBefore, "one read per scheduled delay, and no more").toBe(ENTITLEMENT_WAIT_DELAYS_MS.length);
-    await expect(page.getByText(entitlementActiveSentence("Developer"))).toHaveCount(0);
+    await expect(page.getByText(entitlementActiveSentence("Starter"))).toHaveCount(0);
 
     // Bounded: once it has said pending, time passing reads nothing more.
     await page.clock.runFor(ENTITLEMENT_WAIT_WINDOW_MS);
@@ -742,6 +854,46 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     expect(paddle.loads(), "no refusal fetched the Paddle script").toBe(0);
   });
 
+  test("360, 390 and 430 with reduced motion: the terms dialog and the paid outcome fit the phone", async ({ browser, baseURL, fence }) => {
+    test.setTimeout(120_000);
+    for (const width of [360, 390, 430]) {
+      const context = await browser.newContext({ baseURL, viewport: { width, height: 844 }, reducedMotion: "reduce" });
+      await installNetworkFence(context, baseURL!, fence);
+      const page = await context.newPage();
+      await declineAnalytics(page);
+      await servePosture(page, "switch-on");
+      await installFixtureSession(page);
+      await installFakePaddle(page);
+      await page.route("**/api/billing/status", (route) => route.fulfill({ json: { code: "OK", account: ACTIVE_DEVELOPER } }));
+      const terms = await installTermsRoutes(page);
+      await answerCheckout(page, () => terms.accepted
+        ? { status: 200, json: SANDBOX_CHECKOUT_READY }
+        : { status: 403, json: { code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" } });
+      await page.goto("/pricing", { waitUntil: "domcontentloaded" });
+      const buy = page.getByRole("link", { name: "Buy Starter — $29/month", exact: true });
+      await buy.scrollIntoViewIfNeeded();
+      await buy.click();
+      const dialog = page.getByRole("dialog", { name: "Accept the processing terms" });
+      const accept = dialog.getByRole("button", { name: "Accept terms" });
+      await expect(accept).toBeVisible();
+      const box = (await dialog.boundingBox())!;
+      expect(box.x >= 15 && box.x + box.width <= width - 15, `dialog keeps a 16px gutter at ${width}px`).toBe(true);
+      expect(await dialog.evaluate((node) => node.scrollWidth - node.clientWidth), `no sideways scroll in the dialog at ${width}px`).toBeLessThanOrEqual(1);
+      await dialog.getByRole("checkbox", { name: /I have read and agree/ }).check();
+      await accept.scrollIntoViewIfNeeded();
+      await accept.click({ trial: true });
+      await accept.click();
+      await expect(dialog).toHaveCount(0);
+      await expect(region(page, "status", "Starter sandbox checkout opened.")).toBeVisible();
+      expect(await emitPaddleEvent(page, "checkout.completed")).toBe(true);
+      const outcome = page.locator("section.pricing-purchase");
+      await expect(outcome.getByRole("heading", { name: "Starter is active." })).toBeVisible({ timeout: 10_000 });
+      await expect(outcome).toBeInViewport();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), `no sideways scroll at ${width}px`).toBeLessThanOrEqual(1);
+      await context.close();
+    }
+  });
+
   test("360, 390 and 430 with reduced motion: every decision point fits and is reachable", async ({ browser, baseURL, fence }) => {
     test.setTimeout(120_000);
     for (const width of [360, 390, 430]) {
@@ -771,9 +923,9 @@ test.describe("simulated switch-on (browser mocks only)", () => {
       };
 
       let page = await open("today", "/pricing", false);
-      await reachable(page, page.getByRole("link", { name: "Request Developer access" }), "today's Developer action");
+      await reachable(page, page.getByRole("link", { name: "Request Starter access" }), "today's Starter action");
       page = await open("switch-on", "/pricing", false);
-      await reachable(page, page.getByRole("link", { name: "Buy Developer — $29/month" }), "switch-on Developer action");
+      await reachable(page, page.getByRole("link", { name: "Buy Starter — $29/month" }), "switch-on Starter action");
       page = await open("switch-on", "/login?next=checkout&offer=observer_access", false);
       await reachable(page, page.getByRole("button", { name: "Continue with Google" }), "sign-in");
       page = await open("today", "/workspace?checkout=observer_access", true);
@@ -782,7 +934,7 @@ test.describe("simulated switch-on (browser mocks only)", () => {
       await expect(refusal).toBeInViewport();
       await reachable(page, refusal, "checkout refusal");
       page = await open("switch-on", "/workspace/settings/usage", true);
-      await reachable(page, page.locator("section.billing-card").getByRole("button", { name: "Manage billing" }), "Manage billing");
+      await reachable(page, page.locator("section.billing-card").getByRole("button", { name: "Manage or cancel subscription" }), "Manage or cancel subscription");
 
       await context.close();
     }

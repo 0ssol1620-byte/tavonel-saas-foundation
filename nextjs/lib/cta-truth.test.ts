@@ -220,16 +220,17 @@ const CLOSED = {
   },
   pricing: [
     { href: "/explore", label: "Explore a Compiled World" },
-    { href: "/contact?plan=Developer", label: "Request Developer access" },
-    { href: "/contact?plan=Team", label: "Talk to us about Team" },
+    { href: "/contact?plan=Starter", label: "Request Starter access" },
+    // Team self-serve (2026-11-10, intended): Team's card reads as Developer's does while purchase is closed.
+    { href: "/contact?plan=Pro", label: "Request Pro access" },
     { href: "/contact?plan=Enterprise", label: "Scope an Enterprise pilot" },
   ],
   koPricing: {
     intro: { href: "/ko/contact", label: "도입 상담하기" },
     cards: [
       { href: "/explore", label: "공개 World 살펴보기 (영문)" },
-      { href: "/ko/contact?plan=Developer", label: "Developer 도입 상담" },
-      { href: "/ko/contact?plan=Team", label: "Team 도입 상담" },
+      { href: "/ko/contact?plan=Starter", label: "Starter 도입 상담" },
+      { href: "/ko/contact?plan=Pro", label: "Pro 도입 상담" },
       { href: "/ko/contact?plan=Enterprise", label: "Enterprise 도입 상담" },
     ],
   },
@@ -247,8 +248,8 @@ const CLOSED = {
     is not sold online and offers the contact path `/pricing` itself offers for Developer.
   */
   login: {
-    text: "Developer is not sold online today. Nothing is charged by signing in. Request Developer access",
-    links: [{ href: "/contact?plan=Developer", label: "Request Developer access" }],
+    text: "Starter is not sold online today. Nothing is charged by signing in. Request Starter access",
+    links: [{ href: "/contact?plan=Starter", label: "Request Starter access" }],
   },
 } as const;
 
@@ -257,7 +258,7 @@ const CLOSED = {
   carries the deal from the billing catalog and the step before checkout, in place of main's "signed webhook".
 */
 const OPEN_INTENT =
-  "Developer is held for you. $29/month for 500 standard pages, with a full refund within 14 days if you have used fewer than 50 of them. Paddle is the merchant of record. Sign in and accept the processing terms, and checkout opens by itself. Nothing is charged by signing in.";
+  "Starter is held for you. $29/month for 500 standard pages, with a full refund within 14 days if you have used fewer than 50 of them. Paddle is the merchant of record. Sign in and accept the processing terms, and checkout opens by itself. Nothing is charged by signing in.";
 
 const TABLE = {
   S0: CLOSED,
@@ -270,8 +271,8 @@ const TABLE = {
     homeKo: { ...CLOSED.homeKo, primary: { href: "/login", label: "사용 신청하기" } },
     pricing: [
       { href: "/login", label: "Start free" },
-      { href: "/login?next=checkout&offer=observer_access", label: "Buy Developer — $29/month" },
-      { href: "/contact?plan=Team", label: "Talk to us about Team" },
+      { href: "/login?next=checkout&offer=observer_access", label: "Buy Starter — $29/month" },
+      { href: "/login?next=checkout&offer=studio_access", label: "Buy Pro — $99/month" },
       { href: "/contact?plan=Enterprise", label: "Scope an Enterprise pilot" },
     ],
     /*
@@ -283,8 +284,8 @@ const TABLE = {
       intro: { href: "/login", label: "사용 신청하기" },
       cards: [
         CLOSED.koPricing.cards[0],
-        { href: "/login?next=checkout&offer=observer_access", label: "Developer · 사용 신청하기" },
-        CLOSED.koPricing.cards[2],
+        { href: "/login?next=checkout&offer=observer_access", label: "Starter · 사용 신청하기" },
+        { href: "/login?next=checkout&offer=studio_access", label: "Pro · 사용 신청하기" },
         CLOSED.koPricing.cards[3],
       ],
     },
@@ -411,12 +412,11 @@ describe("the checkout-intent notice", () => {
   it("names the plan it was reached for, closed or open", async () => {
     const { default: CheckoutIntentNotice } = await import("../components/checkout-intent-notice");
     const closed = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "studio_access", purchaseOpen: false })));
-    expect(closed).toBe("Team is not sold online today. Nothing is charged by signing in. Request Team access");
-    // B-07 / CLM-023: Team's saleChannel is "contact", so an open deployment still does not sell it
-    // online, and the checkout it would promise answers 403 BILLING_OFFER_CONTACT_REQUIRED.
+    expect(closed).toBe("Pro is not sold online today. Nothing is charged by signing in. Request Pro access");
+    // Team self-serve (2026-11-10, intended): an open deployment sells Team online, so the notice holds it
+    // with its own catalog numbers, as it does Developer.
     const open = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "studio_access", purchaseOpen: true })));
-    expect(open).toBe("Team is not sold online today. Nothing is charged by signing in. Request Team access");
-    expect(open).not.toContain("Checkout opens by itself");
+    expect(open).toBe("Pro is held for you. $99/month for 2,500 standard pages, with a full refund within 14 days if you have used fewer than 250 of them. Paddle is the merchant of record. Sign in and accept the processing terms, and checkout opens by itself. Nothing is charged by signing in.");
     const developer = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "observer_access", purchaseOpen: true })));
     expect(developer).toBe(OPEN_INTENT);
   }, RENDER_TIMEOUT);

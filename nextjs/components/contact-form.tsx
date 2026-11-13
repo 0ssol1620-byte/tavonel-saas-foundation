@@ -7,7 +7,7 @@ import { CONTACT_EMAIL, contactErrorCopy, contactText, type ContactLocale } from
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 
 type State = "idle" | "sending" | "sent" | "error";
-type PlanIntent = "Developer" | "Team" | "Enterprise" | "";
+type PlanIntent = "Starter" | "Pro" | "Enterprise" | "";
 
 export default function ContactForm({ locale = "en" }: { locale?: ContactLocale }) {
   const [state, setState] = useState<State>("idle");
@@ -22,7 +22,9 @@ export default function ContactForm({ locale = "en" }: { locale?: ContactLocale 
 
   useEffect(() => {
     const plan = new URLSearchParams(window.location.search).get("plan");
-    setPlanIntent(plan === "Developer" || plan === "Team" || plan === "Enterprise" ? plan : "");
+    // 2026-11-10: Developer and Team were renamed Starter and Pro. Links already shared keep working.
+    const named = plan === "Developer" ? "Starter" : plan === "Team" ? "Pro" : plan;
+    setPlanIntent(named === "Starter" || named === "Pro" || named === "Enterprise" ? named : "");
   }, []);
 
   /*

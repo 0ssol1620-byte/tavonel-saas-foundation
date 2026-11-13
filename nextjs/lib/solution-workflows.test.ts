@@ -172,11 +172,12 @@ describe("Solutions task choices and workflow evidence", () => {
     }
   });
 
-  it("keeps Team contact-led without promising shared membership administration", async () => {
+  it("sells Starter and Pro online without promising shared membership administration", async () => {
     const html = renderToStaticMarkup(await SolutionPage({ params: Promise.resolve({ slug: "knowledge-operations" }) }));
-    expect(html).toContain("Team setup is arranged with us rather than bought at a checkout");
-    expect(html).toContain("single-member workspace");
-    expect(html).toContain("shared roles, invitations and organization administration are not available");
+    // Team self-serve (2026-11-10, intended): 
+    // Starter/Pro rename (2026-11-10, founder, intended).
+    expect(html).toContain("Starter and Pro are both bought online");
+    expect(html).toContain("Each workspace has a single owner, and shared administration is scoped with Enterprise.");
     expect(html).not.toContain("we provision the tenant and the roles with you");
   });
 

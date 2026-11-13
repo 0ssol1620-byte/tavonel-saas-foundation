@@ -18,7 +18,7 @@ const TOPICS = {
 } as const;
 
 type Topic = keyof typeof TOPICS;
-type PlanIntent = "Developer" | "Team" | "Enterprise" | "";
+type PlanIntent = "Starter" | "Pro" | "Enterprise" | "";
 type Contact = {
   name: string;
   email: string;
@@ -169,7 +169,7 @@ function parseContact(raw: unknown): Contact | null {
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 ||
     company.length > 120 ||
     !(topic in TOPICS) ||
-    !["", "Developer", "Team", "Enterprise"].includes(plan) ||
+    !["", "Starter", "Pro", "Enterprise"].includes(plan) ||
     message.length < 20 || message.length > 5_000 ||
     website.length > 200 ||
     typeof startedAt !== "number" || !Number.isInteger(startedAt) || startedAt <= 0

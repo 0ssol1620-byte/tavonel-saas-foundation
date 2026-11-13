@@ -15,7 +15,7 @@ import type { BillingStatusAccount, EntitlementWaitResult } from "@/lib/entitlem
 import { formatCount, formatTimestamp } from "@/lib/format";
 import { countNoun } from "@/lib/plural";
 import { decideCheckoutResume, heldOfferSentence, readOfferParam, rememberCheckoutIntent, takeCheckoutIntent, type ResumeAccess } from "@/lib/checkout-intent";
-import type { BillingOfferCode } from "@/lib/billing-catalog";
+import { BILLING_OFFERS, isBillingOfferCode, type BillingOfferCode } from "@/lib/billing-catalog";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
 import { putWithProgress } from "@/lib/upload-transfer";
 import {
@@ -65,6 +65,7 @@ import WorkspaceUltimateShell, { type SourcePendingReason, type WorkspaceSurface
 import WorkspaceGettingStarted from "@/components/workspace-getting-started";
 import WorkspaceUseWithAi from "@/components/workspace-use-with-ai";
 import ProcessingConsentPanel from "@/components/processing-consent-panel";
+import BillingRefund from "@/components/billing-refund";
 import IntakeTriageReview from "@/components/intake-triage-review";
 import workspaceStateStyles from "./workspace-states.module.css";
 import {
@@ -2980,7 +2981,7 @@ export default function WorkspacePage() {
       ? { sentence: "Your processing terms are accepted and file access is awaiting release.", action: null }
       : sourcePending === "workspace_refused"
         ? { sentence: "File processing is not available for this workspace.", action: <Link className="btn" href="/contact">Contact support</Link> }
-        : { sentence: "This workspace has no active plan. Choose a plan to open it.", action: <Link className="btn" href="/pricing">See Developer access</Link> };
+        : { sentence: "This workspace has no active plan. Choose a plan to open it.", action: <Link className="btn" href="/pricing">See plans</Link> };
 
   return (
     <WorkspaceUltimateShell
@@ -3982,7 +3983,7 @@ export default function WorkspacePage() {
                   so the card does not repeat it. It is still headed -- by the plan the account is
                   actually on, or, when that has not been read, by a neutral name for the card.
                   Never by a plan name this panel does not have. */}
-              <h2>{billingAccount?.accessPlan ? `${billingAccount.accessPlan.replace("_access", "")} access` : "Access and balance"}</h2>
+              <h2>{isBillingOfferCode(billingAccount?.accessPlan ?? null) ? `${BILLING_OFFERS[billingAccount!.accessPlan as BillingOfferCode].label} plan` : billingAccount?.accessPlan ? `${billingAccount.accessPlan.replace("_access", "")} access` : "Access and balance"}</h2>
               <p>Included usage is granted only from a signed subscription transaction and settled from observed processing.</p>
             </div>
             {/*
@@ -4014,10 +4015,12 @@ export default function WorkspacePage() {
             </p>
             <div className="billing-actions">
               <button disabled={billingBusy} onClick={() => void loadBilling()}>Refresh billing</button>
+              {/* One-step buy (2026-11-10): the portal is where a subscription is changed or cancelled, so the label says both. */}
               <button disabled={billingBusy || !billingAccount?.paddleCustomerId} onClick={() => void openBillingPortal()}>
-                {billingBusy ? "Opening..." : "Manage billing"}
+                {billingBusy ? "Opening..." : "Manage or cancel subscription"}
               </button>
             </div>
+            {billingAccount?.paddleCustomerId ? <BillingRefund getToken={getAuthToken} /> : null}
             {billingAccount?.billingHold ? <p className="billing-hold" role="alert">Billing hold active. Refunded or disputed usage cannot be processed.</p> : null}
             {billingAccount?.subscriptionCancelAt ? (
               <p className="billing-hold" role="status">
@@ -4082,14 +4085,14 @@ export default function WorkspacePage() {
             <section className="card workspace-access-gate" role="status">
               <h2>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "Workspace access could not be verified." : "Checking workspace access."
-                : customerDataAccess === "closed" ? "Source connections are not available for this workspace yet." : "Available on Developer and Team."}</h2>
+                : customerDataAccess === "closed" ? "Source connections are not available for this workspace yet." : "Available on Starter and Pro."}</h2>
               <p>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
                 : customerDataAccess === "closed"
                 ? `Your account is ready, but source processing is closed. ${closedGate.sentence}`
                 : accessSource === "trial"
-                ? "Google Drive and file-server connections are included on Developer and Team. The free evaluation works with files you upload directly."
-                : "Google Drive and file-server connections are included on Developer and Team. This workspace has no active plan."}</p>
+                ? "Google Drive and file-server connections are included on Starter and Pro. The free evaluation works with files you upload directly."
+                : "Google Drive and file-server connections are included on Starter and Pro. This workspace has no active plan."}</p>
               <div className="billing-actions">{accessSource === null
                 ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
                 : customerDataAccess === "closed"
@@ -4102,19 +4105,19 @@ export default function WorkspacePage() {
             <section className="card workspace-access-gate" role="status">
               <h2>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "Workspace access could not be verified." : "Checking workspace access."
-                : customerDataAccess === "closed" ? "AI connections are not available for this workspace yet." : "API keys are part of Developer access."}</h2>
+                : customerDataAccess === "closed" ? "AI connections are not available for this workspace yet." : "API keys are part of the Starter and Pro plans."}</h2>
               <p>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
                 : customerDataAccess === "closed"
                 ? `Your account is ready, but source processing is closed. ${closedGate.sentence}`
                 : accessSource === "trial"
-                ? "Free evaluation reads the World inside this workspace. Keys, the OpenAPI document and MCP setup open with Developer access."
-                : "This account has no active compute access. API keys and MCP setup require Developer access."}</p>
+                ? "Free evaluation reads the World inside this workspace. Keys, the OpenAPI document and MCP setup open with Starter or Pro."
+                : "This account has no active compute access. API keys and MCP setup require Starter or Pro."}</p>
               <div className="billing-actions">{accessSource === null
                 ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
                 : customerDataAccess === "closed"
                 ? closedGate.action
-                : <Link className="btn" href="/pricing">See Developer access</Link>}</div>
+                : <Link className="btn" href="/pricing">See plans</Link>}</div>
             </section>
           ) : <DeveloperPanel />) : null}
 

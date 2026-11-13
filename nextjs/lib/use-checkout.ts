@@ -63,11 +63,29 @@ export function termsFirstLink(offerCode: BillingOfferCode): NoticeLink {
 /** What a billing-exempt owner is told instead of a checkout; the workspace says it too when it drops a held offer (P2-29). */
 export const OWNER_ACCESS_ACTIVE_SENTENCE = "Owner access is already active. No checkout or payment is required for this account.";
 
+/*
+  One-step buy (2026-11-10). What a page may take over from the hook's own sentences. /pricing
+  collects the processing terms in a dialog on the page itself, so it takes the terms refusal
+  instead of a sentence pointing at the workspace, and it shows the outcome of a payment where the
+  buyer is, so it hears the moment Paddle reports one. A page that passes neither keeps the
+  sentences, which is the workspace.
+*/
+export type CheckoutHandlers = {
+  /** The server refused for the processing terms (403). Nothing was opened or charged. */
+  onTermsRequired?: (offerCode: BillingOfferCode) => void;
+  /** Paddle reported `checkout.completed`. Entitlement still waits for the signed webhook. */
+  onCompleted?: (offerCode: BillingOfferCode) => void;
+};
+
 /**
  * `onEntitlement` hears how the bounded wait after `checkout.completed` ended (journey A4), so a
  * page that shows billing can show the account the wait read without a reload.
  */
-export function useCheckout(notify: (message: string, tone: NoticeTone, link?: NoticeLink) => void, onEntitlement?: (wait: EntitlementWaitResult) => void) {
+export function useCheckout(
+  notify: (message: string, tone: NoticeTone, link?: NoticeLink) => void,
+  onEntitlement?: (wait: EntitlementWaitResult) => void,
+  handlers?: CheckoutHandlers,
+) {
   const [busy, setBusy] = useState<BillingOfferCode | null>(null);
 
   const start = useCallback(
@@ -100,10 +118,21 @@ export function useCheckout(notify: (message: string, tone: NoticeTone, link?: N
         // Journey A1 (D-03): a refusal is a sentence from the one failure-copy table, never a raw
         // code in parentheses. A code with no sentence still reaches the screen as a reference.
         if (!response.ok) {
+          if (checkout.code === "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" && handlers?.onTermsRequired) {
+            handlers.onTermsRequired(offerCode);
+            return;
+          }
           notify(
             `Checkout is unavailable. ${failureSentence(checkout.code, response.status)}`,
             "alert",
-            checkout.code === "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" ? termsFirstLink(offerCode) : undefined,
+            checkout.code === "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE"
+              ? termsFirstLink(offerCode)
+              : checkout.code === "BILLING_PLAN_CHANGE_REQUIRED" || checkout.code === "BILLING_PLAN_ALREADY_ACTIVE"
+                  || checkout.code === "BILLING_SUBSCRIPTION_NEEDS_PORTAL"
+                ? { href: "/workspace/settings/usage", label: "Manage or cancel subscription" }
+                : checkout.code === "BILLING_RESUBSCRIBE_CONTACT"
+                  ? { href: "mailto:support@tavonel.com", label: "Write to support@tavonel.com" }
+                  : undefined,
           );
           return;
         }
@@ -135,6 +164,11 @@ export function useCheckout(notify: (message: string, tone: NoticeTone, link?: N
               */
               trackFunnel("checkout_completed", { offer: offerCode, mode: paymentMode });
               notify(`Paddle accepted the ${paymentMode} payment. Access and credits remain pending until the signed webhook is persisted.`, "status");
+              // The page under the overlay states the outcome, so the buyer is not left on Paddle's own screen.
+              if (handlers?.onCompleted) {
+                window.Paddle?.Checkout.close?.();
+                handlers.onCompleted(offerCode);
+              }
               /*
                 Journey A4 (D-04): then read billing status again, a bounded number of times, and
                 end in a stated outcome -- active, or still pending with what to do next.
@@ -169,7 +203,7 @@ export function useCheckout(notify: (message: string, tone: NoticeTone, link?: N
         setBusy(null);
       }
     },
-    [notify, onEntitlement],
+    [notify, onEntitlement, handlers],
   );
 
   return { start, busy };

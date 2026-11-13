@@ -4,12 +4,14 @@
 import "@/app/paper-product.css";
 import Link from "next/link";
 import type { Route } from "next";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
 import PricingPlanOverview, { pricingPlanDestinationClass, pricingPlanId } from "./pricing-plan-overview";
 import tableStyles from "@/components/docs/docs-table.module.css";
-import { useCheckout, type NoticeLink, type NoticeTone } from "@/lib/use-checkout";
-import { loginUrlForOffer } from "@/lib/checkout-intent";
+import { useCheckout, type CheckoutHandlers, type NoticeLink, type NoticeTone } from "@/lib/use-checkout";
+import { loginUrlForOffer, readOfferParam } from "@/lib/checkout-intent";
+import { ProcessingTermsDialog } from "@/components/processing-consent-panel";
+import { ENTITLEMENT_PENDING_SENTENCE, type EntitlementWaitResult } from "@/lib/entitlement-wait";
 import {
   BILLING_OFFERS,
   REFUND_MAX_CONSUMED_FRACTION,
@@ -267,7 +269,7 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceE
     // Identity and team-access requirements stay in Enterprise scoping rather than plan copy.
     [
       "What differs by plan",
-      `${BILLING_OFFERS.studio_access.label} carries ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} included pages against ${BILLING_OFFERS.observer_access.label}'s ${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")}, adds the review queue, version history and a guided onboarding session, and is sold through a conversation rather than a checkout. ${activationPlans.join(" and ")} reach World activation — activating a candidate and rolling one back — as the workspace owner. Both include Google Drive and file-server connections.`,
+      `${BILLING_OFFERS.studio_access.label} carries ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} included pages against ${BILLING_OFFERS.observer_access.label}'s ${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")}, adds the review queue and version history, and is bought online as ${BILLING_OFFERS.observer_access.label} is. ${activationPlans.join(" and ")} reach World activation — activating a candidate and rolling one back — as the workspace owner. Both include Google Drive and file-server connections.`,
     ],
     [
       "What does not consume pages",
@@ -415,7 +417,7 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "Members in a workspace",
-    "Published plans cover the workspace owner. Team access and identity requirements are confirmed during Enterprise scoping.",
+    "Published plans cover the workspace owner. Access for more people and identity requirements are confirmed during Enterprise scoping.",
   ],
   [
     "API requests",
@@ -660,6 +662,17 @@ const pricingJsonLd = (purchaseReady: boolean, faqRows: typeof PURCHASE_FAQ) => 
   ],
 });
 
+/** The catalog offer a plan card sells, by its label. Developer and Team have one, Evaluation and Enterprise do not. */
+function offerForPlan(name: string): BillingOfferCode | null {
+  return (Object.keys(BILLING_OFFERS) as BillingOfferCode[]).find((code) => BILLING_OFFERS[code].label === name) ?? null;
+}
+
+/** A refusal names its next step. Without one from the hook, it is a conversation about the plan. */
+function noticeLink(notice: { tone: NoticeTone; link?: NoticeLink }, planName: string): NoticeLink | undefined {
+  if (notice.link || notice.tone !== "alert") return notice.link;
+  return { href: `/contact?plan=${encodeURIComponent(planName)}`, label: `Contact us about ${planName}` };
+}
+
 export default function PricingPageClient({
   initialLiveCheckout,
   initialSelfService,
@@ -675,9 +688,22 @@ export default function PricingPageClient({
   gates: readonly PurchaseGate[];
   planCapabilities: readonly PlanCapabilityRow[];
 }) {
-  /* Journey A9 (D-08): the checkout hook says whether a sentence is progress or a refusal. */
+  /*
+    Journey A9 (D-08): the checkout hook says whether a sentence is progress or a refusal.
+
+    One-step buy (2026-11-10): the sentence sits in the card of the plan it is about, in the page,
+    instead of a toast fixed to the foot of the screen. A refusal always names a next step: the
+    hook's own link where it has one, otherwise a conversation about that plan.
+  */
   const [notice, setNotice] = useState<{ text: string; tone: NoticeTone; link?: NoticeLink } | null>(null);
+  const [noticeOffer, setNoticeOffer] = useState<BillingOfferCode | null>(null);
   const notify = useCallback((text: string, tone: NoticeTone, link?: NoticeLink) => setNotice({ text, tone, link }), []);
+  /* The terms dialog, open for this offer. A second terms refusal after an acceptance is a sentence, never the dialog again. */
+  const [termsFor, setTermsFor] = useState<BillingOfferCode | null>(null);
+  const termsAccepted = useRef(false);
+  /* What happened after Paddle reported the payment: pending until the bounded wait reads the plan. */
+  const [purchase, setPurchase] = useState<{ offer: BillingOfferCode; outcome: "pending" | "active" | "unconfirmed" } | null>(null);
+  const purchaseRef = useRef<HTMLElement | null>(null);
   const [signedIn, setSignedIn] = useState(false);
   const [ownerBillingExempt, setOwnerBillingExempt] = useState(false);
   // SD-01: the same `activationPolicy` row the fine print under the grid prints.
@@ -721,7 +747,43 @@ export default function PricingPageClient({
   const [sources, setSources] = useState<number>(25);
   const [pagesPerSource, setPagesPerSource] = useState<number>(20);
   const fit = corpusFit(sources, pagesPerSource);
-  const { start: startCheckout, busy: billingBusy } = useCheckout(notify);
+  const settlePurchase = useCallback((wait: EntitlementWaitResult) => {
+    setPurchase((current) => current && { ...current, outcome: wait.outcome === "active" ? "active" : "unconfirmed" });
+  }, []);
+  const checkoutHandlers = useMemo<CheckoutHandlers>(() => ({
+    onTermsRequired: (offer) => {
+      if (!termsAccepted.current) {
+        setTermsFor(offer);
+        return;
+      }
+      notify(
+        "Your agreement is recorded. File processing is not open for this workspace yet, so nothing was opened or charged.",
+        "alert",
+        { href: "/workspace", label: "Open your workspace" },
+      );
+    },
+    onCompleted: (offer) => {
+      setNotice(null);
+      setPurchase({ offer, outcome: "pending" });
+    },
+  }), [notify]);
+  const { start: startCheckout, busy: billingBusy } = useCheckout(notify, settlePurchase, checkoutHandlers);
+  const buy = useCallback((offer: BillingOfferCode) => {
+    setNotice(null);
+    setNoticeOffer(offer);
+    void startCheckout(offer);
+  }, [startCheckout]);
+  // The terms POST takes the session token the checkout uses; the server reads workspace and user from it.
+  const sessionToken = useCallback(async () => {
+    const { getSupabaseBrowserClient } = await import("@/lib/supabase-browser");
+    const { data } = await getSupabaseBrowserClient()?.auth.getSession() ?? { data: { session: null } };
+    return data.session?.access_token ?? null;
+  }, []);
+  useEffect(() => {
+    if (!purchase) return;
+    purchaseRef.current?.scrollIntoView({ block: "center" });
+    purchaseRef.current?.focus({ preventScroll: true });
+  }, [purchase?.offer]); // eslint-disable-line react-hooks/exhaustive-deps -- once per purchase, not per outcome
   const estimate = estimatorRows(fit.pages);
 
   /*
@@ -747,10 +809,12 @@ export default function PricingPageClient({
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      let session = false;
       const { getSupabaseBrowserClient } = await import("@/lib/supabase-browser");
       const client = getSupabaseBrowserClient();
       if (client && !cancelled) {
         const { data } = await client.auth.getSession();
+        session = Boolean(data.session);
         if (!cancelled) setSignedIn(Boolean(data.session));
         if (data.session) {
           try {
@@ -785,8 +849,24 @@ export default function PricingPageClient({
           setSelfServiceFlag(false);
         }
       }
+      /*
+        One-step buy (2026-11-10). A buyer who picked a plan signed out comes back here from sign-in
+        as /pricing?checkout=<offer> (`resumeDestination`), and the purchase continues on this page.
+        `readOfferParam` admits only a code on the offer list. The parameter is stripped first, so a
+        reload or a back-navigation cannot start a second checkout. Signed out, nothing resumes.
+      */
+      const resume = readOfferParam(window.location.search);
+      if (!cancelled && resume && session) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("checkout");
+        window.history.replaceState(null, "", url.toString());
+        trackFunnel("checkout_opened", { offer: resume });
+        buy(resume);
+      }
     })();
     return () => { cancelled = true; };
+    // The mount sequence runs once. `buy` is stable (its handlers are memoized on setters).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /*
@@ -848,8 +928,8 @@ export default function PricingPageClient({
             */}
             <div className="pricing-context">
               <p className="lede">
-                Developer includes {BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")} standard
-                pages each month. Team includes {BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")}.
+                {BILLING_OFFERS.observer_access.label} includes {BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")} standard
+                pages each month. {BILLING_OFFERS.studio_access.label} includes {BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")}.
                 Need more in a month? Talk to us and we will arrange the additional volume.
               </p>
               {/*
@@ -882,9 +962,45 @@ export default function PricingPageClient({
               name: plan.name, price: plan.price,
               unit: plan.name === EVALUATION.name && !selfService ? "to explore the public World" : plan.unit,
             }))} />
+            {purchase ? (
+              /*
+                One-step buy (2026-11-10). After Paddle reports the payment its overlay is closed and the
+                outcome is stated here: pending while the bounded wait reads billing, then active with
+                the plan's included pages from the catalog, or still unconfirmed with where to look.
+              */
+              <section className="notice static pricing-purchase" role="status" ref={purchaseRef} tabIndex={-1} aria-labelledby="pricing-purchase-title">
+                <h2 id="pricing-purchase-title">
+                  {purchase.outcome === "active" ? `${BILLING_OFFERS[purchase.offer].label} is active.` : "Payment accepted."}
+                </h2>
+                <p>
+                  {purchase.outcome === "active"
+                    ? `${BILLING_OFFERS[purchase.offer].includedPages.toLocaleString("en-US")} pages this month.`
+                    : purchase.outcome === "pending"
+                      ? `${BILLING_OFFERS[purchase.offer].label} turns on when Paddle's signed confirmation reaches us. This page is checking for it now.`
+                      : ENTITLEMENT_PENDING_SENTENCE}
+                </p>
+                <p className="pricing-purchase-actions">
+                  <Link className="btn" href={"/workspace" as Route}>Open your workspace</Link>
+                  {purchase.outcome === "unconfirmed" ? <Link href={"/workspace/settings/usage" as Route}>Usage &amp; billing</Link> : null}
+                </p>
+              </section>
+            ) : null}
+            {termsFor ? (
+              <ProcessingTermsDialog
+                title="Accept the processing terms"
+                lead={`${BILLING_OFFERS[termsFor].label} checkout opens as soon as you accept.`}
+                getToken={sessionToken}
+                onAccepted={() => {
+                  termsAccepted.current = true;
+                  setTermsFor(null);
+                  buy(termsFor);
+                }}
+                onClose={() => setTermsFor(null)}
+              />
+            ) : null}
             <div className="plans" ref={plansRef} data-visual>
               {PLANS.map((plan, index) => (
-                <article className={`plan ${pricingPlanDestinationClass}`} id={pricingPlanId(index)} tabIndex={-1} key={plan.name} data-featured={plan.name === "Developer" ? 1 : 0}>
+                <article className={`plan ${pricingPlanDestinationClass}`} id={pricingPlanId(index)} tabIndex={-1} key={plan.name} data-featured={plan.offerCode === "observer_access" ? 1 : 0}>
                   {/*
                     BQ-027. Four cards, four shared baselines.
 
@@ -922,8 +1038,7 @@ export default function PricingPageClient({
                     {plan.name === EVALUATION.name && !selfService ? EVALUATION_GATED_DESCRIPTION : plan.description}
                   </p>
                   <div className="plan-features">
-                    {plan.name === "Team" ? <p className="fine"><b>Single-member workspace</b></p> : null}
-                    {!ownFilesOpen && (plan.name === "Developer" || plan.name === "Team") ? (
+                    {!ownFilesOpen && plan.offerCode ? (
                       <p className="fine">Ask us about an approved source-processing pilot before your first compile.</p>
                     ) : null}
                     <ul>{(plan.name === EVALUATION.name && !selfService ? EVALUATION_GATED_FEATURES : plan.features).map((feature) => (
@@ -953,7 +1068,7 @@ export default function PricingPageClient({
                     discovered one redirect at a time.
                   */}
                   <a
-                    className={plan.name === "Developer" ? "btn" : "btn ghost"}
+                    className={plan.offerCode === "observer_access" ? "btn" : "btn ghost"}
                     href={planHref(plan)}
                     aria-disabled={billingBusy !== null && billingBusy === plan.offerCode ? true : undefined}
                     onClick={(event) => {
@@ -965,7 +1080,7 @@ export default function PricingPageClient({
                       trackFunnel("pricing_start_clicked", { plan: plan.name });
                       if (!opensOverlay(plan) || !plan.offerCode) return;
                       event.preventDefault();
-                      void startCheckout(plan.offerCode);
+                      buy(plan.offerCode);
                     }}
                   >
                     {ownerBillingExempt && plan.offerCode
@@ -986,6 +1101,23 @@ export default function PricingPageClient({
                     <Link className="fine pricing-secondary-link" href="/contact">Discuss your sources</Link>
                   ) : null}
                   <p className="fine">{planPath(plan, { liveCheckout, selfService })}</p>
+                  {offerForPlan(plan.name) ? (
+                    /*
+                      Journey A9 (D-08). Both regions are in the card before any sentence arrives -- a
+                      region that mounts together with its text is often not read at all -- and a
+                      refusal is announced at once. Empty, they take no space.
+                    */
+                    (["status", "alert"] as const).map((region) => (
+                      <div key={region} role={region}>
+                        {notice?.tone === region && noticeOffer === offerForPlan(plan.name) ? (
+                          <p className="notice static pricing-buy-notice">
+                            {notice.text}
+                            {noticeLink(notice, plan.name) ? <> <Link href={noticeLink(notice, plan.name)!.href as Route}>{noticeLink(notice, plan.name)!.label}</Link></> : null}
+                          </p>
+                        ) : null}
+                      </div>
+                    ))
+                  ) : null}
                   </div>
                 </article>
               ))}
@@ -1384,22 +1516,6 @@ export default function PricingPageClient({
               <Link href="/evidence">how evidence is bound</Link> ·{" "}
               <Link href={"/refunds" as Route}>cancellation and refunds</Link>.
             </p>
-            {/*
-              Journey A9 (D-08). Both regions are in the page before any sentence arrives -- a
-              region that mounts together with its text is often not read at all -- and a refusal
-              is announced at once rather than queued behind the page. `.notice` is the fixed
-              toast, so an empty region is a zero-height block at the end of this column.
-            */}
-            {(["status", "alert"] as const).map((region) => (
-              <div key={region} role={region}>
-                {notice?.tone === region ? (
-                  <p className="notice">
-                    {notice.text}
-                    {notice.link ? <> <Link href={notice.link.href as Route}>{notice.link.label}</Link></> : null}
-                  </p>
-                ) : null}
-              </div>
-            ))}
           </div>
         </section>
       </main>

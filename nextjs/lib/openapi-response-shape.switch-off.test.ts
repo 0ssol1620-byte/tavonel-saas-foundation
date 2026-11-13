@@ -587,7 +587,7 @@ describe("the quickstart names only endpoints the contract publishes", () => {
       .toMatch(/browser-session action by a human/);
     expect(prose, "the quickstart no longer names the plan activation actually requires")
       .toContain("STUDIO_SUBSCRIPTION_REQUIRED");
-    expect(prose).toContain("Team");
+    expect(prose).toContain("Pro");
 
     // Parity in the languages the audit asked for, asserted rather than trusted.
     const languages = new Set(
