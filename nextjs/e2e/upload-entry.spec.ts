@@ -105,6 +105,12 @@ for (const [path, label, href] of SELF_SERVE
     // upload behind sign-in; with it, the entry itself is the one sign-in door.
     await expect(page.locator("#s1 [data-testid='landing-hero-actions'] a")).toHaveCount(2);
     await expect(page.locator("#s1 a[href^='/login']")).toHaveCount(SELF_SERVE ? 1 : 0);
+    // Founder 2026-11-10: the document entry is the hero's primary action, first; the public sample is the secondary text link.
+    await expect(entry).toHaveAttribute("data-analytics", "hero-primary");
+    await expect(page.locator("#s1 [data-testid='landing-hero-actions'] a").first()).toHaveClass(/\blv2-entry\b/);
+    const sample = page.locator("#s1 [data-testid='landing-hero-actions'] a.lv2-text-link");
+    await expect(sample).toHaveAttribute("href", "/explore");
+    await expect(sample).toHaveAttribute("data-analytics", "hero-secondary");
     await entry.click();
     await page.waitForURL(`**${href}`);
     await expect(page.locator("main")).toBeVisible();

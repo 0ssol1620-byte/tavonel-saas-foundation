@@ -89,6 +89,6 @@ export default function EvidenceWorkbench({ model, answers, technical, capturedO
         </aside>
       </div>
     </>}
-    <p className={styles.boundary}>This sample is compiled from Apple’s public SEC filings at a single permission level. One issuer’s clean English-language filings are not a claim about a mixed internal corpus, degraded scans, tables, or your access policies. <Link href="/sources">Supported scope</Link> · <Link href="/evaluation">Evaluate your documents</Link></p>
+    <p className={styles.boundary}>This sample is compiled from Apple’s public SEC filings at a single permission level: one issuer’s clean, English-language filings. <Link href="/sources">Supported scope</Link> · <Link href="/evaluation">Evaluate your documents</Link></p>
   </div>;
 }

@@ -230,7 +230,6 @@ function mainOf(html: string): string {
 const HOME_CLAIM_ALLOWLIST: Readonly<Record<string, string>> = {
   "compilation-guarantees": "936b859c484fb54a8bdff3175d89d2fd47d695d48ec93b99fcfd93ac53ee2e25",
   "recovery-contribution-olmocr": "1f5b6220c1fa569e8e33530d933a16eb7ad6b856c56e22f1744f8fa96efe33e0",
-  "accuracy-by-document-type": "4d75ae96e70c7c1c425b991df0f1c356ec6393e73914aaed27f5f54b0048a559",
 };
 
 type PackClaim = { id: string; status: string; evidence_sha256?: unknown; numbers?: unknown };
@@ -340,6 +339,13 @@ const attr = (open: string, name: string): string | undefined =>
 const GROUND = ["paper", "paper", "paper", "paper", "paper", "paper"];
 
 /** One scene's markup: from its own `<section>` to the next one (scenes never nest). */
+/** The recorded walkthrough's block below the fold (landing-page.tsx, founder 2026-11-10): it is not a scene. */
+function walkthroughOf(main: string): string {
+  const at = main.indexOf('id="walkthrough"');
+  expect(at, "the walkthrough block").toBeGreaterThan(-1);
+  return main.slice(at, main.indexOf('<section id="s2"'));
+}
+
 function sceneOf(main: string, id: string): string {
   const opens = [...main.matchAll(/<section(\s[^>]*)?>/g)];
   const index = opens.findIndex(match => attr(match[1] ?? "", "id") === id);
@@ -407,11 +413,12 @@ describe("landing v2 -- the composition with the specimen strip rendered", () =>
       in both postures -- the film poster is the first screen's one priority image and is preloaded -- and nothing
       from s2 on asks for priority.
     */
-    const poster = elements(hero, "img").filter(open => open.includes("compile-film-still"));
+    // Founder 2026-11-10: the first screen's priority image is the hero tabs' first poster (hero-compile-tabs.tsx).
+    const poster = elements(hero, "img").filter(open => open.includes("/film/hero-tab-1.webp"));
     expect(poster).toHaveLength(1);
     expect([attr(poster[0]!, "loading"), attr(poster[0]!, "fetchpriority")]).toEqual(["eager", "high"]);
     // The whole render, not <main>: React writes a preload() hint ahead of the content (merge review A2).
-    const posterPreload = /<link[^>]*rel="preload"[^>]*poster-r3-c1/;
+    const posterPreload = /<link[^>]*rel="preload"[^>]*hero-tab-1/;
     expect(page).toMatch(posterPreload);
     expect(elements(hero, "img").filter(open => attr(open, "fetchpriority") === "high")).toHaveLength(1);
     expect(hero).not.toContain("data-specimen-strip");
@@ -547,22 +554,21 @@ describe("landing v2 -- the composition", () => {
   /*
     Release 3 move 7. The band sits between the hero and the workbench, every figure in it is
     claim-bound (the walk above checks each one), and every fact links to the receipt that holds it.
-    The weakest row is asserted by name: a band that kept only its flattering figures would pass
-    the digit walk and still be the thing the evidence rules forbid.
+    2026-11-10 public-copy cleanup (founder direction): intended re-pin. The by-document-type row (R-03) left Home, so the band carries R-01 and R-02.
+    Every figure on it is still claim-bound and dated, and 99.98 is still never on it.
   */
-  it.each(LOCALES)("%s shows three receipted measures under the hero, weakest row included", locale => {
+  it.each(LOCALES)("%s shows two receipted measures under the hero", locale => {
     const main = mainOf(render(locale));
     const band = main.slice(main.lastIndexOf("<section", main.indexOf("data-home-measures")), main.indexOf('<section id="s2"'));
     expect(main.indexOf("data-home-measures")).toBeGreaterThan(main.indexOf('<section id="s1"'));
     expect(main.indexOf("data-home-measures")).toBeLessThan(main.indexOf('<section id="s2"'));
     // FINAL-SPEC 2026-10-26 D-12: the same three allowlisted claims, in receipt order R-01, R-02, R-03.
     const ids = [...band.matchAll(/data-claim-id="([^"]+)"/g)].map(match => match[1]);
-    expect(ids).toEqual(["recovery-contribution-olmocr", "compilation-guarantees", "accuracy-by-document-type"]);
+    expect(ids).toEqual(["recovery-contribution-olmocr", "compilation-guarantees"]);
     expect([...ids].sort()).toEqual(Object.keys(HOME_CLAIM_ALLOWLIST).sort());
     const receipts = elements(band, "a").filter(open => attr(open, "data-receipt")).map(open => [attr(open, "href"), attr(open, "data-receipt")]);
-    expect(receipts).toEqual([["/research/notes#R-01", "R-01"], ["/research/notes#R-02", "R-02"], ["/research/notes#R-03", "R-03"]]);
-    expect(readable(band)).toContain(locale === "ko" ? "저품질 스캔본" : "low-quality scans");
-    expect(band).toContain('data-claim-sha="4d75ae96e70c7c1c425b991df0f1c356ec6393e73914aaed27f5f54b0048a559">36.9</span>');
+    expect(receipts).toEqual([["/research/notes#R-01", "R-01"], ["/research/notes#R-02", "R-02"]]);
+    expect(readable(band)).not.toContain(locale === "ko" ? "저품질 스캔본" : "low-quality scans");
     // The completion share is never called accuracy, and is not on the band without a served receipt.
     expect(readable(band).toLowerCase()).not.toContain("accuracy");
     expect(readable(band)).not.toContain("99.98");
@@ -637,7 +643,9 @@ describe("landing v2 -- the composition", () => {
       expect(main).not.toContain("<canvas");
       expect(main).not.toContain("data-compiler-specimen");
       expect(elements(sceneOf(main, "s1"), "div").filter(open => attr(open, "role") === "tablist")).toHaveLength(1);
-      expect(sceneOf(main, "s1")).toContain('data-video-primary-src="/film/hero-r3-c1.mp4"');
+      // Founder 2026-11-10: the hero is the four compile cuts' poster; the recorded walkthrough sits below the fold.
+      expect(sceneOf(main, "s1")).toContain('src="/film/hero-tab-1.webp"');
+      expect(walkthroughOf(main)).toContain('data-video-primary-src="/film/hero-r3-c1.mp4"');
       expect(sceneOf(main, "s1")).not.toContain("data-source-inspection-film");
       const text = readable(main);
       for (const tab of buildProofTabs()) expect(text).not.toContain(tab.question);
@@ -840,7 +848,7 @@ describe("landing v2 -- the lead and the workbench", () => {
   it.each(LOCALES)("%s shows four demo stages immediately after the headline", locale => {
     const main = mainOf(render(locale));
     const hero = sceneOf(main, "s1");
-    const filmAt = hero.indexOf('data-testid="landing-hero-film"');
+    const filmAt = hero.indexOf('data-testid="hero-compile-tabs"');
     const actionsAt = hero.indexOf('data-testid="landing-hero-actions"');
     expect(actionsAt).toBeGreaterThan(hero.indexOf('</h1>'));
     expect(filmAt).toBeGreaterThan(actionsAt);
@@ -852,16 +860,29 @@ describe("landing v2 -- the lead and the workbench", () => {
     expect(readable(hero)).toContain(
       locale === "ko" ? "각 진술에 원문 페이지와 영역이 남습니다." : "Each statement keeps its source page and region.",
     );
-    expect(hero).toContain("/film/poster-r3-c1-t10.40-2x.webp");
-    expect(hero).toContain("/film/poster-r3-c1-t10.40-2x.avif");
-    expect(elements(hero, "button").filter(open => attr(open, "role") === "tab")).toHaveLength(4);
-    // Founder ask 2026-10-27, kept for R3 (2026-11-09): the film opens compact (the whole frame) at every width; the pane still waits for Focus details.
-    expect(hero).toContain('data-mobile-view="fit"');
-    expect(hero).toContain('data-wide-view="fit"');
-    expect(hero).not.toContain("/film/poster-r3-c1-t10.40-pane1-848x1060.avif");
+    // Founder 2026-11-10: four compile cuts in one tabbed slot -- Extract, Link, Update, Use -- each with its poster.
+    expect(hero).toContain("/film/hero-tab-1-2x.webp");
+    expect(hero).toContain("/film/hero-tab-1-2x.avif");
+    const tabs = elements(hero, "button").filter(open => attr(open, "role") === "tab");
+    expect(tabs).toHaveLength(4);
+    expect(tabs.map(open => attr(open, "aria-selected"))).toEqual(["true", "false", "false", "false"]);
+    const panel = elements(hero, "div").find(open => attr(open, "role") === "tabpanel")!;
+    for (const tab of tabs) expect(attr(tab, "aria-controls")).toBe(attr(panel, "id"));
+    expect(hero).not.toContain('data-testid="landing-hero-film"');
     expect(hero).not.toContain('data-source-inspection-film');
-    // The not-customer-results disclosure stays (FINAL-SPEC D-9 shortens its wording only).
-    expect(readable(hero)).toContain(locale === "ko" ? "고객 결과가 아닙니다" : "not customer results");
+    // Founder 2026-11-10: each film is labelled by what it is, a walkthrough on sample files; the old negation is gone.
+    expect(readable(hero)).toContain(locale === "ko" ? "샘플 파일로 보는 제품 흐름" : "Product walkthrough on sample files");
+    expect(readable(hero)).not.toContain(locale === "ko" ? "고객 결과가 아닙니다" : "not customer results");
+    // The recorded walkthrough moved below the fold, unchanged: compact at every width, the pane waits for Focus details.
+    const walkthrough = walkthroughOf(main);
+    expect(walkthrough).toContain('data-testid="landing-hero-film"');
+    expect(walkthrough).toContain('data-mobile-view="fit"');
+    expect(walkthrough).toContain('data-wide-view="fit"');
+    expect(walkthrough).not.toContain("/film/poster-r3-c1-t10.40-pane1-848x1060.avif");
+    expect(readable(walkthrough)).toContain(locale === "ko" ? "샘플 파일로 보는 제품 흐름" : "Product walkthrough on sample files");
+    expect(readable(walkthrough)).not.toContain(locale === "ko" ? "고객 결과가 아닙니다" : "not customer results");
+    expect(main.indexOf('id="walkthrough"')).toBeGreaterThan(main.indexOf("data-home-measures"));
+    expect(main.indexOf('id="walkthrough"')).toBeLessThan(main.indexOf('<section id="s2"'));
     expect(sceneOf(main, "s2")).not.toContain('data-testid="landing-hero-film"');
   });
 });
@@ -869,9 +890,10 @@ describe("landing v2 -- the lead and the workbench", () => {
 /*
   THE HERO'S ACTIONS, BY COMMERCIAL STATE.
 
-  The primary action is always the public sample. The secondary is the access action the server
-  resolved, except while that resolves to `/contact`: then the hero offers the document evaluation
-  in the page's own locale instead. The close keeps the resolved access action either way.
+  Founder 2026-11-10: the primary action is the document entry (the drop zone), drawn as the access
+  action the server resolved, except while that resolves to `/contact`: then it is the document
+  evaluation in the page's own locale. The public sample is the secondary link in every state. The
+  close keeps the public sample either way.
 */
 describe("landing v2 -- hero actions by commercial state", () => {
   afterEach(() => {
@@ -883,13 +905,14 @@ describe("landing v2 -- hero actions by commercial state", () => {
   /* The visible label without its aria-hidden arrow (FINAL-SPEC 2026-10-26 §2.1): what the access action is called. */
   const label = (inner: string) => readable(inner.replace(/<span aria-hidden="true">[\s\S]*?<\/span>/g, "")).trim();
 
-  it.each(LOCALES)("%s sends the primary action to the public sample", locale => {
+  it.each(LOCALES)("%s sends the secondary action to the public sample", locale => {
     for (const live of [false, true]) {
       commercial.live = live;
-      const primary = action(sceneOf(mainOf(render(locale)), "s1"), "hero-primary");
-      expect(primary, `primary action (live: ${live})`).not.toBeNull();
+      const secondary = action(sceneOf(mainOf(render(locale)), "s1"), "hero-secondary");
+      expect(secondary, `secondary action (live: ${live})`).not.toBeNull();
       expect(EXPLORE_CTA.href).toMatch(/^\/explore\b/);
-      expect(attr(primary![0], "href")).toBe(escaped(EXPLORE_CTA.href));
+      expect(attr(secondary![0], "href")).toBe(escaped(EXPLORE_CTA.href));
+      expect(attr(secondary![0], "class")).toBe("lv2-text-link");
     }
   });
 
@@ -900,11 +923,12 @@ describe("landing v2 -- hero actions by commercial state", () => {
       expect(primaryCallToAction()).toEqual(ACCESS_CTA);
       expect(ACCESS_CTA.href).toBe("/contact");
       const main = mainOf(render(locale));
-      const secondary = action(sceneOf(main, "s1"), "hero-secondary");
-      expect(secondary).not.toBeNull();
-      expect(attr(secondary![0], "href")).toBe(locale === "ko" ? "/ko/evaluation" : "/evaluation");
-      // Fix round 3 (judge gap 4): the quiet secondary is the start path, to the same evaluation route.
-      expect(label(secondary![1]!)).toBe(locale === "ko" ? "내 문서 평가" : "Evaluate your documents");
+      const primary = action(sceneOf(main, "s1"), "hero-primary");
+      expect(primary).not.toBeNull();
+      expect(attr(primary![0], "href")).toBe(locale === "ko" ? "/ko/evaluation" : "/evaluation");
+      // Founder 2026-11-10: the drop zone is the hero's primary, to the same evaluation route.
+      expect(attr(primary![0], "class")).toBe("lv2-entry");
+      expect(label(primary![1]!)).toBe(locale === "ko" ? "내 문서 평가" : "Evaluate your documents");
       // Brief 2026-10-15 move 1: the close fills the hero's public-sample action beside the price link, in both languages.
       const close = elements(sceneOf(main, "s6"), "a").map(open => attr(open, "href"));
       // Conversion pass 2026-11-09: the English close also links the MCP setup page.
@@ -919,10 +943,10 @@ describe("landing v2 -- hero actions by commercial state", () => {
       expect(primaryCallToAction()).toEqual(SELF_SERVE_CTA);
       expect(SELF_SERVE_CTA.href).not.toBe("/contact");
       const main = mainOf(render(locale));
-      const secondary = action(sceneOf(main, "s1"), "hero-secondary");
-      expect(secondary).not.toBeNull();
-      expect(attr(secondary![0], "href")).toBe(escaped(SELF_SERVE_CTA.href));
-      expect(label(secondary![1]!)).toBe(
+      const primary = action(sceneOf(main, "s1"), "hero-primary");
+      expect(primary).not.toBeNull();
+      expect(attr(primary![0], "href")).toBe(escaped(SELF_SERVE_CTA.href));
+      expect(label(primary![1]!)).toBe(
         locale === "ko" ? KO_CHROME.cta[SELF_SERVE_CTA.href] : SELF_SERVE_CTA.label
       );
       expect(main).not.toMatch(/href="(?:\/ko)?\/evaluation"/);
@@ -1029,6 +1053,19 @@ describe("current-main bounded evaluation entry", () => {
     }));
     expect(access).toContain('href="/evaluation"');
     expect(access).not.toContain('href="/pricing"');
+  });
+
+  // PR #235 review R1, S3: the CTA-order arms stay distinct on Home -- the control draws the entry first, arm B the sample.
+  it("keeps the CTA-order arms distinct on Home", () => {
+    const arm = (ctaOrderVariant: "a" | "b") => renderToStaticMarkup(createElement(HeroActions, {
+      exploreLabel: "Explore", exploreHref: "/explore", startLabel: "Evaluate documents", startHref: "/evaluation", scene: "1", entry: true, ctaOrderVariant,
+    }));
+    const [a, b] = [arm("a"), arm("b")];
+    expect(a).not.toBe(b);
+    expect(a).toContain("lv2-entry");
+    expect(a.indexOf('href="/evaluation"')).toBeLessThan(a.indexOf('href="/explore"'));
+    expect(b).not.toContain("lv2-entry");
+    expect(b.indexOf('href="/explore"')).toBeLessThan(b.indexOf('href="/evaluation"'));
   });
 
   it.each(["en", "ko"] as const)("%s offers the blank localized worksheet without uploading documents", locale => {

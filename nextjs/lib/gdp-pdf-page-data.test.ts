@@ -477,8 +477,13 @@ describe("the route's public surface", () => {
     expect(metadata.alternates?.canonical).toBe("/benchmarks/gdp-pdf");
   });
 
-  it("is advertised in the sitemap", () => {
-    expect(sitemap().some((entry) => entry.url.endsWith("/benchmarks/gdp-pdf"))).toBe(true);
+  /*
+    2026-11-10 (founder direction): intended re-pin. The run page stays at its URL as the evidence
+    record, unchanged, and is no longer featured: out of the sitemap and out of the index.
+  */
+  it("stays reachable but is neither advertised in the sitemap nor indexed", () => {
+    expect(sitemap().some((entry) => entry.url.endsWith("/benchmarks/gdp-pdf"))).toBe(false);
+    expect(metadata.robots).toEqual({ index: false, follow: true });
   });
 
   it("is measured, because what is advertised is what is measured", () => {

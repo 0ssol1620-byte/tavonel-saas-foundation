@@ -6,7 +6,7 @@ import WorldExplorer from "@/components/world-explorer";
 import { FileText, ShieldCheck, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activationPolicy, type ActivationCapability } from "@/lib/activation-policy";
-import { failureSentence, isSizeLimitFailure, offersUpgrade } from "@/lib/workspace-failure-copy";
+import { failureSentence, isSizeLimitFailure, offersUpgrade, pageLocale } from "@/lib/workspace-failure-copy";
 import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion } from "@/lib/workspace-ask-copy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -83,7 +83,7 @@ import { compileLimitsNotice, judgeCompileSet } from "@/lib/compile-limits";
 import { describeCorpusStart, judgeCorpusSet, type CorpusProgress } from "@/lib/corpus-batching";
 import { CompileJobPanel, type CompileJobView } from "@/components/compile-job-panel";
 import { compileJobRestingNotice, isCompileJobResting, isCompileJobTerminal, observeCompileJob, pickResumableCompileJob } from "@/lib/compile-job-client";
-import { measureSelection, type PageCountResult } from "@/lib/page-count";
+import { measureSelection, refusablePageCount, type PageCountResult } from "@/lib/page-count";
 import {
   buildPreflightSummary,
   describePreflightFile,
@@ -932,7 +932,9 @@ export default function WorkspacePage() {
       !paths.includes("graph/nodes.csv") ||
       !paths.includes("graph/relationships.csv")
     ) {
-      setNotice(`Immutable collection verification failed. ${failureSentence(json.code, response.status)}`);
+      setNotice(json.code === "COLLECTION_PACKAGE_TOO_LARGE"
+        ? failureSentence(json.code, response.status)
+        : `Immutable collection verification failed. ${failureSentence(json.code, response.status)}`);
       return;
     }
     setCollectionResult({ ...artifact, artifactKey: json.artifactKey ?? "" });
@@ -1284,7 +1286,9 @@ export default function WorkspacePage() {
     capability, confirm and release exactly as main does: each file reserves its own compute, and
     no approval exists to reference.
   */
-  const uploadLegacyDocument = async (file: File, manageBusy = true, onRefusal?: (reason: string) => void): Promise<string | null> => {
+  const uploadLegacyDocument = async (
+    file: File, manageBusy = true, onRefusal?: (reason: string) => void, measured?: PageCountResult | null,
+  ): Promise<string | null> => {
     if (!intakeOpen) { setNotice(intakeClosedCopy); onRefusal?.(intakeClosedCopy); return null; }
     const sourceLabel = (file as WorkspaceUploadFile).tavonelRelativePath || file.name;
     if (manageBusy) setBusy(true);
@@ -1328,9 +1332,15 @@ export default function WorkspacePage() {
           originalFilename: file.name,
           declaredMimeType: file.type || "application/pdf",
           requestedBytes: file.size,
+          /*
+            A PDF's counted page tree, so the route can refuse a file over the page ceiling before
+            any byte is sent rather than the rasterizer refusing it after. A declared DOCX count or
+            a PPTX slide count is not sent: either can exceed what the file renders to.
+          */
           estimatedPages: estimateBillablePages({
             bytes: file.size,
             mimeType: file.type || "application/pdf",
+            ...refusablePageCount(measured),
           })?.pages,
         }),
       });
@@ -1861,7 +1871,7 @@ export default function WorkspacePage() {
    * still being read, so the report now names the failure and keeps going.
    */
   // main's batch over the per-file upload above, for when the approval lineage is off.
-  const uploadLegacyDocuments = async (files: File[]) => {
+  const uploadLegacyDocuments = async (files: File[], measured?: PageCountResult[] | null) => {
     if (files.length === 0) return;
     if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
     setBusy(true);
@@ -1870,8 +1880,10 @@ export default function WorkspacePage() {
     try {
       setNotice(`Uploading ${files.length} file(s) securely, ${UPLOAD_CEILING} at a time.`);
       const refusals: string[] = [];
+      // The counts were measured on this same selection, in order; a stale set is not used.
+      const counts = measured?.length === files.length ? measured : null;
       const settled = await runBounded(files, UPLOAD_CEILING, (file) =>
-        uploadLegacyDocument(file, false, (reason) => { refusals.push(reason); }));
+        uploadLegacyDocument(file, false, (reason) => { refusals.push(reason); }, counts?.[files.indexOf(file)] ?? null));
       const ids = settled.flatMap((result) => (result.ok && result.value ? [result.value] : []));
       const lost = files.length - ids.length;
       if (lost > 0) {
@@ -1903,7 +1915,7 @@ export default function WorkspacePage() {
     if (files.length === 0) return;
     if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
     // No whole-set approval to create: upload file by file, exactly as main does.
-    if (!approvalLineage && !triageApproval) { await uploadLegacyDocuments(files); return; }
+    if (!approvalLineage && !triageApproval) { await uploadLegacyDocuments(files, measured); return; }
     setBusy(true);
     setCollectionResult(null);
     clearWorldState();
@@ -2744,7 +2756,7 @@ export default function WorkspacePage() {
       trackFunnelOnce("workspace_first_ask", { status: json.status });
       setNotice(json.status === "grounded"
         ? `Answer returned from ${json.citations.length} exact source region(s) in active revision ${activeWorld.revision}.`
-        : askAbstentionCopy(json.reason, navigator.languages).notice);
+        : askAbstentionCopy(json.reason, pageLocale()).notice);
     } catch {
       setNotice("The answer response could not be read. Your question is kept. No answer is shown; retry when the connection is available.");
     } finally {
@@ -2923,7 +2935,7 @@ export default function WorkspacePage() {
           corpus={corpus}
           names={names}
           busy={busy}
-          languages={navigator.languages}
+          locale={pageLocale()}
           onResolve={(resolution) => void resolveCompileBlockers(resolution)}
           onCancel={() => void cancelCompileJob()}
           onOpenPart={(jobId) => {
@@ -3362,7 +3374,7 @@ export default function WorkspacePage() {
           */}
           {tab === "overview" && surface === "home" && workspaceState.mode === "new" && intakeOpen ? (
             <figure className="workspace-example-run">
-              <figcaption>What a run looks like · example files, not yours</figcaption>
+              <figcaption>What a run looks like · example files</figcaption>
               {/* Plain markup, not ProductCapture: this page is a client component, and importing the capture
                   manifest would ship all of it in the workspace bundle. The two sizes are MANIFEST.json's pixel
                   size for the pair; lib/workspace-onboarding.test.ts holds them to the manifest. */}
@@ -3642,7 +3654,7 @@ export default function WorkspacePage() {
                 <h2 id="review-queue-title">Sources waiting on you, most at risk first.</h2>
                 <ReviewQueue
                   input={reviewQueueInput}
-                  languages={navigator.languages}
+                  locale={pageLocale()}
                   selectedDocumentId={worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)?.sourceId ?? null}
                   onSelectDocument={(documentId) => selectReviewEvidence(worldReadModel?.evidence.find((item) => item.sourceId === documentId)?.id ?? null)}
                 />
@@ -3895,13 +3907,13 @@ export default function WorkspacePage() {
                 {askResult ? (
                   <div className={`ask-result ${askResult.status}`} role="status">
                     <strong>{askResult.status === "grounded" ? "Grounded answer" : "Abstained"}</strong>
-                    <p data-sensitive="content">{askResult.status === "grounded" ? askResult.answer : askAbstentionCopy(askResult.reason, navigator.languages).result}</p>
+                    <p data-sensitive="content">{askResult.status === "grounded" ? askResult.answer : askAbstentionCopy(askResult.reason, pageLocale()).result}</p>
                     {askResult.citations.length > 0 ? (
                       <ol data-sensitive="content">
                         {askResult.citations.map((citation, index) => {
                           // One strict resolver for both availability and the click; null keeps the button disabled.
                           const regionId = resolveCitationRegion(citation, askWorldModel?.evidence);
-                          const sourceCopy = askSourceCopy(navigator.languages);
+                          const sourceCopy = askSourceCopy(pageLocale());
                           return (
                           <li key={`${index}-${citation.evidenceId}`}>
                             <b>{citation.evidenceId}</b>
@@ -3930,7 +3942,7 @@ export default function WorkspacePage() {
                     {askResult.status === "abstained" && askResult.reason === EVIDENCE_EXCEEDS_ANSWER_LIMIT ? (
                       <div className="workspace-intake-actions">
                         <button type="button" onClick={() => document.getElementById("ask-question")?.focus()}>
-                          {askAbstentionCopy(askResult.reason, navigator.languages).action}
+                          {askAbstentionCopy(askResult.reason, pageLocale()).action}
                         </button>
                       </div>
                     ) : askResult.status === "abstained" ? (
@@ -4073,14 +4085,14 @@ export default function WorkspacePage() {
             <section className="card workspace-access-gate" role="status">
               <h2>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "Workspace access could not be verified." : "Checking workspace access."
-                : customerDataAccess === "closed" ? "Source connections are not available for this workspace yet." : "Source connections are part of the Starter and Pro plans."}</h2>
+                : customerDataAccess === "closed" ? "Source connections are not available for this workspace yet." : "Available on Starter and Pro."}</h2>
               <p>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
                 : customerDataAccess === "closed"
                 ? `Your account is ready, but source processing is closed. ${closedGate.sentence}`
                 : accessSource === "trial"
-                ? "Free evaluation works with files you upload directly. Connect Google Drive, Dropbox, OneDrive or your own storage once the workspace is on Starter or Pro."
-                : "This account has no active compute access. Source connections require Starter or Pro."}</p>
+                ? "Google Drive and file-server connections are included on Starter and Pro. The free evaluation works with files you upload directly."
+                : "Google Drive and file-server connections are included on Starter and Pro. This workspace has no active plan."}</p>
               <div className="billing-actions">{accessSource === null
                 ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
                 : customerDataAccess === "closed"

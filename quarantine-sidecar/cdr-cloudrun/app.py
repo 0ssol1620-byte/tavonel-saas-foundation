@@ -98,6 +98,18 @@ STAGE_1_MAX_OUTPUT_BYTES: Final = 45 * 1024 * 1024
 STAGE_1_RASTER_RANGE_PAGES: Final = 8
 INTAKE_CEILING_STAGE_ENV: Final = "TAVONEL_INTAKE_CEILING_STAGE"
 
+# Segmented sources (docs/adr/0006-segmented-large-sources.md). A worker that reads a long source
+# asks for one page range per request, by ending its signed request id in `_p<start0>_<end0>`
+# (0-based, end-exclusive). The range is part of the signed id, so it cannot be changed or replayed
+# under another range. Each request renders at most `LIMITS.pages` pages -- the same per-request
+# render, pixel and output bounds as an unranged request -- out of a document of at most
+# SEGMENTED_MAX_DOCUMENT_PAGES. An unranged request is unchanged: the whole document, at most
+# `LIMITS.pages` pages. The 500 is the loop bound the worker's range reader already uses
+# (`foundation-cdr-worker/src/ocr.ts` MAX_RANGE_DOCUMENT_PAGES), not a measurement.
+SEGMENTED_MAX_DOCUMENT_PAGES: Final = 500
+CDR_RANGES_HEADER: Final = "x-tavonel-cdr-ranges"
+PAGE_RANGE_REQUEST_ID: Final = re.compile(r"^[A-Za-z0-9-]{16,140}_p([0-9]{1,4})_([0-9]{1,4})$")
+
 
 @dataclass(frozen=True)
 class Limits:
@@ -728,7 +740,28 @@ def _join_pdf_ranges(parts: list[Path], target: Path) -> None:
             part.unlink(missing_ok=True)
 
 
+def requested_page_range(request_id: str | None) -> tuple[int, int] | None:
+    """The page range a signed request id names, or None for the whole document."""
+    match = PAGE_RANGE_REQUEST_ID.fullmatch(request_id or "")
+    if match is None:
+        return None
+    start, end = int(match.group(1)), int(match.group(2))
+    if start >= end or end - start > LIMITS.pages or end > SEGMENTED_MAX_DOCUMENT_PAGES:
+        raise HTTPException(422, "CDR page range is not qualified")
+    return start, end
+
+
 def rasterize_to_pdf(source: Path, target: Path) -> int:
+    return rasterize_pages(source, target, None)[0]
+
+
+def rasterize_pages(source: Path, target: Path, page_range: tuple[int, int] | None) -> tuple[int, int, int]:
+    """Render the whole document, or one page range of it, into a new image-only PDF.
+
+    Returns the output size, the source's page count and the end of the range actually rendered
+    (the last range of a document stops at its last page). A page that cannot be rendered refuses
+    the whole request: no range is ever returned with a page missing.
+    """
     source_doc: pdfium.PdfDocument | None = None
     output_doc: pdfium.PdfDocument | None = None
     try:
@@ -741,17 +774,25 @@ def rasterize_to_pdf(source: Path, target: Path) -> int:
             raise HTTPException(422, "CDR source renderer rejected this document") from exc
 
         page_count = len(source_doc)
-        if page_count < 1 or page_count > LIMITS.pages:
-            raise HTTPException(422, "CDR source page count is not qualified")
+        if page_range is None:
+            if page_count < 1 or page_count > LIMITS.pages:
+                raise HTTPException(422, "CDR source page count is not qualified")
+            selected = range(page_count)
+        else:
+            if page_count < 1 or page_count > SEGMENTED_MAX_DOCUMENT_PAGES:
+                raise HTTPException(422, "CDR source page count is not qualified")
+            if page_range[0] >= page_count:
+                raise HTTPException(422, "CDR page range starts past the end of the document")
+            selected = range(page_range[0], min(page_range[1], page_count))
         page_sizes: list[tuple[float, float]] = []
-        for page_index in range(page_count):
+        for page_index in selected:
             page = source_doc[page_index]
             try:
                 page_sizes.append(tuple(float(value) for value in page.get_size()))
             finally:
                 page.close()
         render_scale = document_render_scale(page_sizes)
-        ranges = raster_ranges(page_count)
+        ranges = raster_ranges(len(selected))
         parts: list[Path] = []
         written = 0
         for range_index, pages in enumerate(ranges):
@@ -759,7 +800,7 @@ def rasterize_to_pdf(source: Path, target: Path) -> int:
             rendered_pixels = 0
             for page_index in pages:
                 page_width, page_height = page_sizes[page_index]
-                source_page = source_doc[page_index]
+                source_page = source_doc[selected[page_index]]
                 bitmap: pdfium.PdfBitmap | None = None
                 try:
                     bitmap = source_page.render(
@@ -811,7 +852,7 @@ def rasterize_to_pdf(source: Path, target: Path) -> int:
     size = target.stat().st_size if target.is_file() else 0
     if size < 1 or size > LIMITS.output_bytes:
         raise HTTPException(422, "CDR sanitized output is outside the controlled-beta size limit")
-    return size
+    return size, page_count, selected.stop
 
 
 def qualified_text_layer_scale(source: Path) -> float:
@@ -855,7 +896,9 @@ app.add_middleware(
 
 @app.exception_handler(HTTPException)
 async def http_exception_no_store(_: Request, exc: HTTPException) -> JSONResponse:
-    headers = {"cache-control": "no-store"}
+    # CDR_RANGES_HEADER on every refusal tells the worker this revision answers page ranges, so a
+    # refusal of a ranged request is a verdict. Without it the worker retries (ADR-0006, E4).
+    headers = {"cache-control": "no-store", CDR_RANGES_HEADER: "1"}
     if exc.headers:
         headers.update(exc.headers)
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=headers)
@@ -911,6 +954,8 @@ def disarm(
     if not isinstance(expected_digest, str):
         raise HTTPException(401, "CDR request boundary authentication is required")
     file_name, mime_type = validate_input(source.filename, source.content_type)
+    # Read from the authenticated id, so the range is the one the signature covers.
+    page_range = requested_page_range(request.headers.get("x-tavonel-cdr-request-id"))
     work_dir = Path(tempfile.mkdtemp(prefix="tavonel-cdr-"))
     try:
         input_path = work_dir / file_name
@@ -924,7 +969,7 @@ def disarm(
         reject_active_html(input_path, mime_type)
         pdf_source = convert_to_pdf(input_path, mime_type, work_dir)
         output_path = work_dir / "sanitized.pdf"
-        byte_size = rasterize_to_pdf(pdf_source, output_path)
+        byte_size, source_pages, rendered_end = rasterize_pages(pdf_source, output_path, page_range)
         with output_path.open("rb") as sanitized:
             output_digest = f"sha256:{hashlib.file_digest(sanitized, 'sha256').hexdigest()}"
     except Exception:
@@ -945,6 +990,11 @@ def disarm(
             "x-tavonel-cdr-output-mime": "application/pdf",
             "x-tavonel-cdr-output-sha256": output_digest,
             "x-tavonel-malware-scan": json.dumps(malware_scan, separators=(",", ":")),
+            # Only a ranged request is answered with its range; an unranged answer is unchanged.
+            **({
+                "x-tavonel-cdr-source-pages": str(source_pages),
+                "x-tavonel-cdr-page-range": f"{page_range[0]}-{rendered_end}",
+            } if page_range is not None else {}),
         },
         background=background_tasks,
     )

@@ -1,6 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mkdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { installFixtureSession, installWorkspaceRoutes } from "./fixtures/workspace-fixture";
 
 // Labeled UI fixtures only. No provider account, document or production auth is used.
 test("connector progress follows real response states and retains uncertainty on read failure", async ({ page }, testInfo) => {
@@ -41,9 +40,9 @@ test("connector progress follows real response states and retains uncertainty on
   await expect(panel).toContainText("Source access changed");
   await panel.getByText("Import details", { exact: true }).click();
   await expect(panel).toContainText("SOURCE_LIFECYCLE_REVIEW_REQUIRED");
-  const directory = resolve(process.cwd(), "../.chatgpt2codex/connection-sync-captures-0910");
-  mkdirSync(directory, { recursive: true });
-  await page.screenshot({ path: resolve(directory, `${testInfo.project.name}-fixture.png`), fullPage: true });
+  // Inside the ignored test output, not a tracked tree: a capture outside it left the CI checkout
+  // with untracked paths, which the repair-scope gate refuses.
+  await page.screenshot({ path: testInfo.outputPath(`${testInfo.project.name}-fixture.png`), fullPage: true });
   unavailable = true;
   await panel.getByRole("button", { name: "Refresh import progress" }).click();
   await expect(panel).toContainText("last known state");
@@ -69,4 +68,43 @@ test("connector progress follows real response states and retains uncertainty on
   await expect(page.getByRole("button", { name: "Connect Google Drive", exact: true })).toBeEnabled();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(pageErrors).toEqual([]);
+});
+
+// 2026-11-10: plan availability is shown before the click. Labeled UI fixtures only.
+for (const [source, sentence] of [
+  ["trial", "The free evaluation works with files you upload directly."],
+  ["unentitled", "This workspace has no active plan."],
+] as const) {
+  test(`a ${source} workspace sees where connections are sold, and no connect button`, async ({ page }) => {
+    await installFixtureSession(page);
+    await installWorkspaceRoutes(page, { accessSource: source, customerDataEnabled: true });
+    let authorizeCalls = 0;
+    await page.route("**/api/v1/oauth-connectors/authorize", route => { authorizeCalls += 1; return route.fulfill({ status: 402, json: { code: "TRIAL_FEATURE_NOT_INCLUDED" } }); });
+    await page.goto("/workspace/connections");
+    const gate = page.locator(".workspace-access-gate");
+    await expect(gate.getByRole("heading", { name: "Available on Starter and Pro." })).toBeVisible();
+    await expect(gate).toContainText("Google Drive and file-server connections are included on Starter and Pro.");
+    await expect(gate).toContainText(sentence);
+    await expect(gate).not.toContainText(/Dropbox|OneDrive/);
+    await expect(gate.getByRole("link", { name: "See plans" })).toHaveAttribute("href", "/pricing");
+    await expect(page.getByRole("button", { name: /^Connect / })).toHaveCount(0);
+    expect(authorizeCalls).toBe(0);
+  });
+}
+
+test("a paid Developer workspace sees only the providers this deployment configured", async ({ page }) => {
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page, { accessSource: "paid", customerDataEnabled: true });
+  await page.route("**/api/connections", route => route.fulfill({ json: { code: "OK", connections: [] } }));
+  await page.route("**/api/v1/oauth-connectors", route => route.fulfill({ json: { providers: [
+    { provider: "google_drive", configured: true },
+    { provider: "dropbox", configured: false },
+    { provider: "microsoft_graph", configured: false },
+  ], connections: [] } }));
+  await page.goto("/workspace/connections");
+  await expect(page.getByRole("button", { name: "Connect Google Drive", exact: true })).toBeEnabled();
+  await expect(page.getByText(/not configured/)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Dropbox|OneDrive/ })).toHaveCount(0);
+  await expect(page.locator(".workspace-access-gate")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Create connection" })).toBeVisible();
 });

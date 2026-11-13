@@ -44,12 +44,15 @@ test.describe("visual continuity — locked film side", () => {
     */
     await expect(page.locator(".one-path-world-stage, [data-world-stage]")).toHaveCount(0);
     /*
-      The four locked cuts are direct tabs in Scene 01. The source-linked specimen follows in
+      The four locked cuts are direct tabs in the walkthrough (founder 2026-11-10: below the fold, in #walkthrough;
+      Scene 01's one tablist is the hero film's, hero-compile-tabs.tsx). The source-linked specimen follows in
       Scene 02; Scene 03 presents a source-bound record. The retired One-Path markup
       (.one-path-world-stage, one-path-works-film) still stays out.
     */
     await expect(page.locator("#s1").getByRole("tablist")).toHaveCount(1);
-    await expect(page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]')).toHaveCount(1);
+    await expect(page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="hero-compile-tabs"]')).toHaveCount(1);
+    await expect(page.locator('#walkthrough figure[data-testid="landing-hero-film"]')).toHaveCount(1);
+    await expect(page.locator('#s1 [data-testid="landing-hero-film"]')).toHaveCount(0);
     await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
     const disclosure = page.getByTestId("landing-hero-film");
     await expect(disclosure).toBeVisible();

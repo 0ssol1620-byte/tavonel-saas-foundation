@@ -669,6 +669,15 @@
 .scene.doc.docs-hub .docs-hub-body > .stack {
   min-width: 0;
 }
+/*
+  The hub opens on its title, with no breadcrumb row above it as the section pages have, so the
+  reading surface's short top padding put the title under the fixed header: at 360-1024 the cap
+  line sat 2-8px behind the header's bottom edge (overlap audit 2026-11-10). The hub clears the
+  header by its own height plus a gap; the section pages keep their measured B-09 reach.
+*/
+.scene.doc.docs-reading-surface.docs-hub {
+  padding-top: calc(var(--tv-header-h) + 16px);
+}
 @media (max-width: 760px) {
   .scene.doc.docs-reading-surface {
     padding-top: 32px;

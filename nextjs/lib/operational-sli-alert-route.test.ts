@@ -200,9 +200,41 @@ describe("scheduled operational SLI alert route", () => {
     expect(body.code).toBe("SLI_ALERT_EVALUATION_RECORDED");
     // The 12:00 slot is an hourly slot; with no cap configured the check says so and pages nobody.
     expect(body.watch).toEqual([{ check: "runpod_daily_cost", code: "RUNPOD_COST_CAP_UNCONFIGURED" }]);
+    // C1: the stored evaluation carries the same codes, so the hourly read is visible in the record.
+    expect(persist.mock.calls[0][0].watch).toEqual([{ check: "runpod_daily_cost", code: "RUNPOD_COST_CAP_UNCONFIGURED" }]);
 
     vi.setSystemTime(new Date("2026-09-20T12:09:59.999Z"));
     expect((await (await GET(request())).json()).watch).toEqual([]);
+    expect(persist.mock.calls[1][0].watch).toEqual([]);
+  });
+
+  it("C1: records the billing-read failure code even when the store write itself fails", async () => {
+    vi.stubEnv("TAVONEL_RUNPOD_DAILY_COST_CAP_USD", "40");
+    vi.stubEnv("TAVONEL_RUNPOD_API_KEY", "rp-test");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("down", { status: 503 })));
+    const response = await GET(request());
+    expect(response.status).toBe(503);
+    expect(persist.mock.calls[0][0].watch).toEqual([{ check: "runpod_daily_cost", code: "RUNPOD_BILLING_UNREADABLE" }]);
+    expect((await response.json()).watch).toEqual([{ check: "runpod_daily_cost", code: "RUNPOD_BILLING_UNREADABLE" }]);
+  });
+
+  it("B3: a hanging billing read cannot hold the SLI record past the scheduled-check deadline", async () => {
+    vi.stubEnv("TAVONEL_RUNPOD_DAILY_COST_CAP_USD", "40");
+    vi.stubEnv("TAVONEL_RUNPOD_API_KEY", "rp-test");
+    const hanging = vi.fn((_input: unknown, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+    }));
+    vi.stubGlobal("fetch", hanging);
+    persist.mockResolvedValue({ ok: true, receipt: RECEIPT });
+    const pending = GET(request());
+    await vi.advanceTimersByTimeAsync(3_999);
+    expect(persist).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    const response = await pending;
+    expect(response.status).toBe(200);
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(persist.mock.calls[0][0].watch).toEqual([{ check: "runpod_daily_cost", code: "CHECK_DEADLINE_EXCEEDED" }]);
+    expect((hanging.mock.calls[0][1] as RequestInit).signal?.aborted).toBe(true);
   });
 
   it("W1-A3: pages a RunPod day over its cap from the hourly slot", async () => {
@@ -216,8 +248,13 @@ describe("scheduled operational SLI alert route", () => {
     persist.mockResolvedValue({ ok: true, receipt: RECEIPT });
     const body = await (await GET(request())).json();
     expect(body.watch).toEqual([{ check: "runpod_daily_cost", code: "RUNPOD_COST_CAP_EXCEEDED", delivery: "ALERT_DELIVERED" }]);
+    // The stored record keeps the code alone: no spend, no cap, no delivery outcome.
+    expect(persist.mock.calls[0][0].watch).toEqual([{ check: "runpod_daily_cost", code: "RUNPOD_COST_CAP_EXCEEDED" }]);
+    expect(JSON.stringify(persist.mock.calls[0][0])).not.toMatch(/"(currentValue|thresholdValue|delivery)"|rp-test/);
     const pages = post.mock.calls.filter(([url]) => url === HOOK).map((entry) => JSON.parse(String((entry as unknown as [string, RequestInit])[1].body)));
-    expect(pages.map((page) => page.kind)).toEqual(["incident", "cost"]);
+    // C1: the scheduled checks run before the record so their codes are stored with it, so the cost
+    // page now leaves first; both pages still go out from the one slot.
+    expect(pages.map((page) => page.kind)).toEqual(["cost", "incident"]);
     expect(JSON.stringify(body)).not.toContain("rp-test");
   });
 });

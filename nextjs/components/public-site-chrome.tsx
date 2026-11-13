@@ -3,7 +3,7 @@ import type { Route } from "next";
 import type { CSSProperties } from "react";
 import Logomark from "@/components/logomark";
 import MobilePrimaryNav from "@/components/mobile-primary-nav";
-import { HeaderCta, NavCurrentLink, NavDisclosure } from "@/components/site-nav/desktop-primary-nav";
+import { HeaderAccountActions, NavCurrentLink, NavDisclosure } from "@/components/site-nav/desktop-primary-nav";
 import HeaderScrollState from "@/components/site-nav/header-scroll-state";
 import { MarketingConsentLink } from "@/components/marketing-consent";
 import { primaryCallToAction } from "@/lib/commercial-state";
@@ -14,7 +14,6 @@ import {
   HEADER_NAV,
   KO_CHROME,
   KO_NAV_PANELS,
-  SAMPLE_CTA,
   navAlsoOwns,
   navGroupFor,
   type NavPanelItem,
@@ -158,6 +157,17 @@ export function PublicSiteHeader({
   ghostCta?: boolean;
 }) {
   const pricingLabel = korean ? KO_CHROME.nav["/pricing"] : "Pricing";
+  /*
+    Founder 2026-11-10: signed out, the header's action is the start -- "Start free" (SELF_SERVE_CTA) wherever live
+    commerce is on, the access action where it is not, so the header never offers a start the deployment refuses
+    (lib/cta-truth.test.ts). A page that resolved its own start passes it; a client caller that cannot read the flags
+    (BA-232) and passes nothing gets the closed posture, which is the truthful default.
+  */
+  const resolved = primaryCallToAction();
+  // Korean pages send /contact to its Korean page, the one KO_FOOTER_PAGES names (lib/guide-content.test.ts).
+  const action = start ?? (korean
+    ? { href: resolved.href === "/contact" ? "/ko/contact" : resolved.href, label: KO_CHROME.cta[resolved.href] ?? resolved.label }
+    : resolved);
   return (
     <header className={`nav chrome-v2-header ${chrome.header}`}>
       <HeaderScrollState />
@@ -166,7 +176,7 @@ export function PublicSiteHeader({
         <b>TAVONEL</b>
       </Link>
       <DesktopPrimaryNav korean={korean} />
-      <MobilePrimaryNav korean={korean} signedIn={signedIn} start={start}
+      <MobilePrimaryNav korean={korean} signedIn={signedIn} start={action}
         labels={{ menu: korean ? KO_CHROME.menu : "Menu", pricing: pricingLabel, signIn: korean ? KO_CHROME.signIn : "Sign in" }}>
         <NavSections korean={korean} sheet />
       </MobilePrimaryNav>
@@ -180,13 +190,12 @@ export function PublicSiteHeader({
           sheet on a phone; the action beside it is the one thing that may not go behind a
           disclosure.
         */}
-        {/* FUNNEL-SIGNED-IN #10: a signed-in reader is shown where their account is, not asked to sign in. */}
-        {signedIn
-          ? <Link className="nav-signin chrome-v2-signin" href="/workspace">{korean ? "워크스페이스" : "Your workspace"}</Link>
-          : <Link className="nav-signin chrome-v2-signin" href="/login">{korean ? KO_CHROME.signIn : "Sign in"}</Link>}
-        {/* Desktop only: below the switch the header is the wordmark and Menu, and the hero carries this.
-            Absent on the sample itself (/explore, /ko/explore): an action may not point at its own page. */}
-        <HeaderCta className={`btn${ghostCta ? " btn-ghost" : ""} ${chrome.cta}`} href={SAMPLE_CTA.href} label={korean ? SAMPLE_CTA.ko : SAMPLE_CTA.label} />
+        {/* FUNNEL-SIGNED-IN #10 and founder 2026-11-10: signed in, the action is Open workspace and Sign in goes;
+            signed out, Sign in stays a plain link and the action is the start. Desktop only: below the switch both are
+            the phone sheet's foot. The public sample is the hero's secondary link, no longer the header's action. */}
+        <HeaderAccountActions signedIn={signedIn} start={action}
+          labels={{ signIn: korean ? KO_CHROME.signIn : "Sign in", workspace: korean ? "워크스페이스 열기" : "Open workspace" }}
+          className={`btn${ghostCta ? " btn-ghost" : ""} ${chrome.cta}`} signInClassName="nav-signin chrome-v2-signin" />
       </span>
     </header>
   );

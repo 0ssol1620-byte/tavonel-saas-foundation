@@ -31,12 +31,20 @@ type FilmView = "fit" | "focus";
 /** Opens the view: Fit is the default; Focus is one press of the toggle, as a visitor would ask for it. */
 async function openView(page: Page, view: FilmView) {
   const sequence = page.locator(`${FILM} .compile-film-sequence`);
+  // In view, as a visitor reaches it: the player plays only while it is on screen.
+  await sequence.locator(".compile-film-viewport").scrollIntoViewIfNeeded();
   await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
   if (view === "focus") await page.locator(`${FILM} .compile-film-focus-control`).click();
   await expect(sequence).toHaveAttribute("data-mobile-view", view);
 }
 
-const FILM = '#s1 figure[data-testid="landing-hero-film"]';
+/*
+  Founder 2026-11-10: the recorded player moved below the fold into #walkthrough (the hero film is now the tabbed compile
+  slot). Its frame must still not move when it changes stage by itself, so each watch first brings it into view -- a
+  programmatic scroll before the watch starts, not an input -- and then holds the page's scroll position fixed: the frame
+  top is a viewport coordinate, so "unscrolled" becomes "not scrolled during the watch".
+*/
+const FILM = '#walkthrough figure[data-testid="landing-hero-film"]';
 const STAGE_COUNT = 4;
 /** The stage on screen: the index of the tab the film selected. */
 const selectedStage = (page: Page) => page.locator(`${FILM} [role="tab"]`).evaluateAll(tabs => tabs.findIndex(tab => tab.getAttribute("aria-selected") === "true"));
@@ -87,9 +95,10 @@ async function watchAutoAdvance(page: Page, advances: number, before?: () => Pro
   await expect(film.locator("[data-film-reading] p"), "no reading line on Home (D-7)").toHaveCount(0);
   const first = await selectedStage(page);
   expect(first, "the film selects one of the four stages").toBeGreaterThanOrEqual(0);
+  const startY = await page.evaluate(() => window.scrollY);
   const startTime = await page.evaluate(() => {
     const store = window as unknown as { __frameTop: FrameTop };
-    const frame = document.querySelector("#s1 .compile-film-viewport")!;
+    const frame = document.querySelector("#walkthrough .compile-film-viewport")!;
     store.__frameTop = { min: Infinity, max: -Infinity, frames: 0, stop: false };
     const tick = () => {
       const sample = store.__frameTop;
@@ -121,6 +130,7 @@ async function watchAutoAdvance(page: Page, advances: number, before?: () => Pro
   return {
     first,
     tops,
+    startY,
     ...record,
     inputShifts: record.shifts.length - counted.length,
     sum: counted.reduce((total, shift) => total + shift.value, 0),
@@ -144,7 +154,7 @@ for (const [width, height, views] of [[390, 844, ["fit", "focus"]], [430, 932, [
       await page.goto(path);
       const run = await watchAutoAdvance(page, 3, undefined, view);
       await testInfo.attach(`auto-advance-${path === "/" ? "en" : "ko"}-${width}-${view}`, { body: JSON.stringify({ width, height, path, view, ...run }, null, 2), contentType: "application/json" });
-      expect(run.scrollY, "unscrolled").toBe(0);
+      expect(run.scrollY, "not scrolled during the watch").toBe(run.startY);
       expect(run.inputShifts, "no input during the watch").toBe(0);
       expect(run.sampled.frames, "the frame was sampled between advances").toBeGreaterThan(60);
       for (const [step, top] of run.tops.entries()) {

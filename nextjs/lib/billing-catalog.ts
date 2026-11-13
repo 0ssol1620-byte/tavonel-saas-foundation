@@ -34,6 +34,8 @@ export const BILLING_OFFERS = {
       "Compile your own worlds",
       "Evidence, Ask and signed export",
       "API and MCP access",
+      // 2026-11-10: the `connections` level. Only providers with a production OAuth app are named.
+      "Google Drive and file-server connections",
     ],
     notYetSold: [],
   },
@@ -78,6 +80,7 @@ export const BILLING_OFFERS = {
       "2,500 standard pages",
       "Everything in Starter",
       "Review queue and version history",
+      "Google Drive and file-server connections",
     ],
     notYetSold: [],
   },

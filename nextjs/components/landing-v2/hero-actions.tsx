@@ -24,9 +24,18 @@ export default function HeroActions(props: HeroActionsProps) {
   const access = "startLabel" in props
     ? { label: props.startLabel, href: props.startHref, cta: "start" as const }
     : { label: props.pricingLabel, href: props.pricingHref ?? "/pricing", cta: "pricing" as const };
-  const [primary, secondary] = ctaOrderVariant === "b" ? [access, explore] : [explore, access];
+  /*
+    Founder 2026-11-10: on Home the document entry (the drop zone) is the hero's primary action and the public sample is
+    the secondary link under it ("Open the compiled sample" in the header read as "enter the dashboard").
+    The CTA-order experiment (lib/landing-experiments.ts, off on every deployment) keeps two distinct arms: on Home its
+    control is now this entry-first order and arm B is the order Home had before 2026-11-10, sample first. Elsewhere arm B
+    puts the access action first, as before. A series keyed on data-analytics="hero-primary" changes meaning on Home from
+    2026-11-10: it was the sample and is now the document entry (PR #235 review R1, S3).
+  */
+  const accessFirst = entry ? ctaOrderVariant !== "b" : ctaOrderVariant === "b";
+  const [primary, secondary] = accessFirst ? [access, explore] : [explore, access];
   const entryRef = useRef<HTMLAnchorElement>(null);
-  const drawsEntry = entry && secondary === access;
+  const drawsEntry = entry && primary === access;
   // While files are dragged over the page the entry says it is where they go (CRITIQUE-R1 #5); it says nothing else.
   const [dragging, setDragging] = useState(false);
   // A file dropped anywhere on Home would open in the tab and leave the site. Home keeps no file: the drop only
@@ -59,24 +68,24 @@ export default function HeroActions(props: HeroActionsProps) {
   };
   return (
     <div className="lv2-actions" data-scene-actions={scene}>
-      <Link className="btn lv2-cta" href={primary.href as Route} prefetch={false}
-        onClick={onSelect(primary)} data-analytics="hero-primary">
-        {primary.label}
-      </Link>
       {drawsEntry ? (
-        <Link ref={entryRef} className="lv2-entry" href={secondary.href as Route} prefetch={false}
-          onClick={onSelect(secondary)} data-analytics="hero-secondary" data-drag={dragging ? "" : undefined}>
+        <Link ref={entryRef} className="lv2-entry" href={primary.href as Route} prefetch={false}
+          onClick={onSelect(primary)} data-analytics="hero-primary" data-drag={dragging ? "" : undefined}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" focusable="false">
             <path d="M3.5 1.5h6l3 3v10h-9zM9.5 1.5v3h3" />
           </svg>
-          {secondary.label}
+          {primary.label}
         </Link>
       ) : (
-        <Link className="lv2-text-link" href={secondary.href as Route} prefetch={false}
-          onClick={onSelect(secondary)} data-analytics="hero-secondary">
-          {secondary.label}<span aria-hidden="true">&nbsp;→</span>
+        <Link className="btn lv2-cta" href={primary.href as Route} prefetch={false}
+          onClick={onSelect(primary)} data-analytics="hero-primary">
+          {primary.label}
         </Link>
       )}
+      <Link className="lv2-text-link" href={secondary.href as Route} prefetch={false}
+        onClick={onSelect(secondary)} data-analytics="hero-secondary">
+        {secondary.label}<span aria-hidden="true">&nbsp;→</span>
+      </Link>
     </div>
   );
 }

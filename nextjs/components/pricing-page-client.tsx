@@ -21,7 +21,7 @@ import {
 } from "@/lib/billing-catalog";
 import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "@/lib/compile-limits";
 import { trackFunnel } from "@/lib/funnel-events";
-import { EXPLORE_CTA, SELF_SERVE_CTA } from "@/lib/site-navigation";
+import { EXPLORE_CTA, SELF_SERVE_CTA, type SiteLink } from "@/lib/site-navigation";
 import { MCP_TOOL_COUNT_WORD } from "@/lib/mcp-tools";
 import { jsonLdHtml } from "@/lib/structured-data";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
@@ -269,7 +269,7 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceE
     // Identity and team-access requirements stay in Enterprise scoping rather than plan copy.
     [
       "What differs by plan",
-      `${BILLING_OFFERS.studio_access.label} carries ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} included pages against ${BILLING_OFFERS.observer_access.label}'s ${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")}, adds the review queue and version history, and is bought online as ${BILLING_OFFERS.observer_access.label} is. ${activationPlans.join(" and ")} reach World activation — activating a candidate and rolling one back — as the workspace owner. Source connections are verified separately in Workspace.`,
+      `${BILLING_OFFERS.studio_access.label} carries ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} included pages against ${BILLING_OFFERS.observer_access.label}'s ${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")}, adds the review queue and version history, and is bought online as ${BILLING_OFFERS.observer_access.label} is. ${activationPlans.join(" and ")} reach World activation — activating a candidate and rolling one back — as the workspace owner. Both include Google Drive and file-server connections.`,
     ],
     [
       "What does not consume pages",
@@ -409,7 +409,7 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "Most pages in one source",
-    `${PROCESSING_CEILING.maxSourcePages}. The page ceiling is checked after the document is decoded, so a longer file is refused during processing rather than at upload.`,
+    `${PROCESSING_CEILING.maxSourcePages}. A PDF is counted in your browser, also when it is inside a ZIP, and a longer one is refused before it uploads. Other formats, and a PDF the browser cannot open, are counted when they are read, and a longer one is refused then, with the reason on the source. Nothing is cut short.`,
   ],
   [
     "Sources in one run",
@@ -519,7 +519,7 @@ export type PlanCapabilityRow = {
   capability: string;
   /** The route file whose access check this row's level is taken from; absent on an unsold row. */
   route?: string;
-  level?: "observer" | "studio" | "activation";
+  level?: "observer" | "connections" | "studio" | "activation";
   plans: ReadonlyArray<{ label: string; saleChannel: string; state: PlanFeatureState }>;
 };
 
@@ -676,11 +676,14 @@ function noticeLink(notice: { tone: NoticeTone; link?: NoticeLink }, planName: s
 export default function PricingPageClient({
   initialLiveCheckout,
   initialSelfService,
+  headerStart,
   gates,
   planCapabilities,
 }: {
   initialLiveCheckout: boolean;
   initialSelfService: boolean;
+  /** The site-wide header start, resolved on the server: this client module cannot read the commercial flags (BA-232). */
+  headerStart: SiteLink;
   /** Read on the server from `lib/activation-policy`, the object /api/status serves verbatim. */
   gates: readonly PurchaseGate[];
   planCapabilities: readonly PlanCapabilityRow[];
@@ -899,7 +902,7 @@ export default function PricingPageClient({
         dangerouslySetInnerHTML={{ __html: jsonLdHtml(pricingJsonLd(initialLiveCheckout, faqRows)) }}
       />
       {/* Conversion pass 2026-11-09: the phone sheet's start action, the same one the Evaluation card offers. */}
-      <PublicSiteHeader signedIn={signedIn} start={selfService ? SELF_SERVE_CTA : undefined} />
+      <PublicSiteHeader signedIn={signedIn} start={selfService ? SELF_SERVE_CTA : headerStart} />
       <main id="main">
         <section className="scene doc">
           <div className="shell">

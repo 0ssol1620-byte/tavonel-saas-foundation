@@ -6,6 +6,9 @@ import { describe, it } from "node:test";
 import { PermanentReject } from "./errors";
 import {
   MIME_FALLBACK_EXTENSION,
+  segmentImmutableKey,
+  segmentManifestKey,
+  segmentPlanKey,
   assertProcessableSourceKey,
   cdrReceiptSiblingKey,
   extractObjectKey,
@@ -199,6 +202,28 @@ describe("D1 intake ceiling stage (PROGRAM-2026-11-04 §4.D)", () => {
     assert.equal(intakeCeilingStage({ TAVONEL_INTAKE_CEILING_STAGE: "1" }), "1");
     for (const value of ["2", "01", "true", "one", "-1"]) {
       assert.equal(intakeCeilingStage({ TAVONEL_INTAKE_CEILING_STAGE: value }), null, value);
+    }
+  });
+});
+
+describe("segmented source keys (docs/adr/0006-segmented-large-sources.md)", () => {
+  it("keeps every range under the source's own prefix, in a shape the site does not list as a document", () => {
+    const digest = `sha256:${"ab".repeat(32)}`;
+    const key = segmentImmutableKey("ws_pilot", "doc_1", 80, 160, digest);
+    assert.equal(key, `immutable/ws_pilot/ws_pilot/doc_1/segments/80-160/${"ab".repeat(32)}/sanitized.pdf`);
+    assert.equal(segmentPlanKey("ws_pilot", "doc_1"), "immutable/ws_pilot/ws_pilot/doc_1/segments/plan.json");
+    assert.equal(segmentManifestKey("ws_pilot", "doc_1"), "immutable/ws_pilot/ws_pilot/doc_1/segments/manifest.json");
+    // <doc>/<hex version>/<file> is a listed document (nextjs/lib/immutable-keys.ts); none of these is.
+    for (const candidate of [key, segmentPlanKey("ws_pilot", "doc_1"), segmentManifestKey("ws_pilot", "doc_1")]) {
+      const rest = candidate.slice("immutable/ws_pilot/ws_pilot/".length).split("/");
+      assert.ok(rest.length !== 3 || !/^[a-f0-9]{32,64}$/i.test(rest[1]), candidate);
+    }
+  });
+
+  it("refuses an empty or reversed range", () => {
+    const digest = `sha256:${"ab".repeat(32)}`;
+    for (const [start0, end0] of [[-1, 2], [4, 4], [5, 2], [0.5, 2]]) {
+      assert.throws(() => segmentImmutableKey("ws_pilot", "doc_1", start0, end0, digest), PermanentReject);
     }
   });
 });

@@ -358,7 +358,7 @@ const HUBS: Array<[string, string]> = [
   ["app/evidence/page.tsx", "how a compiled result stays bound to the"],
   ["app/benchmarks/page.tsx", "what a knowledge-compilation result has to"],
   ["app/research/page.tsx", "which problems are still open"],
-  ["app/research/notes/page.tsx", "what has actually been measured"],
+  ["app/research/notes/page.tsx", "These are the results we have measured"],
 ];
 
 describe("CA B04 the five hubs each say which question they answer", () => {
@@ -460,7 +460,7 @@ describe("CA E02/E05 the measured entries carry their figures and their receipts
   const record = read("lib/evidence-record.ts");
 
   it("states the recovery delta with both confidence intervals", () => {
-    expect(record).toContain("80.6 with the recovery lane and 53.7");
+    expect(record).toContain("80.6 with the recovery step and 53.7");
     expect(record).toContain("26.9 points");
     expect(record).toContain("79.62\u201381.57");
     expect(record).toContain("52.62\u201354.93");

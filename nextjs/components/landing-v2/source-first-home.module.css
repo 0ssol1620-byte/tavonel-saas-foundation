@@ -149,7 +149,7 @@
   .home.home :global(main .lv2-meta) { font: 500 13px/1.45 var(--f-sans); letter-spacing: 0; text-transform: none; }
   .home.home :global(main .lv2-meta[data-derived="1"]) { font-family: var(--f-mono); }
   /* §4.5: no uppercase tracking on Hangul. */
-  .home[lang="ko"].home :global(:is(.lv2-meta, [class*="eyebrow"], .compile-film-stages button, .lv2-revision-title, #s1 figure figcaption)) { letter-spacing: 0; text-transform: none; }
+  .home[lang="ko"].home :global(:is(.lv2-meta, [class*="eyebrow"], .compile-film-stages button, .lv2-revision-title, #s1 figure figcaption, #walkthrough figure figcaption)) { letter-spacing: 0; text-transform: none; }
   .home[lang="ko"].home :global(.lv2-hero-h1) { line-height: 1.16; letter-spacing: -0.012em; word-break: keep-all; }
   /*
     R3 (design critique R2-B1): KO holds "인용할 수 있는" and "맥락으로 바꿉니다." each on one line (hero-statement.tsx keep prop),
@@ -168,31 +168,31 @@
      The stroke is this font's stem difference: l is 0.082em at 400, 0.112em at 560, 0.120em at 600.
      FINAL-SPEC 2026-10-26: the headings are 510 now, so the stroke starts from 0.012em (§3.2). */
   :global(html[data-static-wght="1"]) .home.home :global(:is(.lv2-hero-h1, .lv2-h2, [data-home-reader-guide] h2, #s5 .lv2-proof-label)) { -webkit-text-stroke: 0.012em currentColor; }
-  :global(html[data-static-wght="1"]) .home.home :global(:is(#s1 .compile-film-stages button, .lv2-cta)) { -webkit-text-stroke: 0.03em currentColor; }
+  :global(html[data-static-wght="1"]) .home.home :global(:is(#walkthrough .compile-film-stages button, .lv2-cta)) { -webkit-text-stroke: 0.03em currentColor; }
   /* WEIGHT-HOOK-END */
   .home.home :global(main a) { display: inline-flex; align-items: center; min-height: 44px; }
   .home.home :global(main summary) { min-height: 44px; }
   /* Legacy film figure/body margins are unlayered; reset only this opening figure.
      Brief move 2(a): the film takes the whole container, not a narrower 1040px column. */
-  .home.home :global(#s1 .lv2-film-story) { margin: 0 auto !important; border: 0 !important; width: 100%; max-width: none; }
-  .home.home :global(#s1 .lv2-film) { --lv2-film-w: var(--page-max); margin-top: 0 !important; padding-bottom: 0 !important; }
-  .home.home :global(#s1 .compile-film-sequence) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px 20px; }
+  .home.home :global(#walkthrough .lv2-film-story) { margin: 0 auto !important; border: 0 !important; width: 100%; max-width: none; }
+  .home.home :global(#walkthrough .lv2-film) { --lv2-film-w: var(--page-max); margin-top: 0 !important; padding-bottom: 0 !important; }
+  .home.home :global(#walkthrough .compile-film-sequence) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px 20px; }
   /* FINAL-SPEC 2026-10-26 §2.1: tabs, then the view toggle at the row's right end; the frame below. */
-  .home.home :global(#s1 .compile-film-stages) { grid-column: 1; grid-row: 1; border: 0; }
-  .home.home :global(#s1 .compile-film-stages button) {
+  .home.home :global(#walkthrough .compile-film-stages) { grid-column: 1; grid-row: 1; border: 0; }
+  .home.home :global(#walkthrough .compile-film-stages button) {
     color: var(--home-muted); font: 560 14px/1.2 var(--f-sans); letter-spacing: 0;
     padding: 12px 8px; border: 0; border-bottom: 2px solid transparent; box-shadow: none;
   }
-  .home[lang="ko"].home :global(#s1 .compile-film-stages button) { letter-spacing: 0; text-transform: none; }
-  .home.home :global(#s1 .compile-film-stages button[data-active="1"]) { color: var(--home-ink); border-bottom-color: var(--home-cobalt); }
+  .home[lang="ko"].home :global(#walkthrough .compile-film-stages button) { letter-spacing: 0; text-transform: none; }
+  .home.home :global(#walkthrough .compile-film-stages button[data-active="1"]) { color: var(--home-ink); border-bottom-color: var(--home-cobalt); }
   /* The film stage is one of the page's two dark surfaces (the other is the footer). */
-  .home.home :global(#s1 .compile-film-viewport) { grid-column: 1 / -1; grid-row: 2; border-radius: var(--tv-r-media); border: 1px solid var(--tv-rule); background: var(--tv-inst-1); }
+  .home.home :global(#walkthrough .compile-film-viewport) { grid-column: 1 / -1; grid-row: 2; border-radius: var(--tv-r-media); border: 1px solid var(--tv-rule); background: var(--tv-inst-1); }
   /* A legacy unlayered cover rule crops the still even when the player says fit. */
-  .home.home :global(#s1 .compile-film-sequence[data-mobile-view="fit"] .compile-film-still) { object-fit: contain !important; }
-  .home.home :global(#s1 .compile-film-mobile-tools) { grid-column: 2; grid-row: 1; align-self: center; margin: 0; }
+  .home.home :global(#walkthrough .compile-film-sequence[data-mobile-view="fit"] .compile-film-still) { object-fit: contain !important; }
+  .home.home :global(#walkthrough .compile-film-mobile-tools) { grid-column: 2; grid-row: 1; align-self: center; margin: 0; }
   /* The film's own failure sentence (the caption row that carried it is gone): full width, under the frame. */
-  .home.home :global(#s1 .compile-film-inline-error) { grid-column: 1 / -1; margin: 0; color: var(--home-ink); font: 400 15px/1.5 var(--f-sans); }
-  .home.home :global(#s1 .lv2-film-story > figcaption) { max-width: none; margin-top: 12px; color: var(--home-muted); font: var(--home-meta-fs, 13px)/1.5 var(--f-sans); text-align: start; }
+  .home.home :global(#walkthrough .compile-film-inline-error) { grid-column: 1 / -1; margin: 0; color: var(--home-ink); font: 400 15px/1.5 var(--f-sans); }
+  .home.home :global(#walkthrough .lv2-film-story > figcaption) { max-width: none; margin-top: 12px; color: var(--home-muted); font: var(--home-meta-fs, 13px)/1.5 var(--f-sans); text-align: start; }
   /* FINAL-SPEC 2026-10-26 §2.1 rhythm at 1440: support -> actions 40, actions -> film tabs 56. */
   .heroAside { min-width: 0; max-width: none; margin: 40px 0 56px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
   .heroAside :global(.lv2-actions) { display: flex; flex-direction: row; justify-content: flex-start; align-items: center; gap: 8px 24px; margin-top: 0; }
@@ -241,24 +241,24 @@
     /* FINAL-SPEC 2026-10-26 §2.1: the pan surface scrolls from 768px only. Below it Focus is one clipped
        pane (film-reading-layer.module.css), and an !important auto here would beat its `overflow: clip`. */
     @media (min-width: 768px) {
-      .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-viewport) { overflow: auto !important; }
+      .home.home :global(#walkthrough .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-viewport) { overflow: auto !important; }
     }
-    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] .compile-film-panes) { display: none !important; }
+    .home.home :global(#walkthrough .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] .compile-film-panes) { display: none !important; }
     /* The tools hold the view toggle (and, panning from 768px, the motion control) at the tab row's end. */
-    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"] .compile-film-mobile-tools) {
+    .home.home :global(#walkthrough .compile-film-sequence[data-story-layout="1"] .compile-film-mobile-tools) {
       display: flex; align-items: center; justify-content: flex-end; gap: 8px; width: auto; margin: 0;
     }
     /* §2.1: the view toggle is a 44px drawn mark on a phone, named by its aria-label. */
-    .home.home :global(#s1 .compile-film-focus-control) {
+    .home.home :global(#walkthrough .compile-film-focus-control) {
       display: inline-grid; place-items: center; width: 44px; height: 44px; min-height: 44px; padding: 0;
       border: 1px solid var(--home-rule-strong); border-radius: 999px; background: transparent; color: var(--home-ink);
     }
-    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-mobile-tools .compile-film-motion-control) {
+    .home.home :global(#walkthrough .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-mobile-tools .compile-film-motion-control) {
       position: static !important; margin: 0; flex: none; min-width: 44px; min-height: 44px;
       width: 44px; height: 44px; opacity: 1 !important;
       background: var(--home-ink) !important; color: #ffffff !important; border-color: var(--home-ink) !important;
     }
-    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-mobile-tools .compile-film-motion-control:focus-visible) { outline: 2px solid var(--home-cobalt) !important; outline-offset: 3px; }
+    .home.home :global(#walkthrough .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-mobile-tools .compile-film-motion-control:focus-visible) { outline: 2px solid var(--home-cobalt) !important; outline-offset: 3px; }
   }
   @media (max-width: 899px) {
     /*
@@ -276,7 +276,7 @@
     .heroAside :global(.lv2-actions) { flex-direction: row; flex-wrap: wrap; }
   }
   @media (min-width: 900px) {
-    .home.home :global(#s1 .compile-film-sequence[data-mobile-view="fit"] .compile-film-viewport) { height: auto; min-height: 0; max-height: none; aspect-ratio: 8 / 5; }
+    .home.home :global(#walkthrough .compile-film-sequence[data-mobile-view="fit"] .compile-film-viewport) { height: auto; min-height: 0; max-height: none; aspect-ratio: 8 / 5; }
   }
   @media (max-width: 767px) {
     .home.home > header { height: 56px !important; min-height: 56px; }
@@ -325,10 +325,10 @@
       <= 480 EN / 430 KO at 412x915) failed once the phone film returned (R3, 2026-11-09: CI Linux EN 486.7, KO 437.8), so
       the tabs sit 4px above the panel instead of 12, and the figure drops its 12px top padding below 768px (further down).
     */
-    .home.home :global(#s1 .compile-film-sequence) { gap: 4px 8px; }
-    .home.home :global(#s1 .compile-film-stages) { grid-template-columns: repeat(4, auto); justify-content: start; column-gap: 16px; }
+    .home.home :global(#walkthrough .compile-film-sequence) { gap: 4px 8px; }
+    .home.home :global(#walkthrough .compile-film-stages) { grid-template-columns: repeat(4, auto); justify-content: start; column-gap: 16px; }
     .home.home :global(.lv2-hero-support) { margin-top: 16px; font-size: 17px; line-height: 1.5; }
-    .home.home :global(#s1 .compile-film-stages button) { font-size: 13px; padding-block: 10px; padding-inline: 2px; min-height: 44px; white-space: nowrap; }
+    .home.home :global(#walkthrough .compile-film-stages button) { font-size: 13px; padding-block: 10px; padding-inline: 2px; min-height: 44px; white-space: nowrap; }
     /* §2.1 at 412: the filled action full width at 48px, the quieter link a 44px row on the left edge. */
     .heroAside { align-items: stretch; gap: 0; }
     .heroAside :global(.lv2-actions) { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; gap: 8px; }
@@ -341,21 +341,21 @@
   }
   /* Design critique 2026-10-26 B2(c): at 360 "Use with AI" ended about 1px from the view toggle. */
   @media (max-width: 379.98px) {
-    .home.home :global(#s1 .compile-film-stages) { column-gap: 12px; }
-    .home.home :global(#s1 .compile-film-sequence) { column-gap: 12px; }
+    .home.home :global(#walkthrough .compile-film-stages) { column-gap: 12px; }
+    .home.home :global(#walkthrough .compile-film-sequence) { column-gap: 12px; }
   }
   @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
     .heroAside :global(a:not(:focus-visible)),
-    .home.home :global(#s1 .compile-film-stages button:not(:focus-visible)) {
+    .home.home :global(#walkthrough .compile-film-stages button:not(:focus-visible)) {
       transition: color 160ms var(--home-ease), background-color 160ms var(--home-ease), border-color 160ms var(--home-ease), transform 120ms var(--home-ease);
     }
     .heroAside :global(a:active:not(:focus-visible)) { transform: scale(0.98); }
   }
   .heroAside :global(a:focus-visible),
-  .home.home :global(#s1 .compile-film-stages button:focus-visible) { transition: none; transform: none; }
+  .home.home :global(#walkthrough .compile-film-stages button:focus-visible) { transition: none; transform: none; }
   @media (prefers-reduced-motion: reduce) {
     .play:active, .heroAside :global(a:active) { transform: none; }
-    .heroAside :global(a), .home.home :global(#s1 .compile-film-stages button) { transition: none; }
+    .heroAside :global(a), .home.home :global(#walkthrough .compile-film-stages button) { transition: none; }
     /* Shared unlayered controls otherwise retain their press transform and transition. */
     .home.home :global(#s1 :is(button, a):active) { transform: none !important; }
   }
@@ -415,35 +415,35 @@
     The film on the canvas itself (round 2, CRITIQUE-R1 #1): a dark recording in a warm frame read as two tones fighting;
     on the page ground it reads as one device on a desk. The chapters stay one segmented control.
   */
-  .home.home :global(#s1 .lv2-film-story) { padding: 12px 0 16px; border-radius: 0; background: transparent; }
-  .home.home :global(#s1 .compile-film-viewport) {
+  .home.home :global(#walkthrough .lv2-film-story) { padding: 12px 0 16px; border-radius: 0; background: transparent; }
+  .home.home :global(#walkthrough .compile-film-viewport) {
     border: 0; border-radius: var(--tv-r-inner);
     box-shadow: 0 3px 6px rgb(40 32 20 / 0.08), 0 30px 60px -20px rgb(40 32 20 / 0.45);
   }
-  .home.home :global(#s1 .lv2-film-story > figcaption) { color: var(--tv-ink-muted); padding-inline: 4px; }
+  .home.home :global(#walkthrough .lv2-film-story > figcaption) { color: var(--tv-ink-muted); padding-inline: 4px; }
   /* Below 768px the link -> tabs distance is the heroAside margin alone (§2.1: 24px), so acceptance 24 holds with margin. */
   @media (max-width: 767px) {
-    .home.home :global(#s1 .lv2-film-story) { padding-top: 0; }
+    .home.home :global(#walkthrough .lv2-film-story) { padding-top: 0; }
   }
   @media (min-width: 768px) {
-    .home.home :global(#s1 .lv2-film-story) { padding: 20px 0 24px; }
-    .home.home :global(#s1 .compile-film-stages) {
+    .home.home :global(#walkthrough .lv2-film-story) { padding: 20px 0 24px; }
+    .home.home :global(#walkthrough .compile-film-stages) {
       display: inline-flex; justify-self: center; gap: 4px; padding: 4px;
       border-radius: var(--tv-r-pill); background: var(--tv-sand);
     }
-    .home.home :global(#s1 .compile-film-stages button) {
+    .home.home :global(#walkthrough .compile-film-stages button) {
       min-height: 44px; padding: 11px 18px; border: 0; border-radius: var(--tv-r-pill); color: var(--tv-ink-muted);
     }
-    .home.home :global(#s1 .compile-film-stages button[data-active="1"]) {
+    .home.home :global(#walkthrough .compile-film-stages button[data-active="1"]) {
       border: 0; background: var(--tv-sheet); color: var(--tv-ink); box-shadow: var(--tv-shadow-1);
     }
   }
   @media (min-width: 900px) {
-    .home.home :global(#s1 .compile-film-sequence) { grid-template-columns: minmax(0, 1fr); }
-    .home.home :global(#s1 .compile-film-stages) { grid-column: 1; }
+    .home.home :global(#walkthrough .compile-film-sequence) { grid-template-columns: minmax(0, 1fr); }
+    .home.home :global(#walkthrough .compile-film-stages) { grid-column: 1; }
   }
   @media (max-width: 767px) {
-    .home.home :global(#s1 .compile-film-stages button[data-active="1"]) { border-bottom-color: var(--tv-ink); }
+    .home.home :global(#walkthrough .compile-film-stages button[data-active="1"]) { border-bottom-color: var(--tv-ink); }
   }
 
   /*

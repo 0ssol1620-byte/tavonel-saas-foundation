@@ -1,6 +1,11 @@
 import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { expect, test } from "@playwright/test";
-const FILM = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]';
+/*
+  Founder 2026-11-10: the recorded four-stage player moved below the fold into #walkthrough (the hero film is now the
+  tabbed compile slot, hero-compile-tabs.tsx, held in hero-home-responsive.spec.ts). Its phone contract is unchanged and
+  is asked of it there; its poster is lazy, so each check reaches it first, as a visitor scrolls to it.
+*/
+const FILM = '#walkthrough figure[data-testid="landing-hero-film"]';
 test.describe("phone four-stage film", () => {
   test.beforeEach(async ({ page }, info) => {
     test.skip(!["360", "390"].includes(info.project.name), "phone composition");
@@ -12,11 +17,12 @@ test.describe("phone four-stage film", () => {
     test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     const film = page.locator(FILM);
     await expect(film).toBeVisible();
+    await film.scrollIntoViewIfNeeded();
     const still = () => film.locator("img.compile-film-still").evaluate((image: HTMLImageElement) => new URL(image.currentSrc).pathname);
-    const column = (await page.locator("#s1 .lv2-wrap").boundingBox())!;
+    const column = (await page.locator("#walkthrough .lv2-wrap").boundingBox())!;
     // Founder ask 2026-10-27: a phone opens compact -- the whole frame of the locked stage-1 poster, inside the viewport.
     await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
-    expect(await still()).toMatch(/^\/film\/poster-r3-c1-t10\.40(-2x)?\.(avif|webp)$/);
+    await expect.poll(still).toMatch(/^\/film\/poster-r3-c1-t10\.40(-2x)?\.(avif|webp)$/);
     const fit = (await film.locator(".compile-film-viewport").boundingBox())!;
     const drawn = await film.locator("img.compile-film-still").evaluate(image => image.getBoundingClientRect().width);
     expect(Math.abs(drawn - fit.width), "the whole frame at the frame's width, no crop").toBeLessThanOrEqual(2);
@@ -42,12 +48,13 @@ test.describe("phone four-stage film", () => {
   test("plays the approved recording and supports Fit, Focus and keyboard stage selection", async ({ page }, testInfo) => {
     test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     const film = page.locator(FILM);
+    await film.scrollIntoViewIfNeeded();
     await film.getByRole("button", { name: "Play the compilation film", exact: true }).click();
     const video = film.locator("video");
     await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.currentTime)).toBeGreaterThan(1);
     // R3 (D1): a phone plays the yuv420p twin first (phoneSrc), which every engine decodes.
     expect(await video.evaluate((node: HTMLVideoElement) => node.currentSrc)).toContain("/film/hero-r3-c1-hq.mp4");
-    await expect(film.locator("figcaption")).toHaveText("Illustrative demo · not customer results.");
+    await expect(film.locator("figcaption")).toHaveText("Product walkthrough on sample files");
     const focus = film.getByRole("button", { name: "Focus details", exact: true });
     const toggle = (await focus.boundingBox())!;
     expect(toggle.height, "44px touch target (acceptance 28)").toBeGreaterThanOrEqual(44);
@@ -83,6 +90,7 @@ test.describe("phone four-stage film", () => {
   test("reduced motion stays static and failed primary and fallback playback restore the locked poster", async ({ page }, testInfo) => {
     test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     const film = page.locator(FILM);
+    await film.scrollIntoViewIfNeeded();
     await expect(film.locator("video")).toHaveCount(0);
     const failed: string[] = [];
     await page.route("**/film/hero-r3-c1*.mp4", route => { failed.push(route.request().url()); return route.abort(); });

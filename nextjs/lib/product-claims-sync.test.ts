@@ -361,7 +361,7 @@ describe("product claims sync", () => {
   */
   it("states a plan capability at the level the route enforcing it demands", () => {
     const page = read("app/pricing/page.tsx");
-    const rows = [...page.matchAll(/route: "([^"]+)", level: "(observer|studio|activation)"/g)];
+    const rows = [...page.matchAll(/route: "([^"]+)", level: "(observer|connections|studio|activation)"/g)];
     expect(rows.length, "the capability table is still declared on the pricing page")
       .toBeGreaterThanOrEqual(5);
     for (const [, route, level] of rows) {
@@ -371,6 +371,9 @@ describe("product claims sync", () => {
           // Promote asks through authorizeWorldActivation (lib/trial-ai-access.ts), which hands the same
           // role to authorizeFoundationProduct(.., "activation", role) and adds the trial's one World.
           .toMatch(/authorizeFoundationProduct\([^)]*"activation",\s*\w+(?:\.\w+)*\.role\s*\)|authorizeWorldActivation\([^)]*\w+(?:\.\w+)*\.role,/s);
+      } else if (level === "connections") {
+        expect(source, `${route} is advertised as a paid-plan connection and does not require that level`)
+          .toMatch(/(?:authorizeFoundationRequest|requireFoundationSession)\([^)]*"connections"/s);
       } else if (level === "studio") {
         expect(source, `${route} is advertised as Team-only and does not require it`)
           .toMatch(/(?:authorizeFoundationProduct|authorizeFoundationRequest|requireFoundationSession)\([^)]*"studio"/s);

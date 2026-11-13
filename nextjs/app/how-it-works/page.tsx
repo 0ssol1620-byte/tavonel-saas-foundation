@@ -45,7 +45,7 @@ export default function HowItWorksPage() {
           </li>)}
         </ol>
         <div className={styles.processClose}>
-          <p>Own-source processing follows the current access, rights and release conditions. This process diagram describes the product path. It is not a customer run receipt.</p>
+          <p>Own-source processing follows the current access, rights and release conditions. This process diagram describes the product path.</p>
           <Link href="/product">See the product and its outputs</Link>
           <Link href="/product/continuous-knowledge">Read the version contract</Link>
           <Link href="/knowledge-compiler">Read the Knowledge Compiler category guide</Link>

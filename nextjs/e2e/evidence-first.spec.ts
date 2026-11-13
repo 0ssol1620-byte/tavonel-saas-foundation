@@ -46,13 +46,16 @@ test("the landing makes no proof-shaped claim of its own", async ({ page }, test
   /*
     The film opens in Scene 01; the source-linked specimen and Evidence Inspector follow in
     Scene 02. Nothing is a fabricated result, and each Explore link resolves to its source.
+    Founder 2026-11-10: Scene 01's film is the four compile cuts in one tabbed slot (hero-compile-tabs.tsx), whose
+    live canvas from 900px is the only canvas the hero may hold; the recorded walkthrough sits below it, in #walkthrough.
   */
   await expect(page.locator(`${BENCH} button[aria-pressed]`)).toHaveCount(3);
   await expect(page.locator(`${BENCH} details`)).not.toHaveAttribute("open");
   await expect(page.locator(BENCH)).toContainText("processing not yet run");
-  await expect(page.locator("section#s1 canvas")).toHaveCount(0);
-  await expect(page.locator('section#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]')).toHaveCount(1);
-  await expect(page.locator("section#s1 .compile-film-sequence").getByRole("tab")).toHaveCount(4);
+  await expect(page.locator('section#s1 canvas:not(figure[data-testid="hero-compile-tabs"] [role="tabpanel"] canvas)')).toHaveCount(0);
+  await expect(page.locator('section#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="hero-compile-tabs"]')).toHaveCount(1);
+  await expect(page.locator('section#s1 figure[data-testid="hero-compile-tabs"]').getByRole("tab")).toHaveCount(4);
+  await expect(page.locator("#walkthrough .compile-film-sequence").getByRole("tab")).toHaveCount(4);
   await expect(page.locator("section#s2 [data-source-inspection-film]")).toHaveCount(0);
   await expect(page.locator("section#s2 .lv2-film-note")).toHaveCount(0);
   await expect(page.locator("section#s2 [data-compiler-specimen]")).toHaveCount(0);

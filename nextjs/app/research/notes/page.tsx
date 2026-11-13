@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   openGraph: { url: "/research/notes" },
   title: "Research notes: what we measured, and how — TAVONEL",
   description:
-    "What we measured and how: the figures, their denominators, their receipts, and the hypotheses that did not hold. Each result carries the state of its evidence.",
+    "What we measured and how: each figure with its denominator, the conditions it was measured under and a receipt you can download and check.",
 };
 
 /**
@@ -44,6 +44,13 @@ export const metadata: Metadata = {
  * BA-110  The page was a dead end -- three equal ghosts, no primary -- while four other pages
  *         send readers here.
  */
+/*
+  2026-11-10 (founder direction): this page publishes measured results. Experiments that were
+  tested and not shipped, and statements about internal thresholds, are not customer copy and are
+  not rendered here. They stay in lib/evidence-record.ts as the internal record.
+*/
+const MEASURED = EVIDENCE.filter((entry) => entry.state === "measured");
+
 export default function ResearchNotesPage() {
   return (
     <PublicSitePage template="T5">
@@ -55,15 +62,13 @@ export default function ResearchNotesPage() {
             </div>
             <div className="stack">
               <p className="lede">
-                This is the record of what has actually been measured, and what has not.
-                Every result carries the state of its evidence: a measurement is a number we
-                produced and can describe the conditions for, open is code that passes its tests
-                without that making a threshold right, and not supported is a hypothesis we
-                tested, that failed, and that we did not ship anyway.
+                These are the results we have measured. Each one names the population it was
+                measured over, the conditions it was measured under and a receipt you can
+                download and check yourself.
               </p>
 
               <div className="tiles">
-                {EVIDENCE.map((entry) => (
+                {MEASURED.map((entry) => (
                   /* The receipt id is the anchor the Home measurement band links to (/research/notes#R-01). */
                   <article className="tile" key={entry.title} data-state={entry.state} id={entry.receipt?.id}>
                     <span className="n">{EVIDENCE_STATE[entry.state]}</span>

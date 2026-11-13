@@ -56,7 +56,8 @@ describe("Solutions task choices and workflow evidence", () => {
       expect(html).toContain(`data-workflow-proof="${slug}"`);
       expect(html).toContain(escape(proof.region.excerpt.slice(0, 100)));
       expect(html).toContain(encodeURIComponent(proof.region.id));
-      expect(html).toContain("mechanics demonstrations, not customer engagements or domain-accuracy results");
+      expect(html).toContain("Five public Apple filings, compiled with the TypeScript sample compiler.");
+      expect(html).not.toContain("not customer engagements");
     }
   });
 
@@ -155,9 +156,12 @@ describe("Solutions task choices and workflow evidence", () => {
     expect(exploreSampleArtifact.lifecycle).toBe("candidate");
     expect(exploreSampleArtifact.candidatePromotion).toBe(false);
     const operationHtml = renderToStaticMarkup(createElement(SolutionWorkflowProof, { kind: "knowledge-operations", pick: SOLUTIONS["knowledge-operations"].proof }));
-    expect(operationHtml).toContain("not a production activation receipt");
+    expect(operationHtml).toContain("“Passed” reports artifact validation of this public candidate.");
+    expect(operationHtml).toContain("A candidate, before any activation.");
+    expect(operationHtml).not.toContain("activation receipt");
     const readHtml = renderToStaticMarkup(createElement(SolutionWorkflowProof, { kind: "document-intelligence", pick: SOLUTIONS["document-intelligence"].proof }));
-    expect(readHtml).toContain("does not establish degraded-scan accuracy or recovered table grids");
+    expect(readHtml).toContain("the grid that arranged them is not recovered");
+    expect(readHtml).not.toContain("does not establish");
   });
 
   it("links exported files to the existing compiled-world package section", () => {

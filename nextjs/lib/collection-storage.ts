@@ -37,22 +37,31 @@ export async function loadPreferredCollectionCandidate(
     .slice(0, 12);
   if (keys.length === 0) return { ok: false, code: "NOT_FOUND" };
 
-  const fetched = await Promise.all(
-    keys.map(async (key) => ({ key, result: await getWorkspaceCollectionCandidate(signer, workspaceId, key) })),
-  );
-  const available = fetched.filter(
-    (item): item is { key: string; result: { ok: true; json: unknown } } => item.result.ok,
-  );
-  const preferred = available.find((item) => {
-    const artifact = item.result.json as {
+  /*
+    One candidate in memory at a time, plus the first readable one as the fallback. This read
+    every listed version (up to 12) in parallel and parsed them all, so peak memory was twelve
+    parsed Worlds: harmless at 24 MiB packages, an out-of-memory at the 56 MiB the package bound
+    now allows. The preference is unchanged -- the first completed candidate in listing order,
+    else the first readable one, else the first failure.
+  */
+  // ponytail: sequential GETs, so a collection with many versions waits for each; bounded
+  // parallelism (2-3) if the open latency of long histories shows up.
+  let fallback: StoredCollection | null = null;
+  let firstFailure: { ok: false; code: string } | null = null;
+  for (const key of keys) {
+    const result = await getWorkspaceCollectionCandidate(signer, workspaceId, key);
+    if (!result.ok) {
+      firstFailure ??= result;
+      continue;
+    }
+    const artifact = result.json as {
       coreExecution?: { status?: unknown; receipt?: { candidatePromotion?: unknown } };
     };
-    return artifact.coreExecution?.status === "completed" && artifact.coreExecution.receipt?.candidatePromotion === false;
-  }) ?? available[0];
-
-  if (preferred) return { ok: true, value: { key: preferred.key, artifact: preferred.result.json } };
-  const firstFailure = fetched.find((item) => !item.result.ok);
-  return firstFailure && !firstFailure.result.ok
-    ? firstFailure.result
-    : { ok: false, code: "GET_FAILED" };
+    if (artifact.coreExecution?.status === "completed" && artifact.coreExecution.receipt?.candidatePromotion === false) {
+      return { ok: true, value: { key, artifact: result.json } };
+    }
+    fallback ??= { key, artifact: result.json };
+  }
+  if (fallback) return { ok: true, value: fallback };
+  return firstFailure ?? { ok: false, code: "GET_FAILED" };
 }

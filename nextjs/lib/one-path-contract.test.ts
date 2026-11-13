@@ -88,6 +88,7 @@ describe("approved one-path experience", () => {
       'id="s1"',
       "<HeroStatement",
       "<HeroActions",
+      "<HeroCompileTabs",
       "<HeroFilm",
       'id="s2"',
       "<HeroSourceCard",
@@ -98,10 +99,12 @@ describe("approved one-path experience", () => {
     ].map(token => page.indexOf(token));
     expect(order.every((at, index) => at >= 0 && (index === 0 || at > order[index - 1]!))).toBe(true);
     const hero = page.slice(page.indexOf('id="s1"'), page.indexOf('id="s2"'));
-    // hard-proof 2026-10-27: the specimen strip closes s2, so the film keeps its default priority in every posture.
-    expect(hero, "the four-stage film follows the title inside the hero").toContain("<HeroFilm korean={korean} />");
+    // Founder 2026-11-10: the four compile cuts follow the title inside the hero; the recorded walkthrough sits below the fold.
+    expect(hero, "the compile tabs follow the title inside the hero").toContain("<HeroCompileTabs korean={korean} />");
+    expect(hero, "the walkthrough is below the fold, its poster lazy").toContain("<HeroFilm korean={korean} priority={false} />");
+    expect(hero.indexOf("<HeroFilm")).toBeGreaterThan(hero.indexOf("<HomeMeasures"));
     expect(hero).not.toContain("<SpecimenStrip");
-    expect(hero.indexOf("<HeroFilm")).toBeGreaterThan(hero.indexOf("<HeroStatement"));
+    expect(hero.indexOf("<HeroCompileTabs")).toBeGreaterThan(hero.indexOf("<HeroStatement"));
     expect(hero).not.toContain("<SourceInspectionFilm");
     /* The hero layout grid sets no columns of its own. */
     const css = text("components/landing-v2/landing-hero.module.css");
@@ -131,8 +134,9 @@ describe("approved one-path experience", () => {
     expect(disclosure).toContain("<CompileStagePlayer");
     expect(disclosure).toContain("preferVideo");
     expect(disclosure).toContain("priorityPoster");
-    // FINAL-SPEC 2026-10-26 D-9: shorter wording, same disclosure (illustrative, not customer results).
-    expect(disclosure).toContain("Illustrative demo · not customer results.");
+    // Founder 2026-11-10: the caption names what the film is (a walkthrough on sample files) instead of what it is not.
+    expect(disclosure).toContain("Product walkthrough on sample files");
+    expect(disclosure).not.toContain("not customer results");
     // Founder ask 2026-10-27 (over FINAL-SPEC 2026-10-26 §2.1's Focus), kept for R3 (2026-11-09): Home opens compact at every width; Focus details expands.
     expect(disclosure).toContain('LANDING_MOBILE_FILM_VIEW: MobileFilmView = "fit"');
     expect(disclosure).toContain('LANDING_WIDE_FILM_VIEW: WideView = "fit"');
@@ -156,7 +160,9 @@ describe("approved one-path experience", () => {
     expect(onDemo).toContain('trackFunnelOnce("hero_demo_interact", arm)');
     const selector = onDemo.match(/target\.closest\("([^"]+)"\)/)?.[1] ?? "";
     const parts = selector.split(",").map(part => part.trim());
-    expect(parts, "the film's controls, where the film now is").toContain("#s1 .compile-film-sequence button");
+    // Founder 2026-11-10: the hero film is the tabbed slot in s1; the recorded walkthrough moved below the fold.
+    expect(parts, "the hero film's tabs").toContain("#s1 [data-testid=hero-compile-tabs] [role=tab]");
+    expect(parts, "the film's controls, where the film now is").toContain("#walkthrough .compile-film-sequence button");
     expect(parts, "decision A preserves prepared source UI engagement")
       .toContain("#s2 [data-source-digest] button[aria-pressed][aria-controls]");
     expect(onDemo, "the engagement hook adds no action or document payload")
