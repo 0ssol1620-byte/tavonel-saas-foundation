@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { collectionSourceDocumentIds } from "./collection-source-access";
+import { collectionSourceDocumentIds, coreCollectionSourceBinding } from "./collection-source-access";
 import type { ReviewableCollectionArtifact } from "./collection-download";
 function artifact(source: unknown, documents: unknown[]): ReviewableCollectionArtifact {
   // Parser fixture only: cryptographic package validation is performed separately by the route.
@@ -149,4 +149,24 @@ it("still refuses one product document listed twice, which is malformed rather t
 it("pairs the same package to the same documents however the input is ordered", () => {
   expect(collectionSourceDocumentIds(coreArtifact({ sourceDocuments: [...SAME_BYTES].reverse() })))
     .toEqual(collectionSourceDocumentIds(coreArtifact({ sourceDocuments: SAME_BYTES })));
+});
+
+// ADR-0006: a segmented source is compiled as its ranges, so its parent id is listed once per range.
+it("pairs each range of a segmented source with the parent and that range's version", () => {
+  const second = `src_${"8".repeat(64)}`;
+  const RANGE_B = "b".repeat(64);
+  const artifact = coreArtifact({
+    sourceDocuments: [
+      { documentId: "doc-1", versionKey: VERSION, inputSha256: `sha256:${VERSION}` },
+      { documentId: "doc-1", versionKey: RANGE_B, inputSha256: `sha256:${RANGE_B}` },
+    ],
+    sources: [
+      { documentId: SRC, documentVersionId: DV, sourceSha256: `sha256:${VERSION}` },
+      { documentId: second, documentVersionId: `dv_${"9".repeat(64)}`, sourceSha256: `sha256:${RANGE_B}` },
+    ],
+    documents: [{ documentId: SRC, title: "Manual pages 1-80" }, { documentId: second, title: "Manual pages 81-160" }],
+  });
+  expect(collectionSourceDocumentIds(artifact)).toEqual(["doc-1"]);
+  expect(coreCollectionSourceBinding(artifact)?.map((row) => [row.documentId, row.productDocumentId, row.productVersionKey]))
+    .toEqual([[SRC, "doc-1", VERSION], [second, "doc-1", RANGE_B]]);
 });

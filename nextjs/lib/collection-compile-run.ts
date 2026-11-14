@@ -5,7 +5,7 @@ import { CORE_MAX_LATENCY_MS, WORKER_SETTLEMENT_RESERVE_MS } from "./execution-b
 import { OCR_REGIONS_REQUIRED, documentsWithoutRegions } from "../../shared/compiledWorldValidation";
 import { authorizationStage, type CustomerDataAuthorization } from "../../shared/customerDataAuthorization";
 import type { ReleaseStage } from "../../shared/scopedCustomerDataGate";
-import { type CollectionCandidateArtifact, validateCollectionOcrInput } from "./collection-compiler";
+import { type CollectionCandidateArtifact, toOriginalPages, validateCollectionOcrInput } from "./collection-compiler";
 import {
   compileReceiptAuditDetails,
   readCompileReceiptSigner,
@@ -30,8 +30,8 @@ import {
 import { readCustomerSourceAuthorization, type SourceAuthorizationResult } from "./customer-data-admission";
 import { readCustomerSourceScope } from "./customer-source-scope";
 import { appendServiceAuditEvent } from "./enterprise-store";
-import { checkCurrentSourceVersions, collectionCandidateKey, groupImmutableDocuments, selectCurrentDocumentVersions } from "./immutable-keys";
-import { getWorkspaceCollectionCandidate, getWorkspaceOcrJson, listImmutableWorkspaceObjects, MAX_DERIVED_JSON_BYTES, putSerializedCollectionCandidate, serializeCollectionCandidate, type JsonSizeLimit } from "./r2-objects";
+import { checkCurrentSourceVersions, collectionCandidateKey, groupImmutableDocuments, selectCurrentDocumentVersions, verifySegmentManifest } from "./immutable-keys";
+import { getWorkspaceCollectionCandidate, getWorkspaceOcrJson, getWorkspaceSegmentManifest, listImmutableWorkspaceObjects, MAX_DERIVED_JSON_BYTES, putSerializedCollectionCandidate, serializeCollectionCandidate, type JsonSizeLimit } from "./r2-objects";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
 import { getFoundationActiveWorld } from "./world-store";
 import { detectExactDuplicatesAtIntake, type ExactDuplicateNote } from "./source-dedup";
@@ -211,15 +211,41 @@ export async function runCollectionCompile(
     if (!beforeOcr.ok) return { ok: false, status: beforeOcr.code === "COMPILE_JOB_AUTHORITY_DENIED" ? 403 : 503,
       code: beforeOcr.code, payload: {} };
   }
+  /*
+    ADR-0006: a segmented source is compiled as its page ranges, each its own Core document of at
+    most one CDR request, so no request is handed a whole manual. Its manifest is read and checked
+    against the listing before any range is (`verifySegmentManifest`); a mismatch refuses the
+    compile with the manifest's own code, never a compile of the ranges that did agree. The ranges
+    then go through the same read budget as documents: a set that does not fit is refused, as a
+    single document that does not fit always was.
+  */
+  const reads: Array<{ documentId: string; versionKey: string; sanitizedKey: string; ocrJsonKey: string;
+    range?: { start0: number; end0: number } }> = [];
+  for (const item of selected) {
+    const document = item!;
+    if (!document.segmentManifestKey) {
+      reads.push({ documentId: document.documentId, versionKey: document.versionKey,
+        sanitizedKey: document.sanitizedKey!, ocrJsonKey: document.ocrJsonKey! });
+      continue;
+    }
+    const manifest = await getWorkspaceSegmentManifest(signer, workspaceId, document.segmentManifestKey);
+    if (!manifest.ok) return { ok: false, status: 503, code: "SEGMENT_MANIFEST_UNREADABLE",
+      payload: { documentId: document.documentId, reason: manifest.code } };
+    const verified = verifySegmentManifest(workspaceId, document, manifest.json);
+    if (!verified.ok) return { ok: false, status: 422, code: verified.code,
+      payload: { documentId: document.documentId, ...(verified.start0 === undefined ? {} : { start0: verified.start0 }) } };
+    reads.push(...verified.segments.map((segment) => ({ documentId: document.documentId, versionKey: segment.versionKey,
+      sanitizedKey: segment.sanitizedKey, ocrJsonKey: segment.ocrJsonKey, range: { start0: segment.start0, end0: segment.end0 } })));
+  }
   let fetchedBytes = 0;
   let fetchedRegions = 0;
   const fanout = globalCollection ? 1 : 4;
   const budget = globalCollection ? GLOBAL_COLLECTION_MAX_BYTES : COMPILE_INPUT_MAX_OCR_BYTES;
   // Every read is bounded by what is left of this compile's budget; global reads are sequential.
-  for (let offset = 0; offset < selected.length; offset += fanout) {
+  for (let offset = 0; offset < reads.length; offset += fanout) {
     const readBound = Math.min(MAX_DERIVED_JSON_BYTES, budget - fetchedBytes);
-    const batch = await Promise.all(selected.slice(offset, offset + fanout).map((item) =>
-      getWorkspaceOcrJson(signer, workspaceId, item!.ocrJsonKey!, new Date(), readBound)));
+    const batch = await Promise.all(reads.slice(offset, offset + fanout).map((item) =>
+      getWorkspaceOcrJson(signer, workspaceId, item.ocrJsonKey, new Date(), readBound)));
     fetched.push(...batch);
     fetchedBytes += batch.reduce((sum, result) => sum + (result.ok ? (result.byteLength ?? Buffer.byteLength(JSON.stringify(result.json), "utf8")) : 0), 0);
     if (globalCollection) {
@@ -234,12 +260,14 @@ export async function runCollectionCompile(
     const refusedAt = batch.findIndex((result) => "sizeLimit" in result);
     if (refusedAt >= 0) {
       const { sizeLimit } = batch[refusedAt] as { sizeLimit: JsonSizeLimit };
-      const documentId = selected[offset + refusedAt]!.documentId;
+      const { documentId, range } = reads[offset + refusedAt]!;
       const objectBound = sizeLimit.bound === MAX_DERIVED_JSON_BYTES;
+      // A range is named by its original pages, so the refusal says which part of the source did not fit.
+      const at = range ? { documentId, start0: range.start0, end0: range.end0 } : { documentId };
       const detail = objectBound
-        ? { ...sizeLimit, documentId }
+        ? { ...sizeLimit, ...at }
         : { object: "compile-input" as const, bytes: sizeLimit.bytes === null ? null : fetchedBytes + sizeLimit.bytes,
-            bound: budget, documentId };
+            bound: budget, ...at };
       return { ok: false, status: 413,
         code: globalCollection ? "GLOBAL_COLLECTION_RESOURCE_LIMIT" : objectBound ? "JSON_TOO_LARGE" : "COMPILE_INPUT_TOO_LARGE",
         payload: { sizeLimit: detail } };
@@ -266,9 +294,10 @@ export async function runCollectionCompile(
                   "readerRevision", "readerBindingSha256", "recognitionConflictCount"]).has(key)));
   })) return { ok: false, status: 422, code: "OCR_BINDING_INVALID", payload: {} };
   const candidates = bodies.map((body, index) => {
-    const document = selected[index]!;
+    const document = reads[index]!;
     const json = body as Record<string, unknown>;
     return {
+      range: document.range,
       documentId: document.documentId,
       versionKey: document.versionKey,
       sanitizedKey: document.sanitizedKey,
@@ -308,7 +337,11 @@ export async function runCollectionCompile(
     };
   }
 
-  const inputs = candidates.map((candidate) => validateCollectionOcrInput(candidate));
+  // A range is validated as the reading it is (its own pages), then renumbered into the original's.
+  const inputs = candidates.map(({ range, ...candidate }) => {
+    const input = validateCollectionOcrInput(candidate);
+    return input && range ? toOriginalPages(input, range.start0, range.end0) : input;
+  });
   if (inputs.some((item) => item === null)) {
     return { ok: false, status: 422, code: "OCR_BINDING_INVALID", payload: {} };
   }
@@ -341,13 +374,16 @@ export async function runCollectionCompile(
 
   // B1 intake annotation. Off by default; in no mode does it change what is dispatched or stored.
   // `on` names only documents this principal may read; with no bound principal it names none.
-  const duplicateNotes = await detectExactDuplicatesAtIntake(workspaceId, verifiedInputs, process.env,
+  // ponytail: both annotate whole documents only; a range of a segmented source is not a document to them.
+  // Add ranges when either learns to group a source by its parent id.
+  const wholeInputs = verifiedInputs.filter((input) => input.pageStart0 === undefined);
+  const duplicateNotes = await detectExactDuplicatesAtIntake(workspaceId, wholeInputs, process.env,
     principalBound ? observationPrincipal!.userId! : null);
   // B2 shadow proposals (near duplicate, document type, topics). Off by default; in no mode does it
   // change what is dispatched, stored or returned, and it never throws.
-  await organizeLibraryAtIntake(workspaceId, verifiedInputs, process.env);
+  await organizeLibraryAtIntake(workspaceId, wholeInputs, process.env);
 
-  const expectedVersions = selected.map((item) => ({ documentId: item!.documentId, versionKey: item!.versionKey }));
+  const expectedVersions = reads.map((item) => ({ documentId: item.documentId, versionKey: item.versionKey }));
   const revalidate = async (phase: "before_core" | "after_core"): Promise<CollectionCompileRun | null> => {
     if (compileJobAuthorityEnabled()) {
       const jobAuthority = await authorizeCompileJobSourceAccess({ jobId: compileJobId!, workspaceKey: workspaceId,

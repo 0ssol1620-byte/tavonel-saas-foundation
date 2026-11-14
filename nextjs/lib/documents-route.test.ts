@@ -332,3 +332,38 @@ describe("the documents listing", () => {
     expect(getReject.mock.calls[0][1]).toBe(workspaceKey);
   });
 });
+
+// ADR-0006: a segmented source is one row under its parent id, and only once its manifest exists.
+describe("a segmented source in the documents listing", () => {
+  const segmentedId = "7a7a7a7a-2222-4222-8222-222222222222";
+  const segments = `immutable/${workspaceKey}/${workspaceKey}/${segmentedId}/segments`;
+  const ranges = ([[0, 80, "d".repeat(64)], [80, 160, "e".repeat(64)], [160, 200, "f".repeat(64)]] as const)
+    .flatMap(([start0, end0, version]) => [
+      { key: `${segments}/${start0}-${end0}/${version}/sanitized.pdf`, size: 1024 },
+      { key: `${segments}/${start0}-${end0}/${version}/ocr.json`, size: 256 },
+    ]);
+
+  it("lists it once, under the parent id, with its three ranges, and checks access on the parent id", async () => {
+    listImmutable.mockResolvedValue({ ok: true, objects: [...ranges, { key: `${segments}/plan.json`, size: 90 }, { key: `${segments}/manifest.json`, size: 900 }] });
+    listRejects.mockResolvedValue({ ok: true, documentIds: [], storedDocumentIds: [], truncated: false });
+    const body = await documents();
+    expect(body.documents).toHaveLength(1);
+    expect(body.documents[0]).toMatchObject({ documentId: segmentedId, processingState: "ocr_ready" });
+    expect((body.documents[0]!.segments as Array<{ start0: number; end0: number }>).map(({ start0, end0 }) => [start0, end0]))
+      .toEqual([[0, 80], [80, 160], [160, 200]]);
+    expect(sourceAccess).toHaveBeenCalledWith(workspaceKey, [segmentedId], "viewer-user");
+  });
+
+  it("does not list ranges whose manifest was never written", async () => {
+    listImmutable.mockResolvedValue({ ok: true, objects: [...ranges, { key: `${segments}/plan.json`, size: 90 }] });
+    listRejects.mockResolvedValue({ ok: true, documentIds: [], storedDocumentIds: [], truncated: false });
+    expect((await documents()).documents).toEqual([]);
+  });
+
+  it("leaves a deleted segmented source out, by its parent id", async () => {
+    listImmutable.mockResolvedValue({ ok: true, objects: [...ranges, { key: `${segments}/manifest.json`, size: 900 }] });
+    listRejects.mockResolvedValue({ ok: true, documentIds: [], storedDocumentIds: [], truncated: false });
+    tombstoned.mockResolvedValue({ ok: true, ids: new Set([segmentedId]) });
+    expect((await documents()).documents).toEqual([]);
+  });
+});

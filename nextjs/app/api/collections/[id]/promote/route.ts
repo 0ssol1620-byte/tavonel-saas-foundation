@@ -255,9 +255,11 @@ export async function POST(
       { status: 409, headers: NO_STORE }
     );
   }
+  // One row per compiled range for a segmented source, so the parent id may repeat: name it once.
+  const sourceDocumentIds = [...new Set(sourceDocuments.map((item) => item.documentId as string))];
   const sourceAccess = await checkConnectorSourceAccessForViewer(
       membership.workspaceId,
-      sourceDocuments.map((item) => item.documentId as string), user.id
+      sourceDocumentIds, user.id
   );
   if (!sourceAccess.ok) {
     return NextResponse.json(
@@ -291,7 +293,7 @@ export async function POST(
     expectedCurrentManifest,
     expectedCurrentRevision,
     reason,
-    sourceDocumentIds: sourceDocuments.map((item) => item.documentId as string),
+    sourceDocumentIds,
   });
   if (!promoted.ok) {
     const status =

@@ -950,11 +950,13 @@ async function finishWholeDocument(
 const SEGMENT_PAGES = 80;
 /** The CDR's SEGMENTED_MAX_DOCUMENT_PAGES. */
 export const MAX_SEGMENTED_SOURCE_PAGES = 500;
-/** The formats intake counts pages for before upload (`nextjs/lib/page-count.ts`). */
-const SEGMENTABLE_MIMES: ReadonlySet<string> = new Set([
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-]);
+/**
+ * PDF only: the one format whose page count intake reads from the file itself and may approve
+ * past one request (`shared/intakeCeiling.ts` SEGMENTED_SOURCE_MIMES). A DOCX goes whole, so
+ * one longer than a request's pages is refused by the rasterizer (PARSER_OOM, 0 credits) rather
+ * than read past what its approval covered (#234 R1, item 1).
+ */
+const SEGMENTABLE_MIMES: ReadonlySet<string> = new Set(["application/pdf"]);
 const SEGMENT_PLAN_SCHEMA = "tavonel.source_segment_plan.v1";
 export const SEGMENT_MANIFEST_SCHEMA = "tavonel.source_segments.v1";
 /** A delivery read its one new range and more remain: index.ts sends the source on as a new message. */

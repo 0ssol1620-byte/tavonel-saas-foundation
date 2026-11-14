@@ -13,7 +13,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../shared/intakeCeiling", async (importOriginal) => {
   const real = await importOriginal<typeof import("../../shared/intakeCeiling")>();
-  return { ...real, ...real.intakeCeilingFor(1), INTAKE_CEILING_STAGE: 1 };
+  const stage1 = real.intakeCeilingFor(1);
+  return { ...real, ...stage1, INTAKE_CEILING_STAGE: 1,
+    maxSourcePagesFor: (mimeType: string) => real.maxSourcePagesFor(mimeType, stage1.PROCESSING_CEILING) };
 });
 
 const mocks = vi.hoisted(() => ({ calls: [] as string[], presign: vi.fn() }));

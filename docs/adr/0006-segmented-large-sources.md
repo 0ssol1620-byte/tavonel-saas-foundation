@@ -51,13 +51,15 @@ processor keeps the per-request bound it has today. Nothing is raised to meet a 
   pixel and output bounds; the answer carries `x-tavonel-cdr-source-pages` and the range actually
   rendered. An unranged request is unchanged. Tests: `tests/test_page_ranges.py`.
 - **Worker** (`src/sanitize.ts`), behind `FOUNDATION_SOURCE_SEGMENT_PAGES` (unset = off). For a
-  PDF or DOCX it asks for range `[0, N)` first. A source that fits is stored exactly where a whole
+  PDF it asks for range `[0, N)` first. A source that fits is stored exactly where a whole
   document goes. A longer one gets `segments/plan.json` (create-once page count), then each range
   is stored, receipted and read under `immutable/<ws>/<ws>/<doc>/segments/<start0>-<end0>/<v>/`,
   through the same read, retry, billing and review path as a whole document. `segments/manifest.json`
-  is written only after every range has an `ocr.json`. DOCX is converted inside the CDR on every
-  range request and takes the same path; its pagination is expected to be stable for one input on
-  one image, and if it is not, the page-count check below refuses the source.
+  is written only after every range has an `ocr.json`. **DOCX is not segmented** (#234 R1): its page
+  count is Word's own saved number, or absent, so intake can only approve it at a count nobody
+  verified or at 80. Reading it in ranges would process pages the approval never covered. A DOCX
+  goes whole, and one over 80 pages is refused by the rasterizer as `PARSER_OOM` (released, 0
+  credits) with the ceiling sentence on the source.
 - **Fail closed.** A refused range refuses the source and names the pages. A reader failure parks
   the source for review. A page count that changes between ranges is `RECEIPT_MISMATCH`. None of
   these writes a manifest, so no range is ever shown. A CDR revision that does not answer ranges
@@ -105,8 +107,13 @@ processor keeps the per-request bound it has today. Nothing is raised to meet a 
    4.5 MB request is never handed a whole manual.
 3. Evidence keeps original page numbers: page = `start0` + the range's own page. The viewer opens
    the range's sanitized PDF at the local page.
-4. Intake: `PROCESSING_CEILING.maxSourcePages` becomes 500 for PDF and DOCX (a format whose page
-   count is unknown before upload stays at 80); one migration lifts the approval checks
+4. Intake: `PROCESSING_CEILING.maxSourcePages` becomes 500 for a counted PDF once
+   `shared/intakeCeiling.ts` `SEGMENTED_INTAKE_ENABLED` is true (every other format, DOCX included,
+   and any file whose pages are not counted before upload stays at 80). The switch is a code
+   constant, flipped in its own release in the same commit as the worker's
+   `FOUNDATION_SOURCE_SEGMENT_PAGES` var in `wrangler.jsonc`; `intake-ceiling-cross-tree.test.ts`
+   refuses a tree where the two disagree. While it is off the pricing fingerprint is production's,
+   so no approval goes stale on deploy. One migration lifts the approval checks
    (`approved_max_pages` 80 → 500, the set cap 10,240 → 64,000) with pgTAP for both boundaries,
    built on the current production function bodies (PR #228's `_unchecked`), not on 0051.
 5. `/pricing`, the drop box and `PROCESSING_CEILING_SENTENCE` change in the same build.

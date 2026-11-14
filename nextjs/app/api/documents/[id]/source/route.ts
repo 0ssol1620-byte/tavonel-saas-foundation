@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
-import { DOCUMENT_ID_PATTERN, groupImmutableDocuments, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
+import { DOCUMENT_ID_PATTERN, groupImmutableDocuments, selectCurrentDocumentVersions, sourceReadTarget } from "@/lib/immutable-keys";
 import { getWorkspaceSanitizedPdf, listImmutableWorkspaceObjects } from "@/lib/r2-objects";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
@@ -26,14 +26,25 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const listed = await listImmutableWorkspaceObjects(signer, access.membership.workspaceId);
   if (!listed.ok) return NextResponse.json({ code: listed.code }, { status: 503 });
   const version = new URL(request.url).searchParams.get("version");
+  /*
+    An original page (1-based), optional. A segmented source (ADR-0006) is served one page range at
+    a time: the range holding this page, or the range `version` names, is the PDF served, and
+    `pageStart0` (the JSON answer, and the PDF's X-Tavonel-Source-Page-Start0 header) says where its
+    first page sits in the original, so evidence at original page N opens at N - pageStart0.
+  */
+  const pageParam = new URL(request.url).searchParams.get("page");
+  const page = pageParam === null ? null : /^[1-9][0-9]{0,5}$/.test(pageParam) ? Number(pageParam) : Number.NaN;
+  if (Number.isNaN(page)) return NextResponse.json({ code: "PAGE_INVALID" }, { status: 400 });
   const candidates = groupImmutableDocuments(access.membership.workspaceId, listed.objects)
     .filter((item) => item.documentId === id && item.sanitizedKey);
   const selected = selectCurrentDocumentVersions(candidates);
   if (!version && selected.ambiguousDocumentIds.includes(id)) {
     return NextResponse.json({ code: "SOURCE_VERSION_AMBIGUOUS" }, { status: 409, headers: { "Cache-Control": "no-store" } });
   }
-  const match = (version ? candidates.find((item) => item.versionKey === version) : selected.documents[0]) ?? null;
-  if (!match?.sanitizedKey) return NextResponse.json({ code: "NOT_FOUND" }, { status: 404 });
+  const match = version
+    ? candidates.map((item) => sourceReadTarget(item, version, page)).find((target) => target !== null) ?? null
+    : selected.documents[0] ? sourceReadTarget(selected.documents[0], null, page) : null;
+  if (!match) return NextResponse.json({ code: "NOT_FOUND" }, { status: 404 });
   const sourceAccess = await checkConnectorSourceAccessForViewer(access.membership.workspaceId, [id], user.id);
   if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
     status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
@@ -41,7 +52,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   });
   if (new URL(request.url).searchParams.get("format") !== "pdf") {
     const readUrl = `/api/documents/${encodeURIComponent(id)}/source?version=${encodeURIComponent(match.versionKey)}&format=pdf`;
-    return NextResponse.json({ code: "OK", documentId: id, versionKey: match.versionKey, readUrl, requiresAuthorization: true }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ code: "OK", documentId: id, versionKey: match.versionKey, pageStart0: match.pageStart0,
+      ...(match.localPage1 === null ? {} : { localPage: match.localPage1 }), readUrl, requiresAuthorization: true },
+      { headers: { "Cache-Control": "no-store" } });
   }
   const lease = await acquireWorkspaceOperation("export", access.membership.workspaceId);
   if (!lease.ok) return NextResponse.json({ code: lease.code }, {
@@ -74,7 +87,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       async cancel() { offset = source.bytes.byteLength; await release(); },
     });
     const response = new Response(body, { headers: { "Content-Type": "application/pdf",
-      "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Content-Disposition": "inline" } });
+      "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Content-Disposition": "inline",
+      "X-Tavonel-Source-Page-Start0": String(match.pageStart0) } });
     streaming = true;
     return response;
   } finally {

@@ -92,6 +92,14 @@ export type CollectionOcrInput = {
   readerBindingSha256?: string;
   recognitionConflictCount?: number;
   /*
+    Set only for one page range of a segmented source (ADR-0006), by `toOriginalPages`: the range's
+    first page as a 0-based page of the original source. Its regions then carry original page
+    numbers, and `pageCount` is the last original page it may cite (`end0`), which is what the
+    Core's "region page exceeds pageCount" check needs. The range's own PDF holds pages
+    `pageStart0 + 1 .. pageCount` of the original.
+  */
+  pageStart0?: number;
+  /*
     Optional on the wire, and `regionsOrNone` is the only reading of "absent" either path takes.
 
     A document read before region capture existed carries none. This compiler abstains -- no
@@ -588,6 +596,34 @@ export function validateCollectionOcrInput(value: unknown): CollectionOcrInput |
     if (input.text !== input.regions.map((region) => (region as Record<string, unknown>).text).join("\n").trim()) return null;
   }
   return input as CollectionOcrInput;
+}
+
+/**
+ * One page range of a segmented source, renumbered into the original source's pages (ADR-0006).
+ *
+ * Applied to a validated range input before Core sees it, so every page the Core cites -- in its
+ * units, its chunks and the package it hashes -- is already the original page: original page =
+ * `start0` + the range's own page. The range's ocr.json must say it read exactly the range's
+ * pages; anything else is null, and the caller refuses the compile rather than shifting a reading
+ * of some other cut.
+ */
+export function toOriginalPages(input: CollectionOcrInput, start0: number, end0: number): CollectionOcrInput | null {
+  if (!Number.isSafeInteger(start0) || start0 < 0 || !Number.isSafeInteger(end0) || input.pageCount !== end0 - start0) return null;
+  return {
+    ...input,
+    pageCount: end0,
+    pageStart0: start0,
+    ...(input.regions ? {
+      regions: input.regions.map((region) => ({
+        ...region,
+        pageIndex0: region.pageIndex0 + start0,
+        pageNumber1: region.pageNumber1 + start0,
+        ...(region.recognitionConflict
+          ? { recognitionConflict: { ...region.recognitionConflict, pageIndex0: region.recognitionConflict.pageIndex0 + start0 } }
+          : {}),
+      })),
+    } : {}),
+  };
 }
 
 export function compileCollectionCandidate(inputs: CollectionOcrInput[]): CollectionCandidateArtifact {

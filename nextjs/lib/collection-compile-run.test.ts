@@ -1,6 +1,7 @@
 import { createHash, createPublicKey, generateKeyPairSync } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { dispatchProductCoreV2 } from "./core-runtime-v2";
+import type { CollectionOcrInput } from "./collection-compiler";
 import type { authorizeCompileJobSourceAccess, classifyCompileJobSources } from "./compile-job-authority";
 
 /*
@@ -19,6 +20,7 @@ import type { authorizeCompileJobSourceAccess, classifyCompileJobSources } from 
 
 const listed = vi.fn();
 const fetched = vi.fn();
+const segmentManifest = vi.fn();
 const put = vi.fn();
 const serialize = vi.fn();
 const dispatched = vi.fn<(...args: Parameters<typeof dispatchProductCoreV2>) => Promise<unknown>>();
@@ -41,6 +43,7 @@ vi.mock("./r2-objects", () => ({
   MAX_DERIVED_JSON_BYTES: 24 * 1024 * 1024,
   listImmutableWorkspaceObjects: (...args: unknown[]) => listed(...args),
   getWorkspaceOcrJson: (...args: unknown[]) => fetched(...args),
+  getWorkspaceSegmentManifest: (...args: unknown[]) => segmentManifest(...args),
   serializeCollectionCandidate: (...args: unknown[]) => serialize(...args),
   putSerializedCollectionCandidate: (...args: unknown[]) => put(...args),
   getWorkspaceCollectionCandidate: (...args: unknown[]) => priorCandidate(...args),
@@ -84,7 +87,7 @@ vi.mock("./compile-artifact-provenance", async (importOriginal) => ({
 }));
 
 const { runCollectionCompile, COMPILE_INPUT_MAX_OCR_BYTES } = await import("./collection-compile-run");
-const { CORE_V2_MAX_REQUEST_BYTES } = await import("./core-runtime-v2");
+const { CORE_V2_MAX_REQUEST_BYTES, buildProductCoreV2Request } = await import("./core-runtime-v2");
 const { verifyCompileReceipt } = await import("./compile-receipt-signing");
 const { readExportTrustStoreEnv } = await import("./export-signing");
 
@@ -1255,5 +1258,107 @@ describe("library organize proposals at compile intake", () => {
     const down = await compileWith("shadow", vi.fn(async () => { throw new TypeError("network"); }) as unknown as typeof store);
     expect(down.ok).toBe(true);
     expect([down.core, down.stored, down.run]).toEqual([off.core, off.stored, off.run]);
+  });
+});
+
+/*
+  ADR-0006, site half. A segmented source is compiled as its page ranges, each its own Core
+  document, with original page numbers: original page = start0 + the range's own page. The
+  manifest is checked against the listing before any range is read, and a mismatch is a named
+  refusal before anything is read or paid for.
+*/
+describe("segmented sources (ADR-0006)", () => {
+  const SEG = `immutable/${WS}/${WS}/${DOCUMENT}/segments`;
+  const RANGES: Array<[number, number, string]> = [[0, 80, "a1".repeat(32)], [80, 160, "b2".repeat(32)]];
+  const rangeKey = (start0: number, end0: number, version: string, file: string) => `${SEG}/${start0}-${end0}/${version}/${file}`;
+  const manifest = (ranges = RANGES) => ({
+    schemaVersion: "tavonel.source_segments.v1",
+    sourceKey: `quarantine/${WS}/${DOCUMENT}/source`,
+    inputSha256: `sha256:${"9".repeat(64)}`,
+    totalPages: 160,
+    segmentPages: 80,
+    segments: ranges.map(([start0, end0, version]) => ({ start0, end0, immutableKey: rangeKey(start0, end0, version, "sanitized.pdf"),
+      sanitizedSha256: `sha256:${version}`, ocrKey: rangeKey(start0, end0, version, "ocr.json") })),
+  });
+  /** Each range's ocr.json, with one region on the range's own page 3. */
+  function segmentedSource(pageCountOf = (start0: number, end0: number) => end0 - start0) {
+    listed.mockResolvedValue({ ok: true, objects: [
+      ...RANGES.flatMap(([start0, end0, version]) => [
+        { key: rangeKey(start0, end0, version, "sanitized.pdf"), size: 10 },
+        { key: rangeKey(start0, end0, version, "ocr.json"), size: 10 },
+      ]),
+      { key: `${SEG}/plan.json`, size: 10 },
+      { key: `${SEG}/manifest.json`, size: 10 },
+    ] });
+    segmentManifest.mockResolvedValue({ ok: true, json: manifest() });
+    fetched.mockImplementation(async (_env: unknown, _workspace: unknown, ocrKey: string) => {
+      const [start0, end0, version] = RANGES.find(([s, e, v]) => ocrKey === rangeKey(s, e, v, "ocr.json"))!;
+      const text = `Pages ${start0 + 1} to ${end0}: the pump reading stayed inside the policy limits.`;
+      return { ok: true, json: {
+        schemaVersion: "tavonel.ocr_result.v2", pageCount: pageCountOf(start0, end0), text, inputSha256: `sha256:${version}`,
+        sourceImmutableKey: rangeKey(start0, end0, version, "sanitized.pdf"),
+        regions: [{ regionId: "native-p0003", pageIndex0: 2, pageNumber1: 3, order: 0, blockType: "paragraph",
+          bbox1000: [0, 0, 1000, 1000], text, confidence: 1, authority: "official" }],
+      } };
+    });
+    dispatched.mockResolvedValue({ ok: true, result: {
+      status: "completed", runtime: "tavonel-python-core-v2", candidate: { worldStateId: "world-1", reviewReasons: [] },
+      receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, candidatePromotion: false },
+    } });
+    put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
+  }
+
+  it("compiles each range as its own Core document, on original page numbers", async () => {
+    segmentedSource();
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+    expect(run).toMatchObject({ ok: true });
+    const inputs = (dispatched.mock.calls[0] as unknown as [unknown, string, CollectionOcrInput[]])[2];
+    expect(inputs.map((input) => [input.documentId, input.versionKey, input.pageStart0, input.pageCount])).toEqual([
+      [DOCUMENT, RANGES[0][2], 0, 80],
+      [DOCUMENT, RANGES[1][2], 80, 160],
+    ]);
+    // A region on page 3 of range 80-160 is page 83 of the manual.
+    expect(inputs.map((input) => [input.regions?.[0]?.pageIndex0, input.regions?.[0]?.pageNumber1])).toEqual([[2, 3], [82, 83]]);
+    const request = buildProductCoreV2Request(WS, inputs);
+    expect(request.documents.map((document) => [document.nativeId, document.pageCount, document.regions[0]?.pageNumber1])).toEqual([
+      [`${DOCUMENT}:p1-80`, 80, 3],
+      [`${DOCUMENT}:p81-160`, 160, 83],
+    ]);
+    // The collection is the parent's, however the source was cut.
+    expect(request.collectionId).toBe(buildProductCoreV2Request(WS, [{ ...inputs[0]!, pageStart0: undefined }]).collectionId);
+    expect(segmentManifest).toHaveBeenCalledWith(expect.anything(), WS, `${SEG}/manifest.json`);
+  });
+
+  it("refuses a manifest that does not match the listing, before any range is read", async () => {
+    segmentedSource();
+    segmentManifest.mockResolvedValue({ ok: true, json: manifest([RANGES[0]]) });
+    expect(await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).toEqual({
+      ok: false, status: 422, code: "SEGMENT_MANIFEST_RANGE_GAP", payload: { documentId: DOCUMENT, start0: 80 },
+    });
+    segmentManifest.mockResolvedValue({ ok: false, code: "NOT_FOUND" });
+    expect(await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).toEqual({
+      ok: false, status: 503, code: "SEGMENT_MANIFEST_UNREADABLE", payload: { documentId: DOCUMENT, reason: "NOT_FOUND" },
+    });
+    expect(fetched).not.toHaveBeenCalled();
+    expect(dispatched).not.toHaveBeenCalled();
+  });
+
+  it("refuses a range whose reading is not exactly the range's pages", async () => {
+    segmentedSource((start0, end0) => (start0 === 80 ? end0 - start0 - 1 : end0 - start0));
+    expect(await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).toMatchObject({ ok: false, code: "OCR_BINDING_INVALID" });
+    expect(dispatched).not.toHaveBeenCalled();
+  });
+
+  it("refuses a set of ranges over the compile budget, naming the range that crossed it", async () => {
+    segmentedSource();
+    const original = fetched.getMockImplementation()!;
+    fetched.mockImplementation(async (env: unknown, workspace: unknown, ocrKey: string, now: unknown, bound: number) =>
+      ocrKey.includes("/80-160/") ? { ok: false, code: "JSON_TOO_LARGE", sizeLimit: { object: "ocr.json", bytes: null, bound } }
+        : original(env, workspace, ocrKey, now, bound));
+    expect(await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).toEqual({
+      ok: false, status: 413, code: "COMPILE_INPUT_TOO_LARGE",
+      payload: { sizeLimit: { object: "compile-input", bytes: null, bound: COMPILE_INPUT_MAX_OCR_BYTES, documentId: DOCUMENT, start0: 80, end0: 160 } },
+    });
+    expect(dispatched).not.toHaveBeenCalled();
   });
 });

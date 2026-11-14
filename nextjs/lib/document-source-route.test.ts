@@ -148,3 +148,42 @@ describe("document source PDF route", () => {
     expect(listObjects).not.toHaveBeenCalled();
   });
 });
+
+// ADR-0006: evidence at an original page of a segmented source opens that page's range at its local page.
+describe("a segmented source", () => {
+  const ranges: Array<[number, number, string]> = [[0, 80, "a1".repeat(32)], [80, 160, "b2".repeat(32)]];
+  const rangeKey = (start0: number, end0: number, rangeVersion: string) =>
+    `immutable/${workspaceId}/${workspaceId}/${documentId}/segments/${start0}-${end0}/${rangeVersion}/sanitized.pdf`;
+  const read = (query: string) => GET(new Request(`https://tavonel.com/api/documents/${documentId}/source?${query}`,
+    { headers: { authorization: "Bearer session" } }), { params: Promise.resolve({ id: documentId }) });
+  beforeEach(() => {
+    listObjects.mockResolvedValue({ ok: true, objects: [
+      ...ranges.flatMap(([start0, end0, rangeVersion]) => [
+        { key: rangeKey(start0, end0, rangeVersion), size: 10 },
+        { key: rangeKey(start0, end0, rangeVersion).replace(/sanitized\.pdf$/, "ocr.json"), size: 10 },
+      ]),
+      { key: `immutable/${workspaceId}/${workspaceId}/${documentId}/segments/manifest.json`, size: 10 },
+    ] });
+  });
+
+  it("resolves original page 83 to range 80-160 and local page 3", async () => {
+    const response = await read("page=83");
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ versionKey: ranges[1][2], pageStart0: 80, localPage: 3,
+      readUrl: `/api/documents/${documentId}/source?version=${ranges[1][2]}&format=pdf` });
+  });
+
+  it("serves the range a citation's version names, with its offset, through the digest-checked read", async () => {
+    const response = await read(`version=${ranges[1][2]}&format=pdf`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-tavonel-source-page-start0")).toBe("80");
+    expect(signPdf).toHaveBeenCalledWith(expect.any(Object), workspaceId, rangeKey(80, 160, ranges[1][2]));
+  });
+
+  it("refuses a page outside every range, a page outside the named range, and a malformed page", async () => {
+    expect((await read("page=161")).status).toBe(404);
+    expect((await read(`version=${ranges[0][2]}&page=83`)).status).toBe(404);
+    expect((await read("page=0")).status).toBe(400);
+    expect(signPdf).not.toHaveBeenCalled();
+  });
+});
