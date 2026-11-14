@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { settleFoundationCompute } from "@/lib/compute-reservation";
+import { settleFoundationCompute, settleFoundationMeteredCompute } from "@/lib/compute-reservation";
 import { settleCompletedRead } from "@/lib/completed-read-proof";
 import { parseCompletedReadFacts } from "../../../../../../shared/completedReadReceipt";
 import { verifyComputeSettlementRequest } from "@/lib/compute-settlement-auth";
@@ -18,6 +18,12 @@ const FAILURE_CLASS = /^[A-Z][A-Z_]{2,63}$/;
 const SOURCE_SHA256 = /^sha256:[a-f0-9]{64}$/;
 /** Printable ASCII only: the worker writes these sentences, and this is all they contain. */
 const UNPRINTABLE = /[^\x20-\x7e]/g;
+
+/** Null stays null (an uncounted read, an unclassified page); anything else must be a number. */
+function meterNumber(value: unknown): number | null {
+  if (value === undefined || value === null) return null;
+  return typeof value === "number" ? value : Number.NaN;
+}
 
 function boundedReason(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -130,13 +136,38 @@ export async function POST(request: Request) {
     && input.outcome === "settled" && reasonCode === "OCR_COMPLETED") {
     return NextResponse.json({ code: "COMPLETED_READ_REQUIRED" }, { status: 503, headers });
   }
-  const result = completedRead ? await settleCompletedRead(completedRead) : await settleFoundationCompute({
-    workspaceKey,
-    documentId,
-    outcome: input.outcome as "settled" | "operator_review" | "released",
-    actualCredits: typeof input.actualCredits === "number" ? input.actualCredits : Number.NaN,
-    reasonCode,
-  });
+  // `sourceSha256` is the digest the worker computed over the bytes it read; the application
+  // server never reads them, so this is the only place it can come from. It is the key of the
+  // unchanged-source rule, and the client-supplied digest recorded at upload confirm never is.
+  const sourceSha256 = typeof input.sourceSha256 === "string" && SOURCE_SHA256.test(input.sourceSha256)
+    ? input.sourceSha256
+    : null;
+  // Page meter (20261109080000). A read that finished or failed is settled by its pages; only a
+  // release, which charges nothing, stays on the per-document v3 path. A body without `pages` is
+  // a worker from before the meter: refused as retryable, never settled at a guessed length.
+  const metered = !completedRead && (input.outcome === "settled" || input.outcome === "operator_review");
+  if (metered && !Object.prototype.hasOwnProperty.call(input, "pages")) {
+    return NextResponse.json({ code: "COMPUTE_PAGE_COUNT_REQUIRED" }, { status: 503, headers });
+  }
+  const result = completedRead
+    ? await settleCompletedRead(completedRead)
+    : metered
+      ? await settleFoundationMeteredCompute({
+        workspaceKey,
+        documentId,
+        outcome: input.outcome as "settled" | "operator_review",
+        pages: meterNumber(input.pages),
+        complexPages: meterNumber(input.complexPages),
+        sourceSha256,
+        reasonCode,
+      })
+      : await settleFoundationCompute({
+        workspaceKey,
+        documentId,
+        outcome: input.outcome as "settled" | "operator_review" | "released",
+        actualCredits: typeof input.actualCredits === "number" ? input.actualCredits : Number.NaN,
+        reasonCode,
+      });
   if (!result.ok) return NextResponse.json({ code: result.code }, { status: 503, headers });
 
   if (reasonCode === TERMINAL_REJECT
@@ -159,13 +190,6 @@ export async function POST(request: Request) {
     await alertOcrFailure({ workspaceKey, documentId, reasonCode, outcome: input.outcome });
   }
 
-  // `sourceSha256` is the digest the worker computed over the bytes it read; the application
-  // server never reads them, so this is the only place it can come from. It is validated here so
-  // the wire shape is settled. Binding it to `documents.source_sha256` and to the trial digest
-  // gate is D1-07/D1-04 and lands with the confirm changes, not with this row.
-  const sourceSha256 = typeof input.sourceSha256 === "string" && SOURCE_SHA256.test(input.sourceSha256)
-    ? input.sourceSha256
-    : null;
   return NextResponse.json(
     { code: "SETTLEMENT_APPLIED", result: result.result, ...(sourceSha256 ? { sourceSha256 } : {}) },
     { headers },
