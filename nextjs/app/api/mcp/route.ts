@@ -3,6 +3,7 @@ import { NextResponse, after } from "next/server";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { TOOLS, assertReadOnly, createClient, createServer } from "@/public/developer/tavonel-mcp.mjs";
 import {
+  REMOTE_MCP_CANONICAL_TOOL_SCOPES,
   REMOTE_MCP_PROTOCOL_VERSIONS,
   REMOTE_MCP_TOOL_SCOPES,
   bearerChallenge,
@@ -12,9 +13,12 @@ import {
   remoteMcpCohortRefusal,
   remoteMcpToolLabel,
   toolFailureCode,
+  remoteMcpCanonicalToolsEnabled,
   remoteMcpEnabled,
+  remoteMcpSealingKey,
   requestOrigin,
 } from "@/lib/remote-mcp";
+import { createCanonicalFacade } from "@/lib/remote-mcp-facade";
 import { recordMcpToolCall } from "@/lib/operations-alert-triggers";
 import { recordFirstMcpAnswerTiming } from "@/lib/operations-e2e-timing";
 import { withinRemoteMcpDispatch } from "@/lib/remote-mcp-dispatch";
@@ -166,9 +170,12 @@ async function answer(request: Request, seen: Seen) {
   // A notification or a response: accepted, nothing to answer.
   if (typeof method !== "string" || id === undefined || id === null) return new NextResponse(null, { status: 202 });
 
+  const canonical = remoteMcpCanonicalToolsEnabled();
   if (method === "tools/call") {
     if (bearer.kind === "anonymous") return rpcError(401, id, -32001, "AUTH_REQUIRED", { "WWW-Authenticate": bearerChallenge(origin) });
-    const scope = typeof rpcParams?.name === "string" ? REMOTE_MCP_TOOL_SCOPES[rpcParams.name] : undefined;
+    const name = typeof rpcParams?.name === "string" ? rpcParams.name : undefined;
+    const scope = name === undefined ? undefined
+      : REMOTE_MCP_TOOL_SCOPES[name] ?? (canonical && Object.hasOwn(REMOTE_MCP_CANONICAL_TOOL_SCOPES, name) ? REMOTE_MCP_CANONICAL_TOOL_SCOPES[name] : undefined);
     if (scope && !bearer.scopes.includes(scope)) {
       return rpcError(403, id, -32001, "API_SCOPE_REQUIRED", {
         "WWW-Authenticate": bearerChallenge(origin, { error: "insufficient_scope", description: `This tool needs ${scope}.`, scope }),
@@ -187,9 +194,18 @@ async function answer(request: Request, seen: Seen) {
     seen.reached.push({ pathname: new URL(url).pathname, status: response.status });
     return response;
   };
-  const handle = createServer({
-    call: createClient({ baseUrl: origin, apiKey: bearer.kind === "principal" ? bearer.token : "", fetcher: tracked as typeof fetch }),
-  });
+  const call = createClient({ baseUrl: origin, apiKey: bearer.kind === "principal" ? bearer.token : "", fetcher: tracked as typeof fetch });
+  const bridge = createServer({ call });
+  // WO-D19-1: flag off, the bridge answers alone and the facade is never built.
+  const handle = canonical
+    ? createCanonicalFacade({
+      handle: bridge,
+      call,
+      origin,
+      principal: bearer.kind === "principal" ? { workspaceKey: bearer.workspaceKey, authorizationRevision: bearer.authorizationRevision } : null,
+      key: remoteMcpSealingKey(),
+    })
+    : bridge;
   let answered: unknown;
   try {
     answered = await handle(message);
