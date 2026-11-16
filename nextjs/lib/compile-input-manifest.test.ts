@@ -5,6 +5,9 @@ import type { CollectionOcrInput } from "./collection-compiler";
 import { buildProductCoreV2Request } from "./core-runtime-v2";
 import fixture from "./fixtures/compile-input-manifest.v1.json";
 import {
+  COMPILE_INPUT_CHUNK_BYTES_MAX,
+  COMPILE_INPUT_ID_MAX_LENGTH,
+  COMPILE_INPUT_MANIFEST_MAX_ENTRIES,
   buildCompileInputManifest,
   manifestDigest,
   verifyCompileInputManifest,
@@ -126,9 +129,22 @@ describe("compile input manifest", () => {
   });
 
   it("refuses a chunkBytesMax that is not a positive safe integer instead of building without a limit", () => {
-    for (const bad of [NaN, 0, -1, 1.5, Infinity, 2 ** 53, "900" as never, null as never]) {
+    for (const bad of [NaN, 0, -1, 1.5, Infinity, 2 ** 53, "900" as never, null as never, COMPILE_INPUT_CHUNK_BYTES_MAX + 1, Number.MAX_SAFE_INTEGER, 32 * 1024 * 1024]) {
       expect(() => built(bad)).toThrow(/chunkBytesMax must be a positive safe integer/);
     }
+    expect(built(COMPILE_INPUT_CHUNK_BYTES_MAX).manifest.chunkBytesMax).toBe(COMPILE_INPUT_CHUNK_BYTES_MAX);
+  });
+
+  it("never builds a manifest the verifier would refuse for its size: ids and list lengths are bounded", () => {
+    const long = "x".repeat(COMPILE_INPUT_ID_MAX_LENGTH + 1);
+    for (const over of [{ requestId: long }, { collectionId: long }, { workspaceId: long }]) {
+      expect(() => buildCompileInputManifest({ ...input, ...over })).toThrow(/bounds/);
+    }
+    const doc = input.documents[0]!;
+    expect(() => buildCompileInputManifest({ ...input, documents: [{ ...doc, versionKey: long }] })).toThrow(/bounds/);
+    expect(() => buildCompileInputManifest({ ...input, documents: [{ ...doc, nativeId: long }] })).toThrow(/bounds/);
+    const many = Array.from({ length: COMPILE_INPUT_MANIFEST_MAX_ENTRIES + 1 }, (_, i) => ({ ...doc, nativeId: `d-${i}`, regions: [] }));
+    expect(() => buildCompileInputManifest({ ...input, documents: many })).toThrow(/bounds/);
   });
 
   it("puts the header in a segment of its own when the first region does not fit beside it", () => {
@@ -235,7 +251,7 @@ describe("compile input manifest", () => {
 
     it("a manifest chunkBytesMax that is not a number cannot switch the ceiling off", () => {
       const { manifest, chunkBodies } = built();
-      for (const bad of ["x", "900", null, -1, 0, 1.5, 2 ** 53]) {
+      for (const bad of ["x", "900", null, -1, 0, 1.5, 2 ** 53, Number.MAX_SAFE_INTEGER, 1e15, COMPILE_INPUT_CHUNK_BYTES_MAX + 1]) {
         const m = reseal({ ...manifest, chunkBytesMax: bad as never });
         expect(code(m, chunkBodies)).not.toBe("ok");
         expect(verifyCompileInputManifest(m, chunkBodies, { ...scope, chunkBytesMax: 100 }).ok).toBe(false);
@@ -244,7 +260,7 @@ describe("compile input manifest", () => {
 
     it("a caller ceiling that is not a positive safe integer refuses instead of lifting the limit", () => {
       const { manifest, chunkBodies } = built();
-      for (const bad of [NaN, 0, -1, 1.5, Infinity, "100" as never, null as never]) {
+      for (const bad of [NaN, 0, -1, 1.5, Infinity, "100" as never, null as never, Number.MAX_SAFE_INTEGER, COMPILE_INPUT_CHUNK_BYTES_MAX + 1]) {
         expect(verifyCompileInputManifest(manifest, chunkBodies, { ...scope, chunkBytesMax: bad })).toEqual({ ok: false, code: "manifest_chunk_too_large" });
       }
       expect(verifyCompileInputManifest(manifest, chunkBodies, { ...scope, chunkBytesMax: 900 }).ok).toBe(true);
@@ -271,6 +287,41 @@ describe("compile input manifest", () => {
       expect(code(...withBody(manifest, chunkBodies, 0, interleaved))).toBe("manifest_document_invalid");
     });
 
+    it("reassembles a continuation of any region count the ceiling admits, without the call stack", () => {
+      // At the hard ceiling a continuation of empty-object regions carries about 1.33 million of them;
+      // spreading that many into one call overflows V8's stack from roughly 120,000 on.
+      const { manifest, chunkBodies } = built();
+      const open = { ...manifest, chunkBytesMax: COMPILE_INPUT_CHUNK_BYTES_MAX };
+      const segments = JSON.parse(chunkBodies[manifest.chunks[1]!.chunkId]!) as Array<{ documentId: string; header?: unknown; regions: unknown[] }>;
+      expect(segments[0]!.header).toBeUndefined();
+      const others = input.documents[0]!.regions.length - segments[0]!.regions.length;
+      for (const count of [150_000, Math.floor((COMPILE_INPUT_CHUNK_BYTES_MAX - 2_000) / 3)]) {
+        const body = JSON.stringify([{ documentId: segments[0]!.documentId, regions: Array.from({ length: count }, () => ({})) }, ...segments.slice(1)]);
+        expect(Buffer.byteLength(body)).toBeLessThanOrEqual(COMPILE_INPUT_CHUNK_BYTES_MAX);
+        const result = verifyCompileInputManifest(...withBody(open, chunkBodies, 1, body), scope);
+        expect(result.ok && result.documents[0]!.regions.length).toBe(others + count);
+      }
+    });
+
+    it("bounds every list and string before walking it, so an oversized manifest is refused at once", () => {
+      const { manifest, chunkBodies } = built();
+      const over = COMPILE_INPUT_MANIFEST_MAX_ENTRIES + 1;
+      const doc = manifest.documents[0]!;
+      const cases: unknown[] = [
+        // unsealed on purpose: the size check runs before the digest, so none of these is hashed
+        { ...manifest, documents: Array.from({ length: 1_000_000 }, (_, i) => ({ ...doc, documentId: `d${i}` })) },
+        { ...manifest, chunks: Array.from({ length: over }, (_, i) => ({ ...manifest.chunks[0]!, chunkId: `c${i}`, index: i })) },
+        { ...manifest, documents: [{ ...doc, chunkIds: Array.from({ length: manifest.chunks.length + 1 }, () => doc.chunkIds[0]!) }] },
+        { ...manifest, documents: manifest.documents.map((d) => ({ ...d, chunkIds: manifest.chunks.map((c) => c.chunkId) })) },
+        { ...manifest, requestId: "x".repeat(50_000_000) },
+      ];
+      for (const candidate of cases) {
+        const started = Date.now();
+        expect(verifyCompileInputManifest(candidate, chunkBodies, scope)).toEqual({ ok: false, code: "manifest_schema_unknown" });
+        expect(Date.now() - started).toBeLessThan(200);
+      }
+    });
+
     it("hostile chunk bodies are refused with a code, never thrown", () => {
       const { manifest, chunkBodies } = built();
       const bodies = [
@@ -286,7 +337,12 @@ describe("compile input manifest", () => {
     it("never throws and never accepts a manifest with any one field replaced, deleted or added", () => {
       const { manifest, chunkBodies } = built();
       const DELETE = Symbol("delete");
-      const hostile: unknown[] = [DELETE, null, undefined, NaN, Infinity, -1, 0, 1, 1.5, 2 ** 53, "", "x", "constructor", "__proto__", true, [], {}, [null], { length: 1 }];
+      const hostile: unknown[] = [
+        DELETE, null, undefined, NaN, Infinity, -1, 0, 1, 1.5, 2 ** 53, "", "x", "constructor", "__proto__", true, [], {}, [null], { length: 1 },
+        // oversized but well-typed: the values a type check alone lets through
+        "x".repeat(COMPILE_INPUT_ID_MAX_LENGTH + 1), Number.MAX_SAFE_INTEGER, COMPILE_INPUT_CHUNK_BYTES_MAX + 1,
+        Array.from({ length: COMPILE_INPUT_MANIFEST_MAX_ENTRIES + 1 }, () => "chunk-000000"),
+      ];
       const freeText = new Set(["collectionId", "requestId", "versionKey"]);
       type Key = string | number;
       const paths = (value: unknown, at: Key[] = []): Key[][] => [
@@ -323,7 +379,7 @@ describe("compile input manifest", () => {
         const original = valueAt(path);
         for (const next of hostile) {
           const same = next !== DELETE && isDeepStrictEqual(original, next);
-          const text = typeof next === "string" && next.length > 0 && freeText.has(String(path[path.length - 1]));
+          const text = typeof next === "string" && next.length > 0 && next.length <= COMPILE_INPUT_ID_MAX_LENGTH && freeText.has(String(path[path.length - 1]));
           check(`${path.join(".")}=${String(next === DELETE ? "<delete>" : JSON.stringify(next))}`, sealed(mutate(path, next), path), same || text);
         }
         if (original && typeof original === "object" && !Array.isArray(original)) {

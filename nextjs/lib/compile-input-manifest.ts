@@ -17,7 +17,12 @@ import type { ProductCoreV2CompileRequest } from "./core-runtime-v2";
 */
 
 export const COMPILE_INPUT_MANIFEST_SCHEMA = "tavonel.compile_input_manifest.v1" as const;
+/** The default and the hard ceiling for one chunk: a chunk must fit one Core request (CORE_V2_MAX_REQUEST_BYTES). */
 export const COMPILE_INPUT_CHUNK_BYTES_MAX = 4_000_000;
+/** Longest id the manifest carries; Core's own IDENTIFIER (core-runtime-v2.ts) allows 256 characters. */
+export const COMPILE_INPUT_ID_MAX_LENGTH = 256;
+/** Structural bound on documents and on chunks (4 MB each, about 40 GB): a one-compile manifest is far below it. */
+export const COMPILE_INPUT_MANIFEST_MAX_ENTRIES = 10_000;
 
 type RequestDocument = ProductCoreV2CompileRequest["documents"][number];
 export type CompileInputDocument = RequestDocument & { versionKey: string };
@@ -70,8 +75,9 @@ function canonical(value: unknown): string {
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
-const isId = (v: unknown): v is string => typeof v === "string" && v.length > 0;
+const isId = (v: unknown): v is string => typeof v === "string" && v.length > 0 && v.length <= COMPILE_INPUT_ID_MAX_LENGTH;
 const isCount = (v: unknown, min = 0): v is number => Number.isSafeInteger(v) && (v as number) >= min;
+const isCeiling = (v: unknown): v is number => isCount(v, 1) && v <= COMPILE_INPUT_CHUNK_BYTES_MAX;
 const isSha = (v: unknown) => typeof v === "string" && /^sha256:[0-9a-f]{64}$/.test(v);
 const exactKeys = (v: Record<string, unknown>, keys: readonly string[]) =>
   Object.keys(v).length === keys.length && keys.every((key) => Object.hasOwn(v, key));
@@ -82,23 +88,30 @@ const MANIFEST_KEYS = [
 ] as const;
 
 /**
- * The manifest arrives as hostile JSON, like the chunk bodies: every field is checked for type, range and
- * exact key set before anything reads it, so no later step can meet a NaN ceiling, a null list or an
- * inherited property.
+ * The manifest arrives as hostile JSON, like the chunk bodies: every field is checked for type, range, size
+ * and exact key set before anything reads it, so no later step can meet a NaN or unbounded ceiling, a null
+ * list, an inherited property, or a string or list large enough to make the walk itself the attack. List
+ * lengths are checked before any list is walked, and the chunkIds of all documents together are bounded by
+ * chunks + documents (a valid manifest's runs overlap by at most one chunk), so the work stays linear.
+ * The builder runs its own output through this, so it never emits a manifest the verifier would refuse.
  */
 function manifestShaped(m: unknown): m is CompileInputManifest {
   if (!isRecord(m) || !exactKeys(m, MANIFEST_KEYS)) return false;
   const { chunks, documents } = m;
+  if (!Array.isArray(chunks) || !Array.isArray(documents)) return false;
+  if (chunks.length > COMPILE_INPUT_MANIFEST_MAX_ENTRIES || documents.length > COMPILE_INPUT_MANIFEST_MAX_ENTRIES) return false;
+  let chunkIdCount = 0;
   return (
     isId(m.workspaceId) && isId(m.collectionId) && isId(m.requestId) &&
-    isCount(m.chunkBytesMax, 1) && isCount(m.totalBytes) && isSha(m.manifestSha256) &&
-    Array.isArray(chunks) && chunks.every((c) =>
+    isCeiling(m.chunkBytesMax) && isCount(m.totalBytes) && isSha(m.manifestSha256) &&
+    chunks.every((c) =>
       isRecord(c) && exactKeys(c, ["chunkId", "index", "byteLength", "sha256"]) &&
       isId(c.chunkId) && isCount(c.index) && isCount(c.byteLength) && isSha(c.sha256)) &&
     new Set(chunks.map((c: { chunkId: string }) => c.chunkId)).size === chunks.length &&
-    Array.isArray(documents) && documents.every((d) =>
+    documents.every((d) =>
       isRecord(d) && exactKeys(d, ["documentId", "versionKey", "chunkIds"]) &&
-      isId(d.documentId) && isId(d.versionKey) && Array.isArray(d.chunkIds) && d.chunkIds.every(isId))
+      isId(d.documentId) && isId(d.versionKey) && Array.isArray(d.chunkIds) && d.chunkIds.length <= chunks.length &&
+      (chunkIdCount += d.chunkIds.length) <= chunks.length + documents.length && d.chunkIds.every(isId))
   );
 }
 
@@ -121,7 +134,7 @@ export function buildCompileInputManifest(
   options: { chunkBytesMax?: number } = {},
 ): { manifest: CompileInputManifest; chunkBodies: Record<string, string> } {
   const chunkBytesMax = options.chunkBytesMax === undefined ? COMPILE_INPUT_CHUNK_BYTES_MAX : options.chunkBytesMax;
-  if (!isCount(chunkBytesMax, 1)) throw new Error("chunkBytesMax must be a positive safe integer");
+  if (!isCeiling(chunkBytesMax)) throw new Error(`chunkBytesMax must be a positive safe integer no larger than ${COMPILE_INPUT_CHUNK_BYTES_MAX}`);
   const docs = input.documents;
   if (new Set(docs.map((d) => d.nativeId)).size !== docs.length) throw new Error("duplicate documentId");
 
@@ -205,7 +218,9 @@ export function buildCompileInputManifest(
     })),
     chunks: chunkMeta,
   };
-  return { manifest: { ...unsealed, manifestSha256: manifestDigest(unsealed) }, chunkBodies };
+  const manifest = { ...unsealed, manifestSha256: manifestDigest(unsealed) };
+  if (!manifestShaped(manifest)) throw new Error("compile input exceeds the manifest's bounds (id length, document or chunk count)");
+  return { manifest, chunkBodies };
 }
 
 export function verifyCompileInputManifest(
@@ -220,7 +235,7 @@ export function verifyCompileInputManifest(
   const { manifestSha256, ...unsealed } = manifest;
   if (manifestDigest(unsealed) !== manifestSha256) return fail("manifest_digest_mismatch");
   // A caller ceiling that is not a positive integer cannot be honoured, so nothing passes it.
-  if (expected.chunkBytesMax !== undefined && !isCount(expected.chunkBytesMax, 1)) return fail("manifest_chunk_too_large");
+  if (expected.chunkBytesMax !== undefined && !isCeiling(expected.chunkBytesMax)) return fail("manifest_chunk_too_large");
   if (manifest.chunks.some((chunk, i) => chunk.index !== i)) return fail("manifest_chunk_index_invalid");
 
   // The caller's own ceiling wins over whatever the manifest declares about itself.
@@ -268,7 +283,8 @@ export function verifyCompileInputManifest(
       const { chunkId, segment } = stream[at]!;
       if (segment.header || chunkId === spanned[spanned.length - 1]) return fail("manifest_document_invalid");
       spanned.push(chunkId);
-      regions.push(...segment.regions);
+      // Never spread an input-sized list into call arguments: past ~120k items V8 overflows its stack.
+      for (const region of segment.regions) regions.push(region);
     }
     if (spanned.length !== entry.chunkIds.length || spanned.some((id, i) => id !== entry.chunkIds[i])) {
       return fail("manifest_document_invalid");
