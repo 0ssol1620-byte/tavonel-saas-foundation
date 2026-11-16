@@ -4,6 +4,36 @@
   constant, no plan quantity, no ledger function, no migration, no public sentence and no
   commercial, intake or consent switch. The register row also asks for shadow meter code. That
   code is not written here; it is the first row of [Work this unblocks](#work-this-unblocks).
+- **Amended 2026-11-09 (pricing v2, package B, phase 1):** the founder chose package B, whose
+  first step binds settlement to pages. Migration `20261117120000_page_meter_settlement.sql` and
+  `settle_foundation_compute_v4` implement S2 on this ADR's definition (C1, the reader's
+  `pageCount` of the sanitized PDF), skipping S0/S1 shadow by that decision. What it binds: N-1 is
+  the existing `STANDARD_UNITS_PER_PAGE`; a no-text page counts as a page (N-2); nothing is
+  metered complex because nothing classifies a complex page (N-3 stays open, and an unclassified
+  page is charged standard); no per-document minimum (N-4); the trial quota now counts metered
+  credits (N-6). Added beyond this ADR: a re-read of a source the same workspace already paid to
+  read settles 0, keyed on the worker-observed digest; a read that produced nothing usable
+  (`operator_review`, or a compile that failed with no world) is not charged. Prices, plan
+  quantities and public copy are unchanged and remain phase 2. The completed-read proof path still
+  carries the per-document `2` and must be re-bound before its flag is enabled.
+- **Amended 2026-11-17 (V34 WO-D27-4, decision OC-3):** the migration lands renumbered as
+  `20261117120000_page_meter_settlement.sql` (it was `20261109080000` on PR #209), with the
+  rollback draft `supabase/drafts/rollback-20261117120000-page-meter-settlement.sql`. The first of
+  PR #209's five known limits is closed: a read a failed compile refunded is charged again, once,
+  on the first later compile that reaches `ready` (`recharged_credits`,
+  `recharged_balance_credits`, `recharge_compile_job_id`, `recharged_at`), for exactly what the
+  refund gave back; a balance spent since the refund pays what it still holds and the rest is
+  booked as overage; a read charged again counts as paid for the unchanged-source rule.
+  `review_required` charges nothing until the world reaches `ready`. The other four are accepted
+  limits, unchanged in behaviour:
+  1. an `unchanged_source` read settled before its match was reversed stays free and still names
+     the reversed row;
+  2. `unchanged_source` matches trial and owner history too, so a source read on trial and re-read
+     after converting to paid is free (the wording above is narrower than the code);
+  3. the trial quota sums `settled_credits` and ignores `reversed_credits`, so a trial user's
+     failed compile still uses quota;
+  4. nothing drains `overage_units` today; if a billing report ever has, a reversal returns only
+     the overage still outstanding and `reversed_credits` records the smaller amount.
 - **Date:** 2026-10-19. Drafted 2026-10-17, the date of the register and of the adoption it records.
 - **Branch this was written on:** `codex/records-20261017`, on top of `main` `4c80bb30`.
 - **Register row:** D-28 (aliases T-F6), "페이지 단위 과금". Adopted default: "페이지 계량 설계를
