@@ -2,13 +2,20 @@ import { createHash, createPublicKey, generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GET as getExportTrust } from "../app/api/export/trust/route";
 import {
+  ANSWER_RECEIPT_SIGNATURE_SCOPE,
+  CAPABILITY_MANIFEST_SIGNATURE_SCOPE,
+  COMPILE_RECEIPT_SIGNATURE_SCOPE,
+  WORLD_RELEASE_SIGNATURE_SCOPE,
   createExportSigner,
+  isScopedSignature,
   exportTrustRecord,
   readExportSignerEnv,
   readExportTrustStoreEnv,
   verifyExportSignature,
   verifyExportSignatureWithTrustStore,
+  type ExportSignature,
   type ExportSignatureV2,
+  type SignatureScope,
   type ExportTrustKey,
   type ExportTrustStore,
 } from "./export-signing";
@@ -232,5 +239,31 @@ describe("Foundation signed exports", () => {
       activeKeyId: record.keyId,
       keys: [{ ...record, notBefore: "2026-09-01" }],
     }) })).toBeNull();
+  });
+
+  it("keeps capability-manifest and world-release signatures to their own scope and refuses v1", () => {
+    const material = keys();
+    const payload = Buffer.from("scoped payload");
+    const scopes: SignatureScope[] = [
+      "tavonel.signed_export_manifest.v1", COMPILE_RECEIPT_SIGNATURE_SCOPE, ANSWER_RECEIPT_SIGNATURE_SCOPE,
+      CAPABILITY_MANIFEST_SIGNATURE_SCOPE, WORLD_RELEASE_SIGNATURE_SCOPE,
+    ];
+    for (const scope of [CAPABILITY_MANIFEST_SIGNATURE_SCOPE, WORLD_RELEASE_SIGNATURE_SCOPE]) {
+      const signer = createExportSigner({
+        keyId: "scoped-key", keyVersion: 1, privateKeyPkcs8DerBase64: material.privateKeyPkcs8DerBase64,
+        notBefore: "2026-09-01T00:00:00.000Z", expiresAt: "2026-10-01T00:00:00.000Z",
+        issuedAt: "2026-09-15T00:00:00.000Z", signatureScope: scope,
+      })!;
+      const signature = signer.signPayload(payload);
+      for (const expected of scopes) {
+        expect(verifyExportSignature(payload, signature, material.publicKeySpkiDer, expected)).toBe(expected === scope);
+        expect(isScopedSignature(signature, expected)).toBe(expected === scope);
+      }
+    }
+    const v1 = createExportSigner({ keyId: "scoped-key", privateKeyPkcs8DerBase64: material.privateKeyPkcs8DerBase64 })!
+      .signPayload(payload) as ExportSignature;
+    expect(v1.schemaVersion).toBe("tavonel.export_signature.v1");
+    expect(isScopedSignature(v1, WORLD_RELEASE_SIGNATURE_SCOPE)).toBe(false);
+    expect(isScopedSignature(v1, CAPABILITY_MANIFEST_SIGNATURE_SCOPE)).toBe(false);
   });
 });
