@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { h1Text, typedCounts } from "./route-test-support";
 import { ChangesBody } from "@/components/v34/routes/changes/changes";
 import { CHANGES_DESTINATIONS, CHANGES_RETAINED } from "@/components/v34/routes/changes/changes-content";
+import { CONTRACT_CLAUSES } from "@/lib/compiler-contract";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { DOCS_SECTIONS } from "@/lib/docs-content";
 import { MCP_TOOL_NAMES } from "@/lib/mcp-tools";
@@ -42,7 +43,7 @@ const html = renderToStaticMarkup(createElement(ChangesBody));
 
 describe("changes route files", () => {
   it("has exactly the files this route composes", () => {
-    expect(sources.map((f) => f.file.split("/").pop()).sort()).toEqual(["changes-art.tsx", "changes-content.ts", "changes.module.css", "changes.tsx"]);
+    expect(sources.map((f) => f.file.split("/").pop()).sort()).toEqual(["changes-art.tsx", "changes-content.ts", "changes-contract.tsx", "changes.module.css", "changes.tsx"]);
   });
 
   it("is English only and carries no internal id", () => {
@@ -224,5 +225,21 @@ describe("copy", () => {
 describe("typed counts", () => {
   it("types no number word or digits before a counted noun", () => {
     expect(typedCounts("changes")).toEqual([]);
+  });
+});
+
+describe("the Compiler Contract section", () => {
+  it("renders every clause with a visible state, and grades none as qualified", () => {
+    expect(html.match(/data-contract-clause=""/g)).toHaveLength(CONTRACT_CLAUSES.length);
+    expect(html.match(/data-state-label=""/g)?.length ?? 0).toBeGreaterThanOrEqual(CONTRACT_CLAUSES.length);
+    expect(html).not.toContain('data-state="qualified"');
+    expect(html).toMatch(/data-contract-clause="" data-state="direction" id="selective-recompilation"/);
+  });
+
+  it("opens no disclosure by default and anchors the clauses at #clauses", () => {
+    expect(html.match(/<details\b[^>]*\bopen\b/g)).toBeNull();
+    expect(html.match(/<details\b/g)).toHaveLength(CONTRACT_CLAUSES.length + 2);
+    expect(html).toContain('id="clauses"');
+    expect(html).toContain('href="#clauses"');
   });
 });

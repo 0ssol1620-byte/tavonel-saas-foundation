@@ -13,8 +13,9 @@ import { exploreChangeTimeline } from "@/lib/explore-change";
 import { readPublicCorpus } from "@/lib/v34/public-corpus";
 import { v34Route } from "@/lib/v34/routes";
 import { ChangesArt } from "./changes-art";
+import { ChangesContract } from "./changes-contract";
 import {
-  ACTIVATE, BRIDGE, COVERS, FINAL, HERO, REVISION, REVISION_RECORD_ID, REVISION_RELATION,
+  ACTIVATE, BRIDGE, CONTRACT, COVERS, FINAL, HERO, REVISION, REVISION_RECORD_ID, REVISION_RELATION,
   REVISION_SOURCE_IDS, TIMELINE,
 } from "./changes-content";
 import s from "./changes.module.css";
@@ -51,7 +52,12 @@ export function ChangesBody() {
         eyebrow={HERO.eyebrow}
         title={v34Route("changes").heading}
         lead={HERO.lead}
-        actions={<ButtonLink href={HERO.primary.href}>{HERO.primary.label}</ButtonLink>}
+        actions={
+          <>
+            <ButtonLink href={HERO.primary.href}>{HERO.primary.label}</ButtonLink>
+            <ButtonLink href={CONTRACT.action.href} tone="secondary">{CONTRACT.action.label}</ButtonLink>
+          </>
+        }
         art={<Figure art={<ChangesArt label={HERO.art.label} />} caption={HERO.art.caption} />}
       />
 
@@ -59,7 +65,7 @@ export function ChangesBody() {
         <div className={s.tagRow}>
           <Tag kind="Public reference corpus" />
         </div>
-        <ol className={s.path}>
+        <ol className={s.path} data-card-grid="">
           <li className={s.pathItem}>
             <p className={s.when}>Before {announcement[1]}</p>
             <h3 className={s.itemTitle}>{REVISION.steps.before.title}</h3>
@@ -100,7 +106,7 @@ export function ChangesBody() {
         <div className={s.tagRow}>
           <Tag kind="Sample" />
         </div>
-        <ol className={s.steps}>
+        <ol className={s.steps} data-changes-timeline="">
           {exploreChangeTimeline.map((step) => (
             <li key={step.id} className={s.stepItem}>
               <p className={s.stepHead}>
@@ -141,7 +147,7 @@ export function ChangesBody() {
       </Section>
 
       <Section surface="light" eyebrow={COVERS.eyebrow} title={COVERS.title}>
-        <ul className={s.covers}>
+        <ul className={s.covers} data-card-grid="">
           {COVERS.items.map((item, i) => (
             <li key={item.title} className={s.cover}>
               <p className={s.kicker}>{ordinal(i)}</p>
@@ -153,7 +159,7 @@ export function ChangesBody() {
       </Section>
 
       <Section surface="green" eyebrow={ACTIVATE.eyebrow} title={ACTIVATE.title}>
-        <ol className={s.covers}>
+        <ol className={s.covers} data-card-grid="">
           {ACTIVATE.steps.map((step, i) => (
             <li key={step.title} className={s.cover}>
               <p className={s.kicker}>{ordinal(i)}</p>
@@ -163,6 +169,8 @@ export function ChangesBody() {
           ))}
         </ol>
       </Section>
+
+      <ChangesContract />
 
       <Bridge eyebrow={BRIDGE.eyebrow} title={BRIDGE.title} href={BRIDGE.href} label={BRIDGE.label} />
 

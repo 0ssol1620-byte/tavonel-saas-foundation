@@ -37,7 +37,8 @@ type Page = {
   title: () => Promise<string>;
 };
 
-const ROUTE = "/product/continuous-knowledge";
+/* The contract lives on /changes; /product/continuous-knowledge redirects there. */
+const ROUTE = "/changes";
 
 /** The two words this page is allowed to grade a clause with today. */
 const ALLOWED_STATES = ["DEMONSTRATED", "DIRECTION"];
@@ -133,29 +134,32 @@ test("draws the whole source-change flow, and says which half of it runs here", 
 });
 
 /*
-  The /product index it is linked from must not gain an orphan slot because of that link.
+  The card grids on the route leave no empty slot.
 
   A fourth card in a three-column grid leaves one card beside two empty tracks on row two, which
-  the visual rules bar. This lane added the fourth card, so this lane checks the row.
+  the visual rules bar. The route's card grids (the revision path, what a comparison covers, the
+  steps of a decision) are checked at the width the project runs.
 */
-test("leaves no empty row in the three product outcomes", async ({ page }: { page: Page }) => {
-  await page.goto("/product");
+test("leaves no empty row in the route's card grids", async ({ page }: { page: Page }) => {
+  await page.goto(ROUTE);
 
-  const layout = await page.evaluate(() => {
-    const grid = [...document.querySelectorAll("h2")].find(heading => heading.textContent === "Inspect the evidence")?.parentElement?.parentElement;
-    if (!grid) return { columns: 0, cards: 0, rows: [] as number[] };
-    const columns = getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length;
-    const rows = [...new Set([...grid.children].map((card) => Math.round(card.getBoundingClientRect().top)))];
-    return { columns, cards: grid.children.length, rows };
-  });
+  const grids = await page.evaluate(() =>
+    [...document.querySelectorAll("[data-card-grid]")].map((grid) => {
+      const columns = getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length;
+      const rows = [...new Set([...grid.children].map((card) => Math.round(card.getBoundingClientRect().top)))];
+      return { columns, cards: grid.children.length, rows: rows.length };
+    }),
+  );
 
-  expect(layout.cards).toBe(3);
-  expect(layout.columns).toBeGreaterThan(0);
-  expect(
-    layout.cards % layout.columns,
-    `${layout.cards} cards in ${layout.columns} columns leaves ${layout.columns - (layout.cards % layout.columns)} empty slot(s)`,
-  ).toBe(0);
-  expect(layout.rows.length).toBe(layout.cards / layout.columns);
+  expect(grids.length).toBe(3);
+  for (const layout of grids) {
+    expect(layout.columns).toBeGreaterThan(0);
+    expect(
+      layout.cards % layout.columns,
+      `${layout.cards} cards in ${layout.columns} columns leaves ${layout.columns - (layout.cards % layout.columns)} empty slot(s)`,
+    ).toBe(0);
+    expect(layout.rows).toBe(layout.cards / layout.columns);
+  }
 });
 
 test("lists the nine interchange standards without implying all nine are emitted", async ({ page }: { page: Page }) => {
@@ -225,29 +229,30 @@ test("never scrolls the document sideways, at any width", async ({ page }: { pag
   expect(overflow).toEqual([]);
 });
 
-test("is reachable from the product index and names itself in the tab", async ({ page }: { page: Page }) => {
-  await page.goto("/product");
-  const link = page.locator(`a[href="${ROUTE}"]`).first();
-  expect(await link.isVisible()).toBe(true);
+test("is reachable from the Platform page and names itself in the tab", async ({ page }: { page: BrowserPage }) => {
+  await page.goto("/platform");
+  const link = page.locator(`footer a[href="${ROUTE}"]`).first();
+  await link.scrollIntoViewIfNeeded();
+  await expect(link).toBeVisible();
 
   await page.goto(ROUTE);
-  expect(await page.title()).toContain("Continuous recompilation");
+  expect(await page.title()).toContain("Compare what changed between two versions");
 });
 
 // TAV-014: product behaviour and real comparisons precede optional contract detail.
 test("leads with version comparison and keeps technical explanations optional", async ({ page }: { page: Page }) => {
   await page.goto(ROUTE);
-  expect(await page.locator("h1").innerText()).toBe("See what changed before you activate it.");
-  expect(await page.locator(".world-recompile").isVisible()).toBe(true);
-  const overview = page.locator('[aria-labelledby="working-summary"]');
-  expect(await overview.innerText()).toContain("Current compilation rebuilds the whole collection.");
+  expect(await page.locator("h1").innerText()).toBe("Compare what changed between two versions");
+  expect(await page.locator("[data-changes-timeline]").isVisible()).toBe(true);
+  const overview = page.locator('[aria-labelledby="v34-title"]');
+  expect(await page.locator("main").innerText()).toContain("A compile rebuilds the collection you give it into a new candidate World.");
   const change = overview.locator('a[href="/explore?act=change"]');
   expect(await change.isVisible()).toBe(true);
   expect(await overview.locator('a[href="#clauses"]').isVisible()).toBe(true);
   const defaultState = await page.evaluate(() => ({
     clauses: [...document.querySelectorAll("[data-contract-detail]")].map(element => element.hasAttribute("open")),
     references: [...document.querySelectorAll("[data-contract-reference]")].map(element => element.hasAttribute("open")),
-    actions: [...document.querySelectorAll<HTMLElement>('[aria-labelledby="working-summary"] a')].map(element => ({ height: element.getBoundingClientRect().height, width: element.getBoundingClientRect().width })),
+    actions: [...document.querySelectorAll<HTMLElement>('[aria-labelledby="v34-title"] a')].map(element => ({ height: element.getBoundingClientRect().height, width: element.getBoundingClientRect().width })),
   }));
   expect(defaultState.clauses).toEqual(Array(8).fill(false));
   expect(defaultState.references).toEqual([false, false]);
@@ -269,13 +274,13 @@ test("keeps the summary first and supports keyboard reading and Change navigatio
   await expect(consent).toBeHidden();
   await page.evaluate(() => window.scrollTo(0, 0));
 
-  const summary = page.locator('[aria-labelledby="working-summary"]');
+  const summary = page.locator('[aria-labelledby="v34-title"]');
   const compare = summary.getByRole("link", { name: "Compare the public World versions", exact: true });
-  const contract = summary.getByRole("link", { name: "Read the eight-clause Compiler Contract", exact: true });
+  const contract = summary.getByRole("link", { name: "Read the Compiler Contract", exact: true });
   const order = await page.evaluate(() => {
     const heading = document.querySelector("h1")!;
-    const summary = document.querySelector('[aria-labelledby="working-summary"]')!;
-    const timeline = document.querySelector(".world-recompile")!;
+    const summary = document.querySelector('[aria-labelledby="v34-title"] a')!.parentElement!;
+    const timeline = document.querySelector("[data-changes-timeline]")!;
     return {
       headingBeforeSummary: Boolean(heading.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING),
       summaryBeforeTimeline: Boolean(summary.compareDocumentPosition(timeline) & Node.DOCUMENT_POSITION_FOLLOWING),
@@ -296,7 +301,7 @@ test("keeps the summary first and supports keyboard reading and Change navigatio
   await expect(page.locator("[data-contract-detail][open], [data-contract-reference][open]")).toHaveCount(0);
   const capture = async (state: "default" | "expanded") => {
     await page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: "instant" }));
-    const name = `continuous-knowledge-${state}-${width}.png`;
+    const name = `changes-contract-${state}-${width}.png`;
     const path = test.info().outputPath(name);
     await page.screenshot({ path, fullPage: true, animations: "disabled" });
     await test.info().attach(name, { path, contentType: "image/png" });
@@ -309,10 +314,10 @@ test("keeps the summary first and supports keyboard reading and Change navigatio
   await expect(contract).toBeFocused();
   await expect(contract).not.toHaveCSS("outline-style", "none");
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\/product\/continuous-knowledge#clauses$/);
+  await expect(page).toHaveURL(/\/changes#clauses$/);
   await expect.poll(() => page.evaluate(() => {
-    const heading = document.querySelector("#clauses")!.getBoundingClientRect();
-    const header = document.querySelector("header.nav")!.getBoundingClientRect();
+    const heading = document.querySelector("#clauses h2")!.getBoundingClientRect();
+    const header = document.querySelector("[data-v34-header]")!.getBoundingClientRect();
     return heading.top >= header.bottom - 1 && heading.bottom <= innerHeight;
   }), { message: "the activated clauses heading clears the fixed public header" }).toBe(true);
 
