@@ -15,7 +15,7 @@ import {
 import { CANONICAL_DOCUMENT_ID, mayPublish, registerCollectionArtifact } from "./compile-artifact-provenance";
 import { authorizeCompileJobSourceAccess, classifyCompileJobSources, compileJobAuthorityEnabled } from "./compile-job-authority";
 import { readConnectorCompileIdentities } from "./connector-compile-identity";
-import { dispatchCoreCompile, readCoreRuntimeEnv } from "./core-runtime";
+import { readCoreRuntimeEnv } from "./core-runtime";
 import {
   dispatchProductCoreV2,
   productCoreV2CollectionId,
@@ -434,72 +434,58 @@ export async function runCollectionCompile(
     }
   }
 
-  let artifact: CollectionCandidateArtifact;
-  let coreExecution: CollectionCompileSuccess["coreExecution"];
-  if (coreV2) {
-    const currentGate = await readCompileAuthorization(workspaceId, documentIds);
-    if (!currentGate.ok) {
-      return { ok: false, status: 503, code: currentGate.code, payload: {} };
-    }
-    customerDataGate = currentGate.decision;
-    // Bounded by the tick as well (REVIEW-PR192-R1 MINOR-10): a Core call that ran to its own 52 s
-    // limit after a late claim would leave no time to settle, and a dead lease retried every 5 min.
-    const tickRemainingMs = deadlineAt === undefined ? CORE_MAX_LATENCY_MS : deadlineAt - Date.now() - WORKER_SETTLEMENT_RESERVE_MS;
-    const remainingMs = Math.min(globalCollection ? CORE_MAX_LATENCY_MS - (Date.now() - startedAt) : CORE_MAX_LATENCY_MS,
-      tickRemainingMs);
-    if (remainingMs < 1000) return { ok: false, status: 503, code: "GLOBAL_COLLECTION_TIME_BUDGET_EXHAUSTED", payload: {} };
-    const compiled = await dispatchProductCoreV2(
-      coreV2,
-      workspaceId,
-      verifiedInputs,
-      new Date(),
-      previousActiveWorld,
-      customerDataGate,
-      currentGate.scope,
-      logicalCollectionKey,
-      remainingMs,
-    );
-    if (!compiled.ok) {
-      // CORE_OUTPUT_TOO_LARGE is deterministic -- a retry gets the same answer -- so 422, as Core says, not a retryable 503.
-      const status = compiled.code === "COMPILE_INPUT_TOO_LARGE" ? 413 : compiled.code === "CORE_OUTPUT_TOO_LARGE" ? 422 : 503;
-      return { ok: false, status, code: compiled.code,
-        payload: sizeLimitPayload(compiled) };
-    }
-    if (globalCollection && compiled.result.receipt.coreReleaseDigest !== process.env.TAVONEL_GLOBAL_COLLECTION_CORE_RELEASE_SHA256) {
-      return { ok: false, status: 502, code: "GLOBAL_COLLECTION_CORE_RELEASE_MISMATCH", payload: {} };
-    }
-    if (compiled.result.status === "rejected") {
-      return {
-        ok: false,
-        status: 422,
-        code: "CORE_V2_REJECTED",
-        payload: {
-          candidateWorldStateId: compiled.result.candidate.worldStateId,
-          reviewReasons: compiled.result.candidate.reviewReasons,
-          candidatePromotion: false,
-        },
-      };
-    }
-    const projected = projectProductCoreV2Candidate(compiled.result, verifiedInputs, revisionCompileEnabled(), workspaceId);
-    if (!projected) return { ok: false, status: 502, code: "CORE_V2_PROJECTION_INVALID", payload: {} };
-    artifact = projected;
-    coreExecution = {
-      status: compiled.result.status,
-      runtime: compiled.result.runtime,
-      worldStateId: compiled.result.candidate.worldStateId,
-      receipt: compiled.result.receipt,
-    };
-  } else {
-    const compiled = await dispatchCoreCompile(coreV1!, workspaceId, verifiedInputs);
-    if (!compiled.ok) return { ok: false, status: 503, code: compiled.code, payload: {} };
-    artifact = compiled.result.artifact;
-    coreExecution = {
-      status: "completed",
-      runtime: compiled.result.runtime,
-      worldStateId: null,
-      receipt: compiled.result.receipt,
+  const currentGate = await readCompileAuthorization(workspaceId, documentIds);
+  if (!currentGate.ok) {
+    return { ok: false, status: 503, code: currentGate.code, payload: {} };
+  }
+  customerDataGate = currentGate.decision;
+  // Bounded by the tick as well (REVIEW-PR192-R1 MINOR-10): a Core call that ran to its own 52 s
+  // limit after a late claim would leave no time to settle, and a dead lease retried every 5 min.
+  const tickRemainingMs = deadlineAt === undefined ? CORE_MAX_LATENCY_MS : deadlineAt - Date.now() - WORKER_SETTLEMENT_RESERVE_MS;
+  const remainingMs = Math.min(globalCollection ? CORE_MAX_LATENCY_MS - (Date.now() - startedAt) : CORE_MAX_LATENCY_MS,
+    tickRemainingMs);
+  if (remainingMs < 1000) return { ok: false, status: 503, code: "GLOBAL_COLLECTION_TIME_BUDGET_EXHAUSTED", payload: {} };
+  const compiled = await dispatchProductCoreV2(
+    coreV2,
+    workspaceId,
+    verifiedInputs,
+    new Date(),
+    previousActiveWorld,
+    customerDataGate,
+    currentGate.scope,
+    logicalCollectionKey,
+    remainingMs,
+  );
+  if (!compiled.ok) {
+    // CORE_OUTPUT_TOO_LARGE is deterministic -- a retry gets the same answer -- so 422, as Core says, not a retryable 503.
+    const status = compiled.code === "COMPILE_INPUT_TOO_LARGE" ? 413 : compiled.code === "CORE_OUTPUT_TOO_LARGE" ? 422 : 503;
+    return { ok: false, status, code: compiled.code,
+      payload: sizeLimitPayload(compiled) };
+  }
+  if (globalCollection && compiled.result.receipt.coreReleaseDigest !== process.env.TAVONEL_GLOBAL_COLLECTION_CORE_RELEASE_SHA256) {
+    return { ok: false, status: 502, code: "GLOBAL_COLLECTION_CORE_RELEASE_MISMATCH", payload: {} };
+  }
+  if (compiled.result.status === "rejected") {
+    return {
+      ok: false,
+      status: 422,
+      code: "CORE_V2_REJECTED",
+      payload: {
+        candidateWorldStateId: compiled.result.candidate.worldStateId,
+        reviewReasons: compiled.result.candidate.reviewReasons,
+        candidatePromotion: false,
+      },
     };
   }
+  const projected = projectProductCoreV2Candidate(compiled.result, verifiedInputs, revisionCompileEnabled(), workspaceId);
+  if (!projected) return { ok: false, status: 502, code: "CORE_V2_PROJECTION_INVALID", payload: {} };
+  const artifact: CollectionCandidateArtifact = projected;
+  const coreExecution: CollectionCompileSuccess["coreExecution"] = {
+    status: compiled.result.status,
+    runtime: compiled.result.runtime,
+    worldStateId: compiled.result.candidate.worldStateId,
+    receipt: compiled.result.receipt,
+  };
 
   const postDispatchVersionFailure = await revalidate("after_core");
   if (postDispatchVersionFailure) return postDispatchVersionFailure;
