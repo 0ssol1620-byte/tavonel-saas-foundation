@@ -27,9 +27,12 @@ type Props = {
 };
 type Decision = "confirmed" | "rejected";
 export type Target = { documentId: string; labelKind: "doc_type" | "topic"; labelKey: string };
-export type SessionDecisions = Readonly<Record<string, { target: Target; decision: Decision }>>;
+/** A decision this session made, and how many rows it took (its Undo writes the opposite that many times). */
+type SessionEntry = { target: Target; decision: Decision; rows: number };
+export type SessionDecisions = Readonly<Record<string, SessionEntry>>;
 type Loaded = { documents: LibraryDocument[]; sourceVersions: Record<string, string> };
-type Load = { state: "loading" } | { state: "hidden" } | { state: "unavailable" } | ({ state: "ready" } & Loaded);
+type Fetched = { state: "hidden" } | { state: "unavailable" } | ({ state: "ready" } & Loaded);
+type Load = { state: "loading" } | Fetched;
 
 const BADGE: Record<LibraryDocument["duplicates"][number]["badge"], string> = { exact: "Exact copy", near: "Near copy", revision: "Possible revision" };
 const typeName = (label: string) => label.replace(/_/g, " ");
@@ -43,12 +46,11 @@ export function shownState(document: LibraryDocument, target: Target): "confirme
 }
 
 /*
-  The controls are chosen from what the Library shows, never from what this session remembers alone. Undo is
-  the opposite decision, and the store folds a decision after its opposite into a withdrawal, so a decision can
-  land as something other than what it said (a Reject of a label confirmed on another visit withdraws that
-  confirmation, and the proposal speaks again). A session decision therefore offers Undo only while the Library
-  shows exactly what it did: a confirmation shows the label confirmed, a rejection shows no such label.
-  Otherwise the label gets the ordinary controls for what it shows, and the session forgets that decision.
+  The controls are chosen from what the Library shows, never from what this session remembers alone. A decision
+  is written until the Library shows what it means (recordDecision), but a write can fail half way, or another
+  person can decide in between. A session decision therefore offers Undo only while the Library shows exactly
+  what it did: a confirmation shows the label confirmed, a rejection shows no such label. Otherwise the label
+  gets the ordinary controls for what it shows, and the session forgets that decision.
 */
 const showsWhatItDid = (decision: Decision, shown: ReturnType<typeof shownState>) => (decision === "confirmed" ? shown === "confirmed" : shown === null);
 
@@ -58,14 +60,51 @@ export function labelControls(shown: ReturnType<typeof shownState>, session: Dec
   return shown === "proposed" ? ["confirm", "reject"] : shown === "confirmed" ? ["reject"] : [];
 }
 
-/** The session after a saved decision and a fresh read: an Undo forgets the decision; one the Library does not show is dropped. */
-export function nextSession(current: SessionDecisions, saved: { target: Target; decision: Decision; isUndo: boolean } | null,
-  documents: readonly LibraryDocument[]): SessionDecisions {
-  const next: Record<string, { target: Target; decision: Decision }> = { ...current };
+/*
+  The store folds one person-label's rows as a three-way toggle (library-shadow.ts standingDecisions): a decision after its
+  opposite withdraws it. So a Reject of a label confirmed on another visit first lands as a withdrawal, and the proposal of the
+  same label speaks again. The person meant a rejection, so a decision is written until the Library shows what it means: at
+  most twice, because two rows of one kind reach that decision from any standing state. Undo writes the opposite as many
+  times as the decision took, which folds back to exactly the standing state before it: [c] r r = rejected, then c c =
+  confirmed again; [] r = rejected, then c = nothing standing (the proposal). Each row has its own idempotency key.
+*/
+export type DecisionIo = {
+  /** Records one row; false when it was not saved. */
+  write: (decision: Decision) => Promise<boolean>;
+  /** Reads the Library; null when it cannot be read. */
+  read: () => Promise<readonly LibraryDocument[] | null>;
+};
+export async function recordDecision(io: DecisionIo, target: Target, decision: Decision, undoRows?: number):
+  Promise<{ rows: number; documents: readonly LibraryDocument[] | null; complete: boolean }> {
+  let rows = 0;
+  if (undoRows !== undefined) {
+    while (rows < undoRows && await io.write(decision)) rows += 1;
+    return { rows, documents: rows === 0 ? null : await io.read(), complete: rows === undoRows };
+  }
+  let documents: readonly LibraryDocument[] | null = null;
+  let complete = false;
+  while (!complete && rows < 2 && await io.write(decision)) {
+    rows += 1;
+    documents = await io.read();
+    const document = documents?.find((candidate) => candidate.documentId === target.documentId);
+    if (!document) break;
+    complete = showsWhatItDid(decision, shownState(document, target));
+  }
+  return { rows, documents, complete };
+}
+
+/**
+ * The session after a saved decision and a fresh read: an Undo forgets the decision; one the Library does not show is
+ * dropped. Without a read (the Library could not be read after saving) the saved decision is kept until the next read.
+ */
+export function nextSession(current: SessionDecisions, saved: { target: Target; decision: Decision; rows: number; isUndo: boolean } | null,
+  documents: readonly LibraryDocument[] | null): SessionDecisions {
+  const next: Record<string, SessionEntry> = { ...current };
   if (saved) {
     if (saved.isUndo) delete next[targetKey(saved.target)];
-    else next[targetKey(saved.target)] = { target: saved.target, decision: saved.decision };
+    else next[targetKey(saved.target)] = { target: saved.target, decision: saved.decision, rows: saved.rows };
   }
+  if (!documents) return next;
   for (const [key, { target, decision }] of Object.entries(next)) {
     const document = documents.find((candidate) => candidate.documentId === target.documentId);
     if (!document || !showsWhatItDid(decision, shownState(document, target))) delete next[key];
@@ -85,6 +124,19 @@ async function api(path: string, init: RequestInit = {}) {
     ...(init.body ? { "Content-Type": "application/json" } : {}) } });
 }
 
+async function fetchLibrary(idsKey: string): Promise<Fetched> {
+  if (idsKey === "") return { state: "ready", documents: [], sourceVersions: {} };
+  try {
+    const response = await api(`/api/library?documents=${encodeURIComponent(idsKey)}`);
+    if (response.status === 404) return { state: "hidden" };
+    const body = await response.json().catch(() => null) as ({ documents?: LibraryDocument[]; sourceVersions?: Record<string, string> }) | null;
+    if (!response.ok || !body || !Array.isArray(body.documents) || !body.sourceVersions) return { state: "unavailable" };
+    return { state: "ready", documents: body.documents, sourceVersions: body.sourceVersions };
+  } catch {
+    return { state: "unavailable" };
+  }
+}
+
 function groupOf(document: LibraryDocument): "confirmed" | "proposed" | "unknown" {
   const type = document.documentType;
   return type?.state === "confirmed" ? "confirmed" : type?.state === "proposed" ? "proposed" : "unknown";
@@ -99,20 +151,11 @@ export default function LibraryPanel({ documentIds, names, onAvailability }: Pro
   const [problem, setProblem] = useState<string | null>(null);
   const idsKey = documentIds.join(",");
 
-  // A read after a saved decision reconciles the session with what the Library now shows (nextSession).
-  const refresh = useCallback(async (saved: Parameters<typeof nextSession>[1] = null) => {
-    if (idsKey === "") return setLoad({ state: "ready", documents: [], sourceVersions: {} });
-    try {
-      const response = await api(`/api/library?documents=${encodeURIComponent(idsKey)}`);
-      if (response.status === 404) return setLoad({ state: "hidden" });
-      const body = await response.json().catch(() => null) as ({ documents?: LibraryDocument[]; sourceVersions?: Record<string, string> }) | null;
-      if (!response.ok || !body || !Array.isArray(body.documents) || !body.sourceVersions) return setLoad({ state: "unavailable" });
-      const documents = body.documents;
-      setDecided((current) => nextSession(current, saved, documents));
-      setLoad({ state: "ready", documents, sourceVersions: body.sourceVersions });
-    } catch {
-      setLoad({ state: "unavailable" });
-    }
+  // Every read reconciles the session with what the Library now shows (nextSession).
+  const refresh = useCallback(async () => {
+    const fetched = await fetchLibrary(idsKey);
+    if (fetched.state === "ready") setDecided((current) => nextSession(current, null, fetched.documents));
+    setLoad(fetched);
   }, [idsKey]);
 
   useEffect(() => { void refresh(); }, [refresh]);
@@ -121,22 +164,34 @@ export default function LibraryPanel({ documentIds, names, onAvailability }: Pro
     else if (load.state === "ready") onAvailability?.(true);
   }, [load.state, onAvailability]);
 
-  async function decide(target: Target, decision: Decision, sourceVersionId: string | undefined, isUndo: boolean) {
+  /** A decision, or with `undoRows` the Undo of one; see recordDecision for why it can take two rows. */
+  async function decide(target: Target, decision: Decision, sourceVersionId: string | undefined, undoRows?: number) {
     if (!sourceVersionId) return setProblem("This source has no recorded version to decide on yet.");
-    const key = targetKey(target);
-    setBusy(key);
+    setBusy(targetKey(target));
     setProblem(null);
-    try {
-      const response = await api("/api/library/decisions", { method: "POST",
-        body: JSON.stringify({ ...target, sourceVersionId, decision, idempotencyKey: crypto.randomUUID() }) });
-      if (!response.ok) {
-        // Nothing changed on the server, so nothing changes here: the panel keeps what it showed.
-        setProblem(response.status === 403 ? "You can not decide on this source." : "The decision was not saved. Nothing changed. Try again.");
-        return;
+    let refused: number | null = null;
+    let fetched: Fetched = { state: "unavailable" };
+    const write = async (row: Decision) => {
+      try {
+        const response = await api("/api/library/decisions", { method: "POST",
+          body: JSON.stringify({ ...target, sourceVersionId, decision: row, idempotencyKey: crypto.randomUUID() }) });
+        if (!response.ok) refused = response.status;
+        return response.ok;
+      } catch {
+        return false;
       }
-      await refresh({ target, decision, isUndo });
-    } catch {
-      setProblem("The decision was not saved. Nothing changed. Try again.");
+    };
+    const read = async () => {
+      fetched = await fetchLibrary(idsKey);
+      return fetched.state === "ready" ? fetched.documents : null;
+    };
+    try {
+      const { rows, documents, complete } = await recordDecision({ write, read }, target, decision, undoRows);
+      // Nothing changed on the server, so nothing changes here: the panel keeps what it showed.
+      if (rows === 0) return setProblem(refused === 403 ? "You can not decide on this source." : "The decision was not saved. Nothing changed. Try again.");
+      setDecided((current) => nextSession(current, { target, decision, rows, isUndo: undoRows !== undefined }, documents));
+      setLoad(fetched);
+      if (!complete && documents) setProblem("Only part of the decision was saved. The Library shows what was saved. Try again.");
     } finally {
       setBusy(null);
     }
@@ -162,16 +217,16 @@ export default function LibraryPanel({ documentIds, names, onAvailability }: Pro
   ].map((group) => ({ ...group, documents: load.documents.filter((document) => groupOf(document) === group.id) }));
 
   function controls(document: LibraryDocument, target: Target, sourceVersionId: string | undefined, label: string) {
-    const last = decided[targetKey(target)]?.decision;
+    const entry = decided[targetKey(target)];
     const disabled = busy !== null;
-    return labelControls(shownState(document, target), last).map((control) => (control === "undo" && last ? (
-      <button key={control} type="button" className={styles.action} disabled={disabled} onClick={() => void decide(target, opposite(last), sourceVersionId, true)}
-        aria-label={`Undo ${last === "confirmed" ? "confirming" : "rejecting"} ${label}`}>Undo</button>
+    return labelControls(shownState(document, target), entry?.decision).map((control) => (control === "undo" && entry ? (
+      <button key={control} type="button" className={styles.action} disabled={disabled} onClick={() => void decide(target, opposite(entry.decision), sourceVersionId, entry.rows)}
+        aria-label={`Undo ${entry.decision === "confirmed" ? "confirming" : "rejecting"} ${label}`}>Undo</button>
     ) : control === "confirm" ? (
-      <button key={control} type="button" className={styles.action} disabled={disabled} onClick={() => void decide(target, "confirmed", sourceVersionId, false)}
+      <button key={control} type="button" className={styles.action} disabled={disabled} onClick={() => void decide(target, "confirmed", sourceVersionId)}
         aria-label={`Confirm ${label}`}>Confirm</button>
     ) : (
-      <button key={control} type="button" className={styles.action} disabled={disabled} onClick={() => void decide(target, "rejected", sourceVersionId, false)}
+      <button key={control} type="button" className={styles.action} disabled={disabled} onClick={() => void decide(target, "rejected", sourceVersionId)}
         aria-label={`Reject ${label}`}>Reject</button>
     )));
   }

@@ -7,7 +7,7 @@ import {
   type LibraryInternalView,
 } from "./library-shadow";
 import {
-  labelControls, nextSession, opposite, shownState, targetKey, type LabelControl, type SessionDecisions, type Target,
+  labelControls, nextSession, opposite, recordDecision, shownState, targetKey, type DecisionIo, type LabelControl, type SessionDecisions, type Target,
 } from "@/components/library-panel";
 
 const { viewerAccess, alerted } = vi.hoisted(() => ({ viewerAccess: vi.fn(), alerted: vi.fn() }));
@@ -481,9 +481,10 @@ describe("decideLibraryLabel", () => {
 /*
   The panel's controls against the store's fold (WO-D23-4 fix round 3). Undo is the opposite decision and the fold
   reads a decision after its opposite as a withdrawal, so what a session decided and what the Library shows can
-  differ. These pin the fold for a returning visit, then fuzz the panel's control choice over random histories:
-  every control changes what the Library shows, every Undo the panel offers restores what the Library shows, and a
-  person can always get rid of a label, or keep it, in a bounded number of clicks.
+  differ. These pin the fold for a returning visit, then fuzz the panel (its controls and recordDecision, which
+  writes a decision until the Library shows it) over random histories: every decision lands as what it says and
+  offers Undo, every Undo restores what the Library showed before, a label this session did not decide goes in one
+  Reject (round 4, lead note), and a person can always keep a label in a bounded number of clicks.
 */
 describe("a returning visit's Reject of a confirmed label", () => {
   const confirm = (kind: "doc_type" | "topic") => person(A, kind, kind === "doc_type" ? "contract" : "terms", "confirmed", "2026-11-08T10:00:00+00:00");
@@ -499,19 +500,104 @@ describe("a returning visit's Reject of a confirmed label", () => {
     expect(topics(confirm("topic"), reject("topic", "2026-11-08T11:00:00+00:00"))).toEqual([{ label: "terms", state: "proposed" }]);
     expect(topics(confirm("topic"), reject("topic", "2026-11-08T11:00:00+00:00"), reject("topic", "2026-11-08T12:00:00+00:00"))).toEqual([]);
   });
-  it("the panel then offers Confirm and Reject on the proposal again, not an Undo that would re-confirm it", () => {
+  it("a Reject that landed only as the withdrawal (its second row not saved) leaves no Undo: the panel offers Confirm and Reject on the proposal", () => {
     const target: Target = { documentId: A, labelKind: "doc_type", labelKey: "contract" };
     const rows: unknown[] = [proposal("contract"), confirm("doc_type")];
     const read = () => toLibraryDocuments(view(...rows), [A]);
     expect(labelControls(shownState(read()[0]!, target), undefined)).toEqual(["reject"]);
     rows.push(reject("doc_type", "2026-11-08T11:00:00+00:00"));
-    let session = nextSession({}, { target, decision: "rejected", isUndo: false }, read());
+    let session = nextSession({}, { target, decision: "rejected", rows: 1, isUndo: false }, read());
     expect(session).toEqual({});
     expect(labelControls(shownState(read()[0]!, target), session[targetKey(target)]?.decision)).toEqual(["confirm", "reject"]);
     rows.push(reject("doc_type", "2026-11-08T12:00:00+00:00"));
-    session = nextSession(session, { target, decision: "rejected", isUndo: false }, read());
+    session = nextSession(session, { target, decision: "rejected", rows: 1, isUndo: false }, read());
     expect(shownState(read()[0]!, target)).toBeNull();
     expect(labelControls(shownState(read()[0]!, target), session[targetKey(target)]?.decision)).toEqual(["undo"]);
+  });
+});
+
+/* The panel against an in-memory store: every row it writes is appended, and every read folds all rows. */
+const storeIo = (rows: unknown[], target: Target, at: () => string, saved: (row: number) => boolean = () => true) => {
+  let written = 0;
+  const reads = { count: 0 };
+  const io: DecisionIo = {
+    write: async (decision) => {
+      if (!saved(written)) return false;
+      written += 1;
+      rows.push(person(A, target.labelKind, target.labelKey, decision, at()));
+      return true;
+    },
+    read: async () => { reads.count += 1; return toLibraryDocuments(view(...rows), [A]); },
+  };
+  return { io, reads };
+};
+const clockFrom = (hour: number) => {
+  let tick = 0;
+  return () => `2026-11-08T${hour}:${String(Math.floor(tick / 60)).padStart(2, "0")}:${String(tick++ % 60).padStart(2, "0")}+00:00`;
+};
+
+describe("one Reject corrects a label confirmed on another visit, and its Undo restores it (lead note)", () => {
+  for (const kind of ["doc_type", "topic"] as const) {
+    const key = kind === "doc_type" ? "contract" : "terms";
+    const target: Target = { documentId: A, labelKind: kind, labelKey: key };
+    for (const confirmations of [1, 2]) {
+      it(`${kind}, confirmed ${confirmations} time(s) before, over its own proposal`, async () => {
+        const at = clockFrom(11);
+        const rows: unknown[] = [kind === "doc_type" ? proposal(key) : topic(key)];
+        for (let n = 0; n < confirmations; n += 1) rows.push(person(A, kind, key, "confirmed", `2026-11-08T10:0${n}:00+00:00`));
+        const shown = () => shownState(toLibraryDocuments(view(...rows), [A])[0]!, target);
+        expect(shown()).toBe("confirmed");
+        expect(labelControls(shown(), undefined)).toEqual(["reject"]);
+        // One click: the label is gone, and Undo is offered.
+        const rejected = await recordDecision(storeIo(rows, target, at).io, target, "rejected");
+        expect(rejected).toMatchObject({ rows: 2, complete: true });
+        expect(shown()).toBeNull();
+        let session = nextSession({}, { target, decision: "rejected", rows: rejected.rows, isUndo: false }, rejected.documents);
+        expect(labelControls(shown(), session[targetKey(target)]?.decision)).toEqual(["undo"]);
+        // Undo: exactly the state before the Reject, with the same controls.
+        const undone = await recordDecision(storeIo(rows, target, at).io, target, "confirmed", session[targetKey(target)]!.rows);
+        expect(undone).toMatchObject({ rows: 2, complete: true });
+        expect(shown()).toBe("confirmed");
+        session = nextSession(session, { target, decision: "confirmed", rows: undone.rows, isUndo: true }, undone.documents);
+        expect(session).toEqual({});
+        expect(labelControls(shown(), undefined)).toEqual(["reject"]);
+      });
+    }
+    it(`${kind}: a proposal's Reject is one row and its Undo one row, back to Proposed`, async () => {
+      const at = clockFrom(11);
+      const rows: unknown[] = [kind === "doc_type" ? proposal(key) : topic(key)];
+      const shown = () => shownState(toLibraryDocuments(view(...rows), [A])[0]!, target);
+      expect(await recordDecision(storeIo(rows, target, at).io, target, "rejected")).toMatchObject({ rows: 1, complete: true });
+      expect(shown()).toBeNull();
+      expect(await recordDecision(storeIo(rows, target, at).io, target, "confirmed", 1)).toMatchObject({ rows: 1, complete: true });
+      expect(shown()).toBe("proposed");
+    });
+  }
+
+  it("a second row that is not saved reports an incomplete decision, and the panel keeps no Undo for it", async () => {
+    const target: Target = { documentId: A, labelKind: "doc_type", labelKey: "contract" };
+    const rows: unknown[] = [proposal("contract"), person(A, "doc_type", "contract", "confirmed", "2026-11-08T10:00:00+00:00")];
+    const result = await recordDecision(storeIo(rows, target, clockFrom(11), (row) => row === 0).io, target, "rejected");
+    expect(result).toMatchObject({ rows: 1, complete: false });
+    expect(shownState(result.documents![0]!, target)).toBe("proposed");
+    const session = nextSession({}, { target, decision: "rejected", rows: result.rows, isUndo: false }, result.documents);
+    expect(labelControls(shownState(result.documents![0]!, target), session[targetKey(target)]?.decision)).toEqual(["confirm", "reject"]);
+  });
+
+  it("an Undo saved only in part says so; a decision refused at once writes and reads nothing", async () => {
+    const target: Target = { documentId: A, labelKind: "doc_type", labelKey: "contract" };
+    const rows: unknown[] = [proposal("contract")];
+    expect(await recordDecision(storeIo(rows, target, clockFrom(11), (row) => row === 0).io, target, "confirmed", 2))
+      .toMatchObject({ rows: 1, complete: false });
+    const refused = storeIo(rows, target, clockFrom(12), () => false);
+    expect(await recordDecision(refused.io, target, "rejected")).toEqual({ rows: 0, documents: null, complete: false });
+    expect(refused.reads.count).toBe(0);
+  });
+
+  it("a saved decision the Library could not be read after keeps its Undo until the next read", () => {
+    const target: Target = { documentId: A, labelKind: "topic", labelKey: "terms" };
+    const session = nextSession({}, { target, decision: "rejected", rows: 2, isUndo: false }, null);
+    expect(session[targetKey(target)]).toEqual({ target, decision: "rejected", rows: 2 });
   });
 });
 
@@ -537,7 +623,7 @@ describe("the Library panel's controls follow what the Library shows (fuzzed)", 
     return targets;
   };
 
-  it("holds its invariants over 400 random histories and sessions", () => {
+  it("holds its invariants over 400 random histories and sessions", async () => {
     const random = rng(0x0d234);
     const pick = <T,>(items: readonly T[]) => items[Math.floor(random() * items.length)]!;
     for (let scenario = 0; scenario < 400; scenario += 1) {
@@ -553,12 +639,19 @@ describe("the Library panel's controls follow what the Library shows (fuzzed)", 
       }
       const read = (extra: unknown[] = []) => toLibraryDocuments(view(...rows, ...extra), [A])[0]!;
       const label = (target: Target) => `scenario ${scenario}: ${target.labelKind} ${target.labelKey} after ${rows.length} rows`;
-      // One click: the decision it records, the Library after it, the session after it.
-      const click = (session: SessionDecisions, target: Target, control: LabelControl, extra: unknown[]) => {
-        const decision = control === "undo" ? opposite(session[targetKey(target)]!.decision) : control === "confirm" ? "confirmed" as const : "rejected" as const;
-        const added = [...extra, person(A, target.labelKind, target.labelKey, decision, at())];
+      // One click, as the panel makes it: recordDecision against the store, the Library after it, the session after it.
+      const click = async (session: SessionDecisions, target: Target, control: LabelControl, extra: unknown[]) => {
+        const entry = session[targetKey(target)];
+        const decision = control === "undo" ? opposite(entry!.decision) : control === "confirm" ? "confirmed" as const : "rejected" as const;
+        const added = [...extra];
+        const io: DecisionIo = {
+          write: async (row) => { added.push(person(A, target.labelKind, target.labelKey, row, at())); return true; },
+          read: async () => [read(added)],
+        };
+        const recorded = await recordDecision(io, target, decision, control === "undo" ? entry!.rows : undefined);
         const after = read(added);
-        return { added, after, session: nextSession(session, { target, decision, isUndo: control === "undo" }, [after]) };
+        return { added, after, complete: recorded.complete,
+          session: nextSession(session, { target, decision, rows: recorded.rows, isUndo: control === "undo" }, [after]) };
       };
       let session: SessionDecisions = {};
       for (let step = 0; step < 6; step += 1) {
@@ -567,31 +660,37 @@ describe("the Library panel's controls follow what the Library shows (fuzzed)", 
           const shown = shownState(document, target);
           const controls = labelControls(shown, session[targetKey(target)]?.decision);
           for (const control of controls) {
-            const first = click(session, target, control, []);
+            const first = await click(session, target, control, []);
+            // With an honest store every click lands as what it says.
+            expect(first.complete, label(target)).toBe(true);
             // Every control changes what the panel shows for that label. (Undoing a type rejection while another type is
             // confirmed only removes the 'Rejected' entry: the rejection is withdrawn, the confirmed type still outranks it.)
             expect(onPanel(first.after, first.session, target), label(target)).not.toBe(onPanel(document, session, target));
-            // Every Undo the panel then offers restores what the Library shows (topics compared as a set: a re-confirmed topic moves).
-            if (control !== "undo" && labelControls(shownState(first.after, target), first.session[targetKey(target)]?.decision).includes("undo")) {
-              expect(asShown(click(first.session, target, "undo", first.added).after), label(target)).toEqual(asShown(document));
-            }
+            if (control === "undo") continue;
+            // Every decision offers Undo, and that Undo restores what the Library showed (topics compared as a set: a re-confirmed topic moves).
+            expect(labelControls(shownState(first.after, target), first.session[targetKey(target)]?.decision), `undo offered ${label(target)}`).toEqual(["undo"]);
+            const undone = await click(first.session, target, "undo", first.added);
+            expect(asShown(undone.after), label(target)).toEqual(asShown(document));
+            expect(labelControls(shownState(undone.after, target), undone.session[targetKey(target)]?.decision), label(target))
+              .toEqual(labelControls(shown, undefined));
           }
-          // Getting rid of a label: Reject where offered, else Undo a confirmation; never a loop.
+          // Getting rid of a label: one Reject, unless this session confirmed it (then Undo, then Reject); never a loop.
           let state = { added: [] as unknown[], after: document, session };
-          for (let clicks = 0; clicks < 3 && shownState(state.after, target) !== null; clicks += 1) {
+          const removeIn = session[targetKey(target)]?.decision === "confirmed" ? 2 : 1;
+          for (let clicks = 0; clicks < removeIn && shownState(state.after, target) !== null; clicks += 1) {
             const offered = labelControls(shownState(state.after, target), state.session[targetKey(target)]?.decision);
-            if (offered.includes("reject")) state = click(state.session, target, "reject", state.added);
-            else if (offered.includes("undo") && state.session[targetKey(target)]?.decision === "confirmed") state = click(state.session, target, "undo", state.added);
+            if (offered.includes("reject")) state = await click(state.session, target, "reject", state.added);
+            else if (offered.includes("undo") && state.session[targetKey(target)]?.decision === "confirmed") state = await click(state.session, target, "undo", state.added);
             else break;
           }
-          expect(shownState(state.after, target), `remove ${label(target)}`).toBeNull();
+          expect(shownState(state.after, target), `remove ${label(target)} in ${removeIn}`).toBeNull();
           // Keeping a label: Confirm where offered, else Undo a rejection. A document has one type, so a rejected type
           // under another confirmed type comes back only once that one is rejected; that is the other label's control.
           state = { added: [], after: document, session };
           for (let clicks = 0; clicks < 2 && shownState(state.after, target) !== "confirmed"; clicks += 1) {
             const offered = labelControls(shownState(state.after, target), state.session[targetKey(target)]?.decision);
-            if (offered.includes("confirm")) state = click(state.session, target, "confirm", state.added);
-            else if (offered.includes("undo") && state.session[targetKey(target)]?.decision === "rejected") state = click(state.session, target, "undo", state.added);
+            if (offered.includes("confirm")) state = await click(state.session, target, "confirm", state.added);
+            else if (offered.includes("undo") && state.session[targetKey(target)]?.decision === "rejected") state = await click(state.session, target, "undo", state.added);
             else break;
           }
           const outranked = target.labelKind === "doc_type" && document.documentType?.state === "confirmed" && document.documentType.label !== target.labelKey;
@@ -604,7 +703,7 @@ describe("the Library panel's controls follow what the Library shows (fuzzed)", 
           labelControls(shownState(document, target), session[targetKey(target)]?.decision).map((control) => ({ target, control })));
         if (offered.length === 0) break;
         const { target, control } = pick(offered);
-        const next = click(session, target, control, []);
+        const next = await click(session, target, control, []);
         rows.push(...next.added);
         session = next.session;
       }
