@@ -95,6 +95,30 @@ async function openGraphLens(page: Page) {
   await expect(page.getByRole("searchbox", { name: "Search" })).toBeVisible();
 }
 
+/*
+  Move to another workspace surface the way a person does: by the rail row's exact label. Only
+  Home, Knowledge and Use with AI sit on the rail itself; Review, Knowledge graph and the rest are
+  inside the closed "More" disclosure, so open it when the row is not already showing. An exact
+  label that matches nothing fails here instead of a pattern quietly matching the wrong row.
+*/
+async function goToSurface(page: Page, label: string) {
+  const nav = page.getByRole("complementary", { name: "Workspace navigation" });
+  const row = nav.getByRole("button", { name: label, exact: true });
+  if (!(await row.isVisible())) await nav.locator('summary[aria-label="More workspace tools"]').click();
+  await row.click();
+}
+
+/*
+  An absence is only evidence once the thing that would contain it has finished loading. On the
+  Versions lens of the older version the comparison reads the other manifest first ("Reading the
+  other version…"), and while it does no rollback button is drawn whatever the guard says. Wait for
+  the settled, non-identical comparison (the rollback offer needs both) before asserting it is absent.
+*/
+async function expectPastComparisonSettled(page: Page) {
+  const pair = `${LENS_CURRENT_MANIFEST.slice(7, 19)} → ${LENS_PAST_MANIFEST.slice(7, 19)}`;
+  await expect(page.getByText(new RegExp(`^${pair} · [0-9]+ changes?$`))).toBeVisible();
+}
+
 /* The lens at this viewport: fits, shows a graph or its table, and the inspector is a Tab away. */
 async function expectLensUsable(page: Page) {
   await page.goto(WORLD_URL);
@@ -149,7 +173,7 @@ test.describe("World lens", () => {
     await expect(inspector).toContainText(lensObjectLabel(1, 0));
 
     // Back: leave for another surface (pushState), come back, and the remounted lens reads its URL again.
-    await page.getByRole("complementary", { name: "Workspace navigation" }).getByRole("button", { name: /Review/ }).click();
+    await goToSurface(page, "Review");
     await expect(page).toHaveURL(/\/workspace\/review/);
     await page.goBack();
     await expect(page).toHaveURL(/\/workspace\/world/);
@@ -165,6 +189,7 @@ test.describe("World lens", () => {
     await expect(page.getByRole("status").filter({ hasText: "Viewing version 1 · not the current World" })).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`asof=${encodeURIComponent(LENS_PAST_MANIFEST)}`));
     await page.getByRole("tab", { name: "Versions", exact: true }).click();
+    await expectPastComparisonSettled(page);
     await expect(page.getByRole("button", { name: "Roll back to this version" })).toHaveCount(0);
 
     await page.goto(`${WORLD_URL}&lens=evidence&evidence=ev-c0&asof=${encodeURIComponent(LENS_PAST_MANIFEST)}`);
@@ -177,7 +202,7 @@ test.describe("World lens", () => {
     // The reason box lives on Review; page state survives the client-side move to World.
     await page.goto(`/workspace/review?collection=${LENS_COLLECTION_ID}`);
     await page.getByLabel("Rollback reason").fill("Reviewed the diff and the older version is correct.");
-    await page.getByRole("complementary", { name: "Workspace navigation" }).getByRole("button", { name: /World/ }).click();
+    await goToSurface(page, "Knowledge graph");
     await expect(page).toHaveURL(/\/workspace\/world/);
     await page.getByRole("tab", { name: "Versions", exact: true }).click();
     const rollback = page.getByRole("button", { name: "Roll back to this version" });
@@ -186,6 +211,7 @@ test.describe("World lens", () => {
 
     await page.getByLabel("View as of").selectOption(LENS_PAST_MANIFEST);
     await expect(page.getByRole("status").filter({ hasText: "Viewing version 1 · not the current World" })).toBeVisible();
+    await expectPastComparisonSettled(page);
     await expect(rollback).toHaveCount(0);
   });
 
