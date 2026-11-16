@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import {
   DrillRefusal, EXECUTE_CONFIRMATION, TABLES, checkConnection, compareState, computeRpoRto, measureRestore,
-  parseArguments, psqlEnv, writeRestoreReceipt,
+  parseArguments, psqlEnv, readState, writeRestoreReceipt,
 } from "./database-restore-drill.mjs";
 
 const T0 = "2026-11-16T10:00:00.000000Z";
@@ -153,4 +153,40 @@ test("operator attestations and the production guard are required", async () => 
   await assert.rejects(() => writeRestoreReceipt({ ...receiptInput(), attestNotificationsDisabled: false }, { verifySignedExport: verifyOk }), /ATTESTATION_MISSING/);
   const remote = receiptInput({ connection: "remote", forbidRefs: [] });
   await assert.rejects(() => writeRestoreReceipt(remote, { verifySignedExport: verifyOk }), /PRODUCTION_GUARD_MISSING/);
+});
+
+// ---- fix round: reviewer blockers ----
+
+test("readState trims the catalog object name (information_schema name type pads/truncates with trailing blanks)", () => {
+  let script = "";
+  const run = (dsn, s) => { script = s; return fakeRun({ now: T2, heartbeat: T1 })(); };
+  readState("postgres://x@127.0.0.1/db", run);
+  assert.match(script, /'object', rtrim\(f\.object::text\)/);
+});
+
+test("a measurement that failed integrity never becomes a receipt, even when the identity artifacts agree", async () => {
+  const tenant = receiptInput();
+  tenant.measurement.integrity = { ok: false, mismatches: [{ table: "foundation_compile_jobs", tenantIsolationViolations: 3, kind: "tenant_isolation" }], afterRecoveryPoint: {} };
+  tenant.measurement.verdict = "integrity_failed";
+  await assert.rejects(() => writeRestoreReceipt(tenant, { verifySignedExport: verifyOk }), /INTEGRITY_FAILED/);
+  assert.equal(existsSync(tenant.outDir), false);
+  const drift = receiptInput();
+  drift.measurement.schemaDrift = { equal: false, counts: {} };
+  await assert.rejects(() => writeRestoreReceipt(drift, { verifySignedExport: verifyOk }), /INTEGRITY_FAILED/);
+});
+
+test("the forbidden project ref matches case-insensitively in host and pooler user", () => {
+  const env = { TAVONEL_RESTORE_DRILL_OPERATOR: "op", TAVONEL_RESTORE_DRILL_CONFIRM: EXECUTE_CONFIRMATION };
+  const opts = { execute: true, forbidRefs: ["prodref"], env };
+  refusal(() => checkConnection("postgres://u:p@db.PRODREF.supabase.co/postgres", opts), "FORBIDDEN_REF");
+  refusal(() => checkConnection("postgres://postgres.PRODREF:p@pooler.example/postgres", opts), "FORBIDDEN_REF");
+  refusal(() => checkConnection("postgres://u:p@db.prodref.supabase.co/postgres", { ...opts, forbidRefs: ["PRODREF"] }), "FORBIDDEN_REF");
+});
+
+test("psqlEnv drops variables that let libpq connect somewhere other than the DSN", () => {
+  const base = { PGSERVICE: "s", PGSERVICEFILE: "/f", PGHOSTADDR: "10.0.0.1", PGOPTIONS: "-c x=1", KEEP: "1" };
+  const env = psqlEnv("postgres://me@db.example/app", base);
+  for (const k of ["PGSERVICE", "PGSERVICEFILE", "PGHOSTADDR", "PGOPTIONS"]) assert.equal(k in env, false, k);
+  assert.equal(env.KEEP, "1");
+  assert.equal(env.PGHOST, "db.example");
 });

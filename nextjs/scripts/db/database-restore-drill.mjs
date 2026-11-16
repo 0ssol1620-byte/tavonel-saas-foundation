@@ -76,7 +76,7 @@ export function checkConnection(dsn, { execute = false, forbidRefs = [], env = p
   try { url = new URL(dsn); } catch { throw new DrillRefusal("DSN_INVALID", "the DSN is not a postgres URL"); }
   if (!/^postgres(ql)?:$/.test(url.protocol)) throw new DrillRefusal("DSN_INVALID", "the DSN is not a postgres URL");
   const text = decodeURIComponent(`${url.host}${url.pathname}${url.username}`);
-  if (forbidRefs.some((ref) => ref && text.includes(ref))) throw new DrillRefusal("FORBIDDEN_REF", "the DSN names a forbidden project ref");
+  if (forbidRefs.some((ref) => ref && text.toLowerCase().includes(ref.toLowerCase()))) throw new DrillRefusal("FORBIDDEN_REF", "the DSN names a forbidden project ref");
   if (LOOPBACK.has(url.hostname)) return "loopback";
   if (!execute) throw new DrillRefusal("DRY_RUN", `non-loopback host ${url.hostname}: nothing was contacted; re-run with --execute`);
   if (forbidRefs.length === 0) throw new DrillRefusal("FORBID_REF_REQUIRED", "a non-loopback DSN needs at least one --forbid-ref (the production project ref)");
@@ -156,6 +156,8 @@ export function compareState({ snapshot, restored, recoveryPoint, tenantViolatio
 export function psqlEnv(dsn, base = process.env) {
   const url = new URL(dsn);
   const env = { ...base, PGHOST: url.hostname.replace(/^\[|\]$/g, ""), PGPORT: url.port || "5432", PGDATABASE: decodeURIComponent(url.pathname.slice(1)) };
+  // libpq lets these override the host/database named above, so the loopback and forbid-ref guards would not describe the connection made.
+  for (const name of ["PGSERVICE", "PGSERVICEFILE", "PGHOSTADDR", "PGOPTIONS"]) delete env[name];
   if (url.username) env.PGUSER = decodeURIComponent(url.username);
   if (url.password) env.PGPASSWORD = decodeURIComponent(url.password);
   const sslmode = url.searchParams.get("sslmode");
@@ -190,7 +192,7 @@ export function readState(dsn, run = runPsql) {
     ...TABLES.map(([t, key, ts]) => `select coalesce(jsonb_agg(jsonb_build_array(${key}, ${iso(ts)}) order by ${key}), '[]'::jsonb)::text from public.${t};`),
     `${WORLD_UNITS_SQL};`,
     `select jsonb_build_object(${TENANT_TABLES.map((t) => `'${t}', (select count(*) from public.${t} x where not exists (select 1 from public.foundation_billing_accounts a where a.workspace_key = x.workspace_key))`).join(", ")})::text;`,
-    `select coalesce(jsonb_agg(jsonb_build_object('kind', f.kind, 'object', f.object, 'fingerprint', f.fingerprint)), '[]'::jsonb)::text from (${FINGERPRINT_SQL}) f;`,
+    `select coalesce(jsonb_agg(jsonb_build_object('kind', f.kind, 'object', rtrim(f.object::text), 'fingerprint', f.fingerprint)), '[]'::jsonb)::text from (${FINGERPRINT_SQL}) f;`,
     "commit;",
   ];
   // Multi-line statements are fine for psql; output stays one line per select because every select returns one scalar.
@@ -259,6 +261,9 @@ export async function writeRestoreReceipt(input, { verifySignedExport } = {}) {
   if (measurement.connection.kind === "remote" && measurement.connection.forbidRefsChecked < 1) throw new DrillRefusal("PRODUCTION_GUARD_MISSING", "a remote measurement carries no --forbid-ref check");
   for (const flag of ["attestCleanProvisioning", "attestNotificationsDisabled"]) {
     if (input[flag] !== true) throw new DrillRefusal("ATTESTATION_MISSING", `--${flag.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)} is required: an operator states it, the script cannot observe it`);
+  }
+  if (measurement.verdict === "integrity_failed" || measurement.integrity?.ok !== true || measurement.schemaDrift?.equal !== true) {
+    throw new DrillRefusal("INTEGRITY_FAILED", "the measurement found an integrity or schema mismatch; a failed restore is never written as evidence");
   }
   const final = join(outDir, drillId);
   if (existsSync(final)) throw new DrillRefusal("RECEIPT_ALREADY_EXISTS", `${final} exists; evidence is never overwritten`);
