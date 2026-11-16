@@ -1,6 +1,8 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { DeveloperScope } from "./developer-contracts";
-import { authenticateDeveloperApiKey } from "./developer-store";
+import { REMOTE_MCP_REFRESH_TTL_SECONDS, authenticateDeveloperApiKey, remoteMcpRefreshEnabled } from "./developer-store";
+
+export { REMOTE_MCP_REFRESH_TTL_SECONDS, remoteMcpRefreshEnabled };
 
 /*
   G11 REMOTE-MCP (DECISION-REGISTER S6-09, S6-10; SERVICE-DEFINITION §6 D; ENABLEMENT-GAP §4).
@@ -137,7 +139,7 @@ export type RemoteMcpAuthorizationServerMetadata = {
   token_endpoint: string;
   registration_endpoint: string;
   response_types_supported: ["code"];
-  grant_types_supported: ["authorization_code"];
+  grant_types_supported: ["authorization_code"] | ["authorization_code", "refresh_token"];
   code_challenge_methods_supported: ["S256"];
   token_endpoint_auth_methods_supported: ["none"];
   scopes_supported: DeveloperScope[];
@@ -167,6 +169,8 @@ export type RemoteMcpTokenResponse = {
   token_type: "Bearer";
   expires_in: number;
   scope: string;
+  /** Only with TAVONEL_REMOTE_MCP_REFRESH_ENABLED. Sealed; bound to the key behind access_token. */
+  refresh_token?: string;
 };
 
 export function resourceMetadata(origin: string): RemoteMcpResourceMetadata {
@@ -180,7 +184,7 @@ export function resourceMetadata(origin: string): RemoteMcpResourceMetadata {
   };
 }
 
-export function authorizationServerMetadata(origin: string): RemoteMcpAuthorizationServerMetadata {
+export function authorizationServerMetadata(origin: string, env: Env = process.env): RemoteMcpAuthorizationServerMetadata {
   const urls = remoteMcpUrls(origin);
   return {
     issuer: urls.issuer,
@@ -188,7 +192,7 @@ export function authorizationServerMetadata(origin: string): RemoteMcpAuthorizat
     token_endpoint: urls.token,
     registration_endpoint: urls.registration,
     response_types_supported: ["code"],
-    grant_types_supported: ["authorization_code"],
+    grant_types_supported: remoteMcpRefreshEnabled(env) ? ["authorization_code", "refresh_token"] : ["authorization_code"],
     code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported: ["none"],
     scopes_supported: [...REMOTE_MCP_SCOPES],
@@ -217,8 +221,12 @@ type CodeClaims = {
   j: string;
 };
 
+/** Internal. Sealed into the refresh token; `k` is the live key it rotates. */
+type RefreshClaims = Omit<CodeClaims, "r" | "ch"> & { k: string };
+
 /* -------------------------------------------------------------------- sealing */
 
+const REFRESH_PREFIX = "tvmcp_refresh_";
 const CLIENT_PREFIX = "tvmcp_client_";
 const CODE_PREFIX = "tvmcp_code_";
 const SEALED = /^[A-Za-z0-9_-]{40,4096}$/;
@@ -428,7 +436,7 @@ export type TokenGrant = {
   codeId: string;
 };
 
-export type TokenCheck = { ok: true; grant: TokenGrant } | { ok: false; status: 400 | 401; error: string; error_description: string };
+export type TokenCheck = { ok: true; grant: TokenGrant; refreshKeyId?: string } | { ok: false; status: 400 | 401; error: string; error_description: string };
 
 export function checkTokenRequest(form: URLSearchParams, key: Buffer, origin: string, now = Date.now()): TokenCheck {
   const bad = (error: string, error_description: string, status: 400 | 401 = 400): TokenCheck => ({ ok: false, status, error, error_description });
@@ -456,6 +464,42 @@ export function checkTokenRequest(form: URLSearchParams, key: Buffer, origin: st
   return {
     ok: true,
     grant: { userId: claims.u, workspaceKey: claims.w, authorizationRevision: Number(claims.a), scopes, clientName: client.n, clientId, codeId: claims.j },
+  };
+}
+
+/** The refresh token for the key `keyId` just minted for `grant`; rotates with it. */
+export function issueRefreshToken(grant: TokenGrant, keyId: string, key: Buffer, now = Date.now()): string {
+  const claims: RefreshClaims = {
+    v: 1, c: sha256(grant.clientId), s: grant.scopes, u: grant.userId, w: grant.workspaceKey,
+    a: grant.authorizationRevision, exp: Math.floor(now / 1000) + REMOTE_MCP_REFRESH_TTL_SECONDS, j: grant.codeId, k: keyId,
+  };
+  return `${REFRESH_PREFIX}${seal("refresh", claims, key)}`;
+}
+
+/** grant_type=refresh_token: the sealed token, the client and the scope. Key state is the route's check. */
+export function checkRefreshRequest(form: URLSearchParams, key: Buffer, now = Date.now()): TokenCheck {
+  const bad = (error: string, error_description: string, status: 400 | 401 = 400): TokenCheck => ({ ok: false, status, error, error_description });
+  const clientId = form.get("client_id") ?? "";
+  const client = openClient(clientId, key);
+  if (!client) return bad("invalid_client", "The client is not registered with this server.", 401);
+  const token = form.get("refresh_token") ?? "";
+  const claims = token.startsWith(REFRESH_PREFIX) ? unseal("refresh", token.slice(REFRESH_PREFIX.length), key) : null;
+  if (!claims || claims.v !== 1 || typeof claims.exp !== "number" || typeof claims.c !== "string" || typeof claims.u !== "string"
+    || typeof claims.w !== "string" || typeof claims.j !== "string" || typeof claims.k !== "string"
+    || !Number.isSafeInteger(claims.a) || !Array.isArray(claims.s)) {
+    return bad("invalid_grant", "The refresh token is not valid.");
+  }
+  if (claims.exp <= Math.floor(now / 1000)) return bad("invalid_grant", "The refresh token has expired.");
+  if (!sameText(claims.c, sha256(clientId))) return bad("invalid_grant", "The refresh token was issued to another client.");
+  const sealed = (claims.s as unknown[]).filter((scope): scope is DeveloperScope => (REMOTE_MCP_SCOPES as readonly unknown[]).includes(scope));
+  if (sealed.length !== claims.s.length || sealed.length === 0) return bad("invalid_grant", "The refresh token carries a scope this server does not grant.");
+  const requested = form.get("scope");
+  const scopes = requested === null ? sealed : requested.split(" ").filter(Boolean) as DeveloperScope[];
+  if (scopes.length === 0 || !scopes.every((scope) => sealed.includes(scope))) return bad("invalid_scope", "The requested scope exceeds the granted scope.");
+  return {
+    ok: true,
+    refreshKeyId: claims.k,
+    grant: { userId: claims.u, workspaceKey: claims.w, authorizationRevision: Number(claims.a), scopes: [...new Set(scopes)], clientName: client.n, clientId, codeId: claims.j },
   };
 }
 
