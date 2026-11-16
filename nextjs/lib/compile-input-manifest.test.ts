@@ -2,12 +2,13 @@ import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { describe, expect, it } from "vitest";
 import type { CollectionOcrInput } from "./collection-compiler";
-import { buildProductCoreV2Request } from "./core-runtime-v2";
+import { buildProductCoreV2Request, CORE_V2_MAX_REQUEST_BYTES } from "./core-runtime-v2";
 import fixture from "./fixtures/compile-input-manifest.v1.json";
 import {
   COMPILE_INPUT_CHUNK_BYTES_MAX,
   COMPILE_INPUT_ID_MAX_LENGTH,
   COMPILE_INPUT_MANIFEST_MAX_ENTRIES,
+  COMPILE_INPUT_MAX_REGIONS,
   buildCompileInputManifest,
   manifestDigest,
   verifyCompileInputManifest,
@@ -133,6 +134,54 @@ describe("compile input manifest", () => {
       expect(() => built(bad)).toThrow(/chunkBytesMax must be a positive safe integer/);
     }
     expect(built(COMPILE_INPUT_CHUNK_BYTES_MAX).manifest.chunkBytesMax).toBe(COMPILE_INPUT_CHUNK_BYTES_MAX);
+    // the hard ceiling is only meaningful while one chunk still fits one Core request
+    expect(COMPILE_INPUT_CHUNK_BYTES_MAX).toBeLessThanOrEqual(CORE_V2_MAX_REQUEST_BYTES);
+  });
+
+  const totalRegions = input.documents.reduce((n, d) => n + d.regions.length, 0);
+  const EMPTY_REGION = {} as CompileInputDocument["regions"][number];
+
+  it("checks every input bound before any work proportional to the input", () => {
+    const doc = input.documents[0]!;
+    const big = "x".repeat(50_000_000);
+    const million = Array.from({ length: 1_000_000 }, (_, i) => ({ ...doc, nativeId: `d-${i}`, regions: [] }));
+    const cases: Array<[string, () => unknown]> = [
+      ["1e6 documents", () => buildCompileInputManifest({ ...input, documents: million })],
+      ["50 MB requestId", () => buildCompileInputManifest({ ...input, requestId: big })],
+      ["50 MB workspaceId", () => buildCompileInputManifest({ ...input, workspaceId: big })],
+      ["50 MB collectionId", () => buildCompileInputManifest({ ...input, collectionId: big })],
+      ["50 MB nativeId", () => buildCompileInputManifest({ ...input, documents: [...input.documents, { ...doc, nativeId: big }] })],
+      ["50 MB versionKey", () => buildCompileInputManifest({ ...input, documents: [...input.documents, { ...doc, versionKey: big }] })],
+      ["regions over the cap", () => buildCompileInputManifest({ ...input, documents: [...input.documents, { ...doc, nativeId: "d-many", regions: new Array(COMPILE_INPUT_MAX_REGIONS).fill(doc.regions[0]) }] })],
+      // a region list that is not a list would make the region count NaN, and NaN passes every `>` check
+      ["regions not a list", () => buildCompileInputManifest({ ...input, documents: [{ ...doc, regions: { length: 1 } as never }] })],
+      ["documents not a list", () => buildCompileInputManifest({ ...input, documents: { length: 1 } as never })],
+    ];
+    for (const [label, build] of cases) {
+      const started = Date.now();
+      expect(build, label).toThrow(/bounds/);
+      expect(Date.now() - started, label).toBeLessThan(200);
+    }
+  });
+
+  it("bounds the region count of the whole compile in the builder: the cap builds and round-trips, one more is refused", () => {
+    const doc = input.documents[0]!;
+    const fill = (n: number) => [...input.documents, { ...doc, nativeId: "d-many", regions: new Array(n).fill(EMPTY_REGION) }];
+    const atCap = fill(COMPILE_INPUT_MAX_REGIONS - totalRegions);
+    const { manifest, chunkBodies } = buildCompileInputManifest({ ...input, documents: atCap });
+    const result = verifyCompileInputManifest(manifest, chunkBodies, scope);
+    expect(result.ok && result.documents.reduce((n, d) => n + d.regions.length, 0)).toBe(COMPILE_INPUT_MAX_REGIONS);
+    expect(() => buildCompileInputManifest({ ...input, documents: fill(COMPILE_INPUT_MAX_REGIONS - totalRegions + 1) })).toThrow(/regions/);
+  });
+
+  it("stops splitting as soon as the chunk count passes its bound", () => {
+    // 200,000 regions of ~400 bytes at a 1,000-byte ceiling is one chunk per region: refused after the
+    // 10,001st chunk, not after building and hashing all 200,000.
+    const region = { ...input.documents[0]!.regions[0]!, text: "y".repeat(300) };
+    const doc: CompileInputDocument = { ...input.documents[0]!, regions: new Array(200_000).fill(region) };
+    const started = Date.now();
+    expect(() => buildCompileInputManifest({ ...input, documents: [doc] }, { chunkBytesMax: 1_000 })).toThrow(/bounds/);
+    expect(Date.now() - started).toBeLessThan(1_000);
   });
 
   it("never builds a manifest the verifier would refuse for its size: ids and list lengths are bounded", () => {
@@ -287,20 +336,56 @@ describe("compile input manifest", () => {
       expect(code(...withBody(manifest, chunkBodies, 0, interleaved))).toBe("manifest_document_invalid");
     });
 
-    it("reassembles a continuation of any region count the ceiling admits, without the call stack", () => {
-      // At the hard ceiling a continuation of empty-object regions carries about 1.33 million of them;
-      // spreading that many into one call overflows V8's stack from roughly 120,000 on.
+    it("reassembles a continuation of any region count the cap admits, without the call stack, and refuses one more", () => {
+      // At the hard byte ceiling a continuation of empty-object regions carries about 1.33 million of them, so the
+      // region cap, not the byte ceiling, is what binds; spreading that many into one call overflows V8's stack
+      // from roughly 120,000 on.
       const { manifest, chunkBodies } = built();
       const open = { ...manifest, chunkBytesMax: COMPILE_INPUT_CHUNK_BYTES_MAX };
       const segments = JSON.parse(chunkBodies[manifest.chunks[1]!.chunkId]!) as Array<{ documentId: string; header?: unknown; regions: unknown[] }>;
       expect(segments[0]!.header).toBeUndefined();
       const others = input.documents[0]!.regions.length - segments[0]!.regions.length;
-      for (const count of [150_000, Math.floor((COMPILE_INPUT_CHUNK_BYTES_MAX - 2_000) / 3)]) {
-        const body = JSON.stringify([{ documentId: segments[0]!.documentId, regions: Array.from({ length: count }, () => ({})) }, ...segments.slice(1)]);
+      const rest = totalRegions - segments[0]!.regions.length;
+      const withCount = (count: number) => {
+        const body = JSON.stringify([{ documentId: segments[0]!.documentId, regions: new Array(count).fill({}) }, ...segments.slice(1)]);
         expect(Buffer.byteLength(body)).toBeLessThanOrEqual(COMPILE_INPUT_CHUNK_BYTES_MAX);
-        const result = verifyCompileInputManifest(...withBody(open, chunkBodies, 1, body), scope);
+        return verifyCompileInputManifest(...withBody(open, chunkBodies, 1, body), scope);
+      };
+      for (const count of [150_000, COMPILE_INPUT_MAX_REGIONS - rest]) {
+        const result = withCount(count);
         expect(result.ok && result.documents[0]!.regions.length).toBe(others + count);
       }
+      expect(withCount(COMPILE_INPUT_MAX_REGIONS - rest + 1)).toEqual({ ok: false, code: "manifest_document_invalid" });
+    });
+
+    it("counts regions across every chunk of the compile, not per chunk", () => {
+      // One document whose continuations are each well under the cap and the byte ceiling, but together exceed the cap.
+      const doc = input.documents[0]!;
+      const { regions: _r, versionKey, ...header } = doc;
+      const sealed = (perChunk: number[]) => {
+        const bodies: Record<string, string> = {};
+        const chunks = [{ documentId: doc.nativeId, header, regions: [] as unknown[] }, ...perChunk.map((n) => ({ documentId: doc.nativeId, regions: new Array(n).fill({}) }))]
+          .map((segment, index) => {
+            const body = JSON.stringify([segment]);
+            const chunkId = `chunk-${index}`;
+            bodies[chunkId] = body;
+            return { chunkId, index, byteLength: Buffer.byteLength(body), sha256: sha256(body) };
+          });
+        const unsealed = {
+          schemaVersion: "tavonel.compile_input_manifest.v1" as const, workspaceId: input.workspaceId, collectionId: input.collectionId,
+          requestId: input.requestId, coreRequestSchema: "tavonel.product_core.compile_request.v2" as const,
+          chunkBytesMax: COMPILE_INPUT_CHUNK_BYTES_MAX, totalBytes: chunks.reduce((n, c) => n + c.byteLength, 0),
+          documents: [{ documentId: doc.nativeId, versionKey, chunkIds: chunks.map((c) => c.chunkId) }], chunks,
+        };
+        return verifyCompileInputManifest({ ...unsealed, manifestSha256: manifestDigest(unsealed) }, bodies, scope);
+      };
+      const half = COMPILE_INPUT_MAX_REGIONS / 2;
+      const atCap = sealed([half, half]);
+      expect(atCap.ok && atCap.documents[0]!.regions.length).toBe(COMPILE_INPUT_MAX_REGIONS);
+      expect(sealed([half, half, 1])).toEqual({ ok: false, code: "manifest_document_invalid" });
+      expect(sealed([half, half + 1])).toEqual({ ok: false, code: "manifest_document_invalid" });
+      // the reviewer's shape: four chunks of about 1.33 million each
+      expect(sealed([1_333_266, 1_333_266, 1_333_266])).toEqual({ ok: false, code: "manifest_document_invalid" });
     });
 
     it("bounds every list and string before walking it, so an oversized manifest is refused at once", () => {
@@ -342,6 +427,8 @@ describe("compile input manifest", () => {
         // oversized but well-typed: the values a type check alone lets through
         "x".repeat(COMPILE_INPUT_ID_MAX_LENGTH + 1), Number.MAX_SAFE_INTEGER, COMPILE_INPUT_CHUNK_BYTES_MAX + 1,
         Array.from({ length: COMPILE_INPUT_MANIFEST_MAX_ENTRIES + 1 }, () => "chunk-000000"),
+        // far past every bound: one reference each, so the memory is paid once however many paths reuse it
+        "x".repeat(50_000_000), Array.from({ length: 1_000_000 }, () => "chunk-000000"), 1e15, -1e15, 1e308,
       ];
       const freeText = new Set(["collectionId", "requestId", "versionKey"]);
       type Key = string | number;
@@ -387,6 +474,6 @@ describe("compile input manifest", () => {
         }
       }
       expect(failures).toEqual([]);
-    });
+    }, 120_000);
   });
 });

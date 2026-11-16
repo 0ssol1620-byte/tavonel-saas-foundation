@@ -23,6 +23,13 @@ export const COMPILE_INPUT_CHUNK_BYTES_MAX = 4_000_000;
 export const COMPILE_INPUT_ID_MAX_LENGTH = 256;
 /** Structural bound on documents and on chunks (4 MB each, about 40 GB): a one-compile manifest is far below it. */
 export const COMPILE_INPUT_MANIFEST_MAX_ENTRIES = 10_000;
+/**
+ * Regions in one compile, all documents together. No product limit exists for the chunked path
+ * (GLOBAL_COLLECTION_MAX_REGIONS = 10,000 binds only the global collection), so this is the lead's structural
+ * default for that case; the lead confirms the value. Without it one 4 MB chunk of empty-object regions carries
+ * about 1.33 million, and the chunk count multiplies that.
+ */
+export const COMPILE_INPUT_MAX_REGIONS = 1_000_000;
 
 type RequestDocument = ProductCoreV2CompileRequest["documents"][number];
 export type CompileInputDocument = RequestDocument & { versionKey: string };
@@ -135,7 +142,22 @@ export function buildCompileInputManifest(
 ): { manifest: CompileInputManifest; chunkBodies: Record<string, string> } {
   const chunkBytesMax = options.chunkBytesMax === undefined ? COMPILE_INPUT_CHUNK_BYTES_MAX : options.chunkBytesMax;
   if (!isCeiling(chunkBytesMax)) throw new Error(`chunkBytesMax must be a positive safe integer no larger than ${COMPILE_INPUT_CHUNK_BYTES_MAX}`);
-  const docs = input.documents;
+  // Every input bound is checked here, before anything walks, serializes or hashes the input: the list length first,
+  // then O(documents) field checks. The output check at the end stays as the second line of defence.
+  const outOfBounds = (what: string) => new Error(`compile input exceeds the manifest's bounds: ${what}`);
+  const list: unknown = input.documents;
+  if (!isId(input.workspaceId) || !isId(input.collectionId) || !isId(input.requestId)) throw outOfBounds("an id is empty or too long");
+  if (!Array.isArray(list) || list.length > COMPILE_INPUT_MANIFEST_MAX_ENTRIES) throw outOfBounds("documents is not a list or too long");
+  let regionCount = 0;
+  for (const d of list as unknown[]) {
+    // A region list that is not a list would make the count NaN, and NaN passes every `>` check.
+    if (!isRecord(d) || !isId(d.nativeId) || !isId(d.versionKey) || !Array.isArray(d.regions)) {
+      throw outOfBounds("a document's id, versionKey or region list");
+    }
+    regionCount += d.regions.length;
+  }
+  if (regionCount > COMPILE_INPUT_MAX_REGIONS) throw outOfBounds(`${regionCount} regions, more than ${COMPILE_INPUT_MAX_REGIONS}`);
+  const docs = list as CompileInputDocument[];
   if (new Set(docs.map((d) => d.nativeId)).size !== docs.length) throw new Error("duplicate documentId");
 
   const chunks: Segment[][] = [[]];
@@ -145,6 +167,8 @@ export function buildCompileInputManifest(
     if (segmentBytes + 2 > chunkBytesMax) throw new Error(`document ${documentId} segment exceeds chunkBytesMax`);
     let current = chunks[chunks.length - 1]!;
     if (current.length && size + segmentBytes + 1 > chunkBytesMax) {
+      // Stop at the bound, not after splitting and hashing the rest of an input that cannot be emitted.
+      if (chunks.length >= COMPILE_INPUT_MANIFEST_MAX_ENTRIES) throw outOfBounds(`more than ${COMPILE_INPUT_MANIFEST_MAX_ENTRIES} chunks`);
       current = [];
       chunks.push(current);
       size = 2;
@@ -242,6 +266,10 @@ export function verifyCompileInputManifest(
   const chunkBytesMax = Math.min(manifest.chunkBytesMax, expected.chunkBytesMax ?? manifest.chunkBytesMax);
   const bodies: unknown = chunkBodies;
   let total = 0;
+  // What a chunk adds is counted before it is kept, so neither the reassembled regions nor the segment stream
+  // (exactly one segment per document per chunk it lists) can outgrow its bound across chunks.
+  let regionCount = 0;
+  const segmentsListed = manifest.documents.reduce((n, d) => n + d.chunkIds.length, 0);
   const stream: Array<{ chunkId: string; segment: Segment }> = [];
   for (const chunk of manifest.chunks) {
     const body = isRecord(bodies) && Object.hasOwn(bodies, chunk.chunkId) ? bodies[chunk.chunkId] : undefined;
@@ -260,6 +288,9 @@ export function verifyCompileInputManifest(
     if (!Array.isArray(segments) || !segments.every(wellFormed)) return fail("manifest_chunk_unreadable");
     // Only an empty compile has an empty chunk, and then it is the only one.
     if (!segments.length && manifest.chunks.length > 1) return fail("manifest_document_invalid");
+    if (stream.length + segments.length > segmentsListed) return fail("manifest_document_invalid");
+    for (const segment of segments) regionCount += segment.regions.length;
+    if (regionCount > COMPILE_INPUT_MAX_REGIONS) return fail("manifest_document_invalid");
     for (const segment of segments) stream.push({ chunkId: chunk.chunkId, segment });
   }
   if (total !== manifest.totalBytes) return fail("manifest_total_mismatch");
