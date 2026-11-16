@@ -1,0 +1,229 @@
+/*
+  Studio page only. Colours come from --v34-* tokens and nothing else. The bands set their own
+  surface, so a rule here that paints a background also states its foreground. No animation.
+*/
+
+/* ---- hero art: source, region, answer --------------------------------------------------- */
+
+.art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.page {
+  fill: none;
+  stroke: var(--v34-on-dark);
+  stroke-width: 2;
+}
+
+.rule {
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+}
+
+.region {
+  fill: none;
+  stroke: var(--v34-lime);
+  stroke-width: 2;
+}
+
+.link {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+}
+
+.node {
+  fill: var(--v34-lime);
+}
+
+.answer {
+  fill: none;
+  stroke: var(--v34-on-dark);
+  stroke-width: 2;
+}
+
+.cite {
+  fill: none;
+  stroke: var(--v34-lime);
+  stroke-width: 3;
+}
+
+/* ---- steps ------------------------------------------------------------------------------ */
+
+.tag {
+  margin-bottom: 24px;
+}
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.step {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 20px clamp(24px, 5vw, 72px);
+  align-items: start;
+  padding: 32px 0;
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.copy {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.kicker {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.heading {
+  margin: 0;
+  color: var(--v34-fg);
+  font-size: clamp(1.45rem, 2.3vw, 2.2rem);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.2;
+}
+
+.body {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.5;
+}
+
+.meta {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.recordLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+.recordLink:hover {
+  color: var(--v34-fg);
+  text-decoration-thickness: 3px;
+}
+
+.recordSource {
+  margin: 0;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: clip;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- sample ----------------------------------------------------------------------------- */
+
+.sample {
+  display: grid;
+  justify-items: start;
+  gap: 20px;
+  min-width: 0;
+}
+
+.textLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+.textLink:hover {
+  color: var(--v34-fg);
+}
+
+.textLink:focus-visible,
+.recordLink:focus-visible,
+.nextLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+/* ---- next ------------------------------------------------------------------------------- */
+
+.next {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 32px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nextItem {
+  min-width: 0;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.nextLink {
+  display: grid;
+  gap: 4px;
+  min-height: 44px;
+  padding: 18px 0 22px;
+  color: var(--v34-fg);
+  text-decoration: none;
+}
+
+.nextTitle {
+  color: var(--v34-fg);
+  font-size: var(--v34-h3);
+  font-weight: 600;
+}
+
+.nextText {
+  color: var(--v34-fg-muted);
+  line-height: 1.5;
+}
+
+.nextLink:hover {
+  background: var(--v34-fg-hover);
+  color: var(--v34-fg);
+}
+
+.nextLink:hover .nextTitle {
+  color: var(--v34-fg-link);
+  text-decoration: underline;
+}
+
+/* ---- narrow ----------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .step {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .next {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .next {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
