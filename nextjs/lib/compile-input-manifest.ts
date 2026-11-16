@@ -69,11 +69,43 @@ function canonical(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function wellFormed(value: unknown): boolean {
-  const s = value as Segment | null;
+const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+const isId = (v: unknown): v is string => typeof v === "string" && v.length > 0;
+const isCount = (v: unknown, min = 0): v is number => Number.isSafeInteger(v) && (v as number) >= min;
+const isSha = (v: unknown) => typeof v === "string" && /^sha256:[0-9a-f]{64}$/.test(v);
+const exactKeys = (v: Record<string, unknown>, keys: readonly string[]) =>
+  Object.keys(v).length === keys.length && keys.every((key) => Object.hasOwn(v, key));
+
+const MANIFEST_KEYS = [
+  "schemaVersion", "workspaceId", "collectionId", "requestId", "coreRequestSchema",
+  "chunkBytesMax", "totalBytes", "documents", "chunks", "manifestSha256",
+] as const;
+
+/**
+ * The manifest arrives as hostile JSON, like the chunk bodies: every field is checked for type, range and
+ * exact key set before anything reads it, so no later step can meet a NaN ceiling, a null list or an
+ * inherited property.
+ */
+function manifestShaped(m: unknown): m is CompileInputManifest {
+  if (!isRecord(m) || !exactKeys(m, MANIFEST_KEYS)) return false;
+  const { chunks, documents } = m;
   return (
-    !!s && typeof s === "object" && typeof s.documentId === "string" && Array.isArray(s.regions) &&
-    (s.header === undefined || (!!s.header && typeof s.header === "object" && !Array.isArray(s.header)))
+    isId(m.workspaceId) && isId(m.collectionId) && isId(m.requestId) &&
+    isCount(m.chunkBytesMax, 1) && isCount(m.totalBytes) && isSha(m.manifestSha256) &&
+    Array.isArray(chunks) && chunks.every((c) =>
+      isRecord(c) && exactKeys(c, ["chunkId", "index", "byteLength", "sha256"]) &&
+      isId(c.chunkId) && isCount(c.index) && isCount(c.byteLength) && isSha(c.sha256)) &&
+    new Set(chunks.map((c: { chunkId: string }) => c.chunkId)).size === chunks.length &&
+    Array.isArray(documents) && documents.every((d) =>
+      isRecord(d) && exactKeys(d, ["documentId", "versionKey", "chunkIds"]) &&
+      isId(d.documentId) && isId(d.versionKey) && Array.isArray(d.chunkIds) && d.chunkIds.every(isId))
+  );
+}
+
+function wellFormed(value: unknown): value is Segment {
+  return (
+    isRecord(value) && isId(value.documentId) && Array.isArray(value.regions) && value.regions.every(isRecord) &&
+    (value.header === undefined || isRecord(value.header))
   );
 }
 
@@ -88,7 +120,8 @@ export function buildCompileInputManifest(
   input: { workspaceId: string; collectionId: string; requestId: string; documents: CompileInputDocument[] },
   options: { chunkBytesMax?: number } = {},
 ): { manifest: CompileInputManifest; chunkBodies: Record<string, string> } {
-  const chunkBytesMax = options.chunkBytesMax ?? COMPILE_INPUT_CHUNK_BYTES_MAX;
+  const chunkBytesMax = options.chunkBytesMax === undefined ? COMPILE_INPUT_CHUNK_BYTES_MAX : options.chunkBytesMax;
+  if (!isCount(chunkBytesMax, 1)) throw new Error("chunkBytesMax must be a positive safe integer");
   const docs = input.documents;
   if (new Set(docs.map((d) => d.nativeId)).size !== docs.length) throw new Error("duplicate documentId");
 
@@ -139,7 +172,8 @@ export function buildCompileInputManifest(
     for (const region of regions) {
       const rb = bytes(canonical(region));
       if (segmentBytes() + rb + (range.length ? 1 : 0) + 2 > chunkBytesMax) {
-        if (!range.length) throw new Error(`region ${region.regionId} exceeds chunkBytesMax`);
+        // An empty range here is only ever the first segment: the header goes out alone and the
+        // region starts the first continuation (a continuation's own fit is checked just below).
         flush();
         if (baseRest + rb + 2 > chunkBytesMax) throw new Error(`region ${region.regionId} exceeds chunkBytesMax`);
       }
@@ -175,74 +209,73 @@ export function buildCompileInputManifest(
 }
 
 export function verifyCompileInputManifest(
-  manifest: CompileInputManifest,
-  chunkBodies: Record<string, string>,
+  manifest: unknown,
+  chunkBodies: Readonly<Record<string, string>>,
   expected: { workspaceId: string; chunkBytesMax?: number },
 ): ManifestVerification {
   const fail = (code: ManifestRefusal): ManifestVerification => ({ ok: false, code });
-  if (manifest.schemaVersion !== COMPILE_INPUT_MANIFEST_SCHEMA) return fail("manifest_schema_unknown");
+  if (!manifestShaped(manifest) || manifest.schemaVersion !== COMPILE_INPUT_MANIFEST_SCHEMA) return fail("manifest_schema_unknown");
   if (manifest.workspaceId !== expected.workspaceId) return fail("manifest_workspace_foreign");
   if (manifest.coreRequestSchema !== "tavonel.product_core.compile_request.v2") return fail("manifest_schema_unknown");
   const { manifestSha256, ...unsealed } = manifest;
   if (manifestDigest(unsealed) !== manifestSha256) return fail("manifest_digest_mismatch");
+  // A caller ceiling that is not a positive integer cannot be honoured, so nothing passes it.
+  if (expected.chunkBytesMax !== undefined && !isCount(expected.chunkBytesMax, 1)) return fail("manifest_chunk_too_large");
   if (manifest.chunks.some((chunk, i) => chunk.index !== i)) return fail("manifest_chunk_index_invalid");
 
   // The caller's own ceiling wins over whatever the manifest declares about itself.
-  const chunkBytesMax = Math.min(manifest.chunkBytesMax, expected.chunkBytesMax ?? Infinity);
+  const chunkBytesMax = Math.min(manifest.chunkBytesMax, expected.chunkBytesMax ?? manifest.chunkBytesMax);
+  const bodies: unknown = chunkBodies;
   let total = 0;
-  let segmentCount = 0;
-  const parsed = new Map<string, Segment[]>();
+  const stream: Array<{ chunkId: string; segment: Segment }> = [];
   for (const chunk of manifest.chunks) {
-    const body = chunkBodies[chunk.chunkId];
-    if (body === undefined) return fail("manifest_chunk_missing");
+    const body = isRecord(bodies) && Object.hasOwn(bodies, chunk.chunkId) ? bodies[chunk.chunkId] : undefined;
+    if (typeof body !== "string") return fail("manifest_chunk_missing");
     const length = bytes(body);
     if (length !== chunk.byteLength) return fail("manifest_chunk_length_mismatch");
     if (length > chunkBytesMax) return fail("manifest_chunk_too_large");
     if (sha(body) !== chunk.sha256) return fail("manifest_chunk_sha256_mismatch");
     total += length;
+    let segments: unknown;
     try {
-      const segments: unknown = JSON.parse(body);
-      if (!Array.isArray(segments) || !segments.every(wellFormed)) return fail("manifest_chunk_unreadable");
-      parsed.set(chunk.chunkId, segments as Segment[]);
-      segmentCount += segments.length;
+      segments = JSON.parse(body);
     } catch {
       return fail("manifest_chunk_unreadable");
     }
+    if (!Array.isArray(segments) || !segments.every(wellFormed)) return fail("manifest_chunk_unreadable");
+    // Only an empty compile has an empty chunk, and then it is the only one.
+    if (!segments.length && manifest.chunks.length > 1) return fail("manifest_document_invalid");
+    for (const segment of segments) stream.push({ chunkId: chunk.chunkId, segment });
   }
   if (total !== manifest.totalBytes) return fail("manifest_total_mismatch");
 
   if (new Set(manifest.documents.map((d) => d.documentId)).size !== manifest.documents.length) return fail("manifest_document_invalid");
-  const indexOf = new Map(manifest.chunks.map((c) => [c.chunkId, c.index]));
-  let consumed = 0;
+  const known = new Set(manifest.chunks.map((c) => c.chunkId));
   const documents: RequestDocument[] = [];
+  // The segment stream, in chunk order, is the documents in manifest order. Each document is one contiguous
+  // run: its header segment, then at most one continuation per following chunk, spanning exactly its chunkIds.
+  let at = 0;
   for (const entry of manifest.documents) {
-    let previous: number | undefined;
-    for (const chunkId of entry.chunkIds) {
-      const index = indexOf.get(chunkId);
-      if (index === undefined) return fail("manifest_document_chunk_missing");
-      if (previous !== undefined && index !== previous + 1) return fail("manifest_document_invalid");
-      previous = index;
+    if (entry.chunkIds.some((id) => !known.has(id))) return fail("manifest_document_chunk_missing");
+    const head = stream[at];
+    const header = head?.segment.header;
+    if (!head || head.segment.documentId !== entry.documentId || !header || header.nativeId !== entry.documentId) {
+      return fail("manifest_document_invalid");
     }
-    let header: Segment["header"];
-    const regions: RequestDocument["regions"] = [];
-    for (const chunkId of entry.chunkIds) {
-      const segments = parsed.get(chunkId);
-      if (!segments) return fail("manifest_document_chunk_missing");
-      const own = segments.filter((s) => s.documentId === entry.documentId);
-      if (!own.length) return fail("manifest_document_invalid");
-      consumed += own.length;
-      for (const segment of own) {
-        if (segment.header) {
-          if (header) return fail("manifest_document_invalid");
-          header = segment.header;
-        } else if (!header) return fail("manifest_document_invalid");
-        regions.push(...segment.regions);
-      }
+    const spanned = [head.chunkId];
+    const regions = [...head.segment.regions];
+    for (at += 1; at < stream.length && stream[at]!.segment.documentId === entry.documentId; at += 1) {
+      const { chunkId, segment } = stream[at]!;
+      if (segment.header || chunkId === spanned[spanned.length - 1]) return fail("manifest_document_invalid");
+      spanned.push(chunkId);
+      regions.push(...segment.regions);
     }
-    if (!header || header.nativeId !== entry.documentId) return fail("manifest_document_invalid");
+    if (spanned.length !== entry.chunkIds.length || spanned.some((id, i) => id !== entry.chunkIds[i])) {
+      return fail("manifest_document_invalid");
+    }
     documents.push({ ...header, regions });
   }
   // Every segment of every chunk belongs to exactly one listed document, once.
-  if (consumed !== segmentCount) return fail("manifest_document_invalid");
+  if (at !== stream.length) return fail("manifest_document_invalid");
   return { ok: true, documents };
 }

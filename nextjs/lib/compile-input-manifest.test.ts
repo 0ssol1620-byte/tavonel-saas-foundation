@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import { describe, expect, it } from "vitest";
 import type { CollectionOcrInput } from "./collection-compiler";
 import { buildProductCoreV2Request } from "./core-runtime-v2";
@@ -79,13 +80,14 @@ describe("compile input manifest", () => {
   });
 
   it("builds a many-region multi-chunk document in linear time", () => {
+    // 20,000 regions: the linear builder takes a few hundred ms; a per-region rescan of the range takes over a minute.
     const region = { ...input.documents[0]!.regions[0]!, text: "y".repeat(200) };
-    const doc: CompileInputDocument = { ...input.documents[0]!, regions: Array.from({ length: 5000 }, (_, i) => ({ ...region, regionId: `r-${i}`, order: i })) };
+    const doc: CompileInputDocument = { ...input.documents[0]!, regions: Array.from({ length: 20_000 }, (_, i) => ({ ...region, regionId: `r-${i}`, order: i })) };
     const started = Date.now();
-    const { manifest, chunkBodies } = buildCompileInputManifest({ ...input, documents: [doc] }, { chunkBytesMax: 200_000 });
-    expect(Date.now() - started).toBeLessThan(5_000);
+    const { manifest, chunkBodies } = buildCompileInputManifest({ ...input, documents: [doc] }, { chunkBytesMax: 800_000 });
+    expect(Date.now() - started).toBeLessThan(2_000);
     expect(manifest.chunks.length).toBeGreaterThan(4);
-    expect(manifest.chunks.every((c) => c.byteLength <= 200_000)).toBe(true);
+    expect(manifest.chunks.every((c) => c.byteLength <= 800_000)).toBe(true);
     const { versionKey: _v, ...expected } = doc;
     expect(verifyCompileInputManifest(manifest, chunkBodies, scope)).toEqual({ ok: true, documents: [expected] });
   });
@@ -121,6 +123,25 @@ describe("compile input manifest", () => {
 
   it("refuses a document whose header alone exceeds the limit, naming the header", () => {
     expect(() => built(200)).toThrow(/header exceeds chunkBytesMax/);
+  });
+
+  it("refuses a chunkBytesMax that is not a positive safe integer instead of building without a limit", () => {
+    for (const bad of [NaN, 0, -1, 1.5, Infinity, 2 ** 53, "900" as never, null as never]) {
+      expect(() => built(bad)).toThrow(/chunkBytesMax must be a positive safe integer/);
+    }
+  });
+
+  it("puts the header in a segment of its own when the first region does not fit beside it", () => {
+    const first = input.documents[0]!;
+    const doc: CompileInputDocument = {
+      ...first,
+      title: "T".repeat(400),
+      regions: [0, 1, 2].map((i) => ({ ...first.regions[0]!, regionId: `h-${i}`, order: i, text: "w".repeat(300) })),
+    };
+    const { manifest, chunkBodies } = buildCompileInputManifest({ ...input, documents: [doc] }, { chunkBytesMax: 1000 });
+    expect(manifest.chunks.every((c) => c.byteLength <= 1000)).toBe(true);
+    expect(JSON.parse(chunkBodies[manifest.chunks[0]!.chunkId]!)).toEqual([expect.objectContaining({ regions: [] })]);
+    expect(verifyCompileInputManifest(manifest, chunkBodies, scope)).toEqual({ ok: true, documents: strip([doc]) });
   });
 
   describe("refusals", () => {
@@ -203,6 +224,113 @@ describe("compile input manifest", () => {
       const { manifest, chunkBodies } = built();
       const documents = manifest.documents.map((d, i) => (i === 0 ? { ...d, chunkIds: [d.chunkIds[1]!] } : d));
       expect(code(reseal({ ...manifest, documents }), chunkBodies)).toBe("manifest_document_invalid");
+    });
+
+    /** Replace chunk `index`'s body and re-seal its length, digest and the total, so only the body is under test. */
+    const withBody = (manifest: CompileInputManifest, bodies: Record<string, string>, index: number, body: string) => {
+      const chunks = manifest.chunks.map((c, i) => (i === index ? { ...c, byteLength: Buffer.byteLength(body), sha256: sha256(body) } : c));
+      const totalBytes = chunks.reduce((n, c) => n + c.byteLength, 0);
+      return [reseal({ ...manifest, chunks, totalBytes }), { ...bodies, [manifest.chunks[index]!.chunkId]: body }] as const;
+    };
+
+    it("a manifest chunkBytesMax that is not a number cannot switch the ceiling off", () => {
+      const { manifest, chunkBodies } = built();
+      for (const bad of ["x", "900", null, -1, 0, 1.5, 2 ** 53]) {
+        const m = reseal({ ...manifest, chunkBytesMax: bad as never });
+        expect(code(m, chunkBodies)).not.toBe("ok");
+        expect(verifyCompileInputManifest(m, chunkBodies, { ...scope, chunkBytesMax: 100 }).ok).toBe(false);
+      }
+    });
+
+    it("a caller ceiling that is not a positive safe integer refuses instead of lifting the limit", () => {
+      const { manifest, chunkBodies } = built();
+      for (const bad of [NaN, 0, -1, 1.5, Infinity, "100" as never, null as never]) {
+        expect(verifyCompileInputManifest(manifest, chunkBodies, { ...scope, chunkBytesMax: bad })).toEqual({ ok: false, code: "manifest_chunk_too_large" });
+      }
+      expect(verifyCompileInputManifest(manifest, chunkBodies, { ...scope, chunkBytesMax: 900 }).ok).toBe(true);
+    });
+
+    it("a chunk id naming an Object.prototype key, or a body that is not a string", () => {
+      const { manifest, chunkBodies } = built();
+      for (const name of ["constructor", "toString", "__proto__", "hasOwnProperty", "valueOf"]) {
+        const old = manifest.chunks[0]!.chunkId;
+        const chunks = manifest.chunks.map((c, i) => (i === 0 ? { ...c, chunkId: name } : c));
+        const documents = manifest.documents.map((d) => ({ ...d, chunkIds: d.chunkIds.map((id) => (id === old ? name : id)) }));
+        const { [old]: _gone, ...rest } = chunkBodies;
+        expect(code(reseal({ ...manifest, chunks, documents }), rest)).toBe("manifest_chunk_missing");
+      }
+      expect(code(manifest, { ...chunkBodies, "chunk-000000": 5 as never })).toBe("manifest_chunk_missing");
+      expect(code(manifest, null as never)).toBe("manifest_chunk_missing");
+    });
+
+    it("a continuation that does not follow its own document's run of segments", () => {
+      const { manifest, chunkBodies } = buildCompileInputManifest(input, { chunkBytesMax: 4_000_000 });
+      const segments = JSON.parse(chunkBodies["chunk-000000"]!) as Array<{ documentId: string; regions: unknown[] }>;
+      const a = segments[0]!;
+      const interleaved = JSON.stringify([...segments, { documentId: a.documentId, regions: [a.regions[0]] }]);
+      expect(code(...withBody(manifest, chunkBodies, 0, interleaved))).toBe("manifest_document_invalid");
+    });
+
+    it("hostile chunk bodies are refused with a code, never thrown", () => {
+      const { manifest, chunkBodies } = built();
+      const bodies = [
+        "[null]", "[[]]", "{}", "null", "[1]", '"x"', "", "[", "[".repeat(400) + "]".repeat(400),
+        '[{"documentId":5,"regions":[]}]', '[{"documentId":"x","regions":null}]', '[{"documentId":"x","regions":[null]}]',
+        '[{"documentId":"x","regions":[],"header":[]}]', '[{"documentId":"x","regions":[],"header":null}]',
+        '[{"documentId":"constructor","regions":[]}]', "[]",
+      ];
+      const results = bodies.map((body) => [body.slice(0, 40), code(...withBody(manifest, chunkBodies, 1, body))]);
+      expect(results.filter(([, c]) => c === "ok" || !String(c).startsWith("manifest_"))).toEqual([]);
+    });
+
+    it("never throws and never accepts a manifest with any one field replaced, deleted or added", () => {
+      const { manifest, chunkBodies } = built();
+      const DELETE = Symbol("delete");
+      const hostile: unknown[] = [DELETE, null, undefined, NaN, Infinity, -1, 0, 1, 1.5, 2 ** 53, "", "x", "constructor", "__proto__", true, [], {}, [null], { length: 1 }];
+      const freeText = new Set(["collectionId", "requestId", "versionKey"]);
+      type Key = string | number;
+      const paths = (value: unknown, at: Key[] = []): Key[][] => [
+        at,
+        ...(value && typeof value === "object"
+          ? Object.entries(value).flatMap(([k, v]) => paths(v, [...at, Array.isArray(value) ? Number(k) : k]))
+          : []),
+      ];
+      const valueAt = (path: Key[]) => path.reduce<unknown>((v, k) => (v as Record<Key, unknown>)[k], manifest);
+      const mutate = (path: Key[], next: unknown): unknown => {
+        if (!path.length) return next === DELETE ? undefined : next;
+        const copy = structuredClone(manifest) as unknown as Record<Key, unknown>;
+        const parent = path.slice(0, -1).reduce<Record<Key, unknown>>((v, k) => v[k] as Record<Key, unknown>, copy);
+        const key = path[path.length - 1]!;
+        if (next !== DELETE) parent[key] = next;
+        else if (Array.isArray(parent)) parent.splice(Number(key), 1);
+        else delete parent[key];
+        return copy;
+      };
+      const sealed = (m: unknown, path: Key[]) =>
+        m && typeof m === "object" && !Array.isArray(m) && path[0] !== "manifestSha256" ? reseal(m as CompileInputManifest) : m;
+      const failures: string[] = [];
+      const check = (label: string, candidate: unknown, mayPass: boolean) => {
+        let result: string;
+        try {
+          result = code(candidate as CompileInputManifest, chunkBodies);
+        } catch (error) {
+          failures.push(`${label} threw ${String(error)}`);
+          return;
+        }
+        if (result === "ok" && !mayPass) failures.push(`${label} accepted`);
+      };
+      for (const path of paths(manifest)) {
+        const original = valueAt(path);
+        for (const next of hostile) {
+          const same = next !== DELETE && isDeepStrictEqual(original, next);
+          const text = typeof next === "string" && next.length > 0 && freeText.has(String(path[path.length - 1]));
+          check(`${path.join(".")}=${String(next === DELETE ? "<delete>" : JSON.stringify(next))}`, sealed(mutate(path, next), path), same || text);
+        }
+        if (original && typeof original === "object" && !Array.isArray(original)) {
+          check(`${path.join(".")}+extra`, sealed(mutate([...path, "extra"], 1), [...path, "extra"]), false);
+        }
+      }
+      expect(failures).toEqual([]);
     });
   });
 });
