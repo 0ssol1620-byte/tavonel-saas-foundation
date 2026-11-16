@@ -26,8 +26,7 @@ const TRUST_KEY = "/api/export/trust";
 
 export const HERO = {
   eyebrow: "Evidence",
-  title: "Every answer has a trail.",
-  lead: "Make a claim inspectable. See where it came from, which revision of the source it was read from, and what it actually supports.",
+  lead: "Every answer has a trail. Make a claim inspectable. See where it came from, which revision of the source it was read from, and what it actually supports.",
   primary: { href: SAMPLE_EVIDENCE, label: "Open a result at its source" },
   art: {
     label: "A source page with one highlighted region, joined by a line to the claim that cites it",

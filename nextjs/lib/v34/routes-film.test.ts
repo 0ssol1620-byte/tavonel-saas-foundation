@@ -13,8 +13,8 @@ import { V34_HELD_PATHS, v34Route, v34RouteByPath } from "./routes";
 
 /*
   Source-level guards for /film (held): app/film/page.tsx and components/v34/routes/film, plus a server
-  render. The 404 in production belongs to app/film/layout.tsx (unchanged), so the page itself does not
-  call releaseGate; the layout guard is pinned here instead.
+  render. The page calls releaseGate first like every held route; app/film/layout.tsx applies the same
+  visibility helper, so there is one rule.
 */
 
 const KEY = "film" as const;
@@ -50,9 +50,17 @@ describe("/film page file", () => {
     expect(page).not.toMatch(/OpeningFilm|RouteStub/);
   });
 
-  it("leaves the 404 to the layout guard, which stays as it was", () => {
-    expect(layout).toContain('process.env.VERCEL_ENV === "production"');
-    expect(layout).toContain("notFound()");
+  it("is a thin held page: the release gate first, then the body", () => {
+    expect(page).toContain("routeViewport()");
+    expect(page).toContain(`await releaseGate("${KEY}")`);
+    expect(page.indexOf("releaseGate(")).toBeLessThan(page.indexOf("return <"));
+    expect(page.indexOf("releaseGate(")).toBeLessThan(page.indexOf("<Film"));
+  });
+
+  it("has a layout that answers 404 by the release helper's rule, not by VERCEL_ENV of its own", () => {
+    expect(layout).toContain('import { heldVisible } from "@/lib/v34/release"');
+    expect(layout).toContain("if (!heldVisible()) notFound();");
+    expect(layout).not.toContain("VERCEL_ENV");
   });
 
   it("adds no video file and no media element", () => {
@@ -66,7 +74,7 @@ describe("/film page file", () => {
   });
 });
 
-describe("one h1 and the Storyboard label", () => {
+describe("one h1, the Storyboard eyebrow and the Illustration label", () => {
   it("writes no h1 of its own and renders the registry title once", () => {
     for (const f of files) expect(f.text, f.file).not.toMatch(/<h1\b/);
     expect(html.match(/<h1\b/g)).toHaveLength(1);
@@ -75,9 +83,12 @@ describe("one h1 and the Storyboard label", () => {
     expect(html.match(/<h1\b[^>]*>.*?<\/h1>/s)?.[0]).not.toContain("— TAVONEL");
   });
 
-  it("labels the page and its drawing Storyboard", () => {
+  it("names the page Storyboard and labels its drawing Illustration, as the art rule requires", () => {
     expect(html).toContain(">Storyboard<");
-    expect(html).toMatch(/<figcaption[^>]*>.*Storyboard/);
+    const caption = html.match(/<figcaption[^>]*>[\s\S]*?<\/figcaption>/)![0];
+    expect(caption).toContain(">Illustration<");
+    expect(caption).not.toContain(">Storyboard<");
+    expect(caption).toContain("Storyboard frames");
   });
 });
 

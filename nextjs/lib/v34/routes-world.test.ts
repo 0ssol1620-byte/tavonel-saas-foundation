@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { typedCounts } from "./route-test-support";
+import { h1Text, typedCounts } from "./route-test-support";
 import { WorldBody } from "@/components/v34/routes/world/world";
 import { WORLD_DESTINATIONS, WORLD_RETAINED } from "@/components/v34/routes/world/world-content";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
@@ -77,8 +77,10 @@ describe("one h1", () => {
     expect(body.text.match(/<Hero\b/g)).toHaveLength(1);
   });
 
-  it("renders exactly one h1", () => {
+  it("renders exactly one h1 and it is the registry heading", () => {
     expect(html.match(/<h1\b/g)).toHaveLength(1);
+    expect(h1Text(html)).toBe("A public reference World you can inspect");
+    expect(v34Route("world").heading).toBe("A public reference World you can inspect");
   });
 });
 

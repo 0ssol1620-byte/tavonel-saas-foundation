@@ -50,7 +50,7 @@ import { WorldBody } from "@/components/v34/routes/world/world";
 import { activationPolicy, customerDataState } from "@/lib/activation-policy";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { sampleEvidencePage } from "@/lib/evidence-regions";
-import { V34_ROUTE_KEYS, type V34RouteKey } from "./routes";
+import { V34_ROUTE_KEYS, v34Route, type V34RouteKey } from "./routes";
 
 /*
   Rules every V34 route body shares, checked once over the rendered bodies rather than re-typed in
@@ -116,10 +116,18 @@ describe("every V34 route body", () => {
     expect([...Object.keys(BODIES), "pricing"].sort()).toEqual([...V34_ROUTE_KEYS].sort());
   });
 
-  it.each(rendered.map((r) => [r.key, r.html]))("%s renders one non-empty h1 without the brand suffix", (_key, html) => {
+  it.each(rendered.map((r) => [r.key, r.html]))("%s renders one non-empty h1 without the brand suffix", (key, html) => {
     const h1 = h1Text(html);
     expect(h1).not.toBe("");
     expect(h1).not.toMatch(/—\s*TAVONEL/);
+    // Every body's h1 is its registry heading. The home is the one exception, pinned in the test below.
+    if (key !== "home") expect(h1).toBe(v34Route(key as V34RouteKey).heading);
+  });
+
+  it("the home is the single exception: its h1 is the hero line reviewed in the home QA, not the registry heading", () => {
+    const h1 = h1Text(rendered.find((r) => r.key === "home")!.html);
+    expect(h1).toBe("Turn your files into knowledge your AI can trust.");
+    expect(h1).not.toBe(v34Route("home").heading);
   });
 
   it("and /pricing, the legacy client, writes one h1 without the brand suffix", () => {
@@ -135,9 +143,10 @@ describe("every V34 route body", () => {
   A plan label used as a plan's name: the label followed by "plan" (or tier, subscription), or the
   label in a list with another capitalised name ("Team and Enterprise"). Labels come from the plan
   catalog and match case-sensitively, so the word "team", the /teams route ("Teams") and a sentence
-  that opens on "Team members" do not trip it.
+  that opens on "Team members" do not trip it. Enterprise is sold by contact and has no catalog offer,
+  so its label is added by hand.
 */
-const LABELS = Object.values(BILLING_OFFERS).map((offer) => offer.label).join("|");
+const LABELS = [...Object.values(BILLING_OFFERS).map((offer) => offer.label), "Enterprise"].join("|");
 const LIST = String.raw`\s*(?:,|and|or|&)\s*(?:the\s+)?`;
 const PLAN_NAME = new RegExp(
   String.raw`\b(?:${LABELS})\s+(?:plans?|tiers?|subscriptions?)\b|\b(?:${LABELS})${LIST}[A-Z][a-z]+\b|\b[A-Z][a-z]+${LIST}(?:${LABELS})\b`,
@@ -152,6 +161,8 @@ describe("plan names stay on /pricing", () => {
       "On the Team plan you get more pages.",
       "Upgrade to the Team subscription.",
       "Enterprise or Team, scoped with you.",
+      "Talk to us about the Enterprise plan.",
+      "The Enterprise tier adds review.",
     ]) expect(named).toMatch(PLAN_NAME);
     for (const plain of [
       "Shared Worlds for groups that work together",
@@ -161,6 +172,9 @@ describe("plan names stay on /pricing", () => {
       "Your team reads the same World.",
       "API and MCP reference for developers",
       "Developer documentation and the MCP server",
+      "Knowledge compiled for large organizations, across the enterprise.",
+      "Built for enterprise teams that answer to auditors.",
+      "Enterprise",
     ]) expect(plain).not.toMatch(PLAN_NAME);
   });
 

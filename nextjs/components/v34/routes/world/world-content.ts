@@ -19,8 +19,7 @@ export const CATALOG_LABEL = "Source catalog";
 
 export const HERO = {
   eyebrow: "World",
-  title: "See how knowledge connects.",
-  lead: "Explore source, entity, concept, claim and change records, then inspect the original document.",
+  lead: "See how knowledge connects. Explore source, entity, concept, claim and change records, then inspect the original document.",
 } as const;
 
 export const INSTRUMENT = {

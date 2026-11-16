@@ -253,7 +253,8 @@ describe("2026-09-05 production hardening", () => {
     expect(redirect).toContain('permanentRedirect("/knowledge-compiler")');
     expect(read("app/sitemap.ts")).not.toContain('"/product/knowledge-compiler"');
     expect(read("app/dev/layout.tsx")).toContain('process.env.VERCEL_ENV === "production"');
-    expect(read("app/film/layout.tsx")).toContain('process.env.VERCEL_ENV === "production"');
+    // /film is a held V34 route: its layout uses the release helper's fail-closed rule (lib/v34/release.ts).
+    expect(read("app/film/layout.tsx")).toContain("if (!heldVisible()) notFound();");
   });
 
   /*

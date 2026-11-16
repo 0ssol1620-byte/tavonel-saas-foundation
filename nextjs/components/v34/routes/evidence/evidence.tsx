@@ -13,6 +13,7 @@ import { Section } from "@/components/v34/ui/section";
 import { Tag } from "@/components/v34/ui/tag";
 import type { EvidencePageView } from "@/lib/evidence-regions";
 import { PUBLIC_CORPUS_STATS, readPublicCorpus } from "@/lib/v34/public-corpus";
+import { v34Route } from "@/lib/v34/routes";
 import type { CorpusSource } from "@/lib/v34/world-geometry";
 import { EvidenceArt } from "./evidence-art";
 import {
@@ -53,7 +54,7 @@ export function EvidenceBody({ view }: { view: EvidencePageView }) {
       <Hero
         variant="split"
         eyebrow={HERO.eyebrow}
-        title={HERO.title}
+        title={v34Route("evidence").heading}
         lead={HERO.lead}
         actions={<ButtonLink href={HERO.primary.href}>{HERO.primary.label}</ButtonLink>}
         art={<Figure art={<EvidenceArt label={HERO.art.label} />} caption={HERO.art.caption} />}

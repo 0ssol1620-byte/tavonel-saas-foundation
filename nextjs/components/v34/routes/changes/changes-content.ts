@@ -20,8 +20,7 @@ const SAMPLE_CHANGE = `${EXPLORE_CTA.href}?act=change` as Route;
 
 export const HERO = {
   eyebrow: "Changes",
-  title: "See what changed before you activate it.",
-  lead: "A version update changes what your AI knows. Compare two versions of a World, see which records, relationships and evidence differ, and choose what becomes current.",
+  lead: "See what changed before you activate it. A version update changes what your AI knows. Compare two versions of a World, see which records, relationships and evidence differ, and choose what becomes current.",
   primary: { href: SAMPLE_CHANGE, label: "Compare the public World versions" },
   art: {
     label: "Two versions of a World side by side, with one record unchanged, one changed, one removed and one added",

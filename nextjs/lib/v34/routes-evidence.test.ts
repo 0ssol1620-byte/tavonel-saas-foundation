@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { typedCounts } from "./route-test-support";
+import { h1Text, typedCounts } from "./route-test-support";
 import { EvidenceBody } from "@/components/v34/routes/evidence/evidence";
 import { sampleEvidencePage } from "@/lib/evidence-regions";
 import { EVIDENCE_DESTINATIONS, EVIDENCE_RETAINED } from "@/components/v34/routes/evidence/evidence-content";
@@ -78,8 +78,10 @@ describe("one h1", () => {
     expect(body.text.match(/<Hero\b/g)).toHaveLength(1);
   });
 
-  it("renders exactly one h1", () => {
+  it("renders exactly one h1 and it is the registry heading", () => {
     expect(html.match(/<h1\b/g)).toHaveLength(1);
+    expect(h1Text(html)).toBe("Evidence regions behind every cited answer");
+    expect(v34Route("evidence").heading).toBe("Evidence regions behind every cited answer");
   });
 });
 

@@ -299,9 +299,10 @@ function collectControls(max: number): { index: number; selector: string; border
     const borderPx = parseFloat(s.borderTopWidth);
     if (s.borderTopStyle === "none" || borderPx <= 0) continue;
     const border = rgba(s.borderTopColor), fill = rgba(s.backgroundColor);
-    // A transparent border on a transparent control draws no boundary, exactly as border: none does. It is
+    // A transparent border on a transparent button draws no boundary, exactly as border: none does. It is
     // the forced-colours border (the system draws it in the user's colour), so there is nothing here to measure.
-    if (border[3] < 0.05 && fill[3] < 0.05) continue;
+    // Buttons only: a text field, select or textarea drawn that way shows no edge at all, and still fails 1.4.11.
+    if (border[3] < 0.05 && fill[3] < 0.05 && el.matches("button, [role=button]")) continue;
     const index = out.length;
     el.setAttribute("data-v34-control-idx", String(index));
     out.push({ index, selector: `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}${typeof el.className === "string" && el.className ? `.${el.className.trim().split(/\s+/)[0]}` : ""}`, border, fill, borderPx });

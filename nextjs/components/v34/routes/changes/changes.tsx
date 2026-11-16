@@ -11,6 +11,7 @@ import { Section } from "@/components/v34/ui/section";
 import { Tag } from "@/components/v34/ui/tag";
 import { exploreChangeTimeline } from "@/lib/explore-change";
 import { readPublicCorpus } from "@/lib/v34/public-corpus";
+import { v34Route } from "@/lib/v34/routes";
 import { ChangesArt } from "./changes-art";
 import {
   ACTIVATE, BRIDGE, COVERS, FINAL, HERO, REVISION, REVISION_RECORD_ID, REVISION_RELATION,
@@ -48,7 +49,7 @@ export function ChangesBody() {
       <Hero
         variant="split"
         eyebrow={HERO.eyebrow}
-        title={HERO.title}
+        title={v34Route("changes").heading}
         lead={HERO.lead}
         actions={<ButtonLink href={HERO.primary.href}>{HERO.primary.label}</ButtonLink>}
         art={<Figure art={<ChangesArt label={HERO.art.label} />} caption={HERO.art.caption} />}

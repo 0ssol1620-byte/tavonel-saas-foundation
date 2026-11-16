@@ -216,6 +216,18 @@ test.describe("contrast", () => {
     expect(await controlContrastPass(page)).toHaveLength(1);
   });
 
+  test("transparent-border input fails", async ({ page }) => {
+    // The skip is for buttons. A field with no visible edge has no boundary to find, and 1.4.11 still applies.
+    for (const field of [
+      `<input style="border:1px solid transparent;background:transparent;width:200px;height:40px">`,
+      `<select style="border:1px solid transparent;background:transparent;width:200px;height:40px"><option>a</option></select>`,
+      `<textarea style="border:1px solid transparent;background:transparent;width:200px;height:60px"></textarea>`,
+    ]) {
+      await load(page, `<main style="background:#fff;padding:12px">${field}</main>`);
+      expect(await controlContrastPass(page), field).toHaveLength(1);
+    }
+  });
+
   test("details: the content ones are opened, the header menu is not", async ({ page }) => {
     // An open header menu lies over the field: measured with it open, the field reads against the menu.
     const menu = `<header style="position:relative"><details id="menu"><summary>Menu</summary><div style="position:absolute;top:24px;left:0;width:400px;height:40px;background:#0050b4"></div></details></header>`;

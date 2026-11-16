@@ -41,16 +41,26 @@ describe("registry and app pages", () => {
     expect(existsSync(join(root, pageFile(path)))).toBe(true);
   });
 
-  it.each(V34_HELD_ROUTES.filter((r) => r.key !== "film").map((r) => [r.key] as const))(
-    "held route %s calls releaseGate with its own key",
+  /*
+    Every held row, with no exception: a held route added to the registry cannot ship without the gate.
+    The call is awaited inside the page function and comes before its first return, so nothing renders
+    ahead of the 404.
+  */
+  it.each(V34_HELD_ROUTES.map((r) => [r.key] as const))(
+    "held route %s awaits releaseGate with its own key before it renders",
     (key) => {
-      expect(read(pageFile(v34Route(key).path))).toContain(`releaseGate("${key}")`);
+      const source = read(pageFile(v34Route(key).path)).replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "$1");
+      const page = source.slice(source.indexOf("export default"));
+      const gate = page.indexOf(`await releaseGate("${key}")`);
+      expect(gate, "no awaited releaseGate with this key in the page function").toBeGreaterThan(-1);
+      expect(gate, "the gate comes after the page returns").toBeLessThan(page.indexOf("return"));
     },
   );
 
-  it("leaves /film's 404 to its layout and does not gate it twice", () => {
-    expect(read("app/film/layout.tsx")).toContain("notFound");
-    expect(read("app/film/page.tsx")).not.toContain("releaseGate");
+  it("gives /film's layout the same fail-closed rule as the gate, not a rule of its own", () => {
+    const layout = read("app/film/layout.tsx");
+    expect(layout).toContain("if (!heldVisible()) notFound();");
+    expect(layout).not.toContain("VERCEL_ENV");
   });
 
   it("resolves every routeMetadata(<key>) to the key of the page that calls it", () => {

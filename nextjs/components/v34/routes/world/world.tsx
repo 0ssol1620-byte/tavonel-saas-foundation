@@ -9,6 +9,7 @@ import { Section } from "@/components/v34/ui/section";
 import { Tag } from "@/components/v34/ui/tag";
 import { WorldInstrument } from "@/components/v34/world/world-instrument";
 import { PUBLIC_CORPUS_STATS, readPublicCorpus } from "@/lib/v34/public-corpus";
+import { v34Route } from "@/lib/v34/routes";
 import { CATALOG_LABEL, DOMAINS, FINAL, HERO, INSTRUMENT, NEXT, SOURCES } from "./world-content";
 import s from "./world.module.css";
 
@@ -19,7 +20,7 @@ export function WorldBody() {
   const loaded = Object.values(corpus.sources).filter((source) => source[1] !== CATALOG_LABEL);
   return (
     <>
-      <Hero variant="sub" eyebrow={HERO.eyebrow} title={HERO.title} lead={HERO.lead} />
+      <Hero variant="sub" eyebrow={HERO.eyebrow} title={v34Route("world").heading} lead={HERO.lead} />
 
       <Section surface="green">
         <WorldInstrument variant="full" />

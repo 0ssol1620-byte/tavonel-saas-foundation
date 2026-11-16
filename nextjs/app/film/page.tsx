@@ -1,14 +1,16 @@
 import Film from "@/components/v34/routes/film/film";
+import { releaseGate } from "@/lib/v34/release";
 import { routeMetadata, routeViewport } from "@/lib/v34/route-metadata";
 
 /*
-  Held: production answers 404 from the layout beside this file (`VERCEL_ENV === "production"`), so
-  this page carries no gate call of its own. The page is a storyboard until a film capture and its rights
+  Held: the page answers 404 through releaseGate, like every held route, and the layout beside this
+  file applies the same visibility rule. The page is a storyboard until a film capture and its rights
   exist; no video file is added.
 */
 export const metadata = routeMetadata("film");
 export const viewport = routeViewport();
 
-export default function Page() {
+export default async function Page() {
+  await releaseGate("film");
   return <Film />;
 }
