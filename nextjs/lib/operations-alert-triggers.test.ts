@@ -207,6 +207,20 @@ describe("RunPod daily cost", () => {
       expect(posts[0]).toMatchObject({ severity: "critical" });
     });
 
+    it("does not latch a tier whose page failed to deliver: the next evaluation pages again", async () => {
+      history(null);
+      vi.stubGlobal("fetch", vi.fn(async () => new Response("down", { status: 503 })));
+      const failed = await checkRunPodDailyCost(NOW, env, spend(21));
+      expect(failed).toMatchObject({ code: "RUNPOD_BUDGET_TIER_80_UNSENT", delivery: "ALERT_DELIVERY_FAILED" });
+      history(failed.code);
+      vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+        posts.push(JSON.parse(String(init?.body)));
+        return new Response("ok", { status: 200 });
+      }));
+      expect(await checkRunPodDailyCost(NOW + 3_600_000, env, spend(21))).toMatchObject({ code: "RUNPOD_BUDGET_TIER_80", delivery: "ALERT_DELIVERED" });
+      expect(posts).toHaveLength(1);
+    });
+
     it("pages, keyed by the hour, when the previous tier cannot be read, rather than staying silent", async () => {
       store.request.mockResolvedValue(new Response("down", { status: 503 }));
       expect(await checkRunPodDailyCost(NOW, env, spend(21))).toMatchObject({ code: "RUNPOD_BUDGET_TIER_80", delivery: "ALERT_DELIVERED" });

@@ -328,7 +328,8 @@ export async function checkRunPodDailyCost(
       summary: `RunPod spend for the billing day from ${new Date(bucketStart).toISOString()} reached ${tier}% of the daily cap`,
       currentValue: Math.round(spent * 100) / 100, thresholdValue: cap, unit: "usd",
     }, now);
-    return result(`RUNPOD_BUDGET_TIER_${tier}`, delivery);
+    // An undelivered page must not latch: _UNSENT reads as tier 0, so the next hour sends again.
+    return result(delivery.ok ? `RUNPOD_BUDGET_TIER_${tier}` : `RUNPOD_BUDGET_TIER_${tier}_UNSENT`, delivery);
   }
   const delivery = await send(`runpod-daily-cost:${day}`, {
     kind: "cost", severity: spent >= cap * 1.2 ? "critical" : "warning", service: "runpod",
