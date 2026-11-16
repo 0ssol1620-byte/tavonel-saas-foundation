@@ -1,11 +1,14 @@
-import RouteStub from "@/components/v34/route-stub";
+import Platform from "@/components/v34/routes/platform/platform";
 import { releaseGate } from "@/lib/v34/release";
 import { routeMetadata, routeViewport } from "@/lib/v34/route-metadata";
 
 export const metadata = routeMetadata("platform");
 export const viewport = routeViewport();
+// The primary action is commercial state (self-serve or "Request access") read from the runtime's flags,
+// so the page renders on each request, as the home page does, instead of freezing the build-time answer.
+export const dynamic = "force-dynamic";
 
 export default async function Page() {
   await releaseGate("platform");
-  return <RouteStub route="platform" line="Start from a document, follow it through compilation to a cited record, then read the finished World from an AI client." />;
+  return <Platform />;
 }

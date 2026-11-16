@@ -1,0 +1,226 @@
+/*
+  Compiler page only. Colours come from --v34-* tokens and nothing else. The bands themselves
+  (Hero, Section, Bridge, FinalCta) set their own surface, so a rule here that paints a background
+  also states its foreground, and the rest read --v34-fg* from the band they sit in.
+  No animation: nothing on this page moves.
+*/
+
+/* ---- illustration ----------------------------------------------------------------------- */
+
+.art {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.page {
+  fill: var(--v34-step-bg);
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 1.5;
+}
+
+.line {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+}
+
+.region {
+  fill: none;
+  stroke: var(--v34-lime);
+  stroke-width: 2;
+}
+
+.link {
+  fill: none;
+  stroke: var(--v34-lime);
+  stroke-width: 1.5;
+  stroke-dasharray: 7 6;
+}
+
+.head {
+  fill: var(--v34-lime);
+}
+
+.record {
+  fill: var(--v34-step-bg);
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 1.5;
+}
+
+.node {
+  fill: var(--v34-lime);
+}
+
+.label {
+  fill: var(--v34-on-dark);
+  font-family: var(--v34-font);
+  font-size: 22px;
+}
+
+/* ---- formats ---------------------------------------------------------------------------- */
+
+.stats {
+  max-width: 34rem;
+  margin-bottom: 28px;
+}
+
+.after {
+  margin: 14px 0 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.5;
+}
+
+.textLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+.textLink:hover {
+  color: var(--v34-fg);
+  text-decoration-thickness: 2px;
+}
+
+.textLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+/* ---- stages ----------------------------------------------------------------------------- */
+
+.stages {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stage {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 2px solid var(--v34-fg);
+}
+
+.stageKicker {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stageTitle {
+  margin: 0;
+  color: var(--v34-fg);
+  font-size: var(--v34-h3);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.15;
+}
+
+.stageText {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+}
+
+/* ---- what a region carries -------------------------------------------------------------- */
+
+.receipt {
+  min-width: 0;
+  padding: 8px 22px;
+  border: 1px solid var(--v34-rule);
+  border-radius: var(--v34-radius-panel);
+}
+
+.fields {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.field {
+  display: grid;
+  grid-template-columns: minmax(0, 0.45fr) minmax(0, 1fr);
+  gap: 4px 18px;
+  min-width: 0;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.field:last-child {
+  border-bottom: 0;
+}
+
+.term {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.definition {
+  margin: 0;
+  min-width: 0;
+  color: var(--v34-fg);
+  line-height: 1.5;
+}
+
+/* ---- sources ---------------------------------------------------------------------------- */
+
+.tag {
+  margin-bottom: 20px;
+}
+
+.sources {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.references {
+  margin-top: 14px;
+}
+
+.source {
+  display: grid;
+  min-width: 0;
+}
+
+/* ---- narrower screens ------------------------------------------------------------------- */
+
+@media (max-width: 1100px) {
+  .stages {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sources {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 650px) {
+  .stages,
+  .sources {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .field {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
