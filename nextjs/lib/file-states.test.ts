@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPipeline, type LocalUpload, type PipelineDocument, type PipelineRow, type StageState } from "./pipeline";
+import { buildPipeline, refusalDetail, type LocalUpload, type PipelineDocument, type PipelineRow, type StageState } from "./pipeline";
 import { censusOf, deriveFileStates, reconciles, type Census } from "./file-states";
 
 const doc = (o: Partial<PipelineDocument> = {}): PipelineDocument => ({
@@ -36,7 +36,7 @@ describe("deriveFileStates", () => {
     };
     const row = one(buildPipeline([], [refused], ["d1"]));
     expect(row.state).toBe("held");
-    expect(row.reason).toContain("encrypted");
+    expect(row.reason).toBe(refusalDetail(refused.refusal!));
   });
 
   it("never yields accepted while the World is not active", () => {
@@ -65,16 +65,33 @@ describe("deriveFileStates", () => {
 });
 
 describe("censusOf", () => {
+  const refusedDoc: PipelineDocument = {
+    ...doc({ documentId: "g", processingState: "refused", sanitizedKey: null }),
+    refusal: { reasonCode: "ENCRYPTED_SOURCE", observedBytes: null, occurredAt: "t" },
+  };
   const mixed = () => buildPipeline(
-    [up({ localId: "u1" }), up({ localId: "u2", phase: "failed", reason: "r" })],
+    [up({ localId: "u1" }), up({ localId: "u2", phase: "failed", reason: "r" }), up({ localId: "u3", phase: "uncertain", reason: "u" })],
     [doc({ documentId: "a" }), doc({ documentId: "b", hasOcrJson: true }), doc({ documentId: "c", hasOcrJson: true }),
-     doc({ documentId: "e", processingState: "operator_review" }), doc({ documentId: "f", sanitizedKey: null })],
+     doc({ documentId: "e", processingState: "operator_review" }), doc({ documentId: "f", sanitizedKey: null }),
+     refusedDoc, doc({ documentId: "i", hasOcrJson: true })],
     ["c"],
   );
+  const blocked = [{ documentId: "i", kind: "input" as const, reason: "x" }];
 
-  it("reconciles on a mixed fixture and leaves removed unobserved", () => {
-    const census = censusOf(deriveFileStates(mixed(), live));
-    expect(census).toMatchObject({ discovered: 7, accepted: 1, pending: 1, held: 2, processing: 3, removed: null });
+  it("reconciles a 10-file mixed fixture, every bucket exact, removed unobserved", () => {
+    const rows = deriveFileStates(mixed(), { ...live, blocked, blockedResolution: "remove_blocked" });
+    const census = censusOf(rows);
+    expect(census).toEqual({
+      discovered: 10, pending: 1, processing: 3, verified_pending_publish: 0, accepted: 1, held: 4, excluded: 1, removed: null,
+    });
+    expect(reconciles(census)).toBe(true);
+  });
+
+  it("with the World inactive the compiled file is verified_pending_publish and accepted is 0", () => {
+    const census = censusOf(deriveFileStates(mixed(), { compiledWorldActive: false, blocked, blockedResolution: "remove_blocked" }));
+    expect(census).toEqual({
+      discovered: 10, pending: 1, processing: 3, verified_pending_publish: 1, accepted: 0, held: 4, excluded: 1, removed: null,
+    });
     expect(reconciles(census)).toBe(true);
   });
 
@@ -105,6 +122,8 @@ describe("censusOf", () => {
       expect(rows).toHaveLength(500);
       expect(census.discovered).toBe(500);
       expect(reconciles(census)).toBe(true);
+      if (!active) expect(census.accepted).toBe(0);
+      expect(rows.filter((r) => r.state === "accepted")).toHaveLength(census.accepted);
     }
   });
 });
