@@ -179,7 +179,9 @@ test("closed intake offers a working public evaluation and an Enterprise convers
   const pro = page.locator("article.plan").filter({ has: page.getByRole("heading", { name: "Pro" }) });
   await expect(pro.getByText("Review queue and version history", { exact: true })).toBeVisible();
   await expect(pro).not.toContainText(/single-member|seats|guided corpus onboarding/i);
-  await expect(pro.getByText("Plan limits")).toHaveCount(1);
+  await expect(pro.getByText("Shared members and roles")).not.toBeVisible();
+  await pro.getByText("Plan limits").click();
+  await expect(pro.getByText("Shared members and roles")).toBeVisible();
   const quote = page.locator("#enterprise-pricing");
   await expect(quote.getByRole("link", { name: "Scope an Enterprise pilot" })).toBeVisible();
   await expect(quote.getByRole("heading", { name: "What moves the quote" })).not.toBeVisible();
