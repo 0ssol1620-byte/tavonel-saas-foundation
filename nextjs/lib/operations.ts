@@ -1,5 +1,5 @@
 import { activationPolicy } from "@/lib/activation-policy";
-import { readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
+import { catalogConfigured, readPaddleBrowserConfig } from "@/lib/billing-catalog";
 import { readCommercialState } from "@/lib/commercial-state";
 import { readBillingSecret } from "@/lib/billing-secrets";
 import { readExportSignerEnv } from "@/lib/export-signing";
@@ -77,7 +77,7 @@ export function readPublicOperations() {
     // Same reader as the signers and verifiers: a value with surrounding whitespace reports as not configured.
     binding: readBillingSecret("FOUNDATION_BILLING_HMAC").ok,
     settlement: readBillingSecret("FOUNDATION_BILLING_SETTLEMENT_HMAC").ok,
-    catalog: readConfiguredBillingOffers().size === 2,
+    catalog: catalogConfigured(),
   };
   const signer = readR2SignerEnv();
 

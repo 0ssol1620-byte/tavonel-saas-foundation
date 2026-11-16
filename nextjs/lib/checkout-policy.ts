@@ -1,5 +1,5 @@
 import type { CommercialState } from "./commercial-state";
-import type { BillingOffer } from "./billing-catalog";
+import { planAvailability, type BillingOffer, type PlanAvailability } from "./billing-catalog";
 
 export type CheckoutPolicyDecision =
   | { allowed: true; mode: "sandbox_qualification" | "production" }
@@ -9,11 +9,17 @@ export type OfferCheckoutPolicyDecision =
   | { allowed: true }
   | { allowed: false; code: "BILLING_OFFER_CONTACT_REQUIRED" };
 
-/** Enforces the catalog's per-offer sales boundary independently of deployment-wide readiness. */
+/**
+ * Enforces the catalog's per-offer sales boundary independently of deployment-wide readiness.
+ * An offer is sold online only when it is `purchasable` (every capability on its line delivered, its
+ * price configured) and its channel is self-serve; a retired or not-yet-deliverable offer is refused
+ * here, before an intent exists.
+ */
 export function decideOfferCheckoutPolicy(
-  offer: Pick<BillingOffer, "saleChannel">,
+  offer: Pick<BillingOffer, "code" | "saleChannel">,
+  availability: PlanAvailability = planAvailability(offer.code),
 ): OfferCheckoutPolicyDecision {
-  return offer.saleChannel === "self_serve"
+  return availability === "purchasable" && offer.saleChannel === "self_serve"
     ? { allowed: true }
     : { allowed: false, code: "BILLING_OFFER_CONTACT_REQUIRED" };
 }

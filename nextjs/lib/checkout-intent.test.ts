@@ -9,7 +9,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BILLING_OFFERS } from "./billing-catalog";
+import { BILLING_OFFERS, planAvailability } from "./billing-catalog";
 import {
   checkoutSellable,
   decideCheckoutResume,
@@ -44,13 +44,19 @@ describe("checkoutSellable: the one predicate /login's notice and H1 both read (
     for (const code of OFFER_CODES) expect(checkoutSellable(code, false)).toBe(false);
   });
 
-  it("sells, on an open deployment, exactly the offers whose sale channel is self_serve", () => {
+  it("sells, on an open deployment, only a purchasable plan", () => {
+    expect(checkoutSellable("purchasable", true)).toBe(true);
+    // Failure paths: a plan waiting for its capabilities, and a retired one, are never sold online.
+    expect(checkoutSellable("request_access", true)).toBe(false);
+    expect(checkoutSellable("retired", true)).toBe(false);
+  });
+
+  it("fails closed for an offer code with nothing delivered, which is every offer today", () => {
+    const configured = new Map(OFFER_CODES.map((code) => [code, true] as const));
     for (const code of OFFER_CODES) {
-      expect(checkoutSellable(code, true), code).toBe(BILLING_OFFERS[code].saleChannel === "self_serve");
+      expect(planAvailability(code, configured), code).not.toBe("purchasable");
+      expect(checkoutSellable(code, true), code).toBe(false);
     }
-    // Pro stays "contact" (CAT-D4, 2026-11-16): only Starter sells online on an open deployment.
-    expect(checkoutSellable("studio_access", true)).toBe(false);
-    expect(checkoutSellable("observer_access", true)).toBe(true);
   });
 });
 
@@ -138,12 +144,13 @@ describe("decideCheckoutResume: terms -> launch -> checkout (D-14)", () => {
         expect(decideCheckoutResume("observer_access", purchaseOpen, access), String(purchaseOpen)).toBe("open");
       }
     }
-    // Pro is a conversation (CAT-D4); its checkout is refused with the contact sentence, never held.
-    expect(decideCheckoutResume("studio_access", true, newAccount)).toBe("open");
+    // A plan that is not purchasable is a conversation; its checkout is refused with the contact sentence, never held.
+    expect(decideCheckoutResume("request_access", true, newAccount)).toBe("open");
+    expect(decideCheckoutResume("retired", true, newAccount)).toBe("open");
   });
 
   it("opens only for production processing in this workspace", () => {
-    expect(decideCheckoutResume("observer_access", true, released)).toBe("open");
+    expect(decideCheckoutResume("purchasable", true, released)).toBe("open");
   });
 
   /*
@@ -154,14 +161,14 @@ describe("decideCheckoutResume: terms -> launch -> checkout (D-14)", () => {
   */
   it("opens for a released workspace with no entitlement: the trial-refused buyer is not held", () => {
     const unentitledReleased: ResumeAccess = { ...newAccount, sourcePending: null, processingStage: "production" };
-    expect(decideCheckoutResume("observer_access", true, unentitledReleased)).toBe("open");
+    expect(decideCheckoutResume("purchasable", true, unentitledReleased)).toBe("open");
     // Not released: still held, whatever else is true.
-    expect(decideCheckoutResume("observer_access", true, { ...unentitledReleased, processingStage: "qualification" })).toBe("hold_release");
-    expect(decideCheckoutResume("observer_access", true, { ...unentitledReleased, processingStage: null })).toBe("hold_release");
+    expect(decideCheckoutResume("purchasable", true, { ...unentitledReleased, processingStage: "qualification" })).toBe("hold_release");
+    expect(decideCheckoutResume("purchasable", true, { ...unentitledReleased, processingStage: null })).toBe("hold_release");
   });
 
   it("holds for the processing terms before anything else", () => {
-    expect(decideCheckoutResume("observer_access", true, newAccount)).toBe("hold_terms");
+    expect(decideCheckoutResume("purchasable", true, newAccount)).toBe("hold_terms");
   });
 
   it("holds for the launch once the terms are accepted, and fails closed on anything short of production", () => {
@@ -174,21 +181,21 @@ describe("decideCheckoutResume: terms -> launch -> checkout (D-14)", () => {
       { ...released, processingStage: undefined },
     ];
     for (const access of short) {
-      expect(decideCheckoutResume("observer_access", true, access), JSON.stringify(access)).toBe("hold_release");
+      expect(decideCheckoutResume("purchasable", true, access), JSON.stringify(access)).toBe("hold_release");
     }
     // Access could not be read: kept, not spent.
-    expect(decideCheckoutResume("observer_access", true, null)).toBe("hold_release");
+    expect(decideCheckoutResume("purchasable", true, null)).toBe("hold_release");
   });
 
   it("drops the intent for a billing-exempt owner instead of holding it", () => {
-    expect(decideCheckoutResume("observer_access", true, { ...newAccount, source: "owner", billingExempt: true })).toBe("drop_owner");
-    expect(decideCheckoutResume("observer_access", true, { ...released, source: "owner", billingExempt: true })).toBe("drop_owner");
+    expect(decideCheckoutResume("purchasable", true, { ...newAccount, source: "owner", billingExempt: true })).toBe("drop_owner");
+    expect(decideCheckoutResume("purchasable", true, { ...released, source: "owner", billingExempt: true })).toBe("drop_owner");
     // An owner grant that is not billing-exempt buys like anyone else.
-    expect(decideCheckoutResume("observer_access", true, { ...released, source: "owner", billingExempt: false })).toBe("open");
+    expect(decideCheckoutResume("purchasable", true, { ...released, source: "owner", billingExempt: false })).toBe("open");
   });
 
   it("says the live /login hold sentence and nothing it cannot keep (register C4)", () => {
-    expect(heldOfferSentence("observer_access")).toBe("Starter is held for you.");
+    expect(heldOfferSentence("personal")).toBe("Personal is held for you.");
     for (const code of OFFER_CODES) {
       expect(heldOfferSentence(code)).toBe(`${BILLING_OFFERS[code].label} is held for you.`);
       expect(heldOfferSentence(code)).not.toMatch(/opens by itself|once you are in/);

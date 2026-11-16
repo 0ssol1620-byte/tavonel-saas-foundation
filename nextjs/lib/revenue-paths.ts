@@ -12,7 +12,7 @@ export type RevenuePath = {
   family: string;
   state: RevenuePathState;
   offerCodes: readonly BillingOfferCode[];
-  /** Null for not_sold, and for sold_contract (invoiced outside the self-serve ledger). */
+  /** Null for sold_contract (invoiced outside the self-serve ledger) and for a not_sold family that holds no offer. */
   ledgerPath: LedgerPath | null;
   /** Public-copy terms that must not appear while the path is not_sold. */
   terms: readonly string[];
@@ -30,14 +30,21 @@ export const REVENUE_PATHS: readonly RevenuePath[] = [
   // Trial usage is not an allowance row (that kind is unique per Paddle transaction_id); it is counted
   // through foundation_trial_policy and reserve_foundation_compute_v3 with billing source "trial".
   { family: "CORE_FREE", state: "sold_self_serve", offerCodes: [], ledgerPath: "compute_reservation", terms: [] },
+  /*
+    Catalog v2 (PB-2026-11-V22). No v2 plan is purchasable until `DELIVERED` holds every capability on
+    its line (`planAvailability`), so these paths are `not_sold`; WO-CAT-7 flips them with the release
+    that proves the meters. They already name their ledger path, because the two retired offers settle
+    renewals through it today: they are never sold again, and an existing subscriber keeps both the
+    price and the `allowance` path until they change plan.
+  */
   {
     family: "CORE_PERSONAL_TEAM_BUSINESS",
-    state: "sold_self_serve",
-    offerCodes: ["observer_access", "studio_access"],
-    ledgerPath: "allowance", // both offers are kind "subscription"; paddle-billing-event emits action "allowance"
+    state: "not_sold",
+    offerCodes: ["personal", "team", "business", "observer_access", "studio_access"],
+    ledgerPath: "allowance", // every offer is kind "subscription"; paddle-billing-event emits action "allowance"
     terms: [],
   },
-  notSold("DEV"),
+  { family: "DEV", state: "not_sold", offerCodes: ["developer"], ledgerPath: "allowance", terms: [] },
   { family: "COMPILE_PCU", state: "sold_self_serve", offerCodes: [], ledgerPath: "compute_reservation", terms: [] },
   notSold("CONTEXT_KQU", "KQU"),
   notSold("STORAGE_RETENTION", "GB-month"),

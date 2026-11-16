@@ -18,7 +18,7 @@
  * owns the allow-list, and a URL a visitor can edit must not be able to name a number.
  */
 
-import { BILLING_OFFERS, isBillingOfferCode, type BillingOfferCode } from "./billing-catalog";
+import { BILLING_OFFERS, isBillingOfferCode, planAvailability, type BillingOfferCode, type PlanAvailability } from "./billing-catalog";
 
 const KEY = "tavonel.checkout-intent";
 
@@ -27,12 +27,18 @@ const KEY = "tavonel.checkout-intent";
  * the H1 both read, so they cannot disagree.
  *
  * `purchaseOpen` is the deployment's `purchasePlan`; it says whether any plan can be bought. The
- * offer's `saleChannel` says whether this one is sold online at all -- Team is "contact" and its
- * checkout answers 403 BILLING_OFFER_CONTACT_REQUIRED (`checkout-policy.ts`), which is why /pricing
- * already decides per offer. null: the deployment has not answered, so nothing is said either way.
+ * plan's availability says whether this one is sold online at all -- a plan the product does not
+ * deliver in full is "request_access" and its checkout answers 403 BILLING_OFFER_CONTACT_REQUIRED
+ * (`checkout-policy.ts`). null: the deployment has not answered, so nothing is said either way.
  */
-export function checkoutSellable(offerCode: BillingOfferCode, purchaseOpen: boolean | null): boolean | null {
-  return purchaseOpen === null ? null : purchaseOpen && BILLING_OFFERS[offerCode].saleChannel === "self_serve";
+export function checkoutSellable(
+  availability: PlanAvailability | BillingOfferCode,
+  purchaseOpen: boolean | null,
+): boolean | null {
+  // ponytail: an offer code is accepted until WO-CAT-2 passes the server's availability to every caller;
+  // it resolves from this runtime's env, which the browser does not have, so a client-side call fails closed.
+  const resolved = isBillingOfferCode(availability) ? planAvailability(availability) : availability;
+  return purchaseOpen === null ? null : purchaseOpen && resolved === "purchasable";
 }
 
 /** Where a signed-out visitor goes when they pick an offer. */
@@ -97,7 +103,7 @@ export type CheckoutResume = "open" | "hold_terms" | "hold_release" | "drop_owne
  *                 production processing -- including a qualification grant and an unread access.
  */
 export function decideCheckoutResume(
-  offer: BillingOfferCode,
+  offer: PlanAvailability | BillingOfferCode,
   purchaseOpen: boolean | null,
   access: ResumeAccess | null,
 ): CheckoutResume {

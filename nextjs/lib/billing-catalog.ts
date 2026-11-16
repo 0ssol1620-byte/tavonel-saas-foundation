@@ -19,15 +19,128 @@
  * `/security` and `/trust` already publish instead of discovering the contradiction between two
  * pages. An empty list renders nothing.
  */
+/** The price book every plan below belongs to. A price id, a quote and a receipt name it. */
+export const PRICE_BOOK_VERSION = "PB-2026-11-V22";
+
+/** What a plan line can depend on. A capability enters DELIVERED only in the release commit that proves it (WO-CAT-7). */
+export type Capability =
+  | "pcu_accepted_meter" | "kqu_meter" | "storage_meter" | "seat_cap"
+  | "per_member_source_scopes" | "org_policy_audit";
+
+/** Empty at catalog v2: no plan is purchasable online until the product delivers every item on its line. */
+export const DELIVERED: ReadonlySet<Capability> = new Set<Capability>([]);
+
+/** V22 overage rates. Shown with "Request access": nothing bills past an allowance yet. Automation is absent on purpose (Autopilot is held). */
+export const METER_RATES_USD = { pcu: 0.04, kqu: 0.006, storageGbMonth: 0.2, seatMonth: 15 } as const;
+
 export const BILLING_OFFERS = {
+  personal: {
+    kind: "subscription",
+    label: "Personal",
+    priceUsd: 29,
+    included: { pcu: 500, kqu: 1_000, storageGb: 10, seats: 1 },
+    credits: 2_000, // = pcu x STANDARD_UNITS_PER_PAGE (billing-catalog.test.ts)
+    includedPages: 500,
+    priceEnv: "PADDLE_PRICE_PERSONAL",
+    saleChannel: "self_serve",
+    status: "v2",
+    accessLevel: "observer_access",
+    requires: ["pcu_accepted_meter", "kqu_meter", "storage_meter", "seat_cap"],
+    description: "For one person compiling their own sources.",
+    features: [
+      "500 standard pages",
+      "Compile your own worlds",
+      "Evidence, Ask and signed export",
+      "API and MCP access",
+      "Google Drive and file-server connections",
+    ],
+    notYetSold: [],
+  },
+  developer: {
+    kind: "subscription",
+    label: "Developer",
+    priceUsd: 49,
+    included: { pcu: 500, kqu: 5_000, storageGb: 10, seats: 1 },
+    credits: 2_000,
+    includedPages: 500,
+    priceEnv: "PADDLE_PRICE_DEVELOPER",
+    saleChannel: "self_serve",
+    status: "v2",
+    accessLevel: "observer_access",
+    requires: ["pcu_accepted_meter", "kqu_meter", "storage_meter", "seat_cap"],
+    description: "For builders shipping source-grounded AI through the API.",
+    features: [
+      "500 standard pages",
+      "Compile your own worlds",
+      "Evidence, Ask and signed export",
+      "API and MCP access, with scoped developer keys",
+      "Google Drive and file-server connections",
+    ],
+    notYetSold: [],
+  },
+  team: {
+    kind: "subscription",
+    label: "Team",
+    priceUsd: 199,
+    included: { pcu: 3_000, kqu: 10_000, storageGb: 100, seats: 5 },
+    credits: 12_000,
+    includedPages: 3_000,
+    priceEnv: "PADDLE_PRICE_TEAM",
+    saleChannel: "self_serve",
+    status: "v2",
+    accessLevel: "studio_access",
+    requires: ["pcu_accepted_meter", "kqu_meter", "storage_meter", "seat_cap", "per_member_source_scopes"],
+    description: "The higher-volume plan, with the review queue and version history.",
+    features: [
+      "3,000 standard pages",
+      "Everything in Developer",
+      "Review queue and version history",
+      "Google Drive and file-server connections",
+    ],
+    notYetSold: ["Per-member source permissions"],
+  },
+  business: {
+    kind: "subscription",
+    label: "Business",
+    priceUsd: 799,
+    included: { pcu: 12_000, kqu: 50_000, storageGb: 500, seats: 20 },
+    credits: 48_000,
+    includedPages: 12_000,
+    priceEnv: "PADDLE_PRICE_BUSINESS",
+    saleChannel: "self_serve",
+    status: "v2",
+    accessLevel: "studio_access",
+    requires: [
+      "pcu_accepted_meter", "kqu_meter", "storage_meter", "seat_cap",
+      "per_member_source_scopes", "org_policy_audit",
+    ],
+    description: "The highest-volume plan, for an organization's sources.",
+    features: [
+      "12,000 standard pages",
+      "Everything in Team",
+      "Google Drive and file-server connections",
+    ],
+    notYetSold: ["Per-member source permissions", "Organization policy and audit"],
+  },
+  /*
+    Retired by the V22 price book (Amendment 2, 2026-11-16). Never sold again, and never removed:
+    a renewal settles through `findOfferByPriceId` and `kind`, so these two stay resolvable and
+    their price envs stay set until no active subscription holds either price. Existing
+    subscribers keep their price and terms until they change plan.
+  */
   observer_access: {
     kind: "subscription",
-    label: "Starter",
+    label: "Developer (2026-09 plan)",
     priceUsd: 29,
     credits: 2_000,
     includedPages: 500,
     priceEnv: "PADDLE_PRICE_OBSERVER_ACCESS",
+    // Unchanged from the 2026-09 plan. `status: "retired"` is the gate: `planAvailability` is "retired" and checkout refuses it.
     saleChannel: "self_serve",
+    status: "retired",
+    accessLevel: "observer_access",
+    included: null,
+    requires: [],
     description: "For builders shipping source-grounded AI.",
     features: [
       "500 standard pages",
@@ -41,7 +154,7 @@ export const BILLING_OFFERS = {
   },
   studio_access: {
     kind: "subscription",
-    label: "Pro",
+    label: "Team (2026-09 plan)",
     priceUsd: 99,
     credits: 10_000,
     includedPages: 2_500,
@@ -56,6 +169,10 @@ export const BILLING_OFFERS = {
       (`decideOfferCheckoutPolicy`), whatever the commercial mode.
     */
     saleChannel: "contact",
+    status: "retired",
+    accessLevel: "studio_access",
+    included: null,
+    requires: [],
     /*
       SD-02, 2026-09-16. Collaboration was what this plan sold, and collaboration is the part
       that is not finished. "Up to 5 seats" came off the card in an earlier pass, but the copy
@@ -78,14 +195,14 @@ export const BILLING_OFFERS = {
     description: "The higher-volume plan, with the review queue and version history.",
     features: [
       "2,500 standard pages",
-      "Everything in Starter",
+      "Everything in Developer (2026-09 plan)",
       "Review queue and version history",
       "Google Drive and file-server connections",
     ],
     // Kept as main has it: `lib/v34/routes.test.ts` holds /teams exactly while this lists shared members.
     notYetSold: ["Shared members and roles", "Per-member source permissions"],
   },
-} as const;
+} as const satisfies Record<string, { requires: readonly Capability[]; [field: string]: unknown }>;
 
 /*
   The refund bright line, as two numbers rather than an adjective.
@@ -125,15 +242,58 @@ export function isBillingOfferCode(value: unknown): value is BillingOfferCode {
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
+/** Free and Enterprise have no Paddle price, so they are not offers; the pricing page reads every plan from this module. */
+export const PRICE_BOOK_EXTRA = {
+  free: { label: "Free", priceUsd: 0, saleChannel: "self_serve" },
+  enterprise: { label: "Enterprise", priceUsd: null, saleChannel: "contact" },
+} as const;
+
+const isRetired = (code: BillingOfferCode) => BILLING_OFFERS[code].status === "retired";
+
 export function readConfiguredBillingOffers(env: Environment = process.env) {
-  const configured = new Map<BillingOfferCode, BillingOffer>();
+  const claimed = new Map<string, BillingOfferCode[]>();
   for (const [code, definition] of Object.entries(BILLING_OFFERS) as Array<
     [BillingOfferCode, (typeof BILLING_OFFERS)[BillingOfferCode]]
   >) {
     const priceId = env[definition.priceEnv]?.trim() ?? "";
-    if (/^pri_[a-z0-9]{26}$/.test(priceId)) configured.set(code, { ...definition, code, priceId });
+    if (/^pri_[a-z0-9]{26}$/.test(priceId)) claimed.set(priceId, [...claimed.get(priceId) ?? [], code]);
+  }
+  const configured = new Map<BillingOfferCode, BillingOffer>();
+  for (const [priceId, codes] of claimed) {
+    // A price id a retired offer holds stays with it, and one id claimed by two current offers
+    // belongs to neither: `findOfferByPriceId` must name one offer, or a renewal settles on a guess.
+    const owners = codes.some(isRetired) ? codes.filter(isRetired) : codes.length === 1 ? codes : [];
+    for (const code of owners) configured.set(code, { ...BILLING_OFFERS[code], code, priceId });
   }
   return configured;
+}
+
+export type PlanAvailability = "purchasable" | "request_access" | "retired";
+
+/** The one decision every surface reads: buy online only when the product delivers the whole line and its price is configured. */
+export function planAvailability(
+  code: BillingOfferCode,
+  configured: ReadonlyMap<BillingOfferCode, unknown> = readConfiguredBillingOffers(),
+  delivered: ReadonlySet<Capability> = DELIVERED,
+): PlanAvailability {
+  const offer = BILLING_OFFERS[code];
+  if (offer.status === "retired") return "retired";
+  return (offer.requires as readonly Capability[]).every((c) => delivered.has(c)) && configured.has(code)
+    ? "purchasable"
+    : "request_access";
+}
+
+/**
+ * Readiness of the price configuration: every retired offer is configured (a missing legacy env is a
+ * renewal incident), and so is every offer that would be purchasable. A v2 offer waiting for a
+ * capability may have no price yet.
+ */
+export function catalogConfigured(
+  configured: ReadonlyMap<BillingOfferCode, unknown> = readConfiguredBillingOffers(),
+  delivered: ReadonlySet<Capability> = DELIVERED,
+) {
+  return (Object.keys(BILLING_OFFERS) as BillingOfferCode[]).every((code) =>
+    configured.has(code) || (!isRetired(code) && !(BILLING_OFFERS[code].requires as readonly Capability[]).every((c) => delivered.has(c))));
 }
 
 export function findOfferByPriceId(priceId: string, env: Environment = process.env) {

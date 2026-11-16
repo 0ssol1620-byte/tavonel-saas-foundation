@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { BILLING_OFFERS } from "./billing-catalog";
+import { BILLING_OFFERS, planAvailability, readConfiguredBillingOffers } from "./billing-catalog";
 import { OFFER_CODES, REVENUE_PATHS, revenuePathForOffer } from "./revenue-paths";
 
 describe("revenue paths", () => {
@@ -9,8 +9,26 @@ describe("revenue paths", () => {
     expect(new Set(REVENUE_PATHS.map((p) => p.family)).size).toBe(15);
   });
 
-  it("maps every catalog offer to exactly one path", () => {
-    for (const code of OFFER_CODES) expect(revenuePathForOffer(code).state).not.toBe("not_sold");
+  it("maps every catalog offer to exactly one path, and every code is mapped exactly once", () => {
+    for (const code of OFFER_CODES) expect(() => revenuePathForOffer(code), code).not.toThrow();
+    const mapped = REVENUE_PATHS.flatMap((p) => p.offerCodes);
+    expect([...mapped].sort()).toEqual([...OFFER_CODES].sort());
+  });
+
+  it("maps the v2 codes to not_sold paths while the sale is closed, and the retired codes to the allowance ledger", () => {
+    expect(OFFER_CODES.length).toBe(6);
+    const everyEnv = Object.fromEntries(OFFER_CODES.map((c, i) => [BILLING_OFFERS[c].priceEnv, `pri_${String(i).repeat(26)}`]));
+    const configured = readConfiguredBillingOffers(everyEnv);
+    for (const code of OFFER_CODES) {
+      // No offer is purchasable now, so no path may claim to be sold self-serve.
+      expect(planAvailability(code, configured), code).not.toBe("purchasable");
+      expect(revenuePathForOffer(code).state, code).not.toBe("sold_self_serve");
+    }
+    for (const code of ["observer_access", "studio_access"] as const) {
+      expect(revenuePathForOffer(code).ledgerPath, code).toBe("allowance");
+    }
+    expect(revenuePathForOffer("developer").family).toBe("DEV");
+    expect(revenuePathForOffer("personal").family).toBe("CORE_PERSONAL_TEAM_BUSINESS");
   });
 
   it("fails on an unmapped offer (failure path)", () => {
@@ -18,13 +36,11 @@ describe("revenue paths", () => {
     expect(() => revenuePathForOffer("observer_access", [])).toThrow();
   });
 
-  it("every self-serve path names a ledger path; not_sold paths hold none", () => {
+  it("every self-serve path names a ledger path; a not_sold path holds one only for the offers it maps", () => {
     for (const p of REVENUE_PATHS) {
       if (p.state === "sold_self_serve") expect(p.ledgerPath).not.toBeNull();
-      if (p.state === "not_sold") {
-        expect(p.ledgerPath).toBeNull();
-        expect(p.offerCodes).toHaveLength(0);
-      }
+      // A not_sold family holds a ledger path only for offers whose renewals settle through it.
+      if (p.state === "not_sold") expect(p.ledgerPath === null, p.family).toBe(p.offerCodes.length === 0);
     }
   });
 
