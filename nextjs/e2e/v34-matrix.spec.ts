@@ -3,6 +3,12 @@
  *
  *   V34_SHOW_HELD=1 pnpm start --port 3117     (QA mode, every route renders)
  *   VERCEL_ENV=production pnpm start --port 3118   (production mode, held routes 404)
+ *
+ * VERCEL_ENV=production is what makes /film 404: it is held by app/film/layout.tsx, not by the route
+ * registry that gates every other held path, so a production-mode server started without it answers
+ * 200 there and the SEO pass reports a defect that is the server's start-up, not the page.
+ * The matrix opens its contexts with bypassCSP (the app's style-src-elem 'self' refuses the style
+ * the passes inject) and with the analytics consent declined (a fixed panel would sit over the footer).
  *   PLAYWRIGHT_EXTERNAL_SERVER=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3117 V34_QA_OUT=<dir> \
  *     playwright test e2e/v34-matrix.spec.ts --project=v34-chromium
  *

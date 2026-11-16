@@ -9,7 +9,7 @@
  * at weight >= 700), 3.0 for control boundaries. Disabled controls are reported, not failed.
  */
 
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import type { Violation } from "./v34-measure";
 
 export type Rgb = readonly [number, number, number];
@@ -171,6 +171,15 @@ export type ContrastResult = {
   checked: number;
 };
 
+/**
+ * Brings an element to the middle of the viewport without animation. Scrolling it "into view" can
+ * leave it flush with the top edge, under a sticky header whose pixels then land in the sample, and
+ * a page with `scroll-behavior: smooth` would still be moving when the screenshot is taken.
+ */
+async function centreInView(handle: Locator): Promise<void> {
+  await handle.evaluate(e => e.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" }), undefined, { timeout: 2000 });
+}
+
 /** Pixel-sampled text contrast for the current page state. */
 export async function contrastPass(page: Page, options: ContrastOptions = {}): Promise<ContrastResult> {
   const targets = await page.evaluate(collectTargets, options.max ?? 60);
@@ -181,7 +190,7 @@ export async function contrastPass(page: Page, options: ContrastOptions = {}): P
   for (const t of targets) {
     const handle = page.locator(`[data-v34-contrast-idx="${t.index}"]`).first();
     try {
-      await handle.scrollIntoViewIfNeeded({ timeout: 2000 });
+      await centreInView(handle);
       await handle.evaluate((e, a) => e.setAttribute(a, ""), HIDE_ATTR);
       // Only the element's own text lines are sampled: its border, corners and child elements stay out.
       const rects = await handle.evaluate(ownTextRects);
@@ -258,7 +267,7 @@ export async function controlContrastPass(page: Page, max = 30): Promise<Violati
   for (const c of controls) {
     const handle = page.locator(`[data-v34-control-idx="${c.index}"]`).first();
     try {
-      await handle.scrollIntoViewIfNeeded({ timeout: 2000 });
+      await centreInView(handle);
       await handle.evaluate(e => ((e as HTMLElement).style.visibility = "hidden"));
       const rect = await handle.boundingBox();
       const png = rect ? await page.screenshot({ type: "png", clip: rect, timeout: 3000 }) : null;

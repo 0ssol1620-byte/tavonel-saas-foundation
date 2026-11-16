@@ -9,6 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import {
+  measureClippedRows,
   measureClippedText,
   measureOutsideBounds,
   measureSiblingOverlap,
@@ -20,6 +21,7 @@ import {
   colorSchemePass,
   forcedColorsPass,
   layoutPass,
+  openContext,
   openZoomedContext,
   reducedMotionPass,
   statePass,
@@ -279,6 +281,77 @@ test.describe("seo", () => {
     const a = parseSeo(page(), 200);
     expect(checkSeoUnique([{ route: "/a", facts: a }, { route: "/b", facts: parseSeo(page().replace("Home", "Other").replace('"d"', '"e"'), 200) }])).toEqual([]);
     expect(checkSeoUnique([{ route: "/a", facts: a }, { route: "/b", facts: a }])).toHaveLength(2);
+  });
+});
+
+test.describe("round 3: false positives found by the first integrated QA run", () => {
+  test("sibling overlap: a wrapped inline link is judged by its line boxes, a padded stacked link still overlaps", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 640 });
+    await load(page, `<p style="width:120px;margin:0"><a href="#a">first link</a> <a href="#b">second link that wraps to a new line</a></p>`);
+    expect(await page.evaluate(measureSiblingOverlap)).toEqual([]);
+    await load(page, `<p style="width:300px;margin:0"><a href="#a" style="display:inline-block;width:100%;padding-block:12px;margin-block:-12px">one</a><a href="#b" style="display:inline-block;width:100%;padding-block:12px;margin-block:-12px">two</a></p>`);
+    expect((await page.evaluate(measureSiblingOverlap)).length).toBe(1);
+  });
+
+  test("occluded text: a closed details body and a stretched link are not covered; a real cover still is", async ({ page }) => {
+    await load(page, `<details style="margin:20px"><summary>question</summary><p>answer text that is not painted</p></details><details><summary>another question</summary><p>second answer</p></details>`);
+    expect((await page.evaluate(measureClippedText)).filter(v => v.pass === "occluded-text")).toEqual([]);
+    await load(page, `<div style="position:relative;margin:20px"><p>card copy</p><a href="#x" class="s">Open card</a></div>`, `.s{position:static}.s::after{content:"";position:absolute;inset:0}`);
+    expect((await page.evaluate(measureClippedText)).filter(v => v.pass === "occluded-text" && v.selector.startsWith("p"))).toEqual([]);
+    await load(page, `<div style="position:relative;margin:20px"><p>card copy</p><a href="#x" class="s">Open card</a></div>`, `.s{position:static}.s::after{content:"";position:absolute;inset:0;background:#eee}`);
+    expect((await page.evaluate(measureClippedText)).some(v => v.pass === "occluded-text")).toBe(true);
+  });
+
+  test("clipped text: a declared line clamp is not a defect, a plain clip is", async ({ page }) => {
+    const clamp = "display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;width:120px;margin:0";
+    await load(page, `<span style="${clamp}">one two three four five six seven eight nine ten eleven twelve thirteen</span>`);
+    expect(await page.evaluate(measureClippedText)).toEqual([]);
+    await load(page, `<p style="width:120px;height:20px;overflow:hidden;margin:0">one two three four five six seven eight nine ten eleven twelve</p>`);
+    expect((await page.evaluate(measureClippedText)).some(v => v.pass === "clipped-text")).toBe(true);
+  });
+
+  test("clipped by an ancestor: a scrolling code box and a closed details pass, a plain clip fails", async ({ page }) => {
+    await load(page, `<figure style="width:120px;overflow:hidden;margin:0"><pre style="overflow:auto;margin:0"><span>a very long line of code that scrolls inside its box</span></pre></figure>`);
+    expect(await page.evaluate(measureClippedRows)).toEqual([]);
+    await load(page, `<div style="width:120px;overflow:hidden"><details><summary>plan limits</summary><ul style="width:400px"><li>closed list item that is wider than the box</li></ul></details></div>`);
+    expect(await page.evaluate(measureClippedRows)).toEqual([]);
+    await load(page, `<figure style="width:120px;overflow:hidden;margin:0"><p style="margin:0;white-space:nowrap">a very long line of text clipped by the figure</p></figure>`);
+    expect((await page.evaluate(measureClippedRows)).length).toBeGreaterThan(0);
+  });
+
+  test("contexts: the app's CSP does not stop the injected style, and the consent panel is answered", async ({ browser }) => {
+    const ctx = await openContext(browser, 360);
+    const page = await ctx.newPage();
+    await page.route(`${ORIGIN}/**`, route =>
+      route.fulfill({ contentType: "text/html", headers: { "content-security-policy": "style-src-elem 'self'" }, body: "<!doctype html><html lang=\"en\"><head><title>t</title></head><body><p>x</p></body></html>" }),
+    );
+    await page.goto(`${ORIGIN}/`);
+    await applyTextZoom200(page);
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).fontSize)).toBe("32px");
+    expect(await page.evaluate(() => window.localStorage.getItem("tavonel.analytics-consent.v1"))).toContain('"allowed":false');
+    await ctx.close();
+    const pending = await openContext(browser, 360, { consent: "pending" });
+    const p2 = await pending.newPage();
+    await p2.route(`${ORIGIN}/**`, route => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>t</title><p>x</p>" }));
+    await p2.goto(`${ORIGIN}/`);
+    expect(await p2.evaluate(() => window.localStorage.getItem("tavonel.analytics-consent.v1"))).toBeNull();
+    await pending.close();
+  });
+
+  test("contrast: an element is sampled mid-screen, not under a sticky header", async ({ page }) => {
+    await page.setViewportSize({ width: 800, height: 600 });
+    await load(page, `<header style="position:sticky;top:0;height:70px;background:#f4f6fa"></header><div style="height:1500px"></div><h2 style="margin:0;font-size:30px;color:#f3f7f0;background:#0a1712;padding:12px">light heading on a dark ground</h2><div style="height:1500px"></div>`, "html{scroll-behavior:smooth}");
+    const r = await contrastPass(page);
+    expect(r.checked).toBe(1);
+    expect(r.violations).toEqual([]);
+  });
+
+  test("keyboard: a smooth-scrolling page is waited for before the focus rect is read", async ({ page }) => {
+    await page.setViewportSize({ width: 600, height: 500 });
+    await load(page, `<button class="r">top</button><div style="height:3000px"></div><button class="r">far below</button>`, ".r{padding:14px 20px}.r:focus-visible{outline:2px solid #00e}html{scroll-behavior:smooth}");
+    const r = await keyboardWalk(page);
+    expect(r.stops).toBe(2);
+    expect(r.violations).toEqual([]);
   });
 });
 

@@ -191,14 +191,30 @@ export async function statePass(page: Page): Promise<Violation[]> {
 export async function openContext(
   browser: Browser,
   width: number,
-  opts: { colorScheme?: "light" | "dark"; deviceScaleFactor?: number; height?: number; javaScriptEnabled?: boolean } = {},
+  opts: { colorScheme?: "light" | "dark"; deviceScaleFactor?: number; height?: number; javaScriptEnabled?: boolean; consent?: "declined" | "pending" } = {},
 ): Promise<BrowserContext> {
-  return browser.newContext({
+  const context = await browser.newContext({
     viewport: { width, height: opts.height ?? V34_HEIGHTS[width] ?? 900 },
     colorScheme: opts.colorScheme ?? "light",
     deviceScaleFactor: opts.deviceScaleFactor ?? 1,
     javaScriptEnabled: opts.javaScriptEnabled ?? true,
+    // The passes inject a <style> (text zoom, the contrast hide rule); the app's own CSP (style-src-elem 'self') refuses it.
+    bypassCSP: true,
   });
+  /*
+    The marketing consent panel is a fixed sheet that appears after a few seconds. A pass takes tens
+    of seconds per page, so the panel ends up over the footer and every sample there reads white. A
+    visitor answers it once, so the pass answers it the way a visitor who declined does. "pending"
+    leaves it up for a pass whose subject is the panel itself.
+  */
+  if ((opts.consent ?? "declined") === "declined") {
+    await context.addInitScript(() => {
+      try {
+        window.localStorage.setItem("tavonel.analytics-consent.v1", JSON.stringify({ allowed: false, expires: Date.now() + 180 * 24 * 60 * 60 * 1000 }));
+      } catch { /* storage denied: the panel stays and the pass says so through its own findings */ }
+    });
+  }
+  return context;
 }
 
 /**

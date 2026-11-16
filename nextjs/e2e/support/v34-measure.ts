@@ -61,7 +61,9 @@ export function measureClippedText(): Violation[] {
     const cls = typeof el.className === "string" && el.className.trim() ? `.${el.className.trim().split(/\s+/)[0]}` : "";
     return `${el.tagName.toLowerCase()}${id}${cls}`.slice(0, 120);
   };
-  const exempt = (el: Element) => !!el.closest("[data-v34-scroll], [data-v34-overlay], canvas, svg, [hidden]");
+  // A closed <details> body keeps a layout rect it does not paint; its summary is painted.
+  const inClosedDetails = (el: Element) => !!el.closest("details:not([open])") && !el.closest("summary");
+  const exempt = (el: Element) => !!el.closest("[data-v34-scroll], [data-v34-overlay], canvas, svg, [hidden]") || inClosedDetails(el);
   for (const el of document.querySelectorAll("body *")) {
     const own = [...el.childNodes].find(n => n.nodeType === Node.TEXT_NODE && (n.textContent ?? "").trim().length > 1);
     if (!own || exempt(el)) continue;
@@ -75,7 +77,10 @@ export function measureClippedText(): Violation[] {
     if (clipX && !ellipsis && el.scrollWidth > el.clientWidth + 1) {
       out.push({ pass: "clipped-text", selector: describe(el), detail: `scrollWidth ${el.scrollWidth} > clientWidth ${el.clientWidth}` });
     }
-    if (clipY && el.scrollHeight > el.clientHeight + 1) {
+    // A declared line clamp is the intended clip ("clamped by the box rather than rewritten"), as in measureClippedRows.
+    const clamped = style.getPropertyValue("-webkit-line-clamp").trim();
+    const lineClamp = clamped !== "" && clamped !== "none";
+    if (clipY && !lineClamp && el.scrollHeight > el.clientHeight + 1) {
       out.push({ pass: "clipped-text", selector: describe(el), detail: `scrollHeight ${el.scrollHeight} > clientHeight ${el.clientHeight}` });
     }
     // Occlusion: sample the middle of the text's own rect, only when it is inside the viewport.
@@ -89,6 +94,12 @@ export function measureClippedText(): Violation[] {
     const top = document.elementFromPoint(px, py);
     if (!top || top === el || el.contains(top) || top.contains(el)) continue;
     if (top.closest("[data-v34-overlay]")) continue;
+    // A card's stretched link (a::after { position: absolute; inset: 0 }) is a transparent hit area by design.
+    if (top instanceof HTMLAnchorElement) {
+      const after = getComputedStyle(top, "::after");
+      const transparent = after.backgroundColor === "rgba(0, 0, 0, 0)" && after.backgroundImage === "none" && parseFloat(after.borderTopWidth) === 0;
+      if (after.content !== "none" && after.position === "absolute" && transparent) continue;
+    }
     const topStyle = getComputedStyle(top);
     if (topStyle.pointerEvents === "none" && topStyle.position === "fixed") continue;
     out.push({ pass: "occluded-text", selector: describe(el), detail: `covered by ${describe(top)} at ${Math.round(px)},${Math.round(py)}` });
@@ -119,10 +130,18 @@ export function measureSiblingOverlap(): Violation[] {
     });
     for (let i = 0; i < kids.length; i++) {
       for (let j = i + 1; j < kids.length; j++) {
-        const a = kids[i].getBoundingClientRect();
-        const b = kids[j].getBoundingClientRect();
-        const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
-        const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        // A wrapped inline element's bounding box is the union of its line boxes and covers the lines of
+        // its neighbours; compare the line boxes themselves. A block, flex item or inline-block has one box.
+        const boxes = (k: Element) => (getComputedStyle(k).display === "inline" ? [...k.getClientRects()] : [k.getBoundingClientRect()]);
+        let w = 0;
+        let h = 0;
+        for (const a of boxes(kids[i])) {
+          for (const b of boxes(kids[j])) {
+            const bw = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+            const bh = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+            if (bw > 2 && bh > 2 && bw * bh > w * h) { w = bw; h = bh; }
+          }
+        }
         if (w > 2 && h > 2) {
           out.push({ pass: "sibling-overlap", selector: `${describe(kids[i])} + ${describe(kids[j])}`, detail: `overlap ${Math.round(w)}x${Math.round(h)} in ${describe(parent)}` });
         }
@@ -228,6 +247,8 @@ export function measureClippedRows(): Violation[] {
   for (const el of document.querySelectorAll("body *")) {
     if (out.length >= 40) break;
     if (el.closest("[data-v34-scroll], canvas, svg, [hidden]") || !live(el)) continue;
+    // Text in a closed <details> is not drawn, so nothing is clipped.
+    if (el.closest("details:not([open])") && !el.closest("summary")) continue;
     const own = [...el.childNodes].find(n => n.nodeType === Node.TEXT_NODE && (n.textContent ?? "").trim().length > 1);
     if (own) {
       const range = document.createRange();
@@ -238,6 +259,8 @@ export function measureClippedRows(): Violation[] {
         for (let a: Element | null = start; a && a !== document.body && a !== document.documentElement; a = a.parentElement) {
           if (a.closest("[data-v34-scroll]")) break;
           const s = getComputedStyle(a);
+          // A scroll container (a <pre> with overflow:auto) keeps its text reachable; what lies beyond it clips the container, not the text.
+          if (s.overflowX === "auto" || s.overflowX === "scroll" || s.overflowY === "auto" || s.overflowY === "scroll") break;
           const cx = clips(s.overflowX), cy = clips(s.overflowY);
           if (!cx && !cy) continue;
           if (a.clientHeight <= 2 || a.clientWidth <= 2) continue; // visually-hidden pattern

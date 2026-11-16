@@ -32,11 +32,43 @@ export async function keyboardWalk(page: Page, max = 250): Promise<KeyboardResul
     w.__v34Visits = new WeakMap();
     w.__v34First = null;
   });
+  /*
+    Playwright's WebKit does not put links in the Tab order (it follows Safari's default: Tab goes to
+    form controls, Alt+Tab to links, and in this build Alt+Tab does not reach them either). The walk
+    there sees buttons with the document body between them and would call the first body stop the
+    end of the page. On WebKit a body stop is skipped, a run of them ends the walk, and anchors are
+    left out of the "never reached" list; the result says so rather than judging links it cannot reach.
+  */
+  const webkit = page.context().browser()?.browserType().name() === "webkit";
+  if (webkit) {
+    result.reported.push({ pass: "keyboard-engine", selector: "webkit", detail: "this WebKit build does not Tab to links: anchors are judged on chromium and firefox only" });
+  }
+  let bodyStops = 0;
   for (let i = 0; i < max; i++) {
     await page.keyboard.press("Tab");
-    // Let a blur handler that schedules a refocus (setTimeout) land before focus is read.
-    await page.evaluate(() => new Promise(r => setTimeout(r, 16)));
-    const stop: Stop | null = await page.evaluate(() => {
+    /*
+      Let a blur handler that schedules a refocus (setTimeout) land before focus is read, and let a
+      scroll that focus started finish: with `scroll-behavior: smooth` the focused element is still
+      on its way into view for a few hundred ms, and reading its rect then reports it off screen.
+    */
+    await page.evaluate(() => new Promise<void>(done => {
+      const started = performance.now();
+      let last = -1;
+      let steady = 0;
+      const poll = () => {
+        const e = document.activeElement;
+        const r = e && e !== document.body ? e.getBoundingClientRect() : null;
+        const onScreen = !r || (r.bottom > 0 && r.right > 0 && r.top < window.innerHeight && r.left < window.innerWidth);
+        const y = window.scrollY;
+        steady = y === last ? steady + 1 : 0;
+        last = y;
+        // Off screen and still scrolling: wait. Off screen and the page has stopped: that is a finding.
+        if (onScreen || steady >= 3 || performance.now() - started > 1200) done();
+        else setTimeout(poll, 30);
+      };
+      setTimeout(poll, 16);
+    }));
+    const stop: Stop | null = await page.evaluate((skipAnchors) => {
       const e = document.activeElement;
       if (!e || e === document.body || e === document.documentElement) return null;
       const r = e.getBoundingClientRect();
@@ -73,15 +105,21 @@ export async function keyboardWalk(page: Page, max = 250): Promise<KeyboardResul
             const members = [...document.getElementsByName(key)];
             if (members.some(m => (w.__v34Visits.get(m) ?? 0) > 0)) continue;
           }
+          if (skipAnchors && x.tagName === "A") continue;
           if (!w.__v34Visits.get(x)) unvisited.push(nm(x));
         }
       }
       return { selector: `${e.tagName.toLowerCase()}${id}${cls}[${label}]`, inViewport, indicator, w: r.width, h: r.height, inline, visits, isFirst, unvisited };
-    });
+    }, webkit);
     if (!stop) {
+      if (webkit) {
+        if (++bodyStops >= 3) break;
+        continue;
+      }
       if (i > 0) break; // focus left the document: the walk is complete
       continue;
     }
+    bodyStops = 0;
     if (stop.isFirst && stop.visits === 2) {
       // A natural wrap leaves the document (the null branch above). Landing on the first stop again
       // is only a wrap when nothing was skipped; otherwise focus was sent back: a trap.
