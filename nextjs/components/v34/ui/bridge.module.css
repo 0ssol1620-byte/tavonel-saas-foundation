@@ -1,0 +1,37 @@
+.band {
+  padding: clamp(28px, 4.5vw, 48px) 0;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.shell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px 32px;
+  width: var(--v34-shell);
+  margin-inline: auto;
+}
+
+.copy {
+  flex: 1 1 22rem;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(1.5rem, 2.8vw, 2.25rem);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.12;
+  overflow-wrap: normal;
+  hyphens: manual;
+  text-wrap: balance;
+}
+
+.text {
+  max-width: 60ch;
+  margin: 10px 0 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+}

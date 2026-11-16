@@ -1,0 +1,28 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 20px 24px;
+  margin: 0;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 4px;
+  min-width: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.value {
+  margin: 0;
+  font-size: clamp(1.6rem, 4vw, 3.3rem);
+  font-weight: 500;
+  letter-spacing: -0.05em;
+  line-height: 1.05;
+}
+
+.label {
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+}

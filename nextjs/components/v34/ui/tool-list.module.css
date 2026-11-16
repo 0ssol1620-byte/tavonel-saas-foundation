@@ -1,0 +1,36 @@
+.list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.item {
+  display: grid;
+  grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
+  gap: 4px 24px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.name {
+  /* Identifiers are code: they may wrap inside the box rather than push the page wide. */
+  overflow-wrap: anywhere;
+  font-family: var(--v34-mono);
+  font-size: var(--v34-small);
+  font-weight: 650;
+}
+
+.description {
+  min-width: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.5;
+}
+
+@media (max-width: 650px) {
+  .item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

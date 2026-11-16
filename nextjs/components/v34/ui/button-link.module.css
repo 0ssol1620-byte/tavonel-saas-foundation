@@ -1,0 +1,79 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 46px;
+  padding: 10px 22px;
+  border: 1px solid transparent;
+  border-radius: var(--v34-radius-pill);
+  font-size: 0.96rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.35;
+  text-align: center;
+  text-decoration: none;
+  transition: background-color var(--v34-move) ease, color var(--v34-move) ease;
+}
+
+.button:focus-visible {
+  outline: 3px solid var(--v34-fg-focus, var(--v34-focus));
+  outline-offset: 4px;
+}
+
+.primary {
+  background: var(--v34-header-btn);
+  color: var(--v34-white);
+}
+
+.primary:hover {
+  background: var(--v34-header-btn-hover);
+  color: var(--v34-white);
+}
+
+.secondary {
+  background: transparent;
+  border-color: var(--v34-fg-border, var(--v34-control-border));
+  color: var(--v34-fg, var(--v34-ink));
+}
+
+.secondary:hover {
+  background: var(--v34-fg-hover, var(--v34-secondary-hover));
+  color: var(--v34-fg, var(--v34-ink));
+}
+
+.onDark {
+  background: var(--v34-lime);
+  color: var(--v34-lime-ink);
+}
+
+.onDark:hover {
+  background: var(--v34-lime-hover);
+  color: var(--v34-lime-ink);
+}
+
+/* Both colours are restated and opacity is 1: a faded pair is a different pair. */
+.disabled {
+  background: var(--v34-disabled-bg);
+  border-color: var(--v34-disabled-fg);
+  color: var(--v34-disabled-fg);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+@media (forced-colors: active) {
+  .button { border: 1px solid ButtonText; }
+  .button:focus-visible { outline-color: Highlight; }
+}

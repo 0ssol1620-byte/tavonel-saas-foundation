@@ -1,0 +1,40 @@
+.figure {
+  min-width: 0;
+  margin: 0;
+}
+
+/* Media crop: holds a drawing, never text that could be cut. */
+.frame {
+  overflow: hidden;
+  aspect-ratio: 2 / 1;
+  border: 1px solid var(--v34-fg-border);
+  border-radius: var(--v34-radius-art);
+  background: var(--v34-dark);
+  color: var(--v34-on-dark);
+  box-shadow: 0 22px 45px rgb(16 46 41 / 0.08);
+}
+
+.bare {
+  min-width: 0;
+}
+
+.caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 12px 0 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.5;
+}
+
+.text {
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .frame {
+    box-shadow: none;
+  }
+}
