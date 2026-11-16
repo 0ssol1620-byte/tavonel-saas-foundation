@@ -517,6 +517,8 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
       { code: "CONNECTOR_SOURCE_ACCESS_DENIED", status: 401, meaning: "The provider refused the stored credential.", whatToDo: "Re-authorize the connector." },
       { code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE", status: 503, meaning: "The provider could not be reached.", whatToDo: "Retry." },
       { code: "CONNECTOR_SOURCE_SUSPENSION_UNRESOLVED", status: 409, meaning: "The connector is suspended and the suspension has not been cleared.", whatToDo: "Re-authorize, or revoke and re-create the connection." },
+      { code: "CONNECTOR_ACL_FRESH_CHECK_UNAVAILABLE", status: 503, meaning: "The provider's current permissions could not be read at delivery, so the export was refused instead of using a cached copy.", whatToDo: "Retry." },
+      { code: "CONNECTOR_ACL_FRESH_CHECK_LIMIT", status: 503, meaning: "The export names more connector-bound documents than one delivery can re-check against the provider.", whatToDo: "Export fewer connector-bound documents at a time." },
       { code: "CONNECTOR_BINDING_INVALID", meaning: "The connector binding did not validate.", whatToDo: "Re-create the connection." },
       { code: "CONNECTOR_BINDING_CONFLICT", status: 409, meaning: "Two bindings claim the same connector.", whatToDo: "Revoke one." },
       { code: "OAUTH_PROVIDER_NOT_CONFIGURED", status: 503, meaning: "The provider's client is not configured. Fails closed rather than starting an authorization that cannot complete.", whatToDo: "Check /integrations for which providers are live here." },
