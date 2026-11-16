@@ -25,12 +25,15 @@ import Logomark from "@/components/logomark";
 import { failureSentence } from "@/lib/workspace-failure-copy";
 
 type View = { client: { name: string; redirectOrigin: string }; scopes: string[] };
+type Check = { id: string; ok?: boolean; code: string; action?: { href: string } };
 type Phase =
   | { kind: "checking" }
   | { kind: "invalid"; description: string; back: { href: string; origin: string } | null }
   | { kind: "signed-out"; view: View }
   | { kind: "consent"; view: View }
   | { kind: "working"; view: View }
+  | { kind: "not-ready"; view: View; failed: Check[] }
+  | { kind: "no-world"; view: View; check: Check }
   | { kind: "unavailable"; code: string; status: number }
   | { kind: "leaving" };
 
@@ -54,7 +57,7 @@ async function sessionToken() {
   return data.session?.access_token ?? null;
 }
 
-async function decide(decision: "describe" | "approve" | "deny", token: string | null) {
+async function decide(decision: "describe" | "precheck" | "approve" | "deny", token: string | null) {
   const response = await fetch("/api/mcp/oauth/authorize", {
     method: "POST",
     cache: "no-store",
@@ -96,15 +99,41 @@ export default function OAuthAuthorizePage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const submit = async (decision: "approve" | "deny", view: View) => {
+  // Allow runs the readiness precheck first (F30-10): entitlement and cohort refuse before any grant,
+  // and a workspace with no active World is told so and must click a second time. Nothing navigates
+  // on its own.
+  const submit = async (decision: "allow" | "connect" | "deny", view: View) => {
     setPhase({ kind: "working", view });
     try {
-      const token = decision === "approve" ? await sessionToken() : null;
-      if (decision === "approve" && !token) {
+      const token = decision === "deny" ? null : await sessionToken();
+      if (decision !== "deny" && !token) {
         setPhase({ kind: "signed-out", view });
         return;
       }
-      const { status, body } = await decide(decision, token);
+      if (decision === "allow") {
+        const { status, body } = await decide("precheck", token);
+        if (status === 401) {
+          setPhase({ kind: "signed-out", view });
+          return;
+        }
+        const checks = Array.isArray(body.checks) ? (body.checks as Check[]) : null;
+        if (body.code !== "AUTHORIZATION_READINESS" || !checks) {
+          setPhase({ kind: "unavailable", code: String(body.code ?? ""), status });
+          return;
+        }
+        const failed = checks.filter((check) => !check.ok);
+        const blocking = failed.filter((check) => check.id !== "active_world");
+        if (body.ready !== true || blocking.length > 0) {
+          setPhase({ kind: "not-ready", view, failed: blocking.length > 0 ? blocking : failed });
+          return;
+        }
+        const world = failed.find((check) => check.id === "active_world");
+        if (world) {
+          setPhase({ kind: "no-world", view, check: world });
+          return;
+        }
+      }
+      const { status, body } = await decide(decision === "deny" ? "deny" : "approve", token);
       if (leave(body.redirectTo)) return;
       if (status === 401) setPhase({ kind: "signed-out", view });
       else setPhase({ kind: "unavailable", code: String(body.code ?? ""), status });
@@ -158,6 +187,33 @@ export default function OAuthAuthorizePage() {
             </p>
           ) : null}
 
+          {phase.kind === "not-ready" ? (
+            <div className="notice static" role="alert">
+              <p><strong>Nothing was granted.</strong></p>
+              <ul>
+                {phase.failed.map((check) => (
+                  <li key={check.id} style={WRAP}>
+                    {check.code === "TRIAL_FEATURE_NOT_INCLUDED"
+                      ? "Connecting an AI client needs a workspace that can hold API keys; a free evaluation cannot."
+                      : failureSentence(check.code, 403)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {phase.kind === "no-world" ? (
+            <div className="notice static" role="status">
+              <p>
+                <strong>{phase.check.code === "NO_ACTIVE_WORLD" ? "No active World yet." : "Active Worlds could not be checked."}</strong>{" "}
+                {phase.check.code === "NO_ACTIVE_WORLD"
+                  ? "You can connect now, but the AI client will find nothing until a World is activated."
+                  : "You can still connect; the AI client may find nothing until a World is active."}
+              </p>
+              {phase.check.action ? <p><Link href={phase.check.action.href}>Add sources and compile a World</Link></p> : null}
+            </div>
+          ) : null}
+
           {view ? (
             <>
               <p className="lead">
@@ -178,7 +234,11 @@ export default function OAuthAuthorizePage() {
                   </>
                 ) : (
                   <>
-                    <button className="btn" type="button" disabled={phase.kind === "working"} onClick={() => void submit("approve", view)}>Allow read-only access</button>
+                    {phase.kind === "no-world" ? (
+                      <button className="btn" type="button" onClick={() => void submit("connect", view)}>Connect anyway</button>
+                    ) : (
+                      <button className="btn" type="button" disabled={phase.kind === "working"} onClick={() => void submit("allow", view)}>Allow read-only access</button>
+                    )}
                     <button className="btn ghost" type="button" disabled={phase.kind === "working"} onClick={() => void submit("deny", view)}>Deny</button>
                   </>
                 )}
