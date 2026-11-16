@@ -190,23 +190,6 @@ export const BRAND_LINE = {
 */
 export const KO_CHROME = {
   cta: { [ACCESS_CTA.href]: "이용 문의", [SELF_SERVE_CTA.href]: "사용 신청하기" } as Record<string, string>,
-  signIn: "로그인",
-  /* Labels follow the same hrefs as the English primary navigation. */
-  nav: {
-    "/product": "제품",
-    "/how-it-works": "작동 방식",
-    "/resources": "자료",
-    "/docs": "문서",
-    "/pricing": "요금",
-  } as Record<string, string>,
-  menu: "메뉴",
-  footerGroups: {
-    Product: "제품",
-    Research: "리서치",
-    Developers: "개발자",
-    Trust: "신뢰와 보안",
-    Legal: "약관",
-  } as Record<string, string>,
   /*
     chrome-14 / D36. The footer was half translated: Korean group headings over 24 English link
     labels, which reads as an unfinished translation rather than a decision. Keyed by href for
@@ -240,7 +223,6 @@ export const KO_CHROME = {
     "/terms": "이용약관",
     "/refunds": "환불 정책",
   } as Record<string, string>,
-  tagline: "모든 결과에서 원문까지 다시 따라갈 수 있도록 컴파일합니다.",
   /*
     The deployment gate, in Korean, and the site's only Korean spelling of it.
 
@@ -780,72 +762,6 @@ export const NAV_PRICING: SiteLink = { href: "/pricing", label: "Pricing" };
 /** The group that hangs from a bar item, if any. How it works and Pricing have none. */
 export const navGroupFor = (href: string): NavGroup | undefined =>
   NAV_GROUPS.find((group) => group.overviewHref === href);
-
-/**
- * The panels in Korean, for the /ko header.
- *
- * Kept apart from `KO_CHROME` on purpose: the two client components import `KO_CHROME`, so a
- * table added to it ships in every page's script. Only the server-rendered panels read this one.
- * Keyed the way the footer's table is -- links and descriptions by href, columns by their English
- * title -- so it cannot name a destination the panels do not carry. Product names (TAVONEL,
- * Compiled World, MCP, API, CLI) are not translated.
- *
- * Every syllable here has to be in /ko's subset font (`app/wanted-sans-korean.css`, pinned by
- * `lib/landing-v2-page.test.ts`), so a few labels take the word the subset already carries:
- * the footer's own "지원 파일", "연동" and "방법론", and "관계도" or "분석" where the usual loanword
- * is outside it. Widening the subset is a font rebuild, not a copy edit. The corpus line repeats the figures of the
- * English one, and `lib/site-nav-model.test.ts` recomputes both from the sample.
- */
-export const KO_NAV_PANELS = {
-  menu: "메뉴",
-  columns: {
-    "Understand the product": "제품 이해하기",
-    "Sources, connections and trust": "지원 파일, 연동, 신뢰",
-    "Solutions by workflow": "워크플로별 솔루션",
-    "Get connected": "연결하기",
-    "Interfaces and tools": "인터페이스와 도구",
-    "Learn and do": "학습하고 실행하기",
-    "Verify and compare": "검증하고 비교하기",
-  } as Record<string, string>,
-  links: {
-    "/product": "제품 개요",
-    "/product/document-understanding": "문서 이해",
-    "/product/compiled-world": "Compiled World",
-    "/sources": "지원 파일",
-    "/integrations": "연동",
-    "/trust": "신뢰 센터",
-    "/solutions/ai-ready-knowledge": "AI 준비가 된 지식",
-    "/solutions/source-grounded-assistants": "근거 기반 AI 비서",
-    "/solutions/knowledge-graph": "지식 관계도",
-    "/solutions/knowledge-operations": "지식 운영",
-    "/solutions/document-intelligence": "문서 분석",
-    "/solutions": "모든 솔루션",
-    "/explore": "Compiled World 살펴보기",
-    "/developers": "개발자 가이드",
-    "/docs/quickstart": "시작하기",
-    "/docs/use-with-ai": "AI에서 결과 사용하기",
-    "/api": "API 레퍼런스",
-    "/docs/mcp": "MCP",
-    "/docs/cli": "CLI와 패키지 검증",
-    "/docs": "모든 문서",
-    "/demo": "검증할 수 있는 제품 경로",
-    "/knowledge-compiler": "지식 컴파일러 가이드",
-    "/guide": "제품 가이드",
-    "/changelog": "변경 이력",
-    "/research": "리서치",
-    "/benchmarks": "방법론",
-    "/resources": "모든 자료",
-  } as Record<string, string>,
-  descriptions: {
-    "/sources": "TAVONEL이 읽는 것과 읽은 뒤 남는 것",
-    "/solutions/ai-ready-knowledge": "AI·인프라 엔지니어",
-    "/solutions/source-grounded-assistants": "서비스·에이전트 개발자",
-    "/solutions/knowledge-graph": "데이터·지식 아키텍트",
-    "/solutions/knowledge-operations": "지식 관리자와 보안 검토자",
-    "/solutions/document-intelligence": "문서·운영 조직",
-    "/explore": "Apple SEC 코퍼스 · 공시 5건 · 영역 1,281개",
-  } as Record<string, string>,
-} as const;
 
 /**
  * Declared in the menu before the route exists. Empty, and meant to stay empty.

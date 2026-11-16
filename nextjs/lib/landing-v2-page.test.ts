@@ -1068,8 +1068,8 @@ describe("current-main bounded evaluation entry", () => {
     expect(b.indexOf('href="/explore"')).toBeLessThan(b.indexOf('href="/evaluation"'));
   });
 
-  it.each(["en", "ko"] as const)("%s offers the blank localized worksheet without uploading documents", locale => {
-    const html = renderToStaticMarkup(createElement(EvaluationPage, { korean: locale === "ko" }));
+  it.each(["en"] as const)("%s offers the blank localized worksheet without uploading documents", locale => {
+    const html = renderToStaticMarkup(createElement(EvaluationPage));
     expect(html).toContain(`lang="${locale}"`);
     expect(html).toContain(`href="/evaluation/pilot-worksheet.${locale}.md"`);
     expect(html).toContain(`download="tavonel-pilot-worksheet.${locale}.md"`);
@@ -1156,7 +1156,7 @@ describe("the entry-page figure allowlist still fails closed", () => {
 
 /*
   FINAL-SPEC 2026-10-26 §2.8: Home's compact footer. Seven of the footer's own links, labelled by
-  FOOTER_GROUPS / KO_CHROME.footerLinks (no new string), no group titles and no tagline, and the
+  FOOTER_GROUPS (no new string), no group titles and no tagline, and the
   legal row unchanged. A missing route fails the render instead of printing a link the full
   footer does not have.
 */
@@ -1167,11 +1167,11 @@ describe("Home compact footer", () => {
     const footer = html.slice(html.indexOf('<footer class="site'), html.lastIndexOf("</footer>"));
     const links = [...footer.matchAll(/<a(\s[^>]*)>([\s\S]*?)<\/a>/g)].filter(([, open]) => !/wordmark/.test(open!) && !/mailto:/.test(open!));
     const nav = links.slice(0, ORDER.length);
-    expect(nav.map(([, open]) => attr(open!, "href"))).toEqual(ORDER.map(href => (locale === "ko" && href === "/contact" ? "/ko/contact" : href)));
+    expect(nav.map(([, open]) => attr(open!, "href"))).toEqual(ORDER);
     const all = FOOTER_GROUPS.flatMap(group => group.links);
     for (const [index, [, , label]] of nav.entries()) {
       const href = ORDER[index]!;
-      expect(readable(label!)).toBe(locale === "ko" ? KO_CHROME.footerLinks[href] : all.find(link => link.href === href)!.label);
+      expect(readable(label!)).toBe(all.find(link => link.href === href)!.label);
     }
     expect(footer).not.toContain("site-footer-title");
     expect(footer).not.toContain("site-footer-tagline");
@@ -1180,9 +1180,8 @@ describe("Home compact footer", () => {
 
   it("fails closed when a compact link is not a footer route", () => {
     const without = FOOTER_GROUPS.map(group => ({ ...group, links: group.links.filter(link => link.href !== "/status") }));
-    expect(() => compactFooterLinks(false, without)).toThrow(/\/status/);
-    expect(() => compactFooterLinks(true, without)).toThrow(/\/status/);
-    expect(compactFooterLinks(false).map(link => link.href)).toEqual(ORDER);
+    expect(() => compactFooterLinks(without)).toThrow(/\/status/);
+    expect(compactFooterLinks().map(link => link.href)).toEqual(ORDER);
   });
 });
 

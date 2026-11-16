@@ -92,7 +92,6 @@ const COPY_SURFACES = [
   "lib/guide-content.ts",
   "components/guide/guide-page.tsx",
   "app/guide/page.tsx",
-  "app/ko/guide/page.tsx",
   "app/pricing/page.tsx",
   "app/product/page.tsx",
   "app/product/knowledge-compiler/page.tsx",
@@ -209,14 +208,6 @@ const COPY_SURFACES = [
   "app/cookbooks/[slug]/page.tsx",
   // The cookbook index, 2026-09-11 (BA-210). Its lede and card copy are written on the page.
   "app/cookbooks/page.tsx",
-  /*
-    The §12.4 Korean entry page. A barred phrase does not stop being barred in translation, and
-    the list below is matched against source text, so the row is here for the English words this
-    page does carry -- the plan label it reads from `billing-catalog.ts`, the page names it links
-    to, and its own comments. What it cannot check is a Korean sentence that means one of these
-    things; that is a review, and it is why this page states no claim it does not link to.
-  */
-  "app/ko/page.tsx",
   /*
     `llms.txt` is public copy that no guard read.
 
@@ -364,7 +355,6 @@ function marketingPageFiles(directory = "app", found: string[] = []): string[] {
 function landingSource(): string {
   return [
     read("app/page.tsx"),
-    read("app/ko/page.tsx"),
     read("components/landing-v2/landing-page.tsx"),
     read("components/landing-v2/scene-actions.ts"),
     read("lib/landing-v2-copy.ts"),
@@ -525,7 +515,6 @@ describe("public copy", () => {
       "<video"
     );
     expect(read("app/page.tsx")).not.toContain("HERO_PROOF_IMAGE");
-    expect(read("app/ko/page.tsx")).not.toContain("HERO_PROOF_IMAGE");
     expect(read("components/landing-v2/hero-film.tsx")).not.toContain("lv2-film-note");
   });
 
@@ -579,7 +568,6 @@ describe("public copy", () => {
   it("hand-rolls no <video> on the entry pages, and keeps the one decoder in the player", () => {
     for (const file of [
       "app/page.tsx",
-      "app/ko/page.tsx",
       "components/landing-v2/landing-page.tsx",
       "components/landing-v2/hero-film.tsx",
     ]) {
@@ -1643,13 +1631,9 @@ describe("the site's own vocabulary", () => {
       `cta.label` unless the page is /ko, where it is that action's Korean name keyed by the same
       destination. The chrome may still write neither English literal itself.
     */
-    expect(
-      chrome,
-      "the header derives the Pricing label from the navigation model"
-    ).toContain(
-      'const pricingLabel = korean ? KO_CHROME.nav["/pricing"] : "Pricing";'
+    expect(read("components/public-site-chrome.tsx"), "the header's Pricing link is a plain English label").toContain(
+      'href="/pricing">Pricing</Link>'
     );
-    expect(chrome, "and renders that").toContain("{pricingLabel}");
     for (const literal of ["Request access", "Sign up for access"]) {
       expect(
         chrome,

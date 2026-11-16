@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { slugify, tocEntries } from "@/components/docs/page-toc";
@@ -198,9 +198,8 @@ describe("an eyebrow that survives reads as its own clauses", () => {
     below it says is deleted rather than restyled, so there is no two-clause label left on that
     page to separate. The tripwire moves with it: that page must render none, not some.
   */
-  it("../app/ko/page.tsx renders no eyebrow, because each one restated the heading under it", () => {
-    const source = read("../app/ko/page.tsx");
-    expect([...source.matchAll(/className="(?:slate|one-path-eyebrow|eyebrow)"/g)]).toHaveLength(0);
+  it("/ko renders no page of its own: the route answers 308 and app/ko is gone", () => {
+    expect(existsSync(new URL("../app/ko", import.meta.url))).toBe(false);
   });
 
   it.each(SURFACES)("%s separates the label from the text it sits beside", (surface) => {

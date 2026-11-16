@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createElement, type FunctionComponent } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -124,9 +125,9 @@ function render(component: FunctionComponent<Record<string, unknown>>, props: Re
 
 /* --------------------------------------------------------------------- the surfaces */
 
-async function header(korean: boolean): Promise<Action> {
+async function header(): Promise<Action> {
   const { PublicSiteHeader } = await import("../components/public-site-chrome");
-  const actions = anchors(block(render(PublicSiteHeader, { korean }), 'class="nav-actions"', "span"));
+  const actions = anchors(block(render(PublicSiteHeader, {}), 'class="nav-actions"', "span"));
   return actions[actions.length - 1]!;
 }
 
@@ -145,19 +146,6 @@ async function pricing(): Promise<Action[]> {
   return [...html.matchAll(/<div class="plan-action">/g)].map((match) =>
     anchors(block(html.slice(match.index), 'class="plan-action"', "div"))[0]!,
   );
-}
-
-/** /ko/pricing: the intro's access action, then each card's action in card order. */
-async function koPricing(): Promise<{ intro: Action; cards: Action[] }> {
-  const { default: KoreanPricingPage } = await import("../app/ko/pricing/page");
-  const { pricingPlanId } = await import("../components/pricing-plan-overview");
-  const html = render(KoreanPricingPage as FunctionComponent<Record<string, unknown>>);
-  const cards = [0, 1, 2, 3].map((index) => {
-    const [action] = anchors(block(html, `id="${pricingPlanId(index)}"`, "article")).slice(-1);
-    return action!;
-  });
-  const intro = anchors(block(html, 'id="ko-pricing-title"', "div")).find((action) => action.href !== "/explore")!;
-  return { intro, cards };
 }
 
 /** /explore: the stage header's exit links, and the closing scene's primary action. */
@@ -207,7 +195,6 @@ const SAMPLE_KO = { href: "/explore", label: "컴파일된 샘플 열기" };
 */
 const CLOSED = {
   header: { href: "/contact", label: "Request access" },
-  headerKo: { href: "/ko/contact", label: "이용 문의" },
   home: {
     primary: { href: "/evaluation", label: "Evaluate your documents" },
     secondary: SAMPLE,
@@ -224,15 +211,6 @@ const CLOSED = {
     { href: "/contact?plan=Team", label: "Talk to us about Team" },
     { href: "/contact?plan=Enterprise", label: "Scope an Enterprise pilot" },
   ],
-  koPricing: {
-    intro: { href: "/ko/contact", label: "도입 상담하기" },
-    cards: [
-      { href: "/explore", label: "공개 World 살펴보기 (영문)" },
-      { href: "/ko/contact?plan=Developer", label: "Developer 도입 상담" },
-      { href: "/ko/contact?plan=Team", label: "Team 도입 상담" },
-      { href: "/ko/contact?plan=Enterprise", label: "Enterprise 도입 상담" },
-    ],
-  },
   explore: {
     exits: [
       { href: "/product", label: "Product" },
@@ -265,7 +243,6 @@ const TABLE = {
   S2: {
     ...CLOSED,
     header: { href: "/login", label: "Start free" },
-    headerKo: { href: "/login", label: "사용 신청하기" },
     home: { ...CLOSED.home, primary: { href: "/login", label: "Start free" } },
     homeKo: { ...CLOSED.homeKo, primary: { href: "/login", label: "사용 신청하기" } },
     pricing: [
@@ -274,20 +251,7 @@ const TABLE = {
       { href: "/contact?plan=Team", label: "Talk to us about Team" },
       { href: "/contact?plan=Enterprise", label: "Scope an Enterprise pilot" },
     ],
-    /*
-      /ko/pricing and /explore follow the switch now (JOURNEY-MAP D-07, A5). The Korean labels are
-      the site's existing strings, not new pricing copy: the founder sets the S2 Korean pricing
-      wording with D-07, in P2-37, before the switch moves.
-    */
-    koPricing: {
-      intro: { href: "/login", label: "사용 신청하기" },
-      cards: [
-        CLOSED.koPricing.cards[0],
-        { href: "/login?next=checkout&offer=observer_access", label: "Developer · 사용 신청하기" },
-        CLOSED.koPricing.cards[2],
-        CLOSED.koPricing.cards[3],
-      ],
-    },
+    // /explore follows the switch too (JOURNEY-MAP D-07, A5).
     explore: {
       exits: [CLOSED.explore.exits[0], CLOSED.explore.exits[1], { href: "/login", label: "Start free" }],
       close: { href: "/login", label: "Start free — 3 files, no card" },
@@ -320,12 +284,10 @@ async function surfaces(state: State) {
   await enter(state);
   rendered = [];
   const seen = {
-    header: await header(false),
-    headerKo: await header(true),
+    header: await header(),
     home: await home(false),
     homeKo: await home(true),
     pricing: await pricing(),
-    koPricing: await koPricing(),
     explore: await explore(),
     login: await login(),
   };
@@ -339,7 +301,6 @@ describe.each(STATES)("CTA truth in %s", (state) => {
 
   it("header filled action", () => {
     expect(seen.header).toEqual(expected.header);
-    expect(seen.headerKo).toEqual(expected.headerKo);
   });
 
   /*
@@ -350,14 +311,14 @@ describe.each(STATES)("CTA truth in %s", (state) => {
   */
   it("the header offers no start on the start's own page", async () => {
     const { PublicSiteHeader } = await import("../components/public-site-chrome");
-    for (const [korean, start] of [[false, expected.header], [true, expected.headerKo]] as const) {
+    for (const start of [expected.header]) {
       nav.path = start.href;
       try {
-        const html = renderToStaticMarkup(createElement(PublicSiteHeader, { korean }));
+        const html = renderToStaticMarkup(createElement(PublicSiteHeader, {}));
         const actions = anchors(block(html, 'class="nav-actions"', "span"));
         expect(html, `${start.href}: no header start`).not.toContain('data-analytics="header-start"');
         expect(actions.map((action) => action.label), `${start.href}: the start goes`).not.toContain(start.label);
-        expect(actions.at(-1), `${start.href}: Sign in stays, last`).toEqual({ href: "/login", label: korean ? "로그인" : "Sign in" });
+        expect(actions.at(-1), `${start.href}: Sign in stays, last`).toEqual({ href: "/login", label: "Sign in" });
       } finally {
         nav.path = "/";
       }
@@ -373,8 +334,10 @@ describe.each(STATES)("CTA truth in %s", (state) => {
     expect(seen.pricing).toEqual(expected.pricing);
   });
 
-  it("/ko/pricing actions", () => {
-    expect(seen.koPricing).toEqual(expected.koPricing);
+  it("/ko redirects with a 308 to its English path", () => {
+    const config = readFileSync(new URL("../next.config.mjs", import.meta.url), "utf8");
+    expect(config).toContain('{ source: "/ko", destination: "/", permanent: true }');
+    expect(config).toContain('{ source: "/ko/:path*", destination: "/:path*", permanent: true }');
   });
 
   it("/explore exits and close", () => {

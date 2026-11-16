@@ -457,14 +457,14 @@ describe("product claims sync", () => {
     // talks about plans -- neither by name nor as a literal cents figure (review PR201-R1 note 4).
     const R1_RATE = /per standard page|STANDARD_PAGE_USD|MAXIMUM_PAGE_USD|PROCESSING_UNIT_USD|\$\s?0\.\d/;
     for (const [surface, source] of [
-      ["pricing", pricing], ["docs", read("lib/docs-content.ts")], ["ko pricing", read("app/ko/pricing/page.tsx")],
+      ["pricing", pricing], ["docs", read("lib/docs-content.ts")],
       ["enterprise", read("app/enterprise/page.tsx")], ["guide", read("lib/guide-content.ts")], ["integrations", read("app/integrations/page.tsx")],
     ] as const) {
       expect(source, `R1: ${surface} publishes no overage rate`).not.toMatch(R1_RATE);
     }
     expect("Additional pages are $0.04 each", "R1: the guard catches the old lede's literal form").toMatch(R1_RATE);
     expect("Maximum routed cost $0.06 / page", "R1: and the workspace's form").toMatch(R1_RATE);
-    for (const [surface, source] of [["pricing", pricing], ["docs", read("lib/docs-content.ts")], ["ko pricing", read("app/ko/pricing/page.tsx")]] as const) {
+    for (const [surface, source] of [["pricing", pricing], ["docs", read("lib/docs-content.ts")]] as const) {
       expect(source, `R1: ${surface} says where additional volume goes`).toMatch(/arranged with us|저희와 상담해 정합니다/);
     }
     expect(pricing, "P03: whether Ask and search consume pages")

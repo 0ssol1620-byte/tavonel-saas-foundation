@@ -244,7 +244,7 @@ export default function LandingPage({
         <link rel="preload" as="font" type="font/woff2" href="/fonts/wanted-sans-ko-home-400.woff2" crossOrigin="" />
         <link rel="preload" as="font" type="font/woff2" href="/fonts/wanted-sans-ko-home-510.woff2" crossOrigin="" />
       </> : null}
-      <PublicSiteHeader korean={korean} ghostCta start={heroStart} />
+      <PublicSiteHeader ghostCta start={heroStart} />
       <main id="main" tabIndex={-1} data-home-ia="outcome-v1.1">
         {children}
         {/*
@@ -390,7 +390,7 @@ export default function LandingPage({
         <TrustScene locale={locale} copy={copy.trust} sectionId="s5" sceneIndex={5} />
         <StartScene locale={locale} copy={copy.start} actions={heroActions} sectionId="s6" sceneIndex={6} />
       </main>
-      <PublicSiteFooter korean={korean} compact />
+      <PublicSiteFooter compact />
     </div>
   );
 }

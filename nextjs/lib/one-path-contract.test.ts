@@ -30,8 +30,8 @@ describe("approved one-path experience", () => {
     expect(text("components/public-site-chrome.tsx")).toContain("HEADER_NAV.map");
     // NAV PANELS 2026-11-09: the sheet renders the bar's own rows, handed to it by the header.
     expect(text("components/mobile-primary-nav.tsx")).toContain("{children}");
-    expect(text("components/public-site-chrome.tsx")).toContain("<NavSections korean={korean} sheet />");
-    expect(text("components/public-site-chrome.tsx")).toContain('href={korean ? "/ko/pricing" : "/pricing"}');
+    expect(text("components/public-site-chrome.tsx")).toContain("<NavSections sheet />");
+    expect(text("components/public-site-chrome.tsx")).toContain('href="/pricing">Pricing</Link>');
   });
   it("does not confuse a prefix with an unrelated route", () => {
     expect(customerNavOwns("/product", "/product/document-intelligence/")).toBe(true);
@@ -235,10 +235,6 @@ describe("approved one-path experience", () => {
       a Korean table joined to `COMPILE_STAGES` by position rather than a second stage list with its
       own `src` and `poster` -- the landing-01 defect that painted a blank panel on /ko.
     */
-    const ko = text("app/ko/page.tsx");
-    expect(ko.match(/<CompileStagePlayer/g), "the Korean entry page mounts its own player").toBeNull();
-    expect(ko, "the Korean film may not reuse the English stage labels verbatim")
-      .not.toContain("const KO_WORK_STAGES");
     const film = text("components/landing-v2/hero-film.tsx");
     expect(film, "the film takes the locale").toContain("korean={korean}");
     expect(film, "and the Korean captions are copy, joined by position")
@@ -275,7 +271,7 @@ describe("approved one-path experience", () => {
        LandingPage and must not duplicate or mutate that table themselves. */
     expect(text("lib/compile-stages.ts"), "the table stays a plain module a server component can read")
       .not.toMatch(/^\s*["']use client["']/m);
-    for (const page of ["app/page.tsx", "app/ko/page.tsx"]) {
+    for (const page of ["app/page.tsx"]) {
       expect(text(page), `${page} must not duplicate the shared HeroFilm stage table`)
         .not.toContain('from "@/lib/compile-stages"');
     }
@@ -298,12 +294,6 @@ describe("approved one-path experience", () => {
       .toContain('"/ko/pricing"');
     expect(composition, "evaluation remains localized while live entry stays state controlled").toContain('access.href === "/contact" ? (korean ? "/ko/evaluation" : "/evaluation") : access.href');
     expect(composition).not.toContain("pricingHref");
-    const korean = text("app/ko/page.tsx");
-    expect(korean, "/ko renders the same composition in the other language").toContain("<LandingPage korean");
-    expect(korean).toContain('canonical: "/ko"');
-    // Comments stripped: the rationale for deleting them names the strings it deleted.
-    expect(korean.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, ""), "a numbered section kicker is not a section name")
-      .not.toMatch(/0\d \/ /);
     expect(text("app/page.tsx"), "the proof block is not on the landing any more").not.toContain("<SolutionProofSample");
   });
 

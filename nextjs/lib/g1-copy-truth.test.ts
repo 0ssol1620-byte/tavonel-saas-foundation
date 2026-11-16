@@ -243,7 +243,7 @@ describe("G1-COPY: Korean measurement and HWP wording on /sources (D-33 / P2-33)
   });
 
   it("D-33. keeps it off the Korean home, which is a first-impression surface (C1)", () => {
-    for (const file of ["app/ko/page.tsx", "lib/landing-v2-copy.ts", "components/landing-v2/landing-page.tsx"]) {
+    for (const file of ["lib/landing-v2-copy.ts", "components/landing-v2/landing-page.tsx"]) {
       expect(read(file), file).not.toContain("측정하지 않았습니다");
       expect(read(file), file).not.toContain("측정 안 함");
     }

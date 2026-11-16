@@ -12,8 +12,6 @@ import {
   FOOTER_GROUPS,
   FOOTER_LEGAL_ROW,
   HEADER_NAV,
-  KO_CHROME,
-  KO_NAV_PANELS,
   navAlsoOwns,
   navGroupFor,
   type NavPanelItem,
@@ -36,38 +34,35 @@ import chrome from "./public-site-chrome.module.css";
   Panel links do not prefetch: they are in the DOM on every page, and T1-014 measured what a footer
   full of prefetching links cost a cold Home load.
 */
-export function NavSections({ korean = false, sheet = false }: { korean?: boolean; sheet?: boolean }) {
-  const linkText = (item: NavPanelItem) => (korean ? KO_NAV_PANELS.links[item.href] ?? item.label : item.label);
-  const description = (item: NavPanelItem) => (korean ? KO_NAV_PANELS.descriptions[item.href] ?? item.description : item.description);
+export function NavSections({ sheet = false }: { sheet?: boolean }) {
   const panelLink = (item: NavPanelItem) => (
     <Link key={item.href} className={chrome.navLink} href={item.href as Route} prefetch={false}>
-      <span className={chrome.navLinkLabel}>{linkText(item)}</span>
-      {description(item) ? <span className={chrome.navDescription}>{description(item)}</span> : null}
+      <span className={chrome.navLinkLabel}>{item.label}</span>
+      {item.description ? <span className={chrome.navDescription}>{item.description}</span> : null}
     </Link>
   );
   return (
     <>
       {HEADER_NAV.map((item) => {
-        const label = korean ? KO_CHROME.nav[item.href] ?? item.label : item.label;
+        const label = item.label;
         const group = navGroupFor(item.href);
         const panelId = `${sheet ? "sheet" : "bar"}-nav-panel-${group?.section}`;
         return [
           <NavCurrentLink key={item.href} href={item.href} also={navAlsoOwns(item.href)} native={sheet} section={group?.section}
             className={sheet ? "mobile-nav-direct" : "site-nav-direct"}>
-            {/* BQ-013: /ko rendered these in English above Korean body copy. */}
             {label}
           </NavCurrentLink>,
           group ? (
             <button key={`${item.href}-toggle`} type="button" className={chrome.navToggle} aria-expanded="false"
               aria-controls={panelId} data-section={group.section} data-hub={item.href}
-              aria-label={`${label} ${korean ? KO_NAV_PANELS.menu : "menu"}`} />
+              aria-label={`${label} menu`} />
           ) : null,
           group ? (
             <div key={`${item.href}-panel`} className={chrome.navPanel} id={panelId} data-section={group.section}>
               <div className={chrome.navCard} style={{ "--nav-columns": group.columns.length } as CSSProperties}>
                 {group.columns.map((column) => (
                   <div className={chrome.navColumn} key={column.title}>
-                    <p className={chrome.navColumnTitle}>{korean ? KO_NAV_PANELS.columns[column.title] ?? column.title : column.title}</p>
+                    <p className={chrome.navColumnTitle}>{column.title}</p>
                     {column.items.map(panelLink)}
                   </div>
                 ))}
@@ -83,10 +78,10 @@ export function NavSections({ korean = false, sheet = false }: { korean?: boolea
 }
 
 /** The desktop row: the bar items, their toggles and their panels. Below 1250px the sheet takes over. */
-export function DesktopPrimaryNav({ korean = false }: { korean?: boolean }) {
+export function DesktopPrimaryNav() {
   return (
-    <nav aria-label={korean ? "섹션" : "Sections"} className={`site-nav one-path-primary-nav ${chrome.navBar}`}>
-      <NavSections korean={korean} />
+    <nav aria-label="Sections" className={`site-nav one-path-primary-nav ${chrome.navBar}`}>
+      <NavSections />
     </nav>
   );
 }
@@ -138,7 +133,6 @@ export function DesktopPrimaryNav({ korean = false }: { korean?: boolean }) {
  */
 export function PublicSiteHeader({
   signedIn,
-  korean = false,
   ghostCta = false,
   start,
 }: {
@@ -148,15 +142,12 @@ export function PublicSiteHeader({
    * client caller passes the one it already resolved, or nothing.
    */
   start?: { href: string; label: string };
-  /** Korean entry, pricing, and contact share the localized chrome. */
-  korean?: boolean;
   /**
    * FINAL-SPEC 2026-10-26 §2.8: on Home the header action is a ghost pill (the hero and the close carry
    * the one filled action per screen), so it is marked as the ghost it is rather than as a filled `.btn`.
    */
   ghostCta?: boolean;
 }) {
-  const pricingLabel = korean ? KO_CHROME.nav["/pricing"] : "Pricing";
   /*
     Founder 2026-11-10: signed out, the header's action is the start -- "Start free" (SELF_SERVE_CTA) wherever live
     commerce is on, the access action where it is not, so the header never offers a start the deployment refuses
@@ -164,24 +155,21 @@ export function PublicSiteHeader({
     (BA-232) and passes nothing gets the closed posture, which is the truthful default.
   */
   const resolved = primaryCallToAction();
-  // Korean pages send /contact to its Korean page, the one KO_FOOTER_PAGES names (lib/guide-content.test.ts).
-  const action = start ?? (korean
-    ? { href: resolved.href === "/contact" ? "/ko/contact" : resolved.href, label: KO_CHROME.cta[resolved.href] ?? resolved.label }
-    : resolved);
+  const action = start ?? resolved;
   return (
     <header className={`nav chrome-v2-header ${chrome.header}`}>
       <HeaderScrollState />
-      <Link href={korean ? "/ko" : "/"} className={`wordmark ${chrome.wordmark}`} aria-label={korean ? "TAVONEL 홈" : "TAVONEL home"}>
+      <Link href="/" className={`wordmark ${chrome.wordmark}`} aria-label="TAVONEL home">
         <Logomark />
         <b>TAVONEL</b>
       </Link>
-      <DesktopPrimaryNav korean={korean} />
-      <MobilePrimaryNav korean={korean} signedIn={signedIn} start={action}
-        labels={{ menu: korean ? KO_CHROME.menu : "Menu", pricing: pricingLabel, signIn: korean ? KO_CHROME.signIn : "Sign in" }}>
-        <NavSections korean={korean} sheet />
+      <DesktopPrimaryNav />
+      <MobilePrimaryNav signedIn={signedIn} start={action}
+        labels={{ menu: "Menu", pricing: "Pricing", signIn: "Sign in" }}>
+        <NavSections sheet />
       </MobilePrimaryNav>
       <span className="nav-actions">
-        <Link className={`small ${chrome.pricingLink}`} href={korean ? "/ko/pricing" : "/pricing"}>{pricingLabel}</Link>
+        <Link className={`small ${chrome.pricingLink}`} href="/pricing">Pricing</Link>
         {/*
           Below the desktop switch this link is in the phone sheet instead, where it gets a 44px
           row of its own. At 360px the row was wordmark + toggle + a 109px filled button + Sign in
@@ -194,7 +182,7 @@ export function PublicSiteHeader({
             signed out, Sign in stays a plain link and the action is the start. Desktop only: below the switch both are
             the phone sheet's foot. The public sample is the hero's secondary link, no longer the header's action. */}
         <HeaderAccountActions signedIn={signedIn} start={action}
-          labels={{ signIn: korean ? KO_CHROME.signIn : "Sign in", workspace: korean ? "워크스페이스 열기" : "Open workspace" }}
+          labels={{ signIn: "Sign in", workspace: "Open workspace" }}
           className={`btn${ghostCta ? " btn-ghost" : ""} ${chrome.cta}`} signInClassName="nav-signin chrome-v2-signin" />
       </span>
     </header>
@@ -218,35 +206,26 @@ export function PublicSiteHeader({
  * `.nav > nav` child selectors two sheets rely on), which is what puts the wordmark on the same
  * left edge as the content below it.
  */
-/* The footer destinations that have a /ko page of their own; every other link says it is English. EN-1 added /guide. */
-const KO_FOOTER_PAGES = new Set(["/contact", "/pricing", "/guide"]);
-
 /*
   FINAL-SPEC 2026-10-26 §2.8: Home's compact footer -- seven of the footer's own links, in this
-  order, labelled exactly as `FOOTER_GROUPS` (English) and `KO_CHROME.footerLinks` (Korean) label
-  them, so the compact row introduces no string. A route missing from either fails the render
-  rather than printing a link the full footer does not have.
+  order, labelled exactly as `FOOTER_GROUPS` labels them, so the compact row introduces no string. A
+  route missing from it fails the render rather than printing a link the full footer does not have.
 */
 const COMPACT_FOOTER_HREFS = ["/knowledge-compiler", "/enterprise", "/trust", "/security", "/status", "/subprocessors", "/contact"] as const;
 
-export function compactFooterLinks(korean: boolean, groups: typeof FOOTER_GROUPS = FOOTER_GROUPS) {
+export function compactFooterLinks(groups: typeof FOOTER_GROUPS = FOOTER_GROUPS) {
   const all = groups.flatMap((group) => group.links);
   return COMPACT_FOOTER_HREFS.map((href) => {
     const link = all.find((candidate) => candidate.href === href);
-    const label = korean ? KO_CHROME.footerLinks[href] : link?.label;
-    if (!link || !label) throw new Error(`compact footer: ${href} has no ${link ? "Korean label" : "FOOTER_GROUPS entry"}`);
-    return {
-      href: korean && KO_FOOTER_PAGES.has(href) ? `/ko${href}` : href,
-      label,
-      hrefLang: korean && !KO_FOOTER_PAGES.has(href) ? "en" : undefined,
-    };
+    if (!link) throw new Error(`compact footer: ${href} has no FOOTER_GROUPS entry`);
+    return { href, label: link.label };
   });
 }
 
-export function PublicSiteFooter({ korean = false, onePath = false, compact = false }: { korean?: boolean; onePath?: boolean; compact?: boolean } = {}) {
+export function PublicSiteFooter({ onePath = false, compact = false }: { onePath?: boolean; compact?: boolean } = {}) {
   /* BQ-131: the wordmark at the bottom of a page is where a reader goes home from. It was
      a bare <span> -- the one instance of the lockup on the site that was not a link. */
-  const wordmark = <Link href={korean ? "/ko" : "/"} className={`wordmark ${chrome.wordmark}`} aria-label={korean ? "TAVONEL 홈" : "TAVONEL home"}><Logomark /><b>TAVONEL</b></Link>;
+  const wordmark = <Link href="/" className={`wordmark ${chrome.wordmark}`} aria-label="TAVONEL home"><Logomark /><b>TAVONEL</b></Link>;
   return (
     <footer className={`${onePath ? "site one-path-footer" : "site"} chrome-v2-footer ${chrome.footer}${compact ? ` ${chrome.compact}` : ""}`}>
       <div className={`${onePath ? "one-path-wrap" : "shell"} chrome-v2-wrap`}>
@@ -255,8 +234,8 @@ export function PublicSiteFooter({ korean = false, onePath = false, compact = fa
           <div className={chrome.compactRow}>
             {wordmark}
             <nav className={`site-footer-groups ${chrome.footerGroups} ${chrome.compactLinks}`}>
-              {compactFooterLinks(korean).map((link) => (
-                <Link key={link.href} href={link.href as Route} hrefLang={link.hrefLang} prefetch={false}>{link.label}</Link>
+              {compactFooterLinks().map((link) => (
+                <Link key={link.href} href={link.href as Route} prefetch={false}>{link.label}</Link>
               ))}
             </nav>
           </div>
@@ -265,10 +244,10 @@ export function PublicSiteFooter({ korean = false, onePath = false, compact = fa
         <div className={`site-footer-groups ${chrome.footerGroups}`}>
           {FOOTER_GROUPS.map((group) => (
             <nav key={group.title} aria-label={group.title}>
-              <p className="site-footer-title">{korean ? KO_CHROME.footerGroups[group.title] ?? group.title : group.title}</p>
+              <p className="site-footer-title">{group.title}</p>
               {/* T1-014: the footer is always below the fold; prefetching every group wasted ~185KB on a cold home load. */}
               {group.links.map((link) => (
-                <Link key={link.href} href={(korean && KO_FOOTER_PAGES.has(link.href) ? `/ko${link.href}` : link.href) as Route} hrefLang={korean && !KO_FOOTER_PAGES.has(link.href) ? "en" : undefined} prefetch={false}>{korean ? KO_CHROME.footerLinks[link.href] ?? link.label : link.label}</Link>
+                <Link key={link.href} href={link.href as Route} prefetch={false}>{link.label}</Link>
               ))}
             </nav>
           ))}
@@ -281,7 +260,7 @@ export function PublicSiteFooter({ korean = false, onePath = false, compact = fa
           positioning line, and at 412 it ran straight into the copyright row. Its own class, its
           own row, its own tone.
         */}
-        <p className="fine site-footer-tagline">{korean ? KO_CHROME.tagline : BRAND_LINE.descriptor}</p>
+        <p className="fine site-footer-tagline">{BRAND_LINE.descriptor}</p>
         </>}
         {/*
           THE DEPLOYMENT GATE IS NOT IN THE CHROME. 2026-09-19, hero/chrome fix round.
@@ -302,8 +281,7 @@ export function PublicSiteFooter({ korean = false, onePath = false, compact = fa
           The fact itself is unchanged and still published verbatim, on the surfaces where a
           reader is actually deciding: /pricing, /security, /integrations, the /docs first-run
           notes, and the landing's own closing scene, which is what /contact's access action is
-          reached from. `KO_CHROME.customerDataGate` remains its one Korean translation for those
-          surfaces. Restoring it to shared chrome needs a placement that satisfies both gates
+          reached from. Restoring it to shared chrome needs a placement that satisfies both gates
           above, which is a design decision rather than a re-add.
         */}
         {/*
@@ -350,7 +328,7 @@ export type PageTemplate = "T0" | "T1" | "T2" | "T3" | "T4" | "T5";
   `template` is required: a new public page has to say which template it is, and a page outside
   §5.4's inventory (the 404, the noindex /arena) says so with `null` rather than by forgetting.
 */
-export function PublicSitePage({ children, template, korean = false }: { children: React.ReactNode; template: PageTemplate | null; korean?: boolean }) {
+export function PublicSitePage({ children, template }: { children: React.ReactNode; template: PageTemplate | null }) {
   /*
     The commercial posture, read once per page rather than fetched once per visitor.
 
@@ -361,10 +339,10 @@ export function PublicSitePage({ children, template, korean = false }: { childre
     the closed posture.
   */
   return (
-    <div className="page public-page" lang={korean ? "ko" : undefined} data-template={template ?? undefined}>
-      <PublicSiteHeader korean={korean} start={korean ? undefined : primaryCallToAction()} />
+    <div className="page public-page" data-template={template ?? undefined}>
+      <PublicSiteHeader start={primaryCallToAction()} />
       <main id="main" tabIndex={-1}>{children}</main>
-      <PublicSiteFooter korean={korean} />
+      <PublicSiteFooter />
     </div>
   );
 }
