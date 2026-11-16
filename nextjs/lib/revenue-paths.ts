@@ -27,12 +27,14 @@ const notSold = (family: string, ...terms: string[]): RevenuePath => ({
 });
 
 export const REVENUE_PATHS: readonly RevenuePath[] = [
-  { family: "CORE_FREE", state: "sold_self_serve", offerCodes: [], ledgerPath: "allowance", terms: [] },
+  // Trial usage is not an allowance row (that kind is unique per Paddle transaction_id); it is counted
+  // through foundation_trial_policy and reserve_foundation_compute_v3 with billing source "trial".
+  { family: "CORE_FREE", state: "sold_self_serve", offerCodes: [], ledgerPath: "compute_reservation", terms: [] },
   {
     family: "CORE_PERSONAL_TEAM_BUSINESS",
     state: "sold_self_serve",
     offerCodes: ["observer_access", "studio_access"],
-    ledgerPath: "purchase",
+    ledgerPath: "allowance", // both offers are kind "subscription"; paddle-billing-event emits action "allowance"
     terms: [],
   },
   notSold("DEV"),

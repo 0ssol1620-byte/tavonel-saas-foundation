@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { BILLING_OFFERS } from "./billing-catalog";
 import { OFFER_CODES, REVENUE_PATHS, revenuePathForOffer } from "./revenue-paths";
 
 describe("revenue paths", () => {
@@ -25,6 +26,11 @@ describe("revenue paths", () => {
         expect(p.offerCodes).toHaveLength(0);
       }
     }
+  });
+
+  it("an offer's ledger path follows its catalog kind", () => {
+    for (const code of OFFER_CODES)
+      expect(revenuePathForOffer(code).ledgerPath, code).toBe(BILLING_OFFERS[code].kind === "subscription" ? "allowance" : "purchase");
   });
 
   it("pricing copy never names a not_sold family", () => {
