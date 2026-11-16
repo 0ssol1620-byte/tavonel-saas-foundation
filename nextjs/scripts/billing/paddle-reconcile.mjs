@@ -15,6 +15,7 @@
  * 2: not configured, refused, or bad arguments. 3: a read failed (fail closed, never read as agreement).
  */
 
+import "../router/register-ts-loader.mjs";
 import { pathToFileURL } from "node:url";
 
 export const RECONCILE_SCHEMA = "tavonel.paddle_reconcile.v1";

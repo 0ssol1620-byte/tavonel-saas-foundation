@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
 import { BILLING_OFFERS } from "../../lib/billing-catalog.ts";
@@ -128,4 +129,16 @@ describe("paddle-reconcile", () => {
     const none = await run(["prices", "--json"], SANDBOX, d);
     expect(JSON.parse(none.out).delta[0].problems).toEqual(["price_id_not_configured"]);
   });
+});
+
+describe("operator CLI as documented", () => {
+  it("runs under plain node --experimental-strip-types: no key exits 2 naming PADDLE_API_KEY", () => {
+    const r = spawnSync(process.execPath, ["--experimental-strip-types", "scripts/billing/paddle-reconcile.mjs", "prices"], {
+      cwd: new URL("../..", import.meta.url),
+      env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, PADDLE_SANDBOX: "true" },
+      encoding: "utf8",
+    });
+    expect(r.stdout).toContain("PADDLE_API_KEY");
+    expect(r.status).toBe(2);
+  }, 60_000);
 });
