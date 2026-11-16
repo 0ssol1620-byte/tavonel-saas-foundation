@@ -7,7 +7,7 @@ import { foundationWorkspaceId } from "./foundation-pilot";
 const ROOT = resolve(__dirname, "..");
 const MIGRATIONS = resolve(ROOT, "..", "supabase", "migrations");
 
-type Site = { where: string; source: string; width: number };
+type Site = { where: string; source: string; width: number | null };
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -21,15 +21,23 @@ function walk(dir: string, out: string[] = []): string[] {
 const sourceFiles = (dir: string) =>
   walk(resolve(ROOT, dir)).filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f));
 
-const TS_PATTERN = /\/(\^pilot-\[[^\]]+\]\{1,(\d+)\}\$)\//g;
-const SQL_PATTERN = /'(\^pilot-\[[^\]]+\]\{1,(\d+)\}\$)'/g;
+// Every ^pilot- literal, whatever its shape: /regex/, "string"/'string' (new RegExp) and SQL '...'.
+const TS_PATTERN = /\/(\^pilot-[^/\n]*\$)\/|["'`](\^pilot-[^"'`\n]*\$)["'`]/g;
+const SQL_PATTERN = /'(\^pilot-[^'\n]*\$)'/g;
+// The one validator that is deliberately not a tenant-key admitter (see immutable-keys.ts).
+const PROBE_WORKSPACE_SOURCE = "^pilot-drill[0-9a-f]{8}$";
+const POSIX: Record<string, string> = { "[:digit:]": "0-9", "[:alnum:]": "A-Za-z0-9", "[:alpha:]": "A-Za-z", "[:xdigit:]": "0-9A-Fa-f" };
+const compile = (source: string) =>
+  new RegExp(source.replace(/\[:(?:digit|alnum|alpha|xdigit):\]/g, (m) => POSIX[m]));
 
 function sites(files: string[], pattern: RegExp): Site[] {
   const found: Site[] = [];
   for (const file of files) {
     const text = readFileSync(file, "utf8");
     for (const m of text.matchAll(pattern)) {
-      found.push({ where: relative(resolve(ROOT, ".."), file).replaceAll("\\", "/"), source: m[1], width: Number(m[2]) });
+      const source = m[1] ?? m[2];
+      const w = /\{1,(\d+)\}/.exec(source);
+      found.push({ where: relative(resolve(ROOT, ".."), file).replaceAll("\\", "/"), source, width: w ? Number(w[1]) : null });
     }
   }
   return found;
@@ -38,7 +46,8 @@ function sites(files: string[], pattern: RegExp): Site[] {
 /** Pure helper: the sites whose pattern refuses at least one of the given keys. */
 function sitesRefusing(all: Site[], keys: string[]): Site[] {
   return all.filter((s) => {
-    const re = new RegExp(s.source);
+    if (s.source === PROBE_WORKSPACE_SOURCE) return false;
+    const re = compile(s.source);
     return keys.some((k) => !re.test(k));
   });
 }
@@ -87,7 +96,10 @@ describe("tenant key contract (pilot- is a permanent key format, F30-08)", () =>
 
   it("the distinct widths are exactly {16, 32} and every 32 is on the allowlist", () => {
     const all = [...tsSites, ...sqlSites];
-    expect([...new Set(all.map((s) => s.width))].sort((a, b) => a - b)).toEqual([16, 32]);
+    // A site whose width cannot be read is a new validator shape: only the probe pattern may be one.
+    expect(all.filter((s) => s.width === null && s.source !== PROBE_WORKSPACE_SOURCE)).toEqual([]);
+    expect(all.filter((s) => s.source === PROBE_WORKSPACE_SOURCE).length).toBe(1);
+    expect([...new Set(all.filter((s) => s.width !== null).map((s) => s.width as number))].sort((a, b) => a - b)).toEqual([16, 32]);
     const unlisted = all.filter((s) => s.width === 32 && !WIDE_ALLOWED.has(s.where)).map((s) => s.where);
     expect([...new Set(unlisted)]).toEqual([]);
     // The probe-workspace pattern is a different shape on purpose, not a tenant validator.
@@ -99,6 +111,18 @@ describe("tenant key contract (pilot- is a permanent key format, F30-08)", () =>
       .filter((f) => readFileSync(f, "utf8").includes("`pilot-${"))
       .map((f) => relative(ROOT, f).replaceAll("\\", "/"));
     expect(producers).toEqual(["lib/foundation-pilot.ts"]);
+  });
+
+  it("failure path: the scanner itself reports validator shapes other than {1,N}", () => {
+    const synthetic = [
+      "const a = /^pilot-[a-f0-9]{16}$/;", "const b = /^pilot-[0-9]+$/;", 'const c = new RegExp("^pilot-[0-9]{8,16}$");',
+      "check (k ~ '^pilot-[0-9]{16}$')", "check (k ~ '^pilot-[[:digit:]]{1,16}$')",
+    ];
+    const found = synthetic.flatMap((line) => [...line.matchAll(line.includes("check") ? SQL_PATTERN : TS_PATTERN)].map((m) => m[1] ?? m[2]));
+    expect(found).toHaveLength(synthetic.length);
+    // /^pilot-[a-f0-9]{16}$/ refuses the key an uppercase UUID derives, and the helper says so.
+    const upper: Site = { where: "synthetic.ts", source: found[0], width: null };
+    expect(sitesRefusing([upper], [foundationWorkspaceId("ABCDEF01-2345-4678-9ABC-DEF012345678")])).toEqual([upper]);
   });
 
   it("failure path: a narrower validator is reported with its site", () => {
