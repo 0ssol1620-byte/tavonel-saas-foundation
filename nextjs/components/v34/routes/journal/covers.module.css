@@ -1,0 +1,49 @@
+/*
+  Journal drawings. Every colour is a V34 token; the drawing sits on the shared dark media panel
+  (Figure) or on the card cover below, which paints the same dark surface itself.
+*/
+
+.art {
+  display: block;
+  width: 100%;
+  height: auto;
+  color: var(--v34-on-dark);
+  font-family: var(--v34-font);
+}
+
+.sheet {
+  fill: var(--v34-step-bg);
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+}
+
+.line {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dash {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+  stroke-dasharray: 6 6;
+}
+
+.node {
+  fill: var(--v34-lime);
+}
+
+.label {
+  fill: var(--v34-on-dark);
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.small {
+  fill: var(--v34-on-dark);
+  font-size: 20px;
+  font-weight: 600;
+}

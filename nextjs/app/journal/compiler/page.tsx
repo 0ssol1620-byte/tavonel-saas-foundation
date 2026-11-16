@@ -1,4 +1,4 @@
-import RouteStub from "@/components/v34/route-stub";
+import CompilerArticle from "@/components/v34/routes/journal-compiler/compiler-article";
 import { releaseGate } from "@/lib/v34/release";
 import { routeMetadata, routeViewport } from "@/lib/v34/route-metadata";
 
@@ -7,5 +7,5 @@ export const viewport = routeViewport();
 
 export default async function Page() {
   await releaseGate("journal-compiler");
-  return <RouteStub route="journal-compiler" line="A Knowledge Compiler turns documents into records with evidence, where search returns passages." />;
+  return <CompilerArticle />;
 }

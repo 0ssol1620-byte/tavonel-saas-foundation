@@ -1,0 +1,28 @@
+.art {
+  display: block;
+  width: 100%;
+  height: auto;
+  color: var(--v34-on-dark);
+  font-family: var(--v34-font);
+}
+
+.box {
+  fill: var(--v34-step-bg);
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+}
+
+.line {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+
+.label {
+  fill: var(--v34-on-dark);
+  font-size: 17px;
+  font-weight: 600;
+}
