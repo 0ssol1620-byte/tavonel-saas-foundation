@@ -55,7 +55,7 @@ describe("/security publishes customer-relevant controls without the internal re
 describe("§17 trust chain", () => {
   it("runs Security → Evidence → Benchmarks → Reproducibility → Research, in that order", () => {
     expect(TRUST_SEQUENCE.slice(0, 5).map((step) => step.href)).toEqual([
-      "/security", "/evidence", "/benchmarks", "/reproducibility", "/research",
+      "/security", "/evidence", "/benchmarks", "/reproducibility", "/research/program",
     ]);
   });
 
@@ -357,7 +357,7 @@ const HUBS: Array<[string, string]> = [
   ["app/trust/page.tsx", "what is published about security and"],
   ["app/evidence/page.tsx", "how a compiled result stays bound to the"],
   ["app/benchmarks/page.tsx", "what a knowledge-compilation result has to"],
-  ["app/research/page.tsx", "which problems are still open"],
+  ["components/v34/routes/research-program/program-content.ts", "which problems are still open"],
   ["app/research/notes/page.tsx", "These are the results we have measured"],
 ];
 
@@ -896,15 +896,15 @@ describe("G2-012 /benchmarks publishes the GDP.pdf evaluation design", () => {
 describe("G2-043 the research page's next step is its results", () => {
   const component = read("components/trust-next.tsx");
 
-  it("sends /research to /research/notes", () => {
-    expect(component).toContain('"/research": {');
+  it("sends /research/program to /research/notes", () => {
+    expect(component).toContain('"/research/program": {');
     expect(component).toContain('to: "/research/notes" as Route');
-    expect(component).toContain('"/research": "Read what was measured"');
+    expect(component).toContain('"/research/program": "Read what was measured"');
   });
 
   it("leaves the five-hub order alone", () => {
     expect(TRUST_SEQUENCE.map((step) => step.href)).toEqual([
-      "/security", "/evidence", "/benchmarks", "/reproducibility", "/research", "/pricing",
+      "/security", "/evidence", "/benchmarks", "/reproducibility", "/research/program", "/pricing",
     ]);
   });
 

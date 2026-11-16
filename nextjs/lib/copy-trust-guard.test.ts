@@ -85,7 +85,7 @@ const DISCLOSURE_SURFACES: Record<string, string> = {
   "app/status/page.tsx": "the probe table, where an unprobed dependency has to say so",
   "app/benchmarks/page.tsx": "the protocol: what a result must carry before it may be published",
   "app/reproducibility/page.tsx": "the frozen fixtures and what rerunning them does and does not settle",
-  "app/research/page.tsx": "13.20 puts the open problems and the failed experiments here",
+  "app/research/program/page.tsx": "13.20 puts the open problems and the failed experiments here",
   "app/research/notes/page.tsx": "13.20 puts the failure records here, with their context",
   "app/product/continuous-knowledge/page.tsx": "the eight contract clauses and the state each one holds here",
   "app/product/document-understanding/page.tsx": "what the read recovers, derived from the capability manifest",

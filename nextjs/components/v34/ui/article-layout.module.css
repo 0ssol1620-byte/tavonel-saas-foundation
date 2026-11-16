@@ -37,6 +37,12 @@
   outline-offset: 4px;
 }
 
+.crumbLink:hover,
+.sourceLink:hover {
+  color: var(--v34-fg);
+  text-decoration-thickness: 2px;
+}
+
 .head {
   margin-bottom: 28px;
 }
@@ -166,7 +172,8 @@
   margin: -1px;
   padding: 0;
   border: 0;
-  white-space: nowrap;
+  /* normal, not nowrap: an unwrapped hidden label near the right edge widened the page on phones. */
+  white-space: normal;
   clip-path: inset(50%);
 }
 

@@ -63,6 +63,11 @@
   outline-offset: 4px;
 }
 
+.link:hover {
+  color: var(--v34-fg);
+  text-decoration-thickness: 2px;
+}
+
 .visuallyHidden {
   position: absolute;
   width: 1px;

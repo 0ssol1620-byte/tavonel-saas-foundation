@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import sitemap from "@/app/sitemap";
+import { HERO, TASKS } from "@/components/v34/routes/solutions/solutions-content";
+import { v34Route } from "@/lib/v34/routes";
 
 /*
   The /solutions hub, and the one thing that can go wrong with it that nobody would notice.
@@ -16,35 +18,44 @@ import sitemap from "@/app/sitemap";
   It is source-text checking rather than rendering because this suite runs in Node against a
   server component tree; what is worth asserting here is the data path, and Playwright walks the
   rendered page (`e2e/overflow-audit.spec.ts` at seven widths).
+
+  V34 (D33 §4 #18): the hub's body is `components/v34/routes/solutions/solutions.tsx` and its words
+  are `solutions-content.ts`; `app/solutions/page.tsx` is the thin registry page. Every check below
+  is the same invariant it was, read from where the hub now lives.
 */
 
 const read = (path: string) => readFileSync(resolve(import.meta.dirname, path), "utf8");
-const hub = read("../app/solutions/page.tsx");
+const page = read("../app/solutions/page.tsx");
+const hub = read("../components/v34/routes/solutions/solutions.tsx");
+const words = read("../components/v34/routes/solutions/solutions-content.ts");
+const css = read("../components/v34/routes/solutions/solutions.module.css");
 const detail = read("../app/solutions/[slug]/page.tsx");
 const slugs = [...detail.matchAll(/^ {2}"([a-z-]+)": \{\r?$/gm)].map((match) => match[1]!);
 
 /*
   Comments explain what is deliberately absent and must not themselves count as present -- the
-  same reason `public-copy-purge.test.ts` strips before it matches. The hub's own comment names
-  the solution it does not list.
+  same reason `public-copy-purge.test.ts` strips before it matches.
 */
-const shipped = hub
+const strip = (text: string) => text
   .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, " ")
   .replace(/\/\*[\s\S]*?\*\//g, " ")
   .replace(/^[ \t]*\/\/.*$/gm, " ");
+const shipped = strip(hub);
+const shippedWords = strip(words);
 
 describe("the solutions hub", () => {
   it("reads its cards from the record the detail pages render", () => {
     expect(detail).toContain("export const SOLUTIONS = {");
-    expect(hub).toContain('import { SOLUTIONS } from "./[slug]/page";');
+    expect(hub).toContain('import { SOLUTIONS } from "@/app/solutions/[slug]/page";');
     expect(hub).toContain("Object.entries(SOLUTIONS)");
   });
 
   it("writes no solution of its own", () => {
     expect(slugs.length).toBeGreaterThanOrEqual(5);
     for (const slug of slugs) {
-      expect(shipped, `${slug} is written into the hub instead of read from the record`)
-        .not.toContain(`"${slug}"`);
+      for (const [file, text] of [["solutions.tsx", shipped], ["solutions-content.ts", shippedWords]] as const) {
+        expect(text, `${slug} is written into ${file} instead of read from the record`).not.toContain(`"${slug}"`);
+      }
     }
   });
 
@@ -53,8 +64,10 @@ describe("the solutions hub", () => {
     with a 404, which is worse than a hub that lists five.
   */
   it("offers no destination that does not exist", () => {
-    expect(shipped).not.toContain("technical-document-assistant");
-    expect(shipped).not.toContain("/cookbooks");
+    for (const text of [shipped, shippedWords]) {
+      expect(text).not.toContain("technical-document-assistant");
+      expect(text).not.toContain("/cookbooks");
+    }
     expect(shipped, "one card per record, linked by its own slug").toContain("/solutions/${slug}");
   });
 
@@ -63,30 +76,16 @@ describe("the solutions hub", () => {
     expect(detail).toContain("For: {solution.audience}");
   });
 
+  /*
+    BA-040 moved a disclaimer out of the lede to the foot; the 2026-11-10 founder rule (label what
+    a thing IS, never a defensive "not ..." sentence) retires it. The invariant that survives: the
+    section that lists the five pages says what a reader finds on one -- the workflow, a sample
+    source and the published limits -- and no "not ... customer" sentence stands in for that.
+  */
   it("says what a solution page is before a reader opens one", () => {
-    /*
-      BA-040 moved this sentence rather than deleting it, and the case moves with it and gets
-      tighter. The hub's lede used to end on "A described use is not a completed customer case",
-      so a page whose job is to answer "who is this for" opened by disqualifying its own five
-      entries. The sentence is still published, at the foot of the page. What this now refuses is
-      the old lede, in both directions: the disclaimer may not return to the top, and it may not
-      quietly disappear from the bottom either.
-    */
-    /*
-      The 2026-09-22 copy cleanup restated the foot sentence positively: "These five pages
-      describe how the compiler is used, not completed customer engagements." Same fact, same
-      place, so this still refuses both directions -- it may not return to the lede, and it may
-      not disappear from the foot.
-    */
-    expect(shipped).toContain("not completed customer engagements");
-    const lede = shipped.match(/<p className="lede">([\s\S]*?)<\/p>/)?.[1] ?? "";
-    expect(lede, "the hub has a lede").not.toBe("");
-    expect(lede).toContain("Five ways teams put the compiler to work");
-    expect(lede, "the lede does not disqualify its own five entries")
-      .not.toContain("not completed customer engagements");
-    const fine = shipped.match(/<p className="fine">([\s\S]*?)<\/p>/)?.[1] ?? "";
-    expect(fine, "and it is the page's closing line instead")
-      .toContain("not completed customer engagements");
+    expect(shipped).toMatch(/<Section[^>]*title=\{TASKS\.title\}[^>]*lead=\{TASKS\.lead\}/);
+    for (const part of ["workflow", "sample source", "published limits"]) expect(TASKS.lead).toContain(part);
+    for (const text of [shipped, shippedWords]) expect(text).not.toMatch(/not (?:completed )?customer/);
   });
 
   /*
@@ -95,47 +94,44 @@ describe("the solutions hub", () => {
     and are not, under a heading whose descriptor slot is filled with our own brand name.
   */
   it("makes the task concrete before a reader opens a detail", () => {
-    const card = shipped.match(/<article className=\{`tile \$\{styles\.card\}`\}[\s\S]*?<\/article>/)?.[0] ?? "";
+    const card = shipped.match(/<dl className=\{s\.task\}[\s\S]*?<\/dl>/)?.[0] ?? "";
     expect(card, "the card markup is still where this can read it").not.toBe("");
     expect(card).toContain('aria-label="Input, action and output"');
     for (const field of ["input", "action", "output"]) expect(card).toContain(`{solution.task.${field}}`);
-    expect(card).toContain('variant="thumb"');
-    expect(card).not.toContain("{solution.problem}");
+    expect(shipped).not.toContain("{solution.problem}");
   });
 
   it("makes the whole card the target it looks like", () => {
-    const css = read("../app/solutions/solutions.module.css");
-    expect(shipped, "one link per card, not a second anchor wrapped round the first")
-      .toContain("className={styles.cardTitle}");
+    expect(shipped.match(/<Link\b/g), "one link per card, not a second anchor wrapped round the first").toHaveLength(1);
+    expect(shipped).toContain("<Link className={s.link}");
     expect(css).toMatch(/\.card \{[^}]*position: relative/);
-    expect(css, "the title anchor is expanded over the article")
-      .toMatch(/\.card \.cardTitle a::after \{[^}]*inset: 0/);
+    expect(css, "the title anchor is expanded over the article").toMatch(/\.link::after \{[^}]*inset: 0/);
     expect(css, "and the surface answers a pointer").toMatch(/\.card:hover/);
-    expect(css, "and a keyboard").toMatch(/\.card:focus-within/);
+    expect(css, "and a keyboard").toMatch(/\.link:focus-visible/);
   });
 
   /*
     BA-054 was that the eyebrow's descriptor slot held our own brand name -- "SOLUTIONS ·
-    TAVONEL" -- so the first line of the page said nothing. BQ-099 settles it by deleting the
-    slot rather than refilling it: the hub's own H1 is the first thing on the page, and there is
-    no label above the label.
-
-    The guard moves with the change rather than being dropped, because a restating eyebrow above
-    the H1 is exactly the shape that grew back last time.
+    TAVONEL" -- so the first line of the page said nothing. In V34 the h1 is the shared Hero's,
+    its words are the registry title, and the eyebrow the Hero carries may not be the brand.
   */
   it("leads with the heading rather than a label above it", () => {
-    expect(shipped, "no eyebrow above the H1").not.toMatch(/<p className="slate">[\s\S]*?<\/p>\s*<h1/);
-    expect(shipped).toContain('<h1 className="document-title">');
+    expect(shipped.match(/<Hero\b/g)).toHaveLength(1);
+    expect(shipped).not.toMatch(/<h1\b/);
+    expect(shipped).toContain('title={route.title.replace(SUFFIX, "")}');
+    expect(HERO.eyebrow).not.toMatch(/tavonel/i);
   });
 
-  it("ends at the resources hub and the documentation", () => {
-    expect(hub).toContain('href="/resources"');
-    expect(hub).toContain('href="/docs"');
+  /* `/resources` is a 308 to `/journal` (D33 §1.1); the hub ends on the field guides there. */
+  it("ends at the field guides and the closing action", () => {
+    expect(words).toContain('href: to("journal")');
+    expect(shipped).toMatch(/<Bridge\b[\s\S]*<FinalCta\b/);
   });
 
   it("is canonical, indexable and in the sitemap", () => {
-    expect(hub).toContain('alternates: { canonical: "/solutions" }');
-    expect(hub).not.toMatch(/robots:\s*\{[^}]*index:\s*false/);
+    expect(page).toContain('routeMetadata("solutions")');
+    expect(v34Route("solutions").path).toBe("/solutions");
+    expect(page).not.toMatch(/robots:\s*\{[^}]*index:\s*false/);
     expect(sitemap().map((entry) => new URL(entry.url).pathname)).toContain("/solutions");
   });
 });

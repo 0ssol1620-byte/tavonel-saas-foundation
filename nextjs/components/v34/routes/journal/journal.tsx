@@ -11,6 +11,8 @@ import { surfaceClass } from "@/components/v34/ui/surface";
 import { V34_LIVE_ROUTES, v34Route, type V34RouteKey } from "@/lib/v34/routes";
 import { COMPILER_BLOCKS } from "../journal-compiler/compiler-article";
 import { MCP_BLOCKS } from "../journal-mcp/mcp-article";
+import { RESEARCH_BLOCKS } from "../journal-research/research-article";
+import { REVISION_BLOCKS } from "../journal-revision/revision-article";
 import { COVERS } from "./covers";
 import { CATEGORY, FEATURED, FINAL, GUIDES, HERO, REFERENCE } from "./journal-content";
 import s from "./journal.module.css";
@@ -25,6 +27,8 @@ const record = v34Route(ROUTE);
 export const READ_MINUTES: Partial<Record<V34RouteKey, number>> = {
   "journal-compiler": articleReadMinutes(COMPILER_BLOCKS),
   "journal-mcp": articleReadMinutes(MCP_BLOCKS),
+  "journal-revision": articleReadMinutes(REVISION_BLOCKS),
+  "journal-research": articleReadMinutes(RESEARCH_BLOCKS),
 };
 
 /** The live journal articles, in registry order. A held article has no card. */

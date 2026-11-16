@@ -2,7 +2,7 @@ import { createElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import ExplorePage from "../app/explore/page";
-import SolutionsPage from "../app/solutions/page";
+import { SolutionsBody } from "../components/v34/routes/solutions/solutions";
 import SolutionPage, { SOLUTIONS } from "../app/solutions/[slug]/page";
 import SolutionWorkflowProof, { solutionWorkflowEvidence } from "../app/solutions/solution-workflow-proof";
 import { readFileSync } from "node:fs";
@@ -29,9 +29,10 @@ const entries = Object.entries(SOLUTIONS) as [keyof typeof SOLUTIONS, typeof SOL
 const escape = (text: string) => text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#x27;");
 
 describe("Solutions task choices and workflow evidence", () => {
-  it("renders the same input/action/output on hub and every detail, with adoption content once", async () => {
-    const hub = renderToStaticMarkup(createElement(SolutionsPage));
-    expect((hub.match(/id="design-partners-title"/g) ?? []).length).toBe(1);
+  // V34 (D33 §4 #18): the hub body renders without the frame; the adoption path is /contact.
+  it("renders the same input/action/output on hub and every detail, with one adoption path", async () => {
+    const hub = renderToStaticMarkup(createElement(SolutionsBody));
+    expect(hub).not.toContain('href="/solutions#design-partners-title"');
     for (const [slug, solution] of entries) {
       const detail = renderToStaticMarkup(await SolutionPage({ params: Promise.resolve({ slug }) }));
       expect(hub).toContain(`href="/solutions/${slug}"`);
@@ -40,7 +41,8 @@ describe("Solutions task choices and workflow evidence", () => {
         expect(detail).toContain(escape(value));
       }
       expect(detail).not.toContain('id="design-partners-title"');
-      expect(detail).toContain('href="/solutions#design-partners-title"');
+      expect(detail).toContain('href="/contact"');
+      expect(detail).not.toContain("#design-partners-title");
       expect(detail).toMatch(/<details[^>]*class="solution-notes"[^>]*open=""/);
       for (const limitation of solution.limitations) expect(detail).toContain(escape(limitation));
       expect(detail).toContain('href="/docs"');

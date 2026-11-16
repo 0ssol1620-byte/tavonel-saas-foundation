@@ -24,7 +24,7 @@ export const TRUST_SEQUENCE = [
   { href: "/evidence", label: "Evidence", question: "Can I verify a compiled fact?" },
   { href: "/benchmarks", label: "Benchmarks", question: "Does the architecture have merit?" },
   { href: "/reproducibility", label: "Reproducibility", question: "Can I rebuild it myself?" },
-  { href: "/research", label: "Research", question: "What is still open?" },
+  { href: "/research/program", label: "Research", question: "What is still open?" },
   { href: "/pricing", label: "Pricing", question: "What does this cost?" },
 ] as const;
 
@@ -44,7 +44,7 @@ const NEXT_ACTION: Record<TrustStep, string> = {
   "/evidence": "See what was measured",
   "/benchmarks": "Rerun the public sample",
   "/reproducibility": "Read the open questions",
-  "/research": "Read what was measured",
+  "/research/program": "Read what was measured",
   "/pricing": "See the plans",
 };
 
@@ -61,7 +61,7 @@ const NEXT_ACTION: Record<TrustStep, string> = {
   chain still ends at /pricing: the notes page offers it as its closing ghost.
 */
 const INSTEAD_OF_THE_NEXT_STEP: Partial<Record<TrustStep, { to: Route; label: string; question: string }>> = {
-  "/research": {
+  "/research/program": {
     to: "/research/notes" as Route,
     label: "Research notes",
     question: "What has actually been measured?",

@@ -138,6 +138,7 @@ describe("figures, prices, plans and tool names are never typed", () => {
     expect(READ_MINUTES["journal-compiler"]).toBe(compiler);
     expect(READ_MINUTES["journal-mcp"]).toBe(mcp);
     expect(pages.journal()).toContain(`${mcp} min read`);
+    for (const article of LIVE_ARTICLES) expect(READ_MINUTES[article.key], article.key).toBeGreaterThan(0);
   });
 });
 

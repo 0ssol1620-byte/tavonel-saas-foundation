@@ -28,8 +28,9 @@ Indexing: public product, documentation, research and trust pages are indexable.
 - [Developers](https://tavonel.com/developers): API, MCP, retrieval packages and signed exports.
 - [Solutions](https://tavonel.com/solutions): The five documented uses, each linking to its own page: who it is for, the path from source to World, what the workflow leaves behind, and where it stops. A described use, not a completed customer case.
 - [Personal](https://tavonel.com/personal): Compile your own PDFs into a World of your own, cite answers back to the page they came from and revoke any API key at any time.
-- [Research](https://tavonel.com/research): Research areas, methods and current findings.
+- [Research](https://tavonel.com/research): Keeping papers, datasets and notes as a World where every claim links to its source.
 - [Research notes](https://tavonel.com/research/notes): Measurements, limitations and experiment notes.
+- [Research program](https://tavonel.com/research/program): The open problems in compiling documents into evidence-bound, versioned knowledge.
 - [Markets](https://tavonel.com/markets): Explore a compiled sample of SEC filings, follow each figure to the filing that states it and compare reporting periods side by side.
 - [Engineering](https://tavonel.com/engineering): Keep standards and procedures as a World where each requirement cites its source and a revision shows exactly which controls changed.
 - [Enterprise](https://tavonel.com/enterprise): What an enterprise engagement covers today, and what is not provided.
@@ -37,7 +38,7 @@ Indexing: public product, documentation, research and trust pages are indexable.
 - [What a knowledge compiler is](https://tavonel.com/journal/compiler): A plain explanation of what a knowledge compiler does differently from search and chat over files.
 - [How an AI client reads a World through MCP](https://tavonel.com/journal/mcp): What the Model Context Protocol is and how a client connects to TAVONEL.
 - [What changed in a NIST control catalog revision](https://tavonel.com/journal/revision): A worked example of a standards revision, traced to the published notice.
-- [A research record built from public sources](https://tavonel.com/journal/research): A worked example using the TRAPPIST-1 papers.
+- [A research record built from public sources](https://tavonel.com/journal/research): A worked method for a literature review, with each claim tied to its source passage.
 - [Pricing](https://tavonel.com/pricing): Free Evaluation, Developer, Team and Enterprise access.
 - [Billing](https://tavonel.com/billing): What a credit is, how many credits a page uses, how refunds work and what happens when a balance runs out.
 - [Security](https://tavonel.com/security): Data path, tenant isolation, retention and security controls.

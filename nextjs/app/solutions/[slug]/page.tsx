@@ -350,7 +350,7 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
           phone. It is above the actions now, in the text face, and it names its destinations.
         */}
         <p className={styles.next}>
-          Planning a first compile? <Link href="/solutions#design-partners-title">See how a design partnership works</Link>.
+          Planning a first compile? <Link href="/contact">Tell us what you are trying to compile</Link>.
         </p>
 
         <p className={styles.next}>

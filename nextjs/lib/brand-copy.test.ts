@@ -1095,7 +1095,7 @@ describe("public copy", () => {
     ["app/evidence/page.tsx", "/evidence"],
     ["app/benchmarks/page.tsx", "/benchmarks"],
     ["app/reproducibility/page.tsx", "/reproducibility"],
-    ["app/research/page.tsx", "/research"],
+    ["components/v34/routes/research-program/program.tsx", "/research/program"],
   ];
 
   it.each(TRUST_PAGES)(
@@ -1118,7 +1118,7 @@ describe("public copy", () => {
     const steps = [...source.matchAll(/href: "([^"]+)"/g)].map(
       match => match[1]!
     );
-    const actions = [...source.matchAll(/"(\/[a-z]+)": "([^"]+)"/g)];
+    const actions = [...source.matchAll(/"(\/[a-z/]+)": "([^"]+)"/g)];
     expect(steps.length).toBeGreaterThanOrEqual(5);
     for (const step of steps.slice(0, -1)) {
       const action = actions.find(([, href]) => href === step);

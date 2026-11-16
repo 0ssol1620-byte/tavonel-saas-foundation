@@ -46,14 +46,19 @@ describe("routeJsonLd", () => {
     expect(crumbs.itemListElement.at(-1)?.item).toBe("https://tavonel.com/journal/mcp");
   });
 
-  it("emits only allowed types, and no Article while an article has no real dates", () => {
+  it("emits only allowed types, and an Article only with the registry's dates", () => {
     const allowed = new Set(["WebSite", "BreadcrumbList", "Article", "Organization"]);
     for (const r of V34_ROUTES) {
       for (const node of routeJsonLd(r.key)) {
         expect(allowed.has(String(node["@type"])), r.key).toBe(true);
         expect(JSON.stringify(node)).not.toMatch(/Offer|AggregateRating|Review|SearchAction/);
       }
-      expect(routeJsonLd(r.key).some((n) => n["@type"] === "Article"), r.key).toBe(false);
+      const article = routeJsonLd(r.key).find((n) => n["@type"] === "Article");
+      if (!r.article) {
+        expect(article, r.key).toBeUndefined();
+        continue;
+      }
+      expect(article, r.key).toMatchObject({ datePublished: r.article.published, dateModified: r.article.modified });
     }
   });
 });

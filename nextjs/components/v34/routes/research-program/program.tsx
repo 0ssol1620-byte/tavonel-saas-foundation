@@ -73,7 +73,7 @@ export function ProgramBody() {
         </p>
       </Section>
 
-      <TrustNext from="/research" />
+      <TrustNext from="/research/program" />
     </>
   );
 }

@@ -57,7 +57,7 @@ import { V34_LIVE_PATHS, v34RouteByPath } from "@/lib/v34/routes";
   the typed registry: a route is here exactly when its `release` is "live", so flipping one value
   moves it in the sitemap, llms.txt, the nav and the analytics set together.
 */
-const RETAINED_ROUTES = ["", "/api", "/benchmarks", "/changelog", "/contact", "/cookbooks", "/demo", "/developers", "/docs", "/enterprise", "/evaluation", "/evidence", "/explore", "/guide", "/pricing", "/privacy", "/refunds", "/research", "/research/notes", "/security", "/solutions", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence", "/solutions/knowledge-graph", "/solutions/source-grounded-assistants", "/solutions/knowledge-operations", "/sources", "/status", "/subprocessors", "/terms", "/trust"];
+const RETAINED_ROUTES = ["", "/api", "/benchmarks", "/changelog", "/contact", "/cookbooks", "/demo", "/developers", "/docs", "/enterprise", "/evaluation", "/evidence", "/explore", "/guide", "/pricing", "/privacy", "/refunds", "/research", "/research/notes", "/research/program", "/security", "/solutions", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence", "/solutions/knowledge-graph", "/solutions/source-grounded-assistants", "/solutions/knowledge-operations", "/sources", "/status", "/subprocessors", "/terms", "/trust"];
 const ROUTES = [...new Set([...RETAINED_ROUTES, ...V34_LIVE_PATHS.map((path) => (path === "/" ? "" : path))])];
 /*
   The documentation sections come from the documentation rather than being listed again here.

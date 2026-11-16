@@ -96,10 +96,24 @@ describe("V34 route registry", () => {
     for (const path of V34_HELD_PATHS) expect(V34_LIVE_PATHS).not.toContain(path);
   });
 
-  it("types every journal article as an Article and carries no invented dates", () => {
-    for (const r of V34_ROUTES.filter((x) => x.path.startsWith("/journal/"))) {
+  /*
+    The dates are the commit dates of each article's source file (git log --follow), written here at
+    integration, never typed in a page. This pins their shape, and that only an article whose source
+    exists carries them; the article page throws when its record has none.
+  */
+  it("types every journal article as an Article and dates only articles that have a source", () => {
+    for (const r of V34_ROUTES) {
+      if (!r.path.startsWith("/journal/")) {
+        expect(r.article, r.key).toBeUndefined();
+        continue;
+      }
       expect(r.schema, r.key).toBe("Article");
-      expect(r.article, r.key).toBeUndefined();
+      const name = r.key.replace(/^journal-/, "");
+      const source = join(import.meta.dirname, `../../components/v34/routes/${r.key}/${name}-article.tsx`);
+      expect(existsSync(source), r.key).toBe(true);
+      expect(r.article?.published, r.key).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(r.article?.modified, r.key).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(r.article!.published <= r.article!.modified, r.key).toBe(true);
     }
   });
 });
