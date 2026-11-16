@@ -98,6 +98,8 @@
 }
 
 @media (forced-colors: active) {
+  /* A bare text button has no affordance once the author colours are gone; give it the system button edge. */
+  .button { border: 1px solid ButtonText; padding-inline: 8px; }
   .button:focus-visible,
   .link:focus-visible { outline-color: Highlight; }
   .link[aria-current="page"] { outline: 2px solid Highlight; outline-offset: 2px; }

@@ -26,6 +26,7 @@
 }
 
 .label {
+  color: var(--v34-fg);
   margin: 0;
   font-size: 1.15rem;
   font-weight: 650;

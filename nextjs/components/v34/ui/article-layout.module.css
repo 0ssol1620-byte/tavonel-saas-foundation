@@ -42,6 +42,7 @@
 }
 
 .title {
+  color: var(--v34-fg);
   margin: 0;
   font-size: var(--v34-h1-split);
   font-weight: 500;
@@ -79,6 +80,7 @@
 }
 
 .h2 {
+  color: var(--v34-fg);
   margin: 44px 0 12px;
   font-size: clamp(1.5rem, 3vw, 2.1rem);
   font-weight: 500;
@@ -88,6 +90,7 @@
 }
 
 .h3 {
+  color: var(--v34-fg);
   margin: 32px 0 8px;
   font-size: var(--v34-h3);
   font-weight: 650;

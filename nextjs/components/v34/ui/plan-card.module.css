@@ -9,6 +9,7 @@
 }
 
 .name {
+  color: var(--v34-fg);
   margin: 0;
   font-size: var(--v34-h3);
   font-weight: 650;

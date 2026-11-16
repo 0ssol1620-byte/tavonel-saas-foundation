@@ -20,6 +20,7 @@
 }
 
 .title {
+  color: var(--v34-fg);
   margin: 0;
   font-weight: 500;
   letter-spacing: var(--v34-track-display);
@@ -74,10 +75,12 @@
   line-height: 1.04;
 }
 
-/* home: the instrument takes the wider column */
+/* home: the instrument takes the wider column. The shell is the header's own container, so the hero
+   starts and ends on the same edges as the bar above it; the copy sits at the top of the column
+   rather than centred against a panel that is several hundred pixels taller than it. */
 .home .shell {
   grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
-  width: min(1440px, 100% - 72px);
+  align-items: start;
 }
 
 .home .title {
@@ -98,12 +101,14 @@
   }
 }
 
-@media (max-width: 760px) {
+/* The header gives way to the drawer at 1000px; two columns of a headline and a search field do not fit under it. */
+@media (max-width: 1000px) {
   .home .shell {
     grid-template-columns: minmax(0, 1fr);
-    width: var(--v34-shell);
   }
+}
 
+@media (max-width: 760px) {
   .home .title {
     max-width: 15ch;
   }

@@ -10,6 +10,7 @@ import { MARKETING_EVENTS } from "@/lib/marketing-analytics";
 import { BRAND_LINE } from "@/lib/site-navigation";
 import { CREATE_WORLD_LABEL, createWorldAction } from "@/components/v34/ui/create-world";
 import { HomeBody } from "@/components/v34/routes/home/home";
+import { Walkthrough } from "@/components/v34/walkthrough/walkthrough";
 import { HOME_DESTINATIONS } from "@/components/v34/routes/home/home-content";
 import { PUBLIC_CORPUS_STATS } from "./public-corpus";
 import { routeMetadata } from "./route-metadata";
@@ -216,5 +217,15 @@ describe("app/page.tsx", () => {
     const { title } = routeMetadata("home");
     expect(title).toBe(`TAVONEL — ${BRAND_LINE.headline}`);
     expect(v34Route("home").title).toBe(title);
+  });
+});
+
+describe("hero_demo_interact carries the step it opens", () => {
+  it("puts the destination step on every walkthrough control and sends it as `scene`", () => {
+    const html = renderToStaticMarkup(createElement(Walkthrough));
+    // four tabs, then four "next" buttons that open the following step and wrap at the end
+    expect([...html.matchAll(/data-step="(\d)"/g)].map((m) => m[1]).join("")).toBe("01231230");
+    const analytics = readFileSync(join(root, "components/v34/routes/home/home-analytics.tsx"), "utf8");
+    expect(analytics).toContain('trackFunnelOnce("hero_demo_interact", { scene: stepButton.dataset.step ?? "" })');
   });
 });

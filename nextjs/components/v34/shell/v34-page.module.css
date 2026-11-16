@@ -9,3 +9,12 @@
 .main:focus {
   outline: none;
 }
+
+/*
+  Retained bodies (pricing, security, changelog ...) render inside this <main>. A long unbroken
+  token in one of them (an environment variable name in the changelog) wraps here instead of
+  widening the page past 320px.
+*/
+.main {
+  overflow-wrap: break-word;
+}

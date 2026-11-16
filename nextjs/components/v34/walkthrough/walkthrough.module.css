@@ -29,6 +29,8 @@
   border-radius: 8px; cursor: pointer; min-width: 0;
 }
 .tabNo { font-size: 0.75rem; font-weight: 500; color: var(--v34-on-dark-muted, #b8ccc0); }
+.tab:hover:not([aria-selected="true"]) { border-color: var(--v34-lime, #c9f2a5); }
+.next:hover { background: var(--v34-lime-hover, #d8f7bd); }
 .tab[aria-selected="true"] { background: var(--v34-step-bg, #143629); color: #fff; }
 .tab[aria-selected="true"] .tabNo { color: var(--v34-step-small, #c8e6d3); }
 
@@ -38,6 +40,7 @@
 .copy, .record { min-width: 0; }
 .eyebrow { margin: 0 0 8px; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--v34-on-dark-muted, #b8ccc0); }
 .heading {
+  color: var(--v34-on-dark, #eff6ef);
   margin: 0 0 12px; font-size: clamp(1.375rem, 1.1rem + 1.2vw, 2rem); line-height: 1.15; letter-spacing: -0.03em;
   overflow-wrap: normal; word-break: normal; hyphens: none; text-wrap: balance;
 }
@@ -57,7 +60,8 @@
 .kind { margin: 0 0 8px; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--v34-muted, #465b4e); }
 .title { margin: 0 0 6px; font-size: 1.25rem; line-height: 1.25; overflow-wrap: normal; word-break: normal; hyphens: none; }
 .meta { margin: 0 0 16px; color: var(--v34-muted, #465b4e); line-height: 1.45; }
-.link { color: var(--v34-link, #205135); font-weight: 600; text-underline-offset: 3px; }
+.link { display: inline-flex; align-items: center; min-height: 24px; color: var(--v34-link, #205135); font-weight: 600; text-underline-offset: 3px; }
+.link:hover { text-decoration-thickness: 2px; }
 
 .tab:focus-visible, .next:focus-visible { outline: 3px solid var(--v34-focus-world, #8ae0bc); outline-offset: 4px; }
 .link:focus-visible { outline: 3px solid var(--v34-focus, #4880ba); outline-offset: 4px; }

@@ -64,11 +64,26 @@
   display: inline-flex;
   align-items: center;
   min-height: 36px;
+  /* WCAG 2.5.8: a three-letter link ("API") is under 24px wide on its own. */
+  min-width: 24px;
   color: var(--v34-fg);
   font-size: var(--v34-small);
   line-height: 1.45;
   overflow-wrap: anywhere;
   text-decoration: none;
+}
+
+/*
+  The legacy 44px hit-area floor (app/tavonel.css) pads every mailto: link by 12.5px and pulls it back
+  with a negative margin, which is only safe on an inline link. In this flex row it made the
+  address wrap and run 7px into the next row at 320px, so the address stays whole and unpadded.
+*/
+.link[href^="mailto:"] {
+  display: inline-flex;
+  padding-block: 0;
+  margin-block: 0;
+  overflow-wrap: normal;
+  white-space: nowrap;
 }
 
 .link:hover {

@@ -10,9 +10,9 @@ import { trackFunnel, trackFunnelOnce, type FunnelEvent } from "@/lib/funnel-eve
 
   - `data-analytics="hero-primary" | "hero-secondary"`  the two hero actions
   - a click on a link to Connect, Developers, Security, Evidence or Pricing  `integration_open`, `trust_open`, `pricing_open`
-  - the first touch of the walkthrough  `hero_demo_interact`, once per page session
+  - the first touch of the walkthrough  `hero_demo_interact` with `scene` = the step index it opens, once per page session
 
-  It sends no detail at all: no href, no label, no record id.
+  Apart from that one step index it sends no detail: no href, no label, no record id.
 */
 
 const HOOKS: Record<string, FunnelEvent> = {
@@ -35,7 +35,8 @@ export default function HomeAnalytics() {
       const target = event.target;
       if (!(target instanceof Element)) return;
 
-      if (target.closest("[data-v34-walkthrough] button")) trackFunnelOnce("hero_demo_interact");
+      const stepButton = target.closest<HTMLElement>("[data-v34-walkthrough] button");
+      if (stepButton) trackFunnelOnce("hero_demo_interact", { scene: stepButton.dataset.step ?? "" });
 
       const hooked = target.closest<HTMLElement>("[data-analytics]");
       const hook = hooked?.dataset.analytics ?? "";

@@ -145,7 +145,7 @@
   min-width: 40px;
   min-height: 40px;
   padding: 0 14px;
-  border: 1px solid #3a5e52;
+  border: 1px solid #5d8070;
   border-radius: 6px;
   color: #f2f7f0;
   background-color: #12251f;
@@ -157,6 +157,7 @@
 }
 
 .control:hover:not(:disabled) {
+  border-color: #8fb3a0;
   color: #f2f7f0;
   background-color: #1a352c;
 }
@@ -230,7 +231,7 @@
   min-width: 0;
   min-height: 44px;
   padding: 0 12px;
-  border: 1px solid #3a5e52;
+  border: 1px solid #5d8070;
   border-radius: 6px;
   color: #f2f7f0;
   background-color: #0d1b16;

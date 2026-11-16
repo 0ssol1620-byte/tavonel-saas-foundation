@@ -56,6 +56,7 @@ export function Walkthrough({ onStepChange }: { onStepChange?: (index: number) =
             aria-controls={`${id}-panel-${i}`}
             tabIndex={i === active ? 0 : -1}
             className={styles.tab}
+            data-step={i}
             onClick={() => go(i)}
             onKeyDown={onKeyDown}
           >
@@ -77,7 +78,7 @@ export function Walkthrough({ onStepChange }: { onStepChange?: (index: number) =
             <p className={styles.eyebrow}>{pad(i)} / {step.label}</p>
             <h3 className={styles.heading}>{step.heading}</h3>
             <p className={styles.body}>{step.body}</p>
-            <button type="button" className={styles.next} onClick={() => go(i + 1, true)}>
+            <button type="button" className={styles.next} data-step={(i + 1) % COUNT} onClick={() => go(i + 1, true)}>
               {step.nextLabel} →
             </button>
           </div>

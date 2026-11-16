@@ -26,6 +26,8 @@
   text-decoration: none;
 }
 
+.brand:hover { color: var(--v34-header-btn-hover); }
+
 .brand:focus-visible,
 .link:focus-visible,
 .signIn:focus-visible,

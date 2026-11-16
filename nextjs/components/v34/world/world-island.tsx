@@ -290,6 +290,7 @@ export function WorldIsland({ variant, corpusPath, corpusIntegrity, expected, ov
     if (load !== "ready" || gfx === "static" || !stage) return;
     const canvas = document.createElement("canvas");
     canvas.className = styles.canvas;
+    canvas.setAttribute("data-v34-layer", "");
     canvas.setAttribute("role", "img");
     canvas.setAttribute("aria-label", "Interactive projection of the public reference corpus. Use the record finder below to inspect a record.");
     canvas.tabIndex = -1;
@@ -480,12 +481,13 @@ export function WorldIsland({ variant, corpusPath, corpusIntegrity, expected, ov
       data-node-count={rendered ? rendered.nodes : expected.records}
       data-edge-count={rendered ? rendered.edges : expected.relations}
       data-ids-sha={rendered ? (rendered.sha ?? undefined) : expected.idsSha}
+      data-animating={motion && live ? "true" : undefined}
       onPointerDownCapture={requestLoad}
       onFocusCapture={requestLoad}
     >
       <div ref={stageRef} className={styles.stageCrop}>
-        <div className={styles.fallback}>{children}</div>
-        <button type="button" className={styles.explore} onClick={requestLoad} disabled={load !== "idle"}>
+        <div className={styles.fallback} data-v34-layer="">{children}</div>
+        <button type="button" className={styles.explore} data-v34-layer="" onClick={requestLoad} disabled={load !== "idle"}>
           Explore the layers
         </button>
       </div>
