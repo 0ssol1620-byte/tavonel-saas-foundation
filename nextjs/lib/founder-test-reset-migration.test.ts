@@ -257,6 +257,7 @@ describe("founder test reset keeps its archived-row DELETE allowance in every gu
   const B1 = "20261104091000_founder_test_reset_source_fingerprints.sql";
   const OPS = "20261105010000_founder_test_reset_operations_receipts.sql";
   const B2 = "20261107100100_founder_test_reset_library_organize.sql";
+  const PROPOSALS = "20261116130200_founder_test_reset_change_proposals.sql";
   const deletedIn = (finalize: string) => [...finalize.matchAll(/delete\s+from\s+public\.([a-z0-9_]+)/gi)].map((m) => m[1]!);
   const resetBody = (file: string, name: string) => {
     const match = read(file).match(new RegExp(
@@ -265,10 +266,10 @@ describe("founder test reset keeps its archived-row DELETE allowance in every gu
     return match![1]!;
   };
 
-  it("is the live definition of every reset function it replaces, until 20261104091000, 20261105010000 and 20261107100100 extend it", () => {
+  it("is the live definition of every reset function it replaces, until 20261104091000, 20261105010000, 20261107100100 and 20261116130200 extend it", () => {
     for (const name of RESET) {
       const file = files.filter((candidate) => new RegExp(`function\\s+public\\.${name}\\(`, "i").test(read(candidate))).at(-1);
-      expect([FIX, B1, OPS, B2], name).toContain(file);
+      expect([FIX, B1, OPS, B2, PROPOSALS], name).toContain(file);
     }
   });
 
@@ -301,7 +302,7 @@ describe("founder test reset keeps its archived-row DELETE allowance in every gu
     const RECEIPTS = "foundation_operations_receipts";
     for (const name of RESET) {
       const file = files.filter((candidate) => new RegExp(`function\\s+public\\.${name}\\(`, "i").test(read(candidate))).at(-1);
-      expect([OPS, B2], name).toContain(file);
+      expect([OPS, B2, PROPOSALS], name).toContain(file);
       const kept = resetBody(OPS, name).split("\n")
         .filter((line) => !line.includes(`public.${RECEIPTS}`) && !/^\s*-- 20261105010000/.test(line));
       expect(kept.join("\n"), name).toBe(resetBody(B1, name));
@@ -321,11 +322,11 @@ describe("founder test reset keeps its archived-row DELETE allowance in every gu
     expect(read(OPS)).not.toMatch(/^\s*(grant|revoke)\b/im);
   });
 
-  it("20261107100100 (W2-B2) is the live definition and adds only document_labels to 20261105010000's bodies", () => {
+  it("20261107100100 (W2-B2) adds only document_labels to 20261105010000's bodies", () => {
     const LABELS = "document_labels";
     for (const name of RESET) {
       const file = files.filter((candidate) => new RegExp(`function\\s+public\\.${name}\\(`, "i").test(read(candidate))).at(-1);
-      expect(file, name).toBe(B2);
+      expect([B2, PROPOSALS], name).toContain(file);
       const kept = resetBody(B2, name).split("\n")
         .filter((line) => !line.includes(`public.${LABELS}`) && !/^\s*-- 20261107100100/.test(line));
       expect(kept.join("\n"), name).toBe(resetBody(OPS, name));
@@ -346,6 +347,30 @@ describe("founder test reset keeps its archived-row DELETE allowance in every gu
       + "  for each row execute function public.guard_founder_test_reset_workspace_write();");
     expect(read(B2)).not.toMatch(/function\s+public\.archive_founder_test_reset_evidence/i);
     expect(read(B2)).not.toMatch(/^\s*(grant|revoke)\b/im);
+  });
+
+  it("20261116130200 (WO-D30-1) is the live definition and adds only world_change_proposals to 20261107100100's bodies", () => {
+    const TABLE = "world_change_proposals";
+    for (const name of RESET) {
+      const file = files.filter((candidate) => new RegExp(`function\\s+public\\.${name}\\(`, "i").test(read(candidate))).at(-1);
+      expect(file, name).toBe(PROPOSALS);
+      const kept = resetBody(PROPOSALS, name).split("\n")
+        .filter((line) => !line.includes(`public.${TABLE}`) && !/^\s*-- 20261116130200/.test(line));
+      expect(kept.join("\n"), name).toBe(resetBody(B2, name));
+    }
+    const after = deletedIn(resetBody(PROPOSALS, "finalize_founder_test_reset"));
+    expect(new Set(after).size).toBe(47);
+    expect([...selectedTables(resetBody(PROPOSALS, "founder_test_reset_table_counts"), "count\\(\\*\\)")].sort())
+      .toEqual([...new Set(after)].sort());
+    expect([...selectedTables(resetBody(PROPOSALS, "founder_test_reset_rows_fingerprint"), "to_jsonb\\(x\\)::text")].sort())
+      .toEqual([...new Set(after)].sort());
+    const finalize = resetBody(PROPOSALS, "finalize_founder_test_reset");
+    expect(finalize.indexOf(`delete from public.${TABLE} where workspace_key=p_workspace_key;`))
+      .toBeGreaterThan(finalize.indexOf("set_config('tavonel.founder_reset_id'"));
+    expect(read(PROPOSALS)).toContain(`create trigger founder_reset_fence before insert or update or delete on public.${TABLE}\n`
+      + "  for each row execute function public.guard_founder_test_reset_workspace_write();");
+    expect(read(PROPOSALS)).not.toMatch(/function\s+public\.archive_founder_test_reset_evidence/i);
+    expect(read(PROPOSALS)).not.toMatch(/^\s*(grant|revoke)\b/im);
   });
 
   it("counts, fingerprints and deletes exactly the tie resolutions on top of 20261002120000", () => {

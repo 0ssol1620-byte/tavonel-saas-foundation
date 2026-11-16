@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const { readSigner, readHistory, persist, evaluate } = vi.hoisted(() => ({
+const { readSigner, readHistory, persist, evaluate, readTimings } = vi.hoisted(() => ({
+  readTimings: vi.fn(async () => ({ ok: false as const })),
   readSigner: vi.fn(),
   readHistory: vi.fn(),
   persist: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock("@/lib/r2-synthetic-canary", () => ({
   readR2SignerEnv: readSigner,
   authorizeSyntheticCanary: (presented: string | null, secret: string) => presented === `Bearer ${secret}`,
 }));
+vi.mock("@/lib/compile-queue-timing", () => ({ readCompileQueueTimings: readTimings }));
 vi.mock("@/lib/synthetic-probe-store", () => ({ readProbeHistory: readHistory }));
 vi.mock("@/lib/operational-sli", () => ({ evaluateOperationalSli: evaluate }));
 vi.mock("@/lib/operational-sli-alert-store", async (original) => ({
@@ -120,6 +122,21 @@ describe("scheduled operational SLI alert route", () => {
       now: new Date("2026-09-20T12:00:00.000Z"),
       compileBacklog: { ok: false },
     }));
+  });
+
+  it("WO-D24-2: hands the evaluator queue timings read from the hour before the slot, and records only {check, code} for watch", async () => {
+    const samples = [{ startWaitSeconds: 4, timeToSettleSeconds: 90 }];
+    readTimings.mockResolvedValueOnce({ ok: true, samples } as never);
+    persist.mockResolvedValue({ ok: true, receipt: RECEIPT });
+    await GET(request());
+    expect(readTimings).toHaveBeenCalledWith("2026-09-20T11:00:00.000Z");
+    expect(evaluate).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ queueTimings: { ok: true, samples } }));
+    for (const entry of persist.mock.calls[0][0].watch) expect(Object.keys(entry).sort()).toEqual(["check", "code"]);
+  });
+
+  it("WO-D24-2: an unreadable timing read reaches the evaluator as not ok, not as an empty window", async () => {
+    await GET(request());
+    expect(evaluate).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ queueTimings: { ok: false } }));
   });
 
   it("returns a durable replay receipt as success", async () => {

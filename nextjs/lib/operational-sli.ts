@@ -17,6 +17,7 @@
   Queue liveness is a fourth, separate question ("is queued work moving?") and is reported beside
   this decision as `jobLiveness`, never folded into its state or alerts.
 */
+import type { CompileQueueTimingReading } from "./compile-queue-timing";
 import type { ModelProviderCircuitSnapshot } from "./model-provider-circuit";
 import {
   evaluateOperationalJobLiveness,
@@ -24,6 +25,7 @@ import {
   type OperationalJobObservation,
   type OperationalJobProcessingGate,
 } from "./operational-job-liveness";
+import { summarizeQueueTimings } from "./compile-queue-timing";
 import { PROBE_DEPENDENCIES, type ProbeDependency } from "./synthetic-probe";
 import type { ProbeHistory } from "./synthetic-probe-store";
 
@@ -48,7 +50,9 @@ export type OperationalReason =
   | "model_provider_circuit_open"
   | "model_provider_circuit_state_unavailable"
   | "compile_backlog_age_exceeded"
-  | "compile_backlog_unavailable";
+  | "compile_backlog_unavailable"
+  | "compile_queue_timing_unavailable"
+  | "compile_queue_wait_p95_exceeded";
 
 /*
   Compile backlog age (GA ops audit gap 4, 2026-11-10): how long the oldest runnable compile job
@@ -69,6 +73,20 @@ export type CompileBacklogHealth = {
   status: "ok" | "unavailable";
   /** Null when the queue holds no runnable job, or could not be read. */
   oldestWaitSeconds: number | null;
+};
+
+/*
+  Compile queue latency distribution (WO-D24-2), beside the oldest-job wait above. Unreadable is
+  `unavailable` and never zero; a readable window with no settled job is `no_samples`. The
+  warning reuses the 15-minute judgement above: uncalibrated, no measured p95 exists yet.
+*/
+export type CompileQueueTimingHealth = {
+  status: "ok" | "unavailable" | "no_samples";
+  n: number;
+  startWaitP95Seconds: number | null;
+  startWaitP99Seconds: number | null;
+  timeToSettleP95Seconds: number | null;
+  timeToSettleP99Seconds: number | null;
 };
 
 /*
@@ -120,6 +138,7 @@ export type OperationalSli = {
   };
   modelProviders: ModelProviderHealth[];
   compileBacklog?: CompileBacklogHealth;
+  queueTimings?: CompileQueueTimingHealth;
   alerts: OperationalAlert[];
 };
 
@@ -136,6 +155,8 @@ export type OperationalSliOptions = {
   modelProviderCircuits?: readonly ModelProviderCircuitReading[];
   /** Already-read oldest runnable compile job. Omitted, the evaluation carries no backlog field. */
   compileBacklog?: CompileBacklogReading;
+  /** Already-read settled-job timings. Omitted, the evaluation carries no queueTimings field. */
+  queueTimings?: CompileQueueTimingReading;
 };
 
 type StoredHistory = { ok: true; history: ProbeHistory } | { ok: false; code: string };
@@ -162,11 +183,14 @@ function uniqueRequired(value: readonly ProbeDependency[] | undefined): ProbeDep
   return required;
 }
 
-function percentile95(values: number[]) {
+/** Nearest-rank percentile (integer p, 1-100); null when there are no values. */
+export function percentile(values: readonly number[], p: number) {
   if (values.length === 0) return null;
   const sorted = [...values].sort((left, right) => left - right);
-  return sorted[Math.ceil(sorted.length * 0.95) - 1];
+  return sorted[Math.ceil((sorted.length * p) / 100) - 1];
 }
+
+const percentile95 = (values: number[]) => percentile(values, 95);
 
 function ratio(passing: number, total: number) {
   return total === 0 ? null : passing / total;
@@ -178,7 +202,32 @@ function alert(severity: OperationalAlert["severity"], reason: OperationalReason
 
 const PROVIDER_NAME = /^[a-z0-9][a-z0-9._-]{1,63}$/;
 
-type ProviderReading = { health: ModelProviderHealth[]; alerts: OperationalAlert[]; compileBacklog?: CompileBacklogHealth };
+type ProviderReading = {
+  health: ModelProviderHealth[];
+  alerts: OperationalAlert[];
+  compileBacklog?: CompileBacklogHealth;
+  queueTimings?: CompileQueueTimingHealth;
+};
+
+/** Bounded projection of already-read queue timings. Unreadable is never zero. */
+function withQueueTimings(providers: ProviderReading, reading: CompileQueueTimingReading | undefined): ProviderReading {
+  if (!reading) return providers;
+  if (!reading.ok) {
+    return { ...providers, queueTimings: { status: "unavailable", n: 0, startWaitP95Seconds: null, startWaitP99Seconds: null, timeToSettleP95Seconds: null, timeToSettleP99Seconds: null },
+      alerts: [...providers.alerts, alert("warning", "compile_queue_timing_unavailable")] };
+  }
+  const summary = summarizeQueueTimings(reading.samples);
+  const queueTimings: CompileQueueTimingHealth = {
+    status: summary.n === 0 ? "no_samples" : "ok",
+    n: summary.n,
+    startWaitP95Seconds: summary.startWait.p95,
+    startWaitP99Seconds: summary.startWait.p99,
+    timeToSettleP95Seconds: summary.timeToSettle.p95,
+    timeToSettleP99Seconds: summary.timeToSettle.p99,
+  };
+  const late = summary.startWait.p95 !== null && summary.startWait.p95 > COMPILE_BACKLOG_WARNING_SECONDS;
+  return { ...providers, queueTimings, alerts: late ? [...providers.alerts, alert("warning", "compile_queue_wait_p95_exceeded")] : providers.alerts };
+}
 
 /** Bounded projection of the already-read backlog head. Unreadable or untrusted is never healthy. */
 function withCompileBacklog(providers: ProviderReading, reading: CompileBacklogReading | undefined, nowMs: number): ProviderReading {
@@ -237,6 +286,7 @@ function emptyResult(
     window: { passingRuns: 0, totalRuns: 0, ratio: null, successfulRequestLatencyP95Ms: null, latencySamples: 0 },
     modelProviders: providers.health,
     ...(providers.compileBacklog ? { compileBacklog: providers.compileBacklog } : {}),
+    ...(providers.queueTimings ? { queueTimings: providers.queueTimings } : {}),
     alerts: [alert("critical", reason), ...providers.alerts],
   };
 }
@@ -258,7 +308,10 @@ export function evaluateOperationalSli(stored: StoredHistory, options: Operation
 
   // The compile backlog rides with provider health: independent of probe freshness, appended on
   // every branch, able to degrade an available state and never to clear a blocked or stale one.
-  const providers = withCompileBacklog(modelProviderHealth(options.modelProviderCircuits), options.compileBacklog, nowMs);
+  const providers = withQueueTimings(
+    withCompileBacklog(modelProviderHealth(options.modelProviderCircuits), options.compileBacklog, nowMs),
+    options.queueTimings,
+  );
 
   if (!stored.ok) return emptyResult(evaluatedAt, ttlMs, required, "history_unavailable", providers);
   if (stored.history.runs.length === 0) {
@@ -334,6 +387,7 @@ export function evaluateOperationalSli(stored: StoredHistory, options: Operation
     },
     modelProviders: providers.health,
     ...(providers.compileBacklog ? { compileBacklog: providers.compileBacklog } : {}),
+    ...(providers.queueTimings ? { queueTimings: providers.queueTimings } : {}),
     alerts,
   };
 }

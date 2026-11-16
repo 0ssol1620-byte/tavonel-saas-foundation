@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireFoundationSession } from "@/lib/developer-auth";
+import { remoteMcpReadiness } from "@/lib/remote-mcp-readiness";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { trialAiAccess } from "@/lib/trial-ai-access";
 import {
@@ -56,6 +57,11 @@ export async function POST(request: Request) {
   }
   if (body.decision === "describe") return NextResponse.json({ code: "AUTHORIZATION_REQUEST_VALID", ...checked.view }, { headers: NO_STORE });
   if (body.decision === "deny") return NextResponse.json({ code: "AUTHORIZATION_DENIED", redirectTo: denialRedirect(checked.request, origin) }, { headers: NO_STORE });
+  if (body.decision === "precheck") {
+    const session = await requireFoundationSession(request, "observer");
+    if (!session.ok) return NextResponse.json({ code: session.code }, { status: session.status, headers: NO_STORE });
+    return NextResponse.json(await remoteMcpReadiness(session.principal), { headers: NO_STORE });
+  }
   if (body.decision !== "approve") return NextResponse.json({ code: "AUTHORIZATION_DECISION_INVALID" }, { status: 400, headers: NO_STORE });
 
   const auth = await requireFoundationSession(request, "observer");

@@ -37,6 +37,8 @@ const { getUser, pilotAccess, productAccess, getCandidate, listObjects, promote,
     freshness: vi.fn(),
   }));
 
+// The signed-receipt check has its own suite (promotion-receipt-check.test.ts); these fixtures carry unsigned candidates.
+vi.mock("@/lib/promotion-receipt-check", () => ({ checkCandidateCompileReceipt: () => ({ ok: true }) }));
 vi.mock("@/lib/foundation-pilot", () => ({ getRequestUser: getUser, foundationPilotAccess: pilotAccess }));
 vi.mock("@/lib/billing-product-access", () => ({ authorizeFoundationProduct: productAccess }));
 vi.mock("@/lib/r2-objects", async (importOriginal) => ({

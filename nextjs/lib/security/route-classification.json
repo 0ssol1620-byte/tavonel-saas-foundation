@@ -290,6 +290,14 @@
       "credential": "bearer:shared-secret",
       "note": "FOUNDATION_WORKER_SECRET / CRON_SECRET, constant-time compare, closed when unset. W1-A1 rollback lever: revokes every live remote MCP key (token_kind mcp) in one write; returns counts per workspace, no key material."
     },
+    "app/api/library/decisions/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "Session only: an API key is refused with 403 even with scopes. A person's decision on a Library label; appends one row, deletes nothing."
+    },
     "app/api/operations/p0/admission/route.ts": {
       "type": "P-public",
       "methods": [
@@ -320,6 +328,31 @@
       ],
       "credential": "none",
       "note": "GET only, and state-changing in neither shape nor effect: it re-fetches one fixed public W3C fixture and refuses it unless the bytes hash to a pinned sha256. It accepts no URL, no id and no customer input, so it reaches no tenant data. Listed because the inventory is a checked-in fact only if the routes that are deliberately public appear in it alongside the ones that are not."
+    },
+    "app/api/proposals/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "Session only: an API key is refused with 403. POST creates a proposal and mutates nothing else; needs an Idempotency-Key header."
+    },
+    "app/api/proposals/[id]/decision/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "Session only: no API key or MCP path can confirm. Confirm executes once through the executor map; stale and expired never execute."
+    },
+    "app/api/proposals/[id]/undo/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "Session only. Undo of an executed proposal: the opposite library decision, recorded as undone."
     },
     "app/api/research-updates/route.ts": {
       "type": "P-public",

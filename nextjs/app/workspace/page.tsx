@@ -74,8 +74,12 @@ import {
   type WorkspaceIntent,
   type WorkspaceStateInput,
 } from "@/lib/workspace-onboarding";
+import { deriveJourney } from "@/lib/workspace-journey";
+import { useStoredPurpose } from "@/components/workspace-purpose-picker";
 import WorldStudioUltimate from "@/components/world-studio-ultimate";
 import ChangeInbox from "@/components/change-inbox";
+import ChangeProposalsPanel from "@/components/change-proposals-panel";
+import LibraryPanel from "@/components/library-panel";
 import OperationsUltimate from "@/components/operations-ultimate";
 import type { WorldReadModel } from "@/lib/world-read-model";
 import { compileLimitsNotice, judgeCompileSet } from "@/lib/compile-limits";
@@ -374,6 +378,7 @@ export default function WorkspacePage() {
   const [busy, setBusy] = useState(false);
   const corpusFollowRef = useRef<AbortController | null>(null);
   const [compileJob, setCompileJob] = useState<CompileJobView | null>(null);
+  const [purpose, setPurpose] = useStoredPurpose();
   /*
     A corpus is several compiles, followed as one run.
 
@@ -488,6 +493,7 @@ export default function WorkspacePage() {
   }, [documents]);
   const [proofMode, setProofMode] = useState(false);
   const [collectionResult, setCollectionResult] = useState<CollectionResult | null>(null);
+  const [libraryAvailable, setLibraryAvailable] = useState(false);
   const candidateLoadSequence = useRef(0);
   const [worldReadModel, setWorldReadModel] = useState<WorldReadModel | null>(null);
   /*
@@ -2966,6 +2972,10 @@ export default function WorkspacePage() {
         run: () => { if (nextAction.surface) navigateSurface(nextAction.surface); else nextAction.run?.(); },
       }}
       onOpenWorld={() => navigateSurface("world")}
+      journey={deriveJourney({ ...workspaceStateInput, purpose, libraryAvailable })}
+      purpose={purpose}
+      onPurpose={setPurpose}
+      onOpenStep={navigateSurface}
     />
   ) : null;
 
@@ -3514,6 +3524,9 @@ export default function WorkspacePage() {
               reading={readingForCurrentVersions}
               names={names}
               customerDataAccess={customerDataAccess}
+              compiledWorldActive={Boolean(activeWorld && collectionResult && activeWorld.manifestDigest === collectionResult.manifestDigest)}
+              blocked={compileJob?.blocked}
+              blockedResolution={compileJob?.blockedResolution ?? null}
               noComputeAccess={accessSource === "unentitled"}
               selectableIds={intakeOpen ? compilableDocumentIds : []}
               selectedIds={selectedDocumentIds}
@@ -3523,6 +3536,7 @@ export default function WorkspacePage() {
               onDismiss={uploads.length > 0 ? () => { setUploads([]); setReading({}); setSourceObservation(null); sourceBytesCacheRef.current.clear(); } : undefined}
             />
           </div>
+          {documents && documents.length > 0 ? <LibraryPanel documentIds={documents.map((d) => d.documentId)} names={names} onAvailability={setLibraryAvailable} /> : null}
           {(intakeOpen || Boolean(collectionResult && !collectionResult.coreExecution)) ? <div className="workspace-grid">
             {intakeOpen ? (
             <section id="workspace-sources" className="card document-card">
@@ -3607,6 +3621,7 @@ export default function WorkspacePage() {
                 */}
                 <WorldStudioUltimate
                   model={worldReadModel}
+                  syncUrl
                   onRollback={rollbackReason.trim().length >= 8 ? (digest) => void rollbackWorld(digest) : undefined}
                   rollbackBusy={worldBusy}
                 />
@@ -3626,6 +3641,9 @@ export default function WorkspacePage() {
                   collectionId={collectionResult?.collectionId ?? null}
                   names={names}
                 />
+              ) : null}
+              {surface === "changes" ? (
+                <ChangeProposalsPanel collectionId={collectionResult?.collectionId ?? null} />
               ) : null}
               {/*
                 This control was lost when the sidebar buttons became tabs: the handler survived

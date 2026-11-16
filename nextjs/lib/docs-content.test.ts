@@ -629,3 +629,13 @@ describe("/docs/mcp says what this deployment serves", () => {
     });
   }
 });
+
+describe("/docs/mcp retry guidance matches the facade", () => {
+  it("offers the smaller-limit retry for search only, never for fetch", async () => {
+    const { findDocsSection } = await import("./docs-content");
+    const text = JSON.stringify(findDocsSection("mcp")!.blocks);
+    expect(text).toContain("search answers DELIVERY_OVER_TOOL_RESULT_BUDGET, and a smaller limit is the retry");
+    expect(text).toContain("fetch takes only the result id and answers FETCH_OVER_BUDGET");
+    expect(text).not.toContain("DELIVERY_OVER_TOOL_RESULT_BUDGET or FETCH_OVER_BUDGET");
+  });
+});

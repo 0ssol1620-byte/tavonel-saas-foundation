@@ -67,6 +67,7 @@ export async function POST(request: Request) {
   });
   const run = await runCollectionCompile(auth.principal.workspaceKey, documentIds, undefined, undefined, {
     userId: auth.principal.userId, provenance: "authenticated_request",
+    authorizationRevision: auth.principal.authorizationRevision,
   });
   if (!run.ok) {
     const headers: Record<string, string> = { "Cache-Control": "no-store" };

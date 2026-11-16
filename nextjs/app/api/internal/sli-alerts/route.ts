@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { readOpenCompileJobs } from "@/lib/compile-job-store";
+import { readCompileQueueTimings } from "@/lib/compile-queue-timing";
 import { readModelProviderCircuitSnapshot } from "@/lib/model-provider-circuit-store";
 import { evaluateOperationalSli } from "@/lib/operational-sli";
 import {
@@ -45,7 +46,8 @@ async function evaluateAndPersist(request: Request) {
   // different payload and meets the idempotency conflict below, like a changed circuit read.
   const head = await readOpenCompileJobs(1);
   const compileBacklog = head.ok ? { ok: true as const, oldestWaitingSince: head.value[0]?.updatedAt ?? null } : { ok: false as const };
-  const evaluation = evaluateOperationalSli(history, { now: windowStartedAt, modelProviderCircuits, compileBacklog });
+  const queueTimings = await readCompileQueueTimings(new Date(windowStartedAt.getTime() - 3_600_000).toISOString());
+  const evaluation = evaluateOperationalSli(history, { now: windowStartedAt, modelProviderCircuits, compileBacklog, queueTimings });
   // W1-A3: hourly RunPod daily-cost and daily release-row expiry checks ride the same slot. Their
   // outcome is reported beside the SLI result and never changes its status code. They run before
   // the record so their codes are stored with it: the hourly billing read leaves a durable receipt,

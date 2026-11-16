@@ -400,9 +400,9 @@ async function advanceCompileJobTurn(job: CompileJob, deadlineAt: number): Promi
 
   const run = job.compilationMode === "global_collection"
     ? await runCollectionCompile(job.workspaceKey, classified.ready, `${GLOBAL_COLLECTION_KEY_PREFIX}${job.corpusId}`, job.jobId,
-      { userId: job.createdByUserId, provenance: "durable_job" }, tickDeadline)
+      { userId: job.createdByUserId, provenance: "durable_job", authorizationRevision: job.authorizationRevision }, tickDeadline)
     : await runCollectionCompile(job.workspaceKey, classified.ready, undefined, job.jobId,
-      { userId: job.createdByUserId, provenance: "durable_job" }, tickDeadline);
+      { userId: job.createdByUserId, provenance: "durable_job", authorizationRevision: job.authorizationRevision }, tickDeadline);
   /*
     A run that was refused for a reason that may pass: write the deferral down, move the job to the
     back of the queue, and settle with `reason` once `max` deferrals have been spent. A count that

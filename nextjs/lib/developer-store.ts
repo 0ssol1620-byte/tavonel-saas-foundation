@@ -13,6 +13,19 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
 const API_KEY_PATTERN = /^tvnl_(live|mcp)_([A-Za-z0-9_-]{12})_([A-Za-z0-9_-]{43})$/;
 export type ApiKeyAudience = "api" | "mcp";
 
+/*
+  WO-D19-8 (DN-2). With TAVONEL_REMOTE_MCP_REFRESH_ENABLED=true a remote MCP key stays refreshable
+  until it is revoked or its refresh token (this TTL) runs out, expired or not. Defined here, not in
+  lib/remote-mcp.ts (which re-exports both), because remote-mcp imports this module and the
+  Developers inventory below has to apply the same window.
+*/
+export const REMOTE_MCP_REFRESH_TTL_SECONDS = 30 * 24 * 3600;
+export const remoteMcpRefreshEnabled = (env: Readonly<Record<string, string | undefined>> = process.env): boolean =>
+  env.TAVONEL_REMOTE_MCP_REFRESH_ENABLED === "true";
+
+/** The most rows one remote MCP key read returns. A read that matches more fails closed, never silently short. */
+const REMOTE_MCP_READ_LIMIT = 200;
+
 export type DeveloperApiKey = {
   keyId: string;
   name: string;
@@ -104,8 +117,11 @@ async function insertAudit(workspaceKey: string, action: string, targetId: strin
 /**
  * The Developers inventory, in two reads so the remote MCP's hourly keys never push a hand-made key
  * out of view (review R1 M6): `keys` is the newest 100 keys made by hand (`token_kind` live), any
- * state; `remoteMcpKeys` is the live `token_kind` mcp keys only, a null expiry counting as live.
- * Every key either list shows is revocable from it.
+ * state; `remoteMcpKeys` is the `token_kind` mcp keys that can still be used. Refresh flag off, that
+ * is the unexpired ones, a null expiry counting as live. Flag on, it is every unrevoked one minted
+ * within the refresh TTL, expired included, because an expired key still refreshes until revoked;
+ * that includes keys minted before the flag was turned on, which carry no refresh token (DN-7
+ * decides whether to drop them). Every key either list shows is revocable from it.
  */
 export async function listDeveloperApiKeys(workspaceKey: string) {
   const config = readSupabaseAdminConfig();
@@ -126,7 +142,9 @@ export async function listDeveloperApiKeys(workspaceKey: string) {
   try {
     const [manual, remote] = await Promise.all([
       read({ token_kind: "eq.live" }),
-      read({ token_kind: "eq.mcp", revoked_at: "is.null", or: `(expires_at.is.null,expires_at.gt.${new Date().toISOString()})` }),
+      read(remoteMcpRefreshEnabled()
+        ? { token_kind: "eq.mcp", revoked_at: "is.null", created_at: `gt.${new Date(Date.now() - REMOTE_MCP_REFRESH_TTL_SECONDS * 1000).toISOString()}` }
+        : { token_kind: "eq.mcp", revoked_at: "is.null", or: `(expires_at.is.null,expires_at.gt.${new Date().toISOString()})` }),
     ]);
     if (manual === null || remote === null) return { ok: false as const, code: "DEVELOPER_STORE_READ_FAILED" };
     if (manual === undefined || remote === undefined) return { ok: false as const, code: "DEVELOPER_STORE_BINDING_INVALID" };
@@ -138,10 +156,15 @@ export async function listDeveloperApiKeys(workspaceKey: string) {
 
 /**
  * The remote MCP keys one member minted in one workspace since `since`, newest first, revoked and
- * expired included. A token lives 3600 s, so a window of TTL + code TTL holds every live one and
- * every one a code could still be replayed against.
+ * expired included unless `narrow` says otherwise. A token lives 3600 s, so a window of TTL + code TTL
+ * holds every live one and every one a code could still be replayed against.
+ *
+ * `narrow` lets a caller read only the rows its decision is about (`nameLike` is a PostgREST like
+ * pattern, `*` the wildcard; the caller re-checks the exact name), so other keys cannot crowd them out.
+ * More than REMOTE_MCP_READ_LIMIT matching rows is DEVELOPER_STORE_READ_TRUNCATED: a revoke or replay
+ * decision taken over a list cut short would miss rows with no signal (review r13 Q1).
  */
-export async function listRecentRemoteMcpKeys(workspaceKey: string, userId: string, since: string) {
+export async function listRecentRemoteMcpKeys(workspaceKey: string, userId: string, since: string, narrow?: { nameLike?: string; unrevokedOnly?: boolean }) {
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "DEVELOPER_STORE_NOT_CONFIGURED" };
   const query = new URLSearchParams({
@@ -150,15 +173,42 @@ export async function listRecentRemoteMcpKeys(workspaceKey: string, userId: stri
     created_by: `eq.${userId}`,
     token_kind: "eq.mcp",
     created_at: `gt.${since}`,
+    ...(narrow?.nameLike === undefined ? {} : { name: `like.${narrow.nameLike}` }),
+    ...(narrow?.unrevokedOnly ? { revoked_at: "is.null" } : {}),
     order: "created_at.desc",
-    limit: "200",
+    limit: String(REMOTE_MCP_READ_LIMIT + 1),
   });
   try {
     const response = await supabaseAdminRequest(config, `/rest/v1/foundation_api_keys?${query}`);
     if (!response.ok) return { ok: false as const, code: "DEVELOPER_STORE_READ_FAILED" };
     const parsed = ((await response.json()) as Array<Record<string, unknown>>).map(parseApiKey);
     if (parsed.some((key) => key === null)) return { ok: false as const, code: "DEVELOPER_STORE_BINDING_INVALID" };
+    if (parsed.length > REMOTE_MCP_READ_LIMIT) return { ok: false as const, code: "DEVELOPER_STORE_READ_TRUNCATED" };
     return { ok: true as const, keys: parsed as DeveloperApiKey[] };
+  } catch {
+    return { ok: false as const, code: "DEVELOPER_STORE_READ_FAILED" };
+  }
+}
+
+/** One MCP-kind key by id, revoked or expired included; `key: null` when the member has no such key. */
+export async function getRemoteMcpKey(workspaceKey: string, userId: string, keyId: string) {
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false as const, code: "DEVELOPER_STORE_NOT_CONFIGURED" };
+  const query = new URLSearchParams({
+    select: "key_id,name,key_prefix,scopes,created_at,expires_at,last_used_at,revoked_at",
+    workspace_key: `eq.${workspaceKey}`,
+    created_by: `eq.${userId}`,
+    token_kind: "eq.mcp",
+    key_id: `eq.${keyId}`,
+    limit: "1",
+  });
+  try {
+    const response = await supabaseAdminRequest(config, `/rest/v1/foundation_api_keys?${query}`);
+    if (!response.ok) return { ok: false as const, code: "DEVELOPER_STORE_READ_FAILED" };
+    const row = ((await response.json()) as Array<Record<string, unknown>>)[0];
+    if (!row) return { ok: true as const, key: null };
+    const key = parseApiKey(row);
+    return key ? { ok: true as const, key } : { ok: false as const, code: "DEVELOPER_STORE_BINDING_INVALID" };
   } catch {
     return { ok: false as const, code: "DEVELOPER_STORE_READ_FAILED" };
   }

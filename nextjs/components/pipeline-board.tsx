@@ -11,6 +11,8 @@ import { trackFunnel } from "@/lib/funnel-events";
 import { acceptedFormatSentence } from "@/lib/qualified-input";
 import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary";
 import { countNoun } from "@/lib/plural";
+import type { BlockerResolution, CompileBlocker } from "@/lib/compile-job-store";
+import { censusOf, deriveFileStates, reconciles, type CensusBucket, type NextAction } from "@/lib/file-states";
 // One UTC face for every device, so the time in a support conversation is the time on the screen.
 import { formatTimestamp } from "@/lib/format";
 
@@ -43,6 +45,16 @@ function stageLabel(row: PipelineRow): string {
   return PIPELINE_STAGES[0].label;
 }
 
+const CENSUS_PARTS: ReadonlyArray<readonly [CensusBucket, string]> = [
+  ["pending", "queued"],
+  ["processing", "processing"],
+  ["verified_pending_publish", "compiled, not yet active"],
+  ["accepted", "active"],
+  ["held", "held"],
+  ["excluded", "excluded"],
+];
+const NEXT_ACTION_WORD: Record<NextAction, string> = { retry: "Retry", reconnect: "Reconnect", "re-upload": "Re-upload", review: "Review", exclude: "Exclude", compile: "Compile", none: "" };
+
 function failureCopy(detail: string) {
   if (detail.includes("TRIAL_FILE_TOO_LARGE")) return "Free Evaluation accepts files up to 50 MB. Use a smaller source or upgrade for larger manuals.";
   if (detail.includes("FILE_TOO_LARGE") || detail.includes("INTAKE_FILE_TOO_LARGE")) return "This file exceeds the 250 MB direct-upload limit. Connect the source system instead of uploading it directly.";
@@ -61,7 +73,7 @@ function failureCopy(detail: string) {
   name. The board does not decide which rows are eligible -- the page passes the ids it read
   from the document list, so eligibility and the compile call cannot drift apart.
 */
-export default function PipelineBoard({ rows, reading = {}, names = {}, onDismiss, selectableIds, selectedIds, onToggleSelected, customerDataAccess, noComputeAccess = false }: {
+export default function PipelineBoard({ rows, reading = {}, names = {}, onDismiss, selectableIds, selectedIds, onToggleSelected, customerDataAccess, noComputeAccess = false, compiledWorldActive = false, blocked, blockedResolution }: {
   rows: PipelineRow[];
   reading?: Record<string, OcrProgress>;
   names?: DocumentNames;
@@ -71,6 +83,9 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
   onToggleSelected?: (documentId: string) => void;
   customerDataAccess: CustomerDataAccess;
   noComputeAccess?: boolean;
+  compiledWorldActive?: boolean;
+  blocked?: CompileBlocker[];
+  blockedResolution?: BlockerResolution | null;
 }) {
   const firstFailed = rows.find((row) => statusOf(row) === "failed") ?? null;
   const selectable = new Set(selectableIds ?? []);
@@ -80,6 +95,18 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
   const [visibleCount, setVisibleCount] = useState(12);
   const [expandedId, setExpandedId] = useState<string | null>(() => firstFailed?.id ?? rows.find((row) => row.stages[2].state === "active")?.id ?? null);
   const counts = useMemo(() => ({ all: rows.length, attention: rows.filter((row) => statusOf(row) === "attention").length, processing: rows.filter((row) => statusOf(row) === "processing").length, ready: rows.filter((row) => statusOf(row) === "ready").length, failed: rows.filter((row) => statusOf(row) === "failed").length }), [rows]);
+  // A census that does not add up, or a row no V30 state fits, prints nothing rather than a wrong sum.
+  const fileStates = useMemo(() => {
+    try {
+      const derived = deriveFileStates(rows, { compiledWorldActive, blocked, blockedResolution });
+      const census = censusOf(derived);
+      if (reconciles(census)) return { byId: new Map(derived.map((item) => [item.id, item])), census };
+      console.error("PipelineBoard: file-state census does not reconcile; line not shown.");
+    } catch (error) {
+      console.error("PipelineBoard: file states unavailable; line not shown.", error);
+    }
+    return null;
+  }, [rows, compiledWorldActive, blocked, blockedResolution]);
   if (rows.length === 0) return null;
   const effectiveFilter: Filter = filter === "attention" && counts.attention === 0 ? (counts.failed > 0 ? "failed" : "all") : filter;
   const normalizedQuery = query.trim().toLowerCase();
@@ -100,6 +127,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
         </div>
       ) : null}
 
+      {fileStates ? <p className="fine board-census" data-census data-discovered={fileStates.census.discovered} {...Object.fromEntries(CENSUS_PARTS.map(([bucket]) => [`data-${bucket.replaceAll("_", "-")}`, fileStates.census[bucket]]))}>{[countNoun(fileStates.census.discovered, "source"), ...CENSUS_PARTS.filter(([bucket]) => fileStates.census[bucket] > 0).map(([bucket, label]) => `${fileStates.census[bucket]} ${label}`)].join(" · ")}</p> : null}
       {/* The counts live in the filter chips below; four big-number tiles said the same thing with zeroes. */}
       <div className="board-toolbar"><div className="board-filters" role="group" aria-label="Filter sources"><button type="button" data-active={effectiveFilter === "all"} onClick={() => selectFilter("all")}>All {counts.all}</button><button type="button" data-active={effectiveFilter === "attention"} onClick={() => selectFilter("attention")}>Review {counts.attention}</button><button type="button" data-active={effectiveFilter === "processing"} onClick={() => selectFilter("processing")}>Processing {counts.processing}</button><button type="button" data-active={effectiveFilter === "ready"} onClick={() => selectFilter("ready")}>Ready {counts.ready}</button>{counts.failed > 0 ? <button type="button" data-active={effectiveFilter === "failed"} onClick={() => selectFilter("failed")}>Failed {counts.failed}</button> : null}</div><label className="board-search"><span className="sr-only">Search sources</span><input value={query} onChange={(event) => { setQuery(event.target.value); setVisibleCount(12); }} placeholder="Search sources…" /></label></div>
       <div className="board-list-wrap"><ol className="board-list board-rows" aria-label={countNoun(filtered.length, "matching source")}>
@@ -120,6 +148,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
                   renders on the server too, and a relative age would be a different sentence on
                   each side of hydration. A row the server gave no observation time for prints
                   nothing. */}
+              {NEXT_ACTION_WORD[fileStates?.byId.get(row.id)?.nextAction ?? "none"] ? <p className="fine board-row-next" data-next-action={fileStates?.byId.get(row.id)?.nextAction}>Next: {NEXT_ACTION_WORD[fileStates?.byId.get(row.id)?.nextAction ?? "none"]}</p> : null}
               {row.observedAt ? <p className="fine board-row-observed">Source ready <time dateTime={row.observedAt}>{formatTimestamp(row.observedAt)}</time></p> : null}
               {progress && row.stages[2].state === "active" ? <ReadingView progress={progress} /> : null}
               <div className="board-stages board-stages-detail">{row.stages.map((stageItem) => <div className="board-stage" key={stageItem.key} data-s={stageItem.state}><span className="board-stage-k"><i aria-hidden="true" />{stageItem.label}</span><span className="board-stage-d">{stageItem.key === "compile" && stageItem.state === "active" && customerDataAccess !== "open" ? customerDataAccess === "closed" ? noComputeAccess ? "Reading complete · no active compute access" : "Reading complete · compilation requires a scoped pilot" : customerDataAccess === "checking" ? "Reading complete · checking access" : "Reading complete · source access unavailable" : stageItem.state === "failed" ? failureCopy(stageItem.detail) : stageItem.detail || "Not started"}</span></div>)}</div>
