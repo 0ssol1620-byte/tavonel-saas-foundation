@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { BILLING_OFFERS, REFUND_WINDOW_DAYS, refundablePageAllowance, type BillingOfferCode, type PlanAvailability } from "@/lib/billing-catalog";
+import { BILLING_OFFERS, REFUND_WINDOW_DAYS, refundablePageAllowance, type BillingOfferCode } from "@/lib/billing-catalog";
 import { ACCESS_CTA } from "@/lib/site-navigation";
-import { checkoutSellable } from "@/lib/checkout-intent";
+import { checkoutSellable, type ServedAvailability } from "@/lib/checkout-intent";
 
 /**
  * What /login tells a reader who arrived by choosing a plan (JOURNEY-MAP D-02, A2; lane P2-10).
@@ -32,7 +32,7 @@ export default function CheckoutIntentNotice({
 }: {
   offer: BillingOfferCode;
   purchaseOpen: boolean | null;
-  availability: PlanAvailability;
+  availability: ServedAvailability;
 }) {
   const plan = BILLING_OFFERS[offer].label;
   const terms = BILLING_OFFERS[offer];

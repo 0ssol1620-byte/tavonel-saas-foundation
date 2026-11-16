@@ -118,11 +118,14 @@ describe("revenue paths", () => {
       return ranges;
     }
 
-    /** Every occurrence of a not_sold term outside those places, with the text around it. */
+    /**
+     * Every occurrence of a not_sold term outside those places, with the text around it. A term starts a word ("GB" is
+     * not the "gb" of "rgba"); it may end inside one, so "Skill run" still finds "Skill runs".
+     */
     function misplacedTerms(html: string) {
       const ranges = allowedRanges(html);
       return REVENUE_PATHS.filter((path) => path.state === "not_sold").flatMap((path) => path.terms.flatMap((term) =>
-        [...html.matchAll(new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"))]
+        [...html.matchAll(new RegExp(`(?<![A-Za-z0-9])${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "gi"))]
           .filter((match) => !ranges.some(([start, end]) => match.index! >= start && match.index! < end))
           .map((match) => `${path.family} "${term}": ${text(html.slice(Math.max(0, match.index! - 90), match.index! + 60)).trim()}`)));
     }
@@ -146,6 +149,15 @@ describe("revenue paths", () => {
       const html = '<p>A KQU is one bounded knowledge retrieval request.</p><h3 id="pricing-overage-title">x</h3><table><tr><td>KQU</td><td>Request access</td></tr></table>';
       expect(misplacedTerms(html)).toHaveLength(1);
       expect(misplacedTerms(html)[0]).toContain("A KQU is one bounded knowledge retrieval request.");
+    });
+
+    it("is caught on a storage quantity in GB outside the two places (failure path, WO-CAT-2 N5)", () => {
+      const overage = '<h3 id="pricing-overage-title">x</h3><table><tr><td>Storage</td><td>$0.20 / GB-month</td><td>Request access</td></tr></table>';
+      const misplaced = misplacedTerms(`<table><tr><th>Storage included, GB</th><td>50</td></tr></table>${overage}`);
+      expect(misplaced).toHaveLength(1);
+      expect(misplaced[0]).toMatch(/^STORAGE_RETENTION "GB": Storage included, GB 50 /);
+      // The rate in its Request access row stays allowed, and "rgba" is not a GB.
+      expect(misplacedTerms(`<p style="color: rgba(0,0,0,1)">x</p>${overage}`)).toEqual([]);
     });
   });
 });

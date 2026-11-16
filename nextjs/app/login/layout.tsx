@@ -4,8 +4,8 @@ import type { Metadata, Viewport } from "next";
 export const viewport: Viewport = { themeColor: "#F5F3EE", colorScheme: "light" };
 
 /**
- * The page itself is a client component and cannot export metadata, so the title lives here.
- * All three surfaces used to share one title, which made a workspace tab and a marketing tab
+ * The title lives here, beside the viewport, for the sign-in surface as a whole; the page is a server
+ * component that hands its client body the plans' availability (`./page.tsx`). All three surfaces used to share one title, which made a workspace tab and a marketing tab
  * indistinguishable in a browser with both open.
  */
 export const metadata: Metadata = {

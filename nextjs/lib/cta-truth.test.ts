@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { createElement, type FunctionComponent } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { servedAvailability as served } from "./checkout-intent";
 
 /*
   CTA truth, one table per commercial state (UX program 2026-10-17, lane P2-10: UX-PLAN §6.2 and
@@ -392,31 +393,31 @@ describe("the checkout-intent notice", () => {
   it("promises nothing before the deployment has answered", async () => {
     const { default: CheckoutIntentNotice } = await import("../components/checkout-intent-notice");
     for (const availability of ["purchasable", "request_access", "retired"] as const) {
-      expect(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "personal", purchaseOpen: null, availability }))).toBe("");
+      expect(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "personal", purchaseOpen: null, availability: served(availability) }))).toBe("");
     }
   }, RENDER_TIMEOUT);
 
   it("names the plan it was reached for, closed or open", async () => {
     const { default: CheckoutIntentNotice } = await import("../components/checkout-intent-notice");
-    const closed = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "team", purchaseOpen: false, availability: "request_access" })));
+    const closed = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "team", purchaseOpen: false, availability: served("request_access") })));
     expect(closed).toBe("Team is not sold online today. Nothing is charged by signing in. Request Team access");
     // B-07 / CLM-023: a plan the server computed as request_access is not sold online even where the
     // deployment's purchase action is open, and the checkout it would promise answers 403 BILLING_OFFER_CONTACT_REQUIRED.
-    const open = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "team", purchaseOpen: true, availability: "request_access" })));
+    const open = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "team", purchaseOpen: true, availability: served("request_access") })));
     expect(open).toBe("Team is not sold online today. Nothing is charged by signing in. Request Team access");
     expect(open).not.toContain("Checkout opens by itself");
     // The one plan the server says is purchasable, with the deployment's purchase action open, is held for the reader.
-    const personal = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "personal", purchaseOpen: true, availability: "purchasable" })));
+    const personal = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "personal", purchaseOpen: true, availability: served("purchasable") })));
     expect(personal).toBe(OPEN_INTENT);
     // Failure path: purchasable but the deployment's purchase action is closed promises nothing.
-    const shut = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "personal", purchaseOpen: false, availability: "purchasable" })));
+    const shut = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "personal", purchaseOpen: false, availability: served("purchasable") })));
     expect(shut).toBe("Personal is not sold online today. Nothing is charged by signing in. Request Personal access");
   }, RENDER_TIMEOUT);
 
   it("names no retired plan: a retired code in the address gets a sentence without its label", async () => {
     const { default: CheckoutIntentNotice } = await import("../components/checkout-intent-notice");
     for (const offer of ["observer_access", "studio_access"] as const) {
-      const text = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer, purchaseOpen: true, availability: "retired" })));
+      const text = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer, purchaseOpen: true, availability: served("retired") })));
       expect(text).toBe("That plan is not sold online. Nothing is charged by signing in. Request access");
       expect(text).not.toMatch(/2026-09|Developer|Team/);
     }
@@ -496,7 +497,37 @@ describe("catalog v2: /pricing buys only what the server computed as purchasable
       expect(decode(overage), "the overage rows offer Request access and nothing to buy").not.toMatch(/\bBuy\b/);
       expect(decode(overage)).toContain("Request access");
       expect(decode(block(html, 'class="plans"', "div"))).not.toMatch(/automation|\bSSO\b|\bSLA\b|federation/i);
+      // WO-CAT-2 N4: KQU is defined in its own row, so the unit is never shown undefined.
+      const kquRow = [...overage.matchAll(/<tr\b[\s\S]*?<\/tr>/g)].map((row) => decode(row[0])).find((row) => row.startsWith("KQU"));
+      expect(kquRow).toContain("A KQU is one bounded knowledge retrieval request.");
+      // N6: a meter is not a plan. Every overage row's Request access goes to the contact page with no plan named.
+      expect(anchors(overage)).toEqual(Array.from({ length: 4 }, () => ({ href: "/contact", label: "Request access" })));
     }
+  }, RENDER_TIMEOUT);
+
+  /*
+    WO-CAT-2 N6. No rendered link names a plan the contact form would not keep as given (the L3 allow-list, read through
+    the form's own `planIntentFrom`): on /pricing in every state of the seam, and in /login's notice for every offer.
+  */
+  it("no rendered link carries a plan value outside the contact form's allow-list", async () => {
+    const { planIntentFrom } = await import("../components/contact-form");
+    const planValues = (html: string) => anchors(html).flatMap(({ href }) =>
+      href.includes("?") ? new URLSearchParams(href.slice(href.indexOf("?") + 1)).getAll("plan") : []);
+    const seen: string[] = [];
+    for (const seam of [{ delivered: true, personalPrice: true }, { delivered: true, personalPrice: false }, { delivered: false, personalPrice: false }]) {
+      seen.push(...planValues(await pricingHtml(seam)));
+    }
+    const { default: CheckoutIntentNotice } = await import("../components/checkout-intent-notice");
+    const { BILLING_OFFERS } = await import("./billing-catalog");
+    for (const offer of Object.keys(BILLING_OFFERS) as Array<keyof typeof BILLING_OFFERS>) {
+      // The availability the server gives each offer while no plan is sold: a retired offer is always "retired".
+      const availability = served(BILLING_OFFERS[offer].status === "retired" ? "retired" : "request_access");
+      seen.push(...planValues(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer, purchaseOpen: false, availability }))));
+    }
+    expect(seen.length, "the rule reads links that name a plan").toBeGreaterThan(0);
+    expect(seen.filter((plan) => planIntentFrom(plan) !== plan)).toEqual([]);
+    // Failure path: the values the overage rows used to carry are refused by the form.
+    for (const meter of ["PCU", "KQU", "Storage", "Extra seat"]) expect(planIntentFrom(meter)).toBe("");
   }, RENDER_TIMEOUT);
 
   it("reads no price environment in the browser modules that render the plans and the checkout notice", () => {
@@ -506,12 +537,21 @@ describe("catalog v2: /pricing buys only what the server computed as purchasable
   });
 
   /*
-    WO-CAT-2 L4: the class, not the four files. `checkoutSellable` and `decideCheckoutResume` still accept an offer code
-    and then resolve it from the runtime's environment -- which in a browser is empty, so the answer is always
-    "request_access" and a hold or a promise is silently skipped once a plan is on sale. So no browser module may resolve
-    availability itself: none calls `planAvailability` or `readConfiguredBillingOffers`, and every `checkoutSellable` /
-    `decideCheckoutResume` call is handed an availability value (by name), never an offer code. Every "use client"
-    module in the tree is read, plus the intent notice, which carries no directive and renders inside /login's client.
+    WO-CAT-2 L4, N3: the class, not the four files. No browser module may resolve a plan's availability, or stand in
+    for the server's answer with one of its own. How each source is told apart, and by what:
+      - an offer code, a string literal, or a `PlanAvailability` constant: by the TYPE. `checkoutSellable` and
+        `decideCheckoutResume` take only a `ServedAvailability` (or, for the workspace's hold, null: no answer, which
+        claims nothing), so `tsc --noEmit` refuses them (the @ts-expect-error lines in checkout-intent.test.ts);
+      - the server's own resolvers or brand (`planAvailability`, `readConfiguredBillingOffers`, `servedAvailability`)
+        called in the browser: by this test, a call of any of them is a violation;
+      - a cast that manufactures the brand: by this test, `as ServedAvailability` anywhere in a browser module, and
+        any type escape (`as never`, `as any`, `as unknown`) in a browser module that calls either function;
+      - a prop: allowed, because its type is `ServedAvailability` and only a server page can make one.
+    What it cannot tell apart: a value typed `any` reaches the brand without a cast. That is how a route response
+    arrives (`response.json()`), which the rule allows, but a browser module that read `any` from somewhere else
+    (storage, an untyped parse) would pass too; neither the type nor this test traces data flow. No browser module
+    does that today; the type escape rule above catches the explicit forms. Every "use client" module in the tree is
+    read, plus the intent notice, which carries no directive and renders inside /login's client.
   */
   describe("no browser module resolves a plan's availability itself", () => {
     const root = new URL("../", import.meta.url);
@@ -522,15 +562,15 @@ describe("catalog v2: /pricing buys only what the server computed as purchasable
     const browserModules = ["app/", "components/", "lib/"].flatMap(walk)
       .filter((path) => /^\s*["']use client["']/.test(readFileSync(new URL(path, root), "utf8")))
       .concat("components/checkout-intent-notice.tsx");
-    /** The first argument of every call to `name`, as written. */
-    const firstArguments = (source: string, name: string) =>
-      [...source.matchAll(new RegExp(`\\b${name}\\(\\s*([^,)]+)`, "g"))].map((match) => match[1]!.trim());
-    const violations = (path: string, source: string) => [
-      ...["planAvailability", "readConfiguredBillingOffers"].filter((name) => new RegExp(`\\b${name}\\(`).test(source)).map((name) => `${path}: calls ${name}`),
-      ...["checkoutSellable", "decideCheckoutResume"].flatMap((name) => firstArguments(source, name)
-        .filter((argument) => !/availability/i.test(argument))
-        .map((argument) => `${path}: ${name}(${argument}, ...) is not handed an availability`)),
-    ];
+    const violations = (path: string, source: string) => {
+      const decides = /\b(?:checkoutSellable|decideCheckoutResume)\(/.test(source);
+      return [
+        ...["planAvailability", "readConfiguredBillingOffers", "servedAvailability"]
+          .filter((name) => new RegExp(`\\b${name}\\(`).test(source)).map((name) => `${path}: calls ${name}`),
+        ...[...source.matchAll(/\bas\s+ServedAvailability\b|<ServedAvailability>/g)].map((match) => `${path}: casts (${match[0]})`),
+        ...(decides ? [...source.matchAll(/\bas\s+(?:never|any|unknown)\b/g)].map((match) => `${path}: type escape beside an availability decision (${match[0]})`) : []),
+      ];
+    };
 
     it("reads the modules it guards", () => {
       for (const path of ["app/login/login-client.tsx", "app/workspace/page.tsx", "components/pricing-page-client.tsx", "components/checkout-intent-notice.tsx"]) {
@@ -543,13 +583,21 @@ describe("catalog v2: /pricing buys only what the server computed as purchasable
     });
 
     it("catches each shape the rule exists for (failure path)", () => {
-      expect(violations("x.tsx", "decideCheckoutResume(resumeOffer, purchaseOpen, resumeAccess)")).toEqual([
-        "x.tsx: decideCheckoutResume(resumeOffer, ...) is not handed an availability",
-      ]);
-      expect(violations("x.tsx", 'checkoutSellable(intent, purchaseOpen); checkoutSellable("personal", true)')).toHaveLength(2);
       expect(violations("x.tsx", "const a = planAvailability(code);")).toEqual(["x.tsx: calls planAvailability"]);
       expect(violations("x.tsx", "readConfiguredBillingOffers()")).toEqual(["x.tsx: calls readConfiguredBillingOffers"]);
+      // A client-side constant standing in for the server's answer, made the two ways the type leaves open.
+      expect(violations("x.tsx", 'decideCheckoutResume(servedAvailability("purchasable"), purchaseOpen, resumeAccess)')).toEqual([
+        "x.tsx: calls servedAvailability",
+      ]);
+      expect(violations("x.tsx", 'const HOLD = "purchasable" as ServedAvailability; decideCheckoutResume(HOLD, true, null)')).toEqual([
+        "x.tsx: casts (as ServedAvailability)",
+      ]);
+      expect(violations("x.tsx", 'checkoutSellable("purchasable" as never, purchaseOpen)')).toEqual([
+        "x.tsx: type escape beside an availability decision (as never)",
+      ]);
+      // What a browser module may pass: a prop, or (the workspace's hold) nothing.
       expect(violations("x.tsx", "checkoutSellable(availability[intent], purchaseOpen)")).toEqual([]);
+      expect(violations("x.tsx", "decideCheckoutResume(null, purchaseOpen, resumeAccess)")).toEqual([]);
     });
   });
 });

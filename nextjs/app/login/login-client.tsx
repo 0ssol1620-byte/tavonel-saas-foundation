@@ -19,7 +19,7 @@ import { useEffect, useState } from "react";
 import CheckoutIntentNotice from "@/components/checkout-intent-notice";
 import Logomark from "@/components/logomark";
 import { RecipeContinuation, RecipePreflight } from "@/components/recipe-preflight";
-import { checkoutSellable, readOfferParam, rememberCheckoutIntent, takeCheckoutIntent } from "@/lib/checkout-intent";
+import { checkoutSellable, readOfferParam, rememberCheckoutIntent, takeCheckoutIntent, type ServedAvailability } from "@/lib/checkout-intent";
 import { trackFunnel } from "@/lib/funnel-events";
 import {
   readRecipeParams,
@@ -29,7 +29,7 @@ import {
   takeRecipeIntent,
   type RecipeIntent,
 } from "@/lib/recipe-intent";
-import type { BillingOfferCode, PlanAvailability } from "@/lib/billing-catalog";
+import type { BillingOfferCode } from "@/lib/billing-catalog";
 import { EXPLORE_CTA, TRIAL_ALLOWANCE } from "@/lib/site-navigation";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
 
@@ -40,7 +40,7 @@ type AuthState = "checking" | "ready" | "unconfigured";
   in. This module runs in the browser and reads no price environment, so it never decides a plan's
   availability itself: the H1 and the intent notice both read this one answer.
 */
-export type LoginAvailability = Readonly<Record<BillingOfferCode, PlanAvailability>>;
+export type LoginAvailability = Readonly<Record<BillingOfferCode, ServedAvailability>>;
 
 /*
   BQ-113. One claim per heading. "One step before checkout" is a promise, so it is made only where the

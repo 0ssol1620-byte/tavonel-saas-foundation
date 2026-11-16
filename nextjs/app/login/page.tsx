@@ -1,5 +1,6 @@
 import LoginClient, { type LoginAvailability } from "./login-client";
 import { BILLING_OFFERS, planAvailability, readConfiguredBillingOffers, type BillingOfferCode } from "@/lib/billing-catalog";
+import { servedAvailability } from "@/lib/checkout-intent";
 
 /*
   Sign in (the body is `./login-client.tsx`).
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
 export default function LoginPage() {
   const configured = readConfiguredBillingOffers();
   const availability = Object.fromEntries(
-    (Object.keys(BILLING_OFFERS) as BillingOfferCode[]).map((code) => [code, planAvailability(code, configured)]),
+    (Object.keys(BILLING_OFFERS) as BillingOfferCode[]).map((code) => [code, servedAvailability(planAvailability(code, configured))]),
   ) as LoginAvailability;
   return <LoginClient availability={availability} />;
 }

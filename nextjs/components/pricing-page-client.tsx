@@ -426,8 +426,8 @@ const SCENARIOS = SCENARIO_PAGES.map((pages) => ({
   the same routes. A buyer reading rows of ✓ learned nothing about why one plan costs more than
   another, and the things that do differ were spread between a card, a tile and a fold.
 
-  Included pages, storage, seats and the plan's features come from `lib/billing-catalog.ts` (KQU, a not_sold
-  meter, is named only on a Request access card's allowance line and its overage row: `revenue-paths.test.ts`);
+  Included pages, seats and the plan's features come from `lib/billing-catalog.ts` (KQU and storage, not_sold
+  meters, are named only on a Request access card's allowance line and their overage rows: `revenue-paths.test.ts`);
   how you get a plan is `planAvailability`, computed on the server. A catalog change moves the
   table, but a closed purchase gate never leaves a visible "Checkout" promise behind. A row that
   is the same on every plan belongs in "Limits" below, not in a column here.
@@ -442,7 +442,6 @@ function planDifferences(availability: PlanAvailabilityByCode, checkoutOpen: boo
     [label, ...CURRENT_CODES.map((code) => say(BILLING_OFFERS[code], code))] as const;
   return [
     row("Included standard pages each month", (offer) => grouped(offer.includedPages)),
-    row("Storage included, GB", (offer) => grouped(offer.included.storageGb)),
     row("Seats", (offer) => grouped(offer.included.seats)),
     row("How you get it", (_offer, code) => howYouGet(availabilityOf(availability, code), checkoutOpen)),
     row("Review queue and version history", (offer) => offer.features.some((feature) => feature.includes("Review queue")) ? "Included" : "—"),
@@ -1436,6 +1435,8 @@ export default function PricingPageClient({
               CAT-D3. The V22 meter rates, read from `METER_RATES_USD`, with the one action every paid line
               has today: Request access. Plans stop at their monthly allowance, so nothing here is a buy
               control. Automation runs, curated Worlds and the marketplace fee are not products and have no row.
+              WO-CAT-2 N4: KQU is defined in its own row, one of the two places a not_sold meter may be named. N6: a
+              meter is not a plan, so its Request access link carries no `plan` and goes to the contact page as is.
             */}
             <h3 id="pricing-overage-title">Capacity past an allowance</h3>
             <div className="table-scroll">
@@ -1449,16 +1450,19 @@ export default function PricingPageClient({
               </thead>
               <tbody>
                 {([
-                  ["PCU", `${rate(METER_RATES_USD.pcu)} / unit`],
-                  ["KQU", `${rate(METER_RATES_USD.kqu)} / unit`],
-                  ["Storage", `${rate(METER_RATES_USD.storageGbMonth)} / GB-month`],
-                  ["Extra seat", `${rate(METER_RATES_USD.seatMonth)} / seat-month`],
-                ] as const).map(([meter, price]) => (
+                  ["PCU", `${rate(METER_RATES_USD.pcu)} / unit`, null],
+                  ["KQU", `${rate(METER_RATES_USD.kqu)} / unit`, "A KQU is one bounded knowledge retrieval request."],
+                  ["Storage", `${rate(METER_RATES_USD.storageGbMonth)} / GB-month`, null],
+                  ["Extra seat", `${rate(METER_RATES_USD.seatMonth)} / seat-month`, null],
+                ] as const).map(([meter, price, definition]) => (
                   <tr key={meter}>
-                    <th scope="row">{meter}</th>
+                    <th scope="row">
+                      {meter}
+                      {definition ? <><br /><span className="fine">{definition}</span></> : null}
+                    </th>
                     <td data-label="Rate, USD">{price}</td>
                     <td data-label="How to get it">
-                      <Link href={`/contact?plan=${encodeURIComponent(meter)}` as Route}>{ACCESS_CTA.label}</Link>
+                      <Link href={ACCESS_CTA.href as Route}>{ACCESS_CTA.label}</Link>
                     </td>
                   </tr>
                 ))}

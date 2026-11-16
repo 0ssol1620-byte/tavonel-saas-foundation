@@ -266,14 +266,15 @@ test.describe("launch approval withheld (purchase closed; customer processing sw
     await servePosture(page, "today");
     const paddle = await installFakePaddle(page);
 
-    // H0. The hero's access action is the evaluation request, a contact form.
+    // H0. The hero's access action is a conversation, a contact form. Home is the V34 reference route (5dc6cb59): its
+    // hero and its header both carry the one filled action, "Create your World" (`CREATE_WORLD_LABEL`), to /contact.
     await page.goto("/");
-    // FINAL-SPEC 2026-10-26 §2.1 (D, veto): the hero's second action is named "Evaluate your documents".
-    // Founder 2026-11-10: the Home header start names the same evaluation, so the hero and the header both say it.
-    await expect(page.getByTestId("landing-hero-actions").getByRole("link", { name: "Evaluate your documents" })).toHaveAttribute("href", "/evaluation");
-    await expect(page.getByRole("banner").getByRole("link", { name: "Evaluate your documents" })).toHaveAttribute("href", "/evaluation");
+    const hero = page.locator("main").getByRole("region").first();
+    await expect(hero.getByRole("link", { name: "Create your World", exact: true })).toHaveAttribute("href", "/contact");
+    await expect(page.getByRole("banner").getByRole("link", { name: "Create your World", exact: true })).toHaveAttribute("href", "/contact");
     await expectNoCheckoutDoor(page);
-    await page.goto("/evaluation");
+    await hero.getByRole("link", { name: "Create your World", exact: true }).click();
+    await expect(page).toHaveURL(/\/contact$/);
     await expect(page.locator("form.contact-form")).toBeVisible();
 
     // H1. The sample's exit.
@@ -545,6 +546,35 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(region(page, "status", "Team is held for you.")).toHaveCount(0);
     expect(posts).toHaveLength(1);
+  });
+
+  /*
+    WO-CAT-2 N2. Only a current (v2) offer is held. A retired one is catalog data, not environment: it is never held or
+    named, and goes straight to the route, whose refusal is the sentence -- even where terms are still owed, where a v2
+    offer would wait. A code that is no offer at all is neither held, named nor sent.
+  */
+  test("a retired offer code goes straight to the route's refusal and an unknown code does nothing: neither is held or named", async ({ page }) => {
+    test.setTimeout(90_000);
+    await declineAnalytics(page);
+    await servePosture(page, "switch-on");
+    const paddle = await installFakePaddle(page);
+    await installFixtureSession(page);
+    await installWorkspaceRoutes(page, { accessSource: "unentitled", customerDataEnabled: false });
+    await page.route("**/api/access/bootstrap", (route) => route.fulfill({ json: TODAY_NEW_ACCOUNT }));
+    const posts = await answerCheckout(page, () => ({ status: 403, json: { code: "BILLING_OFFER_CONTACT_REQUIRED" } }));
+
+    await page.goto("/workspace?checkout=observer_access", { waitUntil: "domcontentloaded" });
+    await expect(region(page, "alert", `Checkout is unavailable. ${failureSentence("BILLING_OFFER_CONTACT_REQUIRED", 403)}`)).toBeVisible();
+    expect(posts).toEqual([{ offerCode: "observer_access" }]);
+    await expect(page.getByText("is held for you.", { exact: false })).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText(BILLING_OFFERS.observer_access.label);
+
+    await page.goto("/workspace?checkout=starter", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("button", { name: "Review processing terms" })).toBeVisible();
+    await expect(page.getByText("is held for you.", { exact: false })).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText(/\bStarter\b/);
+    expect(posts, "an unknown code is never sent").toHaveLength(1);
+    expect(paddle.loads()).toBe(0);
   });
 
   /*

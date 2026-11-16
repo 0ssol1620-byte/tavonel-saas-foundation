@@ -52,7 +52,8 @@ export const REVENUE_PATHS: readonly RevenuePath[] = [
   { family: "DEV", state: "not_sold", offerCodes: ["developer"], ledgerPath: "allowance", terms: [] },
   { family: "COMPILE_PCU", state: "sold_self_serve", offerCodes: [], ledgerPath: "compute_reservation", terms: [], meter: "pcu" },
   { ...notSold("CONTEXT_KQU", "KQU"), meter: "kqu" },
-  { ...notSold("STORAGE_RETENTION", "GB-month"), meter: "storageGb" },
+  // "GB", not only "GB-month": a storage quantity in GB (an allowance, a comparison row) names the meter as surely as its rate (WO-CAT-2 N5).
+  { ...notSold("STORAGE_RETENTION", "GB"), meter: "storageGb" },
   notSold("STEWARD_SYNC", "Steward sync"),
   notSold("SKILL_RUN_LICENSE", "Verified Skill", "Skill run"),
   notSold("WORLD_FIRST_PARTY", "first-party World"),
