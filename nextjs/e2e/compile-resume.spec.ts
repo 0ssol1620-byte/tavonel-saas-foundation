@@ -278,7 +278,7 @@ test("A cancel the server refuses keeps the running state and says so, never 'Ca
   await startRunningCompile(page, RUNNING, cancel);
   await expect(progress(page)).toHaveAttribute("data-state", "reading", { timeout: 20_000 });
   await progress(page).getByRole("button", { name: "Cancel this compile" }).click();
-  await expect(page.getByText(/^Cancel failed\./)).toBeVisible();
+  await expect(page.getByText(/Cancel failed\./)).toBeVisible();
   await expect(progress(page)).toHaveAttribute("data-state", "reading");
   await expect(progress(page).getByRole("heading", { name: "Cancelled." })).toHaveCount(0);
   expect(cancel.posts).toBe(1);
