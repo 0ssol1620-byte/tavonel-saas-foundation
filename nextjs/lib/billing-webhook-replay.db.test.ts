@@ -6,7 +6,10 @@
 //     pnpm exec vitest run lib/billing-webhook-replay.db.test.ts
 //
 // Not covered here (see lib/testing/postgrest-rpc-psql.ts): PostgREST, RLS and role boundaries, Paddle's own
-// delivery and retry behaviour, concurrency (one session, strictly sequential). A mismatch between the oracle
+// delivery and retry behaviour, concurrency (one session, strictly sequential), now() (constant: one outer
+// transaction per seed), scheduled cancellation (the replay always sends scheduled_change: null, so
+// subscription_cancel_at is never exercised). billing-ledger-replay.db.test.ts inserts the same fixture user;
+// the 600_000 timeouts let this suite wait on that row lock. A mismatch between the oracle
 // and the database is a FINDING: record it, never edit the oracle to agree without the Opus reviewer.
 import { createHash, createHmac } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -57,7 +60,7 @@ function signedBinding(baseIso: string, nonceValue: string, offer: BillingOfferC
 // The intent's credits are an arbitrary fixture value here, not a catalog offer's, so the literal type is widened.
 const offerArg = (priceId: string, credits: number) => ({ priceId, credits }) as unknown as Parameters<typeof issueFoundationCheckoutIntent>[1];
 
-const signatureHeader =(body: string, secret = WEBHOOK_SECRET) => {
+const signatureHeader = (body: string, secret = WEBHOOK_SECRET) => {
   const ts = Math.floor(Date.now() / 1000);
   return `ts=${ts};h1=${createHmac("sha256", secret).update(`${ts}:${body}`, "utf8").digest("hex")}`;
 };
@@ -289,7 +292,7 @@ describe.skipIf(!dsn)("webhook replay through the real route into the local data
     vi.stubEnv("PADDLE_PRICE_OBSERVER_ACCESS", CONFIGURED_PRICE.observer_access);
     vi.stubEnv("PADDLE_PRICE_STUDIO_ACCESS", CONFIGURED_PRICE.studio_access);
     for (const method of ["error", "warn", "info"] as const) spies.push(vi.spyOn(console, method).mockImplementation(() => {}));
-  });
+  }, 600_000);
   afterAll(async () => {
     for (const spy of spies) spy.mockRestore();
     vi.unstubAllEnvs();
@@ -423,7 +426,7 @@ describe.skipIf(!dsn)("webhook replay through the real route into the local data
     expect(wrongSecret.status).toBe(401);
     expect(current.calls.length).toBe(calls0);
     expect(await snap(null, null)).toEqual(before);
-  });
+  }, 600_000);
 
   it("with the adapter installed as fetch, an unknown request still throws instead of answering", async () => {
     const before = current.unsupported.length;
