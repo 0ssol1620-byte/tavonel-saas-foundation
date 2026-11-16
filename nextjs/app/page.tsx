@@ -1,12 +1,12 @@
 import Home from "@/components/v34/routes/home/home";
-import { jsonLdHtml } from "@/lib/structured-data";
 import { releaseGate } from "@/lib/v34/release";
-import { routeJsonLd, routeMetadata, routeViewport } from "@/lib/v34/route-metadata";
+import { routeMetadata, routeViewport } from "@/lib/v34/route-metadata";
 
 /*
   The entry point, rebuilt as V34 (decision 11 keeps the Landing V2 components in the tree for
   rollback; nothing here imports them). A thin file: metadata and viewport from the registry, the
-  release gate, the structured data, then the body.
+  release gate, then the body. Structured data is the root layout's `@graph` (Organization,
+  WebSite, SoftwareApplication); the home route adds none of its own.
 
   The title is the registry's one named exception to " — TAVONEL": the home tab has no section to
   name, so it names the product and what it does (`TAVONEL — ` + BRAND_LINE.headline).
@@ -23,12 +23,5 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   await releaseGate("home");
-  return (
-    <>
-      {routeJsonLd("home").map((node, index) => (
-        <script key={index} type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(node) }} />
-      ))}
-      <Home />
-    </>
-  );
+  return <Home />;
 }

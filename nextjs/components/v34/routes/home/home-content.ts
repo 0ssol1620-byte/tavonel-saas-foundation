@@ -86,7 +86,7 @@ export const CASES = {
 export const CONNECT = {
   eyebrow: "Bring your own AI",
   title: "One World. Many ways to work.",
-  lead: "Read a World from any MCP client or call the HTTP API. Configuration steps are on the Connect page.",
+  lead: "Read a World from an MCP client or call the HTTP API. Configuration steps are on the Connect page.",
   primary: { href: to("connect"), label: "Connect your AI →" },
   secondary: { href: to("developers"), label: "Build with the API →" },
   origin: { name: "Your World", detail: "Versioned records with their evidence" },
