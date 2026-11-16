@@ -299,8 +299,8 @@ describe("environment handling", () => {
   const raw = readFileSync(tokensPath, "utf8");
 
   it("sets the overscroll ground to the paper token, only on documents that hold a V34 wrapper", () => {
-    const rule = /:global\(html:has\(\[data-v34-site\]\)\)\s*\{([^}]*)\}/.exec(raw);
-    expect(rule, "html:has([data-v34-site]) rule").not.toBeNull();
+    const rule = /:global\(html\):has\(\.site\)\s*\{([^}]*)\}/.exec(raw);
+    expect(rule, "html:has(.site) rule").not.toBeNull();
     const decls = declarations(rule?.[1] ?? "");
     expect(decls.get("background")).toBe(tokenValue("--v34-paper"));
     expect(decls.get("color-scheme")).toBe("light");
@@ -339,8 +339,8 @@ describe("what the V34 sheets are not allowed to contain", () => {
       expect(css, file).not.toMatch(/:root\b/);
       /* The only global selectors: the overscroll ground, the drawer's scroll lock, and the shared consent link's separator. */
       const rest = css
-        .replace(/:global\(html:has\(\[data-v34-site\]\)\)/g, "")
-        .replace(/:global\(html:has\(\[data-v34-drawer\]\[open\]\)\)/g, "")
+        .replace(/:global\(html\):has\(\.site\)/g, "")
+        .replace(/:global\(html\):has\(\.dialog\[open\]\)/g, "")
         .replace(/:global\(\.site-footer-legal-sep\)/g, "");
       expect(rest, file).not.toContain(":global");
     }

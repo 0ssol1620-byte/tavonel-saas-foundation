@@ -66,7 +66,6 @@ export default function MobileDrawer({ primary, groups, start }: {
         id={id}
         className={`${tokens.paper} ${s.dialog}`}
         aria-label="Site navigation"
-        data-v34-drawer=""
         onClose={() => setOpen(false)}
       >
         <div className={s.bar}>

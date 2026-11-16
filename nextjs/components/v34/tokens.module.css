@@ -260,7 +260,7 @@
 }
 
 /* The bar behind the overscroll area matches the page, and only on documents that hold a V34 wrapper. */
-:global(html:has([data-v34-site])) {
+:global(html):has(.site) {
   background: #f7f8f4;
   color-scheme: light;
 }

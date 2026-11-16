@@ -53,7 +53,7 @@
 }
 
 /* Scroll lock: the page behind the open drawer does not move. */
-:global(html:has([data-v34-drawer][open])) {
+:global(html):has(.dialog[open]) {
   overflow: hidden;
 }
 
