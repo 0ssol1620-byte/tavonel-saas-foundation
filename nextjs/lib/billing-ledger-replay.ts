@@ -16,9 +16,18 @@
     the oracle models `billing_source = 'paid'` only.
   - "Settle after expiry" ages a reservation with a fixture UPDATE (the `expire` op). That UPDATE
     is test scaffolding, not product behaviour.
+
+  Page meter (WO-D27-4, migration 20261117120000). `generateOps(seed, n, { meter: true })` adds the
+  worker's page facts to every settle and compile jobs that end failed / ready / cancelled /
+  review_required (a fixture INSERT + UPDATE on `foundation_compile_jobs`, test scaffolding again).
+  `new LedgerOracle("v4")` sends finished and failed reads to `settle_foundation_compute_v4` and runs
+  the compile-job triggers (failed-compile reversal, OC-3 recharge on `ready`); `"v3"` is the ledger
+  before the meter. `shadowCompare` runs both from the same state on every op and names the page-meter
+  rule behind each difference; a difference no rule explains is reported, never absorbed.
 */
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import { MAX_UNITS_PER_PAGE, STANDARD_UNITS_PER_PAGE } from "./usage-pricing";
 
 // ---------------------------------------------------------------------------------------------
 // Fixed identities. Everything is rolled back, so reuse across seeds is safe.
@@ -81,8 +90,24 @@ export interface SettleOp extends OpBase {
   k: "settle";
   doc: string;
   outcome: string;
+  /** What a pre-meter worker sends (`settle_v3`). */
   actual: number;
   reason: string;
+  /** Page-meter facts (`settle_v4`, WO-D27-4). Present only in a metered stream; null = not observed. */
+  pages?: number | null;
+  complex?: number | null;
+  src?: string | null;
+}
+/**
+ * Fixture: a compile job over `docs` that ends in `state`. The job table is written by the compile
+ * worker, not by a billing function, so this INSERT + UPDATE is test scaffolding; what it exercises
+ * is the page meter's triggers on that table (failed-compile reversal, OC-3 recharge on `ready`).
+ */
+export interface CompileOp extends OpBase {
+  k: "compile";
+  job: string;
+  docs: string[];
+  state: "failed" | "ready" | "cancelled" | "review_required";
 }
 export interface ExpireOp extends OpBase {
   k: "expire";
@@ -92,7 +117,9 @@ export interface ExpireOp extends OpBase {
 export interface ClearHoldOp extends OpBase {
   k: "clear_hold";
 }
-export type Op = IntentOp | EventOp | ReserveOp | SettleOp | ExpireOp | ClearHoldOp;
+export type Op = IntentOp | EventOp | ReserveOp | SettleOp | ExpireOp | ClearHoldOp | CompileOp;
+/** Which settlement the route sends a finished or failed read to: per document (v3) or by pages (v4). */
+export type Meter = "v3" | "v4";
 
 // ---------------------------------------------------------------------------------------------
 // Generator
@@ -127,7 +154,20 @@ const SUB_STATUS: ReadonlyArray<readonly [string, number]> = [
   ["active", 45], ["trialing", 8], ["past_due", 15], ["paused", 12], ["canceled", 10], ["inactive", 4],
 ];
 
-export function generateOps(seed: number, count = 1000): Op[] {
+// A metered stream (WO-D27-4) adds these to WEIGHTS. A stream without `meter` draws exactly what it drew before.
+const METER_WEIGHTS: ReadonlyArray<readonly [string, number]> = [
+  ["compile", 70], ["recompile_refunded", 35], ["settle_meter_invalid", 10], ["settle_no_pages", 8],
+  ["twin_resettle", 15],
+];
+const COMPILE_STATE: ReadonlyArray<readonly [CompileOp["state"], number]> = [
+  ["failed", 45], ["ready", 30], ["cancelled", 10], ["review_required", 15],
+];
+const RECOMPILE_STATE: ReadonlyArray<readonly [CompileOp["state"], number]> = [
+  ["ready", 65], ["failed", 15], ["review_required", 10], ["cancelled", 10],
+];
+
+export function generateOps(seed: number, count = 1000, options: { meter?: boolean } = {}): Op[] {
+  const meter = options.meter === true;
   const rnd = mulberry32(seed);
   const int = (lo: number, hi: number) => lo + Math.floor(rnd() * (hi - lo + 1));
   const pick = <T>(xs: readonly T[]): T => xs[int(0, xs.length - 1)];
@@ -160,7 +200,18 @@ export function generateOps(seed: number, count = 1000): Op[] {
   let clock = 0;
 
   // The stream follows the oracle (never the database), so it is still a pure function of the seed.
-  const tracker = new LedgerOracle();
+  const tracker = new LedgerOracle(meter ? "v4" : "v3");
+  // Few distinct sources, so the same digest is read again (unchanged_source) and re-read after a refund.
+  const sources = Array.from({ length: 8 }, (_, i) => sha(`replay-source-${seed}-${i}`));
+  const jobId = (n: number) => `cjob-${(seed * 1_000_000 + n).toString(16).padStart(32, "0")}`;
+  // In a metered stream every settle carries the worker's page facts as well as the pre-meter amount.
+  const metered = (op: SettleOp): SettleOp => {
+    if (!meter) return op;
+    const pages = rnd() < 0.04 ? null : int(1, 30);
+    const complex = pages === null || rnd() < 0.7 ? null : int(0, pages);
+    const src = rnd() < 0.08 ? null : sources[int(0, sources.length - 1)];
+    return { ...op, pages, complex, src };
+  };
   const live: ReserveOp[] = [];
   const push = (op: Op) => {
     if (ops.length >= count) return;
@@ -207,9 +258,10 @@ export function generateOps(seed: number, count = 1000): Op[] {
   push(bound("bootstrap_subscription", 0, { action: "subscription", eventType: "subscription.created", status: "active" }));
   allowance("bootstrap_allowance", 0);
 
+  const table = meter ? [...WEIGHTS, ...METER_WEIGHTS] : WEIGHTS;
   while (ops.length < count) {
     clock += int(1, 20);
-    const variant = weighted(WEIGHTS);
+    const variant = weighted(table);
     const k = issuedIntent();
     switch (variant) {
       case "allowance_new": allowance(variant, k); break;
@@ -295,21 +347,21 @@ export function generateOps(seed: number, count = 1000): Op[] {
         const outcome = pick(["settled", "settled", "settled", "operator_review", "released", "released"]);
         const x = rnd();
         const actual = outcome === "released" ? 0 : x < 0.5 ? int(0, r.reserved) : x < 0.85 ? int(r.reserved, r.max) : r.max + int(1, 5);
-        push({ k: "settle", retry: false, tag: variant, doc: r.doc, outcome, actual, reason: "OCR_COMPLETED" });
+        push(metered({ k: "settle", retry: false, tag: variant, doc: r.doc, outcome, actual, reason: "OCR_COMPLETED" }));
         break;
       }
       case "settle_redeliver":
         if (settles.length) push(clone(pick(settles), variant));
         break;
       case "settle_unknown":
-        push({ k: "settle", retry: false, tag: variant, doc: uuid("3333", next()), outcome: "settled", actual: 1, reason: "OCR_COMPLETED" });
+        push(metered({ k: "settle", retry: false, tag: variant, doc: uuid("3333", next()), outcome: "settled", actual: 1, reason: "OCR_COMPLETED" }));
         break;
       case "settle_invalid":
         if (reserves.length) {
           const r = pick(reserves);
-          push(rnd() < 0.5
+          push(metered(rnd() < 0.5
             ? { k: "settle", retry: false, tag: variant, doc: r.doc, outcome: "released", actual: 3, reason: "OCR_COMPLETED" }
-            : { k: "settle", retry: false, tag: variant, doc: r.doc, outcome: "settled", actual: 1, reason: "bad reason" });
+            : { k: "settle", retry: false, tag: variant, doc: r.doc, outcome: "settled", actual: 1, reason: "bad reason" }));
         }
         break;
       case "expire_seq":
@@ -317,7 +369,7 @@ export function generateOps(seed: number, count = 1000): Op[] {
           const r = pick(live);
           push({ k: "expire", retry: false, tag: variant, doc: r.doc });
           reserve("expire_sweep");
-          push({ k: "settle", retry: false, tag: "settle_after_expiry", doc: r.doc, outcome: "settled", actual: r.reserved, reason: "OCR_COMPLETED" });
+          push(metered({ k: "settle", retry: false, tag: "settle_after_expiry", doc: r.doc, outcome: "settled", actual: r.reserved, reason: "OCR_COMPLETED" }));
         }
         break;
       case "intent_dup":
@@ -326,6 +378,56 @@ export function generateOps(seed: number, count = 1000): Op[] {
       case "clear_hold": push({ k: "clear_hold", retry: false, tag: variant }); break;
       case "intent_late":
         if (issued < CREDITS.length) push(intentOp(issued++));
+        break;
+      // Metered stream only (METER_WEIGHTS).
+      case "compile":
+        if (reserves.length) {
+          const docs = [...new Set(Array.from({ length: int(1, 3) }, () => pick(reserves).doc))];
+          push({ k: "compile", retry: false, tag: variant, job: jobId(next()), docs, state: weighted(COMPILE_STATE) });
+        }
+        break;
+      case "recompile_refunded": {
+        // The OC-3 path: a read a failed compile refunded is compiled again.
+        const refunded = tracker.refundedDocs();
+        if (refunded.length) push({ k: "compile", retry: false, tag: variant, job: jobId(next()), docs: [pick(refunded)], state: weighted(RECOMPILE_STATE) });
+        break;
+      }
+      case "twin_resettle": {
+        // Rule 2 under OC-3 (reviewer probes P1, P1b, P6): the bytes of a refunded read are read again as
+        // a new document, that twin is sometimes refunded too, then compiles use one or both of them.
+        const compile = (docs: string[], state: CompileOp["state"]) => push({ k: "compile", retry: false, tag: variant, job: jobId(next()), docs, state });
+        const read = (src: string) => {
+          const r = reserve(variant);
+          if (rnd() < 0.5) push(clone(r, `redeliver:${variant}`)); // an upload retried after a lost answer
+          const settled: SettleOp = { k: "settle", retry: false, tag: variant, doc: r.doc, outcome: "settled", actual: r.reserved, reason: "OCR_COMPLETED", pages: int(1, 30), complex: null, src };
+          push(settled);
+          push(clone(settled, `redeliver:${variant}`)); // the worker retries a settlement it lost the answer to
+          return r.doc;
+        };
+        const refunded = tracker.refundedSources();
+        let a: string;
+        let src: string;
+        if (refunded.length && rnd() < 0.5) [a, src] = pick(refunded);
+        else {
+          // Mostly fresh bytes: the eight shared sources are soon all paid for, and a paid source re-read is free.
+          src = rnd() < 0.75 ? sha(`replay-twin-${seed}-${next()}`) : pick(sources);
+          a = read(src);
+          compile([a], "failed");
+        }
+        const b = read(src);
+        if (rnd() < 0.35) compile([b], "failed");
+        compile(pick([[a], [b], [a, b], [b, a]]), weighted(RECOMPILE_STATE));
+        if (rnd() < 0.35) compile([pick([a, b])], "failed");
+        break;
+      }
+      case "settle_meter_invalid":
+        if (reserves.length) {
+          const bad = pick<Partial<SettleOp>>([{ pages: 0 }, { pages: 10001 }, { pages: 3, complex: 4 }, { src: "sha256:not-a-digest" }]);
+          push({ ...metered({ k: "settle", retry: false, tag: variant, doc: pick(reserves).doc, outcome: "settled", actual: 1, reason: "OCR_COMPLETED" }), ...bad });
+        }
+        break;
+      case "settle_no_pages":
+        if (live.length) push({ ...metered({ k: "settle", retry: false, tag: variant, doc: pick(live).doc, outcome: "settled", actual: 1, reason: "OCR_COMPLETED" }), pages: null, complex: null });
         break;
     }
   }
@@ -351,7 +453,12 @@ interface Acct {
   lifetimeAllowance: number; lifetimeReversed: number; accessPlan: string | null; status: string;
   subscriptionId: string | null; lastSubAt: number | null;
 }
-interface Res { state: string; reserved: number; max: number; settled: number | null; reason: string | null; aged: boolean }
+interface Res {
+  state: string; reserved: number; max: number; settled: number | null; reason: string | null; aged: boolean;
+  /** Page meter (absent = null): the facts v4 settled with, its charge basis, the failed-compile reversal and the OC-3 recharge. */
+  pages?: number | null; complex?: number | null; src?: string | null; basis?: string | null;
+  reversed?: number | null; recharged?: number | null; rechargedBalance?: number | null;
+}
 interface State {
   acct: Acct | null;
   events: Map<string, Ev>;
@@ -361,7 +468,28 @@ interface State {
   consumptions: Map<string, { offer: string; sub: string | null; price: string; credit: number }>;
   rejections: Set<string>;
   reservations: Map<string, Res>;
+  /** Documents a `ready` or `review_required` compile has used (the reversal rule's "a world used it"). */
+  usedDocs: Set<string>;
 }
+
+// Page-meter rules (20261117120000), written from the SQL, with the rates the quote uses.
+const meteredRate = (pages: number, complex: number | null) =>
+  (pages - (complex ?? 0)) * STANDARD_UNITS_PER_PAGE + (complex ?? 0) * MAX_UNITS_PER_PAGE;
+/** Never above what was approved: the hold when the paid account may not run into overage, else the maximum. */
+const meteredCap = (a: Acct, r: Res) => (!a.overageEnabled || a.hold ? r.reserved : r.max);
+/** A settled read of `src` that still counts as paid: never reversed, or charged again after its refund (OC-3). */
+const isPaidSource = (p: Res, src: string) => p.state === "settled" && p.src === src && (p.reversed == null || p.recharged != null);
+/** recharge_foundation_compute_for_ready_compile's skip: another read of the same bytes is a live paid charge. */
+const sourcePaidElsewhere = (s: State, r: Res) =>
+  r.src != null && [...s.reservations.values()].some((p) => p !== r && (p.settled ?? 0) > 0 && isPaidSource(p, r.src as string));
+/** reverse_foundation_compute_for_failed_compile's "a world used it": this document, or a read of the same bytes. */
+const usedByWorld = (s: State, doc: string, r: Res) =>
+  s.usedDocs.has(doc) || (r.src != null && [...s.usedDocs].some((d) => s.reservations.get(d)?.src === r.src));
+const meteredReceipt = (status: string, r: Res, released: number, over: number): Rec => ({
+  status, state: r.state, settledCredits: r.settled, reservedCredits: r.reserved, maximumCredits: r.max,
+  releasedCredits: released, overageCredits: over, billingSource: "paid",
+  meteredPages: r.pages ?? null, meteredComplexPages: r.complex ?? null, chargeBasis: r.basis ?? null,
+});
 
 class Refusal extends Error {}
 const refuse = (name: string): never => {
@@ -374,14 +502,58 @@ export interface Snapshot {
   events: Array<{ eventId: string; result: string }>;
   reservation: Record<string, Scalar> | null;
   counts: Record<string, number>;
+  /** A compile op: the reservations of the job's documents (reversal and recharge columns), by document id. */
+  compiled?: Array<Record<string, Scalar>>;
 }
 export type ActualSnapshot = Snapshot & { invariants: Record<string, number | null> };
 
 export class LedgerOracle {
   private s: State = {
     acct: null, events: new Map(), ledger: [], pending: new Map(), intents: new Map(),
-    consumptions: new Map(), rejections: new Set(), reservations: new Map(),
+    consumptions: new Map(), rejections: new Set(), reservations: new Map(), usedDocs: new Set(),
   };
+
+  /**
+   * `v3`: every settlement goes to `settle_foundation_compute_v3` and a compile moves no credit (the
+   * ledger before the page meter). `v4`: a finished or failed read goes to `settle_foundation_compute_v4`
+   * and the compile-job triggers run (20261117120000); a release stays on v3, as the route sends it.
+   */
+  constructor(readonly meter: Meter = "v3") {}
+
+  /** The same state under another settlement regime: the shadow compares both from one starting point. */
+  fork(meter: Meter = this.meter): LedgerOracle {
+    const o = new LedgerOracle(meter);
+    o.s = structuredClone(this.s);
+    return o;
+  }
+
+  /** Documents whose read a failed compile refunded and nothing has charged again (the OC-3 candidates). */
+  refundedDocs(): string[] {
+    return [...this.s.reservations.entries()].filter(([, r]) => r.reversed != null && r.recharged == null).map(([doc]) => doc);
+  }
+
+  /** The OC-3 candidates that carry a source digest, with it: the generator reads their bytes again. */
+  refundedSources(): Array<[doc: string, src: string]> {
+    return [...this.s.reservations.entries()].flatMap(([doc, r]) => (r.reversed != null && r.recharged == null && r.src ? [[doc, r.src] as [string, string]] : []));
+  }
+
+  /**
+   * Measurement only: how many refunded reads a `ready` op would meet whose source also has another
+   * read in play -- a live paid read of the same bytes, or a second refunded twin in the same job.
+   * These are the interleavings where a re-charge can pay for one source twice.
+   */
+  twinRecharges(op: Op): number {
+    if (op.k !== "compile" || op.state !== "ready") return 0;
+    const docs = new Set(op.docs);
+    const all = [...this.s.reservations.entries()];
+    return [...docs].filter((doc) => {
+      const r = this.s.reservations.get(doc);
+      if (!r || r.reversed == null || r.recharged != null || !r.src) return false;
+      const src = r.src;
+      return all.some(([d, p]) => d !== doc && p.src === src
+        && (((p.settled ?? 0) > 0 && isPaidSource(p, src)) || (docs.has(d) && p.reversed != null && p.recharged == null)));
+    }).length;
+  }
 
   /** Applies one op. A refusal rolls the whole call back, exactly like a raised exception in SQL. */
   apply(op: Op): Outcome {
@@ -394,6 +566,7 @@ export class LedgerOracle {
         case "settle": return { ok: this.settle(op) };
         case "expire": return { ok: this.expire(op) };
         case "clear_hold": return { ok: this.clearHold() };
+        case "compile": return { ok: this.compile(op) };
       }
     } catch (e) {
       if (!(e instanceof Refusal)) throw e;
@@ -590,6 +763,7 @@ export class LedgerOracle {
 
   // settle_foundation_compute_v3, billing_source = 'paid'
   private settle(op: SettleOp): Rec {
+    if (this.meter === "v4" && op.outcome !== "released") return this.settleMetered(op);
     const s = this.s;
     if (
       !["settled", "operator_review", "released"].includes(op.outcome) || op.actual < 0 || op.actual > 60000 ||
@@ -614,6 +788,92 @@ export class LedgerOracle {
     r.settled = op.actual;
     r.reason = op.reason;
     return { status: "processed", state: op.outcome, settledCredits: op.actual, releasedCredits: released, overageCredits: over, billingSource: "paid" };
+  }
+
+  // settle_foundation_compute_v4 (20261117120000), billing_source = 'paid'
+  private settleMetered(op: SettleOp): Rec {
+    const s = this.s;
+    const pages = op.pages ?? null;
+    const complex = op.complex ?? null;
+    const src = op.src ?? null;
+    if (
+      !["settled", "operator_review"].includes(op.outcome) || !/^[A-Z0-9_]{3,80}$/.test(op.reason) ||
+      (pages !== null && (pages < 1 || pages > 10000)) ||
+      (complex !== null && (pages === null || complex < 0 || complex > pages)) ||
+      (src !== null && !/^sha256:[a-f0-9]{64}$/.test(src))
+    ) refuse("foundation_compute_settlement_invalid");
+    if (op.outcome === "settled" && pages === null) refuse("foundation_compute_page_count_required");
+    const r = s.reservations.get(op.doc) ?? refuse("foundation_compute_reservation_not_found");
+    if (r.state !== "reserved") {
+      if (r.state === op.outcome && r.basis != null && (r.pages ?? null) === pages && (r.complex ?? null) === complex && (r.src ?? null) === src) {
+        return meteredReceipt("duplicate", r, 0, 0);
+      }
+      if (r.state === "expired") refuse("foundation_compute_settlement_expired");
+      refuse("foundation_compute_settlement_conflict");
+    }
+    const a = s.acct ?? refuse("foundation_billing_account_required");
+    let credits: number;
+    let basis: string;
+    if (op.outcome === "operator_review") {
+      credits = 0;
+      basis = "no_usable_output";
+    } else if (src !== null && [...s.reservations.values()].some((p) => p !== r && isPaidSource(p, src))) {
+      credits = 0;
+      basis = "unchanged_source";
+    } else {
+      const rate = meteredRate(pages as number, complex);
+      credits = Math.min(rate, meteredCap(a, r));
+      basis = credits < rate ? "pages_capped" : "pages";
+    }
+    const released = Math.max(0, r.reserved - credits);
+    const over = Math.max(0, credits - r.reserved);
+    a.balance += released;
+    a.overageUnits += over;
+    a.lifetimeOverage += over;
+    Object.assign(r, { state: op.outcome, settled: credits, reason: op.reason, pages, complex, src, basis });
+    return meteredReceipt("processed", r, released, over);
+  }
+
+  // Compile-job triggers (20261117120000). Under v3 there are none that move a credit.
+  private compile(op: CompileOp): Rec {
+    const s = this.s;
+    const docs = [...new Set(op.docs)];
+    let reversed = 0;
+    let recharged = 0;
+    if (this.meter === "v4" && op.state === "failed") {
+      // reverse_foundation_compute_for_failed_compile
+      for (const doc of docs) {
+        const r = s.reservations.get(doc);
+        if (!r || r.state !== "settled" || !(r.settled as number > 0) || r.reversed != null || r.basis == null || usedByWorld(s, doc, r)) continue;
+        const a = s.acct as Acct;
+        const held = Math.min(r.settled as number, r.reserved);
+        const overBack = Math.min(Math.max(0, (r.settled as number) - r.reserved), a.overageUnits);
+        a.balance += held;
+        a.overageUnits -= overBack;
+        a.lifetimeOverage -= overBack;
+        r.reversed = held + overBack;
+        reversed++;
+      }
+    }
+    if (this.meter === "v4" && op.state === "ready") {
+      // recharge_foundation_compute_for_ready_compile (OC-3), in its cursor order `settled_at, document_id`.
+      // Every op of a replay runs in one transaction, so `settled_at` (now()) is one value and the order is the document id.
+      for (const doc of [...docs].sort()) {
+        const r = s.reservations.get(doc);
+        if (!r || r.reversed == null || r.recharged != null || sourcePaidElsewhere(s, r)) continue;
+        const a = s.acct as Acct;
+        const fromBalance = Math.min(Math.min(r.settled as number, r.reserved), Math.max(0, a.balance));
+        const over = r.reversed - fromBalance;
+        a.balance -= fromBalance;
+        a.overageUnits += over;
+        a.lifetimeOverage += over;
+        r.recharged = r.reversed;
+        r.rechargedBalance = fromBalance;
+        recharged++;
+      }
+    }
+    if (op.state === "ready" || op.state === "review_required") for (const doc of docs) s.usedDocs.add(doc);
+    return { reversed, recharged };
   }
 
   // Fixture: age a held reservation past its lifetime (what the SQL tests do with an UPDATE).
@@ -657,15 +917,231 @@ export class LedgerOracle {
         .map(([eventId, e]) => ({ eventId, result: e.result }))
         .sort((x, y) => (x.eventId < y.eventId ? -1 : 1)),
       reservation: res
-        ? { state: res.state, reserved: res.reserved, maximum: res.max, settled: res.settled, reason: res.reason, source: "paid" }
+        ? {
+          state: res.state, reserved: res.reserved, maximum: res.max, settled: res.settled, reason: res.reason, source: "paid",
+          ...(this.meter === "v4" ? meterColumns(res) : {}),
+        }
         : null,
       counts: {
         events: s.events.size, ledger: s.ledger.length, ledgerSum: s.ledger.reduce((n, r) => n + r.delta, 0),
         reservations: s.reservations.size, consumptions: s.consumptions.size, rejections: s.rejections.size,
         intents: s.intents.size, pending: s.pending.size,
       },
+      ...(op.k === "compile"
+        ? {
+          compiled: [...new Set(op.docs)].filter((d) => s.reservations.has(d)).sort().map((doc) => {
+            const r = s.reservations.get(doc) as Res;
+            return { doc, state: r.state, settled: r.settled, reversed: r.reversed ?? null, recharged: r.recharged ?? null, rechargedBalance: r.rechargedBalance ?? null };
+          }),
+        }
+        : {}),
     };
   }
+
+  /**
+   * One shadow step (WO-D27-4 ladder step 2): `pre` is the state before `op`, `v3` and `v4` are that
+   * state after `op` under each regime. Names the page-meter rule that explains every difference
+   * between them, or says what no rule explains. Anything outside a finished/failed read and a
+   * compile must not differ at all.
+   */
+  static explainShadow(op: Op, pre: LedgerOracle, v3: LedgerOracle, o3: Outcome, v4: LedgerOracle, o4: Outcome): Explained {
+    const no = (detail: string): Explained => ({ rule: null, detail });
+    if (op.k === "compile") return explainCompile(op, pre.s, v3.s, o3, v4.s);
+    if (op.k !== "settle" || op.outcome === "released") {
+      return stateKey(v3.s) === stateKey(v4.s) && canon(o3) === canon(o4)
+        ? { rule: "identical" }
+        : no("an op the page meter does not touch differs between v3 and v4");
+    }
+    const p = pre.s.reservations.get(op.doc);
+    const pages = op.pages ?? null;
+    const complex = op.complex ?? null;
+    const src = op.src ?? null;
+    if (o4.error !== undefined) {
+      if (stateKey(v4.s) !== stateKey(pre.s)) return no("v4 refused the read but moved state");
+      if (o4.error === o3.error) return { rule: "identical" };
+      if (o4.error === "foundation_compute_page_count_required" && op.outcome === "settled" && pages === null) return { rule: "page_count_required" };
+      const factsInvalid = (pages !== null && (pages < 1 || pages > 10000)) ||
+        (complex !== null && (pages === null || complex < 0 || complex > pages)) || (src !== null && !/^sha256:[a-f0-9]{64}$/.test(src));
+      if (o4.error === "foundation_compute_settlement_invalid" && factsInvalid) return { rule: "page_facts_invalid" };
+      if (o4.error === "foundation_compute_settlement_conflict" && o3.ok?.status === "duplicate") return { rule: "idempotent_on_page_facts" };
+      return no(`v4 refused with ${o4.error} where v3 answered ${canon(o3)}`);
+    }
+    const r = o4.ok as Rec;
+    if (r.status === "duplicate") {
+      return stateKey(v4.s) === stateKey(pre.s) && (o3.ok?.status === "duplicate" || o3.error === "foundation_compute_settlement_conflict")
+        ? { rule: "idempotent_on_page_facts" }
+        : no("a v4 duplicate moved state, or v3 neither repeated nor refused it as a conflict");
+    }
+    if (o3.error !== undefined && !["foundation_compute_maximum_charge_exceeded", "foundation_compute_overage_not_enabled"].includes(o3.error)) {
+      return no(`v4 charged a read v3 refuses with ${o3.error}, which the meter does not change`);
+    }
+    if (!p || p.state !== "reserved" || !pre.s.acct) return no("v4 settled a reservation that was not held");
+    const a = pre.s.acct;
+    const credits = r.settledCredits as number;
+    const basis = r.chargeBasis as string;
+    const rate = pages === null ? null : meteredRate(pages, complex);
+    const cap = meteredCap(a, p);
+    const paidSource = src !== null && [...pre.s.reservations.entries()].some(([doc, q]) => doc !== op.doc && isPaidSource(q, src));
+    const rule: ShadowRule | null =
+      op.outcome === "operator_review" ? (basis === "no_usable_output" && credits === 0 ? "no_usable_output" : null)
+        : paidSource ? (basis === "unchanged_source" && credits === 0 ? "unchanged_source" : null)
+          : rate !== null && rate <= cap && basis === "pages" && credits === rate ? "pages_rate"
+            : rate !== null && rate > cap && basis === "pages_capped" && credits === cap ? "pages_capped" : null;
+    if (rule === null) return no(`v4 charged ${credits} as ${basis}; the page-meter rules say otherwise`);
+    const v4a = v4.s.acct as Acct;
+    if (stateKey(v4.s, new Set([op.doc]), true) !== stateKey(pre.s, new Set([op.doc]), true)) return no("v4 settlement changed more than its own read and the account's money");
+    if (v4a.balance - a.balance !== Math.max(0, p.reserved - credits) || v4a.overageUnits - a.overageUnits !== Math.max(0, credits - p.reserved)
+      || v4a.lifetimeOverage - a.lifetimeOverage !== Math.max(0, credits - p.reserved)) {
+      return no("v4 moved the balance or overage by something other than its own charge");
+    }
+    return { rule };
+  }
+}
+
+/** The page-meter rule behind a v3/v4 difference, or `identical` where the meter changes nothing. */
+export type ShadowRule =
+  | "identical" | "pages_rate" | "pages_capped" | "unchanged_source" | "no_usable_output"
+  | "page_count_required" | "page_facts_invalid" | "idempotent_on_page_facts"
+  | "failed_compile_reversal" | "ready_recharge";
+export type Explained = { rule: ShadowRule } | { rule: null; detail: string };
+
+/** Order-free, null-equals-absent rendering, so two states compare by content. */
+function canon(value: unknown): string {
+  return JSON.stringify(value, (_key, x: unknown) => {
+    if (x instanceof Map) return [...x.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    if (x instanceof Set) return [...x].sort();
+    if (x && typeof x === "object" && !Array.isArray(x)) {
+      return Object.fromEntries(Object.entries(x).filter(([, y]) => y !== undefined && y !== null).sort(([a], [b]) => (a < b ? -1 : 1)));
+    }
+    return x;
+  });
+}
+
+/** The whole state, optionally without some reservations and without the account's three money counters. */
+function stateKey(s: State, skipDocs: ReadonlySet<string> = new Set(), skipMoney = false): string {
+  const acct = s.acct && skipMoney ? { ...s.acct, balance: 0, overageUnits: 0, lifetimeOverage: 0 } : s.acct;
+  return canon({ ...s, acct, reservations: new Map([...s.reservations].filter(([doc]) => !skipDocs.has(doc))) });
+}
+
+function explainCompile(op: CompileOp, pre: State, v3: State, o3: Outcome, v4: State): Explained {
+  const no = (detail: string): Explained => ({ rule: null, detail });
+  const docs = new Set(op.docs);
+  if (canon(o3) !== canon({ ok: { reversed: 0, recharged: 0 } }) || stateKey(v3, docs, true) !== stateKey(v4, docs, true)) {
+    return no("a compile moved a credit under v3, or changed more than its own documents' reads under v4");
+  }
+  let rule: ShadowRule = "identical";
+  let balance = 0;
+  let overage = 0;
+  for (const doc of docs) {
+    const p = pre.reservations.get(doc);
+    const r = v4.reservations.get(doc);
+    if (canon(p) === canon(r)) continue;
+    if (!p || !r || canon({ ...r, reversed: p.reversed, recharged: p.recharged, rechargedBalance: p.rechargedBalance }) !== canon(p)) {
+      return no(`compile changed ${doc} beyond its reversal and recharge columns`);
+    }
+    if (op.state === "failed" && p.reversed == null && r.reversed != null && p.state === "settled" && (p.settled ?? 0) > 0
+      && p.basis != null && !usedByWorld(pre, doc, p)) {
+      const held = Math.min(p.settled as number, p.reserved);
+      const back = r.reversed - held;
+      if (back < 0 || back > Math.max(0, (p.settled as number) - p.reserved)) return no(`reversal of ${doc} gave back ${r.reversed}, not what was booked`);
+      balance += held;
+      overage -= back;
+      rule = "failed_compile_reversal";
+    } else if (op.state === "ready" && p.reversed != null && p.recharged == null && r.recharged === p.reversed
+      && r.rechargedBalance != null && r.rechargedBalance >= 0 && r.rechargedBalance <= Math.min(p.settled as number, p.reserved)
+      && !sourcePaidElsewhere(v4, r)) { // rule 2: after the op, no other read of the same bytes is a live paid charge
+      balance -= r.rechargedBalance;
+      overage += r.recharged - r.rechargedBalance;
+      rule = "ready_recharge";
+    } else {
+      return no(`compile ${op.state} changed ${doc} in a way no page-meter rule names`);
+    }
+  }
+  const a3 = v3.acct;
+  const a4 = v4.acct;
+  if ((a3?.balance ?? 0) + balance !== (a4?.balance ?? 0) || (a3?.overageUnits ?? 0) + overage !== (a4?.overageUnits ?? 0)
+    || (a3?.lifetimeOverage ?? 0) + overage !== (a4?.lifetimeOverage ?? 0)) {
+    return no("the account moved by something other than the compile's reversals and recharges");
+  }
+  return { rule };
+}
+
+/**
+ * Ladder step 2 over a whole stream: v4 runs it; before every op a v3 twin is forked from the same
+ * state and given the same op. Returns how often each rule explained a difference, and every op
+ * whose difference no rule explains (a non-empty list blocks the meter).
+ */
+export function shadowCompare(ops: readonly Op[]): { rules: Partial<Record<ShadowRule, number>>; unexplained: Array<{ index: number; op: Op; detail: string }> } {
+  const v4 = new LedgerOracle("v4");
+  const rules: Partial<Record<ShadowRule, number>> = {};
+  const unexplained: Array<{ index: number; op: Op; detail: string }> = [];
+  ops.forEach((op, index) => {
+    const pre = v4.fork();
+    const v3 = v4.fork("v3");
+    const o3 = v3.apply(op);
+    const o4 = v4.apply(op);
+    const why = LedgerOracle.explainShadow(op, pre, v3, o3, v4, o4);
+    if (why.rule === null) unexplained.push({ index, op, detail: why.detail });
+    else rules[why.rule] = (rules[why.rule] ?? 0) + 1;
+  });
+  return { rules, unexplained };
+}
+
+/**
+ * Rule 2 -- a workspace pays for a source once -- kept by the replay's own books, never by the
+ * oracle's or the SQL's recharge rule. It reads only the ops it was given and the rows they produced:
+ * a v4 settlement names a document's source and whether it charged; a compile op reports each of its
+ * documents' state, charge, refund and re-charge. A document is a live paid charge while it is
+ * settled above 0 and either never refunded or charged again. Two live paid charges for one source,
+ * after any op, is a double charge, whichever rule made it.
+ */
+export class SourceChargeBook {
+  private readonly src = new Map<string, string>();
+  private readonly live = new Map<string, boolean>();
+
+  /** Feeds one op and what it produced; returns every source that now carries more than one live paid charge. */
+  observe(op: Op, outcome: Outcome, snapshot: Pick<Snapshot, "compiled">): string[] {
+    const ok = outcome.ok;
+    if (op.k === "settle" && ok?.status === "processed" && ok.chargeBasis != null && op.src) {
+      this.src.set(op.doc, op.src);
+      this.live.set(op.doc, ok.state === "settled" && (ok.settledCredits as number) > 0);
+    }
+    if (op.k === "compile") {
+      for (const row of snapshot.compiled ?? []) {
+        const doc = row.doc as string;
+        if (!this.src.has(doc)) continue;
+        this.live.set(doc, row.state === "settled" && (row.settled as number) > 0 && (row.reversed == null || row.recharged != null));
+      }
+    }
+    const perSource = new Map<string, string[]>();
+    for (const [doc, isLive] of this.live) {
+      if (!isLive) continue;
+      const src = this.src.get(doc) as string;
+      perSource.set(src, [...(perSource.get(src) ?? []), doc]);
+    }
+    return [...perSource].filter(([, docs]) => docs.length > 1)
+      .map(([src, docs]) => `source ${src} carries ${docs.length} live paid charges (${docs.sort().join(", ")})`);
+  }
+}
+
+/** Measurement: the `ready` compiles in a metered stream that meet a refunded read with a twin in play (see `twinRecharges`). */
+export function countTwinInterleavings(ops: readonly Op[]): number {
+  const o = new LedgerOracle("v4");
+  let n = 0;
+  for (const op of ops) {
+    if (o.twinRecharges(op) > 0) n++;
+    o.apply(op);
+  }
+  return n;
+}
+
+/** The page-meter columns of one reservation as the database snapshot reports them. */
+function meterColumns(r: Res): Record<string, Scalar> {
+  return {
+    pages: r.pages ?? null, complex: r.complex ?? null, src: r.src ?? null, basis: r.basis ?? null,
+    matched: r.basis === "unchanged_source", reversed: r.reversed ?? null, recharged: r.recharged ?? null,
+    rechargedBalance: r.rechargedBalance ?? null,
+  };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -799,7 +1275,7 @@ begin
 exception when others then
   return jsonb_build_object('error', sqlerrm, 'state', sqlstate);
 end $f$;
-create function pg_temp.snap(p_txn text, p_evt text, p_doc uuid) returns jsonb language sql as $f$
+create function pg_temp.snap(p_txn text, p_evt text, p_doc uuid, p_docs text[]) returns jsonb language sql as $f$
 select jsonb_build_object(
   'account', (select jsonb_build_object(
       'balance', credit_balance, 'hold', billing_hold, 'overageEnabled', overage_enabled,
@@ -817,9 +1293,18 @@ select jsonb_build_object(
   'events', coalesce((select jsonb_agg(jsonb_build_object('eventId', event_id, 'result', processing_result) order by event_id collate "C")
     from public.foundation_billing_events
     where event_id = p_evt or (p_txn is not null and transaction_id = p_txn)), '[]'::jsonb),
-  'reservation', (select jsonb_build_object('state', state::text, 'reserved', reserved_credits,
-      'maximum', maximum_credits, 'settled', settled_credits, 'reason', reason_code, 'source', billing_source)
-    from public.foundation_compute_reservations where document_id = p_doc),
+  'reservation', (select jsonb_build_object('state', r.state::text, 'reserved', r.reserved_credits,
+      'maximum', r.maximum_credits, 'settled', r.settled_credits, 'reason', r.reason_code, 'source', r.billing_source,
+      'pages', r.metered_pages, 'complex', r.metered_complex_pages, 'src', r.metered_source_sha256, 'basis', r.charge_basis,
+      'matched', r.charge_basis_reservation_id is not null and exists (select 1 from public.foundation_compute_reservations m
+        where m.reservation_id = r.charge_basis_reservation_id and m.workspace_key = r.workspace_key
+          and m.metered_source_sha256 = r.metered_source_sha256),
+      'reversed', r.reversed_credits, 'recharged', r.recharged_credits, 'rechargedBalance', r.recharged_balance_credits)
+    from public.foundation_compute_reservations r where r.document_id = p_doc),
+  'compiled', coalesce((select jsonb_agg(jsonb_build_object('doc', document_id::text, 'state', state::text, 'settled', settled_credits,
+      'reversed', reversed_credits, 'recharged', recharged_credits, 'rechargedBalance', recharged_balance_credits)
+      order by document_id::text collate "C")
+    from public.foundation_compute_reservations where document_id::text = any (p_docs)), '[]'::jsonb),
   'counts', jsonb_build_object(
     'events', (select count(*) from public.foundation_billing_events),
     'ledger', (select count(*) from public.foundation_credit_ledger),
@@ -839,15 +1324,34 @@ select jsonb_build_object(
     'lifetimeReversed', (select lifetime_credits_reversed from public.foundation_billing_accounts where workspace_key = ${lit(REPLAY_WORKSPACE)}),
     'ledgerSum', (select coalesce(sum(credit_delta), 0) from public.foundation_credit_ledger),
     'liveHolds', (select coalesce(sum(reserved_credits), 0) from public.foundation_compute_reservations where state = 'reserved'),
-    'charged', (select coalesce(sum(least(reserved_credits, settled_credits)), 0)
+    'charged', (select coalesce(sum(least(reserved_credits, settled_credits)
+        - case when reversed_at is null then 0 else least(reserved_credits, settled_credits) end
+        + coalesce(recharged_balance_credits, 0)), 0)
       from public.foundation_compute_reservations where state in ('settled', 'operator_review')),
-    'overageCharged', (select coalesce(sum(greatest(0, settled_credits - reserved_credits)), 0)
+    'overageCharged', (select coalesce(sum(greatest(0, settled_credits - reserved_credits)
+        - case when reversed_at is null then 0 else reversed_credits - least(reserved_credits, settled_credits) end
+        + coalesce(recharged_credits - recharged_balance_credits, 0)), 0)
       from public.foundation_compute_reservations where state in ('settled', 'operator_review'))))
 $f$;
+create function pg_temp.compile(p_job text, p_docs text[], p_state text) returns jsonb language plpgsql as $f$
+begin
+  insert into public.foundation_compile_jobs (job_id, workspace_key, created_by_user_id, document_ids,
+    idempotency_key, state, documents_total)
+  values (p_job, ${lit(REPLAY_WORKSPACE)}, ${lit(REPLAY_USER)}::uuid, p_docs, p_job, 'structuring', cardinality(p_docs));
+  update public.foundation_compile_jobs
+     set state = p_state::public.foundation_compile_state,
+         collection_id = case when p_state = 'ready' then 'collection-' || substr(p_job, 6) end,
+         settled_at = case when p_state in ('ready', 'failed', 'cancelled') then now() end,
+         error_code = case when p_state = 'failed' then 'JSON_TOO_LARGE' end
+   where job_id = p_job;
+  return jsonb_build_object(
+    'reversed', (select count(*) from public.foundation_compute_reservations where reversal_compile_job_id = p_job),
+    'recharged', (select count(*) from public.foundation_compute_reservations where recharge_compile_job_id = p_job));
+end $f$;
 `;
 
 /** The statement the real database gets for an op. Every call is one RPC, as the route sends it. */
-export function opSql(op: Op): string {
+export function opSql(op: Op, meter: Meter = "v3"): string {
   switch (op.k) {
     case "intent":
       return `select to_jsonb(public.issue_foundation_checkout_intent(${lit(op.nonce)}::uuid, ${lit(REPLAY_WORKSPACE)}, ${lit(REPLAY_USER)}::uuid, ${lit(op.offer)}, ${lit(POLICY)}, ${lit(op.price)}, ${op.credit}, now()))`;
@@ -869,9 +1373,15 @@ export function opSql(op: Op): string {
     case "reserve":
       return `select to_jsonb(public.reserve_foundation_compute_v3(${lit(REPLAY_WORKSPACE)}, ${lit(op.doc)}::uuid, ${lit(REPLAY_USER)}::uuid, ${op.reserved}, ${op.max}))`;
     case "settle":
+      // The route's compatibility contract: a finished or failed read carrying page facts goes to v4; a release stays on v3.
+      if (meter === "v4" && op.outcome !== "released") {
+        return `select to_jsonb(public.settle_foundation_compute_v4(${lit(REPLAY_WORKSPACE)}, ${lit(op.doc)}::uuid, ${lit(op.outcome)}, ${lit(op.pages ?? null)}::integer, ${lit(op.complex ?? null)}::integer, ${lit(op.src ?? null)}, ${lit(op.reason)}))`;
+      }
       return `select to_jsonb(public.settle_foundation_compute_v3(${lit(REPLAY_WORKSPACE)}, ${lit(op.doc)}::uuid, ${lit(op.outcome)}, ${op.actual}, ${lit(op.reason)}))`;
     case "clear_hold":
       return `with u as (update public.foundation_billing_accounts set billing_hold = false where workspace_key = ${lit(REPLAY_WORKSPACE)} returning 1) select jsonb_build_object('updated', count(*)) from u`;
+    case "compile":
+      return `select pg_temp.compile(${lit(op.job)}, array[${op.docs.map(lit).join(", ")}]::text[], ${lit(op.state)})`;
     case "expire":
       return `with u as (update public.foundation_compute_reservations set created_at = clock_timestamp() - interval '20 minutes', expires_at = clock_timestamp() - interval '10 minutes' where document_id = ${lit(op.doc)}::uuid and state = 'reserved' returning 1) select jsonb_build_object('updated', count(*)) from u`;
   }
@@ -888,7 +1398,7 @@ export async function assertEmptyLedgerDatabase(session: PsqlSession): Promise<v
   const tables = [
     "foundation_billing_accounts", "foundation_billing_events", "foundation_credit_ledger", "foundation_compute_reservations",
     "foundation_checkout_intents", "foundation_checkout_binding_consumptions", "foundation_billing_event_rejections",
-    "foundation_pending_reversals",
+    "foundation_pending_reversals", "foundation_compile_jobs",
   ];
   const lines = await session.query(
     `select to_jsonb(x) from (select ${tables.map((t) => `(select count(*) from public.${t}) as ${t}`).join(", ")}) x;`,
@@ -908,10 +1418,11 @@ export interface Mismatch {
 }
 
 /** One seed inside begin ... rollback. Returns the first mismatch, or null when oracle and database agree throughout. */
-export async function replayOps(session: PsqlSession, seed: number, ops: readonly Op[]): Promise<Mismatch | null> {
+export async function replayOps(session: PsqlSession, seed: number, ops: readonly Op[], meter: Meter = "v3"): Promise<Mismatch | null> {
   await session.query(SETUP_SQL);
   try {
-    const oracle = new LedgerOracle();
+    const oracle = new LedgerOracle(meter);
+    const book = new SourceChargeBook();
     for (let index = 0; index < ops.length; index++) {
       const op = ops[index];
       const expectedOutcome = oracle.apply(op);
@@ -919,8 +1430,9 @@ export async function replayOps(session: PsqlSession, seed: number, ops: readonl
       const txn = op.k === "event" ? op.txn : null;
       const evt = op.k === "event" ? op.eventId : null;
       const doc = op.k === "reserve" || op.k === "settle" || op.k === "expire" ? op.doc : null;
+      const docs = op.k === "compile" ? `array[${op.docs.map(lit).join(", ")}]::text[]` : "null::text[]";
       const lines = await session.query(
-        `select pg_temp.try($q$${opSql(op)}$q$)::text;\nselect pg_temp.snap(${lit(txn)}, ${lit(evt)}, ${doc ? `${lit(doc)}::uuid` : "null::uuid"})::text;`,
+        `select pg_temp.try($q$${opSql(op, meter)}$q$)::text;\nselect pg_temp.snap(${lit(txn)}, ${lit(evt)}, ${doc ? `${lit(doc)}::uuid` : "null::uuid"}, ${docs})::text;`,
       );
       const actualOutcome = parseOutcome(lines[0]);
       const actualSnapshot = JSON.parse(lines[1]) as ActualSnapshot;
@@ -928,6 +1440,7 @@ export async function replayOps(session: PsqlSession, seed: number, ops: readonl
         ...diffOutcome(expectedOutcome, actualOutcome),
         ...diffValues(expectedSnapshot, actualSnapshot),
         ...checkInvariants(actualSnapshot.invariants).map((p) => `invariant: ${p}`),
+        ...book.observe(op, actualOutcome, actualSnapshot).map((p) => `invariant (rule 2, the replay's own books): ${p}`),
       ];
       if (problems.length) {
         return { seed, index, op, problems, expected: { outcome: expectedOutcome, snapshot: expectedSnapshot }, actual: { outcome: actualOutcome, snapshot: actualSnapshot } };
@@ -943,12 +1456,12 @@ export async function replayOps(session: PsqlSession, seed: number, ops: readonl
  * Shortest failing prefix, then (for short prefixes) a single backward pass dropping every op the
  * failure does not need. Ops are self-contained, so any subsequence is a valid stream.
  */
-export async function shrinkFailure(session: PsqlSession, seed: number, ops: readonly Op[], failure: Mismatch): Promise<Op[]> {
+export async function shrinkFailure(session: PsqlSession, seed: number, ops: readonly Op[], failure: Mismatch, meter: Meter = "v3"): Promise<Op[]> {
   let kept = ops.slice(0, failure.index + 1);
   if (kept.length > 150) return kept;
   for (let i = kept.length - 2; i >= 0; i--) {
     const candidate = kept.filter((_, j) => j !== i);
-    if (await replayOps(session, seed, candidate)) kept = candidate;
+    if (await replayOps(session, seed, candidate, meter)) kept = candidate;
   }
   return kept;
 }
