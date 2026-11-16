@@ -16,6 +16,7 @@ import {
   operationalSliAlertWindow,
   operationalSliBreachId,
   persistOperationalSliAlert,
+  readLatestWatchCode,
 } from "./operational-sli-alert-store";
 import { operationsAlertCounters, resetOperationsAlertDelivery } from "./operations-p0";
 
@@ -29,6 +30,37 @@ const evaluation: OperationalSli = {
   modelProviders: [{ provider: "runpod", status: "closed", correlatedFailures: 0 }],
   alerts: [{ severity: "warning", reason: "required_check_failed" }],
 };
+
+describe("readLatestWatchCode", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    adminConfig.mockReturnValue({ url: "https://example.supabase.co", serviceRoleKey: "x".repeat(48) });
+  });
+  const rows = (value: unknown) => adminRequest.mockResolvedValue(new Response(JSON.stringify(value), { status: 200 }));
+
+  it("returns the newest recorded code for the check, skipping evaluations that carry no watch", async () => {
+    rows([
+      { watch: null },
+      { watch: [{ check: "release_row_expiry", code: "RELEASE_ROW_CURRENT" }] },
+      { watch: [{ check: "runpod_daily_cost", code: "RUNPOD_BUDGET_TIER_80" }] },
+      { watch: [{ check: "runpod_daily_cost", code: "RUNPOD_BUDGET_TIER_50" }] },
+    ]);
+    expect(await readLatestWatchCode("runpod_daily_cost", "2026-11-04T00:00:00.000Z", "2026-11-04T09:00:00.000Z"))
+      .toEqual({ ok: true, code: "RUNPOD_BUDGET_TIER_80" });
+    expect(decodeURIComponent(String(adminRequest.mock.calls[0]![1]))).toContain("window_started_at.lt.2026-11-04T09:00:00.000Z");
+  });
+
+  it("says null for no recorded code, and unreadable for a failing store, never null", async () => {
+    rows([]);
+    expect(await readLatestWatchCode("runpod_daily_cost", "2026-11-04T00:00:00.000Z")).toEqual({ ok: true, code: null });
+    adminRequest.mockResolvedValue(new Response("no", { status: 500 }));
+    expect(await readLatestWatchCode("runpod_daily_cost", "2026-11-04T00:00:00.000Z")).toEqual({ ok: false });
+    adminRequest.mockRejectedValue(new Error("network"));
+    expect(await readLatestWatchCode("runpod_daily_cost", "2026-11-04T00:00:00.000Z")).toEqual({ ok: false });
+    adminConfig.mockReturnValue(null);
+    expect(await readLatestWatchCode("runpod_daily_cost", "2026-11-04T00:00:00.000Z")).toEqual({ ok: false });
+  });
+});
 
 describe("scheduled operational SLI persistence", () => {
   beforeEach(() => {
@@ -97,6 +129,11 @@ describe("operational SLI breach delivery", () => {
   function loggedText() {
     return logged.mock.calls.map((call) => call.join(" ")).join("\n");
   }
+
+  it("holds a queue-wait p95 warning to the hourly slot like the backlog age warning (WO-D24-2)", async () => {
+    const warning = { ...evaluation, state: "degraded" as const, alerts: [{ severity: "warning" as const, reason: "compile_queue_wait_p95_exceeded" as const }] };
+    expect(await deliverOperationalSliBreach(warning, new Date(slot.getTime() + 5 * 60_000), now)).toEqual({ breachId: null, code: "ALERT_HELD_FOR_HOURLY_SLOT" });
+  });
 
   it("pages a backlog-only warning from the hourly slot alone; critical backlog and mixed slots page every slot (GA gap 4)", async () => {
     const post = vi.fn(async (_url: string, _init: RequestInit) => new Response("ok", { status: 200 }));
