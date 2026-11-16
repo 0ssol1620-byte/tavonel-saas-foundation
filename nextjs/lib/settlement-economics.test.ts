@@ -95,4 +95,23 @@ describe("buildUnitEconomicsInput", () => {
     q.providerCosts.storageUsd = { contract: { ...contract(1, "x"), state: "observed" } };
     expect(() => buildUnitEconomicsInput(q)).toThrow(TypeError);
   });
+
+  it("refuses a delta window that does not parse", () => {
+    const q = params();
+    q.processor.delta = { ...cleanDelta, window: { ledgerSince: "garbage", processorUpdatedAfter: "garbage", truncated: false } };
+    expect(buildUnitEconomicsInput(q)).toMatchObject({ status: "refused", code: "PROCESSOR_DELTA_NOT_CLEAN" });
+  });
+
+  it("throws on a settled unit it cannot trust, never drops or double counts it", () => {
+    const base = params().ledger.settledUnits;
+    const bad = (u: Array<(typeof base)[number]>) => () => {
+      const q = params();
+      q.ledger.settledUnits = [...base, ...u];
+      return buildUnitEconomicsInput(q);
+    };
+    expect(bad([{ workspaceId: "w3", unitId: "u9", pages: 500, settledAt: "not-a-date" }])).toThrow(TypeError);
+    expect(bad([base[0]])).toThrow(TypeError);
+    expect(bad([{ workspaceId: "w3", unitId: "u9", pages: -30, settledAt: "2026-11-09T00:00:00Z" }])).toThrow(TypeError);
+    expect(bad([{ workspaceId: "w3", unitId: "u9", pages: 1.5, settledAt: "2026-11-09T00:00:00Z" }])).toThrow(TypeError);
+  });
 });

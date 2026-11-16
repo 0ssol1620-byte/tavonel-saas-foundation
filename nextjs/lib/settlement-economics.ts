@@ -74,8 +74,17 @@ export function buildUnitEconomicsInput(p: SettlementEconomicsParams): Settlemen
   if (!delta.window || delta.window.truncated || dirty.length > 0) {
     return refuse("PROCESSOR_DELTA_NOT_CLEAN", delta.window?.truncated ? "processor/ledger read was truncated" : `processor and ledger disagree: ${dirty.join(", ") || "no window"}`);
   }
-  if (Date.parse(delta.window.ledgerSince) > from || Date.parse(delta.window.processorUpdatedAfter) > from) {
+  if (!(Date.parse(delta.window.ledgerSince) <= from) || !(Date.parse(delta.window.processorUpdatedAfter) <= from)) {
     return refuse("PROCESSOR_DELTA_NOT_CLEAN", "the delta window does not cover the period");
+  }
+
+  // a row it cannot trust is a TypeError, never a skip or a double count
+  const seen = new Set<string>();
+  for (const u of p.ledger.settledUnits) {
+    if (!Number.isFinite(Date.parse(u.settledAt))) throw new TypeError(`settledUnits ${u.unitId}: settledAt does not parse`);
+    if (!Number.isInteger(u.pages) || u.pages < 0) throw new TypeError(`settledUnits ${u.unitId}: pages must be an integer >= 0`);
+    if (seen.has(u.unitId)) throw new TypeError(`settledUnits ${u.unitId}: listed twice`);
+    seen.add(u.unitId);
   }
 
   const units = p.ledger.settledUnits.filter((u) => Date.parse(u.settledAt) >= from && Date.parse(u.settledAt) < to);
