@@ -12,8 +12,9 @@
 -- is `proposal_idempotency_conflict`, never an overwrite. A per-key advisory lock makes the
 -- check-then-insert race-free; decide and record lock the row.
 --
--- A rejection is honoured whatever the World did since: it executes nothing. Only a confirmation
--- is held to the digest.
+-- Order of verdicts: expired, then digest mismatch -> stale (a confirmation or a rejection made after
+-- the active World moved is stale, never executed), then reject, then confirm.
+-- Undo keeps the execution receipt: receipt = {executed, undone}.
 --
 -- Client access: none (RLS on, restrictive deny-all policy, no grants). service_role executes the
 -- four functions; the browser reaches them through session-only routes.
@@ -42,7 +43,7 @@ create table public.world_change_proposals (
   created_at timestamptz not null default clock_timestamp(),
   decided_at timestamptz,
   decided_by uuid,
-  receipt jsonb check (receipt is null or (jsonb_typeof(receipt) = 'object' and pg_catalog.octet_length(receipt::text) <= 8192)),
+  receipt jsonb check (receipt is null or (jsonb_typeof(receipt) = 'object' and pg_catalog.octet_length(receipt::text) <= 20000)),
   unique (workspace_key, idempotency_key),
   check ((state = 'proposed') = (decided_at is null)),
   check (decided_by is null or decided_at is not null),
@@ -129,8 +130,8 @@ begin
 
   v_state := case
     when p_now >= v_row.expires_at then 'expired'
-    when p_decision = 'reject' then 'rejected'
     when p_current_manifest_digest <> v_row.expected_manifest_digest then 'stale'
+    when p_decision = 'reject' then 'rejected'
     else 'confirmed'
   end;
   update public.world_change_proposals
@@ -163,7 +164,10 @@ begin
     raise exception 'proposal_transition_illegal';
   end if;
 
-  update public.world_change_proposals set state = p_outcome, receipt = p_receipt
+  update public.world_change_proposals set state = p_outcome,
+    receipt = case when p_outcome = 'undone'
+      then pg_catalog.jsonb_build_object('executed', v_row.receipt, 'undone', p_receipt)
+      else p_receipt end
     where proposal_id = p_proposal_id
     returning * into v_row;
   return pg_catalog.to_jsonb(v_row);

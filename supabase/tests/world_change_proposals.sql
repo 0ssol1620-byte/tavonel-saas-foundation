@@ -2,13 +2,13 @@
 --
 -- What it proves: the same idempotency key and digest replays the same row; the same key with
 -- another digest raises; a decision is made once (a second decide is refused); a decision past
--- expires_at turns the row expired; a confirmation against a moved World is stale and a
--- rejection is not; outcomes move only confirmed -> executed|failed and executed -> undone; an id
+-- expires_at turns the row expired; a confirmation or rejection against a moved World is stale;
+-- a rejection against the same World is rejected; undo keeps the execution receipt; outcomes move only confirmed -> executed|failed and executed -> undone; an id
 -- of another workspace is not found; anon and authenticated can neither select nor execute.
 --
 -- Not provable here: the per-key advisory lock against a concurrent session (one transaction).
 begin;
-select plan(24);
+select plan(26);
 
 create temp table keep (k text primary key, v jsonb);
 grant all on keep to service_role;
@@ -69,6 +69,10 @@ select throws_ok($$select public.record_world_change_proposal_outcome('pilot-a1a
   'failed', '{}')$$, 'P0001', 'proposal_transition_illegal', 'executed cannot become failed');
 select is((public.record_world_change_proposal_outcome('pilot-a1a1', (select (v->'proposal'->>'proposal_id')::uuid from keep where k = 'first'),
   'undone', '{"ok":true}'))->>'state', 'undone', 'executed moves to undone');
+select is((select (e->'receipt'->'executed'->>'ok') || (e->'receipt'->'undone'->>'ok')
+  from jsonb_array_elements(public.list_world_change_proposals('pilot-a1a1', 'collection-' || repeat('a', 32), 50)) e
+  where e->>'proposal_id' = (select v->'proposal'->>'proposal_id' from keep where k = 'first')), 'truetrue',
+  'undo keeps the execution receipt beside the undo receipt');
 select throws_ok($$select public.record_world_change_proposal_outcome('pilot-a1a1', (select (v->'proposal'->>'proposal_id')::uuid from keep where k = 'first'),
   'undone', '{}')$$, 'P0001', 'proposal_transition_illegal', 'undone is final');
 
@@ -91,12 +95,19 @@ insert into keep select 'rej', public.create_world_change_proposal('pilot-a1a1',
   '{"labelKey":"letter"}', 'sha256:' || repeat('5', 64), '{}', 'sha256:' || repeat('d', 64), 1, 'session',
   'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', 'key-reject01', now() + interval '1 day');
 select is((public.decide_world_change_proposal('pilot-a1a1', (select (v->'proposal'->>'proposal_id')::uuid from keep where k = 'rej'),
-  'reject', 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', 'sha256:' || repeat('e', 64), now()))->>'state', 'rejected',
-  'a rejection stands whatever the World did');
+  'reject', 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', 'sha256:' || repeat('e', 64), now()))->>'state', 'stale',
+  'a rejection after the World moved is stale');
+
+insert into keep select 'rej2', public.create_world_change_proposal('pilot-a1a1', 'collection-' || repeat('a', 32), 'library_label',
+  '{"labelKey":"memo"}', 'sha256:' || repeat('6', 64), '{}', 'sha256:' || repeat('d', 64), 1, 'session',
+  'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', 'key-reject02', now() + interval '1 day');
+select is((public.decide_world_change_proposal('pilot-a1a1', (select (v->'proposal'->>'proposal_id')::uuid from keep where k = 'rej2'),
+  'reject', 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', 'sha256:' || repeat('d', 64), now()))->>'state', 'rejected',
+  'a rejection against the same World is rejected');
 
 -- List: newest first, scoped to the workspace and collection.
-select is(jsonb_array_length(public.list_world_change_proposals('pilot-a1a1', 'collection-' || repeat('a', 32), 50)), 4,
-  'the list holds this collection''s four proposals');
+select is(jsonb_array_length(public.list_world_change_proposals('pilot-a1a1', 'collection-' || repeat('a', 32), 50)), 5,
+  'the list holds this collection''s five proposals');
 select is(jsonb_array_length(public.list_world_change_proposals('pilot-b2b2', 'collection-' || repeat('a', 32), 50)), 0,
   'another workspace lists none');
 

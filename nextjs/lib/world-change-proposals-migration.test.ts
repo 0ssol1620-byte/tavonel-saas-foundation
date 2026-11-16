@@ -59,6 +59,12 @@ describe("world change proposals migration", () => {
     expect(code.match(/for update;/g)).toHaveLength(2);
   });
 
+  it("stales before it rejects, and keeps the execution receipt through undo", () => {
+    expect(code.indexOf("then 'stale'")).toBeGreaterThan(-1);
+    expect(code.indexOf("then 'stale'")).toBeLessThan(code.indexOf("then 'rejected'"));
+    expect(code).toContain("jsonb_build_object('executed', v_row.receipt, 'undone', p_receipt)");
+  });
+
   it("replays the same digest and refuses a conflicting one", () => {
     expect(code).toContain("raise exception 'proposal_idempotency_conflict'");
     expect(code).toContain("'replayed', true");
