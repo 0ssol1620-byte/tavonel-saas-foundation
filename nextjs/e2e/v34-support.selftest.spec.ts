@@ -7,7 +7,7 @@
 import { mkdtempSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, webkit, type Page } from "@playwright/test";
 import {
   measureClippedRows,
   measureClippedText,
@@ -209,6 +209,13 @@ test.describe("contrast", () => {
     expect(await controlContrastPass(page)).toHaveLength(1);
   });
 
+  test("control boundary: a transparent border on a transparent control is no boundary; a faint drawn one still fails", async ({ page }) => {
+    await load(page, `<main style="background:#fff;padding:12px"><button style="border:1px solid transparent;background:transparent;width:40px;height:40px">v</button></main>`);
+    expect(await controlContrastPass(page)).toEqual([]);
+    await load(page, `<main style="background:#fff;padding:12px"><button style="border:1px solid #e2e2e2;background:transparent;width:40px;height:40px">v</button></main>`);
+    expect(await controlContrastPass(page)).toHaveLength(1);
+  });
+
   test("details: the content ones are opened, the header menu is not", async ({ page }) => {
     // An open header menu lies over the field: measured with it open, the field reads against the menu.
     const menu = `<header style="position:relative"><details id="menu"><summary>Menu</summary><div style="position:absolute;top:24px;left:0;width:400px;height:40px;background:#0050b4"></div></details></header>`;
@@ -240,6 +247,23 @@ test.describe("keyboard", () => {
     const r = await keyboardWalk(page);
     expect(r.stops).toBe(4);
     expect(r.violations.map(v => v.pass)).toEqual(["focus-visible"]);
+  });
+
+  test("a control in a closed details body is not owed a tab stop", async ({ page }) => {
+    const ring = ".r:focus-visible{outline:2px solid #00e}";
+    const pad = "padding:14px 20px";
+    const body = `<button class="r" style="${pad}">first</button><details><summary class="r" style="${pad}">more</summary><select class="r"><option>a</option></select><input class="r"></details><button class="r" style="${pad}">last</button>`;
+    await load(page, body, ring);
+    expect((await keyboardWalk(page)).violations.filter(v => v.pass === "keyboard-trap")).toEqual([]);
+    // WebKit is where it showed: its Tab order skips summary, so the walk wraps with the body still closed.
+    const browser = await webkit.launch();
+    try {
+      const wk = await browser.newPage();
+      await load(wk, body, ring);
+      expect((await keyboardWalk(wk)).violations.filter(v => v.pass === "keyboard-trap")).toEqual([]);
+    } finally {
+      await browser.close();
+    }
   });
 
   test("escape closes the surface and restores focus", async ({ page }) => {

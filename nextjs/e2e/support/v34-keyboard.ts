@@ -99,6 +99,8 @@ export async function keyboardWalk(page: Page, max = 250): Promise<KeyboardResul
           const xr = x.getBoundingClientRect();
           if ((x as HTMLInputElement).disabled || (x as HTMLInputElement).type === "hidden" || (x as HTMLElement).tabIndex < 0) continue;
           if (xs.display === "none" || xs.visibility === "hidden" || (xr.width === 0 && xr.height === 0) || x.closest("[inert], [hidden]")) continue;
+          // A closed <details> body is not in any engine's Tab order (the contrast pass skips it too); WebKit still gives it boxes.
+          if (x.closest("details:not([open])") && !x.closest("summary")) continue;
           if ((x as HTMLInputElement).type === "radio" && (x as HTMLInputElement).name) {
             // A radio group is one tab stop: any visited member counts.
             const key = (x as HTMLInputElement).name;

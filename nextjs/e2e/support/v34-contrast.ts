@@ -298,9 +298,13 @@ function collectControls(max: number): { index: number; selector: string; border
     if (el.closest("details:not([open])") && !el.closest("summary")) continue;
     const borderPx = parseFloat(s.borderTopWidth);
     if (s.borderTopStyle === "none" || borderPx <= 0) continue;
+    const border = rgba(s.borderTopColor), fill = rgba(s.backgroundColor);
+    // A transparent border on a transparent control draws no boundary, exactly as border: none does. It is
+    // the forced-colours border (the system draws it in the user's colour), so there is nothing here to measure.
+    if (border[3] < 0.05 && fill[3] < 0.05) continue;
     const index = out.length;
     el.setAttribute("data-v34-control-idx", String(index));
-    out.push({ index, selector: `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}${typeof el.className === "string" && el.className ? `.${el.className.trim().split(/\s+/)[0]}` : ""}`, border: rgba(s.borderTopColor), fill: rgba(s.backgroundColor), borderPx });
+    out.push({ index, selector: `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}${typeof el.className === "string" && el.className ? `.${el.className.trim().split(/\s+/)[0]}` : ""}`, border, fill, borderPx });
     if (out.length >= max) break;
   }
   return out;
