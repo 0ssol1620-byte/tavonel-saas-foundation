@@ -290,11 +290,20 @@ const newestFirst = (labels: readonly LibraryInternalLabel[]) =>
   labels.map((label, index) => ({ label, index }))
     .sort((a, b) => (a.label.createdAt === b.label.createdAt ? b.index - a.index : a.label.createdAt < b.label.createdAt ? 1 : -1))
     .map(({ label }) => label);
-/** The newest row per label key of a newest-first list. */
-const latestPerLabel = (newest: readonly LibraryInternalLabel[]) => {
-  const latest = new Map<string, LibraryInternalLabel>();
-  for (const label of newest) if (!latest.has(label.labelKey)) latest.set(label.labelKey, label);
-  return latest;
+/**
+ * A person's decisions on one label kind, folded oldest to newest into what still stands, per label key.
+ * A decision after the opposite one withdraws it (undo): the label is then in no person's hands and the
+ * production proposal speaks for it again. The same decision twice stands. Map order is the order the
+ * standing decisions were last made, so the last confirmed entry is the most recent confirmation.
+ */
+const standingDecisions = (rows: readonly LibraryInternalLabel[]) => {
+  const standing = new Map<string, LibraryInternalLabel>();
+  for (const row of newestFirst(rows.filter((r) => r.disposition === "confirmed" || r.disposition === "rejected")).reverse()) {
+    const held = standing.get(row.labelKey);
+    standing.delete(row.labelKey);
+    if (!held || held.disposition === row.disposition) standing.set(row.labelKey, row);
+  }
+  return standing;
 };
 
 /**
@@ -312,12 +321,12 @@ export function toLibraryDocuments(view: LibraryInternalView, documentIds: reado
     const documentId = raw.toLowerCase();
     const mine = view.labels.filter((label) => label.documentId === documentId);
     const types = mine.filter((label) => label.labelKind === "doc_type");
-    // A person's newest decision per label decides that label. The document has one type: the most recently
-    // confirmed label that is not rejected since. Withdrawing it (undo) falls back to the label confirmed before it,
-    // else to the production proposal, unless the person rejected that proposal too.
-    const decided = latestPerLabel(newestFirst(types.filter((label) => label.disposition === "confirmed" || label.disposition === "rejected")));
-    const confirmedType = [...decided.values()].find((label) => label.disposition === "confirmed" && DOC_TYPE_SET.has(label.labelKey));
-    const rejectedTypes = new Set([...decided].filter(([, label]) => label.disposition === "rejected").map(([key]) => key));
+    // The document has one type: the most recently confirmed label a person has not withdrawn. Withdrawing it (undo)
+    // falls back to the label confirmed before it, else to the production proposal, unless the person rejected that
+    // proposal too.
+    const decided = [...standingDecisions(types).values()];
+    const confirmedType = [...decided].reverse().find((label) => label.disposition === "confirmed" && DOC_TYPE_SET.has(label.labelKey));
+    const rejectedTypes = new Set(decided.filter((label) => label.disposition === "rejected").map((label) => label.labelKey));
     const proposedType = latestRun(types.filter((label) => label.methodVersion === productionDocTypeMethodVersion
       && (label.disposition === "proposed" || label.disposition === "abstained")))[0];
     const documentType: LibraryDocumentType | null = confirmedType ? { label: confirmedType.labelKey as DocType, state: "confirmed" }
@@ -326,8 +335,9 @@ export function toLibraryDocuments(view: LibraryInternalView, documentIds: reado
           ? { label: null, state: "abstained" }
           : { label: proposedType.labelKey as DocType, state: "proposed" };
     const topicRows = mine.filter((label) => label.labelKind === "topic");
-    // For a topic the newest decision per label decides: confirmed shows it, rejected hides it, even from the proposals.
-    const topicDecisions = latestPerLabel(newestFirst(topicRows.filter((row) => row.disposition === "confirmed" || row.disposition === "rejected")));
+    // For a topic the standing decision per label decides: confirmed shows it, rejected hides it, even from the proposals;
+    // a withdrawn one (confirm then undo, reject then undo) leaves the proposal as it was.
+    const topicDecisions = standingDecisions(topicRows);
     const topics = new Map<string, LibraryTopicTag>();
     for (const [key, label] of topicDecisions) if (label.disposition === "confirmed") topics.set(key, { label: key, state: "confirmed" });
     for (const label of latestRun(topicRows.filter((row) => row.disposition === "proposed" || row.disposition === "abstained"))) {

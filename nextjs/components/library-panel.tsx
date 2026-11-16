@@ -53,8 +53,9 @@ function groupOf(document: LibraryDocument): "confirmed" | "proposed" | "unknown
 
 export default function LibraryPanel({ documentIds, names, onAvailability }: Props) {
   const [load, setLoad] = useState<Load>({ state: "loading" });
-  // What this browser session decided, so Undo can offer the opposite; keyed by label.
-  const [decided, setDecided] = useState<Record<string, Decision>>({});
+  // What this browser session decided, so Undo can offer the opposite; keyed by label. The target is kept because a
+  // rejected label leaves the DTO, and its Undo must still be reachable from the document's row.
+  const [decided, setDecided] = useState<Record<string, { target: Target; decision: Decision }>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const idsKey = documentIds.join(",");
@@ -94,7 +95,7 @@ export default function LibraryPanel({ documentIds, names, onAvailability }: Pro
       setDecided((current) => {
         const next = { ...current };
         if (isUndo) delete next[key];
-        else next[key] = decision;
+        else next[key] = { target, decision };
         return next;
       });
       await refresh();
@@ -121,12 +122,12 @@ export default function LibraryPanel({ documentIds, names, onAvailability }: Pro
   const groups = [
     { id: "confirmed" as const, title: "Confirmed", note: "A person confirmed these labels." },
     { id: "proposed" as const, title: "Proposed", note: "The compiler proposed these. Confirm or reject each one." },
-    { id: "unknown" as const, title: "Unknown", note: "No label was proposed for these sources. They are listed, not hidden." },
+    { id: "unknown" as const, title: "Unknown", note: "No label is confirmed or proposed for these sources. They are listed, not hidden." },
   ].map((group) => ({ ...group, documents: load.documents.filter((document) => groupOf(document) === group.id) }));
 
   function controls(target: Target, state: "proposed" | "confirmed", sourceVersionId: string | undefined, label: string) {
     const key = targetKey(target);
-    const last = decided[key];
+    const last = decided[key]?.decision;
     const disabled = busy !== null;
     if (last) {
       return (
@@ -180,6 +181,16 @@ export default function LibraryPanel({ documentIds, names, onAvailability }: Pro
                           {controls({ documentId: document.documentId, labelKind: "topic", labelKey: topic.label }, topic.state, version, `topic ${topic.label}`)}
                         </span>
                       ))}
+                      {/* A label this session rejected is no longer in the DTO; its Undo stays here, on the document. */}
+                      {Object.values(decided)
+                        .filter(({ target, decision }) => decision === "rejected" && target.documentId === document.documentId
+                          && !(target.labelKind === "doc_type" ? type?.label === target.labelKey : document.topics.some((topic) => topic.label === target.labelKey)))
+                        .map(({ target }) => (
+                          <span key={targetKey(target)} className={styles.label}>
+                            <span className={styles.kind}>{target.labelKind === "doc_type" ? "Type" : "Topic"}</span> Rejected {typeName(target.labelKey)}
+                            {controls(target, "confirmed", version, `${target.labelKind === "doc_type" ? "type" : "topic"} ${typeName(target.labelKey)}`)}
+                          </span>
+                        ))}
                     </div>
                     {document.duplicates.length > 0 ? (
                       <ul className={styles.duplicates} aria-label={`Similar sources to ${nameOf(document.documentId)}`}>

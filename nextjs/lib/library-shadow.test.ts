@@ -360,6 +360,31 @@ describe("a person's decisions on the Library", () => {
     expect(toLibraryDocuments(view(proposal("contract"), confirmed, undone), [A])[0]!.documentType).toEqual({ label: "contract", state: "proposed" });
   });
 
+  it("confirming the proposed type and then undoing it returns the document to Proposed, not Unknown", () => {
+    const confirmed = person(A, "doc_type", "contract", "confirmed", "2026-11-08T10:00:00+00:00");
+    const undone = person(A, "doc_type", "contract", "rejected", "2026-11-08T11:00:00+00:00");
+    const again = person(A, "doc_type", "contract", "confirmed", "2026-11-08T12:00:00+00:00");
+    const type = (...labels: unknown[]) => toLibraryDocuments(view(proposal("contract"), ...labels), [A])[0]!.documentType;
+    expect(type(confirmed)).toEqual({ label: "contract", state: "confirmed" });
+    expect(type(confirmed, undone)).toEqual({ label: "contract", state: "proposed" });
+    expect(type(confirmed, undone, again)).toEqual({ label: "contract", state: "confirmed" });
+  });
+
+  it("rejecting the proposed type and then undoing it returns the document to Proposed", () => {
+    const rejected = person(A, "doc_type", "contract", "rejected", "2026-11-08T10:00:00+00:00");
+    const undone = person(A, "doc_type", "contract", "confirmed", "2026-11-08T11:00:00+00:00");
+    const type = (...labels: unknown[]) => toLibraryDocuments(view(proposal("contract"), ...labels), [A])[0]!.documentType;
+    expect(type(rejected)).toEqual({ label: null, state: "abstained" });
+    expect(type(rejected, undone)).toEqual({ label: "contract", state: "proposed" });
+  });
+
+  it("repeating a rejection keeps it standing", () => {
+    const type = (...labels: unknown[]) => toLibraryDocuments(view(proposal("contract"), ...labels), [A])[0]!.documentType;
+    const twice = [person(A, "doc_type", "contract", "rejected", "2026-11-08T10:00:00+00:00"),
+      person(A, "doc_type", "contract", "rejected", "2026-11-08T11:00:00+00:00")];
+    expect(type(...twice)).toEqual({ label: null, state: "abstained" });
+  });
+
   it("rejecting the proposed type itself leaves the document Unknown, never the label the person refused", () => {
     const rejected = person(A, "doc_type", "contract", "rejected", "2026-11-08T10:00:00+00:00");
     expect(toLibraryDocuments(view(proposal("contract"), rejected), [A])[0]!.documentType).toEqual({ label: null, state: "abstained" });
@@ -378,17 +403,31 @@ describe("a person's decisions on the Library", () => {
     expect(toLibraryDocuments(view(older, newer, rejectNewer), [A])[0]!.documentType).toEqual({ label: "invoice", state: "confirmed" });
   });
 
-  it("a later topic rejection hides a confirmed topic and a proposed one; a later confirmation shows it again", () => {
+  it("a topic rejection hides the proposal; confirm then undo is the proposal again; reject then confirm shows it again", () => {
     const confirm = person(A, "topic", "terms", "confirmed", "2026-11-08T10:00:00+00:00");
     const reject = person(A, "topic", "terms", "rejected", "2026-11-08T11:00:00+00:00");
     const again = person(A, "topic", "terms", "confirmed", "2026-11-08T12:00:00+00:00");
     const topics = (...labels: unknown[]) => toLibraryDocuments(view(topic("terms"), ...labels), [A])[0]!.topics;
     expect(topics()).toEqual([{ label: "terms", state: "proposed" }]);
     expect(topics(confirm)).toEqual([{ label: "terms", state: "confirmed" }]);
-    expect(topics(confirm, reject)).toEqual([]);
+    // Confirm then undo is the proposal again, not a rejection; a lone rejection hides it.
+    expect(topics(confirm, reject)).toEqual([{ label: "terms", state: "proposed" }]);
     expect(topics(reject)).toEqual([]);
     expect(topics(reject, confirm, again)).toEqual([{ label: "terms", state: "confirmed" }]);
     expect(topics(again, reject, confirm)).toEqual([{ label: "terms", state: "confirmed" }]);
+  });
+});
+
+describe("a topic decision and its undo", () => {
+  it("confirming the proposed topic and then undoing it returns the topic to Proposed", () => {
+    const confirm = person(A, "topic", "terms", "confirmed", "2026-11-08T10:00:00+00:00");
+    const undo = person(A, "topic", "terms", "rejected", "2026-11-08T11:00:00+00:00");
+    expect(toLibraryDocuments(view(topic("terms"), confirm, undo), [A])[0]!.topics).toEqual([{ label: "terms", state: "proposed" }]);
+  });
+  it("rejecting the proposed topic and then undoing it returns the topic to Proposed", () => {
+    const reject = person(A, "topic", "terms", "rejected", "2026-11-08T10:00:00+00:00");
+    const undo = person(A, "topic", "terms", "confirmed", "2026-11-08T11:00:00+00:00");
+    expect(toLibraryDocuments(view(topic("terms"), reject, undo), [A])[0]!.topics).toEqual([{ label: "terms", state: "proposed" }]);
   });
 });
 
