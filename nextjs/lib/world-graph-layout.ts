@@ -259,3 +259,101 @@ export function connectedEdgeIds(edges: readonly GraphEdge[], nodeId: string | n
   if (!nodeId) return new Set<string>();
   return new Set(edges.filter((edge) => edge.from === nodeId || edge.to === nodeId).map((edge) => edge.id));
 }
+
+/*
+  Level of detail.
+
+  Above the budget a cluster that nobody asked about is drawn as one mark rather than as every
+  member. The Table view never goes through this: it lists every filtered node, so aggregation
+  changes what the picture draws and nothing about what can be read.
+*/
+export const LOD_NODE_BUDGET = 2000;
+
+export type ClusterAggregate = {
+  cluster: number;
+  x: number;
+  y: number;
+  radius: number;
+  memberCount: number;
+  /** Edges with at least one end in this cluster, whether drawn or folded into the mark. */
+  edgeCount: number;
+  types: Record<WorldObjectType, number>;
+};
+
+export function projectLod(
+  filtered: FilteredGraph,
+  layout: GraphLayout,
+  opts: { budget: number; expanded: ReadonlySet<number> },
+): { nodes: GraphNode[]; edges: GraphEdge[]; aggregates: ClusterAggregate[] } {
+  const budget = Math.max(1, opts.budget);
+  if (filtered.nodes.length <= budget) return { nodes: filtered.nodes, edges: filtered.edges, aggregates: [] };
+
+  const members = new Map<number, GraphNode[]>();
+  const clusterOf = new Map<string, number>();
+  for (const node of filtered.nodes) {
+    const g = members.get(node.cluster);
+    if (g) g.push(node);
+    else members.set(node.cluster, [node]);
+    clusterOf.set(node.id, node.cluster);
+  }
+  const order = [...members.keys()].sort((left, right) => left - right);
+  const centre = new Map(order.map((cluster) => {
+    const group = members.get(cluster)!;
+    return [cluster, {
+      x: group.reduce((sum, node) => sum + node.x, 0) / group.length,
+      y: group.reduce((sum, node) => sum + node.y, 0) / group.length,
+    }] as const;
+  }));
+  const edgeCount = new Map<number, number>();
+  const bump = (cluster: number) => edgeCount.set(cluster, (edgeCount.get(cluster) ?? 0) + 1);
+
+  const kept: GraphEdge[] = [];
+  const pairs = new Map<string, { a: number; b: number; refs: Set<string> }>();
+  for (const edge of filtered.edges) {
+    const a = clusterOf.get(edge.from);
+    const b = clusterOf.get(edge.to);
+    if (a === undefined || b === undefined) continue;
+    if (opts.expanded.has(a) && opts.expanded.has(b)) { kept.push(edge); continue; }
+    bump(a);
+    if (a === b) continue;
+    bump(b);
+    const low = Math.min(a, b);
+    const high = Math.max(a, b);
+    const pair = pairs.get(`${low}-${high}`) ?? { a: low, b: high, refs: new Set<string>() };
+    edge.evidenceRefs.forEach((ref) => pair.refs.add(ref));
+    pairs.set(`${low}-${high}`, pair);
+  }
+  const folded = [...pairs.values()]
+    .sort((left, right) => left.a - right.a || left.b - right.b)
+    .map((pair): GraphEdge => {
+      const from = centre.get(pair.a)!;
+      const to = centre.get(pair.b)!;
+      return {
+        id: `agg:${pair.a}-${pair.b}`,
+        predicate: "cluster_link",
+        from: `agg:${pair.a}`,
+        to: `agg:${pair.b}`,
+        evidenceRefs: [...pair.refs].sort(),
+        x1: from.x, y1: from.y, x2: to.x, y2: to.y,
+      };
+    });
+
+  const aggregates = order.filter((cluster) => !opts.expanded.has(cluster)).map((cluster): ClusterAggregate => {
+    const group = members.get(cluster)!;
+    const types = Object.fromEntries(RING_ORDER.map((type) => [type, 0])) as Record<WorldObjectType, number>;
+    group.forEach((node) => { types[node.type] += 1; });
+    return {
+      cluster,
+      ...centre.get(cluster)!,
+      radius: NODE_RADIUS + Math.min(24, Math.ceil(Math.sqrt(group.length)) * 2),
+      memberCount: group.length,
+      edgeCount: edgeCount.get(cluster) ?? 0,
+      types,
+    };
+  });
+  return {
+    nodes: filtered.nodes.filter((node) => opts.expanded.has(node.cluster)),
+    edges: [...kept, ...folded],
+    aggregates,
+  };
+}

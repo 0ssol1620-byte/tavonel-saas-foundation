@@ -89,3 +89,8 @@
   .evidenceCard:hover:not([data-selected="true"]) { box-shadow: inset 0 0 0 1px var(--verified, #9bb8a4); }
   .objectEvidence li > button:hover, .pagePreview > span button:hover { box-shadow: inset 0 0 0 1px var(--verified, #9bb8a4); }
 }
+
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 16px; border-bottom: 1px solid var(--studio-line); color: var(--studio-muted); font: 500 12px var(--f-sans); }
+.filters label { display: inline-flex; align-items: center; gap: 8px; }
+.filters select { min-height: 44px; max-width: 100%; padding: 0 8px; color: var(--studio-ink); background: var(--studio-panel); border: 1px solid var(--studio-line); border-radius: var(--r-inst, 6px); font: inherit; }
+.filters p { flex: 1 1 100%; margin: 0; line-height: 1.5; }
