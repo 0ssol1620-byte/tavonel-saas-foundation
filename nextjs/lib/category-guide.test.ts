@@ -170,6 +170,7 @@ describe("every solution page says where it stops too", () => {
     const sentinels = [
       "declines when nothing matched at all",
       "is the reader’s call",
+      // Pro stays "contact" (CAT-D4): the sentinel is the Solutions page's own sentence for it.
       "rather than bought at a checkout",
       "held for review with the regions that support each side",
       "is an estimate",

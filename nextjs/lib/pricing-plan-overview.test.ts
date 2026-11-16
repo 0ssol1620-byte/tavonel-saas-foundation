@@ -54,7 +54,8 @@ describe("pricing plan overview", () => {
     // SEC-2 / FE-B2 (review 2): plan-scope wording is pricing wording and is founder-only. main's
     // card line stays; the proposed sentence is listed for founder approval, not shipped.
     expect(english).not.toContain("single-member workspaces. The Team name does not include");
-    expect(english).toContain("<b>Single-member workspace</b>");
+    // Starter/Pro rename (2026-11-10, founder, intended): the Pro card names what it delivers and no membership line.
+    expect(english).not.toContain("<b>Single-member workspace</b>");
     expectDisclosureBefore(english, 'gates.find(gate => gate.id === "customerData")?.reason', "<PricingPlanOverview");
     expect(english).toContain("plans={PLANS.map(plan => ({");
     expect(english).toContain('id={pricingPlanId(index)} tabIndex={-1}');

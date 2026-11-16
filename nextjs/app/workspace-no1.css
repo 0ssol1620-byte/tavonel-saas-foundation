@@ -356,6 +356,10 @@
 .one-path-workspace nav.billing-actions button[aria-current="page"] { background: transparent; border-bottom-color: var(--verified); color: var(--text-hi); }
 .one-path-workspace .billing-card dt { font-size: 12px; }
 .one-path-workspace .billing-card dd { font-variant-numeric: tabular-nums; }
+/* One-step buy (2026-11-10): the renewal, refund rule and refund request under the portal action. */
+.one-path-workspace .billing-refund { display: grid; gap: 10px; }
+.one-path-workspace .billing-refund h3 { margin: 6px 0 0; }
+.one-path-workspace .billing-refund p { margin: 0; }
 .one-path-workspace .gate-list strong { font-size: 14px; }
 .one-path-workspace .gate-list p { font-size: 13px; }
 .one-path-workspace .pill { font: 500 12px var(--f-mono); }

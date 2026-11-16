@@ -152,7 +152,8 @@ describe("the Korean entry page stands on a fact, not a translation", () => {
   });
 
   it("carries the commercial facts it states, and states them as the catalog does", () => {
-    expect(BILLING_OFFERS.studio_access.saleChannel, "Team is self-serve now -- /pricing must be revisited").toBe("contact");
+    // Pro stays "contact" (CAT-D4, 2026-11-16).
+    expect(BILLING_OFFERS.studio_access.saleChannel, "Pro is self-serve now -- /pricing must be revisited").toBe("contact");
     expect(BILLING_OFFERS.observer_access.saleChannel, "Developer is not self-serve now -- /pricing must be revisited").toBe("self_serve");
     /*
       G1-002, followed to where it landed. The gate itself is the strongest of the three facts
@@ -175,7 +176,7 @@ describe("the Korean entry page stands on a fact, not a translation", () => {
       literally. The gate is still stated, still in Korean, still once.
     */
     expect(LANDING_V2_COPY.ko.start.microtext, "the Korean close states the gate in the reader's language")
-      .toContain("열린 뒤에는 Developer 요금제를 바로 구매할 수 있고, Team과 Enterprise는 저희와 함께 정합니다");
+      .toContain("열린 뒤에는 Starter 요금제를 바로 구매할 수 있고, Pro와 Enterprise는 저희와 함께 정합니다");
     expect(copyDeck, "and the English close is the policy's own sentence, not a paraphrase")
       .toContain("microtext: activationPolicy.customerData.reason");
     expect(copyDeck, "the Korean close reads the site's one spelling of the gate, not a second one")

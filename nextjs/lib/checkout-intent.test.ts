@@ -48,6 +48,7 @@ describe("checkoutSellable: the one predicate /login's notice and H1 both read (
     for (const code of OFFER_CODES) {
       expect(checkoutSellable(code, true), code).toBe(BILLING_OFFERS[code].saleChannel === "self_serve");
     }
+    // Pro stays "contact" (CAT-D4, 2026-11-16): only Starter sells online on an open deployment.
     expect(checkoutSellable("studio_access", true)).toBe(false);
     expect(checkoutSellable("observer_access", true)).toBe(true);
   });
@@ -137,7 +138,7 @@ describe("decideCheckoutResume: terms -> launch -> checkout (D-14)", () => {
         expect(decideCheckoutResume("observer_access", purchaseOpen, access), String(purchaseOpen)).toBe("open");
       }
     }
-    // Team is a conversation; its checkout is refused with the contact sentence, never held.
+    // Pro is a conversation (CAT-D4); its checkout is refused with the contact sentence, never held.
     expect(decideCheckoutResume("studio_access", true, newAccount)).toBe("open");
   });
 
@@ -187,7 +188,7 @@ describe("decideCheckoutResume: terms -> launch -> checkout (D-14)", () => {
   });
 
   it("says the live /login hold sentence and nothing it cannot keep (register C4)", () => {
-    expect(heldOfferSentence("observer_access")).toBe("Developer is held for you.");
+    expect(heldOfferSentence("observer_access")).toBe("Starter is held for you.");
     for (const code of OFFER_CODES) {
       expect(heldOfferSentence(code)).toBe(`${BILLING_OFFERS[code].label} is held for you.`);
       expect(heldOfferSentence(code)).not.toMatch(/opens by itself|once you are in/);
