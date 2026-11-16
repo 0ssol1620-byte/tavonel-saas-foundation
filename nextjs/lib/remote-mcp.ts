@@ -49,6 +49,14 @@ export const REMOTE_MCP_TOOL_SCOPES: Readonly<Record<string, DeveloperScope>> = 
   download_package: "collections:download",
 };
 
+/**
+ * WO-D19-1: the two canonical tools, served only while TAVONEL_REMOTE_MCP_CANONICAL_TOOLS is exactly
+ * "true". Kept apart from the table above, which stays equal to the stdio bridge's. Both scopes are
+ * already in it, so a token's allowed scopes do not change.
+ */
+export const REMOTE_MCP_CANONICAL_TOOL_SCOPES: Readonly<Record<string, DeveloperScope>> = { search: "ask:read", fetch: "worlds:read" };
+export const remoteMcpCanonicalToolsEnabled = (env: Env = process.env): boolean => env.TAVONEL_REMOTE_MCP_CANONICAL_TOOLS === "true";
+
 /** The only scopes a remote MCP token may hold. A key holding anything else is refused. */
 export const REMOTE_MCP_SCOPES: readonly DeveloperScope[] = [...new Set(Object.values(REMOTE_MCP_TOOL_SCOPES))].sort();
 
@@ -469,7 +477,7 @@ export const codeIdMarker = (codeId: string) => ` #${codeId}`;
 
 export type BearerCheck =
   | { kind: "anonymous" }
-  | { kind: "principal"; token: string; scopes: readonly DeveloperScope[]; workspaceKey: string }
+  | { kind: "principal"; token: string; scopes: readonly DeveloperScope[]; workspaceKey: string; authorizationRevision: number }
   | { kind: "rejected"; description: string };
 
 /**
@@ -492,13 +500,13 @@ export async function checkBearer(authorization: string | null): Promise<BearerC
   if (scopes.some((scope) => !(REMOTE_MCP_SCOPES as readonly string[]).includes(scope))) {
     return { kind: "rejected", description: "The access token holds a scope outside the read-only MCP scopes, and the remote MCP endpoint accepts only those." };
   }
-  return { kind: "principal", token, scopes, workspaceKey: authenticated.principal.workspaceKey };
+  return { kind: "principal", token, scopes, workspaceKey: authenticated.principal.workspaceKey, authorizationRevision: authenticated.principal.authorizationRevision };
 }
 
 /* ------------------------------------------------------------------- telemetry */
 
-/** The tool's name when it is one of the nine, else "unknown": a client-chosen string never reaches a log. */
-export const remoteMcpToolLabel = (name: string | null) => (name !== null && Object.hasOwn(REMOTE_MCP_TOOL_SCOPES, name) ? name : "unknown");
+/** The tool's name when it is one of the nine (or the two canonical ones), else "unknown": a client-chosen string never reaches a log. */
+export const remoteMcpToolLabel = (name: string | null) => (name !== null && (Object.hasOwn(REMOTE_MCP_TOOL_SCOPES, name) || Object.hasOwn(REMOTE_MCP_CANONICAL_TOOL_SCOPES, name)) ? name : "unknown");
 
 const CODE = /^[A-Z][A-Z0-9_]{2,63}/;
 /**
