@@ -19,6 +19,8 @@ type Stop = {
   inline: boolean;
   visits: number;
   isFirst: boolean;
+  /** Tabbable elements in document order not yet visited (set on every stop; used when focus returns to the first). */
+  unvisited: string[];
 };
 
 export async function keyboardWalk(page: Page, max = 250): Promise<KeyboardResult> {
@@ -50,13 +52,42 @@ export async function keyboardWalk(page: Page, max = 250): Promise<KeyboardResul
       const id = e.id ? `#${e.id}` : "";
       const cls = typeof e.className === "string" && e.className.trim() ? `.${e.className.trim().split(/\s+/)[0]}` : "";
       const label = (e.textContent ?? e.getAttribute("aria-label") ?? "").trim().slice(0, 24);
-      return { selector: `${e.tagName.toLowerCase()}${id}${cls}[${label}]`, inViewport, indicator, w: r.width, h: r.height, inline, visits, isFirst };
+      const nm = (x: Element) => `${x.tagName.toLowerCase()}${x.id ? `#${x.id}` : ""}[${(x.textContent ?? x.getAttribute("aria-label") ?? "").trim().slice(0, 24)}]`;
+      // Only computed when focus is back on the first stop: every tabbable element must have been reached.
+      const unvisited: string[] = [];
+      if (isFirst && visits === 2) {
+        const sel = 'a[href], button, input, select, textarea, summary, [tabindex], [contenteditable=""], [contenteditable="true"]';
+        const groups = new Set<string>();
+        for (const x of document.querySelectorAll(sel)) {
+          const xs = getComputedStyle(x);
+          const xr = x.getBoundingClientRect();
+          if ((x as HTMLInputElement).disabled || (x as HTMLInputElement).type === "hidden" || (x as HTMLElement).tabIndex < 0) continue;
+          if (xs.display === "none" || xs.visibility === "hidden" || (xr.width === 0 && xr.height === 0) || x.closest("[inert], [hidden]")) continue;
+          if ((x as HTMLInputElement).type === "radio" && (x as HTMLInputElement).name) {
+            // A radio group is one tab stop: any visited member counts.
+            const key = (x as HTMLInputElement).name;
+            if (groups.has(key)) continue;
+            groups.add(key);
+            const members = [...document.getElementsByName(key)];
+            if (members.some(m => (w.__v34Visits.get(m) ?? 0) > 0)) continue;
+          }
+          if (!w.__v34Visits.get(x)) unvisited.push(nm(x));
+        }
+      }
+      return { selector: `${e.tagName.toLowerCase()}${id}${cls}[${label}]`, inViewport, indicator, w: r.width, h: r.height, inline, visits, isFirst, unvisited };
     });
     if (!stop) {
       if (i > 0) break; // focus left the document: the walk is complete
       continue;
     }
-    if (stop.isFirst && stop.visits === 2) break; // wrapped around to the first stop
+    if (stop.isFirst && stop.visits === 2) {
+      // A natural wrap leaves the document (the null branch above). Landing on the first stop again
+      // is only a wrap when nothing was skipped; otherwise focus was sent back: a trap.
+      if (stop.unvisited.length) {
+        result.violations.push({ pass: "keyboard-trap", selector: stop.selector, detail: `focus returned to the first stop; never reached: ${stop.unvisited.slice(0, 6).join(", ")}` });
+      }
+      break;
+    }
     result.stops += 1;
     const n = stop.visits;
     if (n === 3) result.violations.push({ pass: "keyboard-trap", selector: stop.selector, detail: "received focus three times in one walk" });

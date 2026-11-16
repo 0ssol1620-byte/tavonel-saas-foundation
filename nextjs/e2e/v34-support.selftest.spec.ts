@@ -302,3 +302,60 @@ test("receipt: entries fold into one receipt.json with their violations", () => 
     else process.env.V34_QA_OUT = before;
   }
 });
+
+test.describe("round 2: overlays, ancestor clipping, keyboard traps", () => {
+  const passes = async (page: Page) => (await layoutPass(page)).map(v => v.pass);
+
+  test("overlay exceptions: a fixed sheet over text and overlay labels over a canvas pass; the same without the attribute fail", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 640 });
+    const sheet = (attr: string) => `${STRUCTURE}<p style="margin:0">body copy under the sheet</p><div ${attr} style="position:fixed;left:0;top:0;width:300px;height:120px;background:#eee">sheet text</div>${END}`;
+    await load(page, sheet("data-v34-overlay"));
+    expect(await layoutPass(page)).toEqual([]);
+    // restored afterwards, not left hidden
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector("[data-v34-overlay]")!).visibility)).toBe("visible");
+    await load(page, sheet(""));
+    expect((await passes(page)).length).toBeGreaterThan(0);
+    const labels = (attr: string) => `${STRUCTURE}<div style="position:relative"><canvas width="300" height="150" style="display:block"></canvas><span ${attr} style="position:absolute;left:10px;top:10px">node A</span><span ${attr} style="position:absolute;left:12px;top:12px">node B</span></div>${END}`;
+    await load(page, labels("data-v34-overlay"));
+    expect(await layoutPass(page)).toEqual([]);
+    await load(page, labels(""));
+    expect((await passes(page)).length).toBeGreaterThan(0);
+  });
+
+  test("an overlay is still judged for its own text clipping", async ({ page }) => {
+    await load(page, `${STRUCTURE}<div data-v34-overlay style="position:fixed;left:0;top:0;width:60px;overflow:hidden"><p style="white-space:nowrap;margin:0">overlay text far wider than its box</p></div>${END}`);
+    expect((await passes(page)).includes("clipped-by-ancestor")).toBe(true);
+  });
+
+  test("clipped by an ancestor: horizontal, vertical, the grid row shape; scroll, ellipsis and a fitting box pass", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 640 });
+    await load(page, `${STRUCTURE}<div style="width:80px;overflow:hidden"><p style="white-space:nowrap;margin:0">long text clipped by its ancestor box</p></div>${END}`);
+    expect(await passes(page)).toContain("clipped-by-ancestor");
+    await load(page, `${STRUCTURE}<div style="height:24px;overflow:hidden"><p style="margin:0;width:200px">several lines of text that wrap and run past the bottom edge of the ancestor box</p></div>${END}`);
+    expect(await passes(page)).toContain("clipped-by-ancestor");
+    await load(page, `${STRUCTURE}<div style="display:grid;grid-template-rows:20px;overflow:hidden;width:200px"><div style="padding:8px;height:60px"><p style="margin:0">tile</p><p style="margin:0">second line</p><p style="margin:0">third line</p></div></div>${END}`);
+    const rows = await passes(page);
+    expect(rows).toContain("clipped-rows");
+    await load(page, `${STRUCTURE}<div data-v34-scroll style="width:80px;overflow-x:auto"><p style="white-space:nowrap;margin:0">wide text inside a scroll surface</p></div><div style="width:80px;overflow:hidden"><p style="white-space:nowrap;text-overflow:ellipsis;overflow:hidden;margin:0">ellipsis marks this clip</p></div><div style="width:300px;overflow:hidden;border-radius:8px"><p style="margin:0">fits</p></div>${END}`);
+    expect(await layoutPass(page)).toEqual([]);
+  });
+
+  test("keyboard: a script that sends focus back to the first stop is a trap, a natural wrap is not", async ({ page }) => {
+    const ring = ".m:focus-visible{outline:2px solid #00e}";
+    const link = (i: number, extra = "") => `<a class="m" href="#${i}" style="display:inline-block;padding:14px" ${extra}>L${i}</a>`;
+    await load(page, `${link(1, 'id="first"')}${link(2)}${link(3, "onfocus=\"document.getElementById('first').focus()\"")}${link(4)}`, ring);
+    const trapped = await keyboardWalk(page);
+    const t = trapped.violations.find(v => v.pass === "keyboard-trap");
+    expect(t?.detail).toContain("L4");
+    await load(page, `${link(1)}${link(2)}${link(3)}`, ring);
+    const wrap = await keyboardWalk(page);
+    expect(wrap.violations).toEqual([]);
+    expect(wrap.stops).toBe(3);
+  });
+
+  test("keyboard: an input that swallows Tab and keeps focus is a trap", async ({ page }) => {
+    await load(page, `<input class="m" id="i" aria-label="x" onkeydown="if(event.key==='Tab'){event.preventDefault();this.focus()}" style="padding:14px"><a class="m" href="#a" style="display:inline-block;padding:14px">after</a>`, ".m:focus-visible{outline:2px solid #00e}");
+    const r = await keyboardWalk(page);
+    expect(r.violations.some(v => v.pass === "keyboard-trap")).toBe(true);
+  });
+});

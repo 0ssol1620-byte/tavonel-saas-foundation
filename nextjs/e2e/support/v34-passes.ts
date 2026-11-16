@@ -8,6 +8,7 @@ import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { measureOverflow } from "./overflow";
 import { measureOverlap } from "./overlap";
 import {
+  measureClippedRows,
   measureClippedText,
   measureHeaderCover,
   measureOutsideBounds,
@@ -36,9 +37,30 @@ export async function layoutPass(page: Page): Promise<Violation[]> {
   out.push(...(await page.evaluate(measureOutsideBounds)));
   out.push(...(await page.evaluate(measureClippedText)));
   out.push(...(await page.evaluate(measureSiblingOverlap)));
-  const overlaps = await page.evaluate(measureOverlap);
-  for (const o of overlaps) {
-    if (o.kind === "text-overlap" || o.kind === "text-clipped" || o.kind === "fixed-covers") out.push({ pass: o.kind, selector: `${o.a} / ${o.b}`, detail: o.text.slice(0, 60) });
+  out.push(...(await page.evaluate(measureClippedRows)));
+  // Declared overlays sit over content on purpose: hide them while measuring everything else
+  // (their own clipping is judged above, with them in place), and always restore.
+  const hideOverlays = () => page.evaluate(() => {
+    for (const e of document.querySelectorAll<HTMLElement>("[data-v34-overlay]")) {
+      e.dataset.v34PrevVis = e.style.getPropertyValue("visibility") + "|" + e.style.getPropertyPriority("visibility");
+      e.style.setProperty("visibility", "hidden", "important");
+    }
+  });
+  const restoreOverlays = () => page.evaluate(() => {
+    for (const e of document.querySelectorAll<HTMLElement>("[data-v34-overlay]")) {
+      const [v, p] = (e.dataset.v34PrevVis ?? "|").split("|");
+      if (v) e.style.setProperty("visibility", v, p); else e.style.removeProperty("visibility");
+      delete e.dataset.v34PrevVis;
+    }
+  });
+  await hideOverlays();
+  try {
+    const overlaps = await page.evaluate(measureOverlap);
+    for (const o of overlaps) {
+      if (o.kind === "text-overlap" || o.kind === "text-clipped" || o.kind === "fixed-covers") out.push({ pass: o.kind, selector: `${o.a} / ${o.b}`, detail: o.text.slice(0, 60) });
+    }
+  } finally {
+    await restoreOverlays();
   }
   out.push(...(await page.evaluate(measureHeaderCover)));
   return out;

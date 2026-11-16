@@ -204,3 +204,74 @@ export function measureHeaderCover(): Violation[] {
   if (!header) return [];
   return [{ pass: "header-cover", selector: header.tagName.toLowerCase(), detail: `covers the first heading "${(heading.textContent ?? "").trim().slice(0, 40)}"` }];
 }
+
+/**
+ * Runs in the page. Content cut off by a clipping box (the .tiles shape that shipped on /trust):
+ *  - text whose drawn rect passes an ancestor's overflow:hidden|clip padding box, vertically or
+ *    horizontally (an overlay also checks its own box, which measureClippedText exempts);
+ *  - in a clipping grid or flex container, an in-flow child whose border box passes the content
+ *    box (copy of measureClippedRows in e2e/overflow-audit.spec.ts, vertical only there).
+ * data-v34-scroll surfaces, line-clamp and ellipsis are declared clips and are not reported.
+ */
+export function measureClippedRows(): Violation[] {
+  const out: Violation[] = [];
+  const name = (el: Element) => {
+    const id = el.id ? `#${el.id}` : "";
+    const cls = typeof el.className === "string" && el.className.trim() ? `.${el.className.trim().split(/\s+/)[0]}` : "";
+    return `${el.tagName.toLowerCase()}${id}${cls}`.slice(0, 120);
+  };
+  const clips = (v: string) => v === "hidden" || v === "clip";
+  const live = (el: Element) => {
+    const s = getComputedStyle(el);
+    return s.display !== "none" && s.visibility !== "hidden" && Number(s.opacity) !== 0;
+  };
+  for (const el of document.querySelectorAll("body *")) {
+    if (out.length >= 40) break;
+    if (el.closest("[data-v34-scroll], canvas, svg, [hidden]") || !live(el)) continue;
+    const own = [...el.childNodes].find(n => n.nodeType === Node.TEXT_NODE && (n.textContent ?? "").trim().length > 1);
+    if (own) {
+      const range = document.createRange();
+      range.selectNodeContents(own);
+      const t = range.getBoundingClientRect();
+      if (t.width >= 2 && t.height >= 2 && getComputedStyle(el).textOverflow !== "ellipsis") {
+        const start = el.closest("[data-v34-overlay]") ? el : el.parentElement;
+        for (let a: Element | null = start; a && a !== document.body && a !== document.documentElement; a = a.parentElement) {
+          if (a.closest("[data-v34-scroll]")) break;
+          const s = getComputedStyle(a);
+          const cx = clips(s.overflowX), cy = clips(s.overflowY);
+          if (!cx && !cy) continue;
+          if (a.clientHeight <= 2 || a.clientWidth <= 2) continue; // visually-hidden pattern
+          if ((s as CSSStyleDeclaration & { webkitLineClamp?: string }).webkitLineClamp && (s as CSSStyleDeclaration & { webkitLineClamp?: string }).webkitLineClamp !== "none") continue;
+          const b = a.getBoundingClientRect();
+          const l = b.left + parseFloat(s.borderLeftWidth), r = b.right - parseFloat(s.borderRightWidth);
+          const tp = b.top + parseFloat(s.borderTopWidth), bt = b.bottom - parseFloat(s.borderBottomWidth);
+          const past = [
+            cx && t.right > r + 1 ? `right ${Math.round(t.right - r)}px` : "",
+            cx && t.left < l - 1 ? `left ${Math.round(l - t.left)}px` : "",
+            cy && t.bottom > bt + 1 ? `bottom ${Math.round(t.bottom - bt)}px` : "",
+            cy && t.top < tp - 1 ? `top ${Math.round(tp - t.top)}px` : "",
+          ].filter(Boolean);
+          if (past.length) {
+            out.push({ pass: "clipped-by-ancestor", selector: name(el), detail: `text passes ${name(a)} (overflow clips) by ${past.join(", ")}` });
+            break;
+          }
+        }
+      }
+    }
+    // Row clip: a child sliced off by a clipping grid/flex container.
+    const cs = getComputedStyle(el);
+    if (clips(cs.overflowY) && /^(inline-)?(grid|flex)$/.test(cs.display) && el.clientHeight > 2) {
+      const box = el.getBoundingClientRect();
+      const bottom = box.bottom - parseFloat(cs.borderBottomWidth) - parseFloat(cs.paddingBottom);
+      for (const child of el.children) {
+        const k = getComputedStyle(child);
+        if (k.display === "none" || k.visibility === "hidden" || k.position === "absolute" || k.position === "fixed") continue;
+        const cb = child.getBoundingClientRect();
+        if (cb.height >= 1 && cb.bottom - bottom > 1) {
+          out.push({ pass: "clipped-rows", selector: name(child), detail: `passes ${name(el)} content box by ${Math.round(cb.bottom - bottom)}px` });
+        }
+      }
+    }
+  }
+  return out.slice(0, 40);
+}
