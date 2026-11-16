@@ -1,95 +1,27 @@
-import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
-import LandingPage from "@/components/landing-v2/landing-page";
-import {
-  LANDING_VARIANT_COOKIE,
-  LANDING_VARIANT_QUERY,
-  landingVariantState,
-} from "@/lib/landing-experiments";
-import { BRAND_LINE } from "@/lib/site-navigation";
-import { SPECIMEN_FIXTURE_COOKIE } from "@/lib/specimen-sources";
+import Home from "@/components/v34/routes/home/home";
+import { releaseGate } from "@/lib/v34/release";
+import { routeMetadata, routeViewport } from "@/lib/v34/route-metadata";
 
-/**
- * The entry point. Self-canonical and nothing else: the founder's 2026-11-09 global-only decision
- * retired the /ko pair (it now redirects here), so there is no hreflang alternate left to name.
- */
 /*
-  D26 / BQ-134. One tab-title pattern, and this page is its one named exception.
+  The entry point, rebuilt as V34 (decision 11 keeps the Landing V2 components in the tree for
+  rollback; nothing here imports them). A thin file: metadata and viewport from the registry, the
+  release gate, then the body. Structured data is the root layout's `@graph` (Organization,
+  WebSite, SoftwareApplication); the home route adds none of its own.
 
-  Every other page on the site is "X — TAVONEL", which reads correctly when the section is the
-  thing being named. The home tab has no section to name, so it names the product and what the
-  product does -- and both halves come from `BRAND_LINE`, the constant the H1, the footer tagline,
-  the OG card and the root metadata description already derive from, rather than from a fifth and
-  sixth positioning sentence typed here. Fix round 3 (2026-10-16): the tab, the OG title and the
-  Twitter title are the outcome sentence the H1 states (`BRAND_LINE.headline`).
+  The title is the registry's one named exception to " — TAVONEL": the home tab has no section to
+  name, so it names the product and what it does (`TAVONEL — ` + BRAND_LINE.headline).
+
+  The primary action is commercial state, not static content. `primaryCallToAction()` decides
+  between self-serve and "Request access" from the deployed runtime's flags, and a prerendered
+  page would freeze the build-time answer into the HTML. So the route renders on each request
+  (the same reason the previous entry page was `force-dynamic`), and the CTA is resolved on the
+  server, with no label swap after hydration.
 */
-export const metadata: Metadata = {
-  title: `TAVONEL — ${BRAND_LINE.headline}`,
-  description:
-    "Inspect a finished public Compiled World, follow one result to its exact source region, and compare what changed before you discuss your own sources.",
-  alternates: { canonical: "/" },
-  openGraph: {
-    title: BRAND_LINE.headline,
-    description: BRAND_LINE.descriptor,
-    type: "website",
-    url: "/",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: BRAND_LINE.headline,
-    description: BRAND_LINE.descriptor,
-  },
-};
-
-/**
- * The landing CTA is commercial state, not static content.
- *
- * Vercel can qualify a Production build in an environment where the build-time commercial flags
- * are intentionally scrubbed while the deployed runtime is live. If this route is prerendered,
- * that safe build-time "pilot" result gets frozen into the HTML and a live self-service site can
- * keep saying "Request access" even while /api/status correctly reports selfService=true.
- *
- * Resolve the state on each request instead. The page itself is light, the deployed function is in
- * the same region as the rest of the app, and this avoids a wrong CTA or a hydration-time label
- * swap on the most important conversion surface.
- */
+export const metadata = routeMetadata("home");
+export const viewport = routeViewport();
 export const dynamic = "force-dynamic";
 
-/*
-  D8: the experiment arm, read on the server and never on the client.
-
-  This page is already `force-dynamic` for the commercial posture, so reading a cookie costs it
-  nothing it was not already paying, and it is what keeps the arm out of the first paint's
-  critical path: a client that decided the headline after hydration would flash the control arm
-  at every reader in the test. The cookie is WRITTEN in `middleware.ts`, which is the one place
-  in Next 15 that can set one for the response a Server Component is rendering.
-
-  With no experiment active this reads a cookie that is never set and returns the frozen default.
-*/
-/*
-  FINAL-SPEC 2026-10-26 §4: Home is a paper page, so the address bar and task-switcher card read
-  paper (`--tv-paper`, the warm canvas #F5F3EE since direction C) here. The layout's dark `#090D14` stays on every other route.
-*/
-export const viewport: Viewport = {
-  themeColor: "#F5F3EE",
-  colorScheme: "light",
-};
-
-export default async function HomePage({
-  searchParams,
-}: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const query = (await searchParams)?.[LANDING_VARIANT_QUERY];
-  const experiment = landingVariantState({
-    cookie: (await cookies()).get(LANDING_VARIANT_COOKIE)?.value,
-    query: Array.isArray(query) ? query[0] : query,
-  });
-  // P2-08 and P2-32: honoured only by the local test server (lib/specimen-sources.ts); a deployment ignores it.
-  const specimenRequest = (await cookies()).get(SPECIMEN_FIXTURE_COOKIE)?.value;
-  return (
-    <>
-      <LandingPage experiment={experiment} specimenRequest={specimenRequest} />
-    </>
-  );
+export default async function HomePage() {
+  await releaseGate("home");
+  return <Home />;
 }
