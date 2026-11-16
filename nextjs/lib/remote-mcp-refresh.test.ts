@@ -24,6 +24,11 @@ const mocks = vi.hoisted(() => ({
   session: vi.fn(),
   sessionProduct: vi.fn(),
 }));
+const fetchSeen: URL[] = [];
+vi.mock("@/lib/supabase-admin", () => ({
+  readSupabaseAdminConfig: () => ({ url: "https://db.test", serviceRoleKey: "x" }),
+  supabaseAdminRequest: async (_config: unknown, path: string) => { fetchSeen.push(new URL(path, "https://db.test")); return Response.json([]); },
+}));
 vi.mock("@/lib/developer-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./developer-store")>()),
   createDeveloperApiKey: mocks.createKey,
@@ -40,6 +45,7 @@ vi.mock("@/lib/developer-auth", async (importOriginal) => ({
   requireFoundationSession: mocks.session,
 }));
 
+import * as developerStore from "./developer-store";
 import { POST as register } from "../app/api/mcp/oauth/register/route";
 import { POST as authorizeRoute } from "../app/api/mcp/oauth/authorize/route";
 import { POST as token } from "../app/api/mcp/oauth/token/route";
@@ -167,6 +173,33 @@ describe("refresh flag on", () => {
     const response = await refresh(id, first.refresh_token!);
     expect((await json(response)).error).toBe("invalid_grant");
     expect(mocks.createKey).toHaveBeenCalledTimes(1);
+  });
+
+  it("an expired key revoked under Developers ends refresh, and the Developers list still offers it", async () => {
+    const id = await client();
+    const first = await connect(id);
+    rows[0].expiresAt = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
+    const listed = await developerStore.listDeveloperApiKeys(MINE, 30 * 24 * 3600);
+    expect(listed.ok).toBe(true);
+    const query = fetchSeen.at(-1)!.searchParams;
+    // Refreshable = unrevoked and minted within the refresh TTL; no expiry filter hides it.
+    expect([query.get("revoked_at"), query.get("or"), query.get("created_at")?.startsWith("gt.")]).toEqual(["is.null", null, true]);
+    await mocks.revokeKey(MINE, USER, 4, "key-1");
+    expect((await json(await refresh(id, first.refresh_token!))).error).toBe("invalid_grant");
+    expect(mocks.createKey).toHaveBeenCalledTimes(1);
+  });
+
+  it("a narrower re-consent ends an earlier family whose key has already expired", async () => {
+    const id = await client();
+    const wide = await connect(id);
+    rows[0].expiresAt = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
+    rows[0].createdAt = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
+    const narrow = await connect(id, "ask:read");
+    expect(narrow.scope).toBe("ask:read");
+    expect(rows[0].revokedAt).not.toBeNull();
+    expect((await json(await refresh(id, wide.refresh_token!))).error).toBe("invalid_grant");
+    // The stale token is reuse of a revoked key, so the client's remaining key ends too (never a wider one).
+    expect(live().filter((row) => row.scopes.length > 1)).toEqual([]);
   });
 
   it("a key the member does not have is invalid_grant", async () => {

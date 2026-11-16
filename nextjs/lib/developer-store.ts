@@ -107,7 +107,7 @@ async function insertAudit(workspaceKey: string, action: string, targetId: strin
  * state; `remoteMcpKeys` is the live `token_kind` mcp keys only, a null expiry counting as live.
  * Every key either list shows is revocable from it.
  */
-export async function listDeveloperApiKeys(workspaceKey: string) {
+export async function listDeveloperApiKeys(workspaceKey: string, refreshableSeconds?: number) {
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "DEVELOPER_STORE_NOT_CONFIGURED" };
   const read = async (filters: Record<string, string>) => {
@@ -126,7 +126,10 @@ export async function listDeveloperApiKeys(workspaceKey: string) {
   try {
     const [manual, remote] = await Promise.all([
       read({ token_kind: "eq.live" }),
-      read({ token_kind: "eq.mcp", revoked_at: "is.null", or: `(expires_at.is.null,expires_at.gt.${new Date().toISOString()})` }),
+      // `refreshableSeconds` (refresh flag on): an expired key still refreshes until revoked, so it stays listed and revocable.
+      read(refreshableSeconds === undefined
+        ? { token_kind: "eq.mcp", revoked_at: "is.null", or: `(expires_at.is.null,expires_at.gt.${new Date().toISOString()})` }
+        : { token_kind: "eq.mcp", revoked_at: "is.null", created_at: `gt.${new Date(Date.now() - refreshableSeconds * 1000).toISOString()}` }),
     ]);
     if (manual === null || remote === null) return { ok: false as const, code: "DEVELOPER_STORE_READ_FAILED" };
     if (manual === undefined || remote === undefined) return { ok: false as const, code: "DEVELOPER_STORE_BINDING_INVALID" };

@@ -5,6 +5,7 @@ import { authorizeFoundationSessionProduct } from "@/lib/self-service-trial";
 import { trialAiAccessEnabled, trialMcpTokenAccess } from "@/lib/trial-ai-access";
 import {
   REMOTE_MCP_CODE_TTL_SECONDS,
+  REMOTE_MCP_REFRESH_TTL_SECONDS,
   REMOTE_MCP_TOKEN_TTL_SECONDS,
   checkRefreshRequest,
   checkTokenRequest,
@@ -83,13 +84,16 @@ export async function POST(request: Request) {
   const trial = product.access.source === "trial";
   if (trial && !trialAiAccessEnabled()) return refuse("TRIAL_FEATURE_NOT_INCLUDED", 402);
 
-  const since = new Date(Date.now() - (REMOTE_MCP_TOKEN_TTL_SECONDS + REMOTE_MCP_CODE_TTL_SECONDS) * 1000).toISOString();
+  // Flag on, a refreshable key is any unrevoked one minted within the refresh TTL, expired or not; off, the old 1 h window.
+  const refreshOn = remoteMcpRefreshEnabled();
+  const windowSeconds = refreshOn ? REMOTE_MCP_REFRESH_TTL_SECONDS : REMOTE_MCP_TOKEN_TTL_SECONDS + REMOTE_MCP_CODE_TTL_SECONDS;
+  const since = new Date(Date.now() - windowSeconds * 1000).toISOString();
   const existing = await listRecentRemoteMcpKeys(grant.workspaceKey, grant.userId, since);
   if (!existing.ok) return oauthError(503, "temporarily_unavailable", existing.code);
   // ponytail: list-then-mint, not a unique constraint; two simultaneous redemptions of one code by
   // the PKCE holder can both mint. Add a code ledger with a unique index if that ever matters.
   const tag = ` ~${clientTag(grant.clientId)} `;
-  const live = (entry: { revokedAt: string | null; expiresAt: string | null }) => !entry.revokedAt && (entry.expiresAt === null || Date.parse(entry.expiresAt) > Date.now());
+  const live = (entry: { revokedAt: string | null; expiresAt: string | null }) => !entry.revokedAt && (refreshOn || entry.expiresAt === null || Date.parse(entry.expiresAt) > Date.now());
   const refreshKeyId = checked.refreshKeyId;
   if (refreshKeyId !== undefined) {
     // Rotation is bound to the live key: it must still exist for this member, and not be revoked (expired is fine).
@@ -98,9 +102,12 @@ export async function POST(request: Request) {
     if (!old.key) return oauthError(400, "invalid_grant", "The refresh token is not valid.");
     if (old.key.revokedAt) {
       // A rotated-out or revoked key presented again: treat as reuse, end this client's live keys.
+      let failed = 0;
       for (const entry of existing.keys.filter((entry) => entry.name.includes(tag) && live(entry))) {
-        await revokeDeveloperApiKey(grant.workspaceKey, grant.userId, grant.authorizationRevision, entry.keyId);
+        const ended = await revokeDeveloperApiKey(grant.workspaceKey, grant.userId, grant.authorizationRevision, entry.keyId);
+        if (!ended.ok) failed += 1;
       }
+      if (failed > 0) console.error(JSON.stringify({ event: "mcp_refresh_reuse_revoke_failed", count: failed }));
       return oauthError(400, "invalid_grant", "The refresh token is not valid.");
     }
   }
