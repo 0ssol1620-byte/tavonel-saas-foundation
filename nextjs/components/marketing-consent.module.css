@@ -195,6 +195,11 @@
   .settings:hover { color: var(--text-hi); }
 }
 
+/* Forced colors drop the underline's colour and the control has no box: give it one. */
+@media (forced-colors: active) {
+  .settings { border: 1px solid ButtonText; padding-inline: 6px; }
+}
+
 .floating {
   position: fixed;
   inset: auto auto 12px 1rem;

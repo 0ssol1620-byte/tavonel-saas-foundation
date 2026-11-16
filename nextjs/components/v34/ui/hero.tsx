@@ -13,9 +13,10 @@ export const HERO_TITLE_ID = "v34-title";
 /**
  * The page opening. `title` is the page's one h1. `art` is the right column of the home and split
  * variants; it takes a figure, the World instrument or a screen and is allowed to shrink
- * (`min-width: 0`), so a wide child cannot push the page past the viewport.
+ * (`min-width: 0`), so a wide child cannot push the page past the viewport. `foot` is a strip under
+ * both columns (the home variant's layer index).
  */
-export function Hero({ variant, surface, eyebrow, title, lead, actions, art }: {
+export function Hero({ variant, surface, eyebrow, title, lead, actions, art, foot }: {
   variant: HeroVariant;
   surface?: V34Surface;
   eyebrow?: string;
@@ -23,6 +24,7 @@ export function Hero({ variant, surface, eyebrow, title, lead, actions, art }: {
   lead?: ReactNode;
   actions?: ReactNode;
   art?: ReactNode;
+  foot?: ReactNode;
 }) {
   return (
     <section className={`${surfaceClass(surface ?? DEFAULT_SURFACE[variant])} ${s.hero} ${s[variant]}`} aria-labelledby={HERO_TITLE_ID}>
@@ -35,6 +37,7 @@ export function Hero({ variant, surface, eyebrow, title, lead, actions, art }: {
         </div>
         {art ? <div className={s.art}>{art}</div> : null}
       </div>
+      {foot ? <div className={s.foot}>{foot}</div> : null}
     </section>
   );
 }

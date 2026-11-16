@@ -75,19 +75,25 @@
   line-height: 1.04;
 }
 
-/* home: the instrument takes the wider column. The shell is the header's own container, so the hero
-   starts and ends on the same edges as the bar above it; the copy sits at the top of the column
-   rather than centred against a panel that is several hundred pixels taller than it. */
+/* home: the instrument takes the wider column and the copy is centred against it. The shell is the
+   header's own container, so the hero starts and ends on the same edges as the bar above it. The
+   copy column is wide enough for the headline's longest line ("your AI can trust.") at the capped
+   size, so the headline sets in three lines from 1001px up. */
 .home .shell {
-  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
-  align-items: start;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
 }
 
 .home .title {
-  max-width: 12ch;
-  font-size: var(--v34-h1-home);
+  max-width: 14ch;
+  font-size: min(var(--v34-h1-home), 4.5rem);
   line-height: 1.01;
   letter-spacing: -0.05em;
+}
+
+.foot {
+  width: var(--v34-shell);
+  margin: clamp(22px, 4vw, 44px) auto 0;
 }
 
 @media (max-width: 900px) {
@@ -101,16 +107,21 @@
   }
 }
 
-/* The header gives way to the drawer at 1000px; two columns of a headline and a search field do not fit under it. */
+/* Between the drawer and the desktop bar the two columns stay, with a smaller headline that still sets its longest line inside the copy column. */
 @media (max-width: 1000px) {
-  .home .shell {
-    grid-template-columns: minmax(0, 1fr);
+  .home .title {
+    font-size: clamp(2.5rem, 5.2vw, 4.5rem);
   }
 }
 
 @media (max-width: 760px) {
+  .home .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .home .title {
     max-width: 15ch;
+    font-size: min(var(--v34-h1-home), 4.5rem);
   }
 }
 
@@ -118,5 +129,11 @@
   .actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  /* The home pair stays on one row (it wraps only where the two do not fit). */
+  .home .actions {
+    flex-direction: row;
+    align-items: center;
   }
 }

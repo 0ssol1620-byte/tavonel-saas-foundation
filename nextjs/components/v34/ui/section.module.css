@@ -24,6 +24,24 @@
   min-width: 0;
 }
 
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 32px clamp(30px, 8vw, 110px);
+}
+
+.splitMain,
+.splitAside {
+  min-width: 0;
+}
+
+.splitMain .head {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
 .title {
   color: var(--v34-fg);
   margin: 0;
@@ -35,6 +53,12 @@
   word-break: normal;
   hyphens: manual;
   text-wrap: balance;
+}
+
+@media (max-width: 900px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 700px) {

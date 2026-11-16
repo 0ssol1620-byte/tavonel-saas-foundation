@@ -114,7 +114,11 @@ export const JOURNAL = {
   label: "Read the field guide",
 } as const;
 
-export const FINAL = { title: "Make what you know work for you." } as const;
+export const FINAL = {
+  eyebrow: "A better foundation for your AI",
+  title: "Make what you know work for you.",
+  secondary: { href: to("pricing"), label: "Compare plans →" },
+} as const;
 
 /** Every internal destination the page can render, for the release guard. */
 export const HOME_DESTINATIONS: readonly Route[] = [
@@ -126,4 +130,5 @@ export const HOME_DESTINATIONS: readonly Route[] = [
   CONNECT.secondary.href,
   ...TRUST.items.map((t) => t.href),
   JOURNAL.href,
+  FINAL.secondary.href,
 ];

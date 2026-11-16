@@ -1,70 +1,87 @@
+/*
+  The reference walkthrough: a light card on the paper band. A tinted title bar, a four-step strip
+  whose selected step is the one dark cell, then the step's copy beside its source record.
+  Every class that carries text states a foreground and, where it paints, its own background.
+*/
 .root {
-  background: var(--v34-dark, #102922);
-  color: var(--v34-on-dark, #eff6ef);
-  color-scheme: dark;
-  border: 1px solid var(--v34-step-bg, #143629);
-  border-radius: 12px;
-  padding: 16px;
+  background: var(--v34-white);
+  color: var(--v34-ink);
+  color-scheme: light;
+  border: 1px solid var(--v34-rule);
+  border-radius: 13px;
   min-width: 0;
 }
 .bar {
-  display: flex; flex-wrap: wrap; gap: 4px 16px; justify-content: space-between;
-  color: var(--v34-on-dark-muted, #b8ccc0);
-  font-size: 0.8125rem; margin-bottom: 12px;
+  display: flex; flex-wrap: wrap; gap: 4px 16px; justify-content: space-between; align-items: center;
+  padding: 16px 25px;
+  background: var(--v34-green);
+  color: var(--v34-muted);
+  border-bottom: 1px solid var(--v34-rule);
+  border-radius: 12px 12px 0 0;
+  font-size: 0.875rem;
 }
-.barTitle { color: var(--v34-on-dark, #eff6ef); font-weight: 600; }
-.barTag { color: var(--v34-on-dark-muted, #b8ccc0); }
+.barTitle { color: var(--v34-ink); font-weight: 600; }
+.barTag { color: var(--v34-muted); }
 
 /* Without JS the tab strip has nothing to drive; the stacked panels carry their own labels. */
 .root:not([data-ready]) .tablist { display: none; }
 .tablist {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--v34-white);
+  color: var(--v34-ink);
 }
 .tab {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
-  min-height: 44px; padding: 8px 12px; text-align: left;
-  font: inherit; font-size: 0.875rem; font-weight: 600; line-height: 1.25;
-  background: transparent; color: var(--v34-on-dark, #eff6ef);
-  border: 1px solid var(--v34-step-small, #c8e6d3);
-  border-radius: 8px; cursor: pointer; min-width: 0;
+  display: flex; flex-direction: row; align-items: center; gap: 9px;
+  min-height: 65px; padding: 17px 24px; text-align: left;
+  font: inherit; font-size: 0.9375rem; font-weight: 600; line-height: 1.25;
+  background: var(--v34-white); color: var(--v34-muted);
+  border: 0; border-right: 1px solid var(--v34-rule); border-bottom: 1px solid var(--v34-rule);
+  border-radius: 0; cursor: pointer; min-width: 0;
 }
-.tabNo { font-size: 0.75rem; font-weight: 500; color: var(--v34-on-dark-muted, #b8ccc0); }
-.tab:hover { border-color: var(--v34-lime, #c9f2a5); }
-.next:hover { background: var(--v34-lime-hover, #d8f7bd); }
-.tab[aria-selected="true"] { background: var(--v34-step-bg, #143629); color: #fff; }
-.tab[aria-selected="true"] .tabNo { color: var(--v34-step-small, #c8e6d3); }
+.tab:last-child { border-right: 0; }
+.tabNo { font-size: 0.75rem; font-weight: 500; color: var(--v34-label); }
+.tab:hover { background: var(--v34-secondary-hover); color: var(--v34-ink); }
+.tab:hover .tabNo { color: var(--v34-ink); }
+.tab[aria-selected="true"] { background: var(--v34-step-bg); color: var(--v34-white); }
+.tab[aria-selected="true"] .tabNo { color: var(--v34-step-small); }
 
-.panel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
-.panelFollowing { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--v34-step-bg, #143629); }
+.panel {
+  display: grid; grid-template-columns: minmax(0, 0.84fr) minmax(0, 1.16fr);
+  gap: clamp(24px, 5vw, 78px); padding: clamp(26px, 4.5vw, 66px);
+}
+.panelFollowing { border-top: 1px solid var(--v34-rule); }
 .panel[hidden] { display: none; }
 .copy, .record { min-width: 0; }
-.eyebrow { margin: 0 0 8px; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--v34-on-dark-muted, #b8ccc0); }
+.eyebrow { margin: 0 0 12px; font-size: 0.75rem; font-weight: 650; letter-spacing: 0.1em; text-transform: uppercase; color: var(--v34-label); }
 .heading {
-  color: var(--v34-on-dark, #eff6ef);
-  margin: 0 0 12px; font-size: clamp(1.375rem, 1.1rem + 1.2vw, 2rem); line-height: 1.15; letter-spacing: -0.03em;
+  color: var(--v34-ink);
+  margin: 0 0 14px; font-size: clamp(1.7rem, 3.6vw, 3rem); font-weight: 500; line-height: 1.07; letter-spacing: -0.03em;
   overflow-wrap: normal; word-break: normal; hyphens: none; text-wrap: balance;
 }
-.body { margin: 0 0 20px; line-height: 1.55; color: var(--v34-on-dark-muted, #b8ccc0); }
+.body { margin: 0 0 20px; line-height: 1.55; color: var(--v34-body); }
 
 .next {
-  min-height: 44px; padding: 0 20px; font: inherit; font-weight: 600; cursor: pointer;
-  background: var(--v34-lime, #c9f2a5); color: var(--v34-lime-ink, #172920);
-  border: 0; border-radius: 999px;
+  min-height: 44px; padding: 12px 0; font: inherit; font-weight: 600; cursor: pointer;
+  background: var(--v34-white); color: var(--v34-link);
+  border: 0; border-bottom: 1px solid var(--v34-link); border-radius: 0;
 }
+.next:hover { color: var(--v34-ink); border-bottom-color: var(--v34-ink); }
 
-/* Nested light panel: declares its own foreground and background. */
+/* The source record: a tinted panel that restates its own pair. */
 .record {
-  background: var(--v34-paper, #f7f8f4); color: var(--v34-ink, #18241e);
-  border-radius: 10px; padding: 20px; color-scheme: light;
+  display: flex; flex-direction: column;
+  min-height: 230px; padding: 25px;
+  background: var(--v34-green); color: var(--v34-ink);
+  border: 1px solid var(--v34-rule); border-radius: 8px;
 }
-.kind { margin: 0 0 8px; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--v34-muted, #465b4e); }
-.title { margin: 0 0 6px; font-size: 1.25rem; line-height: 1.25; overflow-wrap: normal; word-break: normal; hyphens: none; }
-.meta { margin: 0 0 16px; color: var(--v34-muted, #465b4e); line-height: 1.45; }
-.link { display: inline-flex; align-items: center; min-height: 24px; color: var(--v34-link, #205135); font-weight: 600; text-underline-offset: 3px; }
-.link:hover { color: var(--v34-ink, #18241e); text-decoration-thickness: 2px; }
+.kind { margin: 0 0 8px; padding-bottom: 12px; border-bottom: 1px solid var(--v34-rule); font-size: 0.75rem; font-weight: 650; letter-spacing: 0.1em; text-transform: uppercase; color: var(--v34-label); }
+.title { margin: 18px 0 6px; font-size: clamp(1.7rem, 3.2vw, 2.75rem); font-weight: 500; line-height: 1.12; letter-spacing: -0.03em; overflow-wrap: normal; word-break: normal; hyphens: none; text-wrap: balance; }
+.meta { margin: 0 0 16px; color: var(--v34-body); line-height: 1.45; }
+.link { display: inline-flex; align-items: center; align-self: flex-start; margin-top: auto; min-height: 36px; color: var(--v34-link); font-weight: 600; text-underline-offset: 4px; }
+.link:hover { color: var(--v34-ink); text-decoration-thickness: 2px; }
 
-.tab:focus-visible, .next:focus-visible { outline: 3px solid var(--v34-focus-world, #8ae0bc); outline-offset: 4px; }
-.link:focus-visible { outline: 3px solid var(--v34-focus, #4880ba); outline-offset: 4px; }
+.tab:focus-visible, .next:focus-visible, .link:focus-visible { outline: 3px solid var(--v34-focus); outline-offset: -3px; }
+.next:focus-visible, .link:focus-visible { outline-offset: 4px; }
 
 /* Simple opacity only; reduced motion keeps the instant switch. */
 @media (prefers-reduced-motion: no-preference) {
@@ -73,12 +90,16 @@
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 
 @media (max-width: 760px) {
+  .bar { padding: 14px 18px; }
   .tablist { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .panel { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .tab { padding: 12px 16px; }
+  .tab:nth-child(2n) { border-right: 0; }
+  .panel { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .record { min-height: 0; padding: 20px; }
 }
 
 @media (forced-colors: active) {
   .tab, .next { border: 1px solid ButtonText; }
-  .tab[aria-selected="true"] { outline: 2px solid Highlight; }
+  .tab[aria-selected="true"] { outline: 2px solid Highlight; outline-offset: -3px; }
   .tab:focus-visible, .next:focus-visible, .link:focus-visible { outline-color: Highlight; }
 }

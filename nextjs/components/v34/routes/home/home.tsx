@@ -46,11 +46,18 @@ export function HomeBody() {
         actions={
           <>
             <ButtonLink href={action.href} tone="onDark" analytics="hero-primary">{action.label}</ButtonLink>
-            <ButtonLink href={`#${WALKTHROUGH_ANCHOR}`} tone="secondary" analytics="hero-secondary">{HERO.secondary}</ButtonLink>
+            <a className={s.watch} href={`#${WALKTHROUGH_ANCHOR}`} data-analytics="hero-secondary">{HERO.secondary}</a>
             <p className={s.note}>{HERO.note}</p>
           </>
         }
         art={<HeroArt />}
+        foot={
+          <ol className={s.layers} aria-label="Record layers, source to change">
+            {stats.layers.map((l) => (
+              <li key={l.kind}>{String(l.layer).padStart(2, "0")} / {l.kind}</li>
+            ))}
+          </ol>
+        }
       />
 
       <Section id={WALKTHROUGH_ANCHOR} surface="paper" eyebrow={WALKTHROUGH.eyebrow} title={WALKTHROUGH.title} lead={WALKTHROUGH.lead}>
@@ -97,12 +104,12 @@ export function HomeBody() {
         </p>
       </Section>
 
-      <Section surface="connect" eyebrow={CONNECT.eyebrow} title={CONNECT.title} lead={CONNECT.lead}>
-        <div className={s.connectGrid}>
-          <div className={s.connectActions}>
-            <ButtonLink href={CONNECT.primary.href} tone="onDark">{CONNECT.primary.label}</ButtonLink>
-            <ButtonLink href={CONNECT.secondary.href} tone="secondary">{CONNECT.secondary.label}</ButtonLink>
-          </div>
+      <Section
+        surface="connect"
+        eyebrow={CONNECT.eyebrow}
+        title={CONNECT.title}
+        lead={CONNECT.lead}
+        aside={
           <div className={s.diagram}>
             <div className={s.origin}>
               <p className={s.originName}>{CONNECT.origin.name}</p>
@@ -117,6 +124,11 @@ export function HomeBody() {
               ))}
             </ul>
           </div>
+        }
+      >
+        <div className={s.connectActions}>
+          <ButtonLink href={CONNECT.primary.href} tone="onDark">{CONNECT.primary.label}</ButtonLink>
+          <ButtonLink href={CONNECT.secondary.href} tone="secondary">{CONNECT.secondary.label}</ButtonLink>
         </div>
       </Section>
 
@@ -135,7 +147,7 @@ export function HomeBody() {
 
       <Bridge eyebrow={JOURNAL.eyebrow} title={JOURNAL.title} href={JOURNAL.href} label={JOURNAL.label} />
 
-      <FinalCta title={FINAL.title} tone="final" />
+      <FinalCta title={FINAL.title} eyebrow={FINAL.eyebrow} secondary={FINAL.secondary} tone="final" />
     </>
   );
 }

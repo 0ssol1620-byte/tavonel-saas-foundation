@@ -1,5 +1,8 @@
 .tag {
   display: inline-flex;
+  /* A label, not a field: in a grid it keeps its own width instead of stretching across the track. */
+  justify-self: start;
+  width: fit-content;
   align-items: center;
   min-height: 24px;
   padding: 2px 10px;
