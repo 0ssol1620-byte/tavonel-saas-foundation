@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   signer: vi.fn(), load: vi.fn(), access: vi.fn(), user: vi.fn(), pilot: vi.fn(),
   product: vi.fn(), rollback: vi.fn(), ceiling: vi.fn(),
 }));
+// The signed-receipt check has its own suite (promotion-receipt-check.test.ts); these fixtures carry unsigned candidates.
+vi.mock("@/lib/promotion-receipt-check", () => ({ checkCandidateCompileReceipt: () => ({ ok: true }) }));
 vi.mock("./r2-synthetic-canary", () => ({ readR2SignerEnv: mocks.signer }));
 vi.mock("./r2-objects", () => ({ getWorkspaceCollectionCandidate: mocks.load }));
 vi.mock("./connector-source-access", () => ({ checkConnectorSourceAccess: mocks.access }));
