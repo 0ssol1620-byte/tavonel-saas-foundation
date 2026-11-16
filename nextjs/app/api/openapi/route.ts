@@ -1150,10 +1150,12 @@ export async function GET(request: Request) {
             { name: "lens", in: "path", required: true, schema: { type: "string", enum: ["objects", "relations", "evidence", "history", "files", "review"] } },
             { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50 } },
             { name: "cursor", in: "query", required: false, schema: { type: "string" } },
+            { name: "ids", in: "query", required: false, description: "1-50 distinct item ids, comma separated, on `objects`, `relations` or `evidence`. Returns those items in request order plus `selection.missing`; not combinable with `limit`, `cursor` or `page_token`.", schema: { type: "string" } },
+            { name: "page_token", in: "query", required: false, description: "The `page.nextPageToken` of the previous page: a sealed cursor bound to this workspace, collection, lens, World version and access revision. Send it alone; the limit comes from the token.", schema: { type: "string" } },
           ],
           responses: {
             "200": ok(
-              "{ code: OK, world, contract, freshness, <lens>, page }. The lens array is keyed by the lens name, so `objects` comes back under `objects`.",
+              "{ code: OK, world, contract, freshness, <lens>, page, selection? }. The lens array is keyed by the lens name, so `objects` comes back under `objects`.",
               {
                 type: "object",
                 required: ["code", "world", "page"],
@@ -1173,10 +1175,11 @@ export async function GET(request: Request) {
                 page: { limit: 50, cursor: null, nextCursor: "ev-50", total: 212 },
               },
             ),
-            "400": err("WORLD_ID_INVALID", "WORLD_LENS_NOT_PAGEABLE", "WORLD_PAGE_LIMIT_INVALID", "WORLD_PAGE_CURSOR_INVALID"),
+            "400": err("WORLD_ID_INVALID", "WORLD_LENS_NOT_PAGEABLE", "WORLD_PAGE_LIMIT_INVALID", "WORLD_PAGE_CURSOR_INVALID", "WORLD_IDS_INVALID", "WORLD_IDS_WITH_PAGE", "PAGE_TOKEN_INVALID", "PAGE_TOKEN_STALE"),
             "401": err("AUTH_REQUIRED"),
             "404": err("WORLD_NOT_FOUND", "WORLD_LENS_NOT_FOUND"),
-            "503": err("WORLD_STORE_READ_FAILED"),
+            "409": err("PAGE_TOKEN_STALE"),
+            "503": err("WORLD_STORE_READ_FAILED", "PAGE_TOKEN_SIGNER_NOT_CONFIGURED"),
           },
         },
       },
@@ -1563,7 +1566,7 @@ export async function GET(request: Request) {
         Page: {
           type: "object",
           description: "Keyset paging. `cursor` is the last item id from the previous page, never an offset. `limit: null` means the whole collection was returned.",
-          properties: { limit: { type: ["integer", "null"] }, cursor: nullableStr, nextCursor: nullableStr, total: { type: ["integer", "null"] } },
+          properties: { limit: { type: ["integer", "null"] }, cursor: nullableStr, nextCursor: nullableStr, nextPageToken: { ...nullableStr, description: "Sealed continuation for `page_token`; null on the last page, absent when this deployment has no signing key." }, total: { type: ["integer", "null"] } },
         },
         Freshness: {
           type: "object",

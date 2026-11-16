@@ -7,6 +7,7 @@ import {
 } from "@/lib/consumer-context-api";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { loadWorldReadModel } from "@/lib/world-read-model";
+import { pageTokenKey, sealClaims, unsealClaims } from "@/lib/sealed-claims";
 import { getFoundationActiveWorld } from "@/lib/world-store";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +37,9 @@ const LENSES = new Set(["objects", "relations", "evidence", "history", "files", 
 */
 const PAGE_MAX = 50;
 const PAGEABLE = new Set(["objects", "relations", "evidence"]);
+const ID_PATTERN = /^[a-z-]+-[a-f0-9]{32}$/;
+const PAGE_TOKEN_PURPOSE = "tavonel.world_lens_page.v1";
+const PAGE_TOKEN_TTL_MS = 15 * 60 * 1000;
 
 type Identified = { id: string };
 
@@ -62,12 +66,41 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
   const search = new URL(request.url).searchParams;
   const rawLimit = search.get("limit");
-  const cursor = search.get("cursor");
-  const paged = rawLimit !== null || cursor !== null;
-  if (paged && !PAGEABLE.has(lens)) {
-    return NextResponse.json({ code: "WORLD_LENS_NOT_PAGEABLE" }, { status: 400, headers: NO_STORE });
+  let cursor = search.get("cursor");
+  const rawIds = search.get("ids");
+  const pageToken = search.get("page_token");
+  const fail = (code: string, status: number) => NextResponse.json({ code }, { status, headers: NO_STORE });
+  const paged = rawLimit !== null || cursor !== null || pageToken !== null;
+  if ((paged || rawIds !== null) && !PAGEABLE.has(lens)) return fail("WORLD_LENS_NOT_PAGEABLE", 400);
+
+  // By-id read (F30-06): the named items only, never mixed with paging.
+  let ids: string[] | null = null;
+  if (rawIds !== null) {
+    if (paged) return fail("WORLD_IDS_WITH_PAGE", 400);
+    ids = rawIds.split(",");
+    if (ids.length > PAGE_MAX || new Set(ids).size !== ids.length || !ids.every((value) => ID_PATTERN.test(value))) {
+      return fail("WORLD_IDS_INVALID", 400);
+    }
   }
-  const limit = rawLimit === null ? null : Number(rawLimit);
+
+  // A page token carries its own limit and cursor. Its claims are checked against the principal
+  // and path before anything is read, and against the served World and access revision after.
+  const tokenKey = pageTokenKey();
+  let limit = rawLimit === null ? null : Number(rawLimit);
+  let tokenClaims: Record<string, unknown> | null = null;
+  if (pageToken !== null) {
+    if (!tokenKey) return fail("PAGE_TOKEN_SIGNER_NOT_CONFIGURED", 503);
+    if (rawLimit !== null || cursor !== null) return fail("PAGE_TOKEN_INVALID", 400);
+    tokenClaims = unsealClaims(PAGE_TOKEN_PURPOSE, pageToken, tokenKey);
+    if (
+      !tokenClaims || tokenClaims.v !== 1 || tokenClaims.w !== auth.principal.workspaceKey || tokenClaims.c !== id ||
+      tokenClaims.l !== lens || typeof tokenClaims.k !== "string" || typeof tokenClaims.d !== "string" ||
+      typeof tokenClaims.exp !== "number" || !Number.isInteger(tokenClaims.n)
+    ) return fail("PAGE_TOKEN_INVALID", 400);
+    if (tokenClaims.exp < Date.now()) return fail("PAGE_TOKEN_STALE", 400);
+    limit = tokenClaims.n as number;
+    cursor = tokenClaims.k;
+  }
   if (paged && (limit === null || !Number.isInteger(limit) || limit < 1 || limit > PAGE_MAX)) {
     // A cursor with no limit lands here too: it asks for "the next page" of an unbounded read,
     // which is not a page this endpoint can produce.
@@ -98,8 +131,22 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     freshness: loaded.model.freshness,
   };
 
+  if (tokenClaims && (tokenClaims.a !== auth.principal.authorizationRevision || tokenClaims.d !== loaded.model.world.manifestDigest)) {
+    // Access or the World moved between pages: a walk must not splice two of them.
+    return fail("PAGE_TOKEN_STALE", 409);
+  }
+
   let body: Record<string, unknown>;
-  if (paged && limit !== null) {
+  if (ids) {
+    const byId = new Map((loaded.model[lens as "objects" | "relations" | "evidence"] as Identified[]).map((item) => [item.id, item]));
+    const items = ids.flatMap((value) => byId.get(value) ?? []);
+    body = {
+      ...shared,
+      [lens]: items,
+      selection: { requested: ids.length, found: items.length, missing: ids.filter((value) => !byId.has(value)) },
+      page: { limit: null, cursor: null, nextCursor: null, total: null },
+    };
+  } else if (paged && limit !== null) {
     const all = loaded.model[lens as "objects" | "relations" | "evidence"] as Identified[];
     const page = paginate(all, limit, cursor);
     if (!page) {
@@ -108,7 +155,15 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     body = {
       ...shared,
       [lens]: page.items,
-      page: { limit, cursor, nextCursor: page.nextCursor, total: page.total },
+      page: {
+        limit, cursor, nextCursor: page.nextCursor, total: page.total,
+        ...(tokenKey ? {
+          nextPageToken: page.nextCursor === null ? null : sealClaims(PAGE_TOKEN_PURPOSE, {
+            v: 1, w: auth.principal.workspaceKey, c: id, l: lens, d: loaded.model.world.manifestDigest,
+            a: auth.principal.authorizationRevision, k: page.nextCursor, n: limit, exp: Date.now() + PAGE_TOKEN_TTL_MS,
+          }, tokenKey),
+        } : {}),
+      },
     };
   } else {
     const payload = lens === "files"
