@@ -1,0 +1,60 @@
+/*
+  /world only. Colours come from --v34-* tokens. The bands (Hero, Section, FinalCta) set their own
+  surface, so this sheet reads --v34-fg* from the band it sits in. No animation: the only motion on
+  the page is the World's own camera.
+*/
+
+.instrumentNote {
+  margin: 16px 0 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.5;
+}
+
+.stats {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.sourceLink {
+  position: relative;
+  display: inline-flex;
+  white-space: nowrap;
+  align-items: center;
+  min-height: 24px;
+  color: var(--v34-fg-link);
+  font-weight: 650;
+  text-underline-offset: 3px;
+}
+
+.sourceLink:hover {
+  color: var(--v34-fg);
+}
+
+.sourceLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 3px;
+}
+
+
+.tableNote {
+  margin: 16px 0 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
