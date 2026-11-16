@@ -1,0 +1,112 @@
+/*
+  /research/program only. Colours come from --v34-* tokens and nothing else; the bands set their
+  own surface, so the rules here read --v34-fg* from the band they sit in. No animation.
+*/
+
+.areas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.area {
+  display: grid;
+  min-width: 0;
+}
+
+.rules {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 40px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.rule {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 22px 0 26px;
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.ruleNo {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.ruleTitle {
+  margin: 0;
+  color: var(--v34-fg);
+  font-size: clamp(1.3rem, 1.9vw, 1.7rem);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.15;
+}
+
+.ruleText {
+  max-width: 56ch;
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+}
+
+.also {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 28px;
+  margin: 0;
+}
+
+.textLink,
+.inlineLink {
+  color: var(--v34-fg-link);
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+.textLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.textLink:hover,
+.inlineLink:hover {
+  color: var(--v34-fg);
+  text-decoration-thickness: 2px;
+}
+
+.textLink:focus-visible,
+.inlineLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 3px;
+}
+
+@media (max-width: 1000px) {
+  .areas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .areas,
+  .rules {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (forced-colors: active) {
+  .textLink:focus-visible,
+  .inlineLink:focus-visible {
+    outline-color: Highlight;
+  }
+}
