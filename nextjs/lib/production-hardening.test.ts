@@ -244,7 +244,8 @@ describe("2026-09-05 production hardening", () => {
   it("does not sell collaboration that has not shipped", () => {
     const catalog = read("lib/billing-catalog.ts");
     expect(catalog).not.toContain("Shared workspace onboarding");
-    expect(catalog).toContain("Guided corpus onboarding");
+    // Starter/Pro rename (2026-11-10, founder, intended): guided onboarding is Enterprise only, so it is not a Pro feature.
+    expect(catalog).not.toContain('"Guided corpus onboarding"');
     expect(catalog).toContain('saleChannel: "contact"');
   });
 

@@ -43,6 +43,15 @@
       ],
       "credential": "bearer:supabase-jwt"
     },
+    "app/api/billing/refund-request/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "Pages an operator with a refund request. Calls no Paddle refund or adjustment API."
+    },
     "app/api/collections/[id]/ask/route.ts": {
       "type": "A-bearer",
       "methods": [

@@ -41,7 +41,7 @@ test("an authenticated account without compute access sees one consistent next s
   await expect(page.getByText("Your account is ready, but source processing is closed.", { exact: false })).toBeVisible();
   // Re-pinned 2026-11-10 (intended, hotfix PR #227): GA has no access request. Closed with no gate reason is a plan state.
   await expect(page.getByRole("link", { name: "Request source access" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "See Developer access" })).toHaveAttribute("href", "/pricing");
+  await expect(page.getByRole("link", { name: "See plans" })).toHaveAttribute("href", "/pricing");
 });
 
 test("closed workspace does not sell AI connection access as an available plan", async ({ page }) => {
@@ -52,7 +52,7 @@ test("closed workspace does not sell AI connection access as an available plan",
   await expect(page.getByRole("heading", { name: "AI connections are not available for this workspace yet." })).toBeVisible();
   // Re-pinned 2026-11-10 (intended, hotfix PR #227): GA has no access request. Closed with no gate reason is a plan state.
   await expect(page.getByRole("link", { name: "Request source access" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "See Developer access" })).toHaveAttribute("href", "/pricing");
+  await expect(page.getByRole("link", { name: "See plans" })).toHaveAttribute("href", "/pricing");
 });
 
 /*

@@ -22,7 +22,7 @@
 export const BILLING_OFFERS = {
   observer_access: {
     kind: "subscription",
-    label: "Developer",
+    label: "Starter",
     priceUsd: 29,
     credits: 2_000,
     includedPages: 500,
@@ -41,20 +41,19 @@ export const BILLING_OFFERS = {
   },
   studio_access: {
     kind: "subscription",
-    label: "Team",
+    label: "Pro",
     priceUsd: 99,
     credits: 10_000,
     includedPages: 2_500,
     priceEnv: "PADDLE_PRICE_STUDIO_ACCESS",
     /*
-      Contact sales, and not only because billing is in pilot.
+      Contact sales (CAT-D4, 2026-11-16, lead decision on PR #230).
 
-      Routing Team to /contact today is a side effect of checkout being closed for everyone.
-      The moment live checkout opens, that side effect disappears and this plan would start
-      selling itself -- while invitations, roles, seat accounting and access revocation still
-      do not exist in any migration or route. `saleChannel` makes the gate independent of
-      commercial mode, so opening billing cannot arm a plan whose product is unfinished.
-      It flips to "self_serve" when the membership flow ships end to end, not before.
+      PR #230 flipped this plan to self-serve. That flip is not landed: the V22 price book and its
+      plan structure arrive through the catalog work orders (WO-CAT-1/2), and no price or sale
+      channel changes before them. The plan stays a contact-sales plan, and `saleChannel` is the
+      per-offer gate: the checkout route refuses any offer whose channel is "contact"
+      (`decideOfferCheckoutPolicy`), whatever the commercial mode.
     */
     saleChannel: "contact",
     /*
@@ -69,14 +68,21 @@ export const BILLING_OFFERS = {
       all enforced. Membership is named below as something that is not sold yet, in the same
       card, rather than left for a buyer to discover on the security page after they have paid.
     */
-    description: "The higher-volume plan for a single-member workspace, with guided review and onboarding.",
+    /*
+      2026-11-10, founder: the customer-facing names are Starter ($29) and Pro ($99). "Team" read as
+      seats this plan does not have, and "Developer" read as for developers only. The offer codes,
+      price env names, webhooks and stored rows are unchanged, and receipts keep the names they had.
+      Pro is told apart by what it delivers: the volume, the review queue and the version history.
+      Guided onboarding is an Enterprise item and is not part of a self-serve plan.
+    */
+    description: "The higher-volume plan, with the review queue and version history.",
     features: [
       "2,500 standard pages",
-      "Everything in Developer",
+      "Everything in Starter",
       "Review queue and version history",
-      "Guided corpus onboarding",
       "Google Drive and file-server connections",
     ],
+    // Kept as main has it: `lib/v34/routes.test.ts` holds /teams exactly while this lists shared members.
     notYetSold: ["Shared members and roles", "Per-member source permissions"],
   },
 } as const;

@@ -30,6 +30,7 @@ import { OPS_BACKLOG_SLI_AFFECTED_PATHS, OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES } f
 import { PROCESSING_GA_AFFECTED_PATHS, PROCESSING_GA_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { TRIAL_TO_PAID_AFFECTED_PATHS, TRIAL_TO_PAID_AFFECTED_UNIT_FILES, TRIAL_TO_PAID_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { SLI_ALERT_NOISE_AFFECTED_PATHS, SLI_ALERT_NOISE_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { ONE_STEP_BUY_AFFECTED_PATHS, ONE_STEP_BUY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { TRUST_COPY_AFFECTED_PATHS, TRUST_COPY_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 import { HERO_COMPILE_TABS_AFFECTED_PATHS, HERO_COMPILE_TABS_AFFECTED_UNIT_FILES, HERO_COMPILE_TABS_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { CONNECTORS_DEVELOPER_AFFECTED_PATHS, CONNECTORS_DEVELOPER_AFFECTED_UNIT_FILES, CONNECTORS_DEVELOPER_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
@@ -640,7 +641,7 @@ for (const binding of [
     suites: ['lib/access-bootstrap-admission.test.ts', 'lib/billing-binding.test.ts', 'lib/billing-gate-enforce-route.test.ts', 'lib/brand-copy.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-intent.test.ts', 'lib/checkout-policy.test.ts', 'lib/commercial-state.test.ts', 'lib/cta-truth.test.ts', 'lib/customer-data-admission.test.ts', 'lib/customer-data-live-path.test.ts', 'lib/entitlement-wait.test.ts', 'lib/landing-v2-use.test.ts', 'lib/operations.test.ts', 'lib/paddle-billing-event.test.ts', 'lib/page-seo.test.ts', 'lib/pilot-evaluation-worksheet.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/processing-workspace-grant.test.ts', 'lib/production-posture.test.ts', 'lib/public-status.test.ts', 'lib/scoped-admission-boundaries.test.ts', 'lib/self-service-trial-device-rotation.test.ts', 'lib/status-route-contract.test.ts', 'lib/use-checkout.test.ts'],
     browsers: ['e2e/login-capability.spec.ts', 'e2e/self-serve-journey.spec.ts'],
     rows: ["['e2e/self-serve-journey.spec.ts', ['audit']],", "['e2e/login-capability.spec.ts', ['1440']],"],
-    neighbors: ['nextjs/app/api/internal/billing/other/route.ts', 'nextjs/components/checkout-intent-notice.test.tsx', 'nextjs/e2e/fixtures/paddle-fixture-2.ts', 'nextjs/lib/billing-catalog.ts', 'nextjs/lib/checkout-policy.ts', 'nextjs/lib/use-checkout.tsx', 'nextjs/lib/self-service-trial.test.ts', 'nextjs/lib/customer-data-admission.ts', 'nextjs/lib/commercial-state.ts', 'nextjs/lib/processing-workspace-grant.tsx'] },
+    neighbors: ['nextjs/app/api/internal/billing/other/route.ts', 'nextjs/components/checkout-intent-notice.test.tsx', 'nextjs/e2e/fixtures/paddle-fixture-2.ts', 'nextjs/lib/billing-catalog.ts', 'nextjs/lib/checkout-policy.tsx', 'nextjs/lib/use-checkout.tsx', 'nextjs/lib/self-service-trial.test.ts', 'nextjs/lib/customer-data-admission.ts', 'nextjs/lib/commercial-state.ts', 'nextjs/lib/processing-workspace-grant.tsx'] },
   { group: 'table-read-intake-ceiling', prefix: '', exportedPaths: TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, exportedSuites: TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
     paths: ['nextjs/lib/fixtures/table-read/synthetic-no-table.json', 'nextjs/lib/fixtures/table-read/synthetic-read-table-and-formula.json', 'nextjs/lib/fixtures/table-read/synthetic-unreadable-truncated.json', 'nextjs/lib/table-read-contract.test.ts', 'shared/intakeCeiling.ts', 'shared/tableReadContract.ts'],
@@ -863,6 +864,14 @@ for (const binding of [
     browsers: [],
     rows: [],
     neighbors: ['nextjs/app/api/internal/sli/page.tsx', 'nextjs/lib/synthetic-probe-store.tsx', 'lib/synthetic-probe-store.ts'] },
+  // pricing-one-step-buy-20261110: sixteen exact paths, fifteen direct suites, no browser suite.
+  { group: 'pricing-one-step-buy-20261110', prefix: 'nextjs/', exportedPaths: ONE_STEP_BUY_AFFECTED_PATHS, exportedSuites: ONE_STEP_BUY_AFFECTED_UNIT_FILES,
+    exportedBrowsers: [],
+    paths: ['app/api/billing/refund-request/route.ts', 'app/api/contact/route.ts', 'components/billing-refund.tsx', 'components/contact-form.tsx', 'components/pipeline-board.tsx', 'lib/billing-refund-request.test.ts', 'lib/billing-store.ts', 'lib/category-guide.test.ts', 'lib/checkout-policy.test.ts', 'lib/checkout-policy.ts', 'lib/contact-route.test.ts', 'lib/paddle-browser.ts', 'lib/plan-feature-matrix.test.ts', 'lib/refund-eligibility.test.ts', 'lib/refund-eligibility.ts', 'lib/workspace-tenancy.test.ts'],
+    suites: ['lib/api-error-codes.test.ts', 'lib/billing-reconciliation.test.ts', 'lib/billing-refund-request.test.ts', 'lib/category-guide.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-policy.test.ts', 'lib/contact-route.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/output-escaping.test.ts', 'lib/plan-feature-matrix.test.ts', 'lib/production-route-surface.test.ts', 'lib/refund-eligibility.test.ts', 'lib/route-classification.test.ts', 'lib/use-checkout.test.ts', 'lib/workspace-tenancy.test.ts'],
+    browsers: [],
+    rows: [],
+    neighbors: ['nextjs/app/api/billing/refund-request/route.tsx', 'nextjs/components/billing-refund.ts', 'nextjs/lib/checkout-policies.ts', 'nextjs/lib/paddle-browser.tsx', 'nextjs/lib/refund-eligibility.tsx', 'lib/refund-eligibility.ts'] },
   // legal-semicolons-20261109: five exact paths, ten direct suites, no browser suite.
   // ops-backlog-sli-20261110: two exact paths, three direct suites, no browser suite.
   { group: 'ops-backlog-sli-20261110', prefix: 'nextjs/', exportedPaths: OPS_BACKLOG_SLI_AFFECTED_PATHS, exportedSuites: OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES,
