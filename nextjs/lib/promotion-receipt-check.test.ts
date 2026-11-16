@@ -74,6 +74,8 @@ function receiptFor(env: Record<string, string>, over: Record<string, unknown> =
     coreRequestId: "core-proof", coreOutputSha256: compiled.manifestDigest,
     customerDataGateReceiptSha256: `sha256:${"c".repeat(64)}`,
     sourceDocuments: compiled.sourceDocuments.map((d) => ({ documentId: d.documentId, versionKey: d.versionKey })),
+    sourceScope: "direct_upload", authorizationEpoch: null,
+    coreResponseSchema: "tavonel.product_core.compile_response.v2", coreReleaseDigest: `sha256:${"e".repeat(64)}`,
     compiledAt: NOW.toISOString(), ...over,
   })!.receipt;
 }
@@ -86,6 +88,17 @@ const check = (artifact: unknown, e: Record<string, string | undefined> = env, s
 describe("checkCandidateCompileReceipt", () => {
   it("passes a receipt that verifies and describes the stored candidate", () => {
     expect(check(stored())).toEqual({ ok: true });
+  });
+
+  it("refuses a v2 receipt whose source scope changed since compile", () => {
+    expect(check(stored(), env, { ...subject, currentScope: "connector" } as typeof subject))
+      .toEqual({ ok: false, code: "WORLD_CANDIDATE_SCOPE_CHANGED", status: 409 });
+    expect(check(stored(), env, { ...subject, currentScope: "direct_upload" } as typeof subject)).toEqual({ ok: true });
+  });
+
+  it("refuses a v2 receipt that names another Core response schema", () => {
+    expect(check(stored({}, env, { coreResponseSchema: "tavonel.product_core.compile_response.v1" })))
+      .toEqual({ ok: false, code: "COMPILE_RECEIPT_MALFORMED", status: 409 });
   });
 
   it("refuses a candidate with no signed receipt", () => {

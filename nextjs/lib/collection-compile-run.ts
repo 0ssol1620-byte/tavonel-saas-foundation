@@ -25,6 +25,7 @@ import {
   readRevisionCompileSnapshot,
   revisionCompileEnabled,
   CORE_V2_MAX_REQUEST_BYTES,
+  PRODUCT_CORE_RESPONSE_SCHEMA,
   type ProductCoreV2CompileRequest,
 } from "./core-runtime-v2";
 import { readCustomerSourceAuthorization, type SourceAuthorizationResult } from "./customer-data-admission";
@@ -511,6 +512,8 @@ export async function runCollectionCompile(
   const compiledAt = new Date();
   const receiptSigner = readCompileReceiptSigner(process.env, compiledAt);
   if (!receiptSigner) return { ok: false, status: 503, code: "COMPILE_RECEIPT_SIGNER_NOT_CONFIGURED", payload: {} };
+  const receiptScope = await classifyCompileJobSources({ workspaceKey: workspaceId, documentIds });
+  if (!receiptScope.ok) return { ok: false, status: 503, code: receiptScope.code, payload: {} };
   const signed = signCompileReceipt(receiptSigner, {
     tenantId: workspaceId,
     workspaceId,
@@ -523,6 +526,11 @@ export async function runCollectionCompile(
     coreOutputSha256: coreExecution.receipt.outputSha256,
     customerDataGateReceiptSha256: customerDataGate.receiptSha256,
     sourceDocuments: expectedVersions,
+    sourceScope: receiptScope.scope,
+    // Neither the route principal nor the job row hands this function a revision; never invented.
+    authorizationEpoch: null,
+    coreResponseSchema: PRODUCT_CORE_RESPONSE_SCHEMA,
+    coreReleaseDigest: compiled.result.receipt.coreReleaseDigest,
     compiledAt: compiledAt.toISOString(),
   });
   if (!signed) return { ok: false, status: 502, code: "COMPILE_RECEIPT_INVALID", payload: {} };

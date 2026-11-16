@@ -321,7 +321,7 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
         status: "completed",
         runtime: "tavonel-python-core-v2",
         candidate: { worldStateId: "world-1", reviewReasons: [] },
-        receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, candidatePromotion: false },
+        receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, coreReleaseDigest: `sha256:${"e".repeat(64)}`, candidatePromotion: false },
       },
     });
     put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
@@ -784,7 +784,7 @@ describe("a source read before region capture", () => {
         status: "completed",
         runtime: "tavonel-python-core-v2",
         candidate: { worldStateId: "world-1", reviewReasons: [] },
-        receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, candidatePromotion: false },
+        receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, coreReleaseDigest: `sha256:${"e".repeat(64)}`, candidatePromotion: false },
       },
     });
 
@@ -870,7 +870,7 @@ describe("a re-compile of a collection that already has an active World", () => 
         status: "completed",
         runtime: "tavonel-python-core-v2",
         candidate: { worldStateId: "world-2", reviewReasons: [] },
-        receipt: { requestId: "request-2", outputSha256: `sha256:${"f".repeat(64)}`, candidatePromotion: false },
+        receipt: { requestId: "request-2", outputSha256: `sha256:${"f".repeat(64)}`, coreReleaseDigest: `sha256:${"e".repeat(64)}`, candidatePromotion: false },
       },
     });
     put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
@@ -1106,7 +1106,7 @@ describe("exact-duplicate annotation at compile intake", () => {
     dispatched.mockResolvedValue({ ok: true, result: {
       status: "completed", runtime: "tavonel-python-core-v2",
       candidate: { worldStateId: "world-1", reviewReasons: [] },
-      receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, candidatePromotion: false },
+      receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, coreReleaseDigest: `sha256:${"e".repeat(64)}`, candidatePromotion: false },
     } });
     put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
   }
@@ -1204,7 +1204,7 @@ describe("library organize proposals at compile intake", () => {
     dispatched.mockResolvedValue({ ok: true, result: {
       status: "completed", runtime: "tavonel-python-core-v2",
       candidate: { worldStateId: "world-1", reviewReasons: [] },
-      receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, candidatePromotion: false },
+      receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, coreReleaseDigest: `sha256:${"e".repeat(64)}`, candidatePromotion: false },
     } });
     put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
   }

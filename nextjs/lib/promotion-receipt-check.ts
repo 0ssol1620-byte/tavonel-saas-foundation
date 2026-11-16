@@ -1,11 +1,15 @@
-import { verifyCompileReceipt, type SignedCompileReceipt } from "./compile-receipt-signing";
+import { COMPILE_RECEIPT_SCHEMA, verifyCompileReceipt, type SignedCompileReceipt } from "./compile-receipt-signing";
+import { PRODUCT_CORE_RESPONSE_SCHEMA } from "./core-runtime-v2";
 import { readExportTrustStoreEnv } from "./export-signing";
 
 export type CandidateReceiptCheck =
   | { ok: true }
   | { ok: false; code: string; status: 409 | 503 };
 
-type Subject = { workspaceId: string; collectionId: string; manifestDigest: string };
+type Subject = { workspaceId: string; collectionId: string; manifestDigest: string;
+  /** The source classification now (`classifyCompileJobSources`); a v2 receipt signed for another scope is refused. */
+  currentScope?: "direct_upload" | "connector";
+};
 
 const pairs = (docs: unknown) =>
   Array.isArray(docs)
@@ -41,6 +45,12 @@ export function checkCandidateCompileReceipt(
   );
   if (!verified.ok) return { ok: false, code: verified.code, status: 409 };
   const p = verified.payload;
+  if (p.schemaVersion === COMPILE_RECEIPT_SCHEMA) {
+    if (p.coreResponseSchema !== PRODUCT_CORE_RESPONSE_SCHEMA) return { ok: false, code: "COMPILE_RECEIPT_MALFORMED", status: 409 };
+    if (subject.currentScope && p.sourceScope !== subject.currentScope) {
+      return { ok: false, code: "WORLD_CANDIDATE_SCOPE_CHANGED", status: 409 };
+    }
+  }
   const core = artifact.coreExecution;
   const signedPairs = pairs(p.sourceDocuments);
   const storedPairs = pairs(artifact.sourceDocuments);
