@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { TRUST_SEQUENCE } from "@/components/trust-next";
 import { ProgramBody } from "@/components/v34/routes/research-program/program";
 import { metadata } from "@/app/research/program/page";
 import { AREAS, HERO, METHOD, RETAINED } from "@/components/v34/routes/research-program/program-content";
@@ -38,6 +39,8 @@ const stripped = (list: typeof sources) => list.map((f) => ({ file: f.file, text
 const page = stripComments(readFileSync(join(root, "app/research/program/page.tsx"), "utf8"));
 const html = renderToStaticMarkup(createElement(ProgramBody));
 const decoded = html.replaceAll("&#x27;", "'").replaceAll("&amp;", "&");
+/** The trust step after /reproducibility: the page that answers "What is still open?". */
+const PROGRAM_STEP = TRUST_SEQUENCE[TRUST_SEQUENCE.findIndex((step) => step.href === "/reproducibility") + 1]!.href;
 
 describe("route files", () => {
   it("has the body, its words and its sheet", () => {
@@ -129,12 +132,18 @@ describe("the moved body is whole", () => {
     expect(html).toContain("Read what was measured");
   });
 
-  it("ends on the shared trust step, TrustNext from /research, as the crosswalk moves it", () => {
+  /*
+    This page holds the open problems, so it is the trust step /reproducibility leads to ("Read the
+    open questions"). Its `from` is read from the shared sequence rather than typed here, so the page
+    and the sequence cannot drift apart: D33 §4 #11/#13 move that step from /research to
+    /research/program in one lead commit (queued with program.tsx's `from`), and a commit that
+    moves one without the other fails here.
+  */
+  it("ends on the trust step that follows /reproducibility, whose next step is the notes", () => {
     const body = stripped(code).find((f) => f.file.endsWith("/program.tsx"))!;
-    expect(body.text).toContain('<TrustNext from="/research" />');
-    expect(html).toContain("trust-next");
-    expect(decoded).toContain("Next: Research notes");
-    expect(decoded).toContain("What has actually been measured?");
+    expect(body.text).toContain(`<TrustNext from="${PROGRAM_STEP}" />`);
+    expect(html).toContain('class="stack trust-next"');
+    expect(html).toMatch(/<a\b[^>]*\bhref="\/research\/notes"[^>]*>Read what was measured<\/a>/);
   });
 });
 
@@ -148,10 +157,10 @@ describe("the evidence rules", () => {
     expect(text).not.toMatch(/\bGPU\b/);
   });
 
-  // `/research` is the typed `from` of TrustNext, the page's own step in the trust sequence.
+  // The one other literal is TrustNext's typed `from`, the page's own step in the trust sequence.
   it("types no path except the retained pages that have no registry key", () => {
     const literal = stripped(code).flatMap((f) => [...f.text.matchAll(/["'`]\/[a-z][^"'`]*/g)].map((m) => m[0]));
-    expect(literal.sort()).toEqual(['"/benchmarks', '"/research', '"/research/notes', '"/reproducibility', '"/trust'].sort());
+    expect(literal.sort()).toEqual(['"/benchmarks', `"${PROGRAM_STEP}`, '"/research/notes', '"/reproducibility', '"/trust'].sort());
   });
 });
 
