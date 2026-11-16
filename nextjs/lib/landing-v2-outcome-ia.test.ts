@@ -14,7 +14,6 @@ const landingAnalyticsSource = readFileSync(
   "utf8",
 );
 const englishPageSource = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
-const koreanPageSource = readFileSync(new URL("../app/ko/page.tsx", import.meta.url), "utf8");
 const llms = readFileSync(new URL("../public/llms.txt", import.meta.url), "utf8");
 const sitemapPaths = new Set(sitemap().map((entry) => new URL(entry.url).pathname.replace(/\/$/, "") || "/"));
 
@@ -62,9 +61,6 @@ describe("B33 outcome IA cross-surface integration", () => {
       "Inspect a finished public Compiled World, follow one result to its exact source region, and compare what changed before you discuss your own sources.";
     expect(englishPageSource).toContain(sentence);
     expect(llms).toContain(`[Home](https://tavonel.com/): ${sentence}`);
-    expect(koreanPageSource).toContain(
-      "완성된 공개 Compiled World를 살펴보고, 결과 하나를 정확한 원문 영역까지 따라가고, 변경 내용과 허용 원문 및 배포 경계를 확인한 뒤 직접 가진 원문을 논의하세요.",
-    );
   });
 
   it("keeps the entry page indexable and measured, and no longer advertises /ko (GX-02)", () => {

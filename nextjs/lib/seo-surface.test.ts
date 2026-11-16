@@ -473,8 +473,8 @@ describe("public surface: the Korean subtree is retired (GX-02, founder, 2026-11
   const koreanPages = pages.filter((page) => page.route === "/ko" || page.route.startsWith("/ko/"));
   const isKorean = (path: string) => path === "/ko" || path.startsWith("/ko/");
 
-  it("keeps the sources in the tree for a later deletion, and advertises none of them", () => {
-    expect(koreanPages.map((page) => page.route).sort()).toEqual(["/ko", "/ko/contact", "/ko/evaluation", "/ko/guide", "/ko/pricing"]);
+  it("has no page sources left in the tree, and advertises no /ko URL", () => {
+    expect(koreanPages.map((page) => page.route).sort()).toEqual([]);
     expect(sitemapPaths.filter(isKorean), "a /ko URL redirects and must not be in the sitemap").toEqual([]);
     expect(llmsPaths.filter(isKorean), "a /ko URL redirects and must not be in llms.txt").toEqual([]);
   });

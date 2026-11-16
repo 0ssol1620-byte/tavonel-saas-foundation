@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { activationPolicy } from "./activation-policy";
 import { BILLING_OFFERS } from "./billing-catalog";
@@ -143,17 +143,12 @@ describe("pageMetadata refuses a verification date that verifies nothing", () =>
   than something this file can assert its way out of.
 */
 describe("the Korean entry page stands on a fact, not a translation", () => {
-  const source = readFileSync(new URL("../app/ko/page.tsx", import.meta.url), "utf8");
   const copyDeck = readFileSync(new URL("./landing-v2-copy.ts", import.meta.url), "utf8");
 
-  it("renders the shared composition rather than a second Korean page", () => {
-    expect(source, "one composition, two locales -- not two pages to keep in step")
-      .toContain("<LandingPage korean");
-    expect(source, "and the Korean document language is still declared").toContain("<DocumentLangKo />");
-    expect(source, "the Korean entry keeps its own canonical").toContain('canonical: "/ko"');
-    // The page file itself states no commercial fact any more; the copy deck does.
-    expect(source, "a plan label written in Korean here is the drift this file exists to catch")
-      .not.toContain("BILLING_OFFERS");
+  it("has no page file of its own: /ko redirects with a 308", () => {
+    expect(existsSync(new URL("../app/ko", import.meta.url)), "app/ko is gone").toBe(false);
+    const config = readFileSync(new URL("../next.config.mjs", import.meta.url), "utf8");
+    expect(config).toContain('{ source: "/ko", destination: "/", permanent: true }');
   });
 
   it("carries the commercial facts it states, and states them as the catalog does", () => {
@@ -210,7 +205,7 @@ describe("the Korean entry page stands on a fact, not a translation", () => {
   });
 
   it("quotes no price, page count or limit it would have to keep in step", () => {
-    const copy = source.replace(/\/\*[\s\S]*?\*\//g, " ");
+    const copy = copyDeck.replace(/\/\*[\s\S]*?\*\//g, " ");
     expect(copy).not.toMatch(/\$\d|\d{2,}\s*(페이지|장|MiB|MB|일)/);
   });
 });

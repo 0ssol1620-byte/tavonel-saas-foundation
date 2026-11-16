@@ -24,7 +24,6 @@ import {
   navHrefs,
   navSectionForPath,
   KO_CHROME,
-  KO_NAV_PANELS,
   navAlsoOwns,
 } from "./site-navigation";
 
@@ -176,8 +175,8 @@ describe("the global menu's destinations", () => {
     const hrefs = FOOTER_GROUPS.flatMap((group) => group.links.map((link) => link.href));
     for (const href of hrefs) expect(KO_CHROME.footerLinks[href], href).toBeTruthy();
     expect(Object.keys(KO_CHROME.footerLinks).sort()).toEqual([...hrefs].sort());
-    expect(read("../components/public-site-chrome.tsx"), "and the footer renders them")
-      .toContain("korean ? KO_CHROME.footerLinks[link.href] ?? link.label : link.label");
+    expect(read("../components/public-site-chrome.tsx"), "the footer chrome itself is English only")
+      .not.toContain("KO_CHROME");
   });
 
   it("closes the footer with the copyright and the security inbox, and no language switch", () => {
@@ -230,10 +229,9 @@ describe("the production customer destinations in the bar", () => {
     }
   });
 
-  it("gives every one of them a Korean label, and names no route it does not carry", () => {
-    const hrefs = CUSTOMER_NAV.map((item) => item.href);
-    for (const href of hrefs) expect(KO_CHROME.nav[href], href).toBeTruthy();
-    expect(Object.keys(KO_CHROME.nav).sort()).toEqual([...hrefs].sort());
+  it("carries no Korean label table for the bar: /ko redirects with a 308, so the bar is English only", () => {
+    expect(KO_CHROME).not.toHaveProperty("nav");
+    expect(read("../lib/site-navigation.ts")).not.toContain("KO_NAV_PANELS");
   });
 
   it("writes each label once, and points each destination at one item", () => {
@@ -317,25 +315,10 @@ describe("the Solutions column of the Product panel", () => {
   has a Korean spelling, and the table names nothing the panels do not carry. The corpus line is a
   number in two languages: the Korean one is held to the same figures as the English one.
 */
-describe("the panels in Korean", () => {
-  const items = NAV_GROUPS.flatMap((group) => [
-    ...group.columns.flatMap((column) => column.items),
-    ...(group.featured ? [group.featured] : []),
-  ]);
-
-  it("translates every column, link and description, and nothing else", () => {
-    const titles = NAV_GROUPS.flatMap((group) => group.columns.map((column) => column.title));
-    expect(Object.keys(KO_NAV_PANELS.columns).sort()).toEqual([...new Set(titles)].sort());
-    expect(Object.keys(KO_NAV_PANELS.links).sort()).toEqual([...new Set(items.map((item) => item.href))].sort());
-    const described = items.filter((item) => item.description).map((item) => item.href);
-    expect(Object.keys(KO_NAV_PANELS.descriptions).sort()).toEqual([...new Set(described)].sort());
-  });
-
-  it("states the sample corpus with the figures the English line has", () => {
-    const regions = exploreSampleDocuments.reduce((total, document) => total + document.regionCount, 0);
-    expect(KO_NAV_PANELS.descriptions["/explore"]).toBe(
-      `Apple SEC 코퍼스 · 공시 ${exploreSampleDocuments.length}건 · 영역 ${regions.toLocaleString("en-US")}개`,
-    );
+describe("the panels carry no Korean table", () => {
+  it("the panels render their English labels and descriptions only", () => {
+    const html = renderToStaticMarkup(createElement(NavSections, { sheet: true }));
+    expect(html).not.toMatch(/[\uac00-\ud7a3]/);
   });
 });
 
@@ -402,16 +385,15 @@ describe("the rendered panels", () => {
     }
   });
 
-  it("renders the same groups as the phone sheet's rows, in Korean on /ko", () => {
-    const html = renderToStaticMarkup(createElement(NavSections, { korean: true, sheet: true }));
+  it("renders the same groups as the phone sheet's rows", () => {
+    const html = renderToStaticMarkup(createElement(NavSections, { sheet: true }));
     expect(anchors(html, "mobile-nav-direct").map(hrefOf)).toEqual(HEADER_NAV.map((item) => item.href));
     for (const group of NAV_GROUPS) {
       const panel = panelOf(html, `sheet-nav-panel-${group.section}`);
       for (const href of groupHrefs(group.section)) {
         expect(panel).toContain(`href="${href}"`);
-        expect(panel).toContain(KO_NAV_PANELS.links[href]);
       }
-      expect(html).toContain(`aria-label="${KO_CHROME.nav[group.overviewHref]} ${KO_NAV_PANELS.menu}"`);
+      expect(html).toContain(`aria-label="${group.label} menu"`);
     }
   });
 });

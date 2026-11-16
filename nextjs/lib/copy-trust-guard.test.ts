@@ -60,13 +60,10 @@ const COPY_MODULES = [
 /** The marketing routes named in the campaign brief, each as the file that carries its copy. */
 const MARKETING_PAGES = [
   "app/page.tsx",
-  "app/ko/page.tsx",
   "app/product/page.tsx",
   "app/knowledge-compiler/page.tsx",
   "app/explore/page.tsx",
   "app/pricing/page.tsx",
-  // P2-10: the Korean twin of /pricing (UX-PLAN §5.3 R12), now that the list below reads Korean.
-  "app/ko/pricing/page.tsx",
   "app/enterprise/page.tsx",
   "app/solutions/page.tsx",
   "app/integrations/page.tsx",

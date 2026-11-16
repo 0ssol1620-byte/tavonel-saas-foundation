@@ -7,9 +7,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /*
   NAV PANELS, 2026-11-09: this file does not import `lib/site-navigation`, and neither does
-  `components/mobile-primary-nav.tsx`. They were the only client modules on / and /ko that did,
+  `components/mobile-primary-nav.tsx`. They were the only client modules on / that did,
   and `/pricing` renders the header from a client component, so every export the header reads
-  (the panels, their Korean) lands in that one shared module's chunk -- which / and /ko then
+  (the panels) lands in that one shared module's chunk -- which / then
   loaded for three strings and one function. The server passes the strings and each item's owned
   paths instead; `lib/site-nav-model.test.ts` pins the parity of `navCurrent` with
   `customerNavCurrent` and the absence of the import.
@@ -68,7 +68,7 @@ export function HeaderAccountActions({ signedIn, start, labels, className, signI
  * A bar item: the one part of the server-rendered navigation that has to know the route.
  *
  * `also` is `navAlsoOwns(match)` from the server, and `match` is the href the item stands for when
- * it links elsewhere (the sheet's Pricing row points at /ko/pricing on /ko and is still /pricing).
+ * it links elsewhere.
  * The phone sheet's rows stay plain anchors, as they were before the panels came back.
  */
 export function NavCurrentLink({ href, match = href, also, className, section, native = false, children }: {

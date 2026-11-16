@@ -154,7 +154,7 @@ describe("2026-09-05 production hardening", () => {
     expect(css).toContain(".mobile-primary-nav { display: block; }");
     // NAV PANELS 2026-11-09: the rows are the bar's own, rendered by the header into the sheet.
     expect(nav).toContain("{children}");
-    expect(read("components/public-site-chrome.tsx")).toContain("<NavSections korean={korean} sheet />");
+    expect(read("components/public-site-chrome.tsx")).toContain("<NavSections sheet />");
     expect(read("components/public-site-chrome.tsx")).toContain("HEADER_NAV.map");
     /*
       BQ-013. The landmark still has a name; the name is now in the language of the page.
@@ -163,7 +163,7 @@ describe("2026-09-05 production hardening", () => {
       localisation the visible labels had. The guard checks that the label exists in both, rather
       than pinning the English literal and so requiring the Korean page to keep it.
     */
-    expect(nav).toContain('aria-label={korean ? "모바일 섹션" : "Mobile sections"}');
+    expect(nav).toContain('aria-label="Mobile sections"');
     // The accordion is a disclosure, not a dialog: Tab must leave it. A focus trap imported here
     // would pass every geometry assertion in the suite. The import, not the word: both
     // components explain in prose why they do not reach for that hook.
@@ -176,7 +176,7 @@ describe("2026-09-05 production hardening", () => {
     const client = read("components/site-nav/desktop-primary-nav.tsx");
     expect(nav).toContain("HEADER_NAV.map");
     // BQ-013: the landmark keeps its name, in the language of the page it is on.
-    expect(nav).toContain('aria-label={korean ? "섹션" : "Sections"}');
+    expect(nav).toContain('aria-label="Sections"');
     // NAV PANELS 2026-11-09: `aria-expanded`/`aria-controls` on a `<button>`, and no `role="menu"`
     // promising arrow keys this navigation does not implement. The labels stay links.
     expect(nav).toContain('aria-expanded="false"');

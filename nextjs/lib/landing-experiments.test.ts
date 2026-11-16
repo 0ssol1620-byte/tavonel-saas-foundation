@@ -198,7 +198,7 @@ describe("the cookie, and what may travel with the arm", () => {
     expect(middleware).toContain('sameSite: "lax"');
     // A functional preference, not a credential: the reader may read which arm they are in.
     expect(middleware).not.toContain("httpOnly: true");
-    for (const page of ["app/page.tsx", "app/ko/page.tsx"]) {
+    for (const page of ["app/page.tsx"]) {
       expect(read(page), `${page} reads the arm on the server`).toContain("landingVariantState({");
       expect(read(page), `${page} must not set a cookie from a Server Component`).not.toContain(".set(");
     }
