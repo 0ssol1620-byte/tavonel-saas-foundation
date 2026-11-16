@@ -1,0 +1,81 @@
+/*
+  Storyboard drawing and frame list. Every colour is a V34 token; the drawing sits on the shared dark
+  media panel (Figure), the frame list on the page's paper surface.
+*/
+
+.art {
+  display: block;
+  width: 100%;
+  height: auto;
+  color: var(--v34-on-dark);
+  font-family: var(--v34-font);
+}
+
+.sheet {
+  fill: var(--v34-step-bg);
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+}
+
+.line {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.node {
+  fill: var(--v34-lime);
+}
+
+.label {
+  fill: var(--v34-on-dark);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.frames {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.frame {
+  min-width: 0;
+}
+
+@media (max-width: 1000px) {
+  .frames {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .frames {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* The link already has a line; the hover says "this one" with the surface's full-strength text colour. */
+.link:hover {
+  color: var(--v34-fg);
+}
+
+.link:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
