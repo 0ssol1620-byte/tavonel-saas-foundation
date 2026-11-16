@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   WALKTHROUGH_ANSWER_LABEL, WALKTHROUGH_LABEL, WALKTHROUGH_STEPS,
@@ -62,5 +64,30 @@ describe("identifiers in the walkthrough's record text", () => {
   it("returns the text unchanged, run by run, and marks nothing in plain words", () => {
     for (const t of texts) expect(identifierRuns(t).map((r) => r.text).join("")).toBe(t);
     expect(ids("Relation: addresses · status: changed")).toEqual([]);
+  });
+});
+
+/*
+  A regular-expression lookbehind is a SyntaxError when the module is parsed on Safari and iOS
+  before 16.4, which takes the whole client chunk down with it. Shipped V34 code uses none; test
+  files run in Node only and are not scanned.
+*/
+describe("no lookbehind in shipped V34 code", () => {
+  const nextjs = join(import.meta.dirname, "../..");
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]);
+  const shipped = ["components/v34", "lib/v34"]
+    .flatMap((dir) => walk(join(nextjs, dir)))
+    .filter((file) => /\.(?:tsx?|jsx?|mjs)$/.test(file) && !/\.test\.[jt]sx?$/.test(file));
+
+  it("scans the V34 sources", () => {
+    expect(shipped.some((file) => file.endsWith("identifiers.ts"))).toBe(true);
+  });
+
+  it.each(shipped.map((file) => [relative(nextjs, file).replaceAll("\\", "/"), file]))("%s has no (?<= or (?<!", (_name, file) => {
+    const text = readFileSync(file, "utf8");
+    expect(text).not.toContain("(?<=");
+    expect(text).not.toContain("(?<!");
   });
 });
