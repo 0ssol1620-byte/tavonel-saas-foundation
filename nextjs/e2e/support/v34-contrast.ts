@@ -1,0 +1,247 @@
+/**
+ * Rendered-pixel contrast (architecture section 5). The approach of contrast-zoom-audit.spec.ts
+ * (colour from the browser's resolved style, normalised through a canvas, WCAG ratio) extended to
+ * surfaces that audit calls unmeasurable: the background is not read from CSS but sampled from a
+ * screenshot of the element's box with its text hidden, and the minimum and maximum luminance
+ * pixels of that box stand for the gradient extremes. The text passes only if it holds against both.
+ *
+ * Thresholds are WCAG 2.1 AA as published: 4.5 normal text, 3.0 large text (>= 24px, or >= 18.66px
+ * at weight >= 700), 3.0 for control boundaries. Disabled controls are reported, not failed.
+ */
+
+import type { Page } from "@playwright/test";
+import type { Violation } from "./v34-measure";
+
+export type Rgb = readonly [number, number, number];
+
+export function luminance([r, g, b]: Rgb): number {
+  const ch = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b);
+}
+
+export function contrastRatio(a: Rgb, b: Rgb): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** Foreground with alpha over an opaque background. */
+export function composite(fg: readonly [number, number, number, number], bg: Rgb): Rgb {
+  return [0, 1, 2].map(i => fg[i] * fg[3] + bg[i] * (1 - fg[3])) as unknown as Rgb;
+}
+
+export function requiredRatio(fontPx: number, weight: number, kind: "text" | "control"): number {
+  if (kind === "control") return 3;
+  return fontPx >= 24 || (fontPx >= 18.66 && weight >= 700) ? 3 : 4.5;
+}
+
+type Target = {
+  index: number;
+  selector: string;
+  text: string;
+  fg: [number, number, number, number];
+  fontPx: number;
+  weight: number;
+  kind: "text" | "control";
+  disabled: boolean;
+};
+
+const HIDE_ATTR = "data-v34-contrast-hide";
+
+/** Runs in the page: elements that carry text, deduplicated by (colour, size class, surface class). */
+function collectTargets(max: number): Target[] {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 1;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return [];
+  const rgba = (value: string): [number, number, number, number] => {
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = "#000";
+    ctx.fillStyle = value;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+    return [r, g, b, a / 255];
+  };
+  const seen = new Set<string>();
+  const out: Target[] = [];
+  const priority = (e: Element) => (e.matches("h1,h2,h3,a,button,label,summary,[role=button]") ? 0 : 1);
+  const all = [...document.querySelectorAll("body *")]
+    .filter(e => [...e.childNodes].some(n => n.nodeType === Node.TEXT_NODE && (n.textContent ?? "").trim().length > 1))
+    .sort((a, b) => priority(a) - priority(b));
+  document.querySelectorAll(`[${"data-v34-contrast-idx"}]`).forEach(e => e.removeAttribute("data-v34-contrast-idx"));
+  for (const el of all) {
+    if (el.closest("canvas, svg, [hidden], script, style")) continue;
+    const s = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    if (s.display === "none" || s.visibility === "hidden" || r.width < 2 || r.height < 2) continue;
+    let opacity = 1;
+    for (let n: Element | null = el; n; n = n.parentElement) opacity *= Number(getComputedStyle(n).opacity);
+    if (opacity === 0) continue;
+    const fg = rgba(s.color);
+    fg[3] *= opacity;
+    const fontPx = parseFloat(s.fontSize);
+    const weight = Number(s.fontWeight) || 400;
+    const surface = [...(el.parentElement?.classList ?? [])][0] ?? el.parentElement?.tagName ?? "";
+    const named = el.matches("a, button, h1, h2, h3, label, summary, figcaption, [role=button]");
+    const key = `${fg.join(",")}|${fontPx >= 24 ? "L" : fontPx}|${weight >= 700}|${surface}${named ? `|${el.tagName}` : ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const index = out.length;
+    el.setAttribute("data-v34-contrast-idx", String(index));
+    out.push({
+      index,
+      selector: `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}${typeof el.className === "string" && el.className ? `.${el.className.trim().split(/\s+/)[0]}` : ""}`,
+      text: (el.textContent ?? "").trim().slice(0, 40),
+      fg,
+      fontPx,
+      weight,
+      kind: "text",
+      disabled: el.matches(":disabled, [aria-disabled='true']"),
+    });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+/** Runs in the page: decode a PNG (base64) and return the darkest and lightest pixel by luminance. */
+async function extremes(b64: string): Promise<{ dark: Rgb; light: Rgb } | null> {
+  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const bmp = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
+  const c = document.createElement("canvas");
+  c.width = bmp.width;
+  c.height = bmp.height;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.drawImage(bmp, 0, 0);
+  const d = ctx.getImageData(0, 0, c.width, c.height).data;
+  const lum = (r: number, g: number, b: number) => {
+    const f = (v: number) => {
+      const x = v / 255;
+      return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  };
+  let lo = Infinity;
+  let hi = -Infinity;
+  let dark: Rgb = [0, 0, 0];
+  let light: Rgb = [255, 255, 255];
+  for (let i = 0; i < d.length; i += 4) {
+    const l = lum(d[i], d[i + 1], d[i + 2]);
+    if (l < lo) { lo = l; dark = [d[i], d[i + 1], d[i + 2]]; }
+    if (l > hi) { hi = l; light = [d[i], d[i + 1], d[i + 2]]; }
+  }
+  return { dark, light };
+}
+
+export type ContrastOptions = {
+  /** Maximum number of sampled elements per page. */
+  max?: number;
+  /** Receipt exceptions: selector substring -> rationale. Matching findings are returned in `excepted`, not `violations`. */
+  exceptions?: Record<string, string>;
+};
+
+export type ContrastResult = {
+  violations: Violation[];
+  excepted: (Violation & { rationale: string })[];
+  reported: Violation[];
+  checked: number;
+};
+
+/** Pixel-sampled text contrast for the current page state. */
+export async function contrastPass(page: Page, options: ContrastOptions = {}): Promise<ContrastResult> {
+  const targets = await page.evaluate(collectTargets, options.max ?? 60);
+  await page.addStyleTag({
+    content: `[${HIDE_ATTR}], [${HIDE_ATTR}] * { color: transparent !important; text-shadow: none !important; caret-color: transparent !important; -webkit-text-fill-color: transparent !important; }`,
+  });
+  const result: ContrastResult = { violations: [], excepted: [], reported: [], checked: 0 };
+  for (const t of targets) {
+    const handle = page.locator(`[data-v34-contrast-idx="${t.index}"]`).first();
+    try {
+      await handle.scrollIntoViewIfNeeded({ timeout: 2000 });
+      await handle.evaluate((e, a) => e.setAttribute(a, ""), HIDE_ATTR);
+      const png = await handle.screenshot({ type: "png", timeout: 3000 });
+      await handle.evaluate((e, a) => e.removeAttribute(a), HIDE_ATTR);
+      const ex = await page.evaluate(extremes, png.toString("base64"));
+      if (!ex) continue;
+      const required = requiredRatio(t.fontPx, t.weight, t.kind);
+      const worst = Math.min(
+        ...[ex.dark, ex.light].map(bg => contrastRatio(composite(t.fg, bg), bg)),
+      );
+      result.checked += 1;
+      if (worst + 0.005 >= required) continue;
+      const v: Violation = {
+        pass: "contrast",
+        selector: t.selector,
+        detail: `"${t.text}" ${worst.toFixed(2)}:1 needs ${required}:1 (${t.fontPx}px/${t.weight}, fg rgb(${t.fg.slice(0, 3).join(",")}) over ${ex.dark.join(",")} .. ${ex.light.join(",")})`,
+      };
+      const rationale = Object.entries(options.exceptions ?? {}).find(([k]) => t.selector.includes(k))?.[1];
+      if (t.disabled) result.reported.push(v);
+      else if (rationale) result.excepted.push({ ...v, rationale });
+      else result.violations.push(v);
+    } catch {
+      await handle.evaluate((e, a) => e.removeAttribute(a), HIDE_ATTR).catch(() => undefined);
+    }
+  }
+  return result;
+}
+
+/** Runs in the page: visible bordered controls and their resolved border/fill colours. */
+function collectControls(max: number): { index: number; selector: string; border: [number, number, number, number]; fill: [number, number, number, number]; borderPx: number }[] {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 1;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return [];
+  const rgba = (value: string): [number, number, number, number] => {
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = "#000";
+    ctx.fillStyle = value;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+    return [r, g, b, a / 255];
+  };
+  const out: { index: number; selector: string; border: [number, number, number, number]; fill: [number, number, number, number]; borderPx: number }[] = [];
+  document.querySelectorAll("[data-v34-control-idx]").forEach(e => e.removeAttribute("data-v34-control-idx"));
+  for (const el of document.querySelectorAll("input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea, button, [role=button]")) {
+    const s = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    if (s.display === "none" || s.visibility === "hidden" || r.width < 8 || r.height < 8 || el.matches(":disabled, [aria-disabled='true']")) continue;
+    const borderPx = parseFloat(s.borderTopWidth);
+    if (s.borderTopStyle === "none" || borderPx <= 0) continue;
+    const index = out.length;
+    el.setAttribute("data-v34-control-idx", String(index));
+    out.push({ index, selector: `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}${typeof el.className === "string" && el.className ? `.${el.className.trim().split(/\s+/)[0]}` : ""}`, border: rgba(s.borderTopColor), fill: rgba(s.backgroundColor), borderPx });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+/**
+ * Non-text contrast, 3:1: a control's border (or, when the border is weaker, its fill) against the
+ * surface behind it, the surface being sampled from a screenshot with the control hidden.
+ */
+export async function controlContrastPass(page: Page, max = 30): Promise<Violation[]> {
+  const controls = await page.evaluate(collectControls, max);
+  const out: Violation[] = [];
+  for (const c of controls) {
+    const handle = page.locator(`[data-v34-control-idx="${c.index}"]`).first();
+    try {
+      await handle.scrollIntoViewIfNeeded({ timeout: 2000 });
+      await handle.evaluate(e => ((e as HTMLElement).style.visibility = "hidden"));
+      const rect = await handle.boundingBox();
+      const png = rect ? await page.screenshot({ type: "png", clip: rect, timeout: 3000 }) : null;
+      await handle.evaluate(e => ((e as HTMLElement).style.visibility = ""));
+      if (!png) continue;
+      const ex = await page.evaluate(extremes, png.toString("base64"));
+      if (!ex) continue;
+      const edge = (paint: readonly [number, number, number, number]) =>
+        paint[3] < 0.05 ? 1 : Math.min(...[ex.dark, ex.light].map(bg => contrastRatio(composite(paint, bg), bg)));
+      const best = Math.max(edge(c.border), edge(c.fill));
+      if (best + 0.005 < 3) out.push({ pass: "control-contrast", selector: c.selector, detail: `boundary ${best.toFixed(2)}:1 needs 3:1 (border rgb(${c.border.slice(0, 3).join(",")}) ${c.borderPx}px)` });
+    } catch {
+      await handle.evaluate(e => ((e as HTMLElement).style.visibility = "")).catch(() => undefined);
+    }
+  }
+  return out;
+}
