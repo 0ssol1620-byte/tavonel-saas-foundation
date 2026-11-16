@@ -481,7 +481,8 @@ describe("public copy", () => {
     expect(
       hero,
       "the H1 is a rendering of the constant, not a copy of it"
-    ).toContain("copy.headline.split(");
+      // split into sentences in code since the lookbehind went (Safari before 16.4); the input is still the constant
+    ).toContain("sentences(arm || copy.headline)");
     // Comments stripped: the rationale for deleting them names the strings it deleted.
     const page = landingSource().replace(/\{?\/\*[\s\S]*?\*\/\}?/g, "");
     expect(page, "a numbered section kicker is not a section name").not.toMatch(

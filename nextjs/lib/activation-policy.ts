@@ -23,8 +23,6 @@
   below was written narrowly enough to let it through. It is gone now rather than reworded, and
   the two enforced controls are the whole of what the string claims.
 */
-const CUSTOMER_DATA_STATE = "Signing in creates your workspace, and uploading and compiling your own sources open for it once its owner accepts the processing terms. Your workspace shows whether it is open.";
-
 export const activationPolicy = {
   /*
     BA-175. "Bucket" is a storage product, not a customer concept, and the PATH row on /security
@@ -110,15 +108,16 @@ export const activationPolicy = {
     processing terms; the release row and the grant still decide, so it still says the workspace
     shows whether it is open.
   */
-  customerData: { enabled: true, reason: `${CUSTOMER_DATA_STATE} Once it is open, the Developer plan can be bought online. Team and Enterprise are arranged with us rather than enabled by a plan purchase.` },
+  customerData: { enabled: true, reason: "Signing in creates your workspace, and uploading and compiling your own sources open for it once its owner accepts the processing terms. Your workspace shows whether it is open. Once it is open, the Developer plan can be bought online. Team and Enterprise are arranged with us rather than enabled by a plan purchase." },
 } as const;
 
 /*
   The customerData reason without its plan sentence. The V34 route bodies name no plan outside
   /pricing, so /capabilities and /contact print this half; every other surface prints the whole
-  reason, which still begins with it.
+  reason. Both stay literal (the guide quotes the whole sentence and checks it against the source);
+  lib/v34/route-bodies.test.ts holds that the reason still begins with this half.
 */
-export const customerDataState = CUSTOMER_DATA_STATE;
+export const customerDataState = "Signing in creates your workspace, and uploading and compiling your own sources open for it once its owner accepts the processing terms. Your workspace shows whether it is open.";
 
 export type ActivationCapability = keyof typeof activationPolicy;
 export function allCapabilitiesFailClosed() { return Object.values(activationPolicy).every(capability => capability.enabled === false); }

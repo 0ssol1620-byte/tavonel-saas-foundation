@@ -118,7 +118,8 @@ describe("the solutions hub", () => {
   it("leads with the heading rather than a label above it", () => {
     expect(shipped.match(/<Hero\b/g)).toHaveLength(1);
     expect(shipped).not.toMatch(/<h1\b/);
-    expect(shipped).toContain('title={route.title.replace(SUFFIX, "")}');
+    // the registry heading: the title without " — TAVONEL" (V34RouteRecord.heading since route batch 2)
+    expect(shipped).toContain("title={route.heading}");
     expect(HERO.eyebrow).not.toMatch(/tavonel/i);
   });
 

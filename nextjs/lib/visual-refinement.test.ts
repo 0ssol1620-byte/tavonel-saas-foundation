@@ -49,6 +49,7 @@ describe("2026-09-20 visual refinement", () => {
     const disclosure = read("components/landing-v2/hero-film-disclosure.tsx");
     expect(disclosure).toContain('data-testid="landing-hero-film"');
     expect(disclosure).toContain("<CompileStagePlayer");
-    expect(read("components/landing-v2/hero-statement.tsx")).toContain("copy.headline.split");
+    // the headline is split into sentences in code since the lookbehind went (Safari before 16.4)
+    expect(read("components/landing-v2/hero-statement.tsx")).toContain("sentences(arm || copy.headline)");
   });
 });
