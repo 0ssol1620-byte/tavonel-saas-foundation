@@ -59,7 +59,7 @@ export function Walkthrough({ onStepChange }: { onStepChange?: (index: number) =
             onClick={() => go(i)}
             onKeyDown={onKeyDown}
           >
-            <small>{pad(i)}</small>
+            <small className={styles.tabNo}>{pad(i)}</small>
             {step.label}
           </button>
         ))}
@@ -71,7 +71,7 @@ export function Walkthrough({ onStepChange }: { onStepChange?: (index: number) =
           role="tabpanel"
           aria-labelledby={`${id}-tab-${i}`}
           hidden={ready && i !== active}
-          className={styles.panel}
+          className={i === 0 ? styles.panel : `${styles.panel} ${styles.panelFollowing}`}
         >
           <div className={styles.copy}>
             <p className={styles.eyebrow}>{pad(i)} / {step.label}</p>

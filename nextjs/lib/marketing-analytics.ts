@@ -12,9 +12,8 @@ export const CONSENT_KEY = "tavonel.analytics-consent.v1";
 */
 export const PUBLIC_MARKETING_PATHS = new Set([
   "/", "/api", "/arena", "/benchmarks", "/benchmarks/gdp-pdf", "/changelog", "/contact", "/demo", "/developers", "/docs", "/enterprise",
-  "/evidence", "/explore", "/integrations", "/knowledge-compiler", "/how-it-works", "/pricing", "/privacy",
-  "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding",
-  "/refunds", "/research", "/research/notes", "/resources", "/security", "/sources", "/status",
+  "/evidence", "/explore", "/pricing", "/privacy",
+  "/refunds", "/research", "/research/notes", "/security", "/sources", "/status",
   "/subprocessors", "/terms", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence",
   "/solutions/knowledge-graph", "/solutions/source-grounded-assistants", "/solutions/knowledge-operations",
   "/docs/quickstart", "/docs/use-with-ai", "/docs/ontology-output", "/docs/concepts", "/docs/authentication",
@@ -43,6 +42,17 @@ export const PUBLIC_MARKETING_PATHS = new Set([
   */
   "/solutions",
   "/trust",
+  /*
+    V34 (D33 §3.6): the live routes of `lib/v34/routes.ts`, written out. This module reaches the
+    client through the consent component, and importing the registry would put every route's
+    description, held ones included, into the browser bundle. `lib/v34/integration.test.ts` fails
+    when this list and the registry's live paths differ, in either direction. The nine retired
+    sources (/product..., /how-it-works, /knowledge-compiler, /integrations, /resources) answer 308
+    and are measured at their destinations.
+  */
+  "/platform", "/world", "/changes", "/connect", "/personal", "/methods", "/capabilities", "/studio",
+  "/company", "/compiler", "/markets", "/engineering", "/billing", "/journal", "/journal/compiler",
+  "/journal/mcp", "/journal/revision", "/journal/research", "/research/program",
   // Conversion pass 2026-11-09: /reproducibility is indexable and in the sitemap now.
   "/reproducibility",
   // EN-0: the cookbooks index is in the sitemap and on /resources, so it is measured; its six

@@ -483,7 +483,7 @@ export function WorldIsland({ variant, corpusPath, corpusIntegrity, expected, ov
       onPointerDownCapture={requestLoad}
       onFocusCapture={requestLoad}
     >
-      <div ref={stageRef} className={styles.stage}>
+      <div ref={stageRef} className={styles.stageCrop}>
         <div className={styles.fallback}>{children}</div>
         <button type="button" className={styles.explore} onClick={requestLoad} disabled={load !== "idle"}>
           Explore the layers
@@ -553,11 +553,11 @@ export function WorldIsland({ variant, corpusPath, corpusIntegrity, expected, ov
 
       <div className={styles.info} aria-live="polite" aria-atomic="true" data-world-info="">
         {parts ? (
-          <p>
+          <p className={styles.infoLine}>
             <strong>{parts.title}</strong> {parts.body}
           </p>
         ) : (
-          <p>{corpus ? describeOverview(corpus, mode) : overview}</p>
+          <p className={styles.infoLine}>{corpus ? describeOverview(corpus, mode) : overview}</p>
         )}
         {source ? (
           <a className={styles.source} href={source.url} target="_blank" rel="noopener noreferrer">
@@ -568,7 +568,7 @@ export function WorldIsland({ variant, corpusPath, corpusIntegrity, expected, ov
 
       <ul className={styles.legend} aria-label="Record kinds, one layer each">
         {legend.map((item) => (
-          <li key={item.kind}>
+          <li key={item.kind} className={styles.legendItem}>
             <span className={styles.swatch} style={{ backgroundColor: item.color }} aria-hidden="true" />
             <span className={styles.layerNumber}>{String(item.layer).padStart(2, "0")}</span> {item.kind} <span className={styles.legendCount}>{item.count.toLocaleString("en-US")}</span>
           </li>

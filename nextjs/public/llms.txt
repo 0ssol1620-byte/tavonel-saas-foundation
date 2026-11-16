@@ -15,35 +15,43 @@ Indexing: public product, documentation, research and trust pages are indexable.
 ## Pages
 
 - [Home](https://tavonel.com/): Inspect a finished public Compiled World, follow one result to its exact source region, and compare what changed before you discuss your own sources.
-- [Product](https://tavonel.com/product): Inspect the resulting World, its source-linked knowledge, version history and AI connections.
-- [How it works](https://tavonel.com/how-it-works): Follow six steps from a source to a reviewed, versioned World.
-- [Solutions](https://tavonel.com/solutions): The five documented uses, each linking to its own page: who it is for, the path from source to World, what the workflow leaves behind, and where it stops. A described use, not a completed customer case.
-- [Knowledge Compiler guide](https://tavonel.com/knowledge-compiler): What a Knowledge Compiler is, how it differs from RAG/search/graphs, and when to use one.
+- [Platform](https://tavonel.com/platform): Compile documents into a versioned World with evidence regions, compare what changed between versions, read it over MCP and export a signed package.
+- [World](https://tavonel.com/world): Open the public reference corpus as a World of records, relationships and sources, then follow each relationship back to the document it came from.
 - [Explore a Compiled World](https://tavonel.com/explore): Inspect a deterministic source-to-world sample and follow a compiled fact back to its exact source location.
+- [Evidence](https://tavonel.com/evidence): How claims, source regions, versions and signed packages are bound together.
+- [Changes](https://tavonel.com/changes): See which records changed when a source document is revised, compare two World versions side by side and roll back to an earlier version when needed.
+- [Compiler](https://tavonel.com/compiler): See how a source file becomes records with evidence regions, which formats the compiler reads today and how each result is checked against its source. A table's grid is not recovered: its figures arrive as the paragraphs they were printed as, each carrying the page and the box it sat in.
+- [Methods](https://tavonel.com/methods): Follow the method from source file to evidence region, record and relationship, including how supported formats are read and how each step is checked.
+- [Capabilities](https://tavonel.com/capabilities): Every capability listed with its current state, from the compiler contract clauses to supported formats.
+- [Reference walkthrough](https://tavonel.com/studio): Step through compiling a small sample into a World, from source file to evidence region to a cited answer.
+- [Connect](https://tavonel.com/connect): Configuration steps for reading a World from an MCP client over stdio or through the HTTP API, with PKCE sign-in and read-only tools.
+- [Developers](https://tavonel.com/developers): API, MCP, retrieval packages and signed exports.
+- [Solutions](https://tavonel.com/solutions): The five documented uses, each linking to its own page: who it is for, the path from source to World, what the workflow leaves behind, and where it stops. A described use, not a completed customer case.
+- [Personal](https://tavonel.com/personal): Compile your own PDFs into a World of your own, cite answers back to the page they came from and revoke any API key at any time.
 - [Research](https://tavonel.com/research): Research areas, methods and current findings.
 - [Research notes](https://tavonel.com/research/notes): Measurements, limitations and experiment notes.
-- [Evidence](https://tavonel.com/evidence): How claims, source regions, versions and signed packages are bound together.
-- [Developers](https://tavonel.com/developers): API, MCP, retrieval packages and signed exports.
+- [Markets](https://tavonel.com/markets): Explore a compiled sample of SEC filings, follow each figure to the filing that states it and compare reporting periods side by side.
+- [Engineering](https://tavonel.com/engineering): Keep standards and procedures as a World where each requirement cites its source and a revision shows exactly which controls changed.
+- [Enterprise](https://tavonel.com/enterprise): What an enterprise engagement covers today, and what is not provided.
+- [Journal](https://tavonel.com/journal): Articles on compiling documents into knowledge an AI can cite, with the sources each piece relies on.
+- [What a knowledge compiler is](https://tavonel.com/journal/compiler): A plain explanation of what a knowledge compiler does differently from search and chat over files.
+- [How an AI client reads a World through MCP](https://tavonel.com/journal/mcp): What the Model Context Protocol is and how a client connects to TAVONEL.
+- [What changed in a NIST control catalog revision](https://tavonel.com/journal/revision): A worked example of a standards revision, traced to the published notice.
+- [A research record built from public sources](https://tavonel.com/journal/research): A worked example using the TRAPPIST-1 papers.
+- [Pricing](https://tavonel.com/pricing): Free Evaluation, Developer, Team and Enterprise access.
+- [Billing](https://tavonel.com/billing): What a credit is, how many credits a page uses, how refunds work and what happens when a balance runs out.
+- [Security](https://tavonel.com/security): Data path, tenant isolation, retention and security controls.
+- [Trust Center](https://tavonel.com/trust): The index of what this deployment publishes about itself, and what it does not.
+- [Company](https://tavonel.com/company): Who operates TAVONEL, the principles behind the product and where to find the legal documents.
+- [Contact](https://tavonel.com/contact)
 - [Documentation](https://tavonel.com/docs): Product and developer documentation. Every section is listed under Documentation below.
 - [API reference](https://tavonel.com/api): The HTTP interface — its operations, parameters and error codes. The machine-readable specification it is rendered from is served at /openapi.json.
 - [Cookbooks](https://tavonel.com/cookbooks): Task guides that take one piece of work through the product, each published ahead of a recorded run. The guides themselves are drafts and are not listed here.
 - [Changelog](https://tavonel.com/changelog): What changed in the product and the public interfaces. The same entries are served as an Atom feed at /changelog/feed.xml.
-- [Pricing](https://tavonel.com/pricing): Free Evaluation, Developer, Team and Enterprise access.
 - [Sources](https://tavonel.com/sources): The capability manifest this deployment reads — every accepted format, its support tier, what survives into the Compiled World, and what does not.
-- [Integrations](https://tavonel.com/integrations): Which source systems have a connector, which are not supported, and how the customer-run agent behaves.
-- [Trust Center](https://tavonel.com/trust): The index of what this deployment publishes about itself, and what it does not.
-- [Security](https://tavonel.com/security): Data path, tenant isolation, retention and security controls.
-- [Enterprise](https://tavonel.com/enterprise): What an enterprise engagement covers today, and what is not provided.
 - [Benchmarks](https://tavonel.com/benchmarks): The metric families and receipt fields a knowledge-compilation result must satisfy before a number is published.
 - [Reproducibility](https://tavonel.com/reproducibility): Frozen public fixtures and digest-bound sample artifacts.
-- [Resources](https://tavonel.com/resources): The hub over the reading, verification and comparison material.
 - [Status](https://tavonel.com/status): Current service status.
-
-## Product
-
-- [Document understanding](https://tavonel.com/product/document-understanding): Recover text, reading order and source geometry from documents and scans. A table's grid is not recovered: its figures arrive as the paragraphs they were printed as, each carrying the page and the box it sat in.
-- [Compiled World](https://tavonel.com/product/compiled-world): Structured knowledge with provenance, versions and reusable retrieval artifacts.
-- [Continuous recompilation](https://tavonel.com/product/continuous-knowledge): The Compiler Contract — eight clauses, each carrying the state it holds in this deployment.
 
 ## Solutions
 
@@ -85,5 +93,4 @@ Indexing: public product, documentation, research and trust pages are indexable.
 - [Refunds](https://tavonel.com/refunds)
 - [Subprocessors](https://tavonel.com/subprocessors)
 - [Document evaluation](https://tavonel.com/evaluation): Agree on source permissions, scope, retention, costs and evidence checks before processing.
-- [Contact](https://tavonel.com/contact)
 - [Changelog feed (Atom)](https://tavonel.com/changelog/feed.xml)

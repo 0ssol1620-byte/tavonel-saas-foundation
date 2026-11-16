@@ -4,7 +4,7 @@
 }
 
 /* Media crop: holds a drawing, never text that could be cut. */
-.frame {
+.mediaCrop {
   overflow: hidden;
   aspect-ratio: 2 / 1;
   border: 1px solid var(--v34-fg-border);
@@ -34,7 +34,7 @@
 }
 
 @media (max-width: 480px) {
-  .frame {
+  .mediaCrop {
     box-shadow: none;
   }
 }

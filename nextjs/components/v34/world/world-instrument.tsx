@@ -27,12 +27,12 @@ export function WorldInstrument({ variant = "hero" }: { variant?: "hero" | "full
         overview={describeOverview(corpus, "layers")}
         legend={stats.layers.map((l) => ({ kind: l.kind, layer: l.layer, color: KIND_COLORS[l.kind], count: l.count }))}
       >
-        <Image src="/v34/world-layers.svg" width={900} height={620} alt={worldAltText(corpus)} unoptimized priority={variant === "hero"} />
+        <Image className={styles.fallbackImage} src="/v34/world-layers.svg" width={900} height={620} alt={worldAltText(corpus)} unoptimized priority={variant === "hero"} />
       </WorldIsland>
       <ul className={styles.domains} aria-label="Records by domain">
         {stats.domains.map((d) => (
-          <li key={d.domain}>
-            {d.domain} <b>{count(d.count)}</b>
+          <li key={d.domain} className={styles.domain}>
+            {d.domain} <b className={styles.domainCount}>{count(d.count)}</b>
           </li>
         ))}
       </ul>

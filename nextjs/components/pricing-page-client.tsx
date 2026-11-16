@@ -4,8 +4,8 @@
 import "@/app/paper-product.css";
 import Link from "next/link";
 import type { Route } from "next";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import v34 from "@/components/v34/tokens.module.css";
 import PricingPlanOverview, { pricingPlanDestinationClass, pricingPlanId } from "./pricing-plan-overview";
 import tableStyles from "@/components/docs/docs-table.module.css";
 import { useCheckout, type NoticeLink, type NoticeTone } from "@/lib/use-checkout";
@@ -19,7 +19,7 @@ import {
 } from "@/lib/billing-catalog";
 import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "@/lib/compile-limits";
 import { trackFunnel } from "@/lib/funnel-events";
-import { EXPLORE_CTA, SELF_SERVE_CTA, type SiteLink } from "@/lib/site-navigation";
+import { EXPLORE_CTA, SELF_SERVE_CTA } from "@/lib/site-navigation";
 import { MCP_TOOL_COUNT_WORD } from "@/lib/mcp-tools";
 import { jsonLdHtml } from "@/lib/structured-data";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
@@ -663,14 +663,19 @@ const pricingJsonLd = (purchaseReady: boolean, faqRows: typeof PURCHASE_FAQ) => 
 export default function PricingPageClient({
   initialLiveCheckout,
   initialSelfService,
-  headerStart,
+  header,
+  footer,
   gates,
   planCapabilities,
 }: {
   initialLiveCheckout: boolean;
   initialSelfService: boolean;
-  /** The site-wide header start, resolved on the server: this client module cannot read the commercial flags (BA-232). */
-  headerStart: SiteLink;
+  /**
+   * The V34 header and footer, rendered on the server and passed in: this client module cannot read the
+   * commercial flags (BA-232), and the shell's route registry stays out of its bundle.
+   */
+  header: ReactNode;
+  footer: ReactNode;
   /** Read on the server from `lib/activation-policy`, the object /api/status serves verbatim. */
   gates: readonly PurchaseGate[];
   planCapabilities: readonly PlanCapabilityRow[];
@@ -816,13 +821,13 @@ export default function PricingPageClient({
     Boolean(plan.offerCode) && liveCheckout && signedIn && !ownerBillingExempt;
 
   return (
-    <div className="page pricing-page paper-product" data-template="T2">
+    <div className={`page pricing-page paper-product ${v34.site}`} data-v34-site="" data-template="T2">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdHtml(pricingJsonLd(initialLiveCheckout, faqRows)) }}
       />
       {/* Conversion pass 2026-11-09: the phone sheet's start action, the same one the Evaluation card offers. */}
-      <PublicSiteHeader signedIn={signedIn} start={selfService ? SELF_SERVE_CTA : headerStart} />
+      {header}
       <main id="main">
         <section className="scene doc">
           <div className="shell">
@@ -1403,7 +1408,7 @@ export default function PricingPageClient({
           </div>
         </section>
       </main>
-      <PublicSiteFooter />
+      {footer}
     </div>
   );
 }

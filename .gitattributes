@@ -120,3 +120,5 @@ nextjs/content/evidence/*.json -text
 # The guide recordings, their posters and captions (lane EN-2-3), served byte-for-byte from /guide/ and
 # pinned by sha256 in public/guide/manifest.json, which lib/guide-content.test.ts rehashes.
 nextjs/public/guide/** -text
+
+nextjs/public/v34/*.json -text

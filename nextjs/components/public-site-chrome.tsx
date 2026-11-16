@@ -3,6 +3,7 @@ import type { Route } from "next";
 import type { CSSProperties } from "react";
 import Logomark from "@/components/logomark";
 import MobilePrimaryNav from "@/components/mobile-primary-nav";
+import V34Page from "@/components/v34/shell/v34-page";
 import { HeaderAccountActions, NavCurrentLink, NavDisclosure } from "@/components/site-nav/desktop-primary-nav";
 import HeaderScrollState from "@/components/site-nav/header-scroll-state";
 import { MarketingConsentLink } from "@/components/marketing-consent";
@@ -339,10 +340,6 @@ export function PublicSitePage({ children, template }: { children: React.ReactNo
     the closed posture.
   */
   return (
-    <div className="page public-page" data-template={template ?? undefined}>
-      <PublicSiteHeader start={primaryCallToAction()} />
-      <main id="main" tabIndex={-1}>{children}</main>
-      <PublicSiteFooter />
-    </div>
+    <V34Page className="page public-page" template={template ?? undefined}>{children}</V34Page>
   );
 }

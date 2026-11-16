@@ -18,7 +18,7 @@ export function Figure({ art, caption, kind = "Illustration", framed = true }: {
 }) {
   return (
     <figure className={s.figure}>
-      <div className={framed ? s.frame : s.bare}>{art}</div>
+      <div className={framed ? s.mediaCrop : s.bare}>{art}</div>
       <figcaption className={s.caption}>
         <Tag kind={kind} />
         <span className={s.text}>{caption}</span>

@@ -20,12 +20,13 @@ function current(href: string, currentPath: string): "page" | "true" | undefined
  * "Create your World" action. Below 1001px the items and More give way to the drawer. Held routes
  * are filtered out of every list before they reach a client component.
  */
-export default function SiteHeader({ currentPath }: { currentPath: string }) {
+export default function SiteHeader({ currentPath = "" }: { currentPath?: string }) {
   const primary = resolveEntries(V34_PRIMARY_NAV);
   const groups = resolveGroups(V34_MORE_GROUPS);
   const start = createWorldAction();
   return (
-    <header className={`${tokens.paper} ${s.header}`}>
+    /* data-v34-header: the retained pages' stylesheets find their page root by the header it holds. */
+    <header className={`${tokens.paper} ${s.header}`} data-v34-header="">
       <div className={s.inner}>
         <Link href="/" className={s.brand} aria-label="TAVONEL home">
           <Logomark size={26} />

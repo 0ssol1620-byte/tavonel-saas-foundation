@@ -17,15 +17,20 @@ import s from "./v34-page.module.css";
  * The skip link is the root layout's `SkipLink`, which points at `#main`; `main` is focusable so
  * that jump lands the keyboard on the page body. No second skip link is rendered here.
  */
-export default function V34Page({ route, surface = "paper", children }: {
-  route: V34RouteKey;
+export default function V34Page({ route, surface = "paper", className, template, children }: {
+  /** The registry route this page is. A retained public route (docs, legal, status ...) has none. */
+  route?: V34RouteKey;
   /** The surface the page body sits on before any band paints its own. */
   surface?: V34Surface;
+  /** Classes a retained page's own stylesheets key on (`PublicSitePage` passes "page public-page"). */
+  className?: string;
+  /** The page template a retained public page declares (T1..T5); absent on a V34 route. */
+  template?: string;
   children: ReactNode;
 }) {
   return (
-    <div className={tokens.site} data-v34-site="">
-      <SiteHeader currentPath={v34Route(route).path} />
+    <div className={className ? `${tokens.site} ${className}` : tokens.site} data-v34-site="" data-template={template}>
+      <SiteHeader currentPath={route ? v34Route(route).path : undefined} />
       <main id="main" tabIndex={-1} className={`${surfaceClass(surface)} ${s.main}`}>
         {children}
       </main>

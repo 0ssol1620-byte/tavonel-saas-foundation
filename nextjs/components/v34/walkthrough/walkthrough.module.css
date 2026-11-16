@@ -28,12 +28,12 @@
   border: 1px solid var(--v34-step-small, #c8e6d3);
   border-radius: 8px; cursor: pointer; min-width: 0;
 }
-.tab small { font-size: 0.75rem; font-weight: 500; color: var(--v34-on-dark-muted, #b8ccc0); }
+.tabNo { font-size: 0.75rem; font-weight: 500; color: var(--v34-on-dark-muted, #b8ccc0); }
 .tab[aria-selected="true"] { background: var(--v34-step-bg, #143629); color: #fff; }
-.tab[aria-selected="true"] small { color: var(--v34-step-small, #c8e6d3); }
+.tab[aria-selected="true"] .tabNo { color: var(--v34-step-small, #c8e6d3); }
 
 .panel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
-.panel + .panel { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--v34-step-bg, #143629); }
+.panelFollowing { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--v34-step-bg, #143629); }
 .panel[hidden] { display: none; }
 .copy, .record { min-width: 0; }
 .eyebrow { margin: 0 0 8px; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--v34-on-dark-muted, #b8ccc0); }

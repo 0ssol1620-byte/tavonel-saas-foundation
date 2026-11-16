@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 
 import type { MetadataRoute } from "next";
 import { DOCS_SECTIONS } from "@/lib/docs-content";
+import { V34_LIVE_PATHS, v34RouteByPath } from "@/lib/v34/routes";
 /*
   `/reproducibility` is deliberately absent.
 
@@ -49,7 +50,15 @@ import { DOCS_SECTIONS } from "@/lib/docs-content";
   keeps it, because a reading map is not a request to index and `lib/seo-surface.test.ts` allows
   an llms-only URL exactly where the page declares itself noindex.
 */
-const ROUTES = ["", "/api", "/benchmarks", "/changelog", "/contact", "/cookbooks", "/demo", "/developers", "/docs", "/enterprise", "/evaluation", "/evidence", "/explore", "/guide", "/how-it-works", "/integrations", "/knowledge-compiler", "/pricing", "/privacy", "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding", "/refunds", "/research", "/research/notes", "/resources", "/security", "/solutions", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence", "/solutions/knowledge-graph", "/solutions/source-grounded-assistants", "/solutions/knowledge-operations", "/sources", "/status", "/subprocessors", "/terms", "/trust"];
+/*
+  V34 (D33 §3.6). The retained routes below are the legacy list minus the nine that now answer 308
+  (/product and its three children, /how-it-works, /knowledge-compiler, /integrations, /resources;
+  a sitemap entry that redirects asks a crawler to spend the visit twice). The V34 routes come from
+  the typed registry: a route is here exactly when its `release` is "live", so flipping one value
+  moves it in the sitemap, llms.txt, the nav and the analytics set together.
+*/
+const RETAINED_ROUTES = ["", "/api", "/benchmarks", "/changelog", "/contact", "/cookbooks", "/demo", "/developers", "/docs", "/enterprise", "/evaluation", "/evidence", "/explore", "/guide", "/pricing", "/privacy", "/refunds", "/research", "/research/notes", "/security", "/solutions", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence", "/solutions/knowledge-graph", "/solutions/source-grounded-assistants", "/solutions/knowledge-operations", "/sources", "/status", "/subprocessors", "/terms", "/trust"];
+const ROUTES = [...new Set([...RETAINED_ROUTES, ...V34_LIVE_PATHS.map((path) => (path === "/" ? "" : path))])];
 /*
   The documentation sections come from the documentation rather than being listed again here.
 
@@ -134,7 +143,7 @@ function gitOutput(args: string[]): string {
   return result.status === 0 ? result.stdout : "";
 }
 
-const lastCommitDate = (() => {
+const { lastCommitDate, newestCommitUnder } = (() => {
   const dates = new Map<string, Date>();
   try {
     // Paths in `git log --name-only` are relative to the repository root, and this package is a
@@ -157,12 +166,32 @@ const lastCommitDate = (() => {
   } catch {
     // No git, no dates. An invented one is worse than a missing one.
   }
-  return (file: string): Date | undefined => dates.get(file);
+  return {
+    lastCommitDate: (file: string): Date | undefined => dates.get(file),
+    /** The newest commit date of any file below a directory, or undefined when none is tracked. */
+    newestCommitUnder: (dir: string): Date | undefined => {
+      let newest: Date | undefined;
+      for (const [file, when] of dates) if (file.startsWith(dir) && (!newest || when > newest)) newest = when;
+      return newest;
+    },
+  };
 })();
+
+/**
+ * A V34 route's body lives in `components/v34/routes/<key>/` as well as in its page file, so its date is
+ * the newer of the two. A route with no such folder yet keeps the page file's date.
+ */
+function routeDate(path: string): Date | undefined {
+  const page = lastCommitDate(ROUTE_SOURCE(path));
+  const route = v34RouteByPath(path === "" ? "/" : path);
+  if (!page || !route) return page;
+  const body = newestCommitUnder(`components/v34/routes/${route.key}/`);
+  return body && body > page ? body : page;
+}
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const paths = [...ROUTES, ...PROOF_ROUTES, ...DOCS_ROUTES, ...FEED_ROUTES];
-  const dates = paths.map((path) => lastCommitDate(ROUTE_SOURCE(path)));
+  const dates = paths.map((path) => routeDate(path));
   // A newly added or untracked route has no Git date yet. Publishing dates for only the older
   // subset makes the sitemap look authoritative while silently omitting the newest pages, so the
   // entire build falls back to the valid no-lastmod form until every route has provenance.
