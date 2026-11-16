@@ -220,8 +220,9 @@ const CLOSED = {
   },
   pricing: [
     { href: "/explore", label: "Explore a Compiled World" },
-    { href: "/contact?plan=Developer", label: "Request Developer access" },
-    { href: "/contact?plan=Team", label: "Talk to us about Team" },
+    { href: "/contact?plan=Starter", label: "Request Starter access" },
+    // Starter/Pro rename (2026-11-10). Pro stays on the contact path in every state (CAT-D4).
+    { href: "/contact?plan=Pro", label: "Talk to us about Pro" },
     { href: "/contact?plan=Enterprise", label: "Scope an Enterprise pilot" },
   ],
   explore: {
@@ -238,8 +239,8 @@ const CLOSED = {
     is not sold online and offers the contact path `/pricing` itself offers for Developer.
   */
   login: {
-    text: "Developer is not sold online today. Nothing is charged by signing in. Request Developer access",
-    links: [{ href: "/contact?plan=Developer", label: "Request Developer access" }],
+    text: "Starter is not sold online today. Nothing is charged by signing in. Request Starter access",
+    links: [{ href: "/contact?plan=Starter", label: "Request Starter access" }],
   },
 } as const;
 
@@ -248,7 +249,7 @@ const CLOSED = {
   carries the deal from the billing catalog and the step before checkout, in place of main's "signed webhook".
 */
 const OPEN_INTENT =
-  "Developer is held for you. $29/month for 500 standard pages, with a full refund within 14 days if you have used fewer than 50 of them. Paddle is the merchant of record. Sign in and accept the processing terms, and checkout opens by itself. Nothing is charged by signing in.";
+  "Starter is held for you. $29/month for 500 standard pages, with a full refund within 14 days if you have used fewer than 50 of them. Paddle is the merchant of record. Sign in and accept the processing terms, and checkout opens by itself. Nothing is charged by signing in.";
 
 const V34_CLOSED = { href: "/contact", label: "Create your World" };
 
@@ -263,8 +264,8 @@ const TABLE = {
     homeKo: { ...CLOSED.homeKo, primary: { href: "/login", label: "사용 신청하기" } },
     pricing: [
       { href: "/login", label: "Start free" },
-      { href: "/login?next=checkout&offer=observer_access", label: "Buy Developer — $29/month" },
-      { href: "/contact?plan=Team", label: "Talk to us about Team" },
+      { href: "/login?next=checkout&offer=observer_access", label: "Buy Starter — $29/month" },
+      { href: "/contact?plan=Pro", label: "Talk to us about Pro" },
       { href: "/contact?plan=Enterprise", label: "Scope an Enterprise pilot" },
     ],
     // /explore follows the switch too (JOURNEY-MAP D-07, A5).
@@ -395,11 +396,11 @@ describe("the checkout-intent notice", () => {
   it("names the plan it was reached for, closed or open", async () => {
     const { default: CheckoutIntentNotice } = await import("../components/checkout-intent-notice");
     const closed = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "studio_access", purchaseOpen: false })));
-    expect(closed).toBe("Team is not sold online today. Nothing is charged by signing in. Request Team access");
-    // B-07 / CLM-023: Team's saleChannel is "contact", so an open deployment still does not sell it
+    expect(closed).toBe("Pro is not sold online today. Nothing is charged by signing in. Request Pro access");
+    // B-07 / CLM-023: Pro's saleChannel is "contact" (CAT-D4), so an open deployment still does not sell it
     // online, and the checkout it would promise answers 403 BILLING_OFFER_CONTACT_REQUIRED.
     const open = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "studio_access", purchaseOpen: true })));
-    expect(open).toBe("Team is not sold online today. Nothing is charged by signing in. Request Team access");
+    expect(open).toBe("Pro is not sold online today. Nothing is charged by signing in. Request Pro access");
     expect(open).not.toContain("Checkout opens by itself");
     const developer = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "observer_access", purchaseOpen: true })));
     expect(developer).toBe(OPEN_INTENT);

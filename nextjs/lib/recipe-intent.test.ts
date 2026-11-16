@@ -320,13 +320,13 @@ describe("recipe preflight", () => {
     All three are pinned below, both channels are pinned to the catalog, and either one flipping
     fails here.
   */
-  it("states both activation plans as the catalog has them, with no self-serve path for Team", () => {
+  it("states both activation plans as the catalog has them, with no self-serve path for Pro", () => {
     const html = render({ intent: intentFor() });
     expect(BILLING_OFFERS.studio_access.saleChannel).toBe("contact");
     expect(BILLING_OFFERS.observer_access.saleChannel).toBe("self_serve");
     expect(html).toContain(BILLING_OFFERS.studio_access.label);
     expect(html).toContain(BILLING_OFFERS.observer_access.label);
-    // Team's half: a conversation, and the destination is /contact, not a checkout.
+    // Pro's half: a conversation, and the destination is /contact, not a checkout.
     expect(html).toContain("set up with you directly");
     expect(html).toContain("/contact");
     // Developer's half: self-serve, and only for the owner.
@@ -389,8 +389,9 @@ describe("continuing a recipe after sign-in", () => {
 
   it("keeps checkout's precedence, and the owner's exemption from it", () => {
     const recipe = intentFor();
-    expect(resumeDestination({ checkout: "observer_access", recipe })).toBe("/workspace?checkout=observer_access");
-    expect(resumeDestination({ checkout: "observer_access", recipe: null })).toBe("/workspace?checkout=observer_access");
+    // One-step buy (2026-11-10, intended): the held offer returns to /pricing, not the workspace.
+    expect(resumeDestination({ checkout: "observer_access", recipe })).toBe("/pricing?checkout=observer_access");
+    expect(resumeDestination({ checkout: "observer_access", recipe: null })).toBe("/pricing?checkout=observer_access");
     // An owner never reaches checkout: the recipe continues, or the workspace opens.
     expect(resumeDestination({ checkout: "observer_access", ownerBillingExempt: true, recipe }))
       .toBe(loginUrlForRecipe(recipe.recipeId, recipe.returnTo));

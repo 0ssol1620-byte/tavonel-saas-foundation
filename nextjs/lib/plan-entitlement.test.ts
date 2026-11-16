@@ -122,6 +122,7 @@ describe("plan entitlement", () => {
     -- would start taking cards. The gate therefore lives on the offer, not on the mode.
   */
   it("keeps a plan whose product is unfinished off self-serve checkout", () => {
+    // Pro stays "contact" (CAT-D4, 2026-11-16). The derivation from saleChannel below is unchanged.
     expect(BILLING_OFFERS.studio_access.saleChannel).toBe("contact");
     expect(BILLING_OFFERS.observer_access.saleChannel).toBe("self_serve");
     const pricing = readFileSync(new URL("../components/pricing-page-client.tsx", import.meta.url), "utf8");
@@ -131,8 +132,10 @@ describe("plan entitlement", () => {
       .toContain('if (!plan.offerCode || !liveCheckout) return `/contact?plan=${encodeURIComponent(plan.name)}`');
     expect(pricing, "a signed-out Developer buyer must carry the offer through sign-in")
       .toContain("return loginUrlForOffer(plan.offerCode)");
+    // One-step buy (2026-11-10, intended): the click goes through `buy`, which keeps the notice in the card.
     expect(pricing, "a signed-in Developer buyer must open the existing checkout")
-      .toContain("void startCheckout(plan.offerCode)");
+      .toContain("buy(plan.offerCode)");
+    expect(pricing).toContain("void startCheckout(offer)");
   });
 
   it("keeps secondary pricing detail available without leading with it", () => {

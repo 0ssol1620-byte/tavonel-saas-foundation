@@ -210,7 +210,8 @@ describe("the limits are read from the product, and sit above the calls to actio
   it("names the plans that activation needs, how each is sold, and who is refused", () => {
     const team = BILLING_OFFERS.studio_access;
     const developer = BILLING_OFFERS.observer_access;
-    expect(team.saleChannel, "if Team becomes self-serve the activation sentence must be re-read").toBe("contact");
+    // Pro stays "contact" (CAT-D4, 2026-11-16): the sentence says conversation, not checkout.
+    expect(team.saleChannel, "if Pro becomes self-serve the activation sentence must be re-read").toBe("contact");
     expect(developer.saleChannel, "if Developer stops being self-serve the same sentence must be re-read").toBe("self_serve");
     for (const record of COOKBOOKS) {
       const prerequisites = record.sections.find((section) => section.key === "prerequisites")!;

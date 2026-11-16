@@ -82,11 +82,11 @@ describe("contact route", () => {
     vi.stubEnv("AKC_CONTACT_TO", "hello@tavonel.com");
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
 
-    expect((await POST(request({ ...valid, plan: "Developer" }))).status).toBe(202);
+    expect((await POST(request({ ...valid, plan: "Starter" }))).status).toBe(202);
     const [, options] = fetchMock.mock.calls[0]!;
     const payload = JSON.parse(String(options?.body)) as Record<string, string>;
-    expect(payload.text).toContain("Plan: Developer");
-    expect(payload.html).toContain(">Developer</td>");
+    expect(payload.text).toContain("Plan: Starter");
+    expect(payload.html).toContain(">Starter</td>");
     expect((await POST(request({ ...valid, plan: "Administrator" }))).status).toBe(400);
   });
 

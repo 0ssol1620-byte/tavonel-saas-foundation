@@ -99,7 +99,8 @@ describe("customer data on the live compile path", () => {
     expect(reason).toContain("Signing in creates your workspace, and uploading and compiling your own sources open for it once its owner accepts the processing terms.");
     expect(reason).not.toMatch(/in stages|stage by stage/);
     expect(reason).toContain("Your workspace shows whether it is open.");
-    expect(reason).toContain("Once it is open, the Developer plan can be bought online. Team and Enterprise are arranged with us rather than enabled by a plan purchase.");
+    // Starter/Pro rename (2026-11-10); Pro stays contact (CAT-D4).
+    expect(reason).toContain("Once it is open, the Starter plan can be bought online. Pro and Enterprise are arranged with us rather than enabled by a plan purchase.");
     expect(reason).not.toMatch(/waiting list|in turn|notify|notification|we will (?:email|tell)/i);
     expect(reason).not.toMatch(/^Sign in to upload|can be bought online;/);
     expect(reason, "plain sentences").not.toContain(";");
