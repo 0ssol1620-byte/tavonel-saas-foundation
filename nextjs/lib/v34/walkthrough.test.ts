@@ -53,6 +53,12 @@ describe("identifiers in the walkthrough's record text", () => {
     expect(ids("Release 5.2.0 → SA-24")).toEqual(["Release 5.2.0", "SA-24"]);
   });
 
+  it("leaves a sentence-final period outside the identifier", () => {
+    expect(ids("Release 5.2.0.")).toEqual(["Release 5.2.0"]);
+    expect(ids("See NIST SP 800-53.")).toEqual(["NIST SP 800-53"]);
+    expect(identifierRuns("Release 5.2.0.").map((r) => r.text)).toEqual(["Release 5.2.0", "."]);
+  });
+
   it("returns the text unchanged, run by run, and marks nothing in plain words", () => {
     for (const t of texts) expect(identifierRuns(t).map((r) => r.text).join("")).toBe(t);
     expect(ids("Relation: addresses · status: changed")).toEqual([]);

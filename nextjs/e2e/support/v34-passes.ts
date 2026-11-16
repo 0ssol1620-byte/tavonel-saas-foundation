@@ -132,16 +132,21 @@ export async function forcedColorsPass(page: Page): Promise<Violation[]> {
 /**
  * Hover, focus, selected, disabled and error states, where the page has them. A control passes
  * when its state changes at least one painted property against its resting style (or, for
- * selected, against an unselected sibling). Samples at most 12 hover targets per page.
+ * selected, against an unselected sibling). Samples at most 12 hover targets per page by default;
+ * `scope` names a surface (a consent panel) whose every visible, enabled control is hovered instead.
  */
-export async function statePass(page: Page): Promise<Violation[]> {
+export async function statePass(page: Page, scope?: string): Promise<Violation[]> {
   const out: Violation[] = [];
   const sig = (el: Element) => {
     const s = getComputedStyle(el);
     return [s.color, s.backgroundColor, s.borderTopColor, s.borderTopWidth, s.outlineStyle, s.boxShadow, s.textDecorationLine, s.opacity, s.transform].join("|");
   };
-  const controls = page.locator("main a[href]:visible, main button:not([disabled]):visible, header a[href]:visible");
-  const count = Math.min(await controls.count(), 12);
+  const controls = scope
+    ? page.locator(["a[href]", "button:not([disabled])", "summary", "select:not([disabled])", "input:not([type=hidden]):not([disabled])", "[role=tab]"].map(s => `${scope} ${s}:visible`).join(", "))
+    : page.locator("main a[href]:visible, main button:not([disabled]):visible, header a[href]:visible");
+  const count = scope ? await controls.count() : Math.min(await controls.count(), 12);
+  // A scope with nothing to hover is a surface that did not show, not a pass.
+  if (scope && count === 0) out.push({ pass: "state-hover", selector: scope, detail: "no visible, enabled control to hover" });
   for (let i = 0; i < count; i++) {
     const c = controls.nth(i);
     if (!(await c.isVisible())) continue;

@@ -121,8 +121,14 @@ export default defineConfig({
         browserName,
         viewport: { width: 1440, height: 900 },
         colorScheme: "light" as const,
-        // The same Windows WebKit trace deadlock the launch projects document below.
-        ...(browserName === "webkit" ? { trace: "off" as const } : {}),
+        /*
+          Untraced in every engine. WebKit: the same Windows trace deadlock the launch projects document
+          below. All: the contrast, keyboard and consent passes are hundreds of actions and screenshots
+          each, and the trace's per-action snapshots took them past 120 s on a loaded machine where the
+          untraced run takes 15-25 s. `trace` is worker-scoped, so it cannot be turned off for those
+          tests alone. Assertions and failure screenshots are unchanged.
+        */
+        trace: "off" as const,
       },
     })),
     /* The harness's own fixtures; needs no server. Run with PLAYWRIGHT_EXTERNAL_SERVER=1. */

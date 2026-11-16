@@ -422,6 +422,21 @@
   }
 }
 
+/*
+  900-959px: the stage is 379-430px wide and the tray (392px at rest) wrapped to two rows over ~30% of
+  it. Tighter padding and gaps keep it one row; the type, the labels and every hit area above 34px stay.
+*/
+@media (min-width: 900px) and (max-width: 959.98px) {
+  .root[data-variant="hero"] .toolbar {
+    gap: 4px;
+    padding: 4px;
+  }
+
+  .root[data-variant="hero"] .control {
+    padding: 0 6px;
+  }
+}
+
 @media (max-width: 899.98px) {
   .root[data-variant="hero"] :is(.toolbar, .statusBox) {
     display: none;

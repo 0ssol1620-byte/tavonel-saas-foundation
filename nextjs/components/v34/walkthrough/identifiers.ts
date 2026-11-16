@@ -4,9 +4,10 @@
  * source text is returned unchanged, run by run.
  *
  * An identifier is a token with a digit in it (letters and a hyphen may lead it, hyphenated parts
- * may follow), together with the all-capital words and the one capitalised word that name it.
+ * may follow), together with the all-capital words and the one capitalised word that name it. A
+ * period that ends the token ends the sentence, not the identifier.
  */
-const IDENTIFIER = /((?:\b[A-Z]{2,} )*(?:\b[A-Z][a-z]+\.? )?\b[A-Z]*-?\d[\w.]*(?:-[\w.]+)*)/;
+const IDENTIFIER = /((?:\b[A-Z]{2,} )*(?:\b[A-Z][a-z]+\.? )?\b[A-Z]*-?\d[\w.]*(?:-[\w.]+)*(?<!\.))/;
 
 export function identifierRuns(text: string): { text: string; id: boolean }[] {
   return text

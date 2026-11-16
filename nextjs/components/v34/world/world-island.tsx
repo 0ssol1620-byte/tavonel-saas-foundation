@@ -221,7 +221,8 @@ export function WorldIsland({ variant, corpusPath, corpusIntegrity, expected, ov
     dataset.v34WorldInstances = String(Number(dataset.v34WorldInstances ?? "0") + 1);
     const f = readForced();
     setForced(f);
-    setGfx(f.noWebgl ? (f.no2d ? "static" : "canvas2d") : "webgl");
+    const startGfx: Gfx = f.noWebgl ? (f.no2d ? "static" : "canvas2d") : "webgl";
+    setGfx(startGfx);
     // The controls appear once the faces have settled: a face arriving after they show would resize them in view.
     let mounted = true;
     void document.fonts.ready.then(() => {
@@ -230,7 +231,14 @@ export function WorldIsland({ variant, corpusPath, corpusIntegrity, expected, ov
 
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
     const coarse = window.matchMedia("(pointer: coarse)");
-    staticOnlyRef.current = variant === "hero" && !window.matchMedia(HERO_LIVE_QUERY).matches;
+    const heroLive = window.matchMedia(HERO_LIVE_QUERY);
+    staticOnlyRef.current = variant === "hero" && !heroLive.matches;
+    // A tablet turned to portrait after the live view loaded: under 900px the hero is the static image again, so the renderer goes.
+    const onHeroLive = () => {
+      staticOnlyRef.current = !heroLive.matches;
+      setGfx(heroLive.matches ? startGfx : "static");
+    };
+    if (variant === "hero") heroLive.addEventListener("change", onHeroLive);
     // No ambient motion under reduced motion, and none on a coarse pointer until the user asks for it.
     const startMotion = !reduce.matches && !coarse.matches;
     motionRef.current = startMotion;
@@ -272,6 +280,7 @@ export function WorldIsland({ variant, corpusPath, corpusIntegrity, expected, ov
       dataset.v34WorldInstances = String(Math.max(0, Number(dataset.v34WorldInstances ?? "1") - 1));
       if (dataset.v34WorldInstances === "0") delete dataset.v34WorldInstances;
       reduce.removeEventListener("change", onReduce);
+      heroLive.removeEventListener("change", onHeroLive);
       observer.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
       if (idleHandle !== null) window.cancelIdleCallback(idleHandle);

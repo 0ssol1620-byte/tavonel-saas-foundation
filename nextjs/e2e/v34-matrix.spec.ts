@@ -73,7 +73,8 @@ const serverMode = process.env.V34_SERVER_MODE === "production" ? "production" :
 
 const allRoutes = await loadRoutes();
 const routes = allRoutes.filter(r => !routeFilter || routeFilter.includes(r.path));
-const widths = V34_WIDTHS.filter(w => !widthFilter || widthFilter.includes(w));
+// V34_WIDTHS may also name a width off the standard list (920, inside the 900-959 hero tray range) to probe a breakpoint.
+const widths: number[] = widthFilter ?? [...V34_WIDTHS];
 const SCHEMES = ["light", "dark"] as const;
 const SHOT_WIDTHS: readonly number[] = [1440, 412];
 const WORLD_ROUTES = ["/", "/world"];
@@ -291,6 +292,8 @@ if (routes.some(r => r.path === "/")) {
         await page.emulateMedia({ forcedColors: "none" });
         const walk = await keyboardWalk(page);
         violations.push(...walk.violations);
+        // The panel's controls exist only in this state, so the default-state hover sample never sees them: hover every one here.
+        violations.push(...(await statePass(page, "[data-marketing-consent-panel]")));
         record({ route: "/", width, engine: browserName, colorScheme: "light", pass: "consent", state: "pending", violations, reported: text.reported });
         expect(violations, report("/ (consent pending)", width, violations)).toEqual([]);
       } finally {

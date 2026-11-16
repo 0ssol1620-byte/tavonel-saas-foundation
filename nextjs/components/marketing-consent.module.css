@@ -63,6 +63,14 @@
   .panel p a { color: var(--tv-action) !important; }
   /* On Home the accent is not a link colour: the notice link is ink with its underline. */
   :global(body:has([data-home-ia])) .panel p a { color: var(--text-hi) !important; }
+  /*
+    The notice link had no hover at all: both colour rules above are !important, so a hover has to be
+    one too, and as specific as the Home rule. --text-lo is #555b62 here, 6.9:1 on the white card.
+  */
+  @media (hover: hover) and (pointer: fine) {
+    .panel p a:hover,
+    :global(body:has([data-home-ia])) .panel p a:hover { color: var(--text-lo) !important; }
+  }
   .panel .actions button { font-weight: 510 !important; }
 }
 
@@ -139,14 +147,15 @@
   identical border, identical colour -- if a reader has to look twice to tell which is which,
   that is the correct outcome for a choice the site is not entitled to nudge.
 
-  The shared edge is #6b737b, the Home row's rule (4.82:1 on the white card): the panel's hairline
-  measured 1.60:1 as a control boundary, under the 3:1 non-text floor. Hover darkens it to --text-lo.
+  The shared edge is --tv-ink-muted (#4c545d, 7.68:1 on the white card; it was a stray #6b737b at
+  4.82:1): the panel's hairline measured 1.60:1 as a control boundary, under the 3:1 non-text floor.
+  Hover darkens it to --text-hi.
 */
 .actions { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; flex: 0 0 auto; gap: 8px; }
 .actions button {
   min-height: 44px;
   padding: 10px 16px;
-  border: 1px solid #6b737b;
+  border: 1px solid var(--tv-ink-muted);
   border-radius: var(--r-inst, 6px);
   background: var(--g2);
   color: var(--text-hi);
@@ -156,7 +165,7 @@
   cursor: pointer;
 }
 @media (hover: hover) and (pointer: fine) {
-  .actions button:hover { border-color: var(--text-lo); }
+  .actions button:hover { border-color: var(--text-hi); }
 }
 
 /*
@@ -259,7 +268,7 @@
     box-shadow: none;
   }
   :global(body:has([data-home-ia])) .inner { flex-direction: row; align-items: center; gap: 24px; }
-  :global(body:has([data-home-ia])) .actions button { border-color: #6b737b; }
+  :global(body:has([data-home-ia])) .actions button { border-color: var(--tv-ink-muted); }
 }
 /* A fine pointer takes a 36px answer (over the 24px WCAG 2.5.8 floor); a coarse one keeps 44px. */
 @media (min-width: 900px) and (pointer: fine) {

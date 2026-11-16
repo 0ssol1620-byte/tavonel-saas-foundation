@@ -128,6 +128,16 @@ test.describe("passes", () => {
     expect(await statePass(page)).toEqual([]);
   });
 
+  test("statePass with a scope: every control of a fixed panel outside main is hovered; an empty scope fails", async ({ page }) => {
+    const css = `.l{color:#00e}.l:hover{color:#a00}.l:focus{outline:2px solid #00e}`;
+    const panel = (link: string) => `<main><p>page</p></main><div data-p style="position:fixed;left:0;bottom:0;padding:8px"><p>notice ${link}</p><button class="l">Allow</button></div>`;
+    await load(page, panel(`<a href="#n" style="color:#111" class="f">Privacy notice</a>`), `${css}.f:focus{outline:2px solid #00e}`);
+    expect((await statePass(page, "[data-p]")).map(v => `${v.pass} ${v.selector}`)).toEqual(["state-hover a[Privacy notice]"]);
+    await load(page, panel(`<a href="#n" class="l">Privacy notice</a>`), css);
+    expect(await statePass(page, "[data-p]")).toEqual([]);
+    expect((await statePass(page, "[data-absent]")).map(v => v.pass)).toEqual(["state-hover"]);
+  });
+
   test("statePass: selected and error", async ({ page }) => {
     await load(page, `<main><div><button aria-pressed="true">a</button><button aria-pressed="false">b</button></div><input aria-invalid="true" aria-describedby="e"><input></main>`);
     const found = (await statePass(page)).map(v => v.pass);
@@ -488,6 +498,8 @@ test.describe("QA 1 review: scroll axes, stretched links, text hiding, line clam
   });
 
   test("fixed layer: text and controls beneath it are not judged by its pixels; its own text still is", async ({ page }) => {
+    // Four full contrast passes, then a context teardown that ran past the 30s default on a loaded machine.
+    test.setTimeout(60_000);
     const panel = (inner: string) => `<div style="position:fixed;left:0;right:0;bottom:0;height:140px;background:#fff;color:#111;padding:8px">${inner}</div>`;
     const beneath = `<div style="background:#0b1713;color:#eff6ef;height:100vh;display:flex;align-items:flex-end;gap:12px;padding:20px"><p style="margin:0">light footer text on its dark ground</p><button style="background:#0b1713;color:#eff6ef;border:1px solid #c9f2a5;padding:8px">Footer control</button></div>`;
     await load(page, beneath + panel("<p>panel copy that holds</p>"));
