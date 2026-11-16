@@ -1,6 +1,8 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { DeveloperScope } from "./developer-contracts";
-import { authenticateDeveloperApiKey } from "./developer-store";
+import { REMOTE_MCP_REFRESH_TTL_SECONDS, authenticateDeveloperApiKey, remoteMcpRefreshEnabled } from "./developer-store";
+
+export { REMOTE_MCP_REFRESH_TTL_SECONDS, remoteMcpRefreshEnabled };
 
 /*
   G11 REMOTE-MCP (DECISION-REGISTER S6-09, S6-10; SERVICE-DEFINITION §6 D; ENABLEMENT-GAP §4).
@@ -181,9 +183,6 @@ export function resourceMetadata(origin: string): RemoteMcpResourceMetadata {
     resource_name: "TAVONEL Compiled World (read-only)",
   };
 }
-
-export const REMOTE_MCP_REFRESH_TTL_SECONDS = 30 * 24 * 3600;
-export const remoteMcpRefreshEnabled = (env: Env = process.env): boolean => env.TAVONEL_REMOTE_MCP_REFRESH_ENABLED === "true";
 
 export function authorizationServerMetadata(origin: string, env: Env = process.env): RemoteMcpAuthorizationServerMetadata {
   const urls = remoteMcpUrls(origin);

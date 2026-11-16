@@ -5,7 +5,7 @@ import { createDeveloperApiKey, listDeveloperApiKeys } from "@/lib/developer-sto
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { trialAiAccess, type TrialAiOperation } from "@/lib/trial-ai-access";
 import type { FoundationPrincipal } from "@/lib/developer-auth";
-import { REMOTE_MCP_REFRESH_TTL_SECONDS, remoteMcpRefreshEnabled, reservedKeyName } from "@/lib/remote-mcp";
+import { reservedKeyName } from "@/lib/remote-mcp";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
   const blocked = await trialBlocked(auth.principal, "key_list");
   if (blocked) return blocked;
-  const result = await listDeveloperApiKeys(auth.principal.workspaceKey, remoteMcpRefreshEnabled() ? REMOTE_MCP_REFRESH_TTL_SECONDS : undefined);
+  const result = await listDeveloperApiKeys(auth.principal.workspaceKey);
   if (!result.ok) return NextResponse.json({ code: result.code }, { status: 503, headers: NO_STORE });
   const current = await revalidateFoundationSession(request, auth.principal, "observer");
   if (!current.ok) return NextResponse.json({ code: current.code }, { status: current.status, headers: NO_STORE });

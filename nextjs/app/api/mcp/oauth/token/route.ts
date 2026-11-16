@@ -84,17 +84,29 @@ export async function POST(request: Request) {
   const trial = product.access.source === "trial";
   if (trial && !trialAiAccessEnabled()) return refuse("TRIAL_FEATURE_NOT_INCLUDED", 402);
 
-  // Flag on, a refreshable key is any unrevoked one minted within the refresh TTL, expired or not; off, the old 1 h window.
   const refreshOn = remoteMcpRefreshEnabled();
-  const windowSeconds = refreshOn ? REMOTE_MCP_REFRESH_TTL_SECONDS : REMOTE_MCP_TOKEN_TTL_SECONDS + REMOTE_MCP_CODE_TTL_SECONDS;
-  const since = new Date(Date.now() - windowSeconds * 1000).toISOString();
-  const existing = await listRecentRemoteMcpKeys(grant.workspaceKey, grant.userId, since);
+  const refreshKeyId = checked.refreshKeyId;
+  const tag = ` ~${clientTag(grant.clientId)} `;
+  const since = new Date(Date.now() - (REMOTE_MCP_TOKEN_TTL_SECONDS + REMOTE_MCP_CODE_TTL_SECONDS) * 1000).toISOString();
+  // Flag off, one read of the last hour serves the replay check and the supersede, as before. Flag on,
+  // each decision reads only the rows it decides on (this code's keys in the last hour; this client's
+  // unrevoked keys within the refresh TTL, expired or not), so another client's rotations can never push
+  // a row out of the capped read. A read that still overflows is a 503, not a partial decision.
+  const existing = refreshKeyId !== undefined
+    ? { ok: true as const, keys: [] }
+    : refreshOn
+      ? await listRecentRemoteMcpKeys(grant.workspaceKey, grant.userId, since, { nameLike: `*${codeIdMarker(grant.codeId).trim()}` })
+      : await listRecentRemoteMcpKeys(grant.workspaceKey, grant.userId, since);
   if (!existing.ok) return oauthError(503, "temporarily_unavailable", existing.code);
+  const family = refreshOn
+    ? await listRecentRemoteMcpKeys(grant.workspaceKey, grant.userId, new Date(Date.now() - REMOTE_MCP_REFRESH_TTL_SECONDS * 1000).toISOString(), { nameLike: `*${tag.trim()}*`, unrevokedOnly: true })
+    : existing;
+  if (!family.ok) return oauthError(503, "temporarily_unavailable", family.code);
   // ponytail: list-then-mint, not a unique constraint; two simultaneous redemptions of one code by
   // the PKCE holder can both mint. Add a code ledger with a unique index if that ever matters.
-  const tag = ` ~${clientTag(grant.clientId)} `;
   const live = (entry: { revokedAt: string | null; expiresAt: string | null }) => !entry.revokedAt && (refreshOn || entry.expiresAt === null || Date.parse(entry.expiresAt) > Date.now());
-  const refreshKeyId = checked.refreshKeyId;
+  // This member's earlier live keys for this client (exact tag: the narrowed read may over-match).
+  const superseded = family.keys.filter((entry) => entry.name.includes(tag) && live(entry)).map((entry) => entry.keyId);
   if (refreshKeyId !== undefined) {
     // Rotation is bound to the live key: it must still exist for this member, and not be revoked (expired is fine).
     const old = await getRemoteMcpKey(grant.workspaceKey, grant.userId, refreshKeyId);
@@ -103,23 +115,21 @@ export async function POST(request: Request) {
     if (old.key.revokedAt) {
       // A rotated-out or revoked key presented again: treat as reuse, end this client's live keys.
       let failed = 0;
-      for (const entry of existing.keys.filter((entry) => entry.name.includes(tag) && live(entry))) {
-        const ended = await revokeDeveloperApiKey(grant.workspaceKey, grant.userId, grant.authorizationRevision, entry.keyId);
+      for (const keyId of superseded) {
+        const ended = await revokeDeveloperApiKey(grant.workspaceKey, grant.userId, grant.authorizationRevision, keyId);
         if (!ended.ok) failed += 1;
       }
       if (failed > 0) console.error(JSON.stringify({ event: "mcp_refresh_reuse_revoke_failed", count: failed }));
       return oauthError(400, "invalid_grant", "The refresh token is not valid.");
     }
   }
-  const replayed = refreshKeyId !== undefined ? undefined : existing.keys.find((entry) => entry.name.endsWith(codeIdMarker(grant.codeId)));
+  const replayed = existing.keys.find((entry) => entry.name.endsWith(codeIdMarker(grant.codeId)));
   if (replayed) {
     if (!replayed.revokedAt) await revokeDeveloperApiKey(grant.workspaceKey, grant.userId, grant.authorizationRevision, replayed.keyId);
     return oauthError(400, "invalid_grant", "The authorization code was already used.");
   }
-  // This member's earlier live keys for this client: revoked once the new key exists, so a reconnect
-  // replaces them, and the trial cap does not count them against the key that replaces them.
-  const superseded = existing.keys.filter((entry) => entry.name.includes(tag) && live(entry)).map((entry) => entry.keyId);
-  // The rotated key may be older than the listing window (expired); it is still revoked below.
+  // The earlier live keys are revoked once the new key exists, so a reconnect replaces them, and the
+  // trial cap does not count them against the key that replaces them. The rotated key is always among them.
   const toRevoke = refreshKeyId !== undefined && !superseded.includes(refreshKeyId) ? [...superseded, refreshKeyId] : superseded;
   if (trial) {
     const capped = await trialMcpTokenAccess(

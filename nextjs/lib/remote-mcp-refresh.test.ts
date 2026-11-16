@@ -21,21 +21,30 @@ const mocks = vi.hoisted(() => ({
   listKeys: vi.fn(),
   getKey: vi.fn(),
   revokeKey: vi.fn(),
+  database: null as null | ((path: string) => Response),
+  actual: {} as Record<string, unknown>,
   session: vi.fn(),
   sessionProduct: vi.fn(),
 }));
 const fetchSeen: URL[] = [];
 vi.mock("@/lib/supabase-admin", () => ({
   readSupabaseAdminConfig: () => ({ url: "https://db.test", serviceRoleKey: "x" }),
-  supabaseAdminRequest: async (_config: unknown, path: string) => { fetchSeen.push(new URL(path, "https://db.test")); return Response.json([]); },
+  supabaseAdminRequest: async (_config: unknown, path: string) => {
+    fetchSeen.push(new URL(path, "https://db.test"));
+    return mocks.database ? mocks.database(path) : Response.json([]);
+  },
 }));
-vi.mock("@/lib/developer-store", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./developer-store")>()),
-  createDeveloperApiKey: mocks.createKey,
-  listRecentRemoteMcpKeys: mocks.listKeys,
-  getRemoteMcpKey: mocks.getKey,
-  revokeDeveloperApiKey: mocks.revokeKey,
-}));
+vi.mock("@/lib/developer-store", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./developer-store")>();
+  mocks.actual = actual;
+  return {
+    ...actual,
+    createDeveloperApiKey: mocks.createKey,
+    listRecentRemoteMcpKeys: mocks.listKeys,
+    getRemoteMcpKey: mocks.getKey,
+    revokeDeveloperApiKey: mocks.revokeKey,
+  };
+});
 vi.mock("@/lib/self-service-trial", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./self-service-trial")>()),
   authorizeFoundationSessionProduct: mocks.sessionProduct,
@@ -107,6 +116,7 @@ beforeEach(() => {
   });
   mocks.listKeys.mockImplementation(async () => ({ ok: true, keys: [...rows].reverse() }));
   mocks.getKey.mockImplementation(async (_w: string, _u: string, keyId: string) => ({ ok: true, key: rows.find((row) => row.keyId === keyId) ?? null }));
+  mocks.database = null;
   mocks.revokeKey.mockImplementation(async (_w: string, _u: string, _a: number, keyId: string) => {
     const row = rows.find((entry) => entry.keyId === keyId);
     if (row) row.revokedAt = new Date().toISOString();
@@ -179,11 +189,16 @@ describe("refresh flag on", () => {
     const id = await client();
     const first = await connect(id);
     rows[0].expiresAt = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
-    const listed = await developerStore.listDeveloperApiKeys(MINE, 30 * 24 * 3600);
+    // The store reads the flag itself (no caller passes a window): on, refreshable = unrevoked and minted within the refresh TTL.
+    const listed = await developerStore.listDeveloperApiKeys(MINE);
     expect(listed.ok).toBe(true);
     const query = fetchSeen.at(-1)!.searchParams;
-    // Refreshable = unrevoked and minted within the refresh TTL; no expiry filter hides it.
     expect([query.get("revoked_at"), query.get("or"), query.get("created_at")?.startsWith("gt.")]).toEqual(["is.null", null, true]);
+    vi.stubEnv("TAVONEL_REMOTE_MCP_REFRESH_ENABLED", "");
+    await developerStore.listDeveloperApiKeys(MINE);
+    const legacy = fetchSeen.at(-1)!.searchParams;
+    expect([legacy.get("revoked_at"), legacy.get("or")?.startsWith("(expires_at.is.null,expires_at.gt."), legacy.get("created_at")]).toEqual(["is.null", true, null]);
+    vi.stubEnv("TAVONEL_REMOTE_MCP_REFRESH_ENABLED", "true");
     await mocks.revokeKey(MINE, USER, 4, "key-1");
     expect((await json(await refresh(id, first.refresh_token!))).error).toBe("invalid_grant");
     expect(mocks.createKey).toHaveBeenCalledTimes(1);
@@ -269,4 +284,174 @@ describe("refresh flag on", () => {
     expect((await json(await refresh(id, first.refresh_token!))).error).toBe("invalid_grant");
     expect(live().map((row) => row.keyId)).toEqual(["key-1"]);
   });
+});
+
+/*
+  The reads behind supersede, reuse and replay, run for real against a PostgREST stand-in that honours
+  every filter, the order and the row limit. The in-memory fakes above return every row, which is how
+  a 200-row cap once hid an old family (review r13 Q1). An unknown filter, operator or order throws,
+  so the stand-in cannot quietly match more than PostgREST would.
+*/
+function postgrest(path: string): Response {
+  const url = new URL(path, "https://db.test");
+  if (url.pathname !== "/rest/v1/foundation_api_keys") throw new Error(`unexpected read ${url.pathname}`);
+  const field = (row: Row, name: string): string | null => {
+    const fields: Record<string, string | null> = {
+      workspace_key: MINE, created_by: row.userId, token_kind: "mcp", key_id: row.keyId, name: row.name,
+      created_at: row.createdAt, expires_at: row.expiresAt, revoked_at: row.revokedAt,
+    };
+    if (!(name in fields)) throw new Error(`unemulated filter ${name}`);
+    return fields[name];
+  };
+  const like = (pattern: string) => new RegExp(`^${[...pattern].map((ch) => ch === "*" ? ".*" : ch === "_" ? "." : ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("")}$`, "s");
+  const matches = (row: Row, name: string, filter: string) => {
+    const value = field(row, name);
+    if (filter === "is.null") return value === null;
+    const dot = filter.indexOf(".");
+    const [op, operand] = [filter.slice(0, dot), filter.slice(dot + 1)];
+    if (op === "eq") return value === operand;
+    if (op === "gt") return value !== null && Date.parse(value) > Date.parse(operand);
+    if (op === "like") return value !== null && like(operand).test(value);
+    throw new Error(`unemulated operator ${filter}`);
+  };
+  const query = url.searchParams;
+  let out = rows.filter((row) => [...query].every(([name, filter]) => ["select", "order", "limit"].includes(name) || matches(row, name, filter)));
+  const order = query.get("order");
+  if (order !== null) {
+    if (order !== "created_at.desc") throw new Error(`unemulated order ${order}`);
+    out = [...out].sort((x, y) => Date.parse(y.createdAt) - Date.parse(x.createdAt));
+  }
+  if (query.get("limit") !== null) out = out.slice(0, Number(query.get("limit")));
+  return Response.json(out.map((row) => ({
+    key_id: row.keyId, name: row.name, key_prefix: row.prefix, scopes: row.scopes, created_at: row.createdAt,
+    expires_at: row.expiresAt, last_used_at: null, revoked_at: row.revokedAt,
+  })));
+}
+
+describe("refresh flag on, against the real reads (PostgREST stand-in)", () => {
+  const HOUR = 3600 * 1000;
+  const REFRESH_TTL_MS = 30 * 24 * HOUR;
+  const tagOf = (clientId: string) => ` ~${createHash("sha256").update(clientId).digest("hex").slice(0, 12)} `;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.parse("2026-11-01T00:00:00Z"));
+    mocks.database = postgrest;
+    const actual = mocks.actual as Record<string, ((...args: unknown[]) => unknown) | undefined>;
+    const through = (name: string) => (...args: unknown[]) => {
+      const real = actual[name];
+      if (typeof real !== "function") throw new Error(`developer-store has no ${name}`);
+      return real(...args);
+    };
+    mocks.listKeys.mockImplementation(through("listRecentRemoteMcpKeys"));
+    mocks.getKey.mockImplementation(through("getRemoteMcpKey"));
+    // Every mint is one second after the last, so created_at orders the rows as PostgREST would.
+    const mint = mocks.createKey.getMockImplementation()!;
+    mocks.createKey.mockImplementation(async (input: unknown) => { vi.setSystemTime(Date.now() + 1000); return mint(input); });
+  });
+
+  it("a narrower re-consent ends an expired wide family that sits behind 200+ newer rows of another client", async () => {
+    const a = await client();
+    const b = await client();
+    const wideA = await connect(a);
+    vi.setSystemTime(Date.now() + 9 * 24 * HOUR);
+    let tokenB = (await connect(b)).refresh_token!;
+    for (let i = 0; i < 205; i += 1) tokenB = (await json(await refresh(b, tokenB))).refresh_token!;
+    const narrowA = await connect(a, "ask:read");
+    expect(narrowA.scope).toBe("ask:read");
+    expect(rows[0].revokedAt).not.toBeNull();
+    expect((await json(await refresh(a, wideA.refresh_token!))).error).toBe("invalid_grant");
+    expect(live().filter((row) => row.name.includes(tagOf(a)) && row.scopes.length > 1)).toEqual([]);
+  });
+
+  it("reuse behind 200+ newer rows of another client still ends this client's live key", async () => {
+    const a = await client();
+    const b = await client();
+    const firstA = await connect(a);
+    const secondA = await json(await refresh(a, firstA.refresh_token!));
+    vi.setSystemTime(Date.now() + 2 * HOUR);
+    let tokenB = (await connect(b)).refresh_token!;
+    for (let i = 0; i < 205; i += 1) tokenB = (await json(await refresh(b, tokenB))).refresh_token!;
+    expect((await json(await refresh(a, firstA.refresh_token!))).error).toBe("invalid_grant");
+    expect(rows[1].revokedAt).not.toBeNull();
+    expect((await json(await refresh(a, secondA.refresh_token!))).error).toBe("invalid_grant");
+  });
+
+  it("more live keys for one client than one read returns is a 503, never a partial revoke", async () => {
+    const a = await client();
+    await connect(a);
+    const template = rows[0];
+    for (let i = 0; i < 201; i += 1) rows.push({ ...template, keyId: `stuck-${i}`, createdAt: new Date(Date.now() - (i + 2) * 1000).toISOString() });
+    vi.setSystemTime(Date.now() + 2 * HOUR);
+    const minted = mocks.createKey.mock.calls.length;
+    expect((await connect(a)).error).toBe("temporarily_unavailable");
+    expect(mocks.createKey.mock.calls.length).toBe(minted);
+  });
+
+  it("flag off: more keys minted in one replay window than one read returns is a 503, never a missed replay", async () => {
+    vi.stubEnv("TAVONEL_REMOTE_MCP_REFRESH_ENABLED", "");
+    const a = await client();
+    await connect(a);
+    const template = rows[0];
+    for (let i = 0; i < 201; i += 1) rows.push({ ...template, keyId: `burst-${i}`, revokedAt: new Date().toISOString(), createdAt: new Date(Date.now() - (i + 2) * 1000).toISOString() });
+    const minted = mocks.createKey.mock.calls.length;
+    expect((await connect(a)).error).toBe("temporarily_unavailable");
+    expect(mocks.createKey.mock.calls.length).toBe(minted);
+  });
+
+  /*
+    Property: across random interleavings of consents (wide or narrow), refresh bursts, stale-token
+    reuse, Developers revokes and clock jumps, (1) a refresh token that is not the newest one a client
+    was issued never mints, (2) a client never holds more than one unrevoked key minted within the
+    refresh TTL, and (3) such a key never carries a scope the client's latest consent did not grant.
+    Seeded, so a failure replays.
+  */
+  for (const seed of [1, 7, 42, 99, 2026]) {
+    it(`random interleavings keep one family per client (seed ${seed})`, async () => {
+      let state = seed;
+      const rand = (n: number) => { state = (state * 1103515245 + 12345) % 2147483648; return state % n; };
+      const ids = [await client(), await client(), await client()];
+      const latest: Array<string | null> = [null, null, null];
+      const issued: string[][] = [[], [], []];
+      const consented: string[][] = [[], [], []];
+      const keep = (c: number, out: Out) => { if (out.refresh_token) { latest[c] = out.refresh_token; issued[c].push(out.refresh_token); } };
+      for (let step = 0; step < 60; step += 1) {
+        // One busy host and two quiet ones: the quiet hosts' families age behind the busy one's rotations.
+        const c = [0, 0, 0, 1, 2][rand(5)];
+        const op = rand(10);
+        const at = `seed ${seed} step ${step} client ${c} op ${op}`;
+        if (op < 2 || latest[c] === null) {
+          const scope = rand(2) === 0 ? undefined : ALL.filter(() => rand(2) === 0).join(" ") || "ask:read";
+          const out = await connect(ids[c], scope);
+          expect(out.access_token, `${at}: consent refused (${out.error ?? out.code})`).toBeTruthy();
+          consented[c] = (out.scope ?? "").split(" ");
+          keep(c, out);
+        } else if (op < 5) {
+          const n = 1 + rand(260);
+          for (let i = 0; i < n && latest[c] !== null; i += 1) {
+            const out = await json(await refresh(ids[c], latest[c]!));
+            if (out.error) latest[c] = null;
+            else keep(c, out);
+          }
+        } else if (op < 8) {
+          if (issued[c].length > 1) {
+            const stale = issued[c][rand(issued[c].length - 1)];
+            expect((await json(await refresh(ids[c], stale))).error, `${at}: a stale refresh token minted`).toBe("invalid_grant");
+            latest[c] = null;
+          }
+        } else if (op === 8) {
+          const target = live()[rand(Math.max(live().length, 1))];
+          if (target) target.revokedAt = new Date().toISOString();
+        } else {
+          vi.setSystemTime(Date.now() + (1 + rand(72)) * HOUR);
+        }
+        const recent = live().filter((row) => Date.parse(row.createdAt) > Date.now() - REFRESH_TTL_MS);
+        for (const [index, id] of ids.entries()) {
+          const held = recent.filter((row) => row.name.includes(tagOf(id)));
+          expect(held.length, `${at}: client ${index} holds ${held.length} unrevoked keys`).toBeLessThanOrEqual(1);
+          for (const row of held) expect(consented[index], `${at}: scope beyond consent`).toEqual(expect.arrayContaining(row.scopes));
+        }
+      }
+    }, 120_000);
+  }
 });
