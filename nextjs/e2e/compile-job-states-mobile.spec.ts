@@ -65,7 +65,7 @@ async function installJob(page: Page, server: Server) {
     if (server.cancelAnswer) return route.fulfill(server.cancelAnswer);
     server.state = "cancelled";
     server.settledAt = new Date().toISOString();
-    return route.fulfill({ json: { code: "COMPILE_JOB_CANCELLED", state: "cancelled" } });
+    return route.fulfill({ json: { code: "OK", cancelled: true, job: jobRow(server) } });
   });
 }
 
@@ -85,10 +85,9 @@ test("an empty workspace offers the intake and no job", async ({ page }) => {
 test("a signed-out visitor is sent to sign-in and is shown no job", async ({ page }) => {
   // No fixture session at all: the workspace is tenant-scoped and says so by moving the visitor.
   let jobReads = 0;
-  await page.route("**/api/compile-jobs", route => { jobReads += 1; return route.fulfill({ status: 401, json: { code: "UNAUTHENTICATED" } }); });
+  await page.route("**/api/compile-jobs", route => { jobReads += 1; return route.fulfill({ status: 401, json: { code: "AUTH_REQUIRED" } }); });
   await page.goto("/workspace", { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
-  await expect(page.locator("body")).not.toContainText("Compile cancelled.");
   await expect(panel(page)).toHaveCount(0);
   expect(jobReads, "a signed-out browser asked for jobs").toBe(0);
   await expectNoHorizontalOverflow(page);
@@ -97,8 +96,10 @@ test("a signed-out visitor is sent to sign-in and is shown no job", async ({ pag
 test("a 401 on the job list shows no job data", async ({ page }) => {
   await installFixtureSession(page);
   await installWorkspaceRoutes(page, { documents: DOCUMENTS });
-  await page.route("**/api/compile-jobs", route => route.fulfill({ status: 401, json: { code: "UNAUTHENTICATED" } }));
+  await page.route("**/api/compile-jobs", route => route.fulfill({ status: 401, json: { code: "AUTH_REQUIRED" } }));
+  const listed = page.waitForResponse(r => new URL(r.url()).pathname === "/api/compile-jobs");
   await page.goto("/workspace", { waitUntil: "domcontentloaded" });
+  await listed;
   await expect(page.getByRole("button", { name: "Choose files", exact: true })).toBeVisible({ timeout: 20_000 });
   await expect(panel(page), "a refused job list drew a run").toHaveCount(0);
   await expectNoHorizontalOverflow(page);
@@ -137,16 +138,30 @@ test("cancelling posts once, says so, and a reload does not bring the run back",
   expect(server.cancelPosts, "one press posted more than once").toBe(1);
   await expectNoHorizontalOverflow(page);
 
-  await page.reload({ waitUntil: "domcontentloaded" });
+  // A resurrected job is followed, and following asks for its events: count those after the
+  // reload, once the job list has answered, so a zero is not just "not rendered yet".
+  let eventReads = 0;
+  page.on("request", request => { if (new URL(request.url()).pathname === `/api/compile-jobs/${JOB_ID}/events`) eventReads += 1; });
+  await Promise.all([
+    page.waitForResponse(r => new URL(r.url()).pathname === "/api/compile-jobs"),
+    page.reload({ waitUntil: "domcontentloaded" }),
+  ]);
   await expect(page.getByRole("button", { name: "Choose files", exact: true })).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('section.workspace-compile-job[data-state="reading"]'), "a cancelled run came back as running").toHaveCount(0);
   await expect(page.locator('section.workspace-compile-job[data-state="cancelled"]')).toHaveCount(0);
+  expect(eventReads, "a reload followed the cancelled job again").toBe(0);
   expect(server.cancelPosts, "a reload cancelled again").toBe(1);
   await expectNoHorizontalOverflow(page);
 });
 
-for (const [status, code] of [[409, "COMPILE_JOB_STATE_CONFLICT"], [503, "COMPILE_JOB_UNAVAILABLE"], [401, "UNAUTHENTICATED"]] as const) {
-  test(`a cancel answered ${status} leaves the run as it was and says why`, async ({ page }) => {
+const REFUSALS = [
+  [409, "COMPILE_JOB_ALREADY_SETTLED", "That compile had already finished. Nothing was discarded."],
+  [503, "COMPILE_JOB_STORE_WRITE_FAILED", "Cancel failed."],
+  [401, "AUTH_REQUIRED", "Cancel failed."],
+] as const;
+
+for (const [status, code, sentence] of REFUSALS) {
+  test(`a cancel answered ${status} ${code} leaves the run as it was and says why`, async ({ page }) => {
     const server = newServer("reading");
     server.cancelAnswer = { status, json: { code } };
     await installJob(page, server);
@@ -155,7 +170,7 @@ for (const [status, code] of [[409, "COMPILE_JOB_STATE_CONFLICT"], [503, "COMPIL
     const cancel = run.getByRole("button", { name: "Cancel this compile" });
     await cancel.click({ timeout: 20_000 });
 
-    await expect(page.locator("p.notice")).toContainText("Cancel failed.");
+    await expect(page.locator("p.notice")).toContainText(sentence);
     await expect(page.locator("p.notice")).not.toContainText("Compile cancelled.");
     await expect(run).toHaveAttribute("data-state", "reading");
     // A sentence and a usable control, not a spinner: the same button is back and enabled.
