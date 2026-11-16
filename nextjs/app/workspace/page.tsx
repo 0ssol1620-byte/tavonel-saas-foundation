@@ -3536,7 +3536,7 @@ export default function WorkspacePage() {
               onDismiss={uploads.length > 0 ? () => { setUploads([]); setReading({}); setSourceObservation(null); sourceBytesCacheRef.current.clear(); } : undefined}
             />
           </div>
-          <LibraryPanel documentIds={documents?.map((d) => d.documentId) ?? []} names={names} onAvailability={setLibraryAvailable} />
+          {documents && documents.length > 0 ? <LibraryPanel documentIds={documents.map((d) => d.documentId)} names={names} onAvailability={setLibraryAvailable} /> : null}
           {(intakeOpen || Boolean(collectionResult && !collectionResult.coreExecution)) ? <div className="workspace-grid">
             {intakeOpen ? (
             <section id="workspace-sources" className="card document-card">
