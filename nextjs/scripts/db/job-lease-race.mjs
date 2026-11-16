@@ -116,7 +116,13 @@ export function checkIteration(history) {
   for (const [id, j] of st) if (j.cancelled) must("I5", rowById.get(id)?.state === "canceled", `cancelled job ${id} ended as ${rowById.get(id)?.state}`);
 
   // I6: ledger continuity. Numeric gaps are legal (the identity is global); a missing transition is not.
+  // Every op that changes state or attempt writes exactly one event: enqueue, each claim that returned the job,
+  // each accepted completion, each applied cancel. The expire UPDATE touches no tracked column, so it writes none.
+  const expectedEvents = new Map();
+  const bump = (id) => expectedEvents.set(id, (expectedEvents.get(id) ?? 0) + 1);
+  for (const o of history.ops ?? []) if ((o.op === "claim" && o.jobId) || (o.op === "complete" && o.accepted) || (o.op === "cancel" && o.applied)) bump(o.jobId);
   for (const [id, evs] of Object.entries(history.events ?? {})) {
+    must("I6", evs.length === 1 + (expectedEvents.get(id) ?? 0), `job ${id} has ${evs.length} events, ops account for ${1 + (expectedEvents.get(id) ?? 0)} (a missing or extra event)`);
     must("I6", evs.length > 0 && evs[0].type === "enqueued" && evs[0].state === "queued" && evs[0].attempt === 0, `job ${id} first event is not a queued/0 'enqueued'`);
     for (let i = 1; i < evs.length; i += 1) {
       const p = evs[i - 1], e = evs[i];
@@ -135,12 +141,13 @@ export function checkIteration(history) {
 /** One persistent psql session; statements run one at a time, errors come back as text. */
 class Session {
   constructor(psql, host, port, id) {
-    this.id = id; this.n = 0; this.out = ""; this.err = ""; this.waiter = null; this.tail = Promise.resolve();
+    this.id = id; this.dead = null; this.n = 0; this.out = ""; this.err = ""; this.waiter = null; this.tail = Promise.resolve();
     this.child = spawn(psql, ["-X", "-qAt", "-h", host, "-p", String(port), "-U", "postgres", "-d", "postgres", "-v", "VERBOSITY=terse"],
       { stdio: ["pipe", "pipe", "pipe"], windowsHide: true, env: { ...process.env, PGCONNECT_TIMEOUT: "5", PGOPTIONS: "-c lc_messages=C" } });
     this.child.stdout.on("data", (c) => { this.out += c; this.settle(); });
     this.child.stderr.on("data", (c) => { this.err += c; this.settle(); });
-    this.child.on("error", (e) => this.waiter?.reject(e));
+    this.child.on("error", (e) => { this.dead = e; this.waiter?.reject(e); });
+    this.child.on("exit", (code) => { this.dead ??= new Error(`psql session ${id} exited ${code}: ${this.err.trim()}`); this.waiter?.reject(this.dead); });
   }
   settle() {
     const w = this.waiter;
@@ -155,6 +162,7 @@ class Session {
   /** Resolves {out, err}; never rejects on a SQL error. */
   run(sql) {
     const next = this.tail.then(() => new Promise((resolveRun, reject) => {
+      if (this.dead) return reject(this.dead);
       const tag = `@@S${this.id}-${++this.n}@@`;
       this.waiter = { tag, resolve: resolveRun, reject };
       this.child.stdin.write(`${sql}\n\\echo ${tag}\n\\warn ${tag}\n`);
@@ -169,7 +177,7 @@ const q = (v) => (v == null ? "null" : `'${String(v).replaceAll("'", "''")}'`);
 const hex = (rng, n) => Array.from({ length: n }, () => Math.floor(rng() * 16).toString(16)).join("");
 const pick = (rng, list) => list[Math.floor(rng() * list.length)];
 const between = (rng, lo, hi) => lo + Math.floor(rng() * (hi - lo + 1));
-const parseJson = (r, what) => { if (r.err && !/^ERROR/m.test(r.err)) throw new Error(`${what}: ${r.err}`); return r.out ? JSON.parse(r.out) : null; };
+const parseJson = (r, what) => { if (/^(ERROR|FATAL)/m.test(r.err)) throw new Error(`${what}: ${r.err}`); return r.out ? JSON.parse(r.out) : null; };
 const rowsSql = (wss) => `select coalesce(jsonb_agg(jsonb_build_object('jobId',job_id,'ws',workspace_key,'key',idempotency_key,'state',state,'leasedBy',leased_by,'attempt',attempt,'itemsSeen',items_seen,'itemsDone',items_done,'cursor',cursor_token) order by job_id),'[]'::jsonb) from public.foundation_jobs where workspace_key in (${wss.map(q).join(",")});`;
 const eventsSql = (wss) => `select coalesce(jsonb_agg(jsonb_build_object('jobId',job_id,'seq',event_sequence,'type',event_type,'state',state,'attempt',attempt,'itemsSeen',items_seen,'itemsDone',items_done) order by event_sequence),'[]'::jsonb) from public.foundation_job_events where workspace_key in (${wss.map(q).join(",")});`;
 const cancelSql = (ws, id) => `with c as (update public.foundation_jobs set state='canceled', leased_by=null, lease_expires_at=null, completed_at=now(), updated_at=now() where workspace_key=${q(ws)} and job_id=${q(id)} and state in ('queued','leased') returning 1) select count(*) from c;`;
@@ -180,7 +188,7 @@ async function iteration(pool, rng, n, userId, fairness) {
   const ws = `pilot-${n.toString(16).padStart(4, "0")}${hex(rng, 6)}`, ws2 = `pilot-${n.toString(16).padStart(4, "0")}${hex(rng, 5)}b`;
   const jobKeys = Array.from({ length: between(rng, 2, 4) }, (_, j) => ({ ws, key: `idem-${n}-${j}-${hex(rng, 6)}` }));
   jobKeys.push({ ws: ws2, key: `idem-${n}-t2-${hex(rng, 6)}` });
-  let dupErrors = 0, other = 0;
+  let dupErrors = 0;
   const cancelAll = async () => { for (const w of [ws, ws2]) await at(0).run(`update public.foundation_jobs set state='canceled', leased_by=null, lease_expires_at=null, completed_at=now(), updated_at=now() where workspace_key=${q(w)} and state in ('queued','leased');`); };
   const fail = (what, r) => { throw new Error(`${what}: ${r.err}`); };
 
@@ -253,7 +261,7 @@ async function iteration(pool, rng, n, userId, fairness) {
 
   let fair = null;
   if (fairness) fair = await fairnessRun(pool, rng, n, userId);
-  return { ...result, dupErrors, other, evRows, fair };
+  return { ...result, dupErrors, evRows, fair };
 }
 
 /** 50:1 two-tenant FIFO measurement. Reports the claim position of tenant B's only job; asserts nothing. */
@@ -280,7 +288,8 @@ export async function main(env = process.env) {
   const seed = Number(env.RACE_SEED ?? Math.floor(Math.random() * 2 ** 31));
   const iterations = Number(env.RACE_ITERATIONS ?? 1000);
   const receiptDir = resolve(env.RACE_RECEIPT_DIR ?? join(tmpdir(), "tavonel-race-receipts"));
-  if (receiptDir === REPO_ROOT || receiptDir.startsWith(REPO_ROOT + sep)) throw new Error(`refused: receipt directory ${receiptDir} is inside the repository`);
+  const fold = (p) => (process.platform === "win32" ? p.toLowerCase() : p);
+  if (fold(receiptDir) === fold(REPO_ROOT) || fold(receiptDir).startsWith(fold(REPO_ROOT) + sep)) throw new Error(`refused: receipt directory ${receiptDir} is inside the repository`);
   const psql = env.PSQL_BIN || (process.platform === "win32" ? "C:/Program Files/PostgreSQL/17/bin/psql.exe" : "psql");
   process.stdout.write(`seed ${seed} iterations ${iterations} (RACE_SEED=${seed} reproduces the schedule, not the interleaving)\n`);
 

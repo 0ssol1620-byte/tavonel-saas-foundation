@@ -68,6 +68,12 @@ test("event ledger: sequence gap in transitions, wrong head, non-increasing seq,
   const illegal = clean(); illegal.events[J][1].state = "succeeded"; illegal.events[J][2].state = "leased"; assert.ok(rule(illegal).includes("I6"));
 });
 
+test("event ledger: a missing mid-history event is flagged even when neighbours stay legal", () => {
+  const noClaim = clean(); noClaim.events[J].splice(1, 1); assert.ok(rule(noClaim).includes("I6"));
+  const noProgress = clean(); noProgress.events[J].splice(2, 1); assert.ok(rule(noProgress).includes("I6"));
+  const extra = clean(); extra.events[J].splice(2, 0, ev(3, "state_changed", "leased", 1)); assert.ok(rule(extra).includes("I6"));
+});
+
 test("environment: needs LOCAL_RACE_TEST=1 and a loopback host", () => {
   assert.throws(() => validateEnvironment({}, "postgres://postgres@127.0.0.1:55439/postgres"), /LOCAL_RACE_TEST=1/);
   assert.throws(() => validateEnvironment({ LOCAL_RACE_TEST: "1" }, "postgres://postgres@10.0.0.5:5432/postgres"), /non-loopback/);
@@ -84,4 +90,11 @@ test("CLI refuses without the opt-in", () => {
   const r = spawnSync(process.execPath, [fileURLToPath(new URL("./job-lease-race.mjs", import.meta.url))], { env, encoding: "utf8" });
   assert.equal(r.status, 2);
   assert.match(r.stderr, /LOCAL_RACE_TEST=1/);
+});
+
+test("CLI fails closed (exit != 0) when no PostgreSQL answers on the port", () => {
+  const r = spawnSync(process.execPath, [fileURLToPath(new URL("./job-lease-race.mjs", import.meta.url))],
+    { env: { ...process.env, LOCAL_RACE_TEST: "1", RACE_PORT: "55478", RACE_ITERATIONS: "2" }, encoding: "utf8", timeout: 60000 });
+  assert.notEqual(r.status, 0);
+  assert.doesNotMatch(r.stdout, /^PASS/m);
 });
