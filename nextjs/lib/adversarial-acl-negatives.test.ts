@@ -62,6 +62,9 @@ const h = vi.hoisted(() => ({
   advanceJob: vi.fn(),
   listObjects: vi.fn(),
   connector: vi.fn(),
+  rateLimit: vi.fn(),
+  getCandidate: vi.fn(),
+  rollbackAccess: vi.fn(),
 }));
 
 vi.mock("@/lib/developer-auth", async (importOriginal) => ({
@@ -107,6 +110,15 @@ vi.mock("@/lib/compile-job-store", async (importOriginal) => ({
 vi.mock("@/lib/r2-objects", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./r2-objects")>()),
   listImmutableWorkspaceObjects: h.listObjects,
+  getWorkspaceCollectionCandidate: h.getCandidate,
+}));
+vi.mock("@/lib/activation-rate-limit", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./activation-rate-limit")>()),
+  checkActivationRateLimit: h.rateLimit,
+}));
+vi.mock("@/lib/world-rollback-source-access", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./world-rollback-source-access")>()),
+  checkRollbackSourceAccess: h.rollbackAccess,
 }));
 vi.mock("@/lib/connector-source-access", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./connector-source-access")>()),
@@ -142,6 +154,16 @@ function resetFakes() {
   h.spend.mockResolvedValue({ ok: true });
   h.signerEnv.mockReturnValue({ accountId: "acct", accessKeyId: "id", secretAccessKey: "secret", bucket: "b" });
   h.connector.mockResolvedValue({ ok: true });
+  // Without this the unmocked limiter answers 503 before any workspace-scoped lookup runs.
+  h.rateLimit.mockResolvedValue({ ok: true });
+  h.getCandidate.mockImplementation(async (_signer: unknown, workspace: string) => {
+    record(workspace);
+    return { ok: false, code: "NOT_FOUND" };
+  });
+  h.rollbackAccess.mockImplementation(async (workspace: string) => {
+    record(workspace);
+    return { ok: false, code: "ROLLBACK_TARGET_NOT_FOUND", status: 404 };
+  });
   // Workspace-scoped stores: absence for everything the caller's workspace does not own.
   h.activeWorld.mockImplementation(async (workspace: string, id: string) => {
     record(workspace);
@@ -269,7 +291,7 @@ async function assertRefusal(label: string, response: Response, attackIds: strin
 // Source routes that do not yet send Cache-Control on every refusal. Recorded, not tolerated
 // silently: the final describe asserts the gap still exists, so closing it fails that test and
 // forces the entry out of this list. Fixing the routes is outside this work order's scope.
-const NO_STORE_GAPS = new Set<string>(["documentSource", "candidates"]);
+const NO_STORE_GAPS = new Set<string>(["documentSource"]);
 
 function assertNoStore(key: string, label: string, cache: string | null) {
   if (NO_STORE_GAPS.has(key) && cache !== "no-store") return;
@@ -333,10 +355,13 @@ for (const key of [...KEYED, ...SESSION]) {
   add(`${route.name}: foreign id answers as absence`, async () => {
     const r = await assertRefusal("foreign id", await route.call(foreignId(route.kind)), [foreignId(route.kind)]);
     assertNoStore(key, "foreign id", r.cache);
+    // A refusal before the store ran proves nothing about tenant scoping.
+    if (key === "promote" || key === "rollback") expect(scopes.length, "store was asked").toBeGreaterThan(0);
   });
   add(`${route.name}: foreign id is byte-identical to an unknown id`, async () => {
     const foreign = await assertRefusal("foreign", await route.call(foreignId(route.kind)), [foreignId(route.kind)]);
     const unknown = await assertRefusal("unknown", await route.call(unknownId(route.kind)), [unknownId(route.kind)]);
+    if (key === "promote" || key === "rollback") expect(scopes.length, "store was asked").toBeGreaterThan(0);
     expect(foreign.status).toBe(unknown.status);
     expect(foreign.text).toBe(unknown.text);
   });
