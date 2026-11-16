@@ -212,6 +212,17 @@
   background: var(--v34-header-btn-hover);
 }
 
+/* The drawer's links answer the pointer the way the header's do, the current page's included. */
+.brand:hover,
+.primaryLink:hover,
+.summary:hover,
+.link:hover,
+.signIn:hover {
+  color: var(--v34-header-btn-hover);
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+
 @media (forced-colors: active) {
   .cta { border: 1px solid ButtonText; }
   .trigger:focus-visible,

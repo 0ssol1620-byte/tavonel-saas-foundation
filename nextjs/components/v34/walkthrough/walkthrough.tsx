@@ -2,10 +2,15 @@
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { WALKTHROUGH_LABEL, WALKTHROUGH_STEPS } from "@/lib/v34/walkthrough";
+import { identifierRuns } from "./identifiers";
 import styles from "./walkthrough.module.css";
 
 const COUNT = WALKTHROUGH_STEPS.length;
 const pad = (i: number) => String(i + 1).padStart(2, "0");
+
+/** Text whose standard identifiers stay on one line each. */
+const keepIds = (text: string) =>
+  identifierRuns(text).map((run, i) => (run.id ? <span key={i} className={styles.id}>{run.text}</span> : run.text));
 
 /**
  * Four-step reference walkthrough as an accessible tabs pattern. The server renders every
@@ -84,8 +89,8 @@ export function Walkthrough({ onStepChange }: { onStepChange?: (index: number) =
           </div>
           <div className={styles.record}>
             <p className={styles.kind}>{step.record.kind}</p>
-            <h4 className={styles.title}>{step.record.title}</h4>
-            <p className={styles.meta}>{step.record.meta}</p>
+            <h4 className={styles.title}>{keepIds(step.record.title)}</h4>
+            <p className={styles.meta}>{keepIds(step.record.meta)}</p>
             <a className={styles.link} href={step.record.url} target="_blank" rel="noopener noreferrer">
               {step.record.linkLabel} →
             </a>

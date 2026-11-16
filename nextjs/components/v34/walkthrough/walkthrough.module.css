@@ -44,6 +44,9 @@
 .tab:hover .tabNo { color: var(--v34-ink); }
 .tab[aria-selected="true"] { background: var(--v34-step-bg); color: var(--v34-white); }
 .tab[aria-selected="true"] .tabNo { color: var(--v34-step-small); }
+/* The selected step answers the pointer too: one step lighter, the same light text. */
+.tab[aria-selected="true"]:hover { background: var(--v34-header-btn-hover); color: var(--v34-white); }
+.tab[aria-selected="true"]:hover .tabNo { color: var(--v34-step-small); }
 
 .panel {
   display: grid; grid-template-columns: minmax(0, 0.84fr) minmax(0, 1.16fr);
@@ -76,6 +79,10 @@
 }
 .kind { margin: 0 0 8px; padding-bottom: 12px; border-bottom: 1px solid var(--v34-rule); font-size: 0.75rem; font-weight: 650; letter-spacing: 0.1em; text-transform: uppercase; color: var(--v34-label); }
 .title { margin: 18px 0 6px; font-size: clamp(1.7rem, 3.2vw, 2.75rem); font-weight: 500; line-height: 1.12; letter-spacing: -0.03em; overflow-wrap: normal; word-break: normal; hyphens: none; text-wrap: balance; }
+/* A standard identifier ("NIST SP 800-53", "Rev. 5", "SA-24") is one unit: it never breaks at its hyphen or its spaces.
+   The longest, "NIST SP 800-53", is 6.2em in Wanted Sans and 6.7em in the fallback face: 182px at the 1.7rem floor,
+   inside the record's 196px at a 320px viewport. */
+.id { display: inline-block; white-space: nowrap; }
 .meta { margin: 0 0 16px; color: var(--v34-body); line-height: 1.45; }
 .link { display: inline-flex; align-items: center; align-self: flex-start; margin-top: auto; min-height: 36px; color: var(--v34-link); font-weight: 600; text-underline-offset: 4px; }
 .link:hover { color: var(--v34-ink); text-decoration-thickness: 2px; }

@@ -119,8 +119,8 @@
   cursor: pointer;
 }
 
-/* The home hero on a touch device opens the corpus only when asked: the file is 275 kB. */
-@media (pointer: coarse) {
+/* The home hero on a touch device opens the corpus only when asked: the file is 275 kB. Under 900px it never does. */
+@media (pointer: coarse) and (min-width: 900px) {
   .root[data-variant="hero"][data-load="idle"] .explore {
     display: inline-flex;
   }
@@ -192,6 +192,30 @@
 .source:focus-visible {
   outline: 2px solid #8ae0bc;
   outline-offset: 2px;
+}
+
+/* The live status and, hidden in the same grid cell, every other status the variant can show. */
+.statusBox {
+  display: grid;
+  color: #b8cbbd;
+  background-color: #07100e;
+}
+
+.statusBox > * {
+  grid-area: 1 / 1;
+}
+
+.statusSizer {
+  visibility: hidden;
+}
+
+.swap {
+  display: inline-grid;
+  place-items: center;
+}
+
+.swap > * {
+  grid-area: 1 / 1;
 }
 
 .status {
@@ -314,11 +338,12 @@
   background-color: #07100e;
 }
 
+/* An svg dot: the kind's colour is the canvas's own, and forced colours leave an svg's fill to it. */
 .swatch {
   display: inline-block;
+  flex: none;
   width: 10px;
   height: 10px;
-  border-radius: 50%;
   forced-color-adjust: none;
 }
 
@@ -361,6 +386,46 @@
 .root[data-variant="hero"] :is(.finder, .info, .legend),
 .instrument[data-variant="hero"] .domains {
   display: none;
+}
+
+/*
+  From 900px the hero's controls sit on the stage's top edge, as one tray, so their wrapping (which
+  depends on the column width and on which face has loaded) never changes the height of the hero.
+  Under 900px the hero is the static image only (world-island.tsx): no controls, no status.
+*/
+.root[data-variant="hero"] {
+  position: relative;
+}
+
+.root[data-variant="hero"] .toolbar {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-end: 10px;
+  max-width: calc(100% - 20px);
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 8px;
+}
+
+.root[data-variant="hero"] .control {
+  min-height: 34px;
+  min-width: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+@media (pointer: coarse) {
+  .root[data-variant="hero"] .control {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+@media (max-width: 899.98px) {
+  .root[data-variant="hero"] :is(.toolbar, .statusBox) {
+    display: none;
+  }
 }
 
 @media (forced-colors: active) {

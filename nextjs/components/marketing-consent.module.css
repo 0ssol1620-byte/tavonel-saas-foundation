@@ -138,12 +138,15 @@
   are not equally easy to press when only one of them looks like a control. Identical geometry,
   identical border, identical colour -- if a reader has to look twice to tell which is which,
   that is the correct outcome for a choice the site is not entitled to nudge.
+
+  The shared edge is #6b737b, the Home row's rule (4.82:1 on the white card): the panel's hairline
+  measured 1.60:1 as a control boundary, under the 3:1 non-text floor. Hover darkens it to --text-lo.
 */
 .actions { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; flex: 0 0 auto; gap: 8px; }
 .actions button {
   min-height: 44px;
   padding: 10px 16px;
-  border: 1px solid var(--hairline-hi);
+  border: 1px solid #6b737b;
   border-radius: var(--r-inst, 6px);
   background: var(--g2);
   color: var(--text-hi);

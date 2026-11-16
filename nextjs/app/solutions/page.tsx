@@ -31,7 +31,7 @@ export default function SolutionsPage() {
         </div>
         <div className={`tiles ${styles.hubList}`}>
           {ENTRIES.map(([slug, solution]) => (
-            <article className={`tile ${styles.card}`} key={slug}>
+            <article className={`tile ${styles.card}`} key={slug} data-v34-card="">
               <div className={styles.cardIntro}>
                 <p className="n">{solution.eyebrow}</p>
                 <h2 className={styles.cardTitle}>

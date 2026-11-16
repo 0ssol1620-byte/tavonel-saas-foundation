@@ -26,7 +26,11 @@ import styles from "./world.module.css";
   Nothing loads on mount. The corpus is fetched, with subresource integrity, when the instrument is
   near the viewport (after an idle moment on a fine pointer; only on "Explore the layers" for the
   home hero on a coarse pointer) or on the first interaction. Graphics are WebGL, then Canvas2D, then
-  the static image that is already on the page.
+  the static image that is already on the page. The home hero under 900px never loads: it stays the
+  static image there for every pointer, and its controls and status are not drawn.
+
+  The hero hides the finder and the readout (they are /world's), so it does not pick records on a
+  click and its status says what it shows instead of inviting a selection it cannot display.
 
   Test hooks for the QA harness (documented in the lane receipt):
     data-mode          webgl | canvas2d | static   what is drawing now
@@ -61,6 +65,18 @@ const STATUS = {
   static: "Static overview · select a record to inspect it",
   error: "Couldn't load the interactive view",
 } as const;
+
+const HERO_STATUS: Record<keyof typeof STATUS, string> = {
+  loading: STATUS.loading,
+  webgl: "Interactive World · drag to orbit",
+  canvas2d: "Interactive World · compatible graphics mode",
+  lost: "Graphics context lost · compatible graphics mode",
+  static: "Static overview · every record and relationship",
+  error: STATUS.error,
+};
+
+/** The home hero mounts a live canvas only from this width (the same query hides its controls in world.module.css). */
+const HERO_LIVE_QUERY = "(min-width: 900px)";
 
 const FRAME_MS = { webgl: 25, canvas2d: 45 } as const;
 const AMBIENT = { yawPerFrame: 0.0018, frameMs: 25 } as const;
@@ -102,6 +118,8 @@ export function WorldIsland({ variant, corpusPath, corpusIntegrity, expected, ov
   const visibleRef = useRef(false);
   const dirtyRef = useRef(false);
   const loop = useRef({ frame: 0, last: 0, t0: 0, anchor: null as Camera | null });
+  // Until the mount effect has read the viewport, nothing may request the corpus.
+  const staticOnlyRef = useRef(true);
 
   const [hydrated, setHydrated] = useState(false);
   const [wantLoad, setWantLoad] = useState(false);
@@ -204,10 +222,15 @@ export function WorldIsland({ variant, corpusPath, corpusIntegrity, expected, ov
     const f = readForced();
     setForced(f);
     setGfx(f.noWebgl ? (f.no2d ? "static" : "canvas2d") : "webgl");
-    setHydrated(true);
+    // The controls appear once the faces have settled: a face arriving after they show would resize them in view.
+    let mounted = true;
+    void document.fonts.ready.then(() => {
+      if (mounted) setHydrated(true);
+    });
 
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
     const coarse = window.matchMedia("(pointer: coarse)");
+    staticOnlyRef.current = variant === "hero" && !window.matchMedia(HERO_LIVE_QUERY).matches;
     // No ambient motion under reduced motion, and none on a coarse pointer until the user asks for it.
     const startMotion = !reduce.matches && !coarse.matches;
     motionRef.current = startMotion;
@@ -228,7 +251,7 @@ export function WorldIsland({ variant, corpusPath, corpusIntegrity, expected, ov
         const visible = entries.some((e) => e.isIntersecting);
         visibleRef.current = visible;
         if (visible) kick();
-        const autoLoad = !(variant === "hero" && coarse.matches);
+        const autoLoad = !staticOnlyRef.current && !(variant === "hero" && coarse.matches);
         if (visible && autoLoad && !requested) {
           requested = true;
           if (typeof window.requestIdleCallback === "function") idleHandle = window.requestIdleCallback(() => setWantLoad(true), { timeout: 1500 });
@@ -245,6 +268,7 @@ export function WorldIsland({ variant, corpusPath, corpusIntegrity, expected, ov
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
+      mounted = false;
       dataset.v34WorldInstances = String(Math.max(0, Number(dataset.v34WorldInstances ?? "1") - 1));
       if (dataset.v34WorldInstances === "0") delete dataset.v34WorldInstances;
       reduce.removeEventListener("change", onReduce);
@@ -292,7 +316,10 @@ export function WorldIsland({ variant, corpusPath, corpusIntegrity, expected, ov
     canvas.className = styles.canvas;
     canvas.setAttribute("data-v34-layer", "");
     canvas.setAttribute("role", "img");
-    canvas.setAttribute("aria-label", "Interactive projection of the public reference corpus. Use the record finder below to inspect a record.");
+    canvas.setAttribute(
+      "aria-label",
+      variant === "hero" ? "Interactive projection of the public reference corpus." : "Interactive projection of the public reference corpus. Use the record finder below to inspect a record.",
+    );
     canvas.tabIndex = -1;
     stage.append(canvas);
 
@@ -346,7 +373,7 @@ export function WorldIsland({ variant, corpusPath, corpusIntegrity, expected, ov
       travel = Math.max(travel, Math.hypot(cur.x - startX, cur.y - startY));
     };
     const onUp = (e: PointerEvent) => {
-      if (pointers.size === 1 && pointers.has(e.pointerId) && travel < 5 && layoutRef.current) {
+      if (variant === "full" && pointers.size === 1 && pointers.has(e.pointerId) && travel < 5 && layoutRef.current) {
         const rect = canvas.getBoundingClientRect();
         const hit = pick(projectLayout(layoutRef.current, cameraRef.current, rect.width, rect.height), e.clientX - rect.left, e.clientY - rect.top);
         if (hit) setFocusId(hit);
@@ -410,7 +437,7 @@ export function WorldIsland({ variant, corpusPath, corpusIntegrity, expected, ov
       setRendered(null);
       canvas.remove();
     };
-  }, [load, gfx, forced.no2d, invalidate, setCamera, stopMotion]);
+  }, [load, gfx, forced.no2d, invalidate, setCamera, stopMotion, variant]);
 
   useLayoutEffect(() => {
     layoutRef.current = layout;
@@ -438,21 +465,24 @@ export function WorldIsland({ variant, corpusPath, corpusIntegrity, expected, ov
     };
   }, [renderer, layout]);
 
-  const requestLoad = () => setWantLoad(true);
+  const requestLoad = () => {
+    if (!staticOnlyRef.current) setWantLoad(true);
+  };
 
   const active: Gfx = renderer ? renderer.kind : "static";
+  const text = variant === "hero" ? HERO_STATUS : STATUS;
   const status =
     load === "error"
-      ? STATUS.error
+      ? text.error
       : load === "loading" || (load === "ready" && gfx !== "static" && !renderer)
-        ? STATUS.loading
+        ? text.loading
         : renderer?.kind === "webgl"
-          ? STATUS.webgl
+          ? text.webgl
           : renderer?.kind === "canvas2d"
             ? lost
-              ? STATUS.lost
-              : STATUS.canvas2d
-            : STATUS.static;
+              ? text.lost
+              : text.canvas2d
+            : text.static;
 
   const focusNode: CorpusNode | undefined = focusId ? byId.get(focusId) : undefined;
   const parts = focusNode && corpus ? describeParts(focusNode, corpus) : null;
@@ -509,14 +539,26 @@ export function WorldIsland({ variant, corpusPath, corpusIntegrity, expected, ov
         <button type="button" className={styles.control} disabled={!live} onClick={reset}>
           Reset
         </button>
-        <button type="button" className={styles.control} aria-pressed={live && motion} disabled={!live} onClick={() => setMotion((m) => !m)}>
-          {live && motion ? "Pause camera" : "Play camera"}
+        {/* Both labels share one cell, so the button keeps one width when the camera starts or stops. */}
+        <button type="button" className={`${styles.control} ${styles.swap}`} aria-pressed={live && motion} disabled={!live} onClick={() => setMotion((m) => !m)}>
+          <span>{live && motion ? "Pause camera" : "Play camera"}</span>
+          <span className={styles.statusSizer} aria-hidden="true">
+            {live && motion ? "Play camera" : "Pause camera"}
+          </span>
         </button>
       </div>
 
-      <p className={styles.status} role="status" data-world-status="">
-        {status}
-      </p>
+      {/* Every status this variant can say sits invisibly in the same cell, so the box is as tall as the longest of them and a change of state never moves what follows. */}
+      <div className={styles.statusBox}>
+        <p className={styles.status} role="status" data-world-status="">
+          {status}
+        </p>
+        {Object.values(text).map((t) => (
+          <span key={t} className={`${styles.status} ${styles.statusSizer}`} aria-hidden="true">
+            {t}
+          </span>
+        ))}
+      </div>
 
       <div className={styles.finder}>
         <label className={styles.field} htmlFor={`${id}-search`}>
@@ -571,7 +613,9 @@ export function WorldIsland({ variant, corpusPath, corpusIntegrity, expected, ov
       <ul className={styles.legend} aria-label="Record kinds, one layer each">
         {legend.map((item) => (
           <li key={item.kind} className={styles.legendItem}>
-            <span className={styles.swatch} style={{ backgroundColor: item.color }} aria-hidden="true" />
+            <svg className={styles.swatch} viewBox="0 0 10 10" aria-hidden="true" focusable="false">
+              <circle cx="5" cy="5" r="5" fill={item.color} />
+            </svg>
             <span className={styles.layerNumber}>{String(item.layer).padStart(2, "0")}</span> {item.kind} <span className={styles.legendCount}>{item.count.toLocaleString("en-US")}</span>
           </li>
         ))}

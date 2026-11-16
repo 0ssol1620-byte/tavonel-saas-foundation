@@ -86,7 +86,8 @@
   white-space: nowrap;
 }
 
-.link:hover {
+.link:hover,
+.brand:hover {
   text-decoration: underline;
   text-underline-offset: 5px;
 }
