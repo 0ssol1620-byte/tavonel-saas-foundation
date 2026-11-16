@@ -351,3 +351,22 @@ test("v34 SEO set", tags("*", "*", "seo"), async ({ request, browserName }) => {
   all.push(...unique);
   expect(all, all.map(v => `[${v.pass}] ${v.selector}: ${v.detail}`).join("\n")).toEqual([]);
 });
+
+/*
+  Held routes, by measurement and not by reading source order (WO-FND-INT-2 item 4). Run against a server
+  started WITHOUT V34_SHOW_HELD (and not a Vercel preview), with V34_SERVER_MODE=production: every held
+  registry route must answer 404 and five live routes 200. It is skipped, with the reason, on the QA-mode
+  server, where the flag is on and every held route renders.
+*/
+test("held routes answer 404 and live routes 200 on a server without V34_SHOW_HELD", tags("*", "*", "held"), async ({ request }) => {
+  test.skip(serverMode !== "production", "the server runs with V34_SHOW_HELD=1 (V34_SERVER_MODE is not production), so held routes render by design");
+  const held = registryRoutes.filter(r => r.release === "held");
+  const live = registryRoutes.filter(r => r.release === "live").slice(0, 5);
+  expect(held.length, "the registry has held routes").toBeGreaterThan(0);
+  expect(live.length, "the registry has five live routes").toBe(5);
+  const status = async (route: string) => (await request.get(route, { maxRedirects: 0 })).status();
+  const wrong: string[] = [];
+  for (const { path } of held) if ((await status(path)) !== 404) wrong.push(`held ${path} did not answer 404`);
+  for (const { path } of live) if ((await status(path)) !== 200) wrong.push(`live ${path} did not answer 200`);
+  expect(wrong).toEqual([]);
+});

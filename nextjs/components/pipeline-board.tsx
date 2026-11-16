@@ -48,7 +48,7 @@ function stageLabel(row: PipelineRow): string {
 const CENSUS_PARTS: ReadonlyArray<readonly [CensusBucket, string]> = [
   ["pending", "queued"],
   ["processing", "processing"],
-  ["verified_pending_publish", "compiled, not yet active"],
+  ["verified_pending_publish", "compiled, awaiting activation"],
   ["accepted", "active"],
   ["held", "held"],
   ["excluded", "excluded"],

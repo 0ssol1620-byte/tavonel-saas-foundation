@@ -422,6 +422,25 @@ test.describe("round 3: false positives found by the first integrated QA run", (
     expect(await page.evaluate(() => getComputedStyle(document.querySelector("h1")!).color)).toBe("rgb(243, 247, 240)");
   });
 
+  test("contrast: only the containing-block chain clips (fixed in a clip box, absolute past a static clip, html overflow-x)", async ({ page }) => {
+    await page.setViewportSize({ width: 412, height: 800 });
+    const pale = "color:#ddd;font-size:16px";
+    await load(page, `<div style="height:30px;overflow:hidden"><p style="position:fixed;top:100px;left:10px;margin:0;${pale}">fixed pale text</p></div>`);
+    expect((await contrastPass(page)).violations).toHaveLength(1);
+    await load(page, `<div style="height:30px;overflow:hidden"><p style="position:absolute;top:100px;left:10px;margin:0;${pale}">absolute pale text</p></div>`);
+    expect((await contrastPass(page)).violations).toHaveLength(1);
+    await load(page, `<div style="height:1600px"></div><p style="margin:0;${pale}">below the first screen, pale</p>`, "html{overflow-x:hidden}");
+    expect((await contrastPass(page)).violations).toHaveLength(1);
+  });
+
+  test("contrast: text that runs past a scrolling box is sampled inside the box only, and an unreadable block still fails", async ({ page }) => {
+    const block = (fg: string) => `<div style="width:200px;overflow-x:auto;background:#0a1712;border:1px solid #444"><pre style="margin:0;padding:8px;color:${fg};white-space:pre"><code>"TAVONEL_API_KEY": "your key, scoped to reads and nothing more"</code></pre></div>`;
+    await load(page, block("#eff6ef"));
+    expect((await contrastPass(page)).violations).toEqual([]);
+    await load(page, block("#26382f"));
+    expect((await contrastPass(page)).violations).toHaveLength(1);
+  });
+
   test("keyboard: a smooth-scrolling page is waited for before the focus rect is read", async ({ page }) => {
     await page.setViewportSize({ width: 600, height: 500 });
     await load(page, `<button class="r">top</button><div style="height:3000px"></div><button class="r">far below</button>`, ".r{padding:14px 20px}.r:focus-visible{outline:2px solid #00e}html{scroll-behavior:smooth}");

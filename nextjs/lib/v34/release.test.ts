@@ -44,6 +44,16 @@ describe("release gate", () => {
     expect(connection).toHaveBeenCalledTimes(1);
   });
 
+  /*
+    The intended rule, stated once in words (WO-FND-INT-2 item 4). Production without the flag hides every
+    held route; V34_SHOW_HELD=1 is how one is opened deliberately, which is why the production environment
+    must never carry it (docs/runbooks/RELEASE_ORDER.md, "Held routes in production").
+  */
+  it("production hides held routes unless V34_SHOW_HELD=1 opens them deliberately", () => {
+    expect(heldVisible({ VERCEL_ENV: "production" })).toBe(false);
+    expect(heldVisible({ VERCEL_ENV: "production", V34_SHOW_HELD: "1" })).toBe(true);
+  });
+
   it("never gates a live route, in any environment", async () => {
     for (const [vercel, show] of [["production", undefined], [undefined, undefined], ["preview", "1"]] as const) {
       env(vercel, show);

@@ -55,6 +55,13 @@ const COPY_MODULES = [
   // render on `/` and `/ko`, and no list read either file, so a hedge reached /ko through a limit label.
   "components/landing-v2/specimen-strip.tsx",
   "lib/specimen-sources.ts",
+  // WO-FND-INT-2: surfaces a customer meets that no list named. The OAuth consent page, the two
+  // workspace panels, the purpose picker and the pipeline board; named so a move cannot drop them.
+  "app/oauth/authorize/page.tsx",
+  "components/change-proposals-panel.tsx",
+  "components/library-panel.tsx",
+  "components/workspace-purpose-picker.tsx",
+  "components/pipeline-board.tsx",
 ] as const;
 
 /** The marketing routes named in the campaign brief, each as the file that carries its copy. */

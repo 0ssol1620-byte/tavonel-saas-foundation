@@ -146,16 +146,34 @@ function ownTextRects(el: Element): { x: number; y: number; width: number; heigh
   // A text rect is the font's content area, which is taller than the line box when the leading is tight
   // (a display heading at line-height 1.01): its edges then hold the neighbouring lines' glyphs. Sample the line box.
   const lineHeight = parseFloat(getComputedStyle(el).lineHeight);
+  // A scrolling or clipping ancestor paints only its padding box: text that runs past it is not on screen, and a
+  // screenshot of that part would sample the page behind the box (a mcpServers block wider than its region, 1.03:1).
+  // Only ancestors in the element's containing-block chain clip it: a fixed element is clipped by none, an absolute one
+  // skips the static ancestors before its containing block, and the root's overflow belongs to the viewport (bounded below).
+  // ponytail: a transform counts as a containing block for absolute; filter/contain/will-change do not, so those clip less than CSS does.
+  const clips: { l: number; t: number; r: number; b: number }[] = [];
+  const own = getComputedStyle(el).position;
+  let escaping = own === "absolute";
+  for (let p = own === "fixed" ? null : el.parentElement; p && p !== document.documentElement; p = p.parentElement) {
+    const ps = getComputedStyle(p);
+    if (escaping && ps.position === "static" && ps.transform === "none") continue;
+    escaping = ps.position === "absolute";
+    if (ps.overflowX !== "visible" || ps.overflowY !== "visible") {
+      const pr = p.getBoundingClientRect();
+      clips.push({ l: pr.left + p.clientLeft, t: pr.top + p.clientTop, r: pr.left + p.clientLeft + p.clientWidth, b: pr.top + p.clientTop + p.clientHeight });
+    }
+    if (ps.position === "fixed") break;
+  }
   for (const n of el.childNodes) {
     if (n.nodeType !== Node.TEXT_NODE || (n.textContent ?? "").trim().length === 0) continue;
     const range = document.createRange();
     range.selectNodeContents(n);
     for (const r of range.getClientRects()) {
       const trim = Number.isFinite(lineHeight) && lineHeight < r.height ? (r.height - lineHeight) / 2 : 0;
-      const x0 = Math.max(0, Math.ceil(r.left) + 1);
-      const y0 = Math.max(0, Math.ceil(r.top + trim) + 1);
-      const x1 = Math.min(window.innerWidth, Math.floor(r.right) - 1);
-      const y1 = Math.min(window.innerHeight, Math.floor(r.bottom - trim) - 1);
+      const x0 = Math.max(0, Math.ceil(Math.max(r.left, ...clips.map(c => c.l))) + 1);
+      const y0 = Math.max(0, Math.ceil(Math.max(r.top + trim, ...clips.map(c => c.t))) + 1);
+      const x1 = Math.min(window.innerWidth, Math.floor(Math.min(r.right, ...clips.map(c => c.r))) - 1);
+      const y1 = Math.min(window.innerHeight, Math.floor(Math.min(r.bottom - trim, ...clips.map(c => c.b))) - 1);
       if (x1 - x0 >= 2 && y1 - y0 >= 2) out.push({ x: x0, y: y0, width: x1 - x0, height: y1 - y0 });
       if (out.length >= 8) return out;
     }
