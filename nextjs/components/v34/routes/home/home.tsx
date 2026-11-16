@@ -25,7 +25,7 @@ function HeroArt() {
   return (
     <div className={s.worldStack}>
       <WorldInstrument variant="hero" />
-      <Link className={s.worldLink} href={HERO.worldLink.href}>{HERO.worldLink.label}</Link>
+      <Link className={s.worldLink} href={HERO.worldLink.href} prefetch={false}>{HERO.worldLink.label}</Link>
     </div>
   );
 }
@@ -69,7 +69,7 @@ export function HomeBody() {
           <p className={s.footNote}>{WALKTHROUGH.foot}</p>
           <p className={s.footLinks}>
             {WALKTHROUGH.links.map((link) => (
-              <Link key={link.href} className={s.textLink} href={link.href}>{link.label}</Link>
+              <Link key={link.href} className={s.textLink} href={link.href} prefetch={false}>{link.label}</Link>
             ))}
           </p>
         </div>
@@ -79,7 +79,7 @@ export function HomeBody() {
         <ol className={s.cases}>
           {CASES.items.map((c, i) => (
             <li key={c.href} className={s.caseItem}>
-              <Link className={s.caseLink} href={c.href}>
+              <Link className={s.caseLink} href={c.href} prefetch={false}>
                 <span className={s.caseNo}>{ordinal(i)}</span>
                 <div className={s.caseBody}>
                   <span className={s.caseLabel}>{c.label}</span>
@@ -93,7 +93,7 @@ export function HomeBody() {
           ))}
         </ol>
         <p className={s.casesAll}>
-          <Link className={s.textLink} href={CASES.all.href}>{CASES.all.label}</Link>
+          <Link className={s.textLink} href={CASES.all.href} prefetch={false}>{CASES.all.label}</Link>
         </p>
       </Section>
 
@@ -127,7 +127,7 @@ export function HomeBody() {
               <p className={s.trustKicker}>{ordinal(i)} / {t.kicker}</p>
               <h3 className={s.trustTitle}>{t.title}</h3>
               <p className={s.trustText}>{t.text}</p>
-              <Link className={s.textLink} href={t.href}>{t.label}</Link>
+              <Link className={s.textLink} href={t.href} prefetch={false}>{t.label}</Link>
             </li>
           ))}
         </ul>

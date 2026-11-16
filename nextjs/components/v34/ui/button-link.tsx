@@ -30,5 +30,5 @@ export function ButtonLink({ href, tone = "primary", disabled = false, analytics
     );
   }
   if (NON_ROUTE.test(href)) return <a className={className} href={href} data-analytics={analytics}>{children}</a>;
-  return <Link className={className} href={href as Route} data-analytics={analytics}>{children}</Link>;
+  return <Link className={className} href={href as Route} data-analytics={analytics} prefetch={false}>{children}</Link>;
 }

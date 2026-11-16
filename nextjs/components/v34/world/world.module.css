@@ -162,11 +162,16 @@
   background-color: #1a352c;
 }
 
-.control[aria-pressed="true"],
-.control[aria-pressed="true"]:hover:not(:disabled) {
+.control[aria-pressed="true"] {
   border-color: #c9f2a5;
   color: #0b1713;
   background-color: #c9f2a5;
+}
+
+.control[aria-pressed="true"]:hover:not(:disabled) {
+  border-color: #d8f7bd;
+  color: #0b1713;
+  background-color: #d8f7bd;
 }
 
 .control:disabled {

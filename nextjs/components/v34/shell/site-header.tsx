@@ -28,7 +28,7 @@ export default function SiteHeader({ currentPath = "" }: { currentPath?: string 
     /* data-v34-header: the retained pages' stylesheets find their page root by the header it holds. */
     <header className={`${tokens.paper} ${s.header}`} data-v34-header="">
       <div className={s.inner}>
-        <Link href="/" className={s.brand} aria-label="TAVONEL home">
+        <Link href="/" className={s.brand} aria-label="TAVONEL home" prefetch={false}>
           <Logomark size={26} />
           <span className={s.wordmark}>TAVONEL</span>
         </Link>

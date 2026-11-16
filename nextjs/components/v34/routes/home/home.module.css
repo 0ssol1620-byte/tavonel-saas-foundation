@@ -36,6 +36,12 @@
   text-underline-offset: 3px;
 }
 
+/* An underlined link already has a line; the hover says "this one" by taking the surface's full-strength text colour. */
+.worldLink:hover,
+.textLink:hover {
+  color: var(--v34-fg);
+}
+
 .worldLink:focus-visible,
 .textLink:focus-visible,
 .caseLink:focus-visible {
