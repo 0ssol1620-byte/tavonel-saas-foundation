@@ -99,15 +99,70 @@
   margin-bottom: 24px;
 }
 
-.accessActions {
+.accessActions,
+.refActions {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
 }
 
+.refActions {
+  margin-top: 28px;
+}
+
+/* the support-issue card beside the split's text: a drawn example, labelled Illustration */
+.issue {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid var(--v34-fg-rule);
+  border-radius: var(--v34-radius-panel);
+}
+
+.issueTitle {
+  margin: 0;
+  color: var(--v34-fg);
+  font-size: var(--v34-lead);
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.issueRows {
+  display: grid;
+  margin: 0;
+}
+
+.issueRow {
+  display: grid;
+  grid-template-columns: minmax(0, 9rem) minmax(0, 1fr);
+  gap: 4px 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.issueTerm {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  font-weight: 650;
+}
+
+.issueText {
+  min-width: 0;
+  margin: 0;
+  color: var(--v34-fg);
+}
+
 @media (max-width: 900px) {
   .records,
   .steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .issueRow {
     grid-template-columns: minmax(0, 1fr);
   }
 }

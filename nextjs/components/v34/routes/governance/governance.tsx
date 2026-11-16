@@ -14,18 +14,18 @@ const SECURITY = v34Route("security").path;
 const EVIDENCE = v34Route("evidence").path;
 
 const STEPS = [
-  { title: "Propose", text: "A change is written as a scoped proposal that cites its sources." },
-  { title: "Validate", text: "Permissions, limits and the current state of the target are checked." },
-  { title: "Approve", text: "A named reviewer approves, rejects or edits the proposal." },
-  { title: "Apply", text: "The approved change reaches the World and the result is recorded." },
-  { title: "Audit", text: "The request, the reviewer and the result stay in the trail." },
+  { title: "Propose", text: "A scoped proposal for the change, citing its sources." },
+  { title: "Validate", text: "A check of permissions, limits and the current state of the target." },
+  { title: "Approve", text: "A named reviewer's decision to approve, reject or edit the proposal." },
+  { title: "Apply", text: "The approved change written to the World, with its result." },
+  { title: "Audit", text: "The request, the reviewer and the result, kept together as one trail." },
 ] as const;
 
 const REVIEW = [
-  ["Scope", "Which records the change touches", "Listed before approval"],
-  ["Before and after", "The value today and the value proposed", "Shown side by side"],
-  ["Reason", "The sources that justify the change", "Linked to evidence"],
-  ["Reviewer", "Who decided, and when", "Kept in the trail"],
+  ["Scope", "Which records the change touches", "Before approval"],
+  ["Before and after", "The value today and the value proposed", "Side by side"],
+  ["Reason", "The sources that justify the change", "With its evidence"],
+  ["Reviewer", "Who decided, and when", "In the trail"],
 ] as const;
 
 function Art() {
@@ -59,7 +59,7 @@ export function GovernanceBody() {
         art={<Figure framed={false} kind="Illustration" caption="A proposal, a reviewer and a World, with the audit trail beneath." art={<Art />} />}
       />
 
-      <Section surface="paper" eyebrow="The lifecycle" title="From proposal to audit trail" lead="Each change passes through the same steps, and each step leaves a record.">
+      <Section surface="paper" eyebrow="The lifecycle" title="From proposal to audit trail" lead="The steps this page sets out for a change to a World, each with the record it leaves.">
         <ul className={s.list}>
           {STEPS.map((p) => (
             <li key={p.title} className={s.item}>
@@ -73,8 +73,8 @@ export function GovernanceBody() {
         </p>
       </Section>
 
-      <Section surface="green" eyebrow="For the reviewer" title="What a reviewer sees before deciding">
-        <ScrollTable label="What a reviewer sees on a proposal" columns={["Detail", "What it shows", "How it is presented"]} rows={REVIEW} />
+      <Section surface="green" eyebrow="For the reviewer" title="What a reviewer needs before deciding">
+        <ScrollTable label="What a reviewer needs on a proposal" columns={["Detail", "What it shows", "Where it belongs"]} rows={REVIEW} />
       </Section>
 
       <FinalCta title="Compile a World of your own first." />

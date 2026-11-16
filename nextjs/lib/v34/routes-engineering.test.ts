@@ -4,11 +4,11 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { typedCounts } from "./route-test-support";
+import { typedCount, typedCounts } from "./route-test-support";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { MCP_TOOL_NAMES } from "@/lib/mcp-tools";
 import { EngineeringBody } from "@/components/v34/routes/engineering/engineering";
-import { ACCESS, ENGINEERING_DESTINATIONS, REFERENCE, STEPS } from "@/components/v34/routes/engineering/engineering-content";
+import { ACCESS, ENGINEERING_DESTINATIONS, REFERENCE, STEPS, SUPPORT } from "@/components/v34/routes/engineering/engineering-content";
 import { readPublicCorpus } from "./public-corpus";
 import { V34_ROUTE_KEYS, v34Route, v34RouteByPath } from "./routes";
 
@@ -21,10 +21,9 @@ const code = files.filter((x) => /\.tsx?$/.test(x.f));
 const all = code.filter((x) => !x.f.endsWith("-art.tsx")).map((x) => x.text).join("\n");
 const content = code.find((x) => x.f === "engineering-content.ts")!.text;
 const page = strip(readFileSync(join(root, "app/engineering/page.tsx"), "utf8"));
-const words = "zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen"
-  + "|(?:twen|thir|for|fif|six|seven|eigh|nine)ty|hundreds?|thousands?|millions?|dozens?|handful|couple|pair|score";
-const nouns = "controls?|requirements?|revisions?|versions?|documents?|pages?|sources?|records?|procedures?|standards?|editions?|releases?";
-const COUNT = new RegExp(`\\b(?:(?:${words})(?:-[a-z]+)?|\\d+)\\s+(?:[\\w-]+\\s+){0,4}(?:${nouns})\\b`, "i");
+// the shared typed-count pattern (route-test-support.ts), with "one" counted and this page's own nouns
+const COUNT_OPTIONS = { one: true, nouns: ["controls?", "requirements?", "revisions?", "versions?", "procedures?", "standards?", "editions?", "releases?"] };
+const COUNT = typedCount(COUNT_OPTIONS);
 
 describe("engineering route", () => {
   it("is a live registry route, gated and rendered from its own body", () => {
@@ -108,6 +107,43 @@ describe("engineering route", () => {
 
 describe("typed counts", () => {
   it("types no number word or digits before a counted noun", () => {
-    expect(typedCounts("engineering")).toEqual([]);
+    expect(typedCounts("engineering", COUNT_OPTIONS)).toEqual([]);
+  });
+});
+
+/*
+  The lane review found three prototype parts missing. Register row /engineering removes firmware
+  identification, the deprecated-procedure flag, the Approved service Skill and supplier exchange,
+  and nothing else, so the support-issue split and the two reference actions are restored without
+  those rows. The diff visual is the hero's own drawn art (two revisions, the changed line, its page).
+*/
+describe("what the register keeps from the prototype", () => {
+  const html = renderToStaticMarkup(createElement(EngineeringBody));
+  const at = (s: string) => html.indexOf(s);
+
+  it("opens with the support-issue split, an illustrated issue beside it", () => {
+    expect(at(SUPPORT.title)).toBeGreaterThan(-1);
+    expect(at(SUPPORT.title)).toBeLessThan(at(STEPS.title));
+    const split = html.slice(at(SUPPORT.title), at(STEPS.title));
+    expect(split).toContain(">Illustration<");
+    for (const [term, text] of SUPPORT.card.rows) {
+      expect(split).toContain(term);
+      expect(split).toContain(text);
+    }
+    expect(split).not.toMatch(/firmware|deprecated|Approved service|supplier/i);
+  });
+
+  it("ends the Change record band on revision handling and on privacy and access", () => {
+    const band = html.slice(at(REFERENCE.title), at(ACCESS.title));
+    for (const action of [REFERENCE.changes, REFERENCE.security]) {
+      expect(band).toContain(`href="${action.href}"`);
+      expect(band).toContain(action.label);
+      expect(v34RouteByPath(action.href)?.release).toBe("live");
+    }
+  });
+
+  it("keeps the diff visual as the hero's own drawn art", () => {
+    expect(html.indexOf("an earlier and a later revision of a standard side by side")).toBeGreaterThan(-1);
+    expect(html.indexOf("an earlier and a later revision of a standard side by side")).toBeLessThan(at(SUPPORT.title));
   });
 });

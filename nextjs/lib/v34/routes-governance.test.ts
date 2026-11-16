@@ -97,3 +97,17 @@ describe("typed counts", () => {
     expect(typedCounts("governance")).toEqual([]);
   });
 });
+
+/*
+  Held because no approval workflow ships. The page says what it sets out (the steps, what a reviewer
+  needs), never that the product approves, applies or records anything today, and promises no date.
+*/
+describe("an unshipped workflow, described rather than claimed", () => {
+  it("states no step as something the product does today", () => {
+    for (const claim of [
+      "is written as a scoped proposal", "are checked", "approves, rejects or edits", "reaches the World",
+      "the result is recorded", "stay in the trail", "passes through the same steps", "What a reviewer sees",
+    ]) expect(visible, claim).not.toContain(claim);
+    expect(visible).not.toMatch(/\bwill\b|coming soon|\bsoon\b|not (?:yet )?(?:available|shipped)/i);
+  });
+});

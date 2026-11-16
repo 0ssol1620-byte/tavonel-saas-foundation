@@ -16,10 +16,26 @@ export const HERO = {
   caption: "An earlier and a later revision of a standard, with the requirement that differs traced to the page that states it.",
 } as const;
 
+/* The prototype's support-issue split, without the rows the register removes (firmware identification, the deprecated-procedure flag). */
+export const SUPPORT = {
+  eyebrow: "Procedure, history and applicability",
+  title: "A support issue rarely sits in a single document.",
+  lead: "An answer can depend on the product, its installed version, the symptoms, safety requirements, earlier repairs and the current service procedure.",
+  card: {
+    title: "Intermittent connection issue",
+    rows: [
+      ["Evidence", "Match the symptom to the approved manual and its revision."],
+      ["Next action", "Prepare a diagnostic checklist for a person to review."],
+    ],
+  },
+} as const;
+
 export const REFERENCE = {
   eyebrow: "Public reference corpus",
   title: "A standards revision, kept as a Change record.",
   lead: "The public reference corpus keeps a NIST control catalog release as a Change record. It names the announcement it was read from and sits beside the publications that document it.",
+  changes: { href: to("changes"), label: "Inspect revision handling" },
+  security: { href: to("security"), label: "Privacy and access" },
   recordKind: "Change",
   sourceLabel: "Open the source",
   statsControls: "Control records",
@@ -56,5 +72,5 @@ export const FINAL = { title: "Create a World from your standards and procedures
 
 /** Every route this page links to, for the guard test. */
 export const ENGINEERING_DESTINATIONS: readonly string[] = [
-  HERO.secondary.href, ACCESS.primary.href, ACCESS.secondary.href, JOURNAL.href,
+  HERO.secondary.href, REFERENCE.changes.href, REFERENCE.security.href, ACCESS.primary.href, ACCESS.secondary.href, JOURNAL.href,
 ];

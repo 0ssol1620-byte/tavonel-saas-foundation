@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { typedCounts } from "./route-test-support";
+import { typedCount, typedCounts } from "./route-test-support";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { MCP_TOOL_NAMES } from "@/lib/mcp-tools";
 import { TeamsBody } from "@/components/v34/routes/teams/teams";
@@ -19,10 +19,9 @@ const code = files.filter((x) => /\.tsx?$/.test(x.f));
 const all = code.filter((x) => !x.f.endsWith("-art.tsx")).map((x) => x.text).join("\n");
 const content = code.find((x) => x.f === "teams-content.ts")!.text;
 const page = strip(readFileSync(join(root, "app/teams/page.tsx"), "utf8"));
-const words = "zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen"
-  + "|(?:twen|thir|for|fif|six|seven|eigh|nine)ty|hundreds?|thousands?|millions?|dozens?|handful|couple|pair|score";
-const nouns = "members?|readers?|people|users?|seats?|roles?|records?|sources?|pages?|documents?|versions?|questions?|tools?";
-const COUNT = new RegExp(`\\b(?:(?:${words})(?:-[a-z]+)?|\\d+)\\s+(?:[\\w-]+\\s+){0,4}(?:${nouns})\\b`, "i");
+// the shared typed-count pattern (route-test-support.ts), with "one" counted and this page's own nouns
+const COUNT_OPTIONS = { one: true, nouns: ["members?", "readers?", "people", "users?", "seats?", "roles?", "versions?"] };
+const COUNT = typedCount(COUNT_OPTIONS);
 
 describe("teams route (held)", () => {
   it("is a held registry route that gates itself before rendering", () => {
@@ -76,6 +75,6 @@ describe("teams route (held)", () => {
 
 describe("typed counts", () => {
   it("types no number word or digits before a counted noun", () => {
-    expect(typedCounts("teams")).toEqual([]);
+    expect(typedCounts("teams", COUNT_OPTIONS)).toEqual([]);
   });
 });

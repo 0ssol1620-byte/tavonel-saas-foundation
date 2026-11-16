@@ -160,8 +160,8 @@ const ROWS: readonly Row[] = [
     description: "A preview of Skills, reusable procedures an AI client follows with a World as its source, each run leaving a record of what it read and produced.",
     release: "held", nav: { group: "build-trust", label: "Skills" }, schema: "WebPage", ogLabel: "Skills" },
   // held: no customer result exists to report. Live with a pilot outcome receipt.
-  { key: "outcomes", path: "/outcomes", title: "Results reported by organizations using TAVONEL",
-    description: "A preview of outcome reports from organizations that compiled their documents, each stating what was measured, over what period and from which source.",
+  { key: "outcomes", path: "/outcomes", title: "How an outcome report states what was measured",
+    description: "What an outcome report has to state before a result counts: the measure, the period, the source of the data and the baseline it was compared against.",
     release: "held", nav: { group: "company", label: "Outcomes" }, schema: "WebPage", ogLabel: "Outcomes" },
   // held: storyboard only; production 404 is also enforced by the existing film layout. Live with a capture and its rights.
   { key: "film", path: "/film", title: "A storyboard of how a document becomes a World",

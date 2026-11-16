@@ -36,7 +36,7 @@ describe("outcomes page", () => {
   it("renders one h1 whose text is exactly the registry title, without the document-title suffix", () => {
     expect(html.match(/<h1\b/g)).toHaveLength(1);
     const h1 = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)![1]!.replace(/<[^>]*>/g, "");
-    expect(h1).toBe("Results reported by organizations using TAVONEL");
+    expect(h1).toBe("How an outcome report states what was measured");
     expect(code).not.toMatch(/<h1\b/);
   });
 
@@ -95,5 +95,18 @@ describe("outcomes links", () => {
 describe("typed counts", () => {
   it("types no number word or digits before a counted noun", () => {
     expect(typedCounts("outcomes")).toEqual([]);
+  });
+});
+
+/*
+  Held because no customer result exists. The registry row and the lead say what an outcome report is,
+  and read as no report from anybody.
+*/
+describe("a report format, not a report", () => {
+  it("names no organization that reported a result", () => {
+    const { title, description } = v34Route("outcomes");
+    for (const text of [title, description, visible]) {
+      expect(text).not.toMatch(/reported by|organizations? (?:using|that compiled)|customers? (?:using|reported)|using TAVONEL/i);
+    }
   });
 });

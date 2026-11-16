@@ -33,17 +33,20 @@ export const COUNTED_NOUNS = [
   A possessive ends the phrase, so "one company's filings" counts the company. Digits or a word
   glued to a hyphen ("TRAPPIST-1", "non-zero") belong to an identifier and are not a count.
   "one" before a singular noun is an article more often than a figure, so it is in the pattern only
-  where a route asks for it ({ one: true }: /personal and /markets, which were written to it).
+  where a route asks for it ({ one: true }: /personal, /markets, /engineering and /teams, which were
+  written to it). A route adds the nouns its own subject counts (`nouns`).
 */
-export function typedCount({ one = false }: { one?: boolean } = {}): RegExp {
+type CountOptions = { one?: boolean; nouns?: readonly string[] };
+
+export function typedCount({ one = false, nouns = [] }: CountOptions = {}): RegExp {
   const words = one ? `one|${NUMBER_WORDS}` : NUMBER_WORDS;
-  return new RegExp(`(?:^|[^\\w-])(?:(?:${words})(?:-[a-z]+)?|\\d+)\\s+(?:[\\w-]+\\s+){0,4}(?:${COUNTED_NOUNS.join("|")})\\b`, "i");
+  return new RegExp(`(?:^|[^\\w-])(?:(?:${words})(?:-[a-z]+)?|\\d+)\\s+(?:[\\w-]+\\s+){0,4}(?:${[...COUNTED_NOUNS, ...nouns].join("|")})\\b`, "i");
 }
 
 const stripComments = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "$1");
 
 /** Every typed count in a route folder's sources (`components/v34/routes/<folder>`), as "file: phrase". */
-export function typedCounts(folder: string, options: { one?: boolean } = {}): string[] {
+export function typedCounts(folder: string, options: CountOptions = {}): string[] {
   const dir = join(import.meta.dirname, "../../components/v34/routes", folder);
   const pattern = new RegExp(typedCount(options).source, "gi");
   return readdirSync(dir)

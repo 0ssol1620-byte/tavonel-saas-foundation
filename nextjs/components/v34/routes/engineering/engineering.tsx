@@ -13,7 +13,7 @@ import { Tag } from "@/components/v34/ui/tag";
 import { ToolList } from "@/components/v34/ui/tool-list";
 import { PUBLIC_CORPUS_STATS, readPublicCorpus } from "@/lib/v34/public-corpus";
 import { v34Route } from "@/lib/v34/routes";
-import { ACCESS, FINAL, HERO, JOURNAL, REFERENCE, STEPS } from "./engineering-content";
+import { ACCESS, FINAL, HERO, JOURNAL, REFERENCE, STEPS, SUPPORT } from "./engineering-content";
 import { EngineeringArt } from "./engineering-art";
 import s from "./engineering.module.css";
 
@@ -43,6 +43,27 @@ export function EngineeringBody() {
           </div>
         }
         art={<Figure art={<EngineeringArt />} caption={HERO.caption} />}
+      />
+
+      <Section
+        surface="paper"
+        eyebrow={SUPPORT.eyebrow}
+        title={SUPPORT.title}
+        lead={SUPPORT.lead}
+        aside={
+          <div className={s.issue}>
+            <Tag kind="Illustration" />
+            <p className={s.issueTitle}>{SUPPORT.card.title}</p>
+            <dl className={s.issueRows}>
+              {SUPPORT.card.rows.map(([term, text]) => (
+                <div key={term} className={s.issueRow}>
+                  <dt className={s.issueTerm}>{term}</dt>
+                  <dd className={s.issueText}>{text}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        }
       />
 
       <Section surface="green" eyebrow={STEPS.eyebrow} title={STEPS.title}>
@@ -88,6 +109,10 @@ export function EngineeringBody() {
             );
           })}
         </ul>
+        <div className={s.refActions}>
+          <ButtonLink href={REFERENCE.changes.href} tone="primary">{REFERENCE.changes.label}</ButtonLink>
+          <ButtonLink href={REFERENCE.security.href} tone="secondary">{REFERENCE.security.label}</ButtonLink>
+        </div>
       </Section>
 
       <Section surface="connect" eyebrow={ACCESS.eyebrow} title={ACCESS.title} lead={ACCESS.lead}>
