@@ -80,6 +80,20 @@ async function snapshot(page: Page, count: number): Promise<Snapshot> {
   return { census: (await census.textContent()) ?? "", attrs, text: (await board.evaluate((el) => el.textContent)) ?? "", next };
 }
 
+// The no-% guard means something only once a reading row with an unknown page total is on screen. The board's
+// filter chips collapse every row and its default filter can hide doc-p1 altogether, so this runs after
+// snapshot() (filter "All"), opens doc-p1, waits for its ReadingView to be visible, and only then re-reads the
+// board text. A guard read before that state exists would pass on an empty board.
+async function boardTextWithReadingOpen(page: Page): Promise<string> {
+  const row = page.locator('.board [data-document-id="doc-p1"]');
+  await expect(row.locator(".board-row-status")).toContainText("Reading page");
+  const summary = row.locator(".board-row-summary");
+  if ((await summary.getAttribute("aria-expanded")) !== "true") await summary.click();
+  await expect(summary).toHaveAttribute("aria-expanded", "true");
+  await expect(row.locator(".reading")).toBeVisible();
+  return (await page.locator(".board").evaluate((el) => el.textContent)) ?? "";
+}
+
 test.describe("file census across reopen", () => {
   test("ten mixed files, one in flight, one refused: the census adds up and each row names its next action", async ({ page }) => {
     await install(page);
@@ -121,11 +135,8 @@ test.describe("file census across reopen", () => {
     expect(reloaded.attrs).toEqual(server.attrs);
     expect(reloaded.census).toBe(server.census);
     expect(reloaded.next).toEqual(server.next);
-    // Wait until the guard has something to guard: the reading row is drawn with pagesRead but no page total.
-    await expect(page.locator('[data-document-id="doc-p1"] .board-row-status')).toContainText("Reading page");
-    await expect(page.locator(".board .reading")).toBeVisible();
     // Page total unknown, so nothing in the census or board may print a percentage.
-    expect(await page.locator(".board").evaluate((el) => el.textContent)).not.toContain("%");
+    expect(await boardTextWithReadingOpen(page)).not.toContain("%");
   });
 
   test("a second context on the same session reads the identical census and next actions", async ({ page, browser, baseURL }: { page: Page; browser: Browser; baseURL?: string }) => {
@@ -138,13 +149,11 @@ test.describe("file census across reopen", () => {
       await install(second);
       await mockP1Progress(second);
       await open(second);
-      await expect(second.locator('[data-document-id="doc-p1"] .board-row-status')).toContainText("Reading page");
-      await expect(second.locator(".board .reading")).toBeVisible();
       const other = await snapshot(second, 10);
       expect(other.attrs).toEqual(first.attrs);
       expect(other.census).toBe(first.census);
       expect(other.next).toEqual(first.next);
-      expect(other.text).not.toContain("%");
+      expect(await boardTextWithReadingOpen(second)).not.toContain("%");
     } finally {
       await context.close();
     }
