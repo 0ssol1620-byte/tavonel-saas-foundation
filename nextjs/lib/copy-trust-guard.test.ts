@@ -82,6 +82,7 @@ const DISCLOSURE_SURFACES: Record<string, string> = {
   "app/sources/page.tsx": "the support-tier table: what a tier costs to earn, and which formats are refused",
   "app/trust/page.tsx": "the trust index: the draft DPA label and what a qualified review provides",
   "app/security/page.tsx": "the control rows, including the fail-closed refusals",
+  "components/v34/routes/security/security-content.ts": "the control rows, including the fail-closed refusals",
   "app/status/page.tsx": "the probe table, where an unprobed dependency has to say so",
   "app/benchmarks/page.tsx": "the protocol: what a result must carry before it may be published",
   "app/reproducibility/page.tsx": "the frozen fixtures and what rerunning them does and does not settle",
@@ -164,7 +165,24 @@ function prose(relative: string) {
     .replace(/^[ \t]*\/\/.*$/gm, " ");
 }
 
-const GUARDED = [...COPY_MODULES, ...MARKETING_PAGES];
+/*
+  V34: the marketing pages above are thin files that render a body from components/v34, so every
+  source file there is a first-impression surface too, walked so a new one arrives guarded. A V34
+  file that is a disclosure surface is named in DISCLOSURE_SURFACES with its reason instead.
+*/
+function v34Sources(dir = "components/v34"): string[] {
+  return readdirSync(new URL(dir, ROOT), { withFileTypes: true }).flatMap((entry) => {
+    const path = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) return v34Sources(path);
+    return /\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name) ? [path] : [];
+  });
+}
+
+const GUARDED = [
+  ...COPY_MODULES,
+  ...MARKETING_PAGES,
+  ...v34Sources().filter((file) => !(file in DISCLOSURE_SURFACES)),
+];
 
 describe("copy trust guard", () => {
   it("checks a file that exists, so a renamed module cannot silently drop out", () => {

@@ -146,7 +146,7 @@ describe("copy", () => {
 });
 
 describe("links", () => {
-  const allowed = ["/docs/quickstart", "/api", "/docs", "/docs/use-with-ai", "/status", "/workspace", "/explore", "/api/openapi", "/developer/channel.json", "/developer/README.md", "/developer"];
+  const allowed = ["/docs/quickstart", "/api", "/docs", "/docs/use-with-ai", "/status", "/workspace", "/explore", "/api/openapi", "/developer/channel.json", "/developer/README.md", "/developer/"];
 
   it("types no path except the retained pages and the published files it names", () => {
     for (const f of code) {

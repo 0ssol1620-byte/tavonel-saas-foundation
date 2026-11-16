@@ -24,7 +24,6 @@ export const EXPLORE_HREF = "/explore" satisfies Route;
 export const OPENAPI_HREF = "/api/openapi";
 export const CHANNEL_FILE = "/developer/channel.json";
 export const README_FILE = "/developer/README.md";
-export const DEVELOPER_DIR = "/developer";
 
 export const HERO = {
   figure: "A request carries a key, and each result carries the source version and the location it was compiled from.",
@@ -66,7 +65,6 @@ export const JOURNEY = {
   ],
   gate: "Connecting your own sources is arranged with us.",
   request: "Discuss your sources",
-  explore: "Open the public Compiled World",
 } as const;
 
 export const FIRST_READ = {

@@ -125,9 +125,12 @@ describe("the old drafts are archived everywhere they are reachable", () => {
   });
 
   it("every public link to the v2 draft labels it archived, and the shared records cite the addendum", () => {
-    const enterprise = withoutComments(read("app/enterprise/page.tsx"));
-    expect(enterprise).toContain("archived 2026-09-23 template</a>");
-    expect(enterprise).toContain('href="/policy/TAVONEL_PROCESSING_ADDENDUM_2026-09-30.md"');
+    // V34: the /enterprise links are FileOrRouteLink over the RETAINED paths in the route's content file.
+    const enterprise = withoutComments(["enterprise-content.ts", "enterprise.tsx"]
+      .map((name) => read(`components/v34/routes/enterprise/${name}`)).join("\n"));
+    expect(enterprise).toContain("archived 2026-09-23 template</FileOrRouteLink>");
+    expect(enterprise).toContain('addendum: "/policy/TAVONEL_PROCESSING_ADDENDUM_2026-09-30.md"');
+    expect(enterprise).toContain("href={RETAINED.addendum}");
     expect(enterprise).not.toMatch(/>data processing agreement<\/a>\s+is\s+available as a draft/);
     expect(read("lib/public-trust-contract.ts")).not.toContain("TAVONEL_DPA_v2");
     expect(read("content/trust/provisions.ts")).toContain('label: "Enterprise DPA template (archived draft)"');

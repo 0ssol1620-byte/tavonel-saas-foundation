@@ -1,7 +1,8 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { breadcrumbList } from "./structured-data";
+import { V34_ROUTES } from "./v34/routes";
 
 /*
   Breadcrumbs are the only schema this site adds beyond the global Organization and
@@ -142,8 +143,19 @@ describe("JSON-LD emitted anywhere in the tree", () => {
     expect(metadata).toContain('route.schema === "Article" && route.article');
     expect(metadata).toContain("datePublished: route.article.published");
     expect(metadata).not.toMatch(/"(AggregateRating|Review|Offer|SearchAction)"|ratingValue|\bprice\s*:/);
-    const routes = readFileSync(join(sourceRoot, "lib/v34/routes.ts"), "utf8");
-    expect(routes, "no publication date is typed into the registry until an article is published").not.toMatch(/article:\s*\{\s*published:\s*"/);
+    /*
+      Route batch 1 published the journal articles, so the registry carries their dates now. The
+      rule stands for everything else: a date only on an Article row whose article source exists.
+    */
+    for (const route of V34_ROUTES) {
+      if (!route.article) continue;
+      expect(route.schema, `${route.key} carries a publication date but is not an article`).toBe("Article");
+      const name = route.key.replace(/^journal-/, "");
+      expect(
+        existsSync(join(sourceRoot, `components/v34/routes/${route.key}/${name}-article.tsx`)),
+        `no publication date is typed into the registry until ${route.key} is written`,
+      ).toBe(true);
+    }
   });
 
   it.each(emitters.map((file) => file.path))("%s claims no date, rating or dataset", (path) => {

@@ -13,13 +13,14 @@ import { ScrollTable } from "@/components/v34/ui/scroll-table";
 import { Section } from "@/components/v34/ui/section";
 import { ToolList } from "@/components/v34/ui/tool-list";
 import { activationPolicy } from "@/lib/activation-policy";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 import { FIRST_CALL_OPERATION, FIRST_CALL_SNIPPETS } from "@/lib/developer-snippets";
 import { DEVELOPER_FILES, DEVELOPER_FILE_COUNT_WORD, MCP_TOOL_COUNT_WORD } from "@/lib/mcp-tools";
 import { PACKAGE_CONTENTS } from "@/lib/package-contents";
 import { v34Route } from "@/lib/v34/routes";
 import { CodeBlock } from "./code-block";
 import {
-  BRIDGE, CHANNEL_FILE, DEVELOPER_DIR, EXPLORE_HREF, FILES, FINAL, FIRST_READ, HERO, JOURNEY, NEXT, OPENAPI_HREF,
+  BRIDGE, CHANNEL_FILE, FILES, FINAL, FIRST_READ, HERO, JOURNEY, NEXT, OPENAPI_HREF,
   PACKAGE, PATHS, README_FILE, TOOLS, WORKSPACE_HREF,
 } from "./developers-content";
 import s from "./developers.module.css";
@@ -111,7 +112,7 @@ export function DevelopersBody() {
           <p className={s.notice} role="status" data-capability-gate="customerData">
             <strong>{JOURNEY.gate}</strong> {activationPolicy.customerData.reason}{" "}
             <Link className={s.inlineLink} href={v34Route("contact").path} prefetch={false}>{JOURNEY.request}</Link>{" "}
-            <Link className={s.inlineLink} href={EXPLORE_HREF} prefetch={false}>{JOURNEY.explore}</Link>
+            <Link className={s.inlineLink} href={EXPLORE_CTA.href as Route} prefetch={false}>{EXPLORE_CTA.label}</Link>
           </p>
         ) : null}
       </Section>
@@ -150,9 +151,9 @@ export function DevelopersBody() {
           {DEVELOPER_FILES.map(({ key, file, purpose }) => (
             <li key={key} className={s.file}>
               {key === "mcp" ? (
-                <TrackedLink className={s.fileLink} event="developer_mcp_started" href={`${DEVELOPER_DIR}/${file}`} download>{file}</TrackedLink>
+                <TrackedLink className={s.fileLink} event="developer_mcp_started" href={`/developer/${file}`} download>{file}</TrackedLink>
               ) : (
-                <a className={s.fileLink} href={`${DEVELOPER_DIR}/${file}`} download>{file}</a>
+                <a className={s.fileLink} href={`/developer/${file}`} download>{file}</a>
               )}
               <span className={s.filePurpose}>{purpose}</span>
             </li>

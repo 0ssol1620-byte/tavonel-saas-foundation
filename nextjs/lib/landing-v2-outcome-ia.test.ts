@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import sitemap from "@/app/sitemap";
 import { LANDING_V2_COPY, LANDING_V2_SCENE_ORDER } from "./landing-v2-copy";
 import { PUBLIC_MARKETING_PATHS } from "./marketing-analytics";
+import { routeMetadata } from "./v34/route-metadata";
+import { v34Route } from "./v34/routes";
 
 const landingPageSource = readFileSync(
   new URL("../components/landing-v2/landing-page.tsx", import.meta.url),
@@ -67,7 +69,10 @@ describe("B33 outcome IA cross-surface integration", () => {
   it("publishes the result-first home description consistently", () => {
     const sentence =
       "Inspect a finished public Compiled World, follow one result to its exact source region, and compare what changed before you discuss your own sources.";
-    expect(englishPageSource).toContain(sentence);
+    // V34 (D33 §4 #16): the home page takes its head from the registry row.
+    expect(englishPageSource).toContain('routeMetadata("home")');
+    expect(v34Route("home").description).toBe(sentence);
+    expect(routeMetadata("home").description).toBe(sentence);
     expect(llms).toContain(`[Home](https://tavonel.com/): ${sentence}`);
   });
 

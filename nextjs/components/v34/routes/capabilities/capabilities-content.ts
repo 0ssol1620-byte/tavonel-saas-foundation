@@ -38,10 +38,10 @@ export const FORMATS = {
 } as const;
 
 export const DEPLOYMENT = {
-  eyebrow: "This deployment",
+  eyebrow: "Live status",
   title: "What is open today.",
   lead: "Read from the live status when the page loads. A status that cannot be read shows as Unknown.",
-  table: "Capabilities of this deployment and their state",
+  table: "Each capability and its state today",
   columns: ["Capability", "State", "Note"],
 } as const;
 

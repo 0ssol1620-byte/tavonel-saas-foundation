@@ -17,7 +17,7 @@ import { SUPPORT_ACKNOWLEDGEMENT } from "./support-targets";
   worse than a published absence.
 */
 const read = (path: string) => readFileSync(resolve(import.meta.dirname, "..", path), "utf8");
-const SURFACES = ["app/status/page.tsx", "app/contact/page.tsx"] as const;
+const SURFACES = ["app/status/page.tsx", "components/v34/routes/contact/contact.tsx"] as const;
 
 describe("the published support target", () => {
   it("is an acknowledgement within one business day, KST", () => {

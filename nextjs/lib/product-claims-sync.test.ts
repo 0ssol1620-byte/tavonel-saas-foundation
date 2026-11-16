@@ -333,15 +333,18 @@ describe("product claims sync", () => {
     outlived its gate fails.
   */
   it("discloses the closed customer-data gate on /developers before its authenticated examples", () => {
-    const page = read("app/developers/page.tsx");
+    // V34: the body is components/v34/routes/developers; the samples are stacked CodeBlocks, not tabs.
+    const page = read("components/v34/routes/developers/developers.tsx");
+    const words = read("components/v34/routes/developers/developers-content.ts");
     expect(page, "the gate text comes from the object /api/status serves")
       .toMatch(/import \{[^}]*\bactivationPolicy\b[^}]*\} from "@\/lib\/activation-policy"/);
     expect(page, "the public World action is the site's one constant for it")
       .toMatch(/import \{[^}]*\bEXPLORE_CTA\b[^}]*\} from "@\/lib\/site-navigation"/);
 
     const source = strip(page);
+    expect(source).toContain("const gateClosed = !activationPolicy.customerData.enabled;");
     const gate = source.match(
-      /\{activationPolicy\.customerData\.enabled \? null : \(\s*(<p [^>]*>[\s\S]*?<\/p>)\s*\)\}/,
+      /\{gateClosed \? \(\s*(<p [^>]*>[\s\S]*?<\/p>)\s*\) : null\}/,
     );
     expect(gate, "the note renders only while the gate is closed").not.toBeNull();
     const [block, note] = gate!;
@@ -352,13 +355,14 @@ describe("product claims sync", () => {
     expect(note, "the public World, by its constant")
       .toMatch(/<Link [^>]*href=\{EXPLORE_CTA\.href as Route\}[^>]*>\{EXPLORE_CTA\.label\}<\/Link>/);
     expect(note, "and the conversation about the reader's own sources")
-      .toMatch(/<Link [^>]*href="\/contact"[^>]*>Discuss your sources<\/Link>/);
+      .toMatch(/<Link [^>]*href=\{v34Route\("contact"\)\.path\}[^>]*>\{JOURNEY\.request\}<\/Link>/);
+    expect(words).toContain('request: "Discuss your sources"');
 
     const at = source.indexOf(block);
-    const journey = source.indexOf("{JOURNEY.map(");
-    const examples = source.indexOf("<DocsSnippet snippets={[...FIRST_CALL_SNIPPETS]}");
+    const journey = source.indexOf("{JOURNEY.items.map(");
+    const examples = source.indexOf("{FIRST_CALL_SNIPPETS.map(");
     expect(journey, "the journey is still rendered from JOURNEY").toBeGreaterThan(-1);
-    expect(examples, "the authenticated examples are still the first-call tabs").toBeGreaterThan(-1);
+    expect(examples, "the authenticated examples are still the first-call samples").toBeGreaterThan(-1);
     expect(at, "after the journey list closes").toBeGreaterThan(source.indexOf("</ol>", journey));
     expect(at, "before the first authenticated example").toBeLessThan(examples);
   });
@@ -475,7 +479,7 @@ describe("product claims sync", () => {
     const R1_RATE = /per standard page|STANDARD_PAGE_USD|MAXIMUM_PAGE_USD|PROCESSING_UNIT_USD|\$\s?0\.\d/;
     for (const [surface, source] of [
       ["pricing", pricing], ["docs", read("lib/docs-content.ts")],
-      ["enterprise", read("app/enterprise/page.tsx")], ["guide", read("lib/guide-content.ts")], ["integrations", read("app/integrations/page.tsx")],
+      ["enterprise", ["enterprise-content.ts", "enterprise.tsx"].map((name) => read(`components/v34/routes/enterprise/${name}`)).join("\n")], ["guide", read("lib/guide-content.ts")], ["integrations", read("app/integrations/page.tsx")],
     ] as const) {
       expect(source, `R1: ${surface} publishes no overage rate`).not.toMatch(R1_RATE);
     }

@@ -26,7 +26,7 @@ vi.mock("next/navigation", () => ({
 const { KeylessTryIt, KEYLESS_READS, recipeBody } = await import("../components/docs/keyless-try-it");
 const { ReadResult } = await import("../components/api-try-it");
 const { default: DocsSectionPage } = await import("../app/docs/[section]/page");
-const { default: DevelopersPage } = await import("../app/developers/page");
+const { DevelopersBody } = await import("../components/v34/routes/developers/developers");
 const { default: ApiReferencePage } = await import("../app/api/page");
 const { findDocsSection } = await import("./docs-content");
 
@@ -48,9 +48,16 @@ function tryItIn(html: string) {
 }
 
 const quickstart = renderToStaticMarkup(await DocsSectionPage({ params: Promise.resolve({ section: "quickstart" }) }));
+/*
+  V34: /developers no longer mounts the try-it. The component is drawn in the legacy dark tokens and
+  the V34 page stacks its samples on its own surfaces; the try-it stays the first thing on the
+  quickstart, which is the /developers hero's primary action. Whether /developers gets a V34 mount
+  of it is listed for the lead. What is pinned for /developers is the way to it and that it never
+  carries a partial copy.
+*/
+const developers = renderToStaticMarkup(createElement(DevelopersBody));
 const pages = {
   "/docs/quickstart": quickstart,
-  "/developers": renderToStaticMarkup(createElement(DevelopersPage)),
   "/api": renderToStaticMarkup(await ApiReferencePage()),
 };
 
@@ -94,7 +101,11 @@ describe("the keyless try-it mount", () => {
     expect(copies).toHaveLength(2);
     for (const at of copies) expect(at).toBeLessThan(details);
     expect(html).not.toContain('class="docs-code"');
-    expect(pages["/developers"].match(/<figure class="docs-code"/g)).toHaveLength(1);
+  });
+
+  it("is one step from /developers: its primary action opens the quickstart that mounts it", () => {
+    expect(developers).toMatch(/<a [^>]*href="\/docs\/quickstart"/);
+    expect(developers).not.toContain("data-keyless-try-it");
   });
 
   it("links the human view of the same shape, without prefetching the Explore route's scripts", () => {

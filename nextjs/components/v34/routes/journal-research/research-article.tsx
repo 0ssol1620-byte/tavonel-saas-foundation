@@ -49,7 +49,7 @@ export const RESEARCH_BLOCKS: readonly ArticleBlock[] = [
   { kind: "h2", text: "Bound the claim" },
   { kind: "p", text: "This workflow organizes and traces evidence. A formal review adds its own screening, quality appraisal, protocol and independent review, and published material is used within the rights its owner grants." },
   { kind: "h2", text: "Anchor a conclusion in an inspectable record" },
-  { kind: "p", text: "A polished paragraph and a convincing bibliography are weak evidence on their own. A generated reference may be wrong, and an authentic citation may fail to support the specific claim. Create a record for the publication identifier, edition, relevant page or table, extracted statement, study context and limitations. Keep a paper's conclusion, a later interpretation and a new hypothesis as three separate entries." },
+  { kind: "p", text: "A polished paragraph and a convincing bibliography are weak evidence on their own. A generated reference may be wrong, and an authentic citation can still leave the specific claim unsupported. Create a record for the publication identifier, edition, relevant page or table, extracted statement, study context and limitations. Keep a paper's conclusion, a later interpretation and a new hypothesis as three separate entries." },
   { kind: "h3", text: "Evidence review" },
   { kind: "list", items: [
     "Discovery: record identifiers and inclusion criteria.",

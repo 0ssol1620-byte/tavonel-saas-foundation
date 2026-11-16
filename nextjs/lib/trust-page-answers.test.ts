@@ -6,6 +6,11 @@ import { TRUST_SEQUENCE } from "@/components/trust-next";
 import { activationPolicy } from "@/lib/activation-policy";
 
 const read = (path: string) => readFileSync(resolve(import.meta.dirname, "..", path), "utf8");
+/* V34: /security and /enterprise are thin pages; their words and markup live in the route folder. */
+const routeSource = (key: string, names: readonly string[]) =>
+  names.map((name) => read(`components/v34/routes/${key}/${name}`)).join("\n");
+const SECURITY_SRC = () => routeSource("security", ["security-content.ts", "security.tsx"]);
+const ENTERPRISE_SRC = () => routeSource("enterprise", ["enterprise-content.ts", "enterprise.tsx", "sample-frame.tsx"]);
 const publicTrustContract = read("lib/public-trust-contract.ts");
 
 /*
@@ -34,14 +39,14 @@ const SECURITY_ANSWERS: Array<[string, string]> = [
 ];
 
 describe("/security publishes customer-relevant controls without the internal review inventory", () => {
-  const page = read("app/security/page.tsx") + read("lib/security-claims.ts");
+  const page = SECURITY_SRC() + read("lib/security-claims.ts");
 
   it.each(SECURITY_ANSWERS)("answers %s", (_question, phrase) => {
     expect(page).toContain(phrase);
   });
 
   it("keeps topology, providers and implementation gaps out of the public page", () => {
-    const copy = withoutComments(read("app/security/page.tsx"));
+    const copy = withoutComments(SECURITY_SRC());
     for (const internal of [
       "ProcessingRegionTable", "TrustDisclosures", "activationPolicy", "RunPod", "Cloud Run",
       "ClamAV", "generator seam", "injection classes", "authorization_revision", "RPO", "SOC 2",
@@ -66,9 +71,10 @@ describe("§17 trust chain", () => {
     protected: the guide is where a cold reader joins it.
   */
   it("hands the category guide's reader on to evidence and to benchmarks", () => {
-    const guide = read("app/knowledge-compiler/page.tsx");
-    expect(guide).toContain('href: "/evidence"');
-    expect(guide).toContain('href: "/benchmarks"');
+    // D33 §4 #11: the category guide is /journal/compiler now (/knowledge-compiler is a 308 to it).
+    const guide = read("components/v34/routes/journal-compiler/compiler-article.tsx");
+    expect(guide).toContain('href: v34Route("evidence").path');
+    expect(guide).toContain('href: retained("/benchmarks")');
   });
 });
 
@@ -355,7 +361,7 @@ describe("§77 /status scope", () => {
 */
 const HUBS: Array<[string, string]> = [
   ["app/trust/page.tsx", "what is published about security and"],
-  ["app/evidence/page.tsx", "how a compiled result stays bound to the"],
+  ["components/v34/routes/evidence/evidence-content.ts", "how a compiled result stays bound to the"],
   ["app/benchmarks/page.tsx", "what a knowledge-compilation result has to"],
   ["components/v34/routes/research-program/program-content.ts", "which problems are still open"],
   ["app/research/notes/page.tsx", "These are the results we have measured"],
@@ -397,6 +403,8 @@ describe("CA B04 the five hubs each say which question they answer", () => {
 */
 const CASE_SURFACES = [
   "app/evidence/page.tsx",
+  "components/v34/routes/evidence/evidence-content.ts",
+  "components/v34/routes/evidence/evidence.tsx",
   "app/benchmarks/page.tsx",
   "app/reproducibility/page.tsx",
 ] as const;
@@ -765,11 +773,11 @@ describe("public trust disclosures and the enterprise procurement summary", () =
   );
 
   it("routes enterprise buyers to maintained trust records without repeating the review inventory", () => {
-    const source = withoutComments(read("app/enterprise/page.tsx"));
+    const source = withoutComments(ENTERPRISE_SRC());
     expect(source).not.toContain("<TrustDisclosures");
     // D-12 (delegated decision 2026-11-09): the pilot is scoped with us; a plan is bought online.
-    for (const material of ["pilot is scoped with us rather than bought online", 'href={"/trust" as Route}',
-      'href={"/security" as Route}', "qualified review", "draft for review"]) {
+    for (const material of ["pilot is scoped with us rather than bought online", "href={retained(RETAINED.trust)}",
+      "href={security}", "qualified review", "draft for review"]) {
       expect(source).toContain(material);
     }
     for (const internal of ["exactly one member", "SAML", "SCIM", "SOC 2", "ISO 27001",

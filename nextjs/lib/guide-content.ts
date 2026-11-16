@@ -489,7 +489,7 @@ const EN: GuideChapter[] = [
         items: [
           "**/sources** lists every source TAVONEL reads and what survives the read, format by format.",
           "**/evaluation** sets out how an evaluation of your documents is agreed: permissions, questions, limits, costs and evidence quality before processing begins.",
-          "**/contact** asks you to “Tell us what your documents need to become, without sending the documents themselves.”",
+          "**/contact** asks you to “Include the formats and rough volume so the answer can be specific.”",
         ],
       },
       { kind: "note", text: `“${intakeEn}”` },

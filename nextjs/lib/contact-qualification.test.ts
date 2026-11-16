@@ -103,7 +103,10 @@ describe("what reaches the mailbox", () => {
 });
 
 describe("the page around the form", () => {
-  const page = readFileSync(resolve(import.meta.dirname, "../app/contact/page.tsx"), "utf8");
+  // V34: the /contact body and its addresses live in the route folder; the page file is thin.
+  const page = ["contact-content.ts", "contact.tsx"]
+    .map((name) => readFileSync(resolve(import.meta.dirname, `../components/v34/routes/contact/${name}`), "utf8"))
+    .join("\n");
 
   it("routes support and security past the general queue", () => {
     // A vulnerability report waiting behind a pricing question is the one queue it must not

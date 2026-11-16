@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { GET as openapi } from "../app/api/openapi/route";
+import { DevelopersBody } from "../components/v34/routes/developers/developers";
 import { TOOLS } from "../public/developer/tavonel-mcp.mjs";
 import {
   FIRST_CALL,
@@ -22,10 +25,8 @@ import {
   to another path, the tool renamed, or a tab quietly gaining a parameter that no schema has.
 */
 
-const page = readFileSync(
-  fileURLToPath(new URL("../app/developers/page.tsx", import.meta.url)),
-  "utf8",
-);
+/* V34: /developers is a thin page; what it prints is the route body, rendered. */
+const page = renderToStaticMarkup(createElement(DevelopersBody));
 
 const spec = await (await openapi(new Request("https://tavonel.com/api/openapi"))).json();
 const operation = spec.paths[FIRST_CALL_OPERATION.path]?.[FIRST_CALL_OPERATION.method];
@@ -109,7 +110,7 @@ describe("the first-call tabs on /developers", () => {
     expect(request.path).toBe(`/api/v1${FIRST_CALL_OPERATION.path}`);
     /* It takes no arguments, which is why the tab is a client config and not a call. */
     expect(Object.keys(tool.inputSchema.properties ?? {})).toEqual([]);
-    expect(page).toContain("<code>list_sources</code>");
+    expect(page).toMatch(/<code\b[^>]*>list_sources<\/code>/);
   });
 
   /*
@@ -132,15 +133,16 @@ describe("the first-call tabs on /developers", () => {
       fileURLToPath(new URL("../components/docs-snippet.tsx", import.meta.url)),
       "utf8",
     );
-    expect(page).toContain("<DocsSnippet snippets={[...FIRST_CALL_SNIPPETS]}");
     /*
-      The group's accessible name, which `e2e/visual-refinement.spec.ts` finds this block by.
-
-      The tabs replaced a `<pre role="region" aria-label="First API request example">`, and a
-      panel cannot carry `region` as well as `tabpanel`. The name moved to the strip, so the strip
-      is where it is held: a rename here renames the thing that spec goes looking for.
+      V34: /developers no longer tabs the samples. It stacks all four, so every sample is in the
+      HTML, each in its own named region that a keyboard can focus and scroll. The tab component
+      below still serves /api and the docs, so its guards stay. (`e2e/visual-refinement.spec.ts`
+      found the old strip by "First API request example"; that spec is re-aimed with the e2e pass.)
     */
-    expect(page).toContain('label="First API request example"');
+    for (const snippet of FIRST_CALL_SNIPPETS) {
+      expect(page, snippet.label).toContain(`role="region" tabindex="0" aria-label="First request in ${snippet.label}"`);
+    }
+    expect(page.match(/aria-label="First request in /g)).toHaveLength(FIRST_CALL_SNIPPETS.length);
     expect(component).toContain("aria-label={label}");
     expect(component).toContain('label = "Request language"');
     expect(component).toContain('role="tablist"');

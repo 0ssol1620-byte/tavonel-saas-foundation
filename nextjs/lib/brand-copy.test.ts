@@ -14,6 +14,8 @@ import {
   PRODUCT_NOUNS,
   SELF_SERVE_CTA,
 } from "./site-navigation";
+import { routeMetadata } from "./v34/route-metadata";
+import { V34_ROUTES, v34Route } from "./v34/routes";
 
 /**
  * SPEC 13.3 -- phrases the product may not use, enforced.
@@ -539,24 +541,38 @@ describe("public copy", () => {
     BRAND_LINE rather than a positioning sentence typed into the page.
   */
   it("writes one tab-title pattern and names its one exception", () => {
+    /*
+      V34 (D33 §4 #13): the home page takes its head from the registry row, which is the one
+      named exception. Its tab title is still `TAVONEL — ` + BRAND_LINE.headline (the registry test
+      pins the row to that composition); the social title, which carried the headline alone, is
+      now the tab title and still carries the headline.
+    */
     const home = read("app/page.tsx");
+    expect(home).toContain('routeMetadata("home")');
     // Fix round 3: the home tab names the outcome the H1 states.
-    expect(home).toContain("title: `TAVONEL — ${BRAND_LINE.headline}`");
-    expect(home).toContain("title: BRAND_LINE.headline");
-    expect(
-      home,
-      "the home exception does not write its own positioning sentence"
-    ).not.toContain("Make your knowledge ready for AI");
+    expect(v34Route("home").title).toBe(`TAVONEL — ${BRAND_LINE.headline}`);
+    expect(String(routeMetadata("home").openGraph?.title)).toContain(BRAND_LINE.headline);
+    for (const source of [home, read("lib/v34/routes.ts")]) {
+      expect(
+        source,
+        "the home exception does not write its own positioning sentence"
+      ).not.toContain("Make your knowledge ready for AI");
+    }
     expect(
       read("app/layout.tsx"),
       "the inherited fallback follows the site pattern"
     ).toContain('title: "Knowledge Compiler for AI — TAVONEL"');
-    for (const file of ["app/explore/page.tsx", "app/contact/page.tsx"]) {
+    for (const file of ["app/explore/page.tsx"]) {
       const titles = [
         ...read(file).matchAll(/title: "([^"]*TAVONEL[^"]*)"/g),
       ].map(match => match[1]!);
       expect(titles.length, `${file} declares a title`).toBeGreaterThan(0);
       for (const title of titles) expect(title, file).toMatch(/ — TAVONEL$/);
+    }
+    // /contact is a registry page now; every registry title but the home's follows the pattern.
+    expect(read("app/contact/page.tsx")).toContain('routeMetadata("contact")');
+    for (const route of V34_ROUTES) {
+      if (route.key !== "home") expect(route.title, route.key).toMatch(/ — TAVONEL$/);
     }
   });
 
@@ -975,6 +991,9 @@ describe("public copy", () => {
     "app/product/document-understanding/page.tsx",
     "app/knowledge-compiler/page.tsx",
     "app/resources/page.tsx",
+    // V34: the thin /evidence and /enterprise pages render bodies from their route folders.
+    ...v34CopySurfaces("components/v34/routes/evidence"),
+    ...v34CopySurfaces("components/v34/routes/enterprise"),
   ];
 
   it.each(A1_SURFACES)(
@@ -1005,7 +1024,11 @@ describe("public copy", () => {
     the grid rather than a correction folded underneath it.
   */
   it("marks one shipped locator on /evidence, and states the rest as unshipped", () => {
-    const page = read("app/evidence/page.tsx");
+    // V34 (D33 §4 #13): the declarations are in the route's content file, the grid in its body.
+    const page =
+      read("components/v34/routes/evidence/evidence-content.ts") +
+      "\n" +
+      read("components/v34/routes/evidence/evidence.tsx");
     const shipped = page.match(/const READING_TODAY = \["([^"]+)"/);
     expect(
       shipped,
@@ -1091,8 +1114,8 @@ describe("public copy", () => {
     quietly ending the reader's journey.
   */
   const TRUST_PAGES: Array<[string, string]> = [
-    ["app/security/page.tsx", "/security"],
-    ["app/evidence/page.tsx", "/evidence"],
+    ["components/v34/routes/security/security.tsx", "/security"],
+    ["components/v34/routes/evidence/evidence.tsx", "/evidence"],
     ["app/benchmarks/page.tsx", "/benchmarks"],
     ["app/reproducibility/page.tsx", "/reproducibility"],
     ["components/v34/routes/research-program/program.tsx", "/research/program"],
@@ -1102,6 +1125,17 @@ describe("public copy", () => {
     "%s ends on its own step of the §17 trust sequence",
     (surface, href) => {
       const source = read(surface);
+      /*
+        V34 /security renders the step as a Bridge read from the same TRUST_SEQUENCE: it finds
+        its own position by its registry path, so it names itself rather than a typed position.
+      */
+      if (!source.includes("<TrustNext")) {
+        expect(source, `${surface} must render the shared next step`).toContain("TRUST_SEQUENCE");
+        expect(source, `${surface} must name itself, not another page's position`)
+          .toContain(`v34Route("${href.slice(1)}")`);
+        expect(source).toContain("TRUST_SEQUENCE.findIndex((step) => step.href === route.path)");
+        return;
+      }
       expect(source, `${surface} must render the shared next step`).toContain(
         "TrustNext"
       );
@@ -1111,6 +1145,21 @@ describe("public copy", () => {
       ).toContain(`from="${href}"`);
     }
   );
+
+  /*
+    The V34 /security Bridge types its link and label, so pin them to the step the sequence
+    names after /security: the same page and the same action TrustNext would print.
+  */
+  it("sends /security to the next step's page with the sequence's own action", async () => {
+    const { SecurityBody } = await import("@/components/v34/routes/security/security");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    const html = renderToStaticMarkup(createElement(SecurityBody));
+    const order = [...read("components/trust-next.tsx").matchAll(/href: "([^"]+)"/g)].map((m) => m[1]!);
+    const next = order[order.indexOf("/security") + 1]!;
+    const action = read("components/trust-next.tsx").match(/"\/security": "([^"]+)"/)![1]!;
+    expect(html).toMatch(new RegExp(`<a\\b[^>]*href="${next}"[^>]*>[\\s\\S]*?${action}`));
+  });
 
   it("gives every step of the trust sequence a precise next action", () => {
     const source = read("components/trust-next.tsx");
@@ -1138,7 +1187,11 @@ describe("public copy", () => {
     file renamed in the exporter fails here instead of on a customer's `unzip`.
   */
   it("names only files the exporter actually writes, on every page that lists them", () => {
-    const page = read("app/developers/page.tsx");
+    // V34: the /developers body and its words live in the route folder.
+    const page =
+      read("components/v34/routes/developers/developers.tsx") +
+      "\n" +
+      read("components/v34/routes/developers/developers-content.ts");
     const contents = read("lib/package-contents.ts");
     const exporter = read("lib/collection-download.ts");
     const extras = contents.match(
@@ -1194,6 +1247,9 @@ describe("public copy", () => {
     "app/research/page.tsx",
     "app/developers/page.tsx",
     "app/docs/page.tsx",
+    // V34: the thin pages above render bodies from their route folders.
+    ...["security", "evidence", "research", "research-program", "developers"].flatMap((key) =>
+      v34CopySurfaces(`components/v34/routes/${key}`)),
   ];
 
   it.each(CONVERSION_SURFACES)(

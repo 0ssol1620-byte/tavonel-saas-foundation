@@ -122,7 +122,7 @@ describe("G1-COPY: developer docs and files", () => {
   });
 
   it("10. says /developers reads the current active revision", () => {
-    const page = copy("app/developers/page.tsx");
+    const page = copy("components/v34/routes/developers/developers.tsx") + copy("components/v34/routes/developers/developers-content.ts");
     expect(page).toContain("Always the current active revision");
     expect(page).not.toContain("Always the current revision");
   });
