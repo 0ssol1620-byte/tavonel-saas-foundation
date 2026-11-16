@@ -312,7 +312,8 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceE
     ],
     [
       "Units",
-      `A PCU is one standard page. A complex page uses up to ${COMPLEX_PAGE_MAX_STANDARD_PAGES} PCU. A KQU is one bounded knowledge retrieval request.`,
+      // WO-CAT-2 L2: a not_sold meter (KQU) is named only on a Request access plan's allowance line and its overage row.
+      `A PCU is one standard page. A complex page uses up to ${COMPLEX_PAGE_MAX_STANDARD_PAGES} PCU.`,
     ],
     [
       "Past the included pages",
@@ -333,7 +334,7 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceE
     // Identity and team-access requirements stay in Enterprise scoping rather than plan copy.
     [
       "What differs by plan",
-      `${DEVELOPER.label} carries ${grouped(DEVELOPER.included.kqu)} KQU against ${PERSONAL.label}'s ${grouped(PERSONAL.included.kqu)}, with scoped developer keys. ${TEAM.label} and ${BUSINESS.label} add the review queue and version history, at ${grouped(TEAM.includedPages)} and ${grouped(BUSINESS.includedPages)} included pages. ${inWords(activationPlans)} reach World activation — activating a candidate and rolling one back — as the workspace owner. Every plan includes Google Drive and file-server connections.`,
+      `${DEVELOPER.label} adds scoped developer keys to ${PERSONAL.label}, with the larger monthly allowance its card states. ${TEAM.label} and ${BUSINESS.label} add the review queue and version history, at ${grouped(TEAM.includedPages)} and ${grouped(BUSINESS.includedPages)} included pages. ${inWords(activationPlans)} reach World activation — activating a candidate and rolling one back — as the workspace owner. Every plan includes Google Drive and file-server connections.`,
     ],
     [
       "What does not consume pages",
@@ -425,7 +426,8 @@ const SCENARIOS = SCENARIO_PAGES.map((pages) => ({
   the same routes. A buyer reading rows of ✓ learned nothing about why one plan costs more than
   another, and the things that do differ were spread between a card, a tile and a fold.
 
-  Included pages, KQU, storage, seats and the plan's features come from `lib/billing-catalog.ts`;
+  Included pages, storage, seats and the plan's features come from `lib/billing-catalog.ts` (KQU, a not_sold
+  meter, is named only on a Request access card's allowance line and its overage row: `revenue-paths.test.ts`);
   how you get a plan is `planAvailability`, computed on the server. A catalog change moves the
   table, but a closed purchase gate never leaves a visible "Checkout" promise behind. A row that
   is the same on every plan belongs in "Limits" below, not in a column here.
@@ -440,7 +442,6 @@ function planDifferences(availability: PlanAvailabilityByCode, checkoutOpen: boo
     [label, ...CURRENT_CODES.map((code) => say(BILLING_OFFERS[code], code))] as const;
   return [
     row("Included standard pages each month", (offer) => grouped(offer.includedPages)),
-    row("Included KQU each month", (offer) => grouped(offer.included.kqu)),
     row("Storage included, GB", (offer) => grouped(offer.included.storageGb)),
     row("Seats", (offer) => grouped(offer.included.seats)),
     row("How you get it", (_offer, code) => howYouGet(availabilityOf(availability, code), checkoutOpen)),

@@ -187,7 +187,7 @@ describe("/privacy, /trust and /refunds state the same terms", () => {
       expect(count(constant), `${constant}: its declaration and sessionStorage calls only`).toBe(storage + 1);
     }
     // The first-touch record leaves lib/recipe-intent.ts once, to /login, which discards it.
-    const login = read("app/login/page.tsx");
+    const login = read("app/login/login-client.tsx");
     expect(login.split("rememberFirstTouch(")).toHaveLength(2);
     expect(login).toMatch(/^\s*rememberFirstTouch\(window\.location\.search\);\r?$/m);
     expect(login).not.toContain("readFirstTouch");

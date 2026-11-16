@@ -14,6 +14,7 @@ import {
   type Capability,
 } from "./billing-catalog";
 import { decideOfferCheckoutPolicy } from "./checkout-policy";
+import { REVENUE_PATHS } from "./revenue-paths";
 import { STANDARD_UNITS_PER_PAGE } from "./usage-pricing";
 
 const V2 = ["personal", "developer", "team", "business"] as const;
@@ -145,6 +146,44 @@ describe("planAvailability: the one gate every surface reads", () => {
     const env = { PADDLE_PRICE_PERSONAL: id("x"), PADDLE_PRICE_DEVELOPER: id("x"), PADDLE_PRICE_TEAM: id("t") };
     expect([...readConfiguredBillingOffers(env).keys()]).toEqual(["team"]);
     expect(findOfferByPriceId(id("x"), env)).toBeNull();
+  });
+});
+
+/*
+  WO-CAT-2 L2. A plan's allowance line names meters (PCU, KQU, storage). Opening its sale while one of those meters is a
+  `not_sold` revenue family would put a not-sold term next to a Buy action -- and sell an allowance nothing counts. So a
+  plan may be purchasable only if every meter family its allowance names is sold, and opening a sale before its meters
+  exist fails here, not in a review. A seat is a cap the catalog's `seat_cap` capability gates; it has no revenue family.
+*/
+describe("a plan is purchasable only if every meter family its allowance names is sold", () => {
+  const familyOf = (meter: string) => REVENUE_PATHS.filter((path) => path.meter === meter);
+  /** Throws, naming each purchasable plan and the unsold meter family its allowance names. */
+  function expectSoldMeters(delivered: ReadonlySet<Capability>) {
+    const configured = readConfiguredBillingOffers(allEnv);
+    const unsold = V2.filter((code) => planAvailability(code, configured, delivered) === "purchasable").flatMap((code) =>
+      Object.keys(BILLING_OFFERS[code].included).flatMap((meter) => familyOf(meter)
+        .filter((family) => family.state === "not_sold")
+        .map((family) => `${code}: ${meter} (${family.family})`)));
+    if (unsold.length > 0) throw new Error(`purchasable plans whose allowance names a not_sold meter family:\n${unsold.join("\n")}`);
+  }
+
+  it("maps every allowance key to exactly one revenue family, except the seat cap", () => {
+    for (const code of V2) {
+      for (const meter of Object.keys(BILLING_OFFERS[code].included)) {
+        expect(familyOf(meter).length, `${code}: ${meter}`).toBe(meter === "seats" ? 0 : 1);
+      }
+    }
+  });
+
+  it("holds for what the product delivers today", () => {
+    expectSoldMeters(DELIVERED);
+  });
+
+  it("fails when the seam opens Personal while KQU and storage are not sold (failure path)", () => {
+    const personalLine = new Set<Capability>(["pcu_accepted_meter", "kqu_meter", "storage_meter", "seat_cap"]);
+    expect(planAvailability("personal", readConfiguredBillingOffers(allEnv), personalLine)).toBe("purchasable");
+    expect(() => expectSoldMeters(personalLine)).toThrow(/personal: kqu \(CONTEXT_KQU\)[\s\S]*personal: storageGb \(STORAGE_RETENTION\)/);
+    expect(() => expectSoldMeters(new Set(ALL))).toThrow(/business: kqu \(CONTEXT_KQU\)/);
   });
 });
 

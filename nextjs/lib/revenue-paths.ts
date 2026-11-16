@@ -14,8 +14,13 @@ export type RevenuePath = {
   offerCodes: readonly BillingOfferCode[];
   /** Null for sold_contract (invoiced outside the self-serve ledger) and for a not_sold family that holds no offer. */
   ledgerPath: LedgerPath | null;
-  /** Public-copy terms that must not appear while the path is not_sold. */
+  /**
+   * Public-copy terms of a not_sold family. On /pricing one may appear only in the allowance line of a plan whose action
+   * is Request access and in a Request access row of the overage table (`revenue-paths.test.ts`).
+   */
   terms: readonly string[];
+  /** The key of a plan's `included` allowance this family meters, where it meters one. A seat is a cap, not a family. */
+  meter?: "pcu" | "kqu" | "storageGb";
 };
 
 const notSold = (family: string, ...terms: string[]): RevenuePath => ({
@@ -45,9 +50,9 @@ export const REVENUE_PATHS: readonly RevenuePath[] = [
     terms: [],
   },
   { family: "DEV", state: "not_sold", offerCodes: ["developer"], ledgerPath: "allowance", terms: [] },
-  { family: "COMPILE_PCU", state: "sold_self_serve", offerCodes: [], ledgerPath: "compute_reservation", terms: [] },
-  notSold("CONTEXT_KQU", "KQU"),
-  notSold("STORAGE_RETENTION", "GB-month"),
+  { family: "COMPILE_PCU", state: "sold_self_serve", offerCodes: [], ledgerPath: "compute_reservation", terms: [], meter: "pcu" },
+  { ...notSold("CONTEXT_KQU", "KQU"), meter: "kqu" },
+  { ...notSold("STORAGE_RETENTION", "GB-month"), meter: "storageGb" },
   notSold("STEWARD_SYNC", "Steward sync"),
   notSold("SKILL_RUN_LICENSE", "Verified Skill", "Skill run"),
   notSold("WORLD_FIRST_PARTY", "first-party World"),

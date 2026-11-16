@@ -298,7 +298,7 @@ describe("product claims sync", () => {
     later. The fix is the initial value, so that is what this reads.
   */
   it("never paints the pilot badge before /api/status has confirmed the mode", () => {
-    const page = read("app/login/page.tsx");
+    const page = read("app/login/login-client.tsx");
     expect(page, "an unconfirmed commercial mode is null, not pilot")
       .toContain('useState<"pilot" | "live" | null>(null)');
     expect(strip(page), "the old initialiser must not come back")

@@ -72,7 +72,7 @@ describe("pricing plan overview", () => {
 });
 
 describe("evaluation figures are read from TRIAL_ALLOWANCE, never typed (lead note, CAT-D2)", () => {
-  const login = readFileSync(new URL("../app/login/page.tsx", import.meta.url), "utf8");
+  const login = readFileSync(new URL("../app/login/login-client.tsx", import.meta.url), "utf8");
   // Strip comments so prose about the rule does not trip it; what is left is rendered copy and code.
   const code = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 

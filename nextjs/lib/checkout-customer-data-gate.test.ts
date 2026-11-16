@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { gate, intent, commercial, binding, billingAccount, seam } = vi.hoisted(() => ({
+const { gate, intent, commercial, binding, billingAccount, seam, quote } = vi.hoisted(() => ({
   billingAccount: vi.fn(),
+  // The real quote by default (set in beforeEach); a test makes it fail to pin the order of quote and intent.
+  quote: vi.fn(),
   gate: vi.fn(),
   intent: vi.fn(),
   commercial: vi.fn(),
@@ -40,6 +42,7 @@ vi.mock("@/lib/billing-store", () => ({
   getFoundationBillingAccount: billingAccount,
 }));
 vi.mock("@/lib/commercial-state", () => ({ readCommercialState: commercial }));
+vi.mock("@/lib/checkout-quote", () => ({ quoteCheckout: quote }));
 vi.mock("@/lib/customer-data-admission", async () => ({
   readCustomerSourceAuthorization: gate,
   authorizationStage: (await import("../../shared/customerDataAuthorization")).authorizationStage,
@@ -58,6 +61,7 @@ vi.mock("@/lib/public-status", () => ({
 }));
 
 import { POST } from "../app/api/billing/checkout/route";
+const { quoteCheckout: realQuote } = await vi.importActual<typeof import("./checkout-quote")>("./checkout-quote");
 
 function request(offerCode = "developer") {
   const body = JSON.stringify({ offerCode });
@@ -76,6 +80,7 @@ describe("live checkout requires the buyer's document-processing receipt", () =>
     commercial.mockReturnValue({ provider: "production", checkoutEnabled: true, liveChargesEnabled: true });
     binding.mockReturnValue({ tavonel_nonce: "nonce" });
     intent.mockResolvedValue({ ok: true });
+    quote.mockImplementation(realQuote);
     billingAccount.mockResolvedValue({ ok: true, account: { accessPlan: null, subscriptionStatus: "inactive", subscriptionCancelAt: null, paddleSubscriptionId: null } });
   });
 
@@ -116,8 +121,20 @@ describe("live checkout requires the buyer's document-processing receipt", () =>
     const response = await POST(request());
     expect(response.status).toBe(200);
     expect(intent).toHaveBeenCalledOnce();
+    // WO-CAT-2 L5: the quote the overlay needs is made before the intent is recorded, and it is the one returned.
+    expect(quote.mock.invocationCallOrder[0]).toBeLessThan(intent.mock.invocationCallOrder[0]!);
+    expect(quote.mock.invocationCallOrder[0]).toBeLessThan(binding.mock.invocationCallOrder[0]!);
+    await expect(response.json()).resolves.toMatchObject({ quote: { offerCode: "developer", priceUsd: 49 } });
     // Billing integrity: the signer is handed the stored key exactly, not a trimmed copy.
     expect(binding).toHaveBeenCalledWith(expect.anything(), "h".repeat(32));
+  });
+
+  it("a quote that cannot be made leaves no checkout intent and no signed binding (WO-CAT-2 L5)", async () => {
+    gate.mockResolvedValue(approved());
+    quote.mockRejectedValue(new Error("fingerprint unavailable"));
+    await expect(POST(request())).rejects.toThrow("fingerprint unavailable");
+    expect(binding).not.toHaveBeenCalled();
+    expect(intent).not.toHaveBeenCalled();
   });
 
   it("refuses to sign with a binding key that carries surrounding whitespace (billing integrity)", async () => {

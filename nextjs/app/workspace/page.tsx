@@ -15,7 +15,7 @@ import type { BillingStatusAccount, EntitlementWaitResult } from "@/lib/entitlem
 import { formatCount, formatTimestamp } from "@/lib/format";
 import { countNoun } from "@/lib/plural";
 import { decideCheckoutResume, heldOfferSentence, readOfferParam, rememberCheckoutIntent, takeCheckoutIntent, type ResumeAccess } from "@/lib/checkout-intent";
-import { BILLING_OFFERS, isBillingOfferCode, type BillingOfferCode } from "@/lib/billing-catalog";
+import { BILLING_OFFERS, isBillingOfferCode, type BillingOfferCode, type PlanAvailability } from "@/lib/billing-catalog";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
 import { putWithProgress } from "@/lib/upload-transfer";
 import {
@@ -298,6 +298,9 @@ function readWorkspaceLocation(): { surface: WorkspaceSurface; tab: WorkspaceTab
   return { surface: LEGACY_TAB_TO_SURFACE[legacy], tab: legacy };
 }
 
+/** The hold's premise, not an availability: whether the plan is on sale is the checkout route's answer (WO-CAT-2 L4). */
+const HOLD_AVAILABILITY: PlanAvailability = "purchasable";
+
 export default function WorkspacePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
@@ -346,7 +349,15 @@ export default function WorkspacePage() {
   useEffect(() => {
     if (!resumeOffer || purchaseOpen === undefined) return;
     if (purchaseOpen === true && customerDataAccess === "checking") return;
-    const decision = decideCheckoutResume(resumeOffer, purchaseOpen, resumeAccess);
+    /*
+      Catalog v2 (WO-CAT-2 L4). This page runs in the browser and holds no price environment, so it never
+      decides whether a plan is on sale. A carried offer is held through terms and release as an offer on
+      sale would be (its usual way here is the terms-first link, which the checkout route sends only after
+      its offer policy passed), and when the hold ends the checkout route answers: a plan that is not sold
+      online is its 403 BILLING_OFFER_CONTACT_REQUIRED, rendered as the request-access sentence, with
+      nothing opened or charged. Every path but a billing-exempt owner's ends in that request.
+    */
+    const decision = decideCheckoutResume(HOLD_AVAILABILITY, purchaseOpen, resumeAccess);
     if (decision === "hold_terms" || decision === "hold_release") {
       rememberCheckoutIntent(resumeOffer);
       setNotice(heldOfferSentence(resumeOffer));

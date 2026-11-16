@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { activationPolicy } from "../lib/activation-policy";
 
 const statusV2 = ({
@@ -100,9 +100,9 @@ test("a plan intent is not promised a checkout while no plan can be bought", asy
 });
 
 /*
-  Catalog v2: sign-in runs in the browser and cannot compute `planAvailability` (it reads no price environment), so it never
-  promises a checkout for a plan: the sale state is /pricing's, computed on the server. Even where `purchasePlan` is open,
-  a plan intent is told it is requested, and the checkout sentence appears nowhere.
+  Catalog v2 (WO-CAT-2 L1). /login's server page computes every offer's `planAvailability` -- the answer /pricing renders --
+  and hands it to the client as data. Where `purchasePlan` is open, a plan the server computed as requested is told so, and
+  the checkout sentence appears nowhere.
 */
 test("a plan intent is not promised a checkout even where purchase is open", async ({ page }) => {
   await page.route("**/api/status/v2", route => route.fulfill({
@@ -112,6 +112,48 @@ test("a plan intent is not promised a checkout even where purchase is open", asy
   await expect(page.getByText("Personal is not sold online today.")).toBeVisible();
   await expect(page.getByText("is held for you.", { exact: false })).toHaveCount(0);
   await expect(page.getByText("Checkout opens by itself", { exact: false })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in to TAVONEL.");
+});
+
+/*
+  The purchasable case, through the test seam. Nothing is delivered yet, so this server computes no plan as purchasable,
+  and no environment switch may open a sale. The seam is the browser's copy of the server's answer -- the same kind of
+  seam as the `/api/status/v2` mock above: the document's serialized props for the sign-in client are rewritten from
+  `request_access` to `purchasable` for Personal, and nothing else. The first paint does not depend on it (no intent
+  and no status are read until after hydration), so the page hydrates cleanly and then reads the rewritten answer.
+  A rewrite that finds nothing to replace fails the test rather than passing on the server's own answer.
+*/
+async function servePersonalAsPurchasable(page: Page) {
+  await page.route("**/login?next=checkout&offer=personal", async (route) => {
+    const response = await route.fetch();
+    const body = await response.text();
+    // The flight data is a JSON string inside a script, so its quotes may arrive escaped (\").
+    const props = /(\\?"personal\\?":\\?")request_access(\\?")/g;
+    const rewritten = body.replace(props, "$1purchasable$2");
+    expect(rewritten, "the seam found the server's availability for Personal in the document").not.toBe(body);
+    const headers = Object.fromEntries(Object.entries(response.headers()).filter(([name]) => !/^(content-length|content-encoding)$/i.test(name)));
+    await route.fulfill({ status: response.status(), headers, body: rewritten });
+  });
+}
+
+test("a plan the server computed as purchasable is promised its checkout, beside the request case", async ({ page }) => {
+  await page.route("**/api/status/v2", route => route.fulfill({
+    json: statusV2({ createAccount: true, compileCustomerDocuments: true, purchasePlan: true }),
+  }));
+  await servePersonalAsPurchasable(page);
+  await page.goto(INTENT_URL);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("One step before checkout.");
+  await expect(page.getByText("Personal is held for you.")).toBeVisible();
+  // Conversion pass 2026-11-09: the notice carries the deal from the catalog, and names the step between sign-in and checkout.
+  await expect(page.getByText("$29/month for 500 standard pages", { exact: false })).toBeVisible();
+  await expect(page.getByText("Sign in and accept the processing terms, and checkout opens by itself.", { exact: false })).toBeVisible();
+  await expect(page.getByText("not sold online today", { exact: false })).toHaveCount(0);
+
+  // The same seam with purchase closed: the server's answer alone never makes the promise.
+  await page.unroute("**/api/status/v2");
+  await page.route("**/api/status/v2", route => route.fulfill({ json: statusV2({ createAccount: true }) }));
+  await page.goto(INTENT_URL);
+  await expect(page.getByText("Personal is not sold online today.")).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in to TAVONEL.");
 });
 

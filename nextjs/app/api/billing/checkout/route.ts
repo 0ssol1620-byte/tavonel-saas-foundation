@@ -85,6 +85,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ code: "PROCESSING_QUALIFICATION_NOT_BILLABLE" }, { status: 403, headers: NO_STORE });
     }
   }
+  // The quote is computed before anything is signed or recorded: a quote that cannot be made leaves no
+  // intent behind, because `use-checkout` opens no overlay without one and the intent would be orphaned.
+  const quote = await quoteCheckout(offer);
   const customData = createCheckoutBinding(
     { userId: user.id, workspaceId: membership.workspaceId, offerCode: body.offerCode },
     secret,
@@ -103,7 +106,7 @@ export async function POST(request: Request) {
     environment: paddle.environment,
     clientToken: paddle.clientToken,
     offer: { code: offer.code, kind: offer.kind, label: offer.label, priceId: offer.priceId, credits: offer.credits },
-    quote: await quoteCheckout(offer),
+    quote,
     customer: user.email ? { email: user.email } : undefined,
     customData,
   }, { headers: NO_STORE });

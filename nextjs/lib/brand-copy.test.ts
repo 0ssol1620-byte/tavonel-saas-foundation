@@ -66,6 +66,7 @@ const COPY_SURFACES = [
   "app/auth/callback/page.tsx",
   "components/world-explorer.tsx",
   "app/login/page.tsx",
+  "app/login/login-client.tsx",
   "app/not-found.tsx",
   "app/error.tsx",
   "lib/capabilities.ts",

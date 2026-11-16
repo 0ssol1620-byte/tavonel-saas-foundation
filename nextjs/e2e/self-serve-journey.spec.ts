@@ -40,7 +40,7 @@ import { failureSentence } from "../lib/workspace-failure-copy";
 import {
   FIXTURE_PORTAL_URL,
   FIXTURE_R2_ORIGIN,
-  SANDBOX_CHECKOUT_READY as V1_CHECKOUT_READY,
+  SANDBOX_CHECKOUT_READY,
   emitPaddleEvent,
   installFakePaddle,
   installNetworkFence,
@@ -60,15 +60,10 @@ import {
 /*
   Catalog v2 (PB-2026-11-V22, WO-CAT-2). Nothing is on sale while `DELIVERED` is empty, so /pricing renders no Buy action
   and a checkout is reached only by an offer code carried in the address (`/pricing?checkout=<code>`, `/workspace?checkout=<code>`)
-  or by sign-in -- the resume paths this file drives with a mocked checkout reply. The shared fixture is unchanged; the
-  offer it answers with is stated here as the v2 `personal` plan.
+  or by sign-in -- the resume paths this file drives with a mocked checkout reply. The shared fixture answers for the v2
+  `personal` plan, with the quote `use-checkout` requires before it opens an overlay (WO-CAT-2 L5).
 */
 const PERSONAL = BILLING_OFFERS.personal;
-const SANDBOX_CHECKOUT_READY = {
-  ...V1_CHECKOUT_READY,
-  offer: { ...V1_CHECKOUT_READY.offer, code: "personal", label: PERSONAL.label },
-  customData: { ...V1_CHECKOUT_READY.customData, tavonel_offer: "personal" },
-} as const;
 
 /** Every paid plan's action on /pricing is a request, because no capability is delivered; there is no Buy link. */
 const PAID_CODES = ["personal", "developer", "team", "business"] as const;
@@ -514,6 +509,42 @@ test.describe("simulated switch-on (browser mocks only)", () => {
     await expect(page).toHaveURL(FIXTURE_PORTAL_URL);
     expect(portal).toEqual([FIXTURE_PORTAL_URL]);
     expect(posts, "one checkout for one offer").toHaveLength(1);
+  });
+
+  /*
+    WO-CAT-2 L4. The workspace holds no price environment, so it never decides whether a plan is on sale: it holds the
+    carried offer through terms and release, and when the hold ends the checkout route answers. A plan that is not sold
+    online is the route's 403 BILLING_OFFER_CONTACT_REQUIRED, rendered as the request-access sentence, with no overlay.
+  */
+  test("a held offer the checkout route refuses with 403 ends in the request-access sentence, nothing opened", async ({ page }) => {
+    test.setTimeout(90_000);
+    await declineAnalytics(page);
+    await servePosture(page, "switch-on");
+    const paddle = await installFakePaddle(page);
+    await installFixtureSession(page);
+    await installWorkspaceRoutes(page, { accessSource: "unentitled", customerDataEnabled: false });
+    const state: { bootstrap: unknown } = { bootstrap: TODAY_NEW_ACCOUNT };
+    await page.route("**/api/access/bootstrap", (route) => route.fulfill({ json: state.bootstrap }));
+    const posts = await answerCheckout(page, () => ({ status: 403, json: { code: "BILLING_OFFER_CONTACT_REQUIRED" } }));
+
+    // Terms owed: held, and nothing is asked yet.
+    await page.goto("/workspace?checkout=team", { waitUntil: "domcontentloaded" });
+    await expect(region(page, "status", "Team is held for you.")).toBeVisible();
+    expect(posts).toEqual([]);
+
+    // Released: the route is asked once, and its refusal is the sentence.
+    state.bootstrap = bootstrapFor("trial");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    const refusal = region(page, "alert", `Checkout is unavailable. ${failureSentence("BILLING_OFFER_CONTACT_REQUIRED", 403)}`);
+    await expect(refusal).toBeVisible();
+    await expect(refusal).not.toContainText("BILLING_OFFER_CONTACT_REQUIRED");
+    expect(posts).toEqual([{ offerCode: "team" }]);
+    expect(paddle.loads()).toBe(0);
+
+    // Spent: the next visit asks nothing again.
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(region(page, "status", "Team is held for you.")).toHaveCount(0);
+    expect(posts).toHaveLength(1);
   });
 
   /*

@@ -446,7 +446,7 @@ describe("continuing a recipe after sign-in", () => {
     installBlockedStorage();
     // The sign-in page is told the recipe is not held, so it can say so (no silent fallback).
     expect(rememberRecipeIntent(intentFor())).toBe(false);
-    const login = read("../app/login/page.tsx");
+    const login = read("../app/login/login-client.tsx");
     expect(login).toContain("setRecipeKept(rememberRecipeIntent(startedRecipe))");
     expect(login).toContain("This browser is not keeping site data.");
     // The callback cannot carry the recipe, so it opens the workspace and does not throw.
@@ -504,7 +504,7 @@ describe("continuing a recipe after sign-in", () => {
     expect(render({ intent: intentFor() })).toContain("Where you land.");
     expect(render({ intent: intentFor(), omitLanding: true })).not.toContain("Where you land.");
     expect(continuation(intentFor(), true)).not.toContain("Where you land.");
-    expect(read("../app/login/page.tsx")).toContain("<RecipePreflight intent={recipe} omitLanding={!recipeKept} />");
+    expect(read("../app/login/login-client.tsx")).toContain("<RecipePreflight intent={recipe} omitLanding={!recipeKept} />");
   });
 
   function render(props: { intent: RecipeIntent; omitLanding?: boolean }) {
@@ -512,7 +512,7 @@ describe("continuing a recipe after sign-in", () => {
   }
 
   it("routes both sign-in pages through the one precedence rule, and never loops", () => {
-    const login = read("../app/login/page.tsx");
+    const login = read("../app/login/login-client.tsx");
     const callback = read("../app/auth/callback/page.tsx");
     expect(callback).toContain("resumeDestination({ checkout: resume, ownerBillingExempt, recipe: resumeRecipe })");
     expect(callback, "the bare returnTo resume is the gap this closed").not.toContain("resumeRecipe.returnTo");
@@ -524,7 +524,7 @@ describe("continuing a recipe after sign-in", () => {
   });
 
   it("sends no recipe id, return path or account detail to analytics", () => {
-    for (const page of ["../app/login/page.tsx", "../app/auth/callback/page.tsx", "../components/recipe-preflight.tsx"]) {
+    for (const page of ["../app/login/login-client.tsx", "../app/auth/callback/page.tsx", "../components/recipe-preflight.tsx"]) {
       const calls = [...read(page).matchAll(/trackFunnel\([^)]*\)/g)].map((match) => match[0]);
       for (const call of calls) {
         expect(call, page).not.toMatch(/recipeId|returnTo|recipeVersion|session|email|user/i);

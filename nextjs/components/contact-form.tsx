@@ -7,7 +7,18 @@ import { CONTACT_EMAIL, contactErrorCopy, contactText, type ContactLocale } from
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 
 type State = "idle" | "sending" | "sent" | "error";
-type PlanIntent = "Starter" | "Pro" | "Enterprise" | "";
+/*
+  Catalog v2 (PB-2026-11-V22): the plan a Request access link names, stored as received. The same list is
+  `app/api/contact/route.ts`'s allow-list. "Starter" and "Pro" (the 2026-11-10 names) are no longer plan
+  names, so a link still carrying one names no plan rather than being mapped to a plan it never meant.
+*/
+const PLAN_INTENTS = ["Personal", "Developer", "Team", "Business", "Enterprise"] as const;
+export type PlanIntent = (typeof PLAN_INTENTS)[number] | "";
+
+/** The plan intent a `?plan=` value carries: one of the plan names exactly, otherwise none. */
+export function planIntentFrom(value: string | null): PlanIntent {
+  return (PLAN_INTENTS as readonly (string | null)[]).includes(value) ? value as PlanIntent : "";
+}
 
 export default function ContactForm({ locale = "en" }: { locale?: ContactLocale }) {
   const [state, setState] = useState<State>("idle");
@@ -21,10 +32,7 @@ export default function ContactForm({ locale = "en" }: { locale?: ContactLocale 
   const terminal = state === "error" && !failure.retry;
 
   useEffect(() => {
-    const plan = new URLSearchParams(window.location.search).get("plan");
-    // 2026-11-10: Developer and Team were renamed Starter and Pro. Links already shared keep working.
-    const named = plan === "Developer" ? "Starter" : plan === "Team" ? "Pro" : plan;
-    setPlanIntent(named === "Starter" || named === "Pro" || named === "Enterprise" ? named : "");
+    setPlanIntent(planIntentFrom(new URLSearchParams(window.location.search).get("plan")));
   }, []);
 
   /*

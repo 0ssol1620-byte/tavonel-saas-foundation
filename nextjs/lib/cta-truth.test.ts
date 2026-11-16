@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { createElement, type FunctionComponent } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -173,17 +173,18 @@ async function explore(): Promise<{ exits: Action[]; close: Action }> {
 /*
   /login's notice for a reader who arrived with `?next=checkout&offer=personal`. The page passes
   `purchasePlan.enabled` from `/api/status/v2`; this passes the same field from the same builder, in
-  the same environment. The page runs in the browser and holds no price environment, so it passes the
-  availability it can know: `request_access` (never a promise of checkout). The purchasable half of the
-  notice is rendered in "the checkout-intent notice" below, with the availability a server would hand it.
+  the same environment. The availability is the one /login's server page hands its client (WO-CAT-2 L1),
+  read from that page in this environment. The purchasable half of the notice is rendered in "the
+  checkout-intent notice" and "/login promises a checkout only ..." below, through the catalog seam.
 */
 async function login(): Promise<{ text: string; links: Action[] }> {
   const { default: CheckoutIntentNotice } = await import("../components/checkout-intent-notice");
+  const { default: LoginPage } = await import("../app/login/page");
   const purchaseOpen = (await status()).purchasePlan;
   const html = render(CheckoutIntentNotice as FunctionComponent<Record<string, unknown>>, {
     offer: "personal",
     purchaseOpen,
-    availability: "request_access",
+    availability: (LoginPage as () => { props: { availability: Record<string, string> } })().props.availability.personal,
   });
   return { text: decode(html), links: anchors(html) };
 }
@@ -499,8 +500,111 @@ describe("catalog v2: /pricing buys only what the server computed as purchasable
   }, RENDER_TIMEOUT);
 
   it("reads no price environment in the browser modules that render the plans and the checkout notice", () => {
-    for (const path of ["../components/pricing-page-client.tsx", "../components/checkout-intent-notice.tsx", "../app/login/page.tsx"]) {
+    for (const path of ["../components/pricing-page-client.tsx", "../components/checkout-intent-notice.tsx", "../app/login/login-client.tsx", "../app/workspace/page.tsx"]) {
       expect(readFileSync(new URL(path, import.meta.url), "utf8"), path).not.toMatch(/process\.env|PADDLE_PRICE_/);
     }
   });
+
+  /*
+    WO-CAT-2 L4: the class, not the four files. `checkoutSellable` and `decideCheckoutResume` still accept an offer code
+    and then resolve it from the runtime's environment -- which in a browser is empty, so the answer is always
+    "request_access" and a hold or a promise is silently skipped once a plan is on sale. So no browser module may resolve
+    availability itself: none calls `planAvailability` or `readConfiguredBillingOffers`, and every `checkoutSellable` /
+    `decideCheckoutResume` call is handed an availability value (by name), never an offer code. Every "use client"
+    module in the tree is read, plus the intent notice, which carries no directive and renders inside /login's client.
+  */
+  describe("no browser module resolves a plan's availability itself", () => {
+    const root = new URL("../", import.meta.url);
+    const walk = (dir: string): string[] => readdirSync(new URL(dir, root), { withFileTypes: true }).flatMap((entry) =>
+      entry.isDirectory() ? (entry.name === "node_modules" ? [] : walk(`${dir}${entry.name}/`))
+        : /\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name) ? [`${dir}${entry.name}`] : []);
+    const code = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    const browserModules = ["app/", "components/", "lib/"].flatMap(walk)
+      .filter((path) => /^\s*["']use client["']/.test(readFileSync(new URL(path, root), "utf8")))
+      .concat("components/checkout-intent-notice.tsx");
+    /** The first argument of every call to `name`, as written. */
+    const firstArguments = (source: string, name: string) =>
+      [...source.matchAll(new RegExp(`\\b${name}\\(\\s*([^,)]+)`, "g"))].map((match) => match[1]!.trim());
+    const violations = (path: string, source: string) => [
+      ...["planAvailability", "readConfiguredBillingOffers"].filter((name) => new RegExp(`\\b${name}\\(`).test(source)).map((name) => `${path}: calls ${name}`),
+      ...["checkoutSellable", "decideCheckoutResume"].flatMap((name) => firstArguments(source, name)
+        .filter((argument) => !/availability/i.test(argument))
+        .map((argument) => `${path}: ${name}(${argument}, ...) is not handed an availability`)),
+    ];
+
+    it("reads the modules it guards", () => {
+      for (const path of ["app/login/login-client.tsx", "app/workspace/page.tsx", "components/pricing-page-client.tsx", "components/checkout-intent-notice.tsx"]) {
+        expect(browserModules, path).toContain(path);
+      }
+    });
+
+    it("finds no call that resolves availability in the browser", () => {
+      expect(browserModules.flatMap((path) => violations(path, code(readFileSync(new URL(path, root), "utf8"))))).toEqual([]);
+    });
+
+    it("catches each shape the rule exists for (failure path)", () => {
+      expect(violations("x.tsx", "decideCheckoutResume(resumeOffer, purchaseOpen, resumeAccess)")).toEqual([
+        "x.tsx: decideCheckoutResume(resumeOffer, ...) is not handed an availability",
+      ]);
+      expect(violations("x.tsx", 'checkoutSellable(intent, purchaseOpen); checkoutSellable("personal", true)')).toHaveLength(2);
+      expect(violations("x.tsx", "const a = planAvailability(code);")).toEqual(["x.tsx: calls planAvailability"]);
+      expect(violations("x.tsx", "readConfiguredBillingOffers()")).toEqual(["x.tsx: calls readConfiguredBillingOffers"]);
+      expect(violations("x.tsx", "checkoutSellable(availability[intent], purchaseOpen)")).toEqual([]);
+    });
+  });
+});
+
+/*
+  WO-CAT-2 L1. /login's availability is computed by its server page and handed to the client, the same answer /pricing
+  renders. With the test seam opening Personal (every capability delivered, its price configured), the page hands
+  "purchasable" down and the heading promises the checkout; removing the price takes the promise away again.
+*/
+describe("catalog v2: /login promises a checkout only for what the server computed as purchasable", () => {
+  const PRICE = `pri_${"b".repeat(26)}`;
+  afterEach(() => {
+    vi.doUnmock("@/lib/billing-catalog");
+  });
+
+  async function loginAvailability({ delivered, personalPrice }: { delivered: boolean; personalPrice: boolean }) {
+    await enter("S2");
+    vi.doMock("@/lib/billing-catalog", async (original) => {
+      const catalog = await original<typeof import("./billing-catalog")>();
+      const all = new Set(Object.values(catalog.BILLING_OFFERS).flatMap((offer) => offer.requires));
+      return {
+        ...catalog,
+        planAvailability: (code: never, configured: never) => catalog.planAvailability(code, configured, delivered ? all : new Set()),
+      };
+    });
+    if (personalPrice) vi.stubEnv("PADDLE_PRICE_PERSONAL", PRICE);
+    const { default: LoginPage } = await import("../app/login/page");
+    const element = (LoginPage as () => { props: { availability: Record<string, string> } })();
+    return element.props.availability;
+  }
+
+  const heading = async (availability: Record<string, string>, purchaseOpen: boolean | null) => {
+    const { loginHeading } = await import("../app/login/login-client");
+    return loginHeading({ intent: "personal", availability: availability as never, purchaseOpen, signedIn: false, recipe: null });
+  };
+
+  it("a purchasable Personal: 'One step before checkout.' and the held-for-you notice", async () => {
+    const availability = await loginAvailability({ delivered: true, personalPrice: true });
+    expect(availability.personal).toBe("purchasable");
+    expect(availability.team).toBe("request_access");
+    expect(availability.observer_access).toBe("retired");
+    expect(await heading(availability, true)).toBe("One step before checkout.");
+    const { default: CheckoutIntentNotice } = await import("../components/checkout-intent-notice");
+    const notice = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "personal", purchaseOpen: true, availability: availability.personal as never })));
+    expect(notice).toContain("Personal is held for you.");
+    // Purchase closed or not yet answered: no promise, whatever the plan.
+    expect(await heading(availability, false)).toBe("Sign in to TAVONEL.");
+    expect(await heading(availability, null)).toBe("Sign in to TAVONEL.");
+  }, RENDER_TIMEOUT);
+
+  it("the same page with no Personal price, or nothing delivered: a request, never the promise", async () => {
+    for (const seam of [{ delivered: true, personalPrice: false }, { delivered: false, personalPrice: true }]) {
+      const availability = await loginAvailability(seam);
+      expect(availability.personal, JSON.stringify(seam)).toBe("request_access");
+      expect(await heading(availability, true), JSON.stringify(seam)).toBe("Sign in to TAVONEL.");
+    }
+  }, RENDER_TIMEOUT);
 });
