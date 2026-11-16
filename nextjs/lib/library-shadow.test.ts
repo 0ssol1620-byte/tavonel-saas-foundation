@@ -3,12 +3,10 @@ import {
   MINHASH_PERMUTATIONS, RULES_DOC_TYPE_V1, minhashSimilarity, proposeTopics, textFingerprint, type DocTypeProposer,
 } from "./library-methods";
 import {
-  LIBRARY_ORGANIZE_MAX_TEXT_CHARS, decideLibraryLabel, docTypeLabel, libraryOrganizeMode, organizeLibraryAtIntake, readLibraryDocuments, readLibraryInternal, toLibraryDocuments,
-  type LibraryInternalView,
+  LIBRARY_ORGANIZE_MAX_TEXT_CHARS, PERSON_UNDO_METHOD_VERSION, decideLibraryLabel, docTypeLabel, libraryOrganizeMode, organizeLibraryAtIntake,
+  readLibraryDocuments, readLibraryInternal, toLibraryDocuments, type LibraryDecision, type LibraryInternalView,
 } from "./library-shadow";
-import {
-  labelControls, nextSession, opposite, recordDecision, shownState, targetKey, type DecisionIo, type LabelControl, type SessionDecisions, type Target,
-} from "@/components/library-panel";
+import { decisionFor, labelControls, labelState, targetKey, type LabelControl, type Target } from "@/components/library-panel";
 
 const { viewerAccess, alerted } = vi.hoisted(() => ({ viewerAccess: vi.fn(), alerted: vi.fn() }));
 vi.mock("./connector-source-access", () => ({ checkConnectorSourceAccessForViewer: viewerAccess }));
@@ -276,6 +274,7 @@ describe("Library DTOs", () => {
       documentId: A,
       documentType: { label: "contract", state: "proposed" },
       topics: [{ label: "terms", state: "proposed" }],
+      rejected: [],
       duplicates: [
         { relatedDocumentId: B, badge: "near", kind: "near_duplicate", state: "proposed", evidence: { matchedOn: ["text_similarity"] } },
         { relatedDocumentId: H, badge: "exact", kind: "exact_bytes", state: "proposed", evidence: { matchedOn: ["file"] } },
@@ -341,33 +340,47 @@ describe("Library DTOs", () => {
   });
 });
 
-/* A person's decisions (WO-D23-4): the newest decision wins, an undo is a later opposite decision. */
+/*
+  A person's decisions (WO-D23-4). The newest decision standing on a label wins, whatever it follows; an Undo is its
+  own row (method version person-undo:v1) naming the decision it withdraws, chosen by the store under its lock.
+*/
+type Row = {
+  documentId: string; sourceVersionId: string; labelKind: "doc_type" | "topic"; labelKey: string; labelSetVersion: string;
+  method: string; methodVersion: string; inputsSha256: string; disposition: "proposed" | "abstained" | "confirmed" | "rejected";
+  abstainReason: null; internalScore: number | null; evidenceIds: string[]; createdAt: string;
+};
+const sha256Of = (text: string) => Buffer.from(text).toString("hex").padEnd(64, "0").slice(0, 64);
 const person = (documentId: string, labelKind: "doc_type" | "topic", labelKey: string, disposition: "confirmed" | "rejected", createdAt: string,
-  key = createdAt) => ({ documentId, sourceVersionId: "a".repeat(64), labelKind, labelKey,
+  key = createdAt): Row => ({ documentId, sourceVersionId: "a".repeat(64), labelKind, labelKey,
     labelSetVersion: labelKind === "doc_type" ? "doc-type:v0" : "person:v1", method: "person", methodVersion: "person:v1",
     inputsSha256: `sha256:${sha256Of(key)}`, disposition, abstainReason: null, internalScore: null, evidenceIds: [], createdAt });
-const sha256Of = (text: string) => Buffer.from(text).toString("hex").padEnd(64, "0").slice(0, 64);
-const proposal = (labelKey: string, createdAt = "2026-11-07T10:00:00+00:00") => ({
-  documentId: A, sourceVersionId: "a".repeat(64), labelKind: "doc_type" as const, labelKey, labelSetVersion: "doc-type:v0",
-  method: "rules", methodVersion: "doc-type-rules:v1", inputsSha256: `sha256:${"1".repeat(64)}`, disposition: "proposed" as const,
+/** The row decide_library_label writes for an Undo of `withdrawn`. */
+const undo = (withdrawn: Row, createdAt: string, key = `undo ${createdAt}`): Row => ({ ...withdrawn, methodVersion: PERSON_UNDO_METHOD_VERSION,
+  inputsSha256: `sha256:${sha256Of(key)}`, evidenceIds: [withdrawn.inputsSha256], createdAt });
+// A production run: its own inputs digest, so a later run replaces an earlier one.
+const proposal = (labelKey: string, createdAt = "2026-11-07T10:00:00+00:00", run = "1"): Row => ({
+  documentId: A, sourceVersionId: "a".repeat(64), labelKind: "doc_type", labelKey, labelSetVersion: "doc-type:v0",
+  method: "rules", methodVersion: "doc-type-rules:v1", inputsSha256: `sha256:${sha256Of(`run ${run}`)}`, disposition: "proposed",
   abstainReason: null, internalScore: 0.75, evidenceIds: [], createdAt });
-const topic = (labelKey: string) => ({ ...proposal(labelKey), labelKind: "topic" as const, labelSetVersion: "topic-open:v1",
-  method: "tfidf_agglomerative", methodVersion: "topic-ctfidf:v1" });
+const topic = (labelKey: string, createdAt?: string, run?: string): Row => ({ ...proposal(labelKey, createdAt, run), labelKind: "topic",
+  labelSetVersion: "topic-open:v1", method: "tfidf_agglomerative", methodVersion: "topic-ctfidf:v1" });
 const view = (...labels: readonly unknown[]): LibraryInternalView => ({ labels: labels as LibraryInternalView["labels"], relations: [] });
+const docOf = (rows: readonly Row[]) => toLibraryDocuments(view(...rows), [A])[0]!;
+const rejectedBy = (kind: "doc_type" | "topic", label: string) => ({ kind, label, state: "rejected_by_person" });
 
 describe("a person's decisions on the Library", () => {
   it("an undo of a confirmed type falls back to the production proposal", () => {
     const confirmed = person(A, "doc_type", "invoice", "confirmed", "2026-11-08T10:00:00+00:00");
-    const undone = person(A, "doc_type", "invoice", "rejected", "2026-11-08T11:00:00+00:00");
-    expect(toLibraryDocuments(view(proposal("contract"), confirmed), [A])[0]!.documentType).toEqual({ label: "invoice", state: "confirmed" });
-    expect(toLibraryDocuments(view(proposal("contract"), confirmed, undone), [A])[0]!.documentType).toEqual({ label: "contract", state: "proposed" });
+    expect(docOf([proposal("contract"), confirmed]).documentType).toEqual({ label: "invoice", state: "confirmed" });
+    expect(docOf([proposal("contract"), confirmed, undo(confirmed, "2026-11-08T11:00:00+00:00")]).documentType)
+      .toEqual({ label: "contract", state: "proposed" });
   });
 
   it("confirming the proposed type and then undoing it returns the document to Proposed, not Unknown", () => {
     const confirmed = person(A, "doc_type", "contract", "confirmed", "2026-11-08T10:00:00+00:00");
-    const undone = person(A, "doc_type", "contract", "rejected", "2026-11-08T11:00:00+00:00");
+    const undone = undo(confirmed, "2026-11-08T11:00:00+00:00");
     const again = person(A, "doc_type", "contract", "confirmed", "2026-11-08T12:00:00+00:00");
-    const type = (...labels: unknown[]) => toLibraryDocuments(view(proposal("contract"), ...labels), [A])[0]!.documentType;
+    const type = (...labels: Row[]) => docOf([proposal("contract"), ...labels]).documentType;
     expect(type(confirmed)).toEqual({ label: "contract", state: "confirmed" });
     expect(type(confirmed, undone)).toEqual({ label: "contract", state: "proposed" });
     expect(type(confirmed, undone, again)).toEqual({ label: "contract", state: "confirmed" });
@@ -375,62 +388,66 @@ describe("a person's decisions on the Library", () => {
 
   it("rejecting the proposed type and then undoing it returns the document to Proposed", () => {
     const rejected = person(A, "doc_type", "contract", "rejected", "2026-11-08T10:00:00+00:00");
-    const undone = person(A, "doc_type", "contract", "confirmed", "2026-11-08T11:00:00+00:00");
-    const type = (...labels: unknown[]) => toLibraryDocuments(view(proposal("contract"), ...labels), [A])[0]!.documentType;
-    expect(type(rejected)).toEqual({ label: null, state: "abstained" });
-    expect(type(rejected, undone)).toEqual({ label: "contract", state: "proposed" });
+    const doc = (...labels: Row[]) => docOf([proposal("contract"), ...labels]);
+    expect(doc(rejected).documentType).toEqual({ label: null, state: "abstained" });
+    expect(doc(rejected).rejected).toEqual([rejectedBy("doc_type", "contract")]);
+    expect(doc(rejected, undo(rejected, "2026-11-08T11:00:00+00:00"))).toMatchObject({ documentType: { label: "contract", state: "proposed" }, rejected: [] });
   });
 
-  it("repeating a rejection keeps it standing", () => {
-    const type = (...labels: unknown[]) => toLibraryDocuments(view(proposal("contract"), ...labels), [A])[0]!.documentType;
-    const twice = [person(A, "doc_type", "contract", "rejected", "2026-11-08T10:00:00+00:00"),
-      person(A, "doc_type", "contract", "rejected", "2026-11-08T11:00:00+00:00")];
-    expect(type(...twice)).toEqual({ label: null, state: "abstained" });
-  });
-
-  it("rejecting the proposed type itself leaves the document Unknown, never the label the person refused", () => {
-    const rejected = person(A, "doc_type", "contract", "rejected", "2026-11-08T10:00:00+00:00");
-    expect(toLibraryDocuments(view(proposal("contract"), rejected), [A])[0]!.documentType).toEqual({ label: null, state: "abstained" });
+  it("repeating a rejection keeps it standing, and undoing the second leaves the first", () => {
+    const first = person(A, "doc_type", "contract", "rejected", "2026-11-08T10:00:00+00:00");
+    const second = person(A, "doc_type", "contract", "rejected", "2026-11-08T11:00:00+00:00");
+    expect(docOf([proposal("contract"), first, second]).documentType).toEqual({ label: null, state: "abstained" });
+    expect(docOf([proposal("contract"), first, second, undo(second, "2026-11-08T12:00:00+00:00")]).documentType).toEqual({ label: null, state: "abstained" });
   });
 
   it("an older person row never beats a newer one, whatever order the store returns them in", () => {
     const older = person(A, "doc_type", "invoice", "confirmed", "2026-11-08T10:00:00+00:00");
     const newer = person(A, "doc_type", "report", "confirmed", "2026-11-08T12:00:00+00:00");
     for (const labels of [[older, newer], [newer, older]]) {
-      expect(toLibraryDocuments(view(...labels), [A])[0]!.documentType).toEqual({ label: "report", state: "confirmed" });
+      expect(docOf(labels).documentType).toEqual({ label: "report", state: "confirmed" });
     }
     // Rejecting the older label afterwards does not bring the newer one down; rejecting the newer one falls back to the older.
     const rejectOlder = person(A, "doc_type", "invoice", "rejected", "2026-11-08T13:00:00+00:00");
-    expect(toLibraryDocuments(view(older, newer, rejectOlder), [A])[0]!.documentType).toEqual({ label: "report", state: "confirmed" });
+    expect(docOf([older, newer, rejectOlder]).documentType).toEqual({ label: "report", state: "confirmed" });
     const rejectNewer = person(A, "doc_type", "report", "rejected", "2026-11-08T13:00:00+00:00");
-    expect(toLibraryDocuments(view(older, newer, rejectNewer), [A])[0]!.documentType).toEqual({ label: "invoice", state: "confirmed" });
+    expect(docOf([rejectNewer, older, newer]).documentType).toEqual({ label: "invoice", state: "confirmed" });
+    // A reject after a confirm is a rejection, read in either store order.
+    expect(docOf([rejectNewer, newer]).documentType).toBeNull();
+    expect(docOf([newer, rejectNewer]).rejected).toEqual([rejectedBy("doc_type", "report")]);
   });
 
-  it("a topic rejection hides the proposal; confirm then undo is the proposal again; reject then confirm shows it again", () => {
+  it("a later topic reject hides it; confirm then undo is the proposal again; the newest standing decision decides", () => {
     const confirm = person(A, "topic", "terms", "confirmed", "2026-11-08T10:00:00+00:00");
     const reject = person(A, "topic", "terms", "rejected", "2026-11-08T11:00:00+00:00");
     const again = person(A, "topic", "terms", "confirmed", "2026-11-08T12:00:00+00:00");
-    const topics = (...labels: unknown[]) => toLibraryDocuments(view(topic("terms"), ...labels), [A])[0]!.topics;
-    expect(topics()).toEqual([{ label: "terms", state: "proposed" }]);
-    expect(topics(confirm)).toEqual([{ label: "terms", state: "confirmed" }]);
-    // Confirm then undo is the proposal again, not a rejection; a lone rejection hides it.
-    expect(topics(confirm, reject)).toEqual([{ label: "terms", state: "proposed" }]);
-    expect(topics(reject)).toEqual([]);
-    expect(topics(reject, confirm, again)).toEqual([{ label: "terms", state: "confirmed" }]);
-    expect(topics(again, reject, confirm)).toEqual([{ label: "terms", state: "confirmed" }]);
+    const doc = (...labels: Row[]) => docOf([topic("terms"), ...labels]);
+    expect(doc().topics).toEqual([{ label: "terms", state: "proposed" }]);
+    expect(doc(confirm).topics).toEqual([{ label: "terms", state: "confirmed" }]);
+    expect(doc(confirm, reject)).toMatchObject({ topics: [], rejected: [rejectedBy("topic", "terms")] });
+    expect(doc(confirm, undo(confirm, "2026-11-08T11:00:00+00:00")).topics).toEqual([{ label: "terms", state: "proposed" }]);
+    expect(doc(reject).topics).toEqual([]);
+    expect(doc(reject, confirm, again).topics).toEqual([{ label: "terms", state: "confirmed" }]);
+    expect(doc(again, reject, confirm).topics).toEqual([{ label: "terms", state: "confirmed" }]);
+  });
+
+  it("an Undo row withdraws only the decision it names: a label, kind or digest it does not name is untouched", () => {
+    const reject = person(A, "topic", "terms", "rejected", "2026-11-08T10:00:00+00:00");
+    const stray = { ...undo(reject, "2026-11-08T11:00:00+00:00"), evidenceIds: [`sha256:${"9".repeat(64)}`] };
+    const otherLabel = { ...undo(reject, "2026-11-08T11:00:01+00:00"), labelKey: "payment" };
+    const empty = { ...undo(reject, "2026-11-08T11:00:02+00:00"), evidenceIds: [] };
+    expect(docOf([topic("terms"), reject, stray, otherLabel, empty])).toMatchObject({ topics: [], rejected: [rejectedBy("topic", "terms")] });
   });
 });
 
 describe("a topic decision and its undo", () => {
   it("confirming the proposed topic and then undoing it returns the topic to Proposed", () => {
     const confirm = person(A, "topic", "terms", "confirmed", "2026-11-08T10:00:00+00:00");
-    const undo = person(A, "topic", "terms", "rejected", "2026-11-08T11:00:00+00:00");
-    expect(toLibraryDocuments(view(topic("terms"), confirm, undo), [A])[0]!.topics).toEqual([{ label: "terms", state: "proposed" }]);
+    expect(docOf([topic("terms"), confirm, undo(confirm, "2026-11-08T11:00:00+00:00")]).topics).toEqual([{ label: "terms", state: "proposed" }]);
   });
   it("rejecting the proposed topic and then undoing it returns the topic to Proposed", () => {
     const reject = person(A, "topic", "terms", "rejected", "2026-11-08T10:00:00+00:00");
-    const undo = person(A, "topic", "terms", "confirmed", "2026-11-08T11:00:00+00:00");
-    expect(toLibraryDocuments(view(topic("terms"), reject, undo), [A])[0]!.topics).toEqual([{ label: "terms", state: "proposed" }]);
+    expect(docOf([topic("terms"), reject, undo(reject, "2026-11-08T11:00:00+00:00")]).topics).toEqual([{ label: "terms", state: "proposed" }]);
   });
 });
 
@@ -449,21 +466,29 @@ describe("decideLibraryLabel", () => {
       p_label_key: "invoice", p_decision: "confirmed", p_decided_by: VIEWER, p_idempotency_key: "idem-key-0001" });
   });
 
+  it("sends an Undo as the decision it withdraws", async () => {
+    const fetch = answer(200, { schemaVersion: "tavonel.library_decision.v1", replayed: false });
+    vi.stubGlobal("fetch", fetch);
+    expect(await decideLibraryLabel(WS, { ...input, decision: "undo_rejected" }, VIEWER, ON)).toEqual({ ok: true, replayed: false });
+    expect(JSON.parse((fetch.mock.calls[0] as unknown as [string, { body: string }])[1].body).p_decision).toBe("undo_rejected");
+  });
+
   it("answers only under `on` in the cohort, and refuses malformed input before the store", async () => {
     const fetch = answer(200, {});
     vi.stubGlobal("fetch", fetch);
     expect(await decideLibraryLabel(WS, input, VIEWER, SHADOW)).toEqual({ ok: false, code: "LIBRARY_ORGANIZE_NOT_ENABLED", status: 404 });
     for (const bad of [{ ...input, labelKey: "banana" }, { ...input, labelKey: "" }, { ...input, decision: "proposed" as never },
-      { ...input, idempotencyKey: "short" }, { ...input, sourceVersionId: "xyz" }, { ...input, documentId: "nope" },
+      { ...input, decision: "undo" as never }, { ...input, idempotencyKey: "short" }, { ...input, sourceVersionId: "xyz" }, { ...input, documentId: "nope" },
       { ...input, labelKind: "topic" as const, labelKey: "a\nb" }]) {
       expect(await decideLibraryLabel(WS, bad, VIEWER, ON)).toEqual({ ok: false, code: "LIBRARY_DECISION_REQUEST_INVALID", status: 400 });
     }
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("maps the store's refusals: conflict 409, missing target 404, absent migration, outage and a bad answer 503", async () => {
+  it("maps the store's refusals: conflict and stale 409, missing target 404, absent migration, outage and a bad answer 503", async () => {
     const cases: [number, unknown, string, number][] = [
       [400, { code: "P0001", message: "library_decision_conflict" }, "LIBRARY_DECISION_CONFLICT", 409],
+      [400, { code: "P0001", message: "library_decision_stale" }, "LIBRARY_DECISION_STALE", 409],
       [400, { code: "P0001", message: "library_decision_target_missing" }, "LIBRARY_DECISION_TARGET_MISSING", 404],
       [404, { code: "PGRST202", message: "not found" }, "LIBRARY_ORGANIZE_MIGRATION_ABSENT", 503],
       [500, { message: "boom" }, "LIBRARY_ORGANIZE_STORE_FAILED", 503],
@@ -479,129 +504,133 @@ describe("decideLibraryLabel", () => {
 });
 
 /*
-  The panel's controls against the store's fold (WO-D23-4 fix round 3). Undo is the opposite decision and the fold
-  reads a decision after its opposite as a withdrawal, so what a session decided and what the Library shows can
-  differ. These pin the fold for a returning visit, then fuzz the panel (its controls and recordDecision, which
-  writes a decision until the Library shows it) over random histories: every decision lands as what it says and
-  offers Undo, every Undo restores what the Library showed before, a label this session did not decide goes in one
-  Reject (round 4, lead note), and a person can always keep a label in a bounded number of clicks.
+  The panel against an in-memory store that behaves as decide_library_label does: a decision appends one row; an Undo
+  appends one row naming the newest decision standing on the label, or is refused as stale when that is not the decision
+  being undone. Every read folds all rows. The panel's controls come from the read alone (labelState, labelControls).
 */
-describe("a returning visit's Reject of a confirmed label", () => {
-  const confirm = (kind: "doc_type" | "topic") => person(A, kind, kind === "doc_type" ? "contract" : "terms", "confirmed", "2026-11-08T10:00:00+00:00");
-  const reject = (kind: "doc_type" | "topic", at: string) => person(A, kind, kind === "doc_type" ? "contract" : "terms", "rejected", at);
-  it("withdraws the confirmation (the proposal speaks again), and a second Reject stands: document type", () => {
-    const type = (...labels: unknown[]) => toLibraryDocuments(view(proposal("contract"), ...labels), [A])[0]!.documentType;
-    expect(type(confirm("doc_type"), reject("doc_type", "2026-11-08T11:00:00+00:00"))).toEqual({ label: "contract", state: "proposed" });
-    expect(type(confirm("doc_type"), reject("doc_type", "2026-11-08T11:00:00+00:00"), reject("doc_type", "2026-11-08T12:00:00+00:00")))
-      .toEqual({ label: null, state: "abstained" });
-  });
-  it("withdraws the confirmation (the proposal speaks again), and a second Reject stands: topic", () => {
-    const topics = (...labels: unknown[]) => toLibraryDocuments(view(topic("terms"), ...labels), [A])[0]!.topics;
-    expect(topics(confirm("topic"), reject("topic", "2026-11-08T11:00:00+00:00"))).toEqual([{ label: "terms", state: "proposed" }]);
-    expect(topics(confirm("topic"), reject("topic", "2026-11-08T11:00:00+00:00"), reject("topic", "2026-11-08T12:00:00+00:00"))).toEqual([]);
-  });
-  it("a Reject that landed only as the withdrawal (its second row not saved) leaves no Undo: the panel offers Confirm and Reject on the proposal", () => {
-    const target: Target = { documentId: A, labelKind: "doc_type", labelKey: "contract" };
-    const rows: unknown[] = [proposal("contract"), confirm("doc_type")];
-    const read = () => toLibraryDocuments(view(...rows), [A]);
-    expect(labelControls(shownState(read()[0]!, target), undefined)).toEqual(["reject"]);
-    rows.push(reject("doc_type", "2026-11-08T11:00:00+00:00"));
-    let session = nextSession({}, { target, decision: "rejected", rows: 1, isUndo: false }, read());
-    expect(session).toEqual({});
-    expect(labelControls(shownState(read()[0]!, target), session[targetKey(target)]?.decision)).toEqual(["confirm", "reject"]);
-    rows.push(reject("doc_type", "2026-11-08T12:00:00+00:00"));
-    session = nextSession(session, { target, decision: "rejected", rows: 1, isUndo: false }, read());
-    expect(shownState(read()[0]!, target)).toBeNull();
-    expect(labelControls(shownState(read()[0]!, target), session[targetKey(target)]?.decision)).toEqual(["undo"]);
-  });
-});
-
-/* The panel against an in-memory store: every row it writes is appended, and every read folds all rows. */
-const storeIo = (rows: unknown[], target: Target, at: () => string, saved: (row: number) => boolean = () => true) => {
-  let written = 0;
-  const reads = { count: 0 };
-  const io: DecisionIo = {
-    write: async (decision) => {
-      if (!saved(written)) return false;
-      written += 1;
-      rows.push(person(A, target.labelKind, target.labelKey, decision, at()));
-      return true;
-    },
-    read: async () => { reads.count += 1; return toLibraryDocuments(view(...rows), [A]); },
-  };
-  return { io, reads };
+const standingOn = (rows: readonly Row[], target: Target) => {
+  const mine = rows.filter((row) => row.documentId === target.documentId && row.labelKind === target.labelKind && row.labelKey === target.labelKey);
+  const withdrawn = new Set(mine.filter((row) => row.methodVersion === PERSON_UNDO_METHOD_VERSION).map((row) => row.evidenceIds[0]));
+  return mine.filter((row) => (row.disposition === "confirmed" || row.disposition === "rejected") && row.methodVersion !== PERSON_UNDO_METHOD_VERSION
+    && !withdrawn.has(row.inputsSha256)).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0];
+};
+const storeDecide = (rows: Row[], target: Target, decision: LibraryDecision, at: () => string): "saved" | "stale" => {
+  if (decision === "confirmed" || decision === "rejected") {
+    rows.push(person(target.documentId, target.labelKind, target.labelKey, decision, at()));
+    return "saved";
+  }
+  const standing = standingOn(rows, target);
+  if (!standing || `undo_${standing.disposition}` !== decision) return "stale";
+  rows.push(undo(standing, at()));
+  return "saved";
 };
 const clockFrom = (hour: number) => {
   let tick = 0;
   return () => `2026-11-08T${hour}:${String(Math.floor(tick / 60)).padStart(2, "0")}:${String(tick++ % 60).padStart(2, "0")}+00:00`;
 };
+/** One click on the panel: the control must be offered by the Library's answer; it writes at most one row. */
+const panel = (rows: Row[], at: () => string) => ({
+  state: (target: Target) => labelState(docOf(rows), target),
+  controls: (target: Target) => labelControls(labelState(docOf(rows), target)),
+  click(target: Target, control: LabelControl) {
+    const state = labelState(docOf(rows), target);
+    if (!state || !labelControls(state).includes(control)) throw new Error(`${control} not offered for ${targetKey(target)} (${String(state)})`);
+    const before = rows.length;
+    const result = storeDecide(rows, target, decisionFor(state, control), at);
+    expect(rows.length - before).toBe(result === "saved" ? 1 : 0);
+    return result;
+  },
+});
+const T = (labelKind: "doc_type" | "topic", labelKey: string): Target => ({ documentId: A, labelKind, labelKey });
 
-describe("one Reject corrects a label confirmed on another visit, and its Undo restores it (lead note)", () => {
+describe("one Reject leaves the label rejected by a person, whatever stood or masked it (lead note 1)", () => {
   for (const kind of ["doc_type", "topic"] as const) {
     const key = kind === "doc_type" ? "contract" : "terms";
-    const target: Target = { documentId: A, labelKind: kind, labelKey: key };
-    for (const confirmations of [1, 2]) {
-      it(`${kind}, confirmed ${confirmations} time(s) before, over its own proposal`, async () => {
-        const at = clockFrom(11);
-        const rows: unknown[] = [kind === "doc_type" ? proposal(key) : topic(key)];
-        for (let n = 0; n < confirmations; n += 1) rows.push(person(A, kind, key, "confirmed", `2026-11-08T10:0${n}:00+00:00`));
-        const shown = () => shownState(toLibraryDocuments(view(...rows), [A])[0]!, target);
-        expect(shown()).toBe("confirmed");
-        expect(labelControls(shown(), undefined)).toEqual(["reject"]);
-        // One click: the label is gone, and Undo is offered.
-        const rejected = await recordDecision(storeIo(rows, target, at).io, target, "rejected");
-        expect(rejected).toMatchObject({ rows: 2, complete: true });
-        expect(shown()).toBeNull();
-        let session = nextSession({}, { target, decision: "rejected", rows: rejected.rows, isUndo: false }, rejected.documents);
-        expect(labelControls(shown(), session[targetKey(target)]?.decision)).toEqual(["undo"]);
-        // Undo: exactly the state before the Reject, with the same controls.
-        const undone = await recordDecision(storeIo(rows, target, at).io, target, "confirmed", session[targetKey(target)]!.rows);
-        expect(undone).toMatchObject({ rows: 2, complete: true });
-        expect(shown()).toBe("confirmed");
-        session = nextSession(session, { target, decision: "confirmed", rows: undone.rows, isUndo: true }, undone.documents);
-        expect(session).toEqual({});
-        expect(labelControls(shown(), undefined)).toEqual(["reject"]);
-      });
-    }
-    it(`${kind}: a proposal's Reject is one row and its Undo one row, back to Proposed`, async () => {
+    const other = kind === "doc_type" ? "invoice" : "payment";
+    const proposed = (label: string, createdAt?: string, run?: string) => (kind === "doc_type" ? proposal(label, createdAt, run) : topic(label, createdAt, run));
+    const LATER_RUN = "2026-11-09T10:00:00+00:00";
+
+    it(`${kind}: proposal X, another visit confirmed X; one Reject: rejected, Undo offered; Undo: confirmed X again`, () => {
+      const rows = [proposed(key), person(A, kind, key, "confirmed", "2026-11-08T09:00:00+00:00")];
+      const p = panel(rows, clockFrom(11));
+      expect(p.controls(T(kind, key))).toEqual(["reject", "undo"]);
+      p.click(T(kind, key), "reject");
+      expect(p.state(T(kind, key))).toBe("rejected");
+      expect(p.controls(T(kind, key))).toEqual(["confirm", "undo"]);
+      p.click(T(kind, key), "undo");
+      expect(p.state(T(kind, key))).toBe("confirmed");
+      expect(p.controls(T(kind, key))).toEqual(["reject", "undo"]);
+    });
+
+    it(`${kind} (a): proposal X, another visit confirmed Y then X; Reject X, Reject Y: neither shows, X is never a proposal again`, () => {
+      const rows = [proposed(key), person(A, kind, other, "confirmed", "2026-11-08T09:00:00+00:00"), person(A, kind, key, "confirmed", "2026-11-08T09:30:00+00:00")];
+      const p = panel(rows, clockFrom(11));
+      p.click(T(kind, key), "reject");
+      expect(p.state(T(kind, key))).toBe("rejected");
+      if (kind === "doc_type") expect(docOf(rows).documentType).toEqual({ label: other, state: "confirmed" });
+      p.click(T(kind, other), "reject");
+      expect(p.state(T(kind, key))).toBe("rejected");
+      expect(p.state(T(kind, other))).toBe("rejected");
+      if (kind === "doc_type") expect(docOf(rows).documentType).toEqual({ label: null, state: "abstained" });
+      else expect(docOf(rows).topics).toEqual([]);
+      expect(docOf(rows).rejected).toEqual(expect.arrayContaining([rejectedBy(kind, key), rejectedBy(kind, other)]));
+      // Both rejections keep their Undo, and each Undo withdraws exactly its own rejection.
+      p.click(T(kind, key), "undo");
+      expect(p.state(T(kind, key))).toBe("confirmed");
+    });
+
+    it(`${kind} (b): proposal X, another visit confirmed Y; Reject Y; a later run proposes Y: Y stays rejected`, () => {
+      const rows = [proposed(key), person(A, kind, other, "confirmed", "2026-11-08T09:00:00+00:00")];
+      const p = panel(rows, clockFrom(11));
+      p.click(T(kind, other), "reject");
+      rows.push(proposed(other, LATER_RUN, "2"));
+      expect(p.state(T(kind, other))).toBe("rejected");
+      if (kind === "doc_type") expect(docOf(rows).documentType).toEqual({ label: null, state: "abstained" });
+      else expect(docOf(rows).topics).toEqual([]);
+    });
+
+    it(`${kind} (c): Y confirmed on another visit and never proposed; Reject Y; a later run proposes Y: Y stays rejected`, () => {
+      const rows = [person(A, kind, other, "confirmed", "2026-11-08T09:00:00+00:00")];
+      const p = panel(rows, clockFrom(11));
+      p.click(T(kind, other), "reject");
+      rows.push(proposed(other, LATER_RUN, "2"));
+      expect(p.state(T(kind, other))).toBe("rejected");
+      expect(p.controls(T(kind, other))).toEqual(["confirm", "undo"]);
+    });
+
+    it(`${kind}: control - a proposal rejected directly stays rejected through a later run of the same proposal`, () => {
+      const rows = [proposed(key)];
+      panel(rows, clockFrom(11)).click(T(kind, key), "reject");
+      rows.push(proposed(key, LATER_RUN, "2"));
+      expect(labelState(docOf(rows), T(kind, key))).toBe("rejected");
+    });
+
+    it(`${kind}: an Undo made stale by another person's decision is refused and writes nothing`, () => {
+      const rows = [proposed(key)];
       const at = clockFrom(11);
-      const rows: unknown[] = [kind === "doc_type" ? proposal(key) : topic(key)];
-      const shown = () => shownState(toLibraryDocuments(view(...rows), [A])[0]!, target);
-      expect(await recordDecision(storeIo(rows, target, at).io, target, "rejected")).toMatchObject({ rows: 1, complete: true });
-      expect(shown()).toBeNull();
-      expect(await recordDecision(storeIo(rows, target, at).io, target, "confirmed", 1)).toMatchObject({ rows: 1, complete: true });
-      expect(shown()).toBe("proposed");
+      const p = panel(rows, at);
+      p.click(T(kind, key), "reject");
+      const seen = labelState(docOf(rows), T(kind, key))!;
+      storeDecide(rows, T(kind, key), "confirmed", at); // another person, after this panel read the Library
+      const count = rows.length;
+      expect(storeDecide(rows, T(kind, key), decisionFor(seen, "undo"), at)).toBe("stale");
+      expect(rows.length).toBe(count);
+      expect(p.state(T(kind, key))).toBe("confirmed");
     });
   }
 
-  it("a second row that is not saved reports an incomplete decision, and the panel keeps no Undo for it", async () => {
-    const target: Target = { documentId: A, labelKind: "doc_type", labelKey: "contract" };
-    const rows: unknown[] = [proposal("contract"), person(A, "doc_type", "contract", "confirmed", "2026-11-08T10:00:00+00:00")];
-    const result = await recordDecision(storeIo(rows, target, clockFrom(11), (row) => row === 0).io, target, "rejected");
-    expect(result).toMatchObject({ rows: 1, complete: false });
-    expect(shownState(result.documents![0]!, target)).toBe("proposed");
-    const session = nextSession({}, { target, decision: "rejected", rows: result.rows, isUndo: false }, result.documents);
-    expect(labelControls(shownState(result.documents![0]!, target), session[targetKey(target)]?.decision)).toEqual(["confirm", "reject"]);
-  });
-
-  it("an Undo saved only in part says so; a decision refused at once writes and reads nothing", async () => {
-    const target: Target = { documentId: A, labelKind: "doc_type", labelKey: "contract" };
-    const rows: unknown[] = [proposal("contract")];
-    expect(await recordDecision(storeIo(rows, target, clockFrom(11), (row) => row === 0).io, target, "confirmed", 2))
-      .toMatchObject({ rows: 1, complete: false });
-    const refused = storeIo(rows, target, clockFrom(12), () => false);
-    expect(await recordDecision(refused.io, target, "rejected")).toEqual({ rows: 0, documents: null, complete: false });
-    expect(refused.reads.count).toBe(0);
-  });
-
-  it("a saved decision the Library could not be read after keeps its Undo until the next read", () => {
-    const target: Target = { documentId: A, labelKind: "topic", labelKey: "terms" };
-    const session = nextSession({}, { target, decision: "rejected", rows: 2, isUndo: false }, null);
-    expect(session[targetKey(target)]).toEqual({ target, decision: "rejected", rows: 2 });
+  it("the controls come from the Library's answer alone: a reload offers the same Undo", () => {
+    const rows = [proposal("contract")];
+    panel(rows, clockFrom(11)).click(T("doc_type", "contract"), "reject");
+    const reloaded = JSON.parse(JSON.stringify(docOf(rows))) as ReturnType<typeof docOf>;
+    expect(labelControls(labelState(reloaded, T("doc_type", "contract")))).toEqual(["confirm", "undo"]);
+    expect(decisionFor("rejected", "undo")).toBe("undo_rejected");
+    expect(decisionFor("confirmed", "undo")).toBe("undo_confirmed");
+    expect(labelControls(null)).toEqual([]);
   });
 });
 
-describe("the Library panel's controls follow what the Library shows (fuzzed)", () => {
+describe("the Library panel against the store (fuzzed)", () => {
   const TYPES = ["contract", "invoice", "report"] as const;
   const TOPICS = ["terms", "payment", "other"] as const;
   // mulberry32: a fixed seed, so a failure names a reproducible scenario.
@@ -611,101 +640,95 @@ describe("the Library panel's controls follow what the Library shows (fuzzed)", 
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-  type Doc = ReturnType<typeof toLibraryDocuments>[number];
-  const asShown = (document: Doc) => ({ ...document, topics: [...document.topics].sort((a, b) => a.label.localeCompare(b.label)) });
-  // A label on the panel: as the Library shows it, or as this session's 'Rejected' entry with its Undo.
-  const onPanel = (document: Doc, session: SessionDecisions, target: Target) => shownState(document, target)
-    ?? (session[targetKey(target)]?.decision === "rejected" ? "rejected by this session" : null);
-  const targetsOf = (document: Doc, session: SessionDecisions): Target[] => {
-    const targets: Target[] = document.documentType?.label ? [{ documentId: A, labelKind: "doc_type", labelKey: document.documentType.label }] : [];
-    for (const tag of document.topics) targets.push({ documentId: A, labelKind: "topic", labelKey: tag.label });
-    for (const { target, decision } of Object.values(session)) if (decision === "rejected" && shownState(document, target) === null) targets.push(target);
-    return targets;
-  };
+  type Doc = ReturnType<typeof docOf>;
+  const targetsOf = (document: Doc): Target[] => [
+    ...(document.documentType?.label ? [T("doc_type", document.documentType.label)] : []),
+    ...document.topics.map((tag) => T("topic", tag.label)),
+    ...document.rejected.map((label) => T(label.kind, label.label)),
+  ];
 
-  it("holds its invariants over 400 random histories and sessions", async () => {
+  it("holds its invariants over 500 random histories, other people and later production runs", () => {
     const random = rng(0x0d234);
-    const pick = <T,>(items: readonly T[]) => items[Math.floor(random() * items.length)]!;
-    for (let scenario = 0; scenario < 400; scenario += 1) {
+    const pick = <V,>(items: readonly V[]) => items[Math.floor(random() * items.length)]!;
+    const randomTarget = () => (random() < 0.5 ? T("doc_type", pick(TYPES)) : T("topic", pick(TOPICS)));
+    for (let scenario = 0; scenario < 500; scenario += 1) {
       let clock = 0;
-      const at = () => `2026-11-08T${String(10 + Math.floor(clock / 60)).padStart(2, "0")}:${String(clock++ % 60).padStart(2, "0")}:00+00:00`;
-      const rows: unknown[] = [];
-      if (random() < 0.8) rows.push(proposal(pick(TYPES)));
-      for (const key of TOPICS.slice(0, 2)) if (random() < 0.6) rows.push(topic(key));
-      // Decisions made before this visit, by anyone.
-      for (let n = Math.floor(random() * 5); n > 0; n -= 1) {
-        const kind = random() < 0.5 ? "doc_type" as const : "topic" as const;
-        rows.push(person(A, kind, kind === "doc_type" ? pick(TYPES) : pick(TOPICS), random() < 0.5 ? "confirmed" : "rejected", at()));
-      }
-      const read = (extra: unknown[] = []) => toLibraryDocuments(view(...rows, ...extra), [A])[0]!;
-      const label = (target: Target) => `scenario ${scenario}: ${target.labelKind} ${target.labelKey} after ${rows.length} rows`;
-      // One click, as the panel makes it: recordDecision against the store, the Library after it, the session after it.
-      const click = async (session: SessionDecisions, target: Target, control: LabelControl, extra: unknown[]) => {
-        const entry = session[targetKey(target)];
-        const decision = control === "undo" ? opposite(entry!.decision) : control === "confirm" ? "confirmed" as const : "rejected" as const;
-        const added = [...extra];
-        const io: DecisionIo = {
-          write: async (row) => { added.push(person(A, target.labelKind, target.labelKey, row, at())); return true; },
-          read: async () => [read(added)],
-        };
-        const recorded = await recordDecision(io, target, decision, control === "undo" ? entry!.rows : undefined);
-        const after = read(added);
-        return { added, after, complete: recorded.complete,
-          session: nextSession(session, { target, decision, rows: recorded.rows, isUndo: control === "undo" }, [after]) };
+      let run = 0;
+      const at = () => `2026-11-08T${String(10 + Math.floor(clock / 3600)).padStart(2, "0")}:${String(Math.floor((clock % 3600) / 60)).padStart(2, "0")}:${String(clock++ % 60).padStart(2, "0")}+00:00`;
+      const productionRun = () => {
+        const when = at();
+        run += 1;
+        const rows: Row[] = [];
+        if (random() < 0.8) rows.push(proposal(pick(TYPES), when, `${scenario}.${run}`));
+        for (const key of TOPICS) if (random() < 0.5) rows.push(topic(key, when, `${scenario}.${run}`));
+        return rows;
       };
-      let session: SessionDecisions = {};
-      for (let step = 0; step < 6; step += 1) {
-        const document = read();
-        for (const target of targetsOf(document, session)) {
-          const shown = shownState(document, target);
-          const controls = labelControls(shown, session[targetKey(target)]?.decision);
+      // Someone else: a decision, or an Undo of whatever stands (refused when nothing does).
+      const otherPerson = (rows: Row[]) => {
+        const target = randomTarget();
+        const choice = random();
+        storeDecide(rows, target, choice < 0.4 ? "confirmed" : choice < 0.8 ? "rejected" : pick(["undo_confirmed", "undo_rejected"] as const), at);
+        return target;
+      };
+      const rows: Row[] = productionRun();
+      for (let n = Math.floor(random() * 6); n > 0; n -= 1) otherPerson(rows);
+      const p = panel(rows, at);
+      // The labels this session rejected that nobody has confirmed or undone since: never shown as anything but rejected.
+      const mustStayRejected = new Set<string>();
+      const label = (target: Target, what: string) => `scenario ${scenario}: ${what} ${targetKey(target)} after ${rows.length} rows`;
+      for (let step = 0; step < 8; step += 1) {
+        const document = docOf(rows);
+        for (const key of mustStayRejected) {
+          const [, kind, labelKey] = key.split(":") as [string, "doc_type" | "topic", string];
+          expect(labelState(document, T(kind, labelKey)), `scenario ${scenario} step ${step}: ${key} came back`).toBe("rejected");
+          if (kind === "doc_type") expect(document.documentType?.label, `scenario ${scenario}: ${key} shown as the type`).not.toBe(labelKey);
+          else expect(document.topics.map((tag) => tag.label), `scenario ${scenario}: ${key} shown as a topic`).not.toContain(labelKey);
+        }
+        // Every label the Library names has controls, and every decision then its Undo returns exactly that Library.
+        for (const target of targetsOf(document)) {
+          const controls = p.controls(target);
+          expect(controls.length, label(target, "no controls for")).toBeGreaterThan(0);
           for (const control of controls) {
-            const first = await click(session, target, control, []);
-            // With an honest store every click lands as what it says.
-            expect(first.complete, label(target)).toBe(true);
-            // Every control changes what the panel shows for that label. (Undoing a type rejection while another type is
-            // confirmed only removes the 'Rejected' entry: the rejection is withdrawn, the confirmed type still outranks it.)
-            expect(onPanel(first.after, first.session, target), label(target)).not.toBe(onPanel(document, session, target));
+            const scratch = [...rows];
+            const trial = panel(scratch, at);
+            expect(trial.click(target, control), label(target, control)).toBe("saved");
+            if (control === "confirm") expect(trial.state(target), label(target, control)).toBe("confirmed");
+            if (control === "reject") expect(trial.state(target), label(target, control)).toBe("rejected");
             if (control === "undo") continue;
-            // Every decision offers Undo, and that Undo restores what the Library showed (topics compared as a set: a re-confirmed topic moves).
-            expect(labelControls(shownState(first.after, target), first.session[targetKey(target)]?.decision), `undo offered ${label(target)}`).toEqual(["undo"]);
-            const undone = await click(first.session, target, "undo", first.added);
-            expect(asShown(undone.after), label(target)).toEqual(asShown(document));
-            expect(labelControls(shownState(undone.after, target), undone.session[targetKey(target)]?.decision), label(target))
-              .toEqual(labelControls(shown, undefined));
-          }
-          // Getting rid of a label: one Reject, unless this session confirmed it (then Undo, then Reject); never a loop.
-          let state = { added: [] as unknown[], after: document, session };
-          const removeIn = session[targetKey(target)]?.decision === "confirmed" ? 2 : 1;
-          for (let clicks = 0; clicks < removeIn && shownState(state.after, target) !== null; clicks += 1) {
-            const offered = labelControls(shownState(state.after, target), state.session[targetKey(target)]?.decision);
-            if (offered.includes("reject")) state = await click(state.session, target, "reject", state.added);
-            else if (offered.includes("undo") && state.session[targetKey(target)]?.decision === "confirmed") state = await click(state.session, target, "undo", state.added);
-            else break;
-          }
-          expect(shownState(state.after, target), `remove ${label(target)} in ${removeIn}`).toBeNull();
-          // Keeping a label: Confirm where offered, else Undo a rejection. A document has one type, so a rejected type
-          // under another confirmed type comes back only once that one is rejected; that is the other label's control.
-          state = { added: [], after: document, session };
-          for (let clicks = 0; clicks < 2 && shownState(state.after, target) !== "confirmed"; clicks += 1) {
-            const offered = labelControls(shownState(state.after, target), state.session[targetKey(target)]?.decision);
-            if (offered.includes("confirm")) state = await click(state.session, target, "confirm", state.added);
-            else if (offered.includes("undo") && state.session[targetKey(target)]?.decision === "rejected") state = await click(state.session, target, "undo", state.added);
-            else break;
-          }
-          const outranked = target.labelKind === "doc_type" && document.documentType?.state === "confirmed" && document.documentType.label !== target.labelKey;
-          if (shown !== null || (session[targetKey(target)]?.decision === "rejected" && !outranked)) {
-            expect(shownState(state.after, target), `keep ${label(target)}`).toBe("confirmed");
+            expect(trial.controls(target), label(target, `undo after ${control}`)).toContain("undo");
+            trial.click(target, "undo");
+            expect(docOf(scratch), label(target, `undo of ${control}`)).toEqual(document);
           }
         }
-        // Walk on: one random offered click, as a person would.
-        const offered = targetsOf(document, session).flatMap((target) =>
-          labelControls(shownState(document, target), session[targetKey(target)]?.decision).map((control) => ({ target, control })));
-        if (offered.length === 0) break;
-        const { target, control } = pick(offered);
-        const next = await click(session, target, control, []);
-        rows.push(...next.added);
-        session = next.session;
+        // Walk on: this session clicks something offered, or someone else acts, or a production run lands.
+        const choice = random();
+        if (choice < 0.5) {
+          const offered = targetsOf(document).flatMap((target) => p.controls(target).map((control) => ({ target, control })));
+          if (offered.length === 0) continue;
+          const { target, control } = pick(offered);
+          expect(p.click(target, control), label(target, control)).toBe("saved");
+          if (control === "reject") mustStayRejected.add(targetKey(target));
+          else mustStayRejected.delete(targetKey(target));
+        } else if (choice < 0.8) {
+          const target = otherPerson(rows);
+          const after = labelState(docOf(rows), target);
+          // Someone else confirming it, or undoing on it, is the only way out of a person's rejection.
+          if (after !== "rejected") mustStayRejected.delete(targetKey(target));
+        } else {
+          rows.push(...productionRun());
+        }
+        // A stale Undo, made from a read taken before someone else acted, writes nothing.
+        if (random() < 0.2) {
+          const target = randomTarget();
+          const seen = labelState(docOf(rows), target);
+          if (seen === "confirmed" || seen === "rejected") {
+            storeDecide(rows, target, seen === "confirmed" ? "rejected" : "confirmed", at);
+            const count = rows.length;
+            expect(storeDecide(rows, target, decisionFor(seen, "undo"), at), label(target, "stale undo")).toBe("stale");
+            expect(rows.length).toBe(count);
+            if (labelState(docOf(rows), target) !== "rejected") mustStayRejected.delete(targetKey(target));
+          }
+        }
       }
     }
   });

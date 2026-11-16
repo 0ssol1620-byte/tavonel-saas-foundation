@@ -33,7 +33,9 @@ describe("library label decisions migration", () => {
 
   it("appends one person row and never updates or deletes anything", () => {
     expect(code).toMatch(/insert into public\.document_labels/);
-    expect(code).toContain("'person', 'person:v1'");
+    expect(code.match(/insert into/g)).toHaveLength(1);
+    expect(code).toContain("'person', v_method_version");
+    expect(code).toContain("v_method_version := case when v_undo then 'person-undo:v1' else 'person:v1' end;");
     expect(code).not.toMatch(/\bdelete\b/i);
     expect(code).not.toMatch(/\bupdate\b/i);
     expect(code).not.toMatch(/\b(insert into|update|delete from|truncate)\s+public\.source_fingerprints/i);
@@ -45,8 +47,18 @@ describe("library label decisions migration", () => {
     expect(code).toContain("raise exception 'library_decision_conflict'");
     expect(code).toContain("raise exception 'library_decision_target_missing'");
     expect(code).toContain("raise exception 'library_decision_request_invalid'");
-    expect(code).toContain("p_decision not in ('confirmed', 'rejected')");
+    expect(code).toContain("p_decision not in ('confirmed', 'rejected', 'undo_confirmed', 'undo_rejected')");
     expect(code).toContain("pg_advisory_xact_lock");
+  });
+
+  it("an Undo withdraws the newest decision standing on the label, names it, and is refused as stale otherwise", () => {
+    // Chosen under the per-document lock, after the replay check (a replayed Undo is not stale).
+    expect(code.indexOf("pg_advisory_xact_lock")).toBeLessThan(code.indexOf("library_decision_stale"));
+    expect(code.indexOf("v_replayed := true")).toBeLessThan(code.indexOf("library_decision_stale"));
+    expect(code).toContain("u.method_version = 'person-undo:v1' and u.evidence_ids[1] = l.inputs_sha256");
+    expect(code).toContain("order by l.created_at desc limit 1;");
+    expect(code).toMatch(/if not found or v_standing\.disposition <> v_disposition then\s+raise exception 'library_decision_stale';/);
+    expect(code).toContain("v_evidence := array[v_standing.inputs_sha256];");
   });
 
   it("uses the same workspace-key pattern as the recorder", () => {

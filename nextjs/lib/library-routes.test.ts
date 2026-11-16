@@ -69,7 +69,7 @@ describe("GET /api/library", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     const body = await response.json();
-    expect(body.documents).toEqual([{ documentId: A, documentType: { label: "contract", state: "proposed" }, topics: [], duplicates: [] }]);
+    expect(body.documents).toEqual([{ documentId: A, documentType: { label: "contract", state: "proposed" }, topics: [], rejected: [], duplicates: [] }]);
     expect(body.sourceVersions).toEqual({ [A]: VERSION });
     expect(JSON.stringify(body)).not.toContain("internalScore");
   });
@@ -130,12 +130,21 @@ describe("POST /api/library/decisions", () => {
       p_workspace_key: WS, p_decided_by: USER, p_label_key: "invoice", p_decision: "confirmed", p_idempotency_key: "idem-key-0001" }));
   });
 
-  it("an undo is the opposite decision under a new key; the same key with another decision is a 409", async () => {
+  it("an opposite decision is a new row under a new key; the same key with another decision is a 409", async () => {
     expect((await post({ ...decision, decision: "rejected", idempotencyKey: "idem-key-0002" })).status).toBe(200);
     expect((await post(decision)).status).toBe(200);
     const conflict = await post({ ...decision, decision: "rejected" });
     expect(conflict.status).toBe(409);
     expect(await conflict.json()).toEqual({ code: "LIBRARY_DECISION_CONFLICT" });
+  });
+
+  it("an Undo names what it withdraws and reaches the store as such; a stale Undo is a 409 with its own code", async () => {
+    expect((await post({ ...decision, decision: "undo_confirmed", idempotencyKey: "idem-key-0003" })).status).toBe(200);
+    expect(rpc).toHaveBeenLastCalledWith("decide_library_label", expect.objectContaining({ p_decision: "undo_confirmed", p_idempotency_key: "idem-key-0003" }));
+    rpc.mockReturnValue({ status: 400, body: { code: "P0001", message: "library_decision_stale" } });
+    const stale = await post({ ...decision, decision: "undo_rejected", idempotencyKey: "idem-key-0004" });
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toEqual({ code: "LIBRARY_DECISION_STALE" });
   });
 
   it("a viewer who may not read the source is refused with 403 and writes nothing", async () => {
@@ -148,7 +157,7 @@ describe("POST /api/library/decisions", () => {
   });
 
   it("a malformed body is a 400 before the access check or the store", async () => {
-    for (const body of [null, "x", [], { ...decision, decision: "proposed" }, { ...decision, labelKind: "relation" },
+    for (const body of [null, "x", [], { ...decision, decision: "proposed" }, { ...decision, decision: "undo" }, { ...decision, labelKind: "relation" },
       { ...decision, documentId: "not-a-uuid" }, { ...decision, idempotencyKey: "short" }, { ...decision, labelKey: "banana" },
       { ...decision, sourceVersionId: "abc" }]) {
       expect((await post(body)).status).toBe(400);

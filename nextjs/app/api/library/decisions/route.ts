@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
 import { requireFoundationSession } from "@/lib/developer-auth";
-import { decideLibraryLabel } from "@/lib/library-shadow";
+import { LIBRARY_DECISIONS, decideLibraryLabel, type LibraryDecision } from "@/lib/library-shadow";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -9,7 +9,9 @@ export const runtime = "nodejs";
 /*
   A person's decision on a Library label (WO-D23-4), session only: an API key is refused even with
   scopes, because a decision is a person's act. The viewer must be able to read the document now.
-  It appends one row; it never deletes or edits a source, and undo is the opposite decision.
+  It appends one row; it never deletes or edits a source. An Undo (`undo_confirmed` / `undo_rejected`) is
+  one row withdrawing the decision standing on the label, refused as stale (409) when that is no longer
+  the decision being undone.
 */
 const HEADERS = { "Cache-Control": "no-store" } as const;
 const MAX_BODY_BYTES = 2_048;
@@ -29,7 +31,7 @@ export async function POST(request: Request) {
   } catch { /* an unreadable body is the same refusal as a body with the wrong fields */ }
   const { documentId, sourceVersionId, labelKind, labelKey, decision, idempotencyKey } = body;
   if (typeof documentId !== "string" || typeof sourceVersionId !== "string" || (labelKind !== "doc_type" && labelKind !== "topic")
-    || typeof labelKey !== "string" || (decision !== "confirmed" && decision !== "rejected") || typeof idempotencyKey !== "string") {
+    || typeof labelKey !== "string" || !LIBRARY_DECISIONS.includes(decision as LibraryDecision) || typeof idempotencyKey !== "string") {
     return fail("LIBRARY_DECISION_REQUEST_INVALID", 400);
   }
   if (!UUID.test(documentId.toLowerCase())) return fail("LIBRARY_DECISION_REQUEST_INVALID", 400);
@@ -38,7 +40,7 @@ export async function POST(request: Request) {
   const access = await checkConnectorSourceAccessForViewer(workspaceKey, [documentId.toLowerCase()], userId);
   if (!access.ok) return fail(access.code, access.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503);
   const decided = await decideLibraryLabel(workspaceKey,
-    { documentId, sourceVersionId, labelKind, labelKey, decision, idempotencyKey }, userId);
+    { documentId, sourceVersionId, labelKind, labelKey, decision: decision as LibraryDecision, idempotencyKey }, userId);
   if (!decided.ok) return fail(decided.code, decided.status);
   return NextResponse.json({ code: "OK", replayed: decided.replayed }, { headers: HEADERS });
 }
