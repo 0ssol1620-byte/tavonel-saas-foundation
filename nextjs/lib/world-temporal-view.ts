@@ -7,9 +7,23 @@ import type { WorldHistoryEntry, WorldReadModel } from "./world-read-model";
 */
 export type VersionOption = WorldHistoryEntry & { current: boolean };
 
-/** Newest first, the one on screen marked. Order of `history` is preserved as given by the model (newest first). */
-export function versionOptions(history: WorldHistoryEntry[], currentDigest: string): VersionOption[] {
-  return history.map((entry) => ({ ...entry, current: entry.manifestDigest === currentDigest }));
+/**
+  Newest first, the current one marked. Order of `history` is preserved as given by the model (newest first).
+  `viewing` is the version on screen when the current history does not list it (a shared link); it is
+  appended so the select names what is shown instead of silently pointing at another version.
+*/
+export function versionOptions(history: WorldHistoryEntry[], currentDigest: string, viewing?: WorldHistoryEntry | null): VersionOption[] {
+  const listed = viewing && !history.some((entry) => entry.manifestDigest === viewing.manifestDigest) ? [...history, viewing] : history;
+  return listed.map((entry) => ({ ...entry, current: entry.manifestDigest === currentDigest }));
+}
+
+/**
+  How a fetched version describes itself: its own history entry, read in the same request as its
+  content (`buildWorldReadModel` always lists the artifact's own digest). Null when the read does
+  not describe that digest -- the caller then prints no version or state, never a guessed one.
+*/
+export function viewedVersionEntry(read: WorldReadModel | null, digest: string): WorldHistoryEntry | null {
+  return read?.history.find((entry) => entry.manifestDigest === digest) ?? null;
 }
 
 export function sourceRevisions(model: WorldReadModel): string[] {
