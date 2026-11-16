@@ -46,6 +46,18 @@ export function EngineeringBody() {
         art={<Figure art={<EngineeringArt />} caption={HERO.caption} />}
       />
 
+      <Section surface="green" eyebrow={STEPS.eyebrow} title={STEPS.title}>
+        <ol className={s.steps}>
+          {STEPS.items.map((item, i) => (
+            <li key={item.title} className={s.step}>
+              <span className={s.no}>{ordinal(i)}</span>
+              <h3 className={s.title}>{item.title}</h3>
+              <p className={s.text}>{item.text}</p>
+            </li>
+          ))}
+        </ol>
+      </Section>
+
       <Section surface="paper" eyebrow={REFERENCE.eyebrow} title={REFERENCE.title} lead={REFERENCE.lead}>
         <div className={s.refHead}>
           <Tag kind="Public reference corpus" />
@@ -77,18 +89,6 @@ export function EngineeringBody() {
             );
           })}
         </ul>
-      </Section>
-
-      <Section surface="light" eyebrow={STEPS.eyebrow} title={STEPS.title}>
-        <ol className={s.steps}>
-          {STEPS.items.map((item, i) => (
-            <li key={item.title} className={s.step}>
-              <span className={s.no}>{ordinal(i)}</span>
-              <h3 className={s.title}>{item.title}</h3>
-              <p className={s.text}>{item.text}</p>
-            </li>
-          ))}
-        </ol>
       </Section>
 
       <Section surface="connect" eyebrow={ACCESS.eyebrow} title={ACCESS.title} lead={ACCESS.lead}>

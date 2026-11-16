@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { MCP_TOOL_NAMES } from "@/lib/mcp-tools";
 import { EngineeringBody } from "@/components/v34/routes/engineering/engineering";
-import { ENGINEERING_DESTINATIONS } from "@/components/v34/routes/engineering/engineering-content";
+import { ACCESS, ENGINEERING_DESTINATIONS, REFERENCE, STEPS } from "@/components/v34/routes/engineering/engineering-content";
 import { readPublicCorpus } from "./public-corpus";
 import { V34_ROUTE_KEYS, v34Route, v34RouteByPath } from "./routes";
 
@@ -53,6 +53,14 @@ describe("engineering route", () => {
     }
     expect(html).toContain("Public reference corpus");
     expect(html).not.toMatch(/undefined|NaN/);
+  });
+
+  it("follows the prototype order: steps band, then the Change record, then access", () => {
+    const html = renderToStaticMarkup(createElement(EngineeringBody));
+    const at = (s: string) => html.indexOf(s);
+    expect(at(STEPS.title)).toBeGreaterThan(-1);
+    expect(at(STEPS.title)).toBeLessThan(at(REFERENCE.title));
+    expect(at(REFERENCE.title)).toBeLessThan(at(ACCESS.title));
   });
 
   it("prints the computed tool list", () => {
