@@ -1,0 +1,22 @@
+.region {
+  min-width: 0;
+  overflow-x: auto;
+  border: 1px solid var(--v34-fg-border);
+  border-radius: var(--v34-radius-art);
+  background: var(--v34-dark);
+  color: var(--v34-on-dark);
+}
+
+.region:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 3px;
+}
+
+.code {
+  margin: 0;
+  padding: 18px 20px;
+  color: var(--v34-on-dark);
+  font-family: var(--v34-mono);
+  font-size: var(--v34-small);
+  line-height: 1.6;
+}

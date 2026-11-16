@@ -1,4 +1,4 @@
-import RouteStub from "@/components/v34/route-stub";
+import RevisionArticle from "@/components/v34/routes/journal-revision/revision-article";
 import { releaseGate } from "@/lib/v34/release";
 import { routeMetadata, routeViewport } from "@/lib/v34/route-metadata";
 
@@ -7,5 +7,5 @@ export const viewport = routeViewport();
 
 export default async function Page() {
   await releaseGate("journal-revision");
-  return <RouteStub route="journal-revision" line="A revision is shown as the controls that changed, each traced to the published notice." />;
+  return <RevisionArticle />;
 }

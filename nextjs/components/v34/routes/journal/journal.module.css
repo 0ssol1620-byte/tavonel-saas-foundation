@@ -1,0 +1,162 @@
+/*
+  Journal index. Colours come from --v34-* tokens only. The bands (Hero, Section, FinalCta) set
+  their own surface, so a rule here that paints a background also states its foreground.
+  No animation: a card answers hover and keyboard focus with a colour change.
+*/
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  min-width: 0;
+}
+
+.card {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  gap: 10px;
+  height: 100%;
+  min-width: 0;
+  padding: 14px 14px 18px;
+  border: 1px solid var(--v34-fg-rule);
+  border-radius: var(--v34-radius-panel);
+  text-decoration: none;
+}
+
+.card:hover {
+  border-color: var(--v34-fg-border);
+}
+
+.card:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+/* The cover paints the dark panel the drawings are made for. */
+.cover {
+  display: block;
+  min-width: 0;
+  border-radius: var(--v34-radius-art);
+  background: var(--v34-dark);
+  color: var(--v34-on-dark);
+}
+
+.meta {
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.minutes {
+  font-variant-numeric: tabular-nums;
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--v34-fg);
+  font-size: var(--v34-h3);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.cardText {
+  min-width: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-text);
+  line-height: 1.5;
+}
+
+.cardAction {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.card:hover .cardAction {
+  color: var(--v34-fg);
+}
+
+@media (min-width: 761px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1000px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ---- reference -------------------------------------------------------------------------- */
+
+.reference {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 40px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.referenceItem {
+  min-width: 0;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.referenceTitle {
+  margin: 0 0 6px;
+  font-size: var(--v34-h3);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.2;
+}
+
+.referenceLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.referenceLink:hover {
+  color: var(--v34-fg);
+  text-decoration-thickness: 2px;
+}
+
+.referenceLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+.referenceText {
+  max-width: 60ch;
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-text);
+  line-height: 1.5;
+}
+
+@media (min-width: 761px) {
+  .reference {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
