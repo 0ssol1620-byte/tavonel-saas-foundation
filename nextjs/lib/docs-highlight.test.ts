@@ -32,6 +32,13 @@ describe("codeTokens", () => {
     expect(tokens.some((token) => token.kind === "string" && token.text.includes("https://tavonel.com/api"))).toBe(true);
   });
 
+  it("skips only the // after a colon and keeps scanning past it, as the lookbehind it replaced did", () => {
+    const comments = (body: string) => codeTokens(body).filter((t) => t.kind === "comment").map((t) => t.text);
+    expect(comments("curl https://tavonel.com/api // read it")).toEqual(["// read it"]);
+    expect(comments("open file:///tmp/x")).toEqual(["//tmp/x"]);
+    expect(comments("a://b")).toEqual([]);
+  });
+
   it("does not open a comment inside a string, or a string inside a comment", () => {
     expect(codeTokens(`curl "https://tavonel.com/#frag"`).filter((t) => t.kind === "comment")).toEqual([]);
     const commented = codeTokens(`# don't split this\nrun()`);

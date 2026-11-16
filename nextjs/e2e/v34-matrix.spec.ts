@@ -73,14 +73,31 @@ const serverMode = process.env.V34_SERVER_MODE === "production" ? "production" :
 
 /*
   Pages that render a V34 body but are not one of the 43 targets, so the registry has no row for
-  them (architecture section 1.2: /research/program is the old /research body in its new place).
-  Without a row here the matrix never opens them.
+  them (architecture section 1.2: /research/program is the old /research body in its new place), and
+  pages that share a component a V34 body renders (/evaluation renders the /contact form,
+  components/contact-form.tsx). Without a row here the matrix never opens them.
 */
-const V34_BODIES_OUTSIDE_REGISTRY: RouteRow[] = [{ path: "/research/program", release: "live" }];
+const V34_BODIES_OUTSIDE_REGISTRY: RouteRow[] = [
+  { path: "/research/program", release: "live" },
+  { path: "/evaluation", release: "live" },
+];
 
 const registryRoutes = await loadRoutes();
 const allRoutes = registryRoutes.length > 0 ? [...registryRoutes, ...V34_BODIES_OUTSIDE_REGISTRY.filter(r => !registryRoutes.some(x => x.path === r.path))] : [];
 const routes = allRoutes.filter(r => !routeFilter || routeFilter.includes(r.path));
+
+/*
+  A run checks every route it was asked for, or fails. A path V34_ROUTE names that has no row would
+  run nothing for it, and the run would pass on fewer routes than requested: Git Bash rewrites a
+  leading "/platform" into a Windows path unless MSYS_NO_PATHCONV=1 is set, which silently dropped
+  the first route of a list twice.
+*/
+const unknownRoutes = routeFilter?.filter(path => !allRoutes.some(r => r.path === path)) ?? [];
+if (unknownRoutes.length > 0) {
+  test("V34_ROUTE names only routes the matrix has rows for", () => {
+    expect(unknownRoutes, `requested ${routeFilter!.length} route(s), ${routes.length} have rows`).toEqual([]);
+  });
+}
 // V34_WIDTHS may also name a width off the standard list (920, inside the 900-959 hero tray range) to probe a breakpoint.
 const widths: number[] = widthFilter ?? [...V34_WIDTHS];
 const SCHEMES = ["light", "dark"] as const;
