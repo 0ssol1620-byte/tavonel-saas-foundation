@@ -72,7 +72,7 @@ describe("the corpus fit comparator", () => {
     const opening = client.match(/useState<number>\((\d+)\)[\s\S]{0,200}?useState<number>\((\d+)\)/);
     expect(opening, "the two controls no longer open on a literal pair").toBeTruthy();
     expect(Number(opening![1]) * Number(opening![2]))
-      .toBe(BILLING_OFFERS.observer_access.includedPages);
+      .toBe(BILLING_OFFERS.personal.includedPages);
   });
 });
 
@@ -97,11 +97,11 @@ describe("what the comparator may not say", () => {
       expect(prose, `the pricing page names ${competitor}`).not.toContain(competitor);
     }
     /*
-      The one literal money figure the page may hold is the free plan's zero, which is a label
-      rather than a rate. Every other figure on it is computed from the catalog, so a second
-      typed price -- ours or anybody's -- fails here.
+      The page holds no literal money figure at all: the free plan's zero is `PRICE_BOOK_EXTRA.free.priceUsd`
+      (catalog v2) and every other figure is computed from the catalog or `METER_RATES_USD`, so a typed
+      price -- ours or anybody's -- fails here.
     */
-    expect(prose.match(/\$\d[\d,.]*/g) ?? []).toEqual(["$0"]);
+    expect(prose.match(/\$\d[\d,.]*/g) ?? []).toEqual([]);
     /* The comparator itself quotes no money at all: it reports ceilings, and ceilings are free. */
     for (const entry of corpusFit(40, 200).rows) {
       expect(`${entry.label}${entry.value}${entry.ceiling}`).not.toContain("$");

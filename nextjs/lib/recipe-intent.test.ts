@@ -316,26 +316,30 @@ describe("recipe preflight", () => {
     a stricter one rather than deleted, because the same row can still over-sell in three ways
     that the old single negative could not see: dropping the owner condition (any Developer
     member would read as able to activate), dropping the evaluation's refusal (a free reader
-    would read as able to), and letting Team read as a checkout while `saleChannel` is `contact`.
-    All three are pinned below, both channels are pinned to the catalog, and either one flipping
-    fails here.
+    would read as able to), and letting a plan read as a checkout that the server has not opened.
+    All three are pinned below, and either one flipping fails here.
+
+    Catalog v2: Personal and Developer reach activation as the workspace owner (the `observer_access`
+    level), Team and Business for any role (`studio_access`). The row names the four plans from the
+    catalog and says nothing about how any is bought -- that is /pricing's server-computed availability,
+    which this component cannot read, so it cannot over-sell in either direction.
   */
-  it("states both activation plans as the catalog has them, with no self-serve path for Pro", () => {
+  it("states the four activation plans as the catalog has them, with the owner condition and no sale path", () => {
     const html = render({ intent: intentFor() });
-    expect(BILLING_OFFERS.studio_access.saleChannel).toBe("contact");
-    expect(BILLING_OFFERS.observer_access.saleChannel).toBe("self_serve");
-    expect(html).toContain(BILLING_OFFERS.studio_access.label);
-    expect(html).toContain(BILLING_OFFERS.observer_access.label);
-    // Pro's half: a conversation, and the destination is /contact, not a checkout.
-    expect(html).toContain("set up with you directly");
-    expect(html).toContain("/contact");
-    // Developer's half: self-serve, and only for the owner.
+    expect(BILLING_OFFERS.personal.accessLevel).toBe("observer_access");
+    expect(BILLING_OFFERS.developer.accessLevel).toBe("observer_access");
+    expect(BILLING_OFFERS.team.accessLevel).toBe("studio_access");
+    expect(BILLING_OFFERS.business.accessLevel).toBe("studio_access");
+    for (const code of ["personal", "developer", "team", "business"] as const) expect(html).toContain(BILLING_OFFERS[code].label);
+    // The owner's half, and only the owner's.
     expect(html).toContain("if you own the workspace");
+    // The row points at /pricing and promises neither a checkout nor a conversation.
     expect(html).toContain("/pricing");
+    expect(html).not.toMatch(/set up with you directly|rather than self-serve checkout|you can start on|buy|checkout/i);
+    // The retired 2026-09 plans are not named on a public surface.
+    expect(html).not.toMatch(/2026-09/);
     // The free evaluation's one World is as plain as the paid permission (P0 2026-11-09).
     expect(html).toContain("A free evaluation activates one World, as its owner.");
-    expect(html, "Team must not read as a checkout while it is sold through a conversation")
-      .not.toMatch(/Team plan, which you can start on/);
   });
 
   it("names the human review gate and the page the reader comes back to", () => {

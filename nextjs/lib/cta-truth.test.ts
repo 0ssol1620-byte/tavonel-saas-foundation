@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { createElement, type FunctionComponent } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 /*
   CTA truth, one table per commercial state (UX program 2026-10-17, lane P2-10: UX-PLAN §6.2 and
@@ -152,7 +152,7 @@ async function home(korean: boolean): Promise<{ primary: Action; secondary: Acti
   return { primary: primary!, secondary: secondary!, close };
 }
 
-/** The four plan actions on /pricing, in card order: Evaluation, Developer, Team, Enterprise. */
+/** The plan actions on /pricing, in card order: Evaluation (Free once open), Personal, Developer, Team, Business, Enterprise. */
 async function pricing(): Promise<Action[]> {
   const { default: PricingPage } = await import("../app/pricing/page");
   const html = render(PricingPage as FunctionComponent<Record<string, unknown>>);
@@ -171,16 +171,19 @@ async function explore(): Promise<{ exits: Action[]; close: Action }> {
 }
 
 /*
-  /login's notice for a reader who arrived with `?next=checkout&offer=observer_access`. The page
-  passes `purchasePlan.enabled` from `/api/status/v2`; this passes the same field from the same
-  builder, in the same environment.
+  /login's notice for a reader who arrived with `?next=checkout&offer=personal`. The page passes
+  `purchasePlan.enabled` from `/api/status/v2`; this passes the same field from the same builder, in
+  the same environment. The page runs in the browser and holds no price environment, so it passes the
+  availability it can know: `request_access` (never a promise of checkout). The purchasable half of the
+  notice is rendered in "the checkout-intent notice" below, with the availability a server would hand it.
 */
 async function login(): Promise<{ text: string; links: Action[] }> {
   const { default: CheckoutIntentNotice } = await import("../components/checkout-intent-notice");
   const purchaseOpen = (await status()).purchasePlan;
   const html = render(CheckoutIntentNotice as FunctionComponent<Record<string, unknown>>, {
-    offer: "observer_access",
+    offer: "personal",
     purchaseOpen,
+    availability: "request_access",
   });
   return { text: decode(html), links: anchors(html) };
 }
@@ -220,9 +223,11 @@ const CLOSED = {
   },
   pricing: [
     { href: "/explore", label: "Explore a Compiled World" },
-    { href: "/contact?plan=Starter", label: "Request Starter access" },
-    // Starter/Pro rename (2026-11-10). Pro stays on the contact path in every state (CAT-D4).
-    { href: "/contact?plan=Pro", label: "Talk to us about Pro" },
+    // Catalog v2 (PB-2026-11-V22, CAT-D1): DELIVERED is empty, so every paid plan is requested in every state.
+    { href: "/contact?plan=Personal", label: "Request Personal access" },
+    { href: "/contact?plan=Developer", label: "Request Developer access" },
+    { href: "/contact?plan=Team", label: "Request Team access" },
+    { href: "/contact?plan=Business", label: "Request Business access" },
     { href: "/contact?plan=Enterprise", label: "Scope an Enterprise pilot" },
   ],
   explore: {
@@ -236,11 +241,11 @@ const CLOSED = {
   /*
     The one row that is not main's (JOURNEY-MAP D-02, A2). Main rendered OPEN_INTENT below here
     too, promising a checkout that `purchasePlan: false` refuses. The closed notice says the plan
-    is not sold online and offers the contact path `/pricing` itself offers for Developer.
+    is not sold online and offers the contact path `/pricing` itself offers for Personal.
   */
   login: {
-    text: "Starter is not sold online today. Nothing is charged by signing in. Request Starter access",
-    links: [{ href: "/contact?plan=Starter", label: "Request Starter access" }],
+    text: "Personal is not sold online today. Nothing is charged by signing in. Request Personal access",
+    links: [{ href: "/contact?plan=Personal", label: "Request Personal access" }],
   },
 } as const;
 
@@ -249,7 +254,7 @@ const CLOSED = {
   carries the deal from the billing catalog and the step before checkout, in place of main's "signed webhook".
 */
 const OPEN_INTENT =
-  "Starter is held for you. $29/month for 500 standard pages, with a full refund within 14 days if you have used fewer than 50 of them. Paddle is the merchant of record. Sign in and accept the processing terms, and checkout opens by itself. Nothing is charged by signing in.";
+  "Personal is held for you. $29/month for 500 standard pages, with a full refund within 14 days if you have used fewer than 50 of them. Paddle is the merchant of record. Sign in and accept the processing terms, and checkout opens by itself. Nothing is charged by signing in.";
 
 const V34_CLOSED = { href: "/contact", label: "Create your World" };
 
@@ -262,18 +267,13 @@ const TABLE = {
     header: { href: "/login", label: "Start free" },
     home: { ...CLOSED.home, primary: { href: "/login", label: "Start free" } },
     homeKo: { ...CLOSED.homeKo, primary: { href: "/login", label: "사용 신청하기" } },
-    pricing: [
-      { href: "/login", label: "Start free" },
-      { href: "/login?next=checkout&offer=observer_access", label: "Buy Starter — $29/month" },
-      { href: "/contact?plan=Pro", label: "Talk to us about Pro" },
-      { href: "/contact?plan=Enterprise", label: "Scope an Enterprise pilot" },
-    ],
+    // Live commerce opens the Free start. It opens no paid plan: the plans' capabilities are not delivered (CAT-D1).
+    pricing: [{ href: "/login", label: "Start free" }, ...CLOSED.pricing.slice(1)],
     // /explore follows the switch too (JOURNEY-MAP D-07, A5).
     explore: {
       exits: [CLOSED.explore.exits[0], CLOSED.explore.exits[1], { href: "/login", label: "Start free" }],
       close: { href: "/login", label: "Start free — 3 files, no card" },
     },
-    login: { text: OPEN_INTENT, links: [] },
   },
 } as const;
 
@@ -390,19 +390,117 @@ describe.each(STATES)("CTA truth in %s", (state) => {
 describe("the checkout-intent notice", () => {
   it("promises nothing before the deployment has answered", async () => {
     const { default: CheckoutIntentNotice } = await import("../components/checkout-intent-notice");
-    expect(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "observer_access", purchaseOpen: null }))).toBe("");
+    for (const availability of ["purchasable", "request_access", "retired"] as const) {
+      expect(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "personal", purchaseOpen: null, availability }))).toBe("");
+    }
   }, RENDER_TIMEOUT);
 
   it("names the plan it was reached for, closed or open", async () => {
     const { default: CheckoutIntentNotice } = await import("../components/checkout-intent-notice");
-    const closed = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "studio_access", purchaseOpen: false })));
-    expect(closed).toBe("Pro is not sold online today. Nothing is charged by signing in. Request Pro access");
-    // B-07 / CLM-023: Pro's saleChannel is "contact" (CAT-D4), so an open deployment still does not sell it
-    // online, and the checkout it would promise answers 403 BILLING_OFFER_CONTACT_REQUIRED.
-    const open = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "studio_access", purchaseOpen: true })));
-    expect(open).toBe("Pro is not sold online today. Nothing is charged by signing in. Request Pro access");
+    const closed = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "team", purchaseOpen: false, availability: "request_access" })));
+    expect(closed).toBe("Team is not sold online today. Nothing is charged by signing in. Request Team access");
+    // B-07 / CLM-023: a plan the server computed as request_access is not sold online even where the
+    // deployment's purchase action is open, and the checkout it would promise answers 403 BILLING_OFFER_CONTACT_REQUIRED.
+    const open = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "team", purchaseOpen: true, availability: "request_access" })));
+    expect(open).toBe("Team is not sold online today. Nothing is charged by signing in. Request Team access");
     expect(open).not.toContain("Checkout opens by itself");
-    const developer = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "observer_access", purchaseOpen: true })));
-    expect(developer).toBe(OPEN_INTENT);
+    // The one plan the server says is purchasable, with the deployment's purchase action open, is held for the reader.
+    const personal = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "personal", purchaseOpen: true, availability: "purchasable" })));
+    expect(personal).toBe(OPEN_INTENT);
+    // Failure path: purchasable but the deployment's purchase action is closed promises nothing.
+    const shut = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer: "personal", purchaseOpen: false, availability: "purchasable" })));
+    expect(shut).toBe("Personal is not sold online today. Nothing is charged by signing in. Request Personal access");
   }, RENDER_TIMEOUT);
+
+  it("names no retired plan: a retired code in the address gets a sentence without its label", async () => {
+    const { default: CheckoutIntentNotice } = await import("../components/checkout-intent-notice");
+    for (const offer of ["observer_access", "studio_access"] as const) {
+      const text = decode(renderToStaticMarkup(createElement(CheckoutIntentNotice, { offer, purchaseOpen: true, availability: "retired" })));
+      expect(text).toBe("That plan is not sold online. Nothing is charged by signing in. Request access");
+      expect(text).not.toMatch(/2026-09|Developer|Team/);
+    }
+  }, RENDER_TIMEOUT);
+});
+
+/*
+  Catalog v2 (PB-2026-11-V22, WO-CAT-2). /pricing buys exactly what the server computed as `purchasable` and
+  requests everything else. The seam is the one the checkout route test uses: the catalog module with
+  `planAvailability` handed a delivered set (here every capability, or none) -- and a v2 price env, which is
+  the other half of the gate. Nothing in the page reads either.
+*/
+describe("catalog v2: /pricing buys only what the server computed as purchasable", () => {
+  const PRICE = `pri_${"a".repeat(26)}`;
+  afterEach(() => {
+    vi.doUnmock("@/lib/billing-catalog");
+  });
+
+  async function pricingHtml({ delivered, personalPrice }: { delivered: boolean; personalPrice: boolean }) {
+    await enter("S2");
+    vi.doMock("@/lib/billing-catalog", async (original) => {
+      const catalog = await original<typeof import("./billing-catalog")>();
+      const all = new Set(Object.values(catalog.BILLING_OFFERS).flatMap((offer) => offer.requires));
+      return {
+        ...catalog,
+        planAvailability: (code: never, configured: never) =>
+          catalog.planAvailability(code, configured, delivered ? all : new Set()),
+      };
+    });
+    if (personalPrice) vi.stubEnv("PADDLE_PRICE_PERSONAL", PRICE);
+    const { default: PricingPage } = await import("../app/pricing/page");
+    return renderToStaticMarkup(createElement(PricingPage as FunctionComponent<Record<string, unknown>>));
+  }
+
+  const planActions = (html: string) => anchors(block(html, 'class="plans"', "div")).filter((action) => /^(Buy|Request) /.test(action.label));
+  const offers = (html: string) => {
+    const ld = [...html.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)].map((match) => JSON.parse(match[1]!));
+    return ld.flatMap((doc) => (doc["@graph"] ?? []) as Array<{ "@type": string; name?: string; availability?: string }>).filter((node) => node["@type"] === "Offer");
+  };
+
+  it("with a delivered line and a configured price, exactly one Buy link: Personal", async () => {
+    const html = await pricingHtml({ delivered: true, personalPrice: true });
+    const actions = planActions(html);
+    expect(actions.filter((action) => action.label.startsWith("Buy"))).toEqual([
+      { href: "/login?next=checkout&offer=personal", label: "Buy Personal — $29/month" },
+    ]);
+    // The other three paid plans have no price env here, so they stay requests.
+    expect(actions.filter((action) => action.label.startsWith("Request")).map((action) => action.label)).toEqual([
+      "Request Developer access", "Request Team access", "Request Business access",
+    ]);
+    // JSON-LD names exactly the plan that can be bought.
+    expect(offers(html).map((node) => [node.name, node.availability])).toEqual([["Personal", "https://schema.org/InStock"]]);
+  }, RENDER_TIMEOUT);
+
+  it("removing the price env flips Personal to Request access: no Buy link, no Offer", async () => {
+    const html = await pricingHtml({ delivered: true, personalPrice: false });
+    expect(planActions(html).map((action) => action.label)).toEqual([
+      "Request Personal access", "Request Developer access", "Request Team access", "Request Business access",
+    ]);
+    expect(offers(html)).toEqual([]);
+  }, RENDER_TIMEOUT);
+
+  it("a configured price does not open a plan whose line is not delivered", async () => {
+    const html = await pricingHtml({ delivered: false, personalPrice: true });
+    expect(planActions(html).some((action) => action.label.startsWith("Buy"))).toBe(false);
+    expect(html).not.toContain("Buy Personal");
+    expect(offers(html)).toEqual([]);
+  }, RENDER_TIMEOUT);
+
+  it("no body renders an overage figure next to a Buy action, and no plan card names automation, SSO, an SLA or federation", async () => {
+    for (const personalPrice of [true, false]) {
+      const html = await pricingHtml({ delivered: true, personalPrice });
+      const start = html.indexOf('id="pricing-overage-title"');
+      expect(start, "the overage table is rendered").toBeGreaterThan(0);
+      const overage = html.slice(start, html.indexOf("</table>", start));
+      for (const rate of ["$0.04 / unit", "$0.006 / unit", "$0.20 / GB-month", "$15 / seat-month"]) expect(decode(overage)).toContain(rate);
+      expect(decode(overage), "the overage rows offer Request access and nothing to buy").not.toMatch(/\bBuy\b/);
+      expect(decode(overage)).toContain("Request access");
+      expect(decode(block(html, 'class="plans"', "div"))).not.toMatch(/automation|\bSSO\b|\bSLA\b|federation/i);
+    }
+  }, RENDER_TIMEOUT);
+
+  it("reads no price environment in the browser modules that render the plans and the checkout notice", () => {
+    for (const path of ["../components/pricing-page-client.tsx", "../components/checkout-intent-notice.tsx", "../app/login/page.tsx"]) {
+      expect(readFileSync(new URL(path, import.meta.url), "utf8"), path).not.toMatch(/process\.env|PADDLE_PRICE_/);
+    }
+  });
 });

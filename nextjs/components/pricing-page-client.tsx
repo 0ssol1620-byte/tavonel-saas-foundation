@@ -14,14 +14,17 @@ import { ProcessingTermsDialog } from "@/components/processing-consent-panel";
 import { ENTITLEMENT_PENDING_SENTENCE, type EntitlementWaitResult } from "@/lib/entitlement-wait";
 import {
   BILLING_OFFERS,
+  METER_RATES_USD,
+  PRICE_BOOK_EXTRA,
   REFUND_MAX_CONSUMED_FRACTION,
   REFUND_WINDOW_DAYS,
   refundablePageAllowance,
   type BillingOfferCode,
+  type PlanAvailability,
 } from "@/lib/billing-catalog";
 import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "@/lib/compile-limits";
 import { trackFunnel } from "@/lib/funnel-events";
-import { EXPLORE_CTA, SELF_SERVE_CTA } from "@/lib/site-navigation";
+import { ACCESS_CTA, EXPLORE_CTA, SELF_SERVE_CTA, TRIAL_ALLOWANCE } from "@/lib/site-navigation";
 import { MCP_TOOL_COUNT_WORD } from "@/lib/mcp-tools";
 import { jsonLdHtml } from "@/lib/structured-data";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
@@ -64,18 +67,63 @@ import { corpusFit, LIMIT_STATE_GLYPH, LIMIT_STATE_LABEL } from "@/lib/plan-limi
   G2-039. The qualifier is a block under the price rather than a trailing `<small>`: at the
   Enterprise card's width "Custom / scoped with" wrapped and left "you" alone on the next line.
 */
-const PAID_PLANS = (Object.entries(BILLING_OFFERS) as Array<[BillingOfferCode, (typeof BILLING_OFFERS)[BillingOfferCode]]>)
-  .map(([offerCode, offer]) => ({
+/*
+  Catalog v2 (PB-2026-11-V22). The plans a visitor can choose are the current offers, in catalog order.
+  A retired offer stays in the catalog for the subscribers who hold it and is never rendered here.
+
+  Whether a card buys or requests is `availability`, computed on the server by `planAvailability` (the
+  product delivers the whole line and its price is configured) and passed in as data. This module reads
+  no environment: a plan the server did not name is requested, never bought.
+*/
+type CurrentCode = { [K in BillingOfferCode]: (typeof BILLING_OFFERS)[K]["status"] extends "retired" ? never : K }[BillingOfferCode];
+type CurrentOffer = (typeof BILLING_OFFERS)[CurrentCode];
+const CURRENT_CODES = (Object.keys(BILLING_OFFERS) as BillingOfferCode[]).filter((code): code is CurrentCode => BILLING_OFFERS[code].status !== "retired");
+
+/** The server's answer for each current plan, keyed by offer code. */
+export type PlanAvailabilityByCode = Readonly<Partial<Record<BillingOfferCode, PlanAvailability>>>;
+const availabilityOf = (availability: PlanAvailabilityByCode, code: BillingOfferCode): PlanAvailability => availability[code] ?? "request_access";
+
+type Included = { pcu: number; kqu: number; storageGb: number; seats: number };
+
+type Plan = {
+  kind: "evaluation" | "paid" | "enterprise";
+  name: string;
+  price: string;
+  /** The qualifier under the price. Every card has one, so the cards share a shape. */
+  unit: string;
+  description: string;
+  features: readonly string[];
+  /** Named on the card, never implied by its absence. See `notYetSold` in the billing catalog. */
+  notYetSold: readonly string[];
+  /** The monthly allowance the plan's line carries; absent on a card with no allowance of its own. */
+  included: Included | null;
+  /** The catalog offer behind the card, whatever its availability. */
+  code: BillingOfferCode | null;
+  /** The offer a Buy action opens: set only when the server computed `purchasable`. */
+  offerCode: BillingOfferCode | null;
+  note?: { href: Route; label: string };
+  /** An in-page destination, for a card whose detail is a section rather than another page. */
+  anchor?: string;
+};
+
+const paidPlans = (availability: PlanAvailabilityByCode): Plan[] => CURRENT_CODES.map((code) => {
+  const offer = BILLING_OFFERS[code];
+  /* Bought only where the server said `purchasable`; the channel check mirrors `decideOfferCheckoutPolicy`, which the checkout route also applies. */
+  const offerCode = availabilityOf(availability, code) === "purchasable" ? code : null;
+  return {
+    kind: "paid",
     name: offer.label,
     price: `$${offer.priceUsd} USD`,
     unit: "per month",
     description: offer.description,
     features: offer.features as readonly string[],
     notYetSold: offer.notYetSold as readonly string[],
-    // A plan whose product is unfinished is sold through a conversation, whatever the
-    // commercial mode says. See `saleChannel` in the billing catalog.
+    included: offer.included,
+    code,
+    // A plan whose product is unfinished is sold through a conversation, whatever the commercial mode says.
     offerCode: offer.saleChannel === "self_serve" ? offerCode : null,
-  }));
+  };
+});
 
 /** Shown on the Evaluation card while `activationPolicy.customerData` is closed (SD-01). */
 const EVALUATION_GATED_DESCRIPTION =
@@ -87,20 +135,29 @@ const EVALUATION_GATED_FEATURES = [
   "No card or file upload required",
 ] as const;
 
-const EVALUATION = {
+/*
+  CAT-D2. The Free card is the evaluation as it exists: `TRIAL_ALLOWANCE` is pinned to the trial policy
+  migration, so its days, files and pages are read, never typed. It is labelled Free once the workspace
+  is open to visitors and Evaluation while only the public World is on offer, so a closed deployment
+  carries no self-serve label (UX-PLAN §6.3 rule 1).
+*/
+const EVALUATION: Plan = {
+  kind: "evaluation",
   name: "Evaluation",
-  price: "$0 USD",
-  unit: "for 7 days",
+  price: `$${PRICE_BOOK_EXTRA.free.priceUsd} USD`,
+  unit: `for ${TRIAL_ALLOWANCE.days} days`,
   description: "Try TAVONEL with your own files. No card required.",
   features: [
-    "Up to 3 files and 50 standard pages",
+    `Up to ${TRIAL_ALLOWANCE.files} files and ${TRIAL_ALLOWANCE.pages} standard pages`,
     "1 Compiled World with Evidence and Ask",
     "Signed export",
-    "7 days, no card required",
+    `${TRIAL_ALLOWANCE.days} days, no card required`,
   ],
   notYetSold: [],
+  included: null,
+  code: null,
   offerCode: null,
-} as const;
+};
 
 /*
   Audit P08. The card claims nothing it cannot deliver -- SSO, SCIM and seats came off it in an
@@ -108,13 +165,16 @@ const EVALUATION = {
   what enterprise readiness still lacks. /trust already publishes that split by name. The card now
   links to it at the moment the decision is made, rather than after a pilot has started.
 */
-const ENTERPRISE = {
+const ENTERPRISE: Plan = {
+  kind: "enterprise",
   name: "Enterprise",
   price: "Custom",
   unit: "scoped with you",
   description: "An assisted pilot for larger corpora and knowledge operations run by a team, scoped in a conversation.",
   features: ["Custom volume", "Custom retention review", "Audit export", "Dedicated onboarding and support"],
   notYetSold: [],
+  included: null,
+  code: null,
   offerCode: null,
   /*
     BA-127. The label promised the reader a list of what we do not have, inside the one card that
@@ -136,22 +196,14 @@ const ENTERPRISE = {
     page, written in the same vocabulary as the rest of it and rendered from the same constants.
   */
   anchor: "enterprise-pricing",
-} as const;
+};
 
-const PLANS: ReadonlyArray<{
-  name: string;
-  price: string;
-  /** The qualifier under the price. Every card has one, so the four cards share a shape. */
-  unit: string;
-  description: string;
-  features: readonly string[];
-  /** Named on the card, never implied by its absence. See `notYetSold` in the billing catalog. */
-  notYetSold: readonly string[];
-  offerCode: BillingOfferCode | null;
-  note?: { href: Route; label: string };
-  /** An in-page destination, for a card whose detail is a section rather than another page. */
-  anchor?: string;
-}> = [EVALUATION, ...PAID_PLANS, ENTERPRISE];
+/** Free (the evaluation), the current plans, then Enterprise. `selfService` names the first card, as above. */
+const plansFor = (availability: PlanAvailabilityByCode, selfService: boolean): Plan[] => [
+  { ...EVALUATION, name: selfService ? PRICE_BOOK_EXTRA.free.label : EVALUATION.name },
+  ...paidPlans(availability),
+  ENTERPRISE,
+];
 
 /*
   G2-003. The three steps between this card and a first compile, written on the card.
@@ -168,17 +220,16 @@ const PLANS: ReadonlyArray<{
   grid from `activationPolicy` rather than paraphrased here.
 */
 function planPath(
-  plan: (typeof PLANS)[number],
+  plan: Plan,
   state: { liveCheckout: boolean; selfService: boolean },
 ) {
-  if (plan.name === "Evaluation") {
+  if (plan.kind === "evaluation") {
     return state.selfService
       ? "Sign in → your workspace opens → 3 files and 50 pages, your first World"
       : "Explore the public World → inspect its evidence → discuss your sources";
   }
-  if (plan.name === "Enterprise") return "Talk to us → we scope it against your material → a written quote";
-  if (!plan.offerCode) return "Talk to us → scope volume and onboarding → agree a pilot";
-  return state.liveCheckout
+  if (plan.kind === "enterprise") return "Talk to us → we scope it against your material → a written quote";
+  return plan.offerCode && state.liveCheckout
     ? "Sign in → your workspace opens → checkout and first compile"
     : "Request access → scope your sources → agree a pilot";
 }
@@ -224,6 +275,15 @@ function planPath(
   additional volume arranged with us -- and a complex page is described in allowance terms, from
   the two unit constants the reservation code charges against.
 */
+const grouped = (value: number) => value.toLocaleString("en-US");
+/** "A", "A and B", "A, B and C": plan lists are read off the catalog, so they follow it when a plan is added. */
+const inWords = (items: readonly string[]) => items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+const eachPlan = (say: (offer: CurrentOffer) => string) => inWords(CURRENT_CODES.map((code) => say(BILLING_OFFERS[code])));
+const { personal: PERSONAL, developer: DEVELOPER, team: TEAM, business: BUSINESS } = BILLING_OFFERS;
+/** A per-unit rate, from `METER_RATES_USD`: whole dollars bare, everything else to the cent or the mill. */
+const rate = (usd: number) => new Intl.NumberFormat("en-US", {
+  style: "currency", currency: "USD", minimumFractionDigits: Number.isInteger(usd) ? 0 : 2, maximumFractionDigits: 3,
+}).format(usd);
 /** How many standard pages of the allowance one complex page can use, at most. Derived, never typed. */
 const COMPLEX_PAGE_MAX_STANDARD_PAGES = MAX_UNITS_PER_PAGE / STANDARD_UNITS_PER_PAGE;
 /** Said wherever volume past a plan would otherwise carry a price. */
@@ -244,15 +304,19 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceE
   return [
     [
       "Base subscription",
-      `${BILLING_OFFERS.observer_access.label}: $${BILLING_OFFERS.observer_access.priceUsd}/month. ${BILLING_OFFERS.studio_access.label}: $${BILLING_OFFERS.studio_access.priceUsd}/month. ${selfServiceEvaluation ? "Once your workspace is open, the seven-day evaluation is free and needs no card." : "The public World is free to explore. An evaluation with your own sources is arranged with us."}`,
+      `${CURRENT_CODES.map((code) => `${BILLING_OFFERS[code].label}: $${BILLING_OFFERS[code].priceUsd}/month`).join(". ")}. ${selfServiceEvaluation ? "Once your workspace is open, the seven-day evaluation is free and needs no card." : "The public World is free to explore. An evaluation with your own sources is arranged with us."}`,
     ],
     [
       "Included pages",
-      `${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")} standard pages on ${BILLING_OFFERS.observer_access.label} and ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} on ${BILLING_OFFERS.studio_access.label}.`,
+      `Standard pages each month: ${eachPlan((offer) => `${grouped(offer.includedPages)} on ${offer.label}`)}.`,
+    ],
+    [
+      "Units",
+      `A PCU is one standard page. A complex page uses up to ${COMPLEX_PAGE_MAX_STANDARD_PAGES} PCU. A KQU is one bounded knowledge retrieval request.`,
     ],
     [
       "Past the included pages",
-      "Additional volume is arranged with us. Talk to us before you need it. Once a month's included pages are used, new sources wait for the next month's pages, and Ask, search and the Worlds you already compiled keep working.",
+      "Plans stop at their monthly allowance. Additional volume is arranged with us, so talk to us before you need it. Once a month's included pages are used, new sources wait for the next month's pages, and Ask, search and the Worlds you already compiled keep working.",
     ],
     // FD-03 (`docs/policy/DECISION_LOG_2026-09-11.md`): grant-time expiry, no roll-over, no refund
     // of unused pages. Delegated decision, 2026-09-11; the wording here is the customer's, per the
@@ -261,15 +325,15 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceE
       "Unused pages",
       `Included pages belong to the billing month they are granted in: when the next month's pages are granted, whatever is left of the previous month expires. Unused pages do not roll over and are not refunded if you cancel.`,
     ],
-    // FD-02 (`docs/policy/DECISION_LOG_2026-09-11.md`): Developer reaches activation when the
+    // FD-02 (`docs/policy/DECISION_LOG_2026-09-11.md`): the observer level reaches activation when the
     // caller owns the workspace. Delegated decision, 2026-09-11; the row is read off the
     // entitlement function, so it cannot say more than the code admits.
     // SD-02 (G2-002). This row used to end "Team keeps shared membership and roles", which
-    // What differs between the two plans is volume and guided review, which is what this row says.
+    // What differs between plans is volume, developer keys and guided review, which is what this row says.
     // Identity and team-access requirements stay in Enterprise scoping rather than plan copy.
     [
       "What differs by plan",
-      `${BILLING_OFFERS.studio_access.label} carries ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} included pages against ${BILLING_OFFERS.observer_access.label}'s ${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")}, adds the review queue and version history, and is sold through a conversation rather than a checkout. ${activationPlans.join(" and ")} reach World activation — activating a candidate and rolling one back — as the workspace owner. Both include Google Drive and file-server connections.`,
+      `${DEVELOPER.label} carries ${grouped(DEVELOPER.included.kqu)} KQU against ${PERSONAL.label}'s ${grouped(PERSONAL.included.kqu)}, with scoped developer keys. ${TEAM.label} and ${BUSINESS.label} add the review queue and version history, at ${grouped(TEAM.includedPages)} and ${grouped(BUSINESS.includedPages)} included pages. ${inWords(activationPlans)} reach World activation — activating a candidate and rolling one back — as the workspace owner. Every plan includes Google Drive and file-server connections.`,
     ],
     [
       "What does not consume pages",
@@ -283,7 +347,7 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceE
     // decision, 2026-09-11; every figure below is derived from the billing catalog.
     [
       "Refunds",
-      `Ask within ${REFUND_WINDOW_DAYS} days of payment and you get a full refund, provided you have used fewer than ${REFUND_MAX_CONSUMED_PERCENT}% of the plan's included pages — ${refundablePageAllowance(BILLING_OFFERS.observer_access)} pages on ${BILLING_OFFERS.observer_access.label}, ${refundablePageAllowance(BILLING_OFFERS.studio_access)} on ${BILLING_OFFERS.studio_access.label}. Past that, the payment is not refunded. Unused pages are not refunded when you cancel. Subject to the terms as updated.`,
+      `Ask within ${REFUND_WINDOW_DAYS} days of payment and you get a full refund, provided you have used fewer than ${REFUND_MAX_CONSUMED_PERCENT}% of the plan's included pages — ${eachPlan((offer) => `${grouped(refundablePageAllowance(offer))} on ${offer.label}`)}. Past that, the payment is not refunded. Unused pages are not refunded when you cancel. Subject to the terms as updated.`,
     ],
     [
       "How to start",
@@ -302,10 +366,11 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceE
   recomputes it.
 */
 const SCENARIO_PAGES = [
-  Math.round(BILLING_OFFERS.observer_access.includedPages * 0.6),
-  BILLING_OFFERS.observer_access.includedPages,
-  BILLING_OFFERS.observer_access.includedPages * 2,
-  BILLING_OFFERS.studio_access.includedPages,
+  Math.round(PERSONAL.includedPages * 0.6),
+  PERSONAL.includedPages,
+  PERSONAL.includedPages * 2,
+  TEAM.includedPages,
+  BUSINESS.includedPages,
 ] as const;
 
 /** The subscription covers a volume up to the plan's included pages; past them there is no published price (R1). */
@@ -326,66 +391,60 @@ const totalOrArranged = (usd: number | null) => (usd === null ? ADDITIONAL_VOLUM
   same volume costs, because it had left out the subscription entirely. The number a buyer reads
   last was the one understating the bill.
 
-  So the estimator states the two plan totals. `extraPages` is the row the old "Standard
+  So the estimator states every plan's total. `extraPages` is the row the old "Standard
   estimate" was trying to be: the pages past the plan, which are arranged with us (R1) rather
   than priced.
 
   `pricing-estimator.test.ts` holds these rows against `monthlyTotalUsd` and against the
   volume table's own figures at 50, 250, 300 and 348 pages.
+
+  Catalog v2: one total per current plan, read off `CURRENT_CODES`, and `extraPages` is measured
+  against the entry plan, the smallest allowance a buyer can choose.
 */
 export function estimatorRows(pages: number) {
-  const developer = BILLING_OFFERS.observer_access;
-  const team = BILLING_OFFERS.studio_access;
-  const extraPages = Math.max(0, pages - developer.includedPages);
+  const extraPages = Math.max(0, pages - PERSONAL.includedPages);
   return {
     pages,
-    developerTotalUsd: monthlyTotalUsd(developer, pages),
-    teamTotalUsd: monthlyTotalUsd(team, pages),
+    totalsUsd: Object.fromEntries(
+      CURRENT_CODES.map((code) => [code, monthlyTotalUsd(BILLING_OFFERS[code], pages)]),
+    ) as Record<string, number | null>,
     extraPages,
   };
 }
 
 const SCENARIOS = SCENARIO_PAGES.map((pages) => ({
   pages,
-  developer: monthlyTotalUsd(BILLING_OFFERS.observer_access, pages),
-  team: monthlyTotalUsd(BILLING_OFFERS.studio_access, pages),
+  totals: CURRENT_CODES.map((code) => monthlyTotalUsd(BILLING_OFFERS[code], pages)),
 }));
 
 /*
-  G2-007. The rows on which the two paid plans actually differ, and only those.
+  G2-007. The rows on which the paid plans actually differ, and only those.
 
-  "What each plan can do" further down is rendered from `billingProductDecision`, and all six of
-  its rows answer the same for both plans -- correctly, because both plans reach every one of
-  those routes. A buyer reading six ✓ / ✓ rows learned nothing about why one plan costs more
-  than the other, and the things that do differ were spread between a card, a tile and a fold.
+  "What each plan can do" further down is rendered from `billingProductDecision`, and every one of
+  its rows answers the same for each plan that shares an access level, because those plans reach
+  the same routes. A buyer reading rows of ✓ learned nothing about why one plan costs more than
+  another, and the things that do differ were spread between a card, a tile and a fold.
 
-  Included pages, sale channels and onboarding come from `lib/billing-catalog.ts`; the displayed
-  purchase path also respects the effective live checkout action. A catalog change moves the
-  table, but a closed purchase gate never leaves a visible "Checkout" promise behind. A row
-  that is the same on both plans belongs in "Limits" below, not in a column here.
+  Included pages, KQU, storage, seats and the plan's features come from `lib/billing-catalog.ts`;
+  how you get a plan is `planAvailability`, computed on the server. A catalog change moves the
+  table, but a closed purchase gate never leaves a visible "Checkout" promise behind. A row that
+  is the same on every plan belongs in "Limits" below, not in a column here.
 */
-/** A catalog channel cannot promise checkout while the effective purchase action is closed. */
-function howYouBuy(saleChannel: string, checkoutOpen: boolean) {
-  return checkoutOpen && saleChannel === "self_serve" ? "Checkout" : "A conversation";
+/** A plan is bought only where the server said so and the deployment's purchase action is open; otherwise it is requested. */
+function howYouGet(availability: PlanAvailability, checkoutOpen: boolean) {
+  return checkoutOpen && availability === "purchasable" ? "Checkout" : ACCESS_CTA.label;
 }
 
-function planDifferences(checkoutOpen: boolean): ReadonlyArray<readonly [string, string, string]> {
+function planDifferences(availability: PlanAvailabilityByCode, checkoutOpen: boolean): ReadonlyArray<readonly string[]> {
+  const row = (label: string, say: (offer: CurrentOffer, code: CurrentCode) => string) =>
+    [label, ...CURRENT_CODES.map((code) => say(BILLING_OFFERS[code], code))] as const;
   return [
-  [
-    "Included standard pages each month",
-    BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US"),
-    BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US"),
-  ],
-  [
-    "How you buy it",
-    howYouBuy(BILLING_OFFERS.observer_access.saleChannel, checkoutOpen),
-    howYouBuy(BILLING_OFFERS.studio_access.saleChannel, checkoutOpen),
-  ],
-  [
-    "Guided onboarding for your documents",
-    BILLING_OFFERS.observer_access.features.some((feature) => feature.includes("onboarding")) ? "Included" : "—",
-    BILLING_OFFERS.studio_access.features.some((feature) => feature.includes("onboarding")) ? "Included" : "—",
-  ],
+    row("Included standard pages each month", (offer) => grouped(offer.includedPages)),
+    row("Included KQU each month", (offer) => grouped(offer.included.kqu)),
+    row("Storage included, GB", (offer) => grouped(offer.included.storageGb)),
+    row("Seats", (offer) => grouped(offer.included.seats)),
+    row("How you get it", (_offer, code) => howYouGet(availabilityOf(availability, code), checkoutOpen)),
+    row("Review queue and version history", (offer) => offer.features.some((feature) => feature.includes("Review queue")) ? "Included" : "—"),
   ];
 }
 
@@ -416,12 +475,12 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
     `${CORPUS_MAX_DOCUMENTS}, compiled in parts of ${COMPILE_MAX_DOCUMENTS}. Each part compiles to its own World and is reviewed on its own. The parts are not merged.`,
   ],
   [
-    "Members in a workspace",
-    "Published plans cover the workspace owner. Access for more people and identity requirements are confirmed during Enterprise scoping.",
+    "Seats in a workspace",
+    `${eachPlan((offer) => `${grouped(offer.included.seats)} on ${offer.label}`)}. Identity requirements and access for more people are confirmed during Enterprise scoping.`,
   ],
   [
     "API requests",
-    "Limited per key, per scope, per minute. The limits are the same on both paid plans and are not something a plan buys more of.",
+    "Limited per key, per scope, per minute. The limits are the same on every paid plan and are not something a plan buys more of.",
   ],
   [
     "Retention period",
@@ -569,7 +628,7 @@ const PURCHASE_FAQ: Array<[string, string, Route, string, string]> = [
   ["What does it do when it is uncertain?", "It abstains and says which sources it looked at. A composed answer with no region behind it would be indistinguishable from a correct one, which is the failure the whole contract exists to prevent.", "/knowledge-compiler" as Route, "Questions people ask", "What it is"],
   ["Is my data safe?", "Your sources go to a tenant-scoped quarantine, are sanitized before anything reads them, and are not used to train shared models. No third-party model API receives your documents today.", "/security" as Route, "Where your documents go", "What happens to my data"],
   ["What is ready to use?", "A finished public World is available to read today, with source-linked Evidence, Ask, a public HTTP API and a digest-bound sample download. MCP access to your own workspace requires an API key and an arranged evaluation. Current service status stays visible on the linked page.", "/status" as Route, "Current service status", "What it costs"],
-  ["How much does it cost?", "A monthly subscription with included pages, both shown above. Volume past the included pages is arranged with us, and the most any run can use is shown before it starts.", "/refunds" as Route, "Cancellation and refunds", "What it costs"],
+  ["How much does it cost?", "A monthly subscription with included pages, as shown above. Volume past the included pages is arranged with us, and the most any run can use is shown before it starts.", "/refunds" as Route, "Cancellation and refunds", "What it costs"],
   ["How much setup is required?", "Explore the public World and its evidence without a card. To evaluate your own sources, contact us to agree the scope and intake path before any processing or payment.", "/docs" as Route, "Documentation", "What it costs"],
   ["Will I be locked in?", "The package is open formats — canonical JSON, Turtle, JSON-LD, CSV and JSONL — and the two verifiers are readable scripts rather than a service, so a package can be checked and loaded without us.", "/docs/exports" as Route, "The package format", "What happens to my data"],
   ["Can I export?", "You can download the digest-bound public sample World today. Workspace exports are signed. Compiling and exporting your own sources requires an arranged evaluation.", "/reproducibility" as Route, "Public sample and checksums", "What happens to my data"],
@@ -609,64 +668,6 @@ function purchaseFaqRows(selfService: boolean): typeof PURCHASE_FAQ {
 /** The order the groups are shown in. Declared rather than derived, because it is an argument. */
 const FAQ_GROUPS = ["What it is", "What it costs", "What happens to my data", "What a review will find"] as const;
 
-/*
-  G2-032. The prices and the questions on this page, in the markup a search or answer engine reads.
-
-  The site's global JSON-LD is Organization + SoftwareApplication and stops there, on the stated
-  ground that a private pilot has no public catalogue. That ground no longer holds for this page
-  and only for this page: `BILLING_OFFERS` is a catalogue, both plans are rendered with real
-  prices, and a buyer can reach a checkout for one of them. So the block is built by mapping over
-  the two modules the page already renders -- a price change moves the markup instead of leaving a
-  crawler with a stale `Offer`.
-
-  Only the two catalogued subscriptions are described. The free evaluation has no `priceUsd` to
-  cite and Enterprise has no agreed price at all, and an `Offer` for either would be the invented
-  fact the evidence rule bars. `availability` follows `saleChannel`, so the plan sold through a
-  conversation is not advertised to a crawler as a checkout.
-
-  It is emitted from this client component rather than from `app/pricing/page.tsx` because a
-  "use client" module's non-component exports are client references in the server bundle, so the
-  server component cannot read `PURCHASE_FAQ`. Next server-renders this into the HTML either way.
-*/
-const pricingJsonLd = (purchaseReady: boolean, faqRows: typeof PURCHASE_FAQ) => ({
-  "@context": "https://schema.org",
-  "@graph": [
-    ...Object.values(BILLING_OFFERS).map((offer) => ({
-      "@type": "Offer",
-      name: offer.label,
-      description: offer.description,
-      url: "https://tavonel.com/pricing",
-      category: "subscription",
-      availability:
-        offer.saleChannel === "self_serve" && purchaseReady
-          ? "https://schema.org/InStock"
-          : "https://schema.org/LimitedAvailability",
-      priceSpecification: {
-        "@type": "UnitPriceSpecification",
-        price: offer.priceUsd,
-        priceCurrency: "USD",
-        valueAddedTaxIncluded: false,
-        unitText: "month",
-        billingDuration: 1,
-        billingIncrement: 1,
-      },
-    })),
-    {
-      "@type": "FAQPage",
-      mainEntity: faqRows.map(([question, answer]) => ({
-        "@type": "Question",
-        name: question,
-        acceptedAnswer: { "@type": "Answer", text: answer },
-      })),
-    },
-  ],
-});
-
-/** The catalog offer a plan card sells, by its label. Developer and Team have one, Evaluation and Enterprise do not. */
-function offerForPlan(name: string): BillingOfferCode | null {
-  return (Object.keys(BILLING_OFFERS) as BillingOfferCode[]).find((code) => BILLING_OFFERS[code].label === name) ?? null;
-}
-
 /** A refusal names its next step. Without one from the hook, it is a conversation about the plan. */
 function noticeLink(notice: { tone: NoticeTone; link?: NoticeLink }, planName: string): NoticeLink | undefined {
   if (notice.link || notice.tone !== "alert") return notice.link;
@@ -680,9 +681,15 @@ export default function PricingPageClient({
   footer,
   gates,
   planCapabilities,
+  availability,
 }: {
   initialLiveCheckout: boolean;
   initialSelfService: boolean;
+  /**
+   * Whether each plan is bought here or requested, decided on the server by `planAvailability` and passed in.
+   * Nothing in this module reads the environment, so hydration cannot differ from the markup that was sent.
+   */
+  availability: PlanAvailabilityByCode;
   /**
    * The V34 header and footer, rendered on the server and passed in: this client module cannot read the
    * commercial flags (BA-232), and the shell's route registry stays out of its bundle.
@@ -731,8 +738,57 @@ export default function PricingPageClient({
   */
   const selfService = selfServiceFlag && ownFilesOpen;
   const faqRows = purchaseFaqRows(selfService);
+  const PLANS = plansFor(availability, selfService);
   /*
-    BA-128. 348 read as leftover test data. The default is now the Developer plan's included
+    G2-032. The prices and the questions on this page, in the markup a search or answer engine reads.
+
+    The site's global JSON-LD is Organization + SoftwareApplication and stops there, on the stated
+    ground that a private pilot has no public catalogue. An `Offer` is a statement that a plan can be
+    bought, so one is emitted only for a plan the server computed as `purchasable`: a plan that is
+    requested is not described to a crawler as a checkout, and the free evaluation and Enterprise
+    have no price to cite. The block is built by mapping over the catalog the page already renders, so
+    a price change moves the markup instead of leaving a crawler with a stale `Offer`.
+
+    It is emitted from this client component rather than from `app/pricing/page.tsx` because a
+    "use client" module's non-component exports are client references in the server bundle, so the
+    server component cannot read `PURCHASE_FAQ`. Next server-renders this into the HTML either way.
+    It lives inside the component because it needs the server's `availability`; the input is the
+    server's data and authored literals, never a request.
+  */
+  const pricingJsonLd = (purchaseReady: boolean, faqRows: typeof PURCHASE_FAQ) => ({
+    "@context": "https://schema.org",
+    "@graph": [
+      ...(Object.entries(BILLING_OFFERS) as Array<[BillingOfferCode, (typeof BILLING_OFFERS)[BillingOfferCode]]>)
+        .filter(([code]) => purchaseReady && availabilityOf(availability, code) === "purchasable")
+        .map(([, offer]) => ({
+          "@type": "Offer",
+          name: offer.label,
+          description: offer.description,
+          url: "https://tavonel.com/pricing",
+          category: "subscription",
+          availability: "https://schema.org/InStock",
+          priceSpecification: {
+            "@type": "UnitPriceSpecification",
+            price: offer.priceUsd,
+            priceCurrency: "USD",
+            valueAddedTaxIncluded: false,
+            unitText: "month",
+            billingDuration: 1,
+            billingIncrement: 1,
+          },
+        })),
+      {
+        "@type": "FAQPage",
+        mainEntity: faqRows.map(([question, answer]) => ({
+          "@type": "Question",
+          name: question,
+          acceptedAnswer: { "@type": "Answer", text: answer },
+        })),
+      },
+    ],
+  });
+  /*
+    BA-128. 348 read as leftover test data. The default is now the entry plan's included
     pages, so the control opens on "your plan already covers this" rather than on a figure
     nobody chose.
   */
@@ -746,7 +802,7 @@ export default function PricingPageClient({
     derives the volume from it, which also stops the calculator from stating a page total that
     the selection beside it contradicts.
 
-    The defaults multiply to the Developer plan's included pages, which is where BA-128 put the
+    The defaults multiply to the entry plan's included pages, which is where BA-128 put the
     old single control: the calculator still opens on "your plan already covers this".
   */
   const [sources, setSources] = useState<number>(25);
@@ -799,17 +855,18 @@ export default function PricingPageClient({
     fires -- the funnel wants "did they get to the plans", not a scroll trace.
   */
   const plansRef = useRef<HTMLDivElement | null>(null);
+  const planCount = PLANS.length;
   useEffect(() => {
     const node = plansRef.current;
     if (!node || typeof IntersectionObserver === "undefined") return;
     const observer = new IntersectionObserver((entries) => {
       if (!entries.some((entry) => entry.isIntersecting)) return;
       observer.disconnect();
-      trackFunnel("pricing_plan_viewed", { plans: String(PLANS.length) });
+      trackFunnel("pricing_plan_viewed", { plans: String(planCount) });
     }, { threshold: 0.25 });
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
+  }, [planCount]);
 
   useEffect(() => {
     let cancelled = false;
@@ -887,17 +944,17 @@ export default function PricingPageClient({
     where the click was going to send the visitor anyway: the sign-in that carries the offer, or
     /contact. Nothing about the destination depends on JavaScript having run.
   */
-  const planHref = (plan: (typeof PLANS)[number]) => {
-    if (plan.name === "Enterprise") return "/contact?plan=Enterprise";
+  const planHref = (plan: Plan) => {
+    if (plan.kind === "enterprise") return "/contact?plan=Enterprise";
     if (plan.anchor) return `#${plan.anchor}`;
-    if (plan.name === "Evaluation") return selfService ? SELF_SERVE_CTA.href : EXPLORE_CTA.href;
+    if (plan.kind === "evaluation") return selfService ? SELF_SERVE_CTA.href : EXPLORE_CTA.href;
     if (ownerBillingExempt && plan.offerCode) return "/workspace";
     if (!plan.offerCode || !liveCheckout) return `/contact?plan=${encodeURIComponent(plan.name)}`;
     return loginUrlForOffer(plan.offerCode);
   };
 
   /** True only where the Paddle overlay can actually open, which is where the anchor is hijacked. */
-  const opensOverlay = (plan: (typeof PLANS)[number]) =>
+  const opensOverlay = (plan: Plan) =>
     Boolean(plan.offerCode) && liveCheckout && signedIn && !ownerBillingExempt;
 
   return (
@@ -933,9 +990,9 @@ export default function PricingPageClient({
             */}
             <div className="pricing-context">
               <p className="lede">
-                {BILLING_OFFERS.observer_access.label} includes {BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")} standard
-                pages each month. {BILLING_OFFERS.studio_access.label} includes {BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")}.
-                Need more in a month? Talk to us and we will arrange the additional volume.
+                {PERSONAL.label} includes {grouped(PERSONAL.includedPages)} standard pages each month, rising to{" "}
+                {grouped(BUSINESS.includedPages)} on {BUSINESS.label}. Need more in a month? Talk to us and we will
+                arrange the additional volume.
               </p>
               {/*
                 BA-119. Audit M04's disclosure stays -- both gates are still read from
@@ -965,7 +1022,7 @@ export default function PricingPageClient({
             </div>
             <PricingPlanOverview plans={PLANS.map(plan => ({
               name: plan.name, price: plan.price,
-              unit: plan.name === EVALUATION.name && !selfService ? "to explore the public World" : plan.unit,
+              unit: plan.kind === "evaluation" && !selfService ? "to explore the public World" : plan.unit,
             }))} />
             {purchase ? (
               /*
@@ -1005,7 +1062,7 @@ export default function PricingPageClient({
             ) : null}
             <div className="plans" ref={plansRef} data-visual>
               {PLANS.map((plan, index) => (
-                <article className={`plan ${pricingPlanDestinationClass}`} id={pricingPlanId(index)} tabIndex={-1} key={plan.name} data-featured={plan.offerCode === "observer_access" ? 1 : 0}>
+                <article className={`plan ${pricingPlanDestinationClass}`} id={pricingPlanId(index)} tabIndex={-1} key={plan.name} data-featured={plan.code === "personal" ? 1 : 0} style={index >= 4 ? { borderTop: "1px solid var(--tv-rule)" } : undefined}>
                   {/*
                     BQ-027. Four cards, four shared baselines.
 
@@ -1032,7 +1089,7 @@ export default function PricingPageClient({
                       <span>{plan.price.endsWith(" USD") ? plan.price.slice(0, -4) : plan.price}</span>
                       {plan.price.endsWith(" USD") ? <>{" "}<small className="price-currency">USD</small></> : null}
                     </span>
-                    <p className="fine price-period">{plan.name === EVALUATION.name && !selfService ? "to explore the public World" : plan.unit}</p>
+                    <p className="fine price-period">{plan.kind === "evaluation" && !selfService ? "to explore the public World" : plan.unit}</p>
                   </div>
                   {/*
                     SD-01 (G1-001 on this page). The Evaluation card promised "your own files"
@@ -1040,16 +1097,22 @@ export default function PricingPageClient({
                     print under the grid reads, and describes what the trial reaches today.
                   */}
                   <p className="plan-body">
-                    {plan.name === EVALUATION.name && !selfService ? EVALUATION_GATED_DESCRIPTION : plan.description}
+                    {plan.kind === "evaluation" && !selfService ? EVALUATION_GATED_DESCRIPTION : plan.description}
                   </p>
                   <div className="plan-features">
-                    {!ownFilesOpen && plan.offerCode ? (
+                    {!ownFilesOpen && plan.kind === "paid" ? (
                       <p className="fine">Ask us about an approved source-processing pilot before your first compile.</p>
                     ) : null}
-                    <ul>{(plan.name === EVALUATION.name && !selfService ? EVALUATION_GATED_FEATURES : plan.features).map((feature) => (
+                    {/* The allowance the plan's line carries each month, from the catalog's `included`. */}
+                    {plan.included ? (
+                      <p className="fine plan-included">
+                        Each month: {grouped(plan.included.pcu)} PCU · {grouped(plan.included.kqu)} KQU · {grouped(plan.included.storageGb)} GB · {grouped(plan.included.seats)} {plan.included.seats === 1 ? "seat" : "seats"}
+                      </p>
+                    ) : null}
+                    <ul>{(plan.kind === "evaluation" && !selfService ? EVALUATION_GATED_FEATURES : plan.features).map((feature) => (
                       <li key={feature}>{!ownFilesOpen && feature === "Compile your own worlds" ? "Own-source compilation requires an approved pilot" : feature}</li>
                     ))}</ul>
-                    {/* The single-member limit is on the card; detailed exclusions remain available on demand. */}
+                    {/* The plan's allowance is on the card; detailed exclusions remain available on demand. */}
                     {plan.notYetSold.length > 0 ? (
                       <details className="status-fold">
                         <summary>Plan limits</summary>
@@ -1073,7 +1136,7 @@ export default function PricingPageClient({
                     discovered one redirect at a time.
                   */}
                   <a
-                    className={plan.offerCode === "observer_access" ? "btn" : "btn ghost"}
+                    className={plan.code === "personal" ? "btn" : "btn ghost"}
                     href={planHref(plan)}
                     aria-disabled={billingBusy !== null && billingBusy === plan.offerCode ? true : undefined}
                     onClick={(event) => {
@@ -1090,11 +1153,11 @@ export default function PricingPageClient({
                   >
                     {ownerBillingExempt && plan.offerCode
                       ? "Open your workspace"
-                      : plan.name === "Evaluation"
+                      : plan.kind === "evaluation"
                       ? selfService ? SELF_SERVE_CTA.label : EXPLORE_CTA.label
-                      : !plan.offerCode
-                        ? plan.name === "Enterprise" ? "Scope an Enterprise pilot" : `Talk to us about ${plan.name}`
-                        : !liveCheckout
+                      : plan.kind === "enterprise"
+                        ? "Scope an Enterprise pilot"
+                        : !plan.offerCode || !liveCheckout
                           ? `Request ${plan.name} access`
                           : billingBusy === plan.offerCode
                             ? "Opening checkout…"
@@ -1102,11 +1165,11 @@ export default function PricingPageClient({
                             // catalog price. The path under the button still says sign-in comes first.
                             : `Buy ${plan.name} — $${BILLING_OFFERS[plan.offerCode].priceUsd}/month`}
                   </a>
-                  {plan.name === "Evaluation" && !selfService ? (
+                  {plan.kind === "evaluation" && !selfService ? (
                     <Link className="fine pricing-secondary-link" href="/contact">Discuss your sources</Link>
                   ) : null}
                   <p className="fine">{planPath(plan, { liveCheckout, selfService })}</p>
-                  {offerForPlan(plan.name) ? (
+                  {plan.code ? (
                     /*
                       Journey A9 (D-08). Both regions are in the card before any sentence arrives -- a
                       region that mounts together with its text is often not read at all -- and a
@@ -1114,7 +1177,7 @@ export default function PricingPageClient({
                     */
                     (["status", "alert"] as const).map((region) => (
                       <div key={region} role={region}>
-                        {notice?.tone === region && noticeOffer === offerForPlan(plan.name) ? (
+                        {notice?.tone === region && noticeOffer === plan.code ? (
                           <p className="notice static pricing-buy-notice">
                             {notice.text}
                             {noticeLink(notice, plan.name) ? <> <Link href={noticeLink(notice, plan.name)!.href as Route}>{noticeLink(notice, plan.name)!.label}</Link></> : null}
@@ -1169,25 +1232,25 @@ export default function PricingPageClient({
               ))}
             </div>
             {/*
-              G2-007. The three rows on which the two paid plans differ, before the table on which
-              they do not. A comparison whose every cell reads ✓ / ✓ answers the wrong question.
+              G2-007. The rows on which the paid plans differ, before the table on which they do not.
+              A comparison whose every cell reads ✓ answers the wrong question.
             */}
-            <h3 id="plan-differences-title">What the step between the two plans buys</h3>
+            <h3 id="plan-differences-title">What changes from plan to plan</h3>
             <div className="table-scroll">
             <table className={`docs-table ${tableStyles.rowHeader}`} aria-labelledby="plan-differences-title">
               <thead>
                 <tr>
                   <th scope="col">&nbsp;</th>
-                  <th scope="col">{BILLING_OFFERS.observer_access.label}</th>
-                  <th scope="col">{BILLING_OFFERS.studio_access.label}</th>
+                  {CURRENT_CODES.map((code) => <th scope="col" key={code}>{BILLING_OFFERS[code].label}</th>)}
                 </tr>
               </thead>
               <tbody>
-                {planDifferences(liveCheckout).map(([label, developer, team]) => (
+                {planDifferences(availability, liveCheckout).map(([label, ...cells]) => (
                   <tr key={label}>
                     <th scope="row">{label}</th>
-                    <td data-label={BILLING_OFFERS.observer_access.label}>{developer}</td>
-                    <td data-label={BILLING_OFFERS.studio_access.label}>{team}</td>
+                    {cells.map((cell, index) => (
+                      <td key={CURRENT_CODES[index]} data-label={BILLING_OFFERS[CURRENT_CODES[index]!].label}>{cell}</td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -1195,7 +1258,7 @@ export default function PricingPageClient({
             </div>
             <p className="fine">
               Those are the plan differences. Once your source-processing access is approved,
-              both plans include compiling, evidence, Ask, signed export, API and MCP access,
+              every plan includes compiling, evidence, Ask, signed export, API and MCP access,
               reviewing a candidate, activating a World and rolling one back, under the same
               limits below. The
               capability table compares those plan entitlements. It does not open a closed
@@ -1328,35 +1391,35 @@ export default function PricingPageClient({
               sold yet. It is not billed, not enabled by buying the plan, and not a date. A row
               marked Not sold is not part of that plan at all. Only a capability the plan&apos;s
               authorization check admits carries a tick. Every row is answered for the workspace owner, the role a
-              buyer of either plan holds in their own workspace. {selfService
-                ? `The free evaluation reaches ${BILLING_OFFERS.observer_access.label} capabilities inside its file and page limits, including activating its one World and asking it questions. A second World, rollback, API keys and MCP need a paid plan, which is why it has no column here.`
+              buyer of any plan holds in their own workspace. {selfService
+                ? `The free evaluation reaches ${PERSONAL.label} capabilities inside its file and page limits, including activating its one World and asking it questions. A second World, rollback, API keys and MCP need a paid plan, which is why it has no column here.`
                 : "An evaluation of your own sources is arranged with us while self-service intake is closed."}
               {" "}An Enterprise scope is agreed in the conversation rather than compared against
-              these two. Nothing an Ask answer returns is invented for it: every answer names the
+              these plans. Nothing an Ask answer returns is invented for it: every answer names the
               retrieval path it took, and{" "}
               <Link href={"/docs/ask" as Route}>the Ask reference</Link> states which paths exist
               and what each one reads.
             </p>
             {/*
-              Audit P03. Four volumes, derived from the catalog's included pages, priced with the
-              two constants the reservation code charges against. No figure below is typed.
+              Audit P03. Five volumes, derived from the catalog's included pages and read through the
+              same `monthlyTotalUsd` the estimator uses. No figure below is typed.
             */}
-            <h3 id="pricing-scenarios-title">What four volumes cost</h3>
+            <h3 id="pricing-scenarios-title">What these volumes cost</h3>
             <div className="table-scroll">
             <table className={`docs-table ${tableStyles.rowHeader}`} aria-labelledby="pricing-scenarios-title">
               <thead>
                 <tr>
                   <th scope="col">Pages read in a month</th>
-                  <th scope="col">{BILLING_OFFERS.observer_access.label}</th>
-                  <th scope="col">{BILLING_OFFERS.studio_access.label}</th>
+                  {CURRENT_CODES.map((code) => <th scope="col" key={code}>{BILLING_OFFERS[code].label}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {SCENARIOS.map((scenario) => (
                   <tr key={scenario.pages}>
-                    <th scope="row">{scenario.pages.toLocaleString("en-US")}</th>
-                    <td data-label={BILLING_OFFERS.observer_access.label}>{totalOrArranged(scenario.developer)}</td>
-                    <td data-label={BILLING_OFFERS.studio_access.label}>{totalOrArranged(scenario.team)}</td>
+                    <th scope="row">{grouped(scenario.pages)}</th>
+                    {scenario.totals.map((total, index) => (
+                      <td key={CURRENT_CODES[index]} data-label={BILLING_OFFERS[CURRENT_CODES[index]!].label}>{totalOrArranged(total)}</td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -1367,6 +1430,42 @@ export default function PricingPageClient({
               past them is arranged with us. A page is counted when a source is admitted for
               reading, so re-asking, searching and recompiling sources already read do not appear
               in this table. Every figure is in US dollars, excluding tax.
+            </p>
+            {/*
+              CAT-D3. The V22 meter rates, read from `METER_RATES_USD`, with the one action every paid line
+              has today: Request access. Plans stop at their monthly allowance, so nothing here is a buy
+              control. Automation runs, curated Worlds and the marketplace fee are not products and have no row.
+            */}
+            <h3 id="pricing-overage-title">Capacity past an allowance</h3>
+            <div className="table-scroll">
+            <table className={`docs-table ${tableStyles.rowHeader}`} aria-labelledby="pricing-overage-title">
+              <thead>
+                <tr>
+                  <th scope="col">Meter</th>
+                  <th scope="col">Rate, USD</th>
+                  <th scope="col">How to get it</th>
+                </tr>
+              </thead>
+              <tbody>
+                {([
+                  ["PCU", `${rate(METER_RATES_USD.pcu)} / unit`],
+                  ["KQU", `${rate(METER_RATES_USD.kqu)} / unit`],
+                  ["Storage", `${rate(METER_RATES_USD.storageGbMonth)} / GB-month`],
+                  ["Extra seat", `${rate(METER_RATES_USD.seatMonth)} / seat-month`],
+                ] as const).map(([meter, price]) => (
+                  <tr key={meter}>
+                    <th scope="row">{meter}</th>
+                    <td data-label="Rate, USD">{price}</td>
+                    <td data-label="How to get it">
+                      <Link href={`/contact?plan=${encodeURIComponent(meter)}` as Route}>{ACCESS_CTA.label}</Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            </div>
+            <p className="fine">
+              Plans stop at their monthly allowance. Capacity past an allowance is arranged with us.
             </p>
             </section>
             </details>
@@ -1424,10 +1523,11 @@ export default function PricingPageClient({
                 ))}
               </dl>
               <dl>
-                <div><dt>{BILLING_OFFERS.observer_access.label} total, USD</dt><dd>{totalOrArranged(estimate.developerTotalUsd)}</dd></div>
-                <div><dt>{BILLING_OFFERS.studio_access.label} total, USD</dt><dd>{totalOrArranged(estimate.teamTotalUsd)}</dd></div>
+                {CURRENT_CODES.map((code) => (
+                  <div key={code}><dt>{BILLING_OFFERS[code].label} total, USD</dt><dd>{totalOrArranged(estimate.totalsUsd[code] ?? null)}</dd></div>
+                ))}
                 <div>
-                  <dt>Pages beyond {BILLING_OFFERS.observer_access.label}</dt>
+                  <dt>Pages beyond {PERSONAL.label}</dt>
                   <dd>{estimate.extraPages.toLocaleString("en-US")}{estimate.extraPages > 0 ? `, ${ADDITIONAL_VOLUME.toLowerCase()}` : ""}</dd>
                 </div>
               </dl>

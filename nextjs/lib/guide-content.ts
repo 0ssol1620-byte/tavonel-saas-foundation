@@ -153,8 +153,10 @@ export const GUIDE_UI: Record<GuideLanguage, {
   },
 };
 
-const developer = BILLING_OFFERS.observer_access.label;
-const team = BILLING_OFFERS.studio_access.label;
+// Plan names are the current offers' labels (catalog v2). A retired offer's label is shown to its holder only, never in guide content.
+const entry = BILLING_OFFERS.personal.label;
+const paidPlans = (["personal", "developer", "team", "business"] as const).map((code) => BILLING_OFFERS[code].label);
+const planList = `${paidPlans.slice(0, -1).join(", ")} and ${paidPlans.at(-1)}`;
 // D-12 (delegated decision 2026-11-09): intake is the workspace's, no longer arranged with us.
 // Both are live sentences: `activationPolicy.customerIntake.reason` and the /ko/pricing Developer card.
 const intakeEn = "Uploading your own sources opens for a workspace once its owner accepts the processing terms, and your workspace shows whether it is open.";
@@ -437,11 +439,11 @@ const EN: GuideChapter[] = [
         kind: "steps",
         items: [
           "It first shows how that run meets the compile ceilings, row by row.",
-          `Then it shows the ${developer} and ${team} totals and the pages beyond ${developer}, which are arranged with us.`,
+          `Then it shows the monthly total for ${planList} and the pages beyond ${entry}, which are arranged with us.`,
         ],
       },
       { kind: "prose", text: "“All figures in US dollars, excluding tax.”" },
-      { kind: "note", text: `${developer} can be bought on /pricing once your workspace is open. ${team} and Enterprise start with a conversation on /contact.` },
+      { kind: "note", text: `Every paid plan is on /pricing with the way to get it. Enterprise starts with a conversation on /contact.` },
     ],
     links: [
       { href: "/pricing#usage-estimator-title", label: "What will this run cost?" },
@@ -761,11 +763,11 @@ const KO: GuideChapter[] = [
         kind: "steps",
         items: [
           "먼저 그 실행이 컴파일 한도를 어떻게 만나는지 행별로 보여 줍니다.",
-          `이어서 ${developer}와 ${team}의 합계와 ${developer}를 넘는 페이지를 보여 줍니다. 넘는 분량은 저희와 상담해 정합니다.`,
+          `이어서 ${planList}의 월 합계와 ${entry}를 넘는 페이지를 보여 줍니다. 넘는 분량은 저희와 상담해 정합니다.`,
         ],
       },
       { kind: "prose", text: "“All figures in US dollars, excluding tax.” 모든 금액은 미국 달러이며 세금은 포함하지 않습니다." },
-      { kind: "note", text: `${developer}는 워크스페이스가 열리면 /pricing에서 구매할 수 있고, ${team}과 Enterprise는 /contact에서 상담으로 시작합니다.` },
+      { kind: "note", text: `모든 유료 요금제는 /pricing에서 이용 방법과 함께 안내하고, Enterprise는 /contact에서 상담으로 시작합니다.` },
     ],
     links: [
       { href: "/pricing#usage-estimator-title", label: "What will this run cost?" },

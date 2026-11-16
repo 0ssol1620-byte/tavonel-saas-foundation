@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getFoundationAccountGrant } from "@/lib/account-grants";
 import { createCheckoutBinding } from "@/lib/billing-binding";
 import { billingSecret } from "@/lib/billing-secrets";
-import { isBillingOfferCode, readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
+import { BILLING_OFFERS, isBillingOfferCode, readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
 import { getFoundationBillingAccount, issueFoundationCheckoutIntent } from "@/lib/billing-store";
 import { quoteCheckout } from "@/lib/checkout-quote";
 import { readCommercialState } from "@/lib/commercial-state";
@@ -42,16 +42,18 @@ export async function POST(request: Request) {
   if (!isBillingOfferCode(body.offerCode)) {
     return NextResponse.json({ code: "BILLING_OFFER_INVALID" }, { status: 400, headers: NO_STORE });
   }
+  // The offer policy runs first: a plan that is not sold online answers 403 whether or not its price env
+  // is set, so an unset v2 price is the same refusal as an undelivered one, never 503 BILLING_NOT_CONFIGURED.
+  const offerPolicy = decideOfferCheckoutPolicy({ code: body.offerCode, saleChannel: BILLING_OFFERS[body.offerCode].saleChannel });
+  if (!offerPolicy.allowed) {
+    return NextResponse.json({ code: offerPolicy.code }, { status: 403, headers: NO_STORE });
+  }
   const paddle = readPaddleBrowserConfig();
   const offer = readConfiguredBillingOffers().get(body.offerCode);
   // The one reader: a value with surrounding whitespace is refused, never trimmed (lib/billing-secrets.ts).
   const secret = billingSecret("FOUNDATION_BILLING_HMAC");
   if (!paddle || !offer || !secret) {
     return NextResponse.json({ code: "BILLING_NOT_CONFIGURED" }, { status: 503, headers: NO_STORE });
-  }
-  const offerPolicy = decideOfferCheckoutPolicy(offer);
-  if (!offerPolicy.allowed) {
-    return NextResponse.json({ code: offerPolicy.code }, { status: 403, headers: NO_STORE });
   }
   const commercial = readCommercialState();
   const checkoutPolicy = decideCheckoutPolicy(

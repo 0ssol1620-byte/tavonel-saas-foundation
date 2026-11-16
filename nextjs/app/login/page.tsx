@@ -29,11 +29,20 @@ import {
   takeRecipeIntent,
   type RecipeIntent,
 } from "@/lib/recipe-intent";
-import type { BillingOfferCode } from "@/lib/billing-catalog";
+import { BILLING_OFFERS, type BillingOfferCode, type PlanAvailability } from "@/lib/billing-catalog";
 import { EXPLORE_CTA } from "@/lib/site-navigation";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
 
 type AuthState = "checking" | "ready" | "unconfigured";
+
+/*
+  Catalog v2. This page runs in the browser and holds no price environment, so it cannot read the
+  server's per-plan availability (`planAvailability`). It does not guess: a plan is described as
+  requested, never promised a checkout, and a retired code in the address names no plan (its label
+  belongs to its holder). `checkoutSellable` and the notice both read this one answer.
+*/
+const loginAvailability = (offer: BillingOfferCode): PlanAvailability =>
+  BILLING_OFFERS[offer].status === "retired" ? "retired" : "request_access";
 
 export default function LoginPage() {
   const [authState, setAuthState] = useState<AuthState>("checking");
@@ -199,7 +208,7 @@ export default function LoginPage() {
             that is true in every state.
           */}
           <h1>
-            {intent && checkoutSellable(intent, purchaseOpen) ? "One step before checkout."
+            {intent && checkoutSellable(loginAvailability(intent), purchaseOpen) ? "One step before checkout."
               : signedIn && recipe ? "Continue your recipe."
               : recipe ? "One step before you run this."
                 : "Sign in to TAVONEL."}
@@ -222,7 +231,7 @@ export default function LoginPage() {
             />
           ) : <>
           {intent ? (
-            <CheckoutIntentNotice offer={intent} purchaseOpen={purchaseOpen} />
+            <CheckoutIntentNotice offer={intent} purchaseOpen={purchaseOpen} availability={loginAvailability(intent)} />
           ) : recipe ? (
             <>
               {/*

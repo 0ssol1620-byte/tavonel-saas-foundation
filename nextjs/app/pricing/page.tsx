@@ -5,7 +5,7 @@ import PricingPageClient, {
 } from "@/components/pricing-page-client";
 import type { Metadata } from "next";
 import { activationPolicy } from "@/lib/activation-policy";
-import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
+import { BILLING_OFFERS, planAvailability, readConfiguredBillingOffers, type BillingOfferCode } from "@/lib/billing-catalog";
 import { billingProductDecision, type ProductAccessLevel, type ProductAccessRole } from "@/lib/billing-product-access";
 import type { FoundationBillingAccount } from "@/lib/billing-store";
 import { readPublicStatusV2 } from "@/lib/public-status";
@@ -84,11 +84,13 @@ const CAPABILITIES: ReadonlyArray<{ capability: string; route: string; level: Pr
   { capability: "Roll back the active World to an earlier revision", route: "app/api/collections/[id]/world/rollback/route.ts", level: "activation" },
 ];
 
+/** The entitlement function answers for the access level a plan carries; catalog v2 plans share the two levels the gates know. */
 function account(plan: BillingOfferCode): FoundationBillingAccount {
-  return { accessPlan: plan, subscriptionStatus: "active", billingHold: false } as FoundationBillingAccount;
+  return { accessPlan: BILLING_OFFERS[plan].accessLevel, subscriptionStatus: "active", billingHold: false } as FoundationBillingAccount;
 }
 
-const PLAN_CODES = Object.keys(BILLING_OFFERS) as BillingOfferCode[];
+/** The plans a visitor can choose. A retired offer stays in the catalog for its holders and is never rendered here. */
+const PLAN_CODES = (Object.keys(BILLING_OFFERS) as BillingOfferCode[]).filter((code) => BILLING_OFFERS[code].status !== "retired");
 
 const ENTITLEMENT_ROWS: PlanCapabilityRow[] = CAPABILITIES.map((row) => ({
   capability: row.capability,
@@ -152,8 +154,17 @@ const PLAN_CAPABILITIES: PlanCapabilityRow[] = [...ENTITLEMENT_ROWS, ...UNSOLD_R
 */
 export default function PricingPage() {
   const status = readPublicStatusV2();
+  /*
+    Catalog v2. Whether a plan is bought here or requested is decided once, on the server, from what the
+    product delivers and which price ids this deployment holds (`planAvailability`). The client receives
+    the answer as data and reads no environment of its own, so the markup it hydrates is the markup that
+    was sent, whatever a browser could or could not see.
+  */
+  const configured = readConfiguredBillingOffers();
+  const availability = Object.fromEntries(PLAN_CODES.map((code) => [code, planAvailability(code, configured)]));
   return (
     <PricingPageClient
+      availability={availability}
       initialLiveCheckout={status.availableActions.purchasePlan.enabled}
       initialSelfService={status.availableActions.createAccount.enabled}
       header={<SiteHeader />}

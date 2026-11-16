@@ -159,7 +159,9 @@ describe("JSON-LD emitted anywhere in the tree", () => {
       expect(emitsSchema(source, "Offer"), "only the page with the catalogue may describe an offer").toBe(false);
       return;
     }
-    expect(source, "the offers are the catalog's rows").toContain("Object.values(BILLING_OFFERS)");
+    expect(source, "the offers are the catalog's rows").toContain("Object.entries(BILLING_OFFERS)");
+    expect(source, "and only a plan the server computed as purchasable is described as one").toContain('availabilityOf(availability, code) === "purchasable"');
+    expect(source, "an offer is never advertised as limited availability: a plan that is requested has no Offer at all").not.toContain("LimitedAvailability");
     expect(source, "and their prices are the catalog's numbers").toContain("price: offer.priceUsd");
     expect(source, "no price is typed into the markup for a crawler").not.toMatch(/price:\s*\d/);
     expect(source, "the currency is stated, because an unlabelled price is a guess").toContain('priceCurrency: "USD"');

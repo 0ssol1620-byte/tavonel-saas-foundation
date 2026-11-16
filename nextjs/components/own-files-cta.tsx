@@ -16,11 +16,11 @@ import { SELF_SERVE_CTA, START_FREE_LABEL, TRIAL_ALLOWANCE } from "@/lib/site-na
 */
 export function ownFilesCopy(start: { href: string; label: string }) {
   const live = start.href === SELF_SERVE_CTA.href;
-  const developer = BILLING_OFFERS.observer_access;
+  const entry = BILLING_OFFERS.personal;
   return {
     heading: "Run this on your own files",
     note: live
-      ? `Free for ${TRIAL_ALLOWANCE.days} days with up to ${TRIAL_ALLOWANCE.files} files and ${TRIAL_ALLOWANCE.pages} standard pages, no card. ${developer.label} is $${developer.priceUsd}/month for ${developer.includedPages.toLocaleString("en-US")} standard pages.`
+      ? `Free for ${TRIAL_ALLOWANCE.days} days with up to ${TRIAL_ALLOWANCE.files} files and ${TRIAL_ALLOWANCE.pages} standard pages, no card. ${entry.label} is $${entry.priceUsd}/month for ${entry.includedPages.toLocaleString("en-US")} standard pages.`
       : "Tell us about your sources and we will scope an evaluation with you.",
     primary: { href: start.href, label: live ? START_FREE_LABEL : start.label },
     // The access request already goes to /contact, so a second link there would be the same action twice.

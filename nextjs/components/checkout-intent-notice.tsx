@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { BILLING_OFFERS, REFUND_WINDOW_DAYS, refundablePageAllowance, type BillingOfferCode } from "@/lib/billing-catalog";
+import { BILLING_OFFERS, REFUND_WINDOW_DAYS, refundablePageAllowance, type BillingOfferCode, type PlanAvailability } from "@/lib/billing-catalog";
+import { ACCESS_CTA } from "@/lib/site-navigation";
 import { checkoutSellable } from "@/lib/checkout-intent";
 
 /**
@@ -14,9 +15,12 @@ import { checkoutSellable } from "@/lib/checkout-intent";
  *   false  the plan is not sold online, and the same contact path `/pricing` offers for it
  *   null   the deployment has not answered yet, so nothing is promised either way
  *
- * B-07: "true" is per offer, not per deployment. An offer whose saleChannel is "contact" (Team) is
- * never promised a checkout, because the checkout it would open refuses it; it gets the closed
- * sentence and the same contact path. The decision is `checkoutSellable`, which the H1 reads too.
+ * B-07: "true" is per offer, not per deployment. Catalog v2: the offer's availability is the server's
+ * answer (`planAvailability`), passed in, because this component runs in the browser and holds no price
+ * environment. A plan that is requested, not bought, is never promised a checkout, because the checkout
+ * it would open refuses it; it gets the closed sentence and the same contact path. A retired offer's
+ * label belongs to its holder, so a retired code in the address gets a sentence that names no plan.
+ * The decision is `checkoutSellable`, which the H1 reads too.
  *
  * Its own module because a Next.js page may not export a component, and the sentence is what the
  * CTA truth table (`lib/cta-truth.test.ts`) renders in each commercial state.
@@ -24,14 +28,24 @@ import { checkoutSellable } from "@/lib/checkout-intent";
 export default function CheckoutIntentNotice({
   offer,
   purchaseOpen,
+  availability,
 }: {
   offer: BillingOfferCode;
   purchaseOpen: boolean | null;
+  availability: PlanAvailability;
 }) {
   const plan = BILLING_OFFERS[offer].label;
   const terms = BILLING_OFFERS[offer];
-  const sellable = checkoutSellable(offer, purchaseOpen);
+  const sellable = checkoutSellable(availability, purchaseOpen);
   if (sellable === null) return null;
+  if (availability === "retired") {
+    return (
+      <p className="notice static" role="status">
+        <strong>That plan is not sold online.</strong> Nothing is charged by signing in.{" "}
+        <Link href={ACCESS_CTA.href as Route}>{ACCESS_CTA.label}</Link>
+      </p>
+    );
+  }
   if (sellable) {
     return (
       <p className="notice static" role="status">

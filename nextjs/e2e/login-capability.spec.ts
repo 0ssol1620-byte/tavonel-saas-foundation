@@ -88,28 +88,31 @@ test("never shows PRIVATE PILOT on a live deployment, not even for a frame", asy
   only where `purchasePlan` is open. The unit table (`lib/cta-truth.test.ts`) renders the notice
   itself; these three drive the page, which is where the status answer and its failure are read.
 */
-const INTENT_URL = "/login?next=checkout&offer=observer_access";
+const INTENT_URL = "/login?next=checkout&offer=personal";
 
 test("a plan intent is not promised a checkout while no plan can be bought", async ({ page }) => {
   await page.route("**/api/status/v2", route => route.fulfill({ json: statusV2({ createAccount: true }) }));
   await page.goto(INTENT_URL);
-  await expect(page.getByText("Starter is not sold online today.")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Request Starter access" })).toHaveAttribute("href", "/contact?plan=Starter");
+  await expect(page.getByText("Personal is not sold online today.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Request Personal access" })).toHaveAttribute("href", "/contact?plan=Personal");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in to TAVONEL.");
   await expect(page.getByText("Checkout opens by itself", { exact: false })).toHaveCount(0);
 });
 
-test("a plan intent keeps main's checkout promise where a plan can be bought", async ({ page }) => {
+/*
+  Catalog v2: sign-in runs in the browser and cannot compute `planAvailability` (it reads no price environment), so it never
+  promises a checkout for a plan: the sale state is /pricing's, computed on the server. Even where `purchasePlan` is open,
+  a plan intent is told it is requested, and the checkout sentence appears nowhere.
+*/
+test("a plan intent is not promised a checkout even where purchase is open", async ({ page }) => {
   await page.route("**/api/status/v2", route => route.fulfill({
     json: statusV2({ createAccount: true, compileCustomerDocuments: true, purchasePlan: true }),
   }));
   await page.goto(INTENT_URL);
-  await expect(page.getByText("Starter is held for you.")).toBeVisible();
-  // Conversion pass 2026-11-09: the notice carries the deal, and names the step between sign-in and checkout.
-  await expect(page.getByText("$29/month for 500 standard pages", { exact: false })).toBeVisible();
-  await expect(page.getByText("Sign in and accept the processing terms, and checkout opens by itself.", { exact: false })).toBeVisible();
-  await expect(page.getByText("signed webhook", { exact: false })).toHaveCount(0);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("One step before checkout.");
+  await expect(page.getByText("Personal is not sold online today.")).toBeVisible();
+  await expect(page.getByText("is held for you.", { exact: false })).toHaveCount(0);
+  await expect(page.getByText("Checkout opens by itself", { exact: false })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in to TAVONEL.");
 });
 
 test("a plan intent fails closed when the deployment cannot be asked", async ({ page }) => {
@@ -122,16 +125,19 @@ test("a plan intent fails closed when the deployment cannot be asked", async ({ 
   await expect(page.getByText("not sold online today", { exact: false })).toHaveCount(0);
 });
 
-test("a Pro intent is not promised a checkout even where a plan can be bought", async ({ page }) => {
-  // B-07 / CLM-023: Pro's saleChannel is "contact" (CAT-D4); checkout answers 403 BILLING_OFFER_CONTACT_REQUIRED.
+test("a retired plan's code in the address names no plan and offers the contact path", async ({ page }) => {
+  // The 2026-09 plans are never sold again and their labels belong to their holders, not to a public page.
   await page.route("**/api/status/v2", route => route.fulfill({
     json: statusV2({ createAccount: true, compileCustomerDocuments: true, purchasePlan: true }),
   }));
-  await page.goto("/login?next=checkout&offer=studio_access");
-  await expect(page.getByText("Pro is not sold online today.")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Request Pro access" })).toHaveAttribute("href", "/contact?plan=Pro");
-  await expect(page.getByText("Checkout opens by itself", { exact: false })).toHaveCount(0);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in to TAVONEL.");
+  for (const code of ["observer_access", "studio_access"]) {
+    await page.goto(`/login?next=checkout&offer=${code}`);
+    await expect(page.getByText("That plan is not sold online.")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Request access" })).toHaveAttribute("href", "/contact");
+    await expect(page.getByText("2026-09 plan", { exact: false })).toHaveCount(0);
+    await expect(page.getByText("Checkout opens by itself", { exact: false })).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in to TAVONEL.");
+  }
 });
 
 /*
@@ -175,13 +181,16 @@ test("closed intake offers a working public evaluation and an Enterprise convers
 
   const enterprise = page.locator("article.plan").filter({ has: page.getByRole("heading", { name: "Enterprise" }) });
   await expect(enterprise.getByRole("link", { name: "Scope an Enterprise pilot" })).toHaveAttribute("href", "/contact?plan=Enterprise");
-  // Starter/Pro rename (2026-11-10, founder, intended): Pro is told apart by what it delivers, with no single-member line. Its not-yet-sold items stay folded under Plan limits.
-  const pro = page.locator("article.plan").filter({ has: page.getByRole("heading", { name: "Pro" }) });
-  await expect(pro.getByText("Review queue and version history", { exact: true })).toBeVisible();
-  await expect(pro).not.toContainText(/single-member|seats|guided corpus onboarding/i);
-  await expect(pro.getByText("Shared members and roles")).not.toBeVisible();
-  await pro.getByText("Plan limits").click();
-  await expect(pro.getByText("Shared members and roles")).toBeVisible();
+  // Catalog v2: Team is told apart by what it delivers, and what is not sold yet stays folded under Plan limits.
+  const team = page.locator("article.plan").filter({ has: page.getByRole("heading", { name: "Team", exact: true }) });
+  await expect(team.getByText("Review queue and version history", { exact: true })).toBeVisible();
+  await expect(team).not.toContainText(/single-member|guided corpus onboarding/i);
+  await expect(team.getByText("Per-member source permissions")).not.toBeVisible();
+  await team.getByText("Plan limits").click();
+  await expect(team.getByText("Per-member source permissions")).toBeVisible();
+  // A retired plan's label is on no public card.
+  await expect(page.getByRole("heading", { name: /2026-09 plan/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /^Buy / })).toHaveCount(0);
   const quote = page.locator("#enterprise-pricing");
   await expect(quote.getByRole("link", { name: "Scope an Enterprise pilot" })).toBeVisible();
   await expect(quote.getByRole("heading", { name: "What moves the quote" })).not.toBeVisible();
