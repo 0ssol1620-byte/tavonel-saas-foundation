@@ -74,15 +74,22 @@ const post = (fields: Record<string, string>) => token(new Request(`${ORIGIN}/ap
 type Out = { access_token?: string; refresh_token?: string; scope?: string; error?: string; code?: string };
 const json = async (response: Response) => await response.json() as Out;
 
-async function client() {
+async function client(name = "Host agent") {
   const response = await register(new Request(`${ORIGIN}/api/mcp/oauth/register`, {
     method: "POST",
-    body: JSON.stringify({ client_name: "Host agent", redirect_uris: [REDIRECT], token_endpoint_auth_method: "none" }),
+    body: JSON.stringify({ client_name: name, redirect_uris: [REDIRECT], token_endpoint_auth_method: "none" }),
   }));
   return (await response.json() as { client_id: string }).client_id;
 }
 
 async function connect(clientId: string, scope?: string) {
+  return json(await redeem(clientId, await authorizeCode(clientId, scope)));
+}
+
+const redeem = (clientId: string, code: string) =>
+  post({ grant_type: "authorization_code", client_id: clientId, code, code_verifier: VERIFIER, redirect_uri: REDIRECT });
+
+async function authorizeCode(clientId: string, scope?: string) {
   mocks.session.mockResolvedValueOnce({ ok: true, principal: { kind: "session", workspaceKey: MINE, userId: USER, scopes: [], accessSource: "paid", authorizationRevision: 4, workspaceRole: "owner" } });
   const request: Record<string, string> = {
     response_type: "code", client_id: clientId, redirect_uri: REDIRECT, code_challenge: CHALLENGE,
@@ -91,8 +98,7 @@ async function connect(clientId: string, scope?: string) {
   const granted = await (await authorizeRoute(new Request(`${ORIGIN}/api/mcp/oauth/authorize`, {
     method: "POST", headers: { authorization: "Bearer session" }, body: JSON.stringify({ decision: "approve", request }),
   }))).json() as { redirectTo: string };
-  const code = new URL(granted.redirectTo).searchParams.get("code")!;
-  return json(await post({ grant_type: "authorization_code", client_id: clientId, code, code_verifier: VERIFIER, redirect_uri: REDIRECT }));
+  return new URL(granted.redirectTo).searchParams.get("code")!;
 }
 
 const refresh = (clientId: string, refreshToken: string, extra: Record<string, string> = {}) =>
@@ -212,9 +218,38 @@ describe("refresh flag on", () => {
     const narrow = await connect(id, "ask:read");
     expect(narrow.scope).toBe("ask:read");
     expect(rows[0].revokedAt).not.toBeNull();
+    const narrowRow = rows.at(-1)!;
     expect((await json(await refresh(id, wide.refresh_token!))).error).toBe("invalid_grant");
-    // The stale token is reuse of a revoked key, so the client's remaining key ends too (never a wider one).
+    // The stale token is reuse inside its own, already ended family; the newer narrow consent is another family and stays.
     expect(live().filter((row) => row.scopes.length > 1)).toEqual([]);
+    expect(narrowRow.revokedAt).toBeNull();
+    expect((await json(await refresh(id, narrow.refresh_token!))).scope).toBe("ask:read");
+  });
+
+  it("a second redemption of a code ends every unrevoked key of the family it started, not only the newest", async () => {
+    const id = await client();
+    const code = await authorizeCode(id);
+    const first = await json(await redeem(id, code));
+    // The rotation's revoke of key-1 fails, so key-1 and key-2 are both unrevoked members of the code's family.
+    mocks.revokeKey.mockImplementationOnce(async () => ({ ok: false, code: "DEVELOPER_STORE_WRITE_FAILED" }));
+    expect((await json(await refresh(id, first.refresh_token!))).access_token).toBeTruthy();
+    expect(live().map((row) => row.keyId)).toEqual(["key-1", "key-2"]);
+    expect((await json(await redeem(id, code))).error).toBe("invalid_grant");
+    expect(live()).toEqual([]);
+  });
+
+  it("a client name carrying another client's tag never puts its keys in that client's supersede or reuse", async () => {
+    const a = await client();
+    const look = await client(`Look-alike ~${createHash("sha256").update(a).digest("hex").slice(0, 12)} #x`);
+    const firstA = await connect(a);
+    await connect(look);
+    const rotated = await json(await refresh(a, firstA.refresh_token!));
+    expect(rotated.access_token).toBeTruthy();
+    expect(live().map((row) => row.keyId)).toEqual(["key-2", "key-3"]);
+    expect((await json(await refresh(a, firstA.refresh_token!))).error).toBe("invalid_grant");
+    expect(live().map((row) => row.keyId)).toEqual(["key-2"]);
+    await connect(a);
+    expect(live().map((row) => row.keyId)).toEqual(["key-2", "key-4"]);
   });
 
   it("a key the member does not have is invalid_grant", async () => {
@@ -332,6 +367,9 @@ describe("refresh flag on, against the real reads (PostgREST stand-in)", () => {
   const HOUR = 3600 * 1000;
   const REFRESH_TTL_MS = 30 * 24 * HOUR;
   const tagOf = (clientId: string) => ` ~${createHash("sha256").update(clientId).digest("hex").slice(0, 12)} `;
+  // A key's client is the tag just before its trailing ` #<code id>`; the client name before it is self-asserted.
+  const ofClient = (row: Row, clientId: string) => row.name.slice(0, row.name.lastIndexOf(" #") + 1).endsWith(tagOf(clientId));
+  const familyOf = (row: Row) => row.name.slice(row.name.lastIndexOf(" #"));
 
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -358,10 +396,13 @@ describe("refresh flag on, against the real reads (PostgREST stand-in)", () => {
     let tokenB = (await connect(b)).refresh_token!;
     for (let i = 0; i < 205; i += 1) tokenB = (await json(await refresh(b, tokenB))).refresh_token!;
     const narrowA = await connect(a, "ask:read");
+    const narrowRow = rows.at(-1)!;
     expect(narrowA.scope).toBe("ask:read");
     expect(rows[0].revokedAt).not.toBeNull();
     expect((await json(await refresh(a, wideA.refresh_token!))).error).toBe("invalid_grant");
-    expect(live().filter((row) => row.name.includes(tagOf(a)) && row.scopes.length > 1)).toEqual([]);
+    expect(live().filter((row) => ofClient(row, a) && row.scopes.length > 1)).toEqual([]);
+    expect(narrowRow.revokedAt).toBeNull();
+    expect(live().filter((row) => ofClient(row, a)).map((row) => row.keyId)).toEqual([narrowRow.keyId]);
   });
 
   it("reuse behind 200+ newer rows of another client still ends this client's live key", async () => {
@@ -403,18 +444,26 @@ describe("refresh flag on, against the real reads (PostgREST stand-in)", () => {
     Property: across random interleavings of consents (wide or narrow), refresh bursts, stale-token
     reuse, Developers revokes and clock jumps, (1) a refresh token that is not the newest one a client
     was issued never mints, (2) a client never holds more than one unrevoked key minted within the
-    refresh TTL, and (3) such a key never carries a scope the client's latest consent did not grant.
-    Seeded, so a failure replays.
+    refresh TTL, (3) such a key never carries a scope the client's latest consent did not grant, and
+    (4) a stale token ends only its own family: every other unrevoked key, of any client, survives it.
+    The third client's self-asserted name carries the first client's tag. Seeded, so a failure replays.
   */
   for (const seed of [1, 7, 42, 99, 2026]) {
     it(`random interleavings keep one family per client (seed ${seed})`, async () => {
       let state = seed;
       const rand = (n: number) => { state = (state * 1103515245 + 12345) % 2147483648; return state % n; };
-      const ids = [await client(), await client(), await client()];
+      const first = await client();
+      const ids = [first, await client(), await client(`Look-alike${tagOf(first)}#x`)];
       const latest: Array<string | null> = [null, null, null];
       const issued: string[][] = [[], [], []];
       const consented: string[][] = [[], [], []];
-      const keep = (c: number, out: Out) => { if (out.refresh_token) { latest[c] = out.refresh_token; issued[c].push(out.refresh_token); } };
+      const family = new Map<string, string>();
+      const keep = (c: number, out: Out) => {
+        if (!out.refresh_token) return;
+        latest[c] = out.refresh_token;
+        issued[c].push(out.refresh_token);
+        family.set(out.refresh_token, familyOf(rows.at(-1)!));
+      };
       for (let step = 0; step < 60; step += 1) {
         // One busy host and two quiet ones: the quiet hosts' families age behind the busy one's rotations.
         const c = [0, 0, 0, 1, 2][rand(5)];
@@ -436,8 +485,10 @@ describe("refresh flag on, against the real reads (PostgREST stand-in)", () => {
         } else if (op < 8) {
           if (issued[c].length > 1) {
             const stale = issued[c][rand(issued[c].length - 1)];
+            const others = live().filter((row) => familyOf(row) !== family.get(stale));
             expect((await json(await refresh(ids[c], stale))).error, `${at}: a stale refresh token minted`).toBe("invalid_grant");
-            latest[c] = null;
+            expect(others.filter((row) => row.revokedAt), `${at}: a stale token ended another family`).toEqual([]);
+            if (latest[c] !== null && family.get(latest[c]!) === family.get(stale)) latest[c] = null;
           }
         } else if (op === 8) {
           const target = live()[rand(Math.max(live().length, 1))];
@@ -447,7 +498,7 @@ describe("refresh flag on, against the real reads (PostgREST stand-in)", () => {
         }
         const recent = live().filter((row) => Date.parse(row.createdAt) > Date.now() - REFRESH_TTL_MS);
         for (const [index, id] of ids.entries()) {
-          const held = recent.filter((row) => row.name.includes(tagOf(id)));
+          const held = recent.filter((row) => ofClient(row, id));
           expect(held.length, `${at}: client ${index} holds ${held.length} unrevoked keys`).toBeLessThanOrEqual(1);
           for (const row of held) expect(consented[index], `${at}: scope beyond consent`).toEqual(expect.arrayContaining(row.scopes));
         }

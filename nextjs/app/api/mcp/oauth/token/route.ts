@@ -40,7 +40,7 @@ const oauthError = (status: number, error: string, error_description: string) =>
 
   No refresh token is issued unless TAVONEL_REMOTE_MCP_REFRESH_ENABLED=true (off by default); then a
   sealed refresh token rotates with the key it is bound to, and a revoked key presented again ends
-  the client's live keys. Off, a client re-authorizes when the token expires. A second redemption of one code revokes the key the first one minted (OAuth 2.1
+  that token's family (every key rotated from the same code). Off, a client re-authorizes when the token expires. A second redemption of one code revokes the keys the first one minted (OAuth 2.1
   §4.1.3) and is refused. A reconnect revokes the same member's earlier keys for the same client
   (review R1 M6), so a connector holds one live key, not one per hour.
 
@@ -105,17 +105,26 @@ export async function POST(request: Request) {
   // ponytail: list-then-mint, not a unique constraint; two simultaneous redemptions of one code by
   // the PKCE holder can both mint. Add a code ledger with a unique index if that ever matters.
   const live = (entry: { revokedAt: string | null; expiresAt: string | null }) => !entry.revokedAt && (refreshOn || entry.expiresAt === null || Date.parse(entry.expiresAt) > Date.now());
-  // This member's earlier live keys for this client (exact tag: the narrowed read may over-match).
-  const superseded = family.keys.filter((entry) => entry.name.includes(tag) && live(entry)).map((entry) => entry.keyId);
+  /*
+    A key is named `<client name> ~<client tag> #<code id>`, and every key a refresh rotates through keeps
+    the code id that started it: that suffix is the family. Membership is read from the suffix only,
+    because the client name before it is self-asserted and may carry another client's tag.
+  */
+  const marker = codeIdMarker(grant.codeId);
+  const ofThisClient = (name: string) => name.slice(0, name.lastIndexOf(" #") + 1).endsWith(tag);
+  // This member's earlier live keys for this client.
+  const mine = family.keys.filter((entry) => ofThisClient(entry.name) && live(entry));
+  const superseded = mine.map((entry) => entry.keyId);
   if (refreshKeyId !== undefined) {
     // Rotation is bound to the live key: it must still exist for this member, and not be revoked (expired is fine).
     const old = await getRemoteMcpKey(grant.workspaceKey, grant.userId, refreshKeyId);
     if (!old.ok) return oauthError(503, "temporarily_unavailable", old.code);
     if (!old.key) return oauthError(400, "invalid_grant", "The refresh token is not valid.");
     if (old.key.revokedAt) {
-      // A rotated-out or revoked key presented again: treat as reuse, end this client's live keys.
+      // A rotated-out or revoked key presented again: treat as reuse and end the presented token's family.
+      // Only that family: a stale token from a consent that was since replaced must not end the consent that replaced it.
       let failed = 0;
-      for (const keyId of superseded) {
+      for (const keyId of mine.filter((entry) => entry.name.endsWith(marker)).map((entry) => entry.keyId)) {
         const ended = await revokeDeveloperApiKey(grant.workspaceKey, grant.userId, grant.authorizationRevision, keyId);
         if (!ended.ok) failed += 1;
       }
@@ -123,9 +132,12 @@ export async function POST(request: Request) {
       return oauthError(400, "invalid_grant", "The refresh token is not valid.");
     }
   }
-  const replayed = existing.keys.find((entry) => entry.name.endsWith(codeIdMarker(grant.codeId)));
-  if (replayed) {
-    if (!replayed.revokedAt) await revokeDeveloperApiKey(grant.workspaceKey, grant.userId, grant.authorizationRevision, replayed.keyId);
+  // A replayed code ends every unrevoked key of the family it started (one key with the flag off).
+  const replayed = existing.keys.filter((entry) => entry.name.endsWith(marker));
+  if (replayed.length > 0) {
+    for (const entry of replayed) {
+      if (!entry.revokedAt) await revokeDeveloperApiKey(grant.workspaceKey, grant.userId, grant.authorizationRevision, entry.keyId);
+    }
     return oauthError(400, "invalid_grant", "The authorization code was already used.");
   }
   // The earlier live keys are revoked once the new key exists, so a reconnect replaces them, and the
