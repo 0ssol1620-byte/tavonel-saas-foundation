@@ -1,9 +1,9 @@
 import s from "./personal.module.css";
 
-/** Drawn for this page: three pages feed one record, and the citation line runs back to its page. */
+/** Drawn for this page: pages feed a record, and the citation line runs back to its page. */
 export function PersonalArt() {
   return (
-    <svg className={s.art} viewBox="0 0 400 200" role="img" aria-label="Illustration: three PDF pages feed a record, and a citation line runs from the record back to one page.">
+    <svg className={s.art} viewBox="0 0 400 200" role="img" aria-label="Illustration: PDF pages feed a record, and a citation line runs from the record back to its page.">
       <g fill="none" stroke="currentColor" strokeWidth="1.5">
         <rect x="24" y="26" width="76" height="100" rx="3" opacity="0.45" />
         <rect x="36" y="38" width="76" height="100" rx="3" opacity="0.7" />

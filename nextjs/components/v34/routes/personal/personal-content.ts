@@ -31,7 +31,7 @@ export const STEPS = {
   title: "From a file to a cited answer.",
   items: [
     { title: "Add your PDFs", text: "Start with the few files that matter to one goal." },
-    { title: "Check the first result", text: "Open the records the compiler found and read each one against its page." },
+    { title: "Check the first result", text: "Open the records the compiler found and read each against its page." },
     { title: "Ask and follow the citation", text: "Every answer links to the page and region it came from." },
   ],
 } as const;
@@ -46,7 +46,7 @@ export const ACCESS = {
 
 export const JOURNAL = {
   eyebrow: "Field guide",
-  title: "Start with one question worth remembering.",
+  title: "Start with a question worth remembering.",
   text: "Choose a small set of your files and confirm the cited answer before you add more.",
   href: to("journal-compiler"),
   label: "Understand the workflow",

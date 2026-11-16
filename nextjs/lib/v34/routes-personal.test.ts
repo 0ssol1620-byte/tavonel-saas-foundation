@@ -17,6 +17,12 @@ const files = readdirSync(dir).map((f) => ({ f, text: strip(readFileSync(join(di
 const code = files.filter((x) => /\.tsx?$/.test(x.f));
 const all = code.filter((x) => !x.f.endsWith("-art.tsx")).map((x) => x.text).join("\n");
 const page = strip(readFileSync(join(root, "app/personal/page.tsx"), "utf8"));
+// a count typed into copy: a number word or digits, up to four words (10-K counts as one), then a
+// counted noun; a possessive ends the phrase
+const words = "zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen"
+  + "|(?:twen|thir|for|fif|six|seven|eigh|nine)ty|hundreds?|thousands?|millions?|dozens?|handful|couple|pair|score";
+const nouns = "files?|PDFs?|pages?|documents?|records?|tools?|clients?|keys?|answers?|questions?|days?|steps?";
+const COUNT = new RegExp(`\\b(?:(?:${words})(?:-[a-z]+)?|\\d+)\\s+(?:[\\w-]+\\s+){0,4}(?:${nouns})\\b`, "i");
 
 describe("personal route", () => {
   it("is a registry route, gated and rendered from its own body", () => {
@@ -47,6 +53,19 @@ describe("personal route", () => {
     for (const name of MCP_TOOL_NAMES) expect(all).not.toContain(name);
     expect(all).not.toMatch(/\b\d{3,}\b|\b\d+\.\d+\b|\d\s?%/);
     expect(all).not.toMatch(/\b\d+\s+(?:files?|days?|pages?|tools?|documents?)\b/i);
+    // the art is in: its coordinates carry no counted noun, but its label is text a reader hears
+    for (const x of code) expect(x.text, x.f).not.toMatch(COUNT);
+  });
+
+  it("the count guard catches every shape of a typed count", () => {
+    const counts = ["three", "Fifteen", "twenty-one", "a dozen", "dozens of", "a handful of", "a couple of", "5", "12"];
+    const fillers = ["", "of your ", "PDF ", "MCP ", "of your own ", "short 10-K PDF "];
+    for (const n of counts) for (const f of fillers) for (const noun of ["files", "PDF", "tools", "days"]) {
+      expect(`${n} ${f}${noun}`).toMatch(COUNT);
+    }
+    for (const ok of ["Start with the few files that matter to one goal.", "Any MCP client can read the World", "Ask a question"]) {
+      expect(ok).not.toMatch(COUNT);
+    }
   });
 
   it("prints the computed tool list", () => {

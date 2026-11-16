@@ -20,6 +20,12 @@ const code = files.filter((x) => /\.tsx?$/.test(x.f));
 const all = code.filter((x) => !x.f.endsWith("-art.tsx")).map((x) => x.text).join("\n");
 const content = code.find((x) => x.f === "markets-content.ts")!.text;
 const page = strip(readFileSync(join(root, "app/markets/page.tsx"), "utf8"));
+// a count typed into copy: a number word or digits, up to four words (10-K counts as one), then a
+// counted noun; a possessive ends the phrase, so "one company's filings" counts the company
+const words = "zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen"
+  + "|(?:twen|thir|for|fif|six|seven|eigh|nine)ty|hundreds?|thousands?|millions?|dozens?|handful|couple|pair|score";
+const nouns = "filings?|reports?|documents?|pages?|sources?|statements?|rows?|records?|figures?|periods?";
+const COUNT = new RegExp(`\\b(?:(?:${words})(?:-[a-z]+)?|\\d+)\\s+(?:[\\w-]+\\s+){0,4}(?:${nouns})\\b`, "i");
 
 describe("markets route", () => {
   it("is a registry route, gated and rendered from its own body", () => {
@@ -59,11 +65,20 @@ describe("markets route", () => {
     expect(all).not.toMatch(/\b\d{3,}\b|\b\d+\.\d+\b|\d\s?%|sha256:/);
   });
 
+  it("the count guard catches every shape of a typed count", () => {
+    const counts = ["five", "Fifteen", "twenty-one", "a dozen", "dozens of", "a handful of", "a couple of", "5", "12"];
+    const fillers = ["", "public ", "SEC ", "10-K ", "public SEC ", "annual 10-K SEC "];
+    for (const n of counts) for (const f of fillers) for (const noun of ["filings", "report", "pages", "rows"]) {
+      expect(`${n} ${f}${noun}`).toMatch(COUNT);
+    }
+    for (const ok of ["One company's SEC filings, compiled.", "the 10-K filings", "Follow a figure", "Compare periods side by side."]) {
+      expect(ok).not.toMatch(COUNT);
+    }
+  });
+
   it("types no count as a number word or a counted noun", () => {
-    const words = "zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|hundred|thousand|million";
-    const nouns = "filings?|reports?|documents?|pages?|sources?|statements?";
-    expect(content).not.toMatch(new RegExp(`\\b(?:${words})\\b(?:-[a-z]+)?\\s+(?:\\w+\\s+)?(?:${nouns})\\b`, "i"));
-    expect(all).not.toMatch(new RegExp(`\\b\\d+\\s+(?:${nouns})\\b`, "i"));
+    // the art is in: its coordinates carry no counted noun, but its label is text a reader hears
+    for (const x of code) expect(x.text, x.f).not.toMatch(COUNT);
   });
 
   it("carries no investment advice, performance claim or removed register item", () => {

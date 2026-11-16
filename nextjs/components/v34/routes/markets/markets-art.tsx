@@ -1,9 +1,9 @@
 import s from "./markets.module.css";
 
-/** Drawn for this page: five filings along a time axis, and one figure traced back to its filing. */
+/** Drawn for this page: filings along a time axis, and a figure traced back to its filing. */
 export function MarketsArt() {
   return (
-    <svg className={s.art} viewBox="0 0 400 200" role="img" aria-label="Illustration: five filings along a time axis, with one figure traced back to the filing that states it.">
+    <svg className={s.art} viewBox="0 0 400 200" role="img" aria-label="Illustration: filings along a time axis, with a figure traced back to the filing that states it.">
       <g fill="none" stroke="currentColor" strokeWidth="1.5">
         <path d="M24 164h352" />
         <rect x="34" y="70" width="44" height="94" rx="3" />
