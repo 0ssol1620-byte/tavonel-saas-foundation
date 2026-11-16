@@ -208,7 +208,19 @@ async function answer(request: Request, seen: Seen) {
       later(() => recordFirstMcpAnswerTiming(workspaceKey, world));
     }
   }
-  return NextResponse.json(constantToolErrors(answered), { headers: NO_STORE });
+  return NextResponse.json(constantToolErrors(method === "initialize" ? negotiated(answered, rpcParams) : answered), { headers: NO_STORE });
+}
+
+/**
+ * initialize: echo the client's requested revision when this server supports it, else answer the
+ * newest supported one (the client then decides whether to continue). The bridge's constant is
+ * only its own newest; the stdio bridge file is untouched.
+ */
+function negotiated(answered: unknown, rpcParams: unknown) {
+  const asked = (rpcParams as { protocolVersion?: unknown } | undefined)?.protocolVersion;
+  const protocolVersion = typeof asked === "string" && REMOTE_MCP_PROTOCOL_VERSIONS.includes(asked) ? asked : REMOTE_MCP_PROTOCOL_VERSIONS[0];
+  const reply = answered as { result?: object } | null;
+  return reply?.result ? { ...reply, result: { ...reply.result, protocolVersion } } : answered;
 }
 
 /**
