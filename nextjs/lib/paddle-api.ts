@@ -192,6 +192,14 @@ export type PaddleListResult<T> =
 
 type Row = Record<string, unknown>;
 const str = (v: unknown) => (typeof v === "string" && v ? v : null);
+/** Parsers meet arbitrary JSON: a shape they cannot read (a null row, a null line item) is invalid, never a throw. */
+const parseSafely = <T>(parse: (r: Row) => T | null, raw: unknown): T | null => {
+  try {
+    return parse(raw as Row);
+  } catch {
+    return null;
+  }
+};
 
 function parseTransaction(r: Row): PaddleTransaction | null {
   const details = r.details as Row | undefined;
@@ -254,7 +262,7 @@ async function listPaddle<T>(
     const data = result.json?.data;
     if (!Array.isArray(data)) return { ok: false, code: "PADDLE_READ_INVALID" };
     for (const raw of data) {
-      const parsed = parse(raw as Row);
+      const parsed = parseSafely(parse, raw);
       if (!parsed) return { ok: false, code: "PADDLE_READ_INVALID" };
       items.push(parsed);
     }
@@ -278,6 +286,6 @@ export async function getPaddlePrice(
   if (!PRICE_ID.test(id)) return { ok: false, code: "PADDLE_PRICE_ID_INVALID" };
   const result = await paddleGet(`/prices/${encodeURIComponent(id)}`, new URLSearchParams(), env);
   if (result.code) return { ok: false, code: result.code === "NOT_FOUND" ? "PADDLE_PRICE_NOT_FOUND" : result.code };
-  const price = parsePrice((result.json?.data ?? {}) as Row);
+  const price = parseSafely(parsePrice, result.json?.data);
   return price && price.id === id ? { ok: true, price } : { ok: false, code: "PADDLE_READ_INVALID" };
 }

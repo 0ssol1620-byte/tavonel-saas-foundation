@@ -139,4 +139,51 @@ describe("Paddle read-only reconciliation reads", () => {
     await expect(getPaddlePrice(id("pri", 1), env)).resolves.toEqual({ ok: false, code: "PADDLE_PRICE_NOT_FOUND" });
     await expect(getPaddlePrice("nope", env)).resolves.toEqual({ ok: false, code: "PADDLE_PRICE_ID_INVALID" });
   });
+
+  it("answers a null row or a null line item with a typed failure, not a throw", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => page([null], false)));
+    await expect(listPaddleAdjustments({ updatedAfter: "x" }, env)).resolves.toEqual({ ok: false, code: "PADDLE_READ_INVALID" });
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => page([{ ...txnRow(1), details: { totals: { total: "1" }, line_items: [null] } }], false)));
+    await expect(listPaddleTransactions({ updatedAfter: "x" }, env)).resolves.toEqual({ ok: false, code: "PADDLE_READ_INVALID" });
+  });
+
+  // Fuzz: whatever JSON Paddle sends, a read resolves to valid items or a typed code. It never throws.
+  it("never throws and never returns an item that fails its own contract, for random bodies", async () => {
+    let seed = 0xbadc0de;
+    const rand = () => ((seed = (seed * 1_103_515_245 + 12_345) >>> 0) / 2 ** 32);
+    const pick = <T,>(xs: readonly T[]) => xs[Math.floor(rand() * xs.length)];
+    const keys = ["id", "status", "currency_code", "details", "totals", "total", "line_items", "items", "price_id", "price",
+      "quantity", "transaction_id", "action", "unit_price", "amount", "billing_cycle", "interval", "frequency", "data", "meta"];
+    const leaf = () => pick<unknown>([null, undefined, 0, 1, -1, "", "x", "2900", true, id("txn", 1), id("adj", 1), id("pri", 1), "completed", "USD", "month"]);
+    const value = (depth: number): unknown => {
+      const r = rand();
+      if (depth <= 0 || r < 0.4) return leaf();
+      if (r < 0.6) return Array.from({ length: Math.floor(rand() * 3) }, () => value(depth - 1));
+      return Object.fromEntries(Array.from({ length: Math.floor(rand() * 6) }, () => [pick(keys), value(depth - 1)]));
+    };
+    const adjRow = { id: id("adj", 1), transaction_id: id("txn", 1), action: "refund", status: "approved", currency_code: "USD", totals: { total: "1" } };
+    const priceRow = { id: id("pri", 1), status: "active", unit_price: { amount: "2900", currency_code: "USD" }, billing_cycle: { interval: "month", frequency: 1 } };
+    const codes = ["PADDLE_READ_FAILED", "PADDLE_READ_INVALID", "PADDLE_PRICE_NOT_FOUND"];
+    for (let i = 0; i < 1000; i++) {
+      const base = pick<Record<string, unknown>>([txnRow(1), adjRow, priceRow]);
+      const nested = pick(["details", "totals", "unit_price", "billing_cycle"]);
+      const mutated = pick([
+        () => ({ ...base, [pick(keys)]: value(3) }),
+        () => ({ ...base, [nested]: { ...(base[nested] as object | undefined), [pick(keys)]: value(2) } }),
+        () => ({ ...base, details: { totals: { total: "1" }, line_items: [pick([null, value(2), { price_id: id("pri", 1), quantity: value(1) }])] } }),
+        () => value(4),
+      ])();
+      const body = rand() < 0.8 ? { data: rand() < 0.7 ? [mutated, ...(rand() < 0.2 ? [null] : [])] : mutated, meta: { pagination: { has_more: rand() < 0.3 } } } : value(4);
+      vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => new Response(JSON.stringify(body) ?? "", { status: 200 })));
+      for (const result of [
+        await listPaddleTransactions({ updatedAfter: "x" }, env), await listPaddleAdjustments({ updatedAfter: "x" }, env),
+      ]) {
+        if (result.ok) expect(result.items.every((t) => /^(txn|adj)_[a-z0-9]{26}$/.test(t.id) && typeof t.status === "string")).toBe(true);
+        else expect(codes).toContain(result.code);
+      }
+      const price = await getPaddlePrice(id("pri", 1), env);
+      if (price.ok) expect(price.price.id).toBe(id("pri", 1));
+      else expect(codes).toContain(price.code);
+    }
+  });
 });

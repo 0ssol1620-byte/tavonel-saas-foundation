@@ -13,6 +13,20 @@ export type LedgerRow = {
 
 const PAGE = 1000;
 const MAX_PAGES = 10;
+const KINDS = new Set(["purchased", "allowance", "reversed", "allowance_expired"]);
+const GRANTS = new Set(["purchased", "allowance"]);
+const strOrNull = (v: unknown): v is string | null => v === null || typeof v === "string";
+
+/** A row the delta cannot key or count is refused, never coerced: no "undefined" id, no 0 credits, no unkeyed grant. */
+function parseLedgerRow(raw: unknown): LedgerRow | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const { event_id: eventId, kind, transaction_id: transactionId, reversal_of_transaction_id: reversalOf, credit_delta: creditDelta, offer_code: offerCode } = r;
+  if (typeof eventId !== "string" || !eventId || typeof kind !== "string" || !KINDS.has(kind) || !Number.isSafeInteger(creditDelta)
+    || !strOrNull(transactionId) || !strOrNull(reversalOf) || !strOrNull(offerCode)) return null;
+  if ((GRANTS.has(kind) && !transactionId) || (kind === "reversed" && !reversalOf)) return null;
+  return { eventId, kind, transactionId, reversalOfTransactionId: reversalOf, creditDelta: creditDelta as number, offerCode };
+}
 
 /** Service-role read of the credit ledger since an instant. `truncated` is true when the page cap cut it. */
 export async function readLedgerForReconciliation(sinceIso: string) {
@@ -34,16 +48,12 @@ export async function readLedgerForReconciliation(sinceIso: string) {
       return { ok: false as const, code: "BILLING_STORE_READ_FAILED" };
     }
     if (!response.ok) return { ok: false as const, code: "BILLING_STORE_READ_FAILED" };
-    const batch = await response.json().catch(() => null) as Array<Record<string, unknown>> | null;
+    const batch = await response.json().catch(() => null) as unknown;
     if (!Array.isArray(batch)) return { ok: false as const, code: "BILLING_STORE_READ_FAILED" };
-    for (const r of batch) {
-      rows.push({
-        eventId: String(r.event_id), kind: String(r.kind),
-        transactionId: typeof r.transaction_id === "string" ? r.transaction_id : null,
-        reversalOfTransactionId: typeof r.reversal_of_transaction_id === "string" ? r.reversal_of_transaction_id : null,
-        creditDelta: Number(r.credit_delta),
-        offerCode: typeof r.offer_code === "string" ? r.offer_code : null,
-      });
+    for (const raw of batch) {
+      const row = parseLedgerRow(raw);
+      if (!row) return { ok: false as const, code: "BILLING_STORE_READ_INVALID" };
+      rows.push(row);
     }
     if (batch.length < PAGE) return { ok: true as const, rows, truncated: false };
   }
@@ -65,32 +75,36 @@ export type ProcessorDelta = {
 const catalogCredits = (code: string | null) =>
   code && Object.hasOwn(BILLING_OFFERS, code) ? BILLING_OFFERS[code as BillingOfferCode].credits : null;
 
-/** Everything is keyed by Paddle transaction id; each bucket is sorted so the output is stable. */
+/**
+ * Everything is keyed by Paddle transaction id; each bucket is sorted so the output is stable.
+ * Fail closed: an input this cannot match is reported, never read as agreement. The ledger window is not
+ * the processor's, so no bucket is gated on the other side being in its window: a refund whose grant is
+ * older than `since` still needs its reversal row, and a grant the catalog cannot price is a mismatch.
+ */
 export function processorDelta(
   ledger: readonly LedgerRow[],
   transactions: readonly PaddleTransaction[],
   adjustments: readonly PaddleAdjustment[],
 ): ProcessorDelta {
-  const grants = new Map<string, LedgerRow>();
+  const grants = new Map<string, LedgerRow[]>();
   const reversed = new Set<string>();
   for (const row of ledger) {
     if (row.kind === "reversed") {
       if (row.reversalOfTransactionId) reversed.add(row.reversalOfTransactionId);
-    } else if ((row.kind === "purchased" || row.kind === "allowance") && row.transactionId) grants.set(row.transactionId, row);
+    } else if (GRANTS.has(row.kind) && row.transactionId) grants.set(row.transactionId, [...grants.get(row.transactionId) ?? [], row]);
   }
-  const processor = new Set(transactions.map((t) => t.id));
+  const paid = new Set(transactions.filter((t) => PAID.has(t.status)).map((t) => t.id));
   const approvedReversals = new Set(
     adjustments.filter((a) => a.status === "approved" && REVERSING.has(a.action)).map((a) => a.transactionId),
   );
   const sorted = (s: Iterable<string>) => [...new Set(s)].sort();
   return {
-    missingInLedger: sorted(transactions.filter((t) => PAID.has(t.status) && !grants.has(t.id)).map((t) => t.id)),
-    missingAtProcessor: sorted([...grants.keys()].filter((id) => !processor.has(id))),
-    creditMismatch: sorted([...grants].filter(([id, r]) => {
-      const expected = catalogCredits(r.offerCode);
-      return processor.has(id) && expected !== null && expected !== r.creditDelta;
-    }).map(([id]) => id)),
-    reversalMissing: sorted([...approvedReversals].filter((id) => grants.has(id) && !reversed.has(id))),
+    missingInLedger: sorted([...paid].filter((id) => !grants.has(id))),
+    // A grant the processor does not have as a completed transaction (absent, or billed/past_due).
+    missingAtProcessor: sorted([...grants.keys()].filter((id) => !paid.has(id))),
+    // One grant per transaction, for its offer's catalog credits; a second grant or an unknown offer is a mismatch.
+    creditMismatch: sorted([...grants].filter(([, rs]) => rs.length !== 1 || catalogCredits(rs[0].offerCode) !== rs[0].creditDelta).map(([id]) => id)),
+    reversalMissing: sorted([...approvedReversals].filter((id) => !reversed.has(id))),
     reversalUnexpected: sorted([...reversed].filter((id) => !approvedReversals.has(id))),
   };
 }
