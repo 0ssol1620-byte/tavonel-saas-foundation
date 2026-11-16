@@ -5,37 +5,6 @@
     "requestId": "req-synthetic-0001",
     "documents": [
       {
-        "versionKey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "nativeId": "doc-b",
-        "connectorType": "foundation-r2",
-        "immutableObjectKey": "tenants/t/doc-b/source",
-        "ocrObjectKey": "tenants/t/doc-b/ocr.json",
-        "contentSha256": "sha256:6262626262626262626262626262626262626262626262626262626262626262",
-        "title": "Synthetic doc-b",
-        "sourceFilename": "doc-b.pdf",
-        "pageCount": 1,
-        "regions": [
-          {
-            "regionId": "doc-b-r0",
-            "pageIndex0": 0,
-            "pageNumber1": 1,
-            "order": 0,
-            "blockType": "paragraph",
-            "text": "Synthetic paragraph 0 of doc-b. 합성 문단.",
-            "authority": "unclassified"
-          },
-          {
-            "regionId": "doc-b-r1",
-            "pageIndex0": 0,
-            "pageNumber1": 1,
-            "order": 1,
-            "blockType": "paragraph",
-            "text": "Synthetic paragraph 1 of doc-b. 합성 문단.",
-            "authority": "unclassified"
-          }
-        ]
-      },
-      {
         "versionKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "nativeId": "doc-a",
         "connectorType": "foundation-r2",
@@ -107,6 +76,37 @@
             "order": 6,
             "blockType": "paragraph",
             "text": "Synthetic paragraph 6 of doc-a. 합성 문단.",
+            "authority": "unclassified"
+          }
+        ]
+      },
+      {
+        "versionKey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "nativeId": "doc-b",
+        "connectorType": "foundation-r2",
+        "immutableObjectKey": "tenants/t/doc-b/source",
+        "ocrObjectKey": "tenants/t/doc-b/ocr.json",
+        "contentSha256": "sha256:6262626262626262626262626262626262626262626262626262626262626262",
+        "title": "Synthetic doc-b",
+        "sourceFilename": "doc-b.pdf",
+        "pageCount": 1,
+        "regions": [
+          {
+            "regionId": "doc-b-r0",
+            "pageIndex0": 0,
+            "pageNumber1": 1,
+            "order": 0,
+            "blockType": "paragraph",
+            "text": "Synthetic paragraph 0 of doc-b. 합성 문단.",
+            "authority": "unclassified"
+          },
+          {
+            "regionId": "doc-b-r1",
+            "pageIndex0": 0,
+            "pageNumber1": 1,
+            "order": 1,
+            "blockType": "paragraph",
+            "text": "Synthetic paragraph 1 of doc-b. 합성 문단.",
             "authority": "unclassified"
           }
         ]
