@@ -224,7 +224,7 @@ export async function POST(
     );
   }
 
-  const receiptCheck = checkCandidateCompileReceipt(loaded.json, {
+  const receiptCheck = await checkCandidateCompileReceipt(loaded.json, {
     workspaceId: membership.workspaceId, collectionId: id, manifestDigest,
   });
   if (!receiptCheck.ok) {

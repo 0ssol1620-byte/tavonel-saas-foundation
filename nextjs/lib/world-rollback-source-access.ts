@@ -26,7 +26,7 @@ export async function checkRollbackSourceAccess(
       artifact.coreExecution.runtime !== "tavonel-python-core-v2") {
     return { ok: false, code: collectionPackageSizeRefusal(loaded.json)?.code ?? "ROLLBACK_TARGET_ARTIFACT_INVALID", status: 422 };
   }
-  const receipt = checkCandidateCompileReceipt(loaded.json, { workspaceId: workspaceKey, collectionId, manifestDigest });
+  const receipt = await checkCandidateCompileReceipt(loaded.json, { workspaceId: workspaceKey, collectionId, manifestDigest });
   if (!receipt.ok) return receipt;
   const model = buildWorldReadModel(loaded.json, collectionId);
   if (!model || model.evidence.length === 0) {

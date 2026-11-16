@@ -6,9 +6,11 @@ import { readExportTrustStoreEnv } from "./export-signing";
 import { checkCandidateCompileReceipt } from "./promotion-receipt-check";
 
 const m = vi.hoisted(() => ({
+  classify: vi.fn(),
   getUser: vi.fn(), pilotAccess: vi.fn(), productAccess: vi.fn(), getCandidate: vi.fn(),
   listObjects: vi.fn(), promote: vi.fn(), sourceAccess: vi.fn(), ensureIndex: vi.fn(),
 }));
+vi.mock("./compile-job-authority", () => ({ classifyCompileJobSources: m.classify }));
 vi.mock("@/lib/foundation-pilot", () => ({ getRequestUser: m.getUser, foundationPilotAccess: m.pilotAccess }));
 vi.mock("@/lib/billing-product-access", () => ({ authorizeFoundationProduct: m.productAccess }));
 vi.mock("@/lib/r2-objects", async (importOriginal) => ({
@@ -63,7 +65,7 @@ const compiled = compileCollectionCandidate([{
 const coreExecution = {
   status: "completed", runtime: "tavonel-python-core-v2", worldStateId: "world-state-1",
   receipt: { requestId: "core-proof", outputSha256: compiled.manifestDigest, candidatePromotion: false,
-    equivalence: "not_run", totalArtifacts: 8, rebuiltArtifacts: 8, workAvoidedArtifacts: 0 },
+    equivalence: "not_run", coreReleaseDigest: `sha256:${"e".repeat(64)}`, totalArtifacts: 8, rebuiltArtifacts: 8, workAvoidedArtifacts: 0 },
 };
 const subject = { workspaceId, collectionId: compiled.collectionId, manifestDigest: compiled.manifestDigest };
 
@@ -84,64 +86,83 @@ const stored = (patch: Record<string, unknown> = {}, e = env, over: Record<strin
   ({ ...compiled, coreExecution, signedReceipt: receiptFor(e, over), ...patch });
 const check = (artifact: unknown, e: Record<string, string | undefined> = env, subj = subject) =>
   checkCandidateCompileReceipt(artifact, subj, e, NOW);
+beforeEach(() => m.classify.mockReset().mockResolvedValue({ ok: true, scope: "direct_upload" }));
 
 describe("checkCandidateCompileReceipt", () => {
-  it("passes a receipt that verifies and describes the stored candidate", () => {
-    expect(check(stored())).toEqual({ ok: true });
+  it("passes a receipt that verifies and describes the stored candidate", async () => {
+    expect(await check(stored())).toEqual({ ok: true });
   });
 
-  it("refuses a v2 receipt whose source scope changed since compile", () => {
-    expect(check(stored(), env, { ...subject, currentScope: "connector" } as typeof subject))
-      .toEqual({ ok: false, code: "WORLD_CANDIDATE_SCOPE_CHANGED", status: 409 });
-    expect(check(stored(), env, { ...subject, currentScope: "direct_upload" } as typeof subject)).toEqual({ ok: true });
+  it("refuses a v2 receipt whose source scope changed since compile", async () => {
+    m.classify.mockResolvedValue({ ok: true, scope: "connector" });
+    expect(await check(stored())).toEqual({ ok: false, code: "WORLD_CANDIDATE_SCOPE_CHANGED", status: 409 });
+    m.classify.mockResolvedValue({ ok: true, scope: "direct_upload" });
+    expect(await check(stored())).toEqual({ ok: true });
+    expect(m.classify).toHaveBeenCalledWith({ workspaceKey: workspaceId, documentIds: ["doc-one"] });
   });
 
-  it("refuses a v2 receipt that names another Core response schema", () => {
-    expect(check(stored({}, env, { coreResponseSchema: "tavonel.product_core.compile_response.v1" })))
+  it("refuses with 503, not a pass, when the current scope cannot be read", async () => {
+    m.classify.mockResolvedValue({ ok: false, code: "COMPILE_JOB_AUTHORITY_UNAVAILABLE" });
+    expect(await check(stored())).toEqual({ ok: false, code: "COMPILE_JOB_AUTHORITY_UNAVAILABLE", status: 503 });
+  });
+
+  it("refuses a v2 receipt whose Core release digest differs from the stored Core receipt", async () => {
+    const other = { ...coreExecution, receipt: { ...coreExecution.receipt, coreReleaseDigest: `sha256:${"1".repeat(64)}` } };
+    expect(await check(stored({ coreExecution: other }))).toEqual({ ok: false, code: "COMPILE_RECEIPT_SUBJECT_MISMATCH", status: 409 });
+  });
+
+  it("reports a subject mismatch before it reads or reports scope", async () => {
+    m.classify.mockResolvedValue({ ok: true, scope: "connector" });
+    expect(await check(stored(), env, { ...subject, collectionId: `collection-${"2".repeat(32)}` }))
+      .toEqual({ ok: false, code: "COMPILE_RECEIPT_SUBJECT_MISMATCH", status: 409 });
+  });
+
+  it("refuses a v2 receipt that names another Core response schema", async () => {
+    expect(await check(stored({}, env, { coreResponseSchema: "tavonel.product_core.compile_response.v1" })))
       .toEqual({ ok: false, code: "COMPILE_RECEIPT_MALFORMED", status: 409 });
   });
 
-  it("refuses a candidate with no signed receipt", () => {
-    expect(check(stored({ signedReceipt: undefined }))).toEqual({ ok: false, code: "COMPILE_RECEIPT_REQUIRED", status: 409 });
+  it("refuses a candidate with no signed receipt", async () => {
+    expect(await check(stored({ signedReceipt: undefined }))).toEqual({ ok: false, code: "COMPILE_RECEIPT_REQUIRED", status: 409 });
   });
 
-  it("returns 503 when no trust store is configured", () => {
-    expect(check(stored(), {})).toEqual({ ok: false, code: "EXPORT_TRUST_STORE_NOT_CONFIGURED", status: 503 });
+  it("returns 503 when no trust store is configured", async () => {
+    expect(await check(stored(), {})).toEqual({ ok: false, code: "EXPORT_TRUST_STORE_NOT_CONFIGURED", status: 503 });
   });
 
-  it("refuses a tampered payload, an untrusted signer and an expired key", () => {
+  it("refuses a tampered payload, an untrusted signer and an expired key", async () => {
     const good = stored();
     const tampered = { ...good, signedReceipt: { ...good.signedReceipt,
       payloadJson: good.signedReceipt.payloadJson.replace(`"lifecycle":"candidate"`, `"lifecycle":"promoted"`) } };
     const foreign = stored({}, signingEnv());
     for (const artifact of [tampered, foreign]) {
-      expect(check(artifact)).toEqual({ ok: false, code: "COMPILE_RECEIPT_SIGNATURE_INVALID", status: 409 });
+      expect(await check(artifact)).toEqual({ ok: false, code: "COMPILE_RECEIPT_SIGNATURE_INVALID", status: 409 });
     }
     const shortLived = signingEnv("2026-09-28T00:00:00.000Z");
-    expect(checkCandidateCompileReceipt(stored({}, shortLived), subject, shortLived, new Date("2026-10-15T00:00:00.000Z")))
+    expect(await checkCandidateCompileReceipt(stored({}, shortLived), subject, shortLived, new Date("2026-10-15T00:00:00.000Z")))
       .toEqual({ ok: false, code: "COMPILE_RECEIPT_SIGNATURE_INVALID", status: 409 });
   });
 
-  it("refuses an incompatible schema even when the signature is valid", () => {
+  it("refuses an incompatible schema even when the signature is valid", async () => {
     const signer = readCompileReceiptSigner(env, NOW)!;
     const payload = JSON.stringify({ ...JSON.parse(receiptFor(env).payloadJson), schemaVersion: "tavonel.compile_receipt.v9" });
     const signature = signer.signPayload(Buffer.from(payload, "utf8"));
-    expect(check(stored({ signedReceipt: { payloadJson: payload, signature } })))
+    expect(await check(stored({ signedReceipt: { payloadJson: payload, signature } })))
       .toEqual({ ok: false, code: "COMPILE_RECEIPT_MALFORMED", status: 409 });
   });
 
-  it("refuses a receipt for another workspace, a swapped manifest, an extra source, another versionKey or another Core output", () => {
+  it("refuses a receipt for another workspace, a swapped manifest, an extra source, another versionKey or another Core output", async () => {
     const mismatch = { ok: false, code: "COMPILE_RECEIPT_SUBJECT_MISMATCH", status: 409 };
-    expect(check(stored(), env, { ...subject, workspaceId: "pilot-other" })).toEqual(mismatch);
-    expect(check(stored(), env, { ...subject, manifestDigest: `sha256:${"9".repeat(64)}` })).toEqual(mismatch);
-    expect(check(stored({ sourceDocuments: [...compiled.sourceDocuments, { documentId: "doc-two", versionKey: "b".repeat(64) }] })))
+    expect(await check(stored(), env, { ...subject, workspaceId: "pilot-other" })).toEqual(mismatch);
+    expect(await check(stored(), env, { ...subject, manifestDigest: `sha256:${"9".repeat(64)}` })).toEqual(mismatch);
+    expect(await check(stored({ sourceDocuments: [...compiled.sourceDocuments, { documentId: "doc-two", versionKey: "b".repeat(64) }] })))
       .toEqual(mismatch);
-    expect(check(stored({ sourceDocuments: compiled.sourceDocuments.map((d) => ({ ...d, versionKey: "f".repeat(64) })) })))
+    expect(await check(stored({ sourceDocuments: compiled.sourceDocuments.map((d) => ({ ...d, versionKey: "f".repeat(64) })) })))
       .toEqual(mismatch);
-    expect(check(stored({ coreExecution: { ...coreExecution, receipt: { ...coreExecution.receipt, outputSha256: `sha256:${"8".repeat(64)}` } } })))
+    expect(await check(stored({ coreExecution: { ...coreExecution, receipt: { ...coreExecution.receipt, outputSha256: `sha256:${"8".repeat(64)}` } } })))
       .toEqual(mismatch);
-    expect(check(stored({ coreExecution: { ...coreExecution, worldStateId: "world-state-2" } }))).toEqual(mismatch);
-    expect(check(stored({}, env, { collectionId: `collection-${"1".repeat(32)}` }))).toEqual(mismatch);
+    expect(await check(stored({ coreExecution: { ...coreExecution, worldStateId: "world-state-2" } }))).toEqual(mismatch);
+    expect(await check(stored({}, env, { collectionId: `collection-${"1".repeat(32)}` }))).toEqual(mismatch);
   });
 });
 
@@ -170,6 +191,26 @@ describe("promote and rollback enforce the receipt", () => {
     m.getCandidate.mockResolvedValue({ ok: true, json: stored() });
     expect((await promoteRequest()).status).toBe(200);
     expect(m.promote).toHaveBeenCalledTimes(1);
+  });
+
+  it("never calls the promotion RPC when the sources changed scope since compile or the scope is unreadable", async () => {
+    m.getCandidate.mockResolvedValue({ ok: true, json: stored() });
+    m.classify.mockResolvedValue({ ok: true, scope: "connector" });
+    let response = await promoteRequest();
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ code: "WORLD_CANDIDATE_SCOPE_CHANGED" });
+    m.classify.mockResolvedValue({ ok: false, code: "COMPILE_JOB_AUTHORITY_UNAVAILABLE" });
+    response = await promoteRequest();
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ code: "COMPILE_JOB_AUTHORITY_UNAVAILABLE" });
+    expect(m.promote).not.toHaveBeenCalled();
+  });
+
+  it("refuses rollback when the sources changed scope since compile", async () => {
+    m.getCandidate.mockResolvedValue({ ok: true, json: stored() });
+    m.classify.mockResolvedValue({ ok: true, scope: "connector" });
+    expect(await checkRollbackSourceAccess(workspaceId, compiled.collectionId, compiled.manifestDigest))
+      .toEqual({ ok: false, code: "WORLD_CANDIDATE_SCOPE_CHANGED", status: 409 });
   });
 
   it("never calls the promotion RPC for a tampered, missing or unverifiable receipt", async () => {

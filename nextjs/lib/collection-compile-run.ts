@@ -103,6 +103,8 @@ export type CollectionCompileRun =
 export type CompileObservationPrincipal = Readonly<{
   userId: string | null;
   provenance: "authenticated_request" | "durable_job";
+  /** The actor's `authorization_revision` as the caller holds it (route principal or durable job row); absent when it has none. */
+  authorizationRevision?: number | null;
 }>;
 
 /** The compiler has not been given anything to read yet; the caller should wait, not fail. */
@@ -527,8 +529,9 @@ export async function runCollectionCompile(
     customerDataGateReceiptSha256: customerDataGate.receiptSha256,
     sourceDocuments: expectedVersions,
     sourceScope: receiptScope.scope,
-    // Neither the route principal nor the job row hands this function a revision; never invented.
-    authorizationEpoch: null,
+    // Only what the caller's own principal carried; null when it carried none, never invented.
+    authorizationEpoch: principalBound && Number.isSafeInteger(observationPrincipal?.authorizationRevision) && observationPrincipal!.authorizationRevision! > 0
+      ? observationPrincipal!.authorizationRevision! : null,
     coreResponseSchema: PRODUCT_CORE_RESPONSE_SCHEMA,
     coreReleaseDigest: compiled.result.receipt.coreReleaseDigest,
     compiledAt: compiledAt.toISOString(),

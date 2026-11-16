@@ -1,15 +1,14 @@
 import { COMPILE_RECEIPT_SCHEMA, verifyCompileReceipt, type SignedCompileReceipt } from "./compile-receipt-signing";
 import { PRODUCT_CORE_RESPONSE_SCHEMA } from "./core-runtime-v2";
+import { classifyCompileJobSources } from "./compile-job-authority";
 import { readExportTrustStoreEnv } from "./export-signing";
+import { DOCUMENT_ID_PATTERN } from "./immutable-keys";
 
 export type CandidateReceiptCheck =
   | { ok: true }
   | { ok: false; code: string; status: 409 | 503 };
 
-type Subject = { workspaceId: string; collectionId: string; manifestDigest: string;
-  /** The source classification now (`classifyCompileJobSources`); a v2 receipt signed for another scope is refused. */
-  currentScope?: "direct_upload" | "connector";
-};
+type Subject = { workspaceId: string; collectionId: string; manifestDigest: string };
 
 const pairs = (docs: unknown) =>
   Array.isArray(docs)
@@ -22,17 +21,17 @@ const pairs = (docs: unknown) =>
  * artifact being activated. No signature, no trust store, or any mismatch refuses (decision D3:
  * a candidate written before signing existed is recompiled, not grandfathered).
  */
-export function checkCandidateCompileReceipt(
+export async function checkCandidateCompileReceipt(
   stored: unknown,
   subject: Subject,
   env: Readonly<Record<string, string | undefined>> = process.env,
   now = new Date(),
-): CandidateReceiptCheck {
+): Promise<CandidateReceiptCheck> {
   const artifact = (stored ?? {}) as {
     signedReceipt?: SignedCompileReceipt;
     manifestDigest?: unknown;
     sourceDocuments?: unknown;
-    coreExecution?: { runtime?: unknown; worldStateId?: unknown; receipt?: { outputSha256?: unknown; requestId?: unknown } };
+    coreExecution?: { runtime?: unknown; worldStateId?: unknown; receipt?: { outputSha256?: unknown; requestId?: unknown; coreReleaseDigest?: unknown } };
   };
   if (!artifact.signedReceipt) return { ok: false, code: "COMPILE_RECEIPT_REQUIRED", status: 409 };
   const trust = readExportTrustStoreEnv(env);
@@ -47,9 +46,6 @@ export function checkCandidateCompileReceipt(
   const p = verified.payload;
   if (p.schemaVersion === COMPILE_RECEIPT_SCHEMA) {
     if (p.coreResponseSchema !== PRODUCT_CORE_RESPONSE_SCHEMA) return { ok: false, code: "COMPILE_RECEIPT_MALFORMED", status: 409 };
-    if (subject.currentScope && p.sourceScope !== subject.currentScope) {
-      return { ok: false, code: "WORLD_CANDIDATE_SCOPE_CHANGED", status: 409 };
-    }
   }
   const core = artifact.coreExecution;
   const signedPairs = pairs(p.sourceDocuments);
@@ -65,6 +61,20 @@ export function checkCandidateCompileReceipt(
     core?.receipt?.requestId === p.coreRequestId &&
     storedPairs !== null && signedPairs !== null &&
     storedPairs.length === signedPairs.length &&
-    storedPairs.every((v, i) => v === signedPairs[i]);
-  return same ? { ok: true } : { ok: false, code: "COMPILE_RECEIPT_SUBJECT_MISMATCH", status: 409 };
+    storedPairs.every((v, i) => v === signedPairs[i]) &&
+    (p.schemaVersion !== COMPILE_RECEIPT_SCHEMA || core?.receipt?.coreReleaseDigest === p.coreReleaseDigest);
+  if (!same) return { ok: false, code: "COMPILE_RECEIPT_SUBJECT_MISMATCH", status: 409 };
+  if (p.schemaVersion !== COMPILE_RECEIPT_SCHEMA) return { ok: true };
+  /*
+    A v2 receipt names the source scope it was signed for. The classification is read here, from
+    the stored (and just-matched) source ids, so no caller can skip it; an unreadable
+    classification refuses rather than passes.
+  */
+  const ids = (artifact.sourceDocuments as Array<{ documentId?: unknown }>).map((d) => d.documentId);
+  if (!ids.every((id): id is string => typeof id === "string" && DOCUMENT_ID_PATTERN.test(id))) {
+    return { ok: false, code: "COMPILE_RECEIPT_SUBJECT_MISMATCH", status: 409 };
+  }
+  const scope = await classifyCompileJobSources({ workspaceKey: subject.workspaceId, documentIds: ids });
+  if (!scope.ok) return { ok: false, code: scope.code, status: 503 };
+  return scope.scope === p.sourceScope ? { ok: true } : { ok: false, code: "WORLD_CANDIDATE_SCOPE_CHANGED", status: 409 };
 }
