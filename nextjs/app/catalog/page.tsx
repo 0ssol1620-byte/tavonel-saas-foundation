@@ -1,4 +1,4 @@
-import RouteStub from "@/components/v34/route-stub";
+import Catalog from "@/components/v34/routes/catalog/catalog";
 import { releaseGate } from "@/lib/v34/release";
 import { routeMetadata, routeViewport } from "@/lib/v34/route-metadata";
 
@@ -7,5 +7,5 @@ export const viewport = routeViewport();
 
 export default async function Page() {
   await releaseGate("catalog");
-  return <RouteStub route="catalog" line="Each collection shows its source terms before it is added to a World." />;
+  return <Catalog />;
 }
