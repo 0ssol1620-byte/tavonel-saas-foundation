@@ -30,7 +30,7 @@ import {
   type RecipeIntent,
 } from "@/lib/recipe-intent";
 import { BILLING_OFFERS, type BillingOfferCode, type PlanAvailability } from "@/lib/billing-catalog";
-import { EXPLORE_CTA } from "@/lib/site-navigation";
+import { EXPLORE_CTA, TRIAL_ALLOWANCE } from "@/lib/site-navigation";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
 
 type AuthState = "checking" | "ready" | "unconfigured";
@@ -259,8 +259,8 @@ export default function LoginPage() {
               {/* Review PR201-R2, ADR 0008: uploads open per workspace on the owner's terms acceptance, so the evaluation is conditioned on it. */}
               <strong>Signing in creates your workspace.</strong> Uploading your own sources opens once you
               accept the processing terms there, and your workspace shows whether it is open. Once it is
-              open, a free evaluation uses up to 3 files and 50 standard pages to compile 1 World for 7
-              days. No card is required.
+              open, a free evaluation uses up to {TRIAL_ALLOWANCE.files} files and {TRIAL_ALLOWANCE.pages} standard pages to
+              compile 1 World for {TRIAL_ALLOWANCE.days} days. No card is required.
             </p>
           ) : null}
 

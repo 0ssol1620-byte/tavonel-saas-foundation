@@ -70,3 +70,23 @@ describe("pricing plan overview", () => {
     expect(config).toContain('{ source: "/ko/:path*", destination: "/:path*", permanent: true }');
   });
 });
+
+describe("evaluation figures are read from TRIAL_ALLOWANCE, never typed (lead note, CAT-D2)", () => {
+  const login = readFileSync(new URL("../app/login/page.tsx", import.meta.url), "utf8");
+  // Strip comments so prose about the rule does not trip it; what is left is rendered copy and code.
+  const code = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  for (const [name, source] of [["pricing page", english], ["sign-in page", login]] as const) {
+    it(`${name} types no evaluation day, file or page count`, () => {
+      const rendered = code(source);
+      expect(rendered, "3 files").not.toMatch(/\b3 files\b/);
+      expect(rendered, "50 pages").not.toMatch(/\b50 (standard )?pages\b/);
+      expect(rendered, "seven-day").not.toMatch(/seven-day/i);
+      expect(rendered, "for 7 days").not.toMatch(/for 7\s+days/);
+    });
+    it(`${name} interpolates the allowance`, () => {
+      expect(source).toContain("TRIAL_ALLOWANCE.files");
+      expect(source).toContain("TRIAL_ALLOWANCE.pages");
+    });
+  }
+});

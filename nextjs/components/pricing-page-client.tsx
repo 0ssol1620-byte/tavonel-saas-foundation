@@ -225,7 +225,7 @@ function planPath(
 ) {
   if (plan.kind === "evaluation") {
     return state.selfService
-      ? "Sign in → your workspace opens → 3 files and 50 pages, your first World"
+      ? `Sign in → your workspace opens → ${TRIAL_ALLOWANCE.files} files and ${TRIAL_ALLOWANCE.pages} pages, your first World`
       : "Explore the public World → inspect its evidence → discuss your sources";
   }
   if (plan.kind === "enterprise") return "Talk to us → we scope it against your material → a written quote";
@@ -304,7 +304,7 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceE
   return [
     [
       "Base subscription",
-      `${CURRENT_CODES.map((code) => `${BILLING_OFFERS[code].label}: $${BILLING_OFFERS[code].priceUsd}/month`).join(". ")}. ${selfServiceEvaluation ? "Once your workspace is open, the seven-day evaluation is free and needs no card." : "The public World is free to explore. An evaluation with your own sources is arranged with us."}`,
+      `${CURRENT_CODES.map((code) => `${BILLING_OFFERS[code].label}: $${BILLING_OFFERS[code].priceUsd}/month`).join(". ")}. ${selfServiceEvaluation ? `Once your workspace is open, the ${TRIAL_ALLOWANCE.days}-day evaluation is free and needs no card.` : "The public World is free to explore. An evaluation with your own sources is arranged with us."}`,
     ],
     [
       "Included pages",
@@ -651,7 +651,7 @@ const PURCHASE_FAQ: Array<[string, string, Route, string, string]> = [
 /** Keep the visible FAQ and its JSON-LD aligned with the same self-service gate as the cards. */
 const SELF_SERVICE_FAQ_ANSWERS: Record<string, string> = {
   "What is ready to use?": "A finished public World is open today. Once your workspace is open, you can evaluate your own files with source-linked Evidence, grounded Ask and signed export. Signing in creates the workspace, and it shows whether it is open. The plan comparison above shows which capabilities each plan includes.",
-  "How much setup is required?": "Sign in to create your workspace. Once it is open, a free seven-day Evaluation covers up to 3 files and 50 standard pages. No card is needed, and nothing is charged until you choose a plan.",
+  "How much setup is required?": `Sign in to create your workspace. Once it is open, a free ${TRIAL_ALLOWANCE.days}-day Evaluation covers up to ${TRIAL_ALLOWANCE.files} files and ${TRIAL_ALLOWANCE.pages} standard pages. No card is needed, and nothing is charged until you choose a plan.`,
   "Can I export?": "Yes. The public sample World is digest-bound. Once your workspace is open, a signed workspace export is included with a World compiled during your free Evaluation.",
 };
 
