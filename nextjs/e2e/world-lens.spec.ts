@@ -147,6 +147,14 @@ test.describe("World lens", () => {
     const inspector = page.getByRole("complementary", { name: "World selection inspector" });
     await expect(inspector).toContainText("Selected object");
     await expect(inspector).toContainText(lensObjectLabel(1, 0));
+
+    // Back: leave for another surface (pushState), come back, and the remounted lens reads its URL again.
+    await page.getByRole("complementary", { name: "Workspace navigation" }).getByRole("button", { name: /Review/ }).click();
+    await expect(page).toHaveURL(/\/workspace\/review/);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/workspace\/world/);
+    await expect(page.getByRole("tab", { name: "Graph", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("complementary", { name: "World selection inspector" })).toContainText(lensObjectLabel(1, 0));
   });
 
   test("an older version is read-only and says so, and an evidence pin it lacks is named as missing", async ({ page }) => {
@@ -164,6 +172,23 @@ test.describe("World lens", () => {
     await expect(inspector).toContainText("Evidence not in this revision");
   });
 
+  test("an older version never offers the rollback of the current World, even when a reason is on file", async ({ page }) => {
+    await serveWorld(page, { current: SMALL, past: { ...SMALL, evidenceClusters: 0 } });
+    // The reason box lives on Review; page state survives the client-side move to World.
+    await page.goto(`/workspace/review?collection=${LENS_COLLECTION_ID}`);
+    await page.getByLabel("Rollback reason").fill("Reviewed the diff and the older version is correct.");
+    await page.getByRole("complementary", { name: "Workspace navigation" }).getByRole("button", { name: /World/ }).click();
+    await expect(page).toHaveURL(/\/workspace\/world/);
+    await page.getByRole("tab", { name: "Versions", exact: true }).click();
+    const rollback = page.getByRole("button", { name: "Roll back to this version" });
+    // Positive control: with a reason on file the current version's lens does offer it.
+    await expect(rollback).toBeVisible();
+
+    await page.getByLabel("View as of").selectOption(LENS_PAST_MANIFEST);
+    await expect(page.getByRole("status").filter({ hasText: "Viewing version 1 · not the current World" })).toBeVisible();
+    await expect(rollback).toHaveCount(0);
+  });
+
   test("a version that cannot be read leaves the current World on screen with an error and no asof", async ({ page }) => {
     await serveWorld(page, { current: SMALL, pastStatus: 503 });
     await page.goto(WORLD_URL);
@@ -171,7 +196,7 @@ test.describe("World lens", () => {
     await expect(page.getByText("That version could not be read. The current World is shown.")).toBeVisible();
     await expect(page.getByText("not the current World")).toHaveCount(0);
     await expect(page.getByLabel("View as of")).toHaveValue(LENS_CURRENT_MANIFEST);
-    expect(new URL(page.url()).searchParams.has("asof")).toBe(false);
+    await expect.poll(() => new URL(page.url()).searchParams.has("asof")).toBe(false);
   });
 
   test("3,000 objects collapse clusters, Enter on an aggregate expands it, and the table lists every row", async ({ page }) => {
