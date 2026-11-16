@@ -26,6 +26,12 @@ const REFUSED: Record<number, string> = {
   409: "This proposal can no longer be changed. The list now shows the latest.",
 };
 
+export function decisionProblem(status: number): string | null {
+  if (status === 200) return null;
+  if (status === 0 || status >= 500) return "The response could not be confirmed. The list below was read again and shows what was recorded.";
+  return REFUSED[status] ?? "The decision was not saved. Try again.";
+}
+
 async function api(path: string, init: RequestInit = {}) {
   const client = getSupabaseBrowserClient();
   const token = client ? (await client.auth.getSession()).data.session?.access_token ?? null : null;
@@ -67,8 +73,7 @@ export default function ChangeProposalsPanel({ collectionId }: Props) {
       } catch {
         status = 0;
       }
-      if (status === 0) setProblem("The response could not be confirmed. The list below was read again and shows what was recorded.");
-      else if (status !== 200) setProblem(REFUSED[status] ?? "The decision was not saved. Try again.");
+      setProblem(decisionProblem(status));
       await refresh();
     } finally {
       setBusy(null);
