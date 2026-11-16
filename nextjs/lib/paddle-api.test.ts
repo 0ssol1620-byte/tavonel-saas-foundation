@@ -100,7 +100,7 @@ describe("Paddle read-only reconciliation reads", () => {
       .mockResolvedValueOnce(page([txnRow(2)], false));
     vi.stubGlobal("fetch", fetchMock);
     const result = await listPaddleTransactions({ updatedAfter: "2026-11-01T00:00:00Z" }, env);
-    expect(result).toMatchObject({ ok: true, truncated: false, items: [{ id: id("txn", 1), total: "2900" }, { id: id("txn", 2) }] });
+    expect(result).toMatchObject({ ok: true, updatedAfter: "2026-11-01T00:00:00Z", truncated: false, items: [{ id: id("txn", 1), total: "2900" }, { id: id("txn", 2) }] });
     expect(String(fetchMock.mock.calls[1][0])).toContain(`after=${id("txn", 1)}`);
     expect(fetchMock.mock.calls.every((c) => c[1].method === "GET")).toBe(true);
   });
@@ -109,7 +109,7 @@ describe("Paddle read-only reconciliation reads", () => {
     const fetchMock = vi.fn().mockImplementation(async () => page([txnRow(1)], true));
     vi.stubGlobal("fetch", fetchMock);
     const result = await listPaddleTransactions({ updatedAfter: "2026-11-01T00:00:00Z" }, env);
-    expect(result).toMatchObject({ ok: true, truncated: true, next: id("txn", 1) });
+    expect(result).toMatchObject({ ok: true, updatedAfter: "2026-11-01T00:00:00Z", truncated: true, next: id("txn", 1) });
     expect(fetchMock).toHaveBeenCalledTimes(20);
   });
 
@@ -118,6 +118,17 @@ describe("Paddle read-only reconciliation reads", () => {
     await expect(listPaddleAdjustments({ updatedAfter: "x" }, env)).resolves.toEqual({ ok: false, code: "PADDLE_READ_FAILED" });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(page([{ id: "bogus" }], false)));
     await expect(listPaddleTransactions({ updatedAfter: "x" }, env)).resolves.toEqual({ ok: false, code: "PADDLE_READ_INVALID" });
+  });
+
+  // A page that does not say, as a boolean, whether more follow is not the last page: "complete" is never assumed.
+  it("refuses a page whose pagination is missing or not a boolean, instead of calling the read complete", async () => {
+    const metas = [undefined, null, {}, { pagination: null }, { pagination: {} },
+      ...["true", "false", 1, 0, null, {}].map((has_more) => ({ pagination: { has_more } }))];
+    for (const meta of metas) {
+      vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => new Response(JSON.stringify({ data: [txnRow(1)], meta }), { status: 200 })));
+      await expect(listPaddleTransactions({ updatedAfter: "x" }, env), JSON.stringify(meta) ?? "undefined")
+        .resolves.toEqual({ ok: false, code: "PADDLE_READ_INVALID" });
+    }
   });
 
   it("is not configured when a sandbox key meets the production flag, and makes no request", async () => {
@@ -173,12 +184,17 @@ describe("Paddle read-only reconciliation reads", () => {
         () => ({ ...base, details: { totals: { total: "1" }, line_items: [pick([null, value(2), { price_id: id("pri", 1), quantity: value(1) }])] } }),
         () => value(4),
       ])();
-      const body = rand() < 0.8 ? { data: rand() < 0.7 ? [mutated, ...(rand() < 0.2 ? [null] : [])] : mutated, meta: { pagination: { has_more: rand() < 0.3 } } } : value(4);
+      const meta = rand() < 0.8 ? { pagination: { has_more: rand() < 0.3 } } : value(2);
+      const body = rand() < 0.8 ? { data: rand() < 0.7 ? [mutated, ...(rand() < 0.2 ? [null] : [])] : mutated, meta } : value(4);
+      const hasMore = (body as { meta?: { pagination?: { has_more?: unknown } } } | null)?.meta?.pagination?.has_more;
       vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => new Response(JSON.stringify(body) ?? "", { status: 200 })));
       for (const result of [
         await listPaddleTransactions({ updatedAfter: "x" }, env), await listPaddleAdjustments({ updatedAfter: "x" }, env),
       ]) {
-        if (result.ok) expect(result.items.every((t) => /^(txn|adj)_[a-z0-9]{26}$/.test(t.id) && typeof t.status === "string")).toBe(true);
+        if (result.ok) {
+          expect(result.items.every((t) => /^(txn|adj)_[a-z0-9]{26}$/.test(t.id) && typeof t.status === "string")).toBe(true);
+          expect(typeof hasMore).toBe("boolean");
+        }
         else expect(codes).toContain(result.code);
       }
       const price = await getPaddlePrice(id("pri", 1), env);

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BILLING_OFFERS } from "./billing-catalog";
 import type { PaddleAdjustment, PaddlePrice, PaddleTransaction } from "./paddle-api";
-import { priceBookDelta, processorDelta, readLedgerForReconciliation, type LedgerRow } from "./paddle-reconciliation";
+import { priceBookDelta, processorDelta as delta, readLedgerForReconciliation, type LedgerRow } from "./paddle-reconciliation";
 
 const txn = (c: string) => `txn_${c.repeat(26)}`;
 const tx = (id: string, status = "completed"): PaddleTransaction =>
@@ -14,6 +14,9 @@ const reversal = (id: string): LedgerRow => ({
 });
 const refund = (transactionId: string, status = "approved"): PaddleAdjustment =>
   ({ id: `adj_${"a".repeat(26)}`, transactionId, action: "refund", status, currency: "USD", total: "2900" });
+const window = { ledgerSince: "2026-11-01T00:00:00Z", processorUpdatedAfter: "2026-11-01T00:00:00Z", truncated: false };
+const processorDelta = (...args: [readonly LedgerRow[], readonly PaddleTransaction[], readonly PaddleAdjustment[]]) => delta(...args, window);
+const buckets = { missingInLedger: [], missingAtProcessor: [], creditMismatch: [], reversalMissing: [], reversalUnexpected: [] };
 
 describe("processorDelta", () => {
   it("reports each bucket exactly, keyed by transaction id", () => {
@@ -24,6 +27,7 @@ describe("processorDelta", () => {
       [refund(d), refund(e, "pending_approval")],
     );
     expect(delta).toEqual({
+      window,
       missingInLedger: [a],
       missingAtProcessor: [b],
       creditMismatch: [c],
@@ -41,15 +45,41 @@ describe("processorDelta", () => {
       [tx(a), tx(b), tx(c, "billed")],
       [warn],
     );
-    expect(delta).toEqual({
-      missingInLedger: [], missingAtProcessor: [], creditMismatch: [], reversalMissing: [], reversalUnexpected: [],
-    });
+    expect(delta).toEqual({ window, ...buckets });
   });
 
   it("is empty when ledger and processor agree", () => {
     const a = txn("a");
-    const delta = processorDelta([grant(a), reversal(a)], [tx(a)], [refund(a)]);
-    expect(Object.values(delta).every((v) => v.length === 0)).toBe(true);
+    expect(processorDelta([grant(a), reversal(a)], [tx(a)], [refund(a)])).toEqual({ window, ...buckets });
+  });
+
+  // An empty delta means "nothing disagrees inside what was read", so the result names that range, truncation included.
+  it("states the window it read, also when the delta is empty", () => {
+    const read = { ledgerSince: "2026-10-01T00:00:00Z", processorUpdatedAfter: "2026-10-02T00:00:00Z", truncated: true };
+    expect(delta([], [], [], read)).toEqual({ window: read, ...buckets });
+    expect(delta([], [], [], read).window).not.toBe(read);
+  });
+
+  it("reports a completed, refunded transaction with no grant at all in both buckets", () => {
+    const a = txn("a");
+    for (const action of ["refund", "credit", "chargeback", "chargeback_warning"]) {
+      expect(processorDelta([], [tx(a)], [{ ...refund(a), action }])).toMatchObject({ missingInLedger: [a], reversalMissing: [a] });
+    }
+  });
+
+  // A direct caller cannot hand the pure delta a row it cannot key or count and get silence back.
+  it("refuses every ledger row it cannot key or count, instead of dropping it", () => {
+    const a = txn("a");
+    const unkeyable: LedgerRow[] = [
+      { ...grant(a), transactionId: null }, { ...grant(a), kind: "allowance", transactionId: null }, { ...grant(a), transactionId: "" },
+      { ...reversal(a), reversalOfTransactionId: null }, { ...reversal(a), reversalOfTransactionId: "" },
+      { ...grant(a), kind: "consumed" }, { ...grant(a), kind: "" }, { ...grant(a), kind: "__proto__" },
+      { ...grant(a), creditDelta: 1.5 }, { ...grant(a), creditDelta: Number.NaN }, { ...grant(a), creditDelta: 2 ** 60 },
+      { ...grant(a), eventId: "" }, null as unknown as LedgerRow,
+    ];
+    for (const row of unkeyable) {
+      expect(() => processorDelta([grant(txn("b")), row], [tx(a), tx(txn("b"))], []), JSON.stringify(row)).toThrow(TypeError);
+    }
   });
 
   it("reports an approved refund without a reversal row even when its grant is outside the ledger window", () => {
@@ -100,8 +130,8 @@ describe("processorDelta", () => {
         } else if (rand() < 0.2) adjustments.push(refund(id, pick(["pending_approval", "rejected"])));
       }
       const transactions = ids.map((id) => tx(id));
-      const empty = { missingInLedger: [], missingAtProcessor: [], creditMismatch: [], reversalMissing: [], reversalUnexpected: [] };
-      expect(processorDelta(ledger, transactions, adjustments)).toEqual(empty);
+      const empty = buckets;
+      expect(processorDelta(ledger, transactions, adjustments)).toEqual({ window, ...empty });
 
       const target = pick(ids);
       const corruption = pick(corruptions);
@@ -140,11 +170,11 @@ describe("readLedgerForReconciliation", () => {
 
   it("reads typed rows and says when the page cap truncated it", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(ok([valid])));
-    await expect(readLedgerForReconciliation("2026-11-01T00:00:00Z")).resolves.toEqual({ ok: true, truncated: false, rows: [{
+    await expect(readLedgerForReconciliation("2026-11-01T00:00:00Z")).resolves.toEqual({ ok: true, since: "2026-11-01T00:00:00Z", truncated: false, rows: [{
       eventId: "evt_a", kind: "purchased", transactionId: txn("a"), reversalOfTransactionId: null, creditDelta: 2_000, offerCode: "observer_access",
     }] });
     vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => ok(Array.from({ length: 1000 }, () => valid))));
-    await expect(readLedgerForReconciliation("x")).resolves.toMatchObject({ ok: true, truncated: true });
+    await expect(readLedgerForReconciliation("x")).resolves.toMatchObject({ ok: true, since: "x", truncated: true });
   });
 
   it("fails typed when not configured, unreachable, non-2xx or not an array", async () => {

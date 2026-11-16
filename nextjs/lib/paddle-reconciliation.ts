@@ -17,18 +17,30 @@ const KINDS = new Set(["purchased", "allowance", "reversed", "allowance_expired"
 const GRANTS = new Set(["purchased", "allowance"]);
 const strOrNull = (v: unknown): v is string | null => v === null || typeof v === "string";
 
-/** A row the delta cannot key or count is refused, never coerced: no "undefined" id, no 0 credits, no unkeyed grant. */
+/**
+ * A row the delta cannot key or count: no "undefined" id, no 0 credits, no unkeyed grant or reversal.
+ * The reader and the pure delta both route through this one check, so neither path can drop such a row silently.
+ */
+function isKeyable(row: unknown): row is LedgerRow {
+  if (!row || typeof row !== "object") return false;
+  const { eventId, kind, transactionId, reversalOfTransactionId: reversalOf, creditDelta, offerCode } = row as Record<string, unknown>;
+  if (typeof eventId !== "string" || !eventId || typeof kind !== "string" || !KINDS.has(kind) || !Number.isSafeInteger(creditDelta)
+    || !strOrNull(transactionId) || !strOrNull(reversalOf) || !strOrNull(offerCode)) return false;
+  return !((GRANTS.has(kind) && !transactionId) || (kind === "reversed" && !reversalOf));
+}
+
+/** A stored row is refused, never coerced. */
 function parseLedgerRow(raw: unknown): LedgerRow | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
-  const { event_id: eventId, kind, transaction_id: transactionId, reversal_of_transaction_id: reversalOf, credit_delta: creditDelta, offer_code: offerCode } = r;
-  if (typeof eventId !== "string" || !eventId || typeof kind !== "string" || !KINDS.has(kind) || !Number.isSafeInteger(creditDelta)
-    || !strOrNull(transactionId) || !strOrNull(reversalOf) || !strOrNull(offerCode)) return null;
-  if ((GRANTS.has(kind) && !transactionId) || (kind === "reversed" && !reversalOf)) return null;
-  return { eventId, kind, transactionId, reversalOfTransactionId: reversalOf, creditDelta: creditDelta as number, offerCode };
+  const row = {
+    eventId: r.event_id, kind: r.kind, transactionId: r.transaction_id, reversalOfTransactionId: r.reversal_of_transaction_id,
+    creditDelta: r.credit_delta, offerCode: r.offer_code,
+  };
+  return isKeyable(row) ? row : null;
 }
 
-/** Service-role read of the credit ledger since an instant. `truncated` is true when the page cap cut it. */
+/** Service-role read of the credit ledger since an instant. The result names that instant; `truncated` is true when the page cap cut it. */
 export async function readLedgerForReconciliation(sinceIso: string) {
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "BILLING_STORE_NOT_CONFIGURED" };
@@ -55,16 +67,23 @@ export async function readLedgerForReconciliation(sinceIso: string) {
       if (!row) return { ok: false as const, code: "BILLING_STORE_READ_INVALID" };
       rows.push(row);
     }
-    if (batch.length < PAGE) return { ok: true as const, rows, truncated: false };
+    if (batch.length < PAGE) return { ok: true as const, since: sinceIso, rows, truncated: false };
   }
-  return { ok: true as const, rows, truncated: true };
+  return { ok: true as const, since: sinceIso, rows, truncated: true };
 }
 
 // Same sources as the webhook: grants only on transaction.completed; ADVERSE_ADJUSTMENT_ACTIONS in paddle-billing-event.ts.
 const PAID = new Set(["completed"]);
 const REVERSING = new Set(["refund", "credit", "chargeback", "chargeback_warning"]);
 
+/**
+ * What the inputs cover: the ledger's `created_at >= ledgerSince`, Paddle's `updated_at > processorUpdatedAfter`,
+ * and whether any of the three reads hit its page cap. An empty delta means agreement inside this window only.
+ */
+export type ReconciliationWindow = { ledgerSince: string; processorUpdatedAfter: string; truncated: boolean };
+
 export type ProcessorDelta = {
+  window: ReconciliationWindow;
   missingInLedger: string[];
   missingAtProcessor: string[];
   creditMismatch: string[];
@@ -80,18 +99,23 @@ const catalogCredits = (code: string | null) =>
  * Fail closed: an input this cannot match is reported, never read as agreement. The ledger window is not
  * the processor's, so no bucket is gated on the other side being in its window: a refund whose grant is
  * older than `since` still needs its reversal row, and a grant the catalog cannot price is a mismatch.
+ * A ledger row it cannot key, or a window that does not name its range, is a TypeError, never a skip.
  */
 export function processorDelta(
   ledger: readonly LedgerRow[],
   transactions: readonly PaddleTransaction[],
   adjustments: readonly PaddleAdjustment[],
+  window: ReconciliationWindow,
 ): ProcessorDelta {
+  if (typeof window?.ledgerSince !== "string" || typeof window.processorUpdatedAfter !== "string" || typeof window.truncated !== "boolean") {
+    throw new TypeError("processorDelta: the window it read is required");
+  }
   const grants = new Map<string, LedgerRow[]>();
   const reversed = new Set<string>();
   for (const row of ledger) {
-    if (row.kind === "reversed") {
-      if (row.reversalOfTransactionId) reversed.add(row.reversalOfTransactionId);
-    } else if (GRANTS.has(row.kind) && row.transactionId) grants.set(row.transactionId, [...grants.get(row.transactionId) ?? [], row]);
+    if (!isKeyable(row)) throw new TypeError("processorDelta: a ledger row cannot be keyed or counted");
+    if (row.kind === "reversed") reversed.add(row.reversalOfTransactionId!);
+    else if (GRANTS.has(row.kind)) grants.set(row.transactionId!, [...grants.get(row.transactionId!) ?? [], row]);
   }
   const paid = new Set(transactions.filter((t) => PAID.has(t.status)).map((t) => t.id));
   const approvedReversals = new Set(
@@ -99,6 +123,7 @@ export function processorDelta(
   );
   const sorted = (s: Iterable<string>) => [...new Set(s)].sort();
   return {
+    window: { ledgerSince: window.ledgerSince, processorUpdatedAfter: window.processorUpdatedAfter, truncated: window.truncated },
     missingInLedger: sorted([...paid].filter((id) => !grants.has(id))),
     // A grant the processor does not have as a completed transaction (absent, or billed/past_due).
     missingAtProcessor: sorted([...grants.keys()].filter((id) => !paid.has(id))),

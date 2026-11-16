@@ -187,7 +187,7 @@ export type PaddlePrice = {
 
 export type PaddleReadFailure = "PADDLE_API_NOT_CONFIGURED" | "PADDLE_READ_FAILED" | "PADDLE_READ_INVALID";
 export type PaddleListResult<T> =
-  | { ok: true; items: T[]; truncated: boolean; next: string | null }
+  | { ok: true; updatedAfter: string; items: T[]; truncated: boolean; next: string | null }
   | { ok: false; code: PaddleReadFailure };
 
 type Row = Record<string, unknown>;
@@ -266,12 +266,14 @@ async function listPaddle<T>(
       if (!parsed) return { ok: false, code: "PADDLE_READ_INVALID" };
       items.push(parsed);
     }
-    const pagination = (result.json?.meta as Row | undefined)?.pagination as Row | undefined;
-    if (pagination?.has_more !== true) return { ok: true, items, truncated: false, next: null };
+    // A page that does not say, as a boolean, whether more follow is invalid: it is never taken as the last page.
+    const hasMore = ((result.json?.meta as Row | null | undefined)?.pagination as Row | null | undefined)?.has_more;
+    if (typeof hasMore !== "boolean") return { ok: false, code: "PADDLE_READ_INVALID" };
+    if (!hasMore) return { ok: true, updatedAfter, items, truncated: false, next: null };
     cursor = str(data.length ? (data[data.length - 1] as Row).id : null);
     if (!cursor) return { ok: false, code: "PADDLE_READ_INVALID" };
   }
-  return { ok: true, items, truncated: true, next: cursor };
+  return { ok: true, updatedAfter, items, truncated: true, next: cursor };
 }
 
 export const listPaddleTransactions = (q: { updatedAfter: string; after?: string }, env: Env = process.env) =>
