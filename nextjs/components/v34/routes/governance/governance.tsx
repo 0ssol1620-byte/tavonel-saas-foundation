@@ -53,7 +53,7 @@ export function GovernanceBody() {
       <Hero
         variant="split"
         eyebrow={record.ogLabel}
-        title={record.title.replace(/ — TAVONEL$/, "")}
+        title={record.heading}
         lead={record.description}
         actions={<ButtonLink href={SECURITY} tone="onDark">Read the security overview</ButtonLink>}
         art={<Figure framed={false} kind="Illustration" caption="A proposal, a reviewer and a World, with the audit trail beneath." art={<Art />} />}

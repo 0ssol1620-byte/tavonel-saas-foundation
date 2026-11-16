@@ -53,7 +53,7 @@ export function OutcomesBody() {
       <Hero
         variant="split"
         eyebrow={record.ogLabel}
-        title={record.title.replace(/ — TAVONEL$/, "")}
+        title={record.heading}
         lead={record.description}
         actions={<ButtonLink href={EVIDENCE} tone="onDark">See how evidence is linked</ButtonLink>}
         art={<Figure framed={false} kind="Illustration" caption="An outcome report: a baseline, a candidate, a period and a source." art={<Art />} />}

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { typedCounts } from "./route-test-support";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { MCP_TOOL_NAMES } from "@/lib/mcp-tools";
 import { TeamsBody } from "@/components/v34/routes/teams/teams";
@@ -37,7 +38,7 @@ describe("teams route (held)", () => {
     const html = renderToStaticMarkup(createElement(TeamsBody));
     expect(html.match(/<h1\b/g)).toHaveLength(1);
     const h1 = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)![1];
-    expect(h1).toBe(v34Route("teams").title.replace(/ — TAVONEL$/, ""));
+    expect(h1).toBe("Shared Worlds for groups that work together");
     expect(code.filter((x) => /<h1\b/.test(x.text))).toHaveLength(0);
   });
 
@@ -70,5 +71,11 @@ describe("teams route (held)", () => {
       expect(x.text, x.f).not.toMatch(/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(/);
       expect(x.text, x.f).not.toMatch(/overflow(?:-[xy])?\s*:\s*hidden|:global/);
     }
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("teams")).toEqual([]);
   });
 });

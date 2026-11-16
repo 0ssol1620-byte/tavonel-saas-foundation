@@ -14,7 +14,6 @@ import { PersonalArt } from "./personal-art";
 import s from "./personal.module.css";
 
 const ordinal = (index: number) => String(index + 1).padStart(2, "0");
-const TITLE_SUFFIX = / — TAVONEL$/;
 
 /** The page body, without the V34 frame, so it can be rendered on its own. */
 export function PersonalBody() {
@@ -27,7 +26,7 @@ export function PersonalBody() {
       <Hero
         variant="split"
         eyebrow={HERO.eyebrow}
-        title={route.title.replace(TITLE_SUFFIX, "")}
+        title={route.heading}
         lead={route.description}
         actions={
           <div className={s.actions}>

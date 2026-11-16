@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { typedCounts } from "./route-test-support";
 import { REVISION_BLOCKS, RevisionBody } from "@/components/v34/routes/journal-revision/revision-article";
 import { REVISION_SOURCES } from "@/components/v34/routes/journal-revision/revision-sources";
 import { articleDates } from "@/components/v34/routes/journal/article-dates";
@@ -72,7 +73,7 @@ describe("one h1, from the registry", () => {
   it("writes no h1 of its own and renders the registry title once", () => {
     for (const f of files) expect(f.text, f.file).not.toMatch(/<h1\b/);
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    const title = v34Route(KEY).title.replace(/ — TAVONEL$/, "");
+    const title = "What changed in a NIST control catalog revision";
     expect(html).toContain(`>${title}</h1>`);
   });
 });
@@ -165,5 +166,11 @@ describe("copy", () => {
     for (const source of REVISION_SOURCES) expect(source.href).toMatch(/^https:\/\//);
     const printed = [...html.matchAll(/<a class="[^"]*" href="(https:[^"]+)"/g)].map((m) => m[1]);
     expect(printed).toEqual(REVISION_SOURCES.map((s) => s.href.replaceAll("&", "&amp;")));
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("journal-revision")).toEqual([]);
   });
 });

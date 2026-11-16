@@ -37,7 +37,7 @@ export function CreatorsBody() {
       <Hero
         variant="sub"
         eyebrow={record.ogLabel}
-        title={record.title.replace(/ — TAVONEL$/, "")}
+        title={record.heading}
         lead={record.description}
         actions={<ButtonLink href={v34Route("studio").path} tone="primary">Open the reference walkthrough</ButtonLink>}
       />

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { h1Text, typedCounts } from "./route-test-support";
 import { MethodsBody } from "@/components/v34/routes/methods/methods";
 import { METHODS_DESTINATIONS } from "@/components/v34/routes/methods/methods-content";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
@@ -72,7 +73,7 @@ describe("app/methods/page.tsx", () => {
     expect(route.release).toBe("live");
     expect(routeMetadata("methods").title).toBe(route.title);
     expect(html).toContain(`<h1`);
-    expect(html).toContain(escapeHtml(route.title.replace(/ — TAVONEL$/, "")));
+    expect(h1Text(html)).toBe("How TAVONEL compiles a document into records");
     expect(html).toContain(escapeHtml(route.description));
   });
 });
@@ -223,5 +224,11 @@ describe("links", () => {
   it("names its art and tags it as an illustration", () => {
     expect(html).toMatch(/<svg[^>]*role="img"[^>]*aria-label="[^"]+"/);
     expect(html).toContain("Illustration");
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("methods")).toEqual([]);
   });
 });

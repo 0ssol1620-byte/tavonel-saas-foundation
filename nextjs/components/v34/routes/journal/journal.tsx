@@ -45,7 +45,7 @@ function Card({ articleKey }: { articleKey: V34RouteKey }) {
       <Link className={`${surfaceClass("nestedLight")} ${s.card}`} href={article.path} prefetch={false}>
         <span className={s.cover}><Cover /></span>
         <span className={s.meta}>{category}{minutes ? <span className={s.minutes}> / {minutes} min read</span> : null}</span>
-        <h3 className={s.cardTitle}>{article.title.replace(/ — TAVONEL$/, "")}</h3>
+        <h3 className={s.cardTitle}>{article.heading}</h3>
         <span className={s.cardText}>{article.description}</span>
         <span className={s.cardAction}>{GUIDES.read}</span>
       </Link>
@@ -62,7 +62,7 @@ export function JournalBody() {
       <Hero
         variant="split"
         eyebrow={record.ogLabel}
-        title={record.title.replace(/ — TAVONEL$/, "")}
+        title={record.heading}
         lead={record.description}
         actions={<ButtonLink href={v34Route(FEATURED).path}>{HERO.action}</ButtonLink>}
         art={<Figure art={<Cover />} caption={HERO.figure} />}

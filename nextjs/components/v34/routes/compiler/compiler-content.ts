@@ -43,7 +43,7 @@ if (clause("evidence-preserving").state !== "demonstrated") {
 
 export const HERO = {
   eyebrow: record.ogLabel,
-  title: record.title.replace(/ — TAVONEL$/, ""),
+  title: record.heading,
   lead: record.description,
   secondary: { href: to("evidence"), label: "Inspect evidence" },
   figure: "One page, read into regions, with each region held by a record that points back to it.",

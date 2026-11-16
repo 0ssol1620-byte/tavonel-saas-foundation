@@ -7,6 +7,7 @@ import { FinalCta } from "@/components/v34/ui/final-cta";
 import { Hero } from "@/components/v34/ui/hero";
 import { ScrollTable } from "@/components/v34/ui/scroll-table";
 import { Section } from "@/components/v34/ui/section";
+import { activationPolicy, customerDataState } from "@/lib/activation-policy";
 import { readCapabilities, type StatusResponse } from "@/lib/capabilities";
 import { CONTRACT_CLAUSES, CONTRACT_STATE, type ContractClauseState } from "@/lib/compiler-contract";
 import { v34Route } from "@/lib/v34/routes";
@@ -17,7 +18,6 @@ import { CONTRACT, DEPLOYMENT, EXPLORE, FINAL, FORMATS, HERO } from "./capabilit
 import { readStatusBounded, type StatusRead } from "./capabilities-status";
 import s from "./capabilities.module.css";
 
-const SUFFIX = / — TAVONEL$/;
 
 /** "01", "02", ... counted from the list position. */
 const ordinal = (index: number) => String(index + 1).padStart(2, "0");
@@ -58,7 +58,7 @@ export function CapabilitiesBody({ status, failed }: { status: StatusResponse | 
       <Hero
         variant="split"
         eyebrow={record.ogLabel}
-        title={record.title.replace(SUFFIX, "")}
+        title={record.heading}
         lead={record.description}
         art={<Figure art={<ClauseRing />} caption={HERO.figure} />}
       />
@@ -125,7 +125,7 @@ export function CapabilitiesBody({ status, failed }: { status: StatusResponse | 
         <ScrollTable
           label={DEPLOYMENT.table}
           columns={DEPLOYMENT.columns}
-          rows={deployment.map((row) => [row.name, row.state, row.note])}
+          rows={deployment.map((row) => [row.name, row.state, row.note === activationPolicy.customerData.reason ? customerDataState : row.note])}
         />
       </Section>
 

@@ -41,7 +41,7 @@ function verifier(key: string) {
 
 export const HERO = {
   eyebrow: record.ogLabel,
-  title: record.title.replace(/ — TAVONEL$/, ""),
+  title: record.heading,
   lead: record.description,
   secondary: { href: to("capabilities"), label: "Explore the capabilities" },
   figure: "A source file is read into regions, compiled into a World, and every record keeps its way back to the region it came from.",

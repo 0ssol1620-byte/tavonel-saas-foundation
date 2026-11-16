@@ -16,7 +16,6 @@ import { BRIDGE, FIELDS, FINAL, HERO, ROLES, TASKS, type SolutionLink } from "./
 import { SolutionsArt } from "./solutions-art";
 import s from "./solutions.module.css";
 
-const SUFFIX = / — TAVONEL$/;
 
 /**
  * One card, one link. The anchor's ::after covers the card (a stretched link), so the whole card is
@@ -61,7 +60,7 @@ export function SolutionsBody() {
       <Hero
         variant="split"
         eyebrow={HERO.eyebrow}
-        title={route.title.replace(SUFFIX, "")}
+        title={route.heading}
         lead={route.description}
         actions={
           <>

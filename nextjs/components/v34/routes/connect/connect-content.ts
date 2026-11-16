@@ -30,7 +30,7 @@ export const HERO = {
 export const TRANSPORTS = {
   eyebrow: "Two transports",
   title: "Pick how your client connects.",
-  table: "The two ways a client connects and the state of each",
+  table: "The ways a client connects and the state of each",
   columns: ["Transport", "Where it runs", "Sign-in", "State"],
   local: ["Local server (stdio)", "A process your client launches from tavonel-mcp.mjs on your machine", "An API key in the server's env block", "Available"],
   remote: ["Remote endpoint (HTTP)", "A URL your client connects to", "OAuth with PKCE, or an API key that holds only the read scopes"],
@@ -54,7 +54,7 @@ export const CLIENTS = {
 
 export const STEPS = {
   eyebrow: "Local server",
-  title: "Five steps from download to first read.",
+  title: "From download to first read, step by step.",
   items: [
     { title: "Download the server", text: "Take tavonel-mcp.mjs from the published files and check it against the sha256 in the distribution record before it runs." },
     { title: "Create a read key", text: "In the workspace, open Developers and create an API key with read scopes. The server reads with this key." },

@@ -25,7 +25,7 @@ function trail(key: V34RouteKey) {
     const ancestor = v34RouteByPath(`/${segments.slice(0, i).join("/")}`);
     if (ancestor) steps.push({ name: ancestor.ogLabel, path: ancestor.path });
   }
-  steps.push({ name: route.schema === "Article" ? route.title.replace(/ — TAVONEL$/, "") : route.ogLabel, path: route.path });
+  steps.push({ name: route.schema === "Article" ? route.heading : route.ogLabel, path: route.path });
   return steps;
 }
 
@@ -44,7 +44,7 @@ export function routeJsonLd(key: V34RouteKey): readonly JsonLd[] {
     nodes.push({
       "@context": "https://schema.org",
       "@type": "Article",
-      headline: route.title.replace(/ — TAVONEL$/, ""),
+      headline: route.heading,
       description: route.description,
       mainEntityOfPage: route.canonical,
       datePublished: route.article.published,

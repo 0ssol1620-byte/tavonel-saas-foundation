@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { typedCounts } from "./route-test-support";
 import { FilmBody } from "@/components/v34/routes/film/film";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { MCP_TOOL_NAMES } from "@/lib/mcp-tools";
@@ -69,7 +70,7 @@ describe("one h1 and the Storyboard label", () => {
   it("writes no h1 of its own and renders the registry title once", () => {
     for (const f of files) expect(f.text, f.file).not.toMatch(/<h1\b/);
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    const h1Title = v34Route(KEY).title.replace(/ — TAVONEL$/, "");
+    const h1Title = "A storyboard of how a document becomes a World";
     expect(html).toContain(`>${h1Title}</h1>`);
     expect(html.match(/<h1\b[^>]*>.*?<\/h1>/s)?.[0]).not.toContain("— TAVONEL");
   });
@@ -136,5 +137,11 @@ describe("copy", () => {
   it("promises no date and carries no internal identifier", () => {
     expect(text).not.toMatch(/\b(?:coming soon|will launch|launches in|available from)\b/i);
     expect(text).not.toMatch(/\b(?:D\d{2}|U\d{2}|EG-\w+|WO-[\w-]+)\b/);
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("film")).toEqual([]);
   });
 });

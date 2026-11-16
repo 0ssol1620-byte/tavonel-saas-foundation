@@ -116,7 +116,7 @@ export function CompilerBody({ published, modified }: { published: string; modif
   return (
     <>
       <ArticleLayout
-        title={record.title.replace(/ — TAVONEL$/, "")}
+        title={record.heading}
         dek={COMPILER_DEK}
         published={published}
         modified={modified}

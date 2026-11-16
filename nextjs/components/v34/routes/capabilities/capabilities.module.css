@@ -105,7 +105,6 @@
 
 .clauseName {
   margin: 0;
-  color: var(--v34-fg);
   font-size: clamp(1.25rem, 2vw, 1.75rem);
   font-weight: 500;
   letter-spacing: var(--v34-track-h2);
@@ -173,7 +172,6 @@
 
 .sharedTitle {
   margin: 0;
-  color: var(--v34-fg);
   font-size: var(--v34-h3);
   font-weight: 600;
 }

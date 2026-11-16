@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { typedCounts } from "./route-test-support";
 import { WorldBody } from "@/components/v34/routes/world/world";
 import { WORLD_DESTINATIONS, WORLD_RETAINED } from "@/components/v34/routes/world/world-content";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
@@ -220,5 +221,11 @@ describe("copy", () => {
   it("leaves out what the product does not ship and what the register removed", () => {
     const text = stripped(code).map((f) => f.text).join("\n");
     for (const phrase of ["private Worlds remain isolated", "Proposed relationships", "model weights", "authorized source can belong", "first five minutes"]) expect(text.toLowerCase(), phrase).not.toContain(phrase.toLowerCase());
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("world")).toEqual([]);
   });
 });

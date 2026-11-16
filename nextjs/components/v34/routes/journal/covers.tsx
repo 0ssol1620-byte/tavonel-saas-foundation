@@ -58,7 +58,7 @@ export function McpCover() {
 /** Two revisions of a source, and the approved answer traced to the later one. */
 export function RevisionCover() {
   return (
-    <svg className={s.art} viewBox="0 0 640 320" role="img" aria-label="Two revisions of a source lead to the approved revision" xmlns="http://www.w3.org/2000/svg">
+    <svg className={s.art} viewBox="0 0 640 320" role="img" aria-label="An earlier and a later revision of a source lead to the approved revision" xmlns="http://www.w3.org/2000/svg">
       <rect className={s.sheet} x={30} y={196} width={150} height={64} rx={8} />
       <rect className={s.sheet} x={245} y={146} width={150} height={64} rx={8} />
       <rect className={s.sheet} x={460} y={96} width={150} height={64} rx={8} />

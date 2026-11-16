@@ -29,7 +29,7 @@ export const MARKETS_BLOCKS: readonly ArticleBlock[] = [
     kind: "figure",
     node: (
       <ScrollTable
-        label="The four dates a point-in-time record keeps and why each matters"
+        label="The dates a point-in-time record keeps and why each matters"
         columns={["Date", "Why it matters"]}
         rows={[
           ["Effective or observation time", "The period the fact describes."],
@@ -43,7 +43,7 @@ export const MARKETS_BLOCKS: readonly ArticleBlock[] = [
   { kind: "p", text: "For each datum, preserve the source, identifier, publication or ingestion timestamp, original version and rights. Say what available means for the analysis at hand: a public release, a subscription delivery or a timestamp the system captured. Where availability is missing, record the uncertainty and leave the date uninferred." },
   { kind: "figure", node: <Figure art={<MethodFigure />} caption="Method at a glance: a release comes before the cutoff, and later data stays outside the question." /> },
   { kind: "h2", text: "Test with a filing" },
-  { kind: "p", text: "Choose two SEC filings with known filing timestamps and freeze the cutoff before the later one. Retrieve the earlier supporting passage and confirm that the later release is excluded. Repeat after the cutoff and inspect the affected claims. A corrected claim sits beside the historical record and leaves it standing." },
+  { kind: "p", text: "Choose an earlier and a later SEC filing, each with a known filing timestamp, and freeze the cutoff before the later one. Retrieve the earlier supporting passage and confirm that the later release is excluded. Repeat after the cutoff and inspect the affected claims. A corrected claim sits beside the historical record and leaves it standing." },
   { kind: "h2", text: "What did you know at the decision date?" },
   { kind: "p", text: "Financial research can look rigorous while using information that had yet to be released. Macroeconomic series are revised, corporate filings can be amended, and publication times differ from the fiscal period they report. A result built on the latest data everywhere can make an in-sample simulation look better than it was. The answer is to record availability, version and source in the data itself, because a warning beside a chart leaves the data unchanged." },
   { kind: "h2", text: "Use the original sources" },
@@ -96,7 +96,7 @@ export function MarketsBody({ published, modified }: { published: string; modifi
   return (
     <>
       <ArticleLayout
-        title={record.title.replace(/ — TAVONEL$/, "")}
+        title={record.heading}
         dek={MARKETS_DEK}
         published={published}
         modified={modified}

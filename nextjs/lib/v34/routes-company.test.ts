@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { typedCounts } from "./route-test-support";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { COMPANY_REGISTRY_LINKS, RETAINED } from "@/components/v34/routes/company/company-content";
 import { CompanyBody } from "@/components/v34/routes/company/company";
@@ -72,7 +73,7 @@ describe("one h1, from the registry", () => {
     for (const f of stripped(code)) expect(f.text, f.file).not.toMatch(/<h1\b/);
     expect(stripped(code).find((f) => f.file.endsWith("/company.tsx"))!.text.match(/<Hero\b/g)).toHaveLength(1);
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    expect(plain(html.match(/<h1[^>]*>[\s\S]*?<\/h1>/)![0]).trim()).toBe(v34Route(KEY).title.replace(/ — TAVONEL$/, ""));
+    expect(plain(html.match(/<h1[^>]*>[\s\S]*?<\/h1>/)![0]).trim()).toBe("About TAVONEL and the principles we work by");
     expect(routeMetadata(KEY).title).toBe(v34Route(KEY).title);
     expect(plain(html)).toContain(v34Route(KEY).description);
   });
@@ -180,5 +181,11 @@ describe("tokens, targets and states", () => {
       expect(sheet, `.${name}:hover`).toMatch(new RegExp(`\\.${name}:hover`));
       expect(sheet, `.${name}:focus-visible`).toMatch(new RegExp(`\\.${name}:focus-visible`));
     }
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("company")).toEqual([]);
   });
 });

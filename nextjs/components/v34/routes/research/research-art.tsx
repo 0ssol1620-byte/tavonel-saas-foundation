@@ -9,7 +9,7 @@ import s from "./research.module.css";
 /** The hero: a source page with one highlighted passage, and the records drawn from it. */
 export function ResearchArt() {
   return (
-    <svg className={s.art} viewBox="0 0 640 320" role="img" aria-label="A source page with one highlighted passage, linked to two supported records and one uncertain record" xmlns="http://www.w3.org/2000/svg">
+    <svg className={s.art} viewBox="0 0 640 320" role="img" aria-label="A source page with one highlighted passage, linked to supported records and an uncertain record" xmlns="http://www.w3.org/2000/svg">
       <rect className={s.page} x="56" y="36" width="212" height="248" rx="6" />
       <path className={s.line} d="M80 74H244M80 96H226M80 118H244M80 184H236M80 206H210M80 228H244M80 250H190" />
       <rect className={s.passage} x="74" y="140" width="176" height="22" rx="4" />

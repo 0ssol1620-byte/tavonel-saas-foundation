@@ -26,7 +26,6 @@ import {
 import { AGENT_OPERATIONS, CONNECTORS, CUSTOMER_RUN } from "./connect-sources";
 import s from "./connect.module.css";
 
-const SUFFIX = / — TAVONEL$/;
 
 /** "01", "02", ... counted from the list position. */
 const ordinal = (index: number) => String(index + 1).padStart(2, "0");
@@ -95,7 +94,7 @@ export function ConnectBody({ remoteOpen }: { remoteOpen: boolean }) {
       <Hero
         variant="split"
         eyebrow={record.ogLabel}
-        title={record.title.replace(SUFFIX, "")}
+        title={record.heading}
         lead={record.description}
         actions={(
           <>

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { typedCounts } from "./route-test-support";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { CatalogBody } from "@/components/v34/routes/catalog/catalog";
 import { v34Route, v34RouteByPath } from "./routes";
@@ -35,7 +36,7 @@ describe("catalog page", () => {
   it("renders one h1 whose text is exactly the registry title, without the document-title suffix", () => {
     expect(html.match(/<h1\b/g)).toHaveLength(1);
     const h1 = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)![1]!.replace(/<[^>]*>/g, "");
-    expect(h1).toBe(v34Route("catalog").title.replace(/ — TAVONEL$/, ""));
+    expect(h1).toBe("A catalog of licensed knowledge collections");
     expect(code).not.toMatch(/<h1\b/);
   });
 
@@ -66,9 +67,12 @@ describe("catalog copy", () => {
     expect(code).not.toMatch(/\b(?:D\d\d|U\d\d|EG-\d+|WO-RT)\b/);
   });
 
-  it("sets its own heading colour, since the global h3 colour is near-white", () => {
+  it("gives its headings the surface's text colour, since the global h3 colour is near-white", () => {
+    // every V34 surface points the site-wide h1-h3 colour (--text-hi) at its own text colour
+    const tokens = readFileSync(join(root, "components/v34/tokens.module.css"), "utf8");
+    expect(tokens.match(/--text-hi: var\(--v34-fg\);/g)).toHaveLength(2);
     const css = readFileSync(join(dir, "catalog.module.css"), "utf8");
-    expect(css).toMatch(/\.itemTitle \{[^}]*color: var\(--v34-fg\)/);
+    expect(css).not.toMatch(/\.itemTitle \{[^}]*\bcolor:(?! var\(--v34-fg\))/);
   });
 
   it("labels its drawing as an illustration", () => {
@@ -85,5 +89,11 @@ describe("catalog links", () => {
   it("links only to live routes", () => {
     const hrefs = [...html.matchAll(/href="(\/[^"#?]*)/g)].map((m) => m[1]!).filter((h) => v34RouteByPath(h));
     for (const path of hrefs) expect(v34RouteByPath(path)!.release, path).toBe("live");
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("catalog")).toEqual([]);
   });
 });

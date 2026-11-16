@@ -50,7 +50,7 @@ export function CommunityBody() {
       <Hero
         variant="split"
         eyebrow={record.ogLabel}
-        title={record.title.replace(/ — TAVONEL$/, "")}
+        title={record.heading}
         lead={record.description}
         actions={<ButtonLink href={CONNECT} tone="onDark">See how an AI client connects</ButtonLink>}
         art={<Figure framed={false} kind="Illustration" caption="Worlds, connection settings and examples gathered in one place." art={<Art />} />}

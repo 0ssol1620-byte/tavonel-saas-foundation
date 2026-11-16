@@ -30,7 +30,7 @@ export const CONTRACT = {
 export const EXAMPLE = {
   eyebrow: "Example Skill",
   title: "Compare a source revision.",
-  lead: "A read-only analysis. It reads a pair of source versions from a World and returns a diff with the evidence behind it.",
+  lead: "A read-only analysis. It reads an earlier and a later version of a source from a World and returns a diff with the evidence behind it.",
   manifestLabel: "Example manifest",
   manifest: [
     "intent: compare_revisions",

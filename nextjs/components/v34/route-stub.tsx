@@ -4,7 +4,6 @@ import V34Page from "./shell/v34-page";
 import { Hero } from "./ui/hero";
 import { Section } from "./ui/section";
 
-const SUFFIX = / — TAVONEL$/;
 
 /**
  * A route's page until its batch writes the real body: the V34 frame, the one h1 and lead from the
@@ -20,7 +19,7 @@ export default function RouteStub({ route, line }: { route: V34RouteKey; line: s
   return (
     <V34Page route={route}>
       <RouteJsonLd route={route} />
-      <Hero variant="sub" eyebrow={record.ogLabel} title={record.title.replace(SUFFIX, "")} lead={record.description} />
+      <Hero variant="sub" eyebrow={record.ogLabel} title={record.heading} lead={record.description} />
       <Section>
         <p>{line}</p>
       </Section>

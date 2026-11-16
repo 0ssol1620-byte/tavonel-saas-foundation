@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { h1Text, typedCounts } from "./route-test-support";
 import { CompilerBody } from "@/components/v34/routes/compiler/compiler";
 import { COMPILER_DESTINATIONS, COMPILER_FILES } from "@/components/v34/routes/compiler/compiler-content";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
@@ -74,7 +75,7 @@ describe("app/compiler/page.tsx", () => {
     expect(route.release).toBe("live");
     expect(routeMetadata("compiler").title).toBe(route.title);
     expect(html).toContain(`<h1`);
-    expect(html).toContain(escapeHtml(route.title.replace(/ — TAVONEL$/, "")));
+    expect(h1Text(html)).toBe("The compiler that reads documents into records");
     expect(html).toContain(escapeHtml(route.description));
   });
 });
@@ -250,5 +251,11 @@ describe("links", () => {
   it("names its art and tags it as an illustration", () => {
     expect(html).toMatch(/<svg[^>]*role="img"[^>]*aria-label="[^"]+"/);
     expect(html).toContain("Illustration");
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("compiler")).toEqual([]);
   });
 });

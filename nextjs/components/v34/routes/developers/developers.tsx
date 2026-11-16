@@ -25,7 +25,6 @@ import {
 } from "./developers-content";
 import s from "./developers.module.css";
 
-const SUFFIX = / — TAVONEL$/;
 
 const capitalize = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
 
@@ -65,7 +64,7 @@ export function DevelopersBody() {
       <Hero
         variant="split"
         eyebrow={record.ogLabel}
-        title={record.title.replace(SUFFIX, "")}
+        title={record.heading}
         lead={record.description}
         actions={(
           <>

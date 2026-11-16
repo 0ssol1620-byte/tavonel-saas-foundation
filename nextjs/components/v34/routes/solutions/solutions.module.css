@@ -112,7 +112,6 @@
 
 .title {
   margin: 0;
-  color: var(--v34-fg);
   font-size: clamp(1.3rem, 1.9vw, 1.7rem);
   font-weight: 500;
   letter-spacing: var(--v34-track-h2);

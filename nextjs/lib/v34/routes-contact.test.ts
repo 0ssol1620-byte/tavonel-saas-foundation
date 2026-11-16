@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { typedCounts } from "./route-test-support";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { SUPPORT_ACKNOWLEDGEMENT } from "@/lib/support-targets";
 import { ADDRESSES, CONTACT_REGISTRY_LINKS, RETAINED } from "@/components/v34/routes/contact/contact-content";
@@ -83,7 +84,7 @@ describe("one h1, from the registry", () => {
     for (const f of stripped(code)) expect(f.text, f.file).not.toMatch(/<h1\b/);
     expect(stripped(code).find((f) => f.file.endsWith("/contact.tsx"))!.text.match(/<Hero\b/g)).toHaveLength(1);
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    expect(plain(html.match(/<h1[^>]*>[\s\S]*?<\/h1>/)![0]).trim()).toBe(v34Route(KEY).title.replace(/ — TAVONEL$/, ""));
+    expect(plain(html.match(/<h1[^>]*>[\s\S]*?<\/h1>/)![0]).trim()).toBe("Talk to TAVONEL about your own document set");
     expect(routeMetadata(KEY).title).toBe(v34Route(KEY).title);
     expect(plain(html)).toContain(v34Route(KEY).description);
   });
@@ -253,5 +254,11 @@ describe("copy that is true of the product today", () => {
   it("sets the step labels small enough to stay inside their boxes", () => {
     const sheet = stripped(styles).map((f) => f.text).join("\n");
     expect(sheet).toMatch(/\.lab\s*\{[^}]*font-size:\s*14px/);
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("contact")).toEqual([]);
   });
 });

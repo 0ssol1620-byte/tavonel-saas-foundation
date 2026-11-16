@@ -112,7 +112,6 @@
 
 .stepTitle {
   margin: 0;
-  color: var(--v34-fg);
   font-size: 1.3rem;
   font-weight: 560;
   letter-spacing: -0.02em;
@@ -155,7 +154,6 @@
 
 .factTitle {
   margin: 0;
-  color: var(--v34-fg);
   font-size: var(--v34-h3);
   font-weight: 500;
   letter-spacing: var(--v34-track-h2);
@@ -189,7 +187,6 @@
 
 .pairTitle {
   margin: 0;
-  color: var(--v34-fg);
   font-size: var(--v34-h3);
   font-weight: 500;
   letter-spacing: var(--v34-track-h2);

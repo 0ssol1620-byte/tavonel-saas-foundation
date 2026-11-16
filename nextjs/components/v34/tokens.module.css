@@ -126,6 +126,9 @@
   --v34-fg-rule: var(--v34-rule);
   --v34-fg-hover: var(--v34-secondary-hover);
   --v34-fg-focus: var(--v34-focus);
+  /* The site-wide h1-h3 rule (app/tavonel.css) colours headings with --text-hi, near-white for the
+     dark legacy site. On a V34 surface a heading takes the surface's own text colour instead. */
+  --text-hi: var(--v34-fg);
   color-scheme: light;
 }
 
@@ -137,6 +140,7 @@
   --v34-fg-rule: var(--v34-rule-dark);
   --v34-fg-hover: var(--v34-step-bg);
   --v34-fg-focus: var(--v34-focus-dark);
+  --text-hi: var(--v34-fg);
   color-scheme: dark;
 }
 

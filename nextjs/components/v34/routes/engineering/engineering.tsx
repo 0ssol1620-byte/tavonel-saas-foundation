@@ -18,7 +18,6 @@ import { EngineeringArt } from "./engineering-art";
 import s from "./engineering.module.css";
 
 const ordinal = (index: number) => String(index + 1).padStart(2, "0");
-const TITLE_SUFFIX = / — TAVONEL$/;
 const DOMAIN = "Standards";
 
 /** The page body, without the V34 frame, so it can be rendered on its own. */
@@ -35,7 +34,7 @@ export function EngineeringBody() {
       <Hero
         variant="split"
         eyebrow={HERO.eyebrow}
-        title={route.title.replace(TITLE_SUFFIX, "")}
+        title={route.heading}
         lead={route.description}
         actions={
           <div className={s.actions}>

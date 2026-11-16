@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { h1Text, typedCounts } from "./route-test-support";
 import { activationPolicy } from "@/lib/activation-policy";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { OAUTH_CONNECTOR_PROVIDERS } from "@/lib/connector-oauth";
@@ -14,7 +15,7 @@ import {
   CONNECT_DESTINATIONS, EXPLORE_HREF, MCP_DOCS_HREF, WORKSPACE_HREF,
 } from "@/components/v34/routes/connect/connect-content";
 import { CONNECTORS } from "@/components/v34/routes/connect/connect-sources";
-import { V34_ROUTE_KEYS, v34Route, v34RouteByPath } from "./routes";
+import { V34_ROUTE_KEYS, v34RouteByPath } from "./routes";
 
 /*
   Source-level guards for the /connect route (components/v34/routes/connect/** and
@@ -56,7 +57,7 @@ describe("connect page", () => {
     for (const f of code) expect(f.text, f.file).not.toMatch(/<h1\b/);
     for (const html of [open, closed]) {
       expect(html.match(/<h1\b/g)).toHaveLength(1);
-      expect(html).toContain(v34Route(KEY).title.replace(/ — TAVONEL$/, ""));
+      expect(h1Text(html)).toBe("Connect a World to your AI client over MCP");
     }
   });
 });
@@ -188,5 +189,11 @@ describe("sheet", () => {
       }
       expect(f.text).not.toMatch(/overflow(?:-[xy])?\s*:\s*hidden|@import\b|\b(?:animation|transition|@keyframes)\b/);
     }
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("connect")).toEqual([]);
   });
 });

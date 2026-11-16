@@ -97,7 +97,7 @@ export function McpBody({ published, modified }: { published: string; modified: 
   return (
     <>
       <ArticleLayout
-        title={record.title.replace(/ — TAVONEL$/, "")}
+        title={record.heading}
         dek={MCP_DEK}
         published={published}
         modified={modified}

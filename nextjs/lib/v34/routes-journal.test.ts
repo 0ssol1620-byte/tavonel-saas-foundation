@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { h1Text, typedCounts } from "./route-test-support";
 import { JournalBody, LIVE_ARTICLES, READ_MINUTES } from "@/components/v34/routes/journal/journal";
 import { CATEGORY, FEATURED, REFERENCE } from "@/components/v34/routes/journal/journal-content";
 import { COVERS } from "@/components/v34/routes/journal/covers";
@@ -94,12 +95,15 @@ describe("one h1, from the registry", () => {
     for (const f of code) expect(f.text, f.file).not.toMatch(/<h1\b/);
   });
 
+  const HEADINGS = {
+    journal: "Field notes on compiling knowledge for AI",
+    "journal-compiler": "What a knowledge compiler is and why it matters",
+    "journal-mcp": "How an AI client reads a World through MCP",
+  } as const;
   for (const r of ROUTES) {
     it(`${r.key} renders exactly one h1 that reads as the registry title`, () => {
       const html = pages[r.key as keyof typeof pages]();
-      expect(html.match(/<h1\b/g)).toHaveLength(1);
-      const title = v34Route(r.key).title.replace(/ — TAVONEL$/, "");
-      expect(html).toMatch(new RegExp(`<h1[^>]*>${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</h1>`));
+      expect(h1Text(html)).toBe(HEADINGS[r.key as keyof typeof HEADINGS]);
     });
   }
 });
@@ -278,5 +282,13 @@ describe("the primary action", () => {
     const html = pages.journal();
     const hero = html.slice(0, html.indexOf("</section>"));
     expect(hero).toContain(`href="${v34Route(FEATURED).path}"`);
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("journal")).toEqual([]);
+    expect(typedCounts("journal-compiler")).toEqual([]);
+    expect(typedCounts("journal-mcp")).toEqual([]);
   });
 });

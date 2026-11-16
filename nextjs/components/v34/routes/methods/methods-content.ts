@@ -30,7 +30,7 @@ if (clause("temporal-integrity").state !== "demonstrated") {
 
 export const HERO = {
   eyebrow: record.ogLabel,
-  title: record.title.replace(/ — TAVONEL$/, ""),
+  title: record.heading,
   lead: record.description,
   secondary: { href: to("compiler"), label: "Read about the compiler" },
   figure: "Source file, evidence region, record and relationship, with a check at each step.",

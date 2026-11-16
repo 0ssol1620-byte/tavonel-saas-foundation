@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { typedCounts } from "./route-test-support";
 import { SOLUTIONS } from "@/app/solutions/[slug]/page";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { MCP_TOOL_NAMES } from "@/lib/mcp-tools";
@@ -85,7 +86,7 @@ describe("one h1", () => {
 
   it("renders exactly one h1 and it is the registry's title", () => {
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    const title = v34Route("solutions").title.replace(/ — TAVONEL$/, "");
+    const title = "Solutions for the people who rely on sources";
     expect(html).toContain(`>${title}</h1>`);
   });
 });
@@ -186,5 +187,11 @@ describe("copy", () => {
   it("states what things are, with no defensive disclaimer", () => {
     const content = stripped(code).find((f) => f.file.endsWith("solutions-content.ts"))!;
     expect(content.text).not.toMatch(/\b(?:not|never|no longer)\b|n't\b/i);
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("solutions")).toEqual([]);
   });
 });

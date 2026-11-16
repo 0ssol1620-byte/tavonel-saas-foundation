@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { typedCounts } from "./route-test-support";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { MCP_TOOL_NAMES } from "@/lib/mcp-tools";
 import { EngineeringBody } from "@/components/v34/routes/engineering/engineering";
@@ -38,7 +39,7 @@ describe("engineering route", () => {
     const html = renderToStaticMarkup(createElement(EngineeringBody));
     expect(html.match(/<h1\b/g)).toHaveLength(1);
     const h1 = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)![1];
-    expect(h1).toBe(v34Route("engineering").title.replace(/ — TAVONEL$/, ""));
+    expect(h1).toBe("Engineering references with revision history");
     expect(code.filter((x) => /<h1\b/.test(x.text))).toHaveLength(0);
   });
 
@@ -102,5 +103,11 @@ describe("engineering route", () => {
       expect(x.text, x.f).not.toMatch(/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(/);
       expect(x.text, x.f).not.toMatch(/overflow(?:-[xy])?\s*:\s*hidden|:global/);
     }
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("engineering")).toEqual([]);
   });
 });

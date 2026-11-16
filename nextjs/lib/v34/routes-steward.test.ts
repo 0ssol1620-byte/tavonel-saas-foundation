@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { h1Text, typedCounts } from "./route-test-support";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { MCP_TOOL_NAMES } from "@/lib/mcp-tools";
 import { StewardBody } from "@/components/v34/routes/steward/steward";
@@ -53,7 +54,7 @@ describe("steward page", () => {
     expect(html.match(/<h1\b/g)).toHaveLength(1);
     const title = routeMetadata(KEY).title;
     expect(String(title)).toBe(v34Route(KEY).title);
-    expect(html).toContain(v34Route(KEY).title.replace(/ — TAVONEL$/, ""));
+    expect(h1Text(html)).toBe("Stewards who keep a compiled World accurate");
     for (const f of code) expect(f.text, f.file).not.toMatch(/<h1\b/);
   });
 
@@ -151,5 +152,11 @@ describe("layout against the prototype", () => {
   it("numbers the maintenance steps", () => {
     const text = band(MAINTENANCE.title).replace(/<[^>]+>/g, " ");
     MAINTENANCE.steps.forEach((_, i) => expect(text).toContain(String(i + 1).padStart(2, "0")));
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("steward")).toEqual([]);
   });
 });

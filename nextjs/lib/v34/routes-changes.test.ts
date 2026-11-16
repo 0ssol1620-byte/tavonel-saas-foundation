@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { typedCounts } from "./route-test-support";
 import { ChangesBody } from "@/components/v34/routes/changes/changes";
 import { CHANGES_DESTINATIONS, CHANGES_RETAINED } from "@/components/v34/routes/changes/changes-content";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
@@ -215,5 +216,11 @@ describe("copy", () => {
   it("leaves out what the product does not ship and what the register removed", () => {
     const text = stripped(code).map((f) => f.text).join("\n");
     for (const phrase of ["quarantine", "invalidat", "notify", "notification", "subscri", "revocation", "autopilot", "dependency impact", "selective", "incremental"]) expect(text.toLowerCase(), phrase).not.toContain(phrase.toLowerCase());
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("changes")).toEqual([]);
   });
 });

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { h1Text, typedCounts } from "./route-test-support";
 import { PlatformBody } from "@/components/v34/routes/platform/platform";
 import { PLATFORM_DESTINATIONS, PLATFORM_FILES } from "@/components/v34/routes/platform/platform-content";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
@@ -72,7 +73,7 @@ describe("app/platform/page.tsx", () => {
     expect(route.release).toBe("live");
     expect(routeMetadata("platform").title).toBe(route.title);
     expect(html).toContain(`<h1`);
-    expect(html).toContain(escapeHtml(route.title.replace(/ — TAVONEL$/, "")));
+    expect(h1Text(html)).toBe("Compile documents into a World AI can cite");
     expect(html).toContain(escapeHtml(route.description));
   });
 });
@@ -236,5 +237,11 @@ describe("links", () => {
   it("names its art and tags it as an illustration", () => {
     expect(html).toMatch(/<svg[^>]*role="img"[^>]*aria-label="[^"]+"/);
     expect(html).toContain("Illustration");
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("platform")).toEqual([]);
   });
 });

@@ -16,7 +16,6 @@ import { readResearchThread, statusLabel, type ThreadSource } from "./research-d
 import { ResearchArt, ThreadArt } from "./research-art";
 import s from "./research.module.css";
 
-const SUFFIX = / — TAVONEL$/;
 
 /*
   The link is written here rather than passed as the card's source: the shared card's link paints
@@ -51,7 +50,7 @@ export function ResearchBody() {
       <Hero
         variant="split"
         eyebrow={HERO.eyebrow}
-        title={route.title.replace(SUFFIX, "")}
+        title={route.heading}
         lead={route.description}
         actions={
           <>

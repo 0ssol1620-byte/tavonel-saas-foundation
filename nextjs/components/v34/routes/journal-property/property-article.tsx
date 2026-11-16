@@ -61,7 +61,7 @@ export const PROPERTY_BLOCKS: readonly ArticleBlock[] = [
     "Comparable evidence: transaction terms, date and geographic scope.",
     "Open issues: required expert sign-off and missing documents.",
   ] },
-  { kind: "p", text: "For US market context, the Census Building Permits Survey methodology, listed under Sources, describes the permit-issuing jurisdictions. It is a useful aggregated supply signal and sits one level above a parcel-level planning approval. Coverage, imputation and changing jurisdictions all matter when comparing areas. For an individual parcel, consult the actual local planning and property records, and keep the two source types distinct." },
+  { kind: "p", text: "For US market context, the Census Building Permits Survey methodology, listed under Sources, describes the permit-issuing jurisdictions. It is a useful aggregated supply signal and sits one level above a parcel-level planning approval. Coverage, imputation and changing jurisdictions all matter when comparing areas. For an individual parcel, consult the actual local planning and property records, and keep the aggregated survey and the local records distinct." },
   { kind: "h2", text: "Track what remains uncertain" },
   { kind: "p", text: "For each question, write an asserted status, the source, the date, any conflicting evidence and the next verification action. A missing route-of-access document and evidence that legal access is absent are different findings, and the record should show both along with who owns the next action. An inspection report describes the structure it inspected and speaks for that structure alone." },
   { kind: "p", text: "Preserve the decision packet as it stood at the date of the investment committee review. If a planning application changes, create an impact report that shows what changed and leave the past version as it was. A property evidence workflow supports professional diligence, and local legal, surveying and planning advice remains with the professionals." },
@@ -88,7 +88,7 @@ export function PropertyBody({ published, modified }: { published: string; modif
   return (
     <>
       <ArticleLayout
-        title={record.title.replace(/ — TAVONEL$/, "")}
+        title={record.heading}
         dek={PROPERTY_DEK}
         published={published}
         modified={modified}

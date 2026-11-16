@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { typedCounts } from "./route-test-support";
 import { PROPERTY_BLOCKS, PropertyBody } from "@/components/v34/routes/journal-property/property-article";
 import { PROPERTY_SOURCES } from "@/components/v34/routes/journal-property/property-sources";
 import { articleDates } from "@/components/v34/routes/journal/article-dates";
@@ -72,7 +73,7 @@ describe("one h1, from the registry", () => {
   it("writes no h1 of its own and renders the registry title once", () => {
     for (const f of files) expect(f.text, f.file).not.toMatch(/<h1\b/);
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    const title = v34Route(KEY).title.replace(/ — TAVONEL$/, "");
+    const title = "How property documents become a cited record";
     expect(html).toContain(`>${title}</h1>`);
   });
 });
@@ -167,5 +168,11 @@ describe("copy", () => {
     for (const source of PROPERTY_SOURCES) expect(source.href).toMatch(/^https:\/\//);
     const printed = [...html.matchAll(/<a class="[^"]*" href="(https:[^"]+)"/g)].map((m) => m[1]);
     expect(printed).toEqual(PROPERTY_SOURCES.map((s) => s.href.replaceAll("&", "&amp;")));
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("journal-property")).toEqual([]);
   });
 });

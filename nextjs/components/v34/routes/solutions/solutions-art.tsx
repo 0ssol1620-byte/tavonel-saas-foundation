@@ -7,7 +7,7 @@ import s from "./solutions.module.css";
 */
 export function SolutionsArt() {
   return (
-    <svg className={s.art} viewBox="0 0 640 320" role="img" aria-label="Three source documents feed one World, which three readers draw from" xmlns="http://www.w3.org/2000/svg">
+    <svg className={s.art} viewBox="0 0 640 320" role="img" aria-label="Source documents feed one World, which several readers draw from" xmlns="http://www.w3.org/2000/svg">
       <g>
         <rect className={s.sheet} x="44" y="62" width="96" height="124" rx="6" />
         <rect className={s.sheet} x="60" y="86" width="96" height="124" rx="6" />

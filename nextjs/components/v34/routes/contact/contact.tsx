@@ -3,7 +3,7 @@ import type { Route } from "next";
 import type { ReactNode } from "react";
 import { CAPABILITY_MANIFEST, describeAcceptedFormats } from "../../../../../shared/capabilityManifest";
 import ContactForm from "@/components/contact-form";
-import { activationPolicy } from "@/lib/activation-policy";
+import { customerDataState } from "@/lib/activation-policy";
 import { primaryCallToAction } from "@/lib/commercial-state";
 import { readLegalOperator } from "@/lib/legal-operator";
 import { TRAINING_DATA_CLAIM } from "@/lib/security-claims";
@@ -23,7 +23,6 @@ import {
 } from "./contact-content";
 import s from "./contact.module.css";
 
-const TITLE_SUFFIX = / — TAVONEL$/;
 
 /** The six questions a buyer asks before they write. Each answer ends at the page that owns it. */
 function FirstQuestions() {
@@ -49,7 +48,7 @@ function FirstQuestions() {
     },
     {
       question: "Can I compile my own files today?",
-      answer: <>{activationPolicy.customerData.reason} <Link className={s.inline} href={access.href as Route} prefetch={false}>{access.label}</Link></>,
+      answer: <>{customerDataState} <Link className={s.inline} href={access.href as Route} prefetch={false}>{access.label}</Link></>,
     },
     {
       question: "Can what I upload be deleted?",
@@ -105,7 +104,7 @@ export function ContactBody() {
       <Hero
         variant="split"
         eyebrow={HERO.eyebrow}
-        title={route.title.replace(TITLE_SUFFIX, "")}
+        title={route.heading}
         lead={route.description}
         actions={<ButtonLink href={HERO.primary.href}>{HERO.primary.label}</ButtonLink>}
         art={<Figure art={<ContactArt />} caption={HERO.figureCaption} />}

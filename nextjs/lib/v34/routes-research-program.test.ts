@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { typedCounts } from "./route-test-support";
 import { TRUST_SEQUENCE } from "@/components/trust-next";
 import { ProgramBody } from "@/components/v34/routes/research-program/program";
 import { metadata } from "@/app/research/program/page";
@@ -180,5 +181,11 @@ describe("tokens, containment and motion", () => {
       expect(f.text).not.toMatch(/overflow(?:-[xy])?\s*:\s*hidden/);
       expect(f.text).not.toMatch(/\b(?:animation|transition|@keyframes|@import)\b/);
     }
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("research-program")).toEqual([]);
   });
 });

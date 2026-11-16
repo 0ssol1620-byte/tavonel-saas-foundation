@@ -171,6 +171,8 @@ const SURFACES: Record<string, { background: string[]; color: string }> = {
 /** The role variables a component reads, and the contrast each must reach on its surface. */
 const ROLES: Array<{ role: string; min: number; what: string }> = [
   { role: "--v34-fg", min: TEXT, what: "body text" },
+  // the site-wide h1-h3 rule reads --text-hi; every surface points it at its own text colour
+  { role: "--text-hi", min: TEXT, what: "heading text" },
   { role: "--v34-fg-muted", min: TEXT, what: "secondary text" },
   { role: "--v34-fg-link", min: TEXT, what: "link text" },
   { role: "--v34-fg-border", min: LARGE_OR_CONTROL, what: "control border" },

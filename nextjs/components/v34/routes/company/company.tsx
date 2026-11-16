@@ -14,7 +14,6 @@ import {
 } from "./company-content";
 import s from "./company.module.css";
 
-const TITLE_SUFFIX = / — TAVONEL$/;
 const ordinal = (index: number) => String(index + 1).padStart(2, "0");
 
 /** Four numbered statements, used for both ownership and principles. */
@@ -41,7 +40,7 @@ export function CompanyBody() {
       <Hero
         variant="split"
         eyebrow={HERO.eyebrow}
-        title={route.title.replace(TITLE_SUFFIX, "")}
+        title={route.heading}
         lead={route.description}
         actions={<ButtonLink href={registryPath("contact")} tone="secondary">Contact</ButtonLink>}
         art={<Figure art={<CompanyArt />} caption={HERO.figureCaption} />}

@@ -19,7 +19,6 @@ import {
 } from "./security-content";
 import s from "./security.module.css";
 
-const TITLE_SUFFIX = / — TAVONEL$/;
 const ordinal = (index: number) => String(index + 1).padStart(2, "0");
 const shortDigest = (value: string) => `${value.slice(0, 16)}…${value.slice(-8)}`;
 
@@ -62,7 +61,7 @@ export function SecurityBody() {
       <Hero
         variant="split"
         eyebrow={HERO.eyebrow}
-        title={route.title.replace(TITLE_SUFFIX, "")}
+        title={route.heading}
         lead={route.description}
         actions={
           <>

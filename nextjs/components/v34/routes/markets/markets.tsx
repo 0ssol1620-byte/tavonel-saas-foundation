@@ -18,7 +18,6 @@ import { ACCESS, FINAL, HERO, JOURNAL, SAMPLE, TIME } from "./markets-content";
 import { MarketsArt } from "./markets-art";
 import s from "./markets.module.css";
 
-const TITLE_SUFFIX = / — TAVONEL$/;
 
 /** The page body, without the V34 frame, so it can be rendered on its own. */
 export function MarketsBody() {
@@ -32,7 +31,7 @@ export function MarketsBody() {
       <Hero
         variant="split"
         eyebrow={HERO.eyebrow}
-        title={route.title.replace(TITLE_SUFFIX, "")}
+        title={route.heading}
         lead={route.description}
         actions={
           <div className={s.actions}>

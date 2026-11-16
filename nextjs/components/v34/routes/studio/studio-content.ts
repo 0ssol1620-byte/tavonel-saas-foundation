@@ -54,7 +54,7 @@ const ITEMS: readonly StudioStep[] = [
 
 export const STEPS = {
   eyebrow: "Reference walkthrough",
-  title: "Six steps from a source to a cited answer.",
+  title: "From a source to a cited answer, step by step.",
   lead: "One public source, followed through every stage of a World. The records are fixed, so every visit shows the same walkthrough.",
   items: ITEMS,
 } as const;
@@ -73,7 +73,7 @@ export const NEXT = {
   items: [
     { href: to("connect"), title: "Connect your AI", text: "Set up a client that reads the World." },
     { href: to("evidence"), title: "Trace a claim", text: "Review its source and its uncertainty." },
-    { href: to("changes"), title: "Review a change", text: "Compare two releases of a source." },
+    { href: to("changes"), title: "Review a change", text: "Compare an earlier and a later release of a source." },
     { href: to("compiler"), title: "Follow the compiler", text: "See how a source becomes records." },
   ],
 } as const;

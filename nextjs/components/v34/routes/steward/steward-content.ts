@@ -27,7 +27,7 @@ export const INBOX = {
   title: "Each item keeps its evidence in view.",
   lead: "Illustrative items.",
   art: {
-    label: "A list of three review rows, the first one open, with a hold mark beside the second",
+    label: "A short list of review rows, the first one open, with a hold mark beside the second",
     caption: "A drawn review queue. The open row shows its evidence, the held row waits for an owner.",
   },
   items: [

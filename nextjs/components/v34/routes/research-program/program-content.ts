@@ -12,7 +12,7 @@ export const HERO = {
   eyebrow: "Research program",
   title: "The hard parts of turning documents into knowledge.",
   /** Ends where the link to the research notes begins. */
-  lede: "Parsing a document is a solved-enough problem. Deciding what the document is about, which of its statements are the same statement as one in another document, what supports them, and what a change to page 40 invalidates three files away — is not. This page is which problems are still open, and how we work on them; the results themselves are on",
+  lede: "Parsing a document is a solved-enough problem. Deciding what the document is about, which of its statements are the same statement as one in another document, what supports them, and what a change on one page invalidates in files far from it — is not. This page is which problems are still open, and how we work on them; the results themselves are on",
 } as const;
 
 /** Paths of retained pages that have no registry key. */

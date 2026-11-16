@@ -26,7 +26,7 @@ export const REVIEW = {
   eyebrow: "Reviewed actions",
   title: "Every action is reviewed in the open.",
   art: {
-    label: "Two source revisions flowing into one proposal card, then through a review gate to a World",
+    label: "Source revisions flowing into one proposal card, then through a review gate to a World",
     caption: "A drawn proposal passing a review gate. The World changes only after the gate.",
   },
   items: [

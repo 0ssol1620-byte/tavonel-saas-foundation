@@ -32,6 +32,8 @@ export interface V34RouteRecord {
   readonly canonical: string;
   /** 50-60 characters ending " — TAVONEL"; home starts "TAVONEL — " and is sized by its own rule. */
   readonly title: string;
+  /** The page heading: the title without the brand ("TAVONEL — " on home, " — TAVONEL" elsewhere). */
+  readonly heading: string;
   /** 120-160 characters, no semicolons. */
   readonly description: string;
   readonly release: V34Release;
@@ -49,8 +51,9 @@ export interface V34RouteRecord {
 
 export const V34_ORIGIN = "https://tavonel.com";
 const SUFFIX = " — TAVONEL";
+const HOME_PREFIX = "TAVONEL — ";
 
-type Row = Omit<V34RouteRecord, "canonical" | "sitemap" | "measured">;
+type Row = Omit<V34RouteRecord, "heading" | "canonical" | "sitemap" | "measured">;
 
 /* A held route renders only in preview and when V34_SHOW_HELD is set; production answers 404. */
 const ROWS: readonly Row[] = [
@@ -206,6 +209,7 @@ export const V34_ROUTES: readonly V34RouteRecord[] = ROWS.map((row) => {
   return {
     ...row,
     title: row.key === "home" ? row.title : `${row.title}${SUFFIX}`,
+    heading: row.key === "home" ? row.title.slice(HOME_PREFIX.length) : row.title,
     canonical: `${V34_ORIGIN}${row.path === "/" ? "" : row.path}`,
     sitemap: live,
     measured: live,

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { h1Text, typedCount, typedCounts } from "./route-test-support";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { MCP_TOOL_NAMES } from "@/lib/mcp-tools";
 import { PersonalBody } from "@/components/v34/routes/personal/personal";
@@ -17,12 +18,8 @@ const files = readdirSync(dir).map((f) => ({ f, text: strip(readFileSync(join(di
 const code = files.filter((x) => /\.tsx?$/.test(x.f));
 const all = code.filter((x) => !x.f.endsWith("-art.tsx")).map((x) => x.text).join("\n");
 const page = strip(readFileSync(join(root, "app/personal/page.tsx"), "utf8"));
-// a count typed into copy: a number word or digits, up to four words (10-K counts as one), then a
-// counted noun; a possessive ends the phrase
-const words = "zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen"
-  + "|(?:twen|thir|for|fif|six|seven|eigh|nine)ty|hundreds?|thousands?|millions?|dozens?|handful|couple|pair|score";
-const nouns = "files?|PDFs?|pages?|documents?|records?|tools?|clients?|keys?|answers?|questions?|days?|steps?";
-const COUNT = new RegExp(`\\b(?:(?:${words})(?:-[a-z]+)?|\\d+)\\s+(?:[\\w-]+\\s+){0,4}(?:${nouns})\\b`, "i");
+// the shared typed-count pattern (route-test-support.ts), with "one" counted: this page was written to it
+const COUNT = typedCount({ one: true });
 
 describe("personal route", () => {
   it("is a registry route, gated and rendered from its own body", () => {
@@ -36,7 +33,7 @@ describe("personal route", () => {
   it("renders one h1 that is the registry title", () => {
     const html = renderToStaticMarkup(createElement(PersonalBody));
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    expect(html).toContain(v34Route("personal").title.replace(/ — TAVONEL$/, ""));
+    expect(h1Text(html)).toBe("Turn your own PDFs into a World you can cite");
     expect(code.filter((x) => /<h1\b/.test(x.text))).toHaveLength(0);
   });
 
@@ -84,5 +81,11 @@ describe("personal route", () => {
       expect(x.text, x.f).not.toMatch(/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(/);
       expect(x.text, x.f).not.toMatch(/overflow(?:-[xy])?\s*:\s*hidden|:global/);
     }
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("personal", { one: true })).toEqual([]);
   });
 });

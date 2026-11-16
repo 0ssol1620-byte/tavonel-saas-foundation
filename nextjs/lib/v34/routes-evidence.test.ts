@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { typedCounts } from "./route-test-support";
 import { EvidenceBody } from "@/components/v34/routes/evidence/evidence";
 import { sampleEvidencePage } from "@/lib/evidence-regions";
 import { EVIDENCE_DESTINATIONS, EVIDENCE_RETAINED } from "@/components/v34/routes/evidence/evidence-content";
@@ -302,5 +303,11 @@ describe("copy", () => {
   it("leaves out what the product does not ship and what the register removed", () => {
     const text = stripped(code).map((f) => f.text).join("\n");
     for (const phrase of ["model conclusion", "Check access at query time", "forbidden document", "$416", "Apple", "certif", "quarantine", "tamper-proof", "guarantee"]) expect(text.toLowerCase(), phrase).not.toContain(phrase.toLowerCase());
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("evidence")).toEqual([]);
   });
 });

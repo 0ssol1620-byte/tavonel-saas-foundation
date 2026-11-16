@@ -117,7 +117,6 @@
 
 .sourceName {
   margin: 0;
-  color: var(--v34-fg);
   font-size: 1rem;
   font-weight: 650;
   line-height: 1.3;
@@ -177,7 +176,6 @@
 
 .factTitle {
   margin: 0 0 8px;
-  color: var(--v34-fg);
   font-size: var(--v34-h3);
   font-weight: 500;
   line-height: 1.2;

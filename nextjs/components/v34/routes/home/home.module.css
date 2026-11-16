@@ -183,7 +183,6 @@
 }
 
 .caseTitle {
-  color: var(--v34-fg);
   margin: 0;
   font-size: clamp(1.45rem, 2.6vw, 2.5rem);
   font-weight: 500;
@@ -336,7 +335,6 @@
 }
 
 .trustTitle {
-  color: var(--v34-fg);
   margin: 0;
   font-size: clamp(1.45rem, 2.3vw, 2.2rem);
   font-weight: 500;

@@ -35,7 +35,7 @@ export function TradingBody() {
       <Hero
         variant="sub"
         eyebrow={record.ogLabel}
-        title={record.title.replace(/ — TAVONEL$/, "")}
+        title={record.heading}
         lead={record.description}
         actions={
           <>

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { typedCounts } from "./route-test-support";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { primaryCallToAction } from "@/lib/commercial-state";
 import { MARKETING_EVENTS } from "@/lib/marketing-analytics";
@@ -227,5 +228,11 @@ describe("hero_demo_interact carries the step it opens", () => {
     expect([...html.matchAll(/data-step="(\d)"/g)].map((m) => m[1]).join("")).toBe("01231230");
     const analytics = readFileSync(join(root, "components/v34/routes/home/home-analytics.tsx"), "utf8");
     expect(analytics).toContain('trackFunnelOnce("hero_demo_interact", { scene: stepButton.dataset.step ?? "" })');
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("home")).toEqual([]);
   });
 });

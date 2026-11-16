@@ -15,7 +15,6 @@ import { v34Route } from "@/lib/v34/routes";
 import { FINAL, HERO, NEXT, SAMPLE, STEPS } from "./studio-content";
 import s from "./studio.module.css";
 
-const SUFFIX = / — TAVONEL$/;
 
 /** "01", "02", ... counted from the list position. */
 const ordinal = (index: number) => String(index + 1).padStart(2, "0");
@@ -51,7 +50,7 @@ export function StudioBody() {
       <Hero
         variant="split"
         eyebrow={record.ogLabel}
-        title={record.title.replace(SUFFIX, "")}
+        title={record.heading}
         lead={record.description}
         actions={<ButtonLink href={action.href} tone="primary" analytics="hero-primary">{action.label}</ButtonLink>}
         art={<Figure art={<SourceToAnswer />} caption={HERO.figure} />}

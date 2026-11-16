@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { h1Text, typedCount, typedCounts } from "./route-test-support";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { EXPLORE_SAMPLE_DIGEST, exploreSampleSources } from "@/lib/explore-sample";
 import { MCP_TOOL_NAMES } from "@/lib/mcp-tools";
@@ -20,12 +21,8 @@ const code = files.filter((x) => /\.tsx?$/.test(x.f));
 const all = code.filter((x) => !x.f.endsWith("-art.tsx")).map((x) => x.text).join("\n");
 const content = code.find((x) => x.f === "markets-content.ts")!.text;
 const page = strip(readFileSync(join(root, "app/markets/page.tsx"), "utf8"));
-// a count typed into copy: a number word or digits, up to four words (10-K counts as one), then a
-// counted noun; a possessive ends the phrase, so "one company's filings" counts the company
-const words = "zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen"
-  + "|(?:twen|thir|for|fif|six|seven|eigh|nine)ty|hundreds?|thousands?|millions?|dozens?|handful|couple|pair|score";
-const nouns = "filings?|reports?|documents?|pages?|sources?|statements?|rows?|records?|figures?|periods?";
-const COUNT = new RegExp(`\\b(?:(?:${words})(?:-[a-z]+)?|\\d+)\\s+(?:[\\w-]+\\s+){0,4}(?:${nouns})\\b`, "i");
+// the shared typed-count pattern (route-test-support.ts), with "one" counted: this page was written to it
+const COUNT = typedCount({ one: true });
 
 describe("markets route", () => {
   it("is a registry route, gated and rendered from its own body", () => {
@@ -39,7 +36,7 @@ describe("markets route", () => {
   it("renders one h1 that is the registry title", () => {
     const html = renderToStaticMarkup(createElement(MarketsBody));
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    expect(html).toContain(v34Route("markets").title.replace(/ — TAVONEL$/, ""));
+    expect(h1Text(html)).toBe("Market filings compiled into a cited World");
   });
 
   it("shows the compiled sample, labelled, from computed values", () => {
@@ -91,5 +88,11 @@ describe("markets route", () => {
       expect(x.text, x.f).not.toMatch(/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(/);
       expect(x.text, x.f).not.toMatch(/overflow(?:-[xy])?\s*:\s*hidden|:global/);
     }
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("markets", { one: true })).toEqual([]);
   });
 });

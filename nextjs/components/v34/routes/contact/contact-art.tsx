@@ -12,7 +12,7 @@ const WIDTH = 144;
  */
 export function ContactArt() {
   return (
-    <svg className={s.art} viewBox="0 0 640 320" role="img" aria-label="An inquiry in three steps: a message, read by a person, then a reply." xmlns="http://www.w3.org/2000/svg">
+    <svg className={s.art} viewBox="0 0 640 320" role="img" aria-label="An inquiry, step by step: a message, read by a person, then a reply." xmlns="http://www.w3.org/2000/svg">
       {STEPS.map((label, index) => {
         const x = X0 + index * STEP;
         const person = index === 1;

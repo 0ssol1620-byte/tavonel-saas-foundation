@@ -20,7 +20,6 @@ import {
 import { SampleFrame } from "./sample-frame";
 import s from "./enterprise.module.css";
 
-const TITLE_SUFFIX = / — TAVONEL$/;
 const ordinal = (index: number) => String(index + 1).padStart(2, "0");
 
 /** The numbered steps both chains share. */
@@ -56,7 +55,7 @@ export function EnterpriseBody() {
       <Hero
         variant="split"
         eyebrow={HERO.eyebrow}
-        title={route.title.replace(TITLE_SUFFIX, "")}
+        title={route.heading}
         lead={route.description}
         actions={
           <>

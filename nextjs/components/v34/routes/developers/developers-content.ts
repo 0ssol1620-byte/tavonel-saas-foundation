@@ -92,7 +92,7 @@ export const FILES = {
 export const PACKAGE = {
   eyebrow: "Portable package",
   title: "What is in a signed package.",
-  lead: "Every signed export contains these files, written by the exporter and named in a manifest that carries a digest for each one. The two ontology files are the RDF and JSON-LD projection of the compiled objects and relations, with no schema for you to author.",
+  lead: "Every signed export contains these files, written by the exporter and named in a manifest that carries a digest for each one. The ontology files are the RDF and JSON-LD projection of the compiled objects and relations, with no schema for you to author.",
   table: "Files in a signed export and what each one is for",
   columns: ["Path", "Use it for"],
 } as const;

@@ -95,12 +95,12 @@ export function RevisionBody({ published, modified }: { published: string; modif
   return (
     <>
       <ArticleLayout
-        title={record.title.replace(/ — TAVONEL$/, "")}
+        title={record.heading}
         dek={REVISION_DEK}
         published={published}
         modified={modified}
         breadcrumb={[{ href: v34Route("home").path, label: "Home" }, { href: v34Route("journal").path, label: v34Route("journal").ogLabel }]}
-        cover={<Figure art={<RevisionCover />} caption="Two revisions of a source lead to the approved revision." />}
+        cover={<Figure art={<RevisionCover />} caption="An earlier and a later revision of a source lead to the approved revision." />}
         blocks={REVISION_BLOCKS}
         sources={REVISION_SOURCES}
       />

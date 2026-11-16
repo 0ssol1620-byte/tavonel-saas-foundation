@@ -13,7 +13,6 @@ import { ACCESS, FINAL, HERO, JOURNAL, PURPOSE } from "./teams-content";
 import { TeamsArt } from "./teams-art";
 import s from "./teams.module.css";
 
-const TITLE_SUFFIX = / — TAVONEL$/;
 
 /** The page body, without the V34 frame, so it can be rendered on its own. */
 export function TeamsBody() {
@@ -26,7 +25,7 @@ export function TeamsBody() {
       <Hero
         variant="split"
         eyebrow={HERO.eyebrow}
-        title={route.title.replace(TITLE_SUFFIX, "")}
+        title={route.heading}
         lead={route.description}
         actions={
           <div className={s.actions}>

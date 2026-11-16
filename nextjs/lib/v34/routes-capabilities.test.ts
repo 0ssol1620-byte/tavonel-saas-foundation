@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { h1Text, typedCounts } from "./route-test-support";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { readCapabilities } from "@/lib/capabilities";
 import { readStatusBounded } from "@/components/v34/routes/capabilities/capabilities-status";
@@ -12,7 +13,7 @@ import { MCP_TOOLS } from "@/lib/mcp-tools";
 import { CapabilitiesBody } from "@/components/v34/routes/capabilities/capabilities";
 import { CAPABILITIES_DESTINATIONS } from "@/components/v34/routes/capabilities/capabilities-content";
 import { capabilityCensus } from "../../../shared/capabilityManifest";
-import { V34_ROUTE_KEYS, v34Route, v34RouteByPath } from "./routes";
+import { V34_ROUTE_KEYS, v34RouteByPath } from "./routes";
 
 /*
   Source-level guards for the /capabilities route (components/v34/routes/capabilities/** and
@@ -57,7 +58,7 @@ describe("capabilities page", () => {
   it("renders exactly one h1, the registry title, and writes none of its own", () => {
     for (const f of code) expect(f.text, f.file).not.toMatch(/<h1\b/);
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    expect(html).toContain(v34Route(KEY).title.replace(/ — TAVONEL$/, ""));
+    expect(h1Text(html)).toBe("What the knowledge compiler can do today");
   });
 });
 
@@ -162,5 +163,11 @@ describe("sheet", () => {
       }
       expect(f.text).not.toMatch(/overflow(?:-[xy])?\s*:\s*hidden|@import\b|\b(?:animation|transition|@keyframes)\b/);
     }
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("capabilities")).toEqual([]);
   });
 });

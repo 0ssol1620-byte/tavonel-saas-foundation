@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { typedCounts } from "./route-test-support";
 import { TRUST_PROVISIONS } from "@/content/trust/provisions";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { signedProductDemo } from "@/lib/signed-product-demo";
@@ -82,7 +83,7 @@ describe("one h1, from the registry", () => {
 
   it("renders exactly one h1 and it is the registry title", () => {
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    expect(plain(html.match(/<h1[^>]*>[\s\S]*?<\/h1>/)![0]).trim()).toBe(v34Route(KEY).title.replace(/ — TAVONEL$/, ""));
+    expect(plain(html.match(/<h1[^>]*>[\s\S]*?<\/h1>/)![0]).trim()).toBe("Knowledge compiled for large organizations");
     expect(routeMetadata(KEY).title).toBe(v34Route(KEY).title);
   });
 
@@ -273,5 +274,11 @@ describe("tokens, targets and states", () => {
       expect(sheet, `.${name}:hover`).toMatch(new RegExp(`\\.${name}:hover`));
       expect(sheet, `.${name}:focus-visible`).toMatch(new RegExp(`\\.${name}:focus-visible`));
     }
+  });
+});
+
+describe("typed counts", () => {
+  it("types no number word or digits before a counted noun", () => {
+    expect(typedCounts("enterprise")).toEqual([]);
   });
 });

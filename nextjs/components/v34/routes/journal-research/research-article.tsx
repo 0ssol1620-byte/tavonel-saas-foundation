@@ -42,7 +42,7 @@ export const RESEARCH_BLOCKS: readonly ArticleBlock[] = [
     ),
   },
   { kind: "h2", text: "Compare competing claims" },
-  { kind: "p", text: "Select two publicly available records on one research topic. Define the question and the inclusion criteria before reading the outcomes. Extract each claim with its scope, method and limitations independently, then decide whether the studies disagree or answer different questions. Review the exact evidence behind each, and treat a synthesized assertion as a pointer to it." },
+  { kind: "p", text: "Select publicly available records on one research topic. Define the question and the inclusion criteria before reading the outcomes. Extract each claim with its scope, method and limitations independently, then decide whether the studies disagree or answer different questions. Review the exact evidence behind each, and treat a synthesized assertion as a pointer to it." },
   { kind: "figure", node: <Figure art={<MethodFigure />} caption="Method at a glance: a claim is checked against its method and bounded by its limitation." /> },
   { kind: "h2", text: "Keep the review alive" },
   { kind: "p", text: "When a correction, a preprint revision or a new study appears, link it to the original, retain its date and re-evaluate the affected assertions. A living register supports collaboration and evidence checks, and the earlier entries stay readable as they were." },
@@ -61,7 +61,7 @@ export const RESEARCH_BLOCKS: readonly ArticleBlock[] = [
   { kind: "h2", text: "Handle contradictory research" },
   { kind: "p", text: "Two studies can legitimately disagree because their populations, interventions, instruments or outcome definitions differ. Represent the scope of each result and leave the model's score out of the verdict. Create a comparison record that links both source spans and describes the known differences. Flag unresolved contradictions, and keep causal statements within the study design." },
   { kind: "h2", text: "Make citation verification a separate test" },
-  { kind: "p", text: "A published study of chatbot-generated references reported fabricated references and errors in real citations; it is listed under Sources. Its findings concern the systems and conditions it studied. A practical evaluation checks that the identifier exists, that the bibliographic details match and that each citation supports the statement it is attached to. Report those three dimensions separately and include questions that have no eligible source." },
+  { kind: "p", text: "A published study of chatbot-generated references reported fabricated references and errors in real citations; it is listed under Sources. Its findings concern the systems and conditions it studied. A practical evaluation checks that the identifier exists, that the bibliographic details match and that each citation supports the statement it is attached to. Report each of those dimensions separately and include questions that have no eligible source." },
   { kind: "h2", text: "Publish the method with the result" },
   { kind: "p", text: "Record the search date, repositories used, query, inclusion rules, excluded sources and review decisions. Retain accessible evidence links where licences permit, and use bibliographic metadata and authorized access when redistribution is restricted. A reproducible evidence record can then take in a new study and leave the historical review as it was." },
   {
@@ -85,7 +85,7 @@ export function ResearchBody({ published, modified }: { published: string; modif
   return (
     <>
       <ArticleLayout
-        title={record.title.replace(/ — TAVONEL$/, "")}
+        title={record.heading}
         dek={RESEARCH_DEK}
         published={published}
         modified={modified}
