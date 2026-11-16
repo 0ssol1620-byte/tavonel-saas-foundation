@@ -164,6 +164,30 @@ export async function listRecentRemoteMcpKeys(workspaceKey: string, userId: stri
   }
 }
 
+/** One MCP-kind key by id, revoked or expired included; `key: null` when the member has no such key. */
+export async function getRemoteMcpKey(workspaceKey: string, userId: string, keyId: string) {
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false as const, code: "DEVELOPER_STORE_NOT_CONFIGURED" };
+  const query = new URLSearchParams({
+    select: "key_id,name,key_prefix,scopes,created_at,expires_at,last_used_at,revoked_at",
+    workspace_key: `eq.${workspaceKey}`,
+    created_by: `eq.${userId}`,
+    token_kind: "eq.mcp",
+    key_id: `eq.${keyId}`,
+    limit: "1",
+  });
+  try {
+    const response = await supabaseAdminRequest(config, `/rest/v1/foundation_api_keys?${query}`);
+    if (!response.ok) return { ok: false as const, code: "DEVELOPER_STORE_READ_FAILED" };
+    const row = ((await response.json()) as Array<Record<string, unknown>>)[0];
+    if (!row) return { ok: true as const, key: null };
+    const key = parseApiKey(row);
+    return key ? { ok: true as const, key } : { ok: false as const, code: "DEVELOPER_STORE_BINDING_INVALID" };
+  } catch {
+    return { ok: false as const, code: "DEVELOPER_STORE_READ_FAILED" };
+  }
+}
+
 export async function createDeveloperApiKey(input: { workspaceKey: string; userId: string; authorizationRevision: number; name: string; scopes: DeveloperScope[]; expiresAt: string | null; audience?: ApiKeyAudience }) {
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "DEVELOPER_STORE_NOT_CONFIGURED" };
