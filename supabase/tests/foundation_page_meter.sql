@@ -5,7 +5,7 @@
 -- that grant: any unit not explained by a hold, a release, a charge or a reversal is a break.
 -- Every row is rolled back.
 begin;
-select plan(67);
+select plan(78);
 
 -- The two users differ in their first 16 hex digits: the auth.users trigger derives a personal
 -- workspace key from them, and one key with two owners violates the one-owner index.
@@ -264,6 +264,10 @@ select is(pg_temp.balance('pilot-metera'), 1964, 'and its charge stands');
 --     negative, so the shortfall is booked as overage rather than dropped.
 -- ---------------------------------------------------------------------------
 -- Before: doc 3 was reversed 14 (all held), doc 7 reversed 12 (4 held, 8 overage). Balance 1964, overage 2.
+-- Doc 3's bytes (digest 'c') were paid again by doc 6 in section 10, so rule 2 leaves doc 3 refunded:
+-- a workspace pays for a source once. Doc 7's bytes have no other paid read, so doc 7 is charged again.
+-- (Until WO-D27-4 r17 this section expected doc 3 charged 14 again on top of doc 6's 12 -- the
+-- double charge reviewer probe P1b found -- and the balances below were 14 lower.)
 insert into public.foundation_compile_jobs (job_id, workspace_key, created_by_user_id, document_ids,
   idempotency_key, state, documents_total, collection_id, settled_at)
 values
@@ -276,13 +280,13 @@ select ok((select recharged_at is null from public.foundation_compute_reservatio
   where document_id = '92000000-0000-4000-8000-000000000003'), 'a world still in review charges nothing yet');
 update public.foundation_compile_jobs set state = 'ready', collection_id = 'collection-' || repeat('7', 32), settled_at = now()
  where job_id = 'cjob-' || repeat('7', 32);
-select is((select recharged_credits from public.foundation_compute_reservations
-  where document_id = '92000000-0000-4000-8000-000000000003'), 14, 'the first later ready compile charges the refunded read again');
+select ok((select recharged_at is null from public.foundation_compute_reservations
+  where document_id = '92000000-0000-4000-8000-000000000003'), 'a refunded read whose bytes the workspace paid for since is not charged again');
 select is((select recharge_compile_job_id from public.foundation_compute_reservations
-  where document_id = '92000000-0000-4000-8000-000000000003'), 'cjob-' || repeat('7', 32), 'and names the compile that used it');
+  where document_id = '92000000-0000-4000-8000-000000000007'), 'cjob-' || repeat('7', 32), 'the first later ready compile charges the other refunded read again, and names itself');
 select is((select recharged_credits from public.foundation_compute_reservations
   where document_id = '92000000-0000-4000-8000-000000000007'), 12, 'an overage read is charged its whole 12 again');
-select is(pg_temp.balance('pilot-metera'), 1946, 'the held 14 and 4 come off the balance');
+select is(pg_temp.balance('pilot-metera'), 1960, 'the held 4 comes off the balance');
 select is((select overage_units from public.foundation_billing_accounts where workspace_key = 'pilot-metera'),
   10, 'and the 8 above the hold is overage again');
 select is((select lifetime_overage_units from public.foundation_billing_accounts where workspace_key = 'pilot-metera'),
@@ -297,10 +301,10 @@ values
   ('cjob-' || repeat('9', 32), 'pilot-metera', '9100000a-0000-4000-8000-00000000000a',
    array['92000000-0000-4000-8000-000000000003', '92000000-0000-4000-8000-000000000007'],
    'page-meter-fail-after-ready', 'structuring', 2, null, null);
-select is(pg_temp.balance('pilot-metera'), 1946, 'a second ready compile charges nothing twice');
+select is(pg_temp.balance('pilot-metera'), 1960, 'a second ready compile charges nothing twice');
 update public.foundation_compile_jobs set state = 'failed', settled_at = now(), error_code = 'JSON_TOO_LARGE'
  where job_id = 'cjob-' || repeat('9', 32);
-select is(pg_temp.balance('pilot-metera'), 1946, 'a world used the read, so a later failed compile refunds nothing');
+select is(pg_temp.balance('pilot-metera'), 1960, 'a world used the read, so a later failed compile refunds nothing');
 
 -- A recharged read is a paid-for source again: the same digest re-read is free.
 select pg_temp.hold('pilot-metera', '9100000a-0000-4000-8000-00000000000a', '92000000-0000-4000-8000-000000000011', 12, 18);
@@ -329,6 +333,78 @@ select is((select recharged_balance_credits from public.foundation_compute_reser
   where document_id = '92000000-0000-4000-8000-000000000010'), 5, 'and the row says how much came from the balance');
 select is((select overage_units from public.foundation_billing_accounts where workspace_key = 'pilot-metera'),
   17, 'the 7 that no longer fits is overage, so the whole 12 is charged');
+-- Whoever wires overage billing reads this: overage booked by a re-charge is told apart by the row
+-- (recharged_at set, recharged_credits - recharged_balance_credits), never by the account counter.
+select ok((select recharged_at is not null and recharged_credits - recharged_balance_credits = 7
+  from public.foundation_compute_reservations where document_id = '92000000-0000-4000-8000-000000000010'),
+  'a re-charge row names the overage it booked, so an overage biller can tell it from settled overage');
+
+-- ---------------------------------------------------------------------------
+-- 17. A workspace pays for a source once, OC-3 included. A refunded read is not charged again on
+--     `ready` while the workspace holds a live paid charge for the same bytes -- another read of
+--     them, or a twin this same compile charged again first -- and a paid read of a source a
+--     world used is never refunded. Reviewer probes P1, P1b and P6 (WO-D27-4, r16), and P1b
+--     followed by a failed compile of the paid twin. Workspace B starts at 1988; three sources of
+--     12 each must leave 1952.
+-- ---------------------------------------------------------------------------
+create function pg_temp.net(p_sha text) returns integer language sql as $$
+  select (sum(settled_credits) - coalesce(sum(reversed_credits), 0) + coalesce(sum(recharged_credits), 0))::integer
+    from public.foundation_compute_reservations
+   where workspace_key = 'pilot-meterb' and metered_source_sha256 = 'sha256:' || repeat(p_sha, 64);
+$$;
+create function pg_temp.read_b(p_document text, p_sha text) returns text language sql as $$
+  select pg_temp.hold('pilot-meterb', '9100000b-0000-4000-8000-00000000000b', p_document, 12, 18);
+  select pg_temp.settle('pilot-meterb', p_document, 'settled', 3, 0, p_sha)->>'chargeBasis';
+$$;
+create function pg_temp.compile_b(p_id text, p_docs text[], p_state text) returns void language sql as $$
+  insert into public.foundation_compile_jobs (job_id, workspace_key, created_by_user_id, document_ids,
+    idempotency_key, state, documents_total, collection_id, settled_at)
+  values ('cjob-' || md5(p_id), 'pilot-meterb', '9100000b-0000-4000-8000-00000000000b', p_docs,
+    'page-meter-' || p_id, 'structuring', cardinality(p_docs), null, null);
+  update public.foundation_compile_jobs
+     set state = p_state::public.foundation_compile_state, settled_at = now(),
+         collection_id = case when p_state = 'ready' then 'collection-' || md5(p_id) end,
+         error_code = case when p_state = 'failed' then 'JSON_TOO_LARGE' end
+   where job_id = 'cjob-' || md5(p_id);
+$$;
+
+-- P1: A paid, refunded; B (same bytes) paid; a ready compile uses A and B.
+select pg_temp.read_b('92000000-0000-4000-8000-000000000021', '3');
+select pg_temp.compile_b('p1-fail', array['92000000-0000-4000-8000-000000000021'], 'failed');
+select is(pg_temp.read_b('92000000-0000-4000-8000-000000000022', '3'), 'pages',
+  'a source whose only read was refunded is paid again by its next read');
+select pg_temp.compile_b('p1-ready', array['92000000-0000-4000-8000-000000000021', '92000000-0000-4000-8000-000000000022'], 'ready');
+select ok((select recharged_at is null from public.foundation_compute_reservations
+  where document_id = '92000000-0000-4000-8000-000000000021'),
+  'P1: a refunded read is not charged again when the workspace paid for the same bytes since');
+select is(pg_temp.net('3'), 12, 'P1: the source is paid once');
+
+-- P1b: the same, but the ready compile uses only the refunded read.
+select pg_temp.read_b('92000000-0000-4000-8000-000000000023', '4');
+select pg_temp.compile_b('p1b-fail', array['92000000-0000-4000-8000-000000000023'], 'failed');
+select pg_temp.read_b('92000000-0000-4000-8000-000000000024', '4');
+select pg_temp.compile_b('p1b-ready', array['92000000-0000-4000-8000-000000000023'], 'ready');
+select is(pg_temp.net('4'), 12, 'P1b: a world from the refunded read of a paid source charges nothing more');
+-- ... and the paid twin now pays for a source a world used, so failing a compile of it refunds nothing.
+select pg_temp.compile_b('p1b-fail-twin', array['92000000-0000-4000-8000-000000000024'], 'failed');
+select ok((select reversed_at is null from public.foundation_compute_reservations
+  where document_id = '92000000-0000-4000-8000-000000000024'),
+  'P1b: the paid read of a source a world used is not refunded by a failed compile of its own document');
+select is(pg_temp.net('4'), 12, 'P1b: so the source still nets one charge, not zero');
+
+-- P6: A paid, refunded; B paid, refunded; one ready compile uses both.
+select pg_temp.read_b('92000000-0000-4000-8000-000000000025', '5');
+select pg_temp.compile_b('p6-fail-a', array['92000000-0000-4000-8000-000000000025'], 'failed');
+select pg_temp.read_b('92000000-0000-4000-8000-000000000026', '5');
+select pg_temp.compile_b('p6-fail-b', array['92000000-0000-4000-8000-000000000026'], 'failed');
+select pg_temp.compile_b('p6-ready', array['92000000-0000-4000-8000-000000000025', '92000000-0000-4000-8000-000000000026'], 'ready');
+select is((select count(*)::integer from public.foundation_compute_reservations
+  where workspace_key = 'pilot-meterb' and metered_source_sha256 = 'sha256:' || repeat('5', 64) and recharged_at is not null),
+  1, 'P6: of two refunded twins one compile uses, exactly one is charged again');
+select is((select recharged_credits from public.foundation_compute_reservations
+  where document_id = '92000000-0000-4000-8000-000000000025'), 12, 'P6: the earlier read is the one charged again');
+select is(pg_temp.net('5'), 12, 'P6: the source is paid once');
+select is(pg_temp.balance('pilot-meterb'), 1952, 'the balance paid each of the three sources once');
 
 select * from finish();
 rollback;

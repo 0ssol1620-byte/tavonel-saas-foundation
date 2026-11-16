@@ -11,7 +11,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { settleFoundationMeteredCompute, type MeteredSettlement } from "./compute-reservation";
 import { creditsForMeteredPages, MAX_UNITS_PER_PAGE, STANDARD_UNITS_PER_PAGE } from "./usage-pricing";
 import {
-  generateOps, hashOps, LedgerOracle, mulberry32, opSql, shadowCompare, type CompileOp, type Op, type SettleOp,
+  countTwinInterleavings, generateOps, hashOps, LedgerOracle, mulberry32, opSql, shadowCompare, SourceChargeBook,
+  type CompileOp, type Op, type SettleOp,
 } from "./billing-ledger-replay";
 
 const reservationId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -138,9 +139,9 @@ describe("metered settlement", () => {
 // ---------------------------------------------------------------------------------------------
 
 const METERED_PINNED: Record<number, string> = {
-  1: "c2d0e9cbb190a108ab1640f72086d86d660e3264b77cd24770777117b1168cf2",
-  2: "0da28edb1f6203966b1b5a98d59557f70485660c808dd1b6e57f4123e3029f77",
-  3: "9b1cda73626101457117fd92d5974770c6ba3bc05b1871e5a436b04c8e31b74f",
+  1: "a73f98ffaba4ee3bc8f98d0cdb1482a4c9aacdfeb6c931336261d882a69aaa25",
+  2: "57fd83fc579112bd80c074ec0521727f849385cfea16e3c73f676c3e11710787",
+  3: "b20be5e011e2c4ba427c226e5617e55d2935f586cde4f8c19b3239f871e8ecfb",
 };
 
 describe("metered replay stream", () => {
@@ -273,6 +274,79 @@ describe("OC-3: refunded, then used, is charged again", () => {
     o.apply(compile("j2", ["doc-a"], "ready"));
     o.apply(hold);
     expect(o.apply(settle).ok?.chargeBasis).toBe("unchanged_source"); // charged again: paid
+  });
+
+  // Reviewer probes P1, P1b and P6 (WO-D27-4 r16): a re-charge must not make the workspace pay a source twice.
+  it("P1: does not charge a refunded read again when the same bytes were paid since", () => {
+    const o = funded();
+    read("doc-a", 12, 18, 3).forEach((op) => o.apply(op));
+    o.apply(compile("j1", ["doc-a"], "failed"));
+    read("doc-b", 12, 18, 3).forEach((op) => o.apply(op));
+    expect(o.apply(compile("j2", ["doc-a", "doc-b"], "ready")).ok).toEqual({ reversed: 0, recharged: 0 });
+    expect(account(o)?.balance).toBe(1988);
+  });
+
+  it("P1b: nor when the world uses only the refunded read, and then never refunds the paid twin", () => {
+    const o = funded();
+    read("doc-a", 12, 18, 3).forEach((op) => o.apply(op));
+    o.apply(compile("j1", ["doc-a"], "failed"));
+    read("doc-b", 12, 18, 3).forEach((op) => o.apply(op));
+    expect(o.apply(compile("j2", ["doc-a"], "ready")).ok).toEqual({ reversed: 0, recharged: 0 });
+    expect(o.apply(compile("j3", ["doc-b"], "failed")).ok).toEqual({ reversed: 0, recharged: 0 }); // a world used the source
+    expect(account(o)?.balance).toBe(1988);
+  });
+
+  it("P6: of two refunded twins one ready compile uses, charges exactly one again, the earlier", () => {
+    const o = funded();
+    read("doc-a", 12, 18, 3).forEach((op) => o.apply(op));
+    o.apply(compile("j1", ["doc-a"], "failed"));
+    read("doc-b", 12, 18, 3).forEach((op) => o.apply(op));
+    o.apply(compile("j2", ["doc-b"], "failed"));
+    expect(account(o)?.balance).toBe(2000);
+    expect(o.apply(compile("j3", ["doc-b", "doc-a"], "ready")).ok).toEqual({ reversed: 0, recharged: 1 });
+    expect(row(o, "doc-a")).toMatchObject({ recharged: 12 });
+    expect(row(o, "doc-b")).toMatchObject({ recharged: null });
+    expect(account(o)?.balance).toBe(1988);
+  });
+});
+
+describe("rule 2 over the stream: a source carries at most one live paid charge", () => {
+  const SRC = `sha256:${"d".repeat(64)}`;
+  const settle = (doc: string): SettleOp => ({ k: "settle", retry: false, tag: "t", doc, outcome: "settled", actual: 2, reason: "OCR_COMPLETED", pages: 3, complex: null, src: SRC });
+  const charged = { ok: { status: "processed", state: "settled", settledCredits: 12, chargeBasis: "pages" } };
+  const job = (docs: string[], state: CompileOp["state"]): CompileOp => ({ k: "compile", retry: false, tag: "t", job: "j", docs, state });
+
+  it("holds after every op of 3 x 1,000 metered ops, by the replay's own books, not the oracle's rule", () => {
+    for (const seed of [1, 2, 3]) {
+      const o = new LedgerOracle("v4");
+      const book = new SourceChargeBook();
+      const problems = generateOps(seed, 1000, { meter: true })
+        .flatMap((op, i) => book.observe(op, o.apply(op), o.snapshot(op)).map((p) => `op ${i}: ${p}`));
+      expect(problems, `seed ${seed}`).toEqual([]);
+    }
+  }, 60_000);
+
+  it("is exercised: every stream meets refunded reads whose source has a twin in play", () => {
+    for (const seed of [1, 2, 3]) expect(countTwinInterleavings(generateOps(seed, 1000, { meter: true })), `seed ${seed}`).toBeGreaterThan(0);
+  }, 60_000);
+
+  it("reports a re-charge that leaves one source with two live paid charges", () => {
+    const book = new SourceChargeBook();
+    expect(book.observe(settle("a"), charged, {})).toEqual([]);
+    expect(book.observe(job(["a"], "failed"), { ok: {} }, { compiled: [{ doc: "a", state: "settled", settled: 12, reversed: 12, recharged: null }] })).toEqual([]);
+    expect(book.observe(settle("b"), charged, {})).toEqual([]);
+    expect(book.observe(job(["a", "b"], "ready"), { ok: {} }, {
+      compiled: [{ doc: "a", state: "settled", settled: 12, reversed: 12, recharged: 12 }, { doc: "b", state: "settled", settled: 12, reversed: null, recharged: null }],
+    })).toEqual([`source ${SRC} carries 2 live paid charges (a, b)`]);
+  });
+
+  it("does not count a free, refunded or failed read as a paid charge", () => {
+    const book = new SourceChargeBook();
+    expect(book.observe(settle("a"), charged, {})).toEqual([]);
+    expect(book.observe(settle("b"), { ok: { ...charged.ok, settledCredits: 0, chargeBasis: "unchanged_source" } }, {})).toEqual([]);
+    expect(book.observe(settle("c"), { ok: { ...charged.ok, state: "operator_review", settledCredits: 0, chargeBasis: "no_usable_output" } }, {})).toEqual([]);
+    expect(book.observe(settle("d"), { ok: { status: "duplicate" } }, {})).toEqual([]);
+    expect(book.observe(settle("e"), { error: "foundation_compute_settlement_conflict" }, {})).toEqual([]);
   });
 });
 

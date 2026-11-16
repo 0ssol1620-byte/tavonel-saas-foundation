@@ -41,8 +41,8 @@ begin
   select md5(pg_get_functiondef('public.recharge_foundation_compute_for_ready_compile()'::regprocedure))
     into v_recharge;
   if v_v4 is distinct from '48ad2f401fcdbe19645260d4c0890a22'
-    or v_reverse is distinct from 'c3e920b5f47bbd98860b9439a3ca6213'
-    or v_recharge is distinct from 'd6db0fa8769c012878fa4cb81d832d3b' then
+    or v_reverse is distinct from 'b1e3fd3e6649ad33a36faec6aeb3ab55'
+    or v_recharge is distinct from 'a57edc63d70ad3529d1525ed0ab5849d' then
     raise exception 'rollback_20261117120000_refused: live bodies % / % / % are not the 20261117120000 bodies',
       v_v4, v_reverse, v_recharge;
   end if;

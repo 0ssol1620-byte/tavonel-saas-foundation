@@ -157,6 +157,7 @@ const SUB_STATUS: ReadonlyArray<readonly [string, number]> = [
 // A metered stream (WO-D27-4) adds these to WEIGHTS. A stream without `meter` draws exactly what it drew before.
 const METER_WEIGHTS: ReadonlyArray<readonly [string, number]> = [
   ["compile", 70], ["recompile_refunded", 35], ["settle_meter_invalid", 10], ["settle_no_pages", 8],
+  ["twin_resettle", 15],
 ];
 const COMPILE_STATE: ReadonlyArray<readonly [CompileOp["state"], number]> = [
   ["failed", 45], ["ready", 30], ["cancelled", 10], ["review_required", 15],
@@ -391,6 +392,34 @@ export function generateOps(seed: number, count = 1000, options: { meter?: boole
         if (refunded.length) push({ k: "compile", retry: false, tag: variant, job: jobId(next()), docs: [pick(refunded)], state: weighted(RECOMPILE_STATE) });
         break;
       }
+      case "twin_resettle": {
+        // Rule 2 under OC-3 (reviewer probes P1, P1b, P6): the bytes of a refunded read are read again as
+        // a new document, that twin is sometimes refunded too, then compiles use one or both of them.
+        const compile = (docs: string[], state: CompileOp["state"]) => push({ k: "compile", retry: false, tag: variant, job: jobId(next()), docs, state });
+        const read = (src: string) => {
+          const r = reserve(variant);
+          if (rnd() < 0.5) push(clone(r, `redeliver:${variant}`)); // an upload retried after a lost answer
+          const settled: SettleOp = { k: "settle", retry: false, tag: variant, doc: r.doc, outcome: "settled", actual: r.reserved, reason: "OCR_COMPLETED", pages: int(1, 30), complex: null, src };
+          push(settled);
+          push(clone(settled, `redeliver:${variant}`)); // the worker retries a settlement it lost the answer to
+          return r.doc;
+        };
+        const refunded = tracker.refundedSources();
+        let a: string;
+        let src: string;
+        if (refunded.length && rnd() < 0.5) [a, src] = pick(refunded);
+        else {
+          // Mostly fresh bytes: the eight shared sources are soon all paid for, and a paid source re-read is free.
+          src = rnd() < 0.75 ? sha(`replay-twin-${seed}-${next()}`) : pick(sources);
+          a = read(src);
+          compile([a], "failed");
+        }
+        const b = read(src);
+        if (rnd() < 0.35) compile([b], "failed");
+        compile(pick([[a], [b], [a, b], [b, a]]), weighted(RECOMPILE_STATE));
+        if (rnd() < 0.35) compile([pick([a, b])], "failed");
+        break;
+      }
       case "settle_meter_invalid":
         if (reserves.length) {
           const bad = pick<Partial<SettleOp>>([{ pages: 0 }, { pages: 10001 }, { pages: 3, complex: 4 }, { src: "sha256:not-a-digest" }]);
@@ -450,6 +479,12 @@ const meteredRate = (pages: number, complex: number | null) =>
 const meteredCap = (a: Acct, r: Res) => (!a.overageEnabled || a.hold ? r.reserved : r.max);
 /** A settled read of `src` that still counts as paid: never reversed, or charged again after its refund (OC-3). */
 const isPaidSource = (p: Res, src: string) => p.state === "settled" && p.src === src && (p.reversed == null || p.recharged != null);
+/** recharge_foundation_compute_for_ready_compile's skip: another read of the same bytes is a live paid charge. */
+const sourcePaidElsewhere = (s: State, r: Res) =>
+  r.src != null && [...s.reservations.values()].some((p) => p !== r && (p.settled ?? 0) > 0 && isPaidSource(p, r.src as string));
+/** reverse_foundation_compute_for_failed_compile's "a world used it": this document, or a read of the same bytes. */
+const usedByWorld = (s: State, doc: string, r: Res) =>
+  s.usedDocs.has(doc) || (r.src != null && [...s.usedDocs].some((d) => s.reservations.get(d)?.src === r.src));
 const meteredReceipt = (status: string, r: Res, released: number, over: number): Rec => ({
   status, state: r.state, settledCredits: r.settled, reservedCredits: r.reserved, maximumCredits: r.max,
   releasedCredits: released, overageCredits: over, billingSource: "paid",
@@ -495,6 +530,29 @@ export class LedgerOracle {
   /** Documents whose read a failed compile refunded and nothing has charged again (the OC-3 candidates). */
   refundedDocs(): string[] {
     return [...this.s.reservations.entries()].filter(([, r]) => r.reversed != null && r.recharged == null).map(([doc]) => doc);
+  }
+
+  /** The OC-3 candidates that carry a source digest, with it: the generator reads their bytes again. */
+  refundedSources(): Array<[doc: string, src: string]> {
+    return [...this.s.reservations.entries()].flatMap(([doc, r]) => (r.reversed != null && r.recharged == null && r.src ? [[doc, r.src] as [string, string]] : []));
+  }
+
+  /**
+   * Measurement only: how many refunded reads a `ready` op would meet whose source also has another
+   * read in play -- a live paid read of the same bytes, or a second refunded twin in the same job.
+   * These are the interleavings where a re-charge can pay for one source twice.
+   */
+  twinRecharges(op: Op): number {
+    if (op.k !== "compile" || op.state !== "ready") return 0;
+    const docs = new Set(op.docs);
+    const all = [...this.s.reservations.entries()];
+    return [...docs].filter((doc) => {
+      const r = this.s.reservations.get(doc);
+      if (!r || r.reversed == null || r.recharged != null || !r.src) return false;
+      const src = r.src;
+      return all.some(([d, p]) => d !== doc && p.src === src
+        && (((p.settled ?? 0) > 0 && isPaidSource(p, src)) || (docs.has(d) && p.reversed != null && p.recharged == null)));
+    }).length;
   }
 
   /** Applies one op. A refusal rolls the whole call back, exactly like a raised exception in SQL. */
@@ -786,7 +844,7 @@ export class LedgerOracle {
       // reverse_foundation_compute_for_failed_compile
       for (const doc of docs) {
         const r = s.reservations.get(doc);
-        if (!r || r.state !== "settled" || !(r.settled as number > 0) || r.reversed != null || r.basis == null || s.usedDocs.has(doc)) continue;
+        if (!r || r.state !== "settled" || !(r.settled as number > 0) || r.reversed != null || r.basis == null || usedByWorld(s, doc, r)) continue;
         const a = s.acct as Acct;
         const held = Math.min(r.settled as number, r.reserved);
         const overBack = Math.min(Math.max(0, (r.settled as number) - r.reserved), a.overageUnits);
@@ -798,10 +856,11 @@ export class LedgerOracle {
       }
     }
     if (this.meter === "v4" && op.state === "ready") {
-      // recharge_foundation_compute_for_ready_compile (OC-3)
-      for (const doc of docs) {
+      // recharge_foundation_compute_for_ready_compile (OC-3), in its cursor order `settled_at, document_id`.
+      // Every op of a replay runs in one transaction, so `settled_at` (now()) is one value and the order is the document id.
+      for (const doc of [...docs].sort()) {
         const r = s.reservations.get(doc);
-        if (!r || r.reversed == null || r.recharged != null) continue;
+        if (!r || r.reversed == null || r.recharged != null || sourcePaidElsewhere(s, r)) continue;
         const a = s.acct as Acct;
         const fromBalance = Math.min(Math.min(r.settled as number, r.reserved), Math.max(0, a.balance));
         const over = r.reversed - fromBalance;
@@ -981,7 +1040,7 @@ function explainCompile(op: CompileOp, pre: State, v3: State, o3: Outcome, v4: S
       return no(`compile changed ${doc} beyond its reversal and recharge columns`);
     }
     if (op.state === "failed" && p.reversed == null && r.reversed != null && p.state === "settled" && (p.settled ?? 0) > 0
-      && p.basis != null && !pre.usedDocs.has(doc)) {
+      && p.basis != null && !usedByWorld(pre, doc, p)) {
       const held = Math.min(p.settled as number, p.reserved);
       const back = r.reversed - held;
       if (back < 0 || back > Math.max(0, (p.settled as number) - p.reserved)) return no(`reversal of ${doc} gave back ${r.reversed}, not what was booked`);
@@ -989,7 +1048,8 @@ function explainCompile(op: CompileOp, pre: State, v3: State, o3: Outcome, v4: S
       overage -= back;
       rule = "failed_compile_reversal";
     } else if (op.state === "ready" && p.reversed != null && p.recharged == null && r.recharged === p.reversed
-      && r.rechargedBalance != null && r.rechargedBalance >= 0 && r.rechargedBalance <= Math.min(p.settled as number, p.reserved)) {
+      && r.rechargedBalance != null && r.rechargedBalance >= 0 && r.rechargedBalance <= Math.min(p.settled as number, p.reserved)
+      && !sourcePaidElsewhere(v4, r)) { // rule 2: after the op, no other read of the same bytes is a live paid charge
       balance -= r.rechargedBalance;
       overage += r.recharged - r.rechargedBalance;
       rule = "ready_recharge";
@@ -1025,6 +1085,54 @@ export function shadowCompare(ops: readonly Op[]): { rules: Partial<Record<Shado
     else rules[why.rule] = (rules[why.rule] ?? 0) + 1;
   });
   return { rules, unexplained };
+}
+
+/**
+ * Rule 2 -- a workspace pays for a source once -- kept by the replay's own books, never by the
+ * oracle's or the SQL's recharge rule. It reads only the ops it was given and the rows they produced:
+ * a v4 settlement names a document's source and whether it charged; a compile op reports each of its
+ * documents' state, charge, refund and re-charge. A document is a live paid charge while it is
+ * settled above 0 and either never refunded or charged again. Two live paid charges for one source,
+ * after any op, is a double charge, whichever rule made it.
+ */
+export class SourceChargeBook {
+  private readonly src = new Map<string, string>();
+  private readonly live = new Map<string, boolean>();
+
+  /** Feeds one op and what it produced; returns every source that now carries more than one live paid charge. */
+  observe(op: Op, outcome: Outcome, snapshot: Pick<Snapshot, "compiled">): string[] {
+    const ok = outcome.ok;
+    if (op.k === "settle" && ok?.status === "processed" && ok.chargeBasis != null && op.src) {
+      this.src.set(op.doc, op.src);
+      this.live.set(op.doc, ok.state === "settled" && (ok.settledCredits as number) > 0);
+    }
+    if (op.k === "compile") {
+      for (const row of snapshot.compiled ?? []) {
+        const doc = row.doc as string;
+        if (!this.src.has(doc)) continue;
+        this.live.set(doc, row.state === "settled" && (row.settled as number) > 0 && (row.reversed == null || row.recharged != null));
+      }
+    }
+    const perSource = new Map<string, string[]>();
+    for (const [doc, isLive] of this.live) {
+      if (!isLive) continue;
+      const src = this.src.get(doc) as string;
+      perSource.set(src, [...(perSource.get(src) ?? []), doc]);
+    }
+    return [...perSource].filter(([, docs]) => docs.length > 1)
+      .map(([src, docs]) => `source ${src} carries ${docs.length} live paid charges (${docs.sort().join(", ")})`);
+  }
+}
+
+/** Measurement: the `ready` compiles in a metered stream that meet a refunded read with a twin in play (see `twinRecharges`). */
+export function countTwinInterleavings(ops: readonly Op[]): number {
+  const o = new LedgerOracle("v4");
+  let n = 0;
+  for (const op of ops) {
+    if (o.twinRecharges(op) > 0) n++;
+    o.apply(op);
+  }
+  return n;
 }
 
 /** The page-meter columns of one reservation as the database snapshot reports them. */
@@ -1314,6 +1422,7 @@ export async function replayOps(session: PsqlSession, seed: number, ops: readonl
   await session.query(SETUP_SQL);
   try {
     const oracle = new LedgerOracle(meter);
+    const book = new SourceChargeBook();
     for (let index = 0; index < ops.length; index++) {
       const op = ops[index];
       const expectedOutcome = oracle.apply(op);
@@ -1331,6 +1440,7 @@ export async function replayOps(session: PsqlSession, seed: number, ops: readonl
         ...diffOutcome(expectedOutcome, actualOutcome),
         ...diffValues(expectedSnapshot, actualSnapshot),
         ...checkInvariants(actualSnapshot.invariants).map((p) => `invariant: ${p}`),
+        ...book.observe(op, actualOutcome, actualSnapshot).map((p) => `invariant (rule 2, the replay's own books): ${p}`),
       ];
       if (problems.length) {
         return { seed, index, op, problems, expected: { outcome: expectedOutcome, snapshot: expectedSnapshot }, actual: { outcome: actualOutcome, snapshot: actualSnapshot } };

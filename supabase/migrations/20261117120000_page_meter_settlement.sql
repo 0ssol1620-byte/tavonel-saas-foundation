@@ -22,8 +22,9 @@
 --      read, never the client-supplied digest recorded at upload confirm, which the uploader can
 --      choose. Another workspace's reads are never looked at.
 --   3. No usable output. `operator_review` (the reader failed) settles 0 (`no_usable_output`), and
---      a compile job that settles `failed` reverses the page charge of every document in it that
---      no `ready` or `review_required` compile ever used (`COMPILE_FAILED_NO_OUTPUT`), once.
+--      a compile job that settles `failed` reverses the page charge of every document in it whose
+--      source no `ready` or `review_required` compile ever used, through that document or another
+--      read of the same bytes in the workspace (`COMPILE_FAILED_NO_OUTPUT`), once.
 --      Only reads this function settled are reversed: a pre-meter per-document charge
 --      (`charge_basis` null) is left as it was booked. A reversal undoes exactly what settlement
 --      booked: the held part goes back to the balance and the part above the hold comes off the
@@ -34,7 +35,11 @@
 --      fail on purpose and then recompiling is a repeatable free read. The held part comes off
 --      the balance as far as the balance still holds it; what no longer fits is booked as
 --      overage rather than dropped (`recharged_balance_credits` says how much was which). A
---      charged-again read counts as paid for rule 2. `review_required` is not yet a world and
+--      charged-again read counts as paid for rule 2. Rule 2 binds the re-charge too: a refunded
+--      read is not charged again while the workspace holds a live paid charge for the same bytes
+--      (settled above 0, never refunded or charged again), so a source is paid once however many
+--      documents carry it; of two refunded twins one world uses, the earlier-settled is charged.
+--      `review_required` is not yet a world and
 --      charges nothing; a read a world used is never reversed again (rule 3 already looks for
 --      a `ready` compile).
 --
@@ -262,8 +267,11 @@ begin
 end;
 $$;
 
--- A compile that settles `failed` produced no world. Every document in it that no `ready` or
--- `review_required` compile has ever used gets its page charge back, once. A paid account gets
+-- A compile that settles `failed` produced no world. Every document in it whose source no `ready`
+-- or `review_required` compile has ever used -- through this document or through another read of
+-- the same bytes in this workspace -- gets its page charge back, once. (A world built from a
+-- refunded twin is paid for by this read: OC-3 does not charge the twin while this one is live,
+-- so refunding this one too would leave the world free.) A paid account gets
 -- the credits returned to its balance; owner and trial reads moved no balance, so the reversal
 -- is recorded and nothing else moves. `cancelled` is the customer's own stop and reverses nothing.
 create function public.reverse_foundation_compute_for_failed_compile()
@@ -286,9 +294,11 @@ begin
        and c.charge_basis is not null
        and not exists (
          select 1 from public.foundation_compile_jobs j
+           join public.foundation_compute_reservations u
+             on u.workspace_key = j.workspace_key and u.document_id::text = any (j.document_ids)
           where j.workspace_key = new.workspace_key
             and j.state in ('ready', 'review_required')
-            and c.document_id::text = any (j.document_ids))
+            and (u.document_id = c.document_id or u.metered_source_sha256 = c.metered_source_sha256))
      for update of c
   loop
     v_overage_back := 0;
@@ -325,7 +335,11 @@ when (new.state = 'failed' and old.state is distinct from new.state)
 execute function public.reverse_foundation_compute_for_failed_compile();
 
 -- OC-3: a compile that reaches `ready` used its documents. Every read in it that a failed compile
--- refunded is charged again, once, for exactly what the refund gave back (rule 4 above).
+-- refunded is charged again, once, for exactly what the refund gave back (rule 4 above) -- unless
+-- the workspace already holds a live paid charge for the same bytes: a read of that source settled
+-- above 0 and never refunded, or charged again. A workspace pays for a source once (rule 2). The
+-- check is made per row inside the loop, so a twin this same loop charged again counts; the
+-- earliest-settled refunded read is the one charged.
 create function public.recharge_foundation_compute_for_ready_compile()
 returns trigger
 language plpgsql
@@ -344,8 +358,18 @@ begin
      where c.workspace_key = new.workspace_key
        and c.document_id::text = any (new.document_ids)
        and c.reversed_at is not null and c.recharged_at is null
+     order by c.settled_at, c.document_id
      for update of c
   loop
+    if exists (
+      select 1 from public.foundation_compute_reservations p
+       where p.workspace_key = r.workspace_key
+         and p.reservation_id <> r.reservation_id
+         and p.metered_source_sha256 = r.metered_source_sha256
+         and p.state = 'settled' and p.settled_credits > 0
+         and (p.reversed_at is null or p.recharged_at is not null)) then
+      continue;
+    end if;
     v_from_balance := 0;
     if r.billing_source = 'paid' then
       -- The reversal gave back least(charge, hold) to the balance and the rest off overage.

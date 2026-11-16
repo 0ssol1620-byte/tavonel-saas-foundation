@@ -24,16 +24,35 @@
   `recharged_balance_credits`, `recharge_compile_job_id`, `recharged_at`), for exactly what the
   refund gave back; a balance spent since the refund pays what it still holds and the rest is
   booked as overage; a read charged again counts as paid for the unchanged-source rule.
-  `review_required` charges nothing until the world reaches `ready`. The other four are accepted
-  limits, unchanged in behaviour:
+  A workspace pays for a source once, and that binds the re-charge too: a refunded read is not
+  charged again while the workspace holds a live paid charge for the same bytes (a read of them
+  settled above 0 that was never refunded, or was charged again), checked per read, so of two
+  refunded twins one world uses only the earlier-settled is charged. And a paid read is not
+  refunded once a `ready` or `review_required` compile has used its source, through its own
+  document or through a twin -- otherwise a world built from the refunded twin would end up free.
+  `review_required` charges nothing until the world reaches `ready`; a world that stays
+  `review_required` forever never triggers the re-charge (known boundary, no change: whether
+  approving a review moves the job to `ready` decides whether it is charged). The other four are
+  accepted limits, unchanged in behaviour. Each has the same owner -- the ops-commerce lead (the
+  orchestrating session until a named person takes it) -- and the same review trigger: before
+  WO-CAT-7 opens a sale.
   1. an `unchanged_source` read settled before its match was reversed stays free and still names
-     the reversed row;
+     the reversed row (PR #209's known limit 2). Concrete case, reviewer probe P2: A is paid, its
+     twin B settles `unchanged_source`, a failed compile refunds A, and a `ready` compile on [B]
+     nets 0 for the source. This reopens, for two uploads of the same bytes, the free read OC-3
+     closed for a single document;
   2. `unchanged_source` matches trial and owner history too, so a source read on trial and re-read
      after converting to paid is free (the wording above is narrower than the code);
   3. the trial quota sums `settled_credits` and ignores `reversed_credits`, so a trial user's
      failed compile still uses quota;
   4. nothing drains `overage_units` today; if a billing report ever has, a reversal returns only
-     the overage still outstanding and `reversed_credits` records the smaller amount.
+     the overage still outstanding and `reversed_credits` records the smaller amount. Related, and
+     recorded rather than changed: a re-charge on an account with overage off can land in
+     `overage_units` when the balance was spent since the refund (reviewer probe P5). Nothing bills
+     overage units today. Whoever wires overage billing must tell such units apart by the row
+     (`recharged_at` set, `recharged_credits - recharged_balance_credits`; pinned in
+     `supabase/tests/foundation_page_meter.sql` section 16) and must not bill them to an account
+     without overage consent, or must turn them into a billing hold instead.
 - **Date:** 2026-10-19. Drafted 2026-10-17, the date of the register and of the adoption it records.
 - **Branch this was written on:** `codex/records-20261017`, on top of `main` `4c80bb30`.
 - **Register row:** D-28 (aliases T-F6), "페이지 단위 과금". Adopted default: "페이지 계량 설계를
