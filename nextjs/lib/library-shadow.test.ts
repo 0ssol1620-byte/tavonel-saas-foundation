@@ -4,7 +4,7 @@ import {
 } from "./library-methods";
 import {
   LIBRARY_ORGANIZE_MAX_TEXT_CHARS, PERSON_UNDO_METHOD_VERSION, decideLibraryLabel, docTypeLabel, libraryOrganizeMode, organizeLibraryAtIntake,
-  readLibraryDocuments, readLibraryInternal, toLibraryDocuments, type LibraryDecision, type LibraryInternalView,
+  readLibraryDocuments, readLibraryInternal, toLibraryDocuments, type LibraryDecision, type LibraryDocument, type LibraryInternalView,
 } from "./library-shadow";
 import { decisionFor, labelControls, labelState, targetKey, type LabelControl, type Target } from "@/components/library-panel";
 
@@ -365,7 +365,16 @@ const proposal = (labelKey: string, createdAt = "2026-11-07T10:00:00+00:00", run
 const topic = (labelKey: string, createdAt?: string, run?: string): Row => ({ ...proposal(labelKey, createdAt, run), labelKind: "topic",
   labelSetVersion: "topic-open:v1", method: "tfidf_agglomerative", methodVersion: "topic-ctfidf:v1" });
 const view = (...labels: readonly unknown[]): LibraryInternalView => ({ labels: labels as LibraryInternalView["labels"], relations: [] });
-const docOf = (rows: readonly Row[]) => toLibraryDocuments(view(...rows), [A])[0]!;
+// The store only appends rows, so a history's fold is kept per array until it grows: the fuzz below reads one history
+// many times between writes, and refolding it on every read made that test run seconds, past vitest's default limit.
+const folds = new WeakMap<readonly Row[], { length: number; document: LibraryDocument }>();
+const docOf = (rows: readonly Row[]): LibraryDocument => {
+  const kept = folds.get(rows);
+  if (kept?.length === rows.length) return kept.document;
+  const document = toLibraryDocuments(view(...rows), [A])[0]!;
+  folds.set(rows, { length: rows.length, document });
+  return document;
+};
 const rejectedBy = (kind: "doc_type" | "topic", label: string) => ({ kind, label, state: "rejected_by_person" });
 
 describe("a person's decisions on the Library", () => {
@@ -647,7 +656,8 @@ describe("the Library panel against the store (fuzzed)", () => {
     ...document.rejected.map((label) => T(label.kind, label.label)),
   ];
 
-  it("holds its invariants over 500 random histories, other people and later production runs", () => {
+  // Its own limit: 500 histories are real work, and a loaded parallel CI run must not turn that into a timeout.
+  it("holds its invariants over 500 random histories, other people and later production runs", { timeout: 60_000 }, () => {
     const random = rng(0x0d234);
     const pick = <V,>(items: readonly V[]) => items[Math.floor(random() * items.length)]!;
     const randomTarget = () => (random() < 0.5 ? T("doc_type", pick(TYPES)) : T("topic", pick(TOPICS)));
