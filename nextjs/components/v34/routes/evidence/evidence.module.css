@@ -236,6 +236,46 @@
   line-height: 1.55;
 }
 
+.contracted,
+.trustCase {
+  display: grid;
+  gap: 12px;
+  margin-top: 36px;
+  padding-top: 20px;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.locators {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 40px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.locator {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.5;
+}
+
+.locator b {
+  color: var(--v34-fg);
+  font-weight: 650;
+}
+
+.siblings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 /* ---- bound things, steps, tables -------------------------------------------------------- */
 
 .kicker {
@@ -345,6 +385,10 @@
 }
 
 @media (max-width: 600px) {
+  .locators {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .mechanism,
   .steps {
     grid-template-columns: minmax(0, 1fr);

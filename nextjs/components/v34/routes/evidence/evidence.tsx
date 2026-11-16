@@ -1,6 +1,7 @@
 import Link from "next/link";
 import RouteJsonLd from "@/components/v34/shell/route-json-ld";
 import V34Page from "@/components/v34/shell/v34-page";
+import { TrustNext } from "@/components/trust-next";
 import { ButtonLink } from "@/components/v34/ui/button-link";
 import { CorpusStats } from "@/components/v34/ui/corpus-stats";
 import { FinalCta } from "@/components/v34/ui/final-cta";
@@ -15,8 +16,8 @@ import { PUBLIC_CORPUS_STATS, readPublicCorpus } from "@/lib/v34/public-corpus";
 import type { CorpusSource } from "@/lib/v34/world-geometry";
 import { EvidenceArt } from "./evidence-art";
 import {
-  FINAL, HERO, INCOMPLETE, INCOMPLETE_RECORD_ID, MECHANISM, PROVENANCE, PROVENANCE_RECORD_ID,
-  PROVENANCE_SOURCE_IDS, REGIONS, VERIFY,
+  CONTRACTED, CONTRACTED_LOCATORS, FINAL, HERO, INCOMPLETE, INCOMPLETE_RECORD_ID, MECHANISM, PROVENANCE, PROVENANCE_RECORD_ID,
+  PROVENANCE_SOURCE_IDS, REGIONS, TRUST_CASE, VERIFY,
 } from "./evidence-content";
 import { EvidenceRegions } from "./evidence-regions";
 import s from "./evidence.module.css";
@@ -69,6 +70,18 @@ export function EvidenceBody({ view }: { view: EvidencePageView }) {
             <b>{REGIONS.reading.format}</b> · {REGIONS.reading.locator} {REGIONS.reading.text}
           </p>
           <Link className={s.textLink} href={REGIONS.reading.link.href} prefetch={false}>{REGIONS.reading.link.label}</Link>
+        </div>
+        <div className={s.contracted}>
+          <h3 id="contracted-locators" className={s.itemTitle}>{CONTRACTED.title}</h3>
+          <p className={s.readingText}>{CONTRACTED.text}</p>
+          <ul className={s.locators} aria-labelledby="contracted-locators">
+            {CONTRACTED_LOCATORS.map(([family, locator]) => (
+              <li key={family} className={s.locator}>
+                <b>{family}</b>
+                <span>{locator}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </Section>
 
@@ -140,6 +153,18 @@ export function EvidenceBody({ view }: { view: EvidencePageView }) {
         <p className={s.stepsLink}>
           <Link className={s.textLink} href={VERIFY.link.href} prefetch={false}>{VERIFY.link.label}</Link>
         </p>
+        <div className={s.trustCase}>
+          <p className={s.readingText}>{TRUST_CASE.role}</p>
+          <p className={s.readingLabel}>{TRUST_CASE.label}</p>
+          <ul className={s.siblings} aria-label={TRUST_CASE.label}>
+            {TRUST_CASE.links.map((link) => (
+              <li key={link.href}>
+                <Link className={s.textLink} href={link.href} prefetch={false}>{link.label}</Link>
+              </li>
+            ))}
+          </ul>
+          <TrustNext from="/evidence" emphasis="quiet" />
+        </div>
       </Section>
 
       <FinalCta title={FINAL.title} cta={FINAL.cta} />

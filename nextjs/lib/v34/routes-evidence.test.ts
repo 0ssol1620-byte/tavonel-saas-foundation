@@ -126,6 +126,45 @@ describe("numbers come from the corpus and the product, prices and plans from th
   });
 });
 
+describe("what the crosswalk carries over from the legacy page", () => {
+  const content = sources.find((f) => f.file.endsWith("-content.ts"))!.text;
+  const body = sources.find((f) => f.file.endsWith("/evidence.tsx"))!.text;
+
+  it("keeps the shipped locator and the seven contracted ones as declarations the pin can read", () => {
+    const shipped = content.match(/const READING_TODAY = \["([^"]+)"/);
+    expect(shipped?.[1]).toBe("PDF");
+    const contracted = content.match(/const CONTRACTED_LOCATORS = \[([\s\S]*?)\n\] as const;/);
+    expect(contracted).not.toBeNull();
+    const families = [...contracted![1]!.matchAll(/\["([^"]+)",/g)].map((m) => m[1]!);
+    expect(families).toHaveLength(7);
+    expect(families).not.toContain("PDF");
+  });
+
+  it("renders the shipped locator first and the contracted ones after the statement that they are unshipped", () => {
+    expect(html).toContain("Reading today");
+    for (const family of ["Spreadsheet", "Presentation", "Email", "JSON and XML", "Code", "CAD and BIM", "Audio and video"]) expect(html).toContain(family);
+    expect(html.indexOf("ahead of the readers")).toBeGreaterThan(html.indexOf("Reading today"));
+    expect(html.indexOf("Spreadsheet")).toBeGreaterThan(html.indexOf("ahead of the readers"));
+    expect(html.match(/ahead of the readers/g)).toHaveLength(1);
+    expect(html).not.toContain("<details");
+  });
+
+  it("states its own role and names at least three of its trust siblings", () => {
+    expect(content).toContain("how a compiled result stays bound to the");
+    expect(html).toContain("how a compiled result stays bound to the source it came from");
+    const named = ["/benchmarks", "/reproducibility", "/research", "/trust"].filter((href) => content.includes(href) || html.includes(`href="${href}"`));
+    expect(named.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("ends its trust steps on the shared TrustNext, named for this page and quiet", () => {
+    expect(body).toContain('import { TrustNext } from "@/components/trust-next"');
+    expect(body).toContain('<TrustNext from="/evidence" emphasis="quiet" />');
+    expect(html).toContain("trust-next");
+    expect(html).toContain("Next: Benchmarks");
+    expect(html).toContain('class="btn ghost"');
+  });
+});
+
 describe("tokens and explicit pairs", () => {
   it("uses no colour literal in the sheet or in code", () => {
     for (const f of stripped(sources)) {
@@ -169,7 +208,8 @@ describe("links", () => {
   it("types no path outside the content file, and only retained paths there", () => {
     for (const f of stripped(code)) {
       if (f.file.endsWith("-content.ts")) continue;
-      expect(f.text, f.file).not.toMatch(/["'\`]\/[a-z]/);
+      // `from="/evidence"` names this page's own step of the trust order for TrustNext; it is a key, not a link.
+      expect(f.text.replace('from="/evidence"', ""), f.file).not.toMatch(/["'\`]\/[a-z]/);
     }
     const content = stripped(code).find((f) => f.file.endsWith("-content.ts"))!;
     for (const [, path] of content.text.matchAll(/["'\`](\/[a-z][\w/-]*)/g)) {
