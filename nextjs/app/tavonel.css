@@ -1630,6 +1630,8 @@
   }
   @media (hover: hover) and (pointer: fine) {
     .contact-address a:hover { text-decoration-color: var(--text-hi); }
+    /* The privacy link beside "Send inquiry" sits in --text-lo; hover lifts it to the heading ink. */
+    .contact-submit a:hover { color: var(--text-hi); }
   }
   .contact-form { display: grid; gap: 16px; }
   .contact-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
