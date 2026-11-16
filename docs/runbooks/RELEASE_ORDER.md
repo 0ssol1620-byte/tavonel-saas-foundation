@@ -847,3 +847,12 @@ URL·예약 전에 413으로 거절하는 것뿐이다.
 - 순서: (1) CDR revision → (2) site 절반 병합 + migration 적용 → (3) worker version upload에 `FOUNDATION_SOURCE_SEGMENT_PAGES=80`,
   81쪽·300쪽 문서 1건씩 end-to-end 확인 → (4) 문구·`PROCESSING_CEILING_SENTENCE` 변경 build.
 - 되돌리기: worker 변수 삭제(`wrangler versions deploy <prev>@100%`). 저장된 범위는 manifest가 없으면 보이지 않고 소스 삭제 때 함께 지워진다.
+
+## Held routes in production (V34)
+
+The V34 routes the registry marks `held` answer 404 in production because `heldVisible()` (`nextjs/lib/v34/release.ts`)
+is true only for `VERCEL_ENV=preview` or `V34_SHOW_HELD=1`. **The Production environment must not carry
+`V34_SHOW_HELD`**: with it set, every held route renders, is noindex and is out of the sitemap, but is live. Check the
+Production variable list before a release that changes the route registry. To open a held route on purpose, use a
+Preview deployment, or set the variable on a build you serve yourself. A server started without it is measured by
+`e2e/v34-matrix.spec.ts` ("held routes answer 404 ..." with `V34_SERVER_MODE=production`).

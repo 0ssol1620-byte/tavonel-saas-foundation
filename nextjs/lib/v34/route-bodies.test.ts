@@ -120,11 +120,11 @@ describe("every V34 route body", () => {
     const h1 = h1Text(html);
     expect(h1).not.toBe("");
     expect(h1).not.toMatch(/—\s*TAVONEL/);
-    // Every body's h1 is its registry heading. The home is the one exception, pinned in the test below.
+    // Every body's h1 is its registry heading. The home and /pricing (its legacy client has no body here) are the named exceptions, pinned in the tests below.
     if (key !== "home") expect(h1).toBe(v34Route(key as V34RouteKey).heading);
   });
 
-  it("the home is the single exception: its h1 is the hero line reviewed in the home QA, not the registry heading", () => {
+  it("the home is an exception: its h1 is the hero line reviewed in the home QA, not the registry heading", () => {
     const h1 = h1Text(rendered.find((r) => r.key === "home")!.html);
     expect(h1).toBe("Turn your files into knowledge your AI can trust.");
     expect(h1).not.toBe(v34Route("home").heading);
@@ -136,6 +136,14 @@ describe("every V34 route body", () => {
     expect(h1s).toHaveLength(1);
     expect(h1s[0]).not.toBe("");
     expect(h1s[0]).not.toMatch(/—\s*TAVONEL/);
+  });
+
+  // A named legacy exception, next to the home's: the pricing surface is replaced by WO-CAT-2, which retires this line.
+  it("and its h1 is a named legacy exception: the client's own line, not the registry heading", () => {
+    const source = readFileSync(join(import.meta.dirname, "../../components/pricing-page-client.tsx"), "utf8");
+    const h1 = source.match(/<h1\b[^>]*>([^<]*)<\/h1>/)![1]!.trim();
+    expect(h1).toBe("Pages and dollars.");
+    expect(h1).not.toBe(v34Route("pricing").heading);
   });
 });
 

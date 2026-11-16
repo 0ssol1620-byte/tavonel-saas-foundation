@@ -422,6 +422,14 @@ test.describe("round 3: false positives found by the first integrated QA run", (
     expect(await page.evaluate(() => getComputedStyle(document.querySelector("h1")!).color)).toBe("rgb(243, 247, 240)");
   });
 
+  test("contrast: text that runs past a scrolling box is sampled inside the box only, and an unreadable block still fails", async ({ page }) => {
+    const block = (fg: string) => `<div style="width:200px;overflow-x:auto;background:#0a1712;border:1px solid #444"><pre style="margin:0;padding:8px;color:${fg};white-space:pre"><code>"TAVONEL_API_KEY": "your key, scoped to reads and nothing more"</code></pre></div>`;
+    await load(page, block("#eff6ef"));
+    expect((await contrastPass(page)).violations).toEqual([]);
+    await load(page, block("#26382f"));
+    expect((await contrastPass(page)).violations).toHaveLength(1);
+  });
+
   test("keyboard: a smooth-scrolling page is waited for before the focus rect is read", async ({ page }) => {
     await page.setViewportSize({ width: 600, height: 500 });
     await load(page, `<button class="r">top</button><div style="height:3000px"></div><button class="r">far below</button>`, ".r{padding:14px 20px}.r:focus-visible{outline:2px solid #00e}html{scroll-behavior:smooth}");

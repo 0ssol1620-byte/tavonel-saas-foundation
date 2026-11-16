@@ -106,20 +106,20 @@ function up(options, env) {
   writeFileSync(pointer(options.port), JSON.stringify({ dir }));
 
   const dsn = dsnFor(options.port);
-  const left = (why) => { process.stderr.write(`${why}; cluster left up at ${dsn} (dir ${dir}) -- run down${NL}`); process.exit(2); };
+  const left = (why) => { process.stderr.write(`${why}; cluster left up on port ${options.port} (dir ${dir}) -- run down${NL}`); process.exit(2); };
   const sep2 = process.platform === "win32" ? ";" : ":";
   const childEnv = { ...env, PATH: bin ? `${bin}${sep2}${env.PATH ?? ""}` : env.PATH };
   const chain = spawnSync(process.execPath, [join(HERE, "apply-migrations.mjs"), "--dsn", dsn, "--shim-vector"], { encoding: "utf8", env: childEnv });
   process.stdout.write(chain.stdout ?? "");
   if (chain.status !== 0) {
     process.stderr.write(chain.stderr ?? "");
-    process.stderr.write(`migration chain did not apply; cluster left up at ${dsn} (dir ${dir}) -- run down${NL}`);
+    process.stderr.write(`migration chain did not apply; cluster left up on port ${options.port} (dir ${dir}) -- run down${NL}`);
     process.exit(chain.status || 1);
   }
   for (const draft of drafts) {
     try { run(psql, [dsn, "-w", "-q", "-v", "ON_ERROR_STOP=1", "-f", draft]); }
     catch (cause) {
-      process.stderr.write(`draft ${draft} failed: ${String(cause.stderr ?? cause.message).trim()}${NL}cluster left up at ${dsn} -- run down${NL}`);
+      process.stderr.write(`draft ${draft} failed: ${String(cause.stderr ?? cause.message).trim()}${NL}cluster left up on port ${options.port} -- run down${NL}`);
       process.exit(1);
     }
     process.stdout.write(`applied draft ${draft}${NL}`);
@@ -134,7 +134,7 @@ function up(options, env) {
   fingerprints = run(psql, [dsn, "-w", "-At", "-v", "ON_ERROR_STOP=1", "-f", join(HERE, "catalog-fingerprints.sql")]);
   if (!fingerprints.trim()) throw new Error("catalog fingerprints returned no rows");
   } catch (cause) { left(`fingerprint step failed: ${String(cause.stderr ?? cause.message).trim()}`); }
-  process.stdout.write(`postgres ${version}${NL}catalog-fingerprints (schema only, empty migration tracker) sha256 ${createHash("sha256").update(fingerprints).digest("hex")}${NL}dsn ${dsn}${NL}`);
+  process.stdout.write(`postgres ${version}${NL}catalog-fingerprints (schema only, empty migration tracker) sha256 ${createHash("sha256").update(fingerprints).digest("hex")}${NL}port ${options.port}${NL}`);
 }
 
 function down(options, env) {

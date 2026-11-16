@@ -13,10 +13,10 @@ describe("release-gate-check script suite", () => {
     const suite = fileURLToPath(new URL("../scripts/release-gate-check.test.mjs", import.meta.url));
     const output = execFileSync(process.execPath, ["--experimental-strip-types", "--no-warnings", "--test", "--test-reporter=tap", suite], {
       encoding: "utf8",
-      timeout: 30_000,
+      timeout: 240_000, // re-derived from a measurement: 70.9-77.3 s alone, 109.5 and 117.9 s inside the parallel run, 4 s on hosted CI; about twice the slowest
       stdio: ["ignore", "pipe", "pipe"],
     });
     expect(output).toMatch(/^# fail 0$/m);
     expect(output).toMatch(/^# pass [1-9]\d*$/m);
-  }, 35_000);
+  }, 250_000);
 });
