@@ -1,0 +1,329 @@
+/*
+  Home page only. Colours come from --v34-* tokens and nothing else. The bands themselves
+  (Hero, Section, Bridge, FinalCta) set their own surface, so a rule here that paints a background
+  also states its foreground, and the rest read --v34-fg* from the band they sit in.
+  No animation: the only motion on this page is the World's camera and the walkthrough's fade.
+*/
+
+/* ---- hero ------------------------------------------------------------------------------- */
+
+.accent {
+  color: var(--v34-hero-lime);
+  font-style: normal;
+}
+
+.note {
+  flex: 1 0 100%;
+  margin: 6px 0 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.5;
+}
+
+.worldStack {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.worldLink {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+.worldLink:focus-visible,
+.textLink:focus-visible,
+.caseLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+/* ---- walkthrough ------------------------------------------------------------------------ */
+
+.demoStats {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.demoFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 24px;
+  margin-top: 20px;
+}
+
+.footNote {
+  min-width: 0;
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.5;
+}
+
+.footLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 24px;
+  min-width: 0;
+  margin: 0;
+}
+
+.textLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+/* ---- cases ------------------------------------------------------------------------------ */
+
+.cases {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.caseItem {
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.caseLink {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr) minmax(0, 14rem) 2rem;
+  align-items: center;
+  gap: 8px 24px;
+  min-width: 0;
+  padding: 24px 12px;
+  color: var(--v34-fg);
+  text-decoration: none;
+}
+
+.caseLink:hover {
+  background: var(--v34-secondary-hover);
+  color: var(--v34-ink);
+}
+
+.caseNo {
+  color: var(--v34-fg-muted);
+  font-family: var(--v34-mono);
+  font-size: var(--v34-small);
+}
+
+.caseBody {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.caseLabel {
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.caseTitle {
+  margin: 0;
+  font-size: var(--v34-h3);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.caseText {
+  max-width: 60ch;
+  color: var(--v34-fg-muted);
+  line-height: 1.5;
+}
+
+.caseTag {
+  min-width: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.4;
+}
+
+.caseArrow {
+  justify-self: end;
+  font-size: 1.25rem;
+}
+
+.casesAll {
+  margin: 16px 0 0;
+}
+
+/* ---- connect ---------------------------------------------------------------------------- */
+
+.connectGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 32px 56px;
+}
+
+.connectActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.diagram {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+}
+
+.origin {
+  min-width: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--v34-fg-border);
+  border-radius: var(--v34-radius-panel);
+  background: var(--v34-step-bg);
+  color: var(--v34-on-dark);
+}
+
+.originName {
+  margin: 0;
+  font-size: var(--v34-h3);
+  font-weight: 500;
+}
+
+.originDetail {
+  margin: 4px 0 0;
+  color: var(--v34-step-small);
+  font-size: var(--v34-small);
+}
+
+.hosts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 20px 0 0;
+  list-style: none;
+  border-left: 2px solid var(--v34-lime);
+  margin-left: 22px;
+  padding-left: 22px;
+}
+
+.host {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--v34-fg-border);
+  border-radius: var(--v34-radius-panel);
+  background: var(--v34-step-bg);
+  color: var(--v34-on-dark);
+}
+
+.hostName {
+  margin: 0;
+  font-weight: 600;
+}
+
+.hostDetail {
+  margin: 4px 0 0;
+  color: var(--v34-step-small);
+  font-size: var(--v34-small);
+  line-height: 1.45;
+}
+
+/* ---- trust ------------------------------------------------------------------------------ */
+
+.trust {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 32px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trustItem {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 20px 0;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.trustKicker {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.trustTitle {
+  margin: 0;
+  font-size: var(--v34-h3);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.2;
+}
+
+.trustText {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.5;
+}
+
+/* ---- narrow ----------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .connectGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trust {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .caseLink {
+    grid-template-columns: 2.25rem minmax(0, 1fr) 1.5rem;
+    padding: 20px 4px;
+  }
+
+  .caseTag {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .hosts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (forced-colors: active) {
+  .origin,
+  .host {
+    border-color: CanvasText;
+  }
+
+  .hosts {
+    border-left-color: CanvasText;
+  }
+
+  .caseLink:hover {
+    outline: 2px solid Highlight;
+  }
+}
