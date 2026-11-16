@@ -34,6 +34,8 @@ export async function keyboardWalk(page: Page, max = 250): Promise<KeyboardResul
   });
   for (let i = 0; i < max; i++) {
     await page.keyboard.press("Tab");
+    // Let a blur handler that schedules a refocus (setTimeout) land before focus is read.
+    await page.evaluate(() => new Promise(r => setTimeout(r, 16)));
     const stop: Stop | null = await page.evaluate(() => {
       const e = document.activeElement;
       if (!e || e === document.body || e === document.documentElement) return null;

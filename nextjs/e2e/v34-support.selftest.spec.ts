@@ -358,4 +358,11 @@ test.describe("round 2: overlays, ancestor clipping, keyboard traps", () => {
     const r = await keyboardWalk(page);
     expect(r.violations.some(v => v.pass === "keyboard-trap")).toBe(true);
   });
+
+  test("keyboard: an input that takes focus back on blur is a trap", async ({ page }) => {
+    const a = (i: number) => `<a class="m" href="#${i}" style="display:inline-block;padding:14px">L${i}</a>`;
+    await load(page, `<input class="m" aria-label="x" onblur="setTimeout(()=>this.focus())" style="padding:14px">${a(1)}${a(2)}`, ".m:focus-visible{outline:2px solid #00e}");
+    const r = await keyboardWalk(page);
+    expect(r.violations.some(v => v.pass === "keyboard-trap")).toBe(true);
+  });
 });
