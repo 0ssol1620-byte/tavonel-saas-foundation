@@ -517,6 +517,10 @@
   letter-spacing: 0;
   color: var(--text-lo);
 }
+/* The privacy link beside "Send inquiry": its colour does not change on hover, so the hover drops the underline. */
+@media (hover: hover) and (pointer: fine) {
+  .contact-submit a:hover { text-decoration-line: none; }
+}
 .auth-facts li {
   font-family: var(--f-sans);
   font-size: 13px;
