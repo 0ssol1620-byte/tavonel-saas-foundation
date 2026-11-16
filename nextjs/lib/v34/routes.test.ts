@@ -1,3 +1,5 @@
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { BILLING_OFFERS } from "../billing-catalog";
 import { BRAND_LINE } from "../site-navigation";
@@ -98,6 +100,29 @@ describe("V34 route registry", () => {
     for (const r of V34_ROUTES.filter((x) => x.path.startsWith("/journal/"))) {
       expect(r.schema, r.key).toBe("Article");
       expect(r.article, r.key).toBeUndefined();
+    }
+  });
+});
+
+function sourceFiles(dir: string): string[] {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).flatMap((name) => {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) return sourceFiles(path);
+    return /\.(tsx?|css)$/.test(name) ? [path] : [];
+  });
+}
+
+describe("V34 unshipped-capability gates", () => {
+  it("holds /teams exactly while the catalog still lists shared members as not sold", () => {
+    const notSold = BILLING_OFFERS.studio_access.notYetSold.includes("Shared members and roles");
+    expect(v34Route("teams").release === "held").toBe(notSold);
+  });
+
+  it("keeps plan prices and plan names out of components/v34 (vacuous while absent)", () => {
+    const root = join(import.meta.dirname, "../../components/v34");
+    for (const path of sourceFiles(root)) {
+      expect(readFileSync(path, "utf8"), path).not.toMatch(/\$29\b|\$99\b|\bDeveloper\b|\bTeam\b/);
     }
   });
 });
