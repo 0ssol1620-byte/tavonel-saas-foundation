@@ -19,6 +19,7 @@
  * budget (§22). A signed-out person sees the request first and is asked to sign in when they allow.
  */
 
+import type { Route } from "next";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import Logomark from "@/components/logomark";
@@ -210,7 +211,7 @@ export default function OAuthAuthorizePage() {
                   ? "You can connect now, but the AI client will find nothing until a World is activated."
                   : "You can still connect; the AI client may find nothing until a World is active."}
               </p>
-              {phase.check.action ? <p><Link href={phase.check.action.href}>Add sources and compile a World</Link></p> : null}
+              {phase.check.action ? <p><Link href={phase.check.action.href as Route}>Add sources and compile a World</Link></p> : null}
             </div>
           ) : null}
 
