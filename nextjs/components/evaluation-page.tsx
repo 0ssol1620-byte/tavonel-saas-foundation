@@ -9,14 +9,14 @@ import styles from "./evaluation-page.module.css";
 export default function EvaluationPage() {
   return <div className={`page evaluation-page ${styles.page}`} lang="en" data-template="T2">
     <PublicSiteHeader />
-    <main id="main" className="evaluation-shell">
+    <main id="main" className={`evaluation-shell ${styles.shell}`}>
       <section className="evaluation-intro">
         <p className="paper-label">Your documents / a bounded evaluation</p>
         <h1>Find out what your AI<br />can actually rely on.</h1>
         <p>Start with a small, permitted document set and real questions. Agree on the scope and cost before any processing, then inspect the results, missing evidence, and remaining limitations.</p>
         <p className="evaluation-gate">{activationPolicy.customerData.reason}</p>
         {/* UX-L7 (§5.3 R7): no ↗ on a link that stays on the site. The label itself is R6's, for a copy lane. */}
-        <Link href="/explore">Inspect the public sample first</Link>
+        <Link className={styles.sample} href="/explore">Inspect the public sample first</Link>
         {/* A plain same-origin file download with no client state. Following the link is an ordinary GET that retrieves the blank static file; it submits no worksheet or form contents. */}
         <p className="fine">Preparing a pilot? The blank worksheet lists what to record: the task, document permissions, questions with expected answers, and how results will be counted. It is an empty template. Downloading it only retrieves the blank file: it does not start processing, enable a connection, or create a payment. Filling in your copy does not by itself send what you write to us. <a href="/evaluation/pilot-worksheet.en.md" download="tavonel-pilot-worksheet.en.md" type="text/markdown">Download the blank pilot evidence worksheet (Markdown, English)</a></p>
       </section>
@@ -33,7 +33,7 @@ export default function EvaluationPage() {
         </aside>
         <section className="evaluation-form" aria-labelledby="evaluation-request-title">
           <h2 id="evaluation-request-title">Tell us what you want to verify</h2>
-          <p>Three required fields. Keep the first message short; document details are optional. Please do not include private documents or credentials.</p>
+          <p>Keep the first message short; document details are optional. Please do not include private documents or credentials.</p>
           <ContactForm locale="en" />
         </section>
       </div>

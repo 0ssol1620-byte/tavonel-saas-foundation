@@ -51,7 +51,7 @@ export const PROPERTY_BLOCKS: readonly ArticleBlock[] = [
   ] },
   { kind: "p", text: "This is a general research workflow. Appraisal, title opinion, legal advice and brokerage belong to qualified local specialists working from current official records." },
   { kind: "h2", text: "Identify the asset before making a judgment" },
-  { kind: "p", text: "A parcel, a building, a lease and a planning application are four different things, and their identifiers and boundaries can change over time. Start by recording the parcel number, the jurisdiction and the date of each source, and separate the descriptions a seller supplies from official records. On a site with several parcels, document which assertion applies to which parcel. A planning policy for a nearby lot says little about whether the subject site can be developed." },
+  { kind: "p", text: "A parcel, a building, a lease and a planning application are different things, and their identifiers and boundaries can change over time. Start by recording the parcel number, the jurisdiction and the date of each source, and separate the descriptions a seller supplies from official records. On a site with several parcels, document which assertion applies to which parcel. A planning policy for a nearby lot says little about whether the subject site can be developed." },
   { kind: "h2", text: "Make the decision packet auditable" },
   { kind: "h3", text: "Due diligence evidence register" },
   { kind: "list", items: [

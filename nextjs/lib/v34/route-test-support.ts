@@ -25,13 +25,17 @@ const NUMBER_WORDS = "zero|two|three|four|five|six|seven|eight|nine|ten|eleven|t
 export const COUNTED_NOUNS = [
   "files?", "PDFs?", "pages?", "documents?", "records?", "sources?", "filings?", "reports?", "statements?", "rows?",
   "figures?", "periods?", "tools?", "clients?", "keys?", "answers?", "questions?", "days?", "steps?",
+  // Batch 2 measurement: counts of the page's own lists and drawings that the nouns above missed.
+  "things", "kinds", "items?", "dates?", "layers?", "frames?", "characters?", "branch(?:es)?", "events?", "fields?",
+  "procedures?",
 ] as const;
 
 /*
   A count typed into copy, where a figure needs a receipt or a computed value: a number word or
   digits, then up to four words (a hyphenated token such as 10-K is one word), then a counted noun.
   A possessive ends the phrase, so "one company's filings" counts the company. Digits or a word
-  glued to a hyphen ("TRAPPIST-1", "non-zero") belong to an identifier and are not a count.
+  glued to a hyphen ("TRAPPIST-1", "non-zero") belong to an identifier and are not a count, and a
+  word right after "<" is a JSX tag (`<Four items={…} />`, components/v34/routes/company).
   "one" before a singular noun is an article more often than a figure, so it is in the pattern only
   where a route asks for it ({ one: true }: /personal, /markets, /engineering and /teams, which were
   written to it). A route adds the nouns its own subject counts (`nouns`).
@@ -40,17 +44,24 @@ type CountOptions = { one?: boolean; nouns?: readonly string[] };
 
 export function typedCount({ one = false, nouns = [] }: CountOptions = {}): RegExp {
   const words = one ? `one|${NUMBER_WORDS}` : NUMBER_WORDS;
-  return new RegExp(`(?:^|[^\\w-])(?:(?:${words})(?:-[a-z]+)?|\\d+)\\s+(?:[\\w-]+\\s+){0,4}(?:${[...COUNTED_NOUNS, ...nouns].join("|")})\\b`, "i");
+  return new RegExp(`(?:^|[^\\w<-])(?:(?:${words})(?:-[a-z]+)?|\\d+)\\s+(?:[\\w-]+\\s+){0,4}(?:${[...COUNTED_NOUNS, ...nouns].join("|")})\\b`, "i");
 }
 
 const stripComments = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "$1");
 
+const countsIn = (path: string, name: string, options: CountOptions) =>
+  [...stripComments(readFileSync(path, "utf8")).matchAll(new RegExp(typedCount(options).source, "gi"))]
+    .map((match) => `${name}: ${match[0].trim()}`);
+
 /** Every typed count in a route folder's sources (`components/v34/routes/<folder>`), as "file: phrase". */
 export function typedCounts(folder: string, options: CountOptions = {}): string[] {
   const dir = join(import.meta.dirname, "../../components/v34/routes", folder);
-  const pattern = new RegExp(typedCount(options).source, "gi");
   return readdirSync(dir)
     .filter((name) => /\.tsx?$/.test(name))
-    .flatMap((name) => [...stripComments(readFileSync(join(dir, name), "utf8")).matchAll(pattern)]
-      .map((match) => `${name}: ${match[0].trim()}`));
+    .flatMap((name) => countsIn(join(dir, name), name, options));
+}
+
+/** The same, for one shared source a route renders, named from the package root ("components/contact-form.tsx"). */
+export function typedCountsInFile(file: string, options: CountOptions = {}): string[] {
+  return countsIn(join(import.meta.dirname, "../..", file), file, options);
 }

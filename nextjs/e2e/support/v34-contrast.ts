@@ -260,6 +260,20 @@ export async function contrastPass(page: Page, options: ContrastOptions = {}): P
   return result;
 }
 
+/**
+ * Opens every closed <details> in `main` and returns how many it opened. Only content disclosures:
+ * a <details> in the header is a site menu, and an open menu sheet lies over the content, so a
+ * control under it would be measured against the menu (/evaluation at 412: the legacy header's
+ * phone menu over the message field, 2.08:1).
+ */
+export function openContentDetails(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const shut = [...document.querySelectorAll("main details:not([open])")] as HTMLDetailsElement[];
+    shut.forEach(d => (d.open = true));
+    return shut.length;
+  });
+}
+
 /** Runs in the page: visible bordered controls and their resolved border/fill colours. */
 function collectControls(max: number): { index: number; selector: string; border: [number, number, number, number]; fill: [number, number, number, number]; borderPx: number }[] {
   const canvas = document.createElement("canvas");

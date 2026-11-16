@@ -112,7 +112,7 @@ export default function ContactForm({ locale = "en" }: { locale?: ContactLocale 
         inside the label beside the field name, and the word is spelled out for a screen reader
         rather than left as a bare asterisk.
       */}
-      <p className="fine">{contactText("Three fields are needed for a reply. They are marked Required.", locale)}</p>
+      <p className="fine">{contactText("The fields marked Required are needed for a reply.", locale)}</p>
       {planIntent ? (
         <p className="fine" data-plan-intent>{locale === "ko" ? `${planIntent} 요금제 문의` : `Inquiry about the ${planIntent} plan`}</p>
       ) : null}
@@ -245,7 +245,7 @@ function collect(data: FormData) {
   read as one string and the field looked as if it were called that. The marker carries its own
   class now -- a separator and the eyebrow tone, sentence case against the label's caps -- so it
   is visibly a qualifier. It stays a word inside the label element, which is what keeps it in the
-  accessible name and what the sentence above the form promises ("They are marked Required").
+  accessible name and what the sentence above the form promises ("The fields marked Required").
 */
 function RequiredMark({ label = "Required" }: { label?: string }) {
   return <small className="contact-required">{label}</small>;

@@ -7,7 +7,7 @@ import s from "./methods.module.css";
 */
 export function MethodsArt() {
   return (
-    <svg className={s.art} viewBox="0 0 640 320" role="img" aria-label="Four stacked layers, from a source file through an evidence region and a record to a relationship, each with a check mark">
+    <svg className={s.art} viewBox="0 0 640 320" role="img" aria-label="Stacked layers, from a source file through an evidence region and a record to a relationship, each with a check mark">
       <path className={s.spine} d="M205 76V94M205 150V168M205 224V242" />
 
       <rect className={s.layer} x="40" y="20" width="330" height="56" rx="4" />

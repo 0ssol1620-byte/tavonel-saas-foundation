@@ -14,7 +14,7 @@ export const HERO_ACTIONS = {
 
 export const ART = {
   title: "What was knowable before a decision?",
-  lead: "Four dates keep a research replay honest. Each one is recorded beside the fact it belongs to.",
+  lead: "These dates keep a research replay honest. Each one is recorded beside the fact it belongs to.",
   steps: [
     { name: "Source publication", kind: "Known-at" },
     { name: "Observation vintage", kind: "Point-in-time" },
@@ -27,8 +27,8 @@ export const LAYERS = {
   eyebrow: "Evidence layers",
   title: "Give the same model a wider field of view.",
   art: {
-    label: "A drawn price line with three dated events before a cutoff line, and a later revision shaded after it",
-    caption: "A drawn price line, three dated events and one cutoff. What lies right of the cutoff is outside the view.",
+    label: "A drawn price line with dated events before a cutoff line, and a later revision shaded after it",
+    caption: "A drawn price line, dated events and a cutoff. What lies right of the cutoff is outside the view.",
   },
   items: [
     {

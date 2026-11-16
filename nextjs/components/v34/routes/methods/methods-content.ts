@@ -94,7 +94,7 @@ export const STAGES = {
 
 export const SURFACE = {
   title: "Under the surface.",
-  lead: "Three kinds of work, each one visible in the result.",
+  lead: "The work under a result, each part visible in it.",
   phases: [
     { name: "Read", detail: "Text, page, region" },
     { name: "Compile", detail: "Objects, claims, relationships" },
@@ -120,7 +120,7 @@ export const SURFACE = {
 export const OUTCOMES = {
   eyebrow: "What you can do",
   title: "Use a compiled World.",
-  lead: "Four things a finished World makes possible, each one on its own page.",
+  lead: "What a finished World makes possible, each on its own page.",
   items: [
     { kicker: "Find", title: "Locate the source.", text: "Open a source region and read the passage beside its page.", link: { href: to("evidence"), label: "Explore evidence →" } },
     { kicker: "Understand", title: "Follow the relationship.", text: "Follow a relationship to the evidence that supports it.", link: { href: to("world"), label: "Inspect the World →" } },

@@ -8,8 +8,8 @@ import { v34Route } from "@/lib/v34/routes";
 
 export const ART = {
   title: "Protect the world you are writing",
-  lead: "Four things a writer checks before a scene goes in: the characters, the text they come from, and the revision that settles it.",
-  label: "Two characters and a chapter timeline on one canon line, with two draft branches that stay off it",
+  lead: "What a writer checks before a scene goes in: the characters, the text they come from, and the revision that settles it.",
+  label: "Characters and a chapter timeline on one canon line, with draft branches that stay off it",
   caption: "Canon is the solid line. Drafts branch from it and stay open until an author decides.",
   steps: [
     { name: "Elizabeth Bennet", kind: "Character" },

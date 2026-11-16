@@ -21,8 +21,22 @@
   --unresolved: var(--tv-unresolved);
   --paper-50: #fff;
   --lv2-paper-shadow: none;
+  /* A paper page: its native controls, scrollbars and autofill are the light ones (the site root is dark). */
+  color-scheme: light;
   color: var(--text-hi);
   background: var(--ground);
+}
+
+/* "Inspect the public sample first" stands alone on its line, so it gets a full target (2.5.8) and the underline every other body link has. */
+.sample {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration-line: underline;
+}
+/* Body links answer the pointer: the underline lifts, as on the /contact form's Privacy notice. */
+@media (hover: hover) and (pointer: fine) {
+  .shell :any-link:hover { text-decoration-line: none; }
 }
 
 .page :is(a, button, input, select, summary, textarea):focus-visible {

@@ -24,7 +24,7 @@ export const MARKETS_DEK = "A point-in-time evidence checklist for financial res
 export const MARKETS_BLOCKS: readonly ArticleBlock[] = [
   { kind: "h2", text: "Separate the information date from the decision date" },
   { kind: "p", text: "A document can describe an earlier period and become public much later. A revised macroeconomic release can also change historical numbers. When an analysis asks what was knowable before an event, today's revised dataset brings later information into the past." },
-  { kind: "h2", text: "Four dates to preserve" },
+  { kind: "h2", text: "The dates to preserve" },
   {
     kind: "figure",
     node: (

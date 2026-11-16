@@ -2,7 +2,7 @@
 export type ContactLocale = "en" | "ko";
 
 const KOREAN: Record<string, string> = {
-  "Three fields are needed for a reply. They are marked Required.": "답변에 필요한 항목 세 개는 필수로 표시했습니다.",
+  "The fields marked Required are needed for a reply.": "답변에는 필수로 표시한 항목이 필요합니다.",
   "Name": "이름",
   "Work email": "업무용 이메일",
   "Company or organization": "회사 또는 기관",

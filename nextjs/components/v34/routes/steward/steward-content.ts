@@ -13,7 +13,7 @@ export const HERO_ACTIONS = {
 
 export const QUEUE = {
   title: "The inbox is an evidence queue.",
-  lead: "A steward works through four kinds of item, each with the step that follows it.",
+  lead: "A steward works through these kinds of item, each with the step that follows it.",
   steps: [
     { name: "Stale claim", kind: "Review" },
     { name: "Conflict", kind: "Hold" },
@@ -37,7 +37,7 @@ export const INBOX = {
     },
     {
       title: "Conflicting procedures",
-      text: "Two procedures disagree. The item is held until an authorized owner validates the current version.",
+      text: "Procedures for the same task disagree. The item is held until an authorized owner validates the current version.",
     },
     {
       title: "Expired data grant",

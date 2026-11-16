@@ -192,6 +192,11 @@ describe("the shared typed-count pattern", () => {
     for (const n of counts) for (const f of fillers) for (const noun of ["files", "PDF", "pages", "filings", "rows", "days", "steps"]) {
       expect(`${n} ${f}${noun}`).toMatch(COUNT);
     }
+    for (const typed of [
+      "Four things a writer checks", "Four kinds of item reach the briefing", "three dated events and one cutoff",
+      "Four layers over one region", "Three frames of the storyboard", "Three fields are needed", "Three required fields",
+      "Two characters and a chapter timeline", "two draft branches", "Four dates keep a research replay honest", "Two procedures disagree",
+    ]) expect(typed).toMatch(COUNT);
     expect("one file").not.toMatch(COUNT);
     expect("one file").toMatch(STRICT);
     expect("one of your own PDF files").toMatch(STRICT);
@@ -205,6 +210,7 @@ describe("the shared typed-count pattern", () => {
       "three companies' filings",
       "Start with the few files that matter to one goal.",
       "Any MCP client can read the World",
+      "<Four items={OWN.items} numbered />",
     ]) expect(ok).not.toMatch(COUNT);
   });
 });

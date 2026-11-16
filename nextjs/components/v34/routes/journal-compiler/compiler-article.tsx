@@ -63,7 +63,7 @@ export const COMPILER_BLOCKS: readonly ArticleBlock[] = [
     "World: a candidate revision and an active revision, separated by a human decision.",
   ] },
   { kind: "h2", text: "Compared with RAG, graphs and search" },
-  { kind: "p", text: "RAG retrieves chunks at question time, a graph stores entities and relations, and enterprise search helps people find documents. A Knowledge Compiler produces all three kinds of output (retrieval units, a graph and a document index) and treats each as one projection of a reviewed World rather than as the final asset. The comparison is about scope: these are spans of one pipeline." },
+  { kind: "p", text: "RAG retrieves chunks at question time, a graph stores entities and relations, and enterprise search helps people find documents. A Knowledge Compiler produces each of these outputs (retrieval units, a graph and a document index) and treats each as one projection of a reviewed World rather than as the final asset. The comparison is about scope: these are spans of one pipeline." },
   { kind: "figure", node: <ScrollTable label="A Knowledge Compiler compared with RAG, graphs and enterprise search" columns={["Approach", "What it does", "What a compiler adds"]} rows={COMPARISON} /> },
   { kind: "h2", text: "A practical evaluation" },
   { kind: "p", text: "A fair comparison holds the corpus, the model, the access policy, the query and the date constant, then measures exact source support, stale claims, abstentions, latency and cost." },

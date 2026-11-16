@@ -46,7 +46,7 @@ export function TradingBody() {
       />
 
       <Section surface="paper" title={ART.title} lead={ART.lead}>
-        <ol className={s.timeline} aria-label="Four dates of a research replay">
+        <ol className={s.timeline} aria-label="The dates of a research replay">
           {ART.steps.map((step, i) => (
             <li key={step.name} className={s.step}>
               <span className={s.stepNo}>{ordinal(i)}</span>

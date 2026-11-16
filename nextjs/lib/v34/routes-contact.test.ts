@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { typedCounts } from "./route-test-support";
+import { typedCounts, typedCountsInFile } from "./route-test-support";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { SUPPORT_ACKNOWLEDGEMENT } from "@/lib/support-targets";
 import { ADDRESSES, CONTACT_REGISTRY_LINKS, RETAINED } from "@/components/v34/routes/contact/contact-content";
@@ -260,5 +260,10 @@ describe("copy that is true of the product today", () => {
 describe("typed counts", () => {
   it("types no number word or digits before a counted noun", () => {
     expect(typedCounts("contact")).toEqual([]);
+  });
+
+  it("types none in the shared form, or in the other page that renders it", () => {
+    expect(typedCountsInFile("components/contact-form.tsx")).toEqual([]);
+    expect(typedCountsInFile("components/evaluation-page.tsx")).toEqual([]);
   });
 });

@@ -233,6 +233,10 @@
   flex: 0 0 auto;
   white-space: nowrap;
 }
+/* The way home answers the pointer like every other link in the bar. */
+@media (hover: hover) and (pointer: fine) {
+  .wordmark.wordmark:hover { opacity: 0.72; }
+}
 
 /*
   BQ-058 / D10's `.state` rules are gone with the element they styled.
@@ -366,11 +370,12 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 22px;
+  /* 24px: the 2.5.8 minimum. The transparent border is invisible here and drawn in the user's colour under forced colours. */
+  width: 24px;
   min-height: 44px;
-  margin: 0 0 0 -10px;
+  margin: 0 0 0 -12px;
   padding: 0;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: var(--tv-r-inst, 6px);
   background: transparent;
   color: inherit;

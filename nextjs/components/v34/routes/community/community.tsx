@@ -28,7 +28,7 @@ const PER_ITEM = [
 
 function Art() {
   return (
-    <svg className={s.art} viewBox="0 0 480 300" role="img" aria-label="Three shared items, a World, a connection setting and an example, placed on one shelf.">
+    <svg className={s.art} viewBox="0 0 480 300" role="img" aria-label="Shared items, a World, a connection setting and an example, placed on one shelf.">
       <rect className={s.artLine} x="16" y="236" width="448" height="4" rx="2" />
       {["World", "Setting", "Example"].map((label, i) => (
         <g key={label}>

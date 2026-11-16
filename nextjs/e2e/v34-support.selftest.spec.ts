@@ -27,7 +27,7 @@ import {
   statePass,
   textStructurePass,
 } from "./support/v34-passes";
-import { composite, contrastPass, contrastRatio, controlContrastPass, requiredRatio } from "./support/v34-contrast";
+import { composite, contrastPass, contrastRatio, controlContrastPass, openContentDetails, requiredRatio } from "./support/v34-contrast";
 import { escapeRestoresFocus, keyboardWalk } from "./support/v34-keyboard";
 import { assertWorldAgreement, forceWorldMode, readWorldState, type WorldState } from "./support/v34-world";
 import { checkSeo, checkSeoUnique, parseSeo, type SeoExpectation } from "./support/v34-seo";
@@ -206,6 +206,18 @@ test.describe("contrast", () => {
     await load(page, shut);
     expect(await controlContrastPass(page)).toEqual([]);
     await load(page, shut.replace("<details>", "<details open>").replace("#555", "#e2e2e2"));
+    expect(await controlContrastPass(page)).toHaveLength(1);
+  });
+
+  test("details: the content ones are opened, the header menu is not", async ({ page }) => {
+    // An open header menu lies over the field: measured with it open, the field reads against the menu.
+    const menu = `<header style="position:relative"><details id="menu"><summary>Menu</summary><div style="position:absolute;top:24px;left:0;width:400px;height:40px;background:#0050b4"></div></details></header>`;
+    const field = `<main style="background:#fff;padding:12px"><details><summary>more</summary><textarea style="border:1px solid #555;background:#fff;width:300px;height:120px"></textarea></details></main>`;
+    await load(page, menu + field);
+    expect(await openContentDetails(page)).toBe(1);
+    expect(await page.locator("#menu").evaluate(d => (d as HTMLDetailsElement).open)).toBe(false);
+    expect(await controlContrastPass(page)).toEqual([]);
+    await page.locator("#menu").evaluate(d => ((d as HTMLDetailsElement).open = true));
     expect(await controlContrastPass(page)).toHaveLength(1);
   });
 });

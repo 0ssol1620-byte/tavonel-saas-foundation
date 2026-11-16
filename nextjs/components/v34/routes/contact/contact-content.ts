@@ -31,7 +31,7 @@ export const ADDRESSES = [
 
 export const READ_BY_A_PERSON = "Every inquiry is read by a person, and the reply comes from an address on this domain.";
 export const GENERAL_INBOX =
-  "General inquiries to hello@tavonel.com are read by a person and carry the same one business day (KST) acknowledgement target.";
+  "General inquiries to hello@tavonel.com are read by a person and carry the same acknowledgement target.";
 export const TELEPHONE_HOURS = "The telephone is answered during Korean business hours. Outside them, email reaches us sooner.";
 
 export const FORM = {
@@ -43,7 +43,7 @@ export const FIRST_QUESTIONS_TITLE = "Questions we get first";
 
 export const PREPARE = {
   title: "Make the first reply specific",
-  lead: "Four things settle most of a first conversation.",
+  lead: "These settle most of a first conversation.",
   items: [
     ["Goal", "A specific question or task that should become easier."],
     ["Sources", "Types and approximate scope, without sharing confidential documents yet."],

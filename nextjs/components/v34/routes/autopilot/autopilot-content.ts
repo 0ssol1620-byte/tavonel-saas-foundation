@@ -13,7 +13,7 @@ export const HERO_ACTIONS = {
 
 export const BRIEFING = {
   title: "A daily briefing that respects your decisions.",
-  lead: "Four kinds of item reach the briefing, each with the step that follows it.",
+  lead: "These kinds of item reach the briefing, each with the step that follows it.",
   steps: [
     { name: "New source revision", kind: "Inspect" },
     { name: "Uncertain extraction", kind: "Hold" },

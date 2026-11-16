@@ -34,7 +34,7 @@ import {
   textStructurePass,
   type Violation,
 } from "./support/v34-passes";
-import { contrastPass, controlContrastPass } from "./support/v34-contrast";
+import { contrastPass, controlContrastPass, openContentDetails } from "./support/v34-contrast";
 import { keyboardWalk } from "./support/v34-keyboard";
 import { assertWorldAgreement, forceWorldMode, readWorldState, staticSvgCounts, WORLD_ROOT, type WorldMode, type WorldState } from "./support/v34-world";
 import { checkSeo, checkSeoUnique, fetchSeo, fetchSitemapPaths, type SeoFacts } from "./support/v34-seo";
@@ -178,12 +178,8 @@ for (const { path: route, release } of routes) {
           await settle(page, route);
           const text = await contrastPass(page);
           const controls = await controlContrastPass(page);
-          // Controls inside a closed <details> are skipped above; open every one and measure those too.
-          const closed = await page.evaluate(() => {
-            const shut = [...document.querySelectorAll("details:not([open])")] as HTMLDetailsElement[];
-            shut.forEach(d => (d.open = true));
-            return shut.length;
-          });
+          // Controls inside a closed <details> are skipped above; open the ones in main and measure those too.
+          const closed = await openContentDetails(page);
           if (closed > 0) {
             const seen = new Set(controls.map(v => `${v.selector} ${v.detail}`));
             controls.push(...(await controlContrastPass(page)).filter(v => !seen.has(`${v.selector} ${v.detail}`)).map(v => ({ ...v, detail: `details open: ${v.detail}` })));

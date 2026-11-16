@@ -74,7 +74,7 @@ export const CONTRACTED = {
 
 export const MECHANISM = {
   eyebrow: "What a result is bound to",
-  title: "Six things stay with every compiled fact.",
+  title: "What stays with every compiled fact.",
   items: [
     {
       title: "Source identity",

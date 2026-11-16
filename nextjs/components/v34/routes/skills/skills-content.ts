@@ -16,7 +16,7 @@ export const CONTRACT = {
   eyebrow: "Interface contract",
   title: "Every capability has a contract.",
   art: {
-    label: "A manifest card with four field lines, a check mark on each, and a gate before an action",
+    label: "A manifest card with field lines, a check mark on each, and a gate before an action",
     caption: "A drawn manifest. Each field is checked, and an action sits behind its own gate.",
   },
   items: [

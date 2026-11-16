@@ -52,6 +52,8 @@
 }
 @media(prefers-reduced-motion:reduce) { .paper-product *, .paper-product *::before, .paper-product *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
 .paper-product { --g1:#fff; --verified-deep:#eaf4ed; --changed-deep:#fff0bc; --paper:#fff; }
+/* /evaluation is paper under the dark site root (app/tavonel.css): the document says so too, for the scrollbar and the overscroll. */
+html:has(.evaluation-page) { color-scheme: light; }
 .evaluation-shell { max-width:1280px; margin:0 auto; padding:56px 32px 80px; }
 .evaluation-intro { max-width:760px; }
 /* UX-L3 (UX-PLAN-2026-10-17 §5.3 R2): the T2 H1 role in tavonel.css sets its type. */
