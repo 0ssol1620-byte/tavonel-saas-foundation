@@ -1,0 +1,130 @@
+/*
+  Creators page only. Colours come from --v34-* tokens; each band sets its own surface, so a rule
+  that paints a background also states its foreground. No motion.
+*/
+
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(24px, 4vw, 56px);
+}
+
+.art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.canonLine {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+}
+
+.draft {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+  stroke-dasharray: 5 7;
+}
+
+.node {
+  fill: var(--v34-lime);
+  stroke: var(--v34-dark);
+  stroke-width: 3;
+}
+
+.open {
+  fill: var(--v34-dark);
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+}
+
+.steps {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px 16px;
+  min-width: 0;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.stepNo {
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepName {
+  margin: 0;
+  color: var(--v34-fg);
+  font-size: var(--v34-h3);
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.stepKind {
+  grid-column: 2;
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(20px, 4vw, 56px);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: clamp(20px, 3vw, 40px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fact {
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.factTitle {
+  margin: 0 0 8px;
+  color: var(--v34-fg);
+  font-size: var(--v34-h3);
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.factText {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+}
+
+.sourceWrap {
+  max-width: 460px;
+}
+
+@media (max-width: 900px) {
+  .stage,
+  .pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
