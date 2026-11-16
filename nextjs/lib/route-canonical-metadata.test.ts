@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { heldVisible } from "./v34/release";
 import { v34Route, type V34RouteKey } from "./v34/routes";
 
 // Every public route must declare its own canonical address.
@@ -190,12 +191,15 @@ describe("per-route canonical metadata", () => {
       with the landing page for the same argument, and the dev harnesses put fixture-shaped
       internals on the marketing domain.
     */
-    for (const route of ["film", "dev"]) {
-      const layout = readFileSync(join(appDirectory, route, "layout.tsx"), "utf8");
-      expect(layout, `${route} must 404 in production`).toMatch(
-        /process\.env\.VERCEL_ENV === "production"\)\s*notFound\(\)/,
-      );
-    }
+    const dev = readFileSync(join(appDirectory, "dev", "layout.tsx"), "utf8");
+    expect(dev, "dev must 404 in production").toMatch(
+      /process\.env\.VERCEL_ENV === "production"\)\s*notFound\(\)/,
+    );
+    // V34 route integration 2 (34f6240b) moved /film onto the held-route gate: it 404s unless the
+    // deployment is a preview or V34_SHOW_HELD=1, which is stricter than "not production".
+    const film = readFileSync(join(appDirectory, "film", "layout.tsx"), "utf8");
+    expect(film, "film must 404 in production").toMatch(/if \(!heldVisible\(\)\)\s*notFound\(\)/);
+    expect(heldVisible({ VERCEL_ENV: "production" })).toBe(false);
   });
 
   it("gives public marketing routes an og:url matching their canonical", () => {

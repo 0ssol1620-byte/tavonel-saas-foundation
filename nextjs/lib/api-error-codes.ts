@@ -575,6 +575,7 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
       { code: "API_KEY_REVOKE_FAILED", status: 503, meaning: "The revoke could not be recorded.", whatToDo: "Retry. A revoke is reported only when it is written." },
       { code: "DEVELOPER_STORE_NOT_CONFIGURED", status: 503, meaning: "The developer store is not configured.", whatToDo: "Nothing a caller can send." },
       { code: "DEVELOPER_STORE_READ_FAILED", status: 503, meaning: "The developer store could not be read.", whatToDo: "Retry." },
+      { code: "DEVELOPER_STORE_READ_TRUNCATED", status: 503, meaning: "More stored keys matched than one read returns, so the token request was refused rather than decided over a partial list.", whatToDo: "Retry. Nothing was issued or revoked." },
       { code: "DEVELOPER_STORE_BINDING_INVALID", status: 503, meaning: "A stored row did not validate, so it was refused rather than returned partially.", whatToDo: "Report it." },
       { code: "DEVELOPER_AUDIT_READ_FAILED", status: 503, meaning: "The audit trail could not be read.", whatToDo: "Retry." },
       { code: "DEVELOPER_AUDIT_WRITE_FAILED", status: 503, meaning: "An audit event could not be written, so the action it describes was refused. Every key create, rotate and revoke writes an audit row or does not happen.", whatToDo: "Retry." },

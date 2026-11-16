@@ -71,6 +71,10 @@ const WIDE_ALLOWED = new Map<string, string>([
     "20261104090000_trial_ai_usage", "20261104090500_source_fingerprints_exact_dedup",
     "20261107100000_library_organize_shadow", "20261110040000_intake_admission_paid_over_trial",
   ].map((n) => [`supabase/migrations/${n}.sql`, "intake-side table, {1,32} since the intake admission contract"] as [string, string]),
+  // WO-D30 (Library label decisions, change proposals): decisions on the Library's sources, taking the same
+  // {1,32} workspace key as the intake-side tables above, 20261107100000_library_organize_shadow among them.
+  ...["20261116130000_library_label_decisions", "20261116130100_world_change_proposals"]
+    .map((n) => [`supabase/migrations/${n}.sql`, "Library decision table, {1,32} like the intake-side tables"] as [string, string]),
 ]);
 
 const tsSites = sites(sourceFiles("lib").concat(sourceFiles("app")), TS_PATTERN);
