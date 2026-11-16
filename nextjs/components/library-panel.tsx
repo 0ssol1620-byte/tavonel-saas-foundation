@@ -11,8 +11,9 @@ import styles from "./library-panel.module.css";
 
   Three groups by what a person can rely on: Confirmed (a person said so), Proposed (the compiler
   said so), Unknown (it declined to propose, or has not looked). A person confirms or rejects a
-  label; after a decision this panel offers Undo, which records the opposite decision. Nothing is
-  deleted and no source is touched: a decision is one appended row.
+  label; after a decision this panel offers Undo, which records the opposite decision, for as long as
+  the Library shows what that decision did. Nothing is deleted and no source is touched: a decision
+  is one appended row.
 
   When the Library is not enabled for this workspace the route answers 404 and this renders nothing.
   When it cannot be read it says so and shows no documents -- never a partial list.
@@ -25,14 +26,52 @@ type Props = {
   onAvailability?: (available: boolean) => void;
 };
 type Decision = "confirmed" | "rejected";
-type Target = { documentId: string; labelKind: "doc_type" | "topic"; labelKey: string };
+export type Target = { documentId: string; labelKind: "doc_type" | "topic"; labelKey: string };
+export type SessionDecisions = Readonly<Record<string, { target: Target; decision: Decision }>>;
 type Loaded = { documents: LibraryDocument[]; sourceVersions: Record<string, string> };
 type Load = { state: "loading" } | { state: "hidden" } | { state: "unavailable" } | ({ state: "ready" } & Loaded);
 
 const BADGE: Record<LibraryDocument["duplicates"][number]["badge"], string> = { exact: "Exact copy", near: "Near copy", revision: "Possible revision" };
 const typeName = (label: string) => label.replace(/_/g, " ");
-const targetKey = (target: Target) => `${target.documentId}:${target.labelKind}:${target.labelKey}`;
-const opposite = (decision: Decision): Decision => (decision === "confirmed" ? "rejected" : "confirmed");
+export const targetKey = (target: Target) => `${target.documentId}:${target.labelKind}:${target.labelKey}`;
+export const opposite = (decision: Decision): Decision => (decision === "confirmed" ? "rejected" : "confirmed");
+
+/** What the Library shows for one label of one document now; null when it shows no such label. */
+export function shownState(document: LibraryDocument, target: Target): "confirmed" | "proposed" | null {
+  if (target.labelKind === "doc_type") return document.documentType?.label === target.labelKey ? document.documentType.state : null;
+  return document.topics.find((topic) => topic.label === target.labelKey)?.state ?? null;
+}
+
+/*
+  The controls are chosen from what the Library shows, never from what this session remembers alone. Undo is
+  the opposite decision, and the store folds a decision after its opposite into a withdrawal, so a decision can
+  land as something other than what it said (a Reject of a label confirmed on another visit withdraws that
+  confirmation, and the proposal speaks again). A session decision therefore offers Undo only while the Library
+  shows exactly what it did: a confirmation shows the label confirmed, a rejection shows no such label.
+  Otherwise the label gets the ordinary controls for what it shows, and the session forgets that decision.
+*/
+const showsWhatItDid = (decision: Decision, shown: ReturnType<typeof shownState>) => (decision === "confirmed" ? shown === "confirmed" : shown === null);
+
+export type LabelControl = "confirm" | "reject" | "undo";
+export function labelControls(shown: ReturnType<typeof shownState>, session: Decision | undefined): LabelControl[] {
+  if (session && showsWhatItDid(session, shown)) return ["undo"];
+  return shown === "proposed" ? ["confirm", "reject"] : shown === "confirmed" ? ["reject"] : [];
+}
+
+/** The session after a saved decision and a fresh read: an Undo forgets the decision; one the Library does not show is dropped. */
+export function nextSession(current: SessionDecisions, saved: { target: Target; decision: Decision; isUndo: boolean } | null,
+  documents: readonly LibraryDocument[]): SessionDecisions {
+  const next: Record<string, { target: Target; decision: Decision }> = { ...current };
+  if (saved) {
+    if (saved.isUndo) delete next[targetKey(saved.target)];
+    else next[targetKey(saved.target)] = { target: saved.target, decision: saved.decision };
+  }
+  for (const [key, { target, decision }] of Object.entries(next)) {
+    const document = documents.find((candidate) => candidate.documentId === target.documentId);
+    if (!document || !showsWhatItDid(decision, shownState(document, target))) delete next[key];
+  }
+  return next;
+}
 
 async function authToken() {
   const client = getSupabaseBrowserClient();
@@ -55,19 +94,22 @@ export default function LibraryPanel({ documentIds, names, onAvailability }: Pro
   const [load, setLoad] = useState<Load>({ state: "loading" });
   // What this browser session decided, so Undo can offer the opposite; keyed by label. The target is kept because a
   // rejected label leaves the DTO, and its Undo must still be reachable from the document's row.
-  const [decided, setDecided] = useState<Record<string, { target: Target; decision: Decision }>>({});
+  const [decided, setDecided] = useState<SessionDecisions>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const idsKey = documentIds.join(",");
 
-  const refresh = useCallback(async () => {
+  // A read after a saved decision reconciles the session with what the Library now shows (nextSession).
+  const refresh = useCallback(async (saved: Parameters<typeof nextSession>[1] = null) => {
     if (idsKey === "") return setLoad({ state: "ready", documents: [], sourceVersions: {} });
     try {
       const response = await api(`/api/library?documents=${encodeURIComponent(idsKey)}`);
       if (response.status === 404) return setLoad({ state: "hidden" });
       const body = await response.json().catch(() => null) as ({ documents?: LibraryDocument[]; sourceVersions?: Record<string, string> }) | null;
       if (!response.ok || !body || !Array.isArray(body.documents) || !body.sourceVersions) return setLoad({ state: "unavailable" });
-      setLoad({ state: "ready", documents: body.documents, sourceVersions: body.sourceVersions });
+      const documents = body.documents;
+      setDecided((current) => nextSession(current, saved, documents));
+      setLoad({ state: "ready", documents, sourceVersions: body.sourceVersions });
     } catch {
       setLoad({ state: "unavailable" });
     }
@@ -92,13 +134,7 @@ export default function LibraryPanel({ documentIds, names, onAvailability }: Pro
         setProblem(response.status === 403 ? "You can not decide on this source." : "The decision was not saved. Nothing changed. Try again.");
         return;
       }
-      setDecided((current) => {
-        const next = { ...current };
-        if (isUndo) delete next[key];
-        else next[key] = { target, decision };
-        return next;
-      });
-      await refresh();
+      await refresh({ target, decision, isUndo });
     } catch {
       setProblem("The decision was not saved. Nothing changed. Try again.");
     } finally {
@@ -125,26 +161,19 @@ export default function LibraryPanel({ documentIds, names, onAvailability }: Pro
     { id: "unknown" as const, title: "Unknown", note: "No label is confirmed or proposed for these sources. They are listed, not hidden." },
   ].map((group) => ({ ...group, documents: load.documents.filter((document) => groupOf(document) === group.id) }));
 
-  function controls(target: Target, state: "proposed" | "confirmed", sourceVersionId: string | undefined, label: string) {
-    const key = targetKey(target);
-    const last = decided[key]?.decision;
+  function controls(document: LibraryDocument, target: Target, sourceVersionId: string | undefined, label: string) {
+    const last = decided[targetKey(target)]?.decision;
     const disabled = busy !== null;
-    if (last) {
-      return (
-        <button type="button" className={styles.action} disabled={disabled} onClick={() => void decide(target, opposite(last), sourceVersionId, true)}
-          aria-label={`Undo ${last === "confirmed" ? "confirming" : "rejecting"} ${label}`}>Undo</button>
-      );
-    }
-    return (
-      <>
-        {state === "proposed" ? (
-          <button type="button" className={styles.action} disabled={disabled} onClick={() => void decide(target, "confirmed", sourceVersionId, false)}
-            aria-label={`Confirm ${label}`}>Confirm</button>
-        ) : null}
-        <button type="button" className={styles.action} disabled={disabled} onClick={() => void decide(target, "rejected", sourceVersionId, false)}
-          aria-label={`Reject ${label}`}>Reject</button>
-      </>
-    );
+    return labelControls(shownState(document, target), last).map((control) => (control === "undo" && last ? (
+      <button key={control} type="button" className={styles.action} disabled={disabled} onClick={() => void decide(target, opposite(last), sourceVersionId, true)}
+        aria-label={`Undo ${last === "confirmed" ? "confirming" : "rejecting"} ${label}`}>Undo</button>
+    ) : control === "confirm" ? (
+      <button key={control} type="button" className={styles.action} disabled={disabled} onClick={() => void decide(target, "confirmed", sourceVersionId, false)}
+        aria-label={`Confirm ${label}`}>Confirm</button>
+    ) : (
+      <button key={control} type="button" className={styles.action} disabled={disabled} onClick={() => void decide(target, "rejected", sourceVersionId, false)}
+        aria-label={`Reject ${label}`}>Reject</button>
+    )));
   }
 
   return (
@@ -172,23 +201,22 @@ export default function LibraryPanel({ documentIds, names, onAvailability }: Pro
                       {type?.label && typeTarget ? (
                         <span className={styles.label}>
                           <span className={styles.kind}>Type</span> {typeName(type.label)}
-                          {controls(typeTarget, type.state === "confirmed" ? "confirmed" : "proposed", version, `type ${typeName(type.label)}`)}
+                          {controls(document, typeTarget, version, `type ${typeName(type.label)}`)}
                         </span>
                       ) : <span className={styles.label}><span className={styles.kind}>Type</span> Unknown</span>}
                       {document.topics.map((topic) => (
                         <span key={topic.label} className={styles.label}>
                           <span className={styles.kind}>Topic</span> {topic.label}
-                          {controls({ documentId: document.documentId, labelKind: "topic", labelKey: topic.label }, topic.state, version, `topic ${topic.label}`)}
+                          {controls(document, { documentId: document.documentId, labelKind: "topic", labelKey: topic.label }, version, `topic ${topic.label}`)}
                         </span>
                       ))}
                       {/* A label this session rejected is no longer in the DTO; its Undo stays here, on the document. */}
                       {Object.values(decided)
-                        .filter(({ target, decision }) => decision === "rejected" && target.documentId === document.documentId
-                          && !(target.labelKind === "doc_type" ? type?.label === target.labelKey : document.topics.some((topic) => topic.label === target.labelKey)))
+                        .filter(({ target, decision }) => decision === "rejected" && target.documentId === document.documentId && shownState(document, target) === null)
                         .map(({ target }) => (
                           <span key={targetKey(target)} className={styles.label}>
                             <span className={styles.kind}>{target.labelKind === "doc_type" ? "Type" : "Topic"}</span> Rejected {typeName(target.labelKey)}
-                            {controls(target, "confirmed", version, `${target.labelKind === "doc_type" ? "type" : "topic"} ${typeName(target.labelKey)}`)}
+                            {controls(document, target, version, `${target.labelKind === "doc_type" ? "type" : "topic"} ${typeName(target.labelKey)}`)}
                           </span>
                         ))}
                     </div>
