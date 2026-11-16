@@ -769,8 +769,16 @@ describe("contract promises", () => {
 describe("the crawl surface for the contract route", () => {
   const ROUTE = "/product/continuous-knowledge";
 
-  it("lists the route in the sitemap, as the lane specification requires", () => {
-    expect(read("../app/sitemap.ts")).toContain(`"${ROUTE}"`);
+  /*
+    V34 (D33 §1.1): `/product/continuous-knowledge` answers 308 to `/changes`, so the sitemap lists the
+    destination and not the source. The page file this block reads stays in the tree until batch A has
+    moved its content to `app/changes` and `components/v34/routes/changes`; the reads below follow it then.
+  */
+  it("lists the route's destination in the sitemap, as the lane specification requires, and not the 308 source", async () => {
+    const { default: sitemap } = await import("@/app/sitemap");
+    const paths = sitemap().map((entry) => new URL(entry.url).pathname);
+    expect(paths).toContain("/changes");
+    expect(paths).not.toContain(ROUTE);
   });
 
   it("makes no noindex claim the crawler that reaches this page could act on", () => {

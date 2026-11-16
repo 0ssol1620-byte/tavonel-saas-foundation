@@ -904,3 +904,29 @@ describe("public surface: the head is in the head, and says its own address", ()
     expect(source).toContain("distribution");
   });
 });
+
+/*
+  V34 (D33 §1.1, decision 6). Nine retired routes answer 308 at the platform. A sitemap or llms.txt
+  entry for one of them asks a crawler to spend the visit twice, so each is in neither, and the
+  route that replaced it is in both.
+*/
+describe("the nine retired sources", () => {
+  const RETIRED: ReadonlyArray<readonly [string, string]> = [
+    ["/product", "/platform"],
+    ["/product/compiled-world", "/world"],
+    ["/product/continuous-knowledge", "/changes"],
+    ["/product/document-understanding", "/compiler"],
+    ["/product/knowledge-compiler", "/journal/compiler"],
+    ["/how-it-works", "/methods"],
+    ["/knowledge-compiler", "/journal/compiler"],
+    ["/integrations", "/connect"],
+    ["/resources", "/journal"],
+  ];
+
+  it.each(RETIRED)("%s is in neither the sitemap nor llms.txt, and %s is in both", (source, destination) => {
+    expect(sitemapPaths, `${source} redirects and is in the sitemap`).not.toContain(source);
+    expect(llmsPaths, `${source} redirects and is in llms.txt`).not.toContain(source);
+    expect(sitemapPaths).toContain(destination);
+    expect(llmsPaths).toContain(destination);
+  });
+});

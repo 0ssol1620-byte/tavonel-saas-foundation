@@ -4,6 +4,9 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import sitemap from "@/app/sitemap";
+import nextConfig from "@/next.config.mjs";
+import { resolveEntries, resolveGroups, V34_FOOTER_GROUPS, V34_MORE_GROUPS, V34_PRIMARY_NAV } from "@/lib/v34/nav";
+import { V34_LIVE_PATHS } from "@/lib/v34/routes";
 import { DesktopPrimaryNav, NavSections } from "@/components/public-site-chrome";
 import { navCurrent } from "@/components/site-nav/desktop-primary-nav";
 import { exploreSampleDocuments } from "./explore-sample";
@@ -48,6 +51,18 @@ vi.mock("next/navigation", () => ({ usePathname: () => "/docs/mcp" }));
 
 const read = (path: string) => readFileSync(resolve(import.meta.dirname, path), "utf8");
 const SITEMAP_PATHS = new Set(sitemap().map((entry) => new URL(entry.url).pathname.replace(/\/$/, "") || "/"));
+/*
+  V34 (D33 §1.1). The model below is the rollback landing's chrome (Landing V2 stays in the tree until
+  after D36, decision 11) and it still names the nine retired routes. A link to one of them is not a
+  link the site cannot answer: it answers 308 with the V34 destination. So a destination is answerable
+  when it is a sitemap route or a permanent redirect whose target is one. Nothing else is.
+*/
+const REDIRECTED = new Set(
+  ((await nextConfig.redirects!()) as Array<{ source: string; destination: string; permanent: boolean }>)
+    .filter((redirect) => redirect.permanent && SITEMAP_PATHS.has(redirect.destination))
+    .map((redirect) => redirect.source),
+);
+const answers = (href: string) => SITEMAP_PATHS.has(href) || REDIRECTED.has(href);
 const panelItems = NAV_GROUPS.flatMap((group) => [
   ...group.columns.flatMap((column) => column.items),
   ...(group.featured ? [group.featured] : []),
@@ -71,7 +86,7 @@ describe("the global menu's destinations", () => {
 
   it("offers no link the site cannot answer", () => {
     const unreachable = navHrefs().filter(
-      (href) => !SITEMAP_PATHS.has(href) && !NAV_PENDING_HREFS.includes(href),
+      (href) => !answers(href) && !NAV_PENDING_HREFS.includes(href),
     );
     expect(unreachable, "menu destinations that are neither a published route nor declared pending").toEqual([]);
   });
@@ -225,7 +240,7 @@ describe("the production customer destinations in the bar", () => {
 
   it("offers no link the site cannot answer", () => {
     for (const item of CUSTOMER_NAV) {
-      expect(SITEMAP_PATHS.has(item.href), `${item.href} is not in app/sitemap.ts`).toBe(true);
+      expect(answers(item.href), `${item.href} is neither in app/sitemap.ts nor a 308 to a sitemap route`).toBe(true);
     }
   });
 
@@ -488,5 +503,45 @@ describe("the customer navigation's current page and section", () => {
     expect(customerNavCurrent("/docs", "/docs/mcp")).toBe("location");
     expect(navSectionForPath("/sources")).toBe("product");
     expect(customerNavCurrent("/product", "/sources")).toBeUndefined();
+  });
+});
+
+/*
+  V34 (D33 §3.5, §4 #6). The navigation a visitor actually gets: five bar items and the four More
+  columns, from `lib/v34/nav.ts`, which derives every href from the typed registry. What is pinned
+  here is the shape the architecture fixes; that every entry is a live registry route is pinned again
+  in `lib/v34/nav.test.ts` and `lib/v34/integration.test.ts`.
+*/
+describe("the V34 navigation", () => {
+  const primary = resolveEntries(V34_PRIMARY_NAV);
+  const more = resolveGroups(V34_MORE_GROUPS);
+  const footer = resolveGroups(V34_FOOTER_GROUPS);
+
+  it("carries five bar items: Product, Solutions, Integrations, Pricing, Journal", () => {
+    expect(primary.map((link) => link.label)).toEqual(["Product", "Solutions", "Integrations", "Pricing", "Journal"]);
+    expect(primary.map((link) => link.href)).toEqual(["/platform", "/solutions", "/connect", "/pricing", "/journal"]);
+  });
+
+  it("opens More into four columns", () => {
+    expect(more.map((group) => group.title)).toEqual(["Product", "For you", "Build & trust", "TAVONEL"]);
+  });
+
+  it("offers a link only to a live registry route or a retained one the sitemap lists", () => {
+    const live = new Set<string>(V34_LIVE_PATHS);
+    for (const link of [...primary, ...more.flatMap((group) => group.links)]) {
+      expect(live.has(link.href), `${link.href} is in the bar or More and is not a live registry route`).toBe(true);
+    }
+    // The footer also carries retained routes. /research/program arrives with batch B.
+    for (const link of footer.flatMap((group) => group.links)) {
+      if (link.href === "/research/program") continue;
+      expect(SITEMAP_PATHS.has(link.href), `${link.href} is in the footer and not in the sitemap`).toBe(true);
+    }
+  });
+
+  it("lists a destination once per column", () => {
+    for (const group of [...more, ...footer]) {
+      const hrefs = group.links.map((link) => link.href);
+      expect(new Set(hrefs).size, group.title).toBe(hrefs.length);
+    }
   });
 });

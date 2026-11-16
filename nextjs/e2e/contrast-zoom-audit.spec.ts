@@ -28,10 +28,18 @@ import { fixtureDocument, installFixtureSession, installWorkspaceRoutes } from "
 const CONTRAST_ROUTES = [
   "/",
   "/pricing",
-  "/product",
-  "/product/compiled-world",
-  "/product/continuous-knowledge",
-  "/product/document-understanding",
+  /*
+    V34 (D33 §4): the four routes that replaced /product and its three children, and the V34 core routes.
+    The pixel-level pass over every live route is the V34 harness's; this keeps the walk the old way.
+  */
+  "/platform",
+  "/world",
+  "/changes",
+  "/compiler",
+  "/evidence",
+  "/connect",
+  "/methods",
+  "/journal",
   "/docs",
   "/sources",
   /*

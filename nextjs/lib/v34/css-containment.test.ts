@@ -67,6 +67,12 @@ function compounds(selector: string): string[] {
 }
 
 const OVERFLOW_OK = /scroll|media|crop/i;
+/*
+  Named by the foundation receipts, allowed narrowly. The phone drawer locks the document's scroll
+  while its dialog is open, which is the one place a V34 sheet may reach `html` (the selector is
+  `:global(html):has(.dialog[open])`, so it only matches while a dialog is open).
+*/
+const SCROLL_LOCK = /^:global\(html\):has\(\.\w+\[open\]\)$/;
 
 export function scanCss(file: string, source: string): string[] {
   const problems: string[] = [];
@@ -83,11 +89,12 @@ export function scanCss(file: string, source: string): string[] {
       const repeated = classes.find((c, index) => classes.indexOf(c) !== index);
       if (repeated) problems.push(`${file}: ${complex} nests .${repeated} inside .${repeated}`);
     }
-    if (/overflow(-x|-y)?\s*:\s*hidden/.test(body) && !OVERFLOW_OK.test(selector) && !OVERFLOW_OK.test(file)) {
+    if (/overflow(-x|-y)?\s*:\s*hidden/.test(body) && !OVERFLOW_OK.test(selector) && !OVERFLOW_OK.test(file) && !SCROLL_LOCK.test(selector)) {
       problems.push(`${file}: ${selector} hides overflow outside a scroll surface or media crop`);
     }
     for (const [, value] of body.matchAll(/grid-template-(?:columns|rows)\s*:\s*([^;]+)/g)) {
-      const withoutSafe = value!.replace(/minmax\(\s*0(?:px)?\s*,\s*[\d.]+fr\s*\)/g, "");
+      /* minmax(0, 1fr) cannot widen its box; neither can a fixed length floor such as minmax(9.5rem, 1fr). */
+      const withoutSafe = value!.replace(/minmax\(\s*(?:0(?:px)?|[\d.]+(?:rem|em|px))\s*,\s*[\d.]+fr\s*\)/g, "");
       if (/(^|[\s(,])[\d.]*fr\b/.test(withoutSafe)) problems.push(`${file}: ${selector} uses a bare fr track, use minmax(0, 1fr)`);
     }
   }
@@ -146,6 +153,13 @@ describe("the containment scan catches what it exists to catch", () => {
     expect(caught(".panel { overflow: hidden; }")).toHaveLength(1);
     expect(caught(".panel { overflow-x: hidden; }")).toHaveLength(1);
     expect(caught(".mediaCrop { overflow: hidden; }")).toEqual([]);
+  });
+
+  it("allows the drawer's scroll lock on html, and a fixed-floor minmax track, and nothing broader", () => {
+    expect(caught(":global(html):has(.dialog[open]) { overflow: hidden; }")).toEqual([]);
+    expect(caught(":global(html) { overflow: hidden; }")).toHaveLength(1);
+    expect(caught(".grid { grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); }")).toEqual([]);
+    expect(caught(".grid { grid-template-columns: repeat(auto-fit, minmax(auto, 1fr)); }")).toHaveLength(1);
   });
 
   it("flags @import and :root", () => {

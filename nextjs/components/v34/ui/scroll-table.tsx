@@ -17,7 +17,7 @@ export function ScrollTable({ label, caption, columns, rows, rowHeaders = true }
   rowHeaders?: boolean;
 }) {
   return (
-    <div className={s.region} role="region" tabIndex={0} aria-label={label}>
+    <div className={s.region} role="region" tabIndex={0} aria-label={label} data-v34-scroll="">
       <table className={s.table}>
         {caption ? <caption className={s.caption}>{caption}</caption> : null}
         <thead>

@@ -280,3 +280,21 @@ describe("2026-09-05 production hardening", () => {
       .not.toContain("self-service evaluation");
   });
 });
+
+/*
+  V34 (D33 §4 #5): a held route answers 404 in production, so the registry's held routes are in no
+  surface that advertises a page. The registry sets `sitemap` from `release`; this reads the files.
+*/
+describe("held V34 routes are advertised nowhere", async () => {
+  const { V34_HELD_ROUTES } = await import("@/lib/v34/routes");
+  const sitemapSource = read("app/sitemap.ts");
+  const llms = read("public/llms.txt");
+  const robots = read("app/robots.ts");
+
+  it.each(V34_HELD_ROUTES.map((route) => [route.path] as const))("%s is not in the sitemap, llms.txt or robots.txt", (path) => {
+    expect(sitemapSource).not.toContain(`"${path}"`);
+    expect(llms).not.toContain(`https://tavonel.com${path})`);
+    // A 404 is not made indexable-or-not by robots.txt, and a Disallow line would announce the route.
+    expect(robots).not.toContain(`"${path}"`);
+  });
+});

@@ -26,9 +26,27 @@
 
 import { test, expect } from "@playwright/test";
 import { FOOTER_GROUPS, NAV_PENDING_HREFS, PRIMARY_NAV, RESOURCE_LINKS, navHrefs } from "../lib/site-navigation";
+import { V34_LIVE_PATHS } from "../lib/v34/routes";
 import { measureOverflow, type Offender } from "./support/overflow";
 
-const WIDTHS = [1920, 1440, 1280, 1024, 768, 390, 360] as const;
+/* 320, 412 and 430 join the seven release widths for V34 (D33 §4, A7): the narrowest phone and the two wide ones. */
+const WIDTHS = [1920, 1440, 1280, 1024, 768, 430, 412, 390, 360, 320] as const;
+
+/*
+  The nine routes that answer 308 (D33 §1.1). The legacy menu model still names them, and a navigation
+  to one lands on its destination, so the audit measures the destination once instead of the redirect.
+*/
+const RETIRED_TO: Readonly<Record<string, string>> = {
+  "/product": "/platform",
+  "/product/compiled-world": "/world",
+  "/product/continuous-knowledge": "/changes",
+  "/product/document-understanding": "/compiler",
+  "/product/knowledge-compiler": "/journal/compiler",
+  "/how-it-works": "/methods",
+  "/knowledge-compiler": "/journal/compiler",
+  "/integrations": "/connect",
+  "/resources": "/journal",
+};
 
 /* The routes the audit named explicitly, plus every route the navigation itself declares --
    so a new nav entry is audited without anyone remembering to add it here.
@@ -70,7 +88,9 @@ const ROUTES = [
     ...RESOURCE_LINKS.map(link => link.href),
     ...FOOTER_GROUPS.flatMap(group => group.links.map(link => link.href)),
     ...navHrefs(),
-  ]),
+    /* Every live V34 route, from the registry, so a route that goes live is audited without an edit here. */
+    ...V34_LIVE_PATHS,
+  ].map(route => RETIRED_TO[route] ?? route)),
 ]
   .filter(route => !NAV_PENDING_HREFS.includes(route))
   .sort();

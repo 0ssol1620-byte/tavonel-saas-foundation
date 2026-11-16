@@ -486,8 +486,8 @@ describe("the two pages", () => {
       }
     }
     // UX-L7 (P2-11): every public root declares its template; the guide reads as T3 Reference, like /docs.
-    expect(ko).toContain('<div class="page public-page" data-template="T3">');
-    expect(en).toContain('<div class="page public-page" data-template="T3">');
+    expect(ko).toMatch(/<div class="[^"]*page public-page"[^>]* data-template="T3">/);
+    expect(en).toMatch(/<div class="[^"]*page public-page"[^>]* data-template="T3">/);
   });
 
   it("say when a link is English-only, on the Korean text", () => {

@@ -26,6 +26,13 @@ const OUTCOME_ROUTES = [
   "/contact",
 ] as const;
 
+/*
+  V34 (D33 §4 #16). The rollback landing's copy still links `/product/continuous-knowledge`, which
+  answers 308 to `/changes`. The link a reader follows works; the page that answers, is measured and
+  is advertised is the destination, so the three surface checks below are made against it.
+*/
+const SERVED_AT: Readonly<Record<string, string>> = { "/product/continuous-knowledge": "/changes" };
+
 describe("B33 outcome IA cross-surface integration", () => {
   it("keeps the nine customer-task scenes in the canonical order", () => {
     expect(LANDING_V2_SCENE_ORDER).toEqual([
@@ -49,7 +56,8 @@ describe("B33 outcome IA cross-surface integration", () => {
       ...copy.use.outbound.map((entry) => entry.href),
     ]);
     expect(linked).toEqual(new Set(OUTCOME_ROUTES));
-    for (const route of linked) {
+    for (const link of linked) {
+      const route = SERVED_AT[link] ?? link;
       expect(sitemapPaths, `${route} is absent from the sitemap`).toContain(route);
       expect(PUBLIC_MARKETING_PATHS, `${route} is absent from consented analytics`).toContain(route);
       expect(llms, `${route} is absent from llms.txt`).toContain(`https://tavonel.com${route}`);

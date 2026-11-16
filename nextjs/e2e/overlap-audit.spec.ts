@@ -16,10 +16,12 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { V34_LIVE_PATHS } from "../lib/v34/routes";
 import { measureOverlap, type OverlapFinding } from "./support/overlap";
 
-const WIDTHS = [1440, 1280, 1024, 768, 430, 390, 360] as const;
-const NAMED_ROUTES = ["/docs", "/docs/concepts", "/explore", "/guide", "/pricing"];
+/* 320, 412 and 1920 join the seven widths for V34 (D33 §4, A7). */
+const WIDTHS = [1920, 1440, 1280, 1024, 768, 430, 412, 390, 360, 320] as const;
+const NAMED_ROUTES = ["/docs", "/docs/concepts", "/explore", "/guide", "/pricing", ...V34_LIVE_PATHS];
 
 const ALLOWED: ReadonlyArray<{ kind: OverlapFinding["kind"]; route?: RegExp; a: RegExp; b?: RegExp; reason: string }> = [];
 

@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { v34Route, type V34RouteKey } from "./v34/routes";
 
 // Every public route must declare its own canonical address.
 //
@@ -50,6 +51,20 @@ function metadataSourcesFor(pagePath: string): string[] {
   return sources;
 }
 
+/*
+  A V34 page declares `export const metadata = routeMetadata("<key>")`, and `routeMetadata` is
+  `pageMetadata({ title, description, canonical })` over the registry record. Resolve the call to
+  that helper call, with the record's own canonical path, so a registry route is checked exactly
+  as a hand-written one is: its canonical must be its own path. A key that is not in the registry
+  throws, so a typo cannot pass as "declares something".
+*/
+function expandRegistryMetadata(source: string): string {
+  return source.replace(/routeMetadata\("([a-z-]+)"\)/g, (_call, key: string) => {
+    const { title, description, path } = v34Route(key as V34RouteKey);
+    return `pageMetadata({ title: ${JSON.stringify(title)}, description: ${JSON.stringify(description)}, canonical: ${JSON.stringify(path)} })`;
+  });
+}
+
 const pages = findPages(appDirectory);
 const rootLayout = readFileSync(join(appDirectory, "layout.tsx"), "utf8");
 
@@ -95,10 +110,12 @@ describe("per-route canonical metadata", () => {
       if (exemptFromCanonical(route)) continue;
       // The route's own segment chain, excluding the root layout -- inheriting the root's
       // canonical is exactly the defect being prevented, so it does not count as declaring one.
-      const own = metadataSourcesFor(page)
-        .filter((path) => path !== join(appDirectory, "layout.tsx"))
-        .map((path) => readFileSync(path, "utf8"))
-        .join("\n");
+      const own = expandRegistryMetadata(
+        metadataSourcesFor(page)
+          .filter((path) => path !== join(appDirectory, "layout.tsx"))
+          .map((path) => readFileSync(path, "utf8"))
+          .join("\n"),
+      );
       if (!/alternates:\s*\{[^}]*canonical/.test(own) && !declaresThroughHelper(own)) missing.push(route);
     }
     expect(missing).toEqual([]);
@@ -110,10 +127,12 @@ describe("per-route canonical metadata", () => {
       if (isTerminalPage(page)) continue;
       const route = routeOf(page);
       if (exemptFromCanonical(route)) continue;
-      const own = metadataSourcesFor(page)
-        .filter((path) => path !== join(appDirectory, "layout.tsx"))
-        .map((path) => readFileSync(path, "utf8"))
-        .join("\n");
+      const own = expandRegistryMetadata(
+        metadataSourcesFor(page)
+          .filter((path) => path !== join(appDirectory, "layout.tsx"))
+          .map((path) => readFileSync(path, "utf8"))
+          .join("\n"),
+      );
       if (route.includes("[")) {
         expect(own, `${route} must generate its route-specific canonical`).toMatch(
           /generateMetadata[\s\S]*alternates:\s*\{[^}]*canonical:/,
@@ -124,6 +143,22 @@ describe("per-route canonical metadata", () => {
       if (declared !== route) wrong.push(`${route} -> ${declared ?? "(none)"}`);
     }
     expect(wrong).toEqual([]);
+  });
+
+  /*
+    V34 (D33 §4 #1). A held route's page calls `releaseGate("<its own key>")` before it renders anything,
+    so production answers 404 and the page's words are never produced. /film is the one exception: its
+    layout already 404s in production, and the pattern below is pinned a few tests down.
+  */
+  it("has every held registry page call releaseGate with its own key", () => {
+    const missing: string[] = [];
+    for (const page of pages) {
+      const source = readFileSync(page, "utf8");
+      const key = /export const metadata\s*=\s*routeMetadata\("([a-z-]+)"\)/.exec(source)?.[1] as V34RouteKey | undefined;
+      if (!key || v34Route(key).release !== "held" || key === "film") continue;
+      if (!source.includes(`releaseGate("${key}")`)) missing.push(`${routeOf(page)} (${key})`);
+    }
+    expect(missing).toEqual([]);
   });
 
   it("keeps the root canonical at / so the apex still names itself", () => {
@@ -172,10 +207,12 @@ describe("per-route canonical metadata", () => {
       if (isTerminalPage(page)) continue;
       const route = routeOf(page);
       if (exemptFromCanonical(route) || noindexRoutes.has(route)) continue;
-      const own = metadataSourcesFor(page)
-        .filter((path) => path !== join(appDirectory, "layout.tsx"))
-        .map((path) => readFileSync(path, "utf8"))
-        .join("\n");
+      const own = expandRegistryMetadata(
+        metadataSourcesFor(page)
+          .filter((path) => path !== join(appDirectory, "layout.tsx"))
+          .map((path) => readFileSync(path, "utf8"))
+          .join("\n"),
+      );
       if (route.includes("[")) {
         expect(own, `${route} must generate a route-specific Open Graph URL`).toMatch(
           /generateMetadata[\s\S]*openGraph:\s*\{[^}]*url:/,

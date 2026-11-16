@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { BILLING_OFFERS } from "./billing-catalog";
 import { CLAIM_STATE } from "./claim-state";
@@ -50,7 +51,7 @@ function strip(source: string) {
   `app/solutions/[slug]/page.tsx` is one file holding five pages; `lib/docs-content.ts` is the
   whole of /docs. Both are included as files rather than as routes for that reason.
 */
-const CLAIM_SURFACES = [
+const BASE_CLAIM_SURFACES = [
   "app/page.tsx",
   /*
     Landing V2, 2026-09-19. `components/home-page-client.tsx` is deleted; the claims a buyer
@@ -82,6 +83,22 @@ const CLAIM_SURFACES = [
   */
   "lib/cookbook-content.ts",
 ] as const;
+
+/*
+  V34 (D33 §4 #17). Every source file under components/v34 renders on a public page, and so does the
+  walkthrough's copy deck. The rules are unchanged: the same phrases, read the same way. The registry
+  (`lib/v34/routes.ts`) is not here, and that is deliberate: it is scanned by its own test for the
+  rules that apply to descriptions, and the enterprise row has to name single sign-on as scoped.
+*/
+function v34Surfaces(directory = "components/v34"): string[] {
+  return readdirSync(new URL(directory, root)).flatMap((name) => {
+    const path = `${directory}/${name}`;
+    if (statSync(fileURLToPath(new URL(path, root))).isDirectory()) return v34Surfaces(path);
+    return /\.tsx?$/.test(name) ? [path] : [];
+  });
+}
+
+const CLAIM_SURFACES: readonly string[] = [...BASE_CLAIM_SURFACES, ...v34Surfaces(), "lib/v34/walkthrough.ts"];
 
 /*
   Phrases, not words, for the reason `public-copy-purge.test.ts` gives: banning "table" or

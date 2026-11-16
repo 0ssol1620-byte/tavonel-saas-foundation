@@ -35,6 +35,18 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
 
+/**
+ * V34 (D33 §4 #13): every source file under components/v34 is public copy, and so is the walkthrough's
+ * deck. Listed by walking the folder, so a new component arrives already checked.
+ */
+function v34CopySurfaces(directory = "components/v34"): string[] {
+  return readdirSync(join(root, directory), { withFileTypes: true }).flatMap((entry) => {
+    const path = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) return v34CopySurfaces(path);
+    return /\.tsx?$/.test(entry.name) ? [path] : [];
+  });
+}
+
 /** Every file that carries public-facing copy. Add new surfaces here as they are built. */
 const COPY_SURFACES = [
   "app/page.tsx",
@@ -244,6 +256,8 @@ const COPY_SURFACES = [
   // BA-232: the header's action is a rendered button on every public page, so it is a copy
   // surface. It wrote three labels of its own; it reads the shared two now.
   "components/public-primary-cta.tsx",
+  ...v34CopySurfaces(),
+  "lib/v34/walkthrough.ts",
 ];
 
 const BARRED = [

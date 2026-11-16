@@ -131,6 +131,19 @@ async function header(): Promise<Action> {
   return actions[actions.length - 1]!;
 }
 
+/*
+  V34 (decision 2, 2026-11-16). The shell's filled action reads "Create your World" in every state; where it
+  goes is what `primaryCallToAction()` computes, so the label is the blueprint's and the gating stays ours.
+  Read out of the rendered header, by its analytics hook, not recomputed.
+*/
+async function v34Header(): Promise<Action> {
+  const { default: SiteHeader } = await import("../components/v34/shell/site-header");
+  const html = render(SiteHeader as FunctionComponent<Record<string, unknown>>);
+  const start = [...html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/g)].find(([, attributes]) => /data-analytics="header-start"/.test(attributes!));
+  expect(start, "the V34 header renders the start action").toBeDefined();
+  return anchors(start![0])[0]!;
+}
+
 async function home(korean: boolean): Promise<{ primary: Action; secondary: Action; close: Action }> {
   const { default: LandingPage } = await import("../components/landing-v2/landing-page");
   const html = render(LandingPage, { korean });
@@ -237,11 +250,14 @@ const CLOSED = {
 const OPEN_INTENT =
   "Developer is held for you. $29/month for 500 standard pages, with a full refund within 14 days if you have used fewer than 50 of them. Paddle is the merchant of record. Sign in and accept the processing terms, and checkout opens by itself. Nothing is charged by signing in.";
 
+const V34_CLOSED = { href: "/contact", label: "Create your World" };
+
 const TABLE = {
-  S0: CLOSED,
-  S1: CLOSED,
+  S0: { ...CLOSED, v34Header: V34_CLOSED },
+  S1: { ...CLOSED, v34Header: V34_CLOSED },
   S2: {
     ...CLOSED,
+    v34Header: { href: "/login", label: "Create your World" },
     header: { href: "/login", label: "Start free" },
     home: { ...CLOSED.home, primary: { href: "/login", label: "Start free" } },
     homeKo: { ...CLOSED.homeKo, primary: { href: "/login", label: "사용 신청하기" } },
@@ -285,6 +301,7 @@ async function surfaces(state: State) {
   rendered = [];
   const seen = {
     header: await header(),
+    v34Header: await v34Header(),
     home: await home(false),
     homeKo: await home(true),
     pricing: await pricing(),
@@ -301,6 +318,10 @@ describe.each(STATES)("CTA truth in %s", (state) => {
 
   it("header filled action", () => {
     expect(seen.header).toEqual(expected.header);
+  });
+
+  it("V34 header filled action: the label is Create your World, the destination is the computed start", () => {
+    expect(seen.v34Header).toEqual(expected.v34Header);
   });
 
   /*

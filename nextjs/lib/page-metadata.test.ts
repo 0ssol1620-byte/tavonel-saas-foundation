@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { V34_ROUTE_KEYS, v34Route, type V34RouteKey } from "./v34/routes";
 
 /*
   Every route says who it is, or this fails.
@@ -79,8 +80,27 @@ function objectAt(source: string, from: number) {
  * `generateMetadata` returns more than once -- `/solutions/[slug]` returns `{}` for an unknown
  * slug before it returns the real object -- so every return is collected rather than the first.
  */
+/**
+ * A V34 page writes `export const metadata = routeMetadata("<key>")` and the words live in the registry
+ * (`lib/v34/routes.ts`). Resolve the call to the same object literal a hand-written page would carry,
+ * so every rule below reads a registry route exactly as it reads any other.
+ */
+function registryKey(source: string): V34RouteKey | null {
+  const key = source.match(/export const metadata\s*=\s*routeMetadata\("([a-z-]+)"\)/)?.[1];
+  if (!key) return null;
+  expect(V34_ROUTE_KEYS as readonly string[], `routeMetadata("${key}") names no registry route`).toContain(key);
+  return key as V34RouteKey;
+}
+
+function registryBlock(key: V34RouteKey) {
+  const { title, description, path: canonical } = v34Route(key);
+  return `{ title: ${JSON.stringify(title)}, description: ${JSON.stringify(description)}, alternates: { canonical: ${JSON.stringify(canonical)} } }`;
+}
+
 function metadataSource(route: string) {
   const source = ownSource(route);
+  const key = registryKey(source);
+  if (key) return registryBlock(key);
   const blocks: string[] = [];
   for (const match of source.matchAll(/export const metadata[^=]*=\s*/g)) {
     const block = objectAt(source, match.index! + match[0].length - 1);
@@ -143,6 +163,8 @@ function field(block: string, key: string) {
 
 /** Indexable means the layout chain above it never says otherwise. */
 function isIndexable(route: string) {
+  const key = registryKey(ownSource(route));
+  if (key && v34Route(key).release === "held") return false;
   let dir = segmentDir(route);
   for (;;) {
     for (const file of ["page.tsx", "layout.tsx"]) {

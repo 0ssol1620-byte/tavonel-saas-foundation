@@ -25,7 +25,11 @@ import { describe, expect, it } from "vitest";
   the point, because that is a decision someone has to make on purpose.
 */
 
+/* V34 (D33 §4 #17): every live registry route is a sales surface; the three already named below are not repeated. */
+const V34_SALES_SURFACES = ["platform", "world", "changes", "connect", "personal", "methods", "capabilities", "studio", "company", "compiler", "markets", "engineering", "billing", "journal", "journal/compiler", "journal/mcp", "journal/revision", "journal/research"] as const;
+
 const SALES_SURFACES = [
+  ...V34_SALES_SURFACES,
   "",
   "benchmarks",
   "product",

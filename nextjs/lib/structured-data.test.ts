@@ -127,7 +127,23 @@ describe("JSON-LD emitted anywhere in the tree", () => {
       "app/layout.tsx",
       "components/breadcrumb-json-ld.tsx",
       CATALOGUE_EMITTER,
+      // V34 (D33 §3.6): the one emitter every V34 page renders. WebSite, BreadcrumbList and, only with registry dates, Article.
+      "components/v34/shell/route-json-ld.tsx",
     ]);
+  });
+
+  /*
+    V34 (D33 §4 #9). Article and BreadcrumbList are allowed on V34 routes and the bans above stand:
+    an Article is built in exactly one place, from dates the registry record carries, and the record
+    carries none until an article is published. No rating, price, review or search action.
+  */
+  it("allows Article only from registry dates, and Breadcrumb and WebSite beside it", () => {
+    const metadata = readFileSync(join(sourceRoot, "lib/v34/route-metadata.ts"), "utf8");
+    expect(metadata).toContain('route.schema === "Article" && route.article');
+    expect(metadata).toContain("datePublished: route.article.published");
+    expect(metadata).not.toMatch(/"(AggregateRating|Review|Offer|SearchAction)"|ratingValue|\bprice\s*:/);
+    const routes = readFileSync(join(sourceRoot, "lib/v34/routes.ts"), "utf8");
+    expect(routes, "no publication date is typed into the registry until an article is published").not.toMatch(/article:\s*\{\s*published:\s*"/);
   });
 
   it.each(emitters.map((file) => file.path))("%s claims no date, rating or dataset", (path) => {
