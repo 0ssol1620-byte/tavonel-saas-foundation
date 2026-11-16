@@ -280,6 +280,8 @@ function collectControls(max: number): { index: number; selector: string; border
     const s = getComputedStyle(el);
     const r = el.getBoundingClientRect();
     if (s.display === "none" || s.visibility === "hidden" || r.width < 8 || r.height < 8 || el.matches(":disabled, [aria-disabled='true']")) continue;
+    // The same rule as the text pass: a control in a closed <details> body is not painted, and its leftover rect samples whatever lies beneath. The matrix opens the details and measures it there.
+    if (el.closest("details:not([open])") && !el.closest("summary")) continue;
     const borderPx = parseFloat(s.borderTopWidth);
     if (s.borderTopStyle === "none" || borderPx <= 0) continue;
     const index = out.length;

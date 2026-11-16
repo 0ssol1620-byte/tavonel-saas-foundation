@@ -71,7 +71,15 @@ const routeFilter = only("V34_ROUTE");
 const widthFilter = only("V34_WIDTHS")?.map(Number);
 const serverMode = process.env.V34_SERVER_MODE === "production" ? "production" : "qa";
 
-const allRoutes = await loadRoutes();
+/*
+  Pages that render a V34 body but are not one of the 43 targets, so the registry has no row for
+  them (architecture section 1.2: /research/program is the old /research body in its new place).
+  Without a row here the matrix never opens them.
+*/
+const V34_BODIES_OUTSIDE_REGISTRY: RouteRow[] = [{ path: "/research/program", release: "live" }];
+
+const registryRoutes = await loadRoutes();
+const allRoutes = registryRoutes.length > 0 ? [...registryRoutes, ...V34_BODIES_OUTSIDE_REGISTRY.filter(r => !registryRoutes.some(x => x.path === r.path))] : [];
 const routes = allRoutes.filter(r => !routeFilter || routeFilter.includes(r.path));
 // V34_WIDTHS may also name a width off the standard list (920, inside the 900-959 hero tray range) to probe a breakpoint.
 const widths: number[] = widthFilter ?? [...V34_WIDTHS];
@@ -153,6 +161,16 @@ for (const { path: route, release } of routes) {
           await settle(page, route);
           const text = await contrastPass(page);
           const controls = await controlContrastPass(page);
+          // Controls inside a closed <details> are skipped above; open every one and measure those too.
+          const closed = await page.evaluate(() => {
+            const shut = [...document.querySelectorAll("details:not([open])")] as HTMLDetailsElement[];
+            shut.forEach(d => (d.open = true));
+            return shut.length;
+          });
+          if (closed > 0) {
+            const seen = new Set(controls.map(v => `${v.selector} ${v.detail}`));
+            controls.push(...(await controlContrastPass(page)).filter(v => !seen.has(`${v.selector} ${v.detail}`)).map(v => ({ ...v, detail: `details open: ${v.detail}` })));
+          }
           const violations = [...text.violations, ...controls];
           record({ route, width, engine: browserName, colorScheme: scheme, pass: "contrast", violations, reported: text.reported, excepted: text.excepted });
           all.push(...violations.map(v => ({ ...v, detail: `${scheme}: ${v.detail}` })));

@@ -202,12 +202,13 @@ export default function ContactForm({ locale = "en" }: { locale?: ContactLocale 
         >
           {contactText(state === "sending" ? "Sending..." : "Send inquiry", locale)}
         </button>
-        <span>
+        {/* A sentence with its link inline, so it is a paragraph: the link is a target inside running text (2.5.8). */}
+        <p>
           {contactText("We use this information to answer your inquiry.", locale)}{" "}
           <Link href="/privacy" hrefLang={locale === "ko" ? "en" : undefined}>
             {locale === "ko" ? "개인정보 처리방침 (영문)" : "Privacy notice"}
           </Link>
-        </span>
+        </p>
       </div>
       <div className="contact-status" aria-live="polite">
         {state === "sent" && <p data-state="sent">{contactText("Received. We will reply from an official TAVONEL address.", locale)}</p>}

@@ -1765,7 +1765,7 @@
   .contact-field textarea:focus { border-color: var(--verified-dim); background: var(--g2); }
   .contact-trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
   .contact-submit { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-  .contact-submit span,
+  .contact-submit p,
   .contact-status p { margin: 0; font-family: var(--f-sans); font-size: var(--t-1); color: var(--text-lo); }
   .contact-status { min-height: 22px; }
   .contact-status p[data-state="sent"] { color: var(--verified); }

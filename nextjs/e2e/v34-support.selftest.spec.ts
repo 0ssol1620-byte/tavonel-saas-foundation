@@ -201,6 +201,12 @@ test.describe("contrast", () => {
     expect(await controlContrastPass(page)).toHaveLength(1);
     await load(page, `<main style="background:#fff;padding:12px"><input style="border:1px solid #555;background:#fff;padding:6px"></main>`);
     expect(await controlContrastPass(page)).toEqual([]);
+    // A strong-bordered select in a closed details body sits over dark text it does not paint: not measured until opened.
+    const shut = `<main style="background:#fff;padding:12px"><details><summary>more</summary><select style="border:1px solid #555;background:#fff;width:300px;height:40px"><option>a</option></select></details><p style="background:#111;color:#111;height:60px;margin:0">x</p></main>`;
+    await load(page, shut);
+    expect(await controlContrastPass(page)).toEqual([]);
+    await load(page, shut.replace("<details>", "<details open>").replace("#555", "#e2e2e2"));
+    expect(await controlContrastPass(page)).toHaveLength(1);
   });
 });
 

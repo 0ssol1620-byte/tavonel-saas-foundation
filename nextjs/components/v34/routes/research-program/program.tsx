@@ -71,9 +71,10 @@ export function ProgramBody() {
           {link(RETAINED.reproducibility, "Reproducibility")}
           {link(RETAINED.trust, "Trust")}
         </p>
+        <div className={s.next}>
+          <TrustNext from="/research/program" />
+        </div>
       </Section>
-
-      <TrustNext from="/research/program" />
     </>
   );
 }

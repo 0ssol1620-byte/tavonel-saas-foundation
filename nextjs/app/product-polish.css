@@ -510,7 +510,7 @@
   text-transform: none;
   color: var(--text-lo);
 }
-.contact-submit span,
+.contact-submit p,
 .contact-status p {
   font-family: var(--f-sans);
   font-size: 12px;

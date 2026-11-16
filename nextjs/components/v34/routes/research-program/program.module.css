@@ -66,6 +66,24 @@
   margin: 0;
 }
 
+/*
+  The shared TrustNext step is legacy global markup (h2, .fine, .btn) that reads the dark site's
+  names. Set here to this surface's tokens, or its words are dark-ground text on paper.
+*/
+.next {
+  --text-hi: var(--v34-fg);
+  --text-mid: var(--v34-fg-muted);
+  --text-lo: var(--v34-fg-muted);
+  --text-max: var(--v34-header-btn-hover);
+  --hairline-hi: var(--v34-fg-border);
+  --ground: var(--v34-surface);
+  --g1: var(--v34-fg-hover);
+  --verified: var(--v34-fg-focus);
+  margin-top: 36px;
+  padding-top: 20px;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
 .textLink,
 .inlineLink {
   color: var(--v34-fg-link);
