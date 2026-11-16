@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  type ClusterAggregate,
   connectedEdgeIds,
   filterGraph,
   fitViewBox,
   type GraphEdge,
   type GraphNode,
   layoutWorldGraph,
+  LOD_NODE_BUDGET,
+  projectLod,
 } from "@/lib/world-graph-layout";
 import type { WorldObjectType, WorldReadModel } from "@/lib/world-read-model";
 import { useNarrowStage, useReducedMotion } from "@/components/world-visual/use-stage-media";
@@ -51,6 +54,7 @@ export default function WorldGraphCanvas({ model, selectedObjectId, onObjectSele
   const [types, setTypes] = useState<ReadonlySet<WorldObjectType>>(new Set());
   const [predicates, setPredicates] = useState<ReadonlySet<string>>(new Set());
   const [view, setView] = useState(() => fitViewBox(layout));
+  const [expandedByHand, setExpandedByHand] = useState<ReadonlySet<number>>(new Set());
   const [drawn, setDrawn] = useState(PROGRESSIVE_THRESHOLD);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const dragRef = useRef<{ x: number; y: number; view: typeof view } | null>(null);
@@ -79,10 +83,27 @@ export default function WorldGraphCanvas({ model, selectedObjectId, onObjectSele
   );
   const filtered = useMemo(() => filterGraph(layout, { query, types, predicates }), [layout, query, types, predicates]);
   const labelById = useMemo(() => new Map(layout.nodes.map((node) => [node.id, node.label] as const)), [layout.nodes]);
-  const connected = useMemo(() => connectedEdgeIds(filtered.edges, selectedObjectId), [filtered.edges, selectedObjectId]);
+
+  /*
+    Above the budget, clusters collapse to one mark. What the reader is looking at never does:
+    the selected object's cluster and every search match's cluster stay expanded, plus whatever
+    the reader opened by hand.
+  */
+  const expanded = useMemo(() => {
+    const clusters = new Set(expandedByHand);
+    const clusterById = new Map(layout.nodes.map((node) => [node.id, node.cluster] as const));
+    for (const id of filtered.matched) clusters.add(clusterById.get(id)!);
+    if (selectedObjectId && clusterById.has(selectedObjectId)) clusters.add(clusterById.get(selectedObjectId)!);
+    return clusters;
+  }, [expandedByHand, filtered.matched, layout.nodes, selectedObjectId]);
+  const projected = useMemo(
+    () => projectLod(filtered, layout, { budget: LOD_NODE_BUDGET, expanded }),
+    [filtered, layout, expanded],
+  );
+  const connected = useMemo(() => connectedEdgeIds(projected.edges, selectedObjectId), [projected.edges, selectedObjectId]);
 
   // A new World is a new picture: fit it rather than leaving the previous pan in place.
-  useEffect(() => { setView(fitViewBox(layout)); setDrawn(PROGRESSIVE_THRESHOLD); }, [layout]);
+  useEffect(() => { setView(fitViewBox(layout)); setDrawn(PROGRESSIVE_THRESHOLD); setExpandedByHand(new Set()); }, [layout]);
 
   /*
     Grow the drawn slice a frame at a time.
@@ -92,14 +113,21 @@ export default function WorldGraphCanvas({ model, selectedObjectId, onObjectSele
     few frames, instead of seeing nothing until all of them are ready.
   */
   useEffect(() => {
-    if (drawn >= filtered.nodes.length) return;
+    if (drawn >= projected.nodes.length) return;
     const handle = requestAnimationFrame(() => setDrawn((previous) => previous + SLICE));
     return () => cancelAnimationFrame(handle);
-  }, [drawn, filtered.nodes.length]);
+  }, [drawn, projected.nodes.length]);
 
-  const visibleNodes = filtered.nodes.length > PROGRESSIVE_THRESHOLD ? filtered.nodes.slice(0, drawn) : filtered.nodes;
+  const visibleNodes = useMemo(
+    () => (projected.nodes.length > PROGRESSIVE_THRESHOLD ? projected.nodes.slice(0, drawn) : projected.nodes),
+    [projected.nodes, drawn],
+  );
   const visibleIds = useMemo(() => new Set(visibleNodes.map((node) => node.id)), [visibleNodes]);
-  const visibleEdges = filtered.edges.filter((edge) => visibleIds.has(edge.from) && visibleIds.has(edge.to));
+  const visibleEdges = useMemo(
+    () => projected.edges.filter((edge) => edge.id.startsWith("agg:") || (visibleIds.has(edge.from) && visibleIds.has(edge.to))),
+    [projected.edges, visibleIds],
+  );
+  const expandCluster = useCallback((cluster: number) => setExpandedByHand((previous) => new Set(previous).add(cluster)), []);
 
   /*
     Keyboard navigation through the picture (§20, program §36).
@@ -114,15 +142,23 @@ export default function WorldGraphCanvas({ model, selectedObjectId, onObjectSele
     The dominant-axis test is what keeps ArrowRight from picking a node that is mostly above.
   */
   const nodeRefs = useRef(new Map<string, SVGGElement>());
+  // Nodes and cluster marks share one walk, so the keyboard reaches a collapsed cluster too.
+  const stops = useMemo(
+    () => [
+      ...visibleNodes.map((node) => ({ id: node.id, x: node.x, y: node.y })),
+      ...projected.aggregates.map((aggregate) => ({ id: `agg:${aggregate.cluster}`, x: aggregate.x, y: aggregate.y })),
+    ],
+    [visibleNodes, projected.aggregates],
+  );
   const rovingId = selectedObjectId && visibleIds.has(selectedObjectId)
     ? selectedObjectId
-    : visibleNodes[0]?.id ?? null;
+    : stops[0]?.id ?? null;
 
-  const move = (fromId: string, dx: number, dy: number) => {
-    const from = visibleNodes.find((node) => node.id === fromId);
+  const move = useCallback((fromId: string, dx: number, dy: number) => {
+    const from = stops.find((node) => node.id === fromId);
     if (!from) return;
     let best: { id: string; distance: number } | null = null;
-    for (const node of visibleNodes) {
+    for (const node of stops) {
       if (node.id === fromId) continue;
       const deltaX = node.x - from.x;
       const deltaY = node.y - from.y;
@@ -136,9 +172,10 @@ export default function WorldGraphCanvas({ model, selectedObjectId, onObjectSele
       if (!best || distance < best.distance) best = { id: node.id, distance };
     }
     if (!best) return;
-    onObjectSelect(best.id);
+    // A cluster mark takes focus without selecting: it is not an object, and Enter opens it.
+    if (!best.id.startsWith("agg:")) onObjectSelect(best.id);
     nodeRefs.current.get(best.id)?.focus();
-  };
+  }, [stops, onObjectSelect]);
 
   const zoom = (factor: number) => setView((previous) => {
     const width = Math.max(60, Math.min(40_000, previous.width * factor));
@@ -158,10 +195,14 @@ export default function WorldGraphCanvas({ model, selectedObjectId, onObjectSele
     return next;
   };
 
-  const openEdgeEvidence = (edge: GraphEdge) => {
+  const openEdgeEvidence = useCallback((edge: GraphEdge) => {
     const evidenceId = edge.evidenceRefs[0];
     if (evidenceId) onEvidenceSelect?.(evidenceId);
-  };
+  }, [onEvidenceSelect]);
+  const register = useCallback((id: string, element: SVGGElement | null) => {
+    if (element) nodeRefs.current.set(id, element);
+    else nodeRefs.current.delete(id);
+  }, []);
 
   if (!model || layout.nodes.length === 0) {
     return (
@@ -236,6 +277,7 @@ export default function WorldGraphCanvas({ model, selectedObjectId, onObjectSele
       <p className={styles.summary}>
         {filtered.nodes.length} objects · {filtered.edges.length} relations · {layout.clusters} cluster
         {layout.clusters === 1 ? "" : "s"}
+        {projected.aggregates.length > 0 ? ` · ${projected.aggregates.length} clusters collapsed` : ""}
         {filtered.hiddenNodes > 0 ? ` · ${filtered.hiddenNodes} hidden by filter` : ""}
         {query.trim().length > 0 ? ` · ${filtered.matched.size} match${filtered.matched.size === 1 ? "" : "es"}` : ""}
         {visibleNodes.length < filtered.nodes.length ? ` · drawing ${visibleNodes.length} of ${filtered.nodes.length}` : ""}
@@ -317,44 +359,127 @@ export default function WorldGraphCanvas({ model, selectedObjectId, onObjectSele
           }}
           onWheel={(event) => zoom(event.deltaY > 0 ? 1.1 : 0.9)}
         >
-          <g className={styles.edges}>
-            {visibleEdges.map((edge) => (
-              <line
-                key={edge.id}
-                x1={edge.x1}
-                y1={edge.y1}
-                x2={edge.x2}
-                y2={edge.y2}
-                className={styles.edge}
-                data-connected={connected.has(edge.id)}
-                data-evidence={edge.evidenceRefs.length > 0}
-                onClick={() => openEdgeEvidence(edge)}
-              >
-                <title>{`${edge.predicate.replaceAll("_", " ")} · ${edge.evidenceRefs.length} evidence`}</title>
-              </line>
-            ))}
-          </g>
-          <g>
-            {visibleNodes.map((node) => (
-              <GraphCircle
-                key={node.id}
-                node={node}
-                selected={node.id === selectedObjectId}
-                matched={filtered.matched.has(node.id)}
-                dimmed={filtered.matched.size > 0 && !filtered.matched.has(node.id)}
-                roving={node.id === rovingId}
-                onSelect={onObjectSelect}
-                onMove={move}
-                register={(id, element) => {
-                  if (element) nodeRefs.current.set(id, element);
-                  else nodeRefs.current.delete(id);
-                }}
-              />
-            ))}
-          </g>
+          <EdgeLayer edges={visibleEdges} connected={connected} onOpen={openEdgeEvidence} />
+          <NodeLayer
+            nodes={visibleNodes}
+            aggregates={projected.aggregates}
+            selectedObjectId={selectedObjectId}
+            matched={filtered.matched}
+            rovingId={rovingId}
+            onSelect={onObjectSelect}
+            onExpand={expandCluster}
+            onMove={move}
+            register={register}
+          />
         </svg>
       )}
     </div>
+  );
+}
+
+/*
+  The two drawn layers are memoized on their projected arrays, so a pan or zoom -- which only
+  changes the svg's viewBox -- re-renders none of the circles or lines.
+*/
+const EdgeLayer = memo(function EdgeLayer({ edges, connected, onOpen }: {
+  edges: readonly GraphEdge[];
+  connected: ReadonlySet<string>;
+  onOpen: (edge: GraphEdge) => void;
+}) {
+  return (
+    <g className={styles.edges}>
+      {edges.map((edge) => (
+        <line
+          key={edge.id}
+          x1={edge.x1}
+          y1={edge.y1}
+          x2={edge.x2}
+          y2={edge.y2}
+          className={styles.edge}
+          data-connected={connected.has(edge.id)}
+          data-evidence={edge.evidenceRefs.length > 0}
+          onClick={() => onOpen(edge)}
+        >
+          <title>{`${edge.predicate.replaceAll("_", " ")} · ${edge.evidenceRefs.length} evidence`}</title>
+        </line>
+      ))}
+    </g>
+  );
+});
+
+const NodeLayer = memo(function NodeLayer({ nodes, aggregates, selectedObjectId, matched, rovingId, onSelect, onExpand, onMove, register }: {
+  nodes: readonly GraphNode[];
+  aggregates: readonly ClusterAggregate[];
+  selectedObjectId: string | null;
+  matched: ReadonlySet<string>;
+  rovingId: string | null;
+  onSelect: (id: string) => void;
+  onExpand: (cluster: number) => void;
+  onMove: (fromId: string, dx: number, dy: number) => void;
+  register: (id: string, element: SVGGElement | null) => void;
+}) {
+  return (
+    <g>
+      {nodes.map((node) => (
+        <GraphCircle
+          key={node.id}
+          node={node}
+          selected={node.id === selectedObjectId}
+          matched={matched.has(node.id)}
+          dimmed={matched.size > 0 && !matched.has(node.id)}
+          roving={node.id === rovingId}
+          onSelect={onSelect}
+          onMove={onMove}
+          register={register}
+        />
+      ))}
+      {aggregates.map((aggregate) => (
+        <ClusterMark
+          key={aggregate.cluster}
+          aggregate={aggregate}
+          roving={`agg:${aggregate.cluster}` === rovingId}
+          onExpand={onExpand}
+          onMove={onMove}
+          register={register}
+        />
+      ))}
+    </g>
+  );
+});
+
+function ClusterMark({ aggregate, roving, onExpand, onMove, register }: {
+  aggregate: ClusterAggregate;
+  roving: boolean;
+  onExpand: (cluster: number) => void;
+  onMove: (fromId: string, dx: number, dy: number) => void;
+  register: (id: string, element: SVGGElement | null) => void;
+}) {
+  const id = `agg:${aggregate.cluster}`;
+  const kinds = Object.entries(aggregate.types).filter(([, count]) => count > 0).map(([type, count]) => `${count} ${type}`).join(", ");
+  const description = `Cluster of ${aggregate.memberCount} objects (${kinds}). Enter to expand.`;
+  return (
+    <g
+      ref={(element) => { register(id, element); }}
+      className={styles.node}
+      role="button"
+      aria-label={description}
+      tabIndex={roving ? 0 : -1}
+      data-cluster-id={aggregate.cluster}
+      data-type="Cluster"
+      transform={`translate(${aggregate.x} ${aggregate.y})`}
+      onClick={() => onExpand(aggregate.cluster)}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowLeft") { event.preventDefault(); onMove(id, -1, 0); }
+        else if (event.key === "ArrowRight") { event.preventDefault(); onMove(id, 1, 0); }
+        else if (event.key === "ArrowUp") { event.preventDefault(); onMove(id, 0, -1); }
+        else if (event.key === "ArrowDown") { event.preventDefault(); onMove(id, 0, 1); }
+        else if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onExpand(aggregate.cluster); }
+      }}
+    >
+      <circle r={aggregate.radius} />
+      <title>{description}</title>
+      <text x={aggregate.radius + 4} y={4}>{aggregate.memberCount}</text>
+    </g>
   );
 }
 

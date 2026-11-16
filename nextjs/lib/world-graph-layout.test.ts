@@ -5,8 +5,13 @@ import {
   filterGraph,
   fitViewBox,
   layoutWorldGraph,
+  projectLod,
+  type FilteredGraph,
+  type GraphEdge,
+  type GraphLayout,
+  type GraphNode,
 } from "./world-graph-layout";
-import { buildWorldReadModel } from "./world-read-model";
+import { buildWorldReadModel, type WorldReadModel } from "./world-read-model";
 
 /*
   The graph layout, against a real compile rather than a fixture.
@@ -187,5 +192,107 @@ describe("highlighting what a node is connected to", () => {
 
   it("is empty when nothing is selected", () => {
     expect(connectedEdgeIds(layoutWorldGraph(TWO_LINKED).edges, null).size).toBe(0);
+  });
+});
+
+describe("balance of the cluster grid", () => {
+  const singles = (count: number) => ({
+    objects: Array.from({ length: count }, (_, index) => ({
+      id: `o${String(index).padStart(4, "0")}`, label: `o${index}`, type: "Topic", evidenceRefs: [], relations: [],
+    })),
+    relations: [],
+  }) as unknown as WorldReadModel;
+
+  it("keeps the cluster grid square-ish", () => {
+    for (let count = 1; count <= 400; count += 1) {
+      const layout = layoutWorldGraph(singles(count));
+      const columns = new Set(layout.nodes.map((node) => node.x)).size;
+      const rows = new Set(layout.nodes.map((node) => node.y)).size;
+      expect([0, 1], `${count} clusters: ${columns}x${rows}`).toContain(columns - rows);
+      expect(columns / rows).toBeLessThanOrEqual(2);
+      // Two clusters are one row of two cells by construction; the drawn box is only compared from three up.
+      if (count >= 3) {
+        const width = layout.bounds.maxX - layout.bounds.minX;
+        const height = layout.bounds.maxY - layout.bounds.minY;
+        expect(Math.max(width / height, height / width)).toBeLessThanOrEqual(2);
+      }
+    }
+  });
+});
+
+describe("level of detail", () => {
+  const TYPE_CYCLE = ["Document", "Topic", "Entity"] as const;
+  const node = (id: string, cluster: number, x: number, y: number, index = 0): GraphNode => ({
+    id, label: id, type: TYPE_CYCLE[index % 3]!, x, y, radius: 9, cluster, evidenceCount: 0, relationCount: 0,
+  });
+  const edge = (id: string, from: GraphNode, to: GraphNode, evidenceRefs: string[]): GraphEdge => ({
+    id, predicate: "mentions", from: from.id, to: to.id, evidenceRefs, x1: from.x, y1: from.y, x2: to.x, y2: to.y,
+  });
+  const a0 = node("a0", 0, 0, 0, 0);
+  const a1 = node("a1", 0, 10, 20, 1);
+  const a2 = node("a2", 0, 20, 10, 2);
+  const b0 = node("b0", 1, 100, 100, 0);
+  const b1 = node("b1", 1, 120, 100, 1);
+  const c0 = node("c0", 2, 300, 0, 0);
+  const nodes = [a0, a1, a2, b0, b1, c0];
+  const edges = [
+    edge("e1", a0, a1, ["ev-1"]),
+    edge("e2", a1, b0, ["ev-2", "ev-1"]),
+    edge("e3", a2, b1, ["ev-3", "ev-2"]),
+    edge("e4", b0, b1, []),
+  ];
+  const layout: GraphLayout = { nodes, edges, clusters: 3, bounds: { minX: 0, minY: 0, maxX: 300, maxY: 100 } };
+  const filtered: FilteredGraph = { nodes, edges, matched: new Set(), hiddenNodes: 0, hiddenEdges: 0 };
+  const none = new Set<number>();
+
+  it("projects everything when under the budget", () => {
+    const projected = projectLod(filtered, layout, { budget: 6, expanded: none });
+    expect(projected.aggregates).toEqual([]);
+    expect(projected.nodes).toBe(filtered.nodes);
+    expect(projected.edges).toBe(filtered.edges);
+  });
+
+  it("collapses each unexpanded cluster to one aggregate at its members' mean, deterministically", () => {
+    const once = projectLod(filtered, layout, { budget: 2, expanded: none });
+    expect(once).toEqual(projectLod(filtered, layout, { budget: 2, expanded: none }));
+    expect(once.nodes).toEqual([]);
+    expect(once.aggregates.map((aggregate) => aggregate.cluster)).toEqual([0, 1, 2]);
+    const first = once.aggregates[0]!;
+    expect([first.x, first.y, first.memberCount]).toEqual([10, 10, 3]);
+    expect(first.types).toMatchObject({ Document: 1, Topic: 1, Entity: 1, Claim: 0, Evidence: 0 });
+    expect(first.edgeCount).toBe(3);
+  });
+
+  it("keeps an expanded cluster's members and collapses inter-cluster edges to one per pair with the union of evidence", () => {
+    const projected = projectLod(filtered, layout, { budget: 2, expanded: new Set([0]) });
+    expect(projected.nodes.map((n) => n.id)).toEqual(["a0", "a1", "a2"]);
+    expect(projected.aggregates.map((aggregate) => aggregate.cluster)).toEqual([1, 2]);
+    const folded = projected.edges.filter((candidate) => candidate.id.startsWith("agg:"));
+    expect(folded.map((candidate) => [candidate.id, candidate.evidenceRefs])).toEqual([
+      ["agg:0-1", ["ev-1", "ev-2", "ev-3"]],
+    ]);
+    // a0-a1 lies inside the expanded cluster and stays a plain edge.
+    expect(projected.edges.map((candidate) => candidate.id)).toContain("e1");
+  });
+
+  it("never drops an edge's evidence when collapsing", () => {
+    const projected = projectLod(filtered, layout, { budget: 2, expanded: none });
+    const inter = new Set(edges.filter((candidate) => ["e2", "e3"].includes(candidate.id)).flatMap((candidate) => candidate.evidenceRefs));
+    const kept = new Set(projected.edges.flatMap((candidate) => candidate.evidenceRefs));
+    expect(kept).toEqual(inter);
+  });
+
+  it("projects an empty or null model to nothing without throwing", () => {
+    const empty = layoutWorldGraph(null);
+    const none2 = filterGraph(empty, { query: "", types: new Set(), predicates: new Set() });
+    expect(projectLod(none2, empty, { budget: 0, expanded: none })).toEqual({ nodes: [], edges: [], aggregates: [] });
+  });
+
+  it("treats a budget below 1 as 1", () => {
+    const projected = projectLod(filtered, layout, { budget: -5, expanded: none });
+    expect(projected.aggregates).toHaveLength(3);
+    expect(projected.aggregates.every((aggregate) => Number.isFinite(aggregate.x) && Number.isFinite(aggregate.radius))).toBe(true);
+    const single: FilteredGraph = { ...filtered, nodes: [a0], edges: [] };
+    expect(projectLod(single, layout, { budget: 0, expanded: none }).nodes).toBe(single.nodes);
   });
 });
