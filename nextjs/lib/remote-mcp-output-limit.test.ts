@@ -125,9 +125,24 @@ const ALPHABETS = [
   "가나다라마바사아자차카타파하 ",
   "文書契約支払期限遅延損害金",
   "\u{1F600}\u{1F4C4}\u{1F512}\u{1F9EA}",
-  "éäô ",
+  // Escaped, so no editor can recompose it: decomposed marks are their own estimator branch.
+  "e\u0301a\u0308o\u0302 ",
   "0123456789.,;:%$ ",
 ];
+const COMBINING = 4;
+
+// The header's script list is a coverage claim. An editor that normalises the file (NFC or NFD) changes these
+// alphabets without a diff anyone reads, so each claim is checked against the alphabets themselves.
+it("every alphabet still feeds the estimator the scripts the header claims", () => {
+  for (const script of [/[a-z]/, /\p{Script=Hangul}/u, /\p{Script=Han}/u, /\p{Extended_Pictographic}/u, /\p{Mn}/u, /[0-9]/]) {
+    expect(ALPHABETS.some((alphabet) => script.test(alphabet)), String(script)).toBe(true);
+  }
+  // Only the combining alphabet is decomposed; normalisation in either direction flips one of these.
+  ALPHABETS.forEach((alphabet, i) => expect(alphabet.normalize("NFC") !== alphabet, `alphabet ${i}`).toBe(i === COMBINING));
+  // A combining mark splits the ASCII letter run and costs its own bytes; the precomposed form takes another branch.
+  const marks = ALPHABETS[COMBINING]!;
+  expect(estimateTokens(marks)).toBeGreaterThan(estimateTokens(marks.normalize("NFC")));
+});
 
 function text(rand: () => number, length: number) {
   const alphabet = [...ALPHABETS[Math.floor(rand() * ALPHABETS.length)]!];
