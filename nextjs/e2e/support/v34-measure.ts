@@ -10,7 +10,8 @@
  *                     than the viewport are the point of it;
  *   data-v34-overlay  a deliberate layer (drawer, tooltip, World canvas label): it may sit over
  *                     other content, and its own text is not judged for occlusion;
- *   data-v34-layer    a child that is layered on purpose over its siblings.
+ *   data-v34-layer    a child that is layered on purpose over its siblings;
+ *   data-v34-card     a positioned card whose stretched link covers its own text on purpose.
  * `<canvas>` and `<svg>` subtrees are never judged for text clipping.
  */
 
@@ -101,8 +102,9 @@ export function measureClippedText(): Violation[] {
     if (!top || top === el || el.contains(top) || top.contains(el)) continue;
     if (top.closest("[data-v34-overlay]")) continue;
     // A card's stretched link (a::after { position: absolute; inset: 0 }) is a transparent hit area by design,
-    // but only over its own card: the positioned ancestor it stretches to must contain this text, and must not
-    // hold another stretched link or another link this one actually covers (the card that lost position: relative).
+    // but only over its own declared card: the positioned ancestor it stretches to must carry data-v34-card and
+    // contain this text, and must not hold another stretched link or another link this one actually covers.
+    // A card that lost position: relative leaks to an undeclared ancestor, which is never excepted.
     if (top instanceof HTMLAnchorElement) {
       const stretched = (a: HTMLAnchorElement) => {
         const after = getComputedStyle(a, "::after");
@@ -110,7 +112,7 @@ export function measureClippedText(): Violation[] {
         return after.content !== "none" && after.position === "absolute" && transparent;
       };
       const host = top.offsetParent;
-      if (stretched(top) && host && host.contains(el)) {
+      if (stretched(top) && host && host.matches("[data-v34-card]") && host.contains(el)) {
         const leaks = [...host.querySelectorAll("a")].some(other => {
           if (other === top || other.contains(top) || top.contains(other)) return false;
           if (stretched(other)) return true;

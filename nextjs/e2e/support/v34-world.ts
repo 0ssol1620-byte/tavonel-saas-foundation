@@ -72,18 +72,21 @@ export async function staticSvgCounts(page: Page, url = "/v34/world-layers.svg")
 /**
  * Digest equality across modes: counts and ids-sha identical in every mode, each requested mode
  * actually reached, and the island counts equal to the static SVG's. `expectedSha`, when the
- * caller can compute it from the corpus, is compared too.
+ * caller can compute it from the corpus, is compared too. `expectMode`, when set, is the one mode
+ * every forced run must report instead of the forced one (the home hero under 900px stays static).
  */
 export function assertWorldAgreement(
   states: Partial<Record<WorldMode, WorldState>>,
   svg?: { nodes: number; edges: number },
   expectedSha?: string,
+  expectMode?: WorldMode,
 ): Violation[] {
   const out: Violation[] = [];
   const v = (detail: string) => out.push({ pass: "world-digest", selector: WORLD_ROOT, detail });
   const entries = Object.entries(states) as [WorldMode, WorldState][];
   for (const [mode, s] of entries) {
-    if (s.mode !== mode) v(`forced ${mode} but data-mode is ${s.mode ?? "absent"}`);
+    const want = expectMode ?? mode;
+    if (s.mode !== want) v(`forced ${mode}${expectMode ? ` (expected ${want})` : ""} but data-mode is ${s.mode ?? "absent"}`);
     if (s.nodes == null || s.edges == null) v(`${mode}: data-node-count or data-edge-count missing`);
   }
   const ref = entries[0]?.[1];

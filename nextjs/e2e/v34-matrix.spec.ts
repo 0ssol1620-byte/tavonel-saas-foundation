@@ -36,7 +36,7 @@ import {
 } from "./support/v34-passes";
 import { contrastPass, controlContrastPass } from "./support/v34-contrast";
 import { keyboardWalk } from "./support/v34-keyboard";
-import { assertWorldAgreement, forceWorldMode, readWorldState, staticSvgCounts, type WorldMode, type WorldState } from "./support/v34-world";
+import { assertWorldAgreement, forceWorldMode, readWorldState, staticSvgCounts, WORLD_ROOT, type WorldMode, type WorldState } from "./support/v34-world";
 import { checkSeo, checkSeoUnique, fetchSeo, fetchSitemapPaths, type SeoFacts } from "./support/v34-seo";
 import { flushReceipt, qaOut, record, screenshotPath, writeScreenshot } from "./support/v34-receipt";
 
@@ -232,6 +232,9 @@ for (const { path: route, release } of routes) {
         const states: Partial<Record<WorldMode, WorldState>> = {};
         let svg: { nodes: number; edges: number } | undefined;
         let webglAvailable = true;
+        // Under 900px the home hero is the static image for every pointer: whatever mode is forced, it must stay static, with no canvas.
+        const heroStatic = route === "/" && width < 900;
+        let canvases = 0;
         for (const mode of ["webgl", "canvas2d", "static"] as const) {
           const ctx = await openContext(browser, width);
           const page = await ctx.newPage();
@@ -240,7 +243,14 @@ for (const { path: route, release } of routes) {
             await settle(page, route);
             // The island loads on interaction on coarse pointers and on idle for fine ones; reveal it either way.
             await page.getByRole("button", { name: /explore the layers/i }).first().click({ timeout: 1500 }).catch(() => undefined);
-            states[mode] = await readWorldState(page, mode);
+            if (heroStatic) {
+              // An interaction anywhere on the instrument is the other way a load starts; it must not start one here.
+              await page.locator(WORLD_ROOT).first().click({ position: { x: 20, y: 20 }, timeout: 1500 }).catch(() => undefined);
+              states[mode] = await readWorldState(page, "static", 3000);
+              canvases += await page.locator(`${WORLD_ROOT} canvas`).count();
+            } else {
+              states[mode] = await readWorldState(page, mode);
+            }
             if (mode === "webgl") webglAvailable = await page.evaluate(() => !!document.createElement("canvas").getContext("webgl"));
             svg ??= await staticSvgCounts(page);
           } finally {
@@ -250,8 +260,9 @@ for (const { path: route, release } of routes) {
         // Only a browser whose own probe has no WebGL drops the mode; a renderer that falls to canvas2d where WebGL exists is a violation.
         const noWebgl = !webglAvailable;
         if (noWebgl) delete states.webgl;
-        const violations = assertWorldAgreement(states, svg);
-        record({ route, width, engine: browserName, colorScheme: "light", pass: "world", state: noWebgl ? "webgl unavailable in this browser" : "all three modes", violations });
+        const violations = assertWorldAgreement(states, svg, undefined, heroStatic ? "static" : undefined);
+        if (canvases > 0) violations.push({ pass: "world-digest", selector: WORLD_ROOT, detail: `${canvases} live canvas(es) on the home hero under 900px` });
+        record({ route, width, engine: browserName, colorScheme: "light", pass: "world", state: heroStatic ? "hero static under 900px" : noWebgl ? "webgl unavailable in this browser" : "all three modes", violations });
         expect(violations, report(route, width, violations)).toEqual([]);
       });
     }
@@ -272,6 +283,8 @@ if (routes.some(r => r.path === "/")) {
         await settle(page, "/");
         const panel = page.locator("[data-marketing-consent-panel]");
         await expect(panel, "the consent panel did not appear").toBeVisible({ timeout: 20_000 });
+        // Judge the panel where it rests, not mid-way through its entry animation.
+        await panel.evaluate(el => Promise.all(el.getAnimations({ subtree: true }).map(a => a.finished)));
         const text = await contrastPass(page);
         const violations: Violation[] = [...text.violations, ...(await controlContrastPass(page))];
         if (browserName === "chromium") violations.push(...(await forcedColorsPass(page)));

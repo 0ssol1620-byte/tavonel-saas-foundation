@@ -245,6 +245,9 @@ test.describe("world", () => {
     expect(assertWorldAgreement({ canvas2d: s("canvas2d"), static: s("canvas2d") })).toHaveLength(1);
     expect(assertWorldAgreement({ canvas2d: s("canvas2d"), static: s("static") }, { nodes: 6, edges: 4 })).toHaveLength(1);
     expect(assertWorldAgreement({ static: s("static", "abc", 5) }, undefined, "def")).toHaveLength(1);
+    // The home hero under 900px: every forced mode must report static.
+    expect(assertWorldAgreement({ webgl: s("static"), canvas2d: s("static"), static: s("static") }, undefined, undefined, "static")).toEqual([]);
+    expect(assertWorldAgreement({ webgl: s("webgl"), canvas2d: s("static"), static: s("static") }, undefined, undefined, "static")).toHaveLength(1);
   });
 });
 
@@ -296,7 +299,7 @@ test.describe("round 3: false positives found by the first integrated QA run", (
   test("occluded text: a closed details body and a stretched link are not covered; a real cover still is", async ({ page }) => {
     await load(page, `<details style="margin:20px"><summary>question</summary><p>answer text that is not painted</p></details><details><summary>another question</summary><p>second answer</p></details>`);
     expect((await page.evaluate(measureClippedText)).filter(v => v.pass === "occluded-text")).toEqual([]);
-    await load(page, `<div style="position:relative;margin:20px"><p>card copy</p><a href="#x" class="s">Open card</a></div>`, `.s{position:static}.s::after{content:"";position:absolute;inset:0}`);
+    await load(page, `<div data-v34-card style="position:relative;margin:20px"><p>card copy</p><a href="#x" class="s">Open card</a></div>`, `.s{position:static}.s::after{content:"";position:absolute;inset:0}`);
     expect((await page.evaluate(measureClippedText)).filter(v => v.pass === "occluded-text" && v.selector.startsWith("p"))).toEqual([]);
     await load(page, `<div style="position:relative;margin:20px"><p>card copy</p><a href="#x" class="s">Open card</a></div>`, `.s{position:static}.s::after{content:"";position:absolute;inset:0;background:#eee}`);
     expect((await page.evaluate(measureClippedText)).some(v => v.pass === "occluded-text")).toBe(true);
@@ -467,8 +470,32 @@ test.describe("QA 1 review: scroll axes, stretched links, text hiding, line clam
   test("F5: a stretched link that leaks out of an unpositioned card still covers text", async ({ page }) => {
     await load(page, `<div style="position:relative"><div><p>card one copy</p><a class="s" href="#1">Open one</a></div><div><p>card two copy</p><a href="#2">Open two</a></div></div>`, `.s::after{content:"";position:absolute;inset:0}`);
     expect((await page.evaluate(measureClippedText)).some(v => v.pass === "occluded-text")).toBe(true);
-    await load(page, `<div><div style="position:relative"><p>card one copy</p><a class="s" href="#1">Open one</a></div><div style="position:relative"><p>card two copy</p><a class="s" href="#2">Open two</a></div></div>`, `.s::after{content:"";position:absolute;inset:0}`);
+    await load(page, `<div><div data-v34-card style="position:relative"><p>card one copy</p><a class="s" href="#1">Open one</a></div><div data-v34-card style="position:relative"><p>card two copy</p><a class="s" href="#2">Open two</a></div></div>`, `.s::after{content:"";position:absolute;inset:0}`);
     expect((await page.evaluate(measureClippedText)).filter(v => v.pass === "occluded-text")).toEqual([]);
+  });
+
+  test("stretched link: the exception is declared on the card, never inferred", async ({ page }) => {
+    const css = `.s::after{content:"";position:absolute;inset:0}`;
+    // The same positioned card without data-v34-card: its stretched link covers text like any other cover.
+    await load(page, `<div style="position:relative;margin:20px"><p>card copy</p><a href="#x" class="s">Open card</a></div>`, css);
+    expect((await page.evaluate(measureClippedText)).some(v => v.pass === "occluded-text")).toBe(true);
+    // N1: one unpositioned card inside a positioned section; its link stretches over the section heading and lede.
+    await load(page, `<section style="position:relative;padding:20px"><h2 style="margin:0 0 10px">Section heading copy</h2><p>section lede words here</p><div data-v34-card><p>card copy</p><a class="s" href="#1">Open</a></div></section>`, css);
+    expect((await page.evaluate(measureClippedText)).some(v => v.pass === "occluded-text")).toBe(true);
+    // N2: the leak of F5, with the neighbouring card's own link raised above it.
+    await load(page, `<div style="position:relative"><div data-v34-card><p>card one copy</p><a class="s" href="#1">Open one</a></div><div data-v34-card><p>card two copy</p><a href="#2" style="position:relative;z-index:1">Open two</a></div></div>`, css);
+    expect((await page.evaluate(measureClippedText)).some(v => v.pass === "occluded-text")).toBe(true);
+  });
+
+  test("fixed layer: text and controls beneath it are not judged by its pixels; its own text still is", async ({ page }) => {
+    const panel = (inner: string) => `<div style="position:fixed;left:0;right:0;bottom:0;height:140px;background:#fff;color:#111;padding:8px">${inner}</div>`;
+    const beneath = `<div style="background:#0b1713;color:#eff6ef;height:100vh;display:flex;align-items:flex-end;gap:12px;padding:20px"><p style="margin:0">light footer text on its dark ground</p><button style="background:#0b1713;color:#eff6ef;border:1px solid #c9f2a5;padding:8px">Footer control</button></div>`;
+    await load(page, beneath + panel("<p>panel copy that holds</p>"));
+    expect((await contrastPass(page)).violations).toEqual([]);
+    expect(await controlContrastPass(page)).toEqual([]);
+    await load(page, beneath + panel(`<p style="color:#bbb">pale panel copy</p><button style="background:#fff;color:#111;border:1px solid #ddd;padding:8px">Pale edge</button>`));
+    expect((await contrastPass(page)).violations.map(v => v.detail)).toEqual([expect.stringContaining("pale panel copy")]);
+    expect((await controlContrastPass(page)).map(v => v.selector)).toEqual(["button"]);
   });
 
   test("F3: the contrast pass keeps a currentColor background, so text on it is still judged", async ({ page }) => {

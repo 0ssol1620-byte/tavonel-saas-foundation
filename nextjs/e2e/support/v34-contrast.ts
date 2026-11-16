@@ -163,6 +163,22 @@ function ownTextRects(el: Element): { x: number; y: number; width: number; heigh
   return out;
 }
 
+/**
+ * Runs in the page: the rects whose centre is not covered by a position: fixed layer outside the
+ * element (a consent panel over the footer). What a screenshot finds there is the layer, not the
+ * element's surface, so the layer's pixels are never attributed to text or a control beneath it.
+ */
+function openRects(el: Element, rects: { x: number; y: number; width: number; height: number }[]) {
+  return rects.filter(r => {
+    const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    if (!top || top === el || el.contains(top) || top.contains(el)) return true;
+    for (let n: Element | null = top; n && !n.contains(el); n = n.parentElement) {
+      if (getComputedStyle(n).position === "fixed") return false;
+    }
+    return true;
+  });
+}
+
 export type ContrastOptions = {
   /** Maximum number of sampled elements per page. */
   max?: number;
@@ -205,7 +221,11 @@ export async function contrastPass(page: Page, options: ContrastOptions = {}): P
       await centreInView(handle);
       await handle.evaluate((e, a) => e.setAttribute(a, ""), HIDE_ATTR);
       // Only the element's own text lines are sampled: its border, corners and child elements stay out.
-      const rects = await handle.evaluate(ownTextRects);
+      const own = await handle.evaluate(ownTextRects);
+      const rects = await handle.evaluate(openRects, own);
+      if (rects.length < own.length) {
+        result.reported.push({ pass: "contrast", selector: t.selector, detail: `"${t.text}" ${own.length - rects.length} of ${own.length} line(s) under a fixed layer, not sampled` });
+      }
       let ex: { dark: Rgb; light: Rgb } | null = null;
       for (const clip of rects) {
         const png = await page.screenshot({ type: "png", clip, timeout: 3000 });
@@ -281,6 +301,8 @@ export async function controlContrastPass(page: Page, max = 30): Promise<Violati
     const handle = page.locator(`[data-v34-control-idx="${c.index}"]`).first();
     try {
       await centreInView(handle);
+      const box = await handle.boundingBox();
+      if (!box || (await handle.evaluate(openRects, [box])).length === 0) continue;
       await handle.evaluate(e => ((e as HTMLElement).style.visibility = "hidden"));
       const rect = await handle.boundingBox();
       const png = rect ? await page.screenshot({ type: "png", clip: rect, timeout: 3000 }) : null;

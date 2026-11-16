@@ -63,7 +63,9 @@ export async function keyboardWalk(page: Page, max = 250): Promise<KeyboardResul
         steady = y === last ? steady + 1 : 0;
         last = y;
         // Off screen and still scrolling: wait. Off screen and the page has stopped: that is a finding.
-        if (onScreen || steady >= 6 || performance.now() - started > 2500) done();
+        // On screen is read once the scroll has settled too: the next Tab pressed into a smooth scroll still
+        // in flight is one WebKit answers by not scrolling to the next stop at all (a walk artefact, not the page).
+        if ((onScreen && steady >= 1) || steady >= 6 || performance.now() - started > 2500) done();
         else setTimeout(poll, 30);
       };
       setTimeout(poll, 16);
