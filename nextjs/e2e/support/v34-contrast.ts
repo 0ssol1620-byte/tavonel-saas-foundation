@@ -135,6 +135,28 @@ async function extremes(b64: string): Promise<{ dark: Rgb; light: Rgb } | null> 
   return { dark, light };
 }
 
+/**
+ * Runs in the page: viewport rects of the element's own text nodes (not its children's), shrunk
+ * inward to whole pixels so a border or rounded corner never enters the sample. At most 8 lines.
+ */
+function ownTextRects(el: Element): { x: number; y: number; width: number; height: number }[] {
+  const out: { x: number; y: number; width: number; height: number }[] = [];
+  for (const n of el.childNodes) {
+    if (n.nodeType !== Node.TEXT_NODE || (n.textContent ?? "").trim().length === 0) continue;
+    const range = document.createRange();
+    range.selectNodeContents(n);
+    for (const r of range.getClientRects()) {
+      const x0 = Math.max(0, Math.ceil(r.left) + 1);
+      const y0 = Math.max(0, Math.ceil(r.top) + 1);
+      const x1 = Math.min(window.innerWidth, Math.floor(r.right) - 1);
+      const y1 = Math.min(window.innerHeight, Math.floor(r.bottom) - 1);
+      if (x1 - x0 >= 2 && y1 - y0 >= 2) out.push({ x: x0, y: y0, width: x1 - x0, height: y1 - y0 });
+      if (out.length >= 8) return out;
+    }
+  }
+  return out;
+}
+
 export type ContrastOptions = {
   /** Maximum number of sampled elements per page. */
   max?: number;
@@ -161,9 +183,18 @@ export async function contrastPass(page: Page, options: ContrastOptions = {}): P
     try {
       await handle.scrollIntoViewIfNeeded({ timeout: 2000 });
       await handle.evaluate((e, a) => e.setAttribute(a, ""), HIDE_ATTR);
-      const png = await handle.screenshot({ type: "png", timeout: 3000 });
+      // Only the element's own text lines are sampled: its border, corners and child elements stay out.
+      const rects = await handle.evaluate(ownTextRects);
+      let ex: { dark: Rgb; light: Rgb } | null = null;
+      for (const clip of rects) {
+        const png = await page.screenshot({ type: "png", clip, timeout: 3000 });
+        const e = await page.evaluate(extremes, png.toString("base64"));
+        if (!e) continue;
+        ex = ex
+          ? { dark: luminance(e.dark) < luminance(ex.dark) ? e.dark : ex.dark, light: luminance(e.light) > luminance(ex.light) ? e.light : ex.light }
+          : e;
+      }
       await handle.evaluate((e, a) => e.removeAttribute(a), HIDE_ATTR);
-      const ex = await page.evaluate(extremes, png.toString("base64"));
       if (!ex) continue;
       const required = requiredRatio(t.fontPx, t.weight, t.kind);
       const worst = Math.min(

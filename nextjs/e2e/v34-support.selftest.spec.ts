@@ -163,9 +163,16 @@ test.describe("contrast", () => {
     expect(weak.violations).toHaveLength(1);
     expect(weak.checked).toBe(1);
     // White text is fine on the dark end of this gradient and invisible on the light end: only the min/max sampling sees it.
-    await load(page, `<p style="color:#fff;padding:8px;background:linear-gradient(90deg,#102030,#f4f4f4)">gradient text over a light end</p>`);
+    await load(page, `<p style="display:inline-block;color:#fff;padding:8px;background:linear-gradient(90deg,#102030,#f4f4f4)">gradient text over a light end</p>`);
     expect((await contrastPass(page)).violations).toHaveLength(1);
     await load(page, `<p style="color:#111;background:#fff;padding:8px">strong text</p><h2 style="font-size:28px;color:#777;background:#fff">large grey heading</h2>`);
+    expect((await contrastPass(page)).violations).toEqual([]);
+  });
+
+  test("a bordered, rounded or chipped surface samples only its own text", async ({ page }) => {
+    await load(page, `<button style="color:#fff;background:#111;border:2px solid #111;border-radius:12px;padding:10px 18px">Start</button>
+      <a href="#x" style="display:inline-block;color:#fff;background:#111;border:1px solid #111;padding:10px 18px">Outline</a>
+      <p style="color:#111;background:#fff">Plain <code style="background:#111;color:#fff;padding:2px 6px">chip</code> prose</p>`);
     expect((await contrastPass(page)).violations).toEqual([]);
   });
 
@@ -197,6 +204,14 @@ test.describe("keyboard", () => {
     expect(good.stops).toBe(2);
   });
 
+  test("identity, not label, decides a trap or a wrap", async ({ page }) => {
+    const ring = ".m:focus-visible{outline:2px solid #00e}";
+    await load(page, `<a class="m" href="#1" style="display:inline-block;padding:14px">Read more</a><a class="m" href="#2" style="display:inline-block;padding:14px">Read more</a><a class="m" href="#3" style="display:inline-block;padding:14px">Read more</a><a class="m" href="#4" style="display:inline-block;padding:14px;outline:none">Other</a>`, ring);
+    const r = await keyboardWalk(page);
+    expect(r.stops).toBe(4);
+    expect(r.violations.map(v => v.pass)).toEqual(["focus-visible"]);
+  });
+
   test("escape closes the surface and restores focus", async ({ page }) => {
     const wiring = `<button id="t" onclick="s.hidden=false">open</button><div id="s" hidden>panel</div><script>addEventListener('keydown',e=>{if(e.key==='Escape'){s.hidden=true;window.__restore&&t.focus()}})</script>`;
     await load(page, wiring.replace("window.__restore&&", ""));
@@ -210,7 +225,7 @@ test.describe("world", () => {
   const island = `<div id="w" data-node-count="5" data-edge-count="4"></div><script>
     const c=document.createElement('canvas');
     const mode=c.getContext('webgl')||c.getContext('webgl2')?'webgl':c.getContext('2d')?'canvas2d':'static';
-    w.dataset.mode=mode;w.dataset.idsSha='abc'</script>`;
+    w.dataset.mode=mode;w.dataset.idsSha='abc';w.dataset.measured='true'</script>`;
 
   test("forceWorldMode drives the mode the page reports", async ({ page }) => {
     await forceWorldMode(page, "canvas2d");
@@ -218,7 +233,7 @@ test.describe("world", () => {
     expect((await readWorldState(page)).mode).toBe("canvas2d");
     await forceWorldMode(page, "static");
     await load(page, island);
-    expect((await readWorldState(page, 2000))).toMatchObject({ mode: "static", nodes: 5, edges: 4, sha: "abc" });
+    expect((await readWorldState(page, "static", 2000))).toMatchObject({ mode: "static", nodes: 5, edges: 4, sha: "abc" });
   });
 
   test("agreement: equal passes, differing digest and unreached mode are caught", () => {

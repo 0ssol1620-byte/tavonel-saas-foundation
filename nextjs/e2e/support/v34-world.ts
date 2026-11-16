@@ -28,9 +28,28 @@ export async function forceWorldMode(page: Page, mode: WorldMode): Promise<void>
   }, mode);
 }
 
-export async function readWorldState(page: Page, timeout = 15_000): Promise<WorldState> {
+/**
+ * Reads the island root once it has settled. The server renders data-mode="static" and the expected
+ * counts before any renderer exists, so reading on attach would compare the server with itself:
+ * wait for data-measured="true" (the renderer drew and reported), or, for a forced "static" run,
+ * for data-load to reach ready/error. A timeout still reads, so a stuck island reports its state.
+ */
+export async function readWorldState(page: Page, wanted: WorldMode = "webgl", timeout = 15_000): Promise<WorldState> {
   const root = page.locator(WORLD_ROOT).first();
   await root.waitFor({ state: "attached", timeout }).catch(() => undefined);
+  await page
+    .waitForFunction(
+      ([sel, m]) => {
+        const e = document.querySelector(sel);
+        if (!e) return false;
+        if (e.getAttribute("data-measured") === "true") return true;
+        const load = e.getAttribute("data-load");
+        return m === "static" && (load === "ready" || load === "error");
+      },
+      [WORLD_ROOT, wanted] as const,
+      { timeout },
+    )
+    .catch(() => undefined);
   return root
     .evaluate(e => ({
       mode: e.getAttribute("data-mode"),

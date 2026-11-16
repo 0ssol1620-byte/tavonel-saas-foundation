@@ -17,13 +17,19 @@ type Stop = {
   w: number;
   h: number;
   inline: boolean;
+  visits: number;
+  isFirst: boolean;
 };
 
 export async function keyboardWalk(page: Page, max = 250): Promise<KeyboardResult> {
   const result: KeyboardResult = { violations: [], reported: [], stops: 0 };
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  const counts = new Map<string, number>();
-  let first = "";
+  // Visits are counted per element identity (a WeakMap in the page), not per selector string.
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement | null)?.blur();
+    const w = window as unknown as { __v34Visits?: WeakMap<Element, number>; __v34First?: Element | null };
+    w.__v34Visits = new WeakMap();
+    w.__v34First = null;
+  });
   for (let i = 0; i < max; i++) {
     await page.keyboard.press("Tab");
     const stop: Stop | null = await page.evaluate(() => {
@@ -35,21 +41,24 @@ export async function keyboardWalk(page: Page, max = 250): Promise<KeyboardResul
       const indicator =
         (s.outlineStyle !== "none" && parseFloat(s.outlineWidth) > 0 && s.outlineColor !== "rgba(0, 0, 0, 0)") ||
         (s.boxShadow !== "none" && s.boxShadow !== "");
+      const w = window as unknown as { __v34Visits: WeakMap<Element, number>; __v34First: Element | null };
+      const visits = (w.__v34Visits.get(e) ?? 0) + 1;
+      w.__v34Visits.set(e, visits);
+      w.__v34First ??= e;
+      const isFirst = w.__v34First === e;
       const inline = s.display === "inline" && !!e.closest("p, li, dd, td");
       const id = e.id ? `#${e.id}` : "";
       const cls = typeof e.className === "string" && e.className.trim() ? `.${e.className.trim().split(/\s+/)[0]}` : "";
       const label = (e.textContent ?? e.getAttribute("aria-label") ?? "").trim().slice(0, 24);
-      return { selector: `${e.tagName.toLowerCase()}${id}${cls}[${label}]`, inViewport, indicator, w: r.width, h: r.height, inline };
+      return { selector: `${e.tagName.toLowerCase()}${id}${cls}[${label}]`, inViewport, indicator, w: r.width, h: r.height, inline, visits, isFirst };
     });
     if (!stop) {
       if (i > 0) break; // focus left the document: the walk is complete
       continue;
     }
+    if (stop.isFirst && stop.visits === 2) break; // wrapped around to the first stop
     result.stops += 1;
-    if (!first) first = stop.selector;
-    else if (stop.selector === first && result.stops > 2) break; // wrapped around
-    const n = (counts.get(stop.selector) ?? 0) + 1;
-    counts.set(stop.selector, n);
+    const n = stop.visits;
     if (n === 3) result.violations.push({ pass: "keyboard-trap", selector: stop.selector, detail: "received focus three times in one walk" });
     if (!stop.inViewport) result.violations.push({ pass: "focus-visible", selector: stop.selector, detail: "focused element is outside the viewport" });
     if (!stop.indicator) result.violations.push({ pass: "focus-visible", selector: stop.selector, detail: "no outline or box-shadow on focus" });

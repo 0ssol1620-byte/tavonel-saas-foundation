@@ -43,7 +43,14 @@ type RouteRow = { path: string; release: "live" | "held" };
   live or held.
 */
 async function loadRoutes(): Promise<RouteRow[]> {
-  const mod = (await import("@/lib/v34/routes").catch(() => null)) as Record<string, unknown> | null;
+  const mod = (await import("@/lib/v34/routes").catch((error: unknown) => {
+    // Only "the module is not there" is tolerated; an alias, syntax or evaluation error must fail the run.
+    const e = error as { code?: string; message?: string };
+    const msg = e.message ?? "";
+    const missing = (e.code === "ERR_MODULE_NOT_FOUND" || /Cannot find module|Failed to resolve|Could not resolve/i.test(msg)) && /lib\/v34\/routes/.test(msg);
+    if (!missing) throw error;
+    return null;
+  })) as Record<string, unknown> | null;
   if (!mod) return [];
   const candidates = [mod.V34_ROUTES, mod.ROUTES, mod.routes, mod.default, ...Object.values(mod)];
   const list = candidates.find((c): c is Record<string, unknown>[] => Array.isArray(c) && c.length > 0 && typeof (c[0] as { path?: unknown })?.path === "string");
@@ -84,6 +91,8 @@ test.afterAll(() => {
 
 if (routes.length === 0) {
   test("v34 route registry is not available yet", async () => {
+    // A real QA run (V34_QA_OUT set) with no registry fails: never a green run with zero checks.
+    expect(process.env.V34_QA_OUT, '"@/lib/v34/routes" did not load during a QA run').toBeUndefined();
     test.skip(true, '"@/lib/v34/routes" did not load (lane F-lib has not been integrated)');
   });
 }
@@ -212,6 +221,7 @@ for (const { path: route, release } of routes) {
         test.skip(heldInProduction, "held in production");
         const states: Partial<Record<WorldMode, WorldState>> = {};
         let svg: { nodes: number; edges: number } | undefined;
+        let webglAvailable = true;
         for (const mode of ["webgl", "canvas2d", "static"] as const) {
           const ctx = await openContext(browser, width);
           const page = await ctx.newPage();
@@ -220,14 +230,15 @@ for (const { path: route, release } of routes) {
             await settle(page, route);
             // The island loads on interaction on coarse pointers and on idle for fine ones; reveal it either way.
             await page.getByRole("button", { name: /explore the layers/i }).first().click({ timeout: 1500 }).catch(() => undefined);
-            states[mode] = await readWorldState(page);
+            states[mode] = await readWorldState(page, mode);
+            if (mode === "webgl") webglAvailable = await page.evaluate(() => !!document.createElement("canvas").getContext("webgl"));
             svg ??= await staticSvgCounts(page);
           } finally {
             await ctx.close();
           }
         }
-        // A browser without any WebGL cannot reach the "webgl" mode: drop it, and say so in the receipt.
-        const noWebgl = states.webgl?.mode !== "webgl";
+        // Only a browser whose own probe has no WebGL drops the mode; a renderer that falls to canvas2d where WebGL exists is a violation.
+        const noWebgl = !webglAvailable;
         if (noWebgl) delete states.webgl;
         const violations = assertWorldAgreement(states, svg);
         record({ route, width, engine: browserName, colorScheme: "light", pass: "world", state: noWebgl ? "webgl unavailable in this browser" : "all three modes", violations });

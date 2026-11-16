@@ -38,7 +38,7 @@ export async function layoutPass(page: Page): Promise<Violation[]> {
   out.push(...(await page.evaluate(measureSiblingOverlap)));
   const overlaps = await page.evaluate(measureOverlap);
   for (const o of overlaps) {
-    if (o.kind === "text-overlap") out.push({ pass: "text-overlap", selector: `${o.a} / ${o.b}`, detail: o.text.slice(0, 60) });
+    if (o.kind === "text-overlap" || o.kind === "text-clipped" || o.kind === "fixed-covers") out.push({ pass: o.kind, selector: `${o.a} / ${o.b}`, detail: o.text.slice(0, 60) });
   }
   out.push(...(await page.evaluate(measureHeaderCover)));
   return out;
