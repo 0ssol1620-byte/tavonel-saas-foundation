@@ -64,11 +64,18 @@ const evId = (index: number) => `ev-${String(index).padStart(32, "0")}`;
 
 const principal = { kind: "api-key", workspaceKey: WORKSPACE, userId: "u", keyId: "k", scopes: ["worlds:read", "ask:read"], authorizationRevision: 3 };
 
+// What loadWorldReadModel really builds for a digest that is not the active one: status "candidate"
+// on the World and every fact, and that same digest handed to the freshness read as the candidate
+// hint (world-read-model.ts:643, 785-787). A superseded World can never carry "superseded" here.
 const model = (count: number, manifest: string) => ({
-  world: { id: COLLECTION, manifestDigest: manifest, status: manifest === ACTIVE ? "active" : "superseded", revision: { state: "read", value: 1 } },
+  world: { id: COLLECTION, manifestDigest: manifest, status: manifest === ACTIVE ? "active" : "candidate", revision: { state: "read", value: 1 } },
   contract: { origin: "compiled_artifact" },
-  freshness: { ...EMPTY_WORLD_FRESHNESS, activeManifestDigest: ACTIVE },
-  objects: [], relations: [], evidence: Array.from({ length: count }, (_, i) => ({ id: evId(i) })), history: [], files: [],
+  freshness: {
+    ...EMPTY_WORLD_FRESHNESS, activeManifestDigest: ACTIVE,
+    candidateAwaitingActivation: manifest !== ACTIVE, candidateManifestDigest: manifest === ACTIVE ? null : manifest,
+  },
+  objects: [{ id: "obj-1", status: manifest === ACTIVE ? "active" : "candidate" }],
+  relations: [{ id: "rel-1", status: manifest === ACTIVE ? "active" : "candidate" }], evidence: Array.from({ length: count }, (_, i) => ({ id: evId(i) })), history: [], files: [],
   review: { state: "not_yet" }, signature: { state: "not_yet" },
 });
 
@@ -129,6 +136,31 @@ describe("lens read with known_at", () => {
     expect(status).toBe(200);
     expect(m.readModel).toHaveBeenCalledWith(WORKSPACE, COLLECTION, ACTIVE);
     expect(body.temporal).toMatchObject({ manifestDigest: ACTIVE, current: true });
+  });
+
+  it("reports a superseded World as superseded, never as a candidate awaiting activation", async () => {
+    const present = { ...EMPTY_WORLD_FRESHNESS, activeManifestDigest: ACTIVE, candidateAwaitingActivation: false, candidateManifestDigest: null };
+    m.freshness.mockResolvedValue(present);
+    const { status, body } = await lens(`?known_at=${T}`, "objects");
+    expect(status).toBe(200);
+    expect(body.world).toMatchObject({ manifestDigest: OLD, status: "superseded" });
+    expect(body.objects).toEqual([{ id: "obj-1", status: "superseded" }]);
+    const relations = await lens(`?known_at=${T}`, "relations");
+    expect(relations.body.relations).toEqual([{ id: "rel-1", status: "superseded" }]);
+    // The freshness is the present one, read without the historical digest as a candidate hint.
+    expect(m.freshness).toHaveBeenCalledWith(WORKSPACE, COLLECTION);
+    expect(body.freshness).toEqual(present);
+    expect(body.freshness.candidateAwaitingActivation).toBe(false);
+    expect(body.freshness.candidateManifestDigest).toBeNull();
+    expect(body.temporal.current).toBe(false);
+  });
+
+  it("leaves the model alone when the World activated at T is the active one", async () => {
+    m.resolveAt.mockResolvedValue({ ok: true, manifestDigest: ACTIVE, activatedAt: ACTIVATED });
+    const { body } = await lens(`?known_at=${T}`, "objects");
+    expect(body.world.status).toBe("active");
+    expect(body.objects).toEqual([{ id: "obj-1", status: "active" }]);
+    expect(m.freshness).not.toHaveBeenCalled();
   });
 
   it("normalizes an offset to the instant the resolver sees", async () => {

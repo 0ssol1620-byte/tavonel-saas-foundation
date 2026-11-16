@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseTemporal, resolveWorldAtKnownAt } from "./world-activation-history";
+import { getWorldFreshness } from "./world-store";
 
 /*
   WO-D18-2: typed time on World reads.
@@ -155,6 +156,9 @@ describe("resolveWorldAtKnownAt", () => {
 
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify([{ to_manifest_digest: "not-a-digest", created_at: "2026-11-01T00:00:00+00:00", action: "promote" }]), { status: 200 })));
     expect(await resolveWorldAtKnownAt(WORKSPACE, COLLECTION, "2026-11-02T00:00:00.000Z")).toEqual({ ok: false, code: "WORLD_STORE_READ_FAILED", status: 503 });
+
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ message: "not a list" }), { status: 200 })));
+    expect(await resolveWorldAtKnownAt(WORKSPACE, COLLECTION, "2026-11-02T00:00:00.000Z")).toEqual({ ok: false, code: "WORLD_STORE_READ_FAILED", status: 503 });
   });
 
   it("never serves a World activated after T, over 200 random event sequences", async () => {
@@ -184,5 +188,33 @@ describe("resolveWorldAtKnownAt", () => {
       expect(Date.parse(result.activatedAt)).toBe(latest);
       expect(eligible.some((e) => Date.parse(e.created_at) === latest && e.to_manifest_digest === result.manifestDigest)).toBe(true);
     }
+  });
+});
+
+describe("the freshness a past World is served with", () => {
+  // The lens route re-reads freshness with no candidate hint for a World that was activated and
+  // replaced. This is the real getWorldFreshness over a faked store: with the pointer on the newer
+  // World, the old digest handed in as a hint reads as a candidate awaiting activation (the defect),
+  // and the same read with no hint does not.
+  const OLD = digest(1);
+  const ACTIVE = digest(2);
+  function store() {
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("foundation_active_worlds")) return new Response(JSON.stringify([{ manifest_digest: ACTIVE }]));
+      if (url.includes("foundation_world_versions")) return new Response(JSON.stringify([
+        { manifest_digest: ACTIVE, last_activated_at: "2026-11-12T00:00:00+00:00", created_at: "2026-11-12T00:00:00+00:00" },
+        { manifest_digest: OLD, last_activated_at: "2026-11-02T00:00:00+00:00", created_at: "2026-11-02T00:00:00+00:00" },
+      ]));
+      return new Response(JSON.stringify([]));
+    }));
+  }
+
+  it("reports the old digest as a candidate only when it is handed in as a hint", async () => {
+    store();
+    const hinted = await getWorldFreshness(WORKSPACE, COLLECTION, { candidateManifestDigest: OLD });
+    expect(hinted).toMatchObject({ candidateAwaitingActivation: true, candidateManifestDigest: OLD });
+    const present = await getWorldFreshness(WORKSPACE, COLLECTION);
+    expect(present).toMatchObject({ activeManifestDigest: ACTIVE, candidateAwaitingActivation: false, candidateManifestDigest: null });
   });
 });

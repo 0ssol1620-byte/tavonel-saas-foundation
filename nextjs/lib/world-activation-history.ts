@@ -93,8 +93,10 @@ export async function resolveWorldAtKnownAt(workspaceKey: string, collectionId: 
   try {
     const response = await supabaseAdminRequest(config, `/rest/v1/foundation_world_events?${query}`);
     if (!response.ok) return { ok: false as const, code: "WORLD_STORE_READ_FAILED", status: 503 };
-    const rows = (await response.json()) as Array<Record<string, unknown>>;
-    const row = rows[0];
+    const rows: unknown = await response.json();
+    // A 200 that is not a list is a store that did not answer, never "no history".
+    if (!Array.isArray(rows)) return { ok: false as const, code: "WORLD_STORE_READ_FAILED", status: 503 };
+    const row = rows[0] as Record<string, unknown> | undefined;
     if (!row) return { ok: false as const, code: "KNOWN_AT_BEFORE_FIRST_ACTIVATION", status: 404 };
     const manifestDigest = String(row.to_manifest_digest ?? "");
     const activatedMs = Date.parse(String(row.created_at ?? ""));

@@ -8,7 +8,7 @@ import {
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { loadWorldReadModel } from "@/lib/world-read-model";
 import { pageTokenKey, sealClaims, unsealClaims } from "@/lib/sealed-claims";
-import { getFoundationActiveWorld } from "@/lib/world-store";
+import { getFoundationActiveWorld, getWorldFreshness } from "@/lib/world-store";
 import { parseTemporal, resolveWorldAtKnownAt, temporalBlock } from "@/lib/world-activation-history";
 
 export const dynamic = "force-dynamic";
@@ -84,8 +84,6 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (!temporal.ok) return fail(temporal.code, temporal.status);
   // A bound context names its exact World already; a second clock would contradict it.
   if (temporal.knownAt !== null && binding.bound) return fail("KNOWN_AT_WITH_CONTEXT", 400);
-  const resolvedAt = temporal.knownAt === null ? null : await resolveWorldAtKnownAt(auth.principal.workspaceKey, id, temporal.knownAt);
-  if (resolvedAt && !resolvedAt.ok) return fail(resolvedAt.code, resolvedAt.status);
 
   // By-id read (F30-06): the named items only, never mixed with paging.
   let ids: string[] | null = null;
@@ -123,6 +121,10 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     return NextResponse.json({ code: "WORLD_PAGE_LIMIT_INVALID" }, { status: 400, headers: NO_STORE });
   }
 
+  // The activation log is read only once every cheap check above has passed.
+  const resolvedAt = temporal.knownAt === null ? null : await resolveWorldAtKnownAt(auth.principal.workspaceKey, id, temporal.knownAt);
+  if (resolvedAt && !resolvedAt.ok) return fail(resolvedAt.code, resolvedAt.status);
+
   // Bound: resolved before the World is read, and the read is the resolved digest, never the
   // preferred candidate. Legacy reads the active World list_worlds reports, and the preferred
   // candidate only when no World is active; a pointer that cannot be read is an outage, never a
@@ -147,11 +149,23 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   }
   const loaded = await loadWorldReadModel(auth.principal.workspaceKey, id, selected);
   if (!loaded.ok) return NextResponse.json({ code: loaded.code, bytes: loaded.bytes, bound: loaded.bound }, { status: loaded.status, headers: NO_STORE });
+  /*
+    loadWorldReadModel calls every digest that is not the active one a "candidate" and hands it to
+    the freshness read as the candidate awaiting activation. For a World the log says was activated
+    and has since been replaced, both are wrong: it is superseded, and nothing newer is waiting
+    because of it. Say so, and read the freshness again without that digest as a hint.
+  */
+  const past = resolvedAt !== null && !current;
+  const freshness = past ? await getWorldFreshness(auth.principal.workspaceKey, id) : loaded.model.freshness;
+  const pastStatus = <T extends { status: string }>(items: T[]) => (past ? items.map((item) => ({ ...item, status: "superseded" })) : items);
+  const served = past
+    ? { ...loaded.model, world: { ...loaded.model.world, status: "superseded" }, objects: pastStatus(loaded.model.objects), relations: pastStatus(loaded.model.relations) }
+    : loaded.model;
   const shared = {
     code: "OK",
-    world: loaded.model.world,
+    world: served.world,
     contract: loaded.model.contract,
-    freshness: loaded.model.freshness,
+    freshness,
     ...(resolvedAt && temporal.knownAt !== null ? { temporal: temporalBlock(temporal.knownAt, resolvedAt, current) } : {}),
   };
 
@@ -162,7 +176,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
   let body: Record<string, unknown>;
   if (ids) {
-    const byId = new Map((loaded.model[lens as "objects" | "relations" | "evidence"] as Identified[]).map((item) => [item.id, item]));
+    const byId = new Map((served[lens as "objects" | "relations" | "evidence"] as Identified[]).map((item) => [item.id, item]));
     const items = ids.flatMap((value) => byId.get(value) ?? []);
     body = {
       ...shared,
@@ -171,7 +185,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       page: { limit: null, cursor: null, nextCursor: null, total: null },
     };
   } else if (paged && limit !== null) {
-    const all = loaded.model[lens as "objects" | "relations" | "evidence"] as Identified[];
+    const all = served[lens as "objects" | "relations" | "evidence"] as Identified[];
     const page = paginate(all, limit, cursor);
     if (!page) {
       return NextResponse.json({ code: "WORLD_PAGE_CURSOR_INVALID" }, { status: 400, headers: NO_STORE });
@@ -192,7 +206,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   } else {
     const payload = lens === "files"
       ? { files: loaded.model.files, signature: loaded.model.signature }
-      : { [lens]: loaded.model[lens as keyof Pick<typeof loaded.model, "objects" | "relations" | "evidence" | "history" | "review">] };
+      : { [lens]: served[lens as keyof Pick<typeof served, "objects" | "relations" | "evidence" | "history" | "review">] };
     const whole = (payload as Record<string, unknown>)[lens];
     body = {
       ...shared,
