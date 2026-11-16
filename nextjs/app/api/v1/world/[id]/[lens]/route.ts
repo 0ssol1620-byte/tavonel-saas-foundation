@@ -6,7 +6,7 @@ import {
   worldModelSnapshot,
 } from "@/lib/consumer-context-api";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
-import { loadWorldReadModel } from "@/lib/world-read-model";
+import { SAFE_ID, loadWorldReadModel } from "@/lib/world-read-model";
 import { pageTokenKey, sealClaims, unsealClaims } from "@/lib/sealed-claims";
 import { getFoundationActiveWorld } from "@/lib/world-store";
 
@@ -37,7 +37,6 @@ const LENSES = new Set(["objects", "relations", "evidence", "history", "files", 
 */
 const PAGE_MAX = 50;
 const PAGEABLE = new Set(["objects", "relations", "evidence"]);
-const ID_PATTERN = /^[a-z-]+-[a-f0-9]{32}$/;
 const PAGE_TOKEN_PURPOSE = "tavonel.world_lens_page.v1";
 const PAGE_TOKEN_TTL_MS = 15 * 60 * 1000;
 
@@ -77,8 +76,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   let ids: string[] | null = null;
   if (rawIds !== null) {
     if (paged) return fail("WORLD_IDS_WITH_PAGE", 400);
+    if (search.getAll("ids").length > 1) return fail("WORLD_IDS_INVALID", 400);
     ids = rawIds.split(",");
-    if (ids.length > PAGE_MAX || new Set(ids).size !== ids.length || !ids.every((value) => ID_PATTERN.test(value))) {
+    if (ids.length > PAGE_MAX || new Set(ids).size !== ids.length || !ids.every((value) => SAFE_ID.test(value))) {
       return fail("WORLD_IDS_INVALID", 400);
     }
   }
@@ -89,6 +89,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   let limit = rawLimit === null ? null : Number(rawLimit);
   let tokenClaims: Record<string, unknown> | null = null;
   if (pageToken !== null) {
+    if (search.getAll("page_token").length > 1) return fail("PAGE_TOKEN_INVALID", 400);
     if (!tokenKey) return fail("PAGE_TOKEN_SIGNER_NOT_CONFIGURED", 503);
     if (rawLimit !== null || cursor !== null) return fail("PAGE_TOKEN_INVALID", 400);
     tokenClaims = unsealClaims(PAGE_TOKEN_PURPOSE, pageToken, tokenKey);

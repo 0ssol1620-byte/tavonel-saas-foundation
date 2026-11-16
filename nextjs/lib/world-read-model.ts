@@ -29,7 +29,7 @@ const SHA256 = /^sha256:[a-f0-9]{64}$/;
   an id is *resolved* against, which is what the source binding and the evidence namespace
   below are for.
 */
-const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
+export const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
 const NODE_KINDS = new Set(["Document", "Topic", "Entity", "Claim", "Evidence"]);
 
 export type ReadValue<T> =

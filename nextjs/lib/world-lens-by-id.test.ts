@@ -19,7 +19,10 @@ vi.mock("@/lib/world-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./world-store")>()),
   getFoundationActiveWorld: activeWorld,
 }));
-vi.mock("@/lib/world-read-model", () => ({ loadWorldReadModel: readModel }));
+vi.mock("@/lib/world-read-model", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./world-read-model")>()),
+  loadWorldReadModel: readModel,
+}));
 
 import { GET as getLens } from "../app/api/v1/world/[id]/[lens]/route";
 import { EMPTY_WORLD_FRESHNESS } from "./world-store";
@@ -74,6 +77,19 @@ describe("?ids= by-id read", () => {
     expect(body.page).toEqual({ limit: null, cursor: null, nextCursor: null, total: null });
   });
 
+  it("reaches real-shaped evidence and Core object ids", async () => {
+    const real = `evidence-${"5a37461b274e4465a2ef791b17dcf2b4"}:chunk-${"c803befa746ca0715c5c835b73530773"}`;
+    const ko = `ko_document_${"a1".repeat(16)}`;
+    readModel.mockResolvedValue({ ok: true, model: { ...model(0), evidence: [{ id: real }], objects: [{ id: ko }] } });
+    expect((await get(`?ids=${real}`)).body.evidence).toEqual([{ id: real }]);
+    expect((await get(`?ids=${ko}`, "objects")).body.objects).toEqual([{ id: ko }]);
+  });
+
+  it("refuses a repeated ids or page_token parameter", async () => {
+    expect((await get(`?ids=${evId(1)}&ids=${evId(2)}`)).body.code).toBe("WORLD_IDS_INVALID");
+    expect((await get("?page_token=a&page_token=b")).body.code).toBe("PAGE_TOKEN_INVALID");
+  });
+
   it("lists the ids it did not find", async () => {
     const { body } = await get(`?ids=${evId(1)},${evId(999)}`);
     expect(body.evidence).toEqual([{ id: evId(1) }]);
@@ -82,7 +98,7 @@ describe("?ids= by-id read", () => {
 
   it("refuses malformed, empty, repeated and oversized id lists", async () => {
     const tooMany = Array.from({ length: 51 }, (_, index) => evId(index)).join(",");
-    for (const query of ["?ids=", "?ids=nope", `?ids=${evId(1)},`, `?ids=${evId(1)},${evId(1)}`, `?ids=${tooMany}`]) {
+    for (const query of ["?ids=", "?ids=bad%20id", `?ids=${evId(1)},`, `?ids=${evId(1)},${evId(1)}`, `?ids=${tooMany}`]) {
       const { status, body } = await get(query);
       expect([status, body.code, query]).toEqual([400, "WORLD_IDS_INVALID", query]);
     }
