@@ -1,0 +1,27 @@
+.strip {
+  padding: 35px 0;
+}
+
+.shell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px 32px;
+  width: var(--v34-shell);
+  margin-inline: auto;
+}
+
+.title {
+  min-width: 0;
+  max-width: 24ch;
+  margin: 0;
+  font-size: clamp(1.65rem, 3.5vw, 2.6rem);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.1;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
+  text-wrap: balance;
+}

@@ -1,0 +1,11 @@
+.main {
+  display: block;
+  min-width: 0;
+  /* header 66 + 16: an in-page jump never lands under the sticky bar */
+  scroll-margin-top: 82px;
+}
+
+/* The skip link lands here; a focus ring on the whole page body would be noise, the content inside has its own. */
+.main:focus {
+  outline: none;
+}

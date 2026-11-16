@@ -1,0 +1,17 @@
+.eyebrow {
+  margin: 0 0 14px;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.lead {
+  max-width: 57ch;
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-lead);
+  line-height: 1.5;
+}

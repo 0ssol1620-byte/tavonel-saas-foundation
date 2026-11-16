@@ -1,0 +1,121 @@
+/* The footer is a forest surface (tokens.forest): colour and ground come from it. */
+.footer {
+  padding: 44px 0 20px;
+}
+
+.shell {
+  width: var(--v34-shell);
+  margin-inline: auto;
+}
+
+.lead {
+  margin-bottom: 28px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  color: var(--v34-fg);
+  text-decoration: none;
+}
+
+.wordmark {
+  font-size: 1.24rem;
+  font-weight: 850;
+  letter-spacing: -0.055em;
+}
+
+.tagline {
+  max-width: 48ch;
+  margin: 6px 0 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.5;
+}
+
+.groups {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 24px 18px;
+}
+
+.group {
+  min-width: 0;
+}
+
+.title {
+  margin: 0 0 6px;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  color: var(--v34-fg);
+  font-size: var(--v34-small);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+
+.link:focus-visible,
+.brand:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+.legal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 20px;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid var(--v34-fg-rule);
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+}
+
+/* The shared consent link brings its own dot separators; the gap does that job here. */
+.legal :global(.site-footer-legal-sep) {
+  display: none;
+}
+
+@media (max-width: 1000px) {
+  .groups {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .footer {
+    padding: 36px 0 20px;
+  }
+
+  .groups {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (forced-colors: active) {
+  .link:focus-visible,
+  .brand:focus-visible { outline-color: Highlight; }
+}
