@@ -128,6 +128,14 @@ describe("the moved body is whole", () => {
     }
     expect(html).toContain("Read what was measured");
   });
+
+  it("ends on the shared trust step, TrustNext from /research, as the crosswalk moves it", () => {
+    const body = stripped(code).find((f) => f.file.endsWith("/program.tsx"))!;
+    expect(body.text).toContain('<TrustNext from="/research" />');
+    expect(html).toContain("trust-next");
+    expect(decoded).toContain("Next: Research notes");
+    expect(decoded).toContain("What has actually been measured?");
+  });
 });
 
 describe("the evidence rules", () => {
@@ -140,9 +148,10 @@ describe("the evidence rules", () => {
     expect(text).not.toMatch(/\bGPU\b/);
   });
 
+  // `/research` is the typed `from` of TrustNext, the page's own step in the trust sequence.
   it("types no path except the retained pages that have no registry key", () => {
     const literal = stripped(code).flatMap((f) => [...f.text.matchAll(/["'`]\/[a-z][^"'`]*/g)].map((m) => m[0]));
-    expect(literal.sort()).toEqual(['"/benchmarks', '"/research/notes', '"/reproducibility', '"/trust'].sort());
+    expect(literal.sort()).toEqual(['"/benchmarks', '"/research', '"/research/notes', '"/reproducibility', '"/trust'].sort());
   });
 });
 

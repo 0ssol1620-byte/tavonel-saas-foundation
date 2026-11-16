@@ -71,8 +71,3 @@ export const ALSO = {
   title: "Also in the trust case",
   evidenceLabel: "Evidence",
 } as const;
-
-export const NEXT = {
-  title: "Next: Research notes. What has actually been measured?",
-  cta: { href: RETAINED.notes, label: "Read what was measured" },
-} as const;

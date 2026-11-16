@@ -1,11 +1,11 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { FinalCta } from "@/components/v34/ui/final-cta";
+import { TrustNext } from "@/components/trust-next";
 import { Hero } from "@/components/v34/ui/hero";
 import { RecordCard } from "@/components/v34/ui/record-card";
 import { Section } from "@/components/v34/ui/section";
 import { v34Route } from "@/lib/v34/routes";
-import { ALSO, AREAS, HERO, METHOD, NEXT, RETAINED } from "./program-content";
+import { ALSO, AREAS, HERO, METHOD, RETAINED } from "./program-content";
 import s from "./program.module.css";
 
 /** "01", "02", ... counted from the list position. */
@@ -73,7 +73,7 @@ export function ProgramBody() {
         </p>
       </Section>
 
-      <FinalCta title={NEXT.title} cta={NEXT.cta} />
+      <TrustNext from="/research" />
     </>
   );
 }
