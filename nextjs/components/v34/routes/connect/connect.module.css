@@ -1,0 +1,279 @@
+/*
+  Connect page only. Colours come from --v34-* tokens and nothing else. The bands set their own
+  surface, so a rule here that paints a background also states its foreground. No animation.
+*/
+
+/* ---- hero art: a client, the read-only gate, a World, and the key that can be revoked ------ */
+
+.art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.box,
+.gate {
+  fill: none;
+  stroke: var(--v34-on-dark);
+  stroke-width: 2;
+}
+
+.lane {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+}
+
+.dot {
+  fill: var(--v34-lime);
+}
+
+.tick {
+  stroke: var(--v34-lime);
+  stroke-width: 3;
+}
+
+.core {
+  fill: var(--v34-lime);
+}
+
+.node {
+  fill: none;
+  stroke: var(--v34-on-dark);
+  stroke-width: 2;
+}
+
+.edge {
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 1;
+}
+
+.revoke {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+  stroke-dasharray: 6 6;
+}
+
+/* ---- shared small pieces -------------------------------------------------------------------- */
+
+.tagRow {
+  margin: 0 0 20px;
+}
+
+.link,
+.inlineLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.inlineLink {
+  min-height: 24px;
+}
+
+.link:hover,
+.inlineLink:hover {
+  background: var(--v34-fg-hover);
+  color: var(--v34-fg);
+}
+
+.link:focus-visible,
+.inlineLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+.links {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ---- steps ---------------------------------------------------------------------------------- */
+
+.stepsLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
+}
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr);
+  gap: 8px 16px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.stepNo {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepBody {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.stepTitle {
+  margin: 0;
+  color: var(--v34-fg);
+  font-size: var(--v34-h3);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.2;
+}
+
+.stepText {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.stepAside {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* ---- sources -------------------------------------------------------------------------------- */
+
+.notice {
+  margin: 0 0 28px;
+  padding: 16px 18px;
+  border: 1px solid var(--v34-fg-border);
+  border-radius: var(--v34-radius-panel);
+  background: var(--v34-white);
+  color: var(--v34-ink);
+  line-height: 1.55;
+}
+
+.legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 32px;
+  margin: 0 0 28px;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.legendItem {
+  min-width: 0;
+  padding: 14px 0;
+}
+
+.legendTerm {
+  margin: 0;
+  color: var(--v34-fg);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+}
+
+.legendMeaning {
+  margin: 4px 0 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.5;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 16px;
+}
+
+.cardText {
+  margin: 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.technical,
+.agent {
+  min-width: 0;
+  margin-top: 12px;
+}
+
+.agent {
+  margin-top: 28px;
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.summary:hover {
+  color: var(--v34-fg);
+  text-decoration: underline;
+}
+
+.summary:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+.facts {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.fact {
+  min-width: 0;
+}
+
+.factTerm {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+}
+
+.factValue {
+  margin: 2px 0 0;
+  color: var(--v34-fg);
+  font-size: var(--v34-small);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* ---- narrow --------------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .stepsLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 650px) {
+  .legend {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

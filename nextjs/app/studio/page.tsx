@@ -1,11 +1,13 @@
-import RouteStub from "@/components/v34/route-stub";
+import Studio from "@/components/v34/routes/studio/studio";
 import { releaseGate } from "@/lib/v34/release";
 import { routeMetadata, routeViewport } from "@/lib/v34/route-metadata";
 
 export const metadata = routeMetadata("studio");
 export const viewport = routeViewport();
+// The primary action is commercial state (primaryCallToAction), resolved per request like the home page.
+export const dynamic = "force-dynamic";
 
 export default async function Page() {
   await releaseGate("studio");
-  return <RouteStub route="studio" line="The reference walkthrough steps through one fixed sample, from source file to cited answer." />;
+  return <Studio />;
 }

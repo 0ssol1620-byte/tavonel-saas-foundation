@@ -1,0 +1,297 @@
+/*
+  Capabilities page only. Colours come from --v34-* tokens and nothing else. The bands set their
+  own surface, so a rule here that paints a background also states its foreground.
+  No animation.
+*/
+
+/* ---- hero art: one point per contract clause -------------------------------------------- */
+
+.ring {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.orbit {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 1;
+}
+
+.spoke {
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 1;
+}
+
+.core {
+  fill: var(--v34-lime);
+}
+
+.pointFilled {
+  fill: var(--v34-lime);
+  stroke: var(--v34-lime);
+  stroke-width: 2;
+}
+
+.pointOutline {
+  fill: none;
+  stroke: var(--v34-on-dark);
+  stroke-width: 2;
+}
+
+/* ---- contract --------------------------------------------------------------------------- */
+
+.states {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin: 0 0 32px;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.stateItem {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  padding: 16px 22px 0 0;
+}
+
+.stateLabel {
+  margin: 0;
+  color: var(--v34-fg);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+}
+
+.stateMeaning {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.5;
+}
+
+.clauses {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.clause {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr) minmax(0, 12rem);
+  gap: 8px 24px;
+  align-items: start;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.clauseNo {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+}
+
+.clauseBody {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.clauseName {
+  margin: 0;
+  color: var(--v34-fg);
+  font-size: clamp(1.25rem, 2vw, 1.75rem);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.2;
+}
+
+.promise {
+  margin: 0;
+  color: var(--v34-fg);
+  line-height: 1.5;
+}
+
+.clauseState {
+  margin: 0;
+  justify-self: end;
+  color: var(--v34-fg);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-align: right;
+}
+
+.check {
+  min-width: 0;
+}
+
+.checkSummary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.checkSummary:hover {
+  color: var(--v34-fg);
+  text-decoration: underline;
+}
+
+.checkSummary:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+.checkText {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+/* ---- formats ---------------------------------------------------------------------------- */
+
+.formatStats {
+  margin-bottom: 28px;
+}
+
+.shared {
+  display: grid;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.sharedTitle {
+  margin: 0;
+  color: var(--v34-fg);
+  font-size: var(--v34-h3);
+  font-weight: 600;
+}
+
+.sharedList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--v34-fg-muted);
+  line-height: 1.5;
+}
+
+.formatsLink {
+  margin: 24px 0 0;
+}
+
+.inlineLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.inlineLink:hover {
+  background: var(--v34-fg-hover);
+  color: var(--v34-fg);
+}
+
+.inlineLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+/* ---- explore ---------------------------------------------------------------------------- */
+
+.explore {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 32px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.exploreItem {
+  min-width: 0;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.exploreLink {
+  display: grid;
+  gap: 4px;
+  min-height: 44px;
+  padding: 18px 0 22px;
+  color: var(--v34-fg);
+  text-decoration: none;
+}
+
+.exploreTitle {
+  color: var(--v34-fg);
+  font-size: var(--v34-h3);
+  font-weight: 600;
+}
+
+.exploreText {
+  color: var(--v34-fg-muted);
+  line-height: 1.5;
+}
+
+.exploreLink:hover {
+  background: var(--v34-fg-hover);
+  color: var(--v34-fg);
+}
+
+.exploreLink:hover .exploreTitle {
+  color: var(--v34-fg-link);
+  text-decoration: underline;
+}
+
+.exploreLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 2px;
+}
+
+/* ---- narrow ----------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .explore {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .states {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stateItem {
+    padding: 14px 0 0;
+  }
+
+  .clause {
+    grid-template-columns: 2.25rem minmax(0, 1fr);
+  }
+
+  .clauseState {
+    grid-column: 2;
+    justify-self: start;
+    text-align: left;
+  }
+
+  .explore {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
