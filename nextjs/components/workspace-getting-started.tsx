@@ -4,6 +4,9 @@ import Link from "next/link";
 import { Check, ChevronDown, CircleHelp } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import type { OnboardingStep } from "@/lib/workspace-onboarding";
+import type { JourneyStep, Purpose } from "@/lib/workspace-journey";
+import type { WorkspaceSurface } from "@/components/workspace-ultimate-shell";
+import WorkspacePurposePicker from "@/components/workspace-purpose-picker";
 
 type Props = {
   autoOpenEligible: boolean;
@@ -11,6 +14,11 @@ type Props = {
   hasActiveWorld: boolean;
   next: { label: string; run: () => void };
   onOpenWorld: () => void;
+  /* Optional: the nine-step location rail and purpose picker. Absent, nothing changes. */
+  journey?: JourneyStep[];
+  purpose?: Purpose | null;
+  onPurpose?: (purpose: Purpose) => void;
+  onOpenStep?: (surface: WorkspaceSurface) => void;
 };
 
 const DISMISSED_KEY = "tavonel.workspace.getting-started.dismissed.v1";
@@ -21,6 +29,10 @@ export default function WorkspaceGettingStarted({
   hasActiveWorld,
   next,
   onOpenWorld,
+  journey,
+  purpose = null,
+  onPurpose,
+  onOpenStep,
 }: Props) {
   const [open, setOpen] = useState(false);
   const guideId = useId();
@@ -67,6 +79,22 @@ export default function WorkspaceGettingStarted({
               <p>Next, ask a real question. Check the cited passage, then use the result in your work.</p>
             ) : null}
           </div>
+
+          {journey ? (
+            <ol className="workspace-journey-rail" aria-label="Journey">
+              {journey.map((stop) => (
+                <li key={stop.id} aria-current={stop.state === "current" ? "step" : undefined} data-state={stop.state}>
+                  <button type="button" disabled={stop.state === "unavailable"} onClick={() => onOpenStep?.(stop.surface)}>
+                    {stop.step}. {stop.title}
+                    <small> {stop.state === "done" ? "Done" : stop.state === "current" ? "Now" : stop.state === "unavailable" ? "Not available" : "To do"}</small>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          ) : null}
+          {journey && onPurpose && journey[0]?.state === "current" ? (
+            <WorkspacePurposePicker purpose={purpose} onPurpose={onPurpose} />
+          ) : null}
 
           {/*
             Each row's state is read from the workspace, not from a "you have seen this" flag.
