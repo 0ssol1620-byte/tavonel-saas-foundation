@@ -1,0 +1,362 @@
+/*
+  The world instrument: a dark surface for the public reference corpus.
+
+  Every class that carries text or a background states BOTH a foreground and a background colour
+  (U46), so no surface depends on what it happens to sit on. The pairs, all on the #07100e ground:
+    text       #f2f7f0   on #07100e / #0d1b16 / #12251f   above 15:1
+    muted      #b8cbbd   on #07100e                       about 11:1
+    link       #8ae0bc   on #0b1713                       about 11:1
+    pressed    #0b1713   on #c9f2a5                       about 14:1
+    focus ring #8ae0bc, 2px, offset 2px
+  Type is 12px or larger. Nothing here animates: the one motion is the camera, in the canvas.
+*/
+
+.instrument {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #2b4a40;
+  border-radius: 8px;
+  color: #f2f7f0;
+  background-color: #07100e;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.caption {
+  margin: 0;
+  color: #b8cbbd;
+  background-color: #07100e;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.root {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  color: #f2f7f0;
+  background-color: #07100e;
+}
+
+/* Controls need the island: they stay out of sight, and out of the tab order, until it has hydrated. */
+.root[data-hydrated="false"] :is(.toolbar, .finder) {
+  visibility: hidden;
+}
+
+.stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 900 / 620;
+  overflow: hidden;
+  border: 1px solid #1f3a31;
+  border-radius: 6px;
+  color: #f2f7f0;
+  background-color: #07100e;
+}
+
+.fallback {
+  position: absolute;
+  inset: 0;
+  color: #f2f7f0;
+  background-color: #07100e;
+}
+
+.fallback img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.root[data-ready="true"] .fallback {
+  visibility: hidden;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: grab;
+  background-color: #07100e;
+  /* Vertical swipes scroll the page; the camera takes horizontal drags and two-finger gestures. */
+  touch-action: pan-y;
+  outline: none;
+}
+
+.canvas:active {
+  cursor: grabbing;
+}
+
+.canvas:focus-visible {
+  outline: 2px solid #8ae0bc;
+  outline-offset: -4px;
+}
+
+.root[data-ready="true"] .canvas {
+  opacity: 1;
+}
+
+.explore {
+  position: absolute;
+  inset-block-end: 16px;
+  inset-inline: 16px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid #8ae0bc;
+  border-radius: 6px;
+  color: #0b1713;
+  background-color: #c9f2a5;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+/* The home hero on a touch device opens the corpus only when asked: the file is 275 kB. */
+@media (pointer: coarse) {
+  .root[data-variant="hero"][data-load="idle"] .explore {
+    display: inline-flex;
+  }
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #f2f7f0;
+  background-color: #07100e;
+}
+
+.segment {
+  display: inline-flex;
+  gap: 4px;
+  color: #f2f7f0;
+  background-color: #07100e;
+}
+
+.control {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #3a5e52;
+  border-radius: 6px;
+  color: #f2f7f0;
+  background-color: #12251f;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.control:hover:not(:disabled) {
+  color: #f2f7f0;
+  background-color: #1a352c;
+}
+
+.control[aria-pressed="true"],
+.control[aria-pressed="true"]:hover:not(:disabled) {
+  border-color: #c9f2a5;
+  color: #0b1713;
+  background-color: #c9f2a5;
+}
+
+.control:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (pointer: coarse) {
+  .control {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+.control:focus-visible,
+.explore:focus-visible,
+.input:focus-visible,
+.source:focus-visible {
+  outline: 2px solid #8ae0bc;
+  outline-offset: 2px;
+}
+
+.status {
+  margin: 0;
+  color: #b8cbbd;
+  background-color: #07100e;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.finder {
+  display: grid;
+  gap: 8px;
+  color: #f2f7f0;
+  background-color: #07100e;
+}
+
+@media (min-width: 640px) {
+  .finder {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: end;
+  }
+
+  .count {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: #f2f7f0;
+  background-color: #07100e;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #3a5e52;
+  border-radius: 6px;
+  color: #f2f7f0;
+  background-color: #0d1b16;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.input::placeholder {
+  color: #9fb5a8;
+  opacity: 1;
+}
+
+.count {
+  margin: 0;
+  color: #b8cbbd;
+  background-color: #07100e;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.info {
+  min-height: 4.5em;
+  padding: 12px 14px;
+  border: 1px solid #1f3a31;
+  border-radius: 6px;
+  color: #f2f7f0;
+  background-color: #0b1713;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.info p {
+  margin: 0;
+}
+
+.source {
+  display: inline-block;
+  margin-top: 8px;
+  color: #8ae0bc;
+  background-color: #0b1713;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: #f2f7f0;
+  background-color: #07100e;
+  font-size: 13px;
+}
+
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #f2f7f0;
+  background-color: #07100e;
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  forced-color-adjust: none;
+}
+
+.layerNumber,
+.legendCount {
+  color: #b8cbbd;
+  background-color: #07100e;
+  font-variant-numeric: tabular-nums;
+}
+
+.domains {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: #b8cbbd;
+  background-color: #07100e;
+  font-size: 13px;
+}
+
+.domains li {
+  color: #b8cbbd;
+  background-color: #07100e;
+}
+
+.domains b {
+  color: #f2f7f0;
+  background-color: #07100e;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (forced-colors: active) {
+  .control,
+  .input,
+  .explore {
+    border: 1px solid ButtonText;
+  }
+
+  .control[aria-pressed="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -3px;
+  }
+}
