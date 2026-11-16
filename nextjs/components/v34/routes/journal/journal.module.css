@@ -90,7 +90,7 @@
   color: var(--v34-fg);
 }
 
-@media (min-width: 700px) {
+@media (min-width: 761px) {
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -155,7 +155,7 @@
   line-height: 1.5;
 }
 
-@media (min-width: 800px) {
+@media (min-width: 761px) {
   .reference {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

@@ -183,6 +183,15 @@ describe("tokens and explicit pairs", () => {
     }
   });
 
+  it("steps layout only at the section 3.10 breakpoints (1000, 900, 760, 480, 360)", () => {
+    const allowed = [1000, 900, 901, 760, 761, 480, 481, 360, 361]; // a min-width steps up one past its boundary
+    for (const f of styles) {
+      for (const [, px] of f.text.matchAll(/@media[^{]*\(\s*(?:min|max)-width\s*:\s*(\d+)px\s*\)/g)) {
+        expect(allowed, `${f.file}: ${px}px`).toContain(Number(px));
+      }
+    }
+  });
+
   it("hides no overflow, imports nothing and has no motion of its own", () => {
     for (const f of styles) {
       expect(f.text, f.file).not.toMatch(/overflow(?:-[xy])?\s*:\s*hidden/);
