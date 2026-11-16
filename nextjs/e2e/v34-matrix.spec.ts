@@ -142,6 +142,8 @@ for (const { path: route, release } of routes) {
   for (const width of at(412, 1440)) {
     test(`${route} ${width}px contrast`, tags(route, width, "contrast"), async ({ browser, browserName }) => {
       test.skip(heldInProduction, "held in production");
+      // Two appearances, up to 90 sampled elements each, one screenshot per text line: a long page needs more than the default 30s.
+      test.setTimeout(120_000);
       const all: Violation[] = [];
       for (const scheme of SCHEMES) {
         const ctx = await openContext(browser, width, { colorScheme: scheme });
@@ -165,6 +167,8 @@ for (const { path: route, release } of routes) {
   for (const width of at(412, 1440)) {
     test(`${route} ${width}px keyboard and states`, tags(route, width, "keyboard"), async ({ browser, browserName }) => {
       test.skip(heldInProduction, "held in production");
+      // A 250-stop walk, twelve hover targets, and a context close that waits on the page's GL context under load.
+      test.setTimeout(90_000);
       const ctx = await openContext(browser, width);
       const page = await ctx.newPage();
       try {

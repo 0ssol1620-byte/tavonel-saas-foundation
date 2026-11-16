@@ -346,6 +346,15 @@ test.describe("round 3: false positives found by the first integrated QA run", (
     expect(r.violations).toEqual([]);
   });
 
+  test("contrast: a closed details body is not sampled, and tight leading does not pull in the line above", async ({ page }) => {
+    await load(page, `<details open style="background:#fff"><summary>q</summary></details><details style="margin:0"><summary style="color:#111">question</summary><p style="color:#111;background:#111">hidden answer</p></details><div style="background:#111;height:60px"></div>`);
+    expect((await contrastPass(page)).violations).toEqual([]);
+    await load(page, `<div style="background:#0a1712;padding:20px"><h1 style="margin:0;font-size:60px;line-height:0.9;color:#f3f7f0">gggg yyyy<br><span style="color:#c6f0ab">second line accent</span></h1></div>`);
+    expect((await contrastPass(page)).violations).toEqual([]);
+    // and the sheet that hides the text is gone again afterwards
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector("h1")!).color)).toBe("rgb(243, 247, 240)");
+  });
+
   test("keyboard: a smooth-scrolling page is waited for before the focus rect is read", async ({ page }) => {
     await page.setViewportSize({ width: 600, height: 500 });
     await load(page, `<button class="r">top</button><div style="height:3000px"></div><button class="r">far below</button>`, ".r{padding:14px 20px}.r:focus-visible{outline:2px solid #00e}html{scroll-behavior:smooth}");

@@ -73,6 +73,8 @@ function collectTargets(max: number): Target[] {
   document.querySelectorAll(`[${"data-v34-contrast-idx"}]`).forEach(e => e.removeAttribute("data-v34-contrast-idx"));
   for (const el of all) {
     if (el.closest("canvas, svg, [hidden], script, style")) continue;
+    // A closed <details> body is not painted: its box is a leftover layout rect, and what a screenshot finds there is whatever sits beneath it.
+    if (el.closest("details:not([open])") && !el.closest("summary")) continue;
     const s = getComputedStyle(el);
     const r = el.getBoundingClientRect();
     if (s.display === "none" || s.visibility === "hidden" || r.width < 2 || r.height < 2) continue;
@@ -141,15 +143,19 @@ async function extremes(b64: string): Promise<{ dark: Rgb; light: Rgb } | null> 
  */
 function ownTextRects(el: Element): { x: number; y: number; width: number; height: number }[] {
   const out: { x: number; y: number; width: number; height: number }[] = [];
+  // A text rect is the font's content area, which is taller than the line box when the leading is tight
+  // (a display heading at line-height 1.01): its edges then hold the neighbouring lines' glyphs. Sample the line box.
+  const lineHeight = parseFloat(getComputedStyle(el).lineHeight);
   for (const n of el.childNodes) {
     if (n.nodeType !== Node.TEXT_NODE || (n.textContent ?? "").trim().length === 0) continue;
     const range = document.createRange();
     range.selectNodeContents(n);
     for (const r of range.getClientRects()) {
+      const trim = Number.isFinite(lineHeight) && lineHeight < r.height ? (r.height - lineHeight) / 2 : 0;
       const x0 = Math.max(0, Math.ceil(r.left) + 1);
-      const y0 = Math.max(0, Math.ceil(r.top) + 1);
+      const y0 = Math.max(0, Math.ceil(r.top + trim) + 1);
       const x1 = Math.min(window.innerWidth, Math.floor(r.right) - 1);
-      const y1 = Math.min(window.innerHeight, Math.floor(r.bottom) - 1);
+      const y1 = Math.min(window.innerHeight, Math.floor(r.bottom - trim) - 1);
       if (x1 - x0 >= 2 && y1 - y0 >= 2) out.push({ x: x0, y: y0, width: x1 - x0, height: y1 - y0 });
       if (out.length >= 8) return out;
     }
@@ -183,8 +189,14 @@ async function centreInView(handle: Locator): Promise<void> {
 /** Pixel-sampled text contrast for the current page state. */
 export async function contrastPass(page: Page, options: ContrastOptions = {}): Promise<ContrastResult> {
   const targets = await page.evaluate(collectTargets, options.max ?? 60);
-  await page.addStyleTag({
-    content: `[${HIDE_ATTR}], [${HIDE_ATTR}] * { color: transparent !important; text-shadow: none !important; caret-color: transparent !important; -webkit-text-fill-color: transparent !important; }`,
+  /*
+    Every glyph on the page is made transparent for the duration of the pass, not only the element
+    under test. A line's sample box is the line itself, and at tight leading the neighbouring lines'
+    descenders and ascenders reach into it (a 75px headline at line-height 1.01); what must be found
+    there is the surface, and any other text would be read as the lightest or darkest background.
+  */
+  const sheet = await page.addStyleTag({
+    content: `html, html * { color: transparent !important; text-shadow: none !important; caret-color: transparent !important; -webkit-text-fill-color: transparent !important; }`,
   });
   const result: ContrastResult = { violations: [], excepted: [], reported: [], checked: 0 };
   for (const t of targets) {
@@ -224,6 +236,7 @@ export async function contrastPass(page: Page, options: ContrastOptions = {}): P
       await handle.evaluate((e, a) => e.removeAttribute(a), HIDE_ATTR).catch(() => undefined);
     }
   }
+  await sheet.evaluate(e => e.remove()).catch(() => undefined);
   return result;
 }
 

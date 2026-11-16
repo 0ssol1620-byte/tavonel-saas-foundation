@@ -36,12 +36,12 @@ export async function keyboardWalk(page: Page, max = 250): Promise<KeyboardResul
     Playwright's WebKit does not put links in the Tab order (it follows Safari's default: Tab goes to
     form controls, Alt+Tab to links, and in this build Alt+Tab does not reach them either). The walk
     there sees buttons with the document body between them and would call the first body stop the
-    end of the page. On WebKit a body stop is skipped, a run of them ends the walk, and anchors are
-    left out of the "never reached" list; the result says so rather than judging links it cannot reach.
+    end of the page. On WebKit a body stop is skipped, a run of them ends the walk, and anchors
+    and summaries are left out of the "never reached" list; the result says so rather than judging links it cannot reach.
   */
   const webkit = page.context().browser()?.browserType().name() === "webkit";
   if (webkit) {
-    result.reported.push({ pass: "keyboard-engine", selector: "webkit", detail: "this WebKit build does not Tab to links: anchors are judged on chromium and firefox only" });
+    result.reported.push({ pass: "keyboard-engine", selector: "webkit", detail: "this WebKit build does not Tab to links: anchors and summaries are judged on chromium and firefox only" });
   }
   let bodyStops = 0;
   for (let i = 0; i < max; i++) {
@@ -63,7 +63,7 @@ export async function keyboardWalk(page: Page, max = 250): Promise<KeyboardResul
         steady = y === last ? steady + 1 : 0;
         last = y;
         // Off screen and still scrolling: wait. Off screen and the page has stopped: that is a finding.
-        if (onScreen || steady >= 3 || performance.now() - started > 1200) done();
+        if (onScreen || steady >= 6 || performance.now() - started > 2500) done();
         else setTimeout(poll, 30);
       };
       setTimeout(poll, 16);
@@ -105,7 +105,8 @@ export async function keyboardWalk(page: Page, max = 250): Promise<KeyboardResul
             const members = [...document.getElementsByName(key)];
             if (members.some(m => (w.__v34Visits.get(m) ?? 0) > 0)) continue;
           }
-          if (skipAnchors && x.tagName === "A") continue;
+          // WebKit's default Tab order also leaves out <summary>.
+          if (skipAnchors && (x.tagName === "A" || x.tagName === "SUMMARY")) continue;
           if (!w.__v34Visits.get(x)) unvisited.push(nm(x));
         }
       }
