@@ -8,6 +8,8 @@ import WorldDirectoryTree from "@/components/world-directory-tree";
 import WorldOntologyViewer from "@/components/world-ontology-viewer";
 import WorldVersionDiffPanel from "@/components/world-version-diff";
 import type { SelectedWorldEvidence, WorldEvidence, WorldReadModel } from "@/lib/world-read-model";
+import { readWorldLensParams, writeWorldLensParams } from "@/lib/world-lens-url";
+import { datesRecorded, filterBySourceRevision, sourceRevisions, versionOptions } from "@/lib/world-temporal-view";
 import styles from "./world-studio-ultimate.module.css";
 
 export type WorldStudioLens = "overview" | "graph" | "directory" | "ontology" | "evidence" | "versions" | "files";
@@ -25,6 +27,8 @@ type Props = {
   onEvidenceSelect?: (selection: SelectedWorldEvidence | null) => void;
   onRollback?: (manifestDigest: string) => void;
   rollbackBusy?: boolean;
+  /* Mirror lens, selection, version and source revision into the address bar, and read them back on load. */
+  syncUrl?: boolean;
 };
 
 /* What the stat strip prints before there is anything to count. Not "--", and not "0":
@@ -59,7 +63,25 @@ function EvidenceCard({ evidence, selected, onSelect }: { evidence: WorldEvidenc
   );
 }
 
-export default function WorldStudioUltimate({ model, initialLens = "overview", selectedEvidenceId, onEvidenceSelect, onRollback, rollbackBusy }: Props) {
+async function authToken() {
+  const client = getSupabaseBrowserClient();
+  const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+  return data.session?.access_token ?? null;
+}
+
+export default function WorldStudioUltimate({ model: currentModel, initialLens = "overview", selectedEvidenceId, onEvidenceSelect, onRollback, rollbackBusy, syncUrl = false }: Props) {
+  const [asOf, setAsOf] = useState<string | null>(null);
+  const [revision, setRevision] = useState<string | null>(null);
+  const [past, setPast] = useState<{ digest: string; model: WorldReadModel } | null>(null);
+  const [versionError, setVersionError] = useState(false);
+  const [urlRead, setUrlRead] = useState(!syncUrl);
+  const currentDigest = currentModel?.world.manifestDigest ?? null;
+  const worldId = currentModel?.world.id ?? null;
+  const pastView = past && past.digest === asOf ? past.model : null;
+  const viewingPast = asOf !== null && asOf !== currentDigest;
+  // The model on screen: a historical version when one is chosen, narrowed to a source revision when one is.
+  const viewed = pastView ?? currentModel;
+  const model = useMemo(() => (viewed && revision ? filterBySourceRevision(viewed, revision) : viewed), [viewed, revision]);
   const [lens, setLens] = useState<WorldStudioLens>(initialLens);
   const [localEvidenceId, setLocalEvidenceId] = useState<string | null>(null);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
@@ -80,6 +102,42 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
   const focusEvidenceHeading = useRef(false);
 
   useEffect(() => { setLens(initialLens); }, [initialLens]);
+
+  // Read the address bar once, after mount, so server and first client render agree.
+  const latest = useRef({ syncUrl, selectedEvidenceId, currentModel, onEvidenceSelect });
+  latest.current = { syncUrl, selectedEvidenceId, currentModel, onEvidenceSelect };
+  useEffect(() => {
+    const { syncUrl, selectedEvidenceId, currentModel, onEvidenceSelect } = latest.current;
+    if (!syncUrl) return;
+    const params = readWorldLensParams(new URLSearchParams(window.location.search));
+    if (params.lens) setLens(params.lens);
+    if (params.object) setSelectedObjectId(params.object);
+    if (params.evidence) { if (selectedEvidenceId === undefined) setLocalEvidenceId(params.evidence); else { const picked = selectWorldEvidence(currentModel, params.evidence); if (picked) onEvidenceSelect?.(picked); } }
+    if (params.asOf) setAsOf(params.asOf);
+    if (params.revision) setRevision(params.revision);
+    setUrlRead(true);
+  }, []);
+  useEffect(() => {
+    if (!syncUrl || !urlRead) return;
+    const url = writeWorldLensParams(new URL(window.location.href), { lens, object: selectedObjectId ?? undefined, evidence: activeEvidenceId ?? undefined, asOf: asOf ?? undefined, revision: revision ?? undefined });
+    window.history.replaceState(window.history.state, "", url);
+  }, [syncUrl, urlRead, lens, selectedObjectId, activeEvidenceId, asOf, revision]);
+
+  // A chosen older version is fetched whole and shown read-only; a failed read leaves the current World and drops asof.
+  useEffect(() => {
+    if (!asOf || !worldId || asOf === currentDigest) { setPast(null); return; }
+    const controller = new AbortController();
+    void (async () => {
+      const token = await authToken();
+      if (!token) throw new Error("NO_SESSION");
+      const response = await fetch(`/api/v1/world/${worldId}?manifest=${encodeURIComponent(asOf)}`, { headers: { authorization: `Bearer ${token}` }, cache: "no-store", signal: controller.signal });
+      const body = await response.json().catch(() => ({})) as { model?: WorldReadModel };
+      if (!response.ok || !body.model || body.model.world.id !== worldId || body.model.world.manifestDigest !== asOf) throw new Error("VERSION_UNAVAILABLE");
+      setVersionError(false);
+      setPast({ digest: asOf, model: body.model });
+    })().catch(() => { if (controller.signal.aborted) return; setPast(null); setVersionError(true); setAsOf(null); });
+    return () => controller.abort();
+  }, [asOf, currentDigest, worldId]);
   // Only once the control that asked has left the DOM: focus the reader moved elsewhere is never taken.
   useEffect(() => {
     if (!focusEvidenceHeading.current || !evidenceHeadingRef.current) return;
@@ -153,6 +211,25 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
         {LENSES.map((item) => <button key={item.id} type="button" role="tab" aria-selected={lens === item.id} aria-controls={`world-lens-${item.id}`} onClick={() => setLens(item.id)}>{item.label}</button>)}
       </nav>
 
+      {currentModel && (
+        <div className={styles.filters}>
+          <label>View as of
+            <select value={viewingPast ? asOf ?? "" : currentDigest ?? ""} onChange={(event) => { setVersionError(false); setAsOf(event.target.value === currentDigest ? null : event.target.value); }}>
+              {versionOptions(currentModel.history, currentModel.world.manifestDigest).map((option) => <option key={option.manifestDigest} value={option.manifestDigest}>{`Version ${option.version}${option.current ? " (current)" : ""}`}</option>)}
+            </select>
+          </label>
+          <label>Source revision
+            <select value={revision ?? ""} onChange={(event) => setRevision(event.target.value || null)}>
+              <option value="">All source revisions</option>
+              {[...new Set([...sourceRevisions(viewed ?? currentModel), ...(revision ? [revision] : [])])].map((rev) => <option key={rev} value={rev}>{rev}</option>)}
+            </select>
+          </label>
+          {viewingPast && <p role="status">{pastView ? `Viewing version ${currentModel.history.find((entry) => entry.manifestDigest === asOf)?.version ?? pastView.history.find((entry) => entry.manifestDigest === asOf)?.version ?? ""} · not the current World` : "Opening that version…"}</p>}
+          {versionError && <p role="alert">That version could not be read. The current World is shown.</p>}
+          {!datesRecorded(currentModel) && <p>Per-object dates are not recorded in this World; filter by version or source revision.</p>}
+        </div>
+      )}
+
       <div className={styles.workspace} data-lens={lens}>
         <div id={`world-lens-${lens}`} className={styles.lensBody} role="tabpanel">
           {lens === "overview" && (
@@ -177,7 +254,7 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
           {lens === "directory" && <WorldDirectoryTree entries={model?.directory ?? []} objects={model?.objects ?? []} selectedObjectId={selectedObjectId} onObjectSelect={selectObject} />}
           {lens === "ontology" && <WorldOntologyViewer ontology={model?.ontology ?? null} />}
           {lens === "evidence" && (!model || model.evidence.length === 0 ? <EmptyState title="No evidence yet">Compile a World to inspect the exact page and region behind its objects.</EmptyState> : <div className={styles.evidenceGrid}>{model.evidence.map((evidence) => <EvidenceCard key={evidence.id} evidence={evidence} selected={selection?.id === evidence.id} onSelect={selectEvidence} />)}</div>)}
-          {lens === "versions" && <WorldVersionDiffPanel model={model} onRollback={onRollback} rollbackBusy={rollbackBusy} />}
+          {lens === "versions" && <WorldVersionDiffPanel model={viewed} onRollback={viewingPast ? undefined : onRollback} rollbackBusy={rollbackBusy} />}
           {lens === "files" && (!model || model.files.length === 0 ? <EmptyState title="No package files yet">A compiled package appears here after a World is available.</EmptyState> : <ul className={styles.fileList} data-sensitive="content">{model.files.map((file) => <li key={file.path}><strong>{file.path}</strong><span>{file.mediaType}</span><small>{file.sizeBytes.toLocaleString()} B</small><code>{file.sha256}</code></li>)}</ul>)}
         </div>
 
