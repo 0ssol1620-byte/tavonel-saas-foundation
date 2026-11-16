@@ -4,6 +4,7 @@ import { createCheckoutBinding } from "@/lib/billing-binding";
 import { billingSecret } from "@/lib/billing-secrets";
 import { isBillingOfferCode, readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
 import { getFoundationBillingAccount, issueFoundationCheckoutIntent } from "@/lib/billing-store";
+import { quoteCheckout } from "@/lib/checkout-quote";
 import { readCommercialState } from "@/lib/commercial-state";
 import { decideCheckoutPolicy, decideOfferCheckoutPolicy, decideSubscriptionChange } from "@/lib/checkout-policy";
 import { authorizationStage, readCustomerSourceAuthorization } from "@/lib/customer-data-admission";
@@ -100,6 +101,7 @@ export async function POST(request: Request) {
     environment: paddle.environment,
     clientToken: paddle.clientToken,
     offer: { code: offer.code, kind: offer.kind, label: offer.label, priceId: offer.priceId, credits: offer.credits },
+    quote: await quoteCheckout(offer),
     customer: user.email ? { email: user.email } : undefined,
     customData,
   }, { headers: NO_STORE });
