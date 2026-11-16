@@ -150,21 +150,37 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+const BUDGET_CODES = {
+  searchWorld: ["DELIVERY_OVER_TOOL_RESULT_BUDGET", "DELIVERY_ITEM_OVER_PART_BUDGET"],
+  search: ["DELIVERY_OVER_TOOL_RESULT_BUDGET", "DELIVERY_ITEM_OVER_PART_BUDGET"],
+  fetch: ["FETCH_OVER_BUDGET"],
+} as const;
+function refusalCode(text: string): string {
+  const match = REFUSAL.exec(text);
+  if (!match) throw new Error(`refusal without a known code: ${text.slice(0, 80)}`);
+  return match[1]!;
+}
 const REFUSAL = /^(DELIVERY_[A-Z_]+|FETCH_OVER_BUDGET)\b/;
 
 describe("1,000 seeded output-limit, abstention and revoke cases", () => {
   it(`holds on seed ${SEED}`, { timeout: 600_000 }, async () => {
     const rand = prng(SEED);
     const revokeAt = 200 + Math.floor(rand() * 600);
-    const tally = { searchWorld: { ok: 0, refused: 0, empty: 0 }, search: { ok: 0, refused: 0, empty: 0 }, fetch: { ok: 0, refused: 0 }, revoked401: 0, liveBeforeRevoke: 0 };
+    const tally = { searchWorld: { ok: 0, refused: 0, empty: 0 }, search: { ok: 0, refused: 0, empty: 0 }, fetch: { ok: 0, refused: 0 }, revoked401: 0, liveBeforeRevoke: 0, invalidItemCases: 0 };
+    const codes: Record<"searchWorld" | "search" | "fetch", Record<string, number>> = { searchWorld: {}, search: {}, fetch: {} };
+    const count_ = (tool_: "searchWorld" | "search" | "fetch", code: string) => { codes[tool_][code] = (codes[tool_][code] ?? 0) + 1; };
 
     for (let c = 0; c < CASES; c += 1) {
       // Most cases are small enough to deliver; a long tail is large enough to be refused.
       const count = Math.floor(rand() * 61);
       const big = rand() < 0.3;
+      // A small seeded share of cases carries exactly one item with no evidence id; every other item is valid, so the
+      // budget decides those cases. Invalid-item refusals are tallied apart and asserted to need that item.
+      const invalidAt = count > 0 && rand() < 0.03 ? Math.floor(rand() * count) : -1;
+      if (invalidAt >= 0) tally.invalidItemCases += 1;
       const items = Array.from({ length: count }, (_, i) => {
         const length = big ? Math.floor(rand() * 20_001) : Math.floor(rand() * 400);
-        const idCount = Math.floor(rand() * 11);
+        const idCount = i === invalidAt ? 0 : 1 + Math.floor(rand() * 10);
         return {
           unitId: `u${i}`, text: text(rand, length), claimIds: [], entityIds: [], sourceVersionId: `dv_${i % 3}`,
           evidenceIds: Array.from({ length: idCount }, (_, k) => `ev_${c}_${i}_${k}`),
@@ -186,7 +202,10 @@ describe("1,000 seeded output-limit, abstention and revoke cases", () => {
       const sw = await tool("search_world", { collectionId: WORLD, query: "payment terms", limit: 25 });
       expect(sw.status, label).toBe(200);
       if (sw.result.isError) {
-        expect(sw.result.content[0]!.text, label).toMatch(REFUSAL);
+        const code = refusalCode(sw.result.content[0]!.text);
+        if (code === "DELIVERY_ITEM_INVALID") expect(invalidAt, label).toBeGreaterThanOrEqual(0);
+        else expect(BUDGET_CODES.searchWorld as readonly string[], label).toContain(code);
+        count_("searchWorld", code);
         tally.searchWorld.refused += 1;
       } else {
         const total = sw.result.content.reduce((sum, part) => sum + estimateTokens(part.text), 0);
@@ -206,7 +225,10 @@ describe("1,000 seeded output-limit, abstention and revoke cases", () => {
       expect(s.status, label).toBe(200);
       let resultIds: string[] = [];
       if (s.result.isError) {
-        expect(s.result.content[0]!.text, label).toMatch(REFUSAL);
+        const code = refusalCode(s.result.content[0]!.text);
+        if (code === "DELIVERY_ITEM_INVALID") expect(invalidAt, label).toBeGreaterThanOrEqual(0);
+        else expect(BUDGET_CODES.search as readonly string[], label).toContain(code);
+        count_("search", code);
         tally.search.refused += 1;
       } else {
         const out = s.result.structuredContent as { results: Array<{ id: string }>; notice?: { code: string; abstention_reasons?: string[] } };
@@ -228,12 +250,14 @@ describe("1,000 seeded output-limit, abstention and revoke cases", () => {
         const f = await tool("fetch", { id: resultIds[pick]! });
         expect(f.status, label).toBe(200);
         if (f.result.isError) {
-          expect(f.result.content[0]!.text, label).toMatch(REFUSAL);
+          const code = refusalCode(f.result.content[0]!.text);
+          expect(BUDGET_CODES.fetch as readonly string[], label).toContain(code);
+          count_("fetch", code);
           tally.fetch.refused += 1;
         } else {
           const out = f.result.structuredContent as { text: string; metadata: { evidence_ids: string[]; untrusted_content: boolean } };
-          // fetch budgets the rendered files; the join adds one newline between them.
-          expect(estimateTokens(out.text), label).toBeLessThanOrEqual(DELIVERY_PART_BUDGET_TOKENS + 4);
+          // fetch budgets the rendered files; every file ends in a newline, so the join only merges whitespace.
+          expect(estimateTokens(out.text), label).toBeLessThanOrEqual(DELIVERY_PART_BUDGET_TOKENS);
           expect(out.metadata.evidence_ids, label).toEqual(items[pick]!.evidenceIds.slice(0, 8));
           expect(out.metadata.untrusted_content, label).toBe(true);
           tally.fetch.ok += 1;
@@ -254,10 +278,15 @@ describe("1,000 seeded output-limit, abstention and revoke cases", () => {
       }
     }
 
-    console.info(`WO-D19-7 seed=${SEED} cases=${CASES} revokeAt=${revokeAt} tally=${JSON.stringify(tally)}`);
+    console.info(`WO-D19-7 seed=${SEED} cases=${CASES} revokeAt=${revokeAt} tally=${JSON.stringify(tally)} codes=${JSON.stringify(codes)}`);
     // The suite means nothing if it never reached both sides of the limit.
     expect(tally.searchWorld.ok + tally.search.ok + tally.fetch.ok).toBeGreaterThan(0);
-    expect(tally.searchWorld.refused + tally.search.refused + tally.fetch.refused).toBeGreaterThan(0);
+    // Refusals must come from the budget itself, not only from invalid items.
+    const budgetRefusals = (tool_: keyof typeof BUDGET_CODES) => BUDGET_CODES[tool_].reduce((sum, code) => sum + (codes[tool_][code] ?? 0), 0);
+    expect(budgetRefusals("searchWorld")).toBeGreaterThan(0);
+    expect(budgetRefusals("search")).toBeGreaterThan(0);
+    expect(budgetRefusals("fetch")).toBeGreaterThan(0);
+    expect(tally.invalidItemCases).toBeGreaterThan(0);
     expect(tally.searchWorld.empty + tally.search.empty).toBeGreaterThan(0);
     expect(tally.revoked401).toBe(CASES - revokeAt);
     expect(tally.liveBeforeRevoke).toBe(revokeAt);
