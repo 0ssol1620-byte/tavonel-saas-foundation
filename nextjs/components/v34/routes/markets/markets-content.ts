@@ -13,12 +13,12 @@ const to = (key: V34RouteKey): Route => v34Route(key).path;
 export const HERO = {
   eyebrow: "Finance and markets",
   secondary: { href: to("connect"), label: "Connect your AI" },
-  caption: "Five filings in time order, with a figure traced back to the filing that states it.",
+  caption: "Filings in time order, with a figure traced back to the filing that states it.",
 } as const;
 
 export const SAMPLE = {
   eyebrow: "Sample",
-  title: "One company, five filings, compiled.",
+  title: "One company's SEC filings, compiled.",
   lead: "The sample is a compiled World of one company's public SEC filings. Each row opens the filing on the SEC site, and the World keeps the page and region behind every figure.",
   tableLabel: "Filings in the compiled sample",
   columns: ["Filing", "Form", "Filed", "Pages"],
@@ -28,10 +28,10 @@ export const SAMPLE = {
 export const TIME = {
   eyebrow: "Reporting periods",
   title: "Compare periods side by side.",
-  lead: "Each filing is its own source with its own date, so a change between two reports points at the two filings that differ.",
+  lead: "Each filing is its own source with its own date, so a change between reports points at the filings that differ.",
   items: [
     { title: "Follow a figure", text: "Open a figure and read the page and region of the filing that states it." },
-    { title: "Compare periods", text: "Set an annual report beside a later quarterly report and see which statements changed." },
+    { title: "Compare periods", text: "Set the World of the annual report beside the World after the later filings arrived and see what each arrival added." },
     { title: "Keep each filing whole", text: "A later filing arrives as a new source and the earlier one stays as filed." },
   ],
 } as const;

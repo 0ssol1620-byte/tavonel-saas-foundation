@@ -59,6 +59,13 @@ describe("markets route", () => {
     expect(all).not.toMatch(/\b\d{3,}\b|\b\d+\.\d+\b|\d\s?%|sha256:/);
   });
 
+  it("types no count as a number word or a counted noun", () => {
+    const words = "zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|hundred|thousand|million";
+    const nouns = "filings?|reports?|documents?|pages?|sources?|statements?";
+    expect(content).not.toMatch(new RegExp(`\\b(?:${words})\\b(?:-[a-z]+)?\\s+(?:\\w+\\s+)?(?:${nouns})\\b`, "i"));
+    expect(all).not.toMatch(new RegExp(`\\b\\d+\\s+(?:${nouns})\\b`, "i"));
+  });
+
   it("carries no investment advice, performance claim or removed register item", () => {
     expect(content).not.toMatch(/\b(?:buy|sell|forecast|predict\w*|outperform\w*|alpha|trading signal|returns?|KQU|FRED|ALFRED|BEA|USGS)\b/i);
     expect(content).not.toMatch(/\b(?:not|never|no longer)\b|n't\b/i);
