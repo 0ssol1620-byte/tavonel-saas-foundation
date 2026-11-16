@@ -198,6 +198,40 @@ describe("GET /api/proposals", () => {
     expect((await (await get(`collectionId=${OTHER_COLLECTION}`)).json()).proposals).toEqual([]);
   });
 
+  it("leaves out a proposal whose document the viewer cannot read, and checks each distinct document once", async () => {
+    const DOC_B = "0b000000-0000-4000-8000-00000000000b";
+    await create(proposalBody(docType), "proposal-key-0001");
+    await create(proposalBody(topic), "proposal-key-0002");
+    await create(proposalBody({ ...topic, documentId: DOC_B, labelKey: "legal" }), "proposal-key-0003");
+    checkAccess.mockClear();
+    checkAccess.mockImplementation(async (_workspaceKey, ids) =>
+      ids.includes(DOC) ? { ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" } : { ok: true });
+    const response = await get();
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.proposals.map((p: { preview: { labelKey: string } }) => p.preview.labelKey)).toEqual(["legal"]);
+    expect(JSON.stringify(body)).not.toContain(DOC);
+    expect(checkAccess.mock.calls.map((call) => call[1]).sort()).toEqual([[DOC], [DOC_B]]);
+    expect(checkAccess.mock.calls.every((call) => call[0] === WS && call[2] === USER)).toBe(true);
+  });
+
+  it("a viewer who can read none of the documents sees an empty list, not the collection's proposals", async () => {
+    await create(proposalBody(topic));
+    checkAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    const response = await get();
+    expect(response.status).toBe(200);
+    expect((await response.json()).proposals).toEqual([]);
+    expect(checkAccess).toHaveBeenCalled();
+  });
+
+  it("an access check that is unavailable fails closed with 503 and lists nothing", async () => {
+    await create(proposalBody(topic));
+    checkAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" });
+    const response = await get();
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" });
+  });
+
   it("refuses an API key (403), a missing collection (400), and a down store (503)", async () => {
     requireFoundationSession.mockResolvedValue(apiKey);
     expect((await get()).status).toBe(403);
@@ -277,6 +311,26 @@ describe("POST /api/proposals/[id]/decision", () => {
     expect(stateOf(id)).toBe("proposed");
     expect((await decide(id, { collectionId: COLLECTION, decision: "reject" })).status).toBe(200);
     expect(stateOf(id)).toBe("rejected");
+  });
+
+  it("a rejection by a viewer who cannot read the document records the decision but carries no preview", async () => {
+    const id = await idOf(await create(proposalBody(topic)));
+    const second = await idOf(await create(proposalBody(docType), "proposal-key-0002"));
+    checkAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    const response = await decide(id, { collectionId: COLLECTION, decision: "reject" });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.proposal.state).toBe("rejected");
+    expect(body.proposal.preview).toBeNull();
+    expect(JSON.stringify(body)).not.toMatch(/pricing|documentId|sourceVersionId/);
+    checkAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" });
+    expect((await (await decide(second, { collectionId: COLLECTION, decision: "reject" })).json()).proposal.preview).toBeNull();
+  });
+
+  it("a rejection by a viewer who can read the document still carries the preview", async () => {
+    const id = await idOf(await create(proposalBody(topic)));
+    const body = await (await decide(id, { collectionId: COLLECTION, decision: "reject" })).json();
+    expect(body.proposal.preview).toMatchObject({ documentId: DOC, labelKey: "pricing" });
   });
 
   it("is session only: an API key is refused with 403 and the proposal stays proposed", async () => {

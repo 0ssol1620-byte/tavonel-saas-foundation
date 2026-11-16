@@ -70,9 +70,11 @@ export type PublicProposal = Readonly<{
   expiresAt: string; createdAt: string; decidedAt: string | null;
 }>;
 
-export function toPublicProposal(row: ProposalRow): PublicProposal {
+/** `withPreview: false` is the state alone: the preview names a document and a label, so it goes only to a viewer who may read that document. */
+export function toPublicProposal(row: ProposalRow, withPreview = true): PublicProposal {
   return {
-    proposalId: row.proposal_id, actionType: row.action_type, state: row.state, preview: parseProposalInput(row.action_type, row.input),
+    proposalId: row.proposal_id, actionType: row.action_type, state: row.state,
+    preview: withPreview ? parseProposalInput(row.action_type, row.input) : null,
     evidenceIds: row.evidence_ids, expiresAt: row.expires_at, createdAt: row.created_at, decidedAt: row.decided_at,
   };
 }
@@ -160,6 +162,23 @@ async function checkViewerAccess(principal: Principal, input: LibraryLabelInput)
   return access.ok ? null : failure(access.code, access.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503);
 }
 
+/**
+ * The proposals this viewer may see: a proposal is listed only when its document is readable by the viewer now.
+ * Each distinct document is checked once. A refusal drops the proposals of that document; an access check that
+ * cannot answer fails the whole list closed. A proposal whose input names no document carries no preview and stays.
+ */
+export async function filterReadableProposals(principal: Principal, rows: ProposalRow[]): Promise<{ ok: true; rows: ProposalRow[] } | Failure> {
+  const documentOf = (row: ProposalRow) => parseProposalInput(row.action_type, row.input)?.documentId ?? null;
+  const documentIds = [...new Set(rows.map(documentOf).filter((id): id is string => id !== null))];
+  const verdicts = await Promise.all(documentIds.map(async (documentId) => ({
+    documentId, access: await checkConnectorSourceAccessForViewer(principal.workspaceKey, [documentId], principal.userId),
+  })));
+  const unanswered = verdicts.find((verdict) => !verdict.access.ok && verdict.access.code !== "CONNECTOR_SOURCE_ACCESS_DENIED");
+  if (unanswered) return failure("CONNECTOR_SOURCE_ACCESS_UNAVAILABLE", 503);
+  const readable = new Set(verdicts.filter((verdict) => verdict.access.ok).map((verdict) => verdict.documentId));
+  return { ok: true, rows: rows.filter((row) => { const id = documentOf(row); return id === null || readable.has(id); }) };
+}
+
 async function activeManifestDigest(workspaceKey: string, collectionId: string): Promise<{ ok: true; digest: string } | Failure> {
   const active = await getFoundationActiveWorld(workspaceKey, collectionId);
   if (active.ok) return { ok: true, digest: active.world.manifestDigest };
@@ -187,7 +206,7 @@ export async function createProposal(principal: Principal, args: {
     p_idempotency_key: args.idempotencyKey, p_expires_at: new Date(now.getTime() + PROPOSAL_TTL_MS).toISOString(),
   }, (body) => (body as { proposal?: unknown } | null)?.proposal);
   if (!created.ok) return created;
-  return { ok: true, proposal: toPublicProposal(created.row), replayed: (created.body as { replayed?: unknown }).replayed === true };
+  return { ok: true, proposal: toPublicProposal(created.row, true), replayed: (created.body as { replayed?: unknown }).replayed === true };
 }
 
 /** One executor per action type. `run` is the confirmed change, `undo` the opposite decision. Both are idempotent by key. */
@@ -232,10 +251,15 @@ export async function findProposal(workspaceKey: string, collectionId: unknown, 
 export async function decideProposal(request: Request, principal: Principal, row: ProposalRow, decision: "confirm" | "reject", now = new Date()):
   Promise<{ ok: true; proposal: PublicProposal } | Failure> {
   const input = parseProposalInput(row.action_type, row.input);
+  // A confirmation needs source access and is refused without it. A rejection is allowed without it (it changes
+  // nothing in the World), but then the answer is the state alone: the preview goes only where access was confirmed.
+  let mayPreview = true;
   if (decision === "confirm") {
     if (!input) return failure("PROPOSAL_INPUT_INVALID", 400);
     const denied = await checkViewerAccess(principal, input);
     if (denied) return denied;
+  } else {
+    mayPreview = input !== null && (await checkViewerAccess(principal, input)) === null;
   }
   const current = await revalidateFoundationSession(request, principal);
   if (!current.ok) return failure(current.code, current.status);
@@ -246,14 +270,14 @@ export async function decideProposal(request: Request, principal: Principal, row
     p_current_manifest_digest: active.digest, p_now: now.toISOString(),
   });
   if (!decided.ok) return decided;
-  if (decided.row.state !== "confirmed") return { ok: true, proposal: toPublicProposal(decided.row) };
+  if (decided.row.state !== "confirmed") return { ok: true, proposal: toPublicProposal(decided.row, mayPreview) };
   const executedAt = new Date().toISOString();
   const result = await execute("run", decided.row, principal);
   const recorded = await record(decided.row, result.ok ? "executed" : "failed", {
     proposalId: row.proposal_id, inputSha256: row.input_sha256, executedAt, decidedBy: principal.userId,
     result: result.ok ? { ok: true, replayed: result.replayed } : { ok: false, code: result.code, status: result.status },
   });
-  return recorded.ok ? { ok: true, proposal: toPublicProposal(recorded.row) } : failure("PROPOSAL_OUTCOME_NOT_RECORDED", 503);
+  return recorded.ok ? { ok: true, proposal: toPublicProposal(recorded.row, mayPreview) } : failure("PROPOSAL_OUTCOME_NOT_RECORDED", 503);
 }
 
 /** Undo: `executed` only. The opposite decision is issued first; when the library refuses it (someone decided since) nothing is recorded. */
@@ -271,5 +295,5 @@ export async function undoProposal(request: Request, principal: Principal, row: 
   const recorded = await record(row, "undone", {
     proposalId: row.proposal_id, undoneAt: new Date().toISOString(), undoneBy: principal.userId, result: { ok: true, replayed: undone.replayed },
   });
-  return recorded.ok ? { ok: true, proposal: toPublicProposal(recorded.row) } : recorded;
+  return recorded.ok ? { ok: true, proposal: toPublicProposal(recorded.row, true) } : recorded;
 }
