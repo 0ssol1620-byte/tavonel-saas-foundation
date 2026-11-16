@@ -51,7 +51,7 @@ export function CatalogBody() {
       <Hero
         variant="split"
         eyebrow={record.ogLabel}
-        title={record.title}
+        title={record.title.replace(/ — TAVONEL$/, "")}
         lead={record.description}
         actions={<ButtonLink href={WORLD} tone="onDark">Inspect a public reference World</ButtonLink>}
         art={<Figure framed={false} kind="Illustration" caption="Entries in a catalog, each showing its source terms before it is added." art={<Art />} />}

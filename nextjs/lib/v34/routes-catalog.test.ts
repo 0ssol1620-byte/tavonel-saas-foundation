@@ -32,10 +32,16 @@ describe("catalog page", () => {
     expect(v34Route("catalog").release).toBe("held");
   });
 
-  it("renders one h1 that carries the registry title", () => {
+  it("renders one h1 whose text is exactly the registry title, without the document-title suffix", () => {
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    expect(html).toContain(v34Route("catalog").title.replace(" — TAVONEL", ""));
+    const h1 = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)![1]!.replace(/<[^>]*>/g, "");
+    expect(h1).toBe(v34Route("catalog").title.replace(/ — TAVONEL$/, ""));
     expect(code).not.toMatch(/<h1\b/);
+  });
+
+  it("shows the document-title form nowhere on the page", () => {
+    expect(visible).not.toMatch(/—\s*TAVONEL/);
+    expect(html).not.toContain(v34Route("catalog").title);
   });
 });
 

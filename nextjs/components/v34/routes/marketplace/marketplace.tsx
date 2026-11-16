@@ -61,7 +61,7 @@ export function MarketplaceBody() {
       <Hero
         variant="split"
         eyebrow={record.ogLabel}
-        title={record.title}
+        title={record.title.replace(/ — TAVONEL$/, "")}
         lead={record.description}
         actions={<ButtonLink href={WORLD} tone="onDark">Inspect a public reference World</ButtonLink>}
         art={<Figure framed={false} kind="Illustration" caption="A listing carries a chosen subset of a World with its rights, license, release and evidence." art={<Art />} />}

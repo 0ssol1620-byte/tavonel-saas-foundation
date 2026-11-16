@@ -52,7 +52,7 @@ export function FederationBody() {
       <Hero
         variant="split"
         eyebrow={record.ogLabel}
-        title={record.title}
+        title={record.title.replace(/ — TAVONEL$/, "")}
         lead={record.description}
         actions={<ButtonLink href={WORLD} tone="onDark">Inspect a public reference World</ButtonLink>}
         art={<Figure framed={false} kind="Illustration" caption="Worlds exchange a selected subset through a grant and keep their own sources." art={<Art />} />}
