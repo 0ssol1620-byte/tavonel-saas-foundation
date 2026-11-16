@@ -31,6 +31,20 @@ describe("processorDelta", () => {
     });
   });
 
+  it("ignores allowance_expired rows, counts chargeback_warning, and does not expect billed to be granted", () => {
+    const [a, b, c] = ["a", "b", "c"].map(txn);
+    const expired: LedgerRow = { ...grant(a, -500), kind: "allowance_expired", eventId: "evt_x" };
+    const warn: PaddleAdjustment = { ...refund(b), action: "chargeback_warning" };
+    const delta = processorDelta(
+      [{ ...grant(a), kind: "allowance" }, expired, grant(b), reversal(b)],
+      [tx(a), tx(b), tx(c, "billed")],
+      [warn],
+    );
+    expect(delta).toEqual({
+      missingInLedger: [], missingAtProcessor: [], creditMismatch: [], reversalMissing: [], reversalUnexpected: [],
+    });
+  });
+
   it("is empty when ledger and processor agree", () => {
     const a = txn("a");
     const delta = processorDelta([grant(a), reversal(a)], [tx(a)], [refund(a)]);

@@ -50,8 +50,9 @@ export async function readLedgerForReconciliation(sinceIso: string) {
   return { ok: true as const, rows, truncated: true };
 }
 
-const PAID = new Set(["completed", "billed"]);
-const REVERSING = new Set(["refund", "credit", "chargeback"]);
+// Same sources as the webhook: grants only on transaction.completed; ADVERSE_ADJUSTMENT_ACTIONS in paddle-billing-event.ts.
+const PAID = new Set(["completed"]);
+const REVERSING = new Set(["refund", "credit", "chargeback", "chargeback_warning"]);
 
 export type ProcessorDelta = {
   missingInLedger: string[];
@@ -75,7 +76,7 @@ export function processorDelta(
   for (const row of ledger) {
     if (row.kind === "reversed") {
       if (row.reversalOfTransactionId) reversed.add(row.reversalOfTransactionId);
-    } else if (row.transactionId) grants.set(row.transactionId, row);
+    } else if ((row.kind === "purchased" || row.kind === "allowance") && row.transactionId) grants.set(row.transactionId, row);
   }
   const processor = new Set(transactions.map((t) => t.id));
   const approvedReversals = new Set(
