@@ -1571,7 +1571,7 @@ export async function GET(request: Request) {
         Page: {
           type: "object",
           description: "Keyset paging. `cursor` is the last item id from the previous page, never an offset. `limit: null` means the whole collection was returned.",
-          properties: { limit: { type: ["integer", "null"] }, cursor: nullableStr, nextCursor: nullableStr, nextPageToken: { ...nullableStr, description: "Sealed continuation for `page_token`; null on the last page, absent when this deployment has no signing key." }, total: { type: ["integer", "null"] } },
+          properties: { limit: { type: ["integer", "null"] }, cursor: nullableStr, nextCursor: nullableStr, nextPageToken: { ...nullableStr, description: "Sealed continuation for `page_token`; null on the last page, absent when this API has no signing key." }, total: { type: ["integer", "null"] } },
         },
         Freshness: {
           type: "object",
