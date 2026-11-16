@@ -9,7 +9,7 @@ import WorldOntologyViewer from "@/components/world-ontology-viewer";
 import WorldVersionDiffPanel from "@/components/world-version-diff";
 import type { SelectedWorldEvidence, WorldEvidence, WorldReadModel } from "@/lib/world-read-model";
 import { readWorldLensParams, writeWorldLensParams } from "@/lib/world-lens-url";
-import { datesRecorded, filterBySourceRevision, sourceRevisions, versionOptions, viewedVersionEntry } from "@/lib/world-temporal-view";
+import { datesRecorded, filterBySourceRevision, listedVersion, sourceRevisions, versionOptions } from "@/lib/world-temporal-view";
 import styles from "./world-studio-ultimate.module.css";
 
 export type WorldStudioLens = "overview" | "graph" | "directory" | "ontology" | "evidence" | "versions" | "files";
@@ -73,12 +73,15 @@ export default function WorldStudioUltimate({ model: currentModel, initialLens =
   const [asOf, setAsOf] = useState<string | null>(null);
   const [revision, setRevision] = useState<string | null>(null);
   const [past, setPast] = useState<{ digest: string; model: WorldReadModel } | null>(null);
-  const [versionError, setVersionError] = useState(false);
+  /* Why a requested version is not on screen: the server refused it, or this World does not list it. Different facts, different words. */
+  const [versionNotice, setVersionNotice] = useState<"unreadable" | "unavailable" | null>(null);
   const [urlRead, setUrlRead] = useState(!syncUrl);
   const currentDigest = currentModel?.world.manifestDigest ?? null;
   const worldId = currentModel?.world.id ?? null;
-  const pastView = past && past.digest === asOf ? past.model : null;
-  const viewingPast = asOf !== null && asOf !== currentDigest;
+  // A past version is shown only as the current World's history lists it; its own read never describes it.
+  const pastEntry = currentModel && asOf ? listedVersion(currentModel.history, currentModel.world.manifestDigest, asOf) : null;
+  const viewingPast = pastEntry !== null;
+  const pastView = pastEntry && past?.digest === pastEntry.manifestDigest ? past.model : null;
   // The model on screen: a historical version when one is chosen, narrowed to a source revision when one is.
   const viewed = pastView ?? currentModel;
   const model = useMemo(() => (viewed && revision ? filterBySourceRevision(viewed, revision) : viewed), [viewed, revision]);
@@ -123,9 +126,11 @@ export default function WorldStudioUltimate({ model: currentModel, initialLens =
     window.history.replaceState(window.history.state, "", url);
   }, [syncUrl, urlRead, lens, selectedObjectId, activeEvidenceId, asOf, revision]);
 
-  // A chosen older version is fetched whole and shown read-only; a failed read leaves the current World and drops asof.
+  // A chosen older version is fetched whole and shown read-only. One this World does not list is never fetched,
+  // and a failed read is never shown: either way asof is dropped and the current World stays.
   useEffect(() => {
     if (!asOf || !worldId || asOf === currentDigest) { setPast(null); return; }
+    if (!viewingPast) { setPast(null); setVersionNotice("unavailable"); setAsOf(null); return; }
     const controller = new AbortController();
     void (async () => {
       const token = await authToken();
@@ -133,11 +138,11 @@ export default function WorldStudioUltimate({ model: currentModel, initialLens =
       const response = await fetch(`/api/v1/world/${worldId}?manifest=${encodeURIComponent(asOf)}`, { headers: { authorization: `Bearer ${token}` }, cache: "no-store", signal: controller.signal });
       const body = await response.json().catch(() => ({})) as { model?: WorldReadModel };
       if (!response.ok || !body.model || body.model.world.id !== worldId || body.model.world.manifestDigest !== asOf) throw new Error("VERSION_UNAVAILABLE");
-      setVersionError(false);
+      setVersionNotice(null);
       setPast({ digest: asOf, model: body.model });
-    })().catch(() => { if (controller.signal.aborted) return; setPast(null); setVersionError(true); setAsOf(null); });
+    })().catch(() => { if (controller.signal.aborted) return; setPast(null); setVersionNotice("unreadable"); setAsOf(null); });
     return () => controller.abort();
-  }, [asOf, currentDigest, worldId]);
+  }, [asOf, currentDigest, worldId, viewingPast]);
   // Only once the control that asked has left the DOM: focus the reader moved elsewhere is never taken.
   useEffect(() => {
     if (!focusEvidenceHeading.current || !evidenceHeadingRef.current) return;
@@ -195,20 +200,14 @@ export default function WorldStudioUltimate({ model: currentModel, initialLens =
     return { sourcedObjects, evidenceCoverage, sources };
   }, [model]);
 
-  // The version on screen describes itself from its own read; what that read does not say is printed as not yet, never guessed.
-  const pastEntry = viewingPast && asOf ? viewedVersionEntry(pastView, asOf) : null;
-  const pastVersion = pastEntry?.version ?? NOT_YET;
-  const pastState = pastEntry?.status ?? NOT_YET;
-  const options = currentModel ? versionOptions(currentModel.history, currentModel.world.manifestDigest, pastEntry) : [];
-  // A linked version still being read (or unread) keeps its own option, so the select never names another version.
-  const asOfUnlisted = viewingPast && asOf !== null && !options.some((option) => option.manifestDigest === asOf);
+  const options = currentModel ? versionOptions(currentModel.history, currentModel.world.manifestDigest) : [];
 
   return (
     <section className={styles.studio} aria-labelledby="world-studio-title">
       <header className={styles.header}>
-        <div><span className="eyebrow">{!model ? "World not loaded" : viewingPast && pastView ? `Version ${pastVersion} · ${pastState}` : model.world.status === "candidate" ? "Compiled candidate" : "Compiled World"}</span><h2 id="world-studio-title">World Studio</h2><p>{!model ? "A readable compiled model appears here when one is available." : viewingPast && pastView ? `Viewing version ${pastVersion} · not the current World` : model.world.status === "candidate" ? "Inspect this candidate before activation, then open its graph, directory, ontology or source evidence." : "Inspect the current World first, then open the graph, directory, ontology or exact source evidence when you need the detail."}</p></div>
+        <div><span className="eyebrow">{!model ? "World not loaded" : pastEntry && pastView ? `Version ${pastEntry.version} · ${pastEntry.status}` : model.world.status === "candidate" ? "Compiled candidate" : "Compiled World"}</span><h2 id="world-studio-title">World Studio</h2><p>{!model ? "A readable compiled model appears here when one is available." : pastEntry && pastView ? `Viewing version ${pastEntry.version} · not the current World` : model.world.status === "candidate" ? "Inspect this candidate before activation, then open its graph, directory, ontology or source evidence." : "Inspect the current World first, then open the graph, directory, ontology or exact source evidence when you need the detail."}</p></div>
         <dl>
-          <div><dt>State</dt><dd>{model ? (viewingPast && pastView ? pastState : model.world.status) : "Not compiled"}</dd></div>
+          <div><dt>State</dt><dd>{model ? (pastEntry && pastView ? pastEntry.status : model.world.status) : "Not compiled"}</dd></div>
           <div><dt>Sources</dt><dd>{overview ? overview.sources : NOT_YET}</dd></div>
           <div><dt>Objects</dt><dd>{model ? model.objects.length : NOT_YET}</dd></div>
           <div><dt>Relations</dt><dd>{model ? model.relations.length : NOT_YET}</dd></div>
@@ -222,9 +221,8 @@ export default function WorldStudioUltimate({ model: currentModel, initialLens =
       {currentModel && (
         <div className={styles.filters}>
           <label>View as of
-            <select value={viewingPast ? asOf ?? "" : currentDigest ?? ""} onChange={(event) => { setVersionError(false); setAsOf(event.target.value === currentDigest ? null : event.target.value); }}>
+            <select value={pastEntry ? pastEntry.manifestDigest : currentDigest ?? ""} onChange={(event) => { setVersionNotice(null); setAsOf(event.target.value === currentDigest ? null : event.target.value); }}>
               {options.map((option) => <option key={option.manifestDigest} value={option.manifestDigest}>{`Version ${option.version}${option.current ? " (current)" : ""}`}</option>)}
-              {asOfUnlisted && asOf && <option value={asOf}>{`Version ${NOT_YET} read`}</option>}
             </select>
           </label>
           <label>Source revision
@@ -233,8 +231,8 @@ export default function WorldStudioUltimate({ model: currentModel, initialLens =
               {[...new Set([...sourceRevisions(viewed ?? currentModel), ...(revision ? [revision] : [])])].map((rev) => <option key={rev} value={rev}>{rev}</option>)}
             </select>
           </label>
-          {viewingPast && <p role="status">{pastView ? `Viewing version ${pastVersion} · not the current World` : "Opening that version…"}</p>}
-          {versionError && <p role="alert">That version could not be read. The current World is shown.</p>}
+          {pastEntry && <p role="status">{pastView ? `Viewing version ${pastEntry.version} · not the current World` : "Opening that version…"}</p>}
+          {versionNotice && <p role="alert">{versionNotice === "unreadable" ? "That version could not be read. The current World is shown." : "That version is not available in this World. The current World is shown."}</p>}
           {!datesRecorded(currentModel) && <p>Per-object dates are not recorded in this World; filter by version or source revision.</p>}
         </div>
       )}
