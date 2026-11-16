@@ -51,9 +51,18 @@ describe("federation copy", () => {
     for (const offer of Object.values(BILLING_OFFERS)) expect(code).not.toMatch(new RegExp(`\\b${offer.label}\\b`));
   });
 
+  it("uses none of the held-row forbidden terms", () => {
+    expect(visible).not.toMatch(/Curated Worlds|directory listing|role matrix|\b(?:fifteen|ten|twenty|thirty|fifty)\s+(?:percent|per cent)\b/i);
+  });
+
   it("states what things are, with no defensive disclaimer and no internal id", () => {
     expect(code.replace(/aria-label="[^"]*"/g, "")).not.toMatch(/\b(?:not|never|no longer)\b|n't\b/i);
     expect(code).not.toMatch(/\b(?:D\d\d|U\d\d|EG-\d+|WO-RT)\b/);
+  });
+
+  it("sets its own heading colour, since the global h3 colour is near-white", () => {
+    const css = readFileSync(join(dir, "federation.module.css"), "utf8");
+    expect(css).toMatch(/\.itemTitle \{[^}]*color: var\(--v34-fg\)/);
   });
 
   it("labels its drawing as an illustration", () => {
