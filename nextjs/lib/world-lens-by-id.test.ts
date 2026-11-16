@@ -119,13 +119,19 @@ describe("?ids= by-id read", () => {
 describe("the id rule the catalog publishes is the one enforced", () => {
   // The catalog is public developer documentation; a pattern it states that the route does not
   // enforce tells agents real ids are refused. Read the pattern out of the published text and
-  // hold the read model's SAFE_ID and the route's behaviour to it.
+  // hold every copy of the rule -- the read model's SAFE_ID and the route's LENS_ID -- to it by
+  // source, then the route's behaviour too. A behavioural sample alone cannot hold a copy equal: a
+  // character the fuzz alphabet never draws (say `@`) added to one copy passes any sample.
   const meaning = API_ERROR_GROUPS.flatMap((group) => group.codes).find((entry) => entry.code === "WORLD_IDS_INVALID")?.meaning ?? "";
   const published = [...meaning.matchAll(/`([^`]+)`/g)].at(-1)?.[1] ?? "";
 
-  it("is the read model's SAFE_ID", () => {
-    const source = readFileSync(fileURLToPath(new URL("./world-read-model.ts", import.meta.url)), "utf8");
-    expect(/const SAFE_ID = \/\^(.+)\$\/;/.exec(source)?.[1]).toBe(published);
+  it.each([
+    ["the read model's SAFE_ID", "./world-read-model.ts", /const SAFE_ID = \/\^(.+)\$\/;/],
+    ["the route's LENS_ID", "../app/api/v1/world/[id]/[lens]/route.ts", /const LENS_ID = \/\^(.+)\$\/;/],
+  ])("is %s", (_name, path, declaration) => {
+    const source = readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
+    expect(published).not.toBe("");
+    expect(declaration.exec(source)?.[1]).toBe(published);
   });
 
   it("accepts exactly the ids it matches, over random and boundary ids", async () => {
@@ -134,6 +140,8 @@ describe("the id rule the catalog publishes is the one enforced", () => {
     const next = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
     const alphabet = [..."aZ09._:-", " ", "/", "%", "_", "#", "+", "~", "é", "\u0000", "\n"];
     const ids = ["a".repeat(256), "a".repeat(257), "_a", "-a", ".a", "ko_evidence_ab:chunk_cd", "rel.a:b"];
+    // Every printable ASCII character, leading and inside, so no character is left unsampled.
+    for (let code = 0x20; code <= 0x7e; code += 1) ids.push(`${String.fromCharCode(code)}a`, `a${String.fromCharCode(code)}a`);
     for (let index = 0; index < 300; index += 1) {
       // Half the ids draw only from the allowed characters, so long and leading-symbol cases occur.
       const pool = index % 2 === 0 ? alphabet.slice(0, 8) : alphabet;
