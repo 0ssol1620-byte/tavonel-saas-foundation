@@ -1,0 +1,50 @@
+/*
+  Library panel -- hairlines for depth, no hue. State is carried by the group a source sits in and
+  by words (Confirmed, Proposed, Unknown), never by colour alone. Text is 12px or larger.
+*/
+
+.surface {
+  --lp-ink: var(--text-hi, #edeae4);
+  --lp-muted: var(--text-lo, #7d878d);
+  --lp-line: var(--hairline, #23282d);
+  --lp-line-hi: var(--hairline-hi, #2e353b);
+  --lp-changed: var(--changed, #f2a65a);
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.intro { display: grid; gap: 6px; }
+.intro h2 { margin: 0; }
+.intro p { margin: 0; max-width: 62ch; color: var(--lp-muted); font-size: 13px; line-height: 1.6; }
+
+.group { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--lp-line-hi); min-width: 0; }
+.group h3 { margin: 0; font-size: 14px; }
+.count { color: var(--lp-muted); font: 12px var(--f-mono, monospace); }
+.group[data-group="unknown"] { border-style: dashed; }
+
+.note { margin: 0; color: var(--lp-muted); font-size: 12px; line-height: 1.6; }
+.empty { margin: 0; color: var(--lp-muted); font-size: 13px; }
+.problem { margin: 0; padding: 10px 12px; border: 1px solid var(--lp-changed); color: var(--lp-ink); font-size: 13px; }
+
+.list { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; background: var(--lp-line); }
+.row { display: grid; gap: 8px; padding: 12px; background: var(--ground, #08090a); min-width: 0; }
+.name { color: var(--lp-ink); font-size: 13px; overflow-wrap: anywhere; }
+
+.labels { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.label { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--lp-ink); font-size: 13px; }
+.kind { color: var(--lp-muted); font: 12px var(--f-mono, monospace); letter-spacing: .08em; text-transform: uppercase; }
+
+.action {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--lp-line-hi);
+  color: var(--lp-ink);
+  font-size: 12px;
+}
+.action:hover:not(:disabled) { border-color: var(--lp-ink); }
+.action:disabled { opacity: .5; cursor: progress; }
+@media (pointer: coarse) { .action { min-height: 44px; min-width: 44px; } }
+
+.duplicates { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; color: var(--lp-ink); font-size: 13px; }
+.badge { padding: 2px 6px; border: 1px solid var(--lp-line-hi); color: var(--lp-muted); font: 12px var(--f-mono, monospace); }

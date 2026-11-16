@@ -3,7 +3,7 @@ import {
   MINHASH_PERMUTATIONS, RULES_DOC_TYPE_V1, minhashSimilarity, proposeTopics, textFingerprint, type DocTypeProposer,
 } from "./library-methods";
 import {
-  LIBRARY_ORGANIZE_MAX_TEXT_CHARS, docTypeLabel, libraryOrganizeMode, organizeLibraryAtIntake, readLibraryDocuments, readLibraryInternal, toLibraryDocuments,
+  LIBRARY_ORGANIZE_MAX_TEXT_CHARS, decideLibraryLabel, docTypeLabel, libraryOrganizeMode, organizeLibraryAtIntake, readLibraryDocuments, readLibraryInternal, toLibraryDocuments,
   type LibraryInternalView,
 } from "./library-shadow";
 
@@ -329,5 +329,109 @@ describe("Library DTOs", () => {
     expect(await readLibraryInternal(WS, Array.from({ length: 129 }, () => A), STORE)).toEqual({ ok: false, code: "LIBRARY_ORGANIZE_REQUEST_INVALID" });
     expect(fetch).not.toHaveBeenCalled();
     expect(await readLibraryInternal(WS, [A], STORE)).toEqual({ ok: false, code: "LIBRARY_ORGANIZE_RESPONSE_INVALID" });
+  });
+
+  it("names the newest source version of each readable document, and none for an unreadable one", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ schemaVersion: "tavonel.library_organize_read.v1", ...internal }), { status: 200 })));
+    const read = await readLibraryDocuments(WS, [A, H], VIEWER, ON);
+    expect(read.ok && read.sourceVersions).toEqual({ [A]: "a".repeat(64) });
+  });
+});
+
+/* A person's decisions (WO-D23-4): the newest decision wins, an undo is a later opposite decision. */
+const person = (documentId: string, labelKind: "doc_type" | "topic", labelKey: string, disposition: "confirmed" | "rejected", createdAt: string,
+  key = createdAt) => ({ documentId, sourceVersionId: "a".repeat(64), labelKind, labelKey,
+    labelSetVersion: labelKind === "doc_type" ? "doc-type:v0" : "person:v1", method: "person", methodVersion: "person:v1",
+    inputsSha256: `sha256:${sha256Of(key)}`, disposition, abstainReason: null, internalScore: null, evidenceIds: [], createdAt });
+const sha256Of = (text: string) => Buffer.from(text).toString("hex").padEnd(64, "0").slice(0, 64);
+const proposal = (labelKey: string, createdAt = "2026-11-07T10:00:00+00:00") => ({
+  documentId: A, sourceVersionId: "a".repeat(64), labelKind: "doc_type" as const, labelKey, labelSetVersion: "doc-type:v0",
+  method: "rules", methodVersion: "doc-type-rules:v1", inputsSha256: `sha256:${"1".repeat(64)}`, disposition: "proposed" as const,
+  abstainReason: null, internalScore: 0.75, evidenceIds: [], createdAt });
+const topic = (labelKey: string) => ({ ...proposal(labelKey), labelKind: "topic" as const, labelSetVersion: "topic-open:v1",
+  method: "tfidf_agglomerative", methodVersion: "topic-ctfidf:v1" });
+const view = (...labels: readonly unknown[]): LibraryInternalView => ({ labels: labels as LibraryInternalView["labels"], relations: [] });
+
+describe("a person's decisions on the Library", () => {
+  it("an undo of a confirmed type falls back to the production proposal", () => {
+    const confirmed = person(A, "doc_type", "invoice", "confirmed", "2026-11-08T10:00:00+00:00");
+    const undone = person(A, "doc_type", "invoice", "rejected", "2026-11-08T11:00:00+00:00");
+    expect(toLibraryDocuments(view(proposal("contract"), confirmed), [A])[0]!.documentType).toEqual({ label: "invoice", state: "confirmed" });
+    expect(toLibraryDocuments(view(proposal("contract"), confirmed, undone), [A])[0]!.documentType).toEqual({ label: "contract", state: "proposed" });
+  });
+
+  it("rejecting the proposed type itself leaves the document Unknown, never the label the person refused", () => {
+    const rejected = person(A, "doc_type", "contract", "rejected", "2026-11-08T10:00:00+00:00");
+    expect(toLibraryDocuments(view(proposal("contract"), rejected), [A])[0]!.documentType).toEqual({ label: null, state: "abstained" });
+  });
+
+  it("an older person row never beats a newer one, whatever order the store returns them in", () => {
+    const older = person(A, "doc_type", "invoice", "confirmed", "2026-11-08T10:00:00+00:00");
+    const newer = person(A, "doc_type", "report", "confirmed", "2026-11-08T12:00:00+00:00");
+    for (const labels of [[older, newer], [newer, older]]) {
+      expect(toLibraryDocuments(view(...labels), [A])[0]!.documentType).toEqual({ label: "report", state: "confirmed" });
+    }
+    // Rejecting the older label afterwards does not bring the newer one down; rejecting the newer one falls back to the older.
+    const rejectOlder = person(A, "doc_type", "invoice", "rejected", "2026-11-08T13:00:00+00:00");
+    expect(toLibraryDocuments(view(older, newer, rejectOlder), [A])[0]!.documentType).toEqual({ label: "report", state: "confirmed" });
+    const rejectNewer = person(A, "doc_type", "report", "rejected", "2026-11-08T13:00:00+00:00");
+    expect(toLibraryDocuments(view(older, newer, rejectNewer), [A])[0]!.documentType).toEqual({ label: "invoice", state: "confirmed" });
+  });
+
+  it("a later topic rejection hides a confirmed topic and a proposed one; a later confirmation shows it again", () => {
+    const confirm = person(A, "topic", "terms", "confirmed", "2026-11-08T10:00:00+00:00");
+    const reject = person(A, "topic", "terms", "rejected", "2026-11-08T11:00:00+00:00");
+    const again = person(A, "topic", "terms", "confirmed", "2026-11-08T12:00:00+00:00");
+    const topics = (...labels: unknown[]) => toLibraryDocuments(view(topic("terms"), ...labels), [A])[0]!.topics;
+    expect(topics()).toEqual([{ label: "terms", state: "proposed" }]);
+    expect(topics(confirm)).toEqual([{ label: "terms", state: "confirmed" }]);
+    expect(topics(confirm, reject)).toEqual([]);
+    expect(topics(reject)).toEqual([]);
+    expect(topics(reject, confirm, again)).toEqual([{ label: "terms", state: "confirmed" }]);
+    expect(topics(again, reject, confirm)).toEqual([{ label: "terms", state: "confirmed" }]);
+  });
+});
+
+describe("decideLibraryLabel", () => {
+  const input = { documentId: A, sourceVersionId: "a".repeat(64), labelKind: "doc_type" as const, labelKey: "invoice",
+    decision: "confirmed" as const, idempotencyKey: "idem-key-0001" };
+  const answer = (status: number, body: unknown) => vi.fn(async () => new Response(JSON.stringify(body), { status }));
+
+  it("sends one RPC naming the workspace, the person and the key, and reports a replay", async () => {
+    const fetch = answer(200, { schemaVersion: "tavonel.library_decision.v1", replayed: true });
+    vi.stubGlobal("fetch", fetch);
+    expect(await decideLibraryLabel(WS, input, VIEWER, ON)).toEqual({ ok: true, replayed: true });
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, { body: string }];
+    expect(url).toContain("/rest/v1/rpc/decide_library_label");
+    expect(JSON.parse(init.body)).toEqual({ p_workspace_key: WS, p_document_id: A, p_source_version_id: "a".repeat(64), p_label_kind: "doc_type",
+      p_label_key: "invoice", p_decision: "confirmed", p_decided_by: VIEWER, p_idempotency_key: "idem-key-0001" });
+  });
+
+  it("answers only under `on` in the cohort, and refuses malformed input before the store", async () => {
+    const fetch = answer(200, {});
+    vi.stubGlobal("fetch", fetch);
+    expect(await decideLibraryLabel(WS, input, VIEWER, SHADOW)).toEqual({ ok: false, code: "LIBRARY_ORGANIZE_NOT_ENABLED", status: 404 });
+    for (const bad of [{ ...input, labelKey: "banana" }, { ...input, labelKey: "" }, { ...input, decision: "proposed" as never },
+      { ...input, idempotencyKey: "short" }, { ...input, sourceVersionId: "xyz" }, { ...input, documentId: "nope" },
+      { ...input, labelKind: "topic" as const, labelKey: "a\nb" }]) {
+      expect(await decideLibraryLabel(WS, bad, VIEWER, ON)).toEqual({ ok: false, code: "LIBRARY_DECISION_REQUEST_INVALID", status: 400 });
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("maps the store's refusals: conflict 409, missing target 404, absent migration, outage and a bad answer 503", async () => {
+    const cases: [number, unknown, string, number][] = [
+      [400, { code: "P0001", message: "library_decision_conflict" }, "LIBRARY_DECISION_CONFLICT", 409],
+      [400, { code: "P0001", message: "library_decision_target_missing" }, "LIBRARY_DECISION_TARGET_MISSING", 404],
+      [404, { code: "PGRST202", message: "not found" }, "LIBRARY_ORGANIZE_MIGRATION_ABSENT", 503],
+      [500, { message: "boom" }, "LIBRARY_ORGANIZE_STORE_FAILED", 503],
+      [200, { schemaVersion: "other" }, "LIBRARY_ORGANIZE_RESPONSE_INVALID", 503],
+    ];
+    for (const [status, body, code, expected] of cases) {
+      vi.stubGlobal("fetch", answer(status, body));
+      expect(await decideLibraryLabel(WS, input, VIEWER, ON)).toEqual({ ok: false, code, status: expected });
+    }
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("down"); }));
+    expect(await decideLibraryLabel(WS, input, VIEWER, ON)).toEqual({ ok: false, code: "LIBRARY_ORGANIZE_STORE_UNREACHABLE", status: 503 });
   });
 });
