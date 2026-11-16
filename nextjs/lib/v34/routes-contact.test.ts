@@ -215,3 +215,43 @@ describe("tokens, targets and states", () => {
     }
   });
 });
+
+describe("copy that is true of the product today", () => {
+  const OPERATOR = {
+    TAVONEL_LEGAL_BUSINESS_NAME: "Example Co",
+    TAVONEL_LEGAL_REPRESENTATIVE: "A Person",
+    TAVONEL_LEGAL_BUSINESS_NUMBER: "123-45-67890",
+    TAVONEL_LEGAL_ADDRESS: "1 Example Street",
+    TAVONEL_LEGAL_PHONE: "+82 2 1234 5678",
+    TAVONEL_LEGAL_EMAIL: "ops@example.com",
+  };
+  const renderWith = (env: Record<string, string>) => {
+    const saved = Object.keys(OPERATOR).map((k) => [k, process.env[k]] as const);
+    for (const k of Object.keys(OPERATOR)) delete process.env[k];
+    Object.assign(process.env, env);
+    try {
+      return renderToStaticMarkup(createElement(ContactBody));
+    } finally {
+      for (const [k, v] of saved) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  };
+
+  it("offers a call only when a telephone is published", () => {
+    const without = renderWith({});
+    expect(without).not.toContain("tel:");
+    expect(plain(without)).toContain("Write to us");
+    expect(plain(without)).not.toContain("Write or call");
+    const withOp = renderWith(OPERATOR);
+    expect(withOp).toContain("tel:");
+    expect(plain(withOp)).toContain("Write or call");
+  });
+
+  it("does not say the form asks about the four preparation items", () => {
+    expect(plain(html)).not.toMatch(/optional questions in the form ask about each/i);
+  });
+
+  it("sets the step labels small enough to stay inside their boxes", () => {
+    const sheet = stripped(styles).map((f) => f.text).join("\n");
+    expect(sheet).toMatch(/\.lab\s*\{[^}]*font-size:\s*14px/);
+  });
+});

@@ -69,8 +69,7 @@ function FirstQuestions() {
 }
 
 /** The addresses, the telephone where the operator record exists, and what happens after a message is sent. */
-function Reach() {
-  const operator = readLegalOperator();
+function Reach({ operator }: { operator: ReturnType<typeof readLegalOperator> }) {
   return (
     <div className={s.reach}>
       <dl className={s.addresses}>
@@ -98,6 +97,7 @@ function Reach() {
 
 /** The page body, without the V34 frame, so it can be rendered on its own. */
 export function ContactBody() {
+  const operator = readLegalOperator();
   const route = v34Route("contact");
   const pricing = registryPath("pricing");
   return (
@@ -111,8 +111,8 @@ export function ContactBody() {
         art={<Figure art={<ContactArt />} caption={HERO.figureCaption} />}
       />
 
-      <Section id="addresses" surface="paper" title="Write or call">
-        <Reach />
+      <Section id="addresses" surface="paper" title={operator ? "Write or call" : "Write to us"}>
+        <Reach operator={operator} />
       </Section>
 
       <Section id="inquiry" surface="green" title={FORM.title} lead={FORM.lead}>

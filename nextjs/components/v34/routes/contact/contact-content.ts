@@ -2,11 +2,11 @@ import type { Route } from "next";
 import { v34Route } from "@/lib/v34/routes";
 
 /*
-  The words of /contact. Every sentence here is one the previous /contact page already printed:
-  the three addresses, the acknowledgement target (read from lib/support-targets.ts at render
-  time), the six first questions with their links, and the four things the optional questions in
-  the form ask about. The training and provider answers are the /security rows. Nothing is a new
-  claim about the product, and no figure is typed in this file.
+  The words of /contact. The addresses, the acknowledgement target (read from lib/support-targets.ts
+  at render time), the six first questions with their links and the training and provider answers
+  (the /security rows) are ones the previous /contact page printed. The hero caption and the four
+  preparation prompts are new to this page; they say what to bring, not what the product does.
+  No figure is typed in this file.
 */
 
 /** The registry paths this route links to; the route test requires each one to be live. */
@@ -43,7 +43,7 @@ export const FIRST_QUESTIONS_TITLE = "Questions we get first";
 
 export const PREPARE = {
   title: "Make the first reply specific",
-  lead: "Four things settle most of a first conversation. The optional questions in the form ask about each of them, in closed lists, so nothing needs to be typed that a customer document could end up inside.",
+  lead: "Four things settle most of a first conversation.",
   items: [
     ["Goal", "A specific question or task that should become easier."],
     ["Sources", "Types and approximate scope, without sharing confidential documents yet."],
