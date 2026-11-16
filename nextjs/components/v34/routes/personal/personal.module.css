@@ -1,0 +1,75 @@
+/*
+  Personal page only. Colours come from --v34-* tokens. The bands set their own surface, so a rule
+  here that paints a background also states its foreground. No animation.
+*/
+
+.art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--v34-on-dark);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+}
+
+.holds,
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hold,
+.step {
+  min-width: 0;
+  padding: 22px 0 0;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.title {
+  margin: 0 0 8px;
+  color: var(--v34-fg);
+  font-size: var(--v34-h3);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.text {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+}
+
+.no {
+  display: block;
+  margin: 0 0 10px;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  letter-spacing: 0.11em;
+  font-variant-numeric: tabular-nums;
+}
+
+.tools {
+  margin-bottom: 24px;
+}
+
+.accessActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .holds,
+  .steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

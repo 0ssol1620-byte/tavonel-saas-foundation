@@ -1,4 +1,4 @@
-import RouteStub from "@/components/v34/route-stub";
+import Teams from "@/components/v34/routes/teams/teams";
 import { releaseGate } from "@/lib/v34/release";
 import { routeMetadata, routeViewport } from "@/lib/v34/route-metadata";
 
@@ -7,5 +7,5 @@ export const viewport = routeViewport();
 
 export default async function Page() {
   await releaseGate("teams");
-  return <RouteStub route="teams" line="A shared World lets a group read and check the same compiled knowledge." />;
+  return <Teams />;
 }
