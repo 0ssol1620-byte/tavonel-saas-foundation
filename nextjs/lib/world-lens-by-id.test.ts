@@ -26,6 +26,9 @@ vi.mock("@/lib/world-read-model", async (importOriginal) => ({
 
 import { GET as getLens } from "../app/api/v1/world/[id]/[lens]/route";
 import { EMPTY_WORLD_FRESHNESS } from "./world-store";
+import { API_ERROR_GROUPS } from "./api-error-codes";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const WORKSPACE = "pilot-acme01";
 const COLLECTION = `collection-${"a".repeat(32)}`;
@@ -110,6 +113,38 @@ describe("?ids= by-id read", () => {
       expect((await get(`?ids=${evId(1)}${extra}`)).body.code).toBe("WORLD_IDS_WITH_PAGE");
     }
     expect((await get(`?ids=${evId(1)}`, "history")).body.code).toBe("WORLD_LENS_NOT_PAGEABLE");
+  });
+});
+
+describe("the id rule the catalog publishes is the one enforced", () => {
+  // The catalog is public developer documentation; a pattern it states that the route does not
+  // enforce tells agents real ids are refused. Read the pattern out of the published text and
+  // hold the read model's SAFE_ID and the route's behaviour to it.
+  const meaning = API_ERROR_GROUPS.flatMap((group) => group.codes).find((entry) => entry.code === "WORLD_IDS_INVALID")?.meaning ?? "";
+  const published = [...meaning.matchAll(/`([^`]+)`/g)].at(-1)?.[1] ?? "";
+
+  it("is the read model's SAFE_ID", () => {
+    const source = readFileSync(fileURLToPath(new URL("./world-read-model.ts", import.meta.url)), "utf8");
+    expect(/const SAFE_ID = \/\^(.+)\$\/;/.exec(source)?.[1]).toBe(published);
+  });
+
+  it("accepts exactly the ids it matches, over random and boundary ids", async () => {
+    const rule = new RegExp(`^${published}$`);
+    let seed = 0x5eed;
+    const next = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+    const alphabet = [..."aZ09._:-", " ", "/", "%", "_", "#", "+", "~", "é", "\u0000", "\n"];
+    const ids = ["a".repeat(256), "a".repeat(257), "_a", "-a", ".a", "ko_evidence_ab:chunk_cd", "rel.a:b"];
+    for (let index = 0; index < 300; index += 1) {
+      // Half the ids draw only from the allowed characters, so long and leading-symbol cases occur.
+      const pool = index % 2 === 0 ? alphabet.slice(0, 8) : alphabet;
+      const length = Math.floor(next() * 300);
+      ids.push(Array.from({ length }, () => pool[Math.floor(next() * pool.length)]).join(""));
+    }
+    for (const id of ids) {
+      const { status, body } = await get(`?ids=${encodeURIComponent(id)}`);
+      const expected = rule.test(id) ? [200, "OK"] : [400, "WORLD_IDS_INVALID"];
+      expect([status, body.code, JSON.stringify(id)]).toEqual([...expected, JSON.stringify(id)]);
+    }
   });
 });
 

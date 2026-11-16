@@ -6,7 +6,7 @@ import {
   worldModelSnapshot,
 } from "@/lib/consumer-context-api";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
-import { SAFE_ID, loadWorldReadModel } from "@/lib/world-read-model";
+import { loadWorldReadModel } from "@/lib/world-read-model";
 import { pageTokenKey, sealClaims, unsealClaims } from "@/lib/sealed-claims";
 import { getFoundationActiveWorld } from "@/lib/world-store";
 
@@ -39,6 +39,10 @@ const PAGE_MAX = 50;
 const PAGEABLE = new Set(["objects", "relations", "evidence"]);
 const PAGE_TOKEN_PURPOSE = "tavonel.world_lens_page.v1";
 const PAGE_TOKEN_TTL_MS = 15 * 60 * 1000;
+// The same rule as SAFE_ID in lib/world-read-model.ts, which every lens id already passes, and
+// the pattern the WORLD_IDS_INVALID catalog entry publishes; world-lens-by-id.test.ts holds the
+// three equal. Local because a route file cannot export it and that module is outside this scope.
+const LENS_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
 
 type Identified = { id: string };
 
@@ -78,7 +82,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     if (paged) return fail("WORLD_IDS_WITH_PAGE", 400);
     if (search.getAll("ids").length > 1) return fail("WORLD_IDS_INVALID", 400);
     ids = rawIds.split(",");
-    if (ids.length > PAGE_MAX || new Set(ids).size !== ids.length || !ids.every((value) => SAFE_ID.test(value))) {
+    if (ids.length > PAGE_MAX || new Set(ids).size !== ids.length || !ids.every((value) => LENS_ID.test(value))) {
       return fail("WORLD_IDS_INVALID", 400);
     }
   }
