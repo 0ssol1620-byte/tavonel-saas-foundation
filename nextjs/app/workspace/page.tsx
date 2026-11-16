@@ -74,6 +74,8 @@ import {
   type WorkspaceIntent,
   type WorkspaceStateInput,
 } from "@/lib/workspace-onboarding";
+import { deriveJourney } from "@/lib/workspace-journey";
+import { useStoredPurpose } from "@/components/workspace-purpose-picker";
 import WorldStudioUltimate from "@/components/world-studio-ultimate";
 import ChangeInbox from "@/components/change-inbox";
 import OperationsUltimate from "@/components/operations-ultimate";
@@ -374,6 +376,7 @@ export default function WorkspacePage() {
   const [busy, setBusy] = useState(false);
   const corpusFollowRef = useRef<AbortController | null>(null);
   const [compileJob, setCompileJob] = useState<CompileJobView | null>(null);
+  const [purpose, setPurpose] = useStoredPurpose();
   /*
     A corpus is several compiles, followed as one run.
 
@@ -2966,6 +2969,10 @@ export default function WorkspacePage() {
         run: () => { if (nextAction.surface) navigateSurface(nextAction.surface); else nextAction.run?.(); },
       }}
       onOpenWorld={() => navigateSurface("world")}
+      journey={deriveJourney({ ...workspaceStateInput, purpose, libraryAvailable: false })}
+      purpose={purpose}
+      onPurpose={setPurpose}
+      onOpenStep={navigateSurface}
     />
   ) : null;
 
@@ -3514,6 +3521,9 @@ export default function WorkspacePage() {
               reading={readingForCurrentVersions}
               names={names}
               customerDataAccess={customerDataAccess}
+              compiledWorldActive={Boolean(activeWorld && collectionResult && activeWorld.manifestDigest === collectionResult.manifestDigest)}
+              blocked={compileJob?.blocked}
+              blockedResolution={compileJob?.blockedResolution ?? null}
               noComputeAccess={accessSource === "unentitled"}
               selectableIds={intakeOpen ? compilableDocumentIds : []}
               selectedIds={selectedDocumentIds}
@@ -3607,6 +3617,7 @@ export default function WorkspacePage() {
                 */}
                 <WorldStudioUltimate
                   model={worldReadModel}
+                  syncUrl
                   onRollback={rollbackReason.trim().length >= 8 ? (digest) => void rollbackWorld(digest) : undefined}
                   rollbackBusy={worldBusy}
                 />
