@@ -291,7 +291,9 @@ export function projectLod(
   const members = new Map<number, GraphNode[]>();
   const clusterOf = new Map<string, number>();
   for (const node of filtered.nodes) {
-    members.set(node.cluster, [...(members.get(node.cluster) ?? []), node]);
+    const g = members.get(node.cluster);
+    if (g) g.push(node);
+    else members.set(node.cluster, [node]);
     clusterOf.set(node.id, node.cluster);
   }
   const order = [...members.keys()].sort((left, right) => left - right);

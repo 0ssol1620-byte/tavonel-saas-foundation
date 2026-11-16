@@ -280,7 +280,7 @@ export default function WorldGraphCanvas({ model, selectedObjectId, onObjectSele
         {projected.aggregates.length > 0 ? ` · ${projected.aggregates.length} clusters collapsed` : ""}
         {filtered.hiddenNodes > 0 ? ` · ${filtered.hiddenNodes} hidden by filter` : ""}
         {query.trim().length > 0 ? ` · ${filtered.matched.size} match${filtered.matched.size === 1 ? "" : "es"}` : ""}
-        {visibleNodes.length < filtered.nodes.length ? ` · drawing ${visibleNodes.length} of ${filtered.nodes.length}` : ""}
+        {visibleNodes.length < projected.nodes.length ? ` · drawing ${visibleNodes.length} of ${projected.nodes.length}` : ""}
       </p>
 
       {asTable ? (
