@@ -23,7 +23,7 @@ export function FilmBody() {
       <Hero
         variant="split"
         eyebrow={FILM.eyebrow}
-        title={v34Route(KEY).title}
+        title={v34Route(KEY).title.replace(/ — TAVONEL$/, "")}
         lead={FILM.lead}
         actions={<ButtonLink href={action.href} tone="primary">{action.label}</ButtonLink>}
         art={<Figure kind="Storyboard" art={<FilmArt />} caption="Three frames of the storyboard: source, evidence, answer." />}

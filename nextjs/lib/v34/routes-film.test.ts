@@ -69,7 +69,9 @@ describe("one h1 and the Storyboard label", () => {
   it("writes no h1 of its own and renders the registry title once", () => {
     for (const f of files) expect(f.text, f.file).not.toMatch(/<h1\b/);
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    expect(html).toContain(`>${v34Route(KEY).title}</h1>`);
+    const h1Title = v34Route(KEY).title.replace(/ — TAVONEL$/, "");
+    expect(html).toContain(`>${h1Title}</h1>`);
+    expect(html.match(/<h1\b[^>]*>.*?<\/h1>/s)?.[0]).not.toContain("— TAVONEL");
   });
 
   it("labels the page and its drawing Storyboard", () => {
@@ -82,7 +84,7 @@ describe("figures, prices, plans and tool names are never typed", () => {
   it("types no price and no plan", () => {
     expect(text).not.toMatch(/[$€£₩]\s?\d/);
     expect(text).not.toMatch(/\b(?:USD|per month|per year|a month|a year)\b/i);
-    for (const offer of Object.values(BILLING_OFFERS)) expect(text, `plan label "${offer.label}"`).not.toMatch(new RegExp(`\b${offer.label}\b`));
+    for (const offer of Object.values(BILLING_OFFERS)) expect(text, `plan label "${offer.label}"`).not.toMatch(new RegExp(`\\b${offer.label}\\b`));
   });
 
   it("writes no figure", () => {
