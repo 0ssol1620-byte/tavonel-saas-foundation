@@ -5,7 +5,7 @@ import type { Route } from "next";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { HeaderAccountActions } from "@/components/site-nav/desktop-primary-nav";
-import type { NavGroupLinks, NavLink } from "@/lib/v34/nav";
+import { current, type NavGroupLinks, NavLink } from "@/lib/v34/nav";
 import tokens from "../tokens.module.css";
 import s from "./mobile-drawer.module.css";
 
@@ -88,7 +88,7 @@ export default function MobileDrawer({ primary, groups, start }: {
           <ul className={s.primary}>
             {primary.map((link) => (
               <li key={link.href}>
-                <Link className={s.primaryLink} href={link.href as Route} aria-current={link.href === pathname ? "page" : undefined} prefetch={false}>
+                <Link className={s.primaryLink} href={link.href as Route} aria-current={current(link.href, pathname)} prefetch={false}>
                   {link.label}
                 </Link>
               </li>
@@ -100,7 +100,7 @@ export default function MobileDrawer({ primary, groups, start }: {
               <ul className={s.list}>
                 {group.links.map((link) => (
                   <li key={link.href}>
-                    <Link className={s.link} href={link.href as Route} aria-current={link.href === pathname ? "page" : undefined} prefetch={false}>
+                    <Link className={s.link} href={link.href as Route} aria-current={current(link.href, pathname)} prefetch={false}>
                       {link.label}
                     </Link>
                   </li>
