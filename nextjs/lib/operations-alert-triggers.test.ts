@@ -10,8 +10,10 @@ vi.mock("./supabase-admin", () => ({
 import {
   alertCompileJobTurn,
   alertOcrFailure,
+  budgetTier,
   checkReleaseRowExpiry,
   checkRunPodDailyCost,
+  costPerAcceptedUnit,
   ocrSpendStop,
   resetOcrSpendStopCache,
   MCP_SPIKE_MIN_CALLS,
@@ -148,11 +150,89 @@ describe("RunPod daily cost", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it("is within the cap at or below it, and reads only today's bucket", async () => {
-    const fetcher = billing([{ startTime: "2026-11-03T00:00:00Z", totalAmount: 500 }, { startTime: "2026-11-04T00:00:00Z", totalAmount: 25 }]);
-    expect(await checkRunPodDailyCost(NOW, env, fetcher)).toMatchObject({ code: "RUNPOD_COST_WITHIN_CAP" });
+  it("is tier 0 well under the cap, and reads only today's bucket", async () => {
+    const fetcher = billing([{ startTime: "2026-11-03T00:00:00Z", totalAmount: 500 }, { startTime: "2026-11-04T00:00:00Z", totalAmount: 10 }]);
+    expect(await checkRunPodDailyCost(NOW, env, fetcher)).toEqual({ check: "runpod_daily_cost", code: "RUNPOD_BUDGET_TIER_0" });
+    expect(store.request).not.toHaveBeenCalled();
     expect(String((fetcher.mock.calls[0] as unknown as [string])[0])).toBe("https://api.runpod.io/v2/billing?bucketSize=day&lastN=2");
     expect((fetcher.mock.calls[0] as unknown as [string, RequestInit])[1].headers).toEqual({ Authorization: "Bearer rp-test" });
+  });
+
+  describe("50/80/100 budget tiers (WO-D24-2)", () => {
+    const spend = (amount: number) => vi.fn(async () => new Response(JSON.stringify({ records: [{ startTime: "2026-11-04T00:00:00Z", totalAmount: amount }] }), { status: 200 }));
+    const history = (code: string | null) => store.request.mockResolvedValue(new Response(JSON.stringify(
+      code ? [{ window_started_at: "2026-11-04T08:00:00Z", watch: [{ check: "runpod_daily_cost", code }] }] : [],
+    ), { status: 200 }));
+
+    it("budgetTier boundaries", () => {
+      expect([0.4999, 0.5, 0.7999, 0.8, 0.9999, 1, 3].map((ratio) => budgetTier(ratio * 25, 25))).toEqual([0, 50, 50, 80, 80, 100, 100]);
+    });
+
+    it("pages the first crossing of 50%, then stays quiet while the tier is unchanged", async () => {
+      history(null);
+      expect(await checkRunPodDailyCost(NOW, env, spend(13))).toEqual({ check: "runpod_daily_cost", code: "RUNPOD_BUDGET_TIER_50", delivery: "ALERT_DELIVERED" });
+      expect(posts[0]).toMatchObject({ kind: "cost", severity: "warning", currentValue: 13, thresholdValue: 25 });
+      expect(String(posts[0]!.summary)).toContain("50%");
+      history("RUNPOD_BUDGET_TIER_50");
+      expect(await checkRunPodDailyCost(NOW, env, spend(14))).toEqual({ check: "runpod_daily_cost", code: "RUNPOD_BUDGET_TIER_50" });
+      expect(posts).toHaveLength(1);
+    });
+
+    it("pages once when the tier rises 50 to 80, and never on a fall", async () => {
+      history("RUNPOD_BUDGET_TIER_50");
+      expect(await checkRunPodDailyCost(NOW, env, spend(21))).toMatchObject({ code: "RUNPOD_BUDGET_TIER_80", delivery: "ALERT_DELIVERED" });
+      expect(posts).toHaveLength(1);
+      history("RUNPOD_BUDGET_TIER_80");
+      expect(await checkRunPodDailyCost(NOW, env, spend(13))).not.toHaveProperty("delivery");
+      expect(posts).toHaveLength(1);
+    });
+
+    it("reads history only inside the billing day and before this slot", async () => {
+      history(null);
+      await checkRunPodDailyCost(NOW, env, spend(13));
+      const path = String(store.request.mock.calls[0]![0]);
+      expect(path).toContain("foundation_operational_sli_evaluations");
+      expect(decodeURIComponent(path)).toContain("window_started_at.gte.2026-11-04T00:00:00.000Z,window_started_at.lt.2026-11-04T09:00:00.000Z");
+    });
+
+    it("treats the over-cap code as tier 100, so a fall back to 80 does not page", async () => {
+      history("RUNPOD_COST_CAP_EXCEEDED");
+      expect(await checkRunPodDailyCost(NOW, env, spend(21))).not.toHaveProperty("delivery");
+      expect(posts).toHaveLength(0);
+    });
+
+    it("pages exactly at the cap as tier 100, critical", async () => {
+      history("RUNPOD_BUDGET_TIER_80");
+      expect(await checkRunPodDailyCost(NOW, env, spend(25))).toMatchObject({ code: "RUNPOD_BUDGET_TIER_100", delivery: "ALERT_DELIVERED" });
+      expect(posts[0]).toMatchObject({ severity: "critical" });
+    });
+
+    it("does not latch a tier whose page failed to deliver: the next evaluation pages again", async () => {
+      history(null);
+      vi.stubGlobal("fetch", vi.fn(async () => new Response("down", { status: 503 })));
+      const failed = await checkRunPodDailyCost(NOW, env, spend(21));
+      expect(failed).toMatchObject({ code: "RUNPOD_BUDGET_TIER_80_UNSENT", delivery: "ALERT_DELIVERY_FAILED" });
+      history(failed.code);
+      vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+        posts.push(JSON.parse(String(init?.body)));
+        return new Response("ok", { status: 200 });
+      }));
+      expect(await checkRunPodDailyCost(NOW + 3_600_000, env, spend(21))).toMatchObject({ code: "RUNPOD_BUDGET_TIER_80", delivery: "ALERT_DELIVERED" });
+      expect(posts).toHaveLength(1);
+    });
+
+    it("pages, keyed by the hour, when the previous tier cannot be read, rather than staying silent", async () => {
+      store.request.mockResolvedValue(new Response("down", { status: 503 }));
+      expect(await checkRunPodDailyCost(NOW, env, spend(21))).toMatchObject({ code: "RUNPOD_BUDGET_TIER_80", delivery: "ALERT_DELIVERED" });
+      expect(await checkRunPodDailyCost(NOW, env, spend(21))).toMatchObject({ delivery: "ALERT_SUPPRESSED_DUPLICATE" });
+      expect(posts).toHaveLength(1);
+      expect(posts[0]!.alertId).toBe(stableAlertId("budget-history-unreadable:2026-11-04T09"));
+    });
+
+    it("costPerAcceptedUnit divides spend by units and is null, not zero or infinity, with no units", () => {
+      expect(costPerAcceptedUnit({ spentUsd: 12, acceptedUnits: 8 })).toBe(1.5);
+      expect(costPerAcceptedUnit({ spentUsd: 12, acceptedUnits: 0 })).toBeNull();
+    });
   });
 
   it("pages a cost alert over the cap, critical at 120%", async () => {
@@ -174,7 +254,7 @@ describe("RunPod daily cost", () => {
     expect(String(posts[0]!.summary)).toContain("2026-11-03T15:00:00.000Z");
     // No bucket holding now is no spend yet today, not yesterday's.
     expect(await checkRunPodDailyCost(NOW, env, billing([{ startTime: "2026-11-02T00:00:00Z", totalAmount: 400 }])))
-      .toMatchObject({ code: "RUNPOD_COST_WITHIN_CAP" });
+      .toMatchObject({ code: "RUNPOD_BUDGET_TIER_0" });
   });
 
   it("pages once a day, from the 00 UTC slot, when a cap is set but the billing cannot be read", async () => {

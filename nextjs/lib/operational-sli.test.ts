@@ -207,6 +207,42 @@ describe("B35 operational SLI and freshness gate", () => {
     ]);
   });
 
+  describe("compile queue timings (WO-D24-2)", () => {
+    const fresh = stored([run("2026-09-20T11:59:00.000Z")]);
+    const sample = (startWaitSeconds: number | null, timeToSettleSeconds = 60) => ({ startWaitSeconds, timeToSettleSeconds });
+
+    it("carries no field when the caller read none", () => {
+      expect(evaluateOperationalSli(fresh, { now: NOW })).not.toHaveProperty("queueTimings");
+    });
+
+    it("reports p95 and p99 without an alert while start wait is within 15 minutes", () => {
+      const samples = Array.from({ length: 20 }, (_, index) => sample(index + 1, (index + 1) * 10));
+      const result = evaluateOperationalSli(fresh, { now: NOW, queueTimings: { ok: true, samples } });
+      expect(result.queueTimings).toEqual({ status: "ok", n: 20, startWaitP95Seconds: 19, startWaitP99Seconds: 20, timeToSettleP95Seconds: 190, timeToSettleP99Seconds: 200 });
+      expect(result.state).toBe("available");
+      expect(result.alerts).toEqual([]);
+    });
+
+    it("warns when start-wait p95 is above the 15-minute judgement, degrading but not blocking", () => {
+      const one = [...Array.from({ length: 19 }, () => sample(10)), sample(COMPILE_BACKLOG_WARNING_SECONDS + 1)];
+      expect(evaluateOperationalSli(fresh, { now: NOW, queueTimings: { ok: true, samples: one } }).alerts).toEqual([]);
+      const late = Array.from({ length: 5 }, () => sample(COMPILE_BACKLOG_WARNING_SECONDS + 1));
+      const result = evaluateOperationalSli(fresh, { now: NOW, queueTimings: { ok: true, samples: late } });
+      expect(result.state).toBe("degraded");
+      expect(result.alerts).toEqual([{ severity: "warning", reason: "compile_queue_wait_p95_exceeded" }]);
+    });
+
+    it("an empty window is no_samples, and an unreadable one is unavailable with a warning, never zero", () => {
+      const empty = evaluateOperationalSli(fresh, { now: NOW, queueTimings: { ok: true, samples: [] } });
+      expect(empty.queueTimings).toEqual({ status: "no_samples", n: 0, startWaitP95Seconds: null, startWaitP99Seconds: null, timeToSettleP95Seconds: null, timeToSettleP99Seconds: null });
+      expect(empty.alerts).toEqual([]);
+      const down = evaluateOperationalSli(fresh, { now: NOW, queueTimings: { ok: false } });
+      expect(down.queueTimings).toMatchObject({ status: "unavailable", n: 0, startWaitP95Seconds: null });
+      expect(down.alerts).toEqual([{ severity: "warning", reason: "compile_queue_timing_unavailable" }]);
+      expect(evaluateOperationalSli(stored([]), { now: NOW, queueTimings: { ok: false } }).queueTimings?.status).toBe("unavailable");
+    });
+  });
+
   describe("compile backlog age (GA gap 4)", () => {
     const fresh = stored([run("2026-09-20T11:59:00.000Z")]);
     const waitingFor = (seconds: number) => ({ ok: true as const, oldestWaitingSince: new Date(NOW.getTime() - seconds * 1_000).toISOString() });

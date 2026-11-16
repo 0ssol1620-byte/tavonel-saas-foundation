@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { releaseDecisionQuery } from "../../shared/scopedCustomerDataGate";
+import { readLatestWatchCode } from "./operational-sli-alert-store";
 import { deliverOperationsAlert, type AlertDelivery } from "./operations-p0";
 import { deployedGateSurface } from "./processing-workspace-grant";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
@@ -271,6 +272,30 @@ export async function ocrSpendStop(
   return "OCR_DAILY_SPEND_STOP";
 }
 
+/*
+  WO-D24-2: 50 / 80 / 100 percent of the daily cap. The tier is stored as the check's watch code
+  (RUNPOD_BUDGET_TIER_n; the over-cap code counts as 100), so the next hourly evaluation can tell a
+  crossing from a repeat: the page goes out only when the tier rose since the latest evaluation
+  recorded in this billing day. The thresholds are the product's, not a calibration.
+*/
+export type BudgetTier = 0 | 50 | 80 | 100;
+
+export function budgetTier(spent: number, cap: number): BudgetTier {
+  const ratio = spent / cap;
+  return ratio >= 1 ? 100 : ratio >= 0.8 ? 80 : ratio >= 0.5 ? 50 : 0;
+}
+
+function tierOfCode(code: string | null): BudgetTier {
+  if (code === "RUNPOD_COST_CAP_EXCEEDED") return 100;
+  const tier = Number(/^RUNPOD_BUDGET_TIER_(50|80|100)$/.exec(code ?? "")?.[1] ?? 0);
+  return tier as BudgetTier;
+}
+
+/** Spend per accepted unit; null when nothing was accepted, never zero or infinity. */
+export function costPerAcceptedUnit(input: { spentUsd: number; acceptedUnits: number }): number | null {
+  return input.acceptedUnits > 0 ? input.spentUsd / input.acceptedUnits : null;
+}
+
 /**
  * RunPod spend for the current UTC day, from RunPod's own billing (REST v2 `GET /v2/billing`,
  * every resource family). The cap is TAVONEL_RUNPOD_DAILY_COST_CAP_USD; unset means unchecked,
@@ -289,7 +314,23 @@ export async function checkRunPodDailyCost(
   if (!reading.ok) return cannotCheck("runpod_daily_cost", reading.code, now);
   const { spent, bucketStart } = reading;
   const day = new Date(bucketStart).toISOString().slice(0, 10);
-  if (spent <= cap) return result("RUNPOD_COST_WITHIN_CAP");
+  if (spent <= cap) {
+    const tier = budgetTier(spent, cap);
+    if (tier === 0) return result("RUNPOD_BUDGET_TIER_0");
+    // A tier crossing pages once. History that cannot be read pages (keyed by hour) instead of
+    // silently suppressing: a missed 80% is worse than a repeated one. A prior code that is not a
+    // tier (a failed billing read) counts as tier 0, so one transient failure can repeat a page.
+    const slot = new Date(now);
+    const previous = await readLatestWatchCode("runpod_daily_cost", new Date(bucketStart).toISOString(), slot.toISOString());
+    if (previous.ok && tierOfCode(previous.code) >= tier) return result(`RUNPOD_BUDGET_TIER_${tier}`);
+    const delivery = await send(previous.ok ? `runpod-budget-tier:${day}:${tier}` : `budget-history-unreadable:${slot.toISOString().slice(0, 13)}`, {
+      kind: "cost", severity: tier === 100 ? "critical" : "warning", service: "runpod", observedAt: slot.toISOString(),
+      summary: `RunPod spend for the billing day from ${new Date(bucketStart).toISOString()} reached ${tier}% of the daily cap`,
+      currentValue: Math.round(spent * 100) / 100, thresholdValue: cap, unit: "usd",
+    }, now);
+    // An undelivered page must not latch: _UNSENT reads as tier 0, so the next hour sends again.
+    return result(delivery.ok ? `RUNPOD_BUDGET_TIER_${tier}` : `RUNPOD_BUDGET_TIER_${tier}_UNSENT`, delivery);
+  }
   const delivery = await send(`runpod-daily-cost:${day}`, {
     kind: "cost", severity: spent >= cap * 1.2 ? "critical" : "warning", service: "runpod",
     observedAt: new Date(now).toISOString(),
