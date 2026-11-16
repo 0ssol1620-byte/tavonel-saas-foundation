@@ -20,6 +20,8 @@ const io = vi.hoisted(() => ({
   active: vi.fn(), versions: vi.fn(), promote: vi.fn(), rollback: vi.fn(),
   decisions: vi.fn(), decision: vi.fn(), pipeline: vi.fn(),
 }));
+// The signed-receipt check has its own suite (promotion-receipt-check.test.ts); these fixtures carry unsigned candidates.
+vi.mock("@/lib/promotion-receipt-check", () => ({ checkCandidateCompileReceipt: () => ({ ok: true }) }));
 vi.mock("./r2-synthetic-canary", () => ({ readR2SignerEnv: () => ({ bucket: "synthetic-only" }) }));
 vi.mock("./r2-objects", () => ({ getWorkspaceCollectionCandidate: io.get, listImmutableWorkspaceObjects: io.list }));
 vi.mock("./connector-source-access", () => ({ checkConnectorSourceAccess: io.access, checkConnectorSourceAccessForViewer: io.access }));

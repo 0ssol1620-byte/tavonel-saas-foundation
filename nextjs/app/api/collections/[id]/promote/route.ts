@@ -15,6 +15,7 @@ import {
 import { getWorkspaceCollectionCandidate, listImmutableWorkspaceObjects } from "@/lib/r2-objects";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { ensureRetrievalIndexForActiveWorld } from "@/lib/retrieval-index-status";
+import { checkCandidateCompileReceipt } from "@/lib/promotion-receipt-check";
 import { promoteFoundationCandidate } from "@/lib/world-store";
 import { buildWorldReadModel } from "@/lib/world-read-model";
 
@@ -221,6 +222,13 @@ export async function POST(
       { code: "WORLD_EQUIVALENCE_REFUSED", equivalence: { status: equivalence.status, detail: equivalence.detail } },
       { status: 409, headers: NO_STORE }
     );
+  }
+
+  const receiptCheck = checkCandidateCompileReceipt(loaded.json, {
+    workspaceId: membership.workspaceId, collectionId: id, manifestDigest,
+  });
+  if (!receiptCheck.ok) {
+    return NextResponse.json({ code: receiptCheck.code }, { status: receiptCheck.status, headers: NO_STORE });
   }
 
   const sourceDocuments = stored.sourceDocuments;
