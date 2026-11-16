@@ -448,3 +448,38 @@ test.describe("round 2: overlays, ancestor clipping, keyboard traps", () => {
     expect(r.violations.some(v => v.pass === "keyboard-trap")).toBe(true);
   });
 });
+
+test.describe("QA 1 review: scroll axes, stretched links, text hiding, line clamp", () => {
+  test("F6: overflow-x hidden with overflow-y auto still clips horizontally", async ({ page }) => {
+    await load(page, `<div style="width:120px;overflow-x:hidden;overflow-y:auto;height:80px"><p style="margin:0;white-space:nowrap">a long line clipped on the right and never scrollable</p></div>`);
+    expect((await page.evaluate(measureClippedRows)).length).toBeGreaterThan(0);
+    await load(page, `<div style="width:120px;overflow-x:hidden;overflow-y:auto;height:40px"><p style="margin:0;width:100px">several words that wrap and scroll down inside this box</p></div>`);
+    expect(await page.evaluate(measureClippedRows)).toEqual([]);
+  });
+
+  test("F7: a scrolling pre wider than its clipping figure is caught, one that fits passes", async ({ page }) => {
+    await load(page, `<figure style="width:120px;overflow:hidden;margin:0"><pre style="overflow:auto;width:400px;margin:0"><span>code that fits the pre but not the figure</span></pre></figure>`);
+    expect((await page.evaluate(measureClippedRows)).length).toBeGreaterThan(0);
+    await load(page, `<figure style="width:300px;overflow:hidden;margin:0"><pre style="overflow:auto;width:280px;margin:0"><span>a very long line of code that scrolls inside its box and its figure</span></pre></figure>`);
+    expect(await page.evaluate(measureClippedRows)).toEqual([]);
+  });
+
+  test("F5: a stretched link that leaks out of an unpositioned card still covers text", async ({ page }) => {
+    await load(page, `<div style="position:relative"><div><p>card one copy</p><a class="s" href="#1">Open one</a></div><div><p>card two copy</p><a href="#2">Open two</a></div></div>`, `.s::after{content:"";position:absolute;inset:0}`);
+    expect((await page.evaluate(measureClippedText)).some(v => v.pass === "occluded-text")).toBe(true);
+    await load(page, `<div><div style="position:relative"><p>card one copy</p><a class="s" href="#1">Open one</a></div><div style="position:relative"><p>card two copy</p><a class="s" href="#2">Open two</a></div></div>`, `.s::after{content:"";position:absolute;inset:0}`);
+    expect((await page.evaluate(measureClippedText)).filter(v => v.pass === "occluded-text")).toEqual([]);
+  });
+
+  test("F3: the contrast pass keeps a currentColor background, so text on it is still judged", async ({ page }) => {
+    await load(page, `<p style="color:#262626;background:currentColor;padding:8px;display:inline-block;margin:20px">dark text on its own currentColor</p>`);
+    expect((await contrastPass(page)).violations).toHaveLength(1);
+  });
+
+  test("F8: a line clamp whose fixed height cuts a line is reported, a clean clamp is not", async ({ page }) => {
+    await load(page, `<p style="display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;width:120px;height:30px;margin:0;line-height:20px">one two three four five six seven eight nine ten eleven twelve</p>`);
+    expect((await page.evaluate(measureClippedText)).some(v => v.pass === "clipped-text")).toBe(true);
+    await load(page, `<p style="display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;width:120px;margin:0;line-height:20px">one two three four five six seven eight nine ten eleven twelve</p>`);
+    expect(await page.evaluate(measureClippedText)).toEqual([]);
+  });
+});

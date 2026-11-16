@@ -258,6 +258,35 @@ for (const { path: route, release } of routes) {
   }
 }
 
+/*
+  The consent panel is the one surface every other pass answers away (declined in openContext). Home is
+  where it first shows: left pending, it is waited for and then judged on its own, in the two screenshot widths.
+*/
+if (routes.some(r => r.path === "/")) {
+  for (const width of at(412, 1440)) {
+    test(`/ ${width}px consent panel`, tags("/", width, "consent"), async ({ browser, browserName }) => {
+      test.setTimeout(120_000);
+      const ctx = await openContext(browser, width, { consent: "pending" });
+      const page = await ctx.newPage();
+      try {
+        await settle(page, "/");
+        const panel = page.locator("[data-marketing-consent-panel]");
+        await expect(panel, "the consent panel did not appear").toBeVisible({ timeout: 20_000 });
+        const text = await contrastPass(page);
+        const violations: Violation[] = [...text.violations, ...(await controlContrastPass(page))];
+        if (browserName === "chromium") violations.push(...(await forcedColorsPass(page)));
+        await page.emulateMedia({ forcedColors: "none" });
+        const walk = await keyboardWalk(page);
+        violations.push(...walk.violations);
+        record({ route: "/", width, engine: browserName, colorScheme: "light", pass: "consent", state: "pending", violations, reported: text.reported });
+        expect(violations, report("/ (consent pending)", width, violations)).toEqual([]);
+      } finally {
+        await ctx.close();
+      }
+    });
+  }
+}
+
 /* SEO: one test over the whole set, because uniqueness is a property of the set. */
 test("v34 SEO set", tags("*", "*", "seo"), async ({ request, browserName }) => {
   test.skip(routes.length === 0, "no route registry");

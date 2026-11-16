@@ -190,13 +190,13 @@ async function centreInView(handle: Locator): Promise<void> {
 export async function contrastPass(page: Page, options: ContrastOptions = {}): Promise<ContrastResult> {
   const targets = await page.evaluate(collectTargets, options.max ?? 60);
   /*
-    Every glyph on the page is made transparent for the duration of the pass, not only the element
+    Every glyph on the page is made transparent (fill and decoration, not `color`, so a currentColor background or border still paints) for the duration of the pass, not only the element
     under test. A line's sample box is the line itself, and at tight leading the neighbouring lines'
     descenders and ascenders reach into it (a 75px headline at line-height 1.01); what must be found
     there is the surface, and any other text would be read as the lightest or darkest background.
   */
   const sheet = await page.addStyleTag({
-    content: `html, html * { color: transparent !important; text-shadow: none !important; caret-color: transparent !important; -webkit-text-fill-color: transparent !important; }`,
+    content: `html, html * { text-shadow: none !important; caret-color: transparent !important; -webkit-text-fill-color: transparent !important; text-decoration-color: transparent !important; }`,
   });
   const result: ContrastResult = { violations: [], excepted: [], reported: [], checked: 0 };
   for (const t of targets) {

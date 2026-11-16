@@ -83,6 +83,12 @@ export function measureClippedText(): Violation[] {
     if (clipY && !lineClamp && el.scrollHeight > el.clientHeight + 1) {
       out.push({ pass: "clipped-text", selector: describe(el), detail: `scrollHeight ${el.scrollHeight} > clientHeight ${el.clientHeight}` });
     }
+    // A clamp that ends on a line boundary is the declared clip; a fixed height that cuts a line in half is not.
+    if (clipY && lineClamp) {
+      const clip = box.top + parseFloat(style.borderTopWidth) + el.clientHeight;
+      const cut = [...(() => { const r = document.createRange(); r.selectNodeContents(own); return r.getClientRects(); })()].some(l => l.height > 1 && l.top < clip - 1 && l.bottom > clip + 1);
+      if (cut) out.push({ pass: "clipped-text", selector: describe(el), detail: `line-clamp box height ${el.clientHeight} cuts a line in half` });
+    }
     // Occlusion: sample the middle of the text's own rect, only when it is inside the viewport.
     const range = document.createRange();
     range.selectNodeContents(own);
@@ -94,11 +100,26 @@ export function measureClippedText(): Violation[] {
     const top = document.elementFromPoint(px, py);
     if (!top || top === el || el.contains(top) || top.contains(el)) continue;
     if (top.closest("[data-v34-overlay]")) continue;
-    // A card's stretched link (a::after { position: absolute; inset: 0 }) is a transparent hit area by design.
+    // A card's stretched link (a::after { position: absolute; inset: 0 }) is a transparent hit area by design,
+    // but only over its own card: the positioned ancestor it stretches to must contain this text, and must not
+    // hold another stretched link or another link this one actually covers (the card that lost position: relative).
     if (top instanceof HTMLAnchorElement) {
-      const after = getComputedStyle(top, "::after");
-      const transparent = after.backgroundColor === "rgba(0, 0, 0, 0)" && after.backgroundImage === "none" && parseFloat(after.borderTopWidth) === 0;
-      if (after.content !== "none" && after.position === "absolute" && transparent) continue;
+      const stretched = (a: HTMLAnchorElement) => {
+        const after = getComputedStyle(a, "::after");
+        const transparent = after.backgroundColor === "rgba(0, 0, 0, 0)" && after.backgroundImage === "none" && parseFloat(after.borderTopWidth) === 0;
+        return after.content !== "none" && after.position === "absolute" && transparent;
+      };
+      const host = top.offsetParent;
+      if (stretched(top) && host && host.contains(el)) {
+        const leaks = [...host.querySelectorAll("a")].some(other => {
+          if (other === top || other.contains(top) || top.contains(other)) return false;
+          if (stretched(other)) return true;
+          const o = other.getBoundingClientRect();
+          const x = o.left + o.width / 2, y = o.top + o.height / 2;
+          return o.width > 0 && o.height > 0 && x >= 0 && y >= 0 && x <= window.innerWidth && y <= window.innerHeight && document.elementFromPoint(x, y) === top;
+        });
+        if (!leaks) continue;
+      }
     }
     const topStyle = getComputedStyle(top);
     if (topStyle.pointerEvents === "none" && topStyle.position === "fixed") continue;
@@ -253,31 +274,35 @@ export function measureClippedRows(): Violation[] {
     if (own) {
       const range = document.createRange();
       range.selectNodeContents(own);
-      const t = range.getBoundingClientRect();
-      if (t.width >= 2 && t.height >= 2 && getComputedStyle(el).textOverflow !== "ellipsis") {
+      const r0 = range.getBoundingClientRect();
+      // t is the box the text is judged as: the text's own rect, then (past a scroll container) that container's border rect.
+      let t = { left: r0.left, right: r0.right, top: r0.top, bottom: r0.bottom };
+      if (r0.width >= 2 && r0.height >= 2 && getComputedStyle(el).textOverflow !== "ellipsis") {
         const start = el.closest("[data-v34-overlay]") ? el : el.parentElement;
         for (let a: Element | null = start; a && a !== document.body && a !== document.documentElement; a = a.parentElement) {
           if (a.closest("[data-v34-scroll]")) break;
           const s = getComputedStyle(a);
-          // A scroll container (a <pre> with overflow:auto) keeps its text reachable; what lies beyond it clips the container, not the text.
-          if (s.overflowX === "auto" || s.overflowX === "scroll" || s.overflowY === "auto" || s.overflowY === "scroll") break;
           const cx = clips(s.overflowX), cy = clips(s.overflowY);
-          if (!cx && !cy) continue;
-          if (a.clientHeight <= 2 || a.clientWidth <= 2) continue; // visually-hidden pattern
-          if ((s as CSSStyleDeclaration & { webkitLineClamp?: string }).webkitLineClamp && (s as CSSStyleDeclaration & { webkitLineClamp?: string }).webkitLineClamp !== "none") continue;
+          const scrolls = s.overflowX === "auto" || s.overflowX === "scroll" || s.overflowY === "auto" || s.overflowY === "scroll";
           const b = a.getBoundingClientRect();
-          const l = b.left + parseFloat(s.borderLeftWidth), r = b.right - parseFloat(s.borderRightWidth);
-          const tp = b.top + parseFloat(s.borderTopWidth), bt = b.bottom - parseFloat(s.borderBottomWidth);
-          const past = [
-            cx && t.right > r + 1 ? `right ${Math.round(t.right - r)}px` : "",
-            cx && t.left < l - 1 ? `left ${Math.round(l - t.left)}px` : "",
-            cy && t.bottom > bt + 1 ? `bottom ${Math.round(t.bottom - bt)}px` : "",
-            cy && t.top < tp - 1 ? `top ${Math.round(tp - t.top)}px` : "",
-          ].filter(Boolean);
-          if (past.length) {
-            out.push({ pass: "clipped-by-ancestor", selector: name(el), detail: `text passes ${name(a)} (overflow clips) by ${past.join(", ")}` });
-            break;
+          const lineClamp = (s as CSSStyleDeclaration & { webkitLineClamp?: string }).webkitLineClamp;
+          // A scroll axis keeps its text reachable, so it is not judged; a hidden or clip axis of the same box still is.
+          if ((cx || cy) && a.clientHeight > 2 && a.clientWidth > 2 && !(lineClamp && lineClamp !== "none")) {
+            const l = b.left + parseFloat(s.borderLeftWidth), r = b.right - parseFloat(s.borderRightWidth);
+            const tp = b.top + parseFloat(s.borderTopWidth), bt = b.bottom - parseFloat(s.borderBottomWidth);
+            const past = [
+              cx && t.right > r + 1 ? `right ${Math.round(t.right - r)}px` : "",
+              cx && t.left < l - 1 ? `left ${Math.round(l - t.left)}px` : "",
+              cy && t.bottom > bt + 1 ? `bottom ${Math.round(t.bottom - bt)}px` : "",
+              cy && t.top < tp - 1 ? `top ${Math.round(tp - t.top)}px` : "",
+            ].filter(Boolean);
+            if (past.length) {
+              out.push({ pass: "clipped-by-ancestor", selector: name(el), detail: `text passes ${name(a)} (overflow clips) by ${past.join(", ")}` });
+              break;
+            }
           }
+          // Beyond a scroll container the thing an outer clip can cut is the container itself.
+          if (scrolls) t = { left: b.left, right: b.right, top: b.top, bottom: b.bottom };
         }
       }
     }

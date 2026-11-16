@@ -220,7 +220,7 @@ for (const route of ["/", "/pricing", "/docs"] as const) {
       );
       expect(overflow, `${route} scrolls ${overflow}px sideways at 200% zoom`).toBeLessThanOrEqual(1);
       if (route === "/") {
-        const explore = page.locator('main a[href^="/explore?"]').first();
+        const explore = page.locator('main a[href^="/explore"]').first();
         await expect(explore).toBeVisible();
         const box = await explore.boundingBox();
         expect(box, "the public evidence action has no box at 200% zoom").not.toBeNull();
