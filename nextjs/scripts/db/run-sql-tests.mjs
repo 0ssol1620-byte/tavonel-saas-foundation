@@ -46,8 +46,14 @@ export function exitCodeFor(results) {
   return results.some((r) => r.result === "UNSUPPORTED") ? 3 : 0;
 }
 
+/** Parent env minus every libpq variable that can redirect the connection away from the checked DSN host. */
+export function psqlEnv(parent = process.env) {
+  const { PGHOSTADDR, PGHOST, PGSERVICE, PGSERVICEFILE, PGPORT, PGSYSCONFDIR, ...base } = parent;
+  return { ...base, PGOPTIONS: "-c lc_messages=C", PGCLIENTENCODING: "UTF8", LC_MESSAGES: "C" };
+}
+
 function psql(dsn, file) {
-  const r = spawnSync(process.env.PSQL || "psql", ["-X", "-q", "-tA", "-v", "ON_ERROR_STOP=1", "-d", dsn, "-f", file], { encoding: "utf8", env: { ...process.env, PGOPTIONS: "-c lc_messages=C", PGCLIENTENCODING: "UTF8" } });
+  const r = spawnSync(process.env.PSQL || "psql", ["-X", "-q", "-tA", "-v", "ON_ERROR_STOP=1", "-d", dsn, "-f", file], { encoding: "utf8", env: psqlEnv() });
   if (r.error) throw new Error(`cannot run psql (set PSQL or fix PATH): ${r.error.message}`);
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }

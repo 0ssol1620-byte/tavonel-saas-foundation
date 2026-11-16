@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { classifyRun, exitCodeFor, isLoopbackDsn, main } from "./run-sql-tests.mjs";
+import { classifyRun, exitCodeFor, isLoopbackDsn, main, psqlEnv } from "./run-sql-tests.mjs";
 
 const OK = "1..2\nok 1 - a\nok 2 - b\n# all 2 passed\n";
 
@@ -53,4 +53,11 @@ test("the subset file creates no extension and no role", () => {
   const sql = readFileSync(new URL("./pgtap-subset.sql", import.meta.url), "utf8").replace(/--.*$/gm, "");
   assert.doesNotMatch(sql, /create\s+extension/i);
   assert.doesNotMatch(sql, /create\s+role/i);
+});
+
+test("psql env drops libpq variables that redirect the connection past the loopback check", () => {
+  const env = psqlEnv({ PGHOSTADDR: "192.0.2.1", PGHOST: "db.example.com", PGSERVICE: "x", PGPORT: "1", PATH: "p" });
+  for (const k of ["PGHOSTADDR", "PGHOST", "PGSERVICE", "PGSERVICEFILE", "PGPORT", "PGSYSCONFDIR"]) assert.equal(k in env, false, k);
+  assert.equal(env.PATH, "p");
+  assert.equal(env.PGCLIENTENCODING, "UTF8");
 });
