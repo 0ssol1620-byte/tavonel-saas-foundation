@@ -31,11 +31,14 @@ export const LAYERS = {
   lead: "Compare the same region across time. Geographic boundaries, publication dates, coverage and missing fields stay explicit.",
   items: ["Location and parcel", "Supply and permits", "Rates and financing", "Local evidence"],
   link: { href: v34Route("evidence").path, label: "Inspect original evidence" },
+  art: {
+    label: "Four stacked layers over one region: location and parcel, supply and permits, rates and financing, local evidence",
+    caption: "Four layers over one region. Each layer keeps its own source and date.",
+  },
 } as const;
 
 export const SOURCES = {
   title: "Start with what can be audited.",
-  kind: "Public source",
   items: [
     { label: "FHFA HPI", text: "Regional price indexes at published geographies.", href: "https://www.fhfa.gov/data/hpi" },
     { label: "Census Building Permits", text: "Permits by published geographic scope.", href: "https://www.census.gov/construction/bps/" },

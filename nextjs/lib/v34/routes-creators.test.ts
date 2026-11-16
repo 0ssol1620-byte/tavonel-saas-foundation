@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { MCP_TOOL_NAMES } from "@/lib/mcp-tools";
 import { CreatorsBody } from "@/components/v34/routes/creators/creators";
+import { ART, AREAS, CANON, FINAL, SOURCE } from "@/components/v34/routes/creators/creators-content";
 import { PUBLIC_CORPUS_STATS } from "./public-corpus";
 import { routeMetadata } from "./route-metadata";
 import { V34_ROUTE_KEYS, v34Route, v34RouteByPath } from "./routes";
@@ -115,5 +116,31 @@ describe("links and styles", () => {
       expect(f.text).not.toMatch(/overflow(?:-[xy])?\s*:\s*hidden/);
       expect(f.text).not.toMatch(/\b(?:animation|transition|@keyframes|@import)\b/);
     }
+  });
+});
+
+/*
+  Layout against the styled prototype (route_preview/<route>/index.html served over HTTP with its CSS).
+  A band is the markup between two <section openings; FinalCta closes the page.
+*/
+const bands = html.split(/<section\b/).slice(1);
+const band = (title: string) => {
+  const found = bands.filter((b) => b.includes(title));
+  expect(found, title).toHaveLength(1);
+  return found[0]!;
+};
+const inOrder = (titles: readonly string[]) => {
+  const at = titles.map((t) => html.indexOf(t));
+  for (const [i, t] of titles.entries()) expect(at[i], t).toBeGreaterThan(-1);
+  expect(at).toEqual([...at].sort((a, b) => a - b));
+};
+
+describe("layout against the prototype", () => {
+  it("keeps the prototype's section order: drawing, public source, canon, areas, final call", () => {
+    inOrder([ART.title, SOURCE.title, CANON.title, AREAS.title, FINAL.title]);
+  });
+
+  it("keeps the drawing in its own band", () => {
+    expect(band(ART.title)).toContain('role="img"');
   });
 });

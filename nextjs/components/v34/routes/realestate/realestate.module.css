@@ -36,6 +36,12 @@
   stroke-width: 3;
 }
 
+.layer {
+  fill: var(--v34-step-bg);
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+}
+
 .entries {
   display: grid;
   gap: 0;
@@ -96,32 +102,74 @@
   font-weight: 600;
 }
 
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
+/* Sources: one ruled row each, name, what it publishes, and the link out. */
+.sources {
   margin: 0;
   padding: 0;
   list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
 }
 
-.cardItem {
+.source {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: 4px clamp(16px, 3vw, 40px);
   min-width: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--v34-fg-rule);
 }
 
+.sourceName {
+  margin: 0;
+  color: var(--v34-fg);
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.sourceText {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.5;
+}
+
+.sourceLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.sourceLink:hover {
+  color: var(--v34-fg);
+  text-decoration-thickness: 2px;
+}
+
+.sourceLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+/* Uncertainty: ruled rows, the name on the left, what it covers on the right. */
 .facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: clamp(20px, 3vw, 40px);
   margin: 0;
   padding: 0;
   list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
 }
 
 .fact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  align-items: baseline;
+  gap: 4px clamp(20px, 4vw, 56px);
   min-width: 0;
-  padding-top: 16px;
-  border-top: 1px solid var(--v34-fg-rule);
+  padding: 18px 0;
+  border-bottom: 1px solid var(--v34-fg-rule);
 }
 
 .factTitle {
@@ -142,4 +190,20 @@
   .stage {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+@media (max-width: 760px) {
+  .source,
+  .fact {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .source {
+    align-items: start;
+    padding: 14px 0 4px;
+  }
+}
+
+@media (forced-colors: active) {
+  .sourceLink:focus-visible { outline-color: Highlight; }
 }

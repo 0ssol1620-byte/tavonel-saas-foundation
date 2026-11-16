@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { MCP_TOOL_NAMES } from "@/lib/mcp-tools";
 import { TradingBody } from "@/components/v34/routes/trading/trading";
+import { ART, FINAL, LAYERS, REPLAY, SOURCES } from "@/components/v34/routes/trading/trading-content";
 import { PUBLIC_CORPUS_STATS } from "./public-corpus";
 import { routeMetadata } from "./route-metadata";
 import { V34_ROUTE_KEYS, v34Route, v34RouteByPath } from "./routes";
@@ -115,5 +116,47 @@ describe("links and styles", () => {
       expect(f.text).not.toMatch(/overflow(?:-[xy])?\s*:\s*hidden/);
       expect(f.text).not.toMatch(/\b(?:animation|transition|@keyframes|@import)\b/);
     }
+  });
+});
+
+/*
+  Layout against the styled prototype (route_preview/<route>/index.html served over HTTP with its CSS).
+  A band is the markup between two <section openings; FinalCta closes the page.
+*/
+const bands = html.split(/<section\b/).slice(1);
+const band = (title: string) => {
+  const found = bands.filter((b) => b.includes(title));
+  expect(found, title).toHaveLength(1);
+  return found[0]!;
+};
+const inOrder = (titles: readonly string[]) => {
+  const at = titles.map((t) => html.indexOf(t));
+  for (const [i, t] of titles.entries()) expect(at[i], t).toBeGreaterThan(-1);
+  expect(at).toEqual([...at].sort((a, b) => a - b));
+};
+
+describe("layout against the prototype", () => {
+  it("keeps the prototype's section order", () => {
+    inOrder([ART.title, LAYERS.title, SOURCES.title, REPLAY.title, FINAL.title]);
+  });
+
+  it("puts the price drawing in the evidence-layers band, and the four dates in their own band", () => {
+    expect(band(LAYERS.title)).toContain('role="img"');
+    expect(band(ART.title)).not.toContain('role="img"');
+  });
+
+  it("lists sources as one ruled row each, every row naming its source in its link", () => {
+    const rows = band(SOURCES.title).match(/<li\b[\s\S]*?<\/li>/g) ?? [];
+    expect(rows).toHaveLength(SOURCES.items.length);
+    for (const [i, item] of SOURCES.items.entries()) {
+      expect(rows[i]).toContain(item.label);
+      expect(rows[i]).toContain(`href="${item.href}"`);
+      expect(rows[i]).toContain(`aria-label="${SOURCES.linkLabel}: ${item.label}"`);
+    }
+  });
+
+  it("numbers the replay steps", () => {
+    const text = band(REPLAY.title).replace(/<[^>]+>/g, " ");
+    REPLAY.steps.forEach((_, i) => expect(text).toContain(String(i + 1).padStart(2, "0")));
   });
 });

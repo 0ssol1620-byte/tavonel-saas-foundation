@@ -89,19 +89,26 @@
   gap: clamp(20px, 4vw, 56px);
 }
 
+.pairItem {
+  min-width: 0;
+}
+
+/* Ruled rows, as the prototype: the name on the left, what it covers on the right. */
 .facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: clamp(20px, 3vw, 40px);
   margin: 0;
   padding: 0;
   list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
 }
 
 .fact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  align-items: baseline;
+  gap: 4px clamp(20px, 4vw, 56px);
   min-width: 0;
-  padding-top: 16px;
-  border-top: 1px solid var(--v34-fg-rule);
+  padding: 18px 0;
+  border-bottom: 1px solid var(--v34-fg-rule);
 }
 
 .factTitle {
@@ -125,6 +132,12 @@
 @media (max-width: 900px) {
   .stage,
   .pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .fact {
     grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -4,7 +4,6 @@ import { ButtonLink } from "@/components/v34/ui/button-link";
 import { Figure } from "@/components/v34/ui/figure";
 import { FinalCta } from "@/components/v34/ui/final-cta";
 import { Hero } from "@/components/v34/ui/hero";
-import { RecordCard } from "@/components/v34/ui/record-card";
 import { Section } from "@/components/v34/ui/section";
 import { v34Route } from "@/lib/v34/routes";
 import { ART, FINAL, HERO_ACTIONS, LAYERS, SOURCES, UNCERTAINTY } from "./realestate-content";
@@ -20,6 +19,18 @@ function ParcelArt() {
       <path className={s.road} d="M0 70L640 170M190 0L225 320M440 0L400 320" />
       <path className={s.lot} d="M30 100L165 125L175 290L30 262Z M255 28L415 52L404 120L246 92Z M463 28L620 28L620 138L456 110Z M452 200L610 224L596 300L432 290Z" />
       <path className={s.parcel} d="M252 148L405 174L392 296L252 276Z" />
+    </svg>
+  );
+}
+
+/** The route's own drawing: four layers stacked over one region, the parcel layer on top. */
+function LayersArt() {
+  return (
+    <svg className={s.art} viewBox="0 0 640 320" role="img" aria-label={LAYERS.art.label} preserveAspectRatio="xMidYMid meet">
+      <path className={s.layer} d="M240 234L600 226L600 268L240 276Z" />
+      <path className={s.layer} d="M200 172L560 164L560 206L200 214Z" />
+      <path className={s.layer} d="M160 110L520 102L520 144L160 152Z" />
+      <path className={s.parcel} d="M120 48L480 40L480 82L120 90Z" />
     </svg>
   );
 }
@@ -56,7 +67,13 @@ export function RealestateBody() {
         </div>
       </Section>
 
-      <Section surface="light" eyebrow={LAYERS.eyebrow} title={LAYERS.title} lead={LAYERS.lead}>
+      <Section
+        surface="light"
+        eyebrow={LAYERS.eyebrow}
+        title={LAYERS.title}
+        lead={LAYERS.lead}
+        aside={<Figure art={<LayersArt />} caption={LAYERS.art.caption} />}
+      >
         <ul className={s.chips} aria-label="Layers compared">
           {LAYERS.items.map((item) => <li key={item} className={s.chip}>{item}</li>)}
         </ul>
@@ -64,12 +81,14 @@ export function RealestateBody() {
       </Section>
 
       <Section surface="green" title={SOURCES.title}>
-        <ul className={s.cards}>
+        <ul className={s.sources}>
           {SOURCES.items.map((item) => (
-            <li key={item.label} className={s.cardItem}>
-              <RecordCard kind={SOURCES.kind} label={item.label} source={{ href: item.href, label: SOURCES.linkLabel }}>
-                <p>{item.text}</p>
-              </RecordCard>
+            <li key={item.label} className={s.source}>
+              <h3 className={s.sourceName}>{item.label}</h3>
+              <p className={s.sourceText}>{item.text}</p>
+              <a className={s.sourceLink} href={item.href} aria-label={`${SOURCES.linkLabel}: ${item.label}`}>
+                {SOURCES.linkLabel}<span aria-hidden="true"> →</span>
+              </a>
             </li>
           ))}
         </ul>

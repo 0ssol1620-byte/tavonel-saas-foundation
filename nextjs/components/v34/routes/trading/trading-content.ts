@@ -15,8 +15,6 @@ export const HERO_ACTIONS = {
 export const ART = {
   title: "What was knowable before a decision?",
   lead: "Four dates keep a research replay honest. Each one is recorded beside the fact it belongs to.",
-  label: "A drawn price line with three dated events before a cutoff line, and a later revision shaded after it",
-  caption: "A drawn price line, three dated events and one cutoff. What lies right of the cutoff is outside the view.",
   steps: [
     { name: "Source publication", kind: "Known-at" },
     { name: "Observation vintage", kind: "Point-in-time" },
@@ -28,6 +26,10 @@ export const ART = {
 export const LAYERS = {
   eyebrow: "Evidence layers",
   title: "Give the same model a wider field of view.",
+  art: {
+    label: "A drawn price line with three dated events before a cutoff line, and a later revision shaded after it",
+    caption: "A drawn price line, three dated events and one cutoff. What lies right of the cutoff is outside the view.",
+  },
   items: [
     {
       title: "Price and volume",
@@ -43,7 +45,6 @@ export const LAYERS = {
 export const SOURCES = {
   title: "Primary sources, traceable dates.",
   lead: "Each source publishes its own dates and terms, so a fact can be traced to its origin.",
-  kind: "Public source",
   items: [
     { label: "SEC EDGAR", text: "Official filings and XBRL facts.", href: "https://www.sec.gov/search-filings/edgar-application-programming-interfaces" },
     { label: "ALFRED", text: "Economic vintages and revisions. Series rights vary.", href: "https://alfred.stlouisfed.org/" },

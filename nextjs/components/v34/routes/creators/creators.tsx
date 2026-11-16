@@ -57,10 +57,18 @@ export function CreatorsBody() {
         </div>
       </Section>
 
+      <Section surface="light" title={SOURCE.title} lead={SOURCE.lead}>
+        <div className={s.sourceWrap}>
+          <RecordCard kind={SOURCE.kind} label={SOURCE.label} source={SOURCE.link}>
+            <p>{SOURCE.detail}</p>
+          </RecordCard>
+        </div>
+      </Section>
+
       <Section surface="green" title={CANON.title}>
         <div className={s.pair}>
           {CANON.items.map((item) => (
-            <div key={item.title}>
+            <div key={item.title} className={s.pairItem}>
               <h3 className={s.factTitle}>{item.title}</h3>
               <p className={s.factText}>{item.text}</p>
             </div>
@@ -68,7 +76,7 @@ export function CreatorsBody() {
         </div>
       </Section>
 
-      <Section surface="light" title={AREAS.title} lead={AREAS.lead}>
+      <Section surface="paper" title={AREAS.title} lead={AREAS.lead}>
         <ul className={s.facts}>
           {AREAS.items.map((item) => (
             <li key={item.title} className={s.fact}>
@@ -77,14 +85,6 @@ export function CreatorsBody() {
             </li>
           ))}
         </ul>
-      </Section>
-
-      <Section surface="paper" title={SOURCE.title} lead={SOURCE.lead}>
-        <div className={s.sourceWrap}>
-          <RecordCard kind={SOURCE.kind} label={SOURCE.label} source={SOURCE.link}>
-            <p>{SOURCE.detail}</p>
-          </RecordCard>
-        </div>
       </Section>
 
       <FinalCta title={FINAL.title} secondary={FINAL.secondary} />

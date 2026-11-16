@@ -1,14 +1,9 @@
 /*
   Trading page only. Colours come from --v34-* tokens; each band sets its own surface, so a rule
   that paints a background also states its foreground. No motion.
+  Layout follows the styled prototype: the four dates as a horizontal timeline, the price drawing in
+  the dark evidence-layers band, sources as ruled rows, the replay as a numbered ruled list.
 */
-
-.stage {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
-  align-items: center;
-  gap: clamp(24px, 4vw, 56px);
-}
 
 .art {
   display: block;
@@ -52,9 +47,11 @@
   opacity: 0.1;
 }
 
-.steps {
+/* The four dates, left to right along one rule. */
+.timeline {
   display: grid;
-  gap: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 clamp(16px, 3vw, 40px);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -63,12 +60,10 @@
 
 .step {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: baseline;
-  gap: 4px 16px;
+  align-content: start;
+  gap: 6px;
   min-width: 0;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--v34-fg-rule);
+  padding: 20px 0;
 }
 
 .stepNo {
@@ -88,44 +83,96 @@
 }
 
 .stepKind {
-  grid-column: 2;
   margin: 0;
   color: var(--v34-fg-muted);
   font-size: var(--v34-small);
 }
 
-.pair {
+.layers {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(20px, 4vw, 56px);
+  gap: 24px;
 }
 
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.cardItem {
+.layer {
   min-width: 0;
 }
 
-.facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: clamp(20px, 3vw, 40px);
+/* Sources: one ruled row each, name, what it publishes, and the link out. */
+.sources {
   margin: 0;
   padding: 0;
   list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.source {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: 4px clamp(16px, 3vw, 40px);
+  min-width: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.sourceName {
+  margin: 0;
+  color: var(--v34-fg);
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.sourceText {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.5;
+}
+
+.sourceLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.sourceLink:hover {
+  color: var(--v34-fg);
+  text-decoration-thickness: 2px;
+}
+
+.sourceLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+/* The replay: numbered ruled rows. */
+.facts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
 }
 
 .fact {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 2fr);
+  align-items: baseline;
+  gap: 4px clamp(16px, 3vw, 40px);
   min-width: 0;
-  padding-top: 16px;
-  border-top: 1px solid var(--v34-fg-rule);
+  padding: 18px 0;
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.factNo {
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
 }
 
 .factTitle {
@@ -142,9 +189,32 @@
   line-height: 1.55;
 }
 
-@media (max-width: 900px) {
-  .stage,
-  .pair {
+@media (max-width: 760px) {
+  .timeline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .source {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    padding: 14px 0 4px;
+  }
+
+  .fact {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .factText {
+    grid-column: 2;
+  }
+}
+
+@media (max-width: 360px) {
+  .timeline {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+@media (forced-colors: active) {
+  .sourceLink:focus-visible { outline-color: Highlight; }
 }
