@@ -193,6 +193,10 @@
   list-style: none;
 }
 
+.references {
+  margin-top: 14px;
+}
+
 .source {
   display: grid;
   min-width: 0;

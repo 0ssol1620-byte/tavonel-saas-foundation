@@ -94,8 +94,17 @@ export function CompilerBody() {
             </li>
           ))}
         </ul>
+        <p className={s.after}>{SOURCES.more.text}</p>
+        <ul className={`${s.sources} ${s.references}`}>
+          {SOURCES.references.map((item) => (
+            <li key={item.href} className={s.source}>
+              <RecordCard kind="Reference" label={item.name} source={{ href: item.href, label: "Open the publisher's page" }}>
+                {item.about}
+              </RecordCard>
+            </li>
+          ))}
+        </ul>
         <p className={s.after}>
-          {SOURCES.more.text}{" "}
           <Link className={s.textLink} href={SOURCES.more.link.href as Route} prefetch={false}>{SOURCES.more.link.label}</Link>
         </p>
       </Section>

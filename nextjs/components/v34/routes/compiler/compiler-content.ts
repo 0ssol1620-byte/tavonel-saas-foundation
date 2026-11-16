@@ -118,7 +118,9 @@ export const REGION = {
 } as const;
 
 const catalogLabel = "Source catalog";
-const loaded = Object.values(readPublicCorpus().sources).filter((source) => source[1] !== catalogLabel);
+const corpusSources = Object.values(readPublicCorpus().sources);
+const loaded = corpusSources.filter((source) => source[1] !== catalogLabel);
+const catalogs = corpusSources.filter((source) => source[1] === catalogLabel);
 const stats = PUBLIC_CORPUS_STATS();
 
 export const SOURCES = {
@@ -126,6 +128,8 @@ export const SOURCES = {
   title: "The public sources behind the reference World.",
   lead: `${stats.sources.loaded.toLocaleString("en-US")} sources are loaded into the reference World. Each card opens the publisher's own page.`,
   items: loaded.map(([name, edition, href]) => ({ name, edition, href })),
+  /** Reference-only sources: listed in the World with the publisher's link, never loaded. */
+  references: catalogs.map(([name, , href, about]) => ({ name, href, about })),
   more: {
     text: `${stats.sources.referenceOnly.toLocaleString("en-US")} more public catalogs are listed in the World as references.`,
     link: { href: to("world"), label: "Inspect the World →" },

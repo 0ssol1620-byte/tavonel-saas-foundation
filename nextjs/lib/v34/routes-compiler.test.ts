@@ -142,6 +142,15 @@ describe("numbers are computed, prices and plans come from the catalog, tools fr
     expect(html).toContain("Public reference corpus");
   });
 
+  it("keeps the publisher link of every reference-only source, from the corpus", () => {
+    const catalogs = Object.values(readPublicCorpus().sources).filter((source) => source[1] === "Source catalog");
+    expect(catalogs.length).toBe(PUBLIC_CORPUS_STATS().sources.referenceOnly);
+    for (const [name, , href] of catalogs) {
+      expect(html).toContain(escapeHtml(name));
+      expect(html).toContain(`href="${escapeHtml(href)}"`);
+    }
+  });
+
   it("states what a region carries only while the evidence clause is still demonstrated, and downloads a published verifier", () => {
     expect(clause("evidence-preserving").state).toBe("demonstrated");
     expect(copyText).toContain("clause(\"evidence-preserving\").state !== \"demonstrated\"");
