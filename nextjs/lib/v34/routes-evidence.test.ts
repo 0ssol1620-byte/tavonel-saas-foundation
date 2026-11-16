@@ -202,6 +202,49 @@ describe("tokens and explicit pairs", () => {
   });
 });
 
+/** Every style rule of a sheet with the at-rule preludes it sits in, so `@media (…) .a` and `.a` differ. */
+function rulesOf(css: string): { context: string; selector: string }[] {
+  const out: { context: string; selector: string }[] = [];
+  const stack: string[] = [];
+  let start = 0;
+  for (let i = 0; i < css.length; i += 1) {
+    if (css[i] === "{") {
+      const prelude = css.slice(start, i).trim();
+      if (!prelude.startsWith("@")) out.push({ context: stack.join(" "), selector: prelude.replace(/\s+/g, " ") });
+      stack.push(prelude);
+      start = i + 1;
+    } else if (css[i] === "}") {
+      stack.pop();
+      start = i + 1;
+    }
+  }
+  return out;
+}
+
+describe("containment of the route sheet", () => {
+  it("writes every selector as one flat compound: no combinator, so no descendant type or class can leak", () => {
+    for (const f of stripped(styles)) {
+      for (const { selector } of rulesOf(f.text)) {
+        for (const complex of selector.split(",").map((part) => part.trim())) {
+          const flattened = complex.replace(/\[[^\]]*\]/g, "[]").replace(/\([^)]*\)/g, "()");
+          expect(flattened, `${f.file}: ${complex}`).toMatch(/^\.[\w-]+(?:\[\]|:[\w-]+(?:\(\))?)*$/);
+        }
+      }
+    }
+  });
+
+  it("declares no selector twice in the same context, so one class never styles two elements by accident", () => {
+    for (const f of stripped(styles)) {
+      const seen = new Set<string>();
+      for (const { context, selector } of rulesOf(f.text)) {
+        const key = `${context} ${selector}`.trim();
+        expect(seen.has(key), `${f.file}: ${key} is declared twice`).toBe(false);
+        seen.add(key);
+      }
+    }
+  });
+});
+
 describe("links", () => {
   const retained = EVIDENCE_RETAINED.map((href) => href.split("?")[0]!);
 

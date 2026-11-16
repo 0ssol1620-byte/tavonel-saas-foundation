@@ -254,7 +254,7 @@
   list-style: none;
 }
 
-.locator {
+.contractedLocator {
   display: grid;
   gap: 2px;
   min-width: 0;
@@ -262,7 +262,7 @@
   line-height: 1.5;
 }
 
-.locator b {
+.locatorFamily {
   color: var(--v34-fg);
   font-weight: 650;
 }

@@ -76,8 +76,8 @@ export function EvidenceBody({ view }: { view: EvidencePageView }) {
           <p className={s.readingText}>{CONTRACTED.text}</p>
           <ul className={s.locators} aria-labelledby="contracted-locators">
             {CONTRACTED_LOCATORS.map(([family, locator]) => (
-              <li key={family} className={s.locator}>
-                <b>{family}</b>
+              <li key={family} className={s.contractedLocator}>
+                <b className={s.locatorFamily}>{family}</b>
                 <span>{locator}</span>
               </li>
             ))}
