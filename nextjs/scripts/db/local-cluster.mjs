@@ -31,7 +31,6 @@ export function parseArguments(argv) {
   for (let i = 0; i < rest.length; i += 1) {
     const flag = rest[i];
     if (flag === "--port") options.port = rest[++i];
-    else if (flag === "--host") options.host = rest[++i];
     else if (flag === "--draft") {
       const file = rest[++i];
       if (!file) throw new Error("--draft needs a path");
@@ -45,7 +44,7 @@ export function parseArguments(argv) {
 
 export function validate(options, env = process.env) {
   if (env.LOCAL_RACE_TEST !== "1") throw new Error("refused: LOCAL_RACE_TEST=1 is required");
-  if (options.host !== HOST && options.host !== "localhost" && options.host !== "::1") throw new Error(`refused: non-loopback host ${options.host}`);
+  if (options.host !== HOST) throw new Error(`refused: non-loopback host ${options.host}`);
   if (options.port < 1024 || options.port > 65535) throw new Error(`refused: port ${options.port} outside 1024-65535`);
   if (options.command !== "up" && options.drafts.length > 0) throw new Error("--draft is only valid with up");
 }
@@ -53,13 +52,20 @@ export function validate(options, env = process.env) {
 export const dsnFor = (port) => `postgres://postgres@${HOST}:${port}/postgres`;
 const pointer = (port) => join(tmpdir(), `tavonel-local-cluster-${port}.json`);
 
-/** Remove `dir` only when it is a marked directory this tool created under the temp root. */
-export function removeOwnedDirectory(dir, root = tmpdir()) {
-  if (!existsSync(dir)) return false;
+/** Real path of `dir` when it is a marked directory under the temp root; null when it does not exist; throws otherwise. */
+export function resolveOwned(dir, root = tmpdir()) {
+  if (!existsSync(dir)) return null;
   const real = realpathSync(dir);
   if (!real.startsWith(realpathSync(root) + sep)) throw new Error(`refused: ${dir} is outside the temp root`);
   const marker = join(real, MARKER);
   if (!existsSync(marker) || readFileSync(marker, "utf8") !== MARKER_BODY) throw new Error(`refused: ${dir} carries no cluster marker`);
+  return real;
+}
+
+/** Remove `dir` only when it is a marked directory this tool created under the temp root. */
+export function removeOwnedDirectory(dir, root = tmpdir()) {
+  const real = resolveOwned(dir, root);
+  if (!real) return false;
   rmSync(real, { recursive: true, force: true });
   return true;
 }
@@ -85,6 +91,10 @@ function up(options, env) {
   writeFileSync(join(dir, MARKER), MARKER_BODY);
   const data = join(dir, "data");
   const fail = (message) => {
+    // The directory (and its log) is deleted below, so quote the log's tail now.
+    let tail = "";
+    try { tail = readFileSync(join(dir, "postgres.log"), "utf8").slice(-600).trim(); } catch { /* no log */ }
+    if (tail) message += `${NL}postgres.log tail: ${tail}`;
     try { run(pgCtl, ["stop", "-D", data, "-m", "immediate"]); } catch { /* not started */ }
     try { removeOwnedDirectory(dir); } catch { /* keep for inspection */ }
     throw new Error(message);
@@ -96,6 +106,7 @@ function up(options, env) {
   writeFileSync(pointer(options.port), JSON.stringify({ dir }));
 
   const dsn = dsnFor(options.port);
+  const left = (why) => { process.stderr.write(`${why}; cluster left up at ${dsn} (dir ${dir}) -- run down${NL}`); process.exit(2); };
   const sep2 = process.platform === "win32" ? ";" : ":";
   const childEnv = { ...env, PATH: bin ? `${bin}${sep2}${env.PATH ?? ""}` : env.PATH };
   const chain = spawnSync(process.execPath, [join(HERE, "apply-migrations.mjs"), "--dsn", dsn, "--shim-vector"], { encoding: "utf8", env: childEnv });
@@ -113,12 +124,16 @@ function up(options, env) {
     }
     process.stdout.write(`applied draft ${draft}${NL}`);
   }
-  const version = run(psql, [dsn, "-w", "-At", "-c", "show server_version"]).trim();
+  let version;
+  let fingerprints;
+  try {
+  version = run(psql, [dsn, "-w", "-At", "-c", "show server_version"]).trim();
   // The fingerprint file reads Supabase's migration tracker, which a bare cluster lacks. An EMPTY tracker keeps the
   // query runnable; its rows are not invented, so the digest covers the schema and carries no 'migration' rows.
   run(psql, [dsn, "-w", "-q", "-v", "ON_ERROR_STOP=1", "-c", "create schema if not exists supabase_migrations; create table if not exists supabase_migrations.schema_migrations (version text primary key, name text)"]);
-  const fingerprints = run(psql, [dsn, "-w", "-At", "-v", "ON_ERROR_STOP=1", "-f", join(HERE, "catalog-fingerprints.sql")]);
+  fingerprints = run(psql, [dsn, "-w", "-At", "-v", "ON_ERROR_STOP=1", "-f", join(HERE, "catalog-fingerprints.sql")]);
   if (!fingerprints.trim()) throw new Error("catalog fingerprints returned no rows");
+  } catch (cause) { left(`fingerprint step failed: ${String(cause.stderr ?? cause.message).trim()}`); }
   process.stdout.write(`postgres ${version}${NL}catalog-fingerprints (schema only, empty migration tracker) sha256 ${createHash("sha256").update(fingerprints).digest("hex")}${NL}dsn ${dsn}${NL}`);
 }
 
@@ -126,10 +141,15 @@ function down(options, env) {
   const file = pointer(options.port);
   if (!existsSync(file)) throw new Error(`no cluster recorded for port ${options.port}`);
   const { dir } = JSON.parse(readFileSync(file, "utf8"));
-  // Marker check first: never stop or delete anything this tool did not create.
-  if (!existsSync(join(dir, MARKER))) throw new Error(`refused: ${dir} carries no cluster marker`);
-  try { run(binaries(env).pgCtl, ["stop", "-D", join(dir, "data"), "-m", "immediate"]); } catch { /* already stopped */ }
-  removeOwnedDirectory(dir);
+  // Full ownership check (temp root + marker body) before stopping or deleting anything.
+  const real = resolveOwned(dir);
+  if (!real) {
+    rmSync(file, { force: true });
+    process.stdout.write(`directory ${dir} was already gone; removed the stale pointer for port ${options.port}${NL}`);
+    return;
+  }
+  try { run(binaries(env).pgCtl, ["stop", "-D", join(real, "data"), "-m", "immediate"]); } catch { /* already stopped */ }
+  removeOwnedDirectory(real);
   rmSync(file, { force: true });
   process.stdout.write(`removed ${dir}${NL}`);
 }
