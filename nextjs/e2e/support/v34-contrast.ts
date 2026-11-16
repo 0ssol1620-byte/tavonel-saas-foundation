@@ -148,12 +148,21 @@ function ownTextRects(el: Element): { x: number; y: number; width: number; heigh
   const lineHeight = parseFloat(getComputedStyle(el).lineHeight);
   // A scrolling or clipping ancestor paints only its padding box: text that runs past it is not on screen, and a
   // screenshot of that part would sample the page behind the box (a mcpServers block wider than its region, 1.03:1).
+  // Only ancestors in the element's containing-block chain clip it: a fixed element is clipped by none, an absolute one
+  // skips the static ancestors before its containing block, and the root's overflow belongs to the viewport (bounded below).
+  // ponytail: a transform counts as a containing block for absolute; filter/contain/will-change do not, so those clip less than CSS does.
   const clips: { l: number; t: number; r: number; b: number }[] = [];
-  for (let p = el.parentElement; p; p = p.parentElement) {
+  const own = getComputedStyle(el).position;
+  let escaping = own === "absolute";
+  for (let p = own === "fixed" ? null : el.parentElement; p && p !== document.documentElement; p = p.parentElement) {
     const ps = getComputedStyle(p);
-    if (ps.overflowX === "visible" && ps.overflowY === "visible") continue;
-    const pr = p.getBoundingClientRect();
-    clips.push({ l: pr.left + p.clientLeft, t: pr.top + p.clientTop, r: pr.left + p.clientLeft + p.clientWidth, b: pr.top + p.clientTop + p.clientHeight });
+    if (escaping && ps.position === "static" && ps.transform === "none") continue;
+    escaping = ps.position === "absolute";
+    if (ps.overflowX !== "visible" || ps.overflowY !== "visible") {
+      const pr = p.getBoundingClientRect();
+      clips.push({ l: pr.left + p.clientLeft, t: pr.top + p.clientTop, r: pr.left + p.clientLeft + p.clientWidth, b: pr.top + p.clientTop + p.clientHeight });
+    }
+    if (ps.position === "fixed") break;
   }
   for (const n of el.childNodes) {
     if (n.nodeType !== Node.TEXT_NODE || (n.textContent ?? "").trim().length === 0) continue;
