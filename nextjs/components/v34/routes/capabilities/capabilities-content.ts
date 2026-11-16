@@ -12,6 +12,9 @@ import { v34Route, type V34RouteKey } from "@/lib/v34/routes";
 /** A destination is a registry key, resolved here; the page test fails if it names a held route. */
 const to = (key: V34RouteKey): Route => v34Route(key).path;
 
+/** /sources is a retained page outside the registry; the page test checks that it exists. */
+export const SOURCES_HREF = "/sources" satisfies Route;
+
 export const HERO = {
   figure: "Each clause of the compiler contract as one point: filled where it is demonstrated, outlined where it is direction.",
 } as const;
@@ -30,7 +33,16 @@ export const FORMATS = {
   table: "Source formats and what each one keeps",
   columns: ["Format", "Tier", "Keeps", "Specific to this format"],
   shared: "Shared by every accepted format",
+  link: { href: SOURCES_HREF, label: "Limits for each format →" },
   stats: { listed: "Formats listed", accepted: "Accepted at upload", converted: "Converted before reading" },
+} as const;
+
+export const DEPLOYMENT = {
+  eyebrow: "This deployment",
+  title: "What is open today.",
+  lead: "Read from the live status when the page loads. A status that cannot be read shows as Unknown.",
+  table: "Capabilities of this deployment and their state",
+  columns: ["Capability", "State", "Note"],
 } as const;
 
 export const EXPLORE = {
@@ -52,4 +64,4 @@ export const FINAL = {
 } as const;
 
 /** Every route the page links to, for the guard test. */
-export const CAPABILITIES_DESTINATIONS: readonly Route[] = [...EXPLORE.items.map((i) => i.href), FINAL.cta.href];
+export const CAPABILITIES_DESTINATIONS: readonly Route[] = [...EXPLORE.items.map((i) => i.href), FINAL.cta.href, FORMATS.link.href];

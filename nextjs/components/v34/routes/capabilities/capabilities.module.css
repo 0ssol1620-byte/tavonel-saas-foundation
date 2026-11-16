@@ -189,6 +189,30 @@
   line-height: 1.5;
 }
 
+.formatsLink {
+  margin: 24px 0 0;
+}
+
+.inlineLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.inlineLink:hover {
+  background: var(--v34-fg-hover);
+  color: var(--v34-fg);
+}
+
+.inlineLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
 /* ---- explore ---------------------------------------------------------------------------- */
 
 .explore {

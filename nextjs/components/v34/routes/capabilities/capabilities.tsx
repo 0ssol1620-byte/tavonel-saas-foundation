@@ -7,12 +7,14 @@ import { FinalCta } from "@/components/v34/ui/final-cta";
 import { Hero } from "@/components/v34/ui/hero";
 import { ScrollTable } from "@/components/v34/ui/scroll-table";
 import { Section } from "@/components/v34/ui/section";
+import { readCapabilities, type StatusResponse } from "@/lib/capabilities";
 import { CONTRACT_CLAUSES, CONTRACT_STATE, type ContractClauseState } from "@/lib/compiler-contract";
 import { v34Route } from "@/lib/v34/routes";
 import {
   capabilityCensus, publicCapabilityRows, sharedAcceptedLimitationLabels,
 } from "../../../../../shared/capabilityManifest";
-import { CONTRACT, EXPLORE, FINAL, FORMATS, HERO } from "./capabilities-content";
+import { CONTRACT, DEPLOYMENT, EXPLORE, FINAL, FORMATS, HERO } from "./capabilities-content";
+import { readStatusBounded, type StatusRead } from "./capabilities-status";
 import s from "./capabilities.module.css";
 
 const SUFFIX = / — TAVONEL$/;
@@ -45,10 +47,11 @@ function ClauseRing() {
 }
 
 /** The page body, without the V34 frame, so it can be rendered on its own. */
-export function CapabilitiesBody() {
+export function CapabilitiesBody({ status, failed }: { status: StatusResponse | null; failed: boolean }) {
   const record = v34Route("capabilities");
   const census = capabilityCensus();
   const rows = publicCapabilityRows();
+  const deployment = readCapabilities(status, failed);
   const shared = sharedAcceptedLimitationLabels();
   return (
     <>
@@ -113,6 +116,17 @@ export function CapabilitiesBody() {
             {shared.map((label) => <li key={label}>{label}</li>)}
           </ul>
         </div>
+        <p className={s.formatsLink}>
+          <Link className={s.inlineLink} href={FORMATS.link.href} prefetch={false}>{FORMATS.link.label}</Link>
+        </p>
+      </Section>
+
+      <Section surface="paper" eyebrow={DEPLOYMENT.eyebrow} title={DEPLOYMENT.title} lead={DEPLOYMENT.lead}>
+        <ScrollTable
+          label={DEPLOYMENT.table}
+          columns={DEPLOYMENT.columns}
+          rows={deployment.map((row) => [row.name, row.state, row.note])}
+        />
       </Section>
 
       <Section surface="light" eyebrow={EXPLORE.eyebrow} title={EXPLORE.title}>
@@ -133,11 +147,12 @@ export function CapabilitiesBody() {
   );
 }
 
-export default function Capabilities() {
+export default async function Capabilities({ read = readStatusBounded }: { read?: () => Promise<StatusRead> } = {}) {
+  const { status, failed } = await read();
   return (
     <V34Page route="capabilities" surface="paper">
       <RouteJsonLd route="capabilities" />
-      <CapabilitiesBody />
+      <CapabilitiesBody status={status} failed={failed} />
     </V34Page>
   );
 }

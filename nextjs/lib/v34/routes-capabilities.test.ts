@@ -1,10 +1,12 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
+import { readCapabilities } from "@/lib/capabilities";
+import { readStatusBounded } from "@/components/v34/routes/capabilities/capabilities-status";
 import { CONTRACT_CLAUSES, CONTRACT_STATE } from "@/lib/compiler-contract";
 import { MCP_TOOLS } from "@/lib/mcp-tools";
 import { CapabilitiesBody } from "@/components/v34/routes/capabilities/capabilities";
@@ -26,7 +28,17 @@ const stripComments = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, "").re
 const code = files.filter((f) => /\.tsx?$/.test(f.file)).map((f) => ({ ...f, text: stripComments(f.text) }));
 const styles = files.filter((f) => f.file.endsWith(".css")).map((f) => ({ ...f, text: stripComments(f.text) }));
 const text = code.map((f) => f.text).join("\n");
-const html = renderToStaticMarkup(createElement(CapabilitiesBody));
+const render = (status: Parameters<typeof CapabilitiesBody>[0]["status"], failed: boolean) =>
+  renderToStaticMarkup(createElement(CapabilitiesBody, { status, failed }));
+const OPEN_STATUS = {
+  mode: "foundation",
+  activationPolicy: { customerIntake: { enabled: true }, cdr: { enabled: true }, ocrGpu: { enabled: true } },
+  auth: "google_oauth_configured",
+  billing: "sandbox_checkout_ready",
+  r2: "signer_configured",
+};
+const html = render(OPEN_STATUS, false);
+const failedHtml = render(null, true);
 const page = stripComments(readFileSync(join(root, "app", KEY, "page.tsx"), "utf8"));
 
 describe("capabilities page", () => {
@@ -71,6 +83,35 @@ describe("computed, not typed", () => {
   });
 });
 
+describe("deployment grid", () => {
+  it("prints every readCapabilities row", () => {
+    const rows = readCapabilities(OPEN_STATUS, false);
+    expect(rows.some((r) => r.state === "Open")).toBe(true);
+    for (const row of rows) {
+      expect(html).toContain(row.name);
+      expect(html).toContain(row.state);
+    }
+  });
+
+  it("fails closed: a status read that fails shows no Open or Configured row", () => {
+    for (const row of readCapabilities(null, true)) expect(failedHtml).toContain(row.name);
+    expect(failedHtml).toContain("Unknown");
+    expect(failedHtml).not.toMatch(/>(?:Open|Configured)</);
+  });
+
+  it("treats a throw, a timeout and a malformed body as failed", async () => {
+    expect(await readStatusBounded(async () => { throw new Error("down"); })).toEqual({ status: null, failed: true });
+    expect(await readStatusBounded(() => new Promise(() => {}), 20)).toEqual({ status: null, failed: true });
+    expect(await readStatusBounded(async () => "ok")).toEqual({ status: null, failed: true });
+    expect(await readStatusBounded(async () => null)).toEqual({ status: null, failed: true });
+    expect(await readStatusBounded(async () => ({ mode: "foundation" }))).toEqual({ status: { mode: "foundation" }, failed: false });
+  });
+
+  it("is rendered per request", () => {
+    expect(page).toContain('dynamic = "force-dynamic"');
+  });
+});
+
 describe("copy", () => {
   it("drops what the register row removes", () => {
     for (const word of [/\bL\d+\b/, /Verified Skills/i, /Tested methods/i, /Transparent metering/i, /reservations/i]) {
@@ -85,14 +126,28 @@ describe("copy", () => {
 });
 
 describe("links", () => {
-  it("types no path and links only to live registry routes", () => {
-    for (const f of code) expect(f.text, f.file).not.toMatch(/["'`]\/[a-z]/);
+  const allowed = ["/sources"];
+
+  it("types no path except the retained one it names", () => {
+    for (const f of code) {
+      for (const [literal] of f.text.matchAll(/["'`]\/[a-z][^"'`$]*/g)) {
+        expect(allowed, `${f.file}: ${literal}`).toContain(literal.slice(1));
+      }
+    }
+  });
+
+  it("links only to live registry routes or to a retained page that exists", () => {
     expect(CAPABILITIES_DESTINATIONS.length).toBeGreaterThan(0);
     for (const path of CAPABILITIES_DESTINATIONS) {
       const route = v34RouteByPath(path);
-      expect(route, `${path} is not in the registry`).toBeDefined();
-      expect(route!.release, `${path} is held`).toBe("live");
+      if (route) expect(route.release, `${path} is held`).toBe("live");
+      else expect(existsSync(join(root, "app", path, "page.tsx")), `${path} has no page`).toBe(true);
     }
+  });
+
+  it("links the formats table to /sources", () => {
+    expect(CAPABILITIES_DESTINATIONS).toContain("/sources");
+    expect(html).toContain('href="/sources"');
   });
 });
 
