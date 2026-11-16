@@ -9,6 +9,7 @@ import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { loadWorldReadModel } from "@/lib/world-read-model";
 import { pageTokenKey, sealClaims, unsealClaims } from "@/lib/sealed-claims";
 import { getFoundationActiveWorld } from "@/lib/world-store";
+import { parseTemporal, resolveWorldAtKnownAt, temporalBlock } from "@/lib/world-activation-history";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -76,6 +77,16 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const paged = rawLimit !== null || cursor !== null || pageToken !== null;
   if ((paged || rawIds !== null) && !PAGEABLE.has(lens)) return fail("WORLD_LENS_NOT_PAGEABLE", 400);
 
+  // Typed time (D18-2): validated before anything is read. A repeated parameter is passed on as
+  // an array, which the parser refuses, so it can never read as "not sent".
+  const one = (name: string) => (search.getAll(name).length > 1 ? search.getAll(name) : search.get(name));
+  const temporal = parseTemporal({ known_at: one("known_at"), valid_at: one("valid_at"), as_of: one("as_of") });
+  if (!temporal.ok) return fail(temporal.code, temporal.status);
+  // A bound context names its exact World already; a second clock would contradict it.
+  if (temporal.knownAt !== null && binding.bound) return fail("KNOWN_AT_WITH_CONTEXT", 400);
+  const resolvedAt = temporal.knownAt === null ? null : await resolveWorldAtKnownAt(auth.principal.workspaceKey, id, temporal.knownAt);
+  if (resolvedAt && !resolvedAt.ok) return fail(resolvedAt.code, resolvedAt.status);
+
   // By-id read (F30-06): the named items only, never mixed with paging.
   let ids: string[] | null = null;
   if (rawIds !== null) {
@@ -119,12 +130,19 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const snapshot = binding.bound ? await resolveBoundSnapshot(binding, auth.principal.workspaceKey) : null;
   if (snapshot && !snapshot.ok) return NextResponse.json({ code: snapshot.code }, { status: snapshot.status, headers: NO_STORE });
   let selected: string | undefined;
+  let current = true;
   if (snapshot) selected = snapshot.resolved.snapshot.manifestDigest;
   else {
     const active = await getFoundationActiveWorld(auth.principal.workspaceKey, id);
     if (active.ok) selected = active.world.manifestDigest;
     else if (active.code !== "ACTIVE_WORLD_NOT_FOUND") {
       return NextResponse.json({ code: active.code }, { status: active.code === "WORLD_ID_INVALID" ? 400 : 503, headers: NO_STORE });
+    }
+    // known_at: the World activated at T. loadWorldReadModel applies today's source access and
+    // derived-data admission to it, so a source denied since then is refused, not served from history.
+    if (resolvedAt) {
+      current = selected === resolvedAt.manifestDigest;
+      selected = resolvedAt.manifestDigest;
     }
   }
   const loaded = await loadWorldReadModel(auth.principal.workspaceKey, id, selected);
@@ -134,6 +152,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     world: loaded.model.world,
     contract: loaded.model.contract,
     freshness: loaded.model.freshness,
+    ...(resolvedAt && temporal.knownAt !== null ? { temporal: temporalBlock(temporal.knownAt, resolvedAt, current) } : {}),
   };
 
   if (tokenClaims && (tokenClaims.a !== auth.principal.authorizationRevision || tokenClaims.d !== loaded.model.world.manifestDigest)) {
