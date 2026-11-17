@@ -260,3 +260,17 @@ describe("typed counts", () => {
     expect(typedCounts("security")).toEqual([]);
   });
 });
+
+describe("trust sequence", () => {
+  /*
+    The V34 /security Bridge types its link and label, so pin them to the step the sequence
+    names after /security: the same page and the same action TrustNext would print.
+  */
+  it("sends /security to the next step's page with the sequence's own action", () => {
+    const trustNext = readFileSync(join(root, "components/trust-next.tsx"), "utf8");
+    const order = [...trustNext.matchAll(/href: "([^"]+)"/g)].map((m) => m[1]!);
+    const next = order[order.indexOf("/security") + 1]!;
+    const action = trustNext.match(/"\/security": "([^"]+)"/)![1]!;
+    expect(html).toMatch(new RegExp(`<a\\b[^>]*href="${next}"[^>]*>[\\s\\S]*?${action}`));
+  });
+});
