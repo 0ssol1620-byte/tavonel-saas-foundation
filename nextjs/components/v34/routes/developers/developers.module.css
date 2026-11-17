@@ -70,13 +70,31 @@
   color: var(--v34-fg);
 }
 
-/* Inside a sentence (lead decision 21): the gate notice and the sample note. A plain inline box whose
-   target is its text; the floor above does not apply to an inline box and is reset so the computed style
-   says so. The same class alone in a row (.sectionLink, .fileLinks) keeps the 44 px box above. */
+/* Inside a sentence (lead decision 22, the site's G1-TAP rule): the gate notice and the sample note. Wide with
+   a fine pointer, a plain inline box whose target is its text; the floor above does not apply to an inline box
+   and is reset so the computed style says so. The same class alone in a row (.sectionLink, .fileLinks) keeps
+   the 44 px box above. */
 .notice .inlineLink,
 .sampleNote .inlineLink {
   display: inline;
   min-height: 0;
+}
+
+/* Inside a sentence on a touch or narrow screen (G1-TAP's condition in app/tavonel.css, copied exactly): a 44 px
+   hit area on the inline box. Block padding on an inline box does not size the line box, so the paragraph keeps
+   its leading, and the link can still wrap. Nothing else belongs in this block. */
+@media (pointer: coarse), (max-width: 1079px) {
+  .notice .inlineLink,
+  .sampleNote .inlineLink {
+    padding-block: calc((44px - 1em) / 2);
+  }
+}
+
+/* The hover fill stays on the words: across the touch hit area's padding it would paint over the lines above
+   and below. */
+.notice .inlineLink:hover,
+.sampleNote .inlineLink:hover {
+  background-clip: content-box;
 }
 
 .inlineLink:focus-visible {

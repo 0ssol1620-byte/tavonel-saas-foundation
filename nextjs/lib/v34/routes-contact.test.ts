@@ -203,32 +203,70 @@ describe("tokens, targets and states", () => {
   });
 
   /*
-    Lead decision 21 (WO-CI-29). A link alone in a row keeps a floor-sized target. A link inside a
-    sentence is a plain inline box whose target is its text (WCAG 2.5.8 excepts it): a min-height, a
-    flex or inline-block box, block padding, its own line-height or a vertical-align would grow the
-    line that holds it or reach into the lines above and below. IN_SENTENCE names the classes rendered
-    mid-sentence, with the lines that render them; every other link class stands alone, so no class is
-    in neither group, and a name or a line here that the sources no longer bear fails.
+    Lead decision 22 (WO-CI-29; replaces decision 21's "at every width"). A link alone in a row keeps a
+    floor-sized target. A link inside a sentence follows the site's G1-TAP rule (app/tavonel.css):
+    - outside any condition it is a plain inline box whose target is its text: no display but inline, no
+      min-height or height, no own line-height or vertical-align, no block padding, no top or bottom border,
+      no position, offset, float or transform -- each would grow the line that holds it, reach into the lines
+      above and below, or move it off its line;
+    - under exactly G1-TAP's condition it takes one rule with one declaration, the 44px hit area, which leaves
+      the line box alone;
+    - any other conditional block may touch it only to paint (colour, outline, background, text decoration),
+      never its box. (Decision 22 says such a block fails; the forced-colors focus outline on .inline in
+      contact.module.css is paint only and stays -- reported to the lead.)
+    IN_SENTENCE names the classes rendered mid-sentence, with the lines that render them; every other link
+    class stands alone, so no class is in neither group, and a name or a line here that the sources no longer
+    bear fails.
   */
+  const TOUCH = "@media (pointer: coarse), (max-width: 1079px)";
+  const HIT_AREA = "padding-block: calc((44px - 1em) / 2)";
+  const BOX = /^(?:display|min-height|height|max-height|line-height|vertical-align|position|top|bottom|inset(?:-block(?:-start|-end)?)?|float|transform|translate|padding(?:-top|-bottom|-block(?:-start|-end)?)?|border(?:-top|-bottom|-block(?:-start|-end)?)?(?:-width|-style)?)$/;
+  const PAINT = /^(?:color|outline(?:-color|-style|-width|-offset)?|background(?:-color|-clip)?|text-decoration(?:-[a-z]+)?|text-underline-offset|forced-color-adjust)$/;
+  // Every style rule with the at-rule conditions that hold it ("" outside any); nested blocks are walked.
+  const cssRules = (css: string, condition = ""): { condition: string; selector: string; declarations: [string, string][] }[] => {
+    const out: { condition: string; selector: string; declarations: [string, string][] }[] = [];
+    for (let i = 0, open = css.indexOf("{"); open >= 0; open = css.indexOf("{", i)) {
+      let depth = 1;
+      let j = open + 1;
+      for (; j < css.length && depth > 0; j++) depth += css[j] === "{" ? 1 : css[j] === "}" ? -1 : 0;
+      expect(depth, "the sheet's braces balance").toBe(0);
+      const prelude = css.slice(i, open).split(/[;}]/).at(-1)!.trim().replace(/\s+/g, " ");
+      const body = css.slice(open + 1, j - 1);
+      if (prelude.startsWith("@")) out.push(...cssRules(body, condition ? `${condition} ${prelude}` : prelude));
+      else {
+        const declarations = body.split(";").map((d) => d.trim().replace(/\s+/g, " ")).filter(Boolean).map((d): [string, string] => {
+          const colon = d.indexOf(":");
+          expect(colon, `${prelude}: "${d}" is a declaration`).toBeGreaterThan(0);
+          return [d.slice(0, colon).trim().toLowerCase(), d.slice(colon + 1).trim()];
+        });
+        out.push({ condition, selector: prelude, declarations });
+      }
+      i = j;
+    }
+    return out;
+  };
   const IN_SENTENCE: Record<string, { file: string; lines: number[] }> = {
     inline: { file: "components/v34/routes/contact/contact.tsx", lines: [35, 39, 43, 47, 51, 55] },
   };
 
-  it("gives every link class alone in a row a 24px target, every link class inside a sentence a plain inline box, and each a hover and a focus state", () => {
+  it("gives every link class alone in a row a 24px target, every link class inside a sentence a plain inline box with G1-TAP's hit area on a touch or narrow screen, and each a hover and a focus state", () => {
     const sheet = stripped(styles).map((f) => f.text).join("\n");
     const linkClasses = [...new Set([...sheet.matchAll(/\.(mail|inline)\s*\{/g)].map((m) => m[1]!))];
     expect(linkClasses.length).toBe(2);
-    const rules = [...sheet.matchAll(/([^{}@][^{}]*)\{([^{}]*)\}/g)].map((m) => ({ selector: m[1]!.trim(), body: m[2]! }));
     for (const [name, { file, lines }] of Object.entries(IN_SENTENCE)) {
       expect(linkClasses, `.${name} is listed as inside a sentence but no rule defines it`).toContain(name);
       const source = readFileSync(join(root, file), "utf8").split(/\r?\n/);
       for (const line of lines) expect(source[line - 1], `${file}:${line} renders .${name}`).toContain(`className={s.${name}}`);
-      const own = rules.filter((r) => new RegExp(`\\.${name}(?![\\w-])`).test(r.selector));
-      expect(own.length, `.${name} rules`).toBeGreaterThan(0);
-      for (const { selector, body } of own) {
-        for (const [, value] of body.matchAll(/(?:^|[;\s])display\s*:\s*([^;]+)/g)) expect(value!.trim(), `${selector}: display`).toBe("inline");
-        expect(body, `${selector} changes the line that holds it`).not.toMatch(/(?:^|[;\s])(?:min-height|height|line-height|vertical-align)\s*:/);
-        expect(body, `${selector} has block padding`).not.toMatch(/(?:^|[;\s])padding(?:-top|-bottom|-block(?:-start|-end)?)?\s*:/);
+      const own = cssRules(sheet).filter((r) => new RegExp(`\\.${name}(?![\\w-])`).test(r.selector));
+      expect(own.filter((r) => r.condition === "").length, `.${name} rules outside any condition`).toBeGreaterThan(0);
+      const touch = own.filter((r) => r.condition === TOUCH);
+      expect(touch.map((r) => [r.selector, r.declarations.map(([p, v]) => `${p}: ${v}`)]), `.${name} under ${TOUCH}`).toEqual([[`.${name}`, [HIT_AREA]]]);
+      for (const { condition, selector, declarations } of own.filter((r) => r.condition !== TOUCH)) {
+        for (const [property, value] of declarations) {
+          if (condition !== "") expect(property, `${condition} { ${selector} } may only paint`).toMatch(PAINT);
+          else if (property === "display") expect(value, `${selector}: display`).toBe("inline");
+          else expect(property, `${selector} changes or moves the box that holds the link`).not.toMatch(BOX);
+        }
       }
     }
     for (const name of linkClasses) {

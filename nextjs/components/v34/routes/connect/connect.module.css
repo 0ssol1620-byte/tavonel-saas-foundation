@@ -76,16 +76,31 @@
   min-height: 44px;
 }
 
-/* Inside a sentence (lead decision 21): a plain inline box. Its target is its text; nothing here may
-   change the line that holds it. */
+/* Inside a sentence (lead decision 22, the site's G1-TAP rule). Wide with a fine pointer: a plain inline
+   box whose target is its text; nothing here may change the line that holds it. */
 .inlineLink {
   display: inline;
+}
+
+/* Inside a sentence on a touch or narrow screen (G1-TAP's condition in app/tavonel.css, copied exactly): a 44 px
+   hit area on the inline box. Block padding on an inline box does not size the line box, so the paragraph keeps
+   its leading, and the link can still wrap. Nothing else belongs in this block. */
+@media (pointer: coarse), (max-width: 1079px) {
+  .inlineLink {
+    padding-block: calc((44px - 1em) / 2);
+  }
 }
 
 .link:hover,
 .inlineLink:hover {
   background: var(--v34-fg-hover);
   color: var(--v34-fg);
+}
+
+/* The hover fill stays on the words: across the touch hit area's padding it would paint over the lines above
+   and below. */
+.inlineLink:hover {
+  background-clip: content-box;
 }
 
 .link:focus-visible,
