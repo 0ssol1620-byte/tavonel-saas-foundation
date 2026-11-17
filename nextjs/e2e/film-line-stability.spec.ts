@@ -1,7 +1,7 @@
 import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { existsSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
-import { HELD_REASON, HELD_SHOWN } from "./support/held-feature";
+import { HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON } from "./support/held-feature";
 
 /*
   UX-L6 (UX-PLAN-2026-10-17 §3.6, §4.6, §8.2; R4-MJ1): the Home film's frame stays where it is
@@ -146,7 +146,7 @@ async function watchAutoAdvance(page: Page, advances: number, before?: () => Pro
 for (const [width, height, views] of [[390, 844, ["fit", "focus"]], [430, 932, ["fit"]]] as const) {
   for (const path of ["/"]) for (const view of views) {
     test(`with motion on, three auto-advances leave the phone film where it was (${path} ${width}x${height}, ${view})`, async ({ page }, testInfo) => {
-      test.skip(!HELD_SHOWN, HELD_REASON);
+      test.skip(!HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON);
       test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
       test.skip(testInfo.project.name !== "390", "sets its own viewport");
       test.setTimeout(180_000);
@@ -178,7 +178,7 @@ for (const [width, height, views] of [[390, 844, ["fit", "focus"]], [430, 932, [
   the watch can see nothing.
 */
 test("the watch records the shift when the row above the frame changes height by stage (detector)", async ({ page }, testInfo) => {
-  test.skip(!HELD_SHOWN, HELD_REASON);
+  test.skip(!HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON);
   test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   test.skip(testInfo.project.name !== "390", "sets its own viewport");
   test.setTimeout(180_000);
@@ -232,7 +232,7 @@ function expectOneTop(tops: number[], label: string) {
 }
 
 test("from 768px to the edge of Fit the frame top is the same on every stage", async ({ page }, testInfo) => {
-  test.skip(!HELD_SHOWN, HELD_REASON);
+  test.skip(!HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON);
   test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   test.skip(testInfo.project.name !== "390", "sets its own viewports");
   test.setTimeout(120_000);
@@ -250,7 +250,7 @@ test("from 768px to the edge of Fit the frame top is the same on every stage", a
 });
 
 test("webkit: the frame top is the same on every stage from 360px to the edge of Fit", async ({ playwright, baseURL }, testInfo) => {
-  test.skip(!HELD_SHOWN, HELD_REASON);
+  test.skip(!HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON);
   test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
   test.skip(testInfo.project.name !== "390", "sets its own viewports");
   test.skip(!existsSync(playwright.webkit.executablePath()), "WebKit is not installed in this runner (playwright install webkit)");

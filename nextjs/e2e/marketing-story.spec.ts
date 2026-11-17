@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { HELD_REASON, HELD_SHOWN } from "./support/held-feature";
+import { HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON } from "./support/held-feature";
 
 test("How it works explains a pipeline rather than repeating the Product World", async ({ page }) => {
   // V34 (D33 1.1): /how-it-works answers 308 to /methods, which owns the pipeline.
@@ -43,7 +43,7 @@ test("Home leads with the product while the historical result keeps its conditio
 
 // New light-surface text must not inherit the old dark-surface palette.
 test("four-stage film controls and captions retain readable contrast", async ({ page }) => {
-  test.skip(!HELD_SHOWN, HELD_REASON);
+  test.skip(!HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON);
   await page.goto("/");
   // FINAL-SPEC 2026-10-26 (D-7): Home prints no film caption row (the stage sentence is the poster's alt), so the
   // film's text on the page is its controls and the disclosure; both are still held to 4.5:1 below.

@@ -1,25 +1,27 @@
 /*
-  A feature the product holds back by decision is shown only where the product shows held routes:
-  ADR D01 A9 holds the four-stage film and the specimen strip on Home, and the product renders held
-  work only on a preview deployment or with V34_SHOW_HELD=1 (`heldVisible`, lib/v34/release.ts).
+  The film and the specimen strip are markup of components/landing-v2/**. ADR D01 A9 holds them, and
+  D33 #11 keeps the components in the tree for rollback, but V34 Home (app/page.tsx) does not import
+  them: no flag mounts them, so a case that looks for that markup can never run, whatever
+  V34_SHOW_HELD is. These specs are not deleted: the day Home imports landing-v2 again, this gate
+  turns true by itself and they run.
 
-  The specs of a held feature run under exactly that condition and skip, with this reason, otherwise.
-  They are not deleted and not rewritten: the day the hold is lifted they come back by setting the
-  flag in CI. One helper, so the condition is written once; `lib/v34/held-flag.test.ts` fails if this
-  flag name and the one the product reads ever differ.
+  The gate is the import fact, not an environment variable. `lib/v34/held-flag.test.ts` checks it
+  against the import graph, and against a fixture that does import landing-v2.
 
   This module imports nothing from Playwright or Next, so the unit test can load it.
 */
+import { fileURLToPath } from "node:url";
+import { reach } from "../../lib/v34/import-graph";
 
-/** The environment variable the product reads to show held work. */
-export const HELD_FLAG = "V34_SHOW_HELD";
+const root = fileURLToPath(new URL("../../", import.meta.url));
 
-/** The product's rule, over an environment: a preview deployment, or the flag set to "1". */
-export const heldShownIn = (env: Readonly<Record<string, string | undefined>>): boolean =>
-  env.VERCEL_ENV === "preview" || env[HELD_FLAG] === "1";
+/** Whether the module graph of `entry` under `graphRoot` reaches components/landing-v2/**. */
+export const mountsLandingV2 = (graphRoot: string, entry: string): boolean =>
+  [...reach(graphRoot, entry)].some((file) => file.startsWith("components/landing-v2/"));
 
-/** Whether the server under test shows held work. The runner and the server share the environment in CI. */
-export const HELD_SHOWN = heldShownIn(process.env);
+/** Whether Home mounts the held film / specimen-strip components. False at V34 Home. */
+export const HOME_MOUNTS_LANDING_V2 = mountsLandingV2(root, "app/page.tsx");
 
-/** The skip reason a held-feature case carries. */
-export const HELD_REASON = `held on Home by decision (ADR D01 A9): runs when the server shows held work (${HELD_FLAG}=1)`;
+/** The skip reason of a case that looks for landing-v2 markup. */
+export const HOME_NOT_MOUNTED_REASON =
+  "not mounted: V34 Home (app/page.tsx) does not import components/landing-v2/** (kept for rollback, D33 #11)";

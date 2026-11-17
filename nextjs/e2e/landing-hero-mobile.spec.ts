@@ -1,6 +1,6 @@
 import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { expect, test } from "@playwright/test";
-import { HELD_REASON, HELD_SHOWN } from "./support/held-feature";
+import { HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON } from "./support/held-feature";
 /*
   Founder 2026-11-10: the recorded four-stage player moved below the fold into #walkthrough (the hero film is now the
   tabbed compile slot, hero-compile-tabs.tsx, held in hero-home-responsive.spec.ts). Its phone contract is unchanged and
@@ -9,7 +9,7 @@ import { HELD_REASON, HELD_SHOWN } from "./support/held-feature";
 const FILM = '#walkthrough figure[data-testid="landing-hero-film"]';
 test.describe("phone four-stage film", () => {
   test.beforeEach(async ({ page }, info) => {
-    test.skip(!HELD_SHOWN, HELD_REASON);
+    test.skip(!HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON);
     test.skip(!["360", "390"].includes(info.project.name), "phone composition");
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/");
