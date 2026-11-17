@@ -113,11 +113,20 @@ test("every source has matching upright typography, not a substituted italic fac
 test("footer labels use their own cells without clipped or escaping text", async ({ page }) => {
   await page.goto("/product");
   await page.locator(FOOTER).scrollIntoViewIfNeeded();
-  const violations = await page.locator(`${FOOTER} nav a`).evaluateAll(links =>
-    links.flatMap(link => {
-      const box = link.getBoundingClientRect();
-      return link.scrollWidth > link.clientWidth + 1 || box.height < 44
-        ? [{ text: link.textContent, scroll: link.scrollWidth, width: link.clientWidth, height: box.height }] : [];
+  /*
+    WO-CI-22 (lead decision 7): on a phone each group is a native <details> whose summary is its label;
+    a closed group's links are not painted, so every group is opened by its summary before its labels
+    are read. Wide, no summary is drawn and nothing is opened.
+  */
+  for (const summary of await page.locator(`${FOOTER} nav > details > summary`).all()) {
+    if (await summary.isVisible()) await summary.click();
+  }
+  const violations = await page.locator(`${FOOTER} nav a, ${FOOTER} nav summary`).evaluateAll(labels =>
+    labels.flatMap(label => {
+      const box = label.getBoundingClientRect();
+      if (label.tagName === "SUMMARY" && box.height === 0) return []; // not drawn at this width
+      return !label.checkVisibility() || label.scrollWidth > label.clientWidth + 1 || box.height < 44
+        ? [{ text: label.textContent, painted: label.checkVisibility(), scroll: label.scrollWidth, width: label.clientWidth, height: box.height }] : [];
     }));
   expect(violations).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

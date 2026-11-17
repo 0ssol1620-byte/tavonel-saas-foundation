@@ -374,6 +374,13 @@ test.describe("Home keeps main's header and footer colours", () => {
     await expect(footer).toHaveCSS("color", ON_DARK);
     // The footer's links paint the forest surface's text token (`.link { color: var(--v34-fg) }`, which the
     // forest surface sets to --v34-on-dark), read from the tokens module like every colour here.
+    // WO-CI-22: on a phone a group's label is its <details> summary, and its links paint once it opens.
+    if (testInfo.project.name !== "1440") {
+      const summary = footer.locator("nav > details > summary").first();
+      await expect(summary).toHaveCSS("color", ON_DARK);
+      await summary.click();
+      await expect(footer.locator("nav a").first()).toBeVisible();
+    }
     await expect(footer.locator("nav a").first()).toHaveCSS("color", ON_DARK);
     const header = page.locator(HEADER);
     await expect(header).toHaveCSS("background-color", PAPER);

@@ -142,11 +142,42 @@ const activateLink = async (page: Page, link: ReturnType<Page["locator"]>) => {
   destination that left the bar is a footer row, and its second hop is a link inside `main`.
 */
 const DIRECTORY_START = "/platform";
+/*
+  WO-CI-22 (lead decision 7): each footer group is a native <details>. On a phone its summary is drawn
+  and the row is one disclosure away -- open the group, then the row. Wider, the summary is not drawn
+  and the stylesheet paints the closed body, so the row is painted with nothing to open. Whether the
+  row is painted is read from the engine (`checkVisibility()`, a box, and a hit test at its centre),
+  not from `toBeVisible()`: Playwright 1.62 treats every descendant of a closed <details> as hidden in
+  WebKit whatever the CSS says (its injected `isElementVisible` skips `checkVisibility` for webkit and
+  reads `details.open` instead), and in WebKit the wide footer's details are closed and painted.
+*/
+const expectPainted = async (link: ReturnType<Page["locator"]>) => {
+  const painted = await link.evaluate((element) => {
+    // Instant: the page scrolls smoothly, and WebKit reads the box before a smooth scroll has moved it.
+    element.scrollIntoView({ block: "center", behavior: "instant" });
+    const box = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return { visible: element.checkVisibility(), height: box.height, hit: hit !== null && element.contains(hit) };
+  });
+  expect(painted.visible, "the footer row is painted").toBe(true);
+  expect(painted.height, "the footer row has a box").toBeGreaterThan(0);
+  expect(painted.hit, "the footer row takes the pointer at its centre").toBe(true);
+};
 const followTrail = async (page: Page, trail: readonly string[]) => {
   await page.goto(DIRECTORY_START, { waitUntil: "domcontentloaded" });
   const first = page.locator(`${FOOTER} a[href="${trail[0]}"]`).first();
-  await first.scrollIntoViewIfNeeded();
-  await expect(first).toBeVisible();
+  const group = page.locator(`${FOOTER} nav[aria-label] > details`).filter({ has: page.locator(`a[href="${trail[0]}"]`) });
+  const summary = group.locator(":scope > summary");
+  await page.locator(FOOTER).scrollIntoViewIfNeeded();
+  if (await summary.isVisible()) {
+    expect(page.viewportSize()?.width ?? 0, "the footer groups are disclosures on a phone only").toBeLessThanOrEqual(760);
+    await expect(first, "a closed group's row is not painted").toBeHidden();
+    await summary.click();
+    await expect(group).toHaveAttribute("open", "");
+  } else {
+    expect(page.viewportSize()?.width ?? 0, "a wide footer draws no disclosure").toBeGreaterThan(760);
+  }
+  await expectPainted(first);
   await activateLink(page, first);
   await expect(page).toHaveURL(arrivedAt(trail[0]), { timeout: 15_000 });
   for (const href of trail.slice(1)) {
