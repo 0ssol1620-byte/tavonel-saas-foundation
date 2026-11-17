@@ -63,19 +63,35 @@
 
 .link,
 .inlineLink {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
   color: var(--v34-fg-link);
   font-weight: 650;
   text-decoration: underline;
   text-underline-offset: 4px;
 }
 
+/* Alone in a row: a 44 px box (lead decision 14). */
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+/* Inside a sentence (lead decision 20): inline, with block padding to the 44 px floor so the line
+   box keeps the paragraph's leading (see research-program/program.module.css). */
+.inlineLink {
+  display: inline;
+  padding-block: calc((44px - 1em) / 2);
+}
+
 .link:hover,
 .inlineLink:hover {
   background: var(--v34-fg-hover);
   color: var(--v34-fg);
+}
+
+/* The hover fill stays on the words: across the padding it would paint over the lines above and below. */
+.inlineLink:hover {
+  background-clip: content-box;
 }
 
 .link:focus-visible,

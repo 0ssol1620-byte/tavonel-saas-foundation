@@ -310,3 +310,101 @@ test.describe("on a touch screen", () => {
   });
   }
 });
+
+/*
+  WO-CI-29, lead decision 20. A link inside a sentence meets the 44px floor without changing the
+  leading of the paragraph that holds it. As an inline-flex box it is an atomic inline, and the line
+  that holds it grew to 44px while its neighbours kept the paragraph's line height; inline with block
+  padding, its own box reaches 44px and the line box does not grow.
+
+  Found by measuring, not by class name: every painted, inline-level link in main whose paragraph
+  holds words outside it, on its own lines (a link that is a flex or grid item, or alone in its block
+  beside a heading or paragraph, is a row). Lines are read from the text: every text run of the paragraph is
+  clustered into lines, and the distance between the bottoms of runs in the paragraph's own font is
+  the line pitch. The line that holds the link must be as tall as the paragraph's other lines (within
+  one pixel); a one-line paragraph is compared with its own computed line height. No pixel value for
+  the line height is written here.
+*/
+function measureInSentenceLinks() {
+  type Line = { top: number; bottom: number; base: number | null };
+  const inline = (element: Element) => getComputedStyle(element).display.startsWith("inline");
+  const blockOf = (element: Element) => {
+    let block: Element | null = element;
+    while (block && inline(block)) block = block.parentElement;
+    return block;
+  };
+  const runs = (root: Element) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const range = document.createRange();
+    const out: { node: Text; rects: DOMRect[] }[] = [];
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const parent = node.parentElement;
+      // The visually-hidden "(opens in a new tab)" is absolutely positioned and drawn nowhere.
+      if (!parent || !node.textContent?.trim() || getComputedStyle(parent).position === "absolute") continue;
+      // Only the paragraph's own lines: the text of a heading or paragraph nested in the same box is another block.
+      if (blockOf(parent) !== root) continue;
+      range.selectNodeContents(node);
+      out.push({ node: node as Text, rects: [...range.getClientRects()].filter(r => r.width > 0 && r.height > 0) });
+    }
+    return out;
+  };
+  const found: { text: string; height: number; hold: number; next: number; pitches: (number | null)[]; lines: number }[] = [];
+  for (const link of document.querySelectorAll<HTMLElement>("main a[href]")) {
+    if (!inline(link) || link.getClientRects().length === 0) continue;
+    const block = blockOf(link);
+    if (!block) continue;
+    const all = runs(block);
+    const own = getComputedStyle(block);
+    const lines: Line[] = [];
+    for (const rect of all.flatMap(run => run.rects).sort((a, b) => a.top - b.top)) {
+      const last = lines.at(-1);
+      if (last && (rect.top + rect.bottom) / 2 < last.bottom) { last.top = Math.min(last.top, rect.top); last.bottom = Math.max(last.bottom, rect.bottom); }
+      else lines.push({ top: rect.top, bottom: rect.bottom, base: null });
+    }
+    const lineOf = (rect: DOMRect) => lines.findIndex(line => (rect.top + rect.bottom) / 2 >= line.top && (rect.top + rect.bottom) / 2 <= line.bottom);
+    for (const run of all) {
+      const style = getComputedStyle(run.node.parentElement!);
+      if (style.fontSize !== own.fontSize || style.fontFamily !== own.fontFamily) continue;
+      for (const rect of run.rects) {
+        const line = lines[lineOf(rect)];
+        if (line) line.base = Math.max(line.base ?? -Infinity, rect.bottom);
+      }
+    }
+    // In a sentence: its paragraph has words outside the link. Wherever the link wraps to, even onto a
+    // line of its own, an inline-flex box there would still make that line taller than the others.
+    if (!all.some(run => !link.contains(run.node) && run.rects.length > 0)) continue;
+    const linkLines = new Set(all.filter(run => link.contains(run.node)).flatMap(run => run.rects.map(lineOf)));
+    // pitches[i] runs from line i to line i + 1; null where either line has no run in the paragraph's font.
+    const pitches = lines.slice(1).map((line, i) => (line.base === null || lines[i].base === null ? null : line.base - lines[i].base!));
+    const last = Math.max(...linkLines);
+    const touching = pitches.filter((p, i): p is number => p !== null && (linkLines.has(i) || linkLines.has(i + 1)));
+    // The paragraph's next line after the link; on the last line, the nearest one before it.
+    const after = pitches.findIndex((p, i) => p !== null && i > last);
+    let before = -1;
+    pitches.forEach((p, i) => { if (p !== null && i + 1 < Math.min(...linkLines)) before = i; });
+    const lineHeight = parseFloat(own.lineHeight);
+    const content = block.getBoundingClientRect().height - [own.paddingTop, own.paddingBottom, own.borderTopWidth, own.borderBottomWidth].reduce((sum, v) => sum + parseFloat(v), 0);
+    // A one-line paragraph: the line is the content box, compared with the computed line height
+    // ("normal" parses to NaN and fails below rather than passing unmeasured).
+    const hold = lines.length === 1 ? content : touching.length > 0 ? Math.max(...touching) : NaN;
+    const next = after >= 0 ? pitches[after]! : before >= 0 ? pitches[before]! : lineHeight;
+    found.push({ text: (link.textContent ?? "").trim().slice(0, 40), height: link.getBoundingClientRect().height, hold, next, pitches, lines: lines.length });
+  }
+  return found;
+}
+
+for (const route of ["/research/program", "/contact", "/security", "/developers"]) {
+  test(`a link inside a sentence on ${route} keeps the paragraph's leading and the 44px floor`, async ({ page }, testInfo) => {
+    test.skip(!["1440", "390", "360"].includes(testInfo.project.name), "measured at 1440, 390 and 360");
+    await page.goto(route);
+    // /contact's answers are in closed <details>; open every one so its links are laid out.
+    await page.evaluate(() => { for (const details of document.querySelectorAll("main details")) details.open = true; });
+    const links = await page.evaluate(measureInSentenceLinks);
+    expect(links.length, `${route} renders at least one link inside a sentence`).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link.height, `"${link.text}": its own box`).toBeGreaterThanOrEqual(43.99);
+      expect(Number.isFinite(link.hold) && Number.isFinite(link.next), `"${link.text}": both lines measured (${JSON.stringify(link)})`).toBe(true);
+      expect(Math.abs(link.hold - link.next), `"${link.text}": the line that holds it against the paragraph's next line (${JSON.stringify(link)})`).toBeLessThanOrEqual(1);
+    }
+  });
+}

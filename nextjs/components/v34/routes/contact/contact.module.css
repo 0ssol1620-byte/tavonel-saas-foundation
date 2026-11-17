@@ -197,10 +197,11 @@
   line-height: 1.7;
 }
 
+/* Inside a sentence (lead decision 20): inline, with block padding to the 44 px floor so the line
+   box keeps the answer's leading (see research-program/program.module.css). */
 .inline {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
+  display: inline;
+  padding-block: calc((44px - 1em) / 2);
   color: var(--v34-fg-link);
   font-weight: 600;
   text-underline-offset: 3px;
