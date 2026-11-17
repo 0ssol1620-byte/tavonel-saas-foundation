@@ -1,12 +1,13 @@
 /**
  * Concurrency races of the agent-proposal store (migration 20261117130000, workorders/agent-native.md
- * §8 I-8, I-12, I-13) against a real PostgreSQL 17, through real psql sessions as service_role.
+ * §8 I-8, I-12, I-13; lead decision G3(b) of WO-AN-3) against a real PostgreSQL 17, through real psql
+ * sessions as service_role.
  *
  *   LOCAL_RACE_TEST=1 node scripts/db/local-cluster.mjs up --port 55439
  *   LOCAL_RACE_TEST=1 [RACE_SEED=n] [RACE_ITERATIONS=200] [RACE_PORT=55439] [RACE_RECEIPT_DIR=<dir>] \
  *     [PSQL_BIN=<psql>] node scripts/db/agent-grant-race.mjs
  *
- * Every iteration runs four scenarios in a seeded order, each on two sessions plus an observer:
+ * Every iteration runs five scenarios in a seeded order, each on two sessions plus an observer:
  *   I12A  revoke holds the grant in an open transaction, a create on that grant blocks on `for share`,
  *         the revoke commits: the create raises proposal_agent_grant_revoked; no open row of the grant.
  *   I12B  a create commits first (sequential), or holds the grant in an open transaction while a revoke
@@ -15,6 +16,10 @@
  *         `confirmed`, the other proposal_not_decidable.
  *   I13   two concurrent creates of one person at open limit - 1 (the limit is the caller's parameter,
  *         set from the observed open count): exactly one admitted, the other proposal_open_limit.
+ *   LEAF  two sessions record a different correction of one base (record_foundation_review_patch_if_leaf):
+ *         the first holds its transaction open while the second blocks on the base's advisory lock
+ *         (overlapping), or both fire together (concurrent): exactly one recorded, the other
+ *         review_base_not_head; the base carries exactly one correction.
  * "Blocked" is observed, not assumed: the observer polls pg_stat_activity for a Lock wait of the
  * waiting session before releasing the holder. A schedule whose waiter never blocked is still checked by
  * the order-independent invariant (no open row of a revoked grant), which is what a create that reads
@@ -36,14 +41,15 @@ import { mulberry32, validateEnvironment } from "./job-lease-race.mjs";
 export { mulberry32, validateEnvironment };
 
 const REPO_ROOT = resolve(import.meta.dirname, "..", "..", "..");
-export const SCENARIOS = ["I12A", "I12B", "I8", "I13"];
+export const SCENARIOS = ["I12A", "I12B", "I8", "I13", "LEAF"];
 export const INVARIANTS = {
   I8: "two concurrent decides of one proposal: exactly one confirmed, the other proposal_not_decidable; the row ends confirmed",
   I12: "no proposal of a revoked grant is ever left open; a create that waited on the revoke is refused proposal_agent_grant_revoked; a create committed first is withdrawn by the revoke",
   I13: "two concurrent creates at open limit - 1: exactly one admitted, the other proposal_open_limit; the open count rises by one",
+  LEAF: "two corrections of one base: exactly one recorded, the other review_base_not_head; the base carries exactly one correction",
   ERR: "every refusal is exactly one known error token",
 };
-export const KNOWN_REFUSALS = new Set(["proposal_agent_grant_revoked", "proposal_not_decidable", "proposal_open_limit"]);
+export const KNOWN_REFUSALS = new Set(["proposal_agent_grant_revoked", "proposal_not_decidable", "proposal_open_limit", "review_base_not_head"]);
 
 /** One psql result as {ok, value, error}: `value` is the JSON the RPC returned, `error` the error token or raw text. */
 export function parseOutcome({ out, err }) {
@@ -71,6 +77,7 @@ export function planIteration(rng) {
     i8Agent: rng() < 0.5,
     i12bOverlapping: rng() < 0.5,
     staggerMs: Math.floor(rng() * 3),
+    leafOverlapping: rng() < 0.5,
   };
 }
 
@@ -119,6 +126,16 @@ export function checkI13(obs) {
   if (obs.openAfter !== obs.openBefore + 1 || obs.openAfter !== obs.limit) {
     v.push({ invariant: "I13", detail: `open count ${obs.openBefore} -> ${obs.openAfter} with limit ${obs.limit}` });
   }
+  return v;
+}
+
+/** obs = {records: [outcome, outcome], correctionsOfBase} */
+export function checkLeaf(obs) {
+  const v = refusalViolations(obs.records);
+  const recorded = obs.records.filter((o) => o.ok && o.value?.replayed === false).length;
+  const refused = obs.records.filter((o) => !o.ok && o.error === "review_base_not_head").length;
+  if (recorded !== 1 || refused !== 1) v.push({ invariant: "LEAF", detail: `two corrections of one base gave ${recorded} recorded and ${refused} base-not-head` });
+  if (obs.correctionsOfBase !== 1) v.push({ invariant: "LEAF", detail: `the base carries ${obs.correctionsOfBase} correction(s)` });
   return v;
 }
 
@@ -177,6 +194,10 @@ function sessionCreateSql(ctx, key) {
 const revokeSql = (ctx, grantId) => `select public.revoke_foundation_agent_grant(${q(ctx.ws)}, ${q(grantId)}::uuid, ${q(ctx.user)}::uuid);`;
 const decideSql = (ctx, id) => `select public.decide_world_change_proposal(${q(ctx.ws)}, ${q(id)}::uuid, 'confirm', ${q(ctx.user)}::uuid, 'sha256:' || repeat('d', 64));`;
 const openRowsSql = (grantId) => `select count(*) from public.world_change_proposals where agent_grant_id = ${q(grantId)}::uuid and state = 'proposed';`;
+function leafSql(ctx, collection, base, result, after) {
+  return `select public.record_foundation_review_patch_if_leaf(${q(ctx.ws)}, ${q(collection)}, ${q(base)}, 'ev-race', 'src1', repeat('a', 64), 1,
+    array[0, 0, 10, 10], 'Race correction of one base.', ${q(ctx.user)}::uuid, 'obj-race', 'before label', ${q(after)}, ${q(result)});`;
+}
 const openOfPersonSql = (ctx) => `select count(*) from public.world_change_proposals where workspace_key = ${q(ctx.ws)} and principal_id = ${q(ctx.user)}::uuid
   and principal_kind = 'agent' and state = 'proposed' and expires_at > clock_timestamp();`;
 
@@ -235,6 +256,27 @@ async function scenario(kind, plan, s, ctx, ids) {
     const finalState = failOn("final", await obs.run(`select state from public.world_change_proposals where proposal_id = ${q(id)}::uuid;`));
     return { blocked: false, violations: checkI8({ decides, finalState }) };
   }
+  if (kind === "LEAF") {
+    const collection = `collection-${hex(ids, 32)}`;
+    const base = `sha256:${hex(ids, 64)}`;
+    const [one, two] = [`sha256:${hex(ids, 64)}`, `sha256:${hex(ids, 64)}`];
+    let records, blocked = false;
+    if (plan.leafOverlapping) {
+      const first = parseOutcome(await a.run(`begin; ${leafSql(ctx, collection, base, one, "after one")}`));
+      const pending = b.run(leafSql(ctx, collection, base, two, "after two"));
+      blocked = await waitBlocked(obs, b.pid);
+      await sleep(plan.releaseDelayMs);
+      failOn("record commit", await a.run(first.ok ? "commit;" : "rollback;"));
+      records = [first, parseOutcome(await pending)];
+    } else {
+      const first = a.run(leafSql(ctx, collection, base, one, "after one"));
+      await sleep(plan.staggerMs);
+      records = (await Promise.all([first, b.run(leafSql(ctx, collection, base, two, "after two"))])).map(parseOutcome);
+    }
+    const correctionsOfBase = Number(failOn("corrections", await obs.run(`select count(*) from public.foundation_review_decisions
+      where workspace_key = ${q(ctx.ws)} and collection_id = ${q(collection)} and manifest_digest = ${q(base)} and resulting_manifest_digest is not null;`)));
+    return { blocked, violations: checkLeaf({ records, correctionsOfBase }) };
+  }
   // I13
   const openBefore = Number(failOn("open before", await obs.run(openOfPersonSql(ctx))));
   const limit = openBefore + 1;
@@ -279,6 +321,8 @@ export async function main(env = process.env) {
     const user = `a6e0${hex(ids, 4)}-${hex(ids, 4)}-4${hex(ids, 3)}-8${hex(ids, 3)}-${hex(ids, 12)}`;
     failOn("seed user", await obs.run(`insert into auth.users (id) values (${q(user)}) on conflict do nothing;`));
     const ws = `pilot-${user.replaceAll("-", "").slice(0, 16)}`;
+    // foundation_review_decisions.workspace_key references the billing account (LEAF needs one).
+    failOn("seed billing account", await obs.run(`insert into public.foundation_billing_accounts (workspace_key, user_id) values (${q(ws)}, ${q(user)}::uuid) on conflict do nothing;`));
     const ctx = { user, ws, grant: null };
     ctx.grant = failOn("standing grant", await obs.run(grantSql(ctx, ids)));
     for (let n = 0; n < iterations; n += 1) {
@@ -305,7 +349,7 @@ export async function main(env = process.env) {
     const stem = join(receiptDir, `agent-grant-race-seed${seed}`);
     writeFileSync(`${stem}.log`, logText);
     writeFileSync(`${stem}.json`, JSON.stringify(receipt, null, 2));
-    process.stdout.write(`${receipt.status} ${done}/${iterations} iterations; blocked I12A ${counts.I12A.blocked}/${counts.I12A.runs}, I12B ${counts.I12B.blocked}/${counts.I12B.runs}; receipt ${stem}.json\n`);
+    process.stdout.write(`${receipt.status} ${done}/${iterations} iterations; blocked I12A ${counts.I12A.blocked}/${counts.I12A.runs}, I12B ${counts.I12B.blocked}/${counts.I12B.runs}, LEAF ${counts.LEAF.blocked}/${counts.LEAF.runs}; receipt ${stem}.json\n`);
     if (failure) process.stdout.write(`FAILED at iteration ${failure.iteration} seed ${seed}: ${JSON.stringify(failure)}\n`);
     return failure ? 1 : 0;
   } finally {
