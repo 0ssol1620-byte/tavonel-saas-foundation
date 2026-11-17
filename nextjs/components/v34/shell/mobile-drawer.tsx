@@ -39,9 +39,12 @@ export default function MobileDrawer({ primary, groups, start }: {
     return () => wide.removeEventListener("change", onChange);
   }, []);
 
-  const openDrawer = () => {
+  const openDrawer = (trigger: HTMLButtonElement) => {
     const element = dialog.current;
     if (!element || element.open) return;
+    // Safari does not focus a button on click, and a closing dialog returns focus to the element
+    // that was focused when it opened. Focus the trigger first so Escape and the close button hand it back.
+    trigger.focus();
     element.showModal();
     setOpen(true);
   };
@@ -55,7 +58,7 @@ export default function MobileDrawer({ primary, groups, start }: {
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={id}
-        onClick={openDrawer}
+        onClick={(event) => openDrawer(event.currentTarget)}
       >
         <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
           <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
