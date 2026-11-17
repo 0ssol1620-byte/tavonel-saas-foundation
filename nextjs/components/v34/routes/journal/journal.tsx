@@ -1,4 +1,6 @@
+import { Fragment } from "react";
 import Link from "next/link";
+import type { Route } from "next";
 import V34Page from "@/components/v34/shell/v34-page";
 import RouteJsonLd from "@/components/v34/shell/route-json-ld";
 import { articleReadMinutes } from "@/components/v34/ui/article-layout";
@@ -8,13 +10,14 @@ import { Figure } from "@/components/v34/ui/figure";
 import { Hero } from "@/components/v34/ui/hero";
 import { Section } from "@/components/v34/ui/section";
 import { surfaceClass } from "@/components/v34/ui/surface";
+import { RESOURCE_LINKS, RESOURCE_TAG_LABELS } from "@/lib/site-navigation";
 import { V34_LIVE_ROUTES, v34Route, type V34RouteKey } from "@/lib/v34/routes";
 import { COMPILER_BLOCKS } from "../journal-compiler/compiler-article";
 import { MCP_BLOCKS } from "../journal-mcp/mcp-article";
 import { RESEARCH_BLOCKS } from "../journal-research/research-article";
 import { REVISION_BLOCKS } from "../journal-revision/revision-article";
 import { COVERS } from "./covers";
-import { CATEGORY, FEATURED, FINAL, GUIDES, HERO, REFERENCE } from "./journal-content";
+import { CATEGORY, FEATURED, FINAL, GUIDES, HERO, HUB, HUB_FILTERS, REFERENCE, REFERENCE_ONLY, hubEntry } from "./journal-content";
 import s from "./journal.module.css";
 
 const ROUTE = "journal";
@@ -77,16 +80,44 @@ export function JournalBody() {
       </Section>
 
       <Section surface="cases" eyebrow={REFERENCE.eyebrow} title={REFERENCE.title} lead={REFERENCE.lead}>
-        <ul className={s.reference}>
-          {REFERENCE.items.map((item) => (
-            <li key={item.href} className={s.referenceItem}>
-              <h3 className={s.referenceTitle}>
-                <Link className={s.referenceLink} href={item.href} prefetch={false}>{item.label}</Link>
-              </h3>
-              <p className={s.referenceText}>{item.text}</p>
-            </li>
-          ))}
-        </ul>
+        <div className={s.hub}>
+          <nav className={s.filters} aria-label={HUB.label}>
+            {HUB_FILTERS.map(({ tag, group }) => (
+              <Fragment key={tag ?? "all"}>
+                {group ? <p className={s.groupLabel}>{group}</p> : null}
+                <a id={`find-${tag ?? "all"}`} className={s.filter} href={`#find-${tag ?? "all"}`}>
+                  {tag ? RESOURCE_TAG_LABELS[tag] : HUB.all}
+                </a>
+              </Fragment>
+            ))}
+          </nav>
+          <ul className={s.reference}>
+            {RESOURCE_LINKS.map((link) => {
+              const entry = hubEntry(link);
+              return (
+                <li key={link.href} className={s.referenceItem} data-tags={[...link.purposes, ...link.workflows].join(" ")}>
+                  <h3 className={s.referenceTitle}>
+                    <Link className={s.referenceLink} href={link.href as Route} prefetch={false}>{entry.label}</Link>
+                  </h3>
+                  <p className={s.referenceText}>{entry.text}</p>
+                  {link.representativeCase ? <p className={s.referenceNote}>{HUB.representative}</p> : null}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+        {REFERENCE_ONLY.length > 0 ? (
+          <ul className={`${s.reference} ${s.referenceAfter}`}>
+            {REFERENCE_ONLY.map((item) => (
+              <li key={item.href} className={s.referenceItem}>
+                <h3 className={s.referenceTitle}>
+                  <Link className={s.referenceLink} href={item.href} prefetch={false}>{item.label}</Link>
+                </h3>
+                <p className={s.referenceText}>{item.text}</p>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </Section>
 
       <FinalCta title={FINAL.title} />

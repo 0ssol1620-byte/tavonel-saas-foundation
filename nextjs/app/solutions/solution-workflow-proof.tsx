@@ -37,7 +37,7 @@ export default function SolutionWorkflowProof({ kind, pick }: { kind: WorkflowKi
             <code>{preview.content}</code>
           </pre>
           {kind === "knowledge-graph" && <p>This row binds evidence at document level and shows the export’s shape.</p>}
-          <Link href="/product/compiled-world#public-package-proof">Inspect the full sample package</Link>
+          <Link href="/world#public-package-proof">Inspect the full sample package</Link>
         </div>
       )}
       {kind === "document-intelligence" && (

@@ -1,3 +1,4 @@
+import PublicPackageProof from "@/components/public-package-proof";
 import V34Page from "@/components/v34/shell/v34-page";
 import RouteJsonLd from "@/components/v34/shell/route-json-ld";
 import { ButtonLink } from "@/components/v34/ui/button-link";
@@ -8,6 +9,7 @@ import { ScrollTable } from "@/components/v34/ui/scroll-table";
 import { Section } from "@/components/v34/ui/section";
 import { Tag } from "@/components/v34/ui/tag";
 import { WorldInstrument } from "@/components/v34/world/world-instrument";
+import { exploreSampleArtifact, exploreSampleDocuments } from "@/lib/explore-sample";
 import { PUBLIC_CORPUS_STATS, readPublicCorpus } from "@/lib/v34/public-corpus";
 import { v34Route } from "@/lib/v34/routes";
 import { CATALOG_LABEL, DOMAINS, FINAL, HERO, INSTRUMENT, NEXT, SOURCES } from "./world-content";
@@ -52,6 +54,15 @@ export function WorldBody() {
           are documents the records were read from. The other {stats.sources.referenceOnly.toLocaleString("en-US")} are
           catalog entries that name a public data publisher.
         </p>
+      </Section>
+
+      {/*
+        The emitted files of the public sample, ported from the former compiled-world page as they
+        were (lead decision 9). The section keeps its own id, heading and ground, so a link to
+        #public-package-proof lands on it here.
+      */}
+      <Section surface="paper">
+        <PublicPackageProof artifact={exploreSampleArtifact} sources={exploreSampleDocuments} runtime={exploreSampleArtifact.coreExecution.runtime} />
       </Section>
 
       <Section surface="paper" eyebrow={NEXT.eyebrow} title={NEXT.title} lead={NEXT.lead}>

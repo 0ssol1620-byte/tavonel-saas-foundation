@@ -8,8 +8,8 @@ test("How it works explains a pipeline rather than repeating the Product World",
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://tavonel.com/methods");
   const process = page.locator("main ol").filter({ has: page.getByRole("heading", { level: 3 }) }).first();
   await expect(process.locator(":scope > li")).toHaveCount(6);
-  // Not carried by the V34 /methods stages; soft so the rest of the page is still measured.
-  expect.soft(await process.innerText()).toContain("full-corpus compiles");
+  // Lead decision 13 (WO-CI-24): the soft "full-corpus compiles" line is retired; the V34 /methods
+  // stages have no counterpart.
   await expect(page.getByRole("heading", { name: "From a source file to the next version." })).toBeVisible();
   await expect(page.locator('[data-visual-world="explore"]')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);

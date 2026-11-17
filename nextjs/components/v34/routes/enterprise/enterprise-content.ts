@@ -98,6 +98,21 @@ export const COST = {
     "An enterprise number is quoted after the deployment review, against your page volume, your source types and the work that connecting them takes — never before it, because every part of that quote depends on what the review finds.",
 } as const;
 
+/**
+ * The "On this page" index (lead decision 11, the /security pattern), in page order, named by each
+ * section's own title. A section's id is a key of this map (`satisfies JumpId` in enterprise.tsx).
+ */
+export const JUMP = {
+  team: TASKS.title,
+  trace: TRACE.title,
+  run: OPERATIONS.title,
+  pilot: PILOT.title,
+  scoped: SCOPED.title,
+  review: REVIEW.title,
+  cost: COST.title,
+} as const;
+export type JumpId = keyof typeof JUMP;
+
 export const FINAL = {
   title: "Plan a scoped evaluation.",
   secondary: "How your documents are handled",

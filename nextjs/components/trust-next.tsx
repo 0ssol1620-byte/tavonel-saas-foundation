@@ -68,6 +68,17 @@ const INSTEAD_OF_THE_NEXT_STEP: Partial<Record<TrustStep, { to: Route; label: st
   },
 };
 
+/*
+  Lead decision 17 (WO-CI-24): the heading takes the role its position has.
+
+  A V34 trust page renders this block inside one of its Sections, under that Section's own H2, so
+  the block's heading is a sub-heading of that Section: an H3, whose size the host's sheet maps to
+  the V34 sub-heading size (`--t-6`). As an H2 it sat beside the Section's H2 at a second size
+  (/evidence: 33.84px against 61.92px at 1440). A retained page places the block beside its own
+  H2s, so there it stays an H2. A new V34 host is listed here, or its heading is an H2 again.
+*/
+const INSIDE_A_V34_SECTION: ReadonlySet<TrustStep> = new Set<TrustStep>(["/evidence", "/research/program"]);
+
 /**
  * The one next step at the foot of a trust page.
  *
@@ -85,9 +96,10 @@ export function TrustNext({ from, emphasis = "primary" }: { from: TrustStep; emp
   const override = INSTEAD_OF_THE_NEXT_STEP[from];
   const next = override ? { href: override.to, label: override.label, question: override.question } : TRUST_SEQUENCE[index + 1];
   if (!next) return null;
+  const Heading = INSIDE_A_V34_SECTION.has(from) ? "h3" : "h2";
   return (
     <div className="stack trust-next">
-      <h2>Next: {next.label}</h2>
+      <Heading>Next: {next.label}</Heading>
       <p className="fine">{next.question}</p>
       <div className="actions">
         <Link className={emphasis === "quiet" ? "btn ghost" : "btn"} href={next.href as Route}>

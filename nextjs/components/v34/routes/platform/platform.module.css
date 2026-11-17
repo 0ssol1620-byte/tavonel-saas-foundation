@@ -200,6 +200,11 @@
   line-height: 1.6;
 }
 
+/* The lifecycle's link to the page that walks the method through. */
+.method {
+  margin: 20px 0 0;
+}
+
 .textLink {
   display: inline-flex;
   align-items: center;

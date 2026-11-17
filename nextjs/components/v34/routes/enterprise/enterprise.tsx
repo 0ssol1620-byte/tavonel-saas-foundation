@@ -14,8 +14,8 @@ import { Provisions, provisionSummary } from "../security/provisions";
 import { PROVISIONS } from "../security/security-content";
 import { EnterpriseArt } from "./enterprise-art";
 import {
-  COST, FINAL, HERO, OPERATIONS, PILOT, RETAINED, REVIEW, SCOPED, TASKS, TRACE,
-  registryPath, retained,
+  COST, FINAL, HERO, JUMP, OPERATIONS, PILOT, RETAINED, REVIEW, SCOPED, TASKS, TRACE,
+  registryPath, retained, type JumpId,
 } from "./enterprise-content";
 import { SampleFrame } from "./sample-frame";
 import s from "./enterprise.module.css";
@@ -66,7 +66,14 @@ export function EnterpriseBody() {
         art={<Figure art={<EnterpriseArt />} caption={HERO.figureCaption} />}
       />
 
-      <Section id="team" surface="paper" title={TASKS.title} lead={TASKS.lead}>
+      <Section id={"team" satisfies JumpId} surface="paper" title={TASKS.title} lead={TASKS.lead}>
+        <nav aria-label="On this page">
+          <ul className={s.jump}>
+            {(Object.entries(JUMP) as [JumpId, string][]).map(([id, label]) => (
+              <li key={id}><a className={s.jumpLink} href={`#${id}`}>{label}</a></li>
+            ))}
+          </ul>
+        </nav>
         <ul className={s.tasks}>
           {TASKS.items.map(([title, body]) => (
             <li key={title} className={s.task}>
@@ -77,12 +84,12 @@ export function EnterpriseBody() {
         </ul>
       </Section>
 
-      <Section id="trace" surface="light" title={TRACE.title}>
+      <Section id={"trace" satisfies JumpId} surface="light" title={TRACE.title}>
         <SampleFrame demo={signedProductDemo} />
         <Steps steps={TRACE.steps} />
       </Section>
 
-      <Section id="run" surface="green" title={OPERATIONS.title}>
+      <Section id={"run" satisfies JumpId} surface="green" title={OPERATIONS.title}>
         <ul className={s.items}>
           {OPERATIONS.items.map(([title, body]) => (
             <li key={title} className={s.item}>
@@ -93,12 +100,12 @@ export function EnterpriseBody() {
         </ul>
       </Section>
 
-      <Section id="pilot" surface="paper" title={PILOT.title}>
+      <Section id={"pilot" satisfies JumpId} surface="paper" title={PILOT.title}>
         <Steps steps={PILOT.steps} />
         <p className={s.prose}>{PILOT.outcome}</p>
       </Section>
 
-      <Section id="scoped" surface="light" title={SCOPED.title} lead={SCOPED.lead}>
+      <Section id={"scoped" satisfies JumpId} surface="light" title={SCOPED.title} lead={SCOPED.lead}>
         <ul className={s.scoped}>
           {SCOPED.cards.map((card) => (
             <li key={card.title} className={s.scopedCard}>
@@ -110,7 +117,7 @@ export function EnterpriseBody() {
         </ul>
       </Section>
 
-      <Section id="review" surface="paper" title={REVIEW.title} lead={`${PROVISIONS.lead} ${provisionSummary()}`}>
+      <Section id={"review" satisfies JumpId} surface="paper" title={REVIEW.title} lead={`${PROVISIONS.lead} ${provisionSummary()}`}>
         <Provisions />
         <p className={s.prose}>
           Review the maintained public record in the{" "}
@@ -129,7 +136,7 @@ export function EnterpriseBody() {
         </p>
       </Section>
 
-      <Section id="cost" surface="light" title={COST.title}>
+      <Section id={"cost" satisfies JumpId} surface="light" title={COST.title}>
         <p className={s.proseTight}>
           The published plans and the pages each one includes are on{" "}
           <Link className={s.inline} href={registryPath("pricing")} prefetch={false}>Pricing</Link>, in US dollars and

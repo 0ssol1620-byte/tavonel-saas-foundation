@@ -23,8 +23,9 @@ const EDITORIAL_ROUTES = [
   "/terms",
 ] as const;
 
+// Lead decision 12 (WO-CI-24): the /knowledge-compiler row is retired; it answers 308 to a journal
+// article (/journal/compiler), which has no proof-registry hero to balance.
 const REGISTRY_ROUTES = [
-  "/knowledge-compiler",
   "/reproducibility",
 ] as const;
 

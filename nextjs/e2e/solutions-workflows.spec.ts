@@ -78,8 +78,8 @@ for (const width of [390, 1440, 1920]) {
     await page.evaluate(() => document.fonts.ready);
     await capture(page, info, `solutions-hub-${width}.png`);
     await expect(page.locator(TASK_CARDS)).toHaveCount(5);
-    // Soft: the V34 hub carries no design-partner section (reported, not edited away).
-    await expect.soft(page.locator("#design-partners-title")).toHaveCount(1);
+    // Lead decision 13 (WO-CI-24): the soft #design-partners-title row is retired; the V34 hub and
+    // the prototype carry no design-partner section.
     const hubTitle = page.locator("main h1");
     const hubLede = page.locator("main h1 + div p").first();
     expect(Math.abs((await hubTitle.boundingBox())!.x - (await hubLede.boundingBox())!.x)).toBeLessThan(2);
@@ -118,7 +118,7 @@ for (const width of [390, 1440, 1920]) {
       expect(proofHref.pathname).toBe("/explore");
       expect(proofHref.searchParams.get("evidence")).toBe(selectedEvidence);
       const packageLink = proof.getByRole("link", { name: "Inspect the full sample package" });
-      if (await packageLink.count()) await expect(packageLink).toHaveAttribute("href", "/product/compiled-world#public-package-proof");
+      if (await packageLink.count()) await expect(packageLink).toHaveAttribute("href", "/world#public-package-proof");
       for (const link of await proof.locator("a").all()) {
         expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
         await link.focus();
@@ -185,10 +185,9 @@ for (const width of [390, 1440, 1920]) {
         await page.goto(`/solutions/${slug}`, { waitUntil: "networkidle" });
         const packageLink = page.getByRole("link", { name: "Inspect the full sample package" });
         await tabTo(page, packageLink);
-        // The link still names /product/compiled-world, which answers 308 to /world (V34 D33 1.1).
-        await Promise.all([page.waitForURL("**/world**"), page.keyboard.press("Enter")]);
-        // Soft: /world carries no #public-package-proof (reported); the journeys below still run.
-        await expect.soft(page.locator("#public-package-proof")).toBeVisible();
+        // Lead decision 9 (WO-CI-24): the package section is ported to /world and the link names it there.
+        await Promise.all([page.waitForURL("**/world#public-package-proof"), page.keyboard.press("Enter")]);
+        await expect(page.locator("#public-package-proof")).toBeVisible();
         await capture(page, info, `solutions-${slug}-${width}-package-destination.png`);
       }
     }
