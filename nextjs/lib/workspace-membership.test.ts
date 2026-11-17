@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { BILLING_OFFERS } from "./billing-catalog";
 
 const { getRequestUser, readSupabaseAdminConfig, supabaseAdminRequest } = vi.hoisted(() => ({
   getRequestUser: vi.fn(),
@@ -11,7 +14,7 @@ vi.mock("./supabase-admin", () => ({ readSupabaseAdminConfig, supabaseAdminReque
 
 import {
   acceptWorkspaceInvite, createWorkspaceInvite, deriveWorkspaceInviteToken,
-  requireWorkspaceMembership, revalidateWorkspaceMembership,
+  requireWorkspaceMembership, revalidateWorkspaceMembership, WORKSPACE_SEAT_LIMITS,
 } from "./workspace-membership";
 import { getWorkspaceMembership, type WorkspaceRole } from "./workspace-membership";
 
@@ -343,5 +346,68 @@ describe("workspace principal identity: query and projection", () => {
     } });
     const serialized = JSON.stringify([result, found]);
     for (const value of Object.values(extra)) expect(serialized).not.toContain(value);
+  });
+});
+
+describe("workspace seat allowance (WO-CAT-6)", () => {
+  const INVITE = {
+    workspaceKey: WORKSPACE, actorUserId: OWNER, email: "member@example.com", role: "member" as const,
+    idempotencyKey: "invite_retry_key_010", expiresAt: "2026-09-23T00:00:00.000Z", secret: SECRET,
+  };
+  const TOKEN = () => deriveWorkspaceInviteToken({ secret: SECRET, workspaceKey: WORKSPACE, actorUserId: OWNER, idempotencyKey: "invite_retry_key_011" })!;
+  const sentBody = () => JSON.parse(String((supabaseAdminRequest.mock.calls[0]![2] as RequestInit).body)) as Record<string, unknown>;
+  // A fresh Response per call: a body is read once.
+  const refusal = (message: string) => supabaseAdminRequest.mockImplementation(async () => new Response(JSON.stringify({ message }), { status: 400 }));
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    readSupabaseAdminConfig.mockReturnValue({ url: "https://tenant.test", serviceRoleKey: "x".repeat(40) });
+  });
+
+  // The catalog, read here independently of the module under test.
+  const CATALOG_SEATS = Object.fromEntries(Object.entries(BILLING_OFFERS)
+    .filter(([, offer]) => offer.status !== "retired")
+    .map(([code, offer]) => [code, offer.included!.seats]));
+
+  it("is the catalog's included seats for every v2 offer, and names no retired offer (legacy stays uncapped)", () => {
+    expect(WORKSPACE_SEAT_LIMITS).toStrictEqual(CATALOG_SEATS);
+    expect(Object.keys(WORKSPACE_SEAT_LIMITS).sort()).toStrictEqual(["business", "developer", "personal", "team"]);
+    for (const code of Object.keys(BILLING_OFFERS)) {
+      if (BILLING_OFFERS[code as keyof typeof BILLING_OFFERS].status === "retired") expect(WORKSPACE_SEAT_LIMITS).not.toHaveProperty(code);
+    }
+  });
+
+  it("is the map the database test exercises", () => {
+    const sql = readFileSync(resolve(import.meta.dirname, "../../supabase/tests/workspace_seat_allowance.sql"), "utf8");
+    const literal = /select '(\{[^']*\})'::jsonb/.exec(sql)?.[1];
+    expect(literal && JSON.parse(literal)).toStrictEqual(CATALOG_SEATS);
+  });
+
+  it("sends the catalog's limits with every invite", async () => {
+    supabaseAdminRequest.mockResolvedValue(Response.json({ inviteId: "33333333-3333-4333-8333-333333333333", state: "pending" }));
+    await expect(createWorkspaceInvite(INVITE)).resolves.toMatchObject({ ok: true });
+    expect(sentBody().p_seat_limits).toStrictEqual(CATALOG_SEATS);
+  });
+
+  it("sends the catalog's limits with every accept", async () => {
+    supabaseAdminRequest.mockResolvedValue(Response.json({ workspaceKey: WORKSPACE, role: "member", state: "accepted" }));
+    await expect(acceptWorkspaceInvite({ userId: MEMBER, token: TOKEN() })).resolves.toMatchObject({ ok: true });
+    expect(sentBody().p_seat_limits).toStrictEqual(CATALOG_SEATS);
+  });
+
+  it("maps a full workspace to 402 WORKSPACE_SEAT_LIMIT_REACHED on invite and on accept", async () => {
+    refusal("workspace_seat_limit_reached");
+    await expect(createWorkspaceInvite(INVITE))
+      .resolves.toEqual({ ok: false, code: "WORKSPACE_SEAT_LIMIT_REACHED", status: 402 });
+    await expect(acceptWorkspaceInvite({ userId: MEMBER, token: TOKEN() }))
+      .resolves.toEqual({ ok: false, code: "WORKSPACE_SEAT_LIMIT_REACHED", status: 402 });
+  });
+
+  it("maps a plan with no usable limit to a 503, never to an admission", async () => {
+    refusal("workspace_seat_limit_unavailable");
+    await expect(createWorkspaceInvite(INVITE))
+      .resolves.toEqual({ ok: false, code: "WORKSPACE_SEAT_LIMIT_UNAVAILABLE", status: 503 });
+    await expect(acceptWorkspaceInvite({ userId: MEMBER, token: TOKEN() }))
+      .resolves.toEqual({ ok: false, code: "WORKSPACE_SEAT_LIMIT_UNAVAILABLE", status: 503 });
   });
 });
