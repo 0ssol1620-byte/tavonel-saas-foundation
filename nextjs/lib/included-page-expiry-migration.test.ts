@@ -78,8 +78,16 @@ describe("included-page expiry migration", () => {
       readFileSync(join(migrationsDirectory, name), "utf8")
         .includes("create or replace function public.apply_foundation_billing_event_v4("),
     );
-    expect(definitions).toEqual(["0035_subscription_allowance_ledger.sql", FILE]);
+    // 20261117140000 (catalog v2, WO-CAT-3) redefines v4 to name the v2 offer codes; it must carry this file's expiry.
+    expect(definitions).toEqual(["0035_subscription_allowance_ledger.sql", FILE, "20261117140000_catalog_v2_offer_codes.sql"]);
     expect(FILE > "0048").toBe(true);
+    const latest = readFileSync(join(migrationsDirectory, definitions.at(-1) as string), "utf8");
+    for (const line of [
+      "where workspace_key = p_workspace_key and offer_code is distinct from p_offer_code",
+      "expired_units := greatest(0, balance_before - other_offer_credits)",
+      "'allowance_expired', p_offer_code, p_transaction_id, -expired_units)",
+      "if expiry_inserted <> 1 then expired_units := 0; end if;",
+    ]) expect(latest).toContain(line);
   });
 
   it("is re-runnable, because db-rehearsal may replay it", () => {
