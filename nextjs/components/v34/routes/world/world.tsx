@@ -20,7 +20,7 @@ export function WorldBody() {
   const loaded = Object.values(corpus.sources).filter((source) => source[1] !== CATALOG_LABEL);
   return (
     <>
-      <Hero variant="sub" eyebrow={HERO.eyebrow} title={v34Route("world").heading} lead={HERO.lead} />
+      <Hero variant="split" eyebrow={HERO.eyebrow} title={v34Route("world").heading} lead={HERO.lead} />
 
       <Section surface="green">
         <WorldInstrument variant="full" />

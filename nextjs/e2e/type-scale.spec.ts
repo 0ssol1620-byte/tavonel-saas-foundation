@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { V34_ROUTE_KEYS, v34Route } from "../lib/v34/routes";
 
 /*
   UX-L3 (lane P2-05): one face, one type scale, one section head, read off the browser.
@@ -18,16 +19,21 @@ import { expect, test, type Page } from "@playwright/test";
     the case the plan names -- Home's 24px 'Measured, with receipts.' (now 'Research figures, with receipts.') beside five 51.84px section
     H2s -- and it leaves a card's heading inside a section alone, because the card is not the
     section's sibling.
+    Restated per role by WO-CI-20, lead decision 2: the V34 kit sets three H2 roles at three sizes,
+    as the prototype does (route_preview/assets/site.css: `h2`, `.v33-bridge h2`, `.route-foot h2`):
+    the Section title (`--v34-h2`), the Bridge title (`#v34-bridge-title`) and the FinalCta title
+    (`#v34-final-title`). Sibling H2s OF ONE ROLE are one size; any H2 that is neither of the two ids
+    is a Section H2, so a retained page's headings are held exactly as before.
   - The /ko meta line takes no capital tracking (§4.4 KO rules).
 
   Driven from the 1440 project at 1440 and 390, the two widths §8.2 names. /research/experiments is
   in §5.4 but serves a 404, so it is not measured (the same list as site-alignment.spec.ts).
 
   V34 (WO-CI-5a). A route the program moved answers 308 to its V34 page (`V34_REDIRECTS`,
-  next.config.mjs), and that page is the one read. R2 is held per page by what the page declares:
-  a retained page declares its legacy template (`data-template` on the V34 page root) and is held
-  to Display 2 as before; a V34 registry page declares none, and its H1 is held to the V34 display
-  roles instead -- the size of one of `--v34-h1-sub` / `--v34-h1-split` as resolved on the page
+  next.config.mjs), and that page is the one read. R2 is held per page by where it lands: a
+  retained page is held to Display 2 as before; a page that lands on a V34 registry path
+  (lib/v34/routes.ts) -- which since WO-CI-20 declares its template too, so the declaration no longer
+  tells the two apart -- has its H1 held to the V34 display roles instead -- the size of one of `--v34-h1-sub` / `--v34-h1-split` as resolved on the page
   (components/v34/tokens.module.css; the Hero's sub and split variants and the article layout set
   their H1 from these), at the V34 title weight 500 and in the one face. Equal-but-wrong still
   fails: each H1 is compared to a token's resolved value, not only to its neighbours. And a template
@@ -36,6 +42,12 @@ import { expect, test, type Page } from "@playwright/test";
 */
 /** The V34 heading weight (components/v34/ui/hero.module.css and article-layout.module.css `.title`). */
 const V34_TITLE_WEIGHT = "500";
+/**
+ * Every V34 registry path whose body is a V34 page; a route that lands on one is held to the V34 roles.
+ * /pricing is a registry path whose body is still the retained pricing client (its own T2 root, a
+ * Display 2 H1), so it is held to Display 2 like any retained page.
+ */
+const V34_PATHS: ReadonlySet<string> = new Set(V34_ROUTE_KEYS.map((key) => v34Route(key).path).filter((path) => path !== "/pricing"));
 
 const TEMPLATES = {
   T0: ["/"],
@@ -65,15 +77,16 @@ const WIDTHS = [1440, 390] as const;
 const viewportOf = (width: number) => ({ width, height: width <= 390 ? 844 : 900 });
 
 type Signature = { size: string; weight: string; variation: string; face: string };
+type H2Role = "Section" | "Bridge" | "FinalCta";
 type Reading = {
   retiredFaces: string[];
   h1: (Signature & { text: string }) | null;
   displayTwo: Signature;
-  /** The legacy template the page root declares, or null on a V34 registry page. */
+  /** The template the page root declares, or null when it declares none. */
   template: string | null;
   /** The V34 display roles (`--v34-h1-sub`, `--v34-h1-split`) resolved on this page; empty without the shell. */
   v34Roles: string[];
-  h2Groups: { parent: string; items: { size: string; text: string }[] }[];
+  h2Groups: { parent: string; items: { size: string; text: string; role: H2Role }[] }[];
   koMeta: { count: number; tracked: string[] };
 };
 
@@ -133,13 +146,14 @@ function read(): Reading {
     }
   }
 
-  const groups = new Map<Element | null, { size: string; text: string }[]>();
+  const groups = new Map<Element | null, { size: string; text: string; role: H2Role }[]>();
   for (const heading of document.querySelectorAll("h2")) {
     if (!visible(heading)) continue;
     const parent = (heading.closest("section, article, aside") ?? heading).parentElement;
     groups.set(parent, [...(groups.get(parent) ?? []), {
       size: getComputedStyle(heading).fontSize,
       text: (heading.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 48),
+      role: heading.id === "v34-final-title" ? "FinalCta" : heading.id === "v34-bridge-title" ? "Bridge" : "Section",
     }]);
   }
 
@@ -166,11 +180,12 @@ function read(): Reading {
   };
 }
 
-/** Sibling groups whose H2s do not share one size, as readable lines. */
+/** Sibling groups whose H2s of one role do not share one size, as readable lines. */
 function mixedSiblings(reading: Reading): string[] {
-  return reading.h2Groups
-    .filter((group) => group.items.length > 1 && new Set(group.items.map((item) => item.size)).size > 1)
-    .map((group) => `${group.parent}: ${group.items.map((item) => `${item.size} «${item.text}»`).join(" | ")}`);
+  return reading.h2Groups.flatMap((group) => (["Section", "Bridge", "FinalCta"] as const)
+    .map((role) => group.items.filter((item) => item.role === role))
+    .filter((items) => items.length > 1 && new Set(items.map((item) => item.size)).size > 1)
+    .map((items) => `${group.parent} (${items[0]!.role} H2s): ${items.map((item) => `${item.size} «${item.text}»`).join(" | ")}`));
 }
 
 /** Where a set of H1 signatures differs from the first one (or from `expected`). */
@@ -220,7 +235,7 @@ async function seedRefusal(page: Page) {
 async function readRoute(page: Page, route: string) {
   const response = await page.goto(route);
   expect(response?.status(), `${route} answers`).toBeLessThan(400);
-  return page.evaluate(read);
+  return { ...(await page.evaluate(read)), landed: new URL(page.url()).pathname };
 }
 
 for (const width of WIDTHS) test.describe(`type scale (UX-L3) at ${width}`, () => {
@@ -245,8 +260,8 @@ for (const width of WIDTHS) test.describe(`type scale (UX-L3) at ${width}`, () =
       let displayTwo: Signature | undefined;
       for (const route of routes) {
         const reading = await readRoute(page, route);
-        // T0 is Home's own pair; any other page that declares no legacy template is a V34 registry page.
-        if (template === "T0" || reading.template) readings.push({ route, h1: reading.h1 });
+        // T0 is Home's own pair; any other page that lands on a registry path is a V34 page.
+        if (template === "T0" || !V34_PATHS.has(reading.landed)) readings.push({ route, h1: reading.h1 });
         else v34Readings.push({ route, h1: reading.h1, roles: reading.v34Roles });
         displayTwo ??= reading.displayTwo;
       }
@@ -286,20 +301,33 @@ test.describe("the type-scale detector", () => {
     expect(mixedSiblings(clean)).toEqual([]);
     expect(clean.retiredFaces).toEqual([]);
 
-    // V34 Home has no #home-measures-title: the probe is the first H2 that has a sibling H2 (read() decides siblings).
+    /*
+      The clean reading above already holds Home's FinalCta H2 (74.88px at 1440) beside its Section H2s:
+      a role at its own size is not a defect. Two Section H2s of different sizes are: the probe is the
+      first Section H2 that has a Section sibling (read() decides siblings and roles), shrunk to 24px.
+    */
     const shrunk = await page.evaluate(() => {
       const sectionOf = (heading: Element) => heading.closest("section, article, aside") ?? heading;
-      const headings = [...document.querySelectorAll("h2")].filter((heading) => heading.getBoundingClientRect().height > 1);
+      const isSection = (heading: Element) => heading.id !== "v34-final-title" && heading.id !== "v34-bridge-title";
+      const headings = [...document.querySelectorAll("h2")].filter((heading) => heading.getBoundingClientRect().height > 1 && isSection(heading));
       const target = headings.find((heading) =>
         headings.some((other) => other !== heading && sectionOf(other).parentElement === sectionOf(heading).parentElement));
-      if (!target) throw new Error("no H2 with a sibling H2 on /");
+      if (!target) throw new Error("no Section H2 with a Section sibling H2 on /");
       target.setAttribute("data-type-scale-probe", "");
       return (target.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 48);
     });
     await set(page, "[data-type-scale-probe]", "font-size", "24px");
     const mixed = mixedSiblings(await page.evaluate(read));
     expect(mixed).toHaveLength(1);
+    expect(mixed[0]).toContain("(Section H2s)");
     expect(mixed[0]).toContain(`24px «${shrunk}»`);
+
+    // The rule itself, on a written reading: three roles at three sizes pass; two Section sizes fail
+    // whatever the other roles do.
+    const of = (items: Reading["h2Groups"][number]["items"]) => mixedSiblings({ ...clean, h2Groups: [{ parent: "main", items }] });
+    expect(of([{ size: "32px", text: "a", role: "Section" }, { size: "36px", text: "b", role: "Bridge" }, { size: "26.4px", text: "c", role: "FinalCta" }])).toEqual([]);
+    expect(of([{ size: "32px", text: "a", role: "Section" }, { size: "24px", text: "b", role: "Section" }, { size: "26.4px", text: "c", role: "FinalCta" }]))
+      .toEqual(["main (Section H2s): 32px «a» | 24px «b»"]);
 
     // One element set in a retired face is reported.
     await set(page, "main h2", "font-family", "Geist, sans-serif");
