@@ -109,12 +109,14 @@ test("landing scenes flow continuously without artificial viewport oceans", asyn
 
 test("standalone public product surfaces expose one semantic H1", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "1440");
-  for (const route of ["/developers", "/product/compiled-world", "/product/document-understanding"]) {
+  // V34 (D33 1.1): /product, /product/compiled-world and /product/document-understanding answer 308
+  // to /platform, /world and /compiler; the one-H1 promise is asserted where they land.
+  for (const route of ["/developers", "/platform", "/world", "/compiler", "/product", "/product/compiled-world", "/product/document-understanding"]) {
     await page.goto(route);
-    await expect(page.locator("h1")).toHaveCount(1);
+    await expect(page.locator("h1"), route).toHaveCount(1);
   }
   await page.goto("/product/knowledge-compiler");
-  await expect(page).toHaveURL(/\/knowledge-compiler$/);
+  await expect(page).toHaveURL(/\/journal\/compiler$/);
   await expect(page.locator("h1")).toHaveCount(1);
 });
 

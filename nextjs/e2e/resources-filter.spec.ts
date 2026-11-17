@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { RESOURCE_LINKS } from "../lib/site-navigation";
 
 /*
+  V34 (D33 1.1): /resources answers 308 to /journal, so the hub is asserted there.
   The hub narrows in CSS over a fully rendered list (WG-048/051/074): every entry stays in the
   document and only the ones carrying the targeted tag stay visible.
 
@@ -18,11 +19,11 @@ import { RESOURCE_LINKS } from "../lib/site-navigation";
   and not an incidental setting.
 */
 test("the resources hub narrows by a fragment and keeps every entry in the HTML", async ({ page }) => {
-  await page.goto("/resources");
+  await page.goto("/journal");
   await expect(page.locator("[data-tags]")).toHaveCount(RESOURCE_LINKS.length);
   await expect(page.locator("[data-tags]:visible")).toHaveCount(RESOURCE_LINKS.length);
 
-  await page.goto("/resources#find-build");
+  await page.goto("/journal#find-build");
   const expected = RESOURCE_LINKS.filter((link) => link.purposes.includes("build")).length;
   // Fewer visible than total, or the fragment is doing nothing and the assertion below is met by
   // a filter that never ran.
@@ -78,11 +79,11 @@ test("shows exactly one selected filter, and no chip under the tap-target floor"
         .map((link) => (link.textContent ?? "").trim());
     });
 
-  await page.goto("/resources");
+  await page.goto("/journal");
   expect(await selected(), "'Everything' is the state on arrival and nothing said so")
     .toEqual(["Everything"]);
 
-  await page.goto("/resources#find-build");
+  await page.goto("/journal#find-build");
   const afterFilter = await selected();
   expect(afterFilter, "two chips look selected at once").toHaveLength(1);
   expect(afterFilter[0]).not.toBe("Everything");
