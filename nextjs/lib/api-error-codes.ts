@@ -275,6 +275,12 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
         whatToDo: "Honour `Retry-After` (3600 seconds); the quota rolls with the day.",
       },
       {
+        code: "KQU_ALLOWANCE_EXHAUSTED",
+        status: 402,
+        meaning: "The workspace has used its plan's knowledge queries for this calendar month (UTC). One query is one answered Ask or search, from the API, MCP or the browser; a failed or refused one is not counted. Nothing ran.",
+        whatToDo: "Wait for the next calendar month (UTC), or contact us to change plan.",
+      },
+      {
         code: "WORKSPACE_CONCURRENCY_LIMIT",
         status: 429,
         meaning: "The workspace already has as many compiles in flight as it may.",
