@@ -231,7 +231,7 @@ test("never scrolls the document sideways, at any width", async ({ page }: { pag
 
 test("is reachable from the Platform page and names itself in the tab", async ({ page }: { page: BrowserPage }) => {
   await page.goto("/platform");
-  const link = page.locator(`footer a[href="${ROUTE}"]`).first();
+  const link = page.locator(`main a[href="${ROUTE}"]`).first();
   await link.scrollIntoViewIfNeeded();
   await expect(link).toBeVisible();
 

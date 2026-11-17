@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { h1Text, typedCounts } from "./route-test-support";
 import { ChangesBody } from "@/components/v34/routes/changes/changes";
-import { CHANGES_DESTINATIONS, CHANGES_RETAINED } from "@/components/v34/routes/changes/changes-content";
+import { CHANGES_DESTINATIONS, CHANGES_RETAINED, FLOW } from "@/components/v34/routes/changes/changes-content";
 import { CONTRACT_CLAUSES } from "@/lib/compiler-contract";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { DOCS_SECTIONS } from "@/lib/docs-content";
@@ -160,6 +160,14 @@ describe("tokens and explicit pairs", () => {
 
   it("has no motion of its own", () => {
     for (const f of stripped(styles)) expect(f.text).not.toMatch(/\b(?:animation|transition|@keyframes)\b/);
+  });
+});
+
+describe("the source-change note keeps its meaning", () => {
+  it("says the dashed stages run outside this deployment, not that a receipt is missing", () => {
+    expect(FLOW.note).toContain("run outside this deployment");
+    expect(FLOW.note).toContain("the equivalence check that would keep it has nothing to refuse here");
+    expect(FLOW.note).not.toMatch(/receipt/i);
   });
 });
 
