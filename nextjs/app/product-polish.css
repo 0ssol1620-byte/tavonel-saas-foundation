@@ -692,6 +692,27 @@
     gap: 24px;
   }
 }
+/*
+  WO-CI-21 (D14). Inside the V34 frame the header is sticky and in flow, so nothing on the reading
+  surface can sit under it, and the room the rules above keep for a fixed header -- the surface's own
+  top padding, the hub's header height, the shell's 18px -- became empty space under the bar. Measured
+  on the build before this change: the /docs/mcp title stood 105.2px under the header at 1440 and
+  97.2px at 390, against the B-09 reach of 80 and 64 (e2e/docs-reading-layout.spec.ts); 50 + 18px of
+  that was this padding, the rest the breadcrumb row and its gap. The page's first row (the breadcrumb,
+  or the hub's title) now starts 24px under the header, 12px on a phone, where the chapter heading
+  adds its own top padding. Scoped to the frame, so a reading surface outside it keeps the rules above.
+*/
+[data-v34-site] .scene.doc.docs-reading-surface {
+  padding-top: 24px;
+}
+[data-v34-site] .scene.doc.docs-reading-surface > .shell {
+  padding-top: 0;
+}
+@media (max-width: 760px) {
+  [data-v34-site] .scene.doc.docs-reading-surface {
+    padding-top: 12px;
+  }
+}
 
 /*
   Phase 4 follow-ups (2026-10-19), two rules this sheet owns for the doc template.

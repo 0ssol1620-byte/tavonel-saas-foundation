@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Route } from "next";
 import Link from "next/link";
-import { PublicSiteFooter, PublicSiteHeader, type PageTemplate } from "@/components/public-site-chrome";
+import { PublicSitePage, type PageTemplate } from "@/components/public-site-chrome";
 import styles from "./public-proof-registry.module.css";
 
 export type RegistryRow = { key: string; description: string; state: string };
@@ -102,12 +102,13 @@ export default function PublicProofRegistry({ template, title, eyebrow, summary,
     UX-L7 (§5.1): T1 and T5 are PAPER. This layout was the last public one on the instrument ground,
     because its root was a module class only: the paper tokens in public-site-chrome.module.css are
     keyed on the global `.page` that holds the site header, which every other public root carries.
+
+    WO-CI-21 (D1): that root is `PublicSitePage`'s now, the V34 frame, and it declares `template`; this
+    layout's own class stays on the body inside the frame's <main>. Its rows pad with `--chrome-edge`,
+    which inside the frame is the V34 container edge (components/v34/tokens.module.css).
   */
-  return <div className={`page ${styles.page}`} data-template={template}>
-    {/* BA-232 (nav-global CROSS-LANE 2): the header's action is resolved here now. The
-        placeholder-then-replace client fallback that used to supply it is gone. */}
-    <PublicSiteHeader />
-    <main id="main">
+  return <PublicSitePage template={template}>
+    <div className={styles.page}>
       <section className={styles.hero}><div className={styles.heroLead}><p className="eyebrow">{eyebrow}</p><h1>{title}</h1></div><aside>{state ? <span className={styles.status}>{state}</span> : null}<p>{summary}</p></aside></section>
       <div className={styles.body}>
         {index ? (
@@ -147,7 +148,6 @@ export default function PublicProofRegistry({ template, title, eyebrow, summary,
         })}
       </div>
       {footer ? <div className={styles.body}>{footer}</div> : null}
-    </main>
-    <PublicSiteFooter />
-  </div>;
+    </div>
+  </PublicSitePage>;
 }

@@ -44,8 +44,10 @@
   outline-offset: 3px;
 }
 .page :global(.paper-label) { font: 600 13px/1.5 var(--f-sans); color: #53606a; margin: 0; }
-/* UX-L2 (UX-PLAN-2026-10-17 §4.5, R1): the site's one container, so the H1 sits under the wordmark. */
-.page :global(.evaluation-shell) { width: var(--tv-page-w); max-width: none; margin: 0 auto; padding: calc(64px + 56px) 0 80px; }
+/* UX-L2 (UX-PLAN-2026-10-17 §4.5, R1): the site's one container, so the H1 sits under the wordmark.
+   WO-CI-21: that container is the V34 frame's `--v34-shell`, and the header is in flow above this
+   body (sticky, not fixed), so the 64px that used to clear a fixed header is gone from the top. */
+.page :global(.evaluation-shell) { width: var(--v34-shell); max-width: none; margin: 0 auto; padding: 56px 0 80px; }
 .page :global(.evaluation-intro) { max-width: 760px; }
 /* UX-L3 (UX-PLAN-2026-10-17 §5.3 R2): size, weight and tracking are the T2 H1 role in tavonel.css. */
 .page :global(.evaluation-intro) h1 {
@@ -81,31 +83,14 @@
   color: #171c20;
   border-radius: 6px;
 }
-.page :global(.evaluation-form .btn) { background: var(--tv-action); color: #fff; }
-
-/* Main's shared header is transparent on first paint. Re-ink it only on this paper page. */
-.page > header:not([data-scrolled="1"]) > :global(.wordmark),
-.page > header:not([data-scrolled="1"]) > :global(.wordmark) :is(b, svg),
-.page > header:not([data-scrolled="1"]) > :global(.one-path-primary-nav) > :global(.site-nav-direct),
-.page > header:not([data-scrolled="1"]) > :global(.nav-actions) > a:not(:global(.btn)) {
-  color: var(--text-hi);
-}
-.page > header > :global(.one-path-mobile-nav) > summary {
-  color: var(--text-hi);
-  background: var(--ground);
-}
-.page > header > :global(.one-path-mobile-nav[open]) nav a:focus-visible { background: var(--ground); }
-@media (hover: hover) and (pointer: fine) {
-  .page > header > :global(.one-path-mobile-nav[open]) nav a:hover { background: var(--ground); }
-}
-.page > :global(header.nav.chrome-v2-header[data-scrolled="1"]) {
-  background: var(--tv-canvas);
-  border-bottom-color: #d8ddd9;
-}
-.page > header :global(.btn) { color: #fff; background: var(--tv-action); border-color: var(--tv-action); }
+/*
+  WO-CI-21: no accent paint of this page's own. The form's filled button takes the V34 action from
+  the frame's one rule (components/v34/tokens.module.css), and the legacy header these rules re-inked
+  is no longer rendered: the V34 header paints its own surface.
+*/
 
 @media (max-width: 760px) {
-  .page :global(.evaluation-shell) { padding: calc(64px + 32px) 0 48px; }
+  .page :global(.evaluation-shell) { padding: 32px 0 48px; }
   .page :global(.evaluation-grid) { grid-template-columns: 1fr; gap: 24px; }
   .page :global(.evaluation-form) { padding: 20px 16px; }
 }

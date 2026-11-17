@@ -2,14 +2,19 @@
 import "@/app/paper-product.css";
 import Link from "next/link";
 import ContactForm from "@/components/contact-form";
-import { PublicSiteHeader, PublicSiteFooter } from "@/components/public-site-chrome";
+import { PublicSitePage } from "@/components/public-site-chrome";
 import { activationPolicy } from "@/lib/activation-policy";
 import styles from "./evaluation-page.module.css";
 
+/*
+  WO-CI-21 (D1): the page renders inside the V34 frame through `PublicSitePage`, whose root declares
+  T2 and holds the one <main>. The paper tokens this page's body is drawn with stay on its own
+  wrapper inside that <main>; the container is the frame's `--v34-shell`.
+*/
 export default function EvaluationPage() {
-  return <div className={`page evaluation-page ${styles.page}`} lang="en" data-template="T2">
-    <PublicSiteHeader />
-    <main id="main" className={`evaluation-shell ${styles.shell}`}>
+  return <PublicSitePage template="T2">
+    <div className={`evaluation-page ${styles.page}`} lang="en">
+    <div className={`evaluation-shell ${styles.shell}`}>
       <section className="evaluation-intro">
         <p className="paper-label">Your documents / a bounded evaluation</p>
         <h1>Find out what your AI<br />can actually rely on.</h1>
@@ -37,7 +42,7 @@ export default function EvaluationPage() {
           <ContactForm locale="en" />
         </section>
       </div>
-    </main>
-    <PublicSiteFooter />
-  </div>;
+    </div>
+    </div>
+  </PublicSitePage>;
 }

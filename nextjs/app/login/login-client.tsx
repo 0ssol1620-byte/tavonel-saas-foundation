@@ -19,6 +19,8 @@ import { useEffect, useState } from "react";
 import CheckoutIntentNotice from "@/components/checkout-intent-notice";
 import Logomark from "@/components/logomark";
 import { RecipeContinuation, RecipePreflight } from "@/components/recipe-preflight";
+import bar from "@/components/v34/shell/site-header.module.css";
+import tokens from "@/components/v34/tokens.module.css";
 import { checkoutSellable, readOfferParam, rememberCheckoutIntent, takeCheckoutIntent, type ServedAvailability } from "@/lib/checkout-intent";
 import { trackFunnel } from "@/lib/funnel-events";
 import {
@@ -202,10 +204,24 @@ export default function LoginClient({ availability }: { availability: LoginAvail
 
   return (
     <main id="main" className="auth" tabIndex={-1}>
-      <header>
-        <Link href="/" className="wordmark"><Logomark /><b>TAVONEL</b></Link>
-        {commercialMode === "pilot" ? <span className="mode"><i aria-hidden="true" />PRIVATE PILOT</span> : null}
-      </header>
+      {/*
+        WO-CI-21 (lead decision 6): the sign-in header stands on the V34 container edge at the V34
+        header height. It takes the token wrapper the way /explore's shell parts do -- box-less
+        (`display: contents`), so it draws nothing of its own -- and the V34 bar's own layout classes,
+        but not the bar: no site nav here, and `SiteHeader` is not imported, so the sign-in route
+        stays light (lib/client-route-weight.test.ts).
+      */}
+      <div className={tokens.site} data-v34-site="" style={{ display: "contents" }}>
+        <header className={`${tokens.paper} ${bar.header}`} data-v34-header="">
+          <div className={bar.inner}>
+            <Link href="/" className={bar.brand} aria-label="TAVONEL home" prefetch={false}>
+              <Logomark size={26} />
+              <span className={bar.wordmark}>TAVONEL</span>
+            </Link>
+            {commercialMode === "pilot" ? <span className="mode"><i aria-hidden="true" />PRIVATE PILOT</span> : null}
+          </div>
+        </header>
+      </div>
 
       <div className="auth-body">
         <div className="auth-card">
