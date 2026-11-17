@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
-import type { NavGroupLinks } from "@/lib/v34/nav";
+import { current, type NavGroupLinks } from "@/lib/v34/nav";
 import tokens from "../tokens.module.css";
 import s from "./more-menu.module.css";
 
@@ -68,7 +68,7 @@ export default function MoreMenu({ groups }: { groups: readonly NavGroupLinks[] 
               <ul className={s.list}>
                 {group.links.map((link) => (
                   <li key={link.href}>
-                    <Link className={s.link} href={link.href as Route} aria-current={link.href === pathname ? "page" : undefined} prefetch={false}>
+                    <Link className={s.link} href={link.href as Route} aria-current={current(link.href, pathname)} prefetch={false}>
                       {link.label}
                     </Link>
                   </li>

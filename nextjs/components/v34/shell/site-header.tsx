@@ -2,18 +2,12 @@ import Link from "next/link";
 import type { Route } from "next";
 import Logomark from "@/components/logomark";
 import { HeaderAccountActions } from "@/components/site-nav/desktop-primary-nav";
-import { resolveEntries, resolveGroups, V34_MORE_GROUPS, V34_PRIMARY_NAV } from "@/lib/v34/nav";
+import { current, resolveEntries, resolveGroups, V34_MORE_GROUPS, V34_PRIMARY_NAV } from "@/lib/v34/nav";
 import tokens from "../tokens.module.css";
 import { createWorldAction } from "../ui/create-world";
 import MobileDrawer from "./mobile-drawer";
 import MoreMenu from "./more-menu";
 import s from "./site-header.module.css";
-
-/** The exact page is current; a page inside the item's section is a location within it. */
-function current(href: string, currentPath: string): "page" | "true" | undefined {
-  if (currentPath === href) return "page";
-  return href !== "/" && currentPath.startsWith(`${href}/`) ? "true" : undefined;
-}
 
 /**
  * The sticky bar: brand, five primary items, the More panel, the account actions and the filled
