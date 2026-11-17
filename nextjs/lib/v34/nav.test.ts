@@ -136,6 +136,7 @@ describe("current", () => {
     expect(current("/research", "/research/notes")).toBe("true");
     expect(current("/research", "/researcher")).toBeUndefined();
     expect(current("/pricing", "/platform")).toBeUndefined();
+    expect(current("/pricing", null)).toBeUndefined();
   });
   it("treats the root as current only on the root", () => {
     expect(current("/", "/")).toBe("page");
