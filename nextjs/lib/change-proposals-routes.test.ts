@@ -1,6 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash, createPublicKey, generateKeyPairSync } from "node:crypto";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-type Row = Record<string, unknown> & { proposal_id: string; workspace_key: string; collection_id: string; state: string; idempotency_key: string; input_sha256: string; expires_at: string; expected_manifest_digest: string; action_type: string; receipt: unknown };
+type Row = Record<string, unknown> & {
+  proposal_id: string; workspace_key: string; collection_id: string | null; state: string; idempotency_key: string; input_sha256: string;
+  expires_at: string; expected_manifest_digest: string; action_type: string; receipt: unknown; created_at: string; decided_at: string | null;
+  decided_by: string | null; principal_kind: string; principal_id: string; agent_grant_id: string | null; binding_kind: string;
+};
+type Grant = { workspace_key: string; user_id: string; client_label: string; grantor_email: string | null; live: boolean };
 type RpcAnswer = { status: number; body: unknown };
 const error = (message: string): RpcAnswer => ({ status: 400, body: { code: "P0001", message } });
 
@@ -9,47 +15,88 @@ const revalidateFoundationSession = vi.fn<(request: Request, principal: unknown)
 const checkAccess = vi.fn<(workspaceKey: string, ids: string[], userId: string) => Promise<unknown>>();
 const getActiveWorld = vi.fn<(workspaceKey: string, collectionId: string) => Promise<unknown>>();
 const decideLibraryLabel = vi.fn<(workspaceKey: string, input: Record<string, unknown>, userId: string) => Promise<unknown>>();
+const readLibraryDocuments = vi.fn<(workspaceKey: string, ids: readonly string[], userId: string) => Promise<unknown>>();
 
 vi.mock("@/lib/developer-auth", () => ({ requireFoundationSession, revalidateFoundationSession }));
 vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccessForViewer: checkAccess }));
 vi.mock("@/lib/world-store", () => ({ getFoundationActiveWorld: getActiveWorld }));
-vi.mock("@/lib/library-shadow", () => ({ decideLibraryLabel }));
+vi.mock("@/lib/library-shadow", () => ({ decideLibraryLabel, readLibraryDocuments }));
 
-// The store, as the migration behaves: one row per idempotency key, a locked decide, the transitions of the outcome RPC.
+/*
+  The store, as supabase/migrations/20261117130000_agent_proposals.sql behaves: one row per idempotency key
+  (replay only for the same principal, grant, type, collection and input), the agent grant checked and the
+  open cap counted per person at create, a locked decide on the DB clock (`p_now` ignored) in the order
+  expired → withdrawn → stale → rejected → confirmed, the transitions of the outcome RPC, lookup by id and
+  the keyset page with the grant fields. created_at carries microseconds, as to_jsonb prints a timestamptz.
+*/
 let rows: Row[];
-let clock: number;
+let grants: Map<string, Grant>;
+let seq: number;
+let calls: string[];
+let failCreateAfter: number | null;
+let recordDown: boolean;
+const createdAt = (n: number) => `2026-11-16T12:00:00.${String(n).padStart(6, "0")}+00:00`;
+const withGrant = (row: Row) => {
+  const grant = row.agent_grant_id ? grants.get(row.agent_grant_id) : undefined;
+  return { ...row, agent_client_label: grant?.client_label ?? null, agent_grantor_email: grant?.grantor_email ?? null };
+};
 const rpc = (name: string, body: Record<string, unknown>): RpcAnswer => {
+  calls.push(name);
   if (name === "create_world_change_proposal") {
+    if (failCreateAfter !== null && calls.filter((call) => call === name).length > failCreateAfter) return error("proposal_open_limit");
+    const agent = body.p_principal_kind === "agent";
+    const grant = agent ? grants.get(body.p_agent_grant_id as string) : undefined;
+    if (agent && (!grant || !grant.live || grant.workspace_key !== body.p_workspace_key || grant.user_id !== body.p_principal_id)) return error("proposal_agent_grant_revoked");
     const existing = rows.find((row) => row.workspace_key === body.p_workspace_key && row.idempotency_key === body.p_idempotency_key);
     if (existing) {
-      if (existing.input_sha256 !== body.p_input_sha256 || existing.collection_id !== body.p_collection_id) return error("proposal_idempotency_conflict");
+      if (existing.input_sha256 !== body.p_input_sha256 || existing.collection_id !== body.p_collection_id || existing.action_type !== body.p_action_type
+        || existing.principal_kind !== body.p_principal_kind || existing.principal_id !== body.p_principal_id
+        || existing.agent_grant_id !== (body.p_agent_grant_id ?? null)) return error("proposal_idempotency_conflict");
       return { status: 200, body: { proposal: existing, replayed: true } };
     }
+    if (agent) {
+      const open = rows.filter((row) => row.workspace_key === body.p_workspace_key && row.principal_id === body.p_principal_id
+        && row.principal_kind === "agent" && row.state === "proposed").length;
+      if (open + (body.p_open_reserve as number) > (body.p_open_limit as number)) return error("proposal_open_limit");
+    }
+    seq += 1;
     const row: Row = {
-      proposal_id: `00000000-0000-4000-8000-${String(rows.length + 1).padStart(12, "0")}`, workspace_key: body.p_workspace_key as string,
-      collection_id: body.p_collection_id as string, action_type: body.p_action_type as string, input: body.p_input, input_sha256: body.p_input_sha256 as string,
+      proposal_id: `00000000-0000-4000-8000-${String(seq).padStart(12, "0")}`, workspace_key: body.p_workspace_key as string,
+      collection_id: body.p_collection_id as string | null, action_type: body.p_action_type as string, input: body.p_input, input_sha256: body.p_input_sha256 as string,
       evidence_ids: body.p_evidence_ids, expected_manifest_digest: body.p_expected_manifest_digest as string, authorization_revision: body.p_authorization_revision,
-      principal_kind: body.p_principal_kind, principal_id: body.p_principal_id, idempotency_key: body.p_idempotency_key as string, state: "proposed",
-      expires_at: body.p_expires_at as string, created_at: new Date(clock).toISOString(), decided_at: null, decided_by: null, receipt: null,
+      principal_kind: body.p_principal_kind as string, principal_id: body.p_principal_id as string, idempotency_key: body.p_idempotency_key as string,
+      state: "proposed", expires_at: body.p_expires_at as string, created_at: createdAt(seq), decided_at: null, decided_by: null, receipt: null,
+      binding_kind: body.p_binding_kind as string, agent_grant_id: (body.p_agent_grant_id as string | null) ?? null,
     };
     rows.push(row);
     return { status: 200, body: { proposal: row, replayed: false } };
   }
-  const row = rows.find((candidate) => candidate.proposal_id === body.p_proposal_id && candidate.workspace_key === body.p_workspace_key);
   if (name === "list_world_change_proposals") {
     return { status: 200, body: rows.filter((r) => r.workspace_key === body.p_workspace_key && r.collection_id === body.p_collection_id).reverse() };
   }
+  if (name === "list_world_change_proposals_page") {
+    const before = body.p_before_created_at === null ? null : `${body.p_before_created_at as string}|${body.p_before_id as string}`;
+    const page = rows.filter((r) => r.workspace_key === body.p_workspace_key && (body.p_agent_grant_id === null || r.agent_grant_id === body.p_agent_grant_id))
+      .map((r) => ({ r, key: `${r.created_at}|${r.proposal_id}` }))
+      .filter(({ key }) => before === null || key < before)
+      .sort((a, b) => (a.key < b.key ? 1 : -1)).slice(0, body.p_limit as number).map(({ r }) => withGrant(r));
+    return { status: 200, body: page };
+  }
+  const row = rows.find((candidate) => candidate.proposal_id === body.p_proposal_id && candidate.workspace_key === body.p_workspace_key);
   if (!row) return error("proposal_not_found");
+  if (name === "get_world_change_proposal") return { status: 200, body: withGrant(row) };
   if (name === "decide_world_change_proposal") {
     if (row.state !== "proposed") return error("proposal_not_decidable");
-    const now = Date.parse(body.p_now as string);
-    row.state = now >= Date.parse(row.expires_at) ? "expired" : body.p_current_manifest_digest !== row.expected_manifest_digest ? "stale"
-      : body.p_decision === "reject" ? "rejected" : "confirmed";
-    row.decided_at = body.p_now;
-    row.decided_by = body.p_decided_by;
+    const now = Date.now();
+    const grant = row.agent_grant_id ? grants.get(row.agent_grant_id) : undefined;
+    row.state = now >= Date.parse(row.expires_at) ? "expired" : row.principal_kind === "agent" && !grant?.live ? "withdrawn"
+      : body.p_current_manifest_digest !== row.expected_manifest_digest ? "stale" : body.p_decision === "reject" ? "rejected" : "confirmed";
+    row.decided_at = new Date(now).toISOString();
+    row.decided_by = row.state === "withdrawn" ? null : body.p_decided_by as string;
     return { status: 200, body: row };
   }
   if (name === "record_world_change_proposal_outcome") {
+    if (recordDown) throw new Error("network down");
     const legal = (row.state === "confirmed" && (body.p_outcome === "executed" || body.p_outcome === "failed")) || (row.state === "executed" && body.p_outcome === "undone");
     if (!legal) return error("proposal_transition_illegal");
     row.receipt = body.p_outcome === "undone" ? { executed: row.receipt, undone: body.p_receipt } : body.p_receipt;
@@ -68,22 +115,31 @@ vi.mock("@/lib/supabase-admin", () => ({
   },
 }));
 
+const lib = await import("./change-proposals");
 const list = await import("../app/api/proposals/route");
+const byId = await import("../app/api/proposals/[id]/route");
 const decision = await import("../app/api/proposals/[id]/decision/route");
 const undo = await import("../app/api/proposals/[id]/undo/route");
+const { DECISION_MAX_DURATION_S, PROPOSAL_RESUME_AFTER_MS } = await import("./agent-access");
+const signing = await import("./export-signing");
 
 const WS = "pilot-b2b2b2b2b2b24b2b";
 const USER = "7a7a7a7a-7a7a-4a7a-8a7a-7a7a7a7a7a7a";
+const OTHER_USER = "7b7b7b7b-7b7b-4b7b-8b7b-7b7b7b7b7b7b";
+const GRANT = "9a9a9a9a-9a9a-4a9a-8a9a-9a9a9a9a9a9a";
+const GRANT_2 = "9b9b9b9b-9b9b-4b9b-8b9b-9b9b9b9b9b9b";
 const DOC = "0a000000-0000-4000-8000-00000000000a";
 const COLLECTION = `collection-${"c".repeat(32)}`;
 const OTHER_COLLECTION = `collection-${"d".repeat(32)}`;
 const DIGEST = `sha256:${"1".repeat(64)}`;
 const MOVED = `sha256:${"2".repeat(64)}`;
 const session = { ok: true, principal: { kind: "session", workspaceKey: WS, userId: USER, scopes: [], authorizationRevision: 3, workspaceRole: "owner" } };
+const otherPerson = { ok: true, principal: { ...session.principal, userId: OTHER_USER } };
 const apiKey = { ok: true, principal: { kind: "api-key", workspaceKey: WS, userId: USER, scopes: ["documents:read"], authorizationRevision: 3, workspaceRole: "owner" } };
 const nonMember = { ok: false, code: "WORKSPACE_MEMBERSHIP_REQUIRED", status: 403 };
 const revalidated = { ok: true, principal: session.principal };
 const revoked = { ok: false, code: "AUTHORIZATION_CHANGED_RETRY", status: 403 };
+const agentActor = (grantId = GRANT) => ({ kind: "agent" as const, workspaceKey: WS, userId: USER, authorizationRevision: 3, grantId, keyId: "k-1" });
 
 const docType = { documentId: DOC, sourceVersionId: "a".repeat(64), labelKind: "doc_type", labelKey: "invoice", decision: "confirmed" };
 const topic = { documentId: DOC, sourceVersionId: "a".repeat(64), labelKind: "topic", labelKey: "pricing", decision: "rejected" };
@@ -95,22 +151,118 @@ const decide = (id: string, body: unknown) =>
   decision.POST(new Request(`https://tavonel.com/api/proposals/${id}/decision`, json(body)), { params: Promise.resolve({ id }) });
 const undoIt = (id: string, body: unknown = { collectionId: COLLECTION }) =>
   undo.POST(new Request(`https://tavonel.com/api/proposals/${id}/undo`, json(body)), { params: Promise.resolve({ id }) });
-const confirm = (id: string) => decide(id, { collectionId: COLLECTION, decision: "confirm" });
+const readOne = (id: string) => byId.GET(new Request(`https://tavonel.com/api/proposals/${id}`), { params: Promise.resolve({ id }) });
+/** The digest of the preview the panel rendered for this row: what a confirming client sends back. */
+const digestOf = (id: string) => {
+  const row = rows.find((candidate) => candidate.proposal_id === id)!;
+  return lib.proposalPreviewDigest(id, row.action_type, row.action_type === "library_label" ? row.input : stubPreview(row.input));
+};
+const confirm = (id: string) => decide(id, { collectionId: COLLECTION, decision: "confirm", previewDigest: digestOf(id) });
 const idOf = async (response: Response) => ((await response.json()) as { proposal: { proposalId: string } }).proposal.proposalId;
 const stateOf = (id: string) => rows.find((row) => row.proposal_id === id)?.state;
+const decideCalls = () => calls.filter((call) => call === "decide_world_change_proposal").length;
+const createCalls = () => calls.filter((call) => call === "create_world_change_proposal").length;
+
+/*
+  A stub second executor, registered for the duration of a test only: `compile_plan` has no executor until
+  WO-AN-4, and the store pairs it with a null collection, which is what lookup by id must handle.
+*/
+type StubInput = { documentIds: string[] };
+const stubRun = vi.fn<(ctx: unknown) => Promise<unknown>>();
+const stubPreview = (input: unknown) => ({ documentIds: (input as StubInput).documentIds, documentsTotal: (input as StubInput).documentIds.length });
+const stubExecutor = {
+  parse: (raw: unknown) => raw && typeof raw === "object" && Array.isArray((raw as StubInput).documentIds)
+    && (raw as StubInput).documentIds.every((id) => typeof id === "string") ? { documentIds: [...(raw as StubInput).documentIds] } : null,
+  documentsOf: (input: StubInput) => input.documentIds,
+  previewOf: stubPreview,
+  bindingKind: "source_inventory" as const,
+  prepare: async (_actor: unknown, raw: unknown, evidenceIds: string[]) => {
+    const input = stubExecutor.parse((raw as { input?: unknown })?.input);
+    return input && input.documentIds.length > 0 ? { ok: true as const, input, collectionId: null, bindingDigest: DIGEST, evidenceIds }
+      : { ok: false as const, code: "PROPOSAL_REQUEST_INVALID", status: 400 };
+  },
+  currentBinding: async () => ({ ok: true as const, digest: DIGEST }),
+  preconditions: async () => null,
+  run: (ctx: unknown) => stubRun(ctx),
+  resultRef: (result: { jobId?: unknown }) => ({ jobId: result.jobId }),
+};
+const registry = lib.PROPOSAL_EXECUTORS as unknown as Record<string, unknown>;
+const withStub = (documentsOf?: (input: StubInput) => string[]) => {
+  registry.compile_plan = documentsOf ? { ...stubExecutor, documentsOf } : stubExecutor;
+};
+/** A row written straight into the store, as another lane's code or an older deploy would have left it. */
+const seedRow = (fields: Partial<Row>): Row => {
+  seq += 1;
+  const row: Row = {
+    proposal_id: `00000000-0000-4000-8000-${String(seq).padStart(12, "0")}`, workspace_key: WS, collection_id: COLLECTION,
+    action_type: "library_label", input: docType, input_sha256: `sha256:${"e".repeat(64)}`, evidence_ids: [], expected_manifest_digest: DIGEST,
+    authorization_revision: 3, principal_kind: "session", principal_id: USER, idempotency_key: `seeded-key-${seq}`, state: "proposed",
+    expires_at: new Date(Date.now() + 86_400_000).toISOString(), created_at: createdAt(seq), decided_at: null, decided_by: null, receipt: null,
+    binding_kind: "active_manifest", agent_grant_id: null, ...fields,
+  };
+  rows.push(row);
+  return row;
+};
+
+function keyEnv() {
+  const pair = generateKeyPairSync("ed25519");
+  const spki = createPublicKey(pair.privateKey).export({ format: "der", type: "spki" });
+  const trust = {
+    schemaVersion: "tavonel.export_trust.v2", minimumSignatureVersion: 2, activeKeyId: "foundation-actions-2026",
+    keys: [{
+      keyId: "foundation-actions-2026", keyVersion: 1, algorithm: "Ed25519", status: "active",
+      notBefore: "2026-01-01T00:00:00.000Z", expiresAt: "2030-01-01T00:00:00.000Z", publicKeySpkiDerBase64: spki.toString("base64"),
+      publicKeySpkiSha256: `sha256:${createHash("sha256").update(spki).digest("hex")}`,
+    }],
+  };
+  return {
+    TAVONEL_EXPORT_SIGNING_KEY_ID: "foundation-actions-2026",
+    TAVONEL_EXPORT_SIGNING_PRIVATE_KEY_PKCS8_DER_B64: pair.privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
+    TAVONEL_EXPORT_SIGNING_TRUST_STORE_JSON: JSON.stringify(trust),
+  };
+}
+const SIGNER_ENV = keyEnv();
+const stubSigner = (on: boolean) => {
+  for (const [name, value] of Object.entries(SIGNER_ENV)) vi.stubEnv(name, on ? value : "");
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
   rows = [];
-  clock = Date.parse("2026-11-16T12:00:00Z");
+  grants = new Map([[GRANT, { workspace_key: WS, user_id: USER, client_label: "Desk agent", grantor_email: "owner@example.com", live: true }],
+    [GRANT_2, { workspace_key: WS, user_id: USER, client_label: "Second agent", grantor_email: null, live: true }]]);
+  seq = 0;
+  calls = [];
+  failCreateAfter = null;
+  recordDown = false;
   storeDown = false;
+  delete registry.compile_plan;
   vi.useRealTimers();
   requireFoundationSession.mockResolvedValue(session);
   revalidateFoundationSession.mockResolvedValue(revalidated);
   checkAccess.mockResolvedValue({ ok: true });
   getActiveWorld.mockResolvedValue({ ok: true, world: { manifestDigest: DIGEST } });
   decideLibraryLabel.mockResolvedValue({ ok: true, replayed: false });
+  readLibraryDocuments.mockResolvedValue({ ok: true, documents: [], sourceVersions: { [DOC]: "a".repeat(64) } });
+  stubRun.mockResolvedValue({ ok: true, jobId: "cjob-1" });
 });
+afterEach(() => {
+  delete registry.compile_plan;
+  vi.unstubAllEnvs();
+  vi.useRealTimers();
+});
+
+/*
+  Updated deliberately in WO-AN-2: the public DTO now carries its own `previewDigest` (a sha256 the confirming
+  client sends back), so "no sha256 anywhere" became "none of the row's internals": input digest, binding
+  digest, principal, idempotency key, grant, decider.
+*/
+const expectNoInternals = (body: unknown) => {
+  const text = JSON.stringify(body);
+  expect(text).not.toMatch(/principal|idempotency|manifest|input_?sha|grant_?id|decided_?by|binding/i);
+  for (const row of rows) for (const value of [row.input_sha256, row.expected_manifest_digest, row.principal_id, row.idempotency_key]) expect(text).not.toContain(value);
+};
 
 describe("POST /api/proposals", () => {
   it("creates a proposal with a dry-run preview and mutates nothing: the executor is never called", async () => {
@@ -119,8 +271,9 @@ describe("POST /api/proposals", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     const body = await response.json();
     expect(body.replayed).toBe(false);
-    expect(body.proposal).toMatchObject({ actionType: "library_label", state: "proposed", preview: docType, evidenceIds: ["ev-1"] });
-    expect(JSON.stringify(body)).not.toMatch(/sha256|principal|idempotency|manifest/);
+    expect(body.proposal).toMatchObject({ actionType: "library_label", state: "proposed", preview: docType, evidenceIds: ["ev-1"],
+      collectionId: COLLECTION, previewDigest: digestOf(body.proposal.proposalId), resumable: false, proposer: { kind: "person" }, notes: [] });
+    expectNoInternals(body);
     expect(decideLibraryLabel).not.toHaveBeenCalled();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ expected_manifest_digest: DIGEST, authorization_revision: 3, principal_kind: "session", principal_id: USER });
@@ -194,7 +347,7 @@ describe("GET /api/proposals", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.proposals.map((p: { preview: { labelKey: string } }) => p.preview.labelKey)).toEqual(["pricing", "invoice"]);
-    expect(JSON.stringify(body)).not.toMatch(/sha256|principal|idempotency|manifest/);
+    expectNoInternals(body);
     expect((await (await get(`collectionId=${OTHER_COLLECTION}`)).json()).proposals).toEqual([]);
   });
 
@@ -232,11 +385,13 @@ describe("GET /api/proposals", () => {
     expect(await response.json()).toEqual({ code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" });
   });
 
-  it("refuses an API key (403), a missing collection (400), and a down store (503)", async () => {
+  // Updated deliberately in WO-AN-2: no collectionId is now the workspace inbox (below); an empty or malformed one is still 400.
+  it("refuses an API key (403), an empty or malformed collection (400), and a down store (503)", async () => {
     requireFoundationSession.mockResolvedValue(apiKey);
     expect((await get()).status).toBe(403);
     requireFoundationSession.mockResolvedValue(session);
-    expect((await get("")).status).toBe(400);
+    expect((await get("collectionId=")).status).toBe(400);
+    expect((await get("collectionId=collection-x")).status).toBe(400);
     storeDown = true;
     expect((await get()).status).toBe(503);
   });
@@ -341,18 +496,29 @@ describe("POST /api/proposals/[id]/decision", () => {
     expect(decideLibraryLabel).not.toHaveBeenCalled();
   });
 
-  it("a proposal named under another collection or workspace is not found", async () => {
+  /*
+    Updated deliberately in WO-AN-2 (was: "a proposal named under another collection or workspace is not found").
+    The proposal is looked up by id, so the collection a body names no longer matters; another workspace is
+    still not found, with the same body as an id that never existed.
+  */
+  it("a proposal of another workspace is not found exactly like a random id; the body's collection is ignored", async () => {
     const id = await idOf(await create(proposalBody()));
-    expect((await decide(id, { collectionId: OTHER_COLLECTION, decision: "confirm" })).status).toBe(404);
     requireFoundationSession.mockResolvedValue({ ...session, principal: { ...session.principal, workspaceKey: "pilot-other" } });
-    expect((await confirm(id)).status).toBe(404);
+    const foreign = await confirm(id);
+    const random = await decide("00000000-0000-4000-8000-0000000fffff", { decision: "confirm", previewDigest: digestOf(id) });
+    expect([foreign.status, random.status]).toEqual([404, 404]);
+    expect(await foreign.text()).toBe(await random.text());
     expect(decideLibraryLabel).not.toHaveBeenCalled();
+    requireFoundationSession.mockResolvedValue(session);
+    const answer = await decide(id, { collectionId: OTHER_COLLECTION, decision: "confirm", previewDigest: digestOf(id) });
+    expect((await answer.json()).proposal.state).toBe("executed");
   });
 
   it.each([
     ["no decision", { collectionId: COLLECTION }],
     ["an unknown decision", { collectionId: COLLECTION, decision: "approve" }],
-    ["no collection", { decision: "confirm" }],
+    // Updated deliberately in WO-AN-2: the collection is ignored now; a confirm without the preview digest is what is refused.
+    ["a confirm without a preview digest", { decision: "confirm" }],
   ])("refuses %s with 400", async (_name, body) => {
     const id = await idOf(await create(proposalBody()));
     expect((await decide(id, body)).status).toBe(400);
@@ -473,7 +639,9 @@ describe("decision matrix (generated)", () => {
     if (c.who === "revoked_revision") revalidateFoundationSession.mockResolvedValue(revoked);
     decideLibraryLabel.mockClear();
 
-    const answers = await Promise.all(Array.from({ length: c.copies }, () => decide(id, { collectionId: COLLECTION, decision: c.verdict })));
+    // A confirm carries the digest of the preview the client rendered (WO-AN-2); a reject needs none.
+    const body = c.verdict === "confirm" ? { decision: "confirm", previewDigest: digestOf(id) } : { decision: "reject" };
+    const answers = await Promise.all(Array.from({ length: c.copies }, () => decide(id, { collectionId: COLLECTION, ...body })));
     const final = expectedState(c.who, c.when, c.verdict);
     expect(stateOf(id)).toBe(final);
     expect(decideLibraryLabel).toHaveBeenCalledTimes(final === "executed" ? 1 : 0);
@@ -504,5 +672,481 @@ describe("create matrix (generated)", () => {
     if (!denied && c.mode === "other_body" && c.copies > 1) expect(answers.slice(1).every((answer) => answer.status === 409)).toBe(true);
     if (!denied && c.mode === "same_body") expect(answers.every((answer) => answer.status === 200 || answer.status === 201)).toBe(true);
     expect(decideLibraryLabel).not.toHaveBeenCalled();
+  });
+});
+
+/*
+  WO-AN-2 (workorders/agent-native.md §6, §7, §8): lookup by id, preview digest, agent rows, resume, the signed
+  receipt, the registry and the workspace inbox. Each case names the invariant it pins.
+*/
+const agentLabel = (grantId = GRANT, clientKey = "client-key-0001", item: Record<string, unknown> = {}) =>
+  lib.createProposal(agentActor(grantId), {
+    actionType: "library_label", toolName: "propose_library_labels", clientKey, evidenceIds: [],
+    raw: { collectionId: COLLECTION, input: { documentId: DOC, labelKind: "topic", labelKey: "pricing", decision: "confirmed", ...item } },
+  });
+const agentRow = async (grantId = GRANT) => {
+  const created = await agentLabel(grantId);
+  if (!created.ok) throw new Error(created.code);
+  return created.row.proposal_id;
+};
+const agentOn = () => { vi.stubEnv("TAVONEL_AGENT_PROPOSALS_ENABLED", "true"); stubSigner(true); };
+
+describe("lookup by id (§5.5, §6)", () => {
+  it("GET /api/proposals/[id] finds a row with no collection (a stub second type) and answers the public DTO", async () => {
+    withStub();
+    const row = seedRow({ action_type: "compile_plan", collection_id: null, binding_kind: "source_inventory", input: { documentIds: [DOC] } });
+    const response = await readOne(row.proposal_id);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.proposal).toMatchObject({ proposalId: row.proposal_id, actionType: "compile_plan", collectionId: null,
+      preview: { documentIds: [DOC], documentsTotal: 1 }, previewDigest: digestOf(row.proposal_id) });
+    expectNoInternals(body);
+    const answer = await confirm(row.proposal_id);
+    expect((await answer.json()).proposal.state).toBe("executed");
+    expect(stubRun).toHaveBeenCalledTimes(1);
+    expect(rows[0]!.receipt).toMatchObject({ result: { ok: true, jobId: "cjob-1" } });
+  });
+
+  it("an unreadable, a foreign, an absent, a malformed id and a row of an unknown type are the same 404", async () => {
+    const readable = await idOf(await create(proposalBody()));
+    const unknown = seedRow({ action_type: "merge_documents", input: { documentIds: [DOC] } });
+    const bodies: string[] = [];
+    for (const id of [unknown.proposal_id, "00000000-0000-4000-8000-0000000fffff", "not-a-uuid"]) {
+      const answer = await readOne(id);
+      expect(answer.status).toBe(404);
+      expect(answer.headers.get("cache-control")).toBe("no-store");
+      bodies.push(await answer.text());
+    }
+    checkAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    bodies.push(await (await readOne(readable)).text());
+    checkAccess.mockResolvedValue({ ok: true });
+    requireFoundationSession.mockResolvedValue({ ...session, principal: { ...session.principal, workspaceKey: "pilot-other" } });
+    bodies.push(await (await readOne(readable)).text());
+    expect(bodies).toHaveLength(5);
+    expect(new Set(bodies)).toEqual(new Set([JSON.stringify({ code: "PROPOSAL_NOT_FOUND" })]));
+  });
+
+  it("is session only, and an access check that cannot answer is a 503, never the row", async () => {
+    const id = await idOf(await create(proposalBody()));
+    requireFoundationSession.mockResolvedValue(apiKey);
+    expect((await readOne(id)).status).toBe(403);
+    requireFoundationSession.mockResolvedValue(session);
+    checkAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" });
+    expect((await readOne(id)).status).toBe(503);
+  });
+
+  it("the decision and undo routes declare maxDuration = DECISION_MAX_DURATION_S", () => {
+    expect(decision.maxDuration).toBe(DECISION_MAX_DURATION_S);
+    expect(undo.maxDuration).toBe(DECISION_MAX_DURATION_S);
+  });
+});
+
+describe("I-4: confirmation needs a signed-in session", () => {
+  it.each([
+    ["an agent credential (not a session JWT)", { ok: false, code: "AUTH_REQUIRED", status: 401 }, 401],
+    ["a live or MCP API key", apiKey, 403],
+  ])("%s at decision and undo is refused and the row stays proposed", async (_name, auth, status) => {
+    const id = await idOf(await create(proposalBody()));
+    requireFoundationSession.mockResolvedValue(auth);
+    expect((await confirm(id)).status).toBe(status);
+    expect((await undoIt(id)).status).toBe(status);
+    expect(stateOf(id)).toBe("proposed");
+    expect(decideCalls()).toBe(0);
+  });
+});
+
+describe("I-5: the confirmed preview is this proposal's", () => {
+  it("a confirm without previewDigest is 400 and nothing is decided", async () => {
+    const id = await idOf(await create(proposalBody()));
+    const answer = await decide(id, { decision: "confirm" });
+    expect(answer.status).toBe(400);
+    expect(await answer.json()).toEqual({ code: "PROPOSAL_PREVIEW_DIGEST_REQUIRED" });
+    expect(decideCalls()).toBe(0);
+  });
+
+  it.each([
+    ["another proposal's digest", (_id: string, other: string): unknown => digestOf(other), 409],
+    ["a hand-made digest", (): unknown => `sha256:${"f".repeat(64)}`, 409],
+    ["the digest of an edited preview", (id: string): unknown => lib.proposalPreviewDigest(id, "library_label", { ...docType, labelKey: "contract" }), 409],
+    ["a non-string digest", (): unknown => 42, 400],
+  ])("%s is refused and the decide RPC is never called", async (_name, digest, status) => {
+    const id = await idOf(await create(proposalBody()));
+    const other = await idOf(await create(proposalBody(topic), "proposal-key-0002"));
+    const answer = await decide(id, { decision: "confirm", previewDigest: digest(id, other) });
+    expect(answer.status).toBe(status);
+    expect(await answer.json()).toEqual({ code: status === 409 ? "PROPOSAL_PREVIEW_CHANGED" : "PROPOSAL_PREVIEW_DIGEST_REQUIRED" });
+    expect(decideCalls()).toBe(0);
+    expect(decideLibraryLabel).not.toHaveBeenCalled();
+    expect(stateOf(id)).toBe("proposed");
+  });
+
+  it("a reject needs no digest", async () => {
+    const id = await idOf(await create(proposalBody()));
+    expect((await (await decide(id, { decision: "reject" })).json()).proposal.state).toBe("rejected");
+  });
+});
+
+describe("agent-origin rows (§6 steps 3 and 7, I-11, I-14, I-27)", () => {
+  it("shows the agent badge: grantor and an unverified client name, never the grant", async () => {
+    const id = await agentRow();
+    const body = await (await readOne(id)).json();
+    expect(body.proposal.proposer).toEqual({ kind: "agent", grantedBy: "owner@example.com", clientLabel: "Desk agent", clientLabelVerified: false });
+    expect(JSON.stringify(body)).not.toContain(GRANT);
+    expectNoInternals(body);
+    const unnamed = await agentRow(GRANT_2);
+    expect((await (await readOne(unnamed)).json()).proposal.proposer.grantedBy).toBe("a member of this workspace");
+  });
+
+  it("the collection list reads an agent row again by id for its grant fields", async () => {
+    await agentRow();
+    const body = await (await list.GET(new Request(`https://tavonel.com/api/proposals?collectionId=${COLLECTION}`))).json();
+    expect(body.proposals[0].proposer).toMatchObject({ kind: "agent", clientLabel: "Desk agent" });
+  });
+
+  it("flag off: confirming an agent row is 409 AGENT_PROPOSALS_DISABLED, nothing decided; rejecting it is 200", async () => {
+    stubSigner(true);
+    const id = await agentRow();
+    const answer = await confirm(id);
+    expect(answer.status).toBe(409);
+    expect(await answer.json()).toEqual({ code: "AGENT_PROPOSALS_DISABLED" });
+    expect(decideCalls()).toBe(0);
+    const rejected = await decide(id, { decision: "reject" });
+    expect(rejected.status).toBe(200);
+    expect(stateOf(id)).toBe("rejected");
+  });
+
+  it("signer missing: 503 PROPOSAL_RECEIPT_SIGNER_NOT_CONFIGURED and the decide RPC is never called", async () => {
+    vi.stubEnv("TAVONEL_AGENT_PROPOSALS_ENABLED", "true");
+    stubSigner(false);
+    const id = await agentRow();
+    const answer = await confirm(id);
+    expect(answer.status).toBe(503);
+    expect(await answer.json()).toEqual({ code: "PROPOSAL_RECEIPT_SIGNER_NOT_CONFIGURED" });
+    expect(decideCalls()).toBe(0);
+    expect(stateOf(id)).toBe("proposed");
+  });
+
+  it("a session row needs no signer and its receipt stays unsigned", async () => {
+    stubSigner(false);
+    const id = await idOf(await create(proposalBody()));
+    expect((await (await confirm(id)).json()).proposal.state).toBe("executed");
+    expect(rows[0]!.receipt).not.toHaveProperty("signedReceipt");
+  });
+
+  it("I-27: an agent row's receipt is signed under tavonel.signed_action_receipt.v1 and names no principal", async () => {
+    agentOn();
+    const id = await agentRow();
+    const answer = await confirm(id);
+    expect((await answer.json()).proposal.state).toBe("executed");
+    const signed = (rows[0]!.receipt as { signedReceipt: { payloadJson: string; signature: Parameters<typeof signing.verifyExportSignature>[1] } }).signedReceipt;
+    const payload = JSON.parse(signed.payloadJson);
+    expect(payload).toEqual({ schemaVersion: "tavonel.action_receipt.v1", proposalId: id, actionType: "library_label",
+      inputSha256: rows[0]!.input_sha256, outcome: "executed", executedAt: expect.any(String), resultRef: { replayed: false }, confirmedIn: "signed_in_session" });
+    for (const secret of [USER, GRANT, rows[0]!.idempotency_key, DIGEST, digestOf(id)]) expect(signed.payloadJson).not.toContain(secret);
+    const trust = signing.readExportTrustStoreEnv(SIGNER_ENV)!;
+    const bytes = Buffer.from(signed.payloadJson, "utf8");
+    expect(signing.verifyExportSignatureWithTrustStore(bytes, signed.signature, trust, new Date(), signing.ACTION_RECEIPT_SIGNATURE_SCOPE)).toBe(true);
+    expect(signing.verifyExportSignatureWithTrustStore(bytes, signed.signature, trust, new Date(), signing.ANSWER_RECEIPT_SIGNATURE_SCOPE)).toBe(false);
+  });
+
+  it("an agent row whose receipt cannot be signed is never recorded unsigned: it stays confirmed for its confirmer to finish", async () => {
+    agentOn();
+    // A store answer the signer refuses to name (a malformed input digest): the effect ran, the outcome is not recorded.
+    const row = seedRow({ principal_kind: "agent", agent_grant_id: GRANT, input_sha256: "sha256:not-a-digest",
+      input: { ...topic, decision: "confirmed" } });
+    const answer = await confirm(row.proposal_id);
+    expect(answer.status).toBe(503);
+    expect(await answer.json()).toEqual({ code: "PROPOSAL_OUTCOME_NOT_RECORDED" });
+    expect(stateOf(row.proposal_id)).toBe("confirmed");
+    expect(row.receipt).toBeNull();
+  });
+
+  it("I-11: a confirm of a row whose grant was revoked, or whose person's revision moved, is withdrawn and never executes", async () => {
+    agentOn();
+    const id = await agentRow();
+    grants.get(GRANT)!.live = false;
+    const answer = await confirm(id);
+    expect(answer.status).toBe(200);
+    expect((await answer.json()).proposal).toMatchObject({ state: "withdrawn", resumable: false, previewDigest: null });
+    expect(rows[0]!.decided_by).toBeNull();
+    expect(decideLibraryLabel).not.toHaveBeenCalled();
+    expect((await confirm(id)).status).toBe(409);
+  });
+
+  it("I-14: the same client key under two grants is two rows; a person's agt_ key is 400; another principal's replay is 409", async () => {
+    const one = await agentLabel(GRANT, "client-key-0001");
+    const two = await agentLabel(GRANT_2, "client-key-0001");
+    expect(one.ok && two.ok && one.row.proposal_id !== two.row.proposal_id).toBe(true);
+    expect(rows.map((row) => row.idempotency_key.length)).toEqual([47, 47]);
+    const long = await agentLabel(GRANT, "k".repeat(128));
+    expect(long.ok && long.row.idempotency_key).toMatch(/^agt_[A-Za-z0-9_-]{43}$/);
+    const personal = await create(proposalBody(), `agt_${"x".repeat(43)}`);
+    expect(personal.status).toBe(400);
+    await create(proposalBody(), "shared-key-0001");
+    requireFoundationSession.mockResolvedValue(otherPerson);
+    const crossed = await create(proposalBody(), "shared-key-0001");
+    expect(crossed.status).toBe(409);
+    expect(await crossed.json()).toEqual({ code: "PROPOSAL_IDEMPOTENCY_CONFLICT" });
+  });
+
+  it("an agent's access failure folds into the same not-found as a document with no label, and nothing is created", async () => {
+    checkAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    const denied = await agentLabel();
+    checkAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" });
+    const unavailable = await agentLabel();
+    checkAccess.mockResolvedValue({ ok: true });
+    readLibraryDocuments.mockResolvedValue({ ok: true, documents: [], sourceVersions: {} });
+    const unknown = await agentLabel();
+    for (const answer of [denied, unavailable, unknown]) expect(answer).toEqual({ ok: false, code: "PROPOSAL_TARGET_NOT_FOUND", status: 404 });
+    expect(createCalls()).toBe(0);
+  });
+
+  it("an agent names no source version: the server fills the Library's; one it names is refused", async () => {
+    const created = await agentLabel();
+    expect(created.ok && created.row.input).toEqual({ documentId: DOC, sourceVersionId: "a".repeat(64), labelKind: "topic", labelKey: "pricing", decision: "confirmed" });
+    expect(await agentLabel(GRANT, "client-key-0002", { sourceVersionId: "b".repeat(64) })).toEqual({ ok: false, code: "PROPOSAL_REQUEST_INVALID", status: 400 });
+  });
+
+  it("an expected Active digest that is not the current one is PROPOSAL_BASE_NOT_HEAD, no row", async () => {
+    const answer = await lib.createProposal(agentActor(), {
+      actionType: "library_label", toolName: "propose_library_labels", clientKey: "client-key-0001", evidenceIds: [],
+      raw: { collectionId: COLLECTION, expectedManifestDigest: MOVED, input: { documentId: DOC, labelKind: "topic", labelKey: "pricing", decision: "confirmed" } },
+    });
+    expect(answer).toEqual({ ok: false, code: "PROPOSAL_BASE_NOT_HEAD", status: 409 });
+    expect(createCalls()).toBe(0);
+  });
+});
+
+describe("I-9: a crash between execution and record is recoverable by its confirmer", () => {
+  const confirmedThenCrashed = async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-16T12:00:00.000Z"));
+    const id = await idOf(await create(proposalBody()));
+    recordDown = true;
+    const first = await confirm(id);
+    expect(first.status).toBe(503);
+    expect(stateOf(id)).toBe("confirmed");
+    recordDown = false;
+    return id;
+  };
+
+  it("the same person after PROPOSAL_RESUME_AFTER_MS runs it again under the same key and it is recorded executed", async () => {
+    const id = await confirmedThenCrashed();
+    vi.setSystemTime(Date.now() + PROPOSAL_RESUME_AFTER_MS);
+    expect((await (await readOne(id)).json()).proposal.resumable).toBe(true);
+    const finish = await decide(id, { decision: "confirm" });
+    expect(finish.status).toBe(200);
+    expect((await finish.json()).proposal).toMatchObject({ state: "executed", resumable: false });
+    expect(decideLibraryLabel.mock.calls.map((call) => call[1].idempotencyKey)).toEqual([id, id]);
+    expect(decideCalls()).toBe(1);
+  });
+
+  it("one millisecond younger is 409 and nothing runs again", async () => {
+    const id = await confirmedThenCrashed();
+    vi.setSystemTime(Date.now() + PROPOSAL_RESUME_AFTER_MS - 1);
+    expect((await (await readOne(id)).json()).proposal.resumable).toBe(false);
+    const early = await decide(id, { decision: "confirm" });
+    expect(early.status).toBe(409);
+    expect(await early.json()).toEqual({ code: "PROPOSAL_NOT_DECIDABLE" });
+    expect(decideLibraryLabel).toHaveBeenCalledTimes(1);
+  });
+
+  it("another person, however late, is 409 and sees no Finish", async () => {
+    const id = await confirmedThenCrashed();
+    vi.setSystemTime(Date.now() + 10 * PROPOSAL_RESUME_AFTER_MS);
+    requireFoundationSession.mockResolvedValue(otherPerson);
+    revalidateFoundationSession.mockResolvedValue(otherPerson);
+    expect((await (await readOne(id)).json()).proposal.resumable).toBe(false);
+    expect((await decide(id, { decision: "confirm" })).status).toBe(409);
+    expect(decideLibraryLabel).toHaveBeenCalledTimes(1);
+  });
+
+  it("a resume that loses the record race answers the stored row", async () => {
+    const id = await confirmedThenCrashed();
+    vi.setSystemTime(Date.now() + PROPOSAL_RESUME_AFTER_MS);
+    decideLibraryLabel.mockImplementation(async () => { rows[0]!.state = "executed"; return { ok: true, replayed: true }; });
+    const finish = await decide(id, { decision: "confirm" });
+    expect(finish.status).toBe(200);
+    expect((await finish.json()).proposal.state).toBe("executed");
+  });
+});
+
+describe("I-16 and the registry: what the viewer cannot read or the server cannot handle is hidden", () => {
+  it("a row of an unknown action type is not listed and cannot be confirmed or undone", async () => {
+    const unknown = seedRow({ action_type: "merge_documents", input: { documentIds: [DOC] } });
+    const executed = seedRow({ action_type: "merge_documents", input: { documentIds: [DOC] }, state: "executed", decided_at: new Date().toISOString(), decided_by: USER });
+    const page = await (await list.GET(new Request("https://tavonel.com/api/proposals"))).json();
+    expect(page.proposals).toEqual([]);
+    const answer = await decide(unknown.proposal_id, { decision: "confirm", previewDigest: `sha256:${"0".repeat(64)}` });
+    expect(answer.status).toBe(400);
+    expect(await answer.json()).toEqual({ code: "PROPOSAL_INPUT_INVALID" });
+    expect((await undoIt(executed.proposal_id)).status).toBe(400);
+    expect(decideCalls()).toBe(0);
+  });
+
+  it("a type whose documentsOf is empty is hidden, never shown as touching nothing", async () => {
+    withStub(() => []);
+    seedRow({ action_type: "compile_plan", collection_id: null, binding_kind: "source_inventory", input: { documentIds: [DOC] } });
+    const page = await (await list.GET(new Request("https://tavonel.com/api/proposals"))).json();
+    expect(page.proposals).toEqual([]);
+    expect(checkAccess).not.toHaveBeenCalled();
+  });
+
+  it("access is checked on every document of a row, in one call: the second unreadable one hides it", async () => {
+    const DOC_B = "0b000000-0000-4000-8000-00000000000b";
+    withStub();
+    const row = seedRow({ action_type: "compile_plan", collection_id: null, binding_kind: "source_inventory", input: { documentIds: [DOC, DOC_B] } });
+    checkAccess.mockImplementation(async (_ws, ids) => ids.includes(DOC_B) ? { ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" } : { ok: true });
+    const page = await (await list.GET(new Request("https://tavonel.com/api/proposals"))).json();
+    expect(page.proposals).toEqual([]);
+    expect(checkAccess.mock.calls.map((call) => call[1])).toEqual([[DOC, DOC_B]]);
+    expect((await confirm(row.proposal_id)).status).toBe(403);
+    expect(stubRun).not.toHaveBeenCalled();
+  });
+
+  it("a type without an undo is not undoable", async () => {
+    withStub();
+    const row = seedRow({ action_type: "compile_plan", collection_id: null, binding_kind: "source_inventory", input: { documentIds: [DOC] },
+      state: "executed", decided_at: new Date().toISOString(), decided_by: USER });
+    const answer = await undoIt(row.proposal_id);
+    expect(answer.status).toBe(409);
+    expect(await answer.json()).toEqual({ code: "PROPOSAL_NOT_UNDOABLE" });
+  });
+});
+
+describe("I-15 and edit 14: createProposalBatch", () => {
+  const items = (n: number, bad?: number) => Array.from({ length: n }, (_, index) => ({
+    actionType: "library_label", toolName: "propose_library_labels", clientKey: "batch-key-0001", evidenceIds: [],
+    raw: { collectionId: COLLECTION, input: { documentId: DOC, labelKind: "topic", labelKey: index === bad ? "a\nb" : `topic-${index}`, decision: "confirmed" } },
+  }));
+
+  it("one bad item of 25 refuses the whole batch with no create call", async () => {
+    expect(await lib.createProposalBatch(agentActor(), items(25, 24))).toEqual({ ok: false, code: "PROPOSAL_REQUEST_INVALID", status: 400 });
+    expect(createCalls()).toBe(0);
+    expect(rows).toHaveLength(0);
+  });
+
+  it("an empty batch and a batch of 26 are refused before anything", async () => {
+    expect((await lib.createProposalBatch(agentActor(), [])).ok).toBe(false);
+    expect((await lib.createProposalBatch(agentActor(), items(26))).ok).toBe(false);
+    expect(createCalls()).toBe(0);
+  });
+
+  it("a store failure at item k leaves 0..k-1; a retry with the same client key replays them and completes", async () => {
+    failCreateAfter = 3;
+    expect(await lib.createProposalBatch(agentActor(), items(6))).toEqual({ ok: false, code: "PROPOSAL_OPEN_LIMIT", status: 429 });
+    expect(rows).toHaveLength(3);
+    failCreateAfter = null;
+    calls = [];
+    const retry = await lib.createProposalBatch(agentActor(), items(6));
+    expect(retry.ok).toBe(true);
+    expect(retry.ok && retry.created.map((item) => item.replayed)).toEqual([true, true, true, false, false, false]);
+    expect(rows.map((row) => (row.input as { labelKey: string }).labelKey)).toEqual(items(6).map((_, index) => `topic-${index}`));
+  });
+
+  it("I-13 half: the first insert reserves room for the whole batch, so a batch of 3 at 198 open is refused with 0 rows", async () => {
+    for (let index = 0; index < 198; index += 1) seedRow({ principal_kind: "agent", agent_grant_id: GRANT_2, idempotency_key: `agt_open_${index}` });
+    const before = rows.length;
+    expect(await lib.createProposalBatch(agentActor(), items(3))).toEqual({ ok: false, code: "PROPOSAL_OPEN_LIMIT", status: 429 });
+    expect(rows).toHaveLength(before);
+  });
+});
+
+describe("GET /api/proposals without a collection: the workspace inbox, filtered before paging", () => {
+  const DOC_B = "0b000000-0000-4000-8000-00000000000b";
+  const page = async (cursor?: string) => (await list.GET(new Request(`https://tavonel.com/api/proposals${cursor ? `?cursor=${cursor}` : ""}`))).json();
+
+  it("fills each page with readable rows across store pages, and the cursor resumes exactly after the last row returned", async () => {
+    // 120 rows, every third one unreadable, so the page fills in the middle of a store page; created_at differs
+    // only in microseconds, so a millisecond cursor would skip rows.
+    for (let index = 0; index < 120; index += 1) seedRow({ input: { ...docType, documentId: index % 3 === 1 ? DOC_B : DOC } });
+    checkAccess.mockImplementation(async (_ws, ids) => ids.includes(DOC_B) ? { ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" } : { ok: true });
+    const first = await page();
+    expect(first.proposals).toHaveLength(50);
+    expect(first.nextCursor).toEqual(expect.any(String));
+    const second = await page(first.nextCursor);
+    expect(second.proposals).toHaveLength(30);
+    expect(second.nextCursor).toBeNull();
+    const seen = [...first.proposals, ...second.proposals].map((p: { proposalId: string }) => p.proposalId);
+    const expected = rows.filter((_, index) => index % 3 !== 1).map((row) => row.proposal_id).reverse();
+    expect(seen).toEqual(expected);
+  });
+
+  it("a row the registry cannot handle takes no page slot: the page is filled with rows the viewer is shown", async () => {
+    for (let index = 0; index < 70; index += 1) {
+      seedRow(index % 7 === 3 ? { action_type: "merge_documents", input: { documentIds: [DOC] } } : {});
+    }
+    const first = await page();
+    expect(first.proposals).toHaveLength(50);
+    expect(first.proposals.every((p: { actionType: string }) => p.actionType === "library_label")).toBe(true);
+    const second = await page(first.nextCursor);
+    expect(first.proposals.length + second.proposals.length).toBe(60);
+  });
+
+  it("stops after AGENT_ACL_SCAN_PAGES store pages and hands back the store position", async () => {
+    for (let index = 0; index < 260; index += 1) seedRow({ input: { ...docType, documentId: DOC_B } });
+    checkAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    const first = await page();
+    expect(first.proposals).toEqual([]);
+    expect(calls.filter((call) => call === "list_world_change_proposals_page")).toHaveLength(4);
+    expect(Buffer.from(first.nextCursor, "base64url").toString("utf8")).toBe(`${rows[60]!.created_at}|${rows[60]!.proposal_id}`);
+  });
+
+  it.each([["not base64url", "%%%"], ["no separator", Buffer.from("abc").toString("base64url")],
+    ["a bad id", Buffer.from(`${createdAt(1)}|nope`).toString("base64url")], ["a bad time", Buffer.from(`yesterday|${DOC}`).toString("base64url")]])(
+    "a cursor with %s is 400", async (_name, cursor) => {
+      const answer = await list.GET(new Request(`https://tavonel.com/api/proposals?cursor=${encodeURIComponent(cursor)}`));
+      expect(answer.status).toBe(400);
+      expect(calls).not.toContain("list_world_change_proposals_page");
+    });
+});
+
+/*
+  Generated inputs (seeded, so a failure names its case): the two things a client sends that this work order
+  parses -- the decision body and the inbox cursor. Whatever arrives, the answer is a 4xx or the decision, never
+  a 5xx or a throw, and nothing is decided unless the body carries this proposal's exact preview digest.
+*/
+describe("fuzz: decision bodies and cursors", () => {
+  const random = (seed: number) => () => { seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648; return seed / 2_147_483_648; };
+  const pick = <T,>(next: () => number, values: readonly T[]) => values[Math.floor(next() * values.length)]!;
+  const junk = (next: () => number): unknown => pick(next, [
+    undefined, null, true, 0, -1, 1e309, "", "confirm", "reject", "CONFIRM", " confirm", `sha256:${"0".repeat(64)}`, "sha256:", "agt_x",
+    [], ["confirm"], {}, { decision: "confirm" }, "\u0000", "x".repeat(9000), Number.NaN,
+  ]);
+
+  it("400 cases of decision bodies: never 5xx, and only this proposal's digest decides", async () => {
+    const next = random(20261117);
+    for (let index = 0; index < 400; index += 1) {
+      rows = [];
+      calls = [];
+      const id = await idOf(await create(proposalBody(), `fuzz-key-${index}`));
+      const right = next() < 0.25;
+      const body: Record<string, unknown> = { decision: next() < 0.6 ? "confirm" : junk(next), previewDigest: right ? digestOf(id) : junk(next) };
+      if (next() < 0.3) body.collectionId = junk(next);
+      if (next() < 0.2) body.extra = junk(next);
+      const answer = await decide(id, body);
+      const label = `case ${index}: ${JSON.stringify(body).slice(0, 120)}`;
+      expect(answer.status, label).toBeLessThan(500);
+      // A reject needs no digest; a confirm decides only with this proposal's own; a body over 8 KiB is refused whole.
+      const fits = JSON.stringify(body).length <= 8192;
+      const confirmed = fits && body.decision === "confirm" && right;
+      const rejected = fits && body.decision === "reject";
+      expect(decideCalls(), label).toBe(confirmed || rejected ? 1 : 0);
+      expect(stateOf(id), label).toBe(confirmed ? "executed" : rejected ? "rejected" : "proposed");
+    }
+  });
+
+  it("400 cases of cursors: a valid page or 400, never 5xx, and the store is not paged on a 400", async () => {
+    for (let index = 0; index < 30; index += 1) seedRow({});
+    const next = random(17);
+    const alphabet = "AZaz09-_+/=|.:T%é ";
+    for (let index = 0; index < 400; index += 1) {
+      calls = [];
+      const raw = Array.from({ length: Math.floor(next() * 90) }, () => alphabet[Math.floor(next() * alphabet.length)]).join("");
+      const text = next() < 0.5 ? raw : Buffer.from(next() < 0.5 ? raw : `${createdAt(Math.floor(next() * 40))}|${rows[Math.floor(next() * rows.length)]!.proposal_id}${raw.slice(0, 2)}`).toString("base64url");
+      const answer = await list.GET(new Request(`https://tavonel.com/api/proposals?cursor=${encodeURIComponent(text)}`));
+      expect([200, 400], `case ${index}: ${text}`).toContain(answer.status);
+      if (answer.status === 400) expect(calls, `case ${index}`).not.toContain("list_world_change_proposals_page");
+    }
   });
 });
