@@ -35,6 +35,12 @@
   outline-offset: 4px;
 }
 
+/* While a file is dragged over the page the primary action says it is where the file goes: an outline, so no layout shift and no motion. */
+.dragging {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
 .note {
   flex: 1 0 100%;
   margin: 6px 0 0;
