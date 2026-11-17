@@ -154,7 +154,11 @@ describe("every V34 route body", () => {
   that opens on "Team members" do not trip it. Enterprise is sold by contact and has no catalog offer,
   so its label is added by hand.
 */
-const LABELS = [...Object.values(BILLING_OFFERS).map((offer) => offer.label), "Enterprise"].join("|");
+// A retired offer keeps its label with parentheses, so labels are regex-escaped before they join a pattern.
+const RETIRED_LABEL = "Developer (2026-09 plan)";
+const NAMED_LABELS = [...Object.values(BILLING_OFFERS).map((offer) => offer.label), RETIRED_LABEL, "Enterprise"];
+const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const LABELS = NAMED_LABELS.map(escapeRe).join("|");
 const LIST = String.raw`\s*(?:,|and|or|&)\s*(?:the\s+)?`;
 const PLAN_NAME = new RegExp(
   String.raw`\b(?:${LABELS})\s+(?:plans?|tiers?|subscriptions?)\b|\b(?:${LABELS})${LIST}[A-Z][a-z]+\b|\b[A-Z][a-z]+${LIST}(?:${LABELS})\b`,
@@ -163,8 +167,7 @@ const PLAN_NAME = new RegExp(
 describe("plan names stay on /pricing", () => {
   it("the pattern finds a plan named as a plan, and leaves the word team alone", () => {
     // Fixtures come from the catalog, so a renamed plan changes what the guard is shown, not whether it is tested.
-    const labels = [...Object.values(BILLING_OFFERS).map((offer) => offer.label), "Enterprise"];
-    for (const label of labels) for (const named of [
+    for (const label of NAMED_LABELS) for (const named of [
       `On the ${label} plan you get more pages.`,
       `Upgrade to the ${label} subscription.`,
       `The ${label} tier adds review.`,
