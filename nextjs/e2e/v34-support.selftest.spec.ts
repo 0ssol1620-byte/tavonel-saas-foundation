@@ -29,6 +29,7 @@ import {
 } from "./support/v34-passes";
 import { composite, contrastPass, contrastRatio, controlContrastPass, openContentDetails, requiredRatio } from "./support/v34-contrast";
 import { escapeRestoresFocus, keyboardWalk } from "./support/v34-keyboard";
+import { drawerPass } from "./support/v34-drawer";
 import { assertWorldAgreement, forceWorldMode, readWorldState, type WorldState } from "./support/v34-world";
 import { checkSeo, checkSeoUnique, parseSeo, type SeoExpectation } from "./support/v34-seo";
 import { flushReceipt, record, routeKey } from "./support/v34-receipt";
@@ -593,5 +594,97 @@ test.describe("QA 1 review: scroll axes, stretched links, text hiding, line clam
     expect((await page.evaluate(measureClippedText)).some(v => v.pass === "clipped-text")).toBe(true);
     await load(page, `<p style="display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;width:120px;margin:0;line-height:20px">one two three four five six seven eight nine ten eleven twelve</p>`);
     expect(await page.evaluate(measureClippedText)).toEqual([]);
+  });
+});
+
+/*
+  The drawer pass (WO-CI-9) on a stand-in for the V34 shell's drawer: a header button that opens a
+  modal <dialog> of links, wired the way components/v34/shell/mobile-drawer.tsx is (focus the trigger,
+  showModal, close on a followed link; a followed link is a client navigation, history.pushState).
+  Each promise is broken on its own and must be caught; the clean drawer must pass.
+*/
+test.describe("drawer", () => {
+  type Wiring = { hydrateMs?: number; closeOnLink?: boolean; escapeKeepsOpen?: boolean; escapeDropsFocus?: boolean; noOpen?: boolean; drawerStyle?: string; linkStyle?: string; pageText?: string };
+  const drawer = (w: Wiring = {}) => `
+    <header data-v34-header><button aria-label="Open navigation" aria-expanded="false" style="width:44px;height:44px">=</button>
+      <dialog style="box-sizing:border-box;position:fixed;inset:0;width:100%;max-width:none;height:100%;max-height:none;margin:0;padding:16px;border:0;background:#fff;color:#111;${w.drawerStyle ?? ""}">
+        <a href="/" aria-label="Home" style="color:#111">Home</a>
+        <nav><a href="/" style="color:#111;${w.linkStyle ?? ""}">This page</a><details><summary>Group</summary><a href="/other" style="color:#111">Another page</a></details></nav>
+      </dialog></header>
+    <main><h1>t</h1>${w.pageText ?? ""}</main>
+    <script>
+      const t = document.querySelector("button"), d = document.querySelector("dialog");
+      const hydrate = () => t.addEventListener("click", () => { if (d.open) return; t.focus(); d.showModal(); t.setAttribute("aria-expanded", "true"); });
+      ${w.noOpen ? "" : `setTimeout(hydrate, ${w.hydrateMs ?? 0});`}
+      d.addEventListener("close", () => t.setAttribute("aria-expanded", "false"));
+      d.addEventListener("click", e => { const a = e.target.closest("a"); if (!a) return; e.preventDefault(); history.pushState({}, "", a.href); ${w.closeOnLink === false ? "" : "d.close();"} });
+      ${w.escapeKeepsOpen ? `addEventListener("keydown", e => { if (e.key === "Escape") e.preventDefault(); }, true); d.addEventListener("cancel", e => e.preventDefault());` : ""}
+      ${w.escapeDropsFocus ? `d.addEventListener("close", () => setTimeout(() => document.activeElement && document.activeElement.blur(), 0));` : ""}
+    </script>`;
+  const passes = (r: { violations: { pass: string }[] }) => [...new Set(r.violations.map(v => v.pass))].sort();
+
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+  });
+
+  test("a clean drawer passes, and where focus lands after a followed link is reported", async ({ page }) => {
+    await load(page, drawer());
+    const r = await drawerPass(page, "/");
+    expect(r.violations).toEqual([]);
+    expect(r.reported.filter(v => v.pass === "drawer-link-focus").map(v => v.selector)).toEqual(["a[Home] -> /", "a[This page] -> /", "a[Another page] -> /other"]);
+    expect(r.reported.some(v => v.pass === "drawer-hydration")).toBe(false);
+  });
+
+  test("taps lost before the trigger is wired are reported, not judged", async ({ page }) => {
+    await load(page, drawer({ hydrateMs: 700 }));
+    const r = await drawerPass(page, "/");
+    expect(r.violations).toEqual([]);
+    expect(r.reported.find(v => v.pass === "drawer-hydration")?.detail).toMatch(/^[1-9]\d* tap\(s\) after the first response byte opened nothing/);
+  });
+
+  test("a trigger that never opens, and a drawer wider than the viewport, are caught", async ({ page }) => {
+    await load(page, drawer({ noOpen: true }));
+    expect((await drawerPass(page, "/")).violations.map(v => v.detail)).toEqual(["tapping the trigger for 10 s never opened the drawer"]);
+    await load(page, drawer({ drawerStyle: "width:150vw" }));
+    expect((await drawerPass(page, "/")).violations.map(v => v.detail)).toContainEqual(expect.stringMatching(/^spans 0\.\.585px of a 390px viewport$/));
+  });
+
+  test("Escape that leaves it open, and Escape that drops focus, are caught", async ({ page }) => {
+    await load(page, drawer({ escapeKeepsOpen: true }));
+    const open = await drawerPass(page, "/");
+    expect(passes(open)).toEqual(["escape-restore"]);
+    expect(open.violations.map(v => v.detail)).toContain("still open after Escape");
+    await load(page, drawer({ escapeDropsFocus: true }));
+    const lost = await drawerPass(page, "/");
+    expect(passes(lost)).toEqual(["escape-restore"]);
+    expect(lost.violations.map(v => v.detail)).toEqual(["focus went to body, not the trigger, after Escape", "focus did not return to the trigger"]);
+  });
+
+  test("a followed link that leaves the drawer open is caught for the page already open and for another page", async ({ page }) => {
+    // The shell's scroll lock, from mobile-drawer.module.css.
+    await load(page, drawer({ closeOnLink: false }), "html:has(dialog[open]){overflow:hidden}");
+    const r = await drawerPass(page, "/");
+    expect(passes(r)).toEqual(["drawer-link-close"]);
+    expect([...new Set(r.violations.map(v => v.selector))]).toEqual(["a[Home] -> /", "a[This page] -> /", "a[Another page] -> /other"]);
+    expect(r.violations.filter(v => v.selector === "a[Another page] -> /other").map(v => v.detail)).toEqual([
+      "following a link to another page: the drawer is still open",
+      "following a link to another page: the page is still scroll-locked",
+    ]);
+  });
+
+  test("contrast is measured inside the open drawer only: pale drawer text fails, pale page text behind it does not", async ({ page }) => {
+    await load(page, drawer({ linkStyle: "color:#bbb" }));
+    const pale = await drawerPass(page, "/");
+    expect(passes(pale)).toEqual(["contrast"]);
+    expect(pale.violations[0].detail).toMatch(/^drawer open: "This page" /);
+    await load(page, drawer({ pageText: `<p style="color:#ccc">pale page copy behind the drawer</p>` }));
+    expect((await drawerPass(page, "/")).violations).toEqual([]);
+  });
+
+  test("a page without the V34 header says so", async ({ page }) => {
+    await load(page, `<header><nav><a href="/">x</a></nav></header><main><h1>t</h1></main>`);
+    const r = await drawerPass(page, "/");
+    expect(r.hasHeader).toBe(false);
+    expect(r.violations.map(v => v.detail)).toEqual(["the page renders no V34 header"]);
   });
 });
