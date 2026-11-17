@@ -37,6 +37,12 @@ import {
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+/*
+ * The same bound as /ask and /api/mcp (WO-CAT-8): a search holds a knowledge query unit from admission
+ * to settlement, and the hold stops reserving after five minutes (20261117150000). The database also
+ * refuses to count a hold that expired (20261117160000), so this is the platform half, not the proof.
+ */
+export const maxDuration = 60;
 const NO_STORE = { "Cache-Control": "no-store" };
 
 // Read failures that mean "this tenant has no queryable index yet" are a 409 (a state the

@@ -64,7 +64,7 @@ async function mockWorkspace(page: Page, customerDataEnabled = true, documents =
       { bbox1000: [100, 280, 860, 325], confidence: 0.88, text: "", regionId: "ocr-p0004-l00003" },
     ] }],
   } }));
-  await page.route("**/api/billing/status", route => route.fulfill({ json: { account: { accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null } } }));
+  await page.route("**/api/billing/status", route => route.fulfill({ json: { account: { accessPlan: null, planCode: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null } } }));
 }
 
 /*
@@ -175,7 +175,7 @@ test("empty workspace does not render an empty processing panel", async ({ page 
   await page.route("**/api/access/bootstrap", route => route.fulfill({ json: { code: "ACCESS_READY", access: { source: "trial", accessPlan: "observer_access", billingExempt: true, expiresAt: new Date(Date.now() + 5 * 86400000).toISOString(), limits: { files: 3, pages: 50, worlds: 1 }, customerDataEnabled: true } } }));
   await page.route("**/api/compile-jobs", route => route.fulfill({ json: { code: "OK", jobs: [] } }));
   await page.route("**/api/documents", route => route.fulfill({ json: { documents: [] } }));
-  await page.route("**/api/billing/status", route => route.fulfill({ json: { account: { accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null } } }));
+  await page.route("**/api/billing/status", route => route.fulfill({ json: { account: { accessPlan: null, planCode: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null } } }));
   await page.goto("/workspace");
   await expect(page.locator(".board")).toHaveCount(0);
   await expect(page.getByText("Free evaluation")).toBeVisible();

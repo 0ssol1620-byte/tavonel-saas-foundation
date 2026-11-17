@@ -24,6 +24,8 @@ describe("Foundation subscription upgrade migration contract", () => {
     expect(migration).toContain("existing.workspace_key is distinct from p_workspace_key");
     expect(migration).toContain("existing.user_id is distinct from p_user_id");
     expect(migration).toContain("existing.subscription_id is distinct from p_subscription_id");
+    // A pin on the historical 0011 text only: 20261117140100 revokes this grant from service_role, and
+    // supabase/tests/service_role_grant_matrix.sql (section 3) holds that v6 is the only one it can execute.
     expect(migration).toContain("grant execute on function public.apply_foundation_billing_event_v3");
   });
 });
