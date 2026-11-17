@@ -109,6 +109,7 @@ describe("createAgentGrant (I-24, TS half)", () => {
   it.each([
     ["api_key_authorization_changed", "AUTHORIZATION_CHANGED_RETRY"],
     ["foundation_active_api_key_limit", "AGENT_GRANT_LIMIT_REACHED"],
+    ["agent_grant_lock_timeout", "AGENT_GRANTS_BUSY_RETRY"],
     ["agent_grant_request_invalid", "AGENT_GRANT_CREATE_FAILED"],
     ["something else", "AGENT_GRANT_CREATE_FAILED"],
   ])("maps the store's %s to %s", async (message, code) => {
@@ -240,7 +241,7 @@ describe("lib/agent-grants.ts under an arbitrary store (property)", () => {
     switch (Math.floor(rng() * (depth > 2 ? 4 : 7))) {
       case 0: return null;
       case 1: return pick(rng, [true, false, 0, -1, 1.5, 2 ** 60]);
-      case 2: return pick(rng, ["", "x", GRANT, "2026-11-17T12:00:00Z", "tvnl_agt_", "\u0000"]);
+      case 2: return pick(rng, ["", "x", GRANT, "2026-11-17T12:00:00Z", "tvnl_agt_", "\u0000", "agent_grant_lock_timeout"]);
       case 3: return pick(rng, [[], [grantRow()], {}, grantRow()]);
       case 4: return Array.from({ length: Math.floor(rng() * 3) }, () => randomJson(rng, depth + 1));
       default: {
@@ -455,6 +456,55 @@ describe("POST /api/internal/agent-grants/revoke-all (I-20, route half)", () => 
     store(() => pgError("canceling statement due to statement timeout", 500));
     const response = await REVOKE_ALL(killRequest(`Bearer ${SECRET}`));
     expect([response.status, (await response.json()).code]).toEqual([503, "AGENT_GRANT_REVOKE_FAILED"]);
+  });
+});
+
+/*
+  WO-AN-7B: both functions that take the kill-switch lock (migration 20261117130300) refuse an expired lock
+  wait with `agent_grant_lock_timeout` and roll back everything they did, so the caller may send the same
+  request again. Every consumer of those two RPCs reports it as AGENT_GRANTS_BUSY_RETRY (503), and nothing
+  else is reported as that code: a raw lock or statement timeout, or a transport failure, stays the uncertain
+  failure it was.
+*/
+describe("the kill-switch lock timeout is one retryable refusal (WO-AN-7B)", () => {
+  const lockRpcs = [
+    ["create_foundation_agent_grant", () => createAgentGrant({ workspaceKey: WS, userId: USER, authorizationRevision: 7, clientLabel: "Agent", grantorEmail: null }), "AGENT_GRANT_CREATE_FAILED"],
+    ["revoke_all_foundation_agent_grants", () => revokeAllAgentGrants(), "AGENT_GRANT_REVOKE_FAILED"],
+  ] as const;
+  // PostgREST's error body for a raised exception, at every status it may choose for SQLSTATE 55P03.
+  const lockTimeout = (status: number) => Response.json({ code: "55P03", message: "agent_grant_lock_timeout", details: null, hint: null }, { status });
+
+  it.each(lockRpcs)("%s: the refusal is AGENT_GRANTS_BUSY_RETRY at any error status", async (name, call) => {
+    for (const status of [400, 409, 500, 503]) {
+      store(() => lockTimeout(status));
+      expect(await call(), `status ${status}`).toEqual({ ok: false, code: "AGENT_GRANTS_BUSY_RETRY" });
+      expect(calls.map((c) => c.name)).toEqual([name]);
+    }
+    expect(AGENT_GRANT_STATUS.AGENT_GRANTS_BUSY_RETRY).toBe(503);
+  });
+
+  it.each(lockRpcs)("%s: no other failure is reported as retryable-with-no-effect", async (_name, call, otherwise) => {
+    for (const answer of [
+      () => pgError("canceling statement due to lock timeout", 500),
+      () => pgError("canceling statement due to statement timeout", 500),
+      () => pgError("deadlock detected", 500),
+      () => new Response("<html>", { status: 504 }),
+      () => { throw new TypeError("fetch failed"); },
+    ]) {
+      store(answer);
+      expect(await call()).toEqual({ ok: false, code: otherwise });
+    }
+  });
+
+  it("the agent-grant routes answer it as 503 AGENT_GRANTS_BUSY_RETRY, and mint or revoke nothing", async () => {
+    store(() => lockTimeout(500));
+    const created = await POST(post(JSON.stringify({ clientLabel: "Agent" })));
+    const createdBody = await created.json();
+    expect([created.status, createdBody]).toEqual([503, { code: "AGENT_GRANTS_BUSY_RETRY" }]);
+    vi.stubEnv("FOUNDATION_WORKER_SECRET", SECRET);
+    store(() => lockTimeout(500));
+    const killed = await REVOKE_ALL(new Request("https://tavonel.com/api/internal/agent-grants/revoke-all", { method: "POST", headers: { authorization: `Bearer ${SECRET}` } }));
+    expect([killed.status, await killed.json()]).toEqual([503, { code: "AGENT_GRANTS_BUSY_RETRY" }]);
   });
 });
 

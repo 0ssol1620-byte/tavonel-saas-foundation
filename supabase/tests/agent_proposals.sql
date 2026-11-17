@@ -14,12 +14,16 @@
 -- record-if-leaf replays and refuses a second correction of one base; I-1 every read RPC is
 -- stable or immutable. WO-AN-7 (20261117130200): grant creation holds the kill-switch advisory lock
 -- shared and revoke-all holds it exclusive until commit; in one session a grant created after the kill
--- switch is a new, live grant.
+-- switch is a new, live grant. WO-AN-7B (20261117130300): the kill-switch lock is the two-integer key
+-- (1414942284, 1), outside the hashed-string namespace; both functions bound every lock wait with lock_timeout
+-- and carry no statement_timeout clause (it never bounded the calling statement); both map lock_not_available
+-- to agent_grant_lock_timeout. That a held lock makes the other side answer within the bound and change nothing
+-- needs two sessions: scripts/db/agent-grant-race.mjs, scenarios BOUNDA and BOUNDB.
 --
 -- Not provable here (one transaction): the races of I-8, I-12 and I-13 and of grant creation against
 -- revoke-all under concurrent sessions -- scripts/db/agent-grant-race.mjs runs those against a local cluster.
 begin;
-select plan(113);
+select plan(116);
 
 create temp table keep (k text primary key, v jsonb);
 
@@ -51,10 +55,16 @@ returns jsonb language sql as $$
     'sha256:' || repeat('1', 64), '{}', 'sha256:' || repeat('d', 64), 1, 'agent', p_user, p_key, now() + interval '7 days',
     'active_manifest', p_grant, p_limit, p_reserve);
 $$;
--- Whether this session holds the kill-switch advisory lock (20261117130200) in `p_mode`.
+-- Whether this session holds the kill-switch advisory lock in `p_mode`: the two-integer key (1414942284, 1) of
+-- 20261117130300 (objsubid 2), not the hashed string key of 20261117130200 (objsubid 1).
 create function pg_temp.holds_kill_lock(p_mode text) returns boolean language sql as $$
   select exists (select 1 from pg_locks l
-    where l.locktype = 'advisory' and l.pid = pg_backend_pid() and l.granted and l.mode = p_mode and l.objsubid = 1
+    where l.locktype = 'advisory' and l.pid = pg_backend_pid() and l.granted and l.mode = p_mode and l.objsubid = 2
+      and l.classid = 1414942284 and l.objid = 1);
+$$;
+create function pg_temp.holds_old_kill_lock() returns boolean language sql as $$
+  select exists (select 1 from pg_locks l
+    where l.locktype = 'advisory' and l.pid = pg_backend_pid() and l.objsubid = 1
       and l.classid::bigint = (hashtextextended('foundation_agent_grants:kill_switch', 0) >> 32) & 4294967295
       and l.objid::bigint = hashtextextended('foundation_agent_grants:kill_switch', 0) & 4294967295);
 $$;
@@ -75,6 +85,16 @@ select ok(not has_function_privilege('authenticated', 'public.revoke_all_foundat
   'a signed-in client cannot pull the kill switch');
 select ok(not has_function_privilege('anon', 'public.quote_foundation_compile_recharge(text, uuid[])', 'execute'),
   'an anonymous client cannot read a quote');
+-- WO-AN-7B: the waits are bounded by lock_timeout, the one setting a function can apply to its caller's statement.
+select is((select count(*)::integer from pg_proc
+    where proname in ('create_foundation_agent_grant', 'revoke_all_foundation_agent_grants')
+      and 'lock_timeout=2000ms' = any(proconfig)
+      and not exists (select 1 from unnest(proconfig) c where c like 'statement_timeout=%')), 2,
+  'both kill-switch functions bound every lock wait at 2000 ms and carry no statement_timeout that reads as a bound');
+select is((select count(*)::integer from pg_proc
+    where proname in ('create_foundation_agent_grant', 'revoke_all_foundation_agent_grants')
+      and prosrc like '%exception when lock_not_available then%raise exception ''agent_grant_lock_timeout'' using errcode = ''lock_not_available''%'), 2,
+  'both map an expired lock wait to agent_grant_lock_timeout');
 
 -- I-25: one callable signature each; the deployed named-argument calls still resolve.
 select is((select count(*)::integer from pg_proc where proname = 'create_world_change_proposal'), 1, 'one create function');
@@ -113,6 +133,7 @@ insert into keep select 'g1', pg_temp.agent_grant('pilot-aa00000100004000', 'aa0
 insert into keep select 'g1b', pg_temp.agent_grant('pilot-aa00000100004000', 'aa000001-0000-4000-8000-0000000000a1', 'agentGrant02', 1);
 select ok(pg_temp.holds_kill_lock('ShareLock') and not pg_temp.holds_kill_lock('ExclusiveLock'),
   'a grant creation holds the kill-switch lock shared, not exclusive, until its transaction ends');
+select ok(not pg_temp.holds_old_kill_lock(), 'the kill-switch lock is no longer the hashed string key of 20261117130200');
 select is((select token_kind || '|' || (agent_grant_id = pg_temp.id_of('g1'))::text || '|' || (expires_at is not null)::text
   from public.foundation_api_keys where key_prefix = 'agentGrant01'), 'agent|true|true',
   'the grant RPC mints an agent key bound to its grant, with an expiry');
