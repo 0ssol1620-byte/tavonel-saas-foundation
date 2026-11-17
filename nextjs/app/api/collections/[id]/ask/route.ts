@@ -385,7 +385,12 @@ async function ask(request: Request, context: { params: Promise<{ id: string }> 
       if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
         status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE,
       });
-      await lease.complete(answered);
+      // A remembered answer is replayed without a hold or a unit, so it is remembered only once its
+      // unit is recorded (WO-CAT-8). A unit that cannot be recorded withholds the answer, uncached.
+      if (idempotencyKey) {
+        if (!await meter.count()) return NextResponse.json({ code: "READ_FAILED" }, { status: 503, headers: NO_STORE });
+        await lease.complete(answered);
+      }
     }
   } finally {
     if (!lease.replay) await lease.release();

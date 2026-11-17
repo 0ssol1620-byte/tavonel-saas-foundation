@@ -6,7 +6,7 @@
 --   sto002  legacy observer_access (plan_code null)
 --   sto003  Personal, allowance 2048 bytes (re-arming an expired admission)
 --   sto004  trialing, no billing account
--- plus an owner grant (user e5) admitting into sto001.
+-- plus an operator grant (user e5) uploading into sto001, which does not uncap it (WO-CAT-8).
 -- The two-session race (two admissions that together cross the allowance admit one) is outside
 -- one pgTAP transaction: receipts/WO-CAT-5/concurrency.sh runs it against the same migration.
 begin;
@@ -113,14 +113,15 @@ set local role service_role;
 select is(pg_temp.admit('pilot-sto003', 'e3e3e3e3-0000-4000-8000-0000000000e3', 'f3f3f3f3-0000-4000-8000-0000000000f2', 2048, '{"personal": 2048}')->>'intakeClass',
   'paid', 'an expired, unconfirmed admission holds no bytes');
 select throws_ok($$select pg_temp.admit('pilot-sto003', 'e3e3e3e3-0000-4000-8000-0000000000e3', 'f3f3f3f3-0000-4000-8000-0000000000f1', 1024, '{"personal": 2048}')$$,
-  'P0001', 'foundation_storage_allowance_exhausted', 're-arming the expired admission past the allowance is refused');
+  '23514', 're-arming the expired admission is refused, before the allowance: since WO-CAT-8 the inner function runs first, and its re-arm (now + 10 min) cannot pass foundation_intake_admissions_check1 (created_at + 15 min) for any expired row');
 
 -- 17-19: legacy, owner and trial are never refused by the allowance.
 select is(pg_temp.admit('pilot-sto002', 'e2e2e2e2-0000-4000-8000-0000000000e2', 'f2f2f2f2-0000-4000-8000-0000000000f1', 4096,
   '{"personal": 1, "developer": 1, "team": 1, "business": 1}')->>'intakeClass',
   'paid', 'a legacy plan (plan_code null) is counted by nothing and refused by nothing, whatever the allowances');
-select is(pg_temp.admit('pilot-sto001', 'e5e5e5e5-0000-4000-8000-0000000000e5', 'f5f5f5f5-0000-4000-8000-0000000000f1', 4096, '{"personal": 3072}')->>'intakeClass',
-  'owner', 'an owner grant is never refused, even into a workspace at its allowance');
+select throws_ok($$select pg_temp.admit('pilot-sto001', 'e5e5e5e5-0000-4000-8000-0000000000e5', 'f5f5f5f5-0000-4000-8000-0000000000f1', 4096, '{"personal": 3072}')$$,
+  'P0001', 'foundation_storage_allowance_exhausted',
+  'an operator uploading into a customer workspace at its allowance is refused: only a grant on the account''s own user uncaps it (WO-CAT-8, catalog_v2_meter_closure.sql)');
 select is(pg_temp.admit('pilot-sto004', 'e4e4e4e4-0000-4000-8000-0000000000e4', 'f4f4f4f4-0000-4000-8000-0000000000f1', 4096, '{"personal": 1}')->>'intakeClass',
   'trial', 'a trial keeps its own bounds and no storage allowance');
 

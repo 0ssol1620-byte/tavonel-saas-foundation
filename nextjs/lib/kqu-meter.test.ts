@@ -4,11 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
   WO-CAT-4: the KQU meter, through the real route handlers.
 
   The database half (the window lock, holds, the month) is supabase/tests/knowledge_query_units.sql.
-  Here the two RPCs are answered by a fake with the same rule -- used units plus live holds against
-  the limit, a unit added only by an answered settle -- so what is proved is the routes' half: when
-  admission runs (before retrieval), what is settled as answered (a 200 and nothing else), which limit
-  is passed (the catalog's, by plan_code), and that every surface -- the browser routes, /api/v1 and
-  /api/mcp -- reaches the same workspace counter.
+  Here the two RPCs are answered by a fake with the same rule -- the workspace's plan picks its entry
+  from the map the server sends (none for a legacy plan), used units plus live holds against it, a unit
+  added only by an answered settle -- so what is proved is the routes' half: when admission runs (before
+  retrieval), what is settled as answered (a 200 and nothing else), that the catalog map is sent and no
+  caller-chosen limit (WO-CAT-8), that an answer is remembered for replay only once its unit is recorded,
+  and that every surface -- the browser routes, /api/v1 and /api/mcp -- reaches the same workspace counter.
 */
 
 const fx = vi.hoisted(() => ({
@@ -66,7 +67,9 @@ import { POST as v1Search } from "../app/api/v1/collections/[id]/search/route";
 import { POST as v1WorldAsk } from "../app/api/v1/world/[id]/ask/route";
 import { POST as mcp } from "../app/api/mcp/route";
 import { BILLING_OFFERS } from "./billing-catalog";
-import { KQU_ALLOWANCE_EXHAUSTED, kquLimit, meterKnowledgeQuery } from "./kqu-meter";
+import { KQU_ALLOWANCE_EXHAUSTED, KQU_LIMITS, meterKnowledgeQuery } from "./kqu-meter";
+import * as askRoute from "../app/api/collections/[id]/ask/route";
+import * as searchRoute from "../app/api/collections/[id]/search/route";
 import { resetLocalWorkspaceOperationsForTest } from "./workspace-operation-guard";
 
 const WORKSPACE = "pilot-kqu01";
@@ -77,18 +80,37 @@ const WORLD = { manifestDigest: `sha256:${"d".repeat(64)}`, revision: 3, worldSt
 const paid = { kind: "api-key", keyId: "key-1", workspaceKey: WORKSPACE, userId: USER, accessSource: "paid",
   scopes: ["ask:read", "collections:download", "collections:read", "documents:read", "worlds:read"], authorizationRevision: 4, workspaceRole: "owner" };
 
-/* The two RPCs, with the migration's rule. Every call is recorded with its body. */
+/*
+  The two RPCs, with the migrations' rule (20261117150000, 20261117160000): the workspace's plan (no entry
+  in `plans` = no billing account, null = legacy) picks its limit from the map, a v2 plan with no entry is
+  a database error. The operation guard remembers a completed answer per request key and replays it.
+  Every call is recorded with its body.
+*/
 type Hold = { workspace: string; live: boolean };
 const db = { used: new Map<string, number>(), holds: new Map<string, Hold>(), calls: [] as Array<{ name: string; body: Record<string, unknown> }>,
-  failSettle: false, failAdmit: false };
+  plans: new Map<string, string | null>(), failSettle: false, failAdmit: false,
+  owners: new Map<string, unknown>(), remembered: new Map<string, unknown>() };
 let holdSeq = 0;
 function rpcAnswer(name: string, body: Record<string, unknown>): unknown {
   db.calls.push({ name, body });
-  if (name === "acquire_foundation_operation") return { code: "ACQUIRED", ownerToken: body.p_owner_token };
-  if (name === "finish_foundation_operation") return true;
+  if (name === "acquire_foundation_operation") {
+    if (body.p_request_key && db.remembered.has(body.p_request_key as string)) {
+      return { code: "REPLAY", ciphertext: db.remembered.get(body.p_request_key as string) };
+    }
+    db.owners.set(body.p_owner_token as string, body.p_request_key);
+    return { code: "ACQUIRED", ownerToken: body.p_owner_token };
+  }
+  if (name === "finish_foundation_operation") {
+    const key = db.owners.get(body.p_owner_token as string);
+    if (body.p_ciphertext && key) db.remembered.set(key as string, body.p_ciphertext);
+    return true;
+  }
   if (name === "admit_foundation_knowledge_query") {
     const workspace = body.p_workspace_key as string;
-    const limit = body.p_limit as number | null;
+    const plan = db.plans.get(workspace) ?? null;
+    const entry = plan === null ? null : (body.p_limits as Record<string, unknown> | null)?.[plan];
+    if (plan !== null && typeof entry !== "number") throw new Error("knowledge_query_meter_contract_invalid");
+    const limit = plan === null ? null : entry as number;
     const held = [...db.holds.values()].filter((hold) => hold.workspace === workspace && hold.live).length;
     if (limit !== null && (db.used.get(workspace) ?? 0) + held >= limit) return { status: "exhausted" };
     const id = `00000000-0000-4000-8000-${String(++holdSeq).padStart(12, "0")}`;
@@ -132,6 +154,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetLocalWorkspaceOperationsForTest();
   db.used.clear(); db.holds.clear(); db.calls.length = 0; db.failSettle = false; db.failAdmit = false;
+  db.plans.clear(); db.plans.set(WORKSPACE, "personal"); db.owners.clear(); db.remembered.clear();
   vi.stubEnv("TAVONEL_DURABLE_WORKSPACE_GUARDS", "1");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://store.test");
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "k".repeat(40));
@@ -146,7 +169,11 @@ beforeEach(() => {
       db.calls.push({ name, body: JSON.parse(String(init?.body)) });
       return new Response("{}", { status: 500 });
     }
-    return Response.json(rpcAnswer(name, JSON.parse(String(init?.body))));
+    try {
+      return Response.json(rpcAnswer(name, JSON.parse(String(init?.body))));
+    } catch (error) {
+      return Response.json({ message: (error as Error).message }, { status: 400 });
+    }
   }));
   fx.authorize.mockResolvedValue({ ok: true, principal: paid });
   fx.revalidate.mockImplementation(async (_request, expected) => ({ ok: true, principal: expected }));
@@ -175,7 +202,9 @@ describe("the allowance (Personal: 1,000 a month)", () => {
     expect(thousandth.status).toBe(200);
     expect(db.used.get(WORKSPACE)).toBe(1000);
     expect(fx.pipeline).toHaveBeenCalledTimes(1);
-    expect(calls("admit_foundation_knowledge_query")[0]!.body).toEqual({ p_workspace_key: WORKSPACE, p_limit: BILLING_OFFERS.personal.included.kqu });
+    // The catalog map, never a caller-chosen limit: the database applies the workspace's entry.
+    expect(calls("admit_foundation_knowledge_query")[0]!.body).toEqual({ p_workspace_key: WORKSPACE, p_limits: KQU_LIMITS });
+    expect(KQU_LIMITS.personal).toBe(BILLING_OFFERS.personal.included.kqu);
 
     fx.pipeline.mockClear();
     const refused = await ask(askRequest(), params());
@@ -197,11 +226,24 @@ describe("the allowance (Personal: 1,000 a month)", () => {
     expect(fx.indexState).not.toHaveBeenCalled();
   });
 
-  it("takes each v2 plan's allowance from the catalog, by plan_code and not by the access level", async () => {
-    for (const code of ["personal", "developer", "team", "business"] as const) {
-      fx.billing.mockResolvedValueOnce({ ok: true, account: { accessPlan: BILLING_OFFERS[code].accessLevel, planCode: code } });
-      expect(await kquLimit(paid as never)).toEqual({ ok: true, limit: BILLING_OFFERS[code].included.kqu });
-    }
+  it("sends every v2 plan's allowance from the catalog, and none for a retired plan", () => {
+    expect(KQU_LIMITS).toStrictEqual(Object.fromEntries((["personal", "developer", "team", "business"] as const)
+      .map((code) => [code, BILLING_OFFERS[code].included.kqu])));
+    expect(KQU_LIMITS).not.toHaveProperty("observer_access");
+    expect(KQU_LIMITS).not.toHaveProperty("studio_access");
+  });
+
+  it("two users of one workspace meet one limit: the workspace's, whatever each caller's own account holds (WO-CAT-8)", async () => {
+    db.used.set(WORKSPACE, 999);
+    const member = { ...paid, userId: "7a0a1f8e-3b5c-4d2e-9f10-0123456789ab", workspaceRole: "member" };
+    // The member's own account would have said "legacy, uncapped"; nothing reads it any more.
+    fx.billing.mockResolvedValue({ ok: true, account: { accessPlan: "observer_access", planCode: null } });
+    expect((await ask(askRequest(), params())).status).toBe(200);
+    fx.authorize.mockResolvedValueOnce({ ok: true, principal: member });
+    expect((await search(searchRequest(), params())).status).toBe(402);
+    expect(calls("admit_foundation_knowledge_query").map((call) => call.body)).toEqual([
+      { p_workspace_key: WORKSPACE, p_limits: KQU_LIMITS }, { p_workspace_key: WORKSPACE, p_limits: KQU_LIMITS }]);
+    expect(fx.billing).not.toHaveBeenCalled();
   });
 });
 
@@ -237,20 +279,21 @@ describe("what is never counted", () => {
 });
 
 describe("plans that are counted and never refused", () => {
-  it("a legacy plan (plan_code null) passes a null limit and is counted past every v2 allowance", async () => {
-    fx.billing.mockResolvedValue({ ok: true, account: { accessPlan: "observer_access", planCode: null } });
+  it("a legacy workspace (plan_code null) is counted past every v2 allowance", async () => {
+    db.plans.set(WORKSPACE, null);
     db.used.set(WORKSPACE, 60_000);
     expect((await ask(askRequest(), params())).status).toBe(200);
-    expect(calls("admit_foundation_knowledge_query")[0]!.body.p_limit).toBeNull();
+    expect(calls("admit_foundation_knowledge_query")[0]!.body.p_limits).toEqual(KQU_LIMITS);
     expect(db.used.get(WORKSPACE)).toBe(60_001);
   });
 
-  it("an owner grant and the free evaluation are counted with no limit and no billing read", async () => {
+  it("an owner grant and the free evaluation send the same map and read no billing: the workspace decides", async () => {
+    db.plans.delete(WORKSPACE);
     for (const accessSource of ["owner", "trial"] as const) {
       fx.authorize.mockResolvedValueOnce({ ok: true, principal: { ...paid, accessSource } });
       expect((await search(searchRequest(), params())).status).toBe(200);
     }
-    expect(calls("admit_foundation_knowledge_query").map((call) => call.body.p_limit)).toEqual([null, null]);
+    expect(calls("admit_foundation_knowledge_query").map((call) => call.body.p_limits)).toEqual([KQU_LIMITS, KQU_LIMITS]);
     expect(fx.billing).not.toHaveBeenCalled();
     expect(db.used.get(WORKSPACE)).toBe(2);
   });
@@ -290,20 +333,22 @@ describe("fails closed", () => {
     expect(fx.pipeline).not.toHaveBeenCalled();
   });
 
-  it("an unreadable plan, an unknown plan code or a principal with no access source refuses with 503", async () => {
-    fx.billing.mockResolvedValueOnce({ ok: false, code: "BILLING_STORE_NOT_CONFIGURED" });
-    expect((await search(searchRequest(), params())).status).toBe(503);
-    fx.billing.mockResolvedValueOnce({ ok: true, account: { accessPlan: "observer_access", planCode: "platinum" } });
-    expect((await search(searchRequest(), params())).status).toBe(503);
-    fx.authorize.mockResolvedValueOnce({ ok: true, principal: { ...paid, accessSource: undefined } });
-    expect((await search(searchRequest(), params())).status).toBe(503);
+  it("a workspace plan the map has no entry for is refused by the database: 503 before retrieval, never uncapped", async () => {
+    db.plans.set(WORKSPACE, "platinum");
+    expect([(await search(searchRequest(), params())).status, (await ask(askRequest(), params())).status]).toEqual([503, 503]);
     expect(fx.pipeline).not.toHaveBeenCalled();
+    expect(db.holds.size).toBe(0);
   });
 
   it("an answer whose unit cannot be recorded is withheld, not released unmetered", async () => {
     db.failSettle = true;
     const response = await search(searchRequest(), params());
     expect([response.status, await response.json()]).toEqual([503, { code: "READ_FAILED" }]);
+  });
+
+  it("search has the same platform bound as ask (WO-CAT-8: a unit's hold outlives neither)", () => {
+    expect(searchRoute.maxDuration).toBe(askRoute.maxDuration);
+    expect(askRoute.maxDuration).toBe(60);
   });
 
   it("outside production and the durable opt-in the meter makes no call at all (the cost guard's switch)", async () => {
@@ -314,5 +359,46 @@ describe("fails closed", () => {
     expect((await meterKnowledgeQuery(run, { VERCEL_ENV: "preview", TAVONEL_DURABLE_WORKSPACE_GUARDS: "0" })).status).toBe(200);
     expect(db.calls).toHaveLength(0);
     expect(fx.billing).not.toHaveBeenCalled();
+  });
+});
+
+describe("an answer remembered for replay was counted (WO-CAT-8)", () => {
+  const keyed = (key: string) => {
+    const request = askRequest();
+    request.headers.set("idempotency-key", key);
+    return request;
+  };
+
+  it("a unit that cannot be recorded leaves nothing to replay: the retry with the same key is counted", async () => {
+    db.failSettle = true;
+    const first = await ask(keyed("kqu-replay-key-0001"), params());
+    expect([first.status, await first.json()]).toEqual([503, { code: "READ_FAILED" }]);
+    expect(db.remembered.size).toBe(0);
+    db.failSettle = false;
+    const retry = await ask(keyed("kqu-replay-key-0001"), params());
+    expect(retry.status).toBe(200);
+    expect(retry.headers.get("X-Tavonel-Idempotent-Replay")).toBeNull();
+    expect(db.used.get(WORKSPACE)).toBe(1);
+    expect(fx.pipeline).toHaveBeenCalledTimes(2);
+  });
+
+  it("a late refusal after the answer was remembered keeps its unit: the retry replays one counted answer", async () => {
+    // Allowed at the in-flight re-check, refused at release (the second authorization read).
+    fx.revalidate.mockImplementationOnce(async (_request, expected) => ({ ok: true, principal: expected }))
+      .mockResolvedValueOnce({ ok: false, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403 });
+    expect((await ask(keyed("kqu-replay-key-0002"), params())).status).toBe(403);
+    expect(db.used.get(WORKSPACE)).toBe(1);
+    const retry = await ask(keyed("kqu-replay-key-0002"), params());
+    expect([retry.status, retry.headers.get("X-Tavonel-Idempotent-Replay")]).toEqual([200, "true"]);
+    expect(db.used.get(WORKSPACE)).toBe(1);
+    expect(fx.pipeline).toHaveBeenCalledTimes(1);
+  });
+
+  it("a request without a key is still counted only when it answers 200", async () => {
+    fx.revalidate.mockImplementationOnce(async (_request, expected) => ({ ok: true, principal: expected }))
+      .mockResolvedValueOnce({ ok: false, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403 });
+    expect((await ask(askRequest(), params())).status).toBe(403);
+    expect(db.used.get(WORKSPACE) ?? 0).toBe(0);
+    expect(db.holds.size).toBe(0);
   });
 });
