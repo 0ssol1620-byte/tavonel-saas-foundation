@@ -271,8 +271,12 @@ test("is reachable from the footer and /integrations, and no bar item claims to 
   await expect(bar.locator('a[href="/pricing"]')).toHaveCount(1);
   await expect(items.and(page.locator('[href="/integrations"]'))).toHaveCount(0);
   await expect(items.and(page.locator('[href="/sources"]'))).toHaveCount(0);
-  // NAV PANELS 2026-11-09: /sources is a row of the panel behind the bar (V34: More), not a bar item.
-  await expect.soft(page.locator(`${HEADER} nav[aria-label="All pages"] a[href="/sources"]`)).toHaveCount(1);
+  /*
+    NAV PANELS 2026-11-09 put /sources in the panel behind the bar. V34 More carries live registry routes
+    only (D33 §3.5, held by lib/site-nav-model.test.ts and lib/v34/nav.test.ts), and /sources is a retained
+    route, so its one step is the footer row (WO-CI-5a D7) and More does not list it.
+  */
+  await expect(page.locator(`${HEADER} nav[aria-label="All pages"] a[href="/sources"]`)).toHaveCount(0);
   /*
     And none of the five is marked current here. `customerNavOwns` returns false for every bar
     href on this path; a bar that highlighted one anyway would be the false-location defect the
@@ -281,7 +285,7 @@ test("is reachable from the footer and /integrations, and no bar item claims to 
   await expect(bar.locator("a[aria-current]")).toHaveCount(0);
 
   // The footer, which needs no menu at all, and the URL that did not move.
-  await expect.soft(page.locator('[data-v34-site] > footer a[href="/sources"]')).toHaveCount(1);
+  await expect(page.locator('[data-v34-site] > footer a[href="/sources"]')).toHaveCount(1);
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://tavonel.com/sources");
 
   // Phone: the same four section links, with Pricing still available in the header.
@@ -296,7 +300,9 @@ test("is reachable from the footer and /integrations, and no bar item claims to 
     await expect(sheet.locator(`:scope > ul > li > a[href="${item.href}"]`)).toHaveCount(1);
   }
   await expect(sheet.locator(":scope > ul > li > a[aria-current]")).toHaveCount(0);
-  await expect.soft(sheet.locator('details a[href="/sources"]')).toHaveCount(1);
+  // The drawer's groups are the More groups (D33 §3.5, as above); the footer row is the phone's one step too.
+  await expect(sheet.locator('details a[href="/sources"]')).toHaveCount(0);
+  await expect(page.locator('[data-v34-site] > footer a[href="/sources"]')).toHaveCount(1);
 
   const sitemap = await page.request.get("/sitemap.xml");
   expect(await sitemap.text()).toContain("https://tavonel.com/sources");

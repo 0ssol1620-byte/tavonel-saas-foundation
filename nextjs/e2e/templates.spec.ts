@@ -1,5 +1,4 @@
 import { expect, test, type Page } from "@playwright/test";
-import { v34RouteByPath } from "../lib/v34/routes";
 import { measureOverflow } from "./support/overflow";
 
 /*
@@ -28,11 +27,11 @@ import { measureOverflow } from "./support/overflow";
 
   V34 (WO-CI-5a). Every page renders inside the V34 page root (`[data-v34-site]`, components/v34/shell/
   v34-page.tsx), which is where a retained page declares its template. A route the program moved answers
-  308 to its V34 page (`V34_REDIRECTS`), and that page is the one read. A V34 registry page
-  (lib/v34/routes.ts) is declared by the registry rather than by a legacy template, so it may declare
-  none; if it declares one, it is the inventory's. Every other page still declares the inventory's
-  template once. The other rules -- paper behind the H1, no internal ↗, a marker on every summary, no
-  overflow -- are unchanged and hold on both kinds of page.
+  308 to its V34 page (`V34_REDIRECTS`), and that page is the one read. Every page, a V34 registry page
+  included, declares the inventory's template once on the root that holds <main>. The V34 registry
+  (lib/v34/routes.ts) has no template field, so a registry page declares none and fails here: that is
+  the filed defect (WO-CI-5a receipt, D18), not a page this spec lets through. The other rules -- paper
+  behind the H1, no internal ↗, a marker on every summary, no overflow -- are unchanged.
 */
 
 const TEMPLATES = {
@@ -148,14 +147,7 @@ test.describe("page templates (UX-L7)", () => {
           const at = `${route} @${width}`;
           const m = await page.evaluate(read);
           const landed = new URL(page.url()).pathname;
-          if (v34RouteByPath(landed)) {
-            // A V34 registry page: the V34 root holds <main>, and any legacy declaration is the inventory's.
-            expect.soft(await page.locator("[data-v34-site] > main").count(), `${at} (V34 page ${landed}): the V34 root holds main`).toBe(1);
-            expect.soft(m.roots.length, `${at} (V34 page ${landed}): data-template roots`).toBeLessThanOrEqual(1);
-            expect.soft(m.roots.filter((root) => root.template !== template || !root.holdsMain), `${at} (V34 page ${landed}): data-template roots`).toEqual([]);
-          } else {
-            expect.soft(m.roots, `${at}: data-template roots`).toEqual([expect.objectContaining({ template, holdsMain: true })]);
-          }
+          expect.soft(m.roots, `${at} (landed on ${landed}): data-template roots`).toEqual([expect.objectContaining({ template, holdsMain: true })]);
           expect.soft(m.ground, `${at}: no ground behind the H1`).not.toBeNull();
           if (m.ground) expect.soft(m.ground.luminance, `${at}: H1 ground ${m.ground.colour} on ${m.ground.from} is not paper`).toBeGreaterThanOrEqual(PAPER_FLOOR);
           expect.soft(m.internalArrows, `${at}: internal links carrying ↗`).toEqual([]);

@@ -30,7 +30,9 @@ import { expect, test, type Page } from "@playwright/test";
   roles instead -- the size of one of `--v34-h1-sub` / `--v34-h1-split` as resolved on the page
   (components/v34/tokens.module.css; the Hero's sub and split variants and the article layout set
   their H1 from these), at the V34 title weight 500 and in the one face. Equal-but-wrong still
-  fails: each H1 is compared to a token's resolved value, not only to its neighbours.
+  fails: each H1 is compared to a token's resolved value, not only to its neighbours. And a template
+  has ONE H1 role: V34 pages of one template that use both roles fail, and the mix is a filed defect
+  (WO-CI-5a receipt, D19), not something either role excuses.
 */
 /** The V34 heading weight (components/v34/ui/hero.module.css and article-layout.module.css `.title`). */
 const V34_TITLE_WEIGHT = "500";
@@ -198,6 +200,12 @@ function v34Drift(readings: { route: string; h1: Signature | null; roles: string
     if (!roles.includes(h1.size)) drift.push(`${route}: H1 size ${h1.size}, expected one of the V34 roles ${roles.join(" / ") || "(no V34 shell)"}`);
     if (h1.weight !== V34_TITLE_WEIGHT) drift.push(`${route}: H1 weight ${h1.weight}, expected ${V34_TITLE_WEIGHT}`);
     if (h1.face !== face) drift.push(`${route}: H1 face ${h1.face}, expected ${face}`);
+  }
+  // One role per template: every V34 H1 of the template at one size.
+  const bySize = new Map<string, string[]>();
+  for (const { route, h1 } of readings) if (h1) bySize.set(h1.size, [...(bySize.get(h1.size) ?? []), route]);
+  if (bySize.size > 1) {
+    drift.push(`one H1 role per template, V34 pages use ${bySize.size}: ${[...bySize].map(([size, routes]) => `${size} (${routes.join(", ")})`).join(" / ")}`);
   }
   return drift;
 }

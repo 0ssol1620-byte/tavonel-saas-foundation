@@ -1,6 +1,7 @@
 import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { existsSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { HELD_REASON, HELD_SHOWN } from "./support/held-feature";
 
 /*
   Film loading states on the Release 2 Home (main dbe22b1e, PR #149).
@@ -67,6 +68,7 @@ const isPoster = (url: string) => POSTER.test(new URL(url).pathname);
 for (const locale of LOCALES) {
   for (const motion of MOTION_PREFERENCES) {
     test(`loads the poster first and the film on request in ${locale.language} with ${motion.name}`, async ({ page }, testInfo) => {
+      test.skip(!HELD_SHOWN, HELD_REASON);
       test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
       test.skip(testInfo.project.name !== "390", "run the focused media contract once at the phone viewport");
       await page.emulateMedia({ reducedMotion: motion.preference });
@@ -244,6 +246,7 @@ async function posterContract(page: Page, engine: string) {
 }
 
 test("serves the re-cut posters as AVIF within 140,000 bytes, with a WebP fallback, and bars that cover the eyebrow", async ({ page, playwright, baseURL, browserName }, testInfo) => {
+  test.skip(!HELD_SHOWN, HELD_REASON);
   test.skip(testInfo.project.name !== "390", "run the poster contract once, at the phone viewport");
   // While the still stands in below 900px the phone fetches no poster at all (an empty <source>), so the phone poster contract waits for the film.
   test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
@@ -291,6 +294,7 @@ test("while the still stands in, a phone loads the still and no film bytes", asy
 */
 for (const motion of MOTION_PREFERENCES) {
   test(`the hero film loads its first poster first, at priority, and its phone cut only with motion (${motion.name})`, async ({ page, browserName }, testInfo) => {
+    test.skip(!HELD_SHOWN, HELD_REASON);
     test.skip(testInfo.project.name !== "390", "run the hero's media contract once at the phone viewport");
     await page.emulateMedia({ reducedMotion: motion.preference });
     const requests: string[] = [];

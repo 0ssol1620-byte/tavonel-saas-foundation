@@ -86,11 +86,15 @@
     container here, so a retained body starts on the same edge as the V34 header above it -- R1, one
     container (e2e/site-alignment.spec.ts). Batch E re-skins those bodies; until then this is where
     their container comes from inside the V34 frame. Outside the wrapper nothing changes.
+
+    Only the legacy chrome names are re-pointed. A `--tv-*` name is never declared here: app/tavonel.css
+    is the one sheet that declares them, so no later copy can shadow a brand token
+    (lib/brand-tokens.test.ts). A retained body that sizes itself from `--tv-page-w` is a route-body
+    defect in the WO-CI-5a receipt, not something this wrapper papers over.
   */
   --chrome-measure: var(--v34-max);
   --chrome-gutter: var(--v34-gutter);
   --chrome-edge: max(var(--v34-gutter), calc((100% - var(--v34-max)) / 2));
-  --tv-page-w: var(--v34-shell);
   --v34-radius-pill: 100px;
   --v34-radius-panel: 8px;
   --v34-radius-art: 6px;

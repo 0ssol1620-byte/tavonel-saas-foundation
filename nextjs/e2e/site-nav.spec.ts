@@ -83,9 +83,8 @@ test.use({ trace: "off" });
 */
 const TASKS = [
   {
-    // V34: /sources is not a footer row; the Compiler page (a footer row) links it from its body.
     question: "which files can I put in, and what is preserved?",
-    trail: ["/compiler", "/sources"],
+    trail: ["/sources"],
   },
   {
     question: "is there an example of answering a real question from my own manual?",
@@ -211,6 +210,9 @@ const DESKTOP: Scenario[] = [
         { path: "/connect", owner: "/connect", current: "page" },
         { path: "/journal/compiler", owner: "/journal", current: "true" },
         { path: "/solutions/knowledge-graph", owner: "/solutions", current: "true" },
+        // WO-CI-5a D3: a retained page and the hand-assembled /pricing hand the bar their path on the server.
+        { path: "/solutions/source-grounded-assistants", owner: "/solutions", current: "true" },
+        { path: "/pricing", owner: "/pricing", current: "page" },
       ]) {
         await page.goto(entry.path);
         // The bar item, not the More panel row with the same href.
@@ -339,7 +341,7 @@ const PHONE: Scenario[] = [
       await second.locator(":scope > summary").click();
       await expect(second).toHaveAttribute("open", "");
       await expect(second.locator("a").first()).toBeVisible();
-      await expect.soft(first, "opening a second group closes the first").not.toHaveAttribute("open", "");
+      await expect(first, "opening a second group closes the first").not.toHaveAttribute("open", "");
       // Sign in is the drawer's own row; the header row is the wordmark and the drawer trigger only.
       await expect(page.locator(SHEET).getByRole("link", { name: "Sign in", exact: true })).toHaveCount(1);
       await expect(page.locator(`${HEADER} > div > :not(dialog)`).getByRole("link", { name: "Sign in", exact: true })).toBeHidden();

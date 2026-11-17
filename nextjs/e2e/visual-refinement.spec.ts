@@ -2,13 +2,14 @@ import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode
 import { test, expect } from "@playwright/test";
 import { activationPolicy } from "../lib/activation-policy";
 import { EXPLORE_CTA } from "../lib/site-navigation";
+import { HELD_REASON, HELD_SHOWN } from "./support/held-feature";
 
 /*
   V34 (WO-CI-5a): the chrome is the V34 shell (`[data-v34-header]`, the page's contentinfo footer), Home is
   the V34 page (its H1 is `#v34-title`, its hero a `section[aria-labelledby="v34-title"]` whose first
   child is the shell-width column), and /product answers 308 to /platform. Promises are unchanged; the
   four-stage hero film is not on V34 Home (/film is held, ADR D01 A9), so its half of the edge test is
-  its own test and fails while the film is held -- reported, not removed.
+  its own test and runs when the server shows held work (e2e/support/held-feature.ts) -- not removed.
 */
 const HEADER = "[data-v34-header]";
 const FOOTER = "[data-v34-site] > footer";
@@ -71,6 +72,7 @@ for (const path of ["/"]) {
   });
 
   test(`${path} keeps the opened walkthrough inside the shared edge`, async ({ page }, testInfo) => {
+    test.skip(!HELD_SHOWN, HELD_REASON);
     test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(path);
@@ -141,9 +143,15 @@ test("the first developer request remains keyboard reachable on a narrow screen"
     strip's roving tabindex has no counterpart. The contract it held stays: every sample is in the
     HTML with code in it, each sits in a named region a keyboard reaches (one Tab stop each, so a
     long line scrolls inside it rather than widening the page), and the first one takes focus.
+    The count is pinned, not floored: V34 /developers renders exactly the four first-request samples
+    (`FIRST_CALL_SNIPPETS`, cURL / TypeScript / Python / MCP, lib/developer-snippets.test.ts), as the tab
+    group had four panels. A code block is a scroll region holding a `pre`; the package table's scroll
+    region is not one.
   */
-  const samples = page.locator('main [role="region"][data-v34-scroll]');
-  expect(await samples.count(), "a code sample on /developers").toBeGreaterThanOrEqual(1);
+  const samples = page.locator('main [role="region"][data-v34-scroll]:has(> pre)');
+  await expect(samples, "the four first-request samples on /developers").toHaveCount(4);
+  expect(await samples.evaluateAll(regions => regions.map(region => region.getAttribute("aria-label"))))
+    .toEqual(["cURL", "TypeScript", "Python", "MCP"].map(language => `First request in ${language}`));
   for (const code of await samples.locator("pre").allTextContents()) {
     expect(code.trim().length).toBeGreaterThan(0);
   }

@@ -372,6 +372,9 @@ test.describe("Home keeps main's header and footer colours", () => {
     const footer = page.locator(FOOTER);
     await expect(footer).toHaveCSS("background-color", FOREST);
     await expect(footer).toHaveCSS("color", ON_DARK);
+    // The footer's links paint the forest surface's text token (`.link { color: var(--v34-fg) }`, which the
+    // forest surface sets to --v34-on-dark), read from the tokens module like every colour here.
+    await expect(footer.locator("nav a").first()).toHaveCSS("color", ON_DARK);
     const header = page.locator(HEADER);
     await expect(header).toHaveCSS("background-color", PAPER);
     await expect(header).toHaveCSS("color", INK);
