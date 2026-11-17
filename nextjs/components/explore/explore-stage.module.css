@@ -11,6 +11,39 @@
   min-height: 100vh;
   color: var(--text-hi);
   background: var(--ground);
+  /*
+    WO-CI-6B. The stage inherited `dark` from the legacy `:root` (app/tavonel.css, BA-254). The V34
+    shell on this page carries the token wrapper, and `html:has(.site)` (components/v34/tokens.module.css)
+    turns the root light for the overscroll bar, which every element below would inherit: native
+    controls, scrollbars and autofill in the workbench would render light on its dark ground. Stated
+    here, it is the value the stage always had, whatever the root says.
+  */
+  color-scheme: dark;
+  /*
+    WO-CI-6C (E2). The V34 site header sits above the stage and stays on screen (`position: sticky`),
+    so every size here that is "the viewport minus the stage's chrome" loses its height too. The shell
+    declares that height (`--v34-header-h`, components/v34/tokens.module.css) on `.site`, and the stage
+    is deliberately outside `.site` (M2), so it cannot inherit it. This is the one place the stage
+    states it, measured in a browser: the bar is `--v34-header-h` plus its 1px rule, 67px above 760px
+    and 61px at 760px and below. `lib/v34/retained-shell.test.ts` derives both values and the
+    breakpoint from the shell's own stylesheets and fails if they drift.
+  */
+  --v34-bar: 67px;
+}
+@media (max-width: 760px) {
+  .page { --v34-bar: 61px; }
+}
+
+/*
+  WO-CI-6C. Before the V34 shell, the document's root was dark (app/tavonel.css, BA-254) with no
+  ground of its own, so the page scrollbar was dark and the overscroll showed the body's near-black.
+  The shell's `html:has(.site)` turns the root light and paper-coloured for V34 pages; on this one
+  document the root keeps what it had before the shell (lead decision, WO-CI-6C). One more type
+  selector than the shell's rule, so it wins without depending on stylesheet order.
+*/
+:global(html):has(main.page) {
+  color-scheme: dark;
+  background: transparent;
 }
 
 /* ------------------------------------------------------------------ header */
@@ -86,12 +119,31 @@
   left a phone reader at the end of the strongest proof page with no way to Pricing or to start. Product
   folds, Pricing and the access action stay. B-09 allows two header rows below 821px and no more, so at
   the narrowest phones the access action folds too (the closing scene still carries it) and Pricing stays.
+
+  WO-CI-6B: the fold stays at 380px, so the access action stays on a 390-430px phone (the conversion
+  decision). The 15px overflow it caused at 390px is fixed where it came from -- the 820px block below
+  lets the action row wrap instead of growing past the viewport -- not by folding the action away.
 */
 @media (max-width: 860px) {
   .siteLinks a:not([data-phone]) { display: none; }
 }
 @media (max-width: 380px) {
   .siteLinks a[data-phone="start"] { display: none; }
+  /*
+    WO-CI-6C (E3). The narrowest phones get a tighter gap between the header's controls, so the
+    actions row keeps to one line there and the find input stays above the fold at 320px.
+  */
+  .headerActions,
+  .siteLinks { column-gap: 6px; }
+}
+
+/*
+  WO-CI-6C (E1). Under the V34 header, the header's own wordmark is the way back to the site, so on a
+  phone the stage does not draw a second exit beside it: B-09's two header rows, with Pricing,
+  Technical details and, above 380px, the access action kept. Above 430px the link stays, as it was.
+*/
+@media (max-width: 430px) {
+  :global([data-v34-site]) ~ .page .close { display: none; }
 }
 
 /*
@@ -184,6 +236,20 @@
   could read, and two planes of text competing for the same pixels. The entry shows the entry;
   ENTER WORLD shows the World, and the act's own opening is what that transition was always for.
 */
+
+/*
+  WO-CI-6C (E2). The World act's field, where it is drawn as a composition (from 1101px; below that
+  world-visual.module.css lays the objects out as cards or a list), is as wide as the stage allows
+  only while its whole 16:10 height still fits on screen under the sticky bar: the reader sees every
+  object's label without scrolling. The 169px is the stage chrome above the field at these widths,
+  measured: the stage header (64), the stage's top padding (18), the rail and its rule (46), the gap
+  (22) and the act's padding and rule (19). Before the shell the field started 67px higher; on a 1440x900 screen
+  it now gives up 197px of width instead of pushing its last row of labels under the fold.
+  world-visual's 560px floor still holds on a short screen, as it did before.
+*/
+@media (min-width: 1101px) {
+  .worldAct > [role="group"] { width: min(100%, calc((100vh - var(--v34-bar) - 169px) * 1.6)); }
+}
 
 .worldFoot {
   display: flex;
@@ -302,8 +368,8 @@
 */
 .objectPane,
 .sourcePane {
-  max-height: calc(100vh - 210px);
-  max-height: calc(100dvh - 210px);
+  max-height: calc(100vh - 210px - var(--v34-bar));
+  max-height: calc(100dvh - 210px - var(--v34-bar));
 }
 
 .objectPane {
@@ -1191,9 +1257,19 @@
   the Evidence act is on screen for the step it is in.
 */
 @media (max-width: 820px) {
-  .header { grid-template-columns: auto 1fr; row-gap: 8px; padding-bottom: 8px; }
-  .crumb { justify-content: flex-end; }
-  .headerActions { grid-column: 1 / -1; justify-content: flex-start; }
+  /*
+    WO-CI-6B: below 821px the header is rows that reflow, never a row wider than the viewport. It
+    was a grid whose second row was a no-wrap flex line of no-wrap labels, so its width was the sum
+    of its labels: 15px past a 390px viewport with "Request access", 31px with a longer label, 96px at
+    200% zoom on a 412px phone, and every fold below was a guess at one label's width. Now each line
+    wraps, so a longer label, a larger zoom or a narrower phone costs a row instead of overflowing.
+    The crumb takes a zero basis so it shares the wordmark's row while its longest word fits there
+    and drops below it only when it does not.
+  */
+  .header { display: flex; flex-wrap: wrap; justify-content: space-between; row-gap: 8px; padding-bottom: 8px; }
+  .crumb { flex: 1 1 0; flex-wrap: wrap; justify-content: flex-end; }
+  .headerActions { flex-basis: 100%; flex-wrap: wrap; justify-content: flex-start; }
+  .siteLinks { flex-wrap: wrap; }
 
   .evidenceAct { grid-template-columns: 1fr; }
 
@@ -1208,8 +1284,8 @@
   */
   .objectPane,
   .sourcePane {
-    max-height: calc(100vh - 150px);
-    max-height: calc(100dvh - 150px);
+    max-height: calc(100vh - 150px - var(--v34-bar));
+    max-height: calc(100dvh - 150px - var(--v34-bar));
   }
 
   /*
@@ -1282,25 +1358,4 @@
   .askBar:hover { color: var(--text-hi); }
   .askRegions button:hover { color: var(--text-hi); border-color: var(--verified); }
   .nextSourceNote a:hover { color: var(--text-hi); }
-}
-
-/* ------------------------------------------------------------------ footer */
-
-/*
-  chrome-02 / chrome-03 on /explore.
-
-  The site footer arrived under a stage whose chrome edge is this file's `clamp(14px, 3vw, 40px)`,
-  not the site's `--gutter`: at 1440 the header wordmark sat at x = 40 and the footer's at x = 70
-  (the shared `.shell`'s 1360px cap plus a 30px gutter), and at 412 they were 14 and 16. /explore
-  is the one route with both an instrument header and site chrome, so the two lockups have to agree
-  on one edge. UX-L2 (UX-PLAN-2026-10-17 R1): that edge is the site's one container now -- the stage,
-  its header and this footer all sit on it, as every other page's do.
-
-  Scoped through this wrapper rather than through `footer.site .shell`, which is shared chrome:
-  the rule reaches only the footer this page renders, and it holds whatever the shared cap becomes.
-*/
-.siteFooter :global(footer.site .shell) {
-  width: var(--tv-page-w);
-  max-width: none;
-  padding-inline: 0;
 }
