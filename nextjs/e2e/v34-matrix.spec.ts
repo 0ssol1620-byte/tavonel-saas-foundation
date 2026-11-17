@@ -40,7 +40,8 @@ import { assertWorldAgreement, forceWorldMode, readWorldState, staticSvgCounts, 
 import { checkSeo, checkSeoUnique, fetchSeo, fetchSitemapPaths, type SeoFacts } from "./support/v34-seo";
 import { flushReceipt, qaOut, record, screenshotPath, writeScreenshot } from "./support/v34-receipt";
 
-type RouteRow = { path: string; release: "live" | "held" };
+/* `rootScheme`: the workbench on /explore keeps its dark root under the V34 header (WO-CI-6C); every V34 body is light. */
+type RouteRow = { path: string; release: "live" | "held"; rootScheme?: "dark" };
 
 /*
   Lane F-lib builds "@/lib/v34/routes"; until integration the import is allowed to fail so this
@@ -84,7 +85,7 @@ if (releaseFilter !== null && releaseFilter !== "live" && releaseFilter !== "hel
 const V34_BODIES_OUTSIDE_REGISTRY: RouteRow[] = [
   { path: "/research/program", release: "live" },
   { path: "/evaluation", release: "live" },
-  { path: "/explore", release: "live" },
+  { path: "/explore", release: "live", rootScheme: "dark" },
 ];
 
 const registryRoutes = await loadRoutes();
@@ -134,7 +135,7 @@ if (routes.length === 0) {
   });
 }
 
-for (const { path: route, release } of routes) {
+for (const { path: route, release, rootScheme = "light" } of routes) {
   const heldInProduction = release === "held" && serverMode === "production";
 
   /* Default-state passes at every width, in light and dark OS appearance. */
@@ -150,7 +151,7 @@ for (const { path: route, release } of routes) {
           const violations = await collect({
             layout: () => layoutPass(page),
             text: () => textStructurePass(page),
-            scheme: () => colorSchemePass(page),
+            scheme: () => colorSchemePass(page, rootScheme),
           });
           const out = qaOut();
           let screenshot: string | undefined;

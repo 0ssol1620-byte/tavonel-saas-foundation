@@ -90,7 +90,9 @@
   /*
     WO-CI-14: the edge is a boundary a visitor needs to see (WCAG 1.4.11, >= 3:1). --hairline-hi here is
     rgb(21 25 29 / 0.22), 1.6:1 on the white card; --tv-ink-muted (#4c545d) is the answers' own edge, 7.68:1 on
-    the card and above 3:1 on either page ground. One edge colour for the card and its two answers.
+    the card and above 3:1 on the light page grounds (7.20:1 at 1920px after a 300px scroll, where the repository
+    test measures). Over Home's dark hero ground at scroll 0, rgb(6 16 13), it measures 2.51:1 (the old edge was
+    1.02:1 there). One edge colour for the card and its two answers.
   */
   border: 1px solid var(--tv-ink-muted);
   border-radius: 8px;
