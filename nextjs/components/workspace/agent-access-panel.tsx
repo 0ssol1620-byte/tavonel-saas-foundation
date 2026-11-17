@@ -138,7 +138,7 @@ export default function AgentAccessPanel() {
   return (
     <section className={styles.panel} aria-labelledby="agent-access-title">
       <h3 id="agent-access-title">Agent access</h3>
-      <p className={styles.muted}>Connect an agent that suggests changes. Each suggestion waits in Changes until it is confirmed in a signed-in TAVONEL session.</p>
+      <p className={styles.muted}>Connect an agent that suggests changes.</p>
       {notice ? <p className={styles.problem} role="status">{notice}</p> : null}
       <TokenReveal token={token} onClose={() => dispatch({ type: "close" })} />
       <form className={styles.form} onSubmit={create}>
