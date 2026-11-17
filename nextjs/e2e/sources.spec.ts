@@ -247,8 +247,9 @@ test("keeps the header's primary action reachable at the width the section row a
   its own persistent header action.
 
   So what is asserted is what the resolution actually protects, under the IA that exists: the
-  page is one click from the footer's Product group with no menu open at all, no bar item claims
-  to own it, and its URL did not move. What the resolution forbade is still forbidden and still
+  page is one click from the footer's Product group with no menu open at all (on a phone the group
+  is a disclosure: open it, then the link -- WO-CI-22), no bar item claims to own it, and its URL
+  did not move. What the resolution forbade is still forbidden and still
   checked -- it is not a /resources tile and it is not two clicks in from a hub.
 
   NOT ASSERTED, deliberately: `lib/site-navigation.ts` also says /sources stays reachable "from
@@ -286,6 +287,8 @@ test("is reachable from the footer and /integrations, and no bar item claims to 
 
   // The footer, which needs no menu at all, and the URL that did not move.
   await expect(page.locator('[data-v34-site] > footer a[href="/sources"]')).toHaveCount(1);
+  // Wide, the row is painted with no disclosure to open (WO-CI-22).
+  await expect(page.locator('[data-v34-site] > footer a[href="/sources"]')).toBeVisible();
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://tavonel.com/sources");
 
   // Phone: the same four section links, with Pricing still available in the header.
@@ -302,7 +305,23 @@ test("is reachable from the footer and /integrations, and no bar item claims to 
   await expect(sheet.locator(":scope > ul > li > a[aria-current]")).toHaveCount(0);
   // The drawer's groups are the More groups (D33 §3.5, as above); the footer row is the phone's one step too.
   await expect(sheet.locator('details a[href="/sources"]')).toHaveCount(0);
-  await expect(page.locator('[data-v34-site] > footer a[href="/sources"]')).toHaveCount(1);
+  const footerRow = page.locator('[data-v34-site] > footer a[href="/sources"]');
+  await expect(footerRow).toHaveCount(1);
+  /*
+    WO-CI-22 (lead decision 7, approved 2026-11-17): on a phone the footer's groups are native
+    disclosures, so the phone's one step is "open the Product group, then the link". The row is in the
+    document while the group is closed (crawlers and find-in-page read it), and painted once it opens.
+  */
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+  const productGroup = page.locator('[data-v34-site] > footer nav[aria-label="Product"] > details');
+  await expect(productGroup.locator('a[href="/sources"]')).toHaveCount(1);
+  await expect(footerRow).toBeHidden();
+  await productGroup.locator(":scope > summary").click();
+  await expect(productGroup).toHaveAttribute("open", "");
+  await expect(footerRow).toBeVisible();
+  await footerRow.click();
+  await expect(page).toHaveURL(/\/sources$/);
 
   const sitemap = await page.request.get("/sitemap.xml");
   expect(await sitemap.text()).toContain("https://tavonel.com/sources");

@@ -54,6 +54,66 @@
   text-transform: uppercase;
 }
 
+/*
+  WO-CI-22 (lead decision 7): each group is a native <details>. The summary is the group's title and its
+  control on a phone; the phone footer measured 1,370.6px with every link shown, against its 928.4px
+  budget (e2e/public-layout-balance.spec.ts), and no all-links layout fitted. Wider, the summary is
+  hidden, the title above shows, and the closed body is shown by `::details-content` -- the same links,
+  no script. The engines that cannot style the body (no `::details-content`) keep the disclosure at
+  every width rather than hide the links.
+*/
+.title {
+  display: none;
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--v34-fg);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  list-style: none;
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The drawn marker states open or closed from the details' own attribute (the drawer's pattern). */
+.summary::after {
+  content: "+";
+  font-size: 1.2rem;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.disclosure[open] > .summary::after {
+  content: "\2212";
+}
+
+@supports selector(::details-content) {
+  @media (min-width: 761px) {
+    .title {
+      display: block;
+    }
+
+    .summary {
+      display: none;
+    }
+
+    .disclosure::details-content {
+      display: block;
+      content-visibility: visible;
+    }
+  }
+}
+
 .list {
   margin: 0;
   padding: 0;
@@ -91,13 +151,15 @@
 }
 
 .link:hover,
-.brand:hover {
+.brand:hover,
+.summary:hover {
   text-decoration: underline;
   text-underline-offset: 5px;
 }
 
 .link:focus-visible,
-.brand:focus-visible {
+.brand:focus-visible,
+.summary:focus-visible {
   outline: 3px solid var(--v34-fg-focus);
   outline-offset: 4px;
 }
@@ -137,5 +199,6 @@
 
 @media (forced-colors: active) {
   .link:focus-visible,
-  .brand:focus-visible { outline-color: Highlight; }
+  .brand:focus-visible,
+  .summary:focus-visible { outline-color: Highlight; }
 }
