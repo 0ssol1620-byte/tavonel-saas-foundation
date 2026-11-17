@@ -6,8 +6,9 @@ import type { Metadata } from "next";
 */
 import { SOLUTION_PROOF_PICKS, solutionWorkflowEvidence, type WorkflowKind } from "@/lib/solution-proof-picks";
 import ExploreStage from "@/components/explore/explore-stage";
-import stageStyles from "@/components/explore/explore-stage.module.css";
-import { PublicSiteFooter } from "@/components/public-site-chrome";
+import SiteFooter from "@/components/v34/shell/site-footer";
+import SiteHeader from "@/components/v34/shell/site-header";
+import tokens from "@/components/v34/tokens.module.css";
 import { primaryCallToAction } from "@/lib/commercial-state";
 import { chooseExploreEntryProof } from "@/lib/explore-entry-proof";
 import {
@@ -140,16 +141,25 @@ const technical: ExploreTechnicalRecord = {
 };
 
 /*
-  chrome-02 / D35. The stage keeps its own minimal header -- that is documented intent
-  (explore-stage.module.css's header note, G1-021) -- but a public route with no footer had no
-  Privacy, no Terms, no Trust group and no Korean entry at all, which is the half of the finding
-  that survived the skeptic. The site footer is rendered here rather than inside the stage so it
-  stays a server component: the stage is a client component, and importing the footer into it would
-  ship the whole footer directory to the browser for markup that never changes.
+  D33 #4 (WO-CI-6B): /explore is a retained public route, so it carries the V34 shell. Every other
+  retained route gets it from `V34Page` (through `PublicSitePage`); this one cannot take `V34Page`
+  itself because the stage renders the page's one `<main id="main">` and the T4 template mark on it.
+  So the page draws V34Page's frame around the stage -- the same wrapper, `SiteHeader` and
+  `SiteFooter`, in the same order -- and the stage itself is unchanged. `lib/v34/retained-shell.test.ts`
+  holds this frame to V34Page's own markup.
+
+  The header and footer stay here, on the server, rather than inside the stage (a client component),
+  so the footer directory is not shipped to the browser (chrome-02 / D35). The legacy
+  `PublicSiteFooter` this replaces is what put the legacy chrome stylesheet chunk on the route's first
+  paint (WO-CI-6); the same test fails if any module this page reaches imports that chrome again.
+
+  `SiteHeader` gets no `currentPath`, as on every retained route: /explore is not a primary item, and
+  the More panel and the drawer read the path themselves.
 */
 export default function ExplorePage() {
   return (
-    <>
+    <div className={tokens.site} data-v34-site="">
+      <SiteHeader />
       <ExploreStage
         access={primaryCallToAction()}
         model={model}
@@ -159,9 +169,7 @@ export default function ExplorePage() {
         technical={technical}
         capturedOn={capturedOn}
       />
-      <div className={stageStyles.siteFooter}>
-        <PublicSiteFooter />
-      </div>
-    </>
+      <SiteFooter />
+    </div>
   );
 }

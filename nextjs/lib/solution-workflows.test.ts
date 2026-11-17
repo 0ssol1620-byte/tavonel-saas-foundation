@@ -2,6 +2,7 @@ import { createElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import ExplorePage from "../app/explore/page";
+import ExploreStage from "../components/explore/explore-stage";
 import { SolutionsBody } from "../components/v34/routes/solutions/solutions";
 import SolutionPage, { SOLUTIONS } from "../app/solutions/[slug]/page";
 import SolutionWorkflowProof, { solutionWorkflowEvidence } from "../app/solutions/solution-workflow-proof";
@@ -65,8 +66,12 @@ describe("Solutions task choices and workflow evidence", () => {
 
   it("ships every published Solutions target in the bounded /explore model, with its locator and owner", () => {
     // The model /explore actually hands its stage, not a projection rebuilt beside it.
-    const [stage] = ExplorePage().props.children as [ReactElement<{ model: VisualWorldModel }>, ReactNode];
-    const shipped = stage.props.model;
+    // Found by type, not by position: the page draws the V34 header before the stage (WO-CI-6B).
+    const stage = (ExplorePage().props.children as ReactNode[]).find(
+      (child): child is ReactElement<{ model: VisualWorldModel }> => (child as ReactElement | null)?.type === ExploreStage,
+    );
+    expect(stage, "the page renders the stage").toBeDefined();
+    const shipped = stage!.props.model;
     const full = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
     const shippedIds = new Set(shipped.evidence.map((item) => item.id));
     expect(entries.map(([slug]) => slug)).toContain("knowledge-operations");
