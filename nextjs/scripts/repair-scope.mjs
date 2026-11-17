@@ -1985,12 +1985,10 @@ export const SWITCH_ON_BILLING_INTEGRITY_AFFECTED_UNIT_FILES = Object.freeze([
 // ledger client, the worker and the SQL are owned above (w1-trial-ops, intake-triage, ocr-worker, database-contract).
 // Product code, so never nativeReuse. No browser suite of its own.
 // WO-D27-1 (V34) adds the ledger replay over the same rates: lib/billing-ledger-replay.ts, its pure suite and its database
-// suite. The pure suite and the webhook replay's adapter suite run here; the ledger replay's database suite skips entirely
-// without TAVONEL_LOCAL_DSN, so it is named as an external check, never as an executed one.
+// suite. The pure suite and the webhook replay's adapter suite run here. Known gap, not a claim: both database suites need
+// TAVONEL_LOCAL_DSN, which no workflow sets at this head, so the ledger replay's database suite skips entirely and the webhook
+// replay's suite runs only its adapter half (its replay half skips). Nothing hosted runs those halves; none is named as run.
 export const PAGE_METER_AFFECTED_PATHS = Object.freeze(['lib/billing-ledger-replay.db.test.ts', 'lib/billing-ledger-replay.test.ts', 'lib/billing-ledger-replay.ts', 'lib/page-meter.test.ts', 'lib/usage-pricing.ts']);
-export const PAGE_METER_AFFECTED_EXTERNAL_CHECKS = Object.freeze({
-  'lib/billing-ledger-replay.db.test.ts': 'a disposable local PostgreSQL 17 cluster with TAVONEL_LOCAL_DSN (scripts/db/local-cluster.mjs); no hosted lane sets it',
-});
 export const PAGE_METER_AFFECTED_UNIT_FILES = Object.freeze([
   'app/api/compile-jobs/route.test.ts', 'lib/api-error-codes.test.ts', 'lib/billing-ledger-replay.test.ts', 'lib/billing-reconciliation.test.ts', 'lib/billing-webhook-replay.db.test.ts',
   'lib/compute-reservation.test.ts', 'lib/customer-data-admission-routes.test.ts', 'lib/intake-approval-rollout-off.test.ts',
@@ -3087,15 +3085,31 @@ export const REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS = Object.freeze(['app/api/conn
 export const REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES = Object.freeze(['lib/connection-revoke-not-plan-gated.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/google-drive-viewer-link-off.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts']);
 // V34 program owners (WO-CI-7, lead decisions D-1 and D-4). Every path the program branch changed since the verified baseline,
 // by what owns it. Exact paths, no glob: a new V34 file is a new review, and the map fails closed on it until it is owned.
-// Each owner selects the real suites this lane can execute: Vitest files and Playwright specs with a reviewed project row
-// in run-repair-check.mjs. A suite that only another workflow can run is named in externalChecks with that workflow; the map
-// requires it at head and carries it into the plan, and nothing here executes, inherits or claims it.
-// Product code, so never nativeReuse.
+// Each owner selects the real suites the Repair job executes: Vitest files and Playwright specs with a reviewed project row
+// in run-repair-check.mjs. Every owner is built with requireExecutedCheck, so an owner whose executed lists are empty fails the
+// map closed for each of its paths; a suite another workflow runs never counts toward that.
+// externalChecks name the suites another workflow runs, as a structured claim (workflow, job, exact step command, project).
+// buildAffectedMap reads those files at head and refuses a claim whose job/step does not run the file, and two owners naming
+// different runners for one file fail the map. Product code, so never nativeReuse.
 // Pending (lane review): app/login/login-client.tsx lands with the catalog lane and is not in this tree, so it is not listed
 // here; until an owner names it, the map reports it unmapped at the head that adds it.
+// The Launch QA Product QA step at this head: no file filter, no grep, so each project runs every spec playwright.config.ts admits to it.
+const LAUNCH_QA_PRODUCT_STEP = 'pnpm exec playwright test --project=1440 --project=390 --project=360 --project=reduced-motion --project=audit --project=audit-768 --project=audit-1280';
+const productQaClaim = project => Object.freeze({ kind: 'playwright', workflow: '.github/workflows/launch-qa.yml', job: 'product-qa', run: LAUNCH_QA_PRODUCT_STEP, project });
+// ci.yml's nextjs job: `pnpm test` is `vitest run && pnpm test:scripts`, so it runs every file the shared Vitest include admits.
+const CI_NEXTJS_VITEST_CLAIM = Object.freeze({ kind: 'vitest', workflow: '.github/workflows/ci.yml', job: 'nextjs', run: 'pnpm test' });
+// Program paths no owner takes, so each fails the map as unmapped: nothing the Repair job executes exercises them at this head.
+// A red gate with a true reason, not a green one that runs nothing (lead decision K3). Each needs a run-repair-check.mjs change.
+const V34_HARNESS_UNEXECUTED = 'checked only by the v34-selftest and v34-chromium Playwright projects; run-repair-check.mjs has no reviewed project row or project-loop entry for either, and no workflow at this head runs them';
+const DB_HARNESS_UNEXECUTED = 'checked only by the scripts/db/*.test.mjs node:test suites, which the Repair Node runner does not register; the affected SQL lane runs pgTAP through the Supabase CLI, never through this harness';
+export const V34_PROGRAM_UNEXECUTED_PATHS = Object.freeze({
+  ...Object.fromEntries(['e2e/support/v34-contrast.ts', 'e2e/support/v34-keyboard.ts', 'e2e/support/v34-measure.ts', 'e2e/support/v34-passes.ts', 'e2e/support/v34-receipt.ts', 'e2e/support/v34-seo.ts', 'e2e/support/v34-world.ts', 'e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts'].map(path => [path, V34_HARNESS_UNEXECUTED])),
+  ...Object.fromEntries(['scripts/db/connector-acl-race.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/pgtap-subset.sql', 'scripts/db/run-sql-tests.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.mjs', 'scripts/db/world-transition-race.test.mjs'].map(path => [path, DB_HARNESS_UNEXECUTED])),
+});
 export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
   // v34-shell: header, drawer, More menu, footer, page frame, JSON-LD, tokens and the shared UI parts: the nav, token and containment suites, every
   // suite that renders them, and the two audits that walk every V34 live route at ten widths, plus contrast over the core routes.
+  // Known gap: components/v34/ui/plan-card.tsx and its stylesheet have no importer at this head, so no suite here renders them.
   'v34-shell': Object.freeze({
     paths: Object.freeze(['components/v34/shell/mobile-drawer.module.css', 'components/v34/shell/mobile-drawer.tsx', 'components/v34/shell/more-menu.module.css', 'components/v34/shell/more-menu.tsx', 'components/v34/shell/route-json-ld.tsx', 'components/v34/shell/site-footer.module.css', 'components/v34/shell/site-footer.tsx', 'components/v34/shell/site-header.module.css', 'components/v34/shell/site-header.tsx', 'components/v34/shell/v34-page.module.css', 'components/v34/shell/v34-page.tsx', 'components/v34/tokens.module.css', 'components/v34/ui/article-layout.module.css', 'components/v34/ui/article-layout.tsx', 'components/v34/ui/bridge.module.css', 'components/v34/ui/bridge.tsx', 'components/v34/ui/button-link.module.css', 'components/v34/ui/button-link.tsx', 'components/v34/ui/corpus-stats.module.css', 'components/v34/ui/corpus-stats.tsx', 'components/v34/ui/create-world.ts', 'components/v34/ui/figure.module.css', 'components/v34/ui/figure.tsx', 'components/v34/ui/final-cta.module.css', 'components/v34/ui/final-cta.tsx', 'components/v34/ui/hero.module.css', 'components/v34/ui/hero.tsx', 'components/v34/ui/plan-card.module.css', 'components/v34/ui/plan-card.tsx', 'components/v34/ui/record-card.module.css', 'components/v34/ui/record-card.tsx', 'components/v34/ui/scroll-table.module.css', 'components/v34/ui/scroll-table.tsx', 'components/v34/ui/section.module.css', 'components/v34/ui/section.tsx', 'components/v34/ui/surface.ts', 'components/v34/ui/tag.module.css', 'components/v34/ui/tag.tsx', 'components/v34/ui/text.module.css', 'components/v34/ui/text.tsx', 'components/v34/ui/tool-list.module.css', 'components/v34/ui/tool-list.tsx', 'lib/v34/css-containment.test.ts', 'lib/v34/integration.test.ts', 'lib/v34/nav.test.ts', 'lib/v34/nav.ts', 'lib/v34/tokens.test.ts']),
     unitFiles: Object.freeze(['lib/cta-truth.test.ts', 'lib/output-escaping.test.ts', 'lib/site-nav-model.test.ts', 'lib/structured-data.test.ts', 'lib/v34/css-containment.test.ts', 'lib/v34/home-page.test.ts', 'lib/v34/integration.test.ts', 'lib/v34/nav.test.ts', 'lib/v34/route-bodies.test.ts', 'lib/v34/routes-catalog.test.ts', 'lib/v34/routes-community.test.ts', 'lib/v34/routes-contact.test.ts', 'lib/v34/routes-federation.test.ts', 'lib/v34/routes-governance.test.ts', 'lib/v34/routes-journal-markets.test.ts', 'lib/v34/routes-journal-property.test.ts', 'lib/v34/routes-journal-research.test.ts', 'lib/v34/routes-journal-revision.test.ts', 'lib/v34/routes-journal.test.ts', 'lib/v34/routes-marketplace.test.ts', 'lib/v34/routes-outcomes.test.ts', 'lib/v34/routes-studio.test.ts', 'lib/v34/tokens.test.ts']),
@@ -3124,17 +3138,6 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     browserFiles: Object.freeze(['e2e/contrast-zoom-audit.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts']),
     externalChecks: Object.freeze({}),
   }),
-  // v34-qa-harness: the V34 QA matrix and its helpers. Their only checks are the v34-* Playwright projects, which run-repair-check.mjs has
-  // no reviewed project row for, so they are named as external checks and none is executed or claimed here.
-  'v34-qa-harness': Object.freeze({
-    paths: Object.freeze(['e2e/support/v34-contrast.ts', 'e2e/support/v34-keyboard.ts', 'e2e/support/v34-measure.ts', 'e2e/support/v34-passes.ts', 'e2e/support/v34-receipt.ts', 'e2e/support/v34-seo.ts', 'e2e/support/v34-world.ts', 'e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts']),
-    unitFiles: Object.freeze([]),
-    browserFiles: Object.freeze([]),
-    externalChecks: Object.freeze({
-      'e2e/v34-matrix.spec.ts': '.github/workflows/launch-qa.yml v34-chromium project (WO-CI-9)',
-      'e2e/v34-support.selftest.spec.ts': 'playwright.config.ts v34-selftest project',
-    }),
-  }),
   // v34-guard-suites: the legacy guard suites brought to the V34 truth, the two helpers they follow and the contrast audit: each selects itself.
   'v34-guard-suites': Object.freeze({
     paths: Object.freeze(['e2e/contrast-zoom-audit.spec.ts', 'lib/client-route-weight.test.ts', 'lib/contact-locale.ts', 'lib/contact-qualification.test.ts', 'lib/developer-snippets.test.ts', 'lib/landing-experiments.test.ts', 'lib/landing-experiments.ts', 'lib/output-escaping.test.ts', 'lib/route-canonical-metadata.test.ts', 'lib/security-txt.test.ts', 'lib/solutions-hub.test.ts', 'lib/solutions-thumbnails.test.ts', 'lib/structured-data.test.ts', 'lib/support-targets.test.ts', 'lib/trust-provisions.test.ts']),
@@ -3142,11 +3145,12 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     browserFiles: Object.freeze(['e2e/contrast-zoom-audit.spec.ts']),
     externalChecks: Object.freeze({}),
   }),
-  // korean-surface-removal: D33 F0, the /ko surface removed (every /ko URL answers 308): the suites that assert the redirect and the English-only chrome.
+  // korean-surface-removal: D33 F0, the /ko surface removed (every /ko URL answers 308): the suites that assert the redirect and the English-only chrome,
+  // and the launch accessibility spec, whose "working, visible keyboard skip link" case is the one suite that exercises components/skip-link.tsx.
   'korean-surface-removal': Object.freeze({
     paths: Object.freeze(['app/ko/contact/opengraph-image.tsx', 'app/ko/document-lang.tsx', 'app/ko/evaluation/page.tsx', 'app/ko/opengraph-image.tsx', 'components/evaluation-page.test.tsx', 'components/skip-link.tsx', 'lib/ko-terms.test.ts']),
     unitFiles: Object.freeze(['components/evaluation-page.test.tsx', 'lib/cta-truth.test.ts', 'lib/ko-terms.test.ts', 'lib/og-card-frame.test.ts', 'lib/page-seo.test.ts', 'lib/seo-surface.test.ts', 'lib/site-nav-model.test.ts']),
-    browserFiles: Object.freeze([]),
+    browserFiles: Object.freeze(['e2e/launch-qa-accessibility.spec.ts']),
     externalChecks: Object.freeze({}),
   }),
   // proposals-library: WO-D23-4 and WO-D30: Library decisions and change proposals, their routes, panels and migration suites, plus the route
@@ -3156,7 +3160,7 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     unitFiles: Object.freeze(['lib/change-inbox.test.ts', 'lib/change-proposals-panel.test.ts', 'lib/change-proposals-routes.test.ts', 'lib/change-proposals.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/library-label-decisions-migration.test.ts', 'lib/library-routes.test.ts', 'lib/library-shadow.test.ts', 'lib/route-classification.test.ts', 'lib/world-change-proposals-migration.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({
-      'e2e/change-proposals.spec.ts': '.github/workflows/launch-qa.yml Product QA (width projects)',
+      'e2e/change-proposals.spec.ts': productQaClaim('1440'),
     }),
   }),
   // workspace-journey: D23-1/3/5: the file states, purpose picker and journey rail. The census browser spec has no repair project row.
@@ -3165,7 +3169,7 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     unitFiles: Object.freeze(['lib/copy-trust-guard.test.ts', 'lib/file-states.test.ts', 'lib/workspace-journey.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({
-      'e2e/file-census-resume.spec.ts': '.github/workflows/launch-qa.yml Product QA (width projects)',
+      'e2e/file-census-resume.spec.ts': productQaClaim('1440'),
     }),
   }),
   // compile-pipeline: D06-3, D13 and D24-2: compile-input manifest, receipt v2 signing and its promote/rollback check, queue timing. The two
@@ -3175,8 +3179,8 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     unitFiles: Object.freeze(['lib/answer-receipt-signing.test.ts', 'lib/collection-compile-run.test.ts', 'lib/collection-compile-v2-only.test.ts', 'lib/compile-input-manifest.test.ts', 'lib/compile-queue-timing.test.ts', 'lib/compile-receipt-signing.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/promotion-receipt-check.test.ts', 'lib/retrieval-compile-wiring.test.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/world-promotion-current-source.test.ts', 'lib/world-rollback-source-access.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({
-      'e2e/compile-job-states-mobile.spec.ts': '.github/workflows/launch-qa.yml Product QA (width projects)',
-      'e2e/compile-resume.spec.ts': '.github/workflows/launch-qa.yml Product QA (audit project)',
+      'e2e/compile-job-states-mobile.spec.ts': productQaClaim('1440'),
+      'e2e/compile-resume.spec.ts': productQaClaim('audit'),
     }),
   }),
   // world-temporal-lens: D16 and D18: lens URL state, temporal view, activation history, by-id reads and sealed page tokens. The two lens
@@ -3186,8 +3190,8 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     unitFiles: Object.freeze(['lib/sealed-claims.test.ts', 'lib/world-activation-history.test.ts', 'lib/world-lens-by-id.test.ts', 'lib/world-lens-url.test.ts', 'lib/world-temporal-routes.test.ts', 'lib/world-temporal-view.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({
-      'e2e/world-graph-scale.spec.ts': '.github/workflows/launch-qa.yml Product QA (width projects)',
-      'e2e/world-lens.spec.ts': '.github/workflows/launch-qa.yml Product QA (width projects)',
+      'e2e/world-graph-scale.spec.ts': productQaClaim('1440'),
+      'e2e/world-lens.spec.ts': productQaClaim('1440'),
     }),
   }),
   // control-plane: D29 and D31: the signed capability manifest and the World release contract, with the signature-scope suite.
@@ -3212,28 +3216,14 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     externalChecks: Object.freeze({}),
   }),
   // billing-reconciliation: D24-5, D27-2/3 and D28-3/4: Paddle reads and reconciliation, revenue paths, settlement economics and the local webhook
-  // replay. The operator CLI's suite is an .mjs Vitest file the repair runner does not register; ci.yml runs it.
+  // replay. The operator CLI's suite is an .mjs Vitest file the repair runner does not register; ci.yml runs it (verified claim).
+  // Known gap: lib/billing-webhook-replay.db.test.ts runs only its adapter half here; its replay half needs TAVONEL_LOCAL_DSN, which no workflow sets.
   'billing-reconciliation': Object.freeze({
     paths: Object.freeze(['lib/billing-webhook-replay.db.test.ts', 'lib/paddle-api.test.ts', 'lib/paddle-api.ts', 'lib/paddle-reconciliation.test.ts', 'lib/paddle-reconciliation.ts', 'lib/revenue-paths.test.ts', 'lib/revenue-paths.ts', 'lib/settlement-economics.test.ts', 'lib/settlement-economics.ts', 'lib/testing/postgrest-rpc-psql.ts', 'scripts/billing/paddle-reconcile.mjs', 'scripts/billing/paddle-reconcile.test.mjs']),
     unitFiles: Object.freeze(['lib/billing-gate-enforcement.test.ts', 'lib/billing-refund-request.test.ts', 'lib/billing-webhook-replay.db.test.ts', 'lib/paddle-api.test.ts', 'lib/paddle-reconciliation.test.ts', 'lib/revenue-paths.test.ts', 'lib/settlement-economics.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({
-      'scripts/billing/paddle-reconcile.test.mjs': '.github/workflows/ci.yml nextjs job: pnpm test (Vitest include scripts/billing/*.test.mjs)',
-    }),
-  }),
-  // db-harness: D06-1, D15, D24-1/4: the disposable PostgreSQL 17 cluster, race harnesses, restore drill and SQL test runner. Their
-  // suites are node:test files the repair runner does not register; ci.yml runs them, so they are external checks here.
-  'db-harness': Object.freeze({
-    paths: Object.freeze(['scripts/db/connector-acl-race.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/pgtap-subset.sql', 'scripts/db/run-sql-tests.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.mjs', 'scripts/db/world-transition-race.test.mjs']),
-    unitFiles: Object.freeze([]),
-    browserFiles: Object.freeze([]),
-    externalChecks: Object.freeze({
-      'scripts/db/connector-acl-race.test.mjs': '.github/workflows/ci.yml nextjs job: pnpm test (test:scripts, node --test scripts/db/*.test.mjs)',
-      'scripts/db/database-restore-drill.test.mjs': '.github/workflows/ci.yml nextjs job: pnpm test (test:scripts, node --test scripts/db/*.test.mjs)',
-      'scripts/db/job-lease-race.test.mjs': '.github/workflows/ci.yml nextjs job: pnpm test (test:scripts, node --test scripts/db/*.test.mjs)',
-      'scripts/db/local-cluster.test.mjs': '.github/workflows/ci.yml nextjs job: pnpm test (test:scripts, node --test scripts/db/*.test.mjs)',
-      'scripts/db/run-sql-tests.test.mjs': '.github/workflows/ci.yml nextjs job: pnpm test (test:scripts, node --test scripts/db/*.test.mjs)',
-      'scripts/db/world-transition-race.test.mjs': '.github/workflows/ci.yml nextjs job: pnpm test (test:scripts, node --test scripts/db/*.test.mjs)',
+      'scripts/billing/paddle-reconcile.test.mjs': CI_NEXTJS_VITEST_CLAIM,
     }),
   }),
 });
@@ -3381,7 +3371,7 @@ export const AFFECTED_GROUPS = Object.freeze([
     { unitFiles: SWITCH_ON_BILLING_INTEGRITY_AFFECTED_UNIT_FILES }),
   // Page meter: the two exact paths above select twenty-eight direct suites and no browser suite.
   affectedGroup('page-meter', new RegExp(`^nextjs/(?:${exactPathAlternation(PAGE_METER_AFFECTED_PATHS)})$`),
-    { unitFiles: PAGE_METER_AFFECTED_UNIT_FILES, externalChecks: PAGE_METER_AFFECTED_EXTERNAL_CHECKS }),
+    { unitFiles: PAGE_METER_AFFECTED_UNIT_FILES }),
   // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.
   affectedGroup('benchmarks-path-mask', new RegExp(`^nextjs/(?:${exactPathAlternation(BENCHMARKS_PATH_MASK_AFFECTED_PATHS)})$`),
     { unitFiles: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES }),
@@ -3533,7 +3523,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('large-source-intake-copy', new RegExp(`^(?:${exactPathAlternation(LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS)})$`),
     { unitFiles: LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES }),
   ...Object.entries(V34_PROGRAM_AFFECTED_OWNERS).map(([group, { paths, unitFiles, browserFiles, externalChecks }]) =>
-    affectedGroup(group, new RegExp(`^nextjs/(?:${exactPathAlternation(paths)})$`), { unitFiles, browserFiles, externalChecks })),
+    affectedGroup(group, new RegExp(`^nextjs/(?:${exactPathAlternation(paths)})$`), { unitFiles, browserFiles, externalChecks, requireExecutedCheck: true })),
 ]);const regularModes = ['100644', '100755'];
 
 export function parseAffectedRawDiff(output) {
@@ -3554,11 +3544,85 @@ export function parseAffectedRawDiff(output) {
   return records;
 }
 
-export function buildAffectedMap({ headSha, records, headHasFile = () => true, readHeadFile = () => null }) {
+// One job's steps from a workflow file, read as text: { steps: [{ run, conditional }], conditional, nextjsDefault }, with each run
+// command folded to one line, or null when the job is absent. Only the shapes this repository's workflows use are read (an inline
+// run, a `>-`/`>` folded block, a `|` literal block); any other shape yields a run that matches no claim, so the claim is refused.
+function workflowJobSteps(text, job) {
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const jobsAt = lines.indexOf('jobs:'), start = lines.findIndex((line, index) => jobsAt >= 0 && index > jobsAt && line === `  ${job}:`);
+  if (start < 0) return null;
+  const next = lines.findIndex((line, index) => index > start && /^ {0,2}[A-Za-z0-9_-]+:/.test(line));
+  const body = lines.slice(start + 1, next < 0 ? lines.length : next), jobText = body.join('\n'), steps = [];
+  for (const [index, line] of body.entries()) {
+    if (!line.startsWith('      - ')) continue;
+    const end = body.findIndex((candidate, at) => at > index && (candidate.startsWith('      - ') || /^ {0,5}\S/.test(candidate)));
+    const step = body.slice(index, end < 0 ? body.length : end).map((candidate, at) => at === 0 ? '        ' + candidate.slice(8) : candidate);
+    const runAt = step.findIndex(candidate => candidate.startsWith('        run:'));
+    let run = null;
+    if (runAt >= 0) {
+      const inline = step[runAt].slice('        run:'.length).trim();
+      if (!['', '>', '>-', '|', '|-'].includes(inline)) run = inline;
+      else {
+        const block = [];
+        for (const candidate of step.slice(runAt + 1)) { if (candidate.trim() && !candidate.startsWith('          ')) break; if (candidate.trim()) block.push(candidate.trim()); }
+        run = block.join(inline.startsWith('|') ? '\n' : ' ');
+      }
+    }
+    steps.push({ run, conditional: step.some(candidate => /^ {8}(?:if|continue-on-error):/.test(candidate)) });
+  }
+  return { steps, conditional: /^ {4}(?:if|continue-on-error):/m.test(jobText), nextjsDefault: /^ {4}defaults:\n {6}run:\n {8}working-directory: nextjs$/m.test(jobText) };
+}
+const globSource = glob => '^' + glob.split('**/').map(part => part.split('*').map(text => text.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*')).join('(?:[^/]+/)*') + '$';
+// Why a claim that another workflow runs `file` (a path under nextjs/) is refused at head; [] when the named job and its exact,
+// unconditional step do run it. `read` returns a repository-root path's head text, or null when it is absent.
+export function externalCheckClaimFailures(file, claim, read) {
+  const failures = [], refuse = reason => { failures.push(`external check claim refused for ${file}: ${reason}`); return failures; };
+  if (!claim || typeof claim !== 'object' || !['playwright', 'vitest'].includes(claim.kind) || !/^\.github\/workflows\/[A-Za-z0-9_.-]+\.yml$/.test(claim.workflow ?? '')
+    || typeof claim.job !== 'string' || typeof claim.run !== 'string' || !claim.run) return refuse('not a structured workflow claim');
+  const workflow = read(claim.workflow);
+  if (typeof workflow !== 'string') return refuse(`${claim.workflow} is absent or unreadable at head`);
+  const lf = workflow.replace(/\r\n/g, '\n');
+  if (!/^on:\s*$/m.test(lf) || !/^ {2}pull_request:/m.test(lf)) return refuse(`${claim.workflow} does not run on pull_request`);
+  const job = workflowJobSteps(lf, claim.job);
+  if (!job) return refuse(`${claim.workflow} has no job ${claim.job}`);
+  if (job.conditional || !job.nextjsDefault) return refuse(`job ${claim.job} is conditional or does not run in nextjs/`);
+  const steps = job.steps.filter(step => step.run === claim.run);
+  if (steps.length !== 1 || steps[0].conditional) return refuse(`job ${claim.job} has no single unconditional step running: ${claim.run}`);
+  const tokens = claim.run.split(/\s+/);
+  if (claim.kind === 'playwright') {
+    if (tokens.slice(0, 4).join(' ') !== 'pnpm exec playwright test' || !tokens.includes(`--project=${claim.project}`)) return refuse(`the step does not run Playwright project ${claim.project}`);
+    if (tokens.some(token => /^(?:-g|--grep|--grep-invert|--last-failed|--only-changed)(?:=|$)/.test(token) || (/\.spec\.ts$/.test(token) && token !== file))) return refuse('the step filters its specs');
+    const source = read('nextjs/playwright.config.ts');
+    if (typeof source !== 'string') return refuse('nextjs/playwright.config.ts is absent or unreadable at head');
+    const config = source.replace(/\r\n/g, '\n'), name = file.split('/').at(-1);
+    const literal = constant => { const found = new RegExp(`^const ${constant} = /(.+)/;$`, 'm').exec(config); return found ? new RegExp(found[1]) : null; };
+    const auditSpecs = literal('auditSpecs'), v34Specs = literal('v34Specs');
+    const widths = /^const widths = \[([0-9, ]+)\] as const;$/m.exec(config)?.[1].split(',').map(width => width.trim()) ?? [];
+    if (!auditSpecs || !v34Specs) return refuse('playwright.config.ts no longer declares auditSpecs and v34Specs as regex literals');
+    if ([...widths, 'reduced-motion'].includes(claim.project)) {
+      if ((config.match(/testIgnore: \[\/launch-qa\.\*\\\.spec\\\.ts\/, auditSpecs, v34Specs\],/g) ?? []).length !== 2) return refuse('the width and reduced-motion projects no longer share the reviewed testIgnore');
+      if (/launch-qa.*\.spec\.ts/.test(name) || auditSpecs.test(name) || v34Specs.test(name)) return refuse(`project ${claim.project} ignores it`);
+    } else if (claim.project === 'audit') {
+      if (!/name: "audit",\n\s+testMatch: auditSpecs,/.test(config) || !auditSpecs.test(name)) return refuse('project audit does not match it');
+    } else return refuse(`project ${claim.project} is not a reviewed Product QA project`);
+  } else {
+    if (claim.run !== 'pnpm test') return refuse('a Vitest claim must name the step `pnpm test`');
+    let test;
+    try { test = JSON.parse(read('nextjs/package.json') ?? 'null')?.scripts?.test; } catch { test = undefined; }
+    if (typeof test !== 'string' || !/^vitest run(?: &&|$)/.test(test)) return refuse('nextjs/package.json test no longer starts with a bare `vitest run`');
+    const vitest = read('nextjs/vitest.config.ts');
+    const include = typeof vitest === 'string' ? /include: \[([^\]]*)\]/.exec(vitest)?.[1] : null;
+    const globs = include ? [...include.matchAll(/"([^"]+)"/g)].map(match => match[1]) : [];
+    if (!globs.some(glob => new RegExp(globSource(glob)).test(file))) return refuse('the shared Vitest include does not admit it');
+  }
+  return failures;
+}
+
+export function buildAffectedMap({ headSha, records, headHasFile = () => true, readHeadFile = () => null, affectedGroups = AFFECTED_GROUPS }) {
   if (!sha(headSha)) throw new Error('Affected map requires an exact head SHA.');
   const failures = [], entries = [], unmappedPaths = [];
   const groups = new Set(), unitFiles = new Set(), browserFiles = new Set(), databaseTests = new Set(), invalidatingPaths = new Set();
-  const dependencyReasons = new Map(), externalChecks = new Map();
+  const dependencyReasons = new Map(), externalChecks = new Map(), externalConflicts = new Set(), unexecuted = new Set();
   let worker = false, selector = false, database = false, discoveryConfig = false;
   for (const { oldMode, newMode, status, paths } of records) {
     const label = paths.join(' -> ');
@@ -3573,7 +3637,7 @@ export function buildAffectedMap({ headSha, records, headHasFile = () => true, r
         failures.push(`unsupported path spelling: ${JSON.stringify(path)}`);
         continue;
       }
-      const owners = AFFECTED_GROUPS.filter(owner => owner.match.test(path));
+      const owners = affectedGroups.filter(owner => owner.match.test(path));
       if (!owners.length) { failures.push(`unmapped changed endpoint: ${path}`); unmappedPaths.push(path); continue; }
       if (!owners.every(owner => owner.nativeReuse)) invalidatingPaths.add(path);
       discoveryConfig ||= path === VITEST_DISCOVERY_CONFIG_PATH;
@@ -3583,7 +3647,14 @@ export function buildAffectedMap({ headSha, records, headHasFile = () => true, r
         for (const file of owner.browserFiles) browserFiles.add(file);
         for (const file of owner.databaseTests ?? []) databaseTests.add(file);
         for (const [file, reason] of Object.entries(owner.databaseDependencies ?? {})) dependencyReasons.set(file, new Set([...(dependencyReasons.get(file) ?? []), reason]));
-        for (const [file, runner] of Object.entries(owner.externalChecks ?? {})) externalChecks.set(file, runner);
+        for (const [file, claim] of Object.entries(owner.externalChecks ?? {})) {
+          const known = externalChecks.get(file);
+          if (known && JSON.stringify(known.claim) !== JSON.stringify(claim)) externalConflicts.add(`owners ${known.group} and ${owner.group} name different runners for one external check: ${file}`);
+          else if (!known) externalChecks.set(file, { group: owner.group, claim });
+        }
+        // An owner that must execute something and selects nothing executable fails closed; an external check never counts.
+        if (owner.requireExecutedCheck && !owner.unitFiles.length && !owner.browserFiles.length && !(owner.databaseTests ?? []).length)
+          unexecuted.add(`owner ${owner.group} selects no check the Repair job executes: ${path}`);
         worker ||= Boolean(owner.worker);
         selector ||= Boolean(owner.selector);
         database ||= Boolean(owner.database);
@@ -3601,9 +3672,13 @@ export function buildAffectedMap({ headSha, records, headHasFile = () => true, r
   for (const file of [...databaseTests].sort()) {
     if (!headHasFile(file)) failures.push(`selected database fixture is absent at head: ${file}`);
   }
-  // A suite only another workflow runs is still named and still required at head; it is recorded, never executed or claimed.
+  failures.push(...[...unexecuted].sort(), ...[...externalConflicts].sort());
+  // A suite only another workflow runs is still named and required at head, and its claim is read against the head's workflow,
+  // Playwright and Vitest config; a claim that does not hold is refused. It is recorded, never executed, inherited or counted.
+  const headText = new Map(), readClaimSource = path => { if (!headText.has(path)) headText.set(path, headHasFile(path) ? readHeadFile(path) : null); return headText.get(path); };
   for (const file of [...externalChecks.keys()].sort()) {
     if (!headHasFile(`nextjs/${file}`)) failures.push(`named external owner check is absent at head: ${file}`);
+    else failures.push(...externalCheckClaimFailures(file, externalChecks.get(file).claim, readClaimSource));
   }
   // Either rename endpoint or a deletion of the shared discovery config still requires its admitted content at head.
   if (discoveryConfig) {
@@ -3632,8 +3707,8 @@ export function buildAffectedMap({ headSha, records, headHasFile = () => true, r
     databaseChanged: database,
     databaseTests: [...databaseTests].sort(),
     databaseDependencyReasons,
-    externalChecks: [...externalChecks.keys()].sort().map(file => ({ file, runner: externalChecks.get(file), status: 'run by its own workflow; neither executed, inherited nor claimed by this map' })),
-    fixtureContracts: AFFECTED_GROUPS.filter((owner, index, owners) => groups.has(owner.group) && owner.fixtureContract && owners.findIndex(candidate => candidate.group === owner.group && candidate.fixtureContract?.suite === owner.fixtureContract.suite) === index)
+    externalChecks: [...externalChecks.keys()].sort().map(file => ({ file, runner: externalChecks.get(file).claim, status: 'claim read at head: the named job and step run it; neither executed, inherited nor counted by this map' })),
+    fixtureContracts: affectedGroups.filter((owner, index, owners) => groups.has(owner.group) && owner.fixtureContract && owners.findIndex(candidate => candidate.group === owner.group && candidate.fixtureContract?.suite === owner.fixtureContract.suite) === index)
       .map(owner => ({ group: owner.group, ...owner.fixtureContract, enforcement: 'selected as a required executed-passing suite; the declared case count is recorded, not asserted' })),
     nativeEvidence: {
       disposition: fresh ? NATIVE_FRESH_RUN_REQUIRED : NATIVE_HISTORICAL_INPUT_REUSE,

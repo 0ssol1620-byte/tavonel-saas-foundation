@@ -4617,9 +4617,10 @@ test('affected source agent admission: exactly six owner paths select source-age
   // The runtime wrapper is both an owner endpoint and a selected suite; the shared distribution test is a selected suite only.
   assert.ok(AFFECTED_SOURCE_AGENT_PATHS.includes(AFFECTED_SOURCE_AGENT_WRAPPER)&&AFFECTED_SOURCE_AGENT_SUITES.includes('lib/source-agent-runtime.test.ts'));
   assert.ok(!AFFECTED_SOURCE_AGENT_PATHS.includes('nextjs/lib/developer-distribution.test.ts'),'developer-distribution stays a selected suite only');
-  // Its one test outlives the Python child's own 30 s deadline (35 s), instead of Vitest's 5 s default that cut a 6.5 s run; no global timeout.
+  // Its one test outlives the Python child's own deadline by 10 s, instead of Vitest's 5 s default that cut a 6.5 s run; no global timeout.
+  // Commit bcdba6ff (WO-FND-INT-2) re-derived both caps from a measurement (child 30_000 -> 240_000, test 35_000 -> 250_000; LEDGER.md).
   const wrapper=readFileSync(fileURLToPath(new URL('../lib/source-agent-runtime.test.ts',import.meta.url)),'utf8');
-  assert.deepEqual([(wrapper.match(/timeout: 30_000/g)??[]).length,(wrapper.match(/\}, 35_000\);/g)??[]).length,/testTimeout|setConfig|\.skip|\.todo/.test(wrapper)],[1,1,false]);
+  assert.deepEqual([(wrapper.match(/timeout: 240_000/g)??[]).length,(wrapper.match(/\}, 250_000\);/g)??[]).length,/testTimeout|setConfig|\.skip|\.todo/.test(wrapper)],[1,1,false]);
   const owners=AFFECTED_GROUPS.filter(owner=>owner.group==='source-agent');
   assert.equal(owners.length,1);const [owner]=owners;
   assert.deepEqual([[...owner.unitFiles].sort(),owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
@@ -8485,42 +8486,56 @@ test('affected world-read-cap-20261110 owner: 10 exact paths select 14 direct su
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
-// V34 program owners (WO-CI-7, lead decisions D-1 and D-4): one owner per area of the program branch, each restated here
-// independently of the planner's constants by count and digest, with its executed suites and the suites only another workflow runs.
-import { V34_PROGRAM_AFFECTED_OWNERS, DATABASE_CONTRACT_DATABASE_TESTS, PAGE_METER_AFFECTED_PATHS, PAGE_METER_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+// V34 program owners (WO-CI-7, lead decisions D-1, D-4 and K1-K5): one owner per area of the program branch, each restated here
+// independently of the planner's constants by count and digest. Every owner selects at least one suite the Repair job executes;
+// an external check (a suite another workflow runs) is a structured claim the map reads at head and never counts as executed.
+import { V34_PROGRAM_AFFECTED_OWNERS, V34_PROGRAM_UNEXECUTED_PATHS, DATABASE_CONTRACT_DATABASE_TESTS, PAGE_METER_AFFECTED_PATHS, PAGE_METER_AFFECTED_UNIT_FILES, externalCheckClaimFailures } from './repair-scope.mjs';
 const v34Digest = list => createHash('sha256').update([...list].join('\n')).digest('hex').slice(0, 16);
+// The working tree stands in for the head: the external claims are read from the workflow, Playwright and Vitest files it holds.
+function v34RepoPath(path) { return fileURLToPath(new URL(`../../${path}`, import.meta.url)); }
+function v34ReadHead(path) { return existsSync(v34RepoPath(path)) ? readFileSync(v34RepoPath(path), 'utf8') : null; }
+function v34Map(records, overrides = {}) {
+  return buildAffectedMap({ headSha: affectedHeadSha, records, headHasFile: path => existsSync(v34RepoPath(path)), readHeadFile: v34ReadHead, ...overrides });
+}
+const V34_PRODUCT_QA_RUN = 'pnpm exec playwright test --project=1440 --project=390 --project=360 --project=reduced-motion --project=audit --project=audit-768 --project=audit-1280';
+const v34ProductQa = project => ({ kind: 'playwright', workflow: '.github/workflows/launch-qa.yml', job: 'product-qa', run: V34_PRODUCT_QA_RUN, project });
+const V34_CI_VITEST = { kind: 'vitest', workflow: '.github/workflows/ci.yml', job: 'nextjs', run: 'pnpm test' };
 const V34_OWNER_PINS = Object.freeze([
-  // [group, path count, path digest, unit count, unit digest, browser suites, suites another workflow executes]
-  ['v34-shell', 47, '5415129e9d051183', 23, '21eb9fb399a9a589', ['e2e/contrast-zoom-audit.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts'], []],
-  ['v34-route-registry', 6, '65af104d1ff748b6', 55, '669eeeff28aeda73', ['e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts'], []],
-  ['v34-world', 17, 'b4adb5928234787b', 21, '6a4128fa84844da3', ['e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts'], []],
-  ['v34-route-bodies', 258, '3a509398240a8c42', 60, '6f58f6df25341ff6', ['e2e/contrast-zoom-audit.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts'], []],
-  ['v34-qa-harness', 9, '63fbd4a74255f169', 0, 'e3b0c44298fc1c14', [], ['e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts']],
-  ['v34-guard-suites', 15, 'ce918122ee61450c', 16, '68d9967a57ab1416', ['e2e/contrast-zoom-audit.spec.ts'], []],
-  ['korean-surface-removal', 7, '5a0ac5aad8981bd9', 7, 'da5472447e57fca6', [], []],
-  ['proposals-library', 18, '5fbfdcd64fff1ba7', 11, 'bc7f290839aedeb5', [], ['e2e/change-proposals.spec.ts']],
-  ['workspace-journey', 8, '13f26b4c96d356dd', 3, 'a0953aba9d5a75ff', [], ['e2e/file-census-resume.spec.ts']],
-  ['compile-pipeline', 15, 'c0dcca37df08a4b6', 12, 'd73d2c163da39980', [], ['e2e/compile-job-states-mobile.spec.ts', 'e2e/compile-resume.spec.ts']],
-  ['world-temporal-lens', 13, 'fdef27c6e8765cd3', 6, '2c6da671f58ed78b', [], ['e2e/world-graph-scale.spec.ts', 'e2e/world-lens.spec.ts']],
-  ['control-plane', 5, '69fb7d773a115e09', 3, '0252f55e061df2fc', [], []],
-  ['developer-surface', 10, '3e2063aec635d535', 8, '0c3198c499d7bbb0', [], []],
-  ['tenant-isolation', 6, 'd41829069c62cb31', 5, '26b862fea9f1ef7b', [], []],
-  ['billing-reconciliation', 12, 'd98a2e522659cc4b', 7, '00d0f2f362aa3ea7', [], ['scripts/billing/paddle-reconcile.test.mjs']],
-  ['db-harness', 13, 'c4ccbafac6ed2742', 0, 'e3b0c44298fc1c14', [], ['scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']],
+  // [group, path count, path digest, unit count, unit digest, browser suites, external checks with their claims]
+  ['v34-shell', 47, '5415129e9d051183', 23, '21eb9fb399a9a589', ['e2e/contrast-zoom-audit.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts'], {}],
+  ['v34-route-registry', 6, '65af104d1ff748b6', 55, '669eeeff28aeda73', ['e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts'], {}],
+  ['v34-world', 17, 'b4adb5928234787b', 21, '6a4128fa84844da3', ['e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts'], {}],
+  ['v34-route-bodies', 258, '3a509398240a8c42', 60, '6f58f6df25341ff6', ['e2e/contrast-zoom-audit.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts'], {}],
+  ['v34-guard-suites', 15, 'ce918122ee61450c', 16, '68d9967a57ab1416', ['e2e/contrast-zoom-audit.spec.ts'], {}],
+  ['korean-surface-removal', 7, '5a0ac5aad8981bd9', 7, 'da5472447e57fca6', ['e2e/launch-qa-accessibility.spec.ts'], {}],
+  ['proposals-library', 18, '5fbfdcd64fff1ba7', 11, 'bc7f290839aedeb5', [], { 'e2e/change-proposals.spec.ts': v34ProductQa('1440') }],
+  ['workspace-journey', 8, '13f26b4c96d356dd', 3, 'a0953aba9d5a75ff', [], { 'e2e/file-census-resume.spec.ts': v34ProductQa('1440') }],
+  ['compile-pipeline', 15, 'c0dcca37df08a4b6', 12, 'd73d2c163da39980', [], { 'e2e/compile-job-states-mobile.spec.ts': v34ProductQa('1440'), 'e2e/compile-resume.spec.ts': v34ProductQa('audit') }],
+  ['world-temporal-lens', 13, 'fdef27c6e8765cd3', 6, '2c6da671f58ed78b', [], { 'e2e/world-graph-scale.spec.ts': v34ProductQa('1440'), 'e2e/world-lens.spec.ts': v34ProductQa('1440') }],
+  ['control-plane', 5, '69fb7d773a115e09', 3, '0252f55e061df2fc', [], {}],
+  ['developer-surface', 10, '3e2063aec635d535', 8, '0c3198c499d7bbb0', [], {}],
+  ['tenant-isolation', 6, 'd41829069c62cb31', 5, '26b862fea9f1ef7b', [], {}],
+  ['billing-reconciliation', 12, 'd98a2e522659cc4b', 7, '00d0f2f362aa3ea7', [], { 'scripts/billing/paddle-reconcile.test.mjs': V34_CI_VITEST }],
+]);
+// The program paths nothing in the Repair job executes (lead decision K3): the V34 QA harness and the local database harness.
+const V34_UNEXECUTED_PINS = Object.freeze([
+  ['e2e/support/v34-', 9, '63fbd4a74255f169'],
+  ['scripts/db/', 13, 'c4ccbafac6ed2742'],
 ]);
 const V34_PAGE_METER_PATHS = ['lib/billing-ledger-replay.db.test.ts', 'lib/billing-ledger-replay.test.ts', 'lib/billing-ledger-replay.ts', 'lib/page-meter.test.ts', 'lib/usage-pricing.ts'];
 const v34AllPaths = () => [...Object.values(V34_PROGRAM_AFFECTED_OWNERS).flatMap(owner => owner.paths), ...V34_PAGE_METER_PATHS].map(p => `nextjs/${p}`);
-test('affected v34 program owners: every owner keeps its exact paths, its executed suites and the suites another workflow runs', () => {
+const v34Executed = map => map.unitFiles.length + map.browserFiles.length + map.databaseTests.length;
+test('affected v34 program owners: every owner keeps its exact paths, at least one executed suite and its external claims', () => {
   assert.deepEqual(Object.keys(V34_PROGRAM_AFFECTED_OWNERS), V34_OWNER_PINS.map(([group]) => group));
   for (const [group, pathCount, pathDigest, unitCount, unitDigest, browsers, external] of V34_OWNER_PINS) {
     const declared = V34_PROGRAM_AFFECTED_OWNERS[group], owners = AFFECTED_GROUPS.filter(o => o.group === group), [owner] = owners;
     assert.equal(owners.length, 1, group);
-    assert.deepEqual([declared.paths.length, v34Digest(declared.paths), declared.unitFiles.length, v34Digest(declared.unitFiles), [...declared.browserFiles], Object.keys(declared.externalChecks)],
+    assert.deepEqual([declared.paths.length, v34Digest(declared.paths), declared.unitFiles.length, v34Digest(declared.unitFiles), [...declared.browserFiles], JSON.parse(JSON.stringify(declared.externalChecks))],
       [pathCount, pathDigest, unitCount, unitDigest, browsers, external], group);
     assert.deepEqual([[...owner.unitFiles], [...owner.browserFiles], { ...owner.externalChecks }], [[...declared.unitFiles], [...declared.browserFiles], { ...declared.externalChecks }], group);
-    assert.deepEqual([owner.databaseTests, owner.nativeReuse, Boolean(owner.selector), Boolean(owner.worker), Boolean(owner.database)], [[], false, false, false, false], group);
-    // No owner whose check list is empty, and no check counted twice: an externally run suite is never also selected here.
-    assert.ok(owner.unitFiles.length + owner.browserFiles.length + Object.keys(owner.externalChecks).length > 0, group);
+    assert.deepEqual([owner.databaseTests, owner.nativeReuse, Boolean(owner.selector), Boolean(owner.worker), Boolean(owner.database), owner.requireExecutedCheck], [[], false, false, false, false, true], group);
+    // Non-empty means executed: unit and browser suites only. An external check never counts toward it and is never also selected.
+    assert.ok(owner.unitFiles.length + owner.browserFiles.length > 0, group);
     for (const file of Object.keys(owner.externalChecks)) assert.ok(!owner.unitFiles.includes(file) && !owner.browserFiles.includes(file), `${group}: ${file}`);
     // Exact, sorted, duplicate-free paths: the match is built from them and admits nothing else.
     assert.deepEqual([...declared.paths], [...new Set(declared.paths)].sort(), group);
@@ -8529,28 +8544,136 @@ test('affected v34 program owners: every owner keeps its exact paths, its execut
   assert.deepEqual([...PAGE_METER_AFFECTED_PATHS], V34_PAGE_METER_PATHS);
   for (const suite of ['lib/billing-ledger-replay.test.ts', 'lib/billing-webhook-replay.db.test.ts', 'lib/page-meter.test.ts']) assert.ok(PAGE_METER_AFFECTED_UNIT_FILES.includes(suite), suite);
   assert.ok(!PAGE_METER_AFFECTED_UNIT_FILES.includes('lib/billing-ledger-replay.db.test.ts'), 'a suite that skips entirely without a database is never a required executed suite');
+  assert.equal(AFFECTED_GROUPS.find(o => o.group === 'page-meter').externalChecks, undefined, 'no workflow runs the ledger replay database suite, so nothing claims it');
 });
-test('affected v34 program owners: the whole program delta maps with no failure, and the plan carries the externally run suites', () => {
+test('affected v34 program owners: every path of every owner, changed alone, yields a clean plan with at least one executed check', () => {
+  for (const [group, owner] of Object.entries(V34_PROGRAM_AFFECTED_OWNERS)) {
+    for (const path of owner.paths) {
+      const map = v34Map([affectedRecord('M', [`nextjs/${path}`])]);
+      assert.deepEqual(map.failures, [], `${group}: ${path}`);
+      assert.ok(v34Executed(map) >= 1, `${group}: ${path} executes nothing`);
+      // The external entries ride along as verified claims and are not part of the executed count.
+      assert.deepEqual(map.externalChecks.map(check => check.file), Object.keys(owner.externalChecks).sort(), `${group}: ${path}`);
+      const plan = affectedAskPlan(map);
+      assert.ok(plan.unitFiles.length + plan.browserFiles.length >= 1, `${group}: ${path}`);
+    }
+  }
+});
+test('affected v34 program owners: the harness paths nothing in the Repair job executes stay unmapped and fail the plan', () => {
+  const paths = Object.keys(V34_PROGRAM_UNEXECUTED_PATHS);
+  assert.deepEqual(V34_UNEXECUTED_PINS.map(([prefix, count, digest]) => { const own = paths.filter(p => p.startsWith(prefix) || (prefix === 'e2e/support/v34-' && /^e2e\/v34-/.test(p))); return [prefix, own.length, v34Digest(own)]; }), V34_UNEXECUTED_PINS.map(pin => [...pin]));
+  for (const path of paths) {
+    assert.ok(existsSync(v34RepoPath(`nextjs/${path}`)), path);
+    const map = v34Map([affectedRecord('M', [`nextjs/${path}`])]);
+    assert.deepEqual([map.failures, map.unmappedPaths, map.groups], [[`unmapped changed endpoint: nextjs/${path}`], [`nextjs/${path}`], []], path);
+    assert.throws(() => affectedAskPlan(map), /clean fail-closed map/, path);
+  }
+  // The local cluster and the pgTAP subset are not exercised by the affected SQL lane, so database-contract does not take them.
+  assert.equal(AFFECTED_GROUPS.find(o => o.group === 'database-contract').match.test('nextjs/scripts/db/pgtap-subset.sql'), false);
+});
+test('affected v34 program owners: an owner that must execute something and selects nothing fails closed for each of its paths', () => {
+  const empty = { group: 'empty-owner', match: /^nextjs\/x\/(?:a|b)\.ts$/, unitFiles: [], browserFiles: [], databaseTests: [], nativeReuse: false, requireExecutedCheck: true,
+    externalChecks: { 'e2e/change-proposals.spec.ts': v34ProductQa('1440') } };
+  const map = v34Map([affectedRecord('M', ['nextjs/x/a.ts']), affectedRecord('M', ['nextjs/x/b.ts'])], { affectedGroups: [empty] });
+  assert.deepEqual(map.failures, ['owner empty-owner selects no check the Repair job executes: nextjs/x/a.ts', 'owner empty-owner selects no check the Repair job executes: nextjs/x/b.ts']);
+  // A second owner on the same path that does execute something clears it; the flag alone is what makes an empty owner fail.
+  const running = { ...empty, group: 'running-owner', unitFiles: ['lib/v34/nav.test.ts'], externalChecks: {} };
+  assert.deepEqual(v34Map([affectedRecord('M', ['nextjs/x/a.ts'])], { affectedGroups: [running] }).failures, []);
+  assert.deepEqual(v34Map([affectedRecord('M', ['nextjs/x/a.ts'])], { affectedGroups: [{ ...empty, requireExecutedCheck: false, externalChecks: {} }] }).failures, []);
+});
+test('affected v34 program owners: two owners naming different runners for one external check fail the map', () => {
+  const owner = (group, path, claim) => ({ group, match: new RegExp(`^nextjs/${path}$`), unitFiles: ['lib/v34/nav.test.ts'], browserFiles: [], databaseTests: [], nativeReuse: false, externalChecks: { 'e2e/compile-resume.spec.ts': claim } });
+  const records = [affectedRecord('M', ['nextjs/x/a.ts']), affectedRecord('M', ['nextjs/x/b.ts'])];
+  const conflict = v34Map(records, { affectedGroups: [owner('first', 'x/a\\.ts', v34ProductQa('audit')), owner('second', 'x/b\\.ts', v34ProductQa('1440'))] });
+  assert.ok(conflict.failures.includes('owners first and second name different runners for one external check: e2e/compile-resume.spec.ts'), JSON.stringify(conflict.failures));
+  assert.deepEqual(conflict.externalChecks.map(check => check.runner), [v34ProductQa('audit')], 'the first claim is kept, never overwritten by the last writer');
+  const agree = v34Map(records, { affectedGroups: [owner('first', 'x/a\\.ts', v34ProductQa('audit')), owner('second', 'x/b\\.ts', v34ProductQa('audit'))] });
+  assert.deepEqual(agree.failures, []);
+});
+test('affected v34 external claims: each holds at head, and a claim on a runner that does not run the file is refused', () => {
+  for (const [, , , , , , external] of V34_OWNER_PINS) for (const [file, claim] of Object.entries(external)) assert.deepEqual(externalCheckClaimFailures(file, claim, v34ReadHead), [], file);
+  const refused = (file, claim, read = v34ReadHead) => { const failures = externalCheckClaimFailures(file, claim, read); assert.equal(failures.length, 1, `${file} ${JSON.stringify(claim)}`); return failures[0]; };
+  const swap = (path, from, to) => p => { const text = v34ReadHead(p); if (p !== path) return text; const lf = text.replace(/\r\n/g, '\n'); assert.ok(lf.includes(from), from); return lf.replace(from, to); };
+  // Round 1's runners: a project WO-CI-9 has not added, and a config file that is not a workflow.
+  assert.match(refused('e2e/v34-matrix.spec.ts', { kind: 'playwright', workflow: '.github/workflows/launch-qa.yml', job: 'v34-matrix', run: 'pnpm exec playwright test --project=v34-chromium', project: 'v34-chromium' }), /has no job v34-matrix/);
+  assert.match(refused('e2e/v34-support.selftest.spec.ts', { kind: 'playwright', workflow: 'nextjs/playwright.config.ts', job: 'v34-selftest', run: 'pnpm exec playwright test --project=v34-selftest', project: 'v34-selftest' }), /not a structured workflow claim/);
+  for (const claim of ['.github/workflows/launch-qa.yml v34-chromium project (WO-CI-9)', null, 7, [], {}, { ...v34ProductQa('1440'), kind: 'shell' }, { ...v34ProductQa('1440'), run: '' }])
+    assert.match(refused('e2e/world-lens.spec.ts', claim), /not a structured workflow claim/);
+  assert.match(refused('e2e/world-lens.spec.ts', { ...v34ProductQa('1440'), project: 'v34-chromium' }), /does not run Playwright project v34-chromium/);
+  assert.match(refused('e2e/world-lens.spec.ts', { ...v34ProductQa('1440'), job: 'browser-qa' }), /no single unconditional step/);
+  assert.match(refused('e2e/world-lens.spec.ts', v34ProductQa('audit')), /project audit does not match it/);
+  assert.match(refused('e2e/compile-resume.spec.ts', v34ProductQa('1440')), /project 1440 ignores it/);
+  assert.match(refused('e2e/world-lens.spec.ts', { ...v34ProductQa('1440'), workflow: '.github/workflows/absent.yml' }), /absent or unreadable/);
+  const launch = '.github/workflows/launch-qa.yml', step = '      - name: Run the product width, reduced-motion and competitive-audit projects\n';
+  assert.match(refused('e2e/world-lens.spec.ts', v34ProductQa('1440'), swap(launch, '          --project=1440 --project=390', '          --project=390')), /no single unconditional step/);
+  assert.match(refused('e2e/world-lens.spec.ts', v34ProductQa('1440'), swap(launch, step, step + '        if: false\n')), /no single unconditional step/);
+  assert.match(refused('e2e/world-lens.spec.ts', v34ProductQa('1440'), swap(launch, step, step + '        continue-on-error: true\n')), /no single unconditional step/);
+  assert.match(refused('e2e/world-lens.spec.ts', v34ProductQa('1440'), swap(launch, '    name: Product QA (widths + reduced motion + audit)\n', '    name: Product QA (widths + reduced motion + audit)\n    if: false\n')), /conditional/);
+  assert.match(refused('e2e/world-lens.spec.ts', v34ProductQa('1440'), swap(launch, '  pull_request:\n', '  pull_request_target:\n')), /does not run on pull_request/);
+  assert.match(refused('e2e/world-lens.spec.ts', v34ProductQa('1440'), swap('nextjs/playwright.config.ts', '|self-serve-journey)', '|self-serve-journey|world-lens)')), /project 1440 ignores it/);
+  assert.match(refused('e2e/world-lens.spec.ts', v34ProductQa('1440'), swap('nextjs/playwright.config.ts', 'testIgnore: [/launch-qa.*\\.spec\\.ts/, auditSpecs, v34Specs],', 'testIgnore: [/launch-qa.*\\.spec\\.ts/, auditSpecs, v34Specs, /world/],')), /reviewed testIgnore/);
+  const paddle = 'scripts/billing/paddle-reconcile.test.mjs';
+  assert.match(refused(paddle, V34_CI_VITEST, swap('nextjs/vitest.config.ts', '"scripts/billing/*.test.mjs"', '"scripts/billing/*.test.ts"')), /Vitest include does not admit it/);
+  assert.match(refused(paddle, V34_CI_VITEST, swap('nextjs/package.json', '"test": "vitest run && pnpm test:scripts"', '"test": "vitest run lib && pnpm test:scripts"')), /bare `vitest run`/);
+  assert.match(refused(paddle, { ...V34_CI_VITEST, job: 'root' }), /conditional or does not run in nextjs/);
+  assert.match(refused(paddle, { ...V34_CI_VITEST, run: 'pnpm check' }), /a Vitest claim must name the step `pnpm test`/);
+  assert.match(refused(paddle, { ...V34_CI_VITEST, run: 'pnpm vitest run' }), /no single unconditional step/);
+});
+test('affected v34 external claims: fuzzed claims and mutated workflow text never throw, and are held only while the exact step survives', () => {
+  let seed = 7349;
+  const random = n => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+  const values = [null, undefined, 0, 1, '', 'x', true, [], {}, ['a'], { kind: 'playwright' }, '.github/workflows/launch-qa.yml', 'product-qa', V34_PRODUCT_QA_RUN, '1440', 'audit', 'pnpm test', 'vitest'];
+  const keys = ['kind', 'workflow', 'job', 'run', 'project'];
+  for (let i = 0; i < 3000; i++) {
+    const claim = random(5) === 0 ? values[random(values.length)] : Object.fromEntries(keys.filter(() => random(4)).map(key => [key, values[random(values.length)]]));
+    let failures;
+    assert.doesNotThrow(() => { failures = externalCheckClaimFailures('e2e/world-lens.spec.ts', claim, v34ReadHead); }, JSON.stringify(claim));
+    assert.ok(Array.isArray(failures) && (failures.length === 1 || JSON.stringify(claim) === JSON.stringify(v34ProductQa('1440'))), JSON.stringify(claim));
+  }
+  const launch = '.github/workflows/launch-qa.yml', original = v34ReadHead(launch).replace(/\r\n/g, '\n'), lines = original.split('\n');
+  // The bound part of the step is its run block (the step name is not part of the claim).
+  const stepLines = lines.slice(lines.indexOf('      - name: Run the product width, reduced-motion and competitive-audit projects') + 1, lines.indexOf('          --project=audit --project=audit-768 --project=audit-1280') + 1);
+  assert.deepEqual(stepLines, ['        run: >-', '          pnpm exec playwright test', '          --project=1440 --project=390 --project=360 --project=reduced-motion', '          --project=audit --project=audit-768 --project=audit-1280']);
+  const alphabet = ' -:|>abc#\n\t';
+  for (let i = 0; i < 4000; i++) {
+    const mutated = [...lines], at = random(mutated.length), kind = random(3);
+    if (kind === 0) mutated.splice(at, 1);
+    else if (kind === 1) mutated.splice(at, 0, ['    if: false', '        if: false', '        continue-on-error: true', 'jobs:', '  product-qa:', '      - run: x'][random(6)]);
+    else { const line = mutated[at], pos = random(line.length + 1); mutated[at] = line.slice(0, pos) + alphabet[random(alphabet.length)] + line.slice(pos + 1); }
+    const text = mutated.join('\n');
+    let failures;
+    assert.doesNotThrow(() => { failures = externalCheckClaimFailures('e2e/world-lens.spec.ts', v34ProductQa('1440'), p => p === launch ? text : v34ReadHead(p)); }, `mutation ${i}`);
+    // Held only when the exact step block is still there, contiguous and unconditional, inside the unconditional product-qa job.
+    if (!failures.length) assert.ok(text.includes(stepLines.join('\n') + '\n') && !/\n {8}(?:if|continue-on-error):/.test(text.slice(text.indexOf(stepLines.join('\n')), text.indexOf(stepLines.join('\n')) + stepLines.join('\n').length + 40)), `held after mutation ${i}: ${JSON.stringify(mutated[at])}`);
+  }
+});
+test('affected v34 program owners: the whole program delta maps with no failure, and the plan carries the verified external claims', () => {
   const paths = v34AllPaths();
-  const map = affectedMap([affectedRecord('M', paths.slice(0, 1)), ...paths.slice(1).map(p => affectedRecord('A', [p], '000000'))]);
+  const map = v34Map([affectedRecord('M', paths.slice(0, 1)), ...paths.slice(1).map(p => affectedRecord('A', [p], '000000'))]);
   assert.deepEqual([map.failures, map.unmappedPaths], [[], []]);
   for (const [group] of V34_OWNER_PINS) assert.ok(map.groups.includes(group), group);
   assert.ok(map.groups.includes('page-meter'));
-  const external = V34_OWNER_PINS.flatMap(([, , , , , , files]) => files).concat('lib/billing-ledger-replay.db.test.ts').sort();
-  assert.deepEqual(map.externalChecks.map(check => check.file), external);
-  for (const check of map.externalChecks) assert.ok(check.runner && !map.unitFiles.includes(check.file) && !map.browserFiles.includes(check.file), check.file);
-  assert.deepEqual(map.browserFiles, ['e2e/contrast-zoom-audit.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts']);
+  const external = V34_OWNER_PINS.flatMap(([, , , , , , claims]) => Object.entries(claims)).sort(([a], [b]) => a.localeCompare(b));
+  assert.deepEqual(map.externalChecks.map(check => [check.file, check.runner]), external);
+  for (const check of map.externalChecks) assert.ok(!map.unitFiles.includes(check.file) && !map.browserFiles.includes(check.file) && /^claim read at head/.test(check.status), check.file);
+  assert.deepEqual(map.browserFiles, ['e2e/contrast-zoom-audit.spec.ts', 'e2e/launch-qa-accessibility.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts']);
   assert.equal(map.nativeEvidence.disposition, 'fresh-seven-case-native-run-required');
   const plan = affectedAskPlan(map);
   assert.deepEqual(plan.affectedIntegration.externalChecks, map.externalChecks);
   assert.deepEqual([plan.unitFiles, plan.browserFiles], [map.unitFiles, map.browserFiles]);
+  // The same delta with the harness paths added fails closed on exactly those paths.
+  const harness = Object.keys(V34_PROGRAM_UNEXECUTED_PATHS).map(p => `nextjs/${p}`);
+  const withHarness = v34Map([...paths, ...harness].map(p => affectedRecord('M', [p])));
+  assert.deepEqual(withHarness.unmappedPaths, [...harness].sort());
 });
 test('affected v34 program owners: a named external check absent at head fails the map closed', () => {
-  for (const [group, , , , , , external] of V34_OWNER_PINS.filter(pin => pin[6].length)) {
-    const path = `nextjs/${V34_PROGRAM_AFFECTED_OWNERS[group].paths[0]}`;
-    const map = buildAffectedMap({ headSha: affectedHeadSha, records: [affectedRecord('M', [path])], headHasFile: file => file !== `nextjs/${external[0]}` });
-    assert.deepEqual(map.failures, [`named external owner check is absent at head: ${external[0]}`], group);
+  for (const [group, , , , , , external] of V34_OWNER_PINS.filter(pin => Object.keys(pin[6]).length)) {
+    const [file] = Object.keys(external), path = `nextjs/${V34_PROGRAM_AFFECTED_OWNERS[group].paths[0]}`;
+    const map = v34Map([affectedRecord('M', [path])], { headHasFile: candidate => candidate !== `nextjs/${file}` && existsSync(v34RepoPath(candidate)) });
+    assert.deepEqual(map.failures, [`named external owner check is absent at head: ${file}`], group);
     assert.throws(() => affectedAskPlan(map), /clean fail-closed map/, group);
+    // Without the head's workflow text the claim cannot be read, so it is refused rather than assumed.
+    assert.ok(buildAffectedMap({ headSha: affectedHeadSha, records: [affectedRecord('M', [path])] }).failures.every(failure => /^external check claim refused for .+ is absent or unreadable at head$/.test(failure)), group);
   }
 });
 test('affected v34 program owners: no catch-all, so every near neighbour of every program path stays unmapped by them', () => {
@@ -8580,13 +8703,13 @@ test('affected database-contract owner: every SQL change selects the three progr
     assert.deepEqual(absent.failures, ['selected database fixture is absent at head: supabase/tests/foundation_page_meter.sql'], path);
   }
   // A program change that is not SQL starts no DB lane.
-  assert.deepEqual(affectedMap([affectedRecord('M', ['nextjs/lib/change-proposals.ts'])]).databaseTests, []);
+  assert.deepEqual(v34Map([affectedRecord('M', ['nextjs/lib/change-proposals.ts'])]).databaseTests, []);
 });
 // A neighbour an earlier owner left unknown that the V34 program changed is now that program owner's: asserted to exactly it.
 function assertV34ProgramEndpoint(path) {
   const entry = Object.entries(V34_PROGRAM_AFFECTED_OWNERS).find(([, owner]) => owner.paths.some(p => `nextjs/${p}` === path));
   if (!entry) return false;
-  const [group, owner] = entry, map = affectedMap([affectedRecord('M', [path])]);
+  const [group, owner] = entry, map = v34Map([affectedRecord('M', [path])]);
   assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles], [[], [group], [], [...owner.unitFiles].sort(), [...owner.browserFiles].sort()], path);
   return true;
 }

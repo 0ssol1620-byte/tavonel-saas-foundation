@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { sharedBrowserProjectsMapExcludesExplore, NATIVE_RACE_ADDITIONS, NATIVE_RACE_CONFIG_PATHS, NATIVE_RACE_CHANGED_PATHS, NATIVE_RACE_MAIN_OVERLAYS, NATIVE_RACE_MAIN_OVERLAY_PROVENANCE } from './repair-collector-only.mjs';
-import { V34_PROGRAM_AFFECTED_OWNERS, DATABASE_CONTRACT_DATABASE_TESTS } from './repair-scope.mjs';
+import { V34_PROGRAM_AFFECTED_OWNERS, V34_PROGRAM_UNEXECUTED_PATHS, DATABASE_CONTRACT_DATABASE_TESTS, externalCheckClaimFailures } from './repair-scope.mjs';
 import { PR141_MAIN_MERGE_BCBA_AFFECTED_PATHS, PR141_MAIN_MERGE_BCBA_AFFECTED_UNIT_FILES, PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { CHANGE_NOTIFY_AFFECTED_PATHS, CHANGE_NOTIFY_AFFECTED_UNIT_FILES, CHANGE_NOTIFY_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { AFFECTED_GROUPS, HOME_AFFECTED_BROWSER_FILE, HOME_AFFECTED_PATHS, HOME_AFFECTED_UNIT_FILES, HOME_READER_HEADING_CSS_AFFECTED_PATHS, HOME_READER_HEADING_CSS_AFFECTED_UNIT_FILES, REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE, RECIPE_CONTINUATION_AFFECTED_BROWSER_FILES, RECIPE_CONTINUATION_AFFECTED_PATHS, RECIPE_CONTINUATION_AFFECTED_UNIT_FILES, VITEST_DISCOVERY_CONFIG_PATH, vitestDiscoveryConfigFailures, COMPILE_SOURCE_OBSERVATIONS_AFFECTED_PATHS, COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES, WORLD_EXPLORER_NAVIGATION_AFFECTED_PATHS, WORLD_EXPLORER_NAVIGATION_AFFECTED_UNIT_FILES, WORLD_VERSION_DIFF_AFFECTED_PATHS, WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES, INTAKE_APPROVAL_ROLLOUT_AFFECTED_PATHS, INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_PATHS, SOLUTIONS_PROOF_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES, EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS, EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES, EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_PATHS, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_UNIT_FILES, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_BROWSER_FILES, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES, FIX_ROUND_3_AFFECTED_PATHS, FIX_ROUND_3_AFFECTED_UNIT_FILES, FIX_ROUND_3_AFFECTED_BROWSER_FILES, FIX_ROUND_4_AFFECTED_PATHS, FIX_ROUND_4_AFFECTED_UNIT_FILES, PR151_SERVICE_TRUTH_AFFECTED_PATHS, PR151_SERVICE_TRUTH_AFFECTED_UNIT_FILES, OCR_PAGES_INCOMPLETE_AFFECTED_PATHS, OCR_PAGES_INCOMPLETE_AFFECTED_UNIT_FILES, BENCHMARKS_PATH_MASK_AFFECTED_PATHS, BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES, ENABLEMENT_AFFECTED_PATHS, ENABLEMENT_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
@@ -1099,39 +1099,49 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
     &&e2Suites.every(file=>existsSync(resolve(repo,'nextjs',file))),
     'W2-E2 answerability owner must keep its exact ten paths and two suites, leave the Ask route with w1-remote-mcp-a1-a5 and admit no neighbour');
 }
-// V34 program owners (WO-CI-7, D-1 and D-4), restated independently: each owner exists once with exact paths, executes only
-// suites this lane can run, and names every suite only another workflow runs. An external Playwright spec has no reviewed
-// project row and an external .mjs suite is not in the Node registry: once either is routed, it must move to the executed lists.
+// V34 program owners (WO-CI-7, D-1 and D-4), restated independently: each owner exists once with exact paths and selects at least
+// one suite the Repair job itself executes (an external check never counts), and every external check is a claim that the named
+// workflow job's exact step runs the file, read here from that workflow, the Playwright config and the Vitest include at this head.
+// The program paths nothing here executes stay unmapped, so the map fails closed on them.
 {
   const pins = [['v34-shell', 47, 23, 3, 0], ['v34-route-registry', 6, 55, 2, 0], ['v34-world', 17, 21, 2, 0], ['v34-route-bodies', 258, 60, 3, 0],
-    ['v34-qa-harness', 9, 0, 0, 2], ['v34-guard-suites', 15, 16, 1, 0], ['korean-surface-removal', 7, 7, 0, 0], ['proposals-library', 18, 11, 0, 1],
+    ['v34-guard-suites', 15, 16, 1, 0], ['korean-surface-removal', 7, 7, 1, 0], ['proposals-library', 18, 11, 0, 1],
     ['workspace-journey', 8, 3, 0, 1], ['compile-pipeline', 15, 12, 0, 2], ['world-temporal-lens', 13, 6, 0, 2], ['control-plane', 5, 3, 0, 0],
-    ['developer-surface', 10, 8, 0, 0], ['tenant-isolation', 6, 5, 0, 0], ['billing-reconciliation', 12, 7, 0, 1], ['db-harness', 13, 0, 0, 6]];
+    ['developer-surface', 10, 8, 0, 0], ['tenant-isolation', 6, 5, 0, 0], ['billing-reconciliation', 12, 7, 0, 1]];
   const nodeRegistry = runner.split('\n').find(line => line.startsWith('const nodeUnitTestPaths = new Set(')) ?? '';
-  assert(JSON.stringify(Object.keys(V34_PROGRAM_AFFECTED_OWNERS)) === JSON.stringify(pins.map(([group]) => group)), 'V34 program owners must be exactly the sixteen reviewed groups');
+  const readRepoFile = path => existsSync(resolve(repo, path)) ? readFileSync(resolve(repo, path), 'utf8') : null;
+  assert(JSON.stringify(Object.keys(V34_PROGRAM_AFFECTED_OWNERS)) === JSON.stringify(pins.map(([group]) => group)), 'V34 program owners must be exactly the fourteen reviewed groups');
   for (const [group, pathCount, unitCount, browserCount, externalCount] of pins) {
     const declared = V34_PROGRAM_AFFECTED_OWNERS[group], owners = AFFECTED_GROUPS.filter(owner => owner.group === group), [owner] = owners;
     const external = Object.keys(owner?.externalChecks ?? {});
-    assert(owners.length === 1 && declared.paths.length === pathCount && owner.unitFiles.length === unitCount && owner.browserFiles.length === browserCount && external.length === externalCount
+    assert(owners.length === 1 && owner.requireExecutedCheck === true && declared.paths.length === pathCount && owner.unitFiles.length === unitCount && owner.browserFiles.length === browserCount && external.length === externalCount
       && JSON.stringify([...owner.unitFiles]) === JSON.stringify([...declared.unitFiles]) && JSON.stringify([...owner.browserFiles]) === JSON.stringify([...declared.browserFiles])
-      && unitCount + browserCount + externalCount > 0 && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
+      && unitCount + browserCount > 0 && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
       && declared.paths.every(p => AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + p)).map(o => o.group).join() === group)
       && declared.paths.every(p => !owner.match.test(p) && !owner.match.test('nextjs/' + p + '.bak'))
       && [...owner.unitFiles, ...owner.browserFiles, ...external].every(file => existsSync(resolve(repo, 'nextjs', file)))
       && owner.unitFiles.every(file => !file.endsWith('.mjs')) && owner.browserFiles.every(file => sharedMap.includes(`\n  ['${file}', [`))
-      && external.every(file => typeof owner.externalChecks[file] === 'string' && owner.externalChecks[file].length > 0 && !owner.unitFiles.includes(file) && !owner.browserFiles.includes(file))
+      && external.every(file => !owner.unitFiles.includes(file) && !owner.browserFiles.includes(file))
       && external.filter(file => file.endsWith('.spec.ts')).every(file => !sharedMap.includes(`'${file}'`))
       && external.filter(file => file.endsWith('.mjs')).every(file => !nodeRegistry.includes(`'${file}'`)),
-      'V34 program owner must keep its exact paths, executable suites and named external checks: ' + group);
+      'V34 program owner must keep its exact paths, at least one executed suite and its external checks: ' + group);
+    for (const file of external) {
+      const refused = externalCheckClaimFailures(file, owner.externalChecks[file], readRepoFile);
+      assert(!refused.length, 'V34 external check claim does not hold at this head: ' + refused.join('; '));
+    }
   }
+  const unexecuted = Object.keys(V34_PROGRAM_UNEXECUTED_PATHS);
+  assert(unexecuted.length === 22 && unexecuted.every(p => existsSync(resolve(repo, 'nextjs', p)) && !AFFECTED_GROUPS.some(o => o.match.test('nextjs/' + p))),
+    'the 22 program paths nothing in the Repair job executes must stay unmapped');
   const pageMeter = AFFECTED_GROUPS.filter(owner => owner.group === 'page-meter');
   const database = AFFECTED_GROUPS.filter(owner => owner.group === 'database-contract');
   const pgtap = ['supabase/tests/foundation_page_meter.sql', 'supabase/tests/library_label_decisions.sql', 'supabase/tests/world_change_proposals.sql'];
   assert(pageMeter.length === 1 && pageMeter[0].match.test('nextjs/lib/billing-ledger-replay.ts') && pageMeter[0].unitFiles.includes('lib/billing-ledger-replay.test.ts')
-    && !pageMeter[0].unitFiles.includes('lib/billing-ledger-replay.db.test.ts') && Object.keys(pageMeter[0].externalChecks).join() === 'lib/billing-ledger-replay.db.test.ts'
+    && !pageMeter[0].unitFiles.includes('lib/billing-ledger-replay.db.test.ts') && pageMeter[0].externalChecks === undefined
     && database.length === 1 && database[0].database === true && JSON.stringify([...database[0].databaseTests]) === JSON.stringify(pgtap) && JSON.stringify([...DATABASE_CONTRACT_DATABASE_TESTS]) === JSON.stringify(pgtap)
     && pgtap.every(file => existsSync(resolve(repo, file)))
-    && planner.includes('named external owner check is absent at head: ') && planner.includes("status: 'run by its own workflow; neither executed, inherited nor claimed by this map'"),
-    'page-meter must own the ledger replay, database-contract must select the three program pgTAP files, and an absent external check must fail the map closed');
+    && planner.includes('named external owner check is absent at head: ') && planner.includes('selects no check the Repair job executes: ')
+    && planner.includes('name different runners for one external check: ') && planner.includes('externalCheckClaimFailures(file, externalChecks.get(file).claim, readClaimSource)'),
+    'page-meter must own the ledger replay without an unrun claim, database-contract must select the three program pgTAP files, and the map must refuse an absent or unheld external check, two runners for one file and an owner that executes nothing');
 }
-console.log('V34 program owners: sixteen exact owners plus page-meter and database-contract additions verified.');
+console.log('V34 program owners: fourteen exact owners, every external claim read at head, 22 unexecuted program paths unmapped, page-meter and database-contract additions verified.');
