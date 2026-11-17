@@ -85,15 +85,12 @@
 
 .textLink,
 .inlineLink {
-  color: var(--v34-fg-link);
-  font-weight: 600;
-  text-underline-offset: 3px;
-}
-
-.textLink {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 600;
+  text-underline-offset: 3px;
 }
 
 .textLink:hover,
