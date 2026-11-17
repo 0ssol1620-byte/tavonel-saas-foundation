@@ -12,6 +12,8 @@ import { COLLECTION_ID_PATTERN } from "./immutable-keys";
 import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "./intake-approval-rollout";
 import { DOC_TYPES } from "./library-methods";
 import { decideLibraryLabel, readLibraryDocuments } from "./library-shadow";
+import { compilePlanExecutor, type CompilePlanInput } from "./proposal-compile-plan";
+import { labelCorrectionExecutor, type LabelPatchInput } from "./proposal-label-correction";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 import { getFoundationActiveWorld } from "./world-store";
 
@@ -28,7 +30,7 @@ import { getFoundationActiveWorld } from "./world-store";
   refused for confirm and undo.
 */
 
-export const PROPOSAL_ACTION_TYPES = ["library_label"] as const;
+export const PROPOSAL_ACTION_TYPES = ["library_label", "compile_plan", "ontology_label_patch"] as const;
 export type ProposalActionType = (typeof PROPOSAL_ACTION_TYPES)[number];
 export const PROPOSAL_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const PROPOSAL_IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{8,128}$/;
@@ -52,6 +54,8 @@ export type OntologyLabelPatchPreview = Readonly<{
   collectionId: string; baseManifestDigest: string; objectId: string; kind: "Topic" | "Entity" | "Claim"; before: string; after: string; evidenceId: string;
 }>;
 type PreviewShapes = { library_label: LibraryLabelInput; compile_plan: CompilePlanPreview; ontology_label_patch: OntologyLabelPatchPreview };
+/** The stored input of each type; for the two WO-AN-4 types it carries more than the preview (§4.2). */
+type InputShapes = { library_label: LibraryLabelInput; compile_plan: CompilePlanInput; ontology_label_patch: LabelPatchInput };
 
 const ownKeys = (value: object) => Object.keys(value).sort().join(",");
 const isObject = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -316,8 +320,10 @@ const libraryLabel: ProposalExecutor<LibraryLabelInput> = {
 };
 
 /** One entry per type in PROPOSAL_ACTION_TYPES, and nothing else. */
-export const PROPOSAL_EXECUTORS: Readonly<{ [K in ProposalActionType]: ProposalExecutor<PreviewShapes[K]> }> = {
+export const PROPOSAL_EXECUTORS: Readonly<{ [K in ProposalActionType]: ProposalExecutor<InputShapes[K]> }> = {
   library_label: libraryLabel,
+  compile_plan: compilePlanExecutor,
+  ontology_label_patch: labelCorrectionExecutor,
 };
 
 function executorFor(actionType: string): ProposalExecutor<unknown> | null {
@@ -398,16 +404,34 @@ export async function filterReadableProposals(viewer: Pick<ProposalActor, "works
 }
 
 /* The page cursor: base64url of "<created_at>|<proposal_id>", the store's own text, so no precision is lost. */
-const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
+const TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(?:Z|[+-](\d{2}):(\d{2}))$/;
 type Position = Readonly<{ createdAt: string; id: string }>;
 const encodeCursor = (position: Position) => Buffer.from(`${position.createdAt}|${position.id}`, "utf8").toString("base64url");
+
+/*
+  A cursor timestamp PostgreSQL would refuse is the caller's error (400), never the store's (503) (§16). The
+  calendar fields must survive a round trip through Date (so 30 February and hour 25 are refused), the year is
+  at least 1 (PostgreSQL has no year 0), and the offset is within ±15:59. Accepting a strict subset of what
+  PostgreSQL takes is safe: the store only ever writes this form.
+*/
+function postgresTimestamp(text: string): boolean {
+  const match = TIMESTAMP.exec(text);
+  if (!match) return false;
+  const [year, month, day, hour, minute, second] = match.slice(1, 7).map(Number) as [number, number, number, number, number, number];
+  if (year < 1 || (match[7] !== undefined && (Number(match[7]) > 15 || Number(match[8]) > 59))) return false;
+  const at = new Date(0);
+  at.setUTCFullYear(year, month - 1, day);
+  at.setUTCHours(hour, minute, second, 0);
+  return at.getUTCFullYear() === year && at.getUTCMonth() === month - 1 && at.getUTCDate() === day
+    && at.getUTCHours() === hour && at.getUTCMinutes() === minute && at.getUTCSeconds() === second;
+}
 function decodeCursor(cursor: string): Position | null {
   if (cursor.length < 1 || cursor.length > 128 || !/^[A-Za-z0-9_-]+$/.test(cursor)) return null;
   const parts = Buffer.from(cursor, "base64url").toString("utf8").split("|");
   if (parts.length !== 2) return null;
   const [createdAt, id] = parts as [string, string];
   const position = { createdAt, id };
-  return TIMESTAMP.test(createdAt) && Number.isFinite(Date.parse(createdAt)) && UUID.test(id) && encodeCursor(position) === cursor ? position : null;
+  return postgresTimestamp(createdAt) && UUID.test(id) && encodeCursor(position) === cursor ? position : null;
 }
 
 /**
