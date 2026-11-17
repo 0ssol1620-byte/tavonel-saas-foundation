@@ -606,11 +606,13 @@ test.describe("QA 1 review: scroll axes, stretched links, text hiding, line clam
   clean drawer must pass.
 */
 test.describe("drawer", () => {
-  type Wiring = { hydrateMs?: number; closeOnLink?: boolean; escapeKeepsOpen?: boolean; escapeDropsFocus?: boolean; escapeLeaks?: boolean; escapeStopOnOpen?: boolean; noOpen?: boolean; drawerStyle?: string; linkStyle?: string; pageText?: string };
+  type Wiring = { hydrateMs?: number; closeOnLink?: boolean; escapeKeepsOpen?: boolean; escapeDropsFocus?: boolean; escapeLeaks?: boolean; escapeStopOnOpen?: boolean; escapeClosesUnstopped?: "sync" | "microtask"; noOpen?: boolean; drawerStyle?: string; linkStyle?: string; pageText?: string };
   // The shell's Escape guard (mobile-drawer.tsx before WO-CI-14 had none: the press reached every page listener).
   // escapeStopOnOpen adds it on open and removes it on close, the way more-menu.tsx's listener was scoped to `open`.
+  // escapeClosesUnstopped: the guard closes the drawer itself, now or in a microtask, and does not stop the press.
   const stopEscape = (w: Wiring) =>
-    w.escapeLeaks ? "" : `const stop = e => { if (e.key === "Escape" && d.open) e.stopImmediatePropagation(); };
+    w.escapeLeaks ? "" : `const stop = e => { if (e.key === "Escape" && d.open) ${
+      w.escapeClosesUnstopped === "sync" ? "d.close();" : w.escapeClosesUnstopped === "microtask" ? "queueMicrotask(() => d.close());" : "e.stopImmediatePropagation();"} };
       ${w.escapeStopOnOpen ? `d.addEventListener("close", () => removeEventListener("keydown", stop, true));` : ""}`;
   const drawer = (w: Wiring = {}) => `
     <header data-v34-header><button aria-label="Open navigation" aria-expanded="false" style="width:44px;height:44px">=</button>
@@ -683,6 +685,15 @@ test.describe("drawer", () => {
     const late = await drawerPass(page, "/");
     expect(passes(late)).toEqual(["escape-in-shell"]);
     expect(late.violations.map(v => v.detail)).toEqual(["the Escape that closed the drawer also reached the page's key listeners: window capture"]);
+    // A shell that closes the drawer itself, first, and lets the press go on: the drawer is shut before any page listener runs.
+    for (const timing of ["sync", "microtask"] as const) {
+      await load(page, drawer({ escapeClosesUnstopped: timing }));
+      const shut = await drawerPass(page, "/");
+      expect(passes(shut), timing).toEqual(["escape-in-shell"]);
+      expect(shut.violations.map(v => v.detail), timing).toEqual([
+        "the Escape that closed the drawer also reached the page's key listeners: window capture, document capture, document bubble, window bubble",
+      ]);
+    }
   });
 
   test("a followed link that leaves the drawer open is caught for the page already open and for another page", async ({ page }) => {
@@ -745,6 +756,42 @@ test.describe("More menu", () => {
     expect(leak.map(v => v.pass)).toEqual(["escape-in-shell"]);
     expect(leak[0].detail).toMatch(/^the Escape that closed the More menu also reached the page's key listeners: window capture, document capture/);
   });
+
+  /*
+    Every shell closer, by where its key listener sits, whether it stops the press and when the panel
+    closes (React flushes a discrete update in a microtask, so the panel is already hidden when the next
+    listener runs). The probe's listeners come after the shell's, as a page body's do: a stopped press
+    reaches the positions before the shell's in dispatch order; a press that is not stopped reaches all
+    four. Only a stop at window capture keeps the press in the shell. The pass must say so in every case,
+    whatever the panel's state when a later listener runs (WO-CI-14 r2: it read that state and saw nothing).
+  */
+  const POSITIONS = ["window capture", "document capture", "document bubble", "window bubble"] as const;
+  const closer = (at: (typeof POSITIONS)[number], stop: boolean, timing: "sync" | "microtask") => {
+    const [target, phase] = at.split(" ");
+    return `
+      <header data-v34-header><button aria-expanded="false" aria-controls="p">More</button><div id="p" hidden><a href="/x">X</a></div></header>
+      <main><h1>t</h1></main>
+      <script>
+        const b = document.querySelector("button"), p = document.getElementById("p");
+        const set = open => { p.hidden = !open; b.setAttribute("aria-expanded", String(open)); };
+        const close = () => { set(false); b.focus(); };
+        b.addEventListener("click", () => set(p.hidden));
+        ${target}.addEventListener("keydown", e => { if (e.key !== "Escape" || p.hidden) return; ${stop ? "e.stopImmediatePropagation();" : ""} ${timing === "sync" ? "close();" : "queueMicrotask(close);"} }, ${phase === "capture"});
+      </script>`;
+  };
+  for (const [index, at] of POSITIONS.entries()) {
+    for (const stop of [true, false]) {
+      for (const timing of ["sync", "microtask"] as const) {
+        const reached = stop ? POSITIONS.slice(0, index) : POSITIONS;
+        test(`a closer at ${at}, ${stop ? "stopping" : "not stopping"} the press, closing ${timing}: ${reached.length ? "caught" : "passes"}`, async ({ page }) => {
+          await load(page, closer(at, stop, timing));
+          expect(await moreMenuPass(page)).toEqual(
+            reached.length === 0 ? [] : [{ pass: "escape-in-shell", selector: '[id="p"]', detail: `the Escape that closed the More menu also reached the page's key listeners: ${reached.join(", ")}` }],
+          );
+        });
+      }
+    }
+  }
 
   test("a page without the V34 header, or without a visible More button, says so", async ({ page }) => {
     await load(page, `<header><nav><a href="/">x</a></nav></header><main><h1>t</h1></main>`);
