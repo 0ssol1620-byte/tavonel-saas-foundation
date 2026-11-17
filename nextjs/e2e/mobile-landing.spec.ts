@@ -101,7 +101,7 @@ test("the narrow header keeps brand, menu and commercial action inside one row",
   expect(boxes.wordmark).not.toBeNull();
   expect(boxes.menu).not.toBeNull();
   // Brief 2026-10-15 move 6: the narrow row is the wordmark and the menu; the actions are in the drawer.
-  await expect(page.locator(`${HEADER} > div > :not(dialog) a[href="/login"]`)).toBeHidden();
+  await expect(page.locator(`${HEADER} > div > :not(dialog)`).getByRole("link", { name: "Sign in", exact: true })).toBeHidden();
   await expect(page.locator(`${HEADER} > div > :not(dialog) a[data-analytics="header-start"]`)).toBeHidden();
   expect(boxes.wordmark!.right).toBeLessThanOrEqual(boxes.menu!.left + 1);
   expect(boxes.menu!.right).toBeLessThanOrEqual(boxes.viewport + 1);
@@ -127,7 +127,7 @@ test("the mobile menu exposes four section choices, Pricing and Sign in, and the
     the toggle and the action.
   */
   await expect(panel.getByRole("link", { name: "Sign in", exact: true })).toHaveCount(1);
-  await expect(page.locator(`${HEADER} > div > :not(dialog) a[href="/login"]`)).toBeHidden();
+  await expect(page.locator(`${HEADER} > div > :not(dialog)`).getByRole("link", { name: "Sign in", exact: true })).toBeHidden();
   // NAV PANELS 2026-11-09: the groups open closed (Home owns no section). V34: the More groups, as <details>.
   const groups = panel.locator('nav[aria-label="Site"] details');
   expect(await groups.count(), "the drawer carries the More groups").toBeGreaterThanOrEqual(1);
