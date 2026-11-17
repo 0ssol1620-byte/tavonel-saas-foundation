@@ -12,12 +12,14 @@
 -- each for create and decide, and old named-argument calls still resolve; the quote returns exactly
 -- the rows the re-charge trigger loops over and its overage equals the overage the trigger books;
 -- record-if-leaf replays and refuses a second correction of one base; I-1 every read RPC is
--- stable or immutable.
+-- stable or immutable. WO-AN-7 (20261117130200): grant creation holds the kill-switch advisory lock
+-- shared and revoke-all holds it exclusive until commit; in one session a grant created after the kill
+-- switch is a new, live grant.
 --
--- Not provable here (one transaction): the races of I-8, I-12 and I-13 under concurrent sessions --
--- scripts/db/agent-grant-race.mjs runs those against a local cluster.
+-- Not provable here (one transaction): the races of I-8, I-12 and I-13 and of grant creation against
+-- revoke-all under concurrent sessions -- scripts/db/agent-grant-race.mjs runs those against a local cluster.
 begin;
-select plan(110);
+select plan(113);
 
 create temp table keep (k text primary key, v jsonb);
 
@@ -48,6 +50,13 @@ returns jsonb language sql as $$
   select public.create_world_change_proposal(p_ws, 'collection-' || repeat('a', 32), 'library_label', '{"labelKey":"contract"}',
     'sha256:' || repeat('1', 64), '{}', 'sha256:' || repeat('d', 64), 1, 'agent', p_user, p_key, now() + interval '7 days',
     'active_manifest', p_grant, p_limit, p_reserve);
+$$;
+-- Whether this session holds the kill-switch advisory lock (20261117130200) in `p_mode`.
+create function pg_temp.holds_kill_lock(p_mode text) returns boolean language sql as $$
+  select exists (select 1 from pg_locks l
+    where l.locktype = 'advisory' and l.pid = pg_backend_pid() and l.granted and l.mode = p_mode and l.objsubid = 1
+      and l.classid::bigint = (hashtextextended('foundation_agent_grants:kill_switch', 0) >> 32) & 4294967295
+      and l.objid::bigint = hashtextextended('foundation_agent_grants:kill_switch', 0) & 4294967295);
 $$;
 create function pg_temp.id_of(p_k text) returns uuid language sql as $$
   select coalesce((v->'proposal'->>'proposal_id'), v->>'grantId', v->>'keyId')::uuid from keep where k = p_k;
@@ -102,6 +111,8 @@ select throws_ok($$select pg_temp.agent_grant('pilot-aa00000100004000', 'aa00000
   'P0001', 'api_key_authorization_changed', 'a grant at a stale membership revision is refused');
 insert into keep select 'g1', pg_temp.agent_grant('pilot-aa00000100004000', 'aa000001-0000-4000-8000-0000000000a1', 'agentGrant01', 1);
 insert into keep select 'g1b', pg_temp.agent_grant('pilot-aa00000100004000', 'aa000001-0000-4000-8000-0000000000a1', 'agentGrant02', 1);
+select ok(pg_temp.holds_kill_lock('ShareLock') and not pg_temp.holds_kill_lock('ExclusiveLock'),
+  'a grant creation holds the kill-switch lock shared, not exclusive, until its transaction ends');
 select is((select token_kind || '|' || (agent_grant_id = pg_temp.id_of('g1'))::text || '|' || (expires_at is not null)::text
   from public.foundation_api_keys where key_prefix = 'agentGrant01'), 'agent|true|true',
   'the grant RPC mints an agent key bound to its grant, with an expiry');
@@ -325,6 +336,7 @@ insert into keep select 'agent_keys_before', to_jsonb(count(*)) from public.foun
 insert into keep select 'kill_audit_before', to_jsonb(count(*)) from public.foundation_developer_audit_events
   where action = 'api_key_revoked' and details->>'killSwitch' = 'true';
 insert into keep select 'all', public.revoke_all_foundation_agent_grants();
+select ok(pg_temp.holds_kill_lock('ExclusiveLock'), 'revoke-all holds the kill-switch lock exclusive until its transaction ends');
 -- G2: one api_key_revoked row per revoked agent key, same transaction; a second call writes none.
 select ok((select (v->>'keys')::integer from keep where k = 'all') = (select v::text::integer from keep where k = 'agent_keys_before')
   and (select v::text::integer from keep where k = 'agent_keys_before') >= 2, 'revoke-all revokes every live agent key (N >= 2 here)');
@@ -352,6 +364,12 @@ select ok((select revoked_at is null from public.foundation_api_keys where key_p
 select ok((select revoked_at is null from public.foundation_api_keys where key_prefix = 'mcpKeyB00001'), 'a remote MCP key is untouched');
 select is((select state from public.world_change_proposals where proposal_id = pg_temp.id_of('b1')), 'withdrawn',
   'the open agent proposal is withdrawn');
+-- The kill switch is not a standing ban: a grant created after it is a person's new grant (the flag, not the
+-- lock, refuses new grants).
+insert into keep select 'g_after', pg_temp.agent_grant('pilot-bb00000200004000', 'bb000002-0000-4000-8000-0000000000b2', 'agentAfter01', 1);
+select is((select (g.revoked_at is null)::text || '|' || (k.revoked_at is null)::text from public.foundation_agent_grants g
+    join public.foundation_api_keys k on k.agent_grant_id = g.grant_id where g.grant_id = pg_temp.id_of('g_after')), 'true|true',
+  'a grant created after revoke-all is live, with a live credential');
 
 -- ---------------------------------------------------------------------------------------------
 -- The compile quote: the trigger's rows and its arithmetic (20261117120000 rule 4).

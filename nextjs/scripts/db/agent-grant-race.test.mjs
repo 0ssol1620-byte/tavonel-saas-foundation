@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  SCENARIOS, KNOWN_REFUSALS, checkI12A, checkI12B, checkI13, checkI8, checkLeaf, mulberry32, parseOutcome, planIteration, validateEnvironment,
+  SCENARIOS, KNOWN_REFUSALS, checkI12A, checkI12B, checkI13, checkI8, checkKill, checkLeaf, mulberry32, parseOutcome, planIteration, validateEnvironment,
 } from "./agent-grant-race.mjs";
 
 const ok = (value) => ({ ok: true, value, error: null });
@@ -68,6 +68,27 @@ test("LEAF: exactly one of two corrections of one base is recorded, the other is
   assert.deepEqual(rules(checkLeaf({ records: [ok({ replayed: false }), no("deadlock detected")], correctionsOfBase: 1 })), ["ERR", "LEAF"]);
   assert.ok(KNOWN_REFUSALS.has("review_base_not_head"));
   assert.ok(SCENARIOS.includes("LEAF"));
+});
+
+test("KILL: a grant committed before revoke-all's commit and revoked with its key is clean; one committed after and live is clean", () => {
+  const first = { create: ok({ grantId: "g" }), revoke: ok({ grants: 2 }), createCommittedFirst: true, grantRevoked: true, keyRevoked: true };
+  assert.deepEqual(checkKill(first), []);
+  assert.deepEqual(checkKill({ ...first, createCommittedFirst: false, grantRevoked: false, keyRevoked: false }), []);
+  assert.ok(SCENARIOS.includes("KILLA") && SCENARIOS.includes("KILLB"));
+});
+
+test("KILL: the mutant without the lock -- a grant committed before revoke-all's commit left live -- is a violation", () => {
+  const survived = { create: ok({ grantId: "g" }), revoke: ok({ grants: 1 }), createCommittedFirst: true, grantRevoked: false, keyRevoked: false };
+  assert.deepEqual(rules(checkKill(survived)), ["KILL"]);
+  assert.deepEqual(rules(checkKill({ ...survived, grantRevoked: true })), ["KILL"], "a revoked grant whose key is live is a violation");
+  assert.deepEqual(rules(checkKill({ ...survived, keyRevoked: true })), ["KILL"], "a live grant whose key is revoked is a violation");
+});
+
+test("KILL: a creation after the kill switch that is revoked anyway, a refused creation, a failed revoke-all are violations", () => {
+  const after = { create: ok({ grantId: "g" }), revoke: ok({ grants: 1 }), createCommittedFirst: false, grantRevoked: true, keyRevoked: true };
+  assert.deepEqual(rules(checkKill(after)), ["KILL"]);
+  assert.deepEqual(rules(checkKill({ ...after, create: no("api_key_authorization_changed") })), ["ERR", "KILL"]);
+  assert.deepEqual(rules(checkKill({ ...after, revoke: no("deadlock detected") })), ["ERR", "KILL"]);
 });
 
 test("an unknown refusal (a deadlock, a typo) is flagged in every scenario", () => {
