@@ -172,7 +172,7 @@ test.describe("at 1440", () => {
     await expect(action).toHaveCSS("font-weight", linkWeight);
     await expect(page.locator(`${HEADER} > div > :not(dialog) a[data-analytics="header-start"]`)).toHaveAttribute("href", START.href);
 
-    const signIn = page.locator(`${HEADER} > div > :not(dialog) a[href="/login"]`);
+    const signIn = page.locator(`${HEADER} > div > :not(dialog)`).getByRole("link", { name: "Sign in", exact: true });
     await expect(signIn).toHaveAttribute("href", "/login");
     await expect(signIn).toBeVisible();
   });
@@ -275,7 +275,7 @@ test.describe("at 390", () => {
   test("opens a drawer of the primary destinations plus Sign in and the start", async ({ page }) => {
     await page.goto("/product");
     // Brief 2026-10-15 move 6: the phone row is the wordmark and the menu; Sign in and the start leave it.
-    await expect(page.locator(`${HEADER} > div > :not(dialog) a[href="/login"]`)).toBeHidden();
+    await expect(page.locator(`${HEADER} > div > :not(dialog)`).getByRole("link", { name: "Sign in", exact: true })).toBeHidden();
     await expect(page.locator(`${HEADER} > div > :not(dialog) a[data-analytics="header-start"]`)).toBeHidden();
 
     const panel = await openDrawer(page);
@@ -288,8 +288,9 @@ test.describe("at 390", () => {
     await expect(start).toHaveCount(1);
     await expect(start).toHaveText(START.label);
     await expect(start).toHaveAttribute("href", START.href);
-    // The groups may link the sample; the drawer's one filled action is the start, not the sample.
-    const filled = await panel.locator("a, button").evaluateAll((elements: Element[]) => elements
+    // The groups may link the sample; the drawer's one filled action is the start, not the sample. Links, as the
+    // legacy `a.btn` count was: the drawer's close button is a control, not an action.
+    const filled = await panel.locator("a").evaluateAll((elements: Element[]) => elements
       .filter((element) => element.getClientRects().length > 0)
       .filter((element) => {
         const background = getComputedStyle(element).backgroundColor;

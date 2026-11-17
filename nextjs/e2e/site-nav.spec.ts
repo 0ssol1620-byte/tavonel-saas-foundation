@@ -229,7 +229,14 @@ const DESKTOP: Scenario[] = [
       // /explore carries the V34 shell (D33 #4). V34 Home does not link the sample from its body;
       // follow the footer's entry, prove the current act, then use the stage's named exit back home.
       await page.goto("/");
-      await activateLink(page, page.locator(`${FOOTER} a[href="/explore"]`).first());
+      const exploreEntry = page.locator(`${FOOTER} a[href="/explore"]`).first();
+      // Scrolling to the footer raises the analytics consent card over it (Release 2: after 200px); answer it first.
+      await exploreEntry.scrollIntoViewIfNeeded();
+      const consent = page.getByRole("region", { name: "Optional analytics", exact: true });
+      await expect(consent).toBeVisible();
+      await consent.getByRole("button", { name: "No thanks", exact: true }).click();
+      await expect(consent).toBeHidden();
+      await activateLink(page, exploreEntry);
       await expect(page).toHaveURL(arrivedAt("/explore"));
       const stage = page.locator('[data-visual-world="explore"]');
       await expect(stage).toBeVisible();
@@ -335,7 +342,7 @@ const PHONE: Scenario[] = [
       await expect.soft(first, "opening a second group closes the first").not.toHaveAttribute("open", "");
       // Sign in is the drawer's own row; the header row is the wordmark and the drawer trigger only.
       await expect(page.locator(SHEET).getByRole("link", { name: "Sign in", exact: true })).toHaveCount(1);
-      await expect(page.locator(`${HEADER} > div > :not(dialog) a[href="/login"]`)).toBeHidden();
+      await expect(page.locator(`${HEADER} > div > :not(dialog)`).getByRole("link", { name: "Sign in", exact: true })).toBeHidden();
     },
   },
   {

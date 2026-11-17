@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 
 const ROUTES = ["/pricing"] as const;
+/*
+  The plans /pricing shows. Six since catalog v2 (price book PB-2026-11-V22: Free, Personal, Developer,
+  Team, Business, Enterprise; lib/billing-catalog.ts), merged before WO-CI-5a; it was four. The count
+  is pinned, not floored, as before. The 280px compact-comparison budget below is unchanged.
+*/
+const PLANS = 6;
 
 function overview(page: import("@playwright/test").Page, route: typeof ROUTES[number]) {
   return page.getByRole("navigation", { name: route === "/ko/pricing" ? "요금제 비교 및 상세 보기" : "Compare plans and jump to details", exact: true });
@@ -13,8 +19,8 @@ test("phone plan overview matches every detailed plan and jumps by keyboard with
     const nav = overview(page, route);
     await expect(nav).toBeVisible();
     const links = nav.getByRole("link");
-    await expect(links).toHaveCount(4);
-    for (let index = 0; index < 4; index++) {
+    await expect(links).toHaveCount(PLANS);
+    for (let index = 0; index < PLANS; index++) {
       const link = links.nth(index);
       const target = page.locator(`#pricing-plan-${index}`);
       await expect(link).toHaveAttribute("href", `#pricing-plan-${index}`);
@@ -43,7 +49,7 @@ test("phone plan overview matches every detailed plan and jumps by keyboard with
       await expect.poll(async () => {
         return target.getByRole("heading").evaluate(heading => {
           const box = heading.getBoundingClientRect();
-          const header = document.querySelector<HTMLElement>("header.nav");
+          const header = document.querySelector<HTMLElement>("[data-v34-header]");
           if (!header) throw new Error("Missing public header");
           return box.top >= Math.max(0, header.getBoundingClientRect().bottom) - 1 && box.bottom <= innerHeight;
         });
@@ -93,8 +99,8 @@ test("all plan prices fit in the compact phone comparison before detailed plan c
             });
             return { top: bounds.top, bottom: bounds.bottom, height: bounds.height, firstPlanTop: firstPlan.top, viewportWidth: innerWidth, viewportHeight: innerHeight, links };
           });
-          expect(layout.links).toHaveLength(4);
-          expect(layout.height, "all four plan prices form a compact comparison").toBeLessThanOrEqual(280);
+          expect(layout.links).toHaveLength(PLANS);
+          expect(layout.height, "all plan prices form a compact comparison").toBeLessThanOrEqual(280);
           expect(layout.bottom).toBeLessThanOrEqual(layout.firstPlanTop);
           for (const link of layout.links) {
             expect(link.width).toBeGreaterThanOrEqual(44);
@@ -111,7 +117,7 @@ test("all plan prices fit in the compact phone comparison before detailed plan c
           await nav.evaluate(element => element.scrollIntoView({ block: "start", behavior: "instant" }));
           const comparison = await nav.evaluate(element => {
             const box = element.getBoundingClientRect();
-            const header = document.querySelector<HTMLElement>("header.nav");
+            const header = document.querySelector<HTMLElement>("[data-v34-header]");
             if (!header) throw new Error("Missing public header");
             return { top: box.top, bottom: box.bottom, headerBottom: header.getBoundingClientRect().bottom, viewportHeight: innerHeight };
           });
