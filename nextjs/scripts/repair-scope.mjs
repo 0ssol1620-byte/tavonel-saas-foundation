@@ -3094,17 +3094,22 @@ export const REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES = Object.freeze(['lib/con
 // different runners for one file fail the map. Product code, so never nativeReuse.
 // The Launch QA Product QA step at this head: no file filter, no grep, so each project runs every spec playwright.config.ts admits to it.
 const LAUNCH_QA_PRODUCT_STEP = 'pnpm exec playwright test --project=1440 --project=390 --project=360 --project=reduced-motion --project=audit --project=audit-768 --project=audit-1280';
-const productQaClaim = project => Object.freeze({ kind: 'playwright', workflow: '.github/workflows/launch-qa.yml', job: 'product-qa', run: LAUNCH_QA_PRODUCT_STEP, project });
+// Round 5: a claim names the whole environment its step runs with, the workflow's, the job's and the step's env merged. Product QA sets
+// three keys at job level (the server timeout and the live-commerce posture) and none on the step.
+const LAUNCH_QA_PRODUCT_ENV = Object.freeze({ PLAYWRIGHT_WEB_SERVER_TIMEOUT: '480000', COMMERCIAL_MODE: 'live', TAVONEL_BILLING_LAUNCH_APPROVED: 'true' });
+const productQaClaim = project => Object.freeze({ kind: 'playwright', workflow: '.github/workflows/launch-qa.yml', job: 'product-qa', run: LAUNCH_QA_PRODUCT_STEP, env: LAUNCH_QA_PRODUCT_ENV, project });
 // ci.yml's nextjs job: `pnpm test` is `vitest run && pnpm test:scripts`, so it runs every file the shared Vitest include admits.
 const CI_NEXTJS_VITEST_CLAIM = Object.freeze({ kind: 'vitest', workflow: '.github/workflows/ci.yml', job: 'nextjs', run: 'pnpm test' });
 // Product QA runs e2e/change-proposals.spec.ts on every width project and reduced-motion; WO-AN-6 asked for 390, 360, 1440 and
 // reduced-motion, so the claim names those four and each is read at head (the spec has no project skip).
-const CHANGE_PROPOSALS_CLAIM = Object.freeze({ kind: 'playwright', workflow: '.github/workflows/launch-qa.yml', job: 'product-qa', run: LAUNCH_QA_PRODUCT_STEP, projects: Object.freeze(['1440', '390', '360', 'reduced-motion']) });
+const CHANGE_PROPOSALS_CLAIM = Object.freeze({ kind: 'playwright', workflow: '.github/workflows/launch-qa.yml', job: 'product-qa', run: LAUNCH_QA_PRODUCT_STEP, env: LAUNCH_QA_PRODUCT_ENV, projects: Object.freeze(['1440', '390', '360', 'reduced-motion']) });
 // Launch QA's v34-matrix job (WO-CI-9): the whole matrix over the live registry rows and the harness self-test, in one step whose
 // environment is part of the claim (the QA server, live rows, the three widths). The Repair browser stage runs only the matrix's
 // SEO and held passes and the self-test without its WebKit case, so this claim names what only that job runs.
-const LAUNCH_QA_V34_STEP = 'pnpm exec playwright test --project=v34-selftest --project=v34-chromium';
-const LAUNCH_QA_V34_ENV = Object.freeze({ PLAYWRIGHT_EXTERNAL_SERVER: '1', PLAYWRIGHT_BASE_URL: 'http://127.0.0.1:3117', V34_RELEASE: 'live', V34_WIDTHS: '390,412,1440', V34_QA_OUT: 'v34-qa-out/qa' });
+const LAUNCH_QA_V34_STEP = 'pnpm exec playwright test --project=v34-selftest --project=v34-chromium --retries=0';
+// The job's env (the webServer environment for the build and both servers), then the step's own.
+const LAUNCH_QA_V34_ENV = Object.freeze({ NEXT_PUBLIC_SUPABASE_URL: 'https://test.supabase.co', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'foundation-browser-e2e-anon-key', PLAYWRIGHT_LOCAL_HTTP: '1',
+  PLAYWRIGHT_EXTERNAL_SERVER: '1', PLAYWRIGHT_BASE_URL: 'http://127.0.0.1:3117', V34_RELEASE: 'live', V34_WIDTHS: '390,412,1440', V34_QA_OUT: 'v34-qa-out/qa' });
 const v34MatrixJobClaim = project => Object.freeze({ kind: 'playwright', workflow: '.github/workflows/launch-qa.yml', job: 'v34-matrix', run: LAUNCH_QA_V34_STEP, env: LAUNCH_QA_V34_ENV, project });
 // Program paths no owner takes, so each fails the map as unmapped with its reason: a red gate with a true reason, not a green one that
 // runs nothing (lead decision K3). Empty at this head: the V34 QA harness and the local database harness are run by the Repair job
@@ -3326,16 +3331,7 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
       'e2e/change-proposals.spec.ts': CHANGE_PROPOSALS_CLAIM,
     }),
   }),
-});
-// Owners for paths lanes still in flight add, fixed by their work orders. None of these paths exists at this head. Each owner is its
-// own group, selected only by a change to its own paths, so a suite it names that is absent today can only be selected by the change
-// that adds it; until then the map is unchanged.
-// WO-AN-7B's migration 20261117130300 and its rollback draft need no entry: every supabase/{migrations,tests,drafts}/*.sql is the
-// database-contract group's. WO-CI-6B also changes app/explore/page.tsx and components/explore/explore-stage.module.css: both are
-// already owned (public-marketing-surface, which executes 52 unit and 33 browser suites) and are changed in this plan, so naming
-// lib/v34/retained-shell.test.ts for them before that file exists would fail this plan; the refresh after WO-CI-6B merges adds it.
-export const V34_PROGRAM_PENDING_OWNERS = Object.freeze({
-  // agent-mcp-route (WO-AN-5): the agent MCP route, its nine tools, the agent proposal DTO and the security suite, with the route
+  // agent-mcp-route (WO-AN-5, merged): the agent MCP route, its nine tools, the agent proposal DTO and the security suite, with the route
   // matrices every new API route enters.
   'agent-mcp-route': Object.freeze({
     paths: Object.freeze(['app/api/agent-mcp/route.ts', 'lib/agent-mcp-tools.test.ts', 'lib/agent-mcp-tools.ts', 'lib/agent-proposal-view.test.ts', 'lib/agent-proposal-view.ts', 'lib/agent-proposals-security.test.ts']),
@@ -3343,10 +3339,30 @@ export const V34_PROGRAM_PENDING_OWNERS = Object.freeze({
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
-  // v34-retained-shell (WO-CI-6B): the retained-route shell suite, selected by itself.
+  // v34-retained-shell (WO-CI-6B, merged): the retained-route shell suite, which renders app/explore/page.tsx inside the V34 frame and
+  // reads the explore stage and its stylesheet. It owns itself; boundPaths are paths another owner keeps (public-marketing-surface,
+  // paper-product-route-css) that also select this suite, so a change to them runs it as well.
   'v34-retained-shell': Object.freeze({
     paths: Object.freeze(['lib/v34/retained-shell.test.ts']),
+    boundPaths: Object.freeze(['app/explore/page.tsx', 'components/explore/explore-stage.module.css', 'components/explore/explore-stage.tsx']),
     unitFiles: Object.freeze(['lib/v34/retained-shell.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+});
+// Owners for paths lanes still in flight add, fixed by their work orders. None of these paths exists at this head. Each owner is its
+// own group, selected only by a change to its own paths, so a suite it names that is absent today can only be selected by the change
+// that adds it; until then the map is unchanged.
+// WO-AN-7B's migration 20261117130300 and its rollback draft (merged) need no entry: every supabase/{migrations,tests,drafts}/*.sql is
+// the database-contract group's.
+export const V34_PROGRAM_PENDING_OWNERS = Object.freeze({
+  // explore-shell-keys (WO-CI-6C, in flight): the /explore key guard spec. It is its own check, and the Repair browser stage can run it only
+  // through a reviewed row naming the projects its skips allow, which cannot be written before the spec exists. So it selects nothing yet:
+  // a change that adds it fails the map closed ("selects no check the Repair job executes") until the refresh after WO-CI-6C names the
+  // spec and its row here. Launch QA's jobs pick it up on their own; that is not counted here.
+  'explore-shell-keys': Object.freeze({
+    paths: Object.freeze(['e2e/explore-shell-keys.spec.ts']),
+    unitFiles: Object.freeze([]),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
@@ -3647,8 +3663,8 @@ export const AFFECTED_GROUPS = Object.freeze([
   // large-source-intake-copy (ADR-0006): the 4 exact paths above select 4 direct suites and no browser suite.
   affectedGroup('large-source-intake-copy', new RegExp(`^(?:${exactPathAlternation(LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS)})$`),
     { unitFiles: LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES }),
-  ...Object.entries({ ...V34_PROGRAM_AFFECTED_OWNERS, ...V34_PROGRAM_PENDING_OWNERS }).map(([group, { paths, unitFiles, browserFiles, externalChecks }]) =>
-    affectedGroup(group, new RegExp(`^nextjs/(?:${exactPathAlternation(paths)})$`), { unitFiles, browserFiles, externalChecks, requireExecutedCheck: true })),
+  ...Object.entries({ ...V34_PROGRAM_AFFECTED_OWNERS, ...V34_PROGRAM_PENDING_OWNERS }).map(([group, { paths, boundPaths = [], unitFiles, browserFiles, externalChecks }]) =>
+    affectedGroup(group, new RegExp(`^nextjs/(?:${exactPathAlternation([...paths, ...boundPaths])})$`), { unitFiles, browserFiles, externalChecks, requireExecutedCheck: true })),
 ]);const regularModes = ['100644', '100755'];
 
 export function parseAffectedRawDiff(output) {
@@ -3669,47 +3685,102 @@ export function parseAffectedRawDiff(output) {
   return records;
 }
 
-// One job's steps from a workflow file, read as text: { steps: [{ run, conditional, rebound }], conditional, nextjsDefault, needs }, with
-// each run command folded to one line, or null when the job is absent. needs is null when the job's needs list is not an inline name or
-// [a, b] list. Only the shapes this repository's workflows use are read (an inline
-// run, a `>-`/`>` folded block, a `|` literal block); any other shape yields a run that matches no claim, so the claim is refused.
+// The lines YAML reads as content, in order. Blank, whitespace-only and comment-only lines are dropped at any indent, so no reader below
+// ever stops at one; inside a block scalar (`key: |`, `key: >-`, any indicators) every non-blank line indented past the key is content
+// and kept, `#` included (its blank lines are dropped too: no reader here needs them, and a kept one would read as a column-0 line).
+// A line mistaken for a block-scalar start only keeps lines, which the readers then refuse: it never hides one.
+function yamlContentLines(text) {
+  const lines = [];
+  let scalar = -1;
+  for (const line of text.replace(/\r\n/g, '\n').split('\n')) {
+    const indent = line.length - line.trimStart().length;
+    if (scalar >= 0 && !line.trim()) continue;
+    if (scalar >= 0 && indent > scalar) { lines.push(line); continue; }
+    scalar = -1;
+    if (!line.trim() || line.trimStart().startsWith('#')) continue;
+    lines.push(line);
+    // Linear: the leading spaces and `- ` markers are read once, then one anchored test of the rest.
+    const lead = /^ *(?:- +)*/.exec(line)[0].length, rest = line.slice(lead);
+    if (/^[^\s#].*?:[ \t]+[|>][0-9+-]*(?:[ \t]+#.*)?[ \t]*$/.test(rest)) scalar = lead;
+    else if (/^[|>][0-9+-]*(?:[ \t]+#.*)?[ \t]*$/.test(rest)) scalar = indent;
+  }
+  return lines;
+}
+const indentOf = line => line.length - line.trimStart().length;
+// A flat env block under `lines[at]` (`<indent>env:`): { KEY: value } with quotes removed, or null when it is anything else (a flow map,
+// an anchor, a trailing comment, a nested or continued value, a quoted, lower-case or repeated key, an indicator-led or `: `-bearing value).
+function readEnvBlock(lines, at, indent) {
+  if (lines[at].slice(indent + 'env:'.length).trim()) return null;
+  const env = {}, pair = new RegExp(String.raw`^ {${indent + 2}}([A-Z][A-Z0-9_]*): (?:"([^"\\]*)"|([^\s"'#|>&*!%@\x60{}[\],?:-][^#]*?))[ \t]*$`);
+  for (const line of lines.slice(at + 1)) {
+    if (indentOf(line) <= indent) break;
+    const found = pair.exec(line), value = found?.[2] ?? found?.[3];
+    if (!found || Object.hasOwn(env, found[1]) || (found[3] !== undefined && /:(?:\s|$)/.test(value))) return null;
+    env[found[1]] = value;
+  }
+  return env;
+}
+// The env declared at one level (`lines` are that level's own lines): undefined when there is none, null when unreadable or declared twice.
+function levelEnv(lines, indent) {
+  const at = lines.flatMap((line, index) => new RegExp(`^ {${indent}}env:`).test(line) ? [index] : []);
+  return !at.length ? undefined : at.length > 1 ? null : readEnvBlock(lines, at[0], indent);
+}
+// Keys this reader has reviewed: anything else at the job or the claimed step's level (a quoted key included) refuses the claim.
+const REVIEWED_WORKFLOW_KEYS = new Set(['name', 'run-name', 'on', 'permissions', 'concurrency', 'env', 'defaults', 'jobs']);
+const REVIEWED_JOB_KEYS = new Set(['name', 'needs', 'runs-on', 'timeout-minutes', 'defaults', 'env', 'steps', 'if', 'continue-on-error']);
+const REVIEWED_STEP_KEYS = new Set(['name', 'id', 'run', 'env', 'timeout-minutes', 'if', 'continue-on-error', 'working-directory', 'shell']);
+// Keys of one level: the lines at exactly `indent` must each be a bare `key:`; a line between that level and the next one in is unreadable.
+function levelKeys(lines, indent) {
+  const keys = [];
+  for (const line of lines) {
+    const at = indentOf(line);
+    if (at > indent + 1) continue;
+    const key = at === indent ? /^ *([a-z][a-z-]*):(?: |$)/.exec(line)?.[1] : undefined;
+    if (!key) return null;
+    keys.push(key);
+  }
+  return keys;
+}
+// The workflow-level facts every job inherits: { env, defaults, unreviewed }.
+function workflowLevel(text) {
+  const lines = yamlContentLines(text), keys = levelKeys(lines, 0);
+  return { env: levelEnv(lines, 0), defaults: lines.some(line => /^defaults:/.test(line)), unreviewed: !keys || keys.some(key => !REVIEWED_WORKFLOW_KEYS.has(key)) };
+}
+// One job of a workflow file, read from its content lines (yamlContentLines): { steps: [{ run, conditional, rebound, env, unreviewed }],
+// conditional, nextjsDefault, needs, env, unreviewed, writesEnvironment }, or null when the job is absent. Each run is folded to one line;
+// a run is null (it matches no claim, so the claim is refused) for any shape but an inline run with no continuation line, a `>`/`>-`
+// folded or `|`/`|-` literal block whose lines share one indent. needs is null unless an inline name or [a, b] list.
 function workflowJobSteps(text, job) {
-  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const lines = yamlContentLines(text);
   const jobsAt = lines.indexOf('jobs:'), start = lines.findIndex((line, index) => jobsAt >= 0 && index > jobsAt && line === `  ${job}:`);
   if (start < 0) return null;
-  const next = lines.findIndex((line, index) => index > start && /^ {0,2}[A-Za-z0-9_-]+:/.test(line));
+  const next = lines.findIndex((line, index) => index > start && indentOf(line) <= 2);
   const body = lines.slice(start + 1, next < 0 ? lines.length : next), jobText = body.join('\n'), steps = [];
   for (const [index, line] of body.entries()) {
     if (!line.startsWith('      - ')) continue;
-    const end = body.findIndex((candidate, at) => at > index && (candidate.startsWith('      - ') || /^ {0,5}\S/.test(candidate)));
+    const end = body.findIndex((candidate, at) => at > index && (candidate.startsWith('      - ') || indentOf(candidate) <= 5));
     const step = body.slice(index, end < 0 ? body.length : end).map((candidate, at) => at === 0 ? '        ' + candidate.slice(8) : candidate);
     const runAt = step.findIndex(candidate => candidate.startsWith('        run:'));
     let run = null;
     if (runAt >= 0) {
-      const inline = step[runAt].slice('        run:'.length).trim();
-      if (!['', '>', '>-', '|', '|-'].includes(inline)) run = inline;
-      else {
-        const block = [];
-        for (const candidate of step.slice(runAt + 1)) { if (candidate.trim() && !candidate.startsWith('          ')) break; if (candidate.trim()) block.push(candidate.trim()); }
-        run = block.join(inline.startsWith('|') ? '\n' : ' ');
-      }
+      const inline = step[runAt].slice('        run:'.length).trim(), after = step.slice(runAt + 1), more = after.findIndex(candidate => indentOf(candidate) <= 8);
+      const block = (more < 0 ? after : after.slice(0, more)).filter(candidate => candidate.trim());
+      if (!['', '>', '>-', '|', '|-'].includes(inline)) run = block.length ? null : inline;
+      else if (block.length && block.every(candidate => indentOf(candidate) === indentOf(block[0]))) run = block.map(candidate => candidate.trim()).join(inline.startsWith('|') ? '\n' : ' ');
     }
-    // A step env is read as flat `KEY: value` lines (quotes removed); any other shape under `env:` makes it unreadable (null).
-    const envAt = step.findIndex(candidate => /^ {8}env:\s*$/.test(candidate));
-    let env = envAt < 0 ? undefined : {};
-    if (envAt >= 0) for (const candidate of step.slice(envAt + 1)) {
-      if (!candidate.startsWith('          ')) { if (/^ {9}\S/.test(candidate)) env = null; break; }
-      if (!candidate.trim() || candidate.trim().startsWith('#')) continue;
-      const pair = /^ {10}([A-Z][A-Z0-9_]*): (?:"([^"\\]*)"|([^\s"'#][^#]*?))\s*$/.exec(candidate);
-      if (!pair || !env || Object.hasOwn(env, pair[1])) { env = null; break; }
-      env[pair[1]] = pair[2] ?? pair[3];
-    }
-    if (step.some(candidate => /^ {8}env:\s*\S/.test(candidate))) env = null;
-    steps.push({ run, conditional: step.some(candidate => /^ {8}(?:if|continue-on-error):/.test(candidate)), rebound: step.some(candidate => /^ {8}(?:working-directory|shell):/.test(candidate)), env });
+    const keys = levelKeys(step, 8);
+    steps.push({ run, conditional: step.some(candidate => /^ {8}(?:if|continue-on-error):/.test(candidate)), rebound: step.some(candidate => /^ {8}(?:working-directory|shell):/.test(candidate)),
+      env: levelEnv(step, 8), unreviewed: !keys || keys.some(key => !REVIEWED_STEP_KEYS.has(key)) });
   }
   const needsAt = /^ {4}needs:(.*)$/m.exec(jobText)?.[1].trim(), needsList = needsAt === undefined ? '' : /^\[([A-Za-z0-9_, -]*)\]$/.exec(needsAt)?.[1] ?? (/^[A-Za-z0-9_-]+$/.test(needsAt) ? needsAt : null);
   const needs = needsList === null ? null : needsList.split(',').map(name => name.trim()).filter(Boolean);
-  return { steps, conditional: /^ {4}(?:if|continue-on-error):/m.test(jobText), nextjsDefault: /^ {4}defaults:\n {6}run:\n {8}working-directory: nextjs$/m.test(jobText), needs };
+  // defaults is exactly `run: working-directory: nextjs`, nothing more (a shell under it is another environment).
+  const defaultsAt = body.indexOf('    defaults:'), defaultsEnd = body.findIndex((candidate, at) => at > defaultsAt && indentOf(candidate) <= 4);
+  const nextjsDefault = defaultsAt >= 0 && body.slice(defaultsAt + 1, defaultsEnd < 0 ? body.length : defaultsEnd).join('\n') === '      run:\n        working-directory: nextjs';
+  // The job's own key lines only: step lines start at indent 6, so the job level is read at indent 4.
+  const jobKeys = levelKeys(body.filter(candidate => indentOf(candidate) <= 5), 4);
+  return { steps, conditional: /^ {4}(?:if|continue-on-error):/m.test(jobText), nextjsDefault, needs, env: levelEnv(body, 4),
+    unreviewed: !jobKeys || jobKeys.some(key => !REVIEWED_JOB_KEYS.has(key)), writesEnvironment: /GITHUB_(?:ENV|PATH)\b/.test(jobText) };
 }
 const globSource = glob => '^' + glob.split('**/').map(part => part.split('*').map(text => text.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*')).join('(?:[^/]+/)*') + '$';
 // Two claims are one claim when they hold the same keys and values, in any key order.
@@ -3720,7 +3791,9 @@ const canonicalClaim = claim => JSON.stringify(canonicalValue(claim));
 // Two skip conditions are read, with the project name spelled `<identifier>.project.name` or `test.info().project.name`:
 //   test.skip(!["a", "b"].includes(<name>), ...)        allowed: a, b
 //   test.skip(<name> !== "a" && <name> !== "b", ...)   allowed: a, b
-// A skip belongs to the nearest test(...) or test.beforeEach(...) declared above it (line-start declarations only); a hook at
+// A skip belongs to the nearest test(...) or test.beforeEach(...) declared above it (line-start declarations only; test.slow(),
+// test.fail(cond), test.fixme(cond) and test.setTimeout(...) inside a test are not declarations, and a test.fixme or test.skip with a
+// title declares a test that never runs, so it is never counted as running something); a hook at
 // column 0 applies to every test in the file, an indented one to the tests below it up to the next declaration indented less.
 // A project runs nothing when every test declared in the file has a read skip that leaves it out. Not detected, so never a
 // refusal: any other condition (a variable list, ===, ||, a helper such as phoneShowsStill), skips in helpers above the first
@@ -3738,8 +3811,10 @@ const skipStrings = text => [...text.matchAll(new RegExp(SKIP_STRING, 'g'))].map
 export function specSkipAllowance(source) {
   if (typeof source !== 'string' || source.length > SPEC_SKIP_READ_LIMIT) return null;
   const text = source.replace(/\r\n/g, '\n'), declarations = [];
-  for (const match of text.matchAll(/^([ \t]*)test(\.beforeEach|\.describe(?:\.[A-Za-z]+)?|\.(?:only|fail|slow|fixme))?\(/gm))
-    declarations.push({ at: match.index, indent: match[1].length, kind: match[2] === '.beforeEach' ? 'hook' : match[2]?.startsWith('.describe') ? 'describe' : 'test', allowed: null });
+  // test.fail / test.fixme / test.skip declare a test only with a title (a string or template literal first argument); called with a
+  // condition or nothing, as test.slow and test.setTimeout always are, they modify the test they are in and declare nothing.
+  for (const match of text.matchAll(/^([ \t]*)test(\.beforeEach|\.describe(?:\.[A-Za-z]+)?|\.only|\.(?:fail|fixme|skip)(?=\(\s*["'`]))?\(/gm))
+    declarations.push({ at: match.index, indent: match[1].length, kind: match[2] === '.beforeEach' ? 'hook' : match[2]?.startsWith('.describe') ? 'describe' : match[2] === '.fixme' || match[2] === '.skip' ? 'never' : 'test', allowed: null });
   const narrow = (declaration, allowed) => { declaration.allowed = declaration.allowed ? declaration.allowed.filter(project => allowed.includes(project)) : [...allowed]; };
   let owner = null, next = 0;
   for (let at = text.indexOf('test.skip('); at >= 0; at = text.indexOf('test.skip(', at + 1)) {
@@ -3789,19 +3864,27 @@ function claimFailures(file, claim, read) {
   if (!/^on:\s*$/m.test(lf) || !/^ {2}pull_request:/m.test(lf)) return refuse(`${claim.workflow} does not run on pull_request`);
   // A bare `pull_request:` with nothing under it: a paths, branches or types filter can keep the job from running on a PR.
   if (!/^ {2}pull_request:[ \t]*\n(?! {3})/m.test(lf)) return refuse(`${claim.workflow} narrows its pull_request trigger`);
+  const workflowFacts = workflowLevel(lf);
+  if (workflowFacts.unreviewed) return refuse(`${claim.workflow} has a top-level key this check has not reviewed`);
+  if (workflowFacts.defaults) return refuse(`${claim.workflow} sets workflow defaults, so every step's directory, shell or environment is rebound`);
   const job = workflowJobSteps(lf, claim.job);
   if (!job) return refuse(`${claim.workflow} has no job ${claim.job}`);
   if (job.conditional || !job.nextjsDefault) return refuse(`job ${claim.job} is conditional or does not run in nextjs/`);
+  if (job.unreviewed) return refuse(`job ${claim.job} has a key this check has not reviewed (a container, a matrix, a quoted key or another shape)`);
   if (job.needs === null) return refuse(`job ${claim.job} has a needs list this check cannot read`);
   // ponytail: one level of needs is read; a needed job's own needs are not followed.
-  for (const need of job.needs) { const needed = workflowJobSteps(lf, need); if (!needed || needed.conditional) return refuse(`job ${claim.job} needs ${need}, which is absent or conditional`); }
+  for (const need of job.needs) { const needed = workflowJobSteps(lf, need); if (!needed || needed.conditional || needed.unreviewed) return refuse(`job ${claim.job} needs ${need}, which is absent or conditional, or has a key this check has not reviewed`); }
   const steps = job.steps.filter(step => step.run === claim.run);
   if (steps.length !== 1 || steps[0].conditional) return refuse(`job ${claim.job} has no single unconditional step running: ${claim.run}`);
   if (steps[0].rebound) return refuse(`the step running ${claim.run} sets its own directory, shell or environment (a directory or shell)`);
-  // A step environment is part of what the step runs: it holds only when the claim names exactly that environment.
-  if (steps[0].env === null) return refuse(`the step running ${claim.run} sets its own directory, shell or environment (an environment this check cannot read)`);
+  if (steps[0].unreviewed) return refuse(`the step running ${claim.run} has a key this check has not reviewed (a quoted key or another shape)`);
+  // The environment a step runs with is the workflow's, the job's and its own env, merged (the nearer level wins): part of what the step
+  // runs, so the claim holds only when it names exactly that environment. Not read, so never claimed: what an action exports.
+  if (job.writesEnvironment) return refuse(`job ${claim.job} writes GITHUB_ENV or GITHUB_PATH, so a step's environment is not the one written in the file`);
+  if ([workflowFacts.env, job.env, steps[0].env].includes(null)) return refuse(`the step running ${claim.run} sets its own directory, shell or environment (an environment this check cannot read)`);
   if (claim.env !== undefined && (!claim.env || typeof claim.env !== 'object' || Array.isArray(claim.env))) return refuse('the claim names an environment that is not a flat map');
-  if (canonicalClaim(steps[0].env ?? {}) !== canonicalClaim(claim.env ?? {})) return refuse(`the step running ${claim.run} sets its own directory, shell or environment (an environment the claim does not name exactly)`);
+  const environment = { ...workflowFacts.env, ...job.env, ...steps[0].env };
+  if (canonicalClaim(environment) !== canonicalClaim(claim.env ?? {})) return refuse(`the step running ${claim.run} sets its own directory, shell or environment (an environment the claim does not name exactly)`);
   const tokens = claim.run.split(/\s+/);
   if (claim.kind === 'playwright') {
     // One project (`project`) or several (`projects`), never both; each is read below.
@@ -3809,7 +3892,7 @@ function claimFailures(file, claim, read) {
     if ((claim.projects !== undefined && claim.project !== undefined) || !Array.isArray(projects) || !projects.length || projects.some(project => typeof project !== 'string' || !project) || new Set(projects).size !== projects.length)
       return refuse('the claim must name one project or a list of distinct projects');
     for (const project of projects) if (tokens.slice(0, 4).join(' ') !== 'pnpm exec playwright test' || !tokens.includes(`--project=${project}`)) return refuse(`the step does not run Playwright project ${project}`);
-    if (tokens.some(token => /^(?:-g|--grep|--grep-invert|--last-failed|--only-changed)(?:=|$)/.test(token) || (/\.spec\.ts$/.test(token) && token !== file))) return refuse('the step filters its specs');
+    if (tokens.some(token => /^(?:-g|--grep|--grep-invert|--last-failed|--only-changed|--shard|--list|--test-list|--test-list-invert)(?:=|$)/.test(token) || (/\.spec\.ts$/.test(token) && token !== file))) return refuse('the step filters its specs');
     const source = read('nextjs/playwright.config.ts');
     if (typeof source !== 'string') return refuse('nextjs/playwright.config.ts is absent or unreadable at head');
     const config = source.replace(/\r\n/g, '\n'), name = file.split('/').at(-1);
