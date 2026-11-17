@@ -46,6 +46,15 @@
       "credential": "bearer:supabase-jwt",
       "note": "WO-AN-3 Agent access. GET lists the caller's own grants (no token, hash or prefix), flag off included. POST is 404 with the flag off or outside the cohort, 402 for a free evaluation, and answers the tvnl_agt_ token once, no-store; only its sha256 is stored."
     },
+    "app/api/agent-mcp/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "credential": "bearer:api-key",
+      "note": "agent credential only; 404 while TAVONEL_AGENT_PROPOSALS_ENABLED is off"
+    },
     "app/api/billing/checkout/route.ts": {
       "type": "A-bearer",
       "methods": [

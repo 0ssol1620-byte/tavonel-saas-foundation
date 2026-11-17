@@ -147,6 +147,13 @@ async function currentVersions(workspaceKey: string, documentIds: readonly strin
   return { ok: true, versions: new Map(documentIds.map((id) => [id, ambiguous.has(id) ? null : current.get(id) ?? null])) };
 }
 
+/*
+  The quote preconditions found within the balance, held for the binding of the same decision. Keyed by the
+  decision's parsed input object (one per decision, so two decisions never share an entry); a decision that
+  stops after its preconditions leaves an entry the WeakMap drops with the input.
+*/
+const checkedQuotes = new WeakMap<CompilePlanInput, RechargeQuote>();
+
 const bindingOf = async (documentIds: readonly string[], versions: ReadonlyMap<string, string | null>, quote: RechargeQuote) =>
   sha256({ documents: documentIds.map((id) => [id, versions.get(id) ?? null]), quote: await quoteFingerprint(quote) });
 
@@ -203,15 +210,23 @@ export const compilePlanExecutor: ProposalExecutor<CompilePlanInput> = failClose
     Raw: {documentIds}. The order is the web compile's (access first, so nothing past it discloses whether a
     document exists), then inventory, set size, intake lineage, customer-data admission, trial capacity,
     and the quote. Writes nothing: every call here is a read.
+
+    Access and inventory decide whether the ids name documents this person can read. For an agent, a failure
+    of either -- refused, unavailable or thrown -- is that same not-found (§17 (a)): an outage must not tell
+    "absent" from "exists but unreadable". Everything after that decision (the quote included) fails as itself.
   */
   async prepare(actor, raw, evidenceIds) {
     if (!isObject(raw) || !sameKeys(raw, ["documentIds"])) return failure("PROPOSAL_REQUEST_INVALID", 400);
     const documentIds = documentSet(raw.documentIds);
     if (!documentIds) return failure("PROPOSAL_REQUEST_INVALID", 400);
-    const access = await checkConnectorSourceAccessForViewer(actor.workspaceKey, [...documentIds], actor.userId);
-    if (!access.ok) return NOT_FOUND;
-    const inventory = await currentVersions(actor.workspaceKey, documentIds);
-    if (!inventory.ok) return inventory;
+    const agent = actor.kind === "agent";
+    const deciding = async <T>(read: () => Promise<T>): Promise<T | null> => {
+      try { return await read(); } catch (error) { if (agent) return null; throw error; }
+    };
+    const access = await deciding(() => checkConnectorSourceAccessForViewer(actor.workspaceKey, [...documentIds], actor.userId));
+    if (!access?.ok) return NOT_FOUND;
+    const inventory = await deciding(() => currentVersions(actor.workspaceKey, documentIds));
+    if (!inventory || !inventory.ok) return agent ? NOT_FOUND : inventory ?? UNAVAILABLE;
     if (documentIds.some((id) => inventory.versions.get(id) == null)) return NOT_FOUND;
     const verdict = judgeCorpusSet(documentIds.length);
     if (!verdict.ok) return failure(verdict.code, 400);
@@ -240,11 +255,17 @@ export const compilePlanExecutor: ProposalExecutor<CompilePlanInput> = failClose
       } },
     };
   },
-  /* An absent or ambiguous document binds as null, so a source removed since the proposal decides `stale`. */
+  /*
+    An absent or ambiguous document binds as null, so a source removed since the proposal decides `stale`.
+    A confirmation takes one quote (§17 (b)): the one preconditions refused over the balance on is the one bound
+    here. A rejection runs no preconditions, quotes here, and is never refused for the balance.
+  */
   async currentBinding(actor, _row, input) {
     const inventory = await currentVersions(actor.workspaceKey, input.documentIds);
     if (!inventory.ok) return inventory;
-    const quoted = await quoteCompileRecharge(actor.workspaceKey, input.documentIds);
+    const held = checkedQuotes.get(input);
+    checkedQuotes.delete(input);
+    const quoted = held ? { ok: true as const, quote: held } : await quoteCompileRecharge(actor.workspaceKey, input.documentIds);
     if (!quoted.ok) return quoted;
     return { ok: true, digest: await bindingOf(input.documentIds, inventory.versions, quoted.quote) };
   },
@@ -252,7 +273,9 @@ export const compilePlanExecutor: ProposalExecutor<CompilePlanInput> = failClose
   async preconditions(actor, _row, input) {
     const quoted = await quoteCompileRecharge(actor.workspaceKey, input.documentIds);
     if (!quoted.ok) return quoted;
-    return overBalance(quoted.quote) ? failure("PROPOSAL_QUOTE_OVER_BALANCE", 409) : null;
+    if (overBalance(quoted.quote)) return failure("PROPOSAL_QUOTE_OVER_BALANCE", 409);
+    checkedQuotes.set(input, quoted.quote);
+    return null;
   },
   run: ({ request, input }) => runCompile(request, input),
   resultRef: (result) => typeof result.jobId === "string"

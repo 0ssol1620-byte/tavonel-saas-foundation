@@ -23,7 +23,7 @@
 -- Not provable here (one transaction): the races of I-8, I-12 and I-13 and of grant creation against
 -- revoke-all under concurrent sessions -- scripts/db/agent-grant-race.mjs runs those against a local cluster.
 begin;
-select plan(116);
+select plan(117);
 
 create temp table keep (k text primary key, v jsonb);
 
@@ -515,6 +515,10 @@ select ok((select bool_and(provolatile in ('s', 'i')) and count(*) > 0 from pg_p
   'list_world_change_proposals_page does not write');
 select ok((select bool_and(provolatile in ('s', 'i')) and count(*) > 0 from pg_proc where proname = 'list_world_change_proposals'),
   'list_world_change_proposals does not write');
+-- WO-AN-5: beyond the §8 list, reached by the customer-data gate under v2 (admitsDerivedCustomerData in R5/P4,
+-- canAdmitCustomerSource in P1) through readCurrentProcessingTermsAcceptance (lib/processing-workspace-grant.ts).
+select ok((select bool_and(provolatile in ('s', 'i')) and count(*) > 0 from pg_proc where proname = 'current_foundation_processing_terms_acceptance'),
+  'current_foundation_processing_terms_acceptance does not write');
 
 select * from finish();
 rollback;
