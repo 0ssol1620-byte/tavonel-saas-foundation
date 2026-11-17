@@ -1358,4 +1358,15 @@
   .askBar:hover { color: var(--text-hi); }
   .askRegions button:hover { color: var(--text-hi); border-color: var(--verified); }
   .nextSourceNote a:hover { color: var(--text-hi); }
+  /* WO-CI-15. The wordmark's letters carry their own colour (`.wordmark b`), so the hover names them too. */
+  .brand:hover,
+  .brand:hover b { color: var(--text-mid); }
+}
+
+/*
+  WO-CI-15. Under forced colours a borderless text button is a word with nothing to say it can be
+  pressed; the system colour draws the box. Normal rendering is unchanged.
+*/
+@media (forced-colors: active) {
+  .technicalButton { padding-inline: 8px; border: 1px solid ButtonText; }
 }

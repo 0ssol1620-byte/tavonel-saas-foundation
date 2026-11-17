@@ -306,9 +306,35 @@ jobs:
           cache: pnpm
           cache-dependency-path: nextjs/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      # Every v34-* project run here is headless Chromium, which Playwright runs on chromium-headless-shell.
-      - name: Install Chromium runtime
-        run: pnpm exec playwright install --with-deps --only-shell chromium
+      # Every v34-* project run here is headless Chromium, which Playwright runs on chromium-headless-shell, and one
+      # self-test case also launches WebKit itself (e2e/v34-support.selftest.spec.ts, "a control in a closed details
+      # body is not owed a tab stop": WebKit's Tab order skips summary, which is where the keyboard-trap false positive
+      # showed). With Chromium alone that case failed here at `browserType.launch: Executable doesn't exist` (WO-CI-17).
+      #
+      # The same three steps as product-qa, with the same cache key and the same browser set, so either job's save is a
+      # hit for the other and WebKit's apt archives are not downloaded twice (product-qa's comment has the measurements).
+      - name: Read the Playwright version and runner image
+        id: playwright
+        run: |
+          echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "image=${ImageOS}-${ImageVersion}" >> "$GITHUB_OUTPUT"
+      - name: Restore Playwright browsers and their apt archives
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/.cache/apt-archives/*.deb
+          key: product-qa-pw-${{ steps.playwright.outputs.version }}-${{ steps.playwright.outputs.image }}
+          restore-keys: product-qa-pw-${{ steps.playwright.outputs.version }}-
+      - name: Keep apt's downloaded archives in the cached directory
+        run: |
+          mkdir -p ~/.cache/apt-archives/partial
+          printf 'Dir::Cache::Archives "%s";\nAPT::Keep-Downloaded-Packages "true";\n' "$HOME/.cache/apt-archives" | sudo tee /etc/apt/apt.conf.d/99-product-qa-archives
+      - name: Install Chromium and WebKit runtimes
+        run: |
+          pnpm exec playwright install --with-deps --only-shell chromium webkit
+          # Drop archives the mirror no longer serves, so a restored cache does not grow every image.
+          sudo apt-get autoclean -qq
       - name: Build once for both servers
         run: V34_SHOW_HELD=1 pnpm exec next build
       - name: Start the QA server (held routes shown) and the production-mode server (no flag)
