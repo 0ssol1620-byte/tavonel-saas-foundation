@@ -50,6 +50,8 @@ export async function installFixtureSession(page: Page, userId = FIXTURE_USER_ID
 
 export type BillingAccountFixture = {
   accessPlan: string | null;
+  /** The v2 plan bought, or null for a legacy plan (catalog v2). /api/billing/status always sends it; the workspace resolves the plan from both. */
+  planCode: string | null;
   subscriptionStatus: string | null;
   creditBalance: number;
   lifetimeCreditsPurchased: number;
@@ -62,6 +64,7 @@ export type BillingAccountFixture = {
 
 export const INACTIVE_BILLING: BillingAccountFixture = {
   accessPlan: null,
+  planCode: null,
   subscriptionStatus: "inactive",
   creditBalance: 0,
   lifetimeCreditsPurchased: 0,

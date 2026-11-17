@@ -35,4 +35,20 @@ describe("billing status notices", () => {
     expect(body.notices).toBeNull();
     expect(body.account.subscriptionStatus).toBe("paused");
   });
+
+  // WO-CAT-3B: the customer's own account carries the plan code the browser resolves the held plan from; the route
+  // adds no field to the store's account and returns it as read.
+  it("returns the account's plan code, and nothing beyond the account the store read", async () => {
+    const stored = {
+      workspaceKey: "pilot-owner", userId: "owner-id", accessPlan: "observer_access", planCode: "personal",
+      subscriptionStatus: "active", creditBalance: 2_000, lifetimeCreditsPurchased: 2_000, lifetimeCreditsReversed: 0,
+      overageEnabled: false, overageUnits: 0, billingHold: false, paddleCustomerId: "ctm_1", paddleSubscriptionId: "sub_1",
+      subscriptionCancelAt: null, updatedAt: "2026-11-17T00:00:00Z",
+    };
+    mocks.billing.mockResolvedValue({ ok: true, account: stored });
+    const body = await (await GET(new Request("https://tavonel.com/api/billing/status"))).json();
+    expect(body.account).toEqual(stored);
+    expect(body.account.planCode).toBe("personal");
+    expect(Object.keys(body).sort()).toEqual(["access", "account", "code", "notices"]);
+  });
 });

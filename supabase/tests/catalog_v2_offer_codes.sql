@@ -2,7 +2,7 @@
 -- Credit amounts are the catalog's (nextjs/lib/billing-catalog.ts): personal 2,000, team 12,000,
 -- observer_access 2,000. The checkout route records them in the intent; nothing here invents one.
 begin;
-select plan(42);
+select plan(45);
 
 -- Fixtures: one user per workspace (foundation_billing_accounts.user_id is unique).
 insert into auth.users (
@@ -171,6 +171,14 @@ select throws_ok(
 select throws_ok(
   $$update public.foundation_billing_accounts set plan_code = 'personal' where workspace_key = 'pilot-cv2b'$$,
   '23514', null, 'plan_code always agrees with access_plan');
+-- 20261117140100 (WO-CAT-3B): the check evaluated to null, and so passed, for a plan code with no level.
+select throws_ok(
+  $$update public.foundation_billing_accounts set access_plan = null where workspace_key = 'pilot-cv2b'$$,
+  '23514', 'new row for relation "foundation_billing_accounts" violates check constraint "foundation_billing_accounts_plan_code_check"',
+  'a plan code never stands without an access level');
+select lives_ok(
+  $$update public.foundation_billing_accounts set access_plan = null, plan_code = null where workspace_key = 'pilot-cv2b'$$,
+  'a row with neither a level nor a plan code is still accepted (no plan)');
 
 -- 8. A legacy renewal after the migration settles from its snapshot, unchanged.
 select is(pg_temp.intent(5, 'pilot-cv2d', pg_temp.uid(4), 'observer_access', 2000)->>'status', 'issued',
@@ -280,6 +288,14 @@ select ok(
   has_function_privilege('service_role', 'public.apply_foundation_billing_event_v6(text,text,timestamptz,text,text,text,uuid,text,text,text,text,text,text,text,timestamptz,text,text,integer)', 'EXECUTE')
   and not has_function_privilege('service_role', 'public.apply_foundation_billing_event_v4(text,text,timestamptz,text,text,text,uuid,text,text,text,text,text,integer,text)', 'EXECUTE'),
   'v6 stays the service-role entry point and v4 stays closed');
+-- 20261117140100 (WO-CAT-3B): v3 is reached only through v4 by the function owner; the service role cannot call it,
+-- so v6 is the one billing projection function the service role can execute.
+select is(
+  (select string_agg(p.proname, ',' order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname like 'apply\_foundation\_billing\_event%'
+      and has_function_privilege('service_role', p.oid, 'EXECUTE')),
+  'apply_foundation_billing_event_v6',
+  'v6 is the only billing projection entry point the service role can execute (v3 closed)');
 
 select * from finish();
 rollback;

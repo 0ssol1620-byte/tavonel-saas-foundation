@@ -14,7 +14,8 @@
     no page count and no yes/no is shown. Eligibility is confirmed by an operator on request.
 */
 
-import { BILLING_OFFERS, REFUND_WINDOW_DAYS, isBillingOfferCode, refundablePageAllowance } from "./billing-catalog";
+import { BILLING_OFFERS, REFUND_WINDOW_DAYS, refundablePageAllowance } from "./billing-catalog";
+import { heldOffer, type PlanIdentity } from "./checkout-policy";
 
 export type RefundFacts = {
   plan: string;
@@ -28,18 +29,28 @@ export type RefundFacts = {
 
 const DAY_MS = 86_400_000;
 
+export type RefundReading =
+  | { ok: true; facts: RefundFacts }
+  | { ok: false; code: "REFUND_NO_PAID_PLAN" | "BILLING_PLAN_CODE_UNKNOWN" };
+
+/**
+ * The plan is the one the account holds (`heldOffer`): a v2 holder is stated the v2 plan's name and page
+ * line, never its level's legacy plan. A plan code the resolver refuses yields no facts at all.
+ */
 export function refundFacts(
-  input: { accessPlan: string | null; paidAt: string | null; renewsAt: string | null },
-): RefundFacts | null {
-  if (!isBillingOfferCode(input.accessPlan)) return null;
-  const offer = BILLING_OFFERS[input.accessPlan];
+  input: PlanIdentity & { paidAt: string | null; renewsAt: string | null },
+): RefundReading {
+  const held = heldOffer(input);
+  if (!held.ok) return held;
+  if (held.code === null) return { ok: false, code: "REFUND_NO_PAID_PLAN" };
+  const offer = BILLING_OFFERS[held.code];
   const paid = input.paidAt === null ? NaN : Date.parse(input.paidAt);
   const read = Number.isFinite(paid);
-  return {
+  return { ok: true, facts: {
     plan: offer.label,
     paidAt: read ? input.paidAt : null,
     renewsAt: input.renewsAt,
     windowEndsAt: read ? new Date(paid + REFUND_WINDOW_DAYS * DAY_MS).toISOString() : null,
     allowancePages: refundablePageAllowance(offer),
-  };
+  } };
 }

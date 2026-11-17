@@ -180,9 +180,11 @@ const bootstrapFor = (source: "trial" | "paid") => ({
   },
 });
 
+// What the projection writes for a Personal purchase (20261117140000): the level in accessPlan, the plan in planCode.
 const ACTIVE_PERSONAL: BillingAccountFixture = {
   ...INACTIVE_BILLING,
-  accessPlan: "personal",
+  accessPlan: "observer_access",
+  planCode: "personal",
   subscriptionStatus: "active",
   creditBalance: 2_000,
   lifetimeCreditsPurchased: 2_000,

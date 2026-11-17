@@ -51,13 +51,15 @@ async function readRefund(request: Request): Promise<Reading> {
     getPaddleSubscription(subscriptionId),
     getLatestSubscriptionPayment(workspaceId, user.id),
   ]);
-  const facts = refundFacts({
+  const reading = refundFacts({
     accessPlan: account.accessPlan,
+    planCode: account.planCode,
     paidAt: payment.ok ? payment.paidAt : null,
     renewsAt: subscription.ok ? subscription.subscription.nextBilledAt : null,
   });
-  if (!facts) return { ok: false, response: reply({ code: "REFUND_NO_PAID_PLAN" }, 409) };
-  return { ok: true, facts, workspaceKey: workspaceId, subscriptionId };
+  // A plan code the resolver refuses is our record's fault, not the customer's: no facts, stated as a failure.
+  if (!reading.ok) return { ok: false, response: reply({ code: reading.code }, reading.code === "REFUND_NO_PAID_PLAN" ? 409 : 500) };
+  return { ok: true, facts: reading.facts, workspaceKey: workspaceId, subscriptionId };
 }
 
 export async function GET(request: Request) {
