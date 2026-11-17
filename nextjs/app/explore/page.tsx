@@ -165,12 +165,20 @@ const technical: ExploreTechnicalRecord = {
 
   `SiteHeader` gets no `currentPath`, as on every retained route: /explore is not a primary item, and
   the More panel and the drawer read the path themselves.
+
+  One container (R1, WO-CI-19 lead decision 1): the stage's rows pad themselves with `--chrome-edge`,
+  which outside the V34 frame is the legacy 72px edge (app/chrome-v2.css) while the header's wordmark
+  stands on the V34 edge. `tokens.container` carries the container's custom properties and nothing
+  else -- no colour, no colour scheme, no font -- so the stage takes the V34 edge and still inherits
+  its type and colours from the body. It is box-less like the wrappers, and it holds all three parts
+  so the stage's `main` stays a sibling of the shell's wrappers, which its phone rules select
+  (`[data-v34-site] ~ .page`, components/explore/explore-stage.module.css).
 */
 const shellPart = { className: tokens.site, "data-v34-site": "", style: { display: "contents" } } as const;
 
 export default function ExplorePage() {
   return (
-    <>
+    <div className={tokens.container} style={{ display: "contents" }}>
       <div {...shellPart}>
         <SiteHeader />
       </div>
@@ -186,6 +194,6 @@ export default function ExplorePage() {
       <div {...shellPart}>
         <SiteFooter />
       </div>
-    </>
+    </div>
   );
 }

@@ -9,7 +9,7 @@
   A surface class (.paper, .dark, .world ...) declares BOTH `color` and `background` itself and
   never leans on what a parent happened to inherit. It also declares the role variables the
   components read -- --v34-fg, --v34-fg-muted, --v34-fg-link, --v34-fg-border, --v34-fg-rule,
-  --v34-fg-hover, --v34-fg-focus, --v34-surface -- so a component asks for "the muted text colour
+  --v34-fg-hover, --v34-fg-focus, the --v34-fg-action trio, --v34-surface -- so a component asks for "the muted text colour
   of the surface I am on" and cannot pick a pair nobody checked. `lib/v34/tokens.test.ts` parses
   this file and computes the contrast of every pair named there.
 
@@ -75,26 +75,8 @@
   --v34-focus: #4880ba;
   --v34-focus-dark: #8ae0bc;
 
-  /* layout */
-  --v34-max: 1260px;
-  --v34-gutter: 36px;
-  --v34-shell: min(var(--v34-max), 100% - 2 * var(--v34-gutter));
+  /* layout: the container (--v34-max, --v34-gutter, --v34-shell, --chrome-*) is the `.site, .container` rule below */
   --v34-header-h: 66px;
-  /*
-    Retained public bodies (docs, legal, status, solutions ...) render inside this wrapper but read the
-    legacy container names (app/chrome-v2.css, app/tavonel.css). They are pointed at the shell's
-    container here, so a retained body starts on the same edge as the V34 header above it -- R1, one
-    container (e2e/site-alignment.spec.ts). Batch E re-skins those bodies; until then this is where
-    their container comes from inside the V34 frame. Outside the wrapper nothing changes.
-
-    Only the legacy chrome names are re-pointed. A `--tv-*` name is never declared here: app/tavonel.css
-    is the one sheet that declares them, so no later copy can shadow a brand token
-    (lib/brand-tokens.test.ts). A retained body that sizes itself from `--tv-page-w` is a route-body
-    defect in the WO-CI-5a receipt, not something this wrapper papers over.
-  */
-  --chrome-measure: var(--v34-max);
-  --chrome-gutter: var(--v34-gutter);
-  --chrome-edge: max(var(--v34-gutter), calc((100% - var(--v34-max)) / 2));
   --v34-radius-pill: 100px;
   --v34-radius-panel: 8px;
   --v34-radius-art: 6px;
@@ -131,6 +113,31 @@
 }
 
 /*
+  The container: one edge for the header, every body and the footer (R1, e2e/site-alignment.spec.ts).
+  `.container` carries these and nothing else -- no colour, no colour scheme, no font -- for a part of
+  a page that keeps the type and colours it inherits from the document but stands on the V34 edge:
+  the /explore workbench (app/explore/page.tsx; WO-CI-19, lead decision 1).
+
+  Retained public bodies (docs, legal, status, solutions ...) render inside the wrapper but read the
+  legacy container names (app/chrome-v2.css, app/tavonel.css). They are pointed at the shell's
+  container here, so a retained body starts on the same edge as the V34 header above it. Batch E
+  re-skins those bodies; until then this is where their container comes from inside the V34 frame.
+  Outside the wrapper nothing changes.
+
+  Only the legacy chrome names are re-pointed. A `--tv-*` name is never declared here: app/tavonel.css
+  is the one sheet that declares them, so no later copy can shadow a brand token
+  (lib/brand-tokens.test.ts). A retained body sizes itself from `--v34-shell`, never `--tv-page-w`.
+*/
+.site, .container {
+  --v34-max: 1260px;
+  --v34-gutter: 36px;
+  --v34-shell: min(var(--v34-max), 100% - 2 * var(--v34-gutter));
+  --chrome-measure: var(--v34-max);
+  --chrome-gutter: var(--v34-gutter);
+  --chrome-edge: max(var(--v34-gutter), calc((100% - var(--v34-max)) / 2));
+}
+
+/*
   Role variables, shared by the light grounds and by the dark ones. The per-surface blocks below
   add the two declarations that must be explicit on every surface: `background` and `color`.
 */
@@ -142,6 +149,10 @@
   --v34-fg-rule: var(--v34-rule);
   --v34-fg-hover: var(--v34-secondary-hover);
   --v34-fg-focus: var(--v34-focus);
+  /* the filled action on this ground: ButtonLink `.primary` (read by the retained `.btn` rule below) */
+  --v34-fg-action: var(--v34-header-btn);
+  --v34-fg-action-hover: var(--v34-header-btn-hover);
+  --v34-fg-action-ink: var(--v34-white);
   /* The site-wide h1-h3 rule (app/tavonel.css) colours headings with --text-hi, near-white for the
      dark legacy site. On a V34 surface a heading takes the surface's own text colour instead. */
   --text-hi: var(--v34-fg);
@@ -156,6 +167,10 @@
   --v34-fg-rule: var(--v34-rule-dark);
   --v34-fg-hover: var(--v34-step-bg);
   --v34-fg-focus: var(--v34-focus-dark);
+  /* ButtonLink `.onDark` */
+  --v34-fg-action: var(--v34-lime);
+  --v34-fg-action-hover: var(--v34-lime-hover);
+  --v34-fg-action-ink: var(--v34-lime-ink);
   --text-hi: var(--v34-fg);
   color-scheme: dark;
 }
@@ -253,6 +268,49 @@
   --v34-surface: var(--v34-world);
 }
 
+/* ------------------------------------------------------------ retained bodies' legacy buttons */
+
+/*
+  One accent inside the V34 frame (WO-CI-19, D17). Retained bodies still render the legacy `.btn`
+  (app/tavonel.css, components layer), which fills with the page's --text-hi: ink on /contact, the
+  paper-product near-black on /pricing, and the legacy #005bb3 wherever a route sheet repaints it.
+  Rather than edit every retained body (batch E moves them to ButtonLink), the wrapper paints them
+  with ButtonLink's own values (ui/button-link.module.css): the filled kinds take the ground's
+  --v34-fg-action trio (`.primary` on a light surface, `.onDark` in a dark scene, `.primary` where
+  no surface is set), the outlined kinds take `.secondary`. Danger and disabled keep their faces.
+
+  The wrapper is named by its class and its marker attribute (V34Page, /pricing and /explore all
+  render both). With the chained :not()s that outweighs a retained route's own `.surface .btn:not(.ghost)`
+  repaint (app/solutions/solutions.module.css), whatever order the two sheets load in.
+*/
+.site[data-v34-site] :global(:is(.btn, .btn-primary):not(.ghost):not(.btn-ghost):not(.btn-secondary):not(.btn-danger):not(:disabled):not([aria-disabled="true"])) {
+  border-color: var(--v34-fg-action, var(--v34-header-btn));
+  background: var(--v34-fg-action, var(--v34-header-btn));
+  color: var(--v34-fg-action-ink, var(--v34-white));
+}
+
+.site[data-v34-site] :global(:is(.btn, .btn-primary):not(.ghost):not(.btn-ghost):not(.btn-secondary):not(.btn-danger):not(:disabled):not([aria-disabled="true"]):hover) {
+  border-color: var(--v34-fg-action-hover, var(--v34-header-btn-hover));
+  background: var(--v34-fg-action-hover, var(--v34-header-btn-hover));
+  color: var(--v34-fg-action-ink, var(--v34-white));
+}
+
+.site[data-v34-site] :global(.btn.ghost:not(:disabled):not([aria-disabled="true"])),
+.site[data-v34-site] :global(.btn-ghost:not(:disabled):not([aria-disabled="true"])),
+.site[data-v34-site] :global(.btn-secondary:not(:disabled):not([aria-disabled="true"])) {
+  border-color: var(--v34-fg-border, var(--v34-control-border));
+  background: transparent;
+  color: var(--v34-fg, var(--v34-ink));
+}
+
+.site[data-v34-site] :global(.btn.ghost:not(:disabled):not([aria-disabled="true"]):hover),
+.site[data-v34-site] :global(.btn-ghost:not(:disabled):not([aria-disabled="true"]):hover),
+.site[data-v34-site] :global(.btn-secondary:not(:disabled):not([aria-disabled="true"]):hover) {
+  border-color: var(--v34-fg-border, var(--v34-control-border));
+  background: var(--v34-fg-hover, var(--v34-secondary-hover));
+  color: var(--v34-fg, var(--v34-ink));
+}
+
 /* ------------------------------------------------------------------------- environment cases */
 
 /*
@@ -286,14 +344,12 @@
 }
 
 @media (max-width: 760px) {
-  .site {
-    --v34-gutter: 18px;
-    --v34-header-h: 60px;
-  }
+  .site, .container { --v34-gutter: 18px; }
+  .site { --v34-header-h: 60px; }
 }
 
 @media (max-width: 360px) {
-  .site { --v34-gutter: 14px; }
+  .site, .container { --v34-gutter: 14px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
