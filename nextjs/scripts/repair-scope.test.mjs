@@ -3143,6 +3143,11 @@ const affectedRecord=(status,paths,oldMode='100644',newMode='100644')=>({oldMode
 const affectedMap=records=>buildAffectedMap({headSha:affectedHeadSha,records});
 // WO-CI-7 round 5: a path a V34 program owner binds (boundPaths: WO-CI-6B's shell suite for the /explore page and stage) keeps the owner
 // it had and also selects the binding owner and its suites. Expected [groups, unit files, browser files] for `path` with those added.
+// Round 6: a binding owner can carry an external claim (the /explore key spec is Product QA's), read from the head's workflow, Playwright
+// config and spec, so a bound path is mapped with the files of this tree as v34Map maps them; any other path as affectedMap does.
+function affectedBoundMap(path){
+  return Object.values(V34_PROGRAM_AFFECTED_OWNERS).some(owner=>(owner.boundPaths??[]).some(p=>`nextjs/${p}`===path))?v34Map([affectedRecord('M',[path])]):affectedMap([affectedRecord('M',[path])]);
+}
 function withV34Bound(path,groups,units,browsers){
   const bound=Object.entries(V34_PROGRAM_AFFECTED_OWNERS).filter(([,owner])=>(owner.boundPaths??[]).some(p=>`nextjs/${p}`===path));
   const merge=(base,more)=>[...new Set([...base,...more])].sort();
@@ -7288,7 +7293,7 @@ test('affected PR #141 fix owners: intake approval rollout, solutions proof and 
     ['pr141-fix-round-3', FIX_ROUND_3_AFFECTED_PATHS, FIX_ROUND_3_AFFECTED_UNIT_FILES, FIX_ROUND_3_AFFECTED_BROWSER_FILES],
   ]) {
     for (const path of paths) {
-      const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+      const map = affectedBoundMap('nextjs/' + path);
       const [groups, unitFiles, browserFiles] = withV34Bound('nextjs/' + path, [group], units, browsers);
       assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles],
         [[], groups, [], unitFiles, browserFiles], path);
@@ -7897,7 +7902,7 @@ function assertLaunchSwitchEndpoint(path) {
 // and the unreadable tooling rejection explicit; every other spelling/path still runs its original rejection.
 function assertNewReviewedMarketingEndpoint(path) {
   if(PUBLIC_MARKETING_AFFECTED_PATHS.includes(path)) {
-    const map=affectedMap([affectedRecord('M',[path])]);
+    const map=affectedBoundMap(path);
     const [groups,units,browsers]=withV34Bound(path,['public-marketing-surface'],PUBLIC_MARKETING_AFFECTED_UNIT_FILES,PUBLIC_MARKETING_AFFECTED_BROWSER_FILES);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],
       [[],groups,[],units,browsers],path);
@@ -8503,7 +8508,7 @@ test('affected world-read-cap-20261110 owner: 10 exact paths select 14 direct su
 // V34 program owners (WO-CI-7, lead decisions D-1, D-4 and K1-K5): one owner per area of the program branch, each restated here
 // independently of the planner's constants by count and digest. Every owner selects at least one suite the Repair job executes;
 // an external check (a suite another workflow runs) is a structured claim the map reads at head and never counts as executed.
-import { V34_PROGRAM_AFFECTED_OWNERS, V34_PROGRAM_PENDING_OWNERS, V34_PROGRAM_UNEXECUTED_PATHS, DATABASE_CONTRACT_DATABASE_TESTS, PAGE_METER_AFFECTED_PATHS, PAGE_METER_AFFECTED_UNIT_FILES, externalCheckClaimFailures, specSkipAllowance, specSelfSkipReason, SPEC_SKIP_READ_LIMIT } from './repair-scope.mjs';
+import { V34_PROGRAM_AFFECTED_OWNERS, V34_PROGRAM_PENDING_OWNERS, V34_PROGRAM_UNEXECUTED_PATHS, DATABASE_CONTRACT_DATABASE_TESTS, PAGE_METER_AFFECTED_PATHS, PAGE_METER_AFFECTED_UNIT_FILES, externalCheckClaimFailures, readWorkflowYaml, specSkipAllowance, specSelfSkipReason, SPEC_SKIP_READ_LIMIT } from './repair-scope.mjs';
 const v34Digest = list => createHash('sha256').update([...list].join('\n')).digest('hex').slice(0, 16);
 // The working tree stands in for the head: the external claims are read from the workflow, Playwright and Vitest files it holds.
 function v34RepoPath(path) { return fileURLToPath(new URL(`../../${path}`, import.meta.url)); }
@@ -8555,7 +8560,8 @@ const V34_OWNER_PINS = Object.freeze([
   ['agent-access-panel', 3, '4f48a3d2fbf28eb5', 1, '1cf09607117c4dbb', [], { 'e2e/change-proposals.spec.ts': V34_CHANGE_PROPOSALS_CLAIM }],
   // Round 5: WO-AN-5 and WO-CI-6B merged, so their owners left the pending list unchanged.
   ['agent-mcp-route', 6, '7de747c49dbec65c', 7, 'a9a732c5350f063a', [], {}],
-  ['v34-retained-shell', 1, '96c34fcc763756a6', 1, '96c34fcc763756a6', [], {}],
+  // Round 6: WO-CI-6C merged; its key guard spec joined WO-CI-6B's group as Product QA's claim at 1440 (the only project its skip allows).
+  ['v34-retained-shell', 2, '923aa0f0cdd019c2', 1, '96c34fcc763756a6', [], { 'e2e/explore-shell-keys.spec.ts': v34ProductQa('1440') }],
 ]);
 // Paths another owner keeps that also select a program owner's suite.
 const V34_BOUND_PATHS = { 'v34-retained-shell': [['app/explore/page.tsx', 'public-marketing-surface'], ['components/explore/explore-stage.module.css', 'public-marketing-surface'], ['components/explore/explore-stage.tsx', 'paper-product-route-css']] };
@@ -8768,13 +8774,17 @@ test('affected v34 external claims: filters, rebinding and unreadable config are
   const attacks = [
     [lens, swap(launch, '  pull_request:\n  push:', '  pull_request:\n    paths: ["docs/**"]\n  push:'), /narrows its pull_request trigger/],
     [lens, swap(launch, '  pull_request:\n  push:', '  pull_request:\n    branches: [nowhere]\n  push:'), /narrows its pull_request trigger/],
-    [lens, swap(launch, '  pull_request:\n  push:', '  pull_request: { paths: ["docs/**"] }\n  push:'), /narrows its pull_request trigger/],
+    // Round 6: a flow collection inside a flow mapping is outside the workflow grammar, so the file is refused at that line.
+    [lens, swap(launch, '  pull_request:\n  push:', '  pull_request: { paths: ["docs/**"] }\n  push:'), /is not a workflow this check can read \(line 6: a scalar that starts with an indicator/],
+    [lens, swap(launch, '  pull_request:\n  push:', '  pull_request: { types: closed }\n  push:'), /line 6: a flow mapping at on\.pull_request, a shape this check has not reviewed there/],
     [paddle, swap(ci, '  pull_request:\n  push:', '  pull_request:\n    paths-ignore: ["nextjs/**"]\n  push:'), /narrows its pull_request trigger/],
     [lens, swap(launch, step, step + '        working-directory: .\n'), /sets its own directory, shell or environment/],
     [lens, swap(launch, step, step + '        env:\n          PWTEST_SKIP_TEST_OUTPUT: "1"\n'), /sets its own directory, shell or environment/],
     [lens, swap(launch, step, step + '        shell: sh\n'), /sets its own directory, shell or environment/],
     [lens, swap(launch, '  product-qa:\n    needs: preflight\n', '  product-qa:\n    needs: [preflight, never]\n'), /needs never, which is absent or conditional/],
-    [lens, swap(launch, '  product-qa:\n    needs: preflight\n', '  product-qa:\n    needs:\n      - preflight\n'), /a needs list this check cannot read/],
+    // Round 6: a block list is read as the list it is (the grammar reads it whole), so an absent job in it refuses like one inline.
+    [lens, swap(launch, '  product-qa:\n    needs: preflight\n', '  product-qa:\n    needs:\n      - preflight\n      - never\n'), /needs never, which is absent or conditional/],
+    [lens, swap(launch, '  product-qa:\n    needs: preflight\n', '  product-qa:\n    needs: [preflight, "a b"]\n'), /a needs list this check cannot read/],
     [lens, swap(config, 'testIgnore: [/launch-qa.*\\.spec\\.ts/, auditSpecs, v34Specs],', 'testIgnore: [/launch-qa.*\\.spec\\.ts/, auditSpecs, v34Specs], grepInvert: /./,'), /filters tests by grep or shard/],
     [lens, swap(config, '  retries: 1,\n', '  retries: 1,\n  grep: /nothing/,\n'), /filters tests by grep or shard/],
     [lens, swap(config, '  retries: 1,\n', '  retries: 1,\n  shard: { total: 2, current: 1 },\n'), /filters tests by grep or shard/],
@@ -8879,8 +8889,8 @@ test('affected v34 harness owners: the database and V34 harness paths each selec
 });
 // WO-CI-7 round 3 (L8): owners for paths two running lanes add, ready before the files exist.
 test('affected v34 pending owners: a lane path absent at head is owned, selected only by its own change, and fails closed without its suite', () => {
-  // Round 5: WO-AN-5 and WO-CI-6B merged and moved to the program owners; WO-CI-6C's key guard spec is the one still in flight.
-  assert.deepEqual(Object.keys(V34_PROGRAM_PENDING_OWNERS), ['explore-shell-keys']);
+  // Round 5: WO-AN-5 and WO-CI-6B merged and moved to the program owners. Round 6: WO-CI-6C merged too, so none is in flight.
+  assert.deepEqual(Object.keys(V34_PROGRAM_PENDING_OWNERS), []);
   for (const [group, owner] of Object.entries(V34_PROGRAM_PENDING_OWNERS)) {
     assert.deepEqual([...owner.paths], [...new Set(owner.paths)].sort(), group);
     for (const path of owner.paths) {
@@ -8990,7 +9000,8 @@ test('affected v34 claim environment: every level of the step environment is rea
     ['comment at column 0 then a step key', edit(stepEnvLast, stepEnvLast + '# note\n' + extra), /environment the claim does not name exactly/],
     ['comment at column 8 then a step key', edit(stepEnvLast, stepEnvLast + '        # note\n' + extra), /environment the claim does not name exactly/],
     ['comment at column 12 then a step key', edit(stepEnvLast, stepEnvLast + '            # note\n' + extra), /environment the claim does not name exactly/],
-    ['a step key with a trailing comment', edit(stepEnvLast, stepEnvLast + '          V34_SERVER_MODE: production # why\n'), /environment this check cannot read/],
+    // Round 6: a shape outside the workflow grammar refuses the claim at its line, before any level is looked up.
+    ['a step key with a trailing comment', edit(stepEnvLast, stepEnvLast + '          V34_SERVER_MODE: production # why\n'), /is not a workflow this check can read \(line \d+: a trailing comment\)/],
     // The job's env is part of the step's environment, read under the same rule.
     ['a job env key', edit(jobEnvLast, jobEnvLast + jobExtra), /environment the claim does not name exactly/],
     ['a job env key after a blank and a comment line', edit(jobEnvLast, jobEnvLast + '\n  # note\n' + jobExtra), /environment the claim does not name exactly/],
@@ -8999,7 +9010,7 @@ test('affected v34 claim environment: every level of the step environment is rea
     ['a nested job env', edit(jobEnvLast, jobEnvLast + '      V34_NESTED:\n        A: b\n'), /environment this check cannot read/],
     ['a flow-mapping job env', edit('    env:\n      # The playwright.config.ts', '    env: { V34_SERVER_MODE: production }\n    env2:\n      # The playwright.config.ts'), /environment this check cannot read|not reviewed/],
     ['a second job env', edit('    steps:\n      - uses: actions/checkout@v4\n      - uses: pnpm/action-setup@v4\n        with: { version: 10.34.4 }\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 22\n          cache: pnpm\n          cache-dependency-path: nextjs/pnpm-lock.yaml\n      - run: pnpm install --frozen-lockfile\n      # Every v34-*',
-      '    env:\n      V34_SERVER_MODE: production\n    steps:\n      - uses: actions/checkout@v4\n      - uses: pnpm/action-setup@v4\n        with: { version: 10.34.4 }\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 22\n          cache: pnpm\n          cache-dependency-path: nextjs/pnpm-lock.yaml\n      - run: pnpm install --frozen-lockfile\n      # Every v34-*'), /environment this check cannot read/],
+      '    env:\n      V34_SERVER_MODE: production\n    steps:\n      - uses: actions/checkout@v4\n      - uses: pnpm/action-setup@v4\n        with: { version: 10.34.4 }\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 22\n          cache: pnpm\n          cache-dependency-path: nextjs/pnpm-lock.yaml\n      - run: pnpm install --frozen-lockfile\n      # Every v34-*'), /is not a workflow this check can read \(line \d+: the key env repeated in one mapping\)/],
     // The workflow's env and defaults reach every job.
     ['a workflow env', edit('\njobs:\n', '\nenv:\n  V34_SERVER_MODE: production\n\njobs:\n'), /environment the claim does not name exactly/],
     ['a workflow env after a comment', edit('\njobs:\n', '\nenv:\n# note\n  V34_SERVER_MODE: production\njobs:\n'), /environment the claim does not name exactly/],
@@ -9010,16 +9021,16 @@ test('affected v34 claim environment: every level of the step environment is rea
     ['an earlier step writes $GITHUB_ENV', edit(matrixStep, '      - run: echo "V34_SERVER_MODE=production" >> "$GITHUB_ENV"\n' + matrixStep), /GITHUB_ENV or GITHUB_PATH/],
     ['an earlier step writes $GITHUB_PATH', edit(matrixStep, '      - run: echo "$PWD/bin" >> $GITHUB_PATH\n' + matrixStep), /GITHUB_ENV or GITHUB_PATH/],
     // A step or job key spelled another way, or after a comment, is still that key.
-    ['a quoted step if', edit(run, run + "        'if': false\n"), /not reviewed/],
-    ['a quoted step continue-on-error', edit(run, run + '        "continue-on-error": true\n'), /not reviewed/],
+    ['a quoted step if', edit(run, run + "        'if': false\n"), /is not a workflow this check can read \(line \d+: a line that is not a plain `key:`/],
+    ['a quoted step continue-on-error', edit(run, run + '        "continue-on-error": true\n'), /is not a workflow this check can read \(line \d+: a line that is not a plain `key:`/],
     ['a step if after a column-0 comment', edit(run, run + '# note\n        if: false\n'), /no single unconditional step/],
     ['a step if after a blank line', edit(run, run + '\n        if: false\n'), /no single unconditional step/],
     ['a step shell', edit(run, run + '        shell: bash\n'), /directory or shell/],
-    ['a quoted job if', edit('    timeout-minutes: 50\n', '    timeout-minutes: 50\n    "if": false\n'), /not reviewed/],
+    ['a quoted job if', edit('    timeout-minutes: 50\n', '    timeout-minutes: 50\n    "if": false\n'), /is not a workflow this check can read \(line \d+: a line that is not a plain `key:`/],
     ['a job if after a comment', edit('    timeout-minutes: 50\n', '    timeout-minutes: 50\n# note\n    if: false\n'), /conditional/],
     // A run is read whole: a plain continuation line belongs to it.
-    ['a run continued on the next line', edit(run, run + '          --grep "@pass:seo"\n'), /no single unconditional step/],
-    ['a run continued after a blank line', edit(run, run + '\n          --grep "@pass:seo"\n'), /no single unconditional step/],
+    ['a run continued on the next line', edit(run, run + '          --grep "@pass:seo"\n'), /is not a workflow this check can read \(line \d+: a line indented deeper than the mapping it is in/],
+    ['a run continued after a blank line', edit(run, run + '\n          --grep "@pass:seo"\n'), /is not a workflow this check can read \(line \d+: a line indented deeper than the mapping it is in/],
   ];
   for (const [label, read, reason] of cases) {
     const failures = held(read);
@@ -9077,6 +9088,211 @@ test('affected v34 claim environment: noise lines anywhere in the claimed job ne
     assert.equal(failures.length, 1, `level ${level}, round ${round}: ${JSON.stringify(failures)}`);
     assert.match(failures[0], /environment the claim does not name exactly|environment this check cannot read/, `level ${level}, round ${round}`);
   }
+});
+// WO-CI-7 round 6: the claim reader reads a workflow only through readWorkflowYaml, a closed grammar of line shapes. A block scalar or a
+// quoted scalar is read whole, so no line inside one is ever a key, a step or a filter; a shape outside the grammar refuses the claim at
+// its line; where a claim reads, a block scalar sits only on a step's run or a with input.
+test('affected v34 claim grammar: no scalar hides a step or a key, a trigger filter behind a blank or comment line is seen, other shapes refuse', () => {
+  const launch = '.github/workflows/launch-qa.yml', matrix = 'e2e/v34-matrix.spec.ts', claim = v34MatrixJob('v34-chromium');
+  const text = v34ReadHead(launch).replace(/\r\n/g, '\n');
+  const edits = (...pairs) => { let t = text; for (const [from, to] of pairs) { assert.ok(t.includes(from), from); t = t.replace(from, to); } return p => p === launch ? t : v34ReadHead(p); };
+  const env = '        env:\n          PLAYWRIGHT_EXTERNAL_SERVER: "1"\n          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3117\n          V34_RELEASE: live\n          V34_WIDTHS: 390,412,1440\n          V34_QA_OUT: v34-qa-out/qa\n';
+  const stepName = '      - name: Run the V34 harness self-test and the matrix over the live registry rows\n', step = `${stepName}${env}        run: ${V34_MATRIX_RUN}\n`;
+  const jobName = '    name: V34 matrix (chromium, drawer pass)\n', fakeStep = `    name: |\n      V34 matrix\n      - name: fake\n${env}        run: ${V34_MATRIX_RUN}\n`;
+  const quotedName = quote => `      - name: ${quote}Run the V34\n        run: ${V34_MATRIX_RUN}\n        id: x${quote}\n`;
+  const filter = (between, line) => edits(['  pull_request:\n  push:\n', `  pull_request:\n${between}${line}  push:\n`]);
+  const cases = [
+    // The review's shapes (receipts/review-WO-CI-7/r20/r5/adv-probe2): A and B hide a run in a double- or single-quoted step name, D and F a
+    // whole step in a literal job name; js-yaml reads no step running the claim (A, B, D) or one in production mode (F).
+    ['A: a double-quoted name hides a run; the real run sets V34_SERVER_MODE', edits([step, `${quotedName('"')}${env}        run: V34_SERVER_MODE=production ${V34_MATRIX_RUN}\n`]), /\(line 320: a quoted scalar that does not close on its line\)/],
+    ['B: a single-quoted name hides a run; the real run greps nothing', edits([step, `${quotedName("'")}${env}        run: ${V34_MATRIX_RUN} --grep @nothing\n`]), /\(line 320: a quoted scalar that does not close on its line\)/],
+    ['D: a literal job name holds a step; the real step is removed', edits([jobName, fakeStep], [step, '']), /line 288: a block scalar at jobs\.v34-matrix\.name,/],
+    ['F: a literal job name holds a step; the real step (a quoted run) runs in production mode', edits([jobName, fakeStep], [step, `${stepName}${env.replace('          V34_QA_OUT', '          V34_SERVER_MODE: production\n          V34_QA_OUT')}        run: "${V34_MATRIX_RUN}"\n`]), /line 288: a block scalar at jobs\.v34-matrix\.name,/],
+    // The same class on other keys and levels: a block scalar anywhere a claim reads but a step's run or with input, a quote left open anywhere.
+    ['a folded step name', edits([stepName, '      - name: >-\n          Run the V34 matrix\n']), /a block scalar at jobs\.v34-matrix\.steps\[\d+\]\.name,/],
+    ['a literal workflow name', edits(['name: Launch QA\n', 'name: |\n  Launch QA\n']), /line 1: a block scalar at name,/],
+    ['a literal env value', edits(['          V34_RELEASE: live\n', '          V34_RELEASE: |\n            live\n']), /a block scalar at jobs\.v34-matrix\.steps\[\d+\]\.env\.V34_RELEASE,/],
+    ['a quoted name left open in another job', edits(['    name: Lighthouse budgets\n', '    name: "Lighthouse\n      budgets"\n']), /a quoted scalar that does not close on its line/],
+    // Review blocker 2 (r20/r5/adv-probe3): a filter behind a blank, whitespace-only or comment line is still under pull_request.
+    ['a blank line, then a paths filter', filter('\n', '    paths: [docs/**]\n'), /narrows its pull_request trigger/],
+    ['a column-2 comment, then a paths filter', filter('  # only docs\n', '    paths: [docs/**]\n'), /narrows its pull_request trigger/],
+    ['a column-0 comment, then a types filter', filter('# x\n', '    types: [closed]\n'), /narrows its pull_request trigger/],
+    ['a whitespace-only line, then a branches filter', filter('  \n', '    branches: [nothing]\n'), /narrows its pull_request trigger/],
+    ['the filter directly under pull_request (as before)', filter('', '    paths: [docs/**]\n'), /narrows its pull_request trigger/],
+    // A key repeated at one level, an anchor, alias, tag or merge key, a flow mapping where a claim reads, a document marker, a tab.
+    ['a step key repeated', edits([`        run: ${V34_MATRIX_RUN}\n`, `        run: ${V34_MATRIX_RUN}\n        run: echo x\n`]), /the key run repeated in one mapping/],
+    ['a job key repeated after a comment', edits(['    timeout-minutes: 50\n', '    timeout-minutes: 50\n    # again\n    timeout-minutes: 5\n']), /the key timeout-minutes repeated in one mapping/],
+    ['an anchor', edits(['          V34_RELEASE: live\n', '          V34_RELEASE: &release live\n']), /starts with an indicator/],
+    ['an alias', edits(['          V34_RELEASE: live\n', '          V34_RELEASE: *release\n']), /starts with an indicator/],
+    ['a tag', edits(['          V34_RELEASE: live\n', '          V34_RELEASE: !!str live\n']), /starts with an indicator/],
+    ['a merge key', edits(['          V34_RELEASE: live\n', '          <<: *base\n']), /a line that is not a plain `key:`/],
+    ['a flow mapping in the claimed step', edits(['          V34_RELEASE: live\n', '          V34_EXTRA: { a: b }\n']), /a flow mapping at jobs\.v34-matrix\.steps\[\d+\]\.env\.V34_EXTRA,/],
+    ['a document marker', edits(['permissions:\n', '---\npermissions:\n']), /a line that is not a plain `key:`/],
+    ['a tab', edits(['          V34_RELEASE: live\n', '\t  V34_RELEASE: live\n']), /\(line \d+: a tab\)/],
+  ];
+  for (const [label, read, reason] of cases) {
+    const failures = externalCheckClaimFailures(matrix, claim, read);
+    assert.equal(failures.length, 1, `${label}: ${JSON.stringify(failures)}`);
+    assert.match(failures[0], reason, label);
+  }
+  // Every workflow at this head reads under the grammar (the claims read two of them).
+  const workflows = readdirSync(v34RepoPath('.github/workflows')).filter(name => name.endsWith('.yml'));
+  assert.ok(workflows.length >= 16);
+  for (const name of workflows) assert.equal(readWorkflowYaml(v34ReadHead(`.github/workflows/${name}`)).error, undefined, name);
+});
+// A model is built beside each generated workflow from the allowed shapes (noise lines included), and the reader must return exactly it;
+// a shape from outside the list appended to the same workflow must be refused.
+test('affected v34 workflow grammar: generated workflows read to the model they were built from, and any other shape is refused', () => {
+  let seed = 20261118;
+  // High bits of a 32-bit LCG: the low bits of a power-of-two LCG cycle, and two draws in a row would correlate.
+  const random = n => { seed = (Math.imul(seed, 1103515245) + 12345) >>> 0; return Math.floor(seed / 2 ** 32 * n); };
+  const pick = list => list[random(list.length)], pad = n => ' '.repeat(n);
+  const keyName = () => pick(['name', 'run', 'env', 'with', 'if', 'id', 'A_B', 'node-version', 'x.y', '_k']) + (random(3) ? '' : String(random(9)));
+  const freshKey = taken => { let key = keyName(); while (Object.hasOwn(taken, key)) key += 'z'; return key; };
+  // One scalar, spelled plain, double- or single-quoted, with the string YAML reads from it (a flow collection quotes what a comma would split).
+  const scalarText = inFlow => {
+    const word = pick(['live', 'pnpm exec playwright test --project=1440', 'http://127.0.0.1:3117', '390,412,1440', "it's", 'a "b" c', '${{ matrix.browser }}', 'x#y', 'v34-qa-out/qa', 'a:b', 'a - b']);
+    const style = random(3);
+    if (style === 1 && !word.includes('"')) return [`"${word}"`, word];
+    if (style === 2 || (inFlow && /[,[\]{}]/.test(word))) return [`'${word.replace(/'/g, "''")}'`, word];
+    return [word, word];
+  };
+  const noise = () => pick(['', '   ', '# c', '      # deeper comment', '  #', pad(random(12))]);
+  const entry = (indent, key, depth) => {
+    const at = `${pad(indent)}${key}:`, kind = random(depth > 2 ? 4 : 7);
+    if (kind === 0) { const [spelled, value] = scalarText(false); return { lines: [`${at} ${spelled}`], value }; }
+    if (kind === 1) { const items = Array.from({ length: random(4) }, () => scalarText(true)); return { lines: [`${at} [${items.map(([spelled]) => spelled).join(', ')}]`], value: items.map(([, value]) => value) }; }
+    if (kind === 2) {
+      const value = {}, parts = [];
+      for (let n = random(3); n > 0; n--) { const name = freshKey(value), [spelled, read] = scalarText(true); value[name] = read; parts.push(`${name}: ${spelled}`); }
+      return { lines: [`${at} {${parts.length ? ` ${parts.join(', ')} ` : ''}}`], value };
+    }
+    if (kind === 3) {
+      // A block scalar: content lines that would be keys, entries, comments or open quotes outside it; a literal may hold a more-indented
+      // line and an empty one.
+      const header = pick(['|', '|-', '>', '>-']), literal = header[0] === '|', m = indent + 1 + random(3);
+      const body = Array.from({ length: 1 + random(3) }, (_, n) => (literal && n && !random(3) ? '  ' : '') + pick(['echo a', '# not a comment', 'x: y', '- not an entry', 'key:', '"open', "'open"]));
+      if (literal && body.length > 1 && random(2)) body.splice(1, 0, null);
+      const value = (literal ? body.map(line => line ?? '').join('\n') : body.join(' ')) + (header.length === 1 ? '\n' : '');
+      return { lines: [`${at} ${header}`, ...body.map(line => line === null ? '' : pad(m) + line)], value, block: true };
+    }
+    if (kind === 4) { const inner = mapping(indent + 2 + random(2), depth + 1); return { lines: [at, ...inner.lines], value: inner.value, block: inner.block }; }
+    if (kind === 5) { const inner = sequence(indent + 2 + 2 * random(2), depth + 1); return { lines: [at, ...inner.lines], value: inner.value, block: inner.block }; }
+    return { lines: [at], value: null };
+  };
+  // After a block scalar only an empty line may follow (a comment or spaces as deep as its content would be content).
+  const mapping = (indent, depth) => {
+    const value = {}, lines = [];
+    let block = false;
+    for (let n = 1 + random(4); n > 0; n--) {
+      if (lines.length && !random(3)) lines.push(block ? '' : noise());
+      const key = freshKey(value), made = entry(indent, key, depth);
+      lines.push(...made.lines); value[key] = made.value; block = Boolean(made.block);
+    }
+    return { lines, value, block };
+  };
+  const sequence = (indent, depth) => {
+    const value = [], lines = [];
+    let block = false;
+    for (let n = 1 + random(3); n > 0; n--) {
+      if (lines.length && !random(3)) lines.push(block ? '' : noise());
+      if (random(2)) { const [spelled, read] = scalarText(false); lines.push(`${pad(indent)}- ${spelled}`); value.push(read); block = false; continue; }
+      const item = mapping(indent + 2, depth);
+      item.lines[0] = `${pad(indent)}- ${item.lines[0].slice(indent + 2)}`;
+      lines.push(...item.lines); value.push(item.value); block = item.block;
+    }
+    return { lines, value, block };
+  };
+  const outside = ['bad: &a x', 'bad: *a', 'bad: !!str x', 'bad: "open', "bad: 'open", "'bad': x", '"bad": x', 'bad: |+\n  x', 'bad: >2\n  x', 'bad: | # c\n  x',
+    'bad: x # c', 'bad: "x" y', '- x', '\tbad: x', 'bad: {a: [b]}', 'bad: [a, [b]]', 'bad: [a', 'bad: { a: b', '---', '...', '%YAML 1.2', '? bad', 'bad:\n  - a\n  b: c',
+    'bad:\n  a: 1\n   b: 2', 'bad: a\n  continued', 'bad: "a\\tb"', '<<: x', 'bad:x: y', 'bad: a: b', '-bad: x', 'bad: -x', 'bad: [a, , b]', 'bad: {a}', 'bad:\n-x', 'bad:\n  -  a'];
+  for (let round = 0; round < 1500; round++) {
+    const made = mapping(0, 0), text = made.lines.join('\n') + '\n';
+    const read = readWorkflowYaml(text);
+    assert.deepEqual(read.error, undefined, `round ${round}:\n${text}`);
+    assert.deepEqual(read.value, made.value, `round ${round}:\n${text}`);
+    // A shape from outside the list, after the same content (and a repeated root key): refused at its line, never read.
+    const shape = outside[round % outside.length], root = Object.keys(made.value)[0];
+    for (const added of [shape, `${root}: again`]) {
+      const refused = readWorkflowYaml(`${text}${added}\n`);
+      assert.match(refused.error ?? '', /^line \d+: /, `round ${round}: ${JSON.stringify(added)}\n${text}`);
+    }
+  }
+});
+// Every real workflow, mutated by an operator that YAML either ignores or rejects (noise, a trailing comment, a repeated line, a quote left
+// open, an indicator, an unread block header, a tab, a quoted key, a document marker, a continued plain scalar): each mutant is refused,
+// or reads to the same structure, or differs only inside a block scalar of the original (where the mutated line is content).
+test('affected v34 workflow grammar: mutants of every real workflow are refused or read to the same structure', () => {
+  let seed = 20261119;
+  const random = n => { seed = (Math.imul(seed, 1103515245) + 12345) >>> 0; return Math.floor(seed / 2 ** 32 * n); };
+  const differences = (a, b, path = [], out = []) => {
+    if (a === b) return out;
+    if (a && b && typeof a === 'object' && typeof b === 'object' && Array.isArray(a) === Array.isArray(b) && (!Array.isArray(a) || a.length === b.length)) {
+      for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) differences(a[key], b[key], [...path, Array.isArray(a) ? Number(key) : key], out);
+      return out;
+    }
+    out.push(path);
+    return out;
+  };
+  const under = (path, prefix) => prefix.length <= path.length && prefix.every((part, index) => path[index] === part);
+  const valueAt = /^(\s*(?:- )?[A-Za-z_][A-Za-z0-9_.-]*: )(.+)$/;
+  const operators = [
+    (lines, at) => lines.splice(at, 0, [' '.repeat(random(16)), `${' '.repeat(random(16))}# x`, ''][random(3)]),
+    (lines, at) => { lines[at] += ' # c'; },
+    (lines, at) => { if (!/^\s*- /.test(lines[at])) lines.splice(at, 0, lines[at]); },
+    (lines, at) => { lines[at] = lines[at].replace(valueAt, `$1${['"', "'", '&a ', '*', '!!str ', '|+', '>2', '{ '][random(8)]}$2`); },
+    (lines, at) => { lines[at] = `\t${lines[at]}`; },
+    (lines, at) => { lines[at] = lines[at].replace(/^(\s*(?:- )?)([A-Za-z_][A-Za-z0-9_.-]*):/, '$1"$2":'); },
+    (lines, at) => lines.splice(at, 0, ['---', '...', '%YAML 1.2'][random(3)]),
+    (lines, at) => { const found = /^(\s*(?:- )?[A-Za-z_][A-Za-z0-9_.-]*: )([^\s"'|>[{&*!#]\S*) (\S.*)$/.exec(lines[at]); if (found) lines.splice(at, 1, found[1] + found[2], ' '.repeat(found[1].length + 2) + found[3]); },
+  ];
+  const launch = '.github/workflows/launch-qa.yml', claim = v34MatrixJob('v34-chromium');
+  let refused = 0, same = 0, insideBlock = 0;
+  for (const name of readdirSync(v34RepoPath('.github/workflows')).filter(file => file.endsWith('.yml')).sort()) {
+    const path = `.github/workflows/${name}`, source = v34ReadHead(path).replace(/\r\n/g, '\n'), original = readWorkflowYaml(source);
+    assert.equal(original.error, undefined, name);
+    const blocks = original.notes.filter(note => note.kind === 'block').map(note => note.path);
+    for (let round = 0; round < 300; round++) {
+      const lines = source.split('\n'), at = random(lines.length - 1), operator = random(operators.length);
+      operators[operator](lines, at);
+      const mutant = lines.join('\n'), read = readWorkflowYaml(mutant), label = `${name} operator ${operator} at line ${at + 1}`;
+      if (mutant === source) continue;
+      if (read.error) { refused++; assert.match(read.error, /^line \d+: /, label); continue; }
+      const changed = differences(original.value, read.value);
+      if (!changed.length) same++;
+      else { insideBlock++; assert.ok(changed.every(diff => blocks.some(block => under(diff, block))), `${label}: ${JSON.stringify(changed)}`); }
+      // Launch QA's claimed job held before every mutant; one the grammar accepts with the claimed job unchanged still holds.
+      if (path === launch && !changed.some(diff => under(diff, ['jobs', 'v34-matrix']) || diff[0] !== 'jobs'))
+        assert.deepEqual(externalCheckClaimFailures('e2e/v34-matrix.spec.ts', claim, p => p === launch ? mutant : v34ReadHead(p)), [], label);
+    }
+  }
+  assert.ok(refused > 1000 && same > 300 && insideBlock > 20, JSON.stringify({ refused, same, insideBlock }));
+});
+test('affected v34 workflow grammar: linear on pathological workflows, and a claim reader never throws on them', () => {
+  const launch = '.github/workflows/launch-qa.yml', size = 256 * 1024;
+  const inputs = [
+    `a: x${' '.repeat(size)}y\n`, `a: "${'x'.repeat(size)}\n`, `a: '${"''".repeat(size / 2)}\n`, `a: [${'x, '.repeat(size / 3)}\n`, `a: {${' k: v,'.repeat(size / 6)}\n`,
+    `a: 1${'_'.repeat(size)}x\n`, 'a:\n' + '  - '.repeat(size / 4) + 'x\n', 'a: |\n' + '  x\n'.repeat(size / 4), 'a: >\n' + '  x\n    y\n\n'.repeat(size / 12),
+    Array.from({ length: 3000 }, (_, n) => `${' '.repeat(n)}k:`).join('\n') + '\n', '#\n'.repeat(size / 2), ' \n'.repeat(size / 2) + 'a: b\n',
+  ];
+  for (const input of inputs) {
+    const started = process.hrtime.bigint();
+    let failures;
+    assert.doesNotThrow(() => { failures = externalCheckClaimFailures('e2e/v34-matrix.spec.ts', v34MatrixJob('v34-chromium'), p => p === launch ? input : v34ReadHead(p)); }, input.slice(0, 40));
+    const ms = Number(process.hrtime.bigint() - started) / 1e6;
+    assert.equal(failures.length, 1, input.slice(0, 40));
+    assert.ok(ms < 3000, `${JSON.stringify(input.slice(0, 20))} took ${ms} ms at ${input.length} bytes`);
+  }
+});
+// Round 6: a declaration chain is read whole, so test.fail.only and test.describe.serial.only are what they declare.
+test('affected spec skip reader: chained declarations (test.fail.only, test.fixme.only, test.describe.serial.only) are read', () => {
+  const spec = (...lines) => lines.join('\n') + '\n', allowed = source => specSkipAllowance(source).allowed;
+  assert.deepEqual(allowed(spec('test.fail.only("a", async ({}, t) => {', '  test.skip(t.project.name !== "1440");', '});', 'test("b", async () => {});')), [['1440'], null]);
+  assert.equal(specSelfSkipReason(spec('test.fail.only("a", async ({}, t) => {', '  test.skip(t.project.name !== "1440");', '});', 'test.fail.only("b", async () => {});'), '390'), null);
+  assert.deepEqual(allowed(spec('test.describe.serial.only("d", () => {', '  test("a", async ({}, t) => {', '    test.skip(t.project.name !== "390");', '  });', '});')), [['390']]);
+  // fixme.only declares a test that never runs; an untitled chain (test.fail.only()) modifies the test it is in and declares nothing.
+  assert.deepEqual(allowed(spec('test.fixme.only("a", async () => {});', 'test("b", async ({}, t) => {', '  test.skip(t.project.name !== "360");', '});')), [['360']]);
+  assert.deepEqual(allowed(spec('test("a", async ({}, t) => {', '  test.fail.only();', '  test.skip(t.project.name !== "360");', '});')), [['360']]);
 });
 // WO-CI-7 round 4: one skip reader for claims and rows. Synthetic specs pin each form, the per-test and per-hook scope, and the forms
 // it does not read (never a refusal). The real specs the review named are read to the allowance their rows rely on.
@@ -9256,14 +9472,22 @@ test('affected v34 round-4 owners: merged lanes run their own suites, the databa
   for (const path of ['nextjs/app/explore/page.tsx', 'nextjs/components/explore/explore-stage.module.css'])
     assert.deepEqual(AFFECTED_GROUPS.filter(owner => owner.match.test(path)).map(owner => owner.group), ['public-marketing-surface', 'v34-retained-shell'], path);
 });
-// WO-CI-7 round 5: the pending key guard spec has no Repair row (one cannot name the projects of a spec that does not exist), so its
-// owner selects nothing and the map fails closed when the spec lands, until the refresh names it with its row.
-test('affected v34 round-5 pending spec: owned, and the change that adds it fails closed until the refresh gives it a Repair row', () => {
-  const spec = 'e2e/explore-shell-keys.spec.ts';
-  assert.equal(existsSync(v34RepoPath(`nextjs/${spec}`)), false);
+// WO-CI-7 round 6: the key guard spec merged (WO-CI-6C). It skips itself outside 1440 and launches WebKit from there, which Repair does not
+// install, so it has no Repair row; Product QA runs 1440 with no file filter and installs WebKit, so it is that job's claim, verified at
+// head. Its group executes the retained-shell suite, and the three /explore paths bound to the group select both.
+test('affected v34 round-6 key guard spec: WO-CI-6B/6C group, Product QA claim at 1440, the /explore paths select it', () => {
+  const spec = 'e2e/explore-shell-keys.spec.ts', claim = v34ProductQa('1440');
+  assert.ok(existsSync(v34RepoPath(`nextjs/${spec}`)));
   assert.throws(() => planBrowserRuns([spec], false), /No reviewed Playwright project mapping for e2e\/explore-shell-keys\.spec\.ts/);
-  const lane = v34Map([affectedRecord('A', [`nextjs/${spec}`], '000000')], { headHasFile: path => path === `nextjs/${spec}` || existsSync(v34RepoPath(path)) });
-  assert.deepEqual([lane.failures, lane.groups, lane.browserFiles], [[`owner explore-shell-keys selects no check the Repair job executes: nextjs/${spec}`], ['explore-shell-keys'], []]);
+  assert.deepEqual(externalCheckClaimFailures(spec, claim, v34ReadHead), []);
+  assert.match(specSelfSkipReason(v34ReadHead(`nextjs/${spec}`), '390') ?? '', /skips itself outside projects 1440/);
+  assert.match(externalCheckClaimFailures(spec, v34ProductQa('390'), v34ReadHead).join(), /skips itself outside projects 1440/);
+  for (const path of [spec, 'app/explore/page.tsx', 'components/explore/explore-stage.module.css', 'components/explore/explore-stage.tsx']) {
+    const map = v34Map([affectedRecord('M', [`nextjs/${path}`])]);
+    assert.deepEqual(map.failures, [], path);
+    assert.ok(map.groups.includes('v34-retained-shell') && map.unitFiles.includes('lib/v34/retained-shell.test.ts'), path);
+    assert.deepEqual({ ...map.externalChecks.find(check => check.file === spec)?.runner }, claim, path);
+  }
 });
 // A neighbour an earlier owner left unknown that the V34 program changed is now that program owner's: asserted to exactly it.
 function assertV34ProgramEndpoint(path) {

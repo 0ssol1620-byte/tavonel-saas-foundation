@@ -3339,34 +3339,26 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
-  // v34-retained-shell (WO-CI-6B, merged): the retained-route shell suite, which renders app/explore/page.tsx inside the V34 frame and
-  // reads the explore stage and its stylesheet. It owns itself; boundPaths are paths another owner keeps (public-marketing-surface,
-  // paper-product-route-css) that also select this suite, so a change to them runs it as well.
+  // v34-retained-shell (WO-CI-6B and 6C, merged): the retained-route shell suite, which renders app/explore/page.tsx inside the V34 frame
+  // and reads the explore stage and its stylesheet, and the /explore key guard spec. boundPaths are paths another owner keeps
+  // (public-marketing-surface, paper-product-route-css) that also select this group's checks, so a change to them runs them as well.
+  // e2e/explore-shell-keys.spec.ts skips itself outside project 1440 and launches WebKit from there. Repair installs Chromium only and its
+  // 1440 row cannot drop one case (run options are per project), so a Repair row would fail as written; Product QA runs project 1440 with
+  // no file filter and installs WebKit, so the spec is that job's verified claim.
   'v34-retained-shell': Object.freeze({
-    paths: Object.freeze(['lib/v34/retained-shell.test.ts']),
+    paths: Object.freeze(['e2e/explore-shell-keys.spec.ts', 'lib/v34/retained-shell.test.ts']),
     boundPaths: Object.freeze(['app/explore/page.tsx', 'components/explore/explore-stage.module.css', 'components/explore/explore-stage.tsx']),
     unitFiles: Object.freeze(['lib/v34/retained-shell.test.ts']),
     browserFiles: Object.freeze([]),
-    externalChecks: Object.freeze({}),
+    externalChecks: Object.freeze({ 'e2e/explore-shell-keys.spec.ts': productQaClaim('1440') }),
   }),
 });
-// Owners for paths lanes still in flight add, fixed by their work orders. None of these paths exists at this head. Each owner is its
-// own group, selected only by a change to its own paths, so a suite it names that is absent today can only be selected by the change
-// that adds it; until then the map is unchanged.
+// Owners for paths lanes still in flight add, fixed by their work orders: each its own group, selected only by a change to its own paths,
+// so a suite it names that is absent today can only be selected by the change that adds it. None at this head (round 6: WO-CI-6C merged
+// and its spec joined v34-retained-shell).
 // WO-AN-7B's migration 20261117130300 and its rollback draft (merged) need no entry: every supabase/{migrations,tests,drafts}/*.sql is
 // the database-contract group's.
-export const V34_PROGRAM_PENDING_OWNERS = Object.freeze({
-  // explore-shell-keys (WO-CI-6C, in flight): the /explore key guard spec. It is its own check, and the Repair browser stage can run it only
-  // through a reviewed row naming the projects its skips allow, which cannot be written before the spec exists. So it selects nothing yet:
-  // a change that adds it fails the map closed ("selects no check the Repair job executes") until the refresh after WO-CI-6C names the
-  // spec and its row here. Launch QA's jobs pick it up on their own; that is not counted here.
-  'explore-shell-keys': Object.freeze({
-    paths: Object.freeze(['e2e/explore-shell-keys.spec.ts']),
-    unitFiles: Object.freeze([]),
-    browserFiles: Object.freeze([]),
-    externalChecks: Object.freeze({}),
-  }),
-});
+export const V34_PROGRAM_PENDING_OWNERS = Object.freeze({});
 // D-4 and WO-AN-1: the program's four pgTAP files run in the affected SQL fixture job whenever any SQL changes, not only in the full
 // rehearsal. Fixtures that build a SQL-bearing head take this list, never a copy of it.
 export const DATABASE_CONTRACT_DATABASE_TESTS = Object.freeze(['supabase/tests/agent_proposals.sql', 'supabase/tests/foundation_page_meter.sql', 'supabase/tests/library_label_decisions.sql', 'supabase/tests/world_change_proposals.sql']);
@@ -3685,102 +3677,232 @@ export function parseAffectedRawDiff(output) {
   return records;
 }
 
-// The lines YAML reads as content, in order. Blank, whitespace-only and comment-only lines are dropped at any indent, so no reader below
-// ever stops at one; inside a block scalar (`key: |`, `key: >-`, any indicators) every non-blank line indented past the key is content
-// and kept, `#` included (its blank lines are dropped too: no reader here needs them, and a kept one would read as a column-0 line).
-// A line mistaken for a block-scalar start only keeps lines, which the readers then refuse: it never hides one.
-function yamlContentLines(text) {
-  const lines = [];
-  let scalar = -1;
-  for (const line of text.replace(/\r\n/g, '\n').split('\n')) {
-    const indent = line.length - line.trimStart().length;
-    if (scalar >= 0 && !line.trim()) continue;
-    if (scalar >= 0 && indent > scalar) { lines.push(line); continue; }
-    scalar = -1;
-    if (!line.trim() || line.trimStart().startsWith('#')) continue;
-    lines.push(line);
-    // Linear: the leading spaces and `- ` markers are read once, then one anchored test of the rest.
-    const lead = /^ *(?:- +)*/.exec(line)[0].length, rest = line.slice(lead);
-    if (/^[^\s#].*?:[ \t]+[|>][0-9+-]*(?:[ \t]+#.*)?[ \t]*$/.test(rest)) scalar = lead;
-    else if (/^[|>][0-9+-]*(?:[ \t]+#.*)?[ \t]*$/.test(rest)) scalar = indent;
+// The workflow grammar (WO-CI-7 round 6). Every claim reader goes through readWorkflowYaml, which accepts a closed list of line shapes
+// and refuses everything else with its line number. Outside a block scalar, blank, whitespace-only and comment-only lines are skipped at
+// any indent; every other line is one of:
+//   key:                    a plain key (a letter or `_`, then letters, digits, `_`, `.`, `-`) opening a mapping or a sequence
+//                           indented deeper, or null when nothing deeper follows
+//   key: scalar             a plain scalar (no `: `, no ` #`, no leading indicator) or a quoted one that opens and closes on the line
+//                           ("..." with no backslash, or '...' with '' for a quote)
+//   key: [a, "b"]           a flow sequence of such scalars, on one line
+//   key: { k: v, j: "w" }   a flow mapping of plain keys and such scalars, on one line
+//   key: |   key: |-        a literal block: the lines after it indented deeper than the key, read exactly as YAML reads them
+//   key: >   key: >-        a folded block: the same lines, folded as YAML folds them
+//   - key: ...              a sequence entry opening a mapping (one space after the dash; its other keys align with the first)
+//   - scalar                a sequence entry holding a plain or quoted scalar
+// Anything else is refused: a tab or control character, a quoted or complex key, a key repeated in one mapping, an anchor, alias, tag or
+// merge key, a document marker or directive, a trailing comment, a quoted scalar left open, a plain scalar continued on the next line, a
+// line indented between two levels or another block scalar header (`|+`, `>2`, `| # c`).
+// The result is { value, notes }: every scalar a string (null for a `key:` with nothing under it), and notes that list, by path and line,
+// the shapes a claim reads with care (block scalars, flow mappings, single-quoted and non-string plain scalars). A file outside the
+// grammar is { error: 'line N: why' }. Linear in the text: every line is read once, each with indexOf and anchored, unambiguous patterns.
+class WorkflowShapeError extends Error {}
+const WORKFLOW_KEY = /^([A-Za-z_][A-Za-z0-9_.-]*):(?: |$)/;
+const WORKFLOW_FLOW_KEY = /([A-Za-z_][A-Za-z0-9_.-]*): +/y;
+// A plain scalar YAML (1.2 core, js-yaml's timestamps, 1.1 booleans) reads as something other than a string.
+const WORKFLOW_TYPED = /^(?:~|null|Null|NULL|true|True|TRUE|false|False|FALSE|yes|Yes|YES|no|No|NO|on|On|ON|off|Off|OFF|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN)|[-+]?[0-9][0-9_]*(?:\.[0-9_]*)?(?:[eE][-+]?[0-9]+)?|[-+]?\.[0-9][0-9_]*(?:[eE][-+]?[0-9]+)?|0b[01_]+|0o[0-7_]+|0x[0-9a-fA-F_]+|[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}(?:[Tt ].*)?)$/;
+export function readWorkflowYaml(text) {
+  if (typeof text !== 'string') return { error: 'line 1: not text' };
+  const lines = text.replace(/\r\n/g, '\n').split('\n'), notes = [];
+  let i = 0;
+  const fail = (at, why) => { throw new WorkflowShapeError(`line ${at + 1}: ${why}`); };
+  const indentOf = line => line.length - line.trimStart().length;
+  const spaces = line => /^ *$/.test(line);
+  const nextContent = () => { while (i < lines.length && /^ *(?:#.*)?$/.test(lines[i])) i++; return i < lines.length; };
+  const quoted = (s, at, line, path) => {
+    if (s[at] === '"') {
+      const end = s.indexOf('"', at + 1);
+      if (end < 0) fail(line, 'a quoted scalar that does not close on its line');
+      if (s.slice(at + 1, end).includes('\\')) fail(line, 'an escape in a double-quoted scalar');
+      return { value: s.slice(at + 1, end), end: end + 1 };
+    }
+    let value = '';
+    for (let k = at + 1; ;) {
+      const end = s.indexOf("'", k);
+      if (end < 0) fail(line, 'a quoted scalar that does not close on its line');
+      value += s.slice(k, end);
+      if (s[end + 1] === "'") { value += "'"; k = end + 2; continue; }
+      notes.push({ kind: 'single-quoted', path, line: line + 1 });
+      return { value, end: end + 1 };
+    }
+  };
+  const plain = (s, line, path, flow) => {
+    if (/^[-?:,[\]{}#&*!|>'"%@`]/.test(s)) fail(line, 'a scalar that starts with an indicator (an anchor, alias, tag, flow or block marker)');
+    if (s.includes(' #')) fail(line, 'a trailing comment');
+    if (s.includes(': ') || s.endsWith(':')) fail(line, 'a `: ` inside a plain scalar');
+    if (flow && /[[\]{},]/.test(s)) fail(line, 'a flow indicator inside a plain scalar of a flow collection');
+    if (WORKFLOW_TYPED.test(s)) notes.push({ kind: 'typed', path, line: line + 1 });
+    return s;
+  };
+  const scalar = (s, line, path) => {
+    if (s[0] !== '"' && s[0] !== "'") return plain(s.trimEnd(), line, path, false);
+    const q = quoted(s, 0, line, path), after = s.slice(q.end).trim();
+    if (after) fail(line, after.startsWith('#') ? 'a trailing comment' : 'text after a quoted scalar');
+    return q.value;
+  };
+  // One flow collection on one line: entries split at commas, each a quoted scalar or a plain one with no flow indicator.
+  const flow = (s, line, path, mapping) => {
+    const t = s.trimEnd(), close = mapping ? '}' : ']';
+    if (!t.endsWith(close)) fail(line, 'a flow collection that does not close at the end of its line');
+    const inner = t.slice(1, -1), result = mapping ? {} : [];
+    if (mapping) notes.push({ kind: 'flow-map', path, line: line + 1 });
+    for (let k = 0; ;) {
+      while (inner[k] === ' ') k++;
+      if (k >= inner.length) break;
+      let key = null;
+      if (mapping) {
+        WORKFLOW_FLOW_KEY.lastIndex = k;
+        const found = WORKFLOW_FLOW_KEY.exec(inner);
+        if (!found) fail(line, 'a flow mapping entry that is not `key: value`');
+        key = found[1];
+        if (key === '__proto__' || Object.hasOwn(result, key)) fail(line, `the key ${key} repeated in one mapping`);
+        k = WORKFLOW_FLOW_KEY.lastIndex;
+      }
+      const here = [...path, mapping ? key : result.length];
+      let value;
+      if (inner[k] === '"' || inner[k] === "'") { const q = quoted(inner, k, line, here); value = q.value; k = q.end; }
+      else {
+        const comma = inner.indexOf(',', k), end = comma < 0 ? inner.length : comma, token = inner.slice(k, end).trimEnd();
+        if (!token) fail(line, 'an empty flow entry');
+        value = plain(token, line, here, true);
+        k = end;
+      }
+      if (mapping) result[key] = value; else result.push(value);
+      while (inner[k] === ' ') k++;
+      if (k >= inner.length) break;
+      if (inner[k] !== ',') fail(line, 'text after a quoted flow entry');
+      k++;
+    }
+    return result;
+  };
+  // A block scalar after `key: <header>` on line `line`, the key at column `col`: its lines are those after it that are blank or indented at
+  // least as deep as its first non-blank line, which must be deeper than the key.
+  const block = (header, line, col, path) => {
+    if (!['|', '|-', '>', '>-'].includes(header)) fail(line, 'a block scalar header this check does not read (only |, |-, > and >-, with nothing after them)');
+    notes.push({ kind: 'block', path, line: line + 1 });
+    const body = [];
+    let m = -1;
+    while (i < lines.length) {
+      const text = lines[i];
+      if (spaces(text)) { body.push(text); i++; continue; }
+      const at = indentOf(text);
+      if (m < 0) { if (at <= col) break; m = at; }
+      if (at < m) break;
+      body.push(text); i++;
+    }
+    const first = body.findIndex(text => !spaces(text));
+    if (first < 0) { if (body.some(text => text.length > col)) fail(line, 'a block scalar holding only whitespace'); return ''; }
+    if (i < lines.length && indentOf(lines[i]) > col && !/^ *#/.test(lines[i])) fail(i, 'a line inside a block scalar indented less than its first line');
+    for (let k = 0; k < first; k++) if (body[k].length > m) fail(line + 1 + k, 'a whitespace-only line before a block scalar\'s first line, longer than its indent');
+    // null is an empty line (YAML keeps its break); a whitespace-only line longer than the indent is content (its extra spaces).
+    const texts = body.map(text => spaces(text) && text.length <= m ? null : text.slice(m));
+    let last = texts.length;
+    while (last > 0 && texts[last - 1] === null) last--;
+    const kept = texts.slice(0, last), clip = header === '|' || header === '>' ? '\n' : '';
+    if (header.startsWith('|')) return kept.map(text => text ?? '').join('\n') + clip;
+    // Folding (YAML 1.2 8.1.3): a break between two lines at the block's indent is a space; empty lines between them are kept as breaks
+    // (the first break dropped); a more-indented line keeps the breaks around it.
+    let folded = '', read = false, more = false, empty = 0;
+    for (const text of kept) {
+      if (text === null) { empty++; continue; }
+      if (text.startsWith(' ')) { more = true; folded += '\n'.repeat(read ? 1 + empty : empty); }
+      else if (more) { more = false; folded += '\n'.repeat(empty + 1); }
+      else folded += empty ? '\n'.repeat(empty) : read ? ' ' : '';
+      folded += text; read = true; empty = 0;
+    }
+    return folded + clip;
+  };
+  const inline = (rest, line, col, path) => /^[|>]/.test(rest) ? block(rest, line, col, path) : rest[0] === '[' || rest[0] === '{' ? flow(rest, line, path, rest[0] === '{') : scalar(rest, line, path);
+  // One `key: ...` line at column `col` (the text from the key on), into `map`.
+  const entry = (content, col, map, path) => {
+    const key = WORKFLOW_KEY.exec(content);
+    if (!key) fail(i, /^-(?: |$)/.test(content) ? 'a sequence entry where a key is expected' : 'a line that is not a plain `key:` (a quoted or complex key, an anchor, a tag, a document marker or another shape)');
+    const name = key[1], here = [...path, name], rest = content.slice(key[0].length).trim(), line = i++;
+    if (name === '__proto__' || Object.hasOwn(map, name)) fail(line, `the key ${name} repeated in one mapping`);
+    map[name] = rest ? inline(rest, line, col, here) : nextContent() && indentOf(lines[i]) > col ? node(indentOf(lines[i]), here) : null;
+  };
+  const mapping = (indent, map, path) => {
+    while (nextContent()) {
+      const at = indentOf(lines[i]);
+      if (at < indent) break;
+      if (at > indent) fail(i, 'a line indented deeper than the mapping it is in (a continued scalar or a misplaced key)');
+      entry(lines[i].slice(indent), indent, map, path);
+    }
+    return map;
+  };
+  const sequence = (indent, path) => {
+    const items = [];
+    while (nextContent()) {
+      const at = indentOf(lines[i]);
+      if (at < indent) break;
+      if (at > indent) fail(i, 'a line indented deeper than the sequence it is in (a continued scalar or a misplaced entry)');
+      const content = lines[i].slice(indent), after = content.slice(2), here = [...path, items.length];
+      if (!content.startsWith('- ')) fail(i, content === '-' ? 'an empty sequence entry' : 'a key where a sequence entry is expected');
+      if (!after || after.startsWith(' ')) fail(i, 'a sequence entry that is not `- ` and then its content');
+      if (WORKFLOW_KEY.test(after)) { const map = {}; entry(after, indent + 2, map, here); items.push(mapping(indent + 2, map, here)); continue; }
+      const line = i++;
+      if (/^[|>[{]/.test(after)) fail(line, 'a sequence entry holding a block scalar or a flow collection');
+      items.push(scalar(after, line, here));
+    }
+    return items;
+  };
+  const node = (indent, path) => /^-(?: |$)/.test(lines[i].slice(indent)) ? sequence(indent, path) : mapping(indent, {}, path);
+  try {
+    for (const [at, line] of lines.entries()) { const bad = /[\x00-\x09\x0B-\x1F\x7F﻿]/.exec(line); if (bad) fail(at, bad[0] === '\t' ? 'a tab' : 'a control character'); }
+    if (!nextContent()) fail(0, 'no content');
+    if (indentOf(lines[i]) !== 0) fail(i, 'a document that does not start at column 0');
+    return { value: mapping(0, {}, []), notes };
+  } catch (error) {
+    if (error instanceof WorkflowShapeError) return { error: error.message };
+    throw error;
   }
-  return lines;
 }
-const indentOf = line => line.length - line.trimStart().length;
-// A flat env block under `lines[at]` (`<indent>env:`): { KEY: value } with quotes removed, or null when it is anything else (a flow map,
-// an anchor, a trailing comment, a nested or continued value, a quoted, lower-case or repeated key, an indicator-led or `: `-bearing value).
-function readEnvBlock(lines, at, indent) {
-  if (lines[at].slice(indent + 'env:'.length).trim()) return null;
-  const env = {}, pair = new RegExp(String.raw`^ {${indent + 2}}([A-Z][A-Z0-9_]*): (?:"([^"\\]*)"|([^\s"'#|>&*!%@\x60{}[\],?:-][^#]*?))[ \t]*$`);
-  for (const line of lines.slice(at + 1)) {
-    if (indentOf(line) <= indent) break;
-    const found = pair.exec(line), value = found?.[2] ?? found?.[3];
-    if (!found || Object.hasOwn(env, found[1]) || (found[3] !== undefined && /:(?:\s|$)/.test(value))) return null;
-    env[found[1]] = value;
-  }
-  return env;
+const isYamlMap = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+const underPath = (path, prefix) => prefix.length <= path.length && prefix.every((part, index) => path[index] === part);
+const pathText = path => path.map((part, index) => typeof part === 'number' ? `[${part}]` : index ? `.${part}` : part).join('');
+// The env a mapping declares: undefined when it has none, null unless a block mapping of upper-case keys to plain or double-quoted string
+// scalars (a flow map, a nested, empty, single-quoted, block or non-string value is an environment this check does not read).
+function readEnvLevel(container, path, notes) {
+  if (!Object.hasOwn(container, 'env')) return undefined;
+  const env = container.env, at = [...path, 'env'];
+  if (!isYamlMap(env) || notes.some(note => underPath(note.path, at))) return null;
+  return Object.entries(env).every(([key, value]) => /^[A-Z][A-Z0-9_]*$/.test(key) && typeof value === 'string') ? { ...env } : null;
 }
-// The env declared at one level (`lines` are that level's own lines): undefined when there is none, null when unreadable or declared twice.
-function levelEnv(lines, indent) {
-  const at = lines.flatMap((line, index) => new RegExp(`^ {${indent}}env:`).test(line) ? [index] : []);
-  return !at.length ? undefined : at.length > 1 ? null : readEnvBlock(lines, at[0], indent);
-}
-// Keys this reader has reviewed: anything else at the job or the claimed step's level (a quoted key included) refuses the claim.
+// Keys this reader has reviewed: anything else at the workflow, the job or the claimed step's level refuses the claim.
 const REVIEWED_WORKFLOW_KEYS = new Set(['name', 'run-name', 'on', 'permissions', 'concurrency', 'env', 'defaults', 'jobs']);
 const REVIEWED_JOB_KEYS = new Set(['name', 'needs', 'runs-on', 'timeout-minutes', 'defaults', 'env', 'steps', 'if', 'continue-on-error']);
 const REVIEWED_STEP_KEYS = new Set(['name', 'id', 'run', 'env', 'timeout-minutes', 'if', 'continue-on-error', 'working-directory', 'shell']);
-// Keys of one level: the lines at exactly `indent` must each be a bare `key:`; a line between that level and the next one in is unreadable.
-function levelKeys(lines, indent) {
-  const keys = [];
-  for (const line of lines) {
-    const at = indentOf(line);
-    if (at > indent + 1) continue;
-    const key = at === indent ? /^ *([a-z][a-z-]*):(?: |$)/.exec(line)?.[1] : undefined;
-    if (!key) return null;
-    keys.push(key);
+// Where a claim reads (the workflow head and the claimed job) a block scalar is read only as a step's run or one of its with inputs, and a
+// flow mapping only as a step's with: the line and path of the first other one, or null.
+function claimedShapeFailure(notes, job) {
+  for (const note of notes) {
+    if (note.kind !== 'block' && note.kind !== 'flow-map') continue;
+    const [top, name, steps, index, key, input] = note.path;
+    if (top === 'jobs' && name !== job) continue;
+    const step = top === 'jobs' && steps === 'steps' && typeof index === 'number';
+    const allowed = step && (note.kind === 'block' ? (note.path.length === 5 && key === 'run') || (note.path.length === 6 && key === 'with' && input !== undefined) : note.path.length === 5 && key === 'with');
+    if (!allowed) return `line ${note.line}: a ${note.kind === 'block' ? 'block scalar' : 'flow mapping'} at ${pathText(note.path)}, a shape this check has not reviewed there`;
   }
-  return keys;
+  return null;
 }
-// The workflow-level facts every job inherits: { env, defaults, unreviewed }.
-function workflowLevel(text) {
-  const lines = yamlContentLines(text), keys = levelKeys(lines, 0);
-  return { env: levelEnv(lines, 0), defaults: lines.some(line => /^defaults:/.test(line)), unreviewed: !keys || keys.some(key => !REVIEWED_WORKFLOW_KEYS.has(key)) };
-}
-// One job of a workflow file, read from its content lines (yamlContentLines): { steps: [{ run, conditional, rebound, env, unreviewed }],
-// conditional, nextjsDefault, needs, env, unreviewed, writesEnvironment }, or null when the job is absent. Each run is folded to one line;
-// a run is null (it matches no claim, so the claim is refused) for any shape but an inline run with no continuation line, a `>`/`>-`
-// folded or `|`/`|-` literal block whose lines share one indent. needs is null unless an inline name or [a, b] list.
-function workflowJobSteps(text, job) {
-  const lines = yamlContentLines(text);
-  const jobsAt = lines.indexOf('jobs:'), start = lines.findIndex((line, index) => jobsAt >= 0 && index > jobsAt && line === `  ${job}:`);
-  if (start < 0) return null;
-  const next = lines.findIndex((line, index) => index > start && indentOf(line) <= 2);
-  const body = lines.slice(start + 1, next < 0 ? lines.length : next), jobText = body.join('\n'), steps = [];
-  for (const [index, line] of body.entries()) {
-    if (!line.startsWith('      - ')) continue;
-    const end = body.findIndex((candidate, at) => at > index && (candidate.startsWith('      - ') || indentOf(candidate) <= 5));
-    const step = body.slice(index, end < 0 ? body.length : end).map((candidate, at) => at === 0 ? '        ' + candidate.slice(8) : candidate);
-    const runAt = step.findIndex(candidate => candidate.startsWith('        run:'));
-    let run = null;
-    if (runAt >= 0) {
-      const inline = step[runAt].slice('        run:'.length).trim(), after = step.slice(runAt + 1), more = after.findIndex(candidate => indentOf(candidate) <= 8);
-      const block = (more < 0 ? after : after.slice(0, more)).filter(candidate => candidate.trim());
-      if (!['', '>', '>-', '|', '|-'].includes(inline)) run = block.length ? null : inline;
-      else if (block.length && block.every(candidate => indentOf(candidate) === indentOf(block[0]))) run = block.map(candidate => candidate.trim()).join(inline.startsWith('|') ? '\n' : ' ');
-    }
-    const keys = levelKeys(step, 8);
-    steps.push({ run, conditional: step.some(candidate => /^ {8}(?:if|continue-on-error):/.test(candidate)), rebound: step.some(candidate => /^ {8}(?:working-directory|shell):/.test(candidate)),
-      env: levelEnv(step, 8), unreviewed: !keys || keys.some(key => !REVIEWED_STEP_KEYS.has(key)) });
-  }
-  const needsAt = /^ {4}needs:(.*)$/m.exec(jobText)?.[1].trim(), needsList = needsAt === undefined ? '' : /^\[([A-Za-z0-9_, -]*)\]$/.exec(needsAt)?.[1] ?? (/^[A-Za-z0-9_-]+$/.test(needsAt) ? needsAt : null);
-  const needs = needsList === null ? null : needsList.split(',').map(name => name.trim()).filter(Boolean);
+// One job of a read workflow: { steps: [{ run, conditional, rebound, env, unreviewed }], conditional, nextjsDefault, needs, env,
+// unreviewed, writesEnvironment }, or null when the job is absent. A run is the string YAML reads (null for any other value); needs is
+// null unless a job name or a list of job names; a step list that is not a list of mappings is unreviewed.
+function workflowJob(workflow, name) {
+  const jobs = workflow.value.jobs, job = isYamlMap(jobs) && Object.hasOwn(jobs, name) ? jobs[name] : undefined;
+  if (!isYamlMap(job)) return null;
+  const path = ['jobs', name], stepList = Array.isArray(job.steps) && job.steps.every(isYamlMap) ? job.steps : [];
+  const steps = stepList.map((step, index) => ({ run: typeof step.run === 'string' ? step.run : null, conditional: Object.hasOwn(step, 'if') || Object.hasOwn(step, 'continue-on-error'),
+    rebound: Object.hasOwn(step, 'working-directory') || Object.hasOwn(step, 'shell'), env: readEnvLevel(step, [...path, 'steps', index], workflow.notes),
+    unreviewed: Object.keys(step).some(key => !REVIEWED_STEP_KEYS.has(key)) }));
+  const jobName = value => typeof value === 'string' && /^[A-Za-z0-9_-]+$/.test(value);
+  const needs = job.needs === undefined ? [] : jobName(job.needs) ? [job.needs] : Array.isArray(job.needs) && job.needs.every(jobName) ? [...job.needs] : null;
   // defaults is exactly `run: working-directory: nextjs`, nothing more (a shell under it is another environment).
-  const defaultsAt = body.indexOf('    defaults:'), defaultsEnd = body.findIndex((candidate, at) => at > defaultsAt && indentOf(candidate) <= 4);
-  const nextjsDefault = defaultsAt >= 0 && body.slice(defaultsAt + 1, defaultsEnd < 0 ? body.length : defaultsEnd).join('\n') === '      run:\n        working-directory: nextjs';
-  // The job's own key lines only: step lines start at indent 6, so the job level is read at indent 4.
-  const jobKeys = levelKeys(body.filter(candidate => indentOf(candidate) <= 5), 4);
-  return { steps, conditional: /^ {4}(?:if|continue-on-error):/m.test(jobText), nextjsDefault, needs, env: levelEnv(body, 4),
-    unreviewed: !jobKeys || jobKeys.some(key => !REVIEWED_JOB_KEYS.has(key)), writesEnvironment: /GITHUB_(?:ENV|PATH)\b/.test(jobText) };
+  const defaults = job.defaults, nextjsDefault = isYamlMap(defaults) && Object.keys(defaults).join() === 'run' && isYamlMap(defaults.run)
+    && Object.keys(defaults.run).join() === 'working-directory' && defaults.run['working-directory'] === 'nextjs';
+  return { steps, conditional: Object.hasOwn(job, 'if') || Object.hasOwn(job, 'continue-on-error'), nextjsDefault, needs, env: readEnvLevel(job, path, workflow.notes),
+    unreviewed: Object.keys(job).some(key => !REVIEWED_JOB_KEYS.has(key)) || stepList.length !== (Array.isArray(job.steps) ? job.steps.length : -1),
+    writesEnvironment: /GITHUB_(?:ENV|PATH)\b/.test(JSON.stringify(job)) };
 }
 const globSource = glob => '^' + glob.split('**/').map(part => part.split('*').map(text => text.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*')).join('(?:[^/]+/)*') + '$';
 // Two claims are one claim when they hold the same keys and values, in any key order.
@@ -3813,8 +3935,15 @@ export function specSkipAllowance(source) {
   const text = source.replace(/\r\n/g, '\n'), declarations = [];
   // test.fail / test.fixme / test.skip declare a test only with a title (a string or template literal first argument); called with a
   // condition or nothing, as test.slow and test.setTimeout always are, they modify the test they are in and declare nothing.
-  for (const match of text.matchAll(/^([ \t]*)test(\.beforeEach|\.describe(?:\.[A-Za-z]+)?|\.only|\.(?:fail|fixme|skip)(?=\(\s*["'`]))?\(/gm))
-    declarations.push({ at: match.index, indent: match[1].length, kind: match[2] === '.beforeEach' ? 'hook' : match[2]?.startsWith('.describe') ? 'describe' : match[2] === '.fixme' || match[2] === '.skip' ? 'never' : 'test', allowed: null });
+  // A chain is read whole (test.fail.only, test.describe.serial.only): only, fail, fixme and skip in any order declare a test (fixme or
+  // skip one that never runs), and need a title unless the chain is only `only`.
+  for (const match of text.matchAll(/^([ \t]*)test((?:\.[A-Za-z]+){0,4})\(/gm)) {
+    const chain = match[2].split('.').slice(1), end = match.index + match[0].length, titled = /^\s{0,64}["'`]/.test(text.slice(end, end + 65));
+    const kind = chain.join() === 'beforeEach' ? 'hook' : chain[0] === 'describe' ? 'describe'
+      : !chain.every(part => ['only', 'fail', 'fixme', 'skip'].includes(part)) || !(titled || chain.every(part => part === 'only')) ? null
+        : chain.includes('fixme') || chain.includes('skip') ? 'never' : 'test';
+    if (kind) declarations.push({ at: match.index, indent: match[1].length, kind, allowed: null });
+  }
   const narrow = (declaration, allowed) => { declaration.allowed = declaration.allowed ? declaration.allowed.filter(project => allowed.includes(project)) : [...allowed]; };
   let owner = null, next = 0;
   for (let at = text.indexOf('test.skip('); at >= 0; at = text.indexOf('test.skip(', at + 1)) {
@@ -3860,30 +3989,36 @@ function claimFailures(file, claim, read) {
     || typeof claim.job !== 'string' || typeof claim.run !== 'string' || !claim.run) return refuse('not a structured workflow claim');
   const workflow = read(claim.workflow);
   if (typeof workflow !== 'string') return refuse(`${claim.workflow} is absent or unreadable at head`);
-  const lf = workflow.replace(/\r\n/g, '\n');
-  if (!/^on:\s*$/m.test(lf) || !/^ {2}pull_request:/m.test(lf)) return refuse(`${claim.workflow} does not run on pull_request`);
+  // The whole file is read through the workflow grammar (readWorkflowYaml) before anything is looked up in it.
+  const parsed = readWorkflowYaml(workflow);
+  if (parsed.error) return refuse(`${claim.workflow} is not a workflow this check can read (${parsed.error})`);
+  const shape = claimedShapeFailure(parsed.notes, claim.job);
+  if (shape) return refuse(`${claim.workflow} ${shape}`);
+  const top = parsed.value;
+  if (!isYamlMap(top.on) || !Object.hasOwn(top.on, 'pull_request')) return refuse(`${claim.workflow} does not run on pull_request`);
   // A bare `pull_request:` with nothing under it: a paths, branches or types filter can keep the job from running on a PR.
-  if (!/^ {2}pull_request:[ \t]*\n(?! {3})/m.test(lf)) return refuse(`${claim.workflow} narrows its pull_request trigger`);
-  const workflowFacts = workflowLevel(lf);
-  if (workflowFacts.unreviewed) return refuse(`${claim.workflow} has a top-level key this check has not reviewed`);
-  if (workflowFacts.defaults) return refuse(`${claim.workflow} sets workflow defaults, so every step's directory, shell or environment is rebound`);
-  const job = workflowJobSteps(lf, claim.job);
+  if (top.on.pull_request !== null) return refuse(`${claim.workflow} narrows its pull_request trigger`);
+  if (Object.keys(top).some(key => !REVIEWED_WORKFLOW_KEYS.has(key))) return refuse(`${claim.workflow} has a top-level key this check has not reviewed`);
+  if (Object.hasOwn(top, 'defaults')) return refuse(`${claim.workflow} sets workflow defaults, so every step's directory, shell or environment is rebound`);
+  const workflowEnv = readEnvLevel(top, [], parsed.notes);
+  const job = workflowJob(parsed, claim.job);
   if (!job) return refuse(`${claim.workflow} has no job ${claim.job}`);
   if (job.conditional || !job.nextjsDefault) return refuse(`job ${claim.job} is conditional or does not run in nextjs/`);
-  if (job.unreviewed) return refuse(`job ${claim.job} has a key this check has not reviewed (a container, a matrix, a quoted key or another shape)`);
+  if (job.unreviewed) return refuse(`job ${claim.job} has a key this check has not reviewed (a container, a matrix, a step that is not a mapping or another shape)`);
   if (job.needs === null) return refuse(`job ${claim.job} has a needs list this check cannot read`);
   // ponytail: one level of needs is read; a needed job's own needs are not followed.
-  for (const need of job.needs) { const needed = workflowJobSteps(lf, need); if (!needed || needed.conditional || needed.unreviewed) return refuse(`job ${claim.job} needs ${need}, which is absent or conditional, or has a key this check has not reviewed`); }
-  const steps = job.steps.filter(step => step.run === claim.run);
+  for (const need of job.needs) { const needed = workflowJob(parsed, need); if (!needed || needed.conditional || needed.unreviewed) return refuse(`job ${claim.job} needs ${need}, which is absent or conditional, or has a key this check has not reviewed`); }
+  // The run YAML reads, with the one line break a `|` block keeps (the shell runs the same command).
+  const steps = job.steps.filter(step => step.run === claim.run || step.run === `${claim.run}\n`);
   if (steps.length !== 1 || steps[0].conditional) return refuse(`job ${claim.job} has no single unconditional step running: ${claim.run}`);
   if (steps[0].rebound) return refuse(`the step running ${claim.run} sets its own directory, shell or environment (a directory or shell)`);
   if (steps[0].unreviewed) return refuse(`the step running ${claim.run} has a key this check has not reviewed (a quoted key or another shape)`);
   // The environment a step runs with is the workflow's, the job's and its own env, merged (the nearer level wins): part of what the step
   // runs, so the claim holds only when it names exactly that environment. Not read, so never claimed: what an action exports.
   if (job.writesEnvironment) return refuse(`job ${claim.job} writes GITHUB_ENV or GITHUB_PATH, so a step's environment is not the one written in the file`);
-  if ([workflowFacts.env, job.env, steps[0].env].includes(null)) return refuse(`the step running ${claim.run} sets its own directory, shell or environment (an environment this check cannot read)`);
+  if ([workflowEnv, job.env, steps[0].env].includes(null)) return refuse(`the step running ${claim.run} sets its own directory, shell or environment (an environment this check cannot read)`);
   if (claim.env !== undefined && (!claim.env || typeof claim.env !== 'object' || Array.isArray(claim.env))) return refuse('the claim names an environment that is not a flat map');
-  const environment = { ...workflowFacts.env, ...job.env, ...steps[0].env };
+  const environment = { ...workflowEnv, ...job.env, ...steps[0].env };
   if (canonicalClaim(environment) !== canonicalClaim(claim.env ?? {})) return refuse(`the step running ${claim.run} sets its own directory, shell or environment (an environment the claim does not name exactly)`);
   const tokens = claim.run.split(/\s+/);
   if (claim.kind === 'playwright') {
