@@ -138,8 +138,14 @@ describe("every V34 route body", () => {
     expect(h1s[0]).not.toMatch(/—\s*TAVONEL/);
   });
 
-  // A named legacy exception, next to the home's: the pricing surface is replaced by WO-CAT-2, which retires this line.
+  /*
+    A named legacy exception, next to the home's. WO-CAT-2 rewrote the pricing client for catalog v2 and kept this
+    line; the joint build renders it as /pricing's one h1 (receipts/fnd-joint2). The route must still render this
+    client, or the pin reads a file /pricing no longer shows.
+  */
   it("and its h1 is a named legacy exception: the client's own line, not the registry heading", () => {
+    const route = readFileSync(join(import.meta.dirname, "../../app/pricing/page.tsx"), "utf8");
+    expect(route).toMatch(/<PricingPageClient\b/);
     const source = readFileSync(join(import.meta.dirname, "../../components/pricing-page-client.tsx"), "utf8");
     const h1 = source.match(/<h1\b[^>]*>([^<]*)<\/h1>/)![1]!.trim();
     expect(h1).toBe("Pages and dollars.");

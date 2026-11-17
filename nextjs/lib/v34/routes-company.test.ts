@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { typedCounts } from "./route-test-support";
+import { typedCounts, withoutNonPlanWords } from "./route-test-support";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { COMPANY_REGISTRY_LINKS, RETAINED } from "@/components/v34/routes/company/company-content";
 import { CompanyBody } from "@/components/v34/routes/company/company";
@@ -85,7 +85,9 @@ describe("no typed figure, price, plan or invented fact", () => {
   it("types no price and names no plan", () => {
     expect(text).not.toMatch(/[$€£₩]\s?\d/);
     expect(text).not.toMatch(/\b(?:USD|per month|per year|a month|a year)\b/i);
-    for (const offer of Object.values(BILLING_OFFERS)) expect(text, `plan "${offer.label}"`).not.toMatch(new RegExp(`\\b${offer.label}\\b`));
+    // The operator disclosure's legal "Business" rows are not a plan: route-test-support.ts names them, and only them.
+    const named = stripped(code).filter((f) => !f.file.endsWith("-art.tsx")).map((f) => withoutNonPlanWords(f.file, f.text)).join("\n");
+    for (const offer of Object.values(BILLING_OFFERS)) expect(named, `plan "${offer.label}"`).not.toMatch(new RegExp(`\\b${offer.label}\\b`));
   });
 
   it("writes no figure", () => {

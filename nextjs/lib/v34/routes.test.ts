@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { BILLING_OFFERS, planAvailability } from "../billing-catalog";
 import { BRAND_LINE } from "../site-navigation";
+import { withoutNonPlanWords } from "./route-test-support";
 import {
   V34_HELD_PATHS,
   V34_LIVE_PATHS,
@@ -145,10 +146,12 @@ describe("V34 unshipped-capability gates", () => {
     expect(v34Route("teams").release === "held").toBe(planAvailability("team") !== "purchasable");
   });
 
+  // The named non-plan uses of a label (Personal, Business) are removed first: route-test-support.ts lists them.
   it("keeps plan prices and plan names out of components/v34 (vacuous while absent)", () => {
     const root = join(import.meta.dirname, "../../components/v34");
     for (const path of sourceFiles(root)) {
-      expect(readFileSync(path, "utf8"), path).not.toMatch(/\$29\b|\$49\b|\$99\b|\$199\b|\$799\b|\bPersonal\b|\bDeveloper\b|\bTeam\b|\bBusiness\b/);
+      const source = withoutNonPlanWords(path, readFileSync(path, "utf8"));
+      expect(source, path).not.toMatch(/\$29\b|\$49\b|\$99\b|\$199\b|\$799\b|\bPersonal\b|\bDeveloper\b|\bTeam\b|\bBusiness\b/);
     }
   });
 });

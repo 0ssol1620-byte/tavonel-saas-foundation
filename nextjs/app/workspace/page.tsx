@@ -4010,8 +4010,9 @@ export default function WorkspacePage() {
               {/* workspace-18 (C1): the selected tab directly above already says "Usage & billing",
                   so the card does not repeat it. It is still headed -- by the plan the account is
                   actually on, or, when that has not been read, by a neutral name for the card.
-                  Never by a plan name this panel does not have. */}
-              <h2>{isBillingOfferCode(billingAccount?.accessPlan ?? null) ? BILLING_OFFERS[billingAccount!.accessPlan as BillingOfferCode].label.replace(/(?<!\bplan\)|\bplan)$/, " plan") : billingAccount?.accessPlan ? `${billingAccount.accessPlan.replace("_access", "")} access` : "Access and balance"}</h2>
+                  Never by a plan name this panel does not have. " plan" is appended unless the label ends
+                  in it; the test is a lookahead, because a lookbehind does not parse on Safari before 16.4. */}
+              <h2>{isBillingOfferCode(billingAccount?.accessPlan ?? null) ? BILLING_OFFERS[billingAccount!.accessPlan as BillingOfferCode].label.replace(/^(?![\s\S]*\bplan\)?$)[\s\S]*$/, "$& plan") : billingAccount?.accessPlan ? `${billingAccount.accessPlan.replace("_access", "")} access` : "Access and balance"}</h2>
               <p>Included usage is granted only from a signed subscription transaction and settled from observed processing.</p>
             </div>
             {/*
