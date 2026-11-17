@@ -1,6 +1,9 @@
+import { AGENT_SCOPE_RATE_LIMITS, type AgentScope } from "./agent-access";
+import { readAgentGrant } from "./agent-grants";
+import { withinAgentMcpDispatch } from "./agent-mcp-dispatch";
 import { authorizeFoundationProduct, type MinimumPlanLevel } from "./billing-product-access";
 import type { DeveloperScope } from "./developer-contracts";
-import { authenticateDeveloperApiKey, consumeDeveloperApiRateLimit } from "./developer-store";
+import { authenticateDeveloperApiKey, consumeDeveloperApiRateLimit, type ApiKeyAudience } from "./developer-store";
 import { foundationPilotAccess, getRequestUser } from "./foundation-pilot";
 import {
   authorizeFoundationSessionProduct,
@@ -22,6 +25,21 @@ export type FoundationPrincipal = {
   workspaceRole: WorkspaceRole;
   email?: string;
 };
+
+const BEARER_FORM = /^tvnl_(live|mcp|agt)_/;
+/**
+ * The audience a bearer's token form names, or null when it is no TAVONEL key. Authentication accepts
+ * a token only when its row's stored kind is its form's, so this is the authenticated key's audience.
+ */
+function bearerAudience(bearer: string): ApiKeyAudience | null {
+  const form = BEARER_FORM.exec(bearer)?.[1];
+  switch (form) {
+    case "live": return "api";
+    case "mcp": return "mcp";
+    case "agt": return "agent";
+    default: return null;
+  }
+}
 
 async function resolveWorkspaceAuthority(workspaceKey: string, userId: string) {
   const found = await getWorkspaceMembership(workspaceKey, userId);
@@ -96,16 +114,34 @@ async function resolveFoundationAuthorization(
   const authorization = request.headers.get("authorization") ?? "";
   const bearer = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
 
-  if (bearer.startsWith("tvnl_live_") || bearer.startsWith("tvnl_mcp_")) {
+  const audience = bearerAudience(bearer);
+  if (audience !== null) {
     // API keys remain a paid/owner Developer capability. A free evaluation may exercise the
     // product in the browser, but it never mints a reusable credential that can be scripted into
     // an unbounded client. Explicit owner grants are allowed because authorizeFoundationProduct
     // recognizes them independently of Paddle.
     const authenticated = await authenticateDeveloperApiKey(bearer);
     if (!authenticated.ok) return { ok: false as const, code: authenticated.code, status: 401 };
-    // R1 M1: a remote MCP token is for /api/mcp only, which re-checks its switch and cohort per call.
-    if (authenticated.principal.audience === "mcp" && !insideRemoteMcpDispatch()) {
-      return { ok: false as const, code: "API_KEY_AUDIENCE_INVALID", status: 401 };
+    // Audience, exhaustively (workorders/agent-native.md §2.2). R1 M1: a remote MCP token is for
+    // /api/mcp only, which re-checks its switch and cohort per call. An agent credential is served by
+    // /api/agent-mcp alone (authorizeAgentRequest) and never by this path -- not even inside the agent
+    // dispatch, where authentication itself would accept it. The token form decides; a principal that
+    // names another audience than its form is refused, never reconciled.
+    if (authenticated.principal.audience !== undefined && authenticated.principal.audience !== audience) {
+      return { ok: false as const, code: "API_KEY_INVALID", status: 401 };
+    }
+    switch (audience) {
+      case "api":
+        break;
+      case "mcp":
+        if (!insideRemoteMcpDispatch()) return { ok: false as const, code: "API_KEY_AUDIENCE_INVALID", status: 401 };
+        break;
+      case "agent":
+        return { ok: false as const, code: "API_KEY_AUDIENCE_INVALID", status: 401 };
+      default: {
+        const _unknownAudience: never = audience;
+        return { ok: false as const, code: "API_KEY_INVALID", status: 401 };
+      }
     }
     if (!authenticated.principal.scopes.includes(scope)) {
       return { ok: false as const, code: "API_SCOPE_REQUIRED", status: 403 };
@@ -122,7 +158,7 @@ async function resolveFoundationAuthorization(
     if (authenticated.principal.authorizationRevision !== authority.authorizationRevision) {
       return { ok: false as const, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403 };
     }
-    const { audience: _audience, ...identity } = authenticated.principal;
+    const { audience: _audience, agent: _agent, ...identity } = authenticated.principal;
     const principal: FoundationPrincipal = {
       ...identity,
       scopes: [...identity.scopes],
@@ -193,6 +229,77 @@ async function resolveFoundationAuthorization(
     email: typeof user.email === "string" ? user.email : undefined,
   };
   return { ok: true as const, principal };
+}
+
+/** Who an agent call is: always a person's credential under one of their grants, never a session. */
+export type AgentPrincipal = {
+  kind: "agent";
+  workspaceKey: string;
+  userId: string;
+  keyId: string;
+  grantId: string;
+  scopes: readonly AgentScope[];
+  authorizationRevision: number;
+  workspaceRole: WorkspaceRole;
+};
+
+/**
+ * Per-call authorization of /api/agent-mcp (workorders/agent-native.md §2.3). The route checks the
+ * flag and the cohort first (404 when off or outside); this checks, in order: the bearer is an agent
+ * credential -> it authenticates inside the agent dispatch -> it holds `scope` -> its grant is live
+ * and belongs to the same workspace and person as the key -> pilot access -> the membership is
+ * active at the revision both the key and the grant were made at -> product access with no trial
+ * path -> one rate-limit unit of `scope`. Only codes the catalogue already has; a revoked grant is
+ * API_KEY_AUTHORIZATION_REVOKED.
+ */
+export async function authorizeAgentRequest(request: Request, scope: AgentScope) {
+  const authorization = request.headers.get("authorization") ?? "";
+  const bearer = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+  if (!bearer) return { ok: false as const, code: "AUTH_REQUIRED", status: 401 };
+  const form = bearerAudience(bearer);
+  if (form !== "agent") return { ok: false as const, code: form === null ? "API_KEY_INVALID" : "API_KEY_AUDIENCE_INVALID", status: 401 };
+  const authenticated = await withinAgentMcpDispatch(() => authenticateDeveloperApiKey(bearer));
+  if (!authenticated.ok) return { ok: false as const, code: authenticated.code, status: 401 };
+  const { principal } = authenticated;
+  if (principal.audience !== "agent" || principal.agent === null) {
+    return { ok: false as const, code: "API_KEY_AUDIENCE_INVALID", status: 401 };
+  }
+  if (!principal.agent.scopes.includes(scope)) return { ok: false as const, code: "API_SCOPE_REQUIRED", status: 403 };
+  const grant = await readAgentGrant(principal.workspaceKey, principal.agent.grantId, principal.userId);
+  if (!grant.ok) return { ok: false as const, code: grant.code, status: 503 };
+  if (grant.grant === null || grant.grant.revokedAt !== null) {
+    return { ok: false as const, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403 };
+  }
+  const pilot = foundationPilotAccess(principal.userId);
+  if (!pilot || pilot.membership.workspaceId !== principal.workspaceKey) {
+    return { ok: false as const, code: "PILOT_ACCESS_REQUIRED", status: 403 };
+  }
+  const authority = await resolveWorkspaceAuthority(principal.workspaceKey, principal.userId);
+  if (!authority.ok) return authority;
+  if (principal.authorizationRevision !== authority.authorizationRevision
+    || grant.grant.authorizationRevision !== authority.authorizationRevision) {
+    return { ok: false as const, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403 };
+  }
+  const productAccess = await authorizeFoundationProduct(principal.workspaceKey, principal.userId, "observer");
+  if (!productAccess.ok) return { ok: false as const, code: productAccess.code, status: productAccess.status };
+  const rate = await consumeDeveloperApiRateLimit({
+    keyId: principal.keyId,
+    workspaceKey: principal.workspaceKey,
+    scope,
+    limit: AGENT_SCOPE_RATE_LIMITS[scope],
+  });
+  if (!rate.ok) return { ok: false as const, code: rate.code, status: rate.code === "API_RATE_LIMITED" ? 429 : 503 };
+  const agentPrincipal: AgentPrincipal = {
+    kind: "agent",
+    workspaceKey: principal.workspaceKey,
+    userId: principal.userId,
+    keyId: principal.keyId,
+    grantId: principal.agent.grantId,
+    scopes: [...principal.agent.scopes],
+    authorizationRevision: authority.authorizationRevision,
+    workspaceRole: authority.workspaceRole,
+  };
+  return { ok: true as const, principal: agentPrincipal };
 }
 
 /** Re-check session/key, membership and product access before returning sensitive output. */
