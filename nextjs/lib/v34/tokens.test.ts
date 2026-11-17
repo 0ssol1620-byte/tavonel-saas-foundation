@@ -199,7 +199,20 @@ describe("every surface declares both colour and background itself", () => {
 
 describe("coverage", () => {
   it("measures every class the token sheet declares: a new surface cannot ship without its pairs", () => {
-    expect([...classes.keys()].filter((name) => name !== "site").sort()).toEqual(Object.keys(SURFACES).sort());
+    // `.container` is not a surface: it is the layout-only wrapper, held by the next case.
+    expect([...classes.keys()].filter((name) => name !== "site" && name !== "container").sort()).toEqual(Object.keys(SURFACES).sort());
+  });
+
+  it("gives .container the container's custom properties and nothing else: no colour, no scheme, no font (WO-CI-19, decision 1)", () => {
+    const container = classes.get("container");
+    expect(container, ".container exists").toBeDefined();
+    expect([...(container as Decls).keys()].sort()).toEqual(
+      ["--chrome-edge", "--chrome-gutter", "--chrome-measure", "--v34-gutter", "--v34-max", "--v34-shell"]);
+    for (const [name, value] of container as Decls) expect(site.get(name), `.site and .container agree on ${name}`).toBe(value);
+    // Every gutter step, wide and under each media query, is declared on both at once.
+    const gutters = [...source.matchAll(/([^{}]*)\{[^{}]*--v34-gutter\s*:[^{}]*\}/g)].map((m) => m[1]!.trim());
+    expect(gutters).toHaveLength(3);
+    for (const selector of gutters) expect(selector).toBe(".site, .container");
   });
 });
 
@@ -335,17 +348,34 @@ describe("environment handling", () => {
 });
 
 describe("what the V34 sheets are not allowed to contain", () => {
-  it("has no @import, no :root rule and no global selector beyond the three named ones", () => {
+  /*
+    The only global selectors: the overscroll ground, the drawer's scroll lock, the shared consent link's
+    separator, and -- in the token sheet only, under the wrapper -- the legacy `.btn` a retained body
+    still renders inside the V34 frame (WO-CI-19).
+  */
+  const withoutNamedGlobals = (file: string, css: string) => {
+    let rest = css
+      .replace(/:global\(html\):has\(\.site\)/g, "")
+      .replace(/:global\(html\):has\(\.dialog\[open\]\)/g, "")
+      .replace(/:global\(\.site-footer-legal-sep\)/g, "");
+    if (file.endsWith("tokens.module.css")) rest = rest.replace(/\.site\[data-v34-site\] :global\([^\n{]*\.btn[^\n{]*?\)(?=,\s|\s*\{)/g, "");
+    return rest;
+  };
+
+  it("has no @import, no :root rule and no global selector beyond the four named ones", () => {
     for (const [file, css] of cssFiles()) {
       expect(css, file).not.toContain("@import");
       expect(css, file).not.toMatch(/:root\b/);
-      /* The only global selectors: the overscroll ground, the drawer's scroll lock, and the shared consent link's separator. */
-      const rest = css
-        .replace(/:global\(html\):has\(\.site\)/g, "")
-        .replace(/:global\(html\):has\(\.dialog\[open\]\)/g, "")
-        .replace(/:global\(\.site-footer-legal-sep\)/g, "");
-      expect(rest, file).not.toContain(":global");
+      expect(withoutNamedGlobals(file, css), file).not.toContain(":global");
     }
+  });
+
+  it("allows the legacy .btn global only under the wrapper and only in the token sheet", () => {
+    const under = '.site[data-v34-site] :global(.btn-ghost:not(:disabled):hover),\n.site[data-v34-site] :global(:is(.btn, .btn-primary):not(.ghost)) { color: red; }';
+    expect(withoutNamedGlobals("tokens.module.css", under)).not.toContain(":global");
+    expect(withoutNamedGlobals("ui/other.module.css", under)).toContain(":global");
+    expect(withoutNamedGlobals("tokens.module.css", ":global(.btn) { color: red; }")).toContain(":global");
+    expect(withoutNamedGlobals("tokens.module.css", ".site[data-v34-site] :global(.nav a) { color: red; }")).toContain(":global");
   });
 
   it("has no font size under the 12px floor, in px or rem", () => {

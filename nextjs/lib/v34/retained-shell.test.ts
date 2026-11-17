@@ -212,7 +212,14 @@ describe.each(OWN_MAIN_ROUTES)("$path carries the V34 shell around its own main"
     expect(headerAt).toBeLessThan(mainAt);
     expect(footerAt).toBeGreaterThan(html.indexOf("</main>"));
     // The stage's phone rules that apply only under the shell select `[data-v34-site] ~ main` (E1).
-    expect(ancestors(html, mainAt), `${path}: main is a sibling of the shell's wrappers`).toEqual([]);
+    // Its one ancestor is the box-less container wrapper that also holds the shell's wrappers
+    // (WO-CI-19, decision 1): layout custom properties only, not V34Page's wrapper.
+    const mainAncestors = ancestors(html, mainAt);
+    expect(mainAncestors, `${path}: main's only ancestor is the container wrapper`).toHaveLength(1);
+    expect(mainAncestors[0]).toMatch(/style="display:contents"/);
+    expect(mainAncestors[0]).not.toContain(siteClass);
+    expect(ancestors(html, headerAt), `${path}: main is a sibling of the shell's wrappers`).toEqual([mainAncestors[0], wrapperOf(headerAt)[0]]);
+    expect(ancestors(html, footerAt)[0], `${path}: the footer's wrapper shares main's parent`).toBe(mainAncestors[0]);
     expect(html.slice(0, mainAt)).toMatch(/<div\b[^>]*\bdata-v34-site=""/);
     expect(html).not.toMatch(/chrome-v2-(?:header|footer)/);
   }, 120_000);
