@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { actionBody, agentBadge, batchEligible, decisionProblem, ProposalItem, rowActions } from "../components/change-proposals-panel";
 import type { PublicProposal } from "./change-proposals";
+import { PROMPT_INJECTION_FIXTURES } from "./prompt-injection.fixtures";
 
 describe("proposal decision outcome message", () => {
   it("never says 'not saved' when the server may have changed the World (5xx, lost response)", () => {
@@ -96,6 +97,29 @@ describe("proposal rows (WO-AN-6)", () => {
     const markup = html(patch({ preview: { ...patchPreview, after: "<img src=x onerror=alert(1)>" } }));
     expect(markup).not.toContain("<img");
     expect(markup).toContain("&lt;img");
+  });
+  it("every injection fixture, as a correction label or a topic key, is escaped text inside the preview element only (I-21)", () => {
+    const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
+    const count = (h: string, t: string) => h.split(t).length - 1;
+    for (const { payload, id } of PROMPT_INJECTION_FIXTURES) {
+      const e = esc(payload);
+      const afterHtml = html(patch({ preview: { ...patchPreview, after: payload } }));
+      expect(count(afterHtml, e), id).toBe(1);
+      expect(afterHtml, id).toContain(`<q>${e}</q>`);
+      const topicHtml = html(label({ preview: { documentId: DOC_A, sourceVersionId: "b".repeat(64), labelKind: "topic", labelKey: payload, decision: "confirmed" } }));
+      expect(count(topicHtml, e), id).toBe(1);
+      expect(topicHtml, id).toContain(`<strong>${e}</strong>`);
+    }
+  });
+  it("a topic key is shown as stored; only the enumerated doc type has its underscores spelled as spaces", () => {
+    const shown = (labelKind: string, labelKey: string) => html(label({ preview: { documentId: DOC_A, sourceVersionId: "b".repeat(64), labelKind, labelKey, decision: "confirmed" } }));
+    expect(shown("topic", "tool_call")).toContain("<strong>tool_call</strong>");
+    expect(shown("doc_type", "purchase_order")).toContain("<strong>purchase order</strong>");
+  });
+  it("the intro does not say that only a person confirms", () => {
+    const src = readFileSync(new URL("../components/change-proposals-panel.tsx", import.meta.url), "utf8");
+    expect(src).toContain("until it is confirmed in a signed-in session");
+    expect(src).not.toContain("until a person confirms");
   });
   it("Undo is for an executed label change; a compile or a correction is not offered one", () => {
     expect(rowActions(label({ state: "executed", previewDigest: null }))).toEqual(["undo"]);

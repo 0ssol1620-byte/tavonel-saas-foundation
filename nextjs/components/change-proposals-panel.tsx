@@ -6,7 +6,7 @@ import type { PublicProposal, ProposalState } from "@/lib/change-proposals";
 import styles from "./change-proposals-panel.module.css";
 
 /*
-  Proposals in Changes (WO-D30-3, WO-AN-6): requests for a change to the World, waiting for a person.
+  Proposals in Changes (WO-D30-3, WO-AN-6): requests for a change to the World, waiting for a confirmation.
   Creating a proposal changed nothing; the preview is the change it would make. Confirm and Reject
   exist only while a proposal is Proposed, Undo only once a label change is Done, Finish only on a row
   this person confirmed that never completed. Every control is chosen from the state the server last
@@ -118,7 +118,7 @@ function Preview({ proposal }: { proposal: PublicProposal }) {
     return (
       <p className={styles.preview}>
         {preview.decision === "confirmed" ? "Confirm" : "Reject"} {preview.labelKind === "doc_type" ? "type" : "topic"}{" "}
-        <strong>{preview.labelKey.replace(/_/g, " ")}</strong> on <span className={styles.id}>{preview.documentId}</span>
+        <strong>{preview.labelKind === "doc_type" ? preview.labelKey.replace(/_/g, " ") : preview.labelKey}</strong> on <span className={styles.id}>{preview.documentId}</span>
       </p>
     );
   }
@@ -274,7 +274,7 @@ export default function ChangeProposalsPanel(_props: Props) {
     <section className={styles.surface} aria-labelledby="change-proposals-title">
       <div className={styles.intro}>
         <h2 id="change-proposals-title">Proposals</h2>
-        <p>A proposal changes nothing until a person confirms it in a signed-in session. Confirm or reject each one; a confirmed label change can be undone.</p>
+        <p>A proposal changes nothing until it is confirmed in a signed-in session. Confirm or reject each one; a confirmed label change can be undone.</p>
       </div>
       {problem ? <p className={styles.problem} role="status">{problem}</p> : null}
       {batch.length > 1 ? (
