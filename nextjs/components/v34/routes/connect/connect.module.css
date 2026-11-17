@@ -76,22 +76,16 @@
   min-height: 44px;
 }
 
-/* Inside a sentence (lead decision 20): inline, with block padding to the 44 px floor so the line
-   box keeps the paragraph's leading (see research-program/program.module.css). */
+/* Inside a sentence (lead decision 21): a plain inline box. Its target is its text; nothing here may
+   change the line that holds it. */
 .inlineLink {
   display: inline;
-  padding-block: calc((44px - 1em) / 2);
 }
 
 .link:hover,
 .inlineLink:hover {
   background: var(--v34-fg-hover);
   color: var(--v34-fg);
-}
-
-/* The hover fill stays on the words: across the padding it would paint over the lines above and below. */
-.inlineLink:hover {
-  background-clip: content-box;
 }
 
 .link:focus-visible,

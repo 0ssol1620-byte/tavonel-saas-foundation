@@ -70,18 +70,13 @@
   color: var(--v34-fg);
 }
 
-/* Inside a sentence (lead decision 20): the gate notice and the sample note. Inline, with block
-   padding to the 44 px floor so the line box keeps the paragraph's leading; the hover fill stays on
-   the words. The same class alone in a row (.sectionLink, .fileLinks) keeps the 44 px box above. */
+/* Inside a sentence (lead decision 21): the gate notice and the sample note. A plain inline box whose
+   target is its text; the floor above does not apply to an inline box and is reset so the computed style
+   says so. The same class alone in a row (.sectionLink, .fileLinks) keeps the 44 px box above. */
 .notice .inlineLink,
 .sampleNote .inlineLink {
   display: inline;
-  padding-block: calc((44px - 1em) / 2);
-}
-
-.notice .inlineLink:hover,
-.sampleNote .inlineLink:hover {
-  background-clip: content-box;
+  min-height: 0;
 }
 
 .inlineLink:focus-visible {

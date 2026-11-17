@@ -263,11 +263,10 @@
   line-height: 1.6;
 }
 
-/* Inside a sentence (lead decision 20): inline, with block padding to the 44 px floor so the line
-   box keeps the paragraph's leading (see research-program/program.module.css). */
+/* Inside a sentence (lead decision 21): a plain inline box. Its target is its text; nothing here may
+   change the line that holds it. */
 .inline {
   display: inline;
-  padding-block: calc((44px - 1em) / 2);
   color: var(--v34-fg-link);
   font-weight: 600;
   text-underline-offset: 3px;

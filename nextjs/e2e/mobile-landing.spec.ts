@@ -312,21 +312,31 @@ test.describe("on a touch screen", () => {
 });
 
 /*
-  WO-CI-29, lead decision 20. A link inside a sentence meets the 44px floor without changing the
-  leading of the paragraph that holds it. As an inline-flex box it is an atomic inline, and the line
-  that holds it grew to 44px while its neighbours kept the paragraph's line height; inline with block
-  padding, its own box reaches 44px and the line box does not grow.
+  WO-CI-29, lead decision 21 (replaces decision 20). A link inside a sentence is a plain inline box:
+  its target is its text, which WCAG 2.5.8 excepts, and nothing about it may change the paragraph's
+  lines. A 44px box inside a 25 to 30px line cannot have both: as an inline-flex or inline-block box
+  it grows its line, and with block padding it reaches into the lines above and below, where its tap
+  area and focus ring cover another line's words or another link. A link alone in a row keeps the
+  44px floor (the touch-floor rows above).
 
   Found by measuring, not by class name: every painted, inline-level link in main whose paragraph
   holds words outside it, on its own lines (a link that is a flex or grid item, or alone in its block
-  beside a heading or paragraph, is a row). Lines are read from the text: every text run of the paragraph is
-  clustered into lines, and the distance between the bottoms of runs in the paragraph's own font is
-  the line pitch. The line that holds the link must be as tall as the paragraph's other lines (within
-  one pixel); a one-line paragraph is compared with its own computed line height. No pixel value for
-  the line height is written here.
+  beside a heading or paragraph, is a row). Lines are read from the text: every text run of the
+  paragraph is clustered into lines, and a run in the paragraph's own font that sits where the line
+  put it (only plain inline, baseline-aligned, unpositioned elements between it and the paragraph)
+  gives the line's baseline and its strut. Each link must meet all three, and every violation is returned:
+  (1) the line that holds it is as tall as the paragraph's next line, within 1px (baseline to
+      baseline; a one-line paragraph is compared with its own computed line height);
+  (2) each of its boxes lies inside the line box that holds it, within 1px. The line box is read as
+      the paragraph's strut on that line -- a run's content area extended by the half-leading of
+      the paragraph's computed line height -- which every line box contains (CSS 2.1 10.8.1), so a
+      box inside it cannot reach a neighbouring line;
+  (3) its computed font size is not smaller than the paragraph's.
+  No pixel value for a line height is written here; "line-height: normal" reads as NaN and fails.
 */
 function measureInSentenceLinks() {
-  type Line = { top: number; bottom: number; base: number | null };
+  type Box = { top: number; bottom: number };
+  type Line = Box & { base: number | null; strut: Box | null };
   const inline = (element: Element) => getComputedStyle(element).display.startsWith("inline");
   const blockOf = (element: Element) => {
     let block: Element | null = element;
@@ -348,33 +358,48 @@ function measureInSentenceLinks() {
     }
     return out;
   };
-  const found: { text: string; height: number; hold: number; next: number; pitches: (number | null)[]; lines: number }[] = [];
+  // A run's content area marks its line's baseline and strut only when it sits where the line put it: nothing
+  // between it and the paragraph is an atomic inline (inline-flex, inline-block: its text sits where that box puts
+  // it), raised or lowered (vertical-align), or moved after layout (position: relative or sticky).
+  const onBaseline = (node: Text, block: Element) => {
+    for (let element = node.parentElement; element && element !== block; element = element.parentElement) {
+      const style = getComputedStyle(element);
+      if (style.display !== "inline" || style.verticalAlign !== "baseline" || style.position !== "static") return false;
+    }
+    return true;
+  };
+  const px = (value: number) => (Number.isFinite(value) ? value.toFixed(2) : String(value));
+  const found: { text: string; height: number; hold: number; next: number; pitches: (number | null)[]; lines: number; boxes: Box[]; lineBoxes: (Box | null)[]; fontSize: number; paragraphFontSize: number; violations: string[] }[] = [];
   for (const link of document.querySelectorAll<HTMLElement>("main a[href]")) {
     if (!inline(link) || link.getClientRects().length === 0) continue;
     const block = blockOf(link);
     if (!block) continue;
     const all = runs(block);
+    // In a sentence: its paragraph has words outside the link. Wherever the link wraps to, even onto a
+    // line of its own, it is still a line of that paragraph.
+    if (!all.some(run => !link.contains(run.node) && run.rects.length > 0)) continue;
     const own = getComputedStyle(block);
+    const lineHeight = parseFloat(own.lineHeight);
     const lines: Line[] = [];
     for (const rect of all.flatMap(run => run.rects).sort((a, b) => a.top - b.top)) {
       const last = lines.at(-1);
       if (last && (rect.top + rect.bottom) / 2 < last.bottom) { last.top = Math.min(last.top, rect.top); last.bottom = Math.max(last.bottom, rect.bottom); }
-      else lines.push({ top: rect.top, bottom: rect.bottom, base: null });
+      else lines.push({ top: rect.top, bottom: rect.bottom, base: null, strut: null });
     }
-    const lineOf = (rect: DOMRect) => lines.findIndex(line => (rect.top + rect.bottom) / 2 >= line.top && (rect.top + rect.bottom) / 2 <= line.bottom);
+    const lineOf = (rect: Box) => lines.findIndex(line => (rect.top + rect.bottom) / 2 >= line.top && (rect.top + rect.bottom) / 2 <= line.bottom);
     for (const run of all) {
       const style = getComputedStyle(run.node.parentElement!);
-      if (style.fontSize !== own.fontSize || style.fontFamily !== own.fontFamily) continue;
+      if (style.fontSize !== own.fontSize || style.fontFamily !== own.fontFamily || !onBaseline(run.node, block)) continue;
       for (const rect of run.rects) {
         const line = lines[lineOf(rect)];
-        if (line) line.base = Math.max(line.base ?? -Infinity, rect.bottom);
+        if (!line) continue;
+        line.base = Math.max(line.base ?? -Infinity, rect.bottom);
+        const half = (lineHeight - rect.height) / 2;
+        line.strut = { top: Math.min(line.strut?.top ?? Infinity, rect.top - half), bottom: Math.max(line.strut?.bottom ?? -Infinity, rect.bottom + half) };
       }
     }
-    // In a sentence: its paragraph has words outside the link. Wherever the link wraps to, even onto a
-    // line of its own, an inline-flex box there would still make that line taller than the others.
-    if (!all.some(run => !link.contains(run.node) && run.rects.length > 0)) continue;
     const linkLines = new Set(all.filter(run => link.contains(run.node)).flatMap(run => run.rects.map(lineOf)));
-    // pitches[i] runs from line i to line i + 1; null where either line has no run in the paragraph's font.
+    // pitches[i] runs from line i to line i + 1; null where either line has no baseline run in the paragraph's font.
     const pitches = lines.slice(1).map((line, i) => (line.base === null || lines[i].base === null ? null : line.base - lines[i].base!));
     const last = Math.max(...linkLines);
     const touching = pitches.filter((p, i): p is number => p !== null && (linkLines.has(i) || linkLines.has(i + 1)));
@@ -382,29 +407,40 @@ function measureInSentenceLinks() {
     const after = pitches.findIndex((p, i) => p !== null && i > last);
     let before = -1;
     pitches.forEach((p, i) => { if (p !== null && i + 1 < Math.min(...linkLines)) before = i; });
-    const lineHeight = parseFloat(own.lineHeight);
     const content = block.getBoundingClientRect().height - [own.paddingTop, own.paddingBottom, own.borderTopWidth, own.borderBottomWidth].reduce((sum, v) => sum + parseFloat(v), 0);
-    // A one-line paragraph: the line is the content box, compared with the computed line height
-    // ("normal" parses to NaN and fails below rather than passing unmeasured).
+    // A one-line paragraph: the line is the content box, compared with the computed line height.
     const hold = lines.length === 1 ? content : touching.length > 0 ? Math.max(...touching) : NaN;
     const next = after >= 0 ? pitches[after]! : before >= 0 ? pitches[before]! : lineHeight;
-    found.push({ text: (link.textContent ?? "").trim().slice(0, 40), height: link.getBoundingClientRect().height, hold, next, pitches, lines: lines.length });
+
+    const violations: string[] = [];
+    if (!(Math.abs(hold - next) <= 1)) violations.push(`(1) the line that holds it measures ${px(hold)}px against the paragraph's next line ${px(next)}px`);
+    const boxes = [...link.getClientRects()].map(r => ({ top: r.top, bottom: r.bottom }));
+    for (const box of boxes) {
+      const inside = lines.some(line => line.strut !== null && box.top >= line.strut.top - 1 && box.bottom <= line.strut.bottom + 1);
+      if (inside) continue;
+      const mid = (b: Box) => (b.top + b.bottom) / 2;
+      const nearest = lines.map(line => line.strut).filter((s): s is Box => s !== null && Number.isFinite(s.top + s.bottom)).sort((a, b) => Math.abs(mid(a) - mid(box)) - Math.abs(mid(b) - mid(box)))[0];
+      violations.push(nearest
+        ? `(2) its box ${px(box.top)}..${px(box.bottom)} leaves its line box ${px(nearest.top)}..${px(nearest.bottom)} by ${px(Math.max(0, nearest.top - box.top))}px above and ${px(Math.max(0, box.bottom - nearest.bottom))}px below`
+        : `(2) its box ${px(box.top)}..${px(box.bottom)}: no line box of its paragraph was measured (line height ${own.lineHeight})`);
+    }
+    const fontSize = parseFloat(getComputedStyle(link).fontSize);
+    const paragraphFontSize = parseFloat(own.fontSize);
+    if (!(fontSize >= paragraphFontSize - 0.01)) violations.push(`(3) its font size ${px(fontSize)}px is smaller than the paragraph's ${px(paragraphFontSize)}px`);
+    found.push({ text: (link.textContent ?? "").trim().slice(0, 40), height: link.getBoundingClientRect().height, hold, next, pitches, lines: lines.length, boxes, lineBoxes: lines.map(line => line.strut), fontSize, paragraphFontSize, violations });
   }
   return found;
 }
 
 for (const route of ["/research/program", "/contact", "/security", "/developers"]) {
-  test(`a link inside a sentence on ${route} keeps the paragraph's leading and the 44px floor`, async ({ page }, testInfo) => {
+  test(`a link inside a sentence on ${route} is a plain inline box inside its own line`, async ({ page }, testInfo) => {
     test.skip(!["1440", "390", "360"].includes(testInfo.project.name), "measured at 1440, 390 and 360");
     await page.goto(route);
     // /contact's answers are in closed <details>; open every one so its links are laid out.
     await page.evaluate(() => { for (const details of document.querySelectorAll("main details")) details.open = true; });
     const links = await page.evaluate(measureInSentenceLinks);
     expect(links.length, `${route} renders at least one link inside a sentence`).toBeGreaterThan(0);
-    for (const link of links) {
-      expect(link.height, `"${link.text}": its own box`).toBeGreaterThanOrEqual(43.99);
-      expect(Number.isFinite(link.hold) && Number.isFinite(link.next), `"${link.text}": both lines measured (${JSON.stringify(link)})`).toBe(true);
-      expect(Math.abs(link.hold - link.next), `"${link.text}": the line that holds it against the paragraph's next line (${JSON.stringify(link)})`).toBeLessThanOrEqual(1);
-    }
+    // Every link's every violation, in one assertion: a failure names all of them, not the first.
+    expect(links.flatMap(link => link.violations.map(violation => `"${link.text}": ${violation}`)), `${route}: links inside a sentence`).toEqual([]);
   });
 }

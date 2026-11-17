@@ -97,12 +97,10 @@
   min-height: 44px;
 }
 
-/* Inside a sentence (lead decision 20): an inline-flex box would grow the line that holds it, so the
-   link stays inline and block padding takes its own box to the 44 px floor; the line box does not
-   grow. (44px - 1em) / 2 a side clears 44 px while the font's content area is at least 1em tall. */
+/* Inside a sentence (lead decision 21): a plain inline box. Its target is its text; nothing here may
+   change the line that holds it. */
 .inlineLink {
   display: inline;
-  padding-block: calc((44px - 1em) / 2);
 }
 
 .textLink:hover,

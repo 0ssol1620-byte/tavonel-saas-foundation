@@ -240,17 +240,43 @@ describe("tokens, targets and states", () => {
     }
   });
 
-  it("gives every link class a 24px target, a hover and a focus state", () => {
+  /*
+    Lead decision 21 (WO-CI-29). A link alone in a row keeps a floor-sized target. A link inside a
+    sentence is a plain inline box whose target is its text (WCAG 2.5.8 excepts it): a min-height, a
+    flex or inline-block box, block padding, its own line-height or a vertical-align would grow the
+    line that holds it or reach into the lines above and below. IN_SENTENCE names the classes rendered
+    mid-sentence, with the lines that render them; every other link class stands alone, so no class is
+    in neither group, and a name or a line here that the sources no longer bear fails.
+  */
+  const IN_SENTENCE: Record<string, { file: string; lines: number[] }> = {
+    inline: { file: "components/v34/routes/security/security.tsx", lines: [121, 127, 129] },
+  };
+
+  it("gives every link class alone in a row a 24px target, every link class inside a sentence a plain inline box, and each a hover and a focus state", () => {
     const sheet = stripped(styles).map((f) => f.text).join("\n");
     const linkClasses = [...new Set([...sheet.matchAll(/\.(\w*(?:[lL]ink|inline|source))\s*\{/g)].map((m) => m[1]!))];
     expect(linkClasses.length).toBeGreaterThan(0);
+    const rules = [...sheet.matchAll(/([^{}@][^{}]*)\{([^{}]*)\}/g)].map((m) => ({ selector: m[1]!.trim(), body: m[2]! }));
+    for (const [name, { file, lines }] of Object.entries(IN_SENTENCE)) {
+      expect(linkClasses, `.${name} is listed as inside a sentence but no rule defines it`).toContain(name);
+      const source = readFileSync(join(root, file), "utf8").split(/\r?\n/);
+      for (const line of lines) expect(source[line - 1], `${file}:${line} renders .${name}`).toContain(`className={s.${name}}`);
+      const own = rules.filter((r) => new RegExp(`\\.${name}(?![\\w-])`).test(r.selector));
+      expect(own.length, `.${name} rules`).toBeGreaterThan(0);
+      for (const { selector, body } of own) {
+        for (const [, value] of body.matchAll(/(?:^|[;\s])display\s*:\s*([^;]+)/g)) expect(value!.trim(), `${selector}: display`).toBe("inline");
+        expect(body, `${selector} changes the line that holds it`).not.toMatch(/(?:^|[;\s])(?:min-height|height|line-height|vertical-align)\s*:/);
+        expect(body, `${selector} has block padding`).not.toMatch(/(?:^|[;\s])padding(?:-top|-bottom|-block(?:-start|-end)?)?\s*:/);
+      }
+    }
     for (const name of linkClasses) {
+      expect(sheet, `.${name}:hover`).toMatch(new RegExp(`\\.${name}:hover`));
+      expect(sheet, `.${name}:focus-visible`).toMatch(new RegExp(`\\.${name}:focus-visible`));
+      if (name in IN_SENTENCE) continue;
       const rule = sheet.match(new RegExp(`\\.${name}\\s*\\{([^}]*)\\}`))![1]!;
       const min = rule.match(/min-height:\s*([\d.]+)(px|rem)/);
       expect(min, `.${name} has no min-height`).not.toBeNull();
       expect(Number(min![1]) * (min![2] === "rem" ? 16 : 1), `.${name} target`).toBeGreaterThanOrEqual(24);
-      expect(sheet, `.${name}:hover`).toMatch(new RegExp(`\\.${name}:hover`));
-      expect(sheet, `.${name}:focus-visible`).toMatch(new RegExp(`\\.${name}:focus-visible`));
     }
   });
 });
