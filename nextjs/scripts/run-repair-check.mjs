@@ -22,7 +22,8 @@ const registeredUnitTestPaths = new Set([
   'eval/ask-quality/e2/metrics.test.ts',
 ]);
 const asyncRouteUnitTestPath = 'app/api/compile-jobs/route.test.ts';
-const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs']);
+// The seven scripts/db suites (WO-CI-7 L5/L7) run without a DSN and with no skip: each refuses or fails closed when no PostgreSQL answers.
+const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']);
 
 export function isInsideWorkspace(rootPath, targetPath) {
   const rel = relative(rootPath, targetPath);
@@ -57,6 +58,8 @@ export function liveBrowserEnv(sourceEnv = process.env) {
   const env = { ...sourceEnv };
   delete env.PADDLE_SANDBOX;
   delete env.VERCEL_ENV;
+  // The V34 matrix's held-route pass asserts a production-mode server (V34_SERVER_MODE=production); a held route renders with this flag.
+  delete env.V34_SHOW_HELD;
   // Playwright's default CI git-info plugin reads pull_request.base.sha from GITHUB_EVENT_PATH and runs
   // `git fetch origin <base> --depth=1` in this checkout. That writes .git/shallow at the PR base and cuts the baseline
   // ancestry the final gate re-derives. Neither the server nor the browser checks read the event payload.
@@ -253,6 +256,26 @@ const browserProjectsByFile = new Map([
   ['e2e/keyless-try-it.spec.ts', ['1440', '390']],
   ['e2e/p4-followups.spec.ts', ['1440']],
   ['e2e/operations.spec.ts', ['1440']],
+  ['e2e/home-v34.spec.ts', ['1440', '390']],
+  ['e2e/resources-filter.spec.ts', ['1440']],
+  ['e2e/ultimate-mobile-a11y.spec.ts', ['390']],
+  ['e2e/v34-support.selftest.spec.ts', ['v34-selftest']],
+  ['e2e/v34-matrix.spec.ts', ['v34-chromium']],
+]);
+
+/*
+  Per-project run options (WO-CI-7 L6). Only the V34 harness projects carry any, and only these two specs map to them.
+  - v34-chromium runs the matrix against the Repair server, which is built and started without V34_SHOW_HELD and so answers as
+    production: the SEO pass and the held-route 404 pass, the two passes that read a production-mode server
+    (V34_SERVER_MODE=production). The layout, contrast, keyboard, motion and zoom passes need the QA-mode server WO-CI-9 adds.
+  - v34-selftest runs the harness's fixtures, which need no server. One case launches WebKit; the Repair job installs Chromium only
+    (WebKit's system packages took 19-38 minutes on the hosted runner, launch-qa.yml product-qa), so that case is left to the job
+    that installs WebKit. A rename of that case stops the exclusion matching, and the case then fails here: it never passes silently.
+*/
+export const V34_SELFTEST_WEBKIT_CASE = 'a control in a closed details body is not owed a tab stop';
+const browserRunOptionsByProject = new Map([
+  ['v34-chromium', Object.freeze({ grep: '@pass:(seo|held)', env: Object.freeze({ V34_SERVER_MODE: 'production' }) })],
+  ['v34-selftest', Object.freeze({ grepInvert: V34_SELFTEST_WEBKIT_CASE })],
 ]);
 
 const SOLUTIONS_ROUTES=['ai-ready-knowledge','document-intelligence','knowledge-graph','source-grounded-assistants','knowledge-operations'];
@@ -508,9 +531,9 @@ export function planBrowserRuns(files, runDetailIntegrity) {
       filesByProject.get(project).push(file);
     }
   }
-  for (const project of ['audit', 'audit-768', 'audit-1280', '1440', '390', '360', '768', 'reduced-motion', 'launch-chromium']) {
+  for (const project of ['audit', 'audit-768', 'audit-1280', '1440', '390', '360', '768', 'reduced-motion', 'launch-chromium', 'v34-selftest', 'v34-chromium']) {
     const projectFiles = filesByProject.get(project);
-    if (projectFiles) runs.push({ kind: 'project', project, files: [...new Set(projectFiles)].sort() });
+    if (projectFiles) runs.push({ kind: 'project', project, files: [...new Set(projectFiles)].sort(), ...browserRunOptionsByProject.get(project) });
   }
   return runs;
 }
@@ -756,9 +779,10 @@ async function runBrowser() {
         args.push('--output', outputDir);
         args.push('--reporter=json');
         if (planned.grep) args.push('--grep', planned.grep);
+        if (planned.grepInvert) args.push('--grep-invert', planned.grepInvert);
         if (planned.projects) args.push(...planned.projects.map(project => `--project=${project}`));
         if (planned.project) args.push(`--project=${planned.project}`);
-        await run('pnpm', args, { ...browserEnv, PLAYWRIGHT_JSON_OUTPUT_FILE: reportPath });
+        await run('pnpm', args, { ...browserEnv, ...planned.env, PLAYWRIGHT_JSON_OUTPUT_FILE: reportPath });
       },
       readReport: (planned, index) => readAndValidatePlaywrightReport(reportPathFor(index), planned.files, repoRoot, planned.projects ?? [planned.project]),
       onSummary: (planned, summary) => {

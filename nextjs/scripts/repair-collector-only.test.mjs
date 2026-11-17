@@ -9,7 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { buildRepairReceipt } from './repair-scope-gate.mjs';
 import { isInsideWorkspace, planBrowserRuns, WORKSPACE_INTAKE_CAPTURE_NAMES } from './run-repair-check.mjs';
-import { AFFECTED_BASELINE, buildAffectedMap } from './repair-scope.mjs';
+import { AFFECTED_BASELINE, DATABASE_CONTRACT_DATABASE_TESTS, buildAffectedMap } from './repair-scope.mjs';
 
 const head = 'e'.repeat(40);
 const gitBlob = bytes => createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
@@ -1402,13 +1402,20 @@ const AFFECTED_ASK_SUITES=Object.freeze(['lib/ask-route-limits.test.ts','lib/con
 const AFFECTED_NODE_SUPPORT_PATHS=Object.freeze(['nextjs/lib/repair-node-evidence.test.mjs','nextjs/lib/repair-node-gate-receipt.test.ts']);
 const AFFECTED_CI_SUPPORT_PATHS=Object.freeze(['nextjs/lib/home-reader-heading-css-contract.test.ts','nextjs/lib/home-reader-heading-css-registration.test.ts',
   ...AFFECTED_NODE_SUPPORT_PATHS,'nextjs/scripts/fixtures/home-reader-heading-css-baseline.json']);
-const affectedSupportPaths=paths=>!paths.some(p=>AFFECTED_CI_OWNER_PATHS.includes(p)&&p!=='AFFECTED-INTEGRATION-MANIFEST.md')?[]:
-  paths.includes('nextjs/scripts/repair-scope.mjs')?AFFECTED_CI_SUPPORT_PATHS:AFFECTED_NODE_SUPPORT_PATHS;
+// database-contract selects its pgTAP files on every SQL change and requires them at head (D-4, WO-AN-1), so a SQL-bearing fixture head
+// carries their actual repository bytes. The list is the planner's own constant, never a copy: a file the owner adds later is carried
+// too, instead of failing every SQL-bearing fixture on 'selected database fixture is absent at head' (the WO-CI-7 round-1 regression).
+const AFFECTED_DB_FIXTURE_SUPPORT_PATHS=DATABASE_CONTRACT_DATABASE_TESTS;
+const affectedSqlLeaf=p=>/^supabase\/.+\.sql$/.test(p);
+const affectedSupportPaths=paths=>[...(!paths.some(p=>AFFECTED_CI_OWNER_PATHS.includes(p)&&p!=='AFFECTED-INTEGRATION-MANIFEST.md')?[]:
+  paths.includes('nextjs/scripts/repair-scope.mjs')?AFFECTED_CI_SUPPORT_PATHS:AFFECTED_NODE_SUPPORT_PATHS),
+  ...(paths.some(affectedSqlLeaf)?AFFECTED_DB_FIXTURE_SUPPORT_PATHS:[])];
+const affectedActualBytesLeaf=p=>AFFECTED_CI_SUPPORT_PATHS.includes(p)||AFFECTED_DB_FIXTURE_SUPPORT_PATHS.includes(p);
 // CI owners carry their actual candidate bytes. Product (including the Ask answer leaves) and SQL fixture leaves are path-exact stand-ins (baseline
 // bytes plus one line, or a marker when absent at the baseline): the map binds paths and owners, and the reviewed product bytes belong to the parallel
 // product task.
 const affectedLeafBytes=p=>{
-  if(AFFECTED_CI_OWNER_PATHS.includes(p)||AFFECTED_CI_SUPPORT_PATHS.includes(p))return readFileSync(resolve(nativeRoot,p));
+  if(AFFECTED_CI_OWNER_PATHS.includes(p)||affectedActualBytesLeaf(p))return readFileSync(resolve(nativeRoot,p));
   let base;try{base=baselineBytes(p);}catch{return Buffer.from(`affected fixture stand-in for ${p}\n`);}
   return Buffer.concat([base,Buffer.from('\n')]);
 };
@@ -1456,18 +1463,22 @@ test('affected real Git map retains the original 43/48 inventories with exact cu
     process.chdir(root);
     const map=head=>{const intent=world.classifyAffectedIntent({headSha:head});assert.equal(intent.classification,'intended',intent.reason);return world.verifyAffectedSource({headSha:head,intent});};
     const all=[...AFFECTED_PRODUCT_PATHS,...AFFECTED_CI_OWNER_PATHS,...AFFECTED_SQL_FIXTURE_PATHS].sort();
-    const leaves=paths=>[...new Set([...paths,...affectedSupportPaths(paths)])].map(p=>put(p,affectedLeafBytes(p),'100644',AFFECTED_CI_SUPPORT_PATHS.includes(p)));
+    const leaves=paths=>[...new Set([...paths,...affectedSupportPaths(paths)])].map(p=>put(p,affectedLeafBytes(p),'100644',affectedActualBytesLeaf(p)));
     assert.equal(all.length,43);
     const combined=[...all,...AFFECTED_ASK_ANSWER_PATHS].sort();
     assert.equal(combined.length,48);assert.equal(new Set(combined).size,48);
-    const supported=[...combined,...AFFECTED_CI_SUPPORT_PATHS].sort();assert.equal(supported.length,53);assert.equal(new Set(supported).size,53);
+    assert.equal(AFFECTED_DB_FIXTURE_SUPPORT_PATHS.length,4);
+    const supported=[...combined,...AFFECTED_CI_SUPPORT_PATHS,...AFFECTED_DB_FIXTURE_SUPPORT_PATHS].sort();assert.equal(supported.length,57);assert.equal(new Set(supported).size,57);
+    // The same SQL-bearing head without the program's pgTAP files refuses on the first of them instead of shrinking the DB selection.
+    const fixtureless=map(commit(...[...new Set([...combined,...AFFECTED_CI_SUPPORT_PATHS])].map(p=>put(p,affectedLeafBytes(p),'100644',affectedActualBytesLeaf(p)))));
+    assert.equal(fixtureless.eligible,false);assert.match(fixtureless.reason,new RegExp('selected database fixture is absent at head: '+AFFECTED_DB_FIXTURE_SUPPORT_PATHS[0].replace(/[.]/g,'\\.')));
     const integrated=commit(...leaves(combined));
-    // Keep all original 48 leaves and add only the five actual current CI dependencies.
+    // Keep all original 48 leaves and add only the five actual current CI dependencies and the program pgTAP files.
     const rawPaths=git(['diff','--name-only','--no-renames','-z',B,integrated]).split('\0').filter(Boolean).sort();
     assert.deepEqual(rawPaths,supported);
     console.log('collector-current53-diff '+JSON.stringify({head:integrated,baseline:B,paths:rawPaths}));
     for(const p of supported)assert.equal(git(['rev-parse',`${integrated}:${p}`]).trim(),written[p],p);
-    for(const p of AFFECTED_CI_SUPPORT_PATHS){
+    for(const p of [...AFFECTED_CI_SUPPORT_PATHS,...AFFECTED_DB_FIXTURE_SUPPORT_PATHS]){
       const actual=readFileSync(resolve(nativeRoot,p)),staged=git(['show',`${integrated}:${p}`],{encoding:'buffer'});
       assert.ok(staged.equals(actual),p+' actual current CI bytes');assert.equal(gitBlob(staged),written[p],p+' raw blob identity');
       console.log('collector-current-ci-support '+JSON.stringify({path:p,bytes:staged.length,sha256:createHash('sha256').update(staged).digest('hex'),gitBlob:written[p]}));
@@ -1478,8 +1489,9 @@ test('affected real Git map retains the original 43/48 inventories with exact cu
     assert.deepEqual(full.map.groups,['acl','billing-access-plan-gates','ci-selector','database-contract','docs','dropbox-connector','grounded-ask','home-reader-heading-css','intake-triage','ocr-worker','repository-docs','review-queue','workspace-lifecycle']);
     for(const suite of AFFECTED_ASK_SUITES)assert.ok(full.map.unitFiles.includes(suite),suite);
     assert.deepEqual([full.map.databaseChanged,full.map.runSelectorContracts,full.map.runCdrWorkerChecks,full.map.nativeEvidence.disposition],[true,true,true,'fresh-seven-case-native-run-required']);
-    assert.deepEqual(full.map.databaseTests,['supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
-      'supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/dropbox_source_reconciliation.sql','supabase/tests/foundation_jobs.sql','supabase/tests/google_viewer_principal_boundary.sql']);
+    assert.deepEqual(full.map.databaseTests,['supabase/tests/agent_proposals.sql','supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
+      'supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/dropbox_source_reconciliation.sql','supabase/tests/foundation_jobs.sql','supabase/tests/foundation_page_meter.sql',
+      'supabase/tests/google_viewer_principal_boundary.sql','supabase/tests/library_label_decisions.sql','supabase/tests/world_change_proposals.sql']);
     assert.deepEqual(Object.keys(full.map.databaseDependencyReasons),['supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql',
       'supabase/tests/connector_source_suspensions.sql','supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/foundation_jobs.sql']);
     // A selected owner suite or dependency fixture missing at the head fails the whole map closed.
@@ -1508,13 +1520,16 @@ test('affected real Git map retains the original 43/48 inventories with exact cu
     assert.equal(docs.eligible,true,docs.reason);assert.deepEqual(docs.map.groups,['docs']);
     assert.ok(docs.map.entries.some(e=>/^R\d{3}$/.test(e.status)&&e.paths.join(' ')==='nextjs/app/docs/page.tsx nextjs/app/docs/moved/page.tsx'),'both rename endpoints are mapped');
     assert.equal(docs.map.nativeEvidence.disposition,'historical-input-reuse');
+    const sqlLeaves=['supabase/tests/affected_fixture.sql','.github/workflows/repair-scope.yml'];
+    assert.deepEqual(affectedSupportPaths(sqlLeaves),[...AFFECTED_NODE_SUPPORT_PATHS,...AFFECTED_DB_FIXTURE_SUPPORT_PATHS]);
     const sqlHead=commit(put('supabase/tests/affected_fixture.sql','select 1;\n'),put('.github/workflows/repair-scope.yml','name: x\n'),
-      ...AFFECTED_NODE_SUPPORT_PATHS.map(p=>put(p,affectedLeafBytes(p),'100644',true)));
+      ...affectedSupportPaths(sqlLeaves).map(p=>put(p,affectedLeafBytes(p),'100644',true)));
     const sql=map(sqlHead);
     assert.equal(sql.eligible,true,sql.reason);assert.deepEqual(sql.map.groups,['ci-selector','database-contract']);
-    assert.deepEqual(git(['diff','--name-only','--no-renames','-z',B,sqlHead]).split('\0').filter(Boolean).sort(),['.github/workflows/repair-scope.yml',...AFFECTED_NODE_SUPPORT_PATHS,'supabase/tests/affected_fixture.sql'].sort());
+    assert.deepEqual(git(['diff','--name-only','--no-renames','-z',B,sqlHead]).split('\0').filter(Boolean).sort(),['.github/workflows/repair-scope.yml',...AFFECTED_NODE_SUPPORT_PATHS,...AFFECTED_DB_FIXTURE_SUPPORT_PATHS,'supabase/tests/affected_fixture.sql'].sort());
     for(const p of AFFECTED_NODE_SUPPORT_PATHS)assert.ok(git(['show',`${sqlHead}:${p}`],{encoding:'buffer'}).equals(readFileSync(resolve(nativeRoot,p))),p+' workflow-only actual Node contract');
-    assert.deepEqual([sql.map.databaseChanged,sql.map.runSelectorContracts,sql.map.nativeEvidence.disposition,sql.map.databaseTests],[true,true,'fresh-seven-case-native-run-required',[]]);
+    assert.deepEqual([sql.map.databaseChanged,sql.map.runSelectorContracts,sql.map.nativeEvidence.disposition,sql.map.databaseTests],[true,true,'fresh-seven-case-native-run-required',[...AFFECTED_DB_FIXTURE_SUPPORT_PATHS]]);
+    for(const p of AFFECTED_DB_FIXTURE_SUPPORT_PATHS)assert.ok(git(['show',`${sqlHead}:${p}`],{encoding:'buffer'}).equals(readFileSync(resolve(nativeRoot,p))),p+' actual program pgTAP bytes');
     assert.match(map(commit(put('nextjs/lib/docs-content.ts','docs-content.test.ts','120000'))).reason,/unsupported (?:change status T|file mode)/);
     assert.match(map(commit(put('nextjs/next.config.ts','export default {};\n'))).reason,/unmapped changed endpoint: nextjs\/next\.config\.ts/);
   }finally{process.chdir(previous);fixture?.cleanup();}

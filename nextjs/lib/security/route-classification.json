@@ -29,6 +29,23 @@
       "credential": "bearer:supabase-jwt",
       "note": "Destructive founder-only two-phase reset. Requires the exact founder email, active workspace owner membership, reset id, and a dry-run manifest digest; database assertions repeat identity, ownership, legal-hold, and active-work checks."
     },
+    "app/api/agent-grants/[id]/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "DELETE"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "WO-AN-3 Disconnect. Session only (a tvnl_agt_ bearer is not a JWT: AUTH_REQUIRED); never behind the flag, never plan-gated. Revokes the caller's own grant, its credential and its open proposals in one transaction; any other id is the same 404."
+    },
+    "app/api/agent-grants/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "WO-AN-3 Agent access. GET lists the caller's own grants (no token, hash or prefix), flag off included. POST is 404 with the flag off or outside the cohort, 402 for a free evaluation, and answers the tvnl_agt_ token once, no-store; only its sha256 is stored."
+    },
     "app/api/billing/checkout/route.ts": {
       "type": "A-bearer",
       "methods": [
@@ -299,6 +316,14 @@
       "credential": "bearer:shared-secret",
       "note": "FOUNDATION_WORKER_SECRET / CRON_SECRET, constant-time compare, closed when unset. W1-A1 rollback lever: revokes every live remote MCP key (token_kind mcp) in one write; returns counts per workspace, no key material."
     },
+    "app/api/internal/agent-grants/revoke-all/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:shared-secret",
+      "note": "FOUNDATION_WORKER_SECRET / CRON_SECRET, constant-time compare, closed when unset. WO-AN-3 kill switch: revokes every agent grant and tvnl_agt_ credential and withdraws every open agent proposal in one transaction, one audit row per credential; live and remote MCP keys untouched; returns counts per workspace, no key material."
+    },
     "app/api/library/decisions/route.ts": {
       "type": "A-bearer",
       "methods": [
@@ -346,6 +371,14 @@
       ],
       "credential": "bearer:supabase-jwt",
       "note": "Session only: an API key is refused with 403. POST creates a proposal and mutates nothing else; needs an Idempotency-Key header."
+    },
+    "app/api/proposals/[id]/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "Session only: the inbox deep link. Unreadable, foreign, absent, malformed and unknown-type ids are the same 404 body."
     },
     "app/api/proposals/[id]/decision/route.ts": {
       "type": "A-bearer",

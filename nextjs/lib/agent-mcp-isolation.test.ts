@@ -55,7 +55,9 @@ function filesUnder(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
     entry.isDirectory() ? filesUnder(join(dir, entry.name)) : [join(dir, entry.name)]);
 }
-const IMPORTS_AGENT_MODULE = /(?:from\s+|import\s*\(\s*|require\s*\(\s*)["'][^"']*\/lib\/agent-[^"']*["']/;
+// Every way a module names another by string: `from "x"` (import and re-export), a bare side-effect
+// `import "x"`, a dynamic `import("x")` and `require("x")`.
+const IMPORTS_AGENT_MODULE = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)["'][^"']*\/lib\/agent-[^"']*["']/;
 
 describe("the read-only MCP route imports no agent module (source test)", () => {
   it("finds the read-only MCP route files", () => {
@@ -75,7 +77,17 @@ describe("the read-only MCP route imports no agent module (source test)", () => 
       "import x from '../../../lib/agent-consent';",
       'const m = await import("@/lib/agent-mcp-dispatch");',
       'const m = require("../../lib/agent-access");',
+      'export { AGENT_SCOPES } from "@/lib/agent-access";',
+      'export * from "../../lib/agent-grants";',
     ]) expect(IMPORTS_AGENT_MODULE.test(line), line).toBe(true);
     expect(IMPORTS_AGENT_MODULE.test('import { x } from "@/lib/remote-mcp";')).toBe(false);
+  });
+
+  it("the import pattern catches a bare side-effect import (G5)", () => {
+    for (const line of ['import "@/lib/agent-x";', "import '../../lib/agent-mcp-dispatch';", 'import"@/lib/agent-x";']) {
+      expect(IMPORTS_AGENT_MODULE.test(line), line).toBe(true);
+    }
+    expect(IMPORTS_AGENT_MODULE.test('import "@/lib/remote-mcp";')).toBe(false);
+    expect(IMPORTS_AGENT_MODULE.test('const reimport = "/lib/agent-x";')).toBe(false);
   });
 });

@@ -139,8 +139,12 @@ async function mockLibrary(page: Page, store: LibraryStore, ids: string[]) {
 
 /* ---- Proposal store ---- */
 
-type ProposalState = "proposed" | "confirmed" | "executed" | "rejected" | "expired" | "stale" | "failed" | "undone";
-type StoredProposal = { proposalId: string; state: ProposalState; createdAt: string; labelKey: string; documentId: string; keyed?: string };
+type ProposalState = "proposed" | "confirmed" | "executed" | "rejected" | "expired" | "stale" | "failed" | "undone" | "withdrawn";
+type StoredProposal = {
+  proposalId: string; state: ProposalState; createdAt: string; labelKey: string; documentId: string; keyed?: string;
+  /** WO-AN-6: a compile proposal made by an agent; `digest` is what a confirmation must echo, `resumable` an old confirmed row of this viewer. */
+  compile?: boolean; agent?: boolean; digest?: string; resumable?: boolean;
+};
 type ProposalStore = {
   proposals: StoredProposal[];
   activeDigest: string;
@@ -150,23 +154,46 @@ type ProposalStore = {
   /** For the lost-response case: record the outcome, then drop the response. */
   loseNextDecisionResponse: boolean;
   recordWhenLost: boolean;
+  /** WO-AN-6: confirm bodies as received, a page size for "Show more", and ids the single read answers 404 for. */
+  confirmBodies: Record<string, unknown>[];
+  pageSize: number | null;
+  missingIds: string[];
 };
 
 const proposal = (n: number, state: ProposalState, labelKey = "invoice"): StoredProposal => ({
   proposalId: `00000000-0000-4000-8000-00000000000${n}`, state, createdAt: `2026-11-1${n}T09:00:00.000Z`, labelKey, documentId: DOC_A,
 });
 
+const digestOf = (p: StoredProposal) => `sha256:${p.digest ?? "f".repeat(64)}`;
 const toPublic = (p: StoredProposal) => ({
-  proposalId: p.proposalId, actionType: "library_label", state: p.state,
-  preview: { documentId: p.documentId, sourceVersionId: VERSION, labelKind: "doc_type", labelKey: p.labelKey, decision: "confirmed" },
+  proposalId: p.proposalId, state: p.state, collectionId, resumable: p.resumable ?? false,
+  ...(p.compile
+    ? { actionType: "compile_plan", preview: { documentIds: [DOC_A, DOC_B], documentsTotal: 2, corpus: true, parts: 1, quote: { rechargeCredits: 9, balanceRechargeCredits: 6, overageCredits: 3 } } }
+    : { actionType: "library_label", preview: { documentId: p.documentId, sourceVersionId: VERSION, labelKind: "doc_type", labelKey: p.labelKey, decision: "confirmed" } }),
+  previewDigest: p.state === "proposed" ? digestOf(p) : null,
+  proposer: p.agent ? { kind: "agent", grantedBy: "owner@example.invalid", clientLabel: p.labelKey === "injected" ? "<img src=x onerror=alert(1)>" : "Desk Agent", clientLabelVerified: false } : { kind: "person" },
+  notes: [],
   evidenceIds: ["evidence-1"], expiresAt: "2026-11-24T09:00:00.000Z", createdAt: p.createdAt, decidedAt: null,
 });
 
 async function mockProposals(page: Page, store: ProposalStore) {
-  await page.route("**/api/proposals?**", (route) => route.fulfill({
-    json: { code: "OK", proposals: store.proposals.map(toPublic) },
-  }));
+  // The workspace inbox: newest first, a page at a time when the store sets a page size (cursor = offset).
+  const list = (route: import("@playwright/test").Route) => {
+    const sorted = [...store.proposals].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const offset = Number(new URL(route.request().url()).searchParams.get("cursor") ?? "0");
+    const size = store.pageSize ?? sorted.length;
+    const next = offset + size < sorted.length ? String(offset + size) : null;
+    return route.fulfill({ json: { code: "OK", proposals: sorted.slice(offset, offset + size).map(toPublic), nextCursor: next } });
+  };
+  await page.route("**/api/proposals?**", list);
+  await page.route("**/api/proposals/*", (route) => {
+    const id = route.request().url().split("/").pop()?.split("?")[0];
+    const found = store.proposals.find((p) => p.proposalId === id);
+    if (!found || store.missingIds.includes(id ?? "")) return route.fulfill({ status: 404, json: { code: "PROPOSAL_NOT_FOUND" } });
+    return route.fulfill({ json: { code: "OK", proposal: toPublic(found) } });
+  });
   await page.route("**/api/proposals", async (route) => {
+    if (route.request().method() === "GET") return list(route);
     if (route.request().method() !== "POST") return route.fallback();
     const key = route.request().headers()["idempotency-key"];
     const existing = store.proposals.find((p) => p.keyed === key);
@@ -179,8 +206,15 @@ async function mockProposals(page: Page, store: ProposalStore) {
     store.decisionCalls += 1;
     const id = route.request().url().split("/").slice(-2)[0];
     const target = store.proposals.find((p) => p.proposalId === id);
-    const { decision } = route.request().postDataJSON() as { decision: "confirm" | "reject" };
+    const sent = route.request().postDataJSON() as { decision: "confirm" | "reject"; previewDigest?: string };
+    const { decision } = sent;
+    if (decision === "confirm") store.confirmBodies.push(sent);
+    if (target?.state === "confirmed" && target.resumable && decision === "confirm") {
+      target.state = "executed"; target.resumable = false; store.executions.push(id);
+      return route.fulfill({ json: { code: "OK" } });
+    }
     if (!target || target.state !== "proposed") return route.fulfill({ status: 409, json: { code: "PROPOSAL_NOT_DECIDABLE" } });
+    if (decision === "confirm" && sent.previewDigest !== digestOf(target)) return route.fulfill({ status: 409, json: { code: "PROPOSAL_PREVIEW_CHANGED" } });
     if (store.proposalDigest !== store.activeDigest) {
       target.state = "stale"; // the active World moved: nothing is executed
       return route.fulfill({ status: 409, json: { code: "PROPOSAL_STALE" } });
@@ -203,8 +237,16 @@ async function mockProposals(page: Page, store: ProposalStore) {
 
 const newProposalStore = (proposals: StoredProposal[]): ProposalStore => ({
   proposals, activeDigest: digestC, proposalDigest: digestC, executions: [], decisionCalls: 0, loseNextDecisionResponse: false, recordWhenLost: false,
+  confirmBodies: [], pageSize: null, missingIds: [],
 });
 const newLibraryStore = (types: LibraryStore["types"]): LibraryStore => ({ types, rejected: {}, executions: [], lastRequests: [] });
+
+/** Review screenshots: written only when WO_SHOTS_DIR is set, so a normal run leaves no files. */
+async function shot(page: Page, name: string) {
+  const dir = process.env.WO_SHOTS_DIR;
+  const width = page.viewportSize()?.width;
+  if (dir && (width === 390 || width === 1440)) await page.screenshot({ path: `${dir}/${name}-${width}.png`, fullPage: true });
+}
 
 async function overflow(page: Page) {
   return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -220,11 +262,11 @@ async function openLibrary(page: Page, store: LibraryStore, ids: string[]) {
   return library;
 }
 
-async function openProposals(page: Page, store: ProposalStore) {
+async function openProposals(page: Page, store: ProposalStore, query = "") {
   await installSession(page);
   await mockWorkspace(page, [DOC_A]);
   await mockProposals(page, store);
-  await page.goto(`/workspace/changes?collection=${collectionId}`);
+  await page.goto(`/workspace/changes?collection=${collectionId}${query}`);
   const panel = page.getByRole("region", { name: "Proposals" });
   await expect(panel.getByRole("heading", { name: "Proposals", exact: true })).toBeVisible();
   return panel;
@@ -412,4 +454,170 @@ test("Library and Proposals panels do not overflow the page at the project width
   const viewport = page.viewportSize();
   expect(box).not.toBeNull();
   expect(box!.x + box!.width).toBeLessThanOrEqual(viewport!.width + 1);
+});
+
+/* ---- WO-AN-6: agent rows, deep link, Agent access ---- */
+
+const FAKE_CREDENTIAL = "tvnl_agt_TEST-ONLY-NOT-A-CREDENTIAL";
+const agentCompile = (n: number, state: ProposalState = "proposed"): StoredProposal => ({ ...proposal(n, state), compile: true, agent: true, digest: "1".repeat(64) });
+
+test("Proposals: an agent compile row names who suggested it, lists the documents, confirms with its digest and ends Done", async ({ page }) => {
+  const store = newProposalStore([agentCompile(1)]);
+  const panel = await openProposals(page, store);
+  const row = panel.getByRole("listitem");
+
+  await expect(row).toContainText("Suggested by an agent connected by owner@example.invalid — client name “Desk Agent” (not verified)");
+  await expect(row).toContainText(DOC_A);
+  await expect(row).toContainText(DOC_B);
+  await expect(row).toContainText("Re-charges up to 9 credits, of which up to 3 as overage");
+  // A compile row is never part of a batch.
+  await expect(panel.getByRole("button", { name: /Confirm all/ })).toHaveCount(0);
+  await shot(page, "agent-compile-row");
+
+  await row.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(row.locator("span").filter({ hasText: /^Done$/ })).toBeVisible();
+  expect(store.confirmBodies).toHaveLength(1);
+  expect(store.confirmBodies[0]).toMatchObject({ decision: "confirm", previewDigest: `sha256:${"1".repeat(64)}` });
+  expect(store.executions).toHaveLength(1);
+  // No undo exists for a compile.
+  await expect(row.getByRole("button")).toHaveCount(0);
+  expect(await overflow(page)).toBeLessThanOrEqual(1);
+});
+
+test("Proposals: a preview that changed since it was shown says so and the re-read shows the new one", async ({ page }) => {
+  const store = newProposalStore([agentCompile(1)]);
+  const panel = await openProposals(page, store);
+  const row = panel.getByRole("listitem");
+  await expect(row.getByRole("button", { name: "Confirm", exact: true })).toBeVisible();
+
+  store.proposals[0]!.digest = "2".repeat(64); // the preview changed after the list was read
+  await row.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(panel.getByText("This suggestion changed since it was shown. Review it again.")).toBeVisible();
+  await expect(row.locator("span").filter({ hasText: /^Proposed$/ })).toBeVisible();
+  expect(store.executions).toHaveLength(0);
+
+  await row.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(row.locator("span").filter({ hasText: /^Done$/ })).toBeVisible();
+  expect(store.confirmBodies.at(-1)).toMatchObject({ previewDigest: `sha256:${"2".repeat(64)}` });
+});
+
+test("Proposals: a withdrawn row says Withdrawn and offers nothing", async ({ page }) => {
+  const store = newProposalStore([agentCompile(1, "withdrawn")]);
+  const panel = await openProposals(page, store);
+  const row = panel.getByRole("listitem");
+  await expect(row.locator("span").filter({ hasText: /^Withdrawn$/ })).toBeVisible();
+  await expect(row.getByRole("button")).toHaveCount(0);
+  expect(store.decisionCalls).toBe(0);
+});
+
+test("Proposals: Finish appears on this person's old confirmed row only and runs it once", async ({ page }) => {
+  const old = { ...proposal(1, "confirmed"), resumable: true };
+  const store = newProposalStore([old, proposal(2, "confirmed")]);
+  const panel = await openProposals(page, store);
+  await expect(panel.getByRole("listitem")).toHaveCount(2);
+  await expect(panel.getByRole("button", { name: "Finish", exact: true })).toHaveCount(1);
+
+  await panel.getByRole("button", { name: "Finish", exact: true }).click();
+  await expect(panel.getByRole("button", { name: "Finish", exact: true })).toHaveCount(0);
+  expect(store.confirmBodies[0]).toMatchObject({ decision: "confirm" });
+  expect(store.confirmBodies[0]).not.toHaveProperty("previewDigest");
+  expect(store.executions).toHaveLength(1);
+});
+
+test("Proposals: Show more reads the next page with the cursor, and batch confirm covers label rows only", async ({ page }) => {
+  const store = newProposalStore([proposal(1, "proposed"), proposal(2, "proposed", "purchase_order"), agentCompile(3)]);
+  store.pageSize = 2;
+  const panel = await openProposals(page, store);
+  await expect(panel.getByRole("listitem")).toHaveCount(2);
+  await panel.getByRole("button", { name: "Show more" }).click();
+  await expect(panel.getByRole("listitem")).toHaveCount(3);
+  await expect(panel.getByRole("button", { name: "Show more" })).toHaveCount(0);
+
+  await panel.getByRole("button", { name: /Confirm all label suggestions/ }).click();
+  await expect(panel.locator("span").filter({ hasText: /^Done$/ })).toHaveCount(2);
+  expect(store.executions).toHaveLength(2);
+  expect(store.proposals.find((p) => p.compile)?.state).toBe("proposed");
+});
+
+test("Proposals: the deep link focuses a row that is not on the first page, and says so when it is gone", async ({ page }) => {
+  const store = newProposalStore([proposal(1, "proposed"), proposal(2, "proposed", "purchase_order"), agentCompile(3)]);
+  store.pageSize = 1;
+  const oldest = proposal(1, "proposed").proposalId;
+  await openProposals(page, store, `&proposal=${oldest}`);
+  await expect(page.locator(`#proposal-${oldest}`)).toBeFocused();
+
+  const absent = newProposalStore([proposal(1, "proposed")]);
+  await mockProposals(page, absent);
+  await page.goto(`/workspace/changes?collection=${collectionId}&proposal=00000000-0000-4000-8000-0000000000aa`);
+  await expect(page.getByText("This suggestion is not available.")).toBeVisible();
+});
+
+test("Proposals: the deep link focuses a row that is on the first page", async ({ page }) => {
+  const store = newProposalStore([proposal(1, "proposed"), agentCompile(2)]);
+  const target = agentCompile(2).proposalId;
+  await openProposals(page, store, `&proposal=${target}`);
+  await expect(page.locator(`#proposal-${target}`)).toBeFocused();
+});
+
+test("Proposals: an injected client name is shown as text", async ({ page }) => {
+  const injected = { ...agentCompile(1), labelKey: "injected" };
+  const store = newProposalStore([injected]);
+  const panel = await openProposals(page, store);
+  await expect(panel.getByRole("listitem")).toContainText("<img src=x onerror=alert(1)>");
+  await expect(panel.locator("img")).toHaveCount(0);
+});
+
+type Grant = { grantId: string; clientLabel: string; createdAt: string; expiresAt: string | null; revokedAt: string | null; lastUsedAt: string | null };
+
+async function openAgentAccess(page: Page, grants: Grant[]) {
+  await installSession(page);
+  await mockWorkspace(page, [DOC_A]);
+  await page.route("**/api/developer/keys", (route) => route.fulfill({ json: { code: "OK", keys: [], remoteMcpKeys: [] } }));
+  await page.route("**/api/agent-grants", async (route) => {
+    if (route.request().method() === "POST") {
+      const { clientLabel } = route.request().postDataJSON() as { clientLabel: string };
+      const grant = { grantId: `00000000-0000-4000-8000-0000000000b${grants.length}`, clientLabel, createdAt: "2026-11-17T09:00:00.000Z", expiresAt: null, revokedAt: null, lastUsedAt: null };
+      grants.unshift(grant);
+      return route.fulfill({ status: 201, json: { code: "CREATED", grant, token: FAKE_CREDENTIAL } });
+    }
+    return route.fulfill({ json: { code: "OK", grants, truncated: false } });
+  });
+  await page.route("**/api/agent-grants/*", (route) => {
+    const grant = grants.find((g) => route.request().url().endsWith(g.grantId));
+    if (!grant || grant.revokedAt) return route.fulfill({ status: 404, json: { code: "NOT_FOUND" } });
+    grant.revokedAt = "2026-11-17T10:00:00.000Z";
+    return route.fulfill({ json: { code: "REVOKED", revokedAt: grant.revokedAt, keysRevoked: 1, proposalsWithdrawn: 0 } });
+  });
+  await page.goto("/workspace/developer");
+  const panel = page.getByRole("region", { name: "Agent access" });
+  await expect(panel.getByRole("heading", { name: "Agent access" })).toBeVisible();
+  return panel;
+}
+
+test("Agent access: consent before Create, the credential once, then Disconnect", async ({ page }) => {
+  const grants: Grant[] = [];
+  const panel = await openAgentAccess(page, grants);
+  await expect(panel.getByText("No agent is connected.")).toBeVisible();
+
+  await panel.getByLabel("Client name").fill("Desk Agent");
+  await expect(panel.getByText("“Desk Agent” will see the list of your documents", { exact: false })).toBeVisible();
+  await expect(panel.getByText("Each suggestion waits in Changes until it is confirmed in a signed-in TAVONEL session.", { exact: false })).toBeVisible();
+  await panel.getByRole("button", { name: "Create connection" }).click();
+
+  await expect(panel.getByText(FAKE_CREDENTIAL)).toBeVisible();
+  await expect(panel.getByText("It will not be shown again.", { exact: false })).toBeVisible();
+  await expect(panel.getByRole("listitem")).toContainText("“Desk Agent”");
+  expect(await overflow(page)).toBeLessThanOrEqual(1);
+  await shot(page, "agent-access-credential");
+
+  await panel.getByRole("button", { name: "Close" }).click();
+  await expect(panel.getByText(FAKE_CREDENTIAL)).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByText(FAKE_CREDENTIAL)).toHaveCount(0);
+
+  const reread = page.getByRole("region", { name: "Agent access" });
+  await reread.getByRole("button", { name: "Disconnect “Desk Agent”" }).click();
+  await expect(reread.getByRole("listitem")).toContainText("Disconnected");
+  await expect(reread.getByRole("button", { name: /Disconnect “/ })).toHaveCount(0);
+  expect(await overflow(page)).toBeLessThanOrEqual(1);
 });

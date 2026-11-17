@@ -50,8 +50,8 @@ type Target = {
 
 const HIDE_ATTR = "data-v34-contrast-hide";
 
-/** Runs in the page: elements that carry text, deduplicated by (colour, size class, surface class). */
-function collectTargets(max: number): Target[] {
+/** Runs in the page: elements that carry text (inside `scope` when given), deduplicated by (colour, size class, surface class). */
+function collectTargets([max, scope]: [number, string | null]): Target[] {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 1;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -67,7 +67,7 @@ function collectTargets(max: number): Target[] {
   const seen = new Set<string>();
   const out: Target[] = [];
   const priority = (e: Element) => (e.matches("h1,h2,h3,a,button,label,summary,[role=button]") ? 0 : 1);
-  const all = [...document.querySelectorAll("body *")]
+  const all = [...document.querySelectorAll(scope ? `${scope} *` : "body *")]
     .filter(e => [...e.childNodes].some(n => n.nodeType === Node.TEXT_NODE && (n.textContent ?? "").trim().length > 1))
     .sort((a, b) => priority(a) - priority(b));
   document.querySelectorAll(`[${"data-v34-contrast-idx"}]`).forEach(e => e.removeAttribute("data-v34-contrast-idx"));
@@ -202,6 +202,8 @@ export type ContrastOptions = {
   max?: number;
   /** Receipt exceptions: selector substring -> rationale. Matching findings are returned in `excepted`, not `violations`. */
   exceptions?: Record<string, string>;
+  /** Only text inside this selector is sampled (an open drawer, whose page behind is inert). */
+  scope?: string;
 };
 
 export type ContrastResult = {
@@ -222,7 +224,7 @@ async function centreInView(handle: Locator): Promise<void> {
 
 /** Pixel-sampled text contrast for the current page state. */
 export async function contrastPass(page: Page, options: ContrastOptions = {}): Promise<ContrastResult> {
-  const targets = await page.evaluate(collectTargets, options.max ?? 60);
+  const targets = await page.evaluate(collectTargets, [options.max ?? 60, options.scope ?? null] as [number, string | null]);
   /*
     Every glyph on the page is made transparent (fill and decoration, not `color`, so a currentColor background or border still paints) for the duration of the pass, not only the element
     under test. A line's sample box is the line itself, and at tight leading the neighbouring lines'
@@ -293,7 +295,7 @@ export function openContentDetails(page: Page): Promise<number> {
 }
 
 /** Runs in the page: visible bordered controls and their resolved border/fill colours. */
-function collectControls(max: number): { index: number; selector: string; border: [number, number, number, number]; fill: [number, number, number, number]; borderPx: number }[] {
+function collectControls([max, scope]: [number, string | null]): { index: number; selector: string; border: [number, number, number, number]; fill: [number, number, number, number]; borderPx: number }[] {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 1;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -308,7 +310,8 @@ function collectControls(max: number): { index: number; selector: string; border
   };
   const out: { index: number; selector: string; border: [number, number, number, number]; fill: [number, number, number, number]; borderPx: number }[] = [];
   document.querySelectorAll("[data-v34-control-idx]").forEach(e => e.removeAttribute("data-v34-control-idx"));
-  for (const el of document.querySelectorAll("input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea, button, [role=button]")) {
+  const kinds = ["input:not([type=hidden]):not([type=checkbox]):not([type=radio])", "select", "textarea", "button", "[role=button]"];
+  for (const el of document.querySelectorAll(kinds.map(k => (scope ? `${scope} ${k}` : k)).join(", "))) {
     const s = getComputedStyle(el);
     const r = el.getBoundingClientRect();
     if (s.display === "none" || s.visibility === "hidden" || r.width < 8 || r.height < 8 || el.matches(":disabled, [aria-disabled='true']")) continue;
@@ -333,8 +336,8 @@ function collectControls(max: number): { index: number; selector: string; border
  * Non-text contrast, 3:1: a control's border (or, when the border is weaker, its fill) against the
  * surface behind it, the surface being sampled from a screenshot with the control hidden.
  */
-export async function controlContrastPass(page: Page, max = 30): Promise<Violation[]> {
-  const controls = await page.evaluate(collectControls, max);
+export async function controlContrastPass(page: Page, max = 30, scope?: string): Promise<Violation[]> {
+  const controls = await page.evaluate(collectControls, [max, scope ?? null] as [number, string | null]);
   const out: Violation[] = [];
   for (const c of controls) {
     const handle = page.locator(`[data-v34-control-idx="${c.index}"]`).first();

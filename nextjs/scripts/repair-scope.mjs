@@ -1984,9 +1984,13 @@ export const SWITCH_ON_BILLING_INTEGRITY_AFFECTED_UNIT_FILES = Object.freeze([
 // shared rate helper and its new suite -- select every suite that quotes, holds or settles with those rates. The route, the
 // ledger client, the worker and the SQL are owned above (w1-trial-ops, intake-triage, ocr-worker, database-contract).
 // Product code, so never nativeReuse. No browser suite of its own.
-export const PAGE_METER_AFFECTED_PATHS = Object.freeze(['lib/page-meter.test.ts', 'lib/usage-pricing.ts']);
+// WO-D27-1 (V34) adds the ledger replay over the same rates: lib/billing-ledger-replay.ts, its pure suite and its database
+// suite. The pure suite and the webhook replay's adapter suite run here. Known gap, not a claim: both database suites need
+// TAVONEL_LOCAL_DSN, which no workflow sets at this head, so the ledger replay's database suite skips entirely and the webhook
+// replay's suite runs only its adapter half (its replay half skips). Nothing hosted runs those halves; none is named as run.
+export const PAGE_METER_AFFECTED_PATHS = Object.freeze(['lib/billing-ledger-replay.db.test.ts', 'lib/billing-ledger-replay.test.ts', 'lib/billing-ledger-replay.ts', 'lib/page-meter.test.ts', 'lib/usage-pricing.ts']);
 export const PAGE_METER_AFFECTED_UNIT_FILES = Object.freeze([
-  'app/api/compile-jobs/route.test.ts', 'lib/api-error-codes.test.ts', 'lib/billing-reconciliation.test.ts',
+  'app/api/compile-jobs/route.test.ts', 'lib/api-error-codes.test.ts', 'lib/billing-ledger-replay.test.ts', 'lib/billing-reconciliation.test.ts', 'lib/billing-webhook-replay.db.test.ts',
   'lib/compute-reservation.test.ts', 'lib/customer-data-admission-routes.test.ts', 'lib/intake-approval-rollout-off.test.ts',
   'lib/intake-approval-route.test.ts', 'lib/intake-capability-sealed-version.test.ts', 'lib/intake-rollout-compatibility.test.ts',
   'lib/intake-rollout-compile-compatibility.test.ts', 'lib/intake-rollout-server-db-mismatch.test.ts',
@@ -3079,6 +3083,225 @@ export const WORLD_READ_CAP_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error-
 // revoke-not-plan-gated-20261110: the three revocation routes ask for membership and scope, never the plan ("Never let an ACL revoke wait").
 export const REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS = Object.freeze(['app/api/connections/[id]/route.ts', 'app/api/v1/oauth-connectors/connections/[id]/route.ts', 'lib/connection-revoke-not-plan-gated.test.ts']);
 export const REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES = Object.freeze(['lib/connection-revoke-not-plan-gated.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/google-drive-viewer-link-off.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts']);
+// V34 program owners (WO-CI-7, lead decisions D-1 and D-4). Every path the program branch changed since the verified baseline,
+// by what owns it. Exact paths, no glob: a new V34 file is a new review, and the map fails closed on it until it is owned.
+// Each owner selects the real suites the Repair job executes: Vitest files and Playwright specs with a reviewed project row
+// in run-repair-check.mjs, or node:test files its Node runner registers. Every owner is built with requireExecutedCheck, so an owner
+// whose executed lists are empty fails the map closed for each of its paths; a suite another workflow runs never counts toward that.
+// externalChecks name the suites another workflow runs, as a structured claim (workflow, job, exact step command, project).
+// buildAffectedMap reads those files at head and refuses a claim whose job/step does not run the file, and two owners naming
+// different runners for one file fail the map. Product code, so never nativeReuse.
+// The Launch QA Product QA step at this head: no file filter, no grep, so each project runs every spec playwright.config.ts admits to it.
+const LAUNCH_QA_PRODUCT_STEP = 'pnpm exec playwright test --project=1440 --project=390 --project=360 --project=reduced-motion --project=audit --project=audit-768 --project=audit-1280';
+const productQaClaim = project => Object.freeze({ kind: 'playwright', workflow: '.github/workflows/launch-qa.yml', job: 'product-qa', run: LAUNCH_QA_PRODUCT_STEP, project });
+// ci.yml's nextjs job: `pnpm test` is `vitest run && pnpm test:scripts`, so it runs every file the shared Vitest include admits.
+const CI_NEXTJS_VITEST_CLAIM = Object.freeze({ kind: 'vitest', workflow: '.github/workflows/ci.yml', job: 'nextjs', run: 'pnpm test' });
+// Program paths no owner takes, so each fails the map as unmapped with its reason: a red gate with a true reason, not a green one that
+// runs nothing (lead decision K3). Empty at this head: the V34 QA harness and the local database harness are run by the Repair job
+// (WO-CI-7 round 3, L5/L6), so they have owners below.
+export const V34_PROGRAM_UNEXECUTED_PATHS = Object.freeze({});
+export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
+  // v34-shell: header, drawer, More menu, footer, page frame, JSON-LD, tokens and the shared UI parts: the nav, token and containment suites, every
+  // suite that renders them, and the two audits that walk every V34 live route at ten widths, plus contrast over the core routes.
+  // Known gap: components/v34/ui/plan-card.tsx and its stylesheet have no importer at this head, so no suite here renders them.
+  'v34-shell': Object.freeze({
+    paths: Object.freeze(['components/v34/shell/mobile-drawer.module.css', 'components/v34/shell/mobile-drawer.tsx', 'components/v34/shell/more-menu.module.css', 'components/v34/shell/more-menu.tsx', 'components/v34/shell/route-json-ld.tsx', 'components/v34/shell/site-footer.module.css', 'components/v34/shell/site-footer.tsx', 'components/v34/shell/site-header.module.css', 'components/v34/shell/site-header.tsx', 'components/v34/shell/v34-page.module.css', 'components/v34/shell/v34-page.tsx', 'components/v34/tokens.module.css', 'components/v34/ui/article-layout.module.css', 'components/v34/ui/article-layout.tsx', 'components/v34/ui/bridge.module.css', 'components/v34/ui/bridge.tsx', 'components/v34/ui/button-link.module.css', 'components/v34/ui/button-link.tsx', 'components/v34/ui/corpus-stats.module.css', 'components/v34/ui/corpus-stats.tsx', 'components/v34/ui/create-world.ts', 'components/v34/ui/figure.module.css', 'components/v34/ui/figure.tsx', 'components/v34/ui/final-cta.module.css', 'components/v34/ui/final-cta.tsx', 'components/v34/ui/hero.module.css', 'components/v34/ui/hero.tsx', 'components/v34/ui/plan-card.module.css', 'components/v34/ui/plan-card.tsx', 'components/v34/ui/record-card.module.css', 'components/v34/ui/record-card.tsx', 'components/v34/ui/scroll-table.module.css', 'components/v34/ui/scroll-table.tsx', 'components/v34/ui/section.module.css', 'components/v34/ui/section.tsx', 'components/v34/ui/surface.ts', 'components/v34/ui/tag.module.css', 'components/v34/ui/tag.tsx', 'components/v34/ui/text.module.css', 'components/v34/ui/text.tsx', 'components/v34/ui/tool-list.module.css', 'components/v34/ui/tool-list.tsx', 'lib/v34/css-containment.test.ts', 'lib/v34/integration.test.ts', 'lib/v34/nav.test.ts', 'lib/v34/nav.ts', 'lib/v34/tokens.test.ts']),
+    unitFiles: Object.freeze(['lib/cta-truth.test.ts', 'lib/output-escaping.test.ts', 'lib/site-nav-model.test.ts', 'lib/structured-data.test.ts', 'lib/v34/css-containment.test.ts', 'lib/v34/home-page.test.ts', 'lib/v34/integration.test.ts', 'lib/v34/nav.test.ts', 'lib/v34/route-bodies.test.ts', 'lib/v34/routes-catalog.test.ts', 'lib/v34/routes-community.test.ts', 'lib/v34/routes-contact.test.ts', 'lib/v34/routes-federation.test.ts', 'lib/v34/routes-governance.test.ts', 'lib/v34/routes-journal-markets.test.ts', 'lib/v34/routes-journal-property.test.ts', 'lib/v34/routes-journal-research.test.ts', 'lib/v34/routes-journal-revision.test.ts', 'lib/v34/routes-journal.test.ts', 'lib/v34/routes-marketplace.test.ts', 'lib/v34/routes-outcomes.test.ts', 'lib/v34/routes-studio.test.ts', 'lib/v34/tokens.test.ts']),
+    browserFiles: Object.freeze(['e2e/contrast-zoom-audit.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-route-registry: the route registry, its metadata and release gate: every suite that imports them, and the two audits that walk V34_LIVE_PATHS.
+  'v34-route-registry': Object.freeze({
+    paths: Object.freeze(['lib/v34/release.test.ts', 'lib/v34/release.ts', 'lib/v34/route-metadata.test.ts', 'lib/v34/route-metadata.ts', 'lib/v34/routes.test.ts', 'lib/v34/routes.ts']),
+    unitFiles: Object.freeze(['lib/brand-copy.test.ts', 'lib/landing-v2-outcome-ia.test.ts', 'lib/page-metadata.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/route-canonical-metadata.test.ts', 'lib/site-nav-model.test.ts', 'lib/solutions-hub.test.ts', 'lib/structured-data.test.ts', 'lib/v34/home-page.test.ts', 'lib/v34/integration.test.ts', 'lib/v34/nav.test.ts', 'lib/v34/release.test.ts', 'lib/v34/route-bodies.test.ts', 'lib/v34/route-metadata.test.ts', 'lib/v34/routes-autopilot.test.ts', 'lib/v34/routes-capabilities.test.ts', 'lib/v34/routes-catalog.test.ts', 'lib/v34/routes-changes.test.ts', 'lib/v34/routes-community.test.ts', 'lib/v34/routes-company.test.ts', 'lib/v34/routes-compiler.test.ts', 'lib/v34/routes-connect.test.ts', 'lib/v34/routes-contact.test.ts', 'lib/v34/routes-creators.test.ts', 'lib/v34/routes-developers.test.ts', 'lib/v34/routes-engineering.test.ts', 'lib/v34/routes-enterprise.test.ts', 'lib/v34/routes-evidence.test.ts', 'lib/v34/routes-federation.test.ts', 'lib/v34/routes-film.test.ts', 'lib/v34/routes-governance.test.ts', 'lib/v34/routes-journal-markets.test.ts', 'lib/v34/routes-journal-property.test.ts', 'lib/v34/routes-journal-research.test.ts', 'lib/v34/routes-journal-revision.test.ts', 'lib/v34/routes-journal.test.ts', 'lib/v34/routes-marketplace.test.ts', 'lib/v34/routes-markets.test.ts', 'lib/v34/routes-methods.test.ts', 'lib/v34/routes-outcomes.test.ts', 'lib/v34/routes-personal.test.ts', 'lib/v34/routes-platform.test.ts', 'lib/v34/routes-realestate.test.ts', 'lib/v34/routes-research-program.test.ts', 'lib/v34/routes-research.test.ts', 'lib/v34/routes-security.test.ts', 'lib/v34/routes-skills.test.ts', 'lib/v34/routes-solutions.test.ts', 'lib/v34/routes-steward.test.ts', 'lib/v34/routes-studio.test.ts', 'lib/v34/routes-teams.test.ts', 'lib/v34/routes-trading.test.ts', 'lib/v34/routes-world.test.ts', 'lib/v34/routes.test.ts']),
+    browserFiles: Object.freeze(['e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-world: the World instrument, the walkthrough, the public reference corpus and its SVG projection route: their suites and their importers.
+  'v34-world': Object.freeze({
+    paths: Object.freeze(['app/v34/world-layers.svg/route.ts', 'components/v34/walkthrough/identifiers.ts', 'components/v34/walkthrough/walkthrough.module.css', 'components/v34/walkthrough/walkthrough.tsx', 'components/v34/world/canvas2d-renderer.ts', 'components/v34/world/renderer-types.ts', 'components/v34/world/webgl-renderer.ts', 'components/v34/world/world-instrument.tsx', 'components/v34/world/world-island.tsx', 'components/v34/world/world.module.css', 'lib/v34/home-world-edges.test.ts', 'lib/v34/public-corpus.test.ts', 'lib/v34/public-corpus.ts', 'lib/v34/walkthrough.test.ts', 'lib/v34/walkthrough.ts', 'lib/v34/world-geometry.test.ts', 'lib/v34/world-geometry.ts', 'public/v34/corpus-d630a531e460.json']),
+    unitFiles: Object.freeze(['lib/brand-copy.test.ts', 'lib/client-route-weight.test.ts', 'lib/product-claims-sync.test.ts', 'lib/v34/home-page.test.ts', 'lib/v34/home-world-edges.test.ts', 'lib/v34/integration.test.ts', 'lib/v34/public-corpus.test.ts', 'lib/v34/routes-autopilot.test.ts', 'lib/v34/routes-changes.test.ts', 'lib/v34/routes-compiler.test.ts', 'lib/v34/routes-creators.test.ts', 'lib/v34/routes-engineering.test.ts', 'lib/v34/routes-evidence.test.ts', 'lib/v34/routes-realestate.test.ts', 'lib/v34/routes-research.test.ts', 'lib/v34/routes-skills.test.ts', 'lib/v34/routes-steward.test.ts', 'lib/v34/routes-studio.test.ts', 'lib/v34/routes-trading.test.ts', 'lib/v34/routes-world.test.ts', 'lib/v34/walkthrough.test.ts', 'lib/v34/world-geometry.test.ts']),
+    browserFiles: Object.freeze(['e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-route-bodies: every V34 route body and its app/ page, image card or retired stylesheet: the per-route suites, the body render suite and
+  // the site-wide SEO and metadata walks, plus the three audits over the rendered pages.
+  'v34-route-bodies': Object.freeze({
+    paths: Object.freeze(['app/autopilot/page.tsx', 'app/billing/opengraph-image.tsx', 'app/billing/page.tsx', 'app/capabilities/opengraph-image.tsx', 'app/capabilities/page.tsx', 'app/catalog/page.tsx', 'app/changes/opengraph-image.tsx', 'app/changes/page.tsx', 'app/community/page.tsx', 'app/company/opengraph-image.tsx', 'app/company/page.tsx', 'app/compiler/opengraph-image.tsx', 'app/compiler/page.tsx', 'app/connect/opengraph-image.tsx', 'app/connect/page.tsx', 'app/contact/contact-faq.module.css', 'app/contact/opengraph-image.tsx', 'app/creators/page.tsx', 'app/developers/opengraph-image.tsx', 'app/engineering/opengraph-image.tsx', 'app/engineering/page.tsx', 'app/evidence/evidence.module.css', 'app/federation/page.tsx', 'app/film/layout.tsx', 'app/film/page.tsx', 'app/governance/page.tsx', 'app/journal/compiler/opengraph-image.tsx', 'app/journal/compiler/page.tsx', 'app/journal/markets/page.tsx', 'app/journal/mcp/opengraph-image.tsx', 'app/journal/mcp/page.tsx', 'app/journal/opengraph-image.tsx', 'app/journal/page.tsx', 'app/journal/property/page.tsx', 'app/journal/research/opengraph-image.tsx', 'app/journal/research/page.tsx', 'app/journal/revision/opengraph-image.tsx', 'app/journal/revision/page.tsx', 'app/marketplace/page.tsx', 'app/markets/opengraph-image.tsx', 'app/markets/page.tsx', 'app/methods/opengraph-image.tsx', 'app/methods/page.tsx', 'app/outcomes/page.tsx', 'app/personal/opengraph-image.tsx', 'app/personal/page.tsx', 'app/platform/opengraph-image.tsx', 'app/platform/page.tsx', 'app/realestate/page.tsx', 'app/research/opengraph-image.tsx', 'app/research/program/opengraph-image.tsx', 'app/research/program/page.tsx', 'app/skills/page.tsx', 'app/solutions/opengraph-image.tsx', 'app/steward/page.tsx', 'app/studio/opengraph-image.tsx', 'app/studio/page.tsx', 'app/teams/page.tsx', 'app/trading/page.tsx', 'app/world/opengraph-image.tsx', 'app/world/page.tsx', 'components/v34/route-stub.tsx', 'components/v34/routes/autopilot/autopilot-content.ts', 'components/v34/routes/autopilot/autopilot.module.css', 'components/v34/routes/autopilot/autopilot.tsx', 'components/v34/routes/capabilities/capabilities-content.ts', 'components/v34/routes/capabilities/capabilities-status.ts', 'components/v34/routes/capabilities/capabilities.module.css', 'components/v34/routes/capabilities/capabilities.tsx', 'components/v34/routes/catalog/catalog.module.css', 'components/v34/routes/catalog/catalog.tsx', 'components/v34/routes/changes/changes-art.tsx', 'components/v34/routes/changes/changes-content.ts', 'components/v34/routes/changes/changes.module.css', 'components/v34/routes/changes/changes.tsx', 'components/v34/routes/community/community.module.css', 'components/v34/routes/community/community.tsx', 'components/v34/routes/company/company-art.tsx', 'components/v34/routes/company/company-content.ts', 'components/v34/routes/company/company.module.css', 'components/v34/routes/company/company.tsx', 'components/v34/routes/compiler/compiler-art.tsx', 'components/v34/routes/compiler/compiler-content.ts', 'components/v34/routes/compiler/compiler.module.css', 'components/v34/routes/compiler/compiler.tsx', 'components/v34/routes/connect/connect-content.ts', 'components/v34/routes/connect/connect-sources.ts', 'components/v34/routes/connect/connect.module.css', 'components/v34/routes/connect/connect.tsx', 'components/v34/routes/contact/contact-art.tsx', 'components/v34/routes/contact/contact-content.ts', 'components/v34/routes/contact/contact.module.css', 'components/v34/routes/contact/contact.tsx', 'components/v34/routes/creators/creators-content.ts', 'components/v34/routes/creators/creators.module.css', 'components/v34/routes/creators/creators.tsx', 'components/v34/routes/developers/code-block.module.css', 'components/v34/routes/developers/code-block.tsx', 'components/v34/routes/developers/developers-content.ts', 'components/v34/routes/developers/developers.module.css', 'components/v34/routes/developers/developers.tsx', 'components/v34/routes/engineering/engineering-art.tsx', 'components/v34/routes/engineering/engineering-content.ts', 'components/v34/routes/engineering/engineering.module.css', 'components/v34/routes/engineering/engineering.tsx', 'components/v34/routes/enterprise/enterprise-art.tsx', 'components/v34/routes/enterprise/enterprise-content.ts', 'components/v34/routes/enterprise/enterprise.module.css', 'components/v34/routes/enterprise/enterprise.tsx', 'components/v34/routes/enterprise/sample-frame.module.css', 'components/v34/routes/enterprise/sample-frame.tsx', 'components/v34/routes/evidence/evidence-art.tsx', 'components/v34/routes/evidence/evidence-content.ts', 'components/v34/routes/evidence/evidence-regions.tsx', 'components/v34/routes/evidence/evidence.module.css', 'components/v34/routes/evidence/evidence.tsx', 'components/v34/routes/federation/federation.module.css', 'components/v34/routes/federation/federation.tsx', 'components/v34/routes/film/film-art.tsx', 'components/v34/routes/film/film-content.ts', 'components/v34/routes/film/film.module.css', 'components/v34/routes/film/film.tsx', 'components/v34/routes/governance/governance.module.css', 'components/v34/routes/governance/governance.tsx', 'components/v34/routes/home/home-analytics.tsx', 'components/v34/routes/home/home-content.ts', 'components/v34/routes/home/home.module.css', 'components/v34/routes/home/home.tsx', 'components/v34/routes/journal-compiler/compiler-article.tsx', 'components/v34/routes/journal-compiler/compiler-sources.ts', 'components/v34/routes/journal-compiler/proof-line.module.css', 'components/v34/routes/journal-compiler/proof-line.tsx', 'components/v34/routes/journal-markets/figures.tsx', 'components/v34/routes/journal-markets/markets-article.tsx', 'components/v34/routes/journal-markets/markets-sources.ts', 'components/v34/routes/journal-mcp/config-block.module.css', 'components/v34/routes/journal-mcp/config-block.tsx', 'components/v34/routes/journal-mcp/mcp-article.tsx', 'components/v34/routes/journal-mcp/mcp-sources.ts', 'components/v34/routes/journal-property/figures.tsx', 'components/v34/routes/journal-property/property-article.tsx', 'components/v34/routes/journal-property/property-sources.ts', 'components/v34/routes/journal-research/figures.tsx', 'components/v34/routes/journal-research/research-article.tsx', 'components/v34/routes/journal-research/research-sources.ts', 'components/v34/routes/journal-revision/figures.tsx', 'components/v34/routes/journal-revision/revision-article.tsx', 'components/v34/routes/journal-revision/revision-sources.ts', 'components/v34/routes/journal/article-dates.ts', 'components/v34/routes/journal/covers.module.css', 'components/v34/routes/journal/covers.tsx', 'components/v34/routes/journal/journal-content.ts', 'components/v34/routes/journal/journal.module.css', 'components/v34/routes/journal/journal.tsx', 'components/v34/routes/journal/read-next.module.css', 'components/v34/routes/journal/read-next.tsx', 'components/v34/routes/marketplace/marketplace.module.css', 'components/v34/routes/marketplace/marketplace.tsx', 'components/v34/routes/markets/markets-art.tsx', 'components/v34/routes/markets/markets-content.ts', 'components/v34/routes/markets/markets.module.css', 'components/v34/routes/markets/markets.tsx', 'components/v34/routes/methods/methods-art.tsx', 'components/v34/routes/methods/methods-content.ts', 'components/v34/routes/methods/methods.module.css', 'components/v34/routes/methods/methods.tsx', 'components/v34/routes/outcomes/outcomes.module.css', 'components/v34/routes/outcomes/outcomes.tsx', 'components/v34/routes/personal/personal-art.tsx', 'components/v34/routes/personal/personal-content.ts', 'components/v34/routes/personal/personal.module.css', 'components/v34/routes/personal/personal.tsx', 'components/v34/routes/platform/platform-art.tsx', 'components/v34/routes/platform/platform-content.ts', 'components/v34/routes/platform/platform.module.css', 'components/v34/routes/platform/platform.tsx', 'components/v34/routes/realestate/realestate-content.ts', 'components/v34/routes/realestate/realestate.module.css', 'components/v34/routes/realestate/realestate.tsx', 'components/v34/routes/research-program/program-content.ts', 'components/v34/routes/research-program/program.module.css', 'components/v34/routes/research-program/program.tsx', 'components/v34/routes/research/research-art.tsx', 'components/v34/routes/research/research-content.ts', 'components/v34/routes/research/research-data.ts', 'components/v34/routes/research/research.module.css', 'components/v34/routes/research/research.tsx', 'components/v34/routes/security/provisions.module.css', 'components/v34/routes/security/provisions.tsx', 'components/v34/routes/security/security-art.tsx', 'components/v34/routes/security/security-content.ts', 'components/v34/routes/security/security.module.css', 'components/v34/routes/security/security.tsx', 'components/v34/routes/skills/skills-content.ts', 'components/v34/routes/skills/skills.module.css', 'components/v34/routes/skills/skills.tsx', 'components/v34/routes/solutions/solutions-art.tsx', 'components/v34/routes/solutions/solutions-content.ts', 'components/v34/routes/solutions/solutions.module.css', 'components/v34/routes/solutions/solutions.tsx', 'components/v34/routes/steward/steward-content.ts', 'components/v34/routes/steward/steward.module.css', 'components/v34/routes/steward/steward.tsx', 'components/v34/routes/studio/studio-content.ts', 'components/v34/routes/studio/studio.module.css', 'components/v34/routes/studio/studio.tsx', 'components/v34/routes/teams/teams-art.tsx', 'components/v34/routes/teams/teams-content.ts', 'components/v34/routes/teams/teams.module.css', 'components/v34/routes/teams/teams.tsx', 'components/v34/routes/trading/trading-content.ts', 'components/v34/routes/trading/trading.module.css', 'components/v34/routes/trading/trading.tsx', 'components/v34/routes/world/world-content.ts', 'components/v34/routes/world/world.module.css', 'components/v34/routes/world/world.tsx', 'lib/v34/home-page.test.ts', 'lib/v34/route-bodies.test.ts', 'lib/v34/route-test-support.ts', 'lib/v34/routes-autopilot.test.ts', 'lib/v34/routes-capabilities.test.ts', 'lib/v34/routes-catalog.test.ts', 'lib/v34/routes-changes.test.ts', 'lib/v34/routes-community.test.ts', 'lib/v34/routes-company.test.ts', 'lib/v34/routes-compiler.test.ts', 'lib/v34/routes-connect.test.ts', 'lib/v34/routes-contact.test.ts', 'lib/v34/routes-creators.test.ts', 'lib/v34/routes-developers.test.ts', 'lib/v34/routes-engineering.test.ts', 'lib/v34/routes-enterprise.test.ts', 'lib/v34/routes-evidence.test.ts', 'lib/v34/routes-federation.test.ts', 'lib/v34/routes-film.test.ts', 'lib/v34/routes-governance.test.ts', 'lib/v34/routes-journal-markets.test.ts', 'lib/v34/routes-journal-property.test.ts', 'lib/v34/routes-journal-research.test.ts', 'lib/v34/routes-journal-revision.test.ts', 'lib/v34/routes-journal.test.ts', 'lib/v34/routes-marketplace.test.ts', 'lib/v34/routes-markets.test.ts', 'lib/v34/routes-methods.test.ts', 'lib/v34/routes-outcomes.test.ts', 'lib/v34/routes-personal.test.ts', 'lib/v34/routes-platform.test.ts', 'lib/v34/routes-realestate.test.ts', 'lib/v34/routes-research-program.test.ts', 'lib/v34/routes-research.test.ts', 'lib/v34/routes-security.test.ts', 'lib/v34/routes-skills.test.ts', 'lib/v34/routes-solutions.test.ts', 'lib/v34/routes-steward.test.ts', 'lib/v34/routes-studio.test.ts', 'lib/v34/routes-teams.test.ts', 'lib/v34/routes-trading.test.ts', 'lib/v34/routes-world.test.ts']),
+    unitFiles: Object.freeze(['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/developer-snippets.test.ts', 'lib/g1-copy-truth.test.ts', 'lib/keyless-try-it.test.ts', 'lib/page-metadata.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/solution-workflows.test.ts', 'lib/solutions-hub.test.ts', 'lib/support-targets.test.ts', 'lib/trust-page-answers.test.ts', 'lib/trust-provisions.test.ts', 'lib/v34/css-containment.test.ts', 'lib/v34/home-page.test.ts', 'lib/v34/integration.test.ts', 'lib/v34/route-bodies.test.ts', 'lib/v34/route-metadata.test.ts', 'lib/v34/routes-autopilot.test.ts', 'lib/v34/routes-capabilities.test.ts', 'lib/v34/routes-catalog.test.ts', 'lib/v34/routes-changes.test.ts', 'lib/v34/routes-community.test.ts', 'lib/v34/routes-company.test.ts', 'lib/v34/routes-compiler.test.ts', 'lib/v34/routes-connect.test.ts', 'lib/v34/routes-contact.test.ts', 'lib/v34/routes-creators.test.ts', 'lib/v34/routes-developers.test.ts', 'lib/v34/routes-engineering.test.ts', 'lib/v34/routes-enterprise.test.ts', 'lib/v34/routes-evidence.test.ts', 'lib/v34/routes-federation.test.ts', 'lib/v34/routes-film.test.ts', 'lib/v34/routes-governance.test.ts', 'lib/v34/routes-journal-markets.test.ts', 'lib/v34/routes-journal-property.test.ts', 'lib/v34/routes-journal-research.test.ts', 'lib/v34/routes-journal-revision.test.ts', 'lib/v34/routes-journal.test.ts', 'lib/v34/routes-marketplace.test.ts', 'lib/v34/routes-markets.test.ts', 'lib/v34/routes-methods.test.ts', 'lib/v34/routes-outcomes.test.ts', 'lib/v34/routes-personal.test.ts', 'lib/v34/routes-platform.test.ts', 'lib/v34/routes-realestate.test.ts', 'lib/v34/routes-research-program.test.ts', 'lib/v34/routes-research.test.ts', 'lib/v34/routes-security.test.ts', 'lib/v34/routes-skills.test.ts', 'lib/v34/routes-solutions.test.ts', 'lib/v34/routes-steward.test.ts', 'lib/v34/routes-studio.test.ts', 'lib/v34/routes-teams.test.ts', 'lib/v34/routes-trading.test.ts', 'lib/v34/routes-world.test.ts', 'lib/v34/routes.test.ts', 'lib/v34/tokens.test.ts']),
+    browserFiles: Object.freeze(['e2e/contrast-zoom-audit.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-guard-suites: the legacy guard suites brought to the V34 truth, the two helpers they follow and the contrast audit: each selects itself.
+  'v34-guard-suites': Object.freeze({
+    paths: Object.freeze(['e2e/contrast-zoom-audit.spec.ts', 'lib/client-route-weight.test.ts', 'lib/contact-locale.ts', 'lib/contact-qualification.test.ts', 'lib/developer-snippets.test.ts', 'lib/landing-experiments.test.ts', 'lib/landing-experiments.ts', 'lib/output-escaping.test.ts', 'lib/route-canonical-metadata.test.ts', 'lib/security-txt.test.ts', 'lib/solutions-hub.test.ts', 'lib/solutions-thumbnails.test.ts', 'lib/structured-data.test.ts', 'lib/support-targets.test.ts', 'lib/trust-provisions.test.ts']),
+    unitFiles: Object.freeze(['lib/client-route-weight.test.ts', 'lib/contact-locale.test.ts', 'lib/contact-qualification.test.ts', 'lib/cookbook-content.test.ts', 'lib/developer-snippets.test.ts', 'lib/landing-experiments.test.ts', 'lib/output-escaping.test.ts', 'lib/page-seo.test.ts', 'lib/route-canonical-metadata.test.ts', 'lib/security-txt.test.ts', 'lib/seo-surface.test.ts', 'lib/solutions-hub.test.ts', 'lib/solutions-thumbnails.test.ts', 'lib/structured-data.test.ts', 'lib/support-targets.test.ts', 'lib/trust-provisions.test.ts']),
+    browserFiles: Object.freeze(['e2e/contrast-zoom-audit.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // korean-surface-removal: D33 F0, the /ko surface removed (every /ko URL answers 308): the suites that assert the redirect and the English-only chrome,
+  // and the launch accessibility spec, whose "working, visible keyboard skip link" case is the one suite that exercises components/skip-link.tsx.
+  'korean-surface-removal': Object.freeze({
+    paths: Object.freeze(['app/ko/contact/opengraph-image.tsx', 'app/ko/document-lang.tsx', 'app/ko/evaluation/page.tsx', 'app/ko/opengraph-image.tsx', 'components/evaluation-page.test.tsx', 'components/skip-link.tsx', 'lib/ko-terms.test.ts']),
+    unitFiles: Object.freeze(['components/evaluation-page.test.tsx', 'lib/cta-truth.test.ts', 'lib/ko-terms.test.ts', 'lib/og-card-frame.test.ts', 'lib/page-seo.test.ts', 'lib/seo-surface.test.ts', 'lib/site-nav-model.test.ts']),
+    browserFiles: Object.freeze(['e2e/launch-qa-accessibility.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // proposals-library: WO-D23-4 and WO-D30: Library decisions and change proposals, their routes, panels and migration suites, plus the route
+  // classification and CSRF matrices that every new API route enters. The browser spec has no repair project row.
+  'proposals-library': Object.freeze({
+    paths: Object.freeze(['app/api/library/decisions/route.ts', 'app/api/library/route.ts', 'app/api/proposals/[id]/decision/route.ts', 'app/api/proposals/[id]/undo/route.ts', 'app/api/proposals/route.ts', 'components/change-proposals-panel.module.css', 'components/change-proposals-panel.tsx', 'components/library-panel.module.css', 'components/library-panel.tsx', 'e2e/change-proposals.spec.ts', 'lib/change-inbox.test.ts', 'lib/change-proposals-panel.test.ts', 'lib/change-proposals-routes.test.ts', 'lib/change-proposals.test.ts', 'lib/change-proposals.ts', 'lib/library-label-decisions-migration.test.ts', 'lib/library-routes.test.ts', 'lib/world-change-proposals-migration.test.ts']),
+    unitFiles: Object.freeze(['lib/change-inbox.test.ts', 'lib/change-proposals-panel.test.ts', 'lib/change-proposals-routes.test.ts', 'lib/change-proposals.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/library-label-decisions-migration.test.ts', 'lib/library-routes.test.ts', 'lib/library-shadow.test.ts', 'lib/route-classification.test.ts', 'lib/world-change-proposals-migration.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({
+      'e2e/change-proposals.spec.ts': productQaClaim('1440'),
+    }),
+  }),
+  // workspace-journey: D23-1/3/5: the file states, purpose picker and journey rail. The census browser spec has no repair project row.
+  'workspace-journey': Object.freeze({
+    paths: Object.freeze(['components/workspace-getting-started.tsx', 'components/workspace-purpose-picker.module.css', 'components/workspace-purpose-picker.tsx', 'e2e/file-census-resume.spec.ts', 'lib/file-states.test.ts', 'lib/file-states.ts', 'lib/workspace-journey.test.ts', 'lib/workspace-journey.ts']),
+    unitFiles: Object.freeze(['lib/copy-trust-guard.test.ts', 'lib/file-states.test.ts', 'lib/workspace-journey.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({
+      'e2e/file-census-resume.spec.ts': productQaClaim('1440'),
+    }),
+  }),
+  // compile-pipeline: D06-3, D13 and D24-2: compile-input manifest, receipt v2 signing and its promote/rollback check, queue timing. The two
+  // compile browser specs have no repair project row.
+  'compile-pipeline': Object.freeze({
+    paths: Object.freeze(['e2e/compile-job-states-mobile.spec.ts', 'e2e/compile-resume.spec.ts', 'lib/collection-compile-v2-only.test.ts', 'lib/compile-input-manifest.test.ts', 'lib/compile-input-manifest.ts', 'lib/compile-queue-timing.test.ts', 'lib/compile-queue-timing.ts', 'lib/compile-receipt-signing.test.ts', 'lib/compile-receipt-signing.ts', 'lib/fixtures/compile-input-manifest.v1.json', 'lib/promotion-receipt-check.test.ts', 'lib/promotion-receipt-check.ts', 'lib/retrieval-compile-wiring.test.ts', 'lib/world-promotion-current-source.test.ts', 'lib/world-rollback-source-access.test.ts']),
+    unitFiles: Object.freeze(['lib/answer-receipt-signing.test.ts', 'lib/collection-compile-run.test.ts', 'lib/collection-compile-v2-only.test.ts', 'lib/compile-input-manifest.test.ts', 'lib/compile-queue-timing.test.ts', 'lib/compile-receipt-signing.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/promotion-receipt-check.test.ts', 'lib/retrieval-compile-wiring.test.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/world-promotion-current-source.test.ts', 'lib/world-rollback-source-access.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({
+      'e2e/compile-job-states-mobile.spec.ts': productQaClaim('390'),
+      'e2e/compile-resume.spec.ts': productQaClaim('audit'),
+    }),
+  }),
+  // world-temporal-lens: D16 and D18: lens URL state, temporal view, activation history, by-id reads and sealed page tokens. The two lens
+  // browser specs have no repair project row.
+  'world-temporal-lens': Object.freeze({
+    paths: Object.freeze(['e2e/fixtures/world-lens-model.ts', 'e2e/world-graph-scale.spec.ts', 'e2e/world-lens.spec.ts', 'lib/sealed-claims.test.ts', 'lib/sealed-claims.ts', 'lib/world-activation-history.test.ts', 'lib/world-activation-history.ts', 'lib/world-lens-by-id.test.ts', 'lib/world-lens-url.test.ts', 'lib/world-lens-url.ts', 'lib/world-temporal-routes.test.ts', 'lib/world-temporal-view.test.ts', 'lib/world-temporal-view.ts']),
+    unitFiles: Object.freeze(['lib/sealed-claims.test.ts', 'lib/world-activation-history.test.ts', 'lib/world-lens-by-id.test.ts', 'lib/world-lens-url.test.ts', 'lib/world-temporal-routes.test.ts', 'lib/world-temporal-view.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({
+      'e2e/world-graph-scale.spec.ts': productQaClaim('1440'),
+      'e2e/world-lens.spec.ts': productQaClaim('1440'),
+    }),
+  }),
+  // control-plane: D29 and D31: the signed capability manifest and the World release contract, with the signature-scope suite.
+  'control-plane': Object.freeze({
+    paths: Object.freeze(['lib/capability-manifest.test.ts', 'lib/capability-manifest.ts', 'lib/export-signing.test.ts', 'lib/world-release.test.ts', 'lib/world-release.ts']),
+    unitFiles: Object.freeze(['lib/capability-manifest.test.ts', 'lib/export-signing.test.ts', 'lib/world-release.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // developer-surface: D18-3 and D19: the remote MCP facade, readiness, refresh and its matrices, and the signed answer receipt parity suite.
+  'developer-surface': Object.freeze({
+    paths: Object.freeze(['lib/d18-receipt-parity.test.ts', 'lib/remote-mcp-auth-matrix.test.ts', 'lib/remote-mcp-facade.test.ts', 'lib/remote-mcp-facade.ts', 'lib/remote-mcp-injection.test.ts', 'lib/remote-mcp-output-limit.test.ts', 'lib/remote-mcp-protocol.test.ts', 'lib/remote-mcp-readiness.test.ts', 'lib/remote-mcp-readiness.ts', 'lib/remote-mcp-refresh.test.ts']),
+    unitFiles: Object.freeze(['lib/d18-receipt-parity.test.ts', 'lib/remote-mcp-auth-matrix.test.ts', 'lib/remote-mcp-facade.test.ts', 'lib/remote-mcp-injection.test.ts', 'lib/remote-mcp-output-limit.test.ts', 'lib/remote-mcp-protocol.test.ts', 'lib/remote-mcp-readiness.test.ts', 'lib/remote-mcp-refresh.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // tenant-isolation: D05, D15-3 and D24-3: tenant-key and same-bytes/distinct-ACL contracts, adversarial negatives, the fresh ACL read, the log guard.
+  'tenant-isolation': Object.freeze({
+    paths: Object.freeze(['lib/adversarial-acl-negatives.test.ts', 'lib/connector-critical-read.test.ts', 'lib/connector-critical-read.ts', 'lib/no-sensitive-log.test.ts', 'lib/same-bytes-distinct-acl.test.ts', 'lib/tenant-key-contract.test.ts']),
+    unitFiles: Object.freeze(['lib/adversarial-acl-negatives.test.ts', 'lib/connector-critical-read.test.ts', 'lib/no-sensitive-log.test.ts', 'lib/same-bytes-distinct-acl.test.ts', 'lib/tenant-key-contract.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // billing-reconciliation: D24-5, D27-2/3 and D28-3/4: Paddle reads and reconciliation, revenue paths, settlement economics and the local webhook
+  // replay. The operator CLI's suite is an .mjs Vitest file the repair runner does not register; ci.yml runs it (verified claim).
+  // Known gap: lib/billing-webhook-replay.db.test.ts runs only its adapter half here; its replay half needs TAVONEL_LOCAL_DSN, which no workflow sets.
+  'billing-reconciliation': Object.freeze({
+    paths: Object.freeze(['lib/billing-webhook-replay.db.test.ts', 'lib/paddle-api.test.ts', 'lib/paddle-api.ts', 'lib/paddle-reconciliation.test.ts', 'lib/paddle-reconciliation.ts', 'lib/revenue-paths.test.ts', 'lib/revenue-paths.ts', 'lib/settlement-economics.test.ts', 'lib/settlement-economics.ts', 'lib/testing/postgrest-rpc-psql.ts', 'scripts/billing/paddle-reconcile.mjs', 'scripts/billing/paddle-reconcile.test.mjs']),
+    unitFiles: Object.freeze(['lib/billing-gate-enforcement.test.ts', 'lib/billing-refund-request.test.ts', 'lib/billing-webhook-replay.db.test.ts', 'lib/paddle-api.test.ts', 'lib/paddle-reconciliation.test.ts', 'lib/revenue-paths.test.ts', 'lib/settlement-economics.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({
+      'scripts/billing/paddle-reconcile.test.mjs': CI_NEXTJS_VITEST_CLAIM,
+    }),
+  }),
+  // v34-home (WO-CI-2, WO-CI-5b): the Home drop guard and the V34 Home spec. home-page.test.ts renders home.tsx, which mounts the guard;
+  // upload-entry.spec.ts drops a file on the hero and outside it; home-v34.spec.ts runs itself.
+  'v34-home': Object.freeze({
+    paths: Object.freeze(['components/v34/routes/home/home-drop-guard.tsx', 'e2e/home-v34.spec.ts']),
+    unitFiles: Object.freeze(['lib/v34/home-page.test.ts']),
+    browserFiles: Object.freeze(['e2e/home-v34.spec.ts', 'e2e/upload-entry.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-changes-contract (WO-CI-11): the compiler contract section of /changes. routes-changes.test.ts renders ChangesBody, which
+  // imports it; compiler-contract.spec.ts asserts its eight clauses on /changes.
+  'v34-changes-contract': Object.freeze({
+    paths: Object.freeze(['components/v34/routes/changes/changes-contract.tsx']),
+    unitFiles: Object.freeze(['lib/v34/routes-changes.test.ts']),
+    browserFiles: Object.freeze(['e2e/compiler-contract.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-catalog (WO-CAT): the login client, the checkout quote and the catalog suites. cta-truth.test.ts imports the login client and
+  // six more suites read its source; checkout-quote.test.ts and checkout-customer-data-gate.test.ts call the checkout route that uses
+  // the quote; the two catalog suites run themselves; login-capability.spec.ts opens /login.
+  'v34-catalog': Object.freeze({
+    paths: Object.freeze(['app/login/login-client.tsx', 'lib/billing-catalog.test.ts', 'lib/checkout-quote.test.ts', 'lib/checkout-quote.ts', 'lib/plan-limit-fit.test.ts']),
+    unitFiles: Object.freeze(['lib/billing-catalog.test.ts', 'lib/brand-copy.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-quote.test.ts', 'lib/cta-truth.test.ts', 'lib/funnel-events.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/plan-limit-fit.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts', 'lib/recipe-intent.test.ts']),
+    browserFiles: Object.freeze(['e2e/login-capability.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-repointed-specs (WO-CI-5c): two legacy specs repointed onto V34 routes; each runs itself, on the project its skips allow.
+  'v34-repointed-specs': Object.freeze({
+    paths: Object.freeze(['e2e/resources-filter.spec.ts', 'e2e/ultimate-mobile-a11y.spec.ts']),
+    unitFiles: Object.freeze([]),
+    browserFiles: Object.freeze(['e2e/resources-filter.spec.ts', 'e2e/ultimate-mobile-a11y.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-qa-harness (lane F-qa, L6): the V34 matrix helpers, the matrix and the harness's self-test. The self-test imports every helper
+  // and runs in the Repair browser stage under v34-selftest; the matrix runs under v34-chromium in production mode, its SEO and
+  // held-route passes (run-repair-check.mjs browserRunOptionsByProject).
+  'v34-qa-harness': Object.freeze({
+    paths: Object.freeze(['e2e/support/v34-contrast.ts', 'e2e/support/v34-keyboard.ts', 'e2e/support/v34-measure.ts', 'e2e/support/v34-passes.ts', 'e2e/support/v34-receipt.ts', 'e2e/support/v34-seo.ts', 'e2e/support/v34-world.ts', 'e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts']),
+    unitFiles: Object.freeze([]),
+    browserFiles: Object.freeze(['e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // db-harness (L5, L7): the local database harness and the race harnesses. Their seven node:test suites run without a DSN and with
+  // no skip, through the Repair Node runner; each imports, spawns or reads (pgtap-subset.sql) its own script.
+  'db-harness': Object.freeze({
+    paths: Object.freeze(['scripts/db/agent-grant-race.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/pgtap-subset.sql', 'scripts/db/run-sql-tests.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.mjs', 'scripts/db/world-transition-race.test.mjs']),
+    unitFiles: Object.freeze(['scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // agent-proposals (WO-AN-1): the agent access contract, its import-free consent module and the read-MCP isolation tripwire.
+  // agent-access.test.ts imports both modules; agent-mcp-isolation.test.ts imports the tripwire script.
+  'agent-proposals': Object.freeze({
+    paths: Object.freeze(['lib/agent-access.test.ts', 'lib/agent-access.ts', 'lib/agent-consent.ts', 'lib/agent-mcp-isolation.test.ts', 'scripts/agent-mcp-isolation.mjs']),
+    unitFiles: Object.freeze(['lib/agent-access.test.ts', 'lib/agent-mcp-isolation.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+});
+// Owners for paths two running lanes add, fixed by their work orders (agent-native.md, WO-AN-2 and WO-AN-3 "Repair-scope request").
+// None of these paths exists at this head. Each owner is its own group, selected only by a change to its own paths, so a suite it
+// names that is absent today can only be selected by the change that adds it; until then the map is unchanged. The suites the work
+// orders ask existing owners to add (lib/agent-grants.test.ts for the remote-mcp group) wait for the refresh after those lanes merge:
+// naming an absent suite in an existing owner would fail every change to that owner now.
+export const V34_PROGRAM_PENDING_OWNERS = Object.freeze({
+  // proposals-decision-path (WO-AN-2): lookup by id and the signed action receipt, with the proposals suites and the route matrices.
+  'proposals-decision-path': Object.freeze({
+    paths: Object.freeze(['app/api/proposals/[id]/route.ts', 'lib/action-receipt-signing.test.ts', 'lib/action-receipt-signing.ts']),
+    unitFiles: Object.freeze(['lib/action-receipt-signing.test.ts', 'lib/change-proposals-panel.test.ts', 'lib/change-proposals-routes.test.ts', 'lib/change-proposals.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/route-classification.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // agent-grants (WO-AN-3): the agent grant, its credential routes and the agent dispatch scope, with the agent proposals suites.
+  'agent-grants': Object.freeze({
+    paths: Object.freeze(['app/api/agent-grants/[id]/route.ts', 'app/api/agent-grants/route.ts', 'app/api/internal/agent-grants/revoke-all/route.ts', 'lib/agent-grants.test.ts', 'lib/agent-grants.ts', 'lib/agent-mcp-dispatch.ts']),
+    unitFiles: Object.freeze(['lib/agent-access.test.ts', 'lib/agent-grants.test.ts', 'lib/agent-mcp-isolation.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/route-classification.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+});
+// D-4 and WO-AN-1: the program's four pgTAP files run in the affected SQL fixture job whenever any SQL changes, not only in the full
+// rehearsal. Fixtures that build a SQL-bearing head take this list, never a copy of it.
+export const DATABASE_CONTRACT_DATABASE_TESTS = Object.freeze(['supabase/tests/agent_proposals.sql', 'supabase/tests/foundation_page_meter.sql', 'supabase/tests/library_label_decisions.sql', 'supabase/tests/world_change_proposals.sql']);
 export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('public-marketing-surface', new RegExp(`^(?:${exactPathAlternation(PUBLIC_MARKETING_AFFECTED_PATHS)})$`),
     { unitFiles: PUBLIC_MARKETING_AFFECTED_UNIT_FILES, browserFiles: PUBLIC_MARKETING_AFFECTED_BROWSER_FILES }),
@@ -3357,7 +3580,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // The exact global Vitest config only: selector/static checks, distinct from the Home owner; its content must pass
   // vitestDiscoveryConfigFailures at head or the map fails closed.
   affectedGroup('shared-test-discovery', /^nextjs\/vitest\.config\.ts$/, { selector: true }),
-  affectedGroup('database-contract', /^supabase\/(?:migrations|tests|drafts)\/[A-Za-z0-9_./-]+\.sql$/, { unitFiles: ['lib/pgtap-fixtures.test.ts'], database: true }),
+  affectedGroup('database-contract', /^supabase\/(?:migrations|tests|drafts)\/[A-Za-z0-9_./-]+\.sql$/, { unitFiles: ['lib/pgtap-fixtures.test.ts'], database: true, databaseTests: DATABASE_CONTRACT_DATABASE_TESTS }),
   affectedGroup('native-harness-docs', /^docs\/integration\/NATIVE_WORLD_[A-Z_]+\.md$/),
   affectedGroup('repository-docs', /^(?:docs\/(?!integration\/NATIVE_WORLD_)[A-Za-z0-9_./-]+\.md|[A-Za-z0-9_.-]+\.md)$/, { nativeReuse: true }),
   // ask-answerability-e2: the 10 exact paths above select 2 direct suites and no browser suite.
@@ -3372,6 +3595,8 @@ export const AFFECTED_GROUPS = Object.freeze([
   // large-source-intake-copy (ADR-0006): the 4 exact paths above select 4 direct suites and no browser suite.
   affectedGroup('large-source-intake-copy', new RegExp(`^(?:${exactPathAlternation(LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS)})$`),
     { unitFiles: LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES }),
+  ...Object.entries({ ...V34_PROGRAM_AFFECTED_OWNERS, ...V34_PROGRAM_PENDING_OWNERS }).map(([group, { paths, unitFiles, browserFiles, externalChecks }]) =>
+    affectedGroup(group, new RegExp(`^nextjs/(?:${exactPathAlternation(paths)})$`), { unitFiles, browserFiles, externalChecks, requireExecutedCheck: true })),
 ]);const regularModes = ['100644', '100755'];
 
 export function parseAffectedRawDiff(output) {
@@ -3392,11 +3617,117 @@ export function parseAffectedRawDiff(output) {
   return records;
 }
 
-export function buildAffectedMap({ headSha, records, headHasFile = () => true, readHeadFile = () => null }) {
+// One job's steps from a workflow file, read as text: { steps: [{ run, conditional, rebound }], conditional, nextjsDefault, needs }, with
+// each run command folded to one line, or null when the job is absent. needs is null when the job's needs list is not an inline name or
+// [a, b] list. Only the shapes this repository's workflows use are read (an inline
+// run, a `>-`/`>` folded block, a `|` literal block); any other shape yields a run that matches no claim, so the claim is refused.
+function workflowJobSteps(text, job) {
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const jobsAt = lines.indexOf('jobs:'), start = lines.findIndex((line, index) => jobsAt >= 0 && index > jobsAt && line === `  ${job}:`);
+  if (start < 0) return null;
+  const next = lines.findIndex((line, index) => index > start && /^ {0,2}[A-Za-z0-9_-]+:/.test(line));
+  const body = lines.slice(start + 1, next < 0 ? lines.length : next), jobText = body.join('\n'), steps = [];
+  for (const [index, line] of body.entries()) {
+    if (!line.startsWith('      - ')) continue;
+    const end = body.findIndex((candidate, at) => at > index && (candidate.startsWith('      - ') || /^ {0,5}\S/.test(candidate)));
+    const step = body.slice(index, end < 0 ? body.length : end).map((candidate, at) => at === 0 ? '        ' + candidate.slice(8) : candidate);
+    const runAt = step.findIndex(candidate => candidate.startsWith('        run:'));
+    let run = null;
+    if (runAt >= 0) {
+      const inline = step[runAt].slice('        run:'.length).trim();
+      if (!['', '>', '>-', '|', '|-'].includes(inline)) run = inline;
+      else {
+        const block = [];
+        for (const candidate of step.slice(runAt + 1)) { if (candidate.trim() && !candidate.startsWith('          ')) break; if (candidate.trim()) block.push(candidate.trim()); }
+        run = block.join(inline.startsWith('|') ? '\n' : ' ');
+      }
+    }
+    steps.push({ run, conditional: step.some(candidate => /^ {8}(?:if|continue-on-error):/.test(candidate)), rebound: step.some(candidate => /^ {8}(?:working-directory|shell|env):/.test(candidate)) });
+  }
+  const needsAt = /^ {4}needs:(.*)$/m.exec(jobText)?.[1].trim(), needsList = needsAt === undefined ? '' : /^\[([A-Za-z0-9_, -]*)\]$/.exec(needsAt)?.[1] ?? (/^[A-Za-z0-9_-]+$/.test(needsAt) ? needsAt : null);
+  const needs = needsList === null ? null : needsList.split(',').map(name => name.trim()).filter(Boolean);
+  return { steps, conditional: /^ {4}(?:if|continue-on-error):/m.test(jobText), nextjsDefault: /^ {4}defaults:\n {6}run:\n {8}working-directory: nextjs$/m.test(jobText), needs };
+}
+const globSource = glob => '^' + glob.split('**/').map(part => part.split('*').map(text => text.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*')).join('(?:[^/]+/)*') + '$';
+// Two claims are one claim when they hold the same keys and values, in any key order.
+const canonicalClaim = claim => JSON.stringify(claim && typeof claim === 'object' && !Array.isArray(claim) ? Object.fromEntries(Object.keys(claim).sort().map(key => [key, claim[key]])) : claim);
+// A spec that skips itself unless the project is in a literal list runs nothing in any other project. Only this literal form is read:
+// test.skip(![...].includes(testInfo.project.name)). Any other skip condition (a variable list, ===/!==, a helper) is not detected.
+const SELF_SKIP_PROJECTS = /test\.skip\(\s*!\s*\[([^\]]*)\]\.includes\(\s*testInfo\.project\.name\s*\)/g;
+// Why a claim that another workflow runs `file` (a path under nextjs/) is refused at head; [] when the named job and its exact,
+// unconditional step do run it. `read` returns a repository-root path's head text, or null when it is absent. Every shape this reader
+// has not reviewed is refused, and whatever the head text holds, the answer is a refusal with this prefix, never an exception.
+export function externalCheckClaimFailures(file, claim, read) {
+  try { return claimFailures(file, claim, read); }
+  catch (error) { return [`external check claim refused for ${file}: the claim could not be read at head (${error instanceof Error ? error.message : String(error)})`]; }
+}
+function claimFailures(file, claim, read) {
+  const failures = [], refuse = reason => { failures.push(`external check claim refused for ${file}: ${reason}`); return failures; };
+  if (!claim || typeof claim !== 'object' || !['playwright', 'vitest'].includes(claim.kind) || !/^\.github\/workflows\/[A-Za-z0-9_.-]+\.yml$/.test(claim.workflow ?? '')
+    || typeof claim.job !== 'string' || typeof claim.run !== 'string' || !claim.run) return refuse('not a structured workflow claim');
+  const workflow = read(claim.workflow);
+  if (typeof workflow !== 'string') return refuse(`${claim.workflow} is absent or unreadable at head`);
+  const lf = workflow.replace(/\r\n/g, '\n');
+  if (!/^on:\s*$/m.test(lf) || !/^ {2}pull_request:/m.test(lf)) return refuse(`${claim.workflow} does not run on pull_request`);
+  // A bare `pull_request:` with nothing under it: a paths, branches or types filter can keep the job from running on a PR.
+  if (!/^ {2}pull_request:[ \t]*\n(?! {3})/m.test(lf)) return refuse(`${claim.workflow} narrows its pull_request trigger`);
+  const job = workflowJobSteps(lf, claim.job);
+  if (!job) return refuse(`${claim.workflow} has no job ${claim.job}`);
+  if (job.conditional || !job.nextjsDefault) return refuse(`job ${claim.job} is conditional or does not run in nextjs/`);
+  if (job.needs === null) return refuse(`job ${claim.job} has a needs list this check cannot read`);
+  // ponytail: one level of needs is read; a needed job's own needs are not followed.
+  for (const need of job.needs) { const needed = workflowJobSteps(lf, need); if (!needed || needed.conditional) return refuse(`job ${claim.job} needs ${need}, which is absent or conditional`); }
+  const steps = job.steps.filter(step => step.run === claim.run);
+  if (steps.length !== 1 || steps[0].conditional) return refuse(`job ${claim.job} has no single unconditional step running: ${claim.run}`);
+  if (steps[0].rebound) return refuse(`the step running ${claim.run} sets its own directory, shell or environment`);
+  const tokens = claim.run.split(/\s+/);
+  if (claim.kind === 'playwright') {
+    if (tokens.slice(0, 4).join(' ') !== 'pnpm exec playwright test' || !tokens.includes(`--project=${claim.project}`)) return refuse(`the step does not run Playwright project ${claim.project}`);
+    if (tokens.some(token => /^(?:-g|--grep|--grep-invert|--last-failed|--only-changed)(?:=|$)/.test(token) || (/\.spec\.ts$/.test(token) && token !== file))) return refuse('the step filters its specs');
+    const source = read('nextjs/playwright.config.ts');
+    if (typeof source !== 'string') return refuse('nextjs/playwright.config.ts is absent or unreadable at head');
+    const config = source.replace(/\r\n/g, '\n'), name = file.split('/').at(-1);
+    if ((config.match(/\btestDir\s*:/g) ?? []).length !== 1 || !/^ {2}testDir: "\.\/e2e",$/m.test(config)) return refuse('playwright.config.ts no longer reads its specs from ./e2e alone');
+    if (/\b(?:grep|grepInvert|shard)\s*:/.test(config)) return refuse('playwright.config.ts filters tests by grep or shard');
+    // undefined: declared, but not a valid regex literal; null: not declared in the reviewed form.
+    const literal = constant => { const found = new RegExp(`^const ${constant} = /(.+)/;$`, 'm').exec(config); if (!found) return null; try { return new RegExp(found[1]); } catch { return undefined; } };
+    const auditSpecs = literal('auditSpecs'), v34Specs = literal('v34Specs');
+    const widths = /^const widths = \[([0-9, ]+)\] as const;$/m.exec(config)?.[1].split(',').map(width => width.trim()) ?? [];
+    if (auditSpecs === undefined || v34Specs === undefined) return refuse('playwright.config.ts declares auditSpecs or v34Specs as a regex literal that is not a valid regex literal');
+    if (!auditSpecs || !v34Specs) return refuse('playwright.config.ts no longer declares auditSpecs and v34Specs as regex literals');
+    const spec = read(`nextjs/${file}`);
+    if (typeof spec !== 'string') return refuse(`nextjs/${file} is absent or unreadable at head`);
+    for (const [, list] of spec.matchAll(SELF_SKIP_PROJECTS)) {
+      const allowed = [...list.matchAll(/(["'])([^"'\\]*)\1/g)].map(match => match[2]);
+      if (!allowed.includes(claim.project)) return refuse(`the spec skips itself outside projects ${allowed.join(', ')}, so project ${claim.project} runs none of it`);
+    }
+    if ([...widths, 'reduced-motion'].includes(claim.project)) {
+      if ((config.match(/testIgnore: \[\/launch-qa\.\*\\\.spec\\\.ts\/, auditSpecs, v34Specs\],/g) ?? []).length !== 2) return refuse('the width and reduced-motion projects no longer share the reviewed testIgnore');
+      if (/launch-qa.*\.spec\.ts/.test(name) || auditSpecs.test(name) || v34Specs.test(name)) return refuse(`project ${claim.project} ignores it`);
+    } else if (claim.project === 'audit') {
+      if (!/name: "audit",\n\s+testMatch: auditSpecs,/.test(config) || !auditSpecs.test(name)) return refuse('project audit does not match it');
+    } else return refuse(`project ${claim.project} is not a reviewed Product QA project`);
+  } else {
+    if (claim.run !== 'pnpm test') return refuse('a Vitest claim must name the step `pnpm test`');
+    let test;
+    try { test = JSON.parse(read('nextjs/package.json') ?? 'null')?.scripts?.test; } catch { test = undefined; }
+    if (typeof test !== 'string' || !/^vitest run(?: &&|$)/.test(test)) return refuse('nextjs/package.json test no longer starts with a bare `vitest run`');
+    const vitest = read('nextjs/vitest.config.ts');
+    if (typeof vitest === 'string' && /\bexclude\s*:/.test(vitest)) return refuse('nextjs/vitest.config.ts excludes files from the shared include');
+    // The include directly under `test: {`, never an earlier or nested one (a coverage include admits nothing to the run).
+    const testBlock = typeof vitest === 'string' ? vitest.replace(/\r\n/g, '\n').split('\n  test: {\n')[1] : undefined;
+    const include = typeof testBlock === 'string' ? /^ {4}include: \[([^\]]*)\]/m.exec(testBlock)?.[1] : null;
+    const globs = include ? [...include.matchAll(/"([^"]+)"/g)].map(match => match[1]) : [];
+    if (!globs.some(glob => new RegExp(globSource(glob)).test(file))) return refuse('the shared Vitest include does not admit it');
+  }
+  return failures;
+}
+
+export function buildAffectedMap({ headSha, records, headHasFile = () => true, readHeadFile = () => null, affectedGroups = AFFECTED_GROUPS }) {
   if (!sha(headSha)) throw new Error('Affected map requires an exact head SHA.');
   const failures = [], entries = [], unmappedPaths = [];
   const groups = new Set(), unitFiles = new Set(), browserFiles = new Set(), databaseTests = new Set(), invalidatingPaths = new Set();
-  const dependencyReasons = new Map();
+  const dependencyReasons = new Map(), externalChecks = new Map(), externalConflicts = new Set(), unexecuted = new Set();
   let worker = false, selector = false, database = false, discoveryConfig = false;
   for (const { oldMode, newMode, status, paths } of records) {
     const label = paths.join(' -> ');
@@ -3411,7 +3742,7 @@ export function buildAffectedMap({ headSha, records, headHasFile = () => true, r
         failures.push(`unsupported path spelling: ${JSON.stringify(path)}`);
         continue;
       }
-      const owners = AFFECTED_GROUPS.filter(owner => owner.match.test(path));
+      const owners = affectedGroups.filter(owner => owner.match.test(path));
       if (!owners.length) { failures.push(`unmapped changed endpoint: ${path}`); unmappedPaths.push(path); continue; }
       if (!owners.every(owner => owner.nativeReuse)) invalidatingPaths.add(path);
       discoveryConfig ||= path === VITEST_DISCOVERY_CONFIG_PATH;
@@ -3421,6 +3752,14 @@ export function buildAffectedMap({ headSha, records, headHasFile = () => true, r
         for (const file of owner.browserFiles) browserFiles.add(file);
         for (const file of owner.databaseTests ?? []) databaseTests.add(file);
         for (const [file, reason] of Object.entries(owner.databaseDependencies ?? {})) dependencyReasons.set(file, new Set([...(dependencyReasons.get(file) ?? []), reason]));
+        for (const [file, claim] of Object.entries(owner.externalChecks ?? {})) {
+          const known = externalChecks.get(file);
+          if (known && canonicalClaim(known.claim) !== canonicalClaim(claim)) externalConflicts.add(`owners ${known.group} and ${owner.group} name different runners for one external check: ${file}`);
+          else if (!known) externalChecks.set(file, { group: owner.group, claim });
+        }
+        // An owner that must execute something and selects nothing executable fails closed; an external check never counts.
+        if (owner.requireExecutedCheck && !owner.unitFiles.length && !owner.browserFiles.length && !(owner.databaseTests ?? []).length)
+          unexecuted.add(`owner ${owner.group} selects no check the Repair job executes: ${path}`);
         worker ||= Boolean(owner.worker);
         selector ||= Boolean(owner.selector);
         database ||= Boolean(owner.database);
@@ -3437,6 +3776,14 @@ export function buildAffectedMap({ headSha, records, headHasFile = () => true, r
   }
   for (const file of [...databaseTests].sort()) {
     if (!headHasFile(file)) failures.push(`selected database fixture is absent at head: ${file}`);
+  }
+  failures.push(...[...unexecuted].sort(), ...[...externalConflicts].sort());
+  // A suite only another workflow runs is still named and required at head, and its claim is read against the head's workflow,
+  // Playwright and Vitest config; a claim that does not hold is refused. It is recorded, never executed, inherited or counted.
+  const headText = new Map(), readClaimSource = path => { if (!headText.has(path)) headText.set(path, headHasFile(path) ? readHeadFile(path) : null); return headText.get(path); };
+  for (const file of [...externalChecks.keys()].sort()) {
+    if (!headHasFile(`nextjs/${file}`)) failures.push(`named external owner check is absent at head: ${file}`);
+    else failures.push(...externalCheckClaimFailures(file, externalChecks.get(file).claim, readClaimSource));
   }
   // Either rename endpoint or a deletion of the shared discovery config still requires its admitted content at head.
   if (discoveryConfig) {
@@ -3465,7 +3812,8 @@ export function buildAffectedMap({ headSha, records, headHasFile = () => true, r
     databaseChanged: database,
     databaseTests: [...databaseTests].sort(),
     databaseDependencyReasons,
-    fixtureContracts: AFFECTED_GROUPS.filter((owner, index, owners) => groups.has(owner.group) && owner.fixtureContract && owners.findIndex(candidate => candidate.group === owner.group && candidate.fixtureContract?.suite === owner.fixtureContract.suite) === index)
+    externalChecks: [...externalChecks.keys()].sort().map(file => ({ file, runner: externalChecks.get(file).claim, status: 'claim read at head: the named job and step run it; neither executed, inherited nor counted by this map' })),
+    fixtureContracts: affectedGroups.filter((owner, index, owners) => groups.has(owner.group) && owner.fixtureContract && owners.findIndex(candidate => candidate.group === owner.group && candidate.fixtureContract?.suite === owner.fixtureContract.suite) === index)
       .map(owner => ({ group: owner.group, ...owner.fixtureContract, enforcement: 'selected as a required executed-passing suite; the declared case count is recorded, not asserted' })),
     nativeEvidence: {
       disposition: fresh ? NATIVE_FRESH_RUN_REQUIRED : NATIVE_HISTORICAL_INPUT_REUSE,

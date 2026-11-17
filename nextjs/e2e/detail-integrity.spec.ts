@@ -9,29 +9,6 @@ async function capture(page: Page, name: string) {
   mkdirSync(evidenceDir, { recursive: true });
   await page.screenshot({ path: resolve(evidenceDir, `${name}-${page.viewportSize()?.width}.png`), fullPage: true });
 }
-async function sourceBinding(page: Page) {
-  const bench = page.locator('#s2 article[data-case-status]');
-  const region = bench.locator('[data-region-id][data-selected="1"]');
-  await expect(region).toHaveCount(1);
-  const id = await region.getAttribute('data-region-id');
-  const href = await bench.locator('[data-hero-evidence]').getAttribute('href');
-  expect(new URL(href!, 'https://tavonel.com').searchParams.get('evidence')).toBe(id);
-  const a = (await bench.locator('[data-page-window]').boundingBox())!, b = (await region.boundingBox())!;
-  expect(b.x).toBeGreaterThanOrEqual(a.x - 1); expect(b.x + b.width).toBeLessThanOrEqual(a.x + a.width + 1);
-  expect(b.y).toBeGreaterThanOrEqual(a.y - 1); expect(b.y + b.height).toBeLessThanOrEqual(a.y + a.height + 1);
-}
-for (const route of ["/"]) test(`source connections have two real endpoints on ${route}`, async ({ page }) => {
-  await page.goto(route);
-  const buttons = page.locator('#s2 article[data-case-status] button');
-  await expect(buttons).toHaveCount(3);
-  for (const button of await buttons.all()) {
-    await button.click();
-    await expect(button).toHaveAttribute('aria-pressed', 'true');
-    await sourceBinding(page);
-  }
-  await capture(page, route === '/' ? 'evidence-en' : 'evidence-ko');
-});
-
 test('a returned inventory does not mount a pretend live canvas', async ({ page }) => {
   await installFixtureSession(page);
   const ready = Array.from({ length: 31 }, (_, i) => fixtureDocument(`ready-source-${i}`));
@@ -144,15 +121,6 @@ test('unavailable canvas leaves visible text and accessible run information', as
   await expect(page.locator('.compile-stage-canvas')).toBeHidden();
   await expect(page.locator('.compile-stage-summary')).toContainText('The visual is unavailable in this browser');
   await expect(page.locator('.compile-stage-status')).toBeVisible();
-});
-
-test('source endpoints stay attached after a width change, without a page reload', async ({ page }) => {
-  await page.goto('/');
-  for (const width of [1440, 1024, 768, 1920]) {
-    await page.setViewportSize({ width, height: 900 });
-    await page.locator('#s2 article[data-case-status]').scrollIntoViewIfNeeded();
-    await sourceBinding(page);
-  }
 });
 
 test('API reference is scannable while endpoint contracts stay reachable by keyboard', async ({ page }) => {

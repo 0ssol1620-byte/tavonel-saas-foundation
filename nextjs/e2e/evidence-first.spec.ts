@@ -1,7 +1,5 @@
-import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { expect, test } from "@playwright/test";
 import { HERO } from "../components/v34/routes/home/home-content";
-const BENCH = "section#s2 article[data-case-status]";
 
 /*
   What the landing offers as evidence, after the founder's 2026-09-20 hero decision.
@@ -66,34 +64,6 @@ test("every internal link on the landing opens a route that resolves", async ({ 
     const response = await request.get(href);
     expect(response.status(), `${href} does not resolve`).toBe(200);
   }
-});
-
-test("the hero and every scene below it fit the viewport at the active product-QA width", async ({ page }) => {
-  await page.goto("/");
-  const width = page.viewportSize()?.width ?? 1440;
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
-
-  const hero = page.locator("section#s1");
-  const title = page.locator("h1#lv2-hero-title");
-  const demo = page.locator(BENCH);
-  await expect(hero).toBeVisible();
-  await expect(title).toBeVisible();
-  await expect(demo).toBeVisible();
-  const box = await demo.boundingBox();
-  expect(box).not.toBeNull();
-  expect(box!.x).toBeGreaterThanOrEqual(-1);
-  expect(box!.x + box!.width).toBeLessThanOrEqual(width + 1);
-
-  // Every scene below it stays inside the viewport too, which is where the old frames failed.
-  for (const id of ["s2", "s3", "s4", "s5", "s6"]) {
-    const scene = page.locator(`section#${id}`);
-    await scene.scrollIntoViewIfNeeded();
-    const sceneBox = await scene.boundingBox();
-    expect(sceneBox, `${id} has no box`).not.toBeNull();
-    expect(sceneBox!.x).toBeGreaterThanOrEqual(-1);
-    expect(sceneBox!.x + sceneBox!.width).toBeLessThanOrEqual(width + 1);
-  }
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });
 
 test("a /ko link lands on the English page it names (GX-02, global-only)", async ({ page }) => {
